@@ -170,6 +170,7 @@ test('v8 では新しい一覧（FM94M）が出て、管理画面 は出ない',
   expect(host?.querySelector('[data-design-node="WuKzU"]')).toBeNull()
   expect(host?.textContent).toContain('差し込んでいる所')
   expect(host?.textContent).toContain('問い合わせ先')
+  expect(host?.querySelector('[data-page-template="list"] [data-template-region="content"]')?.textContent).toContain('問い合わせ先')
 })
 
 // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。

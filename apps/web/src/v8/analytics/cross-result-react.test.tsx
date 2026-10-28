@@ -84,3 +84,10 @@ it('閲覧者の期間操作は残し、分析保存は表示しない', async (
   expect(screen.queryByRole('button', { name: '対象者を開く' })).toBeNull()
   expect(screen.getByText('結果の保存と対象者づくりは、統括・管理者だけが行えます。')).toBeTruthy()
 })
+
+it('友だち情報欄がないときは実際の項目作成へ案内し、集計を勝手に始めない', async () => {
+  render(<CrossV8 accountId="account-1" canManage />)
+  const addField = await screen.findByRole('link', { name: '友だち情報の項目を追加' })
+  expect(addField.getAttribute('href')).toBe('/tags/fields/new')
+  expect(net.run).not.toHaveBeenCalled()
+})

@@ -56,6 +56,7 @@ describe('公開の状態（WEB318/319）', () => {
     net.setEventLifecycle.mockResolvedValue({ lifecycle_status: 'paused' })
     render(<EditEventPage />)
     const pause = await screen.findByRole('button', { name: '一時停止する' })
+    expect(pause.closest('[data-template-region="content"]')?.closest('[data-page-template="detail"]')).toBeTruthy()
     net.getEvent.mockResolvedValue({ id: 'ev-1', lifecycle_status: 'paused', is_published: 1 })
     await act(async () => { pause.click() })
     const reason = document.body.querySelector('textarea') as HTMLTextAreaElement

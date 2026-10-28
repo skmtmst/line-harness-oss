@@ -272,6 +272,7 @@ describe('V8 自動応答の通し：作る→止める→再開する', () => {
     renderNode(<AutoRepliesPage />)
     await flush()
     const creates = screen.getAllByRole('button', { name: '＋ ルールを作る' })
+    expect(screen.getByText('流れの型').closest('[data-template-region="content"]')?.closest('[data-page-template="list"]')).toBeTruthy()
     expect(creates.length).toBeGreaterThan(0)
     // 絵  の「＋ ルールを作る ▾」は、くわしく作る／かんたんに作るを選ぶ窓を開く。
     act(() => { creates[0].click() })
@@ -340,6 +341,7 @@ describe('V8 自動応答の通し：作って有効にする', () => {
       await goStep('step=trigger')
       fireEvent.click(screen.getByRole('button', { name: /^次へ：/ }))
       const keywordInput = screen.getByLabelText('反応する言葉を足す')
+      expect(keywordInput.closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
       await waitFor(() => expect(document.activeElement).toBe(keywordInput))
       expect(keywordInput.getAttribute('aria-invalid')).toBe('true')
       expect(screen.getAllByText('反応する言葉を入れてください')).toHaveLength(1)

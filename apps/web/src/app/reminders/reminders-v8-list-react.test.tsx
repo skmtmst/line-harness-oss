@@ -137,6 +137,9 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   })
   // 見本が決めた帯と見出し
   expect(host.textContent).toContain('リマインダを作る')
+  const createLinks = [...host.querySelectorAll('a')].filter(link => link.textContent?.trim() === '＋ リマインダを作る')
+  expect(createLinks.length).toBeGreaterThan(0)
+  expect(createLinks.map(link => link.getAttribute('href'))).toEqual(createLinks.map(() => '/reminders/new'))
   expect(host.textContent).toContain('有効')
   expect(host.textContent).toContain('これから送る')
   expect(host.textContent).toContain('今月送った')

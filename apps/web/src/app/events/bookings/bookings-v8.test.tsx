@@ -73,6 +73,7 @@ vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/tes
 }))
 
 import BookingsV8 from '@/v8/events/bookings'
+import BookingsPage from './page'
 
 const v8css = readFileSync(join(process.cwd(), 'src/v8/events/bookings.module.css'), 'utf8')
 const v8tsx = readFileSync(join(process.cwd(), 'src/v8/events/bookings.tsx'), 'utf8')
@@ -361,7 +362,8 @@ describe('V8-B 申込者（Mu8qW）', () => {
   })
 
   it('開催回の見せ方で数と表が出る', async () => {
-    await renderV8()
+    await act(async () => { root.render(<BookingsPage />) })
+    await flush()
     expect(document.querySelector('[data-design-node="Mu8qW"]'), '板IDの枠がある').toBeTruthy()
     expect(document.body.textContent).toContain('秋のしつけ教室')
     expect(document.body.textContent).toContain('申込者')
@@ -371,6 +373,7 @@ describe('V8-B 申込者（Mu8qW）', () => {
     expect(document.body.textContent).toContain('初参加')
     expect(document.body.textContent).toContain('過去のイベント参加あり')
     expect(document.body.textContent).toContain('加藤 舞')
+    expect(host.querySelector('[data-page-template="detail"] [data-template-region="content"]')?.textContent).toContain('加藤 舞')
   })
 
   it('開催回の入口は曜日と時刻を1つのボタンで示し、選ぶ窓を開ける', async () => {

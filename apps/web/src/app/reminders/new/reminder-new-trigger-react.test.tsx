@@ -137,6 +137,7 @@ describe('起点の実在候補選択', () => {
       const select = screen.getByLabelText('基準日に使う情報欄') as HTMLSelectElement
       const labels = [...select.options].map((option) => option.textContent)
       expect(labels).toContain('誕生日')
+      expect(select.closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
       expect(labels).toContain('契約終了日')
       expect(labels).not.toContain('自由メモ')
     })

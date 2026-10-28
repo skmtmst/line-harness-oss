@@ -237,8 +237,9 @@ describe('V8 ウェビナーの編集', () => {
 
   it('作る手順の段（④通知）：5段の帯から別の段へ移れる', async () => {
     nav.search = 'id=webinar-1&pane=notifications'
-    await render(<WebinarEditV8 />)
+    await render(<EditPage />)
     expect(host.textContent).toContain('通知と視聴後のこと')
+    expect(host.querySelector('[data-page-template="create"] [data-template-region="content"]')?.textContent).toContain('通知とリマインド')
     expect(host.querySelector('[aria-current="step"]')?.textContent).toContain('通知')
     expect(host.querySelector('[aria-label="設定済みの内容"]')?.textContent).toContain('動画あり・配信枠 1件')
     const video = host.querySelector('[aria-label="動画を変える"]') as HTMLButtonElement | null

@@ -146,6 +146,8 @@ describe('m19d 一覧の状態ますに申込条件を畳む', () => {
     expect(heads.some((head) => head?.startsWith('状態'))).toBe(true)
     const rows = [...document.querySelectorAll('tbody tr')]
     expect(rows).toHaveLength(2)
+    expect(rows[0].closest('[data-template-region="content"]')?.closest('[data-page-template="list"]')).toBeTruthy()
+    expect(rows[0].textContent).toContain('体験レッスン')
     // 状態のますは後ろから2番目（最後は操作）。
     const stateOf = (row: Element) => row.querySelectorAll('td')[4]
     expect(stateOf(rows[0]).textContent).toContain('公開中')
