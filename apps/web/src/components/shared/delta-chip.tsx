@@ -1,5 +1,5 @@
 import { Children, isValidElement, type ReactNode } from 'react'
-import { TrendingDown, TrendingUp, TriangleAlert } from 'lucide-react'
+import { TriangleAlert } from 'lucide-react'
 import styles from './delta-chip.module.css'
 
 function textOf(node: ReactNode): string {
@@ -24,6 +24,7 @@ export function isZeroDelta(children: ReactNode): boolean {
  *
  * 前より増えた・減った・要確認、を小さな色付きの札で出す。
  * 数のマス（KPI）の横などに置く。良い＝緑、悪い＝赤、要確認＝黄。
+ * 数の向きは符号、良し悪しは色で示し、矢印の向きと色を混同させない。
  */
 export default function DeltaChip({
   tone,
@@ -37,11 +38,17 @@ export default function DeltaChip({
   children: React.ReactNode
 }) {
   if (tone !== 'attention' && isZeroDelta(children)) return null
-  const Icon = tone === 'attention' ? TriangleAlert : (direction ?? tone) === 'up' ? TrendingUp : TrendingDown
+  const text = textOf(children).trimStart()
+  const hasMagnitude = /^[+＋−\-±]?(?:[¥￥$€£]\s*)?\d/u.test(text)
+  // 既に符号がある文字・未知の値・説明文は変えず、符号なしの数だけ補う。
+  const sign = tone !== 'attention' && /^(?:[¥￥$€£]\s*)?\d/u.test(text)
+    ? (direction ?? tone) === 'up' ? '+' : '−'
+    : ''
   return (
     <span className={[styles.root, styles[tone]].join(' ')}>
-      <Icon size={16} aria-hidden="true" className={tone === 'attention' ? styles.attentionIcon : undefined} />
-      <span>{children}</span>
+      {tone === 'attention' ? <TriangleAlert size={16} aria-hidden="true" className={styles.attentionIcon} /> : null}
+      <span>{sign}{children}</span>
+      {tone !== 'attention' && hasMagnitude ? <span data-delta-word className={styles.word}>{tone === 'up' ? '改善' : '悪化'}</span> : null}
     </span>
   )
 }
