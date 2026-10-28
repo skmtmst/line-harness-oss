@@ -174,7 +174,7 @@ describe('リッチメニューを作る：候補の読み込み', () => {
     const alert = screen.getByText(/候補の読み込みに失敗しました（タグ・フォーム）/)
     expect(alert).toBeTruthy()
     const before = calls.filter((path) => path.startsWith('/api/tags')).length
-    const retry = within(alert.closest('[data-part], [role="alert"], [role="status"], div')!.parentElement!).getByRole('button', { name: 'もう一度読み込む' })
+    const retry = within(alert.closest('[data-design-part="notice"]') as HTMLElement).getByRole('button', { name: 'もう一度読み込む' })
     await act(async () => { fireEvent.click(retry) })
     await settle()
     const tagCalls = calls.filter((path) => path.startsWith('/api/tags'))

@@ -159,7 +159,7 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
   test('使用先の各行が個別の編集・詳細画面へ行く', async () => {
     await renderDetailAndWait()
 
-    const hrefs = screen.getAllByText('開く').map((el) => el.closest('a')?.getAttribute('href'))
+    const hrefs = screen.getAllByText('使用画面へ').map((el) => el.closest('a')?.getAttribute('href'))
     expect(hrefs).toEqual([
       '/auto-replies/edit?id=ar-1',
       '/scenarios/detail?id=sc-1',
@@ -194,7 +194,7 @@ describe('テンプレート詳細の使用先リンク (#891 N-143)', () => {
     expect(screen.getByText('前日案内')).toBeTruthy()
     expect(screen.getByText('版1で固定')).toBeTruthy()
     expect(screen.getByText('送信待ち')).toBeTruthy()
-    const hrefs = screen.getAllByText('開く').map((el) => el.closest('a')?.getAttribute('href'))
+    const hrefs = screen.getAllByText('使用画面へ').map((el) => el.closest('a')?.getAttribute('href'))
     expect(hrefs).toEqual(['/reminders/detail?id=re-1'])
   })
 })
@@ -235,7 +235,7 @@ describe('テンプレート一覧の差し替え導線 (#891 N-135)', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: '使っている所をすべて見る' }))
     cleanup()
     await renderDetailAndWait()
-    expect(screen.getAllByText('開く').map((el) => el.closest('a')?.getAttribute('href'))).toEqual([
+    expect(screen.getAllByText('使用画面へ').map((el) => el.closest('a')?.getAttribute('href'))).toEqual([
       '/auto-replies/edit?id=ar-1', '/scenarios/detail?id=sc-1', '/reminders/edit?id=re-1',
       '/rich-menus/edit?id=rg-1', '/inflow-links/detail?id=tl-1',
     ])

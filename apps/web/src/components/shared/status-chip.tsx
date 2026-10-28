@@ -1,5 +1,6 @@
 import React from 'react'
 import StatusBadge, { type StatusBadgeTone } from './status-badge'
+import styles from './status-chip.module.css'
 
 /** 設計 B（★管理画面「監査の直し」）の6つの状態。画面ごとの言い方はやめ、これに寄せる。 */
 export type StatusChipStatus = 'draft' | 'ready' | 'reserved' | 'running' | 'paused' | 'ended'
@@ -43,20 +44,23 @@ export default function StatusChip({
   status,
   size = 'compact',
   withHelp = false,
+  defaultAccount = false,
 }: {
   status: StatusChipStatus
   size?: 'default' | 'compact'
   /** 札の意味を「？」に入れる（1つの札だけの場所で使う。表の行ごとは付けない）。 */
   withHelp?: boolean
+  /** 既定アカウントの行き先を示す小さな札。状態とは別に表示する。 */
+  defaultAccount?: boolean
 }) {
   return (
-    <StatusBadge
+    <span className={styles.group} data-status-chip-group><StatusBadge
       tone={TONE[status]}
       size={size}
       help={withHelp ? STATUS_CHIP_HELP[status] : undefined}
       helpLabel={LABEL[status]}
     >
       {LABEL[status]}
-    </StatusBadge>
+    </StatusBadge>{defaultAccount ? <StatusBadge tone="neutral" dot={false} size={size}>既定</StatusBadge> : null}</span>
   )
 }

@@ -19,32 +19,37 @@ import {
 const NOW = '2026-09-29T15:48:00Z'
 
 describe('★管理画面 日付と数の書き方（板 ZzBqa §2）', () => {
-  it('日時は今年なら M月D日（曜）H:mm、秒も年も出さない', () => {
-    expect(formatDateTime('2026-09-29T15:48:00Z', '—', NOW)).toBe('2026年9月30日 00:48')
-    expect(formatDateTime('2026-09-29T15:48:59Z', '—', NOW)).toBe('2026年9月30日 00:48')
+  it('日時は今年なら M月D日 H:mm、秒も年も出さない', () => {
+    expect(formatDateTime('2026-09-29T15:48:00Z', '—', NOW)).toBe('9月30日 00:48')
+    expect(formatDateTime('2026-09-29T15:48:59Z', '—', NOW)).toBe('9月30日 00:48')
   })
 
-  it('年が違うときだけ頭に YYYY年 を付ける', () => {
-    expect(formatDateTime('2025-04-03T01:00:00Z', '—', NOW)).toBe('2025年4月3日 10:00')
+  it('今年と前年は年を省き、それより古い年には YYYY年 を付ける', () => {
+    expect(formatDateTime('2025-04-03T01:00:00Z', '—', NOW)).toBe('4月3日 10:00')
+    expect(formatDateTime('2024-04-03T01:00:00Z', '—', NOW)).toBe('2024年4月3日 10:00')
   })
 
   it('PCの地域に左右されない（UTC入力が必ずJSTで出る）', () => {
-    expect(formatDateTime('2026-09-30T15:00:00Z', '—', NOW)).toBe('2026年10月1日 00:00')
+    expect(formatDateTime('2026-09-30T15:00:00Z', '—', NOW)).toBe('10月1日 00:00')
   })
 
   it('日付だけは M月D日（曜）', () => {
     expect(formatDay('2026-10-03T15:00:00Z', '—', NOW)).toBe('10月4日（日）')
-    expect(formatDay('2025-04-03T01:00:00Z', '—', NOW)).toBe('2025年4月3日（木）')
+    expect(formatDay('2025-04-03T01:00:00Z', '—', NOW)).toBe('4月3日（木）')
+    expect(formatDay('2024-04-03T01:00:00Z', '—', NOW)).toBe('2024年4月3日（水）')
   })
 
-  it('近い時刻: たった今・◯分前・◯時間前・昨日・◯日前・7日より前は日付', () => {
+  it('近い時刻: 24時間以内は たった今・◯分前・◯時間前、それより前は M月D日 H:mm', () => {
     expect(formatRelative('2026-09-29T15:48:00Z', NOW)).toBe('たった今')
     expect(formatRelative('2026-09-29T15:45:00Z', NOW)).toBe('3分前')
     expect(formatRelative('2026-09-29T10:48:00Z', NOW)).toBe('5時間前')
-    // 昨日 18:02 JST = 2026-09-28 09:02 UTC
-    expect(formatRelative('2026-09-28T15:10:00Z', NOW)).toBe('昨日 0:10')
-    expect(formatRelative('2026-09-26T15:48:00Z', NOW)).toBe('3日前')
-    expect(formatRelative('2026-09-20T15:48:00Z', NOW)).toBe('9月21日（月）')
+    expect(formatRelative('2026-09-28T15:49:00Z', NOW)).toBe('23時間前')
+    expect(formatRelative('2026-09-28T15:48:00Z', NOW)).toBe('24時間前')
+    expect(formatRelative('2026-09-28T15:47:59Z', NOW)).toBe('9月29日 00:47')
+    expect(formatRelative('2026-09-28T15:47:00Z', NOW)).toBe('9月29日 00:47')
+    expect(formatRelative('2026-09-28T15:10:00Z', NOW)).toBe('9月29日 00:10')
+    expect(formatRelative('2025-09-20T15:48:00Z', NOW)).toBe('9月21日 00:48')
+    expect(formatRelative('2024-09-20T15:48:00Z', NOW)).toBe('2024年9月21日 00:48')
   })
 
   it('期間は同じ月なら後ろの月を省く', () => {
@@ -97,9 +102,10 @@ describe('★管理画面 日付と数の書き方（板 ZzBqa §2）', () => {
 
 // UTCの日付とJSTの日付が違う境界・前年・無効値を守る。
 describe('一覧と詳細の書式', () => {
-  it('一覧は今年の日時を短く、別の年は年を出す', () => {
+  it('一覧は前年まで年を省き、さらに古い年と未来年は年を出す', () => {
     expect(formatListDateTime('2026-10-08T01:12:00Z', '—', NOW)).toBe('10/08 10:12')
-    expect(formatListDateTime('2025-10-08T01:12:00Z', '—', NOW)).toBe('2025/10/08')
+    expect(formatListDateTime('2025-10-08T01:12:00Z', '—', NOW)).toBe('10/08 10:12')
+    expect(formatListDateTime('2024-10-08T01:12:00Z', '—', NOW)).toBe('2024/10/08 10:12')
     expect(formatListDay('2026-10-07T15:00:00Z', '—', NOW)).toBe('10/08')
     expect(formatListDateTime('invalid')).toBe('—')
   })

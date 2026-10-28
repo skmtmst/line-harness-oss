@@ -1,12 +1,6 @@
 /*
- * 対応が必要な受信の行き先リンクは、見出しの行の右端に1つ
- *（CardHeader の action、actionTone="info"）。
- *
- * 以前は見出しの2行目に独自の文字色・大きさ（text-info text-xs
- * font-semibold）で矢印なしに置いていて、ほかのカードの
- * 「さらに詳しく →」「アクセス解析へ →」「すべて見る →」と見た目が
- * ずれていた。更新時刻はリンクと同じ行に押し込まず、見出しの脇か
- * 別行に残す。
+ * 対応が必要な受信の更新時刻と表の右端。行き先リンク（「受信箱へ」）の
+ * 置き場所と形は pending-inbox-identity.test.tsx で描いて確かめる。
  */
 
 import { readFileSync } from 'node:fs'
@@ -23,19 +17,6 @@ function code(source: string): string {
 }
 
 describe('対応が必要な受信の行き先リンク', () => {
-  it('CardHeader の action に「受信箱をすべて見る →」を置く', () => {
-    const body = code(CARD)
-    expect(body).toContain('action={<Link href="/chats"')
-    expect(body).toContain('受信箱をすべて見る →')
-    expect(body).toContain('actionTone="info"')
-  })
-
-  it('見出しの2行目に独自の文字色・大きさのリンクを置かない', () => {
-    const body = code(CARD)
-    expect(body).not.toContain('受信箱をすべて見る</Link>')
-    expect(body).not.toMatch(/text-info text-xs font-semibold/)
-  })
-
   it('更新時刻はリンクと同じ行に押し込まない', () => {
     const body = code(CARD)
     // 更新時刻の行は右寄せの1行で、リンクを含まない。

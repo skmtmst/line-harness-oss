@@ -25,7 +25,7 @@ describe('版の表示の組み立て（m18e）', () => {
     expect(lines).toEqual({
       short: 'v2.7.0・検証環境',
       line1: 'Ver. 2.7.0（a1b2c3d）',
-      line2: '2026年9月27日 13:05 配備・検証環境',
+      line2: '9月27日 13:05 配備・検証環境',
     })
   })
 
@@ -69,7 +69,7 @@ describe('版の表示の組み立て（m18e）', () => {
     })
     expect(lines?.short).toBe('v0.24.0・本番環境')
     expect(lines?.line1).toBe('Ver. 0.24.0')
-    expect(lines?.line2).toBe('2026年9月27日 13:05 配備・本番環境')
+    expect(lines?.line2).toBe('9月27日 13:05 配備・本番環境')
   })
 
   it('日時が変なときは日時を出さない。日時も環境も無ければ1行だけ', () => {

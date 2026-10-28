@@ -73,7 +73,7 @@ describe('メニューの下の版の表示（m18e・設計E）', () => {
     act(() => { details?.querySelector('summary')?.click() })
     expect(details?.open).toBe(true)
     expect(host.textContent).toContain('Ver. 2.7.0（a1b2c3d）')
-    expect(host.textContent).toContain('2026年9月27日 13:05 配備・検証環境')
+    expect(host.textContent).toContain('9月27日 13:05 配備・検証環境')
     expect(host.textContent).not.toContain('版の情報なし')
     expect(host.querySelector('a[href="/updates"]')?.textContent).toBe('手動で更新')
   })

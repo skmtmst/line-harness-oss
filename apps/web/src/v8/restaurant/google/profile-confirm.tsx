@@ -180,7 +180,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
       <p className={styles.muted}>{`対象店舗：${store.name} / ${isHours ? store.timeZone : `変更する項目：${FIELD_LABEL[field ?? ''] ?? ''}`}`}</p>
       {ids.length > 1 ? <p className={styles.muted}>{index + 1} / {formatNumber(ids.length)}件目</p> : null}
       {sent ? <Notice tone="success">{sent.alreadyApplied ? 'この内容はすでにGoogleに反映されていました。送信はしていません。' : change.status === 'applied' ? 'Googleに変更を送信し、反映を確認しました。' : 'Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します。審査・同期に時間がかかることがあります。'}</Notice> : null}
-      {conflict !== null ? <Notice tone="danger" action={<Button variant="text" onClick={() => go({ tab: 'profile' })}>最新の内容を確認する</Button>}>
+      {conflict !== null ? <Notice tone="warn" role="alert" action={<Button variant="text" onClick={() => go({ tab: 'profile' })}>最新の内容を確認する</Button>}>
         別の担当者が{isHours ? '営業時間' : 'この項目'}を変更しました。古い値で上書きしないため送信を止めました。Google側の現在の値：{isHours ? describeHours(conflict, change.kind) : describeProfileValue(field ?? '', conflict)}
       </Notice> : null}
       {change.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。「Googleに変更を送信する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}

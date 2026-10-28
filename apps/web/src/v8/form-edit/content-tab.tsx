@@ -526,7 +526,7 @@ function BookingFields({ block, refs, set, portable = false }: { block: FormInpu
         <p className={styles.bookingInfoText}>空いている枠は「予約」の営業時間と担当の予定から出します。入った予約は予約の一覧に入り、リマインダも動きます。</p>
         <TextLink external href="/booking/menus" className={styles.bookingLink}>
 
-          予約の設定を開く
+          予約メニューへ
         </TextLink>
       </div>
     </>

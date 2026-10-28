@@ -480,7 +480,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
         </LinePreviewMessage>
       )}
       {preview.unresolved.length > 0 ? (
-        <Notice tone="danger" >値を確認できない差し込みがあります：{preview.unresolved.map((key) => `{{${key}}}`).join('、')}</Notice>
+        <Notice tone="warn" role="alert">値を確認できない差し込みがあります：{preview.unresolved.map((key) => `{{${key}}}`).join('、')}</Notice>
       ) : null}
     </LinePreview>
   )

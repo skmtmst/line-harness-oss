@@ -51,7 +51,7 @@ describe('operator/new の受け取る人', () => {
     await flush()
     expect(await screen.findByText('受け取る人がいません')).toBeTruthy()
     expect(screen.getByText('スタッフを登録し、LINE連携が済んだ人が宛先になります。')).toBeTruthy()
-    const guide = screen.getByRole('link', { name: 'ログインユーザーでスタッフを確認する' })
+    const guide = screen.getByRole('link', { name: 'ログインユーザー' })
     expect(guide.getAttribute('href')).toBe('/staff')
   })
 

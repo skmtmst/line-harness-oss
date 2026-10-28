@@ -177,12 +177,12 @@ describe('日時', () => {
     expect(parseJstDateTime('2026-09-12T12:40:00Z').toISOString()).toBe('2026-09-12T12:40:00.000Z')
   })
 
-  it('「9/12 21:40」と、日で丸めた相対表示', () => {
+  it('今年の日付と、24時間以内だけ相対表示', () => {
     const now = new Date('2026-09-12T13:00:00Z') // 日本時間 22:00
-    expect(shortDateTime('2026-09-12T21:40:00.000', now)).toBe('2026年9月12日 21:40')
+    expect(shortDateTime('2026-09-12T21:40:00.000', now)).toBe('9月12日 21:40')
     expect(relativeUpdated('2026-09-12T21:57:00.000', now)).toBe('3分前')
-    expect(relativeUpdated('2026-09-11T21:40:00.000', now)).toBe('昨日 21:40')
-    expect(relativeUpdated('2026-09-05T10:00:00.000', now)).toBe('9月5日（土）')
+    expect(relativeUpdated('2026-09-11T21:40:00.000', now)).toBe('9月11日 21:40')
+    expect(relativeUpdated('2026-09-05T10:00:00.000', now)).toBe('9月5日 10:00')
   })
 })
 

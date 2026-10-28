@@ -322,7 +322,7 @@ export function ConnectionCard({ connected, testMode, checkedAt, accountIdTail, 
         {canEdit && onReconnect ? <Button onClick={onReconnect}>つなぎ直す</Button> : null}
       </div> : null}
       {/* 記録・届いた知らせへの入口（絵 FcGmv に無い。前の右の欄 T91bV から移した＝絵を直す）。 */}
-      {connected ? <p className={styles.links}><TextLink href="/booking/menus?tab=payments&view=records">お支払いの記録を見る</TextLink><TextLink href="/booking/menus?tab=payments&view=events">Stripe から届いた知らせを見る</TextLink></p> : null}
+      {connected ? <p className={styles.links}><TextLink href="/booking/menus?tab=payments&view=records">お支払いの記録へ</TextLink><TextLink href="/booking/menus?tab=payments&view=events">Stripe から届いた知らせへ</TextLink></p> : null}
     </section>
   )
 }

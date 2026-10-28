@@ -89,7 +89,7 @@ describe('N-434: 7日間ログインを保持する選択', () => {
     await render()
 
     expect(host.querySelector('[role="alert"]')?.textContent).toBe(
-      'LINEログインを完了できませんでした。もう一度お試しください。',
+      '失敗：LINEログインを完了できませんでした。もう一度お試しください。',
     )
   })
 
