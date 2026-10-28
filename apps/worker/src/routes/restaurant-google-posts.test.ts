@@ -367,6 +367,39 @@ describe('書き込みガード', () => {
     expect(r.status).toBe(400);
     expect((r.json as { code?: string }).code).toBe('confirmation_required');
   });
+
+  it('検証環境では指定アカウントの投稿作成だけを許可し、削除は止める', async () => {
+    env.DEPLOY_ENV = 'staging';
+    env.GOOGLE_BUSINESS_WRITE_ENABLED = 'false';
+    env.GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID = 'account-2';
+    const draft = await createDraft();
+    const detail = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
+    expect(await detail.json()).toMatchObject({ writeEnabled: true });
+    const published = await publish(draft.json.post!.id);
+    expect(published.status).toBe(200);
+    expect(createCalls()).toHaveLength(1);
+    const removed = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/remove`, {
+      body: { confirmed: true },
+    });
+    expect(removed.status).toBe(403);
+    expect((await removed.json()) as { code: string }).toMatchObject({ code: 'write_disabled' });
+  });
+
+  it.each([
+    ['staging', ''],
+    ['staging', 'account-1'],
+    ['production', 'account-2'],
+  ])('対象外では投稿も停止する（環境=%s、許可先=%s）', async (deployEnv, accountId) => {
+    env.DEPLOY_ENV = deployEnv;
+    env.GOOGLE_BUSINESS_WRITE_ENABLED = 'false';
+    env.GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID = accountId;
+    const draft = await createDraft();
+    const detail = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
+    expect(await detail.json()).toMatchObject({ writeEnabled: false });
+    const result = await publish(draft.json.post!.id);
+    expect(result.status).toBe(403);
+    expect(createCalls()).toHaveLength(0);
+  });
 });
 
 describe('公開（GB-14）', () => {
@@ -590,6 +623,18 @@ describe('Instagram 同時投稿', () => {
       permalink: 'https://www.instagram.com/p/abc123/',
       error: null,
     });
+  });
+
+  it('検証環境の投稿専用許可でもGoogleとInstagramへ1回ずつ出す', async () => {
+    env.DEPLOY_ENV = 'staging';
+    env.GOOGLE_BUSINESS_WRITE_ENABLED = 'false';
+    env.GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID = 'account-2';
+    await seedInstagramConnection();
+    const result = await publishWithInstagram();
+    expect(result.status).toBe(200);
+    expect(createCalls()).toHaveLength(1);
+    expect(graphPaths()).toEqual(['ig-1/media', 'ig-1/media_publish', 'ig-media-1']);
+    expect((await instagramOf(result.id)).instagram.status).toBe('published');
   });
 
   it('Instagram用の文章を入れたときはそちらを使う', async () => {
