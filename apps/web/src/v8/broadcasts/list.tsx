@@ -158,7 +158,7 @@ function BroadcastResultCells({ broadcast, insight, narrow }: { broadcast: ApiBr
     )
   }
   return (
-    <Td>
+    <Td align="right">
       {delivered === null ? <span className={styles.cellMain}>{emptyValue('unknown')}</span> : (
         <>
           <span className={styles.resultMain}>{delivered}</span>
