@@ -8,7 +8,7 @@ afterEach(cleanup)
 it('カーソルの現在地だけを表示し、前・次の既存操作へ渡す', () => {
   const previous = vi.fn(), next = vi.fn()
   render(<CursorPagination page={3} pageSize={20} shown={8} total={48} hasNext={false} onPrevious={previous} onNext={next} />)
-  expect(screen.getByText('48件中 41〜48件')).toBeTruthy()
+  expect(screen.getByText('48件中 41〜48件（全3ページ）')).toBeTruthy()
   expect(screen.getByLabelText('3ページ目').tagName).toBe('SPAN')
   expect(screen.queryByLabelText('1ページ目へ')).toBeNull()
   fireEvent.click(screen.getByLabelText('前のページ'))
@@ -17,13 +17,13 @@ it('カーソルの現在地だけを表示し、前・次の既存操作へ渡�
   expect(next).not.toHaveBeenCalled()
 })
 
-it('1ページでも枠を出し、次のカーソルがある時だけ進む', () => {
+it('1ページは件数だけ残し、次のカーソルがある時だけ進む', () => {
   const previous = vi.fn(), next = vi.fn()
   const props = { page: 1, pageSize: 20, shown: 5, total: 5, onPrevious: previous, onNext: next }
   const { rerender } = render(<CursorPagination {...props} hasNext={false} />)
   expect(screen.getByText('5件中 1〜5件')).toBeTruthy()
-  fireEvent.click(screen.getByLabelText('前のページ'))
-  fireEvent.click(screen.getByLabelText('次のページ'))
+  expect(screen.queryByLabelText('前のページ')).toBeNull()
+  expect(screen.queryByLabelText('次のページ')).toBeNull()
   expect(previous).not.toHaveBeenCalled()
   expect(next).not.toHaveBeenCalled()
   rerender(<CursorPagination {...props} total={25} hasNext />)
@@ -37,4 +37,10 @@ it('処理中の移動を止め、未取得の総数を0と表示しない', () 
   expect(screen.getByText('—件中 1〜3件')).toBeTruthy()
   fireEvent.click(screen.getByLabelText('次のページ'))
   expect(next).not.toHaveBeenCalled()
+})
+
+it('総数が不明ならページ総数を推測せず、番号への移動口も作らない', () => {
+ const {container}=render(<CursorPagination page={2} pageSize={20} shown={20} total={null} hasNext onPrevious={vi.fn()} onNext={vi.fn()} />)
+ expect(container.textContent).not.toContain('全3ページ')
+ expect(screen.queryByLabelText('3ページ目へ')).toBeNull()
 })

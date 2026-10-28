@@ -171,13 +171,13 @@ test('ページ送りの今のページは薄い灰の地＋太字、ほかの�
       const other = [...nav.querySelectorAll('button')].find(el => /^\d+$/.test(el.textContent.trim()) && el !== current)
       const [previous, next] = [nav.querySelector('button[aria-label*="前"]'), nav.querySelector('button[aria-label*="次"]')]
       const ink = getComputedStyle(document.documentElement).getPropertyValue('--color-ink').trim()
-      const probe = document.createElement('span'); probe.style.color = ink; document.body.append(probe)
-      const inkRgb = getComputedStyle(probe).color; probe.remove()
-      return { current: look(current), other: look(other), previous: { ...look(previous), disabled: previous.disabled }, next: { ...look(next), disabled: next.disabled }, inkRgb }
+      const probe = document.createElement('span'); probe.style.color = ink; probe.style.backgroundColor = 'var(--color-canvas-sunken)'; document.body.append(probe)
+      const inkRgb = getComputedStyle(probe).color, selectedBgRgb = getComputedStyle(probe).backgroundColor; probe.remove()
+      return { current: look(current), other: look(other), previous: { ...look(previous), disabled: previous.disabled }, next: { ...look(next), disabled: next.disabled }, inkRgb, selectedBgRgb }
     })
     const row = await read()
     const label = JSON.stringify(row)
-    assert.equal(row.current.bg, 'rgb(238, 240, 243)', `今のページは薄い灰の地 ${label}`)
+    assert.equal(row.current.bg, row.selectedBgRgb, `今のページは薄い灰の地 ${label}`)
     assert.equal(row.current.color, row.inkRgb, `今のページの数字は黒 ${label}`)
     assert.equal(row.current.weight, '700', label)
     assert.equal(row.current.shadow, 'none', label)
