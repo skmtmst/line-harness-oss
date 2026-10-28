@@ -31,9 +31,12 @@ vi.mock('next/link', async () => {
   const React = await import('react')
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement('a', { href, ...props }, children) }
 })
-vi.mock('@/lib/api', () => ({
-  api: { notifications: { center: { list: fixture.list, markRead: fixture.markRead, markAllRead: fixture.markAllRead } } },
-}))
+vi.mock('@/lib/api', async (original) => {
+  const actual = await original<typeof import('@/lib/api')>()
+  return { ...actual, api: { ...actual.api, notifications: { ...actual.api.notifications,
+    center: { ...actual.api.notifications.center, list: fixture.list, markRead: fixture.markRead, markAllRead: fixture.markAllRead },
+  } } }
+})
 vi.mock('@/components/shared/toast', async (original) => ({ ...(await original<object>()), notifyToast: fixture.toast, notifySaved: fixture.toast }))
 
 import TopBar from '@/components/shared/top-bar'
@@ -68,7 +71,7 @@ function centerData(items: NotificationCenterItem[]) {
 }
 
 function Harness({ accountId = 'account-1', accounts = [], withPopover = true }: { accountId?: string | null; accounts?: Array<{ id: string; label: string }>; withPopover?: boolean }) {
-  const [unread, setUnread] = useState(3)
+  const [unread, setUnread] = useState<number | null>(3)
   return (
     <TopBar
       title="ホーム"
@@ -80,7 +83,7 @@ function Harness({ accountId = 'account-1', accounts = [], withPopover = true }:
       onLogout={() => {}}
       notificationUnreadCount={unread}
       renderNotifications={withPopover ? (popover) => (
-        <BellNotifications popover={popover} accountId={accountId} accounts={accounts} onAccountChange={fixture.changeAccount} onUnreadChange={setUnread} />
+        <BellNotifications popover={popover} target={accountId ? { kind: 'store', accountId } : accounts.length ? { kind: 'all' } : { kind: 'none' }} accounts={accounts} onAccountChange={fixture.changeAccount} onUnreadChange={setUnread} />
       ) : undefined}
       v8Chrome
       chromeVariant="shell"
@@ -88,7 +91,7 @@ function Harness({ accountId = 'account-1', accounts = [], withPopover = true }:
   )
 }
 
-const bell = () => screen.getByRole('button', { name: /^通知(（未読 \d+ 件）)?$/ })
+const bell = () => screen.getByRole('button', { name: /^通知(?:（.*）)?$/ })
 
 async function openPopover() {
   await act(async () => { fireEvent.click(bell()) })
@@ -298,17 +301,100 @@ describe('★V8 ベルの小窓', () => {
     expect(fixture.toast).toHaveBeenCalled()
   })
 
-  it('統括で一部のアカウントの既読処理が失敗したら未読数を戻して知らせる', async () => {
+  it('統括で一部の既読処理が失敗したら読み直し、成功した店を未読に戻さない', async () => {
+    let saved = false
+    fixture.list.mockImplementation(async (accountId: string) => centerData([item('same', { isRead: saved && accountId === 'account-1' })]))
     fixture.markAllRead.mockImplementation(async (accountId: string) => accountId === 'account-2'
       ? { success: false, error: '保存できませんでした' }
-      : { success: true, data: { updated: 3 } })
+      : (saved = true, { success: true, data: { updated: 1 } }))
     render(<Harness accountId={null} accounts={[{ id: 'account-1', label: '本店' }, { id: 'account-2', label: '渋谷店' }]} />)
     const dialog = await openPopover()
-    await within(dialog).findByText('未読 6')
+    await within(dialog).findByText('未読 2')
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'すべて既読にする' })) })
-    await within(dialog).findByText('未読 6')
+    await within(dialog).findByText('未読 1')
+    expect(fixture.list).toHaveBeenCalledTimes(4)
     expect(fixture.markAllRead.mock.calls.map(([id]) => id)).toEqual(['account-1', 'account-2'])
     expect(fixture.toast).toHaveBeenCalledWith('通知をまとめて既読にできませんでした。', expect.objectContaining({ tone: 'error' }))
+  })
+
+  it('通知を押して閉じた後の既読失敗も知らせ、札をサーバーの未読へ戻す', async () => {
+    let finish!: (result: { success: boolean; error: string }) => void
+    fixture.markRead.mockReturnValue(new Promise((resolve) => { finish = resolve }))
+    render(<Harness />)
+    const dialog = await openPopover()
+    await within(dialog).findByText('未読 3')
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /EC連携が止まった/ })) })
+    expect(screen.queryByRole('dialog', { name: '通知' })).toBeNull()
+    expect(bell().getAttribute('aria-label')).toBe('通知（未読 2 件）')
+    await act(async () => { finish({ success: false, error: 'failed' }) })
+    await waitFor(() => expect(bell().getAttribute('aria-label')).toBe('通知（未読 3 件）'))
+    expect(fixture.toast).toHaveBeenCalledWith('通知を既読にできませんでした。', { tone: 'error' })
+  })
+
+  it('店を替えたあとの古い既読失敗は新しい店の札や知らせを変えない', async () => {
+    let finish!: (result: { success: boolean; error: string }) => void
+    fixture.markRead.mockReturnValue(new Promise((resolve) => { finish = resolve }))
+    const view = render(<Harness />)
+    const dialog = await openPopover()
+    await within(dialog).findByText('未読 3')
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /EC連携が止まった/ })) })
+    view.rerender(<Harness accountId="account-2" />)
+    fixture.list.mockResolvedValue(centerData([item('new-store')]))
+    const nextDialog = await openPopover()
+    await within(nextDialog).findByText('未読 1')
+    await act(async () => { finish({ success: false, error: 'old failed' }) })
+    expect(bell().getAttribute('aria-label')).toBe('通知（未読 1 件）')
+    expect(fixture.toast).not.toHaveBeenCalled()
+  })
+
+  it('同じIDの別店の通知を取り違えず、指定した店だけ既読にする', async () => {
+    fixture.list.mockImplementation(async (id: string) => centerData([item('same', { title: `店${id}` })]))
+    render(<Harness accountId={null} accounts={[{ id: 'account-1', label: '本店' }, { id: 'account-2', label: '渋谷店' }]} />)
+    const dialog = await openPopover()
+    await within(dialog).findByText('未読 2')
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: /渋谷店：店account-2/ })) })
+    expect(fixture.markRead).toHaveBeenCalledExactlyOnceWith('same', 'account-2')
+  })
+
+  it('既読失敗後の再読込も失敗したとき、未取得の数を0件にしない', async () => {
+    fixture.markAllRead.mockResolvedValue({ success: false, error: 'failed' })
+    render(<Harness />)
+    const dialog = await openPopover()
+    await within(dialog).findByText('未読 3')
+    fixture.list.mockResolvedValue({ success: false, error: '読めません' })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'すべて既読にする' })) })
+    await waitFor(() => expect(bell().getAttribute('aria-label')).toBe('通知（未読数を確認できません）'))
+    expect(within(dialog).queryByText('未読 0')).toBeNull()
+  })
+
+  it.each(['single', 'all'])('%s既読の保留中にタブを替えたら、失敗後も現在のタブで再取得し旧応答を捨てる', async (mode) => {
+    let finishMutation!: (value: { success: boolean; error: string }) => void
+    const pendingMutation = new Promise((resolve) => { finishMutation = resolve })
+    if (mode === 'single') fixture.markRead.mockReturnValue(pendingMutation)
+    else fixture.markAllRead.mockReturnValue(pendingMutation)
+    let finishOld!: (value: ReturnType<typeof centerData>) => void
+    const oldResponse = new Promise(resolve => { finishOld = resolve })
+    let holdOld = false
+    fixture.list.mockImplementation(async (_id: string, query: { category?: string }) => query.category === 'error'
+      ? centerData([item('system', { title: '現在のシステム行' })])
+      : holdOld ? oldResponse : centerData([item('all', { title: '最初のすべて行' })]))
+    render(<Harness />)
+    let dialog = await openPopover()
+    await within(dialog).findByText('最初のすべて行')
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: mode === 'single' ? /最初のすべて行/ : 'すべて既読にする' })) })
+    holdOld = true
+    if (mode === 'single') dialog = await openPopover()
+    else await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '未読' })) })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'システム' })) })
+    await within(dialog).findByText('現在のシステム行')
+    const beforeRecovery = fixture.list.mock.calls.length
+    await act(async () => { finishMutation({ success: false, error: 'failed' }) })
+    await waitFor(() => expect(fixture.list).toHaveBeenCalledTimes(beforeRecovery + 1))
+    expect(fixture.list).toHaveBeenLastCalledWith('account-1', { category: 'error', limit: 50 })
+    await act(async () => { finishOld(centerData([item('old', { title: '遅れた旧タブの行' })])) })
+    expect(await within(dialog).findByText('現在のシステム行')).toBeTruthy()
+    expect(within(dialog).queryByText('遅れた旧タブの行')).toBeNull()
+    expect(within(dialog).queryByText('最初のすべて行')).toBeNull()
   })
 
   it('閉じた小窓の遅い読込結果はベルの未読数を変えない', async () => {
