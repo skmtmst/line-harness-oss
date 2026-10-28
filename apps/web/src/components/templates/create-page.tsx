@@ -44,7 +44,7 @@ export interface CreatePageProps extends PageHeadingProps {
    * 入力欄と右の列の余白の口。渡さなければ型の既定（入力欄 上下 24・左右 28・段の間 16、右の列 24）。
    * `'flush-top'` は板の頭のすぐ下から始める絵（両方とも上 4・左右 24・下 24、入力欄の段の間 28。
    * E-9 統括の一括配信 p17Qku）。画面の CSS で型の余白を上書きせず、ここで選ぶ。
-   * `'notice-after-preview'` は狭幅のプレビュー操作の次がNoticeのとき、その上余白だけで間隔を持つ。広幅は既定のまま。
+   * `'notice-after-preview'` は先頭Noticeと直前の表示面を8pxで離す。狭幅のプレビュー操作と広幅のタブの両方へ適用する。
    * `'notice-after-read-only'` は閲覧帯と本文先頭のNoticeが直に続くとき、後者の上余白だけで間隔を持つ。
    */
   contentSpacing?: 'flush-top' | 'notice-after-preview' | 'notice-after-read-only'
