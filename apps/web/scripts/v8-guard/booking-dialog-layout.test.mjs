@@ -54,6 +54,7 @@ createRoot(document.getElementById('root')).render(globalThis.slotFixture?<SlotF
     })
   } }],
 })
+const paint = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
 const css = [await compileUiStyles(new URL('../../src/app/globals.css', import.meta.url).pathname), ...sheets].join('\n')
 
 async function mount(page, width, slots = false) {
@@ -113,8 +114,10 @@ for (const width of [1152,1440]) test(`予約と窓の文字が切れず、状�
       const menu=card.lastElementChild.firstElementChild.getBoundingClientRect(),meta=card.lastElementChild.lastElementChild,rect=meta.getBoundingClientRect()
       meta.style.transition='none';meta.style.setProperty('transform',`translateX(-${rect.left-menu.right+Math.min(menu.width,rect.width)/2}px)`,'important')
     })
+    await paint(page)
     assert.equal(await metaOverlap(),true,JSON.stringify(await page.locator('button[data-placement="timeline"]').first().evaluate(card=>{const m=card.lastElementChild.lastElementChild;return {message:'札をメニューへ重ねる故障を検知する',display:getComputedStyle(m).display,transform:getComputedStyle(m).transform,menu:card.lastElementChild.firstElementChild.getBoundingClientRect().toJSON(),meta:m.getBoundingClientRect().toJSON()}})))
     await page.locator('button[data-placement="timeline"]').first().evaluate(card=>{const style=card.lastElementChild.lastElementChild.style;style.removeProperty('transform');style.removeProperty('transition')})
+    await paint(page)
     assert.equal(await metaOverlap(),false,'配置を戻すと重なりも解消する')
     for(const tick of metrics.ticks) assert.ok(metrics.label.bottom<=tick.y || metrics.label.y>=tick.bottom || metrics.label.right<=tick.x || metrics.label.x>=tick.right,'今の時刻と時刻の見出しが重ならない')
     // 色の見本は表に出ている状態だけ。重なりの無い日は「重なり」を出さず、全部は「印の見本」の窓で読む。
@@ -195,6 +198,18 @@ for (const touch of [false, true]) test(`予約の空き枠は操作領域を保
       assert.ok(before.width > 0 && before.height > 0, '案内が無い時も押せる広さを保つ')
       const region = await page.getByRole('region', { name }).boundingBox()
       assert.ok(before.x>=region.x && before.y>=region.y && before.x+before.width<=region.x+region.width && before.y+before.height<=region.y+region.height, `${name}: 空き枠は担当領域の中 ${JSON.stringify({before,region})}`)
+      if (selected === 'vertical') {
+        const inside = () => button.evaluate(el => {
+          const b=el.getBoundingClientRect(),r=el.closest('section').getBoundingClientRect()
+          return b.left>=r.left && b.top>=r.top && b.right<=r.right && b.bottom<=r.bottom
+        })
+        await button.evaluate(el => { el.style.position='absolute' })
+        await paint(page)
+        assert.equal(await inside(),false,'縦の空き枠がセルを離れる故障を検知する')
+        await button.evaluate(el => { el.style.removeProperty('position') })
+        await paint(page)
+        assert.equal(await inside(),true,'縦の空き枠をセルの配置へ戻すと領域内に戻る')
+      }
       if (touch) {
         const visiblePlus = await button.evaluate(button => {
           const plus = button.querySelector('[class*="touchPlus"]')
@@ -203,14 +218,17 @@ for (const touch of [false, true]) test(`予約の空き枠は操作領域を保
         assert.ok(visiblePlus, `${name}: タッチでは小さな＋を常時出す`)
         await button.tap()
       } else {
-        await page.mouse.move(1100, 10)
+        await page.mouse.move(0, 0)
         await page.evaluate(() => document.activeElement?.blur())
+        await paint(page)
         assert.equal(await opacity(button), 0, `${name}: 通常は案内を隠す`)
         await button.hover()
+        await paint(page)
         assert.equal(await opacity(button), 1, `${name}: 乗せると案内が出る`)
-        await page.mouse.move(1100, 10)
+        await page.mouse.move(0, 0)
         await page.keyboard.press('Tab')
         await button.focus()
+        await paint(page)
         const focused = await button.evaluate(el=>({active:document.activeElement===el,focus:el.matches(':focus'),focusVisible:el.matches(':focus-visible'),within:el.parentElement.matches(':focus-within'),className:el.className,opacity:getComputedStyle(el).opacity,tabIndex:el.tabIndex,disabled:el.disabled}))
         assert.equal(await opacity(button), 1, `${name}: 焦点でも案内が出る ${JSON.stringify(focused)}`)
         const after = await button.boundingBox()

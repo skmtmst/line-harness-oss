@@ -9,7 +9,7 @@ import { TriangleAlert } from 'lucide-react'
 import Button from './button'
 import { GridTable } from './grid-table'
 import { BookingBlock, BookingSlot } from './booking-controls'
-import { reservationBookingState, reservationStatusLabel } from './booking-state'
+import { bookingStateLabels, reservationBookingState, reservationStatusLabel } from './booking-state'
 import { BookingCardContent, BookingStaffHeading, BookingRest } from './booking-presentation'
 import { formatDay, formatTime } from '@/lib/format'
 import styles from './reservation-people-grid.module.css'
@@ -83,11 +83,11 @@ export default function ReservationPeopleGrid({ entries, resources, date, slots 
             const overlapping = rows.filter(other => other.resourceIds.includes(resource.id) && other.startsAt < row.endsAt && other.endsAt > row.startsAt && ['confirmed', 'requested'].includes(other.status)).length
             const over = resource.capacity && overlapping > resource.capacity && ['confirmed', 'requested'].includes(row.status) && rows.filter(other => other.resourceIds.includes(resource.id) && other.startsAt < row.startsAt && other.endsAt > row.startsAt).length >= resource.capacity
             const label = `${row.customerName} ${formatTime(row.startsAt)}〜${formatTime(row.endsAt)} ${row.courseName ?? '予約'}の詳細`
-            return <Fragment key={row.id}><BookingBlock placement="cell" state={over ? 'attention' : reservationBookingState(row)} source={row.source} aria-label={label} title={label} draggable={canWrite && !!onMove && !busy} onDragStart={event => startDrag(row, event)} onDragEnd={() => { dragged.current = null }} onClick={() => onOpen(row.id)}>
-              <BookingCardContent name={row.customerName} time={`${formatTime(row.startsAt)}〜${formatTime(row.endsAt)}`} menu={row.courseName ?? '予約'} source={row.source} sourceNote={row.note} state={over ? 'attention' : reservationBookingState(row)} statusLabel={reservationStatusLabel(row, over ? 'attention' : reservationBookingState(row))} />
+            return <Fragment key={row.id}><BookingBlock placement="cell" state={over ? 'attention' : reservationBookingState(row)} source={row.source} aria-description={[reservationStatusLabel(row, reservationBookingState(row)), over ? bookingStateLabels.attention : null].filter(Boolean).join('。')} aria-label={label} title={label} draggable={canWrite && !!onMove && !busy} onDragStart={event => startDrag(row, event)} onDragEnd={() => { dragged.current = null }} onClick={() => onOpen(row.id)}>
+              <BookingCardContent name={row.customerName} time={`${formatTime(row.startsAt)}〜${formatTime(row.endsAt)}`} menu={row.courseName ?? '予約'} source={row.source} sourceNote={row.note} state={reservationBookingState(row)} statusLabel={reservationStatusLabel(row, reservationBookingState(row))} attention={!!over} />
             </BookingBlock>{over ? <span className={styles.over} role="alert"><TriangleAlert size={16} aria-hidden />受付数を超えています（{overlapping} / {resource.capacity}）</span> : null}</Fragment>
           })}
-          {canWrite && !busy ? available.map(slot => <span key={slot.startsAt} className={styles.slot}>{slot.href ? <Button variant="text" href={slot.href} aria-label={`${resource.label} ${formatTime(slot.startsAt)}に予約を入れる`}>＋ 予約を入れる</Button> : onSlot ? <BookingSlot onClick={() => onSlot(resource.id, slot.startsAt)} aria-label={`${resource.label} ${formatTime(slot.startsAt)}に予約を入れる`}>＋ 予約を入れる</BookingSlot> : null}</span>) : null}
+          {canWrite && !busy ? available.map(slot => <span key={slot.startsAt} className={styles.slot}>{slot.href ? <Button variant="text" href={slot.href} aria-label={`${resource.label} ${formatTime(slot.startsAt)}に予約を入れる`}>＋ 予約を入れる</Button> : onSlot ? <BookingSlot placement="cell" onClick={() => onSlot(resource.id, slot.startsAt)} aria-label={`${resource.label} ${formatTime(slot.startsAt)}に予約を入れる`}>＋ 予約を入れる</BookingSlot> : null}</span>) : null}
         </div>
       })}
     </div>)}

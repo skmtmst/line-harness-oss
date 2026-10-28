@@ -87,3 +87,29 @@
 .cardMeta > .detail { flex: 0 1 auto; min-width: 0; }
 .cardMeta > [data-booking-guests], .cardMeta > [data-booking-warning] { flex: 0 0 auto; }
 .statusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 人数と注意は先頭で確保し、狭い箱では補足から省略する。全文は箱の説明に残す。 */
+[data-placement='timeline'] [data-booking-count-overflow], [data-placement='timeline'] [data-booking-warning-mark] { display: none; }
+[data-placement='timeline'] [data-booking-count] { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-placement='timeline'] .cardMeta > [data-booking-guests] { order: -2; }
+[data-placement='timeline'] .cardMeta > [data-booking-warning] { order: -1; }
+@container booking-card (max-width: 8rem) {
+  .cardHeading > .time { flex: 0 1 auto; min-width: 0; }
+  .cardMeta:has([data-booking-guests]) > [data-booking-source] { display: none; }
+}
+@container booking-card (max-width: 6rem) {
+  .cardMeta:has([data-booking-guests]) > .label { display: none; }
+}
+@container booking-card (max-width: 4rem) {
+  .cardHeading:has(+ .cardDetails [data-booking-guests]) { display: none; }
+  .cardDetails:has([data-booking-guests]) { display: block; }
+  .cardDetails:has([data-booking-guests]) > .detail { display: none; }
+  .cardMeta:has([data-booking-guests]) { flex-direction: column; align-items: stretch; gap: 0; width: 100%; max-width: 100%; }
+  .cardMeta:has([data-booking-guests]) > :not([data-booking-guests], [data-booking-warning]) { display: none; }
+  .cardMeta > [data-booking-guests], .cardMeta > [data-booking-warning] { width: 100%; text-align: center; }
+  [data-booking-count] { display: block; }
+  [data-booking-count][data-many], [data-booking-warning-text] { display: none; }
+  .cardMeta > [data-booking-guests], .cardMeta > [data-booking-warning] { display: flex; align-items: center; justify-content: center; min-height: var(--tpl-rs-lh-11); }
+  :root [data-placement='timeline'] .cardMeta svg:is([data-booking-count-overflow], [data-booking-warning-mark]) { display: block; width: var(--space-8); height: var(--space-8); flex: none; }
+  [data-booking-count-unit] { display: none; }
+}

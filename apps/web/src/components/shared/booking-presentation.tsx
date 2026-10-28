@@ -65,10 +65,10 @@ export function BookingNowLine({ time, direction = 'vertical', labelPosition = '
 const compactBookingLabels: Partial<Record<BookingState, string>> = { active: '進行中', completed: '終了', pending: '要対応', attention: '重なり' }
 
 /** 予約の箱の共通内容。名前と時刻を1段、メニューを2段目に置く。 */
-export function BookingCardContent({ name, time, menu, state = 'confirmed', source, statusLabel, children }: { name: string; time: string; menu: string; state?: BookingState; source?: string; sourceNote?: string | null; statusLabel?: string; children?: ReactNode }) {
+export function BookingCardContent({ name, time, menu, state = 'confirmed', source, statusLabel, attention = false, children }: { name: string; time: string; menu: string; state?: BookingState; source?: string; sourceNote?: string | null; statusLabel?: string; attention?: boolean; children?: ReactNode }) {
   const label = statusLabel ?? bookingStateLabels[state]
   const shortLabel = label === bookingStateLabels[state] ? compactBookingLabels[state] ?? label : label
-  return <><span className={styles.cardHeading}><BookingName title={name}>{name}</BookingName><BookingTime title={time}>{time}</BookingTime></span><span className={styles.cardDetails}><BookingDetail title={menu}>{menu}</BookingDetail><span className={styles.cardMeta}>{source === 'phone' ? <StatusBadge tone="neutral" dot={false} size="micro">電話</StatusBadge> : null}{state !== 'confirmed' && state !== 'closed' ? <BookingStatus state={state} title={label}>{shortLabel}</BookingStatus> : null}{children}</span></span></>
+  return <><span className={styles.cardHeading}><BookingName title={name}>{name}</BookingName><BookingTime title={time}>{time}</BookingTime></span><span className={styles.cardDetails}><BookingDetail title={menu}>{menu}</BookingDetail><span className={styles.cardMeta}>{source === 'phone' ? <StatusBadge tone="neutral" dot={false} size="micro" data-booking-source>電話</StatusBadge> : null}{state !== 'confirmed' && state !== 'closed' ? <BookingStatus state={state} title={label}>{shortLabel}</BookingStatus> : null}{attention ? <BookingStatus state="attention" title={bookingStateLabels.attention}>重なり</BookingStatus> : null}{children}</span></span></>
 }
 
 /** 担当の名前から受付の決まりを確認する。違う決まりの人だけ札を添える。 */

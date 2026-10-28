@@ -180,3 +180,33 @@ it('狭い予約箱でも注意の印から全文を確認でき、焦点では�
   fireEvent.click(warning)
   expect(open).toHaveBeenCalledWith('r')
 })
+
+
+it.each(['seats', 'people'] as const)('重なっても%sの実状態と注意を保ち、詳細操作を変えない', kind => {
+  const first = { ...base, kind, customerName: '来店中の予約', status: 'seated' }
+  const second = { ...base, kind, id: 'pending-overlap', customerName: '承認待ちの予約', status: 'requested', startsAt: '2026-10-23T09:30:00Z', endsAt: '2026-10-23T10:30:00Z', source: 'phone', currentAllergy: 'そば・小麦' }
+  const open = vi.fn()
+  render(<ReservationBoard kind={kind} entries={[first, second]} resources={[{ ...resources[0], capacity: 1 }]} dates={['2026-10-23']} onOpen={open} />)
+  const card = screen.getByRole('button', { name: /承認待ちの予約/ })
+  expect(card.getAttribute('data-booking-state')).toBe('attention')
+  expect(within(card).getByTitle('要対応（承認待ち）').textContent).toBe('要対応')
+  expect(within(card).getByTitle('重なり・受付数超過').textContent).toBe('重なり')
+  expect(card.getAttribute('aria-description')).toContain('要対応（承認待ち）')
+  expect(card.getAttribute('aria-description')).toContain('重なり・受付数超過')
+  expect(card.getAttribute('aria-description')).toContain('注意：そば・小麦')
+  expect(card.getAttribute('aria-description')?.match(/電話/g)).toHaveLength(1)
+  fireEvent.click(card)
+  expect(open).toHaveBeenCalledWith(second.id)
+})
+
+it('縦の担当盤でも重なりの説明に承認待ちを残す', () => {
+  const first = { ...base, kind: 'people' as const, customerName: '先の予約' }
+  const second = { ...first, id: 'pending', customerName: '承認待ちの予約', status: 'requested', startsAt: '2026-10-23T09:30:00Z', endsAt: '2026-10-23T10:30:00Z', source: 'phone' }
+  render(<ReservationBoard kind="people" timeDirection="vertical" entries={[first, second]} resources={[{ ...resources[0], capacity: 1 }]} dates={['2026-10-23']} onOpen={() => {}} />)
+  const card = screen.getByRole('button', { name: /承認待ちの予約/ })
+  expect(card.getAttribute('data-booking-state')).toBe('attention')
+  expect(within(card).getByTitle('要対応（承認待ち）')).toBeTruthy()
+  expect(within(card).getByTitle('重なり・受付数超過')).toBeTruthy()
+  expect(card.getAttribute('aria-description')).toContain('要対応（承認待ち）')
+  expect(card.getAttribute('aria-description')).toContain('重なり・受付数超過')
+})

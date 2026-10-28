@@ -8,7 +8,7 @@
 .resource{display:flex;min-height:max(var(--tpl-board-row-h),calc(3 * var(--tpl-rs-lh-11) + 2 * var(--polish-space-row) + 2 * var(--tpl-board-block-top) + 1px));border-bottom:1px solid var(--color-hairline);}
 .resource>strong{width:var(--tpl-board-resource-w);flex-shrink:0;padding:20px 10px 12px;font-size:var(--text-caption);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .track{flex:1;position:relative;min-width:0;background-image:linear-gradient(to right,var(--color-hairline) 1px,transparent 1px);}
-.booking{position:absolute;top:var(--tpl-board-block-top);bottom:var(--tpl-board-block-top);padding-inline:1px;}
+.booking{container-type:inline-size;container-name:booking-entry;position:absolute;top:var(--tpl-board-block-top);bottom:var(--tpl-board-block-top);padding-inline:1px;}
 .booking button{height:100%;width:100%;min-width:0;text-align:left;overflow:hidden;}
 .booking button>strong,.booking button>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.booking strong{font-size:var(--text-micro);}.booking span{font-size:var(--text-micro);}
 .month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));}.month>div{display:flex;flex-direction:column;gap:var(--polish-space-row);padding:var(--polish-space-row);min-height:var(--tpl-board-row-h);border:1px solid var(--color-hairline);}.month>div[data-today]>strong{color:var(--color-ink);}.month button{max-width:100%;overflow:hidden;text-overflow:ellipsis;}
@@ -54,3 +54,5 @@
   .printLabel { display: none; }
   .printButton { padding-inline: 10px; }
 }
+
+.booking[data-compact] { padding-inline: 0; }
