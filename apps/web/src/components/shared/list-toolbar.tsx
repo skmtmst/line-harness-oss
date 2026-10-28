@@ -7,6 +7,7 @@ import Select, { type SelectProps } from './select'
 import EntitySelect from './entity-select'
 import SearchField from './search-field'
 import FilterChip from './filter-chip'
+import { FilterPopover } from './filter-popover'
 import { RowMenu } from './row-actions'
 import PageSizeSelect from './page-size-select'
 import styles from './list-toolbar.module.css'
@@ -383,6 +384,7 @@ function contentSizedSelects(node: ReactNode): ReactNode {
     const children = node.map(contentSizedSelects)
     return children.every((child, index) => child === node[index]) ? node : children
   }
+  if (isValidElement(node) && node.type === FilterPopover) return node
   if (isContentSizedControl(node)) return contentSizedControl(node)
   if (isValidElement<{ children?: ReactNode }>(node) && node.props.children) {
     const children = contentSizedSelects(node.props.children)
@@ -396,7 +398,7 @@ function compactFilterGroups(node: ReactNode, preserveChips = false): ReactNode 
   if (children.length > 1 && children.every(child => isValidElement(child) && child.type === FilterChip))
     return <ResponsiveFilterChips preserveChips={preserveChips}>{children}</ResponsiveFilterChips>
   return children.map(child => {
-    if (isValidElement(child) && child.type === ResponsiveFilterChips) return child
+    if (isValidElement(child) && (child.type === ResponsiveFilterChips || child.type === FilterPopover)) return child
     if (isContentSizedControl(child)) return contentSizedControl(child)
     if (isValidElement<{ children?: ReactNode }>(child) && child.props.children) {
       const nested = compactFilterGroups(child.props.children, preserveChips)
