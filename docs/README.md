@@ -821,6 +821,7 @@
 - [増減の符号と未分類の灰丸](release-log/unreleased/1858-kenta-delta-folder.md) — 増減の印とフォルダ表示の反映履歴。
 - [一斉配信の作成画面名と外枠](release-log/unreleased/1859-kenta-broadcast-title.md) — 作成手順の反映履歴。
 - [ページ送りの現在地と表示条件](release-log/unreleased/1860-kenta-pagination.md) — 一覧操作の反映履歴。
+- [配布状況と記録一覧の配置](release-log/unreleased/1861-kenta-distribution-history.md) — 配布の表示とページ送りの反映履歴。
 - [画面の表示・配置の追加修復](release-log/unreleased/1852-kenta-ui-followup.md)
 - [完成した画面修復の先行反映](release-log/unreleased/1853-kenta-completed-ui.md)
 - [隣接する操作・案内の間隔](release-log/unreleased/1854-kenta-adjacent-spacing.md)
