@@ -464,13 +464,6 @@
 .historyTable .colActor { width: var(--tpl-stamp-history-actor-w); }
 .historyTable .colMenu { width: var(--tpl-stamp-history-menu-w); }
 
-.historyFooter {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--tpl-e78-pair-gap);
-  min-width: 0;
-}
 
 .appearance { display: flex; align-items: center; gap: var(--tpl-stamp-appearance-gap); min-width: 0; }
 /* 背景画像は画像を入れる所（MediaSlot・Z7vd2）の小さい形。 */
