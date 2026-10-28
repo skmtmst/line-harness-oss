@@ -179,6 +179,8 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     expect(text).toContain('対応済み')
     expect(text).toContain('VIP')
     expect(text).toContain('2,450')
+    expect(text).not.toContain('ほかの進行中の配信・リマインダ')
+    expect(text).not.toContain('一覧はまだ見られません')
     expect(text).toContain('基本メニュー（会員）')
     expect(text).toContain('新規登録7日間フォロー')
     expect(text).toContain('『秋の新商品はいつ届きますか？』')
