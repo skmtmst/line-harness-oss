@@ -792,7 +792,9 @@ export default function TagsTab({
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      {/* 数の帯（絵の4つ）。並びと線は共有の帯に任せる。 */}
+      <ListPageBody
+        skeleton
+        stats={
       <KpiBand data-design="KPIs" className={styles.kpis}>
         {kpis.map((kpi) => (
           <KpiCard
@@ -808,9 +810,7 @@ export default function TagsTab({
           />
         ))}
       </KpiBand>
-
-      <ListPageBody
-        skeleton
+        }
         folders={<>
           <FolderPanel
             createAction={createButton(true)}
