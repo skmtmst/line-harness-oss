@@ -839,3 +839,4 @@
 - [個別設定のスイッチ表示](release-log/unreleased/1871-kenta-individual-setting-switches.md) — タグ編集と機能設定のオン・オフの反映履歴。
 - [検証用店舗の同時投稿](release-log/unreleased/1872-masato-instagram-staging-post-test.md) — 検証対象に限る同時投稿の反映履歴。
 - [本文URLがないときの補足](release-log/unreleased/1873-kenta-template-url-note.md) — テンプレート本文のURL一覧を必要なときに表示する反映履歴。
+- [同時投稿画像の縦横比](release-log/unreleased/1874-masato-instagram-image-ratio.md) — Instagramへ投稿する画像の比率を整える反映履歴。
