@@ -43,9 +43,10 @@
   line-height: var(--tpl-e1-sns-sub-lh);
 }
 
-/* ボタンの行：左に主な操作、右端に解除 */
+/* 主な操作はカードの中央に並べる。 */
 .actions {
   display: flex;
+  justify-content: center;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--tpl-e1-sns-row-gap);

@@ -185,6 +185,37 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     await waitFor(() => expect(fixture.igConnection.mock.calls.length).toBeGreaterThan(1))
   })
 
+  it.each(['disconnected', 'expired'] as const)('%s の閲覧のみには接続操作とログイン案内を出さない', async (state) => {
+    fixture.role.value = 'staff'
+    setup(state, state === 'expired' ? CONNECTED : undefined)
+
+    await screen.findByText(/閲覧のみで見ています/)
+    await igCard().findByText(state === 'expired' ? '接続の異常' : '未接続')
+    expect(igCard().queryByRole('button', { name: 'Instagram にログインして接続する' })).toBeNull()
+    expect(igCard().queryByText(/個人のアカウントは接続できません/)).toBeNull()
+    expect(fixture.igStart).not.toHaveBeenCalled()
+  })
+
+  it('接続開始の処理中は操作を止め、失敗後も案内を保って再試行できる', async () => {
+    let rejectStart!: (reason: Error) => void
+    fixture.igStart.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectStart = reject }))
+    setup('disconnected')
+
+    const start = await screen.findByRole('button', { name: 'Instagram にログインして接続する' })
+    fireEvent.click(start)
+    expect(start.hasAttribute('disabled')).toBe(true)
+    expect(igCard().getByText(/個人のアカウントは接続できません/)).toBeTruthy()
+    fireEvent.click(start)
+    expect(fixture.igStart).toHaveBeenCalledTimes(1)
+    expect(fixture.igStart).toHaveBeenCalledWith('acc-1')
+
+    rejectStart(new Error('offline'))
+    await screen.findByText('Instagram のログイン画面を開けませんでした。もう一度お試しください。')
+    expect(start.hasAttribute('disabled')).toBe(false)
+    expect(igCard().getByText(/個人のアカウントは接続できません/)).toBeTruthy()
+    expect(fixture.igDisconnect).not.toHaveBeenCalled()
+  })
+
   it('［接続を解除する］は確認の小窓をはさみ、いまの版の番号を渡す', async () => {
     fixture.igDisconnect.mockResolvedValue({ success: true })
     setup('connected', CONNECTED)
