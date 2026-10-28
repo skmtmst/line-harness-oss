@@ -228,6 +228,30 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(host.textContent).toContain('3,210回')
   })
 
+  it('共有ページ送りは1ページでは件数だけ残し、2ページなら次と前で表示行を切り替える', async () => {
+    window.history.replaceState(null, '', '/hq/templates')
+    await render()
+    expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('2件中 1〜2件')
+    expect(host.querySelector('nav[data-pagination]')).toBeNull()
+    expect(host.querySelector('[data-pagination] button')).toBeNull()
+
+    const rows = Array.from({ length: 21 }, (_, index) => ({ ...row('page-' + (index + 1), '案内' + (index + 1), 0), outdated_account_count: 0 }))
+    await render({ rows })
+    expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('21件中 1〜20件')
+    const next = host.querySelector<HTMLButtonElement>('nav[data-pagination] button[aria-label="次のページ"]')!
+    expect(next.disabled).toBe(false)
+    await act(async () => { next.click() })
+    expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('21件中 21〜21件')
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(1)
+    expect(host.querySelector('tbody tr')?.getAttribute('data-row-id')).toBe('page-21')
+    expect(host.querySelector('nav[data-pagination] [aria-current="page"]')?.getAttribute('aria-label')).toBe('2ページ目へ')
+    const previous = host.querySelector<HTMLButtonElement>('nav[data-pagination] button[aria-label="前のページ"]')!
+    await act(async () => { previous.click() })
+    expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('21件中 1〜20件')
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(20)
+    expect(host.querySelector('tbody tr')?.getAttribute('data-row-id')).toBe('page-1')
+  })
+
   it('上のタブで種類を替える（店と同じ6種類）', async () => {
     const h = await render()
     const tabs = [...document.querySelectorAll('[role="tab"], a, button')].map((el) => el.textContent ?? '')
