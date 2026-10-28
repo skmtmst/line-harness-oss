@@ -256,7 +256,7 @@ export function PhotoCardV8({ photo, status, ...props }: { photo: Record<string,
         props.canEdit ? (
           <CardActionRow>
             <Button variant="secondary" disabled={busy} aria-label={`${name}の写真を見送る`} onClick={() => props.onReject(photoId)}><X size={16} aria-hidden="true" />見送る</Button>
-            <Button variant="primary" disabled={busy} aria-label={`${name}の写真を採用する`} onClick={() => props.onApprove(photoId)} busy={busy} busyLabel="処理中…"><Check size={16} aria-hidden="true" />採用する</Button>
+            <Button variant="primary" fullWidth disabled={busy} aria-label={`${name}の写真を採用する`} onClick={() => props.onApprove(photoId)} busy={busy} busyLabel="処理中…"><Check size={16} aria-hidden="true" />採用する</Button>
           </CardActionRow>
         ) : (
           /* 閲覧のみには押せないボタンを置かない。場所だけ空けて、並びをそろえる。 */

@@ -259,6 +259,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  vi.useRealTimers()
   delete document.documentElement.dataset.theme
   vi.clearAllMocks()
 })
@@ -463,6 +464,8 @@ describe('シナリオの複製は通の中身を落とさない', () => {
 
 describe('始めた直後の知らせ', () => {
   it('始めた直後だけ知らせの帯を出し、試算の人数・開始の記録を読み、配信結果へ進める', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-28T00:00:00Z'))
     stubStats(undefined)
     await render({ showStarted: true })
     const band = await waitFor(() => {
@@ -475,7 +478,7 @@ describe('始めた直後の知らせ', () => {
     expect(band.textContent).toContain('予約中の 128 人へ')
     const link = within(band).getByRole('link', { name: '始めた記録を見る' })
     expect(link.getAttribute('href')).toBe('/scenarios/results?id=sc-1')
-    expect(link.getAttribute('title')).toBe('開始日時：2026年10月2日 10:00')
+    expect(link.getAttribute('title')).toBe('開始日時：10月2日 10:00')
   })
 
   it('開始の記録が読めないときは、開始日時を作らず読み直しを案内する。始めていない時は帯を出さない', async () => {

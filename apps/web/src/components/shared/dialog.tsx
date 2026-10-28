@@ -319,7 +319,7 @@ export default function Dialog({
     >
       <div className={styles.headerRow}>
         <div className={styles.headerContent}>
-          {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <Notice tone={descriptionBand === 'warning' ? 'warn' : 'danger'} icon={null} role="presentation" data-qa-dialog-callout>{heading}</Notice> : heading}
+          {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <Notice tone={descriptionBand === 'warning' ? 'warn' : 'danger'} statusWord={false} icon={null} role="presentation" data-qa-dialog-callout>{heading}</Notice> : heading}
         </div>
         {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
         {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
@@ -327,7 +327,7 @@ export default function Dialog({
           <X aria-hidden="true" size={20} />
         </IconButton>
       </div>
-      {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><Notice tone="danger" data-qa-dialog-callout>{descriptionNode}</Notice></div> : designLayout === 'stacked' ? descriptionNode : null}
+      {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><Notice tone="danger" statusWord={false} data-qa-dialog-callout>{descriptionNode}</Notice></div> : designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content} data-window-body data-dialog-content data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <Notice tone="danger" role="alert">

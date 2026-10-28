@@ -17,6 +17,7 @@ import { PageContent } from '@/components/templates/page-frame'
  * へ渡す。課金の対象外・支払いの管理画面が無いときは、運営へのお問い合わせへ渡す。
  */
 import { PRODUCT_SCOPE, planFeatureLabel } from '@/lib/product-scope'
+import HelpTip from '@/components/shared/help-tip'
 import { Check, CreditCard, Download } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -437,7 +438,8 @@ function ContractText({ summary }: { summary: BillingSummary }) {
     const amount = price ? ` ${yen(summary.planInterval === 'year' && price.yearlyYen !== null ? price.yearlyYen : price.monthlyYen)}` : ''
     return (
       <>
-        いまのプラン：{summary.planName}（{[basis, amount].filter(Boolean).join('')}）{summary.currentPeriodEndsLabel ? `・次回の更新日 ${summary.currentPeriodEndsLabel}` : ''}。プランを変えるときは、「支払い方法を管理」から開く Stripe の画面で、差額と適用日を確かめてから確定します。
+        <span>いまのプラン：{summary.planName}（{[basis, amount].filter(Boolean).join('')}）{summary.currentPeriodEndsLabel ? `・次回の更新日 ${summary.currentPeriodEndsLabel}` : ''}</span>
+        <HelpTip label="プラン変更の説明">プランを変えるときは、「支払い方法を管理」から開く Stripe の画面で、差額と適用日を確かめてから確定します。</HelpTip>
       </>
     )
   }
@@ -445,7 +447,8 @@ function ContractText({ summary }: { summary: BillingSummary }) {
   if (exemptPlan) {
     return (
       <>
-        いまのプラン：{exemptPlan.name}（課金の対象外）。この統括は運営用のため、料金はかかりません。プランを変えるときは、お問い合わせから運営に伝えます。
+        <span>いまのプラン：{exemptPlan.name}（課金の対象外）</span>
+        <HelpTip label="プラン変更の説明">この統括は運営用のため、料金はかかりません。プランを変えるときは、お問い合わせから運営に伝えます。</HelpTip>
       </>
     )
   }

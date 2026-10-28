@@ -1,10 +1,11 @@
 .body { --gap2-24: 24px; --gap-s: 8px; --gap-m: 12px; --gap-l: 16px; --pad-card: 16px; --radius-card-s: 12px; display: flex; flex-direction: column; gap: var(--gap-l); padding-top: var(--gap2-24); }
-.summary { display: flex; flex-direction: column; gap: var(--gap-s); margin: var(--tpl-layout-zero); padding: var(--pad-card); border: 1px solid var(--color-hairline); border-radius: var(--radius-card-s); font-size: var(--text-body); }
+.summaryFrame { min-width: 0; }
+.summary { display: flex; flex-direction: column; gap: var(--gap-s); margin: var(--tpl-layout-zero); font-size: var(--text-body); }
 .summary div { display: flex; gap: var(--gap-s); }
 .summary { gap: var(--gap-m); }
 .summary dt { color: var(--color-ink-secondary); }
 .summary dd { margin: var(--tpl-layout-zero); color: var(--color-ink); }
-.card { display: flex; flex-direction: column; gap: var(--gap-m); padding: var(--pad-card); border: 1px solid var(--color-hairline); border-radius: var(--radius-card-s); }
+.card { display: flex; flex-direction: column; }
 .cardHead { display: flex; align-items: center; justify-content: space-between; }
 .cardTitle { display: flex; align-items: center; gap: var(--gap-s); margin: var(--tpl-layout-zero); font-size: var(--text-body); font-weight: 700; color: var(--color-ink); }
 .controls { display: flex; align-items: flex-end; gap: var(--gap-l); }

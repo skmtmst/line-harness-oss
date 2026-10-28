@@ -30,7 +30,8 @@ function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, 
   onPick: () => void; onRemove: () => void; onSave?: () => void; orderActions?: React.ReactNode
   disabledReason?: string; visibilityControl?: React.ReactNode; visibilityLabel?: string
 }) {
-  return <Card frame="flat" layout="vertical" overflow="hidden" aria-label={`${name}の写真`}>
+  return <Card layout="vertical" overflow="hidden" aria-label={`${name}の写真`}
+    actions={editable && orderActions ? <CardContent><CardActionRow>{orderActions}</CardActionRow></CardContent> : undefined}>
     <div className={styles.photo}>
       {photo ? <MediaThumbnail kind="image" src={api.media.contentUrl(photo.mediaId, accountId)} alt={`${name}の写真`} />
         : <ListEmptyMessage>写真はありません</ListEmptyMessage>}
@@ -41,7 +42,6 @@ function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, 
       {editable ? <SaveErrorField names={[fieldKey]}><div className={orderActions ? styles.storeActions : styles.actions} role="group" aria-label={`${name}の写真を選ぶ操作`}>
         <Button onClick={onPick} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を選ぶ`}>{photo ? '替える' : '写真を選ぶ'}</Button>
         {photo || orderActions ? <Button onClick={onRemove} disabled={busy || !photo} disabledReason={disabledReason ?? (!photo ? '写真はありません。' : undefined)} aria-label={`${name}の写真を外す`}>外す</Button> : null}
-        {orderActions ? <CardActionRow>{orderActions}</CardActionRow> : null}
         {onSave && changed ? <Button variant="primary" onClick={onSave} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を保存する`}>保存する</Button> : null}
       </div></SaveErrorField> : null}
     </CardContent>

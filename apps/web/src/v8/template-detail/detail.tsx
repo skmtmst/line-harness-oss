@@ -337,7 +337,7 @@ export default function TemplateDetailV8() {
       <span className={row.fixed ? styles.usageVersionFixed : styles.usageVersion} title={row.version}>{row.version}</span>
       <span className={styles.usageState}>{row.status ?? emptyValue('unknown')}</span>
       {row.href
-        ? <TextLink external href={row.href}>開く</TextLink>
+        ? <TextLink external href={row.href}>使用画面へ</TextLink>
         : <span className={styles.ghostSpacer} aria-hidden="true" />}
     </div>
   )

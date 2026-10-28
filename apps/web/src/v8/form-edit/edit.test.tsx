@@ -207,7 +207,7 @@ describe('回答フォームの編集（V8）', () => {
     await render('id=form-1&page=2')
     expect(await screen.findByText('ページ2 のブロック')).toBeTruthy()
     expect(screen.getByDisplayValue('次回のご希望の日時を選んでください')).toBeTruthy()
-    expect(screen.getByText('予約の設定を開く').closest('a')?.getAttribute('href')).toBe('/booking/menus')
+    expect(screen.getByText('予約メニューへ').closest('a')?.getAttribute('href')).toBe('/booking/menus')
   })
 
   it('?tab= で答え終わったあと・受付と見た目を開け、タブでも切り替わる', async () => {

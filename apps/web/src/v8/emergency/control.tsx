@@ -596,7 +596,7 @@ const EmergencyControlV8 = (
         </div>
 
         {isStopped && control ? (
-          <Notice tone="danger" role="status" heading={<>止めているとき</>}>
+          <Notice tone="warn" role="status" heading={<>止めているとき</>}>
             <div className={styles.stoppedLine}>
               <p className={styles.stoppedText}>
                 <span className={styles.stoppedDot}>● </span>

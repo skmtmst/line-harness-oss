@@ -238,3 +238,20 @@ describe('BA-19 予約写真の編集', () => {
   })
 
 });
+
+it('店舗の順序操作は写真選択のエラー枠と分けた正規操作枠へ接続し、理由と拒否を保つ', async () => {
+  show()
+  const back = await screen.findByRole('button', { name: '外観を前へ', exact: true })
+  const waiting = screen.getByRole('region', { name: '待合の写真', exact: true })
+  const actions = back.closest('[data-card-actions]')
+  expect(actions).not.toBeNull()
+  expect(within(actions as HTMLElement).getByRole('button', { name: '外観を後へ', exact: true })).toBeTruthy()
+  expect((back as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.getByText('これが先頭の写真です。')).toBeTruthy()
+  expect(within(waiting).getByText('写真はありません。')).toBeTruthy()
+  expect(within(waiting).getByRole('button', { name: '待合の写真を外す', exact: true }).closest('[data-card-actions]')).toBeNull()
+  expect(within(waiting).getAllByRole('group')).toHaveLength(1)
+  expect(screen.getByRole('button', { name: 'カットの写真を選ぶ', exact: true }).closest('[data-card-actions]')).toBeNull()
+  fireEvent.click(back)
+  expect(net.saveStore).not.toHaveBeenCalled()
+})

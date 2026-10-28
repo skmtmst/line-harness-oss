@@ -87,7 +87,7 @@ describe('運営ログインの失敗理由案内（M041）', () => {
     setInput('#ops-login-password', 'wrongpass1')
     await submitForm()
 
-    expect(host.querySelector('[role="alert"]')?.textContent).toBe('メールアドレスかパスワードが違います')
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('失敗：メールアドレスかパスワードが違います')
   })
 
   it('429 のコードのみは混雑の待ち案内を出す', async () => {

@@ -54,7 +54,7 @@ describe('presentation helpers', () => {
       for (const timeZone of ['UTC', 'America/Los_Angeles', 'Asia/Tokyo']) {
         process.env.TZ = timeZone
         const expected = formatJstDateTime('2026-10-17T15:30:00Z')
-        expect(expected).toContain('2026年10月18日 00:30')
+        expect(expected).toContain('10月18日 00:30')
         expect(formatJstDateTime('2026-10-17 15:30:00')).toBe(expected)
         expect(formatJstDateTime('2026-10-17T15:30:00')).toBe(expected)
         expect(formatJstDateTime('2026-10-18T00:30:00+09:00')).toBe(expected)

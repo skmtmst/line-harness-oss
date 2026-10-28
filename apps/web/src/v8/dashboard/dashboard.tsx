@@ -227,7 +227,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           help={NOT_COMPARED_HELP}
           loading={state === 'loading'}
           detail={state === 'error' ? STATE_TEXT.error : state === 'ready' ? ((s?.soon ?? 0) > 0 ? `今日 ${s?.today ?? 0} 件・明日 ${(s?.soon ?? 0) - (s?.today ?? 0)} 件` : '未処理はありません') : STATE_TEXT.loading}
-          action={{ label: 'ECを見る', href: '/ec-commerce' }}
+          action={{ label: 'ECへ', href: '/ec-commerce' }}
         />,
         detail: <span>{state !== 'ready' || !s
           ? (state === 'error' ? STATE_TEXT.error : STATE_TEXT.loading)
@@ -276,12 +276,12 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
       : data ? <RecentResults conversions={data.conversions} period={dashboardPeriodLabel(d.displayedPeriod) ?? 'この期間'} section={data.sections?.conversions} /> : <><SectionHeader title="最近の成果" /><Loading label="最近の成果" /></>
     const ops = d.sectionAvailable('operations') ? data?.operations : undefined
     const opsDetail = (text: string | null) => text ?? (data ? STATE_TEXT.error : STATE_TEXT.loading)
-    if (id === 'booking-status') return <Metric title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約を見る" value={ops?.bookings?.pending ?? null} detail={opsDetail(ops?.bookings ? `今後の予約 ${ops.bookings.upcoming}件` : null)} section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'inflow-top') return <Metric title="流入経路TOP3" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={ops?.inflowTop?.[0]?.count ?? (ops?.inflowTop ? 0 : null)} detail={opsDetail(ops?.inflowTop ? ops.inflowTop.map((item) => `${item.name ?? emptyValue('unknown')} ${item.count}`).join('、') || '期間内の追加なし' : null)} section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'funnel-alert') return <Metric title="ファネル要注意" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={ops?.funnelAlerts ?? null} detail="" help="3人以上追加され、成果が0件の経路です" section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'automation-failures') return <Metric title="オートメーション失敗" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={ops?.automationFailures ?? null} detail="" help="期間内の失敗と一部失敗の合計です" section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'scenario-status') return <Metric title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={ops?.scenarios?.active ?? null} detail={opsDetail(ops?.scenarios ? `一時停止 ${ops.scenarios.paused} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'uid-migration') return <Metric title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={ops?.migrations?.active ?? null} detail={opsDetail(ops?.migrations ? `完了 ${ops.migrations.completed} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'booking-status') return <Metric title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約へ" value={ops?.bookings?.pending ?? null} detail={opsDetail(ops?.bookings ? `今後の予約 ${ops.bookings.upcoming}件` : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'inflow-top') return <Metric title="流入経路TOP3" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳へ" value={ops?.inflowTop?.[0]?.count ?? (ops?.inflowTop ? 0 : null)} detail={opsDetail(ops?.inflowTop ? ops.inflowTop.map((item) => `${item.name ?? emptyValue('unknown')} ${item.count}`).join('、') || '期間内の追加なし' : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'funnel-alert') return <Metric title="ファネル要注意" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルへ" value={ops?.funnelAlerts ?? null} detail="" help="3人以上追加され、成果が0件の経路です" section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'automation-failures') return <Metric title="オートメーション失敗" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況へ" value={ops?.automationFailures ?? null} detail="" help="期間内の失敗と一部失敗の合計です" section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'scenario-status') return <Metric title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオへ" value={ops?.scenarios?.active ?? null} detail={opsDetail(ops?.scenarios ? `一時停止 ${ops.scenarios.paused} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'uid-migration') return <Metric title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況へ" value={ops?.migrations?.active ?? null} detail={opsDetail(ops?.migrations ? `完了 ${ops.migrations.completed} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
     return null
   }
 
@@ -326,7 +326,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           help="集計は期間の切り替えにかかわらず、いつも直近7日です。"
           helpLabel="友だち数の推移の説明"
           href="/analytics?tab=friends"
-          linkLabel="さらに詳しく"
+          linkLabel="推移へ"
         />
         <FriendTrend trend={trendOf()} loading={d.loading} />
       </>
