@@ -60,8 +60,12 @@ describe('V8 統括のアカウントを探す', () => {
   })
   it('アーカイブは登録内容の編集と戻すだけを出し、本人確認して戻す', async () => {
     const archived: AccountWithStats = { id: 'old', name: '旧キャンペーン', channelId: 'c-old', basicId: '@nen-old', isActive: false, country: null, role: 'owner', displayOrder: 99, archivedAt: '2026-01-01', stats: { friendCount: 0, messagesThisMonth: 0, activeScenarios: 0, staffCount: 0 } }
-    mocks.list.mockResolvedValue({ success: true, data: [archived] })
-    render(<AccountBrowser />); await screen.findByText('旧キャンペーン')
+    mocks.list.mockResolvedValue({ success: true, data: [accounts[0], archived] })
+    render(<AccountBrowser />); await screen.findByText('店舗00')
+    expect(screen.queryByText('旧キャンペーン')).toBeNull()
+    const allButtons = screen.getAllByRole('button', { name: /^すべて/ })
+    expect(allButtons).toHaveLength(2)
+    expect(allButtons.every((button) => button.textContent?.includes('1'))).toBe(true)
     const explanationButton = screen.getByRole('button', { name: '統括のアカウントの説明' })
     fireEvent.click(explanationButton)
     const explanation = document.getElementById(explanationButton.getAttribute('aria-describedby') ?? '')
@@ -70,6 +74,8 @@ describe('V8 統括のアカウントを探す', () => {
     expect(explanation?.textContent).toContain('アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです')
     fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(screen.getByRole('button', { name: /^アーカイブ/ }))
+    await screen.findByText('旧キャンペーン')
+    expect(screen.queryByText('店舗00')).toBeNull()
     expect(screen.getByRole('button', { name: '登録内容を編集' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '詳細' })).toBeNull()
     expect(screen.queryByRole('button', { name: / へ入る$/ })).toBeNull()
