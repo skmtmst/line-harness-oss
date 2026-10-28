@@ -31,6 +31,7 @@ import type { FriendDetailPermissions } from './permissions'
 import { timelineSourceHref, timelineTypeLabel, timelineKey, type FriendTimelineItem } from './timeline'
 import { SUPPORT_LABELS, SUPPORT_TONES } from './support'
 import styles from './detail.module.css'
+import IconRow from '@/components/shared/icon-row'
 import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
@@ -215,12 +216,12 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
         <div className={styles.mile}>
           <span className={styles.mileNum}>{mileageStatus === 'ready' && mileage ? formatNumber(mileage.available) : emptyValue('unknown')}</span>
           <span className={styles.mileUnit}>
-            mile 使える{mileage && mileage.pending > 0 ? `・確定待ち ${formatNumber(mileage.pending)}` : ''}
+            マイル使える{mileage && mileage.pending > 0 ? `・確定待ち ${formatNumber(mileage.pending)}` : ''}
           </span>
         </div>
       )}{rankLine ? <p className={styles.memo}>{rankLine}</p> : null}</> },
         { key: 'delivery', label: '配信の受け取り', action: <Button variant="text" size="inline" actionWording onClick={() => setConsentOpen(true)}>{perms.manage ? '変える' : '見る'}</Button>, content: <DeliveryConsentSummary status={consents.status} rows={consents.rows} /> },
-        { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Link className={styles.groupLink} href="/rich-menus">変更する</Link> : null, content: <>{richMenuStatus === 'error' ? (
+        { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Link className={styles.groupLink} href="/rich-menus">変える</Link> : null, content: <>{richMenuStatus === 'error' ? (
         <p className={`${styles.memo} ${styles.faint}`}>
           読み込めませんでした
           <button type="button" className={styles.retry} onClick={() => void data.loadRichMenu()}>もう一度読み込む</button>
@@ -360,56 +361,36 @@ export default function OverviewTab({
             <Notice tone="danger" className={styles.secNoteNoticePlacement} >配信予定を読み込めませんでした
               <button type="button" className={styles.retry} onClick={() => void data.loadUpcoming()}>もう一度読み込む</button></Notice>
           ) : nextDelivery ? (
-            <Link
-              className={styles.row}
-              data-pressable-card=""
+            <IconRow
+              surface="card"
               href={nextDelivery.kind === 'scenario' ? `/scenarios/detail?id=${encodeURIComponent(nextDelivery.id)}` : `/reminders/detail?id=${encodeURIComponent(nextDelivery.id)}`}
-            >
-              <span className={styles.rowIcon}>{nextDelivery.kind === 'scenario' ? <Workflow size={16} aria-hidden /> : <Bell size={16} aria-hidden />}</span>
-              <span className={styles.rowBody}>
-                <span className={styles.rowTop}>
-                  <span className={styles.rowTitle} ><TruncatedText value={String(nextDelivery.name ?? '')} /></span>
-                  <span className={styles.rowSub}>{`${formatDateTime(nextDelivery.scheduledAt)} に送信予定`}</span>
-                </span>
-                {/* 進み具合（何通目まで）は口がまだ無い。棒の場所だけ取って、行の高さを絵にそろえる。 */}
-                <span className={styles.barSpace} aria-hidden />
-              </span>
-            </Link>
+              icon={nextDelivery.kind === 'scenario' ? <Workflow size={16} aria-hidden /> : <Bell size={16} aria-hidden />}
+              title={<TruncatedText value={String(nextDelivery.name ?? '')} />}
+              end={`${formatDateTime(nextDelivery.scheduledAt)} に送信予定`}
+            />
           ) : (
             <p className={styles.secNote}>確定した配信予定はありません</p>
           )}
           {upcomingStatus === 'ready' && !deliveryFailed ? (
             // 今の口は「いちばん近い1件」だけを返す。ほかがあるかは分からないことを、行の形で正直に出す。
-            <div className={`${styles.row} ${styles.rowMuted}`}>
-              <span className={styles.rowIcon}><List size={16} aria-hidden /></span>
-              <span className={styles.rowBody}>
-                <span className={styles.rowTop}>
-                  <span className={styles.rowTitle}>ほかの進行中の配信・リマインダ</span>
-                  <span className={styles.rowSub}>一覧はまだ見られません</span>
-                </span>
-                <span className={styles.barSpace} aria-hidden />
-              </span>
-            </div>
+            <IconRow surface="muted" icon={<List size={16} aria-hidden />} title="ほかの進行中の配信・リマインダ" end="一覧はまだ見られません" />
           ) : null}
         </section>
 
-        <div className={styles.same}>
-          <span className={styles.rowIcon}><Link2 size={16} aria-hidden /></span>
-          <div className={styles.sameBody}>
-            <p className={styles.sameTitle}>同じ人としてつながる情報</p>
-            {/* NEXT-10: 名寄せの実績（マイル口の応答の統合情報）から出す。 */}
-            <p className={styles.sameSub}>
-              {mileageStatus === 'loading' || mileageStatus === 'idle'
+        {/* NEXT-10: 名寄せの実績（マイル口の応答の統合情報）から出す。 */}
+        <IconRow
+          surface="pearl"
+          icon={<Link2 size={16} aria-hidden />}
+          title="同じ人としてつながる情報"
+          sub={<>{mileageStatus === 'loading' || mileageStatus === 'idle'
                 ? 'つながり情報を読み込んでいます…'
                 : mileageStatus === 'error'
                   ? <>つながり情報を読み込めませんでした<button type="button" className={styles.retry} onClick={() => void data.loadMileage()}>もう一度読み込む</button></>
                   : mileageInsights && mileageInsights.accountCount > 1
                     ? `${formatNumber(mileageInsights.accountCount)} 件のLINEアカウントで同じ人としてつながっています${mileageConnections.length ? `（${mileageConnections.map((c) => c.accountName).join('・')}）` : ''}。重複候補が見つかると、根拠と確信度を表示します。`
-                    : 'このアカウントのみに登録があります。重複候補が見つかると、根拠と確信度を表示します。'}
-            </p>
-          </div>
-          <Button href="/duplicates">重複候補を確認</Button>
-        </div>
+                    : 'このアカウントのみに登録があります。重複候補が見つかると、根拠と確信度を表示します。'}</>}
+          end={<Button href="/duplicates">重複候補を確認</Button>}
+        />
 
         <section className={`${styles.section} ${styles.recent}`} aria-labelledby="fdt-recent">
           <div className={styles.secHead}>
@@ -428,30 +409,28 @@ export default function OverviewTab({
               {history.map((item, index) => {
                 const src = timelineSourceHref(item, friendId)
                 return (
-                  <div key={timelineKey(item)} className={styles.recentItem}>
-                    <span className={styles.recentLine}>
-                      <span className={styles.dot}>{recentIcon(item.type)}</span>
-                      {index < history.length - 1 ? <span className={styles.vline} /> : null}
-                    </span>
-                    <span className={styles.recentText}>
-                      {src
-                        ? <a className={styles.recentTitle} href={src.href} target={src.external ? '_blank' : undefined} rel="noreferrer" title={item.summary}>{item.summary}</a>
-                        : <span className={styles.recentTitle} title={item.summary}>{item.summary}</span>}
-                      <span className={styles.recentSub}>{[timelineTypeLabel(item.type), item.lineAccount?.name].filter(Boolean).join('・')}</span>
-                    </span>
-                    <span className={styles.time}>{formatRelative(item.occurredAt)}</span>
-                  </div>
+                  <IconRow
+                    key={timelineKey(item)}
+                    iconShape="round"
+                    connect={index < history.length - 1}
+                    icon={recentIcon(item.type)}
+                    title={src
+                      ? <a className={styles.recentTitle} href={src.href} target={src.external ? '_blank' : undefined} rel="noreferrer">{item.summary}</a>
+                      : item.summary}
+                    titleAttribute={item.summary}
+                    sub={[timelineTypeLabel(item.type), item.lineAccount?.name].filter(Boolean).join('・')}
+                    end={formatRelative(item.occurredAt)}
+                  />
                 )
               })}
               {history.length === 0 ? (
-                <div className={styles.recentItem}>
-                  <span className={styles.recentLine}><span className={styles.dot}><MailOpen size={16} aria-hidden /></span></span>
-                  <span className={styles.recentText}>
-                    <span className={styles.recentTitle}>友だちに追加されました</span>
-                    <span className={styles.recentSub}>{friend.firstTrackedLinkName ?? 'システム'}・ほかの活動履歴はまだありません</span>
-                  </span>
-                  <span className={styles.time}>{friend.createdAt ? formatDay(friend.createdAt) : emptyValue('unknown')}</span>
-                </div>
+                <IconRow
+                  iconShape="round"
+                  icon={<MailOpen size={16} aria-hidden />}
+                  title="友だちに追加されました"
+                  sub={`${friend.firstTrackedLinkName ?? 'システム'}・ほかの活動履歴はまだありません`}
+                  end={friend.createdAt ? formatDay(friend.createdAt) : emptyValue('unknown')}
+                />
               ) : null}
             </div>
           )}

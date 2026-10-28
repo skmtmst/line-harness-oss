@@ -595,7 +595,7 @@ export default function HqHomeV8() {
         <span className={styles.range}>
           {filtered.length === 0 ? '0件' : `${formatNumber(filtered.length)} 件中 ${formatNumber((current - 1) * size + 1)}〜${formatNumber((current - 1) * size + shown.length)} 件`}
         </span>
-        <p className={styles.footNote}>カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます</p>
+        <p className={styles.footNote}>{`${view === 'cards' ? 'カードの「設定」' : '行の「…」'}から、フォルダの移動・名前・親アカウントを変えられます`}</p>
         {pageCount > 1 ? <Pagination page={current} pageCount={pageCount} onPageChange={setPage} ariaLabel="アカウントのページ送り" /> : null}
       </div>
     </>
@@ -606,7 +606,7 @@ export default function HqHomeV8() {
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="JKjsE"
       title="統括のアカウント"
-      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`} {"カードの「設定」から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。"}</>}
+      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{`${view === 'cards' ? 'カードの「設定」' : '行の「…」'}から、フォルダの移動・名前・親アカウントを変えられます。アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。`}</>}
 
       folders={folderColumn}
       folderInset toolbar={toolbar} toolbarSpacing="stats" toolbarRowGap="card"
@@ -661,7 +661,7 @@ export default function HqHomeV8() {
       <FolderEditorDialog
         open={folderDialog !== null}
         title={folderDialog?.editing ? 'フォルダの名前と色を変える' : 'フォルダを追加'}
-        description="アカウントは1つのフォルダに入ります。フォルダを消しても、アカウントは消えません。"
+        description="アカウントは1つのフォルダに入ります。"
         name={folderName} onNameChange={setFolderName} nameId="hq-account-folder-name" nameLabel="フォルダの名前"
         color={folderColor} onColorChange={setFolderColor} colors={FOLDER_SELECT_COLORS}
         placeholder="例：渋谷エリア" maxLength={100}

@@ -223,7 +223,7 @@ function VersionsInner() {
       title={`${detail.name}（版と使われている場所）`}
       help="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。"
       stats={<PageContent layout="stats"><KpiBand aria-label="版と利用先の集計">
-        <KpiCard presentation="band" title="いまの版" icon={<GitBranch size={16} aria-hidden="true" />} value={null} valueText={published ? `v${published.versionNumber}` : emptyValue('unknown')} unit="" detail={published?.publishedAt ? `${monthDay(published.publishedAt)} 公開` : 'まだ公開していません'} />
+        <KpiCard presentation="band" title="いまの版" icon={<GitBranch size={16} aria-hidden="true" />} value={null} valueText={published ? `第${published.versionNumber}版` : emptyValue('unknown')} unit="" detail={published?.publishedAt ? `${monthDay(published.publishedAt)} 公開` : 'まだ公開していません'} />
         <KpiCard presentation="band" title="呼び出し元" icon={<Link2 size={16} aria-hidden="true" />} value={detail.bindings.length} unit="か所" detail={consumerBreakdown(detail.bindings)} />
         <KpiCard presentation="band" title="古い版のまま" icon={<History size={16} aria-hidden="true" />} value={outdatedCount} unit="か所" detail={outdatedCount > 0 ? '新版あり' : 'すべて最新の版です'} />
         <KpiCard presentation="band" title="今月 動いた回数" icon={<Zap size={16} aria-hidden="true" />} value={summary?.executionCountThisMonth ?? null} unit="回" detail={`失敗 ${summary ? formatNumber(summary.failureCountThisMonth) : emptyValue('unknown')}`} />
@@ -261,7 +261,7 @@ function VersionsInner() {
             const label = isDraft ? '下書き' : isCurrent ? '公開中' : '古い版'
             return (
               <li key={version.id} className={styles.versionRow}>
-                <span className={styles.versionName}>{`v${version.versionNumber}`}</span>
+                <span className={styles.versionName}>{`第${version.versionNumber}版`}</span>
                 <StatusBadge tone={isCurrent ? 'success' : 'neutral'}>{label}</StatusBadge>
                 <span className={styles.versionChain} title={stepChain(version.actions)}>{stepChain(version.actions)}</span>
                 {!canEdit ? null : isDraft ? (
@@ -314,7 +314,7 @@ function VersionsInner() {
                       <TruncatedText value={binding.consumerPath || '全体'} />
                       <span className={styles.whereSub}>{CONSUMER_LABELS[binding.consumerType] ?? binding.consumerType}</span>
                     </Td>
-                    <Td className={styles.colPinned}><span className={styles.cell}>{`v${binding.versionNumber}`}</span></Td>
+                    <Td className={styles.colPinned}><span className={styles.cell}>{`第${binding.versionNumber}版`}</span></Td>
                     <Td className={styles.colNum}>
                       <span className={styles.cell} title={binding.runningCount === null ? '未取得' : undefined}>{binding.runningCount ?? emptyValue('unknown')}</span>
                       {binding.olderRunningCount ? <span className={styles.whereSub}>{`旧版 ${binding.olderRunningCount}`}</span> : null}
@@ -329,7 +329,7 @@ function VersionsInner() {
                     <ActionCell className={styles.colOps}>
                       {canEdit && binding.hasNewerVersion && published ? (
                         <Button disabled={Boolean(working)} onClick={() => { setPendingBindingId(binding.id); setDialogError('') }}>
-                          {`v${published.versionNumber} へ更新する`}
+                          {`第${published.versionNumber}版へ更新する`}
                         </Button>
                       ) : <EmptyCell />}
                     </ActionCell>
@@ -343,9 +343,9 @@ function VersionsInner() {
 
       <Dialog
         open={Boolean(pendingBinding && published)}
-        title={`この利用先をv${published?.versionNumber ?? ''}へ更新しますか`}
+        title={`この利用先を第${published?.versionNumber ?? ''}版へ更新しますか`}
         description="実行中・待機中の処理は変えず、次に始まる処理から新版を使います。"
-        confirmLabel={`v${published?.versionNumber ?? ''}へ更新`}
+        confirmLabel={`第${published?.versionNumber ?? ''}版へ更新`}
         busy={working.startsWith('binding:')}
         onCancel={() => { setPendingBindingId(null); setDialogError('') }}
         onConfirm={() => {
@@ -364,12 +364,12 @@ function VersionsInner() {
         <div className={styles.compare}>
           <section>
             <p className={styles.compareLabel}>現在の版</p>
-            <p className={styles.compareValue}>{`v${pendingBinding?.versionNumber ?? emptyValue('unknown')}・${pendingVersion?.actions.length ?? emptyValue('unknown')}個の処理`}</p>
+            <p className={styles.compareValue}>{`第${pendingBinding?.versionNumber ?? emptyValue('unknown')}版・${pendingVersion?.actions.length ?? emptyValue('unknown')}個の処理`}</p>
             <p className={styles.cardLead}>{pendingVersion ? stepChain(pendingVersion.actions) : '未取得'}</p>
           </section>
           <section>
             <p className={styles.compareLabel}>更新後</p>
-            <p className={styles.compareValue}>{`v${published?.versionNumber ?? emptyValue('unknown')}・${published?.actions.length ?? emptyValue('unknown')}個の処理`}</p>
+            <p className={styles.compareValue}>{`第${published?.versionNumber ?? emptyValue('unknown')}版・${published?.actions.length ?? emptyValue('unknown')}個の処理`}</p>
             <p className={styles.cardLead}>{published ? stepChain(published.actions) : '未取得'}</p>
           </section>
         </div>

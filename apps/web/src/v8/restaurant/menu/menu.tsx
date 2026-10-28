@@ -97,7 +97,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
       </StatRow>
       <Panel
         title="メニュー一覧"
-        description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。価格の改定は承認ワークフローを通り、決めた開始日時から新しい価格になります。"
+        description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。価格の改定は承認の流れを通り、決めた開始日時から新しい価格になります。"
         aside={canEdit ? (
           <Button variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</Button>
         ) : null}

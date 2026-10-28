@@ -52,9 +52,8 @@ describe.each(variants)('$name の読込状態', variant => {
     render(variant.component('A'))
     expect(screen.queryByText(variant.empty)).toBeNull()
     expect(document.querySelector('[data-list-state="empty"]')).toBeNull()
-    const numbers = [...document.querySelectorAll('[data-kpi-number]')].map(node => node.textContent)
-    expect(numbers.length).toBeGreaterThan(0)
-    expect(numbers.every(number => number === '—')).toBe(true)
+    // 読み込み中は「—」ではなく骨組み（洗い出し 126）。
+    expect([...document.querySelectorAll('[data-kpi-number]')].some(node => node.textContent === '—')).toBe(false)
     await act(async () => pending.resolve(answer([])))
     await screen.findByText(variant.empty)
     expect(screen.queryByRole('link', { name: variant.create })).toBeNull()

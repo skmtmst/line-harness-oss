@@ -3,6 +3,8 @@ import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { terms, termsAvoid } from '@/lib/terms'
+
 const SRC = path.join(__dirname, '..')
 
 /** 画面のコードを、`.test.` を除いて集める。 */
@@ -168,4 +170,17 @@ describe("用語表（管理画面 §7 48番の表記ゆれ潰し）", () => {
     const order = [...inbox!.s.matchAll(/label: '(未対応|対応中|保留|対応済み)'/g)].map((m) => m[1])
     expect(order, 'v6-02-inbox-requirements-draft.md:188 の順').toEqual(['未対応', '対応中', '保留', '対応済み'])
   })
+
+  /**
+   * **言葉の表（docs/v8-requirements/terms.md）の「使わない」を画面に出さない。**
+   *
+   * 表の写し（lib/terms.ts の termsAvoid）をそのまま使う。表に行を足せば見張りも増える。
+   * 表そのもの（lib/terms.ts）と、法務の文（content/ の利用規約）は対象外。
+   */
+  for (const { id, avoid } of termsAvoid) {
+    it(`言葉の表 TM-${id}：「${terms[id]}」と書く`, () => {
+      const hits = FILES.filter((f) => f.p !== 'lib/terms.ts' && !f.p.startsWith('content/') && avoid.test(f.s)).map((f) => f.p)
+      expect(hits, `「${terms[id]}」に直す`).toEqual([])
+    })
+  }
 })

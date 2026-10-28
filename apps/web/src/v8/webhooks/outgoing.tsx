@@ -545,7 +545,7 @@ export default function WebhooksOutgoingV8() {
         canCreate={canManage}
         filtered={displayed.length > 0}
         onClearFilters={filterActive ? clearFilters : undefined}
-        filteredDescription="検索や絞り込みの札を外すと、すべて出ます"
+        filteredDescription="検索や絞り込みを外すと、すべて出ます"
       />
     )
   } else {

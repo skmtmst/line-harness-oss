@@ -1,97 +1,57 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, expect, it } from 'vitest'
 import { PageExplanationBody, PageExplanationProvider, PageExplanationToggle } from './page-explanation'
 import { ListPage } from '@/components/templates/list-page'
 
-const staff = vi.hoisted(() => ({ id: 'staff-one' }))
-vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => staff }))
-const stored = new Map<string, string>()
-const browserStorage = {
-  getItem: (key: string) => stored.get(key) ?? null,
-  setItem: (key: string, value: string) => { stored.set(key, value) },
-}
-const storageDescriptor = Object.getOwnPropertyDescriptor(window, 'localStorage')
-function Screen({ pageKey = 'scenarios' }: { pageKey?: string }) {
-  return <PageExplanationProvider pageKey={pageKey}>
+/*
+ * 画面の説明は題の右の「？」1つ（洗い出し 74）。灰の帯・青い「この画面の説明 ⌃」は出さない。
+ * 押すと吹き出しで中身を読め、もう一度押すと閉じる。
+ */
+function Screen() {
+  return <PageExplanationProvider pageKey="scenarios">
     <PageExplanationToggle />
     <PageExplanationBody>配信を始める前にテストを送ります。</PageExplanationBody>
   </PageExplanationProvider>
 }
-beforeEach(() => {
-  staff.id = 'staff-one'
-  stored.clear()
-  Object.defineProperty(window, 'localStorage', { configurable: true, value: browserStorage })
-})
-afterEach(() => {
-  cleanup()
-  vi.restoreAllMocks()
-  if (storageDescriptor) Object.defineProperty(window, 'localStorage', storageDescriptor)
-  else Reflect.deleteProperty(window, 'localStorage')
-})
+afterEach(() => cleanup())
 
-it('初めは開き、閉じた状態を同じ人の同じ画面だけで覚える', () => {
-  const view = render(<Screen />)
-  const toggle = () => screen.getByRole('button', { name: 'この画面の説明' })
-  expect(toggle().getAttribute('aria-expanded')).toBe('true')
-  expect(screen.getByRole('region').id).toBe(toggle().getAttribute('aria-controls'))
-  fireEvent.click(toggle())
-  expect(screen.queryByRole('region')).toBeNull()
-  view.unmount()
-  const next = render(<Screen />)
-  expect(toggle().getAttribute('aria-expanded')).toBe('false')
-  next.rerender(<Screen pageKey="tags" />)
-  expect(toggle().getAttribute('aria-expanded')).toBe('true')
-  next.rerender(<Screen />)
-  expect(toggle().getAttribute('aria-expanded')).toBe('false')
-})
-
-it('人が変わると前の人の開閉を引き継がず、戻るとその人の状態へ戻る', () => {
-  const view = render(<Screen />)
-  fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
-  staff.id = 'staff-two'
-  view.rerender(<Screen />)
-  expect(screen.getByRole('region').textContent).toContain('テストを送ります')
-  staff.id = 'staff-one'
-  view.rerender(<Screen />)
-  expect(screen.queryByRole('region')).toBeNull()
-})
-
-it('保存領域が使えない端末でもその場の開閉はできる', () => {
-  vi.spyOn(window.localStorage, 'getItem').mockImplementation(() => { throw new Error('storage unavailable') })
-  vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => { throw new Error('storage unavailable') })
+it('初めは閉じた「？」で、押すと吹き出しで説明を読める', () => {
   render(<Screen />)
   const toggle = screen.getByRole('button', { name: 'この画面の説明' })
+  expect(toggle.getAttribute('aria-expanded')).toBe('false')
+  expect(document.body.textContent).not.toContain('テストを送ります')
   fireEvent.click(toggle)
-  expect(screen.queryByRole('region')).toBeNull()
+  expect(toggle.getAttribute('aria-expanded')).toBe('true')
+  expect(screen.getByRole('note').textContent).toContain('テストを送ります')
   fireEvent.click(toggle)
-  expect(screen.getByRole('region')).toBeTruthy()
+  expect(screen.queryByRole('note')).toBeNull()
 })
 
-it('外のProviderが持つ説明の入口を一覧の見出しへ渡し、同じ人の開閉を保つ', () => {
-  const List = () => <PageExplanationProvider pageKey="scenarios-list">
+it('画面に説明の帯を出さない', () => {
+  const view = render(<Screen />)
+  expect(view.container.querySelector('[role="region"]')).toBeNull()
+  expect(view.container.textContent).not.toContain('この画面の説明')
+})
+
+it('外のProviderの説明は一覧の見出しの「？」1つに、題の補足と一緒に入る', () => {
+  const view = render(<PageExplanationProvider pageKey="scenarios-list">
     <ListPage title="シナリオ" help="用語の説明" explanationToggle={<PageExplanationToggle />}>
       <PageExplanationBody keepMounted>配信を始める前にテストを送ります。</PageExplanationBody>
     </ListPage>
-  </PageExplanationProvider>
-  const view = render(<List />)
+  </PageExplanationProvider>)
   const toggle = screen.getByRole('button', { name: 'この画面の説明' })
-  const help = screen.getByRole('button', { name: 'シナリオの説明' })
   expect(view.container.querySelector('[data-template-region="heading"]')?.contains(toggle)).toBe(true)
-  expect(help.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-  expect(screen.getByRole('region').id).toBe(toggle.getAttribute('aria-controls'))
+  expect(screen.queryByRole('button', { name: 'シナリオの説明' })).toBeNull()
   fireEvent.click(toggle)
-  expect(screen.queryByRole('region')).toBeNull()
-  view.unmount()
-  render(<List />)
-  expect(screen.getByRole('button', { name: 'この画面の説明' }).getAttribute('aria-expanded')).toBe('false')
-  fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
-  expect(screen.getByRole('region').textContent).toContain('テストを送ります')
+  const note = screen.getByRole('note').textContent ?? ''
+  expect(note).toContain('用語の説明')
+  expect(note).toContain('テストを送ります')
 })
 
 it('説明本文と明示した入口を渡す一覧は入口を二重に作らない', () => {
   render(<ListPage title="一覧" explanation="画面全体の説明" explanationToggle={<PageExplanationToggle />}>本文</ListPage>)
   expect(screen.getAllByRole('button', { name: 'この画面の説明' })).toHaveLength(1)
   fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
-  expect(screen.queryByRole('region')).toBeNull()
+  expect(screen.getByRole('note').textContent).toContain('画面全体の説明')
 })

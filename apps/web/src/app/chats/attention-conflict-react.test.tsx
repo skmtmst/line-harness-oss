@@ -183,7 +183,7 @@ describe('注目切替の競合(N-040 #808)', () => {
     net.malformedEmails = true
     await render()
     await flush()
-    expect(host.textContent).toContain('メールの読み込みに失敗しました。')
+    expect(host.textContent).toContain('メールを読み込めませんでした。')
     expect(starButton()?.getAttribute('aria-label')).toBe('注目にする')
     expect(host.querySelector('textarea[aria-label="メッセージを入力"]')).not.toBeNull()
   })

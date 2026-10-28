@@ -18,4 +18,16 @@
 :root .row { height: var(--polish-table-row); padding-block: 0; }
 :root .row [data-skeleton] { background-color: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); }
 
-:root :global([data-list-skeleton]) .row { height: var(--tpl-list-row-h); }
+:root :global([data-list-skeleton]) .row { height: var(--tpl-list-row-h);
+
+/* 予約の時間の表の骨組み：見出しの段・時刻の列・枠の線。本物の盤と同じ並びにして、出てきた時に形を変えない。 */
+.board { display: flex; flex-direction: column; width: 100%; min-width: 0; }
+.boardHead, .boardRow { display: grid; grid-template-columns: var(--tpl-bks-time-w) repeat(4, minmax(0, 1fr)); align-items: center; gap: var(--polish-space-section); padding: 0 var(--polish-space-section); }
+.boardHead { height: var(--tpl-list-row-h); box-shadow: var(--shadow-row-line); }
+.boardRow { height: var(--tpl-list-row-h); box-shadow: var(--shadow-row-line); }
+.boardRow:last-child { box-shadow: none; }
+.board [data-skeleton] { display: block; height: var(--polish-skeleton-height); background-color: var(--polish-skeleton-bg); border-radius: var(--polish-skeleton-radius); }
+.boardHeadBone { width: 60%; }
+.boardTime { width: 70%; }
+.boardCell { display: block; height: 100%; box-shadow: inset 1px 0 0 var(--color-hairline); }
+}

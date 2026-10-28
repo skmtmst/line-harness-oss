@@ -5,7 +5,7 @@ import type { StaffMember } from '@line-crm/shared'
  * ★V8（夕41）：設定の画面の、白い板の中の左の「設定の中のメニュー」。
  *
  *   - 絵の並び（会社とロゴは API ができるまで出さない）
- *   - 機能設定の下にマニュアルの正本表・ファイルの検査
+ *   - 機能設定の下にマニュアルの対応表・ファイルの安全確認
  *   - 「専用」の小見出しの下に EC連携・LINE通知
  *   - いまの画面が選ばれた形になる
  *   - 見るだけの人には、見られる画面だけ出す（左のメニューと同じ決まり）
@@ -97,8 +97,8 @@ describe('★V8 設定の中のメニュー', () => {
       'ログインユーザー',
       '機能設定',
       // 機能設定を開いているときだけ下の2つを出す（絵には無いが、ここからしか行けない）
-      'マニュアルの正本表',
-      'ファイルの検査',
+      'マニュアルの対応表',
+      'ファイルの安全確認',
       '運用状態',
       'EC連携',
       'LINE通知',
@@ -136,7 +136,7 @@ describe('★V8 設定の中のメニュー', () => {
     await waitFor(() => expect(view.queryByRole('link', { name: 'SNS 連携' })).toBeTruthy())
     expect(view.getByRole('link', { name: 'SNS 連携' }).getAttribute('aria-current')).toBe('page')
     expect(view.getByRole('link', { name: '機能設定' }).getAttribute('aria-current')).toBeNull()
-    expect(view.queryByRole('link', { name: 'ファイルの検査' })).toBeNull()
+    expect(view.queryByRole('link', { name: 'ファイルの安全確認' })).toBeNull()
   })
 
   it('LINE通知の画面では機能設定を同時に選択しない', async () => {
@@ -152,7 +152,7 @@ describe('★V8 設定の中のメニュー', () => {
     fixture.pathname = '/accounts'
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
-    expect(view.queryByRole('link', { name: 'マニュアルの正本表' })).toBeNull()
+    expect(view.queryByRole('link', { name: 'マニュアルの対応表' })).toBeNull()
     expect(view.getByRole('link', { name: 'LINEアカウント' }).className).toContain('itemActive')
   })
 
@@ -160,7 +160,7 @@ describe('★V8 設定の中のメニュー', () => {
     fixture.pathname = '/settings/manual-links'
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
-    const child = view.getByRole('link', { name: 'マニュアルの正本表' })
+    const child = view.getByRole('link', { name: 'マニュアルの対応表' })
     expect(child.className).toContain('itemActive')
     const parent = view.getByRole('link', { name: '機能設定' })
     expect(parent.className).not.toContain('itemActive')

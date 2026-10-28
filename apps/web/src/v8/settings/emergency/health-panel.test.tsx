@@ -59,7 +59,7 @@ const ROW_TITLES = [
   '友だちの急な減り',
   'Webhook が届いているか',
   '配信が送れているか',
-  '裏の仕組み',
+  '保存と送信のしくみ',
   '鍵・証明書の期限',
 ]
 
@@ -72,7 +72,7 @@ const ROW_OF_KEY: Record<OperationHealthCheckKey, string> = {
   friend_change: '友だちの急な減り',
   webhook: 'Webhook が届いているか',
   dispatch_jobs: '配信が送れているか',
-  infra_canary: '裏の仕組み',
+  infra_canary: '保存と送信のしくみ',
   credential_expiry: '鍵・証明書の期限',
 }
 
@@ -193,7 +193,7 @@ describe('健全性チェックの表', () => {
     expect(within(fresh).getByText('正常')).toBeTruthy()
     expect(within(fresh).queryByText('古い確認')).toBeNull()
 
-    const missing = rowOf('裏の仕組み')
+    const missing = rowOf('保存と送信のしくみ')
     expect(within(missing).getByText('未確認')).toBeTruthy()
     expect(within(missing).queryByText('古い確認')).toBeNull()
   })

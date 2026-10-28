@@ -75,7 +75,7 @@ describe('ウェビナー一覧の実測値', () => {
 
   it('CTAの延べ回数と押した人数を分けて表示する', () => {
     const card = kpiCells(overview()).find(({ key }) => key === 'cta')
-    expect(card?.title).toBe('CTAクリック')
+    expect(card?.title).toBe('案内ボタンを押した数')
     expect(card?.value).toBeNull()
     expect(card?.detail).toBe('押した人 86人')
   })

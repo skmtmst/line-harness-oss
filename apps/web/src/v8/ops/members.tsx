@@ -81,7 +81,7 @@ export default function OpsMembersV8() {
     if (!res.success) { setError(res.error || '招待できませんでした。時間をおいて、もう一度お試しください。'); return }
     setNotice(res.data.activationState === 'active'
       ? '最初の運営メンバーとして登録しました'
-      : `${email.trim()} に招待メールを送りました。相手が2要素認証の登録を終えると運営メンバーになります`)
+      : `${email.trim()} に招待メールを送りました。相手が二段階認証の登録を終えると運営メンバーになります`)
     setEmail('')
     void load()
   }
@@ -113,7 +113,7 @@ export default function OpsMembersV8() {
     <PageFrame kind="list" boardId="FvbHW" standalone skeleton>
       <OpsHead
         title="メンバー管理"
-        description="運営メンバーはメールで招待します。招待された人はパスワードを設定し、2要素認証の登録が終わるまで運営コンソールに入れません。自分自身は変えられません。"
+        description="運営メンバーはメールで招待します。招待された人はパスワードを設定し、二段階認証の登録が終わるまで運営コンソールに入れません。自分自身は変えられません。"
         environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
       />
       <div className={parts.stack}>
@@ -130,7 +130,7 @@ export default function OpsMembersV8() {
         {tab === 'members' ? (
           <>
             <KpiBand gridClassName="grid grid-cols-3">
-              <KpiCard presentation="cell" icon={<Users size={16} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? <span title={`2要素認証 設定済み ${summary.totpEnabled}人 / ${formatNumber(summary.members)}人・未設定 ${Math.max(0, summary.members - summary.totpEnabled)}人`}>{`有効 ${active}・招待中 ${summary.invited}`}</span> : emptyValue('unknown')} loading={!loaded} />
+              <KpiCard presentation="cell" icon={<Users size={16} aria-hidden="true" />} title="運営メンバー" value={summary ? summary.members : null} unit="人" detail={summary ? <span title={`二段階認証 設定済み ${summary.totpEnabled}人 / ${formatNumber(summary.members)}人・未設定 ${Math.max(0, summary.members - summary.totpEnabled)}人`}>{`有効 ${active}・招待中 ${summary.invited}`}</span> : emptyValue('unknown')} loading={!loaded} />
               <KpiCard presentation="cell" icon={<LogIn size={16} aria-hidden="true" />} title="今月の代理ログイン" value={summary ? summary.impersonationsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
               <KpiCard presentation="cell" icon={<Eye size={16} aria-hidden="true" />} title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
             </KpiBand>
@@ -171,7 +171,7 @@ export default function OpsMembersV8() {
                 <GridHeadRow>
                   <GridCell role="columnheader">名前</GridCell>
                   <GridCell role="columnheader">メール</GridCell>
-                  <GridCell role="columnheader">2要素認証</GridCell>
+                  <GridCell role="columnheader">二段階認証</GridCell>
                   <GridCell role="columnheader">状態</GridCell>
                   <GridCell role="columnheader">最終ログイン</GridCell>
                   <GridCell role="columnheader">操作</GridCell>
@@ -252,7 +252,7 @@ function shortDateTime(value: string | null): string {
 
 function totpChip(m: OpsMember) {
   if (m.totpEnabled) return <StatusBadge tone="success">設定済み</StatusBadge>
-  if (m.activationState === 'awaiting_totp' || m.activationState === 'invited') return <StatusBadge tone="info">2要素認証待ち</StatusBadge>
+  if (m.activationState === 'awaiting_totp' || m.activationState === 'invited') return <StatusBadge tone="info">二段階認証待ち</StatusBadge>
   return <StatusBadge tone="danger">未設定</StatusBadge>
 }
 

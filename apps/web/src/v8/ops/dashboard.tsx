@@ -284,7 +284,7 @@ function revenueSourceLabel(pricing: 'stripe_actual' | 'list_price', lastSyncedA
   if (!lastSyncedAt) return 'Stripe の入金実績'
   const date = new Date(lastSyncedAt)
   if (!Number.isFinite(date.getTime())) return 'Stripe の入金実績'
-  return `Stripe の入金実績（最終同期 ${formatDateTime(date)}）`
+  return `Stripe の入金実績（最後に取り込んだ日時 ${formatDateTime(date)}）`
 }
 
 /** 平均の初回返信（2.4 時間のように小数1桁の時間）。 */

@@ -175,12 +175,10 @@ describe('スコアの絵合わせ（板 `IRPw8`）', () => {
 
   it('画面の説明から補足を開閉できる', async () => {
     await waitForRows()
-    const explanation = container.querySelector('[data-screen-explanation]') as HTMLElement
-    const toggle = container.querySelector('[data-screen-explanation-toggle]') as HTMLButtonElement
-    expect(explanation.textContent).toContain('下書きの変更は、公開するまで使われません。')
+    const toggle = [...container.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.getAttribute('aria-label') === 'この画面の説明')!
     await act(async () => { toggle.click() })
-    expect(explanation.hidden).toBe(true)
+    expect(container.querySelector('[data-screen-explanation]')?.textContent).toContain('下書きの変更は、公開するまで使われません。')
     await act(async () => { toggle.click() })
-    expect(explanation.hidden).toBe(false)
+    expect(container.querySelector('[data-screen-explanation]')).toBeNull()
   })
 })

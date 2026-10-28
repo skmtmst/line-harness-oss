@@ -27,7 +27,7 @@ import { useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form
 type Session = { id: string; name: string; platformAdmin?: boolean; platformAdminState?: string | null; stepUpMethod?: string }
 
 /**
- * 運営コンソールの 2要素認証の設定 V8。
+ * 運営コンソールの 二段階認証の設定 V8。
  *
  * 動きは 管理画面（app/ops/two-factor）と同じ。招待を受けた人（awaiting_totp）と、
  * 登録済みで未設定の運営メンバーだけが開ける。確認が通るとサーバーが
@@ -142,7 +142,7 @@ export default function OpsTwoFactorV8() {
         </span>
       </div>
       <Card variant="form" className={styles.card} aria-labelledby="ops-totp-title">
-        <PageHeading inset="none" title="2要素認証を設定" titleId="ops-totp-title" titleAs="h1" subtitleSize="body" subtitle={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} />
+        <PageHeading inset="none" title="二段階認証を設定" titleId="ops-totp-title" titleAs="h1" subtitleSize="body" subtitle={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} />
 
         {session?.platformAdmin ? <MfaPolicy loginPath="/ops/login" /> : null}
         {state === 'loading' ? (
@@ -154,7 +154,7 @@ export default function OpsTwoFactorV8() {
           </>
         ) : state === 'done' && recoveryCodes.length ? <RecoveryCodePanel codes={recoveryCodes} onContinue={() => void logoutAndGoToLogin('/ops/login')} /> : state === 'done' ? (
           <>
-            <NoteBar tone="info">2要素認証を登録しました。安全のため一度ログアウトしています。メールとパスワード、次に6桁の数字でログインし直してください。</NoteBar>
+            <NoteBar tone="info">二段階認証を登録しました。安全のため一度ログアウトしています。メールとパスワード、次に6桁の数字でログインし直してください。</NoteBar>
             <Button fullWidth variant="primary" onClick={() => logoutAndGoToLogin('/ops/login')} className={styles.wide}>運営のログインへ</Button>
           </>
         ) : (

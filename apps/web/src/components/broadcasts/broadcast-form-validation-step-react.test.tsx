@@ -121,7 +121,7 @@ function saveDraftButton(): HTMLButtonElement {
 
 function errorText(): Element | null {
   const found = [...container.querySelectorAll('[role="alert"]')].find(
-    (item) => (item.textContent ?? '').includes('管理用タイトルを入力してください'),
+    (item) => (item.textContent ?? '').includes('配信名を入力してください'),
   )
   return found ?? null
 }

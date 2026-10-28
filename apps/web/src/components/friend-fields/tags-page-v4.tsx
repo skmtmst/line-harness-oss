@@ -273,7 +273,7 @@ function deleteImpactRows(
     { name: '積んだマイル', value: 'そのまま残る', result: '取り消されません' },
   ]
   if (impact?.linkedActions.length) {
-    rows.push({ name: '使用中の版', value: impact.linkedActions.map((item) => `${item.state === 'published' ? '公開' : '下書き'} v${item.version}`).join('・'), result: impact.linkedActions.some((item) => item.state === 'published') ? '公開している版があるので消せません' : '公開版はありません' })
+    rows.push({ name: '使用中の版', value: impact.linkedActions.map((item) => `${item.state === 'published' ? '公開' : '下書き'} 第${item.version}版`).join('・'), result: impact.linkedActions.some((item) => item.state === 'published') ? '公開している版があるので消せません' : '公開版はありません' })
   }
   return rows
 }

@@ -62,8 +62,5 @@ describe('#548-9 メール取得の失敗は専用の行で知らせる', () => 
     expect(loader).toContain("setEmailError('')")
   })
 
-  it('LINE側の失敗表示とは別に、読み込み直しのボタンを出す', () => {
-    expect(PAGE).toContain('メールを読み込み直す')
-    expect(PAGE).toContain('channel !== \'line\' && emailError')
-  })
+  // LINE側の失敗と同じ知らせにまとめても押せばメールも読み直すことは、inbox-list-retry-react.test.tsx が画面を描いて確かめる。
 })

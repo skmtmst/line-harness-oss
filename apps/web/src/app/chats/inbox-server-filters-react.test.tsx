@@ -151,7 +151,7 @@ describe.each(['line', 'email'] as const)('%s 一覧の条件変更', channel =>
     await act(async () => { old.resolve(failed ? response({ success: false }, 503) : response(payload(channel, ['stale-result']))) })
     expect(host.textContent).toContain('new-current')
     expect(host.textContent).not.toContain('stale-result')
-    expect(host.textContent).not.toContain('読み込みに失敗')
+    expect(host.textContent).not.toContain('読み込めませんでした')
     expect(host.textContent).not.toContain('追加読み込みに失敗')
   })
 
@@ -163,6 +163,6 @@ describe.each(['line', 'email'] as const)('%s 一覧の条件変更', channel =>
     expect(host.textContent).toContain('old-before-failure')
     await click('1時間以上待ち')
     expect(host.textContent).not.toContain('old-before-failure')
-    expect(host.textContent).toContain('読み込みに失敗')
+    expect(host.textContent).toContain('読み込めませんでした')
   })
 })
