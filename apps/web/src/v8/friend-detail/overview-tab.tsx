@@ -107,10 +107,10 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
   const [tagBusy, setTagBusy] = useState(false)
   const [tagError, setTagError] = useState('')
   const tagRequestRef = useRef(0)
-  const tagScopeRef = useRef({ friendId, accountId: selectedAccountId })
-  if (tagScopeRef.current.friendId !== friendId || tagScopeRef.current.accountId !== selectedAccountId) {
+  const tagScopeRef = useRef({ friendId, accountId: selectedAccountId, canEdit: perms.editSupport })
+  if (tagScopeRef.current.friendId !== friendId || tagScopeRef.current.accountId !== selectedAccountId || tagScopeRef.current.canEdit !== perms.editSupport) {
     tagRequestRef.current += 1
-    tagScopeRef.current = { friendId, accountId: selectedAccountId }
+    tagScopeRef.current = { friendId, accountId: selectedAccountId, canEdit: perms.editSupport }
   }
   const tagScope = tagScopeRef.current
   useEffect(() => {
@@ -120,8 +120,10 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
     setTagError('')
     setAvailableTags([])
     setSelectedTagIds([])
-  }, [friendId, selectedAccountId])
+    return () => { tagRequestRef.current += 1 }
+  }, [friendId, selectedAccountId, perms.editSupport])
   const openTagEditor = async () => {
+    if (!tagScopeRef.current.canEdit || tagScope !== tagScopeRef.current) return
     const request = ++tagRequestRef.current
     const ownerId = friendId
     const ownerAccountId = selectedAccountId
@@ -142,9 +144,10 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
     }
   }
   const saveTags = async () => {
-    if (tagBusy || tagScope !== tagScopeRef.current) return
+    if (tagBusy || !tagScopeRef.current.canEdit || tagScope !== tagScopeRef.current) return
     const request = ++tagRequestRef.current
     const ownerId = friendId
+    const isCurrent = () => request === tagRequestRef.current && tagScope === tagScopeRef.current && tagScopeRef.current.canEdit
     setTagBusy(true)
     setTagError('')
     const current = new Set((friend.tags ?? []).map((tag) => tag.id))
@@ -154,21 +157,24 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
         ...[...next].filter((id) => !current.has(id)).map((id) => api.friends.addTag(ownerId, id)),
         ...[...current].filter((id) => !next.has(id)).map((id) => api.friends.removeTag(ownerId, id)),
       ])
-      if (request !== tagRequestRef.current || ownerId !== tagScopeRef.current.friendId) return
+      if (!isCurrent()) return
       if (changes.some((result) => !result.success)) {
         await data.loadFriend()
+        if (!isCurrent()) return
         setTagError('一部のタグを保存できませんでした。現在の内容を読み直してください')
         return
       }
       await data.loadFriend()
+      if (!isCurrent()) return
       setTagDialogOpen(false)
       notifyToast('タグを更新しました')
     } catch (caught) {
-      if (request !== tagRequestRef.current) return
+      if (!isCurrent()) return
       await data.loadFriend()
+      if (!isCurrent()) return
       setTagError(saveErrors.capture(caught) ? '' : 'タグを保存できませんでした。現在の内容を読み直してください')
     } finally {
-      if (request === tagRequestRef.current) setTagBusy(false)
+      if (isCurrent()) setTagBusy(false)
     }
   }
   /* ★V8 mAbif：配信の受け取り（段と右の引き出し）と、会員ランクの1行。 */
@@ -268,7 +274,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
       </div>}
     />
   </aside></CustomerInfoRail><DeliveryConsentDrawer open={consentOpen} friendId={friendId} friendName={realName || friend.displayName} rows={consents.rows} canEdit={perms.manage} onClose={() => setConsentOpen(false)} onSaved={consents.reload} />
-    <SaveErrorScope errors={saveErrors}><Dialog open={tagDialogOpen} title="タグを編集" designWidth={480} busy={tagBusy} error={tagError} confirmLabel="保存する" onConfirm={() => void saveTags()} onCancel={() => setTagDialogOpen(false)}>
+    <SaveErrorScope errors={saveErrors}><Dialog open={tagDialogOpen && perms.editSupport} title="タグを編集" designWidth={480} busy={tagBusy} error={tagError} confirmLabel="保存する" onConfirm={() => void saveTags()} onCancel={() => setTagDialogOpen(false)}>
       <div className={styles.dialogBody} data-friend-tag-editor>
         {availableTags.map((tag) => <Checkbox key={tag.id} checked={selectedTagIds.includes(tag.id)} disabled={tagBusy} onCheckedChange={(checked) => setSelectedTagIds((current) => checked ? [...current, tag.id] : current.filter((id) => id !== tag.id))}>{tag.name}</Checkbox>)}
         {!tagBusy && availableTags.length === 0 && !tagError ? <p className={styles.memo}>選べるタグはありません</p> : null}
