@@ -2,6 +2,7 @@
 
 import { loadStaffIdentity } from '@/lib/staff-role'
 import Link from 'next/link'
+import TextLink from '@/components/shared/text-link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ApiError, fetchApi } from '@/lib/api'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -218,8 +219,7 @@ export default function PendingInboxCard({
           件数は小カードの1か所に集約し、見出しの横では繰り返さない（m22d）。
         */
         title="対応が必要な受信（全アカウント）"
-        action={<Link href="/chats" className="hover:underline">受信箱をすべて見る →</Link>}
-        actionTone="info"
+        action={<TextLink href="/chats">受信箱へ</TextLink>}
       />
 
       {/*

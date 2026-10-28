@@ -1,7 +1,7 @@
 'use client'
 
-import { useCallback, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes, type ReactNode } from 'react'
-import { Check, CircleAlert, CircleCheck, Info, TriangleAlert, X } from 'lucide-react'
+import { Children, isValidElement, useCallback, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes, type ReactNode } from 'react'
+import { Check, X } from 'lucide-react'
 import HelpTip from './help-tip'
 import styles from './notice.module.css'
 import { humanizeErrorText } from './human-error-text'
@@ -19,11 +19,21 @@ const NODE_BY_TONE: Record<CanonicalTone, string> = {
   danger: 'uR9s8',
 }
 
-const ICON_BY_TONE: Record<CanonicalTone, typeof CircleCheck> = {
-  info: Info,
-  success: CircleCheck,
-  warn: TriangleAlert,
-  danger: CircleAlert,
+/* 色だけに頼らないよう、注意と失敗は題（題が無ければ本文）の頭に言葉を付ける。 */
+const STATUS_WORD_BY_TONE: Partial<Record<CanonicalTone, string>> = {
+  warn: '要確認',
+  danger: '失敗',
+}
+
+/** 文字・断片・要素の中の文字だけをつないで、書き出しを読む。 */
+function leadingText(node: ReactNode): string {
+  let text = ''
+  Children.forEach(node, child => {
+    if (text.length > 8) return
+    if (typeof child === 'string' || typeof child === 'number') text += String(child)
+    else if (isValidElement<{ children?: ReactNode }>(child)) text += leadingText(child.props.children)
+  })
+  return text.trimStart()
 }
 
 export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
@@ -37,7 +47,7 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   states?: readonly { label: string; state: 'done' | 'pending' }[]
   /** 区切り線の下の控えめな操作。確認と遷移は呼び出し側が持つ。 */
   footer?: ReactNode
-  /** 内容を短い丸の印で伝える。既定の図柄も引き続き使える。 */
+  /** @deprecated 印は tone ごとに固定。互換のため受け取るが描画には使わない。 */
   marker?: 'dot'
   /** カード内などの小さな帯。案内・成功の本文は1行に省略し、title で全文を渡す。警告・危険は折り返す。 */
   compact?: boolean
@@ -61,14 +71,15 @@ export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
   helpLabel?: string
   /** 長い説明がある場所。渡すと吹き出しに「くわしく」が出る。 */
   helpHref?: string
-  /**
-   * 左の図柄の差し替え。省略時は種類の既定印。
-   * `null` で図柄なし。 の帯は順序印（list-ordered）のため口を用意。
-   * 既定の描画は変えない（管理画面 の画素も不変）。
-   */
+  /** @deprecated 印は tone ごとに固定。互換のため受け取るが描画には使わない。 */
   icon?: ReactNode
   /** アカウントの短い説明。既定の帯の色・寸法は変えない。 */
   presentation?: 'account-note' | 'ops'
+  /**
+   * 頭の言葉（注意＝「要確認：」・失敗＝「失敗：」）を付けない。危ない操作の窓で、
+   * 題そのものが問いかけになっている帯だけが使う。知らせでは使わない。
+   */
+  statusWord?: false
 }
 
 /**
@@ -83,7 +94,6 @@ export default function Notice({
   heading,
   states,
   footer,
-  marker,
   compact = false,
   appearance,
   message,
@@ -96,12 +106,23 @@ export default function Notice({
   helpLabel,
   helpHref,
   icon,
+  marker,
   presentation,
+  statusWord,
   role,
   ...props
 }: NoticeProps) {
+  // 呼び出し側が渡す図柄で tone と印の組み合わせが崩れないよう、互換 prop は描画しない。
+  void icon
+  void marker
   const canonical = tone
-  const Icon = ICON_BY_TONE[canonical]
+  const body = typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))
+  const word = statusWord === false ? undefined : STATUS_WORD_BY_TONE[canonical]
+  const lead = heading ? heading : body
+  // 呼び出し側がもう同じ言葉で書き出している時（「失敗した処理が…」など）は重ねない。
+  const prefix = word && !leadingText(lead).startsWith(word)
+    ? <span className={styles.statusWord} data-notice-status-word>{word}：</span>
+    : null
   const node = NODE_BY_TONE[canonical]
   const hasHelp = help !== undefined && help !== null
   const helpTip = hasHelp ? (
@@ -126,20 +147,17 @@ export default function Notice({
       data-presentation={presentation}
       data-action-layout={action ? actionLayout : undefined}
       data-has-action={!!action || undefined}
-      data-marker={marker}
       data-design-node={props['data-design-node'] ?? node}
     >
-      {marker === 'dot' && icon === undefined ? <span className={styles.icon} aria-hidden="true" /> : icon === undefined ? (
-        <Icon className={styles.icon} aria-hidden="true" size={16} />
-      ) : icon === null ? null : (
-        <span className={styles.icon} aria-hidden="true">{icon}</span>
-      )}
-      <div className={styles.message}>
-        {heading ? <><div className={styles.headingRow}><div className={styles.heading}>{heading}</div>{hasHelp ? helpTip : null}</div><div className={styles.description}>{typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}</div></>
-          : typeof children === 'string' ? humanizeErrorText(children) : children ?? (message === undefined ? message : humanizeErrorText(message))}
-        {hasHelp && !heading ? helpTip : null}
-        {states?.length ? <NoticeStates items={states} /> : null}
-        {footer ? <div className={styles.footer}>{footer}</div> : null}
+      <div className={styles.content}>
+        <span className={styles.dot} data-notice-dot aria-hidden="true" />
+        <div className={styles.message} data-notice-message>
+          {heading ? <><div className={styles.headingRow}><div className={styles.heading} data-notice-heading>{prefix}{heading}</div>{hasHelp ? helpTip : null}</div><div className={styles.description}>{body}</div></>
+            : <>{prefix}{body}</>}
+          {hasHelp && !heading ? helpTip : null}
+          {states?.length ? <NoticeStates items={states} /> : null}
+          {footer ? <div className={styles.footer}>{footer}</div> : null}
+        </div>
       </div>
       {/* ［×］は操作と同じ行に入れ、操作のボタンと縦の真ん中をそろえる（題が1行でも2行でも）。 */}
       {action ? <span className={styles.action}>{action}{closeButton}</span> : closeButton}

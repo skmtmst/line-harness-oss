@@ -134,7 +134,7 @@ export function AffiliateArchiveDialog({
         />
       ) : impact ? (
         <div className="space-y-4">
-          <Notice tone="danger" heading={<> <h3>アーカイブすると、次の3つが変わります</h3> </>}>
+          <Notice tone="warn" role="alert" heading={<> <h3>アーカイブすると、次の3つが変わります</h3> </>}>
 
             {/*
               R291: 「ここを開く」は確認中の紹介者の明細へ飛ぶ。案件一覧や

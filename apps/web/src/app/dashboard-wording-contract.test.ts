@@ -3,6 +3,7 @@ const fs = { readFileSync: readUiSource }
 import path from 'node:path'
 
 import { describe, expect, it } from 'vitest'
+import { formatWaitRough } from '../lib/format-duration'
 
 const PAGE = fs.readFileSync(path.join(__dirname, 'page.tsx'), 'utf8')
 
@@ -53,11 +54,8 @@ describe('ダッシュボードの言葉を設計にそろえる', () => {
   })
 
   it('待ち時間の整形は共通の場所に置く（画面ごとに書かない）', () => {
-    const shared = code(fs.readFileSync(path.join(__dirname, '..', 'lib', 'format-duration.ts'), 'utf8'))
-    expect(shared).toContain('export function formatWaitRough(minutes: number): string')
-    expect(shared).toContain('if (total < 60) return `${total}分前`')
-    expect(shared).toContain('if (total < 60 * 24) return `${Math.floor(total / 60)}時間前`')
-    expect(shared).toContain('return `${Math.floor(total / (60 * 24))}日前`')
+    expect(formatWaitRough(65)).toBe('1時間前')
+    expect(formatWaitRough(24 * 60)).toBe('24時間前')
     expect(CODE, 'ダッシュボードの中に自前の整形を書かない').not.toContain('function humanWait')
   })
 

@@ -633,7 +633,7 @@ export default function NewCommonVarV8() {
         /></SaveErrorField></Field></div>
 
       {secretWarningFields && (
-        <Notice tone="danger" ref={secretWarningRef} role="alertdialog" aria-labelledby="cv-secret-warning-title" aria-describedby="cv-secret-warning-description" action={<>
+        <Notice tone="warn" ref={secretWarningRef} role="alertdialog" aria-labelledby="cv-secret-warning-title" aria-describedby="cv-secret-warning-description" action={<>
           <div className={styles.secretConfirmActions}>
             <Button
               type="button"

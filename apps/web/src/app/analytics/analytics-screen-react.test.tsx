@@ -269,6 +269,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
@@ -539,6 +540,8 @@ describe('使われ方', () => {
   }
 
   it('帯・注・気づいたこと・最後に確認した時刻を出し、取れない時間は「—」と理由にする', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-28T00:00:00Z'))
     net.handler = usageHandler()
     await render('usage')
 
@@ -551,7 +554,7 @@ describe('使われ方', () => {
     expect(host.textContent).toContain('項目が多いほど良い、ではありません')
     expect(host.querySelector('#usage-observations-title')?.textContent).toBe('気づいたこと')
     expect(host.textContent).toContain('・テンプレート：2 個は使われていません')
-    expect(host.textContent).toContain('利用関係を最後に確認: 2026年9月9日 12:00')
+    expect(host.textContent).toContain('利用関係を最後に確認: 9月9日 12:00')
     const rows = Array.from(host.querySelectorAll('[aria-label="機能ごとの使われ方"] tbody tr'))
     expect(rows[0]?.querySelectorAll('td')[4]?.textContent).toBe('09/08')
     expect(rows[1]?.querySelectorAll('td')[4]?.textContent).toBe('—')

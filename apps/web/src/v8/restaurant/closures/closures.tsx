@@ -1,7 +1,7 @@
 'use client'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Bell, Check, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { RestaurantChannelCloseTask, RestaurantClosure, RestaurantOpeningDay } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -258,7 +258,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
       {mediaError?<ListState kind="error" title="予約サイトを読み込めませんでした" onRetry={()=>setMediaRetry(n=>n+1)}/>:null}
       {first && firstItem ? (
         <div className={styles.bandRow}>
-          <Notice tone="warn" role="status" data-closure-band="" icon={<Bell size={20} aria-hidden="true" />} action={<>
+          <Notice tone="warn" role="status" data-closure-band="" action={<>
             {firstMedium?.loginUrl ? (
               <Button external href={firstMedium.loginUrl}  >{`${firstMedium.name}の管理画面を開く`}</Button>
             ) : null}
@@ -268,7 +268,7 @@ export default function ClosuresBoard({ ctx, accountId, today, canWrite, canGoog
               </Button>
             ) : null}
             <>
-              <TextLink href="/restaurant-test/close-tasks">すべて見る</TextLink>
+              <TextLink href="/restaurant-test/close-tasks">休業日の対応一覧へ</TextLink>
             </>
           </>} heading={<>{`${dayTitle(first.closure.startDate)}の${KIND_LABEL[first.closure.kind]}：他の予約サイトの枠を閉じてください（未対応 ${formatNumber(first.t.open.length)} 件）`}</>}>
             <p className={styles.bandDetail}>

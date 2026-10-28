@@ -106,7 +106,7 @@ describe('統括のアカウント', () => {
     expect(band.closest('article')).toBe(card)
     expect(card.querySelector('dl')!.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(band.compareDocumentPosition(card.querySelector('button[aria-label$="へ入る"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(band.querySelector('svg')).toBeTruthy()
+    expect(band.querySelector('[data-notice-dot]')).toBeTruthy()
     expect(card.textContent).not.toContain('LINE ID・接続状態を確かめてください')
     expect([...card.querySelectorAll('button')].some((button) => button.textContent === '更新する')).toBe(true)
   })

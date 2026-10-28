@@ -124,7 +124,7 @@ test('期間が逆転したまま確定しても取得せず、両方の日付�
   expect(mocks.history).not.toHaveBeenCalled()
   expect(screen.getByLabelText('開始日').getAttribute('aria-invalid')).toBe('true')
   expect(screen.getByLabelText('終了日').getAttribute('aria-invalid')).toBe('true')
-  expect(screen.getByRole('alert').textContent).toBe('開始日は終了日より前の日付を入力してください')
+  expect(screen.getByRole('alert').textContent).toBe('失敗：開始日は終了日より前の日付を入力してください')
 })
 
 test('APIの400は再読み込みの通信障害にせず、日付条件の直し方を知らせる', async () => {

@@ -13,6 +13,7 @@ import { PageFooter } from '@/components/templates/page-footer'
 import Checkbox from '@/components/shared/checkbox'
 import Radio from '@/components/shared/radio'
 import Select from '@/components/shared/select'
+import TruncatedText from '@/components/shared/truncated-text'
 import { TextField } from '@/components/shared/text-field'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import ListState from '@/components/shared/list-state'
@@ -294,7 +295,7 @@ function CompareInner() {
                     const same = left?.valuePreview != null && left.valuePreview === right?.valuePreview
                     return (
                       <Tr key={field.fieldKey} className={styles.row}>
-                        <Td><span className={styles.itemName}>{field.fieldLabel === 'メールアドレス' ? 'メール' : field.fieldLabel}</span></Td>
+                        <Td><TruncatedText className={styles.itemName} value={field.fieldLabel === 'メールアドレス' ? 'メール' : field.fieldLabel} /></Td>
                         <Td>{left?.valuePreview ?? emptyValue('unknown')}</Td>
                         <Td>{right?.valuePreview ?? emptyValue('unknown')}</Td>
                         <Td>
