@@ -17,8 +17,12 @@ export default function PageActionMenu({ buttons, menu, label }: { buttons: Reac
   const focusAnchor = () => anchor.current?.querySelector<HTMLElement>('button[aria-haspopup="menu"]')?.focus({ preventScroll: true })
   const items: ActionMenuItem[] = buttons.filter(node => !node.props.hidden).map((node, index) => ({
     id: `${id}-${node.key ?? index}`, label: actionLabel(node.props.children),
+    title: node.props.title,
+    'aria-label': node.props['aria-label'],
+    'aria-description': node.props['aria-description'],
     disabled: node.props.disabled,
     disabledReason: 'disabledReason' in node.props ? node.props.disabledReason ?? undefined : undefined,
+    lockedReason: node.props.lockedReason ?? undefined,
     tone: /danger/.test(node.props.variant ?? '') ? 'danger' : undefined,
     content: cloneElement(node, {
       variant: 'text', textTone: /danger/.test(node.props.variant ?? '') ? 'danger' : node.props.textTone, role: 'menuitem',

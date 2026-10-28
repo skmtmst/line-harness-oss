@@ -16,6 +16,10 @@ export type ActionMenuItem = {
   group?: ActionMenuGroup
   id: string
   label: string
+  /** 共通の操作から移した説明と読み上げ名を保つ。 */
+  title?: string
+  'aria-label'?: string
+  'aria-description'?: string
   /** 未指定は種類に応じた印、nullは印なし。 */
   icon?: ReactNode
   /** 自分で結果を表示する共通操作（コピーなど）。 */
@@ -262,8 +266,10 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
             disabled={Boolean(item.disabled) && !locked}
             aria-disabled={locked || undefined}
             aria-describedby={blocked && reason ? reasonId : undefined}
+            aria-label={item['aria-label'] ?? (blocked ? itemLabel : undefined)}
+            aria-description={item['aria-description'] ?? (!locked && item.disabled ? item.disabledReason : undefined)}
             data-permission-locked={locked ? '' : undefined}
-            title={itemLabel}
+            title={item.title ?? itemLabel}
             data-qa-open={item.qaOpen}
             onPointerEnter={(event) => { if (locked && event.pointerType !== 'touch') showReason(event.currentTarget, item.lockedReason!) }}
             onPointerLeave={(event) => { if (event.pointerType !== 'touch' && document.activeElement !== event.currentTarget) setTip(null) }}
