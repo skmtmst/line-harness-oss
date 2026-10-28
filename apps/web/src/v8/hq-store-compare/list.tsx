@@ -231,6 +231,7 @@ export default function StoreComparisonList() {
                   <Tr data-store-connection={row.accountId}>
                     <Td colSpan={columns.length + 1}>
                       <Notice tone="warn" compact
+                        heading={row.name?.trim() || expired.name?.trim() || '店名未取得'}
                         message={checkFailed === row.accountId ? 'LINE の接続が切れています。確かめ直せませんでした。時間をおいてもう一度押してください。' : 'LINE の接続が切れています。この店の数は取れないことがあります。'}
                         action={canRecheck ? <Button variant="text" onClick={() => void recheck(expired)} busy={checkingId === row.accountId} disabled={checkingId !== null}>更新する</Button> : undefined}
                       />
