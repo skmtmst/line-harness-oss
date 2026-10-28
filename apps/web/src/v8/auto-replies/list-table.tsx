@@ -15,7 +15,7 @@ import ReorderHandle from '@/components/shared/reorder-handle'
 import { RowMenu } from '@/components/shared/row-actions'
 import { RovingTbody } from '@/components/shared/row-roving'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { DelayedSkeleton } from '@/components/shared/skeleton'
+import { DelayedSkeleton, ListSkeleton } from '@/components/shared/skeleton'
 import StatusBadge from '@/components/shared/status-badge'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { DataTable,NameCell,RowNameLink,TableHeadRow,Td,Th,Tr } from '@/components/shared/table'
@@ -46,7 +46,6 @@ type RenderAutoReplyListContext = {
   liveOrder: { shown: readonly AutoReply[]; overId: string | null; enter: (id: string) => void; dropTarget: (fallback: string) => string; reset: () => void; }
   load: () => Promise<void>
   loadError: unknown
-  loadingSkeleton: JSX.Element
   moveNotice: string
   narrow: boolean
   openMenuId: string | null
@@ -86,12 +85,12 @@ type RenderAutoReplyListContext = {
   visibleLoadState: LoadState
 }
 
-export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, loadingSkeleton, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState }: RenderAutoReplyListContext) {
-  return (visibleLoadState === 'loading' ? (
+export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState }: RenderAutoReplyListContext) {
+  return <DelayedSkeleton loading={visibleLoadState === 'loading'} skeleton={
     <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
-      <DelayedSkeleton loading skeleton={loadingSkeleton} />
+      <ListSkeleton rows={4} columns={narrow ? 3 : 4} />
     </div>
-  ) : visibleLoadState === 'error' || visibleLoadState === 'forbidden' ? (
+  }>{visibleLoadState === 'loading' ? undefined : visibleLoadState === 'error' || visibleLoadState === 'forbidden' ? (
     <ListState kind="error" title={visibleLoadState === 'forbidden' ? LOAD_STATE_WORDS.forbidden.label : '自動応答を読み込めませんでした'} description={visibleLoadState === 'forbidden'
           ? LOAD_STATE_WORDS.forbidden.note
           : isForbiddenOrRateLimited(loadError)
@@ -386,5 +385,5 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
           </Button></BulkBar>
       ) : null}
     </>
-  ))
+  )}</DelayedSkeleton>
 }
