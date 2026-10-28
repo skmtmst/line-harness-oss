@@ -1,5 +1,5 @@
 import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.js';
-import { tracedFetch as fetch } from '@line-crm/shared/server';
+import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 import { inputError, inputJsonBoundary, inputShapeErrors } from '../lib/input-errors.js';
 /**
  * 飲食店向け「Googleビジネス」第3段：投稿（最新情報・イベント・特典）。
@@ -47,6 +47,7 @@ import {
   instagramConfig,
   instagramImageUrl,
   instagramPublish,
+  instagramUrlDetail,
 } from '../services/instagram.js';
 import {
   accessTokenFor,
@@ -446,6 +447,16 @@ async function crossPostToInstagram(c: Context<Env>, store: StoreContext, row: P
     });
   } catch (error) {
     const code = error instanceof InstagramError ? error.code : 'instagram_failed';
+    const detail = error instanceof InstagramError ? instagramUrlDetail(error.detail) : null;
+    const status = /(?:^| )status=([0-9]{3})(?= |$)/.exec(detail ?? '');
+    const upstreamCode = /(?:^| )code=([0-9]{1,9})(?= |$)/.exec(detail ?? '');
+    const upstreamSubcode = /(?:^| )subcode=([0-9]{1,9})(?= |$)/.exec(detail ?? '');
+    const stage = detail?.includes('/media_publish') ? 'publish' : detail?.includes('/media') ? 'container' : 'other';
+    logger.warn(`instagram.cross_post.${stage}.failed`, {
+      status: status ? Number(status[1]) : undefined,
+      upstreamCode: upstreamCode ? Number(upstreamCode[1]) : undefined,
+      upstreamSubcode: upstreamSubcode ? Number(upstreamSubcode[1]) : undefined,
+    });
     await setStatus(c, store.id, row.id, { instagramStatus: 'failed', instagramError: code, instagramPermalink: null });
   }
 }
