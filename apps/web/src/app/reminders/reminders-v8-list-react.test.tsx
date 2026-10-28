@@ -135,6 +135,12 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   await eventually(() => {
     expect(host.querySelector('[data-design-node="apLqS"], [data-design-node="Iffil"]')).toBeTruthy()
   })
+  const folderColumn = host.querySelector('aside[data-template-region="folders"][data-shared-part="folder-column"]')
+  expect(folderColumn, '共通のフォルダ領域に接続されている').not.toBeNull()
+  expect(folderColumn?.closest('[data-list-folders]')?.getAttribute('data-list-folders')).toBe('true')
+  const folderPanel = folderColumn!.querySelector('aside[aria-label="フォルダ"]')
+  expect(folderPanel?.closest('[data-shared-part="folder-column"]')).toBe(folderColumn)
+  expect(folderPanel?.querySelector('button[data-folder-select][title="未分類"]')?.textContent).toBe('未分類0')
   // 見本が決めた帯と見出し
   expect(host.textContent).toContain('リマインダを作る')
   const createLinks = [...host.querySelectorAll('a')].filter(link => link.textContent?.trim() === '＋ リマインダを作る')
