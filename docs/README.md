@@ -844,3 +844,4 @@
 - [休憩表示と配信結果の位置](release-log/unreleased/1876-kenta-break-and-broadcast-results.md) — 休憩の見分け方と配信結果の数字の配置の反映履歴。
 - [二段階認証の説明](release-log/unreleased/1877-kenta-two-factor-help.md) — 二段階認証の画面に関する反映履歴。
 - [バナーの参照画像の説明](release-log/unreleased/1878-kenta-banner-reference-icons.md) — 説明の印の配置に関する反映履歴。
+- [カルーセルのボタン削除](release-log/unreleased/1879-kenta-carousel-delete.md) — カルーセル内の操作に関する反映履歴。
