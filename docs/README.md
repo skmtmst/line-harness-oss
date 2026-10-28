@@ -827,3 +827,5 @@
 - [隣接する操作・案内の間隔](release-log/unreleased/1854-kenta-adjacent-spacing.md)
 - [分析と友だち詳細の案内](release-log/unreleased/1855-kenta-analysis-friend-notices.md)
 - [予約メニューの案内の間隔](release-log/unreleased/1856-kenta-booking-notice-spacing.md)
+
+- [友だち一覧の差の印](release-log/unreleased/1862-kenta-friends-delta.md) — 増減と要確認の共通表示の反映履歴。

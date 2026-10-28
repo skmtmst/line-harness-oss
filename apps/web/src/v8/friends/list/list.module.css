@@ -7,23 +7,6 @@
 .viewerBand { margin-bottom: var(--tpl-fm-band-after); }
 
 
-.delta {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-fr-tag-gap);
-  padding: var(--tpl-fr-delta-pad);
-  border-radius: var(--radius-mini);
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-fr-delta-lh);
-  white-space: nowrap;
-}
-
-.deltaUp { background: var(--color-accent-soft); color: var(--color-accent-deep); }
-.deltaWarn { background: var(--color-status-warn-soft); color: var(--color-status-warn-deep); }
-
 /* 道具の2段（「道具」：段の間10）。 */
 .tools {
   display: flex;
