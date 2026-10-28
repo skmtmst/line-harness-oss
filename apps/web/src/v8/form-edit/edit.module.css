@@ -256,9 +256,6 @@
 .phoneHome > span { width: var(--tpl-fe-phone-home-w); height: var(--tpl-fe-phone-home-line); border-radius: var(--tpl-fe-phone-home-r); background: var(--tpl-fe-phone-home-color); }
 .tabs { display: flex; flex-direction: column; gap: var(--tpl-fe-tabs-gap); }
 .status { margin: 0; font-size: var(--tpl-fe-note-size); line-height: var(--tpl-fe-note-lh); color: var(--color-ink-faint); }
-/* 絵のタブは文字の行 19・下の余白 12（型のタブより 1 低い）。 */
-:global(:root) .tabs :global([role='tab']), :global(:root) .tabs :global([role='tab'] *) { line-height: var(--tpl-fe-body-lh); }
-:global(:root) .tabs :global([role='tablist']), :global(:root) .tabs :global([role='tab']) { height: var(--tpl-fe-tabs-h); }
 /* 行の「…」は絵どおり 28 角の枠付き（共通の「…」をこの画面の中だけ小さく）。 */
 :global(:root) .more :global(button) { min-height: 0; min-width: 0; width: var(--tpl-fe-more-h); height: var(--tpl-fe-more-h); border-radius: var(--radius-control); box-shadow: var(--tpl-fe-ring); background: var(--color-canvas); }
 /* 行の中の押せる文字は行の高さを増やさない（全体の押せる大きさの決まりは行そのものが満たす）。 */
