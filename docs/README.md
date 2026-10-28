@@ -833,3 +833,4 @@
 - [一覧の読み込み表示](release-log/unreleased/1864-kenta-list-loading.md) — 一斉配信の列ずれと自動応答の読み込み表示の反映履歴。
 - [統括の接続情報の更新](release-log/unreleased/1865-kenta-connection-refresh.md) — 単件・全件と再読み込みの反映履歴。
 - [選択中の絞り込み表示](release-log/unreleased/1866-kenta-filter-selection.md) — 薄緑の地と緑の枠・文字の反映履歴。
+- [自動処理のタグ未選択表示](release-log/unreleased/1867-kenta-unselected-tag-summary.md) — 未選択と設定済みの区別の反映履歴。
