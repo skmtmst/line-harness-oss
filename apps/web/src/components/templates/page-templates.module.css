@@ -605,8 +605,8 @@
 
 /* 数の帯を白い板の余白の内側へ置く。道具に含む帯は道具の余白を使う。 */
 :global(:root) .stats:has([data-kpi-strip]) { padding: var(--space-8) var(--tpl-list-inset) 0; min-width: 0; max-width: 100%; }
-/* 一覧の数の帯と本文の白い面は、共通のカード間隔で分ける。 */
-:global(:root) .listBody > .stats:has([data-kpi-strip]) { padding-bottom: var(--polish-space-card); }
+/* 一覧の数の帯は、上下を同じ間隔で白い面から分ける。 */
+:global(:root) .listBody > .stats:has([data-kpi-strip]) { padding-bottom: var(--space-8); }
 :global(:root) .section { border-bottom: 0; }
 
 @container v8-page (width < 1100px) {
