@@ -22,14 +22,42 @@ const candidate = (id: string, lineAccountId: string | null = 'a'): MediaItem =>
 })
 beforeEach(() => {
   vi.clearAllMocks()
+  const nativeRect = HTMLElement.prototype.getBoundingClientRect
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const section = this.closest('[aria-label="お店の写真"]')
+    const card = this.closest('[data-design-part="card"]')
+    if (!section || !card) return nativeRect.call(this)
+    const cards = [...section.querySelectorAll('[data-design-part="card"]')]
+    return new DOMRect(cards.indexOf(card) * 300, 100, 280, 400)
+  })
   net.list.mockResolvedValue({ success: true, data: catalog() })
   net.media.mockResolvedValue({ success: true, data: { items: [candidate('new'), candidate('shared', null), candidate('foreign', 'b')], total: 3 } })
   for (const save of [net.saveMenu, net.saveStaff, net.saveStore]) save.mockResolvedValue({ success: true, data: { version: 5 } })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.restoreAllMocks() })
 function show(permissions = { canEditMenus: true, canEditSettings: true }, accountId = 'a', register = vi.fn()) {
   return render(<V8TabEditContext.Provider value={register}><Photos key={accountId} accountId={accountId} {...permissions} /></V8TabEditContext.Provider>)
 }
+function storeCards() {
+  return within(screen.getByRole('region', { name: 'お店の写真', exact: true })).getAllByRole('region')
+}
+function orderLabels() { return storeCards().map(card => card.getAttribute('aria-label')) }
+async function liftPhoto(name: string) {
+  const handle = await screen.findByRole('button', { name: `${name}の写真を並べ替え`, exact: true })
+  handle.focus()
+  fireEvent.keyDown(handle, { key: ' ', code: 'Space' })
+  await waitFor(() => expect(handle.getAttribute('aria-pressed')).toBe('true'))
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+  return handle
+}
+async function movePhoto(name: string, key: 'ArrowLeft' | 'ArrowRight', destination: string, finish = 'Space') {
+  const handle = await liftPhoto(name)
+  fireEvent.keyDown(document, { key, code: key })
+  await waitFor(() => expect(document.body.textContent).toContain(`${name}の写真を${orderLabels().indexOf(`${destination}の写真`) + 1}番目へ移動します。`))
+  fireEvent.keyDown(document, { key: finish === 'Space' ? ' ' : finish, code: finish })
+  await waitFor(() => expect(handle.getAttribute('aria-pressed')).not.toBe('true'))
+}
+
 async function pick(name: string) {
   fireEvent.click(await screen.findByRole('button', { name: `${name}の写真を選ぶ` }))
   fireEvent.click(await screen.findByRole('option', { name: /候補new/ }))
@@ -52,7 +80,7 @@ describe('BA-19 予約写真の編集', () => {
   })
   it('店の写真は3枠のまま順と解除を一緒に保存する', async () => {
     show()
-    fireEvent.click(await screen.findByRole('button', { name: '外観を後へ' }))
+    await movePhoto('外観', 'ArrowRight', '店内')
     const section = screen.getByRole('region', { name: 'お店の写真' })
     expect(within(section).getAllByRole('region').map(el => el.getAttribute('aria-label'))).toEqual(['店内の写真', '外観の写真', '待合の写真'])
     fireEvent.click(screen.getByRole('button', { name: '外観の写真を外す' }))
@@ -102,7 +130,8 @@ describe('BA-19 予約写真の編集', () => {
     view.rerender(<Photos accountId="a" canEditMenus canEditSettings={false} />)
     expect(await screen.findByRole('button', { name: 'カットの写真を選ぶ' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '山田の写真を選ぶ' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '外観を後へ' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '外観の写真を並べ替え' })).toBeNull()
+    expect(storeCards().map(card => card.querySelector('[data-photo-position]')?.textContent)).toEqual(['1', '2', '3'])
   })
   it('読込失敗は空状態にせず読み直せる', async () => {
     net.list.mockRejectedValueOnce(new Error('offline'))
@@ -128,7 +157,7 @@ describe('BA-19 予約写真の編集', () => {
   it('店の欄名を該当する写真へ結び、写真を直すまで入力を残す', async () => {
     net.saveStore.mockRejectedValueOnce({ status: 422, fields: { 'photos.interior': '店内の写真を選び直してください' } })
     show()
-    fireEvent.click(await screen.findByRole('button', { name: '外観を後へ' }))
+    await movePhoto('外観', 'ArrowRight', '店内')
     fireEvent.click(screen.getByRole('button', { name: 'お店の写真を保存する' }))
     const inside = screen.getByRole('region', { name: '店内の写真' })
     expect(await within(inside).findByText('店内の写真を選び直してください')).toBeTruthy()
@@ -239,19 +268,81 @@ describe('BA-19 予約写真の編集', () => {
 
 });
 
-it('店舗の順序操作は写真選択のエラー枠と分けた正規操作枠へ接続し、理由と拒否を保つ', async () => {
+it('店舗の順序を番号と共通つまみで示し、選択と外すの2操作と写真無しの理由を保つ', async () => {
   show()
-  const back = await screen.findByRole('button', { name: '外観を前へ', exact: true })
-  const waiting = screen.getByRole('region', { name: '待合の写真', exact: true })
-  const actions = back.closest('[data-card-actions]')
-  expect(actions).not.toBeNull()
-  expect(within(actions as HTMLElement).getByRole('button', { name: '外観を後へ', exact: true })).toBeTruthy()
-  expect((back as HTMLButtonElement).disabled).toBe(true)
-  expect(screen.getByText('これが先頭の写真です。')).toBeTruthy()
+  const waiting = await screen.findByRole('region', { name: '待合の写真', exact: true })
+  expect(storeCards().map(card => card.querySelector('[data-photo-position]')?.textContent)).toEqual(['1', '2', '3'])
+  for (const card of storeCards()) {
+    expect(card.querySelector('[data-reorder-handle]')).not.toBeNull()
+    expect(within(card).getAllByRole('button')).toHaveLength(3)
+  }
+  expect(screen.queryByRole('button', { name: /を前へ|を後へ/ })).toBeNull()
+  expect(screen.queryByText('これが先頭の写真です。')).toBeNull()
+  expect(screen.queryByText('これが最後の写真です。')).toBeNull()
   expect(within(waiting).getByText('写真はありません。')).toBeTruthy()
-  expect(within(waiting).getByRole('button', { name: '待合の写真を外す', exact: true }).closest('[data-card-actions]')).toBeNull()
+  expect((within(waiting).getByRole('button', { name: '待合の写真を外す', exact: true }) as HTMLButtonElement).disabled).toBe(true)
   expect(within(waiting).getAllByRole('group')).toHaveLength(1)
-  expect(screen.getByRole('button', { name: 'カットの写真を選ぶ', exact: true }).closest('[data-card-actions]')).toBeNull()
-  fireEvent.click(back)
+  expect(screen.getByRole('region', { name: 'カットの写真' }).querySelector('[data-photo-position]')).toBeNull()
+  expect(net.saveStore).not.toHaveBeenCalled()
+})
+
+it('キーボードのEscで並替を取消し、drop後の番号と書きかけは既存取消口で元に戻る', async () => {
+  const register = vi.fn()
+  show(undefined, 'a', register)
+  await movePhoto('外観', 'ArrowRight', '店内', 'Escape')
+  expect(orderLabels()).toEqual(['外観の写真', '店内の写真', '待合の写真'])
+  expect(screen.queryByRole('button', { name: 'お店の写真を保存する' })).toBeNull()
+  await movePhoto('外観', 'ArrowRight', '店内')
+  expect(orderLabels()).toEqual(['店内の写真', '外観の写真', '待合の写真'])
+  expect(storeCards().map(card => card.querySelector('[data-photo-position]')?.textContent)).toEqual(['1', '2', '3'])
+  expect(net.saveStore).not.toHaveBeenCalled()
+  await waitFor(() => expect(register).toHaveBeenLastCalledWith(expect.objectContaining({ dirty: true })))
+  await act(async () => register.mock.calls.at(-1)![0].onReset())
+  expect(orderLabels()).toEqual(['外観の写真', '店内の写真', '待合の写真'])
+  expect(screen.queryByRole('button', { name: 'お店の写真を保存する' })).toBeNull()
+})
+
+it('順変更の競合時は下書きを残し、再取得した版でだけ明示保存する', async () => {
+  net.saveStore.mockRejectedValueOnce({ status: 409 })
+  const latest = catalog(); latest.store!.version = 8
+  net.list.mockResolvedValueOnce({ success: true, data: catalog() }).mockResolvedValueOnce({ success: true, data: latest })
+  show()
+  await movePhoto('外観', 'ArrowRight', '店内')
+  fireEvent.click(screen.getByRole('button', { name: 'お店の写真を保存する' }))
+  await screen.findByRole('alert')
+  expect(orderLabels()).toEqual(['店内の写真', '外観の写真', '待合の写真'])
+  expect(screen.queryByRole('button', { name: '外観の写真を並べ替え' })).toBeNull()
+  expect((screen.getByRole('button', { name: 'お店の写真を保存する' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: '入力を残して読み直す' }))
+  await screen.findByRole('button', { name: '外観の写真を並べ替え' })
+  fireEvent.click(screen.getByRole('button', { name: 'お店の写真を保存する' }))
+  await waitFor(() => expect(net.saveStore).toHaveBeenLastCalledWith('a', expect.objectContaining({ expectedVersion: 8, order: ['interior', 'exterior', 'waiting'] })))
+})
+
+it('保存中は並替を隠して番号を保持し、遅い保存が新アカウントへ届かない', async () => {
+  let finish!: (value: unknown) => void
+  net.saveStore.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  const view = show()
+  await movePhoto('外観', 'ArrowRight', '店内')
+  fireEvent.click(screen.getByRole('button', { name: 'お店の写真を保存する' }))
+  expect(screen.queryByRole('button', { name: '外観の写真を並べ替え' })).toBeNull()
+  expect(storeCards().map(card => card.querySelector('[data-photo-position]')?.textContent)).toEqual(['1', '2', '3'])
+  view.rerender(<Photos key="b" accountId="b" canEditMenus canEditSettings />)
+  await screen.findByRole('button', { name: '外観の写真を並べ替え' })
+  await act(async () => finish({ success: true, data: { version: 99 } }))
+  expect(orderLabels()).toEqual(['外観の写真', '店内の写真', '待合の写真'])
+  expect(screen.queryByRole('button', { name: 'お店の写真を保存する' })).toBeNull()
+  expect(net.saved).not.toHaveBeenCalled()
+})
+
+it('持ち上げ中のアカウント切替では旧dragを取消し、新店の順や書きかけを変えない', async () => {
+  const view = show()
+  await liftPhoto('外観')
+  view.rerender(<Photos key="b" accountId="b" canEditMenus canEditSettings />)
+  await screen.findByRole('button', { name: '外観の写真を並べ替え' })
+  fireEvent.keyDown(document, { key: 'ArrowRight', code: 'ArrowRight' })
+  fireEvent.keyDown(document, { key: ' ', code: 'Space' })
+  expect(orderLabels()).toEqual(['外観の写真', '店内の写真', '待合の写真'])
+  expect(screen.queryByRole('button', { name: 'お店の写真を保存する' })).toBeNull()
   expect(net.saveStore).not.toHaveBeenCalled()
 })
