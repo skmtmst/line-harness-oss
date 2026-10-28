@@ -595,6 +595,9 @@
 :global(:root) .stats:has([data-kpi-strip]) { padding: var(--space-8) var(--tpl-list-inset) 0; min-width: 0; max-width: 100%; }
 :global(:root) .listBody > .stats:has([data-kpi-strip]),
 :global(:root) .listBody > .split > .main > .content > .stats:has([data-kpi-strip]) { padding-bottom: var(--space-8); }
+/* 数の帯の次に警告と分析の列が続くとき、段の上と警告の下へ間隔を重ねない。 */
+:global(:root) .stats:has([data-kpi-strip]) + .listSection:has(> :global([data-design-part='notice'][data-tone='warn']):first-child + .detailColumns[data-presentation='analysis']:last-child) { padding-top: 0; gap: var(--space-8); }
+:global(:root) .stats:has([data-kpi-strip]) + .listSection:has(> :global([data-design-part='notice'][data-tone='warn']):first-child + .detailColumns[data-presentation='analysis']:last-child) > :global([data-design-part='notice'][data-tone='warn']):first-child { margin-block: 0; }
 :global(:root) .section { border-bottom: 0; }
 
 @container v8-page (width < 1100px) {
