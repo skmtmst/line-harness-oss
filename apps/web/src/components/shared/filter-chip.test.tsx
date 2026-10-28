@@ -98,13 +98,9 @@ describe('絞り込み札 FilterChip（m13i）', () => {
     expect(CODE).toMatch(/:root\s*\.v6-filter-chip\s*\{[^}]*outline:\s*1px solid var\(--color-control-border\)/s)
   })
 
-  it('現在のV8の高さ36・緑の選択を使い、タッチ44pxを保つ', () => {
+  it('現在のV8の高さ36・タッチ44pxを保つ', () => {
     expect(CODE).toMatch(/:root \.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
-    // 現役の選択はの薄い緑の地と濃い緑の文字。aria-pressed の動きも別の試験で守る。
-    expect(CODE).toMatch(
-      /:root \.v6-filter-chip\[aria-pressed='true'\]\s*\{[^}]*background:\s*var\(--color-selection-bg\)/s,
-    )
-    expect(CODE).toMatch(/\.v6-filter-chip\[aria-pressed='true'\]\s*\{[^}]*color:\s*var\(--color-selection-border\)/s)
+    // 選択色の後勝ちと故障復元は実ブラウザのcomputed対照で守る。
     // タッチ端末は44px（#639 の契約と同じ錨）。
     expect(CODE).toMatch(
       /@media \(pointer: coarse\)\s*\{\s*\.v6-filter-chip\s*\{\s*min-height:\s*44px;/,
