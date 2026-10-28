@@ -1,3 +1,4 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
@@ -259,7 +260,7 @@ async function eventually(check: () => void, timeout = 5000) {
 }
 
 beforeEach(() => {
-  staffRole = 'admin'
+  staffRole = verifiedStaffRole('admin')
   query = ''
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
@@ -271,6 +272,7 @@ beforeEach(() => {
   root = createRoot(host)
 })
 afterEach(() => {
+  verifiedStaffRole(null)
   act(() => root.unmount())
   host.remove()
   document.documentElement.removeAttribute('data-theme')
@@ -348,7 +350,7 @@ test('v8 のタブごとに板 ID が替わる（S35pO・CJlf4・oRbJi・IRPw8�
 })
 
 test('v8 の閲覧のみは帯が出て、作る操作は出さない（E2Any）', async () => {
-  staffRole = 'staff'
+  staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<MileagePage />))
   await settle()

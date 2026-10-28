@@ -491,7 +491,7 @@ describe('M4torYの保存・送信の誤操作防止（DOMと実API境界）', (
     const save = getPageAction({ name: '下書きを保存', exact: true }) as HTMLButtonElement
     await act(async () => { save.click(); save.click() })
     await waitFor(() => expect(api.createCalls).toHaveLength(1))
-    expect((getPageAction({ name: '処理中…', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+    expect((getPageAction({ name: '作成中…', exact: true }) as HTMLButtonElement).disabled).toBe(true)
     await act(async () => api.releaseCreate())
     await waitFor(() => expect(api.updateCalls).toHaveLength(1))
     await waitFor(() => expect(storedDraftsOf()[ACCOUNT_A]?.id).toBe('draft-account-a-1'))

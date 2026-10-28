@@ -1,3 +1,4 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
@@ -74,7 +75,7 @@ const json = (data: unknown, status = 200) => new Response(
 beforeEach(() => {
   outgoingItems = [outgoing()]
   folderItems = []
-  staffRole = 'owner'
+  staffRole = verifiedStaffRole('owner')
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -101,6 +102,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  verifiedStaffRole(null)
   act(() => { root.unmount() })
   host.remove()
   vi.unstubAllGlobals()
@@ -171,7 +173,7 @@ test('v8 の左のフォルダの列（共通・種類 webhook）で絞れる。
 })
 
 test('v8 の行の名前の前にフォルダの丸が付く。フォルダに入っていない送り先は灰色の丸（閲覧のみでも出す）', async () => {
-  staffRole = 'staff'
+  staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const row = host.querySelector('[data-design-node="ZSbFY"] tr[data-row-id="wh-1"]')
@@ -189,7 +191,7 @@ test('v8 で何も無いときは wWrpY の「まだ無い」が出る', async (
 })
 
 test('v8 の閲覧のみ（l5SRfT）は帯が出て、［送り先を作る］は押せない形で理由を伝え、設定は置かない', async () => {
-  staffRole = 'staff'
+  staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="ZSbFY"]')

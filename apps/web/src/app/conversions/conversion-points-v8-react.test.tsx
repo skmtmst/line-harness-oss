@@ -1,3 +1,4 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
@@ -162,7 +163,7 @@ function typeInto(input: HTMLInputElement, value: string) {
 }
 
 beforeEach(() => {
-  staffRole = 'admin'
+  staffRole = verifiedStaffRole('admin')
   posted = []
   stopBodies = []
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -175,6 +176,7 @@ beforeEach(() => {
   root = createRoot(host)
 })
 afterEach(() => {
+  verifiedStaffRole(null)
   act(() => root.unmount())
   host.remove()
   document.documentElement.removeAttribute('data-theme')
@@ -255,7 +257,7 @@ test('行から右の詳細を開き、停止の確認では理由を必須に�
 })
 
 test('v8 の閲覧のみでは帯が出て、作る操作は置かない（押せない形でも置かない・2026-10-06 オーナー）', async () => {
-  staffRole = 'viewer'
+  staffRole = verifiedStaffRole('viewer')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<ConversionsPage />))
   await settle()

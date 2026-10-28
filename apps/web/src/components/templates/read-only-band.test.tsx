@@ -16,11 +16,11 @@ it('全ての型が必要な権限の理由を題の下・タブの前に一度�
   rememberStaffIdentity({ role: 'admin' } as StaffMember)
   const props = { title: '外部連携', readOnlyNeed: 'owner' as const }
   for (const page of [
-    <PageHeading {...props} readOnlyBand tabs={<span data-tabs>切り替え</span>} />,
-    <ListPage {...props} readOnly tabs={<span data-tabs>切り替え</span>}>本文</ListPage>,
-    <CreatePage {...props} dirty={false} readOnly tabs={<span data-tabs>切り替え</span>} footerActions={null}>本文</CreatePage>,
-    <DetailPage {...props} readOnly tabs={<span data-tabs>切り替え</span>}>本文</DetailPage>,
-    <SettingsPage {...props} readOnly navigation={<span>目次</span>}>本文</SettingsPage>,
+    <PageHeading key="heading" {...props} readOnlyBand tabs={<span data-tabs>切り替え</span>} />,
+    <ListPage key="list" {...props} readOnly tabs={<span data-tabs>切り替え</span>}>本文</ListPage>,
+    <CreatePage key="create" {...props} dirty={false} readOnly tabs={<span data-tabs>切り替え</span>} footerActions={null}>本文</CreatePage>,
+    <DetailPage key="detail" {...props} readOnly tabs={<span data-tabs>切り替え</span>}>本文</DetailPage>,
+    <SettingsPage key="settings" {...props} readOnly navigation={<span>目次</span>}>本文</SettingsPage>,
   ]) {
     const { container, unmount } = render(page)
     const notices = container.querySelectorAll('[data-read-only-notice]')

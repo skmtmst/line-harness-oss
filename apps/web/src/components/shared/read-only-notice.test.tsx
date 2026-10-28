@@ -65,6 +65,7 @@ it.each(['readOnly', 'view_only'])('閲覧のみの束は元のowner役割より
 it('本人確定後の閲覧帯は知らせの印を使い、目の印を使わない', () => {
   identity('viewer')
   const view = render(<ReadOnlyNotice />)
-  expect(view.container.querySelector('.lucide-info')).not.toBeNull()
+  expect(view.container.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+  expect(screen.getByRole('status').textContent).toBe(READ_ONLY_MESSAGE)
   expect(view.container.querySelector('.lucide-eye')).toBeNull()
 })

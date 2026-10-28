@@ -1,3 +1,4 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
@@ -126,7 +127,7 @@ async function eventually(check: () => void, timeout = 3000) {
 }
 
 beforeEach(() => {
-  staffRole = 'admin'
+  staffRole = verifiedStaffRole('admin')
   handler = base
   lastListUrl = null
   const values = new Map<string, string>()
@@ -148,6 +149,7 @@ beforeEach(() => {
   root = createRoot(host)
 })
 afterEach(() => {
+  verifiedStaffRole(null)
   vi.useRealTimers()
   act(() => root.unmount())
   host.remove()
@@ -266,7 +268,7 @@ test('受け皿の理由を見ると停止できない説明を出す', async ()
 
 // オーナー決定（2026-10-06）：閲覧のみの人には変える操作を押せない形でも置かず、隠す。
 test('v8 の閲覧のみは作る操作を置かない（隠す）', async () => {
-  staffRole = 'staff'
+  staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<FriendAddSettingsPage />))
   await settle()
@@ -279,7 +281,7 @@ test('v8 の閲覧のみは作る操作を置かない（隠す）', async () =>
 })
 
 test('v8 の閲覧のみは見出しの下に閲覧のみの帯が出る（板 LEwkJ）', async () => {
-  staffRole = 'staff'
+  staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<FriendAddSettingsPage />))
   await settle()
