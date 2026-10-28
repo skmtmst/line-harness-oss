@@ -31,6 +31,8 @@ export interface PageHeadingProps {
   subtitleSize?: 'body'
   /** 一覧・詳細の頭と本文の間を詰める口。指定しない画面には効かない。 */
   bottomSpacing?: 'compact'
+  /** 下のタブが区切り線を持つときだけ、見出しの線を外す。 */
+  separator?: 'none'
   /** ：画面全体の説明。題の横から開閉し、人ごと・画面ごとに覚える。 */
   help?: ReactNode
   /** 詳細の顔など、題の前に置く識別の印。 */
@@ -70,7 +72,7 @@ export function PageTitle({ children, as: Tag = 'h1', className }: {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', titleId, titleTabIndex, help, explanation, explanationKey, leading, titleAccessory, explanationToggle, actions, crumbs, steps, tabs, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
+export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', titleId, titleTabIndex, help, explanation, explanationKey, leading, titleAccessory, explanationToggle, actions, crumbs, steps, tabs, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, separator, inset, stepsSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
   /*
    * 絵の値を渡された分だけ、この頭の中だけに効く変数で下へ流す。`.heading`・`.title` は
@@ -84,7 +86,7 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', title
         ...(textGap === undefined ? null : { '--tpl-head-gap': `${textGap}px` }),
         ...(titleSize === 'sub' ? { '--tpl-title-size': '18px', '--tpl-title-lh': '27px' } : null),
       } as CSSProperties)
-  return <header className={styles.heading} style={headStyle} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-subtitle-size={subtitleSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
+  return <header className={styles.heading} style={headStyle} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-subtitle-size={subtitleSize} data-bottom-spacing={bottomSpacing} data-heading-separator={separator} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
     {leading}
     <div className={styles.headingText}>
       <ScreenExplanation titleClassName={styles.titleRow} screenKey={explanationKey} title={<><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}<PageHelp label={typeof title === 'string' ? `${title}の説明` : '画面の説明'} help={help} toggle={explanationToggle} explanation={explanation} /></>} />

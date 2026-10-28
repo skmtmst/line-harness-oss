@@ -5,6 +5,7 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import { columnsWithDiff, diffCount, diffTone, formatDiff, formatMetric, METRICS } from './metrics'
 
 const navigation = vi.hoisted(() => ({push:vi.fn(),select:vi.fn(),replace:vi.fn(),search:''}))
@@ -41,7 +42,7 @@ beforeEach(() => {
   api.get.mockResolvedValue({ success: true, data: DATA })
   api.detail.mockResolvedValue({ success: true, data: { recentBroadcasts: [{ id: 'b1', title: '秋の新メニュー', status: 'sent', sent_at: '2026-10-14T01:00:00Z' }], attention: null } })
 })
-afterEach(() => { cleanup(); vi.clearAllMocks(); accountState.accounts = []; accountState.role = 'owner'; navigation.search = ''; window.history.replaceState(null, '', '/hq/store-comparison') })
+afterEach(() => { cleanup(); forgetSessionSnapshot(); vi.clearAllMocks(); accountState.accounts = []; accountState.role = 'owner'; navigation.search = ''; window.history.replaceState(null, '', '/hq/store-comparison') })
 
 describe('数の書き方', () => {
   it('単位と符号：人は ±、割合は pt、件・分はそのまま', () => {
@@ -190,10 +191,11 @@ describe('数が取れない理由', () => {
     accountState.accounts = [{ id: 's1', name: '大宮店', revision: 3, connection: { status: 'warn', checkedAt: null, tokenExpired: true, issues: [] } }, { id: 's2', name: '渋谷店', revision: 2, connection: { status: 'ok', checkedAt: null, tokenExpired: false } }]
     fetchApi.mockResolvedValue({ success: true })
     render(<StoreComparisonList />)
-    await screen.findByText('大宮店')
+    await waitFor(() => expect(document.querySelector('[data-row-id="s1"]')).toBeTruthy())
     const notices = document.querySelectorAll('[data-store-connection]')
     expect([...notices].map((node) => node.getAttribute('data-store-connection'))).toEqual(['s1'])
     expect(notices[0].textContent).toContain('LINE の接続が切れています')
+    expect(notices[0].querySelector('[data-notice-heading]')?.textContent).toBe('要確認：大宮店')
     const calls = api.get.mock.calls.length
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '更新する' })) })
     expect(fetchApi).toHaveBeenCalledWith('/api/line-accounts/s1/connection-checks', expect.objectContaining({ method: 'POST', body: JSON.stringify({ expectedRevision: 3 }) }))
@@ -206,16 +208,108 @@ describe('数が取れない理由', () => {
     accountState.accounts = [{ id: 's1', name: '大宮店', revision: 3, connection: { status: 'warn', checkedAt: null, tokenExpired: true } }]
     fetchApi.mockRejectedValue(new Error('down'))
     const view = render(<StoreComparisonList />)
-    await screen.findByText('大宮店')
+    await waitFor(() => expect(document.querySelector('[data-row-id="s1"]')).toBeTruthy())
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '更新する' })) })
     expect(await screen.findByText(/確かめ直せませんでした/)).toBeTruthy()
+    expect(document.querySelector('[data-store-connection="s1"] [data-notice-heading]')?.textContent).toBe('要確認：大宮店')
     view.unmount()
     accountState.role = 'staff'
     render(<StoreComparisonList />)
-    await screen.findByText('大宮店')
+    await waitFor(() => expect(document.querySelector('[data-row-id="s1"]')).toBeTruthy())
     expect(document.querySelector('[data-store-connection]')?.textContent).toContain('LINE の接続が切れています')
     expect(screen.queryByRole('button', { name: '更新する' })).toBeNull()
   })
+
+  it('複数店の接続警告は各店の直下に名前を出し、再確認中と失敗を押した店だけに示す', async () => {
+    accountState.accounts = DATA.rows.map((r) => ({ id: r.accountId, name: r.name, revision: 3, connection: { tokenExpired: true } }))
+    let rejectCheck!: (reason: Error) => void
+    fetchApi.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectCheck = reject }))
+    render(<StoreComparisonList />)
+    await waitFor(() => expect(document.querySelectorAll('[data-store-connection]')).toHaveLength(2))
+    const notices = DATA.rows.map((r) => document.querySelector(`[data-store-connection="${r.accountId}"]`) as HTMLElement)
+    for (const [i, notice] of notices.entries()) {
+      expect(notice.previousElementSibling?.getAttribute('data-row-id')).toBe(DATA.rows[i].accountId)
+      expect(notice.querySelector('[data-notice-heading]')?.textContent).toBe(`要確認：${DATA.rows[i].name}`)
+      expect(notice.textContent).not.toContain(DATA.rows[1 - i].name)
+    }
+    const buttons = notices.map((notice) => within(notice).getByRole('button', { name: '更新する' }))
+    fireEvent.click(buttons[1])
+    await waitFor(() => expect(buttons[1].getAttribute('aria-busy')).toBe('true'))
+    expect((buttons[0] as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(buttons[0])
+    fireEvent.click(buttons[1])
+    expect(fetchApi).toHaveBeenCalledTimes(1)
+    expect(fetchApi).toHaveBeenCalledWith('/api/line-accounts/s2/connection-checks', expect.objectContaining({
+      method: 'POST', body: JSON.stringify({ expectedRevision: 3 }),
+      headers: { 'Idempotency-Key': expect.stringMatching(/^store-comparison-check-s2-/) },
+    }))
+    await act(async () => { rejectCheck(new Error('down')) })
+    expect(notices[1].textContent).toContain('確かめ直せませんでした')
+    expect(notices[0].textContent).not.toContain('確かめ直せませんでした')
+    expect(notices[0].querySelector('[data-notice-heading]')?.textContent).toBe('要確認：大宮店')
+    expect(notices[1].querySelector('[data-notice-heading]')?.textContent).toBe('要確認：渋谷店')
+    expect(accountState.refresh).not.toHaveBeenCalled()
+    expect(navigation.push).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['  保存名  ', '別の名前', '保存名'],
+    ['', '  同じ店の名前  ', '同じ店の名前'],
+    ['  ', '  ', '店名未取得'],
+    ['', undefined, '店名未取得'],
+  ])('接続警告に保存名を優先し、同じ店の既知名だけを補完する（%j / %j）', async (savedName, accountName, expectedName) => {
+    api.get.mockResolvedValue({ success: true, data: { ...DATA, rows: [{ ...DATA.rows[0], name: savedName }, DATA.rows[1]] } })
+    accountState.accounts = [{ id: 's1', name: accountName, revision: 3, connection: { tokenExpired: true } }, { id: 'other', name: '無関係な店', connection: { tokenExpired: true } }]
+    render(<StoreComparisonList />)
+    await waitFor(() => expect(document.querySelector('[data-store-connection="s1"] [data-notice-heading]')?.textContent).toBe(`要確認：${expectedName}`))
+    expect(document.querySelectorAll('[data-store-connection]')).toHaveLength(1)
+    expect(document.querySelector('[data-store-connection]')?.textContent).not.toContain('無関係な店')
+    expect(fetchApi).not.toHaveBeenCalled()
+  })
+
+  it.each(['viewer', 'read', 'missing-revision', 'invalid-revision'])('閲覧・版未取得でも対象の名前を残し、再確認入口を作らない（%s）', async (boundary) => {
+    accountState.accounts = [{ id: 's1', name: '大宮店', revision: boundary === 'missing-revision' ? undefined : boundary === 'invalid-revision' ? 0 : 3, connection: { tokenExpired: true } }]
+    if (boundary === 'viewer') accountState.role = 'viewer'
+    if (boundary === 'read') rememberSessionSnapshot({ impersonation: { id: 'read-session', tenantId: 'tenant', mode: 'read', piiRevealed: false, startedAt: '2026-10-28T00:00:00Z' }, unfamiliarAt: null, stepUpMethod: 'none' })
+    render(<StoreComparisonList />)
+    await waitFor(() => expect(document.querySelector('[data-store-connection="s1"] [data-notice-heading]')?.textContent).toBe('要確認：大宮店'))
+    expect(screen.queryByRole('button', { name: '更新する' })).toBeNull()
+    expect(fetchApi).not.toHaveBeenCalled()
+  })
+
+  it('集計前・部分集計でも数を補完せず、接続未取得なら警告を捏造しない', async () => {
+    const rows = [{ ...DATA.rows[0], computedAt: null, metrics: NOTHING as typeof DATA.rows[0]['metrics'] }, { ...DATA.rows[1], coveredDays: 12 }]
+    api.get.mockResolvedValue({ success: true, data: uncomputed(rows) })
+    accountState.accounts = [{ id: 's1', name: '大宮店', connection: { tokenExpired: true } }]
+    const view = render(<StoreComparisonList />)
+    await waitFor(() => expect(document.querySelector('[data-store-connection="s1"] [data-notice-heading]')?.textContent).toBe('要確認：大宮店'))
+    const first = document.querySelector('[data-row-id="s1"]') as HTMLElement
+    expect(within(first).getAllByText('—')).toHaveLength(METRICS.length)
+    expect(first.textContent).not.toContain('0')
+    expect(document.querySelector('[data-row-id="s2"]')?.textContent).toContain('12 日分')
+    view.unmount()
+    accountState.accounts = []
+    render(<StoreComparisonList />)
+    await screen.findByText('大宮店')
+    expect(document.querySelector('[data-store-connection]')).toBeNull()
+  })
+
+  it('再確認成功後の再取得で保存名と接続状態の更新に追随する', async () => {
+    accountState.accounts = [{ id: 's1', name: '大宮店', revision: 3, connection: { tokenExpired: true } }]
+    fetchApi.mockResolvedValueOnce({ success: true })
+    const view = render(<StoreComparisonList />)
+    await waitFor(() => expect(document.querySelector('[data-store-connection="s1"] [data-notice-heading]')?.textContent).toBe('要確認：大宮店'))
+    api.get.mockResolvedValue({ success: true, data: { ...DATA, rows: [{ ...DATA.rows[0], name: '更新後の保存名' }, DATA.rows[1]] } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '更新する' })) })
+    await waitFor(() => expect(document.querySelector('[data-store-connection="s1"] [data-notice-heading]')?.textContent).toBe('要確認：更新後の保存名'))
+    expect(accountState.refresh).toHaveBeenCalledTimes(1)
+    accountState.accounts = [{ id: 's1', name: '更新後の保存名', revision: 4, connection: { tokenExpired: false } }]
+    view.rerender(<StoreComparisonList />)
+    expect(document.querySelector('[data-store-connection]')).toBeNull()
+    expect(document.querySelector('[data-row-id="s1"]')?.textContent).toContain('更新後の保存名')
+    expect(fetchApi).toHaveBeenCalledTimes(1)
+  })
+
 })
 
 describe('違いだけ表示と「7 項目中 5 つが違う」（全店の平均と比べる）', () => {

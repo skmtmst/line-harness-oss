@@ -875,6 +875,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       boardId={narrow ? 'ITBAB' : conflict ? 'J1pdB' : TAB_NODE[editTab]}
       title={name || 'フォーム名未設定'}
       help="回答フォームの内容・回答後の動作・受付条件を設定します。"
+      separator="none"
       stepsSpacing="compact"
       steps={(
         <div className={styles.tabs}>
