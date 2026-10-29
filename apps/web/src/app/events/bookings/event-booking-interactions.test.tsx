@@ -179,13 +179,26 @@ function propsOf(element: HTMLElement): Record<string, unknown> {
 }
 
 function actionButton(container: HTMLElement, bookingId: string, action: string): HTMLElement {
+  const label = action === 'no_show' ? '無断' : action === 'cancel' ? 'キャンセルにする' : action
+  if (action === 'attended') {
+    const primary = elements(container).find((element) => (
+      element.tagName === 'BUTTON'
+      && element.getAttribute('data-booking-id') === bookingId
+      && element.getAttribute('data-booking-action') === action
+    ))
+    if (!primary) throw new Error(`primary action not found: ${bookingId}/${action}`)
+    return primary
+  }
   const found = elements(container).find((element) => (
     element.tagName === 'BUTTON'
     && element.getAttribute('data-booking-id') === bookingId
-    && element.getAttribute('data-booking-action') === action
+    && element.getAttribute('data-booking-action') === 'menu'
   ))
   if (!found) throw new Error(`button not found: ${bookingId}/${action}`)
-  return found
+  fireEvent.click(found)
+  const menuItem = elements(document.body).find((element) => element.getAttribute('role') === 'menuitem' && element.textContent?.trim() === label)
+  if (!menuItem) throw new Error(`menu item not found: ${bookingId}/${action}`)
+  return menuItem
 }
 
 function occurrenceActionButton(container: HTMLElement, _action: string): HTMLElement {
@@ -708,11 +721,9 @@ describe('Issue #684 イベント予約の実操作', () => {
     apiMocks.updateBooking.mockReturnValue(pending.promise)
     const view = await mount(<EventBookingsPage />)
     const button = actionButton(view.container, 'booking-a', 'attended')
-    const onClick = propsOf(button).onClick as (event: unknown) => void
-
     await act(async () => {
-      onClick({})
-      onClick({})
+      button.click()
+      button.click()
     })
     await flush()
 

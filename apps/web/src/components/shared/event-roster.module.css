@@ -11,6 +11,7 @@
 .headerAction { min-width: 0; display: flex; justify-content: flex-end; }
 .table { --record-columns: var(--tpl-roster-main-cols); --record-row-h: var(--tpl-ev-ls-row-h); }
 .table[data-roster-kind='waitlist'] { --record-columns: var(--tpl-ev-bk-wait-cols); --record-row-h: var(--tpl-roster-record-h); }
+.table[data-roster-kind='records'] { display: grid; grid-template-columns: var(--record-columns); column-gap: var(--tpl-toolbar-gap); --record-columns: minmax(0, 2fr) max-content max-content minmax(0, 1fr) max-content; --record-row-h: var(--tpl-roster-record-h); }
 .table[data-roster-kind='cancel'] { --record-columns: var(--tpl-ev-bk-cancel-cols); --record-row-h: var(--tpl-roster-record-h); }
 .tableHead, .row {
   display: grid; grid-template-columns: var(--record-columns); align-items: center;
@@ -20,6 +21,9 @@
 .tableHead { min-height: var(--tpl-ev-row-h); background: var(--color-surface-pearl); font-size: var(--text-micro); font-weight: 600; color: var(--color-ink-secondary); }
 .table:not([data-roster-kind='applicants']) .tableHead { min-height: var(--tpl-roster-history-head-h); }
 .row { min-height: var(--record-row-h); font-size: var(--text-caption); line-height: var(--tpl-wh-cell-lh); }
+.table[data-roster-kind='records'] .tableHead, .table[data-roster-kind='records'] .row { grid-column: 1 / -1; grid-template-columns: subgrid; }
+.table[data-roster-kind='records'] .row { align-items: start; padding-block: var(--polish-space-row); }
+.table[data-roster-kind='records'] .row > :last-child { display: grid; justify-items: end; gap: var(--polish-space-row); }
 .row:last-child { box-shadow: none; }
 .row > *, .tableHead > * { min-width: 0; }
 .actionCell { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-toolbar-gap); }
@@ -31,8 +35,8 @@
   .headerAction { justify-content: flex-start; }
   /* 狭い申込表では、期限を操作の予約幅で潰さない。 */
   .table[data-roster-kind='applicants'] .row { padding-block: var(--polish-space-field); }
-  .table[data-roster-kind='applicants'] .actionCell { display: grid; gap: var(--polish-space-row); }
-  .table[data-roster-kind='applicants'] .actions { flex-wrap: wrap; justify-content: flex-start; }
+  .table[data-roster-kind='applicants'] .actionCell { display: grid; justify-content: stretch; gap: var(--polish-space-row); }
+  .table[data-roster-kind='applicants'] .actions { flex-wrap: wrap; justify-content: flex-end; }
 
 }
 
