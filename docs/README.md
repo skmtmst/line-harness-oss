@@ -463,6 +463,13 @@
 - [アカウント設定の親アカウント欄を非表示](release-log/unreleased/1900-masato-hide-parent-account.md) — 未使用の欄を隠し、既存の親子関係を保つ変更の反映履歴。
 - [LINEアカウント登録の使い方選択ポップアップ](release-log/unreleased/1898-masato-register-style-dialog.md) — 登録時に使い方の見本を見て選ぶか、後で設定する変更の反映履歴。
 - [LINE接続マニュアルの現行4ステップへの更新](release-log/unreleased/1897-masato-line-connect-manual.md)
+- [LINEログインチャネル作成手順の追加](release-log/unreleased/1911-masato-line-login-create-guide.md)
+- [LINEログインチャネル作成・種類の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-type.webp)
+- [LINEログインチャネル作成・入力欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-fields.webp)
+- [LINEログインチャネル作成・同意欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-final.webp)
+- [LINEログインチャネル作成・種類の文書用画像](manuals/line-connect/images/m4-create-type.jpg)
+- [LINEログインチャネル作成・入力欄の文書用画像](manuals/line-connect/images/m4-create-fields.jpg)
+- [LINEログインチャネル作成・同意欄の文書用画像](manuals/line-connect/images/m4-create-final.jpg)
 - [LINE接続マニュアルのWebhook設定位置を明確化](release-log/unreleased/1899-masato-musubo-webhook-guide.md)
 - [Google口コミのAI下書き案内文の削除](release-log/unreleased/1896-masato-google-review-ai-note-remove.md)
 - [LINEアカウント登録のMessaging API設定への直リンク](release-log/unreleased/1895-masato-messaging-api-deeplink.md)
@@ -884,4 +891,5 @@
 - [LINE接続マニュアルStep 3の画像更新](release-log/unreleased/1907-masato-line-step3-images.md) — アイコンのモザイクとMessaging APIタブ案内の反映履歴。
 - [LINE接続マニュアルStep 1の画像更新](release-log/unreleased/1908-masato-line-step1-manager-image.md) — Messaging APIの実画面と秘匿表示の反映履歴。
 - [LINE接続マニュアルStep 4の画像更新](release-log/unreleased/1909-masato-line-login-guide-real-screens.md) — LINEログイン実画面と秘匿表示の反映履歴。
+- [LINE接続マニュアルStep 4の友だち追加画像更新](release-log/unreleased/1910-masato-line-linked-oa-guide-screen.md) — 現行画面の編集箇所と秘匿表示の反映履歴。
 - [まとめ列車 1029](release-log/unreleased/1905-kenta-train-all-1029.md) — メモの保存の直しと各担当の完成分の反映履歴。
