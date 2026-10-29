@@ -645,7 +645,13 @@ export default function BroadcastListV8() {
   }
 
   /* 送信枠は表示幅にかかわらず、同じ月の使用量から残りを出す。 */
-  const quotaRemaining = quota?.limit != null && quota?.used != null ? quota.limit - quota.used : null
+  const quotaReadable = quota?.limit != null && quota?.used != null
+  const quotaRemaining = quotaReadable ? (quota?.limit ?? 0) - (quota?.used ?? 0) : null
+  /* 読めないときは、トークンを入れ直す場所（アカウント設定の資格情報）への行き先を出す。 */
+  const quotaAction = quotaReadable ? undefined : {
+    label: 'アカウント設定へ',
+    href: selectedAccountId ? `/accounts/detail?id=${encodeURIComponent(selectedAccountId)}` : '/accounts',
+  }
   const kpiPending = listKpis === undefined
   const kpis = [
     {
@@ -662,8 +668,8 @@ export default function BroadcastListV8() {
       icon: Gauge,
       value: quotaRemaining,
       unit: '通 残り',
-      detail: quota?.limit != null && quota?.used != null
-        ? `${formatNumber(quota.limit)} 通のうち ${formatNumber(quota.used)} 通を使用`
+      detail: quotaReadable
+        ? `${formatNumber(quota?.limit ?? 0)} 通のうち ${formatNumber(quota?.used ?? 0)} 通を使用`
         : '送信枠を確認できません',
     },
     {
@@ -1136,6 +1142,7 @@ export default function BroadcastListV8() {
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}
+              action={kpi.key === 'quota' ? quotaAction : undefined}
             />
           ))}
         </KpiBand>
