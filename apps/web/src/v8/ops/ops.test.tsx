@@ -26,6 +26,7 @@ import OpsShellV8 from './shell'
 import OpsMembersV8 from './members'
 import OpsTenantsV8 from './tenants'
 import OpsAnnouncementsV8 from './announcements'
+import OpsAnnouncementEditV8 from './announcement-edit'
 import OpsTenantDetailV8 from './tenant-detail'
 import KnowledgeArticleV8 from './knowledge-article'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
@@ -137,7 +138,7 @@ describe('閲覧のみには押せないボタンを置かない', () => {
 
 describe('送る・止める前に確かめる', () => {
   it('お知らせ：今すぐ送るを押すと確認の窓が開き、まだ送らない', async () => {
-    await act(async () => { root.render(<OpsAnnouncementsV8 />) })
+    await act(async () => { root.render(<OpsAnnouncementEditV8 />) })
     await settle()
     // 件名と本文を入れてから押す（足りない欄があるうちは確認の窓を開かない。）。
     fireEvent.change(document.querySelector('#ann-subject')!, { target: { value: 'メンテナンスのお知らせ' } })
@@ -151,7 +152,7 @@ describe('送る・止める前に確かめる', () => {
   })
 
   it('お知らせ：件名と本文が空なら確認の窓を開かず、欄が赤くなり理由が出て、件名の欄へ移る', async () => {
-    await act(async () => { root.render(<OpsAnnouncementsV8 />) })
+    await act(async () => { root.render(<OpsAnnouncementEditV8 />) })
     await settle()
     await act(async () => { (buttons('今すぐ送る')[0] as HTMLButtonElement).click() })
     for (let i = 0; i < 2; i += 1) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })

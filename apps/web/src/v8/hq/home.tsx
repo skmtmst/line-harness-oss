@@ -1,5 +1,7 @@
 'use client'
 
+import { tokenExpiryNotice, tokenExpirySummary } from '@/lib/line-account-state'
+
 import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
@@ -247,8 +249,8 @@ export default function HqHomeV8() {
   const totals = useMemo(() => currentAccounts.reduce<{ friends: number | null; messages: number | null; warnings: number; unconfirmed: number }>((sum, account) => ({
     friends: sum.friends !== null && typeof account.stats?.friendCount === 'number' ? sum.friends + account.stats.friendCount : null,
     messages: sum.messages !== null && typeof account.stats?.messagesThisMonth === 'number' ? sum.messages + account.stats.messagesThisMonth : null,
-    warnings: sum.warnings + (matchesStatus(account, 'warn') && account.connection?.status === 'warn' ? 1 : 0),
-    unconfirmed: sum.unconfirmed + (matchesStatus(account, 'warn') && account.connection?.status !== 'warn' ? 1 : 0),
+    warnings: sum.warnings + (statusOf(account).tone === 'warn' ? 1 : 0),
+    unconfirmed: sum.unconfirmed + (statusOf(account).label === '未確認' ? 1 : 0),
   }), { friends: 0, messages: 0, warnings: 0, unconfirmed: 0 }), [currentAccounts])
 
   /* 所属は1つ。アーカイブを除く同じ一覧で、すべて・フォルダ・未分類を数える。 */
@@ -465,7 +467,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
-        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} />
+        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">
@@ -504,6 +506,7 @@ export default function HqHomeV8() {
           /></SaveErrorField>
           </ListToolbarEnd>
         </ListToolbarRow>
+        {tokenExpirySummary(currentAccounts) ? <ListToolbarRow><TruncatedText className="text-body text-ink-secondary" value={tokenExpirySummary(currentAccounts)!} /></ListToolbarRow> : null}
       </ListToolbarFrame> : null}
   </>
 
@@ -582,6 +585,7 @@ export default function HqHomeV8() {
                     <dd>{typeof account.stats?.messagesThisMonth === 'number' ? `${formatNumber(account.stats.messagesThisMonth)} 通` : emptyValue('unknown')}</dd>
                   </div>
                 </dl>
+                {tokenExpiryNotice(account) ? <TruncatedText value={tokenExpiryNotice(account)!} /> : null}
                 {warned ? (() => {
                   const reason = connectionReasonLine(account)
                   return <Notice tone="warn" compact title={reason.title} message={reason.text}
@@ -593,10 +597,11 @@ export default function HqHomeV8() {
           })}
         </ListPageCards>
       ) : (
-        <DataTable aria-label="アカウントの一覧" columnWeights={[3, 1.5, 1, 1, 1.25, 0.5]}>
+        <DataTable aria-label="アカウントの一覧" columnWeights={[3, 1.25, 1.5, 1, 1, 1.25, 0.5]}>
           <thead><TableHeadRow>
             <Th>アカウント</Th>
-            <Th>接続</Th>
+            <Th>LINE接続</Th>
+            <Th>お支払い</Th>
             <Th>対応が要る</Th>
             <Th>友だち</Th>
             <Th>今月の配信</Th>
@@ -609,12 +614,15 @@ export default function HqHomeV8() {
               <Tr key={account.id}>
                 <PersonCell avatarName={name} avatarSrc={accountIconUrl(account)} avatarShape="rounded" avatarAlt={name} avatarSize={32} nameTitle={[name, state.label, accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))].filter(Boolean).join(' / ')} name={
                   <span className={styles.cardName}>
-                    <FolderDotName folder={folderDotOf(account)} annotation={<StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>}>
+                    <FolderDotName folder={folderDotOf(account)}>
                       <TruncatedText className={styles.name} value={String(name ?? '')} />
                     </FolderDotName>
                     <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />
                   </span>
                 } />
+                <Td><StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>
+                  {tokenExpiryNotice(account) ? <TruncatedText value={tokenExpiryNotice(account)!} /> : null}
+                </Td>
                 <Td>{(() => {
                   const pay = payState[account.id]
                   if (!pay || pay === 'unknown') return emptyValue('unknown')
@@ -645,7 +653,7 @@ export default function HqHomeV8() {
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="JKjsE"
       title="統括のアカウント"
-      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{`${view === 'cards' ? 'カードの「設定」' : '行の「…」'}から、フォルダの移動・名前を変えられます。アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。`}</>}
+      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{`${view === 'cards' ? 'カードの「設定」' : '行の「…」'}から、フォルダの移動・名前を変えられます。アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです（「戻す」を使えるのはオーナーだけです。本人確認のあと、アカウントは「停止中」になります）。`}</>}
 
       folders={folderColumn}
       folderInset toolbar={toolbar} toolbarSpacing="stats" toolbarRowGap="card"

@@ -37,3 +37,14 @@ it('ECの共通機能を保存しただけでは、専用の契約を推測し�
     expect(styleMenuItemVisible(item, 'restaurant', true)).toBe(true)
   }
 })
+
+it.each([false, true, null])('飲食は機能設定%sでも人用の予約3経路だけを除き、ほかの項目を残す', configured => {
+  const excluded = ['/booking/bookings', '/booking/menus', '/booking/staff/shifts']
+  for (const href of excluded) expect(styleMenuItemVisible(item(href), 'restaurant', configured)).toBe(false)
+  for (const entry of items.filter(entry => !excluded.includes(entry.href))) expect(styleMenuItemVisible(entry, 'restaurant', configured)).toBe(true)
+})
+it.each(['salon', 'consult', 'lesson'] as const)('%sの人用予約と自分の勤務の入口は引き続き表示候補にする', style => {
+  for (const configured of [false, true, null]) for (const href of ['/booking/bookings', '/booking/menus', '/booking/staff/shifts']) {
+    expect(styleMenuItemVisible(item(href), style, configured)).toBe(true)
+  }
+})

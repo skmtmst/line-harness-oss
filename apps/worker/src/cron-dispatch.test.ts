@@ -5,6 +5,8 @@ import { SCHEDULED_CRONS, type ScheduledJob } from './services/scheduled-job-iso
 import { DELIVERY_DISPATCH_JOB_NAMES, FEATURE_JOB_MANIFEST } from './services/feature-enforcement.js';
 import { OPERATION_DISPATCH_JOB_CROSSWALK } from './services/operation-dispatch-health.js';
 
+vi.mock('cloudflare:workers', () => ({ env: { LINE_CREDENTIAL_ENCRYPTION_KEY: 'A'.repeat(43) } }));
+
 const observed = vi.hoisted(() => ({ jobs: [] as ScheduledJob[], deliveries: [] as string[],
   scheduled: vi.fn(async () => ({results: []})), overdue: vi.fn(async () => []),
   due: vi.fn(async () => ({processed: 0})), executors: vi.fn(() => ({})),
@@ -291,3 +293,39 @@ test.each([
   expect(result.jobs.includes('friend field reminders')).toBe(reminders);
   expect(result.jobs.includes('action score inactivity')).toBe(inactivity);
 });
+
+
+test.each([200, 503])('7日の境目をまたぐCronは交換した結果で運用確認し、正常な交換で注意を開かない（LINE %s）', async (status) => {
+  const fixture = createTestD1();
+  const pending: Promise<unknown>[] = [];
+  const now = Date.parse('2026-10-01T03:00:00Z');
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(now);
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.spyOn(console, 'info').mockImplementation(() => {});
+  const network = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    if (String(input).endsWith('/oauth/accessToken')) return status === 200
+      ? Response.json({ access_token: 'renewed-token', expires_in: 30 * 24 * 60 * 60, token_type: 'Bearer' })
+      : new Response('{}', { status });
+    return Response.json({ type: 'unlimited', totalUsage: 0 });
+  });
+  try {
+    fixture.raw.prepare(`INSERT INTO line_accounts(id, channel_id, name, channel_access_token, channel_secret, token_expires_at, line_profile_synced_at)
+      VALUES('boundary', 'boundary', 'boundary', 'fixture', 'fixture', ?, ?)`)
+      .run(new Date(now + 7 * 24 * 60 * 60_000 - 1).toISOString(), new Date(now).toISOString());
+    await worker.scheduled({ cron: SCHEDULED_CRONS.delivery, scheduledTime: now } as ScheduledEvent,
+      { DB: fixture.db, DEPLOY_ENV: 'test', LINE_CHANNEL_ACCESS_TOKEN: 'fixture' } as import('./index.js').Env['Bindings'],
+      { waitUntil: (p: Promise<unknown>) => pending.push(p) } as unknown as ExecutionContext);
+    await Promise.all(pending);
+    expect(network.mock.calls.filter(([input]) => String(input).endsWith('/oauth/accessToken'))).toHaveLength(1);
+    const result = fixture.raw.prepare("SELECT status, value_json FROM operation_health_results WHERE check_key = 'credential_expiry'").get() as { status: string; value_json: string };
+    expect(result.status).toBe(status === 200 ? 'normal' : 'warning');
+    expect(JSON.parse(result.value_json)).toMatchObject({ refreshFailed: status !== 200 });
+    const alerts = fixture.raw.prepare("SELECT status FROM operation_alerts WHERE line_account_id='boundary' AND check_key='credential_expiry'").all();
+    expect(alerts).toHaveLength(status === 200 ? 0 : 1);
+  } finally {
+    await Promise.allSettled(pending);
+    vi.useRealTimers();
+    fixture.raw.close();
+  }
+}, 30_000);

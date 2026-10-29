@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useId, useRef, type InputHTMLAttributes, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type InputHTMLAttributes, type ReactNode, type PointerEvent, type FocusEvent, type KeyboardEvent } from 'react'
 import styles from './checkbox.module.css'
+import { usePermissionLockTip } from './permission-lock-tip'
 
 /**
  * チェックボックス。Pencil ★V8 `dQCCN`・`S9U7v`「チェック/オン・オフ」。
@@ -24,6 +25,7 @@ export default function Checkbox({
   indeterminate = false,
   invalid = false,
   description,
+  lockedReason,
   error,
   children,
   className,
@@ -37,6 +39,11 @@ export default function Checkbox({
   invalid?: boolean
   /** 文字の下の補足（薄い字）。 */
   description?: ReactNode
+  /**
+   * 権限で使えない時も同じ欄を残し、焦点で理由を伝える。
+   * 止まるのは click・change・Enter・Space だけ。他のイベントで変更を書き込まない。
+   */
+  lockedReason?: string
   /** 誤りの文。指定すると invalid とみなす。 */
   error?: ReactNode
   /** 横に並べる文字。押しても切り替わる。 */
@@ -49,6 +56,17 @@ export default function Checkbox({
   const noteId = `${inputId}-note`
   const hasNote = Boolean(error || description)
   const isInvalid = invalid || Boolean(error)
+  const describedBy = hasNote ? noteId : rest['aria-describedby']
+  const lock = usePermissionLockTip<HTMLInputElement>(lockedReason, lockedReason ? [rest['aria-describedby'], hasNote ? noteId : undefined].filter(Boolean).join(' ') : describedBy)
+  const setInputRef = (element: HTMLInputElement | null) => { ref.current = element; lock.ref.current = element }
+  const lockHandlers = lock.handlers ? {
+    ...lock.handlers,
+    onPointerEnter: (event: PointerEvent<HTMLInputElement>) => { rest.onPointerEnter?.(event); lock.handlers?.onPointerEnter(event) },
+    onPointerLeave: (event: PointerEvent<HTMLInputElement>) => { rest.onPointerLeave?.(event); lock.handlers?.onPointerLeave(event) },
+    onFocus: (event: FocusEvent<HTMLInputElement>) => { rest.onFocus?.(event); lock.handlers?.onFocus() },
+    onBlur: (event: FocusEvent<HTMLInputElement>) => { rest.onBlur?.(event); lock.handlers?.onBlur() },
+    onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => { lock.handlers?.onKeyDown(event); if (!event.defaultPrevented) rest.onKeyDown?.(event) },
+  } : undefined
 
   useEffect(() => {
     // indeterminate は属性ではなく DOM のプロパティにしか無い。
@@ -56,24 +74,26 @@ export default function Checkbox({
   }, [indeterminate])
 
   return (
-    <span className={[styles.root, className].filter(Boolean).join(' ')} data-disabled={rest.disabled ? 'true' : undefined}>
+    <span className={[styles.root, className].filter(Boolean).join(' ')} data-disabled={rest.disabled || lockedReason ? 'true' : undefined}>
       <label className={styles.line} htmlFor={inputId}>
         <span className={styles.control}>
           <input
             {...rest}
-            ref={ref}
+            ref={lockedReason ? setInputRef : ref}
             id={inputId}
             type="checkbox"
             checked={checked}
             aria-invalid={isInvalid || undefined}
-            aria-describedby={hasNote ? noteId : rest['aria-describedby']}
-            onChange={(event) => { if (!rest.disabled) onCheckedChange(event.target.checked) }}
+            aria-describedby={describedBy}
+            onChange={(event) => { if (!rest.disabled && !lockedReason) onCheckedChange(event.target.checked) }}
+            {...lockHandlers}
             className={styles.input}
           />
           <CheckboxMark />
         </span>
         {children ? <span className={styles.label}>{children}</span> : null}
       </label>
+      {lock.node}
       {hasNote ? (
         <span id={noteId} className={error ? styles.error : styles.description}>{error ?? description}</span>
       ) : null}

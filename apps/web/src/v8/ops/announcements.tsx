@@ -1,115 +1,42 @@
 'use client'
 
-import { shortPublishAt, longPublishAt } from './announcement-dates'
-import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
-import { notifySaved } from '@/components/shared/toast'
-import { Pencil, Send } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ApiError, api, type OpsAnnouncement, type OpsAnnouncementAudience, type OpsAnnouncementChannel, type OpsAnnouncementInput, type OpsAudiencePreview, type OpsTenantRow } from '@/lib/api'
-import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
+import { Pencil, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { api, type OpsAnnouncement } from '@/lib/api'
+import { opsCall } from '@/components/ops/ops-ui'
 import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import DateTimeField from '@/components/shared/date-time-field'
-import Dialog from '@/components/shared/dialog'
-import FilterChip from '@/components/shared/filter-chip'
 import HelpTip from '@/components/shared/help-tip'
 import ListState from '@/components/shared/list-state'
-import Radio from '@/components/shared/radio'
+import { useListUrlState } from '@/components/shared/list-url-state'
 import { RowMenu } from '@/components/shared/row-actions'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import { TextArea, TextField } from '@/components/shared/text-field'
-import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { OpsHead } from './shell'
-import { useOpsReadOnly } from './use-ops-read-only'
-import { useFormErrors } from '@/lib/use-form-errors'
-import ValidationSummary from '@/components/shared/validation-summary'
-import { FieldError, Field } from '@/components/shared/form-controls'
+import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
+import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
 import parts from './parts.module.css'
 import styles from './announcements.module.css'
-import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
-import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
-import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import Notice from '@/components/shared/notice'
+import { formatDate as polishFormatDate, formatDateTime, formatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 /**
- * 運営のお知らせ配信 V8（絵の送る前の確認 ）。
+ * 運営のお知らせ配信 V8（一覧）。
  *
- * 動きは 管理画面（app/ops/announcements）と同じ口：一覧・宛先の見込み（preview）・作る・直す・消す。
- * 左で作り、右に配信済み・予約・下書き。送る（今すぐ・予約）ときは必ず「送る前の確認」を挟む。
- * 下書き・予約は「直す」で左に読み込み、直している間だけ「削除する」を出す。
- * 送ったものの「直す」は中身を写して新しいお知らせを作る（送ったものは変えない）。
- * 閲覧のみの運営メンバー（readOnly）には作る欄と操作を出さない。
+ * 作る欄は別の画面（/ops/announcements/new）に分け、ここは一覧だけ。
+ * 右上の［お知らせを作る］→作る画面（下の帯に［下書きを保存］［今すぐ送る］）。
+ * 下書き・予約は行の「…」から編集・削除、送ったものは中身を写して新しく作る。
+ * 閲覧のみの運営メンバーには、作るボタンも行の「…」も押せない形＋理由で出す
+ * （2026-10-26 オーナー決定）。役割が分かるまでは理由なしの押せない形。
  */
 
-const AUDIENCES: Array<{ key: OpsAnnouncementAudience; label: string }> = [
-  { key: 'all', label: 'すべての契約先' },
-  { key: 'plan', label: 'プラン別' },
-  { key: 'tenants', label: '契約先を選ぶ' },
-]
-const PLANS: Array<{ key: string; label: string }> = [
-  { key: 'light', label: 'ライト' }, { key: 'standard', label: 'スタンダード' }, { key: 'pro', label: 'プロ' }, { key: 'trial', label: 'トライアル' },
-]
-const CHANNELS: Array<{ key: OpsAnnouncementChannel; label: string }> = [
-  { key: 'screen', label: '画面のお知らせ' }, { key: 'email', label: 'メール' }, { key: 'line', label: '契約者専用LINE' },
-]
 const STATUS_TONE: Record<OpsAnnouncement['status'], StatusBadgeTone> = { draft: 'neutral', scheduled: 'info', sending: 'warning', sent: 'success', failed: 'danger' }
-
-type Form = {
-  subject: string
-  body: string
-  audienceKind: OpsAnnouncementAudience
-  audiencePlans: string[]
-  audienceTenantIds: string[]
-  channels: OpsAnnouncementChannel[]
-  publishAt: string
-}
-const EMPTY: Form = { subject: '', body: '', audienceKind: 'all', audiencePlans: [], audienceTenantIds: [], channels: ['screen', 'email'], publishAt: '' }
-
-/** datetime-local の値（日本時間）を +09:00 付きの ISO に。空なら null。 */
-function toPublishAt(local: string): string | null {
-  const v = local.trim()
-  if (!v) return null
-  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v) ? `${v.slice(0, 16)}:00+09:00` : v
-}
-
-function toLocalInput(iso: string | null): string {
-  return iso ? iso.slice(0, 16) : ''
-}
-
-function previewLabel(p: OpsAudiencePreview | null, channels: OpsAnnouncementChannel[]): string {
-  if (!p) return '宛先を数えています…'
-  const words = [`${p.tenants} 件の契約先・${p.staff} 人の権限者`]
-  if (channels.includes('line')) words.push(`うち契約者専用LINEに登録済みの${p.lineLinked} 人へ届きます`)
-  if (channels.includes('email')) words.push(`メールは${p.withEmail} 人に届きます`)
-  return words.join('。')
-}
 
 /** 一覧の小さい日時（9/18 10:00）。 */
 function shortDateTime(value: string | null): string {
   return polishFormatDate(value, { style: 'list', fallback: '—' })
-}
-
-function confirmAudience(form: Form, preview: OpsAudiencePreview | null): string {
-  const base = form.audienceKind === 'all'
-    ? 'すべての契約先'
-    : form.audienceKind === 'plan'
-      ? `${form.audiencePlans.map((key) => PLANS.find((p) => p.key === key)?.label ?? key).join('・')}の契約先`
-      : '選んだ契約先'
-  return preview ? `${base} ${preview.tenants} 社` : `${base}（数えています…）`
-}
-
-function confirmChannels(form: Form, preview: OpsAudiencePreview | null): string {
-  if (!preview) return '数えています…'
-  return form.channels.map((key) => {
-    if (key === 'screen') return `画面 ${preview.tenants}`
-    if (key === 'email') return `メール ${preview.withEmail}`
-    const unlinked = Math.max(preview.staff - preview.lineLinked, 0)
-    return `LINE ${preview.lineLinked}（LINE 未登録 ${unlinked}）`
-  }).join('・')
 }
 
 function loadDescription(err: unknown): string | undefined {
@@ -118,29 +45,34 @@ function loadDescription(err: unknown): string | undefined {
   return describeApiFailure(err, '読み込み', { scope: 'hq' })
 }
 
+/** 行の「…」の中身。閲覧のみは押せない形＋理由、役割が分かるまでは理由なしの押せない形。 */
+function rowItems(a: OpsAnnouncement, access: 'unknown' | 'readonly' | 'writer', busy: boolean, onRemove: () => void): ActionMenuItem[] {
+  if (a.status === 'sending') return []
+  const items: ActionMenuItem[] = a.status === 'draft' || a.status === 'scheduled'
+    ? [
+        { id: 'edit', label: '編集する', icon: <Pencil size={16} aria-hidden="true" />, disabled: busy, href: `/ops/announcements/new?id=${encodeURIComponent(a.id)}` },
+        { id: 'remove', label: '削除する', tone: 'danger', icon: <Trash2 size={16} aria-hidden="true" />, disabled: busy, onSelect: onRemove },
+      ]
+    : [{ id: 'edit', label: '編集する', description: '送ったものは変えず、中身を写して新しく作ります', icon: <Pencil size={16} aria-hidden="true" />, disabled: busy, href: `/ops/announcements/new?copy=${encodeURIComponent(a.id)}` }]
+  if (access === 'readonly') return items.map(({ href: _href, onSelect: _onSelect, ...item }) => ({ ...item, disabled: false, lockedReason: OPS_READONLY_LOCK_REASON }))
+  if (access === 'unknown') return items.map((item) => ({ ...item, disabled: true }))
+  return items
+}
+
 export default function OpsAnnouncementsV8() {
   const saveErrors = useSaveFormErrors()
 
   const [rows, setRows] = useState<OpsAnnouncement[]>([])
   const [loaded, setLoaded] = useState(false)
-  const [lineConfigured, setLineConfigured] = useState(true)
   const [linked, setLinked] = useState<{ linked: number; total: number } | null>(null)
-  const [tenants, setTenants] = useState<OpsTenantRow[]>([])
-  const [form, setForm] = useState<Form>(EMPTY)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  // 作る欄の再実行キー。二重押し・通信再送でも1件だけ作る。
-  const [createKey, setCreateKey] = useState(() => crypto.randomUUID())
-  // 直し始めたときの版。違う版からの保存は最新の内容つきで409になる。
-  const [editingUpdatedAt, setEditingUpdatedAt] = useState<string | null>(null)
-  const [preview, setPreview] = useState<OpsAudiencePreview | null>(null)
   const [busy, setBusy] = useState(false)
   const [loadError, setLoadError] = useState<unknown>(null)
-  const [formError, setFormError] = useState('')
-  const [notice, setNotice] = useState('')
-  const [confirmSend, setConfirmSend] = useState(false)
+  const [actionError, setActionError] = useState('')
   const [deleting, setDeleting] = useState<OpsAnnouncement | null>(null)
-  const [baseline, setBaseline] = useState<Form>(EMPTY)
-  const readOnly = useOpsReadOnly()
+  const access = useOpsReadOnlyState()
+  const [urlState, setUrlState] = useListUrlState({ highlight: '' })
+  // 作る画面は `?highlight=<作った行のID>` で戻ってくる。表の共通部品と同じく1回だけ使って消す。
+  const [highlightId, setHighlightId] = useState('')
 
   const load = useCallback(async () => {
     setLoadError(null)
@@ -148,11 +80,9 @@ export default function OpsAnnouncementsV8() {
       const res = await api.ops.announcements.list()
       if (!res.success) { setLoadError(new Error(res.error || '読み込めませんでした')); return }
       setRows(res.data)
-      setLineConfigured(res.noticeLineConfigured)
       setLinked(res.linked)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
-
       { if (!fieldFailure)
       setLoadError(caught) }
     } finally {
@@ -161,249 +91,50 @@ export default function OpsAnnouncementsV8() {
   }, [saveErrors])
 
   useEffect(() => { void load() }, [load])
+
+  // 対象の行が描かれてから印を消費する。読み込み中には消さない（表の共通部品と同じ）。
   useEffect(() => {
-    if (form.audienceKind !== 'tenants' || tenants.length > 0) return
-    void opsCall(api.ops.tenants()).then((res) => { if (res.success) setTenants(res.data.filter((t) => t.status !== 'archived')) })
-  }, [form.audienceKind, tenants.length])
-
-  useEffect(() => {
-    let cancelled = false
-    setPreview(null)
-    void opsCall(api.ops.announcements.preview({ audienceKind: form.audienceKind, audiencePlans: form.audiencePlans, audienceTenantIds: form.audienceTenantIds })).then((res) => {
-      if (!cancelled && res.success) setPreview(res.data)
-    })
-    return () => { cancelled = true }
-  }, [form.audienceKind, form.audiencePlans, form.audienceTenantIds])
-
-  const toggle = <T extends string>(list: T[], key: T): T[] => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key])
-
-  /* 欄に結び付く誤りは欄で知らせて1つ目へ移る。上の帯は LINE の設定だけ。 */
-  const fields = useFormErrors()
-  fields.define('subject', '件名', () => (form.subject.trim() ? null : '件名を入力してください'), { required: true })
-  fields.define('body', '本文', () => (form.body.trim() ? null : '本文を入力してください'), { required: true })
-  fields.define('audience', '宛先', () => (
-    form.audienceKind === 'plan' && form.audiencePlans.length === 0 ? 'プランを 1 つ以上選んでください'
-      : form.audienceKind === 'tenants' && form.audienceTenantIds.length === 0 ? '契約先を 1 つ以上選んでください'
-        : null
-  ), { required: form.audienceKind !== 'all' })
-  fields.define('channels', '送り方', () => (form.channels.length === 0 ? '送り方を 1 つ以上選んでください' : null), { required: true })
-  const describedBy = (key: string) => (fields.invalid(key) ? `ann-${key}-error` : undefined)
-
-  const validation = useMemo(() => {
-    if (form.channels.includes('line') && !lineConfigured) return '契約者専用LINEのアカウントが未設定です。メンバー管理の「運営の情報」で指定してください'
-    return ''
-  }, [form, lineConfigured])
-
-  const input = (mode: OpsAnnouncementInput['mode']): OpsAnnouncementInput => ({
-    subject: form.subject.trim(), body: form.body.trim(), audienceKind: form.audienceKind,
-    audiencePlans: form.audiencePlans, audienceTenantIds: form.audienceTenantIds, channels: form.channels,
-    publishAt: toPublishAt(form.publishAt), mode,
-  })
-
-  const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(baseline), [form, baseline])
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy, onDiscard: () => { setForm(baseline) } })
-
-  const collision = useSaveConflict<OpsAnnouncement>({
-    contextKey: editingId ?? 'new',
-    fetchLatest: async () => {
-      const response = await api.ops.announcements.list()
-      return response.success ? response.data.find(row => row.id === editingId) ?? null : null
-    },
-    reload: async () => {
-      const response = await api.ops.announcements.list()
-      if (!response.success) throw new Error('読み込めませんでした')
-      const latest = response.data.find(row => row.id === editingId)
-      if (!latest) throw new Error('お知らせが見つかりませんでした')
-      edit(latest)
-      collision.clear()
-    },
-  })
-
-  const submit = async (mode: OpsAnnouncementInput['mode']) => {
-    if (fields.submit().length > 0) { setFormError(''); setConfirmSend(false); return }
-    if (validation) { setFormError(validation); setConfirmSend(false); return }
-    setBusy(true)
-    setFormError('')
-    try {
-      const res = editingId
-        ? await api.ops.announcements.update(editingId, input(mode), editingUpdatedAt ?? undefined)
-        : await api.ops.announcements.create(input(mode), createKey)
-      if (!res.success) { setFormError('保存できませんでした。時間をおいて、もう一度お試しください。'); return }
-      setConfirmSend(false)
-      notifySaved(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${formatNumber(res.data.recipientsTotal)}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
-      collision.clear()
-      if (editingId) {
-        setBaseline(form)
-        setEditingUpdatedAt(res.data.updatedAt)
-      } else {
-        setBaseline(EMPTY)
-        setForm(EMPTY)
-        setEditingId(null)
-        setEditingUpdatedAt(null)
-        setCreateKey(crypto.randomUUID())
-      }
-      await load()
-    } catch (error) {
-      const fieldFailure = saveErrors.capture(error);
-
-      if (error instanceof ApiError && error.status === 409) {
-        if (error.code === 'IDEMPOTENCY_CONFLICT') {
-          { if (!fieldFailure)
-          setFormError('同じ再実行キーが別の内容に使われています。作り直してください。') }
-          setCreateKey(crypto.randomUUID())
-          return
-        }
-        collision.mark()
-        setConfirmSend(false)
-        { if (!fieldFailure)
-        setFormError('') }
-        // 入力は残したまま、他の人が変えた一覧の状態を読み直す。
-        await load()
-        return
-      }
-      { if (!fieldFailure)
-      setFormError(error instanceof ApiError ? opsErrorMessage(error) : '保存できませんでした。時間をおいて、もう一度お試しください。') }
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const edit = (a: OpsAnnouncement) => {
-    const next: Form = { subject: a.subject, body: a.body, audienceKind: a.audienceKind, audiencePlans: a.audiencePlans, audienceTenantIds: a.audienceTenantIds, channels: a.channels, publishAt: toLocalInput(a.publishAt) }
-    setEditingId(a.id)
-    setEditingUpdatedAt(a.updatedAt)
-    setBaseline(next)
-    setForm(next)
-    setFormError('')
-    setNotice('')
-    const scroller = document.getElementById('ops-main')
-    if (scroller) scroller.scrollTo({ top: 0 })
-    else window.scrollTo({ top: 0 })
-  }
-
-  // 送ったものは直せない。中身を左へ写し、新しいお知らせとして作り直す。
-  const copyAsNew = (a: OpsAnnouncement) => {
-    const next: Form = { subject: a.subject, body: a.body, audienceKind: a.audienceKind, audiencePlans: a.audiencePlans, audienceTenantIds: a.audienceTenantIds, channels: a.channels, publishAt: '' }
-    setEditingId(null)
-    setEditingUpdatedAt(null)
-    setCreateKey(crypto.randomUUID())
-    setBaseline(EMPTY)
-    setForm(next)
-    setFormError('')
-    setNotice('送ったお知らせの中身を写しました。直して送ると、新しいお知らせになります')
-    const scroller = document.getElementById('ops-main')
-    if (scroller) scroller.scrollTo({ top: 0 })
-    else window.scrollTo({ top: 0 })
-  }
-
-  const cancelEdit = () => {
-    setEditingId(null)
-    setEditingUpdatedAt(null)
-    setBaseline(EMPTY)
-    setForm(EMPTY)
-    setFormError('')
-    setCreateKey(crypto.randomUUID())
-  }
+    if (!urlState.highlight || typeof document === 'undefined') return
+    const found = rows.some((a) => a.id === urlState.highlight)
+    if (!found) return
+    setHighlightId(urlState.highlight)
+    setUrlState({ highlight: '' })
+    document.querySelector(`[data-row-id="${CSS.escape(urlState.highlight)}"]`)?.scrollIntoView({ block: 'center' })
+  }, [rows, setUrlState, urlState.highlight])
 
   const remove = async () => {
     if (!deleting) return
     setBusy(true)
     const res = await opsCall(api.ops.announcements.remove(deleting.id))
     setBusy(false)
-    if (!res.success) { setFormError(res.error || '消せませんでした'); return }
+    if (!res.success) { setActionError(res.error || '消せませんでした'); return }
     setDeleting(null)
-    if (editingId === deleting.id) { setEditingId(null); setBaseline(EMPTY); setForm(EMPTY) }
+    setActionError('')
     await load()
   }
-
-  const scheduled = form.publishAt.trim().length > 0
-  const editing = rows.find((a) => a.id === editingId) ?? null
 
   return (
     <SaveErrorScope errors={saveErrors}><div data-design-node="tQ2MJ">
       <OpsHead
         title="お知らせ"
         description="契約先へ、画面のお知らせ・メール・契約者専用LINE でお知らせを送ります。"
-        environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
-      />
-      {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}
-      <div className={styles.columns}>
-        {readOnly ? null : (
-          <section aria-label="作成" className={styles.form}>
-            <h2 className={parts.panelTitle}>{editingId ? 'お知らせを直す' : '作成'}</h2>
-            {collision.conflict ? <SaveConflictBand title="ほかの人が先にお知らせを保存しました" compareBusy={collision.compareBusy} onCompare={collision.compare} onReload={collision.reloadLatest} /> : null}
-            <SaveConflictCompareDialog open={collision.compareOpen} busy={collision.compareBusy} error={collision.compareError} onCancel={collision.closeCompare} onReload={collision.reloadLatest}
-              lines={collision.latest ? [
-                { text: `件名：入力 ${form.subject} ／ 最新 ${collision.latest.subject}` },
-                { text: `本文：入力 ${form.body} ／ 最新 ${collision.latest.body}` },
-                { text: `公開時刻：入力 ${form.publishAt || 'すぐに'} ／ 最新 ${toLocalInput(collision.latest.publishAt) || 'すぐに'}` },
-              ] : null} />
-            {formError && !confirmSend ? <Notice tone="danger" className={parts.alertNoticePlacement} >{formError}</Notice> : null}
-            <ValidationSummary problems={fields.listProblems()} onFocusFirst={fields.focusFirst} minProblems={2} />
-            <div className={styles.field}><Field label="件名" htmlFor="ann-subject" requirement={fields.requirement('subject')}><SaveErrorField names={["subject","form.subject"]}><TextField {...fields.bind('subject')} id="ann-subject" invalid={fields.invalid('subject')} aria-describedby={describedBy('subject')} value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))} placeholder="例：9月20日 深夜のメンテナンスのお知らせ" maxLength={120} disabled={busy} /></SaveErrorField>
-<FieldError id="ann-subject-error">{fields.error('subject')}</FieldError></Field></div>
-            <div className={styles.field}><Field label="本文" htmlFor="ann-body" requirement={fields.requirement('body')}><SaveErrorField names={["body","form.body"]}><TextArea {...fields.bind('body')} id="ann-body" invalid={fields.invalid('body')} aria-describedby={describedBy('body')} rows={4} className={styles.body} value={form.body} onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))} placeholder="お客様各位　いつも musubo をご利用いただきありがとうございます。…" maxLength={4000} disabled={busy} /></SaveErrorField>
-<FieldError id="ann-body-error">{fields.error('body')}</FieldError></Field></div>
-            <fieldset className={styles.field} {...fields.bind('audience')} aria-invalid={fields.invalid('audience') || undefined} aria-describedby={describedBy('audience')}>
-              <legend className={`${styles.smallLabel} ${styles.legend}`}>
-                宛先
-                <HelpTip label="宛先の見込み">{previewLabel(preview, form.channels)}</HelpTip>
-              </legend>
-              <div className={styles.choices}>
-                {AUDIENCES.map((a) => (
-                  <SaveErrorField names={["announcement-audience","key","a.key","audienceKind","form.audienceKind","form"]} key={a.key}><Radio key={a.key} name="announcement-audience" value={a.key} checked={form.audienceKind === a.key} disabled={busy} onChange={() => setForm((f) => ({ ...f, audienceKind: a.key }))}>{a.label}</Radio></SaveErrorField>
-                ))}
-              </div>
-              {form.audienceKind === 'plan' ? (
-                <div className={styles.chips}>
-                  {PLANS.map((p) => <FilterChip key={p.key} selected={form.audiencePlans.includes(p.key)} onChange={() => setForm((f) => ({ ...f, audiencePlans: toggle(f.audiencePlans, p.key) }))}>{p.label}</FilterChip>)}
-                </div>
-              ) : null}
-              {form.audienceKind === 'tenants' ? (
-                <div className={`${styles.chips} ${styles.tenantChips}`}>
-                  {tenants.length === 0
-                    ? <span className={parts.note}>契約先を読み込んでいます…</span>
-                    : tenants.map((t) => <FilterChip key={t.id} selected={form.audienceTenantIds.includes(t.id)} onChange={() => setForm((f) => ({ ...f, audienceTenantIds: toggle(f.audienceTenantIds, t.id) }))}>{t.name}</FilterChip>)}
-                </div>
-              ) : null}
-              <FieldError id="ann-audience-error">{fields.error('audience')}</FieldError>
-            </fieldset>
-            <fieldset className={styles.field} {...fields.bind('channels')} aria-invalid={fields.invalid('channels') || undefined} aria-describedby={describedBy('channels')}>
-              <legend className={`${styles.smallLabel} ${styles.legend}`}>送り方</legend>
-              <div className={styles.choices}>
-                {CHANNELS.map((ch, saveFieldIndex) => <SaveErrorField names={[`CHANNELS.${saveFieldIndex}.key`,"key","ch.key","form"]} key={ch.key}><Checkbox key={ch.key} checked={form.channels.includes(ch.key)} disabled={busy} onCheckedChange={() => setForm((f) => ({ ...f, channels: toggle(f.channels, ch.key) }))}>{ch.label}</Checkbox></SaveErrorField>)}
-              </div>
-              <FieldError id="ann-channels-error">{fields.error('channels')}</FieldError>
-            </fieldset>
-            {loaded && !lineConfigured ? (
-              <Notice tone="warn">
-                契約者専用LINE のアカウントが未設定です。メンバー管理の「運営の情報」で指定すると LINE で送れます。
-              </Notice>
-            ) : null}
-            <div className={styles.field}>
-              <span className={styles.label}>
-                配信日時（日本時間）
-                <HelpTip label="配信日時の説明">空のままなら、押したときにすぐ送ります。日時を入れると「配信を予約する」に変わります。</HelpTip>
-              </span>
-              <div className={styles.dateTime}>
-              <SaveErrorField names={["publishAt","form.publishAt","publish_at","form.publish_at"]}><DateTimeField value={form.publishAt} onChange={(v) => setForm((f) => ({ ...f, publishAt: v }))} aria-label="公開日時（日本時間）" placeholder="空のままならすぐに送る" disabled={busy} /></SaveErrorField>
-              </div>
-            </div>
-            <div className={styles.actions}>
-              {editingId ? <Button onClick={cancelEdit} disabled={busy}>直すのをやめる</Button> : null}
-              {editing ? <Button variant="danger" onClick={() => setDeleting(editing)} disabled={busy}>削除する</Button> : null}
-              <Button onClick={() => void submit('draft')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存する</Button>
-              <Button variant="primary" onClick={() => { setFormError(''); if (fields.submit().length === 0) setConfirmSend(true) }} disabled={busy}>
-                <Send aria-hidden="true" />{scheduled ? '配信を予約する' : '今すぐ送る'}
-              </Button>
-            </div>
-          </section>
+        actions={access === 'unknown' ? (
+          <Button variant="primary" disabled>
+            お知らせを作る
+          </Button>
+        ) : (
+          <Button variant="primary" href="/ops/announcements/new" lockedReason={access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined}>
+            お知らせを作る
+          </Button>
         )}
+      />
+      <div className={styles.listWrap}>
         <section aria-label="配信済みの表" className={styles.list}>
           <div className={styles.listHead}>
-            <h3 className={parts.panelTitle}>配信済み・予約・下書き</h3>
+            <h2 className={parts.panelTitle}>配信済み・予約・下書き</h2>
             <HelpTip label="契約者専用LINEの登録状況">{linked ? `契約者専用LINEの登録 ${linked.linked} 人 / ${formatNumber(linked.total)} 人` : '登録状況を読み込んでいます'}</HelpTip>
           </div>
+          {actionError && !deleting ? <Notice tone="danger" className={parts.alertNoticePlacement}>{actionError}</Notice> : null}
           {!loaded ? (
             <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />
           ) : loadError ? (
@@ -412,7 +143,7 @@ export default function OpsAnnouncementsV8() {
             </div>
           ) : rows.length === 0 ? (
             <div className={parts.panel}>
-              <ListState permissionScope="hq" kind="empty" title="まだお知らせはありません" description="左で作って「今すぐ送る」か「配信を予約する」を押すと、ここに並びます。" />
+              <ListState permissionScope="hq" kind="empty" title="まだお知らせはありません" description="右上の「お知らせを作る」から作ると、ここに並びます。" />
             </div>
           ) : (
             <div className={parts.mini} role="table" aria-label="配信済み・予約・下書き">
@@ -425,7 +156,7 @@ export default function OpsAnnouncementsV8() {
                 <span className={`${parts.fixed} ${styles.colOps}`} role="columnheader">操作</span>
               </div>
               {rows.map((a) => (
-                <div key={a.id} className={`${parts.miniRow} ${styles.row}`} role="row">
+                <div key={a.id} className={`${parts.miniRow} ${styles.row}`} role="row" data-row-id={a.id} data-highlight={highlightId === a.id || undefined}>
                   <span className={`${parts.grow} ${styles.subject}`} role="cell">
                     <span className={styles.subjectText} title={a.subject}>{a.subject}</span>
                     <span className={styles.sub} title={`${a.channelLabels.join('・')} ${formatDateTime(a.sentAt ?? a.publishAt)}${a.lastError ? `・${a.lastError}` : ''}`}>
@@ -437,16 +168,12 @@ export default function OpsAnnouncementsV8() {
                   <span className={`${parts.num} ${styles.colRead}`} role="cell">{a.channels.includes('screen') && a.status === 'sent' ? `${a.screenRead}/${a.screenTotal}` : emptyValue('unknown')}</span>
                   <span className={`${parts.num} ${styles.colLine}`} role="cell">{a.channels.includes('line') && a.status === 'sent' ? `${a.lineSent}/${a.recipientsTotal}` : emptyValue('unknown')}</span>
                   <span className={`${parts.fixed} ${styles.colOps}`} role="cell">
-                    {/* 行の右端は「…」1つ（B-253）。閲覧のみは押せる操作が無いので出さない。送信中は中身の無い「…」（使える操作はありません）。 */}
-                    {readOnly
-                      ? <EmptyCell />
-                      : <RowMenu
-                          label={`「${a.subject}」の操作`}
-                          size="row"
-                          items={a.status === 'sending' ? [] : a.status === 'draft' || a.status === 'scheduled'
-                            ? [{ id: 'edit', label: '編集する', icon: <Pencil size={16} aria-hidden="true" />, disabled: Boolean(busy), onSelect: () => edit(a) }]
-                            : [{ id: 'edit', label: '編集する', description: '送ったものは変えず、中身を写して新しく作ります', icon: <Pencil size={16} aria-hidden="true" />, disabled: Boolean(busy), onSelect: () => copyAsNew(a) }]}
-                        />}
+                    {/* 行の右端は「…」1つ（B-253）。閲覧のみにも押せない形＋理由で出す（2026-10-26 オーナー決定）。送信中は中身の無い「…」（使える操作はありません）。 */}
+                    <RowMenu
+                      label={`「${a.subject}」の操作`}
+                      size="row"
+                      items={rowItems(a, access, busy, () => setDeleting(a))}
+                    />
                   </span>
                 </div>
               ))}
@@ -456,45 +183,17 @@ export default function OpsAnnouncementsV8() {
         </section>
       </div>
 
-      <Dialog
-        open={confirmSend}
-        designWidth={600}
-        designTop={220}
-        title="このお知らせを送りますか？"
-        cancelLabel="戻って直す"
-        confirmLabel={scheduled ? `${shortPublishAt(form.publishAt)} に送る` : '今すぐ送る'}
-        confirmIcon={<Send size={16} aria-hidden="true" />}
-        busy={busy}
-        error={formError || undefined}
-        designNode="TJUUl"
-        onConfirm={() => submit(scheduled ? 'schedule' : 'send')}
-        onCancel={() => { if (!busy) setConfirmSend(false) }}
-      >
-        <div className={parts.dialogBody}>
-          <dl className={styles.facts}>
-            <div className={styles.fact}><dt>宛先</dt><dd>{confirmAudience(form, preview)}</dd></div>
-            <div className={styles.fact}><dt>届く方法</dt><dd>{confirmChannels(form, preview)}</dd></div>
-            <div className={styles.fact}><dt>送る日時</dt><dd>{scheduled ? `${longPublishAt(form.publishAt)}（予約）` : '今すぐ'}</dd></div>
-          </dl>
-          <div className={styles.letter}>
-            <p className={styles.letterSubject}>{`件名：${form.subject.trim() || emptyValue('unconfigured')}`}</p>
-            <p className={styles.letterBody}>{form.body.trim().length > 80 ? `${form.body.trim().slice(0, 80)}…` : form.body.trim() || '（本文が未入力です）'}</p>
-          </div>
-          <p className={styles.after}>送ったあとは本文を直せません。画面のお知らせは取り下げられます（メール・LINE は取り消せません）。</p>
-        </div>
-      </Dialog>
       <ConfirmDialog
         open={deleting !== null}
-        title={deleting ? `「${deleting.subject}」を消しますか？` : ''}
+        title={deleting ? `「${deleting.subject}」を削除しますか？` : ''}
         description="下書き・予約を消します。配信済みのものは消せません。"
         confirmLabel="削除する"
         destructive
         busy={busy}
-        error={formError}
+        error={actionError}
         onConfirm={() => remove()}
         onCancel={() => { if (!busy) setDeleting(null) }}
       />
-      <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div></SaveErrorScope>
   )
 }

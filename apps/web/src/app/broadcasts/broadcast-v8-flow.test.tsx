@@ -107,8 +107,19 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
+const heldCreate = vi.hoisted(() => ({ template: null as null | (() => void) }))
+vi.mock('@/components/shared/action-menu', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/action-menu')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.ariaLabel === '配信の作り方') heldCreate.template = props.items.find(item => item.id === 'create-template')?.onSelect ?? null
+    return <actual.default {...props} />
+  } }
+})
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import BroadcastListV8 from '@/v8/broadcasts/list'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
+import type { StaffMember } from '@line-crm/shared'
 import BroadcastListPage from './page'
 import BroadcastDetailPage from './detail/page'
 
@@ -134,9 +145,12 @@ function unmount() {
 }
 
 beforeEach(() => {
-  // 予約を取り消せるオーナーとして操作する。実APIや他の試験の役割に依存させない。
+  heldCreate.template = null
+  // mockした役割と、実行直前に読む本人APIの控えを同じ管理者にそろえる。
+  forgetStaffIdentity(); forgetSessionSnapshot()
+  rememberStaffIdentity({ id: 'admin-1', role: 'admin', name: '管理者', permissionKeys: [] } as unknown as StaffMember)
   vi.stubGlobal('localStorage', {
-    getItem: (key: string) => key === 'lh_staff_role' ? 'owner' : null,
+    getItem: (key: string) => key === 'lh_staff_role' ? 'admin' : null,
     setItem: vi.fn(),
     removeItem: vi.fn(),
   })
@@ -151,11 +165,31 @@ beforeEach(() => {
 
 afterEach(() => {
   unmount()
+  forgetStaffIdentity(); forgetSessionSnapshot()
   window.localStorage.removeItem('lh_staff_role')
   vi.unstubAllGlobals()
 })
 
 describe('V8 一斉配信の通し', () => {
+  it('役割が管理者でも、開いたメニューの後に本人の控えを失うと作成を始めない', async () => {
+    await mount(<BroadcastListPage />)
+    await screen.findByText('はじめの配信')
+    await act(async () => fireEvent.click(screen.getAllByRole('button', { name: '配信を作る' })[0]))
+    const create = await screen.findByRole('menuitem', { name: /テンプレートから作る/ })
+    const retained = heldCreate.template
+    expect(retained).toBeTypeOf('function')
+    await act(async () => { forgetStaffIdentity() })
+    expect((create as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => fireEvent.click(create))
+    expect(mocks.create).not.toHaveBeenCalled()
+    await act(async () => retained!())
+    await screen.findByText('権限が変わったため、配信の作成を中止しました。')
+    expect(screen.queryByRole('dialog', { name: 'テンプレートを選ぶ' })).toBeNull()
+    expect(mocks.create).not.toHaveBeenCalled()
+    await act(async () => { rememberStaffIdentity({ id: 'admin-1', role: 'admin', name: '管理者', permissionKeys: [] } as unknown as StaffMember) })
+    expect(screen.queryByRole('dialog', { name: 'テンプレートを選ぶ' })).toBeNull()
+  })
+
   it('作る→下書き保存→知らせ→一覧に戻ると増えている', async () => {
     await mount(<BroadcastListPage />)
     await screen.findByText('はじめの配信')

@@ -1,3 +1,5 @@
+import { beforeEach as seedIdentity } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 // @vitest-environment happy-dom
 /*
  * Instagram 同時投稿の見え方（★V8-B `U1X7T2`・`HEEN9`／2026-10-07 利用者承認）。
@@ -251,3 +253,5 @@ describe('公開前の確認の Instagram の行（★V8-B `U1X7T2`）', () => {
     expect(screen.getByText(/「Instagram へ再送」でもう一度送れます/)).toBeTruthy()
   })
 })
+
+seedIdentity(() => { verifiedStaffRole('owner') })

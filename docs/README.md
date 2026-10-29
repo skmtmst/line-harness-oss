@@ -459,10 +459,15 @@
 
 ## 反映履歴
 
+- [配信・シナリオ・自動応答の日時・題・下見の修正](release-log/unreleased/1954-kenta-muse-delivery.md)
 - [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
 - [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
 - [共通UIの状態表示・操作の修正](release-log/unreleased/1952-kenta-muse-ui-state.md)
 - [招待・ログインユーザー・予約枠の表示修正](release-log/unreleased/1952-kenta-muse-auth.md)
+- [受信箱の空き・題横の印・保存の入口・カードの縦崩れ](release-log/unreleased/1953-kenta-muse-inbox.md)
+- [運営・監査・分析・問い合わせ・リッチメニューの修正](release-log/unreleased/1953-kenta-muse-ops-misc.md)
+- [統括の一覧の名前押下・友だちCSVのタブ・統括アカウント説明の修正](release-log/unreleased/1953-kenta-muse-list-settings.md)
+- [絞り込みの見出し・0の灰色・日付の年・経過の日数](release-log/unreleased/1955-kenta-muse-ui-color.md)
 - [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/1948-kenta-train-1029f.md)
 - [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
 - [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
@@ -532,6 +537,7 @@
 - [スマートフォンの幅でカードを1列に](release-log/unreleased/1801-kenta-cards-one-column.md)
 - [スマートフォンの幅で店名を切れにくく](release-log/unreleased/1804-kenta-hq-card-narrow.md)
 - [統括のカードの札・要対応の数・表の幅](release-log/unreleased/0000-kenta-hq-card-fixes.md)
+- [統括トップ・店の比較・お店画面の直し](release-log/unreleased/1953-kenta-muse-dash-store.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [二段階認証の画面を見やすく](release-log/unreleased/1843-kenta-two-factor-card.md)
 - [回復コードのお知らせに「要確認：」](release-log/unreleased/1846-kenta-recovery-notice-prefix.md)
@@ -696,8 +702,6 @@
 - [S02Cの検査記録](qa/cleanup-s02c-1019.md)
 - [S02Cの変更履歴](release-log/unreleased/1781-kenta-cleanup-s02c.md)
 
-
-
 - [コードの構成と名前](code-structure.md)
 - [コメントの書き方](comment-style.md)
 
@@ -718,7 +722,6 @@
 - [支払いリンクの期限確認の修正履歴](release-log/unreleased/1781-kenta-cleanup-f03.md)
 - [品質の後戻りを防ぐ仕組みの更新履歴](release-log/unreleased/1781-kenta-cleanup-q00.md)
 - [品質の後戻りを防ぐ仕組みの検査記録](qa/cleanup-q00-1020.md)
-
 
 ## 引き継ぎで加わった文書
 
@@ -877,7 +880,9 @@
 - [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
 - [一覧の帯・フォルダの丸と共通操作の整理](release-log/unreleased/0000-kenta-tags-band-dot.md)
 - [共通部品と言葉・受信箱の絞り込みの修正](release-log/unreleased/0000-kenta-int.md)
+- [飲食店の閲覧のみの案内](release-log/unreleased/1953-kenta-int.md)
 - [チェックの印・スイッチ・選ぶ欄の見た目の統一](release-log/unreleased/0000-kenta-check-green.md)
+- [電話予約のパンくず・予約経路タブ・来店スタンプ・業種盤の担当欄の修正](release-log/unreleased/1953-kenta-muse-booking-ec.md)
 - [閲覧のみの帯を題の横並びから題の下へ](release-log/unreleased/1948-kenta-muse-heading-band.md)
 - [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
 - [まとめ列車 7](release-log/unreleased/1848-kenta-train-one7-1027.md)
@@ -949,13 +954,25 @@
 - [利用開始設定から二段階認証への引き継ぎ](release-log/unreleased/1949-masato-registration-mfa-flow.md) — 登録後の認証とアカウント登録への案内の反映履歴。
 - [LINE通知の操作権限の反映履歴](release-log/unreleased/1950-kenta-notification-permission.md)
 - [LINE通知の説明の置き場所](release-log/unreleased/1950-kenta-notification-help.md)
+- [LINEの接続状態の統一](release-log/unreleased/1954-kenta-line-connection-state.md) — 反映履歴、確認 2026-10-30
 - [LINE通知の送信内訳の表示](release-log/unreleased/1950-kenta-notification-kpi-detail.md)
 - [業種別の初期設定の確認](release-log/unreleased/1950-kenta-style-setup-progress.md) — 反映履歴、確認 2026-10-29
+- [Google投稿の確認時刻](release-log/unreleased/1955-kenta-swb-google-last-checked.md) — 状態確認の時刻表示の反映履歴。
+- [Google投稿の種類の札](release-log/unreleased/1955-kenta-swb-google-kind-chip.md) — 種類の札をそろえた反映履歴。
 - [最初の1通の確認と読み直しの操作](release-log/unreleased/1951-kenta-first-message-guide.md)
 - [シナリオの人数と割合](release-log/unreleased/1951-kenta-scenario-counts.md) — 人数の欠測と登録人数による割合の修正履歴。
 - [シナリオ人数の単位と補足位置](release-log/unreleased/1951-kenta-scenario-count-labels.md) — 不明時の単位と登録0人の補足位置の修正履歴。
 - [問い合わせのタブ・カルーセルの絵・更新履歴の検索](release-log/unreleased/1951-kenta-swb-x10-x14-x18.md)
 - [アカウント選択と読み込み失敗時の案内](release-log/unreleased/1951-kenta-train-1029h.md)
+- [Googleビジネスの権限表示](release-log/unreleased/1955-kenta-swb-google-permission.md) — 閲覧のみの案内と変更操作の反映履歴。
 - [ECのホームの確認項目](release-log/unreleased/1952-kenta-ec-dashboard.md) — 反映履歴、確認 2026-10-30
 - [共通の型と認証画面の帯の間隔](release-log/unreleased/1952-kenta-muse-fqa-space.md)
 - [UID移行の権限と操作の表示](release-log/unreleased/1952-kenta-uid-permissions.md)
+- [サロンと面談の空の日の予約案内](release-log/unreleased/1953-kenta-empty-bookings.md) — 反映履歴、確認 2026-10-30
+- [教室のクラスと会員予約の空状態](release-log/unreleased/1953-kenta-lesson-empty-bookings.md) — 反映履歴、確認 2026-10-30
+
+- [飲食店の左メニューの予約項目](release-log/unreleased/1953-kenta-restaurant-sidebar.md) — 反映履歴、確認 2026-10-30
+- [LIFFの小さな直し](release-log/unreleased/1953-kenta-muse-liff.md) — 写真・次へ・鈴・選択色・支払い案内・読み込み中・業種の出し分けの反映履歴。
+- [一覧の案内と予約の行の操作](release-log/unreleased/1953-kenta-train-1029j.md)
+- [アカウントの説明と権限・予約の見出し](release-log/unreleased/1954-kenta-train-1029k.md)
+- [一斉配信の権限と結果の列](release-log/unreleased/1955-kenta-train-1029l.md) — 閲覧のみの操作と受付件数の反映履歴。

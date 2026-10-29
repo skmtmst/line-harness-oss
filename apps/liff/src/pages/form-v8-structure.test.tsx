@@ -98,6 +98,18 @@ afterEach(() => {
 });
 
 describe('V8 の形', () => {
+  it('読み込み中も題（フォーム）の帯を出す', async () => {
+    getForm.mockReturnValue(new Promise(() => {}));
+    render(
+      <MemoryRouter initialEntries={['/forms/f1?liffId=test']}>
+        <Routes>
+          <Route path="/forms/:id" element={<Form />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByText('フォーム')).toBeTruthy();
+  });
+
   it('上の帯・進みの棒・題と説明・選択肢の枠を出す', async () => {
     setup();
     expect(await screen.findByRole('heading', { name: '来店アンケート' })).toBeTruthy();

@@ -238,6 +238,7 @@ export default function BroadcastRecipients({
               <span className="mt-1 block">
                 <Select
                   aria-label="宛先の絞り込み"
+                  label="結果"
                   value={result}
                   onChange={(value) => setResult(value)}
                   options={RESULT_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}

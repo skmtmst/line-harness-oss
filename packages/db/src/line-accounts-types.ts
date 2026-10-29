@@ -196,6 +196,8 @@ export interface LineAccountListStats {
   connection: {
     status: 'ok' | 'warn' | 'unknown';
     checkedAt: string | null;
+    isActive?: boolean;
+    archivedAt?: string | null;
     /** 期限切れのトークンを持っている（自動の更新が止まっている）。 */
     tokenExpired: boolean;
     /** 最新の確認のうち、引っかかったもの（要確認の理由）。 */
@@ -204,14 +206,7 @@ export interface LineAccountListStats {
 }
 
 /** 一覧に載せる、引っかかった確認1件。秘密値は含まない。 */
-export interface LineAccountConnectionIssue {
-  kind: 'bot_info' | 'webhook_endpoint' | 'webhook_test' | 'token_refresh';
-  result: 'mismatched' | 'unconfigured' | 'failed';
-  expectedUrl: string | null;
-  registeredUrl: string | null;
-  webhookActive: boolean | null;
-  httpStatus: number | null;
-}
+export type LineAccountConnectionIssue = import('@line-crm/shared').LineConnectionIssue;
 
 export type UpdateLineAccountInput = Partial<
   Pick<

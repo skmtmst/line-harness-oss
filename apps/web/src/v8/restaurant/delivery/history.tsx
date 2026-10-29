@@ -196,6 +196,7 @@ export default function HistoryBoard({
             </span>
             <Select
               aria-label="サービス"
+              label="サービス"
               icon={<Funnel size={16} aria-hidden="true" />}
               value={service}
               onChange={(value) => {

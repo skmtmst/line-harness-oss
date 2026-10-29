@@ -844,6 +844,7 @@ export default function AutoRepliesListV8() {
   const folderSelect = (
           <SaveErrorField names={["folderFilter","folder","folder_filter"]}><Select
             aria-label="フォルダ"
+            label="フォルダ"
             value={folderFilter}
             onChange={(value) => {
               setFolderFilter(value)

@@ -60,7 +60,7 @@ const ROW_TITLES = [
   'Webhook が届いているか',
   '配信が送れているか',
   '保存と送信のしくみ',
-  '鍵・証明書の期限',
+  'トークンの期限',
 ]
 
 /** サーバーの結果の種類 → 画面の行。 */
@@ -73,7 +73,7 @@ const ROW_OF_KEY: Record<OperationHealthCheckKey, string> = {
   webhook: 'Webhook が届いているか',
   dispatch_jobs: '配信が送れているか',
   infra_canary: '保存と送信のしくみ',
-  credential_expiry: '鍵・証明書の期限',
+  credential_expiry: 'トークンの期限',
 }
 
 function minutesAgo(minutes: number): string {
@@ -210,6 +210,16 @@ describe('健全性チェックの表', () => {
     calls.alertsResponse = () => Promise.resolve({ success: true, data: [alert('a'), alert('b')] })
     render(<HealthPanelV8 canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
     expect(await screen.findByRole('heading', { name: '開いている異常 2 件' })).toBeTruthy()
+  })
+
+  it('E33: 48時間より古い確認は日に直す（72時間前→3日前）', async () => {
+    calls.healthResponse = () => Promise.resolve(snapshot([
+      { checkKey: 'webhook', status: 'normal', summary: '受け取れています', observedAt: minutesAgo(3 * 24 * 60) },
+    ]))
+    render(<HealthPanelV8 canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
+    const row = rowOf('Webhook が届いているか')
+    await waitFor(() => expect(row.textContent).toContain('3日前'))
+    expect(row.textContent).not.toContain('時間前')
   })
 })
 

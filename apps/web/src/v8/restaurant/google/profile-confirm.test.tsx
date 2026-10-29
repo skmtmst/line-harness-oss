@@ -1,3 +1,5 @@
+import { beforeEach as seedIdentity } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 // @vitest-environment happy-dom
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -57,7 +59,7 @@ describe('Google変更案を現在の確認画面から送信する', () => {
       mocks.change.mockResolvedValue({ ...response, ...permission })
       await open(); check()
       const button = screen.queryByRole('button', { name: 'Googleに変更を送信する' })
-      if (button) expect(button).toHaveProperty('disabled', true)
+      if (button) expect((button as HTMLButtonElement).disabled || button.getAttribute('aria-disabled') === 'true').toBe(true)
       expect(mocks.sendChange).not.toHaveBeenCalled()
     })
   }
@@ -102,3 +104,5 @@ describe('Google変更案を現在の確認画面から送信する', () => {
     expect(screen.getByRole('button', { name: 'Googleに変更を送信する' })).toHaveProperty('disabled', true)
   })
 })
+
+seedIdentity(() => { verifiedStaffRole('owner') })

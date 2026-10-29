@@ -42,6 +42,8 @@ describe('refreshLineAccessTokens profile sync', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
@@ -72,4 +74,16 @@ describe('refreshLineAccessTokens profile sync', () => {
       }),
     );
   });
+
+  it('時差の無い期限をJSTとして読み、7日未満なら交換する',async()=>{
+    vi.stubEnv('TZ','UTC')
+    const value=account('naive','2026-09-15T11:59:00+09:00')
+    value.token_expires_at='2026-09-22T11:59:00'
+    getLineAccounts.mockResolvedValue([value])
+    const fetchMock=vi.fn(async()=>Response.json({access_token:'renewed-token',expires_in:30*24*60*60,token_type:'Bearer'}))
+    vi.stubGlobal('fetch',fetchMock)
+    await refreshLineAccessTokens({} as D1Database)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(updateLineAccount).toHaveBeenCalledWith(expect.anything(),'naive',expect.objectContaining({channel_access_token:'renewed-token'}))
+  })
 });

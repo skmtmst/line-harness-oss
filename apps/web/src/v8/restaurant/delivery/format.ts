@@ -1,4 +1,5 @@
 import { formatYen } from '@line-crm/shared';
+import { formatDurationMinutes } from '@/lib/format-duration'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import type { DeliveryService, DeliveryUrgency } from '@/lib/restaurant-delivery-api'
@@ -112,10 +113,8 @@ export function formatElapsed(
   const received = new Date(receivedAt).getTime()
   if (Number.isNaN(received)) return DASH
   const minutes = Math.max(0, Math.floor((nowMs - received) / 60000))
-  if (minutes < 60) return `${minutes}分`
-  const hours = Math.floor(minutes / 60)
-  const rest = minutes % 60
-  return rest === 0 ? `${hours}時間` : `${hours}時間${rest}分`
+  // 23：長い経過は日に直す（共通の日・時間・分）。短い表示は今までどおり。
+  return formatDurationMinutes(minutes)
 }
 
 /**

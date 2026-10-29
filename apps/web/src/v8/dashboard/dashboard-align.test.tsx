@@ -94,9 +94,11 @@ describe('右の列：現在の対応状況と接続状態', () => {
 
   it('Webhook の値は 正常／要確認（理由つき）／未確認。「確認中」で止まらない', () => {
     expect(webhookState({ connection: { status: 'ok', checkedAt: 'x' } } as never).label).toBe('正常')
-    expect(webhookState({ webhook: { status: 'matched' } } as never).label).toBe('正常')
+    expect(webhookState({ webhook: { status: 'matched' } } as never).label).toBe('未確認')
     expect(webhookState({ connection: { status: 'unknown', checkedAt: null } } as never).label).toBe('未確認')
     expect(webhookState(null).label).toBe('未確認')
+    expect(webhookState({ isActive: true, connection: { status: 'ok' }, webhook: { status: 'mismatched' } } as never).label).toBe('正常')
+    expect(webhookState({ isActive: false, connection: { status: 'warn' } } as never).label).toBe('停止中')
     const warn = webhookState({ connection: { status: 'warn', checkedAt: 'x', issues: [{ kind: 'webhook_endpoint', result: 'unconfigured', expectedUrl: null, registeredUrl: null, webhookActive: null, httpStatus: null }] } } as never)
     expect(warn.label).toBe('要確認')
     expect(warn.reason?.text).toBe('LINE に Webhook の URL が登録されていません')

@@ -7,7 +7,7 @@ vi.mock('@/components/shared/list-url-state', async () => {
   const React = await import('react')
   return { useListUrlValue: (_key: string, initial: unknown) => React.useState(initial) }
 })
-import { useDuplicatesData } from './use-duplicates-data'
+import { formatRelative, useDuplicatesData } from './use-duplicates-data'
 const resultOf = (id: string, total = 1) => ({ success: true, data: { items: [{ id }], total } })
 beforeEach(() => {
   net.stats.mockResolvedValue({ success: true, data: { totalFollowing: 2, uniquePeople: 1, friendDups: 1, duplicateGroups: 1, perAccount: [] } })
@@ -50,4 +50,13 @@ it('表示時刻の1分更新を解除し、離れた後の古い要求を無効
   await waitFor(() => expect(net.list).toHaveBeenCalled())
   unmount()
   expect(clear).toHaveBeenCalled()
+})
+
+it('E33: 見直し時刻は共通の関数で日に直す（1282時間前→53日前）', () => {
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString()
+  expect(formatRelative(ago(30 * 1000))).toBe('30秒前')
+  expect(formatRelative(ago(5 * 60_000))).toBe('5分前')
+  expect(formatRelative(ago(5 * 3_600_000))).toBe('5時間前')
+  expect(formatRelative(ago(47 * 3_600_000))).toBe('47時間前')
+  expect(formatRelative(ago(53 * 24 * 3_600_000))).toBe('53日前')
 })

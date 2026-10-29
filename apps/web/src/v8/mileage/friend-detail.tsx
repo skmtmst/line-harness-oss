@@ -426,6 +426,7 @@ function FriendDetailInner() {
 
             <SaveErrorField names={["period","page"]}><Select
               aria-label="期間"
+              label="期間"
               value={period}
               options={[{ value: 'all', label: 'すべて' }, { value: 'month', label: '今月' }]}
               onChange={(value) => { setPage(1); setPeriod(value) }}

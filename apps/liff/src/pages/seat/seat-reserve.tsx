@@ -529,6 +529,11 @@ export default function SeatReserve() {
 
       {view === 'pick' && (
         <BottomBar appearance="restaurant">
+          {!slot && !busy && Array.isArray(currentSlots) ? (
+            <p role="status" className="text-center text-xs leading-[18px] text-liff-sub">
+              {hasOpenSlot(currentSlots) ? '時刻を選んでください' : '空いている時刻がありません。ほかの日を選んでください'}
+            </p>
+          ) : null}
           <Button variant="restaurant-primary" aria-label={busy ? 'お取りしています…' : 'この時刻で進む'} disabled={!slot || busy} onClick={() => void proceed()}>
             {busy ? 'お取りしています…' : '次へ'}
           </Button>

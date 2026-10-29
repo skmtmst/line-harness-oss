@@ -1,5 +1,6 @@
 'use client'
 import ListDateTime from '@/components/shared/list-date-time'
+import { canChangeBroadcastNow, canEditBroadcastNow, canManageBroadcastListNow, captureBroadcastWriteAccess, isFromHeadquarters, useBroadcastEditAccess, useBroadcastManagementAccess } from './write-access'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd, ListToolbarOptional, ResponsiveFilterChips } from '@/components/shared/list-toolbar';
@@ -10,7 +11,6 @@ import { RowNameLink } from '@/components/shared/table';
 import SharedStatusBadge from '@/components/shared/status-badge'
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue, useListScrollMemory, useListUrlParam } from '@/components/shared/list-url-state';
-import { useFeatureAccess } from '@/lib/use-feature-access';
 import { RovingTbody } from '@/components/shared/row-roving';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Bookmark, CalendarClock, CalendarDays, ChevronDown, Copy, FileText, Gauge, List as ListIcon, Lock, MailOpen, Plus, Send, SendHorizontal, UserCheck } from 'lucide-react';
@@ -54,6 +54,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary';
 import { runOptimistic } from '@/lib/undoable';
+import { notifyToast } from '@/components/shared/toast'
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { terms } from '@/lib/terms';
 import QuickSendV8 from './quick-send'
@@ -154,15 +155,17 @@ function acceptedCountText(count: number): string {
  */
 function BroadcastResultCells({ broadcast, insight, narrow }: { broadcast: ApiBroadcast; insight: BroadcastInsight | undefined; narrow: boolean }) {
   const sent = broadcast.status === 'sent'
+  /* 集計なしの受け付け数は、列に収めるため数だけ出す。説明の全文は title に残す。 */
+  const acceptedFull = !sent ? null : insight?.delivered == null ? acceptedCountText(broadcast.successCount) : null
   const delivered = !sent ? null : insight?.delivered != null
     ? `${formatNumber(insight.delivered)} 人`
-    : acceptedCountText(broadcast.successCount)
+    : `${formatNumber(broadcast.successCount)} 人`
   const open = sent ? percent(insight?.openRate) : null
   const click = sent ? percent(insight?.clickRate) : null
   if (!narrow) {
     return (
       <>
-        <Td align="right"><span className={styles.resultNumber}>{delivered ?? emptyValue('unknown')}</span></Td>
+        <Td align="right"><span className={styles.resultNumber} title={acceptedFull ?? undefined}>{delivered ?? emptyValue('unknown')}</span></Td>
         <Td align="right"><span className={styles.resultNumber}>{open ?? emptyValue('unknown')}</span></Td>
         <Td align="right"><span className={styles.resultNumber}>{click ?? emptyValue('unknown')}</span></Td>
       </>
@@ -172,7 +175,7 @@ function BroadcastResultCells({ broadcast, insight, narrow }: { broadcast: ApiBr
     <Td align="right">
       {delivered === null ? <span className={styles.cellMain}>{emptyValue('unknown')}</span> : (
         <>
-          <span className={styles.resultMain}>{delivered}</span>
+          <span className={styles.resultMain} title={acceptedFull ?? undefined}>{delivered}</span>
           {open !== null || click !== null ? (
             <span className={styles.resultSub}>{[open !== null ? `開封 ${open}` : '', click !== null ? `クリック ${click}` : ''].filter(Boolean).join('・')}</span>
           ) : null}
@@ -212,11 +215,6 @@ function summaryInsight(summary: ApiBroadcast['insightSummary']): BroadcastInsig
   }
 }
 
-/** 統括の一括配信から来た配信か（口が fromHeadquarters を返す。型にはまだ無いので読むだけ）。 */
-function isFromHeadquarters(broadcast: ApiBroadcast): boolean {
-  return (broadcast as ApiBroadcast & { fromHeadquarters?: boolean }).fromHeadquarters === true
-}
-
 /** 名前の横の「統括から」の札と鍵（店では変えられない印。l3RQH）。 */
 function HqMark() {
   return (
@@ -238,10 +236,12 @@ export default function BroadcastListV8() {
   const narrow = useNarrowViewport()
   /*
    * 閲覧のみ：作る・保存する・フォルダを足す・…の変える項目は押せない形にする。
-   * 役割が読めていない間は今までどおり出す（最後の守りはサーバの 403）。
+   * 役割が読めていない間は、理由を作らずに無効にする。
    * 管理者・オーナーと、配信の編集キーを持つ運用担当が変えられる（役割はサーバの答え）。
    */
-  const canEdit = useFeatureAccess('broadcasts')
+  const editAccess = useBroadcastEditAccess()
+  const canEdit = editAccess.allowed
+  const management = useBroadcastManagementAccess()
 
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
@@ -306,7 +306,8 @@ export default function BroadcastListV8() {
   const { value: listKpis, setValue: setListKpis } = useListSnapshot<BroadcastListKpis | null | undefined>(listScope, undefined)
   const { value: statusCounts, setValue: setStatusCounts } = useListSnapshot<Record<string, number> | null>(listScope, null)
   const { value: listTotal, setValue: setListTotal } = useListSnapshot<number | null>(listScope, null)
-  const [quota, setQuota] = useState<{ limit: number | null; used: number | null } | null>(null)
+  const [quota, setQuota] = useState<{ limit: number | null; used: number | null; unlimited: boolean; reason: 'not_connected' | 'fetch_failed' | null } | null>(null)
+  const [quotaLoading, setQuotaLoading] = useState(false)
 
   const listRequestKey = JSON.stringify([listScope, sortKey])
   const currentListRequest = useRef(listRequestKey)
@@ -336,6 +337,7 @@ export default function BroadcastListV8() {
   const moveFolderOrder = async (index: number, direction: -1 | 1) => {
     const target = folders[index]
     const neighbor = folders[index + direction]
+    if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの並べ替えを中止しました。'); return }
     if (!target || !neighbor || folderBusy) return
     setFolderBusy(true)
     setFolderError('')
@@ -354,6 +356,7 @@ export default function BroadcastListV8() {
   }
 
   const removeFolder = async () => {
+    if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの削除を中止しました。'); return }
     if (!deletingFolder || folderBusy) return
     const targetId = deletingFolder.id
     setFolderBusy(true)
@@ -475,19 +478,31 @@ export default function BroadcastListV8() {
     setPage(next)
   }
 
-  /* 今月の送信枠（ダッシュボードの口から quota を借りる）。 */
+  /* 今月の送信枠（ダッシュボードの口から quota を借りる。上限なし・読み込み中・失敗を分ける）。 */
   useEffect(() => {
     if (!selectedAccountId) {
       setQuota(null)
+      setQuotaLoading(false)
       return
     }
     let cancelled = false
+    setQuota(null)
+    setQuotaLoading(true)
     api.dashboard.overview({ accountId: selectedAccountId })
       .then((res) => {
         if (cancelled) return
-        if (res.success) setQuota({ limit: res.data.delivery.quotaLimit, used: res.data.delivery.quotaUsed })
+        setQuotaLoading(false)
+        if (!res.success) return
+        const metric = res.data.metrics?.monthlyQuota
+        const rawReason = metric?.reason ?? res.data.sections?.quota?.reason ?? null
+        const reason = rawReason === 'not_connected' || rawReason === 'fetch_failed' ? rawReason : null
+        if (metric === undefined || metric === null) {
+          setQuota({ limit: res.data.delivery.quotaLimit, used: res.data.delivery.quotaUsed, unlimited: false, reason })
+        } else {
+          setQuota({ limit: metric.value?.limit ?? null, used: metric.value?.used ?? null, unlimited: metric.value?.unlimited === true, reason })
+        }
       })
-      .catch(() => undefined)
+      .catch(() => { if (!cancelled) setQuotaLoading(false) })
     return () => { cancelled = true }
   }, [selectedAccountId])
 
@@ -527,6 +542,7 @@ export default function BroadcastListV8() {
   }
 
   const saveCurrentView = async () => {
+    if (!canManageBroadcastListNow()) { setSavedViewError('権限が変わったため、検索条件の保存を中止しました。'); return }
     if (!selectedAccountId || !savedViewName.trim() || savedViewBusy) return
     setSavedViewBusy(true)
     setSavedViewError('')
@@ -552,10 +568,14 @@ export default function BroadcastListV8() {
   }
 
   /* 削除は、利用状況にかかわらず確認してから実行する。 */
-  const requestDelete = (broadcast: ApiBroadcast) => { setDeleteError(''); setDeleteTarget(broadcast) }
+  const requestDelete = (broadcast: ApiBroadcast) => {
+    if (!canChangeBroadcastNow(broadcast)) { notifyToast('権限が変わったため、配信の削除を中止しました。', { tone: 'error' }); return }
+    setDeleteError(''); setDeleteTarget(broadcast)
+  }
 
   const handleDelete = async () => {
     if (!deleteTarget || deleting) return
+    if (!canChangeBroadcastNow(deleteTarget)) { setDeleteError('権限が変わったため、配信の削除を中止しました。'); return }
     const targetId = deleteTarget.id
     const requestKey = listRequestKey
     setDeleting(true)
@@ -590,14 +610,19 @@ export default function BroadcastListV8() {
 
   /* 行の「…」→「フォルダへ移す」。押した瞬間に移した形を見せて裏で保存し、失敗したら戻す。 */
   const moveBroadcastToFolder = (broadcast: ApiBroadcast, folderId: string | null) => {
+    if (!canChangeBroadcastNow(broadcast)) { notifyToast('権限が変わったため、フォルダへの移動を中止しました。', { tone: 'error' }); return }
     if (moving) return
+    const permitted = captureBroadcastWriteAccess()
     setMoving(true)
     const previous = broadcasts
     setBroadcasts((current) => current.map((item) => (item.id === broadcast.id ? { ...item, folderId } : item)))
     setOpenMenuId(null)
     setMenuMoveFor(null)
     runOptimistic({
-      request: () => api.broadcasts.update(broadcast.id, { folderId, expectedVersion: broadcast.version ?? 0 }),
+      request: () => {
+        if (!permitted(broadcast)) throw new Error('権限が変わったため、フォルダへの移動を中止しました。')
+        return api.broadcasts.update(broadcast.id, { folderId, expectedVersion: broadcast.version ?? 0 })
+      },
       revert: () => { setBroadcasts(previous); setMoving(false) },
       failureMessage: 'フォルダへ移せませんでした。',
       retry: () => moveBroadcastToFolder(broadcast, folderId),
@@ -639,13 +664,22 @@ export default function BroadcastListV8() {
   }
 
   const openCreate = (withTemplate: boolean) => {
+    if (!canEditBroadcastNow()) { notifyToast('権限が変わったため、配信の作成を中止しました。', { tone: 'error' }); return }
     setCreateMenuOpen(false)
     setOpenTemplatePicker(withTemplate)
     setShowCreate(true)
   }
 
   /* 送信枠は表示幅にかかわらず、同じ月の使用量から残りを出す。 */
-  const quotaRemaining = quota?.limit != null && quota?.used != null ? quota.limit - quota.used : null
+  const quotaUnlimited = quota?.unlimited === true
+  const quotaReadable = !quotaUnlimited && quota?.limit != null && quota?.used != null
+  const quotaFailed = !quotaLoading && !quotaUnlimited && !quotaReadable
+  const quotaRemaining = quotaReadable ? (quota?.limit ?? 0) - (quota?.used ?? 0) : null
+  /* 未接続・取得失敗のときだけ、トークンを入れ直す場所（アカウント設定の資格情報）への行き先を出す。上限なし・読み込み中は出さない。 */
+  const quotaAction = quotaFailed && quota?.reason != null ? {
+    label: 'アカウント設定へ',
+    href: selectedAccountId ? `/accounts/detail?id=${encodeURIComponent(selectedAccountId)}` : '/accounts',
+  } : undefined
   const kpiPending = listKpis === undefined
   const kpis = [
     {
@@ -660,11 +694,15 @@ export default function BroadcastListV8() {
       key: 'quota',
       title: '今月の送信枠',
       icon: Gauge,
-      value: quotaRemaining,
-      unit: '通 残り',
-      detail: quota?.limit != null && quota?.used != null
-        ? `${formatNumber(quota.limit)} 通のうち ${formatNumber(quota.used)} 通を使用`
-        : '送信枠を確認できません',
+      value: quotaUnlimited ? quota?.used ?? null : quotaRemaining,
+      unit: quotaUnlimited ? '通 使用' : '通 残り',
+      detail: quotaLoading
+        ? '読み込んでいます'
+        : quotaUnlimited
+          ? '上限なし'
+          : quotaReadable
+            ? `${formatNumber(quota?.limit ?? 0)} 通のうち ${formatNumber(quota?.used ?? 0)} 通を使用`
+            : '送信枠を確認できません',
     },
     {
       key: 'thisMonth',
@@ -696,10 +734,18 @@ export default function BroadcastListV8() {
       label: f.name,
       count: f.itemCount ?? null,
       color: f.color,
-      onEdit: canEdit ? () => setEditingFolder(f) : undefined,
-      onMoveUp: canEdit && index > 0 ? () => void moveFolderOrder(index, -1) : undefined,
-      onMoveDown: canEdit && index < folders.length - 1 ? () => void moveFolderOrder(index, 1) : undefined,
-      onDelete: canEdit ? () => setDeletingFolder(f) : undefined,
+      onEdit: () => {
+        if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの編集を中止しました。'); return }
+        setEditingFolder(f)
+      },
+      lockedReason: management.reason,
+      actionsDisabled: !management.known,
+      onMoveUp: index > 0 ? () => void moveFolderOrder(index, -1) : undefined,
+      onMoveDown: index < folders.length - 1 ? () => void moveFolderOrder(index, 1) : undefined,
+      onDelete: () => {
+        if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの削除を中止しました。'); return }
+        setDeletingFolder(f)
+      },
       deleteNote: '削除しても、中の配信は未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
@@ -712,33 +758,41 @@ export default function BroadcastListV8() {
   ]
 
   /** 行の「…」。編集を続ける（下書き・予約）・複製・フォルダへ移す・削除。 */
+  const withCurrentEdit = (run: () => void, action: '変更' | '作成' = '変更') => () => {
+    if (!canEditBroadcastNow()) { notifyToast(`権限が変わったため、配信の${action}を中止しました。`, { tone: 'error' }); return }
+    run()
+  }
+  const lockedWriteItems = (items: ActionMenuItem[]) => items.map(item => ({
+    ...item,
+    lockedReason: editAccess.reason,
+    disabled: item.disabled || !canEdit,
+    href: editAccess.known ? item.href : undefined,
+  }))
   const rowMenuItems = (broadcast: ApiBroadcast): ActionMenuItem[] => {
     if (menuMoveFor === broadcast.id) {
       return [
         { id: 'move-back', label: '← 操作にもどる', onSelect: () => { keepMenuOpenRef.current = true; setMenuMoveFor(null) } },
-        { id: 'move-unfiled', label: '未分類', onSelect: () => void moveBroadcastToFolder(broadcast, null) },
-        ...folders.map((f) => ({ id: `move-${f.id}`, label: f.name, onSelect: () => void moveBroadcastToFolder(broadcast, f.id) })),
+        ...lockedWriteItems([{ id: 'move-unfiled', label: '未分類', onSelect: () => void moveBroadcastToFolder(broadcast, null) },
+        ...folders.map((f) => ({ id: `move-${f.id}`, label: f.name, onSelect: () => void moveBroadcastToFolder(broadcast, f.id) }))]),
       ]
     }
     /*
      * 統括から来た配信（提案 E-9・l3RQH）は店では変えられない（口が 403）。「…」は見る・複製するだけ。
-     * 閲覧のみには押せない項目を置かないので、閲覧のみは「見る」だけ。
+     * 閲覧のみでも複製の口を残し、現在の権限で拒否する。
      */
     if (isFromHeadquarters(broadcast)) {
       return [
         { id: 'view', label: "配信の詳細を見る", external: false, href: `/broadcasts/detail?id=${encodeURIComponent(broadcast.id)}`, onSelect: () => goDetail(broadcast.id) },
-        ...(canEdit ? [{ id: 'duplicate', label: '複製', external: false, icon: <Copy size={16} aria-hidden="true" />, href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`) }] : []),
+        ...lockedWriteItems([{ id: 'duplicate', label: '複製', external: false, icon: <Copy size={16} aria-hidden="true" />, href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: withCurrentEdit(() => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`)) }]),
       ]
     }
-    // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。この「…」は変える項目だけなので空になる。
-    if (!canEdit) return []
     const items: ActionMenuItem[] = []
     if (broadcast.status === 'draft' || broadcast.status === 'scheduled') {
       items.push({
         id: 'resume',
         label: '編集を続ける',
         external: false,
-        href: `/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`),
+        href: `/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`, onSelect: withCurrentEdit(() => router.push(`/broadcasts/new?draft=${encodeURIComponent(broadcast.id)}`)),
       })
     }
     items.push({
@@ -746,7 +800,7 @@ export default function BroadcastListV8() {
       label: '複製',
       external: false,
       icon: <Copy size={16} aria-hidden="true" />,
-      href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: () => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`),
+      href: `/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`, onSelect: withCurrentEdit(() => router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(broadcast.id)}`)),
     })
     items.push({
       id: 'move-folder',
@@ -765,7 +819,7 @@ export default function BroadcastListV8() {
       dividerBefore: true,
       onSelect: () => requestDelete(broadcast),
     })
-    return items
+    return lockedWriteItems(items)
   }
 
   /** 右クリックは「…」と同じ品ぞろえ（「…」でも必ず開ける）。 */
@@ -780,6 +834,7 @@ export default function BroadcastListV8() {
       danger: item.tone === 'danger',
       disabled: item.disabled,
       disabledReason: item.disabledReason,
+      lockedReason: item.lockedReason,
       onSelect: item.onSelect,
     }))
 
@@ -793,21 +848,25 @@ export default function BroadcastListV8() {
   const panelRow = panelIndex >= 0 ? visibleBroadcasts[panelIndex] : null
 
   /* ===== 部品（広い板・1152 で同じものを並べ替えて使う） ===== */
-  /* 閲覧のみには押せない「配信を作る」を置かずに隠す（2026-10-06 オーナー決定）。
-     広い板では場所だけ空けて、フォルダの列の並びを絵どおりに保つ。 */
-  const createButton = (full: boolean) => (!canEdit ? null : (
+  /* 作る口は同じ場所に残し、権限の理由と入力の状態を分ける。 */
+  const createButton = (full: boolean) => (
     <Button
       type="button"
       variant="primary"
       className={full ? `v8-folder-create ${styles.createFull}` : undefined}
       aria-haspopup="menu"
       aria-expanded={createMenuOpen}
-      onClick={(event) => { createAnchorRef.current = event.currentTarget; setCreateMenuOpen(true) }}
+      lockedReason={editAccess.reason}
+      disabled={!canEdit}
+      onClick={(event) => {
+        if (!canEditBroadcastNow()) { notifyToast('権限が変わったため、配信の作成を中止しました。', { tone: 'error' }); return }
+        createAnchorRef.current = event.currentTarget; setCreateMenuOpen(true)
+      }}
     >
       <Plus size={16} aria-hidden="true" />
       {full ? <>配信を作る<ChevronDown size={16} aria-hidden="true" /></> : '配信を作る'}
     </Button>
-  ))
+  )
 
   const searchBox = (
     <ListToolbarSearchSlot>
@@ -864,13 +923,17 @@ export default function BroadcastListV8() {
             onSelect: () => { setSavedMenuOpen(false); applySavedView(view.id) },
           })),
           ...(savedViewId ? [{ id: 'view-clear', label: '保存した検索を外す', onSelect: () => { setSavedMenuOpen(false); clearFilters() } }] : []),
-          // 閲覧のみは保存できないので、押せない項目を置かない
-          ...(canEdit ? [{
+          ...[{
             id: 'view-save',
             label: '＋ 今の条件を保存する',
             dividerBefore: savedViews.length > 0,
-            onSelect: () => { setSavedMenuOpen(false); setSavedViewOpen(true) },
-          }] : []),
+            lockedReason: management.reason,
+            disabled: !management.known,
+            onSelect: () => {
+              if (!canManageBroadcastListNow()) { setSavedViewError('権限が変わったため、検索条件の保存を中止しました。'); return }
+              setSavedMenuOpen(false); setSavedViewOpen(true)
+            },
+          }],
         ]}
       />
     </div>
@@ -935,11 +998,12 @@ export default function BroadcastListV8() {
           <SaveErrorField names={["savedViewName","name","saved_view_name"]}><SharedTextField
             aria-label="保存する検索の名前"
             placeholder="検索条件の名前"
+            disabled={!management.allowed}
             value={savedViewName}
             onChange={(event) => setSavedViewName(event.target.value)}
             className={styles.saveInput}
           /></SaveErrorField>
-          <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()} busy={savedViewBusy} busyLabel="保存中">保存する</Button>
+          <Button type="button" variant="primary" lockedReason={management.reason} disabled={!management.known || !savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()} busy={savedViewBusy} busyLabel="保存中">保存する</Button>
           <Button type="button" onClick={() => setSavedViewOpen(false)}>閉じる</Button>
         </div>
       ) : null}
@@ -956,7 +1020,7 @@ export default function BroadcastListV8() {
     return folder ? { name: folder.name, color: folder.color } : null
   }
 
-  const selection = useBroadcastFolderSelection({ accountId: selectedAccountId || null, canEdit, broadcasts: visibleBroadcasts.filter(item => !isFromHeadquarters(item)), folders, onChanged: async () => { await loadList((page - 1) * pageSize); await loadFolders() } })
+  const selection = useBroadcastFolderSelection({ accountId: selectedAccountId || null, canEdit, lockedReason: editAccess.reason, broadcasts: visibleBroadcasts.filter(item => !isFromHeadquarters(item)), folders, onChanged: async () => { await loadList((page - 1) * pageSize); await loadFolders() } })
   const tableHead = (
     <thead>
       <TableHeadRow>
@@ -1009,13 +1073,14 @@ export default function BroadcastListV8() {
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', error,
       <Button type="button" onClick={() => loadList((page - 1) * pageSize)} busyLabel="処理中…">もう一度読み込む</Button>, true)
   ) : visibleBroadcasts.length === 0 ? (
-    /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない（2026-10-06 オーナー決定）。 */
+    /* 空の一覧でも作る口を残し、閲覧と変更の権限を分ける。 */
     <EmptyList
       icon={<Send aria-hidden="true" />}
       title="まだ一斉配信がありません"
       description="友だちみんなや絞り込んだ人に、お知らせをまとめて送ります。"
       create={{ label: '最初の一斉配信を作る', onClick: () => openCreate(false) }}
       canCreate={canEdit}
+      lockedReason={editAccess.reason ?? null}
       filtered={filterActive}
       onClearFilters={clearFilters}
       filteredDescription="「予約中のみ」「下書き」や配信日を外すと、すべて出ます"
@@ -1071,8 +1136,8 @@ export default function BroadcastListV8() {
               </Td>
               <BroadcastResultCells broadcast={broadcast} insight={insight} narrow={narrow} />
               <Td className={styles.colMenu}>
-                {/* 閲覧のみ：「…」の中は変える項目だけなので、ボタンごと置かない（列の幅は残す） */}
-                {canEdit ? <div className={styles.menuBox}>
+                {/* 変更の口も同じ列に残し、見る口を権限ロックに巻き込まない。 */}
+                {<div className={styles.menuBox}>
                   <ContextMenu label={menuLabel} items={rowContextItems(broadcast)}>
                     <RowMenu
                       appearance="box"
@@ -1096,7 +1161,7 @@ export default function BroadcastListV8() {
                       }}
                     />
                   </ContextMenu>
-                </div> : null}
+                </div>}
               </Td>
             </Tr>
           )
@@ -1122,9 +1187,9 @@ export default function BroadcastListV8() {
       title="一斉配信"
       help="友だちにまとめて送るメッセージの一覧です。予約・下書き・送った結果をここで見ます。"
       stats={<>
-        {canEdit ? null : (
-          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。{permissionDeniedMessage('store')}</ReadOnlyNotice></div>
-        )}
+        {editAccess.reason ? (
+          <div className={styles.viewerBand}><ReadOnlyNotice need="feature" /></div>
+        ) : null}
         <KpiBand>
           {kpis.map((kpi) => (
             <KpiCard
@@ -1136,6 +1201,8 @@ export default function BroadcastListV8() {
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}
+              loading={kpi.key === 'quota' ? quotaLoading : undefined}
+              action={kpi.key === 'quota' ? quotaAction : undefined}
             />
           ))}
         </KpiBand>
@@ -1146,12 +1213,15 @@ export default function BroadcastListV8() {
           createAction={createButton(true)}
           activeId={folderFilter}
           onSelect={setFolderFilter}
-          onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
+          onAddFolder={() => {
+            if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの作成を中止しました。'); return }
+            setFolderDialogOpen(true)
+          }}
+          addFolderLockedReason={management.reason}
+          addFolderDisabled={!management.known}
           addFolderLabel="フォルダを追加"
           rows={folderRows}
         >
-          {/* 閲覧のみ：「フォルダを追加」は置かず、場所だけ空ける */}
-          {canEdit ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
           <FolderPanelNote>フォルダを消しても、入っていたものは未分類に残ります</FolderPanelNote>
           {folderError ? (
             <Notice tone="danger" className={styles.noteNoticePlacement} >{folderError}
@@ -1168,13 +1238,13 @@ export default function BroadcastListV8() {
           anchorRef={createAnchorRef}
           align="start"
           ariaLabel="配信の作り方"
-          items={[
+          items={lockedWriteItems([
             /* 絵  の分け方：かんたんに送る（1画面・板 ）と詳しく作る（5つの手順 `/broadcasts/new`）。
                テンプレートから作るは絵に無いが今ある機能なので、その下に残す。 */
-            { id: 'create-quick', label: 'かんたんに送る', description: '文字1通を、全員かタグで。1画面で送れる', onSelect: () => { setCreateMenuOpen(false); setQuickSendOpen(true) } },
-            { id: 'create-new', label: '詳しく作る', description: '画像・カード・細かい絞り込み・承認（5つの手順）', onSelect: () => { setCreateMenuOpen(false); router.push('/broadcasts/new') } },
+            { id: 'create-quick', label: 'かんたんに送る', description: '文字1通を、全員かタグで。1画面で送れる', onSelect: withCurrentEdit(() => { setCreateMenuOpen(false); setQuickSendOpen(true) }, '作成') },
+            { id: 'create-new', label: '詳しく作る', description: '画像・カード・細かい絞り込み・承認（5つの手順）', onSelect: withCurrentEdit(() => { setCreateMenuOpen(false); router.push('/broadcasts/new') }, '作成') },
             { id: 'create-template', label: 'テンプレートから作る', onSelect: () => openCreate(true) },
-          ]}
+          ])}
         />
         <QuickSendV8
           open={quickSendOpen}
@@ -1185,6 +1255,9 @@ export default function BroadcastListV8() {
         {folderDialogOpen && (
           <FolderAddDialog
             kind="broadcast"
+            canSaveNow={canManageBroadcastListNow}
+            confirmDisabled={!management.known}
+            confirmLockedReason={management.reason}
             note="配信を分けてしまう箱です。消しても、入っていた配信は未分類として残ります。"
             placeholder="例：01_キャンペーン"
             onClose={() => setFolderDialogOpen(false)}
@@ -1194,6 +1267,9 @@ export default function BroadcastListV8() {
         {editingFolder && (
           <FolderAddDialog
             kind="broadcast"
+            canSaveNow={canManageBroadcastListNow}
+            confirmDisabled={!management.known}
+            confirmLockedReason={management.reason}
             folder={editingFolder}
             note="配信を分けてしまう箱です。削除しても、中の配信は未分類に残ります。"
             placeholder="例：01_キャンペーン"
@@ -1219,31 +1295,37 @@ export default function BroadcastListV8() {
               hasNext={panelIndex < visibleBroadcasts.length - 1}
               footer={<>
                 <Button variant="primary" onClick={() => goDetail(panelRow.id)}>開く</Button>
-                {canResume && canEdit ? (
+                {canResume ? (
                   <Button
                     variant="secondary"
-                    onClick={() => withViewTransition(() => { router.push(`/broadcasts/new?draft=${encodeURIComponent(panelRow.id)}`) })}
+                    lockedReason={editAccess.reason}
+                    disabled={!canEdit}
+                    onClick={withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?draft=${encodeURIComponent(panelRow.id)}`) }))}
                    busyLabel="移動中…">
                     編集を続ける
                   </Button>
                 ) : null}
-                {/* 閲覧のみには押せない操作を置かない */}
-                {canEdit ? <>
+                {/* 同じ操作を残し、実行直前の現在の許可でも守る。 */}
+                {<>
                   <Button
                     variant="secondary"
-                    onClick={() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) })}
+                    lockedReason={editAccess.reason}
+                    disabled={!canEdit}
+                    onClick={withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) }))}
                    busyLabel="移動中…">
                     複製する
                   </Button>
                   {fromHq ? null : (
                     <Button
                       variant="secondary"
-                      onClick={() => { setPanelId(null); requestDelete(panelRow) }}
+                      lockedReason={editAccess.reason}
+                      disabled={!canEdit}
+                      onClick={withCurrentEdit(() => { setPanelId(null); requestDelete(panelRow) })}
                     >
                       削除する
                     </Button>
                   )}
-                </> : null}
+                </>}
               </>}
             >
               <p>
@@ -1264,6 +1346,8 @@ export default function BroadcastListV8() {
           confirmLabel="削除する"
           destructive
           busy={folderBusy}
+          confirmLockedReason={management.reason}
+          confirmDisabled={!management.allowed}
           error={folderError || undefined}
           onConfirm={() => removeFolder()}
           onCancel={() => {
@@ -1279,6 +1363,8 @@ export default function BroadcastListV8() {
           confirmLabel="削除する"
           destructive
           busy={deleting}
+          confirmLockedReason={editAccess.reason}
+          confirmDisabled={!canEdit}
           error={deleteError}
           onConfirm={() => handleDelete()}
           onCancel={() => {

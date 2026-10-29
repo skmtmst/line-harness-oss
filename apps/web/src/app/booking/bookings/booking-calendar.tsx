@@ -349,7 +349,7 @@ function WeekGrid({ days, items, hours, bookable, canCreate, onOpen, onDateClick
               ) : (
                 <p className="text-ink text-xs font-semibold">{dateLabel(day)}</p>
               )}
-              <p className="text-success mt-0.5 text-xs font-semibold">{formatNumber(count)}件</p>
+              <p className="text-ink mt-0.5 text-xs font-semibold">{formatNumber(count)}件</p>
             </div>
           )
         })}

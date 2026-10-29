@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
-import type { StaffMember } from '@line-crm/shared'
+import type { AccountStyle, StaffMember } from '@line-crm/shared'
 
 import { cleanup, render, waitFor, within } from '@testing-library/react'
 import { act } from 'react'
@@ -26,6 +26,7 @@ const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
   get: vi.fn(),
   accountId: 'account-1',
+  style: 'restaurant' as AccountStyle,
 }))
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/' }))
@@ -49,8 +50,8 @@ vi.mock('@/lib/api', async original => {
   }
 })
 
-// この試験は既存の権限・旗・並びを検査する。業種の対照はstyle-menu.testで行う。
-vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' }, status: 'ready', error: null, reload: vi.fn() }) }))
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: fixture.style }, status: 'ready', error: null, reload: vi.fn() }) }))
+import { MENU_SECTIONS } from '@/lib/menu'
 import Sidebar from './sidebar'
 import SettingsInnerNav from './settings-inner-nav'
 import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
@@ -63,6 +64,7 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     clearFeatureVisibilityCache()
     clearFeatureSettingsCache()
     fixture.accountId = 'account-1'
+    fixture.style = 'restaurant'
     window.localStorage.clear()
     window.localStorage.setItem('lh_csrf', 'fixture-session')
     vi.stubGlobal('fetch', vi.fn(async (input: string) => {
@@ -282,4 +284,36 @@ describe('Sidebarのstaff向け機能表示read-model', () => {
     await act(async () => { resolveOld?.({ success: true, data: { features: { broadcasts: false } } }) })
     expect(view.getAllByText('一斉配信')).not.toHaveLength(0)
   })
+  it.each(['owner', 'staff'])('飲食の%sは人用予約を出さず、イベントとスタンプは機能設定に従う', async role => {
+    for (const enabled of [true, false]) {
+      clearFeatureVisibilityCache(); clearFeatureSettingsCache()
+      rememberStaffIdentity({ role } as StaffMember)
+      window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/booking/bookings', '/booking/menus', 'booking.staff.own', '/events', '/visit-stamps', '/restaurant-test/reservations']))
+      window.localStorage.setItem('lh-sidebar-groups', JSON.stringify(Object.fromEntries(MENU_SECTIONS.map(section => [section.id, true]))))
+      const features = { booking: true, events: enabled, visit_stamps: enabled, restaurant_test: true }
+      fixture.visibility.mockResolvedValue({ success: true, data: { features } })
+      fixture.get.mockResolvedValue({ success: true, data: { version: 1, features, sidebarOrder: null, sidebarItemOrder: null, specializedFeatureKeys: [] } })
+      const view = render(<Sidebar />)
+      await waitFor(() => expect(view.container.querySelector('a[href="/restaurant-test/reservations"]')).not.toBeNull())
+      for (const href of ['/booking/bookings', '/booking/menus', '/booking/staff/shifts']) expect(view.container.querySelector(`a[href="${href}"]`)).toBeNull()
+      await waitFor(() => {
+        for (const href of ['/events', '/visit-stamps']) expect(view.container.querySelector(`a[href="${href}"]`) !== null).toBe(enabled)
+      })
+      view.unmount()
+    }
+  })
+
+  it('サロンのstaffには許可された人用予約と自分の勤務を残す', async () => {
+    fixture.style = 'salon'
+    rememberStaffIdentity({ role: 'staff' } as StaffMember)
+    window.localStorage.setItem('lh_staff_permissions', JSON.stringify(['/booking/bookings', '/booking/menus', 'booking.staff.own']))
+    window.localStorage.setItem('lh-sidebar-groups', JSON.stringify(Object.fromEntries(MENU_SECTIONS.map(section => [section.id, true]))))
+    fixture.visibility.mockResolvedValue({ success: true, data: { features: { booking: true, restaurant_test: true } } })
+    const view = render(<Sidebar />)
+    await waitFor(() => {
+      for (const href of ['/booking/bookings', '/booking/menus', '/booking/staff/shifts']) expect(view.container.querySelector(`a[href="${href}"]`)).not.toBeNull()
+    })
+    expect(view.container.querySelector('a[href="/restaurant-test/reservations"]')).toBeNull()
+  })
+
 })
