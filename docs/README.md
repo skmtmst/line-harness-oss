@@ -37,6 +37,7 @@
 - [m2-home.webp](../apps/web/public/manuals/line-connect/images/m2-home.webp) — 図・手引きの資料、確認 2026-10-19
 - [m2-login-id.webp](../apps/web/public/manuals/line-connect/images/m2-login-id.webp) — 図・手引きの資料、確認 2026-10-19
 - [m2-login-secret.webp](../apps/web/public/manuals/line-connect/images/m2-login-secret.webp) — 図・手引きの資料、確認 2026-10-19
+- [m2-provider-id-musubo.webp](../apps/web/public/manuals/line-connect/images/m2-provider-id-musubo.webp) — Step 2のプロバイダーIDコピー位置、確認 2026-10-29
 - [m2-provider.webp](../apps/web/public/manuals/line-connect/images/m2-provider.webp) — 図・手引きの資料、確認 2026-10-19
 - [m2-publish.webp](../apps/web/public/manuals/line-connect/images/m2-publish.webp) — 図・手引きの資料、確認 2026-10-19
 - [m3-callback-1.webp](../apps/web/public/manuals/line-connect/images/m3-callback-1.webp) — 図・手引きの資料、確認 2026-10-19
@@ -70,6 +71,7 @@
 - [m2-home.jpg](manuals/line-connect/images/m2-home.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m2-login-id.jpg](manuals/line-connect/images/m2-login-id.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m2-login-secret.jpg](manuals/line-connect/images/m2-login-secret.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m2-provider-id-musubo.jpg](manuals/line-connect/images/m2-provider-id-musubo.jpg) — Step 2のプロバイダーIDコピー位置、確認 2026-10-29
 - [m2-provider.jpg](manuals/line-connect/images/m2-provider.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m2-publish.jpg](manuals/line-connect/images/m2-publish.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m3-callback-1.jpg](manuals/line-connect/images/m3-callback-1.jpg) — 図・手引きの資料、確認 2026-10-19
@@ -868,3 +870,4 @@
 - [配達連携の解除ボタン](release-log/unreleased/1880-kenta-delivery-disconnect.md) — 配達連携の画面に関する反映履歴。
 - [SNS連携の操作と案内](release-log/unreleased/1881-kenta-sns-actions.md) — SNS連携の画面に関する反映履歴。
 - [LINEログインのコピーと公開の案内](release-log/unreleased/1901-masato-line-login-guide-images.md) — 接続マニュアルStep 4の画像案内の反映履歴。
+- [プロバイダーID確認画面の案内](release-log/unreleased/1903-masato-provider-id-manual-image.md) — 接続マニュアルStep 2の画像案内の反映履歴。
