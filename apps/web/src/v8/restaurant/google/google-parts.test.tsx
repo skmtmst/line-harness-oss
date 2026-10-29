@@ -23,7 +23,7 @@ const review = {
 const connection = (writeEnabled: boolean, canPublishReply: boolean) => ({
   success: true, store: { id: 's', name: '試験店', lineAccountId: 'a' }, connection: { status: 'connected', locationTitle: '試験店', locationMapsUrl: null },
   candidates: [], summary: { unrepliedCount: 0, draftCount: 0, attentionCount: 0, newCount: 0, storedCount: 0, postsAttentionCount: 0, syncStale: false },
-  writeEnabled, oauthConfigured: true, aiAvailable: true, reviewDraftAiEnabled: true, permissions: { canManageConnection: true, canPublishReply },
+  writeEnabled, oauthConfigured: true, aiAvailable: true, permissions: { canManageConnection: true, canPublishReply },
 }) as unknown as GoogleConnectionData
 
 beforeEach(() => { fixture.review.mockResolvedValue({ success: true, review, store: { id: 's', name: '試験店' }, connection: {} }) })
@@ -58,11 +58,14 @@ describe('Googleビジネスの表示の道具', () => {
 })
 
 describe('返信を作る：送れない設定のときは送信へ進むボタンを出さない', () => {
-  it('AI利用が未承認なら生成ボタンを出さず、設定へ案内する', async () => {
-    render(<ReviewDraft accountId="a" reviewId="rv-2" data={{ ...connection(false, true), reviewDraftAiEnabled: false }} go={vi.fn()} onPublished={vi.fn()} />)
-    expect(await screen.findByText('AI下書きは利用開始が必要です。')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'AIで下書きを作る' })).toBeNull()
-    expect(screen.getByRole('link', { name: '設定を開く' }).getAttribute('href')).toBe('/restaurant-test/google?tab=settings')
+  it('AI下書きは設定操作や初回確認なしにボタンだけで生成する', async () => {
+    fixture.generateDraft.mockResolvedValue({ draft: 'ご来店ありがとうございます。' })
+    render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(false, true)} go={vi.fn()} onPublished={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'AIで下書きを作る' }))
+    await waitFor(() => expect(fixture.generateDraft).toHaveBeenCalledWith('a', 'rv-2'))
+    expect((screen.getByRole('textbox', { name: '返信文' }) as HTMLTextAreaElement).value).toBe('ご来店ありがとうございます。')
+    expect(screen.getByText(/口コミ本文と店舗名をAIの提供会社に送ります/)).toBeTruthy()
+    expect(fixture.publishReply).not.toHaveBeenCalled()
   })
   it('検証環境（writeEnabled=false）では「返信内容を確認する」を置かず、下書きの保存はできる', async () => {
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(false, true)} go={vi.fn()} onPublished={vi.fn()} />)

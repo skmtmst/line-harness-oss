@@ -34,7 +34,6 @@ export type GoogleConnectionData = {
   writeEnabled: boolean
   oauthConfigured: boolean
   aiAvailable: boolean
-  reviewDraftAiEnabled: boolean
   permissions: { canManageConnection: boolean; canPublishReply: boolean }
 }
 

@@ -401,13 +401,13 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
                 aria-invalid={textLength > 4096 || undefined}
               /></SaveErrorField>
               <div className={styles.draftTools}>
-                {data.aiAvailable && data.reviewDraftAiEnabled ? (
+                {data.aiAvailable ? (
                   <Button onClick={() => void generate()} disabled={busy !== null} busy={busy === 'generate'} busyLabel="作成中…"><Sparkles aria-hidden className={styles.icon15} />AIで下書きを作る</Button>
-                ) : !data.aiAvailable ? <span className={styles.muted}>この環境ではAI下書きは使えません。</span>
-                  : <span className={styles.muted}>AI下書きは利用開始が必要です。<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定を開く</Link></span>}
+                ) : <span className={styles.muted}>この環境ではAI下書きは使えません。</span>}
                 <span className={styles.spacer} aria-hidden="true" />
                 <span className={textLength > 4096 ? styles.countOver : styles.count}>{`${polishFormatNumber(textLength)} / 4,096`}</span>
               </div>
+              {data.aiAvailable ? <p className={styles.grayNote}>AI下書きでは口コミ本文と店舗名をAIの提供会社に送ります。作成した下書きはGoogleに自動送信されません。</p> : null}
               {saved ? <p className={styles.saved} role="status">{saved}</p> : null}
               {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
             </Card>
