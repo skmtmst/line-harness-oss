@@ -300,7 +300,7 @@ export default function AccountEditModal({
                 className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
               /></SaveErrorField>
               <p className="text-ink-faint mt-1 text-xs">
-                管理画面の一覧で使います。共有時に出る画像（OGP）とは別の欄です。
+                このURLを優先表示します。未指定ならLINE公式アカウントの画像を自動取得します。LINEログインチャネルの画像とは別です。
               </p>
             </div>
           </div>
