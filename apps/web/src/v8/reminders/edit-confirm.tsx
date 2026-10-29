@@ -2,7 +2,8 @@
 
 import { StageFrame } from './edit-model'
 
-import { reminderPlaceholders,reminderStepTimings,reminderStopSummary,reminderTriggerLabel,renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import { reminderPlaceholders, reminderStepTimings, reminderStopSummary, reminderTriggerLabel } from '@/components/reminders/reminder-labels'
+import { fillPreviewSample } from '@/components/shared/preview-sample'
 import { TestRecipientGuidance,testRecipientDestinationLabel,testRecipientNote } from '@/components/reminders/test-recipient-guidance'
 import { useReminderTestRecipient } from '@/components/reminders/use-reminder-test-recipient'
 import Button from '@/components/shared/button'
@@ -158,7 +159,8 @@ export function ConfirmStageV8({
             accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
             chip={firstStep ? `1通目は ${describeReminderTiming(firstStep, settings.deliveryMode)}に届きます` : '通知ステップがありません'}
             empty={!firstStep}
-            message={firstStep ? renderReminderBodySample(firstStep.messageContent || '本文はまだありません') : undefined}
+            hasSampledBody={Boolean(firstStep?.messageContent.trim())}
+            message={firstStep ? fillPreviewSample(firstStep.messageContent || '本文はまだありません').text : undefined}
           />
         </>
       )}
@@ -311,7 +313,7 @@ export function DoneStageV8({
               <CalendarClock size={16} aria-hidden="true" />配信予定を見る
             </Button>
             <Button variant="primary" href={`/reminders/detail?id=${encodeURIComponent(reminderId)}`}>
-              <ArrowRight size={16} aria-hidden="true" />詳細を見る
+              詳細を見る<ArrowRight size={16} aria-hidden="true" />
             </Button>
           </div>
         </Card>

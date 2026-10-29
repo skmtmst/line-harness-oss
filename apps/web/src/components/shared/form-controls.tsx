@@ -133,16 +133,20 @@ export function Field({
   const fieldRef = useRef<HTMLDivElement>(null)
   const [autoCount, setAutoCount] = useState<{ value: number; max: number } | undefined>()
   const [autoRequired, setAutoRequired] = useState(false)
+  const [countFocused, setCountFocused] = useState(false)
+  const [fixedFormat, setFixedFormat] = useState(false)
   const syncControl = () => {
     if (!fieldRef.current || typeof fieldRef.current.querySelector !== 'function') return
     const control = fieldRef.current.querySelector<HTMLInputElement | HTMLTextAreaElement>('input:not([type=checkbox]):not([type=radio]):not([type=hidden]):not([type=file]),textarea')
     if (control) { if (!control.id) control.id = controlId; setDetectedId(control.id); if (!control.hasAttribute('aria-label') && typeof shownLabel === 'string') control.setAttribute('aria-label', shownLabel) }
+    setFixedFormat(Boolean(control && (control.type === 'tel' || /^(?:postal-code|one-time-code|cc-)/.test(control.autocomplete) || /郵便番号|電話番号|FAX|ファクス|認証コード|暗証番号/i.test(fieldNoteText(label)))))
     const next = control && !fieldRef.current.querySelector('[data-message-character-count]') && control.maxLength >= 0 ? { value: control.value.length, max: control.maxLength } : undefined
     setAutoCount(previous => previous?.value === next?.value && previous?.max === next?.max ? previous : next)
     setAutoRequired(Boolean(control?.required || control?.getAttribute('aria-required') === 'true'))
   }
   useEffect(syncControl)
-  const actualCount = count ?? autoCount
+  const availableCount = count ?? autoCount
+  const actualCount = !fixedFormat && availableCount && (countFocused || availableCount.value >= availableCount.max * 0.9) ? availableCount : undefined
   const actualRequired = requirement?.required ?? required ?? (autoRequired || Boolean(typeof label === 'string' && label.match(/[（(]必須[）)]/u)))
   const shownLabel = typeof label === 'string' ? label.replace(/\s*[（(](任意|必須)[）)]/gu, '').replace(/\s*[*＊]$/, '') : label
   const longNote = fieldNoteIsLong(note)
@@ -206,12 +210,13 @@ export function Field({
       data-field-content-gap={contentGap === undefined ? undefined : ''}
       style={contentGap === undefined ? undefined : ({ '--field-content-gap': `${contentGap}px` } as CSSProperties)}
       onInput={() => { syncControl(); if (error && !quiet) setQuiet(true) }}
-      onBlur={quiet ? () => setQuiet(false) : undefined}
+      onFocus={(event) => { if (event.target.matches('input,textarea')) setCountFocused(true) }}
+      onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setCountFocused(false); if (quiet) setQuiet(false) }}
     >
       {/* 「？」は label の外に置く。中に入れるとラベルがボタンを指してしまい、
           入力欄との結びつき（htmlFor・読み上げ）が壊れる。 */}
       {label && !labelHidden ? <div className={styles.labelRow}>
-        <label htmlFor={controlId} className={styles.label} title={fieldNoteText(shownLabel) || undefined}>
+        <label htmlFor={controlId} className={styles.label} title={fieldNoteText(note) || undefined}>
           {shownLabel}
           {/* 設計は「必須」と字で書いている。* だけだと、色が見えない人には
               何も伝わらない。 */}

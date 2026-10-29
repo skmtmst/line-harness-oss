@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -130,9 +131,9 @@ async function fillTagRule(name: string) {
 }
 async function save() {
   const calls = vi.mocked(api.automations.updateDraft).mock.calls.length
-  fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true }))
+  fireEvent.click(getPageAction({ name: '下書きを保存', exact: true }))
   await waitFor(() => expect(api.automations.updateDraft).toHaveBeenCalledTimes(calls + 1))
-  await waitFor(() => expect((screen.getByRole('button', { name: '下書きを保存', exact: true }) as HTMLButtonElement).disabled).toBe(false))
+  await waitFor(() => expect((getPageAction({ name: '下書きを保存', exact: true }) as HTMLButtonElement).disabled).toBe(false))
 }
 
 describe('V8本体の遅延応答と店舗の分離', () => {
@@ -142,7 +143,7 @@ describe('V8本体の遅延応答と店舗の分離', () => {
     await fillTagRule('新規B')
     const pending = deferred<ReturnType<typeof ok<{ id: string; draftVersionId: string }>>>()
     vi.mocked(api.automations.createDraftFromTemplate).mockReturnValueOnce(pending.promise as never)
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true }))
+    fireEvent.click(getPageAction({ name: '下書きを保存', exact: true }))
     await waitFor(() => expect(api.automations.createDraftFromTemplate).toHaveBeenCalledTimes(1))
     await changeProvider(view, 'account-1')
     expect((screen.getByRole('textbox', { name: '名前', exact: true }) as HTMLInputElement).value).toBe('ルール-account-1')

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Plus, SearchX } from 'lucide-react'
 import Button from './button'
+import { lockReason } from './permission-lock'
 import styles from './empty-list.module.css'
 
 /**
@@ -12,7 +13,7 @@ import styles from './empty-list.module.css'
  * - まだ1件も無い：題「まだ〇〇がありません」・説明「何をする場所か」・主ボタン「最初の〇〇を作る」。
  * - 絞り込み・検索で0件（`filtered`）：題「条件に合うものがありません」・副ボタン「条件を外す」。
  *   0件の絞り込みに作るボタンを出すと、保存したものが消えたと読まれるので出さない。
- * - 閲覧のみの人（`canCreate` が false）には作るボタンを出さず、説明だけにする。
+ * - 作る権限が無い人にも操作を残し、押せない理由を吹き出しで伝える。
  *
  * 各一覧は題・説明・ボタン名だけを渡す。箱・余白・文字の大きさを画面側で書かない。
  */
@@ -31,7 +32,7 @@ export interface EmptyListProps {
   /** 何をする場所か1行。 */
   description: string
   create?: EmptyListCreate
-  /** 作れる人か。false なら作るボタンを出さない（閲覧のみ）。 */
+  /** 作れる人か。falseの時は作る操作を理由付きで残す。 */
   canCreate?: boolean
   /** 絞り込み・検索の結果が0件。 */
   filtered?: boolean
@@ -76,13 +77,12 @@ export default function EmptyList({
       </div>
     )
   }
-  const button = !canCreate
-    ? null
-    : action ?? (create
-      ? create.href
-        ? <Button href={create.href} variant="primary"><Plus aria-hidden="true" />{create.label}</Button>
-        : <Button type="button" variant="primary" onClick={create.onClick}><Plus aria-hidden="true" />{create.label}</Button>
-      : null)
+  const reason = lockReason(canCreate)
+  const button = (canCreate && !reason ? action : null) ?? (create
+    ? create.href
+      ? <Button href={create.href} variant="primary" lockedReason={reason}><Plus aria-hidden="true" />{create.label}</Button>
+      : <Button type="button" variant="primary" onClick={create.onClick} lockedReason={reason}><Plus aria-hidden="true" />{create.label}</Button>
+    : null)
   return (
     <div className={styles.root} data-empty-list="first" data-design-node={designNode ?? 'gIaJZ'} role="status">
       <span className={styles.mark} aria-hidden="true">{icon}</span>

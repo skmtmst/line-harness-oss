@@ -16,6 +16,7 @@ import Select from '@/components/shared/select'
 import { ConversationHead } from '@/v8/inbox-chat/public/conversation-head/index'
 import { formatDateTime } from '@/lib/format'
 import Button from '@/components/shared/button'
+import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 /**
  * メールの往復。受信箱（/chats）の中央ペインで使う。
@@ -718,7 +719,7 @@ export default function EmailThread({
             <Button variant="primary" type="button" busy={memoSaving} busyLabel="保存中…" onClick={() => saveMemo()} disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}>保存する</Button>
           </>}>
           <label htmlFor="email-internal-memo" className="text-xs font-semibold text-ink-faint">メモ内容</label>
-          <textarea id="email-internal-memo" value={memoDraft} disabled={memoSaving}
+          <SharedTextArea id="email-internal-memo" value={memoDraft} disabled={memoSaving}
             onChange={(event) => setMemoDraft(event.target.value)} rows={7} autoFocus placeholder="メモを追加"
             className="mt-2 w-full resize-y rounded-control border border-hairline bg-canvas px-3 py-2 text-sm leading-6 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15" />
           {memoError && <p className="text-danger mt-1 text-xs">{memoError}</p>}
@@ -738,7 +739,7 @@ export default function EmailThread({
         )}
         {error && <p className="text-danger mb-2 text-xs">{error}</p>}
         <InboxInputBox>
-          <textarea
+          <SharedTextArea
             value={reply}
             onChange={(e) => setReplyDraft(e.target.value)}
             onCompositionStart={() => { isComposingRef.current = true }}

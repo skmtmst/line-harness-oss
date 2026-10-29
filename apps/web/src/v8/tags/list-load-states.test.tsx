@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -57,7 +58,8 @@ describe.each(variants)('$name の読込状態', variant => {
     await act(async () => pending.resolve(answer([])))
     await screen.findByText(variant.empty)
     expect(screen.queryByRole('link', { name: variant.create })).toBeNull()
-    expect(screen.queryByRole('button', { name: variant.create })).toBeNull()
+    if (variant.name === 'タグ') await expectPermissionLocked(screen.getByRole('button', { name: variant.create }))
+    else expect(screen.queryByRole('button', { name: variant.create })).toBeNull()
   })
 
   it.each([500, 403])('失敗%sは空と混ぜず、通信失敗は再試行で回復する', async status => {

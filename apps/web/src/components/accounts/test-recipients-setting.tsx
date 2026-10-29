@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '@/lib/api'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import CloseButton from '@/components/shared/close-button'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 interface Friend {
   id: string
@@ -204,7 +205,7 @@ export default function TestRecipientsSetting({ accountId }: TestRecipientsSetti
 
       {/* Search to add */}
       <div className="relative">
-        <SaveErrorField names={["search"]}><input
+        <SaveErrorField names={["search"]}><SharedTextField
           type="text"
           placeholder="友だちを検索して追加…"
           value={search}

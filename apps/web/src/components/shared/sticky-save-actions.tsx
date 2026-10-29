@@ -1,8 +1,8 @@
-import { Children, cloneElement, isValidElement, type ReactNode } from 'react'
+import { Children, cloneElement, isValidElement, type ReactNode, type ReactElement } from 'react'
 import { Check, Save } from 'lucide-react'
-import Button from './button'
+import Button, { type ButtonProps } from './button'
 
-type ActionChildren = { children?: ReactNode; 'aria-hidden'?: boolean | 'true' | 'false' }
+type ActionChildren = { children?: ReactNode; hidden?: boolean; inert?: boolean; 'aria-hidden'?: boolean | 'true' | 'false' }
 
 function actionText(node: ReactNode): string {
   if (typeof node === 'string' || typeof node === 'number') return String(node)
@@ -32,4 +32,43 @@ export function normalizeStickySaveActions(node: ReactNode): ReactNode {
   if (node.props.children === undefined) return node
   const children = normalizeStickySaveActions(node.props.children)
   return children === node.props.children ? node : cloneElement(node, {}, children)
+}
+
+/** 入力理由は操作の並びから外し、帯の下段へ一度だけ出す。押せない条件と読み上げはButtonに残す。 */
+export function separateStickyInputReasons(node: ReactNode): { actions: ReactNode; reasons: string[] } {
+  const reasons = new Set<string>()
+  const visit = (child: ReactNode): ReactNode => {
+    if (Array.isArray(child)) return Children.map(child, visit)
+    if (!isValidElement<ActionChildren>(child)) return child
+    if (child.props.hidden || child.props.inert || child.props['aria-hidden'] === true || child.props['aria-hidden'] === 'true') return child
+    if (child.type === Button) {
+      const button = child as ReactElement<ButtonProps>
+      const props = button.props
+      if (props.href === undefined && props.disabled && !props.hidden && !props.lockedReason && !props.busy && props.disabledReason) {
+        reasons.add(props.disabledReason)
+        return cloneElement(button, { disabledReason: undefined, 'aria-description': props.disabledReason })
+      }
+      return child
+    }
+    return child.props.children === undefined ? child : cloneElement(child, {}, visit(child.props.children))
+  }
+  const actions = visit(node)
+  return { actions, reasons: [...reasons] }
+}
+
+/** 削除の入口は赤い文字だけにそろえ、同じ欄へ渡された副操作や配布操作は保つ。 */
+export function normalizeStickyDestructiveActions(node: ReactNode): ReactNode {
+  if (Array.isArray(node)) return Children.map(node, normalizeStickyDestructiveActions)
+  if (!isValidElement<ActionChildren & { variant?: string; icon?: ReactNode; textTone?: string; 'aria-label'?: string }>(node)) return node
+  if (node.type === Button) {
+    const text = actionText(node.props.children)
+    const label = text || node.props['aria-label'] || ''
+    if (/削除|(?<!取り|打ち)消す/.test(label)) {
+      return cloneElement(node, { variant: 'text', textTone: 'danger', icon: undefined }, text ? withoutDecorations(node.props.children) : label)
+    }
+    return ['danger', 'danger-outline'].includes(node.props.variant ?? '') || node.props.textTone === 'danger'
+      ? cloneElement(node, { variant: 'secondary', textTone: undefined }) : node
+  }
+  if (node.props.children === undefined) return node
+  return cloneElement(node, {}, normalizeStickyDestructiveActions(node.props.children))
 }

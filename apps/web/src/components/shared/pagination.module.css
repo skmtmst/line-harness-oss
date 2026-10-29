@@ -25,7 +25,7 @@ button.item:hover:not(:disabled, .current) {
 /*
  * ★V8 仕上げ（M10-2）：ページ送りの乗せた・押した動きと印。
  * 色の変化は 120ms、押したときはほんの少し沈む（明るさで）。
- * キーボードの印はボタンと同じ緑の輪。いまのページの緑は変えない。
+ * キーボードの印は青い焦点の輪。いまのページは薄い灰の地と太字で示す。
  */
 :root button.item {
   transition:
@@ -35,11 +35,6 @@ button.item:hover:not(:disabled, .current) {
 
 :root button.item:active:not(:disabled, .current) {
   filter: brightness(0.95);
-}
-
-:root button.item:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
 }
 
 button.item:disabled {
@@ -53,14 +48,6 @@ button.item:disabled {
 
 .page {
   width: 38px;
-}
-
-/* ：いま開いているページは薄い緑・緑の枠・濃い緑の文字。 */
-.current {
-  border-color: var(--polish-selection-ink);
-  background: var(--polish-selection-bg);
-  color: var(--polish-selection-ink);
-  font-weight: 500;
 }
 
 /*
@@ -81,7 +68,7 @@ button.item:disabled {
 /*
  * ★V8「ページ送り」（jX2Uw）：帯の余白は上下10・左右20、間は 6。
  * 各ボタンは 32×32・角丸 control・文字は 13px/1.5。前・次は「‹」「›」の
- * 印だけの正方形にする。いまのページの緑は変えない。
+ * 印だけの正方形にする。いまのページは薄い灰の地と太字で示す。
  */
 :root .pagination {
   gap: 6px;
@@ -130,15 +117,6 @@ button.item:disabled {
   outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow);
   font-family: var(--font-inter), Inter, sans-serif; line-height: 20px;
 }
-:root .current {
-  outline: 1px solid var(--polish-selection-ink); outline-offset: -1px;
-}
-/* ：通常の .item の色より現在地の選択色を優先する。 */
-html:root .current {
-  border-color: var(--polish-selection-ink);
-  background: var(--polish-selection-bg);
-  color: var(--polish-selection-ink);  font-weight: 600; /* 薄い緑の地で細い字がかすれて見えた。状態の札なので太字 */
-}
 :root span.item:not(.current) { outline-color: transparent; }
 :root .summary { font-family: var(--font-inter), Inter, system-ui, sans-serif; line-height: 20px; }
 
@@ -163,13 +141,20 @@ html:root button.control:disabled {
   box-shadow: none;
 }
 
-/* 現在のページは薄い灰の地と太字で示す。ほかの番号・前後の矢印は保つ。 */
+/* 選択していない番号は枠と影を見せず、前後の操作の枠は残す。 */
+html:root button.page:not(.current) { outline-color: transparent; box-shadow: none; }
+
+/* 属性を重ねた共通の選択色より、ページの現在地の灰を優先する。枠・影を重ねない。 */
 html:root .current {
+  background: var(--color-canvas-sunken) !important;
+  color: var(--color-ink) !important;
+  border: 0;
   outline: 1px solid transparent;
+  outline-offset: -1px;
   border-color: transparent;
   background: var(--color-canvas-sunken);
   color: var(--color-ink);
-  box-shadow: none;
+  box-shadow: none !important;
   font-weight: var(--polish-weight-title);
 }
 
@@ -182,7 +167,16 @@ html:root nav[data-pagination] .current {
 }
 
 /* 現在地の枠を消しても、キーボードの焦点の輪は残す。 */
-html:root nav[data-pagination] button.current:focus-visible {
+html:root nav[data-pagination] button.current:focus-visible,
+html:root button.item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* 選択していない番号は枠と影を見せず、前後の操作の枠は残す。 */
+html:root button.page:not(.current) { outline-color: transparent; box-shadow: none; }
+
+html:root button.item:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }

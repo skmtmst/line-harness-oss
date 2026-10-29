@@ -57,6 +57,16 @@ function urlFrame() {
 }
 
 describe('②Step3 の Webhook URL の枠は承認済み v07 どおり', () => {
+  it('Step1のチャネルIDでMessaging API設定を直接開き、IDがないときは誤ったリンクを出さない', () => {
+    const view = render(
+      <Step2Connect sub={3} badge="Step 3 / 4" values={{ ...VALUES, channelId: ' 2001234567 ' }} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,
+    )
+    expect(view.getByRole('link', { name: 'LINE Developers を開く' }).getAttribute('href')).toBe('https://developers.line.biz/console/channel/2001234567/messaging-api')
+    view.rerender(<Step2Connect sub={3} badge="Step 3 / 4" values={VALUES} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />)
+    expect(view.queryByRole('link', { name: 'LINE Developers を開く' })).toBeNull()
+    expect(view.getByText('チャネルIDがありません。Messaging APIの情報へ戻って入力してください。')).toBeTruthy()
+  })
+
   it('プロバイダーIDがない古い下書きでは、Step4から別チャネルへ飛ばさない', () => {
     const view = render(
       <Step2Connect sub={4} badge="Step 4 / 4" values={VALUES} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,

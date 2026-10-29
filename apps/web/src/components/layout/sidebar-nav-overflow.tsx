@@ -2,8 +2,6 @@
 import { cancelMeasurement, scheduleMeasurement } from '../shared/dom-measurement-batch'
 import { observeElementResize } from '../shared/element-resize-observer'
 
-
-
 export function watchNavOverflow(nav: HTMLElement | null) {
   if (!nav) return
   let active = true
@@ -11,29 +9,33 @@ export function watchNavOverflow(nav: HTMLElement | null) {
   const read = () => {
     if (!active) return () => {}
     const more = nav.scrollHeight - nav.clientHeight - nav.scrollTop > 1
-    const above = nav.scrollTop > 1
-    let cutTop = 0
+    const scrolled = nav.scrollTop > 1
     let cutBottom = 0
-    if (more || above) {
+    if (more || scrolled) {
       const box = nav.getBoundingClientRect()
-      for (const row of Array.from(nav.querySelectorAll<HTMLElement>('a, button'))) {
-        const rect = row.getBoundingClientRect()
-        if (rect.height === 0) continue
+      const rows = Array.from(nav.querySelectorAll<HTMLElement>('a, button'))
+        .filter(row => !row.closest('[inert]'))
+        .map(row => row.getBoundingClientRect())
+        .filter(rect => rect.height > 0)
+        .map(rect => ({ top: rect.top, bottom: rect.bottom }))
+      for (const rect of rows) {
         if (more && rect.top < box.bottom && rect.bottom > box.bottom) cutBottom = Math.max(cutBottom, box.bottom - rect.top)
-        if (above && rect.top < box.top && rect.bottom > box.top) cutTop = Math.max(cutTop, rect.bottom - box.top)
       }
     }
-    const top = `${Math.ceil(cutTop)}px`, bottom = `${Math.ceil(cutBottom)}px`, clipped = more || above
-    const topChanged = nav.style.getPropertyValue('--nav-cut-top') !== top
+    const bottom = `${Math.ceil(cutBottom)}px`
     const bottomChanged = nav.style.getPropertyValue('--nav-cut-bottom') !== bottom
-    const clippedChanged = nav.hasAttribute('data-clipped') !== clipped
+    const clippedChanged = nav.hasAttribute('data-clipped') !== more
+    const scrolledChanged = nav.hasAttribute('data-scrolled') !== scrolled
     return () => {
       if (!active) return
-      if (topChanged) nav.style.setProperty('--nav-cut-top', top)
       if (bottomChanged) nav.style.setProperty('--nav-cut-bottom', bottom)
       if (clippedChanged) {
-        if (clipped) nav.setAttribute('data-clipped', '')
+        if (more) nav.setAttribute('data-clipped', '')
         else nav.removeAttribute('data-clipped')
+      }
+      if (scrolledChanged) {
+        if (scrolled) nav.setAttribute('data-scrolled', '')
+        else nav.removeAttribute('data-scrolled')
       }
     }
   }

@@ -39,6 +39,12 @@ import { describeApiFailure, permissionDeniedMessage } from '@/components/shared
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { lockReason } from '@/components/shared/permission-lock'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
+import { useStaffRole } from '@/lib/staff-role'
+import { effectiveStaffRole, readStaffIdentity } from '@/lib/staff-identity-state'
+import { canOperateAutomationRun, canExportAutomationRuns } from '@/components/automations/use-can-manage'
 
 
 /*
@@ -50,6 +56,14 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
  * 型（ListPage）に、タブ・数の帯・案内の帯・道具の段・表（列の並び）を渡す。
  * 中身は右の詳細パネルで開く。
  */
+
+/** 保持された操作も、実行時の本人・専用鍵・代理モードで確かめる。 */
+function canUseRunActionNow(action: 'operate' | 'export'): boolean {
+  const identity = readStaffIdentity()
+  const role = effectiveStaffRole(identity)
+  const allowed = (action === 'operate' ? canOperateAutomationRun : canExportAutomationRuns)(role, identity?.permissionKeys ?? [])
+  return allowed && !lockReason(true)
+}
 
 type RunStatus = AutomationRunDetail['status']
 type ApiResponse<T> = { success: true; data: T } | { success: false; error: string }
@@ -172,9 +186,13 @@ export default function AutomationRunsV8() {
   const searchFromUrl = searchParams.get('search') ?? ''
   const tabCounts = useAutomationTabCounts()
   const permissions = useAutomationRunManage()
-  // 役割が読めるまでは今までどおり出す（最後の守りはサーバの 403）。
-  const canOperate = permissions === null || permissions.canOperate
-  const canExport = permissions === null || permissions.canExport
+  const staffRole = useStaffRole()
+  const canOperate = staffRole !== null && permissions !== null && permissions.canOperate
+  const canExport = staffRole !== null && permissions !== null && permissions.canExport
+  const knownOperateReason = usePermissionLockReason(canOperate)
+  const knownExportReason = usePermissionLockReason(canExport)
+  const operateReason = permissions === null ? undefined : knownOperateReason
+  const exportReason = permissions === null ? undefined : knownExportReason
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [data, setData] = useState<RunsResponse | null>(null)
@@ -207,6 +225,10 @@ export default function AutomationRunsV8() {
   const [cancellingId, setCancellingId] = useState<string | null>(null)
   const [confirmCancel, setConfirmCancel] = useState(false)
   const [csvBusy, setCsvBusy] = useState(false)
+
+  useEffect(() => {
+    if (!canOperate || operateReason) setConfirmCancel(false)
+  }, [canOperate, operateReason])
 
   const loadGeneration = useRef(0)
   const selectedAccountRef = useRef(selectedAccountId)
@@ -301,7 +323,7 @@ export default function AutomationRunsV8() {
   }, [selectedRun, selectedAccountId, detailReloadKey])
 
   const cancelRun = async (run: AutomationRunRow) => {
-    if (!run.canCancel || cancellingId) return
+    if (!canUseRunActionNow('operate') || !run.canCancel || cancellingId) return
     const accountAtStart = selectedAccountId
     setCancellingId(run.id)
     setNotice('')
@@ -323,7 +345,7 @@ export default function AutomationRunsV8() {
 
   /* もう一度やる：失敗した処理だけ。失敗したら記録を読み直して、受け付け済みかを確かめる。 */
   const retryRun = async (run: AutomationRunRow) => {
-    if (!run.canRetry || retryingId) return
+    if (!canUseRunActionNow('operate') || !run.canRetry || retryingId) return
     const accountAtStart = selectedAccountId
     setRetryingId(run.id)
     setNotice('')
@@ -364,7 +386,7 @@ export default function AutomationRunsV8() {
   }
 
   const downloadRunsCsv = () => {
-    if (csvBusy) return
+    if (!canUseRunActionNow('export') || csvBusy) return
     setCsvBusy(true)
     setNotice('')
     void downloadApiFile(api.automations.runsCsvUrl({
@@ -430,8 +452,8 @@ export default function AutomationRunsV8() {
   /* 行の「…」：中身を見る・もう一度やる（やり直せる失敗のとき）・ルールを開く・トークを開く。 */
   const rowMenuItems = (run: AutomationRunRow): ActionMenuItem[] => [
     { id: 'open', label: "実行の記録を見る", onSelect: () => setSelectedRun(run) },
-    ...(canOperate && run.canRetry
-      ? [{ id: 'retry', label: 'もう一度やる', disabled: retryingId !== null, onSelect: () => void retryRun(run) }]
+    ...(run.canRetry
+      ? [{ id: 'retry', label: 'もう一度やる', lockedReason: operateReason, disabled: !canOperate || retryingId !== null, onSelect: () => void retryRun(run) }]
       : []),
     { id: 'rule', label: 'ルールを開く', onSelect: () => router.push(`/automations?search=${encodeURIComponent(run.automationName)}`) },
     ...(run.friendId
@@ -469,6 +491,7 @@ export default function AutomationRunsV8() {
   )
   const toolbar = (
     <>
+      {operateReason ? <div className={styles.noticeRow}><ReadOnlyNotice need="feature" /></div> : null}
       {canExport && data && data.pagination.total > 5000 ? (
         <div className={styles.noticeRow}><Notice tone="warn">CSVは5,000件までしか出ません。期間や絞り込みで分けて出してください。</Notice></div>
       ) : null}
@@ -574,9 +597,7 @@ export default function AutomationRunsV8() {
       headingSize="regular"
       title="オートメーション"
 
-      actions={canExport
-        ? <Button onClick={downloadRunsCsv} disabled={csvBusy} busy={csvBusy} busyLabel="書き出しています…" title="いまの検索・絞り込みの行が出ます（5,000件まで）"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
-        : undefined}
+      actions={<Button onClick={downloadRunsCsv} lockedReason={exportReason} disabled={!canExport || csvBusy} busy={csvBusy} busyLabel="書き出しています…" title="いまの検索・絞り込みの行が出ます（5,000件まで）"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>}
       tabs={<AutomationTabs active="runs" counts={tabCounts} />}
       stats={<AutomationBand label="動いた記録の数の帯" cells={cells} />}
       toolbar={toolbar}
@@ -595,17 +616,17 @@ export default function AutomationRunsV8() {
           onClose={() => setSelectedRun(null)}
           footer={run ? (
             <div className={styles.panelActions}>
-              {run.canRetry && canOperate ? (
-                <Button onClick={() => void retryRun(run)} disabled={retryingId !== null} busy={retryingId === run.id} busyLabel="実行中">失敗した処理をもう一度やる</Button>
+              {run.canRetry ? (
+                <Button onClick={() => void retryRun(run)} lockedReason={operateReason} disabled={!canOperate || retryingId !== null} busy={retryingId === run.id} busyLabel="実行中">失敗した処理をもう一度やる</Button>
               ) : null}
-              {run.canCancel && canOperate ? (
-                confirmCancel ? (
+              {run.canCancel ? (
+                confirmCancel && canOperate && !operateReason ? (
                   <>
-                    <Button onClick={() => void cancelRun(run)} disabled={cancellingId !== null} busy={cancellingId === run.id} busyLabel="取りやめ中">取りやめる</Button>
+                    <Button onClick={() => void cancelRun(run)} lockedReason={operateReason} disabled={!canOperate || cancellingId !== null} busy={cancellingId === run.id} busyLabel="取りやめ中">取りやめる</Button>
                     <Button variant="secondary" onClick={() => setConfirmCancel(false)} disabled={cancellingId !== null}>キャンセル</Button>
                   </>
                 ) : (
-                  <Button variant="secondary" onClick={() => setConfirmCancel(true)} disabled={cancellingId !== null}>この実行を取りやめる</Button>
+                  <Button variant="secondary" onClick={() => { if (canUseRunActionNow('operate')) setConfirmCancel(true) }} lockedReason={operateReason} disabled={!canOperate || cancellingId !== null}>この実行を取りやめる</Button>
                 )
               ) : null}
             </div>
@@ -656,7 +677,7 @@ export default function AutomationRunsV8() {
                     ? 'まだ終わっていない実行です。取りやめるとこれ以降の処理は動きませんが、記録は残ります。'
                     : '安全な再実行の対象ではありません。成功済みの処理を二重に動かさないため、この記録からは再実行できません。'}
               </p>
-              {confirmCancel ? (
+              {confirmCancel && canOperate && !operateReason ? (
                 <p className={styles.panelWarn}>{`「${run.accountLabel ?? '選択中のアカウント'}」の実行を取りやめますか？記録は残りますが、実行は戻せません。`}</p>
               ) : null}
             </div>

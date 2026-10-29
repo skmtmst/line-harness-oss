@@ -2,7 +2,7 @@
 /*
  * SortSelect / PageSizeSelect（監査6 #668）を本物のReactで動かす試験。
  *
- * 一覧のツールバーで「並び順」「表示件数」を選ぶ口は、字ラベルつき・
+ * 一覧のツールバーで「並び順」「表示件数」を選ぶ口は、読み上げ名を持ち、
  * 選択中の語が切れない幅の1形にそろえる。見るのはラベル、選択肢の
  * 書き方、幅の下限、操作できることの4点。
  */
@@ -54,9 +54,10 @@ describe('SortSelect（監査6 #668: 並び順の統一）', () => {
 })
 
 describe('PageSizeSelect（監査6 #668: 表示件数の統一）', () => {
-  it('「表示件数」の字ラベルつきで、選択肢は「N件表示」の1形', () => {
+  it('可視の字ラベルを重ねず、選択肢は「N件表示」の1形', () => {
     render(<PageSizeSelect value={20} onChange={() => {}} />)
-    expect(screen.getByText('表示件数')).toBeTruthy()
+    expect(screen.queryByText('表示件数')).toBeNull()
+    expect(screen.getByRole('button', { name: '表示件数' }).textContent).toBe('20件表示')
     // 選び口は共通 Select（開くボタン）。
     // 「20件」でも「20件を表示」でもなく設計の語「20件表示」
     fireEvent.click(screen.getByLabelText('表示件数'))

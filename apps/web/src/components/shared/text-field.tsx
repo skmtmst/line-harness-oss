@@ -1,5 +1,6 @@
 'use client'
 
+import { inputPlaceholder } from './input-placeholder'
 import { forwardRef, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
 import { guardCompositionEnter } from './composition-enter'
 import { joinDescribedBy, useFieldContext } from './field-context'
@@ -16,7 +17,7 @@ import styles from './text-field.module.css'
  * 自動で付ける。呼ぶ側が直接渡した値はそのまま残し、足し合わせる。
  */
 
-type ControlOwnProps = { invalid?: boolean; className?: string }
+type ControlOwnProps = { invalid?: boolean; className?: string; /** 計算値だけに使う読み取り専用の欄。 */ derived?: boolean }
 
 function useControlA11y(props: {
   id?: string
@@ -45,7 +46,7 @@ function useControlA11y(props: {
 export const TextField = forwardRef<
   HTMLInputElement,
   ControlOwnProps & Omit<InputHTMLAttributes<HTMLInputElement>, 'className'>
->(function TextField({ invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, ...rest }, ref) {
+>(function TextField({ derived, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, ...rest }, ref) {
   const a11y = useControlA11y({ id, invalid, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired })
   return (
     <input
@@ -53,6 +54,9 @@ export const TextField = forwardRef<
       type="text"
       data-design-node="Ume2U"
       {...rest}
+      readOnly={derived || rest.readOnly}
+      data-look={derived ? 'derived' : (rest as Record<string, unknown>)['data-look'] as string | undefined}
+      placeholder={inputPlaceholder(rest.placeholder)}
       onKeyDown={guardCompositionEnter(onKeyDown)}
       id={a11y.id}
       required={required}
@@ -72,7 +76,7 @@ export const AffixedTextField = forwardRef<
 >(function AffixedTextField({ startAdornment, endAdornment, monospace, layout = 'inline', className, style, ...props }, ref) {
   const a11y = useControlA11y(props)
   return <span className={[styles.field, styles.single, styles.affixed, className].filter(Boolean).join(' ')}
-    style={style} aria-invalid={a11y['aria-invalid']} data-disabled={props.disabled || undefined} data-monospace={monospace || undefined} data-affixed-layout={layout}>
+    style={style} aria-invalid={a11y['aria-invalid']} data-look={props.derived ? 'derived' : undefined} data-disabled={props.disabled || undefined} data-monospace={monospace || undefined} data-affixed-layout={layout}>
     {startAdornment !== undefined && <span className={styles.adornment} aria-hidden="true">{startAdornment}</span>}
     <TextField {...props} ref={ref} className={styles.affixedControl} />
     {endAdornment !== undefined && <span className={styles.adornment} aria-hidden="true">{endAdornment}</span>}
@@ -88,7 +92,7 @@ export const AffixedTextField = forwardRef<
 export const TextArea = forwardRef<
   HTMLTextAreaElement,
   ControlOwnProps & { compact?: boolean; density?: 'regular' | 'compact'; height?: 'post' | 'reply'; size?: 'short' | 'single-row' } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, 'className'>
->(function TextArea({ compact, density, height, size, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, ...rest }, ref) {
+>(function TextArea({ derived, compact, density, height, size, invalid, className, id, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired, onKeyDown, ...rest }, ref) {
   const a11y = useControlA11y({ id, invalid, required, 'aria-describedby': describedBy, 'aria-invalid': ariaInvalid, 'aria-required': ariaRequired })
   return (
     <textarea
@@ -97,6 +101,8 @@ export const TextArea = forwardRef<
       data-density={density}
       data-height={height}
       {...rest}
+      readOnly={derived || rest.readOnly}
+      placeholder={inputPlaceholder(rest.placeholder)}
       onKeyDown={guardCompositionEnter(onKeyDown)}
       id={a11y.id}
       required={required}

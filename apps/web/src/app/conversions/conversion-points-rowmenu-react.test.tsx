@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -132,8 +133,8 @@ function menus(): HTMLElement[] {
 }
 
 function byText(text: string): HTMLButtonElement | undefined {
-  return [...document.body.querySelectorAll('button')]
-    .find((node) => node.textContent?.trim() === text) as HTMLButtonElement | undefined
+  return ([...document.body.querySelectorAll('button')]
+    .find((node) => node.textContent?.trim() === text) ?? querySupplementaryPageAction(text)) as HTMLButtonElement | undefined
 }
 
 function moreButtons(): HTMLButtonElement[] {
@@ -143,8 +144,8 @@ function moreButtons(): HTMLButtonElement[] {
 
 function stopButton(): HTMLButtonElement | undefined {
   const reason = document.body.querySelector('#cv-stop-reason')
-  return [...(reason?.closest('[role="dialog"]')?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
-    .find(button => button.textContent?.trim() === '止める')
+  return ([...(reason?.closest('[role="dialog"]')?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+    .find(button => button.textContent?.trim() === '止める') ?? querySupplementaryPageAction('止める'))
 }
 
 async function click(node: HTMLElement | undefined) {
@@ -271,7 +272,7 @@ describe('V8 閲覧だけの担当者と権限確認中', () => {
     await click(container.querySelector<HTMLButtonElement>('button[aria-label="表示件数"]') ?? undefined)
     await click(byText('50件表示'))
     expect(container.querySelectorAll('tbody tr')).toHaveLength(21)
-    expect(container.querySelector<HTMLButtonElement>('button[aria-label="次のページ"]')?.disabled).toBe(true)
+    expect(container.querySelector<HTMLButtonElement>('button[aria-label="次のページ"]')).toBeNull()
   })
 
   it('旧URLの紹介者や送り元を失わず成果とアフィリエイトへ送る', async () => {

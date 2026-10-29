@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * R530: 権限のない運用担当（staff）には実行結果の再実行・一時停止を出さない。
- * owner/admin には出す。役割×操作の表を実マウントで固定する。
+ * 再実行・停止は許可が無くても理由付きで残す。読む操作とCSVは保つ。
  * 再実行の口側の staff 拒否は Worker の試験で見る。
  */
 import React, { act } from 'react'
@@ -12,12 +11,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const runsMock = vi.hoisted(() => vi.fn())
 const staffMeMock = vi.hoisted(() => vi.fn())
+const actions = vi.hoisted(() => ({ retry: vi.fn(), stop: vi.fn(), confirm: undefined as (() => void) | undefined }))
 
 vi.mock('@/lib/api', () => ({
   api: {
     autoReplies: {
       runs: runsMock,
-      retryRun: vi.fn(),
+      retryRun: actions.retry,
+      stop: actions.stop,
       update: vi.fn(),
     },
     staff: { me: staffMeMock },
@@ -43,6 +44,17 @@ vi.mock('@/components/shell/page-chrome', () => ({
 }))
 
 import AutoReplyRunsPage from './page'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
+
+vi.mock('@/components/shared/confirm-dialog', async importOriginal => {
+  const { default: ConfirmDialog } = await importOriginal<typeof import('@/components/shared/confirm-dialog')>()
+  return { default: (props: React.ComponentProps<typeof ConfirmDialog>) => {
+    if (props.open) actions.confirm = () => { void props.onConfirm() }
+    return <ConfirmDialog {...props} />
+  } }
+})
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -106,33 +118,51 @@ afterEach(() => {
     root.unmount()
   })
   container.remove()
+  document.body.innerHTML = ''
+  forgetStaffIdentity()
+  forgetSessionSnapshot()
+  vi.restoreAllMocks()
   vi.clearAllMocks()
 })
 
 beforeEach(() => {
+  forgetStaffIdentity()
+  forgetSessionSnapshot()
+  actions.confirm = undefined
+  actions.retry.mockResolvedValue({ success: true, data: {} })
+  actions.stop.mockResolvedValue({ success: true, data: {} })
   runsMock.mockResolvedValue(listResponse())
 })
 
 function buttonLabels(): string[] {
   return Array.from(container.querySelectorAll('button')).map((b) => b.textContent ?? '')
 }
+const button = (text: string) => ([...document.querySelectorAll('button')].find(b => b.textContent?.trim() === text) ?? querySupplementaryPageAction(text)) as HTMLButtonElement
+const proxy = (mode: 'read' | 'write') => ({ impersonation: { id: 'runs-proxy', tenantId: 'tenant', mode, piiRevealed: false, startedAt: '' }, unfamiliarAt: null, stepUpMethod: 'none' as const })
+async function openMenu() {
+  await act(async () => { container.querySelector<HTMLButtonElement>('button[aria-label$="記録の操作"]')!.click() })
+}
 
 describe('R530 実行結果の出し分け（役割×操作）', () => {
-  it('staff の失敗行には再実行ボタンを出さず、一時停止も出さない', async () => {
-    staffMeMock.mockResolvedValue({ success: true, data: { role: 'staff' } })
+  it.each([{ role: 'staff' }, { role: 'viewer' }, { role: 'owner', readOnly: true }, { role: 'admin', roleBundle: 'view_only' }])('拒否された本人%jは灰色の再実行・停止・編集を残し、起動しない', async identity => {
+    staffMeMock.mockResolvedValue({ success: true, data: identity })
     await renderPage()
-
-    expect(buttonLabels().some((label) => label.includes('もう一度実行'))).toBe(false)
-    expect(buttonLabels().some((label) => label.includes('一時停止'))).toBe(false)
-    // 行の「…」を開いても、失敗の記録に再実行は無い（確認は残る）。
-    const more = container.querySelector<HTMLButtonElement>('button[aria-label$="記録の操作"]')!
-    await act(async () => { more.click() })
+    for (const label of ['一時停止する', '失敗した処理をもう一度', 'ルールの編集へ']) {
+      const control = button(label)
+      expect(control.getAttribute('aria-disabled')).toBe('true')
+      expect(control.disabled).toBe(false)
+      expect(control.getAttribute('href')).toBeNull()
+      await act(async () => { control.click(); control.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); control.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true })) })
+    }
+    await openMenu()
     expect(document.querySelector('[role="menu"]')?.textContent).toContain('実行の詳細を見る')
-    expect(document.querySelector('[role="menu"]')?.textContent).not.toContain('もう一度実行')
-    expect(container.textContent).toContain(
-      '再実行・一時停止はオーナーと管理者だけができます',
-    )
-    // 読み取り（確認・書き出し・設定への移動）は残す。
+    const retry = document.querySelector<HTMLButtonElement>('[role="menuitem"][aria-disabled="true"]')!
+    expect(retry.textContent).toContain('もう一度実行')
+    await act(async () => { retry.click() })
+    expect(document.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+    expect(actions.retry).not.toHaveBeenCalled()
+    expect(actions.stop).not.toHaveBeenCalled()
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
     expect(container.querySelector('[aria-label="実行の記録"]')).not.toBeNull()
     expect(buttonLabels().some((label) => label.includes('CSVで書き出す'))).toBe(true)
   })
@@ -145,9 +175,88 @@ describe('R530 実行結果の出し分け（役割×操作）', () => {
     await act(async () => { more.click() })
     expect(document.querySelector('[role="menu"]')?.textContent).toContain('もう一度実行')
     expect(buttonLabels().some((label) => label.includes('一時停止'))).toBe(true)
-    expect(container.textContent).not.toContain(
-      '再実行・一時停止はオーナーと管理者だけができます',
-    )
+    expect(document.querySelector('[data-read-only-notice]')).toBeNull()
+  })
+
+  it.each(['owner', 'admin'])('%sの正規再実行・停止はそれぞれ1回', async role => {
+    staffMeMock.mockResolvedValue({ success: true, data: { role } })
+    await renderPage()
+    await act(async () => { button('失敗した処理をもう一度').click() })
+    expect(actions.retry).toHaveBeenCalledExactlyOnceWith('evaluation-1')
+    await act(async () => { button('一時停止する').click() })
+    const dialog = document.querySelector('[role="dialog"], [role="alertdialog"]')!
+    await act(async () => { [...dialog.querySelectorAll('button')].find(b => b.textContent?.trim() === '一時停止する')!.click() })
+    expect(actions.stop).toHaveBeenCalledExactlyOnceWith('rule-1', { reason: null }, expect.any(String))
+  })
+
+  it('本人未知は帯と理由無しでdisabled、owner確定後は操作できる', async () => {
+    let resolve!: (value: unknown) => void
+    staffMeMock.mockImplementation(() => new Promise(answer => { resolve = answer }))
+    await renderPage()
+    for (const label of ['一時停止する', '失敗した処理をもう一度', 'ルールの編集へ', 'CSVで書き出す']) {
+      expect(button(label).disabled).toBe(true)
+      await act(async () => { button(label).click() })
+    }
+    expect(document.querySelector('[data-read-only-notice], [data-permission-locked]')).toBeNull()
+    expect(button('ルールの編集へ').getAttribute('href')).toBeNull()
+    expect(document.querySelector('a[href^="/auto-replies/edit"]')).toBeNull()
+    expect(actions.stop).not.toHaveBeenCalled()
+    expect(actions.retry).not.toHaveBeenCalled()
+    await act(async () => { resolve({ success: true, data: { role: 'owner' } }) })
+    expect(button('一時停止する').disabled).toBe(false)
+    await act(async () => { button('失敗した処理をもう一度').click() })
+    expect(actions.retry).toHaveBeenCalledTimes(1)
+  })
+
+  it('開いた停止窓をread代理で閉じ、保持したconfirmも0、writeへ戻すと停止1', async () => {
+    staffMeMock.mockResolvedValue({ success: true, data: { role: 'owner' } })
+    await renderPage()
+    await act(async () => { button('一時停止する').click() })
+    const confirm = actions.confirm!
+    await act(async () => { rememberSessionSnapshot(proxy('read')) })
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
+    expect(document.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+    expect(button('一時停止する').getAttribute('aria-disabled')).toBe('true')
+    await act(async () => { confirm(); button('失敗した処理をもう一度').click() })
+    expect(actions.stop).not.toHaveBeenCalled()
+    expect(actions.retry).not.toHaveBeenCalled()
+    await act(async () => { rememberSessionSnapshot(proxy('write')) })
+    await act(async () => { confirm() })
+    expect(actions.stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('一括再実行の1件目の後にread代理へ変わったら2件目を送らない', async () => {
+    staffMeMock.mockResolvedValue({ success: true, data: { role: 'owner' } })
+    const response = listResponse()
+    response.data.items.push({ ...response.data.items[0], id: 'evaluation-2' })
+    runsMock.mockResolvedValue(response)
+    actions.retry.mockImplementation(async () => { rememberSessionSnapshot(proxy('read')); return { success: true, data: {} } })
+    await renderPage()
+    await act(async () => { button('失敗した処理をもう一度').click() })
+    expect(actions.retry).toHaveBeenCalledExactlyOnceWith('evaluation-1')
+    expect(document.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+  })
+
+  it('read代理でも詳細・失敗の絞り込み・GETからのローカルCSVを残す', async () => {
+    staffMeMock.mockResolvedValue({ success: true, data: { role: 'owner' } })
+    rememberSessionSnapshot(proxy('read'))
+    const blobs: Blob[] = []
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => { blobs.push(blob as Blob); return 'blob:local-runs' })
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    await renderPage()
+    await act(async () => { button('CSVで書き出す').click() })
+    expect(runsMock).toHaveBeenLastCalledWith(expect.objectContaining({ limit: 100, offset: 0 }))
+    expect(blobs).toHaveLength(1)
+    expect(await blobs[0].text()).toContain('田中さん')
+    await act(async () => { button('失敗だけ見る').click() })
+    expect(container.textContent).toContain('田中さん')
+    await openMenu()
+    const detail = [...document.querySelectorAll('[role="menuitem"]')].find(e => e.textContent?.includes('実行の詳細を見る')) as HTMLElement
+    await act(async () => { detail.click() })
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('実行記録の中身')
+    expect(actions.retry).not.toHaveBeenCalled()
+    expect(actions.stop).not.toHaveBeenCalled()
   })
 })
 

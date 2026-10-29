@@ -152,10 +152,10 @@ export function musuboWebhookUrl(channelId: string): string {
   return base && /^\d+$/.test(id) ? `${base}/webhook/${id}` : ''
 }
 
-/** LINE Developers のチャネル画面。配下の画面名は未確認なのでチャネルの入口まで。 */
+/** LINE Developers の Messaging API 設定画面。数字のチャネルIDがあるときだけリンクする。 */
 export function developerChannelUrl(channelId: string): string {
   const id = channelId.trim()
-  return id ? `https://developers.line.biz/console/channel/${encodeURIComponent(id)}` : 'https://developers.line.biz/console/'
+  return /^\d+$/.test(id) ? `https://developers.line.biz/console/channel/${id}/messaging-api` : ''
 }
 
 /** LINE Developers のプロバイダー画面。チャネルIDからは組み立てられない。 */

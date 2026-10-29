@@ -243,6 +243,7 @@ const EXEMPTIONS: Record<string, string> = {
   'v8/restaurant/google/google.tsx':
     '編集を持たないGoogleの外枠。タブ・店舗の切替を共通の未保存確認へ委ね、現在の編集画面自身の番兵が止める。URLの試験で確認→続ける/破棄の動きを守る',
   'components/shared/entity-picker.tsx': '選ぶ窓の候補は仮選択で、選ぶを押したときだけ親へ渡す。閉じる操作は仮選択を破棄し、親の保存前の値を変えない。',
+  'v8/restaurant/google/post-media-picker-dialog.tsx': '投稿の画像を選ぶ窓。候補は仮選択で、使うを押したときだけ親へ渡す。キャンセルと閉じる操作は仮選択を捨て、親の保存前の値を変えない。',
   'components/chats/friend-info-sidebar.tsx':
     '受信箱の右の欄（B-26 その場で直す）。対応状況・担当・タグは押した瞬間に保存し、メモは書くのをやめて1秒で保存する。保存待ちの入力を溜めないので番兵の対象外（失敗は知らせで戻してもう一度試す）',
   'components/hq/account-menu.tsx':
@@ -403,7 +404,7 @@ const NOT_RENDERED: Record<string, string> = {
  * 画面を編集画面とみなし、分類を求める。
  */
 const EDITOR_SAVE_SIGNATURE = /(?:\bapi(?:\.[A-Za-z]+)+|\b[a-z][A-Za-z]*Api)\.(?:create|update|save|patch|upsert)[A-Za-z]*\(/
-const EDITOR_INPUT_SIGNATURE = /<(input|textarea|TextField|TextArea|Select|DateField|DateTimeField|TimeField)\b/g
+const EDITOR_INPUT_SIGNATURE = /<(input|textarea|TextField|TextArea|SharedTextField|SharedTextArea|Select|DateField|DateTimeField|TimeField)\b/g
 const EDITOR_MIN_INPUTS = 3
 
 /*

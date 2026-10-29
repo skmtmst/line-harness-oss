@@ -3,7 +3,7 @@ import { MENU_SECTION_LABELS, expectedMenuItemOrder, isMenuSectionId, type Featu
 
 import { accountFeatureAvailabilityMap } from '../services/feature-enforcement.js';
 import { cleanStringArray, cleanItemOrder } from './feature-settings-definition-collect-feature-impact.js';
-import { type FeatureSettingsData, TOGGLEABLE_FEATURES, SETTING_PREFIX, SIDEBAR_ORDER_KEY, SIDEBAR_ITEM_ORDER_KEY, featureIsEnabled, type FeatureSettingsState, FEATURE_SETTINGS_BUNDLE_KEY, type FeatureVisibilityData, SPECIALIZED_CATALOG_KEY, specializedCatalog, NEN_SPECIALIZED_FEATURES } from './feature-settings-definition-is-toggleable.js';
+import { type FeatureSettingsData, TOGGLEABLE_FEATURES, SETTING_PREFIX, SIDEBAR_ORDER_KEY, SIDEBAR_ITEM_ORDER_KEY, featureIsEnabled, type FeatureSettingsState, FEATURE_SETTINGS_BUNDLE_KEY, type FeatureVisibilityData, SPECIALIZED_CATALOG_KEY, specializedCatalog } from './feature-settings-definition-is-toggleable.js';
 
 export /**
  * 区分の並び（sidebarOrder）の保存値検査。
@@ -131,10 +131,14 @@ export async function loadFeatureVisibility(
   const featureStates = await accountFeatureAvailabilityMap(db, accountId, state.features);
   const specialized = new Set(specializedCatalog(specializedRaw));
   return {
-    features: Object.fromEntries(TOGGLEABLE_FEATURES.map((featureId) => [
-      featureId,
-      featureStates[featureId].effectiveEnabled
-        && (!NEN_SPECIALIZED_FEATURES.includes(featureId) || specialized.has(featureId)),
-    ])) as Record<FeatureId, boolean>,
+    features: {
+      ...Object.fromEntries(TOGGLEABLE_FEATURES.map((featureId) => [
+        featureId,
+        featureStates[featureId].effectiveEnabled
+          && (!['nen_campaigns', 'photo_review'].includes(featureId) || specialized.has(featureId)),
+      ])) as Record<FeatureId, boolean>,
+      // EC連携は通常の設定にもあるため、専用メニュー側だけを別に判定する。
+      specialized_ec_commerce: featureStates.ec_commerce.effectiveEnabled && specialized.has('ec_commerce'),
+    },
   };
 }

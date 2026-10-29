@@ -8,7 +8,6 @@ import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
 import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
 import Toggle from '@/components/shared/toggle'
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
@@ -22,10 +21,11 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 import type { ChannelsSummary } from './channels-summary'
 import ChannelsTables, { StaffStatusChip, formatReadAt } from './channels-tables'
+import { withHonorific } from '@line-crm/shared'
 type LoadStatus = 'loading' | 'ready' | 'error'
 function formatConflictRange(conflict: BookingConflict): string {
   const day = polishFormatDate(conflict.startsAt, { style: 'day', fallback: '' })
-  return day ? `${conflict.staffName}さんの ${day} ${formatConflictTime(conflict.startsAt)}` : ''
+  return day ? `${withHonorific(conflict.staffName)}の ${day} ${formatConflictTime(conflict.startsAt)}` : ''
 }
 
 function formatConflictTime(value: string): string {
@@ -181,7 +181,7 @@ export function ConflictDialog({
           <div className={ch.detail}>
             {conflict.bookings.map((booking, index) => (
               <p key={booking.bookingId} className={ch.conflictBooking}>
-                {index === 0 ? '①' : '②'} {booking.sourceLabel}・{booking.customerName}さん・{booking.menuName}・{formatConflictTime(booking.startsAt)}〜{formatConflictTime(booking.endsAt)}
+                {index === 0 ? '①' : '②'} {booking.sourceLabel}・{withHonorific(booking.customerName)}・{booking.menuName}・{formatConflictTime(booking.startsAt)}〜{formatConflictTime(booking.endsAt)}
               </p>
             ))}
           </div>
@@ -201,7 +201,7 @@ export function ConflictDialog({
           ]}
         /></SaveErrorField>
         <div className={ch.detailRow}>
-          <SaveErrorField names={["notify","notifyCustomer"]}><SettingCheckbox label="移したことを、お客さまに知らせる" checked={notify} disabled={busy} onChange={setNotify} /></SaveErrorField>
+          <SaveErrorField names={["notify","notifyCustomer"]}><Toggle label="移したことを、お客さまに知らせる" checked={notify} disabled={busy} onChange={setNotify} /></SaveErrorField>
           <span className={ch.conflictReason}>移したことを、お客さまに知らせる（LINE の友だちなら LINE、そうでなければ電話の案内を出す）</span>
         </div>
         </> : null}

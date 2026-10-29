@@ -1,3 +1,5 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -73,7 +75,7 @@ const json = (data: unknown, status = 200) => new Response(
 beforeEach(() => {
   outgoingItems = [outgoing()]
   folderItems = []
-  staffRole = 'owner'
+  staffRole = verifiedStaffRole('owner')
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -100,6 +102,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  verifiedStaffRole(null)
   act(() => { root.unmount() })
   host.remove()
   vi.unstubAllGlobals()
@@ -161,7 +164,7 @@ test('v8 の左のフォルダの列（共通・種類 webhook）で絞れる。
   expect(nav.querySelector('button[title="顧客"]')?.textContent).toContain('1')
   expect(nav.querySelector('button[title="未分類"]')?.textContent).toContain('1')
   expect(host.querySelector('tr[data-row-id="wh-1"] [aria-label="フォルダ：顧客"]')).not.toBeNull()
-  expect(host.querySelector('tr[data-row-id="wh-2"] [data-folder-dot]')).toBeNull()
+  expect(host.querySelector('tr[data-row-id="wh-2"] [data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
   await act(async () => { (nav.querySelector('button[title="顧客"]') as HTMLButtonElement).click() })
   expect(host.querySelector('tr[data-row-id="wh-1"]')).not.toBeNull()
   expect(host.querySelector('tr[data-row-id="wh-2"]')).toBeNull()
@@ -171,13 +174,14 @@ test('v8 の左のフォルダの列（共通・種類 webhook）で絞れる。
   await act(async () => { (nav.querySelector('button[title="すべて"]') as HTMLButtonElement).click() })
 })
 
-test('v8 の行の名前の前にフォルダの丸が付く。フォルダに入っていない送り先は丸を出さない（閲覧のみでも出す）', async () => {
-  staffRole = 'staff'
+test('v8 の行の名前の前にフォルダの丸が付く。フォルダに入っていない送り先は灰色の丸（閲覧のみでも出す）', async () => {
+  staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const row = host.querySelector('[data-design-node="ZSbFY"] tr[data-row-id="wh-1"]')
   const dots = row?.querySelectorAll('[data-folder-dot]') ?? []
-  expect(dots).toHaveLength(0)
+  expect(dots).toHaveLength(1)
+  expect(dots[0].getAttribute('data-folder-dot')).toBe('unfiled')
 })
 
 test('v8 で何も無いときは wWrpY の「まだ無い」が出る', async () => {
@@ -188,15 +192,33 @@ test('v8 で何も無いときは wWrpY の「まだ無い」が出る', async (
   expect(board?.textContent).toContain('まだ送り先がありません')
 })
 
-test('v8 の閲覧のみ（l5SRfT）は帯が出て、押せない作るボタン・設定は置かない', async () => {
-  staffRole = 'staff'
+test('v8 の閲覧のみ（l5SRfT）は帯が出て、［送り先を作る］は押せない形で理由を伝え、設定は置かない', async () => {
+  staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await renderPage()
   const board = host.querySelector('[data-design-node="ZSbFY"]')
   expect(board).not.toBeNull()
-  expect(board?.textContent).toContain('閲覧のみで見ています')
+  expect(board?.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
   const clickable = [...board!.querySelectorAll('a, button')]
-  expect(clickable.some((element) => element.textContent?.includes('送り先を作る'))).toBe(false)
+  // 作る口は空白にせず、押せない本物のボタン。行き先へのリンクは置かない。
+  const creates = clickable.filter((element) => element.textContent?.includes('送り先を作る'))
+  expect(creates.length).toBeGreaterThan(0)
+  for (const create of creates) {
+    expect(create.tagName).toBe('BUTTON')
+    expect(create.getAttribute('aria-disabled')).toBe('true')
+    expect(create.hasAttribute('href')).toBe(false)
+    const reason = document.getElementById(create.getAttribute('aria-describedby') ?? '')
+    expect(reason?.textContent).toBe('送り先は統括の担当者だけが作れます')
+  }
+  const create = creates[0] as HTMLButtonElement
+  const before = window.location.href
+  await act(async () => { create.click() })
+  expect(window.location.href).toBe(before)
+  // キーボードで焦点を当てると理由の吹き出しが出る（マウスは部品の試験で見る）。
+  await act(async () => { create.focus() })
+  expect(document.querySelector('[role="tooltip"]')?.textContent).toBe('送り先は統括の担当者だけが作れます')
+  await act(async () => { create.blur() })
+  expect(document.querySelector('[role="tooltip"]')).toBeNull()
   expect(clickable.some((element) => element.textContent === '設定')).toBe(false)
   // 見るだけの操作（送信の記録を見る）は行の「…」の中に残る。
   const trigger = board!.querySelector('[aria-label="「顧客台帳（CRM）」の操作"]') as HTMLButtonElement
@@ -244,7 +266,7 @@ test('v8 の動かす・止めるは押した瞬間に札が変わり、失敗�
   expect(settingButton.getAttribute('aria-expanded')).toBe('false')
   await act(async () => { settingButton.click() })
   expect(settingButton.getAttribute('aria-expanded')).toBe('true')
-  const stopItem = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.includes('止める'))!
+  const stopItem = ([...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent?.includes('止める')) ?? querySupplementaryPageAction('止める'))!
   await act(async () => { (stopItem as HTMLElement).click() })
   expect(board.textContent).toContain('止めている')
   // 口が失敗したら札が戻り、知らせに「もう一度」が出る。
@@ -294,7 +316,7 @@ test('v8 で行を右クリックすると「設定」と同じ操作が押し�
     expect(menu?.textContent).toContain(label)
   }
   // 右クリックから「止める」を押すと「設定」と同じく札が変わる。
-  const stopItem = [...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === '止める') as HTMLElement
+  const stopItem = ([...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === '止める') ?? querySupplementaryPageAction('止める')) as HTMLElement
   await act(async () => { stopItem.click() })
   expect(board.textContent).toContain('止めている')
   expect(document.querySelector('[role="menu"]')).toBeNull()

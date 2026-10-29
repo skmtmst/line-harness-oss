@@ -18,6 +18,7 @@ import type { Gap2Booking } from '@line-crm/shared'
 import { dayOf, dayWithWeekday, hm } from './series-model'
 import styles from './series-scope-dialog.module.css'
 import { formatNumber } from '@/lib/format'
+import { withHonorific } from '@line-crm/shared'
 
 export type SeriesTarget = {
   seriesId: string
@@ -114,7 +115,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
       designWidth={560}
       designTop={170}
       title={changing ? '繰り返しの予約を変えますか？' : '繰り返しの予約を取り消しますか？'}
-      description={`${target.customerName} さん・${target.ruleText}・${target.menuName}・${target.index} 回目 ${dayOf(target.startsAt)}`}
+      description={`${withHonorific(target.customerName, 'さん', { space: true })}・${target.ruleText}・${target.menuName}・${target.index} 回目 ${dayOf(target.startsAt)}`}
       tone={changing ? 'default' : 'destructive'}
       confirmation
       confirmLabel={`${formatNumber(count)} 件を${changing ? '変える' : '取り消す'}`}
@@ -152,7 +153,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
           </tbody>
         </DataTable> : null}
         {changing || impact ? null : <p className={styles.note}>取り消すと元に戻せません。キャンセル料は期限を過ぎた回だけに掛かり、取り消しの結果の知らせに見込みの金額が出ます（請求は予約の詳細の「お支払い」から）。</p>}
-        <Checkbox checked={false} onCheckedChange={() => preparing.open('LINE でのお知らせ')}>{target.customerName} さんに LINE で知らせる（{changing ? '変わった日と時間' : '取り消した日'}）</Checkbox>
+        <Checkbox checked={false} onCheckedChange={() => preparing.open('LINE でのお知らせ')}>{withHonorific(target.customerName, 'さん', { space: true })}に LINE で知らせる（{changing ? '変わった日と時間' : '取り消した日'}）</Checkbox>
         {preparing.dialog}
       </div>
     </Dialog>

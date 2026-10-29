@@ -217,7 +217,7 @@ describe('箱の作成・名前変更・移動が選んだアカウントでつ�
     })
     await clickFolder('フォルダを追加')
     // 共通の追加窓は最上層へ描画される。
-    const nameInput = document.querySelector('[role="dialog"] input[placeholder^="例:"]') as HTMLInputElement | null
+    const nameInput = document.querySelector('[role="dialog"] input[placeholder^="例："]') as HTMLInputElement | null
     expect(nameInput).toBeTruthy()
     await act(async () => {
       nameInput!.focus()

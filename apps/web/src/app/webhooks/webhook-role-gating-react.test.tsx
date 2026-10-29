@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 /*
  * R32: 受け取り口・送り先の作成は統括だけに出す。
  * C33: 受け取り口のURLはAPIの住所で組み立てる。
@@ -104,17 +105,17 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     expect(host.textContent).not.toContain('送り先の作成は統括だけができます')
   })
 
-  it('管理者には送り先の作成を出さず、統括への依頼を案内する', async () => {
+  it('管理者には送り先の作成を理由付きで残し、実行を拒否する', async () => {
     staffRole = 'admin'
     await act(async () => {
       root.render(<WebhooksPage />)
     })
     await settle()
-    expect(host.textContent).not.toContain('最初の送り先を作る')
-    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
+    await expectPermissionLocked([...host.querySelectorAll('button')].find(button => button.textContent?.includes('最初の送り先を作る')))
+    expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
   })
 
-  it('手元に統括の保存値が残っていても、本人確認が管理者なら作成を出さない', async () => {
+  it('手元に統括の保存値が残っていても、本人確認が管理者なら作成を拒否する', async () => {
     staffRole = 'admin'
     window.localStorage.setItem('lh_staff_role', 'owner')
     try {
@@ -124,7 +125,8 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
           root.render(<WebhooksPage />)
         })
         await settle()
-        expect(host.textContent, tabQuery || 'outgoing').not.toContain('最初の送り先を作る')
+        if (!tabQuery) await expectPermissionLocked([...host.querySelectorAll('button')].find(button => button.textContent?.includes('最初の送り先を作る')))
+        else expect(host.textContent).not.toContain('最初の送り先を作る')
         expect(host.textContent, tabQuery || 'outgoing').not.toContain('受け取り口を作る')
         expect(host.textContent, tabQuery || 'outgoing').not.toContain('見本から作る')
       }
@@ -141,7 +143,7 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     })
     await settle()
     expect(host.textContent).not.toContain('受け取り口を作る')
-    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
+    expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
   })
 
   it('受け取り口のURLはAPIの住所で組み立てる', async () => {
@@ -179,8 +181,8 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
 
   it('管理者には見本から作るを出さず、統括への依頼だけ出す', async () => {
     for (const [tabQuery, guidance] of [
-      ['', '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'],
-      ['tab=incoming', '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'],
+      ['', 'この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。'],
+      ['tab=incoming', 'この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。'],
     ] as const) {
       query = tabQuery
       staffRole = 'admin'
@@ -220,7 +222,7 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     await settle()
     expect(host.textContent).not.toContain('この見本で作る')
     expect(host.textContent).not.toContain('送り先を作る')
-    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
-    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
+    expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
+    expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
   })
 })

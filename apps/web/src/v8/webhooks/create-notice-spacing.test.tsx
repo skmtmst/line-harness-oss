@@ -8,14 +8,16 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => identity.role }))
 import WebhooksCreate from './create'
-afterEach(() => { cleanup(); vi.unstubAllGlobals() })
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); verifiedStaffRole(null) })
 it.each(['staff', 'admin'] as const)('非オーナー%sは両通知と戻る操作を残し、書込を起動しない', role => {
-  identity.role = role
+  identity.role = verifiedStaffRole(role)
   const fetcher = vi.fn()
   vi.stubGlobal('fetch', fetcher)
   const { container } = render(<WebhooksCreate />)
   expect(container.querySelector('[data-read-only-notice]')?.getAttribute('role')).toBe('status')
-  expect(container.querySelector('[data-read-only-notice]')?.textContent).toContain('閲覧のみで見ています。')
+  expect(container.querySelector('[data-read-only-notice]')?.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
   const content = container.querySelector('[data-template-region="content"]')!
   expect(content.getAttribute('data-content-spacing')).toBe('notice-after-read-only')
   expect(content.querySelector('[data-design-part="notice"]')?.textContent).toBeTruthy()
@@ -25,7 +27,7 @@ it.each(['staff', 'admin'] as const)('非オーナー%sは両通知と戻る操�
   expect(fetcher).not.toHaveBeenCalled()
 })
 it('オーナーの入力と既定の余白は維持する', () => {
-  identity.role = 'owner'
+  identity.role = verifiedStaffRole('owner')
   const { container } = render(<WebhooksCreate />)
   expect(container.querySelector('[data-read-only-notice]')).toBeNull()
   expect(container.querySelector('[data-template-region="content"]')!.hasAttribute('data-content-spacing')).toBe(false)

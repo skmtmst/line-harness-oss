@@ -14,6 +14,7 @@ import type { Dispatch,SetStateAction } from 'react'
 import styles from './edit.module.css'
 
 import { readOnlyDate,ReadOnlyValue } from './edit-impact'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 type RenderValueFieldsContext = {
   canWrite: boolean
   expiryBehavior: "stop" | "fallback"
@@ -50,7 +51,7 @@ export function renderValueFields({ canWrite, expiryBehavior, fallbackFieldError
       <section className={styles.sideCard} aria-labelledby="cv-edit-name-heading">
         <h2 id="cv-edit-name-heading" className={styles.sideTitle}>名前とフォルダ</h2>
         <div className={styles.sideFields}>
-          <div className={styles.field}><Field label="名前" htmlFor="cv-name"><SaveErrorField names={["name","saved"]}><input
+          <div className={styles.field}><Field label="名前" htmlFor="cv-name"><SaveErrorField names={["name","saved"]}><SharedTextField
               id="cv-name"
               type="text"
               maxLength={200}
@@ -137,7 +138,7 @@ export function renderValueFields({ canWrite, expiryBehavior, fallbackFieldError
               ) : (item.type as string) === 'datetime' ? (
                 <SaveErrorField names={["fallbackValue","saved","fallback_value"]}><DateTimeField id="cv-fallback-value" value={fallbackValue} onChange={(v) => { setSaved(false); setFallbackValue(v) }} /></SaveErrorField>
               ) : (
-                <SaveErrorField names={["fallbackValue","saved","fallback_value"]}><input
+                <SaveErrorField names={["fallbackValue","saved","fallback_value"]}><SharedTextField
                   id="cv-fallback-value"
                   type={item.type === 'number' ? 'number' : 'text'}
                   value={fallbackValue}

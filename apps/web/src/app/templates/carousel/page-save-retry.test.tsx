@@ -173,7 +173,7 @@ function typeName(value: string) {
   typeInto(nameInput()!, value)
   typeInto(document.getElementById('cr-text') as HTMLInputElement, '案内の本文')
   typeInto(choiceLabelInput()!, '詳しく見る')
-  const uri = container.querySelector<HTMLInputElement>('input[placeholder="https://example.com"]')
+  const uri = container.querySelector<HTMLInputElement>('input[placeholder="例：https://example.com"]')
   if (uri) typeInto(uri, 'https://example.com')
 }
 

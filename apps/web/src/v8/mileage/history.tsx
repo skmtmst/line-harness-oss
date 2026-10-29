@@ -35,6 +35,7 @@ import { Field } from '@/components/shared/form-controls'
 import { csvFileName } from '@/lib/csv-file-name'
 
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 export default function HistoryTab() {
   const { readonly, narrow } = useMileageShell()
@@ -357,7 +358,7 @@ export default function HistoryTab() {
           onCancel={() => { if (!pendingBusy) setPendingAction(null) }}
           onConfirm={() => runPendingAction()}
         >
-          <Field label="理由" required><SaveErrorField names={["pendingReason","pending_reason"]}><textarea
+          <Field label="理由" required><SaveErrorField names={["pendingReason","pending_reason"]}><SharedTextArea
               className={styles.textarea}
               value={pendingReason}
               onChange={(event) => setPendingReason(event.target.value)}

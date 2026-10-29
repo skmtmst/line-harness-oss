@@ -34,6 +34,10 @@ export function comparisonTrend(rows:Record<string,unknown>[], period:ReturnType
 }
 /** 件数（足し上げる数）。そろった日数が違う店どうしでは比べられないので、平均と差は期間の全部の日がそろった時だけ出す。 */
 export const comparisonCountKeys:readonly ComparisonKey[]=['friendChange','bookings','visits'];
+/** 比較画面では履歴用に残したアーカイブ済みアカウントを表示しない。停止中は履歴を比較できる。 */
+export function comparisonAccounts<T extends {archived_at:string|null}>(accounts:readonly T[]):T[]{
+ return accounts.filter(account=>account.archived_at===null);
+}
 /** 期間のうち、集計がそろった日（失敗の日・未集計の日を除く）だけで数を出す。何日分かは coveredDays で返す。 */
 export async function storeNumbers(db:D1Database,a:string,period:ReturnType<typeof comparisonPeriod>){
  const style=(await db.prepare("SELECT style FROM account_styles WHERE line_account_id=? AND selection_mode='configured'").bind(a).first<{style:string}>())?.style??null;

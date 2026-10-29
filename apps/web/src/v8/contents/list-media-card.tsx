@@ -12,6 +12,7 @@ import type { MediaItem } from '@line-crm/shared'
 import { formatMediaDetails,isKnownUnused,MediaView } from './list-model'
 import styles from './list.module.css'
 import { formatMediaSize } from './media-usage-display'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 export type MediaCardV8Props = {
   item: MediaItem
@@ -146,7 +147,7 @@ export function MediaCardV8({
       <CardContent className={view === 'grid' ? styles.cardBody : styles.rowBody}>
         {renaming ? (
           <div className={styles.renameBox}>
-            <SaveErrorField names={["value","renaming.value"]}><input
+            <SaveErrorField names={["value","renaming.value"]}><SharedTextField
               type="text"
               autoFocus
               value={renaming.value}

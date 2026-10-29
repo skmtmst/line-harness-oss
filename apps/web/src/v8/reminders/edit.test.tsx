@@ -202,9 +202,15 @@ describe('V8 リマインダを作る②〜⑤', () => {
 
   it('通知の中身：開いた通知は日・前・時刻で書き、閉じた通知は本文の頭だけを出す', async () => {
     await render(null)
-    // happy-dom の窓は幅 1024 なので 1152 の板：右の列は「LINEでの見え方を見る」と例だけ。
+    // happy-dom の窓は幅 1024 なので、まず右の列からスマホの見え方を開く。
     expect(host.querySelector('[data-page-template="create"]')?.getAttribute('data-design-node')).toBe('r1l0bT')
-    expect(buttonByText('LINEでの見え方を見る')).toBeTruthy()
+    const previewButton = buttonByText('LINEでの見え方を見る')
+    expect(previewButton).toBeTruthy()
+    await act(async () => { previewButton!.click() })
+    const help = document.querySelector<HTMLButtonElement>('button[aria-label="LINEでの見え方の説明"]')
+    expect(help).toBeTruthy()
+    await act(async () => { help!.click() })
+    expect(document.body.textContent).toContain('名前や日時は見本の値です。')
     expect(host.querySelector('[aria-label="届く日時の例"]')?.textContent).toContain('2 通目')
     const cards = host.querySelectorAll('[data-open]')
     expect(cards).toHaveLength(1)
@@ -249,6 +255,7 @@ describe('V8 リマインダを作る②〜⑤', () => {
   it('配信予定（T0nis）：重なりの行は「1通にまとめる」と出し、案内の帯で件数を言う', async () => {
     await render('preview')
     expect(host.querySelector('[data-page-template="create"]')?.getAttribute('data-design-node')).toBe('T0nis')
+    expect(host.querySelector('button[aria-label="LINEでの見え方の説明"]')).toBeTruthy()
     expect(host.textContent).toContain('今後7日 124 通')
     expect(host.textContent).toContain('重なり→1通にまとめる')
     expect(host.textContent).toContain('1通にまとめて送ります（3 件）')

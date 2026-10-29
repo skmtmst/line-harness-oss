@@ -4,8 +4,8 @@
  * チェックボックス。Pencil ★V8 `dQCCN`・`S9U7v`「チェック/オン・オフ」。
  *
  *   四角   18×18  角丸 $radius-xxs(3)  枠 1.5px $ink-faint  地 $canvas
- *   選択   地・枠 $accent-deep、印 lucide check 14px $on-accent
- *   一部   地・枠 $accent-deep、印 lucide minus
+ *   選択   地 緑のグラデ（--gradient-choice-on）、印 ✓ 白。印は箱の真ん中（上下左右 0.5px 以内）
+ *   一部   地 緑のグラデ、印 －
  *   誤り   枠 2px $status-danger  地 $status-danger-soft、誤りの文 12px $status-danger
  *   無効   全体の不透明度 0.5
  *   文字   14px $ink、四角との間 8、補足 12px $ink-faint（上との間 4）
@@ -110,8 +110,8 @@
 
 .input:checked + .box,
 .input:indeterminate + .box {
-  border-color: var(--color-accent-deep); /* stroke: $accent-deep */
-  background: var(--color-accent-deep); /* fill: $accent-deep */
+  border-color: var(--color-choice-on);
+  background: var(--color-choice-on);
 }
 
 .input:checked:not(:indeterminate) + .box .check path,
@@ -124,7 +124,7 @@
 /* 入力中（キーボードで移った）`SN4Ch`。緑は「正常」の意味なので輪郭に使わない。 */
 
 /* 誤り（必須の同意）`DpG9o`。 */
-.input[aria-invalid='true']:not(:checked) + .box {
+.input[aria-invalid='true'] + .box {
   border: 2px solid var(--color-status-danger); /* stroke: $status-danger 2px */
   background: var(--color-status-danger-soft); /* fill: $status-danger-soft */
 }
@@ -180,9 +180,11 @@
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .label { line-height: 20px; font-weight: var(--font-weight-ui); font-family: var(--font-sans); }
-:root .box { border: 0; border-radius: var(--polish-radius-small); outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); }
-:root .input:checked + .box, :root .input:indeterminate + .box { outline-color: var(--color-accent-deep); }
-:root .input[aria-invalid='true']:not(:checked) + .box { outline-color: var(--color-status-danger); }
+:root .box { border: 0; border-radius: var(--choice-checkbox-radius); outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); }
+:root .box { box-shadow: var(--shadow-choice-off); }
+/* 選んだ・一部：主ボタンと同じ緑のグラデと上端の光。 */
+:root .input:checked + .box, :root .input:indeterminate + .box { outline-color: transparent; background: var(--gradient-choice-on); box-shadow: var(--shadow-choice-on); }
+:root .input[aria-invalid='true'] + .box { outline-color: var(--color-status-danger); }
 :root .input:focus-visible + .box { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
 :root .mark { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-choice-mark-stroke); }
 

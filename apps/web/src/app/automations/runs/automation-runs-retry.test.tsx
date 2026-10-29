@@ -128,7 +128,7 @@ afterEach(() => {
 
 function retryButtons(): HTMLButtonElement[] {
   return Array.from(document.querySelectorAll('button'))
-    .filter((button) => button.textContent === 'もう一度やる')
+    .filter((button) => button.textContent === 'もう一度やる' || button.getAttribute('aria-label') === 'もう一度やる')
 }
 
 function listCalls(): unknown[][] {
@@ -179,13 +179,18 @@ describe('動いた記録の再実行受け付け(#736)', () => {
     expect(document.body.textContent).not.toContain('受け付けました')
   })
 
-  it('見るだけの権限では再実行・CSVの操作を出さない (#1043)', async () => {
+  it('見るだけでも再実行・CSVを理由付きで残し、起動しない', async () => {
     runPermissions.useAutomationRunPermissions.mockReturnValue({ canOperate: false, canExport: false })
     fetchApi.mockImplementation(async () => listResponse())
     await renderPage()
 
-    expect(retryButtons()).toHaveLength(0)
-    expect(document.body.textContent).not.toContain('CSVで書き出す')
+    expect(retryButtons()).toHaveLength(1)
+    expect(retryButtons()[0].getAttribute('aria-disabled')).toBe('true')
+    expect(retryButtons()[0].hasAttribute('data-permission-locked')).toBe(true)
+    const csv = Array.from(document.querySelectorAll('button')).find(button => button.textContent === 'CSVで書き出す')!
+    expect(csv.getAttribute('aria-disabled')).toBe('true')
+    await act(async () => { retryButtons()[0].click(); csv.click() })
+    expect(fetchApi.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0)
     // 記録自体（見る権限の範囲）は表示される。
     expect(document.body.textContent).toContain('予約案内')
   })

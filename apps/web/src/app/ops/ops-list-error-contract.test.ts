@@ -43,7 +43,7 @@ describe('例外を投げる API の受け方', () => {
     expect(page).not.toContain('Promise.all([api.ops.members()')
   })
 
-  it('2要素認証の確認は opsCall で受け、HTTP エラーも画面へ出す', () => {
+  it('二段階認証の確認は opsCall で受け、HTTP エラーも画面へ出す', () => {
     const page = read('../../v8/ops/two-factor.tsx')
     expect(page).toContain('opsCall(api.staff.confirmTwoFactorSetup')
     expect(page).not.toContain('await api.staff.confirmTwoFactorSetup')

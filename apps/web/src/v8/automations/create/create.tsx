@@ -260,11 +260,11 @@ const { syncResumeUrl, bindAccountDraft, captureFormSnapshot, resumeBase } = use
     }
     if (row.type === 'common_action') {
       const commonActionName = commonActions.find((item) => item.id === row.commonActionId)?.name
-      return commonActionName ? `共通アクション「${commonActionName}」を実行` : '共通アクションを実行'
+      return row.commonActionId === '' ? '共通アクション（未選択）' : commonActionName ? `共通アクション「${commonActionName}」を実行` : '共通アクションを実行'
     }
     if (row.type === 'start_scenario') {
       const scenarioName = scenarios.find((item) => item.id === row.scenarioId)?.name
-      return scenarioName ? `シナリオ「${scenarioName}」を始める` : 'シナリオを始める'
+      return row.scenarioId === '' ? 'シナリオ（未選択）' : scenarioName ? `シナリオ「${scenarioName}」を始める` : 'シナリオを始める'
     }
     if (row.type === 'notify_staff') return '担当へ知らせる'
     return row.message.trim() ? '入力したメッセージを送る' : 'メッセージを送る'
@@ -687,8 +687,8 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
     const scenarioName = scenarios.find((item) => item.id === row.scenarioId)?.name
     const commonName = commonActions.find((item) => item.id === row.commonActionId)?.name
     if (row.type === 'add_tag') return `${row.tagId === '' ? 'タグ（未選択）' : tagName ? `タグ「${tagName}」` : 'タグ'}を付け${last ? 'ます' : 'て'}`
-    if (row.type === 'start_scenario') return `${scenarioName ? `シナリオ「${scenarioName}」` : 'シナリオ'}を始め${last ? 'ます' : 'て'}`
-    if (row.type === 'common_action') return `${commonName ? `共通アクション「${commonName}」` : '共通アクション'}を実行し${last ? 'ます' : 'て'}`
+    if (row.type === 'start_scenario') return `${row.scenarioId === '' ? 'シナリオ（未選択）' : scenarioName ? `シナリオ「${scenarioName}」` : 'シナリオ'}を始め${last ? 'ます' : 'て'}`
+    if (row.type === 'common_action') return `${row.commonActionId === '' ? '共通アクション（未選択）' : commonName ? `共通アクション「${commonName}」` : '共通アクション'}を実行し${last ? 'ます' : 'て'}`
     if (row.type === 'notify_staff') return `担当へ知らせ${last ? 'ます' : 'て'}`
     return `メッセージを送${last ? 'ります' : 'り'}`
   })

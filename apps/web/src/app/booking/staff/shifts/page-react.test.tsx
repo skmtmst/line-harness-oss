@@ -127,20 +127,23 @@ function daysAhead(n: number) {
 /** 日付の選択（★管理画面）で選ぶ。値は今までどおり YYYY-MM-DD。 */
 async function pickDateByLabel(label: string, date: Date) {
   fireEvent.click(screen.getByLabelText(label))
+  await screen.findByRole('grid', { name: /^\d+年\d+月$/ })
   const target = partsOf(date).y * 12 + partsOf(date).mo
   for (let i = 0; i < 24; i += 1) {
-    const grid = document.querySelector('[role="grid"]')
+    const grid = screen.getByRole('grid', { name: /^\d+年\d+月$/ })
     const currentLabel = /^(\d+)年(\d+)月$/.exec(grid?.getAttribute('aria-label') ?? '')
     const current = currentLabel ? Number(currentLabel[1]) * 12 + Number(currentLabel[2]) : target
     if (grid?.getAttribute('aria-label') === monthLabelOf(date)) break
-    const nav = [...document.querySelectorAll('button')].find(
+    const nav = [...grid.closest('[role="dialog"]')!.querySelectorAll('button')].find(
       (b) => b.getAttribute('aria-label') === (target >= current ? '次の月' : '前の月'),
     )!
     fireEvent.click(nav)
+    await waitFor(() => expect(screen.queryByRole('grid', { name: /^\d+年\d+月$/ })?.getAttribute('aria-label')).not.toBe(currentLabel?.[0]))
   }
-  const day = [...document.querySelectorAll('button')].find((b) =>
+  const day = [...screen.getByRole('grid', { name: /^\d+年\d+月$/ }).querySelectorAll('button')].find((b) =>
     (b.getAttribute('aria-label') ?? '').startsWith(dayLabelOf(date)),
   )!
+  if (!day) throw new Error(`日付 ${dayLabelOf(date)} が見つかりません: ${document.querySelector('[role="grid"]')?.outerHTML}`)
   fireEvent.click(day)
 }
 
@@ -287,7 +290,7 @@ async function renderEditor(viewOnly = false) {
   const availabilityCallsBeforeRender = fixture.getAvailability.mock.calls.length
   render(<><StaffShiftsPage /><ToastHost /></>)
   // N-411: 閲覧のみの人には保存ボタンを出さない。代わりに閲覧注記を待つ。
-  await screen.findByText(viewOnly ? '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。' : fixture.tab === 'holidays' ? '臨時休業を足す' : '開ける時間')
+  await screen.findByText(viewOnly ? 'この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。' : fixture.tab === 'holidays' ? '臨時休業を足す' : '開ける時間')
   await waitFor(() => expect(fixture.getAvailability.mock.calls.length).toBeGreaterThan(availabilityCallsBeforeRender))
   await act(async () => { await Promise.resolve() })
 }
@@ -462,7 +465,7 @@ describe('予約設備の編集', () => {
     expect(await screen.findByText('個室A')).toBeTruthy()
     expect(screen.queryByRole('button', { name: '「個室A」のそのほかの操作' })).toBeNull()
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
-    expect(screen.getAllByText(/閲覧のみで/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。').length).toBeGreaterThan(0)
   })
 
   test('R312: 書きかけがある停止は破棄確認を挟み、戻れば送らない', async () => {

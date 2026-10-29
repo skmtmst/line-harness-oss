@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * R518: 保存検索の編集でアカウントを切り替えたら、前のアカウントの
@@ -136,7 +137,7 @@ describe('R518 アカウント切替後の取得失敗', () => {
     })
     await screen.findByDisplayValue('Bの検索')
     expect(screen.queryByDisplayValue('Aの検索')).toBeNull()
-    expect(screen.getByRole('button', { name: '複製して保存する' })).not.toBeNull()
+    expect(getPageAction({ name: '複製して保存する' })).not.toBeNull()
   })
 
   test('403でAの内容を表示せず、再試行だけ出す', async () => {

@@ -3,8 +3,8 @@ import type { LineAccountConnectData } from '@/lib/api'
 import {
   DRAFT_KEY, LOGIN_ACKS, PRECHECK_RESULT, PRECHECK_VERIFIED_ACK, WEBHOOK_ACKS, allAcked, allV06RowsOk,
   allV8RowsPassed, checkActionLabel, checkErrorText, checkRowText, checkStage, developerChannelUrl, developerProviderUrl,
-  formatJaDuration, handoverProgress, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked, providerIdErrors,
-  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary, precheckUpcoming,
+  formatJaDuration, handoverProgress, latestFollowerImportState, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked, providerIdErrors,
+  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
   readDraft, readPrecheckAnswers, readPrecheckAt, stepLabel, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
 } from './logic'
 import type { V06CheckRow } from './logic'
@@ -125,23 +125,13 @@ describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
     expect(precheckBack('q4', { q2: 'yes', q3: 'no' })).toBe('q3')
   })
 
-  it('答えの一覧は答えた質問だけ、「このあとの質問」は尋ねないと決まった質問を外す', () => {
+  it('答えの一覧は答えた質問だけ出す', () => {
     expect(precheckSummary('q2', { q1: 'yes', q2: 'no' })).toEqual([
       { key: 'q1', label: 'Q1. LINE公式アカウント', value: 'あります' },
       { key: 'q2', label: 'Q2. 友だちの引き継ぎ', value: 'いいえ、引き継ぎません' },
     ])
     expect(precheckSummary('done', { q1: 'yes', q2: 'no', q4: 'no' }).map((row) => row.key)).toEqual(['q1', 'q2', 'q4'])
     expect(precheckSummary('q1', {})).toEqual([])
-    // 未定のあいだは括弧の注記を付け、尋ねないと決まったら一覧から消す。
-    expect(precheckUpcoming('q1', {}).map((row) => row.text)).toEqual([
-      'Q2. いまの友だちを引き継ぎますか？',
-      'Q3. 友だちの数は50万人を超えていますか？（引き継ぐときだけ）',
-      'Q4. ほかのLINE配信ツールを使っていますか？',
-      'Q5. そのツールを、これからどうしますか？（使っているときだけ）',
-    ])
-    expect(precheckUpcoming('q2', { q1: 'yes', q2: 'no' }).map((row) => row.key)).toEqual(['q4', 'q5'])
-    expect(precheckUpcoming('q4', { q1: 'yes', q2: 'no', q4: 'no' })).toEqual([])
-    expect(precheckUpcoming('done', { q1: 'yes' })).toEqual([])
   })
 
   it('札は「質問 n」。最後だけ「チェック完了」で、結果は4項目', () => {
@@ -210,9 +200,10 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     for (const ack of [...WEBHOOK_ACKS, ...LOGIN_ACKS]) expect(ack.note.length).toBeGreaterThan(0)
   })
 
-  it('LINE Developers の行き先は入れたチャネルIDのページ。空ならコンソールの入口', () => {
-    expect(developerChannelUrl(' 2001 ')).toBe('https://developers.line.biz/console/channel/2001')
-    expect(developerChannelUrl('')).toBe('https://developers.line.biz/console/')
+  it('LINE Developers の行き先は入れたMessaging APIチャネルの設定画面', () => {
+    expect(developerChannelUrl(' 2001 ')).toBe('https://developers.line.biz/console/channel/2001/messaging-api')
+    expect(developerChannelUrl('')).toBe('')
+    expect(developerChannelUrl('2001x')).toBe('')
   })
 
   it('LINEログイン作成時は入力されたプロバイダーIDの画面を開く', () => {
@@ -319,21 +310,24 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     expect(options[5].note).toBe('今のダッシュボードのままです。カードは、あとから自分で足し引きできます')
   })
 
-  it('引き継ぎ中の進み具合：総人数が分からないうちは割合を出さず、速さから残り時間を見積もる', () => {
-    const half = handoverProgress({ imported: 60, total: 120, elapsedSeconds: 30, running: true })
-    expect(half.rate).toBe(50)
-    expect(half.perMinute).toBe(120)
-    expect(half.remainingSeconds).toBe(30)
-    expect(half.done).toBe(false)
-    const unknown = handoverProgress({ imported: 10, total: null, elapsedSeconds: 60, running: true })
-    expect(unknown.rate).toBe(0)
-    expect(unknown.remainingSeconds).toBeNull()
-    const finished = handoverProgress({ imported: 120, total: 120, elapsedSeconds: 60, running: false })
-    expect(finished.rate).toBe(100)
-    expect(finished.remainingSeconds).toBe(0)
-    expect(finished.done).toBe(true)
-    // 始まったばかりで何も進んでいなければ速さは出さない（0人／分と言わない）。
-    expect(handoverProgress({ imported: 0, total: 120, elapsedSeconds: 2, running: true }).perMinute).toBeNull()
+  it('引き継ぎ人数はジョブの結果を使い、探索中の分母と前日集計を表示しない', () => {
+    const counts = {
+      received: 2, imported: 1, alreadyPresent: 1, reactivated: 0,
+      claimedUnassigned: 0, conflicts: 0, invalid: 0, profilesUpdated: 0,
+    }
+    expect(handoverProgress({ ...counts, phase: 'importing_ids' })).toMatchObject({ confirmed: null, foundSoFar: 2, processed: 2, stage: 1 })
+    // 前日2人に今日2人が加わった場合、LINEの現在の一覧を読み終えて初めて4人と表示する。
+    const four = handoverProgress({ ...counts, phase: 'hydrating_profiles', received: 4, imported: 3 })
+    expect(four).toMatchObject({ confirmed: 4, imported: 3, alreadyPresent: 1, processed: 4, stage: 2 })
+    expect(handoverProgress({ ...counts, phase: 'completed', received: 4, imported: 3 }).stage).toBe(3)
+  })
+
+  it('処理応答より古い読み取り結果で段階と人数を巻き戻さない', () => {
+    const current = { phase: 'hydrating_profiles' as const, received: 4, profilesProcessed: 2, profilesUpdated: 2 }
+    expect(latestFollowerImportState(current, { phase: 'importing_ids', received: 0, profilesProcessed: 0, profilesUpdated: 0 })).toBe(current)
+    expect(latestFollowerImportState(current, { phase: 'hydrating_profiles', received: 4, profilesProcessed: 1, profilesUpdated: 1 })).toBe(current)
+    const finished = { phase: 'completed' as const, received: 4, profilesProcessed: 4, profilesUpdated: 4 }
+    expect(latestFollowerImportState(current, finished)).toBe(finished)
   })
 
   it('長さは日本語で出す（0以下は出さない）', () => {

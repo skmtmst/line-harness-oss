@@ -14,7 +14,6 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -41,6 +40,7 @@ const eventRequirements = {
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { EVENT_NAME_MAX_LENGTH, EVENT_DESCRIPTION_MAX_LENGTH, resolveEventMultiAccountIds } from '@/components/events/event-draft-shared'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import { ToggleField } from '@/components/shared/toggle'
 
 /*
  * ★V8 イベント予約「イベントを作る」（Pencil ）。
@@ -496,7 +496,7 @@ function EventsCreateV8Inner() {
               maxLength={200}
               onChange={(event) => setAdding({ ...adding, label: event.target.value })}
             /></SaveErrorField>
-            <SaveErrorField names={["required","adding.required"]}><Checkbox checked={adding.required} onCheckedChange={(checked) => setAdding({ ...adding, required: checked })}>必須</Checkbox></SaveErrorField>
+            <SaveErrorField names={["required","adding.required"]}><ToggleField checked={adding.required} onChange={(checked) => setAdding({ ...adding, required: checked })}>必須</ToggleField></SaveErrorField>
             <Button
               disabled={!adding.label.trim()}
               onClick={() => {
@@ -516,16 +516,16 @@ function EventsCreateV8Inner() {
       <Card variant="form" gap="normal" aria-labelledby="ev-new-after-apply">
         <CardHeader size="stacked" titleId="ev-new-after-apply" title="申し込んだ人にすること" />
         <div className={styles.checks}>
-            <Checkbox checked disabled description="日時・場所が届きます" onCheckedChange={() => {}} title="申込の受付は、いつも LINE でお知らせします">
+            <ToggleField checked disabled description="日時・場所が届きます" onChange={() => {}} title="申込の受付は、いつも LINE でお知らせします">
               申込を受けたら LINE で知らせる
-            </Checkbox>
+            </ToggleField>
 
-          <SaveErrorField names={["reminder_day_before_enabled","draft.reminder_day_before_enabled"]}><Checkbox
+          <SaveErrorField names={["reminder_day_before_enabled","draft.reminder_day_before_enabled"]}><ToggleField
             checked={draft.reminder_day_before_enabled === 1}
-            onCheckedChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
+            onChange={(checked) => update('reminder_day_before_enabled', checked ? 1 : 0)}
           >
             前日に思い出してもらう
-          </Checkbox></SaveErrorField>
+          </ToggleField></SaveErrorField>
         </div>
       </Card>
 

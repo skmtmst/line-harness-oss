@@ -3,6 +3,7 @@
 import { Children, Fragment, isValidElement, useState, type CSSProperties, type ReactNode } from 'react'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
 import HelpTip from './help-tip'
+import { usePermissionLockTip } from './permission-lock-tip'
 import { folderDisplayColor } from './folder-dot'
 import { ArrowDown, ArrowUp, Ellipsis, Folder, FolderOpen, FolderPlus, Inbox, Palette, Pencil, Star, Trash2 } from 'lucide-react'
 import { RowMenu } from './row-actions'
@@ -60,6 +61,10 @@ export interface FolderPanelRow {
    * 直したいときに作り直すしかなかった。
    */
   onEdit?: () => void
+  /** 権限がない時も行操作を残すための理由。 */
+  lockedReason?: string
+  /** 権限未確定などの普通の無効状態。 */
+  actionsDisabled?: boolean
   /** 色を持たないフォルダ（統括のひな形の分類など）は false。「色を変える」を出さない。 */
   colorEditable?: boolean
   /**
@@ -124,7 +129,7 @@ function folderMenuItems(
   }
   const leading = row.leadingActions ?? []
   return [...leading.map((item) => ({ ...item, onSelect: () => runAction(item.onSelect) })),
-    ...items.map((item, index) => index === 0 && leading.length ? { ...item, dividerBefore: true } : item)]
+    ...items.map((item, index) => ({ ...item, lockedReason: row.lockedReason, disabled: item.disabled || row.actionsDisabled, ...(index === 0 && leading.length ? { dividerBefore: true } : {}) }))]
 }
 
 const FOLDER_DELETE_HELP = 'フォルダを消しても、中の項目は未分類に残ります。'
@@ -158,6 +163,7 @@ export default function FolderPanel({
   onAddFolder,
   addFolderLabel = 'フォルダを追加する',
   addFolderDisabled = false,
+  addFolderLockedReason,
   addFolderTitle,
   addFolderNote,
   children,
@@ -194,6 +200,8 @@ export default function FolderPanel({
   onAddFolder?: () => void
   addFolderLabel?: string
   addFolderDisabled?: boolean
+  /** 入力不足とは別の権限理由。 */
+  addFolderLockedReason?: string
   addFolderTitle?: string
   /** テンプレート画面と同じ位置に出す、追加操作の補足。 */
   addFolderNote?: ReactNode
@@ -201,6 +209,7 @@ export default function FolderPanel({
   children?: ReactNode
 }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const addLock = usePermissionLockTip<HTMLButtonElement>(addFolderLockedReason)
   const notes = takeFolderNotes(children), addNotes = takeFolderNotes(addFolderNote)
   const hasExplanation = (!readOnly && heading === 'フォルダ') || headingHelp || notes.help.length > 0 || addNotes.help.length > 0
 
@@ -226,8 +235,8 @@ export default function FolderPanel({
         {rows.map((row) => {
           const isActive = activeId === row.id
           const kind = row.kind ?? (row.label === 'すべて' ? 'all' : row.label === '未分類' ? 'unfiled' : 'folder')
-          const menuRow = kind === 'all' && onAddFolder && !addFolderDisabled ? { ...row, leadingActions: [
-            ...(row.leadingActions ?? []), { id: 'add-folder', label: addFolderLabel, icon: <FolderPlus size={16} aria-hidden="true" />, onSelect: onAddFolder },
+          const menuRow = kind === 'all' && (onAddFolder || addFolderLockedReason) && !addFolderDisabled ? { ...row, leadingActions: [
+            ...(row.leadingActions ?? []), { id: 'add-folder', label: addFolderLabel, icon: <FolderPlus size={16} aria-hidden="true" />, onSelect: onAddFolder, lockedReason: addFolderLockedReason },
           ] } : row
           const hasActions = !readOnly && Boolean(menuRow.leadingActions?.length || row.onEdit || row.onMoveUp || row.onMoveDown || row.onDelete)
 
@@ -309,14 +318,16 @@ export default function FolderPanel({
         {/*
           フォルダの最後の行と同じ形の「行」にする（Apple の Finder・メモの脇の列と同じ）。
           地の塗りなし・左端と印の位置・文字の大きさ・行の高さをフォルダの行にそろえる。
-          乗せた時だけ行と同じ薄い地にする。閲覧のみには出さない。
+          乗せた時だけ行と同じ薄い地にする。選ぶ専用の窓では出さない。
         */}
-        {!readOnly && (onAddFolder || addFolderDisabled) && (
+        {!readOnly && (onAddFolder || addFolderDisabled || addFolderLockedReason) && (
           <button
             type="button"
             onClick={onAddFolder}
             disabled={addFolderDisabled}
-            title={addFolderTitle}
+            ref={addLock.ref}
+            title={addFolderLockedReason ? undefined : addFolderTitle}
+            {...addLock.handlers}
             className={styles.add}
           >
             <span className={styles.addIcon} aria-hidden="true"><FolderPlus size={16} /></span>
@@ -324,6 +335,7 @@ export default function FolderPanel({
           </button>
         )}
       </nav>
+      {!readOnly ? addLock.node : null}
       {!readOnly && (addNotes.content.length > 0 || notes.content.length > 0) && (
         <div className={styles.footer}>
           {addNotes.content}

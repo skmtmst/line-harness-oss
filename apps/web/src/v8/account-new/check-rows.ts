@@ -174,15 +174,59 @@ export function formatJaDuration(seconds: number | null): string {
   return `${second}秒`
 }
 
-export interface HandoverProgress { imported: number; total: number | null; rate: number; perMinute: number | null; remainingSeconds: number | null; done: boolean }
+export interface HandoverProgress {
+  /** LINE の ID 一覧で確認できた人数。探索中は分母が確定しない。 */
+  confirmed: number | null
+  foundSoFar: number
+  imported: number
+  alreadyPresent: number
+  restored: number
+  /** このジョブで取り込み・再登録・登録済み確認を終えた人数。 */
+  processed: number
+  needsReview: number
+  profilesUpdated: number
+  stage: 1 | 2 | 3
+}
 
-/** 引き継ぎ中（S16DJ）の進み具合。総人数が分からないうちは割合を出さない。 */
-export function handoverProgress(input: { imported: number; total: number | null; elapsedSeconds: number; running: boolean }): HandoverProgress {
-  const imported = Math.max(0, Math.round(input.imported))
-  const total = input.total !== null && input.total > 0 ? Math.round(input.total) : null
-  const rate = total ? Math.min(100, Math.round((imported / total) * 100)) : (input.running ? 0 : 100)
-  const perMinute = input.elapsedSeconds > 0 && imported > 0 ? Math.max(1, Math.round(imported / (input.elapsedSeconds / 60))) : null
-  const left = total ? Math.max(0, total - imported) : null
-  const remainingSeconds = perMinute && left !== null ? Math.round((left / perMinute) * 60) : null
-  return { imported, total, rate, perMinute, remainingSeconds, done: !input.running }
+/** 読み取りと処理応答が前後しても、画面の段階・件数を巻き戻さない。 */
+export function latestFollowerImportState<T extends {
+  phase: 'not_started' | 'importing_ids' | 'hydrating_profiles' | 'completed'
+  received: number
+  profilesProcessed: number
+  profilesUpdated: number
+}>(current: T | null, next: T): T {
+  if (!current) return next
+  const rank = { not_started: 0, importing_ids: 1, hydrating_profiles: 2, completed: 3 }
+  if (rank[next.phase] < rank[current.phase]) return current
+  if (next.received < current.received || next.profilesProcessed < current.profilesProcessed || next.profilesUpdated < current.profilesUpdated) return current
+  return next
+}
+
+/** 前日集計を現在の人数と混同せず、ジョブ自身の件数だけを表示する。 */
+export function handoverProgress(input: {
+  phase: 'not_started' | 'importing_ids' | 'hydrating_profiles' | 'completed'
+  received: number
+  imported: number
+  alreadyPresent: number
+  reactivated: number
+  claimedUnassigned: number
+  conflicts: number
+  invalid: number
+  profilesUpdated: number
+}): HandoverProgress {
+  const count = (value: number) => Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0
+  const imported = count(input.imported)
+  const alreadyPresent = count(input.alreadyPresent)
+  const restored = count(input.reactivated) + count(input.claimedUnassigned)
+  return {
+    confirmed: input.phase === 'importing_ids' || input.phase === 'not_started' ? null : count(input.received),
+    foundSoFar: count(input.received),
+    imported,
+    alreadyPresent,
+    restored,
+    processed: imported + alreadyPresent + restored,
+    needsReview: count(input.conflicts) + count(input.invalid),
+    profilesUpdated: count(input.profilesUpdated),
+    stage: input.phase === 'completed' ? 3 : input.phase === 'hydrating_profiles' ? 2 : 1,
+  }
 }

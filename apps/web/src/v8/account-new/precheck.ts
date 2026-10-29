@@ -34,11 +34,6 @@ export const PRECHECK_HELPS: Record<PrecheckKey, string> = {
   q4: 'LINE公式アカウントにつないで、メッセージの配信や自動応答を行うツールのことです。',
   q5: 'あてはまるものを1つ選んでください。',
 }
-/** 「このあとの質問」で、まだ尋ねるか決まっていない質問に付ける注記（絵 iAtCE・Vc6HN）。 */
-export const PRECHECK_CONDITION_NOTES: Partial<Record<PrecheckKey, string>> = {
-  q3: '（引き継ぐときだけ）', q5: '（使っているときだけ）',
-}
-
 export interface PrecheckChoice { value: string; title: string; note?: string }
 export const PRECHECK_CHOICES: Record<PrecheckKey, readonly PrecheckChoice[]> = {
   q1: [{ value: 'yes', title: 'はい、あります' }, { value: 'no', title: 'いいえ、まだありません' }],
@@ -110,24 +105,6 @@ export function precheckSummary(at: PrecheckAt, answers: PrecheckAnswers): Prech
     const answer = answers[key]
     if (!answer || !precheckAsked(key, answers)) continue
     rows.push({ key, label: PRECHECK_SUMMARY_LABELS[key], value: PRECHECK_SUMMARY_VALUES[key][answer] ?? '' })
-  }
-  return rows
-}
-
-/**
- * 「このあとの質問」。尋ねるかどうかが未定の質問には括弧の注記を付け、
- * 尋ねないと決まった質問は一覧から外す。チェック結果の面では出さない。
- */
-export interface PrecheckUpcomingRow { key: PrecheckKey; text: string }
-export function precheckUpcoming(at: PrecheckAt, answers: PrecheckAnswers): PrecheckUpcomingRow[] {
-  if (at === 'done') return []
-  const rows: PrecheckUpcomingRow[] = []
-  for (let i = PRECHECK_ORDER.indexOf(at) + 1; i < PRECHECK_ORDER.length; i += 1) {
-    const key = PRECHECK_ORDER[i]
-    const gate = key === 'q3' ? answers.q2 : key === 'q5' ? answers.q4 : 'yes'
-    if (gate === 'no') continue
-    const note = gate === undefined ? PRECHECK_CONDITION_NOTES[key] ?? '' : ''
-    rows.push({ key, text: `${PRECHECK_TITLES[key]}${note}` })
   }
   return rows
 }

@@ -23,6 +23,7 @@ import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
 import ComposerStickers from '@/components/shared/composer-stickers'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 export type MessageKind = 'location' | 'video' | 'audio' | 'sticker'
 
@@ -341,7 +342,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
       <div className="space-y-3">
         <label className="block">
           <span className={labelClass}>見出し</span>
-          <SaveErrorField names={["title","v.title"]}><input
+          <SaveErrorField names={["title","v.title"]}><SharedTextField
             value={v.title}
             onChange={(e) => set({ title: e.target.value })}
             placeholder="例：本店"
@@ -350,7 +351,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
         </label>
         <label className="block">
           <span className={labelClass}>住所</span>
-          <SaveErrorField names={["address","v.address"]}><input
+          <SaveErrorField names={["address","v.address"]}><SharedTextField
             value={v.address}
             onChange={(e) => set({ address: e.target.value })}
             placeholder="例：東京都渋谷区〇〇1-2-3"
@@ -362,7 +363,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             <span className={labelClass}>
               緯度 <span className="text-danger">*</span>
             </span>
-            <SaveErrorField names={["latitude","v.latitude"]}><input
+            <SaveErrorField names={["latitude","v.latitude"]}><SharedTextField
               value={v.latitude}
               onChange={(e) => set({ latitude: e.target.value })}
               inputMode="decimal"
@@ -374,7 +375,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             <span className={labelClass}>
               経度 <span className="text-danger">*</span>
             </span>
-            <SaveErrorField names={["longitude","v.longitude"]}><input
+            <SaveErrorField names={["longitude","v.longitude"]}><SharedTextField
               value={v.longitude}
               onChange={(e) => set({ longitude: e.target.value })}
               inputMode="decimal"
@@ -476,7 +477,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             <span className={labelClass}>
               長さ（秒） <span className="text-danger">*</span>
             </span>
-            <SaveErrorField names={["duration","v.duration"]}><input
+            <SaveErrorField names={["duration","v.duration"]}><SharedTextField
               value={v.duration}
               onChange={(e) => set({ duration: e.target.value })}
               inputMode="decimal"
@@ -544,7 +545,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             <span className={labelClass}>
               パッケージID <span className="text-danger">*</span>
             </span>
-            <SaveErrorField names={["packageId","v.packageId","package_id","v.package_id"]}><input
+            <SaveErrorField names={["packageId","v.packageId","package_id","v.package_id"]}><SharedTextField
               value={v.packageId}
               onChange={(e) => set({ packageId: e.target.value })}
               inputMode="numeric"
@@ -556,7 +557,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
             <span className={labelClass}>
               スタンプID <span className="text-danger">*</span>
             </span>
-            <SaveErrorField names={["stickerId","v.stickerId","sticker_id","v.sticker_id"]}><input
+            <SaveErrorField names={["stickerId","v.stickerId","sticker_id","v.sticker_id"]}><SharedTextField
               value={v.stickerId}
               onChange={(e) => set({ stickerId: e.target.value })}
               inputMode="numeric"

@@ -338,12 +338,6 @@
   margin: 0;
 }
 
-.sessions summary {
-  color: var(--color-action);
-  font-size: var(--text-caption);
-  cursor: pointer;
-}
-
 /* 権限のかたまり（タブ）のカード。 */
 .roleCards {
   display: grid;

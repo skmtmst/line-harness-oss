@@ -5,11 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearAdminVersionCache } from '@/lib/admin-version-cache'
 import SidebarVersion from './sidebar-version'
 
-const { update } = vi.hoisted(() => ({ update: { kind: 'fork' } }))
-const guide = 'https://github.com/Shudesu/line-harness-oss/blob/main/docs/wiki/26-Manual-Update.md'
+const { update, access } = vi.hoisted(() => ({ update: { kind: 'fork' }, access: { role: 'owner' as string | null } }))
+vi.mock('@/lib/staff-role', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/staff-role')>(),
+  useStaffRole: () => access.role,
+}))
 vi.mock('@/components/update/use-update-status', () => ({
   useUpdateStatus: () => ({ ...update, reason: 'custom build', version: '2.7.0' }),
-  MANUAL_UPDATE_GUIDE_URL: 'https://github.com/Shudesu/line-harness-oss/blob/main/docs/wiki/26-Manual-Update.md',
 }))
 
 const detail = {
@@ -26,13 +28,14 @@ async function mount(data: unknown = detail) {
   return view
 }
 function open() {
-  const trigger = screen.getByRole('button', { name: 'v2.7.0・検証環境' })
+  const trigger = screen.getByRole('button', { name: '2.7.0・検証環境' })
   fireEvent.click(trigger)
   return { trigger, dialog: screen.getByRole('dialog', { name: '版の情報' }) }
 }
 
 beforeEach(() => {
   update.kind = 'fork'
+  access.role = 'owner'
   process.env.NEXT_PUBLIC_API_URL = 'https://worker.example.com'
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
@@ -47,9 +50,20 @@ afterEach(() => {
 })
 
 describe('左メニューの版は1行、詳細と更新は開いて確かめる', () => {
+  it.each(['fork', 'upgrade', 'latest', 'loading'])('%sの更新案内は閉じた版の行でも伝える', async kind => {
+    update.kind = kind
+    await mount()
+    const trigger = screen.getByRole('button', { name: '2.7.0・検証環境' })
+    const notice = kind === 'fork' || kind === 'upgrade'
+    expect(trigger.querySelector('[data-version-update]') !== null).toBe(notice)
+    expect(trigger.getAttribute('aria-description')).toBe(kind === 'upgrade' ? '更新あり' : kind === 'fork' ? 'カスタマイズ版の更新案内' : null)
+    expect(trigger.querySelector('[data-version-update]')?.getAttribute('title') ?? null).toBe(kind === 'upgrade' ? '更新あり' : kind === 'fork' ? 'カスタマイズ版の更新案内' : null)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   it('日時は閉じた状態で描画せず、実版と環境を出す', async () => {
     await mount()
-    expect(screen.getByRole('button', { name: 'v2.7.0・検証環境' }).title).toBe('v2.7.0・検証環境')
+    expect(screen.getByRole('button', { name: '2.7.0・検証環境' }).title).toBe('2.7.0・検証環境')
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByText(/配備/)).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -75,16 +89,47 @@ describe('左メニューの版は1行、詳細と更新は開いて確かめる
     expect(document.activeElement).toBe(trigger)
   })
 
-  it.each(['fork', 'upgrade', 'latest', 'loading'])('%sの更新導線と手動ガイドを保持する', async kind => {
+  it.each(['fork', 'upgrade', 'latest', 'loading'])('%sの更新導線を保ち、必要な時だけ社内ガイドを出す', async kind => {
     update.kind = kind
     await mount()
     const { dialog } = open()
-    const manual = within(dialog).getByRole('link', { name: '手動で更新' }) as HTMLAnchorElement
-    expect(manual.href).toBe(guide)
-    expect(manual.target).toBe('_blank')
-    expect(manual.rel.split(' ')).toEqual(expect.arrayContaining(['noopener', 'noreferrer']))
+    const manual = within(dialog).queryByRole('link', { name: '手動で更新' }) as HTMLAnchorElement | null
+    if (kind === 'fork' || kind === 'upgrade') {
+      expect(manual).not.toBeNull()
+      expect(manual!.getAttribute('href')).toBe('/updates')
+      expect(manual!.getAttribute('href')).toMatch(/^\/(?!\/)/)
+      expect(manual!.target).not.toBe('_blank')
+    } else expect(manual).toBeNull()
     const updates = dialog.querySelector('a[href="/updates"]')
     expect(updates?.textContent ?? null).toBe(kind === 'fork' ? '更新履歴' : kind === 'upgrade' ? '更新あり' : null)
+  })
+
+  it.each(['owner', 'admin', 'staff', 'viewer', null])('役割%sでは許可された人だけ手動ガイドを出す', async role => {
+    access.role = role
+    for (const kind of ['fork', 'upgrade']) {
+      update.kind = kind
+      const view = await mount()
+      const { dialog } = open()
+      const manual = within(dialog).queryByRole('link', { name: '手動で更新' })
+      expect(manual !== null).toBe(role === 'owner' || role === 'admin')
+      if (manual) expect(manual.getAttribute('href')).toBe('/updates')
+      expect(within(dialog).getByRole('link', { name: kind === 'fork' ? '更新履歴' : '更新あり' })).toBeTruthy()
+      view.unmount()
+    }
+  })
+
+  it('開いた後に役割が変わっても手動ガイドを残さず、権限取得後だけ出す', async () => {
+    const view = await mount()
+    open()
+    expect(screen.getByRole('link', { name: '手動で更新' })).toBeTruthy()
+    for (const role of ['viewer', 'staff', null]) {
+      access.role = role
+      view.rerender(<SidebarVersion />)
+      expect(screen.queryByRole('link', { name: '手動で更新' })).toBeNull()
+    }
+    access.role = 'admin'
+    view.rerender(<SidebarVersion />)
+    expect(screen.getByRole('link', { name: '手動で更新' }).getAttribute('href')).toBe('/updates')
   })
 
   it('取得中から成功まで同じ外枠と操作を維持し、先に開いた詳細も更新する', async () => {
@@ -98,7 +143,7 @@ describe('左メニューの版は1行、詳細と更新は開いて確かめる
     fireEvent.click(trigger)
     await act(async () => { resolve(json(detail)) })
     expect(container.querySelector('[data-sidebar-version]')).toBe(frame)
-    expect(screen.getByRole('button', { name: 'v2.7.0・検証環境' })).toBe(trigger)
+    expect(screen.getByRole('button', { name: '2.7.0・検証環境' })).toBe(trigger)
     expect(trigger.className).toBe(classes)
     expect(frame.getAttribute('aria-busy')).toBe('false')
     expect(screen.getByRole('dialog').textContent).toContain('a1b2c3d')
@@ -121,7 +166,7 @@ describe('左メニューの版は1行、詳細と更新は開いて確かめる
 
   it.each([null, 'preview-east-with-a-long-environment-name'])('環境%sを捏造せず、長い実値をtitleにも残す', async env => {
     await mount({ ...detail, deploy_env: env, git_commit: 'unknown', released_at: '' })
-    const label = `v2.7.0${env ? `・${env}` : ''}`
+    const label = `2.7.0${env ? `・${env}` : ''}`
     const trigger = screen.getByRole('button', { name: label })
     expect(trigger.title).toBe(label)
     fireEvent.click(trigger)
@@ -137,7 +182,7 @@ describe('左メニューの版は1行、詳細と更新は開いて確かめる
     clearAdminVersionCache()
     await mount({ ...detail, version: '2.8.0' })
     await act(async () => { resolve(json(detail)) })
-    expect(screen.getByRole('button', { name: 'v2.8.0・検証環境' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'v2.7.0・検証環境' })).toBeNull()
+    expect(screen.getByRole('button', { name: '2.8.0・検証環境' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '2.7.0・検証環境' })).toBeNull()
   })
 })

@@ -9,6 +9,7 @@ const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), list: vi.fn(), registrationReceipt: vi.fn(),
   followerImportState: vi.fn(), stepFollowerImport: vi.fn(), followerInsight: vi.fn(),
   staffList: vi.fn(), tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(), friendsList: vi.fn(),
+  styleGet: vi.fn(), styleSave: vi.fn(),
 }))
 vi.mock('@/lib/api', () => ({
   api: {
@@ -26,7 +27,7 @@ vi.mock('@/lib/api', () => ({
     lineAccountTags: { list: calls.tagList, create: calls.tagCreate, setForAccount: calls.tagSet },
   },
 }))
-vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })), save: vi.fn(async () => ({ success: true, data: { version: 1 } })) } }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: calls.styleGet, save: calls.styleSave } }))
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('@/components/step-up-prompt', () => ({
@@ -79,10 +80,20 @@ beforeEach(() => {
   calls.tagList.mockResolvedValue({ success: true, data: [] })
   calls.followerInsight.mockResolvedValue({ success: true, data: { followers: null } })
   calls.friendsList.mockResolvedValue({ success: true, data: { total: 0 } })
+  calls.styleGet.mockResolvedValue({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })
+  calls.styleSave.mockResolvedValue({ success: true, data: { version: 1 } })
 })
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
 const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }))
+const chooseStyle = async (label: string) => {
+  const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  fireEvent.click(within(dialog).getByRole('button', { name: label }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
+  const save = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
+  await waitFor(() => expect(save.disabled).toBe(false))
+  fireEvent.click(save)
+}
 /** ②の中だけ進むボタンの名前が違う（v07 Fqy29）。 */
 const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
 const back = (name: string) => fireEvent.click(screen.getByRole('button', { name }))
@@ -164,9 +175,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     next()
     await waitFor(() => expect(shownNode()).toBe('X0pGdw'))
     expect(calls.registrationReceipt.mock.calls.length).toBeGreaterThanOrEqual(2)
-    fireEvent.click(await screen.findByRole('radio', { name: /飲食店/ }))
-    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
-    next()
+    await chooseStyle('飲食店')
     await waitFor(() => expect(shownNode()).toBe('Plmq1'))
     expect(await screen.findByText('準備ができました')).toBeTruthy()
   })
@@ -184,6 +193,24 @@ describe('V8 登録ウィザードの gated 進行', () => {
     await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
     next()
     await waitFor(() => expect(current()).toContain('使い方を選ぶ'))
+  })
+
+  it('④のポップアップを閉じても、登録画面の「あとで設定する」で保留を保存して⑤へ進める', async () => {
+    enterCheckStep()
+    await runCheck()
+    fireEvent.click(screen.getByRole('button', { name: '登録する' }))
+    await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
+    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
+    next()
+    const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull())
+    const skip = screen.getByRole('button', { name: 'あとで設定する' }) as HTMLButtonElement
+    await waitFor(() => expect(skip.disabled).toBe(false))
+    fireEvent.click(skip)
+    expect(await screen.findByText('準備ができました')).toBeTruthy()
+    expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, styleMode: 'later' })
+    expect(sessionStorage.getItem('musubo-registration-style')).toBeNull()
   })
 
   it('登録までは済んだ段を押して戻れ、入れた値は残る。登録したら戻れない', async () => {
@@ -333,9 +360,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
     await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
     next()
-    fireEvent.click(await screen.findByRole('radio', { name: /飲食店/ }))
-    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
-    next()
+    await chooseStyle('飲食店')
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledWith('new-account'))
     expect(calls.followerImportState).not.toHaveBeenCalled()
     expect(await screen.findByText('準備ができました')).toBeTruthy()
