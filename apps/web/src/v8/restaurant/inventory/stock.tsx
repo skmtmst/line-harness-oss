@@ -7,6 +7,7 @@ import type { RestaurantOpeningDay } from '@line-crm/shared'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import SeatTile from '@/components/shared/seat-tile'
 import Button from '@/components/shared/button'
 import { RowActions } from '@/components/shared/row-actions'
@@ -23,6 +24,7 @@ import Toggle from '@/components/shared/toggle'
 import { DialogContentRow } from '@/components/shared/dialog-form-row'
 
 import { useAccount } from '@/contexts/account-context'
+import { useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { ApiError, fetchApi } from '@/lib/api'
@@ -69,13 +71,17 @@ function NumberField({ id, 'aria-describedby': describedBy, label, value, onChan
       aria-label={label}
       value={String(value)}
       readOnly={!canEdit}
+      disabled={!canEdit}
       invalid={invalid}
-      onChange={(event) => onChange(Number(event.target.value))}
+      onChange={(event) => { if (canEdit) onChange(Number(event.target.value)) }}
     /></SaveErrorField>
   )
 }
 
-export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context; canEdit: boolean }) {
+export default function StockBoard({ ctx, canEdit: allowedByRole }: { ctx: RestaurantV8Context; canEdit: boolean }) {
+  const role = useStaffRole()
+  const lockedReason = usePermissionLockReason(allowedByRole)
+  const canEdit = allowedByRole && !lockedReason
   const saveErrors = useSaveFormErrors()
   const { data, store, busy, mutate } = ctx
   const { selectedAccountId } = useAccount()
@@ -254,7 +260,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
 
   /* 下の帯の保存：配分（全部の時間帯）→ 開ける時間。どちらかで 409 なら競合の帯。 */
   const saveAll = (force = false) => {
-    if (!selectedAccountId || !store || allocInvalid) return
+    if (!canEdit || busy || !selectedAccountId || !store || allocInvalid) return
     const attemptedAlloc = rows.length > 0 ? { ...alloc } : null
     const attemptedHours = hoursDraft
     void mutate(async () => {
@@ -292,7 +298,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
   }
 
   const saveSlot = () => {
-    if (!selectedAccountId || !selected || slotInvalid) return
+    if (!canEdit || busy || !selectedAccountId || !selected || slotInvalid) return
     const attempt = { ...currentSlotAlloc }
     void mutate(async () => {
       try {
@@ -323,14 +329,16 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
   const gridTables = tables.slice().sort((a, b) => a.floor_y - b.floor_y || a.floor_x - b.floor_x || tableOrder(a, b))
   /* 閉じる先は、メール転送で今も予約が届いている媒体（受付を各媒体の管理画面で閉じるもの）。 */
   const closingChannels = channels.filter((channel) => channel.receiveMethod === 'email_forward' && channel.status === 'receiving')
-  const canCloseNote = Boolean(canEdit && selected && lowSlot(selected) && !closedSlots.includes(selected.row.id))
+  const canCloseNote = Boolean(selected && lowSlot(selected) && !closedSlots.includes(selected.row.id))
 
-  const setDay = (weekday: number, next: RestaurantOpeningDay['periods']) =>
+  const setDay = (weekday: number, next: RestaurantOpeningDay['periods']) => {
+    if (!canEdit) return
     setHoursDraft((current) => (current ?? emptyWeek()).map((day) => (day.weekday === weekday ? { ...day, periods: next } : day)))
+  }
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      {!canEdit ? <ReadOnlyNotice /> : null}
+      {role !== null && !canEdit ? <ReadOnlyNotice /> : null}
       {channelsError?<ListState kind="error" title="予約サイトを読み込めませんでした" onRetry={()=>setChannelsRetry(n=>n+1)}/>:null}
       {loadError ? (
         <Notice tone="warn" message={loadError} action={<Button onClick={() => setRefresh((n) => n + 1)}>もう一度読み込む</Button>} />
@@ -370,7 +378,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               <div className={styles.sideActions}>
                 <Button href={`/restaurant-test/reservations?date=${encodeURIComponent(date)}`}><BookOpen size={16} aria-hidden="true" />{`予約台帳で ${selected.time} を見る`}</Button>
                 {canCloseNote ? (
-                  <Button onClick={() => { setClosedChannels([]); setCloseNoteOpen(true) }}>媒体の受付を閉じる</Button>
+                  <Button lockedReason={lockedReason} disabled={!canEdit} onClick={() => { if (!canEdit) return; setClosedChannels([]); setCloseNoteOpen(true) }}>媒体の受付を閉じる</Button>
                 ) : null}
               </div>
             ) : null}
@@ -400,7 +408,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
           </Card>
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-stock-title">
             <StockListHeading date={date} busy={busy} onChange={changeDate}>
-              {canEdit && slots.length > 0 ? <RowActions subjectName="時間帯ごとの在庫" menuButtonProps={{ disabled: busy || !hoursVersion || allocInvalid }} menuItems={[{ id: 'generate', label: 'この日の枠を作る', onSelect: generateSlots }]} /> : null}
+              {slots.length > 0 ? <RowActions subjectName="時間帯ごとの在庫" menuButtonProps={{ disabled: busy || !hoursVersion || allocInvalid }} menuItems={[{ id: 'generate', label: 'この日の枠を作る', lockedReason, disabled: !canEdit, onSelect: generateSlots }]} /> : null}
             </StockListHeading>
             {dayRows === null ? (
               <div className={styles.stateBox}><ListState kind="loading" /></div>
@@ -410,13 +418,14 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                   kind="empty"
                   title="この日の時間帯がありません"
                   description="開ける時間から、30分ごとの枠を作れます。今ある枠は残します。"
-                  action={canEdit ? (
+                  action={(
                     <Button
                       variant="primary"
-                      disabled={busy || !hoursVersion || allocInvalid}
+                      lockedReason={lockedReason}
+                      disabled={!canEdit || busy || !hoursVersion || allocInvalid}
                       onClick={generateSlots}
                     >この日の枠を作る</Button>
-                  ) : undefined}
+                  )}
                 />
               </div>
             ) : (
@@ -439,7 +448,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                       onClick={() => { setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}
                     >
                       <Td>
-                        <Button variant="text" size="inline" textTone="ink" data-part="row-name" aria-pressed={selected?.row.id === slot.row.id} onClick={(event) => { event.stopPropagation(); setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}>{slot.time}</Button>
+                        <Button variant="text" size="compact" fullWidth presentation="row-action" textTone="ink" data-part="row-name" aria-pressed={selected?.row.id === slot.row.id} onClick={(event) => { event.stopPropagation(); setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}>{slot.time}</Button>
                       </Td>
                       <Td>
                         <svg className={styles.useBar} role="img" aria-label={`利用率 ${Math.round(slot.ratio * 100)}％`} viewBox="0 0 120 8" preserveAspectRatio="none">
@@ -474,12 +483,8 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                 </div>
                 <div className={styles.slotActions}>
                   <span className={styles.slotBase}>{`全部の時間帯の配分：予約サイト ${alloc.ota}・LINE ${alloc.line}・当日 ${alloc.walkin}（上で入れた数）`}</span>
-                  {canEdit ? (
-                    <>
-                      <Button onClick={() => updateSlot({ ...alloc })}>全体の配分に戻す</Button>
-                      <Button variant="primary" disabled={busy || slotInvalid} onClick={saveSlot}>この時間帯だけ保存</Button>
-                    </>
-                  ) : null}
+                  <Button lockedReason={lockedReason} disabled={!canEdit} onClick={() => { if (canEdit) updateSlot({ ...alloc }) }}>全体の配分に戻す</Button>
+                  <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy || slotInvalid} onClick={saveSlot}>この時間帯だけ保存</Button>
                 </div>
               </Card>
             ) : null}
@@ -492,7 +497,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
               return (
                 <div key={weekday} className={styles.dayRow}>
                   <div className={styles.dayHead}>
-                    {/* 閲覧のみ：つまみ・時刻を選ぶ部品は置かず、いまの時間を文字で見せる（2026-10-06 オーナー決定）。 */}
+                    {/* 閲覧時は現在の受付状態と時刻を読み、変更ボタンは理由付きで残す。 */}
                     {canEdit ? (
                       <SaveErrorField names={["open","day"]}><Toggle
                         checked={open}
@@ -530,16 +535,12 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
                           </> : (
                             <span aria-label={`${name}曜日 ${index + 1}つ目の時間帯`}>{`${period.opensAt}〜${period.closesAt}`}</span>
                           )}
-                          {canEdit ? (
-                            <IconButton variant="plain" size="row" aria-label={`${name}曜日の${index + 1}つ目の時間帯を外す`} onClick={() => setDay(weekday, day.periods.filter((_, i) => i !== index))}>
+                          <IconButton lockedReason={lockedReason} disabled={!canEdit} variant="plain" size="row" aria-label={`${name}曜日の${index + 1}つ目の時間帯を外す`} onClick={() => setDay(weekday, day.periods.filter((_, i) => i !== index))}>
                               <X size={16} aria-hidden="true" />
-                            </IconButton>
-                          ) : null}
+                          </IconButton>
                         </div>
                       ))}
-                      {canEdit ? (
-                        <Button variant="text" size="inline" onClick={() => setDay(weekday, [...day.periods, { opensAt: '17:00', closesAt: '22:00' }])}>＋ 時間帯を足す</Button>
-                      ) : null}
+                      <Button variant="text" lockedReason={lockedReason} disabled={!canEdit} onClick={() => setDay(weekday, [...day.periods, { opensAt: '17:00', closesAt: '22:00' }])}>＋ 時間帯を足す</Button>
                     </div>
                   ) : (
                     <p className={styles.dayClosed}>休み（定休日）・お客さまの画面に出ません</p>
@@ -550,21 +551,19 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
           </Card>
         </div>
       </DetailColumns>
-      {canEdit ? (
-        <StickyBar
+      <StickyBar
           className={styles.stickyBar}
           actions={(
             <>
-              <Button onClick={resetAll} disabled={busy}>キャンセル</Button>
+              <Button lockedReason={lockedReason} onClick={resetAll} disabled={!canEdit || busy}>キャンセル</Button>
               {conflict ? (
-                <Button variant="primary" disabled={busy} onClick={() => setDiffOpen(true)}><Check size={16} aria-hidden="true" />比べてから保存</Button>
+                <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={() => setDiffOpen(true)}><Check size={16} aria-hidden="true" />比べてから保存</Button>
               ) : (
-                <Button variant="primary" disabled={busy || allocInvalid || (!hoursDraft && rows.length === 0)} onClick={() => saveAll(false)}><Check size={16} aria-hidden="true" />開ける時間と配分を保存</Button>
+                <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy || allocInvalid || (!hoursDraft && rows.length === 0)} onClick={() => saveAll(false)}><Check size={16} aria-hidden="true" />開ける時間と配分を保存</Button>
               )}
             </>
           )}
         />
-      ) : null}
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="配分と開ける時間の変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
       <RsDialog
         open={closeNoteOpen && Boolean(selected)}
@@ -578,9 +577,10 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
             <Button onClick={() => setCloseNoteOpen(false)}>あとで</Button>
             <Button
               variant="primary"
-              disabled={closedChannels.length === 0}
+              lockedReason={lockedReason}
+              disabled={!canEdit || closedChannels.length === 0}
               title={closedChannels.length === 0 ? '閉じた媒体にチェックを入れてください' : undefined}
-              onClick={() => { if (selected) setClosedSlots((current) => [...current, selected.row.id]); setCloseNoteOpen(false) }}
+              onClick={() => { if (!canEdit) return; if (selected) setClosedSlots((current) => [...current, selected.row.id]); setCloseNoteOpen(false) }}
             >
               <Check size={16} aria-hidden="true" />閉じたものを記録する
             </Button>
@@ -611,7 +611,7 @@ export default function StockBoard({ ctx, canEdit }: { ctx: RestaurantV8Context;
         actions={(
           <>
             <Button onClick={reloadLatest} disabled={busy}>最新を読み込んで続ける</Button>
-            <Button variant="primary" disabled={busy} onClick={() => saveAll(true)}>このまま保存する</Button>
+            <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={() => saveAll(true)}>このまま保存する</Button>
           </>
         )}
       >
