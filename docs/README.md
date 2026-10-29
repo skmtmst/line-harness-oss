@@ -913,3 +913,4 @@
 - [担当者が店の画面を開けない不具合の修正](release-log/unreleased/0000-kenta-follower-import-staff.md)
 - [閲覧のみの操作と理由の表示](release-log/unreleased/0000-kenta-perm-rebuild.md) — 閲覧時の操作表示と代理ログインの権限制御の反映履歴。
 - [左上の統括名の表示幅](release-log/unreleased/1926-masato-sidebar-name-width.md) — 統括名の表示幅を調整した反映履歴。
+- [店の比較から削除・アーカイブした店を除く](release-log/unreleased/1927-masato-store-comparison-archived.md) — 店の比較とCSVの修正履歴。

@@ -24,6 +24,7 @@ vi.mock('./update/update-banner', () => ({ UpdateBanner: () => null }))
 vi.mock('./session-lost-notice', () => ({ default: () => <div data-test="session" /> }))
 vi.mock('./auth-guard', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="auth">{children}</div> }))
 vi.mock('@/contexts/account-context', () => ({ AccountProvider: ({ children }: { children: ReactNode }) => <div data-test="account">{children}</div> }))
+vi.mock('./hq-access-gate', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="hq-access">{children}</div> }))
 vi.mock('./view-permission-gate', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="permission">{children}</div> }))
 vi.mock('./root-landing-gate', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="root">{children}</div> }))
 vi.mock('./store-selection-gate', () => ({ default: ({ children }: { children: ReactNode }) => <div data-test="store">{children}</div> }))
@@ -41,7 +42,7 @@ describe('登録の画面枠', () => {
   ] as const)('認証と全gateを保持: %s（%s）', (pathname, theme) => {
     const html = render(pathname, theme)
     expect(html).toContain('<div data-test="auth"><div data-test="account">')
-    expect(html).toContain('<div data-test="permission"><div data-test="root"><div data-test="store"><div data-test="feature"><p>登録内容</p>')
+    expect(html).toContain('<div data-test="hq-access"><div data-test="permission"><div data-test="root"><div data-test="store"><div data-test="feature"><p>登録内容</p>')
     expect(html).toContain('data-test="session"')
   })
 
