@@ -14,7 +14,7 @@ vi.mock('@/lib/api', () => ({
   api: { tags: { importPreview: vi.fn(), importCsv: vi.fn() } },
 }))
 
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); vi.clearAllMocks() })
 
 function openDialog() {
   render(<TagCsvImportDialog open onClose={() => {}} onCompleted={() => {}} />)
@@ -64,9 +64,27 @@ it('CSVの確認前に、既存タグを上書きしないこととエラー行�
   chooseFile('タグ.csv', 'タグ名,フォルダ\nVIP,会員\n,\n')
   await screen.findByText('タグ.csv')
   fireEvent.click(screen.getByRole('button', { name: '取り込む内容を確認' }))
-  expect(await screen.findByText('エラーの1行は登録されません')).toBeTruthy()
+  expect(await screen.findByText('要確認：エラーの1行は登録されません')).toBeTruthy()
   expect(screen.getByText(/同じ名前のタグは上書きしません/)).toBeTruthy()
   expect(screen.getByText(/エラーの行はCSVを直してから/)).toBeTruthy()
+})
+
+it('登録できる行がない時は理由を示し、登録を送らない', async () => {
+  vi.mocked(api.tags.importPreview).mockResolvedValueOnce({ success: true, data: {
+    summary: { total: 1, ready: 0, created: 0, skipped: 1, invalid: 0, failed: 0 },
+    rows: [{ line: 2, name: 'VIP', folderName: '', status: 'skipped', code: 'already_exists', message: '同じ名前のタグがあります' }],
+  } } as Awaited<ReturnType<typeof api.tags.importPreview>>)
+  openDialog()
+  expect(screen.getByText('CSVファイルを選ぶと確認できます。')).toBeTruthy()
+  chooseFile('既存.csv', 'タグ名,フォルダ\nVIP,\n')
+  await screen.findByText('既存.csv')
+  fireEvent.click(screen.getByRole('button', { name: '取り込む内容を確認' }))
+  const save = await screen.findByRole('button', { name: '0件を登録する' })
+  expect(save.hasAttribute('disabled')).toBe(true)
+  expect(screen.getByText('登録できる行がありません。CSVを直して選び直してください。')).toBeTruthy()
+    expect(screen.getByText('要確認：登録できる行だけを登録します')).toBeTruthy()
+  fireEvent.click(save)
+  expect(api.tags.importCsv).not.toHaveBeenCalled()
 })
 
 describe('タグCSV取り込みの確認から登録まで', () => {
@@ -131,7 +149,7 @@ describe('タグCSV取り込みの確認から登録まで', () => {
     await screen.findByText('タグ.csv')
     fireEvent.click(screen.getByRole('button', { name: '取り込む内容を確認' }))
     fireEvent.click(await screen.findByRole('button', { name: '1件を登録する' }))
-    expect(await screen.findByText('1件を登録し、6件は入りませんでした')).toBeTruthy()
+    expect(await screen.findByRole('heading', { name: '要確認：1件を登録し、6件は入りませんでした', exact: true })).toBeTruthy()
     expect(dialog().getAttribute('data-design-node')).toBe('QzRsJ')
     const table = screen.getByRole('table')
     expect(table.querySelector('thead')?.textContent).toBe('行タグ名入らなかった理由')

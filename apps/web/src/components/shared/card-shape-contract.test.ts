@@ -21,7 +21,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["app/reminders/wizard-v8.module.css", ".choice", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["app/reminders/wizard-v8.module.css", ".addStep", "入力欄・補助操作・選択肢。中身のカードではない。"],
   ["components/friend-fields/tag-csv-import-dialog.module.css", ".panel", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
-  ["components/friend-fields/tag-csv-import-dialog.module.css", ".summary", "取り込む件数の数の帯。影を重ねない。"],
   ["components/friend-fields/tag-csv-import-dialog.module.css", ".tableFrame", "取り込み内容の表の枠。影を重ねない。"],
   ["components/hq/account-menu.module.css", ".menu", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
   ["components/shared/account-switch-menu.module.css", ".panel", "開いたメニュー・選ぶ欄。浮く面の影を使い、カードの影を重ねない。"],
