@@ -2,6 +2,7 @@
 
 import { PageContent } from '@/components/templates/page-frame'
 import { Field as SharedField } from '@/components/shared/form-controls'
+import { Tabs } from '@/components/shared/tabs'
 import StatusBadge from '@/components/shared/status-badge'
 import { CheckCircle2, MessageCircleQuestion, Plus, X } from 'lucide-react'
 import EmptyList from '@/components/shared/empty-list'
@@ -31,7 +32,6 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import Notice from '@/components/shared/notice'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import TruncatedText from '@/components/shared/truncated-text'
-import { formatNumber } from '@/lib/format'
 
 /*
  * ★V8 統括のお問い合わせ（Pencil 。運営の LINE を登録する窓を開いた状態が ）。
@@ -56,6 +56,7 @@ export default function HqSupportV8() {
   const [accounts, setAccounts] = useState<Array<{ id: string; name: string }>>([])
   const [sender, setSender] = useState({ tenantName: '', name: '', email: null as string | null, planLabel: '—' })
   const [history, setHistory] = useState<HqSupportRequest[] | null>(null)
+  const [chosenTab, setChosenTab] = useState<'history' | 'send' | null>(null)
   const [historyError, setHistoryError] = useState(false)
   const [input, setInput] = useState<HqSupportInput>(EMPTY_SUPPORT_INPUT)
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -64,7 +65,10 @@ export default function HqSupportV8() {
   const [sent, setSent] = useState<HqSupportRequest | null>(null)
   const [lineGuide, setLineGuide] = useState(false)
 
+  const tab = chosenTab ?? (history?.length || historyError || history === null ? 'history' : 'send')
+
   const loadHistory = async () => {
+    setHistory(null)
     setHistoryError(false)
     try {
       const res = await api.hqSupport.list()
@@ -194,8 +198,12 @@ export default function HqSupportV8() {
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="b8xBtZ"
       title="お問い合わせ"
-      help="使い方の質問・不具合・料金の相談を運営へ送れます。返信は登録メールアドレスと、下の「これまでの問い合わせ」に届きます（平日 2 営業日以内）。"
+      help="使い方の質問・不具合・料金の相談を運営へ送れます。返信は登録メールアドレスと、「これまでの問い合わせ」タブに届きます（平日 2 営業日以内）。"
       folders={<HqSettingsNavV8 active="contact" />} folderNav={settingsNav}
+      tabs={<Tabs label="問い合わせの表示" items={[
+        { id: `${uid}-history-tab`, controls: `${uid}-history`, label: 'これまでの問い合わせ', current: tab === 'history', onClick: () => setChosenTab('history') },
+        { id: `${uid}-send-tab`, controls: `${uid}-send`, label: '問い合わせを送る', current: tab === 'send', onClick: () => setChosenTab('send') },
+      ]} />}
     >
       <PageContent>
         {/* 契約者専用LINEの登録案内（2026-09-18 決定：ここからもいつでも開ける。開いた状態が板 D6fh3） */}
@@ -217,6 +225,7 @@ export default function HqSupportV8() {
           {sent?.ticketLabel ? <p className={styles.sentLine}>受付番号：<strong>{sent.ticketLabel}</strong>　件名：{sent.subject}</p> : null}
         </Dialog>
 
+        <div id={`${uid}-send`} role="tabpanel" aria-labelledby={`${uid}-send-tab`} hidden={tab !== 'send'}>
         <form
           className={styles.card}
           onSubmit={(event) => {
@@ -321,8 +330,9 @@ export default function HqSupportV8() {
             </Button>
           </div>
         </form>
+        </div>
 
-        <section aria-label="これまでの問い合わせ" className={styles.history}>
+        <section id={`${uid}-history`} role="tabpanel" aria-labelledby={`${uid}-history-tab`} hidden={tab !== 'history'} className={styles.history}>
           <h2 className={styles.historyTitle}>これまでの問い合わせ</h2>
           {history === null ? (
             <p className={styles.empty}>読み込んでいます…</p>
@@ -332,7 +342,7 @@ export default function HqSupportV8() {
               <button type="button" onClick={() => void loadHistory()} className={styles.linkButton}>もう一度読み込む</button>
             </p>
           ) : history.length === 0 ? (
-            <EmptyList icon={<MessageCircleQuestion aria-hidden="true" />} title="まだ問い合わせはありません" description="上の欄から送った問い合わせと、運営からの返事がここに並びます。" canCreate={false} />
+            <EmptyList icon={<MessageCircleQuestion aria-hidden="true" />} title="まだ問い合わせはありません" description="「問い合わせを送る」から送った問い合わせと、運営からの返事がここに並びます。" canCreate={false} />
           ) : (
             <GridTable label="これまでの問い合わせ" design={{ columns: 'var(--tpl-hq-col-ticket) minmax(0, 1fr) var(--tpl-hq-col-paystate) var(--tpl-hq-col-paystate) var(--tpl-hq-col-ticket)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
               <GridHeadRow>
@@ -342,22 +352,24 @@ export default function HqSupportV8() {
                 <GridCell role="columnheader">状態</GridCell>
                 <GridCell role="columnheader">更新</GridCell>
               </GridHeadRow>
-              {history.slice(0, 10).map((item) => (
+              {history.slice(0, 10).map((item) => {
+                const latestReply = item.replies?.reduce<(NonNullable<HqSupportRequest['replies']>[number]) | null>((latest, reply) => !latest || reply.createdAt > latest.createdAt ? reply : latest, null)
+                return (
                 <GridRow key={item.id}>
                   <GridCell>{item.ticketLabel ?? emptyValue('unknown')}</GridCell>
                   <GridCell className={styles.subjectCell}>
                     <Link href={`/hq/support/detail?id=${encodeURIComponent(item.id)}`}><TruncatedText value={item.subject} /></Link>
                     {!tenantUnavailable && item.replies && item.replies.length > 0 ? (
-                      <span className={styles.replyNote}>運営からの返信 {formatNumber(item.replies.length)} 件・開いて続きを送れます</span>
+                      <span className={styles.replyNote}><TruncatedText value={`最新の返事：${latestReply?.body ?? ''}`} /></span>
                     ) : null}
                   </GridCell>
                   <GridCell>{supportKindWord(item.kind, item.kindLabel)}</GridCell>
                   <GridCell>
                     <StatusBadge tone={item.status === 'open' ? 'warning' : 'success'}>{SUPPORT_STATUS_WORDS[item.status]}</StatusBadge>
                   </GridCell>
-                  <GridCell><span className={styles.shortText}>{supportTime(item.createdAt)}</span></GridCell>
+                  <GridCell><span className={styles.shortText}>{supportTime(latestReply?.createdAt ?? item.createdAt)}</span></GridCell>
                 </GridRow>
-              ))}
+              )})}
             </GridTable>
           )}
         </section>

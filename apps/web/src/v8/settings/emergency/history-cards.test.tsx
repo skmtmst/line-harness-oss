@@ -2,9 +2,15 @@
 /*
  * SPEC-7 更新履歴の画面：1回の更新＝1枚を描いたときの形。
  */
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import UpdateHistoryV8 from './history'
+
+vi.mock('@/generated/release-log.json', () => ({ default: { releases: [
+  { version: 'unreleased', released: null, entries: [{ kind: 'fixed', text: '配信の予定を変える' }] },
+  { version: '0.26.0', released: '2026-10-25 18:00', entries: [{ kind: 'added', text: '予約の札を足した', at: '2026-10-25T09:30' }] },
+  { version: '0.25.0', released: '2026-10-14 02:05', entries: [{ kind: 'fixed', text: '要約に無い古い本文' }] },
+] } }))
 
 const history = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', () => ({ api: { operations: { history } } }))
@@ -21,6 +27,7 @@ vi.mock('@/generated/release-log-summary.json', () => ({ default: {
     ] },
     { version: '0.25.0', released: '2026-10-14 02:05', entryCount: 5707, entries: [] },
   ],
+  updates: [{ version: '0.25.0', source: 'archive' }],
   pending: { entryCount: 4, counts: { added: 2, changed: 1, fixed: 1 } },
 } }))
 afterEach(() => { cleanup(); history.mockReset() })
@@ -88,4 +95,34 @@ it('画面に仕組みの名前（表・関数・ファイルの名前）を出�
   const { container } = render(<UpdateHistoryV8 />)
   await waitFor(() => expect(cards().length).toBe(4))
   expect(container.textContent).not.toMatch(/release[-_]log|deployment|highlights|summary|unreleased|\.md\b|\.json\b/i)
+})
+
+it('本文を検索しても日付と版を保ち、消すと全体へ戻る', async () => {
+  history.mockResolvedValue({ success: true, data: [] })
+  render(<UpdateHistoryV8 />)
+  await waitFor(() => expect(cards()).toHaveLength(4))
+  fireEvent.change(screen.getByRole('searchbox', { name: '変更内容を探す' }), { target: { value: '予約' } })
+  await waitFor(() => expect(cards()).toHaveLength(1))
+  expect(within(cards()[0]).getByText('0.26.0')).toBeTruthy()
+  expect(within(cards()[0]).getByText('予約の札を足した')).toBeTruthy()
+  expect(screen.queryByText('配信の宛先の誤りを直した')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '検索語を消す' }))
+  await waitFor(() => expect(cards()).toHaveLength(4))
+})
+
+
+it('保管用の版の本文も検索して表示し、予定とは区別する', async () => {
+  history.mockResolvedValue({ success: true, data: [] })
+  render(<UpdateHistoryV8 />)
+  await waitFor(() => expect(cards()).toHaveLength(4))
+  fireEvent.change(screen.getByRole('searchbox', { name: '変更内容を探す' }), { target: { value: '要約に無い古い本文' } })
+  await screen.findByText('要約に無い古い本文')
+  expect(cards()).toHaveLength(1)
+  expect(cards()[0].dataset.updateCard).toBe('archive')
+  expect(within(cards()[0]).getByText('0.25.0')).toBeTruthy()
+  expect(cards()[0].querySelector('time')?.getAttribute('datetime')).toBe('2026-10-14T02:05+09:00')
+  fireEvent.change(screen.getByRole('searchbox', { name: '変更内容を探す' }), { target: { value: '配信の予定' } })
+  await screen.findByText('配信の予定を変える')
+  expect(cards()).toHaveLength(1)
+  expect(cards()[0].dataset.updateCard).toBe('pending')
 })

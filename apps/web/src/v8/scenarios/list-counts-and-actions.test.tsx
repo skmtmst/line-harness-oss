@@ -360,7 +360,8 @@ describe('右詳細の情報と操作', () => {
     const detail = await panel()
     expect(detail.textContent).toContain('配信方法は未確認・通数は未確認')
     const facts = within(detail).getByRole('region', { name: '配信状況' })
-    expect(facts.textContent).toContain('配信中 — 人・最後まで配信 — 人')
+    expect(facts.textContent).toContain('配信中 —・最後まで配信 —')
+    expect(facts.textContent).not.toContain('— 人')
     expect(facts.textContent).not.toContain('0 人')
   })
 

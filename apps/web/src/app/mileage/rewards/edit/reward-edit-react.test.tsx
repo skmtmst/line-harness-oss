@@ -301,7 +301,7 @@ describe('既存の使い道', () => {
     await render()
 
     expect(host.querySelector('[data-list-state="error"]')).not.toBeNull()
-    expect(host.textContent).toContain('再読み込みしても直らない場合はエラー報告へ。')
+    expect(host.textContent).toContain('管理者にお問い合わせください。')
     expect(host.querySelector('#reward-name')).toBeNull()
   })
 })

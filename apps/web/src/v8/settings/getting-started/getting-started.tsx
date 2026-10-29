@@ -20,6 +20,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import Card, { CardHeader } from '@/components/shared/card'
 import { ProgressBar } from '@/components/shared/progress'
 import { GridTable, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -86,14 +87,15 @@ export default function GettingStartedV8() {
             </Card>
 
             <Card id="first-message" variant="form" aria-label="最初の1通の確認方法">
-              <CardHeader size="stacked" title="最初の1通の確認方法" />
-              <p className={styles.cardLine}>自分のLINEで受け取る方法を選びます。QRから友だち追加時の配信を受け取るか、シナリオを選んで「まとめてテストを送る」を開き、自分をテスト受信者に選んでください。</p>
-              <p className={styles.cardLine}>送信の記録は友だち追加時の配信かシナリオの1通目で判定します。送らずに判定するテストと受信箱の手動返信は完了に数えません。記録が済みでも、LINEの端末で本文を確認してください。</p>
+              <CardHeader size="stacked" title="最初の1通の確認方法"
+                help={<HelpTip label="最初の1通の判定と確認方法">QRからは友だち追加時の配信を受け取ります。シナリオは「まとめてテストを送る」で自分をテスト受信者に選びます。完了は友だち追加時の配信かシナリオの1通目の送信記録で判定します。送らずに判定するテストと受信箱の手動返信は完了に数えません。</HelpTip>}
+                action={<Button size="compact" aria-label="受信後に状態を読み直す" onClick={reload}>読み直す</Button>}
+              />
+              <p className={styles.cardLine}>QRから友だち追加するか、シナリオを選んで自分にテスト送信してください。受け取ったらLINEで本文を確かめてください。</p>
               {role ? <div className={styles.bottom}>
                 <Button href="/?qr=base" lockedReason={sendReason}>友だち追加のQRを開く</Button>
                 <Button href="/scenarios" lockedReason={sendReason}>シナリオを選んでテスト送信する</Button>
               </div> : null}
-              <Button onClick={reload}>受信後に状態を読み直す</Button>
             </Card>
 
             <div className={styles.bottom}>

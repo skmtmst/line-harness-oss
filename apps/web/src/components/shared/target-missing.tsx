@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { CloudOff, FileSearch, List, Lock, RotateCw, SearchX } from 'lucide-react'
 import Button from './button'
 import { loadFailureCopy, type PermissionScope } from './api-error-message'
+import LoadFailureContact from './load-failure-contact'
 import styles from './target-missing.module.css'
 
 /**
@@ -127,7 +128,7 @@ export default function TargetMissing({
       </div>
       <p className={styles.title}>{shownTitle}</p>
       <p className={styles.description}>
-        {failure && !failure.retryable ? failure.description : description}
+        {failure && !failure.retryable ? failure.description : kind === 'error' ? <LoadFailureContact description={description} /> : description}
         {accountLine ? <span> {accountLine}</span> : null}
       </p>
       {finalAction ? <div className={styles.action}>{finalAction}</div> : null}
