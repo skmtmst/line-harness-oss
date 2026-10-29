@@ -25,13 +25,19 @@ const KPI_VIEW = readFileSync(
  * 誰かに足してもらう——ので、1枚ずつ言い分ける。
  */
 describe('一覧の状態（設計 6-1-N `TmHjF`）', () => {
+  /*
+   * 骨格の注記：読み込んでいるときの骨格は f1075d55e4 から
+   * `DelayedSkeleton` の包みへ移り、`listBody` は権限不足が先頭になった。
+   * 三項の続き形 `) : forbidden ? (` は固定せず、各状態の枝があること自体を見る。
+   */
   it('権限不足を読み込み失敗と別の1枚にする', () => {
     /*
      * 403 は読み直しても直らない。失敗の枠に混ぜると「もう一度試す」を
      * 何度押しても直らない道へ誘うことになる。
      */
     expect(PAGE, '403 を見分けていない').toContain('err.status === 403')
-    expect(PAGE, '権限不足の1枚が無い').toContain(") : forbidden ? (")
+    expect(PAGE, '権限不足の1枚が無い').toContain('forbidden ? (')
+    expect(PAGE, '権限不足の題が無い').toContain('配信を見る権限がありません')
   })
 
   it('失敗をページ上の帯と一覧の2か所に出さない', () => {
@@ -40,7 +46,7 @@ describe('一覧の状態（設計 6-1-N `TmHjF`）', () => {
     expect(PAGE).not.toContain('{error && !forbidden && (')
     // ページ上の帯（`p-4 bg-danger-bg` の箱）。行の削除ボタンの hover は別物。
     expect(PAGE).not.toContain('p-4 bg-danger-bg')
-    expect(PAGE).toContain(") : forbidden ? (")
+    expect(PAGE).toContain('forbidden ? (')
     expect(PAGE).toContain("onClick={() => loadList(")
   })
 
@@ -48,7 +54,7 @@ describe('一覧の状態（設計 6-1-N `TmHjF`）', () => {
     /* 画面ごとに直書きすると、同じ状態が画面ごとに違う顔になる。 */
     expect(PAGE).toContain("import EmptyList")
     for (const kind of ['forbidden', 'error']) {
-      expect(PAGE, `${kind} の1枚が無い`).toContain(`) : ${kind} ? (`)
+      expect(PAGE, `${kind} の1枚が無い`).toContain(`${kind} ? (`)
     }
   })
 })
