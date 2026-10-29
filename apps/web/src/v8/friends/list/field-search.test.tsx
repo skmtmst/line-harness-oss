@@ -16,7 +16,8 @@ import List from './list'
 afterEach(()=>{cleanup();sessionStorage.clear()})
 test('友だち一覧の詳細条件には選んだ店の情報欄の候補を渡す', async()=>{
   render(<List />)
-  fireEvent.click(screen.getByRole('button',{name:'詳細条件'}))
+  fireEvent.click(screen.getByRole('button',{name:'絞り込み'}))
+  fireEvent.click(await screen.findByRole('button',{name:'詳細条件'}))
   expect(await screen.findByText('プラン')).toBeTruthy()
   expect(listFields).toHaveBeenCalledWith('A')
 })
@@ -24,6 +25,6 @@ test('友だち一覧の詳細条件には選んだ店の情報欄の候補を�
 test('表示項目を開くたびに最新の店の欄を読み直す',async()=>{
  listFields.mockClear();render(<List/>);await waitFor(()=>expect(listFields).toHaveBeenCalledTimes(1));
  listFields.mockResolvedValueOnce({success:true,data:[{id:'new-field',name:'新しい項目'}]});
- fireEvent.click(screen.getByRole('button',{name:'表示項目を編集'}));
+ fireEvent.click(screen.getByRole('button',{name:'一覧のほかの操作'}));fireEvent.click(await screen.findByRole('menuitem',{name:'表示項目を編集'}));
  expect(await screen.findByRole('checkbox',{name:'新しい項目'})).toBeTruthy();expect(listFields).toHaveBeenCalledTimes(2);
 })

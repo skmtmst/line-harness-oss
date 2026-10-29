@@ -46,3 +46,17 @@ test('確定ボタンの処理中の文字も共通Buttonへ渡し、入力を�
   expect(button.getAttribute('aria-busy')).toBe('true')
   expect((screen.getByRole('textbox', { name: '移動先' }) as HTMLInputElement).value).toBe('入力を残す')
 })
+
+test('同期例外も窓の知らせへ出し、操作の隣へエラー文を差し込まず再実行できる', () => {
+  const save = vi.fn().mockImplementationOnce(() => { throw new Error('offline') }).mockImplementationOnce(() => {})
+  render(<Dialog open title="設定" onConfirm={save} onCancel={() => {}}><input aria-label="名前" defaultValue="保持する入力" /></Dialog>)
+  const button = screen.getByRole('button', { name: '保存する' })
+  expect(screen.queryByRole('alert')).toBeNull()
+  fireEvent.click(button)
+  expect(screen.getByRole('alert').textContent).toContain('実行できませんでした')
+  expect(document.querySelector('[data-button-error]')).toBeNull()
+  expect((screen.getByRole('textbox', { name: '名前' }) as HTMLInputElement).value).toBe('保持する入力')
+  fireEvent.click(button)
+  expect(save).toHaveBeenCalledTimes(2)
+  expect(screen.queryByRole('alert')).toBeNull()
+})

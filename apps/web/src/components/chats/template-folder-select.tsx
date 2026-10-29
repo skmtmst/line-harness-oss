@@ -1,116 +1,19 @@
 'use client'
 
-import { Check, ChevronDown, ChevronRight, ChevronUp, Folder } from 'lucide-react'
-import { useRef, useState } from 'react'
-import Button from '@/components/shared/button'
-import MenuPortal from '@/components/shared/menu-portal'
+import { Folder } from 'lucide-react'
+import { EntityPickerField } from '@/components/shared/entity-picker'
 
-export type TemplateFolderOption = {
-  value: string
-  label: string
-  count: number | null
-  depth?: number
-}
-
+export type TemplateFolderOption = { value: string; label: string; count: number | null; depth?: number }
 export type TemplateFolderStatus = 'loading' | 'ready' | 'error'
 
-/** 管理画面受信箱のテンプレート用フォルダ選択（`NWbuF` / `TUveA`）。 */
-export default function TemplateFolderSelect({
-  value,
-  options,
-  onChange,
-  status,
-}: {
-  value: string
-  options: TemplateFolderOption[]
-  onChange: (value: string) => void
-  status: TemplateFolderStatus
+/** 増えるフォルダは共通の選ぶ窓へ渡し、確定するまで元の絞り込みを保つ。 */
+export default function TemplateFolderSelect({ value, options, onChange, status }: {
+  value: string; options: TemplateFolderOption[]; onChange: (value: string) => void; status: TemplateFolderStatus
 }) {
-  const [open, setOpen] = useState(false)
-  const rootRef = useRef<HTMLDivElement>(null)
-  const optionsRef = useRef<HTMLUListElement>(null)
-  const selected = options.find((option) => option.value === value) ?? options[0]
-  const statusLabel = status === 'loading'
-    ? 'フォルダを読み込み中'
-    : status === 'error'
-      ? 'フォルダを読み込めません'
-      : null
-
-  const choose = (next: string) => {
-    onChange(next)
-    setOpen(false)
-  }
-
-  return (
-    <div
-      ref={rootRef}
-      className="relative"
-      data-template-folder-select
-      onBlur={(event) => {
-        if (!rootRef.current?.contains(event.relatedTarget) && !optionsRef.current?.contains(event.relatedTarget)) setOpen(false)
-      }}
-    >
-      <div className={`rounded-control ${open ? 'ring-2 ring-accent/20' : ''}`}>
-        <Button
-          size="field"
-          aria-label="テンプレートのフォルダ"
-          aria-haspopup="listbox"
-          aria-expanded={open}
-          aria-busy={status === 'loading'}
-          disabled={status !== 'ready'}
-          onClick={() => setOpen((current) => !current)}
-          className="w-full"
-        >
-          <span className="flex min-w-0 flex-1 items-center gap-2">
-            <Folder aria-hidden="true" size={16} className="shrink-0 text-ink-faint" />
-            <span className="min-w-0 flex-1 truncate text-left">{statusLabel ?? selected?.label ?? 'すべてのフォルダ'}</span>
-            {open ? <ChevronUp aria-hidden="true" size={16} /> : <ChevronDown aria-hidden="true" size={16} />}
-          </span>
-        </Button>
-      </div>
-
-      {open && status === 'ready' ? (
-        <MenuPortal
-          open={open}
-          align="end"
-          matchWidth="min"
-          getAnchor={() => rootRef.current}
-          onClose={() => setOpen(false)}
-        >
-        <ul
-          ref={optionsRef}
-          role="listbox"
-          aria-label="テンプレートのフォルダ"
-          className="max-h-72 min-w-64 overflow-y-auto rounded-control border border-hairline bg-canvas p-1.5 shadow-float"
-          // 最上層では absolute 指定を無効にする（位置は器が決める）。
-          // 欄に焦点を残したまま押せるよう、押す前に焦点を移さない。
-          style={{ position: 'static' }}
-          onMouseDown={(event) => event.preventDefault()}
-        >
-          {options.map((option) => {
-            const selectedOption = option.value === value
-            return (
-              <li key={option.value} role="option" aria-selected={selectedOption}>
-                <button
-                  type="button"
-                  onClick={() => choose(option.value)}
-                  className={`flex min-h-9 w-full items-center gap-2 rounded-mini px-2.5 py-1.5 text-left text-caption ${selectedOption ? 'bg-accent-soft font-medium text-accent-deep' : 'font-medium text-ink hover:bg-canvas-sunken'}`}
-                >
-                  {option.depth ? (
-                    <ChevronRight aria-hidden="true" size={16} className="ml-3 shrink-0 text-ink-faint" />
-                  ) : (
-                    <Folder aria-hidden="true" size={16} className="shrink-0 text-ink-faint" />
-                  )}
-                  <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                  <span className="shrink-0 tabular-nums text-ink-faint">{option.count ?? '—'}</span>
-                  {selectedOption ? <Check aria-hidden="true" size={16} className="shrink-0" /> : null}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-        </MenuPortal>
-      ) : null}
-    </div>
-  )
+  const statusLabel = status === 'loading' ? 'フォルダを読み込み中' : status === 'error' ? 'フォルダを読み込めません' : undefined
+  return <div data-template-folder-select aria-busy={status === 'loading' || undefined}>
+    <EntityPickerField label="テンプレートのフォルダ" ariaLabel="テンプレートのフォルダ" noun="フォルダ" title="テンプレートのフォルダを選ぶ" icon={Folder} valuePrefix="フォルダ"
+      value={status === 'ready' ? JSON.stringify(value) : ''} onChange={id=>onChange(JSON.parse(id) as string)} disabled={status !== 'ready'} placeholder={statusLabel}
+      items={options.map(option=>({id:JSON.stringify(option.value),name:`${option.label} ${option.count ?? '—'}`,meta:option.depth ? '下のフォルダ' : undefined}))} />
+  </div>
 }

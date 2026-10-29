@@ -8,7 +8,6 @@ import type { FriendField, FriendFieldType, Folder } from '@line-crm/shared';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import { AffixedTextField, TextField } from '@/components/shared/text-field';
 import { Field, RequiredBadge } from '@/components/shared/form-controls';
@@ -23,6 +22,7 @@ import { sameLabels, storedDefaultLabels, suggestKey } from './field-model';
 import styles from './create.module.css'
 import { formatNumber } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors';
+import { ToggleField } from '@/components/shared/toggle'
 
 const nameRequirement = requiredText('項目名を入力してください')
 const keyRequirement = requiredText('差し込みの名前を入力してください')
@@ -331,9 +331,9 @@ export default function FieldEditor({
 
         <Card variant="aside" aria-labelledby="ff-options">
           <h2 className={styles.sideCardTitle} id="ff-options">オプション</h2>
-          <SaveErrorField names={["isPersonal","is_personal"]}><Checkbox checked={isPersonal} onCheckedChange={setIsPersonal} disabled={locked || saving}>個人情報として保護（画面で伏せる）</Checkbox></SaveErrorField>
-          <SaveErrorField names={["isStarred","is_starred"]}><Checkbox checked={isStarred} onCheckedChange={setIsStarred} disabled={locked || saving}>友だち一覧の列に出す</Checkbox></SaveErrorField>
-          <SaveErrorField names={["ecIsMaster","ec_is_master"]}><Checkbox checked={ecIsMaster} onCheckedChange={setEcIsMaster} disabled={locked || saving}>EC側の値を正とする（EC連携で上書き）</Checkbox></SaveErrorField>
+          <SaveErrorField names={["isPersonal","is_personal"]}><ToggleField checked={isPersonal} onChange={setIsPersonal} disabled={locked || saving}>個人情報として保護（画面で伏せる）</ToggleField></SaveErrorField>
+          <SaveErrorField names={["isStarred","is_starred"]}><ToggleField checked={isStarred} onChange={setIsStarred} disabled={locked || saving}>友だち一覧の列に出す</ToggleField></SaveErrorField>
+          <SaveErrorField names={["ecIsMaster","ec_is_master"]}><ToggleField checked={ecIsMaster} onChange={setEcIsMaster} disabled={locked || saving}>EC側の値を正とする（EC連携で上書き）</ToggleField></SaveErrorField>
           {ecIsMaster ? (
             <Field label="EC側の項目名" requirement={{ ...ecPathRequirement, required: ecIsMaster }}><SaveErrorField names={["ecFieldPath","ec_field_path"]}><TextField ref={(element) => { validationRefs.current.ec = element }} invalid={validationTarget === 'ec' && Boolean(validationError)} aria-describedby={validationTarget === 'ec' && validationError ? 'ff-error-ec' : undefined} value={ecFieldPath} disabled={locked || saving} onChange={(event) => setEcFieldPath(event.target.value)} placeholder="customer.phone" /></SaveErrorField>
 {fieldError('ec')}</Field>

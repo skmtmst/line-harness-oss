@@ -18,6 +18,7 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
+import PermissionLockedButton from '@/components/shared/permission-locked-button'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -434,10 +435,10 @@ export default function WebhooksOutgoingV8() {
       options={managedFolderOptions('webhook', folders, { allId: '', unfiledId: UNFILED })}
     /></SaveErrorField>
   )
-  /* 変更権限が無い人には作る操作も予約領域も置かない。 */
+  /* 作れない人には押せない［送り先を作る］を薄く置き、乗せると理由を出す。 */
   const createButton = canManage
     ? <Button variant="primary" href="/webhooks/new"><Plus size={16} aria-hidden="true" />送り先を作る</Button>
-    : null
+    : <PermissionLockedButton reason="送り先は統括の担当者だけが作れます" icon={<Plus size={16} aria-hidden="true" />}>送り先を作る</PermissionLockedButton>
 
   /* ===== 道具の段 ===== */
   const chips = (

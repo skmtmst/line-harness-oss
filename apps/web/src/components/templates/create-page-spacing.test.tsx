@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { cleanup, render } from '@testing-library/react'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { getPageAction } from '@/test-utils/page-action'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import HqCreate from '@/v8/hq-broadcasts/create'
 
@@ -22,7 +24,7 @@ import { CreatePage } from '.'
 const WEB = process.cwd()
 const read = (path: string) => readFileSync(join(WEB, path), 'utf8')
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); verifiedStaffRole(null) })
 
 describe('作成の型の余白の口', () => {
   it('タブが区切りを持つ見出しだけ線を外す口を渡し、既定へ戻せる', () => {
@@ -53,6 +55,7 @@ describe('作成の型の余白の口', () => {
   })
 
   it('直に続く閲覧案内だけに余白口を渡し、本文と両方の通知を残す', () => {
+    verifiedStaffRole('viewer')
     const { container, rerender } = render(<CreatePage title="作成" dirty={false} readOnly contentSpacing="notice-after-read-only" footerActions={null}><p>権限の説明</p></CreatePage>)
     const slot = container.querySelector('[data-read-only-notice]')!.parentElement!
     expect(slot.getAttribute('data-content-spacing')).toBe('notice-after-read-only')
@@ -88,7 +91,8 @@ describe('作成の型の余白の口', () => {
     expect(frame).toBeTruthy()
     expect(frame.querySelector('[data-template-region="content"] input[aria-label="配信名"]')).toBeTruthy()
     expect(frame.querySelector('[data-template-region="preview"][aria-label="LINEの見え方"]')).toBeTruthy()
-    expect(frame.querySelector('[data-template-region="footer"]')?.textContent).toContain('下書きを保存する')
+    expect(frame.querySelector('[data-template-region="footer"]')?.textContent).toContain('対象設定へ')
+    expect(getPageAction({ name: '下書きを保存する' }).getAttribute('role')).toBe('menuitem')
   })
 })
 

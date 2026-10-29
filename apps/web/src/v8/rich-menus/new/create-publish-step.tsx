@@ -9,7 +9,7 @@ import { areaDisplayName } from '@/components/rich-menus/canvas-editor'
 import { type Area } from '../../../components/rich-menus/area-types'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import DateTimeField from '@/components/shared/date-time-field'
 import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select'
 import { Field,OptionalBadge } from '@/components/shared/form-controls'
@@ -360,7 +360,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
           <div className={styles.endBox}>
             <div className={styles.endHead}>
               <span className={styles.endTitle} title="指定した期間だけLINEに登録し、終わったら切り替えを予約します。誰の画面に出るかは「公開すると何が変わるか」で確認してください">終わりを決める <OptionalBadge /></span>
-              <SaveErrorField names={["endEnabled","end_enabled"]}><SettingCheckbox
+              <SaveErrorField names={["endEnabled","end_enabled"]}><Toggle
                 label="終わりを決める"
                 checked={endEnabled}
                 onChange={(on) => {

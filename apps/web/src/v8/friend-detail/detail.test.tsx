@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 友だち詳細（src/v8/friend-detail）の動きの試験。BEHAVIOR.md の主要な動きを守る。
  * 概要が出る・閲覧のみは変える操作を置かない・鍵のある運用担当は対応を変えられる・
@@ -120,7 +121,7 @@ const friend = {
 
 const timeline = [
   { id: 'a', type: 'message_received', summary: '『秋の新商品はいつ届きますか？』', status: null, source: { kind: 'message', id: 'm1', parentId: null, url: null }, occurredAt: '2026-10-01T10:12:00+09:00', lineAccount: { id: 'x', name: '然-NEN-TEST' } },
-  { id: 'b', type: 'message_sent', summary: '『10月5日に発送予定です』', status: null, source: { kind: 'message', id: 'm2', parentId: null, url: null }, occurredAt: '2026-10-01T10:20:00+09:00', lineAccount: { id: 'x', name: '然-NEN-TEST' } },
+  { id: 'b', type: 'message_sent', summary: '『10月5日に発送予定です』', status: null, source: { kind: 'message', id: 'm2', parentId: null, url: 'https://shop.example.test/orders/sample' }, occurredAt: '2026-10-01T10:20:00+09:00', lineAccount: { id: 'x', name: '然-NEN-TEST' } },
   { id: 'c', type: 'tag_change', summary: 'タグ『VIP』が付いた', status: null, source: null, occurredAt: '2026-09-26T12:40:00+09:00', lineAccount: { id: 'x', name: '然-NEN-TEST' } },
 ]
 
@@ -137,7 +138,7 @@ beforeEach(() => {
   fetchApi.mockClear()
   forgetStaffIdentity();
   document.documentElement.dataset.theme = 'v8'
-  role.current = 'owner'
+  role.current = verifiedStaffRole('owner')
   store.clear()
   params.current = new URLSearchParams('id=friend-1')
   getFriend.mockImplementation(async () => ({ success: true, data: friend }))
@@ -189,8 +190,19 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     expect(fetchApi).toHaveBeenCalledWith(expect.stringContaining('/api/friends/friend-1/timeline?limit=8'), expect.anything())
   })
 
+  it('履歴の外部リンクは別タブの印を出し、内部リンクと区別する', async () => {
+    await render()
+    const external = links('『10月5日に発送予定です』')[0]
+    expect(external?.getAttribute('target')).toBe('_blank')
+    expect(external?.getAttribute('rel')).toContain('noopener')
+    expect(external?.querySelector('[data-external-icon]')).toBeTruthy()
+    const internal = links('『秋の新商品はいつ届きますか？』')[0]
+    expect(internal?.getAttribute('target')).toBeNull()
+    expect(internal?.querySelector('[data-external-icon]')).toBeNull()
+  })
+
   it('鍵の無い運用担当（閲覧のみ）は帯が出て、変える操作を置かない', async () => {
-    role.current = 'staff'
+    role.current = verifiedStaffRole('staff')
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(links('編集する')).toHaveLength(0)
@@ -200,7 +212,7 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
   })
 
   it("'/chats' の鍵を持つ運用担当は対応・タグ・メモを編集でき、帯は出ない", async () => {
-    role.current = 'staff'
+    role.current = verifiedStaffRole('staff')
     store.set('lh_staff_permissions', JSON.stringify(['/chats']))
     rememberStaffIdentity({ role: 'staff', permissionKeys: ['/chats'] } as StaffMember)
     await render()
@@ -326,3 +338,5 @@ it('保存記録の構造変更が必要な場合は案内を出し、再押下�
   act(() => confirm.click()); await flush()
   expect(fetchApi.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
 })
+
+afterEach(() => { verifiedStaffRole(null) })

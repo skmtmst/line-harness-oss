@@ -179,19 +179,6 @@
   box-shadow: var(--tpl-sd-line-left);
 }
 
-.rightTitle {
-  margin: 0;
-  color: var(--color-ink);
-  font-size: var(--tpl-sd-right-title-size);
-  font-weight: 600;
-  line-height: var(--tpl-sd-right-title-lh);
-}
-
-/* 共通のスマホが持つ題「LINEでの見え方」は、この欄では上の題が兼ねるので出さない。 */
-.phoneSlot > section > p:first-child {
-  display: none;
-}
-
 /* ── 帯（閲覧のみ・始めた直後） ───────────────── */
 .viewerBand,
 .startedBand {

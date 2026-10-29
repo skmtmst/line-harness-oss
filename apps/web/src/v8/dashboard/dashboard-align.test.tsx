@@ -133,26 +133,26 @@ describe('ダッシュボード編集の表示の切り替え', () => {
   it('V8 はスイッチ（読み上げ「〇〇を表示」）。押すとオン・オフが変わる', async () => {
     document.documentElement.dataset.theme = 'v8'
     await act(async () => { render(<DashboardEditor {...props()} />) })
-    const toggle = screen.getByRole('checkbox', { name: '写真審査を表示' })
-    expect((toggle as HTMLInputElement).checked).toBe(true)
+    const toggle = screen.getByRole('switch', { name: '写真審査を表示' })
+    expect((toggle as HTMLElement).getAttribute('aria-checked') === 'true').toBe(true)
     fireEvent.click(toggle)
-    expect((screen.getByRole('checkbox', { name: '写真審査を表示' }) as HTMLInputElement).checked).toBe(false)
+    expect((screen.getByRole('switch', { name: '写真審査を表示' }) as HTMLElement).getAttribute('aria-checked') === 'true').toBe(false)
   })
 
   it('V8 でも「今日やること」の切り替えは同じ動き（オフ→オンで4枠に戻る）', async () => {
     document.documentElement.dataset.theme = 'v8'
     await act(async () => { render(<DashboardEditor {...props()} />) })
-    fireEvent.click(screen.getByRole('checkbox', { name: '写真審査を表示' }))
-    fireEvent.click(screen.getByRole('checkbox', { name: '写真審査を表示' }))
+    fireEvent.click(screen.getByRole('switch', { name: '写真審査を表示' }))
+    fireEvent.click(screen.getByRole('switch', { name: '写真審査を表示' }))
     const on = ['対応が必要な受信', '写真審査', '今日の予約', '出荷予定件数']
-      .map((label) => (screen.getByRole('checkbox', { name: `${label}を表示` }) as HTMLInputElement).checked)
+      .map((label) => (screen.getByRole('switch', { name: `${label}を表示` }) as HTMLElement).getAttribute('aria-checked') === 'true')
     expect(on.filter(Boolean)).toHaveLength(4)
   })
 
   it('旧テーマ属性でも現役V8の編集を使う', async () => {
     document.documentElement.dataset.theme = 'v7'
     await act(async () => { render(<DashboardEditor {...props()} />) })
-    expect(screen.getByRole('checkbox', { name: '写真審査を表示' })).toBeTruthy()
+    expect(screen.getByRole('switch', { name: '写真審査を表示' })).toBeTruthy()
     expect(document.querySelector('input[aria-label="写真審査を非表示にする"]')).toBeNull()
   })
 })

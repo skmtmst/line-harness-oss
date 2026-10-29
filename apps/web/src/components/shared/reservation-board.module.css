@@ -42,9 +42,8 @@
 .nowTrack{position:absolute;inset-block:var(--tpl-board-block-top) 0;inset-inline:var(--tpl-board-resource-w) 0;pointer-events:none;max-width:calc(820px - var(--tpl-board-resource-w));}
 .contentCols :is(th,td):not(:last-child){padding-inline-end:12px;}
 
-/* 日の予約盤は、道具を表と同じ左端に置き、1152 でも1段に保つ。 */
-.board[data-kind='people'] > .toolbar { padding-inline: 0; gap: var(--space-4); }
-.board[data-kind='people'] > .toolbar > :has(+ .printButton) { margin-inline: var(--space-4); }
+/* 日の予約盤は、道具を表と同じ左端に置き、折り返さず1段に保つ。押せるもの同士の間は道具の段の共通の値。 */
+.board[data-kind='people'] > .toolbar { padding-inline: 0; gap: var(--tpl-toolbar-gap); flex-wrap: nowrap; }
 /* 入りきらない幅では印刷を印だけにする（読み上げ名は残す）。 */
 @media (max-width: 1440px) {
   .printLabel { display: none; }

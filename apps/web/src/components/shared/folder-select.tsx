@@ -16,6 +16,7 @@
  *
  * 画面ごとに作り方を書かない。各画面は自分の種類のフォルダの受け口を onCreate に渡すだけ。
  */
+import { inputPlaceholder } from './input-placeholder'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import FolderDot from './folder-dot'
 import Select, { type SelectCreateContext, type SelectProps } from './select'
@@ -222,7 +223,7 @@ function FolderCreatePanel({
           className={styles.field}
           value={name}
           maxLength={100}
-          placeholder="フォルダ名"
+          placeholder={inputPlaceholder('フォルダ名')}
           aria-label="新しいフォルダの名前"
           aria-invalid={error ? true : undefined}
           // 作っている間は直せない（焦点は残す。disabled にすると焦点が外れて板が閉じる）。

@@ -170,7 +170,7 @@ describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', (
     })
 
     render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
-    await screen.findByRole('checkbox', { name: 'Instagram にも投稿する' })
+    await screen.findByRole('switch', { name: 'Instagram にも投稿する' })
     const picks = screen.getAllByRole('button', { name: '登録メディアから選ぶ' })
     fireEvent.click(picks[target === 'Google' ? 0 : 1])
     await screen.findByRole('dialog', { name: `${target}用画像を登録メディアから選ぶ` })
@@ -197,8 +197,8 @@ describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', (
 
     render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
 
-    const toggle = await screen.findByRole('checkbox', { name: 'Instagram にも投稿する' })
-    expect((toggle as HTMLInputElement).checked).toBe(true)
+    const toggle = await screen.findByRole('switch', { name: 'Instagram にも投稿する' })
+    expect((toggle.getAttribute('aria-checked') === 'true')).toBe(true)
     expect(screen.getByLabelText('Instagram 用の文章（書き換えたいときだけ）')).toBeTruthy()
     expect(screen.getByText('Instagram 用の画像')).toBeTruthy()
 
@@ -212,8 +212,10 @@ describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', (
     render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
 
     await screen.findByText('投稿を作る')
+    expect(screen.queryByRole('switch', { name: 'Instagram にも投稿する' })).toBeNull()
     expect(screen.queryByRole('checkbox', { name: 'Instagram にも投稿する' })).toBeNull()
     expect(screen.queryByText('Instagram 用の画像')).toBeNull()
+    expect(screen.queryByText(/Instagram には画像が 1 枚必要です/)).toBeNull()
   })
 })
 

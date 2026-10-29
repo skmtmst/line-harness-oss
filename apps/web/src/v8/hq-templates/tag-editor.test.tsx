@@ -1,4 +1,6 @@
+import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -26,7 +28,7 @@ describe('統括の V8 タグ編集と保存先', () => {
     expect(document.getElementById(title.getAttribute('aria-describedby')!)?.textContent).toContain('オフのままでも、タグの手動付与')
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(title.getAttribute('aria-expanded')).toBe('false')
-    fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
+    fireEvent.click(getPageAction({ name: '保存して続けて作る' }))
     await waitFor(() => expect(save).toHaveBeenCalledOnce())
     expect(save.mock.calls[0][0].tag.linkedEnabled).toBe(false)
     expect(save.mock.calls[0][1]).toBe(true)
@@ -35,11 +37,11 @@ describe('統括の V8 タグ編集と保存先', () => {
     const save = vi.fn<(definition: TagDefinition, another?: boolean) => Promise<void>>().mockResolvedValue(undefined)
     const draft = vi.fn<(definition: TagDefinition) => Promise<void>>().mockResolvedValue(undefined)
     render(<HqTagEditorV8 definition={definition} editing={false} saving={false} onCancel={() => {}} onSave={save} onSaveDraft={draft} />)
-    fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
+    fireEvent.click(getPageAction({ name: '保存して続けて作る' }))
     await waitFor(() => expect(save).toHaveBeenCalledOnce())
     expect(save.mock.calls[0][1]).toBe(true)
     expect(draft).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: '下書きを保存' })).toBeTruthy()
+    expect(getPageAction({ name: '下書きを保存' })).toBeTruthy()
   })
   it('店のAPIや遡及処理を呼ばず、名前・フォルダ・マイルを統括の保存へ渡す', async () => {
     const save = vi.fn<(definition: TagDefinition, another?: boolean) => Promise<void>>().mockResolvedValue(undefined)
@@ -62,13 +64,14 @@ describe('統括の V8 タグ編集と保存先', () => {
     expect(menu.textContent).toContain('マイルを付ける')
     expect(menu.textContent).not.toContain('タグを付ける')
     fireEvent.keyDown(menu, { key: 'Escape' })
-    fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
+    fireEvent.click(getPageAction({ name: '保存して続けて作る' }))
     await waitFor(() => expect(save).toHaveBeenCalledTimes(1))
     expect(save.mock.calls[0][0].tag.linkedEnabled).toBe(false)
     expect(save.mock.calls[0][1]).toBe(true)
   })
 
   it('閲覧のみでは保存・連動の変更操作を隠し、空の名前では保存できない', () => {
+    verifiedStaffRole('viewer')
     const props = { definition, editing: false, saving: false, onCancel: () => {}, onSave: vi.fn(async () => {}) }
     const view = render(<HqTagEditorV8 {...props} readOnly />)
     expect(screen.queryByRole('button', { name: 'タグを作る' })).toBeNull()
@@ -119,7 +122,7 @@ it.each([null, '#ef4444'])('統括のタグひな形は所属フォルダの色 
     editing={false} saving={false} onCancel={() => {}} onSave={vi.fn(async () => {})} />)
   const trigger = screen.getByRole('button', { name: '所属フォルダ' })
   fireEvent.click(trigger)
-  const option = screen.getAllByRole('option').find((row) => row.textContent === 'テスト')!
+  const option = (screen.getAllByRole('option').find((row) => row.textContent === 'テスト') ?? querySupplementaryPageAction('テスト'))!
   const expected = document.createElement('span')
   expected.style.backgroundColor = folderDisplayColor(folder)
   expect(option.querySelector<HTMLElement>('[data-folder-dot]')!.style.backgroundColor).toBe(expected.style.backgroundColor)
@@ -130,3 +133,5 @@ it.each([null, '#ef4444'])('統括のタグひな形は所属フォルダの色 
   expect(container.textContent).toContain('テスト')
   delete document.documentElement.dataset.theme
 })
+
+afterEach(() => { verifiedStaffRole(null) })

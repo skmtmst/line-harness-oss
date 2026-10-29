@@ -39,12 +39,12 @@ beforeEach(() => {
   })
 })
 afterEach(cleanup)
-const setting = () => screen.getByRole('checkbox', { name: '友だち一覧に出す' }) as HTMLInputElement
+const setting = () => screen.getByRole('switch', { name: '友だち一覧に出す' }) as HTMLInputElement
 
 describe('友だち一覧への表示設定は版付きで保存する(#715)', () => {
   it('版と担当を送り、読み直した新しい版で次の保存を送る', async () => {
     render(<TagEdit />)
-    await screen.findByRole('checkbox', { name: '友だち一覧に出す' })
+    await screen.findByRole('switch', { name: '友だち一覧に出す' })
     fireEvent.click(setting()); fireEvent.click(screen.getByRole('button', { name: 'タグを保存する' }))
     await waitFor(() => expect(fx.update).toHaveBeenCalledWith('t1', 'a1', 1, expect.objectContaining({ isStarred: true }), expect.any(String)))
     await waitFor(() => expect((screen.getByRole('button', { name: 'タグを保存する' }) as HTMLButtonElement).disabled).toBe(false))
@@ -55,13 +55,13 @@ describe('友だち一覧への表示設定は版付きで保存する(#715)', (
   it('409は保存成功とせず入力を残し、最新を読み込むと保存済みの設定へ戻る', async () => {
     fx.update.mockRejectedValueOnce(new ApiError(409, '別の人が先にタグを更新しました'))
     render(<TagEdit />)
-    await screen.findByRole('checkbox', { name: '友だち一覧に出す' })
+    await screen.findByRole('switch', { name: '友だち一覧に出す' })
     fireEvent.click(setting()); fireEvent.click(screen.getByRole('button', { name: 'タグを保存する' }))
     await screen.findByText('ほかの人がタグ「通常タグ」を先に保存しました')
-    expect(setting().checked).toBe(true)
+    expect((setting().getAttribute('aria-checked') === 'true')).toBe(true)
     expect(fx.isStarred).toBe(false)
     fireEvent.click(screen.getByRole('button', { name: '最新を読み込んで続ける' }))
-    await waitFor(() => expect(setting().checked).toBe(false))
+    await waitFor(() => expect((setting().getAttribute('aria-checked') === 'true')).toBe(false))
     expect(screen.queryByText('ほかの人がタグ「通常タグ」を先に保存しました')).toBeNull()
   })
 })

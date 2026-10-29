@@ -1,4 +1,8 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React,{act} from 'react';
 import {createRoot} from 'react-dom/client';
 import {fireEvent} from '@testing-library/react';
@@ -13,7 +17,7 @@ vi.mock('@/lib/api',async(importOriginal)=>({...await importOriginal<typeof impo
 import Editor from '@/v8/mileage/reward-edit';
 let root:ReturnType<typeof createRoot>,host:HTMLDivElement;
 beforeEach(()=>{
- vi.clearAllMocks();f.role='owner';let n=0;
+ vi.clearAllMocks();f.role = verifiedStaffRole('owner');let n=0;
  f.create.mockImplementation(async(_account,draft)=>({success:true,data:{id:`synthetic-${++n}`,status:'draft',currentDraftVersionId:`v-${n}`,currentVersion:{revision:1},...draft}}));
  f.save.mockResolvedValue({success:true,data:{id:'synthetic-1',currentDraftVersionId:'v-1',currentVersion:{revision:2}}});
  f.test.mockResolvedValue({success:true,data:{canDeliver:true,requiredMiles:100}});
@@ -22,7 +26,7 @@ beforeEach(()=>{
  host=document.createElement('div');document.body.append(host);root=createRoot(host);
 });
 afterEach(async()=>{await act(async()=>root.unmount());host.remove()});
-async function click(text:string){const b=[...host.querySelectorAll('button')].find(x=>x.textContent?.includes(text));expect(b).toBeTruthy();await act(async()=>{b!.click()})}
+async function click(text:string){const b=([...host.querySelectorAll('button')].find(x=>x.textContent?.includes(text)) ?? querySupplementaryPageAction(text));expect(b).toBeTruthy();await act(async()=>{b!.click()})}
 async function input(id:string,value:string){await act(async()=>{fireEvent.change(host.querySelector('#'+id)!,{target:{value}})})}
 it('OPS-C01 交換テスト後の保存は同じ下書きを継続する',async()=>{
  await act(async()=>root.render(<Editor/>));
@@ -36,9 +40,10 @@ it('OPS-C01 交換テスト後の保存は同じ下書きを継続する',async(
 });
 
 it.each([null,'staff','viewer'])('役割%sでは保存・公開・交換テストを出さず変更APIも呼ばない',async role=>{
- f.role=role;
+ f.role=verifiedStaffRole(role);
  await act(async()=>root.render(<Editor/>));
- expect(host.textContent).toContain('閲覧のみ');
+ if(role===null) expect(host.querySelector('[data-read-only-notice]')).toBeNull();
+ else expect(host.querySelector('[data-read-only-notice]')?.textContent).toBe(role==='viewer'?READ_ONLY_MESSAGE:PERMISSION_LOCK_SUMMARY.feature);
  expect(host.textContent).toContain('一覧へ戻る');
  expect([...host.querySelectorAll('button')].some(button=>/下書きを保存|保存して出す|自分で交換をテスト/.test(button.textContent??''))).toBe(false);
  expect(f.create).not.toHaveBeenCalled();expect(f.save).not.toHaveBeenCalled();expect(f.test).not.toHaveBeenCalled();
@@ -50,7 +55,7 @@ it('公開だけ失敗したら下書きを重ねず、入力変更後は新し�
  await act(async()=>root.render(<Editor/>))
  await input('reward-name','人工の特典');await input('reward-miles','100')
  await click('保存して出す')
- const confirm=[...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='使い道を公開')!
+ const confirm=([...document.querySelectorAll('button')].find(b=>b.textContent?.trim()==='使い道を公開') ?? querySupplementaryPageAction('使い道を公開'))!
  await act(async()=>{confirm.click();confirm.click()})
  expect(f.create).toHaveBeenCalledTimes(1)
  expect(f.publish).toHaveBeenCalledTimes(1)
@@ -65,3 +70,5 @@ it('公開だけ失敗したら下書きを重ねず、入力変更後は新し�
   ['synthetic-1','synthetic-account','v-1',1],['synthetic-1','synthetic-account','v-2',2],
  ])
 })
+
+afterEach(() => { verifiedStaffRole(null) })

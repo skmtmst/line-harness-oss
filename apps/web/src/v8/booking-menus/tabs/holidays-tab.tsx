@@ -14,6 +14,7 @@ import { Field } from '@/components/shared/form-controls'
 import { requiredText, optionalText } from '@/lib/form-requirement'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /* ③ 休業日（settings-v8.tsx から分割。見た目・動きは変えない） */
 
@@ -310,7 +311,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
         <div className="grid gap-3">
           <Field label="開始日" requirement={holidayRequirements.from} error={dateErrors.from}><SaveErrorField names={["editFrom","dateFrom","edit_from"]}><DateField aria-label="休業の開始日" value={editFrom} onChange={(value) => { setEditFrom(value); setDateErrors(current => ({ ...current, from: undefined })) }} disabled={busy} className="mt-1" /></SaveErrorField></Field>
           <Field label="終了日" requirement={holidayRequirements.to} error={dateErrors.to}><SaveErrorField names={["editTo","dateTo","edit_to"]}><DateField aria-label="休業の終了日" value={editTo} onChange={(value) => { setEditTo(value); setDateErrors(current => ({ ...current, to: undefined })) }} disabled={busy} className="mt-1" /></SaveErrorField></Field>
-          <Field label="理由" requirement={holidayRequirements.reason}><SaveErrorField names={["editReason","reason","edit_reason"]}><input aria-label="休業の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={busy} placeholder="例：お盆・店舗の改装" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
+          <Field label="理由" requirement={holidayRequirements.reason}><SaveErrorField names={["editReason","reason","edit_reason"]}><SharedTextField aria-label="休業の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={busy} placeholder="例：お盆・店舗の改装" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
           {editError ? <Notice tone="danger" >{editError}</Notice> : null}
           <div className="flex justify-end gap-2">
             <Button onClick={() => { if (!busy) setEditing(null) }} disabled={busy}>キャンセル</Button>

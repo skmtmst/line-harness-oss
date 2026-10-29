@@ -42,8 +42,8 @@ export function WizardConfirmStep({ actionOptions, autoReplyId, confirmState, ef
                   <SummaryRow label="名前・フォルダ" onEdit={() => goToStep('basic')}>
                     {thisRuleName}
                     {form.folderId
-                      ? `・${folders.find((f) => f.id === form.folderId)?.name ?? '分けない'}`
-                      : '・分けない'}
+                      ? `・${folders.find((f) => f.id === form.folderId)?.name ?? '未分類'}`
+                      : '・未分類'}
                   </SummaryRow>
                   <SummaryRow label="反応する言葉" onEdit={() => goToStep('trigger')}>
                     {form.respondToAll

@@ -6,9 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
 import FormsListV8 from './list'
+import { formQuestionCount, type Form } from './model'
+import { fieldsToLayout } from '@line-crm/shared'
 
 ;
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 回答フォーム一覧（src/v8/forms）の動きの試験。BEHAVIOR.md の「今までと変えたところ」を守る。
  * 未分類の件数・閲覧のみの帯と押せない「フォルダを追加」・行の「…」の読み上げ名・1152 で保存先を出さない・表示件数 10/20/50。
@@ -103,7 +106,7 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   const values = new Map<string, string>()
   const storage = {
     getItem: (key: string) => values.get(key) ?? null,
@@ -151,7 +154,7 @@ describe('V8 回答フォーム一覧', () => {
     expect(unfiled.textContent).toContain('3')
   })
 
-  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は丸を出さない）', async () => {
+  it('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は灰色の丸）', async () => {
     fetchApi.mockImplementation(async (path: string) => {
       if (path.startsWith('/api/forms?')) {
         return {
@@ -174,7 +177,8 @@ describe('V8 回答フォーム一覧', () => {
     expect(filed[0].getAttribute('data-folder-dot')).toBe('filed')
     expect(filed[0].getAttribute('aria-label')).toBe('フォルダ：来店・予約')
     const unfiled = host.querySelector('tr[data-row-id="f-2"]')?.querySelectorAll('[data-folder-dot]') ?? []
-    expect(unfiled).toHaveLength(0)
+    expect(unfiled).toHaveLength(1)
+    expect(unfiled[0].getAttribute('data-folder-dot')).toBe('unfiled')
   })
 
   it('行の「…」は「「〇〇」のその他の操作」で押せて、項目が開く', async () => {
@@ -186,7 +190,7 @@ describe('V8 回答フォーム一覧', () => {
   })
 
   it('変えられない人には閲覧のみの帯が出て、「フォルダを追加」は出さない（押せない飾りを置かない）', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await mount()
     expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
@@ -204,7 +208,7 @@ describe('V8 回答フォーム一覧', () => {
   })
 
   it('フォームの編集権限がある staff は変更でき、フォルダの管理だけは出さない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     window.localStorage.setItem('lh_staff_role', 'staff')
     rememberStaffIdentity({ role: 'staff', permissionKeys: ['/form-submissions'] } as StaffMember)
     await mount()
@@ -233,10 +237,11 @@ describe('V8 回答フォーム一覧', () => {
     expect(screen.getByText('友だち情報 3')).toBeTruthy()
   })
 
-  it('1ページでも件数の範囲と現在のページを出す', async () => {
+  it('1ページは件数の範囲だけを出す', async () => {
     await mount()
-    expect(screen.getByRole('navigation', { name: '回答フォームのページ送り' }).textContent).toContain('1件中 1〜1件')
-    expect(screen.getByRole('button', { name: '1ページ目へ' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByText('1件中 1〜1件')).toBeTruthy()
+    expect(screen.queryByRole('navigation', { name: '回答フォームのページ送り' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '1ページ目へ' })).toBeNull()
   })
 
   it('一覧の口へ件数 20・最新の回答順で頼む', async () => {
@@ -356,4 +361,12 @@ it('一覧フロー：余白・Enter・Spaceでフォームのパネル、名前
   expect(new URLSearchParams(window.location.search).has('form')).toBe(false)
   await act(async () => { fireEvent.keyDown(row, { key: ' ' }) })
   expect(new URLSearchParams(window.location.search).get('form')).toBe('f-1')
+})
+
+afterEach(() => { verifiedStaffRole(null) })
+it('質問数は配置の入力欄を数え、見出し・説明を数えず、互換fieldsの欠落でも落とさない', () => {
+  const fields = [{ name: 'answer', label: '回答', type: 'text' }, { name: 'title', label: '題', type: 'heading' }]
+  const layout = fieldsToLayout(fields)
+  expect(formQuestionCount({ fields: [], layout })).toBe(1)
+  expect(formQuestionCount({ fields, layout: undefined } as unknown as Form)).toBe(1)
 })

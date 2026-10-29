@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import { connectGuardBrowser } from './browser-session.mjs'
 import scan from './owner-rules-browser.mjs'
 import scanPolish from './polish-rules-browser.mjs'
+import scanRowHeights from './control-row-height-browser.mjs'
 import scanRowCentering from './row-centering-browser.mjs'
 import scanHoverReveal from './hover-reveal-browser.mjs'
 
@@ -49,6 +50,20 @@ test('small UI text drawn at weight 400 fails; 500 and larger reading text pass'
     assert.deepEqual(broken[0].measure, { size: 12, weight: 400 })
     await page.locator('#small').evaluate(el => { el.style.fontWeight = '500' })
     assert.deepEqual(await page.evaluate(scan), [])
+  } finally { await browser.close() }
+})
+
+test('操作できる要素の当たり判定がゼロなら落ち、表示を戻すと通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><button id="action" style="width:0;height:36px;padding:0;border:0;box-sizing:border-box">保存</button><a href="#" style="display:none">非表示</a></main>')
+    const broken = await page.evaluate(scanRowHeights)
+    assert.equal(broken.length, 1)
+    assert.equal(broken[0].kind, 'zero-control-hit-area')
+    assert.deepEqual(broken[0].measure, { width: 0, height: 36 })
+    await page.locator('#action').evaluate(el => { el.style.width = '96px' })
+    assert.deepEqual(await page.evaluate(scanRowHeights), [])
   } finally { await browser.close() }
 })
 
@@ -330,6 +345,166 @@ test('手書きの動きを同じ選び先の後ろの規則で共通の値に�
   } finally { await browser.close() }
 })
 
+test('同じ段の押せるもの同士の外枠が 1px でも重なると落ち、間を空ける・欄の中の印・別の層は通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const kinds = async () => (await page.evaluate(scan)).filter(f => f.kind === 'control-collide')
+    const row = gap => `<main><div style="display:flex;gap:${gap}"><select aria-label="予約元" style="width:140px;height:36px"><option>予約元：すべて</option></select><button id="print" style="width:72px;height:36px">印刷</button></div></main>`
+    await page.setContent(row('8px'))
+    assert.deepEqual(await kinds(), [])
+    await page.setContent(row('0px'))
+    assert.deepEqual(await kinds(), [])
+    await page.locator('#print').evaluate(el => { el.style.marginLeft = '-1px' })
+    const broken = await kinds()
+    assert.equal(broken.length, 1)
+    assert.deepEqual(broken[0].measure, { width: 1, height: 36 })
+    // 欄の中に収めた消すボタンは欄の内側なので数えない。
+    await page.setContent('<main><div style="position:relative;width:240px"><input aria-label="探す" style="width:240px;height:36px;box-sizing:border-box"><button aria-label="消す" style="position:absolute;right:4px;top:4px;width:28px;height:28px">×</button></div></main>')
+    assert.deepEqual(await kinds(), [])
+    // 下に追従する帯の中のボタンと、帯の裏の本文のボタンは別の層。
+    await page.setContent('<main><button style="height:36px;width:200px;margin-top:800px">本文</button><div style="position:fixed;bottom:0;left:0;right:0"><button style="height:36px;width:200px">保存する</button></div></main>')
+    await page.setViewportSize({ width: 800, height: 830 })
+    assert.deepEqual(await kinds(), [])
+  } finally { await browser.close() }
+})
+
+test('ボタンが丸ごと重なる場合も落ち、カードの外へ出た操作を検出する', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><article style="width:200px"><div style="display:flex"><button style="width:120px;flex:none">見送る</button><button style="width:120px;flex:none">採用する</button></div></article></main>')
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'card-control-overflow'))
+    await page.setContent('<main><div style="position:relative"><button style="width:120px">予約元</button><button style="position:absolute;left:0;top:0;width:120px">印刷</button></div></main>')
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'control-collide'))
+    await page.setContent('<main><article style="width:200px"><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px"><button style="min-width:0">見送る</button><button style="min-width:0">採用する</button></div></article></main>')
+    assert.ok(!(await page.evaluate(scan)).some(f => /card-control|control-collide/.test(f.kind)))
+  } finally { await browser.close() }
+})
+
+test('主操作の置き場所と題の副操作は、壊すと落ち、戻すと通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><div data-page-template="list"><header data-template-region="heading"><div data-page-heading-actions><button data-variant="primary">作る</button><button data-variant="secondary">CSV</button></div></header><div data-list-folders="true"><aside data-template-region="folders">フォルダ</aside></div></div></main>')
+    const kinds = async () => (await page.evaluate(scan)).map(f => f.kind)
+    assert.ok((await kinds()).includes('create-action-placement'))
+    assert.ok((await kinds()).includes('heading-secondary-style'))
+    await page.locator('[data-variant="secondary"]').evaluate(el => { el.dataset.variant = 'text' })
+    await page.locator('aside').evaluate(el => el.append(document.querySelector('[data-variant="primary"]')))
+    assert.deepEqual(await kinds(), [])
+    await page.locator('[data-list-folders]').evaluate(el => { el.dataset.listFolders = 'false' })
+    assert.ok((await kinds()).includes('create-action-placement'))
+    await page.locator('[data-page-heading-actions]').evaluate(el => el.append(document.querySelector('[data-variant="primary"]')))
+    assert.deepEqual(await kinds(), [])
+  } finally { await browser.close() }
+})
+
+test('1つの操作の段で高さが違う操作が並ぶと落ち、36pxにそろえれば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><div data-control-row style="display:flex;gap:8px;align-items:center"><button id="prev" style="height:32px">前へ</button><button style="height:36px">今日</button><select aria-label="状態" style="height:36px"><option>すべて</option></select></div></main>')
+    const broken = await page.evaluate(scanRowHeights)
+    assert.equal(broken.length, 1)
+    assert.equal(broken[0].kind, 'rowheight')
+    assert.deepEqual(broken[0].measure.heights, [32, 36, 36])
+    await page.locator('#prev').evaluate(el => { el.style.height = '20px' })
+    assert.ok((await page.evaluate(scanRowHeights)).some(f => f.kind === 'rowheight'))
+    await page.locator('#prev').evaluate(el => { el.style.height = '36px' })
+    assert.deepEqual(await page.evaluate(scanRowHeights), [])
+  } finally { await browser.close() }
+})
+
+test('ダイアログ・カード・下の帯で影が親の overflow に切られると落ち、逃げを作れば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const html = overflow => `<main><section role="dialog"><div id="clip" style="position:relative;width:240px;height:64px;overflow:${overflow}"><button style="position:absolute;left:8px;top:40px;width:180px;height:36px;box-shadow:0px 0px 8px 0px rgba(0,0,0,.3)">詳しい数値を見る</button></div></section></main>`
+    await page.setContent(html('hidden'))
+    const clipped = (await page.evaluate(scan)).filter(f => f.kind === 'shadow-clip')
+    assert.equal(clipped.length, 1)
+    assert.ok(clipped[0].measure.bottom > 0)
+    await page.locator('#clip').evaluate(el => { el.style.height = '96px'; el.style.overflow = 'visible' })
+    assert.deepEqual((await page.evaluate(scan)).filter(f => f.kind === 'shadow-clip'), [])
+
+    await page.setContent(html('auto'))
+    assert.equal((await page.evaluate(scan)).filter(f => f.kind === 'shadow-clip').length, 1)
+  } finally { await browser.close() }
+})
+
+test('吹き出しが画面の題に重なる配置を検出し、どかせば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><h2 style="position:absolute;left:40px;top:40px;width:120px;height:24px">親アカウント</h2><span role="tooltip" style="position:fixed;left:50px;top:45px;width:100px;height:30px">説明</span></main>')
+    const overlap = async () => (await page.evaluate(scan)).filter(f => f.kind === 'tooltip-heading-overlap')
+    assert.equal((await overlap()).length, 1)
+    await page.locator('[role="tooltip"]').evaluate(el => { el.style.top = '5px' })
+    assert.deepEqual(await overlap(), [])
+  } finally { await browser.close() }
+})
+
+test('内側の影と輪は切れに数えず、外側の輪へ壊すと検出する', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><section role="dialog" style="width:200px;height:40px;overflow:hidden"><button style="width:200px;height:40px;box-shadow:inset 0 0 8px #0004;outline:2px solid blue;outline-offset:-2px">保存</button></section></main>')
+    const clips = async () => (await page.evaluate(scan)).filter(f => f.kind === 'shadow-clip')
+    assert.deepEqual(await clips(), [])
+    await page.locator('button').evaluate(el => { el.style.outlineOffset = '2px' })
+    assert.ok((await clips()).some(f => f.measure.bottom > 0))
+    await page.locator('button').evaluate(el => { el.style.outlineOffset = '-2px' })
+    assert.deepEqual(await clips(), [])
+  } finally { await browser.close() }
+})
+
+test('表の省略に余りがある・括弧の補足が欠ける・詳細の矢印を検出し、復元後は通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><table style="width:700px;table-layout:fixed"><thead><tr><th>フォーム（質問の数）</th><th>状態</th></tr></thead><tbody><tr><td><span style="display:block;width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">とても長いフォームの名前</span></td><td>公開中</td></tr></tbody></table><button>詳細<svg class="lucide-log-in" /></button></main>')
+    const broken = await page.evaluate(scan)
+    for (const kind of ['table-unused-space', 'table-missing-detail', 'action-icon']) assert.ok(broken.some(f => f.kind === kind), kind)
+    await page.locator('td').first().evaluate(cell => { cell.firstChild.style.width = '100%'; const sub = document.createElement('span'); sub.textContent = '質問 6'; sub.setAttribute('data-list-name-description', ''); cell.append(sub) })
+    await page.locator('button svg').evaluate(el => el.remove())
+    assert.deepEqual(await page.evaluate(scan), [])
+    await page.locator('th').first().evaluate(el => { el.textContent = 'メニュー（大きさ・ボタン）' })
+    await page.locator('td').first().evaluate(el => { el.innerHTML = '通常メニュー<span data-list-name-description>大 6 ボタン</span>' })
+    assert.deepEqual(await page.evaluate(scan), [])
+    await page.locator('td').first().evaluate(el => { el.textContent = '大阪店 6 ボタン' })
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'table-missing-detail'))
+  } finally { await browser.close() }
+})
+
+
+test('スクロール本文の下方の影は読み進められるが、本文の終端の逃げ不足は落とす', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    const html = padding => `<main><section role="dialog" style="overflow:hidden;height:120px"><div id="scroll" style="height:100px;overflow:auto;padding:24px;box-sizing:border-box"><div style="height:300px"></div><button style="box-shadow:0 0 4px #0004;margin-bottom:${padding}px">保存する</button><div style="height:80px"></div></div></section></main>`
+    await page.setContent(html(24))
+    const clips = async () => (await page.evaluate(scan)).filter(f => f.kind === 'shadow-clip')
+    assert.deepEqual(await clips(), [])
+    await page.locator('#scroll').evaluate(el => { el.scrollTop = 250 })
+    assert.deepEqual(await clips(), [])
+    await page.setContent('<main><section role="dialog"><div style="height:100px;overflow:auto"><div style="height:300px"></div><button style="height:30px;box-shadow:0 0 4px #0004">保存する</button></div></section></main>')
+    assert.ok((await clips()).some(f => f.measure.bottom > 0))
+  } finally { await browser.close() }
+})
+
+
+test('影のないスクロール窓自体が外のoverflowに切られる故障も検出する', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><section role="dialog" style="height:120px;overflow:hidden"><div id="scroll" style="height:200px;overflow:auto;padding:24px"><div style="height:300px"></div><button style="box-shadow:0 0 4px #0004">保存</button><div style="height:80px"></div></div></section></main>')
+    assert.ok((await page.evaluate(scan)).some(f => f.kind === 'scroll-window-clip'))
+    await page.locator('#scroll').evaluate(el => { el.style.height = '100px'; el.style.boxSizing = 'border-box' })
+    assert.ok(!(await page.evaluate(scan)).some(f => f.kind === 'scroll-window-clip'))
+  } finally { await browser.close() }
+})
+
 test('印＋文字の行で、印・文字・右のボタンの上下の真ん中が 1px を超えてずれると落ち、そろえば通る', async () => {
   const browser = await connectGuardBrowser()
   try {
@@ -404,5 +579,21 @@ test('押せない薄いボタン（aria-disabled=true）は数えず、有効�
     const findings = await page.evaluate(scanHoverReveal)
     assert.deepEqual(findings.map(f => f.kind).sort(), ['hover-focus', 'hover-touch'])
     assert.ok(findings.every(f => f.text === '外す'))
+  } finally { await browser.close() }
+})
+
+test('1 つの操作の段で高さが違う操作が並ぶと落ち、36px にそろえれば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><div data-control-row style="display:flex;gap:8px;align-items:center"><button id="prev" style="height:32px">‹</button><button style="height:36px">今日</button><div data-segmented-control role="group" style="height:36px;display:flex"><button style="height:32px">時間</button><button style="height:32px">月</button></div><button aria-haspopup="listbox" style="height:36px">担当：すべて</button></div></main>')
+    const broken = await page.evaluate(scanRowHeights)
+    assert.equal(broken.length, 1)
+    assert.equal(broken[0].kind, 'rowheight')
+    assert.deepEqual(broken[0].measure.heights, [32, 36, 36, 36])
+    await page.locator('#prev').evaluate((el) => { el.style.height = '50px' })
+    assert.equal((await page.evaluate(scanRowHeights)).length, 1)
+    await page.locator('#prev').evaluate((el) => { el.style.height = '36px' })
+    assert.deepEqual(await page.evaluate(scanRowHeights), [])
   } finally { await browser.close() }
 })

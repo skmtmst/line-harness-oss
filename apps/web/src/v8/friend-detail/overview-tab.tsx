@@ -18,6 +18,7 @@ import type { FriendField, Tag } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Checkbox from '@/components/shared/checkbox'
+import TextLink from '@/components/shared/text-link'
 import TagPill from '@/components/shared/tag-pill'
 import CustomerInfoPanel, { CustomerInfoRail } from '@/components/shared/customer-info-panel'
 import TagOverflow from '@/components/shared/tag-overflow'
@@ -416,7 +417,7 @@ export default function OverviewTab({
                     connect={index < history.length - 1}
                     icon={recentIcon(item.type)}
                     title={src
-                      ? <a className={styles.recentTitle} href={src.href} target={src.external ? '_blank' : undefined} rel="noreferrer">{item.summary}</a>
+                      ? <TextLink href={src.href} external={src.external} title={item.summary}>{item.summary}</TextLink>
                       : item.summary}
                     titleAttribute={item.summary}
                     sub={[timelineTypeLabel(item.type), item.lineAccount?.name].filter(Boolean).join('・')}

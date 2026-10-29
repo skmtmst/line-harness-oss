@@ -1,13 +1,13 @@
 'use client'
 
-import { ProgressBar } from '@/components/shared/progress'
 import { useMemo } from 'react'
-import { CircleCheck, Circle, TriangleAlert } from 'lucide-react'
+import { CircleCheck, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { RowStatusActions } from '@/components/shared/row-actions'
 import Card, { CardHeader } from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
+import { ProgressBar, StepMark } from '@/components/shared/progress'
 import StatusBadge from '@/components/shared/status-badge'
 import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { FEATURES, featureHref, sampleMenuFor, featureName, summarizeSetup, type SetupSummary, type TodoRow } from './model'
@@ -89,10 +89,9 @@ export function SetupTasks({ summary, onOpenStep, heading = false }: { summary: 
 }
 
 function SetupRow({ row, onOpenStep, onPreparing }: { row: TodoRow; onOpenStep: (step: string | number) => void; onPreparing: (feature: string) => void }) {
-  const Icon = row.alert ? TriangleAlert : Circle
   return (
     <li className={styles.row} data-alert={row.alert || undefined}>
-      <Icon aria-hidden="true" className={styles.rowIcon} />
+      {row.alert ? <TriangleAlert aria-hidden="true" className={styles.rowIcon} /> : <StepMark done={false} />}
       <span className={styles.rowText}>
         <span className={styles.rowTitle}>{row.title}</span>
         <span className={styles.rowNote}>{row.note}</span>

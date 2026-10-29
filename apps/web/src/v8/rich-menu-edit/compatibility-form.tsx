@@ -4,7 +4,6 @@ import { useMemo, useState, type ReactNode } from 'react'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
 import Chip from '@/components/shared/chip'
 import LinePreview from '@/components/shared/line-preview'
 import { Field, TextInput } from '@/components/shared/form-controls'
@@ -24,6 +23,7 @@ import type { RichMenuAreaIntent } from '@line-crm/shared'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { STORE_NEW_MENU_INTENTS, RichMenuTemplatePreview, type RichMenuOption, type RichMenuFolderOption, type RichMenuCreateValue } from '../../components/rich-menus/rich-menu-create-model'
+import { ToggleField } from '@/components/shared/toggle'
 
 const SIZE_TABS: { value: 'large' | 'compact'; label: string; dims: string; hint: string }[] = [
   { value: 'large', label: '大きい', dims: `${SIZE_DIMENSIONS.large.width} × ${SIZE_DIMENSIONS.large.height}px`, hint: '画面をしっかり使う。ボタンを6つまで置ける' },
@@ -194,7 +194,7 @@ export default function RichMenuCreateForm({
           <SaveErrorField names={["targetingPriority","value.targetingPriority","targeting_priority","value.targeting_priority"]}><NumberInput id="create-targeting-priority" min={1} unit="番目" disabled={locked} value={value.targetingPriority + 1} onChange={event => patch({ targetingPriority: Math.max(0, Number(event.target.value) - 1) })} /></SaveErrorField>
         </Field>
       </> : null}
-      <SaveErrorField names={["isDefaultForAll","value.isDefaultForAll","is_default_for_all","value.is_default_for_all"]}><Checkbox checked={value.isDefaultForAll} disabled={locked || value.targetingEnabled} onCheckedChange={checked => patch({ isDefaultForAll: checked })} description={value.targetingEnabled ? '出し分けを選んだメニューは全員の既定にはできません。' : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}>公開したら「すべての友だち」の既定メニューにする</Checkbox></SaveErrorField>
+      <SaveErrorField names={["isDefaultForAll","value.isDefaultForAll","is_default_for_all","value.is_default_for_all"]}><ToggleField checked={value.isDefaultForAll} disabled={locked || value.targetingEnabled} onChange={checked => patch({ isDefaultForAll: checked })} description={value.targetingEnabled ? '出し分けを選んだメニューは全員の既定にはできません。' : '公開のときにLINEの既定へ設定します。ほかに既定のメニューがある場合は入れ替わります。'}>公開したら「すべての友だち」の既定メニューにする</ToggleField></SaveErrorField>
     </Card> : null}
 
     <Card variant="form" padding="roomy" layout="vertical" gap="normal">

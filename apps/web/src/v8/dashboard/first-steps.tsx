@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Link from '@/components/shared/list-navigation'
-import { Check, ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { canManageRole } from '@/lib/staff-role'
 import styles from './first-steps.module.css'
-import { ProgressBar } from '@/components/shared/progress'
+import { ProgressBar, StepMark } from '@/components/shared/progress'
 
 import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
 import { doneCount, type StepResult } from '@/v8/settings/public/getting-started-steps/index'
@@ -96,7 +96,13 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
   }
 }
 
+/** 次にやる 1 つ。まだで、行き先があるうちの最初の段。 */
+export function nextFirstStepKey(summary: FirstStepsSummary): string | null {
+  return summary.steps.find((step) => !step.done && step.href)?.key ?? null
+}
+
 export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigure, setupTasks, feedback }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onConfigure?: () => void; setupTasks?: ReactNode; feedback?: ReactNode }) {
+  const nextKey = summary ? nextFirstStepKey(summary) : null
   return (
     <Card as="section" layout="vertical" contentPadding="var(--space-16) var(--space-20)" gap="var(--tpl-d23-ob-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34" actions={!folded && onConfigure ? <Button variant="primary" onClick={onConfigure}>使い方の設定を開く</Button> : undefined}>
       <div className={styles.head}>
@@ -116,8 +122,8 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigu
       {!folded ? setupTasks : null}
       {summary ? <ul id="first-steps-list" className={styles.grid} hidden={folded}>
         {summary.steps.map((step) => (
-          <li key={step.key} className={styles.step} data-done={step.done ? '' : undefined}>
-            <span className={styles.check} aria-hidden="true">{step.done ? <Check className={styles.checkIcon} strokeWidth={3} /> : null}</span>
+          <li key={step.key} className={styles.step} data-done={step.done ? '' : undefined} data-next={step.key === nextKey ? '' : undefined}>
+            <StepMark done={step.done} />
             <span className={styles.label} title={step.label}>
               {step.label}
               <span className="sr-only">{step.done ? '（済み）' : step.state === 'unknown' ? '（未確認）' : step.state === 'forbidden' ? '（権限がありません）' : '（まだ）'}</span>

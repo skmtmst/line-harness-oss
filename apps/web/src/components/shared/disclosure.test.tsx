@@ -20,4 +20,9 @@ describe('開閉する欄（★管理画面）', () => {
     const { container } = render(<Disclosure title="詳細" defaultOpen><p>中身</p></Disclosure>)
     expect(container.querySelector('details')!.open).toBe(true)
   })
+
+  it('選択中の欄は見出し左に緑印を付ける', () => {
+    const { container } = render(<Disclosure title="LINE来店フォロー" selected><p>中身</p></Disclosure>)
+    expect(container.querySelector('summary')?.hasAttribute('data-selected')).toBe(true)
+  })
 })

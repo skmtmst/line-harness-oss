@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import { ProgressBar } from '@/components/shared/progress'
-import StyleChoiceStep, { STYLE_CHOICE_START_ID, StyleChoiceStatus } from '@/v8/onboarding/style-choice-step'
+import { StyleChoiceStep, STYLE_CHOICE_START_ID, StyleChoiceStatus } from '@/v8/onboarding/public/style-choice'
 import styles from '@/v8/onboarding/wizard.module.css'
 
 /** 登録の④でも、はじめの質問と同じ見本を見てからスタイルを選ぶ。 */
