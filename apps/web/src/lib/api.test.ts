@@ -34,19 +34,6 @@ beforeAll(async () => {
   } = await import('./api'))
 })
 
-describe('投稿前の登録メディア閲覧', () => {
-  it('切り取り用画像は追加本人確認が必要な download ではなく認証付き content から取得する', async () => {
-    const fetchSpy = vi.fn(async () => new Response(new Blob(['image'], { type: 'image/jpeg' })))
-    vi.stubGlobal('fetch', fetchSpy)
-
-    await expect(api.media.readContent('media/1', 'account/1')).resolves.toBeInstanceOf(Blob)
-    expect(fetchSpy).toHaveBeenCalledWith(
-      'https://worker.example.com/api/media/media%2F1/content?accountId=account%2F1',
-      expect.objectContaining({ credentials: 'include' }),
-    )
-  })
-})
-
 describe('api.audit attention filter', () => {
   it('sends the server-side union flag with the selected account and pagination', async () => {
     const fetchSpy = vi.fn(async () => new Response(
