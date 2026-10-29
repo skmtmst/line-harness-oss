@@ -83,6 +83,16 @@ describe('店の比較の表', () => {
     expect(screen.getByText(/数の横の印は前の期間との差（赤＝悪い・緑＝良い）/)).toBeTruthy()
   })
 
+  it('狭い幅で2段に分けられるよう、数と札は別の包みに入れる', async () => {
+    render(<StoreComparisonList />)
+    const chip = await screen.findByText('−25')
+    const cell = chip.closest('span[title]')!
+    const wraps = [...cell.children]
+    expect(wraps).toHaveLength(2)
+    expect(wraps[0].textContent).toBe('12 件')
+    expect(wraps[1].textContent).toContain('−25')
+  })
+
   it('列の見出しを押すとその数の順で頼み直す（同じ列をもう一度押すと向きが逆）', async () => {
     render(<StoreComparisonList />)
     await screen.findByText('大宮店')

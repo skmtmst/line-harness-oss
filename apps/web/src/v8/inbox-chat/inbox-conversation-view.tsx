@@ -6,7 +6,6 @@ import Dialog from '@/components/shared/dialog';
 import { InboxMedia } from '@/components/shared/inbox-content';
 import { InboxHistoryButton } from '@/components/shared/inbox-list';
 import { InboxThreadLoading } from '@/components/shared/inbox-thread';
-import ListState from '@/components/shared/list-state';
 import EmailThread from '@/components/support/email-thread';
 import { InboxConversationPane, InboxMessages } from '@/components/templates/inbox-page';
 import { formatListRecent } from '@/lib/format';
@@ -17,11 +16,12 @@ import { CORRECTION_TEMPLATE, Chat, formatByteSize, formatInboxDatetime } from '
 
 import { useMemo } from 'react';
 import type { Props } from './inbox-conversation-view-types';
+import InboxEmptyGuide from './inbox-empty-guide';
 import InboxReplyComposer from './inbox-reply-composer';
 import { InboxMessageRow } from './message-row';
 import { withHonorific } from '@line-crm/shared'
 
-export default function InboxConversation({ operators, selectedChatId, selectedThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo, loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId, attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch, openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef, messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage, textareaRef, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming, dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, quotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, messageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, imageError, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack, imagePreviewOpen, sendError, pendingMessages }: Props) {
+export default function InboxConversation({ operators, selectedChatId, selectedThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo, loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId, attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch, openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef, messagesHasMore, loadingOlderMessages, loadOlderMessages, chatSearchTarget, setQuotedMessage, textareaRef, staffRole, setCorrectingId, setMessageContent, unseenIncoming, setUnseenIncoming, dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, quotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, messageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, imageError, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack, imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled, overdueTotal, chats, emailItems, onOpenAttentionTarget }: Props) {
   const messages = useMemo(() => pendingMessages?.length ? [...(chatDetail?.messages ?? []), ...pendingMessages] : (chatDetail?.messages ?? []), [chatDetail?.messages, pendingMessages])
   return (<InboxConversationPane data-inbox-v4="talk-pane" selected={Boolean(selectedChatId || selectedThreadId)}>
     {selectedThreadId ? (
@@ -50,7 +50,14 @@ export default function InboxConversation({ operators, selectedChatId, selectedT
         </div>
       </div>
     ) : !selectedChatId ? (
-      <ListState kind="empty" emptyPreset="readonly" title="会話を選ぶと、ここに表示されます" description="左の一覧から選んでください。「要返信」で、まだ返していない会話だけに絞れます。" />
+      <InboxEmptyGuide
+        unread={statusCountsNow?.unread ?? null}
+        overdue={slaEnabled ? overdueTotal : (quickCountsNow?.overdue ?? null)}
+        slaEnabled={slaEnabled}
+        chats={chats}
+        emails={emailItems}
+        onOpenTarget={onOpenAttentionTarget}
+      />
     ) : <InboxThreadLoading key={`${selectedAccountId}:${selectedChatId}`} loading={detailLoading && !chatDetail}>{chatDetail ? (
       <>
         {/* Chat Header */}

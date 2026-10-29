@@ -87,4 +87,14 @@ describe('業種ダッシュボード（XBkC2）', () => {
     expect(kpisFor('salon', unavailable, 'today')[3]).toMatchObject({ value: null, detail: '未設定です' })
     expect(kpisFor('salon', unavailable, 'today')[4]).toMatchObject({ value: null, unit: '%', detail: '数が少ないため出せません' })
   })
+
+  it('B28: サロンの対応待ちの補足は1152のマス（121px・9字）に切れずに入る', () => {
+    const snapshot: StyleSnapshot = {
+      style: 'salon', asOf: '2026-10-21T01:00:00Z', timeZone: 'Asia/Tokyo',
+      from: '2026-10-21T00:00:00+09:00', to: '2026-10-22T00:00:00+09:00', dateBasis: 'visit', range: 'today',
+      metrics: { attention: { value: 2, unit: '件', status: 'available', formula: '対応が必要な数' } },
+      previous: {}, items: [], newBookings: [], resultId: 'test',
+    }
+    expect(kpisFor('salon', snapshot, 'today')[1]).toMatchObject({ id: 'waiting', detail: '承認待ち・来店未記録' })
+  })
 })

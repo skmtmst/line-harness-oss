@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const permission = vi.hoisted(() => ({ value: false }))
 vi.mock('@/lib/staff-capability', () => ({ canEditFeature: () => permission.value }))
@@ -13,18 +13,22 @@ vi.mock('@/lib/api', async (original) => {
 })
 import BookingStaffPage from './page'
 afterEach(cleanup)
-it('PKG-CAND-booking-staff-readonly: 閲覧のみは作成を隠し、スタッフとシフトは読める', async () => {
+it('PKG-CAND-booking-staff-readonly: 閲覧のみは作成を理由付きで残し、スタッフとシフトは読める', async () => {
   permission.value = false
   verifiedStaffRole('viewer')
   render(<BookingStaffPage />)
   await screen.findByText('佐野')
-  expect(screen.queryByRole('button', { name: '＋ スタッフを作る' })).toBeNull()
+  const create = screen.getByRole('button', { name: '＋ スタッフを作る' })
+  expect(create.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.click(create)
+  expect(screen.queryByText('新規スタッフ')).toBeNull()
   expect(screen.queryByRole('button', { name: '編集' })).toBeNull()
   expect(screen.getByRole('link', { name: 'シフト' })).toBeTruthy()
   expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
 })
 it('PKG-CAND-booking-staff-readonly: 設定権限がある人には作成を残す', async () => {
   permission.value = true
+  verifiedStaffRole('owner')
   render(<BookingStaffPage />)
   await screen.findByText('佐野')
   expect((screen.getByRole('button', { name: '＋ スタッフを作る' }) as HTMLButtonElement).disabled).toBe(false)

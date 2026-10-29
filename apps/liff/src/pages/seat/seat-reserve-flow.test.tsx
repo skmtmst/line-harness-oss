@@ -261,3 +261,22 @@ it('E3: 休業・貸切・開始1時間前の時刻には席の待ちの入口�
   open(); await screen.findByRole('radio', { name: '19:30 貸切' });
   expect(screen.queryByRole('button', { name: /空いたら知らせる/ })).toBeNull();
 });
+it('押せない「次へ」には理由の1行を出し、時刻を選んだら消す', async () => {
+  open();
+  await screen.findByRole('radio', { name: '19:00 空きあり' });
+  expect(screen.getByRole('button', { name: 'この時刻で進む' })).toHaveProperty('disabled', true);
+  expect(screen.getByText('時刻を選んでください')).toBeTruthy();
+  fireEvent.click(screen.getByRole('radio', { name: '19:00 空きあり' }));
+  await screen.findByRole('radio', { name: '19:00 空きあり' });
+  expect(screen.getByRole('button', { name: 'この時刻で進む' })).toHaveProperty('disabled', false);
+  expect(screen.queryByText('時刻を選んでください')).toBeNull();
+});
+it('空きが無い日は「ほかの日を選んでください」の1行を出す', async () => {
+  vi.mocked(seat.availability).mockImplementation(async (_s, date, guestCount) => ({
+    success: true, data: { storeId: 'st', date, guestCount, slots: slots(date).map((s) => ({ ...s, available: false, remainingTables: 0 })), cancelDeadlineMinutesBefore: 120, cutoffMinutesBefore: 60 },
+  }));
+  open();
+  await screen.findByRole('radio', { name: '19:00 満席' });
+  expect(screen.getByRole('button', { name: 'この時刻で進む' })).toHaveProperty('disabled', true);
+  expect(screen.getByText('空いている時刻がありません。ほかの日を選んでください')).toBeTruthy();
+});

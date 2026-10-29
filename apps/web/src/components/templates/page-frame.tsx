@@ -10,6 +10,8 @@ export interface PageHeadingProps {
   readOnlyBand?: boolean | 'hq'
   /** 上の権限帯と押せない操作で同じ理由を使う。 */
   readOnlyNeed?: ComponentProps<typeof ReadOnlyNotice>['need']
+  /** 一覧の頭だけ：閲覧の帯を見出しと操作の行の下の全幅の行へ置く。渡さない型は題の列の中のまま。 */
+  noticeRow?: 'full'
   title: ReactNode
   subtitle?:ReactNode
   /** 認証画面では h1。管理画面内では外側の h1 に続く h2。 */
@@ -77,7 +79,7 @@ export function PageTitle({ children, as: Tag = 'h1', className }: {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', titleId, titleTabIndex, help, explanation, explanationKey, leading, titleAccessory, explanationToggle, actions, crumbs, steps, tabs, readOnlyBand, readOnlyNeed, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, separator, inset, stepsSpacing }: PageHeadingProps) {
+export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', titleId, titleTabIndex, help, explanation, explanationKey, leading, titleAccessory, explanationToggle, actions, crumbs, steps, tabs, readOnlyBand, readOnlyNeed, noticeRow, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, separator, inset, stepsSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
   /*
    * 絵の値を渡された分だけ、この頭の中だけに効く変数で下へ流す。`.heading`・`.title` は
@@ -91,14 +93,16 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', title
         ...(textGap === undefined ? null : { '--tpl-head-gap': `${textGap}px` }),
         ...(titleSize === 'sub' ? { '--tpl-title-size': '18px', '--tpl-title-lh': '27px' } : null),
       } as CSSProperties)
+  const notice = readOnlyBand ? <div className={styles.headingNotice} data-template-region="notice"><ReadOnlyNotice scope={readOnlyBand === 'hq' ? 'hq' : 'store'} need={readOnlyNeed} /></div> : null
   return <header className={styles.heading} style={headStyle} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-subtitle-size={subtitleSize} data-bottom-spacing={bottomSpacing} data-heading-separator={separator} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
     {leading}
     <div className={styles.headingText}>
       <ScreenExplanation titleClassName={styles.titleRow} screenKey={explanationKey} title={<><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}<PageHelp label={typeof title === 'string' ? `${title}の説明` : '画面の説明'} help={help} toggle={explanationToggle} explanation={explanation} /></>} />
       {subtitle?<p className={styles.subtitle}>{subtitle}</p>:null}
-      {readOnlyBand ? <div className={styles.headingNotice} data-template-region="notice"><ReadOnlyNotice scope={readOnlyBand === 'hq' ? 'hq' : 'store'} need={readOnlyNeed} /></div> : null}
+      {noticeRow === 'full' ? null : notice}
       {tabs ? <div className={styles.headingTabs} data-template-region="heading-tabs">{tabs}</div> : null}
     </div>
+    {noticeRow === 'full' ? notice : null}
     {crumbs ? <div className={styles.crumbs} data-template-region="crumbs">{crumbs}</div> : null}
     {steps ? <div className={styles.steps} data-template-region="steps">{steps}</div> : null}
     {actions ? <div className={styles.actions}><PageHeadingActions>{actions}</PageHeadingActions></div> : null}

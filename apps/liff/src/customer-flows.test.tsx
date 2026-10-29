@@ -90,6 +90,32 @@ it('ECでも過去の予約は読めるが、新しく予約する入口は出�
   expect(api.me).toHaveBeenCalled();
 });
 
+it('ECのマイページに予約系（キャンセル待ち・回数券）の行は並べない', async () => {
+  vi.mocked(api.bookingWaitlists).mockResolvedValue({ waitlist: [{ id: 'wait', status: 'waiting' }] } as never);
+  vi.mocked(api.entitlements).mockResolvedValue([{ id: 'pass', name: '10回券', kind: 'ticket', remaining: 9, usable: true, expiresAt: '2099-01-01T00:00:00Z' }] as never);
+  mount('ec');
+  await screen.findByRole('button', { name: /クーポン/ });
+  await vi.waitFor(() => expect(api.bookingWaitlists).toHaveBeenCalled());
+  await vi.waitFor(() => expect(api.entitlements).toHaveBeenCalled());
+  expect(screen.queryByRole('button', { name: /キャンセル待ち/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: /回数券/ })).toBeNull();
+});
+
+it('サロンのマイページには待ち・回数券の行を出す', async () => {
+  vi.mocked(api.bookingWaitlists).mockResolvedValue({ waitlist: [{ id: 'wait', status: 'waiting' }] } as never);
+  vi.mocked(api.entitlements).mockResolvedValue([{ id: 'pass', name: '10回券', kind: 'ticket', remaining: 9, usable: true, expiresAt: '2099-01-01T00:00:00Z' }] as never);
+  mount('salon', '/mypage?liffId=fixture');
+  expect(await screen.findByRole('button', { name: /キャンセル待ち.*1 件/ })).toBeTruthy();
+  expect(screen.getByRole('button', { name: /回数券.*残り 9 回/ })).toBeTruthy();
+});
+
+it('教室の履歴に［新しく予約する］は出さず、そのまま予約できる文も出さない', async () => {
+  mount('lesson', '/booking/history?liffId=fixture');
+  await screen.findByRole('tab', { name: 'これから' });
+  expect(screen.queryByRole('button', { name: '新しく予約する' })).toBeNull();
+  expect(screen.queryByText('空いている日時から、そのまま予約できます。')).toBeNull();
+});
+
 it('教室の入口と振替は本人のクラス一覧、回数券はマイページへ進む', async () => {
   mount('lesson');
   await screen.findByRole('button', { name: '欠席する' });

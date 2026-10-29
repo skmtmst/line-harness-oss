@@ -61,16 +61,21 @@ describe('バナー生成の検索行（U017）', () => {
     expect(sort.closest('[data-toolbar-search]')).toBeNull()
     expect(sort.closest('[data-toolbar-end]')).not.toBeNull()
   })
-  it('画像検索も共通の検索スロットへ置き、並びはその外へ置く', async () => {
+  it('画像検索と札・用途を同じ道具の段に置き、動かない並びを出さない', async () => {
     navigation.query = 'tab=library'
     render(createElement(HqBannersListV8))
     const search = await screen.findByRole('searchbox', { name: 'テキスト・指示で探す' })
-    const sort = screen.getByText('並び：作成が新しい順')
+    const chips = screen.getByRole('group', { name: '見るもので絞り込む' })
+    const shape = screen.getByRole('group', { name: '用途' })
     const searchSlot = search.closest('[data-toolbar-search]')
+    const toolbar = search.closest('[data-list-toolbar]')
     expect(searchSlot).not.toBeNull()
-    expect(sort.closest('[data-list-toolbar]')).toBe(search.closest('[data-list-toolbar]'))
-    expect(searchSlot!.contains(sort)).toBe(false)
-    expect(sort.closest('[data-toolbar-end]')).not.toBeNull()
+    expect(toolbar).not.toBeNull()
+    for (const control of [chips, shape]) {
+      expect(toolbar!.contains(control)).toBe(true)
+      expect(searchSlot!.contains(control)).toBe(false)
+    }
+    expect(screen.queryByText('並び：作成が新しい順')).toBeNull()
   })
 })
 /*

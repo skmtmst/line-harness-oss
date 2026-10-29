@@ -4,10 +4,8 @@
  */
 
 /* ── 対応ルールの小窓 ─────────────────────────── */
-.popWrap { position: relative; display: inline-flex; }
-/* 受信箱の頭の印のボタン（絵 XqSvX：32角・印14・ink-secondary）。共通の副ボタン（compact）に大きさだけ。 */
-.popTrigger { flex: none; width: var(--tpl-inbox-tool-size); padding: 0; color: var(--color-ink-secondary); }
-.popTrigger svg { width: var(--tpl-inbox-tool-icon); height: var(--tpl-inbox-tool-icon); }
+.popWrap { position: relative; display: inline-flex; flex: none; }
+/* 頭の印のボタンは F12 で字つきにし、list-parts の tool と同じ形にそろえた（popTrigger は廃止）。 */
 
 .pop {
   display: flex;

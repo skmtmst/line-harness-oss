@@ -8,6 +8,13 @@
 .sentLine { margin: 0; color: var(--color-ink); font-size: var(--text-label); }
 .full { width: 100%; }
 
+/* 本文の上のひな形を入れる操作（右寄せ）。 */
+.templateRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--tpl-hq-field-gap);
+}
+
 /* 問い合わせのカード（角丸12・余白20・間12） */
 .card {
   display: flex;
