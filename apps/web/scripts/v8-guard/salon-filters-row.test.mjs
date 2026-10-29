@@ -14,14 +14,18 @@ import { mockFetch } from './mock-local.mjs'
  *
  * 1152 では白い板が 1100 未満になり折り返しが有効化されるが、日付の段は
  * 1段に保つ（読み直すを2段目へ落とさない）。担当の欄は4字名が入る幅。
- * 書体の差でぶれないよう、同じ行・表示/非表示・欄幅・はみ出しだけを見る。
+ * 同じ行・表示/非表示・欄幅・はみ出しだけを見て、同梱書体の読み込み完了を
+ * 待ってから測る（CI の書体での配置検査。文言の切れ自体は見ない）。
  * 文言の切れ（数の帯の補足）は unit 試験と前後写真で守る。
+ * SALON_GUARD_DELAY_MS に応答遅延msを渡すと API を遅らせて測る（遅延耐性の検査用）。
  */
 const root = resolve(fileURLToPath(new URL('../../out/', import.meta.url)))
 const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' }
 
 /* 盤の業種だけサロンへ寄せ、他は本物の応答器に任せる。 */
 async function salonFetch(method, path) {
+  const delay = Number(process.env.SALON_GUARD_DELAY_MS ?? 0)
+  if (delay > 0 && path.includes('/api/dashboard/')) await new Promise(done => setTimeout(done, delay))
   const answered = await mockFetch(method, path)
   if (method === 'GET' && path.startsWith('/api/dashboard/style') && answered.status === 200) {
     try {
@@ -82,6 +86,9 @@ async function open(browser, width) {
   const response = await page.goto(`${base}/`)
   assert.ok(response?.ok())
   await page.getByRole('button', { name: '読み直す', exact: true }).waitFor()
+  /* 読み直すは取得前にも出る。更新時刻は summary/schedule 完了後に描かれるので、DOM出現を待つ（1152 では非表示のため attached 待ち）。 */
+  await page.waitForFunction(() => [...document.querySelectorAll('span')].some((el) => /^更新 \d/.test(el.textContent.trim())))
+  await page.evaluate(() => document.fonts.ready)
   await page.evaluate(() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done))))
   return page
 }
