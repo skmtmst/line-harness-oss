@@ -44,6 +44,8 @@ export default function OpsInviteV8() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [checkFailed, setCheckFailed] = useState<unknown>(null)
+  /* 使えない招待（未使用でない・期限切れ・見つからない）では「もう一度読み込む」を出さない。通信・混雑・サーバーの失敗だけ再試行する。 */
+  const [checkRetryable, setCheckRetryable] = useState(false)
 
   const checkInvite = useCallback(async () => {
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
@@ -52,11 +54,13 @@ export default function OpsInviteV8() {
     setState('loading')
     setMessage('')
     setCheckFailed(null)
+    setCheckRetryable(false)
     setInviteCode(null)
     if (!value) { setState('invalid'); setMessage('この招待は見つかりません。招待した運営メンバーに確認してください'); return }
     const res = await authRequest<Check>(`/api/auth/ops-invite/check?token=${encodeURIComponent(value)}`)
     if (!res.ok || !res.data) {
       setCheckFailed(new ApiError(res.status, res.error))
+      setCheckRetryable(res.status === 0 || res.status === 429 || res.status >= 500)
       setInviteCode(res.code ?? null)
       setState('invalid'); setMessage(res.error || 'この招待は使えません'); return
     }
@@ -108,6 +112,15 @@ export default function OpsInviteV8() {
 
   const usedInvite = inviteCode === 'used' || acceptCode === 'used'
   const fieldError = (id: string, text: string | null) => (text ? <p id={id} className={styles.error}>{text}</p> : null)
+  /* 名前とパスワードの説明は、招待が有効で入力へ進めるときだけ出す。確認中・使えない招待では出さない。 */
+  const headingSubtitle = state === 'ready' ? (<>
+    {check && !check.needsPassword
+      ? '運営コンソールに招待されました（有効期限は24時間）。続けると二段階認証の設定に進みます。'
+      : '運営コンソールに招待されました（有効期限は24時間）。名前とパスワードを決めると、次に二段階認証を設定します。'}
+  </>) : undefined
+  const invalidTitle = checkRetryable
+    ? '招待を読み込めませんでした'
+    : inviteCode === 'used' ? 'この招待はすでに使われています' : inviteCode === 'expired' ? 'この招待は期限切れです' : 'この招待は使えません'
 
   return (
     <main className={styles.page} data-design-node="tVaUh">
@@ -119,11 +132,7 @@ export default function OpsInviteV8() {
         </span>
       </div>
       <Card variant="form" className={styles.card} aria-labelledby="ops-invite-title">
-        <PageHeading inset="none" title="運営メンバーの招待" titleId="ops-invite-title" titleAs="h1" subtitleSize="body" subtitle={<>
-          {check && !check.needsPassword
-            ? '運営コンソールに招待されました（有効期限は24時間）。続けると二段階認証の設定に進みます。'
-            : '運営コンソールに招待されました（有効期限は24時間）。名前とパスワードを決めると、次に二段階認証を設定します。'}
-        </>} />
+        <PageHeading inset="none" title="運営メンバーの招待" titleId="ops-invite-title" titleAs="h1" subtitleSize="body" subtitle={headingSubtitle} />
 
         {state === 'loading' ? (
           <ListState permissionScope="hq" kind="loading" title="招待を確認しています" />
@@ -131,12 +140,13 @@ export default function OpsInviteV8() {
           <>
             <ListState permissionScope="hq"
               kind="error"
-              title={inviteCode === 'used' ? 'この招待はすでに使われています' : inviteCode === 'expired' ? 'この招待は期限切れです' : 'この招待は使えません'}
+              title={invalidTitle}
               description={isForbiddenOrRateLimited(checkFailed) ? undefined : message}
               error={checkFailed ?? undefined}
-              onRetry={() => void checkInvite()}
+              onRetry={checkRetryable ? () => void checkInvite() : undefined}
+              action={checkRetryable ? undefined : null}
             />
-            {inviteCode === 'used' ? <Button href="/ops/login" className={styles.wide}>運営のログインへ</Button> : null}
+            {checkRetryable ? null : <Button href="/ops/login" className={styles.wide}>運営のログインへ</Button>}
           </>
         ) : (
           <form onSubmit={(event) => void submit(event)} noValidate className={styles.form}>

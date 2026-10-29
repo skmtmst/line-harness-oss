@@ -47,7 +47,6 @@ import { isActiveAdministrator, matchStaffMember, staffActionPolicy } from './st
 import { applyScopeRowChange, findPartialScopeRows, restoreSavedLevels, scopePiiToEmailMask } from './staff-scope-draft';
 import { CONVERSION_APPROVAL_EDIT_KEY, PERMISSION_LABELS, normalizeStaffPermissionKeys, permissionLabel, toggleStaffPermissionKey } from './permission-labels';
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input';
-import TruncatedText from '@/components/shared/truncated-text'
 import { describeApiFailure, withPermissionFailure } from '@/components/shared/api-error-message';
 import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
@@ -154,11 +153,6 @@ function accessScopeLabel(user: AccessUserItem, accountNames: Record<string, str
   return names.length > 0 ? names.join('、') : '担当アカウント未設定'
 }
 
-function accessFeatureLabel(user: AccessUserItem): string {
-  if (user.roleBundle === 'administrator') return 'すべての機能'
-  if (user.featureCount === null) return '機能数を読み込めませんでした'
-  return `${user.featureCount}機能`
-}
 function Modal({ children, onClose, wide = false, title }: { children: React.ReactNode; onClose: () => void; wide?: boolean; title: string }) {
   return <Dialog open title={title} onCancel={onClose} size={wide ? 'large' : 'medium'}>{children}</Dialog>
 }
@@ -746,12 +740,6 @@ function shortWhen(value: string | null | undefined, now: number): string {
   return polishFormatDate(value, { style: 'list-day', now })
 }
 
-/** 担当のLINEアカウントの短い言い方（全部なら「すべて」）。 */
-function scopeShort(user: AccessUserItem, accountNames: Record<string, string>): string {
-  if (user.accountScope.type === 'all') return 'すべて'
-  return accessScopeLabel(user, accountNames)
-}
-
 /** 二段階認証の札。オン／確認が必要（作る・送る役割で未設定）／無効（見るだけで未設定・止めた人）。 */
 function twoFactorState(user: AccessUserItem): { label: string; tone: 'success' | 'warning' | 'neutral' } {
   if (user.status === 'suspended') return { label: '利用停止中', tone: 'neutral' }
@@ -1056,10 +1044,6 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     if (!selectedAccountId && (member?.role === 'owner' || (me?.role === 'owner' && me.id === user.id))) return 'owner'
     return user.roleBundle
   }
-  /* 右の「直したあとの列」：状態ごとに1人ずつの例（二段階認証 オン・確認が必要・無効）。 */
-  const examples = (['二段階認証 オン', '確認が必要', '無効'] as const)
-    .map((label) => filteredUsers.find((user) => twoFactorState(user).label === label))
-    .filter((user): user is AccessUserItem => Boolean(user))
   const rowMenuItems = (user: AccessUserItem): ActionMenuItem[] => {
     const member = memberById.get(user.id)
     const editable = member ? canEdit(member) && !member.isAccountCreator : false
@@ -1201,23 +1185,6 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
         </div>
         {tab === 'members' ? (
           <aside className={styles.aside} aria-label="補足">
-            {administrator ? (
-              <section className={styles.asideCard} aria-label="直したあとの列">
-                <h2 className={styles.asideTitle}>直したあとの列</h2>
-                <p className={styles.asideLead}>表に足す列：職位・見せる範囲・二段階認証・最後の操作（下は1人分の中身の例）</p>
-                {examples.map((user) => {
-                  const state = twoFactorState(user)
-                  return (
-                    <div key={user.id} className={styles.example}>
-                      <p className={styles.exampleHead}><span className={styles.exampleName} ><TruncatedText value={String(user.name ?? '')} /></span><StatusBadge tone={state.tone} size="compact">{state.label}</StatusBadge></p>
-                      <p className={styles.exampleLine}>{`${V8_ROLE_LABEL[roleOf(user)]}・${user.jobTitle ?? '—'}`}</p>
-                      <p className={styles.exampleLine} title={accessScopeLabel(user, accountNames)}>{`見せる範囲：${user.roleBundle === 'administrator' ? 'すべて' : `${accessFeatureLabel(user)}／${scopeShort(user, accountNames)}`}`}</p>
-                      <p className={styles.exampleLine} title={`最後のログイン：${formatStaffDate(user.lastLoginAt ?? undefined)}${user.lastActionAt ? `／最後の操作：${formatStaffDate(user.lastActionAt)}` : ''}`}>{`最後に入った：${shortWhen(user.lastLoginAt, nowMs)}${user.lastActionAt ? `（最後の操作 ${formatStaffDate(user.lastActionAt)}）` : ''}`}</p>
-                    </div>
-                  )
-                })}
-              </section>
-            ) : null}
             <StaffRoleGuide />
           </aside>
         ) : null}

@@ -213,7 +213,8 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
   })
 
   it('公開期間だけを保存して更新日時が変わっても詳細の未保存入力を消さない', async () => {
-    apiMocks.update.mockResolvedValueOnce({ data: { ...WEBINAR, updatedAt: '2026-10-04T18:37:00+09:00' } })
+    let finish!: (value: { data: Webinar }) => void
+    apiMocks.update.mockImplementationOnce(() => new Promise<{ data: Webinar }>(resolve => { finish = resolve }))
     let host!: HTMLElement
     await act(async () => { host = render() })
     await act(async () => { (host.querySelector('#webinar-period-start') as HTMLButtonElement).click() })
@@ -221,12 +222,13 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     await act(async () => fireEvent.change(time, { target: { value: '11:00' } }))
     await act(async () => fireEvent.blur(time))
     await act(async () => fireEvent.keyDown(document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!, { key: 'Escape' }))
-    await act(async () => ([...host.querySelectorAll('button')].find(button => button.textContent === '差し替える') ?? querySupplementaryPageAction('差し替える'))!.click())
-    const input = document.querySelector<HTMLInputElement>('#wd-minutes')!
-    await act(async () => fireEvent.change(input, { target: { value: '17' } }))
     const save = ([...host.querySelectorAll('button')].find((button) => button.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
     await act(async () => save.click())
     expect(apiMocks.update).toHaveBeenCalledWith('webinar-1', expect.objectContaining({ publicationStartsAt: '2026-10-01T02:00:00.000Z', publicationEndsAt: null }))
+    await act(async () => ([...host.querySelectorAll('button')].find(button => button.textContent === '差し替える') ?? querySupplementaryPageAction('差し替える'))!.click())
+    const input = document.querySelector<HTMLInputElement>('#wd-minutes')!
+    await act(async () => fireEvent.change(input, { target: { value: '17' } }))
+    await act(async () => { finish({ data: { ...WEBINAR, updatedAt: '2026-10-04T18:37:00+09:00' } }) })
     expect(document.querySelector<HTMLInputElement>('#wd-minutes')?.value).toBe('17')
   })
 })
