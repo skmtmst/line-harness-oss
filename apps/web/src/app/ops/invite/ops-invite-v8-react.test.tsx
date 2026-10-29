@@ -77,13 +77,21 @@ describe('運営メンバーの招待V8（tVaUh）', () => {
     await unmount()
   })
 
-  it('期限切れ・見つからない招待でもログインへ案内し、やり直しは出さない', async () => {
+  it('見つからない招待でもログインへ案内し、やり直しは出さない', async () => {
     net.check = { status: 404, body: { success: false, error: 'この招待は使えません' } }
     await render()
     expect(host.textContent).toContain('この招待は使えません')
     expect(host.textContent).toContain('運営のログインへ')
     expect(host.textContent).not.toContain('もう一度読み込む')
     expect(host.textContent).not.toContain('名前とパスワードを決める')
+    await unmount()
+  })
+
+  it('混雑の失敗では読み直せる口を残す', async () => {
+    net.check = { status: 429, body: { success: false, error: '混み合っています' } }
+    await render()
+    expect(host.textContent).toContain('招待を読み込めませんでした')
+    expect(host.textContent).toContain('もう一度読み込む')
     await unmount()
   })
 
