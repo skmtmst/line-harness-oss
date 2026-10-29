@@ -146,8 +146,7 @@ export default function BellPopover<F extends string = BellFilter>({
           {onMarkAllRead ? (
             <Button type="button" variant="text" size="inline" className={styles.markAll} onClick={onMarkAllRead}
               disabled={markAllReadDisabled ?? (state !== 'ready' || unreadCount === null || unreadCount === 0)}
-              disabledReason={markAllReadDisabledReason}
-              lockedReason={markAllReadLockedReason}>
+              lockedReason={markAllReadLockedReason ?? markAllReadDisabledReason}>
               すべて既読にする
             </Button>
           ) : null}
@@ -171,10 +170,13 @@ export default function BellPopover<F extends string = BellFilter>({
         ) : state === 'no-account' ? (
           <p className={styles.state}>{`LINEアカウントを選ぶと、そのアカウントの${title}が出ます。`}</p>
         ) : state === 'error' ? (
-          <div className={styles.state} role="alert">
-            <span>{errorMessage || `${title}を読み込めませんでした。`}</span>
-            {onRetry ? <button type="button" className={styles.retry} onClick={onRetry}>もう一度</button> : null}
-          </div>
+          <>
+            <div className={styles.state} role="alert">
+              <span>{errorMessage || `${title}を読み込めませんでした。`}</span>
+              {onRetry ? <button type="button" className={styles.retry} onClick={onRetry}>もう一度</button> : null}
+            </div>
+            {markAllReadDisabledReason ? <p className={styles.state} role="status">{markAllReadDisabledReason}</p> : null}
+          </>
         ) : items.length === 0 ? (
           <p className={styles.state}>{emptyText ?? `${title}はまだありません。`}</p>
         ) : (
