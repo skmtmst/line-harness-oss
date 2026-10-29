@@ -15,7 +15,7 @@ import Select from '@/components/shared/select'
 import { api, type AnalyticsMetric, type AnalyticsUrlClicksOverview } from '@/lib/api'
 import { RangePickerV8, StatePill } from './common'
 import { MetricText } from './reactions'
-import { downloadCsv, formatAnalyticsDateTime, periodCaption, rangeFor, shownValue, useOverview, useRegisterExport } from './parts'
+import { downloadCsv, formatAnalyticsDateTime, periodCaption, rangeFor, reportPeriodLabel, shownValue, useOverview, useRegisterExport } from './parts'
 import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
@@ -51,6 +51,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 10)
   const [page, setPage] = useListUrlValue('page', 0)
   const { days, setDays, range, customRange, setRange } = useReportPeriod()
+  const periodLabel = reportPeriodLabel(days, Boolean(customRange))
   const [query, setQuery] = useListUrlValue('q', '')
   const [status, setStatus] = useListUrlValue('status', 'all')
   // 検索語は API へ渡し、200件を超えた URL にも届くようにする。
@@ -94,7 +95,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
 
   return <>
     <ListPageStats><KpiBand className={styles.band}>
-      <KpiCard presentation="band" title="押された回数" icon={<MousePointerClick size={16} aria-hidden="true" />} value={clicks} unit="回" detail={`この${days}日`} />
+      <KpiCard presentation="band" title="押された回数" icon={<MousePointerClick size={16} aria-hidden="true" />} value={clicks} unit="回" detail={periodLabel} />
       <KpiCard presentation="band" title="押した人（URLごとの合計）" icon={<Users size={16} aria-hidden="true" />} value={people} unit="人" detail="同じ人の何度押しは1人" />
       <KpiCard presentation="band" title="計測中のURL" icon={<Link2 size={16} aria-hidden="true" />} value={active} unit="件" detail={`止めている ${stopped}`} />
       <KpiCard presentation="band" title="押されていないURL" icon={<Unlink size={16} aria-hidden="true" />} value={zeroLinks} unit="件" detail="実測できたURLのうち" />

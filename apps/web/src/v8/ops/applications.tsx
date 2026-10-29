@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { api, type OpsApplication } from '@/lib/api'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import { PageFrame } from '@/components/templates/page-frame'
 import styles from './applications.module.css'
@@ -22,9 +23,9 @@ export default function OpsApplications() {
     setError('')
     try {
       const res = await api.ops.applications.list()
-      if (!res.success) throw new Error(res.error || '申込を読み込めませんでした')
+      if (!res.success) { setError(res.error || '申込を読み込めませんでした'); return }
       setRows(res.data)
-    } catch (caught) { setError(caught instanceof Error ? caught.message : '申込を読み込めませんでした') }
+    } catch (caught) { setError(japaneseDetailOf(caught) || '申込を読み込めませんでした') }
     finally { setLoading(false) }
   }
   useEffect(() => { void load() }, [])

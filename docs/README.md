@@ -459,6 +459,13 @@
 
 ## 反映履歴
 
+- [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
+- [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
+- [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/1948-kenta-train-1029f.md)
+- [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
+- [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
+- [お知らせの帯と次の段の間隔そろえ](release-log/unreleased/1950-kenta-muse-fqa-space.md)
+- [在庫の保存帯と本文の重なり修正](release-log/unreleased/1950-kenta-swbm-b19.md)
 - [新規店舗の専用機能を非表示](release-log/unreleased/1925-masato-new-store-specialized-hidden.md)
 - [一斉配信・シナリオ一覧の自動点検の更新](release-log/unreleased/1930-kenta-muse-broadcast-scenario-reds.md)
 - [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
@@ -499,15 +506,18 @@
 - [契約者向けLINEの通知専用化](release-log/unreleased/1941-masato-notice-line-only.md)
 - [申込受付と承認画面の調整](release-log/unreleased/1943-masato-registration-approval-pen.md)
 - [接続マニュアルのチャット注意書き復元と画像軽量化](release-log/unreleased/1946-kenta-muse-red-accounts.md)
+- [友だち分析の日付と縦軸の重なり修正](release-log/unreleased/1950-kenta-chart-date-axis.md)
 - [投稿メディアの内容選択](release-log/unreleased/1890-masato-post-media-content.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
+- [運営コンソールの端の詰まり修正](release-log/unreleased/1948-kenta-muse-fqa-edge.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
 - [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
 - [反映履歴（アップデート履歴）の設計](change-log-design.md)
 - [0.24.0.md](release-log/0.24.0.md)
 - [リマインダ](release-log/0.25.0.md)
 - [反映履歴の書き方](release-log/README.md)
+- [下見・件数・待ち時間の不具合の修正](release-log/unreleased/1948-kenta-swbs.md)
 - [外部点検のボタン名・導線・表示崩れの修正](release-log/unreleased/1851-kenta-staging-ui.md)
 - [統括名の必須表示と入力エラー時の焦点復帰](release-log/unreleased/1857-kenta-hq-name-focus.md)
 - [検査とビルドの実行環境の更新](release-log/unreleased/1794-kenta-node-runtime-security.md)
@@ -865,6 +875,7 @@
 - [一覧の帯・フォルダの丸と共通操作の整理](release-log/unreleased/0000-kenta-tags-band-dot.md)
 - [共通部品と言葉・受信箱の絞り込みの修正](release-log/unreleased/0000-kenta-int.md)
 - [チェックの印・スイッチ・選ぶ欄の見た目の統一](release-log/unreleased/0000-kenta-check-green.md)
+- [閲覧のみの帯を題の横並びから題の下へ](release-log/unreleased/1948-kenta-muse-heading-band.md)
 - [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
 - [まとめ列車 7](release-log/unreleased/1848-kenta-train-one7-1027.md)
 
@@ -927,3 +938,18 @@
 - [自動応答の閲覧表示と作成画面の間隔](release-log/unreleased/1933-kenta-auto-reply-wizard.md) — 閲覧時の入力表示と縦の空きの反映履歴。
 - [一覧のページ範囲の補正](release-log/unreleased/1933-kenta-muse-history-pagination.md) — 削除後に最後のページへ戻す修正の反映履歴。
 - [登録の確認画面の表示とロゴ](release-log/unreleased/1945-masato-registration-confirmed-logo.md) — 登録の確認項目と正式ロゴの修正履歴。
+- [登録画面の補足文の削除](release-log/unreleased/1947-masato-registration-hints.md) — 確定済みの3項目の補足文を外した修正履歴。
+- [設定の画面のお知らせとカードの間隔](release-log/unreleased/1948-kenta-muse-settings-gap.md) — お知らせとカードの間の空きをそろえた修正履歴。
+- [本線の見張りの赤の修正](release-log/unreleased/1948-kenta-muse-guard-reds.md) — 言葉・CSS・確認窓の見張り9件の赤を直した反映履歴。
+- [押せない理由の表示](release-log/unreleased/1948-kenta-muse-fqa-table.md) — 閲覧のみの帯と除外の理由結び付けの反映履歴。
+- [今日送った内訳の名前表示](release-log/unreleased/1948-kenta-line-notify-kpi-label.md) — LINE通知の内訳を内部名でなくお知らせ名で出す反映履歴。
+- [利用開始設定から二段階認証への引き継ぎ](release-log/unreleased/1949-masato-registration-mfa-flow.md) — 登録後の認証とアカウント登録への案内の反映履歴。
+- [LINE通知の操作権限の反映履歴](release-log/unreleased/1950-kenta-notification-permission.md)
+- [LINE通知の説明の置き場所](release-log/unreleased/1950-kenta-notification-help.md)
+- [LINE通知の送信内訳の表示](release-log/unreleased/1950-kenta-notification-kpi-detail.md)
+- [業種別の初期設定の確認](release-log/unreleased/1950-kenta-style-setup-progress.md) — 反映履歴、確認 2026-10-29
+- [最初の1通の確認と読み直しの操作](release-log/unreleased/1951-kenta-first-message-guide.md)
+- [シナリオの人数と割合](release-log/unreleased/1951-kenta-scenario-counts.md) — 人数の欠測と登録人数による割合の修正履歴。
+- [シナリオ人数の単位と補足位置](release-log/unreleased/1951-kenta-scenario-count-labels.md) — 不明時の単位と登録0人の補足位置の修正履歴。
+- [問い合わせのタブ・カルーセルの絵・更新履歴の検索](release-log/unreleased/1951-kenta-swb-x10-x14-x18.md)
+- [アカウント選択と読み込み失敗時の案内](release-log/unreleased/1951-kenta-train-1029h.md)

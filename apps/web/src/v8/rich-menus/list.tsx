@@ -1079,7 +1079,7 @@ export default function RichMenusListV8() {
                   </Td>
                   <Td>
                     {g.publishingAt ? (
-                      <StatusBadge tone="info" size="compact">{`${shortDay(g.publishingAt)} 公開`}</StatusBadge>
+                      <><StatusBadge tone="info" size="compact">予約中</StatusBadge><span className={styles.sub} title={g.publishingAt}>{shortDay(g.publishingAt)}</span></>
                     ) : (
                       <StatusBadge tone={g.status === 'published' ? 'success' : 'neutral'} size="compact">{g.status === 'published' ? '公開中' : '下書き'}</StatusBadge>
                     )}
@@ -1299,11 +1299,12 @@ export default function RichMenusListV8() {
             presentation="band"
             title="いちばん押された"
             icon={<Trophy size={16} aria-hidden="true" />}
-            value={null}
-            unit=""
-            valueText={topArea ? topArea.label || '名前のないボタン' : emptyValue('unknown')}
+            value={topArea?.taps ?? null}
+            primaryText={topArea ? topArea.label || '名前のないボタン' : undefined}
+            detailLayout="single"
+            unit="回"
             detail={topArea
-              ? `${topAreaGroupName ? `${topAreaGroupName}・` : ''}${formatNumber(topArea.taps)} 回`
+              ? `${topArea.taps.toLocaleString('ja-JP')} 回${topAreaGroupName ? `・${topAreaGroupName}` : ''}`
               : tapKpiReady
                 ? (tapStats?.total ?? 0) > 0
                   ? '内訳はまだ集まっていません'

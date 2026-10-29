@@ -1,5 +1,6 @@
 'use client'
 
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { canManageRole, isOwnerRole, useStaffRole } from '@/lib/staff-role'
 import { LogEntryCopy } from '@/components/shared/log-entry-details'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -103,10 +104,12 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
   const [retrying, setRetrying] = useState<ScopedRetrying>({ generation: -1, id: null })
   const [notice, setNotice] = useState<ScopedNotice>({ generation: -1, notice: null })
   const [detailId, setDetailId] = useState<string | null>(null)
-  /* 再試行は店長だけ、対応済みは店長・管理者だけ。押せない人には出さない。 */
+  /* 再試行はオーナー、対応済みは管理者も可能。操作を残して共通の理由で止める。 */
   const staffRole = useStaffRole()
   const canRetry = isOwnerRole(staffRole)
   const canResolve = canManageRole(staffRole)
+  const retryLockReason = usePermissionLockReason(canRetry, 'owner')
+  const resolveLockReason = usePermissionLockReason(canResolve, 'manager')
   const requestRef = useRef(0)
   const mutationRef = useRef<{ generation: number; id: string } | null>(null)
   const env = useMemo<NotificationRunEnv>(() => ({
@@ -227,7 +230,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
               const who = item.recipientType === 'customer' ? `顧客${item.orderNumber ? `・${item.orderNumber}` : ''}` : '運用者'
               const reason = reasonWords(item)
               return <Tr key={item.id} data-row-id={item.id}>
-                <Td className={`${styles.cell} ${styles.runWhen}`}><span className={styles.runWhen}>{shortJst(item.receivedAt)}</span></Td>
+                <Td className={`${styles.cell} ${styles.runWhen}`} title={shortJst(item.receivedAt)}><span className={styles.runWhen}>{shortJst(item.receivedAt)}</span></Td>
                 <Td className={styles.cell}>
                   <button type="button" className={styles.runOpen} onClick={() => setDetailId(item.id)} title={`${item.notificationName}の記録の詳細を開く`} >{item.notificationName}</button>
                 </Td>
@@ -275,11 +278,11 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
           ) : <p className={styles.minor}>試行の履歴はまだありません。</p>}
           <div className={styles.inlineRow}>
             {mode === 'failures' && detail.friendId ? <Button href={`/chats?friend=${encodeURIComponent(detail.friendId)}`}>受信箱で連絡</Button> : null}
-            {mode === 'failures' && detail.retryAvailable && canRetry ? (
-              <Button disabled={retryingId !== null} busy={retryingId === detail.id} busyLabel="再試行中" onClick={() => void retryNotificationRun(env, { generation, lineAccountId, item: detail, reload: load })}>送信を再試行する</Button>
+            {mode === 'failures' && detail.retryAvailable ? (
+              <Button disabled={retryingId !== null || !canRetry} lockedReason={retryLockReason} busy={retryingId === detail.id} busyLabel="再試行中" onClick={() => { if (canRetry && !retryLockReason) void retryNotificationRun(env, { generation, lineAccountId, item: detail, reload: load }) }}>送信を再試行する</Button>
             ) : null}
-            {mode === 'failures' && canResolve && (detail.status === 'failed' || detail.status === 'excluded') ? (
-              <Button disabled={retryingId !== null} busy={retryingId === detail.id} busyLabel="保存中" onClick={() => void resolveNotificationRun(env, { generation, lineAccountId, item: detail, resolved: !detail.resolved, reload: load })}>
+            {mode === 'failures' && (detail.status === 'failed' || detail.status === 'excluded') ? (
+              <Button disabled={retryingId !== null || !canResolve} lockedReason={resolveLockReason} busy={retryingId === detail.id} busyLabel="保存中" onClick={() => { if (canResolve && !resolveLockReason) void resolveNotificationRun(env, { generation, lineAccountId, item: detail, resolved: !detail.resolved, reload: load }) }}>
                 {detail.resolved ? '未対応に戻す' : '対応済みにする'}
               </Button>
             ) : null}

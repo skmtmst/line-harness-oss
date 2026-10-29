@@ -108,15 +108,8 @@
 
 .link {
   flex-shrink: 0;
-  color: var(--color-accent-deep);
-  font-size: var(--tpl-d23-ob-text);
-  font-weight: 600;
-  line-height: var(--tpl-d23-ob-text-lh);
-  text-decoration: none;
   white-space: nowrap;
 }
-
-.link:hover { text-decoration: underline; }
 
 @container v8-page (width < 1100px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @container v8-page (width < 640px) { .grid { grid-template-columns: minmax(0, 1fr); } }

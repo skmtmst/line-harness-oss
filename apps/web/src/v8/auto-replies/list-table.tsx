@@ -33,6 +33,8 @@ import { conditionChips,LOAD_STATE_WORDS,responseTypeWord,stopNote,templateWord,
 type RenderAutoReplyListContext = {
   allOnPageSelected: boolean
   canEdit: boolean
+  canRunList: () => boolean
+  lockedReason?: string
   clearFilters: () => void
   clearSelection: () => void
   dragId: string | null
@@ -85,7 +87,7 @@ type RenderAutoReplyListContext = {
   visibleLoadState: LoadState
 }
 
-export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState }: RenderAutoReplyListContext) {
+export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lockedReason, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState }: RenderAutoReplyListContext) {
   return <DelayedSkeleton loading={visibleLoadState === 'loading'} skeleton={
     <div className={styles.tableWrap} aria-busy="true" aria-label="読み込んでいます">
       <ListSkeleton rows={4} columns={narrow ? 3 : 4} />
@@ -99,14 +101,15 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
         <Button type="button" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
       )}</>} />
   ) : sortedItems.length === 0 ? (
-    /* 修正案 D-2：空の一覧。閲覧のみには作るボタンを出さない。 */
+    /* 空の一覧にも同じ作成操作を残し、未知は理由なしで止める。 */
     <EmptyList
       data-design-node="G8i4xP"
       icon={<MessageSquare aria-hidden="true" />}
       title="まだ自動応答のルールはありません"
       description="よく届く質問や営業時間外の連絡に、自動で返せます。ひな形からも作れます。"
-      create={{ label: 'ルールを作る', onClick: () => router.push('/auto-replies/edit') }}
+      create={{ label: 'ルールを作る', onClick: () => { if (canRunList()) router.push('/auto-replies/edit') } }}
       canCreate={canEdit}
+      lockedReason={lockedReason ?? null}
       filtered={filterActive}
       onClearFilters={clearFilters}
       filteredTitle="条件に合うルールはありません"
@@ -121,10 +124,9 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
         <DataTable>
           <colgroup>
             {/* ★V8 列の幅＝絵の中身の幅＋欄の間16。端の列は端の24も足す（uE9gf：選ぶ16・つまみ14・返すもの200・回数96・状態60・操作28） */}
-            {/* 閲覧のみは選ぶ・つまみの列を置かない（押せない物は隠す）。名前の列が表の左端から始まる（Q5lOCc）。 */}
-            {canEdit ? <col style={{ width: 16 + 24 + 8 }} /> : null}
-            {canEdit ? <col style={{ width: 14 + 16 }} /> : null}
-            {!narrow ? <col style={{ width: canEdit ? 426 : 426 + (16 + 24 + 8) + (14 + 16) }} /> : <col />}
+            <col style={{ width: 16 + 24 + 8 }} />
+            <col style={{ width: 14 + 16 }} />
+            {!narrow ? <col style={{ width: 426 }} /> : <col />}
             <col style={{ width: 200 + 16 }} />
             {!narrow && <col style={{ width: 96 + 16 }} />}
             <col style={{ width: 80 + 16 }} />
@@ -132,14 +134,14 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
           </colgroup>
           <thead>
             <TableHeadRow>
-                {canEdit ? <Th className={styles.selectCell} aria-label="選択">
+                <Th className={styles.selectCell} aria-label="選択">
                   <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのルールをすべて選択"
                   /></SaveErrorField>
-                </Th> : null}
+                </Th>
               {tableHeadCells}
             </TableHeadRow>
           </thead>
@@ -166,7 +168,7 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
                   detailKey="reply" onOpen={() => setPanelId(panelId === r.id ? null : r.id)}
                    data-row-id={r.id}
                 >
-                    {canEdit ? <><Td className={styles.selectCell}>
+                    <><Td className={styles.selectCell}>
                       <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","r.id"]}><Checkbox
                         checked={selectedIds.has(r.id)}
                         onCheckedChange={() => toggleOne(r.id)}
@@ -177,17 +179,19 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
                     className={styles.gripCell}
                     onClick={(event) => event.stopPropagation()}
                     draggable={canEdit && sortKey === 'priority'}
-                    onDragStart={() => setDragId(r.id)}
+                    onDragStart={() => { if (canRunList()) setDragId(r.id) }}
                     onDragEnd={() => setDragId(null)}
                   >
-                    {canEdit && <ReorderHandle
+                    <ReorderHandle
                       label={name}
+                      disabled={!canEdit && !lockedReason}
+                      lockedReason={lockedReason}
                       disabledReason={sortKey !== 'priority' ? '並びを「評価順」にすると動かせます' : null}
                       onMove={(direction) => keyboardMove(r.id, direction)}
                     >
                       <span aria-hidden>⠿</span>
-                    </ReorderHandle>}
-                  </Td></> : null}
+                    </ReorderHandle>
+                  </Td></>
                   <NameCell name={<div className={styles.nameRow}>
                       <>
                         {canEdit ? <RowNameLink
@@ -293,9 +297,9 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
               hasNext={panelIndex < items.length - 1}
               footer={
                 <>
-                  {canEdit && <Button variant="primary" onClick={() => goEdit(panelRow.id)}>
+                  <Button variant="primary" onClick={() => goEdit(panelRow.id)}>
                     開く
-                  </Button>}
+                  </Button>
                   <Button
                     variant="secondary"
                     onClick={() =>
@@ -306,33 +310,41 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
                    busyLabel="移動中…">
                     実行結果を見る
                   </Button>
-                  {canEdit && <Button
+                  <Button
                     variant="secondary"
+                    disabled={!canEdit}
+                    lockedReason={lockedReason}
                     onClick={() => {
+                      if (!canRunList()) return
                       setDuplicateError('')
                       void runDuplicate(panelRow)
                       setPanelId(null)
                     }}
                   >
                     複製する
-                  </Button>}
-                  {canEdit && canToggle && (
+                  </Button>
+                  {canToggle && (
                     <Button
                       variant="secondary"
+                      disabled={!canEdit}
+                      lockedReason={lockedReason}
                       onClick={() => toggleFromPanel(panelRow)}
                     >
                       {panelRow.isActive ? '止める' : '再開する'}
                     </Button>
                   )}
-                  {canEdit && <Button
+                  <Button
                     variant="secondary"
+                    disabled={!canEdit}
+                    lockedReason={lockedReason}
                     onClick={() => {
+                      if (!canRunList()) return
                       setPanelId(null)
                       requestDelete(panelRow)
                     }}
                   >
                     削除する
-                  </Button>}
+                  </Button>
                 </>
               }
             >
@@ -347,13 +359,15 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
         })()}
 
       {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
-      {canEdit && selectedCount > 0 ? (
+      {selectedCount > 0 ? (
         <BulkBar count={selectedCount} total={sortedItems.length} onSelectAll={() => setSelectedIds(new Set(sortedItems.map(item => item.id)))} onClear={clearSelection}><Button
             type="button"
             variant="secondary"
-            disabled={stoppableIds.length === 0}
-            title={stoppableIds.length === 0 ? '動いているルールが選ばれていません' : undefined}
+            disabled={!canEdit || stoppableIds.length === 0}
+            lockedReason={lockedReason}
+            disabledReason={canEdit && stoppableIds.length === 0 ? '動いているルールが選ばれていません' : undefined}
             onClick={() => {
+              if (!canRunList()) return
               setToggleError('')
               setToggleReason('')
               setPendingToggle({ ids: stoppableIds, names: [], kind: 'stop', accountId: selectedAccountId })
@@ -364,9 +378,11 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
           </Button><Button
             type="button"
             variant="secondary"
-            disabled={resumableIds.length === 0}
-            title={resumableIds.length === 0 ? '停止中のルールが選ばれていません' : undefined}
+            disabled={!canEdit || resumableIds.length === 0}
+            lockedReason={lockedReason}
+            disabledReason={canEdit && resumableIds.length === 0 ? '停止中のルールが選ばれていません' : undefined}
             onClick={() => {
+              if (!canRunList()) return
               setToggleError('')
               runToggle({ ids: resumableIds, names: [], kind: 'resume', accountId: selectedAccountId })
             }}
@@ -376,6 +392,8 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, 
           </Button><Button
             type="button"
             variant="secondary"
+            disabled={!canEdit}
+            lockedReason={lockedReason}
             onClick={() => openMove([...selectedIds])}
           >
             <FolderIcon size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />

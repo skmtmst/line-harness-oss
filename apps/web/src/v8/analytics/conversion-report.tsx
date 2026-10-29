@@ -1,8 +1,8 @@
 'use client'
 
+import { useListSnapshot } from '@/lib/use-list-snapshot'
 import HelpTip from '@/components/shared/help-tip'
 import { ValueBarChart } from '@/components/shared/charts'
-import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
 
 /*
  * ★V8 分析「成果地点ごとのレポート」（Pencil ・`/analytics?view=conversion-report`）。
@@ -29,10 +29,6 @@ import AggregationStatus from '@/components/shared/aggregation-status'
 
 type Point = ConversionDefinitionReport['byDefinition'][number]
 
-function rangeOf(days: number) {
-  const now = new Date()
-  return { from: jstDateOffset(1 - days, now), to: jstDate(now) }
-}
 
 function RowMenu({ point, onShowDaily }: { point: Point; onShowDaily: () => void }) {
   const router = useRouter()
@@ -47,9 +43,10 @@ function RowMenu({ point, onShowDaily }: { point: Point; onShowDaily: () => void
 export default function ConversionReportV8({ accountId }: { accountId: string }) {
   const { days, setDays, customRange, setRange, range } = useReportPeriod()
   const [attempt, setAttempt] = useState(0)
-  const [report, setReport] = useState<ConversionDefinitionReport | null>(null)
+  const { value: report, setValue: setReport } = useListSnapshot<ConversionDefinitionReport | null>(`${accountId}:${range.from}:${range.to}`, null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [completedAt, setCompletedAt] = useState<string | null>(null)
   const [startedAt, setStartedAt] = useState<string | null>(null)
   const [noRun, setNoRun] = useState(false)
   const inFlight = useRef(true)
@@ -61,14 +58,17 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
     let active = true
     inFlight.current = true
     setStartedAt(new Date().toISOString())
-    setLoading(true); setError(''); setReport(null); setNoRun(false)
+    setLoading(true); setError(''); setReport(null); setNoRun(false); setCompletedAt(null)
     void api.conversions.definitionReport({ ...range, lineAccountId: accountId }).then((response) => {
       if (!active) return
       if (!response.success || !Array.isArray(response.data.byDefinition) || !Array.isArray(response.data.daily)) throw new Error()
+      if (response.data.range && (response.data.range.from.slice(0, 10) !== range.from || response.data.range.to.slice(0, 10) !== range.to)) throw new Error('period_mismatch')
+      if (response.data.daily.some((item) => item.day < range.from || item.day > range.to)) throw new Error('period_mismatch')
       setReport(response.data)
+      setCompletedAt(new Date().toISOString())
     }).catch((error) => { if (active) { if (error instanceof ApiError && error.status === 404) setNoRun(true); else setError('成果レポートを読み込めませんでした') } }).finally(() => { if (active) { inFlight.current = false; setLoading(false) } })
     return () => { active = false }
-  }, [accountId, range, attempt])
+  }, [accountId, range, attempt, setReport])
   const point = report?.byDefinition.find((item) => item.conversionPointId === pointId) ?? null
   const daily = useMemo(() => {
     const rows = new Map<string, number>()
@@ -88,7 +88,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
 
   return <RoutesFrame customRange={customRange} onRangeChange={(value) => { setRange(value); setPointId(null) }} accountId={accountId} days={days} onDaysChange={(value) => { setDays(value); setPointId(null) }} exportCsv={() => void exportCsv()} exportDisabled={!report || exporting}>
     {() => <div className={styles.reportStack}>
-      <AggregationStatus state={loading ? { kind: 'running', startedAt } : error ? { kind: 'failed', reason: error } : report ? { kind: 'complete', dataAt: null } : { kind: 'empty' }} onRun={retry} />
+      <AggregationStatus state={loading ? { kind: 'running', startedAt } : error ? { kind: 'failed', reason: error } : report ? { kind: 'complete', dataAt: completedAt } : { kind: 'empty' }} onRun={retry} />
       {noRun ? <ListState kind="empty" title="まだ集計していません" /> : null}
       {exportError ? <Notice tone="danger" className={styles.captionNoticePlacement} >{exportError}</Notice> : null}
       {loading ? <ListState kind="loading" title="成果レポートを読み込んでいます" />
@@ -97,7 +97,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
           <section className={styles.reportCard} aria-labelledby="conversion-daily-title">
             <div className={styles.reportHead}>
               <h2 id="conversion-daily-title" className={styles.hoursTitle}>{`日ごとの成果（${point ? point.conversionPointName : '成果地点すべて'}）`}</h2>
-              <span className={styles.reportSub}>{`この${days}日 ${formatNumber(point ? point.netCount : report.kpis.netCount)} 件・前の${days}日 ${formatNumber(point ? point.previousNetCount : report.kpis.previousNetCount)} 件`}</span>
+              <span className={styles.reportSub}>{`この期間 ${formatNumber(point ? point.netCount : report.kpis.netCount)} 件・前の期間 ${formatNumber(point ? point.previousNetCount : report.kpis.previousNetCount)} 件`}</span>
               {point ? <><span className={styles.spacer} /><Button variant="secondary" onClick={() => setPointId(null)}>すべてに戻す</Button></> : null}
             </div>
             {daily.length ? <>

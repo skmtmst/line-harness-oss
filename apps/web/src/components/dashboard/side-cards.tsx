@@ -4,6 +4,7 @@ import type { BookingRequest, DashboardOverview, DashboardUpcoming, DeliveryFail
 import { api } from '@/lib/api'
 import Card from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
+import TextLink from '@/components/shared/text-link'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { formatDateTime, formatNumber, formatTime } from '@/lib/format'
 
@@ -46,7 +47,7 @@ export function SideCard({
   return (
     <Card padding="roomy">
       <div className="flex flex-col gap-2.5">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center justify-between gap-3">
           {/*
             題と「？」・期間はひとかたまりにし、文字の縦の中央でそろえる
             （★V7・2026-09-27）。ばらばらに置くと「？」だけ右端へ飛び、
@@ -58,12 +59,8 @@ export function SideCard({
             {/* 期間は常に1行にする（DASH-23）。折り返すとカード間で見出しの高さがずれる。 */}
             {period ? <span className="text-ink-faint shrink-0 text-micro font-medium whitespace-nowrap">{period}</span> : null}
           </div>
-          {/*
-            行き先リンクは CardHeader の action（actionTone="info"）と
-            同じ見た目にする。ダッシュボードの行き先リンクはこの1つに
-            そろえ、独自の色・大きさを増やさない。
-          */}
-          {action ? <Link href={action.href} prefetch={false} className="text-status-info shrink-0 text-label font-semibold hover:underline">{action.label}</Link> : null}
+          {/* 行き先は共通リンクの緑・文字・矢印を使い、見出しの右に1つ置く。 */}
+          {action ? <TextLink href={action.href} className="shrink-0">{action.label.replace(/\s*→\s*$/, '')}</TextLink> : null}
         </div>
         <div>{children}</div>
         {freshness ? <div className="flex justify-end">{freshness}</div> : null}

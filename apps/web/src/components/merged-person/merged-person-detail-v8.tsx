@@ -19,6 +19,7 @@ import ListState from '@/components/shared/list-state'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { formatDateTime } from '@/lib/format'
 import MergedDeliveryDialog from './merged-delivery-dialog'
+import { comparisonSourceLabels } from '@/components/shared/differences-filter'
 import MergedProfileDialog from './merged-profile-dialog'
 import { useMergedPerson } from './use-merged-person'
 import styles from '@/app/friends/friends-v8.module.css'
@@ -263,6 +264,7 @@ export default function MergedPersonDetailViewV8({
       <MergedProfileDialog
         open={m.profileEditing}
         candidates={person.profileCandidates}
+        sourceLabels={comparisonSourceLabels(person.linkedFriends.map((friend) => ({ id: friend.friendId, name: friend.displayName, source: friend.lineAccountName })))}
         draft={m.profileDraft}
         revision={person.revision}
         busy={m.profileSaving}

@@ -296,11 +296,11 @@ export default function TopBar({
                     <span className={`${styles.accountName}`} data-part="account-name" title={hq.name}>{hq.name}</span>
                   </>
                 ) : (
-                  <span className={styles.accountName} data-part="account-name" title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
+                  <span className={styles.accountName} data-part="account-name" title={current?.label ?? 'LINE公式アカウントを選んでください'}>{current?.label ?? '未選択'}</span>
                 )}
               </span>
             ) : (
-              <span className={styles.accountName} data-part="account-name" title={current?.label ?? '店舗を選択'}>{current?.label ?? '店舗を選択'}</span>
+              <span className={styles.accountName} data-part="account-name" title={current?.label ?? 'LINE公式アカウントを選んでください'}>{current?.label ?? '未選択'}</span>
             )}
             <span className={styles.switchChevron} data-open={switchOpen || undefined} aria-hidden="true">{chromeVariant === 'shell' ? <ChevronsUpDown size={16} /> : <ChevronIcon />}</span>
 

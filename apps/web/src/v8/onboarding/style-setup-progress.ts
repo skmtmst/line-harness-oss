@@ -1,0 +1,87 @@
+import { api, bookingApi, eventsApi } from '@/lib/api'
+import { styleApi } from '@/lib/api/helpers/styles'
+import { restaurantTestApi } from '@/lib/restaurant-test-api'
+import type { AccountStyle } from '@line-crm/shared'
+import type { StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
+
+type Evidence = { complete: boolean | null; reason?: string }
+const evidence = (complete: boolean | null, reason: string): Evidence => ({ complete, ...(complete === true ? {} : { reason }) })
+const validDate = (value: unknown): value is string => typeof value === 'string' && Number.isFinite(Date.parse(value))
+const both = (...values: Array<boolean | null>): boolean | null => values.includes(false) ? false : values.includes(null) ? null : true
+const either = (values: Array<boolean | null>): boolean | null => values.includes(true) ? true : values.includes(null) ? null : false
+const read = async <T,>(load: () => Promise<T>): Promise<T | null> => { try { return await load() } catch { return null } }
+
+export function unknownStyleSetupProgress(style: AccountStyle, reason = '設定を確かめています'): StyleSetupProgress {
+  return { style, steps: Object.fromEntries(['attributes', 'friendAdd', 'scenario'].map(key => [key, { complete: null, reason }])) }
+}
+
+/** 実設定のGETだけを読む。タグ・配信の済みや友だち総数を業種の設定へ代用しない。 */
+export async function loadStyleSetupProgress(accountId: string, style: AccountStyle): Promise<StyleSetupProgress> {
+  if (style === 'standard') return { style, steps: {} }
+  if (style === 'restaurant') {
+    const response = await read(() => restaurantTestApi.snapshot(accountId, { limit: 1 }))
+    if (!response?.success || !Array.isArray(response.data.stores) || !Array.isArray(response.data.tables) || !Array.isArray(response.data.menuItems) || !Array.isArray(response.data.inventory)) {
+      return unknownStyleSetupProgress(style, 'お店の設定を読み込めていません')
+    }
+    const data = response.data
+    const stores = data.stores.filter(store => store.line_account_id === accountId && store.status === 'active')
+    const hasTables = (storeId: string) => data.tables.some(table => table.store_id === storeId && table.is_active === 1 && table.max_capacity > 0)
+    const hasMenu = data.menuItems.some(menu => stores.some(store => store.id === menu.store_id) && menu.status === 'active')
+    const reception = await Promise.all(stores.map(async store => {
+      if (!hasTables(store.id) || store.line_status !== 'connected' || !data.inventory.some(slot => slot.store_id === store.id && slot.line_capacity > 0 && slot.total_capacity > 0)) return false
+      const hours = await read(() => restaurantTestApi.openingHours(accountId, store.id))
+      if (!hours?.success || (hours.data.hours !== null && !Array.isArray(hours.data.hours))) return null
+      return Boolean(hours.data.hours?.some(day => Array.isArray(day.periods) && day.periods.some(period => /^\d{2}:\d{2}$/.test(period.opensAt) && /^\d{2}:\d{2}$/.test(period.closesAt) && period.opensAt !== period.closesAt)))
+    }))
+    return { style, steps: {
+      attributes: evidence(stores.some(store => hasTables(store.id)), '有効な卓と席を登録してください'),
+      friendAdd: evidence(hasMenu, 'コースとメニューを登録してください'),
+      scenario: evidence(either(reception), reception.includes(null) ? '予約受付の営業時間を読み込めていません' : 'LINEの受付枠と営業時間を用意してください'),
+    } }
+  }
+  if (style === 'salon' || style === 'consult') {
+    const [menusResponse, staffResponse, settingsResponse, accountResponse] = await Promise.all([
+      read(() => bookingApi.listMenus(accountId)), read(() => bookingApi.listStaff(accountId)),
+      read(() => bookingApi.getSettings(accountId)), read(() => api.lineAccounts.get(accountId)),
+    ])
+    const menus = Array.isArray(menusResponse?.menus) ? menusResponse.menus.filter(menu => menu.is_active === 1) : null
+    const staff = Array.isArray(staffResponse?.staff) ? staffResponse.staff.filter(person => person.is_active === 1) : null
+    const hasMenus = menus === null ? null : menus.length > 0
+    const hasStaff = staff === null ? null : staff.length > 0
+    const linked = menus === null || staff === null ? null : either(menus.map(menu => Array.isArray(menu.assigned_staff) ? menu.assigned_staff.some(person => staff.some(active => active.id === person.id)) : null))
+    const settings = settingsResponse?.success && settingsResponse.data.lineAccountId === accountId ? settingsResponse.data : null
+    const hours = settings && typeof settings.businessHoursConfigured === 'boolean' && Array.isArray(settings.businessHours)
+      ? settings.businessHoursConfigured && settings.businessHours.some(day => Array.isArray(day.intervals) && day.intervals.some(interval => interval.start !== interval.end)) : null
+    const account = accountResponse?.success && accountResponse.data.id === accountId ? accountResponse.data : null
+    const bookingUrl = account && (account.liffId === null || typeof account.liffId === 'string') ? Boolean(account.liffId?.trim()) : null
+    const slots = both(hasMenus, hasStaff, linked, hours)
+    return { style, steps: {
+      attributes: evidence(style === 'salon' ? hasMenus : slots, style === 'salon' ? menus === null ? 'メニューを読み込めていません' : '有効なメニューを登録してください' : slots === null ? '面談枠の設定を読み込めていません' : '担当者と面談できる時間を設定してください'),
+      friendAdd: evidence(style === 'salon' ? hasStaff : bookingUrl, style === 'salon' ? staff === null ? '担当者を読み込めていません' : '有効な担当者を登録してください' : bookingUrl === null ? '予約ページを確認できていません' : 'LINEの予約ページを設定してください'),
+      scenario: evidence(both(slots, bookingUrl), slots === null || bookingUrl === null ? '予約受付の設定を確認できていません' : '担当するメニュー・営業時間・予約ページを確認してください'),
+    } }
+  }
+  if (style === 'lesson') {
+    const [events, members] = await Promise.all([read(() => eventsApi.listEvents(accountId, { limit: 100 })), read(() => styleApi.members(accountId))])
+    const items = events && Array.isArray(events.items) && Number.isSafeInteger(events.total) && events.total >= 0 ? events.items : null
+    const withDates = items?.filter(event => validDate(event.next_slot_starts_at))
+    const classes = items === null ? null : withDates!.length > 0 ? true : items.length === 0 && events!.total === 0 ? false : null
+    const open = items === null ? null : items.some(event => event.is_published === 1 && (!event.lifecycle_status || event.lifecycle_status === 'published') && validDate(event.next_slot_starts_at) && Date.parse(event.next_slot_starts_at) > Date.now()) ? true : events!.total <= items.length ? false : null
+    const registered = members?.success && Array.isArray(members.data) ? members.data.some(member => member.line_account_id === accountId && !member.ended_at && (!member.expires_at || validDate(member.expires_at) && Date.parse(member.expires_at) > Date.now())) : null
+    return { style, steps: {
+      attributes: evidence(classes, classes === false ? 'クラスを作って開催日時を決めてください' : 'クラスの開催日時を確認できていません'),
+      friendAdd: evidence(registered, registered === false ? '会員を登録してください' : '会員の登録状況を読み込めていません'),
+      scenario: evidence(open, open === false ? '開催日時を決めてクラスを公開してください' : 'クラスの受付状況を確認できていません'),
+    } }
+  }
+  const connector = await read(() => api.ecCommerce.connector(accountId))
+  const data = connector?.success ? connector.data : null
+  const connected = data && typeof data.configured === 'boolean' ? Boolean(data.configured && data.connector?.status === 'connected' && data.connector.secretConfigured) : null
+  const events = data?.connector?.eventTypes
+  const receivesOrders = both(connected, Array.isArray(events) ? events.includes('ec.order.confirmed') : null, validDate(data?.health?.lastSucceededAt) ? true : null)
+  return { style, steps: {
+    attributes: evidence(connected, connected === false ? 'ストアを接続してください' : 'ストアの接続状況を読み込めていません'),
+    friendAdd: evidence(null, 'ストアの商品を確認できる情報がまだありません。EC連携で確認してください'),
+    scenario: evidence(receivesOrders, receivesOrders === false ? '注文を受け取る設定を確認してください' : 'ストアからの注文の受け取りをまだ確認できていません'),
+  } }
+}

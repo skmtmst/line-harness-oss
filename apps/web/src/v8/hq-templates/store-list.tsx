@@ -119,7 +119,7 @@ export default function HqStoreList(props: HqStoreListProps) {
   const distributed = rows.filter((row) => (row.distributed_account_count ?? 0) > 0).length
   const accountNames = new Set(rows.flatMap((row) => row.distributed_account_names ?? []))
   const namesComplete = rows.every((row) => (row.distributed_account_more ?? 0) === 0)
-  const outdated = stats ? stats.outdatedTemplateCount : rows.filter((row) => (row.outdated_account_count ?? 0) > 0).length
+  const outdated = stats && !kind ? stats.outdatedTemplateCount : rows.some((row) => row.outdated_account_count == null) ? null : rows.filter((row) => (row.outdated_account_count ?? 0) > 0).length
   const kpis = [
     { key: 'templates', title: 'ひな形', icon: FileText, value: ready ? rows.length : null, unit: '件', detail: ready ? `下書き ${rows.length - distributed}件` : emptyValue('unknown') },
     { key: 'accounts', title: '配ったアカウント', icon: Link, value: ready && namesComplete ? accountNames.size : null, unit: '件', detail: ready ? (namesComplete ? `全 ${formatNumber(accountTotal)} アカウントのうち` : '数え切れないアカウントがあります') : emptyValue('unknown') },
@@ -128,7 +128,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       : type === 'tag'
       ? { key: 'friends', title: '付けている友だち', icon: Users, value: ready ? sumOrNull(rows.map((row) => row.friend_count)) : null, unit: '人', detail: ready ? '配った先の合計' : emptyValue('unknown') }
       : type === 'template'
-      ? { key: 'sent', title: '今月送った数', icon: Send, value: ready && stats ? stats.thisMonthSentCount : null, unit: '通', detail: ready ? '配った先の合計' : emptyValue('unknown') }
+      ? { key: 'sent', title: '今月送った数', icon: Send, value: ready ? kind ? sumOrNull(rows.map((row) => row.this_month_sent_count)) : stats?.thisMonthSentCount ?? null : null, unit: '通', detail: ready ? '配った先の合計' : emptyValue('unknown') }
       : { key: 'distributed', title: '配ったひな形', icon: Send, value: ready ? distributed : null, unit: '件', detail: ready ? '1つ以上のアカウントへ配った' : emptyValue('unknown') },
     { key: 'outdated', title: '新しい版を未配布', icon: Archive, value: ready ? outdated : null, unit: '件', detail: ready ? '直したあと配っていない' : emptyValue('unknown') },
   ]

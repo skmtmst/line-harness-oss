@@ -12,6 +12,9 @@ import { CircleHelp, Copy, FlaskConical, RefreshCw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { ReservationSource } from '@/components/shared/reservation-board'
 import Notice from '@/components/shared/notice'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { useStaffRole } from '@/lib/staff-role'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { Field } from '@/components/shared/form-controls'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -81,7 +84,7 @@ function channelStatus(channel: RestaurantChannel): { value: string; label: stri
 const accountQuery = (accountId: string, storeId: string) =>
   `account_id=${encodeURIComponent(accountId)}&storeId=${encodeURIComponent(storeId)}`
 
-export default function ChannelsBoard({ accountId, storeId, date, canEdit, timezone }: {
+export default function ChannelsBoard({ accountId, storeId, date, canEdit: allowedByRole, timezone }: {
   accountId: string
   storeId: string
   timezone?: string
@@ -96,6 +99,9 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
   const [failed, setFailed] = useState(false)
   const [howToOpen, setHowToOpen] = useState(false)
   const [reissueOpen, setReissueOpen] = useState(false)
+  const role = useStaffRole()
+  const lockedReason = usePermissionLockReason(allowedByRole)
+  const canEdit = allowedByRole && !lockedReason
   const router = useRouter()
   const [detail, setDetail] = useState<InboundEmail | null>(null)
   const [importing, setImporting] = useState<InboundEmail | null>(null)
@@ -133,6 +139,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
 
 
   const issue = () => {
+    if (!canEdit || busy) return
     setBusy(true)
     void restaurantTestApi.issueIntakeAddress(accountId, storeId)
       .then(() => { setMessage({ tone: 'success', text: '取り込みアドレスを発行しました。' }); setReload((n) => n + 1) })
@@ -141,7 +148,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
   }
 
   const manualImport = () => {
-    if (!importing || busy) return
+    if (!canEdit || !importing || busy) return
     const errors: typeof fieldErrors = {}
     if ((FIELD_REQUIREMENTS.draft_customerName.check(draft.customerName) !== null)) errors.customerName = 'お客さまのお名前を入れてください。'
     const guests = Number(draft.guestCount)
@@ -182,6 +189,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
 
   return (
     <div data-design-node="hQQlt" className={styles.channels}>
+      {role !== null && !canEdit ? <ReadOnlyNotice /> : null}
       {message ? <Notice role="status" tone={message.tone === 'success' ? 'success' : 'danger'} message={message.text} /> : null}
       {/* 絵 mVUo3：左に取り込みアドレス（欄＋コピー・3つの操作）、右に今日の取り込み（中身の高さ）。 */}
       <div className={styles.channelCards}>
@@ -197,9 +205,9 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
           <div className={styles.cardActions}>
             <Button onClick={() => setHowToOpen(true)}><CircleHelp size={16} aria-hidden="true" />転送の設定のしかた</Button>
             <Button href="/restaurant-test/reservations"><FlaskConical size={16} aria-hidden="true" />試しに受け取る（予約台帳へ）</Button>
-            {canEdit ? (address
-              ? <Button onClick={() => setReissueOpen(true)} disabled={busy}><RefreshCw size={16} aria-hidden="true" />発行し直す（旧は 90 日で失効）</Button>
-              : <Button variant="primary" disabled={busy} onClick={issue} busy={Boolean(busy)} busyLabel="処理中…">発行する</Button>) : null}
+            {address
+              ? <Button lockedReason={lockedReason} onClick={() => setReissueOpen(true)} disabled={!canEdit || busy}><RefreshCw size={16} aria-hidden="true" />発行し直す（旧は 90 日で失効）</Button>
+              : <Button lockedReason={lockedReason} variant="primary" disabled={!canEdit || busy} onClick={issue} busy={Boolean(busy)} busyLabel="処理中…">発行する</Button>}
           </div>
         </Card>
         <Card layout="vertical" padding="default" gap="tight" surface="standard" className={styles.todayCard} aria-labelledby="rs-today-title">
@@ -265,7 +273,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
         actions={(
           <>
             <Button type="button" onClick={() => setReissueOpen(false)} disabled={busy}>キャンセル</Button>
-            <Button type="button" variant="primary" disabled={busy} busy={busy} busyLabel="処理中…" onClick={() => { setReissueOpen(false); issue() }}>発行し直す</Button>
+            <Button lockedReason={lockedReason} type="button" variant="primary" disabled={!canEdit || busy} busy={busy} busyLabel="処理中…" onClick={() => { setReissueOpen(false); issue() }}>発行し直す</Button>
           </>
         )}
       >
@@ -315,7 +323,7 @@ export default function ChannelsBoard({ accountId, storeId, date, canEdit, timez
         actions={(
           <>
             <Button type="button" onClick={() => setImporting(null)} disabled={busy}>キャンセル</Button>
-            <Button type="submit" variant="primary" disabled={busy}>台帳へ取り込む</Button>
+            <Button lockedReason={lockedReason} type="submit" variant="primary" disabled={!canEdit || busy}>台帳へ取り込む</Button>
           </>
         )}
       >

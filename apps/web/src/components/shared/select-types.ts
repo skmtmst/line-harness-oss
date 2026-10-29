@@ -32,6 +32,8 @@ export interface SelectProps {
   'aria-label': string
   className?: string
   defaultOpen?: boolean
+  /** 権限の理由。入力や状態のdisabledとは分ける。 */
+  lockedReason?: string
   disabled?: boolean
   error?: string
   /** 理由を Field が描くとき、欄の赤枠だけを出す。 */
