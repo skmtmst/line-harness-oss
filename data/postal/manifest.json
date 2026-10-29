@@ -1,5 +1,5 @@
 {
-  "id": "jp-20261002",
+  "id": "jp-20261029",
   "sourceUrl": "https://www.post.japanpost.jp/service/search/zipcode/download/utf/zip/utf_ken_all.zip",
   "inputFile": "utf_ken_all.csv",
   "inputSha256": "444881769a631d2c36c644fc041e5ce62fe65d204ff498a601641ba1e66b5955",
@@ -7,5 +7,8 @@
   "rowCount": 124525,
   "skippedRows": 1,
   "format": "jp-post-utf-15col",
-  "importedAt": "2026-10-02T19:00:54+09:00"
+  "importedAt": "2026-10-29T19:42:00+09:00",
+  "importBatches": 277,
+  "statementByteBudget": 80000,
+  "statementByteLimit": 100000
 }
