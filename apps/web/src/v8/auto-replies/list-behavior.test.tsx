@@ -9,6 +9,9 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -113,6 +116,7 @@ function kpiNumbers() {
 }
 
 beforeEach(() => {
+  verifiedStaffRole('owner'); forgetSessionSnapshot()
   window.history.replaceState(null, '', '/auto-replies')
   document.documentElement.dataset.theme = 'v8'
   accountState.selectedAccountId = 'account-a'
@@ -130,6 +134,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount())
+  forgetStaffIdentity(); forgetSessionSnapshot()
   onCleanup.splice(0).forEach((restore) => restore())
   host.remove()
   clearToastsForTest()
