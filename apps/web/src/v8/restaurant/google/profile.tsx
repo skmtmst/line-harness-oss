@@ -1,10 +1,10 @@
 'use client'
+import { useGooglePermission } from './use-google-permission'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarDays, CalendarX, Clock, GitCompare, History, Pencil, RefreshCw, Timer } from 'lucide-react'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -16,7 +16,6 @@ import styles from './google.module.css'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { formatNumber } from '@/lib/format'
 
 /*
@@ -34,7 +33,8 @@ function addressText(a: GoogleProfileAddress | null | undefined): string {
 const COMPARABLE = ['regularHours', 'specialHours', 'storefrontAddress', 'phoneNumbers', 'profile', 'title', 'websiteUri']
 
 export default function ProfileBoard({ accountId, go }: { accountId: string; go: GoogleNav }) {
-  const role = useStaffRole()
+  const { allowed: canEdit, lockedReason } = useGooglePermission('manager')
+  const { allowed: canSync, lockedReason: syncReason } = useGooglePermission()
   const [data, setData] = useState<GoogleProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -49,7 +49,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
 
   const load = useCallback(async (sync = false) => {
     if (sync) {
-      if (syncLock.current) return
+      if (!canSync || syncLock.current) return
       syncLock.current = true
       setSyncing(true)
     } else setLoading(true)
@@ -66,11 +66,12 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
         setSyncing(false)
       }
     }
-  }, [accountId])
+  }, [accountId, canSync])
 
   useEffect(() => { void load() }, [load])
 
   const quick = async (proposal: GoogleHoursProposal) => {
+    if (!canEdit || busy || !data || data.closed) return
     setBusy(true)
     setActionError('')
     try {
@@ -90,7 +91,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
   }
 
   const { profile, today } = data
-  const canChange = !data.closed && !busy && (canManageRole(role))
+  const canChange = !data.closed && !busy && canEdit
   const todayText = today.closed ? '本日は休業' : formatPeriods(today.periods)
   const closeOptions = TIME_OPTIONS.filter((t) => today.periods.length > 0 && t > today.periods[today.periods.length - 1].open).map((t) => ({ value: t, label: t }))
   const updates = data.googleUpdates
@@ -112,8 +113,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
 
   return (
     <>
-      {role !== null && !canManageRole(role) ? <ReadOnlyNotice>閲覧のみです。営業時間と店舗情報を確認できます。</ReadOnlyNotice> : null}
-      {data.stale ? <Notice tone="warn" action={<Button variant="text" onClick={() => void load(true)} busy={syncing} busyLabel="取得中…">もう一度取得</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
+      {data.stale ? <Notice tone="warn" action={<Button variant="text" lockedReason={syncReason} disabled={!canSync || syncing} onClick={() => void load(true)} busy={syncing} busyLabel="取得中…">もう一度取得</Button>}>{`Googleから最新の情報を読み込めませんでした。前回取得した内容（${formatStampFull(data.fetchedAt)}）を表示しています。`}</Notice> : null}
       {!data.stale && data.closed ? <Notice tone="warn" role="alert">Google側で「臨時休業」または「閉業」になっています。営業時間の変更はGoogleビジネスプロフィールで営業状態を戻してから行ってください。</Notice> : null}
       {!data.stale && !data.closed && data.pendingChangeCount > 0 ? <Notice tone="info" action={<Button variant="text" onClick={() => go({ tab: 'profile', view: 'history', result: 'pending' })}>状態を確認する</Button>}>{`Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します（${formatNumber(data.pendingChangeCount)} 件）。`}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
@@ -122,10 +122,10 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
         <SectionHeader size="small" title={<span id="gb-today-title">本日の営業時間</span>} />
         <p className={styles.todayHours}>{`${formatYmdShort(today.date)}${today.holidayName ? `・${today.holidayName} ` : ''}${todayText}${today.special ? '（特別営業時間）' : ''}`}</p>
         <div className={styles.buttonRow}>
-          {canChange ? <Button onClick={() => go({ tab: 'profile', view: 'hours', mode: 'text' })}><Clock aria-hidden className={styles.icon15} />営業時間を変える</Button> : null}
-          {canChange ? <Button onClick={() => void quick({ source: 'shortcut', shortcut: 'close_today' })} disabled={today.closed} busy={Boolean(busy)} busyLabel="処理中…"><CalendarX aria-hidden className={styles.icon15} />今日を休みにする</Button> : null}
+          <Button disabled={!canChange} lockedReason={lockedReason} onClick={() => canChange && go({ tab: 'profile', view: 'hours', mode: 'text' })}><Clock aria-hidden className={styles.icon15} />営業時間を変える</Button>
+          <Button lockedReason={lockedReason} onClick={() => void quick({ source: 'shortcut', shortcut: 'close_today' })} disabled={!canChange || today.closed} busy={Boolean(busy)} busyLabel="処理中…"><CalendarX aria-hidden className={styles.icon15} />今日を休みにする</Button>
           <Button onClick={() => setShowHolidays((v) => !v)} aria-expanded={showHolidays}><CalendarDays aria-hidden className={styles.icon15} />祝日の営業時間を確認する</Button>
-          {canChange ? <Button onClick={() => { setEarlyClose(closeOptions[closeOptions.length - 1]?.value ?? null); setActionError('') }} disabled={today.closed || closeOptions.length === 0}><Timer aria-hidden className={styles.icon15} />今日は早く閉める</Button> : null}
+          <Button lockedReason={lockedReason} onClick={() => { if (!canChange) return; setEarlyClose(closeOptions[closeOptions.length - 1]?.value ?? null); setActionError('') }} disabled={!canChange || today.closed || closeOptions.length === 0}><Timer aria-hidden className={styles.icon15} />今日は早く閉める</Button>
         </div>
         {earlyClose !== null ? (
           <div className={styles.inlinePanel}>
@@ -134,7 +134,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
             <span className={styles.muted}>{`現在 ${formatPeriods(today.periods)}`}</span>
             <span className={styles.spacer} aria-hidden="true" />
             <Button onClick={() => setEarlyClose(null)} disabled={busy}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void quick({ source: 'shortcut', shortcut: 'early_close_today', closeTime: earlyClose })} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">変更案を確認する</Button>
+            <Button variant="primary" lockedReason={lockedReason} onClick={() => void quick({ source: 'shortcut', shortcut: 'early_close_today', closeTime: earlyClose })} disabled={!canChange} busy={Boolean(busy)} busyLabel="処理中…">変更案を確認する</Button>
           </div>
         ) : null}
         {showHolidays ? (
@@ -147,7 +147,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
                     <span className={styles.muted}>{h.name}</span>
                     <span>{h.special ? `特別営業時間：${h.special.closed ? '休業' : formatPeriods(h.special.periods)}` : `通常どおり：${formatPeriods(profile.regularHours[h.weekday] ?? [], '定休日')}`}</span>
                     <span className={styles.spacer} aria-hidden="true" />
-                    {canChange ? <Button onClick={() => go({ tab: 'profile', view: 'hours', mode: 'calendar', date: h.date })}>{h.special ? '編集' : '設定する'}</Button> : null}
+                    <Button disabled={!canChange} lockedReason={lockedReason} onClick={() => canChange && go({ tab: 'profile', view: 'hours', mode: 'calendar', date: h.date })}>{h.special ? '編集' : '設定する'}</Button>
                   </li>
                 ))}
               </ul>
@@ -167,7 +167,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
           <Button variant="text" onClick={() => setShowMore((v) => !v)} aria-expanded={showMore}>{showMore ? 'ほかの項目を閉じる' : 'ほかの項目（特別営業時間・写真）'}</Button>
           <span className={styles.spacer} aria-hidden="true" />
           <Button onClick={() => go({ tab: 'profile', view: 'history' })}><History aria-hidden className={styles.icon15} />変更履歴を見る</Button>
-          {canChange ? <Button variant="primary" onClick={() => go({ tab: 'profile', view: 'edit' })}><Pencil aria-hidden className={styles.icon15} />プロフィールを編集する</Button> : null}
+          <Button variant="primary" disabled={!canChange} lockedReason={lockedReason} onClick={() => { if (canChange) go({ tab: 'profile', view: 'edit' }) }}><Pencil aria-hidden className={styles.icon15} />プロフィールを編集する</Button>
         </div>
       </Card>
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="gb-google-updates-title">
@@ -209,7 +209,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
           {updates && updates.fields.length > 0 ? (
             <Button onClick={() => setShowDiff((v) => !v)} aria-expanded={showDiff}><GitCompare aria-hidden className={styles.icon15} />{showDiff ? '差分を閉じる' : '差分を見る'}</Button>
           ) : (
-            <Button onClick={() => void load(true)} disabled={syncing} busy={syncing} busyLabel="取得中…"><RefreshCw aria-hidden className={styles.icon15} />同期する</Button>
+            <Button lockedReason={syncReason} disabled={!canSync || syncing} onClick={() => void load(true)} busy={syncing} busyLabel="取得中…"><RefreshCw aria-hidden className={styles.icon15} />同期する</Button>
           )}
         </div>
       </Card>

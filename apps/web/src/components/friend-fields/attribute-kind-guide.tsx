@@ -1,6 +1,6 @@
 'use client'
 
-import Link from 'next/link'
+import TextLink from '@/components/shared/text-link'
 
 /*
  * IDEA-04（issue #1022）：分類の使い分けと重複候補。
@@ -81,14 +81,12 @@ export function AttributeKindGuide({ current }: { current: AttributeKind }) {
               </p>
               <p className="mt-0.5 leading-5">{guide.holds}。{guide.useWhen}ときに選びます。</p>
               {/*
-                m22c: 行き先リンクは共通の見た目（カード見出しの行き先リンクと
-                同じ13px/600の青文字）にそろえる。12pxのままでは、同じ画面の
-                見出し行の戻りリンクと大きさ・色がずれる（自動点検 k=10）。
+                34: 行き先リンクは共通の緑の文字リンク（TextLink）。青は焦点の輪だけ。
               */}
               {!isCurrent ? (
-                <Link href={guide.createHref} className="text-status-info mt-0.5 inline-block text-label font-semibold hover:underline">
-                  {guide.createLabel} →
-                </Link>
+                <TextLink href={guide.createHref} className="mt-0.5 inline-block">
+                  {guide.createLabel}
+                </TextLink>
               ) : null}
             </li>
           )

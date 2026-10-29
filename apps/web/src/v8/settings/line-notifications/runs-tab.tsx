@@ -197,7 +197,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
         ]} /></SaveErrorField>
       </div>
       <div className={styles.runPeriod}>
-        <SaveErrorField names={["periodFilter","period","period_filter"]}><Select aria-label="期間を絞り込み" value={periodFilter} onChange={(value) => setPeriodFilter(value as PeriodFilter)} options={[
+        <SaveErrorField names={["periodFilter","period","period_filter"]}><Select aria-label="期間を絞り込み" label="期間" value={periodFilter} onChange={(value) => setPeriodFilter(value as PeriodFilter)} options={[
           { value: 'all', label: 'すべての期間' }, { value: '24h', label: '24時間以内' }, { value: '7d', label: '7日以内' }, { value: '30d', label: '30日以内' },
         ]} /></SaveErrorField>
       </div>

@@ -107,6 +107,14 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
+const heldCreate = vi.hoisted(() => ({ template: null as null | (() => void) }))
+vi.mock('@/components/shared/action-menu', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/action-menu')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.ariaLabel === '配信の作り方') heldCreate.template = props.items.find(item => item.id === 'create-template')?.onSelect ?? null
+    return <actual.default {...props} />
+  } }
+})
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import BroadcastListV8 from '@/v8/broadcasts/list'
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
@@ -137,6 +145,7 @@ function unmount() {
 }
 
 beforeEach(() => {
+  heldCreate.template = null
   // mockした役割と、実行直前に読む本人APIの控えを同じ管理者にそろえる。
   forgetStaffIdentity(); forgetSessionSnapshot()
   rememberStaffIdentity({ id: 'admin-1', role: 'admin', name: '管理者', permissionKeys: [] } as unknown as StaffMember)
@@ -167,11 +176,17 @@ describe('V8 一斉配信の通し', () => {
     await screen.findByText('はじめの配信')
     await act(async () => fireEvent.click(screen.getAllByRole('button', { name: '配信を作る' })[0]))
     const create = await screen.findByRole('menuitem', { name: /テンプレートから作る/ })
-    await act(async () => { forgetStaffIdentity(); fireEvent.click(create) })
+    const retained = heldCreate.template
+    expect(retained).toBeTypeOf('function')
+    await act(async () => { forgetStaffIdentity() })
+    expect((create as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => fireEvent.click(create))
+    expect(mocks.create).not.toHaveBeenCalled()
+    await act(async () => retained!())
     await screen.findByText('権限が変わったため、配信の作成を中止しました。')
     expect(screen.queryByRole('dialog', { name: 'テンプレートを選ぶ' })).toBeNull()
     expect(mocks.create).not.toHaveBeenCalled()
-    act(() => rememberStaffIdentity({ id: 'admin-1', role: 'admin', name: '管理者', permissionKeys: [] } as unknown as StaffMember))
+    await act(async () => { rememberStaffIdentity({ id: 'admin-1', role: 'admin', name: '管理者', permissionKeys: [] } as unknown as StaffMember) })
     expect(screen.queryByRole('dialog', { name: 'テンプレートを選ぶ' })).toBeNull()
   })
 

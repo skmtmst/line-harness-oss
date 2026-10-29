@@ -855,6 +855,7 @@ export default function RichMenusListV8() {
   const folderSelect = (
     <SaveErrorField names={["folderFilter","folder_filter"]}><Select
       aria-label="フォルダ"
+      label="フォルダ"
       value={folderFilter}
       onChange={(value) => {
         setFolderFilter(value)

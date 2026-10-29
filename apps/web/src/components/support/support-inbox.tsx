@@ -336,6 +336,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
               <SharedTextField value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" aria-label="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm" />
               <Select
                 aria-label="対応状況で絞り込む"
+                label="対応状況"
                 value={status}
                 onChange={(value) => setStatus(value as typeof status)}
                 options={[

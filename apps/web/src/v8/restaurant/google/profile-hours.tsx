@@ -1,4 +1,5 @@
 'use client'
+import { useGooglePermission } from './use-google-permission'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -6,14 +7,12 @@ import DateField from '@/components/shared/date-field'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import SectionHeader from '@/components/shared/section-header'
 import Select from '@/components/shared/select'
 import StickyBar from '@/components/shared/sticky-bar'
 import { Tabs } from '@/components/shared/tabs'
 import { TextArea } from '@/components/shared/text-field'
 import { ApiError } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { restaurantGoogleApi, type GoogleDayHours, type GoogleHoursPeriod, type GoogleHoursProposal, type GoogleProfileData, type GoogleWeekday, type GoogleWeeklyHours } from '@/lib/restaurant-google-api'
@@ -55,8 +54,7 @@ function periodDiff(before: GoogleHoursPeriod[], after: GoogleHoursPeriod[]): [s
 
 export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: string; mode: HoursMode; initialDate?: string | null; go: GoogleNav }) {
   const saveErrors = useSaveFormErrors()
-  const role = useStaffRole()
-  const canEdit = canManageRole(role)
+  const { allowed: canEdit, lockedReason } = useGooglePermission('manager')
   const submitLock = useRef(false)
   const [data, setData] = useState<GoogleProfileData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -157,17 +155,16 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
       <Tabs size="compact" label="営業時間の変更方式" items={([
         ['text', 'かんたん入力'], ['calendar', 'カレンダーで指定'], ['weekly', '毎週の営業時間'],
       ] as const).map(([key, label]) => ({ label, current: mode === key, onClick: () => guarded(() => go({ tab: 'profile', view: 'hours', mode: key })) }))} />
-      {!canEdit ? <ReadOnlyNotice>閲覧のみです。営業時間を確認できます。</ReadOnlyNotice> : null}
       {data.closed ? <Notice tone="danger">Google側で「臨時休業」または「閉業」になっているため、営業時間は変更できません。</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       {mode === 'text' ? <>
         <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
           <SectionHeader size="small" title="いつ、何時に変更しますか？" />
           <Field label="文章で入力" htmlFor="gb-hours-text"><SaveErrorField names={["text"]}><TextArea id="gb-hours-text" value={text} onChange={(event) => { setText(event.target.value); setQuestion('') }} rows={4} maxLength={500} placeholder="例：今週の金曜日は9:00から17:00オープンにして" disabled={!editable || !data.aiAvailable} /></SaveErrorField></Field>
-          {canEdit ? <div className={styles.buttonRow}>
-            <Button onClick={() => { setText('今日を休みにして'); setQuestion('') }} disabled={!editable || !data.aiAvailable}>今日を休みにして</Button>
-            <Button onClick={() => { setText('明日は20時に閉店'); setQuestion('') }} disabled={!editable || !data.aiAvailable}>明日は20時に閉店</Button>
-          </div> : null}
+          <div className={styles.buttonRow}>
+            <Button lockedReason={lockedReason} onClick={() => { if (!canEdit) return; setText('今日を休みにして'); setQuestion('') }} disabled={!editable || !data.aiAvailable}>今日を休みにして</Button>
+            <Button lockedReason={lockedReason} onClick={() => { if (!canEdit) return; setText('明日は20時に閉店'); setQuestion('') }} disabled={!editable || !data.aiAvailable}>明日は20時に閉店</Button>
+          </div>
           {!data.aiAvailable ? <Notice tone="warn">この環境ではかんたん入力（AI）は使えません。「カレンダーで指定」または「毎週の営業時間」から変更してください。</Notice> : null}
           {question ? <Notice tone="warn">{question}</Notice> : null}
           <Notice tone="info">AIは変更案を作成するだけです。この画面ではGoogleの営業時間は変わりません。日付があいまいな場合は対象の日付を確認します。</Notice>
@@ -190,10 +187,10 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
           <SectionHeader size="small" title={`${formatYmdShort(edited.date)}の営業時間`} />
           <p className={styles.muted}>現在：{describeDay(original)}{original.special ? '（特別営業時間として登録済み）' : ''}</p>
           {edited.remove ? <Notice tone="warn" action={<Button variant="text" onClick={() => undoDay(edited.date)} disabled={!editable}>外すのをやめる</Button>}>この日の特別営業時間を外し、通常の営業時間（{formatPeriods(regularFor(edited.date).periods, '定休日')}）に戻します。</Notice> : <>
-            <ToggleField checked={edited.closed} disabled={!editable} onChange={(next) => setDay({ ...edited, closed: next, periods: next ? [] : (profile.regularHours[weekdayOf(edited.date)] ?? []) })}>この日は休業にする</ToggleField>
+            <ToggleField lockedReason={lockedReason} checked={edited.closed} disabled={!editable} onChange={(next) => setDay({ ...edited, closed: next, periods: next ? [] : (profile.regularHours[weekdayOf(edited.date)] ?? []) })}>この日は休業にする</ToggleField>
             {!edited.closed ? <HoursPeriods periods={edited.periods} label="" disabled={!editable} readOnly={!canEdit} onChange={(periods) => setDay({ ...edited, periods })} /> : null}
             {!edited.closed && edited.periods.length === 0 ? <Notice tone="warn">営業する日は枠を1つ以上入れてください（休業なら上の「この日は休業にする」にチェックを入れてください）。</Notice> : null}
-            {original.special && canEdit ? <Button disabled={!editable} onClick={() => setDay({ ...regularFor(edited.date), remove: true })}>特別営業時間を外す（通常の営業時間に戻す）</Button> : null}
+            {original.special ? <Button lockedReason={lockedReason} disabled={!editable} onClick={() => setDay({ ...regularFor(edited.date), remove: true })}>特別営業時間を外す（通常の営業時間に戻す）</Button> : null}
           </>}
         </Card> : null}
         {editedDates.length ? <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label="変更する日の一覧">
@@ -213,7 +210,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
           return <Card key={day} appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label={`${WEEKDAY_JA[day]}曜の営業時間`}>
             <SectionHeader size="small" title={`${WEEKDAY_JA[day]}曜${weeklyChanged.includes(day) ? '（変更）' : ''}`} />
             {/* 保存（確かめて送る）してから効くのでチェック（決まり14：スイッチはその場で効く物だけ）。 */}
-            <ToggleField checked={periods.length === 0} disabled={!editable} onChange={(next) => setPeriods(next ? [] : (profile.regularHours[day]?.length ? profile.regularHours[day] : [{ open: '11:00', close: '22:00' }]))}>{`${WEEKDAY_JA[day]}曜を定休日にする`}</ToggleField>
+            <ToggleField lockedReason={lockedReason} checked={periods.length === 0} disabled={!editable} onChange={(next) => setPeriods(next ? [] : (profile.regularHours[day]?.length ? profile.regularHours[day] : [{ open: '11:00', close: '22:00' }]))}>{`${WEEKDAY_JA[day]}曜を定休日にする`}</ToggleField>
             {periods.length ? <HoursPeriods periods={periods} label={`${WEEKDAY_JA[day]}曜 `} disabled={!editable} readOnly={!canEdit} removeLastOnly onChange={setPeriods} /> : <p className={styles.muted}>定休日</p>}
           </Card>
         })}
@@ -225,22 +222,23 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
         <Notice tone="info">ここで変えた曜日は、毎週その時間になります。「変更案を確認する」を押すまでGoogleの営業時間は変わりません。特別営業時間が設定されている日は、そちらが優先されます。</Notice>
       </>}
       {mode !== 'text' ? <p className={styles.muted}>15分刻みで選べます。翌日にまたぐ時間（例：18:00–02:00）はそのまま入力できます。</p> : null}
-      {canEdit ? <StickyBar actions={<><Button onClick={clear} disabled={busy || !dirty}>入力をクリア</Button><Button variant="primary" onClick={() => void submit()} disabled={!canSubmit} busy={busy} busyLabel="確認中…">変更案を確認する</Button></>} /> : null}
+      <StickyBar actions={<><Button lockedReason={lockedReason} onClick={clear} disabled={!canEdit || busy || !dirty}>入力をクリア</Button><Button lockedReason={lockedReason} variant="primary" onClick={() => void submit()} disabled={!canSubmit} busy={busy} busyLabel="確認中…">変更案を確認する</Button></>} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した営業時間の変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </></SaveErrorScope>
   )
 }
 
 function HoursPeriods({ periods, label, disabled, readOnly = false, removeLastOnly = false, onChange }: { periods: GoogleHoursPeriod[]; label: string; disabled: boolean; readOnly?: boolean; removeLastOnly?: boolean; onChange: (periods: GoogleHoursPeriod[]) => void }) {
+  const { allowed, lockedReason } = useGooglePermission('manager')
   const problem = periodsProblem(periods)
   return <>
     {periods.map((period, index) => <Card key={index} appearance="outlined" layout="vertical" padding="compact" gap="normal">
       {(['open', 'close'] as const).map((kind) => <Field key={kind} label={`${label}枠${index + 1}の${kind === 'open' ? '開始' : '終了'}`}>
-        <Select size="full" aria-label={`${label}枠${index + 1}の${kind === 'open' ? '開始' : '終了'}`} value={period[kind]} disabled={disabled} options={TIME_OPTIONS.map((time) => ({ value: time, label: kind === 'close' && time === '00:00' ? '24:00' : time }))} onChange={(value) => onChange(periods.map((item, at) => at === index ? { ...item, [kind]: value } : item))} />
+        <Select size="full" aria-label={`${label}枠${index + 1}の${kind === 'open' ? '開始' : '終了'}`} value={period[kind]} disabled={disabled || readOnly || !allowed} options={TIME_OPTIONS.map((time) => ({ value: time, label: kind === 'close' && time === '00:00' ? '24:00' : time }))} onChange={(value) => onChange(periods.map((item, at) => at === index ? { ...item, [kind]: value } : item))} />
       </Field>)}
-      {!readOnly && (!removeLastOnly || (periods.length > 1 && index === periods.length - 1)) ? <Button disabled={disabled} onClick={() => onChange(periods.filter((_, at) => at !== index))} aria-label={`${label}枠${index + 1}を削除`}>枠を削除する</Button> : null}
+      {(!removeLastOnly || (periods.length > 1 && index === periods.length - 1)) ? <Button lockedReason={lockedReason} disabled={disabled || readOnly || !allowed} onClick={() => { if (!disabled && !readOnly && allowed) onChange(periods.filter((_, at) => at !== index)) }} aria-label={`${label}枠${index + 1}を削除`}>枠を削除する</Button> : null}
     </Card>)}
     {problem ? <Notice tone="warn">{problem}</Notice> : null}
-    {!readOnly ? <Button disabled={disabled || periods.length >= 3} onClick={() => onChange([...periods, { open: periods[periods.length - 1]?.close ?? '11:00', close: '22:00' }])}>枠を追加（1日3枠まで）</Button> : null}
+    <Button lockedReason={lockedReason} disabled={disabled || readOnly || !allowed || periods.length >= 3} onClick={() => { if (!disabled && !readOnly && allowed) onChange([...periods, { open: periods[periods.length - 1]?.close ?? '11:00', close: '22:00' }]) }}>枠を追加（1日3枠まで）</Button>
   </>
 }

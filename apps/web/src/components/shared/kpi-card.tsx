@@ -6,7 +6,7 @@ import { ArrowRight, MoreHorizontal } from 'lucide-react'
 import type { CSSProperties, ReactNode } from 'react'
 import StatusBadge from './status-badge'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
-import { isKpiNumberText } from './kpi-number-text'
+import { isKpiNumberText, isZeroNumberText } from './kpi-number-text'
 import HelpTip from './help-tip'
 import { isCountableValue } from './not-connected'
 import styles from './kpi-card.module.css'
@@ -243,7 +243,7 @@ export default function KpiCard({
       data-kpi-density={density}
       data-kpi-range={valueRange !== undefined || undefined}
       data-kpi-detail-layout={detailLayout}
-      data-kpi-zero={!loading && primaryText === undefined && valueText === undefined && valueRange === undefined && value === 0 ? '' : undefined}
+      data-kpi-zero={!loading && primaryText === undefined && valueRange === undefined && (valueText === undefined ? value === 0 : isZeroNumberText(valueText)) ? '' : undefined}
       aria-busy={loading || undefined}
       data-design-version="v8"
       {...cardProps}

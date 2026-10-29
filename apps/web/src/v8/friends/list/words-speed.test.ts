@@ -37,7 +37,8 @@ describe('友だち一覧の日付を大量に表示する', () => {
     vi.setSystemTime(new Date('2026-12-31T15:00:00Z'))
     expect(monthDay('2026-12-31T15:00:00Z')).toBe('1月1日（金）')
     expect(monthDay('2026-12-31T14:59:00Z')).toBe('12月31日（木）')
-    expect(monthDayTime('2026-12-31T15:00:00Z')).toBe('12/31 15:00')
+    // 93：一覧の列は前年も年を落とさない（2027年始から見た2026年は年付き）。
+    expect(monthDayTime('2026-12-31T15:00:00Z')).toBe('2026/12/31 15:00')
     expect(monthDay('壊れた値')).toBe('—')
     expect(monthDayTime('壊れた値')).toBe('—')
   })

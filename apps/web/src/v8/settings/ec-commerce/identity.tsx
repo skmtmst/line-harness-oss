@@ -202,6 +202,7 @@ export default function EcIdentityCandidatesScreen() {
           <span className={styles.sortBox}>
             <SaveErrorField names={["view"]}><Select
               aria-label="候補の絞り込み"
+              label="候補"
               value={view}
               onChange={(value) => setView(value as View)}
               options={VIEW_OPTIONS.map((option) => ({ value: option.value, label: viewCount[option.value] == null ? option.label : `${option.label} ${formatNumber(viewCount[option.value] ?? 0)}` }))}

@@ -467,6 +467,7 @@
 - [受信箱の空き・題横の印・保存の入口・カードの縦崩れ](release-log/unreleased/1953-kenta-muse-inbox.md)
 - [運営・監査・分析・問い合わせ・リッチメニューの修正](release-log/unreleased/1953-kenta-muse-ops-misc.md)
 - [統括の一覧の名前押下・友だちCSVのタブ・統括アカウント説明の修正](release-log/unreleased/1953-kenta-muse-list-settings.md)
+- [絞り込みの見出し・0の灰色・日付の年・経過の日数](release-log/unreleased/1955-kenta-muse-ui-color.md)
 - [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/1948-kenta-train-1029f.md)
 - [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
 - [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
@@ -956,11 +957,14 @@
 - [LINEの接続状態の統一](release-log/unreleased/1954-kenta-line-connection-state.md) — 反映履歴、確認 2026-10-30
 - [LINE通知の送信内訳の表示](release-log/unreleased/1950-kenta-notification-kpi-detail.md)
 - [業種別の初期設定の確認](release-log/unreleased/1950-kenta-style-setup-progress.md) — 反映履歴、確認 2026-10-29
+- [Google投稿の確認時刻](release-log/unreleased/1955-kenta-swb-google-last-checked.md) — 状態確認の時刻表示の反映履歴。
+- [Google投稿の種類の札](release-log/unreleased/1955-kenta-swb-google-kind-chip.md) — 種類の札をそろえた反映履歴。
 - [最初の1通の確認と読み直しの操作](release-log/unreleased/1951-kenta-first-message-guide.md)
 - [シナリオの人数と割合](release-log/unreleased/1951-kenta-scenario-counts.md) — 人数の欠測と登録人数による割合の修正履歴。
 - [シナリオ人数の単位と補足位置](release-log/unreleased/1951-kenta-scenario-count-labels.md) — 不明時の単位と登録0人の補足位置の修正履歴。
 - [問い合わせのタブ・カルーセルの絵・更新履歴の検索](release-log/unreleased/1951-kenta-swb-x10-x14-x18.md)
 - [アカウント選択と読み込み失敗時の案内](release-log/unreleased/1951-kenta-train-1029h.md)
+- [Googleビジネスの権限表示](release-log/unreleased/1955-kenta-swb-google-permission.md) — 閲覧のみの案内と変更操作の反映履歴。
 - [ECのホームの確認項目](release-log/unreleased/1952-kenta-ec-dashboard.md) — 反映履歴、確認 2026-10-30
 - [共通の型と認証画面の帯の間隔](release-log/unreleased/1952-kenta-muse-fqa-space.md)
 - [UID移行の権限と操作の表示](release-log/unreleased/1952-kenta-uid-permissions.md)
@@ -971,3 +975,4 @@
 - [LIFFの小さな直し](release-log/unreleased/1953-kenta-muse-liff.md) — 写真・次へ・鈴・選択色・支払い案内・読み込み中・業種の出し分けの反映履歴。
 - [一覧の案内と予約の行の操作](release-log/unreleased/1953-kenta-train-1029j.md)
 - [アカウントの説明と権限・予約の見出し](release-log/unreleased/1954-kenta-train-1029k.md)
+- [一斉配信の権限と結果の列](release-log/unreleased/1955-kenta-train-1029l.md) — 閲覧のみの操作と受付件数の反映履歴。
