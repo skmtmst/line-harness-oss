@@ -7,6 +7,7 @@ import { api,ApiError } from '@/lib/api'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { AutoReply,PendingToggle } from './list-model'
 import { formatNumber } from '@/lib/format'
+import { canEditAutoReplyListNow } from './list-access'
 
 type ToggleAutoReplyContext = {
   listContextKey: string
@@ -25,7 +26,7 @@ type ToggleAutoReplyContext = {
 }
 
 export function toggleAutoReply({ listContextKey, load, pendingToggle, rules, saveErrors, selectedAccountId, selectedAccountIdRef, setOptimisticRows, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, toggleReason }: ToggleAutoReplyContext, target = pendingToggle) {
-    if (!target) return
+    if (!canEditAutoReplyListNow() || !target) return
     if (target.accountId !== selectedAccountId) {
       setToggleError('アカウントが切り替わりました。操作する自動応答を選び直してください。')
       return
@@ -67,11 +68,17 @@ export function toggleAutoReply({ listContextKey, load, pendingToggle, rules, sa
       if (selectedAccountIdRef.current === requestAccountId) void load()
     }
     const sendToggle = (targetKind: 'stop' | 'resume', targetReasonOf: (id: string) => string | null, requestKeys = new Map<string, string>()) => {
+      if (!canEditAutoReplyListNow() || selectedAccountIdRef.current !== requestAccountId) return
       applyOptimistic(targetKind === 'resume', targetReasonOf)
       void (async () => {
         let failed = 0
         let forbidden = false
         for (const id of ids) {
+          if (!canEditAutoReplyListNow() || selectedAccountIdRef.current !== requestAccountId) {
+            setOptimisticRows(null)
+            reloadIfSameAccount()
+            return
+          }
           try {
             if (!requestKeys.has(id)) requestKeys.set(id, crypto.randomUUID())
             const result = targetKind === 'stop'

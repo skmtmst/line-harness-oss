@@ -27,6 +27,8 @@ import { TextField, TextArea } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
 import { useBookingRequests } from './booking-requests'
 import BookingRecords from './booking-records'
+import { RowMenu } from '@/components/shared/row-actions'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 
 /*
  * ★V8 イベント予約の「申込者」（Pencil ）。
@@ -97,6 +99,10 @@ function Bookings({ eventId }: { eventId: string }) {
   const saveErrors = useSaveFormErrors()
   const { selectedAccountId } = useAccount()
   const staffRole = useStaffRole()
+  const canChangeBookings = staffRole === 'owner' || staffRole === 'admin' || staffRole === 'staff'
+  const canBroadcast = canManageRole(staffRole)
+  const bookingLockReason = usePermissionLockReason(canChangeBookings)
+  const broadcastLockReason = usePermissionLockReason(canBroadcast, 'manager')
   const [event, setEvent] = useState<EventDetail | null>(null)
   const [eventStatus, setEventStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [slotsStatus, setSlotsStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -124,6 +130,16 @@ function Bookings({ eventId }: { eventId: string }) {
   const [broadcastConfirmOpen, setBroadcastConfirmOpen] = useState(false)
   const [broadcastBusy, setBroadcastBusy] = useState(false)
   const [broadcastError, setBroadcastError] = useState('')
+
+  /* お知らせの口は統括・管理者だけ（Worker の requireRole('owner','admin')）。役割はサーバーから読む。 */
+  useEffect(() => {
+    if (!canChangeBookings || bookingLockReason) {
+      setCancelApplicant(null)
+      setRejectApplicant(null)
+      setWaitlistDialog(null)
+    }
+    if (!canBroadcast || broadcastLockReason) setBroadcastConfirmOpen(false)
+  }, [canChangeBookings, bookingLockReason, canBroadcast, broadcastLockReason])
 
   usePageTitle(event?.name ? `${event.name} の申込者` : 'イベントの申込者')
 
@@ -280,10 +296,10 @@ function Bookings({ eventId }: { eventId: string }) {
   const history = applicants?.waitlistHistory ?? []
   const cancelledCount = history.filter((entry) => entry.status === 'cancelled').length
   const attendance = applicants?.attendance ?? null
-  /* お知らせの口は統括・管理者だけ（Worker の requireRole('owner','admin')）。役割はサーバーから読む。 */
-  const canBroadcast = canManageRole(staffRole)
+
 
   async function decide(applicant: EventOccurrenceApplicant, action: 'confirm' | 'reject') {
+    if (!canChangeBookings || bookingLockReason) return
     if (!selectedAccountId || busy) return
     const request = operations.start('decide')
     if (!request) return
@@ -317,6 +333,7 @@ function Bookings({ eventId }: { eventId: string }) {
   }
 
   async function runAdminCancel() {
+    if (!canChangeBookings || bookingLockReason) return
     if (!cancelApplicant || cancelling) return
     if (cancelApplicant.accountId !== selectedAccountId) return
     const request = operations.start('cancel')
@@ -343,6 +360,7 @@ function Bookings({ eventId }: { eventId: string }) {
 
   async function markStatus(applicant: EventOccurrenceApplicant, status: 'attended' | 'no_show') {
     const accountId = selectedAccountId
+    if (!canChangeBookings || bookingLockReason) return
     if (!accountId || marking.has(applicant.id)) return
     const request = operations.start(`mark:${applicant.id}`)
     if (!request) return
@@ -386,6 +404,7 @@ function Bookings({ eventId }: { eventId: string }) {
   }
 
   async function runWaitlistOperation() {
+    if (!canChangeBookings || bookingLockReason) return
     if (!selectedAccountId || !occurrence || !waitlistDialog || waitlistBusy) return
     const trimmed = waitlistReason.trim()
     if (trimmed === '') return
@@ -433,6 +452,7 @@ function Bookings({ eventId }: { eventId: string }) {
   }
 
   async function exportCsv() {
+    if (!canChangeBookings || bookingLockReason) return
     if (!selectedAccountId || !applicants || csvBusy) return
     const request = operations.start('csv')
     if (!request) return
@@ -454,6 +474,7 @@ function Bookings({ eventId }: { eventId: string }) {
 
   async function previewBroadcast() {
     const message = broadcastMessage.trim()
+    if (!canBroadcast || broadcastLockReason) return
     if (!selectedAccountId || !occurrence || !message || broadcastBusy) return
     const request = operations.start('broadcast')
     if (!request) return
@@ -481,6 +502,7 @@ function Bookings({ eventId }: { eventId: string }) {
   }
 
   async function sendBroadcast() {
+    if (!canBroadcast || broadcastLockReason) return
     if (!broadcastPreview || broadcastBusy) return
     const request = operations.start('broadcast')
     if (!request) return
@@ -521,6 +543,7 @@ function Bookings({ eventId }: { eventId: string }) {
   return (
     <SaveErrorScope errors={saveErrors}><DetailPage
       boardId="Mu8qW"
+      readOnly={Boolean(bookingLockReason)}
       title={title}
       layout="event-roster"
       help={subLine || '開催回ごとの申込・承認・キャンセル待ちを確認できます。'}
@@ -533,7 +556,7 @@ function Bookings({ eventId }: { eventId: string }) {
       </KpiBand>}
       actions={(
         <div className={styles.headActions}>
-          <Button onClick={() => void exportCsv()} disabled={csvBusy || !applicants} busy={csvBusy} busyLabel="書き出しています…">
+          <Button onClick={() => void exportCsv()} lockedReason={bookingLockReason} disabled={!canChangeBookings || csvBusy || !applicants} busy={csvBusy} busyLabel="書き出しています…">
             <Download size={16} aria-hidden="true" />CSVで書き出す
           </Button>
           <div className={styles.occurrencePick}>
@@ -596,52 +619,67 @@ function Bookings({ eventId }: { eventId: string }) {
                 </span>}>
                   {row.source === 'booking' && row.status === 'requested' ? (
                     <>
-                      <Button onClick={() => void decide(row, 'confirm')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認する</Button>
-                      <Button
-                        onClick={() => {
+                      <Button variant="primary" onClick={() => void decide(row, 'confirm')} lockedReason={bookingLockReason} disabled={!canChangeBookings || busy} busy={Boolean(busy)} busyLabel="処理中…">承認する</Button>
+                      <RowMenu label={`${row.displayName ?? '申込者'}さんの操作`} triggerProps={{ 'data-booking-id': row.id, 'data-booking-action': 'menu' }} items={[{ id: 'reject', lockedReason: bookingLockReason, label: '断る', onSelect: () => {
                           setRejectReason('')
                           setRejectError('')
                           setRejectApplicant(row)
-                        }}
-                        disabled={busy}
-                      >断る</Button>
+                        }, disabled: !canChangeBookings || Boolean(busy), disabledReason: busy ? '処理を反映しています' : undefined}]} />
                     </>
                   ) : null}
                   {row.source === 'booking' && row.status === 'confirmed' ? (
                     <>
-                      <Button
-                        onClick={() => {
+                      <Button data-booking-id={row.id} data-booking-action="attended" variant="primary"
+                        onClick={() => void markStatus(row, 'attended')}
+                        lockedReason={bookingLockReason} disabled={!canChangeBookings || marking.has(row.id)}
+                      ><Check size={16} aria-hidden="true" />参加済にする</Button>
+                      <RowMenu label={`${row.displayName ?? '申込者'}さんの操作`} triggerProps={{ 'data-booking-id': row.id, 'data-booking-action': 'menu' }} items={[
+                        { id: 'no-show', lockedReason: bookingLockReason, label: '無断', onSelect: () => void markStatus(row, 'no_show'), disabled: !canChangeBookings || marking.has(row.id), disabledReason: marking.has(row.id) ? '処理を反映しています' : undefined },
+                        { id: 'cancel', lockedReason: bookingLockReason, label: 'キャンセルにする', onSelect: () => {
                           if (!selectedAccountId) return
                           setCancelError('')
                           setCancelApplicant({ applicant: row, accountId: selectedAccountId })
-                        }}
-                        disabled={busy}
-                      >キャンセルにする</Button>
-                      <Button onClick={() => void markStatus(row, 'attended')} disabled={marking.has(row.id)}><Check size={16} aria-hidden="true" />参加済</Button>
-                      <Button onClick={() => void markStatus(row, 'no_show')} disabled={marking.has(row.id)}>無断</Button>
+                        }, disabled: !canChangeBookings || Boolean(busy), disabledReason: busy ? '処理を反映しています' : undefined },
+                      ]} />
                     </>
                   ) : null}
                   {row.source === 'waitlist' && (row.status === 'offered' || row.status === 'accepted') ? (
-                    <Button
-                      onClick={() => {
+                    <>
+                      <Button
+                        data-booking-id={row.id} data-booking-action="promote"
+                        variant="primary"
+                        onClick={() => {
+                          setWaitlistReason('')
+                          setWaitlistError('')
+                          setWaitlistDialog({ kind: 'promote' })
+                        }}
+                        lockedReason={bookingLockReason} disabled={!canChangeBookings || waitlistBusy}
+                      >予約に繰上げ</Button>
+                      <RowMenu label={`${row.displayName ?? '待機中の方'}の操作`} triggerProps={{ 'data-booking-id': row.id, 'data-booking-action': 'menu' }} items={[{ id: 'skip', lockedReason: bookingLockReason, label: '見送る', onSelect: () => {
                         setWaitlistReason('')
                         setWaitlistError('')
-                        setWaitlistDialog({ kind: 'promote' })
-                      }}
-                      disabled={waitlistBusy}
-                    >予約に繰上げ</Button>
+                        setWaitlistDialog({ kind: 'skip', waitlistId: row.id, name: row.displayName ?? '待機中の方' })
+                      }, disabled: !canChangeBookings || waitlistBusy, disabledReason: waitlistBusy ? '処理を反映しています' : undefined }]} />
+                    </>
                   ) : null}
                   {row.source === 'waitlist' && row.status === 'waiting' ? (
-                    <Button
-                      onClick={() => {
+                    <>
+                      <Button variant="primary"
+                        onClick={() => {
+                          setWaitlistReason('')
+                          setWaitlistError('')
+                          const index = waitingRows.findIndex((waiting) => waiting.id === row.id)
+                          openReorder(row.id, index <= 0 ? 1 : -1)
+                        }}
+                        lockedReason={bookingLockReason} disabled={!canChangeBookings || waitlistBusy || waitingRows.length < 2}
+                        title={waitingRows.length < 2 ? '並んでいる人が2人以上いるときに使えます' : undefined}
+                      >待ち順を変える</Button>
+                      <RowMenu label={`${row.displayName ?? '待機中の方'}の操作`} triggerProps={{ 'data-booking-id': row.id, 'data-booking-action': 'menu' }} items={[{ id: 'skip', lockedReason: bookingLockReason, label: '見送る', onSelect: () => {
                         setWaitlistReason('')
                         setWaitlistError('')
-                        const index = waitingRows.findIndex((waiting) => waiting.id === row.id)
-                        openReorder(row.id, index <= 0 ? 1 : -1)
-                      }}
-                      disabled={waitlistBusy || waitingRows.length < 2}
-                      title={waitingRows.length < 2 ? '並んでいる人が2人以上いるときに使えます' : undefined}
-                    >待ち順を変える</Button>
+                        setWaitlistDialog({ kind: 'skip', waitlistId: row.id, name: row.displayName ?? '待機中の方' })
+                      }, disabled: !canChangeBookings || waitlistBusy, disabledReason: waitlistBusy ? '処理を反映しています' : undefined }]} />
+                    </>
                   ) : null}
                 </EventRosterActions>
               </EventRosterRow>
@@ -657,7 +695,7 @@ function Bookings({ eventId }: { eventId: string }) {
               setWaitlistError('')
               setWaitlistDialog({ kind: 'promote' })
             }}
-            disabled={waitlistBusy || waitingRows.length === 0}
+            lockedReason={bookingLockReason} disabled={!canChangeBookings || waitlistBusy || waitingRows.length === 0}
           >
             <Send size={16} aria-hidden="true" />次の方へ案内する
           </Button>
@@ -699,23 +737,22 @@ function Bookings({ eventId }: { eventId: string }) {
         </EventRosterTable>
       </EventRosterCard>
 
-      {canBroadcast ? (
-        <EventRosterCard title="お知らせを送る" id="ev-bk-broadcast" note="この回の申込者へ LINE でまとめて送ります（送ったお知らせは取り消せません）">
+      <EventRosterCard title="お知らせを送る" id="ev-bk-broadcast" note="この回の申込者へ LINE でまとめて送ります（送ったお知らせは取り消せません）">
           <div className={styles.field}><Field label="申込者へ送るメッセージ" htmlFor="ev-bk-message"><div className={styles.broadcastRow}>
               <SaveErrorField names={["broadcastMessage","messageContent","broadcast_message"]}><TextField
                 className={styles.messageInput}
                 id="ev-bk-message"
                 value={broadcastMessage}
+                readOnly={!canBroadcast || Boolean(broadcastLockReason)}
                 onChange={(e) => setBroadcastMessage(e.target.value)}
                 placeholder="当日は動きやすい服装でお越しください"
               /></SaveErrorField>
-              <Button onClick={() => void previewBroadcast()} disabled={broadcastBusy || broadcastMessage.trim() === ''} title={broadcastMessage.trim() === '' ? 'メッセージを入力してください' : undefined} busy={broadcastBusy} busyLabel="確認中…">
+              <Button onClick={() => void previewBroadcast()} lockedReason={broadcastLockReason} disabled={!canBroadcast || broadcastBusy || broadcastMessage.trim() === ''} title={broadcastMessage.trim() === '' ? 'メッセージを入力してください' : undefined} busy={broadcastBusy} busyLabel="確認中…">
                 <Send size={16} aria-hidden="true" />送る
               </Button>
             </div></Field></div>
           {broadcastError ? <Notice tone="danger" >{broadcastError}</Notice> : null}
         </EventRosterCard>
-      ) : null}
       {selectedOccurrenceId ? <BookingRecords accountId={selectedAccountId} eventId={eventId} occurrenceId={selectedOccurrenceId} questionsJson={event?.questions_json} revision={`${applicants?.snapshotId}:${recordsRevision}`} renderActions={(booking) => {
         const row: EventOccurrenceApplicant = {
           source: 'booking', id: booking.id, friendId: booking.friend_id,
@@ -725,14 +762,16 @@ function Bookings({ eventId }: { eventId: string }) {
           firstParticipation: { isFirst: booking.is_first_time == null ? null : booking.is_first_time === 1, attendedCount: null, checkedAt: null },
           offeredAt: null, offerExpiresAt: null,
         }
-        return booking.status === 'confirmed' ? <>
-          <Button data-booking-id={booking.id} data-booking-action="attended" onClick={() => void markStatus(row, 'attended')} disabled={marking.has(booking.id)}>参加済</Button>
-          <Button data-booking-id={booking.id} data-booking-action="no_show" onClick={() => void markStatus(row, 'no_show')} disabled={marking.has(booking.id)}>無断</Button>
-          <Button onClick={() => { setCancelError(''); setCancelApplicant({ applicant: row, accountId: selectedAccountId }) }} disabled={busy}>キャンセルにする</Button>
-        </> : booking.status === 'requested' ? <>
-          <Button onClick={() => void decide(row, 'confirm')} disabled={busy}>承認する</Button>
-          <Button onClick={() => { setRejectReason(''); setRejectError(''); setRejectApplicant(row) }} disabled={busy}>断る</Button>
-        </> : null
+        return booking.status === 'confirmed' ? <span className={styles.recordsActions}>
+          <Button data-booking-id={booking.id} data-booking-action="attended" variant="primary" onClick={() => void markStatus(row, 'attended')} lockedReason={bookingLockReason} disabled={!canChangeBookings || marking.has(booking.id)}><Check size={16} aria-hidden="true" />参加済にする</Button>
+          <RowMenu label={`${booking.friend_display_name ?? booking.friend_name ?? '申込者'}さんの操作`} triggerProps={{ 'data-booking-id': booking.id, 'data-booking-action': 'menu' }} items={[
+            { id: 'no-show', lockedReason: bookingLockReason, label: '無断', onSelect: () => void markStatus(row, 'no_show'), disabled: !canChangeBookings || marking.has(booking.id), disabledReason: marking.has(booking.id) ? '処理を反映しています' : undefined },
+            { id: 'cancel', lockedReason: bookingLockReason, label: 'キャンセルにする', onSelect: () => { setCancelError(''); setCancelApplicant({ applicant: row, accountId: selectedAccountId }) }, disabled: !canChangeBookings || busy, disabledReason: busy ? '処理を反映しています' : undefined },
+          ]} />
+        </span> : booking.status === 'requested' ? <span className={styles.recordsActions}>
+          <Button variant="primary" onClick={() => void decide(row, 'confirm')} lockedReason={bookingLockReason} disabled={!canChangeBookings || busy}>承認する</Button>
+          <RowMenu label={`${booking.friend_display_name ?? booking.friend_name ?? '申込者'}さんの操作`} triggerProps={{ 'data-booking-id': booking.id, 'data-booking-action': 'menu' }} items={[{ id: 'reject', lockedReason: bookingLockReason, label: '断る', onSelect: () => { setRejectReason(''); setRejectError(''); setRejectApplicant(row) }, disabled: !canChangeBookings || busy, disabledReason: busy ? '処理を反映しています' : undefined }]} />
+        </span> : null
       }}>
         {ready ? <>
           <p>{`申込 ${confirmedSeats + requestedSeats}人（確定 ${confirmedSeats}人・承認待ち ${requestedSeats}人）・キャンセル待ち ${waitingSeats}人・案内中 ${offeredSeats}人 / ${capacity === null ? '定員の上限なし' : occurrence && occurrence.activeSeats >= capacity ? `満席（定員 ${capacity}人）` : `残席 ${Math.max(0, capacity - (occurrence?.activeSeats ?? 0))}席（定員 ${capacity}人）`}`}</p>
@@ -748,7 +787,7 @@ function Bookings({ eventId }: { eventId: string }) {
             <Button href={`/chats?friend=${encodeURIComponent(row.friendId)}`}>個別トーク</Button>
             {row.status === 'waiting' ? <Button onClick={() => {
               setWaitlistReason(''); setWaitlistError(''); setWaitlistDialog({ kind: 'skip', waitlistId: row.id, name: row.displayName ?? '待機中の方' })
-            }} disabled={waitlistBusy}>見送る</Button> : null}
+            }} lockedReason={bookingLockReason} disabled={!canChangeBookings || waitlistBusy}>見送る</Button> : null}
           </Field>)}
         </> : null}
       </BookingRecords> : null}

@@ -1,6 +1,7 @@
 'use client'
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Link from 'next/link'
 import Select from '@/components/shared/select'
@@ -306,7 +307,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
       <SaveFeedback state={feedback.state} onRetry={saveError?.includes('先に保存') ? () => { feedback.reset(); onReload() } : submit} retryLabel={saveError?.includes('先に保存') ? '最新の内容を読み直す' : undefined} />
       {/* 閲覧のみ：選ぶ部品・つまみは置かず、選んでいる値を読み取りだけの欄で見せる（2026-10-06 オーナー決定）。 */}
       <div className="contents">
-        <section className={styles.section}>
+        <Card layout="vertical" padding="roomy" gap="normal">
           <div className={styles.sectionHead}>
             <h2 className={styles.sectionTitle}>いつまで予約を受けるか</h2>
           </div>
@@ -342,9 +343,9 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
               /></SaveErrorField> : <ReadOnlyText label="キャンセルの期限" value={beforeLabel(draft.cancelDeadlineMinutesBefore)} />}
             </Field>
           </SettingsFormRow>
-        </section>
+        </Card>
 
-        <section className={styles.section}>
+        <Card layout="vertical" padding="roomy" gap="normal">
           <div className={styles.sectionHead}>
             <h2 className={styles.sectionTitle}>予約の受け方</h2>
           </div>
@@ -384,9 +385,9 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
               /></SaveErrorField>
             ) : <span className="text-sm text-ink-secondary">{(noAssign ?? initialNoAssign) ? 'オン' : 'オフ'}</span>}
           </div>
-        </section>
+        </Card>
 
-        <section className={styles.section}>
+        <Card layout="vertical" padding="roomy" gap="normal">
           <div className={styles.sectionHead}>
             <h2 className={styles.sectionTitle}>お知らせ</h2>
             <p className={styles.sectionDesc}>予約・変更・キャンセルをLINEで送ります</p>
@@ -403,7 +404,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
             <span className={styles.noticeWhen}>前日</span>
             <span className={styles.noticeWhat}>{dayBeforeText}</span>
           </div>
-        </section>
+        </Card>
 
         <Band tone="hint">メニューごとに変えたいときは、メニューの中身から「このメニューだけ変える」。</Band>
 

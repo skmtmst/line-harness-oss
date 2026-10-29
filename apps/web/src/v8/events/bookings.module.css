@@ -5,6 +5,7 @@
 .occurrencePick :global(*) { max-width: 100%; }
 .error { margin: 0; color: var(--color-danger); font-size: var(--text-label); }
 .person { display: flex; flex-direction: column; gap: var(--tpl-compact-gap); min-width: 0; }
+.recordsActions { display: inline-flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 .personName, .cellName { min-width: 0; overflow: hidden; color: var(--color-ink); font-size: var(--text-caption); font-weight: 600; line-height: var(--tpl-wh-cell-lh); text-overflow: ellipsis; white-space: nowrap; }
 .cellName { font-weight: 500; }
 .personSub { color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-row-sub-lh); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

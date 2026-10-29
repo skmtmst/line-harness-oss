@@ -27,8 +27,8 @@ export function useBookingLedger() {
   const router = useRouter()
   const [view, setView] = useState<'day' | 'week' | 'month' | 'list'>('day')
   const [tab, setTab] = useState<string>('requested')
-  /** 「今日」「今週」の絞り込み。設計の「よく使う」にある。 */
-  const [range, setRange] = useState<'all' | 'today' | 'week'>('all')
+  /** 今日・今週と、休業日のリンクから指定した1日の絞り込み。 */
+  const [range, setRange] = useState<'all' | 'today' | 'week' | 'date'>('all')
   /** 「今月」の表の月送り（0＝今月）。数の帯は今月のまま。 */
   /*
    * R317: URLの条件（`?view=` `?status=` `?range=` `?date=` `?q=` …）で
@@ -62,7 +62,7 @@ export function useBookingLedger() {
       pageResetRef.current.restoreTransition = true
     }
     const rangeParam = get('range')
-    if (rangeParam === 'today' || rangeParam === 'week') {
+    if (rangeParam === 'today' || rangeParam === 'week' || rangeParam === 'date') {
       setRange(rangeParam)
       pageResetRef.current.restoreTransition = true
     }
@@ -245,7 +245,10 @@ export function useBookingLedger() {
       from = new Date(`${monthKey(monthOffset)}-01T00:00:00+09:00`).toISOString()
       to = new Date(`${monthKey(monthOffset + 1)}-01T00:00:00+09:00`).toISOString()
     }
-    if (range !== 'all') {
+    if (range === 'date') {
+      from = new Date(`${calendarAnchor}T00:00:00+09:00`).toISOString()
+      to = new Date(`${moveDay(calendarAnchor, 1)}T00:00:00+09:00`).toISOString()
+    } else if (range !== 'all') {
       const today = jstDay(new Date().toISOString())
       const weekTo = jstDay(new Date(Date.now() + 7 * 86_400_000).toISOString())
       const rangeFrom = new Date(`${today}T00:00:00+09:00`).toISOString()
@@ -256,7 +259,7 @@ export function useBookingLedger() {
       to = to && to < rangeTo ? to : rangeTo
     }
     return { ...(from ? { from } : {}), ...(to ? { to } : {}) }
-  }, [range, view, monthOffset])
+  }, [range, view, monthOffset, calendarAnchor])
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return

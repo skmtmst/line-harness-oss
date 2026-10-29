@@ -6,6 +6,11 @@
   gap: var(--tpl-op-section-gap);
 }
 
+/* 板の直下の束だけ内側の余白を持つ（入れ子・窓の中の束には付けない）。 */
+:global([data-page-template]) > .stack {
+  padding-inline: var(--space-24);
+}
+
 .row {
   display: flex;
   align-items: flex-start;

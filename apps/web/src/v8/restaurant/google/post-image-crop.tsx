@@ -74,7 +74,7 @@ export function PostImageCrop({ target, source, onClose, onConfirm }: {
   const clamp = (value: number, limit: number) => Math.max(-limit, Math.min(limit, value))
   const move = (x: number, y: number) => setOffset({ x: clamp(x, limitX), y: clamp(y, limitY) })
 
-  const confirm = async () => {
+  const applyCrop = async () => {
     const img = image.current
     if (!img || !img.naturalWidth || !frameSize.width || busy) return
     setBusy(true)
@@ -128,7 +128,7 @@ export function PostImageCrop({ target, source, onClose, onConfirm }: {
           <div><span>暗い部分は投稿されません</span><b>白い余白は追加しません</b></div>
         </div>
       </div>
-      <div className={styles.footer}><span>元画像は保持され、投稿用の表示範囲だけが保存されます。</span><div><Button onClick={onClose} disabled={busy}>キャンセル</Button><Button variant="primary" onClick={() => void confirm()} disabled={!dimensions.width || busy} busy={busy}>この位置で確定</Button></div></div>
+      <div className={styles.footer}><span>元画像は保持され、投稿用の表示範囲だけが保存されます。</span><div><Button onClick={onClose} disabled={busy}>キャンセル</Button><Button variant="primary" onClick={() => void applyCrop()} disabled={!dimensions.width || busy} busy={busy}>この位置で確定</Button></div></div>
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
     </div>
   </div>

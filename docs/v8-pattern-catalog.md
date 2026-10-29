@@ -1189,6 +1189,11 @@
 - 使用先：スタイルを選ぶ画面の見本の枠（style-choice）。
 - 見張り：`player.test.tsx`・`script.test.ts`・実ブラウザの `apps/web/scripts/v8-guard/style-experience-player.test.mjs`。
 
+## CSVのひな形と比較項目の表示
+
+- CSV取り込みのひな形は `shared/csv-template-download.tsx` の `CsvTemplateDownload`。取り込みで使う列定義から見出しだけのUTF-8 CSVを作り、各画面に列名を重複させない。
+- 同じ人の比較は `shared/differences-filter.tsx` の `DifferencesFilter`。既定で違う項目を見せ、表示の切り替えで選択・保存対象を変えない。未取得・マスク済みの値は一致と断定せず表示を残す。
+
 ## mobile-frame モバイルの外枠（電話の専用の画面 /m）
 
 - **役目**：電話の専用の画面（`/m`）の上の帯・本文・下のタブ。段の題（`MobileSection`）・一覧の上の道具（`MobileListTools`：探す欄と表示の切り替え）・カード 1 列（`MobileCardList`・`MobileCardLink`・`MobileCard`）もこの型が持つ。管理画面を縮めた物ではなく、機能をしぼった別の外枠。

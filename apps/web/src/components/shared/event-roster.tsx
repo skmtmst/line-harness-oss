@@ -16,7 +16,7 @@ export function EventRosterCard({ title, id, note, action, splitAction, children
 }
 
 export function EventRosterTable({ kind, label, headings, children }: {
-  kind: 'applicants' | 'waitlist' | 'cancel'; label: string; headings: string[]; children: ReactNode
+  kind: 'applicants' | 'waitlist' | 'cancel' | 'records'; label: string; headings: string[]; children: ReactNode
 }) {
   return <div role="table" aria-label={label} className={styles.table} data-roster-kind={kind}>
     <div role="row" className={styles.tableHead}>{headings.map((heading) => <span role="columnheader" key={heading}>{heading}</span>)}</div>

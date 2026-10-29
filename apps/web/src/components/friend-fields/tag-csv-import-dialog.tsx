@@ -3,7 +3,7 @@
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { CircleCheck, Download, Info, TriangleAlert, X } from 'lucide-react'
+import { Download, X } from 'lucide-react'
 import type {
   TagCsvImportInputRow,
   TagCsvImportPreview,
@@ -11,12 +11,16 @@ import type {
   TagCsvImportRowResult,
 } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import CsvTemplateDownload from '@/components/shared/csv-template-download'
+import { DialogActions } from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import FileDropzone, { AttachmentRow } from '@/components/shared/file-drop'
 import SegmentedControl from '@/components/shared/segmented'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { TableHeadRow, Th } from '@/components/shared/table'
 import {
+  TAG_IMPORT_HEADERS,
   failedTagRowsCsv,
   parseTagCsv,
   TAG_CSV_MAX_BYTES,
@@ -26,7 +30,8 @@ import styles from './tag-csv-import-dialog.module.css'
 import { formatYmd, formatNumber } from '@/lib/format'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
-import CsvTemplateDownload from '@/components/shared/csv-template-download'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
 import { downloadCsv } from '@/components/shared/csv-download'
 
 const PREVIEW_ROW_STEP = 100
@@ -198,16 +203,15 @@ export default function TagCsvImportDialog({
             <p className={styles.description}>タグ名とフォルダ名をCSVからまとめて読み込みます。最大500件まで確認できます。</p>
           </header>
           <div className={styles.body}>
-            <ol className={styles.steps}>
-              <li>1列目に「タグ名」、2列目に「フォルダ名」を入れます。</li>
-              <li>先頭行は「タグ名,フォルダ」の見出しにできます。</li>
-              <li>確認画面で、新規・見送り・入力確認を確かめてから登録します。</li>
-            </ol>
-            <CsvTemplateDownload headers={['タグ名', 'フォルダ']} name="タグ" />
+
             {/*
               登録の実行は1回のAPI呼び出しで、途中の割合を測れない。
               実測できない進みは出さない（Progress は足さない）。
             */}
+            <div className="flex shrink-0 items-center justify-center gap-2">
+              <CsvTemplateDownload headers={TAG_IMPORT_HEADERS} name="タグ" />
+              <HelpTip label="タグCSVの列と登録手順">1列目に「タグ名」、2列目に「フォルダ名」を入れます。先頭行は「タグ名,フォルダ」の見出しにできます。確認画面で、新規・見送り・入力確認を確かめてから登録します。フォルダが見つからない行は、確認画面で知らせたうえで未分類として登録します。</HelpTip>
+            </div>
             <FileDropzone
               title="ここにCSVを置く"
               hint="UTF-8・最大500件・1MB以下"
@@ -233,18 +237,15 @@ export default function TagCsvImportDialog({
                 )}
               </div>
             ) : null}
-            <Notice tone="info" icon={<Info aria-hidden="true" size={20} />}>
-              <span>フォルダが見つからない行は、確認画面で知らせたうえで未分類として登録します。</span>
-            </Notice>
           </div>
           {/* ファイル由来の誤りは上の行に出ているので、ここでは重ねて出さない。 */}
-          {error && !(fileName && rows.length === 0) ? <Notice tone="danger" role="alert">
+          {error && !(fileName && rows.length === 0) ? <Notice tone="danger" marker="dot" heading="失敗：CSVの取り込みを進められませんでした" role="alert">
             {error}
           </Notice> : null}
-          <div className={styles.actions}>
+          <DialogActions padding="none">
             <Button type="button" onClick={close}>キャンセル</Button>
-            <Button type="button" variant="primary" disabled={rows.length === 0} onClick={() => void confirmRows()}>取り込む内容を確認</Button>
-          </div>
+            <Button type="button" variant="primary" disabled={rows.length === 0} disabledReason={rows.length === 0 ? 'CSVファイルを選ぶと確認できます。' : undefined} onClick={() => void confirmRows()}>取り込む内容を確認</Button>
+          </DialogActions>
         </> : null}
 
         {phase === 'preview' || phase === 'saving' ? <>
@@ -262,19 +263,12 @@ export default function TagCsvImportDialog({
           </header>
           <div className={styles.body}>
           {preview ? <>
-            {/* 設計 `sfTEW` は4枚とも「その数が何なのか」を1行添える。 */}
-            <div className={styles.summary}>
-              {([
-                ['読み込んだ行', preview.summary.total, 'ファイルの行数', undefined],
-                ['新しく作る', preview.summary.ready, 'そのまま登録されます', styles.summaryReady],
-                ['飛ばす', preview.summary.skipped, '同じ名前のタグがあります', undefined],
-                ['エラー', preview.summary.invalid, '直すまで登録されません', preview.summary.invalid > 0 ? styles.summaryInvalid : undefined],
-              ] as Array<[string, number, string, string | undefined]>).map(([label, value, detail, tone]) => <div className={styles.summaryItem} key={label}>
-                <span className={styles.summaryLabel}>{label}</span>
-                <strong className={`${styles.summaryValue} ${tone ?? ''}`}>{value}件</strong>
-                <span className={styles.summaryDetail}>{detail}</span>
-              </div>)}
-            </div>
+            <KpiBand density="compact" border="dividers">
+              <KpiCard title="読み込んだ行" value={preview.summary.total} unit="件" detail="ファイルの行数" />
+              <KpiCard title="新しく作る" value={preview.summary.ready} unit="件" detail="そのまま登録されます" />
+              <KpiCard title="飛ばす" value={preview.summary.skipped} unit="件" detail="同じ名前のタグがあります" />
+              <KpiCard title="エラー" value={preview.summary.invalid} unit="件" detail="直すまで登録されません" />
+            </KpiBand>
             <div className={styles.filters}>
               <SegmentedControl<PreviewFilter>
                 aria-label="取り込む行の絞り込み"
@@ -313,7 +307,7 @@ export default function TagCsvImportDialog({
               とくに「同じ名前のタグは上書きしない」は、CSVでフォルダを
               直そうとして見送られたときに、どこへ行けばよいか分からなくなる。
             */}
-              <Notice tone="warn" icon={<TriangleAlert aria-hidden="true" size={20} />} heading={<>{preview.summary.invalid > 0
+              <Notice tone="warn" marker="dot" heading={<>要確認：{preview.summary.invalid > 0
                 ? `エラーの${preview.summary.invalid}行は登録されません`
                 : '登録できる行だけを登録します'}</>}>
                 <p className={styles.warnBody}>
@@ -323,22 +317,20 @@ export default function TagCsvImportDialog({
               </Notice>
           </> : null}
           </div>
-          {error ? <Notice tone="danger" role="alert">
+          {error ? <Notice tone="danger" marker="dot" heading="失敗：CSVの取り込みを進められませんでした" role="alert">
             {error}
           </Notice> : null}
-          <div className={styles.footerRow}>
-            <div className={styles.actions}>
-              <Button type="button" disabled={busy} onClick={resetSelection}>キャンセル</Button>
-              <Button type="button" variant="primary" disabled={busy || !preview || preview.summary.ready === 0} onClick={() => void saveRows()} busy={busy} busyLabel="登録中…">
-                {`${preview?.summary.ready ?? 0}件を登録する`}
-              </Button>
-            </div>
-          </div>
+          <DialogActions padding="none">
+            <Button type="button" disabled={busy} onClick={resetSelection}>キャンセル</Button>
+            <Button type="button" variant="primary" disabled={busy || !preview || preview.summary.ready === 0} disabledReason={!preview || preview.summary.ready === 0 ? '登録できる行がありません。CSVを直して選び直してください。' : undefined} onClick={() => void saveRows()} busy={busy} busyLabel="登録中…">
+              {`${preview?.summary.ready ?? 0}件を登録する`}
+            </Button>
+          </DialogActions>
         </> : null}
 
         {phase === 'success' && result ? <>
           <div className={styles.body}>
-            <Notice tone="success" icon={<CircleCheck aria-hidden="true" size={20} />}>
+            <Notice tone="success" marker="dot">
               <h2 id="tag-csv-title" className={styles.resultTitle}>{result.summary.created}件を登録しました</h2>
             </Notice>
             <div className={styles.breakdown}>
@@ -351,14 +343,14 @@ export default function TagCsvImportDialog({
               {result.summary.skipped > 0 ? <p>同じ名前だった{formatNumber(result.summary.skipped)}件は、上書きせずに飛ばしました。</p> : null}
             </div>
           </div>
-          <div className={styles.actions}><Button type="button" variant="primary" onClick={close}>一覧へ戻る</Button></div>
+          <DialogActions padding="none"><Button type="button" variant="primary" onClick={close}>一覧へ戻る</Button></DialogActions>
         </> : null}
 
         {phase === 'partial' && result ? <>
           <div className={styles.body}>
-            <Notice tone="warn" icon={<TriangleAlert aria-hidden="true" size={20} />}>
+            <Notice tone="warn" marker="dot">
               <h2 id="tag-csv-title" className={styles.resultTitle}>
-                {result.summary.created > 0
+                要確認：{result.summary.created > 0
                   ? `${result.summary.created}件を登録し、${result.summary.invalid + result.summary.failed}件は入りませんでした`
                   : 'タグを登録できませんでした'}
               </h2>
@@ -375,12 +367,12 @@ export default function TagCsvImportDialog({
               </table>
             </div>
           </div>
-          <div className={styles.actions}>
+          <DialogActions padding="none">
             <Button className={styles.exportButton} type="button" onClick={() => downloadCsv(failedTagRowsCsv(result.rows), `タグ一括登録-要修正-${todayInJapan()}.csv`)}>
               <Download aria-hidden="true" size={16} /> 入らなかった{result.summary.invalid + result.summary.failed}行をCSVで出す
             </Button>
             <Button type="button" variant="primary" onClick={close}>一覧へ戻る</Button>
-          </div>
+          </DialogActions>
         </> : null}
       </section>
     </div>

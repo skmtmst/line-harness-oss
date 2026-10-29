@@ -8,6 +8,7 @@
   display: flex;
   align-items: flex-start;
   gap: var(--tpl-op-section-gap);
+  padding-inline: var(--space-24);
 }
 
 .list {

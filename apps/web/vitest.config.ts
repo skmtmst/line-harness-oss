@@ -31,6 +31,7 @@ export default defineConfig({
     jsx: 'automatic',
   },
   test: {
+    css: { include: [/target-missing\.module\.css/, /kpi-card\.module\.css/, /kpi-band-v8\.css/] },
     maxWorkers: 4,
     // Vitest 4 restoreAllMocks no longer clears standalone vi.fn call history.
     clearMocks: true,

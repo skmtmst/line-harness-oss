@@ -36,6 +36,7 @@ import SegmentsV8 from './segments'
 import styles from './analytics.module.css'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 
 export const ANALYTICS_TABS = ['friends', 'reactions', 'routes', 'usage', 'cross', 'funnel', 'url-clicks', 'saved', 'segments'] as const
 export type AnalyticsTabV8 = (typeof ANALYTICS_TABS)[number] | 'conversion-report'
@@ -88,8 +89,8 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
-  // 役割が分かるまでは今の画面と同じく変える操作を出さない（owner・admin だけ）。
   const canManage = canManageRole(role)
+  const manageReason = usePermissionLockReason(canManage)
   const readOnly = role !== null && !canManage
   const narrow = useNarrowViewport(1351)
   const scope = `${selectedAccountId}:${tab}`
@@ -105,8 +106,9 @@ function AnalyticsInnerV8({ slots }: { slots?: AnalyticsSlotsV8 }) {
   const exportReady = exportAction !== null && exportAction.scope === scope && !exportAction.disabled
   const actions = <>
     <Button variant="secondary" className={readOnly ? undefined : styles.csvButton} disabled={!exportReady} onClick={() => exportAction?.scope === scope && exportAction.onClick()}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
-    {/* 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。CSV が右端へ寄る（絵 L4Uov）。 */}
-    {readOnly ? null : <Button variant="primary" href="/analytics/reports/new"><Plus size={16} aria-hidden="true" />レポートを作る</Button>}
+    {canManage
+      ? <Button variant="primary" lockedReason={manageReason} href="/analytics/reports/new"><Plus size={16} aria-hidden="true" />レポートを作る</Button>
+      : <Button variant="primary" lockedReason={manageReason} disabled={!manageReason}><Plus size={16} aria-hidden="true" />レポートを作る</Button>}
   </>
   const tabs = <>
     <Navigation active={tab} savedCount={savedCount} />

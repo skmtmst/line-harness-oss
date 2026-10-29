@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
-import { expectLockedFolderMenu } from '@/test-utils/permission-locked-control'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
+import { expectPermissionLocked, expectLockedFolderMenu } from '@/test-utils/permission-locked-control'
 /*
- * R527: 作成できない運用担当（staff）には自動応答の作成入口を出さない。
- * owner/admin には出す。役割×操作の表を実マウントで固定する。
+ * 編集鍵がない担当者にも同じ操作を残し、灰色と理由で変更を拒否する。
+ * 正規編集者の動作と、読む・選ぶ操作は保つ。
  * 口側の作成・更新・停止・削除の staff 拒否は Worker の試験で見る。
  */
 import React, { act } from 'react'
@@ -20,6 +23,7 @@ const listTemplates = vi.hoisted(() => vi.fn())
 const summary = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
 const staffMe = vi.hoisted(() => vi.fn())
+const changeRule = vi.hoisted(() => vi.fn())
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -27,7 +31,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...actual.api,
-      autoReplies: { ...actual.api.autoReplies, list: listReplies, summary },
+      autoReplies: { ...actual.api.autoReplies, list: listReplies, summary, create: changeRule, createDraft: changeRule, saveDraft: changeRule, publishDraft: changeRule, update: changeRule, stop: changeRule, delete: changeRule },
       templates: { ...actual.api.templates, list: listTemplates },
       folders: { ...actual.api.folders, list: listFolders },
       staff: { ...actual.api.staff, me: staffMe },
@@ -87,6 +91,7 @@ const rule = {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); forgetSessionSnapshot(); changeRule.mockReset()
   listReplies.mockImplementation(async () => ({ success: true, data: [rule] }))
   listTemplates.mockImplementation(async () => ({ success: true, data: [] }))
   summary.mockImplementation(async () => ({ success: true, data: { conflictCount: 0 } }))
@@ -99,6 +104,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  forgetStaffIdentity(); forgetSessionSnapshot()
 })
 
 async function flush() {
@@ -114,28 +120,37 @@ function buttons(): string[] {
 }
 
 describe('R527 自動応答一覧の出し分け（役割×操作）', () => {
-  it('staff には作成・編集・停止・削除の入口が出ず、理由が出る', async () => {
+  it('編集鍵なしstaffにも作成・編集・停止・削除を残し、理由と書込0を保つ', async () => {
+    verifiedStaffRole('staff')
     staffMe.mockImplementation(async () => ({ success: true, data: { role: 'staff' } }))
     await act(async () => {
       root.render(<AutoRepliesPage />)
     })
     await flush()
 
-    const labels = buttons()
-    expect(labels).not.toContain('ルールを作る')
-    expect(labels).not.toContain('編集')
+    const create = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('ルールを作る'))
+    await expectPermissionLocked(create)
+    expect(host.querySelector('a[href="/auto-replies/edit?id=ar-1"]')).toBeNull()
     const more = host.querySelector<HTMLButtonElement>('button[aria-label="自動応答「旧キーワードルール」の操作"]')!
     await act(async () => { more.click() })
     const menu = document.querySelector('[role="menu"]')!
-    for (const label of ['編集する', '止める', '削除', '複製する', 'フォルダへ移す']) expect(menu.textContent).not.toContain(label)
-    // 順番の入れ替え（更新口）も出さない。
-    expect(host.querySelector('button[aria-label="自動応答「旧キーワードルール」を1つ上へ"]')).toBeNull()
+    for (const label of ['編集する', '止める', '削除する', '複製する', 'フォルダへ移す']) {
+      const item = [...menu.querySelectorAll('[role="menuitem"]')].find(element => element.getAttribute('aria-label') === label)
+      await expectPermissionLocked(item)
+    }
+    await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
+    const grip = host.querySelector('button[aria-label="旧キーワードルールを並び替え。上下キーで移動"]')
+    await expectPermissionLocked(grip)
+    await act(async () => { grip!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true })) })
+    expect(changeRule).not.toHaveBeenCalled()
+    expect(listReplies).toHaveBeenCalled()
     expect(host.textContent).toContain(
       'この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。',
     )
   })
 
   it('owner には作成・編集・停止・削除の入口が出る', async () => {
+    verifiedStaffRole('owner')
     staffMe.mockImplementation(async () => ({ success: true, data: { role: 'owner' } }))
     await act(async () => {
       root.render(<AutoRepliesPage />)
@@ -168,6 +183,7 @@ describe('R527 フォルダの列の出し分け', () => {
     const restore = stubWideViewport()
     try {
       listFolders.mockImplementation(async () => ({ success: true, data: [{ id: 'folder-1', name: '営業時間', color: 'blue', count: 1 }], unfiledCount: 0 }))
+      verifiedStaffRole(role)
       staffMe.mockImplementation(async () => ({ success: true, data: { role } }))
       await act(async () => { root.render(<AutoRepliesPage />) })
       await flush()

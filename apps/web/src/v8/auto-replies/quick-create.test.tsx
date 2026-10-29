@@ -2,6 +2,9 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 const apiMock = vi.hoisted(() => ({ createDraft: vi.fn(), saveDraft: vi.fn(), conflicts: vi.fn(), publishDraft: vi.fn() }))
 vi.mock('@/lib/api', async importOriginal => ({ ...(await importOriginal<typeof import('@/lib/api')>()), api: { autoReplies: apiMock }, describeSaveFailure: () => '保存失敗' }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
@@ -9,6 +12,7 @@ vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; chil
 import QuickCreate from './quick-create'
 const created = vi.fn()
 beforeEach(() => {
+  verifiedStaffRole('owner'); forgetSessionSnapshot()
   document.documentElement.dataset.theme = 'v8'
   vi.clearAllMocks()
   apiMock.createDraft.mockResolvedValue({ success: true, data: { autoReplyId: 'draft-1', versionNumber: 1 } })
@@ -16,7 +20,7 @@ beforeEach(() => {
   apiMock.conflicts.mockResolvedValue({ success: true, data: { conflicts: [{ autoReplyId: 'rule-1', name: '既存ルール' }] } })
   apiMock.publishDraft.mockResolvedValue({ success: true })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot() })
 async function fill() {
   render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={created} />)
   fireEvent.change(screen.getByLabelText('追加する言葉'), { target: { value: '営業時間' } })
