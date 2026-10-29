@@ -43,13 +43,14 @@ it('店の案内は保存した順・登録した写真だけを出す', async (
   expect([...document.querySelectorAll('img')].map(img => img.getAttribute('alt'))).toEqual(['お店の待合', 'お店の外観']);
   expect(document.querySelectorAll('figure')).toHaveLength(2);
 });
-it('店の写真の読込失敗を空にせず、予約メニューの選択を残して読み直す', async () => {
+it('店の写真の読込失敗は失敗の文を出さず、読み直しの操作だけ残す', async () => {
   net.storePhotos.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce([{ slot: 'interior', url: '/media/i/content' }]);
   render(<StorePhotos />);
-  expect((await screen.findByRole('alert')).textContent).toContain('読み込めませんでした');
+  await screen.findByRole('button', { name: '写真を読み直す' });
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(screen.queryByText(/読み込めませんでした/)).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: '写真を読み直す' }));
   await screen.findByText('お店の案内');
-  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   expect(document.querySelector('img')?.getAttribute('src')).toBe('/media/i/content');
 });
 
