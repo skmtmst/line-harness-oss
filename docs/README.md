@@ -908,3 +908,5 @@
 - [LINE接続マニュアル画像のキャッシュ更新](release-log/unreleased/1920-masato-line-manual-image-cache.md) — 伏せ済み画像をブラウザで確実に表示する修正履歴。
 - [新規アカウントの受信箱をLINEのみに](release-log/unreleased/1922-masato-new-account-line-only-inbox.md) — 新規はLINEのみ・既存はメール表示を残す修正履歴。
 - [左上に統括名を表示](release-log/unreleased/1924-masato-sidebar-tenant-name.md) — 左上の名前を統括名に直した修正履歴。
+
+- [担当者が店の画面を開けない不具合の修正](release-log/unreleased/0000-kenta-follower-import-staff.md)

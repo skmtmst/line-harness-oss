@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { forgetStaffIdentity, rememberStaffIdentity, readStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
 import StoreSelectionGate from './store-selection-gate'
 
 const mocks = vi.hoisted(() => ({ state: vi.fn(), replace: vi.fn(), pathname: '/chats' }))
@@ -14,7 +16,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
 vi.mock('@/lib/api', () => ({ api: { lineAccounts: { followerImportState: mocks.state } } }))
 
 beforeEach(() => { vi.clearAllMocks(); mocks.pathname = '/chats' })
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); forgetStaffIdentity() })
 
 describe('保存済みの店舗選択からの再訪', () => {
   it('引き継ぎ中なら店舗画面をマウントせずPenの進捗画面へ戻す', async () => {
@@ -30,6 +32,17 @@ describe('保存済みの店舗選択からの再訪', () => {
     render(<StoreSelectionGate><div>店舗画面</div></StoreSelectionGate>)
     await screen.findByText('友だちの引き継ぎ状態を確認できません')
     expect(screen.queryByText('店舗画面')).toBeNull()
+  })
+
+  it('受信箱の権限を持つstaffが状態を読めれば店舗画面を表示する', async () => {
+    rememberStaffIdentity({ id: 'staff-1', role: 'staff', permissionKeys: ['/chats'] } as StaffMember)
+    expect(readStaffIdentity()?.role).toBe('staff')
+    mocks.state.mockResolvedValue({ success: true, data: { phase: 'not_started' } })
+    render(<StoreSelectionGate><div>担当者の受信箱</div></StoreSelectionGate>)
+    await screen.findByText('担当者の受信箱')
+    expect(mocks.state).toHaveBeenCalledWith('the-shed')
+    expect(mocks.replace).not.toHaveBeenCalled()
+    expect(screen.queryByText('友だちの引き継ぎ状態を確認できません')).toBeNull()
   })
 
   it('完了後だけ店舗画面を開く', async () => {
