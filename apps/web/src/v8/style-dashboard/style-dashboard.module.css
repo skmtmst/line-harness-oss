@@ -13,6 +13,8 @@
 .updated { color: var(--color-ink-faint); font-size: var(--text-label); white-space: nowrap; }
 
 .inset { display: flex; flex-direction: column; gap: var(--polish-space-field); padding-inline: var(--polish-space-section); }
+/* 頭の下の縦積みが間隔の唯一の持ち主。共有Noticeの上下余白を消し、帯→帯を12にそろえる。 */
+:global(:root) .inset > :global([data-design-part='notice']) { margin-block: 0; }
 .alert { min-inline-size: 0; }
 .alertActions { display: flex; gap: var(--polish-space-row); flex-wrap: nowrap; }
 
