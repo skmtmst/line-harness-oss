@@ -453,6 +453,7 @@
 
 ## 反映履歴
 
+- [LINEアカウント登録の使い方選択ポップアップ](release-log/unreleased/1898-masato-register-style-dialog.md) — 登録時に使い方の見本を見て選ぶか、後で設定する変更の反映履歴。
 - [LINE接続マニュアルの現行4ステップへの更新](release-log/unreleased/1897-masato-line-connect-manual.md)
 - [Google口コミのAI下書き案内文の削除](release-log/unreleased/1896-masato-google-review-ai-note-remove.md)
 - [LINEアカウント登録のMessaging API設定への直リンク](release-log/unreleased/1895-masato-messaging-api-deeplink.md)

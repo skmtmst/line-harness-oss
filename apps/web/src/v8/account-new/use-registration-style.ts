@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { AccountStyle } from '@line-crm/shared'
 import { styleApi } from '@/lib/api/helpers/styles'
 import { accountStyleUpdated } from '@/hooks/use-account-style'
@@ -15,6 +15,7 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [tick, setTick] = useState(0)
+  const busyLock = useRef(false)
   useEffect(() => {
     if (!enabled || !accountId) return
     let active = true
@@ -28,7 +29,8 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
     return () => { active = false }
   }, [accountId, enabled, tick])
   const save = async () => {
-    if (busy || !choice || version === null) return false
+    if (busyLock.current || !choice || version === null) return false
+    busyLock.current = true
     setBusy(true); setError('')
     try {
       const res = await styleApi.save(accountId, { expectedVersion: version, style: choice, answers: {} })
@@ -40,7 +42,24 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
     } catch (caught) {
       setError(describeApiFailure(caught, '保存'))
       return false
-    } finally { setBusy(false) }
+    } finally { busyLock.current = false; setBusy(false) }
   }
-  return { choice, setChoice, version, busy, error, reload: () => setTick(n => n + 1), save }
+  const skip = async () => {
+    if (busyLock.current || version === null) return false
+    busyLock.current = true
+    setBusy(true); setError('')
+    try {
+      const res = await styleApi.save(accountId, { expectedVersion: version, styleMode: 'later' })
+      if (!res.success) throw new Error('スキップを保存できませんでした。時間をおいて、もう一度お試しください。')
+      setVersion(res.data.version)
+      setChoice('')
+      accountStyleUpdated(accountId)
+      try { sessionStorage.removeItem(REGISTRATION_STYLE_KEY) } catch { /* 設定画面であとから変更できる。 */ }
+      return true
+    } catch (caught) {
+      setError(describeApiFailure(caught, 'スキップ'))
+      return false
+    } finally { busyLock.current = false; setBusy(false) }
+  }
+  return { choice, setChoice, version, busy, error, reload: () => setTick(n => n + 1), save, skip }
 }
