@@ -60,9 +60,19 @@ function stepScheduleForClone(
  *
  * @param sourceId 写す元のシナリオID
  * @param copyName コピーの名前（呼び出し側のダイアログが決める）
+ * @param canWriteNow 実行直前の本人・セッション・対象を照合する口。未指定は従来どおり。
  */
-export async function duplicateScenario(sourceId: string, copyName: string): Promise<string> {
+export async function duplicateScenario(
+  sourceId: string,
+  copyName: string,
+  canWriteNow?: () => boolean,
+): Promise<string> {
+  const requireWrite = () => {
+    if (canWriteNow && !canWriteNow()) throw new Error('権限が変わったため、複製を中止しました。')
+  }
+  requireWrite()
   const source = await api.scenarios.get(sourceId)
+  requireWrite()
   if (!source.success) throw new Error(source.error)
   const scenario = source.data
   const steps = [...scenario.steps].sort((a, b) => a.stepOrder - b.stepOrder)
@@ -85,11 +95,13 @@ export async function duplicateScenario(sourceId: string, copyName: string): Pro
 
   // 2. 配信対象・終了後の処理。create は受けないので直後の update で入れる。
   try {
+    requireWrite()
     const updated = await api.scenarios.update(copyId, {
       audienceCondition: scenario.audienceCondition ?? null,
       onCompleteMode: scenario.onCompleteMode ?? 'pause',
       onCompleteScenarioId: scenario.onCompleteScenarioId ?? null,
     })
+    requireWrite()
     if (!updated.success) throw new Error(updated.error)
   } catch (cause) {
     throw new DuplicateAborted(copyId, 'シナリオ全体の設定（配信対象・終了後の処理）', cause)
@@ -98,6 +110,12 @@ export async function duplicateScenario(sourceId: string, copyName: string): Pro
   // 3. 通を順に足す。途中で止めて通が欠けた別物の流れを残さない。
   const stepIdMap = new Map<string, string>()
   for (const step of steps) {
+    const requireStepWrite = () => {
+      try { requireWrite() } catch (cause) {
+        throw new DuplicateAborted(copyId, `${step.stepOrder}通目のコピー`, cause)
+      }
+    }
+    requireStepWrite()
     const copied = await api.scenarios
       .addStep(copyId, {
         stepOrder: step.stepOrder,
@@ -116,6 +134,7 @@ export async function duplicateScenario(sourceId: string, copyName: string): Pro
         success: false as const,
         error: describeApiFailure(cause, '複製'),
       }))
+    requireStepWrite()
     if (!copied.success) {
       throw new DuplicateAborted(copyId, `${step.stepOrder}通目のコピー`, new Error(copied.error))
     }
@@ -124,16 +143,20 @@ export async function duplicateScenario(sourceId: string, copyName: string): Pro
 
   // 4. 開始のきっかけ。写さないと「複製したのに始まらない」コピーになる。
   try {
+    requireWrite()
     const [sourceTriggers, copyTriggers] = await Promise.all([
       api.scenarios.triggers.list(sourceId),
       api.scenarios.triggers.list(copyId),
     ])
+    requireWrite()
     if (!sourceTriggers.success) throw new Error(sourceTriggers.error)
     if (!copyTriggers.success) throw new Error(copyTriggers.error)
     const have = new Set(copyTriggers.data.map((t) => `${t.kind}:${t.tagId ?? ''}`))
     for (const trigger of sourceTriggers.data) {
       if (have.has(`${trigger.kind}:${trigger.tagId ?? ''}`)) continue
+      requireWrite()
       const added = await api.scenarios.triggers.add(copyId, trigger.kind, trigger.tagId)
+      requireWrite()
       if (!added.success) throw new Error(added.error)
     }
   } catch (cause) {
@@ -142,10 +165,12 @@ export async function duplicateScenario(sourceId: string, copyName: string): Pro
 
   // 5. アクション。通にぶら下がるものは写した先の通へ張り替える。
   try {
+    requireWrite()
     const [sourceActions, copyActions] = await Promise.all([
       api.scenarios.actions.list(sourceId),
       api.scenarios.actions.list(copyId),
     ])
+    requireWrite()
     if (!sourceActions.success) throw new Error(sourceActions.error)
     if (!copyActions.success) throw new Error(copyActions.error)
     const keyOf = (
@@ -166,6 +191,7 @@ export async function duplicateScenario(sourceId: string, copyName: string): Pro
       }
       const key = keyOf(action.hook, mappedStepId, action.choiceIndex, action.actionType, action.sortOrder)
       if (have.has(key)) continue
+      requireWrite()
       const createdAction = await api.scenarios.actions.create(copyId, {
         hook: action.hook,
         stepId: mappedStepId,
@@ -176,6 +202,7 @@ export async function duplicateScenario(sourceId: string, copyName: string): Pro
         repeatOnRefire: action.repeatOnRefire,
         sortOrder: action.sortOrder,
       })
+      requireWrite()
       if (!createdAction.success) throw new Error(createdAction.error)
       have.add(key)
     }
