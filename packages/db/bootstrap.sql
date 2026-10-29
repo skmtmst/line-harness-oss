@@ -4608,11 +4608,13 @@ CREATE TABLE line_account_tag_links (
   FOREIGN KEY (tag_id, tenant_id) REFERENCES line_account_tags(id, tenant_id) ON DELETE CASCADE
 );
 
-CREATE TABLE line_account_tags (
+CREATE TABLE "line_account_tags" (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL REFERENCES tenants(id),
   name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
-  color TEXT CHECK (color IS NULL OR (length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')),
+  color TEXT CHECK (color IS NULL OR
+    (length(color)=7 AND substr(color,1,1)='#'
+      AND substr(color,2) NOT GLOB '*[^0-9A-Fa-f]*')),
   display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -10452,7 +10454,7 @@ CREATE INDEX idx_line_account_connection_checks_latest
 
 CREATE INDEX idx_line_account_tag_links_tag ON line_account_tag_links(tag_id, line_account_id);
 
-CREATE INDEX idx_line_account_tags_order ON line_account_tags(tenant_id, display_order, name);
+CREATE INDEX idx_line_account_tags_order ON line_account_tags(tenant_id,display_order,name);
 
 CREATE INDEX idx_line_accounts_archived
   ON line_accounts (archived_at, display_order, created_at);

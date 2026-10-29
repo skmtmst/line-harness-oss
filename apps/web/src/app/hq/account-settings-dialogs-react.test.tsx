@@ -25,16 +25,6 @@ const account = {
   role: 'owner',
   displayOrder: 1,
 } as AccountWithStats
-const parent = {
-  id: 'account-hq',
-  channelId: '2000000001',
-  name: '然 -NEN- 本部',
-  isActive: true,
-  country: null,
-  role: 'owner',
-  displayOrder: 0,
-} as AccountWithStats
-
 let root: Root
 let host: HTMLDivElement
 let calls: Array<{ url: string; method: string; body: string }>
@@ -87,13 +77,12 @@ async function fillCode(code: string) {
   }
 }
 
-test('設定の窓は板 HMpVx・名前・親・登録内容編集・アーカイブが出る', async () => {
+test('設定の窓は名前・フォルダを出し、親アカウントの設定を出さない', async () => {
   const onEditRegistration = vi.fn()
   const onArchive = vi.fn()
   await act(async () => root.render(
     <AccountSettingsDialog
       account={account}
-      accounts={[account, parent]}
       archived={false}
       onClose={() => {}}
       onSaved={() => {}}
@@ -104,6 +93,8 @@ test('設定の窓は板 HMpVx・名前・親・登録内容編集・アーカ�
   await settle()
   expect(document.body.querySelector('[data-design-node="HMpVx"]')).toBeTruthy()
   expect(document.body.textContent).toContain('アカウントの設定')
+  expect(document.body.textContent).toContain('フォルダ')
+  expect(document.body.textContent).not.toContain('親アカウント')
   expect(document.body.textContent).toContain('アーカイブ')
   const editRegistration = getByRole(document.body, 'button', { name: 'LINE の登録内容を編集' })
   await act(async () => { fireEvent.click(editRegistration) })
@@ -137,11 +128,10 @@ test('設定の窓はフォルダを選んで保存すると付け替え口へ�
     return response({ success: true, data: { id: 'account-a' } })
   }))
   let saved = false
-  const tagged = { ...account, tags: [] as Array<{ id: string; name: string; color: string | null }> }
+  const tagged = { ...account, parentLineAccountId: 'account-hq', tags: [] as Array<{ id: string; name: string; color: string | null }> }
   await act(async () => root.render(
     <AccountSettingsDialog
       account={tagged}
-      accounts={[tagged, parent]}
       archived={false}
       onClose={() => {}}
       onSaved={() => { saved = true }}
@@ -162,6 +152,7 @@ test('設定の窓はフォルダを選んで保存すると付け替え口へ�
   await settle()
   const put = calls.find((call) => call.url === '/api/line-accounts/account-a/folder' && call.method === 'PUT')
   expect(put && JSON.parse(put.body)).toEqual({ folderId: 'folder-area' })
+  expect(calls.some((call) => call.url.includes('hierarchy'))).toBe(false)
   expect(saved).toBe(true)
 })
 
