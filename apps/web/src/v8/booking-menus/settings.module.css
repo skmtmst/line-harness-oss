@@ -228,19 +228,6 @@
   color: var(--color-warning);
 }
 
-/* 白い板の中の段（枠付き・角12）。 */
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-bm-12);
-  padding: var(--tpl-bm-24);
-  outline: 1px solid var(--card-edge);
-  outline-offset: calc(var(--tpl-bm-1) * -1);
-  border-radius: var(--radius-card);
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
-
 .sectionHead {
   display: flex;
   flex-direction: column;
