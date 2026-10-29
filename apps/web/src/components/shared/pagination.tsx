@@ -1,4 +1,4 @@
-import React, { useId } from 'react'
+import React, { useEffect, useId } from 'react'
 import styles from './pagination.module.css'
 
 export type PaginationItem = number | 'ellipsis'
@@ -22,6 +22,13 @@ export type PaginationProps = {
   spacing?: 'roomy' | 'restaurant'
   /** カーソル式は前・現在・次だけ。任意の番号へは移動しない。 */
   mode?: 'numbered' | 'cursor'
+  /**
+   * 渡された page が範囲の外（pageCount より大きい）なら、最後のページへ
+   * 戻す知らせ（onPageChange）を出す。絞り込み・削除で全体が縮んだ一覧用。
+   * 印のない呼び出しの動きは変えない。読み込み中（disabled）は出さない。
+   * 呼ぶ側は取得の成功後・確定したページ数のときだけ描くこと。
+   */
+  correctOutOfRange?: boolean
 }
 
 /** Pencil の5枠に収め、先頭・現在地・末尾を常に辿れる並びを返す。 */
@@ -71,10 +78,16 @@ export default function Pagination({
   range,
   spacing,
   mode = 'numbered',
+  correctOutOfRange = false,
 }: PaginationProps) {
   const reasonId = useId()
   const total = safePage(pageCount, 1)
   const current = Math.min(total, safePage(page, 1))
+
+  useEffect(() => {
+    if (!correctOutOfRange || disabled) return
+    if (page > total) onPageChange(total)
+  }, [correctOutOfRange, disabled, page, total, onPageChange])
   const classes = [styles.pagination, className].filter(Boolean).join(' ')
   const pausedReason = disabled ? '現在、ページを移動できません。' : undefined
   const previousReason = pausedReason ?? (current <= 1 ? '最初のページです。' : undefined)

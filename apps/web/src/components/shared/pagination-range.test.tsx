@@ -63,3 +63,22 @@ it('1ページで件数文がなければ空のナビゲーションを作らな
   const { container } = render(<Pagination page={1} pageCount={1} onPageChange={vi.fn()} />)
   expect(container.childElementCount).toBe(0)
 })
+
+it('印がある時に範囲の外なら最後のページへ戻す知らせを1回出す', () => {
+  const change = vi.fn()
+  render(<Pagination page={3} pageCount={1} onPageChange={change} correctOutOfRange />)
+  expect(change).toHaveBeenCalledTimes(1)
+  expect(change).toHaveBeenCalledWith(1)
+})
+
+it('印がなければ範囲の外でも知らせを出さない', () => {
+  const change = vi.fn()
+  render(<Pagination page={3} pageCount={1} onPageChange={change} />)
+  expect(change).not.toHaveBeenCalled()
+})
+
+it('印があっても読み込み中は知らせを出さない', () => {
+  const change = vi.fn()
+  render(<Pagination page={3} pageCount={1} onPageChange={change} correctOutOfRange disabled />)
+  expect(change).not.toHaveBeenCalled()
+})

@@ -1037,7 +1037,7 @@ export default function ScenariosListV8() {
   /* ページ送りは型の pagination 枠へ。 */
   const listPager = scenarioList.loaded && !scenarioList.error ? (
     <ListPagePagination>
-      <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage}
+      <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} correctOutOfRange
         range={{ total: scenarioList.total, first: (scenarioList.page - 1) * scenarioList.limit + 1, last: Math.min(scenarioList.page * scenarioList.limit, scenarioList.total) }} />
     </ListPagePagination>
   ) : null

@@ -1096,7 +1096,7 @@ export default function BroadcastListV8() {
   )
   const pager = !loading && !error && !forbidden && (resultTotal !== null || visibleBroadcasts.length > 0) ? (
     <ListPagePagination>
-      <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り"
+      <Pagination page={page} pageCount={pageCount} onPageChange={goPage} ariaLabel="一斉配信のページ送り" correctOutOfRange
         range={{ total: resultTotal ?? visibleBroadcasts.length, first: rangeFirst, last: rangeLast }} />
     </ListPagePagination>
   ) : null
