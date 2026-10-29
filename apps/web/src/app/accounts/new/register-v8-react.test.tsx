@@ -96,11 +96,8 @@ const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name 
  */
 function clearPrecheck() {
   pick('はい、あります')
-  next()
   pick('いいえ、引き継ぎません')
-  next()
   pick('使っていません')
-  next()
   next()
 }
 

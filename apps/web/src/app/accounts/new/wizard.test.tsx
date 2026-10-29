@@ -61,19 +61,16 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }
 /** ②の中だけ進むボタンの名前が違う（v07 Fqy29）。 */
 const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
 const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
-const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name }))
+const pick = (name: string | RegExp) => fireEvent.click(screen.getByRole('radio', { name }))
 
 /**
- * ①事前確認（v07 p6zMkA）を最短で通す。質問は1つずつ出るので、答えるたびに「次へ」を押す。
+ * ①事前確認を最短で通す。回答時に次の質問へ進み、チェック結果で「次へ」を押す。
  * Q1=はい → Q2=いいえ（Q3は尋ねない）→ Q4=使っていません（Q5は尋ねない）→ チェック結果 → ②へ。
  */
 function passPrecheck() {
   pick('はい、あります')
-  next()
   pick('いいえ、引き継ぎません')
-  next()
   pick('使っていません')
-  next()
   expect(screen.getByText('あなたの接続前チェック結果')).toBeTruthy()
   next()
 }
@@ -173,33 +170,61 @@ describe('LINEアカウント作成ウィザード', () => {
     const link = screen.getByRole('link', { name: /LINE公式アカウントを作る/ })
     expect(link.getAttribute('href')).toBe('https://manager.line.biz/')
     expect(link.getAttribute('target')).toBe('_blank')
-    expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
   })
 
   it('①-9 Q2がはいなら認証済みアカウントの印にチェックするまで進めない', () => {
     render(<NewLineAccountPage />)
     pick('はい、あります')
-    next()
+    expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
     pick('はい、引き継ぎます')
-    const step = () => screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement
-    expect(step().disabled).toBe(true)
+    expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
     ack('認証済みアカウントであることを確認した')
-    expect(step().disabled).toBe(false)
+    expect(screen.getByText('Q3. 友だちの数は50万人を超えていますか？', { selector: 'h3' })).toBeTruthy()
+  })
+
+  it('①の条件付き質問を自動で進め、最後の次へだけで②へ進む', () => {
+    render(<NewLineAccountPage />)
+    pick('はい、あります')
+    pick('いいえ、引き継ぎません')
+    expect(screen.getByText('Q4. ほかのLINE配信ツールを使っていますか？', { selector: 'h3' })).toBeTruthy()
+    pick('使っています')
+    expect(screen.getByText('Q5. そのツールを、これからどうしますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
+    pick(/musuboに乗り換える/)
+    expect(screen.getByText('あなたの接続前チェック結果')).toBeTruthy()
+    expect(screen.getByText('二重に届かない切り替え方をご案内します')).toBeTruthy()
+    next()
+    expect(screen.getByText('Messaging API の情報を入れる', { selector: 'h2' })).toBeTruthy()
+  })
+
+  it('回答を変更すると新しい分岐の質問へ進み、戻る操作も使える', () => {
+    render(<NewLineAccountPage />)
+    pick('はい、あります')
+    pick('いいえ、引き継ぎません')
+    pick('使っていません')
+    fireEvent.click(screen.getAllByRole('button', { name: '変更' })[1])
+    expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
+    pick('はい、引き継ぎます')
+    ack('認証済みアカウントであることを確認した')
+    expect(screen.getByText('Q3. 友だちの数は50万人を超えていますか？', { selector: 'h3' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '戻る' }))
+    expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
   })
 
   it('①-2 Q3がはいなら相談の案内を出し、先へ進めない', () => {
     render(<NewLineAccountPage />)
     pick('はい、あります')
-    next()
     pick('はい、引き継ぎます')
     ack('認証済みアカウントであることを確認した')
-    next()
     expect(screen.getByText('Q3. 友だちの数は50万人を超えていますか？', { selector: 'h3' })).toBeTruthy()
     pick('はい、超えています')
     const link = screen.getByRole('link', { name: /サポートへ問い合わせる/ })
     expect(link.getAttribute('href')).toBe('/hq/support')
     expect(link.getAttribute('target')).toBeNull()
-    expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
   })
 
   it('②Step1は Messaging API の2項目とプロバイダーIDを必須にし、マニュアルを別タブで開く', () => {
@@ -209,11 +234,10 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(ids.every((id) => (document.getElementById(id) as HTMLInputElement).required)).toBe(true)
     expect(document.getElementById('channel-access-token')).toBeNull()
     expect(document.getElementById('liff-id')).toBeNull()
-    /* 承認済み v07 の ②-1（A2cEg1）では、取りに行く先は青い囲みの「LINE Developers を開く」1つ。
-       マニュアルは右の列からいつでも開ける。どちらも別タブ。 */
-    const developers = screen.getByRole('link', { name: /LINE Developers を開く/ })
-    expect(developers.getAttribute('href')).toBe('https://developers.line.biz/console/')
-    expect(developers.getAttribute('target')).toBe('_blank')
+    /* ②-1は公式アカウントマネージャーからMessaging API設定を開く。 */
+    const manager = screen.getByRole('link', { name: /LINE公式アカウントマネージャーを開く/ })
+    expect(manager.getAttribute('href')).toBe('https://manager.line.biz/')
+    expect(manager.getAttribute('target')).toBe('_blank')
     const manual = screen.getByRole('link', { name: /マニュアルを開く/ })
     expect(manual.getAttribute('href')).toBe('/manuals/line-connect/index.html')
     expect(manual.getAttribute('target')).toBe('_blank')
