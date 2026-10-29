@@ -33,19 +33,7 @@ figure{margin:18px 0 0;border:1px solid var(--line);border-radius:11px;overflow:
 
 .screen-note{margin:18px 0 8px;padding:8px 12px;border-left:3px solid var(--green);background:var(--green-light);color:#245c37;font-size:12px;font-weight:700}
 .scroll-cue{margin:14px 0 2px;text-align:center;color:var(--green);font-size:13px;font-weight:800}
-.webhook-map{margin:8px 0 18px;padding:18px 20px;border:1.5px solid var(--line);border-radius:12px;background:var(--sheet);box-shadow:0 2px 0 #e5e9e3}
-.webhook-map .map-caption{margin:0 0 12px;color:var(--muted);font-size:11px}
-.webhook-map .map-path{padding-bottom:9px;border-bottom:1px solid var(--line);color:var(--muted);font-size:11px}
-.webhook-map .map-path strong{color:var(--ink)}
-.webhook-map h3{margin:13px 0 8px;font-size:17px}
-.webhook-map .map-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(0,2fr);gap:8px 16px;align-items:center;padding:10px 0;border-top:1px solid var(--line);font-size:13px}
-.webhook-map .map-row:first-of-type{border-top:0}
-.webhook-map .map-row b{font-size:12px}
-.webhook-map .map-row .map-switch{display:inline-flex;align-items:center;gap:7px;color:var(--green);font-size:12px;font-weight:800}
-.webhook-map .map-switch:before{content:"";display:inline-block;width:32px;height:18px;border-radius:20px;background:var(--green);box-shadow:inset -14px 0 0 -3px var(--sheet)}
-.webhook-map .map-badge{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:7px;border:2px solid var(--red);border-radius:50%;color:var(--red);font-size:11px;font-weight:800}
-@media(max-width:520px){.webhook-map{padding:14px}.webhook-map .map-row{grid-template-columns:1fr;gap:4px}}
-@media(prefers-color-scheme:dark){.screen-note{color:#d0f1d6}.webhook-map{box-shadow:0 2px 0 #101711}}
+@media(prefers-color-scheme:dark){.screen-note{color:#d0f1d6}}
 .publish-flow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;margin:17px 0 0;padding:15px;border:1.5px dashed #9ac4a1;border-radius:12px;background:#fcfefb;font-size:13px;font-weight:800}.publish-flow span,.publish-flow strong{padding:5px 11px;border:1.5px solid var(--line);border-radius:8px;background:var(--sheet)}.publish-flow strong{border-color:var(--green);background:var(--green-light);color:var(--green)}.publish-flow b{color:var(--red)}
 @media(prefers-color-scheme:dark){.publish-flow{background:#1c3022}}
 </style>
@@ -72,17 +60,8 @@ figure{margin:18px 0 0;border:1px solid var(--line);border-radius:11px;overflow:
 <figure><img src="/manuals/line-connect/images/m3-tab.webp" width="1489" height="812" alt="musuboのMessaging APIチャネル画面。上部のMessaging API設定タブを赤枠で示している"><figcaption>実画面の例は musubo です。Step 3のボタンから開くと「Messaging API設定」へ進みます。別のタブが出た場合は赤枠のタブを押してください。</figcaption></figure>
 <p class="scroll-cue" aria-hidden="true">↓ この画面を少し下へスクロール</p>
 <figure><img src="/manuals/line-connect/images/m3-musubo-webhook.png" width="1513" height="773" alt="musuboのMessaging API設定を下にスクロールした実画面。Webhook設定の見出し、Webhook URL、編集ボタンがある"><figcaption>musuboの実画面。スクロールした先の「Webhook設定」→「Webhook URL」→「編集」を探します。他のプロバイダー情報は掲載していません。</figcaption></figure>
-<div class="webhook-map" role="img" aria-label="musuboのMessaging API設定画面では、ボット情報とQRコードの下にWebhook設定があり、Webhook URLの編集欄、その下にWebhookの利用、Webhookの再送、エラーの統計情報のスイッチが並ぶ">
-<p class="map-caption">musubo画面の見取り図 · 他のプロバイダー情報は省略</p>
-<p class="map-path">musubo › musubo › <strong>Messaging API設定</strong></p>
-<h3>Webhook設定</h3>
-<div class="map-row"><b><span class="map-badge">1</span>Webhook URL</b><span>「編集」→ musuboのURLを貼り付け →「更新」</span></div>
-<div class="map-row"><b><span class="map-badge">2</span>Webhookの利用</b><span class="map-switch">ON</span></div>
-<div class="map-row"><b><span class="map-badge">3</span>Webhookの再送</b><span class="map-switch">ON</span></div>
-<div class="map-row"><b><span class="map-badge">4</span>エラーの統計情報</b><span class="map-switch">ON</span></div>
-</div>
 <p class="small">URLが未設定の画面では、先に「編集」からURLを保存します。保存後に3つのスイッチが表示されます。</p>
-<ol class="steps"><li>musuboに表示された<strong>チャネル専用のWebhook URL</strong>を「コピー」し、上図①の「Webhook URL」で<strong>「編集」→貼り付け→「更新」</strong>の順に進めます。</li><li>同じ設定欄で上図②〜④の<strong>「Webhookの利用」</strong>、<strong>「Webhookの再送」</strong>、<strong>「エラーの統計情報」</strong>をすべてONにします。</li><li>musuboへ戻り、下の4項目を実際の設定と照らし合わせてチェックします。</li></ol>
+<ol class="steps"><li>musuboに表示された<strong>チャネル専用のWebhook URL</strong>を「コピー」し、後述の画像①の「Webhook URL」で<strong>「編集」→貼り付け→「更新」</strong>の順に進めます。</li><li>同じ設定欄で同じ画像②〜④の<strong>「Webhookの利用」</strong>、<strong>「Webhookの再送」</strong>、<strong>「エラーの統計情報」</strong>をすべてONにします。</li><li>musuboへ戻り、下の4項目を実際の設定と照らし合わせてチェックします。</li></ol>
 <h3>設定後の画面で4か所を確認する</h3>
 <figure><img src="/manuals/line-connect/images/m3-webhook-configured-musubo.webp" width="1752" height="897" loading="lazy" alt="説明用に加工したmusuboのMessaging API設定画面。Webhook URLと、Webhookの利用・再送・エラーの統計情報がONの位置を赤い番号で示す"><figcaption>添付画面を説明用に加工した例です。①にURL、②〜④にONのスイッチが並びます。画像中の「1111111111」は例であり、実際はmusuboのStep 3に表示されたURLをコピーします。 <a href="/manuals/line-connect/images/m3-webhook-configured-musubo.webp" target="_blank" rel="noopener noreferrer">画像を拡大</a></figcaption></figure>
 <div class="mock" role="img" aria-label="Webhook URLにはMessaging APIチャネルIDが含まれることを示す図"><small>musubo の Webhook URL</small><div><code>https://stg-api.musubo.jp/webhook/&lt;Messaging APIチャネルID&gt;</code><strong>コピー → LINEに貼る</strong></div></div>
@@ -96,7 +75,7 @@ figure{margin:18px 0 0;border:1px solid var(--line);border-radius:11px;overflow:
 <div class="route"><span>同じプロバイダー</span><span>LINEログインチャネル</span><span>チャネル基本設定</span></div>
 <ol class="steps"><li>未作成なら<strong>「新規チャネル作成」→「LINEログイン」</strong>を選び、必要事項を入力します。アプリタイプは<strong>「ウェブアプリ」</strong>を選びます。</li><li>LINEログインチャネルの<strong>「チャネル基本設定」</strong>からチャネルIDとチャネルシークレットをコピーし、musuboの<strong>LINEログイン用</strong>の2欄に貼り付けます。</li><li><strong>「友だち追加オプション」</strong>でStep 1の公式アカウントをリンクし、チャネルを<strong>「公開済み」</strong>にします。</li><li>musuboへ戻り、公式アカウントのリンクと公開を確認した2つのチェックを入れます。</li></ol>
 <h3>① 同じプロバイダーのLINEログインチャネルを開く</h3>
-<figure><img src="/manuals/line-connect/images/m2-provider.webp" width="1489" height="812" loading="lazy" alt="musuboプロバイダーにLINEログインチャネルとMessaging APIチャネルが並ぶ。LINEログインチャネルがなければ新規チャネル作成を選ぶ"><figcaption>musuboの例。同じプロバイダー内のLINEログインチャネルを開きます。無い場合は左の「新規チャネル作成」から作ります。</figcaption></figure>
+<figure><img src="/manuals/line-connect/images/m2-provider.webp" width="1769" height="889" loading="lazy" alt="musuboプロバイダーにLINEログインチャネルとMessaging APIチャネルが並ぶ。LINEログインチャネルがなければ新規チャネル作成を選ぶ。他のプロバイダーと関係のないチャネルは表示していない"><figcaption>musuboの例。同じプロバイダー内のLINEログインチャネルを開きます。無い場合は左の「新規チャネル作成」から作ります。</figcaption></figure>
 <h3>② チャネル基本設定の2か所からコピーする</h3>
 <p>LINEログインチャネルの<strong>「チャネル基本設定」</strong>を開きます。上部の<strong>「チャネルID」</strong>のコピーアイコンを押し、musuboの<strong>チャネルID（LINEログイン）</strong>欄に貼り付けます。</p>
 <figure><img src="/manuals/line-connect/images/m2-login-id.webp" width="1489" height="812" loading="lazy" alt="musuboのLINEログインチャネルのチャネル基本設定。上部のチャネルIDとコピーアイコンを赤枠で示す"><figcaption>「チャネル基本設定」の上部。LINEログイン用のチャネルIDをコピーします。</figcaption></figure>

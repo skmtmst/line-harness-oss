@@ -880,4 +880,5 @@
 - [LINEログインのコピーと公開の案内](release-log/unreleased/1901-masato-line-login-guide-images.md) — 接続マニュアルStep 4の画像案内の反映履歴。
 - [プロバイダーID確認画面の案内](release-log/unreleased/1903-masato-provider-id-manual-image.md) — 接続マニュアルStep 2の画像案内の反映履歴。
 - [musuboのWebhook設定後の案内](release-log/unreleased/1904-masato-musubo-webhook-guide-image.md) — 接続マニュアルStep 3の画像案内の反映履歴。
+- [LINE接続マニュアルの画像整理](release-log/unreleased/1906-masato-line-guide-image-cleanup.md) — Step 3とStep 4の画像整理の反映履歴。
 - [まとめ列車 1029](release-log/unreleased/1905-kenta-train-all-1029.md) — メモの保存の直しと各担当の完成分の反映履歴。
