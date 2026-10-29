@@ -53,7 +53,7 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
     selectedAccountId: fixture.accountId,
-    selectedAccount: null,
+    selectedAccount: { emailInboxEnabled: true },
     loading: false,
   }),
 }))
