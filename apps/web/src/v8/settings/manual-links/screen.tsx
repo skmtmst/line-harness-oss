@@ -51,6 +51,8 @@ export default function ManualLinksScreen() {
     notice,
     canEdit,
     canView,
+    staff,
+    permissionReason,
     loadInitial,
     checkAll,
     startEdit,
@@ -62,6 +64,7 @@ export default function ManualLinksScreen() {
 
   const frame = (children: React.ReactNode) => (
     <SbSettingsScreen boardId="cIdA2" title={TITLE} help={DESCRIPTION} explanation="この表を直せるのは運営だけです。お客さまの組織からは見えません。"
+      notice={status === 'ready' && canView && !canEdit ? <ReadOnlyNotice need="ops" /> : undefined}
       saveStatus={canEdit && editingKey ? `${rows.find(row => (row.taskId ?? row.screenId) === editingKey)?.name ?? ''}の行き先を編集中` : undefined}
       saveActions={canEdit && editingKey && (dirty || saving) ? <>
         <Button variant="secondary" disabled={saving} onClick={cancelEdit}>キャンセル</Button>
@@ -100,7 +103,6 @@ export default function ManualLinksScreen() {
     <>
 
 
-      {!canEdit ? <ReadOnlyNotice /> : null}
       <ListToolbar
         search={{ value: query, onChange: setQuery, placeholder: '画面の番号・画面名で探す' }}
         filters={<SegmentedControl
@@ -114,7 +116,7 @@ export default function ManualLinksScreen() {
         />}
         trailing={<>
           <span className={styles.schedule}>{SCHEDULE}</span>
-          {canEdit ? <Button variant="secondary" disabled={checking} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…"><RefreshCw aria-hidden="true" />いま全部を確かめる</Button> : null}
+          <Button lockedReason={permissionReason} variant="secondary" disabled={checking || staff === null} onClick={() => void checkAll()} busy={checking} busyLabel="確かめています…"><RefreshCw aria-hidden="true" />いま全部を確かめる</Button>
         </>}
       />
 
@@ -167,7 +169,7 @@ export default function ManualLinksScreen() {
                     <StatusBadge tone={row.status === 'ok' ? 'success' : row.status === 'broken' ? 'danger' : 'neutral'}>{row.status === 'unset' ? emptyValue('unconfigured') : LINK_STATUS_LABEL[row.status]}</StatusBadge>
                   </GridCell>
                   <GridCell role="cell" className={styles.actions}>
-                    {!canEdit || editing ? null : <RowActions subjectName={row.name} menuItems={[{ id: 'edit', label: row.url ? '行き先を編集する' : '行き先を決める', onSelect: () => startEdit(key) }]} />}
+                    {editing ? null : <RowActions subjectName={row.name} menuItems={[{ id: 'edit', label: row.url ? '行き先を編集する' : '行き先を決める', lockedReason: permissionReason, disabled: staff === null, onSelect: () => startEdit(key) }]} />}
                   </GridCell>
                 </GridRow>
               )
