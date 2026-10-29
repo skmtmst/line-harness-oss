@@ -19,7 +19,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
-  selectedAccountId: fixture.accountId, selectedAccount: null, loading: false,
+  selectedAccountId: fixture.accountId, selectedAccount: { emailInboxEnabled: true }, loading: false,
 }) }))
 
 let root: Root
