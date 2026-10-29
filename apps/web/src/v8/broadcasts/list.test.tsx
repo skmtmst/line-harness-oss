@@ -22,6 +22,7 @@ const listBroadcasts = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
 const createView = vi.hoisted(() => vi.fn(async (_accountId: string, input: Record<string, unknown>) => ({ success: true, data: { id: 'new-view', ...input } })))
 const listViews = vi.hoisted(() => vi.fn())
+const dashboardOverview = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { delivery: { quotaLimit: 5000, quotaUsed: 1842 } } })))
 const deleteBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
 const updateBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
 const narrow = vi.hoisted(() => ({ value: false }))
@@ -47,7 +48,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       scenarios: { ...actual.api.scenarios, list: async () => ({ success: true, data: [] }) },
       dashboard: {
         ...actual.api.dashboard,
-        overview: async () => ({ success: true, data: { delivery: { quotaLimit: 5000, quotaUsed: 1842 } } }),
+        overview: dashboardOverview,
       },
     },
   }
@@ -137,6 +138,7 @@ beforeEach(() => {
   }))
   listFolders.mockImplementation(async () => ({ success: true, data: [], unfiledCount: 0 }))
   listViews.mockImplementation(async () => ({ success: true, data: [] }))
+  dashboardOverview.mockImplementation(async () => ({ success: true, data: { delivery: { quotaLimit: 5000, quotaUsed: 1842 } } }))
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -831,3 +833,19 @@ it('総件数が未取得のときは補正せず2ページ目の行を出す', 
   flushListUrlState()
   expect(window.location.search).toContain('page=2')
 }, 20_000)
+
+describe('V8 一斉配信一覧の送信枠の行き先', () => {
+  it('送信枠が読めないときはトークンを入れ直す場所（アカウント設定）への行き先を出す', async () => {
+    dashboardOverview.mockResolvedValue({ success: false })
+    act(() => { root.render(<BroadcastListV8 />) })
+    await waitFor(() => expect(host.textContent).toContain('送信枠を確認できません'))
+    const link = [...host.querySelectorAll('a')].find((a) => a.textContent?.includes('アカウント設定へ'))
+    expect(link?.getAttribute('href')).toBe('/accounts/detail?id=account-a')
+  })
+
+  it('送信枠が読めたときは行き先を出さない', async () => {
+    act(() => { root.render(<BroadcastListV8 />) })
+    await waitFor(() => expect(host.textContent).toContain('5,000 通のうち 1,842 通を使用'))
+    expect([...host.querySelectorAll('a')].some((a) => a.textContent?.includes('アカウント設定へ'))).toBe(false)
+  })
+})
