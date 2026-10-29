@@ -459,6 +459,7 @@
 
 ## 反映履歴
 
+- [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/0000-kenta-train-1029f.md)
 - [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/0000-kenta-swa.md)
 - [予約枠・在庫の操作サイズの更新](release-log/unreleased/0000-kenta-swbm.md)
 - [新規店舗の専用機能を非表示](release-log/unreleased/1925-masato-new-store-specialized-hidden.md)
