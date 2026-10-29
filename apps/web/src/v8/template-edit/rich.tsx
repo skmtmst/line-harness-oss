@@ -8,7 +8,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useMemo, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { CircleSlash, Send } from 'lucide-react'
+import { CircleSlash, Upload } from 'lucide-react'
 import { type TapExtras, type Folder, type MediaItem, type TemplateImagemapUpload } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
@@ -464,7 +464,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
               下書きを保存
             </Button>
             <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
-              {host ? null : <Send size={16} aria-hidden="true" />}
+              {host ? null : <Upload size={16} aria-hidden="true" />}
               {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
           </>

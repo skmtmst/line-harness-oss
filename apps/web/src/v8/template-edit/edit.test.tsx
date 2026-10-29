@@ -555,6 +555,18 @@ describe('V8 テンプレートの公開と送信の違い', () => {
     expect(screen.getByText(note)).toBeTruthy()
   })
 
+  it('素材（クーポン）でも注記を出す', async () => {
+    await mount('kind=coupon&visual=1')
+    expect(screen.getByRole('button', { name: '保存して公開' })).toBeTruthy()
+    expect(screen.getByText(note)).toBeTruthy()
+  })
+
+  it('リッチメッセージでも注記を出す', async () => {
+    await mount('kind=rich_message&visual=1')
+    expect(screen.getByRole('button', { name: '保存して公開' })).toBeTruthy()
+    expect(screen.getByText(note)).toBeTruthy()
+  })
+
   it('組み込み（host）では出さない', async () => {
     const parent: TemplateEditHost = { description: '統括のひな形', folders: [], folder: '', onFolderChange: vi.fn(), busy: false, onSave: vi.fn(), onCancel: vi.fn(), primaryLabel: '親へ保存', initialMessage: { name: '親の下書き', messageType: 'text', messageContent: '元の本文' } }
     await act(async () => { root.render(<TemplateMessageEditor id={null} visual={false} host={parent} />) })

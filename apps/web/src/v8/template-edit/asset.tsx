@@ -14,7 +14,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { GripVertical, Plus, Send, Trash2, X } from 'lucide-react'
+import { GripVertical, Plus, Trash2, Upload, X } from 'lucide-react'
 import { hasTapExtras, tapExtrasError, type TapExtras, type Folder, type MediaItem, type FormBlock, type FormLayout } from '@line-crm/shared'
 import { tapExtraSaveError } from '@/lib/tap-actions'
 import { api } from '@/lib/api'
@@ -461,7 +461,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               下書きを保存
             </Button>
             <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
-              {host ? null : <Send size={16} aria-hidden="true" />}
+              {host ? null : <Upload size={16} aria-hidden="true" />}
               {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
           </>

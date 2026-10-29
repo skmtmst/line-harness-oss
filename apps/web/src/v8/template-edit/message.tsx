@@ -9,7 +9,7 @@ import Link from '@/components/shared/list-navigation'
 import {  } from 'next/navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { GitCompare, Link2, Send } from 'lucide-react'
+import { GitCompare, Link2, Upload } from 'lucide-react'
 import { validateFlexContent, type Folder } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import { useStaffRole } from '@/lib/staff-role'
@@ -528,7 +528,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               busy={publishing || Boolean(host?.busy)}
               busyLabel={host ? '保存中…' : '公開中…'}
             >
-              {conflict ? <GitCompare size={16} aria-hidden="true" /> : host ? null : <Send size={16} aria-hidden="true" />}
+              {conflict ? <GitCompare size={16} aria-hidden="true" /> : host ? null : <Upload size={16} aria-hidden="true" />}
               {conflict ? '比べてから保存' : host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
           </>
