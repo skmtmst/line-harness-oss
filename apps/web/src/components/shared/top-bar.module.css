@@ -582,6 +582,7 @@
 :root .pillRole { font-size: 10px; font-weight: var(--font-weight-ui); line-height: 12px; }
 :root .accountName { font-size: 13px; font-weight: 600; line-height: 17px; }
 :root .root[data-v8-chrome='shell'] .bellBadge { background: var(--color-status-danger); width: 18px; height: 18px; min-width: 18px; left: 22px; right: auto; top: -4px; padding: 0; outline: 2px solid var(--color-shell); outline-offset: -1px; font-size: 10px; font-weight: 700; line-height: 10px; }
+:root .root[data-v8-chrome='shell'] .bellBadge[data-count-unknown] { width: 8px; height: 8px; min-width: 8px; border: 0; border-radius: 50%; background: var(--color-status-warn); outline: 2px solid var(--color-shell); outline-offset: -1px; }
 :root .root[data-v8-chrome='shell'] .identity { height: 36px; padding: 0 10px 0 4px; gap: 8px; }
 :root .root[data-v8-chrome='shell'] .avatar { width: 28px; height: 28px; border-radius: var(--polish-radius-pill); background: var(--color-status-info-soft); color: var(--color-action); font-size: 12px; font-weight: 600; line-height: 17px; }
 :root .root[data-v8-chrome='shell'] .user { font-size: 13px; font-weight: 600; line-height: 17px; }

@@ -452,7 +452,7 @@ function notificationBellLabel(count: number | null) {
 }
 
 function BellBadge({ count }: { count: number | null }) {
-  if (count === null) return <span className={styles.bellBadge} aria-hidden="true" title="未読数を確認できません">—</span>
+  if (count === null) return <span className={styles.bellBadge} data-count-unknown="" aria-label="未読件数を確認できません" />
   if (count <= 0) return null
   return (
     <span className={styles.bellBadge} aria-hidden="true">

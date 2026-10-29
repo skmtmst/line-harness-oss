@@ -146,7 +146,9 @@ export default function BellPopover<F extends string = BellFilter>({
           {onMarkAllRead ? (
             <Button type="button" variant="text" size="inline" className={styles.markAll} onClick={onMarkAllRead}
               disabled={markAllReadDisabled ?? (state !== 'ready' || unreadCount === null || unreadCount === 0)}
-              disabledReason={markAllReadDisabledReason} lockedReason={markAllReadLockedReason}>
+              aria-description={markAllReadDisabledReason || undefined}
+              title={markAllReadDisabledReason || undefined}
+              lockedReason={markAllReadLockedReason}>
               すべて既読にする
             </Button>
           ) : null}
