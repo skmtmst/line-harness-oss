@@ -459,6 +459,7 @@
 
 ## 反映履歴
 
+- [一斉配信・シナリオ一覧の自動点検の更新](release-log/unreleased/0000-kenta-muse-broadcast-scenario-reds.md)
 - [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
 - [アカウント設定の親アカウント欄を非表示](release-log/unreleased/1900-masato-hide-parent-account.md) — 未使用の欄を隠し、既存の親子関係を保つ変更の反映履歴。
 - [LINEアカウント登録の使い方選択ポップアップ](release-log/unreleased/1898-masato-register-style-dialog.md) — 登録時に使い方の見本を見て選ぶか、後で設定する変更の反映履歴。
