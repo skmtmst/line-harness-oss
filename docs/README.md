@@ -868,6 +868,7 @@
 - [スマートフォン専用の画面（トークと対応）](release-log/unreleased/1845-kenta-phone-shell-talk.md)
 - [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
 - [一覧の帯・フォルダの丸と共通操作の整理](release-log/unreleased/0000-kenta-tags-band-dot.md)
+- [共通UIの並び・形の統一（パンくず・ボタン・選択・空表示など）](release-log/unreleased/0000-kenta-muse-ui-layout.md)
 - [共通部品と言葉・受信箱の絞り込みの修正](release-log/unreleased/0000-kenta-int.md)
 - [チェックの印・スイッチ・選ぶ欄の見た目の統一](release-log/unreleased/0000-kenta-check-green.md)
 - [閲覧のみの帯を題の横並びから題の下へ](release-log/unreleased/1948-kenta-muse-heading-band.md)

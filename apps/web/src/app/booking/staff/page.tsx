@@ -5,7 +5,6 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { PageHeading } from '@/components/templates/page-frame'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import IconButton from '@/components/shared/icon-button'
@@ -17,7 +16,7 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { EMPTY_STAFF as EMPTY, StaffEditModal } from './staff-edit-dialog'
 
 // 編集窓は V8 予約設定の担当スタッフタブ（menus/settings-v8.tsx）と共用。
@@ -64,7 +63,9 @@ function StaffTableSkeleton() {
 }
 
 export default function BookingStaffPage() {
-  usePageTitle('予約設定')
+  /* パンくずは上の帯だけ（板の中の2つ目のパンくずは置かない）。 */
+  usePageTitle('担当スタッフ')
+  usePageCrumbs([{ label: '予約設定', href: '/booking/menus' }])
   const { selectedAccountId } = useAccount()
   /* V8 のときだけ骨組み・保存中表示へ。互換経路は従来の見た目のまま。 */
   const [items, setItems] = useState<BookingStaff[]>([])
@@ -152,13 +153,6 @@ export default function BookingStaffPage() {
     <div className="flex flex-col gap-4">
       <div><PageHeading title="担当スタッフ" /></div>
       {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav data-design="Crumb" className="text-ink-faint text-xs" aria-label="パンくず">
-          <Link href="/booking/menus" className="hover:underline">予約設定</Link>
-          <span className="mx-1.5">/</span>
-          <span>担当スタッフ</span>
-        </nav>
-      </div>
       {/*
         作る操作は一覧のすぐ上の左。見出しの行の右端には置かない。
         押せない理由はボタンの説明に出す。押せないボタンを黙って置かない。
