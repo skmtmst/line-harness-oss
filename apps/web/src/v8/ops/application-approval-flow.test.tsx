@@ -48,15 +48,29 @@ describe('申込詳細の連絡から承認まで', () => {
     state.access = 'readonly'
     state.get.mockResolvedValue({ success: true, data: initial })
     render(<OpsApplicationDetail />)
-    const save = await screen.findByRole('button', { name: '連絡済みとして保存' }) as HTMLButtonElement
-    expect(save.disabled).toBe(true)
-    expect(save.title).toContain('閲覧のみ')
-    const approve = screen.getByRole('button', { name: '承認して招待メールを送る' }) as HTMLButtonElement
-    expect(approve.disabled).toBe(true)
+    const save = await screen.findByRole('button', { name: '連絡済みとして保存' })
+    expect(save.getAttribute('aria-disabled')).toBe('true')
+    expect(document.getElementById(save.getAttribute('aria-describedby') ?? '')?.textContent).toContain('閲覧のみ')
+    const approve = screen.getByRole('button', { name: '承認して招待メールを送る' })
+    expect(approve.getAttribute('aria-disabled')).toBe('true')
+    expect(document.getElementById(approve.getAttribute('aria-describedby') ?? '')?.textContent).toContain('閲覧のみ')
     fireEvent.click(save)
     fireEvent.click(approve)
     expect(state.contact).not.toHaveBeenCalled()
     expect(state.approve).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog', { name: 'この申込を承認しますか？' })).toBeNull()
+  })
+
+  it('保存中は「保存しています…」と出す', async () => {
+    state.get.mockResolvedValue({ success: true, data: initial })
+    let done: (value: unknown) => void = () => {}
+    state.contact.mockReturnValue(new Promise((resolve) => { done = resolve }))
+    render(<OpsApplicationDetail />)
+    const save = await screen.findByRole('button', { name: '連絡済みとして保存' })
+    fireEvent.change(screen.getByRole('textbox', { name: '担当者からの連絡メモ' }), { target: { value: '電話で内容を確認' } })
+    fireEvent.click(save)
+    expect(await screen.findByText('保存しています…')).not.toBeNull()
+    done({ success: true, data: { ...initial, status: 'contacted', contact_note: '電話で内容を確認', contacted_at: '2026-10-29T02:30:00.000Z' } })
+    await waitFor(() => expect(state.contact).toHaveBeenCalledWith('application-1', '電話で内容を確認'))
   })
 })
