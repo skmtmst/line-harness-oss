@@ -1,3 +1,5 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 // 現役の画面と共通Dialogを実際に操作して、旧9ケースのAPI・権限・競合を守る。
@@ -129,7 +131,7 @@ async function settle(work?: () => void) {
 }
 async function mountControl() {
   render(createElement(EmergencyScreen, {
-    renderControl: (accounts, ref) => createElement(EmergencyControlV8, { accounts, ref }),
+    renderControl: (accounts, ref, onAccessChange) => createElement(EmergencyControlV8, { accounts, ref, onAccessChange }),
   }))
   await waitFor(() => expect(bench.previewCalls).toHaveLength(1))
 }
@@ -175,10 +177,11 @@ function assertLocked() {
   expect(screen.queryByRole('textbox', { name: '1桁目' })).toBeNull()
 }
 beforeEach(() => {
+  verifiedStaffRole('owner')
   bench.previewCalls.length = 0; bench.stopCalls.length = 0; bench.restoreCalls.length = 0; bench.stepUpCalls.length = 0
   bench.stopResult = null; bench.restoreResult = null
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); verifiedStaffRole(null) })
 const ACCOUNTS = [
   { id: 'acc-a', name: 'Aアカウント' },
   { id: 'acc-b', name: 'Bアカウント' },
@@ -288,7 +291,7 @@ describe('EmergencyControlV8 を現役の画面から操作する', () => {
     await runRestoreFlow()
     expect(feedback()).toContain('この範囲を操作する権限がありません。対象アカウントを選び直すか、オーナーに確認してください。')
     expect(screen.queryByRole('button', { name: '本人確認して実行' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '復旧する' })).toBeNull()
+    await expectPermissionLocked(screen.getByRole('button', { name: '復旧する' }))
     expect(bench.restoreCalls).toHaveLength(1); expect(bench.stepUpCalls).toHaveLength(1)
   })
 

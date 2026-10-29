@@ -245,3 +245,11 @@ html:root .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset:
 
 /* 同じ操作の段では、部品の小型指定より共通の高さを優先する。 */
 html:root :is([data-toolbar-row], [data-control-row]) .field { height: var(--control-h); min-height: var(--control-h); }
+
+/* 権限で使えない入口は、触れても色を変えず押せないカーソルを保つ。 */
+:root .field:has(.fieldTrigger[data-permission-locked]):hover {
+  background: var(--gradient-raised-control) var(--color-canvas);
+}
+:root .field [data-permission-locked] { cursor: not-allowed; }
+/* 欄全体が薄いので、中の外す印は二重に薄くしない。 */
+:root .field[data-disabled] :global([data-permission-locked]) { opacity: var(--polish-enabled-opacity); }

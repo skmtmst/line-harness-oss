@@ -68,9 +68,18 @@ function valueBarFixture() {
       stdin: { resolveDir: webRoot, loader: 'tsx', contents: `
         import React from 'react';import {createRoot} from 'react-dom/client';
         import {ValueBarChart} from './src/components/shared/charts';
+        import {BarChart, toBarChartItems} from './src/components/shared/bar-chart';
         createRoot(document.getElementById('root')).render(<main>
           <section data-chart-fixture="summary"><ValueBarChart label="月ごとの売上" presentation="summary" unit="円" items={${JSON.stringify(summaryItems)}}/></section>
           <section data-chart-fixture="standard"><ValueBarChart label="日ごとの数" unit="件" items={${JSON.stringify(dailyItems)}}/></section>
+          {[7,31,90].map(count => <section key={count} data-friend-chart-fixture={count}>
+            <BarChart distribution="diverging" items={toBarChartItems(Array.from({length:count},(_,index)=>({
+              date:new Date(Date.UTC(2026,9,15+index)).toISOString().slice(0,10),added:index%9+1,removed:index%4,
+            })))}/>
+          </section>)}
+          <section data-friend-chart-fixture="dashboard"><BarChart layout="dashboard" items={toBarChartItems(Array.from({length:7},(_,index)=>({
+            date:new Date(Date.UTC(2026,9,15+index)).toISOString().slice(0,10),added:index+2,removed:index%3,
+          })),{formatAxisLabel:date=>date.slice(5).replace('-','/')+'（木）'})}/></section>
         </main>);
       ` },
       bundle: true, write: false, outdir: resolve(webRoot, '.value-bar-fixture-output'),
@@ -124,9 +133,9 @@ for (const width of [1152, 1440]) {
       const errors = []
       page.on('pageerror', error => errors.push(error.message))
       await page.setContent(`<html data-theme="v8"><style>${fixture.globals}</style><style>${fixture.css}</style>
-        <style>body{margin:0}main{padding:24px}section{width:${width === 1152 ? 280 : 520}px;margin-bottom:48px}</style><div id="root"></div></html>`)
+        <style>body{margin:0}main{padding:24px}section{width:${width === 1152 ? 280 : 520}px;margin-bottom:48px}[data-friend-chart-fixture]{width:720px}</style><div id="root"></div></html>`)
       await page.addScriptTag({ content: fixture.script })
-      await expect(page.getByRole('group')).toHaveCount(2).catch(error => {
+      await expect(page.locator('[data-chart-fixture] [role=group]')).toHaveCount(2).catch(error => {
         console.log(JSON.stringify({ width, phase: 'render-failed', errors }))
         throw error
       })
@@ -182,6 +191,77 @@ for (const width of [1152, 1440]) {
       assert.deepEqual(restoredStandard, normal)
       assert.deepEqual(errors, [])
       console.log(JSON.stringify({ width, normal, brokenSummary, restoredSummary, brokenStandard, restoredStandard, errors }))
+    } finally { await browser.close() }
+  })
+}
+
+
+function dateCoversTick(row) {
+  return row.labels.some(label => row.ticks.some(tick => label.box.left < tick.right && label.box.right > tick.left
+    && label.box.top < tick.bottom && label.box.bottom > tick.top))
+}
+
+function healthyDateAxes(rows) {
+  return rows.length === 4 && rows.every(row => row.ticks.length > 0 && !dateCoversTick(row)
+    && row.labels.length > 0 && row.labels.every((label, index) =>
+      label.text.length > 0 && label.whiteSpace === 'nowrap' && label.textOverflow !== 'ellipsis'
+      && label.textBox.left >= label.box.left - 1 && label.textBox.right <= label.box.right + 1
+      && label.textBox.left >= row.bounds.left - 1 && label.textBox.right <= row.bounds.right + 1
+      && label.box.left >= row.plot.left - 1
+      && (index === 0 || label.textBox.left >= row.labels[index - 1].textBox.right + 1)))
+}
+
+for (const width of [1152, 1440]) {
+  test(`BarChartの日付は文字が箱に収まり隣と重ならない ${width}`, async () => {
+    const fixture = await valueBarFixture()
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ viewport: { width, height: 1128 }, reducedMotion: 'reduce' })
+      await page.setContent(`<html data-theme="v8"><style>${fixture.globals}</style><style>${fixture.css}</style>
+        <style>body{margin:0}main{padding:24px}section{width:${width === 1152 ? 800 : 744}px;margin-bottom:56px}</style><div id="root"></div></html>`)
+      await page.addScriptTag({ content: fixture.script })
+      await expect(page.locator('[data-friend-chart-fixture]')).toHaveCount(4)
+      await page.evaluate(() => document.fonts.ready)
+      const measure = () => page.locator('[data-friend-chart-fixture]').evaluateAll(sections => sections.map(section => {
+        const rect = element => { const r = element.getBoundingClientRect(); return {left:r.left,right:r.right,width:r.width,top:r.top,bottom:r.bottom} }
+        const plot = section.querySelector('[role=group]')
+        return { kind:section.dataset.friendChartFixture, bounds:rect(section), plot:rect(plot),
+          ticks:[...plot.querySelectorAll('[aria-hidden=true] > span')].filter(tick => /^-?\d+$/.test(tick.textContent.trim())).map(tick => {
+            const range=document.createRange();range.selectNodeContents(tick);return rect(range)
+          }),
+          bars:[...plot.querySelectorAll('[data-chart-series]')].map(bar => rect(bar)),
+          labels:[...plot.querySelectorAll('button')].flatMap(button => {
+            const label = button.nextElementSibling
+            if (!label) return []
+            const range = document.createRange();range.selectNodeContents(label)
+            const style = getComputedStyle(label)
+            return [{text:label.textContent.trim(),box:rect(label),textBox:rect(range),
+              whiteSpace:style.whiteSpace,textOverflow:style.textOverflow}]
+          }) }
+      }))
+      const normal = await measure()
+      console.log(JSON.stringify({width,phase:'normal',rows:normal}))
+      assert.equal(healthyDateAxes(normal), true, '日付全文・自身の箱・図の端・隣の文字・縦軸数字との非重複を同時に守る')
+      const oldWidth = await page.addStyleTag({content:`[data-chart-distribution="diverging"] button+span{width:100%!important;min-width:0!important;left:0!important;transform:none!important}`})
+      await expect.poll(async () => healthyDateAxes(await measure())).toBe(false)
+      const broken = await measure()
+      assert.equal(healthyDateAxes(broken), false, '旧来の列幅へ戻すと同じ測定で落ちる')
+      assert.deepEqual(broken.at(-1),normal.at(-1),'dashboardには故障も修復も波及しない')
+      for (let i=0;i<normal.length;i++) assert.deepEqual(broken[i].bars,normal[i].bars,'棒の幅・位置を変えない')
+      await oldWidth.evaluate(style => style.remove())
+      await expect.poll(measure).toEqual(normal)
+      console.log(JSON.stringify({width,phase:'old-width-fault',rows:broken,restored:true}))
+      // Reduced motion still uses a nonzero transition; wait for the injected geometry.
+      const centeredEdge = await page.addStyleTag({content:`[data-chart-distribution="diverging"] [role=group] > :last-child > :first-child > button+span{left:50%!important;transform:translateX(-50%)!important}`})
+      await expect.poll(async () => (await measure()).some(dateCoversTick)).toBe(true)
+      const covered = await measure()
+      assert.equal(healthyDateAxes(covered),false,'中央へ広げた先頭の日付が縦軸を隠す旧版を検出する')
+      assert.deepEqual(covered.at(-1),normal.at(-1),'dashboardには先頭日付の故障も波及しない')
+      assert.ok(covered.some(dateCoversTick),'日付の箱と縦軸数字の実矩形が重なる')
+      for (let i=0;i<normal.length;i++) assert.deepEqual(covered[i].bars,normal[i].bars)
+      await centeredEdge.evaluate(style => style.remove())
+      await expect.poll(measure).toEqual(normal)
+      console.log(JSON.stringify({width,phase:'centered-edge-fault',rows:covered,restored:true}))
     } finally { await browser.close() }
   })
 }

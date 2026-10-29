@@ -1,5 +1,7 @@
 /* Search Consoleの中身の並び。枠・頭・表・グラフ・札は共通部品。 */
 .body { display: flex; flex-direction: column; gap: var(--polish-space-card); padding: var(--polish-space-section); }
+/* 本文の縦積みが間隔の唯一の持ち主。共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
+:global(:root) .body > :global([data-design-part='notice']) { margin-block: 0; }
 .toolbar, .controls { display: flex; align-items: center; flex-wrap: wrap; gap: var(--polish-space-field); }
 .spacer { flex: 1; min-width: 0; }
 .rankings { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) var(--tpl-an-sc-devices-w); align-items: start; gap: var(--tpl-an-report-col-gap); }

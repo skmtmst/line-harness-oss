@@ -1,3 +1,4 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 // @vitest-environment happy-dom
 
 /*
@@ -10,7 +11,7 @@
  *   - 差分の読み取りに失敗しても復旧自体は止まらない（口側が同じ検査をする）
  */
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { OperationCapability, OperationControl, OperationImpactPreview, OperationRestoreDrift, OperationRestoreReport } from '@/lib/api'
 import EmergencyPageInner from './page'
@@ -288,3 +289,6 @@ describe('停止中の変更を理由つきで見せて安全に復旧する(N-4
     expect(document.body.textContent ?? '').toContain('サーバー共通の停止状態を復旧しました')
   })
 })
+
+beforeEach(() => { verifiedStaffRole('owner') })
+afterEach(() => { verifiedStaffRole(null) })

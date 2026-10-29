@@ -3,13 +3,15 @@
 import { useEffect, useState } from 'react'
 import type { AccountStyle } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
-import Link from '@/components/shared/list-navigation'
+import TextLink from '@/components/shared/text-link'
 import ListState from '@/components/shared/list-state'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { styleApi, type StarterSetItem } from '@/lib/api/helpers/styles'
-import type { StepResult } from '@/v8/settings/public/getting-started-steps/index'
+import type { StepResult, StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
+import { stepsForStyle } from '@/v8/settings/public/getting-started-steps/index'
 import styles from './first-run-done.module.css'
 
 /*
@@ -51,11 +53,12 @@ export function elapsedText(minutes: number | null): string | null {
   return `開始から ${Math.floor(minutes / 60)} 時間 ${minutes % 60} 分`
 }
 
-export function FirstRunDoneDialog({ accountId, style, minutes, steps, onClose }: {
+export function FirstRunDoneDialog({ accountId, style, minutes, steps, progress, onClose }: {
   accountId: string
   style: AccountStyle
   minutes: number | null
   steps: ReadonlyArray<StepResult>
+  progress?: StyleSetupProgress
   onClose: () => void
 }) {
   const [rows, setRows] = useState<DoneRow[] | null>(null)
@@ -72,7 +75,7 @@ export function FirstRunDoneDialog({ accountId, style, minutes, steps, onClose }
     return () => { cancelled = true }
   }, [accountId, style, tick])
   const elapsed = elapsedText(minutes)
-  const next = steps.filter((step) => step.state !== 'done' && step.action)
+  const next = stepsForStyle(steps, style, progress).filter((step) => step.state !== 'done' && step.action)
   return (
     <Dialog
       open
@@ -107,7 +110,8 @@ export function FirstRunDoneDialog({ accountId, style, minutes, steps, onClose }
               {next.map((step) => (
                 <li key={step.key} className={styles.row}>
                   <span className={styles.rowLabel}>{step.title}</span>
-                  <Link href={step.action!.href} className={styles.link}>開く</Link>
+                  {step.state === 'unknown' ? <HelpTip label={`${step.title}の未確認の理由`}>{step.next}</HelpTip> : null}
+                  <TextLink tone="action" href={step.action!.href} className={styles.link}>開く</TextLink>
                 </li>
               ))}
             </ul>
