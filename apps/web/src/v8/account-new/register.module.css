@@ -253,7 +253,6 @@
 .handoverHeading > :last-child { margin-left: auto; }
 .handoverHeading .panelTitle { font-size: var(--tpl-htn6-handover-title-size); line-height: var(--tpl-htn6-handover-title-lh); }
 .handoverIcon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--tpl-htn6-handover-icon-size); height: var(--tpl-htn6-handover-icon-size); border-radius: var(--radius-pill); background: var(--color-selection-bg); color: var(--color-accent-deep); }
-.handoverIcon[data-attention] { background: var(--color-warning-bg); color: var(--color-warning); }
 .handoverSpinner { flex: none; animation: handover-turn var(--tpl-htn6-handover-spin-time) linear infinite; }
 .handoverStages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tpl-htn-gap-s); }
 .handoverStage { display: flex; align-items: center; gap: var(--tpl-htn-gap-s); min-height: var(--tpl-htn6-handover-stage-h); padding: var(--tpl-htn-gap-s); border-radius: var(--tpl-htn-radius-m); background: var(--color-canvas-sunken); color: var(--color-ink-secondary); font-size: var(--tpl-htn-text-14); font-weight: 600; }
