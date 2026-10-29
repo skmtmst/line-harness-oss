@@ -92,3 +92,12 @@ it('数の帯はタブの段の中に出さず、タブの段より後ろの本�
   const band = screen.getByLabelText('予約経路の数の帯')
   expect(tabs.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
 })
+
+it('B12: channels のタブの段はメニューと同じ余白（createFlow の上24pxを付けない）', () => {
+  const channels = render(<BookingSettingsView {...props()} />)
+  expect(channels.container.querySelector('[data-template-region="create-flow"]')).toBeNull()
+  channels.unmount()
+  const menus = render(<BookingSettingsView {...{ ...props(), tab: 'menus' }} />)
+  expect(menus.container.querySelector('[data-template-region="create-flow"]')).toBeNull()
+  menus.unmount()
+})

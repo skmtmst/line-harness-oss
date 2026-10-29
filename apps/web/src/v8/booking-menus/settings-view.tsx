@@ -67,7 +67,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
             {previewUrl ? <Button href={previewUrl} external><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
           </div>
         )}
-        contentSpacing={accountId && tab === 'menus' && menusStatus === 'ready' ? 'notice-after-preview' : undefined}
+        contentSpacing={accountId && (tab === 'channels' || (tab === 'menus' && menusStatus === 'ready')) ? 'notice-after-preview' : undefined}
         footerActions={tabEdit && tabEdit.showBar !== false && !tabEdit.saveDisabled ? (
                 <>
                   <Button onClick={() => tabEdit.onReset()} disabled={tabEdit.saving}>キャンセル</Button>
