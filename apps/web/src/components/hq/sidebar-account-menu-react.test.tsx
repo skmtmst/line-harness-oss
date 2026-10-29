@@ -105,6 +105,7 @@ describe('★V8 左下の自分とメニュー', () => {
   })
 
   it('統括へ戻れる人にはメニューを開く前から戻るリンクを出す', async () => {
+    rememberStaffIdentity({ role: 'owner', accountScope: 'all' } as StaffMember)
     const view = await renderMenu()
     const link = view.getByRole('link', { name: '統括へ →' })
     expect(link.nextElementSibling).toBe(trigger(view))
@@ -112,6 +113,12 @@ describe('★V8 左下の自分とメニュー', () => {
     fireEvent.click(link)
     expect(fixture.clearSelectedAccountId).toHaveBeenCalledOnce()
     expect(fixture.push).toHaveBeenCalledWith('/hq')
+  })
+
+  it.each([undefined, 'accounts'] as const)('統括の担当範囲が%sなら常設リンクを出さない', async accountScope => {
+    rememberStaffIdentity({ role: 'owner', accountScope } as StaffMember)
+    const view = await renderMenu()
+    expect(view.queryByRole('link', { name: '統括へ →' })).toBeNull()
   })
 
   it.each(['staff', 'viewer'])('統括へ戻れない%sには常設リンクを出さない', async role => {
