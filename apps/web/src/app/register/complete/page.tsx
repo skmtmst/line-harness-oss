@@ -9,7 +9,6 @@ import PasswordRequirements from '@/components/auth/password-requirements'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, confirmError, CONTACT_URL, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
@@ -138,28 +137,9 @@ function CompleteInner() {
         {error ? (
           <Notice tone="danger" message={error} />
         ) : null}
-        <AuthField label="メールアドレス" hint="確認済み・ここでは変えられません" htmlFor="complete-email">
-          <div id="complete-email" className="flex h-11 w-full items-center justify-between rounded-control border border-hairline bg-surface-pearl px-3 text-label text-ink-secondary">
-            <span className="truncate">{check.email}</span>
-            <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-accent-deep" />
-          </div>
-        </AuthField>
-        <AuthField label="会社名" htmlFor="complete-tenant">
-          <TextField
-            id="complete-tenant"
-            value={check.companyName}
-            readOnly
-            autoComplete="organization"
-          />
-        </AuthField>
-        <AuthField label="担当者名" htmlFor="complete-name">
-          <TextField
-            id="complete-name"
-            value={check.contactName}
-            readOnly
-            autoComplete="name"
-          />
-        </AuthField>
+        <ConfirmedField label="メールアドレス" id="complete-email" value={check.email} />
+        <ConfirmedField label="会社名" id="complete-tenant" value={check.companyName} />
+        <ConfirmedField label="担当者名" id="complete-name" value={check.contactName} />
         <AuthField label="パスワード" htmlFor="complete-password" error={messages.password}>
           <PasswordField id="complete-password" value={password} onChange={setPassword} invalid={Boolean(messages.password)} autoComplete="new-password" placeholder="新しいパスワードを入力" />
           <PasswordRequirements value={password} />
@@ -172,4 +152,13 @@ function CompleteInner() {
       </form>
     </AuthCard>
   )
+}
+
+function ConfirmedField({ label, id, value }: { label: string; id: string; value: string }) {
+  return <AuthField label={label} hint="確認済み・ここでは変えられません" htmlFor={id}>
+    <output id={id} className="flex h-11 w-full items-center justify-between rounded-control border border-hairline bg-surface-pearl px-3 text-label text-ink-secondary">
+      <span className="truncate">{value}</span>
+      <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-accent-deep" />
+    </output>
+  </AuthField>
 }
