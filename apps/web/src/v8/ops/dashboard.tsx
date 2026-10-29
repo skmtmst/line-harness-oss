@@ -8,7 +8,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsDashboard, type OpsDashboardPeriod, type OpsLineUnregistered } from '@/lib/api'
 import { formatDateTime, formatNumber } from '@/lib/format'
 import { opsCall } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { formatYen, formatBytes } from '@/components/ops/ops-charts'
 import { contractDetail, minutesLabel, revenueDetail } from '@/v8/ops/dashboard/format'
 import OpsFirstRunCard from '@/v8/ops/dashboard/first-run'
@@ -120,7 +119,6 @@ export default function OpsDashboardV8() {
       <OpsHead
         title="ダッシュボード"
         description="契約先の売上・使用量・お問い合わせを見て、要対応から片づけます。"
-        environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         actions={<PeriodPicker days={PERIODS.findIndex((item) => item.value === period)} choices={PERIODS.map((item, index) => ({ days: index, label: item.label }))} onChange={(value) => setPeriod(PERIODS[value].value)} />}
       />
 
@@ -181,8 +179,8 @@ export default function OpsDashboardV8() {
                   <GridHeadRow>
                     <GridCell role="columnheader">契約先</GridCell>
                     <GridCell role="columnheader" align="right">配信通数</GridCell>
-                    <GridCell role="columnheader" align="right">バナー生成</GridCell>
-                    <GridCell role="columnheader" align="right">メディア容量</GridCell>
+                    <GridCell role="columnheader" align="right" title="バナー生成">バナー</GridCell>
+                    <GridCell role="columnheader" align="right" title="メディア容量">メディア</GridCell>
                   </GridHeadRow>
                   {data.usage.map((row) => (
                     <GridRow key={row.tenantId}>

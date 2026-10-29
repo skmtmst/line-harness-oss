@@ -63,6 +63,8 @@ const net = vi.hoisted(() => ({
   readOnly: false, roleBundle: undefined as string | undefined,
   noStaff: false,
   posts: [] as Record<string, unknown>[],
+  ranges: [] as string[],
+  overviews: null as null | ((path: string) => Response | null),
 }))
 
 function installFetch() {
@@ -103,6 +105,36 @@ function installFetch() {
         success: true,
         data: { items: [{ ...SCHEDULE, name, updatedAt: net.latestVersion }], options: net.noStaff ? { ...OPTIONS, recipients: [] } : OPTIONS },
       }), { status: 200 })
+    }
+    // 見本の数：前の期間の本当の数（友だち12人増加・100件配信・成果3件）。
+    if (url.pathname === '/api/analytics/friends' || url.pathname === '/api/analytics/reactions' || url.pathname === '/api/analytics/routes') {
+      net.ranges.push(`${url.pathname}${url.search}`)
+      const overridden = net.overviews?.(url.pathname)
+      if (overridden) return overridden
+      const ok = (value: number) => ({ value, state: 'available', reason: null })
+      const na = { value: null, state: 'unavailable', reason: null }
+      const envelope = (data: unknown) => ({ success: true, data: { lineAccountId: 'account-a', timeZone: 'Asia/Tokyo', period: { from: '2026-09-01', to: '2026-09-07' }, dataCutoffAt: '2026-09-07T00:00:00.000Z', data } })
+      if (url.pathname === '/api/analytics/friends') {
+        return new Response(JSON.stringify(envelope({
+          state: 'available', stateReason: null,
+          metrics: { added: ok(15), removed: ok(3), net: ok(12), currentFriends: ok(100), firstTime: ok(10), returning: ok(5) },
+          days: [], campaigns: [], historyAvailableFrom: null,
+        })), { status: 200 })
+      }
+      if (url.pathname === '/api/analytics/reactions') {
+        return new Response(JSON.stringify(envelope({
+          metrics: { sent: ok(120), delivered: ok(100), opened: ok(68), lineClicked: ok(10), trackedClicks: ok(5), unavailableCampaigns: ok(0) },
+          campaigns: [], campaignsTruncation: { limit: 50, broadcast: false, scenario: false }, trackedClickHours: [], clickDefinition: '',
+        })), { status: 200 })
+      }
+      return new Response(JSON.stringify(envelope({
+        attributionModel: 'first_touch', attributionLabel: '', searchConsoleHref: '',
+        routes: [{
+          id: 'r1', refCode: null, name: 'リンク1', clicks: na, friendAdds: na, currentFriends: na, reactionPeople: na,
+          conversions: { approved: ok(3), pending: ok(0), rejected: ok(0), revenue: na },
+          adCost: na, costPerFriend: na, costPerConversion: na, profitAfterAdCost: na,
+        }],
+      })), { status: 200 })
     }
     return new Response(JSON.stringify({ success: false, error: '未設定' }), { status: 500 })
   })
@@ -172,6 +204,8 @@ beforeEach(() => {
   net.getDeferred.length = 0
   net.latestVersion = SCHEDULE.updatedAt
   net.latestName = null
+  net.ranges.length = 0
+  net.overviews = null
   installFetch()
 })
 
@@ -208,6 +242,70 @@ describe('V8 レポート作成（H5UoIu）', () => {
     expect(container.textContent).toContain('レポートが見ているもの')
     expect(container.textContent).toContain('数は送る時刻の時点で集めます')
     expect(container.textContent).toContain('宛先がブロックしていると、LINE では届きません')
+  })
+
+  it('右欄の見本に前の期間の本当の数を出す（届く本文と同じ式）', async () => {
+    await mount()
+    await waitFor(() => expect(container.textContent).toContain('これは前の7日の数での見本です'))
+    expect(container.textContent).toContain('12人増加（新規15・解除3）')
+    expect(container.textContent).toContain('100件配信・開封68件')
+    expect(container.textContent).toContain('3件')
+    // 今日の途中は含めない（昨日までの期間で読む）。
+    const friends = net.ranges.find((range) => range.startsWith('/api/analytics/friends?'))!
+    const params = new URLSearchParams(friends.slice(friends.indexOf('?')))
+    const { jstDate } = await import('@/lib/jst-datetime')
+    expect(params.get('to')).not.toBe(jstDate(new Date()))
+    expect(params.get('from')! < params.get('to')!).toBe(true)
+  })
+
+  it('成果は承認済み＋保留を足し、経路不明は除く。1つでも読めなければ出さない', async () => {
+    const ok = (value: number) => ({ value, state: 'available', reason: null })
+    const na = { value: null, state: 'unavailable', reason: null }
+    const route = (name: string, approved: unknown, pending: unknown) => ({
+      id: name, refCode: null, name, clicks: na, friendAdds: na, currentFriends: na, reactionPeople: na,
+      conversions: { approved, pending, rejected: ok(0), revenue: na },
+      adCost: na, costPerFriend: na, costPerConversion: na, profitAfterAdCost: na,
+    })
+    const envelope = (routes: unknown[]) => new Response(JSON.stringify({
+      success: true,
+      data: { lineAccountId: 'account-a', timeZone: 'Asia/Tokyo', period: { from: '2026-09-01', to: '2026-09-07' }, dataCutoffAt: '2026-09-07T00:00:00.000Z', data: { attributionModel: 'first_touch', attributionLabel: '', searchConsoleHref: '', routes } },
+    }), { status: 200 })
+    // 経路不明の99件は混ぜない（2+1=3件）。
+    net.overviews = (path) => (path === '/api/analytics/routes'
+      ? envelope([route('経路不明', ok(99), ok(0)), route('リンク1', ok(2), ok(1))])
+      : null)
+    await mount()
+    await waitFor(() => expect(container.textContent).toContain('これは前の7日の数での見本です'))
+    const row = [...container.querySelectorAll('.report-v8-previewRow')].find((p) => p.textContent?.startsWith('成果'))!
+    expect(row.textContent).toContain('3件')
+    expect(row.textContent).not.toContain('99')
+    // 保留が読めない経路があると、足さずに「送信時に集計」のまま。
+    net.overviews = (path) => (path === '/api/analytics/routes'
+      ? envelope([route('リンク1', ok(2), na), route('リンク2', ok(1), ok(0))])
+      : null)
+    await act(async () => { root.unmount() })
+    container.remove()
+    await mount()
+    await waitFor(() => expect(container.textContent).toContain('これは前の7日の数での見本です'))
+    const row2 = [...container.querySelectorAll('.report-v8-previewRow')].find((p) => p.textContent?.startsWith('成果'))!
+    expect(row2.textContent).toContain('送信時に集計')
+  })
+
+  it('配信数が一斉配信だけのときは添え書きを付けて出す', async () => {
+    const ok = (value: number) => ({ value, state: 'available', reason: null })
+    net.overviews = (path) => (path === '/api/analytics/reactions' ? new Response(JSON.stringify({
+      success: true,
+      data: {
+        lineAccountId: 'account-a', timeZone: 'Asia/Tokyo', period: { from: '2026-09-01', to: '2026-09-07' }, dataCutoffAt: '2026-09-07T00:00:00.000Z',
+        data: {
+          metrics: { sent: ok(120), delivered: { value: 100, state: 'partial', reason: null }, opened: ok(68), lineClicked: ok(10), trackedClicks: ok(5), unavailableCampaigns: ok(0) },
+          campaigns: [], campaignsTruncation: { limit: 50, broadcast: false, scenario: false }, trackedClickHours: [], clickDefinition: '',
+        },
+      },
+    }), { status: 200 }) : null)
+    await mount()
+    await waitFor(() => expect(container.textContent).toContain('これは前の7日の数での見本です'))
+    expect(container.textContent).toContain('100件配信・開封68件（一斉配信のみ）')
   })
 
   it.each([

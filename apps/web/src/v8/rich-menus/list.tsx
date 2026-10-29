@@ -1009,7 +1009,7 @@ export default function RichMenusListV8() {
           {tableCols}
           {tableHead}
           <tbody ref={bodyRef}>
-            {duplicateFeedback.order(liveOrder.shown).map((g) => {
+            {duplicateFeedback.order(liveOrder.shown).map((g, position) => {
               const cells = thumbCells(g)
               const shape = menuShapeText(g)
               const audienceMain = audienceMainText(g, tagNameById)
@@ -1051,7 +1051,10 @@ export default function RichMenusListV8() {
                       >
                         <span aria-hidden>⠿</span>
                       </ReorderHandle>}
-                      <span className={styles.orderNumber}>{g.targetingPriority + 1}</span>
+                      {/* 出す順番の並び・絞り込みなしのときだけ、ページを通した位置を出す（古い行は優先度が 0 のままなので保存値では出せない）。それ以外は位置が順番ではないので出さない。 */}
+                      {sortKey === 'priority' && !filterActive
+                        ? <span className={styles.orderNumber} data-order-number={(currentPage - 1) * pageSize + position + 1}>{(currentPage - 1) * pageSize + position + 1}</span>
+                        : <span className={styles.orderNumber}>{emptyValue('unknown')}</span>}
                     </span>
                   </Td>
                   <Td>

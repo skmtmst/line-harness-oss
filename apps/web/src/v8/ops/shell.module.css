@@ -12,6 +12,25 @@
   font-weight: 600;
 }
 
+/* 左メニューの下の小さな印「操作は記録されます」（各画面の帯の代わり）。 */
+.auditMark {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-op-me-gap);
+  margin: 0;
+  padding: var(--tpl-op-me-pad);
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.auditMark svg {
+  width: var(--tpl-op-icon);
+  height: var(--tpl-op-icon);
+  flex-shrink: 0;
+}
+
 .side {
   min-width: 0;
 }
@@ -135,8 +154,4 @@
   flex-shrink: 0;
   align-items: center;
   gap: var(--tpl-op-head-gap);
-}
-
-.caution {
-  margin: 0 0 var(--tpl-op-section-gap);
 }

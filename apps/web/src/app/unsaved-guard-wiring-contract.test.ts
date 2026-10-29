@@ -103,7 +103,7 @@ const GUARDED = [
   'v8/nen-campaigns/edit.tsx',
   'v8/nen-members/lifetime.tsx',
   'v8/nen-members/ranks.tsx',
-  'v8/ops/announcements.tsx',
+  'v8/ops/announcement-edit.tsx',
   'v8/ops/knowledge-article.tsx',
   'v8/reminders/edit.tsx',
   'v8/restaurant/google/posts.tsx',

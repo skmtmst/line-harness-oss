@@ -19,7 +19,6 @@ import SidebarUserMenu from '@/components/shared/sidebar-user-menu'
 import SidebarVersion from '@/components/layout/sidebar-version'
 import OpsBrand from './ops-brand'
 import { SIDEBAR_AUTO_COLLAPSE_BELOW } from '@/components/layout/sidebar-collapse'
-import Notice from '@/components/shared/notice'
 import { humanizeErrorText } from '@/components/shared/human-error-text'
 import { PageHeading } from '@/components/templates/page-frame'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -128,6 +127,10 @@ function OpsShellFrame({
           })}
         </div>
       </nav>
+      <p className={styles.auditMark} title="契約先のデータを扱います。操作はすべて記録されます">
+        <ShieldCheck aria-hidden="true" />
+        {collapsed && !drawer ? <span className="sr-only">操作は記録されます</span> : <span>操作は記録されます</span>}
+      </p>
       {!me ? (
         <div className={nav.settingsEntry}>
           <p className={styles.meNote} role="status">
@@ -198,33 +201,28 @@ function OpsShellFrame({
 }
 
 /**
- * 板の中の頭（題・説明・右の操作）と、その下の注意の帯
- * 「運営コンソール：契約先のデータを扱います。操作はすべて記録されます」。
- * 管理画面 の上の環境帯（橙・墨）の役目をここが持つ。検証環境では帯の右に小さく出す。
+ * 板の中の頭（題・説明・右の操作）と、その下の数の帯。
+ * 「操作は記録されます」の注意は左メニューの下の小さな印1つにまとめ、
+ * 各画面の帯は出さない。
  */
 export function OpsHead({
   title,
   description,
   actions,
-  environment,
   stats,
   band,
 }: {
   title: string
   description?: ReactNode
   actions?: ReactNode
-  environment?: 'production' | 'staging'
   stats?: ReactNode
-  /** 見出しと注意帯の間に置く数の帯（絵 ：見出し→数の帯→注意帯の順）。 */
+  /** 見出しの下に置く数の帯。 */
   band?: ReactNode
 }) {
   return (
     <div className={styles.head}>
       <PageHeading title={title} help={description} actions={actions} inset="none" />
       {band}
-      <Notice tone="warn" presentation="ops" className={styles.caution} data-ops-env={environment} icon={<ShieldCheck aria-hidden="true" />}>
-        運営コンソール：契約先のデータを扱います。操作はすべて記録されます
-      </Notice>
     </div>
   )
 }

@@ -33,7 +33,7 @@ export function SbSettingsScreen({
 }: {
   /**
    * 板の作りの違い。wide-nav＝今の設定の板（中のメニュー 208・頭の間 8・説明 12）。
-   * narrow-nav＝EC連携・LINE通知・運用状態の板（中のメニュー 200・頭は型のまま・本文の余白 16/24）。
+   * narrow-nav＝EC連携・運用状態ほかの板（中のメニュー 200・頭は型のまま・本文の余白 16/24）。
    */
   layout?: 'wide-nav' | 'narrow-nav'
   contentLayout?: 'wide'
