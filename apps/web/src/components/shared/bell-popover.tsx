@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import { Sparkles, TriangleAlert } from 'lucide-react'
+import Button from './button'
 import MenuPortal, { type MenuPortalRect } from './menu-portal'
 import SegmentedControl from './segmented'
 import styles from './bell-popover.module.css'
@@ -51,6 +52,9 @@ export type BellPopoverProps<F extends string = BellFilter> = {
   onRetry?: () => void
   onSelect: (id: string) => void
   onMarkAllRead?: () => void
+  markAllReadDisabled?: boolean
+  markAllReadDisabledReason?: string
+  markAllReadLockedReason?: string
   onViewAll: () => void
 }
 
@@ -93,6 +97,9 @@ export default function BellPopover<F extends string = BellFilter>({
   onRetry,
   onSelect,
   onMarkAllRead,
+  markAllReadDisabled,
+  markAllReadDisabledReason,
+  markAllReadLockedReason,
   onViewAll,
 }: BellPopoverProps<F>) {
   const panelRef = useRef<HTMLElement>(null)
@@ -136,10 +143,12 @@ export default function BellPopover<F extends string = BellFilter>({
               {unreadCount === null ? '未読 —' : `未読 ${unreadCount}`}
             </span>
           ) : null}
-          {state === 'ready' && onMarkAllRead ? (
-            <button type="button" className={styles.markAll} onClick={onMarkAllRead} disabled={unreadCount === 0}>
+          {onMarkAllRead ? (
+            <Button type="button" variant="text" size="inline" className={styles.markAll} onClick={onMarkAllRead}
+              disabled={markAllReadDisabled ?? (state !== 'ready' || unreadCount === null || unreadCount === 0)}
+              disabledReason={markAllReadDisabledReason} lockedReason={markAllReadLockedReason}>
               すべて既読にする
-            </button>
+            </Button>
           ) : null}
         </header>
 

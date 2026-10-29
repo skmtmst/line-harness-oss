@@ -40,6 +40,9 @@ export type BellPanelProps = {
   onRetry?: () => void
   onSelect: (id: string) => void
   onMarkAllRead?: () => void
+  markAllReadDisabled?: boolean
+  markAllReadDisabledReason?: string
+  markAllReadLockedReason?: string
   onViewAll: () => void
 }
 

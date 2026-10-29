@@ -9,6 +9,7 @@ export type ScopedCenterData = Omit<NotificationCenterData, 'items' | 'unreadCou
   items: ScopedNotification[]
   unreadCount: number | null
   failedAccountLabels: string[]
+  loadedAccountIds: string[]
 }
 
 /** ベルの札と小窓は、同じ対象・同じ未読の数を使う。取得失敗は0件にしない。 */
@@ -44,5 +45,11 @@ export async function loadNotificationCenter(
     update: sum.update + data.counts.update,
     unread: sum.unread + data.unreadCount,
   }), { all: 0, error: 0, update: 0, unread: 0 })
-  return { items, counts, unreadCount: failedAccountLabels.length === 0 ? counts.unread : null, failedAccountLabels }
+  return {
+    items,
+    counts,
+    unreadCount: failedAccountLabels.length === 0 ? counts.unread : null,
+    failedAccountLabels: [...new Set(failedAccountLabels)],
+    loadedAccountIds: responses.map(({ account }) => account.id),
+  }
 }

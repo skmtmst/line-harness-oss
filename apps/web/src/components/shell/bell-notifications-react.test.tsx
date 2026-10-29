@@ -25,6 +25,12 @@ const fixture = vi.hoisted(() => ({
   toast: vi.fn(),
 }))
 vi.mock('@/lib/staff-role', async (original) => ({ ...(await original<object>()), useStaffRole: () => fixture.role }))
+vi.mock('@/components/shared/use-permission-lock-reason', async (original) => ({
+  ...(await original<object>()),
+  usePermissionLockReason: (allowed: boolean) => fixture.role === 'viewer' && !allowed
+    ? '閲覧のみのため変更できません。オーナーか管理者に頼んでください。'
+    : undefined,
+}))
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: fixture.push }), usePathname: () => '/' }))
 vi.mock('next/link', async () => {
@@ -121,12 +127,24 @@ describe('★V8 ベルの小窓', () => {
     ]))
   })
 
-  it.each(['viewer', null])('権限が %s の間は既読操作を出さず、通知の移動はできる', async (role) => {
+  it.each(['viewer', null])('権限が %s の間は規定どおり無効化し、通知の移動はできる', async (role) => {
     fixture.role = role
     render(<Harness />)
     const panel = await openPopover()
     await within(panel).findByText('未読のエラー')
-    expect(within(panel).queryByRole('button', { name: 'すべて既読にする' })).toBeNull()
+    const markAll = within(panel).getByRole('button', { name: 'すべて既読にする' })
+    if (role === 'viewer') {
+      expect(markAll.getAttribute('data-permission-locked')).not.toBeNull()
+      expect(markAll.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.focus(markAll)
+      expect(screen.getByRole('tooltip').textContent).toContain('閲覧のみ')
+    } else {
+      expect((markAll as HTMLButtonElement).disabled).toBe(true)
+      expect(within(panel).queryByRole('status')).toBeNull()
+      expect(within(panel).queryByRole('tooltip')).toBeNull()
+    }
+    await act(async () => { fireEvent.click(markAll) })
+    expect(fixture.markAllRead).not.toHaveBeenCalled()
     await act(async () => { fireEvent.click(within(panel).getByText('未読のエラー')) })
     expect(fixture.markRead).not.toHaveBeenCalled()
     expect(fixture.markAllRead).not.toHaveBeenCalled()
@@ -153,20 +171,51 @@ describe('★V8 ベルの小窓', () => {
 
     const dialog = await openPopover()
     expect(await within(dialog).findByText('本店：本店で読めた通知')).toBeTruthy()
-    expect(within(dialog).getByRole('status').textContent).toContain('渋谷店 の通知を読み込めませんでした')
-    expect(within(dialog).getAllByRole('status')).toHaveLength(1)
+    const statuses = within(dialog).getAllByRole('status')
+    expect(statuses.find((entry) => entry.textContent?.includes('渋谷店 の通知を読み込めませんでした'))).toBeTruthy()
+    expect(statuses.filter((entry) => entry.textContent?.includes('未読件数を確認できないため'))).toHaveLength(1)
     expect(within(dialog).getByText('未読 —')).toBeTruthy()
     expect(within(dialog).queryByText('未読 1')).toBeNull()
     expect(within(dialog).queryByText('通知はまだありません。')).toBeNull()
     expect(bell().getAttribute('aria-label')).toBe('通知（未読数を確認できません）')
     expect(fixture.list).toHaveBeenCalledTimes(2)
     const markAll = within(dialog).getByRole('button', { name: 'すべて既読にする' })
-    expect((markAll as HTMLButtonElement).disabled).toBe(false)
+    expect((markAll as HTMLButtonElement).disabled).toBe(true)
+    expect(statuses.filter((entry) => entry.textContent?.includes('未読件数を確認できないため'))).toHaveLength(1)
     await act(async () => { fireEvent.click(markAll) })
-    expect(fixture.markAllRead.mock.calls.map(([id]) => id)).toEqual(['account-1', 'account-2'])
+    expect(fixture.markAllRead).not.toHaveBeenCalled()
     expect(within(dialog).getByText('未読 —')).toBeTruthy()
     expect(within(dialog).queryByText('未読 0')).toBeNull()
     expect(bell().getAttribute('aria-label')).toBe('通知（未読数を確認できません）')
+  })
+
+  it('統括で全店の取得に失敗したらエラーを出し、未読0と既読操作を出さない', async () => {
+    fixture.list.mockResolvedValue({ success: false, error: 'failed' })
+    render(<Harness accountId={null} accounts={[{ id: 'account-1', label: '本店' }, { id: 'account-2', label: '渋谷店' }]} />)
+
+    const dialog = await openPopover()
+    expect(await within(dialog).findByRole('alert')).toBeTruthy()
+    expect(within(dialog).queryByText('未読 0')).toBeNull()
+    const markAll = within(dialog).getByRole('button', { name: 'すべて既読にする' }) as HTMLButtonElement
+    expect(markAll.disabled).toBe(true)
+    expect(within(dialog).getByRole('status').textContent).toContain('未読件数を確認できないため')
+    await act(async () => { fireEvent.click(markAll) })
+    expect(fixture.markAllRead).not.toHaveBeenCalled()
+  })
+
+  it('名前のない失敗店舗が複数あっても部分失敗の文言を重ねない', async () => {
+    fixture.list.mockImplementation(async (id: string) => id === 'account-1'
+      ? centerData([item('available', { title: '読めた通知' })])
+      : { success: false, error: 'failed' })
+    render(<Harness accountId={null} accounts={[
+      { id: 'account-1', label: '本店' }, { id: 'account-2', label: '' }, { id: 'account-3', label: '  ' },
+    ]} />)
+
+    const dialog = await openPopover()
+    expect(await within(dialog).findByText('本店：読めた通知')).toBeTruthy()
+    const notice = within(dialog).getAllByRole('status').find((entry) => entry.textContent?.includes('の通知を読み込めませんでした'))
+    expect(notice).toBeTruthy()
+    expect(notice.textContent?.match(/一部の店舗/g)).toHaveLength(1)
   })
 
   afterEach(() => {

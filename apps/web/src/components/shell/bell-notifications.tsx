@@ -9,6 +9,7 @@ import { notificationDestination, notificationLinkLabel } from '@/v8/notificatio
 import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-error-message'
 import { formatRelative, formatYmd } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { notifyToast } from '@/components/shared/toast'
 import Notice from '@/components/shared/notice'
 import { loadNotificationCenter, type NotificationAccount, type NotificationScope, type ScopedCenterData, type ScopedNotification } from './notification-center-data'
@@ -56,7 +57,9 @@ export default function BellNotifications({
   const targetKind = target.kind
   const loadTarget = useMemo<NotificationScope>(() => targetKind === 'store' && accountId ? { kind: 'store', accountId } : { kind: targetKind === 'all' ? 'all' : 'none' }, [targetKind, accountId])
   const role = useStaffRole()
-  const canMarkRead = role === 'owner' || role === 'admin' || role === 'staff'
+  const canMarkReadByRole = role === 'owner' || role === 'admin' || role === 'staff'
+  const markAllReadLockedReason = usePermissionLockReason(canMarkReadByRole, 'manager')
+  const canMarkRead = canMarkReadByRole && !markAllReadLockedReason
   const destinationContext = { accountId, canManage: canManageRole(role) }
   const { open, onClose } = popover
   // 上の未読数の更新で親が描き直されても、同じ対象への読込は起こし直さない。
@@ -75,6 +78,11 @@ export default function BellNotifications({
   const [data, setData] = useState<ScopedCenterData | null>(null)
   const [state, setState] = useState<BellPanelState>('loading')
   const [error, setError] = useState<{ message: string; retryable: boolean } | null>(null)
+  const markAllReadDisabledReason = role === null || markAllReadLockedReason || data?.unreadCount === 0
+    ? undefined
+    : data?.unreadCount === null || !data
+      ? '未読件数を確認できないため、すべて既読にできません。'
+      : undefined
   const requestId = useRef(0)
   const unreadRef = useRef(onUnreadChange)
   unreadRef.current = onUnreadChange
@@ -132,18 +140,17 @@ export default function BellNotifications({
   }, [apply, canMarkRead, data, load, scope])
 
   const markAllRead = useCallback(() => {
-    if (!canMarkRead || !data || data.unreadCount === 0) return
-    const totalWasUnknown = data.unreadCount === null
+    if (!canMarkRead || !data || data.unreadCount === null || data.unreadCount === 0 || data.loadedAccountIds.length === 0) return
     apply({
       ...data,
       items: data.items.map((row) => ({ ...row, isRead: true })),
       counts: { ...data.counts, unread: 0 },
-      unreadCount: totalWasUnknown ? null : 0,
+      unreadCount: 0,
     })
     void (async () => {
       try {
         const { api } = await import('@/lib/api')
-        const results = await Promise.allSettled((accountId ? [accountId] : notificationAccounts.map((account) => account.id))
+        const results = await Promise.allSettled(data.loadedAccountIds
           .map((id) => api.notifications.center.markAllRead(id, 'all')))
         if (results.some((result) => result.status === 'rejected' || !result.value.success)) throw new Error('notification read failed')
       } catch {
@@ -152,7 +159,7 @@ export default function BellNotifications({
         void loadRef.current()
       }
     })()
-  }, [accountId, notificationAccounts, apply, canMarkRead, data, load, scope])
+  }, [apply, canMarkRead, data, load, scope])
 
   const shown = useMemo(() => (data ? bellOrder(data.items).slice(0, BELL_POPOVER_LIMIT) : []), [data])
   const today = formatYmd(new Date())
@@ -203,7 +210,10 @@ export default function BellNotifications({
       errorMessage={error?.message}
       onRetry={error?.retryable ? () => { void load() } : undefined}
       onSelect={select}
-      onMarkAllRead={canMarkRead ? markAllRead : undefined}
+      onMarkAllRead={loadTarget.kind === 'none' ? undefined : markAllRead}
+      markAllReadDisabled={role === null || Boolean(markAllReadLockedReason) || !data || data.unreadCount === null || data.unreadCount === 0}
+      markAllReadDisabledReason={markAllReadDisabledReason}
+      markAllReadLockedReason={markAllReadLockedReason}
       onViewAll={() => { onClose(); router.push('/notifications') }}
     />
   )
