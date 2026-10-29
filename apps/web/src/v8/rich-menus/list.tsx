@@ -59,7 +59,7 @@ import { richMenuError, richMenuErrorAll } from './errors';
 import BlockedDeleteDialog, { type BlockedRow } from './blocked-dialog';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { emptyValue } from '@/components/shared/empty-value';
+import { emptyValue, EmptyCell } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { useDuplicateFeedback } from '@/components/shared/use-duplicate-feedback';
 import { notifyToast } from '@/components/shared/toast';
@@ -1054,7 +1054,7 @@ export default function RichMenusListV8() {
                       {/* 出す順番の並び・絞り込みなしのときだけ、ページを通した位置を出す（古い行は優先度が 0 のままなので保存値では出せない）。それ以外は位置が順番ではないので出さない。 */}
                       {sortKey === 'priority' && !filterActive
                         ? <span className={styles.orderNumber} data-order-number={(currentPage - 1) * pageSize + position + 1}>{(currentPage - 1) * pageSize + position + 1}</span>
-                        : <span className={styles.orderNumber}>{emptyValue('unknown')}</span>}
+                        : <span className={styles.orderNumber}><EmptyCell /></span>}
                     </span>
                   </Td>
                   <Td>
