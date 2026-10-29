@@ -18,7 +18,7 @@ import Radio from '@/components/shared/radio'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import RestaurantFloorMap from '@/components/shared/restaurant-floor-map'
 import { DetailColumns } from '@/components/templates/detail-columns'
-import SearchField from '@/components/shared/search-field'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 import SegmentedControl from '@/components/shared/segmented'
 import { Tabs } from '@/components/shared/tabs'
 import TestModeNote from '@/components/shared/test-mode-note'
@@ -182,8 +182,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     } else {
       main = (
         <>
-          {/* B18：1つの探す欄に帯の道具段を使うと余白で狭まり文が切れるので、探す欄を直接置く。 */}
-          {style !== 'lesson' ? <div className={styles.listTools}><span className={styles.grow} /><div className={styles.search}><SearchField aria-label={cfg.search} placeholder={cfg.search} width="100%" value={search} onChange={setSearch} onClear={() => setSearch('')} /></div></div> : null}
+          {/* B18：1つの探す欄に帯の道具段を使うと余白で狭まり文が切れるので、帯の余白が付かない正の包み（ListToolbarSearchSlot）で幅を保つ。 */}
+          {style !== 'lesson' ? <div className={styles.listTools}><span className={styles.grow} /><div className={styles.search}><ListToolbarSearchSlot width={220} search={{ value: search, onChange: setSearch, placeholder: cfg.search }} /></div></div> : null}
           <TodayList style={style} rows={rows} note={today.rowsNote} canWrite={canWrite} busyId={busy} menuFor={menuFor} onVisit={(r) => void markVisit(r)} onNoShow={(r) => void markNoShow(r)} onApprove={(r) => void approve(r)} onResult={(r) => setResultRow(r)} onUndo={(r) => void undoVisit(r)}
             empty={<ListState kind="empty" title={`${range === 'today' ? '今日' : range === 'week' ? '今週' : '今月'}の${style === 'consult' ? '面談' : style === 'lesson' ? 'クラス' : '予約'}はありません`} description={canWrite ? (style === 'consult' ? '予約の URL を案内すると、空いた時間に入ります。' : '空いている時間に予約を入れられます。') : undefined}
               action={canWrite ? (style === 'consult' ? <Button variant="primary" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/booking`).then(() => notifyToast('予約 URL をコピーしました。')) }}><Copy size={16} aria-hidden="true" />予約 URL をコピー</Button> : <Button variant="primary" onClick={() => addNew()}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button>) : undefined} />}

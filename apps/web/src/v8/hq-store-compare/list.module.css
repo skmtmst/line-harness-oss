@@ -2,7 +2,7 @@
  * ★V8 統括「店の比較」（G7-1 `W4fI7A`・G7-2 `z0fSYt`）。頭・道具の段は型（ListPage）・共通部品。
  * 値は var(--space-*)・var(--text-*)・var(--color-*) だけ。
  */
-/* CX21：狭い幅では数と札を2段に分け、隣の列へはみ出さない。入るときは1段のまま。 */
+/* CX21（REPORT-v15「店の比較で数値と差の札が隣の列に重なる」の直し）：狭い幅では数と札を2段に分け、隣の列へはみ出さない。入るときは1段のまま。 */
 .cell { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--space-8); row-gap: var(--space-2); }
 .cellValue { white-space: nowrap; }
 .cellEmpty { color: var(--color-ink-faint); }
