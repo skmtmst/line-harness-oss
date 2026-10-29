@@ -101,7 +101,7 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
       {/* ページ内に戻るは置かない（決まり）。前の段へは上の手順の段から戻る。 */}
       <Button disabled={busy} onClick={onCancel}>キャンセル</Button>
       {canEdit ? <Button disabled={busy || !name.trim()} title={!name.trim() ? '統括での名前を入力してください。' : undefined} onClick={onSave} busy={busy} busyLabel="保存中…">下書きとして保存</Button> : null}
-      {next ? <Button variant="primary" disabled={busy || !done(step)} onClick={() => setStep(next)}><ArrowRight size={16} aria-hidden="true" />{`次へ：${STEP_LABELS[next]}`}</Button> : null}
+      {next ? <Button variant="primary" disabled={busy || !done(step)} onClick={() => setStep(next)}>{`次へ：${STEP_LABELS[next]}`}<ArrowRight size={16} aria-hidden="true" /></Button> : null}
     </>}>
     {step === 'basic' ? <Card variant="form" gap="normal">
       <CardHeader size="stacked" title="基本設定" />

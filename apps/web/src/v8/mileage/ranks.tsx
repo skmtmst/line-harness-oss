@@ -11,7 +11,7 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import NumberField from '@/components/shared/number-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { RowMenu } from '@/components/shared/row-actions'
 import Select from '@/components/shared/select'
 import SegmentedControl from '@/components/shared/segmented'
@@ -232,9 +232,9 @@ export default function RanksTab() {
               <span className={styles.settingsLabel}>数える物</span>
               <Select aria-label="数える物" value={program.metric} options={METRIC_OPTIONS} onChange={(value) => saveProgram({ metric: value as RankProgram['metric'] })} disabled={busy} />
               <span className={styles.settingsLabel}>期間</span>
-              <SettingCheckbox checked={program.notifyUpgrade} label="上がったときに知らせる" onChange={(checked) => saveProgram({ notifyUpgrade: checked })} disabled={busy} />
+              <Toggle checked={program.notifyUpgrade} label="上がったときに知らせる" onChange={(checked) => saveProgram({ notifyUpgrade: checked })} disabled={busy} />
               <span className={styles.settingsLabel}>上がったときに知らせる</span>
-              <SettingCheckbox checked={program.notifyDowngrade} label="下がる前に知らせる" onChange={(checked) => saveProgram({ notifyDowngrade: checked })} disabled={busy} />
+              <Toggle checked={program.notifyDowngrade} label="下がる前に知らせる" onChange={(checked) => saveProgram({ notifyDowngrade: checked })} disabled={busy} />
               <span className={styles.settingsLabel}>下がる前に知らせる</span>
               <Select aria-label="数える期間" value={String(program.windowMonths)} options={Array.from(new Set([...WINDOW_OPTIONS, program.windowMonths])).sort((a, b) => a - b).map((value) => ({ value: String(value), label: windowLabel(value) }))} onChange={(value) => saveProgram({ windowMonths: Number(value) })} disabled={busy} />
             </div>

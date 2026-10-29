@@ -150,14 +150,15 @@ describe('V8 シナリオ一覧の並び替えのつまみ', () => {
 })
 
 describe('V8 シナリオ一覧のフォルダの丸', () => {
-  test('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は丸を出さない）', async () => {
+  test('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は灰色の丸）', async () => {
     const view = render(<ScenariosListV8 />)
     const filedRow = (await view.findByText('新規登録7日間フォロー')).closest('tr') as HTMLElement
     await waitFor(() => expect(filedRow.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('filed'))
     expect(filedRow.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
     expect(filedRow.querySelector('[data-folder-dot]')?.getAttribute('aria-label')).toBe('フォルダ：初回案内')
     const unfiledRow = view.getByText('会員更新リマインド').closest('tr') as HTMLElement
-    expect(unfiledRow.querySelectorAll('[data-folder-dot]')).toHaveLength(0)
+    expect(unfiledRow.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(unfiledRow.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
   })
 })
 

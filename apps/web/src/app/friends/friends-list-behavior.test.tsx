@@ -71,6 +71,18 @@ function at(url: string) {
   window.history.replaceState(null, '', url)
 }
 
+async function openListMenu() {
+  fireEvent.click(screen.getByRole('button', { name: '一覧のほかの操作' }))
+  return within(await screen.findByRole('menu', { name: '一覧のほかの操作' }))
+}
+
+async function openAdvancedConditions() {
+  fireEvent.click(screen.getByRole('button', { name: /^絞り込み(?:\s+\d+)?$/ }))
+  const filters = await screen.findByRole('dialog', { name: '絞り込み', exact: true })
+  fireEvent.click(within(filters).getByRole('button', { name: '詳細条件', exact: true }))
+  return screen.findByRole('dialog', { name: '絞り込み条件を設定' })
+}
+
 beforeEach(() => {
   flushListUrlState()
   at('/friends')
@@ -112,13 +124,17 @@ describe('友だち一覧の読込状態', () => {
     expect(await screen.findByText('友だちを読み込めませんでした')).toBeTruthy()
     expect(screen.queryByText('まだ友だちがいません')).toBeNull()
     expect(screen.queryByText('0件')).toBeNull()
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: '表示中をCSVで書き出す' }).disabled).toBe(true)
+    const failedMenu = await openListMenu()
+    expect(failedMenu.getByRole<HTMLButtonElement>('menuitem', { name: /^表示中をCSVで書き出す/ }).disabled).toBe(true)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
 
     fireEvent.click(within(screen.getByText('友だちを読み込めませんでした').closest('td')!).getByRole('button', { name: 'もう一度読み込む' }))
     expect(await screen.findByText('戻った人')).toBeTruthy()
     expect(fx.list).toHaveBeenCalledTimes(2)
     expect(screen.getByText('1件')).toBeTruthy()
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: '表示中をCSVで書き出す' }).disabled).toBe(false)
+    const readyMenu = await openListMenu()
+    expect(readyMenu.getByRole<HTMLButtonElement>('menuitem', { name: '表示中をCSVで書き出す' }).disabled).toBe(false)
   })
 })
 
@@ -163,12 +179,13 @@ describe('すばやく絞り込む札', () => {
 })
 
 describe('一覧 → 配信作成の条件引き継ぎ', () => {
-  const handoff = () => document.querySelector<HTMLAnchorElement>('[data-broadcast-handoff]')
+  const handoff = () => screen.queryByRole<HTMLAnchorElement>('menuitem', { name: 'この条件で配信を作る' })
 
   it('絞り込み条件をJSONにして配信作成へ渡し、表示中の友だちIDは渡さない', async () => {
     at('/friends?tag=tag-1')
     render(<List />)
     await screen.findByText('山田さん')
+    await openListMenu()
     const href = handoff()?.getAttribute('href') ?? ''
     expect(href.startsWith('/broadcasts/new?condition=')).toBe(true)
     const condition = JSON.parse(decodeURIComponent(href.slice('/broadcasts/new?condition='.length)))
@@ -181,7 +198,10 @@ describe('一覧 → 配信作成の条件引き継ぎ', () => {
     at('/friends?tag=tag-1')
     render(<List />)
     await screen.findByText('山田さん')
-    expect(handoff()).toBeNull()
+    const menu = await openListMenu()
+    expect(menu.getByRole('menuitem', { name: /^表示中をCSVで書き出す/ })).toBeTruthy()
+    expect(menu.queryByRole('menuitem', { name: /配信/ })).toBeNull()
+    expect(document.querySelector('a[href^="/broadcasts/new?condition="]')).toBeNull()
   })
 })
 
@@ -227,16 +247,14 @@ describe('詳細条件の並び順・表示件数（FRIEND-04/32）', () => {
   it('適用すると一覧の並び順・件数が変わり、開き直すとその値から始まる', async () => {
     render(<List />)
     await screen.findByText('山田さん')
-    fireEvent.click(screen.getByRole('button', { name: /詳細条件/ }))
-    const dialog = await screen.findByRole('dialog')
+    const dialog = await openAdvancedConditions()
     fireEvent.change(within(dialog).getByRole('combobox', { name: '並び順' }), { target: { value: 'oldest' } })
     fireEvent.change(within(dialog).getByRole('combobox', { name: '表示件数' }), { target: { value: '50' } })
     const apply = within(dialog).getAllByRole('button').find(button => /この条件で表示|人を表示/.test(button.textContent ?? ''))!
     await act(async () => { fireEvent.click(apply) })
     await waitFor(() => expect(listParams().at(-1)).toMatchObject({ sort: 'oldest', limit: 50 }))
 
-    fireEvent.click(screen.getByRole('button', { name: /詳細条件/ }))
-    const reopened = await screen.findByRole('dialog')
+    const reopened = await openAdvancedConditions()
     expect(within(reopened).getByRole<HTMLSelectElement>('combobox', { name: '並び順' }).value).toBe('oldest')
     expect(within(reopened).getByRole<HTMLSelectElement>('combobox', { name: '表示件数' }).value).toBe('50')
   })

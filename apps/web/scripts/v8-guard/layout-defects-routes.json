@@ -28,6 +28,7 @@
   "/restaurant-test/inventory?tab=closures",
   "/restaurant-test/reservations",
   "/restaurant-test/stores/new",
+  "/hq/store-comparison",
   "/rich-menus/edit?id=rmg-1&step=publish",
   "/rich-menus/edit?id=rmg-1&step=targeting",
   "/rich-menus/new",

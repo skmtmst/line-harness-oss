@@ -173,6 +173,10 @@ const REBUILD_MARKER = /--\s*migration-policy:\s*table-rebuild\b/i;
  * ここに無い `*_backup` の DROP は今までどおり止まる。
  */
 const SIDECAR_BACKUP_TABLES: Record<string, ReadonlySet<string>> = {
+  '736_line_account_tag_color_check.sql': new Set([
+    'migration_736_account_folder_refs_backup',
+    'migration_736_account_tag_links_backup',
+  ]),
   // イメージマップ種類追加：D1のCASCADE履歴とログの参照を退避・復元する。
   '595_imagemap_message_kinds.sql': new Set([
     'migration_595_broadcast_after_action_runs_backup',

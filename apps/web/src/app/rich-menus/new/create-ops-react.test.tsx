@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * ★V8 リッチメニューを作る：作成の口へ送る中身・登録メディア・未保存の確認・板の印・競合の帯・スタッフの集計。
@@ -203,7 +204,7 @@ describe('切り替えの面', () => {
     // 開き直すと最初の面が選ばれている。
     await act(async () => { fireEvent.click(screen.getByRole('radio', { name: 'メニューを切り替える', exact: false })) })
     const patches = requests.filter((r) => r.method === 'PATCH').length
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: '下書きを保存' })) })
     await settle()
     expect(screen.getByText('「メニューを切り替える」面の行き先ページが決まっていません。切り替え先を選んでください。')).toBeTruthy()
     expect(requests.filter((r) => r.method === 'PATCH').length).toBe(patches)
@@ -227,7 +228,7 @@ describe('編集の競合', () => {
     await open('?id=rmg-x&step=shape')
     await act(async () => { fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: '自分の直し' } }) })
     patchStatus = 409
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: '下書きを保存' })) })
     await settle()
     const band = host.querySelector('[data-design-node="r8dGXT"]')
     expect(band).not.toBeNull()

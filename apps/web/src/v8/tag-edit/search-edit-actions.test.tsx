@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * 保存した検索の編集（XBkiQ）を描いて押す。
@@ -83,7 +84,7 @@ describe('保存した検索の編集', () => {
     fireEvent.change(name, { target: { value: 'VIP（直した）' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
     expect(net.update).toHaveBeenCalledWith('s1', 'acc', expect.objectContaining({ name: 'VIP（直した）', expectedRevision: 4, isShared: false }))
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '複製して保存する' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: '複製して保存する' })) })
     expect(net.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'VIP（直した） のコピー', accountId: 'acc', isShared: false }))
     await waitFor(() => expect(router.push).toHaveBeenCalledWith('/tags/searches/edit?id=s9'))
   })

@@ -34,7 +34,6 @@ import { broadcastNextBlockReason,broadcastSaveProblem,broadcastSaveProblemStep,
 import { createLoadGeneration,filterSendableTemplates } from '@/components/scenarios/carousel-picker'
 import ActionList,{ ActionAddButton } from '@/components/shared/action-list'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
 import Disclosure from '@/components/shared/disclosure'
 import { EntityPickerDialog,EntityPickerField } from '@/components/shared/entity-picker'
 import { folderById,folderCreator } from '@/components/shared/folder-select'
@@ -74,6 +73,7 @@ import type { BroadcastFormProps } from './broadcast-form-props'
 import styles from './broadcast-form-v8.module.css'
 import { MAX_BUBBLES,messageLengthNotice } from './message-limits'
 import { type TestSendView } from './test-send-view'
+import { ToggleField } from '@/components/shared/toggle'
 export default function BroadcastForm({
   tags,
   tagsStatus = 'ready',
@@ -1344,7 +1344,7 @@ export default function BroadcastForm({
             renderEditor={(id, update) =>
           <EntityPickerField label="配信後のアクション" noun="共通アクション" items={publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` }))} value={id} onChange={update}/>}/>
         </section>}
-        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <Disclosure size="compact" title="ほかの設定" hint="クリックを数える・ボタン" detailsRef={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><SaveErrorField names={["trackLinks","track_links"]}><Checkbox checked={trackLinks} onCheckedChange={setTrackLinks}>URLを短縮してクリックを数える</Checkbox></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></Disclosure> : null}
+        {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <Disclosure size="compact" title="ほかの設定" hint="クリックを数える・ボタン" detailsRef={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><SaveErrorField names={["trackLinks","track_links"]}><ToggleField checked={trackLinks} onChange={setTrackLinks}>URLを短縮してクリックを数える</ToggleField></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></Disclosure> : null}
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </>}</div>
         <BroadcastScheduleStep {...{ ab, approvalConfig, audienceCount, concurrentBroadcasts, goToStep, measureOpens, quota, quotaInsufficient, scheduledAtIso, scheduledDate, scheduledTime, sendMode, setMeasureOpens, setScheduledDate, setScheduledTime, setSendMode, setSpreadMinutes, shows, spreadMinutes, targetMode }} />

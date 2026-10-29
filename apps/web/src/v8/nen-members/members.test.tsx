@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 会員（src/v8/nen-members）の動きの試験。BEHAVIOR.md を守る。
  * V8 のテーマで表示し、ランクを消す窓（移す先を先に選ぶ・版つきの DELETE）・
@@ -108,7 +109,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
   })
   beforeEach(() => {
     document.documentElement.dataset.theme = 'v8'
-    role.value = 'owner'
+    role.value = verifiedStaffRole('owner')
     fetchApi.mockReset()
     notifySaved.mockReset()
     push.mockReset()
@@ -227,7 +228,7 @@ describe('V8 会員（src/v8/nen-members）', () => {
   })
 
   it('閲覧のみ：帯を出し、変える・足す・消す・保存のボタンを置かない（CSV は使える）', async () => {
-    role.value = 'viewer'
+    role.value = verifiedStaffRole('viewer')
     await render('ranks')
     expect(host.textContent).toContain('閲覧のみで見ています')
     for (const text of ['ランクを足す', 'もう一度同期', 'キャンセル', '保存して EC へ同期']) {
@@ -246,3 +247,5 @@ describe('V8 会員（src/v8/nen-members）', () => {
     expect(byLabel('節目「なかよし」のその他操作')).toBeFalsy()
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

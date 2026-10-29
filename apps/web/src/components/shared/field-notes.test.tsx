@@ -9,7 +9,18 @@ it('短い補足は1行、長い説明は？から読む',()=>{
  render(<><Field label="人数" note="1〜23"><input/></Field><Field label="受付期間" note={long}><input/></Field></>)
  expect(screen.getByText('1〜23')).toBeTruthy();expect(screen.queryByText(long)).toBeNull();fireEvent.click(screen.getByRole('button',{name:'受付期間の説明'}));expect(screen.getByText(long)).toBeTruthy()
 })
+it('入力欄のラベル自体を吹き出しとして重ねず、補足がないラベルに title を付けない',()=>{
+ render(<><Field label="親アカウント"><input/></Field><Field label="人数" note="1〜23"><input/></Field></>)
+ expect(screen.getByText('親アカウント').closest('label')?.getAttribute('title')).toBeNull()
+ expect(screen.getByText('人数').closest('label')?.getAttribute('title')).toBe('1〜23')
+})
 it('改行のある補足も？に集め、誤りは本文に残す',()=>{
  expect(fieldNoteIsLong('1行目\n2行目')).toBe(true)
  render(<Field label="名前" note="長い説明です。長い説明です。長い説明です。長い説明です。長い説明です。" error="名前を入れてください"><input/></Field>);expect(screen.getByRole('alert').textContent).toBe('名前を入れてください')
+})
+
+it('説明のないラベルを同じ文の吹き出しにしない', () => {
+ render(<Field label="タグ名"><input /></Field>)
+ expect(screen.getByText('タグ名').getAttribute('title')).toBeNull()
+ expect(screen.queryByRole('button', {name: 'タグ名の説明'})).toBeNull()
 })

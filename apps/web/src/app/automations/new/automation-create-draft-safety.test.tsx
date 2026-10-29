@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React from 'react'
 import { Storage } from 'happy-dom'
@@ -422,7 +423,7 @@ async function openPage(options: Parameters<typeof attachApiMock>[1] = {}) {
   const api = await attachApiMock(transport, options)
   vi.stubGlobal('fetch', transport.fetch.bind(transport))
   const view = startView()
-  await waitFor(() => expect(screen.getByRole('button', { name: '下書きを保存', exact: true }).hasAttribute('disabled')).toBe(false))
+  await waitFor(() => expect(getPageAction({ name: '下書きを保存', exact: true }).hasAttribute('disabled')).toBe(false))
   return { api, view, transport }
 }
 async function openWorkerPage(options: { slowTest?: boolean; beforeTest?: (worker: WorkerHarness) => void } = {}) {
@@ -431,7 +432,7 @@ async function openWorkerPage(options: { slowTest?: boolean; beforeTest?: (worke
   await attachWorkerApi(transport, worker, { beforeTest: () => options.beforeTest?.(worker) })
   vi.stubGlobal('fetch', transport.fetch.bind(transport))
   const view = startView()
-  await waitFor(() => expect(screen.getByRole('button', { name: '下書きを保存', exact: true }).hasAttribute('disabled')).toBe(false))
+  await waitFor(() => expect(getPageAction({ name: '下書きを保存', exact: true }).hasAttribute('disabled')).toBe(false))
   return { worker, view }
 }
 function nameInput() { return screen.getByRole('textbox', { name: '名前', exact: true }) as HTMLInputElement }
@@ -447,7 +448,7 @@ async function fillMessageRule(name: string, message: string) {
 }
 async function saveDraft() {
   const before = notices.mock.calls.length
-  fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true }))
+  fireEvent.click(getPageAction({ name: '下書きを保存', exact: true }))
   await waitFor(() => expect(notices.mock.calls.slice(before).some(args => String(args[0]).includes('下書きに保存しました'))).toBe(true))
 }
 function storedDraftsOf(): StoredDrafts { return JSON.parse(sessionStorage.getItem(DRAFT_STORAGE_KEY) ?? '{}') }
@@ -472,7 +473,7 @@ describe('M4torYの保存・送信の誤操作防止（DOMと実API境界）', (
     await transport.route(`${API_ORIGIN}/api/automation-drafts/`, async route => {
       await json(route, { success: false, error: '入力を確認してください', fields: { name: 'この名前は使われています' } }, 422)
     })
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true }))
+    fireEvent.click(getPageAction({ name: '下書きを保存', exact: true }))
     const reason = await screen.findByText('この名前は使われています', { exact: true })
     await waitFor(() => expect(document.activeElement).toBe(nameInput()))
     expect(nameInput().value).toBe('入力を残すルール')
@@ -487,10 +488,10 @@ describe('M4torYの保存・送信の誤操作防止（DOMと実API境界）', (
     const { api, view: initialView } = await openPage({ slowCreate: true })
     let view = initialView
     await fillTagRule('来店後フォロー')
-    const save = screen.getByRole('button', { name: '下書きを保存', exact: true }) as HTMLButtonElement
+    const save = getPageAction({ name: '下書きを保存', exact: true }) as HTMLButtonElement
     await act(async () => { save.click(); save.click() })
     await waitFor(() => expect(api.createCalls).toHaveLength(1))
-    expect((screen.getByRole('button', { name: '処理中…', exact: true }) as HTMLButtonElement).disabled).toBe(true)
+    expect((getPageAction({ name: '作成中…', exact: true }) as HTMLButtonElement).disabled).toBe(true)
     await act(async () => api.releaseCreate())
     await waitFor(() => expect(api.updateCalls).toHaveLength(1))
     await waitFor(() => expect(storedDraftsOf()[ACCOUNT_A]?.id).toBe('draft-account-a-1'))
@@ -525,11 +526,11 @@ describe('M4torYの保存・送信の誤操作防止（DOMと実API境界）', (
     fireEvent.click(screen.getByRole('button', { name: '保存した下書きを開く' }))
     await waitFor(() => expect(nameInput().value).toBe('既存Aの下書き'))
     await switchAccount(view, ACCOUNT_B)
-    await fillTagRule('新規B'); fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true }))
+    await fillTagRule('新規B'); fireEvent.click(getPageAction({ name: '下書きを保存', exact: true }))
     await waitFor(() => expect(api.createCalls).toHaveLength(1))
     await switchAccount(view, ACCOUNT_A); expect(account.id).toBe(ACCOUNT_B)
     await act(async () => api.releaseCreate()); await waitFor(() => expect(api.updateCalls).toHaveLength(1))
-    await waitFor(() => expect((screen.getByRole('button', { name: '下書きを保存', exact: true }) as HTMLButtonElement).disabled).toBe(false))
+    await waitFor(() => expect((getPageAction({ name: '下書きを保存', exact: true }) as HTMLButtonElement).disabled).toBe(false))
     for (const id of [ACCOUNT_A, ACCOUNT_B]) {
       await switchAccount(view, id); await fillTagRule(`更新${id}`); await saveDraft()
       expect(api.updateCalls.at(-1)?.pathname).toBe(`/api/automation-drafts/${id === ACCOUNT_A ? 'existing-a' : 'draft-account-b-1'}`)

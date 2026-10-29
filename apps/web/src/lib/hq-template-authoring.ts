@@ -1,4 +1,18 @@
 import { emptyLayout, composeHqMessageCard, type HqMessageCard } from '@line-crm/shared'
+import type { TapActionKind, TapActionValue } from './tap-actions'
+
+/** 統括カードが保存できる種類を、押したらの共通欄へ渡す。 */
+export const MESSAGE_CARD_TAP_KINDS: readonly TapActionKind[] = ['uri', 'message', 'form']
+
+export function messageCardTapValue(button: HqMessageCard['buttons'][number]): TapActionValue {
+  return { kind: button.action === 'url' ? 'uri' : button.action,
+    uri: button.action === 'url' ? button.value : '', text: button.action === 'message' ? button.value : '',
+    refId: button.action === 'form' || button.action === 'scenario' ? button.value : '', tapExtras: button.tapExtras }
+}
+
+export function messageCardActionOf(kind: string): HqMessageCard['buttons'][number]['action'] {
+  return (kind === 'uri' ? 'url' : kind) as HqMessageCard['buttons'][number]['action']
+}
 import type { TemplateType, TemplateDefinition, MessageTemplateDefinition } from './hq-templates-api'
 
 export function freshDefinition(type: TemplateType): TemplateDefinition {

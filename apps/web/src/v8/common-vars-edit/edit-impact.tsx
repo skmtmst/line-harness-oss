@@ -13,6 +13,7 @@ import { ChevronDown,ChevronUp,CircleCheck,Download } from 'lucide-react'
 import { useState } from 'react'
 import styles from './edit.module.css'
 import { blockingErrors,characterCountText,checkedAtText,hiddenText,historicalText,immediateItems,isChangeItem,reflectionScopeText,reflectionTimingText,reviewWarnings } from './impact'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /*
  * 変える前に影響を見る、の行。いまの文と保存したあとの文を
@@ -117,7 +118,7 @@ export function readOnlyDate(value: string): string {
 /** 閲覧のみ：選ぶ部品・日付の部品の代わりに、選んでいる値を読み取りだけの欄で見せる。 */
 export function ReadOnlyValue({ id, label, value }: { id: string; label?: string; value: string }) {
   return (
-    <SaveErrorField names={["value"]}><input
+    <SaveErrorField names={["value"]}><SharedTextField
       id={id}
       type="text"
       value={value}

@@ -2,7 +2,7 @@
  * はじめにやること（★V8 修正案 D-3・絵 `r3X34`）。
  * 白い角丸カード（枠 hairline・角12・内側 18/20・段の間14）。
  * 頭：題 15/700・数 13・進みの線 160×6・畳む／開く 13/500＋矢印16（間4）。
- * 手順：3列×2行（間8）。全行を白地に枠でそろえ、済みは青い丸の ✓ と灰の文字だけで示す。
+ * 手順：3列×2行（間8）。済みは緑の丸に白い ✓・薄い文字・ごく薄い灰の地、まだは白い丸、次の 1 つは緑の枠。
  */
 
 .head {
@@ -26,23 +26,6 @@
   font-size: var(--tpl-d23-ob-text);
   line-height: var(--tpl-d23-ob-text-lh);
   white-space: nowrap;
-}
-
-.track {
-  position: relative;
-  flex-shrink: 0;
-  width: var(--tpl-d23-ob-bar-w);
-  height: var(--tpl-d23-ob-bar-h);
-  overflow: hidden;
-  border-radius: var(--tpl-d23-ob-bar-radius);
-  background: var(--color-surface-pearl);
-}
-
-.fill {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: var(--tpl-d23-ob-bar-radius);
-  background: var(--color-action);
 }
 
 .spacer {
@@ -98,34 +81,14 @@
 }
 
 .step[data-done] {
-  background: var(--color-canvas);
+  background: var(--color-step-done-bg);
 }
 
-.check {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: var(--tpl-d23-ob-check);
-  height: var(--tpl-d23-ob-check);
-  border-radius: var(--tpl-d23-ob-check-radius);
-  outline: 1px solid var(--color-control-border);
-  outline-offset: -1px;
-  color: var(--color-canvas);
-  font-size: var(--tpl-d23-ob-check-size);
-  font-weight: 700;
-  line-height: var(--tpl-d23-ob-check);
-}
-
-/* 済みの印は文字の ✓ ではなく線画にする（文字は書体の都合で丸の中心から右下へずれる・2026-10-08 オーナー指摘）。 */
-.checkIcon {
-  width: var(--tpl-d23-ob-check-size);
-  height: var(--tpl-d23-ob-check-size);
-}
-
-.step[data-done] .check {
-  background: var(--color-action);
-  outline: 0;
+/* 次の 1 つだけ緑の枠とごく薄い緑の地。 */
+.step[data-next] {
+  background: var(--color-step-next-bg);
+  outline: var(--step-mark-ring) solid var(--color-step-next-border);
+  outline-offset: calc(-1 * var(--step-mark-ring));
 }
 
 .label {
@@ -139,13 +102,13 @@
 }
 
 .step[data-done] .label {
-  color: var(--color-ink-secondary);
+  color: var(--color-step-done-ink);
   font-weight: var(--font-weight-ui);
 }
 
 .link {
   flex-shrink: 0;
-  color: var(--color-action);
+  color: var(--color-accent-deep);
   font-size: var(--tpl-d23-ob-text);
   font-weight: 600;
   line-height: var(--tpl-d23-ob-text-lh);

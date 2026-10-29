@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -169,13 +170,13 @@ async function typeText(input: HTMLInputElement, value: string): Promise<void> {
 }
 
 async function clickButton(el: HTMLElement, text: string): Promise<void> {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]'))
+  const button = (Array.from(el.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]')) ?? querySupplementaryPageAction(text))
   if (!button) throw new Error(`ボタンが見つかりません: ${text}`)
   await act(async () => { (button as HTMLButtonElement).click() })
 }
 
 function findButton(el: HTMLElement, text: string): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]'))
+  const button = (Array.from(el.querySelectorAll('button')).find((node) => node.textContent?.trim() === text && !node.closest('[data-closing]')) ?? querySupplementaryPageAction(text))
   if (!button) throw new Error(`ボタンが見つかりません: ${text}`)
   return button as HTMLButtonElement
 }

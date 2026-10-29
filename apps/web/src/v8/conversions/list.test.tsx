@@ -1,5 +1,8 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 コンバージョンの一覧（src/v8/conversions/list.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * 状態の札と件数・行の「…」（変える操作は権限のある人だけ）・止める小窓（理由が無いと止められない）・
@@ -98,7 +101,7 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   narrow.value = false
   window.history.replaceState(null, '', '/conversions')
   push.mockReset()
@@ -248,23 +251,24 @@ describe('V8 コンバージョンの一覧', () => {
     const card = screen.getByRole('dialog', { name: '「商品を買った」を止めますか？' })
     expect(card.textContent).toContain('2か所で使われています。どうしますか。')
     expect(document.getElementById(card.getAttribute('aria-describedby')!)?.textContent).toContain('2か所で使われています。どうしますか。')
-    const stop = Array.from(card.querySelectorAll('button')).find((button) => button.textContent === '止める') as HTMLButtonElement
+    const stop = (Array.from(card.querySelectorAll('button')).find((button) => button.textContent === '止める') ?? querySupplementaryPageAction('止める')) as HTMLButtonElement
     expect(stop.disabled).toBe(true)
-    expect(stop.title).toContain('止める理由を入力してください')
+    expect(stop.getAttribute('aria-description')).toContain('止める理由を入力してください')
     fireEvent.change(screen.getByLabelText('止める理由'), { target: { value: '計測の仕方を変えるため' } })
     expect(stop.disabled).toBe(false)
   })
 
   it('閲覧のみ：帯を出し、作る・使う場所を足す・変える操作は置かない（見る操作は残す）', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await mount()
-    expect(screen.getByText(READ_ONLY_MESSAGE)).toBeTruthy()
+    expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
     expect(screen.queryByRole('link', { name: /成果地点を作る/ })).toBeNull()
     expect(screen.queryByRole('link', { name: '使う場所を足す' })).toBeNull()
-    // 1ページでも頁送りを出すV8。端の前/次だけは押せない（閲覧の境界）。変更操作は隠す。
+    // 1ページでは移動を置かず、閲覧のみの変更操作も隠す。
     const disabled = Array.from(document.querySelectorAll('button')).filter((button) => button.disabled)
     expect(disabled.filter((button) => !button.closest('[data-pagination]'))).toEqual([])
-    expect(disabled.map((button) => button.getAttribute('aria-label'))).toEqual(['前のページ', '次のページ'])
+    expect(disabled).toEqual([])
+    expect(screen.queryByRole('button', { name: '次のページ' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '成果地点「商品を買った」の操作' }))
     await flush()
     expect(screen.getByRole('menuitem', { name: '成果地点の詳細を見る' })).toBeTruthy()
@@ -327,7 +331,7 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.getByRole('button', { name: /フォルダを追加/ })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'フォルダ「通販」の操作' })).toBeTruthy()
     expect(host.querySelector('tr[data-row-id="cp-1"] [aria-label="フォルダ：通販"]')).not.toBeNull()
-    expect(host.querySelector('tr[data-row-id="cp-6"] [data-folder-dot]')).toBeNull()
+    expect(host.querySelector('tr[data-row-id="cp-6"] [data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
     fireEvent.click(folderNav.querySelector('button[title="通販"]')!)
     await flush()
     expect(screen.getByText('商品を買った')).toBeTruthy()
@@ -341,7 +345,7 @@ describe('V8 コンバージョンの一覧', () => {
 
     act(() => root.unmount())
     root = createRoot(host)
-    role.value = 'viewer'
+    role.value = verifiedStaffRole('viewer')
     await mount()
     expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'フォルダ「通販」の操作' })).toBeNull()
@@ -676,7 +680,7 @@ describe('V8 コンバージョンの一覧：中身を見る窓', () => {
 
   it('対象・金額・数えない条件・数え方を対応表と同じ言葉で出す', async () => {
     const dialog = await openDetail('資料をダウンロードした')
-    const term = (label: string) => Array.from(dialog.querySelectorAll('dt')).find((dt) => dt.textContent?.trim() === label)?.nextElementSibling?.textContent
+    const term = (label: string) => (Array.from(dialog.querySelectorAll('dt')).find((dt) => dt.textContent?.trim() === label) ?? querySupplementaryPageAction(label))?.nextElementSibling?.textContent
     expect(term('何が起きたら数えるか')).toBe('サイトの「https://example.com/dl」に到達')
     expect(term('対象')).toBe(originInfoOf('url_reach').target)
     expect(term('金額')).toBe('金額を集計しない')
@@ -694,3 +698,5 @@ describe('V8 コンバージョンの一覧：編集の窓', () => {
     expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual(['何回でも数える', '1人1回だけ', '決めた日数に1回まで'])
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

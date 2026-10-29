@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 成果地点を作る（src/v8/conversions/create.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * 同じ名前の成果地点があると競合の帯と「比べてから保存」・保存が 409 で返ったときも帯・
@@ -69,7 +70,7 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   query.value = ''
   push.mockReset()
   posted.length = 0
@@ -184,7 +185,7 @@ describe('V8 成果地点を作る', () => {
   })
 
   it('閲覧のみ：帯を出し、保存のボタン・使う場所を足すは置かない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await mount()
     expect(screen.getByText('閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /保存して/ })).toBeNull()
@@ -320,3 +321,5 @@ describe('V8 成果地点を作る：送る形と確かめ', () => {
     expect(note).toContain('試算では成果を追加しません。')
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

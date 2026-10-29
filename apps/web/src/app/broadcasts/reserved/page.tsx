@@ -217,7 +217,7 @@ function ReservedBroadcastContent() {
     return (
       <TargetMissing
         kind="unspecified"
-        title="予約した配信が指定されていません"
+        title="予約中の配信が指定されていません"
         description="配信予定から、確認する予約を選び直してください。"
         backHref="/broadcasts"
         backLabel="配信予定へ戻る"

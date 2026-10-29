@@ -20,6 +20,7 @@ import { Children, cloneElement, isValidElement } from 'react'
 import { DETAIL_SECTIONS, DetailSectionKey, ExpandableText, FriendFieldsState, PurchaseState, RichMenuState, UpcomingState, formatAddedDate, formatDate, renderValue, statusLabels, upcomingBookingHref, upcomingDeliveryHref } from './friend-info-model'
 import { STATUS_OPTIONS } from './friend-info-status'
 import { type ChatStatusInfo, type FriendDetail } from './friend-info-types'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 type Options = {
   sectionStyle: (key: DetailSectionKey) => { order: number; }
@@ -160,7 +161,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
             />
           </div>
         ) : canEditChat ? (
-          <textarea
+          <SharedTextArea
             id="inbox-panel-memo"
             ref={memoAreaRef}
             defaultValue={effectiveNotes ?? ''}
@@ -291,7 +292,7 @@ export function createFriendInfoSections({ sectionStyle, canEditChat, statusButt
         </div>
       ) : canEditFriend ? (
         <div className="mt-2">
-          <input
+          <SharedTextField
             ref={tagSearchRef}
             type="text"
             value={tagQuery}

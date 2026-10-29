@@ -1,20 +1,30 @@
+// @vitest-environment happy-dom
+import { cleanup, render } from '@testing-library/react'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import ReadOnlyNotice, { READ_ONLY_MESSAGE } from './read-only-notice'
 import ListState from './list-state'
 import PageSizeSelect, { PAGE_SIZES } from './page-size-select'
 import { ListPageBody } from '@/components/templates/list-page'
 
+afterEach(() => { cleanup(); verifiedStaffRole(null) })
+
 describe('共通部品へ寄せた後も案内と操作を保つ', () => {
   it('閲覧権限の条件は型に渡し、個別の許可理由は帯に残せる', () => {
     const editable = renderToStaticMarkup(<ListPageBody><p>一覧</p></ListPageBody>)
     expect(editable).not.toContain(READ_ONLY_MESSAGE)
-    const readonly = renderToStaticMarkup(<ListPageBody readOnly><p>一覧</p></ListPageBody>)
-    expect(readonly.split(READ_ONLY_MESSAGE)).toHaveLength(2)
-    const custom = renderToStaticMarkup(<ReadOnlyNotice>停止の解除は許可された人に頼んでください。</ReadOnlyNotice>)
-    expect(custom).toContain('停止の解除は許可された人に頼んでください。')
-    expect(custom).toContain('role="status"')
-    expect(custom).not.toContain(READ_ONLY_MESSAGE)
+    expect(renderToStaticMarkup(<ListPageBody readOnly><p>一覧</p></ListPageBody>)).not.toContain(READ_ONLY_MESSAGE)
+    verifiedStaffRole('viewer')
+    const view = render(<ListPageBody><p>一覧</p></ListPageBody>)
+    expect(view.container.querySelector('[data-read-only-notice]')).toBeNull()
+    view.rerender(<ListPageBody readOnly><p>一覧</p></ListPageBody>)
+    expect(view.container.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+    expect(view.container.querySelector('[data-read-only-notice]')?.textContent).toBe(READ_ONLY_MESSAGE)
+    view.rerender(<ReadOnlyNotice>停止の解除は許可された人に頼んでください。</ReadOnlyNotice>)
+    expect(view.container.textContent).toContain('停止の解除は許可された人に頼んでください。')
+    expect(view.container.querySelector('[role="status"]')).not.toBeNull()
+    expect(view.container.textContent).not.toContain(READ_ONLY_MESSAGE)
   })
 
   it('取得失敗で画面固有の再試行を既定の再試行と二重に出さない', () => {

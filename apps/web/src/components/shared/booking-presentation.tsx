@@ -29,10 +29,6 @@ export function ReservationSource({ value, note, label }: { value: string; note?
   return <span data-source={value}><BookingCategory name={name} color={sourceColors[value]} /></span>
 }
 
-export function BookingSourceLegend({ sources }: { sources: string[] }) {
-  return <span className={styles.legend} role="list" aria-label="予約元">{sources.map(value => <span key={value} role="listitem"><ReservationSource value={value}/></span>)}</span>
-}
-
 export function BookingName({ children }: { children: ReactNode }) { return <strong className={styles.name}>{children}</strong> }
 export function BookingTime({ children }: { children: ReactNode }) { return <span className={styles.time}>{children}</span> }
 export function BookingDetail({ children }: { children: ReactNode }) { return <span className={styles.detail}>{children}</span> }

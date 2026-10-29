@@ -37,6 +37,7 @@
 - [m2-home.webp](../apps/web/public/manuals/line-connect/images/m2-home.webp) — 図・手引きの資料、確認 2026-10-19
 - [m2-login-id.webp](../apps/web/public/manuals/line-connect/images/m2-login-id.webp) — 図・手引きの資料、確認 2026-10-19
 - [m2-login-secret.webp](../apps/web/public/manuals/line-connect/images/m2-login-secret.webp) — 図・手引きの資料、確認 2026-10-19
+- [m2-provider-id-musubo.webp](../apps/web/public/manuals/line-connect/images/m2-provider-id-musubo.webp) — Step 2のプロバイダーIDコピー位置、確認 2026-10-29
 - [m2-provider.webp](../apps/web/public/manuals/line-connect/images/m2-provider.webp) — 図・手引きの資料、確認 2026-10-19
 - [m2-publish.webp](../apps/web/public/manuals/line-connect/images/m2-publish.webp) — 図・手引きの資料、確認 2026-10-19
 - [m3-callback-1.webp](../apps/web/public/manuals/line-connect/images/m3-callback-1.webp) — 図・手引きの資料、確認 2026-10-19
@@ -48,7 +49,9 @@
 - [m3-oam-response.webp](../apps/web/public/manuals/line-connect/images/m3-oam-response.webp) — 図・手引きの資料、確認 2026-10-19
 - [m3-tab.webp](../apps/web/public/manuals/line-connect/images/m3-tab.webp) — 図・手引きの資料、確認 2026-10-19
 - [m3-webhook-on.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-on.webp) — 図・手引きの資料、確認 2026-10-19
-- [index.html](../apps/web/public/manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-19
+- [m3-webhook-configured-musubo.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-configured-musubo.webp) — Webhook設定後の確認画面、確認 2026-10-29
+- [m3-musubo-webhook.png](../apps/web/public/manuals/line-connect/images/m3-musubo-webhook.png) — musuboのWebhook設定画面、確認 2026-10-29
+- [index.html](../apps/web/public/manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
 - [LINEアカウント登録（V6 33-2）](line-account-register.md)
 - [Googleビジネスプロフィール連携 機能対応表（申請用・根拠付き）](manuals/google-business-feature-matrix.md)
 - [Googleビジネスプロフィール API 審査パッケージ（撮影チェックリスト・公開URL・想定質問）](manuals/google-business-review-package.md)
@@ -69,6 +72,7 @@
 - [m2-home.jpg](manuals/line-connect/images/m2-home.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m2-login-id.jpg](manuals/line-connect/images/m2-login-id.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m2-login-secret.jpg](manuals/line-connect/images/m2-login-secret.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m2-provider-id-musubo.jpg](manuals/line-connect/images/m2-provider-id-musubo.jpg) — Step 2のプロバイダーIDコピー位置、確認 2026-10-29
 - [m2-provider.jpg](manuals/line-connect/images/m2-provider.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m2-publish.jpg](manuals/line-connect/images/m2-publish.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m3-callback-1.jpg](manuals/line-connect/images/m3-callback-1.jpg) — 図・手引きの資料、確認 2026-10-19
@@ -80,7 +84,9 @@
 - [m3-oam-response.jpg](manuals/line-connect/images/m3-oam-response.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m3-tab.jpg](manuals/line-connect/images/m3-tab.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m3-webhook-on.jpg](manuals/line-connect/images/m3-webhook-on.jpg) — 図・手引きの資料、確認 2026-10-19
-- [index.html](manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-19
+- [m3-webhook-configured-musubo.jpg](manuals/line-connect/images/m3-webhook-configured-musubo.jpg) — Webhook設定後の確認画面、確認 2026-10-29
+- [m3-musubo-webhook.png](manuals/line-connect/images/m3-musubo-webhook.png) — musuboのWebhook設定画面、確認 2026-10-29
+- [index.html](manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
 
 ## 要件
 
@@ -453,8 +459,35 @@
 
 ## 反映履歴
 
+- [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
+- [アカウント設定の親アカウント欄を非表示](release-log/unreleased/1900-masato-hide-parent-account.md) — 未使用の欄を隠し、既存の親子関係を保つ変更の反映履歴。
+- [LINEアカウント登録の使い方選択ポップアップ](release-log/unreleased/1898-masato-register-style-dialog.md) — 登録時に使い方の見本を見て選ぶか、後で設定する変更の反映履歴。
+- [LINE接続マニュアルの現行4ステップへの更新](release-log/unreleased/1897-masato-line-connect-manual.md)
+- [LINEログインチャネル作成手順の追加](release-log/unreleased/1911-masato-line-login-create-guide.md)
+- [LINEログイン画像の重複した番号を削除](release-log/unreleased/1912-masato-line-login-callout-numbers.md)
+- [LINEログインチャネル作成・種類の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-type.webp)
+- [LINEログインチャネル作成・入力欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-fields.webp)
+- [LINEログインチャネル作成・同意欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-final.webp)
+- [LINEログインチャネル作成・種類の文書用画像](manuals/line-connect/images/m4-create-type.jpg)
+- [LINEログインチャネル作成・入力欄の文書用画像](manuals/line-connect/images/m4-create-fields.jpg)
+- [LINEログインチャネル作成・同意欄の文書用画像](manuals/line-connect/images/m4-create-final.jpg)
+- [LINE接続マニュアルのWebhook設定位置を明確化](release-log/unreleased/1899-masato-musubo-webhook-guide.md)
+- [Google口コミのAI下書き案内文の削除](release-log/unreleased/1896-masato-google-review-ai-note-remove.md)
+- [LINEアカウント登録のMessaging API設定への直リンク](release-log/unreleased/1895-masato-messaging-api-deeplink.md)
+- [Google口コミのAI下書き生成の修正](release-log/unreleased/1892-masato-google-review-ai-draft.md)
 - [LINEアカウント登録の事前確認を回答時に進める変更](release-log/unreleased/1891-masato-line-precheck-auto-next.md)
+- [LINEアカウント登録の選択済み回答と質問一覧の修正](release-log/unreleased/1894-masato-line-precheck-restored-choice.md)
+- [LINEアカウント登録でプロバイダーIDを独立した手順にした変更](release-log/unreleased/1893-masato-provider-id-step2.md)
+- [LINEアカウント登録のチャネル専用Webhook URL](release-log/unreleased/1882-masato-channel-webhook-url.md)
+- [Google・Instagram画像の切り取り](release-log/unreleased/1883-masato-google-instagram-image-crop.md)
+- [検証環境のビルド情報表示](release-log/unreleased/1884-masato-staging-build-metadata.md)
+- [LINEログインのプロバイダー画面への導線](release-log/unreleased/1885-masato-line-provider-step3.md)
+- [投稿メディアの選択画面](release-log/unreleased/1886-masato-post-media-picker.md)
+- [既存のLINEログインチャネルの案内](release-log/unreleased/1887-masato-provider-existing-login-copy.md)
+- [Messaging API設定への案内](release-log/unreleased/1889-masato-line-manager-step1.md)
+- [投稿メディアの内容選択](release-log/unreleased/1890-masato-post-media-content.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
+- [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
 - [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
 - [反映履歴（アップデート履歴）の設計](change-log-design.md)
@@ -471,6 +504,7 @@
 - [細部の直し（左メニューの吹き出し・「？」・2段階認証の欄・主ボタン）](release-log/unreleased/1803-kenta-detail-polish.md)
 - [スマートフォンの幅でカードを1列に](release-log/unreleased/1801-kenta-cards-one-column.md)
 - [スマートフォンの幅で店名を切れにくく](release-log/unreleased/1804-kenta-hq-card-narrow.md)
+- [統括のカードの札・要対応の数・表の幅](release-log/unreleased/0000-kenta-hq-card-fixes.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [二段階認証の画面を見やすく](release-log/unreleased/1843-kenta-two-factor-card.md)
 - [回復コードのお知らせに「要確認：」](release-log/unreleased/1846-kenta-recovery-notice-prefix.md)
@@ -814,6 +848,9 @@
 - [画面の地・カードの影・知らせ・日付の表示](release-log/unreleased/1849-kenta-tone2-card-a.md)
 - [スマートフォン専用の画面（トークと対応）](release-log/unreleased/1845-kenta-phone-shell-talk.md)
 - [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
+- [一覧の帯・フォルダの丸と共通操作の整理](release-log/unreleased/0000-kenta-tags-band-dot.md)
+- [共通部品と言葉・受信箱の絞り込みの修正](release-log/unreleased/0000-kenta-int.md)
+- [チェックの印・スイッチ・選ぶ欄の見た目の統一](release-log/unreleased/0000-kenta-check-green.md)
 - [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
 - [まとめ列車 7](release-log/unreleased/1848-kenta-train-one7-1027.md)
 
@@ -848,4 +885,13 @@
 - [カルーセルのボタン削除](release-log/unreleased/1879-kenta-carousel-delete.md) — カルーセル内の操作に関する反映履歴。
 - [配達連携の解除ボタン](release-log/unreleased/1880-kenta-delivery-disconnect.md) — 配達連携の画面に関する反映履歴。
 - [SNS連携の操作と案内](release-log/unreleased/1881-kenta-sns-actions.md) — SNS連携の画面に関する反映履歴。
+- [LINEログインのコピーと公開の案内](release-log/unreleased/1901-masato-line-login-guide-images.md) — 接続マニュアルStep 4の画像案内の反映履歴。
+- [プロバイダーID確認画面の案内](release-log/unreleased/1903-masato-provider-id-manual-image.md) — 接続マニュアルStep 2の画像案内の反映履歴。
+- [musuboのWebhook設定後の案内](release-log/unreleased/1904-masato-musubo-webhook-guide-image.md) — 接続マニュアルStep 3の画像案内の反映履歴。
+- [LINE接続マニュアルの画像整理](release-log/unreleased/1906-masato-line-guide-image-cleanup.md) — Step 3とStep 4の画像整理の反映履歴。
+- [LINE接続マニュアルStep 3の画像更新](release-log/unreleased/1907-masato-line-step3-images.md) — アイコンのモザイクとMessaging APIタブ案内の反映履歴。
+- [LINE接続マニュアルStep 1の画像更新](release-log/unreleased/1908-masato-line-step1-manager-image.md) — Messaging APIの実画面と秘匿表示の反映履歴。
+- [LINE接続マニュアルStep 4の画像更新](release-log/unreleased/1909-masato-line-login-guide-real-screens.md) — LINEログイン実画面と秘匿表示の反映履歴。
+- [LINE接続マニュアルStep 4の友だち追加画像更新](release-log/unreleased/1910-masato-line-linked-oa-guide-screen.md) — 現行画面の編集箇所と秘匿表示の反映履歴。
+- [まとめ列車 1029](release-log/unreleased/1905-kenta-train-all-1029.md) — メモの保存の直しと各担当の完成分の反映履歴。
 - [今日送った内訳の名前表示](release-log/unreleased/0000-kenta-line-notify-kpi-label.md) — LINE通知の内訳を内部名でなくお知らせ名で出す反映履歴。

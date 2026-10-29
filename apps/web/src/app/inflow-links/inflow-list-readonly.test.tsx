@@ -76,7 +76,7 @@ describe('EMUl9 一覧の閲覧のみ', () => {
     await settle()
     await settle()
 
-    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
+    expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
     expect(host.textContent).not.toContain('流入リンクを作る')
     expect(host.querySelector('th [aria-label="表示中の登録済み経路をすべて選ぶ"]')).toBeNull()
     expect(host.textContent).not.toContain('まとめて操作')

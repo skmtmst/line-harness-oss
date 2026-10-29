@@ -92,16 +92,16 @@ describe('イベント作成の名前欄を離れたときの確かめ', () => {
 describe('イベント編集（form）の名前欄を離れたときの確かめ', () => {
   it('空にして離れると保存前に直し方が出て、戻すと消える', async () => {
     await renderNode(<EventForm accountId="acc-1" eventId="ev-1" />)
-    const input = host.querySelector('input[placeholder="例: 第1回 AAA 説明会"]') as HTMLInputElement
+    const input = host.querySelector('input[placeholder="例：第1回 AAA 説明会"]') as HTMLInputElement
     if (!input) throw new Error('form name input not found')
     expect(input.value).toBe('体験レッスン')
 
     await act(async () => { fireEvent.change(input, { target: { value: '' } }) })
-    await act(async () => { fireEvent.blur(host.querySelector('input[placeholder="例: 第1回 AAA 説明会"]') as HTMLInputElement) })
+    await act(async () => { fireEvent.blur(host.querySelector('input[placeholder="例：第1回 AAA 説明会"]') as HTMLInputElement) })
     expect(host.textContent).toContain('イベント名は必須です')
 
     await act(async () => {
-      fireEvent.change(host.querySelector('input[placeholder="例: 第1回 AAA 説明会"]') as HTMLInputElement, { target: { value: '体験レッスン' } })
+      fireEvent.change(host.querySelector('input[placeholder="例：第1回 AAA 説明会"]') as HTMLInputElement, { target: { value: '体験レッスン' } })
     })
     expect(host.textContent).not.toContain('イベント名は必須です')
   })

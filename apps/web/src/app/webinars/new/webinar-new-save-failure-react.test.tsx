@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
@@ -90,7 +91,7 @@ async function flush() {
 }
 
 function buttonByText(label: string): HTMLButtonElement {
-  const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === label)
+  const button = (Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === label) ?? querySupplementaryPageAction(label))
   if (!button) throw new Error(`button not found: ${label}`)
   return button as HTMLButtonElement
 }
@@ -144,7 +145,7 @@ describe('ウェビナー作成のフォルダ取得失敗（D003）', () => {
 
     expect(host.textContent).toContain('フォルダを読み込めませんでした')
 
-    const retry = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む'))
+    const retry = (Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('もう一度読み込む')) ?? querySupplementaryPageAction('もう一度読み込む'))
     if (!retry) throw new Error('再読み込みボタンが見つかりません')
     await act(async () => { retry.click() })
     await flush()

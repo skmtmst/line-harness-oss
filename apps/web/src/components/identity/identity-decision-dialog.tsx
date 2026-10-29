@@ -24,6 +24,7 @@ import {
 import styles from './identity-review.module.css'
 import type { IdentityCandidateWithProfiles } from '@/lib/api'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 const DECISIONS: IdentityCandidateDecision[] = ['linked', 'different', 'deferred']
 
@@ -206,7 +207,7 @@ export default function IdentityDecisionDialog({
           <label className={styles.fieldLabel} htmlFor="identity-reason">
             判定の理由<RequiredBadge />
           </label>
-          <SaveErrorField names={["reason"]}><textarea
+          <SaveErrorField names={["reason"]}><SharedTextArea
             id="identity-reason"
             className={styles.reason}
             value={reason}

@@ -79,6 +79,22 @@ describe('migration 320 EC order and action read models', () => {
         version: 1, orderLines: [{ productName: '鹿肉フード', quantity: 2, lineAmount: 4200 }],
       }],
     });
+    expect(await listEcOrders(db, {
+      lineAccountId: 'account-1', from: '2026-09-07T00:00:00.000Z', to: '2026-09-08T00:00:00.000Z',
+      limit: 20, offset: 0,
+    })).toMatchObject({ total: 1, summary: { total: 1, current: 1 } });
+    expect(await listEcOrders(db, {
+      lineAccountId: 'account-1', from: '2026-09-08T00:00:00.000Z', to: '2026-09-09T00:00:00.000Z',
+      limit: 20, offset: 0,
+    })).toMatchObject({ total: 0, summary: { total: 0, current: 0 } });
+    // 終端の瞬間を含めず、UTCと+09:00が混在していても同じ瞬間で比較する。
+    expect(await listEcOrders(db, {
+      lineAccountId: 'account-1', from: '2026-09-06T00:00:00.000Z', to: '2026-09-07T00:00:00.000Z', limit: 20, offset: 0,
+    })).toMatchObject({ total: 0, summary: { current: 0 } });
+    sqlite.prepare('UPDATE ec_orders SET ordered_at = ?').run('2026-09-07T09:00:00+09:00');
+    expect(await listEcOrders(db, {
+      lineAccountId: 'account-1', from: '2026-09-07T00:00:00.000Z', to: '2026-09-08T00:00:00.000Z', limit: 20, offset: 0,
+    })).toMatchObject({ total: 1, summary: { current: 1 } });
     expect(await listEcOrders(db, { lineAccountId: 'account-2', limit: 20, offset: 0 }))
       .toMatchObject({ total: 0, items: [] });
 

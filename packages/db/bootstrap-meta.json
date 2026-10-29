@@ -648,7 +648,8 @@
     "731_photo_derivative_keys.sql",
     "733_event_booking_entitlement_uses.sql",
     "734_unlimited_monthly_passes.sql",
-    "735_booking_photos.sql"
+    "735_booking_photos.sql",
+    "736_line_account_tag_color_check.sql"
   ],
-  "migrationCount": 649
+  "migrationCount": 650
 }

@@ -22,6 +22,7 @@ import Checkbox from '@/components/shared/checkbox'
 import { cellInput, miniButton, type FormRefs } from './form-refs'
 import Button from '@/components/shared/button'
 import { formatNumber } from '@/lib/format'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 const MODES: { value: NonNullable<FormInputBlock['choiceMode']>; label: string }[] = [
   { value: 'tag', label: 'タグ追加' },
@@ -129,7 +130,7 @@ export default function ChoiceTable({
           {choices.map((choice) => (
             <li key={choice.id} className="px-3 py-2">
               <div className="grid grid-cols-[1fr_1fr_auto] items-center gap-2">
-                <input
+                <SharedTextField
                   type="text"
                   value={choice.label}
                   onChange={(e) => patchChoice(choice.id, { label: e.target.value })}
@@ -150,7 +151,7 @@ export default function ChoiceTable({
                 )}
 
                 {mode === 'friendField' && (
-                  <input
+                  <SharedTextField
                     type="text"
                     value={choice.value ?? ''}
                     onChange={(e) => patchChoice(choice.id, { value: e.target.value })}
@@ -252,7 +253,7 @@ export default function ChoiceTable({
 
                     {choice.capacity?.enabled && (
                       <label className="text-ink-secondary flex items-center gap-1 text-xs">
-                        <input
+                        <SharedTextField
                           type="number"
                           min={1}
                           step={1}
@@ -352,7 +353,7 @@ export default function ChoiceTable({
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-ink-secondary text-xs font-medium">選べる数</span>
           <label className="text-ink-secondary flex items-center gap-1 text-xs">
-            <input
+            <SharedTextField
               type="number"
               min={0}
               value={block.selectionLimit?.min ?? ''}
@@ -370,7 +371,7 @@ export default function ChoiceTable({
             つ以上
           </label>
           <label className="text-ink-secondary flex items-center gap-1 text-xs">
-            <input
+            <SharedTextField
               type="number"
               min={0}
               value={block.selectionLimit?.max ?? ''}

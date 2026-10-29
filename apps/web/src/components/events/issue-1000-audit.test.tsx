@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
   #1000 追加詳細監査(DETAIL-08/09/11)の回帰テスト。
@@ -151,11 +152,11 @@ async function pickTime(id: string, hhmm: string) {
 async function clearDate(id: string) {
   await act(async () => { fireEvent.click(document.querySelector('#' + id)!) })
   const dialog = document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!
-  const clear = [...dialog.querySelectorAll('button')].find((b) => b.textContent?.trim() === '消す')!
+  const clear = ([...dialog.querySelectorAll('button')].find((b) => b.textContent?.trim() === '消す') ?? querySupplementaryPageAction('消す'))!
   await act(async () => { fireEvent.click(clear) })
 }
 async function click(text: string) {
-  const b = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === text)!
+  const b = (Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === text) ?? querySupplementaryPageAction(text))!
   expect(b).toBeTruthy()
   await act(async () => b.click())
 }
@@ -234,7 +235,7 @@ it('D11: 一括追加の途中失敗後は、残りだけを同じ鍵で再送�
   await pickDate('開始日', '2026-10-01')
   await pickDate('終了日', '2026-10-03')
   await click('土')
-  await act(async () => { document.querySelector<HTMLInputElement>('[role="dialog"] input[type="checkbox"]')!.click() })
+  await act(async () => { document.querySelector<HTMLInputElement>('[role="dialog"] [role="switch"]')!.click() })
   await pickTime('時間帯の終了', '15:30')
   await act(async () => { fireEvent.change(document.querySelector('[role="dialog"] input[type="number"]')!, { target: { value: '10' } }) })
   await click('生成')

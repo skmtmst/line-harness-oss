@@ -33,7 +33,7 @@ beforeEach(() => {
 afterEach(cleanup)
 
 it.each([
-  ['LINE の接続', '/accounts'],
+  ['本店の接続の異常 1件を開く', '/accounts'],
   ['本店の未対応のトーク 2件を開く', '/chats?status=unread'],
 ])('%sから個別画面を開くと切り替え先を知らせる', async (name, href) => {
   render(<AttentionPage />)

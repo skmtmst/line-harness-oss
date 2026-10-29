@@ -113,22 +113,18 @@ describe('aINnz 支払いタブの絵合わせ', () => {
   })
 })
 
- test('支払いが1ページでも件数と現在地を残し、本文に口座の案内を置く', async () => {
+ test('支払いが1ページなら件数だけを残し、本文に口座の案内を置く', async () => {
   const container = renderTab()
-  const pager = await screen.findByRole('navigation', { name: 'ページ送り' })
-  expect(pager.textContent).toContain('2人中 1〜2人')
-  expect(pager.querySelector('[aria-current="page"]')?.textContent).toBe('1')
-  for (const name of ['前のページ', '次のページ']) {
-   const button = screen.getByRole('button', { name }) as HTMLButtonElement
-   expect(button.disabled).toBe(true)
-   expect(button.title).not.toBe('')
-  }
+  expect(await screen.findByText('2人中 1〜2人')).toBeTruthy()
+  expect(screen.queryByRole('navigation', { name: 'ページ送り' })).toBeNull()
+  for (const name of ['前のページ', '次のページ']) expect(screen.queryByRole('button', { name })).toBeNull()
   expect(container.querySelector('[data-template-region="body"]')?.textContent).toContain('口座番号は本人だけに表示します。')
  })
- test('支払いが0件になっても0件のページ送りを残す', async () => {
+ test('支払いが0件になっても件数を残し、ページ送りを出さない', async () => {
   renderTab()
-  await screen.findByRole('navigation', { name: 'ページ送り' })
+  await screen.findByText('2人中 1〜2人')
   fireEvent.change(screen.getByRole('searchbox', { name: '名前・振込先で探す' }), { target: { value: '一致しない名前' } })
   await screen.findByText('条件に合うものはありません')
-  expect(screen.getByRole('navigation', { name: 'ページ送り' }).querySelector('[data-pagination-summary]')?.textContent).toBe('0人')
+  expect(screen.getByText('0人')).toBeTruthy()
+  expect(screen.queryByRole('navigation', { name: 'ページ送り' })).toBeNull()
  })

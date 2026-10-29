@@ -1,4 +1,5 @@
 import type {
+  AccountStyle,
   FriendAddRouting,
   FriendAddRoutingVersion,
   LineAccount,
@@ -82,6 +83,66 @@ export interface GettingStartedInput {
   friendAddDraft: FriendAddRoutingVersion | null
   scenarios: Scenario[]
   role: StaffMember['role'] | null
+}
+
+/** 業種の設定画面で実物を読んだ結果。未取得・失敗はnull、対象外の段は省略できる。 */
+export type StyleSetupProgress = {
+  style: AccountStyle
+  steps: Partial<Record<'attributes' | 'friendAdd' | 'scenario', { complete: boolean | null; reason?: string }>>
+}
+
+/** 業種の3〜5段は、その設定の実測だけで済みを決める。標準の配信判定は流用しない。 */
+export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountStyle | null, progress?: StyleSetupProgress): StepResult[] {
+  if (!style || style === 'standard') return [...steps]
+  const copy = steps.map((step): StepResult => ['attributes', 'friendAdd', 'scenario'].includes(step.key) && step.state !== 'forbidden'
+    ? { ...step, state: 'unknown', blockedReason: null, next: '業種の設定状況を確認できませんでした。' }
+    : { ...step })
+  const replace = (key: keyof StyleSetupProgress['steps'], title: string, sub: string, label: string, href: string, condition: string, instruction: string) => {
+    const step = copy.find((item) => item.key === key)
+    if (!step) return
+    step.title = title
+    step.sub = sub
+    step.condition = condition
+    const result = progress?.style === style ? progress.steps[key] : undefined
+    if (step.state !== 'forbidden') {
+      step.state = result?.complete === true ? 'done' : result?.complete === false ? 'todo' : 'unknown'
+      step.blockedReason = null
+    }
+    if (step.state === 'done') step.next = `終わっています。${label}から設定を見直せます。`
+    else if (step.state === 'unknown') step.next = result?.reason?.trim() || `${sub}ための設定状況を確認できませんでした。`
+    else if (step.state === 'todo') step.next = instruction
+    step.action = step.state === 'forbidden' ? null : { label, href }
+  }
+  switch (style) {
+    case 'restaurant':
+      replace('attributes', '卓と席を登録する', '座席・卓を用意する', '座席・卓を開く', '/restaurant-test/tables', '座席・卓が登録されている', '座席と卓を登録し、予約で使う席を用意します。')
+      replace('friendAdd', 'コースとメニューを登録する', '予約で受け付ける内容を決める', 'メニュー管理を開く', '/restaurant-test/menu', '予約で受け付けるコースとメニューが登録されている', '予約で受け付けるコースとメニューを登録します。')
+      replace('scenario', '予約の受付を開ける', '予約枠と在庫を用意する', '予約枠を開く', '/restaurant-test/inventory', '予約枠と在庫が用意され、受付を確認している', '予約枠と在庫を用意し、予約の受付を確認します。')
+      break
+    case 'lesson':
+      replace('attributes', 'クラスを作る', 'クラスの時間と定員を決める', 'イベント予約を開く', '/events', 'クラスの時間と定員が設定されている', 'クラスを作り、開催する時間と定員を設定します。')
+      replace('friendAdd', '会員を登録する', '予約する会員を用意する', '友だちを開く', '/friends', '予約する会員が登録されている', '友だちの画面で、クラスを予約する会員を登録します。')
+      replace('scenario', 'クラスの予約を受け付ける', 'イベント予約の受付を確認する', 'イベント予約を開く', '/events', 'クラスの予約受付を確認している', 'イベント予約で、クラスの予約を受け付けられるか確認します。')
+      break
+    case 'salon':
+      replace('attributes', 'メニューを登録する', '予約で受け付ける内容を決める', '予約設定を開く', '/booking/menus', '予約メニューが登録されている', '予約で受け付けるメニューを登録します。')
+      replace('friendAdd', '担当者を登録する', 'メニューを担当する人を決める', '担当者を開く', '/booking/menus?tab=staff', 'メニューを担当する人が登録されている', 'メニューを担当する人を登録します。')
+      replace('scenario', '予約の受付を確認する', '受付枠と予約ページを用意する', '予約設定を開く', '/booking/menus?tab=hours', '受付枠と予約ページを確認している', '受付枠を設定し、予約ページから受け付けられるか確認します。')
+      break
+    case 'consult':
+      replace('attributes', '面談の枠を作る', '面談できる日時を決める', '予約設定を開く', '/booking/menus?tab=hours', '面談を受け付ける日時が設定されている', '面談を受け付ける日時を設定します。')
+      replace('friendAdd', '面談の URL を用意する', '予約ページを確認する', '予約ページを開く', '/booking/menus', '面談の予約ページを確認している', '面談の予約ページを開き、案内するURLを確認します。')
+      replace('scenario', '面談の受付を確認する', '受付枠を公開する', '予約設定を開く', '/booking/menus?tab=hours', '面談の受付枠を公開し、受付を確認している', '面談の受付枠を公開し、予約できるか確認します。')
+      break
+    case 'ec':
+      replace('attributes', 'ストアをつなぐ', 'ECストアの連携を設定する', 'EC連携を開く', '/ec-commerce', 'ECストアの連携を設定している', 'ECストアをつなぎ、連携の設定を確認します。')
+      replace('friendAdd', 'ストアの商品を確認する', 'つないだストアの商品を確認する', 'EC連携を開く', '/ec-commerce', 'つないだストアの商品を確認している', 'つないだECストアの商品を確認します。')
+      replace('scenario', '注文の受付を確認する', 'ストアから注文を受け取れる状態にする', 'EC連携を開く', '/ec-commerce', 'ストアから注文を受け取れる状態を確認している', 'ECストアから注文を受け取れるか確認します。')
+      break
+    default:
+      style satisfies never
+  }
+  return copy
 }
 
 /**
@@ -377,7 +438,7 @@ export function stoppedReasons(steps: ReadonlyArray<StepResult>): string[] {
   }
   const unknown = steps.filter((s) => s.state === 'unknown')
   for (const step of unknown) {
-    lines.push(`「${step.title}」は、いまの仕組みでは自動で確かめられません。${step.next}`)
+    lines.push(`「${step.title}」は、いまは状況を確認できません。${step.next}`)
   }
   return lines
 }

@@ -26,6 +26,7 @@ it('テンプレート参照は本文が空でも確認へ進め、同名参照�
   expect(screen.getByText(/内容は配布先の同じ名前のテンプレートで確認/)).toBeTruthy()
   const next = screen.getByRole('button', { name: '次へ：確認' }) as HTMLButtonElement
   expect(next.disabled).toBe(false)
+  expect(next.lastElementChild?.classList.contains('lucide-arrow-right')).toBe(true)
   fireEvent.click(next)
   expect(screen.getAllByText('テンプレート「予約の案内」', { selector: 'dd' })).toHaveLength(2)
   expect(onSetting).not.toHaveBeenCalled()

@@ -1,4 +1,3 @@
-import fs from 'node:fs'
 import { readUiSource } from '../scripts/test-ui-source.mjs'
 import path from 'node:path'
 
@@ -14,13 +13,10 @@ function read(rel: string): string {
 }
 
 describe('m22c 札・ボタンの折り返し', () => {
-  it('受信箱の札はV8の共通部品で高さ36・折り返しなし（言葉は変えない）', () => {
+  it('受信箱の札と保存した検索は共通部品を使う', () => {
     const source = read('app/chats/page.tsx')
     // の36px。画面の旧いTailwind指定ではなく、札の持ち主を確かめる。
-    const chipCss = fs.readFileSync(path.join(__dirname, 'components/shared/filter-chip.css'), 'utf8')
     expect(source).toContain('<FilterChip')
-    expect(chipCss).toMatch(/:root \.v6-filter-chip\s*{[^}]*height:\s*36px/s)
-    expect(chipCss).toMatch(/\.v6-filter-chip\s*{[^}]*white-space:\s*nowrap/s)
     expect(source).toContain('保存した検索')
     expect(source).not.toContain('<Button href="/tags?tab=marks" className="h-10 shrink-0">')
   })

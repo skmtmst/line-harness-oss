@@ -100,7 +100,7 @@ async function settle() {
 }
 
 function switches(): number {
-  return host.querySelectorAll('[type="checkbox"]').length
+  return host.querySelectorAll('[role="switch"]:not([aria-label*="まとめて"])').length
 }
 
 function retryButton(): HTMLButtonElement | undefined {

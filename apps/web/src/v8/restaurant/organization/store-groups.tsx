@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
-import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { SaveErrorScope, SaveErrorField, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -19,6 +18,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { Panel, Status } from '@/v8/restaurant/common-a/public/parts/index'
 import styles from './organization.module.css'
+import { ToggleField } from '@/components/shared/toggle'
 
 type Member = RestaurantStoreGroup['members'][number]
 type Target = { group: RestaurantStoreGroup; member: Member; store: RestaurantStore }
@@ -54,7 +54,7 @@ function MemberEditor({ target, onClose, onSave }: {
       onCancel={onClose} onConfirm={() => setConfirming(true)} confirmLabel="保存する" confirmDisabled={!dirty || !validDistance}>
       <div className={styles.form}>
         {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
-        <SaveErrorField names={["referralEnabled", "input.referralEnabled"]}><Checkbox checked={enabled} onCheckedChange={setEnabled} description="満席のとき、同じ組の参加店へ案内します。閲覧権限は変わりません。">満席のとき案内に参加する</Checkbox></SaveErrorField>
+        <SaveErrorField names={["referralEnabled", "input.referralEnabled"]}><ToggleField checked={enabled} onChange={setEnabled} description="満席のとき、同じ組の参加店へ案内します。閲覧権限は変わりません。">満席のとき案内に参加する</ToggleField></SaveErrorField>
         <Field label="案内する距離（km）" required error={validDistance ? undefined : '0〜1000の距離を入力してください。'}>
           <SaveErrorField names={["maxDistance", "input.maxDistance"]}><TextField type="number" min={0} max={1000} step="any" value={distance} onChange={e => setDistance(e.target.value)} /></SaveErrorField>
         </Field>

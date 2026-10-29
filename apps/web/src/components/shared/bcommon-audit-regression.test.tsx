@@ -49,21 +49,40 @@ it('WEB-019: 接続済みのマウスの移動口は保つ', () => {
   expect(screen.getByRole('button', { name: /行を並び替え/ })).toBeTruthy()
 })
 
-it('WEB240: フォルダ候補へTabで入っても閉じない', () => {
-  render(<TemplateFolderSelect value="" status="ready" options={[{ value: '', label: 'すべて', count: 1 }]} onChange={vi.fn()} />)
+it('フォルダ候補への焦点移動で閉じず、確定するまで絞り込みを保つ', () => {
+  const change=vi.fn()
+  render(<TemplateFolderSelect value="" status="ready" options={[{ value: '', label: 'すべて', count: 1 }]} onChange={change} />)
   const trigger = screen.getByRole('button', { name: 'テンプレートのフォルダ' })
   fireEvent.click(trigger)
-  const option = screen.getByRole('button', { name: /すべて/ })
+  const option = screen.getByRole('radio', { name: /すべて/ })
   fireEvent.blur(trigger, { relatedTarget: option })
-  expect(screen.queryByRole('listbox')).toBeTruthy()
-  fireEvent.blur(option, { relatedTarget: document.body })
-  expect(screen.queryByRole('listbox')).toBeNull()
+  expect(screen.queryByRole('dialog')).toBeTruthy()
+  fireEvent.click(option)
+  expect(change).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button',{name:'キャンセル',exact:true}))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(change).not.toHaveBeenCalled()
 })
 
 it('WEB-019: 薄くする指定でも未接続のつまみは見せない', () => {
   document.documentElement.dataset.theme = 'v8'
   const view = render(<ReorderHandle label="行" disabledLook="dim" />)
   expect(view.container.querySelector('[data-reorder-disabled]')).toBeTruthy()
+})
+
+it('フォルダを確定した時だけ元のIDを返し、すべても空のIDで選び直せる', () => {
+  const change=vi.fn(), options=[{value:'',label:'すべて',count:3},{value:'案内/"親"',label:'案内',count:2,depth:1}]
+  const view=render(<TemplateFolderSelect value="" status="ready" options={options} onChange={change} />)
+  fireEvent.click(screen.getByRole('button',{name:'テンプレートのフォルダ'}))
+  fireEvent.click(screen.getByRole('radio',{name:'案内 2'}))
+  expect(change).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button',{name:'選ぶ',exact:true}))
+  expect(change).toHaveBeenLastCalledWith('案内/"親"')
+  view.rerender(<TemplateFolderSelect value={'案内/"親"'} status="ready" options={options} onChange={change} />)
+  fireEvent.click(screen.getByRole('button',{name:'テンプレートのフォルダ'}))
+  fireEvent.click(screen.getByRole('radio',{name:'すべて 3'}))
+  fireEvent.click(screen.getByRole('button',{name:'選ぶ',exact:true}))
+  expect(change).toHaveBeenLastCalledWith('')
 })
 
 it('WEB-019: つまみの親でマウスのドラッグが接続されていれば上下キーも保つ', () => {

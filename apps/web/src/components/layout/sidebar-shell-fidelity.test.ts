@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
-import { cleanup, render, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
 import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
@@ -16,7 +16,7 @@ vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { 
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '試験会社', iconUrl: null }) }))
 vi.mock('@/components/hq/account-menu', () => ({ SidebarAccountMenu: () => null }))
 vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: fixture.version }))
-vi.mock('@/components/update/use-update-status', () => ({ useUpdateStatus: () => ({ kind: 'latest', version: '2.7.0' }) }))
+vi.mock('@/components/update/use-update-status', async (original) => ({ ...await original<typeof import('@/components/update/use-update-status')>(), useUpdateStatus: () => ({ kind: 'latest', version: '2.7.0' }) }))
 vi.mock('@/lib/api/helpers/styles', () => ({ hqStyleApi: { attention: async () => ({ success: true, data: { items: [] } }) } }))
 
 import Sidebar from './sidebar'
@@ -48,8 +48,10 @@ describe('サイドバーの会社表示・設定・版', () => {
     expect(desktop.getByText('musubo')).toBeTruthy()
     expect(desktop.getByRole('link', { name: label }).getAttribute('href')).toBe(href)
     expect(desktop.queryByRole('link', { name: otherLabel })).toBeNull()
-    expect(await desktop.findByText('Ver. 2.7.0（a1b2c3d）')).toBeTruthy()
-    expect(desktop.getByText('検証環境')).toBeTruthy()
+    // 閉じた状態は版と環境の1行。詳細は共通の浮く面で開いて確かめる。
+    fireEvent.click(await desktop.findByRole('button', { name: '2.7.0・検証環境' }))
+    expect(await screen.findByText('Ver. 2.7.0（a1b2c3d）')).toBeTruthy()
+    expect(screen.getAllByText(/検証環境/).length).toBeGreaterThan(0)
     expect(fixture.version).toHaveBeenCalled()
   })
 

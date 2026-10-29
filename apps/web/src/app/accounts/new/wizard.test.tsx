@@ -2,10 +2,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import NewLineAccountPage from './page'
+import { DRAFT_KEY } from '@/v8/account-new/logic'
 
 /*
  * v07（LINE新規追加_v07.pen・2026-10-18承認）の5段の通し。
- * ②は3つ、③は2つの小さな段に分かれ、登録は③Step1の「登録する」で行う。
+ * ②は4つ、③は2つの小さな段に分かれ、登録は③Step1の「登録する」で行う。
  * 登録前のタグ・親アカウント・担当範囲・既存LIFF IDの入力は承認済みの設計で外したので、
  * ここでは確かめない（wire の tagIds などは空のまま送る）。
  */
@@ -76,7 +77,7 @@ function passPrecheck() {
 }
 
 /**
- * v07（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
+ * ①→②-1 Messaging API→②-2 プロバイダーID→②-3 Webhook→②-4 LINEログイン→③Step1。
  * 入力を変えると確認がやり直しになるので、先に全部入れる。
  */
 function enterCheckStep() {
@@ -84,6 +85,7 @@ function enterCheckStep() {
   passPrecheck()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
+  nextStep()
   fill('v8-provider-id', '2005648758')
   nextStep()
   ack('Webhook URL を貼り付けて「更新」を押した')
@@ -117,29 +119,45 @@ async function saveAndFinish() {
 }
 
 describe('LINEアカウント作成ウィザード', () => {
-  it('①の質問に答えてから②の3つの小さな段へ順に進む', () => {
+  it('①の質問に答えてから②の4つの小さな段へ順に進む', () => {
     render(<NewLineAccountPage />)
     expect(screen.getByText('ご利用環境の確認', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('質問 1')).toBeTruthy()
+    expect(screen.queryByText('このあとの質問')).toBeNull()
     passPrecheck()
     expect(screen.getByText('Messaging API の情報を入れる', { selector: 'h2' })).toBeTruthy()
-    expect(screen.getByText('Step 1 / 3')).toBeTruthy()
+    expect(screen.getByText('Step 1 / 4')).toBeTruthy()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
+    nextStep()
+    expect(screen.getByText('プロバイダーIDを確認する', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('Step 2 / 4')).toBeTruthy()
     fill('v8-provider-id', '2005648758')
     nextStep()
     expect(screen.getByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeTruthy()
-    expect(screen.getByText('Step 2 / 3')).toBeTruthy()
+    expect(screen.getByText('Step 3 / 4')).toBeTruthy()
     ack('Webhook URL を貼り付けて「更新」を押した')
     ack('Webhookの利用をONにした')
     ack('Webhookの再送をONにした')
     ack('エラーの統計情報をONにした')
     nextStep()
     expect(screen.getByText('LINEログインの情報を入れる', { selector: 'h2' })).toBeTruthy()
-    expect(screen.getByText('Step 3 / 3')).toBeTruthy()
+    expect(screen.getByText('Step 4 / 4')).toBeTruthy()
     const providerLink = screen.getByRole('link', { name: 'LINE Developers のプロバイダーを開く' })
     expect(providerLink.getAttribute('href')).toBe('https://developers.line.biz/console/provider/2005648758')
     expect(providerLink.getAttribute('target')).toBe('_blank')
+  })
+
+  it('下書きで選択済みの回答をもう一度押しても次の質問へ進む', async () => {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: 1, precheckAt: 'q1', precheck: { q1: 'yes' } }))
+    render(<NewLineAccountPage />)
+    const selected = await screen.findByRole('radio', { name: 'はい、あります' }) as HTMLInputElement
+    await waitFor(() => expect(selected.checked).toBe(true))
+    expect(screen.getByText('Q1. LINE公式アカウントはありますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByText('このあとの質問')).toBeNull()
+    fireEvent.click(selected.closest('label')!)
+    expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByText('このあとの質問')).toBeNull()
   })
 
   it('LINE側でやることの印が残っていると次の段へ進めない', () => {
@@ -147,6 +165,7 @@ describe('LINEアカウント作成ウィザード', () => {
     passPrecheck()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
+    nextStep()
     fill('v8-provider-id', '2005648758')
     nextStep()
     ack('Webhook URL を貼り付けて「更新」を押した')
@@ -227,11 +246,12 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
   })
 
-  it('②Step1は Messaging API の2項目とプロバイダーIDを必須にし、マニュアルを別タブで開く', () => {
+  it('②Step1は Messaging API の2項目を必須にし、マニュアルを別タブで開く', () => {
     render(<NewLineAccountPage />)
     passPrecheck()
-    const ids = ['v8-channel-id', 'v8-channel-secret', 'v8-provider-id']
+    const ids = ['v8-channel-id', 'v8-channel-secret']
     expect(ids.every((id) => (document.getElementById(id) as HTMLInputElement).required)).toBe(true)
+    expect(document.getElementById('v8-provider-id')).toBeNull()
     expect(document.getElementById('channel-access-token')).toBeNull()
     expect(document.getElementById('liff-id')).toBeNull()
     /* ②-1は公式アカウントマネージャーからMessaging API設定を開く。 */

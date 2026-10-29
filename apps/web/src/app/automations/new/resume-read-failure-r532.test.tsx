@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -147,13 +148,13 @@ async function mountPage(): Promise<HTMLDivElement> {
 }
 
 function saveButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存')
+  const button = (Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))
   if (!button) throw new Error('保存ボタンが見つかりません')
   return button as HTMLButtonElement
 }
 
 function findButton(el: HTMLDivElement, text: string): HTMLButtonElement | null {
-  return Array.from(el.querySelectorAll('button')).find((node) => node.textContent === text) as HTMLButtonElement ?? null
+  return (Array.from(el.querySelectorAll('button')).find((node) => node.textContent === text) ?? querySupplementaryPageAction(text)) as HTMLButtonElement ?? null
 }
 
 describe('R532 再開の取得失敗中は保存させない', () => {

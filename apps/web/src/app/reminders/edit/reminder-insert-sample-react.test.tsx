@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 /*
@@ -126,7 +126,8 @@ describe('通知ステップの差し込みボタンと見本', () => {
     // 保存する本文は差し込みのまま、現在のLINEプレビューで見本値を確認する。
     expect(area.value).toBe('{{name}}さん、こんにちは{{name}}')
     fireEvent.click(screen.getByRole('button', { name: /LINEでの見え方を見る/ }))
-    expect(await screen.findByText('山田花子さん、こんにちは山田花子')).toBeTruthy()
+    const preview = await screen.findByRole('region', { name: 'LINEでの見え方' })
+    expect(await within(preview).findByText('山田 花子さん、こんにちは山田 花子')).toBeTruthy()
   })
 
   it('差し込みの無い本文では見本を出さない', async () => {
