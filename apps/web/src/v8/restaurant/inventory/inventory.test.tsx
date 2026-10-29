@@ -143,6 +143,17 @@ describe('Y8SjT2 予約枠・在庫', () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
     const reason = value === 'viewer' ? PERMISSION_LOCK_REASON.viewer : PERMISSION_LOCK_REASON.feature
+    for (const [name, savedValue] of [
+      ['予約サイト', '8'], ['LINE 専用', '6'], ['当日（ウォークイン）', '6'],
+      ['19:00の予約サイト', '6'], ['19:00のLINE', '4'], ['19:00の当日', '4'],
+    ]) {
+      const input = screen.getByRole('spinbutton', { name }) as HTMLInputElement
+      expect(input.value).toBe(savedValue)
+      expect(input.disabled).toBe(true)
+      expect(input.readOnly).toBe(true)
+      fireEvent.change(input, { target: { value: '999' } })
+      expect(input.value).toBe(savedValue)
+    }
     const controls = [
       screen.getByRole('button', { name: /開ける時間と配分を保存/ }),
       screen.getAllByRole('button', { name: '＋ 時間帯を足す' })[0],

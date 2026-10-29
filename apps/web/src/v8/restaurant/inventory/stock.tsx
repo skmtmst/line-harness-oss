@@ -71,8 +71,9 @@ function NumberField({ id, 'aria-describedby': describedBy, label, value, onChan
       aria-label={label}
       value={String(value)}
       readOnly={!canEdit}
+      disabled={!canEdit}
       invalid={invalid}
-      onChange={(event) => onChange(Number(event.target.value))}
+      onChange={(event) => { if (canEdit) onChange(Number(event.target.value)) }}
     /></SaveErrorField>
   )
 }
@@ -447,7 +448,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole }: { ctx: Resta
                       onClick={() => { setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}
                     >
                       <Td>
-                        <Button variant="text" size="compact" textTone="ink" data-part="row-name" aria-pressed={selected?.row.id === slot.row.id} onClick={(event) => { event.stopPropagation(); setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}>{slot.time}</Button>
+                        <Button variant="text" size="compact" fullWidth presentation="row-action" textTone="ink" data-part="row-name" aria-pressed={selected?.row.id === slot.row.id} onClick={(event) => { event.stopPropagation(); setSelectedId(slot.row.id); setSlotAlloc(null); setSlotVersion(undefined) }}>{slot.time}</Button>
                       </Td>
                       <Td>
                         <svg className={styles.useBar} role="img" aria-label={`利用率 ${Math.round(slot.ratio * 100)}％`} viewBox="0 0 120 8" preserveAspectRatio="none">
