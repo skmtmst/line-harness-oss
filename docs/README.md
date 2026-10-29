@@ -49,6 +49,7 @@
 - [m3-oam-response.webp](../apps/web/public/manuals/line-connect/images/m3-oam-response.webp) — 図・手引きの資料、確認 2026-10-19
 - [m3-tab.webp](../apps/web/public/manuals/line-connect/images/m3-tab.webp) — 図・手引きの資料、確認 2026-10-19
 - [m3-webhook-on.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-on.webp) — 図・手引きの資料、確認 2026-10-19
+- [m3-webhook-configured-musubo.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-configured-musubo.webp) — Webhook設定後の確認画面、確認 2026-10-29
 - [m3-musubo-webhook.png](../apps/web/public/manuals/line-connect/images/m3-musubo-webhook.png) — musuboのWebhook設定画面、確認 2026-10-29
 - [index.html](../apps/web/public/manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
 - [LINEアカウント登録（V6 33-2）](line-account-register.md)
@@ -83,6 +84,7 @@
 - [m3-oam-response.jpg](manuals/line-connect/images/m3-oam-response.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m3-tab.jpg](manuals/line-connect/images/m3-tab.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m3-webhook-on.jpg](manuals/line-connect/images/m3-webhook-on.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m3-webhook-configured-musubo.jpg](manuals/line-connect/images/m3-webhook-configured-musubo.jpg) — Webhook設定後の確認画面、確認 2026-10-29
 - [m3-musubo-webhook.png](manuals/line-connect/images/m3-musubo-webhook.png) — musuboのWebhook設定画面、確認 2026-10-29
 - [index.html](manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
 
@@ -877,3 +879,4 @@
 - [SNS連携の操作と案内](release-log/unreleased/1881-kenta-sns-actions.md) — SNS連携の画面に関する反映履歴。
 - [LINEログインのコピーと公開の案内](release-log/unreleased/1901-masato-line-login-guide-images.md) — 接続マニュアルStep 4の画像案内の反映履歴。
 - [プロバイダーID確認画面の案内](release-log/unreleased/1903-masato-provider-id-manual-image.md) — 接続マニュアルStep 2の画像案内の反映履歴。
+- [musuboのWebhook設定後の案内](release-log/unreleased/1904-masato-musubo-webhook-guide-image.md) — 接続マニュアルStep 3の画像案内の反映履歴。
