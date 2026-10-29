@@ -332,7 +332,7 @@ export default function AssignMatrixV8() {
     (selectedRow!.override_duration_minutes != null || selectedRow!.override_price != null)
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage boardId="ooufy" dirty={false}
+    <SaveErrorScope errors={saveErrors}><CreatePage boardId="ooufy" dirty={false} readOnly={Boolean(selectedAccountId && !canEditMenus)}
               footerActions={canEditMenus ? (
               <>
                 <Button
