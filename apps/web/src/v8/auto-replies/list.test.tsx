@@ -302,3 +302,18 @@ it('すべて・フォルダ・未分類を同じ一覧で数え、別の集計�
  const rows=[...host.querySelectorAll('aside [data-part="folder-row"]')].map(el=>el.textContent?.replace(/\s/g,''))
  expect(rows).toEqual(expect.arrayContaining(['すべて2','問合せ1','未分類1']))
 })
+
+it('フォルダの数は表示ページの20件ではなく取得した26件全体を数える', async () => {
+  listReplies.mockResolvedValueOnce({ success: true, data: Array.from({ length: 26 }, (_, index) => ({
+    ...ruleA, id: `rule-${index}`, name: `ルール${index}`, folderId: index < 13 ? 'folder-a' : null,
+  })) })
+  listFolders.mockResolvedValueOnce({ success: true, data: [{ id: 'folder-a', name: '問合せ', itemCount: 99 }], unfiledCount: 98 })
+  act(() => root.render(<AutoRepliesListV8 />)); await flush()
+  const counts = () => [...host.querySelectorAll('aside [data-part="folder-row"]')].map(el => el.textContent?.replace(/\s/g, ''))
+  expect(counts()).toEqual(expect.arrayContaining(['すべて26', '問合せ13', '未分類13']))
+  expect(host.querySelectorAll('[data-row-id]')).toHaveLength(20)
+  fireEvent.click(host.querySelector<HTMLButtonElement>('button[aria-label="次のページ"]')!)
+  await flush()
+  expect(host.querySelectorAll('[data-row-id]')).toHaveLength(6)
+  expect(counts()).toEqual(expect.arrayContaining(['すべて26', '問合せ13', '未分類13']))
+})

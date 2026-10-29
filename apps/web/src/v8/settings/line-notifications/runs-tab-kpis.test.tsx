@@ -67,6 +67,9 @@ test('ページ内で絞り込んでも全体の件数と検索範囲の案内�
   expect(screen.getByRole('searchbox', { name: 'このページ内で名前・注文番号を探す' }).getAttribute('placeholder')).toBe('このページ内で名前・注文番号を探す')
   expect(screen.getByText('57件中 1〜20件')).toBeTruthy()
   expect(screen.getByText('個人の既読は見られません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。')).toBeTruthy()
+  fireEvent.change(screen.getByRole('searchbox', { name: 'このページ内で名前・注文番号を探す' }), { target: { value: '' } })
+  expect(await screen.findAllByTitle('田中')).toHaveLength(2)
+  expect(screen.getByText('57件中 1〜20件')).toBeTruthy()
 })
 
 test.each([
