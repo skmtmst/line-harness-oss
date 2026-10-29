@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -15,7 +16,7 @@ import EmergencyControlV8 from '../../v8/emergency/control'
  * ★V8-B 運用状態の緊急コントロール（板 ）の契約。
  * 新しい制御タブに切り替わり、何を止めますか・止めるアカウント・
  * 記録の表が出ること、権限が無い人には閲覧のみの帯が出て止める操作が
- * 隠れること、止める確認の窓は「停止」の言葉が合うまで
+ * 灰色＋理由で残ること、止める確認の窓は「停止」の言葉が合うまで
  * 進めないことを実DOMで固定する。
  */
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
@@ -64,6 +65,7 @@ let root: Root | null = null
 let host: HTMLDivElement | null = null
 
 beforeEach(() => {
+  verifiedStaffRole('owner')
   canControl = true
   activeIncidentId = null
   host = document.createElement('div')
@@ -170,15 +172,18 @@ test('新しい制御タブ（OHwbU）が出る', async () => {
   expect(labels.find(label => label.textContent === 'いまの版')?.querySelector('.lucide-git-branch')).toBeTruthy()
 })
 
-test('PKG107: 閲覧のみには停止操作を隠し、状態と記録を残す', async () => {
+test('PKG107: 閲覧のみには停止操作を灰色で残し、状態と記録を残す', async () => {
   canControl = false
   verifiedStaffRole('viewer')
   await renderControl()
   expect(host?.textContent).toContain('閲覧のみで見ています')
   const stopButton = Array.from(host?.querySelectorAll('button') ?? [])
     .find((button) => button.textContent === '選んだものを止める')
-  expect(stopButton).toBeUndefined()
-  expect(host?.querySelector('input[type="checkbox"]')).toBeNull()
+  await expectPermissionLocked(stopButton)
+  const checkboxes = [...host!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+  expect(checkboxes).toHaveLength(4)
+  expect(checkboxes.every(box => box.disabled)).toBe(true)
+  expect(stopCalls).toHaveLength(0)
   // 対象アカウントは状態を見るためにも使うので、閲覧だけでも選べる。
   expect(host?.querySelector('[aria-label="緊急停止の対象アカウント"]')).not.toBeNull()
   expect(host?.textContent).toContain('止めた・戻した記録')
@@ -395,13 +400,14 @@ test('WEB312: 状態が読めないときは「—」と読み直しを出す', 
   expect(host?.textContent).toContain('いまの停止状態を確認できませんでした')
 })
 
-test('PKG107: 停止中の閲覧のみでは復旧操作を隠し、停止の状態を読める', async () => {
+test('PKG107: 停止中の閲覧のみでは復旧操作を灰色で残し、停止の状態を読める', async () => {
   canControl = false
   verifiedStaffRole('viewer')
   activeIncidentId = 'incident-1'
   await renderControl()
   expect(host?.textContent).toContain('止めているとき')
-  expect([...host!.querySelectorAll('button')].find((el) => el.textContent?.trim() === '復旧する')).toBeUndefined()
+  await expectPermissionLocked([...host!.querySelectorAll('button')].find((el) => el.textContent?.trim() === '復旧する'))
+  expect(stopCalls).toHaveLength(0)
  })
 
 afterEach(() => { verifiedStaffRole(null) })
