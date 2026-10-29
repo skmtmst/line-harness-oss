@@ -10,12 +10,12 @@ import { processLineWebhookEvents } from '../services/line-webhook-events.js';
 import { MAX_WEBHOOK_BODY_SIZE, ensureFriendFromWebhookUser, handleStoppedTenantEvent, handleNoticeLinkCode, handleEvent } from './webhook-definition.js';
 import type { Context } from 'hono';
 
-function noticeLineInquiryReply(adminPublicUrl: string | undefined): string {
-  const adminUrl = adminPublicUrl?.trim().replace(/\/+$/, '');
+function noticeLineInquiryReply(): string {
+  // 通知専用LINEは検証・本番で共用するため、環境別の管理画面URLを案内しない。
   return [
     'こちらはmusubo契約者様向けの通知専用LINEです。',
     'お問い合わせはmusuboの管理画面にログインし、各店舗アカウントの「お問い合わせ」ボタンよりお送りください。',
-    ...(adminUrl ? [adminUrl] : []),
+    'https://admin.musubo.jp',
     'このトークに送った内容はお問い合わせとして受け付けていません。',
   ].join('\n');
 }
@@ -127,7 +127,7 @@ export const post__webhook_1 = async (c: Context<Env>) => {
         }
         if (await handleNoticeLinkCode(c.env, execution.mutationDb('notice_code'), ownedClient, event, matchedAccountId)) return;
         if (event.type === 'message' && event.source.type === 'user' && event.replyToken) {
-          await ownedClient.replyMessage(event.replyToken, [{ type: 'text', text: noticeLineInquiryReply(c.env.ADMIN_PUBLIC_URL) }]);
+          await ownedClient.replyMessage(event.replyToken, [{ type: 'text', text: noticeLineInquiryReply() }]);
         }
         return;
       }
