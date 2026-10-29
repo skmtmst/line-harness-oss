@@ -306,7 +306,8 @@ export default function BroadcastListV8() {
   const { value: listKpis, setValue: setListKpis } = useListSnapshot<BroadcastListKpis | null | undefined>(listScope, undefined)
   const { value: statusCounts, setValue: setStatusCounts } = useListSnapshot<Record<string, number> | null>(listScope, null)
   const { value: listTotal, setValue: setListTotal } = useListSnapshot<number | null>(listScope, null)
-  const [quota, setQuota] = useState<{ limit: number | null; used: number | null } | null>(null)
+  const [quota, setQuota] = useState<{ limit: number | null; used: number | null; unlimited: boolean; reason: 'not_connected' | 'fetch_failed' | null } | null>(null)
+  const [quotaLoading, setQuotaLoading] = useState(false)
 
   const listRequestKey = JSON.stringify([listScope, sortKey])
   const currentListRequest = useRef(listRequestKey)
@@ -475,19 +476,31 @@ export default function BroadcastListV8() {
     setPage(next)
   }
 
-  /* 今月の送信枠（ダッシュボードの口から quota を借りる）。 */
+  /* 今月の送信枠（ダッシュボードの口から quota を借りる。上限なし・読み込み中・失敗を分ける）。 */
   useEffect(() => {
     if (!selectedAccountId) {
       setQuota(null)
+      setQuotaLoading(false)
       return
     }
     let cancelled = false
+    setQuota(null)
+    setQuotaLoading(true)
     api.dashboard.overview({ accountId: selectedAccountId })
       .then((res) => {
         if (cancelled) return
-        if (res.success) setQuota({ limit: res.data.delivery.quotaLimit, used: res.data.delivery.quotaUsed })
+        setQuotaLoading(false)
+        if (!res.success) return
+        const metric = res.data.metrics?.monthlyQuota
+        const rawReason = metric?.reason ?? res.data.sections?.quota?.reason ?? null
+        const reason = rawReason === 'not_connected' || rawReason === 'fetch_failed' ? rawReason : null
+        if (metric === undefined || metric === null) {
+          setQuota({ limit: res.data.delivery.quotaLimit, used: res.data.delivery.quotaUsed, unlimited: false, reason })
+        } else {
+          setQuota({ limit: metric.value?.limit ?? null, used: metric.value?.used ?? null, unlimited: metric.value?.unlimited === true, reason })
+        }
       })
-      .catch(() => undefined)
+      .catch(() => { if (!cancelled) setQuotaLoading(false) })
     return () => { cancelled = true }
   }, [selectedAccountId])
 
@@ -645,13 +658,15 @@ export default function BroadcastListV8() {
   }
 
   /* 送信枠は表示幅にかかわらず、同じ月の使用量から残りを出す。 */
-  const quotaReadable = quota?.limit != null && quota?.used != null
+  const quotaUnlimited = quota?.unlimited === true
+  const quotaReadable = !quotaUnlimited && quota?.limit != null && quota?.used != null
+  const quotaFailed = !quotaLoading && !quotaUnlimited && !quotaReadable
   const quotaRemaining = quotaReadable ? (quota?.limit ?? 0) - (quota?.used ?? 0) : null
-  /* 読めないときは、トークンを入れ直す場所（アカウント設定の資格情報）への行き先を出す。 */
-  const quotaAction = quotaReadable ? undefined : {
+  /* 未接続・取得失敗のときだけ、トークンを入れ直す場所（アカウント設定の資格情報）への行き先を出す。上限なし・読み込み中は出さない。 */
+  const quotaAction = quotaFailed && quota?.reason != null ? {
     label: 'アカウント設定へ',
     href: selectedAccountId ? `/accounts/detail?id=${encodeURIComponent(selectedAccountId)}` : '/accounts',
-  }
+  } : undefined
   const kpiPending = listKpis === undefined
   const kpis = [
     {
@@ -666,11 +681,15 @@ export default function BroadcastListV8() {
       key: 'quota',
       title: '今月の送信枠',
       icon: Gauge,
-      value: quotaRemaining,
-      unit: '通 残り',
-      detail: quotaReadable
-        ? `${formatNumber(quota?.limit ?? 0)} 通のうち ${formatNumber(quota?.used ?? 0)} 通を使用`
-        : '送信枠を確認できません',
+      value: quotaUnlimited ? quota?.used ?? null : quotaRemaining,
+      unit: quotaUnlimited ? '通 使用' : '通 残り',
+      detail: quotaLoading
+        ? '読み込んでいます'
+        : quotaUnlimited
+          ? '上限なし'
+          : quotaReadable
+            ? `${formatNumber(quota?.limit ?? 0)} 通のうち ${formatNumber(quota?.used ?? 0)} 通を使用`
+            : '送信枠を確認できません',
     },
     {
       key: 'thisMonth',
@@ -1142,6 +1161,7 @@ export default function BroadcastListV8() {
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}
+              loading={kpi.key === 'quota' ? quotaLoading : undefined}
               action={kpi.key === 'quota' ? quotaAction : undefined}
             />
           ))}
