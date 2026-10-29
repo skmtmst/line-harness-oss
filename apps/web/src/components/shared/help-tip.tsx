@@ -38,14 +38,11 @@ export default function HelpTip({
    */
   children: ReactNode
 }) {
-  // 乗せた・焦点で読む状態と、押して開いた状態を分ける。
-  const [openSource, setOpenSource] = useState<'automatic' | 'activation' | null>(null)
-  const open = openSource !== null
+  const [open, setOpen] = useState(false)
   const tipId = useId()
   const wrapRef = useRef<HTMLSpanElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const tipRef = useRef<HTMLSpanElement>(null)
-  const restoringFocus = useRef(false)
   const [position, setPosition] = useState<{ left: number; top: number }>()
 
   useLayoutEffect(() => {
@@ -70,7 +67,7 @@ export default function HelpTip({
   useEffect(() => {
     if (!open) return
     const closeOthers = (event: Event) => {
-      if ((event as CustomEvent<string>).detail !== tipId) setOpenSource(null)
+      if ((event as CustomEvent<string>).detail !== tipId) setOpen(false)
     }
     window.addEventListener(CLOSE_OTHERS_EVENT, closeOthers)
     return () => window.removeEventListener(CLOSE_OTHERS_EVENT, closeOthers)
@@ -82,12 +79,11 @@ export default function HelpTip({
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return
       event.preventDefault()
-      setOpenSource(null)
-      restoringFocus.current = true
-      try { buttonRef.current?.focus() } finally { restoringFocus.current = false }
+      setOpen(false)
+      buttonRef.current?.focus()
     }
     const onPointer = (event: PointerEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpenSource(null)
+      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false)
     }
     document.addEventListener('keydown', onKey)
     document.addEventListener('pointerdown', onPointer)
@@ -98,22 +94,20 @@ export default function HelpTip({
   }, [open ])
 
   const toggle = () => {
-    setOpenSource((current) => {
+    setOpen((current) => {
       if (!current) window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId }))
-      if (hover && current === 'automatic') return 'activation'
-      return current ? null : 'activation'
+      return !current
     })
   }
 
   return (
     <span
       ref={wrapRef}
-      onMouseEnter={hover ? () => { window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpenSource(current => current ?? 'automatic') } : undefined}
-      onPointerLeave={hover ? event => { if (event.pointerType !== 'touch') setOpenSource(null) } : undefined}
-      onFocus={hover ? () => { if (restoringFocus.current) return; window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpenSource(current => current ?? 'automatic') } : undefined}
+      onMouseEnter={hover ? () => { window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpen(true) } : undefined}
+      onMouseLeave={hover ? () => setOpen(false) : undefined}
       className={[styles.wrap, className].filter(Boolean).join(' ')}
       onBlur={(event) => {
-        if (!wrapRef.current?.contains(event.relatedTarget as Node)) setOpenSource(null)
+        if (!wrapRef.current?.contains(event.relatedTarget as Node)) setOpen(false)
       }}
     >
       <button
