@@ -49,8 +49,8 @@ export default function NoticeLineRegisterDialog({ open, onClose, quietWhenUnava
   return (
     <Dialog
       open={open}
-      title="musubo 運営（契約者専用）の LINE を登録してください"
-      description="今後の大事なお知らせ（メンテナンス、料金、重要な変更）はこの LINE に届きます。メールを見逃しても気づけるよう、必ず登録をお願いします。"
+      title="運営からの通知を LINE で受け取る"
+      description="メンテナンスや料金など、大事なお知らせを受け取る通知専用LINEです。お問い合わせへの返信は登録メールアドレスと管理画面に届きます。"
       onCancel={onClose}
       footer={<div className="flex justify-end"><Button variant="primary" onClick={onClose}>あとで確認する</Button></div>}
       designNode="D6fh3"
@@ -77,7 +77,7 @@ export default function NoticeLineRegisterDialog({ open, onClose, quietWhenUnava
             {info.addFriendUrl ? (
               <TextLink inline external href={info.addFriendUrl}>スマートフォンで開く（友だち追加）</TextLink>
             ) : null}
-            <p className="text-micro text-ink-faint">確認コードは 24 時間有効です。管理画面の「お問い合わせ」からも、いつでもこの案内を開けます。</p>
+            <p className="text-micro text-ink-faint">確認コードは 24 時間有効です。このLINEは問い合わせを受け付けません。お問い合わせは管理画面の「お問い合わせ」から送れます。</p>
           </div>
         </div>
       ) : (

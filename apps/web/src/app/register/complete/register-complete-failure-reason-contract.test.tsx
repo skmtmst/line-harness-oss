@@ -78,8 +78,8 @@ describe('本登録の失敗理由案内（M045）', () => {
     await act(async () => { await Promise.resolve() })
     setInput('#complete-tenant', 'テスト統括')
     setInput('#complete-name', '山田 太郎')
-    setInput('#complete-password', 'Passw0rd1')
-    setInput('#complete-confirm', 'Passw0rd1')
+    setInput('#complete-password', 'StrongPass123!')
+    setInput('#complete-confirm', 'StrongPass123!')
     await submitForm()
 
     const alert = host.querySelector('[role="alert"]')?.textContent ?? ''
@@ -87,7 +87,7 @@ describe('本登録の失敗理由案内（M045）', () => {
     expect(alert).toContain('もう一度お試しください')
     // 入力値は保持される。
     expect((host.querySelector('#complete-tenant') as HTMLInputElement).value).toBe('テスト統括')
-    expect((host.querySelector('#complete-password') as HTMLInputElement).value).toBe('Passw0rd1')
+    expect((host.querySelector('#complete-password') as HTMLInputElement).value).toBe('StrongPass123!')
     // busy が戻り、再送信できる。
     expect(host.querySelector('button[type="submit"]')?.hasAttribute('disabled')).toBe(false)
   })
@@ -98,8 +98,8 @@ describe('本登録の失敗理由案内（M045）', () => {
     await act(async () => { await Promise.resolve() })
     setInput('#complete-tenant', 'テスト統括')
     setInput('#complete-name', '山田 太郎')
-    setInput('#complete-password', 'Passw0rd1')
-    setInput('#complete-confirm', 'Passw0rd1')
+    setInput('#complete-password', 'StrongPass123!')
+    setInput('#complete-confirm', 'StrongPass123!')
     await submitForm()
 
     const alert = host.querySelector('[role="alert"]')?.textContent ?? ''
