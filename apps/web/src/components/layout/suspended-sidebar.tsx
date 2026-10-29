@@ -3,16 +3,12 @@
 import { LifeBuoy } from 'lucide-react'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { useBrand } from '@/lib/use-brand'
 import styles from './sidebar.module.css'
-import identityStyles from './sidebar-identity.module.css'
+import SidebarIdentity from './sidebar-identity'
 
 /** 管理画面 `IwfA0`。停止中はお問い合わせ以外の導線を出さない。 */
 export default function SuspendedSidebar() {
   const [name, setName] = useState('—')
-  const brand = useBrand()
-  const brandName = brand.name || '管理画面'
-  const brandInitial = 'm'
 
   useEffect(() => {
     try { setName(localStorage.getItem('lh_staff_name') || '—') } catch { /* storage なし */ }
@@ -25,13 +21,7 @@ export default function SuspendedSidebar() {
         <span className="inline-flex h-7 items-center rounded-pill bg-status-danger-soft px-2 text-nano font-medium text-danger">利用停止中</span>
       </div>
       <aside className={styles.desktop} aria-label="停止中の管理メニュー">
-        <div className={identityStyles.root} data-design-node="J33xq/V2WbXF">
-          <span className={identityStyles.mark} aria-hidden="true">{brandInitial}</span>
-          <span className={identityStyles.text}>
-            <span className={identityStyles.name} title={brandName}>{brandName}</span>
-            <span className={identityStyles.version}>musubo 統括コンソール</span>
-          </span>
-        </div>
+        <SidebarIdentity />
         <div className={styles.identityRule} />
         <nav className={styles.nav}>
           <div className={styles.section}>
