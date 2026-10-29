@@ -465,6 +465,7 @@
 - [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
 - [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
 - [お知らせの帯と次の段の間隔そろえ](release-log/unreleased/1950-kenta-muse-fqa-space.md)
+- [在庫の保存帯と本文の重なり修正](release-log/unreleased/0000-kenta-swbm-b19.md)
 - [新規店舗の専用機能を非表示](release-log/unreleased/1925-masato-new-store-specialized-hidden.md)
 - [一斉配信・シナリオ一覧の自動点検の更新](release-log/unreleased/1930-kenta-muse-broadcast-scenario-reds.md)
 - [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)

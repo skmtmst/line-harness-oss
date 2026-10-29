@@ -280,3 +280,24 @@
     background-color: var(--color-scroll-thumb-hover);
   }
 }
+
+/* 明示した画面の高さだけ、外枠とお知らせを除いた残りを親から受け取る。
+   対象条件は templates/page-templates.module.css の親収容・保存帯の規則と対で保つ。 */
+@media (min-width: 1024px) {
+  :root .main[id='main-content']:has(> .content[data-design-shell] > :global([data-page-template][data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']))) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+
+  :root .main[id='main-content']:has(> .content[data-design-shell] > :global([data-page-template][data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']))) > .recoveryNotice {
+    flex-shrink: 0;
+  }
+
+  :root .main[id='main-content'] > .content[data-design-shell]:has(> :global([data-page-template][data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']))) {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+}
