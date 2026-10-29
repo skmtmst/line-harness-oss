@@ -4,6 +4,7 @@
  * 部品の中で決めること：押した「…」から開く・Esc／外を押すと閉じて「…」へ戻る・
  * 矢印で項目を移る・危ない操作は赤字で区切りの下・行の押下へ伝えない。
  */
+import { RowMenuReference } from '@/test-utils/row-menu-reference'
 import React, { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -180,15 +181,20 @@ describe('RowMenu：行の右端の「…」', () => {
 
 describe('RowMenu の任意の権限ロック', () => {
   it.each(['plain', 'box'] as const)('%s は指定なしのDOMとTab入口を保ち、理由付きでは開かない', async (appearance) => {
+    const reference = render(<RowMenuReference appearance={appearance} label="春のセールの操作" items={items()} />)
+    const before = reference.container.innerHTML
+    const tabIndex = trigger().tabIndex
+    reference.unmount()
     const changed = vi.fn()
     const { rerender, container } = render(<RowMenu appearance={appearance} label="春のセールの操作" items={items()} onOpenChange={changed} />)
-    const before = container.innerHTML
-    const tabIndex = trigger().tabIndex
+    expect(container.innerHTML).toBe(before)
+    expect(trigger().tabIndex).toBe(tabIndex)
     rerender(<RowMenu appearance={appearance} label="春のセールの操作" items={items()} onOpenChange={changed} lockedReason={undefined} />)
     expect(container.innerHTML).toBe(before)
     expect(trigger().tabIndex).toBe(tabIndex)
     rerender(<RowMenu appearance={appearance} label="春のセールの操作" items={items()} onOpenChange={changed} lockedReason="閲覧のみのため変更できません。" />)
     expect(trigger().getAttribute('aria-disabled')).toBe('true')
+    expect(trigger().hasAttribute('title')).toBe(false)
     expect((trigger() as HTMLButtonElement).disabled).toBe(false)
     fireEvent.focus(trigger())
     expect(screen.getByRole('tooltip').textContent).toContain('閲覧のみ')
