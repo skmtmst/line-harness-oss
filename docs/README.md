@@ -961,3 +961,5 @@
 - [UID移行の権限と操作の表示](release-log/unreleased/1952-kenta-uid-permissions.md)
 - [サロンと面談の空の日の予約案内](release-log/unreleased/0000-kenta-empty-bookings.md) — 反映履歴、確認 2026-10-30
 - [教室のクラスと会員予約の空状態](release-log/unreleased/0000-kenta-lesson-empty-bookings.md) — 反映履歴、確認 2026-10-30
+
+- [飲食店の左メニューの予約項目](release-log/unreleased/0000-kenta-restaurant-sidebar.md) — 反映履歴、確認 2026-10-30
