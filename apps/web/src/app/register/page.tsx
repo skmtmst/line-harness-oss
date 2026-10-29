@@ -77,8 +77,8 @@ export default function RegisterPage() {
 
   return (
     <AuthCard
-      node="JBd7P"
-      cardNode="NIOtl"
+      node="Bo15C"
+      applicationFlow="form"
       title="利用を申し込む"
       description="必要事項を送信すると、musuboの担当者からご連絡します。承認後に利用を開始できます。"
     >
@@ -119,6 +119,7 @@ export default function RegisterPage() {
           <Select id="register-referral" aria-label="musuboを知ったきっかけ" size="full" value={referralSource} onChange={setReferralSource}
             options={REFERRAL_OPTIONS} invalid={Boolean(messages.referralSource)} />
         </AuthField>
+        <p className="text-micro text-ink-faint">知人・取引先からの紹介／インターネット検索／SNS／広告／イベント・セミナー／その他</p>
 
         <Turnstile onToken={setTurnstileToken} handleRef={setTurnstileHandle} />
 

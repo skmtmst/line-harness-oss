@@ -16,7 +16,7 @@ vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(w
   usePathname: () => '/hq',
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ setSelectedAccountId: vi.fn(), refreshAccounts: vi.fn(async () => {}) }),
+  useAccount: () => ({ accounts: [], setSelectedAccountId: vi.fn(), refreshAccounts: vi.fn(async () => {}) }),
 }))
 vi.mock('@/lib/api', () => ({
   api: {

@@ -50,7 +50,7 @@
 - [m3-tab.webp](../apps/web/public/manuals/line-connect/images/m3-tab.webp) — 図・手引きの資料、確認 2026-10-29
 - [m3-webhook-on.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-on.webp) — 図・手引きの資料、確認 2026-10-29
 - [m3-webhook-configured-musubo.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-configured-musubo.webp) — Webhook設定後の確認画面、確認 2026-10-29
-- [m3-musubo-webhook.png](../apps/web/public/manuals/line-connect/images/m3-musubo-webhook.png) — musuboのWebhook設定画面、確認 2026-10-29
+- [m3-musubo-webhook.webp](../apps/web/public/manuals/line-connect/images/m3-musubo-webhook.webp) — musuboのWebhook設定画面、確認 2026-10-29
 - [index.html](../apps/web/public/manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
 - [LINEアカウント登録（V6 33-2）](line-account-register.md)
 - [Googleビジネスプロフィール連携 機能対応表（申請用・根拠付き）](manuals/google-business-feature-matrix.md)
@@ -85,7 +85,7 @@
 - [m3-tab.jpg](manuals/line-connect/images/m3-tab.jpg) — 図・手引きの資料、確認 2026-10-29
 - [m3-webhook-on.jpg](manuals/line-connect/images/m3-webhook-on.jpg) — 図・手引きの資料、確認 2026-10-29
 - [m3-webhook-configured-musubo.jpg](manuals/line-connect/images/m3-webhook-configured-musubo.jpg) — Webhook設定後の確認画面、確認 2026-10-29
-- [m3-musubo-webhook.png](manuals/line-connect/images/m3-musubo-webhook.png) — musuboのWebhook設定画面、確認 2026-10-29
+- [m3-musubo-webhook.webp](manuals/line-connect/images/m3-musubo-webhook.webp) — musuboのWebhook設定画面、確認 2026-10-29
 - [index.html](manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
 
 ## 要件
@@ -489,6 +489,16 @@
 - [投稿メディアの選択画面](release-log/unreleased/1886-masato-post-media-picker.md)
 - [既存のLINEログインチャネルの案内](release-log/unreleased/1887-masato-provider-existing-login-copy.md)
 - [Messaging API設定への案内](release-log/unreleased/1889-masato-line-manager-step1.md)
+- [運営コンソールの入口整理](release-log/unreleased/1934-masato-ops-menu-cleanup.md)
+- [運営画面の正式ロゴ](release-log/unreleased/1935-masato-ops-musubo-logo.md)
+- [郵便番号の住所データ登録](release-log/unreleased/1936-masato-postal-lookup.md)
+- [契約者専用LINEの通知先接続](release-log/unreleased/1937-masato-notice-line-connect.md)
+- [管理画面のロゴ統一](release-log/unreleased/1938-masato-common-musubo-logo.md)
+- [管理画面のロゴサイズ調整](release-log/unreleased/1939-masato-ops-logo-size.md)
+- [ロゴと上部メニューの高さ調整](release-log/unreleased/1940-masato-logo-header-align.md)
+- [契約者向けLINEの通知専用化](release-log/unreleased/1941-masato-notice-line-only.md)
+- [申込受付と承認画面の調整](release-log/unreleased/1943-masato-registration-approval-pen.md)
+- [接続マニュアルのチャット注意書き復元と画像軽量化](release-log/unreleased/1946-kenta-muse-red-accounts.md)
 - [投稿メディアの内容選択](release-log/unreleased/1890-masato-post-media-content.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
@@ -917,3 +927,4 @@
 - [店の比較から削除・アーカイブした店を除く](release-log/unreleased/1927-masato-store-comparison-archived.md) — 店の比較とCSVの修正履歴。
 - [自動応答の閲覧表示と作成画面の間隔](release-log/unreleased/1933-kenta-auto-reply-wizard.md) — 閲覧時の入力表示と縦の空きの反映履歴。
 - [一覧のページ範囲の補正](release-log/unreleased/1933-kenta-muse-history-pagination.md) — 削除後に最後のページへ戻す修正の反映履歴。
+- [登録の確認画面の表示とロゴ](release-log/unreleased/1945-masato-registration-confirmed-logo.md) — 登録の確認項目と正式ロゴの修正履歴。

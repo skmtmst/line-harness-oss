@@ -33,7 +33,7 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
 
   it('登録の 1 歩目は会社・担当者・連絡先・きっかけを送る。Turnstile と同意がある', () => {
     const page = read('app/register/page.tsx')
-    expect(page).toContain("node=\"JBd7P\"")
+    expect(page).toContain("node=\"Bo15C\"")
     expect(page).toContain('/api/auth/register/request')
     expect(page).toContain('<Turnstile')
     expect(page).toContain('readDeviceMarker()')

@@ -5,7 +5,7 @@ import TextLink from '@/components/shared/text-link'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import Button from '@/components/shared/button'
 import { adminSessionHandoffPath, adminSessionHeaders, captureTwoFactorChallenge, clearTwoFactorChallenge, storeAdminSession, takeTwoFactorNextPath } from '@/lib/admin-session'
-import { ApiError, describeSaveFailure, responseApiError } from '@/lib/api'
+import { ApiError, api, describeSaveFailure, responseApiError } from '@/lib/api'
 import { qrToDataURL } from '@/lib/qr-image'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -131,7 +131,7 @@ export default function TwoFactorSetupPage() {
       else if (body.csrfToken) {
         try { localStorage.setItem('lh_csrf', body.csrfToken) } catch { /* Cookie session is sufficient */ }
       }
-      const nextPath = takeTwoFactorNextPath()
+      let nextPath = takeTwoFactorNextPath()
       if (nextPath === '/ops') {
         const session = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/session`, {
           credentials: 'include',
@@ -141,6 +141,12 @@ export default function TwoFactorSetupPage() {
         if (!session.ok || !sessionBody.success || !sessionBody.data?.platformAdmin) {
           throw new Error('二段階認証は登録できましたが、運営メンバーの有効状態を確認できませんでした。時間をおいて、もう一度お試しください。')
         }
+      }
+      if (nextPath === '/') {
+        try {
+          const accounts = await api.lineAccounts.list(false, undefined, { cache: 'no-store' })
+          if (accounts.success && accounts.data.length === 0) nextPath = '/accounts/new'
+        } catch { /* 一覧を確認できない場合は通常のホームへ進む */ }
       }
       clearTwoFactorChallenge()
       const path = adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken)
