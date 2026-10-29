@@ -3,7 +3,7 @@ import type { LineAccountConnectData } from '@/lib/api'
 import {
   DRAFT_KEY, LOGIN_ACKS, PRECHECK_RESULT, PRECHECK_VERIFIED_ACK, WEBHOOK_ACKS, allAcked, allV06RowsOk,
   allV8RowsPassed, checkActionLabel, checkErrorText, checkRowText, checkStage, developerChannelUrl, developerProviderUrl,
-  formatJaDuration, handoverProgress, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked,
+  formatJaDuration, handoverProgress, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked, providerIdErrors,
   precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary, precheckUpcoming,
   readDraft, readPrecheckAnswers, readPrecheckAt, stepLabel, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
 } from './logic'
@@ -164,26 +164,27 @@ describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
 })
 
 describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算', () => {
-  it('②は3つ、③は2つの小さな段。札は「Step 2 / 3」の形で、段の無い画面では出さない', () => {
-    expect([subTotal(1), subTotal(2), subTotal(3), subTotal(4), subTotal(5)]).toEqual([0, 3, 2, 0, 0])
-    expect(stepLabel(2, 2)).toBe('Step 2 / 3')
+  it('②は4つ、③は2つの小さな段。札は「Step 2 / 4」の形で、段の無い画面では出さない', () => {
+    expect([subTotal(1), subTotal(2), subTotal(3), subTotal(4), subTotal(5)]).toEqual([0, 4, 2, 0, 0])
+    expect(stepLabel(2, 2)).toBe('Step 2 / 4')
     expect(stepLabel(3, 2)).toBe('Step 2 / 2')
     expect(stepLabel(1, 1)).toBe('')
     // 範囲の外を渡されても札は壊さない。
     expect(stepLabel(3, 9)).toBe('Step 2 / 2')
   })
 
-  it('②は Messaging API の2項目・プロバイダーIDと LINEログインの2項目を別々に調べる', () => {
+  it('②は Messaging API の2項目・プロバイダーID・LINEログインの2項目を別々に調べる', () => {
     const empty = { channelId: '', channelSecret: '', providerId: '', loginChannelId: '', loginChannelSecret: '' }
-    expect(Object.keys(messagingApiErrors(empty)).sort()).toEqual(['channelId', 'channelSecret', 'providerId'])
+    expect(Object.keys(messagingApiErrors(empty)).sort()).toEqual(['channelId', 'channelSecret'])
+    expect(Object.keys(providerIdErrors(empty))).toEqual(['providerId'])
     expect(Object.keys(loginChannelErrors(empty)).sort()).toEqual(['loginChannelId', 'loginChannelSecret'])
     expect(messagingApiErrors({ channelId: 'abc', channelSecret: 'x', providerId: '2002' }).channelId).toBe('チャネルIDは半角数字で入力してください。')
-    expect(messagingApiErrors({ channelId: '2001', channelSecret: 'x', providerId: 'abc' }).providerId).toBe('プロバイダーIDは半角数字で入力してください。')
+    expect(providerIdErrors({ providerId: 'abc' }).providerId).toBe('プロバイダーIDは半角数字で入力してください。')
     expect(messagingApiErrors({ channelId: '2001', channelSecret: 'x', providerId: '2002' })).toEqual({})
     expect(loginChannelErrors({ loginChannelId: '2002', loginChannelSecret: 'x' })).toEqual({})
   })
 
-  it('②Step2の4つ・Step3の2つは、すべて入れないと次の段へ進めない', () => {
+  it('②Step3の4つ・Step4の2つは、すべて入れないと次の段へ進めない', () => {
     expect(WEBHOOK_ACKS).toHaveLength(4)
     expect(LOGIN_ACKS).toHaveLength(2)
     expect(allAcked(WEBHOOK_ACKS, {})).toBe(false)
@@ -346,7 +347,8 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
   })
 
   it('下書きは小さな段も戻す（画面に無い段の数は1に丸める）', () => {
-    expect(readDraft(storage({ step: 2, sub: 3, channelId: '2001' }))).toMatchObject({ step: 2, sub: 3 })
+    expect(readDraft(storage({ step: 2, sub: 3, channelId: '2001' }))).toMatchObject({ step: 2, sub: 4 })
+    expect(readDraft(storage({ step: 2, sub: 2, connectionStepsVersion: 4, channelId: '2001' }))).toMatchObject({ step: 2, sub: 2 })
     expect(readDraft(storage({ step: 2, sub: 9, channelId: '2001' }))).toMatchObject({ step: 2, sub: 1 })
     expect(readDraft(storage({ step: 4, sub: 2, channelId: '2001' }))).toMatchObject({ step: 4, sub: 1 })
     expect(readDraft(storage({ step: 2, channelId: '2001' }))).toMatchObject({ sub: 1 })
