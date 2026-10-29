@@ -423,6 +423,9 @@ html:root .button[data-permission-locked], html:root .button[data-permission-loc
   transform: none;
   scale: none;
 }
+html:root .button.primary[data-permission-locked]:not(:focus-visible) {
+  outline-color: var(--color-field-border);
+}
 .conditionCount {
   display: inline-flex;
   align-items: center;
