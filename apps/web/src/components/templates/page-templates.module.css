@@ -389,6 +389,8 @@
 :global(:root) [data-page-template='create'] .heading > .headingText > .description { flex-basis: 100%; order: 3; }
 /* 状態の短い補足も題の下の行。compact の間2を display:contents で失わない。 */
 :global(:root) [data-page-template='create'] .heading > .headingText > .subtitle { flex-basis: 100%; order: 3; }
+/* 閲覧のみの帯も題の行の下・横いっぱい。display:contents で頭の並びに加わるため order が要る。説明と同じ 3（DOM順で説明の後）にし、空きの値は触らない。 */
+:global(:root) [data-page-template='create'] .heading > .headingText > .headingNotice { flex-basis: 100%; order: 3; }
 :global(:root) [data-page-template='create'] .heading[data-heading-size='compact'] { row-gap: var(--tpl-compact-gap); }
 :global(:root) [data-page-template='create'] .heading > .crumbs { flex-basis: 100%; order: 4; }
 :global(:root) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: 0; }
