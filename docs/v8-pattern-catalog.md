@@ -44,7 +44,7 @@
 ## 使い方（必ず守る）
 
 - 外側の看板は `layout/sidebar-identity.tsx` の `SidebarBrand`（店は `SidebarIdentity` が取得した値を渡す）。運営も同じ横並びを使う。
-- 左下の本人操作は `shared/sidebar-user-menu.tsx`。既存の本人カードと `ActionMenu` を使い、運営の本人情報・プロフィール・2要素認証・ログアウトを渡す。店・統括の権限取得は既存 `hq/account-menu.tsx` が持つ。
+- 左下の本人操作は `shared/sidebar-user-menu.tsx`。既存の本人カードと `ActionMenu` を使い、運営の本人情報・メンバー管理・2要素認証・ログアウトを渡す。店・統括の権限取得は既存 `hq/account-menu.tsx` が持つ。
 - 運営の注意帯は `Notice` の `presentation="ops"`。琥珀色・右の環境札なし。環境と版は左下の `SidebarVersion` で確認する。
 
 1. **画面を作る・直す前に**、その画面に出る型をこの表で探し、**持ち主（正の部品）だけを使う**。画面の中で同じ役目の物を書かない（§2・§6.20）。
