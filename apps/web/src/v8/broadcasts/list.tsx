@@ -1,5 +1,6 @@
 'use client'
 import ListDateTime from '@/components/shared/list-date-time'
+import { canChangeBroadcastNow, canEditBroadcastNow, canManageBroadcastListNow, captureBroadcastWriteAccess, isFromHeadquarters, useBroadcastManagementAccess } from './write-access'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd, ListToolbarOptional, ResponsiveFilterChips } from '@/components/shared/list-toolbar';
@@ -54,6 +55,7 @@ import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary';
 import { runOptimistic } from '@/lib/undoable';
+import { notifyToast } from '@/components/shared/toast'
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { terms } from '@/lib/terms';
 import QuickSendV8 from './quick-send'
@@ -212,11 +214,6 @@ function summaryInsight(summary: ApiBroadcast['insightSummary']): BroadcastInsig
   }
 }
 
-/** 統括の一括配信から来た配信か（口が fromHeadquarters を返す。型にはまだ無いので読むだけ）。 */
-function isFromHeadquarters(broadcast: ApiBroadcast): boolean {
-  return (broadcast as ApiBroadcast & { fromHeadquarters?: boolean }).fromHeadquarters === true
-}
-
 /** 名前の横の「統括から」の札と鍵（店では変えられない印。l3RQH）。 */
 function HqMark() {
   return (
@@ -242,6 +239,7 @@ export default function BroadcastListV8() {
    * 管理者・オーナーと、配信の編集キーを持つ運用担当が変えられる（役割はサーバの答え）。
    */
   const canEdit = useFeatureAccess('broadcasts')
+  const management = useBroadcastManagementAccess()
 
   const [tags, setTags] = useState<Tag[]>([])
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
@@ -336,6 +334,7 @@ export default function BroadcastListV8() {
   const moveFolderOrder = async (index: number, direction: -1 | 1) => {
     const target = folders[index]
     const neighbor = folders[index + direction]
+    if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの並べ替えを中止しました。'); return }
     if (!target || !neighbor || folderBusy) return
     setFolderBusy(true)
     setFolderError('')
@@ -354,6 +353,7 @@ export default function BroadcastListV8() {
   }
 
   const removeFolder = async () => {
+    if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの削除を中止しました。'); return }
     if (!deletingFolder || folderBusy) return
     const targetId = deletingFolder.id
     setFolderBusy(true)
@@ -527,6 +527,7 @@ export default function BroadcastListV8() {
   }
 
   const saveCurrentView = async () => {
+    if (!canManageBroadcastListNow()) { setSavedViewError('権限が変わったため、検索条件の保存を中止しました。'); return }
     if (!selectedAccountId || !savedViewName.trim() || savedViewBusy) return
     setSavedViewBusy(true)
     setSavedViewError('')
@@ -552,10 +553,14 @@ export default function BroadcastListV8() {
   }
 
   /* 削除は、利用状況にかかわらず確認してから実行する。 */
-  const requestDelete = (broadcast: ApiBroadcast) => { setDeleteError(''); setDeleteTarget(broadcast) }
+  const requestDelete = (broadcast: ApiBroadcast) => {
+    if (!canChangeBroadcastNow(broadcast)) { notifyToast('権限が変わったため、配信の削除を中止しました。', { tone: 'error' }); return }
+    setDeleteError(''); setDeleteTarget(broadcast)
+  }
 
   const handleDelete = async () => {
     if (!deleteTarget || deleting) return
+    if (!canChangeBroadcastNow(deleteTarget)) { setDeleteError('権限が変わったため、配信の削除を中止しました。'); return }
     const targetId = deleteTarget.id
     const requestKey = listRequestKey
     setDeleting(true)
@@ -590,14 +595,19 @@ export default function BroadcastListV8() {
 
   /* 行の「…」→「フォルダへ移す」。押した瞬間に移した形を見せて裏で保存し、失敗したら戻す。 */
   const moveBroadcastToFolder = (broadcast: ApiBroadcast, folderId: string | null) => {
+    if (!canChangeBroadcastNow(broadcast)) { notifyToast('権限が変わったため、フォルダへの移動を中止しました。', { tone: 'error' }); return }
     if (moving) return
+    const permitted = captureBroadcastWriteAccess()
     setMoving(true)
     const previous = broadcasts
     setBroadcasts((current) => current.map((item) => (item.id === broadcast.id ? { ...item, folderId } : item)))
     setOpenMenuId(null)
     setMenuMoveFor(null)
     runOptimistic({
-      request: () => api.broadcasts.update(broadcast.id, { folderId, expectedVersion: broadcast.version ?? 0 }),
+      request: () => {
+        if (!permitted(broadcast)) throw new Error('権限が変わったため、フォルダへの移動を中止しました。')
+        return api.broadcasts.update(broadcast.id, { folderId, expectedVersion: broadcast.version ?? 0 })
+      },
       revert: () => { setBroadcasts(previous); setMoving(false) },
       failureMessage: 'フォルダへ移せませんでした。',
       retry: () => moveBroadcastToFolder(broadcast, folderId),
@@ -639,13 +649,20 @@ export default function BroadcastListV8() {
   }
 
   const openCreate = (withTemplate: boolean) => {
+    if (!canEditBroadcastNow()) { notifyToast('権限が変わったため、配信の作成を中止しました。', { tone: 'error' }); return }
     setCreateMenuOpen(false)
     setOpenTemplatePicker(withTemplate)
     setShowCreate(true)
   }
 
   /* 送信枠は表示幅にかかわらず、同じ月の使用量から残りを出す。 */
-  const quotaRemaining = quota?.limit != null && quota?.used != null ? quota.limit - quota.used : null
+  const quotaReadable = quota?.limit != null && quota?.used != null
+  const quotaRemaining = quotaReadable ? (quota?.limit ?? 0) - (quota?.used ?? 0) : null
+  /* 読めないときは、トークンを入れ直す場所（アカウント設定の資格情報）への行き先を出す。 */
+  const quotaAction = quotaReadable ? undefined : {
+    label: 'アカウント設定へ',
+    href: selectedAccountId ? `/accounts/detail?id=${encodeURIComponent(selectedAccountId)}` : '/accounts',
+  }
   const kpiPending = listKpis === undefined
   const kpis = [
     {
@@ -662,8 +679,8 @@ export default function BroadcastListV8() {
       icon: Gauge,
       value: quotaRemaining,
       unit: '通 残り',
-      detail: quota?.limit != null && quota?.used != null
-        ? `${formatNumber(quota.limit)} 通のうち ${formatNumber(quota.used)} 通を使用`
+      detail: quotaReadable
+        ? `${formatNumber(quota?.limit ?? 0)} 通のうち ${formatNumber(quota?.used ?? 0)} 通を使用`
         : '送信枠を確認できません',
     },
     {
@@ -696,10 +713,18 @@ export default function BroadcastListV8() {
       label: f.name,
       count: f.itemCount ?? null,
       color: f.color,
-      onEdit: canEdit ? () => setEditingFolder(f) : undefined,
-      onMoveUp: canEdit && index > 0 ? () => void moveFolderOrder(index, -1) : undefined,
-      onMoveDown: canEdit && index < folders.length - 1 ? () => void moveFolderOrder(index, 1) : undefined,
-      onDelete: canEdit ? () => setDeletingFolder(f) : undefined,
+      onEdit: () => {
+        if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの編集を中止しました。'); return }
+        setEditingFolder(f)
+      },
+      lockedReason: management.reason,
+      actionsDisabled: !management.known,
+      onMoveUp: index > 0 ? () => void moveFolderOrder(index, -1) : undefined,
+      onMoveDown: index < folders.length - 1 ? () => void moveFolderOrder(index, 1) : undefined,
+      onDelete: () => {
+        if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの削除を中止しました。'); return }
+        setDeletingFolder(f)
+      },
       deleteNote: '削除しても、中の配信は未分類に残ります。',
     })),
     { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount },
@@ -864,13 +889,17 @@ export default function BroadcastListV8() {
             onSelect: () => { setSavedMenuOpen(false); applySavedView(view.id) },
           })),
           ...(savedViewId ? [{ id: 'view-clear', label: '保存した検索を外す', onSelect: () => { setSavedMenuOpen(false); clearFilters() } }] : []),
-          // 閲覧のみは保存できないので、押せない項目を置かない
-          ...(canEdit ? [{
+          ...[{
             id: 'view-save',
             label: '＋ 今の条件を保存する',
             dividerBefore: savedViews.length > 0,
-            onSelect: () => { setSavedMenuOpen(false); setSavedViewOpen(true) },
-          }] : []),
+            lockedReason: management.reason,
+            disabled: !management.known,
+            onSelect: () => {
+              if (!canManageBroadcastListNow()) { setSavedViewError('権限が変わったため、検索条件の保存を中止しました。'); return }
+              setSavedMenuOpen(false); setSavedViewOpen(true)
+            },
+          }],
         ]}
       />
     </div>
@@ -939,7 +968,7 @@ export default function BroadcastListV8() {
             onChange={(event) => setSavedViewName(event.target.value)}
             className={styles.saveInput}
           /></SaveErrorField>
-          <Button type="button" variant="primary" disabled={!savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()} busy={savedViewBusy} busyLabel="保存中">保存する</Button>
+          <Button type="button" variant="primary" lockedReason={management.reason} disabled={!management.known || !savedViewName.trim() || savedViewBusy} onClick={() => void saveCurrentView()} busy={savedViewBusy} busyLabel="保存中">保存する</Button>
           <Button type="button" onClick={() => setSavedViewOpen(false)}>閉じる</Button>
         </div>
       ) : null}
@@ -1136,6 +1165,7 @@ export default function BroadcastListV8() {
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}
+              action={kpi.key === 'quota' ? quotaAction : undefined}
             />
           ))}
         </KpiBand>
@@ -1146,12 +1176,15 @@ export default function BroadcastListV8() {
           createAction={createButton(true)}
           activeId={folderFilter}
           onSelect={setFolderFilter}
-          onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}
+          onAddFolder={() => {
+            if (!canManageBroadcastListNow()) { setFolderError('権限が変わったため、フォルダの作成を中止しました。'); return }
+            setFolderDialogOpen(true)
+          }}
+          addFolderLockedReason={management.reason}
+          addFolderDisabled={!management.known}
           addFolderLabel="フォルダを追加"
           rows={folderRows}
         >
-          {/* 閲覧のみ：「フォルダを追加」は置かず、場所だけ空ける */}
-          {canEdit ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
           <FolderPanelNote>フォルダを消しても、入っていたものは未分類に残ります</FolderPanelNote>
           {folderError ? (
             <Notice tone="danger" className={styles.noteNoticePlacement} >{folderError}
@@ -1185,6 +1218,9 @@ export default function BroadcastListV8() {
         {folderDialogOpen && (
           <FolderAddDialog
             kind="broadcast"
+            canSaveNow={canManageBroadcastListNow}
+            confirmDisabled={!management.known}
+            confirmLockedReason={management.reason}
             note="配信を分けてしまう箱です。消しても、入っていた配信は未分類として残ります。"
             placeholder="例：01_キャンペーン"
             onClose={() => setFolderDialogOpen(false)}
@@ -1194,6 +1230,9 @@ export default function BroadcastListV8() {
         {editingFolder && (
           <FolderAddDialog
             kind="broadcast"
+            canSaveNow={canManageBroadcastListNow}
+            confirmDisabled={!management.known}
+            confirmLockedReason={management.reason}
             folder={editingFolder}
             note="配信を分けてしまう箱です。削除しても、中の配信は未分類に残ります。"
             placeholder="例：01_キャンペーン"
