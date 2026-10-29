@@ -91,8 +91,8 @@ async function fillAndSubmit() {
   await act(async () => {
     setValue(tenant, '株式会社テスト')
     setValue(name, '山田 太郎')
-    setValue(passwords[0], 'Abcdefg1')
-    setValue(passwords[1], 'Abcdefg1')
+    setValue(passwords[0], 'StrongPass123!')
+    setValue(passwords[1], 'StrongPass123!')
   })
   const form = host.querySelector('form')!
   await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
