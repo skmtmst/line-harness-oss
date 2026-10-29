@@ -5,6 +5,7 @@ describe('統括へ戻れるか（上の帯の切り替えと左下の自分の�
   it('店の画面のオーナー・管理者だけ', () => {
     expect(canReturnToHqFrom('owner', '/friends', false)).toBe(true)
     expect(canReturnToHqFrom('admin', '/', false)).toBe(true)
+  expect(canReturnToHqFrom('admin', '/', false, 'accounts')).toBe(false)
     expect(canReturnToHqFrom('staff', '/friends', false)).toBe(false)
     expect(canReturnToHqFrom('viewer', '/friends', false)).toBe(false)
     expect(canReturnToHqFrom('', '/friends', false)).toBe(false)

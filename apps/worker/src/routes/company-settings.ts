@@ -15,7 +15,8 @@ companySettings.use('/api/settings/company', async (c, next) => {
   const staff = c.get('staff');
   if (!staff?.tenantId) return c.json({ success: false, code: 'FORBIDDEN', error: '所属する会社を確認できません' }, 403);
   const member = await getStaffById(dbFor(c.env), staff.id);
-  if (!member || member.is_active !== 1 || member.tenant_id !== staff.tenantId) {
+  if (!member || member.is_active !== 1 || member.tenant_id !== staff.tenantId
+    || member.account_scope !== 'all') {
     return c.json({ success: false, code: 'FORBIDDEN', error: '所属する会社を確認できません' }, 403);
   }
   if (c.req.method === 'PUT' && (staff.readOnly || member.access_level === 'read_only'

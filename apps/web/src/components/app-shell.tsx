@@ -3,6 +3,7 @@ import { usePathname } from 'next/navigation'
 import Sidebar from './layout/sidebar'
 import SettingsInnerNav, { isSettingsAreaPath } from './layout/settings-inner-nav'
 import AuthGuard from './auth-guard'
+import HqAccessGate from './hq-access-gate'
 import { AccountProvider } from '@/contexts/account-context'
 import SessionLostNotice from './session-lost-notice'
 import RootLandingGate from './root-landing-gate'
@@ -72,7 +73,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     )
   }
 
-  const guardedContent = <RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate>
+  const guardedContent = <HqAccessGate><RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate></HqAccessGate>
 
   const suspendedSupport = (
     <PageChromeProvider>
