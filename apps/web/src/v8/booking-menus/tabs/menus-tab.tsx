@@ -10,6 +10,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Plus } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import { EmptyCell } from '@/components/shared/empty-value'
@@ -271,7 +272,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
           filteredDescription="検索を外すと、すべて出ます"
         />
       ) : (
-        <section className={styles.section}>
+        <Card layout="vertical" padding="roomy" gap="normal">
           <div className={styles.sectionHead}>
             <h2 className={styles.sectionTitle}>メニュー</h2>
             <span className={styles.sectionDesc}>
@@ -385,7 +386,7 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
             />
             <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} ariaLabel="予約メニューのページ送り" />
           </div>
-        </section>
+        </Card>
       )}
 
       {historyTarget ? (

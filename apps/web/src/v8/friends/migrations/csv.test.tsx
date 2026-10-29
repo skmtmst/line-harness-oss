@@ -13,8 +13,11 @@ vi.mock('./use-friend-migrations', () => ({
   }),
 }))
 import Csv from './csv'
-afterEach(cleanup)
-beforeEach(() => { model.download.mockClear(); model.created = false; model.locked = false; model.expires = '2030-01-01T00:00:00Z' })
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
+import type { StaffMember } from '@line-crm/shared'
+afterEach(() => { cleanup(); forgetStaffIdentity() })
+beforeEach(() => { rememberStaffIdentity({ id: 'owner', role: 'owner' } as StaffMember); model.download.mockClear(); model.created = false; model.locked = false; model.expires = '2030-01-01T00:00:00Z' })
 test('期限内の完成済みCSVは既存のダウンロード先を開く', () => {
   render(<Csv />)
   fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す', exact: true }))
@@ -25,19 +28,20 @@ test('期限切れの履歴にはダウンロードの操作を出さない', ()
   render(<Csv />)
   expect(screen.queryByRole('button', { name: 'CSVで書き出す', exact: true })).toBeNull()
 })
-test('閲覧者は履歴を読めるが管理者用のダウンロードを出さない', () => {
+test('閲覧者は履歴を読め、管理操作は灰色と理由で残して起動しない', async () => {
   model.locked = true
   render(<Csv />)
   expect(screen.getByText('反映ずみ')).toBeTruthy()
-  expect(screen.queryByRole('button', { name: 'CSVで書き出す', exact: true })).toBeNull()
-  expect(screen.queryByRole('button', { name: '書き出しを作る' })).toBeNull()
+  for (const name of ['CSVで書き出す', '書き出しを作る', 'まず確認だけする']) await expectPermissionLocked(screen.getByRole('button', { name, exact: true }))
+  expect(model.download).not.toHaveBeenCalled()
 })
 
-test('先に作ったCSVがあっても閲覧者へ保存の操作を残さない', () => {
+test('先に作ったCSVの保存も閲覧者では理由付きで起動しない', async () => {
   model.created = true
   model.locked = true
   render(<Csv />)
-  expect(screen.queryByRole('button', { name: /^CSVで書き出す/ })).toBeNull()
+  for (const button of screen.getAllByRole('button', { name: /^CSVで書き出す/ })) await expectPermissionLocked(button)
+  expect(model.download).not.toHaveBeenCalled()
 })
 test('書き出し直後の保存も同じ認証付き操作へ渡す', () => {
   model.created = true
@@ -56,4 +60,15 @@ test('CSVを追加する欄をキー操作でき、閲覧者はファイルを�
   model.locked = true; rerender(<Csv />)
   fireEvent.keyDown(zone, { key: 'Enter' }); expect(opened).toHaveBeenCalledTimes(1)
   expect(zone.getAttribute('aria-disabled')).toBe('true')
+})
+
+test('本人未取得では拒否理由を決めつけず、管理操作を止める', () => {
+  forgetStaffIdentity(); model.locked = true
+  render(<Csv />)
+  const button = screen.getByRole('button', { name: '書き出しを作る' }) as HTMLButtonElement
+  expect(button.disabled).toBe(true)
+  expect(button.hasAttribute('data-permission-locked')).toBe(false)
+  expect(document.querySelector('[data-read-only-notice]')).toBeNull()
+  fireEvent.click(button)
+  expect(model.download).not.toHaveBeenCalled()
 })

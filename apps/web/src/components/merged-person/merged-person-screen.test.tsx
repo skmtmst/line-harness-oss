@@ -262,7 +262,7 @@ describe('プロフィールの採用値を変える窓', () => {
       />,
     )
     expect(html).toContain('統合プロフィールを編集')
-    expect(html).toContain('田中 はなこ ／ 支店の友だち情報')
+    expect(html).toContain('支店の友だち情報：田中 はなこ')
     expect(html).toContain('読み込んだのは第4版です')
     expect(html).toMatch(/<button[^>]*disabled[^>]*>選んだ0項目を保存</)
     expect(html).not.toContain(`pc_${'a'.repeat(64)}`)
