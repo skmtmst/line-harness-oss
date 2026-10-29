@@ -212,12 +212,14 @@ describe('回答フォームの編集（V8）', () => {
   })
 
   it('「答え終わったあと」のタブでは右のスマホにお礼の画面を出し、中身のタブでは質問に戻す', async () => {
+    /* お礼の文を空にし、実画面（LIFF）と同じ予備文が出ることを確かめる */
+    formsGet.mockImplementation(async () => ({ success: true, data: { ...structuredClone(formData), layout: { ...structuredClone(layout), options: { ...layout.options, thanksText: '' } } } }))
     await render('id=form-1&tab=after')
     expect(await screen.findByText('答え終わったら行うこと')).toBeTruthy()
-    expect(screen.getByText('ご回答ありがとうございました。')).toBeTruthy()
+    expect(screen.getByText('ご回答ありがとうございました')).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: '中身' }))
     expect(await screen.findByText('ページ1 のブロック')).toBeTruthy()
-    expect(screen.queryByText('ご回答ありがとうございました。')).toBeNull()
+    expect(screen.queryByText('ご回答ありがとうございました')).toBeNull()
     expect(screen.getAllByText('今日のご来店の目的は？').length).toBeGreaterThan(0)
   })
 

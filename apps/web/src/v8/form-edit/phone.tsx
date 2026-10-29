@@ -8,6 +8,7 @@ import { jstDateOffset } from '@/lib/jst-datetime'
  * 選んでいるページを出す。押せない見本（role="img" ではなく読める文で出す）。
  * 予約を入れる欄の日にち・時刻は形を見せるための見本で、実際の空きではない。
  */
+import { Check } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
 import { resolveCustomerFormTheme, DEFAULT_CUSTOMER_LOOK, type CustomerLook, PREFECTURES, normalizeRatingValue, FORM_OPTIONS_DEFAULT, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
@@ -81,8 +82,8 @@ export function FormPhone({ accountLook, layout, pageIndex, accountName, booking
           <div ref={formRef} className={styles.phoneForm} style={{backgroundColor:theme.sub,color:theme.text,fontFamily:theme.fontFamily==='serif'?'serif':'sans-serif'}}>
             {thanks ? (
               <div className={styles.thanksBox}>
-                <span className={styles.thanksMark} aria-hidden="true">✓</span>
-                <p className={styles.thanksText}>{thanks.url ? '送信後、次のURLを開きます' : (thanks.text.trim() || 'ご回答ありがとうございました。')}</p>
+                <span className={styles.thanksMark} aria-hidden="true"><Check size={40} strokeWidth={3} color="var(--color-success)" /></span>
+                <p className={styles.thanksText}>{thanks.url ? '送信後、次のURLを開きます' : (thanks.text || 'ご回答ありがとうございました')}</p>
                 {thanks.url ? <p className={styles.thanksSub}>{thanks.url}</p> : null}
               </div>
             ) : (<>

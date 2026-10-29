@@ -35,4 +35,8 @@ describe('行うことの行の題は種類と重ねない', () => {
     expect(formActionTitle({ kind: 'tag', op: 'add', tagIds: [] }, refs)).toBe('（未選択）')
     expect(formActionTitle({ kind: 'send_template', templateId: '' }, refs)).toBe('（未選択）')
   })
+  it('選んだ先が消えた・読めないときは見つかりませんと言う', () => {
+    expect(formActionTitle({ kind: 'tag', op: 'add', tagIds: ['gone'] }, refs)).toBe('（見つかりません）')
+    expect(formActionTitle({ kind: 'send_template', templateId: 'gone' }, refs)).toBe('（見つかりません）')
+  })
 })
