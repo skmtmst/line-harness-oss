@@ -198,12 +198,12 @@ export default function Step2Connect({
           <p className={styles.precheckLead}>友だち追加の窓口（LIFF）を musubo が自動で作るために使います。入れていただくのはこの2項目だけです。</p>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
             <p className={styles.precheckNoteTitle}>LINE Developers で「LINEログイン」チャネルを開いてください</p>
-            <p>ステップ1で入力したプロバイダーの画面を直接開きます。「新規チャネル作成」から「LINEログイン」を選び、作成したチャネルの下記2項目をコピーしてください。</p>
+            <p>ステップ1で入力したプロバイダーの画面を直接開きます。LINEログインチャネルがまだなければ「新規チャネル作成」から作成し、すでにあればそのチャネルを開いて、下記2項目をコピーしてください。</p>
             <div className={styles.precheckNoteLink}>
               {providerUrl
                 ? <Button variant="primary" external href={providerUrl}>LINE Developers のプロバイダーを開く</Button>
                 : <p className={styles.help}>プロバイダーIDがありません。Messaging API の情報へ戻って入力してください。</p>}
-              {providerUrl && <p className={styles.help}>同じプロバイダー内でLINEログインチャネルを作成してください</p>}
+              {providerUrl && <p className={styles.help}>同じプロバイダー内のLINEログインチャネルを使ってください</p>}
             </div>
           </div>
           <div className={styles.acInputs}>
