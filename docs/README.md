@@ -939,3 +939,4 @@
 - [押せない理由の表示](release-log/unreleased/1948-kenta-muse-fqa-table.md) — 閲覧のみの帯と除外の理由結び付けの反映履歴。
 - [今日送った内訳の名前表示](release-log/unreleased/1948-kenta-line-notify-kpi-label.md) — LINE通知の内訳を内部名でなくお知らせ名で出す反映履歴。
 - [利用開始設定から二段階認証への引き継ぎ](release-log/unreleased/1949-masato-registration-mfa-flow.md) — 登録後の認証とアカウント登録への案内の反映履歴。
+- [LIFFの小さな直し](release-log/unreleased/0000-kenta-muse-liff.md) — 写真・次へ・鈴・選択色・支払い案内・読み込み中・業種の出し分けの反映履歴。
