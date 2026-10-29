@@ -7,6 +7,11 @@
   padding: var(--tpl-e1-sns-body-pad);
 }
 
+/* 本文の縦積みが間隔の唯一の持ち主。共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
+:global(:root) .body > :global([data-design-part='notice']) {
+  margin-block: 0;
+}
+
 /* 段の頭：頭文字の四角・題・（余白）・状態の札・「…」の横並び */
 .cardHead {
   display: flex;

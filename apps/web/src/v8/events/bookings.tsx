@@ -1,5 +1,6 @@
 'use client'
 import { Inbox, Check, Download, Send } from 'lucide-react'
+import { withHonorific } from '@line-crm/shared'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -620,7 +621,7 @@ function Bookings({ eventId }: { eventId: string }) {
                   {row.source === 'booking' && row.status === 'requested' ? (
                     <>
                       <Button variant="primary" onClick={() => void decide(row, 'confirm')} lockedReason={bookingLockReason} disabled={!canChangeBookings || busy} busy={Boolean(busy)} busyLabel="処理中…">承認する</Button>
-                      <RowMenu label={`${row.displayName ?? '申込者'}さんの操作`} triggerProps={{ 'data-booking-id': row.id, 'data-booking-action': 'menu' }} items={[{ id: 'reject', lockedReason: bookingLockReason, label: '断る', onSelect: () => {
+                      <RowMenu label={`${withHonorific(row.displayName ?? '申込者')}の操作`} triggerProps={{ 'data-booking-id': row.id, 'data-booking-action': 'menu' }} items={[{ id: 'reject', lockedReason: bookingLockReason, label: '断る', onSelect: () => {
                           setRejectReason('')
                           setRejectError('')
                           setRejectApplicant(row)
@@ -633,7 +634,7 @@ function Bookings({ eventId }: { eventId: string }) {
                         onClick={() => void markStatus(row, 'attended')}
                         lockedReason={bookingLockReason} disabled={!canChangeBookings || marking.has(row.id)}
                       ><Check size={16} aria-hidden="true" />参加済にする</Button>
-                      <RowMenu label={`${row.displayName ?? '申込者'}さんの操作`} triggerProps={{ 'data-booking-id': row.id, 'data-booking-action': 'menu' }} items={[
+                      <RowMenu label={`${withHonorific(row.displayName ?? '申込者')}の操作`} triggerProps={{ 'data-booking-id': row.id, 'data-booking-action': 'menu' }} items={[
                         { id: 'no-show', lockedReason: bookingLockReason, label: '無断', onSelect: () => void markStatus(row, 'no_show'), disabled: !canChangeBookings || marking.has(row.id), disabledReason: marking.has(row.id) ? '処理を反映しています' : undefined },
                         { id: 'cancel', lockedReason: bookingLockReason, label: 'キャンセルにする', onSelect: () => {
                           if (!selectedAccountId) return
@@ -764,13 +765,13 @@ function Bookings({ eventId }: { eventId: string }) {
         }
         return booking.status === 'confirmed' ? <span className={styles.recordsActions}>
           <Button data-booking-id={booking.id} data-booking-action="attended" variant="primary" onClick={() => void markStatus(row, 'attended')} lockedReason={bookingLockReason} disabled={!canChangeBookings || marking.has(booking.id)}><Check size={16} aria-hidden="true" />参加済にする</Button>
-          <RowMenu label={`${booking.friend_display_name ?? booking.friend_name ?? '申込者'}さんの操作`} triggerProps={{ 'data-booking-id': booking.id, 'data-booking-action': 'menu' }} items={[
+          <RowMenu label={`${withHonorific(booking.friend_display_name ?? booking.friend_name ?? '申込者')}の操作`} triggerProps={{ 'data-booking-id': booking.id, 'data-booking-action': 'menu' }} items={[
             { id: 'no-show', lockedReason: bookingLockReason, label: '無断', onSelect: () => void markStatus(row, 'no_show'), disabled: !canChangeBookings || marking.has(booking.id), disabledReason: marking.has(booking.id) ? '処理を反映しています' : undefined },
             { id: 'cancel', lockedReason: bookingLockReason, label: 'キャンセルにする', onSelect: () => { setCancelError(''); setCancelApplicant({ applicant: row, accountId: selectedAccountId }) }, disabled: !canChangeBookings || busy, disabledReason: busy ? '処理を反映しています' : undefined },
           ]} />
         </span> : booking.status === 'requested' ? <span className={styles.recordsActions}>
           <Button variant="primary" onClick={() => void decide(row, 'confirm')} lockedReason={bookingLockReason} disabled={!canChangeBookings || busy}>承認する</Button>
-          <RowMenu label={`${booking.friend_display_name ?? booking.friend_name ?? '申込者'}さんの操作`} triggerProps={{ 'data-booking-id': booking.id, 'data-booking-action': 'menu' }} items={[{ id: 'reject', lockedReason: bookingLockReason, label: '断る', onSelect: () => { setRejectReason(''); setRejectError(''); setRejectApplicant(row) }, disabled: !canChangeBookings || busy, disabledReason: busy ? '処理を反映しています' : undefined }]} />
+          <RowMenu label={`${withHonorific(booking.friend_display_name ?? booking.friend_name ?? '申込者')}の操作`} triggerProps={{ 'data-booking-id': booking.id, 'data-booking-action': 'menu' }} items={[{ id: 'reject', lockedReason: bookingLockReason, label: '断る', onSelect: () => { setRejectReason(''); setRejectError(''); setRejectApplicant(row) }, disabled: !canChangeBookings || busy, disabledReason: busy ? '処理を反映しています' : undefined }]} />
         </span> : null
       }}>
         {ready ? <>

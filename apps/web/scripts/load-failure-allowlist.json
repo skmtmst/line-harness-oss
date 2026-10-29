@@ -1,7 +1,7 @@
 [
   {
     "filename": "src/v8/emergency/control.tsx",
-    "fingerprint": "779d9088fbfcc762",
+    "fingerprint": "4c27c126dccc4def",
     "reason": "空配列は復旧できない追加理由だけ。setFeedback(tone= danger)で復旧失敗を表示し、正常・空として進めない。"
   },
   {

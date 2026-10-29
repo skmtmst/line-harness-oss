@@ -9,10 +9,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FirstStepsCard, firstStepsLegacyDismissedKey, firstStepsStorageKey, readFirstStepsFolded, summarizeFirstSteps } from './first-steps'
 
 import { buildStepsFromApi } from '@/v8/settings/getting-started/steps'
+import type { StepResult } from '@/v8/settings/public/getting-started-steps/index'
 import ListState from '@/components/shared/list-state'
 import { SetupTasks } from '@/v8/onboarding/public/setup-card/index'
 import type { SetupSummary } from '@/v8/onboarding/model'
-const summary = summarizeFirstSteps(buildStepsFromApi([{ key: 'accounts', state: 'done', href: '/accounts', reason: null }, { key: 'featureSet', state: 'done', href: '/settings', reason: null }]))
+const summary = summarizeFirstSteps(buildStepsFromApi([
+  { key: 'accounts', state: 'done', href: '/accounts', reason: null },
+  { key: 'featureSet', state: 'done', href: '/settings', reason: null },
+  { key: 'attributes', state: 'unknown', href: '/tags?tab=tags', reason: '設定を読み込めていません' },
+  { key: 'firstMessage', state: 'todo', href: '/getting-started#first-message', reason: null },
+]))
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -35,12 +41,36 @@ function Host({ initial = false }: { initial?: boolean }) {
 }
 
 describe('はじめにやることを畳む', () => {
+  it('設定画面と同じスタイル別の3〜5段目を表示し、状態を保つ', () => {
+    const steps: StepResult[] = ['attributes', 'friendAdd', 'scenario'].map((key, index) => ({
+      key: key as StepResult['key'], ordinal: String(index + 3), title: ['友だちの分け方を決める', '友だち追加時の配信を作る', 'シナリオを作る'][index], sub: key, state: 'stalled',
+      condition: 'condition', next: 'next', action: { label: 'same secondary action', href: '/' }, blockedReason: null,
+    }))
+    const cases = [
+      ['restaurant', ['卓と席を登録する', 'コースとメニューを登録する', '予約の受付を開ける']],
+      ['salon', ['メニューを登録する', '担当者を登録する', '予約の受付を確認する']],
+      ['consult', ['面談の枠を作る', '面談の URL を用意する', '面談の受付を確認する']],
+      ['lesson', ['クラスを作る', '会員を登録する', 'クラスの予約を受け付ける']],
+      ['ec', ['ストアをつなぐ', 'ストアの商品を確認する', '注文の受付を確認する']],
+      ['standard', ['友だちの分け方を決める', '友だち追加時の配信を作る', 'シナリオを作る']],
+    ] as const
+    for (const [style, labels] of cases) {
+      const result = summarizeFirstSteps(steps, style)
+      expect(result.steps.map((step) => step.label)).toEqual(labels)
+      expect(result.steps.map((step) => step.state)).toEqual(style === 'standard' ? ['stalled', 'stalled', 'stalled'] : ['unknown', 'unknown', 'unknown'])
+    }
+  })
+
+
   it('「畳む」で手順が隠れて「開く」に替わり、もう一度押すと戻る。閉じるの文字は無い', async () => {
     await act(async () => { render(<Host />) })
     expect(screen.queryByRole('button', { name: '閉じる' })).toBeNull()
     const fold = screen.getByRole('button', { name: '畳む' })
     expect(fold.getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByText('LINE アカウントをつなぐ')).toBeTruthy()
+    const actions = summary.steps.filter(step => !step.done && step.href)
+    expect(screen.getAllByRole('link').map(link => link.getAttribute('href'))).toEqual(actions.map(step => step.href))
+    expect(screen.getByRole('button', { name: '友だちの分け方を決めるの未確認の理由' })).toBeTruthy()
     await act(async () => { fireEvent.click(fold) })
     const open = screen.getByRole('button', { name: '開く' })
     expect(open.getAttribute('aria-expanded')).toBe('false')
@@ -116,4 +146,15 @@ it('基本と使い方の進捗を分け、畳んでも設定行と入口を残�
   expect(screen.getAllByRole('progressbar')).toHaveLength(2)
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '開く', exact: true })) })
   expect(screen.getByRole('button', { name: '決める', exact: true })).toBeTruthy()
+})
+
+
+it('権限のない段の入口も灰色のボタンで残す', () => {
+  const forbidden = summarizeFirstSteps(buildStepsFromApi([{ key: 'attributes', state: 'forbidden', href: null, reason: '管理者に頼んでください' }]))
+  render(<FirstStepsCard summary={forbidden} folded={false} onToggle={() => {}} />)
+  const button = screen.getByRole('button', { name: '開く', exact: true })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  expect(button.hasAttribute('disabled')).toBe(false)
+  expect(button.hasAttribute('href')).toBe(false)
+  fireEvent.click(button)
 })

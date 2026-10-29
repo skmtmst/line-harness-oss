@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { flushListUrlState } from '@/components/shared/list-url-state'
 /*
  * V8 統括のアカウント（src/v8/hq/home.tsx）の動きの試験。
  * LINE ID の @ を二重にしない、要確認のカードに引っかかった確認の言葉を出す（全文は title）、
@@ -85,6 +86,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount())
+  flushListUrlState()
   container.remove()
 })
 

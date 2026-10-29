@@ -1,4 +1,4 @@
-> 文書：onboarding のコード案内｜区分：今の説明｜最終確認：2026-10-26（日本時間）
+> 文書：onboarding のコード案内｜区分：今の説明｜最終確認：2026-10-29（日本時間）
 
 # はじめの質問・使い方の設定：コードの入口
 
@@ -19,6 +19,7 @@
 - [public/model/index.ts](public/model/index.ts)：`StyleWarning`・`FEATURES`・`STYLE_CHOICES`・`featureHref`・`featureName`・`sampleMenuFor`・`styleLabel`
 - [public/sample-menu/index.ts](public/sample-menu/index.ts)：`SampleMenuTiles`
 - [public/setup-card/index.ts](public/setup-card/index.ts)：`SetupCard`・`SetupWarningBands`・`setupSummary`
+- [public/style-setup-progress/index.ts](public/style-setup-progress/index.ts)：`useStyleSetupProgress`・`loadStyleSetupProgress`（業種の設定を実物のGETで確認）
 - [public/style-entry/index.ts](public/style-entry/index.ts)：`StyleEntry`
 - [public/use-first-run/index.ts](public/use-first-run/index.ts)：`useFirstRun`
 - [public/use-starter-menu/index.ts](public/use-starter-menu/index.ts)：`useStarterMenu`
