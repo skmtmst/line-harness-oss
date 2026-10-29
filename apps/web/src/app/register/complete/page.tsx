@@ -155,7 +155,7 @@ function CompleteInner() {
 }
 
 function ConfirmedField({ label, id, value }: { label: string; id: string; value: string }) {
-  return <AuthField label={label} hint="確認済み・ここでは変えられません" htmlFor={id}>
+  return <AuthField label={label} htmlFor={id}>
     <output id={id} className="flex h-11 w-full items-center justify-between rounded-control border border-hairline bg-surface-pearl px-3 text-label text-ink-secondary">
       <span className="truncate">{value}</span>
       <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-accent-deep" />
