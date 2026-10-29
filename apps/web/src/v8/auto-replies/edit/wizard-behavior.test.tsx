@@ -190,6 +190,6 @@ it('下書きを読めなかったら、同じ下書きをその場で読み直�
 it('新規の題とブラウザ・パンくず用の題には自動応答と分かる名前を付ける',async()=>{
  net.query='step=basic'
  render(<Page/>)
- await waitFor(()=>expect(screen.getByRole('heading',{name:'自動応答のルールを作る'})).toBeTruthy())
- expect(net.title).toHaveBeenCalledWith('自動応答のルールを作る・基本設定')
+ await waitFor(()=>expect(screen.getByRole('heading',{name:'自動応答を作る'})).toBeTruthy())
+ expect(net.title).toHaveBeenCalledWith('自動応答を作る・基本設定')
 })
