@@ -1192,7 +1192,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                     <Button variant="secondary" size="compact" onClick={() => void loadMoreUsers()} disabled={moreUsersBusy} busy={moreUsersBusy}>続きを読み込む</Button>
                   ) : null}
                   {moreUsersError ? <Notice tone="danger" >{moreUsersError}</Notice> : null}
-                  <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} />
+                  <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} correctOutOfRange={!loading && !error} />
                 </div>
               ) : null}
               {tab === 'members' ? <Disclosure appearance="inset" size="compact" title="ログイン中の端末を確認"><SessionsCard /></Disclosure> : null}
