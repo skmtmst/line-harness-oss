@@ -25,7 +25,7 @@ export default function IconButton({
    */
   size?: 'small' | 'row' | 'compact'
   /** 枠のない行内操作。既定の枠つきボタンには効かない。 */
-  variant?: 'plain'
+  variant?: 'plain' | 'attention'
   /** Controlled selection, for actions such as starring an item. */
   pressed?: boolean
 }) {

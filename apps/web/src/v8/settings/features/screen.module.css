@@ -45,12 +45,7 @@
   min-width: 0;
 }
 
-.group {
-  overflow: hidden;
-  border-radius: var(--tpl-sb-card-radius);
-  outline: 1px solid var(--card-edge);
-  box-shadow: var(--card-shadow);
-}
+
 
 .groupHead {
   display: flex;
@@ -293,7 +288,7 @@
   margin: 0;
   padding: var(--tpl-sb-state-pad);
   border-radius: var(--tpl-sb-card-radius);
-  outline: 1px solid var(--card-edge);
+  background: var(--color-canvas);
   color: var(--color-ink-secondary);
   font-size: var(--tpl-sb-band-text);
   box-shadow: var(--card-shadow);

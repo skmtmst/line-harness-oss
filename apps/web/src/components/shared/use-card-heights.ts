@@ -29,13 +29,25 @@ export function useCardHeights() {
     const existing = groups.get(parent)
     if (existing) existing.users++
     else {
-      let frame = 0, width = -1
+      let frame = 0, width = -1, released = false
       const originals = new Map<HTMLElement, string>()
+      const actionHeights = new Map<HTMLElement, string>()
+      const restoreActionHeights = () => {
+        for (const [slot, minHeight] of actionHeights) slot.style.minHeight = minHeight
+        actionHeights.clear()
+      }
+      const restoreCards = () => {
+        for (const [card, style] of originals) card.style.cssText = style
+        originals.clear()
+      }
       const measure = () => {
+        if (released) return
         view.cancelAnimationFrame(frame)
         frame = view.requestAnimationFrame(() => {
+          if (released) return
+          restoreActionHeights()
           const cards = [...parent.children].filter((el): el is HTMLElement => el instanceof HTMLElement && el.matches('[data-design-part="card"]'))
-          if (cards.length < 2) return
+          if (cards.length < 2) { restoreCards(); return }
           const layout = getComputedStyle(parent)
           const horizontal = layout.display.includes('grid') || layout.display.includes('flex') && layout.flexDirection === 'row'
           if (!horizontal || parent.dataset.cardHeight === 'natural') {
@@ -54,6 +66,16 @@ export function useCardHeights() {
           for (const card of cards) {
             const y = Math.round(card.getBoundingClientRect().top / 4)
             rows.set(y, [...rows.get(y) ?? [], card])
+          }
+          if (parent.dataset.cardHeight === 'equal') {
+            const actionRows = [...rows.values()].filter(row => row.length > 1).map(row => row.map(card =>
+              [...card.children].find((child): child is HTMLElement => child instanceof HTMLElement && child.hasAttribute('data-card-actions')),
+            )).filter((slots): slots is HTMLElement[] => slots.every(slot => slot !== undefined))
+            const sizes = actionRows.map(slots => ({ slots, height: Math.max(...slots.map(slot => slot.getBoundingClientRect().height)) }))
+            for (const { slots, height } of sizes) for (const slot of slots) {
+              actionHeights.set(slot, slot.style.minHeight)
+              slot.style.minHeight = `${height}px`
+            }
           }
           for (const row of rows.values()) {
             const heights = row.map(card => card.getBoundingClientRect().height)
@@ -76,9 +98,11 @@ export function useCardHeights() {
       void document.fonts?.ready.then(measure)
       measure()
       groups.set(parent, { users: 1, release: () => {
+        released = true
         observer?.disconnect(); mutations?.disconnect(); view.cancelAnimationFrame(frame)
         parent.removeEventListener('load', measure, true)
-        for (const [card, style] of originals) card.style.cssText = style
+        restoreActionHeights()
+        restoreCards()
       } })
     }
     return () => {

@@ -9,7 +9,7 @@ import BlockEditor from '@/components/forms/block-editor';
 import { formJumpsInto } from '@/components/forms/form-definition-operations';
 import type { FormRefs } from '@/components/forms/form-refs';
 import Button from '@/components/shared/button';
-import { SettingCheckbox } from '@/components/shared/checkbox';
+import Toggle from '@/components/shared/toggle';
 import Dialog from '@/components/shared/dialog';
 import { EntityKindField } from '@/components/shared/entity-picker-sources';
 import EntitySelect from '@/components/shared/entity-select';
@@ -284,7 +284,7 @@ function OpenBlock(props: RowProps) {
         {input ? (
           <label className={styles.required}>
             <span className={styles.requiredLabel}>必須</span>
-            <SaveErrorField names={["required","input.required"]}><SettingCheckbox checked={input.required ?? false} onChange={(required) => patch({ required } as Partial<FormBlock>)} label="必須" /></SaveErrorField>
+            <SaveErrorField names={["required","input.required"]}><Toggle checked={input.required ?? false} onChange={(required) => patch({ required } as Partial<FormBlock>)} label="必須" /></SaveErrorField>
           </label>
         ) : null}
         <RowActions className={styles.more} subjectName={`「${blockTitleLine(block)}」`} menuItems={menuItems} destructiveItem={menu.destructiveItem} />

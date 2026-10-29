@@ -20,7 +20,7 @@
   container-type: inline-size;
 }
 
-.field {
+.field:not([data-choice-field]) {
   display: flex;
   width: 100%;
   height: 36px;
@@ -35,38 +35,38 @@
   transition: outline-color var(--motion-fast) var(--motion-ease-out);
 }
 
-.field:not([data-open]):not([data-invalid]):not(:focus-within) { box-shadow: var(--control-shadow); }
+.field:not([data-choice-field]):not([data-open]):not([data-invalid]):not(:focus-within) { box-shadow: var(--control-shadow); }
 
 /* 日付の欄と横に並ぶとき・日時の欄の中（絵のZU4Ae）は日付の欄と同じ 36。 */
-.field[data-size='field'] {
+.field:not([data-choice-field])[data-size='field'] {
   height: 36px;
 }
 
 /* 表の中の細い欄（予約の受付枠）は隣の欄と同じ 32。 */
-.field[data-size='compact'] {
+.field:not([data-choice-field])[data-size='compact'] {
   height: 32px;
 }
 
-.field:focus-within,
-.field[data-open] {
+.field:not([data-choice-field]):focus-within,
+.field:not([data-choice-field])[data-open] {
   outline: 2px solid var(--color-accent-deep);
   outline-offset: -2px;
 }
 
-.field[data-invalid] {
+.field:not([data-choice-field])[data-invalid] {
   outline-color: var(--color-danger);
 }
 
-.field[data-readonly] {
+.field:not([data-choice-field])[data-readonly] {
   background: var(--color-canvas-sunken);
 }
 
-.field[data-readonly]:focus-within {
+.field:not([data-choice-field])[data-readonly]:focus-within {
   outline: 1px solid var(--color-control-border);
   outline-offset: -1px;
 }
 
-.field[data-disabled] {
+.field:not([data-choice-field])[data-disabled] {
   opacity: var(--polish-disabled-opacity);
 }
 
@@ -121,7 +121,7 @@
 }
 
 .open:hover:not(:disabled),
-.field[data-open] .open {
+.field:not([data-choice-field])[data-open] .open {
   background: var(--color-canvas-sunken);
 }
 
@@ -134,32 +134,6 @@
   cursor: not-allowed;
 }
 
-/*
- * 狭い欄（120 未満。予約の受付枠・シフトなどの 84px の欄）：字を 13px・字間なしにし、
- * 余白と時計を詰めて「09 : 00」と時計を1行に収める（切らない）。
- */
-@container (max-width: 119px) {
-  .field {
-    gap: 2px;
-    padding: 0 4px 0 8px;
-  }
-
-  .input {
-    font-size: 13px;
-    letter-spacing: 0;
-  }
-
-  .open {
-    width: 24px;
-    height: 24px;
-    flex-basis: 24px;
-  }
-
-  .open :global(svg) {
-    width: 16px;
-    height: 16px;
-  }
-}
 
 .note {
   margin: 4px 0 0;

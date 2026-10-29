@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -70,7 +71,7 @@ async function mount(step: string, settings: Record<string, unknown> = {}, metad
   const view=render(<Page/>);await act(async()=>{})
   return view
 }
-async function save() { await act(async()=>fireEvent.click(screen.getByRole('button',{name:'下書きとして保存'}))) }
+async function save() { await act(async()=>fireEvent.click(getPageAction({name:'下書きとして保存'}))) }
 const saved = () => net.saveDraft.mock.lastCall?.[1]
 
 it('実際の一致選択と追加された言葉を保存する', async () => {
@@ -98,8 +99,8 @@ it('祝日・一人一回・有人対応の設定を変更して保存する', a
   const view=await mount('trigger')
   fireEvent.change(screen.getByRole('combobox',{name:'祝日の扱い'}),{target:{value:'exclude'}})
   net.query='id=synthetic-rule&step=response';view.rerender(<Page/>);await act(async()=>{})
-  fireEvent.click(screen.getByRole('checkbox',{name:'1人につき1回だけ返す'}))
-  fireEvent.click(screen.getByRole('checkbox',{name:'担当者が対応中のトークには返さない'}))
+  fireEvent.click(screen.getByRole('switch',{name:'1人につき1回だけ返す'}))
+  fireEvent.click(screen.getByRole('switch',{name:'担当者が対応中のトークには返さない'}))
   await save()
   expect(saved()).toMatchObject({responseHolidayRule:'exclude',oncePerFriend:true,skipWhenOperatorActive:true})
 })
@@ -243,7 +244,8 @@ it('現行の5段の順序と現在の段を明示する',async()=>{
 it('狭幅用の見本は操作して開き、保存は見本の外の下部帯に置く',async()=>{
   await mount('response')
   expect(document.querySelector('[data-template-region="preview"]')?.getAttribute('data-preview-narrow')).toBe('hidden')
-  expect(screen.getByRole('button',{name:'下書きとして保存'}).closest('[data-template-region="footer"]')).toBeTruthy()
+  expect(getPageAction({name:'下書きとして保存'}).getAttribute('role')).toBe('menuitem')
+  expect(document.querySelector('[data-template-region="footer"]')?.textContent).toContain('次へ')
   fireEvent.click(screen.getByRole('button',{name:'LINEの見え方を確認'}))
   expect(await screen.findByRole('dialog',{name:'LINEの見え方'})).toBeTruthy()
 })

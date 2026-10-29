@@ -2,7 +2,7 @@
 import { formatYen } from '@line-crm/shared';
 
 import ReservationBoard from '@/components/shared/reservation-board'
-import { BookingSourceLegend, BookingStatus } from '@/components/shared/booking-presentation'
+import { BookingStatus } from '@/components/shared/booking-presentation'
 import { reservationBookingState } from '@/components/shared/booking-state'
 
 import { PeopleDayList } from '@/v8/booking-bookings/public/day-list/index'
@@ -93,6 +93,7 @@ import { STATUS_TABS, SOURCE_FILTER_OPTIONS, SOURCE_FILTER_NAME, sourceFilterTex
 import type { BookingLedgerModel } from './use-booking-ledger'
 import { bookingWords } from '@/v8/booking-bookings/public/words/index'
 import { reminderDeliveryStatusLabel } from '@/lib/status-labels'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 export default function BookingLedgerScreen({ model }: { model: BookingLedgerModel }) {
   if (model.selectedAccountId && model.styleProfile && !model.styleProfile.data) return <BookingLedgerFrame view={model.view}>
@@ -270,7 +271,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
             notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<Notice tone="warn" action={<Button href="/booking/menus">設定する</Button>}>担当者か予約メニューが未設定です。予約設定で登録すると空き枠が出ます。</Notice>:null}
             slots={availability.status==='ready'?availability.slots.filter(s=>s.remaining>0&&['available','limited'].includes(s.state)).map(s=>({resourceId:staffList.find(t=>t.display_name===s.staffName)?.id??'',startsAt:s.startUtc??`${s.date}T${s.start}:00+09:00`,href:`/booking/bookings/new?${new URLSearchParams({date:s.date,time:s.start,staff:s.staffName,menu:s.menuId})}`})):[]} entries={(calendarStatus==='ready'?calendarItems:[]).map(r=>peopleBoardEntry({...r,customer_name:r.friend_name,lock_version:(r as unknown as {lock_version:number}).lock_version,line_account_id:selectedAccountId}))}
-            trailingToolbar={view==='day'||view==='week'?<><BookingSourceLegend sources={['line','phone']}/><EntitySelect width={146} aria-label={`${words.staff}で絞り込む`} valuePrefix={`${words.staff}：`} value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'すべて'},...staffList.map(r=>({value:r.id,label:r.display_name}))]}/><Select size="content" label={SOURCE_FILTER_NAME} aria-label="予約元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={SOURCE_FILTER_OPTIONS}/></>:undefined}
+            trailingToolbar={view==='day'||view==='week'?<><EntitySelect width={146} aria-label={`${words.staff}で絞り込む`} valuePrefix={`${words.staff}：`} value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'すべて'},...staffList.map(r=>({value:r.id,label:r.display_name}))]}/><Select size="content" label={SOURCE_FILTER_NAME} aria-label="予約元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={SOURCE_FILTER_OPTIONS}/></>:undefined}
             resources={staffList.filter(r=>view!=='day'||boardStaff==='all'||r.id===boardStaff).map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
             onOpen={setDetailId} canWrite={canOperate}
             renderList={view === 'day' ? () => <PeopleDayList usageStyle={usageStyle} rows={calendarStatus === 'ready' ? calendarItems : []} canMark={canOperate} visits={visits} onOpen={setDetailId} /> : undefined}
@@ -571,7 +572,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             {shareUrl ? (
               <div className="mt-2 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <input
+                  <SharedTextField
                     readOnly
                     value={shareUrl}
                     aria-label="友だち予約URL"
@@ -586,7 +587,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                 {/* N-396: 履歴URLは別画面を開く。両方発行できることを注記と揃える。 */}
                 {historyUrl ? (
                   <div className="flex flex-wrap items-center gap-2">
-                    <input
+                    <SharedTextField
                       readOnly
                       value={historyUrl}
                       aria-label="予約履歴URL"

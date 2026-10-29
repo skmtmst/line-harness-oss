@@ -64,6 +64,7 @@ import { RefreshCover } from '@/components/shared/refresh-cover'
 import { useListSnapshot } from '@/lib/use-list-snapshot'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /*
  * ★V8 一斉配信の一覧（Pencil ・1152 は ・閲覧のみは ）。
@@ -871,6 +872,7 @@ export default function BroadcastListV8() {
         <FilterChip
           key={chip.key}
           selected={statusFilter === chip.key}
+          showCheck={false}
           onChange={() => setStatusFilter(chip.key)}
           icon={<chip.icon size={16} aria-hidden="true" />}
         >
@@ -907,7 +909,7 @@ export default function BroadcastListV8() {
     </div>
   )
 
-  /* 道具の段：1440 は「探す・配信日・保存 … 保存した検索」／「札 … 件数・並び」。1152 は作る・フォルダが前に入り、札は選ぶ欄。 */
+  /* 道具の段：1440 は「探す・配信日 … 保存した検索（この条件を保存するはこの中）」／「札 … 件数・並び」。1152 は作る・フォルダが前に入り、札は選ぶ欄。 */
   const toolbar = (
     <ListToolbarFrame layout="stacked">
       <ListToolbarRow>
@@ -920,7 +922,7 @@ export default function BroadcastListV8() {
       </ListToolbarRow>
       {savedViewOpen ? (
         <div className={styles.saveRow}>
-          <SaveErrorField names={["savedViewName","name","saved_view_name"]}><input
+          <SaveErrorField names={["savedViewName","name","saved_view_name"]}><SharedTextField
             aria-label="保存する検索の名前"
             placeholder="検索条件の名前"
             value={savedViewName}

@@ -153,7 +153,7 @@ export default function OpsInviteV8() {
               </>
             ) : null}
             <Button type="submit" variant="primary" disabled={busy} className={styles.wide} busy={busy} busyLabel="進めています…">
-              <ArrowRight aria-hidden="true" />{check?.needsPassword ? 'パスワードを設定して次へ' : '設定して二段階認証へ進む'}
+              {check?.needsPassword ? 'パスワードを設定して次へ' : '設定して二段階認証へ進む'}<ArrowRight aria-hidden="true" />
             </Button>
           </form>
         )}

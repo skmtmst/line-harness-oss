@@ -330,8 +330,7 @@
   }
 }
 
-/* 絵 ：数の帯は白い板の端から端まで。下の注意帯とは間 4。 */
+/* 数の帯は題・道具の行と同じ内側の余白に収める（板の端にくっつけない）。下の注意帯とは間 4。 */
 .band {
-  margin-inline: var(--tpl-op-support-band-bleed);
   margin-bottom: var(--tpl-op-support-negative-gap);
 }

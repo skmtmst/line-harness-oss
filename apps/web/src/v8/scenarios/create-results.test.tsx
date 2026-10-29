@@ -1,4 +1,6 @@
+import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * ★V8 シナリオを作る①（create.tsx・）と配信結果（results.tsx・）の動きの試験。
  * BEHAVIOR.md の主な動きを守る：
@@ -133,7 +135,7 @@ import ScenarioCreateV8 from './create'
 import ScenarioResultsV8 from './results'
 
 beforeEach(() => {
-  role = 'owner'
+  role = verifiedStaffRole('owner')
   search = ''
   push.mockReset()
   create.mockReset()
@@ -196,13 +198,13 @@ describe('作る①（dnzqC）', () => {
     create.mockRejectedValue(new Error('network'))
     render(<ScenarioCreateV8 />)
     fireEvent.change(screen.getByRole('textbox', { name: 'シナリオ名' }), { target: { value: '春のフォロー' } })
-    fireEvent.click(screen.getByRole('button', { name: /あとで決める/ }))
+    fireEvent.click(getPageAction({ name: /あとで決める/ }))
     await waitFor(() => expect(screen.getByText('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')).toBeTruthy())
     expect(push).not.toHaveBeenCalledWith(expect.stringContaining('/scenarios/first-step'))
   })
 
   test('閲覧のみには保存の操作を置かず、帯を出す', () => {
-    role = 'staff'
+    role = verifiedStaffRole('staff')
     render(<ScenarioCreateV8 />)
     expect(screen.queryByRole('button', { name: /この方式で保存する/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /あとで決める/ })).toBeNull()
@@ -290,7 +292,7 @@ describe('作る①：書きかけをシナリオの下書きの口へ残す（�
 
   test('閲覧のみは下書きの口を読みも書きもせず、戻す帯も出さない', async () => {
     localStorage.setItem('lh:v8-draft:scenario-create:account-a:new', JSON.stringify({ savedAt: Date.now(), value: { name: '前の入力', folderId: '', mode: 'elapsed' } }))
-    role = 'staff'
+    role = verifiedStaffRole('staff')
     render(<ScenarioCreateV8 />)
     await settle(2100)
     expect(draftCalls).toEqual([])
@@ -328,7 +330,7 @@ describe('配信結果（X4STXS）', () => {
       expect(screen.getByText('—（要確認）')).toBeTruthy()
       expect(screen.queryByRole('button', { name: '確認対象のその他の操作' })).toBeNull()
       expect(screen.getByRole('link', { name: 'トークの送信記録を確認' })).toBeTruthy()
-      const row = screen.getAllByRole('row').find(row => row.textContent?.includes('確認対象'))!
+      const row = (screen.getAllByRole('row').find(row => row.textContent?.includes('確認対象')) ?? querySupplementaryPageAction('確認対象'))!
       fireEvent.click(within(row).getByRole('button', { name: '予定を見る' }))
       const dialog = await screen.findByRole('dialog')
       await waitFor(() => expect(within(dialog).getByText('要確認')).toBeTruthy())
@@ -362,7 +364,7 @@ describe('配信結果（X4STXS）', () => {
   })
 
   test('閲覧のみには行の「…」を置かない（予定を見るは出す）', async () => {
-    role = 'staff'
+    role = verifiedStaffRole('staff')
     search = 'id=sc-1'
     render(<ScenarioResultsV8 />)
     await screen.findByText('高橋 直人')
@@ -370,3 +372,5 @@ describe('配信結果（X4STXS）', () => {
     expect(screen.getAllByRole('button', { name: /予定を見る/ }).length).toBeGreaterThan(0)
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

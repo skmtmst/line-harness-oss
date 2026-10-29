@@ -27,7 +27,7 @@ async function edit() {
 }
 async function changeAndConfirm() {
   const dialog = await edit()
-  fireEvent.click(within(dialog).getByRole('checkbox'))
+  fireEvent.click(within(dialog).getByRole('switch'))
   fireEvent.change(within(dialog).getByRole('spinbutton'), { target: { value: '0' } })
   fireEvent.click(within(dialog).getByRole('button', { name: '保存する' }))
   expect(api.updateStoreGroupMember).not.toHaveBeenCalled()
@@ -59,7 +59,7 @@ it('更新失敗は入力を残し、同じ店舗だけ再試行する', async (
   fireEvent.click(within(await changeAndConfirm()).getByRole('button', { name: '保存する' }))
   await screen.findByText(/入力は残っています/)
   expect((screen.getByRole('spinbutton') as HTMLInputElement).value).toBe('0')
-  expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(true)
+  expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true')
   expect(api.saved).not.toHaveBeenCalled()
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '保存する' }))
   fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '保存する' }))

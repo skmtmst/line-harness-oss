@@ -4,7 +4,11 @@
 .headline { display: flex; width: 100%; min-width: 0; align-items: center; gap: var(--tpl-inbox-head-tools-gap); }
 .headline > h2 { flex: 1; min-width: 0; padding-left: var(--tpl-inbox-title-inset); }
 .search { padding: var(--tpl-inbox-head-gap) var(--tpl-inbox-head-pad-x) 0; }
-.filters { display: flex; flex-wrap: wrap; gap: var(--space-8); margin-top: var(--tpl-inbox-head-gap); }
+.header > [data-segmented-control] { width: 100%; }
+.filters { display: flex; flex-wrap: nowrap; gap: var(--space-8); margin-top: var(--tpl-inbox-head-gap); }
+.filters > * { flex: 1 1 0; min-width: 0; }
+.filters > .contentSlot, .filters > .sortSlot { position: relative; flex: none; }
+.sortSlot[data-inbox-sort-changed]::after { content: ''; position: absolute; top: var(--tpl-inbox-head-tools-gap); right: var(--tpl-inbox-head-tools-gap); width: var(--tpl-inbox-dot); height: var(--tpl-inbox-dot); border-radius: var(--radius-pill); background: var(--color-accent-deep); pointer-events: none; }
 .row { padding: var(--tpl-inbox-row-pad); width: 100%; text-align: left; background: transparent; }
 .row:hover { background: var(--color-shell); }
 .row[aria-current='true'], .row[aria-current='true']:hover { background: var(--color-accent-soft); }
@@ -15,3 +19,6 @@
 html:root .loadMore { width: 100%; padding: var(--polish-space-field) var(--polish-space-card); font-size: var(--text-body); color: var(--color-success); border-bottom: 1px solid var(--color-hairline); }
 html:root .loadMore:hover { background: var(--color-accent-soft); }
 html:root .olderMessages { padding: var(--space-4) var(--polish-space-field); background: color-mix(in srgb, var(--color-canvas) 90%, transparent); border-radius: var(--radius-pill); color: var(--color-action); font-size: var(--text-caption); font-weight: 600; box-shadow: var(--card-shadow); }
+
+.name { --tpl-inbox-unread-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--polish-weight-body); }
+.name[data-unread] { font-weight: var(--tpl-inbox-unread-weight); }

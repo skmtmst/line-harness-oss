@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import styles from './post-image-crop.module.css'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 export type CropTarget = 'google' | 'instagram'
 export type CropSource = { file?: File; url?: string; name: string; mediaId?: string }
@@ -95,7 +96,7 @@ export function PostImageCrop({ target, source, onClose, onConfirm }: {
       if (!blob) throw new Error('画像を保存できませんでした。')
       await onConfirm(new File([blob], outputName(source.name, target), { type: 'image/jpeg' }))
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '画像を保存できませんでした。')
+      setError(japaneseDetailOf(cause) || '画像を保存できませんでした。')
     } finally {
       setBusy(false)
     }

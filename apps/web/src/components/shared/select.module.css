@@ -13,7 +13,7 @@
   width: 100%;
 }
 
-.trigger {
+.trigger:not([data-choice-field]) {
   box-sizing: border-box;
   display: flex;
   width: 100%;
@@ -26,7 +26,7 @@
   cursor: pointer;
 }
 
-.trigger:focus-visible {
+.trigger:not([data-choice-field]):focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: var(--polish-focus-offset);
 }
@@ -39,7 +39,7 @@
   opacity: var(--polish-disabled-opacity);
 }
 
-.disabled .trigger {
+.disabled .trigger:not([data-choice-field]) {
   cursor: not-allowed;
 }
 
@@ -57,7 +57,7 @@
 
 /* #976 U079/U083: タッチ端末は文字16px・高さ44px（入力欄と同じ規定）。 */
 @media (pointer: coarse) {
-  .trigger {
+  .trigger:not([data-choice-field]) {
     height: 44px;
     font-size: var(--text-lead);
   }
@@ -73,8 +73,8 @@
  * ★V8「選ぶ欄」（wMMk6）：高さ36・左右12・間8（wMMk6）。文字の段はを優先。
  * 開いた矢印は ink-faint のまま（管理画面 と同じ）。
  */
-:root .trigger {
-  height: 36px;
+:root .trigger:not([data-choice-field]) {
+  height: var(--control-h);
   gap: var(--tpl-select-gap);
   padding: 0 var(--tpl-select-inset);
   border-color: var(--color-control-border);
@@ -96,31 +96,31 @@
  * 枠は 120ms で色が変わり、押したときはほんの少し沈む（明るさで）。
  * 候補の行に乗せたときの薄い背景も 120ms。開く動きは候補の箱が持つ。
  */
-:root .trigger {
+:root .trigger:not([data-choice-field]) {
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
     border-color var(--motion-fast) var(--motion-ease-out),
     filter var(--motion-fast) var(--motion-ease-out);
 }
 
-:root .trigger:hover {
+:root .trigger:not([data-choice-field]):hover {
   background: var(--color-canvas-sunken);
 }
 
-:root .trigger:active:not(:disabled) {
+:root .trigger:not([data-choice-field]):active:not(:disabled) {
   filter: brightness(0.97);
 }
 
-:root .invalid .trigger {
+:root .invalid .trigger:not([data-choice-field]) {
   border-color: var(--color-danger);
 }
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
-:root .trigger { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -1px; padding: 0 var(--tpl-select-inset); gap: var(--tpl-select-gap); box-shadow: var(--control-shadow); font-family: var(--font-sans); }
+:root .trigger:not([data-choice-field]) { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -1px; padding: 0 var(--tpl-select-inset); gap: var(--tpl-select-gap); box-shadow: var(--control-shadow); font-family: var(--font-sans); }
 :root .value { font-size: 13px; font-weight: 500; line-height: 20px; }
 :root .chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); }
-:root .trigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
-:root .invalid .trigger { outline-color: var(--color-danger); }
+:root .trigger:not([data-choice-field]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
+:root .invalid .trigger:not([data-choice-field]) { outline-color: var(--color-danger); }
 :root .chevron { flex-basis: var(--polish-icon-control); }
 }
 /* ：左右12・間8・矢印16を含め、件数の文字を省略しない幅を共通で確保する。 */
@@ -129,9 +129,9 @@
 /*
  * ★V8「枠なしの並び替え」（：枠なし文字＋上下矢印）。
  * treatment="text" のときだけ枠を消す。箱の合格は変えない。
- * 焦点の輪は .trigger:focus-visible が枠なしでも出す。
+ * 焦点の輪は .trigger:not([data-choice-field]):focus-visible が枠なしでも出す。
  */
-:root .textTrigger {
+:root .textTrigger:not([data-choice-field]) {
   height: 32px;
   gap: 4px;
   padding: 0 2px;
@@ -143,7 +143,7 @@
   font-weight: 500;
 }
 
-:root .textTrigger .chevron {
+:root .textTrigger:not([data-choice-field]) .chevron {
   display: block;
 }
 
@@ -187,25 +187,25 @@
  * （★V8 デリバリー受注の注文履歴 OzHLO：余白12・印15・間6で文字は x1120 から）。
  * 渡さない箱は上の両端寄せのまま。
  */
-:root .trigger[data-value-align='start'] .leadingIcon + .value {
+:root .trigger:not([data-choice-field])[data-value-align='start'] .leadingIcon + .value {
   flex: 1;
   text-align: left;
 }
 
 /* 狭い一覧の栞。幅は呼ぶ型が持ち、印と候補は同じSelectが持つ。 */
-:root .trigger:not([data-chevron]) { padding-inline: var(--tpl-button-pad-side); }
-:root .trigger[data-icon-only] { justify-content: center; padding: 0; gap: 0; }
-:root .trigger[data-icon-only] .value { display: none; }
+:root .trigger:not([data-choice-field]):not([data-chevron]) { padding-inline: var(--tpl-button-pad-side); }
+:root .trigger:not([data-choice-field])[data-icon-only] { justify-content: center; padding: 0; gap: 0; }
+:root .trigger:not([data-choice-field])[data-icon-only] .value { display: none; }
 
 /* WEB-006: 枠なしでも焦点の輪を残す。 */
-:root .textTrigger:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
+:root .textTrigger:not([data-choice-field]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 
 /* ・仕上げ7 */
-:root .trigger:disabled { opacity: var(--polish-disabled-opacity); }
+:root .trigger:not([data-choice-field]):disabled { opacity: var(--polish-disabled-opacity); }
 
 /* List controls reserve the whole selected label, icon and existing inset. */
 html:root .content { width: var(--list-select-content-width, max-content); min-width: var(--list-select-content-width, max-content); flex: none; }
-html:root .content .trigger { width: var(--list-select-content-width, max-content); min-width: var(--list-select-content-width, max-content); max-width: none; }
+html:root .content .trigger:not([data-choice-field]) { width: var(--list-select-content-width, max-content); min-width: var(--list-select-content-width, max-content); max-width: none; }
 
 /*
  * ラベル＋値を出す選ぶ欄（EntitySelect）は、中身の幅で広がる。
@@ -221,44 +221,55 @@ html:root .content .trigger { width: var(--list-select-content-width, max-conten
 :root .root[data-select-icon-only] { width: var(--tpl-button-h); min-width: var(--tpl-button-h); flex: none; }
 
 /* 選択欄は白い地と薄い枠。副ボタンとは面で区別する。 */
-:root .trigger:not(.textTrigger):not([data-tone]) {
+:root .trigger:not([data-choice-field]):not(.textTrigger:not([data-choice-field])):not([data-tone]) {
   outline-color: var(--color-control-border); border: 0; box-shadow: none; background: var(--color-canvas);
   font-size: var(--polish-control-text); font-weight: var(--polish-control-weight);
 }
-:root .trigger:not(.textTrigger):not([data-tone]):hover:not(:disabled) { background: var(--color-canvas-sunken); }
-:root .invalid .trigger:not(.textTrigger) { outline: 1px solid var(--color-danger); outline-offset: -1px; }
+:root .trigger:not([data-choice-field]):not(.textTrigger:not([data-choice-field])):not([data-tone]):hover:not(:disabled) { background: var(--color-canvas-sunken); }
+:root .invalid .trigger:not([data-choice-field]):not(.textTrigger:not([data-choice-field])) { outline: 1px solid var(--color-danger); outline-offset: -1px; }
 :root .leadingIcon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 
-:root .trigger { padding-block: 0; }
+:root .trigger:not([data-choice-field]) { padding-block: 0; }
 
-:root .trigger:not(.textTrigger):not([data-tone]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
+:root .trigger:not([data-choice-field]):not(.textTrigger:not([data-choice-field])):not([data-tone]):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 
-:root .textTrigger { height: var(--tpl-button-h); padding-inline: var(--tpl-select-inset); gap: var(--tpl-select-gap); outline: 1px solid var(--color-control-border); outline-offset: -1px; background: var(--color-canvas); }
+:root .textTrigger:not([data-choice-field]) { height: var(--tpl-button-h); padding-inline: var(--tpl-select-inset); gap: var(--tpl-select-gap); outline: 1px solid var(--color-control-border); outline-offset: -1px; background: var(--color-canvas); }
 
 /*
  * 選ぶ欄は1pxの線をやめ、影で浮かせる。
  * 開いた・焦点・誤り（赤）・無効の見え方は今の決まりを保つ。
  */
-:root .trigger:not(.textTrigger):not([data-tone]) {
+:root .trigger:not([data-choice-field]):not(.textTrigger:not([data-choice-field])):not([data-tone]) {
   border: 0;
   outline: 1px solid transparent;
   background: var(--gradient-raised-control) var(--color-canvas);
   box-shadow: var(--shadow-raised-control);
 }
 
-:root .trigger:not(.textTrigger):not([data-tone]):hover:not(:disabled) {
+:root .trigger:not([data-choice-field]):not(.textTrigger:not([data-choice-field])):not([data-tone]):hover:not(:disabled) {
   background: var(--color-canvas-sunken);
 }
 
-:root .trigger:not(.textTrigger):not([data-tone]):focus-visible {
+:root .trigger:not([data-choice-field]):not(.textTrigger:not([data-choice-field])):not([data-tone]):focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: var(--polish-focus-offset);
 }
 
-:root .invalid .trigger:not(.textTrigger) {
+:root .invalid .trigger:not([data-choice-field]):not(.textTrigger:not([data-choice-field])) {
   outline: 1px solid transparent;
   box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
 }
 
 /* 箱ごと薄くした時は、中の押せない部品を重ねて薄くしない。 */
 html:root .disabled :is(button, input, textarea):is(:disabled, [aria-disabled='true']) { opacity: var(--polish-enabled-opacity); }
+
+/* 絞り込みで「すべて」以外を選んでいる欄は、枠を緑の細い線にする。焦点の青い輪は今のまま。 */
+:root .trigger:not([data-choice-field]):not(.textTrigger:not([data-choice-field])):not([data-tone])[data-filter-active]:not(:focus-visible) {
+  box-shadow: var(--shadow-raised-control), inset 0 0 0 var(--choice-ring) var(--color-selection-border);
+}
+
+/* 同じ操作の段では、部品の小型指定より共通の高さを優先する。 */
+html:root :is([data-toolbar-row], [data-control-row]) .trigger:not([data-choice-field]) { height: var(--control-h); min-height: var(--control-h); }
+
+/* 短い既定値は欄の内容幅を下限にして省略しない。長い選択値だけを省略する。 */
+.root[data-entity-default] { min-width: max-content; }

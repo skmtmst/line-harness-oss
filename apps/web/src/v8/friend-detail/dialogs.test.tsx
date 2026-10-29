@@ -113,6 +113,20 @@ describe('対応状況の窓は開いた友だちに固定する（WEB125）', (
   })
 })
 
+it('メモが空でも文字列で送り、保存できる（Worker の入口は notes を文字列だけ受ける）', async () => {
+  chatGet.mockImplementation(async (id: string) => ({ success: true, data: { id: `chat-${id}`, friendId: id, status: 'in_progress', operatorId: null, notes: null, revision: 2 } }))
+  await act(async () => root.render(<Support id="friend-a" />))
+  await act(async () => { button('開く')!.click() })
+  await settle()
+  expect((document.querySelector('textarea[aria-label="メモ"]') as HTMLTextAreaElement).value).toBe('')
+  await act(async () => { button('保存する')!.click() })
+  await settle()
+  expect(chatUpdate).toHaveBeenCalledTimes(1)
+  const body = chatUpdate.mock.calls[0][1] as { notes: unknown }
+  expect(body.notes).toBe('')
+  expect(saved).toHaveBeenCalledWith('対応状況とメモを更新しました')
+})
+
 describe('シナリオの窓も開いた友だちに固定する（WEB125）', () => {
   it('A で開いたまま B に変わると窓を閉じ、B へ登録しない', async () => {
     scenarioList.mockResolvedValue({ success: true, data: [{ id: 'sc-1', name: '7日間フォロー', isActive: true }] })

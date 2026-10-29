@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8の集まった回答（・）を本物の React で確かめる。
  * テーマは `<html data-theme>` で替わるので、描画前に v8 を付ける。
@@ -103,7 +104,7 @@ function tabButton(label: string): HTMLButtonElement | undefined {
 
 beforeEach(() => {
   fetchApi.mockClear()
-  role.current = 'owner'
+  role.current = verifiedStaffRole('owner')
   document.documentElement.dataset.theme = 'v8'
   fetchApi.mockImplementation((async (url: string) => {
     if (url.startsWith('/api/forms/form-1/submissions')) return { success: true, data: submissionsPage }
@@ -159,7 +160,7 @@ describe('V8 集まった回答', () => {
 })
 
 it('WEB-148: 閲覧のみでは編集・後処理を隠し、回答とCSVを残す', async () => {
-  role.current = 'staff'
+  role.current = verifiedStaffRole('staff')
   await act(async () => root.render(<FormResponsesPage />)); await settle()
   const rowTab = tabButton('1件ずつ見る');
   if (rowTab) await act(async () => rowTab.click())
@@ -256,3 +257,5 @@ it('二重押下は1要求。失敗は窓を残してやり直し、成功後は
   expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
   expect(host.querySelector('tbody tr')).toBeNull()
 })
+
+afterEach(() => { verifiedStaffRole(null) })

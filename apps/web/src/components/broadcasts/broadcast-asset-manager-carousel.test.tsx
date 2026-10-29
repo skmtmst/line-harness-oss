@@ -8,6 +8,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { within } from '@testing-library/react'
 import BroadcastAssetManager from './broadcast-asset-manager'
 
 vi.mock('@/contexts/account-context', () => ({
@@ -68,10 +69,8 @@ function addPanelButton(): HTMLButtonElement {
   return buttonStarting('＋ パネルを追加する')
 }
 
-function moreCardCheckbox(): HTMLInputElement {
-  const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement | null
-  if (!checkbox) throw new Error('checkbox not found')
-  return checkbox
+function moreCardSwitch(): HTMLButtonElement {
+  return within(container).getByRole<HTMLButtonElement>('switch', { name: '末尾に「もっと見る」パネルを表示' })
 }
 
 beforeEach(() => {
@@ -104,8 +103,8 @@ describe('カルーセルの呼び方', () => {
 describe('パネルの上限', () => {
   it('「もっと見る」を外すと 10 枚まで作れ、10 枚で追加を止める', async () => {
     await openNewCarousel()
-    click(moreCardCheckbox())
-    expect(moreCardCheckbox().checked).toBe(false)
+    click(moreCardSwitch())
+    expect(moreCardSwitch().getAttribute('aria-checked')).toBe('false')
     for (let count = 1; count < 10; count += 1) click(addPanelButton())
     expect(container.textContent).toContain('パネル 10')
     expect(addPanelButton().textContent).toBe('＋ パネルを追加する（10/10）')
@@ -114,14 +113,14 @@ describe('パネルの上限', () => {
 
   it('「もっと見る」を付けると、その1列ぶん本文は 9 枚までになり、理由を出す', async () => {
     await openNewCarousel()
-    expect(moreCardCheckbox().checked).toBe(true)
+    expect(moreCardSwitch().getAttribute('aria-checked')).toBe('true')
     expect(container.textContent).toContain('「もっと見る」で1枠使うため、パネルは9枚までです。')
     for (let count = 1; count < 9; count += 1) click(addPanelButton())
     expect(addPanelButton().textContent).toBe('＋ パネルを追加する（9/10）')
     expect(addPanelButton().disabled).toBe(true)
 
     // 外すと 10 枚目を足せるようになり、理由も消える。
-    click(moreCardCheckbox())
+    click(moreCardSwitch())
     expect(addPanelButton().disabled).toBe(false)
     expect(container.textContent).not.toContain('1枠使うため')
   })

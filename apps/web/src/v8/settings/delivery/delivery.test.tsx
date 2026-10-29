@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -217,12 +219,12 @@ describe('設定 › デリバリー連携', () => {
   })
 
   it('閲覧のみの担当にはボタンを出さない', () => {
-    fixture.role.value = 'staff'
+    fixture.role.value = verifiedStaffRole('staff')
     render(<DeliverySettingsPage />)
 
     expect(screen.queryByRole('button', { name: 'Uber Eats にログインしてつなぐ' })).toBeNull()
     expect(screen.queryByRole('button', { name: '連携を申し込む' })).toBeNull()
-    expect(screen.getByText(/閲覧のみ/)).toBeTruthy()
+    expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
   })
 
   it('DL-2：接続中はつないだお店・つないだ日・最後に確かめた時刻が出る', () => {
@@ -565,13 +567,13 @@ describe('設定 › デリバリー連携', () => {
   })
 
   it('閲覧のみでOAuthから戻っても、候補の取得や変更窓を自動で開かない', async () => {
-    fixture.role.value = 'staff'
+    fixture.role.value = verifiedStaffRole('staff')
     fixture.accountId.value = 'acc-1'
     fixture.search.value = 'ubereats=pending_store'
     fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
     fixture.stores.mockResolvedValue({ success: true, stores: STORES })
     render(<DeliverySettingsPage />)
-    expect(screen.getByText(/閲覧のみ/)).toBeTruthy()
+    expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
     expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
     expect(fixture.connection).not.toHaveBeenCalled()
     expect(fixture.stores).not.toHaveBeenCalled()
@@ -625,9 +627,9 @@ describe('設定 › デリバリー連携', () => {
     expect(await screen.findByText('渋谷店')).toBeTruthy()
 
     fireEvent.click(button('接続を確かめる'))
-    fixture.role.value = 'staff'
+    fixture.role.value = verifiedStaffRole('staff')
     rerender(<DeliverySettingsPage />)
-    expect(await screen.findByText(/閲覧のみ/)).toBeTruthy()
+    expect(await screen.findByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
     await act(async () => oldCheck.resolve(connectionMutation({ status: 'connected', storeName: '古い店舗' })))
 
     expect(card('Uber Eats').getByText('渋谷店')).toBeTruthy()
@@ -731,3 +733,5 @@ describe('設定 › デリバリー連携', () => {
   })
 
 })
+
+afterEach(() => { verifiedStaffRole(null) })

@@ -45,7 +45,7 @@ export function WizardBasicStep({ accountId, canManage, folders, folderState, lo
                       value={form.folderId}
                       disabled={folderState !== 'ready'}
                       onChange={(value) => patch({ folderId: value })}
-                      unfiled={{ value: '', label: '分けない' }}
+                      unfiled={{ value: '', label: '未分類' }}
                       folders={folders.map(folderById)}
                       // 一覧の左の列の「フォルダを追加」と同じ口（自動応答と同じアカウントのフォルダ）。
                       onCreate={canManage && folderState === 'ready'

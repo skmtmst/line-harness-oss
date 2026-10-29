@@ -47,6 +47,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import Notice from '@/components/shared/notice'
 import { DeliveryUnconfirmedBadge, DeliveryUnconfirmedNotice, DELIVERY_UNCONFIRMED_REASON } from '@/components/shared/delivery-unconfirmed'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /*
  * ★V8 自動応答の実行結果（Pencil ）。
@@ -601,7 +602,7 @@ export default function AutoReplyRunsV8() {
         onConfirm={() => stopRule()}
         onCancel={() => { if (!stopping) { setStopOpen(false); setStopReason('') } }}
       >
-        <SaveErrorField names={["stopReason","reason","stop_reason"]}><input
+        <SaveErrorField names={["stopReason","reason","stop_reason"]}><SharedTextField
           type="text"
           className={styles.stopReason}
           placeholder="止める理由（任意・記録に残ります）"

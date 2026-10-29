@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 運営2要素認証の設定 V8（板 ）。
+ * 運営二段階認証の設定 V8（板 ）。
  * 6桁が揃うまで「登録する」を押せなくする。QRの再表示と
  * 手入力キー・登録後のログアウト案内はそのまま。
  */
@@ -78,7 +78,7 @@ function typeCode(value: string) {
 const registerButton = () =>
   Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes('登録する'))
 
-describe('2要素認証の設定V8（qod6X）', () => {
+describe('二段階認証の設定V8（qod6X）', () => {
   it('板IDを持ち、6桁が揃うまで登録させない', async () => {
     await act(async () => { root.render(<OpsTwoFactorPage />) })
     await flush()

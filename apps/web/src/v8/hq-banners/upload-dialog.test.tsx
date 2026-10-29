@@ -35,7 +35,7 @@ it('選んだ画像は確認後だけ送り、失敗しても再試行できる'
   mocks.upload.mockResolvedValueOnce({ success: true, data: {} })
   const done = vi.fn()
   render(<UploadDialogV8 open onClose={() => {}} onDone={done} />)
-  await screen.findByRole('group', { name: '選択中の入れるプロジェクト：プロジェクト' })
+  await screen.findByLabelText('選択中の入れるプロジェクト：プロジェクト')
   fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File(['image'], 'sample.png', { type: 'image/png' })] } })
   expect(mocks.upload).not.toHaveBeenCalled()
   const confirm = screen.getByRole('button', { name: '取り込む' }) as HTMLButtonElement

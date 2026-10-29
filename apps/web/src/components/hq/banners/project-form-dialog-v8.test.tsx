@@ -24,7 +24,7 @@ describe('プロジェクトを作る V8（W7Z57）', () => {
     expect(document.querySelector('[data-design-node="W7Z57"]')).toBeTruthy()
     const create = screen.getByRole('button', { name: '＋ 作って開く' }) as HTMLButtonElement
     expect(create.disabled).toBe(true)
-    fireEvent.change(screen.getByPlaceholderText('例: 春の感謝祭 2周年'), { target: { value: '秋の企画' } })
+    fireEvent.change(screen.getByPlaceholderText('例：春の感謝祭 2周年'), { target: { value: '秋の企画' } })
     expect(create.disabled).toBe(false)
     fireEvent.click(create)
     expect(fixture.submit).toHaveBeenCalledWith({ name: '秋の企画', description: '' })

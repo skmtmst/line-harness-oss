@@ -17,6 +17,7 @@ import { describeInputUpdates } from './form-update-summary'
 import { cellInput, fieldInput, type FormRefs } from './form-refs'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 
 /**
@@ -154,7 +155,7 @@ export default function BlockEditor({
             <div className="flex flex-wrap items-end gap-3">
               <label className="min-w-[16rem] flex-1">
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">見出し</span>
-                <SaveErrorField names={["text","block.text"]}><input
+                <SaveErrorField names={["text","block.text"]}><SharedTextField
                   type="text"
                   value={block.text}
                   onChange={(e) => onChange({ text: e.target.value } as Partial<FormBlock>)}
@@ -182,7 +183,7 @@ export default function BlockEditor({
           {block.kind === 'text' && (
             <label className="block">
               <span className="text-ink-secondary mb-1 block text-xs font-medium">本文</span>
-              <SaveErrorField names={["text","block.text"]}><textarea
+              <SaveErrorField names={["text","block.text"]}><SharedTextArea
                 rows={3}
                 value={block.text}
                 onChange={(e) => onChange({ text: e.target.value } as Partial<FormBlock>)}
@@ -197,7 +198,7 @@ export default function BlockEditor({
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
                   画像のURL
                 </span>
-                <SaveErrorField names={["mediaUrl","block.mediaUrl","media_url","block.media_url"]}><input
+                <SaveErrorField names={["mediaUrl","block.mediaUrl","media_url","block.media_url"]}><SharedTextField
                   type="url"
                   value={block.mediaUrl}
                   onChange={(e) => onChange({ mediaUrl: e.target.value } as Partial<FormBlock>)}
@@ -223,7 +224,7 @@ export default function BlockEditor({
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
                   押したときに開くURL（任意）
                 </span>
-                <SaveErrorField names={["linkUrl","block.linkUrl","link_url","block.link_url"]}><input
+                <SaveErrorField names={["linkUrl","block.linkUrl","link_url","block.link_url"]}><SharedTextField
                   type="url"
                   value={block.linkUrl ?? ''}
                   onChange={(e) => onChange({ linkUrl: e.target.value } as Partial<FormBlock>)}
@@ -239,7 +240,7 @@ export default function BlockEditor({
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">
                   ボタンの文字
                 </span>
-                <SaveErrorField names={["label","block.label"]}><input
+                <SaveErrorField names={["label","block.label"]}><SharedTextField
                   type="text"
                   value={block.label}
                   onChange={(e) => onChange({ label: e.target.value } as Partial<FormBlock>)}
@@ -248,7 +249,7 @@ export default function BlockEditor({
               </label>
               <label className="min-w-[16rem] flex-1">
                 <span className="text-ink-secondary mb-1 block text-xs font-medium">開くURL</span>
-                <SaveErrorField names={["url","block.url"]}><input
+                <SaveErrorField names={["url","block.url"]}><SharedTextField
                   type="url"
                   value={block.url}
                   onChange={(e) => onChange({ url: e.target.value } as Partial<FormBlock>)}
@@ -296,7 +297,7 @@ export default function BlockEditor({
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">
                     タイトル
                   </span>
-                  <SaveErrorField names={["label","block.label"]}><input
+                  <SaveErrorField names={["label","block.label"]}><SharedTextField
                     type="text"
                     value={block.label}
                     onChange={(e) => patchInput({ label: e.target.value })}
@@ -511,7 +512,7 @@ export default function BlockEditor({
                   <span className="text-ink-secondary mb-1 block text-xs font-medium">
                     説明文
                   </span>
-                  <SaveErrorField names={["description","block.description"]}><input
+                  <SaveErrorField names={["description","block.description"]}><SharedTextField
                     type="text"
                     value={block.description ?? ''}
                     onChange={(e) => patchInput({ description: e.target.value })}
@@ -525,7 +526,7 @@ export default function BlockEditor({
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">
                       うすい文字（プレースホルダ）
                     </span>
-                    <SaveErrorField names={["placeholder","block.placeholder"]}><input
+                    <SaveErrorField names={["placeholder","block.placeholder"]}><SharedTextField
                       type="text"
                       value={block.placeholder ?? ''}
                       onChange={(e) => patchInput({ placeholder: e.target.value })}
@@ -542,7 +543,7 @@ export default function BlockEditor({
                 {block.type === 'textarea' ? (
                   <label className="block">
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
-                    <SaveErrorField names={["defaultValue","block.defaultValue","default_value","block.default_value"]}><textarea
+                    <SaveErrorField names={["defaultValue","block.defaultValue","default_value","block.default_value"]}><SharedTextArea
                       rows={2}
                       value={block.defaultValue ?? ''}
                       onChange={(e) => patchInput({ defaultValue: e.target.value })}
@@ -601,7 +602,7 @@ export default function BlockEditor({
                 ) : (
                   <label className="block">
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
-                    <SaveErrorField names={["defaultValue","block.defaultValue","default_value","block.default_value"]}><input
+                    <SaveErrorField names={["defaultValue","block.defaultValue","default_value","block.default_value"]}><SharedTextField
                       type="text"
                       value={block.defaultValue ?? ''}
                       onChange={(e) => patchInput({ defaultValue: e.target.value })}
@@ -635,7 +636,7 @@ export default function BlockEditor({
                       </label>
                     )}
                     <label className="text-ink-secondary flex items-center gap-1.5 text-xs">
-                      <SaveErrorField names={["min","block.limit?.min","limit?.min"]}><input
+                      <SaveErrorField names={["min","block.limit?.min","limit?.min"]}><SharedTextField
                         type="number"
                         min={0}
                         value={block.limit?.min ?? ''}
@@ -651,7 +652,7 @@ export default function BlockEditor({
                         placeholder="下限"
                       /></SaveErrorField>
                       〜
-                      <SaveErrorField names={["max","block.limit?.max","limit?.max"]}><input
+                      <SaveErrorField names={["max","block.limit?.max","limit?.max"]}><SharedTextField
                         type="number"
                         min={0}
                         value={block.limit?.max ?? ''}

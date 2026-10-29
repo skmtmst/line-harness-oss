@@ -553,7 +553,7 @@ describe('R599 一覧未取得の状態別件数', () => {
     expect(statusTabText(el, '送信なし')).toBe('送信なし1')
   })
 
-  it('正常時は実数と1ページの送りを出す', async () => {
+  it('正常時は実数を出し、1ページなら移動を出さない', async () => {
     const { container: el, root: r } = mount()
     await render(el, r)
     await act(async () => { await drainMicrotasks() })
@@ -569,9 +569,9 @@ describe('R599 一覧未取得の状態別件数', () => {
 
     expect(statusTabText(el, '処理中')).toBe('処理中3')
     expect(statusTabText(el, '失敗')).toBe('失敗4')
-    expect(el.querySelector('[data-pagination]')).not.toBeNull()
-    expect(nextPageButton(el).disabled).toBe(true)
-    expect(el.querySelector('[data-pagination] button')).toHaveProperty('disabled', true)
+    expect(el.querySelector('[data-pagination]')).toBeNull()
+    expect(el.querySelector('[data-pagination] button[aria-label="次のページ"]')).toBeNull()
+    expect(el.querySelector('[data-pagination] button')).toBeNull()
   })
 
   it('空の一覧は「記録はありません」と実数の0を出す', async () => {

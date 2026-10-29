@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -26,7 +27,7 @@ const QA = { id: 'qa-1', questions: ['駐車場はありますか'], answerText:
 
 beforeEach(() => {
   vi.clearAllMocks()
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   apiMock.settings.mockResolvedValue({ success: true, data: { mode: 'draft_only', suspendedReason: null, publishedQaCount: 18, draftQaCount: 1, version: 4 } })
   apiMock.saveSettings.mockResolvedValue({ success: true, data: { mode: 'auto_qa', suspendedReason: null, publishedQaCount: 18, draftQaCount: 1, version: 5 } })
   apiMock.listQa.mockResolvedValue({ success: true, data: { items: [QA], total: 1 } })
@@ -52,7 +53,7 @@ it('オーナーが自動で答えるを選ぶと確かめの窓が開き、窓�
 })
 
 it('管理者には自動で答えるの選択肢を出さない（オーナーだけ）', async () => {
-  role.value = 'admin'
+  role.value = verifiedStaffRole('admin')
   await open()
   fireEvent.click(screen.getByRole('button', { name: '変える' }))
   expect(screen.queryByRole('button', { name: '自動で答える' })).toBeNull()
@@ -60,7 +61,7 @@ it('管理者には自動で答えるの選択肢を出さない（オーナー�
 })
 
 it('閲覧のみには追加・取り込み・変える・行の「…」を出さず、帯を出す', async () => {
-  role.value = 'viewer'
+  role.value = verifiedStaffRole('viewer')
   await open()
   expect(screen.getByText(/閲覧のみで見ています。Q&A の追加/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: /Q&A を追加/ })).toBeNull()
@@ -78,3 +79,5 @@ it('一覧を読めないときは読み直しの押し口を出し、押すと�
   expect(apiMock.listQa).toHaveBeenCalledTimes(2)
   expect(screen.getByText('駐車場はありますか')).toBeTruthy()
 })
+
+afterEach(() => { verifiedStaffRole(null) })
