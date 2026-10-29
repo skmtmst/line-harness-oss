@@ -751,3 +751,39 @@ describe('読込骨格の表示時間と完了への切替', () => {
     } finally { vi.useRealTimers() }
   })
 })
+
+describe('R4 受け付けた数と届いた数を分ける', () => {
+  /* 集計の無い送信済み。口の getInsight は失敗のふりなので受け付け数が残る。 */
+  const acceptedRow = { ...base, id: 'bc-9', title: '集計まちのお知らせ', status: 'sent', displayStatus: 'sent', displayStatusLabel: '送信済み', scheduledAt: null, sentAt: '2026-08-20T03:00:00.000Z', successCount: 937, insightSummary: null }
+  const renderAccepted = async () => {
+    narrow.value = false
+    listBroadcasts.mockImplementation(async () => ({
+      success: true, data: [acceptedRow], kpis: { scheduled: 1, thisMonth: 1, delivered: 1842, openRate: null, drafts: 0 },
+      statusCounts: { all: 1, sent: 1 }, pagination: { total: 1, limit: 20, cursor: 0, nextCursor: null },
+    }))
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    return [...host.querySelectorAll('tbody tr')].find((tr) => tr.textContent?.includes('集計まちのお知らせ')) as HTMLTableRowElement
+  }
+
+  it('数の帯の今月の配信は受け付けの言葉で出し、届いたと言わない', async () => {
+    await renderAccepted()
+    expect(host.textContent).toContain('LINEが受け付けました：1,842人')
+    expect(host.textContent).not.toContain('1,842人に届いた')
+  })
+
+  it('集計の無い送信済みの行は受け付けの言葉で数を出す', async () => {
+    const row = await renderAccepted()
+    const right = [...row.querySelectorAll('td[data-align="right"]')].map((td) => td.textContent?.trim())
+    expect(right[0]).toBe('LINEが受け付けました：937人')
+  })
+
+  it('集計の無い送信済みの詳細パネルは受け付けの言葉で出す', async () => {
+    const row = await renderAccepted()
+    act(() => { fireEvent.click(row) })
+    await flush()
+    const panel = document.body.querySelector('[data-design-part="detail-panel"]') as HTMLElement
+    expect(panel.textContent).toContain('LINEが受け付けました：937人')
+    expect(panel.textContent).not.toContain('人に届いた')
+  })
+})
