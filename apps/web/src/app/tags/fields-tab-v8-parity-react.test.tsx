@@ -126,7 +126,7 @@ describe('友だち情報欄V8一覧', () => {
     const rendered = await draw()
     expect(await rendered.findByText('友だち情報欄を読み込めませんでした')).toBeTruthy()
     expect(rendered.queryByText('まだ項目はありません')).toBeNull()
-    expect(rendered.getByText('再読み込みしても直らない場合はエラー報告へ。')).toBeTruthy()
+    expect(rendered.getByText('管理者にお問い合わせください。')).toBeTruthy()
     const calls = fixture.listCalls
     fixture.list = () => Promise.resolve({ success: true, data: [] })
     fireEvent.click(rendered.getByRole('button', { name: /もう一度/ }))
