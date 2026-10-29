@@ -505,7 +505,7 @@
 - [投稿メディアの内容選択](release-log/unreleased/1890-masato-post-media-content.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
-- [運営コンソールの端の詰まり修正](release-log/unreleased/0000-kenta-muse-fqa-edge.md)
+- [運営コンソールの端の詰まり修正](release-log/unreleased/1948-kenta-muse-fqa-edge.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
 - [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
 - [反映履歴（アップデート履歴）の設計](change-log-design.md)
@@ -870,7 +870,7 @@
 - [一覧の帯・フォルダの丸と共通操作の整理](release-log/unreleased/0000-kenta-tags-band-dot.md)
 - [共通部品と言葉・受信箱の絞り込みの修正](release-log/unreleased/0000-kenta-int.md)
 - [チェックの印・スイッチ・選ぶ欄の見た目の統一](release-log/unreleased/0000-kenta-check-green.md)
-- [閲覧のみの帯を題の横並びから題の下へ](release-log/unreleased/0000-kenta-muse-heading-band.md)
+- [閲覧のみの帯を題の横並びから題の下へ](release-log/unreleased/1948-kenta-muse-heading-band.md)
 - [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
 - [まとめ列車 7](release-log/unreleased/1848-kenta-train-one7-1027.md)
 
@@ -934,5 +934,5 @@
 - [一覧のページ範囲の補正](release-log/unreleased/1933-kenta-muse-history-pagination.md) — 削除後に最後のページへ戻す修正の反映履歴。
 - [登録の確認画面の表示とロゴ](release-log/unreleased/1945-masato-registration-confirmed-logo.md) — 登録の確認項目と正式ロゴの修正履歴。
 - [登録画面の補足文の削除](release-log/unreleased/1947-masato-registration-hints.md) — 確定済みの3項目の補足文を外した修正履歴。
-- [設定の画面のお知らせとカードの間隔](release-log/unreleased/0000-kenta-muse-settings-gap.md) — お知らせとカードの間の空きをそろえた修正履歴。
-- [本線の見張りの赤の修正](release-log/unreleased/0000-kenta-muse-guard-reds.md) — 言葉・CSS・確認窓の見張り9件の赤を直した反映履歴。
+- [設定の画面のお知らせとカードの間隔](release-log/unreleased/1948-kenta-muse-settings-gap.md) — お知らせとカードの間の空きをそろえた修正履歴。
+- [本線の見張りの赤の修正](release-log/unreleased/1948-kenta-muse-guard-reds.md) — 言葉・CSS・確認窓の見張り9件の赤を直した反映履歴。
