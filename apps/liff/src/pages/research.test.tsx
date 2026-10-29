@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import Research from './research.js';
 const researchForm = vi.hoisted(() => vi.fn());
-vi.mock('../lib/api.js', () => ({ api: { researchForm } }));
+vi.mock('../lib/api.js', () => ({ api: { researchForm, liffConfig: vi.fn().mockResolvedValue({ success: true, data: { accountName: '人工店' } }) } }));
 afterEach(() => { cleanup(); researchForm.mockReset(); });
 function Probe() { const location = useLocation(); return <p>{location.pathname + location.search}</p>; }
 function mount() { render(<MemoryRouter initialEntries={['/research/r1?liffId=account1']}><Routes>
@@ -18,4 +18,8 @@ test('取得失敗は再読込でき、回答画面へ進む', async () => {
   researchForm.mockRejectedValueOnce(new Error('network')).mockResolvedValue({ formId: 'form1' }); mount();
   fireEvent.click(await screen.findByRole('button', { name: 'もう一度読み込む' }));
   expect(await screen.findByText('/forms/form1?liffId=account1')).toBeTruthy(); expect(researchForm).toHaveBeenCalledTimes(2);
+});
+test('読み込み中も題（リサーチ）の帯を出す', async () => {
+  researchForm.mockReturnValue(new Promise(() => {})); mount();
+  expect(await screen.findByText('リサーチ')).toBeTruthy();
 });

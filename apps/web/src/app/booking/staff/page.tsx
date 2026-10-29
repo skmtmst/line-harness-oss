@@ -4,12 +4,10 @@ import { usePermissionAccess } from '@/lib/use-feature-access'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { PageHeading } from '@/components/templates/page-frame'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MoreHorizontal } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowActions } from '@/components/shared/row-actions'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import ListState from '@/components/shared/list-state'
 import { isForbidden, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -77,9 +75,7 @@ export default function BookingStaffPage() {
   const [removeError, setRemoveError] = useState('')
   // N-411: 予約スタッフの登録・変更・削除は 'booking.settings' の実効permission。
   const canManageStaff = usePermissionAccess('booking.settings')
-  // 行の「その他」メニューの開き先（#641）
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const router = useRouter()
+  const staffLock = usePermissionLockReason(canManageStaff)
   const loadRequestRef = useRef(0)
 
   const load = useCallback(async () => {
@@ -118,6 +114,7 @@ export default function BookingStaffPage() {
 
   async function save(s: Partial<BookingStaff>) {
     if (!selectedAccountId) return
+    if (!canManageStaff || staffLock) throw new Error(staffLock || '権限を確認しています。')
     if (s.id) {
       await bookingApi.updateStaff(selectedAccountId, s.id, s)
     } else {
@@ -133,7 +130,7 @@ export default function BookingStaffPage() {
    * 画像比較にも写らない（確認の絵をそもそも撮れない）。
    */
   async function remove(id: string) {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || !canManageStaff || staffLock) return
     setDeleting(true)
     setRemoveError('')
     try {
@@ -164,14 +161,14 @@ export default function BookingStaffPage() {
         押せない理由はボタンの説明に出す。押せないボタンを黙って置かない。
       */}
       <div data-design="Actions" className="flex flex-wrap items-center gap-2">
-        {canManageStaff ? <Button
+        <Button
           variant="primary"
-          onClick={() => setEditing(EMPTY)}
+          onClick={() => { if (canManageStaff && !staffLock) setEditing(EMPTY) }}
           disabled={!canManageStaff || !selectedAccountId || loadStatus !== 'ready'}
-          title={canManageStaff ? undefined : '予約設定の変更権限がありません'}
+          lockedReason={staffLock}
         >
           ＋ スタッフを作る
-        </Button> : null}
+        </Button>
       </div>
 
       {!canManageStaff ? <ReadOnlyNotice>閲覧のみで見ています。予約スタッフの変更には予約設定の変更権限が必要です。</ReadOnlyNotice> : null}
@@ -260,41 +257,15 @@ export default function BookingStaffPage() {
                       )}
                     </Td>
                     <ActionCell>
-                      {/* 行の操作は「主な1つ＋…メニュー」。削除は行に直に置かず、メニューの中の危ない操作へ。 */}
-                      <div className="relative inline-flex items-center justify-end gap-1.5">
-                        {canManageStaff ? (
-                          <>
-
-                            <IconButton
-                              aria-label={`${s.display_name}のその他操作`}
-                              aria-expanded={openMenuId === s.id}
-                              onClick={() => setOpenMenuId((current) => (current === s.id ? null : s.id))}
-                            >
-                              <MoreHorizontal aria-hidden />
-                            </IconButton>
-                            <ActionMenu
-                              open={openMenuId === s.id}
-                              ariaLabel={`${s.display_name}の操作`}
-                              onClose={() => setOpenMenuId(null)}
-                              items={[{ id: 'edit', label: '編集する', onSelect: () => setEditing(s) }, {
-                                id: 'shift',
-                                label: 'シフト',
-                                onSelect: () => router.push(`/booking/staff/shifts?staff_id=${s.id}`),
-                              }, {
-                                id: 'delete',
-                                label: '削除する',
-                                tone: 'danger',
-                                dividerBefore: true,
-                                onSelect: () => { setRemoveError(''); setRemoveTarget(s) },
-                              }]}
-                            />
-                          </>
-                        ) : (
-                          <Button href={`/booking/staff/shifts?staff_id=${s.id}`} variant="secondary" size="compact">
-                            シフト
-                          </Button>
-                        )}
-                      </div>
+                      <RowActions
+                        subjectName={s.display_name}
+                        detail={{ label: 'シフト', href: `/booking/staff/shifts?staff_id=${s.id}` }}
+                        edit={{ onClick: () => { if (canManageStaff && !staffLock) setEditing(s) }, disabled: !canManageStaff, lockedReason: staffLock }}
+                        destructiveItem={{
+                          id: 'delete', label: '削除する', disabled: !canManageStaff, lockedReason: staffLock,
+                          onSelect: () => { if (canManageStaff && !staffLock) { setRemoveError(''); setRemoveTarget(s) } },
+                        }}
+                      />
                     </ActionCell>
                   </Tr>
                 ))}

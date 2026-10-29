@@ -687,14 +687,16 @@ describe('カレンダーの見た目（設計合わせ）', () => {
         expect(cell.className).not.toContain('min-h-14');
         expect(cell.className).toContain('h-11');
       }
-      // 選んだ日だけ型の主の色で塗る。ほかは塗らない。
+      // 選んだ日は薄い地＋濃い文字と主の色の枠。主ボタンと同じ緑の塗りにしない。
       // 角丸は型の値 (既定 10px) を変数で受ける。
-      expect(selected.className).toContain('bg-liff-primary');
+      expect(selected.className).toContain('bg-liff-soft');
+      expect(selected.className).not.toContain('bg-liff-primary');
       expect(selected.className).toContain('rounded-(--liff-radius)');
       const others = cells.filter((cell) => cell !== selected);
       expect(others.length).toBeGreaterThan(0);
       for (const cell of others) {
         expect(cell.className).not.toContain('bg-liff-primary');
+        expect(cell.className).not.toContain('bg-liff-soft');
       }
     },
   );
@@ -800,6 +802,16 @@ describe('監査 L4：満席の日から時刻の「空いたら知らせる」�
     fireEvent.click(await screen.findByRole('button', { name: '10月18日 満席' }));
     fireEvent.click(screen.getByRole('button', { name: 'この日の時間を選ぶ' }));
     expect(await screen.findByRole('button', { name: '11:00に空いたら知らせる' })).toBeTruthy();
+  });
+
+  it('鈴が出る日は鈴の意味の1行を出し、鈴の無い日は出さない', async () => {
+    renderPicker();
+    expect(await screen.findByText('10月16日（金）の空き')).toBeTruthy();
+    expect(screen.queryByText('満席の時間の鈴は「空いたら知らせる」の登録です')).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: '10月18日 満席' }));
+    expect(await screen.findByText('10月18日（日）の空き')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '10:00に空いたら知らせる' })).toBeTruthy();
+    expect(screen.getByText('満席の時間の鈴は「空いたら知らせる」の登録です')).toBeTruthy();
   });
 
   it('満席の日しかない週も「空きがありません」で止めず、日の並びと鈴を出す', async () => {

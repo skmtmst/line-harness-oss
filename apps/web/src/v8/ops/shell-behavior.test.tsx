@@ -31,10 +31,16 @@ describe('運営の自分の操作とメニューを閉じる動き', () => {
     fireEvent.keyDown(self, { key: 'ArrowUp' })
     expect(await screen.findByRole('menuitem', { name: '二段階認証（設定済み）' })).not.toBeNull()
   })
-  it('注意を残し、環境の札は版の表示へまとめる', () => {
-    render(<OpsHead title="監査ログ" environment="staging" />)
-    expect(screen.getByRole('note').textContent).toContain('操作はすべて記録されます')
-    expect(screen.getByRole('note').textContent).not.toContain('検証環境')
+  it('記録の注意は左メニューの下の印1つにまとめ、各画面の帯は出さない', () => {
+    const realWidth = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1440 })
+    try {
+      render(<OpsShellV8 {...props}><OpsHead title="監査ログ" /></OpsShellV8>)
+      expect(screen.getAllByText('操作は記録されます')).toHaveLength(1)
+      expect(document.body.textContent).not.toContain('運営コンソール：契約先のデータを扱います')
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: realWidth })
+    }
   })
   it('メンバー管理は左下のメニューだけに置き、認証とログアウトも使える', async () => {
     render(<OpsShellV8 {...props} />)

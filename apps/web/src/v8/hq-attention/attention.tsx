@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import { useListUrlValue } from '@/components/shared/list-url-state'
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -62,7 +63,10 @@ export default function HqAttentionV8() {
   const [items, setItems] = useState<HqAttentionItem[] | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const [kind, setKind] = useState<'all' | HqAttentionKind>('all')
+  /* 種類は URL に置く（統括トップの「接続に問題」から ?kind=connections で来る）。知らない値はすべて扱い。 */
+  const [kindParam, setKindParam] = useListUrlValue('kind', 'all')
+  const kind = (kindParam === 'all' || KINDS.some((item) => item.key === kindParam) ? kindParam : 'all') as 'all' | HqAttentionKind
+  const setKind = (next: 'all' | HqAttentionKind) => setKindParam(next)
   const [order, setOrder] = useState<'count' | 'name'>('count')
   const [folder, setFolder] = useState('all')
   const [folders, setFolders] = useState<Array<{ id: string; name: string }>>([])

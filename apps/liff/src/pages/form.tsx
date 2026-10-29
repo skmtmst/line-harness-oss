@@ -523,7 +523,12 @@ export default function Form() {
   };
 
   if (loading) {
-    return <LoadingView />;
+    return (
+      <div className="min-h-screen bg-canvas">
+        <LiffHeader title="フォーム" />
+        <div className="mx-auto w-full max-w-md p-4"><LoadingView /></div>
+      </div>
+    );
   }
 
   if (error && !form) {

@@ -1,6 +1,6 @@
 'use client'
 import { ChevronLeft, ChevronRight, Info } from 'lucide-react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { CalendarPerson, CalendarTimeEntries, calendarTimeRange, useCalendarTimeScale } from '@/components/shared/calendar-parts'
 import { BookingVisibleLegend } from '@/components/shared/booking-presentation'
 import { calendarBookingState } from '@/components/shared/booking-state'
@@ -36,7 +36,7 @@ function Pager({ title, todayLabel, onMove }: { title: string; todayLabel: strin
   )
 }
 
-export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen, period = 'week' }: { period?: 'day' | 'week'; week: StyleWeek; canWrite: boolean; onMove: (step: -1 | 0 | 1) => void; onSlot: (day: string, start: string) => void; onOpen: (id: string) => void }) {
+export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen, period = 'week', empty }: { empty?: ReactNode; period?: 'day' | 'week'; week: StyleWeek; canWrite: boolean; onMove: (step: -1 | 0 | 1) => void; onSlot: (day: string, start: string) => void; onOpen: (id: string) => void }) {
   const timeScale = useCalendarTimeScale(week.entries, week.free, canWrite)
   const axis = calendarTimeRange([...week.entries, ...(canWrite ? week.free : [])])
   const position = (start: string, end: string, day: number, days: number) => box(start, end, day, days, axis.from)
@@ -50,6 +50,7 @@ export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen, period = 
         <span className={styles.calLegend}><i data-k="booked" />予約<i data-k="free" />空き<i data-k="off" />休み</span>
       </div>
       <BookingVisibleLegend states={[...new Set(week.entries.map(entry => calendarBookingState(entry.state ?? 'confirmed')))]} />
+      {empty}
       <CalendarPeriod period={week.days[0]?.date ?? ''} scope={period}><div className={styles.weekFrame}>
         <div className={styles.weekHead}>
           <span className={styles.boardTimeHead} />
