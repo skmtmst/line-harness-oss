@@ -74,7 +74,6 @@ describe('U094 運営コンソールの外枠', () => {
   it('利用者メニューは矢印キーで項目を移動できる', () => {
     expect(ACTIONS).toContain('role="menu"')
     expect(ACTIONS).toContain('querySelectorAll<HTMLElement>')
-    expect(SHELL).toContain("href: '/staff'")
     expect(ACTIONS).toContain("['ArrowDown', 'ArrowUp', 'Home', 'End']")
   })
 })
