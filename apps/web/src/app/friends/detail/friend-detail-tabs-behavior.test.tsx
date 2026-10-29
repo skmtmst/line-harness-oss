@@ -55,6 +55,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       friendFields: { ...actual.api.friendFields, forFriend: fx.forFriend, saveForFriend: async () => ({ success: true, data: { updated: 1 } }) },
       folders: { ...actual.api.folders, list: fx.folders },
       scenarios: { ...actual.api.scenarios, list: fx.scenarios },
+      tags: { ...actual.api.tags, list: async () => ({ success: true, data: [{ id: 't1', name: 'VIP' }] }) },
       staff: { ...actual.api.staff, me: async () => ({ success: true, data: { role: fx.role } }) },
     },
   }
@@ -152,14 +153,22 @@ const byText = (selector: string, text: string) =>
 const hrefOf = (text: string) => byText('a', text)[0]?.getAttribute('href')
 
 describe('受信箱への口', () => {
-  it('受信箱で開く・タグの編集・テンプレートを送るは、符号化した ID を ?friend= で渡す', async () => {
+  it('受信箱とテンプレートは符号化したIDへ移り、タグはその場で編集する', async () => {
     fx.getFriend.mockImplementation(async (id: string) => ({ success: true, data: { ...friend(id), tags: [{ id: 't1', name: 'VIP', color: '#000', createdAt: '2025-04-03T00:00:00.000Z' }] } }))
     await open('id=a b/c')
     const expected = '/chats?friend=a%20b%2Fc'
     expect(hrefOf('受信箱で開く')).toBe(expected)
     const inboxLinks = [...host.querySelectorAll('a')].map((a) => a.getAttribute('href') ?? '').filter((href) => href.startsWith('/chats'))
-    expect(inboxLinks.length).toBeGreaterThanOrEqual(3)
+    expect(inboxLinks.length).toBeGreaterThanOrEqual(2)
     expect(new Set(inboxLinks)).toEqual(new Set([expected]))
+
+    const editTags = host.querySelector<HTMLButtonElement>('[data-customer-info-panel] section[aria-label="タグ"] button')!
+    act(() => { editTags.click() })
+    await flush()
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('タグを編集')
+    expect(fx.pushed).toEqual([])
+    act(() => { [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((button) => button.textContent?.trim() === 'キャンセル')!.click() })
+    await flush()
 
     act(() => { byText('button', '個別操作')[0].click() })
     await flush()

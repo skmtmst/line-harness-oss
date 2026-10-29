@@ -41,6 +41,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import AutomationListV8 from './list'
+import AutomationsPage from '@/app/automations/page'
 import AutomationRunsV8 from './runs'
 import CommonActionsV8 from './common-actions'
 
@@ -132,12 +133,14 @@ const named = (text: string) => buttons().filter((element) => (element.textConte
 describe('V8 オートメーションのルール一覧（LWQXd）', () => {
   it('旧一覧の削減時間は現在の説明へ残し、未取得を0時間にしない', async () => {
     vi.spyOn(api.automations, 'list').mockResolvedValueOnce({ success: true, data: automations, summary: null })
-    await render(<AutomationListV8 />)
+    await render(<AutomationsPage />)
+    await waitFor(() => Boolean(host.querySelector('[aria-label="ルール「問い合わせを担当へ知らせる」の操作"]')), 'ルールの行')
+    expect(host.querySelector('[data-page-template="list"] [data-template-region="content"]')?.textContent).toContain('問い合わせを担当へ知らせる')
     await act(async () => { host.querySelector<HTMLButtonElement>('button[aria-label="この画面の説明"]')!.click() })
     expect(host.textContent).toContain('削減時間はまだ数えられていません')
     expect(host.textContent).not.toContain('およそ0時間')
     account.id = 'account-b'
-    await render(<AutomationListV8 />)
+    await render(<AutomationsPage />)
     expect(host.textContent).toContain('およそ3時間の削減')
     expect(host.textContent).toContain('1回30秒として計算しています')
   })

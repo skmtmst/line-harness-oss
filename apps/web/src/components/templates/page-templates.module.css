@@ -112,9 +112,13 @@
 :global(:root) .frame[data-page-template='create'] [data-template-region='preview'] { background: var(--color-canvas); }
 /* 作成の型の余白の口（CreatePage の contentSpacing・previewSurface）。画面の CSS で型の余白を上書きしない。 */
 :global(:root) .createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }
+/* メニュー先頭の案内と直前の表示面は、幅を問わず同じ8pxで離す。 */
+:global(:root) .createContent[data-content-spacing='notice-after-preview'] { padding-top: 0; }
+:global(:root) .createContent[data-content-spacing='notice-after-preview'] > :first-child > :global([data-design-part='notice']):first-child { margin-top: var(--space-8); }
 :global(:root) .preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }
 :global(:root) .preview[data-preview-surface='plain'] { background: transparent; }
 :global(:root) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); box-shadow: var(--shadow-row-line); flex-wrap: wrap; }
+:global(:root) [data-page-template='create'] .heading[data-heading-separator='none'] { box-shadow: none; }
 :global(:root) [data-page-template='detail'] .heading { padding: var(--tpl-detail-head-pad-top) var(--tpl-detail-head-pad-side) var(--tpl-detail-head-pad-bottom); gap: var(--tpl-detail-head-gap); flex-wrap: wrap; }
 /*
  * 来た道の案内（crumbs）は題と説明の下の行で、操作のボタンと同じ行の左。
@@ -183,6 +187,10 @@
 :global(:root) .createNotice { padding: var(--tpl-create-notice-pad); }
 :global(:root) .createNotice:empty { display: none; }
 :global(:root) .createNotice[data-notice-spacing='band'] { padding: var(--tpl-fe-band-slot-pad); }
+/* 閲覧帯と本文先頭の知らせが続くとき、後の知らせの上余白へ間隔を集約する。 */
+:global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) { padding-bottom: 0; }
+:global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) > :global([data-read-only-notice]) { margin-bottom: 0; }
+:global(:root) .createNotice[data-content-spacing='notice-after-read-only'] + .split > .createContent[data-content-spacing='notice-after-read-only'] { padding-top: 0; }
 
 :global(:root) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--polish-space-row); }
 
@@ -310,6 +318,8 @@
   :global(:root) .inboxSummary, :global(:root) .analyticsAside, :global(:root) .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global(:root) .dashboardRow[data-row='link'] .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global(:root) .asideToggle { display: block; }
+  /* 先頭の知らせが持つ上余白へ集約し、操作の下と本文の上に重ねて足さない。 */
+  :global(:root) .asideToggle[data-content-spacing='notice-after-preview'] { padding-bottom: 0; }
   :global(:root) .inboxList { width: 348px; }
   :global(:root) .settings { flex-direction: column; gap: var(--polish-space-card); }
   :global(:root) .settingsNav { width: 100%; flex-direction: row; flex-wrap: wrap; }
@@ -586,6 +596,11 @@
 
 /* 数の帯を白い板の余白の内側へ置く。道具に含む帯は道具の余白を使う。 */
 :global(:root) .stats:has([data-kpi-strip]) { padding: var(--space-8) var(--tpl-list-inset) 0; min-width: 0; max-width: 100%; }
+:global(:root) .listBody > .stats:has([data-kpi-strip]),
+:global(:root) .listBody > .split > .main > .content > .stats:has([data-kpi-strip]) { padding-bottom: var(--space-8); }
+/* 数の帯の次に警告と分析の列が続くとき、段の上と警告の下へ間隔を重ねない。 */
+:global(:root) .stats:has([data-kpi-strip]) + .listSection:has(> :global([data-design-part='notice'][data-tone='warn']):first-child + .detailColumns[data-presentation='analysis']:last-child) { padding-top: 0; gap: var(--space-8); }
+:global(:root) .stats:has([data-kpi-strip]) + .listSection:has(> :global([data-design-part='notice'][data-tone='warn']):first-child + .detailColumns[data-presentation='analysis']:last-child) > :global([data-design-part='notice'][data-tone='warn']):first-child { margin-block: 0; }
 :global(:root) .section { border-bottom: 0; }
 
 @container v8-page (width < 1100px) {

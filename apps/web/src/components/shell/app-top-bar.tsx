@@ -2,9 +2,10 @@
 
 import { useStaffRole } from '@/lib/staff-role'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TopBar from '@/components/shared/top-bar'
 import BellNotifications from './bell-notifications'
+import { loadNotificationCenter, type NotificationAccount, type NotificationScope } from './notification-center-data'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
@@ -144,32 +145,40 @@ export default function AppTopBar() {
   const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
   const [staffName, setStaffName] = useState('')
   const staffRole = useStaffRole()
+  const hqShell = isHqShellPath(pathname)
+  const notificationTarget = useMemo<NotificationScope>(() => hqShell ? { kind: 'all' } : selectedAccountId ? { kind: 'store', accountId: selectedAccountId } : { kind: 'none' }, [hqShell, selectedAccountId])
+  const notificationAccountsKey = JSON.stringify(accounts.map((account) => ({ id: account.id, label: account.displayName || account.name })))
+  const notificationAccounts = useMemo(() => JSON.parse(notificationAccountsKey) as NotificationAccount[], [notificationAccountsKey])
+  const notificationScope = JSON.stringify([notificationTarget, notificationAccountsKey])
   /*
    * ★V8 外側：ベルの未読の数。取るのは v8 のときだけ（互換経路では描かない
    * ので余計な要求を出さない）。取れなくても帯は壊さない。
    * 設定画面でその場で v8 へ切り替えたときにも取れるよう、テーマ
    * 変更の合図を受ける。
    */
-  const [notificationUnread, setNotificationUnread] = useState(0)
+  const [unreadState, setUnreadState] = useState<{ scope: string; count: number | null } | null>(null)
+  const notificationUnread = unreadState?.scope === notificationScope ? unreadState.count : undefined
+  const unreadRequest = useRef(0)
+  const setNotificationUnread = useCallback((count: number | null) => {
+    unreadRequest.current += 1
+    setUnreadState({ scope: notificationScope, count })
+  }, [notificationScope])
   useEffect(() => {
     let cancelled = false
+    const request = ++unreadRequest.current
     const load = async () => {
-      // 店を選んでいない（統括で店を選ぶ前など）ときは数を出さない。前の店の数を残さない。
-      if (!selectedAccountId) { setNotificationUnread(0); return }
       try {
-        const { api } = await import('@/lib/api')
-        const response = await api.notifications.center.list(selectedAccountId, { limit: 1 })
-        if (cancelled) return
-        if (response.success) setNotificationUnread(response.data?.unreadCount ?? 0)
+        const data = await loadNotificationCenter(notificationTarget, notificationAccounts, { limit: 1 })
+        if (!cancelled && request === unreadRequest.current) setUnreadState({ scope: notificationScope, count: data?.unreadCount ?? (notificationTarget.kind === 'none' ? 0 : null) })
       } catch {
-        // 数が取れなくてもベル自体は通知一覧への入口として動く
+        if (!cancelled && request === unreadRequest.current) setUnreadState({ scope: notificationScope, count: null })
       }
     }
     void load()
     return () => {
       cancelled = true
     }
-  }, [selectedAccountId])
+  }, [notificationTarget, notificationAccounts, notificationScope])
 
   // AuthGuard が保存した値を読む。ここでは取りに行かない（二重に叩かない）。
   useEffect(() => {
@@ -206,7 +215,6 @@ export default function AppTopBar() {
   // LINEアカウントの登録（/accounts/new）も統括の外側なので「設定」の段を足さない。
   const crumbs = finishPageCrumbs(pathname, parentCrumb && parentCrumb.label !== shownTitle ? [parentCrumb] : pageCrumbs, shownTitle, isHqShellPath(pathname))
   const titleHref = parentCrumb && parentCrumb.label === shownTitle ? parentCrumb.href : undefined
-  const hqShell = isHqShellPath(pathname)
   const [hqName, setHqName] = useState<string | null>(null)
   useEffect(() => {
     if (!hqShell) return
@@ -221,10 +229,11 @@ export default function AppTopBar() {
   const hqPill = hqShell ? { name: hqName ?? '統括', mark: brandInitial(hqName ?? '統括') } : null
   const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (staffRole ? ROLE_LABELS[staffRole] ?? '' : '')
   /* 統括の札から店を選んだら、その店へ入る（カードの「このアカウントへ入る」と同じ）。 */
-  const changeAccount = (accountId: string) => {
+  const changeAccount = (accountId: string, after?: () => void) => {
     requestUnsavedAction(() => {
       setSelectedAccountId(accountId)
-      if (hqShell && accountId) router.push('/')
+      if (hqShell && accountId && !after) router.push('/')
+      after?.()
     })
   }
 
@@ -305,7 +314,7 @@ export default function AppTopBar() {
       onLogout={logout}
       notificationUnreadCount={notificationUnread}
       renderNotifications={(popover) => (
-        <BellNotifications popover={popover} accountId={selectedAccountId || null} onUnreadChange={setNotificationUnread} />
+        <BellNotifications popover={popover} target={notificationTarget} accounts={options} onAccountChange={changeAccount} onUnreadChange={setNotificationUnread} />
       )}
       v8Chrome
       chromeVariant="shell"

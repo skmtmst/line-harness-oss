@@ -226,6 +226,8 @@ describe('V8 一斉配信一覧の結果の列', () => {
     expect(heads).not.toContain('クリック')
     expect(sent.textContent).toContain('624 人')
     expect(sent.textContent).toContain('開封 71.2%・クリック 15.4%')
+    const resultCell = [...sent.querySelectorAll('td')].find((cell) => cell.textContent?.includes('開封 71.2%・クリック 15.4%'))
+    expect(resultCell?.getAttribute('data-align')).toBe('right')
     expect(unsent.textContent).not.toMatch(/0\s*人/)
   })
 })
@@ -699,4 +701,53 @@ it('行が消える途中で別の絞り込みを選んでも、古い条件を�
     await flush()
     expect(listBroadcasts).toHaveBeenCalledTimes(reads)
   } finally { vi.useRealTimers() }
+})
+
+
+describe('読込骨格の表示時間と完了への切替', () => {
+  it.each(['ready', 'error'])('遅い応答から%sへ進むとき表示後400msを保つ', async (outcome) => {
+    vi.useFakeTimers()
+    let complete!: (value: unknown) => void
+    listBroadcasts.mockImplementation(() => new Promise(resolve => { complete = resolve }))
+    const shownBones = () => [...host.querySelectorAll('[aria-busy="true"] [data-skeleton]')]
+      .filter(bone => !bone.closest('[data-skeleton-reserve]'))
+    try {
+      act(() => { root.render(<BroadcastListV8 />) })
+      await flush()
+      await act(async () => { await vi.advanceTimersByTimeAsync(299) })
+      expect(shownBones()).toHaveLength(0)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+      expect(shownBones().length).toBeGreaterThan(0)
+      const table = host.querySelector('[aria-busy="true"] table')!
+      expect(table.querySelector('tbody tr')?.children.length).toBe(table.querySelectorAll('thead th').length)
+      await act(async () => { await vi.advanceTimersByTimeAsync(50) })
+      await act(async () => { complete(outcome === 'ready'
+        ? { success: true, data: [base] }
+        : { success: false, error: '画面確認用の読込失敗' }) })
+      await flush()
+      expect(shownBones().length).toBeGreaterThan(0)
+      expect(host.querySelector('[data-row-id]')).toBeNull()
+      await act(async () => { await vi.advanceTimersByTimeAsync(349) })
+      expect(shownBones().length).toBeGreaterThan(0)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+      expect(shownBones()).toHaveLength(0)
+      if (outcome === 'ready') expect(host.querySelector('[data-row-id]')).toBeTruthy()
+      else expect(host.textContent).toContain('読み込めませんでした')
+    } finally { vi.useRealTimers() }
+  })
+
+  it('300ms以内の応答は骨格を見せず行へ切り替える', async () => {
+    vi.useFakeTimers()
+    let complete!: (value: unknown) => void
+    listBroadcasts.mockImplementation(() => new Promise(resolve => { complete = resolve }))
+    try {
+      act(() => { root.render(<BroadcastListV8 />) }); await flush()
+      await act(async () => { await vi.advanceTimersByTimeAsync(250); complete({ success: true, data: [base] }) })
+      await flush()
+      expect(host.querySelector('[data-row-id]')).toBeTruthy()
+      expect(host.querySelector('[aria-busy="true"] [data-skeleton]')).toBeNull()
+      await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+      expect(host.querySelector('[aria-busy="true"] [data-skeleton]')).toBeNull()
+    } finally { vi.useRealTimers() }
+  })
 })

@@ -1,4 +1,5 @@
 'use client'
+import { ListPageStats } from '@/components/templates/list-page'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -351,14 +352,14 @@ export default function CrossV8({ accountId, canManage, renderSave }: { accountI
   }
 
   const unit = resultAxes?.unit ?? (measureKind === 'events' ? '回' : '人')
-  const kpis = <KpiBand className={styles.band}>
+  const kpis = <ListPageStats><KpiBand className={styles.band}>
     {/* 表の合計は延べ人数。集計対象は口が数えた実際の人数（重複なし）。 */}
     <KpiCard presentation="band" title="集計対象" icon={<Users size={16} aria-hidden="true" />} value={crossResult ? crossResult.totalFriends : null} unit="人" detail={crossResult ? `表の延べ ${formatNumber(grandTotal)} ${unit}` : '結果が出ると数えます'} loading={loading} />
     <KpiCard presentation="band" title="いちばん多い組み合わせ" icon={<Grid2x2 size={16} aria-hidden="true" />} value={summary?.top.value ?? null} unit={unit} detail={summary ? `${summary.top.rowLabel} × ${summary.top.columnLabel}` : emptyValue('unknown')} loading={loading} />
     <KpiCard presentation="band" title="空のマス" icon={<Square size={16} aria-hidden="true" />} value={summary?.empty ?? null} unit="マス" detail={summary ? (summary.emptyLabels.slice(0, 2).join('・') || '該当者なし') : '該当者なし'} loading={loading} />
     {/* その項目に値が入っていない人は集計が数えていない。 */}
     <KpiCard presentation="band" title="未入力" icon={<HelpCircle size={16} aria-hidden="true" />} value={null} unit="人" detail="値がまだ無い人（表に出ない）" />
-  </KpiBand>
+  </KpiBand></ListPageStats>
 
   if (fieldsLoading) return <SaveErrorScope errors={saveErrors}><>{kpis}<div className={styles.body} data-gap="tab"><ListState kind="loading" title="友だち情報欄を読み込んでいます" /></div></></SaveErrorScope>
   if (fieldsError) return <SaveErrorScope errors={saveErrors}><>{kpis}<div className={styles.body} data-gap="tab"><ListState kind="error" title="友だち情報欄を読み込めませんでした。" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => setFieldsReload((n) => n + 1)} /></div></></SaveErrorScope>

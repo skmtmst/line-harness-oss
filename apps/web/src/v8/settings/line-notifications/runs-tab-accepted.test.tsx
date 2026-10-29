@@ -46,4 +46,7 @@ test('LINE が受け付けた行は「LINEが受け付けました」と書き�
   expect((await screen.findAllByText('LINEが受け付けました')).length).toBeGreaterThan(0)
   expect(view.container.textContent).not.toContain('届きました')
   expect(view.container.textContent).not.toContain('開きました')
+  expect(screen.getByText('1件中 1〜1件')).toBeTruthy()
+  expect(screen.getByText('表示中の20件を絞り込み')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '次のページ' })).toBeNull()
 })

@@ -62,6 +62,13 @@ describe('LINEアカウントの編集窓', () => {
     expect(overlay.classList.contains('items-start')).toBe(true)
     expect(overlay.classList.contains('overflow-y-auto')).toBe(true)
     expect(overlay.classList.contains('sm:items-center')).toBe(false)
+    expect(dialog.classList.contains('max-h-[calc(100dvh-1rem)]')).toBe(true)
+    expect(dialog.classList.contains('flex-col')).toBe(true)
+    const form = dialog.querySelector('form')!
+    expect(form.classList.contains('overflow-y-auto')).toBe(true)
+    const footer = form.querySelector('[type="submit"]')?.parentElement
+    expect(footer?.className).toContain('sticky')
+    expect(footer?.className).toContain('justify-center')
     const header = screen.getByRole('heading', { name: '登録の内容を編集する' }).parentElement!
     expect(header.classList.contains('sticky')).toBe(true)
     expect(header.classList.contains('top-0')).toBe(true)

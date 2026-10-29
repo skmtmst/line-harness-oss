@@ -32,3 +32,12 @@ it('UI-N05 ordinary failure is distinct from no aggregation and can be retried',
  expect(await screen.findByText(/まだ集計していません/)).toBeTruthy();
  expect(screen.queryByText(/最新の集計を読み込めませんでした/)).toBeNull();
 });
+
+it('ファネルが0件なら数の帯と空の余白容器を置かない',async()=>{
+ m.list.mockReset().mockResolvedValue({success:true,data:[]});m.latest.mockReset();
+ const {container}=render(<FunnelV8 accountId="fixture-a" canManage={false}/>);
+ await waitFor(()=>expect(m.list).toHaveBeenCalled());await act(async()=>{await Promise.resolve();await Promise.resolve()});
+ expect(container.querySelector('[data-kpi-strip]')).toBeNull();
+ expect(container.querySelector('[data-template-region="stats"]')).toBeNull();
+ expect(m.latest).not.toHaveBeenCalled();
+});

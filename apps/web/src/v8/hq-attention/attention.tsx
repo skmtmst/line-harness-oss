@@ -21,6 +21,7 @@ import { ListPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
+import { notifyToast } from '@/components/shared/toast'
 import type { AccountStyle } from '@line-crm/shared'
 import { hqStyleApi } from '@/lib/api/helpers/styles'
 import { styleLabel } from '@/v8/onboarding/public/model/index'
@@ -97,7 +98,9 @@ export default function HqAttentionV8() {
 
   /* そのアカウントに切り替えてから開く。 */
   const open = (accountId: string, href: string) => {
+    const name = items?.find((item) => item.accountId === accountId)?.name
     setSelectedAccountId(accountId)
+    notifyToast(`${name || '選んだアカウント'} に切り替えました`, { tone: 'info' })
     router.push(href)
   }
 

@@ -75,6 +75,7 @@ function nameInput(): HTMLInputElement {
 describe('R172 名前空欄の下書き保存する', () => {
   it('入力欄の下に案内を出し、欄へフォーカスとスクロールを移す', async () => {
     await mount()
+    expect(nameInput().closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
     const draft = [...host.querySelectorAll('button')].find((el) =>
       el.textContent?.includes('あとで決める'),
     ) as HTMLButtonElement

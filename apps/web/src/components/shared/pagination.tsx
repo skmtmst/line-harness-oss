@@ -59,7 +59,7 @@ function Ellipsis() {
   )
 }
 
-/** 2ページ以上のときに移動操作を出し、1ページのときは件数だけ残す。 */
+/** 件数を残し、移動先があるときだけ現在地と前・次を出す。 */
 export default function Pagination({
   page,
   pageCount,
@@ -80,16 +80,16 @@ export default function Pagination({
   const previousReason = pausedReason ?? (current <= 1 ? '最初のページです。' : undefined)
   const nextReason = pausedReason ?? (current >= total ? '最後のページです。' : undefined)
 
-  if (!Number.isFinite(pageCount) || pageCount <= 0) return null
-  if (total < 2) {
-    const text = range ? paginationSummary(range.total, range.first, range.last, range.unit) : summary
-    return text ? <div className={classes} data-pagination data-spacing={spacing}><span className={styles.summary} data-pagination-summary>{text}</span></div> : null
+  const summaryNode = range ? <span className={styles.summary} data-pagination-summary>{paginationSummary(range.total, range.first, range.last, range.unit)}</span>
+    : summary ? <span className={styles.summary}>{summary}</span> : null
+
+  if (!Number.isFinite(pageCount) || total <= 1) {
+    return summaryNode ? <div data-pagination className={classes} data-spacing={spacing}>{summaryNode}</div> : null
   }
 
   return (
     <nav aria-label={ariaLabel} data-pagination className={classes} data-spacing={spacing}>
-      {range ? <span className={styles.summary} data-pagination-summary>{paginationSummary(range.total, range.first, range.last, range.unit)}</span>
-        : summary ? <span className={styles.summary}>{summary}</span> : null}
+      {summaryNode}
       <button
         type="button"
         className={[styles.item, styles.control].join(' ')}
@@ -162,9 +162,7 @@ export function CursorPagination({ page, pageSize, shown, total, hasNext, onPrev
   const current = safePage(page, 1)
   const start = shown > 0 ? (current - 1) * pageSize + 1 : 0
   const end = shown > 0 ? start + shown - 1 : 0
-  const pages = total != null && Number.isFinite(total) && total >= 0 && Number.isFinite(pageSize) && pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : null
-  const summary = <>{paginationSummary(total, start, end)}{pages !== null && pages > 1 ? `（全${pages.toLocaleString('ja-JP')}ページ）` : ''}</>
   return <Pagination mode="cursor" page={current} pageCount={current + (hasNext ? 1 : 0)} disabled={disabled} ariaLabel={ariaLabel}
-    summary={summary}
+    summary={paginationSummary(total, start, end)}
     onPageChange={(next) => { if (next < current) onPrevious(); else if (next > current) onNext() }} />
 }

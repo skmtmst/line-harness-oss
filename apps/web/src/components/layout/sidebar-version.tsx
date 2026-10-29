@@ -1,81 +1,69 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { loadAdminVersionDetail } from '@/lib/admin-version-cache'
-import { formatDeployInfo, type DeployInfoLines } from '@/lib/deploy-info'
-import { useUpdateStatus } from '@/components/update/use-update-status'
+import { useEffect, useId, useState } from 'react'
+import { loadAdminVersionDetail, type AdminVersionDetail } from '@/lib/admin-version-cache'
+import { deployEnvLabel, formatDeployInfo } from '@/lib/deploy-info'
+import { MANUAL_UPDATE_GUIDE_URL, useUpdateStatus } from '@/components/update/use-update-status'
+import Button from '@/components/shared/button'
+import { FilterPopover } from '@/components/shared/filter-popover'
 import TextLink from '@/components/shared/text-link'
-import { ChevronDown } from 'lucide-react'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import HelpTip from '@/components/shared/help-tip'
 import styles from './sidebar-version.module.css'
 
-/**
- * 共通メニューのいちばん下。いま動いている版と環境の1行。押すと commit・配備日時が開く。
- * 設計 ★管理画面 監査の直し E（`PjoNp`）。
- *
- * 取れない・仮の値のときは「版の情報なし」。穴埋めの数字は出さない。
- * 開け閉めはネイティブの details/summary（キーボードと読み上げが最初から効く）。
- */
+/** 版と環境を1行で出し、配備の詳細と更新の案内は共通の浮く面で開く。 */
 export default function SidebarVersion() {
-  const [lines, setLines] = useState<DeployInfoLines | null>(null)
+  const [detail, setDetail] = useState<AdminVersionDetail | null>(null)
   const [ready, setReady] = useState(false)
+  const [open, setOpen] = useState(false)
+  const detailId = useId()
   const update = useUpdateStatus()
-  const role = useStaffRole()
-  const canUpdate = canManageRole(role)
 
   useEffect(() => {
     let cancelled = false
     loadAdminVersionDetail().then(
-      (detail) => {
+      (value) => {
         if (cancelled) return
-        setLines(formatDeployInfo(detail))
+        setDetail(value)
         setReady(true)
       },
-      () => {
-        // 取れなければ「版の情報なし」。赤や再読み込みボタンは出さない（1画面に1つ）。
-        if (!cancelled) setReady(true)
-      },
+      () => { if (!cancelled) setReady(true) },
     )
     return () => { cancelled = true }
   }, [])
 
-  /*
-   * 読み込む間も1行ぶんの高さを取っておく（動きの点検 11 番）。null にすると、版が
-   * 届いた瞬間に上の「設定」の入口が押し上げられて、全画面で少しずれていた。
-   */
-  if (!ready) {
-    return (
-      <div className={`invisible ${styles.root}`} aria-hidden="true" data-version-reserve="">
-        <p className={styles.summary}>&nbsp;</p>
-      </div>
-    )
-  }
-  if (!lines) return <p className={`${styles.root} ${styles.summary}`}>版の情報なし</p>
+  const lines = formatDeployInfo(detail)
+  const environment = deployEnvLabel(detail?.deploy_env)
+  const summary = lines && detail
+    ? `v${detail.version.trim()}${environment ? `・${environment}` : ''}`
+    : ready ? '版の情報なし' : '版の情報を取得中'
   const notice = update.kind === 'upgrade' || update.kind === 'fork'
-  /*
-   * 毎日使う人には要らない情報なので、版と環境の1行だけにたたむ。
-   * 押すと commit・配備の日時と更新の案内が開く。閲覧のみの人にも同じに見せる。
-   * 新しい版・カスタマイズ版のときは、たたんだ行にも緑の点で知らせる。
-   */
+
   return (
-    <details className={styles.root} data-sidebar-version="">
-      <summary className={styles.summary}>
-        <span className="truncate">{lines.short}</span>
-        {notice ? <span className={styles.dot} role="img" aria-label="更新の案内あり" /> : null}
-        <ChevronDown aria-hidden="true" className={styles.chevron} />
-      </summary>
-      <div className={styles.detail}>
-        <p className="whitespace-nowrap">{lines.line1}</p>
-        {lines.line2 ? <p>{lines.line2}</p> : null}
-        {/*
-          新しい版・カスタマイズ版の案内。
-          どちらも /updates へ。
-        */}
-        {canUpdate
-          ? <TextLink href="/updates" className="self-start">{update.kind === 'upgrade' ? '更新あり' : '手動で更新'}</TextLink>
-          : <HelpTip label={update.kind === 'upgrade' ? '更新あり' : '手動で更新'} trigger={<span className="self-start cursor-not-allowed text-ink-faint" aria-disabled="true">{update.kind === 'upgrade' ? '更新あり' : '手動で更新'}</span>}>更新できるのはオーナーと管理者です。</HelpTip>}
-      </div>
-    </details>
+    <div className="border-t border-hairline px-4 pb-3 pt-2.5" data-sidebar-version aria-busy={!ready}>
+      <FilterPopover
+        open={open}
+        onClose={() => setOpen(false)}
+        label="版の情報"
+        trigger={(
+          <Button variant="text" size="compact" textTone="quiet" className="max-w-full"
+            aria-expanded={open} aria-haspopup="dialog" aria-controls={open ? detailId : undefined}
+            aria-description={notice ? '更新の案内があります。' : undefined}
+            title={summary} onClick={() => setOpen(value => !value)}>
+            <span className="min-w-0 truncate">{summary}</span>
+            {notice ? <span className={styles.dot} data-version-update aria-hidden="true" /> : null}
+          </Button>
+        )}
+        actions={<Button onClick={() => setOpen(false)}>閉じる</Button>}
+      >
+        <div id={detailId} className="flex flex-col gap-2 text-caption text-ink-secondary">
+          {lines ? <>
+            <p>{lines.line1}</p>
+            <p>{lines.line2 || '配備日時・環境の情報なし'}</p>
+          </> : <p role="status">{summary}</p>}
+          {update.kind === 'upgrade' ? <TextLink href="/updates">更新あり</TextLink> : null}
+          {update.kind === 'fork' ? <TextLink href="/updates">更新履歴</TextLink> : null}
+          <TextLink href={MANUAL_UPDATE_GUIDE_URL} external>手動で更新</TextLink>
+        </div>
+      </FilterPopover>
+    </div>
   )
 }

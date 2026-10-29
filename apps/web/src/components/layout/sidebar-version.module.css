@@ -49,8 +49,8 @@ details[open] .chevron {
 }
 
 .dot {
-  width: 6px;
-  height: 6px;
+  width: var(--space-8);
+  height: var(--space-8);
   flex-shrink: 0;
   border-radius: 999px;
   background: var(--color-accent);

@@ -242,11 +242,23 @@ describe('V8 流入と計測の一覧', () => {
   })
 
   it('WEB034（対照）: オーナーにはフォルダを追加がある', async () => {
+    const requests = vi.fn(globalThis.fetch)
+    vi.stubGlobal('fetch', requests)
     await render()
     expect([...host.querySelectorAll('button')].some((el) => (el.textContent ?? '').includes('フォルダを追加'))).toBe(true)
+    const createLinks = [...host.querySelectorAll('a')].filter(link => link.textContent?.trim() === '流入リンクを作る')
+    expect(createLinks.length).toBeGreaterThan(0)
+    expect(createLinks.map(link => link.getAttribute('href'))).toEqual(createLinks.map(() => '/inflow-links/new'))
+    const addFolder = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === 'フォルダを追加')!
+    await act(async () => { addFolder.click() })
+    expect(document.querySelector('[role="dialog"] input')).toBeTruthy()
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('フォルダを追加')
+    expect(requests.mock.calls.filter(([, init]) => (init?.method ?? 'GET') !== 'GET')).toHaveLength(0)
   })
 
   it('WEB034: 「流入」を任された staff には作る・編集を出し、フォルダの作成は出さない', async () => {
+    const requests = vi.fn(globalThis.fetch)
+    vi.stubGlobal('fetch', requests)
     role.value = 'staff'
     rememberStaffIdentity({ role: 'staff', permissionKeys: ['/inflow-links'] } as StaffMember)
     vi.stubGlobal('localStorage', {
@@ -261,6 +273,7 @@ describe('V8 流入と計測の一覧', () => {
     await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="「夏のInstagram投稿」の操作"]')!.click() })
     expect(document.querySelector('[role="menu"]')?.textContent).toContain('リンクを編集')
     expect([...host.querySelectorAll('button')].some((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').includes('フォルダを追加'))).toBe(false)
+    expect(requests.mock.calls.filter(([, init]) => (init?.method ?? 'GET') !== 'GET')).toHaveLength(0)
   })
 })
 

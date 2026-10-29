@@ -113,6 +113,7 @@ function enterCheckStep() {
   clearPrecheck()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
+  fill('v8-provider-id', '2005648758')
   nextStep()
   ack('Webhook URL を貼り付けて「更新」を押した')
   ack('Webhookの利用をONにした')
@@ -253,6 +254,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
 
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
+    fill('v8-provider-id', '2005648758')
     nextStep()
     expect(stepBadgeText()).toBe('Step 2 / 3')
     expect(shownPanel()).toBe('Webhook（受信のつなぎ）を設定する')
@@ -272,6 +274,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     clearPrecheck()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
+    fill('v8-provider-id', '2005648758')
     nextStep()
     const button = () => screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
     expect(button().disabled).toBe(true)

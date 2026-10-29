@@ -42,8 +42,23 @@ it.each([
   expect(screen.getByText(text)).toBeTruthy()
   expect(document.querySelectorAll('[data-pagination-summary]')).toHaveLength(1)
   const next = screen.queryByLabelText('次のページ')
-  if (pageCount === 1) expect(next).toBeNull()
   if (next) fireEvent.click(next)
   if (page < pageCount) expect(change).toHaveBeenCalledWith(page + 1)
   else expect(change).not.toHaveBeenCalled()
+  if (pageCount <= 1) expect(screen.queryByRole('button')).toBeNull()
+})
+
+it.each([0, 1, -1, NaN, Infinity])('ページ数%sでは渡された件数文だけを残す', (pageCount) => {
+  const change = vi.fn()
+  render(<Pagination page={1} pageCount={pageCount} summary={<span>件数を確認しています</span>} onPageChange={change} />)
+  expect(screen.getByText('件数を確認しています')).toBeTruthy()
+  expect(screen.queryByRole('navigation')).toBeNull()
+  expect(screen.queryByRole('button')).toBeNull()
+  expect(screen.queryByLabelText('1ページ目へ')).toBeNull()
+  expect(change).not.toHaveBeenCalled()
+})
+
+it('1ページで件数文がなければ空のナビゲーションを作らない', () => {
+  const { container } = render(<Pagination page={1} pageCount={1} onPageChange={vi.fn()} />)
+  expect(container.childElementCount).toBe(0)
 })

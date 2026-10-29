@@ -545,7 +545,7 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                         </Button>
                         <span className={styles.rowSpacer} />
                         <Button
-                          variant="danger"
+                          variant="secondary"
                           disabled={busy !== null || service.connectionDisconnectBlocked}
                           title={service.connectionDisconnectBlocked ? '結果の確認が終わるまで操作できません' : undefined}
                           onClick={() => { setDisconnectError(''); setDisconnectBlocked(false); setDisconnecting(service) }}

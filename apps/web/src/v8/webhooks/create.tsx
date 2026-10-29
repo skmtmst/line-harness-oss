@@ -21,6 +21,7 @@ import { Field } from '@/components/shared/form-controls'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Notice from '@/components/shared/notice'
+import CopyTextButton from '@/components/shared/copy-text-button'
 import Select from '@/components/shared/select'
 import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
@@ -320,7 +321,7 @@ function WebhooksCreateV8Inner() {
         boardId="hsD8e"
         title="送り先を作る"
         help="友だちの動きを、決めたタイミングでほかのシステムへ送ります。試しに送ってから動かすと安心です。"
-        readOnly footerActions={<Button href="/webhooks">一覧へ戻る</Button>} dirty={false}
+        readOnly contentSpacing="notice-after-read-only" footerActions={<Button href="/webhooks">一覧へ戻る</Button>} dirty={false}
       >
         <Notice tone="info">{permissionDeniedMessage('store')}</Notice>
       </CreatePage></SaveErrorScope>
@@ -346,7 +347,6 @@ function WebhooksCreateV8Inner() {
       <Card spacing="preview" aria-labelledby="wh-new-care">
         <CardHeader size="stacked" titleId="wh-new-care" title="気をつけること" />
         <p className={styles.careText}>
-          ・秘密の鍵は保存すると二度と全部は見えません<br />
           ・作り直すと、前の鍵では届かなくなります<br />
           ・個人情報は必要なものだけ送ります
         </p>
@@ -441,18 +441,21 @@ function WebhooksCreateV8Inner() {
             <SaveErrorField names={["secret"]}><TextField
               id="wh-new-secret"
               value={secret}
-              onChange={(event) => {
-                setSecret(event.target.value)
-                if (fieldErrors.secret && validateSecret(event.target.value) === null) blurField('secret', event.target.value)
-              }}
-              onBlur={() => blurField('secret')}
+              readOnly
               aria-invalid={fieldErrors.secret ? true : undefined}
               required
             /></SaveErrorField>
           </Field>
           </div>
-          <Button type="button" onClick={() => setSecret(generateSecret())}><RefreshCw size={16} aria-hidden="true" />作り直す</Button>
+          <CopyTextButton value={secret} label="コピー" variant="secondary" aria-label="秘密の鍵をコピー" />
+          <Button type="button" onClick={() => {
+            const next = generateSecret()
+            setSecret(next)
+            saveErrors.clear('secret')
+            if (fieldErrors.secret) blurField('secret', next)
+          }}><RefreshCw size={16} aria-hidden="true" />作り直す</Button>
         </div>
+        <Notice tone="warn" marker="dot">保存すると秘密の鍵は二度と表示されません。今コピーしてください。</Notice>
       </Card>
 
       <Card variant="form" aria-labelledby="wh-new-when">

@@ -26,11 +26,12 @@ import { Field } from '@/components/shared/form-controls'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { V8_TABS } from './settings-parts'
 
 /*
  * ★V8「担当メニューをまとめて決める」（板 ）。
  *
- * 白い板1枚：頭（←予約へ・題・未保存の印・5タブ）→ 中身（左＝メニュー×
+ * 白い板1枚：頭（←予約へ・題・未保存の印・9タブ）→ 中身（左＝メニュー×
  * スタッフの升目表と升の中身を変える段、右＝空きの欄）→ 書きかけがある間だけ
  * 下に保存帯（キャンセル・保存）。タブは押すと予約設定のそのタブへ移る
  * （未保存なら共通の離脱確認が出る）。
@@ -41,15 +42,6 @@ import Notice from '@/components/shared/notice'
  * 管理画面 の /booking/menus/staff と同じ。テーマが 互換経路のときはこのファイルは
  * 読まれず、従来の見た目が出る。
  */
-
-/* 予約設定の5タブ（settings-v8.tsx の V8_TABS と同じ並び）。 */
-const V8_TABS = [
-  { key: 'menus', label: 'メニュー' },
-  { key: 'hours', label: '受付枠' },
-  { key: 'holidays', label: '休業日' },
-  { key: 'rules', label: '予約のルール' },
-  { key: 'staff', label: '担当スタッフ' },
-] as const
 
 type SelectedCell = { staffId: string; menuId: string }
 
@@ -367,7 +359,7 @@ export default function AssignMatrixV8() {
                 </Button>
               </>
             ) : null}
-       title={<>担当メニューをまとめて決める</>}
+        title="予約設定"
         help="メニューごとに、予約を受けられるスタッフを決めます"
         status={dirty ? '未保存の変更があります' : undefined}
         tabs={<><Tabs

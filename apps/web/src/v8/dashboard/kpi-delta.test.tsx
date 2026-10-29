@@ -17,10 +17,10 @@ describe('差の札', () => {
     const { container } = render(<KpiDelta current={12} previous={10} better="high" unit="件" />)
     const chip = delta(container)!
     expect(chip.dataset.kpiDelta).toBe('good')
-    expect(chip.querySelector('[aria-hidden="true"]:not(svg)')?.textContent).toBe('2 件 先週比')
+    expect(chip.querySelector('[aria-hidden="true"]:not(svg)')?.textContent).toBe('+2 件 先週比')
     expect(chip.querySelector('.sr-only')?.textContent).toBe('先週の同じ曜日より 2 件多い')
     expect(chip.title).toBe('先週の同じ曜日より 2 件多い')
-    expect(chip.querySelector('svg')).not.toBeNull()
+    expect(chip.querySelector('svg')).toBeNull()
   })
 
   it('友だち（増えると良い）が減ると赤、配信の失敗（減ると良い）が減ると緑', () => {
@@ -50,10 +50,12 @@ describe('差の札', () => {
     expect(chip.dataset.kpiDelta).toBe('neutral')
     expect(chip.querySelector('[data-tone="neutral"]')).not.toBeNull()
     expect(chip.textContent).toContain('先週の同じ曜日より 6 件多い')
+    expect(chip.querySelector('svg')).toBeNull()
+    expect(chip.textContent).toContain('+6 件 先週比')
   })
 
   it('大きい差は桁の区切りを付ける', () => {
-    expect(kpiDeltaText(-1234, '人', { short: '先週比', reading: '先週の同じ曜日' })).toEqual({ visible: '1,234 人 先週比', reading: '先週の同じ曜日より 1,234 人少ない' })
+    expect(kpiDeltaText(-1234, '人', { short: '先週比', reading: '先週の同じ曜日' })).toEqual({ visible: '−1,234 人 先週比', reading: '先週の同じ曜日より 1,234 人少ない' })
   })
 
   it('数が回る動きの途中でも、本当の値と差の文字が最初から DOM にある', () => {

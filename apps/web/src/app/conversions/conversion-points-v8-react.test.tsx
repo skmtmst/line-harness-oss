@@ -8,14 +8,14 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import ConversionsPage from './page'
+import ConversionsPage from '@/app/affiliates/page'
 
 /* : 行から右の詳細へ移り、停止は理由必須の確認窓で実行する。
  * 読み取り権限とAPIへの理由・保存版の受け渡しも守る。 */
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
-  usePathname: () => '/conversions',
-  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/affiliates',
+  useSearchParams: () => new URLSearchParams('tab=points'),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
   selectedAccountId: 'account-a', selectedAccount: null, loading: false,

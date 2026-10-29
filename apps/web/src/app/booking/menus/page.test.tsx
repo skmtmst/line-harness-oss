@@ -303,6 +303,7 @@ describe('R311 受付・キャンセル期限の空欄は0にしない', () => {
     fixture.getSettings = vi.fn(async () => ({ success: true, data: { ...SETTINGS, id: 'settings-a', version: 3 } }))
     render(<><MenusPage /><ToastHost /></>)
     await screen.findByRole('combobox', { name: '受付の締め切り' })
+    expect(screen.getByRole('combobox', { name: '受付の締め切り' }).closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
   }
 
   test('欄を消しても0にならず、空欄のまま保存できない', async () => {

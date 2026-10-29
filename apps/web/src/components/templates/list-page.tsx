@@ -87,6 +87,11 @@ function hasListFolders({ folderNav, folders, collapsedFolders }: ListPageBodyPr
   const navs = listFolderNavs(folderNav)
   return navs.length ? navs.some(nav => nav.rows.length > 1) : !!(folders || collapsedFolders)
 }
+/** 数の帯を、一覧の共通の内側余白と次の段との間隔へ置く。 */
+export function ListPageStats({ children }: { children: ReactNode }) {
+  return <div className={styles.stats} data-template-region="stats">{children}</div>
+}
+
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
 export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, tableInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, explanationInset = 'notice', listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
   const navs = listFolderNavs(folderNav)
@@ -98,7 +103,7 @@ export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFold
   const helpAtEnd = listHelpPlacement === 'end' && Boolean(toolbar)
   return <ListFolderContext.Provider value={hasFolders}><div className={styles.listBody} data-list-folders={hasFolders} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} data-table-inset={tableInset || undefined} style={fillWidth ? { width: '100%' } : undefined}>
     {readOnly ? <ReadOnlyNotice /> : null}
-    {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
+    {stats ? <ListPageStats>{stats}</ListPageStats> : null}
     <div className={styles.split} data-template-region="body">
       {folders && !noFolderChoices ? <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
       <div className={styles.main}>

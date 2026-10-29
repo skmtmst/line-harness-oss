@@ -136,6 +136,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import ScenarioDetailV8 from './detail'
+import ScenarioDetailPage from '@/app/scenarios/detail/page'
 import { ApiError } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -143,9 +144,9 @@ import { ApiError } from '@/lib/api'
 let host: HTMLDivElement
 let root: Root
 
-async function render() {
+async function render(node: React.ReactNode = <ScenarioDetailV8 scenarioId="sc-1" showStarted={false} />) {
   act(() => {
-    root.render(<ScenarioDetailV8 scenarioId="sc-1" showStarted={false} />)
+    root.render(node)
   })
   for (let i = 0; i < 10; i++) {
     await act(async () => {
@@ -177,7 +178,8 @@ afterEach(() => {
 
 describe('V8 シナリオ配信の編集', () => {
   it('絵（PMLkX）の操作と3つの箱・数の帯が出る', async () => {
-    await render()
+    await render(<ScenarioDetailPage />)
+    expect(screen.getByText('購読開始から0日後 10:00').closest('[data-page-template="detail"]')).toBeTruthy()
     for (const name of ['配信結果を見る', 'まとめて下見', 'まとめてテストを送る', '設定を変える', '一時停止する', 'このシナリオを削除する', 'キャンセル', '複製する', '保存する']) {
       expect(screen.getAllByRole(name === '配信結果を見る' ? 'link' : 'button', { name }).length, name).toBeGreaterThan(0)
     }

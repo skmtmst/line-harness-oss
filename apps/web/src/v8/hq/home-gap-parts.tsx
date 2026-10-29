@@ -40,7 +40,7 @@ function isArchived(account: AccountWithStats) {
 
 
 function matchesStatus(account: AccountWithStats, filter: StatusFilter) {
-  if (filter === 'all') return true
+  if (filter === 'all') return !isArchived(account)
   if (filter === 'archived') return isArchived(account)
   if (isArchived(account)) return false
   if (filter === 'ok') return account.isActive && account.connection?.status === 'ok'

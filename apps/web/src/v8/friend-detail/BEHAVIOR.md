@@ -1,4 +1,4 @@
-> 文書：友だち詳細の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+> 文書：友だち詳細の動き（BEHAVIOR.md）｜区分：今の説明｜最終確認：2026-10-27（日本時間）
 
 # 友だち詳細の動き（BEHAVIOR.md）
 
@@ -13,7 +13,7 @@
 | `detail.tsx` | 入口の部品。板の頭（顔・名前・対応の札・補足／…・個別操作・受信箱で開く）・閲覧のみの帯・タブ10個・開けないとき4つ |
 | `use-friend-detail.ts` | データの読み書き（下の「読み込み」） |
 | `permissions.ts` | 変える操作を出してよいか（下の「権限」） |
-| `overview-tab.tsx` | 概要（左の要点 320px／数の帯・進行中・同じ人・最近の履歴・行う操作） |
+| `overview-tab.tsx` | 概要（左の要点 320px／数の帯・進行中・同じ人・最近の履歴・行う操作）。タグはその場で選んで保存し、メモは対応編集の窓で変更する |
 | `history-tab.tsx` | 履歴（全件・受信・送信・システム通知、日ごとの区切り、さらに読み込む） |
 | `info-tab.tsx` | 情報欄（分類の札、2列の欄、変えた欄の左に緑の線、最後に1回保存） |
 | `forms-tab.tsx` | 回答フォーム（1回答＝1枚、さらに読み込む） |
@@ -25,7 +25,7 @@
 - `?id=<友だちID>`：無ければ「見る友だちが指定されていません」。
 - `?tab=`：`timeline`（概要・既定）・`history`・`info`・`forms`・`scenario`・`orders`・`reminders`・`actions`・`miles`・`richmenu`。知らない値は概要。
 - `?group=`（情報欄の分類）：`basic`（既定・URL では省く）・`all`・フォルダID。タブを移っても group は付けたまま。
-- 行き先：受信箱 `/chats?friend=<ID>`（`?friendId=` ではない・#673）、マイル `/mileage/friends/detail?id=<ID>`、項目を作る `/tags/fields/new?back=/friends/detail?id=<ID>`、ほかは今と同じ。
+- 行き先：受信箱 `/chats?friend=<ID>`（`?friendId=` ではない・#673）、マイル `/mileage/friends/detail?id=<ID>`、項目を作る `/tags/fields/new?back=/friends/detail?id=<ID>`、ほかは今と同じ。タグ・メモの編集は友だち詳細内で行う。
 
 ## 読み込み（API・今と同じ口）
 - 本体 `api.friends.get(id, { includeSubmissions: false })`。404＝見つからない、403＝権限なし（再試行なし）、ほか＝読み込めない（もう一度試す）。
@@ -34,7 +34,8 @@
 - 回答 `api.friends.formSubmissions(id, { cursor, limit: 10 })`：回答フォームタブを開いたときだけ。
 - 友だち・アカウントを切り替えたら全部空にして取り直し、遅れて届いた古い返事は捨てる（世代とアカウントで照合）。
 - 保存：`api.friendFields.saveForFriend(id, 変えた欄だけ)`。空にした欄は null。保存の応答待ちの間に書き足した欄は、保存後の読み直しで上書きしない（FRIEND-25）。
-- 対応状況：`api.chats.get(id)`＋担当者の名簿 `loadOperators()` を窓を開くたびに読み、`api.chats.update(id, { status, operatorId, revision })`。409 は「ほかの担当者が先に更新しました。最新の内容を読み直しました」を出して本体を読み直す。
+- 対応・メモ：`api.chats.get(id)`＋担当者の名簿 `loadOperators()` を窓を開くたびに読み、`api.chats.update(id, { status, operatorId, notes, revision })`。メモ欄も同じ窓で保存する。409 は「ほかの担当者が先に更新しました。最新の内容を読み直しました」を出して本体を読み直す。
+- タグ：窓を開いたとき `api.tags.list({ accountId })` で選択肢を読み、差分を `api.friends.addTag` / `api.friends.removeTag` で保存して友だち情報を読み直す。友だち・アカウントが切り替わったときは古い応答を採用しない。
 - シナリオ登録：`api.scenarios.list({ accountId })` の有効なものから選び `api.scenarios.enroll(scenarioId, friendId)`。履歴を読み済みなら読み直す。
 
 ## 権限

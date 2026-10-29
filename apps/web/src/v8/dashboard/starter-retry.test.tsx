@@ -19,7 +19,8 @@ vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('
 vi.mock('@/components/shared/list-navigation', async original => ({ ...(await original<object>()), useListNavigationRouter: () => ({ replace: vi.fn(), push: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ refreshAccounts: vi.fn(), selectedAccountId: 'A', selectedAccount: null, loading: false }) }))
 vi.mock('@/lib/staff-role', async original => ({ ...(await original<object>()), useStaffRole: () => fx.role, useStaffIdentity: () => null }))
-vi.mock('./first-steps', () => ({
+vi.mock('./first-steps', async original => ({
+  ...await original<typeof import('./first-steps')>(),
   useFirstSteps: () => ({ error: null, summary: null, folded: false, toggle: vi.fn(), reload: fx.startReload, steps: [], firstRun: null, starter: fx.starter, arrived: false }),
   FirstStepsCard: () => null,
 }))
