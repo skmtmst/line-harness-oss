@@ -109,6 +109,14 @@ export default function HqSupportV8() {
     setInput((v) => ({ ...v, [key]: next }))
   }
 
+  /** 書き方のひな形（起きたこと／期待したこと／起きた日時）を本文へ入れる。書いた文章は残す。 */
+  const insertTemplate = () => {
+    const template = '【起きたこと】\n\n【期待したこと】\n\n【起きた日時】\n'
+    const body = input.body.trim().length === 0 ? template : `${input.body.replace(/\s+$/, '')}\n\n${template}`
+    set('body', body.slice(0, SUPPORT_BODY_MAX))
+    document.getElementById(`${uid}-body`)?.focus({ preventScroll: true })
+  }
+
   const addFile = async (file: File | undefined) => {
     if (!file) return
     const reason = validateSupportAttachment(file, attachments.length)
@@ -263,6 +271,9 @@ export default function HqSupportV8() {
           </Field>
 
           <Field label="本文" htmlFor={`${uid}-body`} required>
+            <div className={styles.templateRow}>
+              <Button variant="secondary" disabled={sending} onClick={insertTemplate}>書き方のひな形を入れる</Button>
+            </div>
             <SaveErrorField names={["body","input.body"]}><TextArea
               id={`${uid}-body`}
               value={input.body}
