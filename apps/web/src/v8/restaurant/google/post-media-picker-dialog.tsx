@@ -94,12 +94,13 @@ export function PostMediaPickerDialog({ target, accountId, onClose, onSelect }: 
     designNode="post-media-picker" designWidth={850} exactDesignWidth
     designHeaderPadding="28px 24px 22px"
     designContentPadding="22px 24px 24px"
-    designFooterPadding="26px 24px 24px"
-    footerLead="選択後、切り取り位置を確認します。"
-    cancelLabel="キャンセル" confirmLabel="切り取り位置を確認"
-    confirmDisabled={!selected || loading || confirming}
     busy={confirming} busyLabel="画像を読み込み中…"
-    onCancel={onClose} onConfirm={() => void confirm()}
+    onCancel={onClose}
+    footer={<div className={styles.footer}>
+      <span>選択後、切り取り位置を確認します。</span>
+      <Button className={styles.cancel} onClick={onClose} disabled={confirming}>キャンセル</Button>
+      <Button className={styles.confirm} variant="primary" onClick={() => void confirm()} disabled={!selected || loading || confirming} busy={confirming} busyLabel="画像を読み込み中…">切り取り位置を確認</Button>
+    </div>}
   >
     <div className={styles.body}>
       <form className={styles.search} onSubmit={(event) => { event.preventDefault(); search() }}>

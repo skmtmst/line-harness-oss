@@ -1,4 +1,4 @@
-.body { display: flex; flex-direction: column; gap: 20px; }
+.body { display: flex; width: 100%; min-width: 0; flex-direction: column; gap: 20px; }
 .search { display: flex; gap: 12px; }
 .search > :first-child { flex: 1; min-width: 0; }
 .search button { width: 178px; justify-content: center; }
@@ -16,4 +16,9 @@
 .radio { display: grid; width: 22px; height: 22px; flex: none; place-items: center; border: 1px solid var(--color-hairline); border-radius: 50%; color: white; font-size: 13px; }
 .item[data-selected] .radio { border-color: var(--color-action); background: var(--color-action); }
 .pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.footer { display: flex; width: 100%; align-items: center; gap: 12px; padding: 26px 24px 24px; border-top: 1px solid var(--color-hairline); }
+.footer span { flex: 1; color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.footer .cancel { width: 136px; justify-content: center; }
+.footer .confirm { width: 174px; justify-content: center; }
+@media (max-width: 600px) { .footer { flex-wrap: wrap; } .footer span { width: 100%; flex-basis: 100%; } }
 @media (max-width: 600px) { .search { gap: 8px; } .search button { width: auto; } .item { min-height: 92px; padding: 10px; gap: 10px; } .item img { width: 56px; height: 56px; } .listHeading { flex-wrap: wrap; } }
