@@ -11,6 +11,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Button from '@/components/shared/button'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import CloseButton from '@/components/shared/close-button'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /**
  * 受信箱の「この条件を保存」（設計 Pencil `Ln4zS` 保存した検索名入力モーダル）。
@@ -48,6 +49,7 @@ export default function SavedViewDialog({
   operators,
   existingNames,
   saving,
+  emailInboxEnabled = true,
   onSave,
   onClose,
 }: {
@@ -57,6 +59,7 @@ export default function SavedViewDialog({
   /** 同じ名前があるかを見るための一覧 */
   existingNames: string[]
   saving: boolean
+  emailInboxEnabled?: boolean
   /** 保存先が成功を返したときだけ、完了画面へ進める。 */
   onSave: (draft: SavedViewDraft) => Promise<SavedViewSaveResult>
   onClose: () => void
@@ -128,7 +131,7 @@ export default function SavedViewDialog({
       return
     }
     setError('')
-    const result = await onSave({ name: trimmed, status, quickFilter, channel, assignee, unreadOnly, favorite })
+    const result = await onSave({ name: trimmed, status, quickFilter, channel: emailInboxEnabled ? channel : 'line', assignee, unreadOnly, favorite })
     if (!result.success) {
       setError(result.error)
       return
@@ -180,7 +183,7 @@ export default function SavedViewDialog({
                 {/* 残りではなく「11 / 40文字」。上限が何文字かが分かる。 */}
                 <span className="text-ink-faint text-micro tabular-nums">{name.length} / {NAME_LIMIT}文字</span>
               </div>
-              <SaveErrorField names={["name"]}><input
+              <SaveErrorField names={["name"]}><SharedTextField
                 id="saved-view-name"
                 value={name}
                 onChange={(event) => { setName(event.target.value); setNameTouched(true); setError('') }}
@@ -251,7 +254,7 @@ export default function SavedViewDialog({
                     />
                   </dd>
                 </div>
-                <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                {emailInboxEnabled && <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">受信経路</dt>
                   <dd>
                     <Select
@@ -266,7 +269,7 @@ export default function SavedViewDialog({
                       className="h-9 w-40 text-xs font-medium"
                     />
                   </dd>
-                </div>
+                </div>}
                 <div className="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
                   <dt className="text-ink-secondary text-xs">担当</dt>
                   <dd className="w-40">

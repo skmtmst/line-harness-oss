@@ -105,6 +105,15 @@ describe('EC order and action read models', () => {
     expect(await empty.json()).toMatchObject({ data: { items: [], total: 0 } });
   });
 
+  it('注文日の半開区間を検証してDBへ渡す', async () => {
+    const from = '2026-10-27T15:00:00.000Z';
+    const to = '2026-10-28T15:00:00.000Z';
+    expect((await request(`/api/ec-commerce/orders?lineAccountId=account-1&from=${from}&to=${to}`)).status).toBe(200);
+    expect(dbMocks.listEcOrders).toHaveBeenCalledWith(DB, expect.objectContaining({ lineAccountId: 'account-1', from, to }));
+    expect((await request(`/api/ec-commerce/orders?lineAccountId=account-1&from=${to}&to=${from}`)).status).toBe(400);
+    expect((await request(`/api/ec-commerce/orders?lineAccountId=account-1&from=${from}`)).status).toBe(400);
+  });
+
   it('staffの閲覧権限とaccount範囲をサーバで検査する', async () => {
     const path = '/api/ec-commerce/action-executions?lineAccountId=account-1';
     expect((await request(path, { role: 'staff' })).status).toBe(403);

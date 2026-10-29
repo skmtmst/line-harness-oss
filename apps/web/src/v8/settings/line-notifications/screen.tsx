@@ -1,4 +1,5 @@
 'use client'
+import { customerNotificationIncomplete as isIncomplete, customerNotificationStatus } from './customer-status'
 import { requiredText } from '@/lib/form-requirement'
 const notificationTitleRequirement = requiredText('通知の見出しを入力してください。')
 import { RowActions } from '@/components/shared/row-actions'
@@ -21,8 +22,9 @@ import RunsTab from './runs-tab'
 import styles from './screen.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { TextField, TextArea } from '@/components/shared/text-field'
-import { DataTable, TableHeadRow, Th, Tr, Td, ActionCell, RowNameButton } from '@/components/shared/table'
+import { DataTable, TableHeadRow, Th, Tr, Td, StatusCell, ActionCell, RowNameButton } from '@/components/shared/table'
 import StatusBadge from '@/components/shared/status-badge'
+import { StatusDot } from '@/components/shared/status-pill'
 import { Tabs } from '@/components/shared/tabs'
 import Button from '@/components/shared/button'
 import { DialogActions } from '@/components/shared/dialog'
@@ -68,10 +70,6 @@ type CustomerLoadState = 'loading' | 'ready' | 'error' | 'forbidden'
  * 出来事の言葉は下の eventDeliveryWords（運用者の言葉の一覧）だけから取る。
  * `ec.order.confirmed` のような口の値をそのまま描かない。
  */
-function isIncomplete(setting: EcNotificationSetting): boolean {
-  return !setting.title?.trim() || !setting.introText.trim() || !setting.outroText.trim()
-}
-
 /*
  * #988 NEXT-06: 「いつ・誰に送るか」の説明は、イベント別に文のかたちを
  * 決め打ちする。表示名（label）を文に繋ぐと「注文完了らすぐ」のような
@@ -1195,9 +1193,7 @@ function LineNotificationsPage() {
     failures: '/line-notifications?tab=failures',
     history: '/line-notifications?tab=history',
   }
-  const statusOf = (setting: EcNotificationSetting): { label: string; tone: 'good' | 'muted' | 'warn' } => setting.isEnabled
-    ? { label: '出している', tone: 'good' }
-    : isIncomplete(setting) ? { label: '文面が未設定', tone: 'warn' } : { label: '停止中', tone: 'muted' }
+  const statusOf = customerNotificationStatus
 
   return <SaveErrorScope errors={saveErrors}><SbSettingsScreen
     boardId={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}
@@ -1371,7 +1367,7 @@ function LineNotificationsPage() {
                 <Td><TruncatedText value={timingLabel(setting)} /></Td>
                 <Td><TruncatedText value={audienceLabel(setting)} /></Td>
                 <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : emptyValue('unknown')}</span></Td>
-                <Td><StatusBadge tone={status.tone === 'good' ? 'success' : status.tone === 'warn' ? 'warning' : 'neutral'}>{status.label}</StatusBadge></Td>
+                <StatusCell primary={<><StatusBadge tone={status.tone === 'good' ? 'success' : 'neutral'} title={status.warning ?? undefined} aria-description={status.warning ?? undefined}>{status.label}</StatusBadge>{status.warning ? <StatusDot tone="caution" /> : null}</>} />
                 <Td>{canManage ? <NotificationToggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /> : <span className={styles.minor}>{setting.isEnabled ? 'オン' : 'オフ'}</span>}</Td>
                 <ActionCell>{canManage ? <RowActions edit={{ onClick: () => setExpanded(setting.eventType) }} /> : null}</ActionCell>
               </Tr>

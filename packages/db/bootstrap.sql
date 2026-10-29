@@ -1063,7 +1063,7 @@ CREATE TABLE auth_email_tokens (
   expires_at     TEXT NOT NULL,
   consumed_at    TEXT,
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, application_id TEXT);
 
 CREATE TABLE auth_known_devices (
   staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
@@ -4600,6 +4600,13 @@ CREATE TABLE line_account_connection_checks (
   UNIQUE (line_account_id, idempotency_key, check_kind)
 );
 
+CREATE TABLE line_account_hq_admin_memberships (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (line_account_id, staff_id)
+);
+
 CREATE TABLE line_account_tag_links (
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   tag_id TEXT NOT NULL,
@@ -4608,11 +4615,13 @@ CREATE TABLE line_account_tag_links (
   FOREIGN KEY (tag_id, tenant_id) REFERENCES line_account_tags(id, tenant_id) ON DELETE CASCADE
 );
 
-CREATE TABLE line_account_tags (
+CREATE TABLE "line_account_tags" (
   id TEXT PRIMARY KEY,
   tenant_id TEXT NOT NULL REFERENCES tenants(id),
   name TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 100),
-  color TEXT CHECK (color IS NULL OR (length(color) = 7 AND color GLOB '#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f]')),
+  color TEXT CHECK (color IS NULL OR
+    (length(color)=7 AND substr(color,1,1)='#'
+      AND substr(color,2) NOT GLOB '*[^0-9A-Fa-f]*')),
   display_order INTEGER NOT NULL DEFAULT 0 CHECK (display_order >= 0),
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
@@ -4648,7 +4657,7 @@ CREATE TABLE line_accounts (
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT, inactive_reason TEXT
   CHECK (inactive_reason IS NULL OR inactive_reason IN ('manual', 'ban_detected', 'credential_invalid')), inactive_reason_detail TEXT, inactivated_at TEXT, login_channel_secret_encrypted TEXT, last_webhook_received_at TEXT, webhook_silence_exempt INTEGER NOT NULL DEFAULT 0
-  CHECK (webhook_silence_exempt IN (0, 1)), folder_id TEXT REFERENCES line_account_tags(id) ON DELETE SET NULL);
+  CHECK (webhook_silence_exempt IN (0, 1)), folder_id TEXT REFERENCES line_account_tags(id) ON DELETE SET NULL, created_by_staff_id TEXT REFERENCES staff_members(id) ON DELETE SET NULL);
 
 CREATE TABLE line_message_unsends (
   line_message_account_key TEXT NOT NULL,
@@ -6577,6 +6586,28 @@ CREATE TABLE ref_tracking (
   source_url      TEXT,
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 , fbclid TEXT, gclid TEXT, twclid TEXT, ttclid TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, user_agent TEXT, ip_address TEXT, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, ad_conversion_consent_at TEXT);
+
+CREATE TABLE registration_applications (
+  id TEXT PRIMARY KEY,
+  company_name TEXT NOT NULL,
+  contact_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  referral_source TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'contacted', 'approved', 'rejected', 'activated')),
+  contact_note TEXT,
+  contacted_by TEXT,
+  contacted_at TEXT,
+  approved_by TEXT,
+  approved_at TEXT,
+  invite_sent_at TEXT,
+  tenant_id TEXT,
+  ip_hash TEXT,
+  device_marker TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
 
 CREATE TABLE reminder_delivery_runs (
   id                         TEXT PRIMARY KEY,
@@ -9561,6 +9592,9 @@ CREATE INDEX idx_audit_events_security_utc ON audit_events (security_created_at_
 CREATE INDEX idx_audit_events_tenant_created
   ON audit_events (tenant_id, created_at DESC);
 
+CREATE INDEX idx_auth_email_tokens_application
+  ON auth_email_tokens(application_id, created_at DESC);
+
 CREATE INDEX idx_auth_email_tokens_email
   ON auth_email_tokens(purpose, email, created_at DESC);
 
@@ -10450,12 +10484,17 @@ CREATE INDEX idx_line_account_connection_checks_correlation
 CREATE INDEX idx_line_account_connection_checks_latest
   ON line_account_connection_checks(line_account_id, checked_at DESC);
 
+CREATE INDEX idx_line_account_hq_admin_memberships_staff
+  ON line_account_hq_admin_memberships(staff_id);
+
 CREATE INDEX idx_line_account_tag_links_tag ON line_account_tag_links(tag_id, line_account_id);
 
-CREATE INDEX idx_line_account_tags_order ON line_account_tags(tenant_id, display_order, name);
+CREATE INDEX idx_line_account_tags_order ON line_account_tags(tenant_id,display_order,name);
 
 CREATE INDEX idx_line_accounts_archived
   ON line_accounts (archived_at, display_order, created_at);
+
+CREATE INDEX idx_line_accounts_creator ON line_accounts(created_by_staff_id);
 
 CREATE INDEX idx_line_accounts_display_order
   ON line_accounts (display_order, created_at);
@@ -10947,6 +10986,12 @@ CREATE INDEX idx_ref_tracking_friend_created ON ref_tracking(friend_id, created_
 CREATE INDEX idx_ref_tracking_ref    ON ref_tracking (ref_code);
 
 CREATE INDEX idx_ref_tracking_ref_created ON ref_tracking(ref_code, created_at);
+
+CREATE UNIQUE INDEX idx_registration_applications_active_email
+  ON registration_applications(lower(email)) WHERE status <> 'rejected';
+
+CREATE INDEX idx_registration_applications_status_created
+  ON registration_applications(status, created_at DESC);
 
 CREATE INDEX idx_reminder_delivery_runs_due
   ON reminder_delivery_runs (status, next_retry_at, lease_expires_at, scheduled_at);

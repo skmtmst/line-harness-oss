@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import PrivacyNote from '../../components/ui/privacy-note.js';
 import { changeRule, longDate, remainingText, stayText, zonedParts } from '../../lib/seat-reserve.js';
 import { LiffInput } from '../../components/forms/controls.js'
+import { withHonorific } from '@line-crm/shared'
 
 
 /**
@@ -80,7 +81,7 @@ export default function SeatConfirm({
     ['人数', `${guestCount}名`],
     ...(courseName ? [['コース',courseName] as [string,string]] : []),
     ['お席', seat],
-    ['お名前', `${customerName} さま`],
+    ['お名前', `${withHonorific(customerName, 'さま', { space: true })}`],
   ];
 
   return (

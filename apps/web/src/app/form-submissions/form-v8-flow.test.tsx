@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /**
  * V8 回答フォームの通し試験（見た目のみ）。
@@ -253,7 +254,7 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
     await screen.findByDisplayValue('流れのフォーム')
 
     // 下書きを保存する（画面の知らせとトーストの両方に出る）。
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(formsUpdate).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(screen.getAllByText('下書きを保存しました')).toHaveLength(1))
 

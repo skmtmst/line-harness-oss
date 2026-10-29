@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, render } from '@testing-library/react'
+import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import Card from './card'
 
@@ -134,4 +134,148 @@ it('幅の違う本文と横の欄は、印の無い段ではそろえない', (
   </div>)
   frames.splice(0).forEach(cb => cb(0))
   expect([...container.querySelectorAll<HTMLElement>('article')].map(card => parseFloat(card.style.minHeight))).toEqual([0, 0])
+})
+
+function observeActionSlots() {
+  const frames: FrameRequestCallback[] = []
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation(cb => { frames.push(cb); return frames.length })
+  vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {})
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+    const slot = this.hasAttribute('data-card-actions') ? this : [...this.children].find(child => child.hasAttribute('data-card-actions')) as HTMLElement | undefined
+    const natural = Number(slot?.firstElementChild?.getAttribute('data-natural-height') ?? 0)
+    const slotHeight = Math.max(natural, parseFloat(slot?.style.minHeight ?? '') || 0)
+    const height = this.hasAttribute('data-card-actions') ? slotHeight : Math.max(100 + slotHeight, parseFloat(this.style.minHeight) || 0)
+    return { top: Number(this.dataset.row ?? 0) * 200, width: 200, height } as DOMRect
+  })
+  return { frames, flush: () => frames.splice(0).forEach(cb => cb(0)) }
+}
+
+it('明示equalの同じ行は理由の自然高に操作枠をそろえ、カード高も収める', () => {
+  const { flush } = observeActionSlots()
+  const { container } = render(<div data-card-height="equal" style={{ display: 'grid' }}>
+    <Card actions={<div data-natural-height="36">操作だけ</div>}>情報</Card>
+    <Card actions={<div data-natural-height="64">操作と理由全文</div>}>情報</Card>
+  </div>)
+  flush()
+  const slots = [...container.querySelectorAll<HTMLElement>('[data-card-actions]')]
+  expect(slots.map(slot => slot.style.minHeight)).toEqual(['64px', '64px'])
+  expect([...container.querySelectorAll<HTMLElement>('[data-design-part="card"]')].map(card => card.style.minHeight)).toEqual(['164px', '164px'])
+  expect(slots[1].textContent).toBe('操作と理由全文')
+})
+
+it.each(['unmarked', 'natural', 'vertical', 'single', 'missing', 'separate-rows'] as const)('操作枠の対象外（%s）に寸法を足さない', mode => {
+  const { flush } = observeActionSlots()
+  const { container } = render(<div data-card-height={mode === 'unmarked' ? undefined : mode === 'natural' ? 'natural' : 'equal'} style={{ display: mode === 'vertical' ? 'flex' : 'grid', flexDirection: 'column' }}>
+    <Card actions={<div data-natural-height="36">操作</div>}>情報</Card>
+    {mode !== 'single' ? <Card data-row={mode === 'separate-rows' ? 1 : 0} actions={mode === 'missing' ? undefined : <div data-natural-height="64">操作と理由</div>}>情報</Card> : null}
+  </div>)
+  flush()
+  expect([...container.querySelectorAll<HTMLElement>('[data-card-actions]')].map(slot => slot.style.minHeight)).toEqual(mode === 'single' || mode === 'missing' ? [''] : ['', ''])
+})
+
+it('理由が減った再計測では古い操作枠高を解除して縮める', async () => {
+  const { frames, flush } = observeActionSlots()
+  const content = (height: number) => <div data-card-height="equal" style={{ display: 'grid' }}>
+    <Card actions={<div data-natural-height="36">操作</div>}>情報</Card>
+    <Card actions={<div data-natural-height={height}>{height === 64 ? '操作と理由' : '操作'}</div>}>情報</Card>
+  </div>
+  const { container, rerender } = render(content(64))
+  flush()
+  const slots = [...container.querySelectorAll<HTMLElement>('[data-card-actions]')]
+  expect(slots.map(slot => slot.style.minHeight)).toEqual(['64px', '64px'])
+  rerender(content(24))
+  await waitFor(() => expect(frames.length).toBeGreaterThan(0))
+  flush()
+  expect(slots.map(slot => slot.style.minHeight)).toEqual(['36px', '36px'])
+  expect([...container.querySelectorAll<HTMLElement>('[data-design-part="card"]')].map(card => card.style.minHeight)).toEqual(['136px', '136px'])
+})
+
+it('natural切替とcleanupは操作枠の元のinline寸法を復元する', async () => {
+  const { frames, flush } = observeActionSlots()
+  const content = (height: string) => <div data-card-height={height} style={{ display: 'grid' }}>
+    <Card actions={<div data-natural-height="36">操作</div>}>情報</Card>
+    <Card actions={<div data-natural-height="64">操作と理由</div>}>情報</Card>
+  </div>
+  const { container, rerender, unmount } = render(content('equal'))
+  const slots = [...container.querySelectorAll<HTMLElement>('[data-card-actions]')]
+  slots[0].style.minHeight = '12px'
+  flush()
+  expect(slots.map(slot => slot.style.minHeight)).toEqual(['64px', '64px'])
+  rerender(content('natural'))
+  await waitFor(() => expect(frames.length).toBeGreaterThan(0))
+  flush()
+  expect(slots.map(slot => slot.style.minHeight)).toEqual(['12px', ''])
+  rerender(content('equal'))
+  await waitFor(() => expect(frames.length).toBeGreaterThan(0))
+  flush()
+  expect(slots.map(slot => slot.style.minHeight)).toEqual(['64px', '64px'])
+  unmount()
+  expect(slots.map(slot => slot.style.minHeight)).toEqual(['12px', ''])
+})
+
+it('複数から単独へ減ったとき操作枠と本体の元の寸法を両方復元する', async () => {
+  const { frames, flush } = observeActionSlots()
+  const content = (multiple: boolean) => <div data-card-height="equal" style={{ display: 'grid' }}>
+    <Card key="first" style={{ minHeight: 17, alignSelf: 'stretch' }} actions={<div data-natural-height="36">操作</div>}>情報</Card>
+    {multiple ? <Card key="second" actions={<div data-natural-height="64">操作と理由</div>}>情報</Card> : null}
+  </div>
+  const { container, rerender } = render(content(true))
+  const cards = [...container.querySelectorAll<HTMLElement>('[data-design-part="card"]')]
+  const slots = [...container.querySelectorAll<HTMLElement>('[data-card-actions]')]
+  slots[0].style.minHeight = '12px'
+  flush()
+  expect(cards[0].style.minHeight).toBe('164px')
+  rerender(content(false))
+  await waitFor(() => expect(frames.length).toBeGreaterThan(0))
+  flush()
+  expect(cards[0].style.minHeight).toBe('17px')
+  expect(cards[0].style.alignSelf).toBe('stretch')
+  expect(slots.map(slot => slot.style.minHeight)).toEqual(['12px', ''])
+})
+
+it('共有利用者が一つ残る間は監視を解除せず、最後の解除だけ復元する', () => {
+  const { flush } = observeActionSlots()
+  const content = (both: boolean) => <div data-card-height="equal" style={{ display: 'grid' }}>
+    <Card key="first" actions={<div data-natural-height="36">操作</div>}>情報</Card>
+    {both ? <Card key="second" actions={<div data-natural-height="64">操作と理由</div>}>情報</Card> : <section key="plain" data-design-part="card"><div data-card-actions><div data-natural-height="64">操作と理由</div></div></section>}
+  </div>
+  const { container, rerender, unmount } = render(content(true))
+  flush()
+  const first = container.querySelector<HTMLElement>('[data-card-actions]')!
+  const disconnect = vi.spyOn(window.MutationObserver.prototype, 'disconnect')
+  rerender(content(false))
+  expect(disconnect).not.toHaveBeenCalled()
+  expect(first.style.minHeight).toBe('64px')
+  unmount()
+  expect(disconnect).toHaveBeenCalledTimes(1)
+  expect(first.style.minHeight).toBe('')
+})
+
+it('最終解除後の未解決fontsと遅延frameは寸法を再設定しない', async () => {
+  let resolveFonts!: () => void
+  const pending = new Promise<void>(resolve => { resolveFonts = resolve })
+  const descriptor = Object.getOwnPropertyDescriptor(document, 'fonts')
+  Object.defineProperty(document, 'fonts', { configurable: true, value: { ready: pending } })
+  try {
+    const { frames, flush } = observeActionSlots()
+    const { container, unmount } = render(<div data-card-height="equal" style={{ display: 'grid' }}>
+      <Card actions={<div data-natural-height="36">操作</div>}>情報</Card>
+      <Card actions={<div data-natural-height="64">操作と理由</div>}>情報</Card>
+    </div>)
+    const delayedFrame = frames[0]
+    flush()
+    const cards = [...container.querySelectorAll<HTMLElement>('[data-design-part="card"]')]
+    const slots = [...container.querySelectorAll<HTMLElement>('[data-card-actions]')]
+    expect(slots.map(slot => slot.style.minHeight)).toEqual(['64px', '64px'])
+    unmount()
+    const requested = vi.mocked(window.requestAnimationFrame).mock.calls.length
+    await act(async () => { resolveFonts(); await pending })
+    delayedFrame(0)
+    expect(vi.mocked(window.requestAnimationFrame)).toHaveBeenCalledTimes(requested)
+    expect(slots.map(slot => slot.style.minHeight)).toEqual(['', ''])
+    expect(cards.map(card => card.style.minHeight)).toEqual(['', ''])
+  } finally {
+    if (descriptor) Object.defineProperty(document, 'fonts', descriptor)
+    else Reflect.deleteProperty(document, 'fonts')
+  }
 })

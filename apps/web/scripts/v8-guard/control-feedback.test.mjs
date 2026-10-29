@@ -54,12 +54,14 @@ function Fixture(){const[value,setValue]=useState('graph');const[window,setWindo
 <Drawer open={window==='editable-drawer'} onClose={()=>setWindow('')} title="紹介者の詳細" layout="inset" heading={<InlineEdit value="田中 明" label="紹介者の名前を直す" onSave={async()=>{}}/>} description="説明が2行に増えても、名前を直す操作のある題に丸い印がそろうことを確かめます。"><p>本文</p></Drawer>
 <Button onClick={()=>setWindow('settings')}>設定の間隔を見る</Button>
 {window==='settings'?<section data-measure-settings>{['accounts','wide-nav','narrow-nav','account-handover'].map(layout=><SettingsPage key={layout} layout={layout} title={layout} navigation={null}><div>最初の段</div><div>次の段</div></SettingsPage>)}</section>:null}
-</main>}createRoot(document.getElementById('root')).render(<Fixture/>);` },
+</main>}
+function PaginationFixture(){const[page,setPage]=useState(1);return <main style={{flexDirection:"column",alignItems:"stretch"}}><Pagination page={page} pageCount={3} range={{total:25,first:(page-1)*10+1,last:Math.min(page*10,25)}} onPageChange={setPage}/><Pagination page={1} pageCount={1} ariaLabel="1ページの送り" range={{total:1,first:1,last:1}} onPageChange={()=>{}}/><Pagination page={1} pageCount={3} ariaLabel="停止中の送り" disabled onPageChange={()=>setPage(99)}/><output>{page}</output></main>}
+createRoot(document.getElementById('root')).render(globalThis.paginationFixture?<PaginationFixture/>:<Fixture/>);` },
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
   tsconfig: `${webRoot}/tsconfig.json`, define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"' },
   plugins: [{ name: 'fixture', setup(b) {
     b.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: 'navigation', namespace: 'fixture' }))
-    b.onResolve({ filter: /^next\/link$|^@\/components\/shared\/list-navigation$/ }, () => ({ path: 'link', namespace: 'fixture' }))
+    b.onResolve({ filter: /^next\/link$/ }, () => ({ path: 'link', namespace: 'fixture' }))
     b.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'navigation'
       ? 'export const useRouter=()=>({push(){},replace(){},prefetch(){}});export const usePathname=()=>"/fixture";export const useSearchParams=()=>new URLSearchParams();'
       : 'import React from "react";export default function Link(p){return React.createElement("a",p)}', resolveDir: webRoot }))
@@ -73,13 +75,18 @@ function Fixture(){const[value,setValue]=useState('graph');const[window,setWindo
       sheets.push(css.replace(/:global\(([^()]+)\)/g, '$1'))
       return { contents: `export default ${JSON.stringify(names)}`, loader: 'js' }
     })
+    b.onLoad({ filter: /\.css$/ }, async args => {
+      sheets.push(await compileUiStyles(args.path))
+      return { contents: '', loader: 'js' }
+    })
   } }],
 })
 const css = [await compileUiStyles(new URL('../../src/app/globals.css', import.meta.url).pathname), ...sheets].join('\n')
-async function mount(page) {
-  await page.setContent(`<html><style>${css}body{color:var(--color-ink)}main{display:flex;gap:16px;align-items:center;padding:24px}</style><div id="root"></div></html>`)
+async function mount(page, pagination = false) {
+  await page.setContent(`<html${pagination?' data-theme="v8"':''}><style>${css}body{color:var(--color-ink)}main{display:flex;gap:16px;align-items:center;padding:24px}</style><div id="root"></div></html>`)
+  await page.evaluate(value=>{globalThis.paginationFixture=value},pagination)
   await page.addScriptTag({content:compiled.outputFiles[0].text})
-  await page.getByRole('button',{name:'副操作',exact:true}).waitFor()
+  await page.getByRole(pagination?'navigation':'button',{name:pagination?'ページ送り':'副操作',exact:true}).waitFor()
 }
 const focusedRing = page => page.evaluate(() => {
   const control=document.activeElement,style=getComputedStyle(control)
@@ -294,5 +301,35 @@ for(const width of [1152,1440])test(`数の帯の余白と数字を実寸で守�
     await fault.evaluate(el=>el.remove())
     await page.waitForFunction(()=>getComputedStyle(document.querySelector('[data-measure-band] [data-design-version]')).gap==='4px')
     assert.deepEqual(await measure(),normal)
+  }finally{await page.close();await browser.close()}
+})
+
+
+for(const width of [1152,1440])test(`ページ送りowner正式版の灰・焦点・境界と件数 ${width}`,async()=>{
+  const browser=await connectGuardBrowser(),page=await browser.newPage({viewport:{width,height:900},reducedMotion:'reduce'})
+  const paint=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
+  try{
+    await mount(page,true)
+    const pager=page.getByRole('navigation',{name:'ページ送り',exact:true}),current=pager.locator('[aria-current="page"]')
+    const look=el=>el.evaluate(el=>{const s=getComputedStyle(el);return {bg:s.backgroundColor,weight:s.fontWeight,outline:s.outlineColor,shadow:s.boxShadow,border:s.borderTopWidth,opacity:Number(s.opacity)}})
+    await paint();const normal=await look(current)
+    assert.equal(normal.bg,'rgb(247, 247, 245)');assert.equal(normal.weight,'700');assert.equal(normal.outline,'rgba(0, 0, 0, 0)');assert.equal(normal.shadow,'none');assert.equal(normal.border,'0px')
+    const other=pager.getByRole('button',{name:'2ページ目へ'}),otherLook=await look(other)
+    assert.equal(otherLook.outline,'rgba(0, 0, 0, 0)');assert.equal(otherLook.shadow,'none')
+    assert.equal(await pager.getByRole('button',{name:'前のページ'}).isDisabled(),true)
+    assert.ok((await look(pager.getByRole('button',{name:'前のページ'}))).opacity<1)
+    assert.ok((await pager.textContent()).includes('25件中 1〜10件'))
+    await current.evaluate(el=>{el.style.outlineColor='rgb(20, 20, 20)'});await paint();assert.notEqual((await look(current)).outline,normal.outline,'黒い枠の再発を検知する')
+    await current.evaluate(el=>{el.style.removeProperty('outline-color')});await paint();assert.equal((await look(current)).outline,normal.outline)
+    await page.keyboard.press('Tab');await current.focus();await paint();assert.equal((await look(current)).outline,'rgb(37, 99, 235)')
+    await other.click();assert.equal(await page.locator('output').textContent(),'2');assert.ok((await pager.textContent()).includes('25件中 11〜20件'))
+    await pager.getByRole('button',{name:'次のページ'}).click();assert.equal(await page.locator('output').textContent(),'3');assert.equal(await pager.getByRole('button',{name:'次のページ'}).isDisabled(),true)
+    assert.ok((await pager.textContent()).includes('25件中 21〜25件'))
+    const disabled=page.getByRole('navigation',{name:'停止中の送り'});assert.ok((await disabled.getByRole('button').evaluateAll(buttons=>buttons.map(b=>b.disabled))).every(Boolean))
+    assert.equal(await page.getByRole('navigation',{name:'1ページの送り'}).count(),0);assert.ok(await page.getByText('1件中 1〜1件',{exact:true}).isVisible())
+    await page.mouse.move(0,0)
+    await page.waitForFunction(bg=>{const el=document.querySelector('nav[aria-label="ページ送り"] [aria-current="page"]');return el?.textContent==='3'&&getComputedStyle(el).backgroundColor===bg},normal.bg)
+    const finalCurrent=await look(current);assert.equal(finalCurrent.bg,normal.bg);assert.equal(finalCurrent.weight,'700')
+    if(process.env.PAGINATION_TARGET_OUT){const fs=await import('node:fs');fs.mkdirSync(process.env.PAGINATION_TARGET_OUT,{recursive:true});fs.writeFileSync(`${process.env.PAGINATION_TARGET_OUT}/pagination-${width}.json`,JSON.stringify({normal,other:otherLook,finalCurrent,finalPage:await page.locator('output').textContent()},null,2)+'\n');await page.screenshot({path:`${process.env.PAGINATION_TARGET_OUT}/pagination-${width}.png`})}
   }finally{await page.close();await browser.close()}
 })

@@ -5,7 +5,8 @@
  */
 import React, { act } from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import type { EcNotificationSetting } from '@/lib/api'
 
 const fixture = vi.hoisted(() => ({
   tab: 'customer',
@@ -131,4 +132,37 @@ it('LINE通知は題の用語説明と画面の説明を「？」1つで開け�
   const help = screen.getByRole('button', { name: 'この画面の説明' })
   await act(async () => { help.click() })
   expect(screen.getByText(/送れなかった理由や再試行の予定/)).toBeTruthy()
+})
+
+it('未設定の絞り込み件数と行の状態が一致し、任意の前後文が空でも出す・停止の状態を保つ', async () => {
+  const setting = (eventType: string, title: string | null, isEnabled: boolean): EcNotificationSetting => ({
+    eventType, title, isEnabled, label: eventType, introText: '', outroText: '',
+    category: 'order', buttonLabel: '', buttonUrl: '', imageUrl: '', displayOrder: 0,
+    fixedFields: [], fixedPreview: '', updatedAt: '2026-10-29T00:00:00Z',
+  })
+  fixture.settings.mockResolvedValue({ success: true, data: [
+    setting('ec.order.confirmed', '注文を受け付けました', true),
+    setting('ec.order.shipped', '発送しました', false),
+    setting('ec.order.cancelled', '　', true),
+    setting('ec.order.payment_received', null, false),
+  ] })
+  fixture.definitions.mockResolvedValue({ success: true, data: [] })
+  render(<LineNotificationsPage />)
+  const filters = screen.getByRole('group', { name: 'お知らせの絞り込み' })
+  const incomplete = await within(filters).findByRole('button', { name: '文面が未設定 2' })
+  const table = screen.getByRole('table')
+  expect(within(table).getAllByRole('row')).toHaveLength(5)
+  const warnings = within(table).getAllByTitle('要確認：文面が未設定')
+  expect(warnings).toHaveLength(2)
+  for (const warning of warnings) expect(warning.getAttribute('aria-description')).toBe('要確認：文面が未設定')
+  expect(table.querySelectorAll('[data-tone="caution"][aria-hidden="true"]')).toHaveLength(2)
+  expect(within(table).getAllByText('出している')).toHaveLength(2)
+  expect(within(table).getAllByText('停止中')).toHaveLength(2)
+  fireEvent.click(incomplete)
+  expect(within(table).getAllByRole('row')).toHaveLength(3)
+  expect(within(table).getAllByTitle('要確認：文面が未設定')).toHaveLength(2)
+  expect(within(table).getAllByText('出している')).toHaveLength(1)
+  expect(within(table).getAllByText('停止中')).toHaveLength(1)
+  fireEvent.click(within(filters).getByRole('button', { name: 'すべて 4' }))
+  expect(within(table).getAllByRole('row')).toHaveLength(5)
 })

@@ -19,7 +19,7 @@
   min-width: 0;
 }
 
-.field {
+.field:not([data-choice-field]) {
   box-sizing: border-box;
   display: flex;
   width: 100%;
@@ -33,7 +33,7 @@
 }
 
 /* 開いている間は緑の枠。1.5px に見せるため date-field と同じく内側に足す。 */
-:root .field:not(.open):not(.invalid) {
+:root .field:not([data-choice-field]):not(.open):not(.invalid) {
   border-color: var(--color-control-border);
   box-shadow: var(--control-shadow);
 }
@@ -74,7 +74,7 @@
  * 外側の欄に ring を出す（:focus-within）。中の input の輪郭は消し、
  * 外枠の ring を正本にする（focus-visible-contract の例外として許可）。
  */
-.field:focus-within {
+.field:not([data-choice-field]):focus-within {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
@@ -198,13 +198,13 @@
  * 枠は 120ms で色が変わり、候補の行に乗せたときの薄い背景も 120ms。
  * 開く動きは候補の箱が持つ。
  */
-:root .field {
+:root .field:not([data-choice-field]) {
   transition:
     background-color var(--motion-fast) var(--motion-ease-out),
     border-color var(--motion-fast) var(--motion-ease-out);
 }
 
-:root .field:hover {
+:root .field:not([data-choice-field]):hover {
   background: var(--color-canvas-sunken);
 }
 
@@ -341,7 +341,7 @@
 
 /* タッチ端末は指の当たり・拡大防止のため欄だけ 44px・16px（行の高さは設計どおり）。 */
 @media (pointer: coarse) {
-  .field {
+  .field:not([data-choice-field]) {
     height: 44px;
   }
 
@@ -357,7 +357,7 @@
  */
 @layer components {
 @media not (pointer: coarse) {
-  :root .field {
+  :root .field:not([data-choice-field]) {
     height: var(--tpl-ux5-combobox-h);
   }
 }

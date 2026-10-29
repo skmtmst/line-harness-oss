@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * ★V8 動画と公開期間（）・開催回（）の描画。
@@ -109,7 +110,7 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     const host = render()
     expect(host.querySelector('#webinar-period-start')?.textContent).toContain('2026年10月1日')
     expect(host.querySelector('#webinar-period-start')?.textContent).toContain('10:00')
-    const save = [...host.querySelectorAll('button')].find((button) => button.textContent === '下書きを保存')!
+    const save = ([...host.querySelectorAll('button')].find((button) => button.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
     await act(async () => save.click())
     expect(apiMocks.update).not.toHaveBeenCalled()
     expect(host.querySelector('#webinar-period-start')?.textContent).toContain('10:00')
@@ -118,12 +119,12 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
 
   it('枠を足すと保存の口へ枠つきで送る', async () => {
     const host = render()
-    const add = [...host.querySelectorAll('button')].find((el) => el.textContent?.includes('枠を足す'))
+    const add = ([...host.querySelectorAll('button')].find((el) => el.textContent?.includes('枠を足す')) ?? querySupplementaryPageAction('枠を足す'))
     expect(add).toBeDefined()
     await act(async () => {
       add!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    const confirm = [...document.querySelectorAll('[role="dialog"] button')].find((el) => el.textContent === '枠を足す')
+    const confirm = ([...document.querySelectorAll('[role="dialog"] button')].find((el) => el.textContent === '枠を足す') ?? querySupplementaryPageAction('枠を足す'))
     await act(async () => {
       confirm!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
@@ -140,7 +141,7 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     await act(async () => {
       menu!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
-    const remove = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '消す')
+    const remove = ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent === '消す') ?? querySupplementaryPageAction('消す'))
     await act(async () => {
       remove!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
     })
@@ -166,7 +167,7 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     let host!: HTMLElement
     await act(async () => { host = render() })
     expect(host.querySelector('[aria-current="step"]')?.textContent).toBe('検査')
-    const replace = [...host.querySelectorAll('button')].find((button) => button.textContent === '差し替える')!
+    const replace = ([...host.querySelectorAll('button')].find((button) => button.textContent === '差し替える') ?? querySupplementaryPageAction('差し替える'))!
     await act(async () => replace.click())
     expect(document.querySelector('[role="dialog"][aria-labelledby]')?.textContent).toContain('動画を差し替える')
   })
@@ -181,7 +182,7 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     apiMocks.webinarSession.mockResolvedValue({ data: { session } })
     let host!: HTMLElement
     await act(async () => { host = render({ ...EDITOR, deliveryKind: 'scheduled' }) })
-    const badge = [...host.querySelectorAll('[data-design-node="xRvDB"]')].find(el => el.textContent === label)
+    const badge = ([...host.querySelectorAll('[data-design-node="xRvDB"]')].find(el => el.textContent === label) ?? querySupplementaryPageAction(label))
     expect(badge).toBeDefined()
     expect(badge?.getAttribute('data-tone')).toBe(tone)
     expect(badge?.querySelector('[data-truncated-text]')?.textContent).toBe(label)
@@ -195,7 +196,7 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     await act(async () => { host = render({ ...EDITOR, deliveryKind: 'scheduled' }) })
     expect(host.querySelector('[data-design-node="xRvDB"]')?.textContent).toBe('読み込めません')
     apiMocks.webinarSession.mockResolvedValue({ data: { session: { capacity: 80, reservedCount: 32, remaining: 48, state: 'open' } } })
-    await act(async () => { [...host.querySelectorAll('button')].find(el => el.textContent === 'もう一度読み込む')!.click() })
+    await act(async () => { ([...host.querySelectorAll('button')].find(el => el.textContent === 'もう一度読み込む') ?? querySupplementaryPageAction('もう一度読み込む'))!.click() })
     const badge = host.querySelector('[data-design-node="xRvDB"]')
     expect(badge?.textContent).toBe('残り 48 人')
     expect(badge?.getAttribute('data-tone')).toBe('info')
@@ -220,10 +221,10 @@ describe('動画と公開期間のV8（VWNaA・LPOe7）', () => {
     await act(async () => fireEvent.change(time, { target: { value: '11:00' } }))
     await act(async () => fireEvent.blur(time))
     await act(async () => fireEvent.keyDown(document.querySelector('[role="dialog"][aria-label="日時を選ぶ"]')!, { key: 'Escape' }))
-    await act(async () => [...host.querySelectorAll('button')].find(button => button.textContent === '差し替える')!.click())
+    await act(async () => ([...host.querySelectorAll('button')].find(button => button.textContent === '差し替える') ?? querySupplementaryPageAction('差し替える'))!.click())
     const input = document.querySelector<HTMLInputElement>('#wd-minutes')!
     await act(async () => fireEvent.change(input, { target: { value: '17' } }))
-    const save = [...host.querySelectorAll('button')].find((button) => button.textContent === '下書きを保存')!
+    const save = ([...host.querySelectorAll('button')].find((button) => button.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
     await act(async () => save.click())
     expect(apiMocks.update).toHaveBeenCalledWith('webinar-1', expect.objectContaining({ publicationStartsAt: '2026-10-01T02:00:00.000Z', publicationEndsAt: null }))
     expect(document.querySelector<HTMLInputElement>('#wd-minutes')?.value).toBe('17')

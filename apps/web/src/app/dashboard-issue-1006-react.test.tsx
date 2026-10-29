@@ -367,16 +367,16 @@ describe('DASH-15 配置の遅延GETが編集中の変更を上書きしない',
     await render()
     await openEditor()
 
-    const toggle = dialog().querySelector<HTMLInputElement>('input[aria-label="写真審査を表示"]')
-    expect(toggle ? String(toggle.checked) : undefined).toBe('true')
+    const toggle = dialog().querySelector<HTMLInputElement>('[role="switch"][aria-label="写真審査を表示"]')
+    expect(toggle ? String((toggle.getAttribute('aria-checked') === 'true')) : undefined).toBe('true')
     await act(async () => { toggle!.click() })
-    expect(String(toggle!.checked)).toBe('false')
+    expect(String((toggle!.getAttribute('aria-checked') === 'true'))).toBe('false')
 
     // 遅れて届いたGET（既定配置＝写真審査ON）でdraftを初期化しない
     await act(async () => {
       resolvePreferences?.(ok({ success: true, data: { version: 5, cards: null } }))
     })
-    expect(String(toggle!.checked)).toBe('false')
+    expect(String((toggle!.getAttribute('aria-checked') === 'true'))).toBe('false')
   })
 })
 

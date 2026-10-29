@@ -31,7 +31,7 @@
 }
 .block[data-placement='calendar'] > span { max-inline-size: 100%; min-inline-size: 0; }
 
-.block[data-placement='timeline'] { gap: 0; padding: calc(var(--polish-space-row) - var(--booking-stroke)); line-height: var(--tpl-rs-lh-11); }
+.block[data-placement='timeline'] { container-type: inline-size; container-name: booking-card; gap: 0; padding: calc(var(--polish-space-row) - var(--booking-stroke)); line-height: var(--tpl-rs-lh-11); }
 .block[data-placement='timeline'] > * { flex-shrink: 0; }
 .block[data-placement='board'] { position: static; width: 100%; height: 100%; gap: 0; padding: var(--tpl-sd-entry-pad); }
 .block[data-placement='month'] { position: static; width: 100%; padding: var(--polish-space-row); gap: 0; font-size: var(--text-micro); }
@@ -58,6 +58,9 @@
   opacity: 1;
   cursor: pointer;
 }
+
+/* 縦の担当盤では、空き枠をセルの通常の流れに置く。 */
+.slotAdd[data-placement='cell'] { position: static; width: 100%; }
 
 .phoneTable {
   flex: 1 1 var(--tpl-rs-rsv-phone-table-basis);
@@ -94,4 +97,9 @@
 }
 
 .block:focus-visible, .slotAdd:focus-visible, .phoneTable:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 1px; }
+}
+
+/* 時間の幅は変えず、最小の箱だけ余白を縮めて人数と注意を残す。 */
+@container booking-entry (max-width: 4rem) {
+  .block[data-placement='timeline'] { padding-inline: 0; inset-inline: 0; }
 }

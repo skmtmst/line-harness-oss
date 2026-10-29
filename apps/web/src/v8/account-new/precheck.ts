@@ -34,11 +34,6 @@ export const PRECHECK_HELPS: Record<PrecheckKey, string> = {
   q4: 'LINE公式アカウントにつないで、メッセージの配信や自動応答を行うツールのことです。',
   q5: 'あてはまるものを1つ選んでください。',
 }
-/** 「このあとの質問」で、まだ尋ねるか決まっていない質問に付ける注記（絵 iAtCE・Vc6HN）。 */
-export const PRECHECK_CONDITION_NOTES: Partial<Record<PrecheckKey, string>> = {
-  q3: '（引き継ぐときだけ）', q5: '（使っているときだけ）',
-}
-
 export interface PrecheckChoice { value: string; title: string; note?: string }
 export const PRECHECK_CHOICES: Record<PrecheckKey, readonly PrecheckChoice[]> = {
   q1: [{ value: 'yes', title: 'はい、あります' }, { value: 'no', title: 'いいえ、まだありません' }],
@@ -114,28 +109,10 @@ export function precheckSummary(at: PrecheckAt, answers: PrecheckAnswers): Prech
   return rows
 }
 
-/**
- * 「このあとの質問」。尋ねるかどうかが未定の質問には括弧の注記を付け、
- * 尋ねないと決まった質問は一覧から外す。チェック結果の面では出さない。
- */
-export interface PrecheckUpcomingRow { key: PrecheckKey; text: string }
-export function precheckUpcoming(at: PrecheckAt, answers: PrecheckAnswers): PrecheckUpcomingRow[] {
-  if (at === 'done') return []
-  const rows: PrecheckUpcomingRow[] = []
-  for (let i = PRECHECK_ORDER.indexOf(at) + 1; i < PRECHECK_ORDER.length; i += 1) {
-    const key = PRECHECK_ORDER[i]
-    const gate = key === 'q3' ? answers.q2 : key === 'q5' ? answers.q4 : 'yes'
-    if (gate === 'no') continue
-    const note = gate === undefined ? PRECHECK_CONDITION_NOTES[key] ?? '' : ''
-    rows.push({ key, text: `${PRECHECK_TITLES[key]}${note}` })
-  }
-  return rows
-}
-
 /** ①-7「あなたの接続前チェック結果」の4項目（絵 tLhTV〜IvIdn の固定文）。 */
 export interface PrecheckResultItem { title: string; body: string }
 export const PRECHECK_RESULT: readonly PrecheckResultItem[] = [
-  { title: '用意するもの', body: 'Messaging API と LINEログインのチャネルID・チャネルシークレット（計4つ）と、Messaging API チャネルが属するプロバイダーID。プロバイダーIDは LINE Developers のプロバイダー画面URLで確認できます。' },
+  { title: '用意するもの', body: 'Messaging API と LINEログインのチャネルID・チャネルシークレット（計4つ）と、Messaging API チャネルが属するプロバイダーID。プロバイダーIDは LINE Developers の「プロバイダー設定」にあるコピーアイコンから取得できます。' },
   { title: '接続後に変わること', body: 'メッセージの受け取りがmusuboに切り替わります。LINE公式アカウントの「チャット」はオフにします。' },
   { title: '作り直すもの', body: 'あいさつメッセージとリッチメニューは引き継げません。musuboで作り直してから切り替えます。' },
   { title: 'かかる時間', body: '入力から接続の確認まで、およそ10〜15分です。' },

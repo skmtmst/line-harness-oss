@@ -10,6 +10,7 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import type { IndustryStyle, StyleRow } from './model'
 import { StatusOrDash } from './parts'
 import styles from './style-dashboard.module.css'
+import { withHonorific } from '@line-crm/shared'
 
 /*
  * 1枚目のタブの「一覧」（NqAvL・R0FFqz・k2MBw）。
@@ -104,13 +105,13 @@ export function TodayList({ style, rows, note, canWrite, busyId, selectedId, men
     if (!canWrite) return null
     if (row.action === 'visit') return (
       <span className={styles.actionPair}>
-        <Button size="compact" disabled={busyId === row.id} onClick={() => onVisit(row)} aria-label={`${row.name}さんを来店にする`}>{row.past ? null : <Check size={16} aria-hidden="true" />}来店</Button>
-        {row.past && onNoShow ? <Button size="compact" disabled={busyId === row.id} onClick={() => onNoShow(row)} aria-label={`${row.name}さんを${style === 'consult' ? '欠席' : '無断'}にする`}>{style === 'consult' ? '欠席' : '無断'}</Button> : null}
+        <Button size="compact" disabled={busyId === row.id} onClick={() => onVisit(row)} aria-label={`${withHonorific(row.name)}を来店にする`}>{row.past ? null : <Check size={16} aria-hidden="true" />}来店</Button>
+        {row.past && onNoShow ? <Button size="compact" disabled={busyId === row.id} onClick={() => onNoShow(row)} aria-label={`${withHonorific(row.name)}を${style === 'consult' ? '欠席' : '無断'}にする`}>{style === 'consult' ? '欠席' : '無断'}</Button> : null}
       </span>
     )
-    if (row.action === 'approve') return <Button size="compact" disabled={busyId === row.id} onClick={() => onApprove?.(row)} aria-label={`${row.name}さんの予約を承認する`}><Check size={16} aria-hidden="true" />承認する</Button>
-    if (row.action === 'result') return <Button size="compact" disabled={busyId === row.id} onClick={() => onResult?.(row)} aria-label={`${row.name}さんの結果を付ける`}><ClipboardCheck size={16} aria-hidden="true" />結果を付ける</Button>
-    if (row.action === 'undo') return <button type="button" className={styles.textAction} disabled={busyId === row.id} onClick={() => onUndo(row)} aria-label={`${row.name}さんの来店の印を取り消す`}>取り消す</button>
+    if (row.action === 'approve') return <Button size="compact" disabled={busyId === row.id} onClick={() => onApprove?.(row)} aria-label={`${withHonorific(row.name)}の予約を承認する`}><Check size={16} aria-hidden="true" />承認する</Button>
+    if (row.action === 'result') return <Button size="compact" disabled={busyId === row.id} onClick={() => onResult?.(row)} aria-label={`${withHonorific(row.name)}の結果を付ける`}><ClipboardCheck size={16} aria-hidden="true" />結果を付ける</Button>
+    if (row.action === 'undo') return <button type="button" className={styles.textAction} disabled={busyId === row.id} onClick={() => onUndo(row)} aria-label={`${withHonorific(row.name)}の来店の印を取り消す`}>取り消す</button>
     if (row.action === 'meet') return <Button size="compact" href={row.actionHref} external={Boolean(row.actionHref)}><Video size={16} aria-hidden="true" />Meet に入る</Button>
     if (row.action === 'place') return <Button size="compact" href={row.actionHref} external={Boolean(row.actionHref)}><MapPin size={16} aria-hidden="true" />場所を開く</Button>
     return null

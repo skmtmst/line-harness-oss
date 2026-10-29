@@ -1,4 +1,7 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 共通情報の一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
  * 行が出る・札で絞れる・行の「…」から止める窓と削除の窓が開く（板 ・）・
@@ -87,7 +90,7 @@ const notice = { ...base, id: 'v-notice', folderId: null, name: '臨時のお知
 
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
-  staffRole.value = 'owner'
+  staffRole.value = verifiedStaffRole('owner')
   listVars.mockImplementation(async () => ({ success: true, data: [company, contact, notice] }))
   listFolders.mockImplementation(async () => ({ success: true, data: [], unfiledCount: 3 }))
   listExports.mockImplementation(async () => ({ success: true, data: [] }))
@@ -136,8 +139,8 @@ function buttonByLabel(label: string): HTMLButtonElement {
 }
 
 function buttonByText(text: string): HTMLElement {
-  const found = [...document.querySelectorAll('button, [role="menuitem"]')]
-    .find((element) => element.textContent?.trim() === text) as HTMLElement | undefined
+  const found = ([...document.querySelectorAll('button, [role="menuitem"]')]
+    .find((element) => element.textContent?.trim() === text) ?? querySupplementaryPageAction(text)) as HTMLElement | undefined
   expect(found, `「${text}」がありません`).toBeTruthy()
   return found as HTMLElement
 }
@@ -155,10 +158,10 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
       act(() => { root.render(<CommonVarsListV8 />) })
       await flush()
       const rows = [...host.querySelectorAll('tbody tr')]
-      const companyRow = rows.find(row=>row.textContent?.includes('会社名'))!
+      const companyRow = (rows.find(row=>row.textContent?.includes('会社名')) ?? querySupplementaryPageAction('会社名'))!
       expect(companyRow.querySelector('[title="使われている場所を取得できていません"]')?.textContent).toBe('—')
-      expect(rows.find(row=>row.textContent?.includes('問い合わせ先'))?.textContent).toContain('未設定')
-      const zeroRow = rows.find(row=>row.textContent?.includes('臨時のお知らせ'))!
+      expect((rows.find(row=>row.textContent?.includes('問い合わせ先')) ?? querySupplementaryPageAction('問い合わせ先'))?.textContent).toContain('未設定')
+      const zeroRow = (rows.find(row=>row.textContent?.includes('臨時のお知らせ')) ?? querySupplementaryPageAction('臨時のお知らせ'))!
       expect([...zeroRow.querySelectorAll('td')].some(cell=>cell.textContent==='0')).toBe(true)
       expect(zeroRow.textContent).toContain('なし')
       expect(host.textContent).not.toContain('—（未取得）')
@@ -189,7 +192,7 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
   it('空のままの帯の「編集する」で、空のものだけに絞る', async () => {
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
-    const fix = [...host.querySelectorAll('[role="status"] button')].find((b) => b.textContent === '編集する') as HTMLButtonElement
+    const fix = ([...host.querySelectorAll('[role="status"] button')].find((b) => b.textContent === '編集する') ?? querySupplementaryPageAction('編集する')) as HTMLButtonElement
     expect(fix, '帯の「編集する」がありません').toBeTruthy()
     act(() => { fix.click() })
     await flush()
@@ -238,10 +241,10 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
   it('閲覧のみ（staff）では帯が出て、作成・変更は隠しコピーだけを使える', async () => {
-    staffRole.value = 'staff'
+    staffRole.value = verifiedStaffRole('staff')
     act(() => { root.render(<CommonVarsListV8 />) })
     await flush()
-    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
+    expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
     const create = [...host.querySelectorAll('button, a')].filter((b) => b.textContent?.includes('共通情報を作る'))
     expect(create).toHaveLength(0)
     act(() => { buttonByLabel('共通情報「会社名」の操作').click() })
@@ -251,3 +254,5 @@ describe('V8 共通情報の一覧（src/v8）の動き', () => {
     for (const label of ['編集', '止める', '削除する', '再開する']) expect(menu.textContent).not.toContain(label)
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

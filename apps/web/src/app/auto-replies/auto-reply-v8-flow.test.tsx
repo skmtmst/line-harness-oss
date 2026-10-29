@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /**
  * V8 自動応答の通し試験（見た目のみ）。
@@ -372,7 +373,7 @@ describe('V8 自動応答の通し：作って有効にする', () => {
   it('別の手順から保存しても入力を残して最初の不足欄へ移る', async () => {
     await goStep('step=basic')
     fireEvent.change(host.querySelector('#wiz-name') as HTMLInputElement, { target: { value: '入力を残すルール' } })
-    fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' }))
+    fireEvent.click(getPageAction({ name: '下書きとして保存' }))
     expect(replaceMock).toHaveBeenLastCalledWith('/auto-replies/edit?step=trigger')
     expect(createDraft).not.toHaveBeenCalled()
     await goStep(navState.replaces[navState.replaces.length - 1])

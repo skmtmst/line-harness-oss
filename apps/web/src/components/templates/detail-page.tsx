@@ -4,11 +4,10 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import type { ReactNode } from 'react'
 import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import PreviewLauncher from './preview-launcher'
 
 export interface DetailPageProps extends PageHeadingProps {
-  readOnly?: boolean
+  readOnly?: boolean | 'hq'
   layout?: 'event-roster' | 'record-detail'
   /** 短い詳細は中身の高さで白い板を止める。長い内容はmain内で送る。 */
   heightMode?: 'content'
@@ -27,8 +26,7 @@ export interface DetailPageProps extends PageHeadingProps {
 export function DetailPage({ readOnly, boardId, layout, heightMode, standalone, tabSpacing, tabs, stats, summary, summaryLabel, summaryPreview, children, contentPadding, loading = false, loadingLabel, ...heading }: DetailPageProps) {
   const summaryColumn = summary ? <aside className={summaryPreview ? styles.preview : styles.detailSummary} data-template-region={summaryPreview ? "preview" : "summary"} data-preview-narrow={summaryPreview ? "hidden" : undefined} data-preview-surface={summaryPreview ? "plain" : undefined} aria-label={summaryLabel}>{summary}</aside> : null
   return <PageFrame kind="detail" boardId={boardId} layout={layout} heightMode={heightMode} standalone={standalone}>
-    <PageHeading {...heading} bottomSpacing={tabSpacing} />
-    {readOnly ? <div className={styles.createNotice} data-template-region="notice"><ReadOnlyNotice /></div> : null}
+    <PageHeading {...heading} readOnlyBand={readOnly || heading.readOnlyBand} bottomSpacing={tabSpacing} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
     {summary && summaryPreview ? <div className={styles.asideToggle}><PreviewLauncher {...summaryPreview}>{summary}</PreviewLauncher></div> : null}

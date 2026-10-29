@@ -1,11 +1,10 @@
 'use client'
 
-import { useBrand } from '@/lib/use-brand'
+import { useTenantName } from '@/lib/use-tenant-name'
 import styles from './sidebar-identity.module.css'
-import { brandInitial } from './brand-initial'
 
 /**
- * 共通メニューのいちばん上。**アイコン ＋ 会社名 ＋ バージョン**だけ。
+ * 共通メニューのいちばん上。統括名と製品名だけを表示する。
  *
  * ここには 2026-08-26 まで「現在のLINEアカウント」の切替カードがあった。
  * 切替は共通トップバーへ移したので、ここは**いまどの会社の管理画面を
@@ -15,19 +14,15 @@ import { brandInitial } from './brand-initial'
  * 押せるものだと読み違える。ここは押せない。
  */
 export default function SidebarIdentity() {
-  const brand = useBrand()
-
-  const name = brand.name || '管理画面'
-  const initial = brandInitial(name)
-
-  return <SidebarBrand name={name} mark={initial} />
+  const name = useTenantName()
+  return <SidebarBrand name={name} />
 }
 
-/** 取得処理を持たない共通の看板。運営も同じ横並びで描く。 */
-export function SidebarBrand({ name, mark }: { name: string; mark: string }) {
+/** 取得処理を持たない共通の看板。運営では必要に応じて印も表示する。 */
+export function SidebarBrand({ name, mark }: { name: string; mark?: string }) {
   return (
-    <div className={styles.root} data-design-node="J33xq/V2WbXF">
-      <span className={styles.mark} aria-hidden="true">{mark}</span>
+    <div className={`${styles.root} ${mark ? '' : styles.textOnly}`} data-design-node="J33xq/V2WbXF">
+      {mark ? <span className={styles.mark} aria-hidden="true">{mark}</span> : null}
       <span className={styles.text}>
         <span className={styles.name} title={name}>{name}</span>
         <span className={styles.version}>musubo</span>

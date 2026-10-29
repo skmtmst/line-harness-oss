@@ -8,6 +8,20 @@ let d:ReturnType<typeof gapFixture>;const filters={from:'2026-10-15',to:'2026-10
 beforeEach(()=>{d=gapFixture();vi.stubGlobal('fetch',vi.fn(()=>{throw new Error('external_forbidden');}));for(let i=0;i<24;i++){const id='store'+i;d.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,tenant_id,channel_access_token,channel_secret) VALUES(?,?,?,'t','token','secret')").run(id,id,i===0?' =FORMULA':'店'+i);d.raw.prepare("INSERT INTO hq_store_daily_metrics(account_id,date,bookings,state,computed_at) VALUES(?,'2026-10-15',?,'partial','2026-10-16T00:00:00Z')").run(id,i);}});
 afterEach(()=>{expect(fetch).not.toHaveBeenCalled();d.raw.close();vi.unstubAllGlobals();});
 async function create(staff=gapOwner,key='export'){const r=await gapCall(gapApp(d,[storeComparison],staff),'/api/hq/store-comparison/export','POST',filters,key);expect(r.status,await r.clone().text()).toBe(202);return (await r.json() as any).data.id;}
+test('アーカイブした店は新しいCSVに入らず、古いCSVからも取得できない',async()=>{
+ const oldId=await create();
+ await processComparisonExports(d.db);
+ d.raw.exec("UPDATE line_accounts SET is_active=0,archived_at='2026-10-16T00:00:00Z' WHERE id='store0'");
+ expect((await gapCall(gapApp(d,[storeComparison]),`/api/hq/store-comparison/exports/${oldId}/download`)).status).toBe(403);
+ const newId=await create({...gapOwner},'after-archive');
+ expect(JSON.parse((d.raw.prepare('SELECT account_ids_json FROM hq_store_comparison_export_jobs WHERE id=?').get(newId) as {account_ids_json:string}).account_ids_json)).not.toContain('store0');
+ await processComparisonExports(d.db);
+ expect(d.raw.prepare('SELECT status,error_code FROM hq_store_comparison_export_jobs WHERE id=?').get(newId)).toEqual({status:'completed',error_code:null});
+ const csv=await gapCall(gapApp(d,[storeComparison]),`/api/hq/store-comparison/exports/${newId}/download`);
+ expect(csv.status).toBe(200);
+ expect(await csv.text()).not.toContain(' =FORMULA');
+ expect(d.raw.prepare('SELECT row_count FROM hq_store_comparison_export_jobs WHERE id=?').get(newId)).toEqual({row_count:24});
+});
 test('CMP-04/05/09/11/14/15: 集計CSVは閲覧のみ可・全行・一覧と同じ順序と欠測、同じキーは同じ仕事',async()=>{
  const id=await create({...gapOwner,readOnly:true});expect(await create()).toBe(id);expect(d.raw.prepare('SELECT count(*) n FROM hq_store_comparison_export_jobs').get()).toEqual({n:1});
  await processComparisonExports(d.db);await processComparisonExports(d.db);

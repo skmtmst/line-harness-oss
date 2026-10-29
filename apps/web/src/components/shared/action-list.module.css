@@ -22,3 +22,5 @@
   .extra { flex-basis: 100%; }
 }
 }
+
+.disabledFields { display: contents; }

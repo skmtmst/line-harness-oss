@@ -146,3 +146,14 @@ describe('テーマ指定がなくても現在の中身', () => {
     expect(document.querySelector('[data-select-menu]')).not.toBeNull()
   })
 })
+
+it('半角コロンの見出しをそろえ、時刻とURLの中身は切らない', () => {
+  const headed = splitOptionHeads([{ value: 'all', label: '予約元: すべて' }, { value: 'web', label: '予約元: Web' }])
+  expect(headed.heading).toBe('予約元')
+  expect(headed.labelOf({ value: 'web', label: '予約元: Web' })).toBe('Web')
+  for (const label of ['10/12（月） 14:00', 'https://example.com']) {
+    const option = { value: 'one', label }
+    const names = splitOptionHeads([option], '開催回')
+    expect(names.labelOf(option)).toBe(label)
+  }
+})

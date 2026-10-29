@@ -22,6 +22,7 @@ import { formatNumber } from '@/lib/format';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import { BLOCK_HELP, type AdvancedSearchResult } from './advanced-search-dialog-gap-parts'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 export type { AdvancedSearchResult } from './advanced-search-dialog-gap-parts'
 /**
  * V4の詳細検索。既存APIが受け取れる条件だけを実行対象にする。
@@ -978,7 +979,7 @@ function OrAxisPicker({
             className="min-w-0 flex-1"
           /></SaveErrorField>
         ) : axis.input === 'text' ? (
-          <SaveErrorField names={["draft"]}><input
+          <SaveErrorField names={["draft"]}><SharedTextField
             type="text"
             value={draft}
             onChange={(event) => setDraft(event.target.value)}

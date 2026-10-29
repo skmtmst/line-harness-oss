@@ -26,6 +26,7 @@ import Card from '@/components/shared/card'
 import SegmentedControl from '@/components/shared/segmented'
 import { INFLOW_TABLE_LAYOUT } from './table-layout'
 import Dialog from '@/components/shared/dialog'
+import Disclosure from '@/components/shared/disclosure'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -47,6 +48,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /*
  * ★V8 流入と計測の詳細（Pencil ）。
@@ -455,7 +457,7 @@ function InflowDetailContent() {
       {copyFailed && url ? (
         <div role="alert" className={styles.copyFallback}>
           <p className={styles.note}>コピーできませんでした。下の欄を選んでコピーしてください。</p>
-          <SaveErrorField names={["url"]}><input
+          <SaveErrorField names={["url"]}><SharedTextField
             readOnly
             autoFocus
             value={url}
@@ -526,8 +528,7 @@ function InflowDetailContent() {
             )}
             {funnel?.monthly && funnel.monthly.length > 0 ? (
               <section aria-label="月別内訳">
-              <details className={styles.monthly}>
-                <summary>月別内訳（友だちになった月）</summary>
+              <Disclosure appearance="inset" size="compact" title="月別内訳（友だちになった月）">
                 <DataTable className={styles.monthlyTable}>
                   <thead><TableHeadRow><Th>月</Th><Th>友だち追加</Th><Th>いま残っている</Th><Th>ブロック</Th><Th>成果</Th><Th>金額</Th></TableHeadRow></thead>
                   <tbody>{funnel.monthly.map((month) => (
@@ -538,7 +539,7 @@ function InflowDetailContent() {
                     </Tr>
                   ))}</tbody>
                 </DataTable>
-              </details>
+              </Disclosure>
               </section>
             ) : null}
             <div className={styles.ordersRow}>

@@ -440,7 +440,7 @@ function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onCl
             {current.status === 'error' || (current.status === 'ready' && attention?.status !== 'ready') ? <p className={styles.mute}>対応が要るものを読み込めませんでした。</p> : null}
             {current.status === 'ready' && attention?.status === 'ready' ? ATTENTION.map(item => <div key={item.key}>
               <p>{item.label} {attention.counts[item.key]}件</p>
-              {(attention.targets?.[item.key] ?? []).map(target => <Button key={target.href} variant="text" onClick={() => { notifyToast(`${row.name} に切り替えました`, { tone: 'info' }); setSelectedAccountId(row.accountId); router.push(target.href) }}>{attentionTargetLabel(target.href)} {formatNumber(target.count)}件</Button>)}
+              {(attention.targets?.[item.key] ?? []).map(target => <Button key={target.href} variant="text" textTone="ink" onClick={() => { notifyToast(`${row.name} に切り替えました`, { tone: 'info' }); setSelectedAccountId(row.accountId); router.push(target.href) }}>{attentionTargetLabel(target.href)} {formatNumber(target.count)}件</Button>)}
             </div>) : null}
           </Card>
         </div>

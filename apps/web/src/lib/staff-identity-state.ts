@@ -16,6 +16,10 @@ export function forgetStaffIdentity(): void {
   for (const listener of listeners) listener()
 }
 export function readStaffIdentity(): StaffMember | null { return identity }
+/** 読み取り専用の束は役割の表示名より優先する。 */
+export function effectiveStaffRole(identity: Pick<StaffMember, 'role' | 'readOnly' | 'roleBundle'> | null): StaffMember['role'] | null {
+  return identity ? identity.readOnly || identity.roleBundle === 'view_only' ? 'viewer' : identity.role : null
+}
 export function staffIdentityGeneration(): number { return generation }
 export function subscribeStaffIdentity(listener: () => void): () => void {
   listeners.add(listener)

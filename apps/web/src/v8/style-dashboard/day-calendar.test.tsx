@@ -5,6 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { IndustryStyle, StyleBooking, StyleSchedule, StyleSnapshot } from '@line-crm/shared'
 import type { eventsApi } from '@/lib/api'
 import { toToday } from './adapter'
+import { WeekCalendar } from './calendar'
+import { StaffBoard } from './staff-board'
 import StyleDashboard from './style-dashboard'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 
@@ -132,4 +134,21 @@ it.each([
   const next = { ...schedule, entries: [{ ...entry, booking: { ...entry.booking!, status, visited, attendance } }] }
   expect(toToday('salon', snapshot, next, '2026-10-21', 'today').week?.entries[0].state).toBe(expected)
   expect(toToday('salon', snapshot, next, '2026-10-21', 'today').board?.entries[0].state).toBe(({ confirmed: 'booked', completed: 'done' } as Record<string, string>)[expected] ?? expected)
+})
+
+it.each(['phone', 'line', 'manual'])('正規APIの%sを日週の盤へ保ち、電話だけ札と読み上げに出す', source => {
+  const { snapshot, schedule } = fixture('salon')
+  const first = schedule.entries[0]
+  const next = { ...schedule, entries: [{ ...first, booking: { ...first.booking!, source } }] }
+  const data = toToday('salon', snapshot, next, '2026-10-21', 'today')
+  expect(data.week!.entries[0].source).toBe(source)
+  expect(data.board!.entries[0].source).toBe(source)
+  render(<><WeekCalendar period="day" week={data.week!} canWrite={false} onMove={() => {}} onSlot={() => {}} onOpen={() => {}} /><StaffBoard board={data.board!} search="" onSearch={() => {}} canWrite={false} entryItems={() => []} onSlot={() => {}} /></>)
+  for (const name of ['1日のカレンダー', '台帳の盤']) {
+    const region = screen.getByRole('region', { name, exact: true })
+    const button = within(region).getByRole('button', { name: /予約者/ })
+    expect(!!within(button).queryByText('電話')).toBe(source === 'phone')
+    expect(button.getAttribute('aria-description')).toBe(source === 'phone' ? '確定・電話' : '確定')
+  }
+  expect(screen.queryByRole('button', { name: /予約を入れる/ })).toBeNull()
 })

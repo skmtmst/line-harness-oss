@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -21,7 +22,7 @@ const metric = (value: number, unit = '件') => ({ value, status: 'available' as
 const snapshot: StyleSnapshot = { style: 'salon', from: '2026-10-20T15:00:00Z', to: '2026-10-21T15:00:00Z', timeZone: 'Asia/Tokyo', asOf: '2026-10-21T05:00:00Z', dateBasis: 'visit', range: 'today', metrics: { bookings: metric(4), attention: metric(2), nextBookingRate: metric(0.2, '%'), recall: metric(9), noShowRate: metric(0.1, '%'), visits: metric(3, '人') }, previous: {}, items: [], newBookings: [], resultId: 'real' }
 const schedule: StyleSchedule = { style: 'salon', from: snapshot.from, to: snapshot.to, timeZone: snapshot.timeZone, asOf: snapshot.asOf, range: 'today', display: 'list', calendarView: 'day', entries: [], columns: [], days: [], closures: [], availability: { status: 'available', reason: null, resources: [], slots: [], closedDates: [] } }
 function labels() { return Array.from(document.querySelectorAll('[data-style-dashboard] [data-kpi-label]')).map(node => node.getAttribute('title')) }
-async function open() { await waitFor(() => expect(state.summary).toHaveBeenCalled()); fireEvent.click(screen.getByRole('button', { name: '表示を変える' })); const drawer = await screen.findByRole('dialog', { name: /表示を変える/ }); await within(drawer).findByRole('switch', { name: '分析', exact: true }); return drawer }
+async function open() { await waitFor(() => expect(state.summary).toHaveBeenCalled()); fireEvent.click(getPageAction({ name: '表示を変える' })); const drawer = await screen.findByRole('dialog', { name: /表示を変える/ }); await within(drawer).findByRole('switch', { name: '分析', exact: true }); return drawer }
 beforeEach(() => {
   vi.clearAllMocks(); state.account = 'a'; state.role = 'admin'; state.version = 2; state.customized = false; state.ids = ['bookings', 'attention', 'nextBookingRate', 'paidAmount', 'newBookings']; state.error = null
   state.get.mockImplementation(async () => profile()); state.summary.mockResolvedValue({ data: snapshot }); vi.mocked(styleApi.schedule).mockResolvedValue({ success: true, data: schedule })

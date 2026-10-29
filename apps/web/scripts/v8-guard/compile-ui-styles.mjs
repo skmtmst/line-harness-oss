@@ -5,7 +5,7 @@ import { compile } from 'tailwindcss'
 
 const require = createRequire(import.meta.url)
 
-export async function compileUiStyles(path) {
+export async function compileUiStyles(path, candidates = []) {
   const compiler = await compile(readFileSync(path, 'utf8').replace('@theme {', '@theme static {'), {
     base: dirname(path),
     loadStylesheet: async (id, base) => {
@@ -13,5 +13,5 @@ export async function compileUiStyles(path) {
       return { path: file, base: dirname(file), content: readFileSync(file, 'utf8') }
     },
   })
-  return compiler.build([])
+  return compiler.build(candidates)
 }

@@ -241,6 +241,19 @@ async function settle(ticks = 6) {
 }
 
 describe('たまる決めごとの公開確認(本物のReact)', () => {
+  it('公開版の中身で現在の版と反映した日を読める', async () => {
+    stubFetch({ publish: () => { throw new Error('この操作では公開しない') } })
+    await renderPage()
+    await act(async () => { (await waitForRowMenuButton()).click() })
+    const item = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      .find(node => node.textContent?.trim() === '公開版の中身を見る')!
+    expect(item).toBeTruthy()
+    await act(async () => { item.click() })
+    const content = document.querySelector('[role="dialog"]')!
+    expect(content.textContent).toContain('公開中の第1版')
+    expect(content.textContent).toContain('に反映')
+  })
+
   it('確定したときだけpublishを1回送り、版と確認ヘッダーを添える', async () => {
     const net = stubFetch({
       publish: () => new Response(JSON.stringify({

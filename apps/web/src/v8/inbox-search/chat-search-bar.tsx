@@ -7,6 +7,7 @@ import styles from './chat-search-bar.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 
 /*
@@ -52,7 +53,7 @@ export default function ChatSearchBar({ search, focusSeq = 0, busy = false }: {
 
   return (
     <div className={styles.band} role="search" aria-label="会話の中を探す" data-design-node="f64Ok">
-      <Field label={<><Search aria-hidden="true" className={styles.fieldIcon} /></>}><SaveErrorField names={["query","search.query"]}><input
+      <Field label={<><Search aria-hidden="true" className={styles.fieldIcon} /></>}><SaveErrorField names={["query","search.query"]}><SharedTextField
           ref={inputRef}
           type="search"
           className={styles.input}

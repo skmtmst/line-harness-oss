@@ -12,9 +12,9 @@ describe('共通辞書を質問と説明の両方に使う', () => {
       expect(approval.description).toContain(styleTerm(style, 'V12').split('（')[0])
     }
   })
-  it('人数・通数・容量だけを目安とし、画像の制限を目安にしない', () => {
-    for (const feature of ['3アカウント', '10人', '権限者 無制限', '月30,000通', '容量10GB']) expect(planFeatureLabel(feature)).toContain('目安')
+  it('プラン各行では目安を繰り返さず、数と画像の制限を保つ', () => {
+    for (const feature of ['3アカウント', '10人', '権限者 無制限', '月30,000通', '容量10GB']) expect(planFeatureLabel(feature)).not.toContain('目安')
     expect(planFeatureLabel('画像 月20枚')).toBe('画像 月20枚')
-    expect(planFeatureLabel('人数10人（目安）')).toBe('人数10人（目安）')
+    expect(planFeatureLabel('人数10人（目安）')).toBe('人数10人')
   })
 })

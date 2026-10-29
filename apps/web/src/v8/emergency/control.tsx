@@ -39,6 +39,7 @@ import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 /* ★V8-B 緊急コントロール（板 ）。停止・復旧・本人確認・冪等キーと
  * 競合後の読み直しは、この現役の部品だけで守る。 */
@@ -155,7 +156,7 @@ const EmergencyControlV8 = (
 
   const [restoreDrift, setRestoreDrift] = useState<OperationRestoreDrift | null>(null)
 
-  /* V-1: 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
+  /* V-1: 二段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
   const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
 
   const previewGeneration = useRef(0)
@@ -810,7 +811,7 @@ const EmergencyControlV8 = (
                 placeholder="例：宛先の絞り込みを間違えた"
               /></SaveErrorField></Field></DialogFormRow>
               <DialogFormRow><Field label="補足" htmlFor="emergency-detail-v8" optional note={`あと${1000 - reasonDetail.length}文字`}>
-                <SaveErrorField names={["reasonDetail","detail","reason_detail"]}><textarea
+                <SaveErrorField names={["reasonDetail","detail","reason_detail"]}><SharedTextArea
                   id="emergency-detail-v8"
                   value={reasonDetail}
                   onChange={(event) => setReasonDetail(event.target.value)}
@@ -850,7 +851,7 @@ const EmergencyControlV8 = (
                 {stepUpMethod === 'password' ? '本人確認（パスワード）' : '本人確認（認証アプリの6桁）'}
               </span>
               {stepUpMethod === 'password' ? (
-                <SaveErrorField names={["stopPassword","stop_password"]}><input
+                <SaveErrorField names={["stopPassword","stop_password"]}><SharedTextField
                   type="password"
                   aria-label="パスワード"
                   value={stopPassword}
@@ -878,7 +879,7 @@ const EmergencyControlV8 = (
         </div>
       </Dialog>
 
-      {/* 本人確認の窓：2段階認証の人は6桁、無い人はパスワード。 */}
+      {/* 本人確認の窓：二段階認証の人は6桁、無い人はパスワード。 */}
       <StepUpDialog
         open={stepUpMode !== null}
         action={stepUpMode === 'stop' ? '緊急停止する' : '復旧する'}

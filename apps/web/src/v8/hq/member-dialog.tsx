@@ -8,7 +8,7 @@ import { MessageCircle, Send, ShieldCheck } from 'lucide-react'
 import type { LineAccount, StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import { EntityPickerField } from '@/components/shared/entity-picker'
-import { HqAccountPickerField, toHqAccountItems, toPickerFolders, useHqAccountFolders } from '@/components/shared/hq-account-picker'
+import { toHqAccountItems, toPickerFolders, useHqAccountFolders } from '@/components/shared/hq-account-picker'
 import Dialog from '@/components/shared/dialog'
 import { Field as FormField, FieldError } from '@/components/shared/form-controls'
 import { focusFieldById } from '@/lib/use-form-errors'
@@ -61,14 +61,6 @@ export function inviteExpiryLabel(now: Date = new Date()): string {
   return polishFormatDate(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), { style: 'detail', now })
 }
 
-/** 担当範囲で選べるアカウント。アーカイブしたものは選ばせない（今の担当範囲に入っているものは残す）。 */
-function choosableAccounts(accounts: LineAccount[], keep: string[]): LineAccount[] {
-  return accounts.filter((account) => {
-    const archived = Boolean((account as { archivedAt?: string | null }).archivedAt)
-    return !archived || keep.includes(account.id)
-  })
-}
-
 function initial(member: StaffMember | null, accounts: LineAccount[]): MemberDialogValue {
   return {
     name: member?.name ?? '',
@@ -80,8 +72,8 @@ function initial(member: StaffMember | null, accounts: LineAccount[]): MemberDia
     role: member ? (member.role === 'viewer' ? 'viewer' : member.role === 'staff' ? 'staff' : 'admin') : 'viewer',
     assignedLineAccountId: member?.assignedLineAccountId ?? accounts[0]?.id ?? '',
     /* 招待は「指定したアカウントだけ」＋最初に表示するアカウントから始める。 */
-    accountScope: member ? member.accountScope ?? 'all' : accounts[0] ? 'accounts' : 'all',
-    scopedLineAccountIds: member ? member.scopedLineAccountIds ?? [] : accounts[0] ? [accounts[0].id] : [],
+    accountScope: 'all',
+    scopedLineAccountIds: [],
     isActive: member?.isActive ?? true,
   }
 }
@@ -164,7 +156,6 @@ export default function MemberDialogV8({
     ...(member?.role === 'staff' ? [{ value: 'staff', label: '担当者（担当範囲のアカウントだけ）' }] : []),
     { value: 'viewer', label: '閲覧のみ（見るだけ）' },
   ]
-  const scopeAccounts = choosableAccounts(accounts, value.scopedLineAccountIds)
   const accountItems = toHqAccountItems(accounts, accountFolders).map((item) => {
     const folder = accountFolders.membership?.get(item.id)?.folder
     return { ...item, color: folder ? folderDisplayColor(folder) : undefined }
@@ -234,21 +225,7 @@ export default function MemberDialogV8({
 
         <div className={styles.group} role="group" aria-labelledby={`${uid}-scope-label`}>
           <span id={`${uid}-scope-label`} className={styles.label}>担当範囲</span>
-          <div className={styles.radios}>
-
-            <SaveErrorField names={["accountScope","value.accountScope"]}><Radio name={`${uid}-scope`} value="all" checked={value.accountScope === 'all'} disabled={busy} onChange={() => { set('accountScope', 'all'); set('scopedLineAccountIds', []) }}>全アカウント</Radio></SaveErrorField>
-
-            <SaveErrorField names={["accountScope","value.accountScope"]}><Radio name={`${uid}-scope`} value="accounts" checked={value.accountScope === 'accounts'} disabled={busy} onChange={() => set('accountScope', 'accounts')}>指定したアカウントだけ</Radio></SaveErrorField>
-          </div>
-          {value.accountScope === 'accounts' ? (
-            <SaveErrorField names={["scopedLineAccountIds", "value.scopedLineAccountIds"]}>
-              <HqAccountPickerField label="担当アカウント" accounts={scopeAccounts} value={value.scopedLineAccountIds}
-                id={`${uid}-scope`} onChange={(ids) => set('scopedLineAccountIds', ids)} disabled={busy}
-                invalid={Boolean(fieldErrors.scope)} describedBy={fieldErrors.scope ? `${uid}-scope-error` : undefined} />
-            </SaveErrorField>
-          ) : (
-            <p className={styles.note}>統括のすべてのアカウントを見て操作できます。</p>
-          )}
+          <p className={styles.note}>統括のすべてのアカウントを見て操作できます。</p>
           <FieldError id={`${uid}-scope-error`}>{fieldErrors.scope}</FieldError>
         </div>
 

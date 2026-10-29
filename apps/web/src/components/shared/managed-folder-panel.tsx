@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react'
 import type { Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { lockReason } from './permission-lock'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
 import FolderAddDialog from './folder-add-dialog'
 import Dialog from './dialog'
@@ -125,9 +126,11 @@ export interface ManagedFolderPanelProps {
   unfiledCount?: number | null
   /** フォルダの件数。既定はサーバーの itemCount。 */
   countOf?: (folder: Folder) => number | null
-  /** 列の上の［作る］ボタン。閲覧のみは渡さない。 */
+  /** 列の上の［作る］ボタン。権限が無い時は理由付きで渡す。 */
   createAction?: ReactNode
-  /** 閲覧のみで［作る］を隠すときも、フォルダの位置を変えない。 */
+  /** nullは本人未確定などで理由をまだ表示しない。拒否は維持する。 */
+  lockedReason?: string | null
+  /** ［作る］を使わない画面でも、フォルダの位置を変えない。 */
   reserveCreateSpace?: boolean
   /** 消したフォルダを選んでいたときに「すべて」へ戻す。既定は onSelect(allId)。 */
   onDeleted?: (folderId: string) => void
@@ -193,6 +196,7 @@ export default function ManagedFolderPanel({
   unfiledCount = null,
   countOf,
   createAction,
+  lockedReason,
   reserveCreateSpace = canManage && Boolean(createAction),
   onDeleted,
   error,
@@ -205,12 +209,14 @@ export default function ManagedFolderPanel({
 }: ManagedFolderPanelProps) {
   const [adding, setAdding] = useState(false)
   const managed = kind !== null
-  const editable = managed && canManage
+  const editable = managed && canManage && !lockReason(canManage)
+  const permissionReason = lockedReason === undefined ? lockReason(canManage) : lockedReason ?? undefined
   const actions = useFolderRowActions({
     kind: kind ?? '',
     folders,
     accountId,
     enabled: editable,
+    lockedReason: permissionReason ?? null,
     itemLabel,
     countOf: (id) => {
       const folder = folders.find((f) => f.id === id)
@@ -253,12 +259,14 @@ export default function ManagedFolderPanel({
         reserveCreateSpace={reserveCreateSpace}
         onAddFolder={editable ? () => { onAddStart?.(); setAdding(true) } : undefined}
         addFolderLabel="フォルダを追加"
+        addFolderLockedReason={managed ? permissionReason : undefined}
+        addFolderDisabled={managed && !editable && !permissionReason}
         disabled={disabled}
       >
         {error ? <p role="alert" className={styles.note}>{error}</p> : null}
         {children}
       </FolderPanel>
-      {adding && kind ? (
+      {adding && kind && editable ? (
         <FolderAddDialog
           kind={kind}
           accountId={accountId}

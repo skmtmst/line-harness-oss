@@ -8,7 +8,6 @@ import { api, type AffiliateOffer } from '@/lib/api'
 import Dialog from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
-import { SettingCheckbox } from '@/components/shared/checkbox'
 import { Field } from '@/components/shared/form-controls'
 import { TextField, TextArea } from '@/components/shared/text-field'
 import {
@@ -321,7 +320,7 @@ export default function OfferFormModal({ initial, accounts, tags, scenarios, onC
         </div>
 
         {isEdit && (
-          <SaveErrorField names={["isActive","is_active"]}><SettingCheckbox
+          <SaveErrorField names={["isActive","is_active"]}><Toggle
             checked={isActive}
             onChange={setIsActive}
             label={isActive ? '有効' : '無効'}

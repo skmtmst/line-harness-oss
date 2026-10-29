@@ -15,7 +15,7 @@ type MenuPageProps = Pick<ReturnType<typeof useBookingSettings>,
   'settings' | 'reloadCore' | 'previewUrl' | 'setPhoneOpen' | 'requestTab' | 'menuFormState'> & { phone: ReactNode }
 
 export default function MenuSettingsPage({ accountId, tabNode, canEditMenus, menus, menusStatus, menusError, settings, reloadCore, previewUrl, phone, setPhoneOpen, requestTab, menuFormState }: MenuPageProps) {
-  const customerLink = previewUrl ? <Button href={previewUrl}>
+  const customerLink = previewUrl ? <Button href={previewUrl} external>
     <Smartphone aria-hidden="true" />お客さまに見える画面を確かめる
   </Button> : null
 

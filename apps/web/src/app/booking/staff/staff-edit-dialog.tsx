@@ -16,6 +16,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { api, type BookingStaff } from '@/lib/api'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
   return (
@@ -90,7 +91,7 @@ export function StaffEditModal({
         </div>
         <div className="px-6 py-4 space-y-4">
           <Field label="内部名（管理用）" required>
-            <input
+            <SharedTextField
               type="text"
               value={form.name ?? ''}
               onChange={(e) => set('name', e.target.value)}
@@ -100,7 +101,7 @@ export function StaffEditModal({
             />
           </Field>
           <Field label="表示名" required>
-            <input
+            <SharedTextField
               type="text"
               value={form.display_name ?? ''}
               onChange={(e) => set('display_name', e.target.value)}
@@ -110,7 +111,7 @@ export function StaffEditModal({
             />
           </Field>
           <Field label="役職">
-            <input
+            <SharedTextField
               type="text"
               value={form.role ?? ''}
               onChange={(e) => set('role', e.target.value)}
@@ -129,7 +130,7 @@ export function StaffEditModal({
             http:// または https:// で始まるURLを入力してください。
           </p>
           <Field label="紹介文">
-            <textarea
+            <SharedTextArea
               value={form.bio ?? ''}
               onChange={(e) => set('bio', e.target.value)}
               maxLength={BOOKING_STAFF_LIMITS.bio}
@@ -138,7 +139,7 @@ export function StaffEditModal({
             />
           </Field>
           <Field label="並び順">
-            <input
+            <SharedTextField
               type="number"
               value={form.sort_order ?? 0}
               onChange={(e) => set('sort_order', Number(e.target.value))}

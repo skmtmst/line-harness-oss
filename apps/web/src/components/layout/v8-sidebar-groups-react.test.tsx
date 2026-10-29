@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MENU_SECTIONS } from '@/lib/menu'
+import { MENU_SECTIONS, SCREEN_MENU_OWNER } from '@/lib/menu'
 
 const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
@@ -64,12 +64,13 @@ import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 /** 全部の任意機能を on にした応答（組の出方だけを見るため）。 */
-const ALL_FEATURES_ON = Object.fromEntries(
+const ALL_FEATURES_ON: Record<string, boolean> = Object.fromEntries(
   MENU_SECTIONS.flatMap((section) => section.items)
     .map((item) => item.featureKey)
     .filter((key): key is string => Boolean(key))
     .map((key) => [key, true]),
 )
+ALL_FEATURES_ON.specialized_ec_commerce = true
 
 /** : 設定は下の歯車から開く。定義は設定内のナビゲーションに残す。 */
 const VISIBLE_GROUP_LABELS = ['メイン', '配信', 'コンテンツ', '成果と分析', '自動化', '予約', '専用機能']
@@ -107,6 +108,8 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
 
   afterEach(() => {
     cleanup()
+    window.history.replaceState({}, '', '/')
+    vi.unstubAllEnvs()
     delete document.documentElement.dataset.theme
   })
 
@@ -116,6 +119,21 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
       expect(view.getAllByRole('button', { name: label }).length, `組「${label}」の見出しが無い`).toBeGreaterThan(0)
     }
     expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
+  })
+
+  it('新規店舗の空の専用目録では「専用機能」の組を出さない', async () => {
+    fixture.visibility.mockResolvedValue({
+      success: true,
+      data: { features: {
+        ...ALL_FEATURES_ON,
+        nen_campaigns: false,
+        photo_review: false,
+        specialized_ec_commerce: false,
+      } },
+    })
+    const view = await renderSidebar()
+    await waitFor(() => expect(view.queryAllByRole('button', { name: '専用機能' })).toHaveLength(0))
+    expect(view.getAllByRole('button', { name: '配信' }).length).toBeGreaterThan(0)
   })
 
   it('主要4組ははじめから開き、ほかの組は見出しだけ', async () => {
@@ -165,6 +183,21 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     const view = await renderSidebar()
     // 成果と分析は既定で畳むが、/analytics が中にあるので開く
     expect(view.getAllByRole('link', { name: '分析' }).length).toBeGreaterThan(0)
+  })
+
+  it.each([...new Set([...MENU_SECTIONS.flatMap(section => section.items).filter(item => !item.staffOnly).map(item => item.href), ...Object.keys(SCREEN_MENU_OWNER), '/nen-members/detail'])])('%s を開くと選択が1つで、その組が開く', async (href) => {
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'true')
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')
+    fixture.get.mockResolvedValue({ success: true, data: { features: ALL_FEATURES_ON, sidebarOrder: null, sidebarItemOrder: null, specializedFeatureKeys: Object.keys(ALL_FEATURES_ON) } })
+    fixture.pathname = href.split('?')[0]
+    window.history.replaceState({}, '', href)
+    window.localStorage.setItem('lh-sidebar-groups', JSON.stringify(Object.fromEntries(MENU_SECTIONS.map(section => [section.id, false]))))
+    const view = await renderSidebar()
+    const desktop = view.container.querySelector('aside[data-design-node="J33xq"]')!
+    const selected = desktop.querySelectorAll('a[aria-current="page"]')
+    expect(selected.length, href).toBe(1)
+    expect(selected[0].closest('[aria-hidden="true"], [inert]')).toBeNull()
+    window.history.replaceState({}, '', '/')
   })
 
   it('いちばん下に「設定」が出るのはオーナー・管理者だけ', async () => {
@@ -249,6 +282,8 @@ describe('★V8 統括の左メニュー（絵 V8-B/JKjsE・オーナー 2026-10
 
   afterEach(() => {
     cleanup()
+    window.history.replaceState({}, '', '/')
+    vi.unstubAllEnvs()
     delete document.documentElement.dataset.theme
   })
 

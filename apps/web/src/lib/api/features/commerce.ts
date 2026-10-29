@@ -36,10 +36,12 @@ export const commerceMethods = {
         `/api/ec-commerce/events${suffix}`,
       )
     },
-    orders: (params: { lineAccountId: string; status?: EcOrder['status']; query?: string; limit?: number; offset?: number }) => {
+    orders: (params: { lineAccountId: string; status?: EcOrder['status']; query?: string; from?: string; to?: string; limit?: number; offset?: number }) => {
       const query = new URLSearchParams({ lineAccountId: params.lineAccountId })
       if (params.status) query.set('status', params.status)
       if (params.query) query.set('query', params.query)
+      if (params.from) query.set('from', params.from)
+      if (params.to) query.set('to', params.to)
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.offset !== undefined) query.set('offset', String(params.offset))
       return fetchApi<ApiResponse<EcOrderList> & { pagination: { total: number; limit: number; offset: number } }>(

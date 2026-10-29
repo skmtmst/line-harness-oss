@@ -53,6 +53,19 @@ export interface FollowerImportStepOptions {
   maxProfiles?: number;
 }
 
+/** 登録画面を閉じても最初の取り込みを失わない。以後はcron・再訪画面が続ける。 */
+export function scheduleInitialFollowerImport(
+  execution: Pick<ExecutionContext, 'waitUntil'> | undefined,
+  db: D1Database,
+  client: FollowerImportClient,
+  lineAccountId: string,
+  state: Pick<FollowerImportState, 'phase'>,
+  reportError: () => void,
+): void {
+  if (state.phase !== 'importing_ids' || typeof execution?.waitUntil !== 'function') return;
+  execution.waitUntil(processFollowerImportStep(db, client, lineAccountId).catch(reportError));
+}
+
 /** 時間・問い合わせ予算の範囲で進め、状態とカーソルを D1 に残す。ブラウザを閉じても定期処理が継続し、要求も同じロックで再開する。 */
 export async function processFollowerImportStep(
   db: D1Database,

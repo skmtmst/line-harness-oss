@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
+import { getPageAction, queryPageAction } from '@/test-utils/page-action'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { PageExplanationProvider } from '@/components/shared/page-explanation'
@@ -61,15 +63,15 @@ const entries = [
 
 for (const [title, Component, query, actions] of entries) {
   it.each(['staff', 'owner', 'admin'])(`${title}の変更口は閲覧のみで隠す（%s）`, async role => {
-    state.role = role
+    state.role = verifiedStaffRole(role)
     state.query = query
     render(<Component />)
     if (role === 'staff') {
-      await screen.findByText(/^閲覧のみで見ています。変える操作は(?:オーナーか)?管理者に頼んでください。$/)
-      for (const name of actions) expect(screen.queryByRole('button', { name, exact: true })).toBeNull()
+      await screen.findByText(/^(閲覧のみで見ています。(変える操作は|変えたい時は)(オーナーか)?管理者に頼んでください。|この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。)$/)
+      for (const name of actions) expect(queryPageAction({ name, exact: true })).toBeNull()
     } else {
       await waitFor(() => {
-        for (const name of actions) expect(screen.getByRole('button', { name, exact: true })).toBeTruthy()
+        for (const name of actions) expect(getPageAction({ name, exact: true })).toBeTruthy()
       })
     }
   })
@@ -81,7 +83,7 @@ for (const [title, Component, name, menuTitle] of [
   ['保存した検索', SearchesTab, '来店した人', '保存した検索'],
 ] as const) {
   it.each(['staff', 'owner', 'admin'])(`${title}の詳細と行の編集リンクは閲覧のみで隠す（%s）`, async role => {
-    state.role = role
+    state.role = verifiedStaffRole(role)
     state.searchEmpty = false
     const view = <Component accountId="acc-1" canEdit={role !== 'staff'} />
     const { container } = render(title === '友だち情報欄' ? <PageExplanationProvider pageKey="tags:fields">{view}</PageExplanationProvider> : view)
@@ -107,8 +109,10 @@ for (const [title, Component, name, menuTitle] of [
 }
 
 it.each(['staff', 'owner', 'admin'])('保存した検索が0件でも作成リンクは権限で隠す（%s）', async role => {
-  state.role = role
+  state.role = verifiedStaffRole(role)
   render(<SearchesTab accountId="acc-1" canEdit={role !== 'staff'} />)
   await screen.findByText('まだ保存した検索はありません')
   expect(screen.queryByRole('link', { name: '友だち一覧で条件を作る' }) !== null).toBe(role !== 'staff')
 })
+
+afterEach(() => { verifiedStaffRole(null) })

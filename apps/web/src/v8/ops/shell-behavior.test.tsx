@@ -36,11 +36,13 @@ describe('運営の自分の操作とメニューを閉じる動き', () => {
     expect(screen.getByRole('note').textContent).toContain('操作はすべて記録されます')
     expect(screen.getByRole('note').textContent).not.toContain('検証環境')
   })
-  it('プロフィール・メンバー・認証の行き先とログアウトを自分のメニューから使える', async () => {
+  it('メンバー管理は左下のメニューだけに置き、認証とログアウトも使える', async () => {
     render(<OpsShellV8 {...props} />)
+    expect(screen.queryByRole('link', { name: 'メンバー管理', exact: true })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '自分のメニュー', exact: true }))
     const menu = await screen.findByRole('menu', { name: '自分の操作', exact: true })
-    for (const [name, href] of [['プロフィールを編集', '/staff'], ['メンバー管理', '/ops/members'], ['二段階認証（設定済み）', '/ops/two-factor']]) {
+    expect(within(menu).queryByRole('menuitem', { name: 'プロフィールを編集', exact: true })).toBeNull()
+    for (const [name, href] of [['メンバー管理', '/ops/members'], ['二段階認証（設定済み）', '/ops/two-factor']]) {
       expect(within(menu).getByRole('menuitem', { name, exact: true }).getAttribute('href')).toBe(href)
     }
     fireEvent.click(within(menu).getByRole('menuitem', { name: 'ログアウト', exact: true }))

@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /**
  * V8 リッチメニューの通し試験（見た目のみ）。
@@ -284,13 +285,13 @@ describe('V8 リッチメニューの通し：作る→押す所→保存→既�
     const areaRow = await screen.findByRole('button', { name: /未設定/ })
     fireEvent.click(areaRow)
     fireEvent.click(await screen.findByRole('radio', { name: 'URLを開く', exact: true }))
-    const urlInput = await screen.findByPlaceholderText('https://...')
+    const urlInput = await screen.findByPlaceholderText('例：https://...')
     fireEvent.change(urlInput, { target: { value: 'https://example.com/menu' } })
     // 動きが付いた印に変わる。
     await waitFor(() => expect(screen.queryByText('未設定')).toBeNull())
 
     // 保存する（知らせがもう1件積まれる）。
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(updateGroup).toHaveBeenCalled())
     await waitFor(() => expect(screen.getAllByText('下書きを保存しました')).toHaveLength(2))
 

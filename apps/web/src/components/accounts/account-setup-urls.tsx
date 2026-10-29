@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Button from '@/components/shared/button'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 interface Props {
   liffId: string | null
@@ -78,7 +79,7 @@ function UrlRow({ label, hint, url }: { label: string; hint: string; url: string
         <span className="text-nano text-ink-faint">{hint}</span>
       </div>
       <div className="flex min-w-0 items-stretch gap-1">
-        <input
+        <SharedTextField
           readOnly
           value={url}
           placeholder="—"

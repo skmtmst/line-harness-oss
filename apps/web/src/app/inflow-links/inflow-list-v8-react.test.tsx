@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -109,7 +110,7 @@ async function eventually(check: () => void, timeout = 5000) {
 }
 
 beforeEach(() => {
-  staffRole = 'admin'
+  staffRole = verifiedStaffRole('admin')
   clearFeatureVisibilityCache()
   handler = base
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -152,7 +153,7 @@ test('v8 の下では Pencil xbHxg の新しい一覧に切り替わる', async 
 })
 
 test('v8 の閲覧のみでは帯が出て作る操作が押せない形になる', async () => {
-  staffRole = 'viewer'
+  staffRole = verifiedStaffRole('viewer')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<InflowLinksPage />))
   await settle()
@@ -162,3 +163,5 @@ test('v8 の閲覧のみでは帯が出て作る操作が押せない形にな�
   expect(host.textContent).toContain('閲覧のみで見ています')
   expect(host.querySelector('a[href="/inflow-links/new"]')).toBeNull()
 })
+
+afterEach(() => { verifiedStaffRole(null) })

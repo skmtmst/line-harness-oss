@@ -46,7 +46,7 @@
 
 .colSelect { width: var(--tpl-scn-col-select); }
 .colGrip { width: var(--tpl-scn-col-grip); }
-.colName { width: var(--tpl-scn-col-name); }
+.colName { width: auto; }
 .colCount { width: calc(var(--tpl-scn-col-count) + var(--space-32) * 2 + var(--space-20)); }
 .colState { width: var(--tpl-scn-col-state); }
 .colMenu { width: var(--tpl-scn-col-menu); }

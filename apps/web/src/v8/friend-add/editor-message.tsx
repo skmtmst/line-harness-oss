@@ -2,7 +2,7 @@
 
 import Button from '@/components/shared/button';
 import Card,{ CardHeader } from '@/components/shared/card';
-import { SettingCheckbox } from '@/components/shared/checkbox';
+import Toggle from '@/components/shared/toggle';
 import { TimeField } from '@/components/shared/date-time-field';
 import Dialog from '@/components/shared/dialog';
 import { emptyValue } from '@/components/shared/empty-value';
@@ -198,7 +198,7 @@ export function MessageStep({ definition, setDefinition, friendKind, scenarios, 
           <span className={styles.spacer} aria-hidden="true" />
           {/* 閲覧のみ：つまみは置かない（左の文で今の設定が読める）。 */}
           {canEdit ? (
-            <SaveErrorField names={["suppressOn","definition","suppress_on"]}><SettingCheckbox
+            <SaveErrorField names={["suppressOn","definition","suppress_on"]}><Toggle
               checked={suppressOn}
               label="同じ人に何度も送らない"
               onChange={(next) => setDefinition((current) => ({ ...current, resendSuppressionHours: next ? 24 : 0 }))}

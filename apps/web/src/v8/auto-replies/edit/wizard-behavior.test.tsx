@@ -1,3 +1,6 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * 自動応答を作る（V8）の、押して確かめる動き。
@@ -17,7 +20,6 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: (url: string) =
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'synthetic-account', accounts: [{ id: 'synthetic-account' }] }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => false, status: 'ready' }) }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => !net.wide }))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({ default: () => null, useActionOptions: () => ({ tags: [], fields: [], marks: [], scenarios: [], vars: [] }) }))
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -61,6 +63,7 @@ const otherRule = {
 }
 
 beforeEach(() => {
+ verifiedStaffRole('owner')
   net.query = 'id=synthetic-rule&step=priority'; net.liveStatus = 'draft'; net.wide = false
   vi.clearAllMocks()
   net.getDraft.mockResolvedValue(draft())
@@ -70,7 +73,7 @@ beforeEach(() => {
   net.saveDraft.mockResolvedValue({ ...draft(), data: { ...draft().data, versionNumber: 2 } })
   net.friends.mockResolvedValue({ success: true, data: { items: [{ id: 'friend-1', displayName: '試す友だち' }], total: 3 } })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); forgetStaffIdentity() })
 
 const orderNames = () => [...document.querySelectorAll('ol li p:first-child')].map((node) => node.textContent)
 
@@ -113,7 +116,7 @@ it('見送りになったら、先に動くルールと見送った理由を運�
 it('保存できたときだけ「下書きを保存しました」を出す', async () => {
   net.query = 'id=synthetic-rule&step=basic'
   render(<Page />); await act(async () => {})
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' })))
+  await act(async () => fireEvent.click(getPageAction({ name: '下書きとして保存' })))
   expect(net.saveDraft).toHaveBeenCalledTimes(1)
   expect(screen.getByText('下書きを保存しました')).toBeTruthy()
 })
@@ -123,7 +126,7 @@ it('ほかの人が先に保存していたら頭の下に帯を出し、最新�
   net.saveDraft.mockRejectedValueOnce(new ApiError(409, 'conflict'))
   render(<Page />); await act(async () => {})
   net.getDraft.mockResolvedValue(draft({ name: 'ほかの人の名前' }))
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' })))
+  await act(async () => fireEvent.click(getPageAction({ name: '下書きとして保存' })))
   expect(screen.queryByText('下書きを保存しました')).toBeNull()
   const band = screen.getByRole('alert')
   expect(band.closest('[data-design-node="UGrd2"]')).not.toBeNull()
