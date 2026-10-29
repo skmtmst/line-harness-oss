@@ -1,5 +1,11 @@
 import type { TagCsvImportInputRow, TagCsvImportRowResult } from '@line-crm/shared'
 
+export const TAG_IMPORT_COLUMNS = [
+  { header: 'タグ名', aliases: ['タグ名', 'tag', 'name'] },
+  { header: 'フォルダ', aliases: [] },
+] as const
+export const TAG_IMPORT_HEADERS = TAG_IMPORT_COLUMNS.map((column) => column.header)
+
 export const TAG_CSV_MAX_ROWS = 500
 export const TAG_CSV_MAX_BYTES = 1024 * 1024
 
@@ -63,7 +69,7 @@ function readCsvRecords(source: string): CsvRecord[] {
 export function parseTagCsv(source: string): TagCsvImportInputRow[] {
   const records = readCsvRecords(source)
   const first = records[0]?.cells[0]?.trim().normalize('NFKC').toLocaleLowerCase('ja-JP')
-  const body = first === 'タグ名' || first === 'tag' || first === 'name'
+  const body = TAG_IMPORT_COLUMNS[0].aliases.some((name) => name === first)
     ? records.slice(1)
     : records
   if (body.length === 0) throw new TagCsvParseError('登録するタグがありません')

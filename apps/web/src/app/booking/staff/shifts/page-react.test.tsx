@@ -305,7 +305,7 @@ describe('店舗営業時間の編集', () => {
 
   test('7曜日をexpectedVersion付きで1回だけ保存し、設定と空き枠を読み直す', async () => {
     await renderEditor()
-    fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を開ける' }))
+    fireEvent.click(screen.getByRole('switch', { name: '月曜日を開ける' }))
     await screen.findByLabelText('月曜日の開始時刻（1区間目）')
     await pickTimeByLabel('月曜日の開始時刻（1区間目）', '10:00')
     await pickTimeByLabel('月曜日の終了時刻（1区間目）', '18:00')
@@ -329,7 +329,7 @@ describe('店舗営業時間の編集', () => {
 
   test('同じ曜日の重複区間はAPIへ送らず画面内で止める', async () => {
     await renderEditor()
-    fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を開ける' }))
+    fireEvent.click(screen.getByRole('switch', { name: '月曜日を開ける' }))
     fireEvent.click(screen.getByRole('button', { name: '時間帯を足す' }))
     fireEvent.click(screen.getByRole('button', { name: '受付枠を作る' }))
     expect((await screen.findByRole('alert')).textContent).toContain('重ならないように入力してください')
@@ -338,7 +338,7 @@ describe('店舗営業時間の編集', () => {
 
   test('24:00・日またぎを黙って丸めず画面内で案内する', async () => {
     await renderEditor()
-    fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を開ける' }))
+    fireEvent.click(screen.getByRole('switch', { name: '月曜日を開ける' }))
     await screen.findByLabelText('月曜日の開始時刻（1区間目）')
     await pickTimeByLabel('月曜日の開始時刻（1区間目）', '22:00')
     await pickTimeByLabel('月曜日の終了時刻（1区間目）', '02:00')
@@ -350,7 +350,7 @@ describe('店舗営業時間の編集', () => {
   test('409は上書きせず最新内容の再読込を案内する', async () => {
     fixture.saveSettings.mockRejectedValueOnce(new ApiError(409, 'version_conflict', 'version_conflict'))
     await renderEditor()
-    fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を開ける' }))
+    fireEvent.click(screen.getByRole('switch', { name: '月曜日を開ける' }))
     fireEvent.click(screen.getByRole('button', { name: '受付枠を作る' }))
     expect((await screen.findByRole('alert')).textContent).toContain('ほかの担当者が先に保存しました')
     fireEvent.click(screen.getByRole('button', { name: '最新の内容を読み直す' }))
@@ -359,13 +359,13 @@ describe('店舗営業時間の編集', () => {
 
   test('R161: 曜日を変えたまま別画面へ移ると確認を出し、編集継続で入力が残る', async () => {
     await renderEditor()
-    fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を開ける' }))
+    fireEvent.click(screen.getByRole('switch', { name: '月曜日を開ける' }))
     await screen.findByLabelText('月曜日の開始時刻（1区間目）')
     fireEvent.click(screen.getByRole('tab', { name: '予約のルール' }))
     await screen.findByText('受付時間への変更を捨てて移りますか？')
     fireEvent.click(screen.getByRole('button', { name: '編集に戻る' }))
     await waitFor(() => expect(screen.queryByText('受付時間への変更を捨てて移りますか？')).toBeNull())
-    expect((screen.getByRole('checkbox', { name: '月曜日を開ける' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByRole('switch', { name: '月曜日を開ける' }).getAttribute('aria-checked')).toBe('true')
   })
 
   test('R161: 変えていなければ離脱確認を出さない', async () => {
@@ -379,7 +379,7 @@ describe('店舗営業時間の編集', () => {
     let resolveSave!: (value: unknown) => void
     fixture.saveSettings.mockImplementationOnce(() => new Promise((resolve) => { resolveSave = resolve }))
     await renderEditor()
-    fireEvent.click(screen.getByRole('checkbox', { name: '月曜日を開ける' }))
+    fireEvent.click(screen.getByRole('switch', { name: '月曜日を開ける' }))
     fireEvent.click(screen.getByRole('button', { name: '受付枠を作る' }))
     await waitFor(() => expect(fixture.saveSettings).toHaveBeenCalledTimes(1))
 

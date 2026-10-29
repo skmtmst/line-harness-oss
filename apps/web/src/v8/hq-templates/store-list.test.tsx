@@ -48,6 +48,7 @@ async function render(extra: Partial<HqStoreListProps> = {}) {
 }
 
 beforeEach(() => {
+  window.history.replaceState({}, '', '/hq/templates')
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -374,4 +375,13 @@ it('同じ名前（409 FOLDER_NAME_CONFLICT）は名前の欄に、読めない�
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('同じ名前のフォルダがあります。')
   await act(async () => (buttons().find((el) => el.textContent === '追加する') as HTMLButtonElement).click())
   expect(document.querySelector('[data-folder-dialog-error]')?.textContent).toBe('失敗：フォルダを保存できませんでした。（状態 500・UNAVAILABLE）')
+})
+
+it('空の種類タブに、ほかの種類の未配布数や通数を混ぜない', async () => {
+  await render({ rows: [], kind: 'rich_video', stats: { outdatedTemplateCount: 1, thisMonthSentCount: 20 } })
+  const title = [...host.querySelectorAll('[data-kpi-label]')].find(el => el.textContent?.includes('新しい版を未配布'))
+  const card = title?.closest('[data-kpi-presentation]')
+  expect(card).toBeTruthy()
+  expect(card?.querySelector('[data-kpi-value]')?.textContent).toContain('0')
+  expect(host.textContent).toContain('まだテンプレート')
 })

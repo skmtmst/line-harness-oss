@@ -339,3 +339,17 @@
 :root .link:hover, :root .valueAction:hover { text-decoration: underline; }
 
 :root .card[data-kpi-presentation='inline'] .unit { font-weight: var(--polish-control-weight); }
+
+/* 明示された名前だけを主の値にする。数値の既存の幅・書体には触れない。 */
+:root .value.textValueContainer { min-width: 0; }
+:root .textValueContainer .valueAction { min-width: 0; max-width: 100%; }
+:root .textValue {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--tpl-band-number-size);
+  line-height: var(--tpl-band-number-lh);
+  font-weight: var(--tpl-band-number-weight);
+}

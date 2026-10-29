@@ -15,6 +15,8 @@ describe('LIFF の見つからない画面', () => {
     const html = renderToStaticMarkup(<NotFound />);
     expect(html).toContain('data-design-node="aLU3r"');
     expect(html).toContain('ページが見つかりません');
+    expect(html).toContain('ご案内');
+    expect(html).not.toContain('ご予約');
     expect(html).toContain('お店からのメッセージのリンクを、もう一度開いてください。');
     expect(html).toContain('LINE に戻る');
     expect(html).toContain('閉じる');

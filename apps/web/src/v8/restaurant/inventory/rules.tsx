@@ -12,6 +12,8 @@ import { ListToolbarOptional } from '@/components/shared/list-toolbar'
 import Notice from '@/components/shared/notice'
 import NumberField from '@/components/shared/number-field'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { useStaffRole } from '@/lib/staff-role'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import SectionHeader from '@/components/shared/section-header'
 import { SettingsFormCard, SettingsFormRow } from '@/components/shared/settings-form-card'
 import Toggle from '@/components/shared/toggle'
@@ -34,9 +36,12 @@ type Draft = Pick<RestaurantInventoryRules, 'stopLine' | 'stopSameDay' | 'notify
 const toDraft = (rule: RestaurantInventoryRules): Draft => ({ threshold: String(rule.threshold), stopLine: rule.stopLine, stopSameDay: rule.stopSameDay, notify: rule.notify })
 const thresholdError = (value: string) => value.trim() === '' || !Number.isSafeInteger(Number(value)) || Number(value) < 0 || Number(value) > 10000 ? '0〜10,000 の数で入れてください' : ''
 
-export default function RulesBoard({ accountId, storeId, today, timezone, canEdit }: {
+export default function RulesBoard({ accountId, storeId, today, timezone, canEdit: allowedByRole }: {
   accountId: string; storeId: string; today: string; timezone?: string; canEdit: boolean
 }) {
+  const role = useStaffRole()
+  const lockedReason = usePermissionLockReason(allowedByRole)
+  const canEdit = allowedByRole && !lockedReason
   const [saved, setSaved] = useState<RestaurantInventoryRules | null>(null)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [loadError, setLoadError] = useState('')
@@ -102,7 +107,7 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
   ] : null
   return <SaveErrorScope errors={saveErrors}><>
     <PageContent>
-      {!canEdit ? <ReadOnlyNotice /> : null}
+      {role !== null && !canEdit ? <ReadOnlyNotice /> : null}
       {conflict.conflict ? <SaveConflictBand title="ほかの担当者が先にルールを保存しました" onCompare={conflict.compare} compareBusy={conflict.compareBusy} onReload={conflict.reloadLatest} /> : null}
       {loadError ? <Notice tone="danger" action={<Button onClick={conflict.conflict ? conflict.reloadLatest : load}>もう一度読み込む</Button>}>{loadError}</Notice> : null}
       {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
@@ -133,10 +138,10 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
       </ListToolbarOptional>} />
       <RulesState state={state} error={stateError} onRetry={loadState} timezone={timezone} />
     </PageContent>
-    {canEdit ? <StickyBar actions={<>
-      <Button disabled={!dirty || saving} onClick={() => { setDraft(toDraft(saved)); setFieldError(''); saveErrors.reset() }}>キャンセル</Button>
-      <Button type="submit" form="inventory-rules-form" variant="primary" busy={saving} disabled={!dirty || Boolean(conflict.conflict)}>ルールを保存する</Button>
-    </>} /> : null}
+    <StickyBar actions={<>
+      <Button lockedReason={lockedReason} disabled={!canEdit || !dirty || saving} onClick={() => { setDraft(toDraft(saved)); setFieldError(''); saveErrors.reset() }}>キャンセル</Button>
+      <Button lockedReason={lockedReason} type="submit" form="inventory-rules-form" variant="primary" busy={saving} disabled={!canEdit || !dirty || Boolean(conflict.conflict)}>ルールを保存する</Button>
+    </>} />
     <ConfirmDialog open={confirm && canEdit} title="自動調整のルールを保存しますか？" description="保存すると、すでにある予約を含めて受付枠を数え直します。受付停止を外すと、保持していた配分へ戻ります。担当への通知を有効にすると、自動通知の対象になります。" confirmLabel="保存する" busy={saving} onConfirm={save} onCancel={() => { if (!saving) setConfirm(false) }} />
     <SaveConflictCompareDialog open={conflict.compareOpen} busy={conflict.compareBusy} error={conflict.compareError} lines={diff} onReload={conflict.reloadLatest} onCancel={conflict.closeCompare} />
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="自動調整ルールの変更" busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />

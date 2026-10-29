@@ -1,3 +1,11 @@
+export const FRIEND_IMPORT_COLUMNS = {
+  lineUid: ['LINEユーザーID', 'line_user_id', 'lineUid'],
+  displayName: ['LINE表示名', 'display_name', 'displayName'],
+  realName: ['本名', 'real_name', 'realName'],
+  systemDisplayName: ['システム表示名', 'system_display_name', 'systemDisplayName'],
+} as const
+export const FRIEND_IMPORT_HEADERS = Object.values(FRIEND_IMPORT_COLUMNS).map((names) => names[0])
+
 export type FriendImportRow = {
   lineUid: string
   displayName: string | null
@@ -82,11 +90,11 @@ export function parseFriendCsv(text: string): FriendImportRow[] {
   if (records.length < 2) return []
   const headers = records[0].map((value) => value.trim())
   const headerIndex = (...names: string[]) => headers.findIndex((value) => names.includes(value))
-  const uid = headerIndex('LINEユーザーID', 'line_user_id', 'lineUid')
+  const uid = headerIndex(...FRIEND_IMPORT_COLUMNS.lineUid)
   if (uid < 0) return []
-  const display = headerIndex('LINE表示名', 'display_name', 'displayName')
-  const real = headerIndex('本名', 'real_name', 'realName')
-  const system = headerIndex('システム表示名', 'system_display_name', 'systemDisplayName')
+  const display = headerIndex(...FRIEND_IMPORT_COLUMNS.displayName)
+  const real = headerIndex(...FRIEND_IMPORT_COLUMNS.realName)
+  const system = headerIndex(...FRIEND_IMPORT_COLUMNS.systemDisplayName)
   const value = (cells: string[], position: number) => position < 0
     ? null
     : unprotectCsvCell(cells[position]?.trim() || null)

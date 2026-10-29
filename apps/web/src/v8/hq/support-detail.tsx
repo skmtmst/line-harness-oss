@@ -73,7 +73,7 @@ export default function HqSupportDetailV8() {
 }
 
 function HqSupportDetailByQuery() {
-  const queryId = useSearchParams().get('id')
+  const queryId = useSearchParams().get('id')?.trim() || null
   return <HqSupportDetailInner key={queryId ?? ''} queryId={queryId} />
 }
 
@@ -128,9 +128,8 @@ function HqSupportDetailInner({ queryId }: { queryId: string | null }) {
   }, [])
 
   useEffect(() => {
-    if (id === undefined) return
-    if (id) void load(id)
-    // 送信者と履歴は id が無くても読む（U099：右の一覧から正しい件へ戻れるように）。
+    if (!id) return
+    void load(id)
     void Promise.allSettled([loadStaffIdentity(), api.tenants.me(), api.hqSupport.list(), api.hqSupport.context()]).then(([meRes, tenantRes, listRes, contextRes]) => {
       if (meRes.status === 'fulfilled' && meRes.value.success) setMe(meRes.value.data)
       if (tenantRes.status === 'fulfilled' && tenantRes.value.success) setTenantName(tenantRes.value.data.name)

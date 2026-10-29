@@ -39,7 +39,7 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog }: {
 }) {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
-  /* 閲覧のみの人には、保存・時間帯の足し引き・発行などの押せないボタンを置かない（2026-10-06 オーナー）。 */
+  /* 変更の可否を各画面へ渡し、変更操作は共通の理由付きロックで残す。 */
   const canEdit = canManageRole(role)
   const today = todayIn(ctx.store?.timezone)
   const tabs = (

@@ -42,7 +42,7 @@ export default function RegistrationStyleDialog({ open, choice, busy, ready, err
     designContentPadding="16px 24px 24px"
     footer={<DialogActions><div className={styles.footer}>
       <div className={styles.footerSide}><Button type="button" variant="text" onClick={onSkip} disabled={busy || !ready}>あとで設定する</Button></div>
-      <div className={styles.footerCenter}><Button type="button" variant="primary" onClick={onSave} disabled={busy || !ready || !choice} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? 'スタイルを選んでください' : null}><ArrowRight size={16} aria-hidden="true" />次へ</Button></div>
+      <div className={styles.footerCenter}><Button type="button" variant="primary" onClick={onSave} disabled={busy || !ready || !choice} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? 'スタイルを選んでください' : null}>次へ<ArrowRight size={16} aria-hidden="true" /></Button></div>
       <div className={styles.footerEnd}><StyleChoiceStatus chosen={choice || null} /></div>
     </div></DialogActions>}
   >

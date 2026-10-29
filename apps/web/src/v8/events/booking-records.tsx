@@ -105,7 +105,7 @@ function Records({ accountId, eventId, occurrenceId, questionsJson, revision, re
       <ListState kind="error" description="申込記録を読み込めませんでした。開き直してもう一度お試しください。"
         action={<Button onClick={() => setRetry((value) => value + 1)}>開き直す</Button>} /> : rows.length === 0 ?
       <ListState kind="empty" title="この状態の申込記録はありません" /> : <>
-        <EventRosterTable kind="waitlist" label="申込記録" headings={['友だち・回答', '状態', '受付日時', '開催回・通知予定', '個別トーク・操作']}>
+        <EventRosterTable kind="records" label="申込記録" headings={['友だち・回答', '状態', '受付日時', '開催回・通知予定', '個別トーク・操作']}>
           {rows.map((booking) => {
             let answers: Array<[string, unknown]> = []
             try {

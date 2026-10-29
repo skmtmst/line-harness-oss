@@ -311,8 +311,8 @@
 .middleCell { vertical-align: middle; }
 .rowClick > td { height: var(--tpl-ar-row-h); } /* 絵  の行は 63〜66。札の無い行も同じ高さに */
 
-/* 閲覧のみの帯。数の帯の上。薄い青の地・目の印・枠なし。 */
-.viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after); }
+/* 帯と数の帯の左右余白は一覧型が持つ。ここは帯の後の間隔だけを持つ。 */
+.viewerBand { margin-bottom: var(--tpl-ro-band-after); }
 
 /* 1152 の板の道具の段：案内の帯 → 1段目 → 2段目。 */
 .narrowTools {
