@@ -26,6 +26,7 @@ import { Field } from '@/components/shared/form-controls'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { V8_TABS } from './settings-parts'
 
 /*
@@ -332,7 +333,7 @@ export default function AssignMatrixV8() {
     (selectedRow!.override_duration_minutes != null || selectedRow!.override_price != null)
 
   return (
-    <SaveErrorScope errors={saveErrors}><CreatePage boardId="ooufy" dirty={false} readOnly={Boolean(selectedAccountId && !canEditMenus)}
+    <SaveErrorScope errors={saveErrors}><CreatePage boardId="ooufy" dirty={false}
               footerActions={canEditMenus ? (
               <>
                 <Button
@@ -375,6 +376,10 @@ export default function AssignMatrixV8() {
             }))}
           /></>} >
 
+          {/* R5：同じ理由が並ぶ画面は上に1回だけ短い文（題の下・自前の帯。他画面と同じ置き方）。 */}
+          {selectedAccountId && !canEditMenus ? (
+            <div className={styles.viewerBand}><ReadOnlyNotice role="status" /></div>
+          ) : null}
 
           {!selectedAccountId ? (
             <div className={shell.stateCard}>
