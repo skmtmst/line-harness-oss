@@ -31,6 +31,14 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('統括の配信設定を共通の一覧と配布画面で扱う', () => {
+  it('F7: 参照の無い行は「—」を描かず、内容の要約だけを出す', async () => {
+    render(<HqDeliveryConsole type="auto_reply" />)
+    await screen.findByRole('searchbox', { name: 'ひな形を検索' })
+    const row = screen.getByRole('button', { name: '追加のお礼', exact: true }).closest('tr') as HTMLElement
+    expect(row.textContent).toContain('本文')
+    expect(row.textContent).not.toContain('—')
+  })
+
   it('名前が空の作成は保存の理由を出し、入力すると解除する', async () => {
     render(<HqDeliveryConsole type="auto_reply" />)
     const search = await screen.findByRole('searchbox', { name: 'ひな形を検索' })

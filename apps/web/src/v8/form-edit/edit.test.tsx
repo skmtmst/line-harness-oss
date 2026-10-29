@@ -175,6 +175,17 @@ describe('回答フォームの編集（V8）', () => {
     expect(formsUpdate).not.toHaveBeenCalled()
   })
 
+  it('19: 書いていない覚え書き・背景の画像は「未設定」と出す', async () => {
+    staffMe.mockResolvedValue({ success: true, data: { role: 'staff' } })
+    await render('id=form-1')
+    fireEvent.click(screen.getByRole('tab', { name: '受付と見た目' }))
+    const card = screen.getByRole('heading', { name: '受付と見た目' }).closest('section') ?? host
+    const rowOf = (label: string) => Array.from(card.querySelectorAll('dt'))
+      .find((term) => term.textContent === label)?.parentElement?.textContent ?? ''
+    expect(rowOf('覚え書き')).toContain('未設定')
+    expect(rowOf('背景の画像')).toContain('未設定')
+  })
+
   it('競合が残っていてもstaffに変わると保存と比較の入口を隠す', async () => {
     formsUpdate.mockRejectedValue(new ApiError(409, 'conflict', 'VERSION_CONFLICT', { updatedAt: '' }))
     formsGet.mockResolvedValueOnce({ success: true, data: structuredClone(formData) })

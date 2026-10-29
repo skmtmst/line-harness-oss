@@ -4,7 +4,7 @@ import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
 import { HorizontalBarChart } from '@/components/shared/charts'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
+import EmptyValue, { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
 import FormFileAttachments from '@/components/shared/form-file-attachments'
 import ListState from '@/components/shared/list-state'
@@ -527,7 +527,7 @@ function Responses() {
                         return (
                           <Tr key={item.id} interactive={false} data-table-layout="columns">
                             <Td grow><TruncatedText value={`「${text}」`} /></Td>
-                            <Td align="right"><TruncatedText value={`${shortDay(item.createdAt)} ${item.friendName ?? '不明'}`} /></Td>
+                            <Td align="right"><TruncatedText value={`${shortDay(item.createdAt)} ${item.friendName ?? emptyValue('unknown')}`} /></Td>
                           </Tr>
                         )
                       })}
@@ -573,7 +573,7 @@ function Responses() {
                         <DateCell>{shortWhen(item.createdAt)}</DateCell>
                         <NameCell name={
                           <button type="button" className={styles.who} title={item.friendName ?? '不明'} onClick={() => selectAnswer(item.id)}>
-                            {item.friendName ?? '不明'}
+                            {item.friendName ?? <EmptyValue kind="unknown" />}
                           </button>
                         } />
                         <Td className={styles.ellipsis} title={first}>{first}</Td>

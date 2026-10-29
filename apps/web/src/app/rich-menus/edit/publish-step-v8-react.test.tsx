@@ -51,6 +51,10 @@ describe('現役の公開済み詳細と旧設定の見張り', () => {
     expect(host.querySelector('[data-design-node="hKr8f"]')).not.toBeNull()
     expect(host.querySelector('[aria-label="いまの状態"]')?.textContent).toContain('公開中')
     expect(host.querySelector('[aria-label="いまの状態"]')?.textContent).toContain('すべての友だち')
+    // 19: 状態は素の文字ではなく地の色の札で出す。
+    const stateRow = Array.from(host.querySelectorAll('[aria-label="いまの状態"] dt'))
+      .find((term) => term.textContent === '状態')?.parentElement
+    expect(stateRow?.querySelector('[data-tone="success"]')?.textContent).toContain('公開中')
   })
   it('旧設定が残っていても現在の詳細だけを出す', async () => {
     document.documentElement.dataset.theme = 'v7'
