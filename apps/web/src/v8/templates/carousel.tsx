@@ -26,7 +26,6 @@ import Notice from '@/components/shared/notice'
 import { FieldError } from '@/components/shared/form-controls'
 import CarouselOrderChip from './carousel-order-chip'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
-import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
 import { TAP_ACTION_KINDS, tapActionDef, type TapActionKind } from '@/lib/tap-actions'
@@ -386,7 +385,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
           {panels.map((item, index) => <CarouselOrderChip key={index} index={index}
             label={`${index + 1} ${chipName(item.title) || `カード ${index + 1}`}`} src={item.thumbnailImageUrl}
             errorCount={fields.countIn(`card-${index}`)} aria-pressed={index === selectedIndex}
-            lockedReason={readOnlyReason ?? PERMISSION_LOCK_REASON.feature} draggable={false} />)}
+            lockedReason={readOnlyReason} disabled={!readOnlyReason} draggable={false} />)}
         </div>
 
       </CreatePage></SaveErrorScope>

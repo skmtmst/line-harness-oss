@@ -9,7 +9,8 @@
   gap: var(--tpl-cn-field-gap);
 }
 
-.chip { max-width: 100%; cursor: grab; }
+.chip { max-width: 100%; }
+.chip[draggable='true'] { cursor: grab; }
 
 .count {
   margin-left: auto;
