@@ -19,7 +19,7 @@ import Link from '@/components/shared/list-navigation'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { TriangleAlert } from 'lucide-react';
-import type { AutoReplyRun, AutoReplyRunsResponse, ExecutionRunStatus } from '@line-crm/shared';
+import { withHonorific, type AutoReplyRun, type AutoReplyRunsResponse, type ExecutionRunStatus } from '@line-crm/shared';
 import { DetailPage } from '@/components/templates';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import Button from '@/components/shared/button'
@@ -550,7 +550,7 @@ export default function AutoReplyRunsV8() {
                       {menuItems.length > 0 ? (
                         <div className={styles.menuBox}>
                           <RowMenu
-                            size="row" label={`${name}さんの記録の操作`}
+                            size="row" label={`${withHonorific(name)}の記録の操作`}
                             items={menuItems}
                             open={menuId === item.id}
                             onOpenChange={(next) => setMenuId(next ? item.id : null)}

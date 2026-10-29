@@ -8,9 +8,20 @@ const row: ReservationBoardEntry = { id: 'r1', kind: 'people', version: 7, scope
 const resources = [{ id: 'a', label: '担当A', active: true, capacity: 1 }, { id: 'b', label: '担当B', active: true, capacity: 1 }]
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
 
-test.each([['counter', '店頭'], ['operator', '手入力'], ['import', '取り込み']])('%sの予約には電話の印でなく実際の経路を出す', (source, label) => {
+test.each([
+  ['liff', 'LINE'],
+  ['counter', '店頭'],
+  ['operator', '手入力'],
+  ['import', '取り込み'],
+  ['phone', '電話'],
+])('%sの予約は2段にし、電話だけ受付の札を出す', (source, sourceLabel) => {
   render(<ReservationBoard kind="people" timeDirection="vertical" dates={['2026-10-15']} entries={[{ ...row, source }]} resources={resources} onOpen={() => {}} />)
-  expect(screen.getByRole('button', { name: /花子.*カット.*詳細/ }).textContent).toContain(label)
+  const card = screen.getByRole('button', { name: /花子.*カット.*詳細/ })
+  expect(card.textContent).toContain('花子09:30〜10:30カット')
+  expect(card.textContent).not.toContain('確定')
+  expect(card.querySelector('[data-source]')).toBeNull()
+  if (source === 'phone') expect(card.textContent).toContain(sourceLabel)
+  else expect(card.textContent).not.toContain(sourceLabel)
 })
 
 test('時刻が行、担当が列で、予約の詳細とAPIが返す空き枠だけを開ける', () => {
@@ -51,4 +62,13 @@ test('閲覧のみでは空き枠の入口とドラッグを隠し、一覧と�
   expect(screen.getByRole('button', { name: '花子', exact: true })).toBeTruthy()
   expect(container.querySelector('[data-people-day-grid]')).toBeNull()
   expect(screen.getByRole('button', { name: '印刷', exact: true })).toBeTruthy()
+})
+
+test('担当の受付は名前から確認でき、休憩は操作にならない', () => {
+  render(<ReservationBoard kind="people" timeDirection="vertical" dates={['2026-10-15']} entries={[]} resources={[resources[0], { ...resources[1], capacity: 2 }]} breaks={{ a: [{ weekday: 4, start_time: '12:00', end_time: '13:00' }] }} onOpen={() => {}} />)
+  expect(screen.getByRole('button', { name: '担当Aの受付の決まり' })).toBeTruthy()
+  fireEvent.focus(screen.getByRole('button', { name: '担当Bの受付の決まり' }))
+  expect(screen.getByRole('note').textContent).toContain('受付2人まで')
+  expect(screen.getAllByText('個別設定')).toHaveLength(1)
+  expect(screen.getByText('休憩').closest('button')).toBeNull()
 })

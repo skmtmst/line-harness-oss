@@ -10,6 +10,7 @@ import { TextField } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api } from '@/lib/api'
+import { publishTenantName } from '@/lib/use-tenant-name'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import CompanyContactCard from './company-contact'
@@ -121,6 +122,7 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
       if (!response.success) throw new Error(response.error)
       setName(response.data.name ?? trimmed)
       setBaseline(response.data.name ?? trimmed)
+      publishTenantName(response.data.name ?? trimmed)
       notifySaved('統括名を保存しました。')
       return true
     } catch (caught) {

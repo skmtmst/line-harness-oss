@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { MENU_SECTIONS } from '@/lib/menu'
+import { MENU_SECTIONS, SCREEN_MENU_OWNER } from '@/lib/menu'
 
 const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
@@ -108,6 +108,8 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
 
   afterEach(() => {
     cleanup()
+    window.history.replaceState({}, '', '/')
+    vi.unstubAllEnvs()
     delete document.documentElement.dataset.theme
   })
 
@@ -181,6 +183,21 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     const view = await renderSidebar()
     // 成果と分析は既定で畳むが、/analytics が中にあるので開く
     expect(view.getAllByRole('link', { name: '分析' }).length).toBeGreaterThan(0)
+  })
+
+  it.each([...new Set([...MENU_SECTIONS.flatMap(section => section.items).filter(item => !item.staffOnly).map(item => item.href), ...Object.keys(SCREEN_MENU_OWNER), '/nen-members/detail'])])('%s を開くと選択が1つで、その組が開く', async (href) => {
+    vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'true')
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')
+    fixture.get.mockResolvedValue({ success: true, data: { features: ALL_FEATURES_ON, sidebarOrder: null, sidebarItemOrder: null, specializedFeatureKeys: Object.keys(ALL_FEATURES_ON) } })
+    fixture.pathname = href.split('?')[0]
+    window.history.replaceState({}, '', href)
+    window.localStorage.setItem('lh-sidebar-groups', JSON.stringify(Object.fromEntries(MENU_SECTIONS.map(section => [section.id, false]))))
+    const view = await renderSidebar()
+    const desktop = view.container.querySelector('aside[data-design-node="J33xq"]')!
+    const selected = desktop.querySelectorAll('a[aria-current="page"]')
+    expect(selected.length, href).toBe(1)
+    expect(selected[0].closest('[aria-hidden="true"], [inert]')).toBeNull()
+    window.history.replaceState({}, '', '/')
   })
 
   it('いちばん下に「設定」が出るのはオーナー・管理者だけ', async () => {
@@ -265,6 +282,8 @@ describe('★V8 統括の左メニュー（絵 V8-B/JKjsE・オーナー 2026-10
 
   afterEach(() => {
     cleanup()
+    window.history.replaceState({}, '', '/')
+    vi.unstubAllEnvs()
     delete document.documentElement.dataset.theme
   })
 
