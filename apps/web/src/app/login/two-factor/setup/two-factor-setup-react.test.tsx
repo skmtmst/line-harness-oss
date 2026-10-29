@@ -27,6 +27,8 @@ const fixture = vi.hoisted(() => ({
   confirmReject: null as unknown,
   setupStatus: 200,
   setupReject: null as unknown,
+  accountsResponse: { success: true, data: [{ id: 'account-1' }] } as Record<string, unknown>,
+  accountsStatus: 200,
   calls: [] as Array<{ url: string; body: Record<string, unknown> }>,
 }))
 
@@ -67,6 +69,8 @@ beforeEach(() => {
   fixture.confirmReject = null
   fixture.setupStatus = 200
   fixture.setupReject = null
+  fixture.accountsResponse = { success: true, data: [{ id: 'account-1' }] }
+  fixture.accountsStatus = 200
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   window.sessionStorage.clear()
   window.localStorage?.clear?.()
@@ -83,6 +87,7 @@ beforeEach(() => {
       return json(fixture.setupResponse, fixture.setupStatus)
     }
     if (url.endsWith('/api/auth/session')) return json({ success: true, data: { platformAdmin: true } })
+    if (url.endsWith('/api/line-accounts')) return json(fixture.accountsResponse, fixture.accountsStatus)
     return json({ success: false, error: 'unexpected' }, 500)
   }))
   host = document.createElement('div')
@@ -130,6 +135,56 @@ describe('N-426: 初回設定画面', () => {
       url: 'https://api.example.test/api/auth/two-factor/setup/confirm',
       body: { challengeToken: 'setup-tok-1', code: '123456' },
     })
+    expect(window.sessionStorage.getItem('lh_admin_session_fallback')).toBe('sess-1')
+    expect(window.location.pathname).toBe('/')
+  })
+
+  it('二段階認証の登録後にアカウントが0件なら、アカウント登録画面へ進む', async () => {
+    fixture.accountsResponse = { success: true, data: [] }
+    await render()
+    const input = host.querySelector('#totp-setup-code') as HTMLInputElement
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      setter.call(input, '123456')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await flush()
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/line-accounts$/),
+      expect.objectContaining({ headers: expect.objectContaining({ Authorization: 'Bearer lh_session:sess-1' }) }),
+    )
+    expect(window.location.pathname).toBe('/accounts/new')
+  })
+
+  it('回復コードを控えた後も、アカウントが0件なら登録画面へ進む', async () => {
+    fixture.accountsResponse = { success: true, data: [] }
+    fixture.confirmResponse = { success: true, data: { sessionToken: 'sess-1', recoveryCodes: ['TEST-CODE-1'] }, csrfToken: 'csrf-1' }
+    await render()
+    const input = host.querySelector('#totp-setup-code') as HTMLInputElement
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      setter.call(input, '123456')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await flush()
+    expect(host.textContent).toContain('回復コードを控えてください')
+    const continueButton = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('控えました'))
+    expect(continueButton).toBeTruthy()
+    await act(async () => { continueButton?.click() })
+    expect(window.location.pathname).toBe('/accounts/new')
+  })
+
+  it('アカウント一覧を確認できない場合も、二段階認証の完了を取り消さずホームへ進む', async () => {
+    fixture.accountsResponse = { success: false, error: 'temporary failure' }
+    fixture.accountsStatus = 503
+    await render()
+    const input = host.querySelector('#totp-setup-code') as HTMLInputElement
+    await act(async () => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
+      setter.call(input, '123456')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await flush()
     expect(window.sessionStorage.getItem('lh_admin_session_fallback')).toBe('sess-1')
     expect(window.location.pathname).toBe('/')
   })

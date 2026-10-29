@@ -21,7 +21,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
   usePathname: () => '/staff',
   useSearchParams: () => new URLSearchParams('tab=members'),
 }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
 vi.mock('@/components/layout/merged-tabs', () => ({
   default: ({ tabs }: { tabs: Array<{ key: string; label: string }> }) => <nav aria-label="ログインユーザーのタブ">{tabs.map((tab) => <span key={tab.key}>{tab.label}</span>)}</nav>,
   useMergedTab: () => 'members',

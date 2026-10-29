@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { captureTwoFactorChallenge } from '@/lib/admin-session'
 
 import RegisterCompletePage from './page'
 
@@ -31,7 +32,7 @@ vi.mock('@/lib/auth-email', async (importOriginal) => {
     ...actual,
     authRequest: vi.fn(async (path: string) => {
       if (path.startsWith('/api/auth/register/check')) {
-        return { ok: true, data: { email: 'new@example.com', trialDays: 30 } }
+        return { ok: true, data: { email: 'new@example.com', trialDays: 30, companyName: '株式会社テスト', contactName: '山田 太郎' } }
       }
       return fixture.completeResponse
     }),
@@ -85,14 +86,12 @@ async function fillAndSubmit() {
     el.dispatchEvent(new Event('input', { bubbles: true }))
   }
   const inputs = host.querySelectorAll('input')
-  const tenant = [...inputs].find((i) => i.id.includes('tenant') || i.name === 'tenantName')!
-  const name = [...inputs].find((i) => i.id.includes('name') && i !== tenant)!
   const passwords = [...inputs].filter((i) => i.type === 'password')
+  expect(host.querySelector('#complete-tenant')?.textContent).toBe('株式会社テスト')
+  expect(host.querySelector('#complete-name')?.textContent).toBe('山田 太郎')
   await act(async () => {
-    setValue(tenant, '株式会社テスト')
-    setValue(name, '山田 太郎')
-    setValue(passwords[0], 'Abcdefg1')
-    setValue(passwords[1], 'Abcdefg1')
+    setValue(passwords[0], 'StrongPass123!')
+    setValue(passwords[1], 'StrongPass123!')
   })
   const form = host.querySelector('form')!
   await act(async () => { form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })) })
@@ -105,6 +104,8 @@ describe('N-426: 登録完了直後の二段階設定への分岐', () => {
     await fillAndSubmit()
     expect(window.location.pathname).toBe('/login/two-factor/setup')
     expect(new URLSearchParams(window.location.hash.slice(1)).get('lh_2fa')).toBe('setup-tok-9')
+    expect(new URLSearchParams(window.location.hash.slice(1)).get('lh_nonce')).toMatch(/^[0-9a-f-]{36}$/)
+    expect(captureTwoFactorChallenge()).toBe('setup-tok-9')
     expect(window.sessionStorage.getItem('lh_admin_session_fallback')).toBeNull()
   })
 

@@ -39,7 +39,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePa
 vi.mock('@/components/hq/platform-notices', () => ({ default: () => null }))
 vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useTenantWideAccess: () => true, useStaffRole: () => 'owner' }))
 const fx = vi.hoisted(() => ({ refreshAccounts: vi.fn(async () => {}) }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ setSelectedAccountId: () => {}, refreshAccounts: fx.refreshAccounts }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], setSelectedAccountId: () => {}, refreshAccounts: fx.refreshAccounts }) }))
 
 import HqHomeV8 from './home'
 import { api } from '@/lib/api'

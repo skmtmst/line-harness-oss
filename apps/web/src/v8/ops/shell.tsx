@@ -56,7 +56,7 @@ export function opsTitleForPath(pathname: string): string {
   const hit = all.filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0]
   if (pathname.startsWith('/ops/tenants/detail')) return '契約先の詳細'
-  if (pathname.startsWith('/ops/applications/detail')) return '申込アカウントの詳細'
+  if (pathname.startsWith('/ops/applications/detail')) return '申込アカウント › 詳細'
   return hit?.label ?? ''
 }
 
