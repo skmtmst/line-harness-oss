@@ -25,7 +25,7 @@ const INITIAL: Omit<SavedViewDraft, 'name'> = {
 beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true) })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
-function mount(onSave: (draft: SavedViewDraft) => Promise<SavedViewSaveResult> = vi.fn(async () => ({ success: true as const }))) {
+function mount(onSave: (draft: SavedViewDraft) => Promise<SavedViewSaveResult> = vi.fn(async () => ({ success: true as const })), emailInboxEnabled = true) {
   render(
     <SavedViewDialog
       open
@@ -33,6 +33,7 @@ function mount(onSave: (draft: SavedViewDraft) => Promise<SavedViewSaveResult> =
       operators={[{ id: 'op-k', name: '河野' }]}
       existingNames={['朝の未対応']}
       saving={false}
+      emailInboxEnabled={emailInboxEnabled}
       onSave={onSave}
       onClose={vi.fn()}
     />,
@@ -85,6 +86,14 @@ describe('保存した検索を作成の窓', () => {
       name: '河野の未読メール', status: 'resolved', quickFilter: 'reply', channel: 'email',
       assignee: 'op-k', unreadOnly: true, favorite: true,
     })
+  })
+
+  it('メール未接続の新規アカウントではメール経路を出さず、LINE条件だけ保存する', async () => {
+    const { onSave } = mount(vi.fn(async () => ({ success: true as const })), false)
+    expect(screen.queryByLabelText('保存する受信経路')).toBeNull()
+    fireEvent.change(nameInput(), { target: { value: 'LINEの未対応' } })
+    await act(async () => { fireEvent.click(saveButton()) })
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ channel: 'line' }))
   })
 
   it('保存先の成功を受け取ってからだけ「保存しました」へ進む', async () => {

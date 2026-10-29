@@ -55,6 +55,7 @@ export default function InboxFilterPanel({
   operators,
   unassignedUnreadCount = null,
   slaEnabled = false,
+  emailInboxEnabled = true,
   auxiliaryActions,
   onChange,
   onReset,
@@ -67,6 +68,7 @@ export default function InboxFilterPanel({
   unassignedUnreadCount?: number | null
   /** 実際の対応期限を使う場合は「期限超過」、それ以外は「1時間以上待ち」。 */
   slaEnabled?: boolean
+  emailInboxEnabled?: boolean
   /** 対応ルールなど、画面が持つ補助操作。 */
   auxiliaryActions?: ReactNode
   onChange: (next: InboxFilterValue) => void
@@ -144,7 +146,7 @@ export default function InboxFilterPanel({
             </div>
           </div>
 
-          <div>
+          {emailInboxEnabled && <div>
             <span className={labelClass}>受信経路</span>
             {/* 候補も画面内へ描く共通の選択部品を使う。 */}
             <div className="mt-1.5">
@@ -156,7 +158,7 @@ export default function InboxFilterPanel({
                 options={CHANNEL_OPTIONS}
               />
             </div>
-          </div>
+          </div>}
 
           {value.quickFilter !== undefined ? (
             <div>

@@ -82,13 +82,14 @@ lineAccounts.get('/api/line-accounts', async (c) => {
       if(folderId && !await getLineAccountTag(db,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,folderId)) return c.json({success:false,error:'フォルダが見つかりません'},404);
       items=items.filter(item=>(item.folder_id ?? null)===folderId);
     }
-    const { tagsByAccount, foldersByAccount, statsByAccount } = await readLineAccountListMetadata(
+    const { tagsByAccount, foldersByAccount, statsByAccount, emailInboxAccountIds } = await readLineAccountListMetadata(
       db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map((item) => item.id),
     );
     const serializeWithStats = (item: DbLineAccount) => {
       const overview = statsByAccount[item.id];
       return {
         ...serializeLineAccount(item),
+        emailInboxEnabled: emailInboxAccountIds.has(item.id),
         tags: tagsByAccount[item.id] ?? [],
         folderId: foldersByAccount[item.id]?.id ?? null,
         folder: foldersByAccount[item.id] ?? null,
@@ -136,6 +137,25 @@ lineAccounts.get('/api/line-accounts', async (c) => {
   } catch (err) {
     throw err;
   }
+});
+
+// 一覧の軽量なスナップショットを表示した後、LINE公式アカウントの画像だけを
+// 最新の状態へ差し替える。接続確認・プラン照会や DB 更新は行わない。
+lineAccounts.get('/api/line-accounts/profile-pictures', async (c) => {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const accounts = (await getLineAccountsByIds(
+    c.env.DB,
+    scope.allowedAccountIds,
+    c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+  )).filter((account) => account.is_active && !account.archived_at && account.channel_access_token);
+  const pictures = await mapWithConcurrency(accounts, LINE_LIVE_ACCOUNT_CONCURRENCY, async (account) => {
+    const profile = await fetchBotProfile(account.channel_access_token);
+    // LINEへの問い合わせに失敗した場合、保存済みの画像を消さない。
+    if (!profile.displayName && !profile.basicId) return null;
+    return { id: account.id, pictureUrl: profile.pictureUrl ?? null };
+  });
+  c.header('Cache-Control', 'no-store');
+  return c.json({ success: true, data: pictures.filter((picture) => picture !== null) });
 });
 
 // 可視範囲内のアカウントだけを要約する。
