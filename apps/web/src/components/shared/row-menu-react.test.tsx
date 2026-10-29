@@ -176,3 +176,37 @@ describe('RowMenu：行の右端の「…」', () => {
     expect(menuItems()[1].parentElement?.querySelector('hr')).toBeTruthy()
   })
 })
+
+
+describe('RowMenu の任意の権限ロック', () => {
+  it.each(['plain', 'box'] as const)('%s は指定なしのDOMとTab入口を保ち、理由付きでは開かない', async (appearance) => {
+    const changed = vi.fn()
+    const { rerender, container } = render(<RowMenu appearance={appearance} label="春のセールの操作" items={items()} onOpenChange={changed} />)
+    const before = container.innerHTML
+    const tabIndex = trigger().tabIndex
+    rerender(<RowMenu appearance={appearance} label="春のセールの操作" items={items()} onOpenChange={changed} lockedReason={undefined} />)
+    expect(container.innerHTML).toBe(before)
+    expect(trigger().tabIndex).toBe(tabIndex)
+    rerender(<RowMenu appearance={appearance} label="春のセールの操作" items={items()} onOpenChange={changed} lockedReason="閲覧のみのため変更できません。" />)
+    expect(trigger().getAttribute('aria-disabled')).toBe('true')
+    expect((trigger() as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.focus(trigger())
+    expect(screen.getByRole('tooltip').textContent).toContain('閲覧のみ')
+    fireEvent.click(trigger())
+    fireEvent.keyDown(trigger(), { key: 'Enter' })
+    fireEvent.keyDown(trigger(), { key: ' ' })
+    expect(changed).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).toBeNull()
+    rerender(<RowMenu appearance={appearance} label="春のセールの操作" items={items()} onOpenChange={changed} triggerProps={{ disabled: true }} />)
+    expect((trigger() as HTMLButtonElement).disabled).toBe(true)
+    expect(trigger().getAttribute('aria-describedby')).toBeNull()
+    expect(screen.queryByRole('tooltip')).toBeNull()
+  })
+  it('開いている途中でロックされた場合もメニューを出さない', async () => {
+    const { rerender } = render(<RowMenu label="春のセールの操作" items={items()} open />)
+    expect(await screen.findByRole('menu')).toBeTruthy()
+    rerender(<RowMenu label="春のセールの操作" items={items()} open lockedReason="閲覧のみ" />)
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(trigger().getAttribute('aria-expanded')).toBe('false')
+  })
+})
