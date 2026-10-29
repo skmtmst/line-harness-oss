@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 シナリオ一覧の件数と操作の動きの試験。
- * - 読了率の母数は「いま途中＋読み終えた人」。登録0でも数は読めているので「登録した 0 人の 0%」
+ * - 読了率の母数は「いま途中＋読み終えた人」。登録0でも数は読めているので「登録した 0 人」（割合なし）
  * - 「すべて」と数の帯のシナリオ数は、絞り込み無しの全体件数（共通のシナリオを含む）
  * - フォルダ・数の帯は一覧と同じアカウントで数え、「未分類」はサーバーの数を出す
  * - 共通のシナリオがフォルダの内訳に入らないことを、差がある時だけ説明する
@@ -177,10 +177,26 @@ describe('読了率の母数', () => {
     expect(screen.getAllByTitle('配信中 10 人・最後まで配信 2 人')).toHaveLength(2)
   })
 
-  test('登録した人が0でも数は読めているので「登録した 0 人の 0%」と出す', async () => {
+  test('登録した人が0でも数は読めているので薄い灰の「登録した 0 人」と出す（割合は決まらないので出さない）', async () => {
     state.stats = { scenarios: { total: 0, active: 0, subscribers: 0, completed: 0, sentThisWeek: 0 } }
     await mount()
-    await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('登録した 0 人の 0%'))
+    await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('登録した 0 人'))
+    expect(kpi('最後まで配信した人').textContent).not.toContain('%')
+  })
+
+  test('登録0の行は空の棒と「登録した 0 人」を出す', async () => {
+    listPage.mockImplementation(async () => ({
+      success: true,
+      data: { items: [{ ...scenario('s-zero', '誰もいない', null), subscriberCount: 0, completedCount: 0 }], total: 1, limit: 20, sort: [] },
+    }))
+    const view = render(<><ScenariosListV8 /><ToastHost /></>)
+    await view.findByText('誰もいない')
+    const row = screen.getByText('誰もいない').closest('tr') as HTMLElement
+    expect(row.textContent).toContain('配信中 0 人・最後まで配信 0 人')
+    expect(row.textContent).toContain('登録した 0 人')
+    const bar = within(row).getByRole('progressbar', { name: '誰もいないを最後まで配信した割合' })
+    expect(bar.getAttribute('aria-valuemax')).toBe('0')
+    expect(bar.getAttribute('aria-valuenow')).toBe('0')
   })
 })
 
