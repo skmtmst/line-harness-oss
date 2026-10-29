@@ -2,6 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import NewLineAccountPage from './page'
+import { DRAFT_KEY } from '@/v8/account-new/logic'
 
 /*
  * v07（LINE新規追加_v07.pen・2026-10-18承認）の5段の通し。
@@ -122,6 +123,7 @@ describe('LINEアカウント作成ウィザード', () => {
     render(<NewLineAccountPage />)
     expect(screen.getByText('ご利用環境の確認', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('質問 1')).toBeTruthy()
+    expect(screen.queryByText('このあとの質問')).toBeNull()
     passPrecheck()
     expect(screen.getByText('Messaging API の情報を入れる', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 1 / 4')).toBeTruthy()
@@ -144,6 +146,18 @@ describe('LINEアカウント作成ウィザード', () => {
     const providerLink = screen.getByRole('link', { name: 'LINE Developers のプロバイダーを開く' })
     expect(providerLink.getAttribute('href')).toBe('https://developers.line.biz/console/provider/2005648758')
     expect(providerLink.getAttribute('target')).toBe('_blank')
+  })
+
+  it('下書きで選択済みの回答をもう一度押しても次の質問へ進む', async () => {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: 1, precheckAt: 'q1', precheck: { q1: 'yes' } }))
+    render(<NewLineAccountPage />)
+    const selected = await screen.findByRole('radio', { name: 'はい、あります' }) as HTMLInputElement
+    await waitFor(() => expect(selected.checked).toBe(true))
+    expect(screen.getByText('Q1. LINE公式アカウントはありますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByText('このあとの質問')).toBeNull()
+    fireEvent.click(selected.closest('label')!)
+    expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByText('このあとの質問')).toBeNull()
   })
 
   it('LINE側でやることの印が残っていると次の段へ進めない', () => {

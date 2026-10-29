@@ -103,8 +103,6 @@
 .precheckQuestionTitle,
 .precheckNote p,
 .precheckNoteTitle,
-.precheckUpcomingTitle,
-.precheckUpcomingItem,
 .precheckResultHeading,
 .precheckResultTitle,
 .precheckResultBody,
@@ -155,11 +153,6 @@
 .precheckNoteTitle { font-weight: 700; }
 .precheckNoteLink { display: flex; flex-direction: column; align-items: flex-start; gap: var(--tpl-htn6-pre-link-gap); }
 .precheckAck { padding: var(--tpl-htn-ack-pad); }
-
-/* このあとの質問。進む前に全体の見通しを出す（nGlq4）。 */
-.precheckUpcoming { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); }
-.precheckUpcomingTitle { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); font-weight: 700; color: var(--color-ink-secondary); }
-.precheckUpcomingItem { font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-faint); }
 
 /* チェック結果（eOQAo）。印の箱と文を横に並べる。字と色は行ごとに持つ。 */
 .precheckResultHeading { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-19); font-weight: 700; color: var(--color-ink); }

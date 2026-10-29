@@ -27,12 +27,13 @@ import {
   checkStage, formatJaDuration, handoverProgress, insightDateJst, isDuplicateChannelError,
   loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, providerIdErrors, readDraft, stepLabel, subTotal,
   toV06CheckRows,
-  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary, precheckUpcoming,
+  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
   type DraftState, type PrecheckAnswers, type PrecheckAt, type PrecheckKey, type StepNumber,
 } from './logic'
 import Step1Precheck from './step1-precheck'
 import Step2Connect from './step2-connect'
 import Step4Template from './step4-template'
+import RegistrationStyleDialog from './registration-style-dialog'
 import Step5Completion from './step5-completion'
 import ResumeRegistrationStyle from './resume-style'
 import { REGISTRATION_STYLE_KEY, useRegistrationStyle } from './use-registration-style'
@@ -116,6 +117,7 @@ function AccountRegistrationForm() {
   const [insightTotal, setInsightTotal] = useState<number | null>(null)
   const [draftRestored, setDraftRestored] = useState(false)
   const [noticeDialog, setNoticeDialog] = useState<'idle' | 'open' | 'done'>('idle')
+  const [styleDialogOpen, setStyleDialogOpen] = useState(true)
   const busyLock = useRef(false)
   const stepPanelRef = useRef<HTMLDivElement>(null)
 
@@ -126,7 +128,6 @@ function AccountRegistrationForm() {
   // 「公式アカウントをこれから作る人」は Q1=いいえ の人。下書きの持ち方は v05 までと同じにしておく。
   const accountMethod: 'existing' | 'new' = precheck.q1 === 'no' ? 'new' : 'existing'
   const precheckRows = precheckSummary(precheckAt, precheck)
-  const precheckAhead = precheckUpcoming(precheckAt, precheck)
   const precheckGuide = precheckAt === 'done' && precheck.q4 === 'yes' && precheck.q5
     ? precheckNote('q5', precheck)
     : precheckNote(precheckAt, precheck)
@@ -143,6 +144,10 @@ function AccountRegistrationForm() {
   // Webhook URLは②Step3で表示する。Callback URLは入力させない。
   const registrationStyle = useRegistrationStyle(createdId, currentStep === 4)
   const templateKey = registrationStyle.choice
+  const finishStyle = async (action: 'save' | 'skip') => {
+    const succeeded = await registrationStyle[action]()
+    if (succeeded) { setStyleDialogOpen(false); setCurrentStep(5); setSub(1) }
+  }
   const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
   const importRunning = importPhase === 'importing_ids' || importPhase === 'hydrating_profiles'
   const basicId = connection?.basicId ?? ''
@@ -497,11 +502,7 @@ function AccountRegistrationForm() {
       })()
       return
     }
-    if (currentStep === 4) {
-      void registrationStyle.save().then(saved => {
-        if (saved) { setCurrentStep(5); setSub(1) }
-      })
-    }
+    // ④の保存とスキップはポップアップ内の操作から行う。
   }
 
   const moveBack = () => {
@@ -540,7 +541,6 @@ function AccountRegistrationForm() {
     || (currentStep === 2 && sub === 4 && !allAcked(LOGIN_ACKS, acks))
     || (currentStep === 3 && sub === 1 && !rowsOk)
     || (currentStep === 3 && sub === 2 && (receipt.status !== 'confirmed' || receiptRequestFailed || receiptChecking))
-    || (currentStep === 4 && (!templateKey || registrationStyle.version === null))
   // v07 Fqy29／Lwxyh：②の中だけ「次のステップへ」と行き先を名前で書いた「戻る」。ほかの段は「次へ」「戻る」。
   const backLabel = currentStep === 3 && sub === 1 ? 'LINEログインへ戻る'
     : currentStep !== 2 ? '戻る'
@@ -583,7 +583,6 @@ function AccountRegistrationForm() {
               onAnswer={answerPrecheck}
               rows={precheckRows}
               guide={precheckGuide}
-              ahead={precheckAhead}
               acks={acks}
               onToggleAck={acknowledgePrecheck}
             />
@@ -692,7 +691,21 @@ function AccountRegistrationForm() {
           )}
 
           {currentStep === 4 && (
-            <>{registrationStyle.error ? <ListState kind="error" title="使い方を確認・保存できませんでした" error={registrationStyle.error} onRetry={registrationStyle.reload} /> : null}<Step4Template templateKey={templateKey} onPick={(key) => { registrationStyle.setChoice(key); setError('') }} /></>
+            <>
+              {registrationStyle.error ? <ListState kind="error" title="使い方を確認・保存できませんでした" error={registrationStyle.error} onRetry={registrationStyle.reload} /> : null}
+              <Step4Template templateKey={templateKey} onOpen={() => setStyleDialogOpen(true)} />
+              <RegistrationStyleDialog
+                open={styleDialogOpen}
+                choice={templateKey}
+                busy={registrationStyle.busy}
+                ready={registrationStyle.version !== null}
+                error={registrationStyle.error}
+                onChoose={(key) => { registrationStyle.setChoice(key); setError('') }}
+                onSave={() => void finishStyle('save')}
+                onSkip={() => void finishStyle('skip')}
+                onClose={() => setStyleDialogOpen(false)}
+              />
+            </>
           )}
 
           {currentStep === 5 && connection && (
@@ -712,14 +725,17 @@ function AccountRegistrationForm() {
         </StepContent></div>
         <StickyBar presentation="account-registration" actions={currentStep === 5 ? (
             <Button href="/hq" variant="primary"><ArrowLeft size={16} aria-hidden="true" />統括コンソールへ戻る</Button>
-          ) : currentStep === 3 && sub === 1 && !rowsOk ? <>
+          ) : currentStep === 4 ? <>
+            <Button type="button" onClick={() => setStyleDialogOpen(true)} disabled={busy}>スタイルを選ぶ</Button>
+            <Button type="button" onClick={() => void finishStyle('skip')} disabled={busy || registrationStyle.version === null} busy={registrationStyle.busy} busyLabel="保存しています…">あとで設定する</Button>
+          </> : currentStep === 3 && sub === 1 && !rowsOk ? <>
             <Button type="button" disabled={busy || !canBack} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
             <Button type="button" variant="primary" disabled={busy || checkRunning} onClick={() => void runCheck()} busy={busyAction === 'check'} busyLabel="確認しています…"><Plug size={16} aria-hidden="true" />{checkActionLabel({ running: checkRunning, attempted: checkAttempted, allOk: rowsOk })}</Button>
           </> : <>
             {canBack
               ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
-            {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save' || registrationStyle.busy} busyLabel={currentStep === 4 ? '保存しています…' : '登録しています…'}>{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
+            {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save'} busyLabel="登録しています…">{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>}
           </>} />
       </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />

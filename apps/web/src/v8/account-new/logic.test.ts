@@ -4,7 +4,7 @@ import {
   DRAFT_KEY, LOGIN_ACKS, PRECHECK_RESULT, PRECHECK_VERIFIED_ACK, WEBHOOK_ACKS, allAcked, allV06RowsOk,
   allV8RowsPassed, checkActionLabel, checkErrorText, checkRowText, checkStage, developerChannelUrl, developerProviderUrl,
   formatJaDuration, handoverProgress, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked, providerIdErrors,
-  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary, precheckUpcoming,
+  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
   readDraft, readPrecheckAnswers, readPrecheckAt, stepLabel, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
 } from './logic'
 import type { V06CheckRow } from './logic'
@@ -125,23 +125,13 @@ describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
     expect(precheckBack('q4', { q2: 'yes', q3: 'no' })).toBe('q3')
   })
 
-  it('答えの一覧は答えた質問だけ、「このあとの質問」は尋ねないと決まった質問を外す', () => {
+  it('答えの一覧は答えた質問だけ出す', () => {
     expect(precheckSummary('q2', { q1: 'yes', q2: 'no' })).toEqual([
       { key: 'q1', label: 'Q1. LINE公式アカウント', value: 'あります' },
       { key: 'q2', label: 'Q2. 友だちの引き継ぎ', value: 'いいえ、引き継ぎません' },
     ])
     expect(precheckSummary('done', { q1: 'yes', q2: 'no', q4: 'no' }).map((row) => row.key)).toEqual(['q1', 'q2', 'q4'])
     expect(precheckSummary('q1', {})).toEqual([])
-    // 未定のあいだは括弧の注記を付け、尋ねないと決まったら一覧から消す。
-    expect(precheckUpcoming('q1', {}).map((row) => row.text)).toEqual([
-      'Q2. いまの友だちを引き継ぎますか？',
-      'Q3. 友だちの数は50万人を超えていますか？（引き継ぐときだけ）',
-      'Q4. ほかのLINE配信ツールを使っていますか？',
-      'Q5. そのツールを、これからどうしますか？（使っているときだけ）',
-    ])
-    expect(precheckUpcoming('q2', { q1: 'yes', q2: 'no' }).map((row) => row.key)).toEqual(['q4', 'q5'])
-    expect(precheckUpcoming('q4', { q1: 'yes', q2: 'no', q4: 'no' })).toEqual([])
-    expect(precheckUpcoming('done', { q1: 'yes' })).toEqual([])
   })
 
   it('札は「質問 n」。最後だけ「チェック完了」で、結果は4項目', () => {
@@ -210,9 +200,10 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     for (const ack of [...WEBHOOK_ACKS, ...LOGIN_ACKS]) expect(ack.note.length).toBeGreaterThan(0)
   })
 
-  it('LINE Developers の行き先は入れたチャネルIDのページ。空ならコンソールの入口', () => {
-    expect(developerChannelUrl(' 2001 ')).toBe('https://developers.line.biz/console/channel/2001')
-    expect(developerChannelUrl('')).toBe('https://developers.line.biz/console/')
+  it('LINE Developers の行き先は入れたMessaging APIチャネルの設定画面', () => {
+    expect(developerChannelUrl(' 2001 ')).toBe('https://developers.line.biz/console/channel/2001/messaging-api')
+    expect(developerChannelUrl('')).toBe('')
+    expect(developerChannelUrl('2001x')).toBe('')
   })
 
   it('LINEログイン作成時は入力されたプロバイダーIDの画面を開く', () => {
