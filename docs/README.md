@@ -941,3 +941,4 @@
 - [利用開始設定から二段階認証への引き継ぎ](release-log/unreleased/1949-masato-registration-mfa-flow.md) — 登録後の認証とアカウント登録への案内の反映履歴。
 
 - [LINE通知の操作権限の反映履歴](release-log/unreleased/0000-kenta-notification-permission.md)
+- [LINE通知の説明の置き場所](release-log/unreleased/0000-kenta-notification-help.md)

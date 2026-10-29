@@ -1238,7 +1238,7 @@ function LineNotificationsPage() {
     </> : undefined}
     title="LINE通知" help={tab === 'customer' ? '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。' : tab === 'failures' ? '送れなかった理由や再試行の予定を確かめます。ブロックなどの対象外と、再試行が必要な失敗を分けて確認してください。' : undefined}
     explanationKey={`line-notifications:${tab}`}
-    explanation={tab === 'customer' ? undefined : tab === 'operator' ? 'この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。' : '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。'}
+    explanation={tab === 'customer' ? 'これは「お知らせ」であって「売り込みの配信」ではありません。お客さまが配信を止めていても、取引に必要な連絡は届きます。' : tab === 'operator' ? 'この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。' : '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。'}
   >
     {expandedSetting === null ? <Tabs label="LINE通知の中の切り替え" size="notification" items={tabsWithCounts.map(item => ({ label: item.label, href: tabHref[item.key], current: tab === item.key }))} /> : null}
     {/*
@@ -1339,7 +1339,6 @@ function LineNotificationsPage() {
     </KpiBand>
     {/* R611: 一覧の取得に失敗したときは、上部の件数も取れていないことを添える（赤は使わない）。 */}
     {loadState === 'error' ? <p className={styles.minor}>お知らせの件数は取得失敗です。下の一覧の「もう一度読み込む」から読み直してください。</p> : null}
-    <Notice tone="info">これは「お知らせ」であって「売り込みの配信」ではありません。お客さまが配信を止めていても、取引に必要な連絡は届きます。</Notice>
     {sendCountsFailed && loadState === 'ready' ? <div className={styles.inlineRow}>
       <p className={styles.minor}>送信件数を読み込めませんでした。時間をおいて、もう一度お試しください。</p>
       <Button variant="secondary" size="compact" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
