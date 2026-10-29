@@ -608,6 +608,7 @@ export default function EarningRulesTab() {
     <div className={styles.narrowFolder}>
       <SaveErrorField names={["folder"]}><Select
         aria-label="きっかけ"
+        label="きっかけ"
         value={folder}
         options={FOLDERS.map((item) => ({ value: item.key, label: item.key === 'all' ? item.label : `${item.label} ${formatMileageNumber(folderCounts.get(item.key) ?? 0)}` }))}
         onChange={(value) => resetPage(() => setFolder(value as FolderKey))}

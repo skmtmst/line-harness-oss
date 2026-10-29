@@ -144,6 +144,7 @@ export default function UsersV8() {
           <SaveErrorField names={["account","u.account"]}><EntitySelect
             aria-label="所属アカウントで絞り込む"
             label="所属アカウント"
+            valuePrefix="所属"
             size="full"
             value={u.account}
             onChange={u.setAccount}

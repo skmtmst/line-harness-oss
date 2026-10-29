@@ -205,6 +205,7 @@ export default function RestaurantFrame({
     <SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect
       aria-label="店舗"
       noun="店舗"
+      valuePrefix="店舗"
       width={STORE_PICKER_WIDTH}
       value={selectedStoreId}
       onChange={setSelectedStoreId}

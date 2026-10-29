@@ -700,7 +700,7 @@ export default function FriendsListV8() {
   )
 
   const primaryFilter = (
-    <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><EntitySelect kind="tag" aria-label="タグで絞り込む" width={119} value={selectedTagId}
+    <SaveErrorField names={["selectedTagId","tagId","selected_tag_id"]}><EntitySelect kind="tag" aria-label="タグで絞り込む" width={119} value={selectedTagId} valuePrefix="タグ"
           onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
           options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))])} /></SaveErrorField>
   )
@@ -731,7 +731,7 @@ export default function FriendsListV8() {
             placeholder="名前・LINE名・タグ・メモで探す"
           />
         </ListToolbarSearchSlot>
-        {/* 選んだ値は「タグ：すべて」の1つの文字で出す（絵どおり。部品の label は文字が2つに割れる）。
+        {/* 閉じた欄は「タグ：すべて」（絵どおり。valuePrefix が頭を付け、既定は灰・選択で黒太字＋緑枠）。
             先頭の口（leading）は白い板が狭い時だけ出るので、広い幅で消えないよう検索の隣に置く。 */}
         {primaryFilter}
 
@@ -741,10 +741,10 @@ export default function FriendsListV8() {
         <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" size="full" value={responseFilter}
           onChange={(value) => resetPageWith(() => setResponseFilter(value as ResponseFilter))}
           options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} /></SaveErrorField>
-        <SaveErrorField names={["operatorId","operator_id"]}><EntitySelect aria-label="担当で絞り込む" size="full" value={operatorId}
+        <SaveErrorField names={["operatorId","operator_id"]}><EntitySelect aria-label="担当で絞り込む" size="full" value={operatorId} valuePrefix="担当者"
           onChange={(value) => resetPageWith(() => setOperatorId(value))}
           options={prefixed('担当者', [{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name }))])} /></SaveErrorField>
-        <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect kind="scenario" aria-label="シナリオで絞り込む" size="full" value={scenarioId}
+        <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect kind="scenario" aria-label="シナリオで絞り込む" size="full" value={scenarioId} valuePrefix="シナリオ"
           onChange={(value) => resetPageWith(() => setScenarioId(value))}
           options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ ...entityOptionMetadata(scenario), value: scenario.id, label: scenario.name }))])} /></SaveErrorField>
         <Button fullWidth filterActive={advanced !== null} aria-haspopup="dialog"
@@ -845,10 +845,12 @@ export default function FriendsListV8() {
               <Star size={16} aria-hidden="true" />
             </IconButton>
           ) : (
-            /* 閲覧のみは押せない星を置かない。注目の印だけ見せる。 */
-            <span className={attention ? `${styles.star} ${styles.starOn}` : styles.star} title={attention ? '注目' : undefined}>
-              <Star size={16} aria-hidden="true" />
-            </span>
+            /* 16：閲覧のみは押せない星を置かない。星は付いている行だけ見せる。 */
+            attention ? (
+              <span className={`${styles.star} ${styles.starOn}`} title="注目">
+                <Star size={16} aria-hidden="true" />
+              </span>
+            ) : null
           )}
         </Td>
         <Td presentation="friend-list">
