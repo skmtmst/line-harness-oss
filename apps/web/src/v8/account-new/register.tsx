@@ -127,11 +127,17 @@ function AccountRegistrationForm() {
   const accountMethod: 'existing' | 'new' = precheck.q1 === 'no' ? 'new' : 'existing'
   const precheckRows = precheckSummary(precheckAt, precheck)
   const precheckAhead = precheckUpcoming(precheckAt, precheck)
-  const precheckGuide = precheckNote(precheckAt, precheck)
-  // 答えを1つ入れ替える。キーは PrecheckKey なので、まとめて組み直してから渡す。
+  const precheckGuide = precheckAt === 'done' && precheck.q4 === 'yes' && precheck.q5
+    ? precheckNote('q5', precheck)
+    : precheckNote(precheckAt, precheck)
+  // 回答を保存した時点で次の質問（またはチェック結果）を出す。
   const answerPrecheck = (key: PrecheckKey, value: string) => {
-    setPrecheck((current) => ({ ...current, [key]: value }) as PrecheckAnswers)
+    const answers = { ...precheck, [key]: value } as PrecheckAnswers
+    setPrecheck(answers)
     setError('')
+    if (key !== precheckAt || precheckBlocked(key, answers, acks)) return
+    const nextAt = precheckNext(key, answers)
+    if (nextAt) setPrecheckAt(nextAt)
   }
   const createdId = connection?.id ?? ''
   // Webhook URLは②Step2で表示する。Callback URLは入力させない。
@@ -306,6 +312,13 @@ function AccountRegistrationForm() {
     setError('')
   }
 
+  const acknowledgePrecheck = (key: string, next: boolean) => {
+    toggleAck(key, next)
+    if (!next || precheckAt !== 'q2' || precheck.q2 !== 'yes') return
+    const nextAt = precheckNext(precheckAt, precheck)
+    if (nextAt) setPrecheckAt(nextAt)
+  }
+
   const input = () => ({
     name: form.name.trim() || undefined,
     channelId: form.channelId.trim(),
@@ -425,13 +438,8 @@ function AccountRegistrationForm() {
   const moveNext = () => {
     setError('')
     if (currentStep === 1) {
-      // ①は質問を1つずつ出す。最後の「チェック結果」まで来てから②へ渡す（v07 p6zMkA）。
-      if (precheckAt !== 'done') {
-        const nextAt = precheckNext(precheckAt, precheck)
-        if (!nextAt) return
-        setPrecheckAt(nextAt)
-        return
-      }
+      // 質問間は回答時に進む。ここでの「次へ」はチェック結果から②への一度だけ。
+      if (precheckAt !== 'done') return
       setCurrentStep(2)
       setSub(1)
       return
@@ -571,7 +579,7 @@ function AccountRegistrationForm() {
               guide={precheckGuide}
               ahead={precheckAhead}
               acks={acks}
-              onToggleAck={toggleAck}
+              onToggleAck={acknowledgePrecheck}
             />
           )}
 
@@ -705,7 +713,7 @@ function AccountRegistrationForm() {
             {canBack
               ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
-            <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save' || registrationStyle.busy} busyLabel={currentStep === 4 ? '保存しています…' : '登録しています…'}><ArrowRight size={16} aria-hidden="true" />{nextLabel}</Button>
+            {(currentStep !== 1 || precheckAt === 'done') && <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save' || registrationStyle.busy} busyLabel={currentStep === 4 ? '保存しています…' : '登録しています…'}><ArrowRight size={16} aria-hidden="true" />{nextLabel}</Button>}
           </>} />
       </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />
