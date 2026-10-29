@@ -3,35 +3,35 @@
   display: flex;
   min-width: 0;
   height: 54px;
-  align-items: center;
-  padding: 4px 20px 0;
+  align-items: flex-start;
+  padding: 2px 20px 0;
 }
 
 .logoViewport {
   position: relative;
   display: block;
   width: 100%;
-  max-width: 106px;
-  height: 21px;
+  max-width: 118px;
+  height: 24px;
   overflow: hidden;
 }
 
 .logoImage {
   position: absolute;
-  top: -8px;
-  left: -10px;
+  top: -9px;
+  left: -11px;
   display: block;
-  width: 126px;
+  width: 140px;
   max-width: none;
   height: auto;
 }
 
-.compact { padding: 0; }
+.compact { padding: 2px 0 0; }
 
 :root [data-collapsed] .logoRoot {
   height: 40px;
   justify-content: center;
-  padding: 0;
+  padding: 5px 0 0;
 }
 
 :root [data-collapsed] .logoViewport { width: 18px; height: 18px; }
