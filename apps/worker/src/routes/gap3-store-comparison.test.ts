@@ -11,6 +11,16 @@ function snapshot(a:string,n:number,day='2026-10-15'){
  d.raw.prepare("INSERT INTO hq_store_daily_metrics(account_id,date,bookings,visits,no_shows,friends_added,friends_blocked,friends_at_start,state,computed_at) VALUES(?,?,?,?,?,4,1,100,'partial','2026-10-16T00:00:00Z')").run(a,day,n,n,1);
 }
 async function read(path=url,s=gapOwner){const r=await gapCall(gapApp(d,[storeComparison],s),path);expect(r.status,await r.clone().text()).toBe(200);return (await r.json() as any).data;}
+test('アーカイブした店は比較一覧・平均・詳細から消え、停止中の店は残る',async()=>{
+ snapshot('a',2);snapshot('a2',4);snapshot('a3',6);
+ d.raw.exec("UPDATE line_accounts SET archived_at='2026-10-16T00:00:00Z',is_active=0 WHERE id='a2'; UPDATE line_accounts SET is_active=0 WHERE id='a3'");
+ const data=await read(url+'&compare=average');
+ expect(data.rows.map((r:any)=>r.accountId).sort()).toEqual(['a','a3']);
+ expect(data.total).toBe(2);
+ expect(data.average.bookings).toBeNull();
+ expect((await gapCall(gapApp(d,[storeComparison]),'/api/hq/store-comparison/a2?from=2026-10-15&to=2026-10-15')).status).toBe(404);
+ expect((await read('/api/hq/store-comparison/a3?from=2026-10-15&to=2026-10-15')).values.bookings).toBe(6);
+});
 test('CMP-01/03/04/09/10/12/17: 店の範囲・期間・平均との差、未取得を0にしない',async()=>{
  snapshot('a',5);snapshot('a2',2);snapshot('a3',8);snapshot('b',999);
  let data=await read(url+'&compare=average',{...gapOwner});expect(data.rows.map((r:any)=>r.accountId)).toEqual(['a2','a','a3']);expect(data.average.bookings).toBe(5);expect(data.rows[0].metrics.bookings).toMatchObject({value:2,diff:-3,unit:'件',available:true});expect(data.rows[0].metrics.clickRate).toMatchObject({value:null,diff:null,available:false});
