@@ -241,7 +241,19 @@ function normalizeAccountScopeInput(body: AccountScopeInput):
 
 async function hasAllAccountScope(db: D1Database, current: Env['Variables']['staff']): Promise<boolean> {
   if (current.id === 'env-owner') return true;
-  return (await getStaffById(db, current.id))?.account_scope !== 'accounts';
+  const member = await getStaffById(db, current.id);
+  return Boolean(member?.is_active && member.account_scope === 'all'
+    && (member.tenant_id ?? DEFAULT_TENANT_ID) === (current.tenantId ?? DEFAULT_TENANT_ID));
+}
+
+async function canAccessStaffMember(db: D1Database, current: Env['Variables']['staff'], target: StaffMember): Promise<boolean> {
+  if (current.id === target.id || await hasAllAccountScope(db, current)) return true;
+  if (target.account_scope !== 'accounts') return false;
+  const [actorIds, targetIds] = await Promise.all([
+    getStaffAccountScopeIds(db, current.id),
+    getStaffAccountScopeIds(db, target.id),
+  ]);
+  return targetIds.length > 0 && targetIds.every((id) => actorIds.includes(id));
 }
 
 async function mayAssignAccountScopes(
@@ -251,8 +263,9 @@ async function mayAssignAccountScopes(
   requestedIds: string[],
 ): Promise<boolean> {
   if (current.id === 'env-owner') return true;
-  const currentMember = current.id === 'env-owner' ? null : await getStaffById(db, current.id);
-  if (requestedScope === 'all') return currentMember?.account_scope !== 'accounts';
+  const currentMember = await getStaffById(db, current.id);
+  if (!currentMember?.is_active || (currentMember.tenant_id ?? DEFAULT_TENANT_ID) !== (current.tenantId ?? DEFAULT_TENANT_ID)) return false;
+  if (requestedScope === 'all') return currentMember.account_scope === 'all';
   const allowedIds = currentMember?.account_scope === 'accounts'
     ? await getStaffAccountScopeIds(db, current.id)
     : (await getVisibleLineAccountScope(db, current)).allowedAccountIds;
@@ -369,24 +382,45 @@ staff.get('/api/staff/me', async (c) => {
 
 staff.get('/api/staff', async (c) => {
   try {
-    /*
-     * 範囲限定の担当者には権限者の一覧を出さない。画面（/hq/members）
-     * と同じ基準で拒否する（403）。氏名・役割・範囲が出るため、伏せ字の
-     * メールだけでは足りない。
-     */
-    if (!await hasAllAccountScope(c.env.DB, c.get('staff'))) {
-      return c.json({ success: false, error: '全店舗の担当者だけが権限者の一覧を見られます' }, 403);
-    }
-    const members = await getStaffMembers(c.env.DB, currentTenantId(c));
+    const accountId = c.req.query('lineAccountId')?.trim();
+    const allScope = await hasAllAccountScope(c.env.DB, c.get('staff'));
+    if (!accountId && !allScope) return c.json({ success: false, error: 'アカウントを指定してください' }, 403);
+    const visible = accountId ? await getVisibleLineAccountScope(c.env.DB, c.get('staff')) : null;
+    if (accountId && !visible?.allowedAccountIds.includes(accountId)) return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
+    const creator = accountId ? await c.env.DB.prepare('SELECT created_by_staff_id FROM line_accounts WHERE id=?').bind(accountId).first<{ created_by_staff_id: string | null }>() : null;
+    const accountAdminRows = accountId ? await c.env.DB.prepare(
+      'SELECT staff_id FROM line_account_hq_admin_memberships WHERE line_account_id=?',
+    ).bind(accountId).all<{ staff_id: string }>() : null;
+    const accountAdminIds = new Set(accountAdminRows?.results.map((row) => row.staff_id) ?? []);
+    const allMembers = await getStaffMembers(c.env.DB, currentTenantId(c));
+    const scopedIds = await getStaffAccountScopeMap(c.env.DB, allMembers.filter((member) => member.account_scope === 'accounts').map((member) => member.id));
+    const members = accountId
+      ? allMembers.filter((member) => member.id === creator?.created_by_staff_id
+        || (member.account_scope === 'all' && (member.role === 'owner' || member.role === 'admin') && accountAdminIds.has(member.id))
+        || (member.account_scope === 'accounts' && (scopedIds.get(member.id) ?? []).includes(accountId)))
+      : allMembers.filter((member) => member.account_scope === 'all');
     // 担当範囲を1人ずつ読むと人数分の往復になるので一括取得する( 中1)。
-    const scopes = await getStaffAccountScopeMap(
-      c.env.DB,
-      members.filter((member) => (member.account_scope ?? 'all') === 'accounts').map((member) => member.id),
-    );
+    const scopes = scopedIds;
+    const actor = c.get('staff');
+    const actorCanManageAll = await hasAllAccountScope(c.env.DB, actor);
+    const actorScopeIds = actorCanManageAll ? [] : await getStaffAccountScopeIds(c.env.DB, actor.id);
     return c.json({
       success: true,
       data: await Promise.all(members.map((member) => (
-        serializeStaff(c.env.DB, member, staffEmailVisibility(c, member.id), scopes)
+        serializeStaff(c.env.DB, member, staffEmailVisibility(c, member.id), scopes).then((item) => {
+          const isAccountCreator = Boolean(accountId && member.id === creator?.created_by_staff_id);
+          return {
+            ...item,
+            ...(accountId && member.account_scope === 'accounts' ? {
+              scopedLineAccountIds: [accountId],
+              assignedLineAccountId: accountId,
+            } : {}),
+            ...(isAccountCreator || accountAdminIds.has(member.id) ? { role: 'admin' as const } : {}),
+            isAccountCreator,
+            canManageInAccount: Boolean(accountId && !isAccountCreator && member.account_scope === 'accounts'
+              && (actorCanManageAll || (scopedIds.get(member.id) ?? []).every((id) => actorScopeIds.includes(id)))),
+          };
+        })
       ))),
     });
   } catch (error) {
@@ -399,6 +433,7 @@ staff.get('/api/staff/:id/login-summary', requireRole('owner', 'admin'), async (
     const id = c.req.param('id');
     const member = await getStaffById(c.env.DB, id);
     if (!member || !isInCurrentTenant(c, member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
+    if (!await canAccessStaffMember(c.env.DB, c.get('staff'), member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
     const loginCount = await countLoginAudit(c.env.DB, { adminUserId: id, action: 'login' });
     return c.json({ success: true, data: { loginCount } });
   } catch (error) {
@@ -412,7 +447,8 @@ staff.get('/api/staff/:id/login-summary', requireRole('owner', 'admin'), async (
  */
 staff.get('/api/staff/last-logins', requireRole('owner', 'admin'), async (c) => {
   try {
-    const members = await getStaffMembers(c.env.DB, currentTenantId(c));
+    if (!await hasAllAccountScope(c.env.DB, c.get('staff'))) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
+    const members = (await getStaffMembers(c.env.DB, currentTenantId(c))).filter((member) => member.account_scope === 'all');
     const data = await getLastLoginByStaff(c.env.DB, members.map((member) => member.id));
     return c.json({ success: true, data });
   } catch (error) {
@@ -429,6 +465,7 @@ staff.post('/api/staff/:id/resend-invite', requireRole('owner', 'admin'), inputJ
     const id = c.req.param('id');
     const member = await getStaffById(c.env.DB, id);
     if (!member || !isInCurrentTenant(c, member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
+    if (!await canAccessStaffMember(c.env.DB, c.get('staff'), member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
     if (member.invite_status !== 'pending_email' || !member.email) {
       return c.json({ success: false, error: 'この権限者はすでにメールを確認しているため、送り直す必要はありません' }, 409);
     }
@@ -459,7 +496,7 @@ staff.get('/api/staff/:id', requireRole('owner', 'admin', 'staff'), async (c) =>
     return c.json({ success: false, error: 'この情報を表示する権限がありません' }, 403);
   }
   const member = await getStaffById(c.env.DB, id);
-  return member && isInCurrentTenant(c, member)
+  return member && isInCurrentTenant(c, member) && await canAccessStaffMember(c.env.DB, current, member)
     ? c.json({ success: true, data: await serializeStaff(c.env.DB, member, staffEmailVisibility(c, member.id)) })
     : fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
 });
@@ -495,6 +532,7 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
     if (body.managementContext === 'hq' && !await hasAllAccountScope(c.env.DB, current)) {
       return c.json({ success: false, error: '全店舗の担当者だけが統括側の権限者を追加できます' }, 403);
     }
+    if (body.managementContext === 'hq' && accountScope.accountScope !== 'all') return c.json({ success: false, error: '統括メンバーは全アカウントの範囲を指定してください' }, 400);
     const canGrantDescendants =
       current.role === 'owner' ||
       !current.assignedLineAccountId ||
@@ -512,6 +550,9 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
     const duplicateInvite = (await getStaffMembers(c.env.DB, currentTenantId(c)))
       .find((item) => item.email?.toLowerCase() === email);
     if (duplicateInvite) {
+      if (!await canAccessStaffMember(c.env.DB, current, duplicateInvite)) {
+        return c.json({ success: false, error: 'このメールアドレスは登録済みです' }, 409);
+      }
       if (duplicateInvite.invite_status === 'pending_email' || duplicateInvite.invite_status === 'pending_line' || duplicateInvite.invite_status === 'expired') {
         try {
           await deleteStaffMemberWithScopes(c.env.DB, duplicateInvite.id);
@@ -610,6 +651,7 @@ staff.post('/api/staff/:id/resend-invitation', requireRole('owner', 'admin'), in
   const id = c.req.param('id');
   const target = await getStaffById(c.env.DB, id);
   if (!target || !isInCurrentTenant(c, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
+  if (!await canAccessStaffMember(c.env.DB, c.get('staff'), target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   if (target.invite_status === 'active') {
     return c.json({ success: false, error: 'このユーザーはすでに利用を開始しています。招待の再送はできません。' }, 409);
   }
@@ -694,6 +736,7 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   const target = await getStaffById(c.env.DB, id);
   if (!target || !isInCurrentTenant(c, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   const current = c.get('staff');
+  if (!await canAccessStaffMember(c.env.DB, current, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   if (body.managementContext === 'hq' && !await hasAllAccountScope(c.env.DB, current)) {
     return c.json({ success: false, error: '全店舗の担当者だけが統括側の権限者を変更できます' }, 403);
   }
@@ -1143,6 +1186,7 @@ staff.delete('/api/staff/:id/two-factor', async (c) => {
   const id = c.req.param('id');
   const member = await getStaffById(c.env.DB, id);
   if (!member || !isInCurrentTenant(c, member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
+  if (!await canAccessStaffMember(c.env.DB, c.get('staff'), member)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   if (!canEditMember(c, id)) return c.json({ success: false, error: '自分の二段階認証だけ解除できます' }, 403);
   // 二段階認証の解除は本人・他人どちらでも高危険。解除後は対象の全セッションも切る。
   if (!await consumeStaffStepUp(c, 'staff.two_factor.remove')) {
@@ -1163,6 +1207,7 @@ staff.delete('/api/staff/:id', requireRole('owner', 'admin'), async (c) => {
   if (id === c.get('staff').id) return c.json({ success: false, error: '自分自身は利用停止できません' }, 400);
   const target = await getStaffById(c.env.DB, id);
   if (!target || !isInCurrentTenant(c, target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
+  if (!await canAccessStaffMember(c.env.DB, c.get('staff'), target)) return fail(c, 404, 'STAFF_MEMBER_NOT_FOUND');
   const guard = await guardLastAdmin(c.env.DB, target, currentTenantId(c), { isActive: false, self: false });
   if (guard) return c.json({ success: false, error: guard }, 400);
   // 利用停止は権限変更と同じ高危険操作として再認証を要求する。

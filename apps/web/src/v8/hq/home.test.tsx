@@ -208,3 +208,18 @@ describe('統括のアカウント', () => {
     expect([...card.querySelectorAll('button')].some(button => button.textContent === '設定')).toBe(false)
   })
 })
+
+it('フォルダがタグにも返っても札は一つで、アーカイブの詳細には矢印を出さない', async () => {
+  accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, archivedAt: '2026-10-01', folderId: 'area', folder: { name: '渋谷エリア', color: '#0088ff' }, tags: [{ id: 'same', name: '渋谷エリア', color: '#0088ff' }, { id: 'other', name: '本店' }] }] })
+  await render()
+  const archiveFilter = [...container.querySelectorAll('button')].find(el => el.textContent?.startsWith('アーカイブ'))!
+  await act(async () => { archiveFilter.click() })
+  const card = container.querySelector('article')!
+  const labels = [...card.querySelectorAll('[data-icon-label], [role="group"]')].filter(el => !el.closest('[aria-hidden="true"]') && el.textContent === '渋谷エリア')
+  expect(labels).toHaveLength(1)
+  const edit = [...card.querySelectorAll('button')].find(el => el.textContent === '登録内容を編集')!
+  expect(edit).toBeTruthy()
+  expect(edit.querySelectorAll('svg')).toHaveLength(1)
+  expect([...card.querySelectorAll('button')].some(el => el.textContent === '詳細')).toBe(false)
+  expect([...card.querySelectorAll('button')].find(el => el.textContent === '戻す')?.querySelector('svg')).not.toBeNull()
+})

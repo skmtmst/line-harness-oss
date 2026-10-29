@@ -63,7 +63,7 @@ type Row = {
 function row(over: Partial<Row> & { id: string }): Row {
   return {
     name: over.id, email: `${over.id}@example.test`, role: 'admin', access_level: 'full',
-    is_active: 1, line_user_id: null, permission_keys: '[]',
+    is_active: 1, line_user_id: null, permission_keys: '[]', account_scope: 'all',
     ...over,
   };
 }
@@ -82,6 +82,7 @@ function send(path: string, method: 'GET' | 'POST' | 'PATCH' | 'DELETE', body?: 
 
 beforeEach(() => {
   vi.clearAllMocks();
+  dbMocks.getStaffById.mockImplementation(async (_db: unknown, id: string) => row({ id, tenant_id: 'tenant-a' }));
   dbMocks.updateStaffMember.mockImplementation(async (_db: unknown, id: string) => row({ id }));
   dbMocks.deleteStaffMember.mockResolvedValue(undefined);
   dbMocks.countLoginAudit.mockResolvedValue(0);
@@ -214,8 +215,18 @@ describe('スタッフの店舗権限範囲', () => {
   });
 });
 
+describe('アカウント限定管理者の統括境界', () => {
+  it('統括APIとLINEアカウントの新規接続を拒否する', async () => {
+    dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'account-admin', role: 'admin', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'account-admin', role: 'admin', tenant_id: 'tenant-a', account_scope: 'accounts' }));
+    expect((await send('/api/hq/billing/metrics', 'GET')).status).toBe(403);
+    expect((await send('/api/line-accounts/connect/check', 'POST', {})).status).toBe(403);
+  });
+});
+
 describe('スタッフ招待の統括', () => {
   it('招待者と同じtenant_idを新規スタッフへ渡す', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'inviter', role: 'owner', tenant_id: 'tenant-inviter' }));
     dbMocks.getStaffByApiKey.mockResolvedValue(row({
       id: 'inviter',
       role: 'owner',
@@ -251,6 +262,7 @@ describe('スタッフ招待の統括', () => {
   });
 
   it('別統括と同じメールアドレスでも招待できる', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'tenant-b-owner', role: 'owner', tenant_id: 'tenant-b' }));
     dbMocks.getStaffByApiKey.mockResolvedValue(row({ id: 'tenant-b-owner', role: 'owner', tenant_id: 'tenant-b' }));
     dbMocks.getLineAccounts.mockResolvedValue([{
       id: 'line-b', parent_line_account_id: null, is_active: 1, tenant_id: 'tenant-b',
@@ -277,6 +289,7 @@ describe('スタッフ経路の統括分離', () => {
   });
 
   it('一覧をログイン中の統括だけで取得する', async () => {
+    dbMocks.getStaffById.mockResolvedValue(row({ id: 'tenant-b-owner', role: 'owner', tenant_id: 'tenant-b' }));
     const res = await send('/api/staff', 'GET', undefined, 'tenant-b-key');
 
     expect(res.status).toBe(200);

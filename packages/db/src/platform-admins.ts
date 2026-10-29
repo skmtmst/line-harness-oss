@@ -203,6 +203,9 @@ export async function setPlatformAdminActive(
 // ---------------------------------------------------------------------------
 
 export const PLATFORM_AUDIT_ACTIONS = [
+  'application.contact',
+  'application.approve',
+  'application.invite',
   'tenant.create',
   'tenant.status.change',
   'tenant.feature_packs.change',

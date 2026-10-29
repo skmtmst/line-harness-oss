@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { useState } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
@@ -40,13 +41,16 @@ it('月のメニュー絞り込みは左の列と畳んだ欄で同じ選択を�
   const page = container.querySelector('[data-page-template="list"]')!
   expect(page.querySelector('[data-list-skeleton="templates"] [data-template-region="stats"]')?.textContent).toContain('今月の予約3件')
   expect(page.querySelector('[data-template-region="pagination"] [data-pagination-summary]')?.textContent).toContain('3件中 1〜3件')
-  expect((screen.getByRole('button', { name: '次のページ' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByRole('button', { name: '次のページ' })).toBeNull()
 })
 
 it('閲覧のみでもメニューと検索を使え、更新の口を足さない', async () => {
+  verifiedStaffRole('viewer')
   render(<Ledger readOnly />)
   expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: /作る|電話の予約/ })).toBeNull()
   fireEvent.change(screen.getByRole('searchbox'), { target: { value: '花子' } })
   await waitFor(() => expect(screen.getByText('選択中:all 検索:花子')).toBeTruthy())
 })
+
+afterEach(() => { verifiedStaffRole(null) })

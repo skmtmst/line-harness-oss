@@ -8,12 +8,13 @@
  */
 
 .toggle {
+  --toggle-hit-size: var(--space-24);
   position: relative;
   display: inline-block;
   vertical-align: top;
   line-height: 0;
-  width: 36px; /* width: 36 */
-  height: 20px; /* height: 20 */ /* cornerRadius: $radius-full */
+  width: var(--toggle-width); /* width: 36 */
+  height: var(--toggle-height); /* height: 20 */ /* cornerRadius: $radius-full */
   /*
    * ★管理画面（2026-09-24、better-accessibility：部品の見分けは 3:1）。オフの地は $step-idle（#eef0f3）で
    * 白い地と 1.1:1 しかなく、切替があること自体が見えなかった。ink-faint を 72% にして約 3.2:1。
@@ -32,6 +33,18 @@
   height: 16px;
   background: var(--color-canvas); /* fill: $canvas */
   transition: transform var(--motion-fast) var(--motion-ease-out);
+}
+
+/* 見える軌道は20pxのまま、周囲の透明な当たりを共通の最小寸法まで広げる。 */
+.toggle::before {
+  content: '';
+  position: absolute;
+  inset-inline: min(0px, calc((100% - var(--toggle-hit-size)) / 2));
+  inset-block: min(0px, calc((var(--toggle-height) - var(--toggle-hit-size)) / 2));
+}
+
+@media (pointer: coarse) {
+  .toggle { --toggle-hit-size: 44px; }
 }
 
 .on {
@@ -94,8 +107,16 @@
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .toggle { padding: 2px; background: var(--color-toggle-off); }
-:root .on { background: var(--color-accent-deep); }
+:root .on { background: var(--gradient-choice-on) var(--color-accent-deep); box-shadow: var(--shadow-choice-on); }
 :root .locked { background: var(--color-toggle-locked); }
 :root .toggle::after { border-radius: 50%; box-shadow: var(--shadow-controls-toggle); }
 :root .toggle { gap: 0; border-radius: var(--polish-radius-pill); }
 }
+
+:root .toggle:disabled { opacity: var(--polish-disabled-opacity); cursor: not-allowed; }
+
+.field { display: inline-flex; align-items: center; justify-content: space-between; gap: var(--space-12); min-width: 0; color: var(--color-ink); font-size: var(--text-body); line-height: var(--text-body--line-height); }
+.fieldBody { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.description { color: var(--color-ink-secondary); font-size: var(--text-caption); }
+
+.groupActions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); min-width: 0; }

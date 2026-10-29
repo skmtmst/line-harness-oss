@@ -15,7 +15,7 @@ import TagPill from '@/components/shared/tag-pill'
 import Notice from '@/components/shared/notice'
 import FolderSelect, { folderCreateResult } from '@/components/shared/folder-select'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { TextField } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import { notifyToast } from '@/components/shared/toast'
@@ -268,7 +268,7 @@ function TagCreate() {
               <span className={styles.switchTitle}>友だち一覧に出す</span>
               <span className={styles.switchNote}>オンにすると、友だち一覧の名前の下にこのタグが出ます</span>
             </span>
-            <SaveErrorField names={["isStarred","is_starred"]}><SettingCheckbox checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" /></SaveErrorField>
+            <SaveErrorField names={["isStarred","is_starred"]}><Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" /></SaveErrorField>
           </div>
         </Card>
 

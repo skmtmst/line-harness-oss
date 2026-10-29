@@ -86,12 +86,9 @@ export function shortUsageDate(value: string): string {
 
 export function groupSummary(group: FeatureGroup, features: Record<string, boolean>) {
   const total = groupFeatureCount(group)
-  // ★V8  の言い方（「6つ中 5つ有効」「5つすべて有効」「9つ中 0 有効」）。
   if (total === 0) return '消せません（並びだけ変えられる）'
   const enabled = groupEnabledCount(group, features)
-  if (enabled === total) return `${total}つすべて有効`
-  if (enabled === 0) return `${total}つ中 0 有効`
-  return `${total}つ中 ${enabled}つ有効`
+  return `${total} 件中 ${enabled} 件オン`
 }
 
 /**

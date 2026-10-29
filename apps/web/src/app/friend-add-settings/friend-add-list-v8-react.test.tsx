@@ -1,3 +1,5 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -125,7 +127,7 @@ async function eventually(check: () => void, timeout = 3000) {
 }
 
 beforeEach(() => {
-  staffRole = 'admin'
+  staffRole = verifiedStaffRole('admin')
   handler = base
   lastListUrl = null
   const values = new Map<string, string>()
@@ -147,6 +149,7 @@ beforeEach(() => {
   root = createRoot(host)
 })
 afterEach(() => {
+  verifiedStaffRole(null)
   vi.useRealTimers()
   act(() => root.unmount())
   host.remove()
@@ -253,8 +256,8 @@ test('受け皿の理由を見ると停止できない説明を出す', async ()
   await eventually(() => {
     expect(document.querySelector('[role="menu"]')).toBeTruthy()
   })
-  const stop = [...document.querySelectorAll('[role="menuitem"]')]
-    .find((item) => item.textContent?.includes('止められない理由を見る')) as HTMLElement
+  const stop = ([...document.querySelectorAll('[role="menuitem"]')]
+    .find((item) => item.textContent?.includes('止められない理由を見る')) ?? querySupplementaryPageAction('止められない理由を見る')) as HTMLElement
   await act(async () => { stop.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   await eventually(() => {
     // 板 ：止められない確かめ
@@ -266,27 +269,27 @@ test('受け皿の理由を見ると停止できない説明を出す', async ()
 
 // オーナー決定（2026-10-06）：閲覧のみの人には変える操作を押せない形でも置かず、隠す。
 test('v8 の閲覧のみは作る操作を置かない（隠す）', async () => {
-  staffRole = 'staff'
+  staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<FriendAddSettingsPage />))
   await settle()
   await eventually(() => {
     expect(host.querySelector('[data-design-node="LEwkJ"]')).toBeTruthy()
   })
-  const create = [...host.querySelectorAll('button, a')]
-    .find((item) => item.textContent?.includes('初回案内を作る'))
+  const create = ([...host.querySelectorAll('button, a')]
+    .find((item) => item.textContent?.includes('初回案内を作る')) ?? querySupplementaryPageAction('初回案内を作る'))
   expect(create).toBeUndefined()
 })
 
 test('v8 の閲覧のみは見出しの下に閲覧のみの帯が出る（板 LEwkJ）', async () => {
-  staffRole = 'staff'
+  staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<FriendAddSettingsPage />))
   await settle()
   await eventually(() => {
     expect(host.querySelector('[data-design-node="LEwkJ"]')).toBeTruthy()
   })
-  expect(host.textContent).toContain('閲覧のみで見ています')
+  expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
 })
 
 

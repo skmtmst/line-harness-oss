@@ -92,6 +92,7 @@ describe('Field と入力欄の読み上げ', () => {
       </Field>,
     )
     const area = screen.getByLabelText('本文')
+    fireEvent.focus(area)
     expect(describedText(area)).toEqual(['3/10文字'])
     expect(view.container.querySelector('[data-field-count]')?.getAttribute('data-field-count')).toBe('')
     view.rerender(
@@ -109,6 +110,7 @@ describe('Field と入力欄の読み上げ', () => {
         <TextArea id="body" />
       </Field>,
     )
+    fireEvent.focus(screen.getByLabelText('本文'))
     const support = view.container.querySelector('[data-field-support]')
     expect(support?.textContent).toContain('入力の説明')
     expect(support?.textContent).toContain('3/10文字')

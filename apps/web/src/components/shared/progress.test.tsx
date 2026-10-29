@@ -7,7 +7,7 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import Progress, { ProgressBar } from './progress'
+import Progress, { ProgressBar, StepMark } from './progress'
 
 afterEach(() => cleanup())
 
@@ -115,4 +115,28 @@ it.each([false, true])('reduce=%sでも連続更新は値を先に描き、棒�
       expect((bar.firstElementChild as HTMLElement).style.width).toBe('')
     }
   } finally { vi.unstubAllGlobals() }
+})
+
+describe('はじめにやることの進み：段の数に区切った緑', () => {
+  it('6 段のうち 5 段済みなら、緑の段が 5・地の色の段が 1', () => {
+    render(<ProgressBar appearance="onboarding" value={5} max={6} label="はじめにやることの進み" />)
+    const bar = screen.getByRole('progressbar', { name: 'はじめにやることの進み' })
+    expect(bar.getAttribute('aria-valuenow')).toBe('5')
+    expect(bar.getAttribute('aria-valuemax')).toBe('6')
+    const segments = [...bar.children]
+    expect(segments).toHaveLength(6)
+    expect(segments.filter((segment) => segment.hasAttribute('data-on'))).toHaveLength(5)
+  })
+  it('割合（max=100）や段の多い物は 1 本の棒のまま', () => {
+    render(<ProgressBar appearance="onboarding" value={40} label="割合" />)
+    expect(screen.getByRole('progressbar', { name: '割合' }).hasAttribute('data-segmented')).toBe(false)
+  })
+  it('済みの印は押せない丸。済みだけ ✓ を描く', () => {
+    const { container } = render(<><StepMark done /><StepMark done={false} /></>)
+    const marks = [...container.querySelectorAll('[data-step-mark]')]
+    expect(marks.map((mark) => mark.getAttribute('data-step-mark'))).toEqual(['done', 'todo'])
+    expect(marks.every((mark) => mark.getAttribute('aria-hidden') === 'true' && !mark.matches('button, input, [role]'))).toBe(true)
+    expect(marks[0].querySelector('svg')).not.toBeNull()
+    expect(marks[1].querySelector('svg')).toBeNull()
+  })
 })

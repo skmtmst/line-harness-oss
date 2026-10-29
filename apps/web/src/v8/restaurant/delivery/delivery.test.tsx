@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * デリバリー受注の見え方（★承認済み デリバリー受注_v02.pen／2026-10-09 利用者承認）。
  * 守るのは BEHAVIOR.md に書いた決めごと：
@@ -223,7 +225,7 @@ function at(url: string) {
 }
 
 beforeEach(() => {
-  fixture.role.value = 'owner'
+  fixture.role.value = verifiedStaffRole('owner')
   fixture.accountId.value = 'account-1'
   fixture.ubereatsConnection.mockResolvedValue({ connection: { status: 'connected', lastError: null } })
   fixture.snapshot.mockResolvedValue({ success: true, data: { stores: [store()] } })
@@ -403,7 +405,7 @@ describe('?view= で板を入れ替える', () => {
 
 describe('閲覧のみ（staff）', () => {
   it('権限の取得中は管理者用の接続情報を照会しない', async () => {
-    fixture.role.value = null
+    fixture.role.value = verifiedStaffRole(null)
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
     expect(fixture.ubereatsConnection).not.toHaveBeenCalled()
@@ -412,7 +414,7 @@ describe('閲覧のみ（staff）', () => {
   })
 
   it('受け付ける・拒否・準備完了・停止・再開を置かない', async () => {
-    fixture.role.value = 'staff'
+    fixture.role.value = verifiedStaffRole('staff')
     fixture.orders.mockResolvedValue(ordersData([order('o1', 'UE-1001')], true))
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
@@ -424,7 +426,7 @@ describe('閲覧のみ（staff）', () => {
     expect(screen.queryByLabelText('Uber Eatsの受付を止める')).toBeNull()
     expect(screen.queryByText('受付をまとめて止める')).toBeNull()
     // 閲覧のみの帯を出す。
-    expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+    expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
 
     expect(fixture.ubereatsConnection).not.toHaveBeenCalled()
     expect(screen.getByText('接続未確認')).toBeTruthy()
@@ -761,3 +763,5 @@ describe('Uberの接続と未完成の操作を分ける', () => {
     expect(await screen.findByRole('dialog', { name: '注文の詳細' })).toBeTruthy()
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

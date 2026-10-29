@@ -27,6 +27,10 @@ import { REASON_WORDS,RuleRow,displayName,ruleTriggerSummary } from './wizard-mo
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardPriorityStepContext = {
+  canEdit?: boolean
+  lockedReason?: string
+  conflictsReadable?: boolean
+  permissionPending?: boolean
   autoReplyId: string | null
   conflicts: AutoReplyConflict[]
   dryRun: AutoReplyDryRunResult | null
@@ -55,14 +59,15 @@ type WizardPriorityStepContext = {
   thisRuleName: string
 }
 
-export function WizardPriorityStep({ autoReplyId, conflicts, dryRun, effectiveKeywords, firstConflictAbove, friendLoadState, friendQuery, friends, friendTotal, loadPriorityData, matchedAccountId, moveBeforeFirstConflict, moveUp, myIndex, myPositionLabel, orderedRules, priorityState, runTest, saving, searchFriends, selectedFriendId, setFriendQuery, setSelectedFriendId, setTestMessage, testMessage, thisRuleName }: WizardPriorityStepContext) {
+export function WizardPriorityStep({ canEdit = true, lockedReason, conflictsReadable = true, permissionPending = false, autoReplyId, conflicts, dryRun, effectiveKeywords, firstConflictAbove, friendLoadState, friendQuery, friends, friendTotal, loadPriorityData, matchedAccountId, moveBeforeFirstConflict, moveUp, myIndex, myPositionLabel, orderedRules, priorityState, runTest, saving, searchFriends, selectedFriendId, setFriendQuery, setSelectedFriendId, setTestMessage, testMessage, thisRuleName }: WizardPriorityStepContext) {
   return (<>
               <Notice tone="info">
                 上のルールから順に見て、最初に当たった1つだけが動きます。このルールより上に、同じ受信に当たるルールがあると、このルールは動きません。
+                {!conflictsReadable && !permissionPending ? <p>権限のため確認結果を表示できません。設定の閲覧はできます。</p> : null}
               </Notice>
 
               <Card variant="form" gap="normal" className={styles.cardContent}>
-                <CardHeader size="stacked" title={<>動く順番</>} meta={<>黄色は、このルールと同じ受信に当たるルールです（過去28日の受信で確かめました）。</>} />
+                <CardHeader size="stacked" title={<>動く順番</>} meta={conflictsReadable ? <>黄色は、このルールと同じ受信に当たるルールです（過去28日の受信で確かめました）。</> : <>保存済みのルールを動く順番で表示しています。</>} />
                 {priorityState === 'error' ? (
                   <p className={styles.hint}>
                     ルールの並びを読み込めませんでした。
@@ -78,8 +83,8 @@ export function WizardPriorityStep({ autoReplyId, conflicts, dryRun, effectiveKe
                   <ol className={styles.orderList}>
                     {orderedRules.map((rule, index) => {
                       const isSelf = rule.id === autoReplyId
-                      const isConflict = conflicts.some((c) => c.autoReplyId === rule.id)
-                      const certain = conflicts.some((c) => c.autoReplyId === rule.id && c.certainty === 'certain')
+                      const isConflict = conflictsReadable && conflicts.some((c) => c.autoReplyId === rule.id)
+                      const certain = conflictsReadable && conflicts.some((c) => c.autoReplyId === rule.id && c.certainty === 'certain')
                       const aboveSelf = myIndex >= 0 && index < myIndex
                       return (
                         <li
@@ -107,18 +112,18 @@ export function WizardPriorityStep({ autoReplyId, conflicts, dryRun, effectiveKe
                               ) : isConflict ? (
                                 <span>{ruleTriggerSummary(rule)}</span>
                               ) : (
-                                <span>重なりなし</span>
+                                <span>{conflictsReadable ? '重なりなし' : ruleTriggerSummary(rule)}</span>
                               )}
                             </p>
                           </div>
                           {isSelf && (
                             <span className={styles.orderMove}>
-                              <Button type="button" disabled={myIndex <= 0} onClick={moveUp}>
+                              <Button type="button" disabled={!canEdit || myIndex <= 0} lockedReason={lockedReason} onClick={moveUp}>
                                 <ArrowUp size={16} aria-hidden="true" />
                                 上へ
                               </Button>
-                              {firstConflictAbove && (
-                                <Button type="button" onClick={moveBeforeFirstConflict}>
+                              {conflictsReadable && firstConflictAbove && (
+                                <Button type="button" disabled={!canEdit} lockedReason={lockedReason} onClick={moveBeforeFirstConflict}>
                                   <ArrowUpToLine size={16} aria-hidden="true" />
                                   {`「${displayName(firstConflictAbove)}」より前へ`}
                                 </Button>
@@ -183,8 +188,10 @@ export function WizardPriorityStep({ autoReplyId, conflicts, dryRun, effectiveKe
                     type="button"
                     variant="primary"
                     onClick={() => void runTest()}
-                    disabled={!selectedFriendId || !testMessage.trim() || saving}
-                    title={!selectedFriendId ? '送信者を選んでください' : !testMessage.trim() ? '届いたメッセージを入力してください' : undefined}
+                    disabled={!canEdit || !selectedFriendId || !testMessage.trim() || saving}
+                    lockedReason={lockedReason}
+                    disabledReason={canEdit && !selectedFriendId ? '送信者を選んでください。' : canEdit && !testMessage.trim() ? '届いたメッセージを入力してください。' : undefined}
+                    title={!selectedFriendId ? '送信者を選んでください' : canEdit && !testMessage.trim() ? '届いたメッセージを入力してください' : undefined}
                     busy={saving}
                     busyLabel="試しています…"
                   >
@@ -192,7 +199,7 @@ export function WizardPriorityStep({ autoReplyId, conflicts, dryRun, effectiveKe
                     試す
                   </Button>
                 </div>
-                {dryRun && (
+                {conflictsReadable && dryRun && (
         <Notice tone={dryRun.draftWon ? "success" : "warn"} role="status" heading={<>{dryRun.draftWon
           ? `当たったルール：このルール「${thisRuleName}」`
           : dryRun.winner

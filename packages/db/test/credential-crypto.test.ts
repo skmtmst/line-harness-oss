@@ -212,6 +212,9 @@ describe('LINE credential AES-GCM encryption', () => {
   it('writes both encrypted columns when an account is created', async () => {
     let insertValues: unknown[] = [];
     const db = {
+      async batch(statements: D1PreparedStatement[]) {
+        return Promise.all(statements.map((statement) => statement.run()));
+      },
       prepare(sql: string) {
         const statement = {
           bind(...values: unknown[]) {

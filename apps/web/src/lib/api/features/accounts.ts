@@ -36,6 +36,10 @@ export const accountsMethods = {
     update: (id: string, input: Partial<import("@line-crm/shared").LineAccountTagInput>) => fetchApi<ApiResponse<import("@line-crm/shared").LineAccountTagSummary>>(`/api/line-account-tags/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
   },
   lineAccounts: {
+    profilePictures: () =>
+      fetchApi<ApiResponse<Array<{ id: string; pictureUrl: string | null }>>>(
+        '/api/line-accounts/profile-pictures', { cache: 'no-store' },
+      ),
     list: (live = false, folderId?:string|null, options?: FetchApiOptions) => {
       const query=new URLSearchParams()
       if(live) query.set('live','1')
@@ -207,7 +211,7 @@ export const accountsMethods = {
     stepFollowerImport: (id: string) => // 続きを進める（済み・未開始なら何もせず返る）
       fetchApi<ApiResponse<{ state: FollowerImportState; busy: boolean; profilesFetched: number }>>(
         `/api/line-accounts/${id}/follower-import/step`,
-        { method: 'POST' },
+        { method: 'POST', body: '{}' },
       ),
     followerInsight: (id: string, date: string) =>
       fetchApi<ApiResponse<{

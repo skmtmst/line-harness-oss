@@ -1,7 +1,7 @@
 import { fail } from '../lib/fail.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono, type Context } from 'hono';
-import { getTenantCompanyContact, saveTenantCompanyContact } from '@line-crm/db';
+import { getTenantCompanyContact, saveTenantCompanyContact, getStaffById } from '@line-crm/db';
 import { parseTenantCompanyContact } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
@@ -56,6 +56,23 @@ function forbidden(c: Context<Env>) {
 
 /** 読み取り専用の移行診断とし、LINE の資格情報は返さない。 */
 export const tenants = new Hono<Env>();
+
+async function hasTenantWideMembership(c: Context<Env>): Promise<boolean> {
+  const actor = c.get('staff');
+  if (actor.id === 'env-owner') return true;
+  const member = await getStaffById(c.env.DB, actor.id);
+  return Boolean(member?.is_active && member.account_scope === 'all'
+    && (member.tenant_id ?? DEFAULT_TENANT_ID) === (actor.tenantId ?? DEFAULT_TENANT_ID));
+}
+
+tenants.use('/api/tenants/me/company-contact', async (c, next) => {
+  if (!await hasTenantWideMembership(c)) return forbidden(c);
+  return next();
+});
+tenants.use('/api/tenants/boundary-preview', async (c, next) => {
+  if (!await hasTenantWideMembership(c)) return forbidden(c);
+  return next();
+});
 
 /** 会社・連絡先は統括の管理者だけに返す。汎用の名前の口には含めない。 */
 tenants.get('/api/tenants/me/company-contact', requireRole('owner', 'admin'), async c => {
@@ -191,6 +208,7 @@ tenants.get('/api/tenants/me', async (c) => {
 
 /** 認証スタッフ自身が所属する統括の表示名だけを更新する。 */
 tenants.patch('/api/tenants/me', requireRole('owner', 'admin'), inputJsonBoundary(), async (c) => {
+  if (!await hasTenantWideMembership(c)) return forbidden(c);
   const body = await c.req.json<{ name?: unknown }>().catch(() => null);
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   if (!name) return inputError(c, { success: false, error: '統括名を入力してください' }, 400, ["name"]);

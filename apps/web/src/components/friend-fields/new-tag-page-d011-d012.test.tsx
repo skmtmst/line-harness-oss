@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * D011: フォルダ一覧の取得に失敗しても、複製していない通常作成では
@@ -137,7 +138,7 @@ describe('D012 保存して続けて作る', () => {
       fireEvent.change(nameInput, { target: { value: 'リピーター' } })
     })
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
+      fireEvent.click(getPageAction({ name: '保存して続けて作る' }))
     })
 
     // 成功は全画面リロードせず、作った名前を URL に残して遷移する。

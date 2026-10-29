@@ -12,6 +12,7 @@ import { assetBubbleError,isContentTemplateType } from '@/lib/broadcast-template
 import { formatTime } from '@/lib/format'
 import { tapActionFromSavedUri,tapActionLiffUrl,tapActionNeedsLiff,type TapActionKind,type TapActionValue } from '@/lib/tap-actions'
 import { FileText,Trash2 } from 'lucide-react'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 
 /** 知らない種類でも内部の語を出さない。 */
@@ -169,7 +170,7 @@ export function MessageButtonsSection({ buttons, error, onChange, liffId, accoun
       <div className="mt-3 space-y-2">
         {buttons.map((button, buttonIndex) => (
           <div key={buttonIndex} className="grid grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)_2rem] items-center gap-2 rounded-control bg-canvas-sunken p-2">
-            <SaveErrorField names={[`buttons.${buttonIndex}.label`,"label","button.label"]}><input aria-label={`ボタン${buttonIndex + 1}の名前`} value={button.label} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" /></SaveErrorField>
+            <SaveErrorField names={[`buttons.${buttonIndex}.label`,"label","button.label"]}><SharedTextField aria-label={`ボタン${buttonIndex + 1}の名前`} value={button.label} onChange={(event) => onChange(buttons.map((item, i) => i === buttonIndex ? { ...item, label: event.target.value } : item))} placeholder="ボタン名" className="min-w-0 rounded-control border border-hairline bg-canvas px-2 py-1.5 text-xs" /></SaveErrorField>
             <SaveErrorField names={["button"]}><TapActionField
               name={`ボタン${buttonIndex + 1}`}
               kindLabel={`ボタン${buttonIndex + 1}の種類`}

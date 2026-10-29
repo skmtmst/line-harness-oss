@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAccount } from '@/contexts/account-context';
 import { EntityPickerDialog } from './entity-picker';
 import { Plus } from 'lucide-react';
@@ -37,18 +37,26 @@ interface Option {
 function KindPicker({
   kinds,
   onPick,
+  disabled = false,
+  lockedReason,
 }: {
   kinds: RuleKind[]
   onPick: (kind: RuleKind) => void
+  disabled?: boolean
+  lockedReason?: string
 }) {
   const [open, setOpen] = useState(false)
+  const blocked = disabled || Boolean(lockedReason)
+  const blockedRef = useRef(blocked)
+  blockedRef.current = blocked
+  useEffect(() => { if (blocked) setOpen(false) }, [blocked])
   return <>
-    <Button type="button" aria-label="追加する条件を選ぶ" onClick={() => setOpen(true)}>
+    <Button type="button" aria-label="追加する条件を選ぶ" disabled={disabled} lockedReason={lockedReason} onClick={() => { if (!blockedRef.current) setOpen(true) }}>
       <Plus size={16} aria-hidden="true" />条件を足す
     </Button>
-    {open ? <EntityPickerDialog title="条件を選ぶ" confirmLabel="条件を足す" searchPlaceholder="条件の名前で探す"
+    {open && !blocked ? <EntityPickerDialog title="条件を選ぶ" confirmLabel="条件を足す" searchPlaceholder="条件の名前で探す"
       items={kinds.map(kind => ({ id: kind.type, name: kind.label, meta: kind.group, keywords: kind.group }))}
-      onConfirm={id => { const kind = kinds.find(kind => kind.type === id); if (kind) onPick(kind); setOpen(false) }}
+      onConfirm={id => { if (blockedRef.current) return; const kind = kinds.find(kind => kind.type === id); if (kind) onPick(kind); setOpen(false) }}
       onCancel={() => setOpen(false)} /> : null}
   </>
 }

@@ -1,4 +1,8 @@
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 オートメーション（src/v8/automations）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * V8 のテーマで表示し、ルール一覧・閲覧のみ・動いた記録・共通アクションを確かめる。
@@ -83,7 +87,7 @@ beforeEach(() => {
   account.id = 'account-a'
   window.history.replaceState({}, '', '/automations')
   window.dispatchEvent(new PopStateEvent('popstate'))
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   push.mockReset()
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -147,16 +151,25 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
 
   async function chooseRowAction(label: string) {
     await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="ルール「問い合わせを担当へ知らせる」の操作"]')!.click() })
-    const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((node) => node.textContent?.trim() === label)!
+    const item = ([...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((node) => node.textContent?.trim() === label) ?? querySupplementaryPageAction(label))!
     await act(async () => { item.click() })
   }
+
+  it('保管の確認で記録と設定が残り、一覧から戻せると説明する', async () => {
+    await render(<AutomationListV8 />)
+    await chooseRowAction('保管する')
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    expect(dialog.textContent).toContain('通常の一覧から外します。動いた記録と設定は残り、「保管」の絞り込みから戻せます。')
+    await act(async () => { within(dialog as HTMLElement).getByRole('button', { name: 'キャンセル' }).click() })
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+  })
 
   it('編集を連打しても下書きは1つだけ作り、店が変わると前の返事で移動しない', async () => {
     let resolve!: (value: { success: true; data: { id: string } }) => void
     const edit = vi.spyOn(api.automations, 'createDraftFromAutomation').mockImplementation(() => new Promise((done) => { resolve = done }))
     await render(<AutomationListV8 />)
     await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="ルール「問い合わせを担当へ知らせる」の操作"]')!.click() })
-    const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((node) => node.textContent?.trim() === '編集する')!
+    const item = ([...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((node) => node.textContent?.trim() === '編集する') ?? querySupplementaryPageAction('編集する'))!
     await act(async () => { item.click(); item.click() })
     expect(edit).toHaveBeenCalledTimes(1)
     account.id = 'account-b'
@@ -187,7 +200,7 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     await render(<AutomationListV8 />)
     const before = list.mock.calls.length
     await chooseRowAction('止める')
-    const confirm = () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((node) => node.textContent?.trim() === '止める')!
+    const confirm = () => ([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((node) => node.textContent?.trim() === '止める') ?? querySupplementaryPageAction('止める'))!
     await act(async () => { confirm().click(); confirm().click() })
     expect(status).toHaveBeenCalledTimes(1)
     expect(list.mock.calls.length).toBe(before + 1)
@@ -203,7 +216,7 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     const list = vi.spyOn(api.automations, 'list')
     await render(<AutomationListV8 />)
     await chooseRowAction('止める')
-    const confirm = () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((node) => node.textContent?.trim() === '止める')!
+    const confirm = () => ([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find((node) => node.textContent?.trim() === '止める') ?? querySupplementaryPageAction('止める'))!
     await act(async () => { confirm().click() })
     expect(status).toHaveBeenCalledTimes(1)
     account.id = 'account-b'
@@ -234,22 +247,22 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     expect(named('ルールを作る').length).toBeGreaterThan(0)
   })
 
-  it('閲覧のみでは、帯を出し、作る・編集・フォルダを追加・見本から作るを置かない（押せないボタンも無い）', async () => {
-    role.value = 'staff'
+  it('閲覧のみでは、帯を出し、フォルダ追加を理由付きで残して拒否する', async () => {
+    role.value = verifiedStaffRole('staff')
     await render(<AutomationListV8 />)
     await waitFor(() => host.textContent?.includes('問い合わせを担当へ知らせる') ?? false, 'ルールの行')
     expect(host.querySelector('[data-design-node="nH9L8"]')).not.toBeNull()
-    expect(host.textContent).toContain('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')
+    expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
     expect(named('編集する')).toHaveLength(0)
     expect(named('ルールを作る')).toHaveLength(0)
-    expect(named('フォルダを追加')).toHaveLength(0)
+    for (const folderAdd of named('フォルダを追加')) await expectPermissionLocked(folderAdd)
+    expect(named('フォルダを追加').length).toBeGreaterThan(0)
     expect(named('見本から作る')).toHaveLength(0)
     const disabled = buttons().filter((element) => !element.closest('[data-pagination]') && element.matches(':disabled, [aria-disabled="true"]'))
-    expect(disabled.map((element) => element.textContent)).toEqual([])
-    const pager = host.querySelector('[aria-label="ルール一覧のページ送り"]')!
-    expect(pager.querySelector('[aria-label="前のページ"]')).toHaveProperty('disabled', true)
-    expect(pager.querySelector('[aria-label="次のページ"]')).toHaveProperty('disabled', true)
-    expect(pager.querySelector('[aria-current="page"]')?.textContent).toBe('1')
+    expect(disabled.length).toBeGreaterThan(0)
+    for (const element of disabled) await expectPermissionLocked(element)
+    expect(host.querySelector('[aria-label="ルール一覧のページ送り"]')).toBeNull()
+    expect(host.querySelector('[data-pagination]')?.textContent).toContain('2件中 1〜2件')
     // 「…」は動いた記録を見るだけ。
     const menu = host.querySelector('[aria-label="ルール「問い合わせを担当へ知らせる」の操作"]') as HTMLButtonElement
     await act(async () => { menu.click() })
@@ -272,7 +285,7 @@ describe('V8 オートメーションの動いた記録（g98F9）', () => {
 })
 
 describe('V8 オートメーションの共通アクション（LnGNw）', () => {
-  it('行の「中身を見る」は版と使われている場所へ。閲覧のみでは作るボタンを置かない', async () => {
+  it('行の「中身を見る」は版と使われている場所へ。閲覧のみのフォルダ追加は拒否する', async () => {
     await render(<CommonActionsV8 />)
     await waitFor(() => host.textContent?.includes('購入のお礼') ?? false, '共通アクションの行')
     const open = named('中身を見る')[0] as HTMLAnchorElement
@@ -281,12 +294,13 @@ describe('V8 オートメーションの共通アクション（LnGNw）', () =>
 
     act(() => root.unmount())
     root = createRoot(host)
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await render(<CommonActionsV8 />)
     await waitFor(() => host.textContent?.includes('購入のお礼') ?? false, '共通アクションの行（閲覧のみ）')
     expect(named('共通アクションを作る')).toHaveLength(0)
-    expect(named('フォルダを追加')).toHaveLength(0)
-    expect(host.textContent).toContain('閲覧のみで見ています')
+    for (const folderAdd of named('フォルダを追加')) await expectPermissionLocked(folderAdd)
+    expect(named('フォルダを追加').length).toBeGreaterThan(0)
+    expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
   })
 })
 
@@ -309,3 +323,5 @@ describe('V8 オートメーションの共通アクション（LnGNw）', () =>
    await waitFor(()=>Boolean(host.textContent?.includes('再取得した分類')),'フォルダ復帰')
    expect(folderReads).toBe(2)
  })
+
+afterEach(() => { verifiedStaffRole(null) })

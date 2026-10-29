@@ -512,7 +512,6 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/line-account-tags',
     'GET /api/line-accounts/:id',
     'GET /api/line-accounts/:id/credential-health',
-    'GET /api/line-accounts/:id/follower-import',
     'GET /api/line-accounts/:id/follower-insight',
     'GET /api/line-accounts/:id/handovers',
     // 登録の接続確認は owner/admin のウィザードでのみ使う。

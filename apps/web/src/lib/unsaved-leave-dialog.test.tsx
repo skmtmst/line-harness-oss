@@ -1,7 +1,19 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+
+const fixture = vi.hoisted(() => ({ save: undefined as undefined | (() => void) }))
+vi.mock('@/components/shared/button', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/button')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.children === '保存して移る' && props.onClick) {
+      const handler = props.onClick
+      fixture.save = () => Reflect.apply(handler, undefined, [new MouseEvent('click')])
+    }
+    return <actual.default {...props} />
+  } }
+})
 
 import { UnsavedLeaveDialog } from './unsaved-leave-dialog'
 
@@ -76,4 +88,44 @@ describe('UnsavedLeaveDialog（未保存ガードの共通窓）', () => {
     render(<UnsavedLeaveDialog open={false} onConfirm={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.queryByText('保存していない変更があります')).toBeNull()
   })
+})
+
+it('権限で保存できなくても同じ保存操作と理由を残し、破棄と閉じるは使える', () => {
+  const onSave = vi.fn(async () => true), onConfirm = vi.fn(), onCancel = vi.fn()
+  render(<UnsavedLeaveDialog open saveDisabled saveLockedReason="権限のため変更できません。" onSave={onSave} onConfirm={onConfirm} onCancel={onCancel} />)
+  const save = screen.getByRole('button', { name: '保存して移る' })
+  expect(save.getAttribute('aria-disabled')).toBe('true')
+  expect(save.getAttribute('data-permission-locked')).not.toBeNull()
+  expect((save as HTMLButtonElement).disabled).toBe(false)
+  fireEvent.click(save); fireEvent.keyDown(save, { key: 'Enter' })
+  expect(onSave).not.toHaveBeenCalled()
+  fireEvent.click(screen.getByRole('button', { name: '保存せずに移る' }))
+  expect(onConfirm).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
+  expect(onCancel).toHaveBeenCalledTimes(1)
+})
+
+it('本人確認中は理由なしのdisabled、許可確定後だけ保存して移れる', async () => {
+  const onSave = vi.fn(async () => true), onConfirm = vi.fn(), onCancel = vi.fn()
+  const view = render(<UnsavedLeaveDialog open saveDisabled onSave={onSave} onConfirm={onConfirm} onCancel={onCancel} />)
+  const save = screen.getByRole('button', { name: '保存して移る' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  expect(save.getAttribute('data-permission-locked')).toBeNull()
+  fireEvent.click(save); expect(onSave).not.toHaveBeenCalled()
+  view.rerender(<UnsavedLeaveDialog open onSave={onSave} onConfirm={onConfirm} onCancel={onCancel} />)
+  fireEvent.click(screen.getByRole('button', { name: '保存して移る' }))
+  await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
+  expect(onSave).toHaveBeenCalledTimes(1)
+})
+
+it('保持した保存口は後から付いたロックを守り、解除後の通常保存は1回', async () => {
+  const onSave = vi.fn(async () => true), onConfirm = vi.fn(), onCancel = vi.fn()
+  const view = render(<UnsavedLeaveDialog open onSave={onSave} onConfirm={onConfirm} onCancel={onCancel} />)
+  const heldSave = fixture.save!
+  view.rerender(<UnsavedLeaveDialog open saveDisabled saveLockedReason="権限のため変更できません。" onSave={onSave} onConfirm={onConfirm} onCancel={onCancel} />)
+  await act(async () => { heldSave() })
+  expect(onSave).not.toHaveBeenCalled(); expect(onConfirm).not.toHaveBeenCalled()
+  view.rerender(<UnsavedLeaveDialog open onSave={onSave} onConfirm={onConfirm} onCancel={onCancel} />)
+  await act(async () => { fixture.save!() })
+  expect(onSave).toHaveBeenCalledTimes(1); expect(onConfirm).toHaveBeenCalledTimes(1)
 })

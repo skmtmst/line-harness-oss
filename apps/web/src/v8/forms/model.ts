@@ -4,6 +4,8 @@
  * 並び・絞り込み・保存先の数え方の正本は @line-crm/shared（Worker と同じ規則）。
  */
 import {
+  collectInputs,
+  normalizeLayout,
   displayFormName,
   sortFormsByLatestAnswer,
   summarizeFormDestinations,
@@ -176,4 +178,10 @@ export function referenceLabel(reference: FormDeleteImpact['references'][number]
   if (reference.kind === 'webinar') return `ウェビナー「${name}」`
   if (reference.kind === 'scenario') return `シナリオ「${name}」`
   return `「${name}」`
+}
+
+/** 保存形式の入力欄を数える。互換fieldsが空でも、配置内の質問は落とさない。 */
+export function formQuestionCount(form: Pick<Form, 'layout' | 'fields'>): number {
+  const layout = normalizeLayout(form.layout)
+  return layout ? collectInputs(layout).length : form.fields.filter(field => field.type !== 'heading').length
 }

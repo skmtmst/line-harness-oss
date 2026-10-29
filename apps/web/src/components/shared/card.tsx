@@ -122,8 +122,8 @@ export function CardContent({ children, className }: { children: ReactNode; clas
 }
 
 /** カード内の同格操作を均等幅で並べる。 */
-export function CardActionRow({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={[styles.actionRow, className].filter(Boolean).join(' ')} data-card-action-row>{children}</div>
+export function CardActionRow({ children, className, ...props }: Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'style'> & { children: ReactNode }) {
+  return <div {...props} className={[styles.actionRow, className].filter(Boolean).join(' ')} data-card-action-row>{children}</div>
 }
 
 export function CardHeader({

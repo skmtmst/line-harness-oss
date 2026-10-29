@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -133,7 +134,7 @@ describe('R23 作成画面のタグ候補は選択accountで絞る', () => {
     const tagUrls = fetchUrls.filter((url) => new URL(url, 'http://localhost').pathname === '/api/tags')
     expect(tagUrls.some((url) => url.includes('lineAccountId=acc-2'))).toBe(true)
     expect(host.textContent).toContain('1件は、今のアカウントにないため外しました')
-    const save = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '下書きを保存')!
+    const save = ([...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
     expect(save).toBeTruthy()
     await act(async () => fireEvent.click(save))
     await settle(50)

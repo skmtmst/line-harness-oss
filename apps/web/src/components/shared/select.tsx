@@ -1,12 +1,13 @@
 'use client'
 
+import choiceStyles from './choice-field.module.css'
 import { pageSizeLabel } from './page-size-options'
 import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import { isImeComposing } from './ime'
 import { joinDescribedBy, useFieldContext } from './field-context'
-import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption, SelectMenuSpacer, splitOptionHeads } from './select-menu'
+import { SELECT_MENU_ROW_STRIDE, SelectMenu, SelectMenuAction, SelectMenuOption, SelectMenuSpacer, SelectValueText, isAllOption, splitOptionHeads } from './select-menu'
 import styles from './select.module.css'
 import pillStyles from './status-pill.module.css'
 import { useSelectContentWidth } from './use-select-content-width'
@@ -49,6 +50,7 @@ export default function Select({
   treatment = 'box',
   createAction,
   menuHeading,
+  menuAlign,
 }: SelectProps) {
   // Width is a visual preset; a duration selector may use it too. The role
   // comes from the explicit flag or the control's accessible page-size name.
@@ -88,6 +90,9 @@ export default function Select({
 
   const OPTION_HEIGHT = SELECT_MENU_ROW_STRIDE
   const heads = useMemo(() => splitOptionHeads(options, label), [options, label])
+  /* 閉じた欄の見出し。label か、選択肢が持つ頭（「フォルダ：すべて」の「フォルダ」）。 */
+  const valueHead = label ?? (selected && /^[^：:]{1,12}[:：]/.test(selected.label) ? heads.heading : undefined)
+  const filterState: 'default' | 'active' | undefined = valueHead && options.some(isAllOption) && selected ? (isAllOption(selected) ? 'default' : 'active') : undefined
   useSelectContentWidth(rootRef, { size, selectedLabel: selected?.label, label, treatment, showChevron, iconOnly, icon })
   // 一覧は器（MenuPortal）が後から描くので、ref ではなく描かれた時に受け取る。
   const [listEl, setListEl] = useState<HTMLUListElement | null>(null)
@@ -249,10 +254,15 @@ export default function Select({
         ref={triggerRef}
         id={buttonId}
         type="button"
-        className={iconOnly ? undefined : `${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
+        className={iconOnly ? undefined : `${choiceStyles.frame} ${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
+        data-choice-field={!iconOnly || undefined}
+        data-choice-active={filterState === 'active' || undefined}
+        data-choice-invalid={Boolean(error) || invalid || undefined}
+        data-choice-disabled={disabled || undefined}
         data-tone={treatment === 'pill' ? selected?.tone ?? 'neutral' : undefined}
+        data-filter-active={filterState === 'active' || undefined}
         data-value-align={valueAlign}
-        data-chevron={showChevron || undefined}
+        data-chevron={!iconOnly || undefined}
         data-icon-only={iconOnly || undefined}
         title={iconOnly ? ariaLabel : undefined}
         aria-label={ariaLabel}
@@ -275,12 +285,12 @@ export default function Select({
         ) : null}
         {/* 省略表示（…）のとき、ホバーで全文を確認できる（#640）。 */}
         <span className={styles.value} hidden={iconOnly} data-select-value title={selected?.label ?? undefined}>
-          {label ? `${label}：${selected ? heads.labelOf(selected) : ''}` : selected?.label ?? ''}
+          {valueHead ? <SelectValueText head={valueHead} value={selected ? heads.labelOf(selected) : ''} filterState={filterState} /> : selected?.label ?? ''}
         </span>
-        {showChevron && !iconOnly && (open ? (
-          <ChevronUp className={styles.chevron} aria-hidden="true" />
+        {!iconOnly && (open ? (
+          <ChevronUp data-choice-chevron className={styles.chevron} aria-hidden="true" />
         ) : (
-          <ChevronDown className={styles.chevron} aria-hidden="true" />
+          <ChevronDown data-choice-chevron className={styles.chevron} aria-hidden="true" />
         ))}
       </Trigger>
       {open ? (
@@ -288,6 +298,7 @@ export default function Select({
           open={open}
           getAnchor={() => triggerRef.current}
           onClose={() => setOpen(false)}
+          align={menuAlign}
           listboxId={listboxId}
           labelledBy={buttonId}
           heading={heads.heading ?? menuHeading}

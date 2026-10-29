@@ -17,6 +17,7 @@ import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import { formatDateTime } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 /** QRの取得・画像保存はWorker、PDFはブラウザの印刷で行う。 */
 /*
  * 選べる大きさ（#689）。
@@ -485,7 +486,7 @@ export default function QrDialog({
                 URL と重なり、狭い幅では右側が切れていた。狭い幅では下へ。
               */}
               <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
-                <SaveErrorField names={["link"]}><textarea
+                <SaveErrorField names={["link"]}><SharedTextArea
                   id="qr-link"
                   readOnly
                   rows={3}

@@ -43,6 +43,7 @@ export default function HelpTip({
   const wrapRef = useRef<HTMLSpanElement>(null)
   const buttonRef = useRef<HTMLButtonElement>(null)
   const tipRef = useRef<HTMLSpanElement>(null)
+  const restoringFocus = useRef(false)
   const [position, setPosition] = useState<{ left: number; top: number }>()
 
   useLayoutEffect(() => {
@@ -80,7 +81,8 @@ export default function HelpTip({
       if (event.key !== 'Escape') return
       event.preventDefault()
       setOpen(false)
-      buttonRef.current?.focus()
+      restoringFocus.current = true
+      try { buttonRef.current?.focus() } finally { restoringFocus.current = false }
     }
     const onPointer = (event: PointerEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false)
@@ -105,6 +107,7 @@ export default function HelpTip({
       ref={wrapRef}
       onMouseEnter={hover ? () => { window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpen(true) } : undefined}
       onMouseLeave={hover ? () => setOpen(false) : undefined}
+      onFocus={hover ? () => { if (restoringFocus.current) return; window.dispatchEvent(new CustomEvent(CLOSE_OTHERS_EVENT, { detail: tipId })); setOpen(true) } : undefined}
       className={[styles.wrap, className].filter(Boolean).join(' ')}
       onBlur={(event) => {
         if (!wrapRef.current?.contains(event.relatedTarget as Node)) setOpen(false)

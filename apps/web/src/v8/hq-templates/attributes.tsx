@@ -19,7 +19,6 @@ import Notice from '@/components/shared/notice'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import FolderEditorDialog from '@/components/shared/folder-editor-dialog'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
-import Checkbox from '@/components/shared/checkbox'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { FieldsTab } from '@/v8/tags/public/fields-tab/index'
@@ -36,6 +35,7 @@ import { folderDisplayColor } from '@/components/shared/folder-dot'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { PageExplanationProvider, PageExplanationToggle } from '@/components/shared/page-explanation'
+import { ToggleField } from '@/components/shared/toggle'
 
 type Attempt = { input: HqFriendAttributeInput; requestId: string; distribute: boolean }
 type Entry = { row: HqFriendAttributeTemplate; detail: HqFriendAttributeDetail }
@@ -253,6 +253,6 @@ function HqMarkEditor({ definition, busy, locked, notices, footer, onCancel, onS
   }
   return <><CreatePage title="対応マークのひな形" notice={notices} footerActions={footer(submit, () => guarded(onCancel))} dirty={false}>
     <MarkBasicFields name={name} color={color} onName={setName} onColor={setColor} disabled={busy || locked} error={error || undefined} />
-    <Card variant="form" gap="normal"><h2 className={createStyles.cardTitle}>自動で変えるきまり</h2><SaveErrorField names={["autoOnInbound","auto_on_inbound"]}><Checkbox checked={autoOnInbound} onCheckedChange={setAutoOnInbound} disabled={busy || locked}>新しいメッセージが来たらこのマークに変える</Checkbox></SaveErrorField><SaveErrorField names={["isDefault","is_default"]}><Checkbox checked={isDefault} onCheckedChange={setIsDefault} disabled={busy || locked}>新しい友だちに最初から付ける</Checkbox></SaveErrorField></Card>
+    <Card variant="form" gap="normal"><h2 className={createStyles.cardTitle}>自動で変えるきまり</h2><SaveErrorField names={["autoOnInbound","auto_on_inbound"]}><ToggleField checked={autoOnInbound} onChange={setAutoOnInbound} disabled={busy || locked}>新しいメッセージが来たらこのマークに変える</ToggleField></SaveErrorField><SaveErrorField names={["isDefault","is_default"]}><ToggleField checked={isDefault} onChange={setIsDefault} disabled={busy || locked}>新しい友だちに最初から付ける</ToggleField></SaveErrorField></Card>
   </CreatePage><UnsavedLeaveDialog open={leaveTarget !== null} subject="マークへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} /></>
 }

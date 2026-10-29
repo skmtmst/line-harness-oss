@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -32,7 +34,7 @@ import { snapshotOf } from '../booking-kit/test-data'
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   nav.params = new URLSearchParams()
   fixture.snapshot.mockResolvedValue({ data: snapshotOf() })
   fixture.createMenu.mockResolvedValue({ success: true })
@@ -93,10 +95,10 @@ describe('MJoJR メニュー管理', () => {
   })
 
   it('閲覧のみ（staff）には追加・「…」・再開を置かない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
-    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
     expect(screen.queryByRole('button', { name: /メニューを作る/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /の操作$/ })).toBeNull()
     expect(screen.queryByRole('button', { name: '再開' })).toBeNull()
@@ -168,7 +170,7 @@ describe('mauOC コースの編集ページ', () => {
   })
 
   it('閲覧のみでも提供時間と所要時間を読み、保存はできない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     nav.params = new URLSearchParams('id=m1')
     render(<MenuEditPage />)
     expect(await screen.findByText('メニューの内容')).toBeTruthy()
@@ -180,7 +182,7 @@ describe('mauOC コースの編集ページ', () => {
   })
 
   it('閲覧では現在の価格と変更予定の価格を別々に読む', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     const data = snapshotOf()
     data.menuItems[0] = { ...data.menuItems[0], price: 1200, pendingPrice: 2500 }
     fixture.snapshot.mockResolvedValue({ data })
@@ -191,3 +193,5 @@ describe('mauOC コースの編集ページ', () => {
     expect(screen.getByText('¥2,500')).toBeTruthy()
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

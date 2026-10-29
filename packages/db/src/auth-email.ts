@@ -18,6 +18,7 @@ export interface AuthEmailToken {
   staff_id: string | null;
   ip_hash: string | null;
   device_marker: string | null;
+  application_id: string | null;
   expires_at: string;
   consumed_at: string | null;
   created_at: string;
@@ -30,6 +31,7 @@ export interface CreateAuthEmailTokenInput {
   staffId?: string | null;
   ipHash?: string | null;
   deviceMarker?: string | null;
+  applicationId?: string | null;
   expiresAt: string;
 }
 
@@ -37,8 +39,8 @@ export async function createAuthEmailToken(db: D1Database, input: CreateAuthEmai
   const id = crypto.randomUUID();
   await db
     .prepare(
-      `INSERT INTO auth_email_tokens (id, purpose, token_hash, email, staff_id, ip_hash, device_marker, expires_at, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO auth_email_tokens (id, purpose, token_hash, email, staff_id, ip_hash, device_marker, application_id, expires_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -48,6 +50,7 @@ export async function createAuthEmailToken(db: D1Database, input: CreateAuthEmai
       input.staffId ?? null,
       input.ipHash ?? null,
       input.deviceMarker ?? null,
+      input.applicationId ?? null,
       input.expiresAt,
       jstNow(),
     )
@@ -73,6 +76,13 @@ export async function consumeAuthEmailToken(db: D1Database, id: string): Promise
     .bind(jstNow(), id)
     .run();
   return (result.meta?.changes ?? 0) > 0;
+}
+
+/** 招待再送が届いた後、同じ申込の古い URL を無効化する。 */
+export async function consumeOtherSignupTokens(db: D1Database, applicationId: string, keepTokenId: string): Promise<void> {
+  await db.prepare(`UPDATE auth_email_tokens SET consumed_at = ?
+    WHERE purpose = 'signup' AND application_id = ? AND id <> ? AND consumed_at IS NULL`)
+    .bind(jstNow(), applicationId, keepTokenId).run();
 }
 
 /** 同じ用途で、ある時刻以降に作った件数（メール・接続元ごとの上限に使う）。 */

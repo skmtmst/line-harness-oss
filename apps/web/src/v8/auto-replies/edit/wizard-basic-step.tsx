@@ -11,12 +11,15 @@ import { TextField } from '@/components/shared/text-field';
 import { CreateStarterCards } from '@/components/templates/create-parts';
 import { api } from '@/lib/api';
 import type { Dispatch,SetStateAction } from 'react';
+import { canEditWizardNow } from './wizard-access'
 import { STARTER_TEMPLATES,WizardForm,WizardStep } from './wizard-model';
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardBasicStepContext = {
   accountId: string | null
   canManage: boolean
+  disabled?: boolean
+  lockedReason?: string
   folders: { id: string; name: string; color?: string | null; }[]
   folderState: 'loading' | 'ready' | 'error'
   loadFolders: () => Promise<void>
@@ -27,13 +30,13 @@ type WizardBasicStepContext = {
   setForm: Dispatch<SetStateAction<WizardForm>>
 }
 
-export function WizardBasicStep({ accountId, canManage, folders, folderState, loadFolders, form, goToStep, patch, setFolders, setForm }: WizardBasicStepContext) {
+export function WizardBasicStep({ accountId, canManage, disabled = false, lockedReason, folders, folderState, loadFolders, form, goToStep, patch, setFolders, setForm }: WizardBasicStepContext) {
   return (<>
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>名前とフォルダ</>} meta={<>一覧に出る名前です。友だちには見えません。</>} />
                 <SettingsFormRow layout="name-folder">
                   <div className={styles.field}><Field label="ルール名" htmlFor="wiz-name" required><SaveErrorField names={["ruleName","form.ruleName","rule_name","name","form.rule_name"]}><TextField
-                      id="wiz-name"
+                      id="wiz-name" disabled={disabled}
                       value={form.ruleName}
                       onChange={(e) => patch({ ruleName: e.target.value })}
                       placeholder="例：予約の日程変更"
@@ -43,19 +46,19 @@ export function WizardBasicStep({ accountId, canManage, folders, folderState, lo
                       aria-label="フォルダ"
                       size="full"
                       value={form.folderId}
-                      disabled={folderState !== 'ready'}
+                      disabled={disabled || folderState !== 'ready'}
                       onChange={(value) => patch({ folderId: value })}
-                      unfiled={{ value: '', label: '分けない' }}
+                      unfiled={{ value: '', label: '未分類' }}
                       folders={folders.map(folderById)}
                       // 一覧の左の列の「フォルダを追加」と同じ口（自動応答と同じアカウントのフォルダ）。
-                      onCreate={canManage && folderState === 'ready'
-                        ? folderCreator((name, color) => api.folders.create({ kind: 'auto_reply', name, color, accountId }), folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
+                      onCreate={canManage && !disabled && folderState === 'ready'
+                        ? folderCreator((name, color) => { if (!canEditWizardNow()) return Promise.reject(new Error('権限のためフォルダを作れません。')); return api.folders.create({ kind: 'auto_reply', name, color, accountId }) }, folderById, (created) => setFolders((current) => [...current, { id: created.id, name: created.name, color: created.color }]))
                         : undefined}
                     /></SaveErrorField></Field></div>
                 </SettingsFormRow>
                 {folderState === 'error' ? <Notice tone="info" action={<Button onClick={() => void loadFolders()}>フォルダをもう一度読み込む</Button>}>フォルダを読み込めませんでした。選択済みのフォルダは保存時も保持します。</Notice> : null}
                 <div className={styles.field}><Field label="社内メモ" htmlFor="wiz-memo"><SaveErrorField names={["internalMemo","form.internalMemo","internal_memo","form.internal_memo"]}><TextField
-                    id="wiz-memo"
+                    id="wiz-memo" disabled={disabled}
                     value={form.internalMemo}
                     onChange={(e) => patch({ internalMemo: e.target.value })}
                     placeholder="例：キャンペーン中だけ使う"
@@ -71,9 +74,11 @@ export function WizardBasicStep({ accountId, canManage, folders, folderState, lo
                 <CreateStarterCards
                   items={STARTER_TEMPLATES.map((tpl) => ({
                     key: tpl.key,
+                    disabled, lockedReason,
                     name: tpl.name,
                     lines: tpl.lines,
                     onUse: () => {
+                      if (!canEditWizardNow()) return
                       setForm((current) => tpl.apply(current))
                       goToStep('trigger')
                     },

@@ -101,3 +101,17 @@ describe('？印の当たりは透明のはみ出しを持たない（G3・V8）
 
 
 })
+
+it('名前に乗せる補足は焦点でも開き、Escで焦点を戻しても開き直さない', () => {
+  const view = render(<HelpTip hover label="担当の受付" trigger={<strong>担当A</strong>}>受付1人ずつ</HelpTip>)
+  const button = view.getByRole('button', { name: '担当の受付' })
+  fireEvent.focus(button)
+  expect(view.getByRole('note').textContent).toBe('受付1人ずつ')
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(view.queryByRole('note')).toBeNull()
+  button.blur()
+  fireEvent.mouseEnter(button.parentElement!)
+  expect(view.getByRole('note')).toBeTruthy()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(view.queryByRole('note')).toBeNull()
+})

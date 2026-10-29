@@ -14,6 +14,7 @@ import { GripVertical } from 'lucide-react'
 import type { ActionMenuItem } from './action-menu'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import styles from './row-actions.module.css'
+import { usePermissionLockTip } from './permission-lock-tip'
 
 /*
  * 並び替えの共通部品（つまみ1つ・動かし方3つ）。
@@ -47,6 +48,8 @@ export type ReorderHandleProps = HandleButtonProps & {
   disabledReason?: string | null
   /** 理由の文言が無くても動かせない（管理画面 の旧 ReorderGrip の disabled だけが使う）。 */
   locked?: boolean
+  /** 権限で動かせない時は図柄を残し、焦点でも理由を読めるようにする。 */
+  lockedReason?: string
   /**
    * 見た目。`icon` は 32×32 の当たりに6点の図柄（Pencil `K65Uhe`、旧 DragHandle）。
    * `inline` は文字の高さのつまみ（旧 ReorderGrip）。図柄は children で差し替える。
@@ -83,6 +86,7 @@ export default function ReorderHandle({
   look = 'inline',
   disabledLook = 'hide',
   locked = false,
+  lockedReason,
   className,
   children,
   title,
@@ -92,6 +96,7 @@ export default function ReorderHandle({
   const glyph = children ?? (look === 'icon' ? SIX_DOTS : <GripVertical size={16} aria-hidden="true" />)
   // V8 ではマウスの移動が接続されたものだけつまみを出す（WEB-019）。
   const slotRef = useRef<HTMLButtonElement | HTMLSpanElement>(null)
+  const permission = usePermissionLockTip<HTMLButtonElement>(lockedReason, rest['aria-describedby'])
   const [parentDraggable, setParentDraggable] = useState(false)
   // 既存の表では親の箱に dragstart を接続している。そこからの操作も残す。
   useLayoutEffect(() => {
@@ -101,6 +106,22 @@ export default function ReorderHandle({
   const mouseConnected = parentDraggable || rest.onPointerDown || rest.onMouseDown || (rest.draggable && rest.onDragStart)
 
   const noMouse = !mouseConnected
+  if (lockedReason) {
+    // 読み上げ名やdata属性は保ち、元の移動用イベントは持ち込まない。
+    const attributes = Object.fromEntries(Object.entries(rest).filter(([key]) => !/^on[A-Z]/.test(key)))
+    return <><button type="button" {...attributes}
+      ref={element => { slotRef.current = element; permission.ref.current = element }}
+      className={[look === 'icon' && styles.action, look === 'icon' && styles.grip, look === 'inline' && `${INLINE_CLASS} ${styles.inlineGrip}`, className, styles.permissionGrip].filter(Boolean).join(' ')}
+      aria-label={ariaLabel ?? `${label}を並び替え。上下キーで移動`}
+      data-reorder-handle="" data-roving-own="vertical" data-hit-area=""
+      {...permission.handlers} draggable={false}
+      onPointerDown={event => { permission.handlers?.onPointerDown(event); event.stopPropagation() }}
+      onMouseDown={event => event.stopPropagation()}
+      onTouchStart={event => event.stopPropagation()}
+      onDragStart={event => { event.preventDefault(); event.stopPropagation() }}
+      onKeyDown={event => { permission.handlers?.onKeyDown(event); if (event.key === 'ArrowUp' || event.key === 'ArrowDown') { event.preventDefault(); event.stopPropagation() } }}
+    >{glyph}</button>{permission.node}</>
+  }
   if (disabledReason || locked || rest.disabled || noMouse) {
     /* つまみは出さない。幅だけ同じに空け、理由は title と読み上げで言う。 */
     return (

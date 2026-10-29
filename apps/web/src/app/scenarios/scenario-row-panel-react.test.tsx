@@ -157,9 +157,13 @@ test('削除に失敗したら確認窓を閉じず、窓の中に失敗を出�
   await eventually(() => {
     if (!document.body.querySelector('[data-design-part="detail-panel"]')) throw new Error('panel not open')
   })
-  const remove = [...document.body.querySelectorAll('button')].find((b) => b.textContent === '削除する')
-  if (!remove) throw new Error('no delete button')
-  await act(async () => { remove.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  // 複製・削除はパネル下部の「…」（その他操作メニュー）の中（d84a442f09〜）。
+  const more = [...document.body.querySelectorAll('button')].find((b) => b.getAttribute('aria-label') === '「一つ目」のその他操作')
+  if (!more) throw new Error('no more-actions button')
+  await act(async () => { more.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  const menuItem = () => [...document.body.querySelectorAll('[role="menuitem"]')].find((node) => node.textContent === '削除する')
+  await eventually(() => { if (!menuItem()) throw new Error('menu not open') })
+  await act(async () => { menuItem()!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   const dialog = () => [...document.body.querySelectorAll('[role="dialog"], [role="alertdialog"]')]
     .find((node) => node.textContent?.includes('「一つ目」を削除しますか？'))
   await eventually(() => { if (!dialog()) throw new Error('confirm not open') })

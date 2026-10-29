@@ -3,6 +3,7 @@ import { usePathname } from 'next/navigation'
 import Sidebar from './layout/sidebar'
 import SettingsInnerNav, { isSettingsAreaPath } from './layout/settings-inner-nav'
 import AuthGuard from './auth-guard'
+import HqAccessGate from './hq-access-gate'
 import { AccountProvider } from '@/contexts/account-context'
 import SessionLostNotice from './session-lost-notice'
 import RootLandingGate from './root-landing-gate'
@@ -27,6 +28,7 @@ import NoteBar from './shared/note-bar'
 import PlatformNotices from './hq/platform-notices'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useEffect, useState } from 'react'
+import ViewPermissionGate from './view-permission-gate'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -72,7 +74,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     )
   }
 
-  const guardedContent = <RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate>
+  const guardedContent = <HqAccessGate><ViewPermissionGate><RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate></ViewPermissionGate></HqAccessGate>
 
   const suspendedSupport = (
     <PageChromeProvider>

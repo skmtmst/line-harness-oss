@@ -1,3 +1,4 @@
+import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * ★V8 運営コンソール（src/v8/ops）の動きの試験。BEHAVIOR.md の主な動きを守る。
@@ -95,7 +96,7 @@ describe('運営コンソールの V8 外枠', () => {
       expect(text()).toContain(label)
     }
     expect(text()).toContain('運営 › メンバー管理')
-    expect(document.querySelector('a[aria-current="page"]')?.textContent).toContain('メンバー管理')
+    expect(document.querySelector('a[aria-current="page"]')).toBeNull()
   })
 })
 
@@ -168,7 +169,7 @@ describe('送る・止める前に確かめる', () => {
     search = 'id=t1'
     await act(async () => { root.render(<OpsTenantDetailV8 />) })
     await settle()
-    await act(async () => { (buttons('停止')[0] as HTMLButtonElement).click() })
+    await act(async () => { getPageAction({ name: '停止' }).click() })
     await settle()
     const name = document.querySelector('input[placeholder="契約先A"]') as HTMLInputElement
     expect(name.getAttribute('aria-required')).toBe('true')
@@ -221,7 +222,7 @@ describe('承認の前に元の問い合わせを読み合わせる', () => {
     const dialog = document.querySelector('[data-design-node="eSXxA"]')!
     fireEvent.click(dialog.querySelector('input[type="checkbox"]')!)
     await settle()
-    return { dialog, approve: [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '保存して承認')! }
+    return { dialog, approve: ([...dialog.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === '保存して承認') ?? querySupplementaryPageAction('保存して承認'))! }
   }
   it.each(['resolved', 'in_progress'] as const)('%s は取得した状態を示し、未解決なら承認を止める', async stage => {
     const fetchTicket = vi.spyOn(api.ops.support, 'ticket').mockResolvedValue(source(stage))

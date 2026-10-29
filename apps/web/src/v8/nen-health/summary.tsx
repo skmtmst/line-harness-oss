@@ -27,6 +27,7 @@ import { SKIN_LABELS, TEAR_LABELS, countText, md } from './parts'
 import styles from './health.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import Notice from '@/components/shared/notice'
+import { withHonorific } from '@line-crm/shared'
 
 type Logs = NenHealthSummaryData['summary']['logs']
 
@@ -43,7 +44,7 @@ function petLine(summary: NenHealthSummaryData): string {
   const end = new Date(summary.generatedAt)
   const start = new Date(end.getTime() - (summary.summary.days - 1) * 86_400_000)
   const range = Number.isNaN(end.getTime()) ? '' : `・${polishFormatDate(start, { style: 'list-day' })}〜${polishFormatDate(end, { style: 'list-day' })}`
-  return `${summary.pet.name || summary.pet.callName}（${parts}）・${summary.owner.name}さん${range}`
+  return `${summary.pet.name || summary.pet.callName}（${parts}）・${withHonorific(summary.owner.name)}${range}`
 }
 
 function signed(value: number, digits: number): string {

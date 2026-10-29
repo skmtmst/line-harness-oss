@@ -39,19 +39,19 @@
 - 監査：`api.ops.audit`（50件ずつ）。CSV はいまの条件で全部（上限 2万件）
 - お知らせ：`api.ops.announcements.list / preview / create（再実行キー）/ update（版つき）/ remove`
 - ナレッジ：`api.ops.knowledge.list / article / update / review（approve・dismiss・disable）`
-- 契約先：`api.ops.tenants`・`createTenant`・`tenant`・`changeTenantStatus`・`setTenantFeaturePacks`・`impersonation.start`
+- 契約先：`api.ops.tenants`・`createTenant`・`tenant`・`changeTenantStatus`・`impersonation.start`。飲食店機能の切り替えは契約先詳細に置かない
 - お問い合わせ：`api.ops.support.summary / tickets / ticket / update / saveDraft / aiDraft / deleteDraft / reply / create`、ナレッジの確認の続き `api.ops.knowledge.process`
 
 ## 閲覧のみ（`/api/ops/me` の readOnly）
 - 分かるまで・取れなかったときは閲覧のみとして扱う（`use-ops-read-only.ts`）。
 - 閲覧のみの人には、押せないボタンを置かずに隠す（2026-10-06 オーナー決定）：
-  契約先を作る・停止・アーカイブ・再開・飲食店機能の切り替え／招待メールを送る・停止・取り消す・再送／
+  契約先を作る・停止・アーカイブ・再開／招待メールを送る・停止・取り消す・再送／
   お知らせの作る欄と「直す」／お問い合わせの起票・返信・段階の変更・代理ログイン。
 - ダッシュボードの「Stripe と同期」も書ける人だけ（今と同じ）。
 
 ## 今の V8（app/ops の v8 分岐）と違うところ
 - 外枠：上の環境帯（橙・墨）の代わりに、板の中の頭の下に注意の帯「運営コンソール：…」。検証環境では帯の右に「検証環境」。
-- 外枠：メンバー管理・2要素認証は左メニューの下に入口を置いた。名前・ログアウトは上の帯。
+- 外枠：メンバー管理・2要素認証・ログアウトは左下の本人メニューから開く。サイドバーにメンバー管理を重ねて置かず、運営にはプロフィール編集を出さない。
 - 外枠：上の帯のアカウントの札は「運営コンソール」1つだけ（切り替える先が無い）。通知のベルは数を出さない。
 - ログイン：絵どおり「または」の区切り・LINE でログイン・パスワードを忘れた方は、カードの中。下に招待の案内。
 - 招待：「24時間で期限切れ」は説明の文に入れた（下の注記はやめた）。

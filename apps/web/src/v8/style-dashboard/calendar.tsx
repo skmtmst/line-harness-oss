@@ -2,7 +2,8 @@
 import { ChevronLeft, ChevronRight, Info } from 'lucide-react'
 import type { CSSProperties } from 'react'
 import { CalendarPerson, CalendarTimeEntries, calendarTimeRange, useCalendarTimeScale } from '@/components/shared/calendar-parts'
-import { BookingLegend } from '@/components/shared/booking-presentation'
+import { BookingVisibleLegend } from '@/components/shared/booking-presentation'
+import { calendarBookingState } from '@/components/shared/booking-state'
 import MonthCalendarGrid from '@/components/shared/month-calendar'
 import CalendarPeriod from '@/components/shared/calendar-period'
 import Button from '@/components/shared/button'
@@ -48,7 +49,7 @@ export function WeekCalendar({ week, canWrite, onMove, onSlot, onOpen, period = 
         <span className={styles.grow} />
         <span className={styles.calLegend}><i data-k="booked" />予約<i data-k="free" />空き<i data-k="off" />休み</span>
       </div>
-      <BookingLegend/>
+      <BookingVisibleLegend states={[...new Set(week.entries.map(entry => calendarBookingState(entry.state ?? 'confirmed')))]} />
       <CalendarPeriod period={week.days[0]?.date ?? ''} scope={period}><div className={styles.weekFrame}>
         <div className={styles.weekHead}>
           <span className={styles.boardTimeHead} />

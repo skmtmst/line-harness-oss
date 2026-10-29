@@ -1,6 +1,8 @@
 'use client'
 
-import { Plus, X } from 'lucide-react'
+import choiceStyles from './choice-field.module.css'
+import { inputPlaceholder } from './input-placeholder'
+import { ChevronDown, Plus, X } from 'lucide-react'
 import { useId, useRef, useState } from 'react'
 import type { KeyboardEvent } from 'react'
 import Checkbox from '@/components/shared/checkbox'
@@ -186,7 +188,8 @@ export default function MultiSelect({
         : null}
       <div
         ref={fieldRef}
-        className={[styles.field, open ? styles.open : null, invalid ? styles.invalid : null, disabled ? styles.disabled : null]
+        data-choice-field data-choice-invalid={invalid || undefined} data-choice-disabled={disabled || undefined}
+        className={[choiceStyles.frame, styles.field, open ? styles.open : null, invalid ? styles.invalid : null, disabled ? styles.disabled : null]
           .filter(Boolean)
           .join(' ')}
         onClick={() => {
@@ -197,7 +200,7 @@ export default function MultiSelect({
         }}
       >
         {visibleChips.map((chip) => (
-          <span key={chip.value} className={styles.chip} title={chip.label}>
+          <span key={chip.value} data-choice-chip className={styles.chip} title={chip.label}>
             {chip.dot ? <span aria-hidden="true" data-dot={chip.dot} className={styles.dot} /> : null}
             <span className={styles.chipLabel}>{chip.label}</span>
             {!disabled ? (
@@ -236,6 +239,7 @@ export default function MultiSelect({
           ref={inputRef}
           id={inputId}
           type="text"
+          data-choice-trigger
           role="combobox"
           aria-label={ariaLabel}
           aria-expanded={open}
@@ -247,7 +251,7 @@ export default function MultiSelect({
           aria-busy={loading || undefined}
           autoComplete="off"
           disabled={disabled}
-          placeholder={selected.length === 0 ? placeholder : undefined}
+          placeholder={selected.length === 0 ? inputPlaceholder(placeholder) : undefined}
           value={query}
           onFocus={() => {
             if (!disabled) setOpen(true)
@@ -260,6 +264,7 @@ export default function MultiSelect({
           onKeyDown={onInputKeyDown}
           className={styles.input}
         />
+        <ChevronDown data-choice-chevron aria-hidden="true" />
       </div>
       {open ? (
         <MenuPortal

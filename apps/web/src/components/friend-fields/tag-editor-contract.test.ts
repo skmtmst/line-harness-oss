@@ -1,10 +1,39 @@
+// @vitest-environment happy-dom
+import React from 'react'
+import { cleanup, render } from '@testing-library/react'
+import type { Tag } from '@line-crm/shared'
+import { TagEditForm } from '@/v8/tag-edit/edit-form'
+import { getPageAction } from '@/test-utils/page-action'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 const read = (file: string) => readFileSync(resolve(process.cwd(), 'src', file), 'utf8')
 const EDITOR = read('v8/tag-edit/edit-form.tsx')
 const MODEL = read('v8/tag-edit/model.ts')
 const SAVE = read('v8/tag-edit/edit.tsx')
+
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
+vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => React.createElement('a', { href }, children) }))
+vi.mock('@/lib/api', async original => {
+  const actual = await original<typeof import('@/lib/api')>()
+  return { ...actual, api: { ...actual.api,
+    commonActions: { ...actual.api.commonActions, resources: async () => ({ success: false, error: 'not configured' }) },
+    tags: { ...actual.api.tags, list: async () => ({ success: true, data: [] }) },
+  } }
+})
+afterEach(cleanup)
+
+function renderCopyAction() {
+  const save = vi.fn(), remove = vi.fn()
+  render(React.createElement(TagEditForm, {
+    tag: { id: 'copy-source', name: '会員', status: 'active', linkedEnabled: false } as Tag,
+    groups: [], dependencies: null, accountId: 'account-1', readOnly: false, conflict: false, compareBusy: false,
+    onCompare: vi.fn(), onReloadLatest: vi.fn(), retroactiveReference: false, initialActions: [], saving: false,
+    error: '', onCancel: vi.fn(), onSave: save, onDelete: remove,
+  }))
+  return { action: getPageAction({ name: '複製して作る', exact: true }), save, remove }
+}
+
 describe('現役V8のタグ編集', () => {
   it('友だち一覧の表示設定は現在の編集の選ぶ欄から変える', () => {
     expect(EDITOR).toContain('label="友だち一覧に出す"')
@@ -29,7 +58,10 @@ describe('現役V8のタグ編集', () => {
   })
   it('編集から同じタグを複製して作れる', () => {
     expect(EDITOR).toContain('複製して作る')
-    expect(EDITOR).toContain('href={`/tags/new?copy=${tag.id}`}')
+    const { action, save, remove } = renderCopyAction()
+    expect(action.getAttribute('href')).toBe('/tags/new?copy=copy-source')
+    expect(save).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
   })
   it('R620: 遡及OFFでは既存へ反映せず、確認した時だけ反映する', () => {
     expect(EDITOR).toContain('if (applyToExisting && (tag.friendCount ?? 0) > 0')

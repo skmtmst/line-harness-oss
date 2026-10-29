@@ -202,6 +202,20 @@ function noticeText(container: HTMLDivElement): string | null {
 }
 
 describe('LINE通知一覧のReact実mount試験', () => {
+  it('LINEの受付を到達や既読と言い切らず、受付の状態を表示する', async () => {
+    const { container, nextDelivery } = await setup()
+    await act(async () => {
+      nextDelivery('account-a').resolve(ok([run('受付', { status: 'accepted', acceptedAt: '2026-09-09T11:01:00+09:00', retryAvailable: false })], 0))
+      await drainMicrotasks()
+    })
+    expect(container.textContent).toContain('個人の既読は見られません')
+    await openDetail(container)
+    const detail = document.querySelector('[role="dialog"]')!
+    expect(detail.textContent).toContain('LINEが受け付けました')
+    expect(detail.textContent).not.toContain('届きました')
+    expect(detail.textContent).not.toContain('開きました')
+  })
+
   it('失敗の行から詳細を開き、試行履歴・次回時刻・対応済み状態を表示する', async () => {
     const { container, nextDelivery } = await setup()
     const detailed = Object.assign(run('詳細'), {

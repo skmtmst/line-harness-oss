@@ -95,7 +95,7 @@ export function useSupportEditor(friendId: string, onSaved: (notice: string) => 
     setError('')
     try {
       // 読んだ改訂値を付けて、ほかの人の変更を黙って上書きしない。
-      const res = await api.chats.update(owner, { status, operatorId: operatorId || null, notes: notes || null, revision })
+      const res = await api.chats.update(owner, { status, operatorId: operatorId || null, notes, revision })
       if (gen !== genRef.current) return
       if (!res.success) {
         setError(res.error)

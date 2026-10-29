@@ -1,5 +1,5 @@
 'use client'
-import { normalizePhone, phoneProblem } from '@line-crm/shared'
+import { normalizePhone, phoneProblem, withHonorific } from '@line-crm/shared'
 
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import { loadStaffIdentity } from '@/lib/staff-role'
@@ -20,6 +20,7 @@ import { api, ApiError, bookingApi, type BookingAvailabilitySlot, type BookingCo
 import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message';
 import { formatDateTime, formatDay, formatTime } from '@/lib/format';
 import { Card, NotificationToggle, RelatedLinks } from "./page-gap-parts"
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
 
 /**
@@ -805,9 +806,9 @@ export default function NewProxyBookingPage() {
               </div>
               {phoneCustomer ? (
                 <div className="space-y-2">
-                  <input aria-label="電話客の名前" value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="お客様の名前" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
-                  <input aria-label="電話客の電話番号" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="電話番号" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
-                  <input aria-label="電話客のペット名" value={petName} onChange={(event) => setPetName(event.target.value)} placeholder="ペットの名前（任意）" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                  <SharedTextField aria-label="電話客の名前" value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="お客様の名前" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                  <SharedTextField aria-label="電話客の電話番号" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="電話番号" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                  <SharedTextField aria-label="電話客のペット名" value={petName} onChange={(event) => setPetName(event.target.value)} placeholder="ペットの名前（任意）" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
                   {customer && savedMatchesInput ? <p className="text-success text-xs">顧客台帳に保存済み（電話末尾 {customer.phone_last4}）</p> : <p className="text-ink-faint text-xs">「この内容で予約を入れる」を押すと顧客台帳へ保存します。入力へ戻って直せます。</p>}
                 </div>
               ) : friend ? (
@@ -823,7 +824,7 @@ export default function NewProxyBookingPage() {
                 </div>
               ) : (
                 <div className="relative">
-                  <input
+                  <SharedTextField
                     ref={friendInputRef}
                     value={friendQuery}
                     onChange={(event) => {
@@ -908,7 +909,7 @@ export default function NewProxyBookingPage() {
             </Card>
 
             <Card title="お客様からの要望">
-              <textarea aria-label="お客様からの要望" value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={4} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" placeholder="予約時に確認した内容を入力" />
+              <SharedTextArea aria-label="お客様からの要望" value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={4} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" placeholder="予約時に確認した内容を入力" />
             </Card>
 
             <Card title="お客様に何を送りますか" note="LINEと結びついている方には、予約後の案内を送ります。送らない選択もできます。">
@@ -944,7 +945,7 @@ export default function NewProxyBookingPage() {
           </div>
 
           <div data-design="Right" className="w-full space-y-4 xl:flex-none" style={{ maxWidth: 390 }}>
-            <Card title={friend ? `${friend.displayName}さんにはこう届きます` : 'お客様にはこう届きます'}>
+            <Card title={friend ? `${withHonorific(friend.displayName)}にはこう届きます` : 'お客様にはこう届きます'}>
               {phoneCustomer && !isLineLinked ? (
                 // N-390: 未連携の電話客へLINEプレビューを見せると
                 // 「送れる」と誤解させる。実態をそのまま伝える。
@@ -954,7 +955,7 @@ export default function NewProxyBookingPage() {
               ) : (
                 <LinePreview>
                   <div className="rounded-card bg-canvas p-4 text-sm leading-6">
-                    <p>{friend?.displayName ?? 'お客様'}さま</p>
+                    <p>{withHonorific(friend?.displayName ?? 'お客様', 'さま')}</p>
                     <p className="font-semibold">ご予約を承りました。</p>
                     <p className="mt-3">{slotStartIso ? dateLabel(slotStartIso, slotTimeZone) : '日時を選ぶと表示されます'}</p>
                     <p>{menu?.name ?? 'メニューを選ぶと表示されます'} ／ 担当 {selectedStaff?.display_name ?? '—'}</p>
@@ -1030,7 +1031,7 @@ export default function NewProxyBookingPage() {
             </Notice>
           </div>
           <aside data-design="Right" className="space-y-4">
-            <Card title={`${customerLabel}さんにはこう届きます`} note="送る前に、文面をそのまま確かめられます。">
+            <Card title={`${withHonorific(customerLabel)}にはこう届きます`} note="送る前に、文面をそのまま確かめられます。">
               <BookingConfirmPreview friendName={customerLabel} menuName={menu.name} staffName={selectedStaff.display_name} timeZone={slotTimeZone} startUtc={slotStartIso} deliveryStatus={isLineLinked && notification.send_line_confirmation ? 'not_sent' : 'not_applicable'} />
             </Card>
             <WarningCard title="気をつけること" lines={['LINEと結びついていない方には、自動のお知らせは届きません', 'あとで時間を変えたときは、もう一度お知らせを送ってください']} />
@@ -1189,7 +1190,7 @@ function BookingConfirmPreview({ friendName, menuName, staffName, timeZone, star
     <p className="text-ink-secondary mb-2 text-center text-xs">{deliveryLabel}</p>
     <LinePreview>
       <div className="bg-canvas rounded-card p-4 text-sm leading-6">
-        <p>{friendName}さま</p>
+        <p>{withHonorific(friendName, 'さま')}</p>
         <p>{dateLabel(startUtc, timeZone)} から、{menuName}をお受けしました。</p>
         <p>担当は{staffName}です。ご来店をお待ちしています。</p>
         <Button href="/booking/bookings" variant="primary" className="mt-3 w-full">予約内容を確認する</Button>
