@@ -160,6 +160,7 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['POST', '/api/client-errors'],
   ['GET', '/api/capabilities'],
   ['GET', '/api/line-accounts'],
+  ['GET', '/api/line-accounts/profile-pictures'],
   ['GET', '/api/line-accounts/summary'],
   ['GET', '/api/line-account-folders'],
   // 殻の表示に要る最小boolean。管理用の機能設定GETは owner/admin 専用。
