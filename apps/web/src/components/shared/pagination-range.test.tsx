@@ -90,3 +90,12 @@ it('二重実行でも同じ行き先への知らせは1回だけ', () => {
   expect(change).toHaveBeenCalledTimes(1)
   expect(change).toHaveBeenCalledWith(1)
 })
+
+it('読み込み中は知らせが出ず、読み終わって範囲の外なら出る', () => {
+  const change = vi.fn()
+  const { rerender } = render(<Pagination page={3} pageCount={1} onPageChange={change} correctOutOfRange={false} />)
+  expect(change).not.toHaveBeenCalled()
+  rerender(<Pagination page={3} pageCount={1} onPageChange={change} correctOutOfRange />)
+  expect(change).toHaveBeenCalledTimes(1)
+  expect(change).toHaveBeenCalledWith(1)
+})
