@@ -114,10 +114,10 @@ const deliveryModeLabels: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
 }
 
-/** 読み終えた人の補足行（板 ：「登録した 1,756 人の 41%」）。 */
+/** 読み終えた人の補足行（板 ：「登録した 1,756 人の 41%」）。数は読めているので、0 人も薄い灰の 0% で出す。 */
 function scenarioCompletionDetail(active: number, completed: number): string {
   const enrolled = active + completed
-  if (enrolled === 0) return '—'
+  if (enrolled === 0) return '登録した 0 人の 0%'
   const rate = Math.round((completed / enrolled) * 100)
   return `登録した ${formatNumber(enrolled)} 人の ${rate}%`
 }
@@ -968,7 +968,7 @@ export default function ScenariosListV8() {
                       {s.subscriberCount === undefined ? null : (() => {
                         const completed = s.completedCount ?? 0
                         const enrolled = (s.subscriberCount ?? 0) + completed
-                        return enrolled === 0 ? <div className={styles.countSub}>{emptyValue('unknown')}</div> : (
+                        return (
                           <div className={styles.countRow}>
                             <ProgressBar value={completed} max={enrolled} label={`${s.name ?? 'シナリオ'}を最後まで配信した割合`} className={styles.countBar} />
                             <span className={styles.countSub}>{scenarioCompletionDetail(s.subscriberCount ?? 0, completed)}</span>
