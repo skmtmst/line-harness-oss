@@ -230,7 +230,20 @@ export default function AppTopBar() {
   const roleLabel = hqShell && (staffRole === 'owner' || staffRole === 'admin') ? '統括' : (staffRole ? ROLE_LABELS[staffRole] ?? '' : '')
   /* 統括の札から店を選んだら、その店へ入る（カードの「このアカウントへ入る」と同じ）。 */
   const changeAccount = (accountId: string, after?: () => void) => {
-    requestUnsavedAction(() => {
+    requestUnsavedAction(async () => {
+      if (hqShell && accountId) {
+        try {
+          const { api } = await import('@/lib/api')
+          const response = await api.lineAccounts.followerImportState(accountId)
+          if (!response.success || response.data.phase === 'importing_ids' || response.data.phase === 'hydrating_profiles') {
+            router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
+            return
+          }
+        } catch {
+          router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
+          return
+        }
+      }
       setSelectedAccountId(accountId)
       if (hqShell && accountId && !after) router.push('/')
       after?.()
