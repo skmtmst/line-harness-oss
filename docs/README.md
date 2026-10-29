@@ -50,7 +50,7 @@
 - [m3-tab.webp](../apps/web/public/manuals/line-connect/images/m3-tab.webp) — 図・手引きの資料、確認 2026-10-29
 - [m3-webhook-on.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-on.webp) — 図・手引きの資料、確認 2026-10-29
 - [m3-webhook-configured-musubo.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-configured-musubo.webp) — Webhook設定後の確認画面、確認 2026-10-29
-- [m3-musubo-webhook.png](../apps/web/public/manuals/line-connect/images/m3-musubo-webhook.png) — musuboのWebhook設定画面、確認 2026-10-29
+- [m3-musubo-webhook.webp](../apps/web/public/manuals/line-connect/images/m3-musubo-webhook.webp) — musuboのWebhook設定画面、確認 2026-10-29
 - [index.html](../apps/web/public/manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
 - [LINEアカウント登録（V6 33-2）](line-account-register.md)
 - [Googleビジネスプロフィール連携 機能対応表（申請用・根拠付き）](manuals/google-business-feature-matrix.md)
@@ -85,7 +85,7 @@
 - [m3-tab.jpg](manuals/line-connect/images/m3-tab.jpg) — 図・手引きの資料、確認 2026-10-29
 - [m3-webhook-on.jpg](manuals/line-connect/images/m3-webhook-on.jpg) — 図・手引きの資料、確認 2026-10-29
 - [m3-webhook-configured-musubo.jpg](manuals/line-connect/images/m3-webhook-configured-musubo.jpg) — Webhook設定後の確認画面、確認 2026-10-29
-- [m3-musubo-webhook.png](manuals/line-connect/images/m3-musubo-webhook.png) — musuboのWebhook設定画面、確認 2026-10-29
+- [m3-musubo-webhook.webp](manuals/line-connect/images/m3-musubo-webhook.webp) — musuboのWebhook設定画面、確認 2026-10-29
 - [index.html](manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
 
 ## 要件
@@ -489,6 +489,7 @@
 - [投稿メディアの選択画面](release-log/unreleased/1886-masato-post-media-picker.md)
 - [既存のLINEログインチャネルの案内](release-log/unreleased/1887-masato-provider-existing-login-copy.md)
 - [Messaging API設定への案内](release-log/unreleased/1889-masato-line-manager-step1.md)
+- [接続マニュアルのチャット注意書き復元と画像軽量化](release-log/unreleased/0000-kenta-muse-red-accounts.md)
 - [投稿メディアの内容選択](release-log/unreleased/1890-masato-post-media-content.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)

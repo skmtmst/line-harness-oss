@@ -35,8 +35,9 @@ describe('配る画像の重さ', () => {
     const refs = [...html.matchAll(/src="\/manuals\/line-connect\/(images\/[^"]+)"/g)].map((m) => m[1])
     expect(refs.length).toBeGreaterThan(0)
     for (const ref of refs) {
-      expect(ref, ref).toMatch(/\.webp$/)
-      expect(fs.existsSync(path.join(dir, ref)), ref).toBe(true)
+      // #1920：古いブラウザに残った旧画像を見せない更新識別子（?v=）付きの参照も正とする。
+      expect(ref, ref).toMatch(/\.webp(\?v=[0-9a-f]+)?$/)
+      expect(fs.existsSync(path.join(dir, ref.split(/[?#]/)[0])), ref).toBe(true)
     }
   })
 })
