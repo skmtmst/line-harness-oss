@@ -48,7 +48,7 @@
 - [m3-oam-response.webp](../apps/web/public/manuals/line-connect/images/m3-oam-response.webp) — 図・手引きの資料、確認 2026-10-19
 - [m3-tab.webp](../apps/web/public/manuals/line-connect/images/m3-tab.webp) — 図・手引きの資料、確認 2026-10-19
 - [m3-webhook-on.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-on.webp) — 図・手引きの資料、確認 2026-10-19
-- [index.html](../apps/web/public/manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-19
+- [index.html](../apps/web/public/manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
 - [LINEアカウント登録（V6 33-2）](line-account-register.md)
 - [Googleビジネスプロフィール連携 機能対応表（申請用・根拠付き）](manuals/google-business-feature-matrix.md)
 - [Googleビジネスプロフィール API 審査パッケージ（撮影チェックリスト・公開URL・想定質問）](manuals/google-business-review-package.md)
@@ -80,7 +80,7 @@
 - [m3-oam-response.jpg](manuals/line-connect/images/m3-oam-response.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m3-tab.jpg](manuals/line-connect/images/m3-tab.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m3-webhook-on.jpg](manuals/line-connect/images/m3-webhook-on.jpg) — 図・手引きの資料、確認 2026-10-19
-- [index.html](manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-19
+- [index.html](manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
 
 ## 要件
 
@@ -453,6 +453,7 @@
 
 ## 反映履歴
 
+- [LINE接続マニュアルの現行4ステップへの更新](release-log/unreleased/1897-masato-line-connect-manual.md)
 - [Google口コミのAI下書き案内文の削除](release-log/unreleased/1896-masato-google-review-ai-note-remove.md)
 - [LINEアカウント登録のMessaging API設定への直リンク](release-log/unreleased/1895-masato-messaging-api-deeplink.md)
 - [Google口コミのAI下書き生成の修正](release-log/unreleased/1892-masato-google-review-ai-draft.md)
