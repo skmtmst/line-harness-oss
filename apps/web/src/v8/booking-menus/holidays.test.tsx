@@ -115,6 +115,13 @@ it('閲覧のみの休業削除は理由付きで拒否し、確認もAPIも開�
   const item = exception('closed', '2026-10-13', '2026-10-14')
   render(<HolidaysTabV8 accountId="a" settings={{ exceptions: [item] } as unknown as BookingSettings} status="ready" error={null} exceptions={[item]} closedWeekdays={[]} bookingCountOnClosed={null} canEdit={false} onSaved={() => {}} onReload={() => {}} />)
   await expectPermissionLocked(screen.getByRole('button', { name: '削除', exact: true }))
+  const grid = screen.getByRole('grid', { name: /の休業日$/ })
+  expect(within(grid).getAllByRole('gridcell').length).toBeGreaterThan(27)
+  expect(grid.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])')).toHaveLength(0)
+  for (const cell of within(grid).getAllByRole('gridcell')) {
+    fireEvent.click(cell)
+    fireEvent.keyDown(cell, { key: 'Enter' })
+  }
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(net.deleteException).not.toHaveBeenCalled()
 })

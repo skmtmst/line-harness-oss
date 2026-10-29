@@ -827,9 +827,11 @@
   cursor: pointer;
 }
 
-.calDay:hover:not(:disabled) {
+button.calDay:hover:not(:disabled) {
   background: var(--color-canvas-sunken);
 }
+
+span.calDay { cursor: default; color: var(--color-ink); }
 
 .calDayOutside {
   outline: 0;

@@ -244,6 +244,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
               ) : null}
             </>
           )
+          if (!canEdit) return <span key={date} role="gridcell" aria-label={dayLabel} className={dayClass}>{dayBody}</span>
           return (
             <Button
               key={date}
