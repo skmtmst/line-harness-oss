@@ -131,8 +131,10 @@ function sortCustomerSettingsBySentCount(
  * 「今日 送った」の内訳の文。名前は読み込んだ設定の `label` から引く。
  *
  * 設定に無い eventType は「その他」にまとめる。`ec.order.confirmed` のような
- * 内部のイベントキーをそのまま文にしない。読めていないときは空文字を返し、
- * 呼び出し側の「種類別の件数は未取得」のままにする（0 とは書かない）。
+ * 内部のイベントキーをそのまま文にしない。名前で出すのは上位3件までで、
+ * 4件目以降の設定にある種類も「その他」に足す（内訳の合計が今日の合計と合う）。
+ * 読めていないときは空文字を返し、呼び出し側の「種類別の件数は未取得」の
+ * ままにする（0 とは書かない）。
  */
 export function buildSentBreakdown(
   byEventType: LineNotificationSendCounts['byEventType'] | null | undefined,
@@ -143,10 +145,10 @@ export function buildSentBreakdown(
   const ranked = [...byEventType]
     .filter((item) => item.today > 0)
     .sort((a, b) => b.today - a.today)
-  const known = ranked.filter((item) => labelOf.has(item.eventType)).slice(0, 3)
-  const otherTotal = ranked
-    .filter((item) => !labelOf.has(item.eventType))
-    .reduce((sum, item) => sum + item.today, 0)
+  const knownAll = ranked.filter((item) => labelOf.has(item.eventType))
+  const known = knownAll.slice(0, 3)
+  const otherTotal = knownAll.slice(3).reduce((sum, item) => sum + item.today, 0)
+    + ranked.filter((item) => !labelOf.has(item.eventType)).reduce((sum, item) => sum + item.today, 0)
   const parts = known.map((item) => `${labelOf.get(item.eventType)} ${item.today}`)
   if (otherTotal > 0) parts.push(`その他 ${otherTotal}`)
   return parts.join('・')
