@@ -1051,8 +1051,10 @@ export default function RichMenusListV8() {
                       >
                         <span aria-hidden>⠿</span>
                       </ReorderHandle>}
-                      {/* 並び順の数字は見えている並びの位置（古い行は優先度が 0 のままなので、保存値ではなく位置を出す）。 */}
-                      <span className={styles.orderNumber} data-order-number={position + 1}>{position + 1}</span>
+                      {/* 出す順番の並び・絞り込みなしのときだけ、ページを通した位置を出す（古い行は優先度が 0 のままなので保存値では出せない）。それ以外は位置が順番ではないので出さない。 */}
+                      {sortKey === 'priority' && !filterActive
+                        ? <span className={styles.orderNumber} data-order-number={(currentPage - 1) * pageSize + position + 1}>{(currentPage - 1) * pageSize + position + 1}</span>
+                        : <span className={styles.orderNumber}>—</span>}
                     </span>
                   </Td>
                   <Td>

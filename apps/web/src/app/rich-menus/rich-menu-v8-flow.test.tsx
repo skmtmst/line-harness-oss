@@ -250,6 +250,7 @@ afterEach(() => {
   host.remove()
   clearToastsForTest()
   delete document.documentElement.dataset.theme
+  window.history.replaceState(null, '', '/rich-menus')
   vi.clearAllMocks()
   vi.unstubAllGlobals()
 })
@@ -265,6 +266,35 @@ describe('V8 リッチメニューの通し：作る→押す所→保存→既�
     await flush()
     const numbers = Array.from(host.querySelectorAll('[data-order-number]')).map((el) => el.textContent)
     expect(numbers).toEqual(['1', '2', '3'])
+  })
+
+  it('2ページ目の並び順の数字はページを通して 11・12 と出す', async () => {
+    store.rows = Array.from({ length: 12 }, (_, i) => ({ ...rowGroup, id: `g-${i + 1}`, name: `メニュー${i + 1}`, targetingPriority: 0 }))
+    listPage.mockImplementation(async (_accountId: string, input: { page?: number; limit?: number }) => {
+      const page = input.page ?? 1
+      const limit = input.limit ?? 20
+      return {
+        success: true,
+        data: { items: store.rows.slice((page - 1) * limit, page * limit), total: store.rows.length, facets: { total: 12, published: 12, targeting: 0, draft: 0, folderCounts: {} } },
+      }
+    })
+    window.history.replaceState(null, '', '/rich-menus?size=10&page=2')
+    renderNode(<RichMenusPage />)
+    await flush()
+    const numbers = Array.from(host.querySelectorAll('[data-order-number]')).map((el) => el.textContent)
+    expect(numbers).toEqual(['11', '12'])
+  })
+
+  it('並びが「出す順番」でないときは順番の数字を出さない', async () => {
+    store.rows = [
+      { ...rowGroup, id: 'g-1', name: 'メニュー1', targetingPriority: 0 },
+      { ...rowGroup, id: 'g-2', name: 'メニュー2', targetingPriority: 0 },
+    ]
+    window.history.replaceState(null, '', '/rich-menus?sort=name')
+    renderNode(<RichMenusPage />)
+    await flush()
+    expect(host.querySelectorAll('[data-order-number]')).toHaveLength(0)
+    expect(host.textContent).toContain('—')
   })
 
   it('一覧の「メニューを作る」は作成へ進む', async () => {

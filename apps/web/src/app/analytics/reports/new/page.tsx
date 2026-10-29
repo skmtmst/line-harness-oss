@@ -30,7 +30,10 @@ import NumberInput from '@/components/shared/number-field'
 import HelpTip from '@/components/shared/help-tip'
 import { Field, RequiredBadge } from '@/components/shared/form-controls'
 import PeriodPicker, { pastPeriod } from '@/components/shared/period-picker'
-import { shownValue } from '@/v8/analytics/parts'
+/** 実測（available）の数だけ取る。途中・待ち・失敗は見本にしない（Worker の本文と同じ扱い）。 */
+function strictNumber(metric: { value: number | null; state: string }): number | null {
+  return metric.state === 'available' && typeof metric.value === 'number' ? metric.value : null
+}
 import { Check, ChevronDown, GitCompareArrows, RefreshCw } from 'lucide-react'
 import { formatDateTime, formatTime, formatNumber } from '@/lib/format'
 import {
@@ -327,45 +330,69 @@ function AnalyticsReportFormPage() {
   }, [selectedAccountId, editId])
 
   // 見本の数：選んだ区画だけ、前の期間の本当の数を順に読む（重い集計を同時に走らせない）。
+  // 式・期間は届く本文（Worker の analytics-reports）と同じにする。今日の途中は含めない（昨日まで）。
   useEffect(() => {
     if (!selectedAccountId) return
     const days = Number(periodDays)
-    if (!Number.isFinite(days) || days <= 0) return
+    if (!Number.isFinite(days) || days <= 0) { setPreviewNumbers({}); return }
     const wanted = sections.filter((id) => id === 'friends' || id === 'reactions' || id === 'routes')
     if (wanted.length === 0) { setPreviewNumbers({}); return }
     let cancelled = false
-    const range = pastPeriod(days)
-    void (async () => {
-      const next: Partial<Record<string, string>> = {}
-      try {
-        if (wanted.includes('friends')) {
-          const res = await api.analytics.friendsOverview(selectedAccountId, range)
-          if (res.success) {
-            const net = shownValue(res.data.data.metrics.net)
-            if (net !== null) next.friends = `${net >= 0 ? '+' : ''}${formatNumber(net)}人`
+    // 前のアカウント・前の期間の数を残さない。
+    setPreviewNumbers({})
+    // 送り遅れ：期間の切り替えのたびに重い集計を走らせない。
+    const timer = setTimeout(() => {
+      const range = pastPeriod(days, new Date(Date.now() - 24 * 3600 * 1000))
+      void (async () => {
+        const next: Partial<Record<string, string>> = {}
+        try {
+          if (wanted.includes('friends') && !cancelled) {
+            const res = await api.analytics.friendsOverview(selectedAccountId, range)
+            if (res.success) {
+              const added = strictNumber(res.data.data.metrics.added)
+              const removed = strictNumber(res.data.data.metrics.removed)
+              const net = strictNumber(res.data.data.metrics.net)
+              if (added !== null && removed !== null && net !== null) {
+                next.friends = net >= 0
+                  ? `${formatNumber(net)}人増加（新規${formatNumber(added)}・解除${formatNumber(removed)}）`
+                  : `${formatNumber(-net)}人減少（新規${formatNumber(added)}・解除${formatNumber(removed)}）`
+              }
+            }
           }
-        }
-        if (wanted.includes('reactions')) {
-          const res = await api.analytics.reactionsOverview(selectedAccountId, range)
-          if (res.success) {
-            const opened = shownValue(res.data.data.metrics.opened)
-            const delivered = shownValue(res.data.data.metrics.delivered)
-            if (opened !== null && delivered !== null && delivered > 0) next.reactions = `${Math.round((opened / delivered) * 100)}%`
+          if (wanted.includes('reactions') && !cancelled) {
+            const res = await api.analytics.reactionsOverview(selectedAccountId, range)
+            if (res.success) {
+              const delivered = res.data.data.metrics.delivered
+              const opened = res.data.data.metrics.opened
+              if ((delivered.state === 'available' || delivered.state === 'partial') && typeof delivered.value === 'number') {
+                const openedPart = opened.state === 'available' && typeof opened.value === 'number'
+                  ? `・開封${formatNumber(opened.value)}件` : ''
+                const scope = delivered.state === 'partial' ? '（一斉配信のみ）' : ''
+                next.reactions = `${formatNumber(delivered.value)}件配信${openedPart}${scope}`
+              }
+            }
           }
-        }
-        if (wanted.includes('routes')) {
-          const res = await api.analytics.routesOverview(selectedAccountId, range)
-          if (res.success) {
-            const values = res.data.data.routes.map((route) => shownValue(route.conversions.approved)).filter((v): v is number => v !== null)
-            if (values.length > 0) next.routes = `${formatNumber(values.reduce((a, b) => a + b, 0))}件`
+          if (wanted.includes('routes') && !cancelled) {
+            const res = await api.analytics.routesOverview(selectedAccountId, range)
+            if (res.success) {
+              let conversions: number | null = 0
+              for (const route of res.data.data.routes.filter((item) => item.name !== '経路不明')) {
+                const approved = strictNumber(route.conversions.approved)
+                const pending = strictNumber(route.conversions.pending)
+                if (approved === null || pending === null) { conversions = null; break }
+                conversions += approved + pending
+              }
+              // 1つでも読めなければ出さない（一部だけ足した数は見本にしない）。
+              if (conversions !== null) next.routes = `${formatNumber(conversions)}件`
+            }
           }
+        } catch {
+          // 見本の数が読めなければ「送信時に集計」のまま。作る流れは止めない。
         }
-      } catch {
-        // 見本の数が読めなければ「送信時に集計」のまま。作る流れは止めない。
-      }
-      if (!cancelled) setPreviewNumbers(next)
-    })()
-    return () => { cancelled = true }
+        if (!cancelled) setPreviewNumbers(next)
+      })()
+    }, 250)
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [selectedAccountId, periodDays, sections])
 
   // 読み直し用の数え直し。入力の状態には触らない(点検#508軽8)。
