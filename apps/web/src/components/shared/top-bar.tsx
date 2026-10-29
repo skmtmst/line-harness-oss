@@ -65,7 +65,7 @@ export interface TopBarProps {
    * ★V8：ベルの未読の件数。数の取得は呼び出し側が持つ（ここでは取らない）。
    * 互換経路では描かない。
    */
-  notificationUnreadCount?: number
+  notificationUnreadCount?: number | null
   /**
    * ★V8：ベルを押したときの小窓（V8.pen `DIHFx/D2eAyQ`・小窓 `mV28V`）を描く。
    * 渡すとベルはページを移らずに小窓を開くボタンになる。渡さなければ今までどおり
@@ -341,7 +341,7 @@ export default function TopBar({
                 type="button"
                 className={`${styles.iconButton}`}
                 data-topbar-bell=""
-                aria-label={notificationUnreadCount > 0 ? `通知（未読 ${formatNumber(notificationUnreadCount)} 件）` : '通知'}
+                aria-label={notificationBellLabel(notificationUnreadCount)}
                 aria-haspopup="dialog"
                 aria-expanded={bellOpen}
                 aria-controls={bellOpen ? bellPopoverId : undefined}
@@ -357,7 +357,7 @@ export default function TopBar({
               prefetch={false}
               href="/notifications"
               className={`${styles.iconButton}`}
-              aria-label={notificationUnreadCount > 0 ? `通知（未読 ${formatNumber(notificationUnreadCount)} 件）` : '通知'}
+              aria-label={notificationBellLabel(notificationUnreadCount)}
             >
               <BellIcon />
               <BellBadge count={notificationUnreadCount} />
@@ -447,7 +447,12 @@ function PanelLeftIcon() {
 }
 
 /* ★V8: ベルの未読の数（赤い丸・100以上は 99+）。 */
-function BellBadge({ count }: { count: number }) {
+function notificationBellLabel(count: number | null) {
+  return count === null ? '通知（未読数を確認できません）' : count > 0 ? `通知（未読 ${formatNumber(count)} 件）` : '通知'
+}
+
+function BellBadge({ count }: { count: number | null }) {
+  if (count === null) return <span className={styles.bellBadge} aria-hidden="true" title="未読数を確認できません">—</span>
   if (count <= 0) return null
   return (
     <span className={styles.bellBadge} aria-hidden="true">

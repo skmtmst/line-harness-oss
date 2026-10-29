@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { LineAccountConnectData } from '@/lib/api'
 import {
   DRAFT_KEY, LOGIN_ACKS, PRECHECK_RESULT, PRECHECK_VERIFIED_ACK, WEBHOOK_ACKS, allAcked, allV06RowsOk,
-  allV8RowsPassed, checkActionLabel, checkErrorText, checkRowText, checkStage, developerChannelUrl,
+  allV8RowsPassed, checkActionLabel, checkErrorText, checkRowText, checkStage, developerChannelUrl, developerProviderUrl,
   formatJaDuration, handoverProgress, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked,
   precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary, precheckUpcoming,
   readDraft, readPrecheckAnswers, readPrecheckAt, stepLabel, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
@@ -22,9 +22,10 @@ describe('LINEアカウントを登録（★V8）の小さな計算', () => {
   })
 
   it('中身のある下書きは戻す（秘密値の欄は持たない）', () => {
-    const draft = readDraft(storage({ step: 2, accountMethod: 'existing', name: '', channelId: '2001', channelSecret: 'secret', loginChannelId: '', lineId: '', tagIds: [], parentId: '', staffIds: [], liffId: '', importFriends: true }))
-    expect(draft).toMatchObject({ step: 2, channelId: '2001' })
+    const draft = readDraft(storage({ step: 2, accountMethod: 'existing', name: '', channelId: '2001', channelSecret: 'secret', providerId: '2002', loginChannelId: '', lineId: '', tagIds: [], parentId: '', staffIds: [], liffId: '', importFriends: true }))
+    expect(draft).toMatchObject({ step: 2, channelId: '2001', providerId: '2002' })
     expect(draft && 'channelSecret' in draft).toBe(false)
+    expect(readDraft(storage({ step: 2, channelId: '2001' }))?.providerId).toBe('')
     // ①の答えだけでも「中身のある下書き」。何も答えていなければ手順1は戻さない。
     expect(readDraft(storage({ step: 1, precheck: { q1: 'yes' }, precheckAt: 'q2' }))).toMatchObject({ step: 1, precheckAt: 'q2', precheck: { q1: 'yes' } })
     expect(readDraft(storage({ step: 1, accountMethod: 'new' }))).toBeNull()
@@ -172,12 +173,13 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     expect(stepLabel(3, 9)).toBe('Step 2 / 2')
   })
 
-  it('②は Messaging API の2項目と LINEログインの2項目を別々に調べる（Step1でログインの欄を責めない）', () => {
-    const empty = { channelId: '', channelSecret: '', loginChannelId: '', loginChannelSecret: '' }
-    expect(Object.keys(messagingApiErrors(empty)).sort()).toEqual(['channelId', 'channelSecret'])
+  it('②は Messaging API の2項目・プロバイダーIDと LINEログインの2項目を別々に調べる', () => {
+    const empty = { channelId: '', channelSecret: '', providerId: '', loginChannelId: '', loginChannelSecret: '' }
+    expect(Object.keys(messagingApiErrors(empty)).sort()).toEqual(['channelId', 'channelSecret', 'providerId'])
     expect(Object.keys(loginChannelErrors(empty)).sort()).toEqual(['loginChannelId', 'loginChannelSecret'])
-    expect(messagingApiErrors({ channelId: 'abc', channelSecret: 'x' }).channelId).toBe('チャネルIDは半角数字で入力してください。')
-    expect(messagingApiErrors({ channelId: '2001', channelSecret: 'x' })).toEqual({})
+    expect(messagingApiErrors({ channelId: 'abc', channelSecret: 'x', providerId: '2002' }).channelId).toBe('チャネルIDは半角数字で入力してください。')
+    expect(messagingApiErrors({ channelId: '2001', channelSecret: 'x', providerId: 'abc' }).providerId).toBe('プロバイダーIDは半角数字で入力してください。')
+    expect(messagingApiErrors({ channelId: '2001', channelSecret: 'x', providerId: '2002' })).toEqual({})
     expect(loginChannelErrors({ loginChannelId: '2002', loginChannelSecret: 'x' })).toEqual({})
   })
 
@@ -210,6 +212,12 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
   it('LINE Developers の行き先は入れたチャネルIDのページ。空ならコンソールの入口', () => {
     expect(developerChannelUrl(' 2001 ')).toBe('https://developers.line.biz/console/channel/2001')
     expect(developerChannelUrl('')).toBe('https://developers.line.biz/console/')
+  })
+
+  it('LINEログイン作成時は入力されたプロバイダーIDの画面を開く', () => {
+    expect(developerProviderUrl(' 2005648758 ')).toBe('https://developers.line.biz/console/provider/2005648758')
+    expect(developerProviderUrl('')).toBe('')
+    expect(developerProviderUrl('2012x')).toBe('')
   })
 
   it('③Step1の5行は上から順に見せる。手前は本当の合否、今の行は確認中、後ろは待機中', () => {

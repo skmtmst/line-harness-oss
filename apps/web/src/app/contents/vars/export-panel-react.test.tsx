@@ -39,7 +39,12 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   }
 })
 
-import VarsExportPanel from '@/v8/common-vars/export-panel'
+import { useVarsExportPanel } from '@/v8/common-vars/export-panel'
+
+function VarsExportPanel(props: Parameters<typeof useVarsExportPanel>[0]) {
+  const panel = useVarsExportPanel(props)
+  return <><header>{panel.action}</header><main>{panel.status}</main></>
+}
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -151,6 +156,59 @@ describe('共通情報CSVの監査付き出力パネル', () => {
     expect(host.querySelector('a[href$="/download"]')).toBeNull()
     await clickButton('もう一度書き出す')
     expect(api.regenerateExport).toHaveBeenCalledWith('job-1')
+  })
+
+  it('期限切れの案内は閉じられ、表示を閉じても一覧の状態は残る', async () => {
+    api.listExports.mockResolvedValue({
+      success: true,
+      data: [job({ status: 'expired', downloadUrl: null })],
+    })
+    await render()
+    expect(host.querySelector('[data-testid="vars-export-status"]')).not.toBeNull()
+    const close = host.querySelector('button[aria-label="通知を閉じる"]') as HTMLButtonElement
+    await act(async () => { close.click() })
+    expect(host.querySelector('[data-testid="vars-export-status"]')).toBeNull()
+    expect(text()).toContain('CSVで書き出す')
+  })
+
+  it('期限切れの共通通知は操作と同じ行の閉じ口を持ち、見出しの外に出る', async () => {
+    api.listExports.mockResolvedValue({ success: true, data: [job({ status: 'expired', downloadUrl: null })] })
+    await render()
+    const status = host.querySelector('[role="status"]')!
+    expect(status.getAttribute('data-design-part')).toBe('notice')
+    expect(status.querySelector('[data-notice-dot]')).not.toBeNull()
+    expect(status.closest('header')).toBeNull()
+    expect(status.querySelector('button[aria-label="通知を閉じる"]')).not.toBeNull()
+    expect(host.querySelector('header')?.textContent).toBe('CSVで書き出す')
+  })
+
+  it('最近の履歴を残し、通知を閉じても完了のDLと期限切れの再生成を使える', async () => {
+    api.listExports.mockResolvedValue({ success: true, data: [job({ status: 'expired', downloadUrl: null }), job({ id: 'older' })] })
+    await render()
+    await act(async () => { (host.querySelector('[role="status"] button[aria-label="通知を閉じる"]') as HTMLButtonElement).click() })
+    expect(host.querySelector('[role="status"]')).toBeNull()
+    expect(text()).toContain('最近の書き出し（2 件）')
+    expect(host.querySelector('details a')?.getAttribute('href')).toContain('/download')
+    await clickButton('再生成')
+    expect(api.regenerateExport).toHaveBeenCalledWith('job-1')
+  })
+
+  it('別アカウントへ切り替えた後に届いた履歴と依頼結果を表示しない', async () => {
+    let finishHistory!: (value: unknown) => void
+    let finishRequest!: (value: unknown) => void
+    api.listExports.mockImplementationOnce(() => new Promise(resolve => { finishHistory = resolve }))
+    api.createExport.mockImplementationOnce(() => new Promise(resolve => { finishRequest = resolve }))
+    await render()
+    await clickButton('CSVで書き出す')
+    await render({ accountId: 'account-2' })
+    await act(async () => {
+      finishHistory({ success: true, data: [job({ failureReason: '別店舗の理由', status: 'failed' })] })
+      finishRequest({ success: true, data: job({ status: 'completed', rowCount: 999 }) })
+    })
+    expect(text()).not.toContain('別店舗の理由')
+    expect(text()).not.toContain('999')
+    expect(host.querySelector('[role="status"]')).toBeNull()
+    expect(api.listExports).toHaveBeenLastCalledWith('account-2')
   })
 
   it('アカウント未選択では依頼できない', async () => {

@@ -100,6 +100,7 @@ describe('ログインユーザーV8（nku0f・A35Gh）', () => {
     net.populated = true
     await render()
     const table = host.querySelector('[role="table"][aria-label="いまいる人の一覧"]')!
+    expect(table.closest('[data-page-template="settings"]')).toBeTruthy()
     const heads = [...table.querySelectorAll('[role="columnheader"]')].map(cell => cell.textContent)
     expect(heads).not.toContain('担当のLINEアカウント')
     expect(table.textContent).toContain('operations@***.jp')

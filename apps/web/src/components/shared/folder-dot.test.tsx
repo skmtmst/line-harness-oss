@@ -8,12 +8,13 @@ import { describe, expect, it } from 'vitest'
 import { FolderDot, FolderDotName, folderDisplayColor } from './folder-dot'
 import TruncatedText from './truncated-text'
 import Checkbox from './checkbox'
+import { ListFolderContext } from './list-folder-context'
 import { NameCell } from './table'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
 
 /*
  * 一覧の行の名前の前の「フォルダの色の丸」（2026-10-07 オーナー決定）。
- * 色だけに頼らず「フォルダ：〇〇」を読み上げと title で伝える。未分類は色の無い輪。
+ * 色だけに頼らず「フォルダ：〇〇」を読み上げと title で伝える。未分類は灰色の丸。
  */
 const here = dirname(fileURLToPath(import.meta.url))
 const css = readFileSync(join(here, 'folder-dot.module.css'), 'utf8')
@@ -40,18 +41,35 @@ describe('フォルダの色の丸', () => {
     expect(html).toContain(`background-color:${a}`)
   })
 
-  it('未分類は色の無い輪で、「フォルダ：未分類」と伝える', () => {
+  it('未分類は灰色の丸で、「フォルダ：未分類」と伝える', () => {
     const html = renderToStaticMarkup(<FolderDot folder={null} />)
     expect(html).toContain('aria-label="フォルダ：未分類"')
     expect(html).toContain('data-folder-dot="unfiled"')
     expect(html).not.toContain('background-color')
-    expect(css).toMatch(/\.unfiled \{\s*background: transparent;\s*border: 1px solid var\(--color-ink-faint\);/)
   })
 
-  it('フォルダが未分類のときは、名前の前に白い丸を出さない', () => {
+  it('フォルダを使う一覧で未分類の名前にも、名前の前に灰色の丸を出す（丸の無い行を作らない）', () => {
     const html = renderToStaticMarkup(<FolderDotName folder={null}>未分類の資料</FolderDotName>)
-    expect(html).not.toContain('data-folder-dot')
+    expect(html).toContain('data-folder-dot="unfiled"')
+    expect(html.indexOf('data-folder-dot')).toBeLessThan(html.indexOf('>未分類の資料'))
     expect(html).toContain('title="未分類の資料"')
+  })
+
+  it('フォルダを使わない一覧（folder を渡さない）は丸を出さない', () => {
+    expect(renderToStaticMarkup(<FolderDotName>資料</FolderDotName>)).not.toContain('data-folder-dot')
+  })
+
+  it.each([null, undefined])('フォルダ機能がある一覧では未所属 %s にも丸を出す', (folder) => {
+    const html = renderToStaticMarkup(<ListFolderContext.Provider value={true}><FolderDotName folder={folder}>資料</FolderDotName></ListFolderContext.Provider>)
+    expect(html).toContain('data-folder-dot="unfiled"')
+    expect(html).toContain('aria-label="フォルダ：未分類"')
+  })
+
+  it('フォルダ機能の無い一覧と、札が丸を持つ名前には丸を足さない', () => {
+    const noFolders = renderToStaticMarkup(<ListFolderContext.Provider value={false}><FolderDotName folder={null}>資料</FolderDotName></ListFolderContext.Provider>)
+    expect(noFolders).not.toContain('data-folder-dot')
+    const withOwnDot = renderToStaticMarkup(<ListFolderContext.Provider value={true}><FolderDotName folder={null} nameCarriesDot>丸つきの札</FolderDotName></ListFolderContext.Provider>)
+    expect(withOwnDot).not.toContain('data-folder-dot')
   })
 
   it('丸＋名前は1行で、名前の前に丸が来る', () => {
@@ -75,7 +93,7 @@ describe('フォルダの色の丸', () => {
   it('行を選ぶチェックは省略する名前の外に出し、操作と全文を保つ', () => {
     const html = renderToStaticMarkup(<FolderDotName folder={null}><Checkbox aria-label="資料を選ぶ" checked={false} onCheckedChange={() => {}} /><button>資料をダウンロードした</button></FolderDotName>)
     expect(html).toContain('aria-label="資料を選ぶ"')
-    expect(html).not.toContain('data-folder-dot')
+    expect(html).toContain('data-folder-dot="unfiled"')
     expect(html).toContain('title="資料をダウンロードした"')
     expect(html).toContain('<button>資料をダウンロードした</button>')
   })
@@ -86,7 +104,7 @@ describe('フォルダの色の丸', () => {
       name={<div><a href="/events/edit?id=event">教室</a></div>}
     /></tr></tbody></table>)
     expect(html).toContain('aria-label="教室を選ぶ"')
-    expect(html).not.toContain('data-folder-dot')
+    expect(html).toContain('data-folder-dot="unfiled"')
     expect(html).toContain('href="/events/edit?id=event"')
   })
 

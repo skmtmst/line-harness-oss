@@ -158,7 +158,7 @@ function BroadcastResultCells({ broadcast, insight, narrow }: { broadcast: ApiBr
     )
   }
   return (
-    <Td>
+    <Td align="right">
       {delivered === null ? <span className={styles.cellMain}>{emptyValue('unknown')}</span> : (
         <>
           <span className={styles.resultMain}>{delivered}</span>
@@ -970,7 +970,6 @@ export default function BroadcastListV8() {
       <tbody>
         {[0, 1, 2, 3, 4].map((n) => (
           <Tr key={n} className={styles.row}>
-            <Td className={styles.selectCell} />
             <Td><Skeleton width={200} height={16} /><Skeleton width={140} height={12} /></Td>
             <Td><Skeleton width={72} height={22} className="rounded-pill" /></Td>
             {narrow ? null : <Td><Skeleton width={120} height={12} /></Td>}
@@ -991,11 +990,8 @@ export default function BroadcastListV8() {
     <ListState kind={danger ? 'error' : 'empty'} title={title} description={desc ?? undefined} icon={icon} action={action} />
   )
 
-  const listBody = !listLoaded && !error && !forbidden ? (
-    <div aria-busy="true" aria-label="読み込んでいます">
-      <DelayedSkeleton loading skeleton={loadingSkeleton} />
-    </div>
-  ) : forbidden ? (
+  const listLoading = !listLoaded && !error && !forbidden
+  const listBody = forbidden ? (
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '配信を見る権限がありません', permissionDeniedMessage('store'), <Button onClick={() => loadList((page - 1) * pageSize)} busyLabel="処理中…">もう一度読み込む</Button>, true)
   ) : error ? (
     stateCard(<AlertCircle size={20} aria-hidden="true" />, '一斉配信を読み込めませんでした', error,
@@ -1292,7 +1288,13 @@ export default function BroadcastListV8() {
           />
         </div>
       ) : null}
-      <RefreshCover refreshing={loading && listLoaded}>{listBody}</RefreshCover>
+      <RefreshCover refreshing={loading && listLoaded}>
+        <DelayedSkeleton loading={listLoading} skeleton={
+          <div aria-busy="true" aria-label="読み込んでいます">{loadingSkeleton}</div>
+        }>
+          {listLoading ? undefined : listBody}
+        </DelayedSkeleton>
+      </RefreshCover>
     </ListPage></SaveErrorScope>
   )
 }

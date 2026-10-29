@@ -1,6 +1,7 @@
 'use client'
 
 import { csvCell } from '@/lib/presentation'
+import { terms } from '@/lib/terms'
 
 import { useCallback, useEffect, useState } from 'react'
 import { useResponseGate } from '@/lib/use-response-gate'
@@ -14,7 +15,7 @@ import { formatNumber } from '@/lib/format'
 
 const RESULT_OPTIONS = [
   { value: 'all', label: 'すべて' },
-  { value: 'delivered', label: '届いた' },
+  { value: 'delivered', label: terms.W07 },
   { value: 'temporary', label: '一時的（送り直せる）' },
   { value: 'permanent', label: '届けられなかった' },
   { value: 'unknown', label: '送達不明' },
@@ -30,11 +31,16 @@ const GROUP_TONE: Record<BroadcastRecipientRow['group'], StatusBadgeTone> = {
   inflight: 'info',
 }
 
+/** このgroupは送信台帳のsent由来。お客さまへの到達確認ではない。 */
+function recipientResultLabel(row: BroadcastRecipientRow): string {
+  return row.group === 'delivered' ? terms.W07 : row.label
+}
+
 export function recipientCsv(rows: BroadcastRecipientRow[]): string {
   const lines = [
     ['名前', '結果', '理由', 'LINEの要求ID', '送った時刻', '結果が決まった時刻'],
     ...rows.map((row) => [
-      row.displayName, row.label, row.detail, row.lineRequestId, row.dispatchedAt, row.settledAt,
+      row.displayName, recipientResultLabel(row), row.detail, row.lineRequestId, row.dispatchedAt, row.settledAt,
     ]),
   ]
   return `\uFEFF${lines.map((line) => line.map(value => csvCell(value ?? '—')).join(',')).join('\r\n')}\r\n`
@@ -46,7 +52,7 @@ export const RECIPIENT_CSV_MAX_PAGES = 1000
 /**
  * 宛先のタブ（C-2）。誰に送ったか。
  *
- * 届いた・失敗の理由・送る前の件数を札で出し、宛先ごとに行に並べる。
+ * LINEが受け付けた・失敗の理由・送る前の件数を札で出し、宛先ごとに行に並べる。
  * 一時的な失敗だけを送り直せる。CSVに書き出せる。
  * 旧配信は集約だけ（行は捏造しない）。
  */
@@ -204,7 +210,7 @@ export default function BroadcastRecipients({
         <p className="text-ink-secondary mt-1 text-xs leading-relaxed">
           {aggregate.reason === 'all'
             ? '全員への配信は宛先の一覧を持ちません。'
-            : `この配信は集約だけの古い記録です${aggregate.legacySuccess != null ? `（届いた ${formatNumber(aggregate.legacySuccess)}人）` : ''}。`}
+            : `この配信は集約だけの古い記録です${aggregate.legacySuccess != null ? `（成功の記録 ${formatNumber(aggregate.legacySuccess)}人）` : ''}。お客さまに届いたかは確認できません。`}
         </p>
       </section>
     )
@@ -214,11 +220,11 @@ export default function BroadcastRecipients({
   return (
     <section aria-label="宛先" className="bg-canvas rounded-card content-card space-y-4 border p-5">
       <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge tone="success">{`届いた ${formatNumber(summary.sent)}`}</StatusBadge>
+        <StatusBadge tone="success">{`${terms.W07}：${formatNumber(summary.sent)}人`}</StatusBadge>
         <StatusBadge tone="danger">{`失敗 ${formatNumber(summary.failedTemporary + summary.failedPermanent)}`}</StatusBadge>
         <StatusBadge tone="neutral">{`送る前 ${formatNumber(pending ?? 0)}`}</StatusBadge>
         <HelpTip label="宛先の数の説明">
-          届いた・失敗・送る前は宛先の台帳の数です。送る前はまだ送っていない人数で、名前の一覧はありません。
+          LINEが受け付けた数・失敗・送る前は宛先の台帳の数です。お客さまに届いたかは確認できません。送る前はまだ送っていない人数で、名前の一覧はありません。
         </HelpTip>
       </div>
 
@@ -261,7 +267,7 @@ export default function BroadcastRecipients({
                     {row.settledAt
                       ? <time dateTime={row.settledAt} className="text-ink-faint text-xs tabular-nums">{formatTime(row.settledAt)}</time>
                       : <span className="text-ink-faint text-xs">—</span>}
-                    <StatusBadge tone={GROUP_TONE[row.group]}>{row.label}</StatusBadge>
+                    <StatusBadge tone={GROUP_TONE[row.group]}>{recipientResultLabel(row)}</StatusBadge>
                   </span>
                 </li>
               ))}

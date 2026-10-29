@@ -150,8 +150,17 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       friends: {
         ...actual.api.friends,
         get: () => Promise.resolve({ success: true, data: fixtures.friendDetail }),
+        addTag: (...args: unknown[]) => { net.calls.push({ name: 'friends.addTag', args }); return Promise.resolve({ success: true, data: null }) },
+        removeTag: (...args: unknown[]) => { net.calls.push({ name: 'friends.removeTag', args }); return Promise.resolve({ success: true, data: null }) },
         mileage: () => Promise.reject(new Error('mileage unavailable')),
         richMenu: () => Promise.reject(new Error('rich menu unavailable')),
+      },
+      tags: {
+        ...actual.api.tags,
+        list: (...args: unknown[]) => {
+          net.calls.push({ name: 'tags.list', args })
+          return Promise.resolve({ success: true, data: [{ id: 'tag-vip', name: 'VIP', color: '#008000', createdAt: '2026-09-01T00:00:00.000Z' }] })
+        },
       },
       friendFields: {
         ...actual.api.friendFields,
@@ -383,6 +392,21 @@ function supportEditButtons(): HTMLButtonElement[] {
 }
 
 describe('N-035 友だち詳細から担当・対応状況を変える', () => {
+  it('タグの編集は受信箱へ移動せず、その場で選んで保存する', async () => {
+    setRole('admin')
+    await render('info')
+    const edit = document.querySelector<HTMLButtonElement>('[data-customer-info-panel] section[aria-label="タグ"] button')!
+    await act(async () => { edit.click() })
+    await eventually(() => expect(document.querySelector('[data-friend-tag-editor]')).toBeTruthy())
+    expect(net.calls.some((call) => call.name === 'tags.list')).toBe(true)
+    const checkbox = document.querySelector<HTMLInputElement>('[data-friend-tag-editor] input[type="checkbox"]')!
+    await act(async () => { checkbox.click() })
+    const dialogSave = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')).find((button) => button.textContent?.trim() === '保存する')!
+    await act(async () => { dialogSave.click() })
+    await eventually(() => expect(net.calls.some((call) => call.name === 'friends.addTag' && call.args[0] === 'friend-1' && call.args[1] === 'tag-vip')).toBe(true))
+    expect(document.querySelector('[data-friend-tag-editor]')).toBeNull()
+  })
+
   it('管理者は「対応」の編集を開いて担当・対応状況を保存できる', async () => {
     setRole('admin')
     await render('timeline')
@@ -416,9 +440,9 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
       const call = net.calls.find((c) => c.name === 'chats.update')
       expect(call).toBeTruthy()
       expect(call!.args[0]).toBe('friend-1')
-      expect(call!.args[1]).toEqual({ status: 'resolved', operatorId: 'op-2', revision: 3 })
+      expect(call!.args[1]).toEqual({ status: 'resolved', operatorId: 'op-2', notes: '折り返し予定', revision: 3 })
     })
-    await eventually(() => expect(document.body.textContent).toContain('担当・対応状況を更新しました'))
+    await eventually(() => expect(document.body.textContent).toContain('対応状況とメモを更新しました'))
   })
 
   it('「未割り当て」を選ぶと operatorId=null で送る', async () => {
@@ -434,7 +458,7 @@ describe('N-035 友だち詳細から担当・対応状況を変える', () => {
     })
     await eventually(() => {
       const call = net.calls.find((c) => c.name === 'chats.update')
-      expect(call!.args[1]).toEqual({ status: 'in_progress', operatorId: null, revision: 3 })
+      expect(call!.args[1]).toEqual({ status: 'in_progress', operatorId: null, notes: '折り返し予定', revision: 3 })
     })
   })
 

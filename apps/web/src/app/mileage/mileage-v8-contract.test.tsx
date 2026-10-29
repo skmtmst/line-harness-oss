@@ -285,6 +285,7 @@ test('v8 のたまる決めごとは板 OC0gy に切り替わる', async () => {
     expect(host.textContent).toContain('友だち追加')
   })
   expect(host.textContent).toContain('たまる決めごと')
+  expect(host.querySelector('[data-page-template="list"] [data-template-region="content"]')?.textContent).toContain('友だち追加')
   expect(host.textContent).toContain('決めごとを作る')
   expect(host.textContent).toContain('動いています')
   // 管理画面 の器は出ない

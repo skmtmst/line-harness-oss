@@ -19,7 +19,7 @@ import { useAccount } from '@/contexts/account-context'
 import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
-import { SetupCard, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { SetupTasks, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import ListState from '@/components/shared/list-state'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import type { DashboardCardId } from '@line-crm/shared'
@@ -29,7 +29,7 @@ import { useSearchParams } from 'next/navigation'
 import { Fragment,useEffect,useRef,useState,type ReactNode } from 'react'
 import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
-import { FirstStepsCard,useFirstSteps } from './first-steps'
+import { FirstStepsCard,summarizeFirstSteps,useFirstSteps } from './first-steps'
 import { FirstRunDoneDialog } from './first-run-done'
 import { StarterRetryNotice, starterRetryVisible, useStarterRetryResult } from './starter-retry'
 import { FriendAddLink } from './friend-add'
@@ -227,7 +227,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           help={NOT_COMPARED_HELP}
           loading={state === 'loading'}
           detail={state === 'error' ? STATE_TEXT.error : state === 'ready' ? ((s?.soon ?? 0) > 0 ? `今日 ${s?.today ?? 0} 件・明日 ${(s?.soon ?? 0) - (s?.today ?? 0)} 件` : '未処理はありません') : STATE_TEXT.loading}
-          action={{ label: 'ECを見る', href: '/ec-commerce' }}
+          action={{ label: 'ECへ', href: '/ec-commerce' }}
         />,
         detail: <span>{state !== 'ready' || !s
           ? (state === 'error' ? STATE_TEXT.error : STATE_TEXT.loading)
@@ -276,12 +276,12 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
       : data ? <RecentResults conversions={data.conversions} period={dashboardPeriodLabel(d.displayedPeriod) ?? 'この期間'} section={data.sections?.conversions} /> : <><SectionHeader title="最近の成果" /><Loading label="最近の成果" /></>
     const ops = d.sectionAvailable('operations') ? data?.operations : undefined
     const opsDetail = (text: string | null) => text ?? (data ? STATE_TEXT.error : STATE_TEXT.loading)
-    if (id === 'booking-status') return <Metric title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約を見る" value={ops?.bookings?.pending ?? null} detail={opsDetail(ops?.bookings ? `今後の予約 ${ops.bookings.upcoming}件` : null)} section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'inflow-top') return <Metric title="流入経路TOP3" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳を見る" value={ops?.inflowTop?.[0]?.count ?? (ops?.inflowTop ? 0 : null)} detail={opsDetail(ops?.inflowTop ? ops.inflowTop.map((item) => `${item.name ?? emptyValue('unknown')} ${item.count}`).join('、') || '期間内の追加なし' : null)} section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'funnel-alert') return <Metric title="ファネル要注意" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルを見る" value={ops?.funnelAlerts ?? null} detail="" help="3人以上追加され、成果が0件の経路です" section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'automation-failures') return <Metric title="オートメーション失敗" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況を見る" value={ops?.automationFailures ?? null} detail="" help="期間内の失敗と一部失敗の合計です" section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'scenario-status') return <Metric title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオを見る" value={ops?.scenarios?.active ?? null} detail={opsDetail(ops?.scenarios ? `一時停止 ${ops.scenarios.paused} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
-    if (id === 'uid-migration') return <Metric title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況を見る" value={ops?.migrations?.active ?? null} detail={opsDetail(ops?.migrations ? `完了 ${ops.migrations.completed} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'booking-status') return <Metric title="予約状況" period="現在" href="/booking/bookings?view=list&status=requested" linkLabel="予約へ" value={ops?.bookings?.pending ?? null} detail={opsDetail(ops?.bookings ? `今後の予約 ${ops.bookings.upcoming}件` : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'inflow-top') return <Metric title="流入経路TOP3" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/analytics?tab=routes" linkLabel="経路別の内訳へ" value={ops?.inflowTop?.[0]?.count ?? (ops?.inflowTop ? 0 : null)} detail={opsDetail(ops?.inflowTop ? ops.inflowTop.map((item) => `${item.name ?? emptyValue('unknown')} ${item.count}`).join('、') || '期間内の追加なし' : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'funnel-alert') return <Metric title="ファネル要注意" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/analytics?tab=funnel" linkLabel="ファネルへ" value={ops?.funnelAlerts ?? null} detail="" help="3人以上追加され、成果が0件の経路です" section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'automation-failures') return <Metric title="オートメーション失敗" period={dashboardPeriodLabel(d.displayedPeriod) ?? undefined} href="/automations/runs?status=problems" linkLabel="実行状況へ" value={ops?.automationFailures ?? null} detail="" help="期間内の失敗と一部失敗の合計です" section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'scenario-status') return <Metric title="シナリオ配信状況" period="現在" href="/scenarios" linkLabel="シナリオへ" value={ops?.scenarios?.active ?? null} detail={opsDetail(ops?.scenarios ? `一時停止 ${ops.scenarios.paused} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
+    if (id === 'uid-migration') return <Metric title="UID移行状況" period="現在" href="/accounts?tab=migration" linkLabel="移行状況へ" value={ops?.migrations?.active ?? null} detail={opsDetail(ops?.migrations ? `完了 ${ops.migrations.completed} 件` : null)} section={data?.sections?.operations} loading={d.loading} />
     return null
   }
 
@@ -326,7 +326,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
           help="集計は期間の切り替えにかかわらず、いつも直近7日です。"
           helpLabel="友だち数の推移の説明"
           href="/analytics?tab=friends"
-          linkLabel="さらに詳しく"
+          linkLabel="推移へ"
         />
         <FriendTrend trend={trendOf()} loading={d.loading} />
       </>
@@ -388,6 +388,8 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
       inserted={starterResult.inserted} onInserted={starterResult.record} onDismiss={starterResult.clear}
       onChanged={() => { start.reload(); setup.reload() }} />
   ) : null
+  const onboardingSummary = canManage ? start.summary ?? (setupRest && start.steps.length > 0 ? summarizeFirstSteps(start.steps) : null) : null
+  const showOnboarding = canManage && Boolean(onboardingSummary || setupRest || start.error || setup.error)
   const notice = start.error || setup.error || start.summary || starterRetry || setupRest || setup.data?.warnings.length || viewer || d.error || d.periodNotice || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
@@ -395,8 +397,16 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
       ) : null}
       {setupBands}
       {starterRetry}
-      {start.error && canManage ? <ListState kind="error" title="はじめの設定の状態を確認できませんでした" error={start.error} onRetry={start.reload} /> : start.summary ? <FirstStepsCard summary={start.summary} folded={start.folded} onToggle={start.toggle} onRecheck={start.watchExpired ? start.rewatch : undefined} /> : null}
-      {setup.error && canManage ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : setupRest && canManage ? <SetupCard summary={setupRest} onOpenStep={openSetupStep} /> : null}
+      {showOnboarding ? <FirstStepsCard
+        summary={onboardingSummary} folded={start.folded} onToggle={start.toggle}
+        onRecheck={start.watchExpired ? start.rewatch : undefined}
+        onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : undefined}
+        setupTasks={setupRest ? <SetupTasks heading summary={setupRest} onOpenStep={openSetupStep} /> : undefined}
+        feedback={<>
+          {start.error ? <ListState kind="error" title="はじめの設定の状態を確認できませんでした" error={start.error} onRetry={start.reload} /> : null}
+          {setup.error ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}
+        </>}
+      /> : null}
       {d.periodNotice ? <Notice tone="info" role="status">{d.periodNotice}</Notice> : null}
       {d.error ? (
         <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}>{d.error}</Notice>

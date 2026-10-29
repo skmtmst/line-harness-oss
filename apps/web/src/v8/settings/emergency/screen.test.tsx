@@ -6,10 +6,14 @@
  * - 題は板の頭の1つだけで、h1 を重ねない。説明は「？」から開く。
  * - アカウント一覧の取得に失敗したら黙らせず、読み直せる。
  */
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import EmergencyScreen from './screen'
+import EmergencyPage from '@/app/emergency/page'
+import type { OperationHealthResult, OperationHealthSnapshot } from '@/lib/api'
+import { clearAdminVersionCache } from '@/lib/admin-version-cache'
+import { formatTime } from '@/lib/format'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -19,6 +23,8 @@ const state = vi.hoisted(() => ({
   tab: 'health',
   accountCalls: 0,
   accounts: [] as Array<() => Promise<unknown>>,
+  health: null as OperationHealthSnapshot | null,
+  healthCalls: [] as string[],
 }))
 
 vi.mock('@/contexts/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
@@ -48,7 +54,10 @@ vi.mock('@/lib/api', async (importOriginal) => {
       },
       operations: {
         ...actual.api.operations,
-        health: () => new Promise(() => undefined) as Promise<never>,
+        health: (accountId: string) => {
+          state.healthCalls.push(accountId)
+          return (state.health ? Promise.resolve({ success: true, data: state.health }) : new Promise(() => undefined)) as Promise<never>
+        },
         alerts: () => Promise.resolve({ success: true, data: [] }) as Promise<never>,
         history: () => Promise.resolve({ success: true, data: [] }) as Promise<never>,
         lineReceipts: () => Promise.resolve({ success: true, data: [] }) as Promise<never>,
@@ -62,6 +71,8 @@ afterEach(() => {
   state.tab = 'health'
   state.accountCalls = 0
   state.accounts = []
+  state.health = null
+  state.healthCalls = []
 })
 
 async function renderScreen(tab: string) {
@@ -77,6 +88,48 @@ async function openHelp() {
 }
 
 describe('運用状態の外側', () => {
+  it('実入口から取得済みの健全性の行を設定型の本文へ描く', async () => {
+    const now = new Date().toISOString()
+    const keys = ['line_connection', 'monitoring_heartbeat', 'external_integrations', 'message_quota', 'friend_change', 'webhook', 'dispatch_jobs', 'infra_canary', 'credential_expiry'] as const
+    state.health = {
+      latestRun: {
+        id: 'run-1', lineAccountId: 'account-1',
+        source: 'scheduled', status: 'completed', overallStatus: 'normal',
+        startedAt: now, completedAt: now,
+        results: keys.map((checkKey, index): OperationHealthResult => ({
+          id: `result-${index}`, runId: 'run-1', checkKey, status: 'normal', summary: `確認済み-${checkKey}`,
+          value: null, threshold: null, source: 'fixture', observedAt: now,
+        })),
+      },
+      overallStatus: 'normal', lastCheckedAt: now, nextCheckAt: null, serverNow: now,
+    }
+    clearAdminVersionCache()
+    const unexpected: string[] = []
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      const url = new URL(String(input))
+      if (url.pathname === '/admin/version') return new Response(JSON.stringify({ version: '0.0.0-test' }), { status: 200 })
+      unexpected.push(url.pathname)
+      throw new Error(`未定義の取得: ${url.pathname}`)
+    })
+    try {
+      render(<EmergencyPage />)
+      const table = screen.getByRole('table', { name: '確かめていること', exact: true })
+      const result = within(table).getByText('Webhook が届いているか', { exact: true })
+      const row = result.closest('[role="row"]')!
+      await waitFor(() => expect(within(row).getAllByRole('cell')[1].textContent).toBe('正常'))
+      expect(within(row).getAllByRole('cell')[2].textContent).toBe(formatTime(now))
+      expect(within(row).getAllByRole('cell')[3].textContent).toBe('受け取りの失敗が続くと「注意」')
+      expect(result.closest('[data-template-region="content"]')?.closest('[data-page-template="settings"]')).toBeTruthy()
+      expect(state.healthCalls).toEqual(['account-1'])
+      expect(within(table).getAllByRole('row')).toHaveLength(10)
+      expect(unexpected).toEqual([])
+    } finally {
+      cleanup()
+      fetchSpy.mockRestore()
+      clearAdminVersionCache()
+    }
+  })
+
   it('健全性チェックは板 Y4LkX1。タブは板の並びで、題は1つ、h1 を重ねない', async () => {
     const view = await renderScreen('health')
     expect(view.container.querySelector('[data-page-template="settings"]')?.getAttribute('data-design-node')).toBe('Y4LkX1')

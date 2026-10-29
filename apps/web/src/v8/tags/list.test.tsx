@@ -86,6 +86,8 @@ describe('V8 タグ タグの一覧', () => {
     }
     expect(container.querySelector('[data-design-node="I1E7Bt"]')).not.toBeNull()
     expect(screen.getByText('EC顧客連携済み')).toBeTruthy()
+    const createLinks = screen.getAllByRole('link', { name: 'タグを作る' })
+    expect(createLinks.map(link => link.getAttribute('href'))).toEqual(createLinks.map(() => '/tags/new'))
     expect(container.querySelector('[data-list-name]')?.textContent).not.toContain('登録')
   })
 

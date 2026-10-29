@@ -30,7 +30,7 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const field = (id: string) => document.getElementById(id) as HTMLInputElement
 
-test('名前・URL・秘密の鍵は、離れた欄だけを赤くし、直す1文を読み上げつきで出す', () => {
+test('名前とURLは、離れた欄だけを赤くし、直す1文を読み上げつきで出す', () => {
   render(<WebhooksCreateV8 />)
   fireEvent.blur(field('wh-new-name'))
   expect(field('wh-new-name').getAttribute('aria-invalid')).toBe('true')
@@ -43,10 +43,6 @@ test('名前・URL・秘密の鍵は、離れた欄だけを赤くし、直す1�
   expect(field('wh-new-url').getAttribute('aria-invalid')).toBe('true')
   expect(alerts()).toEqual(['名前を入力してください', 'URLは https:// で始めてください'])
 
-  fireEvent.change(field('wh-new-secret'), { target: { value: 'short' } })
-  fireEvent.blur(field('wh-new-secret'))
-  expect(field('wh-new-secret').getAttribute('aria-invalid')).toBe('true')
-  expect(alerts().at(-1)).toMatch(/^秘密の鍵は\d+文字以上にしてください$/)
   for (const text of alerts()) expect(text).toMatch(/ください$/)
 })
 

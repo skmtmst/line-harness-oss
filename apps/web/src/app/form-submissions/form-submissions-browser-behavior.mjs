@@ -641,7 +641,7 @@ try {
     await band.waitFor({ timeout: 15_000 })
     assert.equal(state.putBodies.length, 1, `${tab}: 保存は1回だけ`)
     assert.equal(state.putBodies[0].expectedContentRevision, 4, `${tab}: 読み込んだ版を送る`)
-    assert.equal(await page.getByText(/^ほかの人が.*を保存しました$/).count(), 1, `${tab}: 競合の知らせは1つ`)
+    assert.equal(await page.getByText(/^要確認：ほかの人が.*を保存しました$/).count(), 1, `${tab}: 競合の知らせは1つ`)
     assert.equal(await input.inputValue(), 'わたしが直した内容', `${tab}: 409で入力を捨てない`)
     await page.getByRole('button', { name: '比べてから保存', exact: true }).click()
     const compare = page.getByRole('dialog', { name: '最新の保存と比べる', exact: true })

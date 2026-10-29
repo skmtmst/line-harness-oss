@@ -12,3 +12,9 @@ it.each([Button,TextLink])('external は新しいタブ・noreferrer・外への
 it.each([Button,TextLink])('普通の画面遷移は同じタブ',(Component)=>{
  render(<Component href="/friends">友だちを見る</Component>);expect(screen.getByRole('link').getAttribute('target')).toBeNull();expect(screen.getByRole('link').querySelector('[data-external-icon]')).toBeNull()
 })
+it('本文内リンクは矢印を付けない',( )=>{
+ render(<TextLink href="/password/forgot" inline>パスワードを忘れた方</TextLink>)
+ const link=screen.getByRole('link',{name:'パスワードを忘れた方'})
+ expect(link.hasAttribute('data-inline')).toBe(true)
+ expect(link.querySelector('svg')).toBeNull()
+})

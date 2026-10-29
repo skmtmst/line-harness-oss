@@ -118,6 +118,7 @@ describe('★V8-B 成果地点を作る（j8p3yj・競合cXqlS）', () => {
     })
     expect(host.textContent).toContain('成果地点を作る')
     expect(host.textContent).toContain('何が起きたら数えますか')
+    expect(host.querySelector('[data-page-template="create"] [data-template-region="content"]')?.textContent).toContain('何が起きたら数えますか')
     expect(host.textContent).toContain('同じ人を何回まで数えるか')
     expect(host.textContent).toContain('金額をどう出すか')
     expect(host.textContent).toContain('数えない条件')

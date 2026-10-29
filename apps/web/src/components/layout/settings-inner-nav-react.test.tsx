@@ -139,6 +139,15 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.queryByRole('link', { name: 'ファイルの安全確認' })).toBeNull()
   })
 
+  it('LINE通知の画面では機能設定を同時に選択しない', async () => {
+    fixture.pathname = '/line-notifications'
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(view.getByRole('link', { name: 'LINE通知' })).toBeTruthy())
+    expect(view.getByRole('link', { name: 'LINE通知' }).getAttribute('aria-current')).toBe('page')
+    expect(view.getByRole('link', { name: '機能設定' }).getAttribute('aria-current')).toBeNull()
+    expect(view.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page')).toHaveLength(1)
+  })
+
   it('機能設定の下の2つは、ほかの設定の画面では出さない', async () => {
     fixture.pathname = '/accounts'
     const view = render(<SettingsInnerNav />)

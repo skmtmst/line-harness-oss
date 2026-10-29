@@ -9,7 +9,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { TextField } from '@/components/shared/text-field'
 import TruncatedText from '@/components/shared/truncated-text'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
-import { LOGIN_ACKS, WEBHOOK_ACKS, developerChannelUrl, musuboWebhookUrl } from './logic'
+import { LOGIN_ACKS, WEBHOOK_ACKS, developerChannelUrl, developerProviderUrl, musuboWebhookUrl } from './logic'
 import styles from './register.module.css'
 import Notice from '@/components/shared/notice'
 
@@ -21,12 +21,9 @@ import Notice from '@/components/shared/notice'
 
 const MANUAL = '/manuals/line-connect/index.html'
 
-/* 承認済み v07 Ds3E2 に出す受け取り口。APIの元は組み立てのときに決まるので、一度だけ作る。 */
-const WEBHOOK_URL = musuboWebhookUrl()
-
 /* 正本 v07 ②の左の細い列「AC左 操作ステップ」（fbgO8）。いまどこを触っているかを3段で見せる。 */
 const AC_OUTLINE: ReadonlyArray<{ title: string; note: string }> = [
-  { title: 'Messaging API の2項目', note: 'LINE Developers からコピー' },
+  { title: 'Messaging API とプロバイダー', note: 'チャネル情報とプロバイダーID' },
   { title: 'Webhook の設定', note: 'URLを貼り付けて3つをONに' },
   { title: 'LINEログインの2項目', note: '同じプロバイダーの中に作る' },
 ]
@@ -64,8 +61,8 @@ function AcOutline({ sub }: { sub: number }) {
   )
 }
 
-/** ②で入れてもらう4項目。register.tsx の FormState から必要なぶんだけ受け取る。 */
-export type Step2Field = 'channelId' | 'channelSecret' | 'loginChannelId' | 'loginChannelSecret'
+/** ②で入れてもらう5項目。register.tsx の FormState から必要なぶんだけ受け取る。 */
+export type Step2Field = 'channelId' | 'channelSecret' | 'providerId' | 'loginChannelId' | 'loginChannelSecret'
 
 export default function Step2Connect({
   sub, badge, values, fieldErrors, acks, onUpdate, onToggleAck,
@@ -74,13 +71,15 @@ export default function Step2Connect({
   sub: number
   /** 「Step 1 / 3」などの札。 */
   badge: string
-  /** いま入っている4項目。 */
+  /** いま入っているチャネルの4項目とプロバイダーID。 */
   values: Record<Step2Field, string>
   fieldErrors: Record<string, string>
   acks: Record<string, boolean>
   onUpdate: (key: Step2Field, value: string) => void
   onToggleAck: (key: string, next: boolean) => void
 }) {
+  const webhookUrl = musuboWebhookUrl(values.channelId)
+  const providerUrl = developerProviderUrl(values.providerId)
   return (
     /* 正本 v07 ②の右の列（Step1 msf5n／Step2 RtWJZ／Step3 J84XB は同じ中身）。
        白い板の中に、マニュアル → 区切り → 途中保存して閉じる → 区切り → うまくいかないとき → サポートに聞く。 */
@@ -104,7 +103,7 @@ export default function Step2Connect({
             <h2 className={styles.panelTitle}>Messaging API の情報を入れる</h2>
             <span className={styles.precheckHelpMark} title="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。" aria-label="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。"><CircleHelp size={16} aria-hidden="true" /></span>
           </div>
-          <p className={styles.precheckLead}>LINE公式アカウントと musubo をつなぐための2項目です。ほかの項目は musubo が自動で設定するので入力はいりません。</p>
+          <p className={styles.precheckLead}>Messaging API のチャネルID・シークレットと、同じプロバイダーのIDを入力します。</p>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
             <p className={styles.precheckNoteTitle}>LINE Developers を開いてください</p>
             <p>Messaging API チャネルの「チャネル基本設定」に、チャネルID とチャネルシークレットがあります。</p>
@@ -117,7 +116,7 @@ export default function Step2Connect({
               <Field htmlFor="v8-channel-id" label="チャネルID" error={fieldErrors.channelId}>
                 <SaveErrorField names={["channelId","form.channelId","channel_id","form.channel_id"]}><TextField id="v8-channel-id" value={values.channelId} onChange={(event) => onUpdate('channelId', event.target.value)} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.channelId ? true : undefined} /></SaveErrorField>
               </Field>
-              <p className={styles.help}>Messaging API チャネルの「チャネル基本設定」にある数字です。</p>
+              <p className={styles.help}>Messaging API チャネルの「チャネル基本設定」にある数字です。LINEログインのチャネルIDとは異なります。</p>
             </div>
             <div className={styles.acField}>
               <Field htmlFor="v8-channel-secret" label="チャネルシークレット" error={fieldErrors.channelSecret}>
@@ -125,13 +124,19 @@ export default function Step2Connect({
               </Field>
               <p className={styles.help}>同じ画面の「チャネルシークレット」です。</p>
             </div>
+            <div className={styles.acField}>
+              <Field htmlFor="v8-provider-id" label="プロバイダーID" error={fieldErrors.providerId}>
+                <SaveErrorField names={["providerId","form.providerId"]}><TextField id="v8-provider-id" value={values.providerId} onChange={(event) => onUpdate('providerId', event.target.value)} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.providerId ? true : undefined} /></SaveErrorField>
+              </Field>
+              <p className={styles.help}>LINE Developers でこの Messaging API チャネルのプロバイダーを選び、URLの「/provider/」の後の数字を入力してください。Step 3 のリンクに使います。</p>
+            </div>
           </div>
           <span className={styles.secretNote}><Lock size={16} aria-hidden="true" />シークレットは保存したあと画面には出ません。あとから入れ替えはできます。</span>
         </Card>
       )}
       {sub === 2 && (
-        /* 正本 v07 Fqy29 → ②Step2 の S1KaUa。LINE は Webhook URL を書き換える API を出していないので、
-           利用者が「Messaging API設定」へ貼り付ける。貼って「更新」を押すまで3つのスイッチが出てこないため、
+        /* 正本 v07 Fqy29 → ②Step2 の S1KaUa。利用者が個別 URL を「Messaging API設定」へ貼り付ける。
+           貼って「更新」を押すまで3つのスイッチが出てこないため、
            URLの控えと［コピー］（Ds3E2）を置き、印は「貼り付けた」を先頭にして全4つにした。 */
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Webhook（受信のつなぎ）を設定する">
           <p className={styles.subBadge}>{badge}</p>
@@ -158,9 +163,9 @@ export default function Step2Connect({
                   CSS として成り立たず余白が 0 に落ちる（枠が1行ぶんに潰れて字が線に付く）。
                   ⑤の同じ形の枠（register.tsx）と同じく、値を空白で分けて渡す。 */}
               <Card layout="horizontal" surface="bordered" corner="control" contentPadding="var(--space-8) var(--space-12)">
-                <span className={styles.endpointValue}><TruncatedText value={WEBHOOK_URL || String(emptyValue('unknown'))} url /></span>
+                <span className={styles.endpointValue}><TruncatedText value={webhookUrl || String(emptyValue('unknown'))} /></span>
               </Card>
-              <CopyTextButton value={WEBHOOK_URL} label="コピー" variant="secondary" icon={<Copy size={16} aria-hidden="true" />} aria-label="Webhook URL をコピー" disabled={!WEBHOOK_URL} />
+              <CopyTextButton value={webhookUrl} label="コピー" variant="secondary" icon={<Copy size={16} aria-hidden="true" />} aria-label="Webhook URL をコピー" disabled={!webhookUrl} />
             </div>
           </Card>
           <Notice tone="warn" heading={<>すでにほかのツールのURLが入っているとき</>}>
@@ -183,7 +188,7 @@ export default function Step2Connect({
       )}
       {sub === 3 && (
         /* 正本 v07 Fqy29 → ②-3（J84XB）の wI40b。Callback URL は musubo が自動で登録するので
-           控えの欄を置かない。開くボタンは、ステップ1のチャネルIDから同じプロバイダーをたどる。 */
+           控えの欄を置かない。開くボタンはステップ1で入力したプロバイダーIDを使う。 */
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="LINEログインの情報を入れる">
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
@@ -193,10 +198,12 @@ export default function Step2Connect({
           <p className={styles.precheckLead}>友だち追加の窓口（LIFF）を musubo が自動で作るために使います。入れていただくのはこの2項目だけです。</p>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
             <p className={styles.precheckNoteTitle}>LINE Developers で「LINEログイン」チャネルを開いてください</p>
-            <p>ステップ1で入れたチャネルIDから、Messaging API と同じプロバイダーの画面を直接開きます。その中で「LINEログイン」チャネルを作り、下の2項目をコピーしてください。プロバイダーやチャネルを探し直す必要はありません。</p>
+            <p>ステップ1で入力したプロバイダーの画面を直接開きます。LINEログインチャネルがまだなければ「新規チャネル作成」から作成し、すでにあればそのチャネルを開いて、下記2項目をコピーしてください。</p>
             <div className={styles.precheckNoteLink}>
-              <Button variant="primary" external href={developerChannelUrl(values.channelId)}>LINE Developers を開く</Button>
-              <p className={styles.help}>必ずこのボタンから操作してください</p>
+              {providerUrl
+                ? <Button variant="primary" external href={providerUrl}>LINE Developers のプロバイダーを開く</Button>
+                : <p className={styles.help}>プロバイダーIDがありません。Messaging API の情報へ戻って入力してください。</p>}
+              {providerUrl && <p className={styles.help}>同じプロバイダー内のLINEログインチャネルを使ってください</p>}
             </div>
           </div>
           <div className={styles.acInputs}>

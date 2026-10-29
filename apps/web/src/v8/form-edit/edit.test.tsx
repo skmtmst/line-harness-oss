@@ -128,6 +128,7 @@ describe('回答フォームの編集（V8）', () => {
     expect(screen.getByText('ページ1 のブロック')).toBeTruthy()
     // 開いている設定（質問文の欄）に質問の文が入っている
     expect(screen.getByDisplayValue('今日のご来店の目的は？')).toBeTruthy()
+    expect(screen.getByDisplayValue('今日のご来店の目的は？').closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
     expect(screen.getByText('下書き・公開中と違います')).toBeTruthy()
   })
 
@@ -206,7 +207,7 @@ describe('回答フォームの編集（V8）', () => {
     await render('id=form-1&page=2')
     expect(await screen.findByText('ページ2 のブロック')).toBeTruthy()
     expect(screen.getByDisplayValue('次回のご希望の日時を選んでください')).toBeTruthy()
-    expect(screen.getByText('予約の設定を開く').closest('a')?.getAttribute('href')).toBe('/booking/menus')
+    expect(screen.getByText('予約メニューへ').closest('a')?.getAttribute('href')).toBe('/booking/menus')
   })
 
   it('?tab= で答え終わったあと・受付と見た目を開け、タブでも切り替わる', async () => {

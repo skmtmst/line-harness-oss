@@ -79,6 +79,14 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.clearAllMocks(); window.history.replaceState(null, '', '/') })
 
 describe('来店スタンプ（管理画面）', () => {
+  it('カード一覧の読込中は未保存の変更として扱わない', () => {
+    fx.cards.mockReturnValue(new Promise(() => {}))
+    window.history.replaceState(null, '', '/visit-stamps?tab=settings')
+    render(<VisitStampsV8 />)
+    expect(screen.queryByText('保存していない変更があります')).toBeNull()
+    expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
+  })
+
   it('タブを移っても下書きを保ち、URLの友だちと他の指定を残して保存の帯だけを切り替える', async () => {
     window.history.replaceState(null, '', '/visit-stamps?tab=settings&friend=f1&from=detail#card')
     render(<VisitStampsV8 />)
@@ -179,11 +187,11 @@ describe('来店スタンプ（管理画面）', () => {
     render(<VisitStampsV8 />)
     fireEvent.click(await screen.findByRole('button', { name: '次のページ' }))
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 2, pageSize: 20 }))
-    expect(await screen.findByText('88 件中 21〜40 件')).toBeTruthy()
+    expect(await screen.findByText('88件中 21〜40件')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '記録の表示件数' }))
     fireEvent.click(await screen.findByRole('button', { name: '10件表示' }))
     await waitFor(() => expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 10 }))
-    expect(await screen.findByText('88 件中 1〜10 件')).toBeTruthy()
+    expect(await screen.findByText('88件中 1〜10件')).toBeTruthy()
   })
 
   it('古い記録の返事が遅れても、操作後に読み直した記録を上書きしない', async () => {
@@ -205,8 +213,8 @@ describe('来店スタンプ（管理画面）', () => {
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     await act(async () => { finishOld({ success: true, data: { items: [], total: 88, page: 2, pageSize: 20 } }) })
     fireEvent.click(screen.getByRole('tab', { name: '押した・使った記録' }))
-    expect(await screen.findByText('120 件中 21〜40 件')).toBeTruthy()
-    expect(screen.queryByText(/88 件中/)).toBeNull()
+    expect(await screen.findByText('120件中 21〜40件')).toBeTruthy()
+    expect(screen.queryByText(/88件中/)).toBeNull()
   })
 
   it('記録の総数が減って今のページがなくなったら、最後のページを読み直す', async () => {
@@ -217,10 +225,11 @@ describe('来店スタンプ（管理画面）', () => {
     fireEvent.click(await screen.findByRole('button', { name: '次のページ' }))
     await waitFor(() => expect(fx.entries).toHaveBeenCalledTimes(3))
     expect(fx.entries).toHaveBeenLastCalledWith({ accountId: 'acc-1', page: 1, pageSize: 20 })
-    expect(await screen.findByText('2 件中 1〜2 件')).toBeTruthy()
-    const pager = screen.getByRole('navigation', { name: '記録のページ送り' })
-    expect(pager.querySelector('[aria-current="page"]')?.textContent).toBe('1')
-    expect((pager.querySelector('[aria-label="次のページ"]') as HTMLButtonElement).disabled).toBe(true)
+    expect(await screen.findByText('2件中 1〜2件')).toBeTruthy()
+    const pager = screen.getByText('2件中 1〜2件').closest('[data-pagination]')
+    expect(pager).not.toBeNull()
+    expect(pager!.querySelectorAll('button')).toHaveLength(0)
+    expect(pager!.querySelector('[aria-current="page"]')).toBeNull()
   })
 
   it('閲覧のみは記録タブでも手入力欄を出さず、移行タブで承認・却下を隠す', async () => {

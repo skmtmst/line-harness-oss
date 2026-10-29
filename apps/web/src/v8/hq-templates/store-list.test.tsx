@@ -176,16 +176,16 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     })
   }
 
-  it('テンプレートは「…」の中から配る。公開の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
+  it('テンプレートは「…」の中から配る。配布の札と今月送った数を出す（i0Ao0R・API-18）', async () => {
     const rows = [
       { ...ROWS[0], outdated_account_count: 1, this_month_sent_count: 1860 },
       { ...ROWS[1], this_month_sent_count: null },
       { ...row('t-3', '予約の受付', 1), outdated_account_count: 0, this_month_sent_count: 0 },
     ]
     const h = await render({ rows, stats: { thisMonthSentCount: 1860, outdatedTemplateCount: 1 } })
-    expect(host.textContent).toContain('未公開の変更')
-    expect(host.textContent).toContain('下書きだけ')
-    expect(host.textContent).toContain('公開中')
+    expect(host.textContent).toContain('更新の配布待ち')
+    expect(host.textContent).toContain('未配布')
+    expect(host.textContent).toContain('配布済み')
     expect(host.textContent).toContain('1,860通')
     expect(host.textContent).toContain('0通')
     expect(host.textContent).toContain('新しい版を未配布')
@@ -197,6 +197,29 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     expect(h.onDistribute).toHaveBeenCalledWith(rows[0])
   })
 
+  it.each(['template', 'rich_menu', 'form', 'scenario'] as const)('%sは配布記録の状態を出し、公開と未取得を推測しない', async type => {
+    await render({ type, kind: undefined, rows: [
+      { ...row('distributed', '配ったメニュー', 3), template_type: 'rich_menu', outdated_account_count: 0 },
+      { ...row('changed', '更新待ちメニュー', 3), template_type: 'rich_menu', outdated_account_count: 1 },
+      { ...row('draft', 'まだ配らないメニュー', 0), template_type: 'rich_menu' },
+      { ...row('unknown', '記録が未取得', 3), template_type: 'rich_menu', distributed_account_count: undefined },
+      { ...row('unknown-version', '版が未取得', 3), template_type: 'rich_menu' },
+    ] })
+    const column = [...host.querySelectorAll('thead th')].findIndex(th => th.textContent === '配布状況')
+    expect(column).toBeGreaterThanOrEqual(0)
+    for (const [id, state] of [['distributed', '配布済み'], ['changed', '更新の配布待ち'], ['draft', '未配布'], ['unknown', '—'], ['unknown-version', '—']]) {
+      const tr = host.querySelector('tr[data-row-id="' + id + '"]')!
+      expect(tr.querySelectorAll('td')[column].textContent).toBe(state)
+    }
+    expect(host.querySelector('tbody')!.textContent).not.toContain('公開中')
+  })
+
+  it.each([true, false])('一覧未取得中は配布済みの行を出さない（読込中=%s）', async busy => {
+    await render({ ready: false, busy })
+    expect(host.querySelector('tbody')).toBeNull()
+    expect(host.textContent).toContain(busy ? 'ひな形を読み込み中…' : '読み込めませんでした。権限や接続を確認し、ページを再読み込みしてください。')
+  })
+
   it('タグは人数・付け方、リッチメニューは順・誰に出すか・今月押されたを出す（DzdC3・noVq4）', async () => {
     await render({ type: 'tag', kind: undefined, rows: [{ ...ROWS[0], template_type: 'tag', friend_count: 64, assignment_method: '手動・自動' }] })
     expect(host.textContent).toContain('64人')
@@ -204,6 +227,30 @@ describe('統括のひな形の一覧（店と同じ形）', () => {
     await render({ type: 'rich_menu', kind: undefined, rows: [{ ...ROWS[0], template_type: 'rich_menu', display_order: 0, display_audience: 'タグ「ゴールド会員」', tap_count: 3210 }] })
     expect(host.querySelector('[data-truncated-text][title="タグ「ゴールド会員」"]')?.textContent).toBe('タグ「ゴールド会員」')
     expect(host.textContent).toContain('3,210回')
+  })
+
+  it('共有ページ送りは1ページでは件数だけ残し、2ページなら次と前で表示行を切り替える', async () => {
+    window.history.replaceState(null, '', '/hq/templates')
+    await render()
+    expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('2件中 1〜2件')
+    expect(host.querySelector('nav[data-pagination]')).toBeNull()
+    expect(host.querySelector('[data-pagination] button')).toBeNull()
+
+    const rows = Array.from({ length: 21 }, (_, index) => ({ ...row('page-' + (index + 1), '案内' + (index + 1), 0), outdated_account_count: 0 }))
+    await render({ rows })
+    expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('21件中 1〜20件')
+    const next = host.querySelector<HTMLButtonElement>('nav[data-pagination] button[aria-label="次のページ"]')!
+    expect(next.disabled).toBe(false)
+    await act(async () => { next.click() })
+    expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('21件中 21〜21件')
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(1)
+    expect(host.querySelector('tbody tr')?.getAttribute('data-row-id')).toBe('page-21')
+    expect(host.querySelector('nav[data-pagination] [aria-current="page"]')?.getAttribute('aria-label')).toBe('2ページ目へ')
+    const previous = host.querySelector<HTMLButtonElement>('nav[data-pagination] button[aria-label="前のページ"]')!
+    await act(async () => { previous.click() })
+    expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('21件中 1〜20件')
+    expect(host.querySelectorAll('tbody tr')).toHaveLength(20)
+    expect(host.querySelector('tbody tr')?.getAttribute('data-row-id')).toBe('page-1')
   })
 
   it('上のタブで種類を替える（店と同じ6種類）', async () => {
@@ -327,7 +374,7 @@ it('同じ名前（409 FOLDER_NAME_CONFLICT）は名前の欄に、読めない�
   expect((document.querySelector('[role="dialog"] input') as HTMLInputElement).getAttribute('aria-invalid')).toBe('true')
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('同じ名前のフォルダがあります。')
   await act(async () => (buttons().find((el) => el.textContent === '追加する') as HTMLButtonElement).click())
-  expect(document.querySelector('[data-folder-dialog-error]')?.textContent).toBe('フォルダを保存できませんでした。（状態 500・UNAVAILABLE）')
+  expect(document.querySelector('[data-folder-dialog-error]')?.textContent).toBe('失敗：フォルダを保存できませんでした。（状態 500・UNAVAILABLE）')
 })
 
 it('空の種類タブに、ほかの種類の未配布数や通数を混ぜない', async () => {

@@ -110,6 +110,7 @@ describe('R308 提供できる数は有効の担当だけ', () => {
 
     // カットは稼働1＋非公開1の割当。受付できる数は1人と区別する。
     const cut = menuRow('カット')
+    expect(cut.closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
     expect((within(cut).getByRole('checkbox', { name: 'カット を 稼働さん が受ける' }) as HTMLInputElement).checked).toBe(true)
     expect((within(cut).getByRole('checkbox', { name: 'カット を 非公開さん が受ける' }) as HTMLInputElement).checked).toBe(true)
     expect(screen.queryByText(/「カット」は受付を止めている担当しか/)).toBeNull()

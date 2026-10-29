@@ -201,6 +201,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
     fireEvent.change(nameInput(), { target: { value: 'トリミング' } })
     await act(async () => { deferred.resolve({ success: true, data: TAGS }); await deferred.promise })
     expect(nameInput().value).toBe('トリミング')
+    expect(nameInput().closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
     expect(await tagLabels()).toEqual(['予約中', '常連さん'])
   })
   test('取得に失敗しても保存はできる文言を出し、選ぶ口は出さない', async () => {
@@ -270,7 +271,7 @@ describe('R306/R307 予約時マイルの設定リンク', () => {
   }
 
   function settingsLink(): HTMLAnchorElement {
-    return screen.getByRole('link', { name: '設定を見る' }) as HTMLAnchorElement
+    return screen.getByRole('link', { name: 'マイル設定へ' }) as HTMLAnchorElement
   }
 
   test('行き先はマイルの付与ルールで、行動スコアのルールではない', async () => {

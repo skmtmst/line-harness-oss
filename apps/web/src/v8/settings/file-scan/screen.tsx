@@ -19,7 +19,7 @@ import { TextArea,TextField } from '@/components/shared/text-field'
 import ListRange from '@/components/ui/list-range'
 import type { FileScanItem } from '@/lib/api'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { RotateCcw,ShieldCheck,SlidersHorizontal,Trash2 } from 'lucide-react'
+import { RotateCcw,SlidersHorizontal,Trash2 } from 'lucide-react'
 import { useEffect,useRef,useState } from 'react'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import styles from './screen.module.css'
@@ -35,7 +35,7 @@ import { FILE_SCAN_PAGE_SIZE,useFileScan } from './use-file-scan'
 
 const TITLE = 'ファイルの安全確認'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
-const SAFETY_NOTICE = <Notice tone="info" icon={<ShieldCheck aria-hidden="true" />}>確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
+const SAFETY_NOTICE = <Notice tone="info">確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
 
 /* 板の札。`使えません`・`使えます` の絞り込みは 管理画面 の画面に残す。 */
 const STATUS_CHIPS = [

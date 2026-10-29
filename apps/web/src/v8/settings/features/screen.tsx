@@ -9,7 +9,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { ReorderDialog } from './reorder-dialog'
 export { ReorderDialog } from './reorder-dialog'
 import ListState from '@/components/shared/list-state'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
@@ -117,7 +117,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
           必須
         </span>
       ) : canManage ? (
-        <SaveErrorField names={["enabled"]}><SettingCheckbox
+        <SaveErrorField names={["enabled"]}><Toggle
           checked={enabled}
           label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
           disabled={busy}

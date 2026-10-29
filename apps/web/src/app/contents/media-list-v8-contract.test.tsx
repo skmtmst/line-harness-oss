@@ -183,6 +183,7 @@ describe('V8 登録メディア一覧（O7hUt7）の切り替え', () => {
     readOnly = true
     await renderPage()
     expect(host?.textContent).toContain('秋の新商品.jpg')
+    expect(host?.querySelector('[data-page-template="list"] [data-template-region="content"]')?.textContent).toContain('秋の新商品.jpg')
     expect(host?.textContent).toContain('閲覧のみで見ています')
     expect([...host!.querySelectorAll('button')].some(button => button.textContent?.includes('メディアを登録する'))).toBe(false)
     expect(host!.querySelector('[aria-label="一覧で並べる"]')).not.toBeNull()

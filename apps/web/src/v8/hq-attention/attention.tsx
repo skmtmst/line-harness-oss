@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Info, RefreshCw } from 'lucide-react'
+import { RefreshCw } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
@@ -21,6 +21,7 @@ import { ListPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
+import { notifyToast } from '@/components/shared/toast'
 import type { AccountStyle } from '@line-crm/shared'
 import { hqStyleApi } from '@/lib/api/helpers/styles'
 import { styleLabel } from '@/v8/onboarding/public/model/index'
@@ -97,7 +98,9 @@ export default function HqAttentionV8() {
 
   /* そのアカウントに切り替えてから開く。 */
   const open = (accountId: string, href: string) => {
+    const name = items?.find((item) => item.accountId === accountId)?.name
     setSelectedAccountId(accountId)
+    notifyToast(`${name || '選んだアカウント'} に切り替えました`, { tone: 'info' })
     router.push(href)
   }
 
@@ -137,7 +140,7 @@ export default function HqAttentionV8() {
     <ListPage
       boardId="Kyf8U"
       title="対応が要るもの"
-      help="アカウントごとに、すぐ対応が要るものの件数を出します。件数を押すと、そのアカウントに切り替えて開きます。"
+      help="アカウントごとに、すぐ対応が要るものの件数を出します。件数を押すと、そのアカウントに切り替えて受信箱・予約・配信の画面を開きます。見る権限の無いアカウントは出しません。"
       actions={<Button onClick={() => void load()} busy={loading} busyLabel="読み直しています…"><RefreshCw aria-hidden="true" className={styles.buttonIcon} />すべて読み直す</Button>}
       stats={stats}
       toolbar={toolbar}
@@ -174,7 +177,6 @@ export default function HqAttentionV8() {
           ))}
         </GridTable></div>
       )}
-      <p className={styles.help}><Info aria-hidden="true" className={styles.helpIcon} />件数を押すと、そのアカウントに切り替えて受信箱・予約・配信の画面を開きます。見る権限の無いアカウントは出しません。</p>
       </div>
     </ListPage>
   )

@@ -34,8 +34,8 @@ export default function MediaPreviewOverlay({
       ) : (
         <div className="rounded-card bg-canvas p-6 text-center text-sm">
           <p className="text-ink font-medium">{filename}</p>
-          <TextLink external href={src}   className="text-info mt-2 inline-block hover:underline">
-            別のタブで開く
+          <TextLink external href={src}   className="mt-2 inline-block hover:underline">
+            ファイルへ
           </TextLink>
         </div>
       )}

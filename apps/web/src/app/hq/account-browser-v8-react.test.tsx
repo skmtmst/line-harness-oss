@@ -14,7 +14,7 @@ vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof impo
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api,
-    lineAccounts: { ...actual.api.lineAccounts, list: mocks.list, restore: mocks.restore },
+    lineAccounts: { ...actual.api.lineAccounts, list: mocks.list, restore: mocks.restore, stepFollowerImport: vi.fn(async () => ({ success: true, data: {} })) },
     lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })) },
     tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '統括' } })) },
     auth: { ...actual.api.auth, stepUp: mocks.stepUp },
@@ -58,12 +58,26 @@ describe('V8 統括のアカウントを探す', () => {
     fireEvent.click(screen.getByRole('button', { name: 'フォルダを追加' }))
     expect(screen.getByRole('textbox', { name: 'フォルダの名前' })).toBeTruthy()
   })
-  it('アーカイブは詳細と戻すだけを出し、本人確認して戻す', async () => {
+  it('アーカイブは登録内容の編集と戻すだけを出し、本人確認して戻す', async () => {
     const archived: AccountWithStats = { id: 'old', name: '旧キャンペーン', channelId: 'c-old', basicId: '@nen-old', isActive: false, country: null, role: 'owner', displayOrder: 99, archivedAt: '2026-01-01', stats: { friendCount: 0, messagesThisMonth: 0, activeScenarios: 0, staffCount: 0 } }
-    mocks.list.mockResolvedValue({ success: true, data: [archived] })
-    render(<AccountBrowser />); await screen.findByText('旧キャンペーン')
+    mocks.list.mockResolvedValue({ success: true, data: [accounts[0], archived] })
+    render(<AccountBrowser />); await screen.findByText('店舗00')
+    expect(screen.queryByText('旧キャンペーン')).toBeNull()
+    const allButtons = screen.getAllByRole('button', { name: /^すべて/ })
+    expect(allButtons).toHaveLength(2)
+    expect(allButtons.every((button) => button.textContent?.includes('1'))).toBe(true)
+    const explanationButton = screen.getByRole('button', { name: '統括のアカウントの説明' })
+    fireEvent.click(explanationButton)
+    const explanation = document.getElementById(explanationButton.getAttribute('aria-describedby') ?? '')
+    expect(explanation).not.toBeNull()
+    expect(explanation?.getAttribute('role')).toBe('note')
+    expect(explanation?.textContent).toContain('アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです')
+    fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(screen.getByRole('button', { name: /^アーカイブ/ }))
-    expect(screen.getByRole('button', { name: '詳細' })).toBeTruthy()
+    await screen.findByText('旧キャンペーン')
+    expect(screen.queryByText('店舗00')).toBeNull()
+    expect(screen.getByRole('button', { name: '登録内容を編集' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '詳細' })).toBeNull()
     expect(screen.queryByRole('button', { name: / へ入る$/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '戻す' }))
     const dialog = await screen.findByRole('dialog', { name: '「旧キャンペーン」をアーカイブから戻しますか？' })
@@ -85,7 +99,10 @@ describe('V8 統括のアカウントを探す', () => {
     const person = screen.getByText('店舗11').closest('[data-list-person-cell]')
     expect(person?.querySelector('[data-avatar]')).toBeTruthy()
     const name = person?.querySelector('[data-list-name]')
-    expect(name?.querySelector('[data-folder-dot]')).toBeNull()
+    const dots = name?.querySelectorAll('[data-folder-dot]')
+    expect(dots).toHaveLength(1)
+    expect(dots?.[0].getAttribute('data-folder-dot')).toBe('unfiled')
+    expect(dots?.[0].getAttribute('aria-label')).toBe('フォルダ：未分類')
     expect(name?.getAttribute('data-has-annotation')).toBe('true')
     expect(name?.textContent).toContain('要確認')
     expect(person?.textContent).toContain('@shop11')

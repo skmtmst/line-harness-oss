@@ -434,10 +434,10 @@ export default function WebhooksOutgoingV8() {
       options={managedFolderOptions('webhook', folders, { allId: '', unfiledId: UNFILED })}
     /></SaveErrorField>
   )
-  /* 閲覧のみには押せない作るボタンを置かない（場所だけ空ける）。 */
+  /* 変更権限が無い人には作る操作も予約領域も置かない。 */
   const createButton = canManage
     ? <Button variant="primary" href="/webhooks/new"><Plus size={16} aria-hidden="true" />送り先を作る</Button>
-    : <span className={styles.createSpace} aria-hidden="true" />
+    : null
 
   /* ===== 道具の段 ===== */
   const chips = (

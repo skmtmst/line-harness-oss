@@ -19,12 +19,13 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-const fixture = vi.hoisted(() => ({ role: null as string | null }))
+const fixture = vi.hoisted(() => ({ role: null as string | null, searchParams: new URLSearchParams('') }))
 const create = vi.hoisted(() => vi.fn())
 const update = vi.hoisted(() => vi.fn())
 const getAffiliate = vi.hoisted(() => vi.fn())
 const friendsList = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
+const replace = vi.hoisted(() => vi.fn())
 const pageTitle = vi.hoisted(() => vi.fn())
 const approvalsList = vi.hoisted(() => vi.fn())
 
@@ -60,8 +61,8 @@ vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => React.createElement('a', { href, ...rest }, children),
 }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(''),
+  useRouter: () => ({ push, replace, refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
+  useSearchParams: () => fixture.searchParams,
   usePathname: () => '/affiliates',
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -79,15 +80,22 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: pageTitle, useP
 vi.mock('@/lib/use-unsaved-guard', () => ({
   useUnsavedGuard: () => ({ leaveTarget: null, confirmLeave: () => {}, cancelLeave: () => {} }),
 }))
+vi.mock('@/v8/conversions', () => ({
+  ConversionListV8: ({ embedded }: { embedded?: boolean }) => React.createElement('div', { 'data-testid': embedded ? 'embedded-conversions' : 'standalone-conversions' }),
+}))
 
 // 今の入口そのものを通す（入口が別の画面を出すように変われば、この試験も追いかける）。
 import AffiliatesPage from '@/app/affiliates/page'
 import NewAffiliatePage from '@/app/affiliates/new/page'
+import LegacyConversionsPage from '@/app/conversions/page'
+import { AffiliateTabs } from './frame'
 import { ApiError } from '@/lib/api'
 
 beforeEach(() => {
   fixture.role = null
+  fixture.searchParams = new URLSearchParams('')
   push.mockReset()
+  replace.mockReset()
   pageTitle.mockClear()
   friendsList.mockReset().mockResolvedValue({ success: true, data: { items: [], total: 0 } })
   create.mockReset().mockResolvedValue({ success: false, error: 'このコードは既に使われています' })
@@ -128,6 +136,25 @@ describe('承認待ちの読み込み（WEB003）', () => {
     await new Promise((resolve) => setTimeout(resolve, 20))
     const pendingCalls = approvalsList.mock.calls.filter(([params]) => params?.status === 'pending')
     expect(pendingCalls).toHaveLength(1)
+  })
+})
+
+describe('成果地点タブの統合', () => {
+  it('成果とアフィリエイト内のタブで成果地点一覧を開く', () => {
+    fixture.searchParams = new URLSearchParams('tab=points')
+    render(<AffiliatesPage />)
+    expect(screen.getByTestId('embedded-conversions')).toBeTruthy()
+  })
+
+  it('コンバージョンのタブは統合後の一覧URLへつなぐ', () => {
+    render(<AffiliateTabs />)
+    expect(document.querySelector('a[href="/affiliates?tab=points"]')?.textContent).toContain('コンバージョン')
+  })
+
+  it('旧コンバージョン一覧URLを同じタブへ検索条件つきで移す', async () => {
+    fixture.searchParams = new URLSearchParams('q=月次&tab=points&folder=unfiled')
+    render(<LegacyConversionsPage />)
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/affiliates?q=%E6%9C%88%E6%AC%A1&tab=points&folder=unfiled'))
   })
 })
 

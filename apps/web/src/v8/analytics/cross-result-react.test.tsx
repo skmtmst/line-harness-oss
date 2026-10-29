@@ -3,12 +3,12 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const net = vi.hoisted(() => ({ audience: vi.fn(), push: vi.fn(), save: vi.fn(), run: vi.fn() }))
+const net = vi.hoisted(() => ({ audience: vi.fn(), push: vi.fn(), save: vi.fn(), run: vi.fn(), fields: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: net.push }) }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api,
-    friendFields: { ...actual.api.friendFields, list: async () => ({ success: true, data: [] }) },
+    friendFields: { ...actual.api.friendFields, list: net.fields },
     analytics: { ...actual.api.analytics,
       runCross: net.run,
       crossResult: async () => ({ success: true, data: { id: 'result-1', state: 'available', result: {
@@ -29,6 +29,7 @@ import { flushListUrlState } from '@/components/shared/list-url-state'
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   sessionStorage.clear()
+  net.fields.mockReset().mockResolvedValue({ success: true, data: [] })
   net.audience.mockReset().mockResolvedValue({ success: true, data: { id: 'audience-1' } })
   net.push.mockReset()
   net.save.mockReset()
@@ -83,4 +84,27 @@ it('閲覧者の期間操作は残し、分析保存は表示しない', async (
   expect(screen.queryByRole('button', { name: 'この分析を保存' })).toBeNull()
   expect(screen.queryByRole('button', { name: '対象者を開く' })).toBeNull()
   expect(screen.getByText('結果の保存と対象者づくりは、統括・管理者だけが行えます。')).toBeTruthy()
+})
+
+it('友だち情報欄がないときは実際の項目作成へ案内し、集計を勝手に始めない', async () => {
+  render(<CrossV8 accountId="account-1" canManage />)
+  const addField = await screen.findByRole('link', { name: '友だち情報の項目を追加' })
+  expect(addField.getAttribute('href')).toBe('/tags/fields/new')
+  expect(net.run).not.toHaveBeenCalled()
+})
+
+it('項目の読込中と取得失敗でも数の帯の容器を1つ保ち、未取得を実数にしない', async () => {
+  let reject!: (reason: Error) => void
+  net.fields.mockImplementationOnce(() => new Promise((_resolve, failure) => { reject = failure }))
+  const { container } = render(<CrossV8 accountId="account-1" canManage />)
+  expect(screen.getByLabelText('友だち情報欄を読み込んでいます')).toBeTruthy()
+  const band = () => container.querySelector('[data-template-region="stats"]')!
+  expect(container.querySelectorAll('[data-template-region="stats"]')).toHaveLength(1)
+  expect(band().querySelectorAll('[data-kpi-strip]')).toHaveLength(1)
+  expect(band().textContent).toContain('結果が出ると数えます')
+  reject(new Error('fields unavailable'))
+  expect(await screen.findByText('友だち情報欄を読み込めませんでした。')).toBeTruthy()
+  expect(container.querySelectorAll('[data-template-region="stats"]')).toHaveLength(1)
+  expect(band().textContent).toContain('結果が出ると数えます')
+  expect(net.run).not.toHaveBeenCalled()
 })

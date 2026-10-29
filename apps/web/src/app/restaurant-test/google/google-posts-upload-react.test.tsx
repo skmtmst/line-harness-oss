@@ -73,6 +73,12 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/restaurant-test/google',
 }))
 
+vi.mock('@/v8/restaurant/google/post-image-crop', () => ({
+  PostImageCrop: ({ source, onConfirm }: { source: { name: string }; onConfirm: (file: File) => Promise<void> }) => (
+    <button type="button" onClick={() => void onConfirm(new File(['cropped'], source.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })).catch(() => {})}>この位置で確定</button>
+  ),
+}))
+
 const { PostEditor } = await import('@/v8/restaurant/google/posts')
 const { extractMediaMetadata, mediaAcceptForKind, putMediaFile, validateMediaFile } = await import('@/app/contents/media-direct-upload')
 
@@ -90,11 +96,6 @@ async function render() {
     root.render(<PostEditor accountId="account-2" kind="standard" postId={null} go={() => undefined} mediaUpload={{ accept: mediaAcceptForKind('image'), extractMetadata: extractMediaMetadata, validate: validateMediaFile, put: putMediaFile }} />)
     await settle()
   })
-  await act(async () => {
-    const choose = [...container.querySelectorAll('button')].find((button) => button.textContent?.includes('登録メディアから選ぶ'))
-    choose!.click()
-    await settle()
-  })
 }
 
 async function pickFile() {
@@ -104,6 +105,14 @@ async function pickFile() {
   Object.defineProperty(input, 'files', { value: [file], configurable: true })
   await act(async () => {
     input.dispatchEvent(new Event('change', { bubbles: true }))
+    await settle()
+  })
+}
+
+async function confirmCrop() {
+  await act(async () => {
+    const button = [...container.querySelectorAll('button')].find((item) => item.textContent === 'この位置で確定')
+    button?.click()
     await settle()
   })
 }
@@ -125,11 +134,11 @@ afterEach(async () => {
 })
 
 describe('投稿画像の端末アップロード', () => {
-  it('画像を入れる所（ドラッグ＆ドロップ・クリック）と隠しファイル入力がある', async () => {
+  it('画像を選ぶボタンと隠しファイル入力がある', async () => {
     await render()
     const text = container.textContent ?? ''
-    expect(text).toContain('ドラッグ＆ドロップ')
-    expect(text).toContain('登録メディアの画像')
+    expect(text).toContain('画像を選ぶ')
+    expect(text).toContain('登録メディアから選ぶ')
     const input = container.querySelector<HTMLInputElement>('input[type="file"]')
     expect(input).not.toBeNull()
     expect(input?.accept).toContain('image/png')
@@ -139,19 +148,22 @@ describe('投稿画像の端末アップロード', () => {
     await render()
     await pickFile()
 
-    expect(fixture.prepared).toHaveLength(1)
-    expect(fixture.prepared[0]).toMatchObject({ filename: 'photo.png', mimeType: 'image/png' })
+    expect(fixture.prepared).toHaveLength(0)
+    await confirmCrop()
 
-    expect(container.textContent).toContain('photo.png・4:3')
-    expect([...container.querySelectorAll('button')].some((button) => button.textContent === '消す')).toBe(true)
+    expect(fixture.prepared).toHaveLength(2)
+    expect(fixture.prepared[0]).toMatchObject({ filename: 'photo.png', mimeType: 'image/png' })
+    expect(fixture.prepared[1]).toMatchObject({ filename: 'photo.jpg', mimeType: 'image/jpeg' })
+    expect(container.textContent).toContain('切り取り位置を確認済み')
   })
 
   it('登録に失敗したらエラー文を出し、画像は選ばれたままにしない', async () => {
     fixture.completeFails = true
     await render()
     await pickFile()
+    await confirmCrop()
 
-    expect(container.textContent).toContain('登録できませんでした')
-    expect(container.textContent).not.toContain('photo.png・4:3')
+    expect(container.textContent).toContain('画像を保存できませんでした')
+    expect(container.textContent).not.toContain('切り取り位置を確認済み')
   })
 })

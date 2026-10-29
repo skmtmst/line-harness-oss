@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls = vi.hoisted(() => ({ prepare: vi.fn(), put: vi.fn(), complete: vi.fn(), detail: vi.fn(), create: vi.fn(), update: vi.fn() }))
+const staffRole = vi.hoisted(() => ({ value: 'owner' as 'owner' | 'viewer' }))
 vi.mock('@/lib/api', () => ({ ApiError: class extends Error {}, api: {
   media: { prepareUploads: calls.prepare, completeUpload: calls.complete, detail: calls.detail },
   templates: { create: calls.create, update: calls.update }, folders: { list: async () => ({ success: true, data: [] }) },
@@ -14,7 +15,7 @@ vi.mock('../contents/media-direct-upload', async (original) => ({
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a-1', selectedAccount: { name: '店' }, accounts: [] }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
-vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => staffRole.value }))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({ useActionOptions: () => ({ tags: [], fields: [], marks: [], scenarios: [], vars: [] }) }))
 
 
@@ -24,7 +25,7 @@ import Carousel from './carousel'
  * カルーセルの保存で落ちた欄（・オーナーの写真の指摘：「すべてのカードに本文を入力してください」の帯だけだった）。
  * 欄が赤くなり真下に理由、別のカードならそのカードを開いて移り、カードの札に赤い丸が付く。
  */
-beforeEach(() => { calls.create.mockResolvedValue({ success: true, data: { id: 'template-1' } }) })
+beforeEach(() => { staffRole.value = 'owner'; calls.create.mockResolvedValue({ success: true, data: { id: 'template-1' } }) })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
 const fillFirst = () => {
@@ -34,6 +35,19 @@ const fillFirst = () => {
 }
 
 describe('カルーセルの欄ごとの誤り', () => {
+  it.each(['shop', 'hq'] as const)('閲覧のみでは編集・削除・保存の口を出さない: %s', scope => {
+    const onSave = vi.fn()
+    if (scope === 'shop') staffRole.value = 'viewer'
+    render(<Carousel host={scope === 'hq' ? {
+      description: '', folders: [], folder: '', onFolderChange: vi.fn(), busy: false,
+      onSave, onCancel: vi.fn(), readOnly: true,
+    } : undefined} />)
+    expect(screen.getByText('一覧で中身を確認できます。')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /を外す$|ボタンを足す|下書きを保存|保存して公開|保存して配る/ })).toBeNull()
+    expect(calls.create).not.toHaveBeenCalled()
+    expect(calls.update).not.toHaveBeenCalled()
+    expect(onSave).not.toHaveBeenCalled()
+  })
   it('ボタンごとに文字と動きの題を付け、最後の一つを隠し、削除後も残りの値を保つ', async () => {
     render(<Carousel />)
     expect(screen.queryByRole('button', { name: 'カード1のボタン1を外す' })).toBeNull()

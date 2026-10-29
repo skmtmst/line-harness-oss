@@ -124,6 +124,8 @@ test('v8 では ZSbFY の一覧（帯・表・動いているの札）が出る'
   expect(board?.textContent).toContain('1,734')
   // 表の行：いつ送るか・送るもの・ようすの札。
   expect(board?.textContent).toContain('友だちになった')
+  expect(board?.querySelector('[data-template-region="content"]')?.closest('[data-page-template="list"]')).toBe(board)
+  expect(board?.querySelector('[data-template-region="content"]')?.textContent).toContain('友だちになった')
   expect(board?.textContent).toContain('動いている')
   // 板  行の右端は「…」だけ。中身を見る・やり直すはその中。
   expect(board?.querySelector('[aria-label="「顧客台帳（CRM）」の操作"]')).not.toBeNull()

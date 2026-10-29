@@ -99,6 +99,7 @@ describe('D020 Search Console の読み込み失敗の言い分け', () => {
     await renderPage()
     await settle()
     expect(text()).not.toContain('閲覧権限の確認が必要です')
+    expect(host.querySelector('[data-template-region="stats"]')).toBeNull()
     expect(retryButton()).toBeTruthy()
   })
 
@@ -107,6 +108,7 @@ describe('D020 Search Console の読み込み失敗の言い分け', () => {
     await renderPage()
     await settle()
     expect(text()).not.toContain('閲覧権限の確認が必要です')
+    expect(host.querySelector('[data-template-region="stats"]')).toBeNull()
     expect(retryButton()).toBeTruthy()
   })
 
@@ -115,6 +117,7 @@ describe('D020 Search Console の読み込み失敗の言い分け', () => {
     await renderPage()
     await settle()
     expect(text()).not.toContain('閲覧権限の確認が必要です')
+    expect(host.querySelector('[data-template-region="stats"]')).toBeNull()
     expect(retryButton()).toBeTruthy()
   })
 
@@ -123,6 +126,7 @@ describe('D020 Search Console の読み込み失敗の言い分け', () => {
     await renderPage()
     await settle()
     expect(text()).toContain('閲覧権限の確認が必要です')
+    expect(host.querySelector('[data-template-region="stats"]')).toBeNull()
     expect(retryButton()).toBeFalsy()
   })
 
@@ -150,4 +154,14 @@ it('連携済みの対象プロパティは押せない選択欄にせず、読�
   expect(property.value).toBe(connected.siteUrl)
   expect(property.readOnly).toBe(true)
   expect(property.disabled).toBe(false)
+})
+
+it('読込中と未接続に空の集計容器を追加しない', async () => {
+  let resolve!: (value: unknown) => void
+  mocks.performance.mockImplementationOnce(() => new Promise(done => { resolve = done }))
+  await renderPage()
+  expect(host.querySelector('[data-template-region="stats"]')).toBeNull()
+  await act(async () => { resolve({ success: true, data: { status: 'not_connected' } }) })
+  expect(host.querySelector('[data-template-region="stats"]')).toBeNull()
+  expect(host.textContent).toContain('Search Console をつなぐと')
 })

@@ -24,3 +24,14 @@ it('本人APIのIDごとに保存した件数を復元し、同じ端末の別�
   await waitFor(() => expect(fixture.requests.some(path => path.includes('limit=20'))).toBe(true))
   expect(fixture.requests.some(path => path.includes('limit=10'))).toBe(false)
 })
+
+it('見出しの行の右端に、共通の文字リンクで「受信箱へ」を1つだけ置く', async () => {
+  const { container, findByRole } = render(<PendingInboxCard />)
+  const link = await findByRole('link', { name: '受信箱へ' })
+  expect(link.getAttribute('href')).toBe('/chats')
+  expect(link.closest('[data-design-node="t0jk8p"]')).not.toBeNull()
+  // 共通の TextLink は言葉の後ろに「→」の印を描く（手書きの「→」の文字は使わない）。
+  expect(link.querySelector('svg[aria-hidden="true"]')).not.toBeNull()
+  expect(link.textContent).toBe('受信箱へ')
+  expect(container.textContent).not.toContain('受信箱をすべて見る')
+})

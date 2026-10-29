@@ -38,7 +38,7 @@ export interface DraftState {
   /** ①事前確認の答えと、今出している面。古い下書きには無いので既定へ寄せる。 */
   precheck: PrecheckAnswers
   precheckAt: PrecheckAt
-  name: string; channelId: string; loginChannelId: string; lineId: string
+  name: string; channelId: string; providerId: string; loginChannelId: string; lineId: string
   tagIds: string[]; parentId: string; staffIds: string[]; liffId: string; importFriends: boolean
 }
 
@@ -57,13 +57,13 @@ export function readDraft(storage: Pick<Storage, 'getItem'>): DraftState | null 
     const draft: DraftState = {
       step: parsed.step, sub, accountMethod: parsed.accountMethod === 'new' ? 'new' : 'existing',
       precheck, precheckAt: readPrecheckAt(parsed.precheckAt, precheck),
-      name: text(parsed.name), channelId: text(parsed.channelId), loginChannelId: text(parsed.loginChannelId), lineId: text(parsed.lineId),
+      name: text(parsed.name), channelId: text(parsed.channelId), providerId: text(parsed.providerId), loginChannelId: text(parsed.loginChannelId), lineId: text(parsed.lineId),
       tagIds: ids(parsed.tagIds), parentId: text(parsed.parentId), staffIds: ids(parsed.staffIds), liffId: text(parsed.liffId),
       importFriends: parsed.importFriends !== false,
     }
     // 手順1のまま何も入れていない下書きは戻さない（画面を開き直しただけで「下書きから続けます」を出さない）。
     const empty = draft.step === 1 && draft.precheckAt === 'q1' && Object.keys(draft.precheck).length === 0
-      && !draft.name && !draft.channelId && !draft.loginChannelId
+      && !draft.name && !draft.channelId && !draft.providerId && !draft.loginChannelId
       && !draft.lineId && draft.tagIds.length === 0 && !draft.parentId && draft.staffIds.length === 0 && !draft.liffId
     return empty ? null : draft
   } catch {
@@ -71,19 +71,21 @@ export function readDraft(storage: Pick<Storage, 'getItem'>): DraftState | null 
   }
 }
 
-export interface ChannelFields { channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string }
+export interface ChannelFields { channelId: string; channelSecret: string; providerId: string; loginChannelId: string; loginChannelSecret: string }
 export function channelErrors(form: ChannelFields): Record<string, string> {
   return { ...messagingApiErrors(form), ...loginChannelErrors(form) }
 }
 
 /* ===== ここから v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算 ===== */
 
-/** ②の Step1 で入れる Messaging API の2項目だけを調べる。 */
-export function messagingApiErrors(form: Pick<ChannelFields, 'channelId' | 'channelSecret'>): Record<string, string> {
+/** ②の Step1 で入れる Messaging API の2項目とプロバイダーIDを調べる。 */
+export function messagingApiErrors(form: Pick<ChannelFields, 'channelId' | 'channelSecret' | 'providerId'>): Record<string, string> {
   const errors: Record<string, string> = {}
   if (!form.channelId.trim()) errors.channelId = 'チャネルIDを入力してください。'
   else if (!/^\d+$/.test(form.channelId.trim())) errors.channelId = 'チャネルIDは半角数字で入力してください。'
   if (!form.channelSecret) errors.channelSecret = 'チャネルシークレットを入力してください。'
+  if (!form.providerId.trim()) errors.providerId = 'プロバイダーIDを入力してください。'
+  else if (!/^\d+$/.test(form.providerId.trim())) errors.providerId = 'プロバイダーIDは半角数字で入力してください。'
   return errors
 }
 
@@ -133,18 +135,25 @@ export function allAcked(acks: ReadonlyArray<{ key: string }>, checked: Record<s
 
 /**
  * 承認済み v07 ②Step2 の「musubo の Webhook URL」（Ds3E2 の vnh17）に出す字。
- * 受け取り口は apps/worker の expectedWebhookUrl と同じ `<APIの元>/webhook`。
- * 元が未設定のときは字を作らない（画面側で「不明」を出す）。
+ * 受け取り口は apps/worker の expectedWebhookUrl と同じ `<APIの元>/webhook/<Messaging APIチャネルID>`。
+ * 元や数字のチャネルIDが未設定のときは字を作らない（画面側で「不明」を出す）。
  */
-export function musuboWebhookUrl(): string {
+export function musuboWebhookUrl(channelId: string): string {
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/+$/, '')
-  return base ? `${base}/webhook` : ''
+  const id = channelId.trim()
+  return base && /^\d+$/.test(id) ? `${base}/webhook/${id}` : ''
 }
 
 /** LINE Developers のチャネル画面。配下の画面名は未確認なのでチャネルの入口まで。 */
 export function developerChannelUrl(channelId: string): string {
   const id = channelId.trim()
   return id ? `https://developers.line.biz/console/channel/${encodeURIComponent(id)}` : 'https://developers.line.biz/console/'
+}
+
+/** LINE Developers のプロバイダー画面。チャネルIDからは組み立てられない。 */
+export function developerProviderUrl(providerId: string): string {
+  const id = providerId.trim()
+  return /^\d+$/.test(id) ? `https://developers.line.biz/console/provider/${id}` : ''
 }
 
 

@@ -1,12 +1,16 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type Announcements, type DragEndEvent } from '@dnd-kit/core'
+import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { BookingPhoto, BookingPhotoCatalog, BookingPhotoOwner, BookingStorePhotoSlot, BookingStorePhotoVisibility, MediaItem } from '@line-crm/shared'
 import { bookingPhotosApi } from '@/lib/api-booking-photos'
 import { api } from '@/lib/api'
 import Checkbox from '@/components/shared/checkbox'
 import Button from '@/components/shared/button'
-import Card, { CardContent } from '@/components/shared/card'
+import ReorderHandle from '@/components/shared/reorder-handle'
+import Card, { CardActionRow, CardContent } from '@/components/shared/card'
 import ListState, { ListEmptyMessage } from '@/components/shared/list-state'
 import MediaThumbnail from '@/components/shared/media-thumbnail'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
@@ -24,28 +28,45 @@ import styles from './photos.module.css'
 const LABELS = { exterior: '外観', interior: '店内', waiting: '待合' }
 type Target = { owner: BookingPhotoOwner; id: string; name: string }
 const keyOf = (target: Target) => `${target.owner}:${target.id}`
+const ORDER_INSTRUCTIONS = 'つまみをドラッグして順番を変えられます。キーボードではスペースキーで持ち上げ、矢印キーで移動し、スペースキーで置きます。Escキーでやめます。'
 
-function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, disabledReason, onPick, onRemove, onSave, orderActions, visibilityControl, visibilityLabel }: {
+function PhotoCard({ name, fieldKey, photo, accountId, editable, changed, busy, disabledReason, onPick, onRemove, onSave, position, sortable, visibilityControl, visibilityLabel }: {
   name: string; fieldKey: string; photo: BookingPhoto | null; accountId: string; editable: boolean; changed: boolean; busy: boolean
-  onPick: () => void; onRemove: () => void; onSave?: () => void; orderActions?: React.ReactNode
+  onPick: () => void; onRemove: () => void; onSave?: () => void; position?: React.ReactNode
+  sortable?: Pick<ReturnType<typeof useSortable>, 'setNodeRef' | 'transform' | 'transition' | 'isDragging' | 'isOver'>
   disabledReason?: string; visibilityControl?: React.ReactNode; visibilityLabel?: string
 }) {
-  return <Card frame="flat" layout="vertical" overflow="hidden" aria-label={`${name}の写真`}>
+  const controls = <>
+    <Button onClick={onPick} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を選ぶ`}>{photo ? '替える' : '写真を選ぶ'}</Button>
+    {photo || position ? <Button onClick={onRemove} disabled={busy || !photo} disabledReason={disabledReason ?? (!photo ? '写真はありません。' : undefined)} aria-label={`${name}の写真を外す`}>外す</Button> : null}
+    {onSave && changed ? <Button variant="primary" onClick={onSave} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を保存する`}>保存する</Button> : null}
+  </>
+  return <Card ref={sortable?.setNodeRef} layout="vertical" overflow="hidden" aria-label={`${name}の写真`}
+    selected={sortable?.isDragging || sortable?.isOver}
+    style={sortable ? { transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition, position: 'relative', zIndex: sortable.isDragging ? 1 : undefined } : undefined}>
     <div className={styles.photo}>
       {photo ? <MediaThumbnail kind="image" src={api.media.contentUrl(photo.mediaId, accountId)} alt={`${name}の写真`} />
         : <ListEmptyMessage>写真はありません</ListEmptyMessage>}
     </div>
     <CardContent>
-      <SectionHeader title={<TruncatedText value={name} />} description={visibilityLabel} />
+      <SectionHeader title={position ? <span className={styles.positionTitle}>{position}<TruncatedText value={name} /></span> : <TruncatedText value={name} />} description={visibilityLabel} />
       {visibilityControl}
-      {editable ? <SaveErrorField names={[fieldKey]}><div className={orderActions ? styles.storeActions : styles.actions} role="group" aria-label={`${name}の写真を選ぶ操作`}>
-        <Button onClick={onPick} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を選ぶ`}>{photo ? '替える' : '写真を選ぶ'}</Button>
-        {photo || orderActions ? <Button onClick={onRemove} disabled={busy || !photo} disabledReason={disabledReason ?? (!photo ? '写真はありません。' : undefined)} aria-label={`${name}の写真を外す`}>外す</Button> : null}
-        {orderActions}
-        {onSave && changed ? <Button variant="primary" onClick={onSave} disabled={busy} disabledReason={disabledReason} aria-label={`${name}の写真を保存する`}>保存する</Button> : null}
+      {editable ? <SaveErrorField names={[fieldKey]}><div className={position ? styles.storeActions : styles.actions} role="group" aria-label={`${name}の写真を選ぶ操作`}>
+        {position ? <CardActionRow>{controls}</CardActionRow> : controls}
       </div></SaveErrorField> : null}
     </CardContent>
   </Card>
+}
+
+function StorePhotoCard({ slot, index, disabled, ...props }: Omit<React.ComponentProps<typeof PhotoCard>, 'position' | 'sortable'> & {
+  slot: BookingStorePhotoSlot; index: number; disabled: boolean
+}) {
+  const sortable = useSortable({ id: slot, disabled, attributes: { roleDescription: '写真の順番' } })
+  return <PhotoCard {...props} sortable={sortable} position={<span className={styles.position}>
+    {props.editable && !disabled ? <ReorderHandle {...sortable.attributes} {...sortable.listeners} look="icon" label={`${props.name}の写真`}
+      ariaLabel={`${props.name}の写真を並べ替え`} title={ORDER_INSTRUCTIONS} className={styles.reorderHandle} /> : null}
+    <span className={styles.positionNumber} data-photo-position={index + 1} title={`${index + 1}番目`}>{index + 1}</span>
+  </span>} />
 }
 
 export default function PhotosTab({ accountId, canEditMenus, canEditSettings, onSaved }: {
@@ -63,6 +84,10 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
   const [picker, setPicker] = useState<Target | null>(null)
   const generation = useRef(0)
   const savingRef = useRef(false)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
   const load = useCallback(async () => {
     const request = ++generation.current
     setLoading(true)
@@ -169,28 +194,45 @@ export default function PhotosTab({ accountId, canEditMenus, canEditSettings, on
   const disabled = busy || loading || conflict
   const disabledReason = conflict ? '最新の写真を読み直してから保存してください。' : busy ? '写真を保存しています。' : loading ? '写真を読み直しています。' : undefined
   const storeChanged = Object.keys(visibilityDraft).length > 0 || order !== null || Object.keys(drafts).some(key => key.startsWith('store:'))
+  const positionOf = (id: unknown) => storeOrder.indexOf(id as BookingStorePhotoSlot) + 1
+  const photoName = (id: unknown) => LABELS[id as BookingStorePhotoSlot] ?? '写真'
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `${photoName(active.id)}の写真を持ち上げました。${positionOf(active.id)}番目です。`,
+    onDragOver: ({ active, over }) => over ? `${photoName(active.id)}の写真を${positionOf(over.id)}番目へ移動します。` : '写真の外です。置いても順番は変わりません。',
+    onDragEnd: ({ active, over }) => over ? `${photoName(active.id)}の写真を${positionOf(over.id)}番目に置きました。保存すると反映されます。` : '順番は変わりませんでした。',
+    onDragCancel: () => '並べ替えをやめました。順番は変わりません。',
+  }
+  const reorder = ({ active, over }: DragEndEvent) => {
+    if (!canEditSettings || disabled || !over || active.id === over.id) return
+    const from = storeOrder.indexOf(active.id as BookingStorePhotoSlot), to = storeOrder.indexOf(over.id as BookingStorePhotoSlot)
+    if (from < 0 || to < 0) return
+    saveErrors.clear('store:')
+    setOrder(arrayMove(storeOrder, from, to))
+  }
   return <SaveErrorScope errors={saveErrors}><div className={styles.root} aria-busy={busy}>
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {error ? <Button onClick={() => void load()} disabled={busy || loading} disabledReason={busy ? '写真を保存しています。' : '写真を読み直しています。'}>入力を残して読み直す</Button> : null}
     <SaveErrorField names={['store:']}><section className={styles.section} aria-label="お店の写真">
-      <SectionHeader title="お店" description="外観・店内・待合を各1枚。「前へ」「後へ」で表示順を変えられます。"
+      <SectionHeader title="お店" description={canEditSettings ? '外観・店内・待合を各1枚。つまみで順番を入れ替え、保存すると反映されます。' : '外観・店内・待合を各1枚。番号の順に表示されます。'}
         actions={canEditSettings && storeChanged ? <Button variant="primary" onClick={() => void save({ owner: 'store', id: '', name: 'お店' })} disabled={disabled} disabledReason={disabledReason}>お店の写真を保存する</Button> : undefined} />
+      <DndContext key={accountId} sensors={sensors} collisionDetection={closestCenter} onDragEnd={reorder}
+        accessibility={{ announcements, screenReaderInstructions: { draggable: ORDER_INSTRUCTIONS } }}>
+      <SortableContext items={storeOrder} strategy={rectSortingStrategy}>
       <ListPageCards>
         {storeOrder.map((slot, index) => {
           const target = { owner: 'store' as const, id: slot, name: LABELS[slot] }
-          return <PhotoCard key={slot} name={target.name} fieldKey={keyOf(target)} photo={value(target, store?.photos[slot] ?? null)} accountId={accountId} editable={canEditSettings}
+          return <StorePhotoCard key={slot} slot={slot} index={index} disabled={!canEditSettings || disabled} name={target.name} fieldKey={keyOf(target)} photo={value(target, store?.photos[slot] ?? null)} accountId={accountId} editable={canEditSettings}
             changed={storeChanged} busy={disabled} disabledReason={disabledReason} onPick={() => setPicker(target)} onRemove={() => change(target, null)}
             visibilityLabel={canEditSettings ? undefined : visibility[slot] ? 'お客さまの予約画面に出す' : 'お客さまの予約画面に出さない'}
             visibilityControl={canEditSettings ? <SaveErrorField names={[`store:visibility:${slot}`]}><Checkbox
               aria-label={`${target.name}をお客さまの予約画面に出す`} checked={visibility[slot]} disabled={disabled}
               onCheckedChange={next => { saveErrors.clear('store:'); saveErrors.clear(`store:visibility:${slot}`); setVisibilityDraft(current => ({ ...current, [slot]: next })) }}
             >お客さまの予約画面に出す</Checkbox></SaveErrorField> : null}
-            orderActions={<>
-              <Button aria-label={`${target.name}を前へ`} disabled={disabled || index === 0} disabledReason={disabledReason ?? (index === 0 ? 'これが先頭の写真です。' : undefined)} onClick={() => { saveErrors.clear('store:'); const next = [...storeOrder]; [next[index - 1], next[index]] = [next[index]!, next[index - 1]!]; setOrder(next) }}>前へ</Button>
-              <Button aria-label={`${target.name}を後へ`} disabled={disabled || index === storeOrder.length - 1} disabledReason={disabledReason ?? (index === storeOrder.length - 1 ? 'これが最後の写真です。' : undefined)} onClick={() => { saveErrors.clear('store:'); const next = [...storeOrder]; [next[index + 1], next[index]] = [next[index]!, next[index + 1]!]; setOrder(next) }}>後へ</Button>
-            </>} />
+            />
         })}
       </ListPageCards>
+      </SortableContext>
+      </DndContext>
     </section></SaveErrorField>
     {(['menu', 'staff'] as const).map(owner => {
       const rows = owner === 'menu' ? catalog.menus : catalog.staff

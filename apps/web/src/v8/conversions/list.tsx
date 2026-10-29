@@ -67,6 +67,7 @@ import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { AffiliateTabs, useAffiliateShell } from '@/v8/affiliates/public/tabs'
 
 /*
  * ★V8 コンバージョンの一覧（Pencil：一覧 ・1152 ・閲覧のみ ・
@@ -219,17 +220,19 @@ function ListSkeleton() {
   )
 }
 
-export default function ConversionListV8({ accountId, editId }: { accountId: string | null; editId?: string | null }) {
+export default function ConversionListV8({ accountId, editId, embedded = false }: { accountId: string | null; editId?: string | null; embedded?: boolean }) {
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <ConversionList accountId={accountId} editId={editId} />
+      <ConversionList accountId={accountId} editId={editId} embedded={embedded} />
     </Suspense>
   )
 }
 
-function ConversionList({ accountId, editId }: { accountId: string | null; editId?: string | null }) {
+function ConversionList({ accountId, editId, embedded }: { accountId: string | null; editId?: string | null; embedded: boolean }) {
   const saveErrors = useSaveFormErrors()
-  usePageTitle('コンバージョン')
+  const affiliateShell = useAffiliateShell()
+  const inAffiliateTabs = embedded && affiliateShell.tab === 'points'
+  usePageTitle(inAffiliateTabs ? '成果とアフィリエイト' : 'コンバージョン')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const narrow = useNarrowViewport()
@@ -1179,7 +1182,8 @@ function ConversionList({ accountId, editId }: { accountId: string | null; editI
       explanation="成果地点は、配信・流入リンク・アフィリエイトの成果を数えるときに使います。止めると、使っている所でも数えなくなります。"
       boardId="r6dJFy"
       headingSize="regular"
-      title="コンバージョン"
+      title={inAffiliateTabs ? '成果とアフィリエイト' : 'コンバージョン'}
+      tabs={inAffiliateTabs ? <AffiliateTabs /> : undefined}
       actions={
         <Button onClick={() => exportCsv()} disabled={exporting} busy={exporting} busyLabel="書き出しています…">
           <Download size={16} aria-hidden="true" />CSVで書き出す

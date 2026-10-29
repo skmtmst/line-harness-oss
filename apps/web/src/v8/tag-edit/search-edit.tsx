@@ -198,7 +198,7 @@ function DateRangeEditor({
           </>
         ) : null}
       </div>
-      {reversed ? <Notice tone="danger" >開始日が終了日より後になっています。入れ替えてください。</Notice> : null}
+      {reversed ? <Notice tone="warn" role="alert">開始日が終了日より後になっています。入れ替えてください。</Notice> : null}
     </div>
   )
 }

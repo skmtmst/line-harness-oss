@@ -1,4 +1,5 @@
 'use client'
+import { ListPageStats } from '@/components/templates/list-page'
 import { formatYen } from '@line-crm/shared';
 
 /*
@@ -91,12 +92,12 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
   const noCost = overview.routes.filter((item) => shownValue(item.adCost) === null).length
 
   return <>
-    <KpiBand className={styles.band}>
+    <ListPageStats><KpiBand className={styles.band}>
       <KpiCard presentation="band" title="友だちになった" icon={<UserPlus size={16} aria-hidden="true" />} value={friends} unit="人" detail={clicks === null ? 'クリックは未取得です' : `リンクを押した ${formatNumber(clicks)} 回から`} />
       <KpiCard presentation="band" title="成果" icon={<Target size={16} aria-hidden="true" />} value={conversions} unit="件" detail={pending === null || rejected === null ? '保留・却下は未取得です' : `保留 ${formatNumber(pending)}・却下 ${formatNumber(rejected)}`} />
       <KpiCard presentation="band" title="かかった広告費" icon={<Wallet size={16} aria-hidden="true" />} value={adCost} valueText={yen(adCost)} unit="円" detail={`費用を取れない経路 ${noCost}`} />
       <KpiCard presentation="band" title="差し引き" icon={<TrendingUp size={16} aria-hidden="true" />} value={profit} valueText={yen(profit, true)} unit="円" detail={revenue === null ? '売上は未取得です' : `売上 ${yen(revenue)} − 費用`} />
-    </KpiBand>
+    </KpiBand></ListPageStats>
     <div className={styles.body} data-gap="tab">
       <div className={styles.toolbar}>
         <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />

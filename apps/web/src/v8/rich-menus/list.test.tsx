@@ -168,14 +168,16 @@ describe('V8 リッチメニュー一覧', () => {
     expect(second.closest('[data-column-sizing]')?.getAttribute('data-column-sizing')).toBe('controls')
   })
 
-  test('行の名前の前に、左のフォルダの列と同じ色の丸が付く（未分類は丸を出さない）', async () => {
+  test('行の名前の前に、左のフォルダの列と同じ色の丸が付き、未分類にも灰色の丸を出す', async () => {
     const view = render(<RichMenusListV8 />)
     const filedRow = (await view.findByText('通常メニュー')).closest('tr') as HTMLElement
     await waitFor(() => expect(filedRow.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('filed'))
     expect(filedRow.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
     expect(filedRow.querySelector('[data-folder-dot]')?.getAttribute('aria-label')).toBe('フォルダ：通常')
     const unfiledRow = view.getByText('秋のキャンペーン').closest('tr') as HTMLElement
-    expect(unfiledRow.querySelectorAll('[data-folder-dot]')).toHaveLength(0)
+    expect(unfiledRow.querySelectorAll('[data-folder-dot]')).toHaveLength(1)
+    expect(unfiledRow.querySelector('[data-folder-dot]')?.getAttribute('data-folder-dot')).toBe('unfiled')
+    expect(unfiledRow.querySelector('[data-folder-dot]')?.getAttribute('aria-label')).toBe('フォルダ：未分類')
   })
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。

@@ -93,6 +93,14 @@ afterEach(() => {
 })
 
 describe('担当まとめ（V8）の読み込みと保存', () => {
+  test('担当割当でも予約設定の題と9つのタブを保つ', async () => {
+    renderPage()
+    await screen.findByText('だれがどのメニューを受けるか')
+    expect(screen.getByRole('heading', { name: '予約設定' })).toBeTruthy()
+    expect(screen.getAllByRole('tab')).toHaveLength(9)
+    expect(screen.getByRole('tab', { name: '担当スタッフ' }).getAttribute('aria-selected')).toBe('true')
+  })
+
   test('読み込み中は「読み込み中」の文字を出さず骨組みの入れ物で待つ', async () => {
     const gate = deferred<unknown>()
     fixture.listMenus = () => gate.promise

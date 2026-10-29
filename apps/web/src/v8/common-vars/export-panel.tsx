@@ -9,13 +9,11 @@ import { formatJstDateTime } from '@/lib/presentation'
 import { onlyWhenVisible } from '@/lib/visible-polling'
 import { formatNumber } from '@/lib/format'
 import { Download } from 'lucide-react'
-import styles from './list.module.css'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 共通情報の「CSVで書き出す」。
- * 板  では頭の右に箱が1つだけ。進み具合・最近の書き出しは、頭の高さを
- * 変えないよう箱の下に浮かせて出す。
+ * 書き出し操作と状況を分け、操作は見出し、通知と履歴は一覧の案内口へ渡す。
  *
  * 共通情報の監査付きCSV出力（N-192）。
  *
@@ -51,7 +49,7 @@ function statusLabel(status: CommonVarExportJob['status']) {
   }
 }
 
-export default function VarsExportPanel({ accountId, folderId, ungrouped = false }: {
+export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
   accountId: string | null
   /** 絞り込み中のフォルダ。null は「すべて」。 */
   folderId: string | null
@@ -62,6 +60,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
 
   const [jobs, setJobs] = useState<CommonVarExportJob[]>([])
   const [active, setActive] = useState<CommonVarExportJob | null>(null)
+  const [dismissedJobId, setDismissedJobId] = useState<string | null>(null)
   const [requesting, setRequesting] = useState(false)
   const [error, setError] = useState('')
   /** 遅れて返った別アカウントの結果を映さないための世代番号。 */
@@ -185,75 +184,39 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
 
   const running = active?.status === 'queued' || active?.status === 'running'
 
-  return (
-    <SaveErrorScope errors={saveErrors}><div className={styles.exportBox} data-testid="vars-export-panel">
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={() => void start()}
-        disabled={!accountId || requesting || running} busy={requesting && !active} busyLabel="書き出しを依頼しています…"><Download size={16} aria-hidden="true" />CSVで書き出す
-      </Button>
-      {error || active || jobs.length > 1 ? (
-      <div className={styles.exportPop}>
-
-      {error ? (
-        <Notice tone="danger" message={error} onClose={() => setError('')} />
-      ) : null}
-
-      {active ? (
-        <div
-          className="border-hairline bg-canvas rounded-control min-w-80 border px-4 py-3 text-sm"
-          aria-live="polite"
+  const action = (
+    <Button
+      type="button"
+      variant="secondary"
+      onClick={() => void start()}
+      disabled={!accountId || requesting || running} busy={requesting && !active} busyLabel="書き出しを依頼しています…"><Download size={16} aria-hidden="true" />CSVで書き出す
+    </Button>
+  )
+  const status = error || (active && active.id !== dismissedJobId) || jobs.length > 1 ? (
+    <SaveErrorScope errors={saveErrors}>
+      {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
+      {active && active.id !== dismissedJobId ? (
+        <Notice
+          tone={active.status === 'expired' ? 'warn' : active.status === 'failed' ? 'danger' : active.status === 'completed' ? 'success' : 'info'}
+          role="status"
           data-testid="vars-export-status"
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge tone={statusTone(active.status)} size="compact">
-              {statusLabel(active.status)}
-            </StatusBadge>
-            {running ? (
-              <span className="text-ink-secondary">
-                {formatNumber(active.processedCount)}
-                {' / '}
-                {active.totalCount == null ? '…' : formatNumber(active.totalCount)}
-                件
-              </span>
-            ) : null}
-            {active.status === 'completed' ? (
-              <span className="text-ink-secondary">
-                {formatNumber((active.rowCount ?? 0))} 件
-                （{formatJstDateTime(active.expiresAt)}まで）
-              </span>
-            ) : null}
-            {active.status === 'failed' ? (
-              <span className="text-danger">{active.failureReason ?? '書き出せませんでした'}</span>
-            ) : null}
-            {active.status === 'expired' ? (
-              <span className="text-ink-secondary">ダウンロード期限が切れました</span>
-            ) : null}
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
+          onClose={() => setDismissedJobId(active.id)}
+          action={<>
             {active.status === 'completed' && active.downloadUrl ? (
-              <a
-                className="text-action text-sm font-semibold hover:underline"
-                href={`${API_BASE}${active.downloadUrl}`}
-              >
-                CSVをダウンロード
-              </a>
+              <Button variant="text" href={`${API_BASE}${active.downloadUrl}`}>CSVをダウンロード</Button>
             ) : null}
             {active.status === 'completed' || active.status === 'failed' || active.status === 'expired' ? (
-              <button
-                type="button"
-                className="text-action text-sm font-semibold hover:underline"
-                disabled={requesting}
-                onClick={() => void regenerate(active)}
-              >
-                もう一度書き出す
-              </button>
+              <Button type="button" variant="text" disabled={requesting} onClick={() => void regenerate(active)}>もう一度書き出す</Button>
             ) : null}
-          </div>
-        </div>
+          </>}
+        >
+          {statusLabel(active.status)}{'：'}
+          {running ? <>{formatNumber(active.processedCount)} / {active.totalCount == null ? '…' : formatNumber(active.totalCount)}件</> : null}
+          {active.status === 'completed' ? <>{formatNumber(active.rowCount ?? 0)} 件（{formatJstDateTime(active.expiresAt)}まで）</> : null}
+          {active.status === 'failed' ? active.failureReason ?? '書き出せませんでした' : null}
+          {active.status === 'expired' ? 'ダウンロード期限が切れました' : null}
+        </Notice>
       ) : null}
-
       {jobs.length > 1 ? (
         <details className="text-ink-secondary w-full text-xs">
           <summary className="cursor-pointer">最近の書き出し（{formatNumber(jobs.length)} 件）</summary>
@@ -288,8 +251,7 @@ export default function VarsExportPanel({ accountId, folderId, ungrouped = false
           </ul>
         </details>
       ) : null}
-      </div>
-      ) : null}
-    </div></SaveErrorScope>
-  )
+    </SaveErrorScope>
+  ) : null
+  return { action, status }
 }

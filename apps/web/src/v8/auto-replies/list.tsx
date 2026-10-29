@@ -770,22 +770,7 @@ export default function AutoRepliesListV8() {
     </>
   )
 
-  /* 板 「読み込み中」：見出しなしの骨4行。 */
-  const loadingSkeleton = (
-    <div className={styles.skeletonRows} aria-label="読み込み中">
-      {[0, 1, 2, 3].map((n) => (
-        <div key={n} className={styles.skeletonRow} style={{ gap: 16, padding: '14px 24px' }} data-skeleton aria-hidden="true">
-          <span className={styles.skeletonDot} style={{ width: 32, height: 32 }} />
-          <span className={styles.skeletonBar} style={{ height: 10 }} />
-          <span className={styles.skeletonBar} style={{ height: 10 }} />
-          <span className={styles.skeletonBar} style={{ height: 10 }} />
-          <span className={styles.skeletonBar} style={{ height: 10 }} />
-        </div>
-      ))}
-    </div>
-  )
-
-  const listBody = renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, loadingSkeleton, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState })
+  const listBody = renderAutoReplyList({ allOnPageSelected, canEdit, clearFilters, clearSelection, dragId, dropOn, duplicateFeedback, filterActive, folderDotOf, goEdit, items, keyboardMove, liveOrder, load, loadError, moveNotice, narrow, openMenuId, openMove, panelId, panelIndex, panelRow, requestDelete, resumableIds, router, rowContextItems, rowMenuItems, runDuplicate, runToggle, selectedAccountId, selectedCount, selectedIds, setConflictOnly, setDragId, setDuplicateError, setOpenMenuId, setPage, setPanelId, setPendingToggle, setSelectedIds, setToggleError, setToggleReason, sortedItems, sortKey, stoppableIds, tableHeadCells, templateById, templateListAvailable, toggleAllOnPage, toggleFromPanel, toggleOne, visibleLoadState })
 
   /* ページ送りは型の pagination 枠へ（余白は型）。 */
   const listPager = ready ? (
@@ -986,7 +971,7 @@ export default function AutoRepliesListV8() {
           </div>
         )}
         {toggleTargetStale && (
-          <Notice tone="danger" >アカウントが切り替わりました。操作する自動応答を選び直してください。</Notice>
+          <Notice tone="warn" role="alert">アカウントが切り替わりました。操作する自動応答を選び直してください。</Notice>
         )}
       </Dialog>
 
@@ -1052,9 +1037,9 @@ export default function AutoRepliesListV8() {
           </DialogActions>
         }
       >
-        <Notice tone="danger" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message={pendingDelete?.item.isActive ? '削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。' : '削除は元に戻せません。'} />
+        <Notice tone="warn" role="alert" appearance="soft" icon={<TriangleAlert size={16} aria-hidden="true" />} message={pendingDelete?.item.isActive ? '削除は元に戻せません。しばらく使わないだけなら「止める」を使ってください。' : '削除は元に戻せません。'} />
         {deleteTargetStale && (
-          <Notice tone="danger" >アカウントが切り替わりました。削除する自動応答を選び直してください。</Notice>
+          <Notice tone="warn" role="alert">アカウントが切り替わりました。削除する自動応答を選び直してください。</Notice>
         )}
       </Dialog>
 

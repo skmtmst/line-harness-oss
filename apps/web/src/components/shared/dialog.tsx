@@ -28,6 +28,8 @@ export type DialogProps = {
   /** 確認のボタンを先に置く板だけで指定する。 */
   confirmFirst?: boolean
   designWidth?: number
+  /** 承認済みの個別デザインで正確な幅が必要な窓だけ、段への丸めを省く。 */
+  exactDesignWidth?: boolean
   /** の共通選択窓だけ640pxの幅を使う。 */
   widthPreset?: 'picker'
   /** ★V8：絵の窓の上からの位置（px）。渡すと上寄せにする。渡さなければ今までどおり。互換経路では効かない。 */
@@ -136,6 +138,7 @@ export default function Dialog({
   contentLayout,
   size = 'medium',
   designWidth,
+  exactDesignWidth = false,
   widthPreset,
   designLayout,
   confirmFirst,
@@ -298,7 +301,7 @@ export default function Dialog({
       data-design-title-row={designTitleRow}
       style={({
         ...(designFooterGap !== undefined ? { '--dialog-footer-gap': `${designFooterGap}px` } : {}),
-        '--dialog-design-width': `${widthPreset === 'picker' ? 640 : dialogWidth((designWidth === 600 ? 560 : designWidth === 844 ? 720 : designWidth) ?? ({ small: 480, medium: 560, large: 720, wide: 960 } as const)[size])}px`,
+        '--dialog-design-width': `${widthPreset === 'picker' ? 640 : exactDesignWidth && designWidth ? designWidth : dialogWidth((designWidth === 600 ? 560 : designWidth === 844 ? 720 : designWidth) ?? ({ small: 480, medium: 560, large: 720, wide: 960 } as const)[size])}px`,
         ...(designHeaderPadding ? { '--dialog-design-header-padding': designHeaderPadding } : {}),
         ...(designHeaderHeight ? { '--dialog-design-header-height': `${designHeaderHeight}px` } : {}),
         ...(designContentPadding ? { '--dialog-design-content-padding': designContentPadding } : {}),
@@ -309,7 +312,7 @@ export default function Dialog({
     >
       <div className={styles.headerRow}>
         <div className={styles.headerContent}>
-          {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <Notice tone={descriptionBand === 'warning' ? 'warn' : 'danger'} icon={null} role="presentation" data-qa-dialog-callout>{heading}</Notice> : heading}
+          {descriptionBand === 'danger' ? heading : (tone === 'destructive' && !confirmation) || descriptionBand === 'warning' ? <Notice tone={descriptionBand === 'warning' ? 'warn' : 'danger'} statusWord={false} icon={null} role="presentation" data-qa-dialog-callout>{heading}</Notice> : heading}
         </div>
         {headerAction ? <div className={styles.headerAction}>{headerAction}</div> : null}
         {/* 閉じ方は必ず右上の×。フッターの「閉じる」ボタンは置かない（UI-25）。 */}
@@ -317,7 +320,7 @@ export default function Dialog({
           <X aria-hidden="true" size={20} />
         </IconButton>
       </div>
-      {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><Notice tone="danger" data-qa-dialog-callout>{descriptionNode}</Notice></div> : designLayout === 'stacked' ? descriptionNode : null}
+      {descriptionBand === 'danger' && description ? <div className={styles.descriptionBand}><Notice tone="danger" statusWord={false} data-qa-dialog-callout>{descriptionNode}</Notice></div> : designLayout === 'stacked' ? descriptionNode : null}
       {steps ? <div className={styles.steps}>{steps}</div> : null}
       {children ? <div className={styles.content} data-window-body data-content-layout={contentLayout} ref={motion.outerRef}>{steps ? <div ref={motion.innerRef} data-step-content>{children}</div> : children}</div> : null}
       {error || automaticError ? <Notice tone="danger" role="alert">

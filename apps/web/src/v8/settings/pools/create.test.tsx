@@ -51,6 +51,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 
 import PoolNewV8 from './create'
+import PoolNewPage from '@/app/pools/new/page'
 
 const v8tsx = readFileSync(join(process.cwd(), 'src/v8/settings/pools/create.tsx'), 'utf8')
 
@@ -104,6 +105,15 @@ async function setInput(selector: string, value: string) {
 }
 
 describe('V8-B プールを作る（D0AOyx）', () => {
+  it('実入口から設定の型の本文にプール名の入力欄を描く', async () => {
+    await act(async () => { root.render(<PoolNewPage />) })
+    await flush()
+    const name = host.querySelector('#pl-name')
+    expect(name).toBeTruthy()
+    expect(name?.closest('[data-template-region="content"]')?.closest('[data-page-template="settings"]')).toBeTruthy()
+    expect(lineAccountsList).toHaveBeenCalled()
+  })
+
   it('入力の誤りは該当欄に一度だけ示し、そこへ移動して保存を止める', async () => {
     await renderV8()
     const save = document.querySelector('button[form="pool-create-form"]') as HTMLButtonElement

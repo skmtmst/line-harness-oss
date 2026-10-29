@@ -461,6 +461,8 @@
 - [リマインダ](release-log/0.25.0.md)
 - [反映履歴の書き方](release-log/README.md)
 - [下見・件数・待ち時間の不具合の修正](release-log/unreleased/0000-kenta-swbs.md)
+- [外部点検のボタン名・導線・表示崩れの修正](release-log/unreleased/1851-kenta-staging-ui.md)
+- [統括名の必須表示と入力エラー時の焦点復帰](release-log/unreleased/1857-kenta-hq-name-focus.md)
 - [検査とビルドの実行環境の更新](release-log/unreleased/1794-kenta-node-runtime-security.md)
 - [作るメニューの重なりの修正と入口の案内](release-log/unreleased/1796-kenta-menu-guard-doc.md)
 - [対応が要るものの速さとお知らせの下の空き](release-log/unreleased/1798-kenta-hq-attention-speed.md)
@@ -809,9 +811,40 @@
 - [最初の10分の全アカウントのまとめ（運営だけ）](release-log/unreleased/1843-kenta-funnel-summary.md)
 - [状態の札を地の色のある札にそろえた](release-log/unreleased/1842-kenta-status-chip.md)
 - [ダッシュボードの数を4枚にそろえ、いつもと違う端末の知らせを見やすい場所に移した](release-log/unreleased/1844-kenta-dashboard-kpi.md)
+- [画面の地・カードの影・知らせ・日付の表示](release-log/unreleased/1849-kenta-tone2-card-a.md)
 - [スマートフォン専用の画面（トークと対応）](release-log/unreleased/1845-kenta-phone-shell-talk.md)
 - [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
 - [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
 - [まとめ列車 7](release-log/unreleased/1848-kenta-train-one7-1027.md)
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
+
+- [増減の符号と未分類の灰丸](release-log/unreleased/1858-kenta-delta-folder.md) — 増減の印とフォルダ表示の反映履歴。
+- [一斉配信の作成画面名と外枠](release-log/unreleased/1859-kenta-broadcast-title.md) — 作成手順の反映履歴。
+- [ページ送りの現在地と表示条件](release-log/unreleased/1860-kenta-pagination.md) — 一覧操作の反映履歴。
+- [配布状況と記録一覧の配置](release-log/unreleased/1861-kenta-distribution-history.md) — 配布の表示とページ送りの反映履歴。
+- [画面の表示・配置の追加修復](release-log/unreleased/1852-kenta-ui-followup.md)
+- [完成した画面修復の先行反映](release-log/unreleased/1853-kenta-completed-ui.md)
+- [隣接する操作・案内の間隔](release-log/unreleased/1854-kenta-adjacent-spacing.md)
+- [分析と友だち詳細の案内](release-log/unreleased/1855-kenta-analysis-friend-notices.md)
+- [予約メニューの案内の間隔](release-log/unreleased/1856-kenta-booking-notice-spacing.md)
+
+- [友だち一覧の差の印](release-log/unreleased/1862-kenta-friends-delta.md) — 増減と要確認の共通表示の反映履歴。
+- [版表示と窓の最初の操作](release-log/unreleased/1863-kenta-version-focus.md) — 表示と初期焦点の反映履歴。
+- [一覧の読み込み表示](release-log/unreleased/1864-kenta-list-loading.md) — 一斉配信の列ずれと自動応答の読み込み表示の反映履歴。
+- [統括の接続情報の更新](release-log/unreleased/1865-kenta-connection-refresh.md) — 単件・全件と再読み込みの反映履歴。
+- [選択中の絞り込み表示](release-log/unreleased/1866-kenta-filter-selection.md) — 薄緑の地と緑の枠・文字の反映履歴。
+- [自動処理のタグ未選択表示](release-log/unreleased/1867-kenta-unselected-tag-summary.md) — 未選択と設定済みの区別の反映履歴。
+- [フォームの区切りと店の接続案内](release-log/unreleased/1868-kenta-form-divider-store-warning.md) — 二重線の解消と対象店名の反映履歴。
+- [シナリオの右詳細の整理](release-log/unreleased/1869-kenta-scenario-detail-panel.md) — 配信状況・説明・名前変更と操作の反映履歴。
+- [個別設定のスイッチ表示](release-log/unreleased/1871-kenta-individual-setting-switches.md) — タグ編集と機能設定のオン・オフの反映履歴。
+- [検証用店舗の同時投稿](release-log/unreleased/1872-masato-instagram-staging-post-test.md) — 検証対象に限る同時投稿の反映履歴。
+- [本文URLがないときの補足](release-log/unreleased/1873-kenta-template-url-note.md) — テンプレート本文のURL一覧を必要なときに表示する反映履歴。
+- [同時投稿画像の縦横比](release-log/unreleased/1874-masato-instagram-image-ratio.md) — Instagramへ投稿する画像の比率を整える反映履歴。
+- [設定案内と配信結果の表現](release-log/unreleased/1875-kenta-setup-recipient-guidance.md) — 初期設定の一本化と宛先の受付表示の反映履歴。
+- [休憩表示と配信結果の位置](release-log/unreleased/1876-kenta-break-and-broadcast-results.md) — 休憩の見分け方と配信結果の数字の配置の反映履歴。
+- [二段階認証の説明](release-log/unreleased/1877-kenta-two-factor-help.md) — 二段階認証の画面に関する反映履歴。
+- [バナーの参照画像の説明](release-log/unreleased/1878-kenta-banner-reference-icons.md) — 説明の印の配置に関する反映履歴。
+- [カルーセルのボタン削除](release-log/unreleased/1879-kenta-carousel-delete.md) — カルーセル内の操作に関する反映履歴。
+- [配達連携の解除ボタン](release-log/unreleased/1880-kenta-delivery-disconnect.md) — 配達連携の画面に関する反映履歴。
+- [SNS連携の操作と案内](release-log/unreleased/1881-kenta-sns-actions.md) — SNS連携の画面に関する反映履歴。
