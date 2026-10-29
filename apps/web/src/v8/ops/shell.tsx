@@ -18,7 +18,7 @@ import TopBar from '@/components/shared/top-bar'
 import { PageChromeProvider, usePageChrome } from '@/components/shell/page-chrome'
 import SidebarUserMenu from '@/components/shared/sidebar-user-menu'
 import SidebarVersion from '@/components/layout/sidebar-version'
-import { SidebarBrand } from '@/components/layout/sidebar-identity'
+import OpsBrand from './ops-brand'
 import { SIDEBAR_AUTO_COLLAPSE_BELOW } from '@/components/layout/sidebar-collapse'
 import Notice from '@/components/shared/notice'
 import { humanizeErrorText } from '@/components/shared/human-error-text'
@@ -109,7 +109,7 @@ function OpsShellFrame({
 
   const menu = (
     <>
-      <SidebarBrand name="musubo 運営" mark="m" />
+      <OpsBrand compact={collapsed && !drawer} />
       <nav className={nav.nav} aria-label="運営メニュー">
         <div className={nav.section}>
           <p className={nav.sectionToggle}>
