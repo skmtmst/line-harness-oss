@@ -44,3 +44,18 @@ it('履歴が空なら送信タブ、取得失敗なら履歴の再読込を出�
   expect(await screen.findByText('履歴を読み込めませんでした。')).toBeTruthy()
   expect(screen.getByRole('tab', { name: 'これまでの問い合わせ' }).getAttribute('aria-selected')).toBe('true')
 })
+
+it('取得失敗からの再読込中も履歴タブで待ち、送信へ移らない', async () => {
+  let complete!: (value: { success: true; data: [] }) => void
+  source.list.mockRejectedValueOnce(new Error('network failed'))
+    .mockImplementationOnce(() => new Promise(resolve => { complete = resolve }))
+  render(<HqSupportV8 />)
+  expect(await screen.findByText('履歴を読み込めませんでした。')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+  expect(screen.getByRole('tab', { name: 'これまでの問い合わせ' }).getAttribute('aria-selected')).toBe('true')
+  expect(screen.getByText('読み込んでいます…').closest('[role="tabpanel"]')?.hasAttribute('hidden')).toBe(false)
+  expect(screen.queryByRole('textbox', { name: '件名' })).toBeNull()
+  complete({ success: true, data: [] })
+  await waitFor(() => expect(screen.getByRole('tab', { name: '問い合わせを送る' }).getAttribute('aria-selected')).toBe('true'))
+  expect(source.create).not.toHaveBeenCalled()
+})

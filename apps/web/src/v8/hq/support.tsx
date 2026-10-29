@@ -68,6 +68,7 @@ export default function HqSupportV8() {
   const tab = chosenTab ?? (history?.length || historyError || history === null ? 'history' : 'send')
 
   const loadHistory = async () => {
+    setHistory(null)
     setHistoryError(false)
     try {
       const res = await api.hqSupport.list()
