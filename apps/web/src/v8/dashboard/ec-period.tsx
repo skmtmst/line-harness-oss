@@ -35,8 +35,8 @@ export default function EcPeriodSummary({ accountId, period }: { accountId: stri
   return <>
     {current?.error ? <ListState kind="error" title="注文と再購入の集計を読み込めませんでした" error={current.error} onRetry={() => setTick(n => n + 1)} /> : null}
     <KpiBand>
-      <KpiCard presentation="band" title="期間内の注文" value={data?.orders.value ?? null} unit="件" detail={current?.error ? '読み込めませんでした' : note(data?.orders)} help={data?.orders.formula ?? '注文日で数えます。取消と返金を除きます。'} />
-      <KpiCard presentation="band" title="再購入した人の割合" value={data?.repeatCustomers.value == null ? null : data.repeatCustomers.value * 100} unit="%" detail={current?.error ? '読み込めませんでした' : note(data?.repeatCustomers)} help={data ? `${data.repeatCustomers.formula}（${data.repeatCustomers.numerator ?? '—'}人 / ${data.repeatCustomers.denominator ?? '—'}人）` : '同じ連携元の注文から数えます。模擬の自動LINEの成果を含めません。'} />
+      <KpiCard loading={!current} presentation="band" title="期間内の注文" value={data?.orders.value ?? null} unit="件" detail={current?.error ? '読み込めませんでした' : note(data?.orders)} help={data?.orders.formula ?? '注文日で数えます。取消と返金を除きます。'} />
+      <KpiCard loading={!current} presentation="band" title="再購入した人の割合" value={data?.repeatCustomers.value == null ? null : data.repeatCustomers.value * 100} unit="%" detail={current?.error ? '読み込めませんでした' : note(data?.repeatCustomers)} help={data ? `${data.repeatCustomers.formula}（${data.repeatCustomers.numerator ?? '—'}人 / ${data.repeatCustomers.denominator ?? '—'}人）` : '同じ連携元の注文から数えます。模擬の自動LINEの成果を含めません。'} />
     </KpiBand>
     {data ? <Notice tone={data.status === 'stale' ? 'warn' : 'info'} action={canConfigure && data.status !== 'available' ? <Link href="/ec-commerce?tab=connector">ECの接続へ →</Link> : undefined}>{data.status === 'unconfigured' ? 'ECは未設定です。数字を0件としては表示していません。' : data.status === 'unavailable' ? 'ECは接続済みですが、注文をまだ取り込めていません。数字を0件としては表示していません。' : `注文日で集計：${formatDateTime(data.from)} から ${formatDateTime(data.to)} 未満（${data.timeZone}）。最終取り込み：${formatDateTime(data.asOf)}。${data.status === 'stale' ? '接続が止まっているため、取り込み済みの情報です。' : ''}`}</Notice> : null}
   </>

@@ -325,3 +325,12 @@ describe('V8 オートメーションの共通アクション（LnGNw）', () =>
  })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it('自動処理のフォルダ数も、すべてと同じルール一覧で数える',async()=>{
+ vi.spyOn(api.automations,'list').mockResolvedValueOnce({success:true,data:[automation('a','分類あり',{folderId:'f1'}),automation('b','未分類')]} as never)
+ vi.spyOn(api.folders,'list').mockResolvedValueOnce({success:true,data:[{id:'f1',name:'問合せ',itemCount:99}],unfiledCount:98} as never)
+ await render(<AutomationListV8/>)
+ await waitFor(()=>Boolean(host.textContent?.includes('分類あり')),'一覧')
+ const rows=[...host.querySelectorAll('aside [data-part="folder-row"]')].map(el=>el.textContent?.replace(/\s/g,''))
+ expect(rows).toEqual(expect.arrayContaining(['すべて2','問合せ1','未分類1']))
+})

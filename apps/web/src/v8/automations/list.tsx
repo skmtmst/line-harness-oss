@@ -619,7 +619,7 @@ export default function AutomationListV8() {
           unfiledId={UNFILED}
           allCount={ready ? items.length : null}
           unfiledCount={ready ? items.filter((item) => !item.folderId).length : null}
-          countOf={(folder) => folder.itemCount ?? null}
+          countOf={folder => ready ? items.filter(item => item.folderId === folder.id).length : null}
           placeholder="例： 予約・購入"
         />
       </>}
