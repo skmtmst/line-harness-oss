@@ -513,24 +513,32 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     // 切り替えただけで書きかけが消える。預け・戻しは上の効果が担う。
   }
 
+  // メールの行（一覧）と中央の行き先（ID27）で共用する開き方。
+  const handleSelectEmail = (threadId: string) => {
+    // LINEの選択を外す。両方開いていると中央に何を
+    // 出すのか決まらない。URL指定の案内とURL状態も外す。
+    // friend を残すと、再読込で古いLINE会話へ戻る(#673)。
+    deepLinkRequestIdRef.current += 1
+    deepLinkIdRef.current = null
+    setDeepLinkNotice('')
+    setSelectedChatId(null)
+    setSelectedThreadId(threadId)
+    router.replace(buildInboxUrl(channel, savedViewParam || null))
+    setEmailItems((prev) => prev.map((email) => (
+      email.threadId === threadId ? { ...email, isUnread: false } : email
+    )))
+    void fetchApi(`/api/support/email/threads/${encodeURIComponent(threadId)}/read`, {
+      method: 'POST',
+    }).catch(() => undefined)
+  }
+
   // 未選択の中央の「いちばん古い会話を開く」（ID27）。一覧の行を押した時と同じ開き方。
   const openAttentionTarget = (target: OldestAttentionTarget) => {
     if (target.kind === 'chat') {
       handleSelectChat(target.id)
       return
     }
-    deepLinkRequestIdRef.current += 1
-    deepLinkIdRef.current = null
-    setDeepLinkNotice('')
-    setSelectedChatId(null)
-    setSelectedThreadId(target.threadId)
-    router.replace(buildInboxUrl(channel, savedViewParam || null))
-    setEmailItems((prev) => prev.map((email) => (
-      email.threadId === target.threadId ? { ...email, isUnread: false } : email
-    )))
-    void fetchApi(`/api/support/email/threads/${encodeURIComponent(target.threadId)}/read`, {
-      method: 'POST',
-    }).catch(() => undefined)
+    handleSelectEmail(target.threadId)
   }
 
   const {
@@ -791,9 +799,8 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter,
           setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus,
           assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef,
-          emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef,
-          setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats,
-          handleSelectChat, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
+          emailError, loadEmails, chatListFailed, loadChats, emailItems, chats,
+          handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
           clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder,
         }} />
 
@@ -822,7 +829,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule,
           handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack,
           imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled,
-          overdueTotal, hasInboxFilters, chats, emailItems, onOpenAttentionTarget: openAttentionTarget,
+          overdueTotal, chats, emailItems, onOpenAttentionTarget: openAttentionTarget,
         }} />
 
         {/*

@@ -118,12 +118,15 @@ describe('頭の3つの印と保存した検索', () => {
 
   it('絞り込み中だけ保存した検索に点が付く（ID33）', async () => {
     await act(async () => root.render(<ChatsPage />))
-    const button = () => host.querySelector('button[aria-label="保存した検索"]') as HTMLButtonElement
+    const button = () => host.querySelector('button[aria-label^="保存した検索"]') as HTMLButtonElement
     const dots = () => [...button().querySelectorAll(':scope > span')].filter((span) => span.textContent === '')
     await eventually(() => expect(button()).not.toBeNull())
     expect(dots()).toHaveLength(0)
+    expect(button().getAttribute('aria-label')).toBe('保存した検索')
     await act(async () => { typeSearch(host, '山田') })
     await eventually(() => expect(dots()).toHaveLength(1))
+    // 点は目で見る印。読み上げには名前で絞り込み中を伝える。
+    expect(button().getAttribute('aria-label')).toBe('保存した検索（絞り込み中）')
     await act(async () => { typeSearch(host, '') })
     await eventually(() => expect(dots()).toHaveLength(0))
   })

@@ -105,7 +105,6 @@ export type Props = {
   slaEnabled: boolean
   /** 上の札と同じ期限超過の総数（SLA有りの時だけ数が入る）。 */
   overdueTotal: number | null
-  hasInboxFilters: boolean
   chats: ChatListItem[]
   emailItems: EmailInboxItem[]
   onOpenAttentionTarget: (target: OldestAttentionTarget) => void

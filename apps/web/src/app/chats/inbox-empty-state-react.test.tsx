@@ -337,3 +337,34 @@ test('未選択の中央に件数と行き先を出し、押すと最も古い�
   await eventually(() => expect(document.body.textContent).toContain('こんにちは'))
   expect(document.body.textContent).not.toContain('対応が必要な会話があります')
 })
+
+test('中央の行き先からメールも開ける（共用の開き方・ID27）', async () => {
+  handler = (url) => {
+    if (url.pathname === '/api/chats/quick-counts') {
+      const status = url.searchParams.get('status')
+      if (status) return response({ success: true, data: { all: status === 'unread' ? 1 : 0, reply: 0, overdue: 0 } })
+      return response({ success: true, data: { all: 1, reply: 1, overdue: 0 } })
+    }
+    if (url.pathname === '/api/chats') return response({ success: true, data: [] })
+    if (url.pathname === '/api/support/inbox') return response(emailPayload(['問合せメール']))
+    const thread = url.pathname.match(/^\/api\/support\/email\/threads\/([^/]+)$/)
+    if (thread && !url.pathname.endsWith('/read')) {
+      return response({ success: true, data: {
+        thread: {
+          id: thread[1], subject: '問合せメール', customer_name: '問合せメール',
+          customer_email: 'a@example.test', status: 'unread', assigned_staff_id: null, notes: null, revision: 1,
+        },
+        messages: [{
+          id: 'em1', direction: 'incoming', body_text: 'メール本文です',
+          sent_by_staff_name: null, created_at: '2026-09-01T00:00:00.000Z',
+        }],
+      } })
+    }
+    return base(url)
+  }
+  await act(async () => root.render(<ChatsPage />))
+  await eventually(() => expect(document.body.textContent).toContain('いちばん古い会話を開く'))
+  await click('いちばん古い会話を開く')
+  await eventually(() => expect(document.body.textContent).toContain('メール本文です'))
+  expect(document.body.textContent).not.toContain('対応が必要な会話があります')
+})

@@ -19,7 +19,6 @@ afterEach(() => {
 
 const base = {
   slaEnabled: true,
-  filtered: false,
   chats: [{ id: 'chat-old', status: 'unread', lastMessageAt: '2026-08-11T00:00:00.000Z' }],
   emails: [],
   onOpenTarget: () => {},
@@ -40,9 +39,10 @@ describe('InboxEmptyGuide', () => {
     expect(screen.getByText('未対応 0 件・1時間以上待ち 2 件')).not.toBeNull()
   })
 
-  test('絞り込みの中の数だと分かるように言う', () => {
-    render(<InboxEmptyGuide {...base} filtered unread={1} overdue={0} />)
-    expect(screen.getByText('未対応 1 件・期限超過 0 件（今の絞り込みの中）')).not.toBeNull()
+  test('片方が0件でもう片方が読めない時は断定しない', () => {
+    render(<InboxEmptyGuide {...base} unread={0} overdue={null} />)
+    expect(screen.getByText('会話を選ぶと、ここに表示されます')).not.toBeNull()
+    expect(screen.queryByText('対応が必要な会話があります')).toBeNull()
   })
 
   test('全部片づいた時は行き先を出さない', () => {
