@@ -222,6 +222,12 @@ describe('統括のアカウント', () => {
 
 
 
+  it('接続に問題の数は対応が要るものの接続の絞り込みへ進める', async () => {
+    await render()
+    const link = [...container.querySelectorAll('a')].find((anchor) => anchor.textContent?.includes('対応が要るものへ'))!
+    expect(link.getAttribute('href')).toBe('/hq/attention?kind=connections')
+  })
+
   it('閲覧のみでも所属とタグを読め、権限者を含む補足の全文へ届く', async () => {
     role.value = 'viewer'
     accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, folderId: 'area', folder: { name: '渋谷エリア', color: '#0088ff' }, tags: [{ id: 'main', name: '本店', color: '#0088ff' }], stats: { ...warnedAccount.stats, staffCount: 4 } }] })

@@ -465,7 +465,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
-        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} />
+        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">

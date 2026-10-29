@@ -309,7 +309,7 @@ function MetricCell({ def, metric, compare, computed, coverage }: { def: MetricD
   const tone = diffTone(def, metric.diff)
   return (
     <span className={styles.cell} title={coverage ? `期間のうち${coverage}の数です（日数が違うので差は出しません）` : diffTitle(def.key, metric.diff, compare)}>
-      {formatMetric(def.key, metric.value)}
+      <span className={styles.cellValue}>{formatMetric(def.key, metric.value)}</span>
       <span className={styles.chipSlot}>{diff && tone ? <DeltaChip tone={tone} direction={(metric.diff ?? 0) > 0 ? 'up' : 'down'}>{diff}</DeltaChip> : coverage ? <span className={styles.coverage}>{coverage}</span> : null}</span>
     </span>
   )

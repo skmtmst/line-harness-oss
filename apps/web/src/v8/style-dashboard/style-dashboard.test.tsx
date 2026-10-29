@@ -95,6 +95,6 @@ describe('業種ダッシュボード（XBkC2）', () => {
       metrics: { attention: { value: 2, unit: '件', status: 'available', formula: '対応が必要な数' } },
       previous: {}, items: [], newBookings: [], resultId: 'test',
     }
-    expect(kpisFor('salon', snapshot, 'today')[1]).toMatchObject({ id: 'waiting', detail: '承認待ち・印がまだ' })
+    expect(kpisFor('salon', snapshot, 'today')[1]).toMatchObject({ id: 'waiting', detail: '承認待ち・来店未記録' })
   })
 })
