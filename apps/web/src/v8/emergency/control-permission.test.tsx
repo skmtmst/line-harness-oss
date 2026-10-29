@@ -193,7 +193,7 @@ it('閲覧のみの本人が確定していればpreviewの403でも灰色の理
   render(<EmergencyPage />)
   await waitFor(() => expect(document.querySelectorAll('[data-read-only-notice]')).toHaveLength(1))
   expect(stopButton().hasAttribute('data-permission-locked')).toBe(true)
-  expect(screen.getByText('いまの停止状態を確認できませんでした。読み直してください。')).toBeTruthy()
+  expect(await screen.findByText('いまの停止状態を確認できませんでした。読み直してください。')).toBeTruthy()
   fireEvent.click(stopButton())
   expect(f.stepUp).not.toHaveBeenCalled(); expect(f.stop).not.toHaveBeenCalled()
 })
