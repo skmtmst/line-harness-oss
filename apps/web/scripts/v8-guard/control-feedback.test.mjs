@@ -61,7 +61,7 @@ createRoot(document.getElementById('root')).render(globalThis.paginationFixture?
   tsconfig: `${webRoot}/tsconfig.json`, define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"' },
   plugins: [{ name: 'fixture', setup(b) {
     b.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: 'navigation', namespace: 'fixture' }))
-    b.onResolve({ filter: /^next\/link$|^@\/components\/shared\/list-navigation$/ }, () => ({ path: 'link', namespace: 'fixture' }))
+    b.onResolve({ filter: /^next\/link$/ }, () => ({ path: 'link', namespace: 'fixture' }))
     b.onLoad({ filter: /.*/, namespace: 'fixture' }, args => ({ contents: args.path === 'navigation'
       ? 'export const useRouter=()=>({push(){},replace(){},prefetch(){}});export const usePathname=()=>"/fixture";export const useSearchParams=()=>new URLSearchParams();'
       : 'import React from "react";export default function Link(p){return React.createElement("a",p)}', resolveDir: webRoot }))
@@ -74,6 +74,10 @@ createRoot(document.getElementById('root')).render(globalThis.paginationFixture?
       })
       sheets.push(css.replace(/:global\(([^()]+)\)/g, '$1'))
       return { contents: `export default ${JSON.stringify(names)}`, loader: 'js' }
+    })
+    b.onLoad({ filter: /\.css$/ }, async args => {
+      sheets.push(await compileUiStyles(args.path))
+      return { contents: '', loader: 'js' }
     })
   } }],
 })
