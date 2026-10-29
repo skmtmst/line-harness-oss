@@ -32,7 +32,7 @@ export default function SidebarVersion() {
   const lines = formatDeployInfo(detail)
   const environment = deployEnvLabel(detail?.deploy_env)
   const summary = lines && detail
-    ? `v${detail.version.trim()}${environment ? `・${environment}` : ''}`
+    ? `${detail.version.trim()}${environment ? `・${environment}` : ''}`
     : ready ? '版の情報なし' : '版の情報を取得中'
 
   return (
