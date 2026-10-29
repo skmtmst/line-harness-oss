@@ -1,4 +1,4 @@
-import { getPageAction } from '@/test-utils/page-action'
+import { queryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * 運用状態の外側（板 Y4LkX1・I2V65v・OHwbU）を描いて見る。
@@ -144,11 +144,11 @@ describe('運用状態の外側', () => {
     expect(screen.getByText(/9 つの項目を5分ごとに自動で確かめます。/)).toBeTruthy()
   })
 
-  it('緊急コントロールは板 OHwbU。説明は止め方で、オーナーには緊急停止の主ボタンを出す', async () => {
+  it('緊急コントロールは板 OHwbU。説明は止め方で、115: 右上の赤い停止は出さず中の1つにまとめる', async () => {
     const view = await renderScreen('control')
     expect(view.container.querySelector('[data-page-template="settings"]')?.getAttribute('data-design-node')).toBe('OHwbU')
     expect(screen.getByText('緊急コントロールの中身')).toBeTruthy()
-    expect(getPageAction({ name: '緊急停止する' })).toBeTruthy()
+    expect(queryPageAction({ name: '緊急停止する' })).toBeNull()
     await openHelp()
     expect(screen.getByText('止める配信を選び、理由を入力して緊急停止します。')).toBeTruthy()
   })

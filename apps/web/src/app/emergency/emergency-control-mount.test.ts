@@ -1,4 +1,4 @@
-import { getPageAction } from '@/test-utils/page-action'
+import { queryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 // 現役の画面と共通Dialogを実際に操作して、旧9ケースのAPI・権限・競合を守る。
 import { createElement } from 'react'
@@ -141,7 +141,7 @@ async function closed() {
 }
 function feedback() { return document.querySelector('[role="alert"]')?.textContent ?? '' }
 async function fillStop() {
-  fireEvent.click(getPageAction({ name: '緊急停止する' }))
+  fireEvent.click(screen.getByRole('button', { name: '選んだものを止める' }))
   const dialog = await screen.findByRole('alertdialog', { name: '緊急停止を確認' })
   fireEvent.change(within(dialog).getByRole('textbox', { name: '止める理由' }), { target: { value: '宛先の確認' } })
   fireEvent.change(within(dialog).getByRole('textbox', { name: '確認の言葉' }), { target: { value: '停止' } })
@@ -253,7 +253,9 @@ describe('EmergencyControlV8 を現役の画面から操作する', () => {
     expect(impactTitles(222).length).toBeGreaterThan(0); expect(impactTitles(111)).toHaveLength(0)
     expect(screen.getByRole('combobox', { name: '緊急停止の対象アカウント' }).textContent).toContain('Bアカウント')
     expect(screen.getAllByText(/この範囲を操作する権限がありません/).length).toBeGreaterThan(0)
-    fireEvent.click(getPageAction({ name: '緊急停止する' }))
+    // 115: 右上の停止は無く、中の停止も権限なしでは出ない。
+    expect(queryPageAction({ name: '緊急停止する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '選んだものを止める' })).toBeNull()
     expect([...screen.queryAllByRole('dialog'), ...screen.queryAllByRole('alertdialog')]).toHaveLength(0); expect(bench.stopCalls).toHaveLength(0)
   })
 
@@ -277,7 +279,9 @@ describe('EmergencyControlV8 を現役の画面から操作する', () => {
     expect(feedback()).toContain('緊急停止を実行する権限がありません。オーナーに権限付与を依頼してください。')
     expect(screen.queryByRole('textbox', { name: '1桁目' })).toBeNull(); expect(screen.queryByRole('textbox', { name: '確認の言葉' })).toBeNull()
     expect(screen.queryByRole('button', { name: '最新の状態を読み直す' })).toBeNull()
-    fireEvent.click(getPageAction({ name: '緊急停止する' }))
+    // 115: 送り直しの口は無い（右上は無く、中の停止も権限落ちで消える）。
+    expect(queryPageAction({ name: '緊急停止する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '選んだものを止める' })).toBeNull()
     expect([...screen.queryAllByRole('dialog'), ...screen.queryAllByRole('alertdialog')]).toHaveLength(0); expect(bench.stopCalls).toHaveLength(1); expect(bench.stepUpCalls).toHaveLength(1)
   })
 
@@ -306,7 +310,9 @@ describe('EmergencyControlV8 を現役の画面から操作する', () => {
     expect(feedback()).toContain('別の管理者が先に変更しました'); expect(impactTitles(111)).toHaveLength(0)
     expect(reloadButton()).toBeTruthy(); assertLocked()
     const previews = bench.previewCalls.length
-    fireEvent.click(getPageAction({ name: '緊急停止する' }))
+    // 115: 鍵状態では止め口は無い（右上は無く、中の停止も消える）。
+    expect(queryPageAction({ name: '緊急停止する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '選んだものを止める' })).toBeNull()
     expect([...screen.queryAllByRole('dialog'), ...screen.queryAllByRole('alertdialog')]).toHaveLength(0); expect(bench.previewCalls).toHaveLength(previews)
     expect(bench.stopCalls).toHaveLength(1); expect(bench.stepUpCalls).toHaveLength(1); expect(bench.restoreCalls).toHaveLength(0)
   })
@@ -331,7 +337,10 @@ describe('EmergencyControlV8 を現役の画面から操作する', () => {
     const index = bench.previewCalls.length; fireEvent.click(reloadButton()); await settle(); await failPreview(index, new Error('network down'))
     expect(feedback()).toContain('最新の状態を読み直せませんでした'); expect(impactTitles(111)).toHaveLength(0)
     expect(screen.getByText(/停止状態を確認できないため、停止・復旧を実行できません/)).toBeTruthy(); expect(reloadButton()).toBeTruthy(); assertLocked()
-    fireEvent.click(getPageAction({ name: '緊急停止する' })); expect([...screen.queryAllByRole('dialog'), ...screen.queryAllByRole('alertdialog')]).toHaveLength(0); expect(bench.stopCalls).toHaveLength(1)
+    // 115: 鍵状態では止め口は無い（右上は無く、中の停止も消える）。
+    expect(queryPageAction({ name: '緊急停止する' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '選んだものを止める' })).toBeNull()
+    expect([...screen.queryAllByRole('dialog'), ...screen.queryAllByRole('alertdialog')]).toHaveLength(0); expect(bench.stopCalls).toHaveLength(1)
   })
 
   it('失敗のあとに読み直せば、最新の内容だけを出してlockを解く', async () => {
@@ -341,7 +350,7 @@ describe('EmergencyControlV8 を現役の画面から操作する', () => {
     expect(screen.getByText(/最新の状態を読み直しました/)).toBeTruthy(); expect(impactTitles(555).length).toBeGreaterThan(0); expect(impactTitles(111)).toHaveLength(0)
     expect(screen.queryByText(/停止状態を確認できないため/)).toBeNull()
     expect((screen.getByRole('combobox', { name: '緊急停止の対象アカウント' }) as HTMLSelectElement).disabled).toBe(false)
-    fireEvent.click(getPageAction({ name: '緊急停止する' })); expect(await screen.findByRole('alertdialog')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '選んだものを止める' })); expect(await screen.findByRole('alertdialog')).toBeTruthy()
   })
 
   it('403・409(版競合)以外の失敗(400)は、窓の裏に隠れず理由が見え、押し直せる', async () => {
@@ -349,7 +358,7 @@ describe('EmergencyControlV8 を現役の画面から操作する', () => {
     const { ApiError } = await import('@/lib/api'); bench.stopResult = () => Promise.reject(new ApiError(400, '認証コードが正しくありません', 'INVALID_TOTP'))
     await runStopFlow(); expect(feedback()).toContain('認証コードが正しくありません'); expect(impactTitles(111).length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: '最新の状態を読み直す' })).toBeNull()
-    fireEvent.click(getPageAction({ name: '緊急停止する' })); expect(await screen.findByRole('alertdialog')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '選んだものを止める' })); expect(await screen.findByRole('alertdialog')).toBeTruthy()
     expect(bench.stopCalls).toHaveLength(1); expect(bench.stepUpCalls).toHaveLength(1)
   })
 
