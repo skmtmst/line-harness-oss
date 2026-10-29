@@ -196,12 +196,19 @@ for (const width of [1152, 1440]) {
 }
 
 
+function dateCoversTick(row) {
+  return row.labels.some(label => row.ticks.some(tick => label.box.left < tick.right && label.box.right > tick.left
+    && label.box.top < tick.bottom && label.box.bottom > tick.top))
+}
+
 function healthyDateAxes(rows) {
-  return rows.length === 4 && rows.every(row => row.labels.length > 0 && row.labels.every((label, index) =>
-    label.text.length > 0 && label.whiteSpace === 'nowrap' && label.textOverflow !== 'ellipsis'
-    && label.textBox.left >= label.box.left - 1 && label.textBox.right <= label.box.right + 1
-    && label.textBox.left >= row.bounds.left - 1 && label.textBox.right <= row.bounds.right + 1
-    && (index === 0 || label.textBox.left >= row.labels[index - 1].textBox.right + 1)))
+  return rows.length === 4 && rows.every(row => row.ticks.length > 0 && !dateCoversTick(row)
+    && row.labels.length > 0 && row.labels.every((label, index) =>
+      label.text.length > 0 && label.whiteSpace === 'nowrap' && label.textOverflow !== 'ellipsis'
+      && label.textBox.left >= label.box.left - 1 && label.textBox.right <= label.box.right + 1
+      && label.textBox.left >= row.bounds.left - 1 && label.textBox.right <= row.bounds.right + 1
+      && label.box.left >= row.plot.left - 1
+      && (index === 0 || label.textBox.left >= row.labels[index - 1].textBox.right + 1)))
 }
 
 for (const width of [1152, 1440]) {
@@ -216,9 +223,12 @@ for (const width of [1152, 1440]) {
       await expect(page.locator('[data-friend-chart-fixture]')).toHaveCount(4)
       await page.evaluate(() => document.fonts.ready)
       const measure = () => page.locator('[data-friend-chart-fixture]').evaluateAll(sections => sections.map(section => {
-        const rect = element => { const r = element.getBoundingClientRect(); return {left:r.left,right:r.right,width:r.width} }
+        const rect = element => { const r = element.getBoundingClientRect(); return {left:r.left,right:r.right,width:r.width,top:r.top,bottom:r.bottom} }
         const plot = section.querySelector('[role=group]')
         return { kind:section.dataset.friendChartFixture, bounds:rect(section), plot:rect(plot),
+          ticks:[...plot.querySelectorAll('[aria-hidden=true] > span')].filter(tick => /^-?\d+$/.test(tick.textContent.trim())).map(tick => {
+            const range=document.createRange();range.selectNodeContents(tick);return rect(range)
+          }),
           bars:[...plot.querySelectorAll('[data-chart-series]')].map(bar => rect(bar)),
           labels:[...plot.querySelectorAll('button')].flatMap(button => {
             const label = button.nextElementSibling
@@ -231,7 +241,7 @@ for (const width of [1152, 1440]) {
       }))
       const normal = await measure()
       console.log(JSON.stringify({width,phase:'normal',rows:normal}))
-      assert.equal(healthyDateAxes(normal), true, '日付全文・自身の箱・図の端・隣の文字の間隔を同時に守る')
+      assert.equal(healthyDateAxes(normal), true, '日付全文・自身の箱・図の端・隣の文字・縦軸数字との非重複を同時に守る')
       const oldWidth = await page.addStyleTag({content:`[data-chart-distribution="diverging"] button+span{width:100%!important;min-width:0!important;left:0!important;transform:none!important}`})
       const broken = await measure()
       assert.equal(healthyDateAxes(broken), false, '旧来の列幅へ戻すと同じ測定で落ちる')
@@ -240,6 +250,14 @@ for (const width of [1152, 1440]) {
       await oldWidth.evaluate(style => style.remove())
       await expect.poll(measure).toEqual(normal)
       console.log(JSON.stringify({width,phase:'old-width-fault',rows:broken,restored:true}))
+      const centeredEdge = await page.addStyleTag({content:`[data-chart-distribution="diverging"] [role=group] > :last-child > :first-child > button+span{left:50%!important;transform:translateX(-50%)!important}`})
+      const covered = await measure()
+      assert.equal(healthyDateAxes(covered),false,'中央へ広げた先頭の日付が縦軸を隠す旧版を検出する')
+      assert.ok(covered.some(dateCoversTick),'日付の箱と縦軸数字の実矩形が重なる')
+      for (let i=0;i<normal.length;i++) assert.deepEqual(covered[i].bars,normal[i].bars)
+      await centeredEdge.evaluate(style => style.remove())
+      await expect.poll(measure).toEqual(normal)
+      console.log(JSON.stringify({width,phase:'centered-edge-fault',rows:covered,restored:true}))
     } finally { await browser.close() }
   })
 }
