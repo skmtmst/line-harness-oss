@@ -2,6 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { ecFlexMessage } from './ec-notification-message.js';
 
 describe('EC LINE通知カード', () => {
+  it.each([null, ''])('保存済みの見出しが未設定でも既定の見出しで送信用カードを作る: %j', title => {
+    const event = {
+      event_id: 'order-default-title', event_type: 'ec.order.confirmed' as const,
+      occurred_at: '2026-10-29T00:00:00Z', line_user_id: 'U00000000000000000000000000000000',
+    };
+    const message = ecFlexMessage(event, { title, introText: '', outroText: '' });
+    expect(message).toEqual(ecFlexMessage(event));
+    expect(message.type).toBe('flex');
+  });
+
   it('銀行振込の注文受付に必須の振込先情報を含める', () => {
     const message = ecFlexMessage({
       event_id: 'test-order-bank-1',

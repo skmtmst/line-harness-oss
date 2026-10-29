@@ -3,10 +3,12 @@
 import { useEffect, useId, useState } from 'react'
 import { loadAdminVersionDetail, type AdminVersionDetail } from '@/lib/admin-version-cache'
 import { deployEnvLabel, formatDeployInfo } from '@/lib/deploy-info'
-import { MANUAL_UPDATE_GUIDE_URL, useUpdateStatus } from '@/components/update/use-update-status'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useUpdateStatus } from '@/components/update/use-update-status'
 import Button from '@/components/shared/button'
 import { FilterPopover } from '@/components/shared/filter-popover'
 import TextLink from '@/components/shared/text-link'
+import styles from './sidebar-version.module.css'
 
 /** 版と環境を1行で出し、配備の詳細と更新の案内は共通の浮く面で開く。 */
 export default function SidebarVersion() {
@@ -15,6 +17,7 @@ export default function SidebarVersion() {
   const [open, setOpen] = useState(false)
   const detailId = useId()
   const update = useUpdateStatus()
+  const role = useStaffRole()
 
   useEffect(() => {
     let cancelled = false
@@ -34,6 +37,9 @@ export default function SidebarVersion() {
   const summary = lines && detail
     ? `${detail.version.trim()}${environment ? `・${environment}` : ''}`
     : ready ? '版の情報なし' : '版の情報を取得中'
+  const notice = update.kind === 'upgrade' || update.kind === 'fork'
+  const noticeText = update.kind === 'upgrade' ? '更新あり' : update.kind === 'fork' ? 'カスタマイズ版の更新案内' : undefined
+  const showManual = notice && canManageRole(role)
 
   return (
     <div className="border-t border-hairline px-4 pb-3 pt-2.5" data-sidebar-version aria-busy={!ready}>
@@ -44,8 +50,10 @@ export default function SidebarVersion() {
         trigger={(
           <Button variant="text" size="compact" textTone="quiet" className="max-w-full"
             aria-expanded={open} aria-haspopup="dialog" aria-controls={open ? detailId : undefined}
+            aria-description={noticeText}
             title={summary} onClick={() => setOpen(value => !value)}>
             <span className="min-w-0 truncate">{summary}</span>
+            {notice ? <span className={styles.dot} data-version-update title={noticeText} aria-hidden="true" /> : null}
           </Button>
         )}
         actions={<Button onClick={() => setOpen(false)}>閉じる</Button>}
@@ -57,7 +65,7 @@ export default function SidebarVersion() {
           </> : <p role="status">{summary}</p>}
           {update.kind === 'upgrade' ? <TextLink href="/updates">更新あり</TextLink> : null}
           {update.kind === 'fork' ? <TextLink href="/updates">更新履歴</TextLink> : null}
-          <TextLink href={MANUAL_UPDATE_GUIDE_URL} external>手動で更新</TextLink>
+          {showManual ? <TextLink href="/updates">手動で更新</TextLink> : null}
         </div>
       </FilterPopover>
     </div>

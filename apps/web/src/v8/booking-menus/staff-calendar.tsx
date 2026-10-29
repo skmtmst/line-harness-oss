@@ -1,4 +1,5 @@
 'use client'
+import { withHonorific } from '@line-crm/shared'
 
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 
@@ -189,7 +190,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
           <Dialog open={writeOff !== null} title="書き込みをオフにしますか？" titleNote={`${person?.name ?? ''}・Google カレンダー`} size="medium" contentLayout="form"
             busy={busy} error={error ?? undefined} cancelLabel="やめる" onCancel={() => { if (!busy) setWriteOff(null) }}
             confirmLabel="書き込みをオフにする" onConfirm={() => void saveSwitch({ readEnabled: mine.readEnabled, writeEnabled: false }, { removeFutureEvents: writeOff === 'remove' })}>
-            <p className={styles.body}>{`これからの予約は、${person?.name ?? ''}さんのカレンダーに書きません。予約はそのまま残ります。`}</p>
+            <p className={styles.body}>{`これからの予約は、${withHonorific(person?.name ?? '')}のカレンダーに書きません。予約はそのまま残ります。`}</p>
             <RadioCardGroup legend="これまでに書いた予定をどうしますか" legendVisible>
               <RadioCard name="calendar-write-off" value="keep" icon={<CalendarCheck size={16} />} title="カレンダーの予定は残す" note="いま書いてある予定はそのまま" checked={writeOff === 'keep'} onChange={() => setWriteOff('keep')} />
               <RadioCard name="calendar-write-off" value="remove" icon={<CalendarX2 size={16} />} title={`これから先の予約の予定を消す${mine.futureEventCount !== undefined ? `（${mine.futureEventCount} 件）` : ''}`} note="今日より後の予定だけ。過去の予定は消しません" checked={writeOff === 'remove'} onChange={() => setWriteOff('remove')} />

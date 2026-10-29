@@ -1,6 +1,6 @@
 'use client'
 import ReservationBoard,{ReservationSource} from '@/components/shared/reservation-board'
-import {seatBoardEntry} from '@line-crm/shared'
+import {seatBoardEntry, withHonorific } from '@line-crm/shared'
 import {reservationBoardApi,allBoardPages} from '@/lib/api/helpers/reservation-board'
 import {useAccount} from '@/contexts/account-context'
 
@@ -151,7 +151,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
             {next ? (
               <>
                 <div className={styles.nextBox}>
-                  <p className={styles.nextName}>{`${next.customer_name}さん・${next.guest_count}名`}</p>
+                  <p className={styles.nextName}>{`${withHonorific(next.customer_name)}・${next.guest_count}名`}</p>
                   <p className={styles.nextMeta}>{`${nextOtherDay ? `${mdWeek(new Date(next.starts_at))} ` : ''}${hm(next.starts_at)}〜${hm(next.ends_at)}・${next.table_id ? tableById.get(next.table_id)?.code ?? next.table_label : '未配席'}・${shortCourse(next.course_name)}`}</p>
 
                 </div>
@@ -168,7 +168,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
             <SectionHeader title={<span id="rs-care-title">{isToday ? '今日 気をつけること' : '気をつけること'}</span>}/>
             <p className={styles.sideText}>
               {pending.length > 0
-                ? `・承認待ちが ${formatNumber(pending.length)} 件（${pending.map((item) => `${item.customer_name.split(/\s+/)[0]}さん・${sourceName(item.source)}`).join('、')}）`
+                ? `・承認待ちが ${formatNumber(pending.length)} 件（${pending.map((item) => `${withHonorific(item.customer_name.split(/\s+/)[0])}・${sourceName(item.source)}`).join('、')}）`
                 : '・承認待ちはありません'}
             </p>
             {allergies.length > 0 ? (

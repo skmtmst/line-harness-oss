@@ -82,3 +82,22 @@ test('removing a deliberately added violation restores green and failed updates 
   put('apps/web/src/v8/sample/list.tsx', 'export const x=1\n')
   assert.equal(cli().status, 0)
 }))
+
+for (const lines of [1500, 1501]) test(`generated bootstrap SQL with ${lines} lines is excluded only from long-file counts`, () => fixture(({put, cli}) => {
+  put('packages/db/bootstrap.sql', Array(lines).fill('SELECT 1;').join('\n'))
+  const result = cli()
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(JSON.parse(result.stdout).counts, empty)
+  put('packages/db/bootstrap.sql', '-- B-123\n' + Array(lines).fill('SELECT 1;').join('\n'))
+  const comments = cli()
+  assert.equal(comments.status, 1, comments.stderr)
+  assert.deepEqual(JSON.parse(comments.stdout).counts, {...empty, 'history-comment': 1})
+}))
+
+for (const file of ['packages/db/migrations/001_long.sql', 'packages/other/bootstrap.sql']) test(`other long SQL remains counted in ${file}`, () => fixture(({put, cli}) => {
+  put(file, Array(1500).fill('SELECT 1;').join('\n'))
+  const result = cli()
+  assert.equal(result.status, 1, result.stderr)
+  assert.deepEqual(JSON.parse(result.stdout).counts, {...empty, 'long-files': 1, 'long-file-lines': 1500})
+  assert.equal(cli('--update').status, 1)
+}))

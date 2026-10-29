@@ -30,6 +30,7 @@ import Button from '../components/ui/button/index.js';
 import Badge from '../components/ui/badge.js';
 import { holdDeadlineText } from '../components/unpaid-payment-note.js';
 import Icon, { type IconName } from '../components/ui/icon.js';
+import { withHonorific } from '@line-crm/shared'
 
 /** 準備中の案内。本物の口が来るまで、入口は置いて押すとこれを出す。 */
 const COMING_SOON = '現在準備中です';
@@ -244,7 +245,7 @@ export default function MyPage() {
     <LiffLookScope className="min-h-screen bg-canvas">
       <LiffHeader title="マイページ" />
       <div data-design-node="L5g75" className="mx-auto w-full max-w-md space-y-3 px-4 pt-3 pb-10">
-        <PageHeading title={name ?? undefined}>{name ? `${name} さん` : 'マイページ'}</PageHeading>
+        <PageHeading title={name ?? undefined}>{name ? `${withHonorific(name, 'さん', { space: true })}` : 'マイページ'}</PageHeading>
         {failed ? (
           <LoadErrorView note={style === 'ec' ? '情報はなくなっていません。' : '予約はなくなっていません。'} onRetry={() => setReloadKey((k) => k + 1)} />
         ) : !history ? (

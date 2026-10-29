@@ -39,7 +39,7 @@ function setup() {
 }
 
 describe('左メニューの切れ判定', () => {
-  it('通知をまとめて上下の切れを維持し、同じ結果ではCSS・属性を書き直さない', async () => {
+  it('上端の自然な途中表示を保ち、下の切れを隠し、同じ結果ではCSS・属性を書き直さない', async () => {
     const { nav, bounds } = setup()
     const style = vi.spyOn(nav.style, 'setProperty')
     const attribute = vi.spyOn(nav, 'setAttribute')
@@ -48,9 +48,12 @@ describe('左メニューの切れ判定', () => {
     nav.dispatchEvent(new Event('scroll')); observers.callbacks.at(-1)!(); mutation()
     await flush()
     expect(bounds).toHaveBeenCalledOnce()
-    expect(nav.style.getPropertyValue('--nav-cut-top')).toBe('20px')
+    // 上端は通常のスクロールを保ち、行の高さ単位で飛ばさない。
+    expect(nav.style.getPropertyValue('--nav-cut-top')).toBe('')
+    expect(nav.style.getPropertyValue('--nav-trim-top')).toBe('')
     expect(nav.style.getPropertyValue('--nav-cut-bottom')).toBe('20px')
     expect(nav.hasAttribute('data-clipped')).toBe(true)
+    expect(nav.hasAttribute('data-scrolled')).toBe(true)
     style.mockClear(); attribute.mockClear()
     observers.callbacks.at(-1)!(); nav.dispatchEvent(new Event('scroll'))
     await flush()
@@ -61,7 +64,7 @@ describe('左メニューの切れ判定', () => {
     nav.dispatchEvent(new Event('scroll'))
     await flush()
     expect(nav.hasAttribute('data-clipped')).toBe(false)
-    expect(nav.style.getPropertyValue('--nav-cut-top')).toBe('0px')
+    expect(nav.hasAttribute('data-scrolled')).toBe(false)
     expect(nav.style.getPropertyValue('--nav-cut-bottom')).toBe('0px')
     stop()
   })
