@@ -25,7 +25,7 @@ import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialo
 import {
   DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, channelErrors, checkActionLabel, checkErrorText,
   checkStage, formatJaDuration, handoverProgress, insightDateJst, isDuplicateChannelError,
-  loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, readDraft, stepLabel, subTotal,
+  loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, providerIdErrors, readDraft, stepLabel, subTotal,
   toV06CheckRows,
   precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary, precheckUpcoming,
   type DraftState, type PrecheckAnswers, type PrecheckAt, type PrecheckKey, type StepNumber,
@@ -140,7 +140,7 @@ function AccountRegistrationForm() {
     if (nextAt) setPrecheckAt(nextAt)
   }
   const createdId = connection?.id ?? ''
-  // Webhook URLは②Step2で表示する。Callback URLは入力させない。
+  // Webhook URLは②Step3で表示する。Callback URLは入力させない。
   const registrationStyle = useRegistrationStyle(createdId, currentStep === 4)
   const templateKey = registrationStyle.choice
   const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
@@ -183,7 +183,7 @@ function AccountRegistrationForm() {
       return
     }
     const draft: DraftState = {
-      step: currentStep, sub, accountMethod, precheck, precheckAt,
+      step: currentStep, sub, connectionStepsVersion: 4, accountMethod, precheck, precheckAt,
       name: form.name, channelId: form.channelId, providerId: form.providerId, loginChannelId: form.loginChannelId,
       lineId: form.lineId, tagIds: form.tagIds, parentId: form.parentId, staffIds: form.staffIds, liffId: form.liffId,
       importFriends: form.importFriends,
@@ -347,7 +347,7 @@ function AccountRegistrationForm() {
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors((current) => ({ ...current, ...nextErrors }))
       setCurrentStep(2)
-      setSub(1)
+      setSub(nextErrors.channelId || nextErrors.channelSecret ? 1 : nextErrors.providerId ? 2 : 4)
       setError('')
       return
     }
@@ -452,8 +452,14 @@ function AccountRegistrationForm() {
         return
       }
       if (sub === 2) {
-        if (!allAcked(WEBHOOK_ACKS, acks)) return
+        const nextErrors = providerIdErrors(form)
+        if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); return }
         setSub(3)
+        return
+      }
+      if (sub === 3) {
+        if (!allAcked(WEBHOOK_ACKS, acks)) return
+        setSub(4)
         return
       }
       const loginErrors = loginChannelErrors(form)
@@ -530,15 +536,15 @@ function AccountRegistrationForm() {
   // 登録したあとは戻らない（③の2つめから先）。
   const canBack = !createdId && (currentStep > 1 || sub > 1 || (currentStep === 1 && precheckBack(precheckAt, precheck) !== null))
   const nextBlocked = (currentStep === 1 && precheckBlocked(precheckAt, precheck, acks))
-    || (currentStep === 2 && sub === 2 && !allAcked(WEBHOOK_ACKS, acks))
-    || (currentStep === 2 && sub === 3 && !allAcked(LOGIN_ACKS, acks))
+    || (currentStep === 2 && sub === 3 && !allAcked(WEBHOOK_ACKS, acks))
+    || (currentStep === 2 && sub === 4 && !allAcked(LOGIN_ACKS, acks))
     || (currentStep === 3 && sub === 1 && !rowsOk)
     || (currentStep === 3 && sub === 2 && (receipt.status !== 'confirmed' || receiptRequestFailed || receiptChecking))
     || (currentStep === 4 && (!templateKey || registrationStyle.version === null))
   // v07 Fqy29／Lwxyh：②の中だけ「次のステップへ」と行き先を名前で書いた「戻る」。ほかの段は「次へ」「戻る」。
   const backLabel = currentStep === 3 && sub === 1 ? 'LINEログインへ戻る'
     : currentStep !== 2 ? '戻る'
-    : sub === 1 ? '事前確認へ戻る' : sub === 2 ? 'Messaging API へ戻る' : 'Webhook の設定へ戻る'
+    : sub === 1 ? '事前確認へ戻る' : sub === 2 ? 'Messaging API へ戻る' : sub === 3 ? 'プロバイダーIDへ戻る' : 'Webhook の設定へ戻る'
   const nextLabel = currentStep === 3 && sub === 1 ? '登録する' : currentStep === 2 ? '次のステップへ' : '次へ'
 
   return (
