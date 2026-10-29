@@ -200,9 +200,10 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     for (const ack of [...WEBHOOK_ACKS, ...LOGIN_ACKS]) expect(ack.note.length).toBeGreaterThan(0)
   })
 
-  it('LINE Developers の行き先は入れたチャネルIDのページ。空ならコンソールの入口', () => {
-    expect(developerChannelUrl(' 2001 ')).toBe('https://developers.line.biz/console/channel/2001')
-    expect(developerChannelUrl('')).toBe('https://developers.line.biz/console/')
+  it('LINE Developers の行き先は入れたMessaging APIチャネルの設定画面', () => {
+    expect(developerChannelUrl(' 2001 ')).toBe('https://developers.line.biz/console/channel/2001/messaging-api')
+    expect(developerChannelUrl('')).toBe('')
+    expect(developerChannelUrl('2001x')).toBe('')
   })
 
   it('LINEログイン作成時は入力されたプロバイダーIDの画面を開く', () => {

@@ -453,6 +453,7 @@
 
 ## 反映履歴
 
+- [LINEアカウント登録のMessaging API設定への直リンク](release-log/unreleased/1895-masato-messaging-api-deeplink.md)
 - [Google口コミのAI下書き生成の修正](release-log/unreleased/1892-masato-google-review-ai-draft.md)
 - [LINEアカウント登録の事前確認を回答時に進める変更](release-log/unreleased/1891-masato-line-precheck-auto-next.md)
 - [LINEアカウント登録の選択済み回答と質問一覧の修正](release-log/unreleased/1894-masato-line-precheck-restored-choice.md)
