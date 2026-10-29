@@ -88,7 +88,7 @@ export default function AuthCard({
 
   if (applicationFlow) return <main data-design-node={node} className={applicationStyles.page} data-flow={applicationFlow}>
     <section data-design-node={cardNode} className={applicationStyles.card} data-flow={applicationFlow} aria-label={title}>
-      <div className={applicationStyles.brand}><span aria-hidden="true">m</span><strong>musubo</strong></div>
+      <AuthBrandLogo />
       {applicationFlow === 'sent' ? <div className={applicationStyles.stateIcon} data-tone="success"><Check aria-hidden="true" /></div> : null}
       {applicationFlow === 'pending' ? <div className={applicationStyles.stateIcon} data-tone="warning"><Clock3 aria-hidden="true" /></div> : null}
       <header className={applicationStyles.heading}><h1>{title}</h1><p>{description}</p></header>
@@ -115,12 +115,7 @@ export default function AuthCard({
         data-design-node={cardNode}
         className="flex w-full max-w-130 flex-col items-center gap-5 rounded-large border border-hairline bg-canvas px-6 py-9 shadow-float sm:px-10"
       >
-        <div className="flex items-center gap-2">
-          <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-control bg-accent-deep text-heading font-bold text-on-accent">
-            m
-          </span>
-          <span className="text-display font-bold text-ink">musubo</span>
-        </div>
+        <AuthBrandLogo />
         <div className="flex w-full flex-col items-center gap-2 text-center">
           <h1 className="text-heading font-bold text-ink">{title}</h1>
           <p className="text-caption text-balance text-ink-faint">{description}</p>
@@ -130,6 +125,13 @@ export default function AuthCard({
       <div className="mt-6">{legal}</div>
     </main>
   )
+}
+
+function AuthBrandLogo() {
+  return <span className={applicationStyles.brandViewport}>
+    {/* eslint-disable-next-line @next/next/no-img-element -- 提供されたロゴの透過余白を表示領域で切る */}
+    <img className={applicationStyles.brandImage} src="/brand/musubo-color.png" width={3020} height={890} alt="musubo" />
+  </span>
 }
 
 /** カードの頭：会社の印・会社名・musubo、右に「2 / 2」、下に薄い線（統括のアカウントのカードと同じ作り）。 */
