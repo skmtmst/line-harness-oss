@@ -62,14 +62,20 @@ it.each([
   await waitFor(() => expect(notices()).toHaveLength(1))
   expect(notices()[0].textContent).toBe(PERMISSION_LOCK_SUMMARY[need])
   const header = document.querySelector('header[data-template-region="heading"]')!
-  expect(header.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+  expect(header.querySelectorAll('[data-read-only-notice]')).toHaveLength(0)
   expect(header.querySelector('h1')?.textContent).toBe('Googleビジネス')
+  const group = document.querySelector('[data-google-notices]')!
+  expect(group.querySelectorAll('[data-design-part="notice"]')).toHaveLength(2)
+  expect(group.firstElementChild).toBe(notices()[0])
+  expect(group.lastElementChild?.textContent).toContain('検証環境専用')
+  expect(header.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 it.each(['reviews', 'posts', 'performance', 'profile', 'settings'])('閲覧のみの %s も標準の帯が1本だけ', async tab => {
   fixture.tab = tab; identity('viewer'); render(<GoogleV8 />)
   await act(async () => { resolve(data()) })
   await waitFor(() => expect(notices()).toHaveLength(1))
   expect(notices()[0].textContent).toBe(READ_ONLY_MESSAGE)
+  expect(document.querySelector('[data-google-notices]')?.firstElementChild).toBe(notices()[0])
 })
 it.each(['owner', null])('データ取得後も、許可された人と未知の本人（%s）に帯を作らない', async role => {
   identity(role); render(<GoogleV8 />)

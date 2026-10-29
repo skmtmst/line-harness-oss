@@ -12,6 +12,7 @@ import { ApiError } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 import { Tabs } from '@/components/shared/tabs'
 import { restaurantGoogleApi, type GoogleConnectionData, type GoogleBusinessStore, type GooglePostKind } from '@/lib/restaurant-google-api'
@@ -226,10 +227,12 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       title="Googleビジネス"
       description={draftOpen ? HELP_BASE : TAB_HELP[tab]}
       picker={picker}
-      readOnly={!accountLoading && !loading && !error && Boolean(data) && known && !(tab === 'profile' || tab === 'settings' ? canManage : canEdit)}
-      readOnlyNeed={tab === 'settings' ? 'tenantWide' : tab === 'profile' ? 'manager' : 'feature'}
     >
-      <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : tab === 'settings' && data && !data.writeEnabled ? '外部への更新は止めています' : undefined} />
+      <div className={styles.noticeStack} data-google-notices>
+        {!accountLoading && !loading && !error && Boolean(data) && known && !(tab === 'profile' || tab === 'settings' ? canManage : canEdit)
+          ? <ReadOnlyNotice need={tab === 'settings' ? 'tenantWide' : tab === 'profile' ? 'manager' : 'feature'} /> : null}
+        <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : tab === 'settings' && data && !data.writeEnabled ? '外部への更新は止めています' : undefined} />
+      </div>
       {body}
     </RestaurantPage></SaveErrorScope>
   )

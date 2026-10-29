@@ -14,7 +14,7 @@ const FIELD_REQUIREMENTS = {
 
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import ListToolbar from '@/components/shared/list-toolbar'
+import { ListToolbarEnd, ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import LastChecked from '@/components/shared/last-checked'
 import { usePostStatusCheck } from './use-post-status-check'
@@ -202,7 +202,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
       { id: 'open', label: '中身を見る', onSelect: () => { if (canView) go({ tab: 'posts', view: 'edit', id: post.id }) } },
     ]
     if (actionable) items.push({ id: 'edit', label: '編集', disabled: !canSync, onSelect: () => { if (canSync) go({ tab: 'posts', view: 'edit', id: post.id }) } })
-    if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', external: true, href: post.searchUrl ?? '' })
+    if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', group: 'view', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
     if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublish) setConfirmRemove(post) } })
@@ -214,17 +214,17 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
 
   return (
     <>
-      <ListToolbar
-        filters={<>
+      <ListToolbarFrame>
+        <ListToolbarRow>
           <Select label="状態" aria-label="状態で絞り込み" value={filter} onChange={(value) => { setFilter(value as GooglePostFilter); setPage(1) }} options={FILTER_OPTIONS.map((option) => ({ ...option, disabled: option.value === 'scheduled' && (data?.counts.scheduled ?? 0) === 0 }))} />
           <Select label="種類" aria-label="種類で絞り込み" value={kind} onChange={(value) => { setKind(value as typeof kind); setPage(1) }} options={[{ value: 'all', label: 'すべて' }, ...(['standard', 'event', 'offer'] as GooglePostKind[]).map((k) => ({ value: k, label: KIND_LABELS[k] }))]} />
-        </>}
-        trailing={<>
-          <PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); setPage(1) }} />
-          <Button key={accountId} onClick={() => void sync()} disabled={!canSync || syncing} lockedReason={lockedReason} busy={syncing} busyLabel="確認中…"><RefreshCw aria-hidden className={styles.icon16} />Googleの状態を確認する</Button>
-          <Button variant="primary" disabled={!canSync} lockedReason={lockedReason} onClick={() => { if (canSync) go({ tab: 'posts', view: 'new', kind: 'standard' }) }}><Plus aria-hidden className={styles.icon16} />投稿を作る</Button>
-        </>}
-      />
+          <ListToolbarEnd>
+            <Button key={accountId} onClick={() => void sync()} disabled={!canSync || syncing} lockedReason={lockedReason} busy={syncing} busyLabel="確認中…"><RefreshCw aria-hidden className={styles.icon16} />Googleの状態を確認する</Button>
+            <Button variant="primary" disabled={!canSync} lockedReason={lockedReason} onClick={() => { if (canSync) go({ tab: 'posts', view: 'new', kind: 'standard' }) }}><Plus aria-hidden className={styles.icon16} />投稿を作る</Button>
+            <PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); setPage(1) }} />
+          </ListToolbarEnd>
+        </ListToolbarRow>
+      </ListToolbarFrame>
       <LastChecked at={lastChecked} inSession busy={syncing} />
       {syncError ? <Notice tone="warn">{syncError}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
