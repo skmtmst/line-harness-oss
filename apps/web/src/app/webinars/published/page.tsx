@@ -189,7 +189,7 @@ function PublishedWebinarContent() {
             ['申込重複', editor.monitoring.duplicateRegistrations],
             ['視聴履歴の取得失敗', editor.monitoring.viewSegmentFailures],
             ['個別相談連携失敗', editor.monitoring.actionFailures],
-          ].map(([label, count]) => <div key={String(label)} className="text-ink-secondary flex justify-between text-sm"><span>{label}</span><span className={Number(count) > 0 ? 'text-danger font-semibold' : 'text-success'}>{Number(count)}件</span></div>)}</div></section>
+          ].map(([label, count]) => <div key={String(label)} className="text-ink-secondary flex justify-between text-sm"><span>{label}</span><span className={Number(count) > 0 ? 'text-ink font-semibold' : 'text-ink'}>{Number(count)}件</span></div>)}</div></section>
         </aside>
       </div>
     </div>

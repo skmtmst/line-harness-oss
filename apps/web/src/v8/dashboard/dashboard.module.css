@@ -62,7 +62,8 @@
 a.kv:hover .kvKey { text-decoration: underline; }
 .kvKey { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-ink-secondary); font-size: var(--polish-text-body); line-height: var(--tpl-db-text-lh); }
 .kvValue { flex-shrink: 0; white-space: nowrap; color: var(--color-ink); font-size: var(--polish-text-body); font-weight: 600; line-height: var(--tpl-db-text-lh); font-variant-numeric: tabular-nums;  font-family: var(--font-inter), Inter, sans-serif; }
-.kvDanger .kvKey, .kvDanger .kvValue { color: var(--color-danger); font-weight: 600; }
+/* 17：数の色は札に任せ、値（.kvValue）は黒のまま。赤は鍵（.kvKey）の側だけ。 */
+.kvDanger .kvKey { color: var(--color-danger); font-weight: 600; }
 .kvFaint .kvValue { color: var(--color-ink-faint); }
 /* 値の左に差の札を並べる（札は値の太さ・色を引き継がない）。 */
 .kvDelta { display: inline-flex; align-items: center; gap: var(--tpl-db-kv-gap); }
