@@ -58,7 +58,7 @@ import { Hono, type Context } from 'hono';
 import { noindexHeaderMiddleware, robotsTxtHandler } from './lib/robots.js';
 import { cors } from 'hono/cors';
 
-import { getTrafficPoolBySlug, getTrafficPoolById, getRandomPoolAccount, getPoolAccounts, getEntryRouteByRefCode, getEntryRouteByRefCodeAny, getLineAccountById, getAffiliateLinkByRefCode, incrementAffiliateLinkClick } from '@line-crm/db';
+import { getTrafficPoolBySlug, getTrafficPoolById, getRandomPoolAccount, getPoolAccounts, getEntryRouteByRefCode, getEntryRouteByRefCodeAny, getLineAccountById, getAffiliateLinkByRefCode, incrementAffiliateLinkClick, getStaffById } from '@line-crm/db';
 
 import { authMiddleware } from './middleware/auth.js';
 import { tenantScopeMiddleware } from './middleware/tenant-scope.js';
@@ -289,6 +289,16 @@ app.use('/api/*', timingMiddleware('audit', outputAuditMiddleware));
 
 // 別の統括を選択できないよう、管理 API の LINE アカウントをログイン中のスタッフの統括へ限定する。
 app.use('*', timingMiddleware('tenant', tenantScopeMiddleware));
+// Account-limited members cannot access tenant-wide management endpoints.
+app.use('/api/hq/*', async (c, next) => {
+  const actor = c.get('staff');
+  if (actor.id === 'env-owner') return next();
+  const member = await getStaffById(c.env.DB, actor.id);
+  if (!member?.is_active || member.account_scope !== 'all') {
+    return c.json({ success: false, error: '統括の権限が必要です' }, 403);
+  }
+  return next();
+});
 // 代理ログイン中の個人情報の伏せ字。認証の後ろ、各ルートの前。
 app.use('/api/*', timingMiddleware('pii', piiMaskMiddleware));
 app.use('/api/*', timingMiddleware('pii', privateImageResponseMiddleware));

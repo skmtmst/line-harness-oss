@@ -829,8 +829,9 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     setSummaryReady(false)
     try {
       const scope = selectedAccountId ?? undefined
+      if (!scope) throw new Error('アカウントを選択してください')
       const [staffResult, meResult, accountsResult, usersResult, rolesResult] = await Promise.all([
-        api.staff.list(),
+        api.staff.list(scope),
         loadStaffIdentity(),
         api.lineAccounts.list(),
         api.access.users({ lineAccountId: scope, limit: 200 }),
@@ -941,7 +942,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   useEffect(() => { setUserPage(1) }, [query, statusFilter, tab])
   const activeAdministratorCount = members.filter(isActiveAdministrator).length
   const missing = Math.max(accessSummary.active - accessSummary.mfaEnabled, 0)
-  const canEdit = (member: StaffMember) => Boolean(administrator || (staffRole === 'staff' && me?.id === member.id))
+  const canEdit = (member: StaffMember) => Boolean(member.canManageInAccount !== false && (administrator || (staffRole === 'staff' && me?.id === member.id)))
   const openTwoFactor = (member: StaffMember) => { if (member.twoFactorEnabled) { setDisableError(''); setDisablingTarget(member) } else setSettingTwoFactor(member) }
   /**
    * 二段階認証を外す。
@@ -1044,7 +1045,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       candidate.id !== permissionTarget.id && candidate.roleBundle !== 'custom'
     ))
     const permissionMember = memberById.get(permissionTarget.id)
-    return <SaveErrorScope errors={saveErrors}><PermissionScopeView user={permissionTarget} memberId={permissionMember?.id ?? null} canSave={administrator} copyCandidates={copyCandidates} roleCounts={accessSummary.roleCounts} accountNames={accountNames} savedEditKeys={permissionMember?.permissionKeys ?? []} savedViewKeys={permissionMember?.permissionViewKeys ?? []} savedEmailMask={permissionMember?.emailMask ?? null} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} onConflict={handlePermissionConflict} /></SaveErrorScope>
+    return <SaveErrorScope errors={saveErrors}><PermissionScopeView user={permissionTarget} memberId={permissionMember?.id ?? null} canSave={Boolean(administrator && !permissionMember?.isAccountCreator && permissionMember?.canManageInAccount !== false)} copyCandidates={copyCandidates} roleCounts={accessSummary.roleCounts} accountNames={accountNames} savedEditKeys={permissionMember?.permissionKeys ?? []} savedViewKeys={permissionMember?.permissionViewKeys ?? []} savedEmailMask={permissionMember?.emailMask ?? null} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} onConflict={handlePermissionConflict} /></SaveErrorScope>
   }
   const viewer = me !== null && !administrator
   const nowMs = Date.now()
@@ -1061,7 +1062,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     .filter((user): user is AccessUserItem => Boolean(user))
   const rowMenuItems = (user: AccessUserItem): ActionMenuItem[] => {
     const member = memberById.get(user.id)
-    const editable = member ? canEdit(member) : false
+    const editable = member ? canEdit(member) && !member.isAccountCreator : false
     const isSelf = Boolean(member && me?.id === member.id)
     const resendable = tab === 'invited' && administrator && member !== undefined && member.inviteStatus !== 'active'
     const close = () => setOpenMenuId(null)
@@ -1070,7 +1071,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     items.push({ id: 'scope', label: administrator ? '見える画面' : '見える画面を見る', onSelect: () => { close(); openPermissions(user) } })
     if (isSelf && member && editable) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '二段階認証を解除する' : '二段階認証を設定する', onSelect: () => { close(); openTwoFactor(member) } })
     if (resendable && member) items.push({ id: 'resend', label: 'もう一度送る', disabled: resendingId !== null, disabledReason: resendingId === member.id ? '送信中…' : undefined, onSelect: () => { close(); void runResend(member) } })
-    if (administrator && member && !isSelf) {
+    if (administrator && member && !isSelf && !member.isAccountCreator && member.canManageInAccount !== false) {
       const policy = staffActionPolicy({ member, currentUserId: me?.id ?? null, administrator: true, activeAdministratorCount })
       items.push(member.isActive
         ? { id: 'suspend', label: '止める', dividerBefore: true, disabled: Boolean(policy.statusBlockedReason), disabledReason: policy.statusBlockedReason ?? undefined, onSelect: () => { close(); setSuspendError(''); setSuspendTarget(member) } }
@@ -1107,7 +1108,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             return (
               <GridRow key={user.id}>
                 {/* 絵 nku0f：顔・名前・メール。担当のLINEアカウントは列にせず、名前に重ねた説明と「見える画面」で見る。 */}
-                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
+                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>{member?.isAccountCreator ? <span className={styles.personSub}>管理者・アカウント作成者</span> : null}{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
                 <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} />}</GridCell>
                 <GridCell className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">

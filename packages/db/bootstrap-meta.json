@@ -650,7 +650,8 @@
     "734_unlimited_monthly_passes.sql",
     "735_booking_photos.sql",
     "736_line_account_tag_color_check.sql",
-    "737_existing_account_email_inbox.sql"
+    "737_existing_account_email_inbox.sql",
+    "738_line_account_creator.sql"
   ],
-  "migrationCount": 651
+  "migrationCount": 652
 }
