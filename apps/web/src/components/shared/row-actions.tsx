@@ -7,6 +7,7 @@ import Button from './button'
 import IconButton from './icon-button'
 import ReorderHandle, { type ReorderDirection } from './reorder-handle'
 export { default as ReorderHandle, useReorder } from './reorder-handle'
+import { usePermissionLockTip } from './permission-lock-tip'
 import styles from './row-actions.module.css'
 
 type Base = { className?: string } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'className' | 'children'>
@@ -200,32 +201,38 @@ export type RowQuickActionProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 
   ariaLabel: string
   /** 文字の前の印（lucide。大きさは部品が 13 にそろえる）。 */
   icon?: ReactNode
+  /** 権限で使えない理由。 */
+  lockedReason?: string
 }
 
 /**
  * ★V8 行の右端の「…」の左に置く、よく使う1つの操作（統括の一覧の［配る］：絵の）。
  * 幅60・高さ28・角丸8・薄い枠。同じ操作は「…」の中にも残してよい。
- * 押せない人（閲覧のみ・権限が無い）には呼ぶ側が出さない（押せない形で置かない）。
+ * 権限で使えない人にもlockedReasonを付けて操作を残し、理由を伝える。
  * 押下は行（tr の詳細へ行く押下など）へ伝えない。見た目は部品が決める（className・style は受け取らない）。
  */
-export function RowQuickAction({ label, ariaLabel, icon, onClick, title, ...rest }: RowQuickActionProps) {
-  return (
+export function RowQuickAction({ label, ariaLabel, icon, onClick, title, lockedReason, ...rest }: RowQuickActionProps) {
+  const lock = usePermissionLockTip<HTMLButtonElement>(lockedReason, rest['aria-describedby'])
+  return (<>
     <button
       type="button"
       aria-label={ariaLabel}
-      title={title ?? ariaLabel}
       className={styles.quickAction}
+      ref={lock.ref}
       data-row-quick-action=""
       onClick={(event) => {
         event.stopPropagation()
         onClick?.(event)
       }}
       {...rest}
+      {...lock.handlers}
+      title={lockedReason ? undefined : title ?? ariaLabel}
     >
       {icon}
       {label}
     </button>
-  )
+    {lock.node}
+  </>)
 }
 
 /* ------------------------------------------------------------- LAY-18 */
@@ -238,8 +245,7 @@ export function RowQuickAction({ label, ariaLabel, icon, onClick, title, ...rest
  * - 複製・停止・アーカイブなどは「⋯」へ同じ順序で集約する。
  * - 削除など元に戻せない操作は区切りの後・赤で必ず最後に置く。
  *   ただし実装・許可されている操作だけを出す。全機能に削除を足さない。
- * - 権限で許可されない操作は呼び出し側が渡さない（サーバ側の権限
- *   判定はそのまま維持する）。
+ * - 権限で許可されない操作はlockedReasonで理由を伝える（サーバ側の権限判定は維持）。
  * - 使用中等で押せない操作は disabledReason で理由を示す。
  * - タッチ端末では「⋯」を含め操作領域44pxを確保する（CSS側）。
  */
@@ -249,6 +255,8 @@ export type RowAction = {
   /** 既定は役割の名前（「詳細」「編集」）。行き先が役割と違うときだけ明記する。 */
   label?: string
   disabled?: boolean
+  /** 権限で使えない理由。 */
+  lockedReason?: string
 } & ({ href: string; onClick?: never } | { onClick: () => void; href?: never })
 
 /** 「⋯」の中へ入れる削除などの操作。色と区切りは部品側で固定する。 */
@@ -263,7 +271,7 @@ export type RowActionsProps = {
 
   /** 先頭の操作。既定ラベルは「詳細」。 */
   detail?: RowAction
-  /** 編集は「…」に入れる。許可されない場合は渡さない。 */
+  /** 編集は「…」に入れる。許可されない場合もlockedReasonを付けて残す。 */
   edit?: RowAction
   /** 「⋯」に集約する複製・停止・アーカイブなど。 */
   menuItems?: ActionMenuItem[]
@@ -287,7 +295,7 @@ function RowActionButton({ action, defaultLabel, primary = false }: { action: Ro
       ? { href: action.href }
       : { onClick: action.onClick, disabled: action.disabled }
   return (
-    <Button {...props} variant={primary ? 'primary' : 'secondary'} size="compact" className={styles.rowButton}>
+    <Button {...props} variant={primary ? 'primary' : 'secondary'} size="compact" className={styles.rowButton} lockedReason={action.lockedReason}>
       {label}
     </Button>
   )
@@ -311,7 +319,7 @@ export function RowActions({
   className,
 }: RowActionsProps) {
   const editItem: ActionMenuItem[] = edit ? [{
-    id: 'edit', label: edit.label ?? '編集する', disabled: edit.disabled,
+    id: 'edit', label: edit.label ?? '編集する', disabled: edit.disabled, lockedReason: edit.lockedReason,
     disabledReason: edit.disabled ? 'ほかの操作を反映しています' : undefined,
     onSelect: () => {
       if (edit.href !== undefined) window.location.assign(edit.href)
@@ -319,7 +327,7 @@ export function RowActions({
     },
   }] : []
   const detailItems: ActionMenuItem[] = primary && detail ? [{
-    id: 'detail', label: detail.label ?? '詳細', disabled: detail.disabled,
+    id: 'detail', label: detail.label ?? '詳細', disabled: detail.disabled, lockedReason: detail.lockedReason,
     disabledReason: detail.disabled ? 'ほかの操作を反映しています' : undefined,
     onSelect: () => { if (detail.href !== undefined) window.location.assign(detail.href); else detail.onClick?.() },
   }] : []
