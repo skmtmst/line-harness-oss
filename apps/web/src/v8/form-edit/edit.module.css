@@ -236,8 +236,8 @@
 /* 「答え終わったあと」のタブで出すお礼の画面。✓の印・お礼の文・URLの順。 */
 .thanksBox { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tpl-fe-open-gap); text-align: center; }
 .thanksMark { font-size: var(--tpl-fe-title-size); font-weight: 600; line-height: 1; }
-/* 共通の svg.lucide（16px）より強く、お礼の印だけ 40px にする。 */
-html:root .thanksMark svg:global(.lucide) { width: 40px; height: 40px; }
+/* 共通の svg.lucide（16px）より強く、お礼の印だけ大きな印（40px）にする。 */
+html:root .thanksMark svg:global(.lucide) { width: var(--polish-icon-empty); height: var(--polish-icon-empty); }
 .thanksText { margin: 0; font-size: var(--tpl-fe-body-size); font-weight: 600; line-height: var(--tpl-fe-title-lh); white-space: pre-wrap; }
 .thanksSub { margin: 0; font-size: var(--tpl-fe-small-size); line-height: var(--tpl-fe-small-lh); color: var(--color-ink-faint); overflow-wrap: anywhere; }
 .phoneImage { flex: none; display: block; width: 100%; height: var(--tpl-fe-phone-image-h); object-fit: cover; border-radius: var(--tpl-fe-phone-r); background: var(--tpl-fe-phone-image-bg); }
