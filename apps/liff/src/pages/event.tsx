@@ -232,7 +232,7 @@ export default function Event() {
                 const full = isFull(s);
                 const disabled = overLimit || (full && !waitlistOpen);
                 const selected = selectedId === s.id;
-                // 選んだ時間は濃い緑の地＋白文字 (・予約の日時選びと同じ形)。
+                // 選んだ時間は薄い緑の地＋濃い文字（主ボタンと同じ緑の塗りにしない）。
                 // 満席は押せない灰色の箱。白 (bg-canvas) と重ねると白く見えるので
                 // 押せない時は地を1つ (bg-shell-gray) だけにする。
                 // 待ちに入る満席の枠は白のまま、黄土色の札で分かるようにする。
@@ -250,7 +250,7 @@ export default function Event() {
                       title={formatJstEventAt(s.starts_at)}
                     >
                       <span
-                        className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-(--liff-on-primary)' : 'text-ink'}`}
+                        className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : 'text-ink'}`}
                       >
                         {/* 日付は上の行にあるので、枠が1日だけのときは時刻だけ (板 gVjiC)。 */}
                         {oneDay
@@ -258,7 +258,7 @@ export default function Event() {
                           : `${utcToJstMd(s.starts_at)}(${utcToJstWeekday(s.starts_at)}) ${utcToJstHm(s.starts_at)}〜${utcToJstHm(s.ends_at)}`}
                       </span>
                       <span
-                        className={`shrink-0 text-xs font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected && !full ? 'text-(--liff-on-primary)' : full && !disabled ? 'text-liff-wait-ink' : 'text-ink-secondary'}`}
+                        className={`shrink-0 text-xs font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : full && !disabled ? 'text-liff-wait-ink' : 'text-ink-secondary'}`}
                       >
                         {fullLabel}
                       </span>

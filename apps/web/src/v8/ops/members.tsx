@@ -7,7 +7,6 @@ import { Eye, LogIn, Send, Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsMember, type OpsMemberSummary } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import NoticeLineAccountCard from '@/components/ops/notice-line-account-card'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -114,7 +113,6 @@ export default function OpsMembersV8() {
       <OpsHead
         title="メンバー管理"
         description="運営メンバーはメールで招待します。招待された人はパスワードを設定し、二段階認証の登録が終わるまで運営コンソールに入れません。自分自身は変えられません。"
-        environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
       />
       <div className={parts.stack}>
         <div className={parts.tabs}>

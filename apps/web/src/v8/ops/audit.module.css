@@ -35,6 +35,11 @@
   width: var(--tpl-op-audit-at-w);
 }
 
+/* 日時は1行（10/01 15:20）。行の中の上下中央は表の共通部品が持つ。 */
+.atCell {
+  white-space: nowrap;
+}
+
 .colWho {
   width: var(--tpl-op-mem-state-w);
 }

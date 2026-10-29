@@ -3,7 +3,7 @@ import { Navigate, useLocation, useParams } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import LoadingView from '../components/loading-view.js';
 import LoadErrorView from '../components/load-error-view.js';
-import { liffDocumentTitle } from '../components/ui/liff-header.js';
+import LiffHeader, { liffDocumentTitle } from '../components/ui/liff-header.js';
 
 export default function Research() {
   const { id = '' } = useParams<{ id: string }>();
@@ -20,6 +20,11 @@ export default function Research() {
     return () => { active = false; };
   }, [id, attempt]);
   if (failed) return <LoadErrorView onRetry={() => setAttempt(value => value + 1)} />;
-  if (!formId) return <LoadingView />;
+  if (!formId) return (
+    <div className="min-h-screen bg-canvas">
+      <LiffHeader title="リサーチ" />
+      <div className="mx-auto w-full max-w-md p-4"><LoadingView /></div>
+    </div>
+  );
   return <Navigate to={{ pathname: `/forms/${encodeURIComponent(formId)}`, search: location.search }} replace />;
 }

@@ -627,3 +627,17 @@ it('種類を替えると前の種類の行を隠し、遅い前の応答も表�
   await act(async () => { resolveVideo([{ ...listRow, id: 'video-only', kind: 'rich_video', name: '動画だけの案内' }]) })
   expect(screen.queryByRole('link', { name: '動画だけの案内' })).toBeNull()
 })
+
+it('未配布ありの1件を消すと数の帯を取り直す（B25）', async () => {
+  calls.listStats
+    .mockResolvedValueOnce({ thisMonthSentCount: 0, outdatedTemplateCount: 1 })
+    .mockResolvedValue({ thisMonthSentCount: 0, outdatedTemplateCount: 0 })
+  calls.remove.mockResolvedValue({})
+  render(<HqTemplatesV8 type="form" />)
+  await screen.findByRole('link', { name: '予約前日のご案内' })
+  const loaded = calls.listStats.mock.calls.length
+  fireEvent.click(screen.getByRole('button', { name: /予約前日のご案内.*の操作/ }))
+  fireEvent.click(await screen.findByRole('menuitem', { name: '削除する' }))
+  fireEvent.click(within(await screen.findByRole('alertdialog')).getByRole('button', { name: '削除する' }))
+  await waitFor(() => expect(calls.listStats.mock.calls.length).toBeGreaterThan(loaded))
+})

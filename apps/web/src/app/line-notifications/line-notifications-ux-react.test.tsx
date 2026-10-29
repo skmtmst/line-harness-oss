@@ -125,6 +125,11 @@ it('顧客タブの読み込み中は骨組みが出て「読み込み中」の�
   delete document.documentElement.dataset.theme
 })
 
+it('E27: 設定の板はほかの設定画面と同じ wide-nav で出す', () => {
+  const { container } = render(<LineNotificationsPage />)
+  expect(container.querySelector('[data-sb-settings-screen]')?.getAttribute('data-sb-layout')).toBe('wide-nav')
+})
+
 it.each([
   ['customer', 'これは「お知らせ」であって「売り込みの配信」ではありません。お客さまが配信を止めていても、取引に必要な連絡は届きます。'],
   ['operator', 'この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。'],
