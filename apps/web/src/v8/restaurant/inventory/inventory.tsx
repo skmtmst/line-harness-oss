@@ -30,12 +30,14 @@ import styles from './inventory.module.css'
 
 type InventoryTab = 'stock' | 'channels' | 'closures' | 'rules'
 
-function InventoryTabs({ ctx, tab, onTab, dialog, onDialog }: {
+function InventoryTabs({ ctx, tab, onTab, dialog, onDialog, heading, notice }: {
   ctx: RestaurantV8Context
   tab: InventoryTab
   onTab: (tab: InventoryTab) => void
   dialog: ClosureDialogTarget | null
   onDialog: (target: ClosureDialogTarget | null) => void
+  heading?: ReactNode
+  notice?: ReactNode
 }) {
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
@@ -57,8 +59,9 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog }: {
   )
   let body: ReactNode
   if (tab === 'stock') {
-    body = <StockBoard key={ctx.selectedStoreId} ctx={ctx} canEdit={canEdit} />
-  } else if (!selectedAccountId || !ctx.selectedStoreId) {
+    return <StockBoard key={ctx.selectedStoreId} ctx={ctx} canEdit={canEdit} heading={heading} notice={notice} tabs={tabs} />
+  }
+  if (!selectedAccountId || !ctx.selectedStoreId) {
     body = <ListState kind="empty" title="店舗を選んでください" description={tab === 'channels' ? '予約経路を見たい店舗を選んでください。' : '休業日・貸切を見たい店舗を選んでください。'} />
   } else if (tab === 'rules') {
     body = <RulesBoard key={`${selectedAccountId}:${ctx.selectedStoreId}`} accountId={selectedAccountId} storeId={ctx.selectedStoreId} today={today} timezone={ctx.store?.timezone} canEdit={canEdit} />
@@ -110,6 +113,9 @@ export default function InventoryPage() {
       boundary={!closures}
       headSize={closures ? 'compact' : undefined}
       hideSubtitle={closures}
+      renderPage={tab === 'stock' ? (ctx, heading, notice) => (
+        <InventoryTabs ctx={ctx} tab={tab} onTab={changeTab} dialog={dialog} onDialog={setDialog} heading={heading} notice={notice} />
+      ) : undefined}
       headAfter={closures ? (ctx, storePicker) => (
         <>
           {ctx && ctx.data.stores.length > 1 ? storePicker : null}
