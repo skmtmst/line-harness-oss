@@ -4,6 +4,7 @@ import { issueStaffLineLinkCode, listUnreadScreenNotices, markScreenNoticeRead }
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { loadNoticeLineAccount } from '../services/platform-announcements.js';
+import { fetchBotProfile } from '../lib/bot-profile.js';
 
 /**
  * 統括向けのお知らせと契約者専用 LINE の登録案内は、ログイン中の本人の分だけを扱う。
@@ -27,6 +28,7 @@ hqNotices.get('/api/hq/notices/line-registration', async (c) => {
   const staff = c.get('staff');
   const notice = await loadNoticeLineAccount(c.env);
   if (!notice) return c.json({ success: true, data: { available: false } });
+  const profile = await fetchBotProfile(notice.channelAccessToken);
   const linkedRow = await c.env.DB.prepare('SELECT notice_friend_id FROM staff_members WHERE id = ?').bind(staff.id).first<{ notice_friend_id: string | null }>();
   const linked = Boolean(linkedRow?.notice_friend_id);
   const code = linked ? null : await issueStaffLineLinkCode(c.env.DB, staff.id);
@@ -34,7 +36,7 @@ hqNotices.get('/api/hq/notices/line-registration', async (c) => {
     success: true,
     data: {
       available: true,
-      accountName: notice.name,
+      accountName: profile.displayName?.trim() || notice.name,
       basicId: notice.basicId,
       addFriendUrl: notice.addFriendUrl,
       linked,
