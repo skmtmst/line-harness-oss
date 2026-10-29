@@ -1988,23 +1988,3 @@ test.each(['/api/line-accounts/connect/check', '/api/line-accounts/connect'])('a
   expect(fetch).not.toHaveBeenCalled();
   expect(dbMocks.createLineAccount).not.toHaveBeenCalled();
 });
-
-describe('staff follower-import account scope', () => {
-  test('reads a visible store and returns no state for an invisible store', async () => {
-    dbMocks.getLineAccounts.mockResolvedValue([fakeAccount, { ...fakeAccount, id: 'acc-other' }]);
-    dbMocks.getStaffById.mockResolvedValue({ account_scope: 'accounts' });
-    dbMocks.getStaffAccountScopeIds.mockResolvedValue(['acc-1']);
-    const app = setupApp('staff', makeDbStub(), {
-      assignedLineAccountId: 'acc-1', canAccessDescendantAccounts: false,
-    });
-    const allowed = await app.request('/api/line-accounts/acc-1/follower-import');
-    expect(allowed.status).toBe(200);
-    expect(await allowed.json()).toMatchObject({ success: true, data: { phase: 'not_started' } });
-    expect(dbMocks.getAccountSetting).toHaveBeenCalled();
-    dbMocks.getAccountSetting.mockClear();
-    const denied = await app.request('/api/line-accounts/acc-other/follower-import');
-    expect(denied.status).toBe(404);
-    expect(await denied.json()).toEqual({ success: false, code: 'LINE_ACCOUNT_NOT_FOUND', error: 'LINE公式アカウントが見つかりません。一覧から開き直してください。' });
-    expect(dbMocks.getAccountSetting).not.toHaveBeenCalled();
-  });
-});

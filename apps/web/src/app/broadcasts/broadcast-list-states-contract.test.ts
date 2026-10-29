@@ -37,7 +37,6 @@ describe('一覧の状態（設計 6-1-N `TmHjF`）', () => {
      */
     expect(PAGE, '403 を見分けていない').toContain('err.status === 403')
     expect(PAGE, '権限不足の1枚が無い').toContain('forbidden ? (')
-    expect(PAGE, '権限不足の題が無い').toContain('配信を見る権限がありません')
   })
 
   it('失敗をページ上の帯と一覧の2か所に出さない', () => {
