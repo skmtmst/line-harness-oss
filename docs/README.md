@@ -873,3 +873,4 @@
 - [SNS連携の操作と案内](release-log/unreleased/1881-kenta-sns-actions.md) — SNS連携の画面に関する反映履歴。
 - [LINEログインのコピーと公開の案内](release-log/unreleased/1901-masato-line-login-guide-images.md) — 接続マニュアルStep 4の画像案内の反映履歴。
 - [プロバイダーID確認画面の案内](release-log/unreleased/1903-masato-provider-id-manual-image.md) — 接続マニュアルStep 2の画像案内の反映履歴。
+- [musuboのWebhook設定後の案内](release-log/unreleased/1904-masato-musubo-webhook-guide-image.md) — 接続マニュアルStep 3の画像案内の反映履歴。
