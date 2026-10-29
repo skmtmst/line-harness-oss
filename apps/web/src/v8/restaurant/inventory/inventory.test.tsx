@@ -1,4 +1,4 @@
-import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+import { PERMISSION_LOCK_REASON, PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
@@ -138,14 +138,66 @@ describe('Y8SjT2 予約枠・在庫', () => {
     expect(screen.queryByRole('status')).toBeNull()
   })
 
-  it('閲覧のみ（staff）には保存の帯・時間帯の足し引きを置かない', async () => {
-    role.value = verifiedStaffRole('staff')
+  it.each(['staff', 'viewer'] as const)('%sには変更ボタンを理由付きで残し、クリック・キーでも保存を始めない', async (value) => {
+    role.value = verifiedStaffRole(value)
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    expect(screen.queryByRole('button', { name: /開ける時間と配分を保存/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: '＋ 時間帯を足す' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '媒体の受付を閉じる' })).toBeNull()
-    expect(screen.getByRole('status').textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
+    const reason = value === 'viewer' ? PERMISSION_LOCK_REASON.viewer : PERMISSION_LOCK_REASON.feature
+    const controls = [
+      screen.getByRole('button', { name: /開ける時間と配分を保存/ }),
+      screen.getAllByRole('button', { name: '＋ 時間帯を足す' })[0],
+      screen.getByRole('button', { name: '火曜日の1つ目の時間帯を外す' }),
+      screen.getByRole('button', { name: 'この時間帯だけ保存' }),
+      screen.getByRole('button', { name: '媒体の受付を閉じる' }),
+    ]
+    for (const control of controls) {
+      expect(control.getAttribute('aria-disabled')).toBe('true')
+      expect((control as HTMLButtonElement).disabled).toBe(false)
+      expect(control.tabIndex).toBe(0)
+      const description = control.getAttribute('aria-describedby')
+      expect(description && document.getElementById(description)?.textContent).toBe(reason)
+      expect(fireEvent.keyDown(control, { key: 'Enter' })).toBe(false)
+      expect(fireEvent.keyDown(control, { key: ' ' })).toBe(false)
+      fireEvent.click(control)
+    }
+    expect(fixture.saveOpeningHours).not.toHaveBeenCalled()
+    expect(fixture.saveInventoryAllocation).not.toHaveBeenCalled()
+    expect(fixture.updateInventory).not.toHaveBeenCalled()
+    expect(fixture.generateInventory).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(screen.getByRole('status').textContent).toContain(value === 'viewer' ? '閲覧のみで見ています。' : PERMISSION_LOCK_SUMMARY.feature)
+  })
+
+  it('本人が未確認なら理由を断定せず変更操作を止める', async () => {
+    role.value = verifiedStaffRole(null)
+    render(<InventoryPage />)
+    await screen.findByText('19:00 の卓')
+    const save = screen.getByRole('button', { name: /開ける時間と配分を保存/ }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    expect(save.hasAttribute('data-permission-locked')).toBe(false)
+    expect(screen.queryByText(/閲覧のみで見ています/)).toBeNull()
+    fireEvent.click(save)
+    expect(fixture.saveOpeningHours).not.toHaveBeenCalled()
+    expect(fixture.saveInventoryAllocation).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('tab', { name: '予約経路の連携' }))
+    const issue = await screen.findByRole('button', { name: '発行する' }) as HTMLButtonElement
+    expect(document.querySelector('[data-read-only-notice]')).toBeNull()
+    expect(issue.disabled).toBe(true)
+    fireEvent.click(issue)
+    expect(fixture.issueIntakeAddress).not.toHaveBeenCalled()
+  })
+
+  it('閲覧のみの予約経路は発行操作を残して止め、管理者限定の取得も始めない', async () => {
+    role.value = verifiedStaffRole('viewer')
+    render(<InventoryPage />)
+    await screen.findByText('19:00 の卓')
+    fireEvent.click(screen.getByRole('tab', { name: '予約経路の連携' }))
+    const issue = await screen.findByRole('button', { name: '発行する' })
+    expect(issue.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(issue)
+    expect(fixture.issueIntakeAddress).not.toHaveBeenCalled()
+    expect(fixture.listIntakeAddresses).not.toHaveBeenCalled()
+    expect(fetchApi.mock.calls.some(([path]) => path.includes('/inbound-emails'))).toBe(false)
   })
 
   it('埋まっている卓は個室→テーブル→カウンターの順、3つ以上の連番は「〜」で縮める', () => {

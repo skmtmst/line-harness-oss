@@ -7,6 +7,8 @@ import { ApiError } from '@/lib/api'
 import RulesBoard from './rules'
 
 const api = vi.hoisted(() => ({ inventoryRules: vi.fn(), inventoryRuleState: vi.fn(), saveInventoryRules: vi.fn() }))
+const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: api }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 const initial = { storeId: 'store', threshold: 2, stopLine: false, stopSameDay: false, notify: true, version: 0 }
@@ -24,6 +26,7 @@ async function confirmSave() {
   fireEvent.click(within(dialog).getByRole('button', { name: '保存する' }))
 }
 beforeEach(() => {
+  role.value = verifiedStaffRole('owner')
   api.inventoryRules.mockResolvedValue({ data: initial })
   api.inventoryRuleState.mockResolvedValue({ data: initial, state: emptyState })
   api.saveInventoryRules.mockResolvedValue({ data: { ...initial, threshold: 4, stopLine: true, version: 1 } })
@@ -48,8 +51,8 @@ it('未設定の両停止はオフのまま読み、保存前に確認し、読�
   await confirmSave()
   expect(api.saveInventoryRules).toHaveBeenLastCalledWith('account', expect.objectContaining({ expectedVersion: 1 }))
 })
-it('閲覧のみは有効状態と値だけを読み、変更用の入力・スイッチ・保存が出ない', async () => {
-    verifiedStaffRole('viewer')
+it('閲覧のみは状態を読み、保存ボタンを理由付きで残して送信しない', async () => {
+  role.value = verifiedStaffRole('viewer')
   api.inventoryRules.mockResolvedValue({ data: { ...initial, stopLine: true } })
   render(<RulesBoard {...props} canEdit={false} />)
   await screen.findByText('2席')
@@ -57,7 +60,23 @@ it('閲覧のみは有効状態と値だけを読み、変更用の入力・ス�
   expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
   expect(screen.queryByRole('switch')).toBeNull()
   expect(screen.queryByRole('spinbutton')).toBeNull()
-  expect(screen.queryByRole('button', { name: 'ルールを保存する' })).toBeNull()
+  const save = screen.getByRole('button', { name: 'ルールを保存する' }) as HTMLButtonElement
+  expect(save.getAttribute('aria-disabled')).toBe('true')
+  expect(save.disabled).toBe(false)
+  expect(save.tabIndex).toBe(0)
+  fireEvent.click(save)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(api.saveInventoryRules).not.toHaveBeenCalled()
+})
+it('本人未確認のルールは権限の帯を出さず、保存も始めない', async () => {
+  role.value = verifiedStaffRole(null)
+  render(<RulesBoard {...props} canEdit={false} />)
+  await screen.findByText('停止中の枠・戻った記録')
+  expect(document.querySelector('[data-read-only-notice]')).toBeNull()
+  const save = screen.getByRole('button', { name: 'ルールを保存する' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  fireEvent.click(save)
+  expect(screen.queryByRole('dialog')).toBeNull()
   expect(api.saveInventoryRules).not.toHaveBeenCalled()
 })
 it('設定の取得失敗をオフと見なさず、再読込してから編集する', async () => {
