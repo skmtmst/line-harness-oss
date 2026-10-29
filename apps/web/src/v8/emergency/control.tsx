@@ -39,6 +39,7 @@ import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import Card from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 /* ★V8-B 緊急コントロール（板 ）。停止・復旧・本人確認・冪等キーと
  * 競合後の読み直しは、この現役の部品だけで守る。 */
@@ -810,7 +811,7 @@ const EmergencyControlV8 = (
                 placeholder="例：宛先の絞り込みを間違えた"
               /></SaveErrorField></Field></DialogFormRow>
               <DialogFormRow><Field label="補足" htmlFor="emergency-detail-v8" optional note={`あと${1000 - reasonDetail.length}文字`}>
-                <SaveErrorField names={["reasonDetail","detail","reason_detail"]}><textarea
+                <SaveErrorField names={["reasonDetail","detail","reason_detail"]}><SharedTextArea
                   id="emergency-detail-v8"
                   value={reasonDetail}
                   onChange={(event) => setReasonDetail(event.target.value)}
@@ -850,7 +851,7 @@ const EmergencyControlV8 = (
                 {stepUpMethod === 'password' ? '本人確認（パスワード）' : '本人確認（認証アプリの6桁）'}
               </span>
               {stepUpMethod === 'password' ? (
-                <SaveErrorField names={["stopPassword","stop_password"]}><input
+                <SaveErrorField names={["stopPassword","stop_password"]}><SharedTextField
                   type="password"
                   aria-label="パスワード"
                   value={stopPassword}

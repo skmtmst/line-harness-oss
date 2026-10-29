@@ -20,7 +20,7 @@ vi.mock('@/components/broadcasts/broadcast-form', () => {
 })
 const listBroadcasts = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
-const createView = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'new-view', name: '古い配信', filters: {} } })))
+const createView = vi.hoisted(() => vi.fn(async (_accountId: string, input: Record<string, unknown>) => ({ success: true, data: { id: 'new-view', ...input } })))
 const listViews = vi.hoisted(() => vi.fn())
 const deleteBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
 const updateBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))

@@ -49,7 +49,7 @@ describe('★V8 の生成パネル', () => {
   it('追加の指示は任意と文字数の上限を添え、例を入れる前から見せる', () => {
     open()
     expect(screen.getByText(`任意・${CUSTOM_PROMPT_MAX}文字まで`)).toBeTruthy()
-    expect(screen.getByPlaceholderText('例: 桜の花びらと餃子・生ビールの写真風。和風で温かみのある雰囲気')).toBeTruthy()
+    expect(screen.getByPlaceholderText('例：桜の花びらと餃子・生ビールの写真風。和風で温かみのある雰囲気')).toBeTruthy()
   })
 
   it('参照画像はライブラリか手元の PNG・JPEG・WebP から選べ、使い方の説明を選ぶ前から読める', () => {

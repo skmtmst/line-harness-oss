@@ -6,7 +6,6 @@
   --sc-title-lh: 24px;
   --sc-body-lh: 20px;
   --sc-caption-lh: 18px;
-  --sc-track-h: 6px;
   --sc-small-icon: 16px;
 }
 
@@ -35,7 +34,10 @@
   white-space: nowrap;
 }
 
-
+/* 進み具合は共通の段に区切った緑（ProgressBar）。この板では幅いっぱいに伸ばす。 */
+.track {
+  --progress-steps-w: 100%;
+}
 
 .rows {
   display: flex;

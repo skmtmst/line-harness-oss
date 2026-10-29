@@ -25,6 +25,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string
@@ -560,8 +561,8 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
         </div>}
     >
       <div className="grid gap-3">
-        <Field label="設備名"><SaveErrorField names={["name"]}><input aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
-        <Field label="種類"><SaveErrorField names={["type"]}><input aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例：部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
+        <Field label="設備名"><SaveErrorField names={["name"]}><SharedTextField aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
+        <Field label="種類"><SaveErrorField names={["type"]}><SharedTextField aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例：部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
         <Field label="受付上限"><SaveErrorField names={["capacity"]}><NumberInput aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" /></SaveErrorField></Field>
         {error ? <Notice tone="danger" >{error}</Notice> : null}
 

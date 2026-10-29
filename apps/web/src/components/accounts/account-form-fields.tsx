@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import OgEditor from '@/components/shared/og-editor'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 // Shared form field building blocks for the LINE account create / edit flows.
 // Kept as primitives (not a full form) so the create page (single submit) and
@@ -91,7 +92,7 @@ export function TextField({
         {label}
         {required && <span className="text-status-danger ml-1">*</span>}
       </label>
-      <input
+      <SharedTextField
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -145,7 +146,7 @@ export function AccountFormSections({
         ) : (
           <div>
             <label className="block text-xs font-medium text-ink-secondary mb-1">Channel ID</label>
-            <input
+            <SharedTextField
               value={state.channelId}
               readOnly
               disabled
@@ -222,7 +223,7 @@ export function AccountFormSections({
           <label className="block text-xs font-medium text-ink-secondary mb-1">
             サイト名（og:site_name）
           </label>
-          <input
+          <SharedTextField
             type="text"
             value={state.ogSiteName ?? ''}
             placeholder={`空欄なら「${state.name || 'アカウント名'}」がフォールバック`}

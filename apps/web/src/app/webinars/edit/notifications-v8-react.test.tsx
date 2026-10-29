@@ -106,7 +106,7 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
   it('入り切りの入力を残し、下書き保存したときだけ保存する', async () => {
     const host = render()
     await act(async () => undefined)
-    const toggle = host.querySelector('input[type="checkbox"][aria-label="申込のお礼"]')
+    const toggle = host.querySelector('[role="switch"][aria-label="申込のお礼"]')
     expect(toggle).not.toBeNull()
     await act(async () => {
       fireEvent.click(toggle!)
@@ -121,12 +121,12 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     apiMocks.saveNotifications.mockRejectedValueOnce(new Error('network'))
     const host = render()
     await act(async () => undefined)
-    const toggle = host.querySelector('input[type="checkbox"][aria-label="申込のお礼"]') as HTMLInputElement
+    const toggle = host.querySelector('[role="switch"][aria-label="申込のお礼"]') as HTMLInputElement
     await act(async () => { fireEvent.click(toggle) })
     const save = ([...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
     await act(async () => { querySupplementaryPageAction('下書きを保存')!.click() })
     expect(host.textContent).toContain('入力を残しました')
-    expect(toggle.checked).toBe(false)
+    expect((toggle.getAttribute('aria-checked') === 'true')).toBe(false)
     expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
     await act(async () => { querySupplementaryPageAction('下書きを保存')!.click() })
     expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(2)
@@ -165,7 +165,7 @@ it('通知保存後に版の読込が失敗しても、再開時は保存を繰�
   apiMocks.editor.mockRejectedValueOnce(new Error('reload')).mockResolvedValueOnce({ data: { ...EDITOR, version: 9 } })
   const host = render()
   await act(async () => undefined)
-  await act(async () => { fireEvent.click(host.querySelector('input[aria-label="申込のお礼"]')!) })
+  await act(async () => { fireEvent.click(host.querySelector('[role="switch"][aria-label="申込のお礼"]')!) })
   await act(async () => { fireEvent.change(host.querySelector('input[aria-label="視聴完了メッセージ本文"]')!, { target: { value: '再開後も残す本文' } }) })
   const save = ([...host.querySelectorAll('button')].find(el => el.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
   await act(async () => { querySupplementaryPageAction('下書きを保存')!.click() })

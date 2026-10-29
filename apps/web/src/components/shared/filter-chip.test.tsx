@@ -2,18 +2,10 @@
 /* 一覧の絞り込み札（★管理画面・m13i）。全画面で1つの形にそろえるための契約。 */
 import React from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import FilterChip from './filter-chip'
 
 afterEach(() => cleanup())
-
-const HERE = dirname(fileURLToPath(import.meta.url))
-const CSS = readFileSync(join(HERE, 'filter-chip.css'), 'utf8')
-/** 注釈を落とした宣言だけを見る（#639・#669 と同じやり方）。 */
-const CODE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
 
 describe('絞り込み札 FilterChip（m13i）', () => {
   it('条件の選択と窓の開閉を別の属性で伝える', () => {
@@ -90,12 +82,12 @@ describe('絞り込み札 FilterChip（m13i）', () => {
     expect((container.querySelector('button') as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('v8 の札は固定絵の共通寸法を使う（高36・内側0/12・間4・角丸999・枠control-border＋薄い影）', () => {
-    expect(CODE).toMatch(/:root\s*\.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
-    expect(CODE).toMatch(/:root\s*\.v6-filter-chip\s*\{[^}]*padding:\s*0 var\(--polish-space-field\)/s)
-    expect(CODE).toMatch(/:root\s*\.v6-filter-chip\s*\{[^}]*gap:\s*calc\(var\(--tpl-toolbar-gap\) \/ 2\)/s)
-    expect(CODE).toMatch(/:root\s*\.v6-filter-chip\s*\{\s*[^}]*border-radius:\s*999px/s)
-    expect(CODE).toMatch(/:root\s*\.v6-filter-chip\s*\{[^}]*outline:\s*1px solid var\(--color-control-border\)/s)
+  it('状態の札は印を省いても件数と選択状態を伝える', () => {
+    const { container } = render(<FilterChip selected showCheck={false} count={0} onChange={() => {}}>送信済み</FilterChip>)
+    const button = container.querySelector('button')!
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+    expect(button.textContent).toBe('送信済み 0')
+    expect(button.querySelector('svg')).toBeNull()
   })
 
   it('現在のV8の高さ36・タッチ44pxを保つ', () => {
@@ -105,5 +97,10 @@ describe('絞り込み札 FilterChip（m13i）', () => {
     expect(CODE).toMatch(
       /@media \(pointer: coarse\)\s*\{\s*\.v6-filter-chip\s*\{\s*min-height:\s*44px;/,
     )
+  it('押せない札から状態の変更を送らない', () => {
+    const change = vi.fn()
+    const { container } = render(<FilterChip selected={false} disabled onChange={change}>未対応</FilterChip>)
+    fireEvent.click(container.querySelector('button')!)
+    expect(change).not.toHaveBeenCalled()
   })
 })

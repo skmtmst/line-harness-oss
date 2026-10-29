@@ -243,7 +243,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = 'æ“
       data-design-node="xifuV"
     >
       {(choiceHeading === undefined ? orderActionMenuItems(items) : items.map((item, index) => ({ ...item, sectionBefore: index === 0 ? choiceHeading : undefined }))).map((item, index) => {
-        const itemLabel = normalizeActionLabel(item.label)
+        const itemLabel = normalizeActionLabel(item.label.replace(/(?:â€¦|\.{3})\s*$/u, ''))
         const locked = Boolean(item.lockedReason)
         const blocked = item.disabled || locked
         const reason = item.lockedReason ?? item.disabledReason

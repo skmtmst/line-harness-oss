@@ -256,4 +256,7 @@ html:root .withActions { display: flex; flex-direction: column; }
 html:root .actionRow > :is(button, a) { grid-row: 1; padding-inline: var(--polish-space-row); }
 .actionRow > :is([role='status'], [role='alert']) { grid-column: 1 / -1; }
 
+
+/* 通常の白いカードは影だけで浮かせ、枠の線を重ねない。 */
+html:root .card[data-card-variant='default']:not([data-card-frame]):not([data-card-surface]):not([data-appearance]):not(:focus-visible) { border: 0; outline-color: transparent; }
 html:root .card:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }

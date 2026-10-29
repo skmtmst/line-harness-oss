@@ -7,7 +7,7 @@ const ROW = '[data-toolbar-row],[data-control-row]'
 const CONTROL = [
   'button', 'select', 'a[href]', '[role="button"]', '[role="switch"]', '[role="combobox"]', '[aria-haspopup]',
   'input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"])',
-  '[data-search-field]', '[data-segmented-control]', '[data-entity-picker-field]',
+  '[data-choice-field]', '[data-search-field]', '[data-segmented-control]', '[data-entity-picker-field]',
 ].join(',')
 
 

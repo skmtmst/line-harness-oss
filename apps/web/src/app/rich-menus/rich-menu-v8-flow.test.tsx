@@ -285,7 +285,7 @@ describe('V8 リッチメニューの通し：作る→押す所→保存→既�
     const areaRow = await screen.findByRole('button', { name: /未設定/ })
     fireEvent.click(areaRow)
     fireEvent.click(await screen.findByRole('radio', { name: 'URLを開く', exact: true }))
-    const urlInput = await screen.findByPlaceholderText('https://...')
+    const urlInput = await screen.findByPlaceholderText('例：https://...')
     fireEvent.change(urlInput, { target: { value: 'https://example.com/menu' } })
     // 動きが付いた印に変わる。
     await waitFor(() => expect(screen.queryByText('未設定')).toBeNull())

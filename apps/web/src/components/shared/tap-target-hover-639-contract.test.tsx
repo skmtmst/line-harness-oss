@@ -44,8 +44,7 @@ describe('#639 主要操作の最小高さ 32px', () => {
   it('行内ボタン・チップ・ページネーションは 32px 以上を部品側で持つ', () => {
     // 行内アイコン操作 32px（Pencil K65Uhe・Ls12y・H0V8EK の寸法）。
     expect(readShared('row-actions.module.css')).toMatch(/\.action\s*\{[^}]*height:\s*32px/s)
-    // 一覧の絞り込み札 32px。
-    expect(readShared('filter-chip.css')).toMatch(/:root \.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
+    // 札の高さ・折り返しとタッチ44pxは shared-surface-layout の実描画で確かめる。
     // ページネーションは推奨 36px 以上（38px）。
     expect(readShared('pagination.module.css')).toMatch(/\.item\s*\{[^}]*height:\s*32px/s)
     // タブは 44px。

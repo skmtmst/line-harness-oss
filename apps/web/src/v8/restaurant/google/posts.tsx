@@ -10,7 +10,6 @@ const FIELD_REQUIREMENTS = {
   form_summary: requiredText("本文を入力してください。"),
 }
 
-import Toggle from '@/components/shared/toggle';
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -35,7 +34,7 @@ import { Field } from '@/components/shared/form-controls'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
@@ -689,7 +688,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             <div className={styles.igToggleRow}>
               {editable ? (
                 <>
-                  <SaveErrorField names={["igEnabled","form.igEnabled","ig_enabled","enabled","form.ig_enabled"]}><SettingCheckbox checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} /></SaveErrorField>
+                  <SaveErrorField names={["igEnabled","form.igEnabled","ig_enabled","enabled","form.ig_enabled"]}><Toggle checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} /></SaveErrorField>
                   <span className={styles.igToggleLabel}>Instagram にも投稿する</span>
                 </>
               ) : (

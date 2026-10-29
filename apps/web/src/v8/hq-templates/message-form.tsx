@@ -32,6 +32,7 @@ import styles from './console.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 
 /*
@@ -143,9 +144,9 @@ export default function MessageForm({
         {current.messageType === 'flex' || current.messageType === 'image' ? <Notice tone="warn" message={LEGACY_MESSAGE_NOTICE} /> : null}
         <h2 className={styles.editTitle}>ひな形の中身</h2>
         <div className={styles.twoCol}>
-          <Field label="ひな形の名前" requirement={fields?.requirement('name')}><SaveErrorField names={["name"]}><input aria-label="ひな形の名前" {...bindField('name', 'hq-msg-name')} className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} /></SaveErrorField>
+          <Field label="ひな形の名前" requirement={fields?.requirement('name')}><SaveErrorField names={["name"]}><SharedTextField aria-label="ひな形の名前" {...bindField('name', 'hq-msg-name')} className={styles.input} value={name} maxLength={200} disabled={disabled} onChange={(event) => onNameChange(event.target.value)} /></SaveErrorField>
 <FieldError id="hq-msg-name-error">{fields?.error('name')}</FieldError></Field>
-          <Field label="分類"><SaveErrorField names={["category","current.category"]}><input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} /></SaveErrorField></Field>
+          <Field label="分類"><SaveErrorField names={["category","current.category"]}><SharedTextField aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={disabled} onChange={(event) => onChange({ ...value, template: { ...current, category: event.target.value } })} /></SaveErrorField></Field>
         </div>
         <div className={styles.field}>
           <span className={styles.folderPick}>
@@ -168,7 +169,7 @@ export default function MessageForm({
               {image ? <TruncatedText className={styles.imageName} value={`${image.filename}・${image.width ?? emptyValue('unknown')}×${image.height ?? emptyValue('unknown')}`} /> : null}
             </div>
           )}
-          <Field label="タイトル"><SaveErrorField names={["title","card.title"]}><input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={(event) => updateCard({ ...card, title: event.target.value })} /></SaveErrorField></Field>
+          <Field label="タイトル"><SaveErrorField names={["title","card.title"]}><SharedTextField className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={(event) => updateCard({ ...card, title: event.target.value })} /></SaveErrorField></Field>
           <Field label="本文" requirement={fields?.requirement('body')}><SaveErrorField names={["body","card.body"]}><HqMessageBody value={card.body} label="配信する本文" max={card.format === 'flex'?2000:5000} readOnly={disabled} onChange={body=>updateCard({...card,body})}/></SaveErrorField>
 <FieldError id="hq-msg-body-error">{fields?.error('body')}</FieldError></Field>
           {card.format === 'flex' && (
@@ -177,7 +178,7 @@ export default function MessageForm({
               {referenceError && <Notice tone="warn" message={referenceError} action={<Button disabled={disabled} onClick={() => loadReferences()} busyLabel="処理中…">参照先を再読み込み</Button>} />}
               {card.buttons.map((button, index) => (
                 <div key={button.id} className={styles.buttonEdit} {...(fields ? fields.bind(`button-${button.id}`) : {})} aria-describedby={fields?.invalid(`button-${button.id}`) ? `hq-msg-button-${button.id}-error` : undefined}>
-                  <Field label="ボタンの文字" requirement={FIELD_REQUIREMENTS.button_label}><SaveErrorField names={[`buttons.${index}.label`,"label","button.label"]}><input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></SaveErrorField></Field>
+                  <Field label="ボタンの文字" requirement={FIELD_REQUIREMENTS.button_label}><SaveErrorField names={[`buttons.${index}.label`,"label","button.label"]}><SharedTextField className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={(event) => updateButton(button.id, { label: event.target.value })} /></SaveErrorField></Field>
                   <div className={styles.field}>
                     <span className={styles.smallLabel}>押したとき</span>
                     <SaveErrorField names={["button"]}><TapActionField allowExtras accountId={null} extrasError={fields?.error(`button-${button.id}`)}

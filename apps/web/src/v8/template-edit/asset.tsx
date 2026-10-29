@@ -35,7 +35,6 @@ import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
 import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
 import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { readInlineActions, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
@@ -54,6 +53,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /*
  * ★V8「クーポンを作る」・「リサーチを作る」。
@@ -542,7 +542,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <div className={styles.toggleRow}>
                 <span className={styles.toggleLabel}>抽選する</span>
                 <span className={styles.spacer} />
-                <SaveErrorField names={["lottery"]}><SettingCheckbox checked={lottery} label="抽選する" onChange={setLottery} /></SaveErrorField>
+                <SaveErrorField names={["lottery"]}><Toggle checked={lottery} label="抽選する" onChange={setLottery} /></SaveErrorField>
               </div>
               {lottery ? (
                 <SettingsFormRow layout="columns">
@@ -626,7 +626,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     <div className={styles.choiceRow} role="group" aria-label={`問 ${index + 1} の選択肢`} {...fields.bind(`qc-${question.key}`)} aria-describedby={fields.invalid(`qc-${question.key}`) ? `te-qc-${question.key}-error` : undefined}>
                       {question.choices.map((choice, choiceIndex) => (
                         <div key={choiceIndex} className={styles.choice} data-selected={choiceIndex === activeChoice(question) || undefined}>
-                          <SaveErrorField names={["choice"]}><input
+                          <SaveErrorField names={["choice"]}><SharedTextField
                             className={styles.choiceInput}
                             value={choice}
                             placeholder={`選択肢 ${choiceIndex + 1}`}

@@ -484,7 +484,9 @@ describe('V8 メッセージを作る：フォルダ・読み込めないとき�
     expect(screen.queryByRole('heading', { name: '本文の中のURL' })).toBeNull()
     type(screen.getByLabelText('本文'), '{{name}}さん、ご予約はこちら https://example.com/booking {{field.unknown_key}}')
     await flush()
-    expect(screen.getByRole('checkbox', { name: 'https://example.com/bookingを短縮して数える（いつもオン）' })).toBeTruthy()
+    const tracking = screen.getByRole('switch', { name: 'https://example.com/bookingを短縮して数える（いつもオン）' }) as HTMLButtonElement
+    expect(tracking.getAttribute('aria-checked')).toBe('true')
+    expect(tracking.disabled).toBe(true)
     const preview = host.querySelector('[data-template-region="preview"]')!
     expect(preview.textContent).toContain('山田 太郎さん、ご予約はこちら')
     expect(preview.textContent).toContain('値を確認できない差し込みがあります：{{field.unknown_key}}')

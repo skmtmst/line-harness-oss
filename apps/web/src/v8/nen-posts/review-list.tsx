@@ -27,6 +27,7 @@ import styles from './review.module.css'
 import { safePhotoSrc } from './src'
 import { mileStatusLabel,text } from './text'
 import { formatPhotoReceivedAt } from './time'
+import { ToggleField } from '@/components/shared/toggle'
 
 export type ReviewListV8Props = {
   accountId: string
@@ -362,8 +363,8 @@ export function RejectDialogV8({
 <FieldError id="photo-reject-note-error">{reasonFieldError}</FieldError></Field>
         {/* 絵に無い「次の投稿は人が見る」は、同じ行の右に小さく置く（行を増やさない）。 */}
         <div className={styles.checkLine}>
-          <SaveErrorField names={["resubmitInvite","resubmit_invite"]}><Checkbox checked={resubmitInvite} onCheckedChange={onResubmitInvite}>もう一度 送ってもらえるようお願いする</Checkbox></SaveErrorField>
-          <span className={styles.checkSub}><SaveErrorField names={["watchSubmitter","watch_submitter"]}><Checkbox checked={watchSubmitter} onCheckedChange={onWatchSubmitter}>この人の次の投稿は、必ず人が見る</Checkbox></SaveErrorField></span>
+          <SaveErrorField names={["resubmitInvite","resubmit_invite"]}><ToggleField checked={resubmitInvite} onChange={onResubmitInvite}>もう一度 送ってもらえるようお願いする</ToggleField></SaveErrorField>
+          <span className={styles.checkSub}><SaveErrorField names={["watchSubmitter","watch_submitter"]}><ToggleField checked={watchSubmitter} onChange={onWatchSubmitter}>この人の次の投稿は、必ず人が見る</ToggleField></SaveErrorField></span>
         </div>
         <div className={styles.fieldLabel}>
           <p className={styles.fieldTitle}>投稿者に届く内容</p>

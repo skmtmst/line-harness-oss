@@ -302,11 +302,12 @@ function buttonByText(text: string, scope: ParentNode = document): HTMLButtonEle
   ) as HTMLButtonElement | undefined
 }
 
-function checkboxByLabel(text: string): HTMLInputElement {
-  const input = Array.from(document.querySelectorAll('input[type="checkbox"]')).find(
-    (item) => item.closest('label')?.textContent?.includes(text),
-  ) as HTMLInputElement | undefined
-  expect(input, `チェック「${text}」`).toBeTruthy()
+function switchByLabel(text: string): HTMLButtonElement {
+  const input = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="switch"]')).find(item => {
+    const name = item.getAttribute('aria-label') ?? (item.getAttribute('aria-labelledby') ?? '').split(/\s+/).map(id => document.getElementById(id)?.textContent ?? '').join(' ')
+    return name.includes(text)
+  })
+  expect(input, `スイッチ「${text}」`).toBeTruthy()
   return input!
 }
 
@@ -349,18 +350,18 @@ describe('戻す約束の2チェック(#931 N-312)', () => {
     await act(async () => { openReject!.click() })
     await act(async () => { await Promise.resolve() })
 
-    const invite = checkboxByLabel('もう一度 送ってもらえるようお願いする')
-    const watch = checkboxByLabel('この人の次の投稿は、必ず人が見る')
+    const invite = switchByLabel('もう一度 送ってもらえるようお願いする')
+    const watch = switchByLabel('この人の次の投稿は、必ず人が見る')
     // 以前は disabled のまま押せず、表示の約束を果たせなかった。
     expect(invite.disabled).toBe(false)
     expect(watch.disabled).toBe(false)
-    expect(invite.checked).toBe(true)
-    expect(watch.checked).toBe(false)
+    expect((invite.getAttribute('aria-checked') === 'true')).toBe(true)
+    expect((watch.getAttribute('aria-checked') === 'true')).toBe(false)
 
     await act(async () => { invite.click() })
     await act(async () => { (document.querySelector('details.followup') ?? Array.from(document.querySelectorAll('details')).find((node) => node.textContent?.includes('次の投稿の確認方法')))?.setAttribute('open', ''); watch.click() })
-    expect(invite.checked).toBe(false)
-    expect(watch.checked).toBe(true)
+    expect((invite.getAttribute('aria-checked') === 'true')).toBe(false)
+    expect((watch.getAttribute('aria-checked') === 'true')).toBe(true)
 
     const confirm = buttonByText('見送る', document.querySelector('[role="alertdialog"]') as HTMLDivElement)
     expect(confirm).toBeTruthy()

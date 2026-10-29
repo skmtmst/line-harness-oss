@@ -18,6 +18,7 @@ import styles from './affiliates.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /*
  * 支払いのタブの窓。
@@ -213,7 +214,7 @@ export function PayoutStepUpDialog({
             : '銀行用 CSV には口座情報が入ります。認証アプリの 6 桁コードで本人確認したときだけ書き出せます。ファイルは 15 分で期限切れになります。'}
         </p>
         {usePassword ? (
-          <Field label="パスワード" htmlFor="affiliate-payout-step-up"><SaveErrorField names={["code"]}><input
+          <Field label="パスワード" htmlFor="affiliate-payout-step-up"><SaveErrorField names={["code"]}><SharedTextField
               id="affiliate-payout-step-up"
               type="password"
               value={code}

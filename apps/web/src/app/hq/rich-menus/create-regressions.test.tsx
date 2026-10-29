@@ -107,7 +107,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     await start()
     expect(screen.getAllByRole('button', { name: /^面 [A-F]、動きは/ })).toHaveLength(6)
     selectArea('A'); pickIntent('URLを開く')
-    fireEvent.change(screen.getByPlaceholderText('https://...'), { target: { value: 'https://example.com/booking' } })
+    fireEvent.change(screen.getByPlaceholderText('例：https://...'), { target: { value: 'https://example.com/booking' } })
     selectArea('B'); pickIntent('テキストを送る')
     fireEvent.change(screen.getByLabelText('このボタンの送る文'), { target: { value: '予約を確認する' } })
     await save()

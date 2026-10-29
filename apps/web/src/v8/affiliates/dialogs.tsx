@@ -20,6 +20,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /*
  * 紹介を止める・アーカイブの確かめ（AffiliateArchiveDialog）と、1人ぶんの支払いの確定
@@ -161,7 +162,7 @@ export function AffiliateArchiveDialog({
             ))}
           </RadioCardGroup></SaveErrorField>
 
-          <Field label={`確認のため「${target?.name ?? ''}」と打ってください`}><SaveErrorField names={["confirmationName","confirmation_name"]}><input
+          <Field label={`確認のため「${target?.name ?? ''}」と打ってください`}><SaveErrorField names={["confirmationName","confirmation_name"]}><SharedTextField
                 type="text"
                 aria-label={`確認のため「${target?.name ?? ''}」と打ってください`}
                 value={confirmationName}

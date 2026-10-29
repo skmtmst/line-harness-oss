@@ -11,7 +11,7 @@ import MessageInsertRow, { MessageInsertButton } from '@/components/shared/messa
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import HelpTip from '@/components/shared/help-tip'
 import { notifySaved } from '@/components/shared/toast'
 import { ecAutoLineApi } from '@/lib/api/helpers/gap3'
@@ -120,9 +120,9 @@ export default function EditDrawer({ accountId, rule, onClose, onSaved }: {
           </Field>
           <FixedBlock label="止める条件" help="この条件は、お客さまに迷惑をかけないよう、いつも守ります。変えられません。">
             <div className={styles.fixedList}>
-              <span className={styles.fixedRow}><SettingCheckbox checked locked label="買ったら送らない" />買ったら送らない</span>
-              <span className={styles.fixedRow}><SettingCheckbox checked locked label="同じ商品は 30 日に 1 回だけ" />同じ商品は 30 日に 1 回だけ</span>
-              <span className={styles.fixedRow}><SettingCheckbox checked locked label="宣伝を止めている人・ブロックした人には送らない" />宣伝を止めている人・ブロックした人には送らない</span>
+              <span className={styles.fixedRow}><Toggle checked locked label="買ったら送らない" />買ったら送らない</span>
+              <span className={styles.fixedRow}><Toggle checked locked label="同じ商品は 30 日に 1 回だけ" />同じ商品は 30 日に 1 回だけ</span>
+              <span className={styles.fixedRow}><Toggle checked locked label="宣伝を止めている人・ブロックした人には送らない" />宣伝を止めている人・ブロックした人には送らない</span>
             </div>
           </FixedBlock>
           <FixedBlock label="1 人の上限"><p className={styles.subtle}>1 日に 1 通・1 週間に 3 通まで（変えられません）</p></FixedBlock>

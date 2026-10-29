@@ -104,9 +104,9 @@ describe('R84 一括追加の窓は増えても操作できる', () => {
 
   it('時間帯を同じ長さに分けると、既存の分割計算で全パターンを生成する', async () => {
     const { onSubmit } = await renderDialog()
-    const checkbox = [...document.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')][0]
+    const checkbox = [...document.querySelectorAll<HTMLInputElement>('[role="switch"]')][0]
     await act(async () => { checkbox.click() })
-    expect(checkbox.checked).toBe(true)
+    expect((checkbox.getAttribute('aria-checked') === 'true')).toBe(true)
     await act(async () => { button('生成').click() })
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ time_patterns: [{ start: '14:00', end: '15:30' }, { start: '15:30', end: '17:00' }] }))
   })

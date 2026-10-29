@@ -8,7 +8,7 @@ export function fitSelectContent(root) {
   if (!textWidth) return
   const css = getComputedStyle(trigger)
   const number = value => parseFloat(value) || 0
-  const icons = [...trigger.children].filter(child => child !== value && child.getBoundingClientRect().width > 0)
+  const icons = [...trigger.children].filter(child => child !== value && !['absolute', 'fixed'].includes(getComputedStyle(child).position) && child.getBoundingClientRect().width > 0)
   const width = Math.ceil(textWidth + icons.reduce((sum, icon) => sum + icon.getBoundingClientRect().width, 0)
     + number(css.columnGap) * icons.length + number(css.paddingLeft) + number(css.paddingRight)
     + number(css.borderLeftWidth) + number(css.borderRightWidth))

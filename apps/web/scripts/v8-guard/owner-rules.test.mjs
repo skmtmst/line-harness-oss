@@ -581,3 +581,19 @@ test('押せない薄いボタン（aria-disabled=true）は数えず、有効�
     assert.ok(findings.every(f => f.text === '外す'))
   } finally { await browser.close() }
 })
+
+test('1 つの操作の段で高さが違う操作が並ぶと落ち、36px にそろえれば通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><div data-control-row style="display:flex;gap:8px;align-items:center"><button id="prev" style="height:32px">‹</button><button style="height:36px">今日</button><div data-segmented-control role="group" style="height:36px;display:flex"><button style="height:32px">時間</button><button style="height:32px">月</button></div><button aria-haspopup="listbox" style="height:36px">担当：すべて</button></div></main>')
+    const broken = await page.evaluate(scanRowHeights)
+    assert.equal(broken.length, 1)
+    assert.equal(broken[0].kind, 'rowheight')
+    assert.deepEqual(broken[0].measure.heights, [32, 36, 36, 36])
+    await page.locator('#prev').evaluate((el) => { el.style.height = '50px' })
+    assert.equal((await page.evaluate(scanRowHeights)).length, 1)
+    await page.locator('#prev').evaluate((el) => { el.style.height = '36px' })
+    assert.deepEqual(await page.evaluate(scanRowHeights), [])
+  } finally { await browser.close() }
+})

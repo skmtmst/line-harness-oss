@@ -437,3 +437,5 @@ html:root .button[data-permission-locked], html:root .button[data-permission-loc
   line-height: 1;
   font-weight: var(--font-weight-bold);
 }
+/* 同じ操作の段では、部品の小型指定より共通の高さを優先する。 */
+html:root :is([data-toolbar-row], [data-control-row]) .button { height: var(--control-h); min-height: var(--control-h); }

@@ -261,7 +261,7 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
     await openNotificationsPane()
 
     /* 6通知のON・時刻変更の身代わり。未保存の印が固定バーに出る。 */
-    await act(async () => { fireEvent.click(host.querySelector('input[type="checkbox"]')!) })
+    await act(async () => { fireEvent.click(host.querySelector('[role="switch"]')!) })
     await flush()
     expect(host.textContent).toContain('保存していない変更があります')
 
@@ -282,7 +282,7 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
 
   it('「保存せずに移る」を選んだときだけ入力を捨てて一覧へ遷移する', async () => {
     await openNotificationsPane()
-    await act(async () => { fireEvent.click(host.querySelector('input[type="checkbox"]')!) })
+    await act(async () => { fireEvent.click(host.querySelector('[role="switch"]')!) })
     await flush()
 
     await act(async () => { listLink().click() })
@@ -295,7 +295,7 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
 
   it('通知を保存してから一覧リンクを押すと確認は出ない', async () => {
     await openNotificationsPane()
-    await act(async () => { fireEvent.click(host.querySelector('input[type="checkbox"]')!) })
+    await act(async () => { fireEvent.click(host.querySelector('[role="switch"]')!) })
     await flush()
 
     /* 固定バーの「下書き保存」は通知の保存を呼ぶ。成功で未保存の印が降りる。 */
@@ -314,10 +314,10 @@ describe('Issue #1060 pane内の戻ると公開後の遷移では離脱確認を
     fixture.params = new URLSearchParams('id=webinar-1&pane=notifications')
     await render()
     await flush()
-    await act(async () => { fireEvent.click(host.querySelector('input[type="checkbox"]')!) })
+    await act(async () => { fireEvent.click(host.querySelector('[role="switch"]')!) })
     await flush()
     expect(host.textContent).toContain('保存していない変更があります')
-    expect(host.querySelector('input[type="checkbox"]')?.closest('[hidden]')).toBeNull()
+    expect(host.querySelector('[role="switch"]')?.closest('[hidden]')).toBeNull()
   }
 
   function beforeUnload() {
@@ -339,7 +339,7 @@ describe('Issue #1060 pane内の戻ると公開後の遷移では離脱確認を
     /* 画面内の移動なので履歴を戻さず、確認も出さない。通知の段は畳まれる。 */
     expect(go).not.toHaveBeenCalled()
     expect(host.querySelector('[role="dialog"]')).toBeNull()
-    expect(host.querySelector('input[type="checkbox"]')?.closest('[hidden]')).not.toBeNull()
+    expect(host.querySelector('[role="switch"]')?.closest('[hidden]')).not.toBeNull()
     /* 未保存の入力と印はそのまま残る。 */
     expect(host.textContent).toContain('保存していない変更があります')
   })

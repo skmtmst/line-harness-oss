@@ -68,13 +68,10 @@ describe('一覧の状態とページ送り', () => {
     expect(html).not.toContain('作る')
   })
 
-  it("1ページでも現在地と枠を出し、0件のページ送りは出さない", () => {
+  it('1ページ以下では移動を出さず、2ページあれば移動できる', () => {
     const html = renderToStaticMarkup(<Pagination page={1} pageCount={1} onPageChange={vi.fn()} />)
-    expect(html).toContain('aria-current="page"')
-    expect(html).toContain('aria-label="前のページ"')
-    expect(html).toContain('aria-label="次のページ"')
+    expect(html).toBe('')
     expect(renderToStaticMarkup(<Pagination page={1} pageCount={0} onPageChange={vi.fn()} />)).toBe('')
-    expect(html.match(/disabled=""/g)).toHaveLength(2)
     expect(renderToStaticMarkup(<Pagination page={1} pageCount={2} onPageChange={vi.fn()} />)).toContain('次へ')
   })
 

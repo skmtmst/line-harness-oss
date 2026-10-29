@@ -28,7 +28,7 @@ import LinePreview, { LinePreviewMessage, LinePreviewFlex as FlexPreview } from 
 import Notice from '@/components/shared/notice'
 import FolderSelect, { folderById, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { LEGACY_MESSAGE_NOTICE } from '@/components/templates/message-template-editor'
 import { buildTemplatePreview, extractMessageUrls } from '../../components/templates/template-preview-model'
 import { ACCOUNT_MISMATCH_MESSAGE, EMPTY_REFERENCES, TEMPLATE_LOAD_FAILED_MESSAGE, conflictTime, describeTemplateDiff, draftFromDetail, isTemplateDetailData, loadTemplateReferences, newTemplateEditorState, requestTemplateReferences, resolveEditorAccountId, saveTemplateEdit, validateTemplateSave, templateAccountMismatch, templateSaveGuard, templateUsageEntries, type TemplateAccountBinding, type TemplateDraft, type TemplateEditorState, type TemplateReferenceState, type TemplateReferences } from './core'
@@ -600,22 +600,24 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               <TemplateAccountNotice binding={binding} templateAccountLabel={accountName(editor.templateAccountId)} selectedAccountLabel={accountName(selectedAccountId)} />
             </Card>
 
-            {urls.length === 0 ? (
-              <p className={styles.hint}>URLを入れると、リンクごとの設定がここに出ます。</p>
-            ) : (
-              <Card variant="form" gap="normal">
-                <CardHeader size="stacked" title="本文の中のURL" />
-                {urls.map((url) => (
-                  <div key={url} className={styles.urlRow}>
-                    <Link2 size={16} aria-hidden="true" className={styles.urlIcon} />
-                    <span className={styles.urlText} ><TruncatedText value={String(url ?? '')} url /></span>
-                    <span className={styles.urlNote}>短縮して、押された数を数える</span>
-                    <SettingCheckbox checked locked label={`${url}を短縮して数える（いつもオン）`} />
-                  </div>
-                ))}
-                <p className={styles.hint}>リンク名（計測に出る名前）と短縮URLは、配信のときに自動で付きます。</p>
-              </Card>
-            )}
+            <Card variant="form" gap="normal">
+              <CardHeader size="stacked" title="本文の中のURL" />
+              {urls.length === 0 ? (
+                <p className={styles.cardNote}>本文にURLはありません。URLを書くと、送るときに短く書き換えて、押された数を数えます。</p>
+              ) : (
+                <>
+                  {urls.map((url) => (
+                    <div key={url} className={styles.urlRow}>
+                      <Link2 size={16} aria-hidden="true" className={styles.urlIcon} />
+                      <span className={styles.urlText} ><TruncatedText value={String(url ?? '')} url /></span>
+                      <span className={styles.urlNote}>短縮して、押された数を数える</span>
+                      <Toggle checked locked label={`${url}を短縮して数える（いつもオン）`} />
+                    </div>
+                  ))}
+                  <p className={styles.hint}>リンク名（計測に出る名前）と短縮URLは、配信のときに自動で付きます。</p>
+                </>
+              )}
+            </Card>
           </>
         )}
       </TemplateEditFrame>

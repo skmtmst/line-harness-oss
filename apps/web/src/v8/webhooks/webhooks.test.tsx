@@ -184,12 +184,12 @@ describe('外部連携 V8', () => {
     }
   })
 
-  it('やり取りの記録は1ページでも件数とページ送りを同じ帯に出す', async () => {
+  it('やり取りの記録は1ページは件数だけを帯に出す', async () => {
     await render(<WebhooksInteractionsV8 />)
-    const pager = within(host).getByRole('navigation', { name: 'やり取りの記録のページ送り' })
+    const pager = host.querySelector('[data-pagination]')!
     expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('1件中 1〜1件')
-    expect(within(pager).getByRole('button', { name: '前のページ' }).hasAttribute('disabled')).toBe(true)
-    expect(within(pager).getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
+    expect(within(pager as HTMLElement).queryByRole('button', { name: '前のページ' })).toBeNull()
+    expect(within(pager as HTMLElement).queryByRole('button', { name: '次のページ' })).toBeNull()
     expect(within(host).getByRole('button', { name: '表示件数' }).closest('[data-template-region="toolbar"]')).not.toBeNull()
   })
 

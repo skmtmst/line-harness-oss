@@ -47,6 +47,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /*
  * ★V8 流入と計測の詳細（Pencil ）。
@@ -455,7 +456,7 @@ function InflowDetailContent() {
       {copyFailed && url ? (
         <div role="alert" className={styles.copyFallback}>
           <p className={styles.note}>コピーできませんでした。下の欄を選んでコピーしてください。</p>
-          <SaveErrorField names={["url"]}><input
+          <SaveErrorField names={["url"]}><SharedTextField
             readOnly
             autoFocus
             value={url}
