@@ -232,3 +232,4 @@ html:root .inlineGrip:not(:has(svg)) {
 
 /* 権限の操作は焦点を保ち、入力不足と区別できる灰色にする。 */
 html:root .quickAction[data-permission-locked] { background: var(--color-canvas-sunken); color: var(--color-ink-faint); opacity: var(--polish-disabled-opacity); cursor: not-allowed; filter: none; scale: none; }
+html:root .permissionGrip { color: var(--color-ink-faint); opacity: var(--polish-disabled-opacity); cursor: not-allowed; }
