@@ -1030,6 +1030,7 @@ function LineNotificationsPage() {
       unit={kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
       valueTextWithUnit
       detail={kpi.note || null}
+      detailLayout={kpi.label === '今日 送った' ? 'single' : undefined}
       valueTone={kpi.label === '送れなかった' && typeof kpi.value === 'number' && kpi.value > 0 ? 'warning' : 'default'}
       loading={loadState === 'loading'}
       action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '見る', href: kpi.href } : undefined}
