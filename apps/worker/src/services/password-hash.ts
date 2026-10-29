@@ -12,8 +12,8 @@ const ITERATIONS = 100_000;
 const SALT_BYTES = 16;
 const HASH_BITS = 256;
 
-/** 8 文字以上・128 文字以内・英字と数字を両方含む（設計 36-4「8文字以上・英数」）。 */
-export const PASSWORD_MIN_LENGTH = 8;
+/** 新規設定と再設定に適用する条件。既存ハッシュのログイン検証には適用しない。 */
+export const PASSWORD_MIN_LENGTH = 13;
 export const PASSWORD_MAX_LENGTH = 128;
 
 export function validatePasswordPolicy(password: string): string | null {
@@ -21,7 +21,10 @@ export function validatePasswordPolicy(password: string): string | null {
   if (password.length < PASSWORD_MIN_LENGTH) return `パスワードは${PASSWORD_MIN_LENGTH}文字以上で入力してください`;
   if (password.length > PASSWORD_MAX_LENGTH) return `パスワードは${PASSWORD_MAX_LENGTH}文字以内で入力してください`;
   if (/\s/.test(password)) return 'パスワードに空白は使えません';
-  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) return 'パスワードは英字と数字の両方を含めてください';
+  if (!/[A-Z]/.test(password)) return 'パスワードは英大文字を1文字以上含めてください';
+  if (!/[a-z]/.test(password)) return 'パスワードは英小文字を1文字以上含めてください';
+  if (!/[0-9]/.test(password)) return 'パスワードは数字を1文字以上含めてください';
+  if (!/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(password)) return 'パスワードは特殊記号を1文字以上含めてください';
   return null;
 }
 

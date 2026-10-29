@@ -31,13 +31,17 @@ describe('ログイン前の画面（0-1／36-4／36-6）', () => {
     // 認証後の画面とnonceの受け渡しは login-remember-setup-react.test.tsx で実操作する。
   })
 
-  it('登録の 1 歩目はメールだけ。Turnstile と同意があり、印（deviceMarker）を送る', () => {
+  it('登録の 1 歩目は会社・担当者・連絡先・きっかけを送る。Turnstile と同意がある', () => {
     const page = read('app/register/page.tsx')
     expect(page).toContain("node=\"JBd7P\"")
     expect(page).toContain('/api/auth/register/request')
     expect(page).toContain('<Turnstile')
     expect(page).toContain('readDeviceMarker()')
     expect(page).toContain('agreed: true')
+    expect(page).toContain('companyName: companyName.trim()')
+    expect(page).toContain('contactName: contactName.trim()')
+    expect(page).toContain('phone: phone.trim()')
+    expect(page).toContain('referralSource')
     expect(page).not.toContain('autoComplete="new-password"')
     // 入れたメールは URL に載せない
     expect(page).toContain('rememberSignupEmail(')
