@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
 import Step2Connect, { type Step2Field } from './step2-connect'
@@ -41,6 +41,31 @@ function urlFrame() {
 }
 
 describe('②Step2 の Webhook URL の枠は承認済み v07 どおり', () => {
+  it('表示とコピーが同じチャネル専用URLになる', async () => {
+    const previousApiUrl = process.env.NEXT_PUBLIC_API_URL
+    const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    const copied: string[] = []
+    process.env.NEXT_PUBLIC_API_URL = 'https://stg-api.musubo.jp'
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: async (value: string) => { copied.push(value) } },
+    })
+    try {
+      const view = render(
+        <Step2Connect sub={2} badge="Step 2 / 3" values={{ ...VALUES, channelId: '2001234567' }} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,
+      )
+      const expected = 'https://stg-api.musubo.jp/webhook/2001234567'
+      expect(view.container.querySelector('[data-design-node="Ds3E2"]')?.textContent).toContain(expected)
+      fireEvent.click(view.getByRole('button', { name: 'Webhook URL をコピー' }))
+      await waitFor(() => expect(copied).toEqual([expected]))
+    } finally {
+      if (previousApiUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL
+      else process.env.NEXT_PUBLIC_API_URL = previousApiUrl
+      if (previousClipboard) Object.defineProperty(navigator, 'clipboard', previousClipboard)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
   it('左右別々の余白として渡せている（潰れて 0 に落ちない）', () => {
     // これが無いと共通の下限16の規則に当たり、max に2値が入って padding が 0 になる。
     expect(urlFrame().hasAttribute('data-card-spacing-sides')).toBe(true)
