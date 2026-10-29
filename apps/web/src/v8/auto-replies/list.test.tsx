@@ -7,6 +7,9 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -92,6 +95,7 @@ const ruleA = {
 const ruleB = { ...ruleA, id: 'ar-2', name: '予約変更のお問い合わせ', keyword: '予約', responseContent: 'ご予約を承ります', isActive: false, lifecycleStatus: 'stopped' }
 
 beforeEach(() => {
+  verifiedStaffRole('owner'); forgetSessionSnapshot()
   window.history.replaceState(null, '', '/auto-replies')
   document.documentElement.dataset.theme = 'v8'
   listReplies.mockImplementation(async () => ({ success: true, data: [ruleA, ruleB] }))
@@ -105,6 +109,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount())
+  forgetStaffIdentity(); forgetSessionSnapshot()
   host.remove()
   delete document.documentElement.dataset.theme
 })
