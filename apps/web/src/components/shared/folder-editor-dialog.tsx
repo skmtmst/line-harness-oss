@@ -57,10 +57,11 @@ type Props = FolderNameColorFieldsProps & Pick<ComponentProps<typeof Dialog>, 'o
   footer?: ReactNode
   confirmIcon?: ReactNode
   confirmTitle?: string
+  confirmLockedReason?: string
 }
 
 /**  の低い窓。保存先やエラー処理は画面が持ち、形はここに集約する。 */
-export default function FolderEditorDialog({ name, nameError, nameRef, onNameChange, color, onColorChange, colors = FOLDER_SELECT_COLORS, allowClear, disabled, nameId, nameLabel, placeholder, maxLength, children, footer, confirmIcon, confirmTitle, confirmLabel = '追加する', cancelLabel = 'キャンセル', onConfirm, busy, confirmDisabled, error, ...dialog }: Props) {
+export default function FolderEditorDialog({ name, nameError, nameRef, onNameChange, color, onColorChange, colors = FOLDER_SELECT_COLORS, allowClear, disabled, nameId, nameLabel, placeholder, maxLength, children, footer, confirmIcon, confirmTitle, confirmLockedReason, confirmLabel = '追加する', cancelLabel = 'キャンセル', onConfirm, busy, confirmDisabled, error, ...dialog }: Props) {
   /*
    * 失敗の知らせは窓の本文の中（名前と色の下）に置く。窓の下の帯（やめる・保存する）とは本文の余白で離れ、
    * 知らせが増えたぶん窓が下へ伸びる（2026-10-09 オーナー：知らせがボタンに重なっていた）。
@@ -68,14 +69,14 @@ export default function FolderEditorDialog({ name, nameError, nameRef, onNameCha
   return <Dialog {...dialog} title={normalizeActionLabel(dialog.title)} headerIcon={<Folder />} busy={busy} designWidth={560} designHeaderPadding="24px 24px 0"
     footer={<div className={styles.footer} data-dialog-actions>{footer ?? <>
       <Button type="button" data-dialog-action="secondary" onClick={dialog.onCancel} disabled={busy}>{cancelLabel}</Button>
-      <Button type="button" variant="primary" onClick={onConfirm} title={confirmTitle}
+      <Button type="button" variant="primary" onClick={onConfirm} title={confirmTitle} lockedReason={confirmLockedReason}
         disabled={busy || confirmDisabled || !name.trim()} busy={busy}>{confirmIcon}{confirmLabel}</Button>
     </>}</div>}>
     <div className={styles.body}>
       {children}
       <FolderNameColorFields name={name} nameError={nameError} nameRef={nameRef} onNameChange={onNameChange} color={color} onColorChange={onColorChange}
         colors={colors} allowClear={allowClear} disabled={disabled || busy} nameId={nameId} nameLabel={nameLabel}
-        placeholder={placeholder} maxLength={maxLength} onSubmit={confirmDisabled ? undefined : onConfirm} />
+        placeholder={placeholder} maxLength={maxLength} onSubmit={confirmDisabled || confirmLockedReason ? undefined : onConfirm} />
       {error ? <Notice className={styles.error} tone="danger" role="alert" data-folder-dialog-error="">
         {error}
       </Notice> : null}
