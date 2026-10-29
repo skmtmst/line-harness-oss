@@ -1300,9 +1300,10 @@ export default function RichMenusListV8() {
             title="いちばん押された"
             icon={<Trophy size={16} aria-hidden="true" />}
             value={topArea?.taps ?? null}
+            primaryText={topArea ? topArea.label || '名前のないボタン' : undefined}
             unit="回"
             detail={topArea
-              ? `${topAreaGroupName ? `${topAreaGroupName}・` : ''}${topArea.label || '名前のないボタン'}`
+              ? `${topAreaGroupName ? `${topAreaGroupName}・` : ''}${topArea.taps.toLocaleString('ja-JP')} 回`
               : tapKpiReady
                 ? (tapStats?.total ?? 0) > 0
                   ? '内訳はまだ集まっていません'
