@@ -19,6 +19,7 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import { Send } from 'lucide-react'
 import Link from 'next/link'
 import type { Dispatch,SetStateAction } from 'react'
+import { useId } from 'react'
 import styles from './broadcast-form-v8.module.css'
 import TextLink from '@/components/shared/text-link'
 
@@ -50,6 +51,8 @@ type BroadcastAudienceStepContext = {
 }
 
 export function BroadcastAudienceStep({ audienceDisplayCount, audienceNotice, condition, excludeTagId, exclusionNote, onRetryTags, openConditionDialog, preflight, preflightStatus, runPreflight, scenarioId, scenarios, scenariosStatus, selectedAccountId, setCondition, setExcludeTagId, setScenarioId, setTagId, setTargetMode, shows, tagId, tags, tagsStatus, targetMode }: BroadcastAudienceStepContext) {
+  // 押せない除外の理由（form-action-reason）は、見える文を aria-describedby で結ぶ。
+  const recentExclusionNoteId = useId()
   return (<section id="broadcast-step-audience" className={shows('audience') ? styles.section : 'hidden'}>
           <h3>配信対象</h3>
           <SaveErrorField names={["broadcast-target-mode","value","mode.value","targetMode"]}><RadioCardGroup legend="配信対象" className={styles.audienceCards}>
@@ -175,8 +178,8 @@ export function BroadcastAudienceStep({ audienceDisplayCount, audienceNotice, co
           <BroadcastBlockedExclusion />
           <label className={styles.excludeTag}><span className={styles.labelRow}>除くタグ <span className="text-xs text-ink-faint">任意</span></span><SaveErrorField names={["excludeTagId","exclude_tag_id"]}><EntitySelect kind="tag" aria-label="除くタグ" value={excludeTagId} onChange={setExcludeTagId} disabled={tagsStatus !== 'ready'} options={[{ value: '', label: '除外なし' }, ...tags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))]} size="full" /></SaveErrorField></label>
           <div className={styles.exclusion}>
-            <Checkbox checked={false} onCheckedChange={() => {}} disabled>この1週間に送った人を除く</Checkbox>
-            <small>最近送った人を除く機能は、まだ使えません</small>
+            <Checkbox checked={false} onCheckedChange={() => {}} disabled aria-describedby={recentExclusionNoteId}>この1週間に送った人を除く</Checkbox>
+            <small id={recentExclusionNoteId}>最近送った人を除く機能は、まだ使えません</small>
           </div>
           <div className={styles.audienceCount} aria-live="polite"><span><Send size={16} aria-hidden /> この条件で送る人数</span><strong className={audienceDisplayCount === 0 ? 'text-danger' : preflightStatus === 'error' ? 'text-warning' : ''}>{audienceDisplayCount !== null ? `${formatNumber(audienceDisplayCount)}人` : preflightStatus === 'loading' ? '数えています…' : '—人'}</strong></div>
           {audienceDisplayCount === 0 ? <Notice tone="warn" role="alert">この条件に当てはまる友だちがいません。条件を変えてください</Notice> : preflightStatus === 'error' ? <Notice tone="warn" action={<Button size="compact" onClick={() => void runPreflight()}>もう一度数える</Button>}>人数を数えられませんでした。送る前にもう一度数えてください</Notice> : preflightStatus === 'idle' ? <p className="text-xs text-ink-faint">対象とメッセージを入力すると人数を数えます</p> : null}

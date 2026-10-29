@@ -936,3 +936,4 @@
 - [登録画面の補足文の削除](release-log/unreleased/1947-masato-registration-hints.md) — 確定済みの3項目の補足文を外した修正履歴。
 - [設定の画面のお知らせとカードの間隔](release-log/unreleased/1948-kenta-muse-settings-gap.md) — お知らせとカードの間の空きをそろえた修正履歴。
 - [本線の見張りの赤の修正](release-log/unreleased/1948-kenta-muse-guard-reds.md) — 言葉・CSS・確認窓の見張り9件の赤を直した反映履歴。
+- [押せない理由の表示](release-log/unreleased/0000-kenta-muse-fqa-table.md) — 閲覧のみの帯と除外の理由結び付けの反映履歴。
