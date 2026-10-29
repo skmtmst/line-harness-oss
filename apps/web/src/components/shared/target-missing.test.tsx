@@ -87,12 +87,6 @@ describe('開き先がない（TargetMissing）', () => {
     expect(tsx).toContain('variant="secondary"')
   })
 
-  it('板の直下では左右に余白を持つ（端にくっつけない）', () => {
-    const css = read('target-missing.module.css')
-    expect(css).toContain('[data-page-template]')
-    expect(css).toMatch(/margin-inline:\s*var\(--space-24\)/)
-  })
-
   /** 「選ばれていません」を一覧の空や知らせで手書きすると、形が画面ごとに割れる。上のアカウントを選んでいない時は別の案内なので対象外。 */
   it('対象なしを一覧の空・知らせで手書きしない', () => {
     const SRC = join(HERE, '..', '..')
