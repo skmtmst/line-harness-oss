@@ -902,3 +902,4 @@
 - [畳んだ初期案内の設定表示](release-log/unreleased/1916-kenta-onboarding-fold.md) — 後回しの設定と進みを確認する反映履歴。
 - [自動処理のシナリオ・共通アクション未選択表示](release-log/unreleased/1916-kenta-muse-automation-unselected.md) — 未選択と設定済みの区別の反映履歴。
 - [友だち引き継ぎの進捗表示](release-log/unreleased/1914-masato-follower-handover-progress.md) — Penに合わせた動的な進捗画面の反映履歴。
+- [友だち引き継ぎの再開と進捗表示](release-log/unreleased/1915-masato-follower-import-resume.md) — 引き継ぎ完了前の入口と進捗表示の反映履歴。
