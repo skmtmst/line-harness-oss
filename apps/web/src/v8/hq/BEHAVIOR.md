@@ -35,7 +35,7 @@
 - お問い合わせ：`GET /api/hq/support/context`・`GET /api/hq/support/requests`。やり取り：`GET /api/hq/support/requests/:id` と、送信者・一覧・店舗名のために `staff/me`・`tenants/me`・`requests`・`context`。
 
 ## 書き込み（今までと同じ口・同じ形）
-- ホーム：接続情報の更新（各アカウントへ `POST /api/line-accounts/:id/connection-checks`、`Idempotency-Key`・`expectedRevision`）・タグの追加（色つき）・タグの削除（確認の窓を挟む）・設定の窓（名前・親・タグの付け替え）・アーカイブ／戻す（6桁の本人確認 `line_account.archive`）。
+- ホーム：接続情報の更新（各アカウントへ `POST /api/line-accounts/:id/connection-checks`、`Idempotency-Key`・`expectedRevision`）・タグの追加（色つき）・タグの削除（確認の窓を挟む）・設定の窓（名前・フォルダの付け替え。未使用の親アカウントは表示・変更しない）・アーカイブ／戻す（6桁の本人確認 `line_account.archive`）。
 - メンバー：招待（`api.staff.create`）・変更（確認の窓 `M4jS9` を挟んで `api.staff.update`、`STEP_UP_REQUIRED` は本人確認してやり直す）・招待メールの再送。
 - 請求：申込（Stripe Checkout へ）・支払い方法の管理（ポータルへ）。
 - お問い合わせ：送信（添付は PNG・JPEG 3枚まで）・続きを送る。
