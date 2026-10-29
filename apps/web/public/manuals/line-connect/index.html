@@ -1,122 +1,52 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>musubo LINE接続マニュアル</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&display=swap">
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="musuboのLINE公式アカウント接続を、現在の4ステップに沿って案内します。">
+<title>LINE公式アカウント接続ガイド | musubo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--canvas:#ffffff;--ground:#f7f7f5;--ink:#1d1d1f;--ink-2:#4a5565;--ink-3:#5f6570;--hair:#dadde2;--accent:#087a3e;--accent-soft:#e8f8ee;--warn-soft:#fff7e6;--warn-deep:#a15c00;--info:#175cd3;--info-soft:#e9f1ff;--red:#e5484d;color-scheme:light}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--canvas:#1c1d1f;--ground:#141516;--ink:#f0f0f2;--ink-2:#c3c7ce;--ink-3:#9aa0a8;--hair:#33363b;--accent:#4fca86;--accent-soft:#163a27;--warn-soft:#3a2d12;--warn-deep:#f0c070;--info:#8ab4ff;--info-soft:#1c2a44;color-scheme:dark}}
-:root[data-theme="dark"]{--canvas:#1c1d1f;--ground:#141516;--ink:#f0f0f2;--ink-2:#c3c7ce;--ink-3:#9aa0a8;--hair:#33363b;--accent:#4fca86;--accent-soft:#163a27;--warn-soft:#3a2d12;--warn-deep:#f0c070;--info:#8ab4ff;--info-soft:#1c2a44;color-scheme:dark}
-body{margin:0;background:var(--ground);color:var(--ink);font-family:"Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;font-size:15px;line-height:1.7;padding-block:24px 64px;padding-inline:16px}
-.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
-h1{font-size:22px;margin:0;font-weight:700;text-wrap:balance}
-.lead{color:var(--ink-2);margin:0;font-size:14px}
-nav.tabs{display:flex;flex-wrap:wrap;gap:8px}
-nav.tabs a{display:block;padding:8px 12px;border:1px solid var(--hair);border-radius:8px;background:var(--canvas);color:var(--ink);text-decoration:none;font-size:13px;font-weight:600}
-nav.tabs a:hover{border-color:var(--accent)}
-nav.tabs a:focus-visible{outline:2px solid var(--info);outline-offset:2px}
-a:focus-visible{outline:2px solid var(--info);outline-offset:2px}
-section.card{background:var(--canvas);border:1px solid var(--hair);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:14px;scroll-margin-top:16px}
-section.card h2{font-size:18px;margin:0;font-weight:700}
-section.card h3{font-size:15px;margin:8px 0 0;font-weight:700;color:var(--ink)}
-.desc{color:var(--ink-2);font-size:13px;margin:0}
-ol.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
-ol.steps li{display:flex;gap:10px;align-items:flex-start}
-ol.steps li>div{flex:1;min-width:0}
-.n{flex:none;width:24px;height:24px;border-radius:9999px;background:#b3261e;color:#fff;font-weight:700;font-size:13px;display:inline-flex;align-items:center;justify-content:center;margin-top:3px}
-figure{margin:0;border:1px solid var(--hair);border-radius:8px;overflow:hidden;background:#fff}
-figure img{display:block;width:100%;height:auto;max-width:100%}
-.note{margin:0;padding:10px 12px;border-radius:8px;font-size:13px}
-.note.warn{background:var(--warn-soft);color:var(--warn-deep)}
-.note.info{background:var(--info-soft);color:var(--info)}
-.note.ok{background:var(--accent-soft);color:var(--accent)}
-code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;background:var(--ground);border:1px solid var(--hair);border-radius:4px;padding:0 5px}
-.kv{display:grid;grid-template-columns:max-content 1fr;gap:6px 12px;font-size:13px;margin:0}
-.kv dt{color:var(--ink-3)}.kv dd{margin:0}
-.sub{color:var(--ink-3);font-size:12px}
-a{color:var(--info)}
-.pill{display:inline-block;border:1px solid var(--hair);border-radius:9999px;padding:1px 10px;font-size:12px;color:var(--ink-2);background:var(--canvas)}
+:root{color-scheme:light;--paper:#f8f8f4;--sheet:#fff;--ink:#222924;--muted:#546059;--line:#dadfd8;--green:#087a3e;--green-light:#eaf6ed;--red:#d34b40;--amber:#fff4db}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;padding:0 22px 64px;background:var(--paper);color:var(--ink);font:500 15px/1.8 "Noto Sans JP","Hiragino Sans",sans-serif}
+a{color:var(--green);text-underline-offset:3px}a:focus-visible{outline:3px solid var(--green);outline-offset:3px}.page{max-width:1100px;margin:auto}
+.hero{padding:45px 0 31px;border-bottom:2px dashed #c6d8c9}.eyebrow{margin:0 0 9px;color:var(--green);font-size:12px;font-weight:800;letter-spacing:.12em}
+h1{margin:0;font-size:clamp(27px,4vw,41px);line-height:1.4;letter-spacing:-.04em}.underline{text-decoration:underline;text-decoration-color:#a7d7ae;text-decoration-thickness:7px;text-underline-offset:6px}.hero .lead{max-width:760px;margin:19px 0 0;color:var(--muted)}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin:25px 0 29px}.flow a{display:flex;gap:9px;align-items:flex-start;min-height:77px;padding:11px;border:1.5px solid var(--line);border-radius:13px 15px 12px 16px;background:var(--sheet);color:var(--ink);text-decoration:none;box-shadow:0 2px 0 #e4e9e2}.flow a:hover{border-color:var(--green);transform:translateY(-2px)}
+.flow .num,.mark{flex:none;display:grid;place-items:center;border:2px solid var(--green);border-radius:52% 44% 51% 46%;color:var(--green);font-weight:800;transform:rotate(-7deg)}.flow .num{width:26px;height:26px;font-size:13px}.flow strong{display:block;font-size:13px;line-height:1.5}.flow small{display:block;margin-top:3px;color:var(--muted);font-size:11px;line-height:1.5}
+.layout{display:grid;grid-template-columns:215px minmax(0,1fr);gap:25px;align-items:start}.side{position:sticky;top:16px;padding:18px;border:1.5px solid var(--line);border-radius:16px 18px 15px 19px;background:var(--sheet);box-shadow:0 3px 0 #e5e9e3}.side h2{margin:0 0 9px;font-size:14px}.side a{display:block;padding:7px 3px;border-bottom:1px dashed var(--line);color:var(--muted);font-size:12px;text-decoration:none}.side a:hover{color:var(--green)}.side p{margin:14px 0 0;padding:10px;border-radius:9px;background:var(--green-light);color:#175b31;font-size:11px;line-height:1.65}
+main{display:grid;gap:22px;min-width:0}.card{position:relative;padding:28px clamp(19px,3vw,34px);border:1.5px solid var(--line);border-radius:20px 17px 22px 18px;background:var(--sheet);box-shadow:0 3px 0 #e5e9e3,0 10px 23px #263b2810;scroll-margin-top:18px}.card:before{content:"";position:absolute;inset:5px;border:1px solid #e9ece6;border-radius:17px 14px 18px 15px;pointer-events:none}.card>*{position:relative}.head{display:flex;gap:15px;align-items:flex-start;margin-bottom:14px}.mark{width:46px;height:46px;font-size:20px}.kicker{margin:0 0 1px;color:var(--green);font-size:11px;font-weight:800;letter-spacing:.12em}h2{margin:0;font-size:clamp(19px,2.5vw,24px);line-height:1.5;letter-spacing:-.025em}h3{margin:25px 0 8px;font-size:16px}p{margin:0}.intro{color:var(--muted)}
+.route{display:inline-flex;flex-wrap:wrap;gap:6px;margin:17px 0 15px;padding:7px 12px;border:1px dashed #a9c8ae;border-radius:9px;background:#f7fbf7;color:#24673c;font-size:12px;font-weight:700}.route span:not(:last-child):after{content:" ›";margin-left:7px;color:#8ba68f}
+.steps{counter-reset:item;list-style:none;display:grid;gap:12px;margin:12px 0 0;padding:0}.steps li{position:relative;min-height:26px;padding-left:35px}.steps li:before{counter-increment:item;content:counter(item);position:absolute;top:2px;left:0;display:grid;place-items:center;width:24px;height:24px;border:2px solid var(--red);border-radius:53% 46% 50% 42%;color:var(--red);font-size:12px;font-weight:800;transform:rotate(-7deg)}
+.hint{margin-top:18px;padding:13px 16px;border-left:4px solid var(--green);border-radius:4px 11px 11px 4px;background:var(--green-light);font-size:13px}.hint.warn{border-left-color:#dba23c;background:var(--amber)}.hint strong{display:block}.small{margin-top:11px;color:var(--muted);font-size:12px}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:17px 0 0}.pair div{padding:12px 14px;border:1px dashed #b5cdb8;border-radius:10px;background:#fbfefb}.pair small{display:block;color:var(--muted);font-size:11px}.pair strong{font-size:13px}
+.mock{margin:19px 0 3px;padding:15px;border:1.5px dashed #9ac4a1;border-radius:12px;background:#fcfefb}.mock small{display:block;margin-bottom:5px;color:var(--green);font-weight:800}.mock div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center;border-top:1px solid #dce9df;padding:7px 0;font-size:13px}.mock code{padding:4px 7px;border-radius:5px;background:#eef6ef;color:#245c37;font-size:12px;overflow-wrap:anywhere}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:8px;list-style:none;margin:15px 0 0;padding:0}.checks li{display:flex;gap:8px;padding:10px;border:1px solid var(--line);border-radius:9px;font-size:12px;line-height:1.55}.checks li:before{content:"✓";flex:none;display:grid;place-items:center;width:19px;height:19px;border:1.5px solid var(--green);border-radius:5px;color:var(--green);font-weight:800}
+figure{margin:18px 0 0;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#fff}figure img{display:block;width:100%;height:auto}figcaption{padding:7px 12px;border-top:1px solid var(--line);background:#fafbf9;color:var(--muted);font-size:11px}
+.end{padding:23px 27px;border:1.5px dashed #9ec6a5;border-radius:15px;background:#eef8f0}.end h2{color:#176b37}footer{margin-top:28px;color:var(--muted);font-size:11px}
+@media(max-width:800px){.layout{grid-template-columns:1fr}.side{position:static}.side nav{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}.flow{grid-template-columns:1fr 1fr}}
+@media(max-width:520px){body{padding:0 13px 45px;font-size:14px}.hero{padding:30px 0 24px}.flow{gap:7px;margin:20px 0}.flow a{gap:6px;padding:9px;min-height:80px}.flow strong{font-size:11px}.flow small{font-size:10px}.flow .num{width:23px;height:23px;font-size:11px}.side nav,.pair,.checks{grid-template-columns:1fr}.card{padding:23px 18px}.head{gap:10px}.mark{width:39px;height:39px;font-size:17px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media(prefers-color-scheme:dark){:root{color-scheme:dark;--paper:#151a16;--sheet:#202822;--ink:#edf4ed;--muted:#bdcbbd;--line:#435447;--green:#75d69a;--green-light:#25402d;--red:#ff887d;--amber:#4b391e}.hero{border-color:#45654c}.card,.side{box-shadow:0 3px 0 #101711,0 10px 23px #0004}.card:before{border-color:#334238}.flow a{box-shadow:0 2px 0 #101711}.route,.pair div,.mock{background:#1c3022}.mock code{background:#294532;color:#d0f1d6}.mock div{border-color:#38543e}.hint{color:#e0f2e1}.hint.warn{color:#f9e2ad}figcaption{background:#27302a}.end{background:#203e29}}
 </style>
-</head><body>
-<div class="wrap">
-<h1>musubo LINE接続マニュアル</h1>
-<p class="lead">「LINEアカウントを登録」画面のアカウント接続は、次の4ステップを順番に進めます。各ステップの「開く」ボタンから、対象のLINE設定画面へ進んでください。</p>
-<nav class="tabs" aria-label="アカウント接続の手順">
-<a href="#step1">Step 1　Messaging APIの2項目</a>
-<a href="#step2">Step 2　プロバイダーID</a>
-<a href="#step3">Step 3　Webhookの設定</a>
-<a href="#step4">Step 4　LINEログインの2項目</a>
+</head>
+<body>
+<div class="page">
+<header class="hero"><p class="eyebrow">MUSUBO / LINE CONNECTION GUIDE</p><h1>LINE公式アカウントを<br><span class="underline">musuboにつなぐ</span></h1><p class="lead">「LINEアカウントを登録」の<strong>アカウント接続</strong>に合わせた手順です。画面を開いたまま、下の4つを順番に進めてください。各ステップの「開く」ボタンから設定先へ移動できます。</p></header>
+<nav class="flow" aria-label="4つの接続ステップ">
+<a href="#step1"><span class="num">1</span><span><strong>Messaging API</strong><small>公式アカウントマネージャー</small></span></a>
+<a href="#step2"><span class="num">2</span><span><strong>プロバイダーID</strong><small>LINE Developers</small></span></a>
+<a href="#step3"><span class="num">3</span><span><strong>Webhook</strong><small>LINE Developers</small></span></a>
+<a href="#step4"><span class="num">4</span><span><strong>LINEログイン</strong><small>同じプロバイダー内</small></span></a>
 </nav>
-
-<section class="card" id="official-account">
-<h2>LINE公式アカウントをまだ作っていないとき</h2>
-<p class="desc"><a href="https://manager.line.biz/" target="_blank" rel="noreferrer">LINE公式アカウントマネージャー</a>で新しい公式アカウントを作成し、musuboの事前確認へ戻ってください。</p>
-<p class="note info">新しい店舗の公式アカウントなら、Messaging APIを使い始めるときにプロバイダーを選びます。LINEログインチャネルも同じプロバイダーに作ります。</p>
-</section>
-
-<section class="card" id="step1">
-<h2>Step 1　Messaging APIの2項目</h2>
-<p class="desc">musuboの「LINE公式アカウントマネージャーを開く」から、つなぐ公式アカウントを選びます。「設定」→「Messaging API」でChannel IDとChannel secretをコピーし、それぞれの入力欄へ貼り付けます。</p>
-<p class="note info">Messaging APIが「未利用」なら、同じ画面の「Messaging APIを利用する」から設定してください。すでにプロバイダーがあれば、その名前を選びます。あとで作るLINEログインチャネルも同じプロバイダーに置きます。</p>
-<h3>まだMessaging APIを使っていないとき</h3>
-<ol class="steps">
-<li><span class="n">1</span><div>公式アカウントマネージャーでアカウントを選び、右上の「設定」→「Messaging API」を開きます。</div></li>
-<li><span class="n">2</span><div><b>「Messaging APIを利用する」</b>を押し、初めてならプロバイダーを作ります。既存のプロバイダーがあればその名前を選びます。</div></li>
-<li><span class="n">3</span><div>案内を確認して同意し、プロバイダー名を確かめて設定を終えます。ステータスが<b>「利用中」</b>になったら、下の2項目をコピーできます。</div></li>
-</ol>
-<figure><img src="/manuals/line-connect/images/m1-oam-unused.webp" width="1489" height="812" alt="Messaging APIが未利用のときの画面" loading="lazy"></figure>
-<figure><img src="/manuals/line-connect/images/m1-oam-provider.webp" width="1489" height="812" alt="プロバイダーを選ぶ画面" loading="lazy"></figure>
-<h3>2項目の取り方</h3>
-<ol class="steps">
-<li><span class="n">1</span><div>公式アカウントを選び、右上の<b>「設定」</b>を押します。</div></li>
-<li><span class="n">2</span><div>左のメニューの<b>「Messaging API」</b>を押します。</div></li>
-<li><span class="n">3</span><div><b>「Channel ID」</b>と<b>「Channel secret」</b>を、それぞれmusuboへコピーします。</div></li>
-</ol>
-<figure><img src="/manuals/line-connect/images/m1-oam-messaging-api.webp" width="1489" height="812" alt="LINE公式アカウントマネージャーのMessaging API画面" loading="lazy"></figure>
-<p class="note warn">「発行」ボタンでシークレットを作り直すと、既存の接続が切れます。値を確認するだけなら押さないでください。</p>
-</section>
-
-<section class="card" id="step2">
-<h2>Step 2　プロバイダーID</h2>
-<p class="desc">musuboの「LINE Developersを開く」を押し、Step 1で使ったMessaging APIチャネルが属するプロバイダーを選びます。プロバイダー画面の「プロバイダー設定」→「基本情報」にある「プロバイダーID」をコピーして、musuboの欄に貼り付けます。</p>
-<p class="note warn">別のプロバイダーのIDを貼ると、Step 4でLINEログインチャネルを同じアカウントにつなげられません。画面URLの数字を読み取らず、「プロバイダーID」のコピーアイコンを使ってください。</p>
-</section>
-
-<section class="card" id="step3">
-<h2>Step 3　Webhookの設定</h2>
-<p class="desc">musuboの「LINE Developersを開く」から、Step 1で入力したチャネルIDの「Messaging API設定」を直接開きます。プロバイダーやチャネルを選び直す必要はありません。</p>
-<ol class="steps">
-<li><span class="n">1</span><div>musuboに表示された<b>チャネル専用のWebhook URL</b>をコピーし、LINE Developersの「Webhook URL」へ貼り付けて<b>「更新」</b>を押します。</div></li>
-<li><span class="n">2</span><div><b>「Webhookの利用」</b>、<b>「Webhookの再送」</b>、<b>「エラーの統計情報」</b>をオンにします。</div></li>
-<li><span class="n">3</span><div>musuboへ戻り、4つの確認欄にチェックを入れます。</div></li>
-</ol>
-<figure><img src="/manuals/line-connect/images/m3-tab.webp" width="1489" height="812" alt="LINE DevelopersのMessaging API設定タブ" loading="lazy"></figure>
-<p class="note warn">すでに他の配信ツールのWebhook URLが入っている場合、musuboに書き換えると、そのツールの受信は止まります。使い続けたいときは、先に元のURLを別途保存してください。</p>
-<p class="note info">LINE公式アカウントマネージャーの「応答設定」で、重複する「あいさつメッセージ」「応答メッセージ」はオフにできます。「チャット」はオンのままでも musubo にメッセージは届きます。返信する場所を決めて、二重返信を防いでください。</p>
-</section>
-
-<section class="card" id="step4">
-<h2>Step 4　LINEログインの2項目</h2>
-<p class="desc">musuboの「LINE Developersのプロバイダーを開く」から、Step 2で確認したプロバイダーへ進みます。LINEログインチャネルが無ければ「新規チャネル作成」で<b>「LINEログイン」</b>を選んで作成します。</p>
-<ol class="steps">
-<li><span class="n">1</span><div>同じプロバイダー内のLINEログインチャネルを開き、<b>「チャネル基本設定」</b>の「チャネルID」と「チャネルシークレット」をmusuboへコピーします。</div></li>
-<li><span class="n">2</span><div><b>「友だち追加オプション」</b>で、Step 1の公式アカウントをリンクします。</div></li>
-<li><span class="n">3</span><div>チャネルを「開発中」から<b>「公開済み」</b>に変更し、musuboの2つの確認欄にチェックを入れます。</div></li>
-</ol>
-<figure><img src="/manuals/line-connect/images/m2-provider.webp" width="1489" height="812" alt="プロバイダー内のチャネル一覧" loading="lazy"></figure>
-<h3>LINEログインチャネルをまだ作っていないとき</h3>
-<ol class="steps">
-<li><span class="n">1</span><div>プロバイダー画面の「新規チャネル作成」で<b>「LINEログイン」</b>を選びます。</div></li>
-<li><span class="n">2</span><div>Step 1のMessaging APIと<b>同じプロバイダー</b>であることを確認し、提供地域・事業者の所在国を選びます。</div></li>
-<li><span class="n">3</span><div>チャネル名・説明・連絡先メールアドレスを入力し、アプリタイプで<b>「ウェブアプリ」</b>を選びます。</div></li>
-<li><span class="n">4</span><div>LINE開発者契約への同意を確認して作成し、チャネルを<b>「公開済み」</b>にします。</div></li>
-</ol>
-<figure><img src="/manuals/line-connect/images/m2-create-1.webp" width="1489" height="812" alt="LINEログインの新規チャネル作成" loading="lazy"></figure>
-<figure><img src="/manuals/line-connect/images/m2-create-2.webp" width="1489" height="812" alt="プロバイダーと地域の入力" loading="lazy"></figure>
-<figure><img src="/manuals/line-connect/images/m2-create-3.webp" width="1489" height="812" alt="チャネル名・説明・アプリタイプの入力" loading="lazy"></figure>
-<figure><img src="/manuals/line-connect/images/m2-login-id.webp" width="1489" height="812" alt="LINEログインチャネルのチャネルID" loading="lazy"></figure>
-<figure><img src="/manuals/line-connect/images/m2-login-secret.webp" width="1489" height="812" alt="LINEログインチャネルのチャネルシークレット" loading="lazy"></figure>
-<figure><img src="/manuals/line-connect/images/m3-linked-oa.webp" width="1489" height="812" alt="リンクされたLINE公式アカウント" loading="lazy"></figure>
-<p class="note info">Callback URLとLIFFはmusuboが登録時に設定します。この手順で入力する必要はありません。</p>
-</section>
-<p class="sub">画像の値は説明用の例です。実際の値は自分のLINE画面からコピーしてください。</p>
-</div>
-</body></html>
+<div class="layout"><aside class="side" aria-label="目次"><h2>このページの道案内</h2><nav><a href="#before">始める前に</a><a href="#step1">1. Messaging API</a><a href="#step2">2. プロバイダーID</a><a href="#step3">3. Webhook</a><a href="#step4">4. LINEログイン</a><a href="#after">接続設定のあと</a></nav><p>入力するのは<strong>チャネルID・シークレット2組</strong>と<strong>プロバイダーID</strong>。2種類のチャネルIDは別の番号です。</p></aside>
+<main>
+<section class="card" id="before"><div class="head"><span class="mark" aria-hidden="true">↗</span><div><p class="kicker">START HERE</p><h2>始める前に</h2></div></div><p class="intro">接続するLINE公式アカウントがまだ無い場合は、先に<a href="https://manager.line.biz/" target="_blank" rel="noopener noreferrer">LINE公式アカウントマネージャー</a>で作成します。作成済みなら、musuboの事前確認を終えて「アカウント接続」へ進みます。</p><div class="pair"><div><small>Step 1・3で使う</small><strong>Messaging APIチャネル</strong></div><div><small>Step 4で使う</small><strong>LINEログインチャネル</strong></div></div><p class="hint"><strong>同じプロバイダーでつなぎます</strong>2つのチャネルを同じプロバイダーの中で扱います。Step 2でそのプロバイダーIDを確認します。</p></section>
+<section class="card" id="step1"><div class="head"><span class="mark" aria-hidden="true">1</span><div><p class="kicker">STEP 1 / 4</p><h2>Messaging APIの情報を入れる</h2></div></div><p class="intro">musuboの<strong>「LINE公式アカウントマネージャーを開く」</strong>から、接続する公式アカウントの設定へ進みます。</p><div class="route"><span>公式アカウントを選ぶ</span><span>設定</span><span>Messaging API</span></div><ol class="steps"><li>ステータスが<strong>「未利用」</strong>なら「Messaging APIを利用する」を押します。初めてならプロバイダーを作成し、すでにあるなら同じ会社・店舗のプロバイダーを選びます。案内に同意して<strong>「利用中」</strong>になったことを確認します。</li><li>「Channel ID」の右にある<strong>「コピー」</strong>から、musuboの<strong>チャネルID</strong>欄へ貼り付けます。</li><li>同じ画面の「Channel secret」の右にある<strong>「コピー」</strong>から、musuboの<strong>チャネルシークレット</strong>欄へ貼り付けます。</li></ol><figure><img src="/manuals/line-connect/images/m1-oam-messaging-api.webp" width="1489" height="812" alt="公式アカウントマネージャーのMessaging API画面。設定メニューと2つのコピーボタンを示す"><figcaption>公式アカウントマネージャーの「設定」→「Messaging API」</figcaption></figure><p class="hint warn"><strong>シークレットを作り直さないでください</strong>確認のために「発行」を押すと、以前の接続で使っているシークレットが無効になります。表示済みの値をコピーします。</p><p class="small">LINEログインのチャネルID・シークレットはStep 4で使います。ここには入力しません。</p></section>
+<section class="card" id="step2"><div class="head"><span class="mark" aria-hidden="true">2</span><div><p class="kicker">STEP 2 / 4</p><h2>プロバイダーIDを確認する</h2></div></div><p class="intro">musuboの<strong>「LINE Developersを開く」</strong>からコンソールへ進み、Step 1のMessaging APIチャネルが入っているプロバイダーを選びます。</p><div class="route"><span>Step 1と同じプロバイダー</span><span>プロバイダー設定</span><span>基本情報</span></div><ol class="steps"><li>プロバイダーの<strong>「プロバイダー設定」</strong>タブを開きます。</li><li>「基本情報」にある<strong>「プロバイダーID」</strong>のコピーアイコンを押し、musuboのプロバイダーID欄へ貼り付けます。</li></ol><div class="mock" role="img" aria-label="LINE Developersのプロバイダー設定にあるプロバイダーIDをコピーする図"><small>LINE Developers › プロバイダー設定 › 基本情報</small><div><strong>プロバイダーID</strong><code>数字のID　⧉ コピー</code></div></div><p class="hint warn"><strong>URLの数字ではなく、画面のIDをコピー</strong>別のプロバイダーのIDを入れると、Step 4のLINEログインを正しい公式アカウントにつなげられません。</p></section>
+<section class="card" id="step3"><div class="head"><span class="mark" aria-hidden="true">3</span><div><p class="kicker">STEP 3 / 4</p><h2>Webhook（受信のつなぎ）を設定する</h2></div></div><p class="intro">musuboの<strong>「LINE Developersを開く」</strong>を押します。Step 1で入れたチャネルIDの<strong>「Messaging API設定」</strong>が直接開きます。</p><div class="route"><span>LINE Developers</span><span>対象チャネル</span><span>Messaging API設定</span></div><ol class="steps"><li>musuboに表示された<strong>チャネル専用のWebhook URL</strong>を「コピー」し、LINE Developersの「Webhook URL」に貼り付けて<strong>「更新」</strong>を押します。</li><li>同じ設定画面で<strong>「Webhookの利用」</strong>、<strong>「Webhookの再送」</strong>、<strong>「エラーの統計情報」</strong>をすべてONにします。</li><li>musuboへ戻り、下の4項目を実際の設定と照らし合わせてチェックします。</li></ol><div class="mock" role="img" aria-label="Webhook URLにはMessaging APIチャネルIDが含まれることを示す図"><small>musubo の Webhook URL</small><div><code>https://stg-api.musubo.jp/webhook/&lt;Messaging APIチャネルID&gt;</code><strong>コピー → LINEに貼る</strong></div></div><ul class="checks" aria-label="musuboで確認する4項目"><li>Webhook URLを貼り付けて「更新」を押した</li><li>Webhookの利用をONにした</li><li>Webhookの再送をONにした</li><li>エラーの統計情報をONにした</li></ul><p class="hint warn"><strong>すでに別ツールのWebhook URLがあるとき</strong>musuboのURLに変更すると、そのツールの受信は止まります。使い続ける必要があれば、musuboで「途中保存して閉じる」を押し、現在のURLを別途控えてから進めてください。</p><p class="small">上のURLは形の見本です。実際に貼るURLは、musuboのStep 3に表示されるものをコピーしてください。</p></section>
+<section class="card" id="step4"><div class="head"><span class="mark" aria-hidden="true">4</span><div><p class="kicker">STEP 4 / 4</p><h2>LINEログインの情報を入れる</h2></div></div><p class="intro">musuboの<strong>「LINE Developersのプロバイダーを開く」</strong>から、Step 2で入力したプロバイダーへ進みます。LINEログインチャネルがなければ、同じプロバイダーで作成します。</p><div class="route"><span>同じプロバイダー</span><span>LINEログインチャネル</span><span>チャネル基本設定</span></div><ol class="steps"><li>未作成なら<strong>「新規チャネル作成」→「LINEログイン」</strong>を選び、必要事項を入力します。アプリタイプは<strong>「ウェブアプリ」</strong>を選びます。</li><li>LINEログインチャネルの<strong>「チャネル基本設定」</strong>からチャネルIDとチャネルシークレットをコピーし、musuboの<strong>LINEログイン用</strong>の2欄に貼り付けます。</li><li><strong>「友だち追加オプション」</strong>でStep 1の公式アカウントをリンクし、チャネルを<strong>「公開済み」</strong>にします。</li><li>musuboへ戻り、公式アカウントのリンクと公開を確認した2つのチェックを入れます。</li></ol><figure><img src="/manuals/line-connect/images/m2-provider.webp" width="1489" height="812" alt="プロバイダー内にLINEログインチャネルとMessaging APIチャネルが並ぶ画面"><figcaption>同じプロバイダー内に2種類のチャネルを置きます</figcaption></figure><figure><img src="/manuals/line-connect/images/m3-linked-oa.webp" width="1489" height="812" alt="LINEログインチャネルの友だち追加オプションで公式アカウントをリンクした画面"><figcaption>LINEログインの「友だち追加オプション」で対象の公式アカウントを確認</figcaption></figure><p class="hint"><strong>musuboが自動で行うこと</strong>Callback URLの設定とLIFF（友だち追加の窓口）の作成は、登録の途中でmusuboが行います。この手順で入力する欄はありません。</p></section>
+<section class="end" id="after"><h2>4ステップのあと</h2><p>musuboで<strong>「接続を確かめる」</strong>を押し、5項目がすべて通ったら<strong>「登録する」</strong>へ進みます。次にスマホで友だち追加を試すか、すでに友だちならその公式アカウントのトークへ「接続テスト」と送ります。受信が確認できたら、使い方を選んで完了です。</p></section>
+</main></div><footer>画像内の番号やチャネル名は説明用の例です。実際の値はご自身のLINE画面からコピーしてください。</footer></div></body></html>
