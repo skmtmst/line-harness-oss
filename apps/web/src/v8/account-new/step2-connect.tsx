@@ -80,6 +80,7 @@ export default function Step2Connect({
   onToggleAck: (key: string, next: boolean) => void
 }) {
   const webhookUrl = musuboWebhookUrl(values.channelId)
+  const messagingApiUrl = developerChannelUrl(values.channelId)
   const providerUrl = developerProviderUrl(values.providerId)
   return (
     /* 正本 v07 ②の右の列（Step1 msf5n／Step2 RtWJZ／Step3 J84XB は同じ中身）。
@@ -173,8 +174,10 @@ export default function Step2Connect({
             <p className={styles.precheckNoteTitle}>LINE Developers の Webhook 設定を開いてください</p>
             <p>ステップ1で入れたチャネルIDを使って、このチャネルの「Messaging API設定」を直接開きます。プロバイダーやチャネルを選び直す必要はありません。</p>
             <div className={styles.precheckNoteLink}>
-              <Button variant="primary" external href={developerChannelUrl(values.channelId)}>LINE Developers を開く</Button>
-              <p className={styles.help}>必ずこのボタンから操作してください</p>
+              {messagingApiUrl
+                ? <Button variant="primary" external href={messagingApiUrl}>LINE Developers を開く</Button>
+                : <p className={styles.help}>チャネルIDがありません。Messaging APIの情報へ戻って入力してください。</p>}
+              {messagingApiUrl && <p className={styles.help}>必ずこのボタンから操作してください</p>}
             </div>
           </div>
           {/* 承認済み v07 Ds3E2「AC Webhook URL」。白い枠＋細い線で、上下の色付きの箱と見分ける。 */}
