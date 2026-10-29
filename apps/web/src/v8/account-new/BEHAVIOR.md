@@ -11,7 +11,7 @@
 - ①は5つの質問を1問ずつ出す。友だちを引き継ぐ場合だけ人数、ほかの配信ツールを使う場合だけ今後の使い方を尋ねる。公式アカウント未作成・50万人超は案内で止まり、引き継ぐ場合は認証済みの確認にチェックするまで進めない。回答の変更・戻る・下書き復元でも同じ判定を使う。
 - ①事前確認 → ②アカウント接続 → ③接続確認 → ④使い方を選ぶ → ⑤完了。
 - ②は中で3つに分かれる（`Step 1 / 3`〜`Step 3 / 3`）。**絵の正本（`Fqy29` の `②-1`／`②-2`／`②-3`）どおり** Step1＝「Messaging API の情報を入れる」、Step2＝「Webhook（受信のつなぎ）を設定する」、Step3＝「LINEログインの情報を入れる」（題も札の名前も絵の正本のまま）。
-- Step1ではMessaging APIチャネルのID・シークレットに加え、同じプロバイダーのIDを入力する。Step3の「LINE Developers のプロバイダーを開く」は、そのIDから `/console/provider/<プロバイダーID>` を開く。チャネルIDをプロバイダーIDとして使わない。古い下書きにIDがないときはリンクを表示せず、Step1へ戻って入力するよう案内する。プロバイダーIDは秘密値ではなく端末の下書きに保存し、接続APIには送らない。
+- Step1ではLINE公式アカウントマネージャー（`https://manager.line.biz/`）を開き、「設定」→「Messaging API」にあるChannel ID・Channel secretをコピーする。同じプロバイダーのIDはLINE Developersの「プロバイダー設定」に表示された「プロバイダーID」からコピーする。Step3の「LINE Developers のプロバイダーを開く」は、そのIDから `/console/provider/<プロバイダーID>` を開く。チャネルIDをプロバイダーIDとして使わない。古い下書きにIDがないときはリンクを表示せず、Step1へ戻って入力するよう案内する。プロバイダーIDは秘密値ではなく端末の下書きに保存し、接続APIには送らない。
 - ②の中だけ、進むボタンは「次のステップへ」、戻るボタンは行き先の名前（`事前確認へ戻る`／`Messaging API へ戻る`／`Webhook の設定へ戻る`）。③Step1 の戻るは「LINEログインへ戻る」。ほかの段は「次へ」「戻る」。
 - ③は中で2つに分かれる。**Step1 で接続を確かめ、そのまま「登録する」で登録する**（登録は④や⑤ではなく③Step1）。Step2 は「友だち追加できるか確かめます」。
 - 済んだ段へは戻れるが、登録後（`createdId` あり）は戻れない。段の表示は登録済みでも先に飛ばさない（`currentKey={String(currentStep)}`）。
@@ -44,7 +44,7 @@
 - ②Step2 の題は絵の正本（`②-2` の `S1KaUa`）どおり「Webhook（受信のつなぎ）を設定する」。段の名前（戻るボタンの行き先）は「Webhook の設定」。
 - **②Step2 に Webhook URL の控え（写す欄）と［コピー］を置く**（承認済み `LINE新規追加_v07.pen`・2026-10-18承認の `Ds3E2`）。LINE の「Messaging API設定」に URL を貼って「更新」を押すまで、LINE 側に Webhook の3つのスイッチが出てこないため、利用者が自分で貼る必要がある。字は `musuboWebhookUrl(channelId)`（`<NEXT_PUBLIC_API_URL>/webhook/<Messaging APIチャネルID>`・`apps/worker` の `expectedWebhookUrl` と同じ形）。チャネルIDが数字で確定するまではURLを出さず、コピーもできない。
 - そのため印は4つで、先頭が「Webhook URL を貼り付けて「更新」を押した」（`dqe2M`）。左の細い列の「musubo が自動で行うこと」からは **「Webhook URL の登録」を外した**（自動登録しないので・`iaTqO`）。③の接続チェックの行「Webhook URL の登録」は、貼られた URL が musubo のものと合っているかの確認として残す。
-- ②Step1・Step3 の青い囲みから **「LINE Developers を開く」**（別タブ）。チャネルIDが入っていればそのチャネルの画面、空なら一覧を開く（`developerChannelUrl`）。v05 までの「取得方法を見る」は承認済み v06 で外した。マニュアル全文は②の右の列の「マニュアルを開く」（`/manuals/line-connect/index.html`・別タブ）から。
+- ②Step1 の青い囲みから **「LINE公式アカウントマネージャーを開く」**（別タブ）。②Step2 はMessaging APIチャネルのWebhook設定を開く（`developerChannelUrl`）。②Step3 はStep1で入力されたプロバイダー画面を開く（`developerProviderUrl`）。マニュアル全文は②の右の列の「マニュアルを開く」（`/manuals/line-connect/index.html`・別タブ）から。
 
 ## ②の左の列（操作ステップ）
 - 絵の正本の ② は左にも細い列を持つ（`AC左 操作ステップ` `g48QV`）。②の3つの小さな段で同じものを出す（`CreateStepColumns` の `outline`）。

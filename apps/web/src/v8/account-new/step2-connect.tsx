@@ -95,8 +95,8 @@ export default function Step2Connect({
       </Card>
       )}>
       {sub === 1 && (
-        /* 正本 v07 Fqy29 → ②-1（msf5n）の A2cEg1。入力は縦に2つだけで、
-           ほかの項目は musubo が自動で設定するので欄も控えも置かない。 */
+        /* 正本 v07 Fqy29 → ②-1（msf5n）の A2cEg1。Messaging API の2項目は
+           公式アカウントマネージャーから取り、プロバイダーIDはプロバイダー設定からコピーする。 */
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Messaging API の情報を入れる">
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
@@ -105,10 +105,10 @@ export default function Step2Connect({
           </div>
           <p className={styles.precheckLead}>Messaging API のチャネルID・シークレットと、同じプロバイダーのIDを入力します。</p>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
-            <p className={styles.precheckNoteTitle}>LINE Developers を開いてください</p>
-            <p>Messaging API チャネルの「チャネル基本設定」に、チャネルID とチャネルシークレットがあります。</p>
+            <p className={styles.precheckNoteTitle}>LINE公式アカウントマネージャーを開いてください</p>
+            <p>公式アカウントを選び、右上の「設定」→「Messaging API」を開きます。未利用なら「Messaging APIを利用する」を設定してから、Channel ID と Channel secret をコピーしてください。</p>
             <div className={styles.precheckNoteLink}>
-              <Button variant="primary" external href={developerChannelUrl(values.channelId)}>LINE Developers を開く</Button>
+              <Button variant="primary" external href="https://manager.line.biz/">LINE公式アカウントマネージャーを開く</Button>
             </div>
           </div>
           <div className={styles.acInputs}>
@@ -116,19 +116,19 @@ export default function Step2Connect({
               <Field htmlFor="v8-channel-id" label="チャネルID" error={fieldErrors.channelId}>
                 <SaveErrorField names={["channelId","form.channelId","channel_id","form.channel_id"]}><TextField id="v8-channel-id" value={values.channelId} onChange={(event) => onUpdate('channelId', event.target.value)} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.channelId ? true : undefined} /></SaveErrorField>
               </Field>
-              <p className={styles.help}>Messaging API チャネルの「チャネル基本設定」にある数字です。LINEログインのチャネルIDとは異なります。</p>
+              <p className={styles.help}>公式アカウントマネージャーの「設定」→「Messaging API」にある「Channel ID」の右のコピーから貼り付けてください。LINEログインのチャネルIDとは異なります。</p>
             </div>
             <div className={styles.acField}>
               <Field htmlFor="v8-channel-secret" label="チャネルシークレット" error={fieldErrors.channelSecret}>
                 <SaveErrorField names={["channelSecret","form.channelSecret","channel_secret","form.channel_secret"]}><TextField id="v8-channel-secret" type="password" autoComplete="new-password" value={values.channelSecret} onChange={(event) => onUpdate('channelSecret', event.target.value)} placeholder="例：abc123def456ghi789…" required aria-invalid={fieldErrors.channelSecret ? true : undefined} /></SaveErrorField>
               </Field>
-              <p className={styles.help}>同じ画面の「チャネルシークレット」です。</p>
+              <p className={styles.help}>同じ画面の「Channel secret」の右のコピーから貼り付けてください。</p>
             </div>
             <div className={styles.acField}>
               <Field htmlFor="v8-provider-id" label="プロバイダーID" error={fieldErrors.providerId}>
                 <SaveErrorField names={["providerId","form.providerId"]}><TextField id="v8-provider-id" value={values.providerId} onChange={(event) => onUpdate('providerId', event.target.value)} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.providerId ? true : undefined} /></SaveErrorField>
               </Field>
-              <p className={styles.help}>LINE Developers でこの Messaging API チャネルのプロバイダーを選び、URLの「/provider/」の後の数字を入力してください。Step 3 のリンクに使います。</p>
+              <p className={styles.help}>LINE Developers で同じプロバイダーを開き、「プロバイダー設定」→「プロバイダーID」の右のコピーアイコンからコピーして貼り付けてください。Step 3 のリンクに使います。</p>
             </div>
           </div>
           <span className={styles.secretNote}><Lock size={16} aria-hidden="true" />シークレットは保存したあと画面には出ません。あとから入れ替えはできます。</span>
