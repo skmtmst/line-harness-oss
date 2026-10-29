@@ -15,6 +15,11 @@
   container-type: inline-size;
 }
 
+/* 板の縦積みが間隔の唯一の持ち主。直下の共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
+:global(:root) .board > :global([data-design-part='notice']) {
+  margin-block: 0;
+}
+
 /* 見出しブロック：画面名＋一行の説明。右端はその画面の主操作。 */
 .head {
   display: flex;
