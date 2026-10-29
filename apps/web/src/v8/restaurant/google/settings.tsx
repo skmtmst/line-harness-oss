@@ -1,12 +1,17 @@
 'use client'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link2, RefreshCw } from 'lucide-react'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
+import Checkbox from '@/components/shared/checkbox'
+import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
+import { accountAiFeaturesApi } from '@/lib/api/helpers/gap3'
+import { useStaffRole } from '@/lib/staff-role'
+import type { AccountAiSetting } from '@line-crm/shared'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge from '@/components/shared/status-badge'
 import { GOOGLE_CONNECTION_STATUS } from '@/lib/status-labels'
@@ -178,6 +183,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
           </div>
         ) : manageNote}
       </Card>
+      <GoogleReviewAiSettings accountId={accountId} enabled={data.reviewDraftAiEnabled} available={data.aiAvailable} onChanged={onChanged} />
       <p className={styles.footCaption}>{`LINEアカウント：${data.store.name}・接続店舗：${connection.locationTitle ?? emptyValue('unknown')}・最後に取り込んだ日時：${formatStampFull(connection.lastSyncedAt)}`}</p>
       <ConfirmDialog
         open={confirmDisconnect}
@@ -192,4 +198,72 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
       />
     </></SaveErrorScope>
   )
+}
+
+function GoogleReviewAiSettings({ accountId, enabled, available, onChanged }: { accountId: string; enabled: boolean; available: boolean; onChanged: () => void }) {
+  const role = useStaffRole()
+  const canManage = role === 'owner' || role === 'admin'
+  const [setting, setSetting] = useState<AccountAiSetting | null>(null)
+  const [disclosure, setDisclosure] = useState('')
+  const [disclosureVersion, setDisclosureVersion] = useState('')
+  const [checked, setChecked] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
+
+  useEffect(() => {
+    setSetting(null)
+    setChecked(false)
+    setStepUp(null)
+    setError('')
+    if (!canManage) return
+    let active = true
+    void accountAiFeaturesApi.get(accountId).then((response) => {
+      if (!active) return
+      setSetting(response.data.items.find((item) => item.feature === 'google_review') ?? null)
+      setDisclosure(response.data.disclosure)
+      setDisclosureVersion(response.data.disclosureVersion)
+    }).catch((caught) => { if (active) setError(errorMessage(caught, 'AI下書きの設定を読み込めませんでした。')) })
+    return () => { active = false }
+  }, [accountId, canManage])
+
+  const save = async (nextEnabled: boolean, stepUpToken?: string) => {
+    if (!setting || busy || (nextEnabled && (!checked || !disclosureVersion))) return
+    setBusy(true)
+    setError('')
+    try {
+      const response = await accountAiFeaturesApi.save(accountId, 'google_review', {
+        enabled: nextEnabled,
+        expectedVersion: setting.version,
+        ...(nextEnabled ? { consent: true, disclosureVersion } : {}),
+      }, stepUpToken)
+      setSetting(response.data)
+      setChecked(false)
+      onChanged()
+    } catch (caught) {
+      if (!stepUpToken && isStepUpRequired(caught)) {
+        setStepUp({ purpose: 'ai.settings', action: '口コミのAI下書きを利用開始する', retry: (token) => save(nextEnabled, token) })
+      } else {
+        setError(errorMessage(caught, 'AI下書きの設定を変更できませんでした。'))
+        if (stepUpToken) throw caught
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label="口コミのAI下書き">
+    <SectionHeader size="small" title="口コミのAI下書き" />
+    <p className={styles.muted}>{enabled ? 'このLINEアカウントで利用中です。' : 'このLINEアカウントでは利用していません。'}</p>
+    {!available ? <Notice tone="warn">この環境ではAI下書きを使えません。</Notice> : null}
+    {canManage && available && !enabled ? <>
+      <p className={styles.preText}>口コミ本文と店舗名がAIの提供会社に送られます。作った下書きはGoogleへ自動送信されず、別途確認して公開する操作が必要です。</p>
+      {disclosure ? <Checkbox checked={checked} onCheckedChange={setChecked}>{disclosure}</Checkbox> : null}
+      <Button onClick={() => void save(true)} disabled={!setting || !checked || busy} busy={busy} busyLabel="設定中…">AI下書きを利用開始する</Button>
+    </> : null}
+    {canManage && enabled ? <Button onClick={() => void save(false)} disabled={!setting || busy} busy={busy} busyLabel="停止中…">AI下書きを停止する</Button> : null}
+    {!canManage && !enabled && available ? <p className={styles.muted}>利用開始はオーナーか管理者に依頼してください。</p> : null}
+    {error ? <Notice tone="danger">{error}</Notice> : null}
+    {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
+  </Card>
 }

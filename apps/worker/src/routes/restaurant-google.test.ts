@@ -699,6 +699,14 @@ describe('Googleビジネス：口コミ', () => {
 
   beforeEach(()=>{testDb.raw.prepare("INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id) VALUES('account-2','test-2','店','','',?)").run(TENANT);testDb.raw.exec("INSERT INTO account_ai_features(account_id,feature,enabled,consent_by,consent_at,disclosure_version) VALUES('account-2','google_review',1,'owner-1','2026-10-16','2026-10-16')");});
 
+  it('接続情報はこのLINEアカウントのAI下書き利用状態を返す', async () => {
+    await seedReviews();
+    const path = '/api/restaurant-test/google/connection?account_id=account-2';
+    expect(await (await call(path)).json()).toMatchObject({ reviewDraftAiEnabled: true });
+    testDb.raw.prepare("UPDATE account_ai_features SET enabled=0 WHERE account_id='account-2' AND feature='google_review'").run();
+    expect(await (await call(path)).json()).toMatchObject({ reviewDraftAiEnabled: false });
+  });
+
   it('既定off・別店の同意では呼ばず、自店の停止後もAIを呼ばない',async()=>{
     await seedReviews();const run=vi.fn(async()=>({response:'文'}));env.AI={run} as unknown as Ai;
     testDb.raw.exec("DELETE FROM account_ai_features");googleCalls=[];

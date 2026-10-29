@@ -401,9 +401,10 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
                 aria-invalid={textLength > 4096 || undefined}
               /></SaveErrorField>
               <div className={styles.draftTools}>
-                {data.aiAvailable ? (
+                {data.aiAvailable && data.reviewDraftAiEnabled ? (
                   <Button onClick={() => void generate()} disabled={busy !== null} busy={busy === 'generate'} busyLabel="作成中…"><Sparkles aria-hidden className={styles.icon15} />AIで下書きを作る</Button>
-                ) : <span className={styles.muted}>この環境ではAI下書きは使えません。</span>}
+                ) : !data.aiAvailable ? <span className={styles.muted}>この環境ではAI下書きは使えません。</span>
+                  : <span className={styles.muted}>AI下書きは利用開始が必要です。<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定を開く</Link></span>}
                 <span className={styles.spacer} aria-hidden="true" />
                 <span className={textLength > 4096 ? styles.countOver : styles.count}>{`${polishFormatNumber(textLength)} / 4,096`}</span>
               </div>

@@ -2,7 +2,7 @@ import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.j
 import { fail } from '../lib/fail.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
-import {requireAccountAi} from '../services/account-ai-features.js';
+import {accountAiSetting,requireAccountAi} from '../services/account-ai-features.js';
 import {GapError} from '../services/gap-common.js';
 import { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 export { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
@@ -566,6 +566,7 @@ restaurantGoogle.get('/api/restaurant-test/google/connection', async (c) => {
     writeEnabled: writeEnabled(c.env),
     oauthConfigured: Boolean(oauthClient(c)),
     aiAvailable: Boolean(c.env.AI || c.env.OPENAI_API_KEY),
+    reviewDraftAiEnabled: (await accountAiSetting(db, store.lineAccountId, 'google_review')).enabled,
     permissions: await googlePermissions(c),
   });
 });
