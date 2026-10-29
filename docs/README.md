@@ -947,3 +947,4 @@
 - [LINE通知の操作権限の反映履歴](release-log/unreleased/1950-kenta-notification-permission.md)
 - [LINE通知の説明の置き場所](release-log/unreleased/1950-kenta-notification-help.md)
 - [LINE通知の送信内訳の表示](release-log/unreleased/1950-kenta-notification-kpi-detail.md)
+- [業種別の初期設定の確認](release-log/unreleased/0000-kenta-style-setup-progress.md) — 反映履歴、確認 2026-10-29

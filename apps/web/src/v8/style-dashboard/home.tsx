@@ -27,12 +27,12 @@ export default function HomeDashboard() {
   const setupRequested = setupParam === 'summary' || (setupParam !== null && /^\d+$/.test(setupParam))
   const profile = useAccountStyle(selectedAccountId)
   // QR・質問の再開は業種より先に既存の共通画面へ渡す。閉じると業種のホームへ戻る。
-  if (qrRequested || setupRequested) return <StandardDashboard key={selectedAccountId} usageStyle={profile.data?.style === 'ec' ? 'ec' : 'standard'} />
+  if (qrRequested || setupRequested) return <StandardDashboard key={selectedAccountId} usageStyle={profile.data?.style === 'ec' ? 'ec' : 'standard'} accountStyle={profile.data?.style ?? null} />
   if (selectedAccountId && !profile.data) return <PageFrame kind="dashboard"><PageHeading title="ダッシュボード" /><PageContent layout="stats">
     {profile.error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={profile.error} onRetry={profile.reload} /> : <ListState kind="loading" loadingShape="cards" title="使い方のスタイルを確認しています" />}
   </PageContent></PageFrame>
   const style = profile.data?.style ?? 'standard'
   const stale = profile.stale ? <StaleStyleNotice onRetry={profile.reload} /> : null
   if (INDUSTRY.includes(style)) return <>{stale}<StyleDashboard key={style} style={style as IndustryStyle} /></>
-  return <>{stale}<StandardDashboard key={selectedAccountId} usageStyle={style === 'ec' ? 'ec' : 'standard'} /></>
+  return <>{stale}<StandardDashboard key={selectedAccountId} usageStyle={style === 'ec' ? 'ec' : 'standard'} accountStyle={style} /></>
 }

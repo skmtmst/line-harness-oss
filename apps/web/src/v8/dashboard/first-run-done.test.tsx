@@ -10,6 +10,7 @@ vi.mock('@/components/shared/list-navigation', () => ({
 }))
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 import { buildStepsFromApi } from '@/v8/settings/public/steps/index'
+import { stepsForStyle } from '@/v8/settings/public/getting-started-steps/index'
 import { FirstRunDoneDialog, doneRows, elapsedText } from './first-run-done'
 import { useFirstMessageArrived, useFirstSteps, waitingForFirstMessage } from './first-steps'
 
@@ -83,13 +84,16 @@ describe('最初の1通が届いた時の窓', () => {
     net.starterItems.mockResolvedValue({ success: true, data: { items: [{ target_id: 'r1', key: 'menu', kind: 'rich_menu', status: 'draft', is_sample: 1, draftRevision: null, name: 'メニュー' }] } })
     const onClose = vi.fn()
     const list = steps({ attributes: 'todo', scenario: 'todo' })
-    render(<FirstRunDoneDialog accountId="a" style="restaurant" minutes={8} steps={list} onClose={onClose} />)
+    const progress = { style: 'restaurant' as const, steps: { attributes: { complete: false }, friendAdd: { complete: true }, scenario: { complete: false } } }
+    const displayed = stepsForStyle(list, 'restaurant', progress)
+    render(<FirstRunDoneDialog accountId="a" style="restaurant" minutes={8} steps={displayed} progress={progress} onClose={onClose} />)
     expect(screen.getByRole('dialog', { name: '最初の 1 通が届きました' })).toBeTruthy()
     expect(screen.getByText('開始から 8 分')).toBeTruthy()
     await waitFor(() => expect(screen.getByText('止めています')).toBeTruthy())
     expect(screen.queryByText(/読まれ/)).toBeNull()
     const next = screen.getAllByRole('link', { name: '開く' }).map((link) => link.getAttribute('href'))
-    expect(next).toEqual(list.filter((step) => step.state !== 'done').map((step) => step.action?.href))
+    expect(next).toEqual(['/restaurant-test/tables', '/restaurant-test/inventory'])
+    expect(screen.queryByText('コースとメニューを登録する')).toBeNull()
     expect(next).toHaveLength(2)
     for (const button of screen.getAllByRole('button', { name: '閉じる' })) fireEvent.click(button)
     expect(onClose).toHaveBeenCalled()
