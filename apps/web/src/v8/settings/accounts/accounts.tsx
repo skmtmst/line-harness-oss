@@ -21,6 +21,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { TextArea } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import SearchField from '@/components/shared/search-field'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiBand from '@/components/shared/kpi-band'
@@ -191,7 +192,7 @@ export default function AccountsV8() {
 
   return (
     <>
-      <SettingsPage layout="accounts" help={<>{DESCRIPTION}{"行の「…」から 詳細・接続をもう一度確かめる・既定にする・引き継ぎ（UID の移行）・アーカイブ。"}</>} boardId="V7vn3" title={TITLE} readOnly={role !== null && blocked} readOnlyNeed="manager" actions={headActions} navigation={<SettingsInnerNav inline />}>
+      <SettingsPage layout="accounts" help={<>{DESCRIPTION}{"行の「…」から 詳細・接続をもう一度確かめる・既定にする・引き継ぎ（UID の移行）・アーカイブ。"}</>} boardId="V7vn3" title={TITLE} notice={role !== null && blocked ? <ReadOnlyNotice need="manager" /> : undefined} actions={headActions} navigation={<SettingsInnerNav inline />}>
         {notice ? (
           <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} onClose={() => setNotice(null)} />
         ) : null}

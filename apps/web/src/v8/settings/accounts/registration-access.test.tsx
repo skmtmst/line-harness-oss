@@ -115,6 +115,8 @@ it('本人未知は理由も帯も出さず普通にdisabled、判明したviewe
   verifiedStaffRole('viewer')
   view.rerender(<AccountsV8 />)
   expect(view.container.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+  expect(view.container.querySelector('[data-read-only-notice]')?.closest('header')).toBeNull()
+  expect(view.container.querySelector('[data-read-only-notice]')?.closest('[data-template-region="notice"]')?.previousElementSibling?.getAttribute('data-template-region')).toBe('heading')
   expect(screen.getAllByRole('button', { name: /LINEアカウントを登録/ })[0].getAttribute('aria-disabled')).toBe('true')
 })
 
@@ -124,6 +126,8 @@ it('ownerの閲覧代理への切替は書込入口を止め、書込代理で�
   expect(screen.getAllByRole('link', { name: /LINEアカウントを登録/ })).toHaveLength(2)
   await act(async () => { rememberSessionSnapshot(snapshot('read')) })
   expect(view.container.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+  expect(view.container.querySelector('[data-read-only-notice]')?.closest('header')).toBeNull()
+  expect(view.container.querySelector('[data-read-only-notice]')?.closest('[data-template-region="notice"]')?.previousElementSibling?.getAttribute('data-template-region')).toBe('heading')
   expect(screen.queryByRole('link', { name: /LINEアカウントを登録/ })).toBeNull()
   const order = screen.getByRole('button', { name: /並び順と親子を変える/ })
   expect(order.getAttribute('aria-disabled')).toBe('true')
