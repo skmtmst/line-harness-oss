@@ -70,13 +70,14 @@ const ACCOUNT: AccountWithStats = {
 
 /** 文脈の中身を DOM に出すだけの観測点。 */
 function Probe() {
-  const { accounts, error, loading, refreshing, refreshAccounts } = useAccount()
+  const { accounts, selectedAccountId, error, loading, refreshing, refreshAccounts } = useAccount()
   return (
     <div>
       <span data-probe="loading">{String(loading)}</span>
       <span data-probe="refreshing">{String(refreshing)}</span>
       <span data-probe="error">{error ?? ''}</span>
       <span data-probe="count">{accounts.length}</span>
+      <span data-probe="selected">{selectedAccountId ?? ''}</span>
       <button type="button" data-probe="refresh" onClick={() => { void refreshAccounts() }}>
         refresh
       </button>
@@ -130,6 +131,29 @@ afterEach(() => {
 })
 
 describe('アカウント一覧の取得失敗（Issue #978）', () => {
+  it('アーカイブ済みは切り替え一覧から除き、保存された選択も解除する', async () => {
+    const archived = { ...ACCOUNT, id: 'old-shed', name: 'THE SHED（旧登録）', archivedAt: '2026-10-28T00:00:00Z' }
+    const active = { ...ACCOUNT, id: 'current-shed', name: 'THE SHED', archivedAt: null }
+    storage.setItem('lh_selected_account', archived.id)
+    api.listAccounts.mockResolvedValue({ success: true, data: [archived, active] })
+
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => { expect(probe('loading').textContent).toBe('false') })
+    expect(probe('count').textContent).toBe('1')
+    expect(probe('selected').textContent).toBe('')
+    expect(storage.getItem('lh_selected_account')).toBeNull()
+
+    storage.setItem('lh_selected_account', active.id)
+    await act(async () => { probe('refresh').click() })
+    await eventually(() => { expect(probe('selected').textContent).toBe(active.id) })
+
+    api.listAccounts.mockResolvedValue({ success: true, data: [archived, { ...active, archivedAt: '2026-10-29T00:00:00Z' }] })
+    await act(async () => { probe('refresh').click() })
+    await eventually(() => { expect(probe('count').textContent).toBe('0') })
+    expect(probe('selected').textContent).toBe('')
+    expect(storage.getItem('lh_selected_account')).toBeNull()
+  })
+
   it('初回は先読みした一覧を使い、手動の取り直しは最新を取得する', async () => {
     api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
     prefetchLineAccounts()
