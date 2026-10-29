@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { StrictMode } from 'react'
 import { afterEach, expect, it, vi } from 'vitest'
 import Pagination from './pagination'
 
@@ -81,4 +82,11 @@ it('印があっても読み込み中は知らせを出さない', () => {
   const change = vi.fn()
   render(<Pagination page={3} pageCount={1} onPageChange={change} correctOutOfRange disabled />)
   expect(change).not.toHaveBeenCalled()
+})
+
+it('二重実行でも同じ行き先への知らせは1回だけ', () => {
+  const change = vi.fn()
+  render(<StrictMode><Pagination page={3} pageCount={1} onPageChange={change} correctOutOfRange /></StrictMode>)
+  expect(change).toHaveBeenCalledTimes(1)
+  expect(change).toHaveBeenCalledWith(1)
 })

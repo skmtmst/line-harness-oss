@@ -780,3 +780,19 @@ it('2ページ目で削除して1ページになると1ページ目に戻って�
   expect(host.textContent).toContain('通常0')
   expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('20件中 1〜20件')
 }, 20_000)
+
+it('総件数が未取得のときは補正せず2ページ目の行を出す', async () => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/broadcasts?page=2')
+  const rows = Array.from({ length: 21 }, (_, i) => ({ ...rowB, id: `nt-${i}`, title: `通常${i}` }))
+  listBroadcasts.mockImplementation(async (params) => {
+    const cursor = Number(params.cursor ?? 0)
+    const limit = params.limit ?? 20
+    return { success: true, data: rows.slice(cursor, cursor + limit), pagination: { nextCursor: null } }
+  })
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  expect(host.textContent).toContain('通常20')
+  flushListUrlState()
+  expect(window.location.search).toContain('page=2')
+}, 20_000)

@@ -1,4 +1,4 @@
-import React, { useEffect, useId } from 'react'
+import React, { useEffect, useId, useRef } from 'react'
 import styles from './pagination.module.css'
 
 export type PaginationItem = number | 'ellipsis'
@@ -84,9 +84,16 @@ export default function Pagination({
   const total = safePage(pageCount, 1)
   const current = Math.min(total, safePage(page, 1))
 
+  const notifiedRef = useRef<number | null>(null)
   useEffect(() => {
-    if (!correctOutOfRange || disabled) return
-    if (page > total) onPageChange(total)
+    // 同じ行き先への知らせは1回だけ（StrictMode の二重実行でも重ねない）。
+    if (!correctOutOfRange || disabled || page <= total) {
+      notifiedRef.current = null
+      return
+    }
+    if (notifiedRef.current === total) return
+    notifiedRef.current = total
+    onPageChange(total)
   }, [correctOutOfRange, disabled, page, total, onPageChange])
   const classes = [styles.pagination, className].filter(Boolean).join(' ')
   const pausedReason = disabled ? '現在、ページを移動できません。' : undefined
