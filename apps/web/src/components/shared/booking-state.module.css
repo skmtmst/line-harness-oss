@@ -85,7 +85,7 @@
 .cardMeta > :not(.detail) { flex-shrink: 0; }
 .cardMeta > .label { flex-shrink: 1; min-width: 0; }
 .cardMeta > .detail { flex: 0 1 auto; min-width: 0; }
-.cardMeta > [data-booking-guests], .cardMeta > [data-booking-warning] { flex: 0 0 auto; }
+.cardMeta > [data-booking-guests] { flex: 0 0 auto; }
 .statusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* 人数と注意は先頭で確保し、狭い箱では補足から省略する。全文は箱の説明に残す。 */
