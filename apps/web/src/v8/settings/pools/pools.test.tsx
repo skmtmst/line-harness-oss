@@ -29,7 +29,7 @@ import PoolsV8 from './pools'
 afterEach(cleanup)
 
 // 決まり2: 外した時の説明は帯にせず、題の横の「？」へ入れる。
-it('外した時の説明は帯に出さず題の「？」に入れる', async () => {
+it('プールから外れた時の説明は帯に出さず題の「？」に入れる', async () => {
   render(<PoolsV8 />)
   await screen.findByText('既定')
   expect(screen.queryByText(/振り分けられなくなります/)).toBeNull()
