@@ -76,6 +76,8 @@ interface ConfirmDialogProps {
   /** 実行ボタンを押せない形で出す（WEB228：確かめのチェックが入るまで）。 */
   confirmDisabled?: boolean
   confirmDisabledReason?: string
+  /** 権限で使えない理由。Dialogの専用口へそのまま渡す。 */
+  confirmLockedReason?: string
   actionWidthReserve?: 'states' | 'idle'
   confirmPlacement?: 'start'
   onCancel: () => void
@@ -117,6 +119,7 @@ export default function ConfirmDialog({
   onConfirm,
   confirmDisabled = false,
   confirmDisabledReason,
+  confirmLockedReason,
   actionWidthReserve,
   confirmPlacement,
   onCancel,
@@ -125,7 +128,7 @@ export default function ConfirmDialog({
   const [executionError, setExecutionError] = useState('')
   const lock = useRef(false)
   const runConfirm = onConfirm ? () => {
-    if (lock.current || busy) return
+    if (lock.current || busy || confirmLockedReason) return
     lock.current = true
     setExecutionError('')
     try {
@@ -171,6 +174,7 @@ export default function ConfirmDialog({
       busy={busy || executing}
       confirmDisabled={confirmDisabled}
       confirmDisabledReason={confirmDisabledReason}
+      confirmLockedReason={confirmLockedReason}
       actionWidthReserve={actionWidthReserve}
       confirmPlacement={confirmPlacement}
       error={error || executionError}
