@@ -818,6 +818,7 @@
 - [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
 - [一覧の帯・フォルダの丸と共通操作の整理](release-log/unreleased/0000-kenta-tags-band-dot.md)
 - [共通部品と言葉・受信箱の絞り込みの修正](release-log/unreleased/0000-kenta-int.md)
+- [チェックの印・スイッチ・選ぶ欄の見た目の統一](release-log/unreleased/0000-kenta-check-green.md)
 - [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
 - [まとめ列車 7](release-log/unreleased/1848-kenta-train-one7-1027.md)
 
@@ -852,3 +853,10 @@
 - [カルーセルのボタン削除](release-log/unreleased/1879-kenta-carousel-delete.md) — カルーセル内の操作に関する反映履歴。
 - [配達連携の解除ボタン](release-log/unreleased/1880-kenta-delivery-disconnect.md) — 配達連携の画面に関する反映履歴。
 - [SNS連携の操作と案内](release-log/unreleased/1881-kenta-sns-actions.md) — SNS連携の画面に関する反映履歴。
+- [チャネルのWebhook URL](release-log/unreleased/1882-masato-channel-webhook-url.md) — LINEアカウント登録の画面に関する反映履歴。
+- [投稿画像の切り取り](release-log/unreleased/1883-masato-google-instagram-image-crop.md) — GoogleビジネスとInstagramの投稿画像に関する反映履歴。
+- [検証環境の配備情報](release-log/unreleased/1884-masato-staging-build-metadata.md) — 検証環境の手元配備に関する反映履歴。
+- [プロバイダーの画面を開く](release-log/unreleased/1885-masato-line-provider-step3.md) — LINEアカウント登録の画面に関する反映履歴。
+- [投稿画像を登録メディアから選ぶ](release-log/unreleased/1886-masato-post-media-picker.md) — GoogleビジネスとInstagramの投稿画像に関する反映履歴。
+- [既存のLINEログインチャネルの案内](release-log/unreleased/1887-masato-provider-existing-login-copy.md) — LINEアカウント登録の画面に関する反映履歴。
+- [登録メディアの画像の読み込み](release-log/unreleased/1890-masato-post-media-content.md) — GoogleビジネスとInstagramの投稿画像に関する反映履歴。
