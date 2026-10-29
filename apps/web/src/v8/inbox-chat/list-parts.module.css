@@ -29,9 +29,9 @@
   height: auto;
   min-width: var(--tpl-inbox-tool-size);
   flex-direction: column;
-  gap: 2px;
-  /* 横の余白は3pxまで。1152幅の列（見出し315px）に題と3つを1行で収める。 */
-  padding: 4px 3px;
+  gap: var(--tpl-inbox-row-line-gap);
+  /* 横の余白は2pxまで。1152幅の列（見出し315px）に題と3つを1行で収める。値は既存の受信箱の変数だけ。 */
+  padding: var(--tpl-inbox-chip-gap) var(--tpl-inbox-seg-gap);
 }
 
 :global(:root) .toolCaptionLabel {
@@ -48,8 +48,8 @@
 
 :global(:root) .toolDot {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: var(--tpl-inbox-seg-gap);
+  right: var(--tpl-inbox-seg-gap);
   width: var(--tpl-inbox-dot);
   height: var(--tpl-inbox-dot);
   border-radius: var(--radius-pill);
