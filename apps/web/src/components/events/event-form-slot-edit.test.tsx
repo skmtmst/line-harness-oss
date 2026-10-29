@@ -189,7 +189,7 @@ describe('予約枠の編集（入口29）', () => {
     await renderForm()
     await click(tabButton('2. 予約枠')!)
     await click(host.querySelector<HTMLButtonElement>('tbody button[aria-haspopup="menu"]')!)
-    await click(await screen.findByRole('menuitem', { name: '編集', exact: true }))
+    await click(await screen.findByRole('menuitem', { name: '編集する', exact: true }))
     expect(dialog()).toBeTruthy()
   }
 

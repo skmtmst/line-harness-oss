@@ -289,7 +289,7 @@ describe('遅れて返った結果の照合', () => {
     expect(buttonIn(dialog(), '削除する')).toBeDefined()
   })
 
-  it('409 の読み直しも、画面を開き直したあとに返ったものは映さない', async () => {
+  it('409 の再取得中に画面を再表示しても古い応答を映さない', async () => {
     const reread = deferred<Impact>()
     let round = 0
     impacts.set('m-1', () => {
