@@ -69,6 +69,39 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); window.localStorage.clear(); window.sessionStorage.clear() })
 
+it.each([
+  ['lh:v8:first-steps-folded:A', true],
+  ['lh:v8:first-steps-dismissed:A', true],
+  ['lh:v8:first-steps-folded:A', false],
+  ['lh:v8:first-steps-dismissed:A', false],
+] as const)('保存済みの畳む状態（%s・基本完了%s）でも残りの設定と入口を残す', async (key, complete) => {
+  window.localStorage.setItem(key, '1')
+  net.progress.mockResolvedValue(basic(complete))
+  render(<DashboardV8 />)
+  const basicProgress = await screen.findByRole('progressbar', { name: 'はじめにやることの進み' })
+  expect(basicProgress.getAttribute('aria-valuenow')).toBe(complete ? '6' : '5')
+  expect(within(guide()).getByRole('button', { name: '開く', exact: true }).getAttribute('aria-expanded')).toBe('false')
+  expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
+  const configure = await pendingSetup()
+  expect(within(guide()).getByText('リッチメニューなどの見た目を決める').closest('[hidden]')).toBeNull()
+  expect(within(guide()).getByText(/残りの設定 1 件/)).toBeTruthy()
+  fireEvent.click(configure)
+  expect(await screen.findByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })).toBeTruthy()
+  expect(net.save).not.toHaveBeenCalled(); expect(net.activate).not.toHaveBeenCalled()
+})
+
+it('基本6段の満タンとは別に、使い方の設定1/3と残りの設定を示す', async () => {
+  net.progress.mockResolvedValue(basic(true))
+  render(<DashboardV8 />)
+  await pendingSetup()
+  expect(within(guide()).getByText('6 / 6 済み')).toBeTruthy()
+  expect(within(guide()).getByText(/1 \/ 3 済み/)).toBeTruthy()
+  expect(within(guide()).getByText(/残りの設定 1 件/)).toBeTruthy()
+  const progress = within(guide()).getByRole('progressbar', { name: '使い方の設定の進み' })
+  expect(progress.getAttribute('aria-valuenow')).toBe('1')
+  expect(progress.getAttribute('aria-valuemax')).toBe('3')
+})
+
 it('基本GETだけ失敗しても取得済みの設定入口と独立した再試行を残す', async () => {
   net.progress.mockRejectedValueOnce(new Error('progress unavailable'))
   render(<DashboardV8 />)
@@ -89,7 +122,8 @@ it('基本GETが保留でstepsが空でも、取得済みの設定を隠さず0/
   net.progress.mockImplementationOnce(() => new Promise(value => { resolve = value }))
   render(<DashboardV8 />)
   expect(await pendingSetup()).toBeTruthy()
-  expect(screen.queryByRole('progressbar')).toBeNull()
+  expect(screen.queryByRole('progressbar', { name: 'はじめにやることの進み' })).toBeNull()
+  expect(screen.getByRole('progressbar', { name: '使い方の設定の進み' }).getAttribute('aria-valuenow')).toBe('1')
   expect(guide().textContent).not.toContain('0 / 0')
   await act(async () => { resolve(basic()) })
   expect(await screen.findByRole('progressbar', { name: 'はじめにやることの進み' })).toBeTruthy()
@@ -125,15 +159,15 @@ it('両GETが失敗したときは各再試行が対応する取得だけをや�
   expect(net.progress).toHaveBeenCalledTimes(2); expect(net.style).toHaveBeenCalledTimes(2)
 })
 
-it('基本6段が済んで使い方だけ後回しなら、既知の進捗1つと設定操作を同じカードへ出す', async () => {
+it('基本6段と使い方の進捗を分け、畳んでも後回しの設定操作を残す', async () => {
   net.progress.mockResolvedValue(basic(true))
   render(<DashboardV8 />)
   await pendingSetup()
-  expect(screen.getAllByRole('progressbar')).toHaveLength(1)
+  expect(screen.getAllByRole('progressbar')).toHaveLength(2)
   expect(within(guide()).getByText('6 / 6 済み')).toBeTruthy()
   expect(within(guide()).getByText('リッチメニューなどの見た目を決める')).toBeTruthy()
   fireEvent.click(within(guide()).getByRole('button', { name: '畳む', exact: true }))
-  expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
+  expect(screen.getByRole('button', { name: '使い方の設定を開く', exact: true })).toBeTruthy()
   fireEvent.click(within(guide()).getByRole('button', { name: '開く', exact: true }))
   expect(await pendingSetup()).toBeTruthy()
   expect(window.localStorage.getItem('lh:v8:first-steps-folded:A')).toBe('0')
