@@ -24,7 +24,7 @@ describe('投稿画像の切り取り確認窓', () => {
     expect(screen.getByRole('button', { name: 'この位置で確定' })).toBeTruthy()
   })
 
-  it('確定は画像の読み込み前は押せない', () => {
+  it('画像を読み込むまでは確定できない', () => {
     render(<PostImageCrop target="google" source={source} onClose={vi.fn()} onConfirm={vi.fn()} />)
     expect((screen.getByRole('button', { name: 'この位置で確定' }) as HTMLButtonElement).disabled).toBe(true)
   })
