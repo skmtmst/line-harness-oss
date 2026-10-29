@@ -11,7 +11,7 @@
  *  - 「初期状態に戻す」は確認なしに実行されない（A01-02）
  */
 import { act } from 'react'
-import { waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -262,7 +262,7 @@ function todayCard(title: string): HTMLElement {
 
 async function openEditor() {
   await act(async () => { button('表示を変える').click() })
-  await waitFor(() => expect(document.body.querySelector('[role="dialog"]')).not.toBeNull())
+  await screen.findByRole('dialog', { name: 'ダッシュボード編集' })
 }
 
 describe('DASH-02 アカウント切替後の取得失敗で前の数値が残らない', () => {
@@ -367,7 +367,7 @@ describe('DASH-15 配置の遅延GETが編集中の変更を上書きしない',
     await render()
     await openEditor()
 
-    const toggle = dialog().querySelector<HTMLInputElement>('[role="switch"][aria-label="写真審査を表示"]')
+    const toggle = await within(dialog()).findByRole('switch', { name: '写真審査を表示' })
     expect(toggle ? String((toggle.getAttribute('aria-checked') === 'true')) : undefined).toBe('true')
     await act(async () => { toggle!.click() })
     expect(String((toggle!.getAttribute('aria-checked') === 'true'))).toBe('false')

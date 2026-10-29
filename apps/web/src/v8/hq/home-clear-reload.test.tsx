@@ -110,3 +110,21 @@ test('フォルダの「色を変える」から既存色を変えて保存し�
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(document.querySelector('nav svg.lucide-folder')?.getAttribute('style')).toContain('#ef4444')
 })
+
+
+test('フォルダの数はすべてと同じ非アーカイブの一覧から数える',async()=>{
+  const original = await api.lineAccounts.list()
+  if(!original.success) throw new Error('fixture')
+  const base=original.data[0]
+  vi.mocked(api.lineAccounts.list).mockResolvedValueOnce({success:true,data:[
+    {...base,id:'one',folderId:'f1'}, {...base,id:'two',folderId:null}, {...base,id:'archived',folderId:'f1',archivedAt:'2026-10-01'},
+  ]})
+  vi.mocked(api.lineAccountFolders.list).mockResolvedValueOnce({success:true,data:{folders:[{id:'f1',kind:'line_account',name:'関西',parentId:null,color:null,displayOrder:1,itemCount:99,createdAt:'',updatedAt:''}],total:99,unclassifiedCount:98}})
+  render(<HqHomeV8/>)
+  await screen.findAllByText('銀座店')
+  const rail=screen.getByRole('complementary',{name:'フォルダ'})
+  const rows=[...rail.querySelectorAll('[data-part="folder-row"]')].map(el=>el.textContent?.replace(/\s/g,''))
+  expect(rows).toEqual(expect.arrayContaining(['すべて2','関西1','未分類1']))
+  fireEvent.click(screen.getByRole('button',{name:'フォルダの説明'}))
+  expect((document.body.textContent?.match(/フォルダを消しても/g) ?? [])).toHaveLength(1)
+})
