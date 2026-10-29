@@ -14,13 +14,13 @@ import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOpti
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import { getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
-import type { LineAccount as DbLineAccount, LineAccountConnectionCheck, LineAccountScopeEntry } from '@line-crm/db';
+import type { LineAccount as DbLineAccount, LineAccountConnectionCheck } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditLog } from '../lib/audit-log.js';
 import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
-import { detectFollowerImportCapability, getFollowerImportState, processFollowerImportStep, startFollowerImport } from '../services/follower-import.js';
+import { detectFollowerImportCapability, getFollowerImportState, processFollowerImportStep, scheduleInitialFollowerImport, startFollowerImport } from '../services/follower-import.js';
 import type { FollowerImportClient } from '../services/follower-import-state.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope, validateAccountHierarchy } from '../services/account-access.js';
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
@@ -29,6 +29,7 @@ import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 import { lineConnectStep, prepareLineConnection, type LineConnectStep } from '../services/line-account-connect.js';
 import { getLineRegistrationReceipt } from '../services/line-registration-receipt.js';
+import { getAuthorizedLineAccount, getVisibleLineAccountEntry } from './line-account-access.js';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 
@@ -399,22 +400,6 @@ async function verifyConnection(input: {
     }
   }
   return result;
-}
-
-async function getVisibleLineAccountEntry(
-  c: Context<Env>,
-  id: string,
-): Promise<LineAccountScopeEntry | null> {
-  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  return scope.accounts.find((account) => account.id === id) ?? null;
-}
-
-async function getAuthorizedLineAccount(
-  c: Context<Env>,
-  id: string,
-): Promise<DbLineAccount | null> {
-  if (!await getVisibleLineAccountEntry(c, id)) return null;
-  return getLineAccountById(c.env.DB, id);
 }
 
 // 保存前の接続確認。成功してもDBには一切書き込まない。
@@ -1216,7 +1201,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
     const started = followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
     savingStyle = true;
     await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style);
-    savingStyle = false;
+    savingStyle = false; try { scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }
     const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed')];
     return c.json({
       success: true,
