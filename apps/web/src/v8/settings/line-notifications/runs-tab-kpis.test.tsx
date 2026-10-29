@@ -13,27 +13,30 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/line-notifications',
 }))
+const mutation = vi.hoisted(() => vi.fn())
+const availability = vi.hoisted(() => ({ retry: true }))
 const identity = vi.hoisted(() => ({ role: 'owner', readOnly: false, roleBundle: undefined as string | undefined }))
-beforeEach(() => { identity.role = 'owner'; identity.readOnly = false; identity.roleBundle = undefined })
+beforeEach(() => { availability.retry = true; mutation.mockReset(); identity.role = 'owner'; identity.readOnly = false; identity.roleBundle = undefined })
 const run = vi.hoisted(() => (id: string, channel: 'line' | 'email', reason: string) => ({
   id, recipientType: 'customer', notificationName: '注文', source: 'ec', sourceEventId: 'e', friendId: 'f', friendName: '田中',
   orderNumber: 'A-1', channel, status: 'failed', reason, receivedAt: '2026-10-01T00:00:00Z', acceptedAt: null, attemptCount: 1,
-  retryAvailable: true, nextRetryAt: null, clickedAt: null, version: 1, executionMode: 'automatic',
+  retryAvailable: availability.retry, recordVersion: 7, nextRetryAt: null, clickedAt: null, version: 1, executionMode: 'automatic',
 }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
-  const page = {
+  const page = () => ({
     success: true,
     data: { items: [run('r1', 'line', 'ブロックされていました'), run('r2', 'email', 'メールが届きませんでした')], summary: { failed: 57 }, coverage: { source: 'notification_delivery_ledger' } },
     pagination: { total: 57, limit: 20, offset: 0 },
-  }
+  })
   return {
     ...actual,
+    fetchApi: mutation,
     api: {
       ...actual.api,
       staff: { ...actual.api.staff, me: async () => ({ success: true, data: identity }) },
-      lineNotifications: { ...actual.api.lineNotifications, deliveries: async () => page, notificationRuns: async () => page },
-      ecCommerce: { ...actual.api.ecCommerce, notificationRuns: async () => page },
+      lineNotifications: { ...actual.api.lineNotifications, deliveries: async () => page(), notificationRuns: async () => page(), retryDelivery: mutation },
+      ecCommerce: { ...actual.api.ecCommerce, notificationRuns: async () => page() },
     },
   }
 })
@@ -68,11 +71,52 @@ test.each([
   [{ role: 'owner' }, true, true], [{ role: 'admin' }, false, true], [{ role: 'staff' }, false, false],
   [{ role: 'viewer' }, false, false], [{ role: 'admin', readOnly: true }, false, false],
   [{ role: 'owner', roleBundle: 'view_only' }, false, false],
-] as const)('詳細は読めるが送り直しと対応済みは現在の権限だけに出す: %j', async (staff, retry, resolve) => {
+] as const)('詳細と操作を残し、送り直しと対応済みは現在の権限でロックする: %j', async (staff, retry, resolve) => {
   Object.assign(identity, staff)
   render(<RunsTab lineAccountId="acc" mode="failures" />)
   fireEvent.click((await screen.findAllByRole('button', { name: '注文' }))[0])
   await screen.findByText('記録の詳細')
-  expect(Boolean(screen.queryByRole('button', { name: '送信を再試行する' }))).toBe(retry)
-  expect(Boolean(screen.queryByRole('button', { name: '対応済みにする' }))).toBe(resolve)
+  expect(screen.getByRole('button', { name: '送信を再試行する' }).getAttribute('aria-disabled') === 'true').toBe(!retry)
+  expect(screen.getByRole('button', { name: '対応済みにする' }).getAttribute('aria-disabled') === 'true').toBe(!resolve)
+  if (!retry) fireEvent.click(screen.getByRole('button', { name: '送信を再試行する' }))
+  if (!resolve) fireEvent.click(screen.getByRole('button', { name: '対応済みにする' }))
+  expect(mutation).not.toHaveBeenCalled()
+})
+
+
+test.each([
+  { role: 'owner', retryAvailable: true },
+  { role: 'viewer', retryAvailable: true },
+  { role: 'owner', retryAvailable: false },
+  { role: 'viewer', retryAvailable: false },
+])('台帳の再試行可否と現在の権限を描画と送信で確かめる: %j', async ({ role, retryAvailable }) => {
+  identity.role = role
+  availability.retry = retryAvailable
+  render(<RunsTab lineAccountId="acc" mode="failures" />)
+  fireEvent.click((await screen.findAllByRole('button', { name: '注文' }))[0])
+  await screen.findByText('記録の詳細')
+  const retry = screen.queryByRole('button', { name: '送信を再試行する' })
+  if (!retryAvailable) {
+    expect(retry).toBeNull()
+    expect(mutation).not.toHaveBeenCalled()
+    return
+  }
+  expect(retry).not.toBeNull()
+  if (role === 'viewer') {
+    expect(retry!.getAttribute('aria-disabled')).toBe('true')
+    expect(retry!.hasAttribute('data-permission-locked')).toBe(true)
+    const reason = (retry!.getAttribute('aria-describedby') ?? '').split(/\s+/)
+      .map(id => document.getElementById(id)?.textContent ?? '').join(' ')
+    expect(reason).toMatch(/権限|閲覧|オーナー|店長/)
+    fireEvent.focus(retry!)
+    fireEvent.click(retry!)
+    fireEvent.keyDown(retry!, { key: 'Enter' })
+    expect(mutation).not.toHaveBeenCalled()
+  } else {
+    expect(retry!.getAttribute('aria-disabled')).not.toBe('true')
+    fireEvent.click(retry!)
+    await waitFor(() => expect(mutation).toHaveBeenCalledWith('r1', {
+      lineAccountId: 'acc', expectedVersion: 7,
+    }))
+  }
 })

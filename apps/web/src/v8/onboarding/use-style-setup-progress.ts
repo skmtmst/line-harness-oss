@@ -1,0 +1,36 @@
+'use client'
+import { useEffect, useState } from 'react'
+import type { AccountStyle } from '@line-crm/shared'
+import { ACCOUNT_STYLE_UPDATED } from '@/hooks/use-account-style'
+import type { StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
+import { loadStyleSetupProgress, unknownStyleSetupProgress } from './style-setup-progress'
+
+/** 店とスタイルを切り替えた直後に、前の設定を「済み」として見せない。 */
+export function useStyleSetupProgress(accountId: string | null, style: AccountStyle | null, enabled = true) {
+  const scope = JSON.stringify([accountId, style])
+  const [snapshot, setSnapshot] = useState<{ scope: string; progress: StyleSetupProgress } | null>(null)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    let active = true
+    setSnapshot(null)
+    if (!enabled || !accountId || !style || style === 'standard') return
+    void loadStyleSetupProgress(accountId, style).then(progress => {
+      if (active) setSnapshot({ scope, progress })
+    }).catch(() => {
+      if (active) setSnapshot({ scope, progress: unknownStyleSetupProgress(style, '設定を読み込めていません。もう一度読み直してください') })
+    })
+    return () => { active = false }
+  }, [accountId, style, enabled, scope, tick])
+  useEffect(() => {
+    const reload = (event: Event) => {
+      if (event.type === 'visibilitychange' ? document.visibilityState === 'visible' : (event as CustomEvent<{ accountId: string }>).detail?.accountId === accountId) setTick(value => value + 1)
+    }
+    window.addEventListener(ACCOUNT_STYLE_UPDATED, reload)
+    document.addEventListener('visibilitychange', reload)
+    return () => { window.removeEventListener(ACCOUNT_STYLE_UPDATED, reload); document.removeEventListener('visibilitychange', reload) }
+  }, [accountId])
+  return {
+    progress: enabled && snapshot?.scope === scope ? snapshot.progress : style ? unknownStyleSetupProgress(style) : undefined,
+    reload: () => setTick(value => value + 1),
+  }
+}

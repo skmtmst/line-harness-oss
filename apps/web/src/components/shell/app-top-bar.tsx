@@ -4,9 +4,10 @@ import { useStaffRole, useStaffIdentity } from '@/lib/staff-role'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TopBar from '@/components/shared/top-bar'
+import Notice from '@/components/shared/notice'
+import { isAccountIndependentRoute } from '@/lib/store-route-guard'
 import BellNotifications from './bell-notifications'
 import { loadNotificationCenter, type NotificationAccount, type NotificationScope } from './notification-center-data'
-import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { usePageChrome } from './page-chrome'
@@ -200,7 +201,6 @@ export default function AppTopBar() {
   const shownTitle = title ?? defaultTitleForPath(pathname)
   // タブの題も上の帯と同じ画面名にする（「<画面名> | musubo」）。
   useEffect(() => { setDocumentTitle(documentTitleForPath(pathname, shownTitle)) }, [pathname, shownTitle])
-  const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
   /*
    * ★V8 統括の外側（絵のオーナー 2026-10-07）：統括の画面（LINEアカウントの登録も含む）では、
    * 切替の札に「統括」と統括名、名前の下に「統括」を出す。互換経路は今までどおり。
@@ -288,12 +288,8 @@ export default function AppTopBar() {
    * `?q=` の受け口自体は友だち一覧が持ち続ける。
    */
 
-  /*
-   * 一覧の取得に失敗したとき、札がただ空になるだけだと「アカウントが
-   * 1件も無い」ように見える（Issue #978）。失敗と再読み込みをバーの
-   * 直下へ出す。統括の画面（/hq）は画面本体が同じ失敗を出すので畳む。
-   */
-  const accountsLoadFailed = !isHq && !loading && Boolean(error) && accounts.length === 0
+  const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
+  const accountsLoadFailed = !isHq && isAccountIndependentRoute(pathname) && !loading && Boolean(error) && accounts.length === 0
 
   return (
     <>
@@ -302,8 +298,6 @@ export default function AppTopBar() {
       （U037/U038）。TopBar 自身のクラスではなく無印の div で包む:
       部品側の display 指定（CSS Module）より utilities の hidden が
       負ける書き方を避けるため。xl は Tailwind 既定の 1280px。
-      アカウント一覧の失敗帯はこの下に別で出すので、モバイルでも
-      失敗だけは見える。
     */}
     {/*
       v8 では帯を 1024px から出す（畳んだ左メニューと組むため）。

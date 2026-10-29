@@ -22,6 +22,10 @@ const fixture = vi.hoisted(() => ({
   setSelectedAccountId: vi.fn(),
   tenantsMe: vi.fn(),
   selectedAccountId: null as string | null,
+  loading: false,
+  error: null as string | null,
+  refreshing: false,
+  refreshAccounts: vi.fn(),
   accounts: [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }],
   notificationList: vi.fn(),
   followerImportState: vi.fn(),
@@ -38,7 +42,10 @@ const testLocalStorage = {
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: testLocalStorage })
 Object.defineProperty(window, 'localStorage', { configurable: true, value: testLocalStorage })
 
-vi.mock('next/navigation', () => ({ usePathname: () => fixture.pathname, useRouter: () => ({ push: fixture.push }) }))
+vi.mock('next/navigation', () => {
+  const router = { push: fixture.push, replace: vi.fn() }
+  return { usePathname: () => fixture.pathname, useRouter: () => router }
+})
 vi.mock('next/link', async () => {
   const React = await import('react')
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement('a', { href, ...props }, children) }
@@ -49,10 +56,10 @@ vi.mock('@/contexts/account-context', () => ({
     selectedAccountId: fixture.selectedAccountId,
     setSelectedAccountId: fixture.setSelectedAccountId,
     clearSelectedAccountId: vi.fn(),
-    loading: false,
-    error: null,
-    refreshing: false,
-    refreshAccounts: vi.fn(),
+    loading: fixture.loading,
+    error: fixture.error,
+    refreshing: fixture.refreshing,
+    refreshAccounts: fixture.refreshAccounts,
   }),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageChrome: () => ({ title: null, crumbs: null, fullWidth: false, settingsNavInline: false }) }))
@@ -60,6 +67,8 @@ vi.mock('@/lib/use-manual-href', () => ({ useManualHref: () => null }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '株式会社 然', iconUrl: null }) }))
 
 import AppTopBar from './app-top-bar'
+import StoreSelectionGate from '@/components/store-selection-gate'
+import RootLandingGate from '@/components/root-landing-gate'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -77,6 +86,10 @@ describe('★V8 統括の上の帯', () => {
     fixture.tenantsMe.mockReset()
     fixture.tenantsMe.mockResolvedValue({ success: true, data: { name: '然 -NEN- 本部' } })
     fixture.selectedAccountId = null
+    fixture.loading = false
+    fixture.error = null
+    fixture.refreshing = false
+    fixture.refreshAccounts.mockReset()
     fixture.accounts = [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }]
     fixture.notificationList.mockReset()
     fixture.notificationList.mockResolvedValue({ success: true, data: { items: [], counts: { all: 0, error: 0, update: 0, unread: 0 }, unreadCount: 0 } })
@@ -113,6 +126,64 @@ describe('★V8 統括の上の帯', () => {
     await act(async () => { await Promise.resolve() })
     expect(view.queryAllByText('然 -NEN- 本部')).toHaveLength(0)
     expect(view.getAllByText('統括').length).toBeGreaterThanOrEqual(2)
+  })
+
+  it.each(['/friends', '/'])('アカウント一覧の失敗は%sの中央1か所で示し、読み直して復旧できる', async (pathname) => {
+    fixture.pathname = pathname
+    fixture.accounts = []
+    fixture.error = 'アカウント一覧を読み込めませんでした'
+    const Gate = pathname === '/' ? RootLandingGate : StoreSelectionGate
+    const content = () => <><AppTopBar /><Gate><p>取得後の画面本体</p></Gate></>
+    const view = render(content())
+    await view.findByText('アカウント一覧を読み込めませんでした')
+    expect(view.queryByText('LINEアカウントの一覧を読み込めませんでした。')).toBeNull()
+    const retries = view.getAllByRole('button', { name: /^(もう一度読み込む|再読み込み)$/ })
+    expect(retries).toHaveLength(1)
+    expect(view.queryByText('取得後の画面本体')).toBeNull()
+    fireEvent.click(retries[0])
+    expect(fixture.refreshAccounts).toHaveBeenCalledTimes(1)
+
+    fixture.refreshing = true
+    view.rerender(content())
+    const retrying = view.getByRole('button', { name: '読み込んでいます' }) as HTMLButtonElement
+    expect(retrying.disabled).toBe(true)
+    fireEvent.click(retrying)
+    expect(fixture.refreshAccounts).toHaveBeenCalledTimes(1)
+
+    fixture.refreshing = false
+    fixture.error = null
+    fixture.accounts = [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }]
+    fixture.selectedAccountId = 'account-1'
+    view.rerender(content())
+    await view.findByText('取得後の画面本体')
+    expect(view.queryByText('アカウント一覧を読み込めませんでした')).toBeNull()
+  })
+
+  it.each(['/settings/customer-look', '/staff', '/accounts', '/emergency'])('選択不要の%sでもアカウント一覧の失敗と再読み込みを1か所に残す', async (pathname) => {
+    fixture.pathname = pathname
+    fixture.accounts = []
+    fixture.error = 'アカウント一覧を読み込めませんでした'
+    const content = () => <><AppTopBar /><StoreSelectionGate><p>選択不要の画面本体</p></StoreSelectionGate></>
+    const view = render(content())
+    await view.findByText('LINEアカウントの一覧を読み込めませんでした。')
+    expect(view.getAllByText('LINEアカウントの一覧を読み込めませんでした。')).toHaveLength(1)
+    expect(view.getAllByRole('button', { name: /^(もう一度読み込む|再読み込み)$/ })).toHaveLength(1)
+    expect(view.getByText('選択不要の画面本体')).toBeTruthy()
+    fireEvent.click(view.getByRole('button', { name: '再読み込み' }))
+    expect(fixture.refreshAccounts).toHaveBeenCalledTimes(1)
+    fixture.refreshing = true
+    view.rerender(content())
+    const busy = view.getByRole('button', { name: '読み込んでいます' }) as HTMLButtonElement
+    expect(busy.disabled).toBe(true)
+    fireEvent.click(busy)
+    expect(fixture.refreshAccounts).toHaveBeenCalledTimes(1)
+    fixture.refreshing = false
+    fixture.error = null
+    fixture.accounts = [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }]
+    view.rerender(content())
+    expect(view.queryByText('LINEアカウントの一覧を読み込めませんでした。')).toBeNull()
+    expect(view.queryByRole('button', { name: '再読み込み' })).toBeNull()
+    expect(view.getByText('選択不要の画面本体')).toBeTruthy()
   })
 
   it.each(['/hq', '/friends'])('前の選択が残る%sでも、統括だけ全アカウントの通知を読む', async (pathname) => {
