@@ -111,6 +111,20 @@ describe('運営コンソールの V8 外枠', () => {
 })
 
 describe('閲覧のみには隠さず押せない形＋理由で出す', () => {
+  it('自分の運営アカウントは停止できず、理由を示して送信しない', async () => {
+    await act(async () => { root.render(<OpsMembersV8 />) })
+    await settle()
+    const selfMenu = document.querySelector<HTMLButtonElement>('button[aria-label="検証 太郎のその他操作"]')!
+    expect(selfMenu).not.toBeNull()
+    expect(selfMenu.disabled).toBe(true)
+    expect(text()).toContain('自分の運営アカウントは停止・取り消しできません')
+    act(() => selfMenu.click())
+    await settle()
+    expect(document.querySelector('[role="menu"]')).toBeNull()
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(calls.filter(call => call.method !== 'GET')).toHaveLength(0)
+  })
+
   it('メンバー管理：書ける人には招待と停止、閲覧のみは押せない形＋理由で押しても口を呼ばない', async () => {
     await act(async () => { root.render(<OpsMembersV8 />) })
     await settle()

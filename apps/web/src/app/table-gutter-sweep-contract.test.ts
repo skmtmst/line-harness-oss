@@ -130,9 +130,5 @@ describe('表の外側の余白の洗い出し', () => {
     expect(css).toMatch(/\.table td\.td:last-child[^{]*\{[^}]*padding-right: var\(--tpl-fr-cell-inset\)/)
   })
 
-  it('/ops/members：自分自身は理由付き操作、閲覧のみは操作を出さない', () => {
-    const body = code(read('v8', 'ops', 'members.tsx'))
-    expect(body).toContain('readOnly ? null : self ? <RowActions')
-    expect(body).toContain("disabled: true, title: '自分の運営アカウントは停止・取り消しできません'")
-  })
+  // 運営メンバーの権限と自己停止の防止は v8/ops/ops.test.tsx の実描画で確かめる。
 })
