@@ -23,6 +23,7 @@ vi.mock('@/lib/api', async (original) => {
     getAvailability: async () => ({ by_staff: [], closed_dates: [] }),
   } }
 })
+vi.mock('@/v8/booking-menus/channels-tab', () => ({ default: () => <p>予約経路の内容</p> }))
 import Settings from '@/v8/booking-menus/settings'
 
 afterEach(cleanup)
@@ -72,3 +73,20 @@ describe('予約設定の板と、型が渡す権限・見本', () => {
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it('予約経路の常設説明は題横の説明から読めて、別のタブには混ぜない', async () => {
+  state.tab = 'channels'
+  await draw()
+  expect(screen.getByText('予約経路の内容')).toBeTruthy()
+  expect(screen.queryByText(/いちばん確かなのは/)).toBeNull()
+  const help = screen.getByRole('button', { name: '画面の説明' })
+  expect(help.closest('header')?.contains(screen.getByRole('heading', { name: '予約設定' }))).toBe(true)
+  fireEvent.click(help)
+  await waitFor(() => expect(document.getElementById(help.getAttribute('aria-describedby')!)).toHaveProperty('textContent', expect.stringContaining('スタッフの Google カレンダー')))
+  fireEvent.keyDown(document, { key: 'Escape' })
+  await waitFor(() => expect(help.getAttribute('aria-expanded')).toBe('false'))
+  cleanup(); state.tab = 'hours'; await draw()
+  const otherHelp = screen.getByRole('button', { name: '画面の説明' })
+  fireEvent.click(otherHelp)
+  expect(document.getElementById(otherHelp.getAttribute('aria-describedby')!)).not.toHaveProperty('textContent', expect.stringContaining('いちばん確かなのは'))
+})

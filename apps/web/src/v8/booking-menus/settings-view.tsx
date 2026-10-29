@@ -44,7 +44,12 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
         boardId={tab === 'menus' && !canEditMenus ? 'C9fv7A' : tabNode}
         dirty={false}
         readOnly={Boolean(accountId && tabReadOnly)} title={<>予約設定</>}
-        help={<>お客さまの予約画面に出るメニュー・時間・ルールを決めます</>}
+        help={<>
+          お客さまの予約画面に出るメニュー・時間・ルールを決めます
+          {tab === 'channels' ? <>。いちばん確かなのは「スタッフの Google カレンダー」です。
+            ほかの予約サービスがスタッフの Google カレンダーへ予約を書き出せれば、
+            その時間は自動で LINE の予約受付から外れます（いまの作りでできます）。</> : null}
+        </>}
         tabs={<>{tab === 'channels' && accountId ? <ChannelsSummaryBand summary={currentSummary} /> : null}<Tabs
               label="予約設定のタブ"
               items={V8_TABS.map((item) => ({

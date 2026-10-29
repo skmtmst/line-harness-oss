@@ -51,6 +51,7 @@ describe('予約経路の連携（ZyDd6）', () => {
   it('状態ごとの操作と名前の下の役割を出し、予定を見るの窓からつなぎ直せる', async () => {
     render(<ChannelsTabV8 accountId="account-a" canEdit staff={staff} />)
     expect(await screen.findByText('高田誠')).toBeTruthy()
+    expect(screen.queryByText(/いちばん確かなのは/)).toBeNull()
     expect(screen.getByText('トリマー')).toBeTruthy()
     expect(screen.getByRole('button', { name: '予定を見る' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'つなぐ' })).toBeTruthy()
