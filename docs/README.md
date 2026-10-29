@@ -975,5 +975,4 @@
 - [LIFFの小さな直し](release-log/unreleased/1953-kenta-muse-liff.md) — 写真・次へ・鈴・選択色・支払い案内・読み込み中・業種の出し分けの反映履歴。
 - [一覧の案内と予約の行の操作](release-log/unreleased/1953-kenta-train-1029j.md)
 - [アカウントの説明と権限・予約の見出し](release-log/unreleased/1954-kenta-train-1029k.md)
-
 - [一斉配信の権限と結果の列](release-log/unreleased/1955-kenta-train-1029l.md) — 閲覧のみの操作と受付件数の反映履歴。
