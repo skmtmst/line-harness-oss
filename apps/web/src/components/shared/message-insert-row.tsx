@@ -3,6 +3,7 @@
 import { forwardRef, useEffect, useRef, useState, type ReactNode, type Ref } from 'react'
 import { User, IdCard, Braces, Calendar, Ellipsis, Store, Phone, Link } from 'lucide-react'
 import styles from './message-insert-row.module.css'
+import { usePermissionLockTip } from './permission-lock-tip'
 import MenuPortal from './menu-portal'
 
 export type MessageInsertKind = 'name' | 'field' | 'var' | 'date' | 'other' | 'store' | 'phone' | 'link'
@@ -10,10 +11,16 @@ const ICONS = { name: User, field: IdCard, var: Braces, date: Calendar, other: E
 /** 店・統括の種類と処理だけを渡す。見た目は本文の枠内で共通。 */
 export const MessageInsertButton = forwardRef<HTMLButtonElement, {
   kind: MessageInsertKind; label: ReactNode; onClick: () => void; disabled?: boolean
-  title?: string; expanded?: boolean
-}>(function MessageInsertButton({ kind, label, onClick, disabled, title, expanded }, ref: Ref<HTMLButtonElement>) {
+  title?: string; expanded?: boolean; lockedReason?: string; 'aria-describedby'?: string
+}>(function MessageInsertButton({ kind, label, onClick, disabled, title, expanded, lockedReason, 'aria-describedby': describedBy }, ref: Ref<HTMLButtonElement>) {
   const Icon = ICONS[kind]
-  return <button ref={ref} type="button" data-message-insert-button={kind} className={styles.button} onClick={onClick} disabled={disabled} title={title} aria-expanded={expanded} aria-haspopup={expanded === undefined ? undefined : 'menu'}><Icon aria-hidden="true" />{label}</button>
+  const lock = usePermissionLockTip<HTMLButtonElement>(lockedReason, describedBy)
+  const setRef = (element: HTMLButtonElement | null) => {
+    lock.ref.current = element
+    if (typeof ref === 'function') ref(element)
+    else if (ref) ref.current = element
+  }
+  return <><button ref={setRef} type="button" data-message-insert-button={kind} className={styles.button} onClick={onClick} disabled={disabled} aria-describedby={describedBy} {...lock.handlers} title={lockedReason ? undefined : title} aria-expanded={expanded} aria-haspopup={expanded === undefined ? undefined : 'menu'}><Icon aria-hidden="true" />{label}</button>{lock.node}</>
 })
 /** moreFirst：広いときは「その他」に畳む項目を先に並べる（統括の店の差し込み・絵 ）。狭いときは今までどおり末尾の「その他」。 */
 export default function MessageInsertRow({ children, count, more, readOnly = false, moreFirst = false }: { children: ReactNode; count?: ReactNode; more?: ReactNode; readOnly?: boolean; moreFirst?: boolean }) {
