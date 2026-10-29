@@ -207,4 +207,19 @@ describe('操作記録の期間切替と集計題 (STAFF-02)', () => {
     expect(host.textContent).not.toContain('99件')
     expect(host.textContent).not.toContain('過去90日の記録')
   })
+
+  it('10: 閉じた期間欄は「期間：…」で頭を出し、すべてでは既定（灰）を示す', async () => {
+    await render()
+
+    const trigger = document.querySelector('button[aria-label="期間で絞り込む"]') as HTMLButtonElement
+    expect(trigger.textContent).toContain('期間：この30日')
+    expect(trigger.querySelector('[data-select-current]')?.getAttribute('data-filter-state')).toBe('active')
+
+    fixture.events.mockImplementationOnce(() => Promise.resolve(ok({ summary: summary({ periodDays: null, total: 41 }), total: 41 })))
+    await choosePeriod('すべての期間')
+    await settle()
+
+    expect(trigger.textContent).toContain('期間：すべての期間')
+    expect(trigger.querySelector('[data-select-current]')?.getAttribute('data-filter-state')).toBe('default')
+  })
 })

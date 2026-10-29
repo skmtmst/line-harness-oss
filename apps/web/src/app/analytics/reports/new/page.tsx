@@ -1186,7 +1186,7 @@ function AnalyticsReportFormPage() {
               <button type="button" className="report-v8-sideLink" aria-expanded={channelsOpen} onClick={() => setChannelsOpen((open) => !open)}>通知方法：{[dashboardEnabled ? '管理画面' : '', emailEnabled ? 'メール' : '', lineEnabled ? 'LINE' : ''].filter(Boolean).join('・') || '未選択'}<ChevronDown size={16} aria-hidden="true" /></button>
             </div>
             <div className="report-v8-panel" hidden={!recipientsOpen && !hasInvalidEmail}>
-              <ul className="report-v8-recipients divide-y" aria-label="レポートを受け取る人">
+              <ul className="report-v8-recipients divide-y divide-hairline" aria-label="レポートを受け取る人">
                 {emails.map((email, index) => <li className="report-v8-recipient" key={index}>
                   <div className="report-v8-emailRow"><TextField id={`report-email-${index}`} type="email" value={email} onChange={(event) => setEmails((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder="report@example.com" aria-label={`宛先のメールアドレス ${index + 1}行目`} aria-invalid={invalidEmails[index] ? true : undefined} /><Button size="compact" aria-label={`${index + 1}行目の宛先を消す`} onClick={() => setEmails((current) => current.filter((_, itemIndex) => itemIndex !== index))}>消す</Button></div>
                   {invalidEmails[index] && <p className="report-v8-fieldError" role="alert">「{invalidEmails[index]}」はメールアドレスの形になっていません。この宛先だけ外れないよう、直すか消してください。</p>}

@@ -13,6 +13,7 @@ import { isKnownUnused,KINDS,MediaDetailFailure,mediaDetailIdFromLocation,MediaD
 import { describeApiFailure, classifyApiFailure,permissionDeniedMessage } from '@/components/shared/api-error-message'
 import BulkBar from '@/components/shared/bulk-bar'
 import Button from '@/components/shared/button'
+import TextLink from '@/components/shared/text-link'
 import Checkbox from '@/components/shared/checkbox'
 import { collectListRows } from '@/components/shared/collect-list-rows'
 import Dialog from '@/components/shared/dialog'
@@ -1139,7 +1140,7 @@ export default function MediaLibraryListV8() {
                       </span>
                       {/* 開ける先があるときだけリンクにする。無い画面へ送らない。 */}
                       {ref.href ? (
-                        <a href={ref.href}>ここを開く</a>
+                        <TextLink href={ref.href}>ここを開く</TextLink>
                       ) : (
                         <span>開けません</span>
                       )}

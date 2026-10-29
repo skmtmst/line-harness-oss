@@ -3,7 +3,8 @@ import { formatElapsedMinutes } from './format-duration'
 /*
  * （2026-10-09）：管理画面の日付と数は、この共通書式を使う。
  * 日時は2つの書き方だけにする。表の狭い列は MM/DD HH:mm、それ以外は M月D日 HH:mm。
- * どちらも去年の日付までは年を省き、去年より前と未来年だけ年を付ける。店舗の時間帯は指定して保つ。
+ * 表の列は前年も年を落とさない（別年は YYYY/MM/DD HH:mm）。それ以外は去年の日付までは年を省き、
+ * 去年より前と未来年だけ年を付ける。店舗の時間帯は指定して保つ。
  * 24時間以内の出来事は formatRelative で「2時間前」。グラフの軸だけ M/D。
  * 時刻を持たない日付（予約日・期限）は M月D日（曜）。
  * 件数は3桁区切りと単位の前の半角空き、金額は ¥29,800、割合は12.4%。
@@ -103,9 +104,11 @@ export function formatDate(
   if (style === 'time') return clock
   const currentYear = (toParts(now ?? new Date(), timeZone) ?? nowJst()).y
   const showYear = p.y < currentYear - 1 || p.y > currentYear
-  if (style === 'list-time') return `${showYear ? `${p.y}/` : ''}${pad2(p.m)}/${pad2(p.d)} ${clock}`
+  // 93：一覧の列は同じ書き方にする。前年も年を落とさず `YYYY/MM/DD`（正本 list-date-time）。
+  const showListYear = p.y !== currentYear
+  if (style === 'list-time') return `${showListYear ? `${p.y}/` : ''}${pad2(p.m)}/${pad2(p.d)} ${clock}`
   if (style === 'list' || style === 'list-day' || style === 'list-day-weekday') {
-    const day = `${showYear ? `${p.y}/` : ''}${pad2(p.m)}/${pad2(p.d)}`
+    const day = `${showListYear ? `${p.y}/` : ''}${pad2(p.m)}/${pad2(p.d)}`
     if (style === 'list-day-weekday') return `${day}${weekday(p.w)}`
     if (style === 'list') return `${day} ${clock}`
     return day

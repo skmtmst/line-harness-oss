@@ -868,7 +868,7 @@ function RunsTab({ reminderId, canManage, initialStatus }: { reminderId: string;
             }
           }}
         />
-        <SaveErrorField names={["status"]}><Select aria-label="結果で絞り込む" value={status} onChange={(value) => { setStatus(value as '' | ReminderDeliveryRunStatus); setPage(1) }} options={RUN_STATUS_OPTIONS} /></SaveErrorField>
+        <SaveErrorField names={["status"]}><Select aria-label="結果で絞り込む" label="結果" value={status} onChange={(value) => { setStatus(value as '' | ReminderDeliveryRunStatus); setPage(1) }} options={RUN_STATUS_OPTIONS} /></SaveErrorField>
         <Button onClick={() => { setAppliedSearch(search.trim()); setPage(1) }}>探す</Button>
       </div>
       {state === 'loading' ? (

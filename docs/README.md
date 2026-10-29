@@ -467,6 +467,7 @@
 - [受信箱の空き・題横の印・保存の入口・カードの縦崩れ](release-log/unreleased/1953-kenta-muse-inbox.md)
 - [運営・監査・分析・問い合わせ・リッチメニューの修正](release-log/unreleased/1953-kenta-muse-ops-misc.md)
 - [統括の一覧の名前押下・友だちCSVのタブ・統括アカウント説明の修正](release-log/unreleased/1953-kenta-muse-list-settings.md)
+- [絞り込みの見出し・0の灰色・日付の年・経過の日数](release-log/unreleased/0000-kenta-muse-ui-color.md)
 - [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/1948-kenta-train-1029f.md)
 - [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
 - [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
