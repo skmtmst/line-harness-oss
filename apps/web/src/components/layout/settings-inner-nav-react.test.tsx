@@ -5,7 +5,7 @@ import type { StaffMember } from '@line-crm/shared'
  * ★V8（夕41）：設定の画面の、白い板の中の左の「設定の中のメニュー」。
  *
  *   - 絵の並び（会社とロゴは API ができるまで出さない）
- *   - 機能設定の下にマニュアルの対応表・ファイルの安全確認
+ *   - マニュアルの対応表・ファイルの安全確認も同じ段の項目
  *   - 「専用」の小見出しの下に EC連携・LINE通知
  *   - いまの画面が選ばれた形になる
  *   - 見るだけの人には、見られる画面だけ出す（左のメニューと同じ決まり）
@@ -96,7 +96,7 @@ describe('★V8 設定の中のメニュー', () => {
       'プール管理',
       'ログインユーザー',
       '機能設定',
-      // 機能設定を開いているときだけ下の2つを出す（絵には無いが、ここからしか行けない）
+      // 2つの設定も同じ段に並べる
       'マニュアルの対応表',
       'ファイルの安全確認',
       '運用状態',
@@ -129,14 +129,14 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.getByRole('link', { name: 'デリバリー連携' }).getAttribute('href')).toBe('/settings/delivery')
   })
 
-  it('SNS 連携の画面では SNS 連携が今の画面になり、機能設定の下の2つは出さない', async () => {
+  it('SNS 連携の画面でも2つの設定の入口を残し、現在地だけを示す', async () => {
     fixture.pathname = '/settings/sns'
     fixture.visibility.mockResolvedValue({ success: true, data: { features: {} } })
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(view.queryByRole('link', { name: 'SNS 連携' })).toBeTruthy())
     expect(view.getByRole('link', { name: 'SNS 連携' }).getAttribute('aria-current')).toBe('page')
     expect(view.getByRole('link', { name: '機能設定' }).getAttribute('aria-current')).toBeNull()
-    expect(view.queryByRole('link', { name: 'ファイルの安全確認' })).toBeNull()
+    expect(view.getByRole('link', { name: 'ファイルの安全確認' }).getAttribute('href')).toBe('/settings/file-scan')
   })
 
   it('LINE通知の画面では機能設定を同時に選択しない', async () => {
@@ -148,15 +148,15 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page')).toHaveLength(1)
   })
 
-  it('機能設定の下の2つは、ほかの設定の画面では出さない', async () => {
+  it('2つの設定は、ほかの設定画面でも同じ段に残す', async () => {
     fixture.pathname = '/accounts'
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
-    expect(view.queryByRole('link', { name: 'マニュアルの対応表' })).toBeNull()
+    expect(view.getByRole('link', { name: 'マニュアルの対応表' }).parentElement?.parentElement).toBe(view.getByRole('link', { name: '機能設定' }).parentElement?.parentElement)
     expect(view.getByRole('link', { name: 'LINEアカウント' }).className).toContain('itemActive')
   })
 
-  it('いまの画面は選ばれた形（aria ではなく className の薄い地）になる', async () => {
+  it('いまの画面は選ばれた形とaria-currentで示す', async () => {
     fixture.pathname = '/settings/manual-links'
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
@@ -164,6 +164,23 @@ describe('★V8 設定の中のメニュー', () => {
     expect(child.className).toContain('itemActive')
     const parent = view.getByRole('link', { name: '機能設定' })
     expect(parent.className).not.toContain('itemActive')
+  })
+
+  it.each(['/settings', '/settings/manual-links', '/settings/file-scan', '/settings/sns'])('設定 %s でも項目を入れ子にせず現在地を1つだけ示す', async (pathname) => {
+    fixture.pathname = pathname
+    const view = render(<SettingsInnerNav inline />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    const nav = view.getByRole('navigation', { name: '設定の中のメニュー' })
+    const parent = view.getByRole('link', { name: '機能設定' })
+    const manual = view.getByRole('link', { name: 'マニュアルの対応表' })
+    const scan = view.getByRole('link', { name: 'ファイルの安全確認' })
+    for (const link of [manual, scan]) {
+      expect(link.parentElement?.parentElement).toBe(parent.parentElement?.parentElement)
+      expect(link.classList[0]).toBe(parent.classList[0])
+      expect(link.querySelector('svg')).toBeTruthy()
+    }
+    expect(nav.querySelector('ul ul')).toBeNull()
+    expect(view.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page').map((link) => link.getAttribute('href'))).toEqual([pathname])
   })
 
   it('見るだけの人には見られる画面だけ出す（スタッフにはログインユーザーを出さない）', async () => {
