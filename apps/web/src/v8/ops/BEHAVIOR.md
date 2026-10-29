@@ -39,13 +39,13 @@
 - 監査：`api.ops.audit`（50件ずつ）。CSV はいまの条件で全部（上限 2万件）
 - お知らせ：`api.ops.announcements.list / preview / create（再実行キー）/ update（版つき）/ remove`
 - ナレッジ：`api.ops.knowledge.list / article / update / review（approve・dismiss・disable）`
-- 契約先：`api.ops.tenants`・`createTenant`・`tenant`・`changeTenantStatus`・`setTenantFeaturePacks`・`impersonation.start`
+- 契約先：`api.ops.tenants`・`createTenant`・`tenant`・`changeTenantStatus`・`impersonation.start`。飲食店機能の切り替えは契約先詳細に置かない
 - お問い合わせ：`api.ops.support.summary / tickets / ticket / update / saveDraft / aiDraft / deleteDraft / reply / create`、ナレッジの確認の続き `api.ops.knowledge.process`
 
 ## 閲覧のみ（`/api/ops/me` の readOnly）
 - 分かるまで・取れなかったときは閲覧のみとして扱う（`use-ops-read-only.ts`）。
 - 閲覧のみの人には、押せないボタンを置かずに隠す（2026-10-06 オーナー決定）：
-  契約先を作る・停止・アーカイブ・再開・飲食店機能の切り替え／招待メールを送る・停止・取り消す・再送／
+  契約先を作る・停止・アーカイブ・再開／招待メールを送る・停止・取り消す・再送／
   お知らせの作る欄と「直す」／お問い合わせの起票・返信・段階の変更・代理ログイン。
 - ダッシュボードの「Stripe と同期」も書ける人だけ（今と同じ）。
 

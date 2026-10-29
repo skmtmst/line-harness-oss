@@ -1063,7 +1063,7 @@ CREATE TABLE auth_email_tokens (
   expires_at     TEXT NOT NULL,
   consumed_at    TEXT,
   created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
-);
+, application_id TEXT);
 
 CREATE TABLE auth_known_devices (
   staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
@@ -6587,6 +6587,28 @@ CREATE TABLE ref_tracking (
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 , fbclid TEXT, gclid TEXT, twclid TEXT, ttclid TEXT, utm_source TEXT, utm_medium TEXT, utm_campaign TEXT, user_agent TEXT, ip_address TEXT, line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, ad_conversion_consent_at TEXT);
 
+CREATE TABLE registration_applications (
+  id TEXT PRIMARY KEY,
+  company_name TEXT NOT NULL,
+  contact_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  referral_source TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'contacted', 'approved', 'rejected', 'activated')),
+  contact_note TEXT,
+  contacted_by TEXT,
+  contacted_at TEXT,
+  approved_by TEXT,
+  approved_at TEXT,
+  invite_sent_at TEXT,
+  tenant_id TEXT,
+  ip_hash TEXT,
+  device_marker TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE reminder_delivery_runs (
   id                         TEXT PRIMARY KEY,
   -- 古いリマインダにはアカウントが未設定の行がある。送信を止めずに履歴化し、
@@ -9570,6 +9592,9 @@ CREATE INDEX idx_audit_events_security_utc ON audit_events (security_created_at_
 CREATE INDEX idx_audit_events_tenant_created
   ON audit_events (tenant_id, created_at DESC);
 
+CREATE INDEX idx_auth_email_tokens_application
+  ON auth_email_tokens(application_id, created_at DESC);
+
 CREATE INDEX idx_auth_email_tokens_email
   ON auth_email_tokens(purpose, email, created_at DESC);
 
@@ -10961,6 +10986,12 @@ CREATE INDEX idx_ref_tracking_friend_created ON ref_tracking(friend_id, created_
 CREATE INDEX idx_ref_tracking_ref    ON ref_tracking (ref_code);
 
 CREATE INDEX idx_ref_tracking_ref_created ON ref_tracking(ref_code, created_at);
+
+CREATE UNIQUE INDEX idx_registration_applications_active_email
+  ON registration_applications(lower(email)) WHERE status <> 'rejected';
+
+CREATE INDEX idx_registration_applications_status_created
+  ON registration_applications(status, created_at DESC);
 
 CREATE INDEX idx_reminder_delivery_runs_due
   ON reminder_delivery_runs (status, next_retry_at, lease_expires_at, scheduled_at);

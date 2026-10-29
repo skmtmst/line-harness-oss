@@ -1164,10 +1164,16 @@ export type {
   BillingInvoice, BillingInvoiceInput, BillingInvoiceInterval, BillingRevenueTotals, BillingSyncTenant,
 } from './billing-invoices';
 export {
-  bumpAuthThrottle, clearAuthThrottle, consumeAuthEmailToken, countAuthEmailTokensSince, createAuthEmailToken, createTrialTenant,
+  bumpAuthThrottle, clearAuthThrottle, consumeAuthEmailToken, consumeOtherSignupTokens, countAuthEmailTokensSince, createAuthEmailToken, createTrialTenant,
   deleteExpiredAuthEmailTokens, getActiveStaffByEmail, getAuthEmailToken, getStaffWithPasswordByEmail, hasStaffWithEmail, hasTenantWithDeviceMarker,
   readAuthThrottle,
 } from './auth-email';
+export {
+  createRegistrationApplication, getRegistrationApplication, getRegistrationApplicationByEmail,
+  listRegistrationApplications, markRegistrationApplicationActivated, markRegistrationApplicationApproved,
+  markRegistrationApplicationContacted, markRegistrationApplicationInviteSent,
+} from './registration-applications.js';
+export type { RegistrationApplication, RegistrationApplicationStatus } from './registration-applications.js';
 export type {
   AuthEmailToken, AuthEmailTokenPurpose, CreateAuthEmailTokenInput, CreateTrialTenantInput,
 } from './auth-email';
