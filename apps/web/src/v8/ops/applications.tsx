@@ -1,22 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CircleDot } from 'lucide-react'
 import { api, type OpsApplication } from '@/lib/api'
-import { OpsListPage, OpsListToolbar } from './list-page'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
-import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
-import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import { DataTable, TableHeadRow, Th, Td, Tr, NameCell, RowNameLink } from '@/components/shared/table'
+import { PageFrame } from '@/components/templates/page-frame'
+import styles from './applications.module.css'
 
-const STATUS: Record<OpsApplication['status'], { label: string; tone: StatusBadgeTone }> = {
-  pending: { label: '未対応', tone: 'caution' },
-  contacted: { label: '連絡中', tone: 'warning' },
-  approved: { label: '承認済み', tone: 'info' },
-  rejected: { label: '見送り', tone: 'neutral' },
-  activated: { label: '利用開始済み', tone: 'success' },
+const STATUS: Record<OpsApplication['status'], string> = {
+  pending: '未対応', contacted: '連絡中', approved: '承認済み',
+  rejected: '見送り', activated: '利用開始済み',
 }
 
 export default function OpsApplications() {
@@ -44,36 +36,28 @@ export default function OpsApplications() {
   })
   const count = (status: OpsApplication['status']) => rows.filter((row) => row.status === status).length
 
-  return <OpsListPage boardId="kWaRc" title="申込アカウント"
-    help="申込内容を確認し、担当者から連絡した後に承認します。"
-    opsNotice="承認するまで申込者はログインできません。操作は監査ログに記録されます。"
-    stats={<KpiBand>
-      <KpiCard presentation="cell" title="未対応" value={loading ? null : count('pending')} unit="件" detail="新しい申し込み" loading={loading} />
-      <KpiCard presentation="cell" title="連絡中" value={loading ? null : count('contacted')} unit="件" detail="担当者の対応待ち" loading={loading} />
-      <KpiCard presentation="cell" title="承認済み" value={loading ? null : count('approved') + count('activated')} unit="件" detail="招待メール送信済み" loading={loading} />
-      <KpiCard presentation="cell" title="見送り" value={loading ? null : count('rejected')} unit="件" detail="利用不可" loading={loading} />
-    </KpiBand>}
-    toolbar={<OpsListToolbar
-      search={{ value: q, onChange: setQ, placeholder: '会社名・担当者・メールで探す', label: '申込を探す' }}
-      filters={<>
-        <FilterChip icon={<CircleDot size={16} aria-hidden="true" />} selected={!filter} onChange={() => setFilter('')}>すべて {rows.length}</FilterChip>
-        {(['pending', 'contacted', 'approved', 'rejected'] as const).map((key) => <FilterChip key={key} selected={filter === key} onChange={(selected) => setFilter(selected ? key : '')}>{STATUS[key].label}</FilterChip>)}
-      </>} />}
-  >
-    {loading ? <ListState kind="loading" title="申込を読み込んでいます" />
-      : error ? <ListState kind="error" title="申込を表示できませんでした" description={error} onRetry={() => void load()} />
-      : visible.length === 0 ? <ListState kind="empty" title="該当する申し込みがありません" />
-      : <DataTable aria-label="申込アカウント" columnSizing="content">
-        <thead><TableHeadRow><Th grow>会社名</Th><Th>担当者</Th><Th>連絡先</Th><Th>きっかけ</Th><Th>状態</Th><Th>受付日</Th></TableHeadRow></thead>
-        <tbody>{visible.map((row) => {
+  return <PageFrame kind="list" boardId="kWaRc" standalone>
+    <article className={styles.panel}>
+      <header><h1>申込アカウント</h1><p>申込内容を確認し、担当者から連絡した後に承認します。</p></header>
+      <p className={styles.notice}><span aria-hidden="true">●</span> 要確認：承認するまで申込者はログインできません。操作は監査ログに記録されます。</p>
+      <div className={styles.stats}>
+        {([['未対応', count('pending'), '新しい申し込み'], ['連絡中', count('contacted'), '担当者の対応待ち'], ['承認済み', count('approved') + count('activated'), '招待メール送信済み'], ['見送り', count('rejected'), '利用不可']] as const).map(([label, value, description]) => <div key={label}><strong>{label}</strong><b>{loading ? '—' : value}件</b><small>{description}</small></div>)}
+      </div>
+      <div className={styles.toolbar}>
+        <label className={styles.search}><span aria-hidden="true">⌕</span><span className="sr-only">申込を探す</span><input value={q} onChange={(event) => setQ(event.target.value)} placeholder="会社名・担当者・メールで探す" /></label>
+        <div className={styles.filters}>
+          <button type="button" data-active={!filter || undefined} onClick={() => setFilter('')}>すべて {rows.length}</button>
+          {(['pending', 'contacted', 'approved', 'rejected'] as const).map((key) => <button key={key} type="button" data-active={filter === key || undefined} onClick={() => setFilter(key)}>{STATUS[key]}</button>)}
+        </div>
+      </div>
+      {loading ? <ListState kind="loading" title="申込を読み込んでいます" />
+        : error ? <ListState kind="error" title="申込を表示できませんでした" description={error} onRetry={() => void load()} />
+        : visible.length === 0 ? <ListState kind="empty" title="該当する申し込みがありません" />
+        : <div className={styles.tableScroll}><table aria-label="申込アカウント"><thead><tr><th>会社名</th><th>担当者</th><th>連絡先</th><th>きっかけ</th><th>状態</th><th>受付日</th></tr></thead><tbody>{visible.map((row) => {
           const href = `/ops/applications/detail?id=${encodeURIComponent(row.id)}`
-          return <Tr key={row.id} href={href}>
-            <NameCell grow name={<RowNameLink href={href} title={row.company_name}>{row.company_name}</RowNameLink>} />
-            <Td>{row.contact_name}</Td><Td><span>{row.email}</span><br /><span>{row.phone}</span></Td>
-            <Td>{row.referral_source}</Td><Td><StatusBadge tone={STATUS[row.status].tone}>{STATUS[row.status].label}</StatusBadge></Td>
-            <Td>{new Date(row.created_at).toLocaleDateString('ja-JP')}</Td>
-          </Tr>
-        })}</tbody>
-      </DataTable>}
-  </OpsListPage>
+          return <tr key={row.id}><td><a href={href}>{row.company_name}</a></td><td>{row.contact_name}</td><td>{row.email}<small>{row.phone}</small></td><td>{row.referral_source}</td><td><span className={styles.badge} data-status={row.status}>{STATUS[row.status]}</span></td><td>{new Date(row.created_at).toLocaleDateString('ja-JP', { month: '2-digit', day: '2-digit' })}</td></tr>
+        })}</tbody></table></div>}
+      <footer className={styles.footer}><span>{visible.length ? `1–${visible.length}` : '0'} / {visible.length}件</span><span>申込を選ぶと詳細が開きます。</span></footer>
+    </article>
+  </PageFrame>
 }

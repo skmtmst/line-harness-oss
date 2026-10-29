@@ -13,6 +13,7 @@ import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, confirmError, CONTACT_URL, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
+import styles from './complete.module.css'
 
 /**
  * 会員登録の本登録。★管理画面 36-4-B（`jk88n`、カード `oVX3x`）。
@@ -114,25 +115,25 @@ function CompleteInner() {
     )
   }
   if (check.state === 'pending') {
-    return <AuthCard node="VA42o" title="お申し込みを確認中です"
+    return <AuthCard node="VA42o" applicationFlow="pending" title="お申し込みを確認中です"
       description="担当者からご連絡します。承認のご案内が届くまで、musuboへのログインはできません。">
-      <div className="w-full rounded-control bg-surface-pearl px-4 py-4 text-caption text-ink-secondary">
-        <strong className="block text-ink">次に行うこと</strong>
+      <div className={styles.pendingNext}>
+        <strong>次に行うこと</strong>
         お申し込み時のメールをご確認ください。担当者からの連絡がない場合はお問い合わせください。
       </div>
-      <Button href={CONTACT_URL} external variant="primary" className="w-full">お問い合わせ</Button>
-      <Button href="/login" className="w-full">ログイン画面に戻る</Button>
+      <a href={CONTACT_URL} target="_blank" rel="noreferrer" className={styles.contact}>お問い合わせ</a>
+      <a href="/login" className={styles.login}>ログイン画面に戻る</a>
     </AuthCard>
   }
 
   return (
     <AuthCard
-      node="jk88n"
-      cardNode="oVX3x"
+      node="x73h3"
+      applicationFlow="setup"
       title="利用開始の設定"
       description={`お申し込みが承認されました。設定を完了すると${check.trialDays}日間無料でmusuboを利用できます。`}
     >
-      <Notice tone="success" message="承認済み　初期設定を完了してください" />
+      <div className={styles.approved}>✓ 承認済み　初期設定を完了してください</div>
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
           <Notice tone="danger" message={error} />

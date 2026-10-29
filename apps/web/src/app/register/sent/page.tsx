@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import AuthCard from '@/components/auth/auth-card'
-import { recallSignupEmail } from '@/lib/auth-email'
+import styles from './sent.module.css'
 
 /**
  * 申込受付。★管理画面 36-4-A（`q32Ao`、カード `r7JPOa`）。
@@ -11,26 +10,19 @@ import { recallSignupEmail } from '@/lib/auth-email'
  * 何も無いときは「入力したメールアドレス」と出す。
  */
 export default function RegisterSentPage() {
-  const [email, setEmail] = useState('')
-  useEffect(() => setEmail(recallSignupEmail()), [])
-
   return (
     <AuthCard
-      node="q32Ao"
-      cardNode="r7JPOa"
+      node="Wbv2v"
+      applicationFlow="sent"
       title="お申し込みを受け付けました"
-      description={
-        <>
-          <span className="font-semibold text-ink">{email || '入力したメールアドレス'}</span> でお申し込みを受け付けました。musuboの担当者からの連絡をお待ちください。
-        </>
-      }
+      description="入力されたメールアドレスに受付内容をお送りします。musuboの担当者からの連絡をお待ちください。"
     >
-      <div className="flex w-full flex-col gap-3 rounded-control bg-surface-pearl px-4 py-4">
-        <p className="text-caption text-ink"><strong>1　申込受付</strong><br />内容を確認します</p>
-        <p className="text-caption text-ink"><strong>2　担当者から連絡</strong><br />ご相談内容をお伺いします</p>
-        <p className="text-caption text-ink"><strong>3　承認・利用開始</strong><br />ご案内メールから設定します</p>
-      </div>
-      <p className="w-full text-caption text-ink-secondary">承認が完了するまでは、musuboにログインできません。</p>
+      <ol className={styles.steps}>
+        <li><span>1</span><p><strong>申込受付</strong><small>内容を確認します</small></p></li>
+        <li><span>2</span><p><strong>担当者から連絡</strong><small>ご相談内容をお伺いします</small></p></li>
+        <li><span>3</span><p><strong>承認・利用開始</strong><small>ご案内メールから設定します</small></p></li>
+      </ol>
+      <p className={styles.restriction}>承認が完了するまでは、musuboにログインできません。</p>
     </AuthCard>
   )
 }

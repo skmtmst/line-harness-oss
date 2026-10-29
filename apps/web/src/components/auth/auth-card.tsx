@@ -6,6 +6,8 @@ import { PageHeading } from '@/components/templates/page-frame'
 import authStyles from '@/components/templates/auth-page.module.css'
 import { CONTACT_URL, LEGAL_LINKS } from '@/lib/auth-email'
 import { nameInitial } from '@/lib/name-initial'
+import { Check, Clock3 } from 'lucide-react'
+import applicationStyles from './application-auth.module.css'
 
 /**
  * ログイン前の画面の入れ物。★管理画面 0-1／36-4／36-6 の「登録カード」（幅 520）。
@@ -27,6 +29,7 @@ export default function AuthCard({
   brandNote,
   step,
   wide,
+  applicationFlow,
 }: {
   title: string
   description: ReactNode
@@ -46,6 +49,8 @@ export default function AuthCard({
   step?: { current: number; total: number }
   /** 中身が広いカード（二段階認証の設定）。 */
   wide?: boolean
+  /** 申込承認フロー v01 のカード。既存のログイン画面には適用しない。 */
+  applicationFlow?: 'form' | 'sent' | 'setup' | 'pending'
 }) {
   // ログイン前の画面もタブの題を「<見出し> | musubo」にする。
   useEffect(() => { setDocumentTitle(title) }, [title])
@@ -80,6 +85,17 @@ export default function AuthCard({
       </a>
     </footer>
   )
+
+  if (applicationFlow) return <main data-design-node={node} className={applicationStyles.page} data-flow={applicationFlow}>
+    <section data-design-node={cardNode} className={applicationStyles.card} data-flow={applicationFlow} aria-label={title}>
+      <div className={applicationStyles.brand}><span aria-hidden="true">m</span><strong>musubo</strong></div>
+      {applicationFlow === 'sent' ? <div className={applicationStyles.stateIcon} data-tone="success"><Check aria-hidden="true" /></div> : null}
+      {applicationFlow === 'pending' ? <div className={applicationStyles.stateIcon} data-tone="warning"><Clock3 aria-hidden="true" /></div> : null}
+      <header className={applicationStyles.heading}><h1>{title}</h1><p>{description}</p></header>
+      <div className={applicationStyles.body}>{children}</div>
+    </section>
+    {applicationFlow === 'form' ? <div className={applicationStyles.legal}>{legal}</div> : <footer className={applicationStyles.simpleFooter}><span>musubo</span><a href={CONTACT_URL} target="_blank" rel="noreferrer">お問い合わせ</a></footer>}
+  </main>
 
   // ログインの 1 段目：二段階認証（2 段目）と同じ地・同じ幅・同じカード（枠の線なしで影だけ）。
   if (step) return (
