@@ -8,6 +8,7 @@ import { jstDateOffset } from '@/lib/jst-datetime'
  * 選んでいるページを出す。押せない見本（role="img" ではなく読める文で出す）。
  * 予約を入れる欄の日にち・時刻は形を見せるための見本で、実際の空きではない。
  */
+import { Check } from 'lucide-react'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
 import { resolveCustomerFormTheme, DEFAULT_CUSTOMER_LOOK, type CustomerLook, PREFECTURES, normalizeRatingValue, FORM_OPTIONS_DEFAULT, type FormBlock, type FormInputBlock, type FormLayout } from '@line-crm/shared'
@@ -34,9 +35,11 @@ type Props = {
   progressHead?: boolean
   /** 編集中のブロック。スマホの中をそこまで送って見せる（下の方の問いを押しても見える。絵 ）。 */
   focusBlockId?: string | null
+  /** 「答え終わったあと」のタブで渡す。質問の画面ではなくお礼の画面を出す。 */
+  thanks?: { text: string; url: string | null } | null
 }
 
-export function FormPhone({ accountLook, layout, pageIndex, accountName, bookingMenus, caption = 'お客さまに見える形', title = '回答フォーム', fixedNext = false, progressHead = false, focusBlockId = null }: Props) {
+export function FormPhone({ accountLook, layout, pageIndex, accountName, bookingMenus, caption = 'お客さまに見える形', title = '回答フォーム', fixedNext = false, progressHead = false, focusBlockId = null, thanks = null }: Props) {
   const formRef = useRef<HTMLDivElement>(null)
   const sections = layout.sections
   const section = sections[pageIndex] ?? sections[0]
@@ -75,15 +78,23 @@ export function FormPhone({ accountLook, layout, pageIndex, accountName, booking
     : `${options.nextLabel || '次へ'}（${pageIndex + 1} / ${sections.length}）`
 
   return (
-    <LiffPhoneFrame title={title} accountName={accountName} caption={caption ?? undefined} label="お客さまに見える形" accent={main} footer={fixedNext ? <div className={styles.phoneFoot} style={{ backgroundColor: theme.sub }}><span className={styles.phoneNext}>{nextLabel}</span></div> : undefined}>
+    <LiffPhoneFrame title={title} accountName={accountName} caption={caption ?? undefined} label="お客さまに見える形" accent={main} footer={!thanks && fixedNext ? <div className={styles.phoneFoot} style={{ backgroundColor: theme.sub }}><span className={styles.phoneNext}>{nextLabel}</span></div> : undefined}>
           <div ref={formRef} className={styles.phoneForm} style={{backgroundColor:theme.sub,color:theme.text,fontFamily:theme.fontFamily==='serif'?'serif':'sans-serif'}}>
-            {blocks.length === 0 ? <p className={styles.phoneEmpty}>このページにはまだブロックがありません</p> : null}
-            {blocks.map((block, index) => (
-              <PhoneBlockWithProgress key={block.id} block={block} showProgress={index === progressAt} progress={progress} bookingMenus={bookingMenus} />
-            ))}
-            {blocks.length === 0 ? progress : null}
-            {fixedNext ? null : <><span className={styles.phoneSpacer} />
-            <span className={styles.phoneNext}>{nextLabel}</span></>}
+            {thanks ? (
+              <div className={styles.thanksBox}>
+                <span className={styles.thanksMark} aria-hidden="true"><Check size={40} strokeWidth={3} color="var(--color-success)" /></span>
+                <p className={styles.thanksText}>{thanks.url ? '送信後、次のURLを開きます' : (thanks.text || 'ご回答ありがとうございました')}</p>
+                {thanks.url ? <p className={styles.thanksSub}>{thanks.url}</p> : null}
+              </div>
+            ) : (<>
+              {blocks.length === 0 ? <p className={styles.phoneEmpty}>このページにはまだブロックがありません</p> : null}
+              {blocks.map((block, index) => (
+                <PhoneBlockWithProgress key={block.id} block={block} showProgress={index === progressAt} progress={progress} bookingMenus={bookingMenus} />
+              ))}
+              {blocks.length === 0 ? progress : null}
+              {fixedNext ? null : <><span className={styles.phoneSpacer} />
+              <span className={styles.phoneNext}>{nextLabel}</span></>}
+            </>)}
           </div>
     </LiffPhoneFrame>
   )

@@ -459,6 +459,7 @@
 
 ## 反映履歴
 
+- [配信・シナリオ・自動応答の日時・題・下見の修正](release-log/unreleased/0000-kenta-muse-delivery.md)
 - [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
 - [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
 - [共通UIの状態表示・操作の修正](release-log/unreleased/1952-kenta-muse-ui-state.md)
