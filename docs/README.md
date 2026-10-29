@@ -498,7 +498,7 @@
 - [ロゴと上部メニューの高さ調整](release-log/unreleased/1940-masato-logo-header-align.md)
 - [契約者向けLINEの通知専用化](release-log/unreleased/1941-masato-notice-line-only.md)
 - [申込受付と承認画面の調整](release-log/unreleased/1943-masato-registration-approval-pen.md)
-- [接続マニュアルのチャット注意書き復元と画像軽量化](release-log/unreleased/0000-kenta-muse-red-accounts.md)
+- [接続マニュアルのチャット注意書き復元と画像軽量化](release-log/unreleased/1946-kenta-muse-red-accounts.md)
 - [投稿メディアの内容選択](release-log/unreleased/1890-masato-post-media-content.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
