@@ -898,3 +898,4 @@
 - [友だち引き継ぎの進捗表示](release-log/unreleased/1914-masato-follower-handover-progress.md) — Penに合わせた動的な進捗画面の反映履歴。
 - [友だち引き継ぎの再開](release-log/unreleased/1915-masato-follower-import-resume.md) — 進捗画面からの再開と人数表示の反映履歴。
 - [LINE接続マニュアルの参考値秘匿](release-log/unreleased/1917-masato-line-manual-redaction-audit.md) — 画像と本文を全点検した反映履歴。
+- [LINE接続マニュアル画像のキャッシュ更新](release-log/unreleased/1920-masato-line-manual-image-cache.md) — 伏せ済み画像をブラウザで確実に表示する修正履歴。
