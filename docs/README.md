@@ -951,3 +951,4 @@
 - [最初の1通の確認と読み直しの操作](release-log/unreleased/1951-kenta-first-message-guide.md)
 - [シナリオの人数と割合](release-log/unreleased/0000-kenta-scenario-counts.md) — 人数の欠測と登録人数による割合の修正履歴。
 - [シナリオ人数の単位と補足位置](release-log/unreleased/0000-kenta-scenario-count-labels.md) — 不明時の単位と登録0人の補足位置の修正履歴。
+- [問い合わせのタブ・カルーセルの絵・更新履歴の検索](release-log/unreleased/0000-kenta-swb-x10-x14-x18.md)

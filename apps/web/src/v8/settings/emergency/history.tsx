@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CircleX, GitBranch, History, RefreshCw } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
+import SearchField from '@/components/shared/search-field'
 import Disclosure from '@/components/shared/disclosure'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -27,7 +28,7 @@ import releaseLog from '@/generated/release-log-summary.json'
 import { api, type OperationHistoryEntry } from '@/lib/api'
 import { formatCount, formatDate } from '@/lib/format'
 import styles from './history.module.css'
-import { buildUpdateCards, latestDeploymentPhases, missingLineCount, toTime, type Deployment, type ReleaseSummary, type UpdateCard, type UpdateKind } from './history-updates'
+import { buildUpdateCards, searchUpdateCards, latestDeploymentPhases, missingLineCount, toTime, type Deployment, type ReleaseSummary, type UpdateCard, type UpdateKind } from './history-updates'
 
 export { latestDeploymentPhases } from './history-updates'
 
@@ -91,7 +92,7 @@ function UpdateCardView({ card, historyState }: { card: UpdateCard; historyState
       ) : null}
       {card.source === 'pending' ? (
         <p className={styles.note}>次の版に入る予定の変更です。版に入ると、ここから日付の1枚へ移ります。</p>
-      ) : card.source === 'archive' ? (
+      ) : card.source === 'archive' && card.entries.length === 0 ? (
         <p className={styles.note}>この版の行は保管用の記録にまとめてあり、この画面には出していません。</p>
       ) : card.highlights.length > 0 ? (
         <ul className={styles.lines} aria-label={card.highlightSource === 'written' ? 'この回のまとめ' : 'この回のおもな変更'}>
@@ -100,7 +101,7 @@ function UpdateCardView({ card, historyState }: { card: UpdateCard; historyState
       ) : (
         <p className={styles.note}>この回の変更の行は記録にありません。</p>
       )}
-      {hasMore ? (
+      {hasMore || (card.source === 'pending' && card.entries.length > 0) ? (
         <Disclosure size="compact" appearance="inset" title={`すべて見る（${formatCount(card.entryCount, '行')}）`}>
           <ul className={styles.lines} aria-label="この回のすべての変更">
             {card.entries.map((entry, index) => (
@@ -122,6 +123,9 @@ export default function UpdateHistoryV8() {
   const [history, setHistory] = useState<OperationHistoryEntry[]>([])
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [page, setPage] = useState(1)
+  const [query, setQuery] = useState('')
+  const [fullReleases, setFullReleases] = useState<NonNullable<ReleaseSummary['releases']> | null>(null)
+  const [searchError, setSearchError] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -147,8 +151,22 @@ export default function UpdateHistoryV8() {
   const failed = recent.filter((d) => d.phase === 'failed' || d.phase === 'rolled_back').length
   const ready = state === 'ready'
 
-  const cards = useMemo(() => buildUpdateCards({ summary, deployments, runningVersion: current }), [summary, deployments, current])
-  const missing = missingLineCount(summary)
+  useEffect(() => {
+    if (!query.trim() || fullReleases !== null) return
+    let cancelled = false
+    setSearchError(false)
+    // 本文の大きい記録は検索するときだけ読み、初期表示は小さい要約を使う。
+    void import('@/generated/release-log.json').then((loaded) => {
+      if (!cancelled) setFullReleases(loaded.default.releases)
+    }).catch(() => { if (!cancelled) setSearchError(true) })
+    return () => { cancelled = true }
+  }, [query, fullReleases])
+  const searchableSummary = useMemo(() => fullReleases === null ? summary : {
+    ...summary, releases: fullReleases,
+  }, [summary, fullReleases])
+  const allCards = useMemo(() => buildUpdateCards({ summary: query.trim() ? searchableSummary : summary, deployments, runningVersion: current, includeArchivedEntries: Boolean(query.trim()) }), [summary, searchableSummary, query, deployments, current])
+  const cards = useMemo(() => searchUpdateCards(allCards, query), [allCards, query])
+  const missing = query.trim() ? 0 : missingLineCount(summary)
   const pageCount = Math.max(1, Math.ceil(cards.length / CARD_PAGE))
   const shownPage = Math.min(page, pageCount)
   const first = (shownPage - 1) * CARD_PAGE + 1
@@ -166,8 +184,15 @@ export default function UpdateHistoryV8() {
         <ListState kind="error" title="更新の記録を読み込めませんでした" description="版の一覧は出しています。配備の結果は読み直すと出ます。" />
       ) : null}
 
+      <SearchField aria-label="変更内容を探す" placeholder="変更内容を探す" value={query}
+        onChange={(value) => { setQuery(value); setPage(1) }} onClear={() => { setQuery(''); setPage(1) }} />
+      <p className={styles.footText}>これから入る変更と、保管用の版を含む公開済みの本文を検索します。</p>
+
+      {query.trim() && fullReleases === null ? searchError
+        ? <ListState kind="error" title="変更の本文を読み込めませんでした" description="画面にある要約だけを検索しています。検索語を入れ直すと再試行します。" />
+        : <ListState kind="loading" title="変更の本文を読み込んでいます" /> : null}
       {cards.length === 0 ? (
-        <ListState kind="empty" title="更新の記録はまだありません" />
+        query.trim() && fullReleases === null && !searchError ? null : <ListState kind="empty" title={query.trim() ? "一致する変更はありません" : "更新の記録はまだありません"} />
       ) : (
         <section className={styles.cards} aria-label="管理画面の更新">
           {cards.slice(first - 1, last).map((card) => <UpdateCardView key={card.key} card={card} historyState={state} />)}
