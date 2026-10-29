@@ -130,13 +130,30 @@ interface MediaRef {
   sourceUrl: string;
 }
 
-function parseMedia(json: string): MediaRef[] {
+interface MediaOriginals {
+  googleMediaId: string | null;
+  instagramMediaId: string | null;
+}
+
+function parseMediaStorage(json: string): { media: MediaRef[]; originals: MediaOriginals } {
+  const empty: MediaOriginals = { googleMediaId: null, instagramMediaId: null };
   try {
     const parsed = JSON.parse(json) as unknown;
-    return Array.isArray(parsed) ? (parsed as MediaRef[]) : [];
-  } catch {
-    return [];
-  }
+    if (Array.isArray(parsed)) return { media: parsed as MediaRef[], originals: empty };
+    if (!parsed || typeof parsed !== 'object') return { media: [], originals: empty };
+    const stored = parsed as { media?: unknown; originals?: Record<string, unknown> };
+    return {
+      media: Array.isArray(stored.media) ? stored.media as MediaRef[] : [],
+      originals: {
+        googleMediaId: typeof stored.originals?.googleMediaId === 'string' ? stored.originals.googleMediaId : null,
+        instagramMediaId: typeof stored.originals?.instagramMediaId === 'string' ? stored.originals.instagramMediaId : null,
+      },
+    };
+  } catch { return { media: [], originals: empty }; }
+}
+
+function parseMedia(json: string): MediaRef[] {
+  return parseMediaStorage(json).media;
 }
 
 /** Google側から届いた画像URL（sourceUrl）を media_json 用に変換する。Google発の画像には社内の登録メディアIDが無い。 */
@@ -168,6 +185,7 @@ function draftFromRow(row: PostRow): PostDraft {
  * 画面では同時投稿をなし・済み・失敗の3つで示すため、DB の状態をまとめる。送信前は none とし、未接続の店でも同じ形を返す。設計図 ★V8-B U1X7T2・HEEN9 と照合する。
  */
 function publicInstagram(row: PostRow) {
+  const originals = parseMediaStorage(row.media_json).originals;
   const status =
     row.instagram_status === 'published'
       ? 'published'
@@ -177,6 +195,8 @@ function publicInstagram(row: PostRow) {
   return {
     enabled: row.instagram_enabled === 1,
     caption: row.instagram_caption,
+    mediaId: row.instagram_media_id,
+    originalMediaId: originals.instagramMediaId,
     status,
     permalink: row.instagram_permalink,
     error: row.instagram_error,
@@ -184,6 +204,7 @@ function publicInstagram(row: PostRow) {
 }
 
 function publicPost(row: PostRow) {
+  const storedMedia = parseMediaStorage(row.media_json);
   return {
     id: row.id,
     kind: row.kind,
@@ -196,7 +217,7 @@ function publicPost(row: PostRow) {
         : null,
     cta: row.cta_type && row.cta_type !== 'none' ? { type: row.cta_type, url: row.cta_url } : null,
     offer: row.kind === 'offer' ? { couponCode: row.coupon_code, redeemOnlineUrl: row.redeem_online_url, termsConditions: row.terms_conditions } : null,
-    media: parseMedia(row.media_json),
+    media: storedMedia.media.map((item) => ({ ...item, originalMediaId: storedMedia.originals.googleMediaId })),
     instagram: publicInstagram(row),
     publishMode: row.publish_mode,
     status: row.status,
@@ -238,8 +259,9 @@ interface DraftInput {
   cta: PostCta | null;
   offer: PostOffer | null;
   mediaId: string | null;
+  mediaOriginalId: string | null;
   /** Instagram へも同時に出すか。`caption` が null なら Google の本文をそのまま使う。 */
-  instagram: { enabled: boolean; caption: string | null };
+  instagram: { enabled: boolean; caption: string | null; mediaId: string | null; originalMediaId: string | null };
 }
 
 function parseDraftInput(body: Record<string, unknown>): DraftInput | null {
@@ -268,12 +290,22 @@ function parseDraftInput(body: Record<string, unknown>): DraftInput | null {
         }
       : null;
   const mediaId = typeof body.mediaId === 'string' && body.mediaId ? body.mediaId : null;
+  const mediaOriginalId = typeof body.mediaOriginalId === 'string' && body.mediaOriginalId ? body.mediaOriginalId : null;
   const rawInstagram = body.instagram as Record<string, unknown> | null | undefined;
   const instagram = {
     enabled: rawInstagram?.enabled === true,
     caption: typeof rawInstagram?.caption === 'string' && rawInstagram.caption.trim() ? rawInstagram.caption.trim() : null,
+    mediaId: typeof rawInstagram?.mediaId === 'string' && rawInstagram.mediaId ? rawInstagram.mediaId : null,
+    originalMediaId: typeof rawInstagram?.originalMediaId === 'string' && rawInstagram.originalMediaId ? rawInstagram.originalMediaId : null,
   };
-  return { kind, summary, title, schedule, cta, offer, mediaId, instagram };
+  return { kind, summary, title, schedule, cta, offer, mediaId, mediaOriginalId, instagram };
+}
+
+function serializeMedia(media: MediaRef[], input: DraftInput): string {
+  return JSON.stringify({ media, originals: {
+    googleMediaId: input.mediaOriginalId,
+    instagramMediaId: input.instagram.enabled ? input.instagram.originalMediaId : null,
+  } });
 }
 
 async function insertDraft(c: Context<Env>, store: StoreContext, input: DraftInput, media: MediaRef[]): Promise<PostRow> {
@@ -302,10 +334,10 @@ async function insertDraft(c: Context<Env>, store: StoreContext, input: DraftInp
       input.offer?.couponCode ?? null,
       input.offer?.redeemOnlineUrl ?? null,
       input.offer?.termsConditions ?? null,
-      JSON.stringify(media),
+      serializeMedia(media, input),
       input.instagram.enabled ? 1 : 0,
       input.instagram.caption,
-      input.instagram.enabled ? input.mediaId : null,
+      input.instagram.enabled ? (input.instagram.mediaId ?? input.mediaId) : null,
       staff?.id ?? null,
       staff?.name ?? null,
     )
@@ -335,10 +367,10 @@ async function updateDraft(c: Context<Env>, store: StoreContext, id: string, inp
       input.offer?.couponCode ?? null,
       input.offer?.redeemOnlineUrl ?? null,
       input.offer?.termsConditions ?? null,
-      JSON.stringify(media),
+      serializeMedia(media, input),
       input.instagram.enabled ? 1 : 0,
       input.instagram.caption,
-      input.instagram.enabled ? input.mediaId : null,
+      input.instagram.enabled ? (input.instagram.mediaId ?? input.mediaId) : null,
       nowIso(),
       id,
       store.id,
@@ -464,7 +496,7 @@ async function crossPostToInstagram(c: Context<Env>, store: StoreContext, row: P
 /** 下書き保存のときの Instagram 側の決まり（画面の検証と同じ内容をサーバーでも見る）。 */
 function instagramDraftError(input: DraftInput): string | null {
   if (!input.instagram.enabled) return null;
-  if (!input.mediaId) return 'Instagram にも投稿するときは、画像を1枚選んでください';
+  if (!input.instagram.mediaId && !input.mediaId) return 'Instagram にも投稿するときは、画像を1枚選んでください';
   if (input.instagram.caption && input.instagram.caption.length > 2200)
     return 'Instagram 用の文章は2,200文字までです';
   return null;
@@ -627,16 +659,28 @@ restaurantGooglePosts.post('/api/restaurant-test/google/posts', inputJsonBoundar
   if (!store) return fail(c, 404, 'このLINEアカウントに店舗が紐付いていません');
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
   const instagramFields = body.instagram && typeof body.instagram === 'object'
-    ? inputShapeErrors(body.instagram as Record<string, unknown>, { enabled: ['boolean'], caption: ['string', 'null'] }) : {};
+    ? inputShapeErrors(body.instagram as Record<string, unknown>, { enabled: ['boolean'], caption: ['string', 'null'], mediaId: ['string', 'null'], originalMediaId: ['string', 'null'] }) : {};
   if (Object.keys(instagramFields).length) return fail(c, 400, 'Instagram の入力内容の形式を確認してください', {
     code: 'invalid_request', fields: Object.fromEntries(Object.entries(instagramFields).map(([key, reason]) => [`instagram.${key}`, reason])),
   });
   const input = parseDraftInput(body);
   if (!input) return fail(c, 400, 'kind が不正です', { code: 'invalid_request' }, ["kind","summary","title","schedule","cta","offer","mediaId"]);
   const instagramError = instagramDraftError(input);
-  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' }, [!input.mediaId ? 'mediaId' : 'instagram.caption']);
+  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' }, [!input.instagram.mediaId && !input.mediaId ? 'instagram.mediaId' : 'instagram.caption']);
   const mediaResult = await resolveMedia(c, store, input.mediaId);
   if (!mediaResult.ok) return fail(c, 404, mediaResult.error, { code: 'media_not_found' });
+  if (input.mediaOriginalId && input.mediaOriginalId !== input.mediaId) {
+    const originalMedia = await resolveMedia(c, store, input.mediaOriginalId);
+    if (!originalMedia.ok) return fail(c, 404, originalMedia.error, { code: 'media_not_found' });
+  }
+  if (input.instagram.enabled && input.instagram.mediaId && input.instagram.mediaId !== input.mediaId) {
+    const instagramMedia = await resolveMedia(c, store, input.instagram.mediaId);
+    if (!instagramMedia.ok) return fail(c, 404, instagramMedia.error, { code: 'media_not_found' });
+  }
+  if (input.instagram.enabled && input.instagram.originalMediaId && input.instagram.originalMediaId !== input.instagram.mediaId && input.instagram.originalMediaId !== input.mediaId && input.instagram.originalMediaId !== input.mediaOriginalId) {
+    const originalMedia = await resolveMedia(c, store, input.instagram.originalMediaId);
+    if (!originalMedia.ok) return fail(c, 404, originalMedia.error, { code: 'media_not_found' });
+  }
   const row = await insertDraft(c, store, input, mediaResult.media);
   return c.json({ success: true, post: publicPost(row) });
 });
@@ -664,16 +708,28 @@ restaurantGooglePosts.put('/api/restaurant-test/google/posts/:id', inputJsonBoun
   if (row.status !== 'draft') return fail(c, 409, 'この投稿は編集できません', { code: 'not_editable' });
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
   const instagramFields = body.instagram && typeof body.instagram === 'object'
-    ? inputShapeErrors(body.instagram as Record<string, unknown>, { enabled: ['boolean'], caption: ['string', 'null'] }) : {};
+    ? inputShapeErrors(body.instagram as Record<string, unknown>, { enabled: ['boolean'], caption: ['string', 'null'], mediaId: ['string', 'null'], originalMediaId: ['string', 'null'] }) : {};
   if (Object.keys(instagramFields).length) return fail(c, 400, 'Instagram の入力内容の形式を確認してください', {
     code: 'invalid_request', fields: Object.fromEntries(Object.entries(instagramFields).map(([key, reason]) => [`instagram.${key}`, reason])),
   });
   const input = parseDraftInput(body);
   if (!input) return fail(c, 400, 'kind が不正です', { code: 'invalid_request' }, ["kind","summary","title","schedule","cta","offer","mediaId"]);
   const instagramError = instagramDraftError(input);
-  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' }, [!input.mediaId ? 'mediaId' : 'instagram.caption']);
+  if (instagramError) return fail(c, 400, instagramError, { code: 'invalid_request' }, [!input.instagram.mediaId && !input.mediaId ? 'instagram.mediaId' : 'instagram.caption']);
   const mediaResult = await resolveMedia(c, store, input.mediaId);
   if (!mediaResult.ok) return fail(c, 404, mediaResult.error, { code: 'media_not_found' });
+  if (input.mediaOriginalId && input.mediaOriginalId !== input.mediaId) {
+    const originalMedia = await resolveMedia(c, store, input.mediaOriginalId);
+    if (!originalMedia.ok) return fail(c, 404, originalMedia.error, { code: 'media_not_found' });
+  }
+  if (input.instagram.enabled && input.instagram.mediaId && input.instagram.mediaId !== input.mediaId) {
+    const instagramMedia = await resolveMedia(c, store, input.instagram.mediaId);
+    if (!instagramMedia.ok) return fail(c, 404, instagramMedia.error, { code: 'media_not_found' });
+  }
+  if (input.instagram.enabled && input.instagram.originalMediaId && input.instagram.originalMediaId !== input.instagram.mediaId && input.instagram.originalMediaId !== input.mediaId && input.instagram.originalMediaId !== input.mediaOriginalId) {
+    const originalMedia = await resolveMedia(c, store, input.instagram.originalMediaId);
+    if (!originalMedia.ok) return fail(c, 404, originalMedia.error, { code: 'media_not_found' });
+  }
   await updateDraft(c, store, row.id, input, mediaResult.media);
   return c.json({ success: true, post: publicPost((await postFor(c, store.id, row.id))!) });
 });

@@ -54,7 +54,7 @@ vi.mock('next/navigation', () => ({
 const go = vi.fn()
 
 function ig(patch: Partial<GooglePostInstagram>): GooglePostInstagram {
-  return { enabled: true, caption: null, status: 'none', permalink: null, error: null, ...patch }
+  return { enabled: true, caption: null, mediaId: null, status: 'none', permalink: null, error: null, ...patch }
 }
 
 function post(id: string, patch: Partial<GooglePost>): GooglePost {
@@ -143,6 +143,17 @@ describe('投稿一覧の Instagram の札（★V8-B `HEEN9`）', () => {
 })
 
 describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', () => {
+  it('Google画像は投稿の詳細より前、Instagram画像はInstagram本文より後に置く', async () => {
+    fixture.igConnection.mockReturnValue(connection('connected'))
+    render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
+    const instagramImage = await screen.findByText('Instagram 用の画像')
+    const googleImage = screen.getByText('Google ビジネス用の画像')
+    const details = screen.getByText('投稿の詳細')
+    const caption = screen.getByLabelText('Instagram 用の文章（書き換えたいときだけ）')
+    expect(googleImage.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(caption.compareDocumentPosition(instagramImage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('つないでいるときだけ出し、既定はオン。オフにすると文章の欄をたたむ', async () => {
     fixture.igConnection.mockReturnValue(connection('connected'))
 
@@ -151,7 +162,7 @@ describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', (
     const toggle = await screen.findByRole('checkbox', { name: 'Instagram にも投稿する' })
     expect((toggle as HTMLInputElement).checked).toBe(true)
     expect(screen.getByLabelText('Instagram 用の文章（書き換えたいときだけ）')).toBeTruthy()
-    expect(screen.getByText('Instagram には画像が 1 枚必要です。PNG の画像は自動で JPEG に変換されます。')).toBeTruthy()
+    expect(screen.getByText('Instagram 用の画像')).toBeTruthy()
 
     fireEvent.click(toggle)
     await waitFor(() => expect(screen.queryByLabelText('Instagram 用の文章（書き換えたいときだけ）')).toBeNull())
@@ -164,7 +175,7 @@ describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', (
 
     await screen.findByText('投稿を作る')
     expect(screen.queryByRole('checkbox', { name: 'Instagram にも投稿する' })).toBeNull()
-    expect(screen.queryByText(/Instagram には画像が 1 枚必要です/)).toBeNull()
+    expect(screen.queryByText('Instagram 用の画像')).toBeNull()
   })
 })
 

@@ -15,7 +15,7 @@ import Toggle from '@/components/shared/toggle';
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import ListToolbar from '@/components/shared/list-toolbar'
 import PageSizeSelect from '@/components/shared/page-size-select'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, RefreshCw, Send } from 'lucide-react'
 import type { InstagramConnectionStatus, MediaItem } from '@line-crm/shared'
 import { api, ApiError, type MediaUploadSession } from '@/lib/api'
@@ -23,7 +23,6 @@ import type { ActionMenuItem } from '@/components/shared/action-menu'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
-import MediaSlot from '@/components/shared/media-slot'
 import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -55,6 +54,7 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { formatNumber } from '@/lib/format'
+import { PostImageCrop, type CropSource, type CropTarget } from './post-image-crop'
 
 /*
  * ★V8 Googleビジネス 投稿（一覧 ・投稿を作る ）と公開前の確認。
@@ -291,6 +291,11 @@ interface PostForm {
   mediaId: string | null
   mediaFilename: string | null
   mediaSourceUrl: string | null
+  mediaOriginalId: string | null
+  igMediaId: string | null
+  igMediaFilename: string | null
+  igMediaSourceUrl: string | null
+  igOriginalId: string | null
   /** Instagram にも出すか（★V8-B `U1X7T2`／2026-10-07 承認。新しい投稿は既定でオン）。 */
   igEnabled: boolean
   /** Instagram 用の文章。空なら本文をそのまま使う。 */
@@ -298,7 +303,7 @@ interface PostForm {
 }
 
 function emptyForm(kind: GooglePostKind): PostForm {
-  return { kind, summary: '', title: '', start: '', end: '', ctaType: '', ctaUrl: '', couponCode: '', redeemOnlineUrl: '', termsConditions: '', mediaId: null, mediaFilename: null, mediaSourceUrl: null, igEnabled: true, igCaption: '' }
+  return { kind, summary: '', title: '', start: '', end: '', ctaType: '', ctaUrl: '', couponCode: '', redeemOnlineUrl: '', termsConditions: '', mediaId: null, mediaFilename: null, mediaSourceUrl: null, mediaOriginalId: null, igMediaId: null, igMediaFilename: null, igMediaSourceUrl: null, igOriginalId: null, igEnabled: true, igCaption: '' }
 }
 
 function formFromPost(post: GooglePost): PostForm {
@@ -317,6 +322,11 @@ function formFromPost(post: GooglePost): PostForm {
     mediaId: post.media[0]?.mediaId ?? null,
     mediaFilename: post.media[0]?.filename ?? null,
     mediaSourceUrl: post.media[0]?.sourceUrl ?? null,
+    mediaOriginalId: post.media[0]?.originalMediaId ?? null,
+    igMediaId: post.instagram?.mediaId ?? null,
+    igMediaFilename: null,
+    igMediaSourceUrl: null,
+    igOriginalId: post.instagram?.originalMediaId ?? null,
     igEnabled: post.instagram?.enabled ?? false,
     igCaption: post.instagram?.caption ?? '',
   }
@@ -337,20 +347,48 @@ function draftInputFrom(form: PostForm, igAvailable: boolean): GooglePostDraftIn
     cta: form.kind !== 'offer' && form.ctaType ? { type: form.ctaType, url: form.ctaType === 'call' ? null : form.ctaUrl.trim() || null } : null,
     offer: form.kind === 'offer' ? { couponCode: form.couponCode.trim() || null, redeemOnlineUrl: form.redeemOnlineUrl.trim() || null, termsConditions: form.termsConditions.trim() || null } : null,
     mediaId: form.mediaId,
-    instagram: igAvailable ? { enabled: form.igEnabled, caption: form.igCaption.trim() || null } : { enabled: false, caption: null },
+    mediaOriginalId: form.mediaOriginalId,
+    instagram: igAvailable ? { enabled: form.igEnabled, caption: form.igCaption.trim() || null, mediaId: form.igMediaId, originalMediaId: form.igOriginalId } : { enabled: false, caption: null, mediaId: null, originalMediaId: null },
   }
 }
 
+function PostImagePanel({ target, filename, url, editable, busy, onFile, onMediaPick, onAdjust, onUseGoogle }: {
+  target: CropTarget
+  filename: string | null
+  url: string | null
+  editable: boolean
+  busy: boolean
+  onFile: (file: File) => void
+  onMediaPick: () => void
+  onAdjust: () => void
+  onUseGoogle?: () => void
+}) {
+  const fileInput = useRef<HTMLInputElement>(null)
+  const isGoogle = target === 'google'
+  return <div className={styles.platformImagePanel}>
+    <div className={styles.platformImageHead}><strong>{isGoogle ? 'Google ビジネス用の画像' : 'Instagram 用の画像'}</strong><span className={isGoogle ? styles.optionalLabel : styles.requiredLabel}>{isGoogle ? '任意' : '必須'}</span><span className={styles.platformImageRatio}>{isGoogle ? '4:3' : '4:5'} の投稿画像</span></div>
+    <div className={styles.platformImageContent}>
+      {url ? <><div className={`${styles.platformThumb} ${isGoogle ? styles.platformThumbGoogle : styles.platformThumbInstagram}`}><img src={url} alt={`${isGoogle ? 'Google' : 'Instagram'}用の投稿画像`} /></div><div className={styles.platformImageInfo}><strong>{filename}</strong><span>{isGoogle ? 'Google 表示範囲 4:3' : 'Instagram 表示範囲 4:5'}</span><b>切り取り位置を確認済み</b></div></> : <div className={styles.platformImageEmpty}><p>画像を選んで、投稿前に切り取り位置を確認</p>{editable ? <div className={styles.platformImageActions}><Button onClick={() => fileInput.current?.click()} disabled={busy}>画像を選ぶ</Button><Button onClick={onMediaPick} disabled={busy}>登録メディアから選ぶ</Button>{onUseGoogle ? <Button variant="text" onClick={onUseGoogle} disabled={busy}>Google画像を使う</Button> : null}</div> : null}</div>}
+    </div>
+    {url && editable ? <div className={styles.platformImageLinks}><button type="button" onClick={() => fileInput.current?.click()} disabled={busy}>画像を変更</button><button type="button" onClick={onAdjust} disabled={busy}>切り取りを調整</button>{onUseGoogle ? <button type="button" onClick={onUseGoogle} disabled={busy}>Google画像を使う</button> : null}</div> : null}
+    <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) onFile(file); event.target.value = '' }} />
+    {!url ? <p className={styles.platformImageHelp}>{isGoogle ? '画像がなくてもGoogleへの投稿は作成できます。' : 'Google画像を使うことも、別の画像を選ぶこともできます。'}</p> : null}
+  </div>
+}
+
 /** 投稿を作る・直す。 */
-export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUpload }: { accountId: string; kind: GooglePostKind; postId: string | null; go: GoogleNav; mediaUpload?: MediaUploadHelpers }) {
+export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUpload, adjustTarget }: { accountId: string; kind: GooglePostKind; postId: string | null; go: GoogleNav; mediaUpload?: MediaUploadHelpers; adjustTarget?: CropTarget }) {
   const saveErrors = useSaveFormErrors()
+  const openedAdjust = useRef(false)
 
   const [form, setForm] = useState<PostForm>(emptyForm(kindFromUrl))
   const [initial, setInitial] = useState<PostForm>(emptyForm(kindFromUrl))
   const [loading, setLoading] = useState(Boolean(postId))
   const [loadError, setLoadError] = useState('')
   const [editable, setEditable] = useState(true)
-  const [picker, setPicker] = useState<{ open: boolean; items: MediaItem[]; loading: boolean; error: string }>({ open: false, items: [], loading: false, error: '' })
+  const [picker, setPicker] = useState<{ target: CropTarget | null; items: MediaItem[]; loading: boolean; error: string }>({ target: null, items: [], loading: false, error: '' })
+  const [crop, setCrop] = useState<{ target: CropTarget; source: CropSource; preserveOriginal: boolean } | null>(null)
+  const [cropSources, setCropSources] = useState<Partial<Record<CropTarget, CropSource>>>({})
   const [busy, setBusy] = useState<'save' | 'confirm' | null>(null)
   const [actionError, setActionError] = useState('')
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof PostForm, string>>>({})
@@ -372,9 +410,22 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
     let alive = true
     setLoading(true)
     restaurantGoogleApi.post(accountId, postId)
-      .then((response) => {
+      .then(async (response) => {
         if (!alive) return
         const next = formFromPost(response.post)
+        if (next.igMediaId) {
+          if (next.igMediaId === next.mediaId) {
+            next.igMediaFilename = next.mediaFilename
+            next.igMediaSourceUrl = next.mediaSourceUrl
+          } else {
+            const media = await api.media.detail(next.igMediaId, accountId)
+            if (media.success) {
+              next.igMediaFilename = media.data.item.filename
+              next.igMediaSourceUrl = media.data.item.url
+            }
+          }
+        }
+        if (!alive) return
         setForm(next)
         setInitial(next)
         setEditable(response.post.status === 'draft')
@@ -387,43 +438,100 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   const dirty = JSON.stringify(form) !== JSON.stringify(initial)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: busy !== null })
 
-  const openPicker = async () => {
-    setPicker({ open: true, items: [], loading: true, error: '' })
+  const openPicker = async (target: CropTarget) => {
+    setPicker({ target, items: [], loading: true, error: '' })
     try {
       const response = await api.media.list(accountId, { kind: 'image', limit: 60, sort: 'newest' })
       if (!response.success) throw new ApiError(500, response.error)
-      setPicker({ open: true, items: response.data.items, loading: false, error: '' })
+      setPicker({ target, items: response.data.items, loading: false, error: '' })
     } catch (err) {
       saveErrors.capture(err)
-      setPicker({ open: true, items: [], loading: false, error: errorMessage(err, '登録メディアを読み込めませんでした。') })
+      setPicker({ target, items: [], loading: false, error: errorMessage(err, '登録メディアを読み込めませんでした。') })
     }
   }
 
-  /** 端末（PC/スマホ）内のファイルをそのまま登録メディアへ登録し、投稿画像として選ぶ（今の画面と同じ手順）。 */
-  const uploadFromDevice = async (file: File) => {
-    if (!mediaUpload) return
+  const uploadMedia = async (file: File): Promise<MediaItem> => {
+    if (!mediaUpload) throw new Error('画像のアップロードを利用できません。')
+    const problem = mediaUpload.validate(file)
+    if (problem) throw new Error(problem)
+    const metadata = await mediaUpload.extractMetadata(file)
+    const prepared = await api.media.prepareUploads({ accountId, files: [{ filename: file.name, mimeType: file.type, sizeBytes: file.size, metadata }] })
+    if (!prepared.success) throw new ApiError(500, prepared.error)
+    const session = prepared.data.sessions[0]
+    if (!session) throw new Error('送信の準備結果を確認できませんでした。')
+    const etag = await mediaUpload.put(session, file, (progress) => setUpload((current) => ({ ...current, progress })))
+    const completion = await api.media.completeUpload(session.id, { accountId, etag })
+    if (!completion.success || !completion.data.mediaId) throw new Error('画像の登録を完了できませんでした。')
+    const detail = await api.media.detail(completion.data.mediaId, accountId)
+    if (!detail.success) throw new ApiError(500, detail.error)
+    return detail.data.item
+  }
+
+  const chooseFile = (target: CropTarget, file: File) => {
+    if (!mediaUpload) { setUpload({ busy: false, progress: 0, error: '画像のアップロードを利用できません。' }); return }
     const problem = mediaUpload.validate(file)
     if (problem) { setUpload({ busy: false, progress: 0, error: problem }); return }
+    setCrop({ target, source: { file, name: file.name }, preserveOriginal: true })
+  }
+
+  const openCropFromMedia = useCallback(async (target: CropTarget, mediaId: string, name: string) => {
     setUpload({ busy: true, progress: 0, error: '' })
     try {
-      const metadata = await mediaUpload.extractMetadata(file)
-      const prepared = await api.media.prepareUploads({ accountId, files: [{ filename: file.name, mimeType: file.type, sizeBytes: file.size, metadata }] })
-      if (!prepared.success) throw new ApiError(500, prepared.error)
-      const session = prepared.data.sessions[0]
-      if (!session) throw new Error('送信の準備結果を確認できませんでした。時間をおいて、もう一度お試しください。')
-      const etag = await mediaUpload.put(session, file, (progress) => setUpload((current) => ({ ...current, progress })))
-      const completion = await api.media.completeUpload(session.id, { accountId, etag })
-      if (!completion.success) throw new ApiError(500, completion.error)
-      const mediaId = completion.data.mediaId
-      if (!mediaId) throw new Error('登録を完了できませんでした。時間をおいて、もう一度お試しください。')
-      const detail = await api.media.detail(mediaId, accountId)
-      if (!detail.success) throw new ApiError(500, detail.error)
-      setForm((current) => ({ ...current, mediaId: detail.data.item.id, mediaFilename: detail.data.item.filename, mediaSourceUrl: detail.data.item.url }))
-      setPicker({ open: false, items: [], loading: false, error: '' })
+      const blob = await api.media.download(mediaId, accountId)
+      setCrop({ target, source: { file: new File([blob], name, { type: blob.type || 'image/jpeg' }), name, mediaId }, preserveOriginal: false })
+    } catch (err) {
+      setUpload({ busy: false, progress: 0, error: errorMessage(err, '画像を読み込めませんでした。') })
+      return
+    }
+    setUpload({ busy: false, progress: 0, error: '' })
+  }, [accountId])
+
+  useEffect(() => {
+    if (!loading && postId && adjustTarget && !openedAdjust.current) {
+      openedAdjust.current = true
+      const mediaId = adjustTarget === 'google' ? (form.mediaOriginalId ?? form.mediaId) : (form.igOriginalId ?? form.igMediaId)
+      const name = adjustTarget === 'google' ? form.mediaFilename : form.igMediaFilename
+      if (mediaId) void openCropFromMedia(adjustTarget, mediaId, name ?? '画像.jpg')
+    }
+  }, [loading, postId, adjustTarget, form.mediaOriginalId, form.mediaId, form.igOriginalId, form.igMediaId, form.mediaFilename, form.igMediaFilename, openCropFromMedia])
+
+  const adjustCrop = (target: CropTarget) => {
+    const source = cropSources[target]
+    if (source) { setCrop({ target, source, preserveOriginal: false }); return }
+    const mediaId = target === 'google' ? (form.mediaOriginalId ?? form.mediaId) : (form.igOriginalId ?? form.igMediaId)
+    const name = target === 'google' ? form.mediaFilename : form.igMediaFilename
+    if (mediaId) void openCropFromMedia(target, mediaId, name ?? '画像.jpg')
+  }
+
+  const useGoogleImage = () => {
+    const source = cropSources.google
+    if (source) { setCrop({ target: 'instagram', source, preserveOriginal: false }); return }
+    if (form.mediaId) void openCropFromMedia('instagram', form.mediaOriginalId ?? form.mediaId, form.mediaFilename ?? 'Google画像.jpg')
+  }
+
+  const confirmCrop = async (file: File) => {
+    if (!crop) return
+    setUpload({ busy: true, progress: 0, error: '' })
+    try {
+      let originalMediaId = crop.source.mediaId ?? null
+      if (crop.preserveOriginal && crop.source.file) {
+        const original = await uploadMedia(crop.source.file)
+        originalMediaId = original.id
+        setCrop((current) => current ? { ...current, source: { ...current.source, mediaId: original.id }, preserveOriginal: false } : current)
+      }
+      const item = await uploadMedia(file)
+      const patch = crop.target === 'google'
+        ? { mediaId: item.id, mediaFilename: crop.source.name, mediaSourceUrl: item.url, mediaOriginalId: originalMediaId }
+        : { igMediaId: item.id, igMediaFilename: crop.source.name, igMediaSourceUrl: item.url, igOriginalId: originalMediaId }
+      set(patch)
+      setCropSources((current) => ({ ...current, [crop.target]: { ...crop.source, mediaId: originalMediaId ?? undefined } }))
+      setCrop(null)
+      setPicker({ target: null, items: [], loading: false, error: '' })
       setUpload({ busy: false, progress: 100, error: '' })
     } catch (err) {
       saveErrors.capture(err)
-      setUpload({ busy: false, progress: 0, error: errorMessage(err, 'アップロードできませんでした。') })
+      setUpload({ busy: false, progress: 0, error: errorMessage(err, '画像を保存できませんでした。') })
+      throw err
     }
   }
 
@@ -448,7 +556,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
     // Instagram にも投稿するときの決まり（★V8-B `U1X7T2`、2026-10-07 利用者承認）。
     // 画像は欄ではなく「選ぶ」操作なので、欄の下ではなく帯で知らせる。
     if (igAvailable && form.igEnabled) {
-      if (!form.mediaId) {
+      if (!form.igMediaId) {
         setActionError('Instagram にも投稿するときは、画像を1枚選んでください。')
         return false
       }
@@ -532,32 +640,11 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             </div>
           </div>
         ) : null}
-        <div className={styles.postCompose}>
         <Field density="compact" label="本文" htmlFor="gb-post-summary" error={fieldErrors.summary} requirement={FIELD_REQUIREMENTS.form_summary}>
           <SaveErrorField names={["summary","form.summary"]}><TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" /></SaveErrorField>
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>
-        <div className={styles.postImageSlot}>
-          <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><MediaSlot
-            kind="image"
-            /* 絵 ：画像は本文の下、幅320・4:3。 */
-            aspectRatio="4 / 3"
-            title="画像を追加"
-            previewAlt={form.mediaFilename ?? '投稿の画像'}
-            value={form.mediaSourceUrl}
-            accept={mediaUpload?.accept}
-            help="4:3推奨・1枚まで"
-            readOnly={!editable}
-            disabled={busy !== null}
-            busy={upload.busy}
-            progress={upload.busy ? upload.progress : undefined}
-            error={upload.error || undefined}
-            onFile={mediaUpload ? (file) => void uploadFromDevice(file) : undefined}
-            onMediaPick={() => (picker.open ? setPicker({ ...picker, open: false }) : void openPicker())}
-            onRemove={() => set({ mediaId: null, mediaFilename: null, mediaSourceUrl: null })}
-          /></SaveErrorField>
-          {form.mediaFilename ? <span className={styles.imageName} title={form.mediaFilename}>{`${form.mediaFilename}・4:3`}</span> : null}
-        </div>
+        <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><PostImagePanel target="google" filename={form.mediaFilename} url={form.mediaSourceUrl} editable={editable} busy={busy !== null || upload.busy} onFile={(file) => chooseFile('google', file)} onMediaPick={() => void openPicker('google')} onAdjust={() => adjustCrop('google')} /></SaveErrorField>
         <div className={styles.postDetails} data-post-details>
           <SectionHeader size="small" title="投稿の詳細" />
           <div className={styles.fieldPair}>
@@ -586,27 +673,25 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             />
           </Field>
         </div>
-        </div>
-        {picker.open ? (
-          <div className={styles.picker} role="group" aria-label="画像を選ぶ">
+        {picker.target === 'google' ? (
+          <div className={styles.picker} role="group" aria-label="Google 用の登録画像を選ぶ">
             <div className={styles.pickerHead}>
               <SectionHeader size="small" title="登録メディアの画像" />
               <span className={styles.spacer} aria-hidden="true" />
-              <Button onClick={() => setPicker({ ...picker, open: false })}>閉じる</Button>
+              <Button onClick={() => setPicker({ ...picker, target: null })}>閉じる</Button>
             </div>
             {picker.loading ? <ListState kind="loading" title="登録メディアを読み込んでいます" /> : null}
             {picker.error ? <Notice tone="danger">{picker.error}</Notice> : null}
             {!picker.loading && !picker.error && picker.items.length === 0 ? <p className={styles.muted}>このLINEアカウントの登録メディアに画像がありません。先に「登録メディア」で画像を追加してください。</p> : null}
             <div className={styles.pickerGrid}>
               {picker.items.map((m) => (
-                <Button key={m.id} variant="text" size="thumbnail" title={m.filename} aria-label={`${m.filename} を選ぶ`} onClick={() => { set({ mediaId: m.id, mediaFilename: m.filename, mediaSourceUrl: m.url }); setPicker({ ...picker, open: false }) }}>
+                <Button key={m.id} variant="text" size="thumbnail" title={m.filename} aria-label={`${m.filename} を選ぶ`} onClick={() => { void openCropFromMedia('google', m.id, m.filename); setPicker({ ...picker, target: null }) }}>
                   <img width={120} height={120} src={m.url} alt="" />
                 </Button>
               ))}
             </div>
           </div>
         ) : null}
-        <p className={styles.grayNote}>画像は4:3推奨・1枚まで。</p>
         {form.kind === 'offer' ? (
           <div className={styles.fieldGroup}>
             <div className={styles.fieldPair}>
@@ -636,20 +721,24 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             </div>
             {form.igEnabled ? (
               <>
-                <Field label="Instagram 用の文章（書き換えたいときだけ）" htmlFor="gb-post-ig-caption">
+                <Field label="Instagram 用の文章（書き換えたいときだけ）" optional htmlFor="gb-post-ig-caption">
                   <SaveErrorField names={["igCaption","form.igCaption","ig_caption","caption","form.ig_caption"]}><TextArea density="compact" height="post" id="gb-post-ig-caption" value={form.igCaption} onChange={(e) => set({ igCaption: e.target.value })} disabled={!editable} maxLength={2200} placeholder="空のままなら、上の本文をそのまま使います" aria-describedby="gb-post-ig-caption-count" /></SaveErrorField>
                   <span id="gb-post-ig-caption-count" className="sr-only">{`${form.igCaption.length} / 2,200 文字`}</span>
                 </Field>
-                <p className={styles.igNote}>Instagram には画像が 1 枚必要です。PNG の画像は自動で JPEG に変換されます。</p>
               </>
             ) : null}
           </div>
         ) : null}
+        {igAvailable && form.igEnabled ? <>
+          <PostImagePanel target="instagram" filename={form.igMediaFilename} url={form.igMediaSourceUrl} editable={editable} busy={busy !== null || upload.busy} onFile={(file) => chooseFile('instagram', file)} onMediaPick={() => void openPicker('instagram')} onAdjust={() => adjustCrop('instagram')} onUseGoogle={form.mediaId ? useGoogleImage : undefined} />
+          {picker.target === 'instagram' ? <div className={styles.picker} role="group" aria-label="Instagram 用の登録画像を選ぶ"><div className={styles.pickerHead}><SectionHeader size="small" title="登録メディアの画像" /><span className={styles.spacer} aria-hidden="true" /><Button onClick={() => setPicker({ ...picker, target: null })}>閉じる</Button></div>{picker.loading ? <ListState kind="loading" title="登録メディアを読み込んでいます" /> : null}{picker.error ? <Notice tone="danger">{picker.error}</Notice> : null}<div className={styles.pickerGrid}>{picker.items.map((m) => <Button key={m.id} variant="text" size="thumbnail" title={m.filename} aria-label={`${m.filename} を選ぶ`} onClick={() => { void openCropFromMedia('instagram', m.id, m.filename); setPicker({ ...picker, target: null }) }}><img width={120} height={120} src={m.url} alt="" /></Button>)}</div></div> : null}
+        </> : null}
+        {upload.error ? <Notice tone="danger">{upload.error}</Notice> : null}
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
         {editable ? (
           <>
             <Notice tone="info" density="compact" icon={null} action={<Button onClick={() => void saveDraft()} disabled={busy !== null || upload.busy} busy={busy === 'save'}>下書きを保存する</Button>}>
-              「公開内容を確認する」で、Google に出る形を確かめてから公開します。途中は「下書きを保存する」。
+              「公開内容を確認する」で、両方の画像を見比べてから公開します。
             </Notice>
             <div className={styles.formActions}>
               <Button onClick={() => go({ tab: 'posts' })} disabled={busy !== null || upload.busy}>キャンセル</Button>
@@ -661,6 +750,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
         )}
       </Card>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
+      {crop ? <PostImageCrop target={crop.target} source={crop.source} onClose={() => setCrop(null)} onConfirm={confirmCrop} /> : null}
     </></SaveErrorScope>
   )
 }
@@ -670,6 +760,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
   const saveErrors = useSaveFormErrors()
 
   const [post, setPost] = useState<GooglePost | null>(null)
+  const [igPreview, setIgPreview] = useState<{ filename: string; url: string } | null>(null)
   const [storeName, setStoreName] = useState('')
   const [writeEnabled, setWriteEnabled] = useState(true)
   const [canPublish, setCanPublish] = useState(false)
@@ -686,6 +777,13 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
     try {
       const response = await restaurantGoogleApi.post(accountId, id)
       setPost(response.post)
+      const instagramMediaId = response.post.instagram?.mediaId
+      if (instagramMediaId && instagramMediaId === response.post.media[0]?.mediaId) {
+        setIgPreview({ filename: response.post.media[0].filename, url: response.post.media[0].sourceUrl })
+      } else if (instagramMediaId) {
+        const media = await api.media.detail(instagramMediaId, accountId)
+        setIgPreview(media.success ? media.data.item : null)
+      } else setIgPreview(null)
       setStoreName(response.store.name)
       setWriteEnabled(response.writeEnabled)
       setCanPublish(response.canPublish)
@@ -746,15 +844,17 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
         <div className={styles.factRow}><dt className={styles.factKey}>種類</dt><dd className={styles.factValue}>{KIND_LABELS[post.kind]}</dd></div>
         <div className={styles.factRow}><dt className={styles.factKey}>公開予定</dt><dd className={styles.factValue}>今すぐ（日本時間）</dd></div>
         {post.cta ? <div className={styles.factRow}><dt className={styles.factKey}>ボタン</dt><dd className={styles.factValue}>{`${CTA_LABELS[post.cta.type]}${post.cta.url ? ` → ${post.cta.url}` : ''}`}</dd></div> : null}
-        {post.media[0] ? <div className={styles.factRow}><dt className={styles.factKey}>画像</dt><dd className={styles.factValue}>{post.media[0].filename}</dd></div> : null}
+        {post.media[0] ? <div className={styles.factRow}><dt className={styles.factKey}>Google画像</dt><dd className={styles.factValue}><div className={styles.confirmImage}><div className={`${styles.confirmThumb} ${styles.confirmThumbGoogle}`}><img src={post.media[0].sourceUrl} alt="Google用画像" /></div><div><strong>Google ビジネス ・4:3</strong><span>{post.media[0].filename}</span>{post.status === 'draft' ? <div className={styles.confirmImageLinks}><button type="button" onClick={() => go({ tab: 'posts', view: 'edit', id })}>画像を変更</button><button type="button" onClick={() => go({ tab: 'posts', view: 'edit', id, adjust: 'google' })}>切り取りを調整</button></div> : null}</div></div></dd></div> : null}
         {post.instagram ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram</dt><dd className={styles.factValue}>{instagramFact(post.instagram)}</dd></div> : null}
+        {post.instagram?.enabled ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram本文</dt><dd className={styles.factValue}>{post.instagram.caption || post.summary}</dd></div> : null}
+        {post.instagram?.enabled && igPreview ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram画像</dt><dd className={styles.factValue}><div className={styles.confirmImage}><div className={`${styles.confirmThumb} ${styles.confirmThumbInstagram}`}><img src={igPreview.url} alt="Instagram用画像" /></div><div><strong>Instagram ・4:5</strong><span>{igPreview.filename}</span>{post.status === 'draft' ? <div className={styles.confirmImageLinks}><button type="button" onClick={() => go({ tab: 'posts', view: 'edit', id })}>画像を変更</button><button type="button" onClick={() => go({ tab: 'posts', view: 'edit', id, adjust: 'instagram' })}>切り取りを調整</button></div> : null}</div></div></dd></div> : null}
       </dl>
       {post.title ? <SectionHeader size="small" title={post.title} /> : null}
       <p className={styles.preText}>{post.summary}</p>
       {!done && post.status !== 'cancelled' ? (
         <>
-          <SaveErrorField names={["checked"]}><Checkbox checked={checked} onCheckedChange={setChecked}>公開先・本文・画像・リンク・日時を確認しました</Checkbox></SaveErrorField>
-          <p className={styles.grayNote}>予約後も編集・取消できます。送信後はGoogleの状態を取得し、予約中・公開済み・不承認を区別します。通信結果が不明な場合は、重複投稿を避けるため先にGoogle側の状態を確認します。</p>
+          <SaveErrorField names={["checked"]}><Checkbox checked={checked} onCheckedChange={setChecked}>公開先・本文・画像・切り取り位置・日時を確認しました</Checkbox></SaveErrorField>
+          <p className={styles.grayNote}>予約後も編集・取消できます。送信後はGoogleとInstagramの状態を確認できます。</p>
           <div className={styles.formActions}>
             <Button onClick={() => go({ tab: 'posts', view: 'edit', id })} disabled={busy}>修正する</Button>
             <Button variant="primary" onClick={() => void publish()} disabled={!canPress} busy={busy} busyLabel="送信中…">この内容で予約する</Button>
