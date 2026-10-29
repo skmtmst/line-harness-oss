@@ -407,7 +407,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
                 <span className={styles.spacer} aria-hidden="true" />
                 <span className={textLength > 4096 ? styles.countOver : styles.count}>{`${polishFormatNumber(textLength)} / 4,096`}</span>
               </div>
-              {data.aiAvailable ? <p className={styles.grayNote}>AI下書きでは口コミ本文と店舗名をAIの提供会社に送ります。作成した下書きはGoogleに自動送信されません。</p> : null}
+              {data.aiAvailable ? <p className={styles.grayNote}>AI下書きでは口コミの評価・本文と店舗名をAIの提供会社に送ります。作成した下書きはGoogleに自動送信されません。</p> : null}
               {saved ? <p className={styles.saved} role="status">{saved}</p> : null}
               {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
             </Card>
