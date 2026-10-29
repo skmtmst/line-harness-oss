@@ -23,7 +23,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, refresh() {}, back() {}, forward() {}, prefetch() {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
+  useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { emailInboxEnabled: true }, loading: false }),
 }))
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
