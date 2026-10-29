@@ -177,7 +177,7 @@ describe('一覧', () => {
     expect(sentItems.some((el) => el.textContent?.includes('削除する'))).toBe(false)
   })
 
-  it('削除は確認の窓を挟み、消したら一覧を読み直す', async () => {
+  it('削除は確認の窓を挟み、実行したら一覧を読み直す', async () => {
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     const items = await openRowMenu('料金改定のご案内（下書き）')
