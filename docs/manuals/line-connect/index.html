@@ -44,7 +44,7 @@ a{color:var(--info)}
 </nav>
 
 <section class="card" id="m1"><h2>手順2　チャネルID・チャネルシークレットの取得（Messaging API）</h2>
-<p class="desc">つなぐ公式アカウントの「チャネルID」と「チャネルシークレット」を、musubo の手順2の欄に貼ります。一番かんたんなのは LINE公式アカウントマネージャーから取る方法です。</p>
+<p class="desc">つなぐ公式アカウントの「チャネルID」と「チャネルシークレット」を、musubo の入力欄に貼ります。LINE公式アカウントマネージャーからコピーする方法をご案内します。</p>
 <h3>用意するもの</h3>
 <dl class="kv"><dt>LINEアカウント</dt><dd>その公式アカウントの「管理者」としてログインできるもの</dd><dt>開くサイト</dt><dd><a href="https://manager.line.biz/" target="_blank" rel="noreferrer">LINE公式アカウントマネージャー（manager.line.biz）</a></dd></dl>
 <h3>まだ Messaging API を使っていないとき（新しい公式アカウント）</h3>
@@ -58,6 +58,8 @@ a{color:var(--info)}
 <h3>取り方（LINE公式アカウントマネージャー）</h3>
 <ol class="steps"><li><span class="n">1</span><div>LINE公式アカウントマネージャーを開き、つなぐ公式アカウントを選びます。画面右上の <b>「設定」</b> を押します。</div></li><li><span class="n">2</span><div>左のメニューで <b>「Messaging API」</b> を押します。</div></li><li><span class="n">3</span><div>「Channel ID」の右の <b>「コピー」</b> を押し、musubo の <b>チャネルID</b> の欄に貼ります。</div></li><li><span class="n">4</span><div>「Channel secret」の右の <b>「コピー」</b> を押し、musubo の <b>チャネルシークレット</b> の欄に貼ります。</div></li></ol>
 <figure><img src="images/m1-oam-messaging-api.jpg" alt="LINE公式アカウントマネージャーの Messaging API 画面" loading="lazy"></figure>
+<h3>プロバイダーIDの取り方（LINE Developers）</h3>
+<p class="desc">同じMessaging APIチャネルのプロバイダーをLINE Developersで開き、「プロバイダー設定」を押します。「基本情報」の「プロバイダーID」の右にあるコピーアイコンを押し、musuboのプロバイダーID欄に貼り付けてください。画面URLの数字を読み取る必要はありません。</p>
 <p class="note info">「Webhook URL」の欄は空のままで進めてください。musubo が手順4で自動で入れます。</p>
 <h3>別の取り方（LINE Developers から）</h3>
 <p class="desc">LINE Developers（developers.line.biz/console）にログインし、プロバイダー →「Messaging API」のチャネルを開きます。</p>
