@@ -1,0 +1,5 @@
+.approved { display: flex; align-items: center; min-height: 53px; width: 100%; padding: 0 14px; border-radius: 10px; background: #e8f8ee; color: #087a3e; font-size: 13px; font-weight: 700; }
+.pendingNext { display: flex; flex-direction: column; gap: 12px; width: 100%; min-height: 110px; padding: 16px; border-radius: 10px; background: #fafafc; color: #4a5565; font-size: 13px; }
+.pendingNext strong { color: #1d1d1f; }
+.contact { display: grid; place-items: center; width: 100%; min-height: 44px; border: 1px solid #c9ced6; border-radius: 10px; background: #fff; color: #1d1d1f; font-size: 13px; font-weight: 700; text-decoration: none; }
+.login { align-self: center; margin-top: 12px; color: #087a3e; font-size: 13px; font-weight: 700; text-decoration: none; }
