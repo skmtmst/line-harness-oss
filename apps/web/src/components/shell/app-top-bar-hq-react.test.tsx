@@ -67,6 +67,7 @@ vi.mock('@/lib/use-manual-href', () => ({ useManualHref: () => null }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '株式会社 然', iconUrl: null }) }))
 
 import AppTopBar from './app-top-bar'
+import TopBar from '@/components/shared/top-bar'
 import StoreSelectionGate from '@/components/store-selection-gate'
 import RootLandingGate from '@/components/root-landing-gate'
 
@@ -365,5 +366,32 @@ describe('★V8 統括の上の帯', () => {
     fireEvent.click(await view.findByRole('menuitemradio', { name: /然-NEN- 本店/ }))
     expect(fixture.setSelectedAccountId).toHaveBeenCalledWith('account-1')
     expect(fixture.push).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('アカウント未選択の共通の呼び名', () => {
+  beforeEach(() => { fixture.loading = false; fixture.error = null; fixture.selectedAccountId = null; fixture.pathname = '/friends'; fixture.setSelectedAccountId.mockClear() })
+  afterEach(() => { cleanup(); window.history.replaceState(null, '', '/hq') })
+  it.each(['オーナー', ''])('上の帯は未選択と全文の案内を出す（役割=%s）', roleLabel => {
+    const view = render(<TopBar title="友だち" accounts={[]} selectedAccountId="" onAccountChange={vi.fn()} roleLabel={roleLabel} userName="確認担当" onLogout={vi.fn()} v8Chrome showIdentity={false} />)
+    const label = view.container.querySelector('[data-part="account-name"]')!
+    expect(label.textContent).toBe('未選択')
+    expect(label.getAttribute('title')).toBe('LINE公式アカウントを選んでください')
+    expect(view.container.textContent).not.toContain('店舗を選択')
+    expect(view.getByRole('button', { name: 'アカウントを切り替える' })).toBeTruthy()
+  })
+
+  it('個別画面は公式アカウントの案内にそろえ、元の画面へ戻る行き先を保つ', async () => {
+    fixture.pathname = '/friends'
+    fixture.selectedAccountId = null
+    window.history.replaceState(null, '', '/friends?folder=followup')
+    const view = render(<StoreSelectionGate><p>個別のデータ</p></StoreSelectionGate>)
+    expect(view.getByRole('heading', { name: 'LINE公式アカウントを選んでください' })).toBeTruthy()
+    expect(view.getByText('この画面はLINE公式アカウントごとのデータを扱います。統括のアカウント一覧から選んでください。')).toBeTruthy()
+    const action = view.getByRole('link', { name: 'LINE公式アカウントを選ぶ' })
+    await waitFor(() => expect(action.getAttribute('href')).toBe('/hq?return=%2Ffriends%3Ffolder%3Dfollowup'))
+    expect(view.queryByText('個別のデータ')).toBeNull()
+    expect(fixture.setSelectedAccountId).not.toHaveBeenCalled()
   })
 })
