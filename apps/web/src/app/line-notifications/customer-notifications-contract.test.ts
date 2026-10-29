@@ -148,6 +148,10 @@ describe('V8 顧客へのお知らせ（板 g3iDs）', () => {
     expect(CODE).not.toContain('text-accent"><p>EC連携</p>')
   })
 
+  it('E27: 左の列と本文の余白はほかの設定画面と同じ wide-nav（narrow-nav を使わない）', () => {
+    expect(CODE).not.toContain('narrow-nav')
+  })
+
   it('端末の控えと未保存の印は、送った文面がそのまま画面に残っているときだけ片づける', () => {
     // 保存中も入力できる。押した時点の写しで「保存済み」にすると、足した分が消える。
     expect(PAGE).toContain('function customerDraftFingerprint(draft: CustomerEditorDraft): string')
