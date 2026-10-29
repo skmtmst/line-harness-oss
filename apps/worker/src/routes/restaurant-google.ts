@@ -2,8 +2,6 @@ import { parseOffsetPaging, buildOffsetListResponse } from '../lib/list-paging.j
 import { fail } from '../lib/fail.js';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 
-import {requireAccountAi} from '../services/account-ai-features.js';
-import {GapError} from '../services/gap-common.js';
 import { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 export { nowIso, upsertReviewsForEnv } from './restaurant-google-review-storage.js';
 import { inputJsonBoundary } from '../lib/input-errors.js';
@@ -1060,7 +1058,6 @@ restaurantGoogle.post('/api/restaurant-test/google/reviews/:id/draft/generate', 
   if (!body || Array.isArray(body) || !['generate','shorten','polite'].includes(String(body.mode ?? 'generate'))) {
     return fail(c,400,'下書きの作り方を確認してください',{code:'invalid_mode'},['mode']);
   }
-  try{await requireAccountAi(dbFor(c.env, store.id),store.lineAccountId,'google_review');}catch(e){if(e instanceof GapError)return fail(c,409,'AIを使っていません',{code:e.code,enabled:false,feature:'google_review'});throw e;}
   const mode = body.mode ?? 'generate';
   const original = mode === 'generate' ? null : validateReplyText(typeof body.replyDraft === 'string' ? body.replyDraft : row.reply_draft ?? '');
   if (mode !== 'generate' && (body.replyDraft !== undefined && typeof body.replyDraft !== 'string' || !original?.ok)) {

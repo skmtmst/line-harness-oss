@@ -46,7 +46,7 @@ describe('/accounts/new の登録権限', () => {
     fixture.role.value = verifiedStaffRole(role)
     render(<AccountRegisterV8 />)
     expect(screen.queryByText(MANAGER_ONLY)).toBeNull()
-    expect(screen.getByRole('button', { name: '次へ' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'はい、あります' })).toBeTruthy()
   })
 
   it('役割が読めるまでは読み込みを示し、下書き復元や変更を始めない', () => {

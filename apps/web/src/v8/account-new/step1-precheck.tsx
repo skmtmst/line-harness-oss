@@ -116,18 +116,26 @@ export default function Step1Precheck({
           </div>
         )}
         {precheckAt === 'done' && (
-          <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn6-ack-gap)">
-            <p className={styles.precheckResultHeading}>あなたの接続前チェック結果</p>
-            {PRECHECK_RESULT.map((item) => (
-              <div key={item.title} className={styles.precheckResultItem}>
-                <span className={styles.precheckResultMark} aria-hidden="true"><Check size={16} /></span>
-                <div className={styles.precheckResultText}>
-                  <p className={styles.precheckResultTitle}>{item.title}</p>
-                  <p className={styles.precheckResultBody}>{item.body}</p>
+          <>
+            {guide && (
+              <Notice tone={guide.tone}>
+                {guide.title && <p className={styles.precheckNoteTitle}>{guide.title}</p>}
+                <p>{guide.body}</p>
+              </Notice>
+            )}
+            <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn6-ack-gap)">
+              <p className={styles.precheckResultHeading}>あなたの接続前チェック結果</p>
+              {PRECHECK_RESULT.map((item) => (
+                <div key={item.title} className={styles.precheckResultItem}>
+                  <span className={styles.precheckResultMark} aria-hidden="true"><Check size={16} /></span>
+                  <div className={styles.precheckResultText}>
+                    <p className={styles.precheckResultTitle}>{item.title}</p>
+                    <p className={styles.precheckResultBody}>{item.body}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </Card>
+              ))}
+            </Card>
+          </>
         )}
       </Card>
     </CreateStepColumns>

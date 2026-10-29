@@ -454,6 +454,17 @@
 ## 反映履歴
 
 - [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
+- [Google口コミのAI下書き生成の修正](release-log/unreleased/1892-masato-google-review-ai-draft.md)
+- [LINEアカウント登録の事前確認を回答時に進める変更](release-log/unreleased/1891-masato-line-precheck-auto-next.md)
+- [LINEアカウント登録でプロバイダーIDを独立した手順にした変更](release-log/unreleased/1893-masato-provider-id-step2.md)
+- [LINEアカウント登録のチャネル専用Webhook URL](release-log/unreleased/1882-masato-channel-webhook-url.md)
+- [Google・Instagram画像の切り取り](release-log/unreleased/1883-masato-google-instagram-image-crop.md)
+- [検証環境のビルド情報表示](release-log/unreleased/1884-masato-staging-build-metadata.md)
+- [LINEログインのプロバイダー画面への導線](release-log/unreleased/1885-masato-line-provider-step3.md)
+- [投稿メディアの選択画面](release-log/unreleased/1886-masato-post-media-picker.md)
+- [既存のLINEログインチャネルの案内](release-log/unreleased/1887-masato-provider-existing-login-copy.md)
+- [Messaging API設定への案内](release-log/unreleased/1889-masato-line-manager-step1.md)
+- [投稿メディアの内容選択](release-log/unreleased/1890-masato-post-media-content.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
@@ -853,11 +864,3 @@
 - [カルーセルのボタン削除](release-log/unreleased/1879-kenta-carousel-delete.md) — カルーセル内の操作に関する反映履歴。
 - [配達連携の解除ボタン](release-log/unreleased/1880-kenta-delivery-disconnect.md) — 配達連携の画面に関する反映履歴。
 - [SNS連携の操作と案内](release-log/unreleased/1881-kenta-sns-actions.md) — SNS連携の画面に関する反映履歴。
-- [チャネルのWebhook URL](release-log/unreleased/1882-masato-channel-webhook-url.md) — LINEアカウント登録の画面に関する反映履歴。
-- [投稿画像の切り取り](release-log/unreleased/1883-masato-google-instagram-image-crop.md) — GoogleビジネスとInstagramの投稿画像に関する反映履歴。
-- [検証環境の配備情報](release-log/unreleased/1884-masato-staging-build-metadata.md) — 検証環境の手元配備に関する反映履歴。
-- [プロバイダーの画面を開く](release-log/unreleased/1885-masato-line-provider-step3.md) — LINEアカウント登録の画面に関する反映履歴。
-- [投稿画像を登録メディアから選ぶ](release-log/unreleased/1886-masato-post-media-picker.md) — GoogleビジネスとInstagramの投稿画像に関する反映履歴。
-- [既存のLINEログインチャネルの案内](release-log/unreleased/1887-masato-provider-existing-login-copy.md) — LINEアカウント登録の画面に関する反映履歴。
-- [LINE公式アカウントマネージャーでの設定案内](release-log/unreleased/1889-masato-line-manager-step1.md) — LINEアカウント登録の画面に関する反映履歴。
-- [登録メディアの画像の読み込み](release-log/unreleased/1890-masato-post-media-content.md) — GoogleビジネスとInstagramの投稿画像に関する反映履歴。

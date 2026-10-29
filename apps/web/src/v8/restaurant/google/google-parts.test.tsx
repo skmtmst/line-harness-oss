@@ -60,6 +60,15 @@ describe('Googleビジネスの表示の道具', () => {
 })
 
 describe('返信を作る：送れない設定のときは送信へ進むボタンを出さない', () => {
+  it('AI下書きは設定操作や初回確認なしにボタンだけで生成する', async () => {
+    fixture.generateDraft.mockResolvedValue({ draft: 'ご来店ありがとうございます。' })
+    render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(false, true)} go={vi.fn()} onPublished={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'AIで下書きを作る' }))
+    await waitFor(() => expect(fixture.generateDraft).toHaveBeenCalledWith('a', 'rv-2'))
+    expect((screen.getByRole('textbox', { name: '返信文' }) as HTMLTextAreaElement).value).toBe('ご来店ありがとうございます。')
+    expect(screen.getByText(/口コミの評価・本文と店舗名をAIの提供会社に送ります/)).toBeTruthy()
+    expect(fixture.publishReply).not.toHaveBeenCalled()
+  })
   it('検証環境（writeEnabled=false）では「返信内容を確認する」を置かず、下書きの保存はできる', async () => {
     render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(false, true)} go={vi.fn()} onPublished={vi.fn()} />)
     expect(await screen.findByRole('button', { name: '下書きを保存する' })).toBeTruthy()
