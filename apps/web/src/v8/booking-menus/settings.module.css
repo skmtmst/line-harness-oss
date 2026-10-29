@@ -304,6 +304,13 @@
   gap: var(--tpl-bm-16);
 }
 
+/* タブの縦積みが間隔の唯一の持ち主。共有Noticeの上下余白を消す。 */
+/* 帯→次の段を16にそろえる（rulesタブの包み経由を含む）。 */
+:global(:root) .tabStack > :global([data-design-part='notice']),
+:global(:root) .tabStack > :global(.contents) > :global([data-design-part='notice']) {
+  margin-block: 0;
+}
+
 .tableHead {
   padding: 0 var(--tpl-bm-8);
   color: var(--color-ink-secondary);
@@ -1090,13 +1097,6 @@
 .staffColMenu {
   width: var(--tpl-bk2-staff-col-menu);
   flex-shrink: 0;
-}
-
-.staffMenuWarning {
-  margin-top: var(--tpl-bm-2);
-  color: var(--color-warning);
-  font-size: var(--text-micro);
-  white-space: nowrap;
 }
 
 .staffColLink .staffCellSub {
