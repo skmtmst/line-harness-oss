@@ -875,9 +875,7 @@ function FriendAddList() {
           designNode="cFo2p"
           designLayout="stacked"
           designTop={280}
-          footerAlign="start"
           designFooterGap={18}
-          confirmFirst
           titleIcon={false}
           title="「経路が分からなかった人」は止められません"
           description="いちばん最後の受け皿なので、止めると誰にも案内が届かなくなります。届く中身を変えたいときは、この設定を編集してください。止めたいときは、先に別の受け皿を有効にしてください。"

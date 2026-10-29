@@ -158,6 +158,16 @@ describe('削除の窓', () => {
     expect(net.list.mock.calls.length).toBe(calls + 1)
   })
 
+  it('81: 取り消しを左、実行をいちばん右（［キャンセル］［代わりに止める］［削除する］）', async () => {
+    renderList(); await flush()
+    openMenu('営業時間外の自動返信', '削除する')
+    const dialog = await screen.findByRole('dialog')
+    const labels = within(dialog).getAllByRole('button')
+      .map((button) => (button.textContent ?? '').replace(/\s+/g, ''))
+      .filter((label) => label.length > 0)
+    expect(labels).toEqual(['キャンセル', '代わりに止める', '削除する'])
+  })
+
   it('消せなかったら窓を閉じず、窓の中に理由を出す', async () => {
     net.remove.mockResolvedValueOnce({ success: false, error: 'failed' })
     renderList(); await flush()

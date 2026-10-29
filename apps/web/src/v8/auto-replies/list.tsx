@@ -956,7 +956,6 @@ export default function AutoRepliesListV8() {
         designNode="u8sKN"
         confirmation
         designLayout="stacked"
-        footerAlign="start"
         designWidth={480}
         designTop={280}
         onCancel={() => {
@@ -966,19 +965,6 @@ export default function AutoRepliesListV8() {
         }}
         footer={
           <DialogActions>
-            <Button
-              type="button"
-              variant="danger"
-              disabled={deleting || deleteTargetStale || !canEdit}
-              lockedReason={lockedReason}
-              busy={deleting}
-              busyLabel="削除中…"
-              /* 絵 ：幅は「削除する」の文字で決める（結果の文字の分を控えない）。 */
-              widthReserve="idle"
-              onClick={() => void runDelete()}
-            >
-              削除する
-            </Button>
               <Button
                 type="button"
                 variant="secondary"
@@ -1003,6 +989,20 @@ export default function AutoRepliesListV8() {
                   代わりに止める
                 </Button>
               ) : null}
+            {/* 81: 取り消しを左、実行をいちばん右（［キャンセル］［代わりに止める］［削除する］）。 */}
+            <Button
+              type="button"
+              variant="danger"
+              disabled={deleting || deleteTargetStale || !canEdit}
+              lockedReason={lockedReason}
+              busy={deleting}
+              busyLabel="削除中…"
+              /* 絵 ：幅は「削除する」の文字で決める（結果の文字の分を控えない）。 */
+              widthReserve="idle"
+              onClick={() => void runDelete()}
+            >
+              削除する
+            </Button>
           </DialogActions>
         }
       >
