@@ -789,3 +789,45 @@ describe('R4 受け付けた数と届いた数を分ける', () => {
     expect(panel.textContent).not.toContain('人に届いた')
   })
 })
+it('2ページ目で削除して1ページになると1ページ目に戻って行を出す', async () => {
+  resetUrl()
+  let rows = Array.from({ length: 21 }, (_, i) => ({ ...rowB, id: `pg-${i}`, title: `通常${i}` }))
+  listBroadcasts.mockImplementation(async (params) => {
+    const cursor = Number(params.cursor ?? 0)
+    const limit = params.limit ?? 20
+    return { success: true, data: rows.slice(cursor, cursor + limit), pagination: { total: rows.length, nextCursor: cursor + limit < rows.length ? String(cursor + limit) : null } }
+  })
+  deleteBroadcast.mockImplementation(async (id: string) => { rows = rows.filter((row) => row.id !== id); return { success: true, data: null } })
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  act(() => { (host.querySelector('button[aria-label="次のページ"]') as HTMLButtonElement).click() })
+  await flush()
+  expect(host.textContent).toContain('通常20')
+  const trigger = host.querySelector<HTMLButtonElement>('tr[data-row-id="pg-20"] button[aria-haspopup="menu"]')!
+  act(() => { trigger.focus(); trigger.click() })
+  const remove = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(item => item.textContent?.includes('削除する'))!
+  act(() => remove.click())
+  await flush()
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(button => button.textContent === '削除する')!
+  act(() => confirm.click())
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 250)) })
+  await flush()
+  expect(host.textContent).toContain('通常0')
+  expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('20件中 1〜20件')
+}, 20_000)
+
+it('総件数が未取得のときは補正せず2ページ目の行を出す', async () => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/broadcasts?page=2')
+  const rows = Array.from({ length: 21 }, (_, i) => ({ ...rowB, id: `nt-${i}`, title: `通常${i}` }))
+  listBroadcasts.mockImplementation(async (params) => {
+    const cursor = Number(params.cursor ?? 0)
+    const limit = params.limit ?? 20
+    return { success: true, data: rows.slice(cursor, cursor + limit), pagination: { nextCursor: null } }
+  })
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  expect(host.textContent).toContain('通常20')
+  flushListUrlState()
+  expect(window.location.search).toContain('page=2')
+}, 20_000)
