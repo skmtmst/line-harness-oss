@@ -72,7 +72,7 @@ describe('バナー生成の検索行（U017）', () => {
     expect(searchSlot).not.toBeNull()
     expect(toolbar).not.toBeNull()
     for (const control of [chips, shape]) {
-      expect(control.closest('[data-list-toolbar]')).toBe(toolbar)
+      expect(toolbar!.contains(control)).toBe(true)
       expect(searchSlot!.contains(control)).toBe(false)
     }
     expect(screen.queryByText('並び：作成が新しい順')).toBeNull()
