@@ -783,6 +783,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
               await hqTemplatesApi.remove(remove.id, remove.revision)
               setTemplates((current) => current.filter((t) => t.id !== remove.id))
               setKindRows((current) => current ? current.filter((t) => t.id !== remove.id) : current)
+              refreshStats()
               setRemove(null); setMessage('ひな形を削除しました。')
             })}
           />
@@ -844,6 +845,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           await hqTemplatesApi.remove(remove.id, remove.revision)
           setTemplates((current) => current.filter((t) => t.id !== remove.id))
           setKindRows((current) => current ? current.filter((t) => t.id !== remove.id) : current)
+          refreshStats()
           setRemove(null); setMessage('ひな形を削除しました。')
           toList()
         })}
