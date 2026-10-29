@@ -32,11 +32,19 @@ import { getLineRegistrationReceipt } from '../services/line-registration-receip
 import { getAuthorizedLineAccount, getVisibleLineAccountEntry } from './line-account-access.js';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { getStaffById } from '@line-crm/db';
 
 import { readCapacity, normalizeOptionalString, validateLoginChannelPair } from './line-accounts-input.js';
 import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
 
 const lineAccounts = new Hono<Env>();
+
+async function mayRegisterLineAccount(c: Context<Env>): Promise<boolean> {
+  const actor = c.get('staff');
+  if (actor.id === 'env-owner') return true;
+  const member = await getStaffById(c.env.DB, actor.id);
+  return Boolean(member?.is_active && member.account_scope === 'all');
+}
 
 function lifecycleConflict(error: unknown): { success: false; error: string } | null {
   if (!(error instanceof LineAccountLifecycleError)) return null;
@@ -1097,6 +1105,7 @@ function publicConnectData(
 
 // UI用の自動接続確認。LINE側のWebhook・LIFFは設定するが、musuboのDBには書き込まない。
 lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
+  if (!await mayRegisterLineAccount(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   const parsed = await readConnectRequest(c);
   if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 'status' in parsed ? parsed.status : 422, ["name","channelId","channelSecret"]);
   let registration;
@@ -1132,6 +1141,7 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner', 'admi
 
 // UI用の自動接続・保存。5段目が完了しなければ作成途中の行を必ず巻き戻す。
 lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
+  if (!await mayRegisterLineAccount(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   // LINE の接続（新しいアカウントの接続）は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
@@ -1164,6 +1174,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
   let savingStyle = false;
   try {
     account = await createLineAccount(c.env.DB, {
+      createdByStaffId: c.get('staff').id,
       channelId: parsed.value.channelId,
       name: parsed.value.name || prepared.bot.displayName,
       channelAccessToken: prepared.channelAccessToken,
@@ -1256,6 +1267,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
 
 // POST /api/line-accounts - create
 lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
+  if (!await mayRegisterLineAccount(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   // LINE の接続の追加は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
@@ -1396,6 +1408,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
     }
 
     const account = await createLineAccount(c.env.DB, {
+      createdByStaffId: currentStaff.id,
       channelId: body.channelId.trim(),
       name,
       channelAccessToken: body.channelAccessToken,

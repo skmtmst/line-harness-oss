@@ -4650,7 +4650,7 @@ CREATE TABLE line_accounts (
   updated_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours'))
 , login_channel_id TEXT, login_channel_secret TEXT, liff_id TEXT, token_expires_at TEXT, friend_capacity INTEGER, capacity_warn_at INTEGER, icon_url TEXT, parent_line_account_id TEXT REFERENCES line_accounts(id) ON DELETE SET NULL, tenant_id TEXT REFERENCES tenants(id), timezone TEXT NOT NULL DEFAULT 'Asia/Tokyo', provider_id TEXT, revision INTEGER NOT NULL DEFAULT 1, line_display_name TEXT, line_picture_url TEXT, line_basic_id TEXT, line_profile_synced_at TEXT, inactive_reason TEXT
   CHECK (inactive_reason IS NULL OR inactive_reason IN ('manual', 'ban_detected', 'credential_invalid')), inactive_reason_detail TEXT, inactivated_at TEXT, login_channel_secret_encrypted TEXT, last_webhook_received_at TEXT, webhook_silence_exempt INTEGER NOT NULL DEFAULT 0
-  CHECK (webhook_silence_exempt IN (0, 1)), folder_id TEXT REFERENCES line_account_tags(id) ON DELETE SET NULL);
+  CHECK (webhook_silence_exempt IN (0, 1)), folder_id TEXT REFERENCES line_account_tags(id) ON DELETE SET NULL, created_by_staff_id TEXT REFERENCES staff_members(id) ON DELETE SET NULL);
 
 CREATE TABLE line_message_unsends (
   line_message_account_key TEXT NOT NULL,
@@ -10458,6 +10458,8 @@ CREATE INDEX idx_line_account_tags_order ON line_account_tags(tenant_id,display_
 
 CREATE INDEX idx_line_accounts_archived
   ON line_accounts (archived_at, display_order, created_at);
+
+CREATE INDEX idx_line_accounts_creator ON line_accounts(created_by_staff_id);
 
 CREATE INDEX idx_line_accounts_display_order
   ON line_accounts (display_order, created_at);

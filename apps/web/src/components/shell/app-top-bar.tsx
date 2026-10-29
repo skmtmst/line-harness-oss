@@ -1,6 +1,6 @@
 'use client'
 
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, useStaffIdentity } from '@/lib/staff-role'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TopBar from '@/components/shared/top-bar'
@@ -145,6 +145,7 @@ export default function AppTopBar() {
   const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
   const [staffName, setStaffName] = useState('')
   const staffRole = useStaffRole()
+  const staffIdentity = useStaffIdentity()
   const hqShell = isHqShellPath(pathname)
   const notificationTarget = useMemo<NotificationScope>(() => hqShell ? { kind: 'all' } : selectedAccountId ? { kind: 'store', accountId: selectedAccountId } : { kind: 'none' }, [hqShell, selectedAccountId])
   const notificationAccountsKey = JSON.stringify(accounts.map((account) => ({ id: account.id, label: account.displayName || account.name })))
@@ -263,7 +264,7 @@ export default function AppTopBar() {
    * すでに統括の画面にいるときも押せない。
    */
   // 統括へ戻る口はオーナーと管理者に出す（管理者も統括を開ける。2026-10-07 オーナーの役割が管理者のため）
-  const canReturnToHq = canReturnToHqFrom(staffRole, pathname, hqShell)
+  const canReturnToHq = canReturnToHqFrom(staffRole, pathname, hqShell, staffIdentity?.accountScope)
   const returnToHq = () => {
     requestUnsavedAction(() => {
       clearSelectedAccountId()
