@@ -20,13 +20,16 @@ vi.mock('@/components/auto-replies/inline-action-list', () => ({ useActionOption
 
 
 import Carousel from './carousel'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 
 /*
  * カルーセルの保存で落ちた欄（・オーナーの写真の指摘：「すべてのカードに本文を入力してください」の帯だけだった）。
  * 欄が赤くなり真下に理由、別のカードならそのカードを開いて移り、カードの札に赤い丸が付く。
  */
 beforeEach(() => { staffRole.value = 'owner'; calls.create.mockResolvedValue({ success: true, data: { id: 'template-1' } }) })
-afterEach(() => { cleanup(); vi.resetAllMocks() })
+afterEach(() => { cleanup(); forgetStaffIdentity(); vi.resetAllMocks() })
 
 const fillFirst = () => {
   fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '夏の定番' } })
@@ -35,18 +38,52 @@ const fillFirst = () => {
 }
 
 describe('カルーセルの欄ごとの誤り', () => {
-  it.each(['shop', 'hq'] as const)('閲覧のみでは編集・削除・保存の口を出さない: %s', scope => {
+  it.each(['shop', 'hq'] as const)('閲覧のみでは順番の絵を灰色と理由で出し、変更を送らない: %s', scope => {
     const onSave = vi.fn()
+    verifiedStaffRole('viewer')
     if (scope === 'shop') staffRole.value = 'viewer'
     render(<Carousel host={scope === 'hq' ? {
       description: '', folders: [], folder: '', onFolderChange: vi.fn(), busy: false,
       onSave, onCancel: vi.fn(), readOnly: true,
     } : undefined} />)
     expect(screen.getByText('一覧で中身を確認できます。')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /を外す$|ボタンを足す|下書きを保存|保存して公開|保存して配る/ })).toBeNull()
+    const chip = screen.getByRole('button', { name: /^1 カード 1$/ })
+    expect(chip.getAttribute('aria-disabled')).toBe('true')
+    expect(chip.getAttribute('draggable')).toBe('false')
+    expect((chip as HTMLButtonElement).disabled).toBe(false)
+    expect(document.getElementById(chip.getAttribute('aria-describedby')!)?.textContent).toBe(PERMISSION_LOCK_REASON.viewer)
+    expect(screen.queryByRole('button', { name: /を外す|ボタンを足す|下書きを保存|保存して公開|保存して配る/ })).toBeNull()
+    fireEvent.click(chip)
+    fireEvent.keyDown(chip, { key: 'ArrowRight', altKey: true })
     expect(calls.create).not.toHaveBeenCalled()
     expect(calls.update).not.toHaveBeenCalled()
     expect(onSave).not.toHaveBeenCalled()
+  })
+  it('役割が未確認なら順番の札を押せなくし、権限の理由は作らない', () => {
+    verifiedStaffRole(null)
+    staffRole.value = 'viewer'
+    render(<Carousel />)
+    const chip = screen.getByRole('button', { name: /^1 カード 1$/ }) as HTMLButtonElement
+    expect(chip.disabled).toBe(true)
+    expect(chip.hasAttribute('aria-describedby')).toBe(false)
+    expect(chip.hasAttribute('data-permission-locked')).toBe(false)
+    expect(chip.getAttribute('draggable')).toBe('false')
+    expect(screen.queryByRole('button', { name: /を外す|ボタンを足す|下書きを保存|保存して公開|保存して配る/ })).toBeNull()
+  })
+  it('順番の札に小さな代わりの絵と題を出し、Alt矢印で入れ替えても中身を保つ', async () => {
+    render(<Carousel />)
+    fillFirst()
+    fireEvent.click(screen.getByRole('button', { name: 'カードを足す' }))
+    fireEvent.change(screen.getByLabelText('タイトル（40文字まで）'), { target: { value: '2枚目' } })
+    const second = screen.getByRole('button', { name: '2 2枚目' })
+    expect(within(second).getByRole('img', { name: '画像なし' })).toBeTruthy()
+    expect(second.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.keyDown(second, { key: 'ArrowLeft', altKey: true })
+    expect(screen.getByRole('button', { name: '1 2枚目' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: '2 1枚目' }))
+    expect((screen.getByLabelText('タイトル（40文字まで）') as HTMLInputElement).value).toBe('1枚目')
+    expect(calls.create).not.toHaveBeenCalled()
+    expect(calls.update).not.toHaveBeenCalled()
   })
   it('ボタンごとに文字と動きの題を付け、最後の一つを隠し、削除後も残りの値を保つ', async () => {
     render(<Carousel />)

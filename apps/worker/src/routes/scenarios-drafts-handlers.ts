@@ -162,7 +162,10 @@ export const get__api_scenarios_4 = async (c: Context<Env, "/api/scenarios">) =>
      *
      * シナリオごとに数えると件数ぶん往復するので、1回で全部数えて配る。
      */
-    const counts = new Map<string, { active: number; completed: number }>();
+    // 集計が成功して行が無いシナリオは実際の0人。失敗時はこの初期値も破棄する。
+    const counts = new Map<string, { active: number | null; completed: number | null }>(
+      items.map(row => [row.id, { active: 0, completed: 0 }]),
+    );
     try {
       const scenarioIds = items.map((item) => item.id);
       const accountIds = lineAccountId ? [lineAccountId] : scope.allowedAccountIds;
@@ -172,8 +175,8 @@ export const get__api_scenarios_4 = async (c: Context<Env, "/api/scenarios">) =>
         const rows = await c.env.DB
           .prepare(
           `SELECT scenario_id,
-                  SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_count,
-                  SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_count
+                  SUM(CASE WHEN fs.status = 'active' THEN 1 ELSE 0 END) AS active_count,
+                  SUM(CASE WHEN fs.status = 'completed' THEN 1 ELSE 0 END) AS completed_count
              FROM friend_scenarios fs
              INNER JOIN friends f ON f.id = fs.friend_id
             WHERE fs.scenario_id IN (${scenarioPlaceholders})
@@ -181,16 +184,17 @@ export const get__api_scenarios_4 = async (c: Context<Env, "/api/scenarios">) =>
             GROUP BY scenario_id`,
           )
           .bind(...sqlIdSet(scenarioIds).binds, ...(accountIds.length ? sqlIdSet(accountIds).binds : []))
-          .all<{ scenario_id: string; active_count: number; completed_count: number }>();
+          .all<{ scenario_id: string; active_count: number | null; completed_count: number | null }>();
         for (const r of rows.results) {
           counts.set(r.scenario_id, {
-            active: Number(r.active_count ?? 0),
-            completed: Number(r.completed_count ?? 0),
+            active: typeof r.active_count === 'number' && Number.isFinite(r.active_count) && r.active_count >= 0 ? r.active_count : null,
+            completed: typeof r.completed_count === 'number' && Number.isFinite(r.completed_count) && r.completed_count >= 0 ? r.completed_count : null,
           });
         }
       }
     } catch {
-      // 数えられなくても一覧は出す。人数だけ 0 になる。
+      // 一覧が読めていれば残す。人数の未取得を0人とは扱わない。
+      counts.clear();
     }
 
     return c.json({
@@ -199,8 +203,8 @@ export const get__api_scenarios_4 = async (c: Context<Env, "/api/scenarios">) =>
         items: items.map((row) => ({
           ...serializeScenario(row),
           stepCount: row.step_count,
-          subscriberCount: counts.get(row.id)?.active ?? 0,
-          completedCount: counts.get(row.id)?.completed ?? 0,
+          subscriberCount: counts.get(row.id)?.active ?? null,
+          completedCount: counts.get(row.id)?.completed ?? null,
         })),
         total,
         paging,
