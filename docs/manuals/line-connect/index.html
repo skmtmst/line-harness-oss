@@ -46,6 +46,8 @@ figure{margin:18px 0 0;border:1px solid var(--line);border-radius:11px;overflow:
 .webhook-map .map-badge{display:inline-grid;place-items:center;width:22px;height:22px;margin-right:7px;border:2px solid var(--red);border-radius:50%;color:var(--red);font-size:11px;font-weight:800}
 @media(max-width:520px){.webhook-map{padding:14px}.webhook-map .map-row{grid-template-columns:1fr;gap:4px}}
 @media(prefers-color-scheme:dark){.screen-note{color:#d0f1d6}.webhook-map{box-shadow:0 2px 0 #101711}}
+.publish-flow{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;margin:17px 0 0;padding:15px;border:1.5px dashed #9ac4a1;border-radius:12px;background:#fcfefb;font-size:13px;font-weight:800}.publish-flow span,.publish-flow strong{padding:5px 11px;border:1.5px solid var(--line);border-radius:8px;background:var(--sheet)}.publish-flow strong{border-color:var(--green);background:var(--green-light);color:var(--green)}.publish-flow b{color:var(--red)}
+@media(prefers-color-scheme:dark){.publish-flow{background:#1c3022}}
 </style>
 </head>
 <body>
@@ -86,6 +88,28 @@ figure{margin:18px 0 0;border:1px solid var(--line);border-radius:11px;overflow:
 <p class="hint warn"><strong>すでに別ツールのWebhook URLがあるとき</strong>musuboのURLに変更すると、そのツールの受信は止まります。使い続ける必要があれば、musuboで「途中保存して閉じる」を押し、現在のURLを別途控えてから進めてください。</p>
 <p class="small">上のURLは形の見本です。実際に貼るURLは、musuboのStep 3に表示されるものをコピーしてください。</p>
 </section>
-<section class="card" id="step4"><div class="head"><span class="mark" aria-hidden="true">4</span><div><p class="kicker">STEP 4 / 4</p><h2>LINEログインの情報を入れる</h2></div></div><p class="intro">musuboの<strong>「LINE Developersのプロバイダーを開く」</strong>から、Step 2で入力したプロバイダーへ進みます。LINEログインチャネルがなければ、同じプロバイダーで作成します。</p><div class="route"><span>同じプロバイダー</span><span>LINEログインチャネル</span><span>チャネル基本設定</span></div><ol class="steps"><li>未作成なら<strong>「新規チャネル作成」→「LINEログイン」</strong>を選び、必要事項を入力します。アプリタイプは<strong>「ウェブアプリ」</strong>を選びます。</li><li>LINEログインチャネルの<strong>「チャネル基本設定」</strong>からチャネルIDとチャネルシークレットをコピーし、musuboの<strong>LINEログイン用</strong>の2欄に貼り付けます。</li><li><strong>「友だち追加オプション」</strong>でStep 1の公式アカウントをリンクし、チャネルを<strong>「公開済み」</strong>にします。</li><li>musuboへ戻り、公式アカウントのリンクと公開を確認した2つのチェックを入れます。</li></ol><figure><img src="images/m2-provider.jpg" width="1489" height="812" alt="プロバイダー内にLINEログインチャネルとMessaging APIチャネルが並ぶ画面"><figcaption>同じプロバイダー内に2種類のチャネルを置きます</figcaption></figure><figure><img src="images/m3-linked-oa.jpg" width="1489" height="812" alt="LINEログインチャネルの友だち追加オプションで公式アカウントをリンクした画面"><figcaption>LINEログインの「友だち追加オプション」で対象の公式アカウントを確認</figcaption></figure><p class="hint"><strong>musuboが自動で行うこと</strong>Callback URLの設定とLIFF（友だち追加の窓口）の作成は、登録の途中でmusuboが行います。この手順で入力する欄はありません。</p></section>
+<section class="card" id="step4">
+<div class="head"><span class="mark" aria-hidden="true">4</span><div><p class="kicker">STEP 4 / 4</p><h2>LINEログインの情報を入れる</h2></div></div>
+<p class="intro">musuboの<strong>「LINE Developersのプロバイダーを開く」</strong>から、Step 2で入力したプロバイダーへ進みます。LINEログインチャネルがなければ、同じプロバイダーで作成します。</p>
+<div class="route"><span>同じプロバイダー</span><span>LINEログインチャネル</span><span>チャネル基本設定</span></div>
+<ol class="steps"><li>未作成なら<strong>「新規チャネル作成」→「LINEログイン」</strong>を選び、必要事項を入力します。アプリタイプは<strong>「ウェブアプリ」</strong>を選びます。</li><li>LINEログインチャネルの<strong>「チャネル基本設定」</strong>からチャネルIDとチャネルシークレットをコピーし、musuboの<strong>LINEログイン用</strong>の2欄に貼り付けます。</li><li><strong>「友だち追加オプション」</strong>でStep 1の公式アカウントをリンクし、チャネルを<strong>「公開済み」</strong>にします。</li><li>musuboへ戻り、公式アカウントのリンクと公開を確認した2つのチェックを入れます。</li></ol>
+<h3>① 同じプロバイダーのLINEログインチャネルを開く</h3>
+<figure><img src="images/m2-provider.jpg" width="1489" height="812" loading="lazy" alt="musuboプロバイダーにLINEログインチャネルとMessaging APIチャネルが並ぶ。LINEログインチャネルがなければ新規チャネル作成を選ぶ"><figcaption>musuboの例。同じプロバイダー内のLINEログインチャネルを開きます。無い場合は左の「新規チャネル作成」から作ります。</figcaption></figure>
+<h3>② チャネル基本設定の2か所からコピーする</h3>
+<p>LINEログインチャネルの<strong>「チャネル基本設定」</strong>を開きます。上部の<strong>「チャネルID」</strong>のコピーアイコンを押し、musuboの<strong>チャネルID（LINEログイン）</strong>欄に貼り付けます。</p>
+<figure><img src="images/m2-login-id.jpg" width="1489" height="812" loading="lazy" alt="musuboのLINEログインチャネルのチャネル基本設定。上部のチャネルIDとコピーアイコンを赤枠で示す"><figcaption>「チャネル基本設定」の上部。LINEログイン用のチャネルIDをコピーします。</figcaption></figure>
+<p class="scroll-cue" aria-hidden="true">↓ 同じ「チャネル基本設定」を下へスクロール</p>
+<p>同じ画面の<strong>「チャネルシークレット」</strong>のコピーアイコンを押し、musuboの<strong>チャネルシークレット（LINEログイン）</strong>欄に貼り付けます。</p>
+<figure><img src="images/m2-login-secret.jpg" width="1489" height="812" loading="lazy" alt="musuboのLINEログインチャネルのチャネル基本設定。下方のチャネルシークレットとコピーアイコンを赤枠で示す"><figcaption>同じ画面の下方。表示済みのシークレットをコピーします。画像中の値は説明用です。</figcaption></figure>
+<p class="hint warn"><strong>「発行」は押さないでください</strong>既存のシークレットが変わるため、右側のコピーアイコンから表示済みの値を取得します。Messaging API用のIDとシークレットはStep 1で入力済みです。ここではLINEログイン用を使います。</p>
+<h3>③ 公式アカウントをリンクして公開する</h3>
+<p>LINEログインチャネルの<strong>「友だち追加オプション」</strong>で、Step 1で使った公式アカウントがリンクされていることを確認します。未設定なら「編集」から対象の公式アカウントを選びます。</p>
+<figure><img src="images/m3-linked-oa.jpg" width="1489" height="812" loading="lazy" alt="musuboのLINEログインチャネルの友だち追加オプション。リンクされたLINE公式アカウントと編集ボタンを赤枠で示す"><figcaption>「友だち追加オプション」で対象の公式アカウントを確認します。</figcaption></figure>
+<p>チャネル画面上部の<strong>「開発中」</strong>を押して<strong>「公開」</strong>を選び、確認画面を進めます。表示が<strong>「公開済み」</strong>になったことを確かめます。</p>
+<figure><img src="images/m2-publish.jpg" width="1489" height="812" loading="lazy" alt="musuboのLINEログインチャネル画面。画面上部の開発中表示を赤枠で示し、公開操作の入口を指す"><figcaption>チャネル画面上部の「開発中」から公開操作を始めます。</figcaption></figure>
+<div class="publish-flow" role="img" aria-label="LINEログインチャネルの状態。開発中を押し、公開を選んで確認すると、公開済みに変わる"><span>開発中</span><b aria-hidden="true">→</b><span>「公開」を選ぶ</span><b aria-hidden="true">→</b><strong>公開済み</strong></div>
+<p class="small">公開すると「開発中」には戻せません。操作前にチャネルと公式アカウントの組み合わせを確認してください。<a href="https://developers.line.biz/ja/docs/line-login/getting-started/" target="_blank" rel="noopener noreferrer">LINE公式の公開手順</a></p>
+<p class="hint"><strong>musuboが自動で行うこと</strong>Callback URLの設定とLIFF（友だち追加の窓口）の作成は、登録の途中でmusuboが行います。この手順で入力する欄はありません。</p>
+</section>
 <section class="end" id="after"><h2>4ステップのあと</h2><p>musuboで<strong>「接続を確かめる」</strong>を押し、5項目がすべて通ったら<strong>「登録する」</strong>へ進みます。次にスマホで友だち追加を試すか、すでに友だちならその公式アカウントのトークへ「接続テスト」と送ります。受信が確認できたら、使い方を選んで完了です。</p></section>
 </main></div><footer>画像内の番号やチャネル名は説明用の例です。実際の値はご自身のLINE画面からコピーしてください。</footer></div></body></html>
