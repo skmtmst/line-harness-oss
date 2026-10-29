@@ -94,3 +94,21 @@ it('行を切り替えても未保存の入力を保ち、選んだフローだ�
   fireEvent.click(screen.getByRole('button', { name: '下書きを保存する' }))
   await waitFor(() => expect(fixture.updateLineFlow).toHaveBeenCalledWith('account-1', 'f1', { title: 'f1の題', body: '編集中の本文' }))
 })
+
+// 118: 開いた行は押している途中の灰にせず、白のまま開いている印（左の緑の線・右端の ⌃）で示す。
+it('開いた行は白のまま開いている印が出る（選んだ札の灰にしない）', async () => {
+  const { container } = render(<LineFollowupV8 />)
+  await screen.findByRole('button', { name: '予約 24時間前' })
+  // 開いている行の札に開印があり、選んだ札の印（灰）は付かない。
+  const openCards = container.querySelectorAll('[data-design-part="card"][data-open]')
+  expect(openCards.length).toBe(1)
+  expect(openCards[0]?.getAttribute('data-card-selected')).toBeNull()
+  expect(container.querySelectorAll('[data-design-part="card"][data-card-selected]').length).toBe(0)
+  // 右端の開閉印（chevron）は行の数だけあり、開いている行の印だけが開の向き。
+  expect(container.querySelectorAll('[data-flow-chevron]').length).toBe(2)
+  expect(container.querySelectorAll('[data-flow-chevron][data-open]').length).toBe(1)
+  // 行を切り替えると開印が追う。
+  fireEvent.click(screen.getByRole('button', { name: '来店後（退店のきっかけ）' }))
+  expect(container.querySelectorAll('[data-design-part="card"][data-open]').length).toBe(1)
+  expect(screen.getByRole('button', { name: '来店後（退店のきっかけ）' }).closest('[data-design-part="card"]')?.getAttribute('data-open')).not.toBeNull()
+})
