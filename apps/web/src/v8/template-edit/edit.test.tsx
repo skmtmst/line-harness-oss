@@ -508,9 +508,9 @@ describe('本文URLの案内と下書き', () => {
     expect(screen.queryByText(hintText)).toBeNull()
     const heading = screen.getByRole('heading', { name: '本文の中のURL' })
     expect(heading.closest('[data-design-part="card"]')).toBeTruthy()
-    const checks = screen.getAllByRole('checkbox', { name: `${url}を短縮して数える（いつもオン）` }) as HTMLInputElement[]
+    const checks = screen.getAllByRole('switch', { name: `${url}を短縮して数える（いつもオン）` }) as HTMLButtonElement[]
     expect(checks).toHaveLength(1)
-    expect(checks[0].checked).toBe(true)
+    expect(checks[0].getAttribute('aria-checked')).toBe('true')
     expect(checks[0].disabled).toBe(true)
     expect((content as HTMLTextAreaElement).value).toBe(withUrl)
     type(content, 'URLを外してもご予約の本文は残ります。')
@@ -536,8 +536,8 @@ describe('本文URLの案内と下書き', () => {
     type(screen.getByLabelText('本文'), `元の本文 ${url}`)
     await flush()
     expect(screen.getByRole('heading', { name: '本文の中のURL' })).toBeTruthy()
-    const check = screen.getByRole('checkbox', { name: `${url}を短縮して数える（いつもオン）` }) as HTMLInputElement
-    expect(check.checked && check.disabled).toBe(true)
+    const check = screen.getByRole('switch', { name: `${url}を短縮して数える（いつもオン）` }) as HTMLButtonElement
+    expect(check.getAttribute('aria-checked') === 'true' && check.disabled).toBe(true)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '親へ保存' })) })
     expect(save).toHaveBeenCalledExactlyOnceWith({ kind: 'message', name: '親の下書き', messageType: 'text', messageContent: `元の本文 ${url}` }, true)
     expect(templatesApi.create).not.toHaveBeenCalled()

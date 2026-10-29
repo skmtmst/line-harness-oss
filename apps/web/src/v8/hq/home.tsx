@@ -399,7 +399,10 @@ export default function HqHomeV8() {
   const cardActions = (account: AccountWithStats) => (
     <div className={styles.cardButtons}>
       {isArchived(account) ? <>
-        <AccountActionButton action="detail" className={styles.grow} onClick={() => setEditingAccount(account)} />
+        {/* アーカイブは登録内容の編集と戻すだけ（本線 375cc79e30 の決定）。 */}
+        <Button className={styles.grow} onClick={() => setEditingAccount(account)}>
+          <Pencil aria-hidden="true" className={styles.buttonIcon} />登録内容を編集
+        </Button>
         {isOwner ? <AccountActionButton action="restore" onClick={() => setArchiveTarget({ account, mode: 'restore' })} /> : null}
       </> : <>
         <AccountActionButton action="enter" className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`} />

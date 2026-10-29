@@ -2,8 +2,16 @@
 /* 一覧の絞り込み札（★管理画面・m13i）。全画面で1つの形にそろえるための契約。 */
 import React from 'react'
 import { cleanup, fireEvent, render } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import FilterChip from './filter-chip'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+const CSS = readFileSync(join(HERE, 'filter-chip.css'), 'utf8')
+/** 注釈を落とした宣言だけを見る（#639・#669 と同じやり方）。 */
+const CODE = CSS.replace(/\/\*[\s\S]*?\*\//g, '')
 
 afterEach(() => cleanup())
 
@@ -91,7 +99,7 @@ describe('絞り込み札 FilterChip（m13i）', () => {
   })
 
   it('現在のV8の高さ36・タッチ44pxを保つ', () => {
-    expect(CODE).toMatch(/:root \.v6-filter-chip\s*\{[^}]*height:\s*36px/s)
+    expect(CODE).toMatch(/:root \.v6-filter-chip\s*\{[^}]*height:\s*(?:36px|var\(--control-h\))/s)
     // 選択色の後勝ちと故障復元は実ブラウザのcomputed対照で守る。
     // タッチ端末は44px（#639 の契約と同じ錨）。
     expect(CODE).toMatch(

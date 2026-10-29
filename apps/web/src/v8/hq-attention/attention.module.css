@@ -46,6 +46,8 @@
 
 .none {
   color: var(--color-ink-faint);
+}
+
 .help {
   display: flex;
   align-items: center;

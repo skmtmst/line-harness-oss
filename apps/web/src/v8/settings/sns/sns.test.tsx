@@ -188,10 +188,10 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
   })
 
   it.each(['disconnected', 'expired'] as const)('%s の閲覧のみには接続操作とログイン案内を出さない', async (state) => {
-    fixture.role.value = 'staff'
+    fixture.role.value = verifiedStaffRole('staff')
     setup(state, state === 'expired' ? CONNECTED : undefined)
 
-    await screen.findByText(/閲覧のみで見ています/)
+    await screen.findByText(PERMISSION_LOCK_SUMMARY.feature)
     await igCard().findByText(state === 'expired' ? '接続の異常' : '未接続')
     expect(igCard().queryByRole('button', { name: 'Instagram にログインして接続する' })).toBeNull()
     expect(igCard().queryByText(/個人のアカウントは接続できません/)).toBeNull()

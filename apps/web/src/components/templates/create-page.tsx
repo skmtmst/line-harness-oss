@@ -72,7 +72,7 @@ export function CreatePage({ step = null, readOnly, contentDisabled, contentLabe
     {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
     {/* 閲覧帯は頭の中に置く（tagf）。本文先頭にも知らせが続く画面（notice-after-read-only）だけは、余白を後の知らせへ集約するため頭の直下に置く。 */}
     <PageHeading {...heading} readOnlyBand={readOnlyAfterHeading ? heading.readOnlyBand : readOnly || heading.readOnlyBand} actions={<>{heading.actions}{formActions.secondary.length ? <FormSecondaryActions buttons={formActions.secondary} /> : null}</>} />
-    {readOnlyAfterHeading ? <div className={styles.createNotice} data-template-region="notice" data-content-spacing={contentSpacing}><ReadOnlyNotice /></div> : null}
+    {readOnlyAfterHeading ? <div className={styles.createNotice} data-template-region="notice" data-content-spacing={contentSpacing}><ReadOnlyNotice scope={heading.readOnlyBand === 'hq' ? 'hq' : 'store'} need={heading.readOnlyNeed} /></div> : null}
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing={noticeSpacing}>{notice}</div> : null}
     {previewToggle || (preview && hidePreviewWhenNarrow) ? <div className={styles.asideToggle} data-content-spacing={contentSpacing === 'notice-after-preview' ? contentSpacing : undefined}>{previewToggle ?? <PreviewLauncher label={previewLabel} title={previewTitle}>{dialogPreview}</PreviewLauncher>}</div> : null}
