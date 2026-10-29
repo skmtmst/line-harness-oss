@@ -1,3 +1,4 @@
+import { beforeEach as seedIdentity } from 'vitest'
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
@@ -70,13 +71,13 @@ describe('Googleプロフィールの再取得（実Googleへ送らず保留API�
     expect(mocks.syncProfile).toHaveBeenCalledTimes(2)
     expect(screen.queryByRole('button', { name: 'もう一度取得' })).toBeNull()
   })
-  it('閲覧のみでは店舗を変更する操作を出さない', async () => {
+  it('閲覧のみでは店舗を変更する操作を灰色にする', async () => {
     mocks.role = verifiedStaffRole('viewer')
     render(<ProfileBoard accountId="busy-test" go={() => {}} />)
     await screen.findByText('試験用店舗')
-    expect(screen.queryByRole('button', { name: 'プロフィールを編集する' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '営業時間を変える' })).toBeNull()
-    expect(screen.getByText(/閲覧のみです/)).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'プロフィールを編集する' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: '営業時間を変える' }).getAttribute('aria-disabled')).toBe('true')
+    expect(document.querySelector('[data-read-only-notice]')).toBeNull() // 帯は親の題の下に1本。
   })
   it('比較できないGoogle項目に管理画面へのリンクを表示する', async () => {
     mocks.profile.mockResolvedValue({
@@ -94,3 +95,5 @@ describe('Googleプロフィールの再取得（実Googleへ送らず保留API�
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+seedIdentity(() => { verifiedStaffRole('owner') })

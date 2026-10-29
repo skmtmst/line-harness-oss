@@ -99,6 +99,8 @@ type RowMenuTriggerProps = Omit<
 }
 
 export type RowMenuProps = {
+  /** 権限で開けない理由。未確認の間は triggerProps.disabled で止める。 */
+  lockedReason?: string
   /** 「…」の中の項目。危ない操作（tone: 'danger'）は部品が最後・区切りの下へ回す。 */
   items: ActionMenuItem[]
   /** 「…」ボタンの読み上げ名（例：「春のセールの操作」）。 */
@@ -141,6 +143,7 @@ export type RowMenuProps = {
  * - 危ない操作は赤字で、区切りの下・最後
  */
 export function RowMenu({
+  lockedReason,
   items,
   label,
   menuLabel,
@@ -154,32 +157,36 @@ export function RowMenu({
   triggerProps,
 }: RowMenuProps) {
   const [openState, setOpenState] = useState(false)
-  const open = openProp ?? openState
+  const open = lockedReason ? false : openProp ?? openState
   const setOpen = (next: boolean) => {
     if (openProp === undefined) setOpenState(next)
     onOpenChange?.(next)
   }
-  const triggerRef = useRef<HTMLButtonElement>(null)
+  const lock = usePermissionLockTip<HTMLButtonElement>(lockedReason, triggerProps?.['aria-describedby'])
+  const triggerRef = lock.ref
   const toggle = (event: MouseEvent<HTMLButtonElement>) => {
     /* R13: 「…」自体の押下も行の詳細遷移へ伝えない。 */
     event.stopPropagation()
-    setOpen(!open)
+    if (!lockedReason && !triggerProps?.disabled) setOpen(!open)
   }
   const common = {
     ...triggerProps,
     'aria-haspopup': 'menu' as const,
     'aria-expanded': open,
     onClick: toggle,
+    ...lock.handlers,
+    ...(lockedReason ? { title: undefined } : {}),
   }
   return (
     <>
       {appearance === 'plain' ? (
         <MoreAction {...common} label={label} buttonRef={triggerRef} className={className} data-size={size} data-row-menu="" />
       ) : (
-        <IconButton {...common} ref={triggerRef} aria-label={label} title={title ?? label} className={className} size={size} variant="plain" data-row-menu="">
+        <IconButton {...common} ref={triggerRef} aria-label={label} title={lockedReason ? undefined : title ?? label} className={className} size={size} variant="plain" data-row-menu="">
           <MoreHorizontal size={size === 'row' ? 14 : 16} aria-hidden="true" />
         </IconButton>
       )}
+      {lock.node}
       <ActionMenu
         open={open}
         ariaLabel={menuLabel ?? label}
