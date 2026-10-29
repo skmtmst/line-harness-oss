@@ -868,6 +868,7 @@
 
 - [友だち一覧の差の印](release-log/unreleased/1862-kenta-friends-delta.md) — 増減と要確認の共通表示の反映履歴。
 - [版表示と窓の最初の操作](release-log/unreleased/1863-kenta-version-focus.md) — 表示と初期焦点の反映履歴。
+- [更新履歴の案内先を管理画面に変更](release-log/unreleased/0000-kenta-muse-history-pagination.md) — 更新案内の反映履歴。
 - [一覧の読み込み表示](release-log/unreleased/1864-kenta-list-loading.md) — 一斉配信の列ずれと自動応答の読み込み表示の反映履歴。
 - [統括の接続情報の更新](release-log/unreleased/1865-kenta-connection-refresh.md) — 単件・全件と再読み込みの反映履歴。
 - [選択中の絞り込み表示](release-log/unreleased/1866-kenta-filter-selection.md) — 薄緑の地と緑の枠・文字の反映履歴。
