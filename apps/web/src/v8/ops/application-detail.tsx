@@ -93,7 +93,6 @@ function Detail() {
 
   return <PageFrame kind="detail" boardId="g6NuH" standalone>
     <article className={styles.panel}>
-      <a href="/ops/applications" className={styles.back}>← 申込アカウントに戻る</a>
       {error ? <Notice tone="danger" message={error} /> : null}
       {message ? <Notice tone={message.includes('失敗') ? 'warn' : 'success'} message={message} /> : null}
       {loading ? <ListState kind="loading" title="申込を読み込んでいます" /> : !application ? <ListState kind="error" title="申込を表示できませんでした" description={error} onRetry={() => void load()} /> : <>

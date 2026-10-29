@@ -61,6 +61,13 @@ describe('申込詳細の連絡から承認まで', () => {
     expect(screen.queryByRole('dialog', { name: 'この申込を承認しますか？' })).toBeNull()
   })
 
+  it('ページ内の戻るリンクは出さない（戻るはパンくずだけ）', async () => {
+    state.get.mockResolvedValue({ success: true, data: initial })
+    render(<OpsApplicationDetail />)
+    await screen.findByRole('button', { name: '連絡済みとして保存' })
+    expect(screen.queryByRole('link', { name: /申込アカウントに戻る/ })).toBeNull()
+  })
+
   it('保存中は「保存しています…」と出す', async () => {
     state.get.mockResolvedValue({ success: true, data: initial })
     let done: (value: unknown) => void = () => {}
