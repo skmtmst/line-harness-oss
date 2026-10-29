@@ -914,3 +914,5 @@
 - [閲覧のみの操作と理由の表示](release-log/unreleased/1930-kenta-perm-rebuild.md) — 閲覧時の操作表示と代理ログインの権限制御の反映履歴。
 - [左上の統括名の表示幅](release-log/unreleased/1926-masato-sidebar-name-width.md) — 統括名の表示幅を調整した反映履歴。
 - [店の比較から削除・アーカイブした店を除く](release-log/unreleased/1927-masato-store-comparison-archived.md) — 店の比較とCSVの修正履歴。
+- [自動応答の閲覧表示と作成画面の間隔](release-log/unreleased/0000-kenta-auto-reply-wizard.md) — 閲覧時の入力表示と縦の空きの反映履歴。
+- [一覧のページ範囲の補正](release-log/unreleased/0000-kenta-muse-history-pagination.md) — 削除後に最後のページへ戻す修正の反映履歴。
