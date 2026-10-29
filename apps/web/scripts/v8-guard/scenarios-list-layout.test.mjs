@@ -34,6 +34,7 @@ async function measure(page) {
         const nameStyle = name ? getComputedStyle(name) : null
         return { id, cellCount, name: name ? { text: name.textContent, title: name.title, whiteSpace: nameStyle.whiteSpace, overflow: nameStyle.overflow, textOverflow: nameStyle.textOverflow, box: r(name) } : null,
         text: row.innerText, countText: row.children[3].innerText,
+        detail: row.children[3].children[1]?.lastElementChild ? r(row.children[3].children[1].lastElementChild) : null,
         count: r(row.children[3]), menu: r(row.children[5]),
         bars: [...row.querySelectorAll('[role="progressbar"]')].map(bar => ({ box: r(bar), value: bar.getAttribute('aria-valuenow'), max: bar.getAttribute('aria-valuemax'), label: bar.getAttribute('aria-label') })),
         actions: [...row.children[5].querySelectorAll('button')].map(button => ({ label: button.getAttribute('aria-label'), box: r(button) })),
@@ -42,23 +43,25 @@ async function measure(page) {
   })
 }
 function numbersPreserved(row) {
+  if (/—\s*人/.test(row.countText)) return false
   const expected = countCases.find(item => item.id === row.id)
   if (expected) {
-    const label = value => value == null ? '—' : value.toLocaleString('en-US')
-    if (!row.countText.includes(`配信中 ${label(expected.subscriberCount)} 人・最後まで配信 ${label(expected.completedCount)} 人`)) return false
+    const label = value => value == null ? '—' : `${value.toLocaleString('en-US')} 人`
+    if (!row.countText.includes(`配信中 ${label(expected.subscriberCount)}・最後まで配信 ${label(expected.completedCount)}`)) return false
   }
-  const match = row.countText.match(/配信中 ([\d,]+|—) 人・最後まで配信 ([\d,]+|—) 人/)
+  const match = row.countText.match(/配信中 ([\d,]+ 人|—)・最後まで配信 ([\d,]+ 人|—)/)
   if (!match) return false
   if (match[1] === '—' || match[2] === '—') return row.bars.length === 0 && !row.countText.includes('登録した') && !row.countText.includes('%')
-  const active = Number(match[1].replaceAll(',', ''))
-  const completed = Number(match[2].replaceAll(',', ''))
+  const active = Number(match[1].replace(' 人', '').replaceAll(',', ''))
+  const completed = Number(match[2].replace(' 人', '').replaceAll(',', ''))
   const enrolled = active + completed
   if (enrolled === 0) return row.bars.length === 0 && row.countText.trim().endsWith('登録した 0 人') && !row.countText.includes('%')
   if (row.bars.length !== 1) return false
   return Number(row.bars[0].value) === completed && Number(row.bars[0].max) === enrolled && row.countText.includes(`登録した ${enrolled.toLocaleString('en-US')} 人の ${Math.round(completed / enrolled * 100)}%`)
 }
 function healthy(m) {
-  return m.table.right <= m.main.right + 1 && m.columns.length === 6 && Math.abs(m.columns[3].width - 230) <= 1 && m.dataRowCount > 0 && m.rows.length === m.dataRowCount && m.sixCellRowCount === m.dataRowCount && m.rows.every(row => row.cellCount === 6 && row.name?.whiteSpace === 'nowrap' && row.name.overflow === 'hidden' && row.name.textOverflow === 'ellipsis' && row.name.title === row.name.text && row.name.box.width > 0 && numbersPreserved(row) && row.count.right <= m.main.right + 1 && row.menu.right <= m.main.right + 1 && row.bars.every(bar => bar.box.width >= 32) && row.actions.length > 0 && row.actions.every(action => action.box.width > 0 && action.box.height > 0 && action.box.right <= m.main.right + 1))
+  const detailRight = m.rows.find(row => row.bars?.length === 1)?.detail?.right
+  return m.table.right <= m.main.right + 1 && m.columns.length === 6 && Math.abs(m.columns[3].width - 230) <= 1 && m.dataRowCount > 0 && m.rows.length === m.dataRowCount && m.sixCellRowCount === m.dataRowCount && m.rows.every(row => row.cellCount === 6 && row.name?.whiteSpace === 'nowrap' && row.name.overflow === 'hidden' && row.name.textOverflow === 'ellipsis' && row.name.title === row.name.text && row.name.box.width > 0 && numbersPreserved(row) && (row.id !== 'counts-zero' || row.detail && Math.abs(row.detail.right - detailRight) <= 1) && row.count.right <= m.main.right + 1 && row.menu.right <= m.main.right + 1 && row.bars.every(bar => bar.box.width >= 32) && row.actions.length > 0 && row.actions.every(action => action.box.width > 0 && action.box.height > 0 && action.box.right <= m.main.right + 1))
 }
 for (const width of [1152, 1440]) {
   test(`シナリオの実表で人数と操作を収め、固定名列の故障を検出する ${width}`, async () => {
@@ -121,7 +124,7 @@ for (const width of [1152, 1440]) {
       for (const item of countCases) {
         const cell = page.locator(`main table tbody tr[data-row-id="${item.id}"] > td`).nth(3)
         const original = await cell.evaluate((element, zero) => {
-          const target = zero ? element.lastElementChild : element.firstElementChild
+          const target = zero ? element.lastElementChild.lastElementChild : element.firstElementChild
           const text = target.textContent
           target.textContent = zero ? '—' : '配信中 0 人・最後まで配信 0 人'
           return text
@@ -129,20 +132,27 @@ for (const width of [1152, 1440]) {
         const broken = await measure(page)
         expect(valid(broken)).toBe(false)
         await cell.evaluate((element, state) => {
-          const target = state.zero ? element.lastElementChild : element.firstElementChild
+          const target = state.zero ? element.lastElementChild.lastElementChild : element.firstElementChild
           target.textContent = state.original
         }, { zero: item.id === 'counts-zero', original })
         await expect.poll(async () => valid(await measure(page))).toBe(true)
         expect(await measure(page)).toEqual(normal)
         countFaults.push({ id: item.id, broken, restored: true })
       }
+      const zeroDetail = page.locator('tr[data-row-id="counts-zero"] > td').nth(3)
+      await zeroDetail.evaluate(cell => { cell.lastElementChild.style.justifyContent = 'flex-start' })
+      const alignmentFault = await measure(page)
+      expect(valid(alignmentFault)).toBe(false)
+      await zeroDetail.evaluate(cell => cell.lastElementChild.style.removeProperty('justify-content'))
+      await expect.poll(async () => valid(await measure(page))).toBe(true)
+      expect(await measure(page)).toEqual(normal)
       const layout = await page.evaluate(scanLayoutOverflow)
       expect(layout.outOfMain).toEqual([])
       expect(layout.pageX).toBe(false)
       for (const key of ['overflow', 'noTitle', 'accountName', 'narrowColumn', 'cutAlert']) expect(layout[key]).toEqual([])
       expect(errors).toEqual([])
       await shot('restored')
-      const result = { width, normal, fault, restored, missingCell, restoredCell, countFaults, layout, errors }
+      const result = { width, normal, fault, restored, missingCell, restoredCell, countFaults, alignmentFault, layout, errors }
       if (out) writeFileSync(resolve(out, `scenarios-${width}.json`), JSON.stringify(result, null, 2))
       console.log(JSON.stringify(result))
     } finally { await browser.close() }

@@ -197,7 +197,8 @@ describe('V8 シナリオ一覧の最後まで配信した割合', () => {
     try {
       const view = render(<ScenariosListV8 />)
       const row = (await view.findByText('新規登録7日間フォロー')).closest('tr') as HTMLElement
-      const expected = `配信中 ${activeLabel} 人・最後まで配信 ${completedLabel} 人`
+      const label = (value: string) => value === '—' ? value : `${value} 人`
+      const expected = `配信中 ${label(activeLabel)}・最後まで配信 ${label(completedLabel)}`
       expect(view.container.querySelectorAll('tbody tr')).toHaveLength(items.length)
       expect(row.textContent).toContain(expected)
       expect(within(row).getByTitle(expected)).not.toBeNull()
@@ -214,6 +215,7 @@ describe('V8 シナリオ一覧の最後まで配信した割合', () => {
         expect(row.textContent).toContain(`登録した ${denominator} 人の ${Math.round(Number(completed) / denominator * 100)}%`)
       }
       expect(row.textContent).not.toMatch(/NaN|Infinity|0\s*\/\s*0/)
+      expect(row.textContent).not.toContain('— 人')
       fireEvent.click(row)
       const detail = await view.findByRole('dialog', { name: '新規登録7日間フォロー', exact: true })
       expect(within(detail).getByRole('region', { name: '配信状況' }).textContent).toContain(expected)
