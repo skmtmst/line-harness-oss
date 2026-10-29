@@ -365,6 +365,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(calls.followerImportState).not.toHaveBeenCalled()
     // #1914：Pen D。取り込み完了後は引き継ぎ結果の板を出し、汎用の完了文は出さない。
     await screen.findByText('友だちの引き継ぎが完了しました', { selector: 'h2' })
+    expect(screen.queryByText('準備ができました')).toBeNull()
     expect(screen.getByText('10人の友だちを引き継ぎました')).toBeTruthy()
   })
 
