@@ -130,6 +130,8 @@ export interface ManagedFolderPanelProps {
   createAction?: ReactNode
   /** nullは本人未確定などで理由をまだ表示しない。拒否は維持する。 */
   lockedReason?: string | null
+  /** 任意の同期判定。未指定の呼び出し方は変えず、指定時は権限変更でも窓を残す。 */
+  canWriteNow?: () => boolean
   /** ［作る］を使わない画面でも、フォルダの位置を変えない。 */
   reserveCreateSpace?: boolean
   /** 消したフォルダを選んでいたときに「すべて」へ戻す。既定は onSelect(allId)。 */
@@ -197,6 +199,7 @@ export default function ManagedFolderPanel({
   countOf,
   createAction,
   lockedReason,
+  canWriteNow,
   reserveCreateSpace = canManage && Boolean(createAction),
   onDeleted,
   error,
@@ -209,7 +212,31 @@ export default function ManagedFolderPanel({
 }: ManagedFolderPanelProps) {
   const [adding, setAdding] = useState(false)
   const managed = kind !== null
-  const editable = managed && canManage && !lockReason(canManage)
+  const editable = managed && canManage && !lockReason(canManage) && (!canWriteNow || canWriteNow())
+  const scope = useRef({ kind, accountId })
+  if (scope.current.kind !== kind || scope.current.accountId !== accountId) scope.current = { kind, accountId }
+  const renderedScope = scope.current
+  const addScope = useRef(renderedScope)
+  const addEpoch = useRef({})
+  const renderedAdd = addEpoch.current
+  const latest = useRef({ canManage, canWriteNow, adding })
+  latest.current = { canManage, canWriteNow, adding }
+  const livePermission = canWriteNow !== undefined
+  useEffect(() => { if (livePermission) { addEpoch.current = {}; setAdding(false) } }, [kind, accountId, livePermission])
+  const canAddNow = () => livePermission || latest.current.canWriteNow !== undefined
+    ? renderedScope === scope.current && kind !== null && latest.current.canManage
+      && !lockReason(latest.current.canManage) && latest.current.canWriteNow !== undefined && latest.current.canWriteNow()
+    : editable
+  const sameAddDialog = () => renderedScope === scope.current && addScope.current === renderedScope && renderedAdd === addEpoch.current
+  const startAdd = () => {
+    if (!canAddNow()) return
+    if (livePermission) {
+      if (latest.current.adding) return
+      addScope.current = scope.current
+      addEpoch.current = {}
+    }
+    onAddStart?.(); setAdding(true)
+  }
   const permissionReason = lockedReason === undefined ? lockReason(canManage) : lockedReason ?? undefined
   const actions = useFolderRowActions({
     kind: kind ?? '',
@@ -217,6 +244,7 @@ export default function ManagedFolderPanel({
     accountId,
     enabled: editable,
     lockedReason: permissionReason ?? null,
+    canWriteNow,
     itemLabel,
     countOf: (id) => {
       const folder = folders.find((f) => f.id === id)
@@ -231,7 +259,7 @@ export default function ManagedFolderPanel({
   })
 
   useImperativeHandle(controlRef, () => ({
-    startAdd: () => { if (editable) { onAddStart?.(); setAdding(true) } },
+    startAdd,
     startEdit: (folder) => { const index = folders.findIndex((f) => f.id === folder.id); if (index >= 0) actions.rowActions(folder, index).onEdit?.() },
     startDelete: (folder) => { const index = folders.findIndex((f) => f.id === folder.id); if (index >= 0) actions.rowActions(folder, index).onDelete?.() },
   }))
@@ -257,7 +285,7 @@ export default function ManagedFolderPanel({
         onSelect={onSelect}
         createAction={createAction}
         reserveCreateSpace={reserveCreateSpace}
-        onAddFolder={editable ? () => { onAddStart?.(); setAdding(true) } : undefined}
+        onAddFolder={editable ? startAdd : undefined}
         addFolderLabel="フォルダを追加"
         addFolderLockedReason={managed ? permissionReason : undefined}
         addFolderDisabled={managed && !editable && !permissionReason}
@@ -266,15 +294,26 @@ export default function ManagedFolderPanel({
         {error ? <p role="alert" className={styles.note}>{error}</p> : null}
         {children}
       </FolderPanel>
-      {adding && kind && editable ? (
+      {adding && kind && (editable || livePermission) && (!livePermission || addScope.current === renderedScope) ? (
         <FolderAddDialog
           kind={kind}
           accountId={accountId}
           note={`${itemLabel}を分けてしまう箱です。消しても、中の${itemLabel}は未分類に残ります。`}
           placeholder={placeholder}
-          onClose={() => setAdding(false)}
-          onAdded={(created) => { setAdding(false); if (created) onAdded?.(created); void onChanged() }}
+          onClose={() => {
+            if (livePermission && !sameAddDialog()) return
+            if (livePermission) addEpoch.current = {}
+            setAdding(false)
+          }}
+          onAdded={(created) => {
+            if (livePermission && !sameAddDialog()) return
+            if (livePermission) addEpoch.current = {}
+            setAdding(false); if (created) onAdded?.(created); void onChanged()
+          }}
           onReload={onChanged}
+          canSaveNow={livePermission ? () => sameAddDialog() && canAddNow() : undefined}
+          confirmLockedReason={livePermission ? permissionReason : undefined}
+          confirmDisabled={livePermission ? !editable && !permissionReason : undefined}
         />
       ) : null}
       {actions.dialogs}
