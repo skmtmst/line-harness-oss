@@ -191,7 +191,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
         {draftOpen && id ? (
           <ReviewDraft key={id} accountId={accountId} reviewId={id} data={data} go={go} onPublished={() => { void load() }} />
         ) : postsView === 'new' || postsView === 'edit' ? (
-          <PostEditor key={`${postsView}-${id ?? ''}-${postKind}`} accountId={accountId} kind={postKind} postId={postsView === 'edit' ? id : null} go={go} mediaUpload={mediaUpload} />
+          <PostEditor key={`${postsView}-${id ?? ''}-${postKind}`} accountId={accountId} kind={postKind} postId={postsView === 'edit' ? id : null} go={go} mediaUpload={mediaUpload} adjustTarget={searchParams.get('adjust') === 'google' || searchParams.get('adjust') === 'instagram' ? searchParams.get('adjust') as 'google' | 'instagram' : undefined} />
         ) : postsView === 'confirm' && id ? (
           <PostConfirm key={id} accountId={accountId} id={id} go={go} />
         ) : postsView ? (

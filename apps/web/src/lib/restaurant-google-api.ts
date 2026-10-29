@@ -181,7 +181,7 @@ export type GooglePostCtaType = 'book' | 'order' | 'shop' | 'learn_more' | 'sign
 export type GooglePostCta = { type: GooglePostCtaType; url: string | null }
 export type GooglePostOffer = { couponCode: string | null; redeemOnlineUrl: string | null; termsConditions: string | null }
 export type GooglePostSchedule = { startDate: string; startTime: string; endDate: string; endTime: string }
-export type GooglePostMedia = { mediaId: string; filename: string; sourceUrl: string }
+export type GooglePostMedia = { mediaId: string; filename: string; sourceUrl: string; originalMediaId?: string | null }
 
 /** Instagram への同時投稿（★V8-B `U1X7T2`・`HEEN9`／2026-10-07 承認）。 */
 export type GooglePostInstagramStatus = 'none' | 'published' | 'failed'
@@ -190,6 +190,8 @@ export type GooglePostInstagram = {
   enabled: boolean
   /** Instagram 用の文章。`null` なら Google の本文をそのまま使う。 */
   caption: string | null
+  mediaId: string | null
+  originalMediaId?: string | null
   status: GooglePostInstagramStatus
   permalink: string | null
   error: string | null
@@ -227,8 +229,9 @@ export type GooglePostDraftInput = {
   cta?: GooglePostCta | null
   offer?: GooglePostOffer | null
   mediaId?: string | null
+  mediaOriginalId?: string | null
   /** Instagram 同時投稿（★V8-B `U1X7T2`／2026-10-07 承認）。`caption` が空なら本文を使う。 */
-  instagram?: { enabled: boolean; caption?: string | null } | null
+  instagram?: { enabled: boolean; caption?: string | null; mediaId?: string | null; originalMediaId?: string | null } | null
 }
 
 export type GooglePostListData = {

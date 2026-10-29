@@ -337,7 +337,7 @@ describe('下書き（GB-4/5/6/7）', () => {
     expect(ok.status).toBe(200);
     const get = await call(`/api/restaurant-test/google/posts/${ok.json.post!.id}`);
     const body = (await get.json()) as { post: { media: Array<{ sourceUrl: string }> } };
-    expect(body.post.media).toEqual([{ mediaId: 'media-1', filename: 'gaikan.jpg', sourceUrl: 'https://worker.example.test/images/images/gaikan.jpg' }]);
+    expect(body.post.media).toMatchObject([{ mediaId: 'media-1', filename: 'gaikan.jpg', sourceUrl: 'https://worker.example.test/images/images/gaikan.jpg' }]);
   });
 });
 
@@ -539,7 +539,7 @@ describe('取り込み（sync）', () => {
     expect(created).toBeTruthy();
     const get = await call(`/api/restaurant-test/google/posts/${created!.id}`);
     const detail = (await get.json()) as { post: { media: Array<{ sourceUrl: string }> } };
-    expect(detail.post.media).toEqual([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo1' }]);
+    expect(detail.post.media).toMatchObject([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo1' }]);
 
     // 2回目の同期でGoogle側の画像が変わっても最新化される（自己修復）。
     googlePostsOnGoogle = googlePostsOnGoogle.map((p) =>
@@ -549,7 +549,7 @@ describe('取り込み（sync）', () => {
     expect(s2.status).toBe(200);
     const get2 = await call(`/api/restaurant-test/google/posts/${created!.id}`);
     const detail2 = (await get2.json()) as { post: { media: Array<{ sourceUrl: string }> } };
-    expect(detail2.post.media).toEqual([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo2' }]);
+    expect(detail2.post.media).toMatchObject([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo2' }]);
   });
 
   it('アプリ発の投稿がGoogleに反映された後も、登録メディアの参照を保持する（Google側のmedia_jsonで上書きしない）', async () => {
@@ -561,7 +561,7 @@ describe('取り込み（sync）', () => {
     expect(s.status).toBe(200);
     const get = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
     const detail = (await get.json()) as { post: { media: Array<{ mediaId: string; sourceUrl: string }> } };
-    expect(detail.post.media).toEqual([{ mediaId: 'media-own', filename: 'mise.jpg', sourceUrl: 'https://worker.example.test/images/images/mise.jpg' }]);
+    expect(detail.post.media).toMatchObject([{ mediaId: 'media-own', filename: 'mise.jpg', sourceUrl: 'https://worker.example.test/images/images/mise.jpg' }]);
   });
 });
 
@@ -594,7 +594,7 @@ describe('Instagram 同時投稿', () => {
   it('画像を選ばずにInstagramへ出す設定にすると下書きで止める', async () => {
     const r = await createDraft({ ...standardBody, mediaId: null, instagram: { enabled: true, caption: null } });
     expect(r.status).toBe(400);
-    expect(r.json).toMatchObject({ error: expect.any(String), fields: { mediaId: expect.any(String) } });
+    expect(r.json).toMatchObject({ error: expect.any(String), fields: { 'instagram.mediaId': expect.any(String) } });
     expect(instagramCalls).toHaveLength(0);
   });
 
@@ -624,10 +624,48 @@ describe('Instagram 同時投稿', () => {
     expect(post.instagram).toEqual({
       enabled: true,
       caption: null,
+      mediaId: 'media-ig',
+      originalMediaId: null,
       status: 'published',
       permalink: 'https://www.instagram.com/p/abc123/',
       error: null,
     });
+  });
+
+  it('GoogleとInstagramに別の画像を保存し、Instagramには専用画像を送る', async () => {
+    await seedInstagramConnection();
+    seedMedia('media-google', 'google.jpg', 'account-2');
+    seedMedia('media-instagram', 'instagram.jpg', 'account-2');
+    seedMedia('original-google', 'source-google.jpg', 'account-2');
+    seedMedia('original-instagram', 'source-instagram.jpg', 'account-2');
+    const draft = await createDraft({ ...standardBody, mediaId: 'media-google', mediaOriginalId: 'original-google', instagram: { enabled: true, caption: null, mediaId: 'media-instagram', originalMediaId: 'original-instagram' } });
+    expect(draft.status).toBe(200);
+    const detail = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
+    const stored = (await detail.json()) as { post: { media: Array<{ mediaId: string; originalMediaId: string }>; instagram: { mediaId: string; originalMediaId: string } } };
+    expect(stored.post.media[0].mediaId).toBe('media-google');
+    expect(stored.post.media[0].originalMediaId).toBe('original-google');
+    expect(stored.post.instagram.mediaId).toBe('media-instagram');
+    expect(stored.post.instagram.originalMediaId).toBe('original-instagram');
+    const published = await publish(draft.json.post!.id);
+    expect(published.status).toBe(200);
+    expect(new URL(instagramCalls[0].url).searchParams.get('image_url')).toBe('https://worker.example.test/images/images/instagram.jpg');
+  });
+
+  it('Instagram専用画像が別アカウントのものなら下書きを保存しない', async () => {
+    seedMedia('media-google', 'google.jpg', 'account-2');
+    seedMedia('media-other', 'other.jpg', 'account-1');
+    const result = await createDraft({ ...standardBody, mediaId: 'media-google', instagram: { enabled: true, caption: null, mediaId: 'media-other' } });
+    expect(result.status).toBe(404);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_posts').get()).toEqual({ n: 0 });
+  });
+
+  it('再切り取り用の元画像も同じアカウントに属していることを確認する', async () => {
+    seedMedia('media-google', 'google.jpg', 'account-2');
+    seedMedia('media-instagram', 'instagram.jpg', 'account-2');
+    seedMedia('media-other', 'source.jpg', 'account-1');
+    const result = await createDraft({ ...standardBody, mediaId: 'media-google', instagram: { enabled: true, caption: null, mediaId: 'media-instagram', originalMediaId: 'media-other' } });
+    expect(result.status).toBe(404);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_posts').get()).toEqual({ n: 0 });
   });
 
   it('検証環境の投稿専用許可でもGoogleとInstagramへ1回ずつ出す', async () => {
@@ -772,7 +810,7 @@ describe('Instagram 同時投稿', () => {
     await publish(draft.json.post!.id);
     expect(instagramCalls).toHaveLength(0);
     const post = await instagramOf(draft.json.post!.id);
-    expect(post.instagram).toEqual({ enabled: false, caption: null, status: 'none', permalink: null, error: null });
+    expect(post.instagram).toEqual({ enabled: false, caption: null, mediaId: null, originalMediaId: null, status: 'none', permalink: null, error: null });
   });
 });
 
