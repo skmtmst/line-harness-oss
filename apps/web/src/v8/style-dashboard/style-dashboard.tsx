@@ -126,7 +126,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <span className={styles.grow} />
       <EntitySelect compact width={190} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
       {loadedAt ? <span className={styles.updated}>更新 {formatDate(loadedAt, { style: 'time' })}</span> : null}
-      {/* 98：上の段を軽くするため、読み直しは文字の押し口にする（題右は型が「…」へ畳む）。 */}
+      {/* 上の段を軽くするため、読み直しは文字の押し口にする（題右は型が「…」へ畳む）。 */}
       <Button variant="text" onClick={() => void reload()}><RefreshCw size={16} aria-hidden="true" />読み直す</Button>
     </div>
   )
@@ -182,7 +182,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     } else {
       main = (
         <>
-          {/* B18：1つの探す欄に帯の道具段を使うと余白で狭まり文が切れるので、帯の余白が付かない正の包み（ListToolbarSearchSlot）で幅を保つ。 */}
+          {/* 1つの探す欄に帯の道具段を使うと余白で狭まり文が切れるので、帯の余白が付かない正の包み（ListToolbarSearchSlot）で幅を保つ。 */}
           {style !== 'lesson' ? <div className={styles.listTools}><span className={styles.grow} /><div className={styles.search}><ListToolbarSearchSlot width={220} search={{ value: search, onChange: setSearch, placeholder: cfg.search }} /></div></div> : null}
           <TodayList style={style} rows={rows} note={today.rowsNote} canWrite={canWrite} busyId={busy} menuFor={menuFor} onVisit={(r) => void markVisit(r)} onNoShow={(r) => void markNoShow(r)} onApprove={(r) => void approve(r)} onResult={(r) => setResultRow(r)} onUndo={(r) => void undoVisit(r)}
             empty={<ListState kind="empty" title={`${range === 'today' ? '今日' : range === 'week' ? '今週' : '今月'}の${style === 'consult' ? '面談' : style === 'lesson' ? 'クラス' : '予約'}はありません`} description={canWrite ? (style === 'consult' ? '予約の URL を案内すると、空いた時間に入ります。' : '空いている時間に予約を入れられます。') : undefined}

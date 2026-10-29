@@ -83,7 +83,7 @@ describe('店の比較の表', () => {
     expect(screen.getByText(/数の横の印は前の期間との差（赤＝悪い・緑＝良い）/)).toBeTruthy()
   })
 
-  it('狭い幅で2段に分けられるよう、数と札は別の包みに入れる（CX21）', async () => {
+  it('狭い幅で2段に分けられるよう、数と札は別の包みに入れる', async () => {
     render(<StoreComparisonList />)
     const chip = await screen.findByText('−25')
     const cell = chip.closest('span[title]')!

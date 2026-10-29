@@ -33,7 +33,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
-it('店舗管理の表は3行の中身に合わせて伸びる（CX22）', async () => {
+it('店舗管理の表は3行の中身に合わせて伸びる', async () => {
   render(<OrganizationV8 />)
   const table = await screen.findByRole('table', { name: '店舗管理' })
   within(table).getByText('試験店')

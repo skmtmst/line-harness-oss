@@ -29,26 +29,26 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-it('上の段を軽くするため読み直しは文字の押し口にする（98）', async () => {
+it('上の段を軽くするため読み直しは文字の押し口にする', async () => {
   render(<StyleDashboard style="restaurant" />)
   const reload = await screen.findByRole('button', { name: '読み直す' })
   expect(reload.getAttribute('data-variant')).toBe('text')
 })
 
-it('探す欄は正の包みで220pxの幅を保つ（B18）', async () => {
+it('探す欄は正の包みで220pxの幅を保つ', async () => {
   render(<StyleDashboard style="restaurant" />)
   const input = await screen.findByPlaceholderText('名前・タグ・メモで探す')
   expect(input.closest('[data-toolbar-layout]')).toBeNull()
   expect((input.closest('[data-toolbar-search]') as HTMLElement).style.getPropertyValue('--list-search-width')).toBe('220px')
 })
 
-it('数の帯の対応待ちの補足は1行に収まる短さにする（B18）', async () => {
+it('数の帯の対応待ちの補足は1行に収まる短さにする', async () => {
   render(<StyleDashboard style="restaurant" />)
   expect(await screen.findByText('未配席 1・枠閉じ 2')).toBeTruthy()
   expect(screen.queryByText(/枠を閉じる/)).toBeNull()
 })
 
-it('サロンの対応待ちの補足も1行に収まる短さにする（B18）', async () => {
+it('サロンの対応待ちの補足も1行に収まる短さにする', async () => {
   render(<StyleDashboard style="salon" />)
   expect(await screen.findByText('承認待ち・来店未記録')).toBeTruthy()
 })
