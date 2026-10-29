@@ -153,15 +153,19 @@ export default function OpsAnnouncementEditV8() {
     const wanted = editId ?? copyId
     if (!wanted) { setSourceLoaded(true); return }
     setSourceError(null)
+    setSourceLoaded(false)
+    let switched = false
     try {
       const res = await api.ops.announcements.list()
       if (!res.success) { setSourceError(new Error(res.error || '読み込めませんでした')); return }
       setLineConfigured(res.noticeLineConfigured)
       const found = res.data.find((row) => row.id === wanted) ?? null
-      if (!found) { setSourceMissing(true); setSourceLoaded(true); return }
+      if (!found) { setSourceMissing(true); return }
       setSource(found)
       // 送ったもの・送信中のものを ?id= で開いたら、写しに切り替える（直しは下書き・予約だけ）。
+      // 切替中は読み込み中のままにし、空の作る欄をちらつかせない。
       if (editId && found.status !== 'draft' && found.status !== 'scheduled') {
+        switched = true
         routerRef.current.replace(`/ops/announcements/new?copy=${encodeURIComponent(found.id)}`)
         return
       }
@@ -181,7 +185,7 @@ export default function OpsAnnouncementEditV8() {
       { if (!fieldFailure)
       setSourceError(caught) }
     } finally {
-      setSourceLoaded(true)
+      if (!switched) setSourceLoaded(true)
     }
   }, [editId, copyId, saveErrors])
 
@@ -295,6 +299,14 @@ export default function OpsAnnouncementEditV8() {
         { if (!fieldFailure)
         setFormError(opsErrorMessage(error)) }
         setConfirmSend(false)
+        // 下書きは通っている場合がある（送信の準備の失敗）。版を読み直し、次が自分の保存と競合しないようにする。
+        if (editingId) {
+          void opsCall(api.ops.announcements.list()).then((res) => {
+            if (!res.success) return
+            const latest = res.data.find((row) => row.id === editingId)
+            if (latest) { setSource(latest); setEditingUpdatedAt(latest.updatedAt) }
+          })
+        }
         return
       }
       { if (!fieldFailure)

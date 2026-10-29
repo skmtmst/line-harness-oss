@@ -458,6 +458,9 @@ describe('作る画面', () => {
     await act(async () => { root.render(<OpsAnnouncementNewPage />) })
     await flush()
     expect(navigation.replace).toHaveBeenCalledWith('/ops/announcements/new?copy=a1')
+    // 切替中は読み込み中のままにし、空の作る欄を出さない。
+    expect(host.querySelector('[data-list-state="loading"]')).not.toBeNull()
+    expect(document.querySelector('input[placeholder^="例："]')).toBeNull()
   })
 
   it('?id= の削除は確認の窓を挟み、実行したら一覧へ戻る', async () => {
@@ -531,6 +534,26 @@ describe('二重押しと同時保存（M512/M513）', () => {
     await flush()
     expect(document.body.textContent).toContain('配信済みのお知らせは変えられません')
     expect(document.body.textContent).not.toContain('ほかの人が先にお知らせを保存しました')
+  })
+
+  it('送信の準備の409の後は版を読み直し、次は自分の保存と競合しない', async () => {
+    search.value = 'id=a2'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    // 下書きは通って版だけ進んだ想定。
+    announcements = [{ ...draft, updatedAt: '2026-10-09T12:00:00.000+09:00' }]
+    putOverride = { status: 409, payload: { success: false, error: '送信の準備に失敗しました' } }
+    await clickDraftSave()
+    await flush()
+    expect(document.body.textContent).toContain('送信の準備に失敗しました')
+    expect(document.body.textContent).not.toContain('ほかの人が先にお知らせを保存しました')
+    putOverride = { status: 200, payload: { success: true, data: { ...draft, updatedAt: '2026-10-09T12:00:00.000+09:00' } } }
+    await clickDraftSave()
+    await flush()
+    const saved = calls.filter((call) => call.method === 'PUT')
+    expect(saved).toHaveLength(2)
+    expect(saved[0].body).toMatchObject({ expectedUpdatedAt: '2026-09-17T10:00:00.000+09:00' })
+    expect(saved[1].body).toMatchObject({ expectedUpdatedAt: '2026-10-09T12:00:00.000+09:00' })
   })
 })
 

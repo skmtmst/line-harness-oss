@@ -30,10 +30,6 @@ import NumberInput from '@/components/shared/number-field'
 import HelpTip from '@/components/shared/help-tip'
 import { Field, RequiredBadge } from '@/components/shared/form-controls'
 import PeriodPicker, { pastPeriod } from '@/components/shared/period-picker'
-/** 実測（available）の数だけ取る。途中・待ち・失敗は見本にしない（Worker の本文と同じ扱い）。 */
-function strictNumber(metric: { value: number | null; state: string }): number | null {
-  return metric.state === 'available' && typeof metric.value === 'number' ? metric.value : null
-}
 import { Check, ChevronDown, GitCompareArrows, RefreshCw } from 'lucide-react'
 import { formatDateTime, formatTime, formatNumber } from '@/lib/format'
 import {
@@ -51,6 +47,11 @@ import {
   runErrorLabel,
   runStateLabel,
 } from '../../report-run-state'
+
+/** 実測（available）の数だけ取る。途中・待ち・失敗は見本にしない（Worker の本文と同じ扱い）。 */
+function strictNumber(metric: { value: number | null; state: string }): number | null {
+  return metric.state === 'available' && typeof metric.value === 'number' ? metric.value : null
+}
 
 const SECTION_CHOICES: Array<{ id: AnalyticsReportSection; title: string; detail: string; unavailable?: string }> = [
   { id: 'friends', title: '友だちの増減', detail: '増えた・減った・残っている割合' },
