@@ -905,3 +905,5 @@
 - [友だち引き継ぎの再開](release-log/unreleased/1915-masato-follower-import-resume.md) — 進捗画面からの再開と人数表示の反映履歴。
 - [LINE接続マニュアルの参考値秘匿](release-log/unreleased/1917-masato-line-manual-redaction-audit.md) — 画像と本文を全点検した反映履歴。
 - [LINE接続マニュアル画像のキャッシュ更新](release-log/unreleased/1920-masato-line-manual-image-cache.md) — 伏せ済み画像をブラウザで確実に表示する修正履歴。
+- [新規アカウントの受信箱をLINEのみに](release-log/unreleased/1922-masato-new-account-line-only-inbox.md) — 新規はLINEのみ・既存はメール表示を残す修正履歴。
+- [左上に統括名を表示](release-log/unreleased/1924-masato-sidebar-tenant-name.md) — 左上の名前を統括名に直した修正履歴。
