@@ -83,6 +83,8 @@ figure{margin:18px 0 0;border:1px solid var(--line);border-radius:11px;overflow:
 </div>
 <p class="small">URLが未設定の画面では、先に「編集」からURLを保存します。保存後に3つのスイッチが表示されます。</p>
 <ol class="steps"><li>musuboに表示された<strong>チャネル専用のWebhook URL</strong>を「コピー」し、上図①の「Webhook URL」で<strong>「編集」→貼り付け→「更新」</strong>の順に進めます。</li><li>同じ設定欄で上図②〜④の<strong>「Webhookの利用」</strong>、<strong>「Webhookの再送」</strong>、<strong>「エラーの統計情報」</strong>をすべてONにします。</li><li>musuboへ戻り、下の4項目を実際の設定と照らし合わせてチェックします。</li></ol>
+<h3>設定後の画面で4か所を確認する</h3>
+<figure><img src="/manuals/line-connect/images/m3-webhook-configured-musubo.webp" width="1752" height="897" loading="lazy" alt="説明用に加工したmusuboのMessaging API設定画面。Webhook URLと、Webhookの利用・再送・エラーの統計情報がONの位置を赤い番号で示す"><figcaption>添付画面を説明用に加工した例です。①にURL、②〜④にONのスイッチが並びます。画像中の「1111111111」は例であり、実際はmusuboのStep 3に表示されたURLをコピーします。 <a href="/manuals/line-connect/images/m3-webhook-configured-musubo.webp" target="_blank" rel="noopener noreferrer">画像を拡大</a></figcaption></figure>
 <div class="mock" role="img" aria-label="Webhook URLにはMessaging APIチャネルIDが含まれることを示す図"><small>musubo の Webhook URL</small><div><code>https://stg-api.musubo.jp/webhook/&lt;Messaging APIチャネルID&gt;</code><strong>コピー → LINEに貼る</strong></div></div>
 <ul class="checks" aria-label="musuboで確認する4項目"><li>Webhook URLを貼り付けて「更新」を押した</li><li>Webhookの利用をONにした</li><li>Webhookの再送をONにした</li><li>エラーの統計情報をONにした</li></ul>
 <p class="hint warn"><strong>すでに別ツールのWebhook URLがあるとき</strong>musuboのURLに変更すると、そのツールの受信は止まります。使い続ける必要があれば、musuboで「途中保存して閉じる」を押し、現在のURLを別途控えてから進めてください。</p>
