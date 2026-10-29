@@ -965,3 +965,4 @@
 - [教室のクラスと会員予約の空状態](release-log/unreleased/0000-kenta-lesson-empty-bookings.md) — 反映履歴、確認 2026-10-30
 
 - [飲食店の左メニューの予約項目](release-log/unreleased/0000-kenta-restaurant-sidebar.md) — 反映履歴、確認 2026-10-30
+- [LIFFの小さな直し](release-log/unreleased/0000-kenta-muse-liff.md) — 写真・次へ・鈴・選択色・支払い案内・読み込み中・業種の出し分けの反映履歴。

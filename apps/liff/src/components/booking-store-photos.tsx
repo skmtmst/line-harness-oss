@@ -6,7 +6,7 @@ import ConfirmDialog from './ui/confirm-dialog.js';
 const labels = { exterior: '外観', interior: '店内', waiting: '待合' };
 type Photo = { slot: keyof typeof labels; url: string };
 
-/** 写真は任意。取得失敗を「写真なし」にせず、予約の入力を残して読み直せる。 */
+/** 写真は任意。取得失敗は失敗の文を出さず、読み直しの操作だけ残す。 */
 export default function BookingStorePhotos() {
   const [selected, setSelected] = useState<Photo | null>(null);
   const [photos, setPhotos] = useState<Photo[] | null>(null);
@@ -20,7 +20,6 @@ export default function BookingStorePhotos() {
     return () => { alive = false; };
   }, [revision]);
   if (failed) return <section aria-label="お店の案内" className="space-y-3">
-    <p role="alert" className="text-sm text-liff-sub">お店の写真を読み込めませんでした。</p>
     <Button variant="secondary" onClick={() => setRevision(value => value + 1)}>写真を読み直す</Button>
   </section>;
   if (!photos?.length) return null;
