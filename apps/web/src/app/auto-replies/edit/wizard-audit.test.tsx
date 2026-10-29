@@ -1,3 +1,6 @@
+import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React from 'react'
@@ -52,11 +55,12 @@ const DRAFT = {
 }
 
 beforeEach(()=> {
+ verifiedStaffRole('owner'); forgetSessionSnapshot()
  net.liveStatus='published';net.query='id=synthetic-rule&step=response';net.accounts=[{id:'synthetic-account'}];vi.clearAllMocks()
  net.getDraft.mockResolvedValue({success:true,data:DRAFT});net.validateDraft.mockResolvedValue({success:true,data:{errors:[],warnings:[],conflicts:[]}})
  net.list.mockResolvedValue({success:true,data:[]});net.saveDraft.mockResolvedValue({success:true,data:{...DRAFT,versionNumber:2}})
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot() })
 it('WEB293: 次へから優先順位へ入る取得を一度だけ行う',async()=>{
  const view=render(<Page/>);await act(async()=>{})
  await act(async()=>fireEvent.click(screen.getByRole('button',{name:/次へ/})))
@@ -151,4 +155,22 @@ it('言葉条件は検索の印、次へは文頭の矢印を持ち、保存し�
  await act(async()=>fireEvent.click(next))
  expect(net.query).toContain('step=response')
  expect(net.saveDraft).toHaveBeenCalled()
+})
+
+it('確認済みの公開操作を保持しても、read代理へ切替後は公開0、writeへ戻せば公開1', async () => {
+ net.liveStatus='draft';net.query='id=synthetic-rule&step=priority'
+ net.testDraft.mockResolvedValue({success:true,data:{draftWon:true,winner:null,candidates:[],staleTest:false}})
+ net.publishDraft.mockResolvedValue({success:true,data:{}})
+ const view=render(<Page/>);await act(async()=>{})
+ fireEvent.change(document.querySelector('#wiz-test-message') as HTMLInputElement,{target:{value:'test'}})
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'試す',exact:true})))
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'次へ：確認',exact:true})))
+ view.rerender(<Page/>);await act(async()=>{})
+ const button=screen.getByRole('button',{name:'有効にする',exact:true}) as HTMLButtonElement
+ expect(button.disabled).toBe(false)
+ const snapshot=(mode:'read'|'write')=>({impersonation:{id:'proxy',tenantId:'tenant',mode,piiRevealed:false,startedAt:''},unfamiliarAt:null,stepUpMethod:'none' as const})
+ await act(async()=>{rememberSessionSnapshot(snapshot('read'));fireEvent.click(button)})
+ expect(net.publishDraft).not.toHaveBeenCalled()
+ await act(async()=>{rememberSessionSnapshot(snapshot('write'));fireEvent.click(button)})
+ expect(net.publishDraft).toHaveBeenCalledTimes(1)
 })

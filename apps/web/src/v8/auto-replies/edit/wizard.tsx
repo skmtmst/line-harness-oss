@@ -2,6 +2,7 @@
 
 import { readLineImageContent } from '@/lib/line-image-content'
 
+import { canEditWizardNow } from './wizard-access'
 import { WizardBasicStep } from './wizard-basic-step'
 import { WizardConfirmStep } from './wizard-confirm-step'
 import { buildWizardInput } from './wizard-input'
@@ -223,7 +224,7 @@ function AutoReplyWizardV8Inner() {
   const loadOrder = useCallback(async (ruleId: string, accountId: string | null) => {
     const [listRes, conflictRes] = await Promise.all([
       api.autoReplies.list(accountId ? { accountId } : undefined),
-      api.autoReplies.conflicts(ruleId).catch(() => null),
+      canEditWizardNow() ? api.autoReplies.conflicts(ruleId).catch(() => null) : Promise.resolve(null),
     ])
     if (!listRes.success || !Array.isArray(listRes.data)) throw new Error('list failed')
     setRules(
@@ -239,7 +240,7 @@ function AutoReplyWizardV8Inner() {
         activeUntil: r.activeUntil ?? null,
       })),
     )
-    if (conflictRes?.success) {
+    if (canEditWizardNow() && conflictRes?.success) {
       setConflicts(Array.isArray(conflictRes.data?.conflicts) ? conflictRes.data.conflicts : [])
     }
   }, [])
@@ -312,11 +313,12 @@ function AutoReplyWizardV8Inner() {
 
   /* ===== 手順5で読むもの（公開前チェック） ===== */
   const loadValidation = useCallback(async (ruleId: string) => {
+    if (!canEditWizardNow()) return
     const subject = assessmentSubjectRef.current
     setConfirmState('loading')
     try {
       const res = await api.autoReplies.validateDraft(ruleId)
-      if (subject !== assessmentSubjectRef.current) return
+      if (!canEditWizardNow() || subject !== assessmentSubjectRef.current) return
       if (!res.success || !res.data) throw new Error('validate failed')
       setValidation(res.data)
       setConflicts(res.data.conflicts ?? [])
@@ -517,7 +519,7 @@ function AutoReplyWizardV8Inner() {
 
   /* ===== 手順4：試しに送る ===== */
   const runTest = useCallback(async () => {
-    if (!autoReplyId || !selectedFriendId || !testMessage.trim()) return
+    if (!canEditWizardNow() || !autoReplyId || !selectedFriendId || !testMessage.trim()) return
     const testedInput = formFingerprintRef.current
     setInputIssue(null)
     setSaving(true)
@@ -530,13 +532,13 @@ function AutoReplyWizardV8Inner() {
         if (!saved) return
         ruleId = saved.id
       }
-      if (!ruleId) return
+      if (!ruleId || !canEditWizardNow()) return
       const testedVersion = savedVersionRef.current
       const res = await api.autoReplies.testDraft(ruleId, {
         friendId: selectedFriendId,
         incomingText: testMessage.trim(),
       })
-      if (ruleIdRef.current !== ruleId || savedVersionRef.current !== testedVersion || formFingerprintRef.current !== testedInput) return
+      if (!canEditWizardNow() || ruleIdRef.current !== ruleId || savedVersionRef.current !== testedVersion || formFingerprintRef.current !== testedInput) return
       if (!res.success) throw new Error(res.error || 'test failed')
       if (res.data.staleTest) {
         setDryRun(null)
@@ -564,7 +566,7 @@ function AutoReplyWizardV8Inner() {
   const publishReady = !dirty && canPublish(gates)
 
   const publish = useCallback(async () => {
-    if (!autoReplyId || !publishReady || saving) return
+    if (!canEditWizardNow() || !autoReplyId || !publishReady || saving) return
     setInputIssue(null)
     setSaving(true)
     setError('')

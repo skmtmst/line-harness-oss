@@ -1,9 +1,14 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity, readStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { DELIVERY_FEATURE_POLICIES, deliveryPermissionKey } from '@line-crm/shared'
+import { canEditWizardNow } from './wizard-access'
 import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-const net = vi.hoisted(() => ({ query: 'id=synthetic-rule&step=response', createDraft: vi.fn(), templates: vi.fn(), folders: vi.fn(), getDraft: vi.fn(), validateDraft: vi.fn(), list: vi.fn(), saveDraft: vi.fn(), testDraft: vi.fn(), publishDraft: vi.fn(), accounts: [{id:'synthetic-account'}], pageTitle: vi.fn(), liveStatus: 'published' }))
+const net = vi.hoisted(() => ({ query: 'id=synthetic-rule&step=response', createDraft: vi.fn(), templates: vi.fn(), folders: vi.fn(), getDraft: vi.fn(), conflicts: vi.fn(), validateDraft: vi.fn(), list: vi.fn(), saveDraft: vi.fn(), testDraft: vi.fn(), publishDraft: vi.fn(), accounts: [{id:'synthetic-account'}], pageTitle: vi.fn(), liveStatus: 'published' }))
 vi.mock('next/navigation', () => ({useRouter: () => ({replace: (url: string) => {net.query = url.split('?')[1]}, push: vi.fn()}), useSearchParams: () => new URLSearchParams(net.query)}))
 vi.mock('@/contexts/account-context', () => ({useAccount: () => ({selectedAccountId: 'synthetic-account', accounts: net.accounts})}))
 vi.mock('@/components/shell/page-chrome', () => ({usePageTitle: net.pageTitle}))
@@ -11,7 +16,7 @@ vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({e
 vi.mock('@/lib/staff-role', () => ({useStaffRole: () => 'owner', canManageRole: () => true}))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({default: () => null, useActionOptions: () => ({tags:[],fields:[],marks:[],scenarios:[],vars:[]})}))
 vi.mock('@/components/shared/select', () => ({ default: ({value,onChange,options,...props}: {value: string; onChange: (value: string) => void; options: Array<{value: string; label: string}>; 'aria-label'?: string}) => <select aria-label={props['aria-label']} value={value} onChange={e=>onChange(e.target.value)}>{options.map((o)=><option key={o.value} value={o.value}>{o.label}</option>)}</select> }))
-vi.mock('@/lib/api', async importOriginal => {const actual = await importOriginal<typeof import('@/lib/api')>(); return {...actual,api:{autoReplies:{createDraft:net.createDraft,getDraft:net.getDraft,get:async()=>({success:true,data:{isActive:net.liveStatus==='published',lifecycleStatus:net.liveStatus}}),list:net.list,conflicts:async()=>({success:true,data:{conflicts:[]}}),validateDraft:net.validateDraft,saveDraft:net.saveDraft,testDraft:net.testDraft,publishDraft:net.publishDraft},templates:{list:net.templates},folders:{list:net.folders},friends:{list:async()=>({success:true,data:{items:[{id:'synthetic-friend',displayName:'試験の友だち'}],total:1}})}}}})
+vi.mock('@/lib/api', async importOriginal => {const actual = await importOriginal<typeof import('@/lib/api')>(); return {...actual,api:{autoReplies:{createDraft:net.createDraft,getDraft:net.getDraft,get:async()=>({success:true,data:{isActive:net.liveStatus==='published',lifecycleStatus:net.liveStatus}}),list:net.list,conflicts:net.conflicts,validateDraft:net.validateDraft,saveDraft:net.saveDraft,testDraft:net.testDraft,publishDraft:net.publishDraft},templates:{list:net.templates},folders:{list:net.folders},friends:{list:async()=>({success:true,data:{items:[{id:'synthetic-friend',displayName:'試験の友だち'}],total:1}})}}}})
 import Page from './wizard'
 import { ApiError } from '@/lib/api'
 import { MESSAGE_KIND_WORDS } from '../auto-reply-words'
@@ -54,12 +59,13 @@ const DRAFT = {
 }
 
 beforeEach(()=> {
+ verifiedStaffRole('owner'); forgetSessionSnapshot()
  net.templates.mockResolvedValue({success:true,data:[]});net.folders.mockResolvedValue({success:true,data:[]});net.createDraft.mockResolvedValue({success:true,data:{...DRAFT,autoReplyId:'created'}})
  net.liveStatus='published';net.query='id=synthetic-rule&step=response';net.accounts=[{id:'synthetic-account'}];vi.clearAllMocks()
  net.getDraft.mockResolvedValue({success:true,data:DRAFT});net.validateDraft.mockResolvedValue({success:true,data:{errors:[],warnings:[],conflicts:[]}})
- net.list.mockResolvedValue({success:true,data:[]});net.saveDraft.mockResolvedValue({success:true,data:{...DRAFT,versionNumber:2}})
+ net.conflicts.mockResolvedValue({success:true,data:{conflicts:[]}});net.list.mockResolvedValue({success:true,data:[]});net.saveDraft.mockResolvedValue({success:true,data:{...DRAFT,versionNumber:2}})
 })
-afterEach(() => { cleanup(); vi.resetAllMocks() })
+afterEach(() => { forgetSessionSnapshot(); forgetStaffIdentity(); cleanup(); vi.resetAllMocks() })
 
 vi.mock('@/components/shared/entity-picker-sources', () => ({ EntityKindField: ({ value, onChange, options, label }: { value: string; onChange: (v: string) => void; options: Array<{ id: string; name: string }>; label: string }) => <select aria-label={label} value={value} onChange={event => onChange(event.target.value)}><option value="">選ばない</option>{options.map(option => <option key={option.id} value={option.id}>{option.name}</option>)}</select> }))
 vi.mock('@/components/shared/image-uploader', () => ({ default: ({ onChange }: { onChange: (v: unknown) => void }) => <button onClick={() => onChange({ mode: 'line-image', originalContentUrl: 'https://example.test/full.png', previewImageUrl: 'https://example.test/thumb.png' })}>試験の画像を選ぶ</button> }))
@@ -299,4 +305,65 @@ it.each([
   const steps = screen.getByRole('navigation', { name: '自動応答を作る進み方' })
   expect(steps.querySelector('[aria-current="step"]')?.textContent).toContain(label)
   expect(screen.getByRole('textbox', { name: field, exact: true })).toBeTruthy()
+})
+
+const proxyMode = (mode: 'read' | 'write') => ({ impersonation: { id: 'proxy', tenantId: 'tenant', mode, piiRevealed: false, startedAt: '' }, unfamiliarAt: null, stepUpMethod: 'none' as const })
+
+it.each(['owner', 'admin', 'staff'] as const)('本人%sの既存編集鍵がある時は下書き保存1', async role => {
+  rememberStaffIdentity({ ...readStaffIdentity()!, role, permissionKeys: [DELIVERY_FEATURE_POLICIES.autoReplies.key, deliveryPermissionKey('autoReplies', 'edit')] })
+  await mount('basic'); expect(canEditWizardNow()).toBe(true); await save()
+  expect(net.saveDraft).toHaveBeenCalledTimes(1)
+})
+
+it.each(['unknown', 'staff-no-key', 'viewer', 'readOnly', 'view_only', 'read-proxy'] as const)('保持した保存操作も%sへ変わればsave/create0、writeへ戻すと保存1', async restriction => {
+  await mount('basic')
+  await act(async () => {
+    const identity = readStaffIdentity()!
+    if (restriction === 'unknown') forgetStaffIdentity()
+    else if (restriction === 'staff-no-key' || restriction === 'viewer') rememberStaffIdentity({ ...identity, role: restriction === 'viewer' ? 'viewer' : 'staff', permissionKeys: [] })
+    else if (restriction === 'readOnly') rememberStaffIdentity({ ...identity, readOnly: true })
+    else if (restriction === 'view_only') rememberStaffIdentity({ ...identity, roleBundle: 'view_only' })
+    else rememberSessionSnapshot(proxyMode('read'))
+    fireEvent.click(getPageAction({ name: '下書きとして保存' }))
+  })
+  expect(canEditWizardNow()).toBe(false)
+  expect(net.saveDraft).not.toHaveBeenCalled(); expect(net.createDraft).not.toHaveBeenCalled()
+  verifiedStaffRole('owner'); rememberSessionSnapshot(proxyMode('write')); await save()
+  expect(net.saveDraft).toHaveBeenCalledTimes(1)
+})
+
+it('read代理でも保存済みGETと順番GETは保ち、edit制約のconflicts/validateを呼ばない', async () => {
+  rememberSessionSnapshot(proxyMode('read'))
+  const view = await mount('priority')
+  expect(net.getDraft).toHaveBeenCalledWith('synthetic-rule'); expect(net.list).toHaveBeenCalled()
+  expect(net.conflicts).not.toHaveBeenCalled(); expect(net.validateDraft).not.toHaveBeenCalled()
+  net.query = 'id=synthetic-rule&step=confirm'; view.rerender(<Page />); await act(async () => {})
+  expect(net.list).toHaveBeenCalled(); expect(net.validateDraft).not.toHaveBeenCalled()
+  expect(net.saveDraft).not.toHaveBeenCalled(); expect(net.publishDraft).not.toHaveBeenCalled(); expect(net.testDraft).not.toHaveBeenCalled()
+})
+
+it('read代理に切り替えた直後の試し送りをAPIへ進めない', async () => {
+  await mount('priority')
+  fireEvent.change(screen.getByRole('textbox', { name: '届いたメッセージ' }), { target: { value: '試す言葉' } })
+  await act(async () => {
+    rememberSessionSnapshot(proxyMode('read'))
+    fireEvent.click(screen.getByRole('button', { name: '試す', exact: true }))
+  })
+  expect(net.testDraft).not.toHaveBeenCalled()
+})
+
+it('新規の有効な入力でもread代理へ切り替えたらcreate0、writeへ戻せばcreate1', async () => {
+  net.query = ''
+  const view = render(<Page />); await act(async () => {})
+  fireEvent.change(screen.getByLabelText(/ルール名/), { target: { value: '新規の確認' } })
+  net.query = 'step=trigger'
+  view.rerender(<Page />); await act(async () => {})
+  fireEvent.change(screen.getByRole('textbox', { name: '反応する言葉を足す' }), { target: { value: '確認' } })
+  fireEvent.keyDown(screen.getByRole('textbox', { name: '反応する言葉を足す' }), { key: 'Enter' })
+  net.query = 'step=response'; view.rerender(<Page />); await act(async () => {})
+  fireEvent.change(screen.getByRole('textbox', { name: '返す文' }), { target: { value: '確認用の返信' } })
+  await act(async () => { rememberSessionSnapshot(proxyMode('read')); fireEvent.click(getPageAction({ name: '下書きとして保存' })) })
+  expect(net.createDraft).not.toHaveBeenCalled()
+  await act(async () => { rememberSessionSnapshot(proxyMode('write')); fireEvent.click(getPageAction({ name: '下書きとして保存' })) })
+  expect(net.createDraft).toHaveBeenCalledTimes(1)
 })
