@@ -3,24 +3,29 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import Link from '@/components/shared/list-navigation'
+import { lockUnless } from '@/components/shared/permission-lock'
+import HelpTip from '@/components/shared/help-tip'
+import TextLink from '@/components/shared/text-link'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { canManageRole } from '@/lib/staff-role'
 import styles from './first-steps.module.css'
 import { ProgressBar, StepMark } from '@/components/shared/progress'
 
 import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
-import { doneCount, type StepResult } from '@/v8/settings/public/getting-started-steps/index'
+import { doneCount, stepsForStyle, type StepResult, type StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
+import { useStyleSetupProgress } from '@/v8/onboarding/public/style-setup-progress/index'
+import type { AccountStyle } from '@line-crm/shared'
 
 export type FirstStepsSummary = {
-  steps: Array<{ key: string; label: string; href: string | null; link: string; done: boolean; state: StepResult['state'] }>
+  steps: Array<{ key: string; label: string; href: string | null; link: string; done: boolean; state: StepResult['state']; reason?: string }>
   done: number
   total: number
 }
 
 /** 設定画面と同じ状態・権限・行き先を使い、別の完了条件を持たない。 */
-export function summarizeFirstSteps(steps: ReadonlyArray<StepResult>): FirstStepsSummary {
-  return { steps: steps.map((step) => ({ key: step.key, label: step.title, href: step.action?.href ?? null, link: step.action ? (step.key === 'firstMessage' ? '確かめる →' : '開く →') : step.blockedReason ?? '状態を確認する', done: step.state === 'done', state: step.state })), done: doneCount(steps), total: steps.length }
+export function summarizeFirstSteps(steps: ReadonlyArray<StepResult>, style: AccountStyle | null = null, progress?: StyleSetupProgress): FirstStepsSummary {
+  const displaySteps = stepsForStyle(steps, style, progress)
+  return { steps: displaySteps.map((step) => ({ key: step.key, label: step.title, href: step.action?.href ?? null, link: step.action ? (step.key === 'firstMessage' ? '確かめる →' : '開く →') : step.blockedReason ?? '状態を確認する', done: step.state === 'done', state: step.state, reason: step.state === 'unknown' ? step.next : undefined })), done: doneCount(displaySteps), total: displaySteps.length }
 }
 
 export function shouldShowFirstSteps(role: string | null, summary: FirstStepsSummary | null): boolean {
@@ -69,12 +74,15 @@ export function useFirstMessageArrived(accountId: string | null, steps: Readonly
   return { arrived, dismiss: useCallback(() => setArrived(false), []) }
 }
 
-export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean } = {}) {
+export function useFirstSteps(accountId: string | null, role: string | null, options: { qrOpen?: boolean; style?: AccountStyle | null } = {}) {
   const enabled = Boolean(accountId) && canManageRole(role)
   const [folded, setFolded] = useState(false)
   const [waiting, setWaiting] = useState(false)
   const state = useFirstRun(accountId, enabled, Boolean(options.qrOpen) || waiting)
-  const summary = state.status === 'ready' ? summarizeFirstSteps(state.steps) : null
+  const style = options.style === undefined ? 'standard' : options.style
+  const progress = useStyleSetupProgress(accountId, style, enabled)
+  const displaySteps = stepsForStyle(state.steps, style, progress.progress)
+  const summary = state.status === 'ready' && style ? summarizeFirstSteps(state.steps, style, progress.progress) : null
   /* 待つ帯（はじめにやること）が開いて見えている間だけ、最初の1通を待って読み直す。 */
   const visibleWaiting = state.status === 'ready' && !folded && waitingForFirstMessage(state.steps)
   useEffect(() => { setWaiting(visibleWaiting) }, [visibleWaiting])
@@ -90,8 +98,8 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
     })
   }, [accountId])
   return {
-    summary: shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: state.reload,
-    steps: state.steps, firstRun: state.firstRun, starter: state.starter, watchExpired: state.watchExpired, rewatch: state.rewatch,
+    summary: shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: () => { state.reload(); progress.reload() },
+    steps: displaySteps, progress: progress.progress, firstRun: state.firstRun, starter: state.starter, watchExpired: state.watchExpired, rewatch: state.rewatch,
     arrived: enabled && done.arrived, dismissArrived: done.dismiss,
   }
 }
@@ -128,10 +136,11 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigu
               {step.label}
               <span className="sr-only">{step.done ? '（済み）' : step.state === 'unknown' ? '（未確認）' : step.state === 'forbidden' ? '（権限がありません）' : '（まだ）'}</span>
             </span>
-            {!step.done && !step.href ? <span className={styles.count}>{step.state === 'unknown' ? '未確認' : '権限がありません'}</span> : step.done ? null : (
+            {step.state === 'unknown' && step.reason ? <HelpTip label={`${step.label}の未確認の理由`}>{step.reason}</HelpTip> : null}
+            {step.state === 'forbidden' ? <><span className={styles.spacer} /><Button size="compact" lockedReason={lockUnless(false, 'manager')}>開く</Button></> : !step.done && !step.href ? <span className={styles.count}>未確認</span> : step.done ? null : (
               <>
                 <span className={styles.spacer} />
-                <Link href={step.href!} className={styles.link} aria-label={`${step.label}（${step.link.replace(' →', '')}）`}>{step.link}</Link>
+                <TextLink tone="action" href={step.href!} className={styles.link} aria-label={`${step.label}（${step.link.replace(' →', '')}）`}>{step.link.replace(' →', '')}</TextLink>
               </>
             )}
           </li>

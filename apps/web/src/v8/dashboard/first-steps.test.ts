@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 const get = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/api', () => ({ api: { gettingStarted: { get } } }))
+vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: () => ({ progress: undefined, reload: vi.fn() }) }))
 import { loadFirstRunSteps } from '@/v8/onboarding/use-first-run'
 import { summarizeFirstSteps } from './first-steps'
 import { buildStepsFromApi } from '@/v8/settings/getting-started/steps'

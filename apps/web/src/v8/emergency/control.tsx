@@ -2,6 +2,7 @@
 import { useRunningVersion } from '@/lib/use-running-version'
 
 import { formatMonthDay, stopMinutes } from './control-time'
+import { useEmergencyControlAccess } from './use-control-access'
 
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { GitBranch, OctagonPause, ShieldCheck, Timer } from 'lucide-react'
@@ -117,9 +118,11 @@ function formatStopRange(start: string | null, end: string | null): string {
 }
 
 export type EmergencyControlV8Handle = { openStop: () => void }
+export type EmergencyControlAccess = { allowed: boolean | null; stopDisabled: boolean; lockedReason?: string }
+type EmergencyControlProps = { accounts: LineAccount[]; onAccessChange?: (access: EmergencyControlAccess) => void }
 
 const EmergencyControlV8 = (
-  { accounts }: { accounts: LineAccount[] },
+  { accounts, onAccessChange }: EmergencyControlProps,
   ref: React.Ref<EmergencyControlV8Handle>,
 ) => {
   const runningVersion = useRunningVersion()
@@ -133,7 +136,7 @@ const EmergencyControlV8 = (
   const [impact, setImpact] = useState<OperationImpactPreview | null>(null)
   const [impactFailed, setImpactFailed] = useState(false)
   const [control, setControl] = useState<OperationControl | null>(null)
-  const [canControl, setCanControl] = useState(false)
+  const [previewCanControl, setCanControl] = useState(false)
   const [blockedCode, setBlockedCode] = useState<string | null>(null)
   const [calculatedAt, setCalculatedAt] = useState<string | null>(null)
 
@@ -163,6 +166,15 @@ const EmergencyControlV8 = (
   const reloadLock = useRef(false)
   const mutationLock = useRef(false)
   const mutationLocked = isEmergencyMutationLocked(needsReload || reloading, running)
+  const access = useEmergencyControlAccess({
+    ready: impact !== null && control !== null && !impactFailed,
+    permitted: previewCanControl,
+    accountId: targetAccountId,
+  })
+  const canControl = access.allowed
+  const lockedReason = access.lockedReason
+  useEffect(() => { if (!canControl) setStepUpMode(null) }, [canControl])
+
 
   const requestPreview = useCallback(async (accountId: string | null) => {
     const response = await api.operations.preview(accountId)
@@ -327,6 +339,7 @@ const EmergencyControlV8 = (
   }
 
   const openStopConfirm = useCallback(() => {
+    if (!access.canRun()) return
     if (mutationLocked) {
       setFeedback({ tone: 'warning', text: '最新の状態を読み直してから、もう一度確認してください。' })
       return
@@ -347,11 +360,12 @@ const EmergencyControlV8 = (
     setStepUpError('')
     setRequestKey(crypto.randomUUID())
     setConfirmMode('stop')
-  }, [canControl, control, impact, impactFailed, mutationLocked, selectedTargets.length])
+  }, [access.canRun, canControl, control, impact, impactFailed, mutationLocked, selectedTargets.length])
 
   useImperativeHandle(ref, () => ({ openStop: () => openStopConfirm() }), [openStopConfirm])
 
   const openRestoreConfirm = () => {
+    if (!access.canRun()) return
     if (mutationLocked) {
       setFeedback({ tone: 'warning', text: '最新の状態を読み直してから、もう一度確認してください。' })
       return
@@ -372,7 +386,7 @@ const EmergencyControlV8 = (
 
   /** 確認の言葉が合ったら本人確認へ進む。二重押しは実行中ロックで止める。 */
   const proceedToStepUp = () => {
-    if (mutationLocked || !confirmMode) return
+    if (!access.canRun() || mutationLocked || !confirmMode) return
     if (confirmWord !== (confirmMode === 'stop' ? '停止' : '復旧')) return
     setStepUpMode(confirmMode)
     setConfirmMode(null)
@@ -386,7 +400,7 @@ const EmergencyControlV8 = (
       ? stopPassword.length > 0
       : /^\d{6}$/.test(stopCode)
   const canRunStop = confirmMode === 'stop'
-    && !mutationLocked && !running
+    && canControl && !mutationLocked && !running
     && reason.trim().length > 0
     && confirmWord === '停止'
     && stopCodeOk
@@ -405,13 +419,15 @@ const EmergencyControlV8 = (
   )
 
   const runStop = async (code: string) => {
-    if (mutationLock.current || mutationLocked || !control || !requestKey || stepUpMethod === 'none') return
+    if (!access.canRun() || mutationLock.current || mutationLocked || !control || !requestKey || stepUpMethod === 'none') return
+    const isCurrent = access.capture()
     mutationLock.current = true
     setRunning(true)
     setStepUpError('')
     setFeedback(null)
     try {
       const grant = await api.operations.stepUp({ method: stepUpMethod === 'password' ? 'password' : 'totp', value: code })
+      if (!isCurrent()) return
       if (!grant.success) throw new Error(grant.error)
       const response = await api.operations.stop({
         lineAccountId: targetAccountId === 'all' ? null : targetAccountId,
@@ -422,6 +438,7 @@ const EmergencyControlV8 = (
         confirmation: '停止',
         expectedVersion: control.version,
       }, grant.data.token, requestKey)
+      if (!isCurrent()) return
       if (!response.success) throw new Error(response.error)
       setControl(response.data.control)
       setNeedsReload(false)
@@ -434,6 +451,7 @@ const EmergencyControlV8 = (
       setRequestKey('')
       void loadPreview(targetAccountId === 'all' ? null : targetAccountId, ++previewGeneration.current)
     } catch (error) {
+      if (!isCurrent()) return
       if (error instanceof ApiError && error.status === 409 && error.code === 'VERSION_CONFLICT') {
         applySafety('conflict')
       } else if (error instanceof ApiError && error.status === 403) {
@@ -452,18 +470,21 @@ const EmergencyControlV8 = (
   }
 
   const runRestore = async (code: string) => {
-    if (mutationLock.current || mutationLocked || !control?.activeIncidentId || !requestKey || stepUpMethod === 'none') return
+    if (!access.canRun() || mutationLock.current || mutationLocked || !control?.activeIncidentId || !requestKey || stepUpMethod === 'none') return
+    const isCurrent = access.capture()
     mutationLock.current = true
     setRunning(true)
     setStepUpError('')
     setFeedback(null)
     try {
       const grant = await api.operations.stepUp({ method: stepUpMethod === 'password' ? 'password' : 'totp', value: code })
+      if (!isCurrent()) return
       if (!grant.success) throw new Error(grant.error)
       const response = await api.operations.restore(control.activeIncidentId, {
         confirmation: '復旧',
         expectedVersion: control.version,
       }, grant.data.token, requestKey)
+      if (!isCurrent()) return
       if (!response.success) throw new Error(response.error)
       setControl(response.data.control)
       setNeedsReload(false)
@@ -475,6 +496,7 @@ const EmergencyControlV8 = (
       setRequestKey('')
       void loadPreview(targetAccountId === 'all' ? null : targetAccountId, ++previewGeneration.current)
     } catch (error) {
+      if (!isCurrent()) return
       if (error instanceof ApiError && error.status === 409 && error.code === 'VERSION_CONFLICT') {
         applySafety('conflict')
       } else if (error instanceof ApiError && error.status === 409 && error.code === 'OPERATION_RESTORE_BLOCKED') {
@@ -509,8 +531,8 @@ const EmergencyControlV8 = (
   if (previewSettled) {
     if (impactFailed) {
       stopBlockers.push(blockedCode === BLOCKED_CODES.scopeForbidden ? 'scope' : 'unavailable')
-    } else if (!canControl) {
-      stopBlockers.push(blockedCode === BLOCKED_CODES.scopeForbidden ? 'scope' : 'forbidden')
+    } else if (!previewCanControl && blockedCode === BLOCKED_CODES.scopeForbidden) {
+      stopBlockers.push('scope')
     }
     if (!impactFailed && selectedTargets.length === 0) stopBlockers.push('empty')
     if (isStopped) stopBlockers.push('stopped')
@@ -522,13 +544,17 @@ const EmergencyControlV8 = (
     .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))
     .slice(0, RECORD_LIMIT)
 
+  const stopDisabled = !canControl || mutationLocked || isStopped || selectedTargets.length === 0
+  const reportedAllowed = impact !== null && control !== null && !impactFailed ? canControl : null
+  useEffect(() => {
+    onAccessChange?.({ allowed: reportedAllowed, stopDisabled, lockedReason })
+  }, [onAccessChange, reportedAllowed, stopDisabled, lockedReason])
+
   return (
     <div data-design-node="OHwbU" className={styles.board}>
       <FormLeaveGuard dirty={!isStopped && Boolean(reason.trim() || reasonDetail.trim() || targetAccountId !== 'all' || JSON.stringify(targets) !== JSON.stringify({ broadcasts: true, scenarios: true, reminders: true, automations: false }))} busy={mutationLocked} />
-      {/* 権限が無い人には閲覧のみの帯。操作は出さず、記録は読める。 */}
-      {previewSettled && !canControl ? (
-        <div className={styles.roBand}><ReadOnlyNotice role="status">閲覧のみで見ています。止める・戻す操作はオーナーか許可された人に頼んでください。</ReadOnlyNotice></div>
-      ) : null}
+      {/* 外側がある入口では、題の下のnoticeへ1回だけ渡す。 */}
+      {!onAccessChange && lockedReason ? <ReadOnlyNotice need="feature" /> : null}
 
       <EmergencyControlFeedback message={feedback} needsReload={needsReload} reloading={reloading} stopBlockers={stopBlockers} onReload={() => void reloadControl()} />
 
@@ -552,13 +578,13 @@ const EmergencyControlV8 = (
         <div className={styles.targetRow} role="group" aria-label="止めるもの">
           {(Object.keys(targetLabels) as StopTarget[]).map((key) => (
             <span key={key} className={styles.targetItem} title={`${targetLabels[key].note}・${impactText(key)}`}>
-              {canControl ? <SaveErrorField names={["targets"]}><Checkbox
+              <SaveErrorField names={["targets"]}><Checkbox
                 checked={targets[key]}
-                onCheckedChange={(checked) => setTargets((current) => ({ ...current, [key]: checked }))}
+                onCheckedChange={(checked) => { if (access.canRun()) setTargets((current) => ({ ...current, [key]: checked })) }}
                 disabled={mutationLocked || isStopped || !canControl}
               >
                 {targetLabels[key].label}
-              </Checkbox></SaveErrorField> : <span>{targetLabels[key].label}</span>}
+              </Checkbox></SaveErrorField>
             </span>
           ))}
         </div>
@@ -569,6 +595,7 @@ const EmergencyControlV8 = (
               id="emergency-account-v8"
               value={targetAccountId}
               onChange={(value) => {
+                access.invalidate()
                 previewGeneration.current += 1
                 setImpact(null)
                 setImpactFailed(false)
@@ -586,14 +613,15 @@ const EmergencyControlV8 = (
               ]}
             /></SaveErrorField>
             </span></Field></div>
-          {canControl ? <Button
+          <Button
             type="button"
             variant="danger"
             onClick={openStopConfirm}
+            lockedReason={lockedReason}
             disabled={mutationLocked || isStopped || impactFailed || !impact || !control || !canControl}
           >
             選んだものを止める
-          </Button> : null}
+          </Button>
         </div>
 
         {isStopped && control ? (
@@ -604,14 +632,15 @@ const EmergencyControlV8 = (
                 止めている　{formatStopRange(control.stoppedAt, null)}から・{control.actorId ?? '担当者不明'}・
                 {(stopIncident?.capabilities ?? selectedCapabilities).map((capability) => CAPABILITY_LABEL[capability]).join('・')}
               </p>
-              {canControl ? <Button
+              <Button
                 type="button"
                 variant="secondary"
                 onClick={openRestoreConfirm}
+                lockedReason={lockedReason}
                 disabled={mutationLocked || !canControl}
               >
                 復旧する
-              </Button> : null}
+              </Button>
             </div>
             <p className={styles.stoppedNote}>
               復旧するとき：止める前に動いていたものだけを戻します。理由を書いて、本人確認（6桁）をしてから戻します。
@@ -748,7 +777,7 @@ const EmergencyControlV8 = (
         </Notice>
       </section>
 
-      <LogEntryDetails canCopy={canControl} entry={recordEntry} onClose={() => setRecordEntry(null)} />
+      <LogEntryDetails canCopy entry={recordEntry} onClose={() => setRecordEntry(null)} />
       {/* 送る経路の網羅（止めると止まる経路）。絵の外なので記録の下に置く。 */}
       <SendPathCoveragePanel accountId={targetAccountId === 'all' ? null : targetAccountId} revision={control?.version ?? 0} />
 
@@ -773,6 +802,7 @@ const EmergencyControlV8 = (
               type="button"
               variant="danger"
               onClick={() => void runStop(stepUpMethod === 'password' ? stopPassword : stopCode)}
+              lockedReason={lockedReason}
               disabled={!canRunStop} title={mutationLocked || running ? '処理中です。' : !canRunStop ? '止める理由、確認の言葉、本人確認を入力してください。' : undefined}
             >
               緊急停止する
@@ -787,7 +817,8 @@ const EmergencyControlV8 = (
               type="button"
               variant="danger"
               onClick={proceedToStepUp}
-              disabled={mutationLocked || confirmWord !== '復旧'} title={mutationLocked ? '処理中です。' : confirmWord !== '復旧' ? '確認の言葉に「復旧」と入力してください。' : undefined}
+              lockedReason={lockedReason}
+              disabled={!canControl || mutationLocked || confirmWord !== '復旧'} title={mutationLocked ? '処理中です。' : confirmWord !== '復旧' ? '確認の言葉に「復旧」と入力してください。' : undefined}
             >
               復旧を実行する
             </Button>
@@ -806,7 +837,7 @@ const EmergencyControlV8 = (
                 aria-label="止める理由"
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
-                disabled={mutationLocked || running}
+                disabled={!canControl || mutationLocked || running}
                 maxLength={200}
                 placeholder="例：宛先の絞り込みを間違えた"
               /></SaveErrorField></Field></DialogFormRow>
@@ -815,7 +846,7 @@ const EmergencyControlV8 = (
                   id="emergency-detail-v8"
                   value={reasonDetail}
                   onChange={(event) => setReasonDetail(event.target.value)}
-                  disabled={mutationLocked || running}
+                  disabled={!canControl || mutationLocked || running}
                   rows={2}
                   maxLength={1000}
                   placeholder="発生していることを短く入力"
@@ -842,7 +873,7 @@ const EmergencyControlV8 = (
             <Field label="確認の文字" required><SaveErrorField names={["confirmWord","confirm_word"]}><TextField
               value={confirmWord}
               onChange={(event) => setConfirmWord(event.target.value)}
-              disabled={mutationLocked || running}
+              disabled={!canControl || mutationLocked || running}
               aria-label="確認の言葉"
             /></SaveErrorField></Field></DialogFormRow>
           {confirmMode === 'stop' && stepUpMethod !== 'none' ? (
@@ -856,7 +887,7 @@ const EmergencyControlV8 = (
                   aria-label="パスワード"
                   value={stopPassword}
                   onChange={(event) => setStopPassword(event.target.value)}
-                  disabled={mutationLocked || running}
+                  disabled={!canControl || mutationLocked || running}
                   autoComplete="current-password"
                   className={styles.dialogInput}
                   style={{ maxWidth: '100%' }}
@@ -867,7 +898,7 @@ const EmergencyControlV8 = (
                   onChange={setStopCode}
                   labelledBy="emergency-stepup-label"
                   busy={running}
-                  disabled={mutationLocked}
+                  disabled={!canControl || mutationLocked}
                 /></SaveErrorField>
               )}
             </div>
@@ -899,4 +930,4 @@ const EmergencyControlV8 = (
   )
 }
 
-export default forwardRef<EmergencyControlV8Handle, { accounts: LineAccount[] }>(EmergencyControlV8)
+export default forwardRef<EmergencyControlV8Handle, EmergencyControlProps>(EmergencyControlV8)

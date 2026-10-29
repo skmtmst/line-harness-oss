@@ -110,3 +110,11 @@
 
 /* 外す「×」の押せる範囲は 24 角（§6.5 の 7）。印の大きさは変えない。 */
 .remove::before { content: ''; position: absolute; inset: calc((var(--polish-hit-min) - var(--tag-pill-font)) / -2); }
+
+/* 権限による拒否は形と焦点を保ち、外す印だけを灰色にする。 */
+.remove[data-permission-locked],
+.remove[data-permission-locked]:hover {
+  opacity: var(--polish-disabled-opacity);
+  background: transparent;
+  cursor: not-allowed;
+}
