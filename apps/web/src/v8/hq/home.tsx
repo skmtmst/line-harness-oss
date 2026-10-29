@@ -63,8 +63,18 @@ export default function HqHomeV8() {
   const readOnlyImpersonation = readSessionSnapshot()?.impersonation?.mode === 'read'
   const canManage = !readOnlyImpersonation && (canManageRole(role))
   const isOwner = !readOnlyImpersonation && role === 'owner'
-  const { setSelectedAccountId, refreshAccounts } = useAccount()
-  const [accounts, setAccounts] = useState<AccountWithStats[]>([])
+  const { accounts: shellAccounts, setSelectedAccountId, refreshAccounts } = useAccount()
+  const [snapshotAccounts, setAccounts] = useState<AccountWithStats[]>([])
+  // 統括カードは独自に一覧を持つため、共通ヘッダーが取得した最新の
+  // LINE公式アカウント画像もカード・表へ反映する。
+  const accounts = useMemo(() => {
+    const pictures = new Map(shellAccounts.map((account) => [account.id, account.pictureUrl ?? null]))
+    return snapshotAccounts.map((account) => {
+      if (!pictures.has(account.id)) return account
+      const pictureUrl = pictures.get(account.id) ?? null
+      return account.pictureUrl === pictureUrl ? account : { ...account, pictureUrl }
+    })
+  }, [shellAccounts, snapshotAccounts])
   const currentAccounts = useMemo(() => accounts.filter((account) => !isArchived(account)), [accounts])
   const [tenantName, setTenantName] = useState('')
   const [loading, setLoading] = useState(true)

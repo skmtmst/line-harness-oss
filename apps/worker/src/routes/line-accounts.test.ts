@@ -72,6 +72,7 @@ type TestEnv = {
 function makeDbStub(firstResult: unknown = null): D1Database {
   return {
     prepare: vi.fn(() => ({
+      all: vi.fn().mockResolvedValue({ results: [] }),
       bind: vi.fn(() => ({
         first: vi.fn().mockResolvedValue(firstResult),
       })),
@@ -1464,6 +1465,36 @@ describe('GET /api/line-accounts', () => {
     expect(res.status).toBe(200);
     expect(((await res.json()) as { data: unknown[] }).data).toHaveLength(8);
     expect(maximum).toBeLessThanOrEqual(6);
+  });
+});
+
+describe('GET /api/line-accounts/profile-pictures', () => {
+  test('閲覧可能で稼働中の公式アカウント画像だけを最新取得する', async () => {
+    dbMocks.getLineAccounts.mockResolvedValue([
+      { ...fakeAccount, id: 'acc-1', tenant_id: 'tenant-a' },
+      { ...fakeAccount, id: 'acc-2', tenant_id: 'tenant-a', is_active: 0 },
+      { ...fakeAccount, id: 'acc-3', tenant_id: 'tenant-b' },
+    ]);
+    const external = vi.fn(async () => Response.json({ displayName: 'THE SHED', pictureUrl: 'https://line.example/shed.png' }));
+    vi.stubGlobal('fetch', external);
+
+    const response = await setupApp('owner', makeDbStub(), { tenantId: 'tenant-a' })
+      .request('/api/line-accounts/profile-pictures');
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({
+      success: true,
+      data: [{ id: 'acc-1', pictureUrl: 'https://line.example/shed.png' }],
+    });
+    expect(external).toHaveBeenCalledTimes(1);
+  });
+
+  test('LINEへの画像照会失敗時は保存済みの画像を消す応答を返さない', async () => {
+    const external = vi.fn(async () => new Response(null, { status: 503 }));
+    vi.stubGlobal('fetch', external);
+    const response = await setupApp().request('/api/line-accounts/profile-pictures');
+    await expect(response.json()).resolves.toEqual({ success: true, data: [] });
   });
 });
 
