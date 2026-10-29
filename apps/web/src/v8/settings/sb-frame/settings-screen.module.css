@@ -1,3 +1,5 @@
 /* SettingsPage.layout が寸法を持つ。 */
 .screen { display: contents; }
+/* 包みの中の帯も外の流れにそろえる。直下の共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
+:global(:root) .screen > :global([data-design-part='notice']) { margin-block: 0; }
 .back { font-size: var(--tpl-sb-band-text); white-space: nowrap; }
