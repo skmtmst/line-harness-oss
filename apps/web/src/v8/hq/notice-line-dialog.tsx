@@ -56,8 +56,8 @@ export default function NoticeLineDialogV8({ open, onClose }: { open: boolean; o
   return (
     <Dialog
       open={open}
-      title="musubo 運営（契約者専用）の LINE を登録してください"
-      description="返信やお知らせを LINE でも受け取れます。"
+      title="運営からの通知を LINE で受け取る"
+      description="メンテナンスや料金など、大事なお知らせを受け取る通知専用LINEです。お問い合わせへの返信は登録メールアドレスと管理画面に届きます。"
       designWidth={DESIGN_WIDTH}
       designTop={DESIGN_TOP}
       onCancel={onClose}
@@ -99,7 +99,7 @@ export default function NoticeLineDialogV8({ open, onClose }: { open: boolean; o
                   {info.code.split('').map((digit, index) => <span key={index} className={styles.digit} aria-hidden="true">{digit}</span>)}
                 </p>
               ) : null}
-              <p className={styles.note}>確認コードは 24 時間有効です。管理画面の「お問い合わせ」からも、いつでもこの案内を開けます。</p>
+              <p className={styles.note}>確認コードは 24 時間有効です。このLINEは問い合わせを受け付けません。お問い合わせは管理画面の「お問い合わせ」から送れます。</p>
             </div>
           </>
         ) : (

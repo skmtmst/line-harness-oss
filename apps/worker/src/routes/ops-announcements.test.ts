@@ -7,6 +7,8 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 const mail = vi.hoisted(() => ({ send: vi.fn(async (_env: unknown, _m: { to: string; subject: string; body: string }) => {}) }));
 vi.mock('../services/plain-mail.js', () => ({ sendPlainMail: mail.send }));
 const noticeConnect = vi.hoisted(() => ({ prepare: vi.fn() }));
+const botProfile = vi.hoisted(() => ({ fetch: vi.fn(async () => ({} as { displayName?: string })) }));
+vi.mock('../lib/bot-profile.js', () => ({ fetchBotProfile: botProfile.fetch }));
 vi.mock('../services/notice-line-connect.js', async (importOriginal) => ({
   ...await importOriginal<typeof import('../services/notice-line-connect.js')>(),
   prepareNoticeLineConnection: noticeConnect.prepare,
@@ -55,6 +57,8 @@ beforeEach(() => {
   line.pushMessage.mockReset();
   line.replyMessage.mockReset();
   noticeConnect.prepare.mockReset();
+  botProfile.fetch.mockReset();
+  botProfile.fetch.mockResolvedValue({});
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_key, plan_status) VALUES ('tenant-a', '株式会社サンプル', 'active', 'standard', 'active')`).run();
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_key, plan_status) VALUES ('tenant-b', 'カフェ ムスビ', 'active', 'light', 'trialing')`).run();
   testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '坂本 真人', 'owner', 'k0', NULL)`).run();
@@ -90,6 +94,16 @@ describe('契約者専用LINEの設定', () => {
     expect(after.data.current.addFriendUrl).toBe('https://line.me/R/ti/p/@musubo');
     const forbidden = await app(ownerA).request('/api/ops/notice-line-account');
     expect(forbidden.status).toBe(403);
+  });
+
+  it('LINE側で通知専用の表示名を変えた後は、設定画面と登録案内へ新しい名前を返す', async () => {
+    await app(master).request('/api/ops/notice-line-account', json({ lineAccountId: 'ops-oa' }, 'PUT'));
+    botProfile.fetch.mockResolvedValue({ displayName: 'musubo契約者様 通知専用' });
+    const settings = await (await app(master).request('/api/ops/notice-line-account')).json() as { data: { current: { name: string }; candidates: Array<{ id: string; name: string }> } };
+    expect(settings.data.current.name).toBe('musubo契約者様 通知専用');
+    expect(settings.data.candidates.find((candidate) => candidate.id === 'ops-oa')?.name).toBe('musubo契約者様 通知専用');
+    const guide = await (await app(ownerA).request('/api/hq/notices/line-registration')).json() as { data: { accountName: string } };
+    expect(guide.data.accountName).toBe('musubo契約者様 通知専用');
   });
 });
 

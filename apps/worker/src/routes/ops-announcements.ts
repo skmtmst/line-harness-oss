@@ -41,6 +41,7 @@ import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { deliverAnnouncement, loadNoticeLineAccount, previewAudience } from '../services/platform-announcements.js';
 import { prepareNoticeLineConnection, NoticeLineConnectError } from '../services/notice-line-connect.js';
 import { expectedWebhookUrl } from '../lib/webhook-endpoint.js';
+import { fetchBotProfile } from '../lib/bot-profile.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 
@@ -140,13 +141,14 @@ opsAnnouncements.get('/api/ops/notice-line-account', async (c) => {
   const current = await getPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY);
   const accounts = (await getLineAccounts(db)).filter((a) => (a.tenant_id ?? DEFAULT_TENANT_ID) === DEFAULT_TENANT_ID && !a.archived_at);
   const notice = await loadNoticeLineAccount(c.env);
+  const liveName = notice ? (await fetchBotProfile(notice.channelAccessToken)).displayName?.trim() : null;
   const linked = await countNoticeLinkedStaff(db, DEFAULT_TENANT_ID);
   return c.json({
     success: true,
     data: {
       currentId: current,
-      current: notice ? { id: notice.id, name: notice.name, basicId: notice.basicId, addFriendUrl: notice.addFriendUrl } : null,
-      candidates: accounts.map((a) => ({ id: a.id, name: a.name, basicId: a.line_basic_id })),
+      current: notice ? { id: notice.id, name: liveName || notice.name, basicId: notice.basicId, addFriendUrl: notice.addFriendUrl } : null,
+      candidates: accounts.map((a) => ({ id: a.id, name: a.id === notice?.id && liveName ? liveName : a.name, basicId: a.line_basic_id })),
       linked,
     },
   });
