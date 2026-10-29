@@ -20,6 +20,43 @@
   height: var(--tpl-inbox-tool-icon);
 }
 
+/*
+ * F12：題の横の3つの印に字を付ける。並びは変えず、印の下に小さな字を置く
+ * （横に字を置くと狭い列に入らない）。印だけの時と同じ副ボタンのまま。
+ */
+:global(:root) .toolCaption {
+  width: auto;
+  height: auto;
+  min-width: var(--tpl-inbox-tool-size);
+  flex-direction: column;
+  gap: 2px;
+  /* 横の余白は3pxまで。1152幅の列（見出し315px）に題と3つを1行で収める。 */
+  padding: 4px 3px;
+}
+
+:global(:root) .toolCaptionLabel {
+  font-size: var(--text-micro);
+  line-height: 1.25;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ID33：絞り込み中だけ、保存した検索の肩に小さな緑の点を付ける。 */
+:global(:root) .toolDotWrap {
+  position: relative;
+}
+
+:global(:root) .toolDot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: var(--tpl-inbox-dot);
+  height: var(--tpl-inbox-dot);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-deep);
+  pointer-events: none;
+}
+
 /* 札：選んでいない＝白地・薄い枠・墨の字、選んだ＝墨の地・白い字（共通の札 O2fCAt・XGJDa と同じ形）。 */
 /* 件数は共通の札と同じ：小さく・普通の太さ・薄い字。選んだ札では白。 */
 /* 担当者と経路：列の幅に半分ずつ・間8。どちらも同じ選ぶ欄の形（高さ36・枠 control-border・13/500）。 */

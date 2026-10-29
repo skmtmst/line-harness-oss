@@ -66,6 +66,17 @@ function getSize(s?: string) { return s ? sizeMap[s] || s : undefined }
 function getMargin(m?: string) { return m ? marginMap[m] || m : undefined }
 function getSpacing(s?: string) { return s ? spacingMap[s] || s : undefined }
 
+/*
+ * LINE の flex:0 は「中身の幅で固定・伸ばさない」。`flex: 0`（= 0 1 0%）の
+ * ままだと基準幅 0% から最小内容幅まで縮み、日本語の短い文字が1字ずつ
+ * 縦に崩れる（E29）。最大幅で吹き出しからはみ出さない。
+ */
+function flexGrowStyle(flex: number | undefined): React.CSSProperties {
+  if (flex === undefined) return {}
+  if (flex === 0) return { flex: '0 0 auto', maxWidth: '100%' }
+  return { flex }
+}
+
 export function safeFlexAssetUrl(value?: string): string | null {
   if (!value) return null
   try {
@@ -92,7 +103,7 @@ function FlexText({ node }: { node: FlexNode }) {
     lineHeight: 1.4,
     ...(node.wrap === false ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : { wordBreak: 'break-word' }),
     ...(node.align === 'center' ? { textAlign: 'center' } : node.align === 'end' ? { textAlign: 'right' } : {}),
-    ...(node.flex !== undefined ? { flex: node.flex } : {}),
+    ...flexGrowStyle(node.flex),
   }
   return <p style={style}>{Array.isArray(node.contents) && node.contents.length ? node.contents.map((span, index) => <span key={index} style={{ fontSize: span.size ? getSize(span.size) : undefined, color: span.color, fontWeight: span.weight === 'bold' ? 700 : undefined }}>{span.text ?? ''}</span>) : node.text || ''}</p>
 }
@@ -170,7 +181,7 @@ function FlexBox({ node }: { node: FlexNode }) {
     ...(node.paddingEnd ? { paddingRight: node.paddingEnd } : {}),
     ...(node.width ? { width: node.width } : {}),
     ...(node.height ? { height: node.height } : {}),
-    ...(node.flex !== undefined ? { flex: node.flex } : {}),
+    ...flexGrowStyle(node.flex),
     ...(isHorizontal ? { alignItems: node.gravity === 'center' ? 'center' : node.gravity === 'bottom' ? 'flex-end' : 'flex-start' } : {}),
     ...(node.align === 'center' ? { alignItems: 'center' } : node.align === 'end' ? { alignItems: 'flex-end' } : {}),
     ...(node.justifyContent ? { justifyContent: node.justifyContent === 'center' ? 'center' : node.justifyContent === 'flex-end' ? 'flex-end' : node.justifyContent === 'space-between' ? 'space-between' : node.justifyContent === 'space-around' ? 'space-around' : 'flex-start' } : {}),
@@ -190,7 +201,7 @@ function FlexBox({ node }: { node: FlexNode }) {
 function FlexNodeRenderer({ node }: { node: FlexNode }) {
   if (!node || !node.type) return null
 
-  const marginStyle: React.CSSProperties = { ...(node.margin ? { marginTop: getMargin(node.margin) } : {}), ...(node.flex !== undefined ? { flex: node.flex } : {}), minWidth: 0 }
+  const marginStyle: React.CSSProperties = { ...(node.margin ? { marginTop: getMargin(node.margin) } : {}), ...flexGrowStyle(node.flex), minWidth: 0 }
 
   return (
     <div style={marginStyle}>
