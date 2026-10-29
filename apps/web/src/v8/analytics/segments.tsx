@@ -90,8 +90,8 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
   const max = useMemo(() => Math.max(0, ...(data?.cells ?? []).map((cell) => cell.count ?? 0)), [data])
   const cellAt = (r: number, f: number): Cell | undefined => data?.cells.find((cell) => cell.r === r && cell.f === f)
 
-  if (status === 'loading' && !data) return <ListState kind="loading" title="お客さまの分け方を読み込んでいます" />
-  if (status === 'error') return <ListState kind="error" error={error} onRetry={() => void load()} />
+  if (status === 'loading' && !data) return <ListPageSection><ListState kind="loading" title="お客さまの分け方を読み込んでいます" /></ListPageSection>
+  if (status === 'error') return <ListPageSection><ListState kind="error" error={error} onRetry={() => void load()} /></ListPageSection>
   if (!data) return null
 
   const notComputed = data.status === 'not_computed' || data.computedAt === null

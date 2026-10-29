@@ -187,6 +187,7 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
         </MenuPortal>
       ) : null}
 
+      {canReturnToHq && staffIdentity?.accountScope === 'all' ? <a href="/hq" className={styles.returnLink} onClick={event => { event.preventDefault(); returnToHq() }}>統括へ →</a> : null}
       <button
         ref={triggerRef}
         type="button"

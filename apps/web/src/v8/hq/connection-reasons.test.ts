@@ -64,7 +64,7 @@ describe('要確認の理由', () => {
       'LINE のトークンが使えません',
       'Webhook の接続テストが通りません',
     ])
-    expect(connectionReasonLine(account).text).toBe('LINE のトークンが使えません（ほか 1 件）')
+    expect(connectionReasonLine(account).text).toBe('LINE のトークンが使えません（ほかに接続の確認事項が1件）')
   })
 
   test('Webhook が未登録・利用オフ', () => {

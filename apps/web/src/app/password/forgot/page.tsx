@@ -9,6 +9,7 @@ import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { authRequest, emailError, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
+import styles from './forgot.module.css'
 
 /**
  * パスワードを忘れた。★管理画面 36-6-A（`fmDeV`、カード `dVI5v`）。
@@ -80,7 +81,7 @@ export default function PasswordForgotPage() {
       title="パスワードを忘れた"
       description="登録しているメールアドレスを入れてください。パスワードを設定し直す URL をお送りします。"
     >
-      <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
+      <form onSubmit={(event) => void submit(event)} noValidate className={`flex w-full flex-col gap-4 ${styles.form}`}>
         {error ? (
           <Notice tone="danger" message={error} />
         ) : null}
