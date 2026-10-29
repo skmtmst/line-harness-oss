@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * 電話の画面のトーク（/m/chats）。PC の受信箱と同じ守りを電話の画面でも保つ。
  * - 送ると 1 回だけ送る（冪等キー付き）。失敗したら書いた文を残し、もう一度送ると同じキーで送る。
@@ -187,7 +188,7 @@ describe('電話の画面のトーク', () => {
 
   it('閲覧のみには返信欄を出さず、閲覧のみの帯を出す', async () => {
     fixture.params = new URLSearchParams('friend=friend-a')
-    fixture.role = 'viewer'
+    fixture.role = verifiedStaffRole('viewer')
     fixture.canEdit = false
     await show()
     await eventually(() => expect(host.textContent).toContain('届きましたか'))
@@ -212,3 +213,5 @@ describe('電話の画面のトーク', () => {
     expect(host.querySelector('nav[aria-label="電話のメニュー"] a[href="/m/chats"]')).toBeNull()
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

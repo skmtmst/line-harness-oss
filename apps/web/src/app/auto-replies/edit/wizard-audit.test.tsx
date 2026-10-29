@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -146,7 +147,7 @@ it('言葉条件は検索の印、次へは文頭の矢印を持ち、保存し�
  const next=screen.getByRole('button',{name:/次へ/})
  expect(next.firstElementChild?.classList.contains('lucide-arrow-right')).toBe(true)
  fireEvent.click(screen.getByRole('button',{name:'部分一致（含む）'}))
- await act(async()=>fireEvent.click(screen.getByRole('button',{name:'下書きとして保存'})))
+ await act(async()=>fireEvent.click(getPageAction({name:'下書きとして保存'})))
  await act(async()=>fireEvent.click(next))
  expect(net.query).toContain('step=response')
  expect(net.saveDraft).toHaveBeenCalled()

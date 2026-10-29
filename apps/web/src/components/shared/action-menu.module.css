@@ -109,6 +109,14 @@
   opacity: var(--polish-disabled-opacity);
 }
 
+.item[data-permission-locked],
+.item[data-permission-locked]:is(:hover, :active) {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  cursor: not-allowed;
+  opacity: var(--polish-disabled-opacity);
+}
+
 .icon {
   display: inline-flex;
   width: 16px;

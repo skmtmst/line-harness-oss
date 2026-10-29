@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 一斉配信一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
  * 行が出る・言葉で絞れる・札と並びが口へ渡る・閲覧のみは帯が出て作れない。
@@ -120,7 +121,7 @@ beforeEach(() => {
   updateBroadcast.mockClear()
   forgetStaffIdentity()
   document.documentElement.dataset.theme = 'v8'
-  role.current = 'owner'
+  role.current = verifiedStaffRole('owner')
   store.clear()
   /* 広い板（1440）のふり。happy-dom は狭い板扱いになる。 */
   Object.defineProperty(window, 'matchMedia', {
@@ -321,7 +322,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
   })
 
   it('編集キーの無い運用担当は閲覧のみの帯が出て、作る・保存・フォルダ追加のボタンを置かない', async () => {
-    role.current = 'staff'
+    role.current = verifiedStaffRole('staff')
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています')
@@ -337,7 +338,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
   })
 
   it('編集キーを持つ運用担当は作れる', async () => {
-    role.current = 'staff'
+    role.current = verifiedStaffRole('staff')
     rememberStaffIdentity({ role: 'staff', permissionKeys: ['/broadcasts', 'broadcast.definition.edit'] } as StaffMember)
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
@@ -703,6 +704,7 @@ it('行が消える途中で別の絞り込みを選んでも、古い条件を�
   } finally { vi.useRealTimers() }
 })
 
+afterEach(() => { verifiedStaffRole(null) })
 
 describe('読込骨格の表示時間と完了への切替', () => {
   it.each(['ready', 'error'])('遅い応答から%sへ進むとき表示後400msを保つ', async (outcome) => {

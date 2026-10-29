@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * R259〜R263（監査・2026-09-27）: 友だち追加時の配信の編集画面。
@@ -146,14 +147,14 @@ async function renderExisting(definition?: Record<string, unknown>) {
 }
 
 function deliverySummaryValue() {
-  const label = [...host.querySelectorAll('dt')]
-    .find((item) => item.textContent === '最初に送るもの')
+  const label = ([...host.querySelectorAll('dt')]
+    .find((item) => item.textContent === '最初に送るもの') ?? querySupplementaryPageAction('最初に送るもの'))
   if (!label?.nextElementSibling) throw new Error(`delivery row: ${host.textContent}`)
   return label.nextElementSibling.textContent
 }
 
 function button(label: string) {
-  const node = [...host.querySelectorAll('button')].find((item) => item.textContent?.includes(label))
+  const node = ([...host.querySelectorAll('button')].find((item) => item.textContent?.includes(label)) ?? querySupplementaryPageAction(label))
   if (!node) throw new Error(`${label}: ${host.textContent}`)
   return node
 }

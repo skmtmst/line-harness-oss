@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
   #1000 追加詳細監査(DETAIL-08/09/11)の回帰テスト。
@@ -151,11 +152,11 @@ async function pickTime(id: string, hhmm: string) {
 async function clearDate(id: string) {
   await act(async () => { fireEvent.click(document.querySelector('#' + id)!) })
   const dialog = document.querySelector('[role="dialog"][aria-label="日付を選ぶ"]')!
-  const clear = [...dialog.querySelectorAll('button')].find((b) => b.textContent?.trim() === '消す')!
+  const clear = ([...dialog.querySelectorAll('button')].find((b) => b.textContent?.trim() === '消す') ?? querySupplementaryPageAction('消す'))!
   await act(async () => { fireEvent.click(clear) })
 }
 async function click(text: string) {
-  const b = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === text)!
+  const b = (Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === text) ?? querySupplementaryPageAction(text))!
   expect(b).toBeTruthy()
   await act(async () => b.click())
 }

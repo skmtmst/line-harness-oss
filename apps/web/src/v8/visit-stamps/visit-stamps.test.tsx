@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -59,7 +60,7 @@ beforeEach(() => {
     window.history.replaceState(null, '', href)
     window.dispatchEvent(new PopStateEvent('popstate'))
   })
-  fx.role = 'owner'
+  fx.role = verifiedStaffRole('owner')
   fx.uploadImage.mockResolvedValue({ success: true, data: { url: 'https://example.test/images/card.png' } })
   fx.cards.mockResolvedValue({ success: true, data: [card] })
   fx.save.mockResolvedValue({ success: true, data: card })
@@ -233,7 +234,7 @@ describe('来店スタンプ（管理画面）', () => {
   })
 
   it('閲覧のみは記録タブでも手入力欄を出さず、移行タブで承認・却下を隠す', async () => {
-    fx.role = 'viewer'
+    fx.role = verifiedStaffRole('viewer')
     window.history.replaceState(null, '', '/visit-stamps?tab=history')
     render(<VisitStampsV8 />)
     await screen.findByRole('tab', { name: '押した・使った記録' })
@@ -312,7 +313,7 @@ describe('来店スタンプ（管理画面）', () => {
   })
 
   it('担当者（staff）は承認と手入力ができ、カードの保存・暗証番号は出さない', async () => {
-    fx.role = 'staff'
+    fx.role = verifiedStaffRole('staff')
     render(<VisitStampsV8 />)
     await screen.findByRole('tab', { name: /紙のカードの移行/ })
     fireEvent.click(screen.getByRole('tab', { name: /紙のカードの移行/ }))
@@ -325,7 +326,7 @@ describe('来店スタンプ（管理画面）', () => {
   })
 
   it('閲覧のみには変える操作を置かない', async () => {
-    fx.role = 'viewer'
+    fx.role = verifiedStaffRole('viewer')
     render(<VisitStampsV8 />)
     await screen.findByDisplayValue('然 来店スタンプカード')
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
@@ -381,3 +382,5 @@ it('変更していない設定は保存しない理由を出し、変更後に�
  const save = screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement
  expect(save.disabled).toBe(false); expect(save.hasAttribute('aria-description')).toBe(false)
 })
+
+afterEach(() => { verifiedStaffRole(null) })

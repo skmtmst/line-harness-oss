@@ -11,8 +11,9 @@ it('押せない条件の理由を結び付け、条件が解消したら外す'
   const { rerender } = render(<Button disabled disabledReason="名前を入れてください" onClick={save}>保存する</Button>)
   const button = screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement
   expect(button.disabled).toBe(true)
-  expect(button.title).toBe('名前を入れてください')
-  expect(button.getAttribute('aria-description')).toBe(button.title)
+  expect(button.title).toBe('')
+  expect(button.getAttribute('aria-description')).toBe('名前を入れてください')
+  expect(screen.getByRole('status').textContent).toBe('名前を入れてください')
   fireEvent.click(button); expect(save).not.toHaveBeenCalled()
   rerender(<Button disabled={false} disabledReason="名前を入れてください" onClick={save}>保存する</Button>)
   expect(button.disabled).toBe(false)

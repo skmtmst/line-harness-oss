@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 友だち追加時の配信の実行結果（src/v8・）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * 結果・行ったことの言葉／札で絞ると URL が変わる／失敗の帯で今のページの失敗を順にもう一度実行する／
@@ -67,7 +68,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
-  roleState.role = 'owner'
+  roleState.role = verifiedStaffRole('owner')
   retried = []
   nav.replace.mockClear()
   items = [
@@ -171,7 +172,7 @@ describe('実行結果の画面（REIxB）', () => {
   })
 
   it('閲覧のみには一時停止・もう一度実行を出さず、帯を出す', async () => {
-    roleState.role = 'viewer'
+    roleState.role = verifiedStaffRole('viewer')
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(buttonByText('一時停止する')).toBeUndefined()
@@ -190,3 +191,5 @@ describe('実行結果の画面（REIxB）', () => {
     expect(document.body.textContent).toContain('トークを開く')
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

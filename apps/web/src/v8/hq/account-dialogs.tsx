@@ -144,11 +144,11 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
       onCancel={onClose}
       footer={
         <div className={`${head.footer} ${head.footerSplit}`}>
-          <Button type="button" variant={archived ? 'secondary' : 'danger'} onClick={onArchive}>
+          <Button type="button" variant="secondary" onClick={onArchive}>
             {archived ? '戻す' : 'アーカイブ'}
           </Button>
           <div className={head.footerGroup}>
-            <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
             <Button type="button" variant="primary" onClick={() => save()} disabled={busy} busy={busy} busyLabel="保存中…">保存</Button>
           </div>
         </div>

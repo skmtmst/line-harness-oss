@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -132,8 +133,8 @@ function menus(): HTMLElement[] {
 }
 
 function byText(text: string): HTMLButtonElement | undefined {
-  return [...document.body.querySelectorAll('button')]
-    .find((node) => node.textContent?.trim() === text) as HTMLButtonElement | undefined
+  return ([...document.body.querySelectorAll('button')]
+    .find((node) => node.textContent?.trim() === text) ?? querySupplementaryPageAction(text)) as HTMLButtonElement | undefined
 }
 
 function moreButtons(): HTMLButtonElement[] {
@@ -143,8 +144,8 @@ function moreButtons(): HTMLButtonElement[] {
 
 function stopButton(): HTMLButtonElement | undefined {
   const reason = document.body.querySelector('#cv-stop-reason')
-  return [...(reason?.closest('[role="dialog"]')?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
-    .find(button => button.textContent?.trim() === '止める')
+  return ([...(reason?.closest('[role="dialog"]')?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+    .find(button => button.textContent?.trim() === '止める') ?? querySupplementaryPageAction('止める'))
 }
 
 async function click(node: HTMLElement | undefined) {

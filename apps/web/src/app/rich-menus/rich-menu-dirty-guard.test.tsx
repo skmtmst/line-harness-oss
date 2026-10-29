@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 // @vitest-environment-options { "url": "http://localhost/rich-menus/" }
 import React, { act } from 'react'
@@ -297,7 +298,7 @@ describe('リッチメニュー編集の未保存ガード (N-162)', () => {
     const nameInput = await screen.findByDisplayValue('メインメニュー')
     await type(nameInput, 'メインメニュー改')
     // 保存（update→再読込で署名が更新される）
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await act(async () => { await Promise.resolve() })
     await flush()
 
@@ -459,7 +460,7 @@ describe('公開のしかたの入力保持 (RICHMENU-06)', () => {
     await fillPublishSchedule()
 
     richMenuUpdate.mockImplementationOnce(() => Promise.resolve({ success: false, error: 'x' }))
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await flush()
 
     expect(document.querySelectorAll<HTMLInputElement>('input[name="timing"]')[1].checked).toBe(true)

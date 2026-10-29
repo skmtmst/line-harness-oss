@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React, { useState } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -18,7 +19,7 @@ vi.mock('./edit-form', () => ({ TagEditForm: ({ tag, saving, onSave }: { tag: { 
 import TagEdit from './edit'
 const detail = (name: string, version = 1) => ({ success: true, data: { tag: { id: fx.id, name, status: 'active', version }, automation: null } })
 const deferred = () => { let resolve!: (v: unknown) => void; let reject!: (v: unknown) => void; const promise = new Promise<unknown>((a,b) => { resolve=a; reject=b }); return { promise, resolve, reject } }
-beforeEach(() => { fx.role='owner';fx.account='A';fx.id='one';fx.definition.mockReset();fx.update.mockReset() })
+beforeEach(() => { fx.role = verifiedStaffRole('owner');fx.account='A';fx.id='one';fx.definition.mockReset();fx.update.mockReset() })
 afterEach(cleanup)
 it('切替先の失敗後も古いタグを編集できない（WEB088）', async () => {
   fx.definition.mockResolvedValueOnce(detail('Aのタグ')).mockRejectedValueOnce(new Error('down'))
@@ -60,7 +61,7 @@ it('A→B→A の古い保存完了で新しい保存中の入力を解放しな
 })
 
 it.each(['staff', 'owner', 'admin'])('保管済みタグの訂正操作も閲覧のみで隠す（%s）', async (role) => {
-  fx.role = role
+  fx.role = verifiedStaffRole(role)
   fx.definition.mockResolvedValue({ success: true, data: { tag: { id: 'one', name: '保管したタグ', status: 'archived', version: 1 }, automation: null } })
   render(<TagEdit />)
   if (role === 'staff') {
@@ -68,3 +69,5 @@ it.each(['staff', 'owner', 'admin'])('保管済みタグの訂正操作も閲覧
     expect(screen.queryByRole('button', { name: '保存する' })).toBeNull()
   } else expect(await screen.findByRole('button', { name: '保存する' })).toBeTruthy()
 })
+
+afterEach(() => { verifiedStaffRole(null) })

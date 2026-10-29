@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * 設定 › SNS 連携の Instagram のカード（★V8-B `YINmJ`・`DFnll`／2026-10-07 利用者承認）。
  * 守るのは BEHAVIOR.md に書いた決めごと：
@@ -167,10 +169,10 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
   })
 
   it('閲覧のみには閲覧のみの帯を出し、接続・解除・確認のボタンを置かない', async () => {
-    fixture.role.value = 'staff'
+    fixture.role.value = verifiedStaffRole('staff')
     setup('connected', CONNECTED)
 
-    expect(await screen.findByText(/閲覧のみで見ています/)).toBeTruthy()
+    expect(await screen.findByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
     expect(await screen.findByText('接続済み')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /接続を確かめる/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /その他操作/ })).toBeNull()
@@ -277,3 +279,5 @@ describe('Instagram のログインから戻ったときの帯', () => {
     expect(screen.queryByText(/status=400/)).toBeNull()
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

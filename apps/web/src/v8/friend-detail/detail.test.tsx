@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 友だち詳細（src/v8/friend-detail）の動きの試験。BEHAVIOR.md の主要な動きを守る。
  * 概要が出る・閲覧のみは変える操作を置かない・鍵のある運用担当は対応を変えられる・
@@ -137,7 +138,7 @@ beforeEach(() => {
   fetchApi.mockClear()
   forgetStaffIdentity();
   document.documentElement.dataset.theme = 'v8'
-  role.current = 'owner'
+  role.current = verifiedStaffRole('owner')
   store.clear()
   params.current = new URLSearchParams('id=friend-1')
   getFriend.mockImplementation(async () => ({ success: true, data: friend }))
@@ -190,7 +191,7 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
   })
 
   it('鍵の無い運用担当（閲覧のみ）は帯が出て、変える操作を置かない', async () => {
-    role.current = 'staff'
+    role.current = verifiedStaffRole('staff')
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(links('編集する')).toHaveLength(0)
@@ -200,7 +201,7 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
   })
 
   it("'/chats' の鍵を持つ運用担当は対応・タグ・メモを編集でき、帯は出ない", async () => {
-    role.current = 'staff'
+    role.current = verifiedStaffRole('staff')
     store.set('lh_staff_permissions', JSON.stringify(['/chats']))
     rememberStaffIdentity({ role: 'staff', permissionKeys: ['/chats'] } as StaffMember)
     await render()
@@ -326,3 +327,5 @@ it('保存記録の構造変更が必要な場合は案内を出し、再押下�
   act(() => confirm.click()); await flush()
   expect(fetchApi.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(1)
 })
+
+afterEach(() => { verifiedStaffRole(null) })

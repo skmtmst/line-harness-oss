@@ -1,3 +1,4 @@
+import { getPageAction, findPageAction } from '@/test-utils/page-action'
 import { findPickerDialog, pickEntities } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
 /*
@@ -70,7 +71,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
     await waitFor(() => expect(calls.listByKind).toHaveBeenCalledWith('rich_video'))
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
     expect(await screen.findByRole('heading', { name: 'リッチビデオを作る' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '下書きを保存' })).toBeTruthy()
+    expect(getPageAction({ name: '下書きを保存' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
     expect(screen.getByLabelText('テンプレート名')).toBeTruthy()
     expect(calls.create).not.toHaveBeenCalled()
@@ -132,7 +133,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
     expect(await screen.findByText('この形は新しく作れません。新しく作るときはカルーセル・リッチメッセージを使ってください。')).toBeTruthy()
     expect(screen.queryByText('形')).toBeNull()
     fireEvent.change(screen.getByLabelText('メッセージ内容'), { target: { value: next } })
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(calls.update).toHaveBeenCalled())
     expect(calls.update.mock.calls[0][1].definition.template).toMatchObject({ messageType, messageContent: next })
   })
@@ -144,7 +145,7 @@ describe('統括のテンプレートを作る（店の作る画面＋保存後�
     expect(await screen.findByRole('heading', { name: 'クーポンを作る' })).toBeTruthy()
     expect(screen.queryByText('使われたときに行うこと')).toBeNull()
     fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '冬の10%オフ' } })
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     /* 期間が無いと口を呼ばない。 */
     await waitFor(() => expect(document.getElementById('te-coupon-start-error')?.textContent).toBe('開始を入力してください'))
     expect(calls.create).not.toHaveBeenCalled()
@@ -160,7 +161,7 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
     expect(screen.queryByText('押されたら')).toBeNull()
     fireEvent.change(screen.getByPlaceholderText('例：継続の意思をうかがう'), { target: { value: '好みのコース' } })
     fireEvent.change(screen.getByLabelText(/^質問文/), { target: { value: 'どのコースが好きですか？' } })
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(calls.create).toHaveBeenCalled())
     const definition = calls.create.mock.calls[0][0].definition
     expect(JSON.parse(definition.template.questionJson)).toMatchObject({ text: 'どのコースが好きですか？', tapMode: 'single' })
@@ -180,7 +181,7 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
     fireEvent.change(screen.getByLabelText('画像を追加（ファイル）'), { target: { files: [file] } })
     await waitFor(() => expect(screen.getByAltText('カードの画像').getAttribute('src')).toBe(media.publicUrl))
     expect(calls.uploadImage).toHaveBeenCalledWith(file, 'message')
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(calls.create).toHaveBeenCalled())
     expect(calls.create.mock.calls[0][0].definition.media).toEqual([media])
     expect(JSON.parse(calls.create.mock.calls[0][0].definition.template.messageContent)[0].thumbnailImageUrl).toBe(media.publicUrl)
@@ -295,7 +296,7 @@ describe('統括の回答フォームの編集（u5MM7：店の回答フォー�
   it('［下書きを保存］は保存して一覧へ戻り、配るへは進まない', async () => {
     render(<HqTemplatesV8 type="form" />)
     fireEvent.click((await screen.findByRole('link', { name: '来店アンケート' })).closest('tr')!)
-    fireEvent.click(await screen.findByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(await findPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(calls.update).toHaveBeenCalled())
     expect(screen.queryByRole('checkbox', { name: /然 -NEN- 本店/ })).toBeNull()
   })
@@ -351,7 +352,7 @@ describe('統括のテンプレートを直す（質問・クーポン：店の�
     expect(await screen.findByDisplayValue('どのコースが好きですか？')).toBeTruthy()
     expect(screen.getByDisplayValue('馬肉')).toBeTruthy()
     fireEvent.change(screen.getByLabelText(/^質問文/), { target: { value: 'どのお肉が好きですか？' } })
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(calls.update).toHaveBeenCalled())
     const [, input] = calls.update.mock.calls[0]
     expect(input.expectedRevision).toBe(3)
@@ -384,7 +385,7 @@ describe('統括のテンプレートを直す（質問・クーポン：店の�
     await open(couponDefinition, 'coupon', '冬の10%オフ')
     expect(await screen.findByRole('heading', { name: 'クーポンを作る' })).toBeTruthy()
     expect(screen.getByDisplayValue('冬の10%オフ')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(calls.update).toHaveBeenCalled())
     const [, input] = calls.update.mock.calls[0]
     expect(input.definition.asset).toMatchObject({ kind: 'coupon', payload: { description: '会計時にご提示ください', startsAt: '2026-12-01T00:00', endsAt: '2026-12-31T23:59' } })
@@ -478,7 +479,7 @@ describe('G-3：保存が済んでから配るか選ぶ', () => {
   })
   it('新規の下書きは保存して一覧へ戻る。配布状況が取れなくても未配布にはしない', async () => {
     await author()
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(calls.create).toHaveBeenCalledOnce())
     expect(screen.queryByRole('dialog')).toBeNull()
     cleanup(); window.history.replaceState(null, '', '/hq/templates'); calls.create.mockClear()

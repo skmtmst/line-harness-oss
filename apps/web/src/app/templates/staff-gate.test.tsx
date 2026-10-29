@@ -152,7 +152,7 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
     expect(screen.queryByLabelText('フォルダ「予約」の操作')).toBeNull()
 
     // 代わりに「なぜ出ないか」の説明と、閲覧そのものは残る
-    expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+    expect(screen.getByText('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(table().getByText('来店お礼').closest('tr')!).toBeTruthy()
     // フォルダ自体は閲覧できる（操作だけが消える）
     expect(screen.getByText('予約')).toBeTruthy()
@@ -288,7 +288,7 @@ describe('カルーセル編集画面のstaffゲート (N-144)', () => {
     expect(screen.queryByRole('textbox')).toBeNull()
     expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
     expect(screen.queryByRole('button', { name: '保存して公開' })).toBeNull()
-    expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+    expect(screen.getByText('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'LINEの見え方を確認' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'カルーセルの説明' }))
     expect(screen.getByText('カルーセルの作成・変更はオーナーと管理者だけができます')).toBeTruthy()
@@ -320,7 +320,7 @@ describe('質問テンプレート画面のstaffゲート (N-144)', () => {
     expect(screen.queryByRole('textbox')).toBeNull()
     expect(screen.queryByRole('button', { name: '下書きを保存' })).toBeNull()
     expect(screen.queryByRole('button', { name: '保存して公開' })).toBeNull()
-    expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+    expect(screen.getByText('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'LINEの見え方を確認' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '質問テンプレートの説明' }))
     expect(screen.getByText('質問テンプレートの作成・変更はオーナーと管理者だけができます')).toBeTruthy()

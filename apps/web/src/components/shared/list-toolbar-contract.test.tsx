@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import ListToolbar, { ListToolbarFrame, ListToolbarLeading, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ListToolbarSort } from './list-toolbar'
 import PageSizeSelect from './page-size-select'
+import { RowMenu } from './row-actions'
 import Select from './select'
 import HelpTip from './help-tip'
 import SearchField from './search-field'
@@ -254,4 +255,14 @@ it.each([false, true])('単独の検索を渡した一覧も、畳む先へフ�
     fireEvent.click(screen.getByRole('button', { name: 'ひな形を作る' }))
     expect(create).toHaveBeenCalledOnce()
   }
+})
+
+it('ほかの操作のメニューは、並び順・件数の右に置いて操作を保つ', () => {
+  const run = vi.fn()
+  render(<ListToolbarEnd><RowMenu label="一覧の操作" items={[{ id: 'export', label: '書き出す', onSelect: run }]} /><PageSizeSelect value={20} onChange={() => {}} /><ListToolbarSort value="recent" onChange={() => {}} options={[{value: 'recent', label: '新しい順'}]} /></ListToolbarEnd>)
+  const buttons = screen.getAllByRole('button')
+  expect(buttons.map(button => button.getAttribute('aria-label'))).toEqual(['並び', '表示件数', '一覧の操作'])
+  fireEvent.click(screen.getByRole('button', { name: '一覧の操作' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: '書き出す' }))
+  expect(run).toHaveBeenCalledOnce()
 })

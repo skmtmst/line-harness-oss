@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 テンプレートの作る・編集（src/v8/template-edit）の動きの試験。V8 のテーマで描いて確かめる。
  * 保存の口・断り方・保存の 409 の帯・差し込み・閲覧のみ（押せない操作を置かない）・クーポン／リサーチの保存。
@@ -97,7 +98,7 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   narrow.value = false
   push.mockReset()
   for (const fn of Object.values(templatesApi)) fn.mockReset()
@@ -259,7 +260,7 @@ describe('V8 メッセージを作る・編集', () => {
   })
 
   it('閲覧のみ（staff）では保存・公開・キャンセルを置かず、帯で知らせる。押せないボタンも置かない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await mount('id=template-1')
     expect(screen.getByText(/閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます/)).toBeTruthy()
     for (const name of ['下書きを保存', '保存して公開', 'キャンセル']) expect(screen.queryByRole('button', { name })).toBeNull()
@@ -329,7 +330,7 @@ describe('V8 テンプレートの下書き自動保存（一斉配信と同じ�
   })
 
   it('閲覧のみ（staff）は自動保存しない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await mount('id=template-1')
     await wait(5000)
     expect(templatesApi.update).not.toHaveBeenCalled()
@@ -580,3 +581,5 @@ describe('V8 クーポン・リサーチ：保存のあと', () => {
     }
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 広告とのつなぎ・広告への送信履歴の動きの試験。BEHAVIOR.md の両節を守る。
  * 対応表（F-21）：返している／返していない・結びつけ（PUT・版つき）は owner・admin だけ。
@@ -64,7 +66,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   calls.length = 0
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
@@ -130,9 +132,9 @@ describe('広告とのつなぎ（FDBsG）', () => {
   })
 
   it('閲覧のみでは、帯を出し、選ぶ欄を置かない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await render(<AdConnectionsV8 />, '来店予約')
-    expect(host.textContent).toContain('閲覧のみで見ています')
+    expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
     expect(host.querySelector('[aria-label="来店予約をMeta広告に返す名前"]')).toBeNull()
   })
 })
@@ -183,8 +185,10 @@ describe('広告への送信履歴（p0kA3）', () => {
   })
 
   it('owner 以外には押せない「やり直す」を置かない', async () => {
-    role.value = 'admin'
+    role.value = verifiedStaffRole('admin')
     await render(<AdHistoryV8 />, '定期便の申し込み')
     expect(buttons('やり直す')).toHaveLength(0)
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

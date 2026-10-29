@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
@@ -160,13 +161,13 @@ function elements(root: HTMLElement): FakeElement[] {
 }
 
 function findButton(container: FakeElement, label: string): FakeElement {
-  const button = elements(container).find((element) => element.tagName === 'BUTTON' && element.textContent.includes(label))
+  const button = (elements(container).find((element) => element.tagName === 'BUTTON' && element.textContent.includes(label)) ?? querySupplementaryPageAction(label))
   if (!button) throw new Error(`button not found: ${label}`)
   return button
 }
 
 function findExactButton(container: FakeElement, label: string): FakeElement {
-  const button = elements(container).find((element) => element.tagName === 'BUTTON' && element.textContent === label)
+  const button = (elements(container).find((element) => element.tagName === 'BUTTON' && element.textContent === label) ?? querySupplementaryPageAction(label))
   if (!button) throw new Error(`button not found: ${label}`)
   return button
 }

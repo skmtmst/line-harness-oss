@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 イベント予約の一覧（src/v8/events/list.tsx）の動きの試験。BEHAVIOR.md の決まりを守る。
  * 見るだけの人には「イベントを作る」を置かず閲覧のみの帯を出す・統括には置く・行の名前の前にフォルダの丸。
@@ -86,14 +87,14 @@ const createLink = () => [...host.querySelectorAll('a')].find((a) => a.textConte
 
 describe('V8 イベント予約の一覧', () => {
   it('統括には「イベントを作る」を置き、閲覧のみの帯は出さない', async () => {
-    role.value = 'owner'
+    role.value = verifiedStaffRole('owner')
     await render()
     expect(createLink()?.getAttribute('href')).toBe('/events/new')
     expect(host.textContent).not.toContain('閲覧のみで見ています')
   })
 
   it('見るだけの人には「イベントを作る」を置かず、閲覧のみの帯を出す（2026-10-06 オーナー決定）', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await render()
     expect(createLink()).toBeUndefined()
     expect(host.textContent).toContain('閲覧のみで見ています')
@@ -134,9 +135,11 @@ it('一覧の複製は確認窓なしで保存済み版を送り、下書きの�
 })
 
 it('閲覧のみの行の操作には複製とフォルダ移動を出さない', async () => {
-  role.value = 'staff'
+  role.value = verifiedStaffRole('staff')
   await render()
   fireEvent.click(screen.getByRole('button', { name: /秋のしつけ教室.*操作/ }))
   expect(screen.queryByRole('menuitem', { name: '複製する' })).toBeNull()
   expect(screen.queryByRole('menuitem', { name: 'フォルダへ移す' })).toBeNull()
 })
+
+afterEach(() => { verifiedStaffRole(null) })

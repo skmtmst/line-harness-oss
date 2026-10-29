@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -106,7 +107,7 @@ function setInputValue(el: HTMLDivElement, id: string, value: string): void {
 }
 
 function saveButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存')
+  const button = (Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))
   if (!button) throw new Error('「下書きを保存」ボタンが見つかりません')
   return button as HTMLButtonElement
 }

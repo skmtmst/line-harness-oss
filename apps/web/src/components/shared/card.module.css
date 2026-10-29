@@ -238,7 +238,7 @@ html:root .records > [data-card-footer] { padding-inline: var(--polish-space-sec
 html:root .headerStacked { padding: 0; }
 
 /* 内側の薄い面は平らにする。form/asideの外枠を重ねない。 */
-html:root .card[data-card-surface='muted'] { border: 0; outline: revert; box-shadow: none; background: var(--color-surface-pearl); }
+html:root .card[data-card-surface='muted'] { border: 0; outline-color: transparent; box-shadow: none; background: var(--color-surface-pearl); }
 
 html:root .card[data-card-selected] { --card-edge: var(--color-control-border); background: var(--polish-selection-bg); }
 
@@ -251,5 +251,9 @@ html:root .card[data-card-frame='ring'] {
 html:root .withActions { display: flex; flex-direction: column; }
 .information { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: inherit; }
 .bottomActions { min-width: 0; }
-.actionRow { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--polish-space-field); min-width: 0; }
+.actionRow { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--polish-space-field); min-width: 0; }
 .actionRow > * { min-width: 0; width: 100%; }
+html:root .actionRow > :is(button, a) { grid-row: 1; padding-inline: var(--polish-space-row); }
+.actionRow > :is([role='status'], [role='alert']) { grid-column: 1 / -1; }
+
+html:root .card:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }

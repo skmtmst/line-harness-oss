@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * 自動応答を作る（V8）の、押して確かめる動き。
@@ -113,7 +114,7 @@ it('見送りになったら、先に動くルールと見送った理由を運�
 it('保存できたときだけ「下書きを保存しました」を出す', async () => {
   net.query = 'id=synthetic-rule&step=basic'
   render(<Page />); await act(async () => {})
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' })))
+  await act(async () => fireEvent.click(getPageAction({ name: '下書きとして保存' })))
   expect(net.saveDraft).toHaveBeenCalledTimes(1)
   expect(screen.getByText('下書きを保存しました')).toBeTruthy()
 })
@@ -123,7 +124,7 @@ it('ほかの人が先に保存していたら頭の下に帯を出し、最新�
   net.saveDraft.mockRejectedValueOnce(new ApiError(409, 'conflict'))
   render(<Page />); await act(async () => {})
   net.getDraft.mockResolvedValue(draft({ name: 'ほかの人の名前' }))
-  await act(async () => fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' })))
+  await act(async () => fireEvent.click(getPageAction({ name: '下書きとして保存' })))
   expect(screen.queryByText('下書きを保存しました')).toBeNull()
   const band = screen.getByRole('alert')
   expect(band.closest('[data-design-node="UGrd2"]')).not.toBeNull()

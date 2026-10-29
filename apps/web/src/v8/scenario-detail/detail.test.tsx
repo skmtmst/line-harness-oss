@@ -1,3 +1,6 @@
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * V8 シナリオ配信の編集（src/v8/scenario-detail）の動きの試験。BEHAVIOR.md の「今までと変えたところ」を守る。
@@ -145,6 +148,7 @@ let host: HTMLDivElement
 let root: Root
 
 async function render(node: React.ReactNode = <ScenarioDetailV8 scenarioId="sc-1" showStarted={false} />) {
+  if (role.value) rememberStaffIdentity({ role: role.value } as StaffMember); else forgetStaffIdentity()
   act(() => {
     root.render(node)
   })
@@ -172,6 +176,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  forgetStaffIdentity()
   delete document.documentElement.dataset.theme
   vi.clearAllMocks()
 })
@@ -181,7 +186,7 @@ describe('V8 シナリオ配信の編集', () => {
     await render(<ScenarioDetailPage />)
     expect(screen.getByText('購読開始から0日後 10:00').closest('[data-page-template="detail"]')).toBeTruthy()
     for (const name of ['配信結果を見る', 'まとめて下見', 'まとめてテストを送る', '設定を変える', '一時停止する', 'このシナリオを削除する', 'キャンセル', '複製する', '保存する']) {
-      expect(screen.getAllByRole(name === '配信結果を見る' ? 'link' : 'button', { name }).length, name).toBeGreaterThan(0)
+      expect(name === '配信結果を見る' ? screen.getByRole('link', { name }) : getPageAction({ name }), name).toBeTruthy()
     }
     expect(screen.getByText('保存済み 10月1日 14:02')).toBeTruthy()
     expect(screen.getByText('友だち追加のとき')).toBeTruthy()
@@ -211,12 +216,12 @@ describe('V8 シナリオ配信の編集', () => {
   it('閲覧のみ：帯が出て、変える操作のボタンを置かない（押せないボタンも残さない）', async () => {
     role.value = 'staff'
     await render()
-    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')).toBeTruthy()
     for (const name of ['まとめてテストを送る', '設定を変える', '一時停止する', '変える', 'このシナリオを削除する', '複製する', '保存する', 'メッセージを追加する', 'テンプレートを追加する', '＋ ここに挿入', '名前・説明・置き場を変える', 'このシナリオのその他操作', '1通目を上へ']) {
       expect(screen.queryByRole('button', { name }), name).toBeNull()
     }
     // 見る操作は残す。残ったボタンはどれも押せる。
-    expect(screen.getByRole('button', { name: 'まとめて下見' })).toBeTruthy()
+    expect(getPageAction({ name: 'まとめて下見' })).toBeTruthy()
     const disabled = [...host.querySelectorAll('button')].filter((b) => b.disabled).map((b) => b.textContent || b.getAttribute('aria-label'))
     expect(disabled).toEqual([])
   })

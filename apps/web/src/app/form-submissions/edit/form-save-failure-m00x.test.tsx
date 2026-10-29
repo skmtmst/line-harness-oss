@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * M001・M002・M003（回答フォーム編集）の試験。本物の React で確かめる。
@@ -126,8 +127,8 @@ async function flush() {
 }
 
 function findButton(text: string): HTMLButtonElement | undefined {
-  return [...container.querySelectorAll('button')]
-    .find((node) => (node.textContent ?? '').includes(text)) as HTMLButtonElement | undefined
+  return ([...container.querySelectorAll('button')]
+    .find((node) => (node.textContent ?? '').includes(text)) ?? querySupplementaryPageAction(text)) as HTMLButtonElement | undefined
 }
 
 async function renderPage() {

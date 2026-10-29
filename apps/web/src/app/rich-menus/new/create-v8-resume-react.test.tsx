@@ -1,3 +1,4 @@
+import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * ★V8 リッチメニューを作る：`?id=<下書き>&step=buttons` で作りかけの下書きを開き直す（板 ・）。
@@ -203,7 +204,7 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     const unset = screen.getByRole('radio', { name: /決めない/ }) as HTMLInputElement
     await act(async () => { fireEvent.click(unset) })
     expect(unset.checked).toBe(true)
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: '下書きを保存', exact: true })) })
     await waitFor(() => {
       const writes = vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'PATCH')
       expect(writes).toHaveLength(1)
@@ -228,7 +229,7 @@ describe('作りかけの下書きを ?id= で開き直す', () => {
     const name = host.querySelector('#rm-name') as HTMLInputElement
     expect(name).toBeTruthy()
     await act(async () => fireEvent.change(name, { target: { value: '直した名前' } }))
-    const save = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === '下書きを保存')!
+    const save = ([...host.querySelectorAll('button')].find(button => button.textContent?.trim() === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
     await act(async () => fireEvent.click(save)); await settle()
     expect(typeof release).toBe('function')
     expect(name.closest('fieldset[disabled]')).not.toBeNull()

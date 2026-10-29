@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -23,9 +24,12 @@ it('メニュー画面を共通の型とプレビューの入口で描く', () =
 })
 
 it('閲覧では案内を出し作成操作を描かない', async () => {
+  verifiedStaffRole('viewer')
   const { container } = render(<MenuSettingsPage {...menuSettingsModel()} />)
   expect(container.querySelector('[data-design-node="C9fv7A"] [data-read-only-notice]')).toBeTruthy()
   await screen.findByText('まだ予約メニューがありません')
   expect(screen.queryByRole('link', { name: /予約メニューを作る/ })).toBeNull()
   expect(screen.queryByRole('button', { name: /予約メニューを作る/ })).toBeNull()
 })
+
+afterEach(() => { verifiedStaffRole(null) })

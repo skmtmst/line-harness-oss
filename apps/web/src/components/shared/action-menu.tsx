@@ -3,8 +3,9 @@ import { normalizeActionLabel } from './action-words'
 
 import Link, { useListNavigationHref } from './list-navigation'
 import { ArrowUpRight, Eye, Pencil, Pause, Trash2 } from 'lucide-react'
-import React, { useEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import React, { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import MenuPortal, { type MenuPortalAlign } from './menu-portal'
+import TooltipBubble from './tooltip-bubble'
 import { useV8Leave } from './overlay-utils'
 import styles from './action-menu.module.css'
 
@@ -15,6 +16,11 @@ export type ActionMenuItem = {
   group?: ActionMenuGroup
   id: string
   label: string
+  /** 共通の操作から移した説明と読み上げ名を保つ。 */
+  title?: string
+  'aria-label'?: string
+  'aria-description'?: string
+  /** 未指定は種類に応じた印、nullは印なし。 */
   icon?: ReactNode
   /** 自分で結果を表示する共通操作（コピーなど）。 */
   content?: ReactNode
@@ -37,6 +43,8 @@ export type ActionMenuItem = {
    * 小さく出す。理由が書けない操作は無効のまま黙って置かない。
    */
   disabledReason?: string
+  /** 権限の理由。焦点と理由の確認を保ち、操作・移動を止める。 */
+  lockedReason?: string
   dividerBefore?: boolean
   /**
    * 小さな見出し（★管理画面）。この項目の前に出す。
@@ -68,7 +76,7 @@ export function orderActionMenuItems(items: ActionMenuItem[]): ActionMenuItem[] 
     previous = group
     const Icon = group === 'view' ? Eye : group === 'manage' ? Pencil : /削除|消す/.test(item.label) ? Trash2 : Pause
     return { ...item, group, tone: group === 'destructive' ? 'danger' as const : item.tone,
-      icon: item.icon ?? <Icon size={16} aria-hidden="true" />,
+      icon: item.icon === undefined ? <Icon size={16} aria-hidden="true" /> : item.icon,
       dividerBefore, sectionBefore: first && items.length >= 5 ? titles[group] : undefined }
   }))
 }
@@ -102,6 +110,24 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
   const leaving = useV8Leave(open, 80)
   const menuRef = useRef<HTMLDivElement>(null)
   const anchorMarkRef = useRef<HTMLSpanElement>(null)
+  const reasonPrefix = useId()
+  const focusFrame = useRef(0)
+  const [tip, setTip] = useState<{ text: string; left: number; top: number; below: boolean } | null>(null)
+  const showReason = (element: HTMLElement, text: string) => {
+    const css = getComputedStyle(document.documentElement)
+    const edge = parseFloat(css.getPropertyValue('--polish-space-row')) || 8
+    const width = parseFloat(css.getPropertyValue('--polish-tooltip-width')) || 288
+    const gap = parseFloat(css.getPropertyValue('--polish-tooltip-gap')) || 8
+    const rect = element.getBoundingClientRect(), below = rect.top < 48
+    setTip({ text, left: Math.max(edge, Math.min(rect.left, window.innerWidth - width - edge)), top: below ? rect.bottom + gap : rect.top - gap, below })
+  }
+  useEffect(() => {
+    const hide = () => setTip(null)
+    window.addEventListener('scroll', hide, true)
+    window.addEventListener('resize', hide)
+    return () => { cancelAnimationFrame(focusFrame.current); window.removeEventListener('scroll', hide, true); window.removeEventListener('resize', hide) }
+  }, [])
+  useEffect(() => { setTip(null) }, [open, items])
 
   const getAnchor = () => {
     const explicit = anchorRef?.current
@@ -160,7 +186,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
     let frame = 0
     let tries = 0
     const focusFirst = () => {
-      const first = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"])')
+      const first = menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"]),[role="menuitem"][data-permission-locked]')
       const host = menuRef.current?.closest<HTMLElement>('[data-menu-portal]')
       const hidden = !first || (host && host.style.visibility === 'hidden')
       if (!hidden && first) {
@@ -189,7 +215,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       return
     }
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return
-    const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"])') ?? [])
+    const buttons = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]:not([disabled]):not([aria-disabled="true"]),[role="menuitem"][data-permission-locked]') ?? [])
     if (buttons.length === 0) return
     event.preventDefault()
     const current = buttons.indexOf(document.activeElement as HTMLButtonElement)
@@ -216,9 +242,13 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
       data-design-part="action-menu"
       data-design-node="xifuV"
     >
-      {(choiceHeading === undefined ? orderActionMenuItems(items) : items.map((item, index) => ({ ...item, sectionBefore: index === 0 ? choiceHeading : undefined }))).map((item) => {
+      {(choiceHeading === undefined ? orderActionMenuItems(items) : items.map((item, index) => ({ ...item, sectionBefore: index === 0 ? choiceHeading : undefined }))).map((item, index) => {
         const itemLabel = normalizeActionLabel(item.label)
-        const Item = item.href && !item.disabled ? 'a' : 'button'
+        const locked = Boolean(item.lockedReason)
+        const blocked = item.disabled || locked
+        const reason = item.lockedReason ?? item.disabledReason
+        const reasonId = `${reasonPrefix}-${index}`
+        const Item = item.href && !blocked ? 'a' : 'button'
         return (
         <div key={item.id} data-menu-group={item.group}>
           {item.dividerBefore ? <hr className={styles.divider} /> : null}
@@ -227,17 +257,35 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
               {item.sectionBefore}
             </p>
           ) : null}
-          {item.content ? <div className={styles.item}>{item.content}</div> : <Item href={Item === 'a' && item.href ? navigationHref(item.href) : undefined}
+          {item.content && !blocked ? <div className={styles.item}>{item.content}</div> : <Item href={Item === 'a' && item.href ? navigationHref(item.href) : undefined}
             target={Item === 'a' &&item.external ? '_blank' : undefined}
             rel={Item === 'a' && item.external ? 'noopener noreferrer' : undefined}
             type="button"
             role="menuitem"
-            className={`${styles.item} ${item.description || (item.disabled && item.disabledReason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
-            disabled={item.disabled}
-            title={itemLabel}
+            className={`${styles.item} ${item.description || (!locked && item.disabled && reason) ? styles.itemTall : ''} ${item.tone === 'danger' ? styles.danger : ''}`}
+            disabled={Boolean(item.disabled) && !locked}
+            aria-disabled={locked || undefined}
+            aria-describedby={blocked && reason ? reasonId : undefined}
+            aria-label={item['aria-label'] ?? (blocked ? itemLabel : undefined)}
+            aria-description={item['aria-description'] ?? (!locked && item.disabled ? item.disabledReason : undefined)}
+            data-permission-locked={locked ? '' : undefined}
+            title={item.title ?? itemLabel}
             data-qa-open={item.qaOpen}
+            onPointerEnter={(event) => { if (locked && event.pointerType !== 'touch') showReason(event.currentTarget, item.lockedReason!) }}
+            onPointerLeave={(event) => { if (event.pointerType !== 'touch' && document.activeElement !== event.currentTarget) setTip(null) }}
+            onPointerDown={(event) => { if (locked && event.pointerType === 'touch') showReason(event.currentTarget, item.lockedReason!) }}
+            onFocus={(event) => {
+              if (!locked) return
+              const element = event.currentTarget
+              showReason(element, item.lockedReason!)
+              cancelAnimationFrame(focusFrame.current)
+              focusFrame.current = requestAnimationFrame(() => { if (document.activeElement === element) showReason(element, item.lockedReason!) })
+            }}
+            onBlur={() => { cancelAnimationFrame(focusFrame.current); setTip(null) }}
+            onKeyDown={(event) => { if (blocked && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); event.stopPropagation() } }}
             onClick={(event) => {
               event.stopPropagation()
+              if (blocked) { event.preventDefault(); return }
               // 先に開いたボタンへ戻しておく。項目が窓を開くと、窓はこのボタンを
               // 「開く前の場所」として覚え、閉じた後にここへ戻す（消えた項目へは戻れない）。
               if (!inline) getFocusTarget()?.focus({ preventScroll: true })
@@ -251,8 +299,8 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
               {item.description ? (
                 <span className={styles.description}>{item.description}</span>
               ) : null}
-              {item.disabled && item.disabledReason ? (
-                <span className={styles.reason}>{item.disabledReason}</span>
+              {blocked && reason ? (
+                <span id={reasonId} className={styles.reason} hidden={locked}>{reason}</span>
               ) : null}
             </span>
             {Item === 'a' &&item.external ? (
@@ -262,6 +310,7 @@ export default function ActionMenu({ open, items, note, onClose, ariaLabel = '�
         </div>
       )})}
       {note ? <p className={styles.note}>{note}</p> : null}
+      {open && tip ? <TooltipBubble id={`${reasonPrefix}-tooltip`} {...tip} /> : null}
     </div>
   )
 

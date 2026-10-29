@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 マイペット（src/v8/nen-pets）の動きの試験。BEHAVIOR.md を守る。
  * 一覧を取り直し続けない・「…」→ペットの情報を直す（版つき保存・409 で止める）・
@@ -88,7 +89,7 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
   beforeEach(() => {
     window.history.replaceState(null, "", "/")
     document.documentElement.dataset.theme = 'v8'
-    role.value = 'owner'
+    role.value = verifiedStaffRole('owner')
     LIST.products = []
     fetchApi.mockReset()
     fetchApi.mockImplementation(async (path: string) => {
@@ -204,7 +205,7 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
   })
 
   it('閲覧のみ：帯を出し、直す・既定にする・削除・追加・保存を置かない（CSV は使える）', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await render('pets')
     expect(host.textContent).toContain('閲覧のみで見ています')
     await click(byLabel('「こむぎ」の操作'))
@@ -219,3 +220,5 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     expect(buttons().some((b) => b.getAttribute('aria-label')?.endsWith('を削除する'))).toBe(false)
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

@@ -69,6 +69,8 @@
 }
 
 .footerCenter { justify-content: center; }
-.footerSplit { justify-content: space-between; }
+.footerSplit { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
 .footerEnd { justify-content: flex-end; }
 .footerGroup { display: flex; align-items: center; gap: var(--tpl-hq-plan-head-gap); }
+.footerSplit > button { justify-self: start; }
+.footerSplit .footerGroup { grid-column: 2; justify-self: center; }
