@@ -1,18 +1,18 @@
 import Card from '@/components/shared/card'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import type { AccountStyle } from '@line-crm/shared'
+import Button from '@/components/shared/button'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
-import { templateOptions } from './check-rows'
+import { STYLE_EXPERIENCE_SCRIPT } from '@/v8/onboarding/style-experience-player'
 import styles from './register.module.css'
 
 /*
  * ★LINE新規追加_v07.pen（2026-10-18承認）④使い方を選ぶ X0pGdw の描画だけ。
  * register.tsx が行数の関所（apps/web/scripts/v8-guard/code-size.mjs）を越えたので
- * 切り出した。状態は持たず、register.tsx から受け取って出すだけ（見た目は変えていない）。
+ * 切り出した。登録④の背景画面だけを描き、選択は共通のスタイル体験を使うポップアップで行う。
  */
-export default function Step4Template({ templateKey, onPick }: {
-  templateKey: string
-  onPick: (key: AccountStyle) => void
+export default function Step4Template({ templateKey, onOpen }: {
+  templateKey: AccountStyle | ''
+  onOpen: () => void
 }) {
   return (
     <CreateStepColumns data-design-node="X0pGdw" previewTitle="あとから変えられます" preview={(
@@ -23,17 +23,10 @@ export default function Step4Template({ templateKey, onPick }: {
       </Card>
       )}>
       <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="使い方を選ぶ">
-        <h2 className={styles.panelTitle}>いちばん近い使い方を選んでください</h2>
-        <RadioCardGroup legend="いちばん近い使い方" columns={2}>
-          {templateOptions().map((option) => (
-            <RadioCard
-              key={option.key} name="template" value={option.key} title={option.label} note={option.note}
-              checked={templateKey === option.key}
-              ariaLabel={option.label}
-              onChange={() => onPick(option.key)}
-            />
-          ))}
-        </RadioCardGroup>
+        <h2 className={styles.panelTitle}>使い方のスタイルを選ぶ</h2>
+        <p className={styles.asideP}>見本を見て、お店に近いスタイルを選んでください。あとから設定で変更できます。</p>
+        {templateKey ? <p className={styles.asideP}>選択中：{STYLE_EXPERIENCE_SCRIPT.styles[templateKey].label}（まだ保存していません）</p> : null}
+        <Button type="button" onClick={onOpen}>スタイルを選ぶ</Button>
       </Card>
     </CreateStepColumns>
   )
