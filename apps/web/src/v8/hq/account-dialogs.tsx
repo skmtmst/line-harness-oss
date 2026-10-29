@@ -1,4 +1,5 @@
 'use client'
+import { lineAccountConnectionState } from '@/lib/line-account-state'
 import { requiredText } from '@/lib/form-requirement'
 const accountNameRequirement = requiredText('名前を入力してください。')
 
@@ -167,7 +168,7 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
               : undefined}
           /></SaveErrorField>
 </Field></div>
-        {!archived && account.connection?.status === 'warn' ? (
+        {lineAccountConnectionState(account).tone === 'warn' ? (
           /* 要確認のときだけ：引っかかった確認ごとの理由（URL は折り返して全文）。 */
           <div className={styles.field}>
             <p className={styles.label}>接続の確認</p>

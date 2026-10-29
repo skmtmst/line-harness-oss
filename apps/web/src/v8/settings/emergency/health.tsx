@@ -1,4 +1,5 @@
 'use client'
+import { LINE_TOKEN_REFRESH_DAYS } from '@line-crm/shared'
 import { useRunningVersion } from '@/lib/use-running-version'
 
 import { operationFailureText } from './health-error'
@@ -64,7 +65,7 @@ const CHECK_DEFINITIONS: Array<Pick<HealthCheckItem, 'id' | 'title' | 'sub' | 't
   { id: 'webhook', title: 'Webhook が届いているか', sub: 'LINE からの受け取り', threshold: '受け取りの失敗が続くと「注意」', href: '/webhooks' },
   { id: 'delivery', title: '配信が送れているか', sub: '予約・自動の配信', threshold: '10分の遅れで「注意」・30分で「エラー」', href: '/broadcasts/reserved' },
   { id: 'infra', title: '保存と送信のしくみ', sub: 'データ・ファイル・送る前の待ち', threshold: '10分より古いと「古い確認」・一度も確かめていなければ「未確認」', href: '/emergency?tab=health' },
-  { id: 'credential', title: '鍵・証明書の期限', sub: 'アクセストークンなど', threshold: '14日前で「注意」・期限切れで「エラー」', href: '/accounts' },
+  { id: 'credential', title: 'トークンの期限', sub: 'LINE接続とは別に確認', threshold: `自動交換の失敗・残り${LINE_TOKEN_REFRESH_DAYS}日未満で「注意」・期限切れで「エラー」`, href: '/accounts' },
 ]
 
 const CHECK_COUNT = CHECK_DEFINITIONS.length
@@ -154,7 +155,7 @@ const ALERT_RESPONSE_FIRST: Record<OperationHealthCheckKey, { impact: string; re
   friend_change: { impact: '友だちが急に減っている可能性があります。誤配信やブロックが原因の可能性があります。', recovery: '直近の配信内容を確認し、必要なら緊急停止してください。', href: '/emergency?tab=control' },
   monitoring_heartbeat: { impact: '異常があっても通知されない可能性があります。', recovery: '時間をおいても直らなければ、運営へ連絡してください。', href: '/emergency?tab=health' },
   infra_canary: { impact: '配信・保存・画面表示が止まる可能性があります。', recovery: '時間をおいて再確認し、続く場合は運営へ連絡してください。', href: '/emergency?tab=health' },
-  credential_expiry: { impact: '期限切れ後はLINEとのやり取りが止まる可能性があります。', recovery: 'アカウント設定でLINEの鍵を確認し直してください。', href: '/accounts' },
+  credential_expiry: { impact: '期限切れ後はLINEとのやり取りが止まる可能性があります。', recovery: 'アカウント設定でトークンの期限を確認し直してください。', href: '/accounts' },
 }
 
 /** 表の上の「開いている異常」。受領（メモつき）・通知のやり直し。異常なしと「読めない」を混同しない。 */

@@ -2,7 +2,7 @@ import type { AccountWithStats } from '@/contexts/account-context'
 
 /**
  * 統括のアカウント：「要確認」の理由を、引っかかった確認ごとの言葉にする。
- * worker の一覧（`connection.issues`・`connection.tokenExpired`）から作る。
+ * worker の一覧（`connection.issues`）から作る。
  * 英語の内部の文は出さない。秘密値は来ない（URL と状態だけ）。
  */
 export type ConnectionReason = {
@@ -32,8 +32,8 @@ function reasonOf(issue: Issue): ConnectionReason | null {
         detail: 'LINE がこのアカウントのトークンを受け付けません。LINE Developers の Messaging API のトークンを確かめてください。',
       }
     }
-    case 'token_refresh':
-      return { short: 'LINE のトークンを更新できませんでした', detail: 'LINE のトークンを自動で更新できませんでした。Channel ID・Channel secret を確かめてください。' }
+    case 'webhook_silence':
+      return { short: 'Webhookを24時間以上受信していません', detail: 'Webhookを24時間以上受信していません。LINEのWebhook設定と受信履歴を確認してください。' }
     case 'webhook_endpoint': {
       if (issue.result === 'unconfigured') {
         return {
@@ -64,9 +64,6 @@ function reasonOf(issue: Issue): ConnectionReason | null {
 /** 要確認の理由。何も分からなければ空。 */
 export function connectionReasons(account: AccountWithStats): ConnectionReason[] {
   const reasons: ConnectionReason[] = []
-  if (account.connection?.tokenExpired) {
-    reasons.push({ short: 'LINE のトークンの期限が切れています', detail: 'LINE のトークンの期限が切れています。自動の更新が止まっていないか確かめてください。' })
-  }
   for (const issue of account.connection?.issues ?? []) {
     const reason = reasonOf(issue)
     if (reason) reasons.push(reason)

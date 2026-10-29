@@ -1,5 +1,7 @@
 'use client'
 
+import { tokenExpiryNotice, tokenExpirySummary } from '@/lib/line-account-state'
+
 import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
@@ -249,8 +251,8 @@ export default function HqHomeV8() {
   const totals = useMemo(() => currentAccounts.reduce<{ friends: number | null; messages: number | null; warnings: number; unconfirmed: number }>((sum, account) => ({
     friends: sum.friends !== null && typeof account.stats?.friendCount === 'number' ? sum.friends + account.stats.friendCount : null,
     messages: sum.messages !== null && typeof account.stats?.messagesThisMonth === 'number' ? sum.messages + account.stats.messagesThisMonth : null,
-    warnings: sum.warnings + (matchesStatus(account, 'warn') && account.connection?.status === 'warn' ? 1 : 0),
-    unconfirmed: sum.unconfirmed + (matchesStatus(account, 'warn') && account.connection?.status !== 'warn' ? 1 : 0),
+    warnings: sum.warnings + (statusOf(account).tone === 'warn' ? 1 : 0),
+    unconfirmed: sum.unconfirmed + (statusOf(account).label === '未確認' ? 1 : 0),
   }), { friends: 0, messages: 0, warnings: 0, unconfirmed: 0 }), [currentAccounts])
 
   /* 所属は1つ（API-17 の folderId）。サーバーの数が無いときは手元で数える。 */
@@ -530,6 +532,7 @@ export default function HqHomeV8() {
     />
   ) : (
     <>
+      {accountsReadable && tokenExpirySummary(currentAccounts) ? <TruncatedText value={tokenExpirySummary(currentAccounts)!} /> : null}
       {connectionProgress ? <p className={styles.progress} role="status">{connectionProgress}</p> : null}
       {connectionResult ? <Notice tone={connectionResult.tone} message={connectionResult.message}
         action={connectionResult.needsReload ? <Button type="button" onClick={() => void reloadConnections()} disabled={checkingConnections}>もう一度読み込む</Button> : undefined}
@@ -585,6 +588,7 @@ export default function HqHomeV8() {
                     <dd>{typeof account.stats?.messagesThisMonth === 'number' ? `${formatNumber(account.stats.messagesThisMonth)} 通` : emptyValue('unknown')}</dd>
                   </div>
                 </dl>
+                {tokenExpiryNotice(account) ? <TruncatedText value={tokenExpiryNotice(account)!} /> : null}
                 {warned ? (() => {
                   const reason = connectionReasonLine(account)
                   return <Notice tone="warn" compact title={reason.title} message={reason.text}
@@ -596,10 +600,11 @@ export default function HqHomeV8() {
           })}
         </ListPageCards>
       ) : (
-        <DataTable aria-label="アカウントの一覧" columnWeights={[3, 1.5, 1, 1, 1.25, 0.5]}>
+        <DataTable aria-label="アカウントの一覧" columnWeights={[3, 1.25, 1.5, 1, 1, 1.25, 0.5]}>
           <thead><TableHeadRow>
             <Th>アカウント</Th>
-            <Th>接続</Th>
+            <Th>LINE接続</Th>
+            <Th>お支払い</Th>
             <Th>対応が要る</Th>
             <Th>友だち</Th>
             <Th>今月の配信</Th>
@@ -612,12 +617,15 @@ export default function HqHomeV8() {
               <Tr key={account.id}>
                 <PersonCell avatarName={name} avatarSrc={accountIconUrl(account)} avatarShape="rounded" avatarAlt={name} avatarSize={32} nameTitle={[name, state.label, accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))].filter(Boolean).join(' / ')} name={
                   <span className={styles.cardName}>
-                    <FolderDotName folder={folderDotOf(account)} annotation={<StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>}>
+                    <FolderDotName folder={folderDotOf(account)}>
                       <TruncatedText className={styles.name} value={String(name ?? '')} />
                     </FolderDotName>
                     <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />
                   </span>
                 } />
+                <Td><StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>
+                  {tokenExpiryNotice(account) ? <TruncatedText value={tokenExpiryNotice(account)!} /> : null}
+                </Td>
                 <Td>{(() => {
                   const pay = payState[account.id]
                   if (!pay || pay === 'unknown') return emptyValue('unknown')
