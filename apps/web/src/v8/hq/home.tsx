@@ -102,7 +102,7 @@ export default function HqHomeV8() {
   const [folderDialog, setFolderDialog] = useState<{ editing: Folder | null } | null>(null)
   const [folderName, setFolderName] = useState('')
   const [folderColor, setFolderColor] = useState<string | null>(null)
-  const [deleteFolder, setDeleteFolder] = useState<Folder | null>(null)
+  const [deleteFolder, setDeleteFolder] = useState<(Folder & { itemCount?: number }) | null>(null)
   const [folderError, setFolderError] = useState('')
   const [folderSaving, setFolderSaving] = useState(false)
 
@@ -246,11 +246,12 @@ export default function HqHomeV8() {
   }
 
   const accountsReadable = !loading && !loadError
-  const totals = useMemo(() => currentAccounts.reduce<{ friends: number | null; messages: number | null; warnings: number | null }>((sum, account) => ({
+  const totals = useMemo(() => currentAccounts.reduce<{ friends: number | null; messages: number | null; warnings: number; unconfirmed: number }>((sum, account) => ({
     friends: sum.friends !== null && typeof account.stats?.friendCount === 'number' ? sum.friends + account.stats.friendCount : null,
     messages: sum.messages !== null && typeof account.stats?.messagesThisMonth === 'number' ? sum.messages + account.stats.messagesThisMonth : null,
-    warnings: sum.warnings !== null && account.connection && account.connection.status !== 'unknown' ? sum.warnings + (account.connection.status === 'warn' ? 1 : 0) : null,
-  }), { friends: 0, messages: 0, warnings: 0 }), [currentAccounts])
+    warnings: sum.warnings + (matchesStatus(account, 'warn') && account.connection?.status === 'warn' ? 1 : 0),
+    unconfirmed: sum.unconfirmed + (matchesStatus(account, 'warn') && account.connection?.status !== 'warn' ? 1 : 0),
+  }), { friends: 0, messages: 0, warnings: 0, unconfirmed: 0 }), [currentAccounts])
 
   /* 所属は1つ（API-17 の folderId）。サーバーの数が無いときは手元で数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
@@ -467,7 +468,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
-        <KpiCard title="接続に問題" value={accountsReadable ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.warnings === null ? '件数は分かりません' : null} valueTone={accountsReadable && totals.warnings !== null && totals.warnings > 0 ? 'warning' : 'default'} />
+        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} />
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">
@@ -714,7 +715,7 @@ export default function HqHomeV8() {
         <ConfirmDialog
           open
           title={`フォルダ「${deleteFolder.name}」を消しますか？`}
-          description={`中のアカウント ${formatNumber(folderCounts.get(deleteFolder.id) ?? 0)} 件は消えずに「未分類」へ移ります。消したフォルダは元に戻せません。`}
+          description={`中のアカウント${typeof deleteFolder.itemCount === 'number' ? ` ${formatNumber(deleteFolder.itemCount)} 件` : ''}は消えずに「未分類」へ移ります。消したフォルダは元に戻せません。`}
           confirmLabel="フォルダを消す"
           cancelLabel="キャンセル"
           destructive
