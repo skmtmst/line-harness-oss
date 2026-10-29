@@ -154,6 +154,15 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     await act(async () => { item.click() })
   }
 
+  it('保管の確認で記録と設定が残り、一覧から戻せると説明する', async () => {
+    await render(<AutomationListV8 />)
+    await chooseRowAction('保管する')
+    const dialog = document.querySelector('[role="alertdialog"]')!
+    expect(dialog.textContent).toContain('通常の一覧から外します。動いた記録と設定は残り、「保管」の絞り込みから戻せます。')
+    await act(async () => { within(dialog as HTMLElement).getByRole('button', { name: 'キャンセル' }).click() })
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+  })
+
   it('編集を連打しても下書きは1つだけ作り、店が変わると前の返事で移動しない', async () => {
     let resolve!: (value: { success: true; data: { id: string } }) => void
     const edit = vi.spyOn(api.automations, 'createDraftFromAutomation').mockImplementation(() => new Promise((done) => { resolve = done }))

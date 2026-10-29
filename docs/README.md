@@ -454,6 +454,7 @@
 ## 反映履歴
 
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
+- [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
 - [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
 - [反映履歴（アップデート履歴）の設計](change-log-design.md)
@@ -815,6 +816,7 @@
 - [スマートフォン専用の画面（トークと対応）](release-log/unreleased/1845-kenta-phone-shell-talk.md)
 - [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
 - [一覧の帯・フォルダの丸と共通操作の整理](release-log/unreleased/0000-kenta-tags-band-dot.md)
+- [共通部品と言葉・受信箱の絞り込みの修正](release-log/unreleased/0000-kenta-int.md)
 - [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
 - [まとめ列車 7](release-log/unreleased/1848-kenta-train-one7-1027.md)
 

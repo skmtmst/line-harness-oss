@@ -8,6 +8,7 @@ import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { Filter, X } from 'lucide-react'
 import Button from '@/components/shared/button'
+import type { ReactNode } from 'react'
 
 /**
  * 受信箱の絞り込みパネル（設計 Pencil `bXyEA` 受信箱 絞り込みパネル）。
@@ -16,10 +17,8 @@ import Button from '@/components/shared/button'
  * という操作そのものがありませんでした。** 条件が増えるほど一覧の上が
  * 埋まり、会話が見える面積が減ります。設計は右から出るパネルにまとめます。
  *
- * **繋がっていない条件は、押せない形で出します。**
- * 「期限」と「表示するメッセージ種別」は、いま絞り込める口がありません。
- * 押せるのに何も起きない操作は、無いより悪い（効いたつもりで読み違える）。
- * 出どころができたら `disabled` を外します。
+ * 期限は一覧と同じ quickFilter へ即時に反映します。
+ * まだ連携していない呼び出し元には期限の操作を出しません。
  */
 
 export type InboxFilterValue = {
@@ -27,6 +26,8 @@ export type InboxFilterValue = {
   assignee: string
   channel: 'all' | 'line' | 'email'
   unreadOnly: boolean
+  /** 一覧の期限条件。未指定の既存呼び出し元には操作を出さない。 */
+  quickFilter?: 'all' | 'reply' | 'overdue'
 }
 
 const STATUS_OPTIONS: { value: InboxFilterValue['status']; label: string }[] = [
@@ -52,6 +53,9 @@ export default function InboxFilterPanel({
   open,
   value,
   operators,
+  unassignedUnreadCount = null,
+  slaEnabled = false,
+  auxiliaryActions,
   onChange,
   onReset,
   onClose,
@@ -59,6 +63,12 @@ export default function InboxFilterPanel({
   open: boolean
   value: InboxFilterValue
   operators: { id: string; name: string }[]
+  /** 未取得・取得失敗は null。取得済みの0件とは区別する。 */
+  unassignedUnreadCount?: number | null
+  /** 実際の対応期限を使う場合は「期限超過」、それ以外は「1時間以上待ち」。 */
+  slaEnabled?: boolean
+  /** 対応ルールなど、画面が持つ補助操作。 */
+  auxiliaryActions?: ReactNode
   onChange: (next: InboxFilterValue) => void
   onReset: () => void
   onClose: () => void
@@ -126,7 +136,7 @@ export default function InboxFilterPanel({
                 value={value.assignee === 'all' ? '' : value.assignee}
                 onChange={(next) => set({ assignee: next || 'all' })}
                 options={[
-                  { value: 'unassigned', label: '未割り当て' },
+                  { value: 'unassigned', label: '未割り当て', description: unassignedUnreadCount === null ? '未読 —' : `未読 ${unassignedUnreadCount}件` },
                   ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name })),
                 ]}
                 className="w-full"
@@ -136,13 +146,7 @@ export default function InboxFilterPanel({
 
           <div>
             <span className={labelClass}>受信経路</span>
-            {/*
-              INBOX-04: 素の `<select>` は開いた候補が OS 側の描画で、
-              画面（DOM）に現れない。実機監査でも1回押しただけでは
-              「候補が展開せず画面変化もない」としか見えないため、
-              候補をDOMへ描く共通の Select へ換える（`inbox-dropdown.tsx`
-              が同じ理由で素の select を使わないのと同じ扱い）。
-            */}
+            {/* 候補も画面内へ描く共通の選択部品を使う。 */}
             <div className="mt-1.5">
               <Select
                 aria-label="受信経路で絞り込む"
@@ -154,6 +158,23 @@ export default function InboxFilterPanel({
             </div>
           </div>
 
+          {value.quickFilter !== undefined ? (
+            <div>
+              <span className={labelClass}>期限</span>
+              <Select
+                aria-label="期限で絞り込む"
+                size="full"
+                value={value.quickFilter}
+                onChange={(next) => set({ quickFilter: next as InboxFilterValue['quickFilter'] })}
+                options={[
+                  { value: 'all', label: 'すべて' },
+                  { value: 'reply', label: '要返信' },
+                  { value: 'overdue', label: slaEnabled ? '期限超過' : '1時間以上待ち' },
+                ]}
+              />
+            </div>
+          ) : null}
+
           {/*
             INBOX-16: まだ絞り込めない条件は、使える条件の下へ畳む。
             無効なまま並べると、使える条件と同じ重さで占有し、
@@ -162,22 +183,9 @@ export default function InboxFilterPanel({
           */}
           <details className="border-hairline rounded-control border px-3 py-2.5">
             <summary className="text-ink-faint cursor-pointer text-xs font-medium">
-              まだ使えない条件（期限・メッセージ種別）
+              まだ使えない条件（メッセージ種別）
             </summary>
             <div className="mt-3 space-y-4">
-              <div>
-                <span className={labelClass}>期限</span>
-                <Select
-                  aria-label="期限で絞り込む"
-                  size="full"
-                  value="all"
-                  disabled
-                  onChange={() => {}}
-                  options={[{ value: 'all', label: 'すべて' }]}
-                />
-                <p className="text-ink-faint mt-1 text-micro">対応期限はまだ記録していないため、この条件では絞り込めません</p>
-              </div>
-
               <div>
                 <span className={labelClass}>表示するメッセージ種別</span>
                 <div className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-2">
@@ -196,6 +204,7 @@ export default function InboxFilterPanel({
             aria-label="未読だけ表示"
             className="border-hairline border-t pt-3"
           >未読だけ表示</Checkbox>
+          {auxiliaryActions ? <div className="flex items-center justify-center gap-2">{auxiliaryActions}</div> : null}
         </div>
 
         {/*
