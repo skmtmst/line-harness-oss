@@ -3,15 +3,6 @@
  * 寸法は板の書き出しから読み、globals.css の --tpl-rs-* に置いた値だけを使う。
  */
 
-.tabs {
-  min-width: 0;
-}
-
-/* 休業日・貸切：検証環境の帯が無いので、店のタブの下にタブを置く（切り替えの文字の高さにそろえる） */
-.tabsClosures {
-  margin-top: var(--tpl-e10-tabs-top);
-}
-
 /* 左（配分・在庫・開ける時間）と右（その時間帯の卓 320） */
 .columns {
   display: flex;

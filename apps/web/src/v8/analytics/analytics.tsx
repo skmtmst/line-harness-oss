@@ -14,7 +14,8 @@
  */
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { Tabs } from '@/components/shared/tabs'
-import { useSearchParams } from 'next/navigation'
+import SegmentedControl from '@/components/shared/segmented'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Download, Plus } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -75,10 +76,13 @@ function readTab(params: URLSearchParams): AnalyticsTabV8 {
 function Navigation({ active, savedCount }: { active: AnalyticsTabV8; savedCount: number | null }) {
   const owner = tabOwner(active)
   const group = GROUPS.find((item) => item.tabs.some((tab) => tab.key === owner)) ?? GROUPS[0]
-  /* 上の段（組）も下の段（その組の見かた）も共通の下線のタブ（司令塔の判断・絵の）。 */
+  const router = useRouter()
+  /* 88: 上の段（組）は下線のタブ、下の段（見かた）は灰の箱の切り替え。移動は履歴を積まない置き換え。 */
   return <div className={styles.navigation}>
     <Tabs label="分析の組" items={GROUPS.map((item) => ({ label: item.label, href: hrefOf(item.tabs[0].key), current: item.label === group.label }))} />
-    <Tabs label="分析の見かた" items={group.tabs.map(item => ({label:item.label,href:hrefOf(item.key),current:item.key===owner,count:item.key==='saved' ? savedCount ?? undefined : undefined}))} />
+    <SegmentedControl aria-label="分析の見かた" value={owner}
+      onChange={(key) => router.replace(hrefOf(key))}
+      options={group.tabs.map((item) => ({ value: item.key, label: item.label, count: item.key === 'saved' ? savedCount ?? undefined : undefined }))} />
   </div>
 }
 
