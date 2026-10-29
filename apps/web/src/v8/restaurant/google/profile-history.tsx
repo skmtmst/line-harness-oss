@@ -120,7 +120,7 @@ export function HistoryScreen({ accountId, initialResult, go }: { accountId: str
               <Td title={formatStampFull(entry.createdAt)}>{formatStampFull(entry.createdAt)}</Td>
               <Td grow><TruncatedText value={entry.summary} /></Td>
               <Td><TruncatedText value={entry.staffName ?? '—'} /></Td>
-              <Td><StatusBadge tone={entry.kind === 'special_hours' || entry.kind === 'regular_hours' ? 'warning' : 'neutral'} dot={false}>{KIND_LABEL[entry.kind] ?? entry.kind}</StatusBadge></Td>
+              <Td><StatusBadge tone={entry.kind === 'special_hours' || entry.kind === 'regular_hours' ? 'warning' : 'neutral'}>{KIND_LABEL[entry.kind] ?? entry.kind}</StatusBadge></Td>
               <Td><StatusBadge tone={status.tone}>{status.label}{entry.status === 'failed' && entry.error ? `（${entry.error}）` : ''}</StatusBadge></Td>
             </Tr>
           })}</tbody>

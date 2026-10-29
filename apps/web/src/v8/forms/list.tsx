@@ -1059,9 +1059,9 @@ export default function FormsListV8() {
                     <StatusBadge tone={form.isActive ? 'success' : 'neutral'}>
                       {form.isActive ? '公開中' : '下書き'}
                     </StatusBadge>
-                    {reviewMode && form.accountScopeReviewRequired ? <StatusBadge tone="warning" size="compact" dot={false}>管理者確認</StatusBadge> : null}
+                    {reviewMode && form.accountScopeReviewRequired ? <StatusBadge tone="warning" size="compact">管理者確認</StatusBadge> : null}
                   </>}>
-                    {pendingCount > 0 ? <StatusBadge tone="danger" size="compact" dot={false}>{`後処理の未完 ${pendingCount}`}</StatusBadge> : null}
+                    {pendingCount > 0 ? <StatusBadge tone="danger" size="compact">{`後処理の未完 ${pendingCount}`}</StatusBadge> : null}
                   </StatusCell>
                   <Td className={styles.answerCell}>
                     {reviewMode ? (

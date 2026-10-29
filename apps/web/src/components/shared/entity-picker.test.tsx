@@ -45,6 +45,11 @@ describe('作ってあるものを選ぶ欄と窓（dJZ7Q）', () => {
     expect(onChange).toHaveBeenCalledWith('b')
   })
 
+  it('頭に「：」の無い valuePrefix でも注釈（title）は「頭：名前」にする', () => {
+    render(<EntityPickerField label="タグ" noun="タグ" items={[{ id: 'a', name: 'VIP' }]} value="a" valuePrefix="タグ" onChange={() => {}} />)
+    expect(screen.getByText('VIP').closest('[title]')?.getAttribute('title')).toBe('タグ：VIP')
+  })
+
   it('欄は空なら［選ぶ］、選ぶと名前とフォルダ＋［変える］。窓の中で押しただけでは変わらない', async () => {
     const onChange = vi.fn()
     render(<Single onChange={onChange} />)

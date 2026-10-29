@@ -107,4 +107,6 @@ it('監視の通知失敗は口が数えた件数を出す', async () => {
   await screen.findByText('公開しました')
   const row = screen.getByText('通知失敗').parentElement!
   expect(row.textContent).toBe('通知失敗2件')
+  // 17：1件以上は危険の札で出す（数は黒のまま、危険は札に任せる）。
+  expect(row.querySelector('[data-tone="danger"]')?.textContent).toBe('2件')
 })

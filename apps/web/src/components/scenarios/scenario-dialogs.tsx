@@ -572,7 +572,7 @@ export function OnCompleteDialog({
               移動先の候補を読み込めませんでした。
               <Button
                 variant="text"
-                presentation="account-inline"
+                size="inline"
                 onClick={() => loadCandidates(() => false)}
               >
                 もう一度読み込む

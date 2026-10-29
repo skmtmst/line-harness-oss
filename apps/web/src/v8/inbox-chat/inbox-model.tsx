@@ -184,13 +184,6 @@ export function formatWaitingDuration(iso: string | null, nowMs: number): string
   if (minutes < 1) return '1分未満'
   if (minutes < 60) return `${minutes}分`
   const hours = Math.floor(minutes / 60)
-  // 23：48時間以上は日に直す（72時間5分→3日5分）。
-  if (hours >= 48) {
-    const days = Math.floor(hours / 24)
-    const restHours = hours % 24
-    const restMinutes = minutes % 60
-    return `${days}日${restHours > 0 ? `${restHours}時間` : ''}${restMinutes > 0 ? `${restMinutes}分` : ''}`
-  }
   return `${hours}時間${minutes % 60}分`
 }
 

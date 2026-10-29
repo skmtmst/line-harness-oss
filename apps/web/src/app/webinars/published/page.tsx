@@ -14,6 +14,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
+import StatusBadge from '@/components/shared/status-badge'
 import { useAccount } from '@/contexts/account-context'
 import { publicationStateLabel } from '@/components/webinars/publication-label'
 import { webinarErrorText } from '@/components/webinars/webinar-error-text'
@@ -189,7 +190,7 @@ function PublishedWebinarContent() {
             ['申込重複', editor.monitoring.duplicateRegistrations],
             ['視聴履歴の取得失敗', editor.monitoring.viewSegmentFailures],
             ['個別相談連携失敗', editor.monitoring.actionFailures],
-          ].map(([label, count]) => <div key={String(label)} className="text-ink-secondary flex justify-between text-sm"><span>{label}</span><span className={Number(count) > 0 ? 'text-ink font-semibold' : 'text-ink'}>{Number(count)}件</span></div>)}</div></section>
+          ].map(([label, count]) => <div key={String(label)} className="text-ink-secondary flex justify-between text-sm"><span>{label}</span>{Number(count) > 0 ? <StatusBadge tone="danger" size="compact">{`${Number(count)}件`}</StatusBadge> : <span className="text-ink">0件</span>}</div>)}</div></section>
         </aside>
       </div>
     </div>

@@ -52,11 +52,11 @@ it('表示時刻の1分更新を解除し、離れた後の古い要求を無効
   expect(clear).toHaveBeenCalled()
 })
 
-it('E33: 見直し時刻は24時間以上前に日に直す（1282時間前→53日前）', () => {
+it('E33: 見直し時刻は共通の関数で日に直す（1282時間前→53日前）', () => {
   const ago = (ms: number) => new Date(Date.now() - ms).toISOString()
   expect(formatRelative(ago(30 * 1000))).toBe('30秒前')
   expect(formatRelative(ago(5 * 60_000))).toBe('5分前')
   expect(formatRelative(ago(5 * 3_600_000))).toBe('5時間前')
-  expect(formatRelative(ago(23 * 3_600_000))).toBe('23時間前')
+  expect(formatRelative(ago(47 * 3_600_000))).toBe('47時間前')
   expect(formatRelative(ago(53 * 24 * 3_600_000))).toBe('53日前')
 })

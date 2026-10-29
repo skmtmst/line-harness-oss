@@ -47,8 +47,16 @@ afterEach(() => { cleanup(); sessionStorage.clear() })
 test('閲覧のみ：星は付いている行だけに出し、無い行には置かない', async () => {
   render(<List />)
   await screen.findByText('星あり')
-  const starred = screen.getByTitle('注目')
-  expect(starred.tagName).toBe('SPAN')
-  // 星なしの行に星の印は無い（付けていない行の薄い星を出さない）。
-  expect(document.querySelectorAll('[title="注目"]')).toHaveLength(1)
+  const onRow = screen.getByText('星あり').closest('tr')
+  const offRow = screen.getByText('星なし').closest('tr')
+  expect(onRow).toBeTruthy()
+  expect(offRow).toBeTruthy()
+  const onCell = onRow!.querySelector('td[data-column-kind="star"]')
+  const offCell = offRow!.querySelector('td[data-column-kind="star"]')
+  // 注目ありの行：星の印（svg）がある。
+  expect(onCell?.querySelector('svg')).toBeTruthy()
+  expect(onCell?.querySelector('[title="注目"]')).toBeTruthy()
+  // 注目なしの行：星の欄に印も題も無い（題なしの薄い星が出ていたら赤）。
+  expect(offCell?.querySelector('svg')).toBeNull()
+  expect(offCell?.querySelector('[title="注目"]')).toBeNull()
 })

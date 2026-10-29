@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { api } from '@/lib/api'
 import type { IdentityCandidateListItem, IdentityCandidateStatus } from '@line-crm/shared'
 import { formatNumber } from '@/lib/format'
+import { formatElapsedMinutes } from '@/lib/format-duration'
 
 export interface PerAccountStat {
   accountId: string
@@ -43,13 +44,9 @@ export function formatRelative(iso: string): string {
   const elapsedMs = Date.now() - new Date(iso).getTime()
   if (elapsedMs < 0) return 'たった今'
   const sec = Math.floor(elapsedMs / 1000)
+  // E33：秒だけここで言い、分以上は共通の関数へ（1282時間前→53日前）。
   if (sec < 60) return `${sec}秒前`
-  const min = Math.floor(sec / 60)
-  if (min < 60) return `${min}分前`
-  const hr = Math.floor(min / 60)
-  // E33：24時間以上は日に直す（1282時間前→53日前）。
-  if (hr < 24) return `${hr}時間前`
-  return `${Math.floor(hr / 24)}日前`
+  return formatElapsedMinutes(Math.floor(sec / 60))
 }
 
 export const CANDIDATE_PAGE_SIZE = 50

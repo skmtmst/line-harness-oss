@@ -6,7 +6,7 @@ import { ArrowRight, MoreHorizontal } from 'lucide-react'
 import type { CSSProperties, ReactNode } from 'react'
 import StatusBadge from './status-badge'
 import ActionMenu, { type ActionMenuItem } from './action-menu'
-import { isKpiNumberText } from './kpi-number-text'
+import { isKpiNumberText, isZeroNumberText } from './kpi-number-text'
 import HelpTip from './help-tip'
 import { isCountableValue } from './not-connected'
 import styles from './kpi-card.module.css'
@@ -32,18 +32,6 @@ function titleParts(title: string) {
   const m = /^(.+?)(（[^（）]+）)$/u.exec(title)
   if (!m) return title
   return <><span className={styles.labelMain}>{m[1]}</span><span className={styles.labelQualifier}>{m[2]}</span></>
-}
-
-/*
- * 14：valueText で渡された 0（「0」「0件」「¥0」など）も value={0} と同じく
- * 帯では薄い灰にする。数でない文字（停止中・日付など）は対象外にする。
- */
-function isZeroNumberText(text: string): boolean {
-  const stripped = text.replace(/[\s,¥￥%％]/g, '')
-  const m = /^[+-]?0+(\.0+)?(.*)$/.exec(stripped)
-  if (!m) return false
-  const rest = m[2] ?? ''
-  return rest === '' || /^(件|名|回|人|通目|通|円|個|枚|組|枠|席|社|マス|頭|匹|台|日|時間|分|秒)(以上)?$/.test(rest)
 }
 
 /** ・：旧いtitleだけの「…」は、説明を共通の「？」へ渡す。 */

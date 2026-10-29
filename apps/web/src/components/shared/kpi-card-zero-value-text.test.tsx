@@ -32,12 +32,12 @@ describe('KpiCardの0（文字で渡した値）', () => {
     return host.firstElementChild as HTMLElement
   }
 
-  it.each(['0', '0件', '0 件', '¥0', '0%'])('「%s」は0として印を付ける', async (valueText) => {
+  it.each(['0', '0件', '0 件', '¥0', '0%', '0マイル', '0ヶ月'])('「%s」は0として印を付ける', async (valueText) => {
     const card = await renderText(valueText)
     expect(card.hasAttribute('data-kpi-zero')).toBe(true)
   })
 
-  it.each(['停止中', '12月25日', '5件', '¥1,200'])('「%s」には0の印を付けない', async (valueText) => {
+  it.each(['停止中', '12月25日', '5件', '¥1,200', '0件以上', '0以上'])('「%s」には0の印を付けない', async (valueText) => {
     const card = await renderText(valueText)
     expect(card.hasAttribute('data-kpi-zero')).toBe(false)
   })

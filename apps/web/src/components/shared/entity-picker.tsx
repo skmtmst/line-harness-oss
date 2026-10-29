@@ -15,7 +15,7 @@ import FilterChip from './filter-chip'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
 import SearchField from './search-field'
 import Select from './select'
-import { SelectValueText, isAllOption } from './select-menu'
+import { SelectValueText, filterHead, isAllOption } from './select-menu'
 import StatusBadge, { type StatusBadgeTone } from './status-badge'
 import shell from './source-picker-dialog.module.css'
 import styles from './entity-picker.module.css'
@@ -339,7 +339,7 @@ export function EntityPickerField(props: SingleField | MultiField) {
     : undefined
   const close = () => setOpen(false)
   return <>
-    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? `${props.valuePrefix ?? ''}${picked.name}` : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} disabledReason={disabledReason} readOnly={readOnly}
+    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? (props.valuePrefix ? `${filterHead(props.valuePrefix)}${picked.name}` : picked.name) : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} disabledReason={disabledReason} readOnly={readOnly}
       ariaLabel={props.ariaLabel} valuePrefix={props.valuePrefix} prefixedValue={prefixedValue} compact={props.compact} actionHidden={props.actionHidden}
       selection={props.multiple && props.value.length ? props.value.map((value) => {
         const item = items.find((candidate) => candidate.id === value)

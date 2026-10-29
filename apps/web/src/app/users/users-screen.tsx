@@ -144,12 +144,12 @@ export default function UsersV8() {
           <SaveErrorField names={["account","u.account"]}><EntitySelect
             aria-label="所属アカウントで絞り込む"
             label="所属アカウント"
-            valuePrefix="所属"
+            valuePrefix="所属アカウント"
             size="full"
             value={u.account}
             onChange={u.setAccount}
             options={[
-              { value: '', label: '所属：すべて' },
+              { value: '', label: '所属アカウント：すべて' },
               ...u.accountOptions.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name })),
             ]}
           /></SaveErrorField>

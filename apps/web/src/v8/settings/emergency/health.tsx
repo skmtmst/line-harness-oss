@@ -18,6 +18,7 @@ import styles from './screen.module.css'
 import Notice from '@/components/shared/notice'
 import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
 import { formatTime as polishFormatTime, formatDate as polishFormatDate, formatNumber } from '@/lib/format'
+import { formatElapsedMinutes } from '@/lib/format-duration'
 import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -114,11 +115,10 @@ function formatCheckedAt(iso: string | null | undefined, now = Date.now()): stri
   const time = Date.parse(iso)
   if (Number.isNaN(time)) return '—'
   const clock = polishFormatTime(new Date(time))
-  const minutes = Math.round((now - time) / 60000)
+  const minutes = Math.floor((now - time) / 60000)
   if (minutes < 10) return clock
-  // E33：24時間以上は日に直す。
-  const ago = minutes >= 1440 ? `${Math.round(minutes / 1440)}日前` : minutes >= 60 ? `${Math.round(minutes / 60)}時間前` : `${minutes}分前`
-  return `${clock}（${ago}）`
+  // E33：経過の言い方は共通の関数へ（切り捨て・48時間で日に直す）。
+  return `${clock}（${formatElapsedMinutes(minutes)}）`
 }
 
 function formatMonthDayTime(iso: string | null | undefined): string {
