@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { usePermissionLockTip } from './permission-lock-tip'
 import { X } from 'lucide-react'
 import TruncatedText from './truncated-text'
 import styles from './tag-pill.module.css'
@@ -17,6 +18,8 @@ export interface TagPillProps {
   compactAtNarrow?: boolean
   href?: string
   onRemove?: () => void
+  /** 外す操作の権限理由。リンクによる閲覧は止めない。 */
+  lockedReason?: string
 }
 
 export function TagColorDot({ color }: Pick<TagPillProps, 'color'>) {
@@ -35,7 +38,8 @@ function TagName({ name, color, folderName }: Pick<TagPillProps, 'name' | 'color
 }
 
 /** V8 のタグ札。管理画面 の呼び出し元は従来の部品を使う。リンクと外すボタンは兄弟にする。 */
-export default function TagPill({ name, color, folderName, size = 'md', compactAtNarrow, href, onRemove, 'aria-label': ariaLabel }: TagPillProps) {
+export default function TagPill({ name, color, folderName, size = 'md', compactAtNarrow, href, onRemove, lockedReason, 'aria-label': ariaLabel }: TagPillProps) {
+  const lock = usePermissionLockTip<HTMLButtonElement>(lockedReason)
   return (
     <span className={styles.pill} data-size={size} data-compact-narrow={compactAtNarrow || undefined} role="group" aria-label={ariaLabel ?? `タグ「${name}」`}>
       {href ? (
@@ -44,10 +48,11 @@ export default function TagPill({ name, color, folderName, size = 'md', compactA
         </Link>
       ) : <TagName name={name} color={color} folderName={folderName} />}
       {onRemove ? (
-        <button type="button" className={styles.remove} data-hit-area="" aria-label={`${name}を外す`} onClick={(event) => { event.stopPropagation(); onRemove() }}>
+        <button type="button" className={styles.remove} data-hit-area="" aria-label={`${name}を外す`} onClick={(event) => { event.stopPropagation(); onRemove() }} ref={lock.ref} {...lock.handlers}>
           <X aria-hidden="true" />
         </button>
       ) : null}
+      {onRemove ? lock.node : null}
     </span>
   )
 }
