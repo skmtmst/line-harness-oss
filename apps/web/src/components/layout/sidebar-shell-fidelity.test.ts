@@ -47,6 +47,7 @@ describe('サイドバーの会社表示・設定・版', () => {
     const desktop = within(view.container.querySelector('aside:not(#mobile-menu)') as HTMLElement)
     expect(desktop.getByTitle('Shed Products株式会社').textContent).toBe('Shed Products株式会社')
     expect(desktop.queryByTitle('LINEアカウント')).toBeNull()
+    expect(desktop.getByTitle('Shed Products株式会社').closest('[data-design-node="J33xq/V2WbXF"]')?.querySelector('[aria-hidden="true"]')).toBeNull()
     expect(desktop.getByText('musubo')).toBeTruthy()
     expect(desktop.getByRole('link', { name: label }).getAttribute('href')).toBe(href)
     expect(desktop.queryByRole('link', { name: otherLabel })).toBeNull()
