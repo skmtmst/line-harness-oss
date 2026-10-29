@@ -21,6 +21,7 @@ import SegmentedControl from '@/components/shared/segmented'
 import { TextArea } from '@/components/shared/text-field'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import SearchField from '@/components/shared/search-field'
 import StatusBadge from '@/components/shared/status-badge'
 import KpiBand from '@/components/shared/kpi-band'
@@ -46,6 +47,8 @@ import { Field } from '@/components/shared/form-controls'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { emptyValue, EmptyCell } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { lockReason, lockMenuItems } from '@/components/shared/permission-lock'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 
 /*
  * ★V8 LINEアカウント（Pencil ）。
@@ -59,22 +62,15 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 const TITLE = 'LINEアカウント'
 const DESCRIPTION = 'musubo でつないでいる LINE 公式アカウントです。既定のアカウントと、親子（本店と支店など）を決めます。'
-/** 管理者に出す一文。押せない入口を出すより、誰に頼めばよいかを先に書く。 */
-const MANAGER_ONLY_REGISTER = 'LINEアカウントの登録はオーナーか管理者ができます'
 
 export default function AccountsV8() {
   usePageTitle(TITLE)
   const router = useRouter()
   const role = useStaffRole()
-  // 役割が読めるまでは今までどおり出し、見るだけと分かったら変える操作を隠す（最後の守りはサーバ）。
   const canManage = canManageRole(role)
-  /*
-   * 登録はオーナーだけ（要件 v6-33 §15 `account.line.register`「登録、接続確認」）。
-   * 管理者に入口を出すと③接続確認でサーバの403に当たって行き止まりになるので、
-   * 入口を出さずに理由を書く。並び順・親子やスタイルは `account.metadata.edit` で
-   * 管理者も持っているため、ここでは分けない。
-   */
   const canRegister = canManageRole(role)
+  const permissionReason = usePermissionLockReason(canManage, 'manager')
+  const blocked = !canManage || Boolean(permissionReason)
   const [accounts, setAccounts] = useState<AccountWithStats[]>([])
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [query, setQuery] = useListUrlValue('q', '')
@@ -126,7 +122,7 @@ export default function AccountsV8() {
   }, [load])
 
   const runArchive = useCallback(async (stepUpToken?: string) => {
-    if (!archiveTarget) return
+    if (!archiveTarget || !canManage || lockReason(canManage, 'manager')) return
     setBusy(true)
     setDialogError('')
     try {
@@ -145,11 +141,11 @@ export default function AccountsV8() {
     } finally {
       setBusy(false)
     }
-  }, [archiveTarget, archiveReason, load])
+  }, [archiveTarget, archiveReason, load, canManage])
 
   /** アーカイブから戻す。戻った直後は「止まっている」状態。 */
   const runRestore = useCallback(async (stepUpToken?: string) => {
-    if (!restoreTarget) return
+    if (!restoreTarget || !canManage || lockReason(canManage, 'manager')) return
     setBusy(true)
     setDialogError('')
     try {
@@ -167,7 +163,7 @@ export default function AccountsV8() {
     } finally {
       setBusy(false)
     }
-  }, [restoreTarget, load])
+  }, [restoreTarget, load, canManage])
 
   /** 行の「…」の中身：詳細・接続をもう一度確かめる・引き継ぎ・アーカイブ（戻す）。 */
   const menuItems = (account: LineAccount): ActionMenuItem[] => {
@@ -175,30 +171,28 @@ export default function AccountsV8() {
       { id: 'detail', label: '詳細', external: false, href: `/accounts/detail?id=${account.id}`, onSelect: () => { setOpenMenuId(null); router.push(`/accounts/detail?id=${account.id}`) } },
       { id: 'recheck', label: '接続をもう一度確かめる', disabled: busy, onSelect: () => void recheck(account) },
     ]
-    if (!canManage) return items
     items.push({ id: 'handover', label: '引き継ぎ', external: false, href: `/accounts/handover?id=${account.id}`, onSelect: () => { setOpenMenuId(null); router.push(`/accounts/handover?id=${account.id}`) } })
     items.push(account.archivedAt
       ? { id: 'restore', label: 'アーカイブから戻す', dividerBefore: true, disabled: busy, onSelect: () => { setOpenMenuId(null); setDialogError(''); setRestoreTarget(account) } }
       : { id: 'archive', label: 'アーカイブ', tone: 'danger', dividerBefore: true, disabled: busy, onSelect: () => { setOpenMenuId(null); setDialogError(''); setArchiveReason(''); setArchiveTarget(account) } })
-    return items
+    const mutations = lockMenuItems(canManage, items, 'manager', (item) => item.id === 'detail' || item.id === 'recheck')
+    return role === null ? mutations.map(item => item.id === 'detail' || item.id === 'recheck' ? item : { ...item, lockedReason: undefined, disabled: true }) : mutations
   }
 
-  const headActions = canManage ? (
+  const headActions = (
     <div className={styles.headActions}>
-      <Button variant="secondary" onClick={() => setOrderingOpen(true)}>
+      <Button variant="secondary" disabled={role === null} lockedReason={permissionReason} onClick={() => { if (!canManage || lockReason(canManage, 'manager')) return; setOrderingOpen(true) }}>
         <ArrowUpDown size={16} aria-hidden="true" />並び順と親子を変える
       </Button>
-      {canRegister ? (
-        <Button variant="primary" href="/accounts/new">
-          <Plus size={16} aria-hidden="true" />LINEアカウントを登録
-        </Button>
-      ) : <span className={styles.ownerOnly}>{MANAGER_ONLY_REGISTER}</span>}
+      <Button variant="primary" lockedReason={permissionReason} {...(role === null ? { disabled: true } : { href: '/accounts/new' })}>
+        <Plus size={16} aria-hidden="true" />LINEアカウントを登録
+      </Button>
     </div>
-  ) : undefined
+  )
 
   return (
     <>
-      <SettingsPage layout="accounts" help={<>{DESCRIPTION}{"行の「…」から 詳細・接続をもう一度確かめる・既定にする・引き継ぎ（UID の移行）・アーカイブ。"}</>} boardId="V7vn3" title={TITLE}  actions={headActions} navigation={<SettingsInnerNav inline />}>
+      <SettingsPage layout="accounts" help={<>{DESCRIPTION}{"行の「…」から 詳細・接続をもう一度確かめる・既定にする・引き継ぎ（UID の移行）・アーカイブ。"}</>} boardId="V7vn3" title={TITLE} notice={role !== null && blocked ? <ReadOnlyNotice need="manager" /> : undefined} actions={headActions} navigation={<SettingsInnerNav inline />}>
         {notice ? (
           <Notice tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} onClose={() => setNotice(null)} />
         ) : null}
@@ -211,7 +205,7 @@ export default function AccountsV8() {
         </KpiBand>
 
         {/* B-335：スタイルを変える入口（今のアカウント）。オーナー・管理者だけ。 */}
-        {canManage ? <StyleEntry /> : null}
+        <StyleEntry />
 
         <div className={styles.toolbar}>
           <SearchField
@@ -246,7 +240,7 @@ export default function AccountsV8() {
                   : '送受信に使うアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。')
                 : undefined}
               action={accounts.length === 0
-                ? (canRegister ? <Button href="/accounts/new" variant="primary"><Plus size={16} aria-hidden="true" />LINEアカウントを登録</Button> : undefined)
+                ? <Button lockedReason={permissionReason} {...(role === null ? { disabled: true } : { href: '/accounts/new' })} variant="primary"><Plus size={16} aria-hidden="true" />LINEアカウントを登録</Button>
                 : <Button type="button" onClick={() => { setQuery(''); setFilter('all') }}>条件を外す</Button>}
             />
           </div>
@@ -297,13 +291,13 @@ export default function AccountsV8() {
         )}
       </SettingsPage>
 
-      {orderingOpen ? <AccountOrdering
+      {orderingOpen && !blocked ? <AccountOrdering
         onClose={() => { setOrderingOpen(false); void load(false) }}
         onSaved={() => { setOrderingOpen(false); void load(false) }}
       /> : null}
 
       <ConfirmDialog
-        open={archiveTarget !== null}
+        open={archiveTarget !== null && !blocked}
         title={`「${archiveTarget?.name}」をアーカイブしますか？`}
         description="一覧から外します。送受信は止まり、友だちと履歴は残ります。あとから「アーカイブから戻す」で戻せます。動いているアカウント・既定のアカウント・配送中のアカウントはアーカイブできません。"
         confirmLabel="アーカイブする"
@@ -324,7 +318,7 @@ export default function AccountsV8() {
       </ConfirmDialog>
 
       <ConfirmDialog
-        open={restoreTarget !== null}
+        open={restoreTarget !== null && !blocked}
         title={`「${restoreTarget?.name}」をアーカイブから戻しますか？`}
         description="一覧へ戻します。戻った直後は「止まっている」状態です。送受信を始めるには、接続を確かめてから「送受信を再開する」を使います。"
         confirmLabel="アーカイブから戻す"
@@ -333,7 +327,7 @@ export default function AccountsV8() {
         onCancel={() => { if (!busy) { setRestoreTarget(null); setDialogError('') } }}
         onConfirm={() => runRestore()}
       />
-      {stepUp ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
+      {stepUp && !blocked ? <StepUpPrompt request={stepUp} onDone={() => setStepUp(null)} onClose={() => setStepUp(null)} /> : null}
     </>
   )
 }

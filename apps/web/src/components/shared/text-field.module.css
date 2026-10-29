@@ -20,6 +20,7 @@
 
 .field::placeholder {
   color: var(--color-ink-faint);
+  opacity: 1;
 }
 
 .field:disabled {
@@ -148,3 +149,20 @@ html:root .affixed:focus-within { outline: 2px solid var(--color-focus-ring); ou
 html:root .affixed[aria-invalid='true']:focus-within { box-shadow: var(--polish-error-ring); }
 html:root .affixed[data-disabled] { opacity: var(--polish-disabled-opacity); }
 html:root .affixed .affixedControl:disabled { opacity: 1; }
+
+/*
+ * 文字を入れる欄も選ぶ欄（プルダウン）と同じ影と地で浮かせる。
+ * 細い線だけだと平らに見えて埋もれる。焦点の青い輪・誤りの赤い枠・計算で決まる灰色の欄は今のまま。
+ * 前後の固定文字つきの欄は外枠だけに付け、中の入力は透明のまま。
+ */
+html:root .field:is(.single, .multi):not(.affixedControl):not([data-look='derived']) {
+  background: var(--gradient-raised-control) var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+}
+html:root .field:is(.single, .multi):not(.affixedControl):not([data-look='derived']):not([aria-invalid='true']):not(:focus-visible):not(:focus-within) {
+  outline-color: transparent;
+  border-color: transparent;
+}
+html:root .field:is(.single, .multi):not(.affixedControl)[aria-invalid='true']:is(:focus-visible, :focus-within) {
+  box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
+}

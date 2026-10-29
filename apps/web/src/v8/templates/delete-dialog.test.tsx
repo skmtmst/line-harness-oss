@@ -12,7 +12,7 @@ it('アカウントが変わった削除は理由を読み、選び直すまで�
     confirmDisabled onConfirm={remove} onCancel={cancel} />)
   const button = screen.getByRole('button', { name: '削除する' }) as HTMLButtonElement
   expect(button.disabled).toBe(true)
-  expect(button.title).toContain('アカウントが切り替わりました')
+  expect(button.getAttribute('aria-description')).toContain('アカウントが切り替わりました')
   fireEvent.click(button)
   expect(remove).not.toHaveBeenCalled()
   rerender(<TemplateDeleteDialog open title="文を削除しますか？" description="配信には残ります。"

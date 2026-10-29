@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * 全ルート監査 A3（2026-09-25）: `?view=new` の優先順位の初期値が
@@ -88,7 +89,7 @@ describe('friend-add 新規の優先順位の初期値', () => {
       name.dispatchEvent(new Event('input', { bubbles: true }))
       name.dispatchEvent(new Event('change', { bubbles: true }))
     })
-    const save = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('下書きを保存'))!
+    const save = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('下書きを保存')) ?? querySupplementaryPageAction('下書きを保存'))!
     await act(async () => { save.click(); await Promise.resolve() })
     expect(api.createDraft).toHaveBeenCalledWith(expect.objectContaining({ priority: 3 }), expect.any(String))
     expect(host.textContent).not.toContain('番目')

@@ -17,6 +17,7 @@ import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { hm } from './series-model'
 import styles from './party-section.module.css'
 import { formatNumber } from '@/lib/format'
+import { withHonorific } from '@line-crm/shared'
 
 /*
  * 予約の詳細パネルの段「この組（N 人）」（B5-3・Nx1kq）。人ごとのメニュー・担当・時間を並べ、
@@ -59,7 +60,7 @@ export default function PartySection({ party, canOperate, canRemoveMember = fals
     <Card padding="compact" layout="vertical" gap="var(--polish-space-field)" aria-label={`この組（${party.members.length} 人）`}>
       <header className={styles.head}>
         <h3 className={styles.title}>この組（{party.members.length} 人）</h3>
-        {party.ownerName ? <span className={styles.owner}>{party.ownerName} さまの予約</span> : null}
+        {party.ownerName ? <span className={styles.owner}>{withHonorific(party.ownerName, 'さま', { space: true })}の予約</span> : null}
       </header>
       <DataTable>
         <thead><Tr><Th truncate>人</Th><Th truncate>メニュー</Th><Th truncate>担当</Th><Th truncate>時間</Th></Tr></thead>

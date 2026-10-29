@@ -2,7 +2,7 @@
 import React from 'react'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Dialog from './dialog'
 import Drawer from './drawer'
@@ -17,7 +17,6 @@ afterEach(() => cleanup())
 const read = (path: string) => readFileSync(join(process.cwd(), path), 'utf8')
 const tabsCss = read('src/components/shared/tabs.module.css')
 const drawerCss = read('src/components/shared/drawer.module.css')
-const dialogCss = read('src/components/shared/dialog.module.css')
 const templateCss = read('src/components/templates/page-templates.module.css')
 const globals = read('src/app/globals.css')
 
@@ -51,7 +50,7 @@ describe('引き出しの幅（width="narrow"）', () => {
   })
 })
 
-describe('窓の下のボタンを中央に（footerAlign="center"）', () => {
+describe('窓の下の操作は既定で中央にそろえる', () => {
   it('渡さなければ印を付けない。渡すと data-footer-align="center"', () => {
     const { rerender } = render(<Dialog open modal={false} title="窓" onCancel={vi.fn()} onConfirm={vi.fn()} />)
     expect(screen.getByRole('dialog').getAttribute('data-footer-align')).toBeNull()
@@ -59,8 +58,21 @@ describe('窓の下のボタンを中央に（footerAlign="center"）', () => {
     expect(screen.getByRole('dialog').getAttribute('data-footer-align')).toBe('center')
   })
 
-  it('中央寄せは v8 の印つきの窓だけ', () => {
-    expect(dialogCss).toMatch(/:root \.panel\[data-footer-align='center'\] \.actions \{ justify-content: center; \}/)
+  it('既定の操作組を中央に置き、明示された lead は左欄に保つ', () => {
+    const cancel = vi.fn(), confirm = vi.fn(), lead = vi.fn()
+    render(<Dialog open modal={false} title="窓" onCancel={cancel} onConfirm={confirm} footerLead={<button onClick={lead}>左の操作</button>} />)
+    const actions = screen.getByRole('dialog').querySelector('[data-dialog-action-pair]')!
+    const cancelButton = screen.getByRole('button', { name: 'キャンセル', exact: true })
+    const confirmButton = screen.getByRole('button', { name: '保存する', exact: true })
+    const leadButton = screen.getByRole('button', { name: '左の操作', exact: true })
+    expect(cancelButton.parentElement).toBe(confirmButton.parentElement)
+    expect(actions.children).toHaveLength(2)
+    expect(actions.firstElementChild?.contains(leadButton)).toBe(true)
+    expect(cancelButton.parentElement?.contains(leadButton)).toBe(false)
+    fireEvent.click(leadButton)
+    expect(lead).toHaveBeenCalledOnce()
+    expect(cancel).not.toHaveBeenCalled()
+    expect(confirm).not.toHaveBeenCalled()
   })
 })
 

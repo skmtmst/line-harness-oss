@@ -41,6 +41,10 @@ beforeEach(() => {
     (id, name, role, api_key, tenant_id) VALUES (?, ?, ?, ?, ?)`).run(
       'owner-1', 'Owner', 'owner', 'owner-key', DEFAULT_TENANT_ID,
     );
+  testDb.raw.prepare(`INSERT INTO staff_members
+    (id, name, role, api_key, tenant_id) VALUES (?, ?, ?, ?, ?)`).run(
+      'admin-1', 'Admin', 'admin', 'admin-key', DEFAULT_TENANT_ID,
+    );
 });
 
 describe('current tenant', () => {
@@ -184,5 +188,21 @@ describe('tenant boundary preview', () => {
         accountsWithoutTenant: 1,
       },
     });
+  });
+});
+
+describe('account-scoped admin tenant boundary', () => {
+  it('denies company details, tenant changes, and boundary diagnostics', async () => {
+    testDb.raw.prepare("UPDATE staff_members SET account_scope = 'accounts' WHERE id = 'admin-1'").run();
+    const accountAdmin = app(operator('admin'));
+    const bindings = environment();
+    expect((await accountAdmin.request('/api/tenants/me/company-contact', {}, bindings)).status).toBe(403);
+    expect((await accountAdmin.request('/api/tenants/me/company-contact', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: '{}',
+    }, bindings)).status).toBe(403);
+    expect((await accountAdmin.request('/api/tenants/me', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: '変更不可' }),
+    }, bindings)).status).toBe(403);
+    expect((await accountAdmin.request('/api/tenants/boundary-preview', {}, bindings)).status).toBe(403);
   });
 });

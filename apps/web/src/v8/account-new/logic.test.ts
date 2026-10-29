@@ -3,8 +3,8 @@ import type { LineAccountConnectData } from '@/lib/api'
 import {
   DRAFT_KEY, LOGIN_ACKS, PRECHECK_RESULT, PRECHECK_VERIFIED_ACK, WEBHOOK_ACKS, allAcked, allV06RowsOk,
   allV8RowsPassed, checkActionLabel, checkErrorText, checkRowText, checkStage, developerChannelUrl, developerProviderUrl,
-  formatJaDuration, handoverProgress, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked,
-  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary, precheckUpcoming,
+  formatJaDuration, handoverProgress, latestFollowerImportState, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked, providerIdErrors,
+  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
   readDraft, readPrecheckAnswers, readPrecheckAt, stepLabel, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
 } from './logic'
 import type { V06CheckRow } from './logic'
@@ -125,23 +125,13 @@ describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
     expect(precheckBack('q4', { q2: 'yes', q3: 'no' })).toBe('q3')
   })
 
-  it('答えの一覧は答えた質問だけ、「このあとの質問」は尋ねないと決まった質問を外す', () => {
+  it('答えの一覧は答えた質問だけ出す', () => {
     expect(precheckSummary('q2', { q1: 'yes', q2: 'no' })).toEqual([
       { key: 'q1', label: 'Q1. LINE公式アカウント', value: 'あります' },
       { key: 'q2', label: 'Q2. 友だちの引き継ぎ', value: 'いいえ、引き継ぎません' },
     ])
     expect(precheckSummary('done', { q1: 'yes', q2: 'no', q4: 'no' }).map((row) => row.key)).toEqual(['q1', 'q2', 'q4'])
     expect(precheckSummary('q1', {})).toEqual([])
-    // 未定のあいだは括弧の注記を付け、尋ねないと決まったら一覧から消す。
-    expect(precheckUpcoming('q1', {}).map((row) => row.text)).toEqual([
-      'Q2. いまの友だちを引き継ぎますか？',
-      'Q3. 友だちの数は50万人を超えていますか？（引き継ぐときだけ）',
-      'Q4. ほかのLINE配信ツールを使っていますか？',
-      'Q5. そのツールを、これからどうしますか？（使っているときだけ）',
-    ])
-    expect(precheckUpcoming('q2', { q1: 'yes', q2: 'no' }).map((row) => row.key)).toEqual(['q4', 'q5'])
-    expect(precheckUpcoming('q4', { q1: 'yes', q2: 'no', q4: 'no' })).toEqual([])
-    expect(precheckUpcoming('done', { q1: 'yes' })).toEqual([])
   })
 
   it('札は「質問 n」。最後だけ「チェック完了」で、結果は4項目', () => {
@@ -164,26 +154,27 @@ describe('①事前確認（v07 p6zMkA）の出しわけ', () => {
 })
 
 describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算', () => {
-  it('②は3つ、③は2つの小さな段。札は「Step 2 / 3」の形で、段の無い画面では出さない', () => {
-    expect([subTotal(1), subTotal(2), subTotal(3), subTotal(4), subTotal(5)]).toEqual([0, 3, 2, 0, 0])
-    expect(stepLabel(2, 2)).toBe('Step 2 / 3')
+  it('②は4つ、③は2つの小さな段。札は「Step 2 / 4」の形で、段の無い画面では出さない', () => {
+    expect([subTotal(1), subTotal(2), subTotal(3), subTotal(4), subTotal(5)]).toEqual([0, 4, 2, 0, 0])
+    expect(stepLabel(2, 2)).toBe('Step 2 / 4')
     expect(stepLabel(3, 2)).toBe('Step 2 / 2')
     expect(stepLabel(1, 1)).toBe('')
     // 範囲の外を渡されても札は壊さない。
     expect(stepLabel(3, 9)).toBe('Step 2 / 2')
   })
 
-  it('②は Messaging API の2項目・プロバイダーIDと LINEログインの2項目を別々に調べる', () => {
+  it('②は Messaging API の2項目・プロバイダーID・LINEログインの2項目を別々に調べる', () => {
     const empty = { channelId: '', channelSecret: '', providerId: '', loginChannelId: '', loginChannelSecret: '' }
-    expect(Object.keys(messagingApiErrors(empty)).sort()).toEqual(['channelId', 'channelSecret', 'providerId'])
+    expect(Object.keys(messagingApiErrors(empty)).sort()).toEqual(['channelId', 'channelSecret'])
+    expect(Object.keys(providerIdErrors(empty))).toEqual(['providerId'])
     expect(Object.keys(loginChannelErrors(empty)).sort()).toEqual(['loginChannelId', 'loginChannelSecret'])
     expect(messagingApiErrors({ channelId: 'abc', channelSecret: 'x', providerId: '2002' }).channelId).toBe('チャネルIDは半角数字で入力してください。')
-    expect(messagingApiErrors({ channelId: '2001', channelSecret: 'x', providerId: 'abc' }).providerId).toBe('プロバイダーIDは半角数字で入力してください。')
+    expect(providerIdErrors({ providerId: 'abc' }).providerId).toBe('プロバイダーIDは半角数字で入力してください。')
     expect(messagingApiErrors({ channelId: '2001', channelSecret: 'x', providerId: '2002' })).toEqual({})
     expect(loginChannelErrors({ loginChannelId: '2002', loginChannelSecret: 'x' })).toEqual({})
   })
 
-  it('②Step2の4つ・Step3の2つは、すべて入れないと次の段へ進めない', () => {
+  it('②Step3の4つ・Step4の2つは、すべて入れないと次の段へ進めない', () => {
     expect(WEBHOOK_ACKS).toHaveLength(4)
     expect(LOGIN_ACKS).toHaveLength(2)
     expect(allAcked(WEBHOOK_ACKS, {})).toBe(false)
@@ -209,9 +200,10 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     for (const ack of [...WEBHOOK_ACKS, ...LOGIN_ACKS]) expect(ack.note.length).toBeGreaterThan(0)
   })
 
-  it('LINE Developers の行き先は入れたチャネルIDのページ。空ならコンソールの入口', () => {
-    expect(developerChannelUrl(' 2001 ')).toBe('https://developers.line.biz/console/channel/2001')
-    expect(developerChannelUrl('')).toBe('https://developers.line.biz/console/')
+  it('LINE Developers の行き先は入れたMessaging APIチャネルの設定画面', () => {
+    expect(developerChannelUrl(' 2001 ')).toBe('https://developers.line.biz/console/channel/2001/messaging-api')
+    expect(developerChannelUrl('')).toBe('')
+    expect(developerChannelUrl('2001x')).toBe('')
   })
 
   it('LINEログイン作成時は入力されたプロバイダーIDの画面を開く', () => {
@@ -318,21 +310,24 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     expect(options[5].note).toBe('今のダッシュボードのままです。カードは、あとから自分で足し引きできます')
   })
 
-  it('引き継ぎ中の進み具合：総人数が分からないうちは割合を出さず、速さから残り時間を見積もる', () => {
-    const half = handoverProgress({ imported: 60, total: 120, elapsedSeconds: 30, running: true })
-    expect(half.rate).toBe(50)
-    expect(half.perMinute).toBe(120)
-    expect(half.remainingSeconds).toBe(30)
-    expect(half.done).toBe(false)
-    const unknown = handoverProgress({ imported: 10, total: null, elapsedSeconds: 60, running: true })
-    expect(unknown.rate).toBe(0)
-    expect(unknown.remainingSeconds).toBeNull()
-    const finished = handoverProgress({ imported: 120, total: 120, elapsedSeconds: 60, running: false })
-    expect(finished.rate).toBe(100)
-    expect(finished.remainingSeconds).toBe(0)
-    expect(finished.done).toBe(true)
-    // 始まったばかりで何も進んでいなければ速さは出さない（0人／分と言わない）。
-    expect(handoverProgress({ imported: 0, total: 120, elapsedSeconds: 2, running: true }).perMinute).toBeNull()
+  it('引き継ぎ人数はジョブの結果を使い、探索中の分母と前日集計を表示しない', () => {
+    const counts = {
+      received: 2, imported: 1, alreadyPresent: 1, reactivated: 0,
+      claimedUnassigned: 0, conflicts: 0, invalid: 0, profilesUpdated: 0,
+    }
+    expect(handoverProgress({ ...counts, phase: 'importing_ids' })).toMatchObject({ confirmed: null, foundSoFar: 2, processed: 2, stage: 1 })
+    // 前日2人に今日2人が加わった場合、LINEの現在の一覧を読み終えて初めて4人と表示する。
+    const four = handoverProgress({ ...counts, phase: 'hydrating_profiles', received: 4, imported: 3 })
+    expect(four).toMatchObject({ confirmed: 4, imported: 3, alreadyPresent: 1, processed: 4, stage: 2 })
+    expect(handoverProgress({ ...counts, phase: 'completed', received: 4, imported: 3 }).stage).toBe(3)
+  })
+
+  it('処理応答より古い読み取り結果で段階と人数を巻き戻さない', () => {
+    const current = { phase: 'hydrating_profiles' as const, received: 4, profilesProcessed: 2, profilesUpdated: 2 }
+    expect(latestFollowerImportState(current, { phase: 'importing_ids', received: 0, profilesProcessed: 0, profilesUpdated: 0 })).toBe(current)
+    expect(latestFollowerImportState(current, { phase: 'hydrating_profiles', received: 4, profilesProcessed: 1, profilesUpdated: 1 })).toBe(current)
+    const finished = { phase: 'completed' as const, received: 4, profilesProcessed: 4, profilesUpdated: 4 }
+    expect(latestFollowerImportState(current, finished)).toBe(finished)
   })
 
   it('長さは日本語で出す（0以下は出さない）', () => {
@@ -346,7 +341,8 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
   })
 
   it('下書きは小さな段も戻す（画面に無い段の数は1に丸める）', () => {
-    expect(readDraft(storage({ step: 2, sub: 3, channelId: '2001' }))).toMatchObject({ step: 2, sub: 3 })
+    expect(readDraft(storage({ step: 2, sub: 3, channelId: '2001' }))).toMatchObject({ step: 2, sub: 4 })
+    expect(readDraft(storage({ step: 2, sub: 2, connectionStepsVersion: 4, channelId: '2001' }))).toMatchObject({ step: 2, sub: 2 })
     expect(readDraft(storage({ step: 2, sub: 9, channelId: '2001' }))).toMatchObject({ step: 2, sub: 1 })
     expect(readDraft(storage({ step: 4, sub: 2, channelId: '2001' }))).toMatchObject({ step: 4, sub: 1 })
     expect(readDraft(storage({ step: 2, channelId: '2001' }))).toMatchObject({ sub: 1 })

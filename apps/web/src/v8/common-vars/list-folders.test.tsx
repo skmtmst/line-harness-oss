@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { expectLockedFolderMenu } from '@/test-utils/permission-locked-control'
 /*
  * V8 共通情報の一覧（src/v8/common-vars/list.tsx）のフォルダ操作と、絞り込み0件の動き（R37・R38）。
  * 左のフォルダの列の「…」と、畳んだ欄（狭い幅）の「フォルダの操作」から名前変更・削除へ届くこと、
@@ -144,10 +145,10 @@ describe('R37 共通情報のフォルダの名前変更・削除', () => {
     expect(document.querySelector<HTMLInputElement>('[role="dialog"] input[type="text"], [role="dialog"] input:not([type])')?.value).toBe('店舗案内')
   })
 
-  it('閲覧のみには、左の列にも畳んだ欄にもフォルダの操作を出さない', async () => {
+  it('閲覧のみでもフォルダの操作を出し、変更を理由付きで拒否する', async () => {
     staffRole.value = 'staff'
     await renderInShop()
-    expect(host.querySelector('button[aria-label="フォルダ「店舗案内」の操作"]')).toBeNull()
+    await expectLockedFolderMenu(host.querySelector('button[aria-label="フォルダ「店舗案内」の操作"]'))
     expect(host.textContent).toContain('店舗案内')
   })
 })

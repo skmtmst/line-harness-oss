@@ -16,7 +16,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { FriendAddEventAttributionStatus, FriendAddEventKind, FriendAddEventRoutingStatus } from '@line-crm/shared';
+import { withHonorific, type FriendAddEventAttributionStatus, type FriendAddEventKind, type FriendAddEventRoutingStatus } from '@line-crm/shared';
 import { UserPlus, Send, Play, Download, FileText, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
@@ -48,6 +48,7 @@ import { csvFileName } from '@/lib/csv-file-name';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import Notice from '@/components/shared/notice'
 
 /*
@@ -123,6 +124,7 @@ function FriendAddRunsInner() {
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
   const role = useStaffRole()
   const canManage = useFeatureAccess('friendAdd')
+  const manageReason = usePermissionLockReason(canManage)
   const searchParams = useSearchParams()
   const router = useRouter()
   const samePageUrl = useSamePageUrl()
@@ -278,7 +280,7 @@ function FriendAddRunsInner() {
   useEffect(() => { void loadRuleState() }, [loadRuleState])
 
   const stopDelivery = async () => {
-    if (!selectedAccountId || !activeRuleId || stopBusy) return
+    if (!canManage || !selectedAccountId || !activeRuleId || stopBusy) return
     setStopBusy(true)
     setStopError('')
     try {
@@ -299,7 +301,7 @@ function FriendAddRunsInner() {
 
   /* もう一度実行（1件）。 */
   const retryOne = async (item: RunItem): Promise<boolean> => {
-    if (!selectedAccountId) return false
+    if (!canManage || !selectedAccountId) return false
     try {
       const response = await api.friendAddRules.retryRun(selectedAccountId, item.id)
       return response.success
@@ -308,7 +310,7 @@ function FriendAddRunsInner() {
     }
   }
   const retryRun = async (item: RunItem) => {
-    if (retrying) return
+    if (!canManage || retrying) return
     setRetrying(item.id)
     setMessage('')
     const ok = await retryOne(item)
@@ -318,7 +320,7 @@ function FriendAddRunsInner() {
   }
   /* 「失敗した処理をもう一度」：今のページの失敗を順に実行する。 */
   const retryAllFailed = async () => {
-    if (retrying || failedItems.length === 0) return
+    if (!canManage || retrying || failedItems.length === 0) return
     setRetrying('all')
     setMessage('')
     let retried = 0
@@ -421,8 +423,8 @@ function FriendAddRunsInner() {
       const friendId = item.friend.id
       list.push({ id: 'chat', label: 'トークを開く', icon: <MessageCircle size={16} aria-hidden="true" />, onSelect: () => router.push(`/chats?friend=${encodeURIComponent(friendId)}`) })
     }
-    if (canManage && (item.status === 'failed' || item.status === 'partial_failed')) {
-      list.push({ id: 'retry', label: 'もう一度実行', icon: <RotateCcw size={16} aria-hidden="true" />, disabled: retrying !== null, onSelect: () => { void retryRun(item) } })
+    if (item.status === 'failed' || item.status === 'partial_failed') {
+      list.push({ id: 'retry', label: 'もう一度実行', icon: <RotateCcw size={16} aria-hidden="true" />, disabled: !manageReason && (!canManage || retrying !== null), lockedReason: manageReason, onSelect: () => { void retryRun(item) } })
     }
     return list
   }
@@ -449,12 +451,10 @@ function FriendAddRunsInner() {
     <DetailPage
       {...head}
       actions={<div className={styles.headActions}>
-        {canManage ? (
-          <Button onClick={() => { setStopError(''); setStopOpen(true) }} disabled={!activeRuleId || stopBusy || ruleState?.status === 'paused'}
+        <Button lockedReason={manageReason} onClick={() => { if (!canManage) return; setStopError(''); setStopOpen(true) }} disabled={!manageReason && (!canManage || !activeRuleId || stopBusy || ruleState?.status === 'paused')}
             title={!activeRuleId ? '実行結果がまだありません' : undefined}>
             <Pause size={16} aria-hidden="true" />一時停止する
           </Button>
-        ) : null}
         <Button href="/friend-add-settings">
           <Pencil size={16} aria-hidden="true" />設定の一覧へ
         </Button>
@@ -483,12 +483,12 @@ function FriendAddRunsInner() {
       </div>
 
       {!loading && !error && failedCount > 0 ? (
-        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => pickChip('failed')}>失敗だけ見る</Button>{canManage ? (
-            <Button variant="primary" onClick={() => void retryAllFailed()} disabled={failedItems.length === 0 || retrying !== null}
+        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => pickChip('failed')}>失敗だけ見る</Button>
+            <Button variant="primary" lockedReason={manageReason} onClick={() => void retryAllFailed()} disabled={!manageReason && (!canManage || failedItems.length === 0 || retrying !== null)}
               busy={retrying === 'all'} busyLabel="実行しています">
               <RotateCcw size={16} aria-hidden="true" />失敗した処理をもう一度
             </Button>
-          ) : null} </>} >案内は届きましたが、シナリオを始められませんでした。止まった行の理由を見て、もう一度実行できます。</Notice>
+          </>} >案内は届きましたが、シナリオを始められませんでした。止まった行の理由を見て、もう一度実行できます。</Notice>
       ) : null}
 
       <Card padding="none" aria-label="実行の記録">
@@ -555,7 +555,7 @@ function FriendAddRunsInner() {
                     <ActionCell>
                       <div className={styles.menuBox}>
                         <RowMenu
-                          size="row" label={`${name}さんの記録の操作`}
+                          size="row" label={`${withHonorific(name)}の記録の操作`}
                           items={rowMenuItems(item)}
                           open={menuId === item.id}
                           onOpenChange={(next) => setMenuId(next ? item.id : null)}

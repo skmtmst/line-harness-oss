@@ -1,12 +1,14 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 友だち追加時の配信の実行結果（src/v8・）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * 結果・行ったことの言葉／札で絞ると URL が変わる／失敗の帯で今のページの失敗を順にもう一度実行する／
- * 閲覧のみには変える操作を出さない／顧客名が隠された記録はトークへ進ませない。
+ * 閲覧のみの操作は理由付きで残し、書き込まない／顧客名が隠された記録はトークへ進ませない。
  */
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { withHonorific } from '@line-crm/shared'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -28,7 +30,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
   usePageCrumbs: () => {},
 }))
 
-const roleState = vi.hoisted(() => ({ role: 'owner' as string }))
+const roleState = vi.hoisted(() => ({ role: 'owner' as string | null }))
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
   return { ...actual, useStaffRole: () => roleState.role }
@@ -69,7 +71,7 @@ let root: Root
 let host: HTMLDivElement
 
 beforeEach(() => {
-  roleState.role = 'owner'
+  roleState.role = verifiedStaffRole('owner')
   retried = []; total = 4; nextCursor = null
   nav.replace.mockClear()
   items = [
@@ -172,18 +174,37 @@ describe('実行結果の画面（REIxB）', () => {
     expect(host.textContent).toContain('失敗した処理を2 件もう一度実行しました。')
   })
 
-  it('閲覧のみには一時停止・もう一度実行を出さず、帯を出す', async () => {
-    roleState.role = 'viewer'
+  it('閲覧のみには一時停止・もう一度実行を灰色で残し、起動させない', async () => {
+    roleState.role = verifiedStaffRole('viewer')
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
-    expect(buttonByText('一時停止する')).toBeUndefined()
-    expect(buttonByText('失敗した処理をもう一度')).toBeUndefined()
+    for (const label of ['一時停止する', '失敗した処理をもう一度']) {
+      const button = buttonByText(label)!
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      expect(button.disabled).toBe(false)
+      await act(async () => { button.click() })
+    }
+    expect(retried).toEqual([])
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
     expect(buttonByText('CSVで書き出す')).toBeTruthy()
+  })
+
+  it('本人が未確認の間は操作を止め、閲覧のみと決めつけない', async () => {
+    roleState.role = verifiedStaffRole(null)
+    await render()
+    for (const label of ['一時停止する', '失敗した処理をもう一度']) {
+      const button = buttonByText(label)!
+      expect(button.disabled).toBe(true)
+      await act(async () => button.click())
+    }
+    expect(retried).toEqual([])
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(host.textContent).not.toContain('閲覧のみで見ています')
   })
 
   it('顧客名が隠された記録の「…」にはトークを開くを出さない', async () => {
     await render()
-    const menuOf = (name: string) => host.querySelector<HTMLButtonElement>(`button[aria-label="${name}さんの記録の操作"]`)
+    const menuOf = (name: string) => host.querySelector<HTMLButtonElement>(`button[aria-label="${withHonorific(name)}の記録の操作"]`)
     await act(async () => { menuOf('顧客名は非表示')?.click() })
     expect(document.body.textContent).toContain('実行の詳細を開く')
     expect(document.body.textContent).not.toContain('トークを開く')
@@ -203,3 +224,5 @@ it('総数と続きがあるカーソルの一覧は、移動できない番号�
   expect(pager?.querySelector('button[aria-label="2ページ目へ"]')).toBeNull()
   expect((pager?.querySelector('[aria-label="次のページ"]') as HTMLButtonElement).disabled).toBe(false)
 })
+
+afterEach(() => { verifiedStaffRole(null) })

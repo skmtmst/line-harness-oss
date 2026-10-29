@@ -9,7 +9,7 @@ import { CreateStepColumns } from '@/components/templates/create-step-columns'
 import {
   PRECHECK_CHOICES, PRECHECK_HELPS, PRECHECK_RESULT, PRECHECK_TITLES,
   type PrecheckAnswers, type PrecheckAt, type PrecheckKey,
-  type PrecheckNote, type PrecheckSummaryRow, type PrecheckUpcomingRow,
+  type PrecheckNote, type PrecheckSummaryRow,
 } from './precheck'
 import styles from './register.module.css'
 
@@ -21,7 +21,7 @@ import styles from './register.module.css'
 export default function Step1Precheck({
   badge, draftRestored, onCloseDraftNotice,
   precheckAt, onJumpTo, precheck, onAnswer,
-  rows, guide, ahead, acks, onToggleAck,
+  rows, guide, acks, onToggleAck,
 }: {
   /** 「Q2 / 全5問」などの札。 */
   badge: string
@@ -34,7 +34,6 @@ export default function Step1Precheck({
   onAnswer: (key: PrecheckKey, value: string) => void
   rows: PrecheckSummaryRow[]
   guide: PrecheckNote | null
-  ahead: PrecheckUpcomingRow[]
   acks: Record<string, boolean>
   onToggleAck: (key: string, next: boolean) => void
 }) {
@@ -85,6 +84,7 @@ export default function Step1Precheck({
                   title={choice.title} note={choice.note} height="fit"
                   checked={precheck[precheckAt] === choice.value}
                   onChange={() => onAnswer(precheckAt, choice.value)}
+                  onClick={precheck[precheckAt] === choice.value ? () => onAnswer(precheckAt, choice.value) : undefined}
                 />
               ))}
             </RadioCardGroup>
@@ -107,27 +107,27 @@ export default function Step1Precheck({
             )}
           </div>
         )}
-        {ahead.length > 0 && (
-          <div className={styles.precheckUpcoming}>
-            <p className={styles.precheckUpcomingTitle}>このあとの質問</p>
-            {ahead.map((row) => (
-              <p key={row.key} className={styles.precheckUpcomingItem}>{row.text}</p>
-            ))}
-          </div>
-        )}
         {precheckAt === 'done' && (
-          <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn6-ack-gap)">
-            <p className={styles.precheckResultHeading}>あなたの接続前チェック結果</p>
-            {PRECHECK_RESULT.map((item) => (
-              <div key={item.title} className={styles.precheckResultItem}>
-                <span className={styles.precheckResultMark} aria-hidden="true"><Check size={16} /></span>
-                <div className={styles.precheckResultText}>
-                  <p className={styles.precheckResultTitle}>{item.title}</p>
-                  <p className={styles.precheckResultBody}>{item.body}</p>
+          <>
+            {guide && (
+              <Notice tone={guide.tone}>
+                {guide.title && <p className={styles.precheckNoteTitle}>{guide.title}</p>}
+                <p>{guide.body}</p>
+              </Notice>
+            )}
+            <Card layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn6-ack-gap)">
+              <p className={styles.precheckResultHeading}>あなたの接続前チェック結果</p>
+              {PRECHECK_RESULT.map((item) => (
+                <div key={item.title} className={styles.precheckResultItem}>
+                  <span className={styles.precheckResultMark} aria-hidden="true"><Check size={16} /></span>
+                  <div className={styles.precheckResultText}>
+                    <p className={styles.precheckResultTitle}>{item.title}</p>
+                    <p className={styles.precheckResultBody}>{item.body}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </Card>
+              ))}
+            </Card>
+          </>
         )}
       </Card>
     </CreateStepColumns>

@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React from 'react'
 import { fireEvent, render, screen, cleanup } from '@testing-library/react'
@@ -27,7 +28,7 @@ afterEach(cleanup)
 describe('イベント作成の入力確認', () => {
   it('保存前に不足する欄を知らせて名前へ移り、通信しない', () => {
     render(<EventsCreate />)
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     const name = screen.getByLabelText('イベント名')
     expect(name.getAttribute('aria-invalid')).toBe('true')
     expect(document.activeElement).toBe(name)
@@ -40,10 +41,10 @@ describe('イベント作成の入力確認', () => {
 
   it('名前を直すと名前の赤が消え、保存時は定員へ移る', () => {
     render(<EventsCreate />)
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     fireEvent.change(screen.getByLabelText('イベント名'), { target: { value: '体験会' } })
     expect(screen.getByLabelText('イベント名').getAttribute('aria-invalid')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     expect(document.activeElement).toBe(screen.getByLabelText('定員'))
     expect(createEvent).not.toHaveBeenCalled()
   })

@@ -19,6 +19,7 @@ import { notifySaved } from '@/components/shared/toast'
 import { friendDeliveryConsentHistoryApi, friendDeliveryConsentsApi, type FriendDeliveryConsent, type FriendDeliveryConsentEvent } from '@/lib/api/helpers/friend-delivery-consents'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './delivery-consent.module.css'
+import { withHonorific } from '@line-crm/shared'
 
 /*
  * ★V8 友だち詳細「配信の受け取り」（E9-1 `mAbif`）。目的ごと（予約の連絡・お知らせ・キャンペーン・宣伝・アンケート）に、
@@ -137,7 +138,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
     <SaveErrorScope errors={errors}><Drawer
       open={open}
       title="配信の受け取り"
-      description={`${friendName} さん・目的ごとに、届けてよいかを記録します`}
+      description={`${withHonorific(friendName, 'さん', { space: true })}・目的ごとに、届けてよいかを記録します`}
       closeAppearance="box"
       heightMode="viewport"
       onClose={onClose}

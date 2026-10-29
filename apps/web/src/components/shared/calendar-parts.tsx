@@ -3,7 +3,7 @@ import { Fragment, useEffect, useState, type ButtonHTMLAttributes, type CSSPrope
 import { Plus } from 'lucide-react'
 import { BookingBlock } from './booking-controls'
 import { calendarBookingState, type BookingState } from './booking-state'
-import { BookingLegendItem, BookingName, BookingSummary } from './booking-presentation'
+import { BookingLegendItem, BookingCardContent } from './booking-presentation'
 import Dialog from './dialog'
 import { RowNameButton } from './table'
 import TruncatedText from './truncated-text'
@@ -15,8 +15,8 @@ import { formatNumber } from '@/lib/format'
 export { useCalendarTimeScale } from './use-calendar-time-scale'
 
 /** 時間盤の空き枠。媒体の取込欄とは別の予約操作。 */
-export function CalendarSlotButton({ placement, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { placement?: 'calendar' }) {
-  return <button {...props} type="button" data-placement={placement} data-calendar-slot={placement === 'calendar' ? '' : undefined} className={[styles.freeSlot, placement === 'calendar' ? styles.calendarFree : null].filter(Boolean).join(' ')} />
+export function CalendarSlotButton({ placement, children, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { placement?: 'calendar' }) {
+  return <button {...props} type="button" data-placement={placement} data-calendar-slot={placement === 'calendar' ? '' : undefined} className={[styles.freeSlot, placement === 'calendar' ? styles.calendarFree : null].filter(Boolean).join(' ')}><span className={styles.slotLabel}>{children}</span><span className={styles.touchPlus} aria-hidden="true">＋</span></button>
 }
 export function CalendarLegendItem({ state, children }: { state: string; children: ReactNode }) {
   return state === 'star' ? <span className={styles.legendItem} data-state={state}>{children}</span> : <BookingLegendItem state={calendarBookingState(state)}>{children}</BookingLegendItem>
@@ -25,7 +25,7 @@ export function CalendarPerson({ href, name, secondary }: { href: string; name: 
   return <span className={styles.dayName}><a href={href}>{name}</a>{secondary}</span>
 }
 
-type TimeEntry = { id: string; day: string; start: string; end: string; title: string; name: string; state?: BookingState }
+type TimeEntry = { id: string; day: string; start: string; end: string; title: string; name: string; state?: BookingState; source?: string }
 type FreeTime = { day: string; start: string; end: string; bookingDay?: string; bookingStart?: string }
 const minutes = (time: string) => calendarMinutes(time) ?? 0
 const laneStyle = (lane: number, lanes: number, span = 1) => ({ '--calendar-lane': lane, '--calendar-lanes': lanes, '--calendar-span': span } as CSSProperties)
@@ -64,8 +64,8 @@ export function CalendarTimeEntries({ days, entries, free, canWrite, position, o
             {visible.map(({ value: entry, lane }, index) => {
               const label = `${entry.start}〜${entry.end} ${entry.title} ${entry.name}`
               return <div key={entry.id} className={styles.calendarPosition} style={position(entry.start, entry.end, dayIndex, days.length)}>
-                <BookingBlock placement="calendar" state={entry.state ?? 'confirmed'} style={laneStyle(group.peak >= 3 ? index : lane, lanes, group.peak === 1 ? bookingLanes : 1)} title={label} aria-label={label} onClick={() => onOpen(entry.id)}>
-                  <BookingName>{entry.name || entry.title}</BookingName><BookingSummary time={`${entry.start}〜${entry.end}`}>{entry.name ? entry.title : ''}</BookingSummary>
+                <BookingBlock placement="calendar" state={entry.state ?? 'confirmed'} source={entry.source} style={laneStyle(group.peak >= 3 ? index : lane, lanes, group.peak === 1 ? bookingLanes : 1)} title={label} aria-label={label} onClick={() => onOpen(entry.id)}>
+                  <BookingCardContent name={entry.name || entry.title} time={`${entry.start}〜${entry.end}`} menu={entry.name ? entry.title : ''} state={entry.state} source={entry.source} />
                 </BookingBlock>
               </div>
             })}

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 import React, { act } from 'react'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import AnalyticsPage from './page'
@@ -30,7 +31,7 @@ let host: HTMLDivElement
 beforeEach(() => {
   window.history.replaceState(null, '', '/analytics')
   document.documentElement.dataset.theme = 'v8'
-  state.role = 'viewer'; state.query = ''; state.account = 'account-a'; state.events = false; state.calls = []
+  state.role = verifiedStaffRole('viewer'); state.query = ''; state.account = 'account-a'; state.events = false; state.calls = []
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   host = document.createElement('div'); document.body.append(host); root = createRoot(host)
 })
@@ -60,8 +61,11 @@ describe('V8の閲覧と実測値の保護', () => {
   it('閲覧者は作成できず、集計値と閲覧の切り替えは残る', async () => {
     await render()
     expect(host.querySelector('[data-page-template]')?.getAttribute('data-design-node')).toBe('L4Uov')
-    // 閲覧のみの人には作るボタンを置かない（オーナー決定 2026-10-06）。帯で閲覧のみと伝える。
-    expect([...host.querySelectorAll('a, button')].some((el) => el.textContent?.includes('レポートを作る'))).toBe(false)
+    const create = [...host.querySelectorAll<HTMLElement>('a, button')].find((el) => el.textContent?.includes('レポートを作る'))!
+    expect(create).toBeTruthy()
+    expect(create.getAttribute('aria-disabled')).toBe('true')
+    await act(async () => create.click())
+    expect(window.location.pathname).toBe('/analytics')
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(host.querySelector('[role="tablist"][aria-label="分析の組"] [aria-current="page"]')?.textContent).toBe('ふだん見る')
     expect(host.querySelector('a[href="/analytics?tab=routes"]')).not.toBeNull()

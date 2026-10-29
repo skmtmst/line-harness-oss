@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -39,19 +40,19 @@ describe('予約設定の板と、型が渡す権限・見本', () => {
   })
 
   it('閲覧のみはC9fv7Aの通知を出し、メニューを作る口を隠す', async () => {
-    state.editable = false
+    state.editable = false; verifiedStaffRole('viewer')
     const { container } = await draw()
     await waitFor(() => expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy())
     expect(container.querySelector('[data-design-node="C9fv7A"]')).toBeTruthy()
     expect(screen.queryByRole('link', { name: '予約メニューを作る' })).toBeNull()
     expect(screen.queryByRole('button', { name: /保存する/ })).toBeNull()
-    cleanup(); state.editable = true
+    cleanup(); state.editable = true; verifiedStaffRole('owner')
     await draw()
     await waitFor(() => expect(screen.getByRole('link', { name: '予約メニューを作る' })).toBeTruthy())
   })
 
   it('閲覧のみの受付枠には保存の帯を出さない', async () => {
-    state.tab = 'hours'; state.editable = false
+    state.tab = 'hours'; state.editable = false; verifiedStaffRole('viewer')
     const { container } = await draw()
     expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
     expect(container.querySelector('[data-template-region="footer"]')).toBeNull()
@@ -69,3 +70,5 @@ describe('予約設定の板と、型が渡す権限・見本', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

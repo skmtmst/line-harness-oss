@@ -82,7 +82,7 @@ stagingQa.post(`${BASE}/runs`, async (c) => {
   const credentials = passwords as Record<string, unknown>;
   for (const role of ROLES) {
     if (typeof credentials[role] !== 'string' || validatePasswordPolicy(credentials[role] as string)) {
-      return c.json({ success: false, error: '4役のパスワードは8〜128文字の英数字を指定してください' }, 400);
+      return c.json({ success: false, error: '4役のパスワードは13〜128文字で、英大文字・英小文字・数字・特殊記号をそれぞれ1文字以上含めてください' }, 400);
     }
   }
   const id = crypto.randomUUID();

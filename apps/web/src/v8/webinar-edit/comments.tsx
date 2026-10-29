@@ -20,6 +20,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import CommentViewerStats from './comment-stats'
 import { formatNumber } from '@/lib/format'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 
 /*
@@ -223,8 +224,8 @@ export default function CommentsPane({ ctx, chrome, onDirtyChange, registerSave 
               {comments.map((comment, index) => (
                 <div key={index} className={styles.row}>
                   <SecondsInput value={comment.atSeconds} label={`${index + 1} 行目の秒数`} disabled={locked2} onChange={(next) => update(index, { atSeconds: next })} />
-                  <SaveErrorField names={[`comments.${index}.authorName`,`comments.${index}.author_name`,"authorName","comment.authorName","author_name","comment.author_name"]}><input className={`${styles.cell} ${styles.cellName}`} value={comment.authorName} disabled={locked2} aria-label={`${index + 1} 行目の名前`} onChange={(event) => update(index, { authorName: event.target.value })} /></SaveErrorField>
-                  <SaveErrorField names={[`comments.${index}.body`,"body","comment.body"]}><input className={`${styles.cell} ${styles.cellBody}`} value={comment.body} disabled={locked2} aria-label={`${index + 1} 行目の本文`} onChange={(event) => update(index, { body: event.target.value })} /></SaveErrorField>
+                  <SaveErrorField names={[`comments.${index}.authorName`,`comments.${index}.author_name`,"authorName","comment.authorName","author_name","comment.author_name"]}><SharedTextField className={`${styles.cell} ${styles.cellName}`} value={comment.authorName} disabled={locked2} aria-label={`${index + 1} 行目の名前`} onChange={(event) => update(index, { authorName: event.target.value })} /></SaveErrorField>
+                  <SaveErrorField names={[`comments.${index}.body`,"body","comment.body"]}><SharedTextField className={`${styles.cell} ${styles.cellBody}`} value={comment.body} disabled={locked2} aria-label={`${index + 1} 行目の本文`} onChange={(event) => update(index, { body: event.target.value })} /></SaveErrorField>
                   {readOnly ? null : (
                     <IconButton className={styles.remove} aria-label={`${comment.authorName || '名前未入力'}のコメントを消す`} title="このコメントを消す" disabled={saving} onClick={() => setComments((prev) => prev.filter((_, j) => j !== index))}>
                       <Trash2 size={16} aria-hidden="true" />

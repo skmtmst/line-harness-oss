@@ -74,6 +74,7 @@ import MessageForm from './message-form'
 import SavedDistributionDialog from './saved-distribution-dialog'
 import HqStoreList,{ KIND_TABS } from './store-list'
 import HqTagEditorV8 from './tag-editor'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 
 /*
@@ -1094,7 +1095,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             <section className={styles.editPanel} aria-label="ひな形の中身">
               <div className={styles.twoCol}>
                 {(createUncertain || !canonicalEditorOwnsSave) && type !== 'rich_menu' ? (
-                  <Field label="ひな形の名前"><SaveErrorField names={["name"]}><input aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={(event) => setName(event.target.value)} /></SaveErrorField></Field>
+                  <Field label="ひな形の名前"><SaveErrorField names={["name"]}><SharedTextField aria-label="ひな形の名前" className={styles.input} value={name} maxLength={200} disabled={busy || createUncertain} onChange={(event) => setName(event.target.value)} /></SaveErrorField></Field>
                 ) : null}
                 {/* タグは中の「所属フォルダ」で分けるので、上のフォルダは出さない（同じ物が2つに見える・オーナー 10-08）。一覧での分けは「…」の「フォルダへ移す」。 */}
                 {type !== 'tag' ? <div className={styles.field}>
@@ -1103,7 +1104,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                 </div> : null}
               </div>
               {(createUncertain || !canonicalEditorOwnsSave) && type !== 'rich_menu' ? (
-                <Field label="説明"><SaveErrorField names={["description"]}><textarea className={styles.textarea} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={(event) => setDescription(event.target.value)} /></SaveErrorField></Field>
+                <Field label="説明"><SaveErrorField names={["description"]}><SharedTextArea className={styles.textarea} value={description} maxLength={2000} rows={2} disabled={busy || createUncertain} onChange={(event) => setDescription(event.target.value)} /></SaveErrorField></Field>
               ) : null}
               {catalogFailed ? <Notice tone="warn" message="参照先の候補を読み込めませんでした。タグ・テンプレート・回答フォームは選べません。" action={<Button onClick={reloadCatalog}>もう一度読み込む</Button>} /> : null}
               {canonicalEditorOwnsSave && createUncertain ? uncertainNotice : DefinitionEditor ? (
@@ -1268,7 +1269,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
                   </tr>,
                   overrideOpen === account.id && on && textMessage && stage === 'accounts' ? (
                     <tr key={`${account.id}-text`} className={styles.subRow}><td /><td colSpan={4}>
-                      < label className={styles.field}><span className={styles.label}>{`${account.name}に配る本文`}</span><SaveErrorField names={["messageContent","definition.template.messageContent","template.messageContent","textOverrides","message_content","definition.template.message_content","template.message_content","text_overrides"]}><textarea aria-label={`${account.name}に配る本文`} className={styles.textarea} disabled={busy} maxLength={5000} value={textOverrides[account.id] ?? ('template' in definition ? definition.template.messageContent : '')} onChange={(event) => setTextOverrides((current) => ({ ...current, [account.id]: event.target.value }))} /></SaveErrorField></label>
+                      < label className={styles.field}><span className={styles.label}>{`${account.name}に配る本文`}</span><SaveErrorField names={["messageContent","definition.template.messageContent","template.messageContent","textOverrides","message_content","definition.template.message_content","template.message_content","text_overrides"]}><SharedTextArea aria-label={`${account.name}に配る本文`} className={styles.textarea} disabled={busy} maxLength={5000} value={textOverrides[account.id] ?? ('template' in definition ? definition.template.messageContent : '')} onChange={(event) => setTextOverrides((current) => ({ ...current, [account.id]: event.target.value }))} /></SaveErrorField></label>
                     </td></tr>
                   ) : null,
                   ...extraItems.map((item) => (

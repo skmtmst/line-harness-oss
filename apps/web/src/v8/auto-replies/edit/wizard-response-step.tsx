@@ -3,7 +3,7 @@
 import { useActionOptions } from '@/components/auto-replies/inline-action-list';
 import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8';
 import Card,{ CardHeader } from '@/components/shared/card';
-import { SettingCheckbox } from '@/components/shared/checkbox';
+import Toggle from '@/components/shared/toggle';
 import { EntityKindField } from '@/components/shared/entity-picker-sources';
 import { Field,FieldError } from '@/components/shared/form-controls';
 import ImageUploader from '@/components/shared/image-uploader';
@@ -27,6 +27,8 @@ import { REPLY_DELAY_OPTIONS,ResponseMode,WizardForm } from './wizard-model';
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardResponseStepContext = {
+  disabled?: boolean
+  lockedReason?: string
   actionOptions: ReturnType<typeof useActionOptions>
   fieldError: (field: string) => string | undefined
   form: WizardForm
@@ -36,7 +38,7 @@ type WizardResponseStepContext = {
   templates: { id: string; name: string; messageType: string; messageContent: string; folderId?: string | null; updatedAt?: string; }[]
 }
 
-export function WizardResponseStep({ actionOptions, fieldError, form, imageContent, matchedAccountId, patch, templates }: WizardResponseStepContext) {
+export function WizardResponseStep({ disabled = false, lockedReason, actionOptions, fieldError, form, imageContent, matchedAccountId, patch, templates }: WizardResponseStepContext) {
   return (<>
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>返すもの</>} />
@@ -50,7 +52,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                       ['silent', '返信しない（後の処理だけ）', CircleCheck],
                     ] as Array<[ResponseMode, string, typeof PenLine]>
                   ).map(([value, label, Icon]) => (
-                    <button
+                    <button disabled={disabled}
                       key={value}
                       type="button"
                       className={styles.pickChip}
@@ -65,7 +67,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
 
                 {form.mode === 'inline-text' && (
                   <MessageBody>
-                    <SaveErrorField names={["responseContent","form.responseContent","response_content","form.response_content"]}><InsertTextField
+                    <SaveErrorField names={["responseContent","form.responseContent","response_content","form.response_content"]}><InsertTextField disabled={disabled}
                       id="wiz-content"
                       aria-invalid={!!fieldError('wiz-content') || undefined}
                       aria-describedby={fieldError('wiz-content') ? 'wiz-content-error' : undefined}
@@ -77,7 +79,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                       maxLength={5000}
                     /></SaveErrorField>
                     <MessageInsertRow count={`${formatNumber(form.responseContent.length)} / 5,000`}>
-                      <AutoReplyInsertChips accountId={matchedAccountId} onInsert={(token) => patch({ responseContent: form.responseContent + token })} />
+                      <AutoReplyInsertChips disabled={disabled} lockedReason={lockedReason} accountId={matchedAccountId} onInsert={(token) => patch({ responseContent: form.responseContent + token })} />
                     </MessageInsertRow>
                     {fieldError('wiz-content') ? <FieldError id="wiz-content-error">{fieldError('wiz-content')}</FieldError> : null}
                   </MessageBody>
@@ -88,7 +90,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                     <span className={styles.label}>
                       テンプレート
                     </span>
-                    <SaveErrorField names={["templateId","form.templateId"]}><EntityKindField
+                    <SaveErrorField names={["templateId","form.templateId"]}><EntityKindField disabled={disabled}
                       kind="template"
                       id="wiz-template"
                       label="テンプレート"
@@ -104,7 +106,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                 )}
 
                 {form.mode === 'inline-flex' && (
-                  <div className={styles.field}><Field label="カードの内容（JSON）" htmlFor="wiz-flex"><SaveErrorField names={["responseContent","form.responseContent","response_content","form.response_content"]}><TextArea
+                  <div className={styles.field}><Field label="カードの内容（JSON）" htmlFor="wiz-flex"><SaveErrorField names={["responseContent","form.responseContent","response_content","form.response_content"]}><TextArea disabled={disabled}
                       id="wiz-flex"
                       invalid={!!fieldError('wiz-flex')}
                       aria-describedby={fieldError('wiz-flex') ? 'wiz-flex-error' : undefined}
@@ -117,7 +119,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
 
                 {form.mode === 'inline-image' && (
                   <div id="wiz-image" role="group" aria-label="返信する画像" aria-describedby={fieldError('wiz-image') ? 'wiz-image-error' : undefined} data-invalid={!!fieldError('wiz-image') || undefined} className={styles.compositeField}>
-                  <ImageUploader
+                  <ImageUploader disabled={disabled}
                     mode="line-image"
                     label="返信する画像"
                     title="返信する画像を追加"
@@ -148,7 +150,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
 
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>返したあとに行うこと</>} meta={<>上から順に動きます。失敗したときの動きも決められます。</>} />
-                <InlineActionRowsV8
+                <InlineActionRowsV8 disabled={disabled} lockedReason={lockedReason}
                   actions={form.actions}
                   onChange={(next) => patch({ actions: next })}
                   {...actionOptions}
@@ -162,7 +164,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                   <div className={styles.toggleText}>
                     <p className={styles.toggleTitle}>返すまで待つ時間</p>
                   </div>
-                  <SaveErrorField names={["replyDelaySeconds","form.replyDelaySeconds","reply_delay_seconds","form.reply_delay_seconds"]}><Select
+                  <SaveErrorField names={["replyDelaySeconds","form.replyDelaySeconds","reply_delay_seconds","form.reply_delay_seconds"]}><Select disabled={disabled}
                     aria-label="返すまで待つ時間"
                     value={form.replyDelaySeconds}
                     onChange={(v) => patch({ replyDelaySeconds: v })}
@@ -175,7 +177,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                   </div>
                   <div className={styles.toggleExtra}>
                     {form.cooldownOn ? (
-                        <SaveErrorField names={["cooldownMinutes","form.cooldownMinutes","cooldown_minutes","form.cooldown_minutes"]}><NumberInput
+                        <SaveErrorField names={["cooldownMinutes","form.cooldownMinutes","cooldown_minutes","form.cooldown_minutes"]}><NumberInput disabled={disabled}
                           id="wiz-cooldown"
                           aria-invalid={!!fieldError('wiz-cooldown') || undefined}
                           aria-describedby={fieldError('wiz-cooldown') ? 'wiz-cooldown-error' : undefined}
@@ -190,7 +192,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                     ) : (
                       <span className={styles.toggleNote}>何度でも返す</span>
                     )}
-                    <SaveErrorField names={["cooldownOn","form.cooldownOn","cooldown_on","form.cooldown_on"]}><SettingCheckbox
+                    <SaveErrorField names={["cooldownOn","form.cooldownOn","cooldown_on","form.cooldown_on"]}><Toggle disabled={disabled}
                       label="同じ人へ続けて返さない"
                       checked={form.cooldownOn}
                       onChange={(on) => patch({ cooldownOn: on })}
@@ -202,7 +204,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                   <div className={styles.toggleText}>
                     <p className={styles.toggleTitle}>担当者が対応中のトークには返さない</p>
                   </div>
-                  <SaveErrorField names={["skipWhenOperatorActive","form.skipWhenOperatorActive","skip_when_operator_active","form.skip_when_operator_active"]}><SettingCheckbox
+                  <SaveErrorField names={["skipWhenOperatorActive","form.skipWhenOperatorActive","skip_when_operator_active","form.skip_when_operator_active"]}><Toggle disabled={disabled}
                     label="担当者が対応中のトークには返さない"
                     checked={form.skipWhenOperatorActive}
                     onChange={(on) => patch({ skipWhenOperatorActive: on })}
@@ -215,7 +217,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                       オフのときは、同じ人が何度送っても返します（上の「続けて返さない」の時間は守ります）
                     </p>
                   </div>
-                  <SaveErrorField names={["oncePerFriend","form.oncePerFriend","once_per_friend","form.once_per_friend"]}><SettingCheckbox
+                  <SaveErrorField names={["oncePerFriend","form.oncePerFriend","once_per_friend","form.once_per_friend"]}><Toggle disabled={disabled}
                     label="1人につき1回だけ返す"
                     checked={form.oncePerFriend}
                     onChange={(on) => patch({ oncePerFriend: on })}
@@ -225,7 +227,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                 <div className={styles.field}>
                   <span className={styles.label}>条件に合わなかったとき</span>
                   <SaveErrorField names={["unmatched","unmatchedMode","form.unmatchedMode"]}><RadioCardGroup legend="条件に合わなかったとき" className={styles.radioPair}>
-                    <RadioCard
+                    <RadioCard disabled={disabled}
                       name="unmatched"
                       value="none"
                       checked={form.unmatchedMode === 'none'}
@@ -233,7 +235,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                       title="何もしない"
                       note="反応しないまま終わります"
                     />
-                    <RadioCard
+                    <RadioCard disabled={disabled}
                       name="unmatched"
                       value="notify"
                       checked={form.unmatchedMode === 'notify_operator'}

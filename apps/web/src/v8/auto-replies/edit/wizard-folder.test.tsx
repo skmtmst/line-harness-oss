@@ -1,4 +1,7 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 import { act, useState } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -22,18 +25,21 @@ function Host({ canManage = true, folderState = 'ready' }: {
 }
 
 beforeEach(() => {
+  forgetSessionSnapshot()
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   document.documentElement.dataset.theme = 'v8'
   network.create.mockResolvedValue({ success: true, data: { id: 'created-folder', name: '予約の応答' } })
 })
 afterEach(() => {
   cleanup()
+  forgetStaffIdentity(); forgetSessionSnapshot()
   vi.resetAllMocks()
   vi.unstubAllGlobals()
   delete document.documentElement.dataset.theme
 })
 
 it('権限があり一覧取得済みなら同じ所属でフォルダを作り、その場で選択する', async () => {
+  verifiedStaffRole('owner')
   render(<Host />)
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ', exact: true })) })
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: '新しいフォルダを作る' })) })
@@ -44,6 +50,7 @@ it('権限があり一覧取得済みなら同じ所属でフォルダを作り�
 })
 
 it('権限がないときはフォルダ作成を出さない', async () => {
+  verifiedStaffRole('viewer')
   render(<Host canManage={false} />)
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'フォルダ', exact: true })) })
   expect(screen.queryByRole('button', { name: '新しいフォルダを作る' })).toBeNull()
@@ -51,6 +58,7 @@ it('権限がないときはフォルダ作成を出さない', async () => {
 })
 
 it.each(['loading', 'error'] as const)('一覧が%sの間はフォルダの選択と作成を開始できない', async folderState => {
+  verifiedStaffRole('owner')
   render(<Host folderState={folderState} />)
   const select = screen.getByRole('button', { name: 'フォルダ', exact: true }) as HTMLButtonElement
   expect(select.disabled).toBe(true)

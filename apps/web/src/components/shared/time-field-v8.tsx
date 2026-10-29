@@ -1,5 +1,10 @@
 'use client'
 
+import choiceStyles from './choice-field.module.css'
+import { normalizeTimeInput, snapToStep, parseHm, normalizeStep, minuteOptions, nowInTokyo, formatValue, formatShown, formatTimePart as pad } from './time-field-input'
+export { normalizeTimeInput, snapToStep } from './time-field-input'
+export type { Hm, TimeInputResult } from './time-field-input'
+import { inputPlaceholder } from './input-placeholder'
 import { Clock3 } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import MenuPortal from './menu-portal'
@@ -10,8 +15,8 @@ import { isImeComposing } from './ime'
  * 時刻の欄（★V8）。Pencil V8.pen の提案「時刻を選ぶ（打つ＋2列から選ぶ）」YCOoR
  * （オーナー 2026-10-08「時間を選ぶものもこういう感じに」で採用）。
  *
- *   欄   高さ36・角丸10・枠 control-border・左に「09 : 00」・右に時計（28角）。
- *        空は「-- : --」。開いている／打っている間は緑の枠 2px。
+ *   欄   閉じた外形と焦点は choice-field の共通の形。右の時計で時刻を選ぶ。
+ *        空は「-- : --」。
  *        数字をそのまま打てる（0900・9:00・9 → 09:00）。範囲外は直さず理由を出す。
  *        きざみに合わない分は近い方へ合わせて知らせる。
  *   板   時計を押す／欄で ↓ で開く。白い板・薄い線・角丸12・影。
@@ -30,10 +35,7 @@ export type TimeFieldV8Props = {
   minuteStep?: number
   /** 終了時刻だけ24:00を使える。通常の時刻入力は0〜23時のまま。 */
   allowEndOfDay?: boolean
-  /**
-   * 欄の高さ。既定 36（絵 YCOoR）。`field` は 40＝日付の欄と横に並ぶとき・日時の欄の中
-   * （絵のZU4Ae）。`compact` は 32＝表の中の細い欄（予約の受付枠）。
-   */
+  /** 互換の配置名。高さは共通36px、タッチ端末は44px。 */
   size?: TimeFieldSize
   pickerTrigger?: 'clock' | 'field'
   disabled?: boolean
@@ -283,7 +285,8 @@ export default function TimeFieldV8({
       {name ? <input type="hidden" name={name} value={current} /> : null}
       <div
         ref={fieldRef}
-        className={styles.field}
+        className={`${styles.field} ${choiceStyles.frame}`}
+        data-choice-field data-choice-time data-choice-invalid={invalid || note?.kind === 'error' || undefined} data-choice-disabled={disabled || undefined}
         data-open={open || undefined}
         data-invalid={invalid || note?.kind === 'error' || undefined}
         data-disabled={disabled || undefined}
@@ -299,12 +302,13 @@ export default function TimeFieldV8({
           spellCheck={false}
           className={styles.input}
           value={text}
-          placeholder={placeholder}
+          placeholder={inputPlaceholder(placeholder)}
           disabled={disabled}
           readOnly={readOnly}
           required={required}
           aria-required={required || undefined}
           aria-invalid={invalid || note?.kind === 'error' || undefined}
+          data-choice-trigger
           role="combobox"
           aria-haspopup="dialog"
           aria-expanded={open}
@@ -322,10 +326,11 @@ export default function TimeFieldV8({
           onKeyDown={onInputKeyDown}
           onClick={pickerTrigger === 'field' ? () => { if (!open) openPanel() } : undefined}
         />
+        {!readOnly && pickerTrigger === 'field' ? <Clock3 data-choice-chevron aria-hidden="true" /> : null}
         {readOnly || pickerTrigger === 'field' ? null : (
         <button
           type="button"
-          className={styles.open}
+          className={styles.open} data-choice-action
           aria-label="時刻の一覧を開く"
           aria-expanded={open}
           aria-controls={open ? dialogId : undefined}
@@ -436,93 +441,6 @@ export default function TimeFieldV8({
   )
 }
 
-export type Hm = { hours: number; minutes: number }
-
-export type TimeInputResult =
-  | { kind: 'empty' }
-  | { kind: 'ok'; time: Hm; note: string | null }
-  | { kind: 'error'; message: string }
-
-/**
- * 打った字を `HH:mm` に直す。
- * - `0900`・`900`・`9:00`・`9：00`・`9`・`09`・`9時`・`9時30分`・全角数字を読む
- * - 時が 24 以上・分が 60 以上は直さず理由を返す
- * - きざみに合わない分は近い方へ合わせ、知らせる文を付ける
- */
-export function normalizeTimeInput(raw: string, minuteStep = 1, allowEndOfDay = false): TimeInputResult {
-  const text = raw.normalize('NFKC').replace(/\s+/g, '')
-  if (text === '' || text === '--:--') return { kind: 'empty' }
-  let hours: number
-  let minutes: number
-  const separated = /^(\d{1,2})(?::|時)(\d{1,2})?分?$/.exec(text)
-  const digits = /^\d{1,4}$/.exec(text)
-  if (separated) {
-    hours = Number(separated[1])
-    minutes = separated[2] === undefined ? 0 : Number(separated[2])
-  } else if (digits) {
-    if (text.length <= 2) {
-      hours = Number(text)
-      minutes = 0
-    } else {
-      hours = Number(text.slice(0, text.length - 2))
-      minutes = Number(text.slice(-2))
-    }
-  } else {
-    return { kind: 'error', message: '「0900」「9:00」の形で入れてください' }
-  }
-  if (allowEndOfDay && hours === 24 && minutes === 0) return { kind: 'ok', time: { hours, minutes }, note: null }
-  if (hours > 23) return { kind: 'error', message: '時は 0〜23 で入れてください' }
-  if (minutes > 59) return { kind: 'error', message: '分は 0〜59 で入れてください' }
-  const snapped = snapToStep({ hours, minutes }, normalizeStep(minuteStep))
-  return {
-    kind: 'ok',
-    time: snapped.time,
-    note: snapped.changed ? `${normalizeStep(minuteStep)}分きざみなので ${formatValue(snapped.time)} にしました` : null,
-  }
-}
-
-/** きざみの近い方へ合わせる。23時台で 24:00 になるときは下へ。 */
-export function snapToStep(time: Hm, minuteStep: number): { time: Hm; changed: boolean } {
-  const step = normalizeStep(minuteStep)
-  if (time.minutes % step === 0) return { time, changed: false }
-  let total = time.hours * 60 + Math.round(time.minutes / step) * step
-  if (total >= 24 * 60) total = time.hours * 60 + Math.floor(time.minutes / step) * step
-  return { time: { hours: Math.floor(total / 60), minutes: total % 60 }, changed: true }
-}
-
-/** `HH:mm`（秒付きも可）を読む。読めなければ null。 */
-function parseHm(value: string, allowEndOfDay = false): Hm | null {
-  const match = /^(\d{2}):(\d{2})/.exec(value)
-  if (!match) return null
-  const hours = Number(match[1])
-  const minutes = Number(match[2])
-  if (allowEndOfDay && hours === 24 && minutes === 0) return { hours, minutes }
-  if (hours > 23 || minutes > 59) return null
-  return { hours, minutes }
-}
-
-/** 60 を割り切る 1〜60 の整数だけ受ける。それ以外は 1。 */
-function normalizeStep(step: number): number {
-  return Number.isInteger(step) && step >= 1 && step <= 60 && 60 % step === 0 ? step : 1
-}
-
-/** 分の列。きざみに合わない今の値があれば、その値も並べて選んだ形で見せる。 */
-function minuteOptions(step: number, currentMinute?: number): number[] {
-  const list = Array.from({ length: 60 / step }, (_, index) => index * step)
-  if (currentMinute !== undefined && !list.includes(currentMinute)) {
-    list.push(currentMinute)
-    list.sort((a, b) => a - b)
-  }
-  return list
-}
-
-function nowInTokyo(): Hm {
-  const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date())
-  const hours = Number(parts.find((part) => part.type === 'hour')?.value ?? 0)
-  const minutes = Number(parts.find((part) => part.type === 'minute')?.value ?? 0)
-  return { hours: hours % 24, minutes }
-}
-
 function scrollToRow(list: HTMLElement | null, index: number) {
   if (!list || index < 0) return
   // 選んだ値の上に1行見えるように（絵の 08 の下に 09）。
@@ -538,16 +456,3 @@ function keepRowVisible(list: HTMLElement | null, index: number) {
 }
 
 const HOURS = Array.from({ length: 24 }, (_, index) => index)
-
-function formatValue(time: Hm): string {
-  return `${pad(time.hours)}:${pad(time.minutes)}`
-}
-
-/** 欄に見せる字。絵の「09 : 00」。 */
-function formatShown(time: Hm): string {
-  return `${pad(time.hours)} : ${pad(time.minutes)}`
-}
-
-function pad(n: number): string {
-  return String(n).padStart(2, '0')
-}

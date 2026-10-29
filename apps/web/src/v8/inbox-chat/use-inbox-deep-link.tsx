@@ -9,13 +9,14 @@ type Options = {
   setSelectedChatId: Dispatch<SetStateAction<string | null>>
   setSelectedThreadId: Dispatch<SetStateAction<string | null>>
   accountsLoading: boolean
+  emailInboxEnabled: boolean
   selectedAccountId: string | null
   router: ReturnType<typeof useRouter>
   channel: "all" | "email" | "line"
   savedViewParam: string
 }
 
-export function useInboxDeepLink({ params, setSelectedChatId, setSelectedThreadId, accountsLoading, selectedAccountId, router, channel, savedViewParam }: Options) {
+export function useInboxDeepLink({ params, setSelectedChatId, setSelectedThreadId, accountsLoading, emailInboxEnabled, selectedAccountId, router, channel, savedViewParam }: Options) {
 
   /**
    * URLで指定された会話が開けなかったときの案内。
@@ -52,11 +53,12 @@ export function useInboxDeepLink({ params, setSelectedChatId, setSelectedThreadI
     const threadId = (params.get('thread') ?? '').trim()
     const rawFriend = (params.get('friend') ?? params.get('friendId') ?? '').trim()
     if (threadId) {
+      if (accountsLoading) return
       deepLinkRequestIdRef.current += 1
       deepLinkIdRef.current = null
-      setDeepLinkNotice('')
+      setDeepLinkNotice(emailInboxEnabled ? '' : 'このアカウントではメールを接続していません。')
       setSelectedChatId(null)
-      setSelectedThreadId(threadId)
+      setSelectedThreadId(emailInboxEnabled ? threadId : null)
       return
     }
     // URLに対象が無いときは何もしない。手で選んだ会話を消さない。
@@ -114,7 +116,7 @@ export function useInboxDeepLink({ params, setSelectedChatId, setSelectedThreadI
       setSelectedChatId(rawFriend)
     })()
     return () => { cancelled = true }
-  }, [params, selectedAccountId, accountsLoading, setSelectedThreadId, setSelectedChatId])
+  }, [params, selectedAccountId, accountsLoading, emailInboxEnabled, setSelectedThreadId, setSelectedChatId])
 
   // 案内付きの空状態から一覧へ戻る。URLの指定も外す。
   // 外さないと再読込で同じ指定が復活する(#673)。

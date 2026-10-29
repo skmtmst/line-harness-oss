@@ -32,7 +32,7 @@ const LINE_LOGIN_FAILURE_CODES = new Set([
  *
  * 動きは 管理画面（app/ops/login）と同じ：メール＋パスワードが主、LINE が副。
  * 入れた後に /api/auth/session で運営メンバーかを確かめてから /ops へ進む。
- * 2要素認証が要る人は /login/two-factor（設定がまだなら setup）へ送る。
+ * 二段階認証が要る人は /login/two-factor（設定がまだなら setup）へ送る。
  */
 export default function OpsLoginV8() {
   const saveErrors = useSaveFormErrors()

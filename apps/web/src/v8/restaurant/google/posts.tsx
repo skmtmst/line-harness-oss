@@ -10,7 +10,6 @@ const FIELD_REQUIREMENTS = {
   form_summary: requiredText("本文を入力してください。"),
 }
 
-import Toggle from '@/components/shared/toggle';
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -35,7 +34,7 @@ import { Field } from '@/components/shared/form-controls'
 import type { StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import DateTimeField from '@/components/shared/date-time-field'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import {
@@ -441,7 +440,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
 
   const selectRegisteredMedia = async (item: MediaItem) => {
     if (!picker) return
-    const blob = await api.media.download(item.id, accountId)
+    const blob = await api.media.readContent(item.id, accountId)
     setCrop({ target: picker, source: { file: new File([blob], item.filename, { type: blob.type || item.mimeType || 'image/jpeg' }), name: item.filename, mediaId: item.id }, preserveOriginal: false })
     setPicker(null)
   }
@@ -473,7 +472,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   const openCropFromMedia = useCallback(async (target: CropTarget, mediaId: string, name: string) => {
     setUpload({ busy: true, progress: 0, error: '' })
     try {
-      const blob = await api.media.download(mediaId, accountId)
+      const blob = await api.media.readContent(mediaId, accountId)
       setCrop({ target, source: { file: new File([blob], name, { type: blob.type || 'image/jpeg' }), name, mediaId }, preserveOriginal: false })
     } catch (err) {
       setUpload({ busy: false, progress: 0, error: errorMessage(err, '画像を読み込めませんでした。') })
@@ -689,7 +688,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             <div className={styles.igToggleRow}>
               {editable ? (
                 <>
-                  <SaveErrorField names={["igEnabled","form.igEnabled","ig_enabled","enabled","form.ig_enabled"]}><SettingCheckbox checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} /></SaveErrorField>
+                  <SaveErrorField names={["igEnabled","form.igEnabled","ig_enabled","enabled","form.ig_enabled"]}><Toggle checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} /></SaveErrorField>
                   <span className={styles.igToggleLabel}>Instagram にも投稿する</span>
                 </>
               ) : (

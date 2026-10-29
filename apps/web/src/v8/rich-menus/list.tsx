@@ -48,7 +48,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Pagination from '@/components/shared/pagination'
 import { DelayedSkeleton } from '@/components/shared/skeleton';
-import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
+import { NameCell, DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useFlipRows, useLiveReorder } from '@/lib/use-live-reorder';
 import { ApplyToTagModal } from '@/components/rich-menus/apply-to-tag-modal';
@@ -111,7 +111,7 @@ type DeleteTarget =
 function menuShapeText(g: RichMenuGroupListItem): string {
   const size = g.size === 'large' ? '大' : '小'
   const areas = g.defaultPageAreaCount != null && g.defaultPageAreaCount > 0
-    ? `・${g.defaultPageAreaCount}面`
+    ? ` ${g.defaultPageAreaCount} ボタン`
     : ''
   const pages = g.pageCount ?? 0
   const tabs = pages > 1 ? `・切替タブ ${pages}` : g.pageCount != null ? '・切替タブ なし' : ''
@@ -946,7 +946,7 @@ export default function RichMenusListV8() {
       <TableHeadRow>
         <Th>順</Th>
         <Th aria-label="見本" />
-        <Th>メニュー（大きさ・ボタン）</Th>
+        <Th>{groups.length > 0 && groups.every(group => group.defaultPageAreaCount != null && group.defaultPageAreaCount > 0) ? 'メニュー（大きさ・ボタン）' : 'メニュー'}</Th>
         <Th>誰に出すか</Th>
         <Th>状態</Th>
         <Th>今月押された</Th>
@@ -1068,18 +1068,11 @@ export default function RichMenusListV8() {
                       )}
                     </span>
                   </Td>
-                  <Td className={styles.nameCell}>
-                    <FolderDotName folder={folderDotOf(g.folderId)}>
-                      <RowNameLink
-                        href={`/rich-menus/edit?id=${g.id}`}
-
-                        className={styles.name}
-                      >
-                        <TruncatedText value={String(g.name ?? '')} />
-                      </RowNameLink>
-                    </FolderDotName>
-
-                  </Td>
+                  <NameCell name={
+                    <RowNameLink href={`/rich-menus/edit?id=${g.id}`} className={styles.name}>
+                      <TruncatedText value={String(g.name ?? '')} />
+                    </RowNameLink>
+                  } folder={folderDotOf(g.folderId)} description={shape} />
                   <Td className={styles.audienceCell}>
                     <span className={audienceSub ? styles.audienceMain : `${styles.audienceMain} ${styles.audienceAlone}`} title={audienceMain}>{audienceMain}</span>
                     {audienceSub ? <span className={styles.sub} title={audienceSub}>{audienceSub}</span> : null}

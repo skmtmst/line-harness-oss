@@ -7,7 +7,7 @@ import { readApiError } from '@line-crm/shared'
  * 利用者向けに書いたものなので、状態にかかわらずそのまま出す）。
  */
 
-export const PASSWORD_MIN_LENGTH = 8
+export const PASSWORD_MIN_LENGTH = 13
 
 export interface AuthResult<T> {
   ok: boolean
@@ -82,7 +82,10 @@ export function passwordError(value: string): string | null {
   if (value.length < PASSWORD_MIN_LENGTH) return `パスワードは${PASSWORD_MIN_LENGTH}文字以上で入力してください`
   if (value.length > 128) return 'パスワードは128文字以内で入力してください'
   if (/\s/.test(value)) return 'パスワードに空白は使えません'
-  if (!/[A-Za-z]/.test(value) || !/[0-9]/.test(value)) return 'パスワードは英字と数字の両方を含めてください'
+  if (!/[A-Z]/.test(value)) return 'パスワードは英大文字を1文字以上含めてください'
+  if (!/[a-z]/.test(value)) return 'パスワードは英小文字を1文字以上含めてください'
+  if (!/[0-9]/.test(value)) return 'パスワードは数字を1文字以上含めてください'
+  if (!/[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(value)) return 'パスワードは特殊記号を1文字以上含めてください'
   return null
 }
 

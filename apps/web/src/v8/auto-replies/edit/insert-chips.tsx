@@ -30,15 +30,19 @@ type MenuKey = 'field' | 'var'
 export default function AutoReplyInsertChips({
   accountId,
   onInsert,
+  disabled = false, lockedReason,
   load = loadTemplateReferences,
 }: {
   accountId: string | null
   onInsert: (token: string) => void
+  disabled?: boolean
+  lockedReason?: string
   load?: (accountId: string) => Promise<TemplateReferences>
 }) {
   const [references, setReferences] = useState<TemplateReferences>(EMPTY_REFERENCES)
   const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
   const [menu, setMenu] = useState<MenuKey | null>(null)
+  useEffect(() => { if (disabled || lockedReason) setMenu(null) }, [disabled, lockedReason])
   const fieldRef = useRef<HTMLButtonElement>(null)
   const varRef = useRef<HTMLButtonElement>(null)
 
@@ -52,7 +56,7 @@ export default function AutoReplyInsertChips({
     return () => { alive = false }
   }, [accountId, load])
 
-  const pick = (token: string) => { setMenu(null); onInsert(token) }
+  const pick = (token: string) => { if (disabled || lockedReason) return; setMenu(null); onInsert(token) }
   const why = (ready: boolean, label: string) =>
     state === 'loading' ? '読み込み中です'
       : state === 'failed' ? '差し込み項目を読み込めませんでした。画面を再読み込みしてください'
@@ -62,19 +66,19 @@ export default function AutoReplyInsertChips({
 
   return (
     <>
-      <MessageInsertButton kind="name" label="名前" title="名前を差し込む" onClick={() => onInsert(NAME_TOKEN)} />
-      <MessageInsertButton kind="field" label="友だち情報" ref={fieldRef} title={why(fieldsReady, '友だち情報')} expanded={menu === 'field'} disabled={!fieldsReady} onClick={() => setMenu(m => m === 'field' ? null : 'field')} />
-      <MessageInsertButton kind="var" label="共通情報" ref={varRef} title={why(varsReady, '共通情報')} expanded={menu === 'var'} disabled={!varsReady} onClick={() => setMenu(m => m === 'var' ? null : 'var')} />
-      <MessageInsertButton kind="date" label="予約日時" disabled title="自動応答では予約日時を差し込めません" onClick={() => {}} />
+      <MessageInsertButton disabled={disabled} lockedReason={lockedReason} kind="name" label="名前" title="名前を差し込む" onClick={() => pick(NAME_TOKEN)} />
+      <MessageInsertButton kind="field" label="友だち情報" ref={fieldRef} title={why(fieldsReady, '友だち情報')} expanded={menu === 'field'} disabled={disabled || !fieldsReady} lockedReason={lockedReason} onClick={() => setMenu(m => m === 'field' ? null : 'field')} />
+      <MessageInsertButton kind="var" label="共通情報" ref={varRef} title={why(varsReady, '共通情報')} expanded={menu === 'var'} disabled={disabled || !varsReady} lockedReason={lockedReason} onClick={() => setMenu(m => m === 'var' ? null : 'var')} />
+      <MessageInsertButton kind="date" label="予約日時" disabled lockedReason={lockedReason} title="自動応答では予約日時を差し込めません" onClick={() => {}} />
       <ActionMenu
-        open={menu === 'field'}
+        open={!disabled && !lockedReason && menu === 'field'}
         anchorRef={fieldRef}
         ariaLabel="差し込む友だち情報"
         onClose={() => setMenu(null)}
         items={references.friendFields.map((field) => ({ id: field.fieldKey, label: field.name, onSelect: () => pick(`{{field.${field.fieldKey}}}`) }))}
       />
       <ActionMenu
-        open={menu === 'var'}
+        open={!disabled && !lockedReason && menu === 'var'}
         anchorRef={varRef}
         ariaLabel="差し込む共通情報"
         onClose={() => setMenu(null)}

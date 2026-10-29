@@ -70,6 +70,14 @@ describe('統括の一括配信の一覧（U4Eep0）', () => {
 })
 
 describe('統括の一括配信の詳細（M2tJM）', () => {
+  it('URLに対象が無いときは詳細の内容を表示せず、一覧へ戻る案内を出す', async () => {
+    params.value = new URLSearchParams()
+    render(<HqBroadcastDetail />)
+    expect(await screen.findByText('開く一括配信が指定されていません')).toBeTruthy()
+    expect(screen.getByRole('link', { name: '一括配信の一覧へ戻る' })).toBeTruthy()
+    expect(screen.queryByText('配信した設定')).toBeNull()
+  })
+
   it('送ったあとは 下書き・送信中・送信済み の帯（予約しない配信は予約中を省く）と、一部の店が失敗した札', async () => {
     params.value = new URLSearchParams('id=r1')
     hq.get.mockResolvedValue({ data: run('r1', '送った配信', [target('a', 'sent', 100, 50), target('b', 'failed', 0, 0)]) })
@@ -126,7 +134,7 @@ it('統括のフォルダは色の保存に失敗しても窓を残し、再試�
 it('選ばれていない一括配信に架空の配信設定を出さない', async () => {
   params.value = new URLSearchParams()
   render(<HqBroadcastDetail />)
-  expect(await screen.findByText('一括配信が選ばれていません')).toBeTruthy()
+  expect(await screen.findByText('開く一括配信が指定されていません')).toBeTruthy()
   expect(screen.queryByRole('complementary', { name: '配信した設定とメッセージ' })).toBeNull()
   expect(screen.queryByText('テキスト 1通')).toBeNull()
 })

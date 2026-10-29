@@ -66,9 +66,17 @@ ecOperations.get(
   async (c) => {
     const accountId = lineAccountId(c);
     const status = c.req.query('status')?.trim() || null;
+    const from = c.req.query('from')?.trim() || null;
+    const to = c.req.query('to')?.trim() || null;
     if (!accountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
     if (status && !ORDER_STATES.has(status as EcOrderState)) {
       return c.json({ success: false, error: '注文の状態が正しくありません' }, 400);
+    }
+    if ((from === null) !== (to === null)
+        || (from !== null && (!Number.isFinite(Date.parse(from)) || new Date(from).toISOString() !== from))
+        || (to !== null && (!Number.isFinite(Date.parse(to)) || new Date(to).toISOString() !== to))
+        || (from !== null && to !== null && from >= to)) {
+      return c.json({ success: false, error: '注文日の範囲が正しくありません' }, 400);
     }
     if (!await visible(c, accountId)) {
       return c.json({ success: false, error: 'このLINEアカウントを表示する権限がありません' }, 403);
@@ -77,6 +85,7 @@ ecOperations.get(
       const page = pagination(c);
       const data = await listEcOrders(c.env.DB, {
         lineAccountId: accountId, status: status as EcOrderState | null,
+        from, to,
         query: c.req.query('query')?.trim().slice(0, 100) || '', ...page,
       });
       return c.json({ success: true, data: buildOffsetListResponse({ ...data, paging: page, sort: [{ field: 'orderedAt', direction: 'desc' }, { field: 'id', direction: 'desc' }] }), pagination: { total: data.total, ...page } });

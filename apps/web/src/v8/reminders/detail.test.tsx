@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   updates: [] as Array<Record<string, unknown>>,
   plannedTotal: 2,
   onlyPlanned: false,
+  omitId: false,
 }))
 
 vi.mock('next/link', () => ({
@@ -27,7 +28,7 @@ vi.mock('next/link', () => ({
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   usePathname: () => '/reminders/detail',
-  useSearchParams: () => new URLSearchParams(`id=reminder-1${state.tab ? `&tab=${state.tab}` : ''}`),
+  useSearchParams: () => new URLSearchParams(`${state.omitId ? '' : 'id=reminder-1'}${state.tab ? `${state.omitId ? '' : '&'}tab=${state.tab}` : ''}`),
 }))
 
 vi.mock('@/contexts/account-context', () => ({
@@ -110,6 +111,7 @@ beforeEach(() => {
   state.updates = []
   state.plannedTotal = 2
   state.onlyPlanned = false
+  state.omitId = false
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -131,6 +133,14 @@ const buttonByText = (text: string) =>
   [...document.querySelectorAll('button')].find((el) => el.textContent?.trim() === text) as HTMLButtonElement | undefined
 
 describe('V8 リマインダの詳細', () => {
+  it('URLに対象が無いときは共通の対象なし画面を出す', async () => {
+    state.omitId = true
+    await render()
+    expect(host.querySelector('[data-target-missing="unspecified"]')).toBeTruthy()
+    expect(host.textContent).toContain('リマインダ一覧へ戻る')
+    expect(host.querySelector('[aria-label="最近の実行"]')).toBeNull()
+  })
+
   it('概要（rbAig）：最近の実行は送った・送れなかった物だけ（予定は配信予定タブ）', async () => {
     await render()
     expect(host.querySelector('[data-design-node="rbAig"]')).toBeTruthy()

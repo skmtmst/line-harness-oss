@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import React from 'react'
+import React, {createRef} from 'react'
 import {render,screen,cleanup,fireEvent} from '@testing-library/react'
 import {afterEach,expect,it,vi} from 'vitest'
 import NumberField,{numberRangeNote} from './number-field'
@@ -26,4 +26,30 @@ it('識別子を省略した数値欄も Field のラベルとつながる',()=>
  const input=screen.getByRole('spinbutton',{name:'人数'}) as HTMLInputElement
  const label=Array.from(container.querySelectorAll('label')).find(node=>node.textContent?.startsWith('人数'))
  expect(input.id).not.toBe('');expect(label?.htmlFor).toBe(input.id)
+})
+
+it('3桁区切りは非編集中の表示だけで、値・ref・入力イベントは元の数値を保つ',()=>{
+ const ref=createRef<HTMLInputElement>(),change=vi.fn(),blur=vi.fn(),focus=vi.fn()
+ const {container}=render(<NumberField ref={ref} aria-label="予算" defaultValue="12345.50" unit="円" onChange={change} onBlur={blur} onFocus={focus}/>)
+ const input=screen.getByRole('spinbutton') as HTMLInputElement
+ expect(input.value).toBe('12345.50');expect(ref.current).toBe(input)
+ expect(container.querySelector('[data-number-display]')?.textContent).toBe('12,345.50')
+ expect(input.parentElement?.contains(container.querySelector('[data-number-unit]'))).toBe(true)
+ fireEvent.focus(input);expect(container.querySelector('[data-number-display]')).toBeNull();expect(focus).toHaveBeenCalledOnce()
+ fireEvent.change(input,{target:{value:'54321'}});expect(change.mock.calls[0][0].target.value).toBe('54321')
+ fireEvent.blur(input);expect(blur).toHaveBeenCalledOnce();expect(container.querySelector('[data-number-display]')?.textContent).toBe('54,321')
+ fireEvent.change(input,{target:{value:''}});expect(container.querySelector('[data-number-display]')).toBeNull()
+})
+it('ネイティブのフォームリセットで表示だけが古い値にならない',()=>{
+ const {container}=render(<form><NumberField aria-label="予算" defaultValue="12345"/><button type="reset">戻す</button></form>)
+ const input=screen.getByRole('spinbutton') as HTMLInputElement
+ fireEvent.change(input,{target:{value:'54321'}});expect(container.querySelector('[data-number-display]')?.textContent).toBe('54,321')
+ fireEvent.reset(container.querySelector('form')!);expect(container.querySelector('[data-number-display]')?.textContent).toBe('12,345')
+})
+
+it('編集でrefを付け直さず、callback refの後始末を実行する',()=>{
+ const dispose=vi.fn(),ref=vi.fn(()=>dispose)
+ const {unmount}=render(<NumberField ref={ref} aria-label="人数" defaultValue="1000"/>)
+ fireEvent.change(screen.getByRole('spinbutton'),{target:{value:'2000'}})
+ expect(ref).toHaveBeenCalledOnce();expect(dispose).not.toHaveBeenCalled();unmount();expect(dispose).toHaveBeenCalledOnce()
 })

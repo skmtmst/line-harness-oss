@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * ★V8 シナリオを作る①（create.tsx）の、作りかけの下書き（id あり）を開いたときの動きの試験。
@@ -73,7 +74,7 @@ const defer = <T,>() => {
   return { promise, resolve }
 }
 const saveButton = () => screen.getByRole('button', { name: /この方式で保存する/ }) as HTMLButtonElement
-const draftButton = () => screen.getByRole('button', { name: /あとで決める/ }) as HTMLButtonElement
+const draftButton = () => getPageAction({ name: /あとで決める/ }) as HTMLButtonElement
 const nameField = () => screen.getByRole('textbox', { name: 'シナリオ名' }) as HTMLInputElement
 
 beforeEach(() => {

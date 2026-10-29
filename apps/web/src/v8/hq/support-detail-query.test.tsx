@@ -6,10 +6,10 @@ import React from 'react'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
-const nav = vi.hoisted(() => ({ id: 'req-a' }))
+const nav = vi.hoisted(() => ({ id: 'req-a' as string | null }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(`id=${nav.id}`),
+  useSearchParams: () => new URLSearchParams(nav.id ? `id=${nav.id}` : ''),
   usePathname: () => '/hq/support/detail',
 }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a> }))
@@ -44,7 +44,16 @@ import * as staffIdentity from '@/lib/staff-role'
 import HqSupportDetailV8 from './support-detail'
 afterEach(() => { cleanup(); vi.restoreAllMocks(); nav.id = 'req-a' })
 
+test('対象IDが無いときは問い合わせや履歴を表示せず、一覧へ戻る案内を出す', async () => {
+  nav.id = null
+  render(<HqSupportDetailV8 />)
+  expect(await screen.findByText('開くお問い合わせが指定されていません')).toBeTruthy()
+  expect(screen.getByRole('link', { name: '問い合わせの一覧へ戻る' })).toBeTruthy()
+  expect(screen.queryByText('請求書について')).toBeNull()
+})
+
 test('別の問い合わせへ移ると、その問い合わせを出し、書きかけを残さない', async () => {
+  nav.id = 'req-a'
   const view = render(<HqSupportDetailV8 />)
   await screen.findAllByText('請求書について')
   const box = document.querySelector('textarea') as HTMLTextAreaElement

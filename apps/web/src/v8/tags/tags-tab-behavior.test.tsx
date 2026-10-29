@@ -115,7 +115,8 @@ describe('よく使う絞り込み', () => {
 
 describe('件数とページ送り・並び替え', () => {
   it('表示件数は10・20・30・40・50件から選べ、ページ送りは共通の部品で出す', async () => {
-    render(<TagsList accountId="account-a" fixture={{ items: ITEMS, groups: GROUPS }} />)
+    const items = Array.from({ length: 21 }, (_, index) => ({ ...ITEMS[0], id: `page-${index}`, name: `ページ確認${index}` }))
+    render(<TagsList accountId="account-a" fixture={{ items, groups: GROUPS }} />)
     fireEvent.click(screen.getByRole('button', { name: '表示件数' }))
     const listbox = await screen.findByRole('listbox')
     expect(within(listbox).getAllByRole('option').map((option) => option.textContent?.trim())).toEqual(['10件表示', '20件表示', '30件表示', '40件表示', '50件表示'])

@@ -1,3 +1,7 @@
+import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -7,7 +11,6 @@ vi.mock('next/navigation', () => ({useRouter: () => ({replace: (url: string) => 
 vi.mock('@/contexts/account-context', () => ({useAccount: () => ({selectedAccountId: 'synthetic-account', accounts: net.accounts})}))
 vi.mock('@/components/shell/page-chrome', () => ({usePageTitle: net.pageTitle}))
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({enabled: () => false, status: 'ready'}) }))
-vi.mock('@/lib/staff-role', () => ({useStaffRole: () => 'owner', canManageRole: () => true}))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({default: () => null, useActionOptions: () => ({tags:[],fields:[],marks:[],scenarios:[],vars:[]})}))
 vi.mock('@/components/shared/select', () => ({ default: ({value,onChange,options,...props}: {value: string; onChange: (value: string) => void; options: Array<{value: string; label: string}>; 'aria-label'?: string}) => <select aria-label={props['aria-label']} value={value} onChange={e=>onChange(e.target.value)}>{options.map((o)=><option key={o.value} value={o.value}>{o.label}</option>)}</select> }))
 vi.mock('@/lib/api', async importOriginal => {const actual = await importOriginal<typeof import('@/lib/api')>(); return {...actual,api:{autoReplies:{getDraft:net.getDraft,get:async()=>({success:true,data:{isActive:net.liveStatus==='published',lifecycleStatus:net.liveStatus}}),list:net.list,conflicts:async()=>({success:true,data:{conflicts:[]}}),validateDraft:net.validateDraft,saveDraft:net.saveDraft,testDraft:net.testDraft,publishDraft:net.publishDraft},templates:{list:async()=>({success:true,data:[]})},folders:{list:async()=>({success:true,data:[]})},friends:{list:async()=>({success:true,data:{items:[{id:'synthetic-friend',displayName:'試験の友だち'}],total:1}})}}}})
@@ -51,11 +54,12 @@ const DRAFT = {
 }
 
 beforeEach(()=> {
+ verifiedStaffRole('owner'); forgetSessionSnapshot()
  net.liveStatus='published';net.query='id=synthetic-rule&step=response';net.accounts=[{id:'synthetic-account'}];vi.clearAllMocks()
  net.getDraft.mockResolvedValue({success:true,data:DRAFT});net.validateDraft.mockResolvedValue({success:true,data:{errors:[],warnings:[],conflicts:[]}})
  net.list.mockResolvedValue({success:true,data:[]});net.saveDraft.mockResolvedValue({success:true,data:{...DRAFT,versionNumber:2}})
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot() })
 it('WEB293: 次へから優先順位へ入る取得を一度だけ行う',async()=>{
  const view=render(<Page/>);await act(async()=>{})
  await act(async()=>fireEvent.click(screen.getByRole('button',{name:/次へ/})))
@@ -146,8 +150,32 @@ it('言葉条件は検索の印、次へは文頭の矢印を持ち、保存し�
  const next=screen.getByRole('button',{name:/次へ/})
  expect(next.firstElementChild?.classList.contains('lucide-arrow-right')).toBe(true)
  fireEvent.click(screen.getByRole('button',{name:'部分一致（含む）'}))
- await act(async()=>fireEvent.click(screen.getByRole('button',{name:'下書きとして保存'})))
+ await act(async()=>fireEvent.click(getPageAction({name:'下書きとして保存'})))
  await act(async()=>fireEvent.click(next))
  expect(net.query).toContain('step=response')
  expect(net.saveDraft).toHaveBeenCalled()
+})
+
+it('確認済みの公開操作を保持しても、read代理へ切替後は公開0、writeで再確認して公開1', async () => {
+ net.liveStatus='draft';net.query='id=synthetic-rule&step=priority'
+ net.testDraft.mockResolvedValue({success:true,data:{draftWon:true,winner:null,candidates:[],staleTest:false}})
+ net.publishDraft.mockResolvedValue({success:true,data:{}})
+ const view=render(<Page/>);await act(async()=>{})
+ fireEvent.change(document.querySelector('#wiz-test-message') as HTMLInputElement,{target:{value:'test'}})
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'試す',exact:true})))
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'次へ：確認',exact:true})))
+ view.rerender(<Page/>);await act(async()=>{})
+ const button=screen.getByRole('button',{name:'有効にする',exact:true}) as HTMLButtonElement
+ expect(button.disabled).toBe(false)
+ const snapshot=(mode:'read'|'write')=>({impersonation:{id:'proxy',tenantId:'tenant',mode,piiRevealed:false,startedAt:''},unfamiliarAt:null,stepUpMethod:'none' as const})
+ await act(async()=>{rememberSessionSnapshot(snapshot('read'));fireEvent.click(button)})
+ expect(net.publishDraft).not.toHaveBeenCalled()
+ await act(async()=>{rememberSessionSnapshot(snapshot('write'))})
+ expect((screen.getByRole('button',{name:'有効にする',exact:true}) as HTMLButtonElement).disabled).toBe(true)
+ net.query='id=synthetic-rule&step=priority';view.rerender(<Page/>);await act(async()=>{})
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'試す',exact:true})))
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'次へ：確認',exact:true})))
+ view.rerender(<Page/>);await act(async()=>{})
+ await act(async()=>fireEvent.click(screen.getByRole('button',{name:'有効にする',exact:true})))
+ expect(net.publishDraft).toHaveBeenCalledTimes(1)
 })

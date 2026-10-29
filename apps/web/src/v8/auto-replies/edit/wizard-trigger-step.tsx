@@ -31,6 +31,8 @@ import { KIND_ICONS,MAIN_KINDS,WEEKDAY_PRESETS,WizardForm,kindOrder,weekdaySumma
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardTriggerStepContext = {
+  disabled?: boolean
+  lockedReason?: string
   effectiveKeywords: KeywordRuleDraft[]
   fieldError: (field: string) => string | undefined
   form: WizardForm
@@ -42,12 +44,12 @@ type WizardTriggerStepContext = {
   weekdayNotice: string
 }
 
-export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKindsButton, narrow, patch, setWeekdayNotice, showMoreKinds, weekdayNotice }: WizardTriggerStepContext) {
+export function WizardTriggerStep({ disabled = false, lockedReason, effectiveKeywords, fieldError, form, moreKindsButton, narrow, patch, setWeekdayNotice, showMoreKinds, weekdayNotice }: WizardTriggerStepContext) {
   return (<>
               <Card variant="form" gap="normal" className={`${styles.cardContent} ${styles.stepTrigger}`}>
                 <CardHeader size="stacked" title={<>1. どのメッセージに反応するか</>} meta={<>届いた言葉で決めます。</>} />
                 <SaveErrorField names={["trigger-kind","respondToAll","form.respondToAll"]}><RadioCardGroup legend="反応するメッセージ" className={styles.radioPair}>
-                  <RadioCard
+                  <RadioCard disabled={disabled}
                     name="trigger-kind"
                     value="keyword"
                     checked={!form.respondToAll}
@@ -56,7 +58,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                     icon={<TextSearch size={16} />}
                     note="決めた言葉が入っていたら返す"
                   />
-                  <RadioCard
+                  <RadioCard disabled={disabled}
                     name="trigger-kind"
                     value="all"
                     checked={form.respondToAll}
@@ -75,7 +77,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                         {effectiveKeywords.map((rule, index) => (
                           <span key={`${rule.keyword}-${index}`} className={styles.chip}>
                             {rule.keyword.trim()}
-                            <button
+                            <button disabled={disabled}
                               type="button"
                               className={styles.chipRemove}
                               data-hit-area=""
@@ -90,7 +92,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                             </button>
                           </span>
                         ))}
-                        <SaveErrorField names={["value"]}><KeywordInput maxLength={200}
+                        <SaveErrorField names={["value"]}><KeywordInput disabled={disabled} maxLength={200}
                           id="wiz-keywords" label="反応する言葉を足す" errorId="wiz-keywords-error"
                           error={fieldError('wiz-keywords')}
                           onAdd={(word) => {
@@ -112,7 +114,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                     <div className={styles.field}>
                       <span className={styles.label}>言葉の合い方</span>
                       <div className={styles.seg} role="group" aria-label="言葉の合い方">
-                        <button
+                        <button disabled={disabled}
                           type="button"
                           className={styles.segBtn}
                           aria-pressed={form.matchType === 'contains'}
@@ -125,7 +127,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                         >
                           部分一致（含む）
                         </button>
-                        <button
+                        <button disabled={disabled}
                           type="button"
                           className={styles.segBtn}
                           aria-pressed={form.matchType === 'exact'}
@@ -144,7 +146,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                       <div className={styles.field}>
                         <span className={styles.label}>言葉が2つ以上のとき</span>
                         <div className={styles.seg} role="group" aria-label="言葉が2つ以上のとき">
-                          <button
+                          <button disabled={disabled}
                             type="button"
                             className={styles.segBtn}
                             aria-pressed={form.keywordMatchMode === 'any'}
@@ -152,7 +154,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                           >
                             どれか1つで反応
                           </button>
-                          <button
+                          <button disabled={disabled}
                             type="button"
                             className={styles.segBtn}
                             aria-pressed={form.keywordMatchMode === 'all'}
@@ -175,7 +177,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                     {/* 受け取る場所（LINE・メール）は機能として残す。絵に場所が無いので題の行の右に小さく。 */}
                     <span className={styles.sourceInline} role="group" aria-label="受け取る場所">
                       受け取る場所
-                      <Checkbox
+                      <Checkbox disabled={disabled}
                       checked={form.receiveSources.includes('line')}
                       onCheckedChange={(on) =>
                         patch({
@@ -187,7 +189,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                     >
                       LINE
                     </Checkbox>
-                    <Checkbox
+                    <Checkbox disabled={disabled}
                       checked={form.receiveSources.includes('email')}
                       onCheckedChange={(on) =>
                         patch({
@@ -208,7 +210,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                       .map((kind) => {
                       const on = form.messageKinds.includes(kind.key)
                       return (
-                        <button
+                        <button disabled={disabled}
                           key={kind.key}
                           type="button"
                           className={styles.pickChip}
@@ -248,7 +250,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                       const label = WEEKDAY_LABELS[index]
                       const on = form.weekdays.includes(index)
                       return (
-                        <button
+                        <button disabled={disabled}
                           key={label}
                           type="button"
                           className={styles.weekday}
@@ -276,7 +278,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                   <div className={styles.weekdayPresets}>
                     <span>まとめて：</span>
                     {WEEKDAY_PRESETS.map((preset) => (
-                      <button
+                      <button disabled={disabled}
                         key={preset.key}
                         type="button"
                         className={styles.weekdayPreset}
@@ -299,7 +301,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                   <span className={styles.label}>時間帯</span>
                   <div className={styles.weekdayRow}>
                   <div className={styles.seg} role="group" aria-label="反応する時間帯">
-                    <button
+                    <button disabled={disabled}
                       type="button"
                       className={styles.segBtn}
                       aria-pressed={form.timeMode === 'always'}
@@ -307,7 +309,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                     >
                       いつでも
                     </button>
-                    <button
+                    <button disabled={disabled}
                       type="button"
                       className={styles.segBtn}
                       aria-pressed={form.timeMode === 'custom' && form.activeFrom === '21:00' && form.activeUntil === '09:00'}
@@ -316,7 +318,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                     >
                       営業時間外だけ
                     </button>
-                    <button
+                    <button disabled={disabled}
                       type="button"
                       className={styles.segBtn}
                       aria-pressed={form.timeMode === 'custom' && !(form.activeFrom === '21:00' && form.activeUntil === '09:00')}
@@ -326,7 +328,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                     </button>
                   </div>
                   {/* 祝日の扱いは機能として残す（絵は説明の1行だけ）。場所を取らないよう時間帯の横に小さく。 */}
-                  <Field label="祝日"><SaveErrorField names={["holidayRule","form.holidayRule","holiday_rule","form.holiday_rule"]}><Select
+                  <Field label="祝日"><SaveErrorField names={["holidayRule","form.holidayRule","holiday_rule","form.holiday_rule"]}><Select disabled={disabled}
                       aria-label="祝日の扱い"
                       value={form.holidayRule}
                       onChange={(v) => patch({ holidayRule: v as HolidayRuleValue })}
@@ -335,13 +337,13 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                   </div>
                   {form.timeMode === 'custom' && (
                     <div className={styles.chips}>
-                      <SaveErrorField names={["activeFrom","form.activeFrom","active_from","form.active_from"]}><TimeField
+                      <SaveErrorField names={["activeFrom","form.activeFrom","active_from","form.active_from"]}><TimeField disabled={disabled}
                         aria-label="始める時刻"
                         value={form.activeFrom}
                         onChange={(v) => patch({ activeFrom: v })}
                       /></SaveErrorField>
                       <span className={styles.weekdayNow}>〜</span>
-                      <SaveErrorField names={["activeUntil","form.activeUntil","active_until","form.active_until"]}><TimeField
+                      <SaveErrorField names={["activeUntil","form.activeUntil","active_until","form.active_until"]}><TimeField disabled={disabled}
                         aria-label="終わる時刻"
                         value={form.activeUntil}
                         onChange={(v) => patch({ activeUntil: v })}
@@ -354,7 +356,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
               <Card variant="form" gap="normal" className={`${styles.cardContent} ${styles.stepTrigger}`}>
                 <CardHeader size="stacked" title={<>3. 誰に反応するか</>} />
                 <SaveErrorField names={["friend-target","friendTarget","form.friendTarget"]}><RadioCardGroup legend="反応する相手" className={styles.radioPair}>
-                  <RadioCard
+                  <RadioCard disabled={disabled}
                     name="friend-target"
                     value="all"
                     checked={form.friendTarget === 'all'}
@@ -363,7 +365,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                     icon={<Users size={16} />}
                     note="届いた人みんなに返す"
                   />
-                  <RadioCard
+                  <RadioCard disabled={disabled}
                     name="friend-target"
                     value="filtered"
                     checked={form.friendTarget === 'filtered'}
@@ -375,7 +377,7 @@ export function WizardTriggerStep({ effectiveKeywords, fieldError, form, moreKin
                 </RadioCardGroup></SaveErrorField>
                 {form.friendTarget === 'filtered' ? (
                   <div id="wiz-conditions" role="group" aria-label="反応する友だちの条件" aria-describedby={fieldError('wiz-conditions') ? 'wiz-conditions-error' : undefined} data-invalid={!!fieldError('wiz-conditions') || undefined} className={styles.compositeField}>
-                  <ConditionBuilder
+                  <ConditionBuilder disabled={disabled} lockedReason={lockedReason}
                     value={form.friendConditions}
                     onChange={(next) => patch({ friendConditions: next })}
                     label="反応する友だちの条件"

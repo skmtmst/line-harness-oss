@@ -131,8 +131,12 @@ function canSeeRowInAccountScope(
   row: StaffAccessRow,
   visibleIds: ReadonlySet<string>,
   requestedLineAccountId?: string,
+  creatorStaffId?: string | null,
+  accountAdminIds?: ReadonlySet<string>,
 ): boolean {
-  if (row.account_scope === 'all') return true;
+  if (row.account_scope === 'all') return requestedLineAccountId
+    ? row.id === creatorStaffId || Boolean(accountAdminIds?.has(row.id) && (row.role === 'owner' || row.role === 'admin'))
+    : true;
   const rowIds = new Set(parseStringArray(row.scoped_line_account_ids));
   if (row.assigned_line_account_id) rowIds.add(row.assigned_line_account_id);
   if (requestedLineAccountId) return rowIds.has(requestedLineAccountId);
@@ -144,7 +148,7 @@ function emptyRoleCounts(): Record<AccessRoleBundle, number> {
   return { administrator: 0, operations: 0, reception: 0, view_only: 0, custom: 0 };
 }
 
-function accessUserItem(row: StaffAccessRow, now: string): AccessUserItem {
+function accessUserItem(row: StaffAccessRow, now: string, requestedLineAccountId?: string): AccessUserItem {
   const scopedLineAccountIds = parseStringArray(row.scoped_line_account_ids);
   const permissionKeys = parsePermissionKeys(row.permission_keys);
   return {
@@ -158,8 +162,8 @@ function accessUserItem(row: StaffAccessRow, now: string): AccessUserItem {
     hasFieldMasks: null,
     accountScope: {
       type: row.account_scope ?? 'all',
-      assignedLineAccountId: row.assigned_line_account_id ?? null,
-      lineAccountIds: row.account_scope === 'accounts' ? scopedLineAccountIds : [],
+      assignedLineAccountId: requestedLineAccountId && row.account_scope === 'accounts' ? requestedLineAccountId : row.assigned_line_account_id ?? null,
+      lineAccountIds: row.account_scope === 'accounts' ? requestedLineAccountId ? [requestedLineAccountId] : scopedLineAccountIds : [],
       includesDescendants: Boolean(row.can_access_descendant_accounts),
     },
     lastLoginAt: row.last_login_at,
@@ -203,9 +207,20 @@ export async function listAccessUsers(db: D1Database, input: ListAccessUsersInpu
   ).bind(DEFAULT_TENANT_ID, tenantId).all<StaffAccessRow>();
 
   const visibleIds = new Set(input.allowedLineAccountIds);
+  const creator = input.lineAccountId
+    ? await db.prepare('SELECT created_by_staff_id FROM line_accounts WHERE id=? AND COALESCE(tenant_id,?)=?')
+      .bind(input.lineAccountId, DEFAULT_TENANT_ID, tenantId).first<{ created_by_staff_id: string | null }>()
+    : null;
+  const accountAdmins = input.lineAccountId
+    ? await db.prepare(`SELECT membership.staff_id FROM line_account_hq_admin_memberships membership
+      JOIN line_accounts account ON account.id = membership.line_account_id
+      WHERE account.id=? AND COALESCE(account.tenant_id,?)=?`)
+      .bind(input.lineAccountId, DEFAULT_TENANT_ID, tenantId).all<{ staff_id: string }>()
+    : null;
+  const accountAdminIds = new Set(accountAdmins?.results.map((row) => row.staff_id) ?? []);
   const visibleRows = result.results.filter((row) =>
-    canSeeRowInAccountScope(row, visibleIds, input.lineAccountId));
-  const allItems = visibleRows.map((row) => accessUserItem(row, now));
+    canSeeRowInAccountScope(row, visibleIds, input.lineAccountId, creator?.created_by_staff_id, accountAdminIds));
+  const allItems = visibleRows.map((row) => accessUserItem(row, now, input.lineAccountId));
   const roleCounts = emptyRoleCounts();
   for (const item of allItems) roleCounts[item.roleBundle] += 1;
   const activeItems = allItems.filter((item) => item.status === 'active');

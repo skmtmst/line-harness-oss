@@ -25,7 +25,7 @@ function request(path: string, method = 'GET', body?: unknown, overrides = {}) {
   }, { ...env, ...overrides });
 }
 async function create(): Promise<QaRun> {
-  const response = await request('/runs', 'POST', { passwords: { hq: 'HqPass123', store: 'Store123', viewer: 'Viewer123', impersonation: 'Proxy123' } });
+  const response = await request('/runs', 'POST', { passwords: { hq: 'HqPassword123!', store: 'StorePassword123!', viewer: 'ViewerPassword123!', impersonation: 'ProxyPassword123!' } });
   expect(response.status).toBe(201);
   const value = await response.json() as { data: QaRun };
   return value.data;
@@ -89,7 +89,7 @@ test('4役と模擬接続を隔離して作る。既存の認証・スコープ�
   expect(JSON.stringify(run)).not.toMatch(/password|token|secret|api_key|Pass123/);
   for (const user of run.users) {
     const row = fixture.raw.prepare('SELECT * FROM staff_members WHERE id=?').get(user.id) as { password_hash: string; api_key: string; access_level: string; role: string };
-    const passwords = { hq: 'HqPass123', store: 'Store123', viewer: 'Viewer123', impersonation: 'Proxy123' };
+    const passwords = { hq: 'HqPassword123!', store: 'StorePassword123!', viewer: 'ViewerPassword123!', impersonation: 'ProxyPassword123!' };
     expect(await verifyPassword(passwords[user.role], row.password_hash)).toBe(true);
     const authenticated = await authenticateApiToken({ env, req: { path: '/api/friends' } } as import('hono').Context<Env>, row.api_key);
     expect(authenticated).not.toBeNull();
