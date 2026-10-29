@@ -916,3 +916,4 @@
 - [店の比較から削除・アーカイブした店を除く](release-log/unreleased/1927-masato-store-comparison-archived.md) — 店の比較とCSVの修正履歴。
 - [自動応答の閲覧表示と作成画面の間隔](release-log/unreleased/1933-kenta-auto-reply-wizard.md) — 閲覧時の入力表示と縦の空きの反映履歴。
 - [一覧のページ範囲の補正](release-log/unreleased/1933-kenta-muse-history-pagination.md) — 削除後に最後のページへ戻す修正の反映履歴。
+- [本線の見張りの赤の修正](release-log/unreleased/0000-kenta-muse-guard-reds.md) — 言葉・CSS・確認窓の見張り9件の赤を直した反映履歴。
