@@ -20,6 +20,10 @@
   flex-direction: column;
 }
 
+.textOnly .text {
+  flex: 1;
+}
+
 .name {
   overflow: hidden;
   color: var(--color-ink);
@@ -40,6 +44,10 @@
 }
 
 :root [data-collapsed] .text {
+  display: none;
+}
+
+:root [data-collapsed] .textOnly {
   display: none;
 }
 
