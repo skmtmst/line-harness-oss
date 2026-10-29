@@ -3,6 +3,7 @@ import { formatDate as polishFormatDate, formatNumber } from '@/lib/format'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import Button from '@/components/shared/button'
+import Card, { CardHeader } from '@/components/shared/card'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import NoteBar from '@/components/shared/note-bar'
@@ -328,9 +329,6 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.tabStack}>
-      <Notice tone="info">
-        いちばん確かなのは「スタッフの Google カレンダー」です。ほかの予約サービスがスタッフの Google カレンダーへ予約を書き出せれば、その時間は自動で LINE の予約受付から外れます（いまの作りでできます）。
-      </Notice>
       {firstConflict ? (
         <NoteBar tone="warn">
           予約が {formatNumber(conflicts.length)} 件重なっています。
@@ -341,8 +339,8 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
 
       <ChannelsTables data={data} canEdit={canEdit} roles={roles} calendars={calendars} onDetail={setDetailTarget} onConnect={setConnectTarget} />
 
-      <section className={ch.card} data-design-node="wJYQb" aria-labelledby="channels-assign-heading">
-        <h2 id="channels-assign-heading" className={ch.cardTitle}>外から予約が入ったとき</h2>
+      <Card padding="roomy" layout="vertical" gap="normal" data-design-node="wJYQb" aria-labelledby="channels-assign-heading">
+        <CardHeader size="content" titleId="channels-assign-heading" title="外から予約が入ったとき" />
         {canEdit ? (
           <fieldset disabled={savingAssign} className={styles.ruleLine}>
             <span className={styles.ruleLineLabel}>指名なしの予約は、その時間に空いているスタッフへ自動で割り当て</span>
@@ -360,7 +358,7 @@ export default function ChannelsTabV8({ accountId, canEdit, staff = [], onSummar
           </p>
         )}
         {assignError ? <Notice tone="danger" className={ch.cardDescNoticePlacement} >{assignError}</Notice> : null}
-      </section>
+      </Card>
 
       {detailTarget ? (
         <CalendarDetailDialog
