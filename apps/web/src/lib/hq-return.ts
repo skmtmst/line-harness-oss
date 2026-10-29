@@ -7,6 +7,6 @@
  *
  * @param hqShell いまの画面が統括の殻か（V8 では `/accounts/new` も統括）。
  */
-export function canReturnToHqFrom(staffRole: string | null | undefined, pathname: string, hqShell: boolean): boolean {
-  return (staffRole === 'owner' || staffRole === 'admin') && !pathname.startsWith('/hq') && !hqShell
+export function canReturnToHqFrom(staffRole: string | null | undefined, pathname: string, hqShell: boolean, accountScope?: 'all' | 'accounts'): boolean {
+  return accountScope !== 'accounts' && (staffRole === 'owner' || staffRole === 'admin') && !pathname.startsWith('/hq') && !hqShell
 }

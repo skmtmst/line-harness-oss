@@ -49,6 +49,10 @@ export interface StaffMember {
   canAccessDescendantAccounts: boolean;
   /** 担当範囲。accounts の場合は scopedLineAccountIds に対象店舗が入る。 */
   accountScope?: 'all' | 'accounts';
+  /** This member created the currently selected LINE account. */
+  isAccountCreator?: boolean;
+  /** Whether this actor may change the member in the selected account. */
+  canManageInAccount?: boolean;
   scopedLineAccountIds?: string[];
   /** 役割bundle。role は初期値、こちらが監査・画面の共通語彙。 */
   roleBundle?: 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom';

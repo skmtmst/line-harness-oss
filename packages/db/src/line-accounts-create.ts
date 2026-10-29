@@ -40,13 +40,13 @@ export async function createLineAccount(
           official_profile_url, timezone, country, role,
           parent_line_account_id, tenant_id,
           line_display_name, line_picture_url, line_basic_id, line_profile_synced_at,
-          created_at, updated_at)
+          created_by_staff_id, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1,
          CASE WHEN EXISTS (
            SELECT 1 FROM line_accounts
             WHERE COALESCE(tenant_id, ?) = ? AND archived_at IS NULL
           ) THEN 0 ELSE 1 END,
-          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       id,
@@ -80,6 +80,7 @@ export async function createLineAccount(
       input.linePictureUrl ?? null,
       input.lineBasicId ?? null,
       input.lineProfileSyncedAt ?? null,
+      input.createdByStaffId ?? null,
       now,
       now,
     );

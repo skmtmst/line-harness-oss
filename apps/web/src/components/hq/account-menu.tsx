@@ -1,6 +1,6 @@
 'use client'
 
-import { useStaffRole } from '@/lib/staff-role'
+import { useStaffRole, useStaffIdentity } from '@/lib/staff-role'
 import { Building2, ChevronsUpDown, CreditCard, LifeBuoy, LogOut, Users } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -64,6 +64,7 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
   const menuId = useId()
   const [name, setName] = useState('')
   const role = useStaffRole()
+  const staffIdentity = useStaffIdentity()
   const [billing, setBilling] = useState<BillingSummary | null>(null)
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -114,8 +115,8 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
     }
   }, [open])
 
-  const canReturnToHq = canReturnToHqFrom(role, pathname, hq)
-  const rows = sidebarAccountRows({ hq, role: role ?? '', canReturnToHq })
+  const canReturnToHq = canReturnToHqFrom(role, pathname, hq, staffIdentity?.accountScope)
+  const rows = sidebarAccountRows({ hq, role: role ?? '', canReturnToHq }).filter((row) => row !== 'billing' || staffIdentity?.accountScope !== 'accounts')
   const roleLabel = role ? ROLE_LABELS[role] ?? role : ''
   const chip = seesBilling && billing ? billingChip(billing) : null
   const daysLeft = seesBilling && billing ? trialDaysLabel(billing) : null

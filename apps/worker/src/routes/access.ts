@@ -70,6 +70,7 @@ function maskEmail(email: string | null): string | null {
 async function visibleScope(c: Context<Env>) {
   const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
   const lineAccountId = c.req.query('lineAccountId')?.trim() || undefined;
+  if (scope.isAccountScoped && !lineAccountId) return c.json({ success: false, error: 'アカウントを指定してください' }, 403);
   if (lineAccountId && !scope.allowedAccountIds.includes(lineAccountId)) {
     return c.json({ success: false, error: '対象が見つかりません' }, 404);
   }
