@@ -120,3 +120,13 @@
 .description { color: var(--color-ink-secondary); font-size: var(--text-caption); }
 
 .groupActions { display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--space-8); min-width: 0; }
+
+/* 権限がない時も状態と焦点を保ち、灰色と共通の理由で伝える。 */
+html:root .toggle[data-permission-locked],
+html:root .toggle[data-permission-locked]:is(:hover, :active) {
+  background: var(--color-toggle-locked);
+  opacity: var(--polish-disabled-opacity);
+  cursor: not-allowed;
+  box-shadow: none;
+  filter: none;
+}
