@@ -43,7 +43,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["v8/analytics/analytics.module.css", ".table", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/analytics/analytics.module.css", ".reportTable", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/analytics/analytics.module.css", ".waitBox", "警告・閲覧のみ・状態・待機の帯。線で区別する。"],
-  ["v8/friends/compare/compare.module.css", ".panel, .historyCard", "値を決めるカード内の判定欄と履歴の小箱。入れ子に影を重ねない。"],
   ["v8/booking-menus/menu-form.module.css", ".subSection", "カード内の小箱・入れ子・階層の行。影を重ねない。"],
   ["v8/broadcast-detail/detail.module.css", ".linkList", "表・一覧の行。外側のカードと影を重ねない。"],
   ["v8/broadcast-detail/detail.module.css", ".approval", "警告・閲覧のみ・状態・待機の帯。線で区別する。"],
