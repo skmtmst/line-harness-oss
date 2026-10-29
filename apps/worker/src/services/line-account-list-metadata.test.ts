@@ -12,11 +12,13 @@ it('先の補足情報が未完了でも残りの読取を始め、同じ店舗�
   reads.tags.mockImplementation(() => new Promise(resolve => { answer = resolve; }));
   reads.folders.mockResolvedValue({ store: { id: 'folder' } });
   reads.stats.mockResolvedValue({ store: { friendCount: 3 } });
-  const db = {} as D1Database;
+  const db = { prepare: vi.fn(() => ({ all: vi.fn().mockResolvedValue({ results: [
+    { line_account_id: 'store' }, { line_account_id: 'other-tenant-store' },
+  ] }) })) } as unknown as D1Database;
   const pending = readLineAccountListMetadata(db, 'tenant', ['store']);
   expect(reads.tags).toHaveBeenCalledWith(db, 'tenant', ['store']);
   expect(reads.folders).toHaveBeenCalledWith(db, 'tenant', ['store']);
   expect(reads.stats).toHaveBeenCalledWith(db, ['store']);
   answer({ store: ['tag'] });
-  expect(await pending).toEqual({ tagsByAccount: { store: ['tag'] }, foldersByAccount: { store: { id: 'folder' } }, statsByAccount: { store: { friendCount: 3 } } });
+  expect(await pending).toEqual({ tagsByAccount: { store: ['tag'] }, foldersByAccount: { store: { id: 'folder' } }, statsByAccount: { store: { friendCount: 3 } }, emailInboxAccountIds: new Set(['store']) });
 });

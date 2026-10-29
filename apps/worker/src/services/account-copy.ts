@@ -63,7 +63,7 @@ export async function copyLineAccountSettings(
   const statements: D1PreparedStatement[] = [];
 
   if (items.includes('accountSettings')) {
-    for (const row of await rows(db, 'SELECT * FROM account_settings WHERE line_account_id = ?', sourceAccountId)) {
+    for (const row of await rows(db, "SELECT * FROM account_settings WHERE line_account_id = ? AND key <> 'inbox_email_legacy_enabled'", sourceAccountId)) {
       statements.push(insertStatement(db, 'account_settings', {
         ...row,
         id: crypto.randomUUID(),
