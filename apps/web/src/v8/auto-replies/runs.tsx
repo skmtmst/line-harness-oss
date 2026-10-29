@@ -37,6 +37,9 @@ import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-ba
 import { DataTable, TableHeadRow, Th, Tr, Td, PersonCell, ActionCell } from '@/components/shared/table';
 import { api, ApiError } from '@/lib/api';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { effectiveStaffRole, readStaffIdentity } from '@/lib/staff-identity-state'
+import { lockReason } from '@/components/shared/permission-lock'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { formatDateTime, formatNumber, formatTime, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
 import styles from './runs.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -59,8 +62,11 @@ import { TextField as SharedTextField } from '@/components/shared/text-field'
  */
 
 /* 再実行・一時停止は owner/admin だけ（R530・再実行POST・停止口の requireRole と同じ境目）。 */
-const NO_MANAGE_NOTE = '閲覧のみで見ています。再実行・一時停止はオーナーと管理者だけができます。実行結果の確認と書き出しはこのまま使えます。'
 const NO_RETRY_PERMISSION = permissionDeniedMessage('store')
+
+function canManageRunsNow(): boolean {
+  return canManageRole(effectiveStaffRole(readStaffIdentity())) && !lockReason(true, 'manager')
+}
 
 /* 絵の札の言葉（成功・確認待ち・失敗・見送り）。表に無い状態は「確認中」で出す（白い画面にしない）。 */
 const STATUS: Record<ExecutionRunStatus, { label: string; tone: StatusBadgeTone }> = {
@@ -162,6 +168,8 @@ export default function AutoReplyRunsV8() {
   const requestedRuleId = searchParams.get('id') ?? ''
   const staffRole = useStaffRole()
   const canManage = canManageRole(staffRole)
+  const manageReason = usePermissionLockReason(canManage, 'manager')
+  const canChange = canManage && !manageReason
   const [period, setPeriod] = useListUrlValue<PeriodKey>('period', 'month')
   const [dateFrom, setDateFrom] = useListUrlValue('dateFrom', '')
   const [dateTo, setDateTo] = useListUrlValue('dateTo', '')
@@ -235,7 +243,7 @@ export default function AutoReplyRunsV8() {
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
 
   const stopRule = async () => {
-    if (!data?.rule.id || stopping) return
+    if (!canManageRunsNow() || !data?.rule.id || stopping) return
     setStopping(true)
     setActionMessage('')
     try {
@@ -257,7 +265,7 @@ export default function AutoReplyRunsV8() {
   }
 
   const retryRun = async (item: AutoReplyRun) => {
-    if (isDeliveryUnconfirmed(item) || !item.canRetry || retryingId !== null || retryingAll) return
+    if (!canManageRunsNow() || isDeliveryUnconfirmed(item) || !item.canRetry || retryingId !== null || retryingAll) return
     setRetryingId(item.id)
     setActionMessage('')
     try {
@@ -283,6 +291,7 @@ export default function AutoReplyRunsV8() {
 
   /* 「失敗した処理をもう一度」：今のページでやり直せる失敗を順に実行する。 */
   const retryAllFailed = async () => {
+    if (!canManageRunsNow()) return
     const targets = items.filter((item) => !isDeliveryUnconfirmed(item) && item.canRetry && matchesFilter(item, 'failed'))
     if (targets.length === 0 || retryingAll || retryingId !== null) return
     setRetryingAll(true)
@@ -291,6 +300,7 @@ export default function AutoReplyRunsV8() {
     let denied = false
     let failed = 0
     for (const item of targets) {
+      if (!canManageRunsNow()) { denied = true; break }
       try {
         const response = await api.autoReplies.retryRun(item.id)
         if (!response.success) throw new Error(response.error)
@@ -318,7 +328,7 @@ export default function AutoReplyRunsV8() {
 
   const MAX_CSV_ROWS = 5000
   const exportCsv = async () => {
-    if (exporting) return
+    if (!readStaffIdentity() || exporting) return
     setExporting(true)
     exportCancelledRef.current = false
     setActionMessage('')
@@ -397,12 +407,13 @@ export default function AutoReplyRunsV8() {
         href: `/chats?friend=${encodeURIComponent(item.friendId)}`, onSelect: () => { router.push(`/chats?friend=${encodeURIComponent(item.friendId)}`) },
       })
     }
-    if (canManage && !isDeliveryUnconfirmed(item) && item.canRetry) {
+    if (!isDeliveryUnconfirmed(item) && item.canRetry) {
       list.push({
         id: 'retry',
         label: 'もう一度実行',
         icon: <RotateCcw size={16} aria-hidden="true" />,
-        disabled: retryingId !== null || retryingAll,
+        lockedReason: manageReason,
+        disabled: !canChange || retryingId !== null || retryingAll,
         onSelect: () => { void retryRun(item) },
       })
     }
@@ -419,17 +430,15 @@ export default function AutoReplyRunsV8() {
       help="いつ・誰に・何を返したか、失敗した処理を見ます。"
       identity={<></>}
       actions={<div className={styles.headActions}>
-        {canManage ? (
-          <Button onClick={() => setStopOpen(true)} disabled={!isActiveRule || stopping}>
+          <Button lockedReason={manageReason} onClick={() => { if (canManageRunsNow()) setStopOpen(true) }} disabled={!canChange || !isActiveRule || stopping}>
             <Pause size={16} aria-hidden="true" />一時停止する
           </Button>
-        ) : null}
-        {canManage && data?.rule.id ? (
-          <Button href={`/auto-replies/edit?id=${encodeURIComponent(data.rule.id)}`}>
+        {data?.rule.id ? (
+          <Button lockedReason={manageReason} {...(staffRole === null ? { disabled: true } : { href: `/auto-replies/edit?id=${encodeURIComponent(data.rule.id)}` })}>
             <Pencil size={16} aria-hidden="true" />ルールの編集へ
           </Button>
         ) : null}
-        <Button onClick={() => void exportCsv()} disabled={exporting || loading} busy={exporting} busyLabel="書き出しています">
+        <Button onClick={() => void exportCsv()} disabled={staffRole === null || exporting || loading} busy={exporting} busyLabel="書き出しています">
           <Download size={16} aria-hidden="true" />CSVで書き出す
         </Button>
         {exporting ? (
@@ -437,8 +446,8 @@ export default function AutoReplyRunsV8() {
         ) : null}
       </div>}
     >
-      {!canManage ? (
-        <div className={styles.viewerBand}><ReadOnlyNotice role="status">{NO_MANAGE_NOTE}</ReadOnlyNotice></div>
+      {staffRole !== null && !canChange ? (
+        <div className={styles.viewerBand}><ReadOnlyNotice need="manager" role="status" /></div>
       ) : null}
 
       <div className={styles.kpis}>
@@ -457,11 +466,12 @@ export default function AutoReplyRunsV8() {
 
       {items.some(isDeliveryUnconfirmed) ? <DeliveryUnconfirmedNotice action={<Button href="/chats">トークの送信記録を確認</Button>} /> : null}
       {failedCount > 0 ? (
-        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>{canManage && retryableFailed > 0 ? (
+        <Notice tone="danger" heading={<> {`失敗した処理が ${formatNumber(failedCount)} 件あります`} </>} action={<> <Button onClick={() => { setFilter('failed'); setPage(1) }}>失敗だけ見る</Button>{retryableFailed > 0 ? (
             <Button
               variant="primary"
+              lockedReason={manageReason}
               onClick={() => void retryAllFailed()}
-              disabled={retryableFailed === 0 || retryingAll || retryingId !== null}
+              disabled={!canChange || retryableFailed === 0 || retryingAll || retryingId !== null}
               busy={retryingAll}
               busyLabel="実行しています"
             >
@@ -592,7 +602,7 @@ export default function AutoReplyRunsV8() {
 
       <LogEntryDetails canCopy={canManage} entry={logEntry} onClose={() => setLogEntry(null)} />
       <ConfirmDialog
-        open={stopOpen}
+        open={stopOpen && canChange}
         title="この自動応答を止めますか？"
         description="止めると、条件に合うメッセージが届いても自動では返しません。あとで一覧から再び動かせます。"
         confirmLabel="一時停止する"

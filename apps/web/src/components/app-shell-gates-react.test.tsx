@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 外枠（app-shell）が、ふつうの画面の本文を着地点・店舗の選択・機能の停止の3つの門で包み、
+ * 外枠（app-shell）が、ふつうの画面の本文を統括の境界・閲覧権限・着地点・店舗の選択・機能の停止の5つの門で包み、
  * 共通トップバーを出すこと。統括へ戻る口は左下の自分のメニューが持つ（sidebar-account-menu-react が押して見る）。
  */
 import React from 'react'
@@ -14,6 +14,8 @@ const { gate } = await vi.hoisted(async () => {
   return { gate: (name: string) => ({ default: ({ children }: { children: React.ReactNode }) => createElement('div', { 'data-gate': name }, children) }) }
 })
 vi.mock('./auth-guard', () => gate('auth'))
+vi.mock('./hq-access-gate', () => gate('hq-access'))
+vi.mock('./view-permission-gate', () => gate('view-permission'))
 vi.mock('./root-landing-gate', () => gate('root-landing'))
 vi.mock('./store-selection-gate', () => gate('store-selection'))
 vi.mock('./feature-disabled-gate', () => gate('feature-disabled'))
@@ -44,11 +46,11 @@ const chain = (page: Element) => {
 }
 
 describe('外枠の門', () => {
-  it.each(['/friends', '/hq'])('%s の本文は着地点→店舗の選択→機能の停止の順に包まれ、上の帯と左メニューが出る', (pathname) => {
+  it.each(['/friends', '/hq'])('%s の本文は統括の境界→閲覧権限→着地点→店舗の選択→機能の停止の順に包まれ、上の帯と左メニューが出る', (pathname) => {
     fixture.pathname = pathname
     const view = render(<AppShell><p data-page="">本文</p></AppShell>)
     const page = view.container.querySelector('[data-page]')!
-    expect(chain(page)).toEqual(['feature-disabled', 'store-selection', 'root-landing', 'auth'])
+    expect(chain(page)).toEqual(['feature-disabled', 'store-selection', 'root-landing', 'view-permission', 'hq-access', 'auth'])
     expect(view.container.querySelector('[data-top-bar]')).not.toBeNull()
     expect(view.container.querySelector('[data-sidebar]')).not.toBeNull()
   })

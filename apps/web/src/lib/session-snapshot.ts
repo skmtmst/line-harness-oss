@@ -23,16 +23,33 @@ export interface SessionSnapshot {
 export const SESSION_SNAPSHOT_CHANGED = 'lh-session-snapshot-changed'
 
 let snapshot: SessionSnapshot | null = null
+// 認証の詳細を読み直している間の操作制限。本人確認方式やログイン通知の値は作らない。
+let pendingPermission: Pick<SessionSnapshot, 'impersonation'> | null = null
+
+/** 代理の切替後、認証の控えが無い間は書込を止める。認証情報の読取口には混ぜない。 */
+export function deferImpersonationSnapshot(impersonation: OpsImpersonation): Pick<SessionSnapshot, 'impersonation'> {
+  snapshot = null
+  pendingPermission = { impersonation: { ...impersonation, mode: 'read' } }
+  if (typeof window !== 'undefined') window.dispatchEvent(new window.Event(SESSION_SNAPSHOT_CHANGED))
+  return pendingPermission
+}
+
+/** 操作の可否だけを読む。読込失敗でも暫定の書込拒否を保つ。 */
+export function readPermissionSessionSnapshot(): Pick<SessionSnapshot, 'impersonation'> | null {
+  return pendingPermission ?? snapshot
+}
 
 /** AuthGuard が確認に成功したときに呼ぶ。 */
 export function rememberSessionSnapshot(next: SessionSnapshot): void {
   snapshot = next
+  pendingPermission = null
   if (typeof window !== 'undefined') window.dispatchEvent(new window.Event(SESSION_SNAPSHOT_CHANGED))
 }
 
 /** 確認に失敗した・セッションを失ったときに呼ぶ。次に読む側は自分で取りに行く。 */
 export function forgetSessionSnapshot(): void {
   snapshot = null
+  pendingPermission = null
   if (typeof window !== 'undefined') window.dispatchEvent(new window.Event(SESSION_SNAPSHOT_CHANGED))
 }
 

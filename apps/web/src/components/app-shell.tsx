@@ -28,6 +28,7 @@ import NoteBar from './shared/note-bar'
 import PlatformNotices from './hq/platform-notices'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useEffect, useState } from 'react'
+import ViewPermissionGate from './view-permission-gate'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -73,7 +74,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     )
   }
 
-  const guardedContent = <HqAccessGate><RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate></HqAccessGate>
+  const guardedContent = <HqAccessGate><ViewPermissionGate><RootLandingGate><StoreSelectionGate><FeatureDisabledGate>{children}</FeatureDisabledGate></StoreSelectionGate></RootLandingGate></ViewPermissionGate></HqAccessGate>
 
   const suspendedSupport = (
     <PageChromeProvider>
