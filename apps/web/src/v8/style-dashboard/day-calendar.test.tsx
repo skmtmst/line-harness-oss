@@ -4,13 +4,30 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { IndustryStyle, StyleBooking, StyleSchedule, StyleSnapshot } from '@line-crm/shared'
 import type { eventsApi } from '@/lib/api'
+import type { ButtonProps } from '@/components/shared/button'
+import { STYLE_CONFIG } from './config'
+import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 import { toToday } from './adapter'
 import { WeekCalendar } from './calendar'
 import { StaffBoard } from './staff-board'
 import StyleDashboard from './style-dashboard'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 
-const state = vi.hoisted(() => ({ search: 'view=calendar', role: 'admin', push: vi.fn(), replace: vi.fn(), summary: vi.fn(), schedule: vi.fn(), bookings: vi.fn<typeof eventsApi.listBookings>() }))
+const state = vi.hoisted(() => ({ search: 'view=calendar', role: 'admin' as string | null, directGuardProbe: false, unsafeAddNew: vi.fn(), buttons: [] as ButtonProps[], push: vi.fn(), replace: vi.fn(), summary: vi.fn(), schedule: vi.fn(), bookings: vi.fn<typeof eventsApi.listBookings>() }))
+vi.mock('@/components/shared/button', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/button')>()
+  return { ...actual, default: (props: ButtonProps) => {
+    const id = state.buttons.push(props) - 1
+    return <actual.default {...props} data-test-button-id={id} />
+  } }
+})
+vi.mock('./use-style-dashboard', async importOriginal => {
+  const actual = await importOriginal<typeof import('./use-style-dashboard')>()
+  return { ...actual, useStyleDashboard: (...args: Parameters<typeof actual.useStyleDashboard>) => {
+    const data = actual.useStyleDashboard(...args)
+    return state.directGuardProbe ? { ...data, addNew: state.unsafeAddNew } : data
+  } }
+})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: state.push, replace: state.replace }), usePathname: () => '/', useSearchParams: () => new URLSearchParams(state.search) }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'calendar-account' }) }))
@@ -38,7 +55,7 @@ function fixture(style: IndustryStyle, date = '2026-10-21', range: 'today' | 'we
   return { snapshot, schedule }
 }
 beforeEach(() => {
-  vi.clearAllMocks(); state.search = 'view=calendar'; state.role = 'admin'
+  vi.clearAllMocks(); state.search = 'view=calendar'; state.role = 'admin'; state.directGuardProbe = false; state.buttons = []
   state.summary.mockImplementation((_account, query) => Promise.resolve({ data: fixture(query.style, query.date, query.range).snapshot }))
   state.schedule.mockImplementation((_account, query) => Promise.resolve({ data: fixture(query.style, query.date, query.range).schedule }))
   state.bookings.mockResolvedValue({ items: [], total: 0, limit: 50, sort: [] })
@@ -151,4 +168,168 @@ it.each(['phone', 'line', 'manual'])('正規APIの%sを日週の盤へ保ち、�
     expect(button.getAttribute('aria-description')).toBe(source === 'phone' ? '確定・電話' : '確定')
   }
   expect(screen.queryByRole('button', { name: /予約を入れる/ })).toBeNull()
+})
+
+function emptySchedule() {
+  state.schedule.mockImplementation((_account, query) => {
+    const data = fixture(query.style, query.date, query.range).schedule
+    return Promise.resolve({ data: { ...data, entries: [], days: data.days.map(day => ({ ...day, entryIds: [], bookings: 0, people: 0 })) } })
+  })
+}
+it.each(['salon', 'consult'] as const)('%sの空日の案内と予約導線を一覧・盤・日表示で1回だけ出す', async style => {
+  emptySchedule()
+  for (const view of ['list', 'board', 'calendar']) {
+    state.search = 'view=' + view
+    const result = render(<StyleDashboard style={style} />)
+    await screen.findByText('今日の予約はありません')
+    expect(screen.getAllByRole('button', { name: '予約を入れる', exact: true })).toHaveLength(1)
+    if (view === 'calendar') expect(screen.getByRole('region', { name: '1日のカレンダー' })).toBeTruthy()
+    if (view === 'board') expect(screen.getByRole('region', { name: '台帳の盤' })).toBeTruthy()
+    state.push.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: '予約を入れる', exact: true }))
+    expect(state.push).toHaveBeenCalledWith('/booking/bookings/new?date=2026-10-21')
+    result.unmount()
+  }
+})
+it.each(['salon', 'consult'] as const)('%sの閲覧のみも空日操作を灰色と共通理由で残し、動かさない', async style => {
+  state.role = 'viewer'; emptySchedule()
+  for (const view of ['list', 'board', 'calendar']) {
+    state.search = 'view=' + view
+    const result = render(<StyleDashboard style={style} />)
+    await screen.findByText('今日の予約はありません')
+    const action = screen.getByRole('button', { name: '予約を入れる', exact: true })
+    expect(action.getAttribute('aria-disabled')).toBe('true')
+    expect(action.getAttribute('data-permission-locked')).not.toBeNull()
+    state.push.mockClear(); fireEvent.click(action)
+    expect(state.push).not.toHaveBeenCalled()
+    result.unmount()
+  }
+})
+it.each(['list', 'board'])('検索結果0は%sでも予約なしとせず、検索を外せる', async view => {
+  state.search = 'view=' + view
+  render(<StyleDashboard style="salon" />)
+  await screen.findByRole('searchbox')
+  fireEvent.change(screen.getByRole('searchbox'), { target: { value: '検索に一致しない名前' } })
+  const clear = await screen.findByRole('button', { name: '検索を外す', exact: true })
+  expect(screen.queryByText('今日の予約はありません')).toBeNull()
+  fireEvent.click(clear)
+  await waitFor(() => expect(screen.queryByRole('button', { name: '検索を外す', exact: true })).toBeNull())
+})
+it('取得失敗は空日扱いにせず、非空の閲覧者には頭の予約操作を灰色で示す', async () => {
+  state.schedule.mockRejectedValueOnce(new Error('offline'))
+  const view = render(<StyleDashboard style="salon" />)
+  await screen.findByText('ダッシュボードを読み込めませんでした')
+  expect(screen.queryByText('今日の予約はありません')).toBeNull()
+  view.unmount(); state.role = 'viewer'
+  render(<StyleDashboard style="salon" />)
+  await screen.findByRole('region', { name: '1日のカレンダー' })
+  expect(screen.queryByText('今日の予約はありません')).toBeNull()
+  expect(screen.getByRole('button', { name: '予約を入れる', exact: true }).getAttribute('aria-disabled')).toBe('true')
+})
+it('盤と日カレンダーのempty口は省略時に案内を足さず、指定した内容だけ1回表示する', () => {
+  const { snapshot, schedule } = fixture('salon')
+  const data = toToday('salon', snapshot, schedule, '2026-10-21', 'today')
+  const renderViews = (empty?: React.ReactNode) => <><WeekCalendar week={data.week!} period="day" canWrite={false} onMove={() => {}} onSlot={() => {}} onOpen={() => {}} empty={empty} /><StaffBoard board={data.board!} search="" onSearch={() => {}} canWrite={false} entryItems={() => []} onSlot={() => {}} empty={empty} /></>
+  const view = render(renderViews())
+  expect(screen.queryByText('空日の案内')).toBeNull()
+  expect(screen.getAllByRole('button', { name: /予約者/ })).toHaveLength(2)
+  view.rerender(renderViews(<p>空日の案内</p>))
+  expect(screen.getAllByText('空日の案内')).toHaveLength(2)
+  view.rerender(renderViews())
+  expect(screen.queryByText('空日の案内')).toBeNull()
+  expect(screen.getAllByRole('button', { name: /予約者/ })).toHaveLength(2)
+})
+
+it.each(['restaurant', 'lesson'] as const)('%sの頭は閲覧のみを灰色と共通理由、未知の役割を理由なしの無効にする', async style => {
+  for (const role of ['viewer', null]) {
+    state.role = role
+    const view = render(<StyleDashboard style={style} />)
+    await screen.findByRole('region', { name: '1日のカレンダー' })
+    fireEvent.click(screen.getByRole('button', { name: 'その他の操作', exact: true }))
+    for (const name of ['LINE を送る', '休みを入れる', '表示を変える', STYLE_CONFIG[style].primary]) {
+      const button = screen.queryByRole('button', { name, exact: true }) ?? screen.getByRole('menuitem', { name, exact: true })
+      const reasonId = button.getAttribute('aria-describedby')
+      if (role === 'viewer') {
+        expect(button.hasAttribute('data-permission-locked')).toBe(true)
+        expect(document.getElementById(reasonId!)?.textContent).toBe(PERMISSION_LOCK_REASON.viewer)
+      } else {
+        expect(button.hasAttribute('data-permission-locked')).toBe(false)
+        expect(reasonId).toBeNull()
+      }
+      expect(button.hasAttribute('disabled')).toBe(role === null)
+      expect(button.getAttribute('href')).toBeNull()
+      fireEvent.click(button)
+    }
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(state.push).not.toHaveBeenCalled()
+    view.unmount()
+  }
+})
+it('頭と既定の空状態の作成handlerは、共通ButtonやaddNewの守りが無くても閲覧者を止める', async () => {
+  state.directGuardProbe = true
+  for (const role of ['viewer', null, 'admin']) {
+    state.role = role
+    for (const empty of [false, true]) {
+      state.search = empty ? 'view=list&range=week' : 'view=list'
+      if (empty) emptySchedule()
+      else state.schedule.mockImplementation((_account, query) => Promise.resolve({ data: fixture(query.style, query.date, query.range).schedule }))
+      const view = render(<StyleDashboard style="salon" />)
+      if (empty) await screen.findByText('今週の予約はありません')
+      else await screen.findByText('予約者')
+      const buttons = screen.getAllByRole('button', { name: '予約を入れる', exact: true })
+      state.unsafeAddNew.mockClear()
+      for (const button of buttons) state.buttons[Number(button.getAttribute('data-test-button-id'))].onClick?.({} as never)
+      expect(state.unsafeAddNew).toHaveBeenCalledTimes(role === 'admin' ? buttons.length : 0)
+      view.unmount()
+    }
+  }
+})
+it('閲覧のみの面談でも予約URLのコピーは許可し、書込みの鍵を付けない', async () => {
+  state.role = 'viewer'; state.search = 'view=list&range=week'; emptySchedule()
+  const original = Object.getOwnPropertyDescriptor(navigator, 'clipboard'), writeText = vi.fn().mockResolvedValue(undefined)
+  Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+  try {
+    render(<StyleDashboard style="consult" />)
+    const button = await screen.findByRole('button', { name: '予約 URL をコピー', exact: true })
+    expect(button.hasAttribute('disabled')).toBe(false)
+    expect(button.hasAttribute('data-permission-locked')).toBe(false)
+    fireEvent.click(button)
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/booking`))
+  } finally {
+    if (original) Object.defineProperty(navigator, 'clipboard', original)
+    else Reflect.deleteProperty(navigator, 'clipboard')
+  }
+})
+it('日送りで今日でない日を開いた時は「この日の予約」と示す', async () => {
+  emptySchedule()
+  render(<StyleDashboard style="salon" />)
+  await screen.findByText('今日の予約はありません')
+  fireEvent.click(within(screen.getByRole('region', { name: '1日のカレンダー' })).getByRole('button', { name: '次へ', exact: true }))
+  await screen.findByText('この日の予約はありません')
+  expect(screen.queryByText('今日の予約はありません')).toBeNull()
+})
+it('読み込み中は頭の主操作を出さず、空と分かった後に本文へ1つだけ出す', async () => {
+  let finish: (value: { data: StyleSchedule }) => void = () => {}
+  state.schedule.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  render(<StyleDashboard style="salon" />)
+  expect(screen.queryByRole('button', { name: '予約を入れる', exact: true })).toBeNull()
+  const data = fixture('salon').schedule
+  finish({ data: { ...data, entries: [], days: data.days.map(day => ({ ...day, entryIds: [], bookings: 0, people: 0 })) } })
+  await screen.findByText('今日の予約はありません')
+  expect(screen.getAllByRole('button', { name: '予約を入れる', exact: true })).toHaveLength(1)
+})
+it('取消だけの日も記録は消さず、有効な予約がない案内と作成入口を1回残す', async () => {
+  state.schedule.mockImplementation((_account, query) => {
+    const data = fixture(query.style, query.date, query.range).schedule
+    return Promise.resolve({ data: { ...data, entries: data.entries.map(entry => ({ ...entry, booking: { ...entry.booking!, status: 'cancelled' } })) } })
+  })
+  for (const view of ['list', 'board', 'calendar']) {
+    state.search = 'view=' + view
+    const result = render(<StyleDashboard style="salon" />)
+    await screen.findByText('今日の予約はありません')
+    expect(screen.getByText(/取消などの記録は下で確認できます/)).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: '予約を入れる', exact: true })).toHaveLength(1)
+    expect(screen.getAllByText(/予約者/).length).toBeGreaterThan(0)
+    result.unmount()
+  }
 })

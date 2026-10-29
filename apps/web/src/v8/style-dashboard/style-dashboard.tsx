@@ -12,6 +12,7 @@ import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import { lockUnless } from '@/components/shared/permission-lock'
 import Notice from '@/components/shared/notice'
 import { RadioCardGroup } from '@/components/shared/radio-card'
 import Radio from '@/components/shared/radio'
@@ -32,6 +33,7 @@ import type { ReactNode } from 'react'
 import { useMemo,useState } from 'react'
 import { PhoneReservationDrawer } from '@/v8/restaurant/front-desk/public/phone-drawer/index'
 import { WalkInDialog } from '@/v8/restaurant/front-desk/public/walk-in-dialog/index'
+import { bookingEmptyState, EmptyBookings } from './empty-bookings'
 import { StyleAnalyticsView } from './analytics'
 import { DayList,MonthCalendar,WeekCalendar } from './calendar'
 import { RANGES,TAB_KEYS,TAB_PARAM,type DashboardTab,type DashboardView } from './config'
@@ -95,14 +97,16 @@ function Kpi({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
 export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const { cfg, router, tab, subTab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, setCardDefaults, roster, rosterRow, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, KIND, saveClosure, addNew } = useStyleDashboard(style)
 
+  const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && bookingEmptyState(style, today) === 'no-bookings'
+  const writeLock = role === null ? undefined : lockUnless(canWrite)
   const viewErrors = useSaveFormErrors()
   const headActions = (
     <>
-      {canWrite && cfg.walkIn && store.store ? <Button onClick={() => setWalkInOpen(true)}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
-      {canWrite ? <Button href="/broadcasts"><MessageCircle size={16} aria-hidden="true" />LINE を送る</Button> : null}
-      {canWrite ? <Button onClick={() => setClosureOpen(true)}><CalendarX2 size={16} aria-hidden="true" />休みを入れる</Button> : null}
-      {canWrite ? <Button onClick={() => setViewOpen(true)}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button> : null}
-      {canWrite ? <Button variant="primary" onClick={() => addNew()}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button> : null}
+      {cfg.walkIn && store.store ? <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setWalkInOpen(true) }}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
+      <Button lockedReason={writeLock} {...(canWrite ? { href: '/broadcasts' } : { disabled: role === null })}><MessageCircle size={16} aria-hidden="true" />LINE を送る</Button>
+      <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setClosureOpen(true) }}><CalendarX2 size={16} aria-hidden="true" />休みを入れる</Button>
+      <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setViewOpen(true) }}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>
+      {today && !hasEmptyBookingAction ? <Button variant="primary" disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) addNew() }}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button> : null}
     </>
   )
 
@@ -162,6 +166,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   } else {
     const rows = today.rows.filter((r) => !search || r.name.includes(search) || (r.sub ?? '').includes(search) || (r.course ?? '').includes(search))
     const shownRoster = style === 'lesson' && (rosterId === undefined ? view !== 'calendar' : rosterId !== null && roster?.rowId === rosterId) ? roster : null
+    const emptyBookings = hasEmptyBookingAction ? <EmptyBookings style={style} day={date === jstToday() ? '今日' : 'この日'} today={today} canWrite={canWrite} role={role} onBook={() => addNew()} /> : null
+    const filteredEmpty = <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => setSearch('')}>検索を外す</Button>} />
     let main: ReactNode
     let aside: ReactNode = side.length ? side : null
     if (view === 'calendar') {
@@ -169,22 +175,23 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         main = <MonthCalendar month={today.month} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, 'month', s))} onDay={(d) => setDate(d)} />
         aside = <DayList month={today.month} href={cfg.links.bookings} />
       } else if (today.week) {
-        main = <WeekCalendar week={today.week} period={range === 'today' ? 'day' : 'week'} canWrite={canWrite} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, range === 'today' ? 'today' : 'week', s))} onSlot={(day, time) => addNew({ date: day, time })} onOpen={(id) => { const row = today.rows.find((item) => item.id === id); if (row) openRow(row) }} />
+        main = <WeekCalendar empty={emptyBookings} week={today.week} period={range === 'today' ? 'day' : 'week'} canWrite={canWrite} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, range === 'today' ? 'today' : 'week', s))} onSlot={(day, time) => addNew({ date: day, time })} onOpen={(id) => { const row = today.rows.find((item) => item.id === id); if (row) openRow(row) }} />
         aside = null
-      } else main = <ListState kind="empty" title="カレンダーに出す予約はまだありません" />
+      } else main = emptyBookings ?? <ListState kind="empty" title="カレンダーに出す予約はまだありません" />
     } else if (view === 'floor') {
       main = floor ? <RestaurantFloorMap floor={floor} labels={tables.map((t) => ({ id: t.id, label: t.code, active: Boolean(t.is_active), capacity: t.max_capacity }))} onSelect={() => router.push('/restaurant-test/tables')} />
         : <ListState kind="empty" title="座席の図がまだありません" action={canWrite ? <Button href="/restaurant-test/tables">座席の図を作る</Button> : undefined} />
     } else if (view === 'board' && today.board) {
-      main = <StaffBoard board={today.board} search={search} onSearch={setSearch} canWrite={canWrite} onSlot={(staffId, time) => addNew({ staffId, time })}
+      main = <StaffBoard empty={search && !today.board.entries.some(e => e.name.includes(search) || e.menu.includes(search)) ? filteredEmpty : emptyBookings} board={today.board} search={search} onSearch={setSearch} canWrite={canWrite} onSlot={(staffId, time) => addNew({ staffId, time })}
         entryItems={(e) => menuFor(today.rows.find((r) => r.id === e.id) ?? { id: e.id, time: e.start, name: e.name })} />
     } else {
       main = (
         <>
           {style !== 'lesson' ? <div className={styles.listTools}><span className={styles.grow} /><div className={styles.search}><ListToolbar search={{ value: search, onChange: setSearch, placeholder: cfg.search, width: 220 }} /></div></div> : null}
+          {rows.length > 0 ? emptyBookings : null}
           <TodayList style={style} rows={rows} note={today.rowsNote} canWrite={canWrite} busyId={busy} menuFor={menuFor} onVisit={(r) => void markVisit(r)} onNoShow={(r) => void markNoShow(r)} onApprove={(r) => void approve(r)} onResult={(r) => setResultRow(r)} onUndo={(r) => void undoVisit(r)}
-            empty={<ListState kind="empty" title={`${range === 'today' ? '今日' : range === 'week' ? '今週' : '今月'}の${style === 'consult' ? '面談' : style === 'lesson' ? 'クラス' : '予約'}はありません`} description={canWrite ? (style === 'consult' ? '予約の URL を案内すると、空いた時間に入ります。' : '空いている時間に予約を入れられます。') : undefined}
-              action={canWrite ? (style === 'consult' ? <Button variant="primary" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/booking`).then(() => notifyToast('予約 URL をコピーしました。')) }}><Copy size={16} aria-hidden="true" />予約 URL をコピー</Button> : <Button variant="primary" onClick={() => addNew()}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button>) : undefined} />}
+            empty={search ? filteredEmpty : emptyBookings ?? <ListState kind="empty" title={`${range === 'today' ? '今日' : range === 'week' ? '今週' : '今月'}の${style === 'consult' ? '面談' : style === 'lesson' ? 'クラス' : '予約'}はありません`} description={canWrite ? (style === 'consult' ? '予約の URL を案内すると、空いた時間に入ります。' : '空いている時間に予約を入れられます。') : undefined}
+              action={style === 'consult' ? <Button variant="primary" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/booking`).then(() => notifyToast('予約 URL をコピーしました。')) }}><Copy size={16} aria-hidden="true" />予約 URL をコピー</Button> : <Button variant="primary" disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) addNew() }}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button>} />}
             selectedId={style === 'lesson' ? (shownRoster ? shownRoster.rowId : null) : undefined} onSelect={style === 'lesson' ? (r) => setRosterId(r.id) : undefined} />
         </>
       )
