@@ -160,6 +160,9 @@ export const mediaMethods = {
     /** 保存URLへ直接行かず、権限確認と監査を通る口から受け取る。 */
     download: (id: string, accountId: string) =>
       fetchApiBlob(`/api/media/${encodeURIComponent(id)}/download?accountId=${encodeURIComponent(accountId)}`),
+    /** 投稿前の切り取り用。保存用ダウンロードではなく、縮小表示と同じ閲覧権限で原画像を読む。 */
+    readContent: (id: string, accountId: string) =>
+      fetchApiBlob(`/api/media/${encodeURIComponent(id)}/content?accountId=${encodeURIComponent(accountId)}`),
     /**
      * 指定した版のダウンロード（IDEA-15）。第1版は登録時の元ファイルで、
      * 差し替え後もここから取り戻せる。権限確認と監査は download と同じ。

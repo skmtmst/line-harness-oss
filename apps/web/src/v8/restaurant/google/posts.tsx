@@ -441,7 +441,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
 
   const selectRegisteredMedia = async (item: MediaItem) => {
     if (!picker) return
-    const blob = await api.media.download(item.id, accountId)
+    const blob = await api.media.readContent(item.id, accountId)
     setCrop({ target: picker, source: { file: new File([blob], item.filename, { type: blob.type || item.mimeType || 'image/jpeg' }), name: item.filename, mediaId: item.id }, preserveOriginal: false })
     setPicker(null)
   }
@@ -473,7 +473,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   const openCropFromMedia = useCallback(async (target: CropTarget, mediaId: string, name: string) => {
     setUpload({ busy: true, progress: 0, error: '' })
     try {
-      const blob = await api.media.download(mediaId, accountId)
+      const blob = await api.media.readContent(mediaId, accountId)
       setCrop({ target, source: { file: new File([blob], name, { type: blob.type || 'image/jpeg' }), name, mediaId }, preserveOriginal: false })
     } catch (err) {
       setUpload({ busy: false, progress: 0, error: errorMessage(err, '画像を読み込めませんでした。') })
