@@ -6,7 +6,7 @@ import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { useAccount } from '@/contexts/account-context'
 import { storeSelectionHref } from '@/lib/hq-navigation'
-import { decideStoreRoute } from '@/lib/store-route-guard'
+import { decideStoreRoute, isAccountIndependentRoute } from '@/lib/store-route-guard'
 import { api } from '@/lib/api'
 
 export default function StoreSelectionGate({ children }: { children: React.ReactNode }) {
@@ -14,6 +14,7 @@ export default function StoreSelectionGate({ children }: { children: React.React
   const router = useRouter()
   const { loading, selectedAccountId, accounts, error, refreshing, refreshAccounts } = useAccount()
   const decision = decideStoreRoute(pathname, loading, selectedAccountId)
+  const needsHandoverCheck = decision === 'show' && !isAccountIndependentRoute(pathname)
   // 「店舗を選ぶ」から戻る先（元の通知編集など）を持ち越す。
   // クエリは window からしか取れないのでマウント後に組み立てる（NEXT-07）。
   const [selectHref, setSelectHref] = useState('/hq')
@@ -24,7 +25,7 @@ export default function StoreSelectionGate({ children }: { children: React.React
   }, [pathname])
 
   useEffect(() => {
-    if (decision !== 'show' || !selectedAccountId) return
+    if (!needsHandoverCheck || !selectedAccountId) return
     let active = true
     void api.lineAccounts.followerImportState(selectedAccountId).then((response) => {
       if (!active) return
@@ -36,9 +37,10 @@ export default function StoreSelectionGate({ children }: { children: React.React
       if (active) setHandoverGate({ id: selectedAccountId, status: 'error' })
     })
     return () => { active = false }
-  }, [decision, selectedAccountId, handoverRetry, router])
+  }, [needsHandoverCheck, selectedAccountId, handoverRetry, router])
 
   if (decision === 'show') {
+    if (!needsHandoverCheck) return <>{children}</>
     if (handoverGate?.id === selectedAccountId && handoverGate.status === 'ready') return <>{children}</>
     if (handoverGate?.id === selectedAccountId && handoverGate.status === 'error') return <ListState kind="error" title="友だちの引き継ぎ状態を確認できません" onRetry={() => setHandoverRetry((value) => value + 1)} />
     return <div className="flex min-h-64 items-center justify-center" role="status" aria-label="友だちの引き継ぎ状態を確認中"><div className="h-8 w-8 animate-spin rounded-pill border-4 border-hairline border-t-accent" /></div>
