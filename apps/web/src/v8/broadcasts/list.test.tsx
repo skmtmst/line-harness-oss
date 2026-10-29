@@ -13,6 +13,17 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
+const heldConfirm = vi.hoisted(() => ({ broadcast: null as null | (() => void), folder: null as null | (() => void) }))
+vi.mock('@/components/shared/confirm-dialog', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/components/shared/confirm-dialog')>()
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.open && props.onConfirm) {
+      if (props.description.startsWith('削除すると配信設定')) heldConfirm.broadcast = props.onConfirm
+      if (props.description.startsWith('削除しても、中の配信は未分類')) heldConfirm.folder = props.onConfirm
+    }
+    return <actual.default {...props} />
+  } }
+})
 const formImport = vi.hoisted(() => ({ evaluations: 0, props: null as unknown }))
 vi.mock('@/components/broadcasts/broadcast-form', () => {
   formImport.evaluations += 1
@@ -84,7 +95,8 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
-import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { deferImpersonationSnapshot, forgetSessionSnapshot, readSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 import type { StaffMember } from '@line-crm/shared'
 import BroadcastListV8 from './list'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
@@ -127,6 +139,7 @@ const rowB = { ...base, id: 'bc-2', title: '未購入者フォロー', messageCo
 
 beforeEach(() => {
   updateBroadcast.mockClear()
+  heldConfirm.broadcast = null; heldConfirm.folder = null
   deleteFolder.mockClear(); swapFolders.mockClear(); createFolder.mockClear(); updateFolder.mockClear()
   forgetStaffIdentity(); forgetSessionSnapshot()
   document.documentElement.dataset.theme = 'v8'
@@ -336,10 +349,15 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
     role.current = verifiedStaffRole('staff')
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
-    expect(host.textContent).toContain('閲覧のみで見ています')
-    expect(host.querySelector('input[type="checkbox"]')).toBeNull()
+    expect(host.textContent).toContain('この画面を変える権限がありません。')
+    expect(host.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+    const rowCheckbox = host.querySelector('input[type="checkbox"]')!
+    expect(rowCheckbox.getAttribute('aria-disabled')).toBe('true')
     const buttons = [...host.querySelectorAll('button')]
-    expect(buttons.find((b) => b.textContent?.includes('配信を作る')), '閲覧のみに「配信を作る」が出ています').toBeUndefined()
+    const create = buttons.find((b) => b.textContent?.includes('配信を作る'))!
+    expect(create.getAttribute('aria-disabled')).toBe('true')
+    act(() => fireEvent.click(create))
+    expect(document.querySelector('[role="menu"][aria-label="配信の作り方"]')).toBeNull()
     expect(buttons.find((b) => b.textContent?.includes('条件を保存する')), '閲覧のみに「条件を保存する」が出ています').toBeUndefined()
     act(() => { buttonByText('保存した検索')!.click() })
     await flush()
@@ -878,6 +896,7 @@ describe('保持した一斉配信一覧の変更操作', () => {
   const person = (value: string, permissionKeys: string[] = []) => ({ id: 'person', role: value, permissionKeys }) as unknown as StaffMember
   const proxy = (mode: 'read' | 'write') => rememberSessionSnapshot({ stepUpMethod: 'totp', unfamiliarAt: null, impersonation: { mode } as never })
   const revoke = (value: string) => {
+    role.current = value === 'unknown' ? null : ['readOnly', 'view_only'].includes(value) ? 'viewer' : value === 'read-proxy' ? 'owner' : value
     if (value === 'unknown') forgetStaffIdentity()
     else if (value === 'read-proxy') proxy('read')
     else if (value === 'readOnly') rememberStaffIdentity({ ...person('owner'), readOnly: true })
@@ -901,9 +920,15 @@ describe('保持した一斉配信一覧の変更操作', () => {
     deleteBroadcast.mockClear(); resetUrl()
     act(() => root.render(<BroadcastListV8 />)); await flush()
     const confirm = await openDraftDelete()
+    const retained = heldConfirm.broadcast
+    expect(retained).toBeTypeOf('function')
     act(() => revoke(denied))
+    expect(confirm.disabled).toBe(denied === 'unknown')
+    expect(confirm.getAttribute('aria-disabled')).toBe(denied === 'unknown' ? null : 'true')
     act(() => fireEvent.click(confirm)); await flush()
     expect(confirm.isConnected).toBe(true)
+    expect(deleteBroadcast).not.toHaveBeenCalled()
+    await act(async () => retained!())
     expect(deleteBroadcast).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('権限が変わったため、配信の削除を中止しました。')
     listBroadcasts.mockClear()
@@ -951,13 +976,17 @@ describe('保持した一斉配信一覧の変更操作', () => {
     act(() => { revoke(denied); fireEvent.click(order) }); await flush()
     expect(swapFolders).not.toHaveBeenCalled()
     expect(host.textContent).toContain('権限が変わったため、フォルダの並べ替えを中止しました。')
-    act(() => rememberStaffIdentity(person('owner'))); forgetSessionSnapshot()
+    act(() => { role.current = 'owner'; rememberStaffIdentity(person('owner')); forgetSessionSnapshot() })
     act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
     act(() => fireEvent.click(menuItem('消す'))); await flush()
     const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(e => e.textContent?.trim() === '削除する')!
+    const retained = heldConfirm.folder
+    expect(retained).toBeTypeOf('function')
     act(() => revoke(denied))
     act(() => fireEvent.click(confirm)); await flush()
     expect(confirm.isConnected).toBe(true)
+    expect(deleteFolder).not.toHaveBeenCalled()
+    await act(async () => retained!())
     expect(deleteFolder).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('権限が変わったため、フォルダの削除を中止しました。')
   })
@@ -1084,6 +1113,129 @@ describe('保持した一斉配信一覧の変更操作', () => {
     act(() => fireEvent.click(confirm)); await flush()
     expect(updateFolder).toHaveBeenCalledExactlyOnceWith('a', expect.objectContaining({ name: '変更した分類' }), undefined)
     expect(dialog.isConnected).toBe(false)
+  })
+
+  it.each(['viewer', 'staff', 'read-proxy', 'readOnly', 'view_only'])('%sも作成・選択・行操作を同じ位置に残し、理由付きで拒否して読取を続ける', async denied => {
+    resetUrl(); deleteBroadcast.mockClear(); createView.mockClear()
+    act(() => { revoke(denied); root.render(<BroadcastListV8 />) }); await flush()
+    const reason = denied === 'read-proxy' ? PERMISSION_LOCK_REASON.impersonation : denied === 'staff' ? PERMISSION_LOCK_REASON.feature : PERMISSION_LOCK_REASON.viewer
+    expect(host.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+    const create = buttonByText('配信を作る')!
+    expect(create.disabled).toBe(false); expect(create.getAttribute('aria-disabled')).toBe('true')
+    act(() => fireEvent.focus(create))
+    expect(document.querySelector('[role="tooltip"]')?.textContent).toContain(reason)
+    act(() => { fireEvent.blur(create); fireEvent.click(create) })
+    expect(document.querySelector('[role="menu"][aria-label="配信の作り方"]')).toBeNull()
+    const select = host.querySelector<HTMLInputElement>('tr[data-row-id="bc-2"] input[type="checkbox"]')!
+    expect(select.disabled).toBe(false); expect(select.getAttribute('aria-disabled')).toBe('true')
+    act(() => fireEvent.click(select))
+    expect(select.checked).toBe(false)
+    act(() => fireEvent.click(host.querySelector('tr[data-row-id="bc-2"] button[aria-haspopup="menu"]')!))
+    for (const label of ['編集を続ける', '複製', 'フォルダへ移す', '削除する']) {
+      const item = menuItem(label)
+      expect(item.getAttribute('aria-disabled')).toBe('true')
+      expect(item.hasAttribute('href')).toBe(false)
+      act(() => fireEvent.click(item))
+    }
+    act(() => fireEvent.keyDown(document, { key: 'Escape' }))
+    listBroadcasts.mockClear()
+    act(() => buttonByText('下書き 3')!.click()); await flush()
+    expect(listBroadcasts).toHaveBeenCalledWith(expect.objectContaining({ displayStatus: 'draft' }))
+    expect(updateBroadcast).not.toHaveBeenCalled(); expect(deleteBroadcast).not.toHaveBeenCalled()
+    expect(createFolder).not.toHaveBeenCalled(); expect(createView).not.toHaveBeenCalled()
+  })
+  it('閲覧者の右クリックでも同じ4操作に理由が届き、APIも移動も起動しない', async () => {
+    resetUrl(); deleteBroadcast.mockClear(); routerPush.mockClear()
+    act(() => { revoke('viewer'); root.render(<BroadcastListV8 />) }); await flush()
+    const trigger = host.querySelector('tr[data-row-id="bc-2"] button[aria-haspopup="menu"]')!
+    act(() => fireEvent.contextMenu(trigger, { clientX: 300, clientY: 250 })); await flush()
+    const context = document.querySelector('[data-context-menu="true"]')!
+    expect(context).toBeTruthy()
+    for (const label of ['編集を続ける', '複製', 'フォルダへ移す', '削除する']) {
+      const item = [...context.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(e => e.getAttribute('aria-label') === label || e.textContent?.trim() === label)!
+      expect(item.getAttribute('aria-disabled')).toBe('true')
+      expect(item.hasAttribute('href')).toBe(false)
+      act(() => fireEvent.focus(item))
+      expect(document.querySelector('[role="tooltip"]')?.textContent).toContain(PERMISSION_LOCK_REASON.viewer)
+      act(() => { fireEvent.blur(item); fireEvent.click(item) })
+    }
+    expect(updateBroadcast).not.toHaveBeenCalled(); expect(deleteBroadcast).not.toHaveBeenCalled()
+    expect(routerPush).not.toHaveBeenCalled()
+  })
+  it('開いた詳細パネルもread代理で書込だけ灰色にし、本文と開く操作を残す', async () => {
+    resetUrl(); deleteBroadcast.mockClear(); routerPush.mockClear()
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    act(() => fireEvent.click(host.querySelector('tr[data-row-id="bc-2"]')!)); await flush()
+    const panel = document.querySelector('[data-design-part="detail-panel"]')!
+    expect(panel).toBeTruthy()
+    act(() => revoke('read-proxy')); await flush()
+    expect(panel.isConnected).toBe(true)
+    expect(panel.textContent).toContain('下書き')
+    for (const label of ['編集を続ける', '複製する', '削除する']) {
+      const button = [...panel.querySelectorAll<HTMLButtonElement>('button')].find(e => e.textContent?.trim() === label)!
+      expect(button.disabled).toBe(false); expect(button.getAttribute('aria-disabled')).toBe('true')
+      act(() => fireEvent.focus(button))
+      expect(document.querySelector('[role="tooltip"]')?.textContent).toContain(PERMISSION_LOCK_REASON.impersonation)
+      act(() => { fireEvent.blur(button); fireEvent.click(button) })
+    }
+    expect(updateBroadcast).not.toHaveBeenCalled(); expect(deleteBroadcast).not.toHaveBeenCalled()
+    expect(routerPush).not.toHaveBeenCalled()
+    const read = [...panel.querySelectorAll<HTMLButtonElement>('button')].find(e => e.textContent?.trim() === '開く')!
+    expect(read.disabled).toBe(false); expect(read.hasAttribute('aria-disabled')).toBe(false)
+    act(() => fireEvent.click(read))
+    expect(routerPush).toHaveBeenCalledTimes(1)
+    const destination = new URL(routerPush.mock.calls[0][0], 'http://localhost')
+    expect(destination.pathname).toBe('/broadcasts/detail'); expect(destination.searchParams.get('id')).toBe('bc-2')
+  })
+  it('本人未確認は帯と権限印を出さず、管理と編集の入口を普通disabledで残す', async () => {
+    resetUrl(); deleteBroadcast.mockClear(); createView.mockClear()
+    act(() => { revoke('unknown'); root.render(<BroadcastListV8 />) }); await flush()
+    expect(host.querySelectorAll('[data-read-only-notice]')).toHaveLength(0)
+    expect(host.querySelectorAll('[data-permission-locked]')).toHaveLength(0)
+    for (const label of ['配信を作る', 'フォルダを追加']) {
+      const button = buttonByText(label)!
+      expect(button.disabled).toBe(true)
+      act(() => fireEvent.click(button))
+    }
+    for (const input of host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) expect(input.disabled).toBe(true)
+    act(() => buttonByText('保存した検索')!.click()); await flush()
+    const save = menuItem('＋ 今の条件を保存する') as HTMLButtonElement
+    expect(save.disabled).toBe(true); expect(save.hasAttribute('data-permission-locked')).toBe(false)
+    act(() => fireEvent.click(save))
+    expect(host.querySelector('input[aria-label="保存する検索の名前"]')).toBeNull()
+    act(() => fireEvent.keyDown(document, { key: 'Escape' }))
+    act(() => fireEvent.click(host.querySelector('tr[data-row-id="bc-2"] button[aria-haspopup="menu"]')!))
+    for (const label of ['編集を続ける', '複製', '削除する']) {
+      const item = menuItem(label) as HTMLButtonElement
+      expect(item.disabled).toBe(true); expect(item.hasAttribute('href')).toBe(false)
+      expect(item.hasAttribute('data-permission-locked')).toBe(false)
+      act(() => fireEvent.click(item))
+    }
+    expect(document.querySelector('[role="tooltip"]')).toBeNull()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(updateBroadcast).not.toHaveBeenCalled(); expect(deleteBroadcast).not.toHaveBeenCalled()
+    expect(createFolder).not.toHaveBeenCalled(); expect(createView).not.toHaveBeenCalled()
+  })
+  it('代理切替のsession読込中も、ownerにmanagerの理由を出さずread代理の理由で止める', async () => {
+    resetUrl(); deleteBroadcast.mockClear(); createView.mockClear()
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    act(() => deferImpersonationSnapshot({ id: 'pending-proxy', tenantId: 'tenant-a', mode: 'write', piiRevealed: false, startedAt: '' }))
+    expect(readSessionSnapshot()).toBeNull()
+    expect(host.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+    for (const label of ['配信を作る', 'フォルダを追加']) {
+      const button = buttonByText(label)!
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      act(() => fireEvent.focus(button))
+      const text = document.querySelector('[role="tooltip"]')?.textContent
+      expect(text).toContain(PERMISSION_LOCK_REASON.impersonation)
+      expect(text).not.toContain(PERMISSION_LOCK_REASON.manager)
+      act(() => { fireEvent.blur(button); fireEvent.click(button) })
+    }
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    listBroadcasts.mockClear(); act(() => buttonByText('下書き 3')!.click()); await flush()
+    expect(listBroadcasts).toHaveBeenCalledWith(expect.objectContaining({ displayStatus: 'draft' }))
+    expect(updateBroadcast).not.toHaveBeenCalled(); expect(deleteBroadcast).not.toHaveBeenCalled()
+    expect(createFolder).not.toHaveBeenCalled(); expect(createView).not.toHaveBeenCalled()
   })
 
 })

@@ -52,3 +52,11 @@ export function useBroadcastManagementAccess() {
   const allowed = canManageBroadcastListNow()
   return { allowed, known: identity !== null, reason: identity ? lockReason(allowed, 'manager') : undefined }
 }
+
+/** 本人と代理モードに従い、定義の変更口の表示を現在の実行条件にそろえる。 */
+export function useBroadcastEditAccess() {
+  const identity = useSyncExternalStore(subscribeStaffIdentity, readStaffIdentity, () => null)
+  useSyncExternalStore(subscribeSession, readPermissionSessionSnapshot, () => null)
+  const allowed = canEditBroadcastNow()
+  return { allowed, known: identity !== null, reason: identity ? lockReason(allowed, 'feature') : undefined }
+}
