@@ -23,6 +23,7 @@ describe('版の表示の組み立て（m18e）', () => {
       released_at: '2026-09-27T04:05:00Z',
     })
     expect(lines).toEqual({
+      short: 'v2.7.0・検証環境',
       line1: 'Ver. 2.7.0（a1b2c3d）',
       line2: '9月27日 13:05 配備・検証環境',
     })
@@ -66,6 +67,7 @@ describe('版の表示の組み立て（m18e）', () => {
       deploy_env: 'production',
       released_at: '2026-09-27T04:05:00Z',
     })
+    expect(lines?.short).toBe('v0.24.0・本番環境')
     expect(lines?.line1).toBe('Ver. 0.24.0')
     expect(lines?.line2).toBe('9月27日 13:05 配備・本番環境')
   })
@@ -83,6 +85,6 @@ describe('版の表示の組み立て（m18e）', () => {
       deploy_env: null,
       released_at: '',
     })
-    expect(lines).toEqual({ line1: 'Ver. 0.24.0（a1b2c3d）', line2: '' })
+    expect(lines).toEqual({ short: 'v0.24.0', line1: 'Ver. 0.24.0（a1b2c3d）', line2: '' })
   })
 })

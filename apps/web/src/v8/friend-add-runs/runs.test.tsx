@@ -8,6 +8,7 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { withHonorific } from '@line-crm/shared'
 
 vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
@@ -182,7 +183,7 @@ describe('実行結果の画面（REIxB）', () => {
 
   it('顧客名が隠された記録の「…」にはトークを開くを出さない', async () => {
     await render()
-    const menuOf = (name: string) => host.querySelector<HTMLButtonElement>(`button[aria-label="${name}さんの記録の操作"]`)
+    const menuOf = (name: string) => host.querySelector<HTMLButtonElement>(`button[aria-label="${withHonorific(name)}の記録の操作"]`)
     await act(async () => { menuOf('顧客名は非表示')?.click() })
     expect(document.body.textContent).toContain('実行の詳細を開く')
     expect(document.body.textContent).not.toContain('トークを開く')

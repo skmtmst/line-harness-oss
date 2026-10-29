@@ -848,6 +848,7 @@
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
 
+- [左メニューのスクロール・予約表示・敬称の修正](release-log/unreleased/0000-kenta-sidebar-scroll.md)
 - [増減の符号と未分類の灰丸](release-log/unreleased/1858-kenta-delta-folder.md) — 増減の印とフォルダ表示の反映履歴。
 - [一斉配信の作成画面名と外枠](release-log/unreleased/1859-kenta-broadcast-title.md) — 作成手順の反映履歴。
 - [ページ送りの現在地と表示条件](release-log/unreleased/1860-kenta-pagination.md) — 一覧操作の反映履歴。

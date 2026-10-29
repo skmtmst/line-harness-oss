@@ -21,10 +21,11 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import Notice from '@/components/shared/notice'
 import type { ChannelsSummary } from './channels-summary'
 import ChannelsTables, { StaffStatusChip, formatReadAt } from './channels-tables'
+import { withHonorific } from '@line-crm/shared'
 type LoadStatus = 'loading' | 'ready' | 'error'
 function formatConflictRange(conflict: BookingConflict): string {
   const day = polishFormatDate(conflict.startsAt, { style: 'day', fallback: '' })
-  return day ? `${conflict.staffName}さんの ${day} ${formatConflictTime(conflict.startsAt)}` : ''
+  return day ? `${withHonorific(conflict.staffName)}の ${day} ${formatConflictTime(conflict.startsAt)}` : ''
 }
 
 function formatConflictTime(value: string): string {
@@ -180,7 +181,7 @@ export function ConflictDialog({
           <div className={ch.detail}>
             {conflict.bookings.map((booking, index) => (
               <p key={booking.bookingId} className={ch.conflictBooking}>
-                {index === 0 ? '①' : '②'} {booking.sourceLabel}・{booking.customerName}さん・{booking.menuName}・{formatConflictTime(booking.startsAt)}〜{formatConflictTime(booking.endsAt)}
+                {index === 0 ? '①' : '②'} {booking.sourceLabel}・{withHonorific(booking.customerName)}・{booking.menuName}・{formatConflictTime(booking.startsAt)}〜{formatConflictTime(booking.endsAt)}
               </p>
             ))}
           </div>

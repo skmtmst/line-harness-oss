@@ -33,6 +33,7 @@ import { usePreparingDialog } from '@/components/shared/preparing-dialog'
 /** 読み取りAPIが返す操作した人と理由。未取得は値を作らずに表示する。 */
 type PaymentRecordWithActor = PaymentRecord & { actorLabel?: string | null }
 import styles from './payments.module.css'
+import { withHonorific } from '@line-crm/shared'
 
 /* お支払いの記録（FY8HC）。返金は 2 段の確かめ（確かめの窓 → 金額を入れる）。 */
 
@@ -154,7 +155,7 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
       setRefunding(false)
     }
     refundAttempt.current = null
-    notifySaved(`${refundTarget.friendName ?? 'お客さま'}さまの ${formatYen(input.amount)} の返金を模擬で記録しました。実際の返金・LINE送信はしていません`)
+    notifySaved(`${withHonorific(refundTarget.friendName ?? 'お客さま', 'さま')}の ${formatYen(input.amount)} の返金を模擬で記録しました。実際の返金・LINE送信はしていません`)
     setRefundTarget(null)
     void reload()
   }
@@ -213,15 +214,15 @@ export default function PaymentRecords({ accountId, canEdit }: { accountId: stri
         </>
       )}
 
-      <Dialog open={linkPreview !== null} title="支払いのリンク（試験モード）" description={`${linkPreview?.name ?? ''}さん用のリンクを作りました。いまは模擬なので、LINE には送っていません。`}
+      <Dialog open={linkPreview !== null} title="支払いのリンク（試験モード）" description={`${withHonorific(linkPreview?.name ?? '')}用のリンクを作りました。いまは模擬なので、LINE には送っていません。`}
         cancelLabel="閉じる" onCancel={() => setLinkPreview(null)}>
         {linkPreview?.url ? <CopyTextButton value={linkPreview.url} label="リンクをコピー" aria-label="支払いのリンクをコピー" /> : <p className={styles.minor}>リンクはまだ作られていません。</p>}
       </Dialog>
-      <RefundDialog open={refundTarget !== null} subtitle={`${refundTarget?.friendName ?? 'お客'}さま・${refundTarget?.bookingLabel ?? ''}`}
+      <RefundDialog open={refundTarget !== null} subtitle={`${withHonorific(refundTarget?.friendName ?? 'お客', 'さま')}・${refundTarget?.bookingLabel ?? ''}`}
         paidAmount={Math.max(0, (refundTarget?.amount ?? 0) - (refundTarget?.refundedAmount ?? 0))} testMode={testMode} busy={refunding} error={refundError ?? undefined}
         facts={[{ label: '支払った額', value: `${formatYen(refundTarget?.amount)}（${refundTarget?.method === 'onsite' ? '店頭' : 'カード'}）` }, { label: 'これまでの返金', value: refundTarget?.refundedAmount ? formatYen(refundTarget.refundedAmount) : 'なし' }]}
         destination={refundTarget?.method === 'onsite' ? '店頭' : 'カード'}
-        messageFor={(input) => `${refundTarget?.friendName ?? 'お客'}さま　${refundTarget?.bookingLabel ?? ''}のご予約のお支払いのうち ${formatYen(input.amount)} を返金しました。カードへの反映は数日かかることがあります。`}
+        messageFor={(input) => `${withHonorific(refundTarget?.friendName ?? 'お客', 'さま')}　${refundTarget?.bookingLabel ?? ''}のご予約のお支払いのうち ${formatYen(input.amount)} を返金しました。カードへの反映は数日かかることがあります。`}
         onClose={() => { if (!refunding) { setRefundTarget(null); setRefundError(null) } }} onConfirm={(input) => void refund(input)} />
       {preparing.dialog}
     </div>
