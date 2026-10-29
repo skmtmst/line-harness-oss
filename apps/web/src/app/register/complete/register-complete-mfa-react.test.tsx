@@ -2,6 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { captureTwoFactorChallenge } from '@/lib/admin-session'
 
 import RegisterCompletePage from './page'
 
@@ -103,6 +104,8 @@ describe('N-426: 登録完了直後の二段階設定への分岐', () => {
     await fillAndSubmit()
     expect(window.location.pathname).toBe('/login/two-factor/setup')
     expect(new URLSearchParams(window.location.hash.slice(1)).get('lh_2fa')).toBe('setup-tok-9')
+    expect(new URLSearchParams(window.location.hash.slice(1)).get('lh_nonce')).toMatch(/^[0-9a-f-]{36}$/)
+    expect(captureTwoFactorChallenge()).toBe('setup-tok-9')
     expect(window.sessionStorage.getItem('lh_admin_session_fallback')).toBeNull()
   })
 

@@ -498,13 +498,13 @@ export default function StockBoard({ ctx, canEdit: allowedByRole }: { ctx: Resta
                 <div key={weekday} className={styles.dayRow}>
                   <div className={styles.dayHead}>
                     {/* 閲覧時は現在の受付状態と時刻を読み、変更ボタンは理由付きで残す。 */}
-                    {canEdit ? (
-                      <SaveErrorField names={["open","day"]}><Toggle
+                    <SaveErrorField names={["open","day"]}><Toggle
                         checked={open}
+                        disabled={!canEdit}
+                        lockedReason={lockedReason}
                         label={`${name}曜日に予約を受ける`}
                         onChange={(next) => setDay(weekday, next ? [{ opensAt: '17:00', closesAt: '22:00' }] : [])}
                       /></SaveErrorField>
-                    ) : null}
                     <span className={styles.dayName}>{name}</span>
                   </div>
                   {open ? (
