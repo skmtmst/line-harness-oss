@@ -27,7 +27,7 @@ import {
   checkStage, formatJaDuration, handoverProgress, insightDateJst, isDuplicateChannelError,
   loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, providerIdErrors, readDraft, stepLabel, subTotal,
   toV06CheckRows,
-  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary, precheckUpcoming,
+  precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
   type DraftState, type PrecheckAnswers, type PrecheckAt, type PrecheckKey, type StepNumber,
 } from './logic'
 import Step1Precheck from './step1-precheck'
@@ -126,7 +126,6 @@ function AccountRegistrationForm() {
   // 「公式アカウントをこれから作る人」は Q1=いいえ の人。下書きの持ち方は v05 までと同じにしておく。
   const accountMethod: 'existing' | 'new' = precheck.q1 === 'no' ? 'new' : 'existing'
   const precheckRows = precheckSummary(precheckAt, precheck)
-  const precheckAhead = precheckUpcoming(precheckAt, precheck)
   const precheckGuide = precheckAt === 'done' && precheck.q4 === 'yes' && precheck.q5
     ? precheckNote('q5', precheck)
     : precheckNote(precheckAt, precheck)
@@ -583,7 +582,6 @@ function AccountRegistrationForm() {
               onAnswer={answerPrecheck}
               rows={precheckRows}
               guide={precheckGuide}
-              ahead={precheckAhead}
               acks={acks}
               onToggleAck={acknowledgePrecheck}
             />
