@@ -1,3 +1,5 @@
+import { beforeEach as seedIdentity } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 // @vitest-environment happy-dom
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
@@ -143,9 +145,14 @@ describe('Google営業時間の3方式を現在の共通部品で使う', () => 
     expect(screen.getByRole('textbox', { name: '文章で入力' })).toHaveProperty('disabled', true)
     cleanup(); mocks.profile.mockResolvedValue({ ...data, closed: true }); await open('weekly')
     expect(screen.getByRole('switch', { name: '月曜を定休日にする' })).toHaveProperty('disabled', true)
-    cleanup(); mocks.role = 'viewer'; mocks.profile.mockResolvedValue(data); await open('weekly')
-    expect(screen.queryByRole('button', { name: '変更案を確認する' })).toBeNull()
-    expect(screen.getByRole('switch', { name: '月曜を定休日にする' })).toHaveProperty('disabled', true)
+    cleanup(); mocks.role = verifiedStaffRole('viewer'); mocks.profile.mockResolvedValue(data); await open('weekly')
+    expect(screen.getByRole('button', { name: '変更案を確認する' }).getAttribute('aria-disabled')).toBe('true')
+    const toggle = screen.getByRole('switch', { name: '月曜を定休日にする' })
+    expect(toggle.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-checked')).toBe('false')
     expect(mocks.proposeHours).not.toHaveBeenCalled()
   })
 })
+
+seedIdentity(() => { verifiedStaffRole('owner') })

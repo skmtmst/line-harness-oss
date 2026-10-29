@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef, useState } from 'react'
-import { usePermissionAccess } from '@/lib/use-feature-access'
-import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
+import { useGooglePermission } from './use-google-permission'
 import { restaurantGoogleApi } from '@/lib/restaurant-google-api'
 import { errorMessage } from './format'
 
@@ -9,8 +8,7 @@ const empty = (accountId: string): CheckState => ({ accountId, at: null, busy: f
 
 /** 確認成功だけを画面内で記録し、別店舗や閉じた画面の応答は引き継がない。 */
 export function usePostStatusCheck(accountId: string, reload: () => Promise<void>) {
-  const canSync = usePermissionAccess('/restaurant-test/google')
-  const lockedReason = usePermissionLockReason(canSync)
+  const { allowed: canSync, lockedReason } = useGooglePermission()
   const [state, setState] = useState(() => empty(accountId))
   const pending = useRef<{ accountId: string } | null>(null)
   const reloadRef = useRef(reload)

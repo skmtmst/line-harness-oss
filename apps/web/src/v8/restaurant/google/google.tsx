@@ -2,6 +2,7 @@
 import type { GoogleNav } from './navigation-types'
 export type { GoogleNav } from './navigation-types'
 
+import { useGooglePermission } from './use-google-permission'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
@@ -75,6 +76,7 @@ const RETURN_MESSAGES: Record<string, { tone: 'info' | 'warn' | 'danger'; text: 
 
 function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   const saveErrors = useSaveFormErrors()
+  const { allowed: canEdit } = useGooglePermission()
   usePageTitle('Googleビジネス')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const samePageUrl = useSamePageUrl()
@@ -129,6 +131,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   const connected = data?.connection.status === 'connected' || data?.connection.status === 'expired' || data?.connection.status === 'no_permission'
   const requestedTab = searchParams.get('tab') as GoogleTab | null
   const tab: GoogleTab = !connected ? 'settings' : requestedTab && requestedTab in TAB_LABELS ? requestedTab : 'reviews'
+  const { allowed: canManage } = useGooglePermission(tab === 'settings' ? 'tenantWide' : 'manager', tab !== 'settings' || Boolean(data?.permissions.canManageConnection))
   const view = searchParams.get('view')
   const id = searchParams.get('id')
   const kindParam = searchParams.get('kind')
@@ -223,6 +226,8 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       title="Googleビジネス"
       description={draftOpen ? HELP_BASE : TAB_HELP[tab]}
       picker={picker}
+      readOnly={!(tab === 'profile' || tab === 'settings' ? canManage : canEdit)}
+      readOnlyNeed={tab === 'settings' ? 'tenantWide' : tab === 'profile' ? 'manager' : 'feature'}
     >
       <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : tab === 'settings' && data && !data.writeEnabled ? '外部への更新は止めています' : undefined} />
       {body}

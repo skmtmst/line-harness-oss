@@ -955,3 +955,4 @@
 - [シナリオ人数の単位と補足位置](release-log/unreleased/1951-kenta-scenario-count-labels.md) — 不明時の単位と登録0人の補足位置の修正履歴。
 - [問い合わせのタブ・カルーセルの絵・更新履歴の検索](release-log/unreleased/1951-kenta-swb-x10-x14-x18.md)
 - [アカウント選択と読み込み失敗時の案内](release-log/unreleased/1951-kenta-train-1029h.md)
+- [Googleビジネスの権限表示](release-log/unreleased/0000-kenta-swb-google-permission.md) — 閲覧のみの案内と変更操作の反映履歴。

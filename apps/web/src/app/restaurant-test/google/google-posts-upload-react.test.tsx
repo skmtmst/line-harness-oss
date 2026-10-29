@@ -1,3 +1,5 @@
+import { beforeEach as seedIdentity } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 // @vitest-environment happy-dom
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -167,3 +169,5 @@ describe('投稿画像の端末アップロード', () => {
     expect(container.textContent).not.toContain('切り取り位置を確認済み')
   })
 })
+
+seedIdentity(() => { verifiedStaffRole('owner') })
