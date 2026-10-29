@@ -176,13 +176,13 @@ describe('保存と停止', () => {
     net.update.mockRejectedValue(new ApiError(409))
     render(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
     fireEvent.click(await screen.findByRole('button', { name: '変更' }))
-    const name = screen.getByPlaceholderText('例: 担当者が決まったら対応中へ') as HTMLInputElement
+    const name = screen.getByPlaceholderText('例：担当者が決まったら対応中へ') as HTMLInputElement
     fireEvent.change(name, { target: { value: '直した名前' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
     expect(net.update).toHaveBeenCalledWith('rule-1', 'acc', 3, expect.objectContaining({ name: '直した名前' }))
     const alert = await screen.findByRole('alert')
     expect(alert.getAttribute('data-failure-kind')).toBe('conflict')
-    expect((screen.getByPlaceholderText('例: 担当者が決まったら対応中へ') as HTMLInputElement).value).toBe('直した名前')
+    expect((screen.getByPlaceholderText('例：担当者が決まったら対応中へ') as HTMLInputElement).value).toBe('直した名前')
     const calls = net.rules.mock.calls.length
     fireEvent.click(screen.getByRole('button', { name: '最新の内容を読み直す' }))
     await waitFor(() => expect(net.rules.mock.calls.length).toBe(calls + 1))
@@ -192,7 +192,7 @@ describe('保存と停止', () => {
     net.create.mockResolvedValueOnce({ success: false, error: 'x' })
     render(<SupportMarkRulesPanel accountId="acc" markId="mk1" markName="対応中" />)
     fireEvent.click(await screen.findByRole('button', { name: '＋ ルールを作る' }))
-    fireEvent.change(screen.getByPlaceholderText('例: 担当者が決まったら対応中へ'), { target: { value: '新しいきまり' } })
+    fireEvent.change(screen.getByPlaceholderText('例：担当者が決まったら対応中へ'), { target: { value: '新しいきまり' } })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
     expect(await screen.findByRole('alert')).toBeTruthy()
     expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()

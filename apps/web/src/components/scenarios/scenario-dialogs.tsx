@@ -19,6 +19,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import type { ScenarioFriendPlanStep } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 /*
  * シナリオ詳細で使う小さな窓。
  *
@@ -1049,7 +1050,7 @@ export function TestSendDialog({
         </div>
       )}
 
-      <SaveErrorField names={["search"]}><input
+      <SaveErrorField names={["search"]}><SharedTextField
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="名前で探す"
@@ -1201,7 +1202,7 @@ export function FriendPlanDialog({
         </Notice>
       ) : null}
 
-      <SaveErrorField names={["search"]}><input
+      <SaveErrorField names={["search"]}><SharedTextField
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         placeholder="名前で探す"

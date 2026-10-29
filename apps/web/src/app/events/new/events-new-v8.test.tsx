@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -26,14 +27,14 @@ describe('V8-B イベントを作る（d4adD4）', () => {
     expect(document.querySelector('[data-design-node="d4adD4"]')).toBeTruthy()
     expect(screen.getByRole('heading', { name: 'イベントを作る' })).toBeTruthy()
     expect(screen.getByLabelText('イベント名')).toBeTruthy()
-    expect(screen.getByRole('button', { name: '下書きを保存' })).toBeTruthy()
+    expect(getPageAction({ name: '下書きを保存' })).toBeTruthy()
   })
 
   it('アカウントが無いときは選ぶ案内になり、保存も送信もしない', async () => {
     account.id = null
     await act(async () => { render(<EventsNew />) })
     expect(screen.getByText('上のバーでLINE公式アカウントを選んでください')).toBeTruthy()
-    const save = screen.getByRole('button', { name: '下書きを保存' }) as HTMLButtonElement
+    const save = getPageAction({ name: '下書きを保存' }) as HTMLButtonElement
     const publish = screen.getByRole('button', { name: '公開する' }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
     expect(publish.disabled).toBe(true)

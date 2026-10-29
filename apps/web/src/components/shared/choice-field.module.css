@@ -1,0 +1,75 @@
+@layer properties, theme, base, components, utilities;
+@layer components {
+.frame { position: relative; --choice-touch-h: 44px; --choice-action-h: var(--control-h); }
+}
+
+/* 選ぶ欄の外形はここだけ。文字入力・窓で選ぶ欄・フォルダ・候補つき入力も同じ寸法。 */
+html:root .frame[data-choice-field] {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-width: 0;
+  width: 100%;
+  height: var(--control-h);
+  min-height: var(--control-h);
+  max-height: var(--control-h);
+  flex-wrap: nowrap;
+  gap: var(--tpl-toolbar-gap);
+  padding: 0 calc(var(--polish-space-field) + var(--polish-icon-control) + var(--tpl-toolbar-gap)) 0 var(--polish-space-field);
+  border: 0;
+  border-radius: var(--polish-radius-control);
+  outline: var(--choice-ring) solid transparent;
+  outline-offset: calc(-1 * var(--choice-ring));
+  background: var(--gradient-raised-control) var(--color-canvas);
+  box-shadow: var(--shadow-raised-control);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: var(--polish-control-text);
+  font-weight: var(--polish-control-weight);
+  line-height: var(--text-body--line-height);
+  cursor: pointer;
+}
+html:root .frame[data-choice-field][data-choice-active]:not([data-choice-invalid]) { box-shadow: var(--shadow-raised-control), inset 0 0 0 var(--choice-ring) var(--color-selection-border); }
+html:root .frame[data-choice-field][data-choice-invalid] { box-shadow: var(--shadow-raised-control), inset 0 0 0 var(--choice-ring) var(--color-danger); }
+html:root .frame[data-choice-field][data-choice-disabled] { box-shadow: none; cursor: not-allowed; }
+html:root .frame[data-choice-field]:is(:focus-visible, :has(> [data-choice-trigger]:focus-visible)) { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
+html:root .frame[data-choice-field] > [data-choice-trigger]:focus-visible { outline-color: transparent; }
+html:root .frame [data-choice-chevron] {
+  position: absolute;
+  inset-inline-end: var(--polish-space-field);
+  top: 50%;
+  transform: translateY(-50%);
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
+  margin: 0;
+  flex: none;
+  pointer-events: none;
+  color: var(--color-ink-faint);
+}
+html:root .frame [data-choice-action] { position: absolute; top: 50%; inset-inline-end: calc(var(--polish-space-field) - (var(--choice-action-h) - var(--polish-icon-control)) / 2); transform: translateY(-50%); display: inline-flex; align-items: center; justify-content: center; width: var(--choice-action-h); height: var(--choice-action-h); min-height: 0; border: 0; background: transparent; box-shadow: none; }
+html:root .frame [data-choice-action] > svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
+html:root .frame [data-choice-clear] { inset-inline-end: calc(var(--polish-space-field) + var(--polish-icon-control)); }
+html:root .frame[data-choice-field]:has([data-choice-clear]) { padding-inline-end: calc(var(--polish-space-field) + var(--choice-action-h) + var(--polish-icon-control)); }
+@media (pointer: coarse) {
+  .frame { --choice-action-h: var(--choice-touch-h); }
+  html:root .frame[data-choice-field] { height: var(--choice-touch-h); min-height: var(--choice-touch-h); max-height: var(--choice-touch-h); font-size: var(--text-lead); }
+}
+
+html:root .frame[data-choice-field] > input[role='combobox'] { min-width: var(--polish-icon-control); flex: 1; font: inherit; cursor: text; }
+html:root .frame[data-choice-field] > [data-choice-selection] { flex: 1; min-width: 0; flex-wrap: nowrap; }
+html:root .frame[data-choice-field] > [data-choice-selection] > * { min-width: 0; flex-shrink: 1; }
+
+html:root .frame[data-choice-field] [data-choice-value] { font: inherit; color: inherit; }
+
+
+html:root .frame[data-choice-field] [data-choice-chip] { min-width: 0; flex: 0 1 auto; white-space: nowrap; }
+
+/* 数字を打つ狭い時刻欄でも、値と右の印が重ならない。 */
+@container (max-width: 119px) {
+  html:root .frame[data-choice-field][data-choice-time] { padding-inline-start: var(--space-8); padding-inline-end: calc(var(--polish-space-field) + var(--polish-icon-control) + var(--space-4)); }
+  html:root .frame[data-choice-field][data-choice-time] > input { letter-spacing: 0; }
+}
+
+html:root .frame[data-choice-field] > [data-choice-trigger]:disabled { cursor: not-allowed; }

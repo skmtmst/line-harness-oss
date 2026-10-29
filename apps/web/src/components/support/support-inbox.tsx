@@ -14,6 +14,7 @@ import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll } from '@/lib/visible-polling'
 import { formatDateTime } from '@/lib/format'
 import Button from '@/components/shared/button'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 type Channel = 'all' | 'line' | 'email'
 type ThreadStatus = 'unread' | 'in_progress' | 'on_hold' | 'resolved'
@@ -332,7 +333,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
         <aside className="border-b border-hairline lg:border-b-0 lg:border-r">
           <div className="space-y-3 border-b border-hairline bg-canvas-sunken/70 p-4">
             <div className="flex gap-2">
-              <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" aria-label="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm" />
+              <SharedTextField value={query} onChange={(event) => setQuery(event.target.value)} placeholder="名前・メール・件名で検索" aria-label="名前・メール・件名で検索" className="min-w-0 flex-1 rounded-control border border-hairline bg-canvas px-3 py-2 text-sm" />
               <Select
                 aria-label="対応状況で絞り込む"
                 value={status}
@@ -419,7 +420,7 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
                 <div ref={bottomRef} />
               </div>
               <div className="border-t border-hairline bg-canvas p-4">
-                <textarea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" aria-label="メールの返信を入力" rows={4} className="w-full resize-none rounded-card border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 focus:bg-canvas" />
+                <SharedTextArea value={reply} onChange={(event) => setReply(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) void sendReply() }} placeholder="メールの返信を入力…（Ctrl/Command + Enterで送信）" aria-label="メールの返信を入力" rows={4} className="w-full resize-none rounded-card border border-hairline bg-canvas-sunken px-4 py-3 text-sm leading-6 focus:bg-canvas" />
                 <div className="mt-3 flex items-center justify-between gap-3">
                   <p className="text-micro text-ink-faint">From: contact-shed@nen-petfood.com</p>
                   <Button variant="primary" className="rounded-card px-6 py-2.5 font-bold shadow-card hover:brightness-90 border-0 h-auto whitespace-normal" onClick={() => sendReply()} disabled={!reply.trim() || sending} busy={sending} busyLabel="送信中…" widthReserve="idle">{'メールで返信'}</Button>

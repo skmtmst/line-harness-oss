@@ -180,11 +180,12 @@ html:root :is(.inlineGrip, .grip)[data-reorder-handle] { color: var(--color-ink-
 html:root .action[data-row-menu] {
   position: relative;
   isolation: isolate;
+  border: 0;
   border-radius: var(--polish-radius-control);
   background: transparent;
   box-shadow: none;
 }
-/* 見える枠は28角、押せる所は既存の36角。型の列幅を動かさない。 */
+/* 押せる所の大きさを保ち、通常時は線を見せない。 */
 html:root .action[data-row-menu]:not(:focus-visible) {
   outline: 1px solid transparent;
 }

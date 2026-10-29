@@ -533,7 +533,7 @@ function Responses() {
                       })}
                     </tbody></DataTable>
                     {/* 絵 v0SbYR：「1件ずつ見る」は一覧の下の右端。 */}
-                    <div className={styles.cardFootEnd}><Button variant="text" onClick={() => setView('rows')}><ArrowRight size={16} aria-hidden="true" />1件ずつ見る</Button></div>
+                    <div className={styles.cardFootEnd}><Button variant="text" onClick={() => setView('rows')}>1件ずつ見る<ArrowRight size={16} aria-hidden="true" /></Button></div>
                   </Card>
                 )
               })() : null}

@@ -12,7 +12,7 @@ import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { RowActions } from '@/components/shared/row-actions'
 import { TextField } from '@/components/shared/text-field'
 import { FieldError, Field } from '@/components/shared/form-controls'
@@ -256,7 +256,7 @@ export default function LifetimeV8({
             <Field label="称号" requirement={FIELD_REQUIREMENTS.editing_title}><SaveErrorField names={["title","editing.title"]}><TextField {...fields.bind('milestone-title')} maxLength={30} placeholder="なかよし" value={editing.title} onChange={(event) => setEditing({ ...editing, title: event.target.value })} /></SaveErrorField>
 <FieldError id="milestone-title-error">{fields.error('milestone-title')}</FieldError></Field>
             <div className={styles.editToggle}>
-              <SaveErrorField names={["notify","editing.notify"]}><SettingCheckbox checked={editing.notify} onChange={(checked) => setEditing({ ...editing, notify: checked })} label={editing.notify ? '到達したら LINE で通知する' : '到達しても通知しない'} /></SaveErrorField>
+              <SaveErrorField names={["notify","editing.notify"]}><Toggle checked={editing.notify} onChange={(checked) => setEditing({ ...editing, notify: checked })} label={editing.notify ? '到達したら LINE で通知する' : '到達しても通知しない'} /></SaveErrorField>
             </div>
           </div>
         ) : null}

@@ -14,6 +14,7 @@ import {
 import AccountSetupUrls from './account-setup-urls'
 import Button from '@/components/shared/button'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 interface Props {
   accountId: string
@@ -215,7 +216,7 @@ export default function AccountEditModal({
         <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col space-y-4 overflow-y-auto p-4 sm:p-6">
           <div>
             <label className="block text-xs font-medium text-ink-secondary mb-1">アカウント名</label>
-            <SaveErrorField names={["name","state.name"]}><input
+            <SaveErrorField names={["name","state.name"]}><SharedTextField
               value={state.name}
               onChange={(e) => update({ name: e.target.value })}
               className="w-full border border-hairline rounded-control px-3 py-2 text-sm"
@@ -226,7 +227,7 @@ export default function AccountEditModal({
           {initialTimezone !== undefined && initialSection === 'basic' && (
             <label className="block text-xs font-medium text-ink-secondary">
               タイムゾーン
-              <SaveErrorField names={["timezone"]}><input aria-label="タイムゾーン" value={timezone} onChange={(e) => setTimezone(e.target.value)} required className="mt-1 w-full rounded-control border border-hairline px-3 py-2 text-sm" /></SaveErrorField>
+              <SaveErrorField names={["timezone"]}><SharedTextField aria-label="タイムゾーン" value={timezone} onChange={(e) => setTimezone(e.target.value)} required className="mt-1 w-full rounded-control border border-hairline px-3 py-2 text-sm" /></SaveErrorField>
             </label>
           )}
           <AccountFormSections
@@ -253,7 +254,7 @@ export default function AccountEditModal({
                   上限
                 </label>
                 <div className="flex items-center gap-1.5">
-                  <SaveErrorField names={["friendCapacity","friend_capacity"]}><input
+                  <SaveErrorField names={["friendCapacity","friend_capacity"]}><SharedTextField
                     id="acc-capacity"
                     type="number"
                     min={1}
@@ -270,7 +271,7 @@ export default function AccountEditModal({
                   警告を出す人数
                 </label>
                 <div className="flex items-center gap-1.5">
-                  <SaveErrorField names={["capacityWarnAt","capacity_warn_at"]}><input
+                  <SaveErrorField names={["capacityWarnAt","capacity_warn_at"]}><SharedTextField
                     id="acc-warn"
                     type="number"
                     min={1}
@@ -290,7 +291,7 @@ export default function AccountEditModal({
               <label htmlFor="acc-icon" className="text-ink-faint mb-1 block text-xs font-medium">
                 アイコンのURL
               </label>
-              <SaveErrorField names={["iconUrl","icon_url"]}><input
+              <SaveErrorField names={["iconUrl","icon_url"]}><SharedTextField
                 id="acc-icon"
                 type="url"
                 value={iconUrl}

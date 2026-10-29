@@ -24,6 +24,8 @@ export const SELECT_MENU_ROW_STRIDE = 34
 
 /** 「並び：友だち順」の頭（「並び」）と中身（「友だち順」）を分ける。頭は 12 字まで。 */
 const HEAD = /^([^：]{1,12})：(.+)$/
+const ASCII_HEAD = /^([^：:\d]{1,12}):\s*(?!\/\/)(.+)$/
+function optionHead(label: string) { return HEAD.exec(label) ?? ASCII_HEAD.exec(label) }
 
 /**
  * 選択肢の頭（「並び：」など）を外して見出しにする。外すのは次の2つだけ。
@@ -38,7 +40,7 @@ export function splitOptionHeads<T extends { label: string }>(
 ): { heading: string | undefined; labelOf: (option: T) => string } {
   const keep = { heading: label || undefined, labelOf: (option: T) => option.label }
   if (options.length === 0) return keep
-  const heads = options.map((option) => HEAD.exec(option.label)?.[1])
+  const heads = options.map((option) => optionHead(option.label)?.[1])
   const first = heads[0]
   if (!first) return keep
   const allSame = heads.every((head) => head === first)
@@ -47,11 +49,33 @@ export function splitOptionHeads<T extends { label: string }>(
   if (label && label !== first) return keep
   return {
     heading: first,
-    labelOf: (option: T) => HEAD.exec(option.label)?.[2] ?? option.label,
+    labelOf: (option: T) => optionHead(option.label)?.[2] ?? option.label,
   }
 }
 
+/** 見出しの終わりの「:」「：」と空白を外し、全角「：」1 つにそろえる。 */
+export function filterHead(head: string): string {
+  return `${head.replace(/\s*[:：]\s*$/, '')}：`
+}
+
+/** 絞り込みの「すべて」に当たる選択肢（既定の値）。 */
+export function isAllOption(option: { value: string; label: string }): boolean {
+  return option.value === 'all' || /^(?:[^：]{1,12}：)?すべて/.test(option.label)
+}
+
+/**
+ * 閉じた欄の「見出し：値」。見出しと値の間は全角「：」に部品の側でそろえる。
+ * 絞り込み（「すべて」の選択肢がある欄）では、既定のときは値を灰、選んだときは黒の太字にする。
+ */
+export function SelectValueText({ head, value, filterState }: { head: string; value: string; filterState?: 'default' | 'active' }) {
+  return <>
+    <span className={styles.valueHead} data-select-head>{filterHead(head)}</span>
+    <span className={styles.valueCurrent} data-select-current data-filter-state={filterState}>{value}</span>
+  </>
+}
+
 export interface SelectMenuProps {
+  align?: 'start' | 'end'
   open: boolean
   getAnchor: () => HTMLElement | null
   onClose: () => void
@@ -82,6 +106,7 @@ export interface SelectMenuProps {
 }
 
 export function SelectMenu({
+  align = 'start',
   open,
   getAnchor,
   onClose,
@@ -100,7 +125,7 @@ export function SelectMenu({
   return (
     <MenuPortal
       open={open}
-      align="start"
+      align={align}
       matchWidth="min"
       getAnchor={getAnchor}
       onClose={onClose}

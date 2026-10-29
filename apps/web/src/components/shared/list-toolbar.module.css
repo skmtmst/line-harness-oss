@@ -388,3 +388,5 @@ html:root .leading > :is(button, a) { width: max-content; flex: none; }
 }
 
 html:root .trailing:has([data-period-range]) { min-width: 0; flex: 1 1 100%; width: 100%; flex-wrap: wrap; }
+
+:root .slotTool[data-toolbar-role='action'] { order: 5; align-self: center; }

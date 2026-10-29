@@ -29,7 +29,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
   const currentSummary: ChannelsSummary = channelsSummary?.accountId === accountId ? channelsSummary : { accountId: accountId ?? '', status: 'loading', data: null, conflicts: 0 }
   const previewContent = <>
             <div className={styles.sideActions}>
-              {previewUrl ? <Button href={previewUrl} fullWidth><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
+              {previewUrl ? <Button href={previewUrl} external fullWidth><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
             </div>
             <p className={styles.sideTitle}>お客さまの予約画面</p>
             {phone}
@@ -64,7 +64,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
           /* 絵 ：畳んだときも「LINEでの見え方を見る」と「お客さまに見える画面を確かめる」の2つを並べる。 */
           <div className={styles.narrowActions}>
             <PreviewLauncher title="お客さまの予約画面" label="LINEでの見え方を見る">{previewContent}</PreviewLauncher>
-            {previewUrl ? <Button href={previewUrl}><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
+            {previewUrl ? <Button href={previewUrl} external><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
           </div>
         )}
         contentSpacing={accountId && tab === 'menus' && menusStatus === 'ready' ? 'notice-after-preview' : undefined}

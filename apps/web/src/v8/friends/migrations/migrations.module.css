@@ -78,22 +78,6 @@
 
 .toolRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); min-width: 0; }
 .chipRow { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
-.chip {
-  display: inline-flex;
-  align-items: center;
-  height: var(--tpl-fr-control-h);
-  padding: 0 var(--tpl-fr-chip-pad);
-  border-radius: var(--radius-pill);
-  background: var(--color-canvas);
-  box-shadow: var(--tpl-fr-shadow-outline);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 500;
-  line-height: var(--tpl-fr-delta-lh);
-  white-space: nowrap;
-}
-.chip:hover { background: var(--color-canvas-sunken); }
-.chipOn, .chipOn:hover { background: var(--color-ink); box-shadow: var(--tpl-fr-shadow-outline-ink); color: var(--color-canvas); }
 .spacer { flex: 1; min-width: 0; }
 
 .textButton {

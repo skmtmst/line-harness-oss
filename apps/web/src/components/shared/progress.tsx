@@ -4,6 +4,7 @@ import { CircleCheck, LoaderCircle, TriangleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Button from './button'
 import styles from './progress.module.css'
+import { CHECK_MARK_PATH } from './checkbox'
 
 export type ProgressState = 'preparing' | 'active' | 'done' | 'partial'
 
@@ -170,16 +171,38 @@ export default function Progress({
   )
 }
 
-/** V8 tydx2: bare progress track. Full Progress keeps its actions and announcements. */
+/** 段に区切って見せる上限。これより多い段・割合（max=100 など）は 1 本の棒で見せる。 */
+const MAX_SEGMENTS = 12
+
+/**
+ * V8 tydx2: bare progress track. Full Progress keeps its actions and announcements.
+ * `appearance="onboarding"` で段の数（max）が少ないときは、段の数に区切った緑で見せる
+ * （済んだ段は緑、まだの段は棒の地の色）。
+ */
 export function ProgressBar({ value, label, className, max = 100, appearance, tone }: {
   value: number; label: string; className?: string; max?: number
   appearance?: 'onboarding' | 'quota'; tone?: 'danger' | 'warning'
 }) {
   const limit = Number.isFinite(max) && max > 0 ? max : 0
   const clamped = Number.isFinite(value) ? Math.min(limit, Math.max(0, value)) : 0
+  const segmented = appearance === 'onboarding' && Number.isInteger(limit) && limit > 1 && limit <= MAX_SEGMENTS
   return (
-    <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={clamped} data-appearance={appearance} data-tone={tone} className={[styles.track, className].filter(Boolean).join(' ')}>
-      <div className={styles.fill} style={{ transform: `scaleX(${limit > 0 ? clamped / limit : 0})` }} />
+    <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={clamped} data-appearance={appearance} data-tone={tone} data-segmented={segmented || undefined} className={[styles.track, className].filter(Boolean).join(' ')}>
+      {segmented
+        ? Array.from({ length: limit }, (_, index) => <span key={index} className={styles.segment} data-on={index < Math.floor(clamped) || undefined} />)
+        : <div className={styles.fill} style={{ transform: `scaleX(${limit > 0 ? clamped / limit : 0})` }} />}
     </div>
+  )
+}
+
+/**
+ * 段の済み・まだの印。押せる形にしない丸（状態の印）。
+ * 済み＝緑の丸に白い ✓、まだ＝白い丸に共通の枠の色。選ぶ物はチェックボックス（四角）を使う。
+ */
+export function StepMark({ done, className }: { done: boolean; className?: string }) {
+  return (
+    <span aria-hidden="true" data-step-mark={done ? 'done' : 'todo'} className={[styles.stepMark, className].filter(Boolean).join(' ')}>
+      {done ? <svg className={styles.stepMarkIcon} viewBox="0 0 24 24"><path d={CHECK_MARK_PATH} /></svg> : null}
+    </span>
   )
 }

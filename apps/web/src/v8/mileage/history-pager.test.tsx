@@ -5,12 +5,11 @@ import { afterEach, expect, it, vi } from 'vitest'
 import HistoryPager from './history-pager'
 
 afterEach(cleanup)
-it('履歴が1ページでも件数と境界のページ送りを出す', () => {
+it('履歴が1ページなら件数だけを残す', () => {
   render(<HistoryPager spentOnly={false} total={2} page={1} pageSize={20} items={{ length: 2 }} pageCount={1} loading={false} setPage={() => {}} />)
-  const pager = screen.getByRole('navigation', { name: 'ページ送り' })
-  expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('2件中 1〜2件')
-  expect(within(pager).getByRole('button', { name: '前のページ' }).hasAttribute('disabled')).toBe(true)
-  expect(within(pager).getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
+  expect(screen.getByText('2件中 1〜2件')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '前のページ' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '次のページ' })).toBeNull()
 })
 it('取得できない総数を0へ置き換えず、次のページへ移れる', () => {
   const setPage = vi.fn()
@@ -32,14 +31,12 @@ it('ページ内の使った件数と全履歴の範囲を分け、空のペー�
 
 const props = { spentOnly: false, page: 1, pageSize: 20, items: { length: 3 }, total: 3, pageCount: 1, loading: false }
 
-it('1ページも件数と前後の枠を残す', () => {
+it('1ページは件数だけを残して移動を出さない', () => {
   const setPage = vi.fn()
   render(<HistoryPager {...props} setPage={setPage} />)
   expect(screen.getByText('3件中 1〜3件')).toBeTruthy()
   for (const label of ['前のページ', '次のページ']) {
-    const button = screen.getByRole('button', { name: label }) as HTMLButtonElement
-    expect(button.disabled).toBe(true)
-    fireEvent.click(button)
+    expect(screen.queryByRole('button', { name: label })).toBeNull()
   }
   expect(setPage).not.toHaveBeenCalled()
 })

@@ -19,6 +19,7 @@ import styles from './console.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 const choiceKey = (account: string, source: string) => JSON.stringify([account, source])
 const labels = { create: '新しく作る', overwrite: '上書き', alias: '別名で作る', skip: '配らない' }
@@ -108,7 +109,7 @@ export default function AttributeDistribution({ detail, saved = false, canEdit =
     {error ? <Notice tone="danger" message={error} /> : null}
     <ListPageBody folders={<DistributionFolderPanel rows={folderRows} activeId={filter} onSelect={setFilter} failed={folders.failed} />}
       collapsedFolders={<SaveErrorField names={["filter"]}><Select aria-label="アカウントのフォルダ" value={filter} onChange={setFilter} options={folderRows.map((row) => ({ value: row.id, label: row.label }))} /></SaveErrorField>}
-      toolbar={<><SaveErrorField names={["search"]}><input aria-label="アカウント名で探す" className={styles.input} value={search} onChange={(event) => setSearch(event.target.value)} /></SaveErrorField><span>{`選んだ ${selected.length} アカウント`}</span></>}>
+      toolbar={<><SaveErrorField names={["search"]}><SharedTextField aria-label="アカウント名で探す" className={styles.input} value={search} onChange={(event) => setSearch(event.target.value)} /></SaveErrorField><span>{`選んだ ${selected.length} アカウント`}</span></>}>
       <DataTable><thead><TableHeadRow><Th>選択</Th><Th>アカウント</Th><Th>配布方法・結果</Th></TableHeadRow></thead><tbody>
         {visible.map((account, saveFieldIndex) => <Tr selected={selected.includes(account.id)} key={account.id} data-row-id={account.id}>
           <Td><SaveErrorField names={[`visible.${saveFieldIndex}.id`,"id","account.id","selected"]}><Checkbox aria-label={account.name} disabled={busy || stage !== 'accounts'} checked={selected.includes(account.id)} onCheckedChange={(on) => setSelected((current) => on ? [...new Set([...current, account.id])] : current.filter((id) => id !== account.id))} /></SaveErrorField></Td>

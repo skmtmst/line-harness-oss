@@ -78,7 +78,7 @@ describe('会員ランクの表', () => {
     render(<RanksTab />)
     await screen.findByText('シルバー')
     expect(screen.getByText(/試験運転で、LINE へは送らず記録だけ/)).toBeTruthy()
-    await act(async () => { fireEvent.click(screen.getByRole('checkbox', { name: '下がる前に知らせる' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: '下がる前に知らせる' })) })
     await waitFor(() => expect(api.save).toHaveBeenCalledWith('a', expect.objectContaining({ notifyDowngrade: false, notifyUpgrade: true, expectedVersion: 4 })))
   })
 })

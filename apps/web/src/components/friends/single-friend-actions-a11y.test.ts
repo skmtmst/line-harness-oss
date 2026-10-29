@@ -30,7 +30,7 @@ describe('R117 個別操作の選択欄・入力欄に読み上げ名がある',
   })
 
   it('すべての input に読み上げ名がある', () => {
-    const inputs = SRC.match(/<input[^>]*>/g) ?? []
+    const inputs = SRC.match(/<(?:input|SharedTextField)\b[^>]*>/g) ?? []
     expect(inputs.length).toBeGreaterThan(0)
     for (const tag of inputs) {
       expect(tag).toMatch(/aria-label="[^"]+"|aria-labelledby="[^"]+"/)

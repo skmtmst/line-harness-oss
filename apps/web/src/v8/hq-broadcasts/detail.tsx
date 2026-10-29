@@ -497,6 +497,7 @@ export default function HqBroadcastDetail() {
   const exampleStore = sentTo[0]?.accountName ?? '店の名前'
   const tone = badge?.tone === 'success' ? 'success' : badge?.tone === 'danger' ? 'danger' : badge?.tone === 'warning' ? 'warning' : 'neutral'
 
+  if (!id) return <TargetMissing kind="unspecified" title="開く一括配信が指定されていません" description="一覧から開く一括配信を選び直してください。" backHref="/hq/broadcasts" backLabel="一括配信の一覧へ戻る" />
 
   /* 選ばれていない時は対象なしの1枚だけ。右の設定・スマホ・タブは出さない。 */
   if (!id) {

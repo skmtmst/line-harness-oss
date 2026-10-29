@@ -3,6 +3,7 @@
 import type { DeliveryMode } from '@line-crm/shared'
 import { TimeField } from '@/components/shared/date-time-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 export interface ScheduleValue {
   delayMinutes: number
@@ -47,7 +48,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
     return (
       <div>
         <label className="block text-xs font-medium text-ink-secondary mb-1">遅延（分）</label>
-        <SaveErrorField names={["delayMinutes","value.delayMinutes","delay_minutes","value.delay_minutes"]}><input
+        <SaveErrorField names={["delayMinutes","value.delayMinutes","delay_minutes","value.delay_minutes"]}><SharedTextField
           type="number"
           min={0}
           className={inputCls + ' w-full'}
@@ -63,7 +64,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
       <div className="space-y-2">
         <label className="block text-xs font-medium text-ink-secondary">購読開始から</label>
         <div className="flex items-center gap-2 flex-wrap">
-          <SaveErrorField names={["offsetDays","value.offsetDays","offset_days","value.offset_days"]}><input
+          <SaveErrorField names={["offsetDays","value.offsetDays","offset_days","value.offset_days"]}><SharedTextField
             type="number"
             min={0}
             className={inputCls}
@@ -71,7 +72,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
             onChange={(e) => onChange({ ...value, offsetDays: Math.max(0, Number(e.target.value) || 0) })}
           /></SaveErrorField>
           <span className="text-sm text-ink-secondary">日</span>
-          <SaveErrorField names={["offsetHours","value.offsetHours","offset_hours","value.offset_hours"]}><input
+          <SaveErrorField names={["offsetHours","value.offsetHours","offset_hours","value.offset_hours"]}><SharedTextField
             type="number"
             min={0}
             max={23}
@@ -82,7 +83,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
             }
           /></SaveErrorField>
           <span className="text-sm text-ink-secondary">時間</span>
-          <SaveErrorField names={["offsetMinutesRemainder","value.offsetMinutesRemainder","offset_minutes_remainder","value.offset_minutes_remainder"]}><input
+          <SaveErrorField names={["offsetMinutesRemainder","value.offsetMinutesRemainder","offset_minutes_remainder","value.offset_minutes_remainder"]}><SharedTextField
             type="number"
             min={0}
             max={59}
@@ -105,7 +106,7 @@ export default function ScheduleInput({ mode, value, onChange }: Props) {
     <div className="space-y-2">
       <label className="block text-xs font-medium text-ink-secondary">購読開始から</label>
       <div className="flex items-center gap-2 flex-wrap">
-        <SaveErrorField names={["offsetDays","value.offsetDays","offset_days","value.offset_days"]}><input
+        <SaveErrorField names={["offsetDays","value.offsetDays","offset_days","value.offset_days"]}><SharedTextField
           type="number"
           min={0}
           className={inputCls}

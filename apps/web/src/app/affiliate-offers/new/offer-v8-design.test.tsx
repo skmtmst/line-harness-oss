@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * 板  案件を作るの絵合わせ（API待ちのため見た目だけ）。
@@ -78,7 +79,7 @@ describe('Td4TN 作る画面の絵合わせ', () => {
     expect(screen.getByText('公開するとこう見えます')).toBeTruthy()
     expect(screen.getByText(/変えたあとの成果から新しい額になります/)).toBeTruthy()
     expect(screen.getByRole('link', { name: 'キャンセル' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '保存して続けて作る' })).toBeTruthy()
+    expect(getPageAction({ name: '保存して続けて作る' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '保存して公開' })).toBeTruthy()
   })
 })

@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 NEN配信「配信を直す」（src/v8/nen-campaigns/edit.tsx：）と
  * 「コラムを書く」（column-new.tsx：）の動きの試験。BEHAVIOR.md の主な動きを守る。
@@ -80,7 +82,7 @@ let root: Root
 
 beforeEach(() => { clearToastsForTest();
   document.documentElement.dataset.theme = 'v8'
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   for (const fn of Object.values(calls)) fn.mockReset()
   calls.settings.mockResolvedValue({ success: true, data: [REVIEW] })
   calls.forms.mockResolvedValue({ success: true, data: [{ id: 'form-review', name: '口コミ', description: null, isActive: true }] })
@@ -167,10 +169,10 @@ describe('V8 NEN配信「配信を直す」（w5pwG）', () => {
   })
 
   it('閲覧のみの人には帯を出し、保存・テスト送信・押せない選ぶ欄を置かない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await act(async () => { root.render(<><CampaignEdit campaignKey="review_request" /><ToastHost /></>) })
     await flush()
-    expect(host.textContent).toContain('閲覧のみで見ています')
+    expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
     expect(button('配信内容を保存する')).toBeUndefined()
     expect(host.textContent).not.toContain('自分にテストを送る')
     expect([...document.querySelectorAll('button[disabled]')].map((b) => b.textContent)).toEqual([])
@@ -239,7 +241,7 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
   })
 
   it('閲覧のみの人には書く欄も保存も置かず、帯と戻る道だけ出す', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await act(async () => { root.render(<ColumnNew />) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています')
@@ -277,3 +279,5 @@ it('押された後の説明に設定のボタン名を出し、式を文字と�
   expect(screen.getByText('メッセージの「感想を書く」を押した人に何をするかです')).toBeTruthy()
   expect(host.textContent).not.toContain('${merged.')
 })
+
+afterEach(() => { verifiedStaffRole(null) })

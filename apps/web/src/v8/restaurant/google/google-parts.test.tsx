@@ -1,4 +1,6 @@
+import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -30,7 +32,7 @@ beforeEach(() => { fixture.review.mockResolvedValue({ success: true, review, sto
 afterEach(() => { cleanup(); vi.resetAllMocks(); fixture.role = 'owner' })
 
 it('閲覧のみのプロフィールでは変更操作を隠し、営業時間は読める', async () => {
-  fixture.role = 'viewer'
+  fixture.role = verifiedStaffRole('viewer')
   fixture.profile.mockResolvedValue({
     profile: { title: '試験店', specialHours: [], regularHours: [], phoneNumbers: {}, address: null },
     today: { date: '2026-10-09', closed: false, periods: [{ open: '11:00', close: '20:00' }] },
@@ -156,14 +158,15 @@ it('WEB176：平均と件数は期間集計ではなく総合と表示する', a
 
 
 it.each(['viewer', null])('口コミは変更権限がない間（%s）も読めるが、下書き・同期操作を出さない', async (role) => {
-  fixture.role = role
+  fixture.role = verifiedStaffRole(role)
   fixture.listReviews.mockResolvedValue({ success: true, reviews: [{ ...review, replyDraft: null }, { ...review, id: 'published', replyStatus: 'published', replyComment: '返信済みの本文' }], total: 2, page: 1, perPage: 20 })
   const data = connection(true, true)
   data.summary.syncStale = true
   const go = vi.fn()
   render(<ReviewsBoard accountId="a" data={data} go={go} onSynced={vi.fn()} />)
   await screen.findAllByText('Kenji')
-  expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+  if (role === null) expect(document.querySelector('[data-read-only-notice]')).toBeNull()
+  else expect(screen.getByText(READ_ONLY_MESSAGE)).toBeTruthy()
   expect(screen.queryByRole('button', { name: '下書きを作る' })).toBeNull()
   expect(screen.queryByRole('button', { name: 'Googleから同期する' })).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '返信を見る' }))
@@ -172,13 +175,14 @@ it.each(['viewer', null])('口コミは変更権限がない間（%s）も読め
 })
 
 it.each(['viewer', null])('下書きのURLを直接開いても変更権限がない間（%s）は読むだけ', async (role) => {
-  fixture.role = role
+  fixture.role = verifiedStaffRole(role)
   fixture.review.mockResolvedValue({ review: { ...review, replyDraftAiGenerated: true } })
   render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
   await screen.findByText('待ちました。')
   expect(screen.getByText('下書き', { exact: true })).toBeTruthy()
   expect(screen.getByText('AIが作った返信の下書き', { exact: true })).toBeTruthy()
-  expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+  if (role === null) expect(document.querySelector('[data-read-only-notice]')).toBeNull()
+  else expect(screen.getByText(READ_ONLY_MESSAGE)).toBeTruthy()
   expect(screen.queryByRole('textbox', { name: '返信文' })).toBeNull()
   for (const name of ['下書きを保存する', 'AIで下書きを作る', '返信内容を確認する']) expect(screen.queryByRole('button', { name })).toBeNull()
   expect(fixture.generateDraft).not.toHaveBeenCalled()
@@ -187,7 +191,7 @@ it.each(['viewer', null])('下書きのURLを直接開いても変更権限が�
 })
 
 it('編集を任された担当者は口コミの下書きを作り、保存できる', async () => {
-  fixture.role = 'staff'
+  fixture.role = verifiedStaffRole('staff')
   fixture.saveDraft.mockResolvedValue({ review: { ...review, replyDraft: '直した返信' } })
   render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, false)} go={vi.fn()} onPublished={vi.fn()} />)
   fireEvent.change(await screen.findByRole('textbox', { name: '返信文' }), { target: { value: '直した返信' } })
@@ -198,7 +202,7 @@ it('編集を任された担当者は口コミの下書きを作り、保存で�
 
 
 it('閲覧のみでも保存済みの下書きは開いて読むことができる', async () => {
-  fixture.role = 'viewer'
+  fixture.role = verifiedStaffRole('viewer')
   fixture.listReviews.mockResolvedValue({ reviews: [{ ...review, replyStatus: 'draft' }], total: 1, page: 1, perPage: 20 })
   const go = vi.fn()
   render(<ReviewsBoard accountId="a" data={connection(false, false)} go={go} onSynced={vi.fn()} />)
@@ -211,7 +215,7 @@ it('公開の確認中に閲覧のみに変わっても、送信へ進めない'
   const view = render(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
   fireEvent.click(await screen.findByRole('button', { name: '返信内容を確認する' }))
   await screen.findByText('この返信をGoogleに公開しますか？')
-  fixture.role = 'viewer'
+  fixture.role = verifiedStaffRole('viewer')
   view.rerender(<ReviewDraft accountId="a" reviewId="rv-2" data={connection(true, true)} go={vi.fn()} onPublished={vi.fn()} />)
   expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
   expect(screen.queryByRole('button', { name: 'この内容で返信する' })).toBeNull()
@@ -226,7 +230,7 @@ it('同期中に閲覧のみへ変わっても失敗の案内は残し、再試�
   const props = { accountId: 'a', data: connection(true, true), go: vi.fn(), onSynced: vi.fn() }
   const view = render(<ReviewsBoard {...props} />)
   fireEvent.click(await screen.findByRole('button', { name: 'Googleから同期する' }))
-  fixture.role = 'viewer'
+  fixture.role = verifiedStaffRole('viewer')
   view.rerender(<ReviewsBoard {...props} />)
   await act(async () => { rejectSync(new Error('模擬の同期失敗')) })
   expect(await screen.findByText(/前回取得した内容を表示しています/)).toBeTruthy()
@@ -243,7 +247,7 @@ it('送信中に閲覧のみへ変わっても結果不明の案内を残し、�
   fireEvent.click(await screen.findByRole('button', { name: '返信内容を確認する' }))
   fireEvent.click(screen.getByRole('checkbox'))
   fireEvent.click(screen.getByRole('button', { name: 'この内容で返信する' }))
-  fixture.role = 'viewer'
+  fixture.role = verifiedStaffRole('viewer')
   view.rerender(<ReviewDraft {...props} />)
   await act(async () => { rejectPublish(new ApiError(502, '送信結果を確認できません', 'upstream_error')) })
   expect(await screen.findByText(/Googleへの送信結果を確認できませんでした/)).toBeTruthy()
@@ -252,3 +256,5 @@ it('送信中に閲覧のみへ変わっても結果不明の案内を残し、�
   expect(fixture.publishReply).toHaveBeenCalledTimes(1)
   expect(props.onPublished).not.toHaveBeenCalled()
 })
+
+afterEach(() => { verifiedStaffRole(null) })

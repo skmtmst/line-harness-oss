@@ -43,12 +43,12 @@ describe('最初に見せるページと、出す相手', () => {
 
   it('全員に出すときは既定にでき、出し分けのときは既定を選ばせない', () => {
     const plain = renderForm({ ...freshRichMenuCreateValue(), targetingEnabled: false, isDefaultForAll: false }, true)
-    const box = plain.view.getByRole('checkbox', { name: /既定メニューにする/ }) as HTMLInputElement
+    const box = plain.view.getByRole('switch', { name: /既定メニューにする/ }) as HTMLButtonElement
     expect(box.disabled).toBe(false)
     fireEvent.click(box)
     expect(latest(plain.onChange)).toMatchObject({ isDefaultForAll: true })
     cleanup()
     const targeted = renderForm({ ...freshRichMenuCreateValue(), targetingEnabled: true, isDefaultForAll: false }, true)
-    expect((targeted.view.getByRole('checkbox', { name: /既定メニューにする/ }) as HTMLInputElement).disabled).toBe(true)
+    expect((targeted.view.getByRole('switch', { name: /既定メニューにする/ }) as HTMLButtonElement).disabled).toBe(true)
   })
 })

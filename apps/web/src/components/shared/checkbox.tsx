@@ -81,15 +81,22 @@ export default function Checkbox({
   )
 }
 
+/**
+ * 印の線。外接する箱の中心が viewBox（24×24）の中心 (12, 12) に来るように置く。
+ * 前の ✓（M4 12l5 5L20 6）は中心が (12, 11.5) で、箱の中で上へずれて見えた。
+ */
+export const CHECK_MARK_PATH = 'M6 12.5l4 4 8-9'
+export const MINUS_MARK_PATH = 'M6 12h12'
+
 /** 四角と印。本物の input の直後に置く（CSS の `.input:checked + .box` で色と印が変わる）。 */
 function CheckboxMark() {
   return (
     <span aria-hidden="true" className={styles.box}>
       <svg className={`${styles.mark} ${styles.check}`} viewBox="0 0 24 24">
-        <path d="M4 12l5 5L20 6" pathLength={1} />
+        <path d={CHECK_MARK_PATH} pathLength={1} />
       </svg>
       <svg className={`${styles.mark} ${styles.minus}`} viewBox="0 0 24 24">
-        <path d="M5 12h14" pathLength={1} />
+        <path d={MINUS_MARK_PATH} pathLength={1} />
       </svg>
     </span>
   )

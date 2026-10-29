@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * アフィリエイター登録・案件登録を、本物の React で mount して操作する（#686）。
@@ -135,9 +136,9 @@ function byLabel<T extends HTMLElement>(label: string): T {
 }
 
 function buttonByText(text: string): HTMLButtonElement {
-  const found = [...container.querySelectorAll('button')].find(
+  const found = ([...container.querySelectorAll('button')].find(
     (b) => (b.textContent ?? '').trim() === text,
-  )
+  ) ?? querySupplementaryPageAction(text))
   if (!found) throw new Error(`「${text}」のボタンが見つかりません（今あるのは ${[...container.querySelectorAll('button')].map((b) => b.textContent?.trim()).join(' / ')}）`)
   return found as HTMLButtonElement
 }
@@ -330,7 +331,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     // やり直しの前にオフへ変えても、保存済みの真実は変わらない。
     // 知らせは「既に始まっています」のまま、再開の送り先だけを言う。
     // 「まだ始まっていない」とは言わない（R525残部）。
-    const tracking = [...container.querySelectorAll('[data-action-row]')].find(row => row.textContent?.includes('すぐに計測を始める'))
+    const tracking = ([...container.querySelectorAll('[data-action-row]')].find(row => row.textContent?.includes('すぐに計測を始める')) ?? querySupplementaryPageAction('すぐに計測を始める'))
     expect(tracking).toBeTruthy()
     await act(async () => { fireEvent.click(within(tracking as HTMLElement).getByRole('button', { name: /操作/ })) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '削除する' })) })
@@ -354,7 +355,7 @@ describe('アフィリエイター登録の実操作（#686）', () => {
     affiliatesUpdate.mockRejectedValueOnce(new Error('一時的に保存できません'))
     await mount(<NewAffiliatePage />)
 
-    const tracking = [...container.querySelectorAll('[data-action-row]')].find(row => row.textContent?.includes('すぐに計測を始める'))
+    const tracking = ([...container.querySelectorAll('[data-action-row]')].find(row => row.textContent?.includes('すぐに計測を始める')) ?? querySupplementaryPageAction('すぐに計測を始める'))
     expect(tracking).toBeTruthy()
     await act(async () => { fireEvent.click(within(tracking as HTMLElement).getByRole('button', { name: /操作/ })) })
     await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: '削除する' })) })

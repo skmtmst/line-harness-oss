@@ -22,6 +22,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import DateTimeField from '@/components/shared/date-time-field'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /**
  * 期限を初めてONにしたときの初期値。日本時間で「7日後の23:59」。
@@ -110,8 +111,8 @@ export default function OptionsDialog({
           </section>
 
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <FieldLine label="答えたあとに開くページ（任意）"><input type="url" value={value.thanksUrl ?? ''} onChange={(e) => patch({ thanksUrl: e.target.value || null })} placeholder="https://..." className={fieldInput} /></FieldLine>
-            <FieldLine label="ページを使わないときに出す文"><input value={value.thanksText ?? ''} onChange={(e) => patch({ thanksText: e.target.value })} placeholder="ご回答ありがとうございました。" className={fieldInput} /></FieldLine>
+            <FieldLine label="答えたあとに開くページ（任意）"><SharedTextField type="url" value={value.thanksUrl ?? ''} onChange={(e) => patch({ thanksUrl: e.target.value || null })} placeholder="https://..." className={fieldInput} /></FieldLine>
+            <FieldLine label="ページを使わないときに出す文"><SharedTextField value={value.thanksText ?? ''} onChange={(e) => patch({ thanksText: e.target.value })} placeholder="ご回答ありがとうございました。" className={fieldInput} /></FieldLine>
           </div>
 
           <section className="mt-3">
@@ -126,13 +127,13 @@ export default function OptionsDialog({
 
           {value.deadline?.enabled && <div className="bg-accent-soft mt-2 grid grid-cols-1 gap-3 rounded-control p-3 sm:grid-cols-2">
             <FieldLine label="受付の期限"><DateTimeField aria-label="受付の期限" value={value.deadline.endsAt ?? ''} onChange={(v) => patch({ deadline: { ...value.deadline, enabled: true, endsAt: v } })} /></FieldLine>
-            <FieldLine label="期限を過ぎた人に出す文"><input type="text" value={value.deadline.message ?? ''} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, message: e.target.value } })} className={fieldInput} /></FieldLine>
+            <FieldLine label="期限を過ぎた人に出す文"><SharedTextField type="text" value={value.deadline.message ?? ''} onChange={(e) => patch({ deadline: { ...value.deadline, enabled: true, message: e.target.value } })} className={fieldInput} /></FieldLine>
           </div>}
 
           <section className="mt-4">
             <h3 className="text-ink text-sm font-bold">見た目の言葉</h3>
             <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3"><FieldLine label="ページの題名">
-            <input
+            <SharedTextField
               type="text"
               value={value.pageTitle ?? ''}
               onChange={(e) => patch({ pageTitle: e.target.value || null })}
@@ -143,7 +144,7 @@ export default function OptionsDialog({
 
           <FieldLine label="送信ボタンの文字">
             <div>
-              <input
+              <SharedTextField
                 type="text"
                 value={value.submitLabel ?? ''}
                 onChange={(e) => patch({ submitLabel: e.target.value })}
@@ -154,7 +155,7 @@ export default function OptionsDialog({
               />
             </div>
           </FieldLine>
-          <FieldLine label="ページ送りの文字"><div className="flex gap-2"><input value={value.prevLabel ?? ''} onChange={(e) => patch({ prevLabel: e.target.value })} className={fieldInput} aria-label="前へボタンの文字" /><input value={value.nextLabel ?? ''} onChange={(e) => patch({ nextLabel: e.target.value })} className={fieldInput} aria-label="次へボタンの文字" /></div></FieldLine></div>
+          <FieldLine label="ページ送りの文字"><div className="flex gap-2"><SharedTextField value={value.prevLabel ?? ''} onChange={(e) => patch({ prevLabel: e.target.value })} className={fieldInput} aria-label="前へボタンの文字" /><SharedTextField value={value.nextLabel ?? ''} onChange={(e) => patch({ nextLabel: e.target.value })} className={fieldInput} aria-label="次へボタンの文字" /></div></FieldLine></div>
           </section>
         </div>
 

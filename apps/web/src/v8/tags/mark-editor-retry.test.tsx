@@ -79,7 +79,7 @@ test('作る画面は題をトップバーへ渡し、名前・色・初期値�
   expect(chrome.title).toHaveBeenLastCalledWith('対応マークを作る')
   expect(screen.getByText('色')).toBeTruthy()
   fireEvent.change(input, { target: { value: '  折り返し待ち  ' } })
-  fireEvent.click(screen.getByRole('checkbox', { name: '新しい友だちに最初から付ける' }))
+  fireEvent.click(screen.getByRole('switch', { name: '新しい友だちに最初から付ける' }))
   fireEvent.click(screen.getByRole('button', { name: '対応マークを作る' }))
   await waitFor(() => expect(net.create).toHaveBeenCalledTimes(1))
   expect(net.create).toHaveBeenCalledWith('acc', expect.objectContaining({ name: '折り返し待ち', color: expect.any(String), displayOrder: 1, isDefault: true }), expect.any(String))

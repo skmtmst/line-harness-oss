@@ -123,6 +123,25 @@ test('再読み込みボタンで同じ条件の一覧を取り直し、成功�
   expect(calls.filter((url) => url.pathname === '/api/chats').length).toBeGreaterThanOrEqual(2)
 })
 
+test.each(['all', 'email'])('メール一覧の失敗は共通の知らせで示し、同じ経路を読み直せる（%s）', async channel => {
+  fixture.params = new URLSearchParams(`channel=${channel}`)
+  let fail = true
+  handler = url => {
+    if (url.pathname === '/api/support/inbox' && fail) return response({ success: false }, 503)
+    return base(url)
+  }
+  await act(async () => root.render(<ChatsPage />))
+  await eventually(() => expect(retryButton()).toBeTruthy())
+  expect(list().textContent).toContain('メールを読み込めませんでした。')
+  expect(list().querySelector('[data-inbox-list-state="empty"]')).toBeNull()
+  const before = calls.filter(url => url.pathname === '/api/support/inbox').length
+  fail = false
+  await act(async () => { retryButton()!.click() })
+  await eventually(() => expect(retryButton()).toBeUndefined())
+  expect(calls.filter(url => url.pathname === '/api/support/inbox')).toHaveLength(before + 1)
+  expect(list().textContent).not.toContain('メールを読み込めませんでした。')
+})
+
 test('LINE とメールの両方が失敗しても知らせは1つで、押せばメールも読み直す', async () => {
   let fail = true
   handler = (url) => {

@@ -792,7 +792,6 @@ export default function TemplatesListV8() {
   }
   const folderPanel = (
     <FolderPanel
-      createAction={createButton(true)}
       activeId={selectedCategory}
       onSelect={selectCategory}
       onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
@@ -969,7 +968,7 @@ export default function TemplatesListV8() {
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content"
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content" createPlacement="heading"
       skeleton
       boardId={narrow ? 'L7zA7C' : 'v19Ivv'}
       headingSize="regular"

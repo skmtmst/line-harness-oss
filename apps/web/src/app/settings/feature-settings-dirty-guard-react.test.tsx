@@ -105,9 +105,9 @@ function button(label: string): HTMLButtonElement {
 }
 
 async function makeDirty() {
-  const toggle = [...host.querySelectorAll<HTMLButtonElement>('[type="checkbox"]')]
-    .find((item) => !item.disabled && String((item as HTMLInputElement).checked) === 'false')
-    ?? [...host.querySelectorAll<HTMLButtonElement>('[type="checkbox"]')].find((item) => !item.disabled)
+  const toggle = [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]:not([aria-label*="まとめて"])')]
+    .find((item) => !item.disabled && String((item as HTMLElement).getAttribute('aria-checked') === 'true') === 'false')
+    ?? [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]:not([aria-label*="まとめて"])')].find((item) => !item.disabled)
   if (!toggle) throw new Error('切替可能な機能がありません')
   await act(async () => { toggle.click(); await Promise.resolve() })
   expect(button('機能設定を保存').disabled).toBe(false)

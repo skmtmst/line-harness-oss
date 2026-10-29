@@ -23,7 +23,6 @@ import { formatNumber } from '@/lib/format'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
 import Button from '@/components/shared/button'
-import Checkbox from '@/components/shared/checkbox'
 import ConditionBuilder, { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import DateField from '@/components/shared/date-field'
 import { Field } from '@/components/shared/form-controls'
@@ -44,6 +43,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
+import { ToggleField } from '@/components/shared/toggle'
 
 
 /*
@@ -479,24 +479,24 @@ function EarningRuleForm({ focusName, onContinue }: { focusName: boolean; onCont
                 <span className={styles.cardNote}>日後（空欄なら期限なし）</span>
               </span>
             </Field>
-            <SaveErrorField names={["ignoreMultiplier","ignore_multiplier"]}><Checkbox checked={ignoreMultiplier} onCheckedChange={setIgnoreMultiplier} description="誰でも同じ額にしたいときに選びます。">
+            <SaveErrorField names={["ignoreMultiplier","ignore_multiplier"]}><ToggleField checked={ignoreMultiplier} onChange={setIgnoreMultiplier} description="誰でも同じ額にしたいときに選びます。">
               会員ランクの倍率をかけない
-            </Checkbox></SaveErrorField>
+            </ToggleField></SaveErrorField>
             {cancellationEvent ? (
-              <SaveErrorField names={["reverseOnCancellation","reverse_on_cancellation"]}><Checkbox
+              <SaveErrorField names={["reverseOnCancellation","reverse_on_cancellation"]}><ToggleField
                 checked={reverseOnCancellation}
-                onCheckedChange={setReverseOnCancellation}
+                onChange={setReverseOnCancellation}
                 description={`${eventType === 'booking_created' ? '予約の取り消し' : '注文の取り消し'}を同じ記録から追跡します。`}
               >
                 取り消されたら、付けたぶんを引く
-              </Checkbox></SaveErrorField>
+              </ToggleField></SaveErrorField>
             ) : null}
-            <SaveErrorField names={["notifyFriend","enabled","notify_friend"]}><Checkbox checked={notifyFriend} onCheckedChange={setNotifyFriend}>
+            <SaveErrorField names={["notifyFriend","enabled","notify_friend"]}><ToggleField checked={notifyFriend} onChange={setNotifyFriend}>
               マイルが付いたら、この内容を自動で知らせる
-            </Checkbox></SaveErrorField>
-            <SaveErrorField names={["isActive","is_active"]}><Checkbox checked={isActive} onCheckedChange={setIsActive} description="オフにすると停止中で保存します。">
+            </ToggleField></SaveErrorField>
+            <SaveErrorField names={["isActive","is_active"]}><ToggleField checked={isActive} onChange={setIsActive} description="オフにすると停止中で保存します。">
               作成したらすぐ動かす
-            </Checkbox></SaveErrorField>
+            </ToggleField></SaveErrorField>
           </div>
         </Disclosure>
       </Card>

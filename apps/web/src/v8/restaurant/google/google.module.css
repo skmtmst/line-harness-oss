@@ -414,7 +414,7 @@
 .platformImageEmpty p { margin: 0; }
 .platformImageActions, .platformImageLinks { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
 .platformImageLinks button { padding: 0; border: 0; background: transparent; color: var(--color-action); font: inherit; font-size: var(--text-caption); font-weight: 600; cursor: pointer; }
-.platformImageLinks button:disabled { cursor: not-allowed; opacity: .5; }
+.platformImageLinks button:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 .platformImageHelp { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-micro); }
 .confirmImage { display: flex; align-items: center; gap: 16px; min-width: 0; padding: 12px; border: 1px solid var(--color-hairline); border-radius: var(--tpl-rt-inner-radius); background: var(--color-surface-pearl); }
 .confirmThumb { display: grid; place-items: center; width: 164px; height: 126px; flex: 0 0 164px; overflow: hidden; border-radius: 6px; background: var(--color-canvas); }

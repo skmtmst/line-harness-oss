@@ -40,6 +40,6 @@ test('列の固定名は選択数に含めず、上限の理由を選べない�
 
 test('幅が変わって上限より多くなった選択を消さず、保存できない理由を示す',()=>{
  render(<DisplayItemsDialog items={items} selected={['a','b','field:c']} maxSelected={2} onCancel={()=>{}} onConfirm={()=>{}}/>);
- expect(screen.getByRole('button',{name:'保存する'}).title).toContain('上限');
+ expect(screen.getByRole('button',{name:'保存する'}).getAttribute('aria-description')).toContain('上限');
  expect(screen.getByRole('checkbox',{name:'アレルギー'})).toBeTruthy();
 })

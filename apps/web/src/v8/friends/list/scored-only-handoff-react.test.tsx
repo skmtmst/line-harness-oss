@@ -7,10 +7,10 @@
  * 渡す側（行動スコアのタブ）は app/mileage/score-band-handoff-react.test.tsx が見る。
  */
 import React from 'react'
-import { cleanup, render, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const fx = vi.hoisted(() => ({ list: vi.fn() }))
+const fx = vi.hoisted(() => ({ list: vi.fn(), role: 'owner' as 'owner' | 'viewer' }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(window.location.search),
@@ -21,7 +21,7 @@ vi.mock('next/link', () => ({
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'A', loading: false }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fx.role, canManageRole: (role: string) => role === 'owner' }))
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => false }) }))
 vi.mock('@/lib/operators-cache', () => ({ loadOperators: async () => [] }))
 vi.mock('@/lib/api', async (original) => {
@@ -42,6 +42,7 @@ import List from './list'
 import { flushListUrlState } from '@/components/shared/list-url-state'
 
 beforeEach(() => {
+  fx.role = 'owner'
   fx.list.mockReset().mockResolvedValue({ success: true, data: { items: [], total: 0 } })
   flushListUrlState()
 })
@@ -57,7 +58,8 @@ function lastListParams(): Record<string, unknown> {
 }
 
 function handoffCondition(container: HTMLElement): unknown {
-  const href = container.querySelector('a[data-broadcast-handoff]')?.getAttribute('href') ?? ''
+  fireEvent.click(container.querySelector('[aria-label="一覧のほかの操作"]')!)
+  const href = [...document.querySelectorAll('a[role="menuitem"]')].find(link => link.textContent === 'この条件で配信を作る')?.getAttribute('href') ?? ''
   const raw = new URL(href, 'https://admin.test').searchParams.get('condition')
   return raw ? JSON.parse(raw) : null
 }
@@ -85,4 +87,24 @@ it('点数の範囲だけで来たときは、未採点の人を外す条件を�
   expect(view.container.textContent).not.toContain('点数がついている人のみ')
   const rule = (handoffCondition(view.container) as { rules: Array<{ value: Record<string, unknown> }> }).rules[0]
   expect(rule.value.scoredOnly).toBeUndefined()
+})
+
+it('閲覧のみの人には配信を作る項目を出さない', async () => {
+  fx.role = 'viewer'
+  window.history.replaceState(null, '', '/friends?scoreMax=9')
+  render(<List />)
+  await waitFor(() => expect(fx.list).toHaveBeenCalled())
+  fireEvent.click(screen.getByRole('button', { name: '一覧のほかの操作' }))
+  expect(await screen.findByRole('menuitem', { name: /表示中をCSVで書き出す/ })).toBeTruthy()
+  expect(screen.queryByRole('menuitem', { name: 'この条件で配信を作る' })).toBeNull()
+})
+
+it('一覧の読み込み中はCSVの操作を止め、未取得を0件にしない', async () => {
+  fx.list.mockImplementation(() => new Promise(() => {}))
+  render(<List />)
+  await waitFor(() => expect(fx.list).toHaveBeenCalled())
+  fireEvent.click(screen.getByRole('button', { name: '一覧のほかの操作' }))
+  const csv = await screen.findByRole('menuitem', { name: /表示中をCSVで書き出す/ })
+  expect((csv as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByText('0件')).toBeNull()
 })

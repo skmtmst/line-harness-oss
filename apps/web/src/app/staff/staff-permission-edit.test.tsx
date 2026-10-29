@@ -113,7 +113,7 @@ async function openEdit(expectOp = true) {
   })
   if (expectOp) {
     await waitFor(() => {
-      expect(screen.getByRole('checkbox', { name: '成果を承認・却下する' })).toBeTruthy()
+      expect(screen.getByRole('switch', { name: '成果を承認・却下する' })).toBeTruthy()
     })
   }
 }
@@ -150,7 +150,7 @@ describe('既存スタッフの成果承認権限', () => {
   test('操作権限を選ぶと表示権限も組で保存される', async () => {
     await openEdit()
     await act(async () => {
-      fireEvent.click(screen.getByRole('checkbox', { name: '成果を承認・却下する' }))
+      fireEvent.click(screen.getByRole('switch', { name: '成果を承認・却下する' }))
     })
     const keys = await saveEdit()
     expect(keys).toEqual(expect.arrayContaining(['/conversions', 'conversion.approval.edit']))
@@ -161,8 +161,8 @@ describe('既存スタッフの成果承認権限', () => {
   test('操作権限を外すと操作だけ外れ、表示権限は残る', async () => {
     state.members = [member({ permissionKeys: ['/chats', '/conversions', 'conversion.approval.edit'] })]
     await openEdit()
-    const op = screen.getByRole('checkbox', { name: '成果を承認・却下する' }) as HTMLInputElement
-    expect(op.checked).toBe(true)
+    const op = screen.getByRole('switch', { name: '成果を承認・却下する' }) as HTMLInputElement
+    expect(op.getAttribute('aria-checked')).toBe('true')
     await act(async () => {
       fireEvent.click(op)
     })
@@ -176,7 +176,7 @@ describe('既存スタッフの成果承認権限', () => {
     state.users = [accessUser({ roleBundle: 'administrator' })]
     await openEdit(false)
     // 管理者に操作権限の欄は出ない。
-    expect(screen.queryByRole('checkbox', { name: '成果を承認・却下する' })).toBeNull()
+    expect(screen.queryByRole('switch', { name: '成果を承認・却下する' })).toBeNull()
     fireEvent.change(screen.getByRole('textbox', { name: '名前' }), { target: { value: '変更後の管理者名' } })
     const payload = (await saveEditFull()) as Record<string, unknown>
     expect(payload.permissionKeys).toBeUndefined()
@@ -195,7 +195,7 @@ test('本人確認が失効したら、古い本人データが残っていて�
   const { forgetStaffIdentity } = await import('@/lib/staff-identity-state')
   await act(async () => { forgetStaffIdentity() })
   expect(screen.queryByRole('menuitem', { name: '役割を変える' })).toBeNull()
-  expect(screen.queryByRole('menuitem', { name: /2段階の確認を設定する/ })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: /二段階認証を設定する/ })).toBeNull()
   expect(fixture.updated).toHaveLength(0)
 })
 
@@ -204,6 +204,6 @@ test('閲覧のみのスタッフは自分の行でも編集と2段階の変更�
   await act(async () => { render(<StaffPage />) })
   fireEvent.click(await screen.findByRole('button', { name: /の操作$/ }))
   expect(screen.queryByRole('menuitem', { name: '役割を変える' })).toBeNull()
-  expect(screen.queryByRole('menuitem', { name: /2段階の確認を設定する/ })).toBeNull()
+  expect(screen.queryByRole('menuitem', { name: /二段階認証を設定する/ })).toBeNull()
   expect(fixture.updated).toHaveLength(0)
 })

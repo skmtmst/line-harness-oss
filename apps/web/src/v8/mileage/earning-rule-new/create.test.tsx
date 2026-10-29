@@ -1,3 +1,6 @@
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * V8 たまる決めごとを作る（src/v8/mileage/earning-rule-new/create.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
@@ -55,6 +58,7 @@ async function flush() {
 }
 
 async function mount() {
+  if (roleFixture.role) rememberStaffIdentity({ role: roleFixture.role } as StaffMember); else forgetStaffIdentity()
   await act(async () => { root.render(<EarningRuleCreateV8 />) })
   await flush()
 }
@@ -65,7 +69,7 @@ function type(label: string, value: string) {
 }
 
 async function clickButton(name: string) {
-  await act(async () => { fireEvent.click(screen.getByRole('button', { name })) })
+  await act(async () => { fireEvent.click(getPageAction({ name })) })
   await flush()
 }
 
@@ -97,6 +101,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  forgetStaffIdentity()
   vi.unstubAllGlobals()
 })
 
@@ -165,7 +170,8 @@ it.each([null, 'staff', 'viewer'])('役割%sでは作成・試算を出さずAPI
   expect(screen.queryByRole('button', { name: '保存して続けて作る' })).toBeNull()
   expect(screen.queryByRole('button', { name: '試算する' })).toBeNull()
   expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
-  expect(host.textContent).toContain('閲覧のみ')
+  if (role === null) expect(host.querySelector('[data-read-only-notice]')).toBeNull()
+  else expect(host.textContent).toContain(role === 'viewer' ? '閲覧のみ' : '権限')
   expect(calls.filter(call => call.method !== 'GET')).toEqual([])
 })
 

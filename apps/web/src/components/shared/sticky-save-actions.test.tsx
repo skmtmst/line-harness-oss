@@ -1,8 +1,9 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { createRef } from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { ArrowRight, Check, Save, Upload } from 'lucide-react'
+import { ArrowRight, Check, Save, Upload, X } from 'lucide-react'
 import Button from './button'
 import StickyBar from './sticky-bar'
 
@@ -49,8 +50,9 @@ it('次へ・副操作・リンク・左端の操作の印はその役目を保�
     <Button variant="primary" href="/templates"><ArrowRight aria-hidden="true" />保存した物を開く</Button>
   </>} />)
   expect(screen.getByRole('button', { name: '次へ' }).querySelector('svg.lucide-arrow-right')).not.toBeNull()
-  expect(screen.getByRole('button', { name: '下書きを保存' }).querySelector('svg.lucide-check')).not.toBeNull()
-  expect(screen.getByRole('button', { name: '削除する' }).querySelector('svg.lucide-upload')).not.toBeNull()
+  expect(getPageAction({ name: '下書きを保存' }).querySelector('svg.lucide-check')).not.toBeNull()
+  expect(screen.getByRole('button', { name: '削除する' }).querySelector('svg')).toBeNull()
+  expect(screen.getByRole('button', { name: '削除する' }).getAttribute('data-variant')).toBe('text')
   expect(screen.getByRole('link').querySelector('svg.lucide-arrow-right')).not.toBeNull()
 })
 
@@ -67,6 +69,36 @@ it('ref・submit・理由・押下は保ち、disabledとbusyでは実行しな�
   expect(button.querySelectorAll('svg')).toHaveLength(1)
   expect(button.querySelector('svg.lucide-loader-circle')).not.toBeNull()
   expect(button.getAttribute('aria-busy')).toBe('true')
+})
+
+it('左欄の配布は緑と印を保ち、保管・切り戻しは副操作、削除だけを赤文字にする', () => {
+  const distribute = vi.fn(), archive = vi.fn(), rollback = vi.fn(), clear = vi.fn(), blocked = vi.fn(), remove = vi.fn()
+  render(<StickyBar destructive={<>
+    <Button variant="primary" onClick={distribute}><Upload aria-hidden="true" />アカウントへ配る</Button>
+    <Button variant="danger" onClick={archive}>アーカイブする</Button>
+    <Button variant="danger-outline" onClick={rollback}>この移行を切り戻す</Button>
+    <Button variant="text" onClick={clear}><X aria-hidden="true" />選ぶのをやめる</Button>
+    <Button variant="danger" disabled onClick={blocked}>別の移行を切り戻す</Button>
+    <Button variant="danger">公開を取り消す</Button>
+    <Button variant="danger" onClick={remove}><Upload aria-hidden="true" />削除する</Button>
+    <Button variant="danger" aria-label="削除" icon={<Upload aria-hidden="true" />} />
+  </>} actions={<Button>キャンセル</Button>} />)
+  const send = screen.getByRole('button', { name: 'アカウントへ配る' })
+  expect(send.getAttribute('data-variant')).toBe('primary')
+  expect(send.querySelector('svg.lucide-upload')).not.toBeNull()
+  expect(screen.getByRole('button', { name: 'アーカイブする' }).getAttribute('data-variant')).toBe('secondary')
+  expect(screen.getByRole('button', { name: 'この移行を切り戻す' }).getAttribute('data-variant')).toBe('secondary')
+  expect(screen.getByRole('button', { name: '削除する' }).getAttribute('data-variant')).toBe('text')
+  expect(screen.getByRole('button', { name: '公開を取り消す' }).getAttribute('data-variant')).toBe('secondary')
+  const clearButton = screen.getByRole('button', { name: '選ぶのをやめる' })
+  expect(clearButton.getAttribute('data-variant')).toBe('text')
+  expect(clearButton.querySelector('svg.lucide-x')).not.toBeNull()
+  expect(screen.getByRole('button', { name: '削除', exact: true }).textContent).toBe('削除')
+  expect(screen.getByRole('button', { name: '削除する' }).querySelector('svg')).toBeNull()
+  fireEvent.click(clearButton); fireEvent.click(screen.getByRole('button', { name: '別の移行を切り戻す' })); fireEvent.click(screen.getByRole('button', { name: '削除する' }))
+  expect(clear).toHaveBeenCalledTimes(1); expect(blocked).not.toHaveBeenCalled(); expect(remove).toHaveBeenCalledTimes(1)
+  fireEvent.click(send); fireEvent.click(screen.getByRole('button', { name: 'アーカイブする' })); fireEvent.click(screen.getByRole('button', { name: 'この移行を切り戻す' }))
+  expect(distribute).toHaveBeenCalledTimes(1); expect(archive).toHaveBeenCalledTimes(1); expect(rollback).toHaveBeenCalledTimes(1)
 })
 
 it('保存中と完了の表示を保ち、完了後に共通の保存印へ戻る', () => {
@@ -93,4 +125,31 @@ it('明示した保存印と印なしの指定は、保存の既定より優先�
   render(<StickyBar actions={<><Button variant="primary" icon={<Save aria-hidden="true" />}>変更を保存</Button><Button variant="primary" icon={null}>保存する</Button></>} />)
   expect(screen.getByRole('button', { name: '変更を保存' }).querySelectorAll('svg.lucide-save')).toHaveLength(1)
   expect(screen.getByRole('button', { name: '保存する' }).querySelectorAll('svg')).toHaveLength(0)
+})
+
+it('入力理由を帯の下段に一度だけ出し、操作の並び・属性・押せない条件を保つ', () => {
+  const activate = vi.fn()
+  const { container, rerender } = render(<StickyBar actions={<><Button disabled disabledReason="名前を入れてください">キャンセル</Button><Button variant="primary" disabled disabledReason="名前を入れてください" data-probe="save" onClick={activate}>保存する</Button></>} />)
+  const actions = container.querySelector('[data-sticky-actions]')!
+  expect(actions.querySelectorAll('button')).toHaveLength(2)
+  expect(actions.querySelector('[role="status"]')).toBeNull()
+  expect(screen.getAllByRole('status')).toHaveLength(1)
+  expect(screen.getByRole('status').textContent).toBe('名前を入れてください')
+  const save = screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  expect(save.dataset.probe).toBe('save')
+  expect(save.getAttribute('aria-description')).toBe('名前を入れてください')
+  fireEvent.click(save); expect(activate).not.toHaveBeenCalled()
+  rerender(<StickyBar actions={<Button variant="primary" onClick={activate}>保存する</Button>} />)
+  expect(screen.queryByRole('status')).toBeNull()
+  fireEvent.click(screen.getByRole('button')); expect(activate).toHaveBeenCalledOnce()
+})
+
+it('隠れた操作の入力理由を帯へ取り出さず、権限理由もinlineへ変えない', () => {
+  render(<StickyBar actions={<><span hidden><Button disabled disabledReason="隠れた入力理由">隠れた操作</Button></span><Button lockedReason="管理者だけが使えます">設定する</Button></>} />)
+  expect(screen.queryByRole('status')).toBeNull()
+  const button = screen.getByRole('button', { name: '設定する' })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.focus(button)
+  expect(screen.getByRole('tooltip').textContent).toBe('管理者だけが使えます')
 })

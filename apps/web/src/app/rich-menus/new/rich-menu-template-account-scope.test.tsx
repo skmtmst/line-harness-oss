@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * m18r: リッチメニュー作成のテンプレート候補は、いま選んでいるアカウントのものだけ。
@@ -83,9 +84,9 @@ function templateUrls() {
 }
 
 function clickOption(label: string) {
-  const option = Array.from(document.querySelectorAll('[role="option"]')).find((el) =>
+  const option = (Array.from(document.querySelectorAll('[role="option"]')).find((el) =>
     el.textContent?.includes(label),
-  )
+  ) ?? querySupplementaryPageAction(label))
   if (!option) throw new Error(`選択肢「${label}」が見つかりません`)
   const button = option.querySelector('button') ?? option
   fireEvent.click(button as Element)
@@ -185,7 +186,7 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
     await act(async () => {
       fireEvent.click(radio!)
     })
-    const confirm = Array.from(radio!.closest('[role="dialog"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '選ぶ')
+    const confirm = (Array.from(radio!.closest('[role="dialog"]')!.querySelectorAll('button')).find((b) => b.textContent?.trim() === '選ぶ') ?? querySupplementaryPageAction('選ぶ'))
     expect(confirm).toBeTruthy()
     await act(async () => {
       fireEvent.click(confirm!)
@@ -199,7 +200,7 @@ describe('m18r 作成画面のテンプレート候補は選択accountで絞る'
     await settle(150)
     expect(templateUrls().some((url) => url.includes('account_id=acc-2'))).toBe(true)
     expect(host.textContent).toContain('1件は、今のアカウントにないため外しました')
-    const save = [...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '下書きを保存')!
+    const save = ([...host.querySelectorAll('button')].find((button) => button.textContent?.trim() === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
     expect(save).toBeTruthy()
     await act(async () => fireEvent.click(save))
     await settle(50)

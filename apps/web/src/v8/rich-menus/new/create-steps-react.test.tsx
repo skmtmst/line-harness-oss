@@ -201,7 +201,7 @@ describe('リッチメニューを作る：選ぶ札と終わりの欄', () => {
     const ends = () => screen.getByLabelText('終わる日時') as HTMLInputElement
     expect(ends().disabled).toBe(true)
     expect(screen.getByText('「終わりを決める」をオンにすると設定できます').id).toBe(ends().getAttribute('aria-describedby'))
-    await act(async () => { fireEvent.click(screen.getByRole('checkbox', { name: '終わりを決める' })) })
+    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: '終わりを決める' })) })
     expect(ends().disabled).toBe(false)
     expect(screen.queryByText('「終わりを決める」をオンにすると設定できます')).toBeNull()
   })
