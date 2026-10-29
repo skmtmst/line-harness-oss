@@ -327,7 +327,7 @@ describe('統括のアカウント：未知の件数と本当の0件を分ける
     expect(folderCounts('すべて')).toEqual(expect.arrayContaining(['すべて']))
     expect(folderCounts('未分類').every(text => text === '未分類')).toBe(true)
     expect(folderCounts('未取得の分類').every(text => text === '未取得の分類')).toBe(true)
-    expect(folderCounts('既知の分類').every(text => text === '既知の分類0')).toBe(true)
+    expect(folderCounts('既知の分類').every(text => text === '既知の分類')).toBe(true)
     await act(async () => { fail(new ApiError(503, 'account failed')) })
     const retry = await screen.findByRole('button', { name: 'もう一度読み込む' })
     expect(kpis()).toHaveLength(4)
@@ -347,19 +347,27 @@ describe('統括のアカウント：未知の件数と本当の0件を分ける
     expect(folderCounts('既知の分類').every(text => text === '既知の分類0')).toBe(true)
   })
 
-  it('一覧の失敗でも別に取得できた分類・未分類の件数は残す', async () => {
+  it('一覧の失敗では分類の件数も未知にし、再取得後は同じ一覧から数える', async () => {
     mocks.list.mockRejectedValue(new ApiError(503, 'account failed'))
     mocks.folders.mockResolvedValue({ success: true, data: { folders: [
       { id: 'known', name: '既知の分類', displayOrder: 0, itemCount: 2 },
     ], unclassifiedCount: 3 } })
     render(<HqHomeV8 />)
-    await screen.findByRole('button', { name: 'もう一度読み込む' })
+    const retry = await screen.findByRole('button', { name: 'もう一度読み込む' })
     await waitFor(() => expect(folderCounts('既知の分類').length).toBeGreaterThan(0))
-    expect(folderCounts('未分類').every(text => text === '未分類3')).toBe(true)
+    expect(folderCounts('未分類').every(text => text === '未分類')).toBe(true)
     expect(folderCounts('未分類').length).toBeGreaterThan(0)
-    expect(folderCounts('既知の分類').every(text => text === '既知の分類2')).toBe(true)
+    expect(folderCounts('既知の分類').every(text => text === '既知の分類')).toBe(true)
     expect(folderCounts('すべて').every(text => text === 'すべて')).toBe(true)
     expect(values()).toEqual(['—', '—', '—', '—'])
+    mocks.list.mockResolvedValue({ success: true, data: [
+      { ...account('a1', '銀座店'), folderId: 'known' }, account('a2', '二号店'),
+    ] })
+    await act(async () => { fireEvent.click(retry) })
+    await screen.findAllByText('銀座店')
+    expect(folderCounts('すべて').every(text => text === 'すべて2')).toBe(true)
+    expect(folderCounts('未分類').every(text => text === '未分類1')).toBe(true)
+    expect(folderCounts('既知の分類').every(text => text === '既知の分類1')).toBe(true)
   })
 
   it('成功した空の一覧は、本当の0件としてカードとフォルダに残す', async () => {

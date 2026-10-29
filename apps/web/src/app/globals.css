@@ -1109,7 +1109,7 @@
   --tpl-htn6-qr: 180px; --tpl-htn6-qr-pad: 16px; --tpl-htn6-qr-gap: 12px;
   --tpl-htn6-text-20: 20px; --tpl-htn6-lh-28: 28px; --tpl-htn6-hero: 48px; --tpl-htn6-done-pad: 24px 0 8px; --tpl-htn6-acct-pad: 14px 16px; --tpl-htn6-hand-pad: 16px; --tpl-htn6-hand-gap: 10px; --tpl-htn6-stat-gap: 16px;
   /* 友だち引き継ぎ_進捗再設計_v01.pen のA〜D。単一カードの位置と進捗の動き。 */
-  --tpl-htn6-handover-card-pad: 36px; --tpl-htn6-handover-card-gap: 18px; --tpl-htn6-handover-icon-size: 44px;
+  --tpl-htn6-handover-card-pad: 36px; --tpl-htn6-handover-card-gap: 16px; --tpl-htn6-handover-icon-size: 44px;
   --tpl-htn6-handover-title-size: 24px; --tpl-htn6-handover-title-lh: 34px; --tpl-htn6-handover-spin-time: .9s;
   --tpl-htn6-handover-intro-to-stages: 12px; --tpl-htn6-handover-stage-h: 74px; --tpl-htn6-handover-step-size: 32px;
   --tpl-htn6-handover-stage-to-metrics: 35px; --tpl-htn6-handover-count-size: 36px; --tpl-htn6-handover-count-lh: 50px;

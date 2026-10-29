@@ -44,7 +44,6 @@ class MemoryStorage implements Storage {
 
 const src = (...parts: string[]) => readFileSync(join(process.cwd(), 'src', ...parts), 'utf8')
 const ANN = src('v8', 'ops', 'announcements.tsx')
-const INV = src('v8', 'ops', 'invite.tsx')
 const LOG = src('v8', 'ops', 'login.tsx')
 const TEN = src('v8', 'ops', 'tenants.tsx')
 const TFA = src('v8', 'ops', 'two-factor.tsx')
@@ -80,9 +79,33 @@ describe('M038/M040/M042 一覧の403契約（ソース）', () => {
 })
 
 describe('M039/M041/M504 の契約（ソース）', () => {
-  it('M039 招待の確認失敗は読み直しの口を出す', () => {
-    expect(INV).toContain('onRetry={() => void checkInvite()}')
-    expect(INV).toContain('new ApiError(res.status')
+  it.each([503, 404, 410])('招待の確認失敗%sを一時的な失敗と使えない招待に分ける', async status => {
+    window.history.replaceState(null, '', '/ops/invite#invite=test-token')
+    let calls = 0
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (!String(input).includes('/api/auth/ops-invite/check')) {
+        return new Response(JSON.stringify({ success: true, data: null }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      calls += 1
+      const body = calls === 1
+        ? { success: false, error: '招待を確認できません', code: status === 410 ? 'expired' : undefined }
+        : { success: true, data: { email: 'ops@example.com', name: '運営 太郎', needsPassword: false } }
+      return new Response(JSON.stringify(body), { status: calls === 1 ? status : 200, headers: { 'Content-Type': 'application/json' } })
+    }))
+    await act(async () => { root.render(<OpsInvitePage />) })
+    await flush()
+    const retry = retryButton()
+    if (status === 503) {
+      expect(retry).toBeTruthy()
+      await act(async () => { retry!.click() })
+      await flush()
+      expect(calls).toBe(2)
+      expect(host.querySelector('#ops-invite-email')).not.toBeNull()
+    } else {
+      expect(retry).toBeUndefined()
+      expect(host.textContent).toContain('運営のログインへ')
+      expect(calls).toBe(1)
+    }
   })
 
   it('M041 ログインの csrf 保存は投げても固まらない', () => {

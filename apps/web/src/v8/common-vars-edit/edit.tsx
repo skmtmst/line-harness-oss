@@ -36,6 +36,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Select from '@/components/shared/select'
 import { StickyBarAction } from '@/components/shared/sticky-bar'
+import ChooseCommonVarTarget from './choose-target'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
@@ -494,13 +495,8 @@ function EditCommonVarV8Inner() {
 
   if (!id) {
     return (
-      <SaveErrorScope errors={saveErrors}><TargetMissing
-        kind="unspecified"
-        title="編集する共通情報が指定されていません"
-        description="一覧から編集する共通情報を選び直してください。"
-        backHref="/contents/vars"
-        backLabel="共通情報一覧へ戻る"
-      /></SaveErrorScope>
+      <SaveErrorScope errors={saveErrors}><ChooseCommonVarTarget accountId={selectedAccountId}
+        onSelect={targetId => router.push(`/contents/vars/edit?id=${encodeURIComponent(targetId)}`)} /></SaveErrorScope>
     )
   }
   if (!accountLoading && !selectedAccountId) {

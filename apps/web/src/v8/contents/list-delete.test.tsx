@@ -289,7 +289,7 @@ describe('遅れて返った結果の照合', () => {
     expect(buttonIn(dialog(), '削除する')).toBeDefined()
   })
 
-  it('409 の読み直しも、窓をもう一度開いたあとに返ったものは映さない', async () => {
+  it('409 の再取得中に画面を再表示しても古い応答を映さない', async () => {
     const reread = deferred<Impact>()
     let round = 0
     impacts.set('m-1', () => {
@@ -301,8 +301,10 @@ describe('遅れて返った結果の照合', () => {
     await render()
     await openDeleteFor('秋の新商品.png')
     await click(buttonIn(dialog(), '削除する'))
-    // 読み直し（2回目）の返事を待つ間は窓が処理中で閉じられない。札の「…」から同じメディアを開き直す。
     expect(buttonIn(dialog(), '閉じる')?.disabled).toBe(true)
+    await act(async () => { root.render(null) })
+    await settle()
+    await render()
     await openDeleteFor('秋の新商品.png')
     expect(round).toBe(3)
     expect(dialog()?.textContent).toContain('どこでも使っていません。')
