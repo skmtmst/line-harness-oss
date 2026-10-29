@@ -1,3 +1,4 @@
+import { hasLineConnectionProblem, lineAccountConnectionState } from '@/lib/line-account-state'
 import type { LineAccount } from '@line-crm/shared'
 
 /*
@@ -11,10 +12,10 @@ export type AccountWithStats = LineAccount & {
   timezone?: string
 }
 
-/** 接続状態：正常／確認停止中／アーカイブ。**色だけに頼らず、必ず文字で言う。** */
+/** 接続状態は共通の判定。未確認・停止中・アーカイブも区別する。**色だけに頼らず、必ず文字で言う。** */
 export function connectionLabel(account: LineAccount): { label: string; tone: 'success' | 'warning' | 'neutral' } {
-  if (account.archivedAt) return { label: 'アーカイブ', tone: 'neutral' }
-  return account.isActive ? { label: '正常', tone: 'success' } : { label: '確認停止中', tone: 'warning' }
+  const state = lineAccountConnectionState(account)
+  return { label: state.label, tone: state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral' }
 }
 
 /** Webhook の照合結果：正常／未確認（合っていない・登録が無い・まだ確かめていないは「未確認」）。 */
@@ -33,9 +34,9 @@ export const ACCOUNT_FILTERS: ReadonlyArray<{ value: AccountFilter; label: strin
   { value: 'archived', label: 'アーカイブ' },
 ]
 
-/** 接続に問題がある＝Webhook が合っていない、または登録されていない。 */
+/** 接続の最新の判定が要確認で、停止中・保管中でない。 */
 export function hasConnectionProblem(account: LineAccount): boolean {
-  return account.webhook?.status === 'mismatched' || account.webhook?.status === 'unconfigured'
+  return hasLineConnectionProblem(account)
 }
 
 export function matchesFilter(account: LineAccount, filter: AccountFilter): boolean {

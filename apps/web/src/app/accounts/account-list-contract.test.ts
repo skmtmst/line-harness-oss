@@ -37,8 +37,8 @@ describe('V7vn3 LINEアカウント一覧', () => {
   })
 
   it('接続状態を、色だけでなく文字で言う', () => {
-    expect(connectionLabel(account({ isActive: true })).label).toBe('正常')
-    expect(connectionLabel(account({ isActive: false })).label).toBe('確認停止中')
+    expect(connectionLabel(account({ isActive: true, connection: { status: 'ok' } })).label).toBe('正常')
+    expect(connectionLabel(account({ isActive: false })).label).toBe('停止中')
     expect(connectionLabel(account({ archivedAt: '2026-09-01T00:00:00Z' })).label).toBe('アーカイブ')
   })
 
@@ -58,14 +58,12 @@ describe('V7vn3 LINEアカウント一覧', () => {
     expect(webhookLabel(account()).label).toBe('未確認')
   })
 
-  it('接続に問題があるのは、止まっているか確かめた上で合っていないとき', () => {
-    const w = (status: NonNullable<LineAccount['webhook']>['status']) =>
-      account({ webhook: { expectedUrl: '', actualUrl: null, active: null, status } })
-    expect(hasConnectionProblem(w('mismatched'))).toBe(true)
-    expect(hasConnectionProblem(w('unconfigured'))).toBe(true)
-    // **確かめていないだけのものを「問題あり」に数えない。**
-    expect(hasConnectionProblem(w('unknown'))).toBe(false)
-    expect(hasConnectionProblem(w('matched'))).toBe(false)
+  it('保存した接続の問題だけを数え、未確認・停止・保管を分ける', () => {
+    expect(connectionLabel(account()).label).toBe('未確認')
+    expect(hasConnectionProblem(account({ connection: { status: 'warn' } }))).toBe(true)
+    expect(hasConnectionProblem(account({ connection: { status: 'unknown' } }))).toBe(false)
+    expect(hasConnectionProblem(account({ isActive: false, connection: { status: 'warn' } }))).toBe(false)
+    expect(hasConnectionProblem(account({ archivedAt: '2026-10-01', connection: { status: 'warn' } }))).toBe(false)
   })
 
   it('絞り込みは板と同じ並び', () => {

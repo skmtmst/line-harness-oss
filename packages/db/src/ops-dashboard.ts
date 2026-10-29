@@ -1,3 +1,4 @@
+import { lineTokenExpiry, lineObservationTime } from '@line-crm/shared';
 /**
  * 運営ダッシュボード（★37-2）の集計。
  *
@@ -64,22 +65,22 @@ export interface DashboardAlerts {
 
 export async function dashboardAlerts(
   db: D1Database,
-  input: { excludeTenantId: string; now: string; trialDeadline: string; tokenDeadline: string },
+  input: { excludeTenantId: string; now: string; trialDeadline: string },
 ): Promise<DashboardAlerts> {
   const row = await db
     .prepare(`SELECT
                 (SELECT COUNT(*) FROM tenants t WHERE t.id <> ? AND t.status <> 'archived' AND t.plan_status = 'past_due') AS past_due,
                 (SELECT COUNT(*) FROM tenants t WHERE t.id <> ? AND t.status <> 'archived' AND t.plan_status = 'trialing'
                     AND t.trial_ends_at IS NOT NULL AND t.trial_ends_at >= ? AND t.trial_ends_at <= ?) AS trial_soon,
-                (SELECT COUNT(*) FROM line_accounts la WHERE la.archived_at IS NULL AND la.token_expires_at IS NOT NULL
-                    AND la.token_expires_at <= ?) AS token_soon,
                 (SELECT COUNT(*) FROM hq_support_requests h WHERE h.stage = 'new') AS unanswered`)
-    .bind(input.excludeTenantId, input.excludeTenantId, input.now, input.trialDeadline, input.tokenDeadline)
-    .first<{ past_due: number; trial_soon: number; token_soon: number; unanswered: number }>();
+    .bind(input.excludeTenantId, input.excludeTenantId, input.now, input.trialDeadline)
+    .first<{ past_due: number; trial_soon: number; unanswered: number }>();
+  const deadlines = await db.prepare('SELECT token_expires_at FROM line_accounts WHERE archived_at IS NULL AND token_expires_at IS NOT NULL').all<{ token_expires_at: string }>();
+  const caution = deadlines.results.filter(row => { const status = lineTokenExpiry(row.token_expires_at, lineObservationTime(input.now)).status; return status === 'expired' || status === 'expiring'; });
   return {
     pastDue: row?.past_due ?? 0,
     trialEndingSoon: row?.trial_soon ?? 0,
-    lineTokenExpiring: row?.token_soon ?? 0,
+    lineTokenExpiring: caution.length,
     unansweredTickets: row?.unanswered ?? 0,
   };
 }

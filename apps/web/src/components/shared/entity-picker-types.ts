@@ -59,6 +59,8 @@ export type SingleProps = {
   error?: string
   busy?: boolean
   confirmDisabled?: boolean
+  /** 確定だけを権限で止める。開いた候補とプレビューは残す。 */
+  confirmLockedReason?: string
   readOnly?: boolean
   createHref?: string
   createLabel?: string

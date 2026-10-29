@@ -202,3 +202,15 @@ html:root .box { border-radius: var(--choice-checkbox-radius); }
 
 /* チェックを直接置くセルでは、文字だけの行の高さに箱を引き上げさせない。 */
 :global(html:root) :is(:global(th), :global(td)):has(> .root.root) { line-height: var(--choice-size); }
+
+/* 権限の理由がある時だけ、選択の印を残した灰色にし、押下の動きを止める。 */
+:root .root:has(.input[data-permission-locked]) .box {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  outline-color: var(--polish-choice-border);
+  box-shadow: var(--shadow-choice-off);
+  scale: 1;
+}
+:root .root .input[data-permission-locked]:focus-visible + .box {
+  outline-color: var(--polish-focus);
+}

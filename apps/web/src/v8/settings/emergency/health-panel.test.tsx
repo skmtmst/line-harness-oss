@@ -60,7 +60,7 @@ const ROW_TITLES = [
   'Webhook が届いているか',
   '配信が送れているか',
   '保存と送信のしくみ',
-  '鍵・証明書の期限',
+  'トークンの期限',
 ]
 
 /** サーバーの結果の種類 → 画面の行。 */
@@ -73,7 +73,7 @@ const ROW_OF_KEY: Record<OperationHealthCheckKey, string> = {
   webhook: 'Webhook が届いているか',
   dispatch_jobs: '配信が送れているか',
   infra_canary: '保存と送信のしくみ',
-  credential_expiry: '鍵・証明書の期限',
+  credential_expiry: 'トークンの期限',
 }
 
 function minutesAgo(minutes: number): string {

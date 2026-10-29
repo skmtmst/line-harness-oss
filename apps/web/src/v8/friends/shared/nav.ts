@@ -14,13 +14,16 @@ export const FRIENDS_TABS: ReadonlyArray<{ key: FriendsTabKey; label: string; hr
   { key: 'uid-migration', label: 'UID移行', href: '/friends/migrations?tab=uid' },
 ]
 
+/** タブに置かない CSV の画面の呼び名（今いるタブ・説明の文で共用）。 */
+export const FRIENDS_CSV_TAB_LABEL = 'CSVで書き出す・取り込む'
+
 /** タブの下に出す1行の説明（絵の「タブの説明」）。 */
 export const FRIENDS_TAB_NOTES: Record<FriendsTabKey, string> = {
   list: '友だち一覧：LINE でつながっている人の一覧です。',
   duplicates: '重複検出：同じ人が2人に分かれていないかを探して、結び付けるか決めます。',
   merged: '統合ユーザー：結び付けた人の一覧です。間違えて結び付けたときは、ここで分けます。',
   'uid-migration': 'UID移行：別のLINEアカウントから友だちを引っ越します。照合してから本移行します。',
-  csv: 'CSVで書き出す・取り込む：友だちの一覧を表計算のファイルで出し入れします。',
+  csv: `${FRIENDS_CSV_TAB_LABEL}：友だちの一覧を表計算のファイルで出し入れします。`,
 }
 
 /**

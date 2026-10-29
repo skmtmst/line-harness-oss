@@ -49,6 +49,7 @@ type AccountHealthState = AccountHealthLog['riskLevel'] | 'unknown' | 'error' | 
 interface AccountHealthSnapshot {
   state: AccountHealthState
   logs: AccountHealthLog[]
+  checkedAt?: string | null
 }
 
 interface AccountHealthResponse {
@@ -94,16 +95,14 @@ function resolveAccountHealth(response: AccountHealthResponse): AccountHealthSna
   if (!response.success) return { state: 'error', logs: [] }
 
   const payload = response.data && typeof response.data === 'object'
-    ? response.data as { riskLevel?: unknown; logs?: unknown }
+    ? response.data as { riskLevel?: unknown; logs?: unknown; connection?: { checkedAt?: unknown } }
     : {}
   const logs = Array.isArray(payload.logs) ? payload.logs as AccountHealthLog[] : []
   const state = isRiskLevel(payload.riskLevel)
     ? payload.riskLevel
-    : isRiskLevel(logs[0]?.riskLevel)
-      ? logs[0].riskLevel
-      : 'unknown'
+    : 'unknown'
 
-  return { state, logs }
+  return { state, logs, checkedAt: typeof payload.connection?.checkedAt === 'string' ? payload.connection.checkedAt : null }
 }
 
 async function loadAccountHealthStates(
@@ -132,6 +131,7 @@ export default function HealthPage() {
   usePageTitle('BAN検知ダッシュボード')
   const [accounts, setAccounts] = useState<LineAccount[]>([])
   const [healthLogs, setHealthLogs] = useState<Record<string, AccountHealthLog[]>>({})
+  const [connectionCheckedAt, setConnectionCheckedAt] = useState<Record<string, string | null>>({})
   const [latestRisk, setLatestRisk] = useState<Record<string, AccountHealthState>>({})
   const [migrations, setMigrations] = useState<AccountMigration[]>([])
   const [migrationLoadState, setMigrationLoadState] = useState<MigrationLoadState>('loading')
@@ -165,6 +165,7 @@ export default function HealthPage() {
         setHealthLogs(Object.fromEntries(
           Object.entries(snapshots).map(([accountId, snapshot]) => [accountId, snapshot.logs]),
         ))
+        setConnectionCheckedAt(Object.fromEntries(Object.entries(snapshots).map(([id, snapshot]) => [id, snapshot.checkedAt ?? null])))
         setLatestRisk(Object.fromEntries(
           Object.entries(snapshots).map(([accountId, snapshot]) => [accountId, snapshot.state]),
         ))
@@ -186,6 +187,7 @@ export default function HealthPage() {
     )
     const snapshot = snapshots[accountId]
     setHealthLogs((current) => ({ ...current, [accountId]: snapshot.logs }))
+    setConnectionCheckedAt((current) => ({ ...current, [accountId]: snapshot.checkedAt ?? null }))
     setLatestRisk((current) => ({ ...current, [accountId]: snapshot.state }))
     setRetryingHealthIds((current) => {
       const next = new Set(current)
@@ -285,9 +287,9 @@ export default function HealthPage() {
               const storedRisk = latestRisk[account.id] ?? 'unknown'
               const isExpanded = expandedId === account.id
               const logs = healthLogs[account.id] || []
-              const latestLog = logs[0] ?? null
+              const checkedAt = connectionCheckedAt[account.id] ?? null
               // R168: 最終確認が古いときは、記録上の結果ではなく「確認が止まっている」を出す。
-              const stale = storedRisk !== 'unknown' && storedRisk !== 'error' && isStaleCheck(latestLog?.createdAt)
+              const stale = storedRisk !== 'unknown' && storedRisk !== 'error' && isStaleCheck(checkedAt)
               const risk: AccountHealthState = stale ? 'stale' : storedRisk
               const config = riskConfig[risk]
               const healthUnavailable = risk === 'unknown' || risk === 'error' || risk === 'stale'
@@ -307,7 +309,7 @@ export default function HealthPage() {
                           <p className="text-xs text-ink-faint">チャネル {account.channelId}</p>
                           {/* R168: いつ確かめた結果かを常に出す。 */}
                           <p className="text-xs text-ink-faint">
-                            最終確認 {latestLog ? shortDateTime(latestLog.createdAt) : '—'}
+                            最終確認 {checkedAt ? shortDateTime(checkedAt) : '—'}
                           </p>
                         </div>
                       </div>
@@ -330,8 +332,8 @@ export default function HealthPage() {
                             {risk === 'error'
                               ? 'ヘルス情報を取得できませんでした。'
                               : risk === 'stale'
-                                ? `最後の確認は ${latestLog ? shortDateTime(latestLog.createdAt) : '—'} です。確認が止まっているため、現在の状態は分かりません（最後の結果は「${latestLog ? riskConfig[latestLog.riskLevel].label : '—'}」）。`
-                                : 'まだ確認結果がありません。'}
+                                ? `最後の確認は ${checkedAt ? shortDateTime(checkedAt) : '—'} です。確認が止まっているため、現在の状態は分かりません（最後の結果は「${storedRisk !== 'unknown' && storedRisk !== 'error' && storedRisk !== 'stale' ? riskConfig[storedRisk].label : '—'}」）。`
+                                : '接続の確認がまだです。'}
                           </p>
                           <button
                             type="button"

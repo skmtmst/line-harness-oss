@@ -45,8 +45,9 @@ function matches(item: EntityPickerItem, query: string) {
   return !q || item.name.toLocaleLowerCase().includes(q) || Boolean(item.keywords?.toLocaleLowerCase().includes(q)) || Boolean(item.content?.toLocaleLowerCase().includes(q))
 }
 
-function CreateLink({ href, label }: { href?: string; label?: string }) {
+function CreateLink({ href, label, lockedReason }: { href?: string; label?: string; lockedReason?: string }) {
   if (!href || !label) return null
+  if (lockedReason) return <Button variant="text" size="inline" lockedReason={lockedReason}>{`作る画面へ：${label}`}<ArrowUpRight size={16} aria-hidden="true" /></Button>
   return <Link className={styles.createLink} href={href} target="_blank" rel="noopener">{`作る画面へ：${label}`}<ArrowUpRight size={16} aria-hidden="true" /></Link>
 }
 
@@ -70,7 +71,7 @@ export function EntityPickerDialog(props: SingleProps | EntityPickerWindowProps)
 /** 行を選ぶ間は仮の選択。確定したときだけ呼ぶ側の値を変える。 */
 function SingleEntityPickerDialog({
   title, description, scrollBody = false, confirmLabel = '選ぶ', items, folders = [], foldersFailed = false, categories = [], initialId = '',
-  state, listFooter, preview, error, busy = false, confirmDisabled = false, readOnly = false, createHref, createLabel,
+  state, listFooter, preview, error, busy = false, confirmDisabled = false, confirmLockedReason, readOnly = false, createHref, createLabel,
   searchPlaceholder = '名前で探す', designNode = 'M0393', query: controlledQuery, onQueryChange, createAction, onSelect, onConfirm, onCancel,
 }: SingleProps) {
   const id = useId()
@@ -98,12 +99,12 @@ function SingleEntityPickerDialog({
     footer={<>
       <div className={styles.tpFootLead}>
         {!readOnly ?
-      <CreateLink href={createHref} label={createLabel} /> : null}
+      <CreateLink href={createHref} label={createLabel} lockedReason={confirmLockedReason} /> : null}
       <span className={styles.selection} title={picked?.name}>{picked ? `選んだもの：${picked.name}` : 'まだ選んでいません'}</span>
       </div>
       <div className={styles.tpFootActions}>
       <Button disabled={busy} onClick={onCancel}>{readOnly ? '閉じる' : 'キャンセル'}</Button>
-      {readOnly ? null : <Button variant="primary" widthReserve="idle" busy={busy} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} title={listState ? '候補を読み込める状態になってから選んでください。' : !picked ? '候補を選んでください。' : picked.disabled ? picked.meta : confirmDisabled ? error : undefined} onClick={() => onConfirm(selected)}>{confirmLabel}</Button>}
+      {readOnly ? null : <Button variant="primary" widthReserve="idle" busy={busy} lockedReason={confirmLockedReason} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} title={confirmLockedReason ? undefined : listState ? '候補を読み込める状態になってから選んでください。' : !picked ? '候補を選んでください。' : picked.disabled ? picked.meta : confirmDisabled ? error : undefined} onClick={() => onConfirm(selected)}>{confirmLabel}</Button>}
     </div>
     </>}
   >
@@ -126,7 +127,7 @@ function SingleEntityPickerDialog({
               {item.content || item.meta ? <span className={styles.tpCardBody} title={item.content ?? item.meta}>{item.content ?? item.meta}</span> : null}
             </span>{item.categoryLabel ? <StatusBadge tone={item.tone} dot={false} size="compact">{item.categoryLabel}</StatusBadge> : null}</label>) : <p className={styles.tpNote}>当てはまる候補がありません。</p>)}
         </div>
-        {createAction && !readOnly && query.trim() && !items.some((item) => item.name === query.trim()) ? <Button disabled={busy || listState} onClick={() => createAction.onCreate(query.trim())}>{createAction.label(query.trim())}</Button> : null}
+        {createAction && !readOnly && query.trim() && !items.some((item) => item.name === query.trim()) ? <Button disabled={busy || listState} lockedReason={confirmLockedReason} onClick={() => { if (!confirmLockedReason) createAction.onCreate(query.trim()) }}>{createAction.label(query.trim())}</Button> : null}
         {!listState ? <div className={shell.more}><span>{`${formatNumber(rows.length)}件中 ${rows.length ? 1 : 0}〜${Math.min(visibleLimit, rows.length)}件`}</span>{rows.length > visibleLimit ? <Button size="compact" onClick={() => setLimit((value) => value + 20)}>続きを読み込む</Button> : null}</div> : null}
       {listFooter}
         {preview !== undefined && picked ? <div className={styles.itemPreview} aria-label="選んだ候補の見え方">{previewNode}</div> : null}

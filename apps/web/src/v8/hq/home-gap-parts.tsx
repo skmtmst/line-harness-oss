@@ -1,5 +1,7 @@
 'use client'
 
+import { lineAccountConnectionState } from '@/lib/line-account-state'
+
 import { accountHandle } from './account-dialogs'
 import { formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
@@ -44,17 +46,14 @@ function matchesStatus(account: AccountWithStats, filter: StatusFilter) {
   if (filter === 'all') return !isArchived(account)
   if (filter === 'archived') return isArchived(account)
   if (isArchived(account)) return false
-  if (filter === 'ok') return account.isActive && account.connection?.status === 'ok'
-  return account.isActive && account.connection?.status !== 'ok'
+  const state = lineAccountConnectionState(account)
+  if (filter === 'ok') return state.tone === 'ok'
+  return state.label === '要確認' || state.label === '未確認'
 }
 
 
 function statusOf(account: AccountWithStats): { label: string; tone: 'ok' | 'warn' | 'idle' } {
-  if (isArchived(account)) return { label: 'アーカイブ', tone: 'idle' }
-  if (!account.isActive) return { label: '停止中', tone: 'idle' }
-  if (account.connection?.status === 'ok') return { label: '正常', tone: 'ok' }
-  if (account.connection?.status === 'warn') return { label: '要確認', tone: 'warn' }
-  return { label: '未確認', tone: 'idle' }
+  return lineAccountConnectionState(account)
 }
 export { type StatusFilter, type View, UNFILED, ALL, STATUS_FILTERS, SORT_OPTIONS, PAGE_SIZES, isArchived, matchesStatus, statusOf }
 

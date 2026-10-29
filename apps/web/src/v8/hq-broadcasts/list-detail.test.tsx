@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 /*
  * 統括の一括配信の一覧と送ったあとの詳細を絵に合わせた所の動き。
- * 一覧：並び順（新しい順／古い順）・数の帯の平均の開封率（数えていない店があれば「—」）。
+ * 一覧：並び順（新しい順／古い順）・数の帯の平均の開封率（数えていない店があれば「—」）・
+ * 配信日時は日時だけの1行（「予約」は状態の札だけ）・空のとき主ボタンは1つ。
  * 詳細：送るまでの段の帯（予約しない配信は「予約中」を省く・分かれ道の札）・配信した設定の「送り方」。
  */
 import React from 'react'
@@ -22,6 +23,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children) }))
 
 import HqBroadcastList from './list'
+import styles from '../broadcasts/list.module.css'
 import HqBroadcastDetail, { deliveryWayText } from './detail'
 
 const target = (accountId: string, status: string, success: number, opened: number | null) => ({
@@ -66,6 +68,30 @@ describe('統括の一括配信の一覧（U4Eep0）', () => {
     render(<HqBroadcastList />)
     await screen.findByText('B')
     expect(screen.getByText('まだ数えていません')).toBeTruthy()
+  })
+
+  it('配信日時の下に「予約」を重ねない（状態の札にあるので日時だけの1行）', async () => {
+    hq.list.mockResolvedValue({ data: [run('r1', '予約した配信', [target('a', 'scheduled', 0, null)], { scheduledAt: '2026-09-10T01:00:00.000Z' })] })
+    render(<HqBroadcastList />)
+    const row = (await screen.findByText('予約した配信')).closest('tr')
+    const cells = within(row as HTMLElement).getAllByRole('cell')
+    expect(cells[1].textContent).toContain('予約中')
+    expect(cells[3].textContent).not.toContain('予約')
+  })
+
+  it('まだ1件も無いときは主ボタンを1つにし、左の列の「配信を作る」を出さない', async () => {
+    hq.list.mockResolvedValue({ data: [] })
+    render(<HqBroadcastList />)
+    await screen.findByText('一括配信はまだありません')
+    expect(screen.getByText('最初の一括配信を作る')).toBeTruthy()
+    expect(screen.queryByText('配信を作る')).toBeNull()
+    /* 空のときも左の列の場所を空け、1件目で列が動かない */
+    expect(document.querySelector(`.${styles.viewerAddSpace}`)).toBeTruthy()
+    cleanup()
+    hq.list.mockResolvedValue({ data: [run('r1', 'ある配信', [target('a', 'sent', 100, 50)])] })
+    render(<HqBroadcastList />)
+    await screen.findByText('ある配信')
+    expect(screen.getAllByText('配信を作る').length).toBeGreaterThan(0)
   })
 })
 
