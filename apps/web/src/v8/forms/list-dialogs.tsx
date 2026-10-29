@@ -178,7 +178,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
             <p className={styles.panelValueRow}>
               <StatusBadge tone={active.isActive ? 'success' : 'neutral'}>{active.isActive ? '公開中' : '下書き'}</StatusBadge>
               {(active.pendingPostActionCount ?? 0) > 0 ? (
-                <StatusBadge tone="danger">{`後処理の未完 ${active.pendingPostActionCount}`}</StatusBadge>
+                <StatusBadge tone="danger" dot={false}>{`後処理の未完 ${active.pendingPostActionCount}`}</StatusBadge>
               ) : null}
             </p>
             <p className={styles.panelLabel}>保存先</p>

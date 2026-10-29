@@ -187,7 +187,7 @@ function PreparedCard({ run }: { run: HqBroadcastRun }) {
                 <Td className={styles.colNum}><span className={styles.num}>{t.audienceCount === null ? emptyValue('unknown') : `${n(t.audienceCount)}人`}</span></Td>
                 <Td className={styles.colNum}><span className={styles.faint}>{t.remaining === null ? emptyValue('unknown') : `${n(t.remaining)}通`}</span></Td>
                 <Td className={styles.colState}><StatusBadge tone={badge.tone} title={t.blockedReasons.join('・') || undefined}>{badge.label}</StatusBadge></Td>
-                <Td className={styles.colFail}><StatusBadge tone={go ? 'success' : 'neutral'}>{go ? '送る' : '外す'}</StatusBadge></Td>
+                <Td className={styles.colFail}><StatusBadge tone={go ? 'success' : 'neutral'} dot={false}>{go ? '送る' : '外す'}</StatusBadge></Td>
               </Tr>
             )
           })}

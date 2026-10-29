@@ -1082,7 +1082,7 @@ export default function HqBroadcastCreate() {
                               <Td className={styles.colPeople}><span className={styles.num}>{p.audienceCount === null ? emptyValue('unknown') : `${formatNumber(p.audienceCount)}人`}</span></Td>
                               <Td className={styles.colQuota}><span className={styles.sub}>{p.remaining === null ? emptyValue('unknown') : `${formatNumber(p.remaining)}通`}</span></Td>
                               <Td className={styles.colCheck}><StatusBadge tone={badge.tone} title={p.blockedReasons.join('・') || undefined}>{badge.label}</StatusBadge></Td>
-                              <Td className={styles.colSend}><StatusBadge tone={go ? 'success' : 'neutral'}>{go ? '送る' : '外す'}</StatusBadge></Td>
+                              <Td className={styles.colSend}><StatusBadge tone={go ? 'success' : 'neutral'} dot={false}>{go ? '送る' : '外す'}</StatusBadge></Td>
                               <Td className={styles.colMenu}>
                                 <RowMenu
                                   subjectName={p.accountName}
@@ -1100,7 +1100,7 @@ export default function HqBroadcastCreate() {
                             <Td className={styles.colPeople}><span className={styles.num}>{`${formatNumber(rest.reduce((sum, p) => sum + (p.audienceCount ?? 0), 0))}人`}</span></Td>
                             <Td className={styles.colQuota}><span className={styles.sub}>{emptyValue('unknown')}</span></Td>
                             <Td className={styles.colCheck}><StatusBadge tone="success">すべて足りる</StatusBadge></Td>
-                            <Td className={styles.colSend}><StatusBadge tone="success">送る</StatusBadge></Td>
+                            <Td className={styles.colSend}><StatusBadge tone="success" dot={false}>送る</StatusBadge></Td>
                             <Td className={styles.colMenu}>
                               <RowMenu subjectName={`ほか ${rest.length}アカウント`} items={[{ id: 'all', label: '1つずつ見る', onSelect: () => setShowAll(true) }]} />
                             </Td>
