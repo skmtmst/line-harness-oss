@@ -970,5 +970,4 @@
 - [飲食店の左メニューの予約項目](release-log/unreleased/1953-kenta-restaurant-sidebar.md) — 反映履歴、確認 2026-10-30
 - [LIFFの小さな直し](release-log/unreleased/1953-kenta-muse-liff.md) — 写真・次へ・鈴・選択色・支払い案内・読み込み中・業種の出し分けの反映履歴。
 - [一覧の案内と予約の行の操作](release-log/unreleased/1953-kenta-train-1029j.md)
-
 - [アカウントの説明と権限・予約の見出し](release-log/unreleased/1954-kenta-train-1029k.md)
