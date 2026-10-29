@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import NewLineAccountPage from './page'
 import { DRAFT_KEY } from '@/v8/account-new/logic'
 
@@ -113,9 +113,10 @@ async function saveAndFinish() {
   await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
   await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
   next()
-  fireEvent.click(await screen.findByRole('radio', { name: /飲食店/ }))
-  await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
-  next()
+  const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  const skip = within(dialog).getByRole('button', { name: 'あとで設定する' })
+  await waitFor(() => expect((skip as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(skip)
 }
 
 describe('LINEアカウント作成ウィザード', () => {
@@ -336,7 +337,7 @@ describe('LINEアカウント作成ウィザード', () => {
     await runCheck()
     await saveAndFinish()
     await screen.findByText('いまの友だちを引き継いでいます', { selector: 'h2' })
-    expect(screen.getByRole('progressbar', { name: '友だちの引き継ぎ' })).toBeTruthy()
+    expect(screen.getByRole('progressbar', { name: '友だち引き継ぎの段階' })).toBeTruthy()
     expect(screen.queryByRole('link', { name: '登録したアカウントを見る' })).toBeNull()
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalled())
     finishStep({ success: true, data: {
@@ -344,5 +345,24 @@ describe('LINEアカウント作成ウィザード', () => {
       busy: false, profilesFetched: 10,
     } })
     await waitFor(() => expect(screen.getByRole('link', { name: '登録したアカウントを見る' })).toBeTruthy())
+  })
+
+  it('引き継ぎ要求が失敗しても理由を示し、画面を開いている間に再試行する', async () => {
+    calls.connect.mockResolvedValue({
+      success: true,
+      data: { ...checked.data, id: 'retry-account', followerImport: { capability: 'available', phase: 'importing_ids' } },
+    })
+    calls.stepFollowerImport
+      .mockResolvedValueOnce({ success: false, error: 'temporarily_unavailable' })
+      .mockResolvedValueOnce({ success: true, data: { state: {
+        capability: 'available', phase: 'completed', received: 4, imported: 3, alreadyPresent: 1,
+        profilesProcessed: 4, profilesUpdated: 3,
+      }, busy: false, profilesFetched: 3 } })
+    enterCheckStep()
+    await runCheck()
+    await saveAndFinish()
+    await screen.findByText('状態を更新できません。自動で再試行しています。')
+    await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledTimes(2), { timeout: 6500 })
+    await screen.findByText(/LINEで確認した 4 人のうち、新しく 3 人を取り込みました。登録済み 1 人/)
   })
 })

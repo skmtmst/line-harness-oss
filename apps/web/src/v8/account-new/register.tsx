@@ -24,7 +24,7 @@ import Notice from '@/components/shared/notice'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
   DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, channelErrors, checkActionLabel, checkErrorText,
-  checkStage, formatJaDuration, handoverProgress, insightDateJst, isDuplicateChannelError,
+  checkStage, handoverProgress, isDuplicateChannelError, latestFollowerImportState,
   loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, providerIdErrors, readDraft, stepLabel, subTotal,
   toV06CheckRows,
   precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
@@ -113,12 +113,14 @@ function AccountRegistrationForm() {
   const [receipt, setReceipt] = useState<LineRegistrationReceipt>({ status: 'waiting', receivedAt: null })
   const [receiptRequestFailed, setReceiptRequestFailed] = useState(false)
   const [receiptChecking, setReceiptChecking] = useState(false)
-  const [elapsed, setElapsed] = useState(0)
-  const [insightTotal, setInsightTotal] = useState<number | null>(null)
+  const [idleSeconds, setIdleSeconds] = useState(0)
+  const [importRequestError, setImportRequestError] = useState(false)
+  const [importRefreshing, setImportRefreshing] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
   const [noticeDialog, setNoticeDialog] = useState<'idle' | 'open' | 'done'>('idle')
   const [styleDialogOpen, setStyleDialogOpen] = useState(true)
   const busyLock = useRef(false)
+  const importProgressRef = useRef('')
   const stepPanelRef = useRef<HTMLDivElement>(null)
 
   const checkRows = toV06CheckRows(connection, { running: checkRunning, cursor: checkCursor })
@@ -244,8 +246,8 @@ function AccountRegistrationForm() {
     return () => { active = false; if (timer) clearTimeout(timer) }
   }, [currentStep, sub, createdId, receipt.status, receiptRequestFailed])
 
-  /* ⑤：読み取りだけだと次の cron（5分ごと）まで進まないので、画面を開いている間は
-   * 1 回ぶんが終わるたびに次を呼ぶ。閉じたあとは cron と「入る」が続きを拾う。 */
+  /* ⑤：画面を開いている間は1回ぶんが終わるたびに次を呼ぶ。
+   * 本番では cron も拾うが、検証環境は cron を無効にしている。 */
   useEffect(() => {
     if (!createdId || !importRunning || !form.importFriends) return
     let active = true
@@ -253,39 +255,61 @@ function AccountRegistrationForm() {
     const advance = async () => {
       try {
         const response = await api.lineAccounts.stepFollowerImport(createdId)
-        if (!active || !response.success) return
-        setImportState(response.data.state)
+        if (!active) return
+        if (!response.success) {
+          setImportRequestError(true)
+          timer = setTimeout(() => void advance(), 5000)
+          return
+        }
+        setImportRequestError(false)
+        setImportState((current) => latestFollowerImportState(current, response.data.state))
         if (['importing_ids', 'hydrating_profiles'].includes(response.data.state.phase)) {
           /* 進めた直後は待たない（0.5秒は、何も進まない応答が続いたときの空回り止め）。 */
           timer = setTimeout(() => void advance(), response.data.busy ? 3000 : 500)
         }
       } catch (saveFailure) {
         saveErrors.capture(saveFailure)
-        if (active) timer = setTimeout(() => void advance(), 5000)
+        if (active) {
+          setImportRequestError(true)
+          timer = setTimeout(() => void advance(), 5000)
+        }
       }
     }
     void advance()
     return () => { active = false; if (timer) clearTimeout(timer) }
   }, [createdId, importRunning, form.importFriends, saveErrors])
 
-  // ⑤：引き継ぎの総数（前日の友だち数）。取れなければ引き継いだ数だけ出す。
+  // ⑤：バックグラウンドで進む状態も読む。POST が一時的に失敗しても表示を止めない。
   useEffect(() => {
-    if (currentStep !== 5 || !createdId || insightTotal !== null) return
+    if (currentStep !== 5 || !createdId || !form.importFriends) return
     let active = true
-    void (async () => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const poll = async () => {
       try {
-        const response = await api.lineAccounts.followerInsight(createdId, insightDateJst())
-        if (active && response.success && typeof response.data.followers === 'number') setInsightTotal(response.data.followers)
-      } catch (saveFailure) {
-        saveErrors.capture(saveFailure) /* 総数が出なくても引き継いだ数は出す。 */ }
-    })()
-    return () => { active = false }
-  }, [currentStep, createdId, insightTotal, saveErrors])
+        const response = await api.lineAccounts.followerImportState(createdId)
+        if (active && response.success) setImportState((current) => latestFollowerImportState(current, response.data))
+        else if (active) setImportRequestError(true)
+      } catch {
+        if (active) setImportRequestError(true)
+      }
+      if (active) timer = setTimeout(() => void poll(), 5000)
+    }
+    void poll()
+    return () => { active = false; if (timer) clearTimeout(timer) }
+  }, [currentStep, createdId, form.importFriends])
 
-  // ⑤：引き継ぎ中だけ経過を数える（残り時間の見積りに使う）。
+  // ⑤：件数・段階が動いたら待ち時間を戻す。時間は目安をでっち上げず更新確認に使う。
+  const importProgressKey = importState
+    ? `${importState.phase}:${importState.received}:${importState.imported}:${importState.alreadyPresent}:${importState.profilesProcessed}:${importState.profilesUpdated}`
+    : ''
+  useEffect(() => {
+    if (!importProgressKey || importProgressRef.current === importProgressKey) return
+    importProgressRef.current = importProgressKey
+    setIdleSeconds(0)
+  }, [importProgressKey])
   useEffect(() => {
     if (currentStep !== 5 || !importRunning) return
-    const timer = setInterval(() => setElapsed((current) => current + 1), 1000)
+    const timer = setInterval(() => setIdleSeconds((current) => current + 1), 1000)
     return () => clearInterval(timer)
   }, [currentStep, importRunning])
 
@@ -527,12 +551,31 @@ function AccountRegistrationForm() {
   }
 
   const handover = handoverProgress({
+    phase: importState?.phase ?? connection?.followerImport.phase ?? 'not_started',
+    received: importState?.received ?? 0,
     imported: importState?.imported ?? 0,
-    total: insightTotal,
-    elapsedSeconds: elapsed,
-    running: importRunning,
+    alreadyPresent: importState?.alreadyPresent ?? 0,
+    reactivated: importState?.reactivated ?? 0,
+    claimedUnassigned: importState?.claimedUnassigned ?? 0,
+    conflicts: importState?.conflicts ?? 0,
+    invalid: importState?.invalid ?? 0,
+    profilesUpdated: importState?.profilesUpdated ?? 0,
   })
-  const remainText = handover.remainingSeconds ? `残り およそ ${formatJaDuration(handover.remainingSeconds)}` : '残り時間を計算しています'
+  const refreshImport = async () => {
+    if (!createdId || importRefreshing) return
+    setImportRefreshing(true)
+    try {
+      const response = await api.lineAccounts.followerImportState(createdId)
+      if (response.success) {
+        setImportState((current) => latestFollowerImportState(current, response.data))
+        setImportRequestError(false)
+      } else setImportRequestError(true)
+    } catch {
+      setImportRequestError(true)
+    } finally {
+      setImportRefreshing(false)
+    }
+  }
   const busy = Boolean(busyAction) || registrationStyle.busy
   // 登録したあとは戻らない（③の2つめから先）。
   const canBack = !createdId && (currentStep > 1 || sub > 1 || (currentStep === 1 && precheckBack(precheckAt, precheck) !== null))
@@ -709,7 +752,7 @@ function AccountRegistrationForm() {
           )}
 
           {currentStep === 5 && connection && (
-            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} handover={handover} remainText={remainText} restaurant={templateKey === 'restaurant'} />
+            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} refreshing={importRefreshing} onRefresh={refreshImport} restaurant={templateKey === 'restaurant'} />
           )}
 
           {recoveredAccountId ? (

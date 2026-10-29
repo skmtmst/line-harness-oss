@@ -3,7 +3,7 @@ import type { LineAccountConnectData } from '@/lib/api'
 import {
   DRAFT_KEY, LOGIN_ACKS, PRECHECK_RESULT, PRECHECK_VERIFIED_ACK, WEBHOOK_ACKS, allAcked, allV06RowsOk,
   allV8RowsPassed, checkActionLabel, checkErrorText, checkRowText, checkStage, developerChannelUrl, developerProviderUrl,
-  formatJaDuration, handoverProgress, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked, providerIdErrors,
+  formatJaDuration, handoverProgress, latestFollowerImportState, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked, providerIdErrors,
   precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
   readDraft, readPrecheckAnswers, readPrecheckAt, stepLabel, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
 } from './logic'
@@ -310,21 +310,24 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     expect(options[5].note).toBe('今のダッシュボードのままです。カードは、あとから自分で足し引きできます')
   })
 
-  it('引き継ぎ中の進み具合：総人数が分からないうちは割合を出さず、速さから残り時間を見積もる', () => {
-    const half = handoverProgress({ imported: 60, total: 120, elapsedSeconds: 30, running: true })
-    expect(half.rate).toBe(50)
-    expect(half.perMinute).toBe(120)
-    expect(half.remainingSeconds).toBe(30)
-    expect(half.done).toBe(false)
-    const unknown = handoverProgress({ imported: 10, total: null, elapsedSeconds: 60, running: true })
-    expect(unknown.rate).toBe(0)
-    expect(unknown.remainingSeconds).toBeNull()
-    const finished = handoverProgress({ imported: 120, total: 120, elapsedSeconds: 60, running: false })
-    expect(finished.rate).toBe(100)
-    expect(finished.remainingSeconds).toBe(0)
-    expect(finished.done).toBe(true)
-    // 始まったばかりで何も進んでいなければ速さは出さない（0人／分と言わない）。
-    expect(handoverProgress({ imported: 0, total: 120, elapsedSeconds: 2, running: true }).perMinute).toBeNull()
+  it('引き継ぎ人数はジョブの結果を使い、探索中の分母と前日集計を表示しない', () => {
+    const counts = {
+      received: 2, imported: 1, alreadyPresent: 1, reactivated: 0,
+      claimedUnassigned: 0, conflicts: 0, invalid: 0, profilesUpdated: 0,
+    }
+    expect(handoverProgress({ ...counts, phase: 'importing_ids' })).toMatchObject({ confirmed: null, foundSoFar: 2, stage: 1 })
+    // 前日2人に今日2人が加わった場合、LINEの現在の一覧を読み終えて初めて4人と表示する。
+    const four = handoverProgress({ ...counts, phase: 'hydrating_profiles', received: 4, imported: 3 })
+    expect(four).toMatchObject({ confirmed: 4, imported: 3, alreadyPresent: 1, stage: 2 })
+    expect(handoverProgress({ ...counts, phase: 'completed', received: 4, imported: 3 }).stage).toBe(3)
+  })
+
+  it('処理応答より古い読み取り結果で段階と人数を巻き戻さない', () => {
+    const current = { phase: 'hydrating_profiles' as const, received: 4, profilesProcessed: 2, profilesUpdated: 2 }
+    expect(latestFollowerImportState(current, { phase: 'importing_ids', received: 0, profilesProcessed: 0, profilesUpdated: 0 })).toBe(current)
+    expect(latestFollowerImportState(current, { phase: 'hydrating_profiles', received: 4, profilesProcessed: 1, profilesUpdated: 1 })).toBe(current)
+    const finished = { phase: 'completed' as const, received: 4, profilesProcessed: 4, profilesUpdated: 4 }
+    expect(latestFollowerImportState(current, finished)).toBe(finished)
   })
 
   it('長さは日本語で出す（0以下は出さない）', () => {
