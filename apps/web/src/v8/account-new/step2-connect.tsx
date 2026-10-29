@@ -21,10 +21,11 @@ import Notice from '@/components/shared/notice'
 
 const MANUAL = '/manuals/line-connect/index.html'
 
-/* 正本 v07 ②の左の細い列「AC左 操作ステップ」（fbgO8）。いまどこを触っているかを3段で見せる。 */
+/* 承認済みの4段構成。現在の操作を左の列で示す。 */
 const AC_OUTLINE: ReadonlyArray<{ title: string; note: string }> = [
-  { title: 'Messaging API とプロバイダー', note: 'チャネル情報とプロバイダーID' },
-  { title: 'Webhook の設定', note: 'URLを貼り付けて3つをONに' },
+  { title: 'Messaging APIの2項目', note: '公式アカウントで取得' },
+  { title: 'プロバイダーID', note: 'LINE Developersからコピー' },
+  { title: 'Webhookの設定', note: 'URLを貼り付けて3つをONに' },
   { title: 'LINEログインの2項目', note: '同じプロバイダーの中に作る' },
 ]
 
@@ -37,7 +38,7 @@ function AcOutline({ sub }: { sub: number }) {
       {AC_OUTLINE.map((row, index) => {
         const number = index + 1
         return (
-          /* 札は三項をそのまま書く。変数に入れると design-debt の見張りが追えなくなる。 */
+          /* 札の状態を現在の段に合わせる。 */
           <div
             key={row.title}
             className={`${styles.outlineRow} ${number < sub ? styles.outlineDone : number === sub ? styles.outlineCurrent : styles.outlineFuture}`}
@@ -67,9 +68,9 @@ export type Step2Field = 'channelId' | 'channelSecret' | 'providerId' | 'loginCh
 export default function Step2Connect({
   sub, badge, values, fieldErrors, acks, onUpdate, onToggleAck,
 }: {
-  /** ②の中の小さな段（1〜3）。 */
+  /** ②の中の小さな段（1〜4）。 */
   sub: number
-  /** 「Step 1 / 3」などの札。 */
+  /** 「Step 1 / 4」などの札。 */
   badge: string
   /** いま入っているチャネルの4項目とプロバイダーID。 */
   values: Record<Step2Field, string>
@@ -95,20 +96,19 @@ export default function Step2Connect({
       </Card>
       )}>
       {sub === 1 && (
-        /* 正本 v07 Fqy29 → ②-1（msf5n）の A2cEg1。入力は縦に2つだけで、
-           ほかの項目は musubo が自動で設定するので欄も控えも置かない。 */
+        /* Messaging API の2項目は公式アカウントマネージャーから取得する。 */
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Messaging API の情報を入れる">
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
             <h2 className={styles.panelTitle}>Messaging API の情報を入れる</h2>
             <span className={styles.precheckHelpMark} title="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。" aria-label="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。"><CircleHelp size={16} aria-hidden="true" /></span>
           </div>
-          <p className={styles.precheckLead}>Messaging API のチャネルID・シークレットと、同じプロバイダーのIDを入力します。</p>
+          <p className={styles.precheckLead}>Messaging API のチャネルIDとチャネルシークレットを入力します。</p>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
-            <p className={styles.precheckNoteTitle}>LINE Developers を開いてください</p>
-            <p>Messaging API チャネルの「チャネル基本設定」に、チャネルID とチャネルシークレットがあります。</p>
+            <p className={styles.precheckNoteTitle}>LINE公式アカウントマネージャーを開いてください</p>
+            <p>公式アカウントを選び、右上の「設定」→「Messaging API」を開きます。未利用なら「Messaging APIを利用する」を設定してから、Channel ID と Channel secret をコピーしてください。</p>
             <div className={styles.precheckNoteLink}>
-              <Button variant="primary" external href={developerChannelUrl(values.channelId)}>LINE Developers を開く</Button>
+              <Button variant="primary" external href="https://manager.line.biz/">LINE公式アカウントマネージャーを開く</Button>
             </div>
           </div>
           <div className={styles.acInputs}>
@@ -116,25 +116,50 @@ export default function Step2Connect({
               <Field htmlFor="v8-channel-id" label="チャネルID" error={fieldErrors.channelId}>
                 <SaveErrorField names={["channelId","form.channelId","channel_id","form.channel_id"]}><TextField id="v8-channel-id" value={values.channelId} onChange={(event) => onUpdate('channelId', event.target.value)} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.channelId ? true : undefined} /></SaveErrorField>
               </Field>
-              <p className={styles.help}>Messaging API チャネルの「チャネル基本設定」にある数字です。LINEログインのチャネルIDとは異なります。</p>
+              <p className={styles.help}>公式アカウントマネージャーの「設定」→「Messaging API」にある「Channel ID」の右のコピーから貼り付けてください。LINEログインのチャネルIDとは異なります。</p>
             </div>
             <div className={styles.acField}>
               <Field htmlFor="v8-channel-secret" label="チャネルシークレット" error={fieldErrors.channelSecret}>
                 <SaveErrorField names={["channelSecret","form.channelSecret","channel_secret","form.channel_secret"]}><TextField id="v8-channel-secret" type="password" autoComplete="new-password" value={values.channelSecret} onChange={(event) => onUpdate('channelSecret', event.target.value)} placeholder="例：abc123def456ghi789…" required aria-invalid={fieldErrors.channelSecret ? true : undefined} /></SaveErrorField>
               </Field>
-              <p className={styles.help}>同じ画面の「チャネルシークレット」です。</p>
-            </div>
-            <div className={styles.acField}>
-              <Field htmlFor="v8-provider-id" label="プロバイダーID" error={fieldErrors.providerId}>
-                <SaveErrorField names={["providerId","form.providerId"]}><TextField id="v8-provider-id" value={values.providerId} onChange={(event) => onUpdate('providerId', event.target.value)} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.providerId ? true : undefined} /></SaveErrorField>
-              </Field>
-              <p className={styles.help}>LINE Developers でこの Messaging API チャネルのプロバイダーを選び、URLの「/provider/」の後の数字を入力してください。Step 3 のリンクに使います。</p>
+              <p className={styles.help}>同じ画面の「Channel secret」の右のコピーから貼り付けてください。</p>
             </div>
           </div>
           <span className={styles.secretNote}><Lock size={16} aria-hidden="true" />シークレットは保存したあと画面には出ません。あとから入れ替えはできます。</span>
         </Card>
       )}
       {sub === 2 && (
+        <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="プロバイダーIDを確認する">
+          <p className={styles.subBadge}>{badge}</p>
+          <div className={styles.precheckHead}>
+            <h2 className={styles.panelTitle}>プロバイダーIDを確認する</h2>
+            <span className={styles.precheckHelpMark} title="Messaging APIとLINEログインを同じプロバイダーにつなぎます。" aria-label="Messaging APIとLINEログインを同じプロバイダーにつなぎます。"><CircleHelp size={16} aria-hidden="true" /></span>
+          </div>
+          <p className={styles.precheckLead}>Messaging APIとLINEログインを同じプロバイダーにつなぎます。</p>
+          <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
+            <p className={styles.precheckNoteTitle}>LINE Developersでプロバイダー設定を開いてください</p>
+            <p>Step 1で使ったMessaging APIチャネルのプロバイダーを選び、「プロバイダー設定」→「基本情報」を開きます。</p>
+            <div className={styles.precheckNoteLink}>
+              <Button variant="primary" external href="https://developers.line.biz/console/">LINE Developersを開く</Button>
+              <p className={styles.help}>必ずこのボタンから操作してください</p>
+            </div>
+          </div>
+          <div className={styles.acField}>
+            <Field htmlFor="v8-provider-id" label="プロバイダーID" error={fieldErrors.providerId}>
+              <SaveErrorField names={["providerId","form.providerId"]}><TextField id="v8-provider-id" value={values.providerId} onChange={(event) => onUpdate('providerId', event.target.value)} inputMode="numeric" placeholder="例：2005648758" required aria-invalid={fieldErrors.providerId ? true : undefined} /></SaveErrorField>
+            </Field>
+            <p className={styles.help}>「プロバイダー設定」の「基本情報」にあるプロバイダーIDをコピーして、ここに貼り付けてください。</p>
+          </div>
+          <Notice tone="warn" heading={<>Step 1と同じプロバイダーを選んでください</>}>
+            <p>別のプロバイダーのIDを入力すると、Step 4で作るLINEログインチャネルを同じアカウントにつなげられません。</p>
+          </Notice>
+          <div className={styles.field}>
+            <p className={styles.groupLabel}>設定手順の確認</p>
+            <p className={styles.help}>IDを貼り付けたら「次のステップへ」を押してください。次はWebhookの設定です。</p>
+          </div>
+        </Card>
+      )}
+      {sub === 3 && (
         /* 正本 v07 Fqy29 → ②Step2 の S1KaUa。利用者が個別 URL を「Messaging API設定」へ貼り付ける。
            貼って「更新」を押すまで3つのスイッチが出てこないため、
            URLの控えと［コピー］（Ds3E2）を置き、印は「貼り付けた」を先頭にして全4つにした。 */
@@ -186,9 +211,9 @@ export default function Step2Connect({
           <p className={styles.help}>4つすべてにチェックを入れると「次のステップへ」が押せるようになります。</p>
         </Card>
       )}
-      {sub === 3 && (
+      {sub === 4 && (
         /* 正本 v07 Fqy29 → ②-3（J84XB）の wI40b。Callback URL は musubo が自動で登録するので
-           控えの欄を置かない。開くボタンはステップ1で入力したプロバイダーIDを使う。 */
+           控えの欄を置かない。開くボタンはステップ2で入力したプロバイダーIDを使う。 */
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="LINEログインの情報を入れる">
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
@@ -198,11 +223,11 @@ export default function Step2Connect({
           <p className={styles.precheckLead}>友だち追加の窓口（LIFF）を musubo が自動で作るために使います。入れていただくのはこの2項目だけです。</p>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
             <p className={styles.precheckNoteTitle}>LINE Developers で「LINEログイン」チャネルを開いてください</p>
-            <p>ステップ1で入力したプロバイダーの画面を直接開きます。LINEログインチャネルがまだなければ「新規チャネル作成」から作成し、すでにあればそのチャネルを開いて、下記2項目をコピーしてください。</p>
+            <p>ステップ2で入力したプロバイダーの画面を直接開きます。LINEログインチャネルがまだなければ「新規チャネル作成」から作成し、すでにあればそのチャネルを開いて、下記2項目をコピーしてください。</p>
             <div className={styles.precheckNoteLink}>
               {providerUrl
                 ? <Button variant="primary" external href={providerUrl}>LINE Developers のプロバイダーを開く</Button>
-                : <p className={styles.help}>プロバイダーIDがありません。Messaging API の情報へ戻って入力してください。</p>}
+                : <p className={styles.help}>プロバイダーIDがありません。プロバイダーIDの確認へ戻って入力してください。</p>}
               {providerUrl && <p className={styles.help}>同じプロバイダー内のLINEログインチャネルを使ってください</p>}
             </div>
           </div>

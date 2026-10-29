@@ -96,16 +96,13 @@ const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name 
  */
 function clearPrecheck() {
   pick('はい、あります')
-  next()
   pick('いいえ、引き継ぎません')
-  next()
   pick('使っていません')
-  next()
   next()
 }
 
 /**
- * v07（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
+ * ①→②-1 Messaging API→②-2 プロバイダーID→②-3 Webhook→②-4 LINEログイン→③Step1。
  * 入力を変えると確認がやり直しになるので先に全部入れる。
  */
 function enterCheckStep() {
@@ -113,6 +110,7 @@ function enterCheckStep() {
   clearPrecheck()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
+  nextStep()
   fill('v8-provider-id', '2005648758')
   nextStep()
   ack('Webhook URL を貼り付けて「更新」を押した')
@@ -197,6 +195,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     nextStep()
     nextStep()
     nextStep()
+    nextStep()
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
@@ -237,26 +236,29 @@ describe('V8 登録ウィザードの gated 進行', () => {
 
   /*
     手順の順番は絵の正本がすべて（利用者指示 2026-10-17）。
-    `Fqy29` の `②-1 Step1 Messaging API`／`②-2 Step2 Webhook の設定`／`②-3 Step3 LINEログインの2項目`、
-    戻るの行き先の名前（事前確認へ戻る→Messaging API へ戻る→Webhook の設定へ戻る）、
+    `②-1 Step1 Messaging API`／`②-2 Step2 プロバイダーID`／`②-3 Step3 Webhook の設定`／`②-4 Step4 LINEログインの2項目`、
+    戻るの行き先の名前（事前確認へ戻る→Messaging API へ戻る→プロバイダーIDへ戻る→Webhook の設定へ戻る）、
     `Lwxyh` Step1 の「LINEログインへ戻る」を、実際のボタン操作でたどって確かめる。
   */
   /** 出ている段は、描かれた札（Card の aria-label）で見る。 */
-  const PANELS = ['Messaging API の情報を入れる', 'Webhook（受信のつなぎ）を設定する', 'LINEログインの情報を入れる'] as const
+  const PANELS = ['Messaging API の情報を入れる', 'プロバイダーIDを確認する', 'Webhook（受信のつなぎ）を設定する', 'LINEログインの情報を入れる'] as const
   const shownPanel = () => PANELS.find((label) => document.querySelector(`[aria-label="${label}"]`))
-  const stepBadgeText = () => screen.getByText(/^Step \d \/ 3$/).textContent
+  const stepBadgeText = () => screen.getByText(/^Step \d \/ 4$/).textContent
 
-  it('②は絵の正本どおり Messaging API→Webhook→LINEログイン の順に進む', () => {
+  it('②は承認済みの絵どおり Messaging API→プロバイダーID→Webhook→LINEログイン の順に進む', () => {
     render(<RegisterV8 />)
     clearPrecheck()
-    expect(stepBadgeText()).toBe('Step 1 / 3')
+    expect(stepBadgeText()).toBe('Step 1 / 4')
     expect(shownPanel()).toBe('Messaging API の情報を入れる')
 
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
+    nextStep()
+    expect(stepBadgeText()).toBe('Step 2 / 4')
+    expect(shownPanel()).toBe('プロバイダーIDを確認する')
     fill('v8-provider-id', '2005648758')
     nextStep()
-    expect(stepBadgeText()).toBe('Step 2 / 3')
+    expect(stepBadgeText()).toBe('Step 3 / 4')
     expect(shownPanel()).toBe('Webhook（受信のつなぎ）を設定する')
     expect(document.getElementById('v8-login-channel-id')).toBeNull()
 
@@ -265,7 +267,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     ack('Webhookの再送をONにした')
     ack('エラーの統計情報をONにした')
     nextStep()
-    expect(stepBadgeText()).toBe('Step 3 / 3')
+    expect(stepBadgeText()).toBe('Step 4 / 4')
     expect(shownPanel()).toBe('LINEログインの情報を入れる')
   })
 
@@ -274,6 +276,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     clearPrecheck()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
+    nextStep()
     fill('v8-provider-id', '2005648758')
     nextStep()
     const button = () => screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
@@ -294,6 +297,8 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(shownPanel()).toBe('LINEログインの情報を入れる')
     back('Webhook の設定へ戻る')
     expect(shownPanel()).toBe('Webhook（受信のつなぎ）を設定する')
+    back('プロバイダーIDへ戻る')
+    expect(shownPanel()).toBe('プロバイダーIDを確認する')
     back('Messaging API へ戻る')
     expect(shownPanel()).toBe('Messaging API の情報を入れる')
     back('事前確認へ戻る')

@@ -29,10 +29,25 @@ const VALUES: Record<Step2Field, string> = {
 
 afterEach(cleanup)
 
-/** ②Step2 を描いて、Ds3E2 の中の URL の枠（内側の Card）を取り出す。 */
+describe('Messaging API の取得先', () => {
+  it('Step 1 は公式アカウントマネージャーを開き、Step 2 でプロバイダーIDをコピーする', () => {
+    const view = render(
+      <Step2Connect sub={1} badge="Step 1 / 4" values={VALUES} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,
+    )
+    expect(view.getByRole('link', { name: 'LINE公式アカウントマネージャーを開く' }).getAttribute('href')).toBe('https://manager.line.biz/')
+    expect(view.queryByRole('link', { name: 'LINE Developers を開く' })).toBeNull()
+    expect(view.queryByLabelText('プロバイダーID')).toBeNull()
+    view.rerender(<Step2Connect sub={2} badge="Step 2 / 4" values={VALUES} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />)
+    expect(view.getByRole('link', { name: 'LINE Developersを開く' }).getAttribute('href')).toBe('https://developers.line.biz/console/')
+    expect(view.getByText(/「プロバイダー設定」の「基本情報」にあるプロバイダーIDをコピー/)).toBeTruthy()
+    expect(view.getByLabelText('プロバイダーID')).toBeTruthy()
+  })
+})
+
+/** ②Step3 を描いて、Ds3E2 の中の URL の枠（内側の Card）を取り出す。 */
 function urlFrame() {
   const { container } = render(
-    <Step2Connect sub={2} badge="Step 2 / 3" values={VALUES} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,
+    <Step2Connect sub={3} badge="Step 3 / 4" values={VALUES} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,
   )
   const box = container.querySelector('[data-design-node="Ds3E2"]')
   expect(box, '承認済み v07 Ds3E2「musubo の Webhook URL」が描かれていない').not.toBeNull()
@@ -41,13 +56,13 @@ function urlFrame() {
   return frame as HTMLElement
 }
 
-describe('②Step2 の Webhook URL の枠は承認済み v07 どおり', () => {
-  it('プロバイダーIDがない古い下書きでは、Step3から別チャネルへ飛ばさない', () => {
+describe('②Step3 の Webhook URL の枠は承認済み v07 どおり', () => {
+  it('プロバイダーIDがない古い下書きでは、Step4から別チャネルへ飛ばさない', () => {
     const view = render(
-      <Step2Connect sub={3} badge="Step 3 / 3" values={VALUES} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,
+      <Step2Connect sub={4} badge="Step 4 / 4" values={VALUES} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,
     )
     expect(view.queryByRole('link', { name: 'LINE Developers のプロバイダーを開く' })).toBeNull()
-    expect(view.getByText('プロバイダーIDがありません。Messaging API の情報へ戻って入力してください。')).toBeTruthy()
+    expect(view.getByText('プロバイダーIDがありません。プロバイダーIDの確認へ戻って入力してください。')).toBeTruthy()
   })
 
   it('表示とコピーが同じチャネル専用URLになる', async () => {
@@ -61,7 +76,7 @@ describe('②Step2 の Webhook URL の枠は承認済み v07 どおり', () => {
     })
     try {
       const view = render(
-        <Step2Connect sub={2} badge="Step 2 / 3" values={{ ...VALUES, channelId: '2001234567' }} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,
+        <Step2Connect sub={3} badge="Step 3 / 4" values={{ ...VALUES, channelId: '2001234567' }} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,
       )
       const expected = 'https://stg-api.musubo.jp/webhook/2001234567'
       expect(view.container.querySelector('[data-design-node="Ds3E2"]')?.textContent).toContain(expected)
