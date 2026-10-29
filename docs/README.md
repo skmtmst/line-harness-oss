@@ -503,6 +503,7 @@
 - [契約者向けLINEの通知専用化](release-log/unreleased/1941-masato-notice-line-only.md)
 - [申込受付と承認画面の調整](release-log/unreleased/1943-masato-registration-approval-pen.md)
 - [接続マニュアルのチャット注意書き復元と画像軽量化](release-log/unreleased/1946-kenta-muse-red-accounts.md)
+- [友だち分析の日付と縦軸の重なり修正](release-log/unreleased/1948-kenta-chart-date-axis.md)
 - [投稿メディアの内容選択](release-log/unreleased/1890-masato-post-media-content.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)

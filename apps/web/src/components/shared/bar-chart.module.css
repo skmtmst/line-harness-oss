@@ -209,6 +209,10 @@
   min-width: 100%;
   transform: translateX(-50%);
 }
+.chart[data-chart-distribution='diverging'] .column:first-child .axisLabel {
+  left: 0;
+  transform: none;
+}
 .chart[data-chart-distribution='diverging'] [data-chart-baseline] { border-color: var(--color-ink-faint); }
 .events { position: absolute; top: calc(0px - var(--tpl-an-mark) - var(--tpl-an-mark-gap)); display: flex; justify-content: center; gap: var(--tpl-an-mark-gap); }
 
