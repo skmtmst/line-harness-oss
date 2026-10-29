@@ -179,8 +179,8 @@ export default function OpsDashboardV8() {
                   <GridHeadRow>
                     <GridCell role="columnheader">契約先</GridCell>
                     <GridCell role="columnheader" align="right">配信通数</GridCell>
-                    <GridCell role="columnheader" align="right">バナー生成</GridCell>
-                    <GridCell role="columnheader" align="right">メディア容量</GridCell>
+                    <GridCell role="columnheader" align="right" title="バナー生成">バナー</GridCell>
+                    <GridCell role="columnheader" align="right" title="メディア容量">メディア</GridCell>
                   </GridHeadRow>
                   {data.usage.map((row) => (
                     <GridRow key={row.tenantId}>

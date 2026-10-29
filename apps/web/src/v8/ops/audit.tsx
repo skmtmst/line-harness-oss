@@ -170,7 +170,7 @@ export default function OpsAuditV8() {
             <thead><TableHeadRow><Th>日時</Th><Th>運営者</Th><Th><span>操作</span></Th><Th>契約先</Th><Th grow>理由</Th></TableHeadRow></thead>
             <tbody>{rows.map((row) => (
               <Tr key={row.id}>
-                <Td title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</Td>
+                <Td title={formatDateTime(row.created_at)} className={styles.atCell}>{shortDateTime(row.created_at)}</Td>
                 <Td><TruncatedText value={row.staff_name ?? ''} /></Td>
                 <Td><RowNameButton title={actionWord(row.action)} onClick={() => setEntry({ occurredAt: row.created_at, target: row.tenant_name ?? '運営全体', status: actionWord(row.action), reason: row.reason ?? '理由の記録なし' })}>{actionWord(row.action)}</RowNameButton></Td>
                 <Td title={row.tenant_name ?? ''}><TruncatedText value={row.tenant_name ?? emptyValue('unknown')} /></Td>
