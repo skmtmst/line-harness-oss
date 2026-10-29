@@ -5,18 +5,19 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
+import PasswordRequirements from '@/components/auth/password-requirements'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession } from '@/lib/admin-session'
-import { authRequest, confirmError, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
+import { authRequest, confirmError, CONTACT_URL, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 
 /**
  * 会員登録の本登録。★管理画面 36-4-B（`jk88n`、カード `oVX3x`）。
  *
- * メールの URL（`?token=`）から開く。会社名・名前・パスワードを入れると
+ * 承認メールの URL（`?token=`）から開く。申込済み会社名・担当者名を確認してパスワードを入れると
  * 統括（トライアル 30 日）とオーナー権限者ができ、そのまま統括の画面へ。
  */
 export default function RegisterCompletePage() {
@@ -27,14 +28,12 @@ export default function RegisterCompletePage() {
   )
 }
 
-type TokenCheck = { state: 'checking' } | { state: 'ok'; email: string; trialDays: number } | { state: 'bad'; message: string }
+type TokenCheck = { state: 'checking' } | { state: 'ok'; email: string; trialDays: number; companyName: string; contactName: string } | { state: 'pending' } | { state: 'bad'; message: string }
 
 function CompleteInner() {
   const params = useSearchParams()
   const token = params.get('token') ?? ''
   const [check, setCheck] = useState<TokenCheck>({ state: 'checking' })
-  const [tenantName, setTenantName] = useState('')
-  const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [messages, setMessages] = useState<Record<string, string | null>>({})
@@ -47,9 +46,10 @@ function CompleteInner() {
       setCheck({ state: 'bad', message: 'この URL は正しくありません。メールの URL をそのまま開いてください' })
       return
     }
-    void authRequest<{ email: string; trialDays: number }>(`/api/auth/register/check?token=${encodeURIComponent(token)}`).then((res) => {
+    void authRequest<{ email: string; trialDays: number; companyName: string; contactName: string }>(`/api/auth/register/check?token=${encodeURIComponent(token)}`).then((res) => {
       if (!alive) return
-      if (res.ok && res.data) setCheck({ state: 'ok', email: res.data.email, trialDays: res.data.trialDays })
+      if (res.ok && res.data) setCheck({ state: 'ok', email: res.data.email, trialDays: res.data.trialDays, companyName: res.data.companyName, contactName: res.data.contactName })
+      else if (res.code === 'approval_required') setCheck({ state: 'pending' })
       else setCheck({ state: 'bad', message: res.error || 'この URL は使えません' })
     })
     return () => {
@@ -60,8 +60,6 @@ function CompleteInner() {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     const next: Record<string, string | null> = {
-      tenantName: tenantName.trim() ? null : '会社名・統括名を入力してください',
-      name: name.trim() ? null : 'お名前を入力してください',
       password: passwordError(password),
       confirm: confirmError(password, confirm),
     }
@@ -71,8 +69,6 @@ function CompleteInner() {
     setError('')
     const res = await authRequest<{ tenantId: string; deviceMarker: string; sessionToken?: string; twoFactorSetup?: boolean; challengeToken?: string }>('/api/auth/register/complete', {
       token,
-      tenantName: tenantName.trim(),
-      name: name.trim(),
       password,
       deviceMarker: readDeviceMarker(),
     })
@@ -117,14 +113,26 @@ function CompleteInner() {
       </AuthCard>
     )
   }
+  if (check.state === 'pending') {
+    return <AuthCard node="VA42o" title="お申し込みを確認中です"
+      description="担当者からご連絡します。承認のご案内が届くまで、musuboへのログインはできません。">
+      <div className="w-full rounded-control bg-surface-pearl px-4 py-4 text-caption text-ink-secondary">
+        <strong className="block text-ink">次に行うこと</strong>
+        お申し込み時のメールをご確認ください。担当者からの連絡がない場合はお問い合わせください。
+      </div>
+      <Button href={CONTACT_URL} external variant="primary" className="w-full">お問い合わせ</Button>
+      <Button href="/login" className="w-full">ログイン画面に戻る</Button>
+    </AuthCard>
+  }
 
   return (
     <AuthCard
       node="jk88n"
       cardNode="oVX3x"
-      title="本登録"
-      description={`メールアドレスの確認ができました。会社名・お名前・パスワードを入れると登録が完了し、そのまま統括の画面に入れます（${check.trialDays}日間の無料トライアル）。`}
+      title="利用開始の設定"
+      description={`お申し込みが承認されました。設定を完了すると${check.trialDays}日間無料でmusuboを利用できます。`}
     >
+      <Notice tone="success" message="承認済み　初期設定を完了してください" />
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
           <Notice tone="danger" message={error} />
@@ -135,35 +143,30 @@ function CompleteInner() {
             <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-accent-deep" />
           </div>
         </AuthField>
-        <AuthField label="会社名・統括名" hint="あとから変えられます" htmlFor="complete-tenant" error={messages.tenantName}>
+        <AuthField label="会社名" htmlFor="complete-tenant">
           <TextField
             id="complete-tenant"
-            value={tenantName}
-            onChange={(event) => setTenantName(event.target.value)}
-            invalid={Boolean(messages.tenantName)}
+            value={check.companyName}
+            readOnly
             autoComplete="organization"
-            maxLength={80}
-            placeholder="例：株式会社サンプル"
           />
         </AuthField>
-        <AuthField label="あなたの名前" htmlFor="complete-name" error={messages.name}>
+        <AuthField label="担当者名" htmlFor="complete-name">
           <TextField
             id="complete-name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            invalid={Boolean(messages.name)}
+            value={check.contactName}
+            readOnly
             autoComplete="name"
-            maxLength={80}
-            placeholder="例：山田 太郎"
           />
         </AuthField>
-        <AuthField label="パスワード" hint="8文字以上・英字と数字" htmlFor="complete-password" error={messages.password}>
-          <PasswordField id="complete-password" value={password} onChange={setPassword} invalid={Boolean(messages.password)} autoComplete="new-password" />
+        <AuthField label="パスワード" htmlFor="complete-password" error={messages.password}>
+          <PasswordField id="complete-password" value={password} onChange={setPassword} invalid={Boolean(messages.password)} autoComplete="new-password" placeholder="新しいパスワードを入力" />
+          <PasswordRequirements value={password} />
         </AuthField>
         <AuthField label="パスワード（確認）" htmlFor="complete-confirm" error={messages.confirm}>
           <PasswordField id="complete-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(messages.confirm)} autoComplete="new-password" />
         </AuthField>
-        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="登録しています…">無料で始める
+        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="設定しています…">設定を完了してmusuboを始める
         </Button>
       </form>
     </AuthCard>

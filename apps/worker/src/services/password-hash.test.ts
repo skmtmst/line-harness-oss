@@ -20,14 +20,16 @@ describe('パスワードのハッシュ（36-4）', () => {
     expect(await verifyPassword('x', 'pbkdf2-sha256$1000$!!!$bb')).toBe(false);
   });
 
-  it('8文字以上・英数の両方・空白なし', () => {
+  it('13文字以上・大小英字・数字・特殊記号・空白なし', () => {
     expect(validatePasswordPolicy('')).toContain('入力');
-    expect(validatePasswordPolicy('abc1')).toContain('8文字');
-    expect(validatePasswordPolicy('abcdefgh')).toContain('英字と数字');
-    expect(validatePasswordPolicy('12345678')).toContain('英字と数字');
-    expect(validatePasswordPolicy('abcd 1234')).toContain('空白');
+    expect(validatePasswordPolicy('abc1')).toContain('13文字');
+    expect(validatePasswordPolicy('a'.repeat(13))).toContain('英大文字');
+    expect(validatePasswordPolicy('A'.repeat(13))).toContain('英小文字');
+    expect(validatePasswordPolicy('Aa'.repeat(7))).toContain('数字');
+    expect(validatePasswordPolicy('Aa1'.repeat(5))).toContain('特殊記号');
+    expect(validatePasswordPolicy('Aa1! '.repeat(3))).toContain('空白');
     expect(validatePasswordPolicy('a'.repeat(128) + '1')).toContain('128文字');
-    expect(validatePasswordPolicy('abcdefg1')).toBeNull();
+    expect(validatePasswordPolicy('StrongPassword1!')).toBeNull();
   });
 });
 
