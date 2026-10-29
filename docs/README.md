@@ -461,8 +461,8 @@
 
 - [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
 - [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
-- [共通UIの状態表示・操作の修正](release-log/unreleased/0000-kenta-muse-ui-state.md)
-- [招待・ログインユーザー・予約枠の表示修正](release-log/unreleased/0000-kenta-muse-auth.md)
+- [共通UIの状態表示・操作の修正](release-log/unreleased/1952-kenta-muse-ui-state.md)
+- [招待・ログインユーザー・予約枠の表示修正](release-log/unreleased/1952-kenta-muse-auth.md)
 - [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/1948-kenta-train-1029f.md)
 - [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
 - [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
@@ -955,4 +955,6 @@
 - [シナリオ人数の単位と補足位置](release-log/unreleased/1951-kenta-scenario-count-labels.md) — 不明時の単位と登録0人の補足位置の修正履歴。
 - [問い合わせのタブ・カルーセルの絵・更新履歴の検索](release-log/unreleased/1951-kenta-swb-x10-x14-x18.md)
 - [アカウント選択と読み込み失敗時の案内](release-log/unreleased/1951-kenta-train-1029h.md)
-- [ECのホームの確認項目](release-log/unreleased/0000-kenta-ec-dashboard.md) — 反映履歴、確認 2026-10-30
+- [ECのホームの確認項目](release-log/unreleased/1952-kenta-ec-dashboard.md) — 反映履歴、確認 2026-10-30
+- [共通の型と認証画面の帯の間隔](release-log/unreleased/1952-kenta-muse-fqa-space.md)
+- [UID移行の権限と操作の表示](release-log/unreleased/1952-kenta-uid-permissions.md)
