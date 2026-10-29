@@ -464,6 +464,8 @@
 - [LINEアカウント登録の使い方選択ポップアップ](release-log/unreleased/1898-masato-register-style-dialog.md) — 登録時に使い方の見本を見て選ぶか、後で設定する変更の反映履歴。
 - [LINE接続マニュアルの現行4ステップへの更新](release-log/unreleased/1897-masato-line-connect-manual.md)
 - [LINEログインチャネル作成手順の追加](release-log/unreleased/1911-masato-line-login-create-guide.md)
+- [LINEログイン画像の重複した番号を削除](release-log/unreleased/1912-masato-line-login-callout-numbers.md)
+- [LINEログインチャネル公開画像の番号とID表示を修正](release-log/unreleased/1913-masato-line-publish-image-cleanup.md)
 - [LINEログインチャネル作成・種類の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-type.webp)
 - [LINEログインチャネル作成・入力欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-fields.webp)
 - [LINEログインチャネル作成・同意欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-final.webp)
@@ -893,3 +895,4 @@
 - [LINE接続マニュアルStep 4の画像更新](release-log/unreleased/1909-masato-line-login-guide-real-screens.md) — LINEログイン実画面と秘匿表示の反映履歴。
 - [LINE接続マニュアルStep 4の友だち追加画像更新](release-log/unreleased/1910-masato-line-linked-oa-guide-screen.md) — 現行画面の編集箇所と秘匿表示の反映履歴。
 - [まとめ列車 1029](release-log/unreleased/1905-kenta-train-all-1029.md) — メモの保存の直しと各担当の完成分の反映履歴。
+- [友だち引き継ぎの進捗表示](release-log/unreleased/1914-masato-follower-handover-progress.md) — Penに合わせた動的な進捗画面の反映履歴。
