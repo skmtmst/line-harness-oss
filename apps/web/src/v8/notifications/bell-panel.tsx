@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import BellPopover, { type BellItem, type BellPopoverProps } from '@/components/shared/bell-popover'
 import { NOTIFICATION_TABS, type NotificationTab } from './tabs'
 
@@ -31,7 +32,8 @@ export type BellPanelProps = {
   state: BellPanelState
   /** 見せる行（呼ぶ側で未読が先・新しい順にし、5件までに切る）。 */
   items: BellPanelItem[]
-  unreadCount: number
+  unreadCount: number | null
+  partialNotice?: ReactNode
   tab: NotificationTab
   onTabChange: (tab: NotificationTab) => void
   errorMessage?: string
@@ -64,7 +66,7 @@ export default function BellPanel({ items, tab, onTabChange, ...rest }: BellPane
       filters={NOTIFICATION_TABS}
       filter={tab}
       onFilterChange={onTabChange}
-      emptyText={EMPTY[tab]}
+      emptyText={rest.partialNotice ? '読み込めた店舗に該当する通知はありません。' : EMPTY[tab]}
     />
   )
 }

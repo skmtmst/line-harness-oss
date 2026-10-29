@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Sparkles, TriangleAlert } from 'lucide-react'
 import MenuPortal, { type MenuPortalRect } from './menu-portal'
 import SegmentedControl from './segmented'
@@ -36,7 +36,9 @@ export type BellPopoverProps<F extends string = BellFilter> = {
   state: BellPopoverState
   /** 見せる行（呼ぶ側で未読が先・新しい順にし、5件までに切る）。 */
   items: BellItem[]
-  unreadCount: number
+  unreadCount: number | null
+  /** 一部の対象だけ読み込めたときの単一案内。 */
+  partialNotice?: ReactNode
   filter: F
   onFilterChange: (filter: F) => void
   /** 種類のタブ。省くと「すべて・エラー・アップデート」。 */
@@ -81,6 +83,7 @@ export default function BellPopover<F extends string = BellFilter>({
   state,
   items,
   unreadCount,
+  partialNotice,
   filter,
   onFilterChange,
   filters,
@@ -128,7 +131,11 @@ export default function BellPopover<F extends string = BellFilter>({
       >
         <header className={styles.head}>
           <h2 className={styles.title}>{title}</h2>
-          {state === 'ready' ? <span className={styles.unread}>{`未読 ${unreadCount}`}</span> : null}
+          {state === 'ready' ? (
+            <span className={styles.unread} aria-label={unreadCount === null ? '未読数を確認できません' : `未読 ${unreadCount}`}>
+              {unreadCount === null ? '未読 —' : `未読 ${unreadCount}`}
+            </span>
+          ) : null}
           {state === 'ready' && onMarkAllRead ? (
             <button type="button" className={styles.markAll} onClick={onMarkAllRead} disabled={unreadCount === 0}>
               すべて既読にする
@@ -148,6 +155,7 @@ export default function BellPopover<F extends string = BellFilter>({
           </div>
         ) : null}
 
+        {state === 'ready' ? partialNotice : null}
         {state === 'loading' ? (
           <p className={styles.state} role="status">読み込み中…</p>
         ) : state === 'no-account' ? (

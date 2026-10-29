@@ -10,6 +10,7 @@ import { loadFailureCopy, loadFailureNotice } from '@/components/shared/api-erro
 import { formatRelative, formatYmd } from '@/lib/format'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { notifyToast } from '@/components/shared/toast'
+import Notice from '@/components/shared/notice'
 import { loadNotificationCenter, type NotificationAccount, type NotificationScope, type ScopedCenterData, type ScopedNotification } from './notification-center-data'
 
 /** 小窓に出す最大の件数（絵 mV28V）。 */
@@ -107,7 +108,7 @@ export default function BellNotifications({
 
   const apply = useCallback((next: ScopedCenterData) => {
     setData(next)
-    unreadRef.current(next.counts.unread)
+    unreadRef.current(next.unreadCount)
   }, [])
 
   const markRead = useCallback((item: ScopedNotification) => {
@@ -116,7 +117,7 @@ export default function BellNotifications({
       ...data,
       items: data.items.map((row) => (row.id === item.id && row.sourceAccountId === item.sourceAccountId ? { ...row, isRead: true } : row)),
       counts: { ...data.counts, unread: Math.max(0, data.counts.unread - 1) },
-      unreadCount: Math.max(0, data.unreadCount - 1),
+      unreadCount: data.unreadCount === null ? null : Math.max(0, data.unreadCount - 1),
     })
     void (async () => {
       try {
@@ -131,12 +132,13 @@ export default function BellNotifications({
   }, [apply, canMarkRead, data, load, scope])
 
   const markAllRead = useCallback(() => {
-    if (!canMarkRead || !data || data.counts.unread === 0) return
+    if (!canMarkRead || !data || data.unreadCount === 0) return
+    const totalWasUnknown = data.unreadCount === null
     apply({
       ...data,
       items: data.items.map((row) => ({ ...row, isRead: true })),
       counts: { ...data.counts, unread: 0 },
-      unreadCount: 0,
+      unreadCount: totalWasUnknown ? null : 0,
     })
     void (async () => {
       try {
@@ -167,6 +169,9 @@ export default function BellNotifications({
       linkLabel: notificationLinkLabel(item, { accountId: item.sourceAccountId, canManage: destinationContext.canManage }),
     }
   })
+  const partialNotice = data && data.failedAccountLabels.length > 0 ? (
+    <Notice tone="warn" compact role="status" message={`${data.failedAccountLabels.join('、')} の通知を読み込めませんでした。読めた店舗の通知を表示しています。全店の未読件数は確認できません。`} />
+  ) : undefined
 
   const select = (id: string) => {
     const item = shown.find((row) => `${row.sourceAccountId}:${row.id}` === id)
@@ -191,7 +196,8 @@ export default function BellNotifications({
       id={popover.id}
       state={state}
       items={items}
-      unreadCount={data?.counts.unread ?? 0}
+      unreadCount={data?.unreadCount ?? null}
+      partialNotice={partialNotice}
       tab={tab}
       onTabChange={setTab}
       errorMessage={error?.message}

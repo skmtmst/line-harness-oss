@@ -145,6 +145,30 @@ describe('★V8 ベルの小窓', () => {
     expect(fixture.push).toHaveBeenCalled()
   })
 
+  it('統括で1店だけ取得に失敗しても読めた店の通知を出し、知らせは1つ・全店件数は不明にする', async () => {
+    fixture.list.mockImplementation(async (id: string) => id === 'account-2'
+      ? { success: false, error: 'failed' }
+      : centerData([item('available', { title: '本店で読めた通知' })]))
+    render(<Harness accountId={null} accounts={[{ id: 'account-1', label: '本店' }, { id: 'account-2', label: '渋谷店' }]} />)
+
+    const dialog = await openPopover()
+    expect(await within(dialog).findByText('本店：本店で読めた通知')).toBeTruthy()
+    expect(within(dialog).getByRole('status').textContent).toContain('渋谷店 の通知を読み込めませんでした')
+    expect(within(dialog).getAllByRole('status')).toHaveLength(1)
+    expect(within(dialog).getByText('未読 —')).toBeTruthy()
+    expect(within(dialog).queryByText('未読 1')).toBeNull()
+    expect(within(dialog).queryByText('通知はまだありません。')).toBeNull()
+    expect(bell().getAttribute('aria-label')).toBe('通知（未読数を確認できません）')
+    expect(fixture.list).toHaveBeenCalledTimes(2)
+    const markAll = within(dialog).getByRole('button', { name: 'すべて既読にする' })
+    expect((markAll as HTMLButtonElement).disabled).toBe(false)
+    await act(async () => { fireEvent.click(markAll) })
+    expect(fixture.markAllRead.mock.calls.map(([id]) => id)).toEqual(['account-1', 'account-2'])
+    expect(within(dialog).getByText('未読 —')).toBeTruthy()
+    expect(within(dialog).queryByText('未読 0')).toBeNull()
+    expect(bell().getAttribute('aria-label')).toBe('通知（未読数を確認できません）')
+  })
+
   afterEach(() => {
     cleanup()
     vi.useRealTimers()
