@@ -13,8 +13,9 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/line-notifications',
 }))
+const mutation = vi.hoisted(() => vi.fn())
 const identity = vi.hoisted(() => ({ role: 'owner', readOnly: false, roleBundle: undefined as string | undefined }))
-beforeEach(() => { identity.role = 'owner'; identity.readOnly = false; identity.roleBundle = undefined })
+beforeEach(() => { mutation.mockReset(); identity.role = 'owner'; identity.readOnly = false; identity.roleBundle = undefined })
 const run = vi.hoisted(() => (id: string, channel: 'line' | 'email', reason: string) => ({
   id, recipientType: 'customer', notificationName: '注文', source: 'ec', sourceEventId: 'e', friendId: 'f', friendName: '田中',
   orderNumber: 'A-1', channel, status: 'failed', reason, receivedAt: '2026-10-01T00:00:00Z', acceptedAt: null, attemptCount: 1,
@@ -29,10 +30,11 @@ vi.mock('@/lib/api', async (importOriginal) => {
   }
   return {
     ...actual,
+    fetchApi: mutation,
     api: {
       ...actual.api,
       staff: { ...actual.api.staff, me: async () => ({ success: true, data: identity }) },
-      lineNotifications: { ...actual.api.lineNotifications, deliveries: async () => page, notificationRuns: async () => page },
+      lineNotifications: { ...actual.api.lineNotifications, deliveries: async () => page, notificationRuns: async () => page, retryDelivery: mutation },
       ecCommerce: { ...actual.api.ecCommerce, notificationRuns: async () => page },
     },
   }
@@ -68,11 +70,14 @@ test.each([
   [{ role: 'owner' }, true, true], [{ role: 'admin' }, false, true], [{ role: 'staff' }, false, false],
   [{ role: 'viewer' }, false, false], [{ role: 'admin', readOnly: true }, false, false],
   [{ role: 'owner', roleBundle: 'view_only' }, false, false],
-] as const)('詳細は読めるが送り直しと対応済みは現在の権限だけに出す: %j', async (staff, retry, resolve) => {
+] as const)('詳細と操作を残し、送り直しと対応済みは現在の権限でロックする: %j', async (staff, retry, resolve) => {
   Object.assign(identity, staff)
   render(<RunsTab lineAccountId="acc" mode="failures" />)
   fireEvent.click((await screen.findAllByRole('button', { name: '注文' }))[0])
   await screen.findByText('記録の詳細')
-  expect(Boolean(screen.queryByRole('button', { name: '送信を再試行する' }))).toBe(retry)
-  expect(Boolean(screen.queryByRole('button', { name: '対応済みにする' }))).toBe(resolve)
+  expect(screen.getByRole('button', { name: '送信を再試行する' }).getAttribute('aria-disabled') === 'true').toBe(!retry)
+  expect(screen.getByRole('button', { name: '対応済みにする' }).getAttribute('aria-disabled') === 'true').toBe(!resolve)
+  if (!retry) fireEvent.click(screen.getByRole('button', { name: '送信を再試行する' }))
+  if (!resolve) fireEvent.click(screen.getByRole('button', { name: '対応済みにする' }))
+  expect(mutation).not.toHaveBeenCalled()
 })

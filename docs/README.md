@@ -927,3 +927,5 @@
 - [自動応答の閲覧表示と作成画面の間隔](release-log/unreleased/1933-kenta-auto-reply-wizard.md) — 閲覧時の入力表示と縦の空きの反映履歴。
 - [一覧のページ範囲の補正](release-log/unreleased/1933-kenta-muse-history-pagination.md) — 削除後に最後のページへ戻す修正の反映履歴。
 - [登録の確認画面の表示とロゴ](release-log/unreleased/1945-masato-registration-confirmed-logo.md) — 登録の確認項目と正式ロゴの修正履歴。
+
+- [LINE通知の操作権限の反映履歴](release-log/unreleased/0000-kenta-notification-permission.md)
