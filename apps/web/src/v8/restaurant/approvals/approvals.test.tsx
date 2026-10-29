@@ -88,4 +88,14 @@ it('86: 「すべての店舗」を足す画面は1店でも選ぶ欄を出す�
   expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
 })
 
+// 109: 承認は主（右）、差戻しは赤い文字だけ。並びは［差戻し］［承認する］。
+it('承認待ちの並びは［差戻し］［承認する］で承認が主', async () => {
+  render(<ApprovalsV8 />)
+  const approve = await screen.findByRole('button', { name: '承認する' })
+  const back = screen.getByRole('button', { name: '差戻し' })
+  expect(back.getAttribute('data-variant')).toBe('text')
+  expect(approve.getAttribute('data-variant')).toBe('primary')
+  expect(Boolean(back.compareDocumentPosition(approve) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+})
+
 afterEach(() => { verifiedStaffRole(null) })
