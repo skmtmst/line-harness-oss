@@ -14,13 +14,13 @@ vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentP
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null, loading: false }) }))
 vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'standard' }, status: 'ready' }) }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: 'LINEアカウント', iconUrl: null }) }))
-vi.mock('@/lib/use-tenant-name', () => ({ useTenantName: () => 'Shed Products株式会社' }))
 vi.mock('@/components/hq/account-menu', () => ({ SidebarAccountMenu: () => null }))
 vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: fixture.version }))
 vi.mock('@/components/update/use-update-status', async (original) => ({ ...await original<typeof import('@/components/update/use-update-status')>(), useUpdateStatus: () => ({ kind: 'latest', version: '2.7.0' }) }))
 vi.mock('@/lib/api/helpers/styles', () => ({ hqStyleApi: { attention: async () => ({ success: true, data: { items: [] } }) } }))
 
 import Sidebar from './sidebar'
+import SuspendedSidebar from './suspended-sidebar'
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -31,7 +31,7 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); forgetStaffIdentity(); window.localStorage.clear() })
 
-describe('サイドバーの会社表示・設定・版', () => {
+describe('サイドバーの共通ロゴ・設定・版', () => {
   it('旧テーマだけに隠すクラスを戻さない', () => {
     const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'sidebar.tsx'), 'utf8')
     expect(source).not.toContain('v7-only')
@@ -40,15 +40,19 @@ describe('サイドバーの会社表示・設定・版', () => {
   it.each([
     ['店舗', '/', '設定', '/settings', '統括の設定'],
     ['統括', '/hq', '統括の設定', '/hq/settings', '設定'],
-  ])('%sで同じ会社表示と版を出し、対応する設定へ進める', async (_shell, pathname, label, href, otherLabel) => {
+  ])('%sで同じ公式ロゴと版を出し、対応する設定へ進める', async (_shell, pathname, label, href, otherLabel) => {
     fixture.pathname = pathname
     const view = render(createElement(Sidebar))
     // 非表示のモバイル複製ではなく、常設のサイドバーを検証する。
     const desktop = within(view.container.querySelector('aside:not(#mobile-menu)') as HTMLElement)
-    expect(desktop.getByTitle('Shed Products株式会社').textContent).toBe('Shed Products株式会社')
+    const logo = desktop.getByRole('img', { name: 'musubo' }) as HTMLImageElement
+    expect(logo.getAttribute('src')).toBe('/brand/musubo-color.png')
+    expect(logo.closest('[data-design-node="J33xq/V2WbXF"]')).toBeTruthy()
+    expect(desktop.queryByText('Shed Products株式会社')).toBeNull()
     expect(desktop.queryByTitle('LINEアカウント')).toBeNull()
-    expect(desktop.getByTitle('Shed Products株式会社').closest('[data-design-node="J33xq/V2WbXF"]')?.querySelector('[aria-hidden="true"]')).toBeNull()
-    expect(desktop.getByText('musubo')).toBeTruthy()
+    const drawer = within(view.container.querySelector('#mobile-menu') as HTMLElement)
+    expect(drawer.getAllByRole('img', { name: 'musubo' })).toHaveLength(1)
+    expect((drawer.getByRole('img', { name: 'musubo' }) as HTMLImageElement).getAttribute('src')).toBe('/brand/musubo-color.png')
     expect(desktop.getByRole('link', { name: label }).getAttribute('href')).toBe(href)
     expect(desktop.queryByRole('link', { name: otherLabel })).toBeNull()
     // 閉じた状態は版と環境の1行。詳細は共通の浮く面で開いて確かめる。
@@ -60,14 +64,22 @@ describe('サイドバーの会社表示・設定・版', () => {
 
   it.each([
     ['/', 'サンプルアカウント'],
-    ['/hq', 'Shed Products株式会社'],
+    ['/hq', 'musubo'],
   ])('%sの見本では見出しを保ち、設定と版の取得を出さない', (pathname, heading) => {
     fixture.pathname = pathname
     const view = render(createElement<NonNullable<Parameters<typeof Sidebar>[0]>>(Sidebar, { preview: true }))
     const desktop = within(view.container.querySelector('aside:not(#mobile-menu)') as HTMLElement)
-    expect(desktop.getByText(heading)).toBeTruthy()
+    if (heading === 'musubo') expect(desktop.getByRole('img', { name: heading })).toBeTruthy()
+    else expect(desktop.getByText(heading)).toBeTruthy()
     expect(desktop.queryByRole('link', { name: /^(統括の)?設定$/ })).toBeNull()
     expect(desktop.queryByText(/Ver\./)).toBeNull()
     expect(fixture.version).not.toHaveBeenCalled()
+  })
+
+  it('利用停止中のメニューでも同じ公式ロゴを出す', () => {
+    const view = render(createElement(SuspendedSidebar))
+    const desktop = within(view.container.querySelector('aside') as HTMLElement)
+    expect((desktop.getByRole('img', { name: 'musubo' }) as HTMLImageElement).getAttribute('src')).toBe('/brand/musubo-color.png')
+    expect(desktop.queryByText('musubo 統括コンソール')).toBeNull()
   })
 })

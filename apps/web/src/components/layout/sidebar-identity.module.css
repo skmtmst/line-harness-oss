@@ -1,4 +1,43 @@
-/* 会社名と製品名の固定部分。下の余白は流れるメニューに持たせる。 */
+/* 提供された横長ロゴの透明余白だけを表示領域で切る。 */
+.logoRoot {
+  display: flex;
+  min-width: 0;
+  height: 54px;
+  align-items: center;
+  padding: 4px 20px 0;
+}
+
+.logoViewport {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 176px;
+  height: 34px;
+  overflow: hidden;
+}
+
+.logoImage {
+  position: absolute;
+  top: -14px;
+  left: -17px;
+  display: block;
+  width: 210px;
+  max-width: none;
+  height: auto;
+}
+
+.compact { padding: 0; }
+
+:root [data-collapsed] .logoRoot {
+  height: 40px;
+  justify-content: center;
+  padding: 0;
+}
+
+:root [data-collapsed] .logoViewport { width: 34px; height: 34px; }
+:root [data-collapsed] .logoImage { top: -21px; left: -22px; width: 260px; }
+
+/* 運営画面の別コンポーネントが使う旧スタイル。 */
 .root {
   display: flex;
   min-width: 0;
