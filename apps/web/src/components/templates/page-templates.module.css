@@ -112,6 +112,8 @@
 :global(:root) .dashboardRow[data-aside-size='column'] > .dashboardCell { grid-column: 1 / -2; }
 :global(:root) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: -2 / -1; width: auto; }
 :global(:root) .createContent { padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side); display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; flex: 1; }
+/* 作成の本文が間隔の唯一の持ち主。直下の共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
+:global(:root) .createContent > :global([data-design-part='notice']) { margin-block: 0; }
 :global(:root) .bodyEndActions { display: flex; flex: none; align-items: center; justify-content: center; gap: var(--polish-space-field); width: 100%; padding-block: var(--polish-space-section); }
 :global(:root) .preview { align-self: flex-start; position: sticky; top: 0; max-height: 100%; width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
 /* 作成の右欄は白い板と同じ面。端末の中の地は見え方の部品が持つ。 */
