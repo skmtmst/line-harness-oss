@@ -8,7 +8,6 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
 import { PageHeading } from '@/components/templates/page-frame';
 import DateField from '@/components/shared/date-field';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Link from 'next/link';
 import { useAccount } from '@/contexts/account-context';
 import Button from '@/components/shared/button';
 import MenuPortal from '@/components/shared/menu-portal';
@@ -762,13 +761,6 @@ export default function NewProxyBookingPage() {
   return (
     <div data-design-node={`${NODE_BY_STEP[step]} If9Mh`} className="space-y-4 pb-24">
       <div><PageHeading title="電話の予約を入れる" /></div>
-      <nav data-design="Crumb" aria-label="現在位置" className="text-ink-faint text-xs">
-        <Link href="/booking/bookings" className="text-action underline">予約</Link>
-        <span className="mx-2">›</span>
-        <Link href="/booking/bookings" className="text-action underline">予約管理</Link>
-        <span className="mx-2">›</span>
-        <span>{step === 'confirm' ? '内容を確認' : step === 'done' ? '登録が終わりました' : step === 'conflict' ? '入れられません' : '電話の予約を入れる'}</span>
-      </nav>
 
       {error && step !== 'conflict' && (
         <Notice
