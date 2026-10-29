@@ -465,6 +465,7 @@
 - [LINE接続マニュアルの現行4ステップへの更新](release-log/unreleased/1897-masato-line-connect-manual.md)
 - [LINEログインチャネル作成手順の追加](release-log/unreleased/1911-masato-line-login-create-guide.md)
 - [LINEログイン画像の重複した番号を削除](release-log/unreleased/1912-masato-line-login-callout-numbers.md)
+- [LINEログインチャネル公開画像の番号とID表示を修正](release-log/unreleased/1913-masato-line-publish-image-cleanup.md)
 - [LINEログインチャネル作成・種類の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-type.webp)
 - [LINEログインチャネル作成・入力欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-fields.webp)
 - [LINEログインチャネル作成・同意欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-final.webp)
