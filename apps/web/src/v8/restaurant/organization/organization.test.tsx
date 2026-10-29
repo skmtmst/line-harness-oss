@@ -33,6 +33,21 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
+it('86: 店が1つしか無い時は選ぶ欄を出さない', async () => {
+  render(<OrganizationV8 />)
+  expect(await screen.findByText('試験担当')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '店舗' })).toBeNull()
+  expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+})
+
+it('86: 2店以上の時は［店舗：…］の選ぶ欄を出す', async () => {
+  fixture.snapshot.mockResolvedValue({ data: { ...data, stores: [...data.stores, { ...data.stores[0], id: 'store-2', name: '二号店' }] } })
+  render(<OrganizationV8 />)
+  expect(await screen.findByText('試験担当')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '店舗' })).toBeTruthy()
+  expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+})
+
 it('ログインとの連携は「変更」の窓の中で保存する', async () => {
   render(<OrganizationV8 />)
   const row = (await screen.findByText('試験担当')).closest('[role="row"]') as HTMLElement

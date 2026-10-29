@@ -73,4 +73,19 @@ it('閲覧のみには帯を出し、差戻し・承認するのボタンを置�
   expect(fixture.decideApproval).not.toHaveBeenCalled()
 })
 
+it('86: 2店以上の時は［店舗：…］の選ぶ欄を出し、下線のタブは出さない', async () => {
+  fixture.snapshot.mockResolvedValue({ data: { ...data, stores: [...data.stores, { ...data.stores[0], id: 'store-2', name: '二号店' }] } })
+  render(<ApprovalsV8 />)
+  expect(await screen.findByText('価格改定')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '店舗' })).toBeTruthy()
+  expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+})
+
+it('86: 「すべての店舗」を足す画面は1店でも選ぶ欄を出す（選ぶ意味がある）', async () => {
+  render(<ApprovalsV8 />)
+  expect(await screen.findByText('価格改定')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '店舗' })).toBeTruthy()
+  expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+})
+
 afterEach(() => { verifiedStaffRole(null) })

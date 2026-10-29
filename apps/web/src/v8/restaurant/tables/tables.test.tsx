@@ -224,4 +224,19 @@ describe('BERxg 座席・卓管理', () => {
     expect(pickMoveTarget(r, tables.filter((t) => t.id !== 't3'), [])?.id).toBe('t1')
     expect(pickMoveTarget(r, tables.filter((t) => t.id !== 't3'), [reservation('y', { table_id: 't1', starts_at: at(1, 19), ends_at: at(1, 21) })])?.id).toBe('t2')
   })
+
+  it('86: 2店以上の時は［店舗：…］の選ぶ欄を出し、下線のタブは出さない', async () => {
+    fixture.snapshot.mockResolvedValue({ data: snapshotOf({ reservations: upcoming, stores: [{ ...store, id: 'store-2', name: '新宿店' }, store] }) })
+    render(<TablesPage />)
+    await screen.findByText('卓の割り当て方')
+    expect(screen.getByRole('button', { name: '店舗' })).toBeTruthy()
+    expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+  })
+
+  it('86: 店が1つしか無い時は選ぶ欄を出さない', async () => {
+    render(<TablesPage />)
+    await screen.findByText('卓の割り当て方')
+    expect(screen.queryByRole('button', { name: /^店舗/ })).toBeNull()
+    expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+  })
 })
