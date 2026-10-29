@@ -26,6 +26,8 @@ import { RowActions } from '@/components/shared/row-actions'
 import HistoryDetails, { type HistoryDetail } from './history-details'
 import Notice from '@/components/shared/notice'
 import { SecurityMonitorPanel } from './security-monitor'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import type { EmergencyControlAccess } from '@/v8/emergency'
 
 /** 板  の並び。健全性チェック・更新履歴・緊急コントロール。 */
 const BASE_TABS = [
@@ -53,7 +55,7 @@ export default function EmergencyScreen({
   renderControl,
 }: {
   renderHistory?: () => ReactNode
-  renderControl?: (accounts: LineAccount[], controlRef: RefObject<EmergencyControlHandle | null>) => ReactNode
+  renderControl?: (accounts: LineAccount[], controlRef: RefObject<EmergencyControlHandle | null>, onAccessChange: (access: EmergencyControlAccess) => void) => ReactNode
 }) {
   const identity = useStaffIdentity()
   const canReadSecurity = Boolean(identity && canManageRole(identity.role))
@@ -94,14 +96,15 @@ export default function EmergencyScreen({
   }, [])
   useEffect(() => { loadAccounts() }, [loadAccounts])
   const controlRef = useRef<EmergencyControlHandle | null>(null)
+  const [controlAccess, setControlAccess] = useState<EmergencyControlAccess>({ allowed: null, stopDisabled: true })
 
   const actions = tab === 'health'
     ? <Button variant="secondary" type="button" onClick={requestManualRun} disabled={!selectedAccountId || manualBusy} busy={manualBusy} busyLabel="確認中…">
         <RefreshCw className={styles.btnIcon} aria-hidden="true" />いますぐ確かめる
       </Button>
-    : tab === 'control' && canManage
+    : tab === 'control'
       // 止める操作は赤（中の［選んだものを止める］と同じ・絵 ）。
-      ? <Button variant="danger" type="button" icon={<OctagonPause size={16} />} onClick={() => controlRef.current?.openStop()}>緊急停止する</Button>
+      ? <Button variant="danger" type="button" icon={<OctagonPause size={16} />} disabled={controlAccess.stopDisabled} lockedReason={controlAccess.lockedReason} onClick={() => controlRef.current?.openStop()}>緊急停止する</Button>
       : tab === 'history' ? <RowActions subjectName="履歴" menuItems={[
         { id: 'incidents', label: '止めた・戻した記録を見る', onSelect: () => setHistoryDetail('incidents') },
         { id: 'updates', label: '更新内容を見る', onSelect: () => setHistoryDetail('updates') },
@@ -121,6 +124,7 @@ export default function EmergencyScreen({
       title="運用状態"
       help={description}
       actions={actions}
+      notice={tab === 'control' && controlAccess.lockedReason ? <ReadOnlyNotice need="feature" /> : undefined}
     >
       <Tabs size="compact" spacing="settings" label="運用状態の中の切り替え" items={tabs.map((item) => ({ label: item.label, href: TAB_HREF[item.key], current: tab === item.key }))} />
       {accountsFailed ? (
@@ -136,7 +140,7 @@ export default function EmergencyScreen({
           canManage={canManage}
         />
       ) : null}
-      {tab === 'control' ? renderControl?.(accounts, controlRef) : null}
+      {tab === 'control' ? renderControl?.(accounts, controlRef, setControlAccess) : null}
       {tab === 'security' && canReadSecurity ? <SecurityMonitorPanel accountId={selectedAccountId} canOperate={canReviewSecurity} /> : null}
       {tab === 'history' ? (renderHistory ? renderHistory() : <UpdateHistoryV8 />) : null}
       <HistoryDetails panel={historyDetail} onClose={() => setHistoryDetail(null)} />

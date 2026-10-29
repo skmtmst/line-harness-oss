@@ -152,6 +152,9 @@ export const LEGAL_LINKS = {
  */
 export const CONTACT_URL = process.env.NEXT_PUBLIC_CONTACT_URL || `${MUSUBO_SITE_URL}/contact/`
 
+/** 管理画面の失敗案内は、連絡先が未指定なら管理者への案内にする。 */
+export const CONFIGURED_CONTACT_URL = process.env.NEXT_PUBLIC_CONTACT_URL?.trim() || null
+
 export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || null
 
 /** ログイン前に開ける画面。`app-shell` と `auth-guard` の両方がこれを見る（片方だけ足すと壊れる）。 */

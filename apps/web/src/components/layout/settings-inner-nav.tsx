@@ -8,7 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
-import { Activity, BellRing, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
+import { Activity, BellRing, BookOpen, ShieldCheck, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
 
@@ -69,10 +69,10 @@ const SETTINGS_ONLY_ITEMS: MenuItem[] = [
   { id: 'settings-delivery', href: '/settings/delivery', label: 'デリバリー連携', icon: '', note: 'Uber Eats・出前館・ロケットナウの注文をまとめて受け取ります', required: true },
 ]
 
-/** 機能設定の下に付く2つの画面（絵の「下にマニュアルの対応表・ファイルの安全確認」）。 */
+/** 機能設定に続けて、ほかと同じ段に並べる設定画面。 */
 const SETTINGS_CHILDREN = [
-  { href: '/settings/manual-links', label: 'マニュアルの対応表' },
-  { href: '/settings/file-scan', label: 'ファイルの安全確認' },
+  { href: '/settings/manual-links', label: 'マニュアルの対応表', Icon: BookOpen },
+  { href: '/settings/file-scan', label: 'ファイルの安全確認', Icon: ShieldCheck },
 ] as const
 
 /** この中のメニューを出す画面（左のメニューの「設定」が光る画面と同じ範囲）。 */
@@ -174,19 +174,19 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
     .filter((item): item is MenuItem => Boolean(item))
     .filter((item) => itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item))
 
-  const entries: SettingsMenuEntry[] = items.map((item) => {
+  const entries: SettingsMenuEntry[] = items.flatMap((item) => {
     const active = item.href === '/settings'
       ? pathname === '/settings'
       : itemActive(item.href)
-    // 機能設定の下の2つは絵に無いが、ここからしか行けないので消さない。機能設定とその2つを開いているときだけ出す。
-    const children = item.href === '/settings' && (pathname === '/settings' || SETTINGS_CHILDREN.some((child) => itemActive(child.href))) ? SETTINGS_CHILDREN : []
-    return {
+    const entry: SettingsMenuEntry = {
       href: item.href,
       label: item.label,
       Icon: SETTINGS_ICONS[item.href as (typeof SETTINGS_ORDER)[number]],
       active,
-      children: children.map((child) => ({ href: child.href, label: child.label, active: itemActive(child.href) })),
     }
+    return item.href === '/settings'
+      ? [entry, ...SETTINGS_CHILDREN.map((child) => ({ ...child, active: itemActive(child.href) }))]
+      : [entry]
   })
 
   return <SettingsMenu heading="設定" label="設定の中のメニュー" entries={entries} placement={inline ? 'inline' : 'outer'} />

@@ -12,10 +12,15 @@ import { Check } from 'lucide-react'
 import { useAccount } from '@/contexts/account-context'
 import { useFirstRun } from '@/v8/onboarding/public/use-first-run/index'
 import { useStaffRole } from '@/lib/staff-role'
+import { useAccountStyle, STALE_STYLE_TEXT } from '@/hooks/use-account-style'
+import { useStyleSetupProgress } from '@/v8/onboarding/public/style-setup-progress/index'
+import Notice from '@/components/shared/notice'
+import { lockUnless } from '@/components/shared/permission-lock'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { SettingsPage } from '@/components/templates'
 import SettingsInnerNav from '@/components/layout/settings-inner-nav'
 import Button from '@/components/shared/button'
+import HelpTip from '@/components/shared/help-tip'
 import Card, { CardHeader } from '@/components/shared/card'
 import { ProgressBar } from '@/components/shared/progress'
 import { GridTable, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -28,6 +33,7 @@ import {
   doneCount,
   progressHeadline,
   stoppedReasons,
+  stepsForStyle,
 } from './steps'
 import frame from '../sa-frame.module.css'
 import styles from './getting-started.module.css'
@@ -39,7 +45,15 @@ export default function GettingStartedV8() {
   usePageTitle('はじめの設定')
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const role = useStaffRole()
-  const { steps, status, error: loadError, reload } = useFirstRun(selectedAccountId, !accountLoading)
+  const profile = useAccountStyle(selectedAccountId)
+  const firstRun = useFirstRun(selectedAccountId, !accountLoading)
+  const progress = useStyleSetupProgress(selectedAccountId, profile.data?.style ?? null, !accountLoading)
+  const steps = stepsForStyle(firstRun.steps, profile.data?.style ?? null, progress.progress)
+  const status = firstRun.status !== 'ready' || !selectedAccountId ? firstRun.status : profile.status === 'ready' ? 'ready' : profile.status === 'error' ? 'error' : 'loading'
+  const loadError = firstRun.error ?? profile.error
+  const reload = () => { firstRun.reload(); progress.reload(); profile.reload() }
+  const firstMessage = steps.find(step => step.key === 'firstMessage')
+  const sendReason = lockUnless(Boolean(role && role !== 'viewer' && firstMessage?.action), role === 'viewer' ? 'viewer' : 'feature')
 
   const reasons = stoppedReasons(steps)
   const done = doneCount(steps)
@@ -51,7 +65,7 @@ export default function GettingStartedV8() {
         title="はじめの設定"
         help="musubo を使いはじめるまでの6つの手順です。上から順に進めると、最初の1通が届くまでたどり着けます。"
         navigation={<SettingsInnerNav inline />}
-        notice={role === 'viewer' ? <ReadOnlyNotice /> : undefined}
+        notice={<>{role === 'viewer' ? <ReadOnlyNotice /> : null}{profile.stale ? <Notice tone="warn">{STALE_STYLE_TEXT}</Notice> : null}</>}
       >
         {status !== 'ready' ? (
           <ListState
@@ -68,19 +82,20 @@ export default function GettingStartedV8() {
 
             <Card padding="rows" overflow="hidden">
               <GridTable label="はじめの設定の順路" framed={false} design={{ columns: "max-content minmax(0, 1fr) max-content", gap: "var(--polish-space-card)", rowPadding: "var(--polish-space-card)", fontSize: "var(--text-body)" }}>
-                {steps.map((step) => <StepRow key={step.key} step={step} readOnly={!role || role === 'viewer'} />)}
+                {steps.map((step) => <StepRow key={step.key} step={step} role={role} />)}
               </GridTable>
             </Card>
 
             <Card id="first-message" variant="form" aria-label="最初の1通の確認方法">
-              <CardHeader size="stacked" title="最初の1通の確認方法" />
-              <p className={styles.cardLine}>自分のLINEで受け取る方法を選びます。QRから友だち追加時の配信を受け取るか、シナリオを選んで「まとめてテストを送る」を開き、自分をテスト受信者に選んでください。</p>
-              <p className={styles.cardLine}>送信の記録は友だち追加時の配信かシナリオの1通目で判定します。送らずに判定するテストと受信箱の手動返信は完了に数えません。記録が済みでも、LINEの端末で本文を確認してください。</p>
-              {role && role !== 'viewer' && steps.find((step) => step.key === 'firstMessage')?.action ? <div className={styles.bottom}>
-                <Button href="/?qr=base">友だち追加のQRを開く</Button>
-                <Button href="/scenarios">シナリオを選んでテスト送信する</Button>
+              <CardHeader size="stacked" title="最初の1通の確認方法"
+                help={<HelpTip label="最初の1通の判定と確認方法">QRからは友だち追加時の配信を受け取ります。シナリオは「まとめてテストを送る」で自分をテスト受信者に選びます。完了は友だち追加時の配信かシナリオの1通目の送信記録で判定します。送らずに判定するテストと受信箱の手動返信は完了に数えません。</HelpTip>}
+                action={<Button size="compact" aria-label="受信後に状態を読み直す" onClick={reload}>読み直す</Button>}
+              />
+              <p className={styles.cardLine}>QRから友だち追加するか、シナリオを選んで自分にテスト送信してください。受け取ったらLINEで本文を確かめてください。</p>
+              {role ? <div className={styles.bottom}>
+                <Button href="/?qr=base" lockedReason={sendReason}>友だち追加のQRを開く</Button>
+                <Button href="/scenarios" lockedReason={sendReason}>シナリオを選んでテスト送信する</Button>
               </div> : null}
-              <Button onClick={reload}>受信後に状態を読み直す</Button>
             </Card>
 
             <div className={styles.bottom}>
@@ -106,8 +121,10 @@ export default function GettingStartedV8() {
   )
 }
 
-/** 1段。済みは緑の丸と札、まだは番号の丸と行き先のボタン。押せない段は理由の文字。 */
-function StepRow({ step, readOnly }: { step: StepResult; readOnly: boolean }) {
+/** 1段。済みは緑の丸と札、まだは番号の丸と行き先のボタン。権限で押せない段は灰色のボタンと共通の理由。 */
+function StepRow({ step, role }: { step: StepResult; role: string | null }) {
+  const allowed = Boolean(role && role !== 'viewer' && step.action && step.state !== 'forbidden')
+  const reason = role ? lockUnless(allowed, role === 'viewer' ? 'viewer' : 'feature') : undefined
   const done = step.state === 'done'
   return (
     <GridRow data-step-state={step.state}>
@@ -117,8 +134,9 @@ function StepRow({ step, readOnly }: { step: StepResult; readOnly: boolean }) {
         <span className={styles.stepSub}><TruncatedText value={step.sub} /></span>
       </div></GridCell>
       <GridCell align="right">
-        {done ? <StatusBadge tone="success" size="compact">済み</StatusBadge> : step.action && !readOnly ? (
-          <Button href={step.action.href} presentation="row-action" textTone={step.state === 'stalled' ? 'accent' : 'ink'}>{step.action.label}</Button>
+        {done ? <StatusBadge tone="success" size="compact">済み</StatusBadge> : step.action || step.state === 'forbidden' ? (
+          role && step.action ? <Button href={step.action.href} lockedReason={reason} presentation="row-action" textTone={step.state === 'stalled' ? 'accent' : 'ink'}>{step.action.label}</Button>
+            : <Button disabled={!role} lockedReason={reason} presentation="row-action" textTone={step.state === 'stalled' ? 'accent' : 'ink'}>{step.action?.label ?? '設定を開く'}</Button>
         ) : <span className={styles.stepBlocked}>{step.blockedReason}</span>}
       </GridCell>
     </GridRow>

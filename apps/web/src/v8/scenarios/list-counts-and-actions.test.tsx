@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 シナリオ一覧の件数と操作の動きの試験。
- * - 読了率の母数は「いま途中＋読み終えた人」。登録0でも数は読めているので「登録した 0 人」（割合なし）
+ * - 読了率の母数は「いま途中＋読み終えた人」。登録0でも数は読めているので「登録した 0 人」（棒・割合なし）
  * - 「すべて」と数の帯のシナリオ数は、絞り込み無しの全体件数（共通のシナリオを含む）
  * - フォルダ・数の帯は一覧と同じアカウントで数え、「未分類」はサーバーの数を出す
  * - 共通のシナリオがフォルダの内訳に入らないことを、差がある時だけ説明する
@@ -184,7 +184,7 @@ describe('読了率の母数', () => {
     expect(kpi('最後まで配信した人').textContent).not.toContain('%')
   })
 
-  test('登録0の行は空の棒と「登録した 0 人」を出す', async () => {
+  test('登録0の行は棒と割合を出さず「登録した 0 人」だけ出す', async () => {
     listPage.mockImplementation(async () => ({
       success: true,
       data: { items: [{ ...scenario('s-zero', '誰もいない', null), subscriberCount: 0, completedCount: 0 }], total: 1, limit: 20, sort: [] },
@@ -194,9 +194,8 @@ describe('読了率の母数', () => {
     const row = screen.getByText('誰もいない').closest('tr') as HTMLElement
     expect(row.textContent).toContain('配信中 0 人・最後まで配信 0 人')
     expect(row.textContent).toContain('登録した 0 人')
-    const bar = within(row).getByRole('progressbar', { name: '誰もいないを最後まで配信した割合' })
-    expect(bar.getAttribute('aria-valuemax')).toBe('0')
-    expect(bar.getAttribute('aria-valuenow')).toBe('0')
+    expect(row.textContent).not.toContain('%')
+    expect(within(row).queryByRole('progressbar')).toBeNull()
   })
 })
 
@@ -375,7 +374,8 @@ describe('右詳細の情報と操作', () => {
     const detail = await panel()
     expect(detail.textContent).toContain('配信方法は未確認・通数は未確認')
     const facts = within(detail).getByRole('region', { name: '配信状況' })
-    expect(facts.textContent).toContain('配信中 — 人・最後まで配信 — 人')
+    expect(facts.textContent).toContain('配信中 —・最後まで配信 —')
+    expect(facts.textContent).not.toContain('— 人')
     expect(facts.textContent).not.toContain('0 人')
   })
 

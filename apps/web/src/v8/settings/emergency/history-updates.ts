@@ -124,10 +124,11 @@ function archivedVersions(summary: ReleaseSummary): Map<string, UpdateCounts> {
 
 type Draft = Omit<UpdateCard, 'latest' | 'counts' | 'highlights' | 'highlightSource' | 'entryCount'> & { time: number; entryCount?: number; counts?: UpdateCounts }
 
-export function buildUpdateCards({ summary, deployments, runningVersion }: {
+export function buildUpdateCards({ summary, deployments, runningVersion, includeArchivedEntries = false }: {
   summary: ReleaseSummary
   deployments: Deployment[]
   runningVersion?: string | null
+  includeArchivedEntries?: boolean
 }): UpdateCard[] {
   const releases = Array.isArray(summary.releases) ? summary.releases : []
   const written = writtenHighlights(summary.updates)
@@ -153,13 +154,15 @@ export function buildUpdateCards({ summary, deployments, runningVersion }: {
   }
 
   let pending = 0
+  const pendingEntries: UpdateEntry[] = []
   for (const release of releases) {
     const version = bare(release.version)
     const total = release.entryCount ?? release.entries.length
-    if (!release.released) { pending += total; continue }
+    if (!release.released) { pending += total; pendingEntries.push(...release.entries); continue }
     const releasedAt = toTime(release.released)
     if (archived.has(version ?? '') || (release.entries.length === 0 && total > 0)) {
-      open(`archive|${version}`, { source: 'archive', version, at: toJstIso(releasedAt), deployment: null, time: releasedAt, entryCount: total, counts: archived.get(version ?? '') })
+      const archive = open(`archive|${version}`, { source: 'archive', version, at: toJstIso(releasedAt), deployment: null, time: releasedAt, entryCount: total, counts: archived.get(version ?? '') })
+      if (includeArchivedEntries) archive.entries.push(...release.entries)
       continue
     }
     for (const entry of release.entries) {
@@ -215,7 +218,7 @@ export function buildUpdateCards({ summary, deployments, runningVersion }: {
       latest: false,
       counts: readCounts(summary.pending?.counts),
       entryCount: pending,
-      entries: [],
+      entries: pendingEntries,
       highlights: [],
       highlightSource: 'none',
     })
@@ -230,4 +233,17 @@ export function missingLineCount(summary: ReleaseSummary): number {
     if (!release.released || release.entries.length === 0 || archived.has(bare(release.version) ?? '')) return sum
     return sum + Math.max(0, (release.entryCount ?? release.entries.length) - release.entries.length)
   }, 0)
+}
+
+/** 本文を探し、版・日付と反映予定の区分を維持する。 */
+export function searchUpdateCards(cards: UpdateCard[], query: string): UpdateCard[] {
+  const needle = query.trim().normalize('NFKC').toLocaleLowerCase('ja')
+  if (!needle) return cards
+  const matches = (text: string) => text.normalize('NFKC').toLocaleLowerCase('ja').includes(needle)
+  return cards.flatMap((card) => {
+    const entries = card.entries.filter((entry) => matches(entry.text))
+    const highlights = card.highlights.filter(matches)
+    if (!entries.length && !highlights.length) return []
+    return [{ ...card, entryCount: entries.length, counts: countKinds(entries), entries, highlights: highlights.length ? highlights : pickHighlights(entries), highlightSource: highlights.length ? card.highlightSource : 'entries' as const }]
+  })
 }

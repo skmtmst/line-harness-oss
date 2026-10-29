@@ -675,3 +675,22 @@
 :global(:root) .settingsFlow:has(> .createNotice:not(:empty)) > .settings > .settingsNav { padding-top: 0; }
 :global(:root) .settingsFlow:has(> .createNotice:not(:empty)) > .settings .customerLookMain,
 :global(:root) .settingsFlow:has(> .createNotice:not(:empty)) > .settings .customerLookPreview { padding-top: 0; }
+
+/* 独立した保存帯付きの板が viewport を明示した時だけ、親の可用高へ収める。
+   対象条件は ../app-shell.module.css の親からの割当てと対で保つ。 */
+@media (min-width: 1024px) {
+  :global(main[id='main-content'] > [data-design-shell]) > .frame[data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']) {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+}
+
+/* この経路は本文だけを送り、保存帯の内側と外側は通常の流れで場所を持つ。 */
+@media (min-width: 1024px) {
+  :global(main[id='main-content'] > [data-design-shell]) > .frame[data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']) > .footer,
+  :global(main[id='main-content'] > [data-design-shell]) > .frame[data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']) > .footer > :global([data-shared-part='sticky-bar']) {
+    position: static;
+    bottom: auto;
+  }
+}

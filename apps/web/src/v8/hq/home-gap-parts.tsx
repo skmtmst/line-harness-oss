@@ -2,6 +2,7 @@
 
 import { accountHandle } from './account-dialogs'
 import { formatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 import { type AccountWithStats } from '@/contexts/account-context';
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
@@ -58,5 +59,5 @@ function statusOf(account: AccountWithStats): { label: string; tone: 'ok' | 'war
 export { type StatusFilter, type View, UNFILED, ALL, STATUS_FILTERS, SORT_OPTIONS, PAGE_SIZES, isArchived, matchesStatus, statusOf }
 
 export function accountMeta(account: AccountWithStats, parent: string | null) {
-  return [accountHandle(account), parent ? `親：${parent}` : null, `権限者 ${formatNumber(account.stats?.staffCount ?? 0)} 人`].filter(Boolean).join('・')
+  return [accountHandle(account), parent ? `親：${parent}` : null, typeof account.stats?.staffCount === 'number' ? `権限者 ${formatNumber(account.stats.staffCount)} 人` : `権限者 ${emptyValue('unknown')}`].filter(Boolean).join('・')
 }

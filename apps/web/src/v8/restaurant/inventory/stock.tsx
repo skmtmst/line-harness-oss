@@ -1,7 +1,7 @@
 'use client'
 import type { Alloc, Hours, SlotInfo, Conflict } from './stock-types'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Armchair, BookOpen, Check, X } from 'lucide-react'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -13,7 +13,7 @@ import Button from '@/components/shared/button'
 import { RowActions } from '@/components/shared/row-actions'
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
-import StickyBar from '@/components/shared/sticky-bar'
+import { PageFrame, PageFooter } from '@/components/templates/page-frame'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 
 import StockListHeading from './stock-list-heading'
@@ -29,7 +29,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { ApiError, fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantInventory, type RestaurantTable } from '@/lib/restaurant-test-api'
-import { QuietError, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
+import { BoundaryBanner, QuietError, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
 import { DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { dayLabel, formatTime, joinTableCodes, sanName, slotTimeLabel, tableOrder, WEEK_ORDER, WEEKDAY_LABEL } from './format'
 import type { RestaurantChannel } from './channels'
@@ -78,7 +78,7 @@ function NumberField({ id, 'aria-describedby': describedBy, label, value, onChan
   )
 }
 
-export default function StockBoard({ ctx, canEdit: allowedByRole }: { ctx: RestaurantV8Context; canEdit: boolean }) {
+export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notice, tabs }: { ctx: RestaurantV8Context; canEdit: boolean; heading?: ReactNode; notice?: ReactNode; tabs: ReactNode }) {
   const role = useStaffRole()
   const lockedReason = usePermissionLockReason(allowedByRole)
   const canEdit = allowedByRole && !lockedReason
@@ -337,7 +337,13 @@ export default function StockBoard({ ctx, canEdit: allowedByRole }: { ctx: Resta
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><>
+    <PageFrame kind="restaurant" standalone heightMode="viewport" boardId="Y8SjT2" hasFooter>
+      {heading}
+      <SaveErrorScope errors={saveErrors}><>
+      <div className={styles.stockBody} data-template-region="body">
+      <BoundaryBanner />
+      {notice}
+      {tabs}
       {role !== null && !canEdit ? <ReadOnlyNotice /> : null}
       {channelsError?<ListState kind="error" title="予約サイトを読み込めませんでした" onRetry={()=>setChannelsRetry(n=>n+1)}/>:null}
       {loadError ? (
@@ -551,8 +557,8 @@ export default function StockBoard({ ctx, canEdit: allowedByRole }: { ctx: Resta
           </Card>
         </div>
       </DetailColumns>
-      <StickyBar
-          className={styles.stickyBar}
+      </div>
+      <PageFooter
           actions={(
             <>
               <Button lockedReason={lockedReason} onClick={resetAll} disabled={!canEdit || busy}>キャンセル</Button>
@@ -618,6 +624,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole }: { ctx: Resta
         {conflict ? <ConflictDiff conflict={conflict} latestAlloc={allocOf(rows[0])} latestHours={hours} /> : null}
       </RsDialog>
     </></SaveErrorScope>
+    </PageFrame>
   )
 }
 
