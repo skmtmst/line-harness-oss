@@ -111,9 +111,9 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     <div className={styles.filters}>
       <SegmentedControl aria-label="期間" value={days} onChange={(v) => setParam({ days: v })} options={ANALYTICS_DAYS} />
       <div className={styles.dateBox} data-short><DateField value={date} onChange={setDate} displayFormat="short" clearable={false} /></div>
-      <EntitySelect compact width={112} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
+      <EntitySelect compact width={152} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
       <span className={styles.grow} />
-      <EntitySelect compact width={190} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
+      <EntitySelect compact width={176} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
       <Button disabled disabledReason="書き出しの口をつなぐと使えます。"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
       <Button disabled disabledReason="定期の送信の口をつなぐと使えます。"><Mail size={16} aria-hidden="true" />毎朝メールで送る</Button>
       {loadedAt ? <span className={styles.updated}>更新 {formatDate(loadedAt, { style: 'time' })}</span> : null}
@@ -122,9 +122,9 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     <div className={styles.filters}>
       <SegmentedControl aria-label="期間" value={range} onChange={(v) => setParam({ range: v === 'today' ? null : v })} options={RANGES} />
       <div className={styles.dateBox}><DateField value={date} onChange={setDate} displayFormat="day" clearable={false} /></div>
-      <EntitySelect compact width={112} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
+      <EntitySelect compact width={152} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
       <span className={styles.grow} />
-      <EntitySelect compact width={190} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
+      <EntitySelect compact width={176} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
       {loadedAt ? <span className={styles.updated}>更新 {formatDate(loadedAt, { style: 'time' })}</span> : null}
       <Button onClick={() => void reload()}><RefreshCw size={16} aria-hidden="true" />読み直す</Button>
     </div>
