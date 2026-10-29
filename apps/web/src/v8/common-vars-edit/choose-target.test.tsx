@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const net=vi.hoisted(()=>({list:vi.fn()}))
 vi.mock('@/lib/api',()=>({api:{commonVars:{list:net.list}}}))
