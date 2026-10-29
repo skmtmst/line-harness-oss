@@ -25,6 +25,22 @@ export default function scanOwnerRules() {
   const hasBorder = c => ['Top','Right','Bottom','Left'].every(side => c[`border${side}Style`] !== 'none' && parseFloat(c[`border${side}Width`]) > 0) || c.boxShadow !== 'none'
   // 小窓・吹き出し・通知はmainの外へ描かれる。面の検査はその口にも届かせる。
   const portals = [...document.querySelectorAll('[role="dialog"],[role="tooltip"],[aria-label="知らせ"]')]
+  // 浮く面は背景の文字を通さない。bodyの白ではなく、その面自身の塗りを測る。
+  const floating = [...document.querySelectorAll('[data-menu-portal],[role="tooltip"],[data-design-part="notification-panel"],[role="note"][id]')]
+  for (const portal of floating.filter(visible)) {
+    const own = css(portal)
+    if (portal.matches('[role="note"]') && !['fixed', 'absolute'].includes(own.position)) continue
+    const surface = own.backgroundColor !== 'rgba(0, 0, 0, 0)' ? portal
+      : [...portal.children].find(el => visible(el) && css(el).backgroundColor !== 'rgba(0, 0, 0, 0)') ?? portal
+    const c = css(surface), color = c.backgroundColor
+    const alpha = color === 'transparent' ? 0 : color.startsWith('rgba(') ? Number(color.split(',').at(-1).replace(')', ''))
+      : color.includes('/') ? Number(color.split('/').at(-1).replace(')', '').trim()) : 1
+    let opacity = 1
+    for (let p = surface; p; p = p.parentElement) opacity *= Number(css(p).opacity)
+    if (alpha < 1 || opacity < 0.999 || c.backdropFilter && c.backdropFilter !== 'none') {
+      add('floating-surface-transparency', surface, { alpha, opacity }, surface.getAttribute('aria-label') || '')
+    }
+  }
   const surfaces = [...new Set([root,...root.querySelectorAll('*'),...portals.flatMap(el => [el,...el.querySelectorAll('*')])])]
   // ダイアログ・カード・固定の下帯で、子の影や輪が overflow の切り抜き端に当たらないか測る。
   // box-shadow は DOM の外枠より広がるため、要素の矩形だけを見る boxclip とは分ける。
