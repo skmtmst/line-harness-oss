@@ -33,6 +33,12 @@ beforeEach(()=>{clearToastsForTest();
 afterEach(cleanup)
 
 describe('会社と連絡先の画面の動き',()=>{
+  it('郵便番号と電話は文字数でなく入力形式の見本で案内する',async()=>{
+    await renderCard()
+    expect(field('郵便番号').placeholder).toBe('例：123-4567')
+    expect(field('電話番号').placeholder).toBe('例：03-1234-5678')
+  })
+
   it('編集した8欄と読み込んだ版を保存し、返された値と新しい版を次の保存に使う',async()=>{
     await renderCard()
     fireEvent.change(field('会社名（正式）'),{target:{value:'  新しい正式名  '}})
