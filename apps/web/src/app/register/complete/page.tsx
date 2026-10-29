@@ -9,7 +9,7 @@ import PasswordRequirements from '@/components/auth/password-requirements'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import { storeAdminSession } from '@/lib/admin-session'
+import { storeAdminSession, twoFactorChallengeHandoffPath } from '@/lib/admin-session'
 import { authRequest, confirmError, CONTACT_URL, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 import styles from './complete.module.css'
@@ -18,7 +18,7 @@ import styles from './complete.module.css'
  * 会員登録の本登録。★管理画面 36-4-B（`jk88n`、カード `oVX3x`）。
  *
  * 承認メールの URL（`?token=`）から開く。申込済み会社名・担当者名を確認してパスワードを入れると
- * 統括（トライアル 30 日）とオーナー権限者ができ、そのまま統括の画面へ。
+ * 統括（トライアル 30 日）とオーナー権限者を作り、二段階認証の設定へ進む。
  */
 export default function RegisterCompletePage() {
   return (
@@ -82,7 +82,7 @@ function CompleteInner() {
     resetAuthSelectionCleared(localStorage, sessionStorage)
     // オーナーは二段階認証が必須（N-426）。設定画面へ進み、完了後にセッションが出る。
     if (res.data.twoFactorSetup && res.data.challengeToken) {
-      window.location.assign(`/login/two-factor/setup#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor/setup', res.data.challengeToken))
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
