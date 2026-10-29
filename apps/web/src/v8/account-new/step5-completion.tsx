@@ -1,4 +1,4 @@
-import { Activity, CircleCheck, LoaderCircle, QrCode, TriangleAlert, Users } from 'lucide-react'
+import { Activity, CircleCheck, LoaderCircle, QrCode, Users } from 'lucide-react'
 import { ProgressBar } from '@/components/shared/progress'
 import { type FollowerImportState, type LineAccountConnectData } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -22,7 +22,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
   const total = handover.confirmed
   const processed = total === null ? handover.processed : Math.min(handover.processed, total)
   const remaining = total === null ? null : Math.max(0, total - processed)
-  const percent = total === null ? null : total === 0 ? 100 : Math.round(processed / total * 100)
+  const percent = total === null ? null : total === 0 ? complete ? 100 : 0 : Math.round(processed / total * 100)
   const stageLabel = complete ? '友だちの引き継ぎが完了しました' : checking ? '進み具合を確認できません' : total === null ? '友だちを確認しています' : '友だちの情報を引き継いでいます'
   const progressLabel = total === null ? '対象人数を確認中' : `${polishFormatNumber(processed)} / ${polishFormatNumber(total)}人 · ${percent}% · 残り${polishFormatNumber(remaining ?? 0)}人`
   const referenceTotal = connection.verification?.followerTotal
@@ -33,7 +33,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
             <Card surface="standard" layout="vertical" contentPadding={showHandover ? 'var(--tpl-htn6-handover-card-pad)' : 'var(--tpl-htn-panel-pad)'} gap={showHandover ? 'var(--tpl-htn6-handover-card-gap)' : 'var(--tpl-htn-panel-gap)'} className={styles.panel} aria-label={showHandover ? '友だちの引き継ぎ' : '登録完了'} data-design-node="Plmq1">
               {showHandover ? <>
                 <div className={styles.handoverHeading}>
-                  <span className={styles.handoverIcon} data-attention={checking || undefined}>{complete ? <CircleCheck size={22} aria-hidden="true" /> : checking ? <TriangleAlert size={22} aria-hidden="true" /> : <LoaderCircle className={styles.handoverSpinner} size={22} aria-hidden="true" />}</span>
+                  <span className={styles.handoverIcon}>{complete ? <CircleCheck size={22} aria-hidden="true" /> : <LoaderCircle className={styles.handoverSpinner} size={22} aria-hidden="true" />}</span>
                   <h2 className={styles.panelTitle}>{stageLabel}</h2>
                   <StatusBadge dot={false} tone={checking ? 'caution' : 'success'}>{complete ? '完了' : checking ? '要確認' : total === null ? '確認中' : '進行中'}</StatusBadge>
                 </div>
@@ -50,7 +50,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
                     <p>{complete ? `対象${polishFormatNumber(total ?? 0)}人を確認・反映しました。` : total === null ? referenceTotal === null || referenceTotal === undefined ? 'LINEの現在の対象人数を確認しています。' : `LINEの参考値：${polishFormatNumber(referenceTotal)}人（前日の集計）` : referenceTotal === null || referenceTotal === undefined ? `現在の対象数は${polishFormatNumber(total)}人です。` : `前日集計は${polishFormatNumber(referenceTotal)}人でした。現在の対象数は${polishFormatNumber(total)}人です。`}</p>
                   </div>
                   <div className={styles.handoverProgressHead}><span>友だちの引き継ぎ進捗</span><strong aria-live="polite">{progressLabel}</strong></div>
-                  <ProgressBar className={styles.handoverProgressBar} appearance="quota" max={total ?? 1} value={total === 0 ? 1 : processed} indeterminate={total === null} label="友だちの引き継ぎ進捗" />
+                  <ProgressBar className={styles.handoverProgressBar} appearance="quota" max={total === 0 ? 1 : total ?? 1} value={total === 0 && complete ? 1 : processed} indeterminate={total === null} indeterminateVisual="empty" label="友だちの引き継ぎ進捗" />
                   <p className={styles.handoverCurrent} data-attention={checking || undefined} role="status" aria-live="polite">{complete ? `${polishFormatNumber(processed)}人の友だちを引き継ぎました` : checking ? idleSeconds >= 60 ? `${Math.floor(idleSeconds / 60)}分間、引き継ぎの状態が更新されていません` : '進み具合を確認できません。状態を再確認してください。' : total === null ? 'LINEから友だちの一覧を確認しています' : remaining === 0 ? 'サーバーの完了を確認しています' : `${polishFormatNumber(total)}人のうち${polishFormatNumber(processed)}人を引き継ぎました。残り${polishFormatNumber(remaining)}人を処理中です。`}</p>
                   <p className={styles.progressNote}>{complete ? '友だち一覧で確認できます。' : checking ? '状態を再確認できます。引き継ぎ中のデータは保持されます。' : total === null ? '人数が分かりしだい、引き継ぎの進み具合を表示します。' : '完了した人数に合わせてバーが伸びます。'}</p>
                   {handover.needsReview > 0 ? <Notice tone="warn" compact>{polishFormatNumber(handover.needsReview)}件は取り込めず、確認が必要です。</Notice> : null}
