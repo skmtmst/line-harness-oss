@@ -117,6 +117,7 @@ describe('統括のアカウント：読み込みの失敗（M021）', () => {
     mocks.list.mockRejectedValueOnce(failure)
     render(<HqHomeV8 />)
     const retry = await screen.findByRole('button', { name: 'もう一度読み込む' })
+    expect(screen.getAllByRole('button', { name: 'もう一度読み込む' })).toHaveLength(1)
     expect(screen.getByText(loadFailureNotice(failure, '統括のアカウント情報', 'hq'))).toBeTruthy()
     expect(document.body.textContent).not.toContain('API error')
     expect(document.body.textContent).not.toContain('統括のアカウント情報を読み込めませんでした。')
