@@ -29,6 +29,8 @@ export function FriendsTabs({ current, line = true, action }: { current: Friends
             {tab.label}
           </Link>
         ))}
+        {/* CSV はタブから行けないが、今いる所は示す（B9）。行き先ではないので押せない。 */}
+        {current === 'csv' ? <span className={`${styles.tab} ${styles.tabCurrent}`} aria-current="page">CSVで書き出す・取り込む</span> : null}
       </nav>
       {action ? <div className={styles.tabAction}>{action}</div> : null}
     </div>
