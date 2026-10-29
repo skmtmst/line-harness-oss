@@ -470,6 +470,7 @@
 - [細部の直し（左メニューの吹き出し・「？」・2段階認証の欄・主ボタン）](release-log/unreleased/1803-kenta-detail-polish.md)
 - [スマートフォンの幅でカードを1列に](release-log/unreleased/1801-kenta-cards-one-column.md)
 - [スマートフォンの幅で店名を切れにくく](release-log/unreleased/1804-kenta-hq-card-narrow.md)
+- [統括のカードの札・要対応の数・表の幅](release-log/unreleased/0000-kenta-hq-card-fixes.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [二段階認証の画面を見やすく](release-log/unreleased/1843-kenta-two-factor-card.md)
 - [回復コードのお知らせに「要確認：」](release-log/unreleased/1846-kenta-recovery-notice-prefix.md)

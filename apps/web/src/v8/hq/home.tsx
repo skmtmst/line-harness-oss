@@ -12,7 +12,7 @@ import Card from '@/components/shared/card';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd } from '@/components/shared/list-toolbar';
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
-import Button from '@/components/shared/button';
+import Button, { AccountActionButton } from '@/components/shared/button';
 import Avatar from '@/components/shared/avatar';
 import { RowMenu } from '@/components/shared/row-actions';
 import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
@@ -396,34 +396,17 @@ export default function HqHomeV8() {
     </div>
   )
 
-  const cardActions = (account: AccountWithStats) => {
-    if (isArchived(account)) {
-      return (
-        <div className={styles.cardButtons}>
-          <Button className={styles.grow} onClick={() => setEditingAccount(account)}>
-            <Pencil aria-hidden="true" className={styles.buttonIcon} />登録内容を編集
-          </Button>
-          {isOwner ? (
-            <Button onClick={() => setArchiveTarget({ account, mode: 'restore' })}>
-              <RotateCcw aria-hidden="true" className={styles.buttonIcon} />戻す
-            </Button>
-          ) : null}
-        </div>
-      )
-    }
-    return (
-      <div className={styles.cardButtons}>
-        <Button className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`}>
-          <LogIn aria-hidden="true" className={styles.buttonIcon} />入る
-        </Button>
-        {canManage ? (
-          <Button onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`}>
-            <Settings aria-hidden="true" className={styles.buttonIcon} />設定
-          </Button>
-        ) : null}
-      </div>
-    )
-  }
+  const cardActions = (account: AccountWithStats) => (
+    <div className={styles.cardButtons}>
+      {isArchived(account) ? <>
+        <AccountActionButton action="detail" className={styles.grow} onClick={() => setEditingAccount(account)} />
+        {isOwner ? <AccountActionButton action="restore" onClick={() => setArchiveTarget({ account, mode: 'restore' })} /> : null}
+      </> : <>
+        <AccountActionButton action="enter" className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`} />
+        {canManage ? <AccountActionButton action="settings" onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`} /> : null}
+      </>}
+    </div>
+  )
 
   /* ★V8 oFq4S：表の行末は「…」1つ（行の操作は中に）。 */
   const tableMenu = (account: AccountWithStats) => {
@@ -559,7 +542,7 @@ export default function HqHomeV8() {
                 </div>
                 <TagOverflow label={`${name}の分類`}>
                   {folderDotOf(account) ? <IconLabel icon={FolderIcon} aria-label={`フォルダ：${folderDotOf(account)!.name}`}>{folderDotOf(account)!.name}</IconLabel> : null}
-                  {(account.tags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
+                  {(account.tags ?? []).filter((tag, index, tags) => tag.name.trim() !== folderDotOf(account)?.name.trim() && tags.findIndex(other => other.name.trim() === tag.name.trim()) === index).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
                 </TagOverflow>
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
