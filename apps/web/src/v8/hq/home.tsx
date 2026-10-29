@@ -210,10 +210,26 @@ export default function HqHomeV8() {
     }
   }
 
-  const login = (accountId: string) => {
+  const [enteringAccountId, setEnteringAccountId] = useState<string | null>(null)
+  const login = async (accountId: string) => {
+    if (enteringAccountId) return
+    setEnteringAccountId(accountId)
+    try {
+      // 保存済みの引き継ぎ状態を毎回確認する。未完了・確認失敗時に店舗へ入れない。
+      const response = await api.lineAccounts.followerImportState(accountId)
+      if (!response.success) throw new Error(response.error || '引き継ぎの状態を確認できませんでした')
+      if (response.data.phase === 'importing_ids' || response.data.phase === 'hydrating_profiles') {
+        router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
+        return
+      }
+    } catch (failure) {
+      saveErrors.capture(failure)
+      router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
+      return
+    } finally {
+      setEnteringAccountId(null)
+    }
     setSelectedAccountId(accountId)
-    /* 引き継ぎが途中なら続きから動かす。見た目は変えず、答えも待たない（cron でも進む）。 */
-    if (canManage) void api.lineAccounts.stepFollowerImport(accountId).catch(() => undefined)
     // 店舗未選択ゲートから来たときは、元いた画面へ戻す（`return` はアプリ内の店舗画面パスだけ：NEXT-07）。
     const back = resolveStoreReturnPath(new URLSearchParams(window.location.search).get('return'))
     router.push(back ?? '/')

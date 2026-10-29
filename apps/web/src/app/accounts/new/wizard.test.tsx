@@ -321,7 +321,7 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(notices.lineRegistration).toHaveBeenCalledTimes(1)
   })
 
-  it('Penの探索中は分母なしで動き、完了後は人数と満タンの棒を表示する', async () => {
+  it('Penの探索中は円形ローダーだけが動き、完了後は人数と満タンの棒を表示する', async () => {
     let finishStep!: (value: unknown) => void
     calls.connect.mockResolvedValue({
       success: true,
@@ -333,6 +333,11 @@ describe('LINEアカウント作成ウィザード', () => {
     })
     /* 画面を開いている間は step で続きを進める（読むだけでは自動処理を待つことになる）。 */
     calls.stepFollowerImport.mockImplementation(() => new Promise((resolve) => { finishStep = resolve }))
+    calls.followerImportState.mockResolvedValue({ success: true, data: {
+      capability: 'available', phase: 'importing_ids', received: 0, imported: 0,
+      alreadyPresent: 0, reactivated: 0, claimedUnassigned: 0, conflicts: 0, invalid: 0,
+      profilesProcessed: 0, profilesUpdated: 0,
+    } })
     enterCheckStep()
     await runCheck()
     await saveAndFinish()
@@ -340,6 +345,8 @@ describe('LINEアカウント作成ウィザード', () => {
     const progress = screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' })
     expect(progress.getAttribute('aria-valuenow')).toBeNull()
     expect(progress.getAttribute('aria-valuetext')).toBe('対象人数を確認中')
+    expect(progress.childElementCount).toBe(0)
+    expect(screen.getByText('友だちを確認しています', { selector: 'h2' }).previousElementSibling?.firstElementChild?.getAttribute('class')).toContain('handoverSpinner')
     expect(screen.queryByRole('link', { name: '登録したアカウントを見る' })).toBeNull()
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalled())
     finishStep({ success: true, data: {
@@ -389,6 +396,8 @@ describe('LINEアカウント作成ウィザード', () => {
     await runCheck()
     await saveAndFinish()
     await screen.findByText('進み具合を確認できません', { selector: 'h2' })
+    expect(screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' }).childElementCount).toBe(0)
+    expect(screen.getByText('進み具合を確認できません', { selector: 'h2' }).previousElementSibling?.firstElementChild?.getAttribute('class')).toContain('handoverSpinner')
     expect(screen.getByRole('button', { name: '状態を再確認' })).toBeTruthy()
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledTimes(2), { timeout: 6500 })
     await screen.findByText('友だちの引き継ぎが完了しました', { selector: 'h2' })
