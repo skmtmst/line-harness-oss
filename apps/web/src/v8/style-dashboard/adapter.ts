@@ -91,7 +91,7 @@ export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: Dashboard
   ]
   if (style === 'salon') return [
     kpi({ id: 'today', key: 'bookings', title: `${r}の予約`, detail: (x) => { const e = metricValue(x.metrics.estimatedRevenue); return e.valueText ? `見込み ${e.valueText}` : '見込み —' }, link: { label: '一覧', href: '/booking/bookings' }, help: '取消を除く予約です。来店日で数えます。' }, s),
-    kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => '承認待ち・来店の印がまだ', link: { label: '内訳', href: '/booking/bookings' }, help: '承認待ち・来店の印が付いていない予約など、お店が何かする必要がある数です。' }, s),
+    kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => '承認待ち・印がまだ', link: { label: '内訳', href: '/booking/bookings' }, help: '承認待ち・来店の印が付いていない予約など、お店が何かする必要がある数です。' }, s),
     kpi({ id: 'rebook', key: 'nextBookingRate', title: '次回予約率', detail: () => '過去30日', link: { label: '人を見る', href: '/friends' }, help: '施術のあと24時間以内に次の予約を入れた人の割合です。' }, s),
     kpi({ id: 'recall', key: 'recall', title: '呼び戻し待ち', detail: () => '次の予約がない人', link: { label: '友だち一覧', href: '/friends' }, help: '来店間隔の目安を過ぎ、次の予約がない人の数です。' }, s),
     kpi({ id: 'noshow', key: 'noShowRate', title: '無断キャンセル率', lower: true, detail: () => '無断／対象の予約', link: { label: '友だち一覧', href: '/friends' }, help: '対象期間の予約に対する無断キャンセルの割合です。期間と除外条件は計算式で確認できます。' }, s),
