@@ -14,6 +14,12 @@ import VisitStampQr from './visit-stamp-qr.js';
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
+it('読み込み中も題（来店スタンプ）の帯を出す', async () => {
+  fx.redeemQr.mockReturnValue(new Promise(() => {}));
+  render(<MemoryRouter initialEntries={['/visit-stamp-qr?token=qr-1&accountId=acc-1']}><VisitStampQr /></MemoryRouter>);
+  expect(await screen.findByText('来店スタンプ')).toBeTruthy();
+});
+
 it('読み込み失敗は共通の失敗表示から同じ依頼で再試行し、LINEへ戻れる', async () => {
   fx.redeemQr.mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce({ data: { status: 'invalid', reason: 'invalid' } });
   render(<MemoryRouter initialEntries={['/visit-stamp-qr?token=qr-1&accountId=acc-1']}><VisitStampQr /></MemoryRouter>);

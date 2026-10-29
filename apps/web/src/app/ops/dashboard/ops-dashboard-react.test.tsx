@@ -239,6 +239,18 @@ describe('画面', () => {
     expect(urls.some((u) => u.endsWith('/api/ops/dashboard/line-unregistered'))).toBe(true)
   })
 
+  it('上限に近い契約先の見出しは切れない短い言葉で、全文は乗せると分かる', async () => {
+    await act(async () => { root.render(<OpsDashboardPage />) })
+    await flush()
+    const headers = Array.from(host.querySelectorAll('[role="columnheader"]'))
+    const banner = headers.find((h) => h.textContent === 'バナー')
+    const media = headers.find((h) => h.textContent === 'メディア')
+    expect(banner?.getAttribute('title')).toBe('バナー生成')
+    expect(media?.getAttribute('title')).toBe('メディア容量')
+    expect(host.textContent).not.toContain('バナー生成')
+    expect(host.textContent).not.toContain('メディア容量')
+  })
+
   it('#1058: 読み込みに失敗したらエラーと再読み込みを1枚だけ出し、各セクションは読み込み中のままにしない', async () => {
     let fail = true
     stubDashboardFetch(async () => (

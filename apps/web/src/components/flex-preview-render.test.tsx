@@ -98,3 +98,11 @@ it('textのcontentsのspanを順番に描く（WEB280）', () => {
   expect(container.textContent).toContain('通常強調')
   expect((getByText('強調') as HTMLElement).style.fontWeight).toBe('700')
 })
+it('flex:0の子は中身の幅で固定し縦に崩さない（E29）', () => {
+  const bubble = { type: 'bubble', body: { type: 'box', contents: [{ type: 'box', layout: 'baseline', contents: [{ type: 'text', text: '期限', flex: 0 }, { type: 'text', text: '10月31日まで有効です' }] }] } }
+  const { getByText } = render(<FlexPreview content={JSON.stringify(bubble)} />)
+  const wrap = getByText('期限').parentElement as HTMLElement
+  // `flex: 0`（= 0 1 0%）のままだと基準幅0%から最小内容幅まで縮み、1字ずつ縦に割れる。
+  expect(wrap.style.flex).toBe('0 0 auto')
+  expect(wrap.style.maxWidth).toBe('100%')
+})

@@ -1231,7 +1231,6 @@ function LineNotificationsPage() {
 
   return <SaveErrorScope errors={saveErrors}><SbSettingsScreen
     boardId={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}
-    layout="narrow-nav"
     contentLayout={tab === 'customer' ? 'wide' : undefined}
     actions={tab === 'operator' && expandedSetting === null ? <>
       <Button onClick={() => { if (canChange) setOperatorExportOpen(true) }} disabled={!selectedAccountId || !canChange} lockedReason={manageLockReason}><Download aria-hidden="true" size={16} />CSVで書き出す</Button>

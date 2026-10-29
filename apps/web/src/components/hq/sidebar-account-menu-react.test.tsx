@@ -104,7 +104,30 @@ describe('★V8 左下の自分とメニュー', () => {
     cleanup()
   })
 
-  it('枠は顔・名前・役割。押すまでメニューは出ない', async () => {
+  it('統括へ戻れる人にはメニューを開く前から戻るリンクを出す', async () => {
+    rememberStaffIdentity({ role: 'owner', accountScope: 'all' } as StaffMember)
+    const view = await renderMenu()
+    const link = view.getByRole('link', { name: '統括へ →' })
+    expect(link.nextElementSibling).toBe(trigger(view))
+    expect(view.queryByRole('menu')).toBeNull()
+    fireEvent.click(link)
+    expect(fixture.clearSelectedAccountId).toHaveBeenCalledOnce()
+    expect(fixture.push).toHaveBeenCalledWith('/hq')
+  })
+
+  it.each([undefined, 'accounts'] as const)('統括の担当範囲が%sなら常設リンクを出さない', async accountScope => {
+    rememberStaffIdentity({ role: 'owner', accountScope } as StaffMember)
+    const view = await renderMenu()
+    expect(view.queryByRole('link', { name: '統括へ →' })).toBeNull()
+  })
+
+  it.each(['staff', 'viewer'])('統括へ戻れない%sには常設リンクを出さない', async role => {
+    rememberStaffIdentity({ role } as StaffMember)
+    const view = await renderMenu()
+    expect(view.queryByRole('link', { name: '統括へ →' })).toBeNull()
+  })
+
+  it('枠は顔・名前・役割。押すまでメニューは出ない' , async () => {
     const view = await renderMenu()
     const button = trigger(view)
     expect(button.tagName).toBe('BUTTON')

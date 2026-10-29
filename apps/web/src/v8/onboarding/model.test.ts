@@ -69,6 +69,16 @@ describe('はじめにやること（Bdfxm）', () => {
     expect(summary.done).toBe(1)
     expect(summary.rows).toEqual([])
   })
+
+  it('ECでは来店スタンプの質問と注意をどちらも出さない', () => {
+    const ec = summarizeSetup(
+      { ...state, style: 'ec' },
+      [{ feature: 'stamps', areaId: 'E', groupId: 'g', href: '/visit-stamps', customerState: 'preparing' }],
+      [],
+    )
+    expect(ec.rows.some((row) => row.key === 'stamps')).toBe(false)
+    expect(ec.rows.some((row) => row.title.includes('スタンプ'))).toBe(false)
+  })
 })
 
 describe('開き直したときの保存', () => {

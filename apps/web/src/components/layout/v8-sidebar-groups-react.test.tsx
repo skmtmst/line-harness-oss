@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
-import type { StaffMember } from '@line-crm/shared'
+import type { AccountStyle, StaffMember } from '@line-crm/shared'
 /*
  * ★V8（夕44-A・部品 T7XSI6）：左メニューの組の開閉と「設定」の入口。
  *
@@ -23,6 +23,7 @@ const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
   get: vi.fn(),
   pathname: '/',
+  style: 'restaurant' as AccountStyle,
 }))
 
 const localStorageValues = new Map<string, string>()
@@ -57,7 +58,7 @@ vi.mock('@/lib/api', () => ({
   },
 }))
 
-vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'restaurant' }, status: 'ready', error: null, reload: vi.fn() }) }))
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: fixture.style }, status: 'ready', error: null, reload: vi.fn() }) }))
 import Sidebar, { isHqShellPath } from './sidebar'
 import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
@@ -89,6 +90,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     fixture.visibility.mockReset()
     fixture.get.mockReset()
     fixture.pathname = '/'
+    fixture.style = 'restaurant'
     fixture.visibility.mockResolvedValue({ success: true, data: { features: ALL_FEATURES_ON } })
     fixture.get.mockResolvedValue({
       success: true,
@@ -142,7 +144,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(view.getAllByRole('link', { name: 'ダッシュボード' }).length).toBeGreaterThan(0)
     expect(view.getAllByRole('link', { name: '一斉配信' }).length).toBeGreaterThan(0)
     expect(view.getAllByRole('link', { name: 'テンプレート' }).length).toBeGreaterThan(0)
-    expect(view.getAllByRole('link', { name: '予約管理' }).length).toBeGreaterThan(0)
+    expect(view.getAllByRole('link', { name: 'イベント予約' }).length).toBeGreaterThan(0)
     // 畳む：成果と分析・自動化・専用機能・設定
     expect(view.queryAllByRole('link', { name: '分析' })).toHaveLength(0)
     expect(view.queryAllByRole('link', { name: 'オートメーション' })).toHaveLength(0)
@@ -189,6 +191,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'true')
     vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')
     fixture.get.mockResolvedValue({ success: true, data: { features: ALL_FEATURES_ON, sidebarOrder: null, sidebarItemOrder: null, specializedFeatureKeys: Object.keys(ALL_FEATURES_ON) } })
+    fixture.style = href.startsWith('/booking/') ? 'salon' : 'restaurant'
     fixture.pathname = href.split('?')[0]
     window.history.replaceState({}, '', href)
     window.localStorage.setItem('lh-sidebar-groups', JSON.stringify(Object.fromEntries(MENU_SECTIONS.map(section => [section.id, false]))))
@@ -200,7 +203,18 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     window.history.replaceState({}, '', '/')
   })
 
-  it('いちばん下に「設定」が出るのはオーナー・管理者だけ', async () => {
+  it('統合された成果画面への入口と設定はそれぞれ1つにまとめる', async () => {
+    fixture.pathname = '/conversions'
+    const view = await renderSidebar()
+    const desktop = view.container.querySelector('aside[data-design-node="J33xq"]')!
+    const links = [...desktop.querySelectorAll('a')]
+    expect(links.filter(link => link.textContent?.trim() === '成果とアフィリエイト')).toHaveLength(1)
+    expect(links.filter(link => link.textContent?.trim() === 'コンバージョン')).toHaveLength(0)
+    expect(links.filter(link => link.getAttribute('href') === '/settings')).toHaveLength(1)
+    expect(links.filter(link => link.getAttribute('aria-current') === 'page')[0]?.textContent).toBe('成果とアフィリエイト')
+  })
+
+  it('いちばん下に「設定」が出るのはオーナー・管理者だけ' , async () => {
     const view = await renderSidebar()
     const gear = view.getAllByRole('link', { name: '設定' })
     expect(gear.length).toBeGreaterThan(0)

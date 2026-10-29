@@ -18,7 +18,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
 import EmptyList from '@/components/shared/empty-list';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel';
 import ListState from '@/components/shared/list-state';
 import Notice from '@/components/shared/notice';
 import Pagination from '@/components/shared/pagination';
@@ -97,7 +97,6 @@ export default function HqHomeV8() {
   const [size, setSize] = useState(20)
   const [page, setPage] = useListUrlValue('page', 1)
   const [folders, setFolders] = useState<(Folder & { itemCount?: number })[]>([])
-  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   /* フォルダの追加・名前と色を変える窓（同じ窓。editing があれば変える）。 */
   const [folderDialog, setFolderDialog] = useState<{ editing: Folder | null } | null>(null)
   const [folderName, setFolderName] = useState('')
@@ -118,7 +117,6 @@ export default function HqHomeV8() {
       const res = await api.lineAccountFolders.list()
       if (res.success && Array.isArray(res.data?.folders)) {
         setFolders([...res.data.folders].sort((a, b) => a.displayOrder - b.displayOrder))
-        setUnfiledCount(typeof res.data.unclassifiedCount === 'number' ? res.data.unclassifiedCount : null)
       }
     } catch (saveFailure) {
       saveErrors.capture(saveFailure)
@@ -253,7 +251,7 @@ export default function HqHomeV8() {
     unconfirmed: sum.unconfirmed + (matchesStatus(account, 'warn') && account.connection?.status !== 'warn' ? 1 : 0),
   }), { friends: 0, messages: 0, warnings: 0, unconfirmed: 0 }), [currentAccounts])
 
-  /* 所属は1つ（API-17 の folderId）。サーバーの数が無いときは手元で数える。 */
+  /* 所属は1つ。アーカイブを除く同じ一覧で、すべて・フォルダ・未分類を数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
   const folderCounts = useMemo(() => {
     const counts = new Map<string, number>()
@@ -390,7 +388,7 @@ export default function HqHomeV8() {
       kind: 'folder' as const,
       id: f.id,
       label: f.name,
-      count: typeof f.itemCount === 'number' ? f.itemCount : accountsReadable ? (folderCounts.get(f.id) ?? 0) : null,
+      count: accountsReadable ? (folderCounts.get(f.id) ?? 0) : null,
       color: f.color,
       icon: <FolderDot folder={{ name: f.name, color: f.color }} />,
       onEdit: canManage ? () => openFolderDialog(f) : undefined,
@@ -398,7 +396,7 @@ export default function HqHomeV8() {
       onMoveDown: canManage && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
       onDelete: canManage ? () => { setFolderError(''); setDeleteFolder(f) } : undefined,
     })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount ?? (accountsReadable ? localUnfiled : null) },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: accountsReadable ? localUnfiled : null },
   ]
 
   const createAccount = canManage ? (
@@ -419,7 +417,6 @@ export default function HqHomeV8() {
         onAddFolder={canManage ? () => openFolderDialog(null) : undefined}
         addFolderLabel="フォルダを追加"
       >
-        <FolderPanelNote>フォルダを消しても、アカウントは消えません</FolderPanelNote>
       </FolderPanel>
     </div>
   )
@@ -468,7 +465,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
-        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} />
+        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">
@@ -648,7 +645,7 @@ export default function HqHomeV8() {
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="JKjsE"
       title="統括のアカウント"
-      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{`${view === 'cards' ? 'カードの「設定」' : '行の「…」'}から、フォルダの移動・名前を変えられます。アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。`}</>}
+      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{`${view === 'cards' ? 'カードの「設定」' : '行の「…」'}から、フォルダの移動・名前を変えられます。アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです（「戻す」はオーナーのみ。本人確認のあと「停止中」に戻ります）。`}</>}
 
       folders={folderColumn}
       folderInset toolbar={toolbar} toolbarSpacing="stats" toolbarRowGap="card"

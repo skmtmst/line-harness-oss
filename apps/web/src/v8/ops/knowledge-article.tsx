@@ -4,7 +4,6 @@ import { Check } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type OpsKnowledgeArticle, type OpsKnowledgeInput } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { KNOWLEDGE_KINDS, knowledgeTime, knowledgeArticleKind } from '@/components/ops/knowledge-format'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -238,7 +237,7 @@ function KnowledgeSurface({ fullPage, editing, busy, onCancel, actions, title, d
   fullPage: boolean; editing: boolean; busy: boolean; onCancel: () => void; actions: ReactNode; title: string; description: string; children: ReactNode
 }) {
   if (!fullPage) return <Dialog open title={editing ? '記事を直す' : '下書きの内容を確認'} designNode={editing ? 'ZAOc7' : 'DHdsw'} busy={busy} onCancel={onCancel} footer={actions}>{children}</Dialog>
-  return <div data-design-node="R5ckwJ"><OpsHead title={title} description={description} environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)} actions={actions} />{children}</div>
+  return <div data-design-node="R5ckwJ"><OpsHead title={title} description={description} actions={actions} />{children}</div>
 }
 
 function KnowledgeBody({ fullPage, preview, children }: { fullPage: boolean; preview: ReactNode; children: ReactNode }) {

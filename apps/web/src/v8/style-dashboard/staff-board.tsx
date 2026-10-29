@@ -1,7 +1,7 @@
 'use client'
 import { CalendarSlotButton, useCalendarTimeScale } from '@/components/shared/calendar-parts'
 import { CircleHelp, Plus, Star } from 'lucide-react'
-import { useRef, useState, type CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu'
 import ListToolbar from '@/components/shared/list-toolbar'
 import { BookingBlock } from '@/components/shared/booking-controls'
@@ -23,7 +23,8 @@ const at = (hm: string, from: string): CSSProperties => ({ insetBlockStart: `cal
 const span = (start: string, end: string): CSSProperties => ({ blockSize: `calc(var(--tpl-sd-hour) * ${(toMin(end) - toMin(start)) / 60} - var(--tpl-sd-entry-gap))` })
 const col = (index: number, count: number): CSSProperties => ({ insetInlineStart: `calc(var(--tpl-sd-time-col) + (100% - var(--tpl-sd-time-col)) / ${count} * ${index})`, inlineSize: `calc((100% - var(--tpl-sd-time-col)) / ${count})` })
 
-export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSlot }: {
+export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSlot, empty }: {
+  empty?: ReactNode
   board: StyleBoard
   search: string
   onSearch: (value: string) => void
@@ -48,6 +49,7 @@ export function StaffBoard({ board, search, onSearch, canWrite, entryItems, onSl
         <div className={styles.search}><ListToolbar search={{ value: search, onChange: onSearch, placeholder: "名前・電話で探す", width: 220 }} /></div>
       </div>
       <BookingVisibleLegend states={[...new Set(shown.map(e => calendarBookingState(e.state)))]}/>
+      {empty}
       <div className={styles.boardStaff}>
         <span className={styles.boardTimeHead} />
         {board.columns.map((c) => (

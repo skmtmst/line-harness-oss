@@ -1,6 +1,5 @@
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { useCustomerWords, useCustomerStyle } from '../components/customer-style-scope.js';
-import PaymentPreparingNote from '../components/payment-preparing-note.js';
 import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
 import PageHeading from '../components/ui/page-heading.js';
 import FieldError from '../components/ui/field-error.js';
@@ -252,7 +251,6 @@ export default function MyPage() {
           <LoadingView />
         ) : (
           <>
-            {unpaid || (nextPayment && nextPayment.kind !== 'onsite') ? <PaymentPreparingNote /> : null}
             {unpaid ? <UnpaidCard booking={unpaid.booking} payment={unpaid.payment} busy={payBusy} onPay={() => void runPay(unpaid.booking)} /> : null}
             {next ? (
               <NextBookingCard booking={next} payment={nextPayment} onChange={() => go('/booking/history')} onDetail={() => go('/booking/history')} />
@@ -267,10 +265,10 @@ export default function MyPage() {
               <ul>
                 {style === 'ec' && (history.hasPast || next) ? <MenuRow icon="calendar" label="予約の履歴" state={{ kind: 'value', text: '' }} onPress={() => go('/booking/history')} /> : null}
                 {style === 'lesson' ? <MenuRow icon="calendar" label="予約の確認・振替" state={{ kind: 'value', text: '' }} onPress={() => go('/events/me')} /> : null}
-                <MenuRow icon="hourglass" label="キャンセル待ち" state={waitlist}
-                  onPress={() => waitlist.kind === 'error' ? setReloadKey((k) => k + 1) : go('/booking/history')} />
-                <MenuRow icon="ticket" label="回数券" state={tickets} expanded={tickets.kind === 'value' ? ticketsOpen : undefined}
-                  onPress={() => tickets.kind === 'error' ? setReloadKey((k) => k + 1) : (tickets.kind === 'value' ? setTicketsOpen((v) => !v) : setNotice(`回数券は${COMING_SOON}。`))} />
+                {style !== 'ec' ? <MenuRow icon="hourglass" label="キャンセル待ち" state={waitlist}
+                  onPress={() => waitlist.kind === 'error' ? setReloadKey((k) => k + 1) : go('/booking/history')} /> : null}
+                {style !== 'ec' ? <MenuRow icon="ticket" label="回数券" state={tickets} expanded={tickets.kind === 'value' ? ticketsOpen : undefined}
+                  onPress={() => tickets.kind === 'error' ? setReloadKey((k) => k + 1) : (tickets.kind === 'value' ? setTicketsOpen((v) => !v) : setNotice(`回数券は${COMING_SOON}。`))} /> : null}
                 {tickets.kind === 'value' && ticketsOpen && (
                   <li>
                     <ul className="mx-3.5 mb-2 space-y-1.5 rounded-(--liff-radius) bg-liff-off-bg p-3">

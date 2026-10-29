@@ -7,14 +7,14 @@ import { opsCall } from '@/components/ops/ops-ui'
 /**
  * いまの運営メンバーが閲覧のみか（/api/ops/me の readOnly）。
  * 分かるまでは閲覧のみとして扱う。理由つきの押せない形にする画面は
- * `useOpsReadOnlyState` を使う（決まり：隠さず灰色＋理由）。
+ * `useOpsReadOnlyState` を使う（2026-10-26 オーナー決定：隠さず灰色＋理由）。
  * 取れなかったときも閲覧のみのまま（変える操作は出さない）。
  */
 export function useOpsReadOnly(): boolean {
   return useOpsReadOnlyState() !== 'writer'
 }
 
-/** 閲覧のみの運営メンバーに押せない操作を見せる時の理由（全画面で隠さず灰色＋理由）。 */
+/** 閲覧のみの運営メンバーに押せない操作を見せる時の理由（2026-10-26 オーナー決定：全画面で隠さず灰色＋理由）。 */
 export const OPS_READONLY_LOCK_REASON = '閲覧のみで見ています。変える時は書ける運営メンバーに頼んでください。'
 
 /** 運営メンバーの書き込みの可否（分かるまでは 'unknown'）。理由つきの押せない形に使う。 */

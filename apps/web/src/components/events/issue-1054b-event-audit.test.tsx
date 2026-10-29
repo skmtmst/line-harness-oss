@@ -9,7 +9,7 @@
 */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
 import EventForm from '@/v8/events/edit-form'
 import { EVENT_DEFAULT_DRAFT } from './event-draft-shared'
@@ -112,8 +112,9 @@ async function click(text: string) {
 it('EVENT-01: 枠の定員を保存すると一覧・残席が新しい値になる', async () => {
   await act(async () => root.render(<EventForm accountId="account-a" eventId="event-1" />))
   await click('2. 予約枠')
-  await act(async () => { (host.querySelector('[aria-label="そのほかの操作"]') as HTMLButtonElement).click() })
-  await act(async () => { (document.querySelector('[role="menuitem"]') as HTMLButtonElement).click() })
+  await act(async () => { (host.querySelector('tbody button[aria-haspopup="menu"]') as HTMLButtonElement).click() })
+  const edit = await screen.findByRole('menuitem', { name: '編集する', exact: true })
+  await act(async () => { edit.click() })
   const dialog = document.querySelector('[role="dialog"]')!
   await act(async () => { fireEvent.change(dialog.querySelector('input[type="number"]')!, { target: { value: '2' } }) })
   st.listSlots.mockResolvedValueOnce({ items: [slotCap2] })

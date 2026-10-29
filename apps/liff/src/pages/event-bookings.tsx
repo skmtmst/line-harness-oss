@@ -434,13 +434,13 @@ export default function EventBookings() {
                         }
                       >
                         <span
-                          className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}
+                          className={`liff-num text-sm font-semibold whitespace-nowrap ${disabled ? 'text-ink-faint' : 'text-ink'}`}
                         >
                           {utcToJstMd(s.starts_at)} {utcToJstHm(s.starts_at)}〜
                           {utcToJstHm(s.ends_at)}
                         </span>
                         <span
-                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : selected ? 'text-(--liff-on-primary)' : 'text-ink-secondary'}`}
+                          className={`shrink-0 text-xs whitespace-nowrap ${disabled ? 'text-ink-faint' : 'text-ink-secondary'}`}
                         >
                           {current ? '今の時間' : full ? '満席' : '空きあり'}
                         </span>

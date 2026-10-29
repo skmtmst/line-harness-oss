@@ -84,14 +84,14 @@ export function kpisFor(style: IndustryStyle, s: StyleSnapshot, range: Dashboard
   const r = RANGE_WORD[range]
   if (style === 'restaurant') return [
     kpi({ id: 'today', key: 'bookings', title: `${r}の予約`, unit: `組・${num(s, 'guests') ?? '—'}人`, detail: () => `初めて ${num(s, 'firstTime') ?? '—'}・常連 ${num(s, 'regular') ?? '—'}`, link: { label: '一覧', href: '/restaurant-test/reservations' }, help: '取消・無断・押さえを除く予約です。来店日で数えます。' }, s),
-    kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => `未配席 ${num(s, 'unseated') ?? '—'}・枠を閉じる ${num(s, 'mediaCloseTasks') ?? '—'}`, link: { label: '内訳', href: '/restaurant-test/reservations' }, help: '承認待ち・卓が決まっていない予約・他の予約サイトの枠を閉じる知らせの数です。' }, s),
+    kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => `未配席 ${num(s, 'unseated') ?? '—'}・枠閉じ ${num(s, 'mediaCloseTasks') ?? '—'}`, link: { label: '内訳', href: '/restaurant-test/reservations' }, help: '承認待ち・卓が決まっていない予約・他の予約サイトの枠を閉じる知らせの数です。' }, s),
     kpi({ id: 'free', key: 'freeTables', title: '空席（いま）', unit: '卓', detail: () => '動いている卓のうち', link: { label: '座席表', href: '/restaurant-test/tables' }, help: '動いている卓のうち、いま予約が重なっていない卓の数です。' }, s),
     kpi({ id: 'noshow', key: 'noShowRate', title: '無断キャンセル率', lower: true, detail: () => '期間内', link: { label: '人を見る', href: '/friends' }, help: '無断キャンセルの割合です。' }, s),
     newKpi(s, '/restaurant-test/reservations', range),
   ]
   if (style === 'salon') return [
     kpi({ id: 'today', key: 'bookings', title: `${r}の予約`, detail: (x) => { const e = metricValue(x.metrics.estimatedRevenue); return e.valueText ? `見込み ${e.valueText}` : '見込み —' }, link: { label: '一覧', href: '/booking/bookings' }, help: '取消を除く予約です。来店日で数えます。' }, s),
-    kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => '承認待ち・来店の印がまだ', link: { label: '内訳', href: '/booking/bookings' }, help: '承認待ち・来店の印が付いていない予約など、お店が何かする必要がある数です。' }, s),
+    kpi({ id: 'waiting', key: 'attention', title: '対応待ち', detail: () => '承認待ち・来店未記録', link: { label: '内訳', href: '/booking/bookings' }, help: '承認待ち・来店の印が付いていない予約など、お店が何かする必要がある数です。' }, s),
     kpi({ id: 'rebook', key: 'nextBookingRate', title: '次回予約率', detail: () => '過去30日', link: { label: '人を見る', href: '/friends' }, help: '施術のあと24時間以内に次の予約を入れた人の割合です。' }, s),
     kpi({ id: 'recall', key: 'recall', title: '呼び戻し待ち', detail: () => '次の予約がない人', link: { label: '友だち一覧', href: '/friends' }, help: '来店間隔の目安を過ぎ、次の予約がない人の数です。' }, s),
     kpi({ id: 'noshow', key: 'noShowRate', title: '無断キャンセル率', lower: true, detail: () => '無断／対象の予約', link: { label: '友だち一覧', href: '/friends' }, help: '対象期間の予約に対する無断キャンセルの割合です。期間と除外条件は計算式で確認できます。' }, s),
@@ -217,9 +217,10 @@ function weekOf(sch: StyleSchedule, now: Date): StyleWeek {
     // A clipped continuation is not a new bookable start. Keep the API candidate's original action.
     return segments(s.startsAt, s.endsAt).map(slot => slot.day === original.date ? slot : { ...slot, bookingDay: original.date, bookingStart: original.time })
   })
+  const classDays = new Set(sch.entries.filter(entry => entry.kind === 'class').flatMap(entry => segments(entry.startsAt, entry.endsAt).map(slot => slot.day)))
   const first = days[0]?.date ?? sch.from.slice(0, 10), last = days.at(-1)?.date ?? first
   const jp = (d: string) => { const x = new Date(`${d}T00:00:00Z`); return `${x.getUTCMonth() + 1}月${x.getUTCDate()}日（${WEEK[x.getUTCDay()]}）` }
-  return { title: first === last ? jp(first) : `${jp(first)} 〜 ${jp(last)}`, from: first, to: last, days: days.map(day => ({ ...day, sub: day.closed ? '定休日' : free.some(slot => slot.day === day.date) ? `空き ${free.filter(slot => slot.day === day.date).length}` : '満' })), entries, free }
+  return { title: first === last ? jp(first) : `${jp(first)} 〜 ${jp(last)}`, from: first, to: last, days: days.map(day => ({ ...day, sub: day.closed ? '定休日' : free.some(slot => slot.day === day.date) ? `空き ${free.filter(slot => slot.day === day.date).length}` : sch.style === 'lesson' && !classDays.has(day.date) ? 'クラスなし' : '満' })), entries, free }
 }
 
 function monthOf(sch: StyleSchedule, selected: string, now: Date, rows: StyleRow[]): StyleMonth {
@@ -280,6 +281,7 @@ export function toToday(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedu
     kpis: kpisFor(style, s, range),
     alert: null,
     rows, rowsNote: `${formatNumber(rows.length)}件中 1〜${formatNumber(rows.length)}件`,
+    bookingCount: s.metrics.bookings?.status === 'available' ? s.metrics.bookings.value : null,
     board: boardOf(style, sch, now),
     week: sch.calendarView === 'week' || range === 'week' || (sch.display === 'calendar' && sch.calendarView === 'day') ? weekOf(sch, now) : null,
     month: range === 'month' ? monthOf(sch, selected, now, dayRows) : null,

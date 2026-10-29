@@ -8,7 +8,6 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useState, type ReactNode } from 'react'
 import { api, type OpsTenantDetail } from '@/lib/api'
 import { AUDIT_ACTION_LABEL, PLAN_STATUS_LABEL, ROLE_LABEL, formatDate, formatDateTime, planLabel, opsCall } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -103,8 +102,6 @@ function DetailContent() {
     window.location.assign('/hq')
   }
 
-  const environment = opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)
-
   if (!id) {
     return (
       <PageFrame kind="detail" boardId="Oub6x" standalone>
@@ -116,7 +113,7 @@ function DetailContent() {
   if (!detail) {
     return (
       <PageFrame kind="detail" boardId="Oub6x" standalone>
-        <OpsHead title="契約先アカウント" environment={environment} />
+        <OpsHead title="契約先アカウント" />
         <div className={parts.panel}>
           {error
             ? <ListState permissionScope="hq" kind="error" title="契約先を表示できませんでした" description={error} onRetry={() => void load()} />
@@ -137,7 +134,6 @@ function DetailContent() {
       <OpsHead
         title={tenant.name}
         description={`${planLabel(tenant.plan_key)}・${PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status}・${formatDate(tenant.created_at).replace(/-/g, '/')} から`}
-        environment={environment}
         band={<TenantOverviewStats detail={detail} />}
         actions={(
           <>

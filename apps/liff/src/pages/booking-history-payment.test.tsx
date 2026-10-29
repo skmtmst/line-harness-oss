@@ -89,3 +89,9 @@ it('A07: 開始結果が不明なら支払いボタンを出さず、問い合�
   expect(screen.queryByRole('button', { name: 'お支払いへ進む' })).toBeNull();
   expect(api.startBookingPayment).not.toHaveBeenCalled();
 });
+
+it('履歴の一覧では「カード決済は準備中です」を出さない（未払いがあっても）', async () => {
+  render2();
+  await screen.findByText('未払い ¥4,400');
+  expect(screen.queryByText('カード決済は準備中です')).toBeNull();
+});

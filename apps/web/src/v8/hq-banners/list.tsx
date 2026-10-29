@@ -702,8 +702,7 @@ function LibraryView({ head, canManage, presets, accounts, onChanged }: {
               { value: 'all', label: 'すべて' },
               ...SHAPE_FILTERS.map((item) => ({ value: item.key as string, label: item.label })),
             ]}
-          /></>}
-          trailing={<span>並び：作成が新しい順</span>} />
+          /></>} />
         {actionError ? <Notice tone="danger" message={actionError} /> : null}
       </>}
     >
