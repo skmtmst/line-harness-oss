@@ -464,6 +464,7 @@
 - [LINEアカウント登録の使い方選択ポップアップ](release-log/unreleased/1898-masato-register-style-dialog.md) — 登録時に使い方の見本を見て選ぶか、後で設定する変更の反映履歴。
 - [LINE接続マニュアルの現行4ステップへの更新](release-log/unreleased/1897-masato-line-connect-manual.md)
 - [LINEログインチャネル作成手順の追加](release-log/unreleased/1911-masato-line-login-create-guide.md)
+- [LINEログイン画像の重複した番号を削除](release-log/unreleased/1912-masato-line-login-callout-numbers.md)
 - [LINEログインチャネル作成・種類の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-type.webp)
 - [LINEログインチャネル作成・入力欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-fields.webp)
 - [LINEログインチャネル作成・同意欄の公開用画像](../apps/web/public/manuals/line-connect/images/m4-create-final.webp)
