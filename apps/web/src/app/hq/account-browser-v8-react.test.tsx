@@ -39,7 +39,7 @@ describe('V8 統括のアカウントを探す', () => {
     expect(screen.queryByText('店舗00')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '2ページ目へ' }))
     fireEvent.click(screen.getAllByRole('button', { name: / へ入る$/ })[0])
-    // #1915：入る前に引き継ぎ状態の確認を挟むので、非同期で待つ。
+    // 入る前に引き継ぎ状態の確認を挟むので、非同期で待つ。
     await waitFor(() => expect(mocks.select).toHaveBeenCalledWith('a2'))
     expect(screen.getByText(/21〜23\s*件/)).toBeTruthy()
   })

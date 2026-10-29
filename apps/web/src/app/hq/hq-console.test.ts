@@ -18,7 +18,7 @@ describe('統括コンソール', () => {
     expect(page).not.toContain('NoteBar')
     expect(page).not.toContain('LINE公式アカウントごとに管理画面へ入れます。')
     for (const source of [page, openPage]) {
-      // 引き継ぎの進捗画面（/accounts/new/handover?accountId=・#1915）は意図した形。古い ?account=・?store= だけ禁じる。
+      // 引き継ぎの進捗画面（/accounts/new/handover?accountId=）は意図した形。古い ?account=・?store= だけ禁じる。
       expect(source).not.toContain('?account=')
       expect(source).not.toContain('?store')
     }

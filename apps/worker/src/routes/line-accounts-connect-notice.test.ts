@@ -128,7 +128,7 @@ const autoConnectBody = {
 describe('POST /api/line-accounts/connect/check の残りの案内', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // #1928：登録系は統括（有効・全店範囲）のみ。案内の検証は統括で通す。
+    // 登録系は統括（有効・全店範囲）のみ。案内の検証は統括で通す。
     dbMocks.getStaffById.mockResolvedValue({ is_active: 1, account_scope: 'all' });
     lineClientMocks.getFollowerIds.mockResolvedValue({ userIds: [] });
     lineClientMocks.getFollowersInsight.mockResolvedValue({ status: 'ready', followers: 3 });

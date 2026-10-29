@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * V8 統括のメンバー（src/v8/hq/members.tsx・member-dialog.tsx）の動きの試験。
- * 招待の始まり（閲覧のみ・統括の全アカウント固定・範囲の選択は無い #1928）、
+ * 招待の始まり（閲覧のみ・統括の全アカウント固定・範囲の選択は無い）、
  * 変更→確認の間は変更の窓を閉じる、確認をやめたら中身のまま戻る、
  * 役割を変えないときは役割を送らない（担当者が管理者に上がらない）。
  */
@@ -100,7 +100,7 @@ describe('V8 統括のメンバーの窓', () => {
     await flush()
     expect(dialogTitles()).toContain('権限者を招待')
     const dialog = document.querySelector('[role="dialog"]')!
-    // 範囲の選び直しは無い（#1928：統括の招待は全アカウント固定）。
+    // 範囲の選び直しは無い（統括の招待は全アカウント固定）。
     expect(screen.queryByRole('radio', { name: '指定したアカウントだけ' })).toBeNull()
     expect(dialog.textContent).toContain('統括のすべてのアカウントを見て操作できます。')
     expect(dialog.textContent).toContain('閲覧のみ（見るだけ）')
@@ -172,7 +172,7 @@ describe('V8 統括のメンバーの窓', () => {
     await flush()
     await act(async () => { buttonByText('権限を変更する')!.click() })
     await flush()
-    // 範囲は選べない（#1928）。状態だけ無効にする。
+    // 範囲は選べない。状態だけ無効にする。
     expect(screen.queryByRole('radio', { name: '指定したアカウントだけ' })).toBeNull()
     const inactive = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'inactive')!
     await act(async () => { inactive.click() })
