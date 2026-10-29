@@ -218,3 +218,9 @@ it.each(['loading', 'failed', 'missing', 'empty-name', 'named'] as const)('保�
   expect(getDraft).toHaveBeenCalledWith('common-action-draft', 'account')
   expect(createDraft).not.toHaveBeenCalled()
 })
+
+it('題は機能名を入れた「オートメーションを作る」（自動応答と分ける）', () => {
+  render(<NewAutomationV8 />)
+  expect(screen.getByRole('heading', { name: 'オートメーションを作る', level: 1 })).toBeTruthy()
+  expect(screen.queryByRole('heading', { name: 'ルールを作る', level: 1 })).toBeNull()
+})

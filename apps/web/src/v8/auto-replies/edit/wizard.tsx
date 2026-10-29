@@ -99,7 +99,7 @@ function AutoReplyWizardV8Inner() {
   const savedVersionRef = useRef<number | null>(null)
   const [isActive, setIsActive] = useState(false)
   const [lifecycleStatus, setLifecycleStatus] = useState('draft')
-  const pageTitle = autoReplyId && lifecycleStatus !== 'draft' ? 'ルールを編集' : 'ルールを作る'
+  const pageTitle = autoReplyId && lifecycleStatus !== 'draft' ? '自動応答を編集' : '自動応答を作る'
   usePageTitle(stage === 'done' ? '自動応答・有効化完了' : `${pageTitle}・${STEP_LABELS_V8[stage]}`)
   const [matchedLast28Days, setMatchedLast28Days] = useState<number | null>(null)
   const [wasPublished, setWasPublished] = useState(false)
@@ -723,7 +723,7 @@ function AutoReplyWizardV8Inner() {
     )
   }
   if (!autoReplyId && staffRole !== null && inputsDisabled) {
-    return <SaveErrorScope errors={saveErrors}><LockedCreatePage title="ルールを作る" backHref="/auto-replies" backLabel="自動応答の一覧へ戻る" /></SaveErrorScope>
+    return <SaveErrorScope errors={saveErrors}><LockedCreatePage title="自動応答を作る" backHref="/auto-replies" backLabel="自動応答の一覧へ戻る" /></SaveErrorScope>
   }
 
   /* ===== 完了 ===== */
@@ -736,7 +736,7 @@ function AutoReplyWizardV8Inner() {
     return (
       <SaveErrorScope errors={saveErrors}><PageFrame kind="create" boardId={DONE_DESIGN_NODE}>
         <PageHeading
-          title="ルールを作る"
+          title="自動応答を作る"
           help={`ルール名：${published!.name}`}
           identity={<Link href="/auto-replies" className={styles.backLink}>
             <ArrowLeft size={16} aria-hidden="true" />
