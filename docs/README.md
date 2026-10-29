@@ -459,9 +459,9 @@
 
 ## 反映履歴
 
-- [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/0000-kenta-train-1029f.md)
-- [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/0000-kenta-swa.md)
-- [予約枠・在庫の操作サイズの更新](release-log/unreleased/0000-kenta-swbm.md)
+- [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/1948-kenta-train-1029f.md)
+- [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
+- [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
 - [新規店舗の専用機能を非表示](release-log/unreleased/1925-masato-new-store-specialized-hidden.md)
 - [一斉配信・シナリオ一覧の自動点検の更新](release-log/unreleased/1930-kenta-muse-broadcast-scenario-reds.md)
 - [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
@@ -511,7 +511,7 @@
 - [0.24.0.md](release-log/0.24.0.md)
 - [リマインダ](release-log/0.25.0.md)
 - [反映履歴の書き方](release-log/README.md)
-- [下見・件数・待ち時間の不具合の修正](release-log/unreleased/0000-kenta-swbs.md)
+- [下見・件数・待ち時間の不具合の修正](release-log/unreleased/1948-kenta-swbs.md)
 - [外部点検のボタン名・導線・表示崩れの修正](release-log/unreleased/1851-kenta-staging-ui.md)
 - [統括名の必須表示と入力エラー時の焦点復帰](release-log/unreleased/1857-kenta-hq-name-focus.md)
 - [検査とビルドの実行環境の更新](release-log/unreleased/1794-kenta-node-runtime-security.md)
@@ -931,3 +931,4 @@
 - [自動応答の閲覧表示と作成画面の間隔](release-log/unreleased/1933-kenta-auto-reply-wizard.md) — 閲覧時の入力表示と縦の空きの反映履歴。
 - [一覧のページ範囲の補正](release-log/unreleased/1933-kenta-muse-history-pagination.md) — 削除後に最後のページへ戻す修正の反映履歴。
 - [登録の確認画面の表示とロゴ](release-log/unreleased/1945-masato-registration-confirmed-logo.md) — 登録の確認項目と正式ロゴの修正履歴。
+- [登録画面の補足文の削除](release-log/unreleased/1947-masato-registration-hints.md) — 確定済みの3項目の補足文を外した修正履歴。
