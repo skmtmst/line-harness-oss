@@ -181,6 +181,8 @@ export interface HandoverProgress {
   imported: number
   alreadyPresent: number
   restored: number
+  /** このジョブで取り込み・再登録・登録済み確認を終えた人数。 */
+  processed: number
   needsReview: number
   profilesUpdated: number
   stage: 1 | 2 | 3
@@ -213,12 +215,16 @@ export function handoverProgress(input: {
   profilesUpdated: number
 }): HandoverProgress {
   const count = (value: number) => Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0
+  const imported = count(input.imported)
+  const alreadyPresent = count(input.alreadyPresent)
+  const restored = count(input.reactivated) + count(input.claimedUnassigned)
   return {
     confirmed: input.phase === 'importing_ids' || input.phase === 'not_started' ? null : count(input.received),
     foundSoFar: count(input.received),
-    imported: count(input.imported),
-    alreadyPresent: count(input.alreadyPresent),
-    restored: count(input.reactivated) + count(input.claimedUnassigned),
+    imported,
+    alreadyPresent,
+    restored,
+    processed: imported + alreadyPresent + restored,
     needsReview: count(input.conflicts) + count(input.invalid),
     profilesUpdated: count(input.profilesUpdated),
     stage: input.phase === 'completed' ? 3 : input.phase === 'hydrating_profiles' ? 2 : 1,

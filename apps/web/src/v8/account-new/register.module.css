@@ -246,20 +246,38 @@
 
 /* ⑤-0 引き継ぎ中。地と角は共通の Card（surface="muted" corner="control"）が持つ（★V8 §24）。 */
 .handoverBox {
-  display: flex; flex-direction: column; gap: var(--tpl-htn6-hand-gap);
-  padding: var(--tpl-htn6-hand-pad);
+  display: flex; flex-direction: column; gap: 0;
+  margin-top: var(--tpl-htn6-handover-intro-to-stages);
 }
-.handoverHeading { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: var(--tpl-htn-gap-s); }
-.handoverHeading > div { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); }
-.handoverCurrent { display: inline-flex; align-items: center; gap: var(--tpl-htn-gap-s); color: var(--color-accent-deep); }
-.handoverSpinner { flex: none; animation: handover-turn 1.6s linear infinite; }
-.handoverStages { display: flex; justify-content: space-between; gap: var(--tpl-htn-gap-s); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
-.handoverCount { margin: 0; font-size: var(--tpl-htn6-text-20); line-height: var(--tpl-htn6-lh-28); font-weight: 700; color: var(--color-ink); }
+.handoverHeading { display: flex; align-items: center; gap: var(--tpl-htn-gap-s); }
+.handoverHeading > :last-child { margin-left: auto; }
+.handoverHeading .panelTitle { font-size: var(--tpl-htn6-handover-title-size); line-height: var(--tpl-htn6-handover-title-lh); }
+.handoverIcon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--tpl-htn6-handover-icon-size); height: var(--tpl-htn6-handover-icon-size); border-radius: var(--radius-pill); background: var(--color-selection-bg); color: var(--color-accent-deep); }
+.handoverIcon[data-attention] { background: var(--color-warning-bg); color: var(--color-warning); }
+.handoverSpinner { flex: none; animation: handover-turn var(--tpl-htn6-handover-spin-time) linear infinite; }
+.handoverStages { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tpl-htn-gap-s); }
+.handoverStage { display: flex; align-items: center; gap: var(--tpl-htn-gap-s); min-height: var(--tpl-htn6-handover-stage-h); padding: var(--tpl-htn-gap-s); border-radius: var(--tpl-htn-radius-m); background: var(--color-canvas-sunken); color: var(--color-ink-secondary); font-size: var(--tpl-htn-text-14); font-weight: 600; }
+.handoverStage[data-state='current'] { color: var(--color-ink); background: var(--color-selection-bg); }
+.handoverStage[data-state='done'] { color: var(--color-accent-deep); }
+.handoverStageNumber { display: inline-flex; flex: none; align-items: center; justify-content: center; width: var(--tpl-htn6-handover-step-size); height: var(--tpl-htn6-handover-step-size); border-radius: var(--radius-pill); background: var(--color-canvas); line-height: 1; }
+.handoverStage[data-state='current'] .handoverStageNumber, .handoverStage[data-state='done'] .handoverStageNumber { background: var(--color-selection-bg); color: var(--color-accent-deep); }
+.handoverMetrics { display: grid; grid-template-columns: 1fr 1fr 1.3fr; align-items: center; gap: var(--tpl-htn-gap-s); margin-top: var(--tpl-htn6-handover-stage-to-metrics); }
+.handoverMetrics > div { display: flex; flex-direction: column; gap: var(--tpl-htn-gap-xs); color: var(--color-ink-secondary); font-size: var(--tpl-htn-text-14); font-weight: 600; }
+.handoverMetrics strong { color: var(--color-ink); font-size: var(--tpl-htn6-handover-count-size); line-height: var(--tpl-htn6-handover-count-lh); font-variant-numeric: var(--font-numeric); }
+.handoverMetrics p { margin: 0; padding: var(--tpl-htn-gap-s); border-radius: var(--tpl-htn-radius-m); background: var(--color-canvas-sunken); color: var(--color-ink-secondary); }
+.handoverProgressHead { display: flex; justify-content: space-between; gap: var(--tpl-htn-gap-s); margin-top: var(--tpl-htn6-handover-metrics-to-progress); color: var(--color-ink-secondary); font-size: var(--tpl-htn-text-14); font-weight: 700; }
+.handoverProgressHead strong { color: var(--color-accent-deep); font-variant-numeric: var(--font-numeric); }
+.handoverProgressBar { margin-top: var(--tpl-htn6-handover-label-to-bar); }
+:root .handoverProgressBar { height: var(--tpl-htn6-handover-bar-h); }
+.handoverCurrent { margin: var(--tpl-htn6-handover-bar-to-status) 0 0; color: var(--color-ink); font-size: var(--tpl-htn6-handover-status-size); font-weight: 700; }
+.handoverCurrent[data-attention] { color: var(--color-warning); }
+.handoverCurrent + .progressNote { margin-top: var(--tpl-htn-gap-xs); }
 .handoverBreakdown { display: flex; flex-wrap: wrap; gap: var(--tpl-htn6-stat-gap); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-18); color: var(--color-ink-secondary); }
 .handoverBreakdown strong { color: var(--color-ink); }
-.handoverFooter { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--tpl-htn-gap-s); }
+.handoverFooter { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: var(--tpl-htn-gap-s); margin-top: var(--tpl-htn-gap-xs); }
 @keyframes handover-turn { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .handoverSpinner { animation: none; } }
+@media (max-width: 700px) { .handoverStages { grid-template-columns: 1fr; } .handoverMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); } .handoverMetrics p { grid-column: 1 / -1; } .handoverProgressHead { flex-wrap: wrap; } }
 
 /* ⑤ 完了 */
 .doneHero { display: flex; flex-direction: column; align-items: center; gap: var(--tpl-htn-gap-s); padding: var(--tpl-htn6-done-pad); text-align: center; }

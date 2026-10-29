@@ -321,7 +321,7 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(notices.lineRegistration).toHaveBeenCalledTimes(1)
   })
 
-  it('引き継ぎ中は進み具合だけを出し、終わってから登録したアカウントを見るを出す', async () => {
+  it('Penの探索中は分母なしで動き、完了後は人数と満タンの棒を表示する', async () => {
     let finishStep!: (value: unknown) => void
     calls.connect.mockResolvedValue({
       success: true,
@@ -336,15 +336,42 @@ describe('LINEアカウント作成ウィザード', () => {
     enterCheckStep()
     await runCheck()
     await saveAndFinish()
-    await screen.findByText('いまの友だちを引き継いでいます', { selector: 'h2' })
-    expect(screen.getByRole('progressbar', { name: '友だち引き継ぎの段階' })).toBeTruthy()
+    await screen.findByText('友だちを確認しています', { selector: 'h2' })
+    const progress = screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' })
+    expect(progress.getAttribute('aria-valuenow')).toBeNull()
+    expect(progress.getAttribute('aria-valuetext')).toBe('対象人数を確認中')
     expect(screen.queryByRole('link', { name: '登録したアカウントを見る' })).toBeNull()
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalled())
     finishStep({ success: true, data: {
       state: { capability: 'available', phase: 'completed', received: 10, imported: 10 },
       busy: false, profilesFetched: 10,
     } })
-    await waitFor(() => expect(screen.getByRole('link', { name: '登録したアカウントを見る' })).toBeTruthy())
+    await screen.findByText('友だちの引き継ぎが完了しました', { selector: 'h2' })
+    expect(screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' }).getAttribute('aria-valuenow')).toBe('10')
+    expect(screen.getByText('10人の友だちを引き継ぎました')).toBeTruthy()
+  })
+
+  it('Penの進行中は前日集計と現在の4人を区別し、1人処理で棒を25%にする', async () => {
+    calls.connect.mockResolvedValue({ success: true, data: {
+      ...checked.data, id: 'partial-account',
+      verification: { ...checked.data.verification, followerTotal: 2 },
+      followerImport: { capability: 'available', phase: 'importing_ids' },
+    } })
+    calls.stepFollowerImport
+      .mockResolvedValueOnce({ success: true, data: { state: {
+        capability: 'available', phase: 'hydrating_profiles', received: 4,
+        imported: 1, alreadyPresent: 0, profilesProcessed: 0, profilesUpdated: 0,
+      }, busy: true, profilesFetched: 0 } })
+      .mockImplementation(() => new Promise(() => {}))
+    enterCheckStep()
+    await runCheck()
+    await saveAndFinish()
+    await screen.findByText('4人のうち1人を引き継ぎました。残り3人を処理中です。')
+    expect(screen.getByText('前日集計は2人でした。現在の対象数は4人です。')).toBeTruthy()
+    const progress = screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' })
+    expect(progress.getAttribute('aria-valuenow')).toBe('1')
+    expect(progress.getAttribute('aria-valuemax')).toBe('4')
+    expect(progress.firstElementChild?.getAttribute('style')).toContain('scaleX(0.25)')
   })
 
   it('引き継ぎ要求が失敗しても理由を示し、画面を開いている間に再試行する', async () => {
@@ -361,8 +388,10 @@ describe('LINEアカウント作成ウィザード', () => {
     enterCheckStep()
     await runCheck()
     await saveAndFinish()
-    await screen.findByText('状態を更新できません。自動で再試行しています。')
+    await screen.findByText('進み具合を確認できません', { selector: 'h2' })
+    expect(screen.getByRole('button', { name: '状態を再確認' })).toBeTruthy()
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledTimes(2), { timeout: 6500 })
-    await screen.findByText(/LINEで確認した 4 人のうち、新しく 3 人を取り込みました。登録済み 1 人/)
+    await screen.findByText('友だちの引き継ぎが完了しました', { selector: 'h2' })
+    expect(screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' }).getAttribute('aria-valuenow')).toBe('4')
   })
 })

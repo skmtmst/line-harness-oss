@@ -179,16 +179,16 @@ const MAX_SEGMENTS = 12
  * `appearance="onboarding"` で段の数（max）が少ないときは、段の数に区切った緑で見せる
  * （済んだ段は緑、まだの段は棒の地の色）。
  */
-export function ProgressBar({ value, label, className, max = 100, appearance, tone }: {
+export function ProgressBar({ value, label, className, max = 100, appearance, tone, indeterminate = false }: {
   value: number; label: string; className?: string; max?: number
-  appearance?: 'onboarding' | 'quota'; tone?: 'danger' | 'warning'
+  appearance?: 'onboarding' | 'quota'; tone?: 'danger' | 'warning'; indeterminate?: boolean
 }) {
   const limit = Number.isFinite(max) && max > 0 ? max : 0
   const clamped = Number.isFinite(value) ? Math.min(limit, Math.max(0, value)) : 0
   const segmented = appearance === 'onboarding' && Number.isInteger(limit) && limit > 1 && limit <= MAX_SEGMENTS
   return (
-    <div role="progressbar" aria-label={label} aria-valuemin={0} aria-valuemax={limit} aria-valuenow={clamped} data-appearance={appearance} data-tone={tone} data-segmented={segmented || undefined} className={[styles.track, className].filter(Boolean).join(' ')}>
-      {segmented
+    <div role="progressbar" aria-label={label} aria-valuemin={indeterminate ? undefined : 0} aria-valuemax={indeterminate ? undefined : limit} aria-valuenow={indeterminate ? undefined : clamped} aria-valuetext={indeterminate ? '対象人数を確認中' : undefined} data-appearance={appearance} data-tone={tone} data-segmented={!indeterminate && segmented || undefined} className={[styles.track, className].filter(Boolean).join(' ')}>
+      {indeterminate ? <div className={styles.indeterminate} /> : segmented
         ? Array.from({ length: limit }, (_, index) => <span key={index} className={styles.segment} data-on={index < Math.floor(clamped) || undefined} />)
         : <div className={styles.fill} style={{ transform: `scaleX(${limit > 0 ? clamped / limit : 0})` }} />}
     </div>

@@ -315,10 +315,10 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
       received: 2, imported: 1, alreadyPresent: 1, reactivated: 0,
       claimedUnassigned: 0, conflicts: 0, invalid: 0, profilesUpdated: 0,
     }
-    expect(handoverProgress({ ...counts, phase: 'importing_ids' })).toMatchObject({ confirmed: null, foundSoFar: 2, stage: 1 })
+    expect(handoverProgress({ ...counts, phase: 'importing_ids' })).toMatchObject({ confirmed: null, foundSoFar: 2, processed: 2, stage: 1 })
     // 前日2人に今日2人が加わった場合、LINEの現在の一覧を読み終えて初めて4人と表示する。
     const four = handoverProgress({ ...counts, phase: 'hydrating_profiles', received: 4, imported: 3 })
-    expect(four).toMatchObject({ confirmed: 4, imported: 3, alreadyPresent: 1, stage: 2 })
+    expect(four).toMatchObject({ confirmed: 4, imported: 3, alreadyPresent: 1, processed: 4, stage: 2 })
     expect(handoverProgress({ ...counts, phase: 'completed', received: 4, imported: 3 }).stage).toBe(3)
   })
 

@@ -152,6 +152,7 @@ function AccountRegistrationForm() {
   }
   const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
   const importRunning = importPhase === 'importing_ids' || importPhase === 'hydrating_profiles'
+  const importAttention = importRunning && (Boolean(importState?.lastError) || importRequestError || idleSeconds >= 60)
   const basicId = connection?.basicId ?? ''
   const addFriendUrl = basicId ? `https://line.me/R/ti/p/${encodeURIComponent(basicId.startsWith('@') ? basicId : `@${basicId}`)}` : ''
   const shownStep = V8_STEPS[currentStep - 1]
@@ -599,7 +600,8 @@ function AccountRegistrationForm() {
         steps={(
           <Steps
             label="登録の進捗"
-            summaries={{ '1': '事前確認済み', '2': 'LINEの接続設定を確認済み', '3': form.name.trim(), '4': templateKey ? ({ standard: '基本の使い方', ec: 'EC・通販', salon: 'サロン', restaurant: '飲食店', school: '教室' } as Record<string, string>)[templateKey] ?? '使い方を設定済み' : '' }}
+            summaryLayout="aligned"
+            summaries={{ '1': '事前確認済み', '2': 'LINEの接続設定を確認済み', '3': currentStep === 5 ? '' : form.name.trim(), '4': templateKey ? ({ standard: '基本の使い方', ec: 'EC・通販', salon: 'サロン', restaurant: '飲食店', school: '教室' } as Record<string, string>)[templateKey] ?? '使い方を設定済み' : '' }}
             /* v07はアカウントを③で作るので、作ったあとも⑤へ飛ばさない。 */
             currentKey={String(currentStep)}
             steps={V8_STEPS.map((step) => ({
@@ -752,7 +754,7 @@ function AccountRegistrationForm() {
           )}
 
           {currentStep === 5 && connection && (
-            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} refreshing={importRefreshing} onRefresh={refreshImport} restaurant={templateKey === 'restaurant'} />
+            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} restaurant={templateKey === 'restaurant'} />
           )}
 
           {recoveredAccountId ? (
@@ -766,9 +768,10 @@ function AccountRegistrationForm() {
             <Notice tone="danger" message={error} onClose={() => setError('')} />
           ) : null}
         </StepContent></div>
-        <StickyBar presentation="account-registration" actions={currentStep === 5 ? (
-            <Button href="/hq" variant="primary"><ArrowLeft size={16} aria-hidden="true" />統括コンソールへ戻る</Button>
-          ) : currentStep === 4 ? <>
+        <StickyBar presentation="account-registration" actions={currentStep === 5 ? <>
+            {importAttention ? <Button type="button" variant="primary" busy={importRefreshing} busyLabel="確認中…" onClick={() => void refreshImport()}>状態を再確認</Button> : null}
+            <Button href="/hq" variant={importAttention ? 'secondary' : 'primary'}><ArrowLeft size={16} aria-hidden="true" />統括コンソールへ戻る</Button>
+          </> : currentStep === 4 ? <>
             <Button type="button" onClick={() => setStyleDialogOpen(true)} disabled={busy}>スタイルを選ぶ</Button>
             <Button type="button" onClick={() => void finishStyle('skip')} disabled={busy || registrationStyle.version === null} busy={registrationStyle.busy} busyLabel="保存しています…">あとで設定する</Button>
           </> : currentStep === 3 && sub === 1 && !rowsOk ? <>
