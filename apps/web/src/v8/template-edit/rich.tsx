@@ -30,7 +30,7 @@ import { FieldError, Field } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
 import { TAP_ACTION_KINDS, tapActionDef, tapActionFromSavedUri, tapActionLiffUrl, tapActionNeedsLiff, tapActionProblem, tapExtraSaveError, type TapActionKind } from '@/lib/tap-actions'
-import { TemplateEditFrame } from './frame'
+import { TemplateEditFrame, TemplatePublishNote } from './frame'
 import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import MediaSlot from '@/components/shared/media-slot'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
@@ -456,6 +456,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div>
           </>
         )}
+        footerInfo={host ? undefined : <TemplatePublishNote />}
         footerActions={(
           <>
             {host ? <Button type="button" onClick={host.onCancel}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}

@@ -38,7 +38,7 @@ import { TextField } from '@/components/shared/text-field'
 import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
 import { readInlineActions, toActionPayload, type InlineAction } from '@/components/auto-replies/draft-fields'
-import { TemplateEditFrame } from './frame'
+import { TemplateEditFrame, TemplatePublishNote } from './frame'
 import ChoiceExtrasRows from './choice-extras'
 import { FormPhone } from '@/v8/form-edit/public/phone/index'
 import type { TemplateEditHost } from './host'
@@ -453,6 +453,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
             <div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div>
           </>
         )}
+        footerInfo={host ? undefined : <TemplatePublishNote />}
         footerActions={(
           <>
             {host ? <Button type="button" onClick={host.onCancel}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}
