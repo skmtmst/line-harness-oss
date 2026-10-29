@@ -882,4 +882,5 @@
 - [musuboのWebhook設定後の案内](release-log/unreleased/1904-masato-musubo-webhook-guide-image.md) — 接続マニュアルStep 3の画像案内の反映履歴。
 - [LINE接続マニュアルの画像整理](release-log/unreleased/1906-masato-line-guide-image-cleanup.md) — Step 3とStep 4の画像整理の反映履歴。
 - [LINE接続マニュアルStep 3の画像更新](release-log/unreleased/1907-masato-line-step3-images.md) — アイコンのモザイクとMessaging APIタブ案内の反映履歴。
+- [LINE接続マニュアルStep 1の画像更新](release-log/unreleased/1908-masato-line-step1-manager-image.md) — Messaging APIの実画面と秘匿表示の反映履歴。
 - [まとめ列車 1029](release-log/unreleased/1905-kenta-train-all-1029.md) — メモの保存の直しと各担当の完成分の反映履歴。
