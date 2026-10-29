@@ -1,6 +1,6 @@
 import { withDisplayReadCache } from '@line-crm/db/src/display-read-cache.js';
 import {GapError} from './gap-common.js';
-import {comparisonCountKeys,comparisonKeys,comparisonUnits,comparisonPeriod,storeNumbers,type ComparisonKey} from './store-comparison.js';
+import {comparisonAccounts,comparisonCountKeys,comparisonKeys,comparisonUnits,comparisonPeriod,storeNumbers,type ComparisonKey} from './store-comparison.js';
 import {getVisibleLineAccountScope} from './account-access.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 export async function comparisonData(db:D1Database,visible:Array<{id:string}>,tenant:string,filters:Record<string,string>,allRows=false){
@@ -32,8 +32,9 @@ export async function checkExportAccess(db:D1Database,job:Record<string,unknown>
  if(!staff)throw new GapError('export_access_changed',403);
  const scope=await getVisibleLineAccountScope(db,{id:staff.id,name:staff.name,role:staff.role,tenantId:staff.tenant_id,readOnly:staff.access_level==='read_only'} as AuthenticatedStaff);
  const ids=JSON.parse(String(job.account_ids_json)) as string[];
- if(ids.some(id=>!scope.accounts.some(a=>a.id===id)))throw new GapError('export_access_changed',403);
- const data=await comparisonData(db,scope.accounts,staff.tenant_id,JSON.parse(String(job.filters_json)),true);
+ const accounts=comparisonAccounts(scope.accounts);
+ if(ids.some(id=>!accounts.some(a=>a.id===id)))throw new GapError('export_access_changed',403);
+ const data=await comparisonData(db,accounts,staff.tenant_id,JSON.parse(String(job.filters_json)),true);
  if(data.rows.length!==ids.length||data.rows.some(r=>!ids.includes(r.accountId)))throw new GapError('export_scope_changed',403);
  return data;
 }

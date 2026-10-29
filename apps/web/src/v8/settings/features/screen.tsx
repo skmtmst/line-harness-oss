@@ -9,7 +9,10 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { ReorderDialog } from './reorder-dialog'
 export { ReorderDialog } from './reorder-dialog'
 import ListState from '@/components/shared/list-state'
-import Toggle from '@/components/shared/toggle'
+import Toggle, { ToggleGroupActions } from '@/components/shared/toggle'
+import Card from '@/components/shared/card'
+import { DialogContentRow } from '@/components/shared/dialog-form-row'
+import { RowMenu } from '@/components/shared/row-actions'
 import SearchField from '@/components/shared/search-field'
 import Notice from '@/components/shared/notice'
 import { Field } from '@/components/shared/form-controls'
@@ -114,7 +117,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
       {item.required ? (
         <span className={styles.required} title={`${item.label}は必須機能のため、オフにできません`}>
           <Lock className={styles.requiredIcon} aria-hidden="true" />
-          必須
+          消せない
         </span>
       ) : canManage ? (
         <SaveErrorField names={["enabled"]}><Toggle
@@ -154,7 +157,6 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
 }) {
   const total = groupFeatureCount(group)
   const enabled = groupEnabledCount(group, features)
-  const allEnabled = total === 0 || enabled === total
   const switchCount = new Map<string, number>()
   for (const item of group.items) {
     const key = item.keys[0]
@@ -162,7 +164,7 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
   }
   const Chevron = open ? ChevronDown : ChevronRight
   return (
-    <section className={styles.group} aria-label={group.label}>
+    <Card overflow="hidden" aria-label={group.label}>
       <div className={styles.groupHead}>
         <button
           type="button"
@@ -175,17 +177,11 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
           <Chevron className={styles.chevron} aria-hidden="true" />
         </button>
         <h2 className={styles.groupTitle}>{group.label}</h2>
-        <span className={styles.groupMeta}>{groupSummary(group, features)}</span>
+        {(!canManage || total === 0) && <span className={styles.groupMeta}>{groupSummary(group, features)}</span>}
         <span className={styles.spacer} />
         {total > 0 && canManage && (
-          <Button
-            variant="text"
-            disabled={busy}
-            onClick={() => onGroupToggle(group, !allEnabled)}
-            aria-label={`${group.label}をまとめて${allEnabled ? 'オフ' : 'オン'}にする`}
-          >
-            まとめて
-          </Button>
+          <ToggleGroupActions total={total} enabled={enabled} label={group.label} disabled={busy}
+            onChange={(next) => onGroupToggle(group, next)} />
         )}
       </div>
       {open && (
@@ -206,7 +202,7 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
           ))}
         </ul>
       )}
-    </section>
+    </Card>
   )
 }
 
@@ -407,7 +403,7 @@ export default function FeatureSettingsScreen() {
             {error && !conflicted && !reasonError && <Notice tone="danger" message={error} />}
           </div>
 
-          <div className={styles.toolbar}>
+          <div className={styles.toolbar} data-control-row>
             <SearchField aria-label="機能の名前で探す" placeholder="機能の名前で探す" value={query} onChange={setQuery} className={styles.search} />
             <span className={styles.spacer} />
             {canManage && (
@@ -416,10 +412,8 @@ export default function FeatureSettingsScreen() {
                   <ArrowUpDown className={styles.btnIcon} aria-hidden="true" />
                   並びを変える
                 </Button>
-                <Button variant="secondary" onClick={() => setResetToDefaultsOpen(true)} disabled={saving}>
-                  <RotateCcw className={styles.btnIcon} aria-hidden="true" />
-                  初期値に戻す
-                </Button>
+                <RowMenu appearance="box" label="機能設定のほかの操作" triggerProps={{ disabled: saving }}
+                  items={[{ id: 'reset', label: '初期値に戻す', tone: 'danger', icon: null, onSelect: () => setResetToDefaultsOpen(true) }]} />
               </>
             )}
           </div>
@@ -513,12 +507,17 @@ export default function FeatureSettingsScreen() {
       <ConfirmDialog
         open={resetToDefaultsOpen}
         title="初期値に戻しますか？"
+        headerIcon={<RotateCcw aria-hidden="true" />}
+        confirmIcon={<RotateCcw aria-hidden="true" />}
         description="機能の表示と並び順を初期値の下書きに置き換えます。保存するまで、他の利用者やサイドメニューには反映されません。"
         confirmLabel="初期値を下書きに入れる"
         cancelLabel="キャンセル"
         onCancel={() => { if (!saving) setResetToDefaultsOpen(false) }}
         onConfirm={resetToDefaults}
-      />
+      >
+        <DialogContentRow>機能ごとの表示（オン・オフ）</DialogContentRow>
+        <DialogContentRow>メニューの並び順</DialogContentRow>
+      </ConfirmDialog>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}

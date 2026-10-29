@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import Dialog from './dialog'
 import Drawer from './drawer'
 import PreparingDialog from './preparing-dialog'
+import MenuPortal from './menu-portal'
 
 afterEach(cleanup)
 
@@ -34,6 +35,28 @@ function DrawerThenDialog() {
 }
 
 describe('後から開いた窓・引き出しが前に出る', () => {
+  it('通知のような既存のポータル小窓は、新しいモーダルが開くと閉じる', async () => {
+    function Both() {
+      const [panel, setPanel] = useState(false)
+      const [dialog, setDialog] = useState(false)
+      const anchor = React.useRef<HTMLButtonElement>(null)
+      return <>
+        <button ref={anchor} type="button" onClick={() => setPanel(true)}>通知を開く</button>
+        <button type="button" onClick={() => setDialog(true)}>設定を開く</button>
+        <MenuPortal open={panel} getAnchor={() => anchor.current} onClose={() => setPanel(false)}>
+          <section role="dialog" aria-label="通知パネル">通知</section>
+        </MenuPortal>
+        <Dialog open={dialog} title="設定" onCancel={() => setDialog(false)} />
+      </>
+    }
+    render(<Both />)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '通知を開く' })) })
+    expect(screen.getByRole('dialog', { name: '通知パネル' })).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '設定を開く' })) })
+    expect(screen.getByRole('dialog', { name: '設定' })).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: '通知パネル' })).toBeNull()
+  })
+
   it('窓の上に開いた引き出しは、窓より前', async () => {
     render(<DialogThenDrawer />)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '引き出しを開く' })) })

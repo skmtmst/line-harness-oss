@@ -6,7 +6,7 @@ import DateField from '@/components/shared/date-field'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import { ApiError, api, type MileageAdjustmentPolicy } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { FieldError } from '@/components/shared/form-controls'
@@ -16,6 +16,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 
 /*
@@ -440,7 +441,7 @@ export default function MileageAdjustDialog({
             </div>
             <div>
               <p className={`${styles.dlgFieldLabel} ${styles.labelRow}`}>問い合わせ・注文・調整元ID<span className={styles.dlgPersonSub}>任意</span></p>
-              <SaveErrorField names={["sourceReferenceId","source_reference_id"]}><input
+              <SaveErrorField names={["sourceReferenceId","source_reference_id"]}><SharedTextField
                 {...fields.bind('source')}
                 className={styles.dlgInput}
                 value={sourceReferenceId}
@@ -456,7 +457,7 @@ export default function MileageAdjustDialog({
 
           <div className={styles.dlgGroup}>
             <p className={styles.dlgCaption}>詳しい理由</p>
-            <SaveErrorField names={["reason"]}><textarea
+            <SaveErrorField names={["reason"]}><SharedTextArea
               {...fields.bind('reason')}
               className={styles.dlgTextarea}
               value={reason}
@@ -470,7 +471,7 @@ export default function MileageAdjustDialog({
 
           {/* 絵 M8zhjL：スイッチ＋題と説明の2行。 */}
           <div className={styles.notifyRow}>
-            <SaveErrorField names={["notifyFriend","notify_friend"]}><SettingCheckbox checked={notifyFriend} onChange={setNotifyFriend} label="友だちに知らせる（LINE通知）" /></SaveErrorField>
+            <SaveErrorField names={["notifyFriend","notify_friend"]}><Toggle checked={notifyFriend} onChange={setNotifyFriend} label="友だちに知らせる（LINE通知）" /></SaveErrorField>
             <div className={styles.dlgPersonText}>
               <span className={styles.dlgPersonName}>友だちに知らせる（LINE通知）</span>
               <span className={styles.dlgPersonSub}>増減したマイルと変更後の残高をLINEで知らせます。</span>

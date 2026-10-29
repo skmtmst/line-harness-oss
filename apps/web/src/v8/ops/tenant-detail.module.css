@@ -32,12 +32,6 @@
   white-space: nowrap;
 }
 
-.toggleRow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--tpl-op-me-gap);
-}
-
 .shortText { white-space: nowrap; }
 .accountRow {
   height: var(--tpl-op-mem-self-h);

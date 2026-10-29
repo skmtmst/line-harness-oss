@@ -54,7 +54,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { displayFormName,hasStoredDestination,type Folder } from '@line-crm/shared'
 import { Link2 } from 'lucide-react'
 import styles from './list.module.css'
-import { answerSubText,destinationText,FORM_PAGE_SIZES,formAnswerCount,formAnswerUrl,listQueryString,SORT_OPTIONS,sortForms,subLineText,UNFILED_VALUE,validFilter,validPage,validPageSize,validSort,type Form,type FormFilter,type FormListResponse,type FormSort } from './model'
+import { answerSubText,destinationText,FORM_PAGE_SIZES,formQuestionCount,formAnswerCount,formAnswerUrl,listQueryString,SORT_OPTIONS,sortForms,subLineText,UNFILED_VALUE,validFilter,validPage,validPageSize,validSort,type Form,type FormFilter,type FormListResponse,type FormSort } from './model'
 
 /* 行の「…」を右クリックでも開けるように直す。中身は「…」と同じ。 */
 function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
@@ -1051,7 +1051,7 @@ export default function FormsListV8() {
               )
               const row = (
                 <Tr highlighted={duplicateFeedback.highlightedId === form.id} key={form.id} data-row-id={form.id} detailKey={reviewMode ? undefined : "form"} onOpen={reviewMode ? undefined : () => openDetail(form.id)}>
-                  <NameCell name={nameNode} folder={folderDotOf(form.folderId)} />
+                  <NameCell name={nameNode} description={`質問 ${formQuestionCount(form)}`} folder={folderDotOf(form.folderId)} />
                   {!narrow && (
                     <Td className={styles.destCell} title={destination}>{destination}</Td>
                   )}

@@ -9,7 +9,8 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import NoteBar from '@/components/shared/note-bar'
 import { TextArea } from '@/components/shared/text-field'
 import { RequiredBadge } from '@/components/shared/form-controls'
-import { forgetSessionSnapshot } from '@/lib/session-snapshot'
+import { deferImpersonationSnapshot, forgetSessionSnapshot, readPermissionSessionSnapshot, readSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { forgetAuthCheck } from '@/lib/auth-check-marker'
 import { formatListTimestamp } from '@/lib/format'
 import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
@@ -40,18 +41,41 @@ export default function ImpersonationBar({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  const update = (next: OpsImpersonation | null) => {
-    if (next) setState(next)
-    // 帯の状態が変わったら、AuthGuard の確認結果（切替前のもの）を次に使わせない（V6R-S0-a）。
-    forgetSessionSnapshot()
+  const update = async (next: OpsImpersonation) => {
+    // 再読込時に切替前の控えを復元させず、今の画面には確定したモードをすぐ配る。
+    forgetAuthCheck()
+    const known = readSessionSnapshot()
+    if (known) {
+      rememberSessionSnapshot({ ...known, impersonation: next })
+    } else {
+      const pending = deferImpersonationSnapshot(next)
+      setState({ ...next, mode: 'read' })
+      try {
+        const body = await api.auth.session()
+        const data = body?.success ? body.data : null
+        if (!data || data.impersonation?.id !== next.id || data.impersonation.tenantId !== next.tenantId || data.impersonation.mode !== next.mode) throw new Error('session not confirmed')
+        // 別の認証確認が先に終わっていたら、この古い読込で上書きしない。
+        if (readPermissionSessionSnapshot() !== pending) return
+        rememberSessionSnapshot({
+          impersonation: { ...data.impersonation, tenantName: next.tenantName },
+          recoveryCodesRemaining: typeof data.recoveryCodesRemaining === 'number' ? data.recoveryCodesRemaining : null,
+          unfamiliarAt: typeof data.unfamiliarAt === 'string' ? data.unfamiliarAt : null,
+          stepUpMethod: data.stepUpMethod === 'totp' || data.stepUpMethod === 'password' ? data.stepUpMethod : 'none',
+        })
+      } catch {
+        setError('切り替え後のログインを確認できませんでした。書き込みを止めています。画面を読み直してください。')
+        return
+      }
+    }
+    setState(next)
     onChange?.(next)
   }
 
   const toRead = async () => {
     setBusy(true)
     const res = await opsCall(api.ops.impersonation.read())
+    if (res.success) { setError(''); await update({ ...state, mode: 'read' }) }
     setBusy(false)
-    if (res.success) update({ ...state, mode: 'read' })
   }
 
   const end = async () => {
@@ -73,15 +97,16 @@ export default function ImpersonationBar({
     const res = dialog === 'write'
       ? await opsCall(api.ops.impersonation.write(reason))
       : await opsCall(api.ops.impersonation.revealPii(reason))
+    if (!res.success) { setBusy(false); setError(res.error || '切り替えできませんでした。時間をおいて、もう一度お試しください。'); return }
+    await update({ ...state, ...res.data, tenantName: state.tenantName })
     setBusy(false)
-    if (!res.success) { setError(res.error || '切り替えできませんでした。時間をおいて、もう一度お試しください。'); return }
-    update({ ...state, ...res.data, tenantName: state.tenantName })
     setDialog(null)
     router.refresh()
   }
 
   const writing = state.mode === 'write'
   const name = state.tenantName ?? '契約先'
+  const started = startedLabel(state.startedAt)
 
   return (
     <>
@@ -98,7 +123,7 @@ export default function ImpersonationBar({
             : <Button type="button" onClick={() => setDialog('write')} disabled={busy}>書き込みに切り替える</Button>}
           <Button type="button" variant="primary" onClick={() => void end()} disabled={busy}>代理ログインを終える</Button>
         </>}
-      >{!writing ? `${startedLabel(state.startedAt)}〜` : null}</Notice>
+      >{!dialog && error ? error : !writing && started ? `${started}〜` : null}</Notice>
       {dialog ? (
         <ReasonDialog
           kind={dialog}

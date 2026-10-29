@@ -29,6 +29,7 @@ import {
 import styles from './support-mark-rules-panel.module.css'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 type Draft = {
   name: string
@@ -320,7 +321,7 @@ export default function SupportMarkRulesPanel({
           <h4 className={styles.formTitle}>{editingId === 'new' ? 'ルールを作る' : 'ルールを変更'}</h4>
           <label className={styles.field}>
             <span className={styles.label}>ルールの名前</span>
-            <SaveErrorField names={["name","draft.name"]}><input
+            <SaveErrorField names={["name","draft.name"]}><SharedTextField
               className={styles.input}
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
@@ -351,7 +352,7 @@ export default function SupportMarkRulesPanel({
           <div className={styles.pair}>
             <label className={styles.field}>
               <span className={styles.label}>優先順位</span>
-              <SaveErrorField names={["priority","draft.priority"]}><input
+              <SaveErrorField names={["priority","draft.priority"]}><SharedTextField
                 className={styles.input}
                 type="number"
                 min={PRIORITY_MIN}
@@ -364,7 +365,7 @@ export default function SupportMarkRulesPanel({
             </label>
             <label className={styles.field}>
               <span className={styles.label}>手動変更のあと自動で変えない時間（分）</span>
-              <SaveErrorField names={["manualProtectionMinutes","draft.manualProtectionMinutes","manual_protection_minutes","draft.manual_protection_minutes"]}><input
+              <SaveErrorField names={["manualProtectionMinutes","draft.manualProtectionMinutes","manual_protection_minutes","draft.manual_protection_minutes"]}><SharedTextField
                 className={styles.input}
                 type="number"
                 min={0}

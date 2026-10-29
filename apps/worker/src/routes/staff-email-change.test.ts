@@ -163,7 +163,7 @@ describe('本人のメール変更 (N-433)', () => {
          (id, name, email, role, api_key, is_active, invite_status)
        VALUES ('member-1', '対象の人', 'member@example.test', 'staff', 'member-key', 1, 'active')`,
     ).run();
-    const response = await app('admin-actor', 'admin').request('/api/staff/member-1', {
+    const response = await app('self-1', 'admin').request('/api/staff/member-1', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'member-new@example.test' }),
     }, bindings());

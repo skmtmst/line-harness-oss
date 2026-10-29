@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * 回数券・月謝を作る（B2-2）：入力の確かめ・下書き保存・作る（販売を始める）・口が無い所の窓・閲覧のみ。
@@ -44,7 +45,7 @@ describe('回数券・月謝を作る', () => {
   it('名前と値段が空なら、欄の下に理由を出して送らない', async () => {
     render(<PassCreateV8 />)
     await screen.findByLabelText('名前')
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書き保存' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: '下書き保存' })) })
     expect(await screen.findByText('名前を入れてください。')).toBeTruthy()
     expect(screen.getByText('0 以上の整数（円）を入れてください。')).toBeTruthy()
     expect(api.create).not.toHaveBeenCalled()
@@ -54,7 +55,7 @@ describe('回数券・月謝を作る', () => {
     render(<PassCreateV8 />)
     await screen.findByLabelText('名前')
     fill('ヨガ 10 回券', '15000')
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書き保存' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: '下書き保存' })) })
     await waitFor(() => expect(api.create).toHaveBeenCalledWith('a', {
       kind: 'ticket', name: 'ヨガ 10 回券', price: 15000, count: 10, monthlyLimit: null, validDays: 180, menuIds: [], allowWithoutPass: true,
     }, expect.any(String)))
@@ -67,7 +68,7 @@ describe('回数券・月謝を作る', () => {
     await screen.findByLabelText('名前')
     fireEvent.click(screen.getByRole('button', { name: '月謝' }))
     fill('ヨガ 月 4 回', '9800')
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書き保存' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: '下書き保存' })) })
     await waitFor(() => expect(api.create).toHaveBeenCalledWith('a', expect.objectContaining({ kind: 'monthly', count: null, monthlyLimit: 4 }), expect.any(String)))
   })
 
@@ -104,7 +105,7 @@ describe('回数券・月謝を作る', () => {
     env.search = 'id=p-new'
     render(<PassCreateV8 />)
     await waitFor(() => expect((screen.getByLabelText('名前') as HTMLInputElement).value).toBe('ヨガ 10 回券'))
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書き保存' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: '下書き保存' })) })
     await waitFor(() => expect(api.save).toHaveBeenCalledWith('a', 'p-new', expect.objectContaining({ expectedVersion: 1 })))
     cleanup()
     api.list.mockResolvedValue({ success: true, data: { items: [{ ...PLAN, status: 'on_sale' }], total: 1, summary: {} } })

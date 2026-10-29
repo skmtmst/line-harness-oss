@@ -1,13 +1,17 @@
 'use client'
 
+import Select from '@/components/shared/select'
+import TapActionField from '@/components/shared/tap-action-field'
+import { Play } from 'lucide-react'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import EntitySelect from '@/components/shared/entity-select'
+
 
 import { useEffect, useRef, useState } from 'react'
 import { parseHqMessageCard, type HqMessageCard, type HqMessageReference } from '@line-crm/shared'
 import { hqTemplatesApi } from '@/lib/hq-templates-api'
 import { decodeImageSize } from './image-size'
-import { freshDefinition, withUploadedImage, withMessageCard } from '@/lib/hq-template-authoring'
+import { freshDefinition, withUploadedImage, withMessageCard, MESSAGE_CARD_TAP_KINDS, messageCardTapValue, messageCardActionOf } from '@/lib/hq-template-authoring'
 import RichMenuCreateForm from '@/components/rich-menus/rich-menu-create-form'
 import { freshRichMenuCreateValue, type RichMenuOption } from '../../../components/rich-menus/rich-menu-create-model'
 import { HqTagEditorV8 } from '@/v8/hq-templates/public/tag-editor/index'
@@ -30,6 +34,7 @@ import type {
   TemplateType,
 } from '@/lib/hq-templates-api'
 import styles from './template-console.module.css'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 export function definitionName(type: TemplateType, definition: TemplateDefinition): string {
   if (type === 'scenario' && 'scenario' in definition) return definition.scenario.name
@@ -127,20 +132,23 @@ export function CardEditor({ value, disabled, onChange, onBusyChange, onReceipt 
   const update = (next: HqMessageCard) => onChange(withMessageCard(value, next))
   const updateButton = (id: string, patch: Partial<HqMessageCard['buttons'][number]>) => update({ ...card, buttons: card.buttons.map(button => button.id === id ? { ...button, ...patch } : button) })
   return <div className={styles.stack}>
-    <label className={styles.field}>形式<select className={styles.input} aria-label="ひな形の形式" value={card.format} disabled={disabled} onChange={event => update({ ...card, format: event.target.value as HqMessageCard['format'] })}><option value="text">テキスト</option><option value="flex">カード型</option></select></label>
-    <label className={styles.field}>タイトル<input className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={event => update({ ...card, title: event.target.value })} /></label>
-    <label className={styles.field}>本文<textarea className={styles.textarea} aria-label="配信する本文" maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={event => update({ ...card, body: event.target.value })} /></label>
+    <label className={styles.field}>形式<Select size="full" aria-label="ひな形の形式" value={card.format} disabled={disabled} onChange={format => update({ ...card, format: format as HqMessageCard['format'] })} options={[{value:"text",label:"テキスト"},{value:"flex",label:"カード型"}]} /></label>
+    <label className={styles.field}>タイトル<SharedTextField className={styles.input} aria-label="ひな形のタイトル" maxLength={200} value={card.title} disabled={disabled} onChange={event => update({ ...card, title: event.target.value })} /></label>
+    <label className={styles.field}>本文<SharedTextArea className={styles.textarea} aria-label="配信する本文" maxLength={card.format === 'flex' ? 2000 : 5000} value={card.body} disabled={disabled} onChange={event => update({ ...card, body: event.target.value })} /></label>
     {card.format === 'flex' && <>
       <ImageUpload purpose="message" disabled={disabled} onBusyChange={onBusyChange} onReceipt={onReceipt} onUploaded={media => { const next = withUploadedImage(value, media); onChange(withMessageCard(next, { ...card, imageMediaId: media.id })) }} />
       {card.imageMediaId && <button type="button" disabled={disabled} onClick={() => { const { imageMediaId: removed, ...next } = card; update(next) }}>画像を外す</button>}
       <h2>ボタン</h2>
       {referenceError && <p role="alert">{referenceError}<button type="button" disabled={disabled} onClick={() => void load()}>参照先を再読み込み</button></p>}
       {card.buttons.map((button, index) => <div key={button.id} className={styles.stack}>
-        <label className={styles.field}>ボタン{index + 1}の文字<input className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={event => updateButton(button.id, { label: event.target.value })} /></label>
-        <label className={styles.field}>押したとき<select className={styles.input} aria-label={`ボタン${index + 1}を押したとき`} disabled={disabled} value={button.action} onChange={event => updateButton(button.id, { action: event.target.value as typeof button.action, value: '' })}><option value="url">URLを開く</option><option value="message">メッセージを送る</option><option value="form">フォームを開く</option><option value="scenario">シナリオを開始</option></select></label>
-        {button.action === 'form' || button.action === 'scenario'
+        <label className={styles.field}>ボタン{index + 1}の文字<SharedTextField className={styles.input} aria-label={`ボタン${index + 1}の文字`} maxLength={20} disabled={disabled} value={button.label} onChange={event => updateButton(button.id, { label: event.target.value })} /></label>
+        <TapActionField name={`ボタン${index + 1}`} kindLabel={`ボタン${index + 1}を押したとき`} scope="hq" hasLiff readOnly={disabled} layout="stack"
+          kinds={MESSAGE_CARD_TAP_KINDS} extraKinds={[{value:'scenario',label:'シナリオを開始',icon:Play}]}
+          value={messageCardTapValue(button)}
+          onChange={patch=>{if(patch.kind) updateButton(button.id,{action:messageCardActionOf(patch.kind),value:''})}}
+          renderBody={()=>(button.action === 'form' || button.action === 'scenario'
           ? <div className={styles.field}><span>参照先</span><EntitySelect aria-label={`ボタン${index + 1}の参照先`} disabled={disabled || !!referenceError} value={button.value} onChange={value => updateButton(button.id, { value })} options={[{ value: '', label: '選択してください' }, ...(button.value && !references.some(row => row.kind === button.action && row.id === button.value) ? [{ value: button.value, label: '保存済みの参照先（候補を確認してください）', disabled: true }] : []), ...references.filter(row => row.kind === button.action).map(row => ({ value: row.id, label: `${row.name}（${row.accountName}）` }))]} /></div>
-          : <label className={styles.field}>{button.action === 'url' ? 'URL' : 'メッセージ'}<input className={styles.input} aria-label={`ボタン${index + 1}の内容`} maxLength={button.action === 'message' ? 300 : 2000} disabled={disabled} value={button.value} onChange={event => updateButton(button.id, { value: event.target.value })} /></label>}
+          : <label className={styles.field}>{button.action === 'url' ? 'URL' : 'メッセージ'}<SharedTextField className={styles.input} aria-label={`ボタン${index + 1}の内容`} maxLength={button.action === 'message' ? 300 : 2000} disabled={disabled} value={button.value} onChange={event => updateButton(button.id, { value: event.target.value })} /></label>)} />
         <button type="button" disabled={disabled} onClick={() => update({ ...card, buttons: card.buttons.filter(row => row.id !== button.id) })}>ボタン{index + 1}を外す</button>
       </div>)}
       <button type="button" disabled={disabled || card.buttons.length >= 3} onClick={() => update({ ...card, buttons: [...card.buttons, { id: crypto.randomUUID(), label: '', action: 'url', value: '' }] })}>ボタンを追加</button>
@@ -189,7 +197,7 @@ function MessageEditor({ value, disabled, onChange, onBusyChange, onReceipt }: {
         <>
           <label className={styles.field}>
             <span>分類</span>
-            <input aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={legacyDisabled} onChange={event => onChange({ ...value, template: { ...current, category: event.target.value } })} />
+            <SharedTextField aria-label="テンプレートの分類" className={styles.input} value={current.category} maxLength={100} disabled={legacyDisabled} onChange={event => onChange({ ...value, template: { ...current, category: event.target.value } })} />
           </label>
           {current.id === 'hq-authored-message' && <ImageUpload purpose="message" disabled={legacyDisabled} onBusyChange={onBusyChange} onReceipt={onReceipt} onUploaded={media => onChange(withUploadedImage(value, media))} />}
           {value.media.map(media => <p key={media.id} className={styles.muted}>{media.filename}（{Math.ceil(media.sizeBytes / 1024)} KB）<br /><span className={styles.name}>{media.publicUrl ?? media.r2Key}</span></p>)}
@@ -236,7 +244,7 @@ function RichMenuEditor({ value, disabled, onChange, onBusyChange, onNameChange,
 }
 
 export default function TemplateDefinitionEditor({ type, value, disabled, editing = false, tenantId, onChange, onBusyChange, onMediaUploaded, richMenuReferences, formReferences, onRichMenuNameChange, onCanonicalSave, onCanonicalCancel }: { type: TemplateType; value: TemplateDefinition; disabled: boolean; editing?: boolean; tenantId?: string; onChange: (next: TemplateDefinition) => void; onBusyChange?: (busy: boolean) => void; onMediaUploaded?: (media: MessageTemplateDefinition['media'][number]) => void; richMenuReferences?: RichMenuEditorReferences; formReferences?: FormRefs; onRichMenuNameChange?: (name: string) => void; onCanonicalSave?: (definition: TagDefinition | FormDefinition, andAnother?: boolean) => void | Promise<void>; onCanonicalCancel?: () => void }) {
-  if (type === 'scenario' && 'scenario' in value) return <div className={styles.stack}>{value.steps.map((step,index)=><section key={step.id} className={styles.panel}><h2>ステップ{index+1}</h2><label className={styles.field}>前のステップからの遅延（分）<input type="number" min={0} max={525600} aria-label={`ステップ${index+1}の遅延`} disabled={disabled} value={step.delayMinutes} onChange={e=>onChange({...value,steps:value.steps.map(s=>s.id===step.id?{...s,delayMinutes:Number(e.target.value)}:s)})}/></label><label className={styles.field}>形式<select disabled={disabled} value={step.messageType} onChange={e=>onChange({...value,steps:value.steps.map(s=>s.id===step.id?{...s,messageType:e.target.value as 'text'|'flex'}:s)})}><option value="text">テキスト</option><option value="flex">カード型</option></select></label><label className={styles.field}>本文<textarea className={styles.textarea} aria-label={`ステップ${index+1}の本文`} disabled={disabled} value={step.messageContent} onChange={e=>onChange({...value,steps:value.steps.map(s=>s.id===step.id?{...s,messageContent:e.target.value}:s)})}/></label><button type="button" disabled={disabled||value.steps.length===1} onClick={()=>onChange({...value,steps:value.steps.filter(s=>s.id!==step.id)})}>このステップを外す</button></section>)}<button type="button" disabled={disabled||value.steps.length>=100} onClick={()=>onChange({...value,steps:[...value.steps,{id:crypto.randomUUID(),delayMinutes:0,messageType:'text',messageContent:''}]})}>ステップを追加</button><p>配布先では停止中の下書きになります。内容を確認して公開してください。</p></div>
+  if (type === 'scenario' && 'scenario' in value) return <div className={styles.stack}>{value.steps.map((step,index)=><section key={step.id} className={styles.panel}><h2>ステップ{index+1}</h2><label className={styles.field}>前のステップからの遅延（分）<SharedTextField type="number" min={0} max={525600} aria-label={`ステップ${index+1}の遅延`} disabled={disabled} value={step.delayMinutes} onChange={e=>onChange({...value,steps:value.steps.map(s=>s.id===step.id?{...s,delayMinutes:Number(e.target.value)}:s)})}/></label><label className={styles.field}>形式<Select size="full" aria-label={`ステップ${index+1}の形式`} disabled={disabled} value={step.messageType} onChange={messageType=>onChange({...value,steps:value.steps.map(s=>s.id===step.id?{...s,messageType:messageType as 'text'|'flex'}:s)})} options={[{value:"text",label:"テキスト"},{value:"flex",label:"カード型"}]} /></label><label className={styles.field}>本文<SharedTextArea className={styles.textarea} aria-label={`ステップ${index+1}の本文`} disabled={disabled} value={step.messageContent} onChange={e=>onChange({...value,steps:value.steps.map(s=>s.id===step.id?{...s,messageContent:e.target.value}:s)})}/></label><button type="button" disabled={disabled||value.steps.length===1} onClick={()=>onChange({...value,steps:value.steps.filter(s=>s.id!==step.id)})}>このステップを外す</button></section>)}<button type="button" disabled={disabled||value.steps.length>=100} onClick={()=>onChange({...value,steps:[...value.steps,{id:crypto.randomUUID(),delayMinutes:0,messageType:'text',messageContent:''}]})}>ステップを追加</button><p>配布先では停止中の下書きになります。内容を確認して公開してください。</p></div>
   if (type === 'tag' && 'tag' in value) return <HqTagEditorV8 definition={value} editing={editing} saving={disabled} onCancel={onCanonicalCancel ?? (() => undefined)} onSave={async (next, andAnother) => { onChange(next); await onCanonicalSave?.(next, andAnother) }} />
   if (type === 'template' && 'template' in value) return <MessageEditor value={value} disabled={disabled} onChange={onChange} onBusyChange={onBusyChange} onReceipt={onMediaUploaded} />
   if (type === 'rich_menu' && 'richMenu' in value) return <RichMenuEditor value={value} disabled={disabled} tenantId={tenantId} onChange={onChange} onBusyChange={onBusyChange} onNameChange={onRichMenuNameChange} onReceipt={onMediaUploaded} references={richMenuReferences} />

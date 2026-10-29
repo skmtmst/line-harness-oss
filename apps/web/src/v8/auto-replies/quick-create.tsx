@@ -15,6 +15,7 @@ import { Field } from '@/components/shared/form-controls'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 /*
  * ★V8 自動応答 かんたんに作る（板 、小窓 560）。
@@ -257,7 +258,7 @@ export default function QuickCreateV8({
                 </button>
               </span>
             ))}
-            <SaveErrorField names={["draft","keyword"]}><input
+            <SaveErrorField names={["draft","keyword"]}><SharedTextField
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onBlur={blurKeywords}
@@ -282,7 +283,7 @@ export default function QuickCreateV8({
           </div>
           {keywordError ? <p className={styles.fieldError} role="alert">{keywordError}</p> : null}
         </div>
-        <div className={styles.field}><Field label="返す文" htmlFor="quick-create-reply" requirement={replyRequirement}><SaveErrorField names={["reply"]}><textarea
+        <div className={styles.field}><Field label="返す文" htmlFor="quick-create-reply" requirement={replyRequirement}><SaveErrorField names={["reply"]}><SharedTextArea
             id="quick-create-reply"
             value={reply}
             onChange={(event) => {

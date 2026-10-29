@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React from 'react'
 import { fireEvent, render, screen, cleanup, waitFor, act, within } from '@testing-library/react'
@@ -40,16 +41,16 @@ it('実画面: 枠失敗は公開済みの本体と残りを分け、変更は�
  expect(createEvent.mock.calls[0][1]).toMatchObject({name:'元の名前',is_published:1});
  expect((screen.getByLabelText('イベント名') as HTMLInputElement).value).toBe('元の名前');
  fireEvent.change(screen.getByLabelText('イベント名'),{target:{value:'修正した名前'}});
- fireEvent.click(screen.getByRole('button',{name:'下書きを保存'}));await waitFor(()=>expect(push).toHaveBeenCalled());
+ fireEvent.click(getPageAction({name:'下書きを保存'}));await waitFor(()=>expect(push).toHaveBeenCalled());
  expect(createEvent).toHaveBeenCalledTimes(1);expect(createSlots).toHaveBeenCalledTimes(2);expect(updateEvent).toHaveBeenCalledWith('account-a','fixture-event',expect.objectContaining({name:'修正した名前',is_published:1}),1);
  expect(createSlots.mock.calls[1][2][0].client_key).toBe('first-slot:fixture-event');
 });
 it('保存待ちの連続クリックは本体要求1回、失敗後は入力を保持',async()=>{
  let reject!:(e:Error)=>void;createEvent.mockImplementation(()=>new Promise((_,r)=>{reject=r}));
- render(<EventsCreate/>);fill();const btn=screen.getByRole('button',{name:'下書きを保存'});fireEvent.click(btn);fireEvent.click(btn);
- expect(createEvent).toHaveBeenCalledTimes(1);expect((btn as HTMLButtonElement).disabled).toBe(true);
+ render(<EventsCreate/>);fill();const btn=getPageAction({name:'下書きを保存'});fireEvent.click(btn);fireEvent.click(btn);
+ expect(createEvent).toHaveBeenCalledTimes(1);expect((screen.getByRole('button',{name:'保存しています…'}) as HTMLButtonElement).disabled).toBe(true);
  await act(async()=>reject(new Error('fixture offline')));
- await waitFor(()=>expect((btn as HTMLButtonElement).disabled).toBe(false));
+ await waitFor(()=>expect((getPageAction({name:'下書きを保存'}) as HTMLButtonElement).disabled).toBe(false));
  expect((screen.getByLabelText('イベント名') as HTMLInputElement).value).toBe('元の名前');expect(push).not.toHaveBeenCalled();
 });
 it('未保存でリンク離脱を止め、編集継続で入力を保つ',async()=>{
@@ -66,7 +67,7 @@ it('枠の作成・更新の応答を失っても、入力と完了分を保ち�
  createSlots.mockImplementation(async () => ({items:[stored]}));
  updateSlot.mockImplementationOnce(async (_account, _eventId, _slotId, patch) => { stored={...stored,...patch,version:5};throw new Error('更新の応答喪失') });
  listSlots.mockImplementation(async () => ({items:[stored]}));
- render(<EventsCreate/>);fill();fireEvent.click(screen.getByRole('button',{name:'下書きを保存'}));
+ render(<EventsCreate/>);fill();fireEvent.click(getPageAction({name:'下書きを保存'}));
  await screen.findByText('残り：最初の予約枠');
  fireEvent.change(screen.getByLabelText('定員'),{target:{value:'3'}});
  fireEvent.click(screen.getByRole('button',{name:'残りだけもう一度'}));

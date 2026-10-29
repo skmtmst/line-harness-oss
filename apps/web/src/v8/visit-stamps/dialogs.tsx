@@ -20,6 +20,7 @@ import { EntityMultiPickerDialog } from '@/components/shared/entity-picker'
 import EntityRemoteField from '@/components/shared/entity-remote-field'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import EditorSurface from '@/components/shared/editor-surface'
+import { withHonorific } from '@line-crm/shared'
 
 /*
  * 来店スタンプ（V8 w4SBbv）の小窓。絵に窓は無いので、共通の Dialog に欄を並べるだけにする。
@@ -242,9 +243,9 @@ export function StoresDialog({ open, accounts, value, onClose, onSave }: {
 
 export function PhotoDialog({ url, name, onClose }: { url: string | null; name: string; onClose: () => void }) {
   return (
-    <Dialog open={!!url} title={`${name}さんの紙のカード`} onCancel={onClose} cancelLabel="閉じる" size="large">
+    <Dialog open={!!url} title={`${withHonorific(name)}の紙のカード`} onCancel={onClose} cancelLabel="閉じる" size="large">
       {/* 写真は担当店舗の権限で読んだもの（本人だけが預けた非公開の写真）。大きさは窓に合わせる。 */}
-      {url ? <img src={url} alt={`${name}さんが送った紙のスタンプカードの写真`} className={styles.photo} /> : null}
+      {url ? <img src={url} alt={`${withHonorific(name)}が送った紙のスタンプカードの写真`} className={styles.photo} /> : null}
     </Dialog>
   )
 }

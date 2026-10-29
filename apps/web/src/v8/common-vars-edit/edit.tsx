@@ -50,6 +50,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import styles from './edit.module.css'
 import { blockingErrors,historicalText,impactBreakdown,impactCsv,impactStateFromError,impactStateText,overLimitCount,placeholderText,reflectionScopeText,reflectionTimingText,scheduleErrorText,urgentImpactCount,type ChangeImpactState } from './impact'
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 function EditCommonVarV8Inner() {
   const saveErrors = useSaveFormErrors()
@@ -722,7 +723,7 @@ function EditCommonVarV8Inner() {
               <h2 id="cv-edit-value-heading" className={styles.cardTitle}>中身を変える</h2>
             </div>
             <div className={styles.valueRow}>
-              <div className={styles.field}><Field label="いまの中身" htmlFor="cv-current"><SaveErrorField names={["value","item.value"]}><input
+              <div className={styles.field}><Field label="いまの中身" htmlFor="cv-current"><SaveErrorField names={["value","item.value"]}><SharedTextField
                   id="cv-current"
                   type="text"
                   value={item.value || '（空）'}
@@ -737,13 +738,13 @@ function EditCommonVarV8Inner() {
                 ) : item.type === 'boolean' ? (
                   <SaveErrorField names={["value","saved"]}><Select size="full" aria-label="新しい中身" id="cv-value" value={value} onChange={(next) => { setSaved(false); setValue(next) }} options={[{ value: 'true', label: 'true' }, { value: 'false', label: 'false' }]} /></SaveErrorField>
                 ) : (item.type as string) === 'long_text' ? (
-                  <SaveErrorField names={["value","saved"]}><textarea id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className={styles.fieldArea} rows={2} readOnly={!canWrite} aria-invalid={valueFieldError ? true : undefined} /></SaveErrorField>
+                  <SaveErrorField names={["value","saved"]}><SharedTextArea id="cv-value" value={value} onChange={(e) => { setSaved(false); setValue(e.target.value) }} className={styles.fieldArea} rows={2} readOnly={!canWrite} aria-invalid={valueFieldError ? true : undefined} /></SaveErrorField>
                 ) : (item.type as string) === 'date' ? (
                   <SaveErrorField names={["value","saved"]}><DateField id="cv-value" invalid={Boolean(valueFieldError)} value={value} onChange={(v) => { setSaved(false); setValue(v) }} /></SaveErrorField>
                 ) : (item.type as string) === 'datetime' ? (
                   <SaveErrorField names={["value","saved"]}><DateTimeField id="cv-value" invalid={Boolean(valueFieldError)} value={value} onChange={(v) => { setSaved(false); setValue(v) }} /></SaveErrorField>
                 ) : (
-                  <SaveErrorField names={["value","saved"]}><input
+                  <SaveErrorField names={["value","saved"]}><SharedTextField
                     id="cv-value"
                     type={item.type === 'number' ? 'number' : 'text'}
                     maxLength={item.type === 'number' ? undefined : 200}
@@ -757,7 +758,7 @@ function EditCommonVarV8Inner() {
                 )}</Field></div>
             </div>
             {valueFieldError ? <p className={styles.fieldError} role="alert">{valueFieldError}</p> : null}
-            <div className={styles.field}><Field label="変える理由（記録に残ります）" htmlFor="cv-change-reason" requirement={b244Requirements.changeReason}><SaveErrorField names={["changeReason","saved","change_reason"]}><input
+            <div className={styles.field}><Field label="変える理由（記録に残ります）" htmlFor="cv-change-reason" requirement={b244Requirements.changeReason}><SaveErrorField names={["changeReason","saved","change_reason"]}><SharedTextField
                 id="cv-change-reason"
                 type="text"
                 value={changeReason}
@@ -840,7 +841,7 @@ function EditCommonVarV8Inner() {
             {statusAction === 'stop' ? '止める理由（記録に残ります）'
               : statusAction === 'resume' ? '再開する理由（記録に残ります）'
                 : '公開する理由（記録に残ります）'}
-          </span></>}><SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
+          </span></>}><SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><SharedTextField
             value={statusReason}
             onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
             maxLength={200}
@@ -885,7 +886,7 @@ function EditCommonVarV8Inner() {
                   : '使っている設定はありません。'}
               </p>
               {deleteImpact.unavailableReferences?.map((reference) => <p key={reference.kind} className={styles.fieldHint}>{reference.kindLabel}：{reference.reason}</p>)}
-              <Field label="消した理由" required><SaveErrorField names={["deleteReason","delete_reason"]}><input
+              <Field label="消した理由" required><SaveErrorField names={["deleteReason","delete_reason"]}><SharedTextField
                   value={deleteReason}
                   onChange={(event) => setDeleteReason(event.target.value)}
                   placeholder="例：店舗情報の変更のため"
@@ -940,7 +941,7 @@ function EditCommonVarV8Inner() {
               ) : (item?.type as string) === 'datetime' ? (
                 <SaveErrorField names={["value","draft.value"]}><DateTimeField id="sc-value" value={draft.value} onChange={(v) => setDraft({ ...draft, value: v })} /></SaveErrorField>
               ) : (
-                <SaveErrorField names={["value","draft.value"]}><input
+                <SaveErrorField names={["value","draft.value"]}><SharedTextField
                   id="sc-value"
                   type={item?.type === 'number' ? 'number' : 'text'}
                   value={draft.value}

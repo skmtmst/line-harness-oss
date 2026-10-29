@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -48,6 +49,7 @@ it('未設定の両停止はオフのまま読み、保存前に確認し、読�
   expect(api.saveInventoryRules).toHaveBeenLastCalledWith('account', expect.objectContaining({ expectedVersion: 1 }))
 })
 it('閲覧のみは有効状態と値だけを読み、変更用の入力・スイッチ・保存が出ない', async () => {
+    verifiedStaffRole('viewer')
   api.inventoryRules.mockResolvedValue({ data: { ...initial, stopLine: true } })
   render(<RulesBoard {...props} canEdit={false} />)
   await screen.findByText('2席')
@@ -180,3 +182,5 @@ it('保存確認中に閲覧のみになったら保存を実行しない', asyn
   expect(screen.queryByRole('switch')).toBeNull()
   expect(api.saveInventoryRules).not.toHaveBeenCalled()
 })
+
+afterEach(() => { verifiedStaffRole(null) })

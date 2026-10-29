@@ -20,6 +20,7 @@ import { RICH_MENU_ACTION_TYPE_BY_INTENT, richMenuUriError, type RichMenuAreaInt
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import TapSideEffects from '@/components/shared/tap-side-effects'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 type Option = { id: string; name: string; folderId?: string | null; updatedAt?: string | null }
 
@@ -192,7 +193,7 @@ function NumField({
   return (
     <label className="block">
       <span className="text-ink-faint text-xs">{label}</span>
-      <SaveErrorField names={["value"]}><input
+      <SaveErrorField names={["value"]}><SharedTextField
         type="number"
         value={value}
         onChange={(e) => onChange(parseInt(e.target.value, 10) || 0)}
@@ -296,7 +297,7 @@ export function AreaProperties({
         </p>
       ) : (
         <>
-          <SaveErrorField names={["uri","data.uri"]}><input
+          <SaveErrorField names={["uri","data.uri"]}><SharedTextField
             id={`${inputId}-url`}
             type="url"
             aria-label="URL"
@@ -354,7 +355,7 @@ export function AreaProperties({
       </div> : null}
 
       <Field label="ボタン名" htmlFor={`${inputId}-name`} hint="管理用の呼び名。友だちには表示されません。">
-        <SaveErrorField names={["label","area.label"]}><input
+        <SaveErrorField names={["label","area.label"]}><SharedTextField
           id={`${inputId}-name`}
           value={area.label ?? ''}
           onChange={(e) => onUpdate({ label: e.target.value })}
@@ -434,7 +435,7 @@ export function AreaProperties({
 
       {intent === 'tel' && (
         <Field label="電話番号" hint="ハイフンはあってもなくても構いません。">
-          <SaveErrorField names={["tel","data.tel"]}><input
+          <SaveErrorField names={["tel","data.tel"]}><SharedTextField
             type="tel"
             value={(data.tel as string) ?? ''}
             onChange={(e) => onUpdate({ actionData: { ...data, tel: e.target.value } })}
@@ -491,7 +492,7 @@ export function AreaProperties({
       {intent === 'postback' && (
         <>
           <Field label="合図の文字列（postback data）">
-            <SaveErrorField names={["data.data"]}><input
+            <SaveErrorField names={["data.data"]}><SharedTextField
               value={(data.data as string) ?? ''}
               onChange={(e) => onUpdate({ actionData: { ...data, data: e.target.value } })}
               maxLength={200}
@@ -499,7 +500,7 @@ export function AreaProperties({
             /></SaveErrorField>
           </Field>
           <Field label="トークに残す文言（任意）">
-            <SaveErrorField names={["displayText","data.displayText","display_text","data.display_text"]}><input
+            <SaveErrorField names={["displayText","data.displayText","display_text","data.display_text"]}><SharedTextField
               value={(data.displayText as string) ?? ''}
               onChange={(e) => onUpdate({ actionData: { ...data, displayText: e.target.value } })}
               maxLength={300}
@@ -525,7 +526,7 @@ export function AreaProperties({
             /></SaveErrorField>
           </Field>
           <Field label="はじめの値（任意）" hint="空欄なら、開いたときの日時が使われます。">
-            <SaveErrorField names={["initial","data.initial"]}><input
+            <SaveErrorField names={["initial","data.initial"]}><SharedTextField
               value={(data.initial as string) ?? ''}
               onChange={(e) => onUpdate({ actionData: { ...data, initial: e.target.value } })}
               placeholder="例：2026-10-01"
@@ -534,7 +535,7 @@ export function AreaProperties({
           </Field>
           <div className="grid grid-cols-2 gap-2">
             <Field label="いちばん前（任意）">
-              <SaveErrorField names={["min","data.min"]}><input
+              <SaveErrorField names={["min","data.min"]}><SharedTextField
                 value={(data.min as string) ?? ''}
                 onChange={(e) => onUpdate({ actionData: { ...data, min: e.target.value } })}
                 placeholder="例：2026-09-01"
@@ -542,7 +543,7 @@ export function AreaProperties({
               /></SaveErrorField>
             </Field>
             <Field label="いちばん後（任意）">
-              <SaveErrorField names={["max","data.max"]}><input
+              <SaveErrorField names={["max","data.max"]}><SharedTextField
                 value={(data.max as string) ?? ''}
                 onChange={(e) => onUpdate({ actionData: { ...data, max: e.target.value } })}
                 placeholder="例：2026-12-31"
@@ -555,7 +556,7 @@ export function AreaProperties({
 
       {intent === 'clipboard' && (
         <Field label="コピーする文字" hint="押すと、この文字が友だちの端末に写ります。">
-          <SaveErrorField names={["text","data.text"]}><input
+          <SaveErrorField names={["text","data.text"]}><SharedTextField
             value={(data.text as string) ?? ''}
             onChange={(e) => onUpdate({ actionData: { ...data, text: e.target.value } })}
             maxLength={1000}

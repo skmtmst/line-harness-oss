@@ -65,3 +65,51 @@
 }
 
 .surface[data-booking-state='attention'] { --booking-bg: var(--color-status-danger-soft); --booking-ink: var(--color-danger); --booking-border: var(--color-danger); --booking-line: dashed; --booking-stroke: 2px; }
+
+.cardHeading { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-row); width: 100%; min-width: 0; }
+.cardHeading > .name { flex: 1; }
+.cardHeading > .time { flex-shrink: 0; }
+.staffHeading { display: flex; align-items: center; justify-content: center; gap: var(--polish-space-row); min-width: 0; }
+.rest { display: flex; align-items: center; justify-content: center; min-height: var(--space-32); border: 0; border-radius: var(--radius-segment); box-shadow: none; background: repeating-linear-gradient(135deg, var(--color-shell), var(--color-shell) 4px, var(--color-hairline) 4px, var(--color-hairline) 5px); color: var(--color-ink-secondary); font-size: var(--text-micro); cursor: default; }
+
+.visibleLegend { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-field); min-width: 0; width: 100%; }
+.visibleLegendInline { display: flex; align-items: center; justify-content: space-between; gap: var(--polish-space-field); flex: 1 1 auto; min-width: 0; width: auto; }
+.legendHelp { flex: none; }
+@media print { .legendHelp { display: none; } }
+
+.cardDetails { display: flex; align-items: center; gap: var(--space-4); width: 100%; min-width: 0; }
+.cardDetails > .detail { flex: 1 1 auto; min-width: min(2em, 25%); }
+.cardDetails > .detail:empty, .cardMeta:empty { display: none; }
+.cardMeta { display: flex; align-items: center; gap: var(--space-4); flex: 0 0 auto; min-width: 0; max-width: calc(100% - min(2em, 25%) - var(--space-4)); }
+.cardDetails > .detail:empty + .cardMeta { max-width: 100%; }
+.cardMeta > :not(.detail) { flex-shrink: 0; }
+.cardMeta > .label { flex-shrink: 1; min-width: 0; }
+.cardMeta > .detail { flex: 0 1 auto; min-width: 0; }
+.cardMeta > [data-booking-guests] { flex: 0 0 auto; }
+.statusText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 人数と注意は先頭で確保し、狭い箱では補足から省略する。全文は箱の説明に残す。 */
+[data-placement='timeline'] .cardMeta [data-booking-count-overflow], [data-placement='timeline'] .cardMeta [data-booking-warning-mark] { display: none; }
+[data-placement='timeline'] .cardMeta [data-booking-count] { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+[data-placement='timeline'] .cardMeta > [data-booking-guests] { order: -2; }
+[data-placement='timeline'] .cardMeta > [data-booking-warning] { order: -1; }
+@container booking-card (max-width: 8rem) {
+  .cardHeading > .time { flex: 0 1 auto; min-width: 0; }
+  .cardMeta:has([data-booking-guests]) > [data-booking-source] { display: none; }
+}
+@container booking-card (max-width: 6rem) {
+  .cardMeta:has([data-booking-guests]) > .label { display: none; }
+}
+@container booking-card (max-width: 4rem) {
+  .cardHeading:has(+ .cardDetails [data-booking-guests]) { display: none; }
+  .cardDetails:has([data-booking-guests]) { display: block; }
+  .cardDetails:has([data-booking-guests]) > .detail { display: none; }
+  .cardMeta:has([data-booking-guests]) { flex-direction: column; align-items: stretch; gap: 0; width: 100%; max-width: 100%; }
+  .cardMeta:has([data-booking-guests]) > :not([data-booking-guests], [data-booking-warning]) { display: none; }
+  .cardMeta > [data-booking-guests], .cardMeta > [data-booking-warning] { width: 100%; text-align: center; }
+  .cardMeta [data-booking-count] { display: block; }
+  .cardMeta [data-booking-count][data-many], .cardMeta [data-booking-warning-text] { display: none; }
+  .cardMeta > [data-booking-guests], .cardMeta > [data-booking-warning] { display: flex; align-items: center; justify-content: center; min-height: var(--tpl-rs-lh-11); }
+  :root [data-placement='timeline'] .cardMeta svg:is([data-booking-count-overflow], [data-booking-warning-mark]) { display: block; width: var(--space-8); height: var(--space-8); flex: none; }
+  .cardMeta [data-booking-count-unit] { display: none; }
+}

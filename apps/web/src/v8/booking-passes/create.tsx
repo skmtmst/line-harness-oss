@@ -10,7 +10,7 @@ import { Pencil, Plus } from 'lucide-react'
 import type { BookingPassPlan, BookingPassPlanWrite } from '@line-crm/shared'
 import { CreatePage } from '@/components/templates/create-page'
 import Button from '@/components/shared/button'
-import { SettingCheckbox } from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { EntityMultiPickerDialog } from '@/components/shared/entity-picker'
 import { loadEntityCandidates } from '@/components/shared/entity-remote-field'
@@ -258,7 +258,7 @@ function PassCreateInner() {
           )}
           <Field label="券が無い人の予約">
             <span className={styles.picked}>
-              <SettingCheckbox checked={form.allowWithoutPass} label="券が無い人も予約できる" onChange={(checked) => patch({ allowWithoutPass: checked })} />
+              <Toggle checked={form.allowWithoutPass} label="券が無い人も予約できる" onChange={(checked) => patch({ allowWithoutPass: checked })} />
               <span>券が無い人も予約できる</span>
             </span>
           </Field>

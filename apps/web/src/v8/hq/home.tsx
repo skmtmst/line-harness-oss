@@ -12,7 +12,7 @@ import Card from '@/components/shared/card';
 import { ListToolbarFrame, ListToolbarRow, ListToolbarEnd } from '@/components/shared/list-toolbar';
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
-import Button from '@/components/shared/button';
+import Button, { AccountActionButton } from '@/components/shared/button';
 import Avatar from '@/components/shared/avatar';
 import { RowMenu } from '@/components/shared/row-actions';
 import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
@@ -63,8 +63,18 @@ export default function HqHomeV8() {
   const readOnlyImpersonation = readSessionSnapshot()?.impersonation?.mode === 'read'
   const canManage = !readOnlyImpersonation && (canManageRole(role))
   const isOwner = !readOnlyImpersonation && role === 'owner'
-  const { setSelectedAccountId, refreshAccounts } = useAccount()
-  const [accounts, setAccounts] = useState<AccountWithStats[]>([])
+  const { accounts: shellAccounts, setSelectedAccountId, refreshAccounts } = useAccount()
+  const [snapshotAccounts, setAccounts] = useState<AccountWithStats[]>([])
+  // 統括カードは独自に一覧を持つため、共通ヘッダーが取得した最新の
+  // LINE公式アカウント画像もカード・表へ反映する。
+  const accounts = useMemo(() => {
+    const pictures = new Map(shellAccounts.map((account) => [account.id, account.pictureUrl ?? null]))
+    return snapshotAccounts.map((account) => {
+      if (!pictures.has(account.id)) return account
+      const pictureUrl = pictures.get(account.id) ?? null
+      return account.pictureUrl === pictureUrl ? account : { ...account, pictureUrl }
+    })
+  }, [shellAccounts, snapshotAccounts])
   const currentAccounts = useMemo(() => accounts.filter((account) => !isArchived(account)), [accounts])
   const [tenantName, setTenantName] = useState('')
   const [loading, setLoading] = useState(true)
@@ -210,10 +220,26 @@ export default function HqHomeV8() {
     }
   }
 
-  const login = (accountId: string) => {
+  const [enteringAccountId, setEnteringAccountId] = useState<string | null>(null)
+  const login = async (accountId: string) => {
+    if (enteringAccountId) return
+    setEnteringAccountId(accountId)
+    try {
+      // 保存済みの引き継ぎ状態を毎回確認する。未完了・確認失敗時に店舗へ入れない。
+      const response = await api.lineAccounts.followerImportState(accountId)
+      if (!response.success) throw new Error(response.error || '引き継ぎの状態を確認できませんでした')
+      if (response.data.phase === 'importing_ids' || response.data.phase === 'hydrating_profiles') {
+        router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
+        return
+      }
+    } catch (failure) {
+      saveErrors.capture(failure)
+      router.push(`/accounts/new/handover?accountId=${encodeURIComponent(accountId)}`)
+      return
+    } finally {
+      setEnteringAccountId(null)
+    }
     setSelectedAccountId(accountId)
-    /* 引き継ぎが途中なら続きから動かす。見た目は変えず、答えも待たない（cron でも進む）。 */
-    if (canManage) void api.lineAccounts.stepFollowerImport(accountId).catch(() => undefined)
     // 店舗未選択ゲートから来たときは、元いた画面へ戻す（`return` はアプリ内の店舗画面パスだけ：NEXT-07）。
     const back = resolveStoreReturnPath(new URLSearchParams(window.location.search).get('return'))
     router.push(back ?? '/')
@@ -396,34 +422,20 @@ export default function HqHomeV8() {
     </div>
   )
 
-  const cardActions = (account: AccountWithStats) => {
-    if (isArchived(account)) {
-      return (
-        <div className={styles.cardButtons}>
-          <Button className={styles.grow} onClick={() => setEditingAccount(account)}>
-            <Pencil aria-hidden="true" className={styles.buttonIcon} />登録内容を編集
-          </Button>
-          {isOwner ? (
-            <Button onClick={() => setArchiveTarget({ account, mode: 'restore' })}>
-              <RotateCcw aria-hidden="true" className={styles.buttonIcon} />戻す
-            </Button>
-          ) : null}
-        </div>
-      )
-    }
-    return (
-      <div className={styles.cardButtons}>
-        <Button className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`}>
-          <LogIn aria-hidden="true" className={styles.buttonIcon} />入る
+  const cardActions = (account: AccountWithStats) => (
+    <div className={styles.cardButtons}>
+      {isArchived(account) ? <>
+        {/* アーカイブは登録内容の編集と戻すだけ（本線 375cc79e30 の決定）。 */}
+        <Button className={styles.grow} onClick={() => setEditingAccount(account)}>
+          <Pencil aria-hidden="true" className={styles.buttonIcon} />登録内容を編集
         </Button>
-        {canManage ? (
-          <Button onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`}>
-            <Settings aria-hidden="true" className={styles.buttonIcon} />設定
-          </Button>
-        ) : null}
-      </div>
-    )
-  }
+        {isOwner ? <AccountActionButton action="restore" onClick={() => setArchiveTarget({ account, mode: 'restore' })} /> : null}
+      </> : <>
+        <AccountActionButton action="enter" className={styles.grow} onClick={() => login(account.id)} aria-label={`${account.displayName || account.name} へ入る`} />
+        {canManage ? <AccountActionButton action="settings" onClick={() => setSettingsAccount(account)} aria-label={`${account.displayName || account.name} の設定`} /> : null}
+      </>}
+    </div>
+  )
 
   /* ★V8 oFq4S：表の行末は「…」1つ（行の操作は中に）。 */
   const tableMenu = (account: AccountWithStats) => {
@@ -559,7 +571,7 @@ export default function HqHomeV8() {
                 </div>
                 <TagOverflow label={`${name}の分類`}>
                   {folderDotOf(account) ? <IconLabel icon={FolderIcon} aria-label={`フォルダ：${folderDotOf(account)!.name}`}>{folderDotOf(account)!.name}</IconLabel> : null}
-                  {(account.tags ?? []).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
+                  {(account.tags ?? []).filter((tag, index, tags) => tag.name.trim() !== folderDotOf(account)?.name.trim() && tags.findIndex(other => other.name.trim() === tag.name.trim()) === index).map(tag => <TagPill key={tag.id} name={tag.name} color={tag.color} />)}
                 </TagOverflow>
                 <dl className={styles.stats}>
                   <div className={styles.stat}>

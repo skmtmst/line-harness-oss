@@ -20,6 +20,7 @@ import { Field } from '@/components/shared/form-controls'
 import TextLink from '@/components/shared/text-link'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /** 版追加を止めた理由を、互換基準ごとに運用者へ説明する。 */
 function versionBlockerText(blockers: MediaVersionBlocker[]): string {
@@ -485,7 +486,7 @@ export default function MediaDetailDialog({
               </Notice>
             ) : null}
             {versionPreview?.canReplace ? (
-              <div className="mt-3"><Field label="変更理由" htmlFor={`${fileInputId}-reason`} requirement={changeReasonRequirement}><SaveErrorField names={["changeReason","change_reason"]}><input id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" /></SaveErrorField></Field></div>
+              <div className="mt-3"><Field label="変更理由" htmlFor={`${fileInputId}-reason`} requirement={changeReasonRequirement}><SaveErrorField names={["changeReason","change_reason"]}><SharedTextField id={`${fileInputId}-reason`} value={changeReason} onChange={(event) => setChangeReason(event.target.value)} maxLength={500} className="border-hairline rounded-control mt-1 min-h-10 w-full border px-3 text-sm" placeholder="例：秋の写真へ更新" /></SaveErrorField></Field></div>
             ) : null}
             {versionError ? <Notice tone="danger" message={versionError} className="mt-3" /> : null}
             {impact && impact.usageCount > 0 ? (
@@ -563,7 +564,7 @@ export default function MediaDetailDialog({
                     onChange={setTermsExpiresAt}
                     className="mt-1"
                   /></SaveErrorField></Field></div>
-                <div><Field label="同意・権利の記録（確認した内容だけ）" htmlFor={`${fileInputId}-consent`}><SaveErrorField names={["termsConsentNote","usageConsentNote","terms_consent_note"]}><input
+                <div><Field label="同意・権利の記録（確認した内容だけ）" htmlFor={`${fileInputId}-consent`}><SaveErrorField names={["termsConsentNote","usageConsentNote","terms_consent_note"]}><SharedTextField
                     id={`${fileInputId}-consent`}
                     type="text"
                     value={termsConsentNote}

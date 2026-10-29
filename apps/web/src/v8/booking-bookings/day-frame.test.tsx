@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import type { BookingRequest } from '@/lib/api'
@@ -42,6 +43,7 @@ test('次の予約は実データから詳細を開き、狭い板の入口か�
 })
 
 test('未取得の一覧に前の数と次の予約を出さず、閲覧者の変更入口を隠す', () => {
+  verifiedStaffRole('viewer')
   render(<PeopleDayFrame view="day" date="2026-10-15" rows={[row]} ready={false} availability={{ status: 'error', slots: [] }} actions={null} canWrite={false} onOpen={() => {}}>盤</PeopleDayFrame>)
   expect(screen.queryByRole('button', { name: '詳細を見る' })).toBeNull()
   expect(screen.queryByRole('link', { name: '日時を変える' })).toBeNull()
@@ -59,3 +61,11 @@ test('pending表記も承認が必要な件数へ含め、売上の確定分へ�
   expect(result.requested).toBe(1)
   expect(result.sales).toBe(0)
 })
+
+test.each(['マロン さん', 'マロン様', 'マロンさま'])('次の予約で %s の敬称を重ねない', name => {
+  vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-15T01:00:00Z'))
+  const { container } = render(<PeopleDayFrame view="day" date="2026-10-15" rows={[{ ...row, friend_name: name }]} ready availability={{ status: 'ready', slots: [] }} actions={null} canWrite={false} onOpen={() => {}}>盤</PeopleDayFrame>)
+  expect(container.querySelector(`[title="${name}"]`)?.textContent).toBe(name)
+  expect(container.textContent).not.toMatch(/(?:さん|様|さま)\s*(?:さん|様|さま)/)
+})
+afterEach(() => { verifiedStaffRole(null) })

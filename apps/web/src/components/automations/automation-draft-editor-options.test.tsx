@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -123,7 +124,7 @@ async function mountWithDraft(eventType: string, triggerConfig: Record<string, u
 }
 
 function saveButton(el: HTMLDivElement): HTMLButtonElement {
-  const button = Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存')
+  const button = (Array.from(el.querySelectorAll('button')).find((node) => node.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))
   if (!button) throw new Error('「下書きを保存する」ボタンが見つかりません')
   return button as HTMLButtonElement
 }
@@ -131,7 +132,7 @@ function saveButton(el: HTMLDivElement): HTMLButtonElement {
 describe('下書き編集の選択可能一覧(#734)', () => {
   it('E1: すべてのきっかけが共有の正本と一致する', async () => {
     const el = await mountWithDraft('friend_add', {})
-    const expand = Array.from(el.querySelectorAll('button')).find(button => button.textContent?.includes('ほかのきっかけもすべて見る'))!
+    const expand = (Array.from(el.querySelectorAll('button')).find(button => button.textContent?.includes('ほかのきっかけもすべて見る')) ?? querySupplementaryPageAction('ほかのきっかけもすべて見る'))!
     await act(async () => { expand.click() })
     const radios = Array.from(el.querySelectorAll<HTMLInputElement>('input[name="v8-trigger"]'))
     expect(radios.map(input => input.value)).toEqual(AUTOMATION_DRAFT_TRIGGER_OPTIONS.map(option => option.value))
@@ -143,7 +144,7 @@ describe('下書き編集の選択可能一覧(#734)', () => {
   it('E2: 行うことを足す選択肢が共有の正本の編集可能な処理と一致する', async () => {
     const notification = { id: 'notify-1', type: 'notify_staff', params: { notificationRuleId: 'rule-1', message: '相談が来ました' }, onFailure: 'stop' }
     const el = await mountWithDraft('friend_add', {}, [notification])
-    const add = Array.from(el.querySelectorAll('button')).find(button => button.textContent?.includes('行うことを足す'))!
+    const add = (Array.from(el.querySelectorAll('button')).find(button => button.textContent?.includes('行うことを足す')) ?? querySupplementaryPageAction('行うことを足す'))!
     await act(async () => { add.click() })
     const labels = Array.from(document.querySelectorAll('[role="menuitem"]')).map(option => option.textContent)
     // 通知は旧編集で選んでも通常の本文へ化けていた。現役では既存通知の中身を保持し、新規の選び口には出さない。

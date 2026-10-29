@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /**
  * N-174: 専用の確認タブではなく、編集画面に常に出ている顧客プレビューと
@@ -123,8 +124,8 @@ async function renderPage() {
 }
 
 function findButton(label: string): HTMLButtonElement {
-  const button = [...container.querySelectorAll('button')]
-    .find((node) => (node.textContent ?? '').includes(label)) as HTMLButtonElement | undefined
+  const button = ([...container.querySelectorAll('button')]
+    .find((node) => (node.textContent ?? '').includes(label)) ?? querySupplementaryPageAction(label)) as HTMLButtonElement | undefined
   if (!button) throw new Error(`button not found: ${label}`)
   return button
 }
@@ -225,7 +226,7 @@ describe('N-174 公開前プレビューと検証の実React対照', () => {
   it('正常な定義は更新を1回だけ保存し、その版を1回だけ公開する', async () => {
     await renderPage()
     await click('この版を公開')
-    const confirm = [...document.body.querySelectorAll('[role="dialog"] button')].find((button) => button.textContent?.trim() === 'この版を公開')! as HTMLButtonElement
+    const confirm = ([...document.body.querySelectorAll('[role="dialog"] button')].find((button) => button.textContent?.trim() === 'この版を公開') ?? querySupplementaryPageAction('この版を公開'))! as HTMLButtonElement
     await act(async () => confirm.click())
     await flush()
 

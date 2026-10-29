@@ -1,4 +1,4 @@
-import { FEATURE_CATALOG, FEATURE_IDS, type FeatureId } from '@line-crm/shared';
+import { FEATURE_CATALOG, FEATURE_IDS, SPECIALIZED_CATALOG_SETTING_KEY, type FeatureId } from '@line-crm/shared';
 
 
 /** 受け付けるIDは共有カタログそのもの。画面・Workerで別の配列を持たない。 */
@@ -23,7 +23,7 @@ const SIDEBAR_ITEM_ORDER_KEY = 'sidebar.item_order';
 
 export const PARENT_CHILD_MODE_KEY = 'organization.parent_child_enabled';
 
-export const SPECIALIZED_CATALOG_KEY = 'feature.specialized.catalog';
+export const SPECIALIZED_CATALOG_KEY = SPECIALIZED_CATALOG_SETTING_KEY;
 
 export const FEATURE_SETTINGS_BUNDLE_KEY = 'feature.settings_bundle_v1';
 
@@ -40,7 +40,7 @@ export type FeatureVisibilityData = {
    * サイドバーに項目を出せるかだけを返す。会社の保存値、契約、依存理由は
    * 管理情報なので、一般staff向けの応答へ混ぜない。
    */
-  features: Record<FeatureId, boolean>;
+  features: Record<FeatureId | 'specialized_ec_commerce', boolean>;
 };
 
 /** 共有カタログで既定オフの機能。記録が無いアカウントではこの状態から始める。 */

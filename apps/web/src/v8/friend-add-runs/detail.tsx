@@ -35,6 +35,7 @@ import { LogRecordJson } from '@/v8/log-record'
 import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import Notice from '@/components/shared/notice'
+import { withHonorific } from '@line-crm/shared'
 
 type ActionRun = FriendAddRunDetail['actionRuns'][number]
 
@@ -303,7 +304,7 @@ function FriendAddRunDetailInner() {
   </>
   return (
     <DetailPage boardId="N43uVX" layout="record-detail" heightMode="content"
-      title={`${displayName}さんの友だち追加`}
+      title={`${withHonorific(displayName)}の友だち追加`}
       help={`${jstTitleDate(detail.receivedAt)} に追加・${friendKindLabel}`}
       summary={summary}
       summaryLabel="この追加について"

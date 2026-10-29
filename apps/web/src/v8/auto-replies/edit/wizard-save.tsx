@@ -10,6 +10,7 @@ AutoReplyValidationResult
 } from '@line-crm/shared';
 import type { Dispatch,RefObject,SetStateAction } from 'react';
 import { InputIssue,WizardForm,WizardStep } from './wizard-model';
+import { canEditWizardNow } from './wizard-access'
 
 type SaveWizardDraftContext = {
   autoReplyId: string | null
@@ -40,6 +41,7 @@ type SaveWizardDraftContext = {
 }
 
 export async function saveWizardDraft({ autoReplyId, buildInput, createKeyRef, form, router, savedSnapshotRef, savedVersionRef, saveErrors, setAutoReplyId, setConfirmState, setDryRun, setError, setInputIssue, setLifecycleStatus, setMatchedAccountId, setSaveConflict, setSaveNotice, setSaving, setValidation, setVersionNumber, setWeekdayNotice, showInputIssue, step, stepDataRequested, versionNumber }: SaveWizardDraftContext): Promise<{ id: string; accountId: string | null } | null> {
+    if (!canEditWizardNow()) return null
     if (form.weekdays.length === 0) { setWeekdayNotice('反応する曜日を1つ以上選んでください。'); return null }
     const body = buildInput()
     if ('error' in body) {

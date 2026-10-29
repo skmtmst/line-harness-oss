@@ -17,6 +17,7 @@ export default function Disclosure({
   defaultOpen = false,
   size = 'standard',
   appearance = 'card',
+  selected = false,
   className,
   id,
   onToggle,
@@ -30,6 +31,8 @@ export default function Disclosure({
   defaultOpen?: boolean
   size?: 'standard' | 'compact'
   appearance?: 'card' | 'inset'
+  /** 選択中の欄を見出し左の緑印で示す。 */
+  selected?: boolean
   className?: string
   id?: string
   /** 開いたときにだけ必要な詳細を読み込むための口。 */
@@ -49,7 +52,7 @@ export default function Disclosure({
       open={defaultOpen || undefined}
       className={[styles.root, size === 'compact' ? styles.compact : '', className].filter(Boolean).join(' ')}
     >
-      <summary className={styles.summary}>
+      <summary className={styles.summary} data-selected={selected || undefined}>
         <span className={styles.title}>{title}</span>
         {hint ? <span className={styles.hint}>{hint}</span> : null}
         <ChevronDown aria-hidden="true" className={styles.chevron} />

@@ -1,7 +1,6 @@
 'use client'
 
 import { scrollMotion } from '@/components/shared/overlay-utils'
-import Checkbox from '@/components/shared/checkbox'
 import { flushListUrlState, useListUrlValue } from '@/components/shared/list-url-state';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
 import { notifySaved, notifyToast } from '@/components/shared/toast';
@@ -44,6 +43,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { visitStampsApi } from '@/lib/visit-stamps-api';
 import { MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount } from './display';
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs';
+import { withHonorific } from '@line-crm/shared'
 import HistoryTable from './history-table'
 import styles from './visit-stamps.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format';
@@ -55,6 +55,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import Toggle from '@/components/shared/toggle'
 
 /*
  * ★V8 来店スタンプ（G-8a〜a3）。マイル（オンライン・特定の動き）とは別のスタンプカード。
@@ -612,7 +613,7 @@ function VisitStampsScreen() {
                 {settings.multipliers.map((m, i) => (
                   <div key={i} className={styles.switchRow}>
                     {/* 切る＝止める（消さない）。消すのは「…」から。 */}
-                    <SaveErrorField names={[`multipliers.${i}.active`,"active","m.active"]}><Checkbox checked={m.active !== false} aria-label={`${multiplierName(m)}を使う`} disabled={ro} onCheckedChange={ro ? () => {} : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} /></SaveErrorField>
+                    <SaveErrorField names={[`multipliers.${i}.active`,"active","m.active"]}><Toggle checked={m.active !== false} label={`${multiplierName(m)}を使う`} disabled={ro} onChange={ro ? () => {} : (on) => set({ multipliers: settings.multipliers.map((x, k) => (k === i ? { ...x, active: on } : x)) })} /></SaveErrorField>
                     <span className={styles.texts}>
                       <span className={styles.name}>{multiplierName(m)}</span>
                       <span className={styles.sub} title={multiplierDetail(m)}>{m.active === false ? `止めています・${multiplierDetail(m)}` : multiplierDetail(m)}</span>
@@ -622,7 +623,7 @@ function VisitStampsScreen() {
                   </div>
                 ))}
                 <div className={styles.switchRow}>
-                  <SaveErrorField names={["firstVisitBonus","settings.firstVisitBonus","first_visit_bonus","settings.first_visit_bonus"]}><Checkbox checked={settings.firstVisitBonus > 0} aria-label="初回来店ボーナスを使う" disabled={ro} onCheckedChange={ro ? () => {} : (on) => set({ firstVisitBonus: on ? 1 : 0 })} /></SaveErrorField>
+                  <SaveErrorField names={["firstVisitBonus","settings.firstVisitBonus","first_visit_bonus","settings.first_visit_bonus"]}><Toggle checked={settings.firstVisitBonus > 0} label="初回来店ボーナスを使う" disabled={ro} onChange={ro ? () => {} : (on) => set({ firstVisitBonus: on ? 1 : 0 })} /></SaveErrorField>
                   <span className={styles.texts}>
                     <span className={styles.name}>初回来店ボーナス</span>
                     <span className={styles.sub}>{settings.firstVisitBonus > 0 ? `はじめての来店で +${settings.firstVisitBonus} 個` : 'はじめての来店で多めに押します'}</span>
@@ -630,7 +631,7 @@ function VisitStampsScreen() {
                   {ro ? null : <RowActions subjectName="初回来店ボーナス" menuItems={[{ id: 'edit', label: '個数を変える', onSelect: () => setBonusOpen(true) }]} />}
                 </div>
                 <div className={styles.switchRow}>
-                  <SaveErrorField names={["length","settings.rankMultipliers.length","rankMultipliers.length","rankOpen","settings.rank_multipliers.length","rank_multipliers.length","rank_open"]}><Checkbox checked={settings.rankMultipliers.length > 0} aria-label="会員ランクの倍率を使う" disabled={ro} onCheckedChange={ro ? () => {} : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} /></SaveErrorField>
+                  <SaveErrorField names={["length","settings.rankMultipliers.length","rankMultipliers.length","rankOpen","settings.rank_multipliers.length","rank_multipliers.length","rank_open"]}><Toggle checked={settings.rankMultipliers.length > 0} label="会員ランクの倍率を使う" disabled={ro} onChange={ro ? () => {} : (on) => (on ? setRankOpen(true) : set({ rankMultipliers: [] }))} /></SaveErrorField>
                   <span className={styles.texts}>
                     <span className={styles.name}>会員ランクの倍率</span>
                     <span className={styles.sub} title={rankDetail(settings)}>{rankDetail(settings)}</span>
@@ -691,7 +692,7 @@ function VisitStampsScreen() {
                             return (
                               <Tr key={row.id} className={`${styles.row} ${styles.paperLine}`} data-row-id={row.id}>
                                 <Td className={styles.colPhoto}>
-                                  <button type="button" className={styles.thumb} onClick={() => setPhoto(row)} aria-label={`${names.name}さんの写真を大きく見る`}>
+                                  <button type="button" className={styles.thumb} onClick={() => setPhoto(row)} aria-label={`${withHonorific(names.name)}の写真を大きく見る`}>
                                     <PaperThumb accountId={selectedAccountId} url={row.photo_url} />
                                   </button>
                                 </Td>
@@ -712,10 +713,10 @@ function VisitStampsScreen() {
                                     {row.status === 'pending' && canStamp ? (
                                       <>
                                         <Button size="compact" disabled={!!busy} onClick={() => { setDialogError(''); setRejecting(row) }}>却下</Button>
-                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${names.name}さんの ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />承認</Button>
+                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${withHonorific(names.name)}の ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />承認</Button>
                                       </>
                                     ) : null}
-                                    <RowActions subjectName={`${names.name}さんの申請`} menuItems={[
+                                    <RowActions subjectName={`${withHonorific(names.name)}の申請`} menuItems={[
                                       { id: 'photo', label: '写真を大きく見る', onSelect: () => setPhoto(row) },
                                       { id: 'friend', label: '友だちの詳細を開く', external: false, href: `/friends/detail?id=${encodeURIComponent(row.friend_id)}`, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friend_id)}`) } },
                                     ]} />

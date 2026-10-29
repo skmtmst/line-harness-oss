@@ -147,6 +147,8 @@ function app() {
   a.route('/', adminAuth);
   a.get('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
   a.post('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
+  a.all('/api/line-accounts/:id/follower-import', (c) => c.json({ success: true }));
+  a.post('/api/line-accounts/:id/follower-import/:action', (c) => c.json({ success: true }));
   a.get('/api/friends', (c) => c.json({ success: true }));
   a.post('/api/broadcasts/:id/send', (c) => c.json({ success: true }));
   a.post('/api/hq/support/requests', (c) => c.json({ success: true }));
@@ -527,6 +529,35 @@ describe('protected API access', () => {
     }, crossSiteEnv());
     expect(res.status).toBe(401);
   });
+});
+
+describe('staff follower-import gate access', () => {
+  test('staff with chat permission can read the visible store import state', async () => {
+    const response = await app().request('/api/line-accounts/acc-1/follower-import', {
+      headers: { Authorization: 'Bearer chats-key' },
+    }, crossSiteEnv());
+    expect(response.status).toBe(200);
+  });
+
+  test.each(['POST', 'PUT', 'PATCH', 'DELETE'])('%s cannot write import state', async method => {
+    const response = await app().request('/api/line-accounts/acc-1/follower-import', {
+      method, headers: { Authorization: 'Bearer chats-key' },
+    }, crossSiteEnv());
+    expect(response.status).toBe(403);
+  });
+
+  test.each(['detect', 'start', 'step'])('staff cannot run %s', async action => {
+    const response = await app().request(`/api/line-accounts/acc-1/follower-import/${action}`, {
+      method: 'POST', headers: { Authorization: 'Bearer chats-key' },
+    }, crossSiteEnv());
+    expect(response.status).toBe(403);
+  });
+
+  test.each(['/api/line-accounts/acc-1/follower-import/extra', '/api/line-accounts/acc-1/extra/follower-import'])(
+    'the read exception does not allow %s', path => {
+      expect(isStaffExplicitAllow('GET', path)).toBe(false);
+    },
+  );
 });
 
 describe('staff feature permissions', () => {

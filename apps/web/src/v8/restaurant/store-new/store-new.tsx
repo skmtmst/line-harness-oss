@@ -231,12 +231,12 @@ export default function StoreNewV8() {
     if (step === STEP.TERMS) {
       return <>
         <Button href="/hq">キャンセル</Button>
-        <Button variant="primary" disabled={!canSubmitTerms(readToEnd, termsChecked) || agreeing} onClick={() => agree()} busy={agreeing} busyLabel="同意を記録中…"><ArrowRight aria-hidden className={styles.icon15} />同意して次へ進む</Button>
+        <Button variant="primary" disabled={!canSubmitTerms(readToEnd, termsChecked) || agreeing} onClick={() => agree()} busy={agreeing} busyLabel="同意を記録中…">同意して次へ進む<ArrowRight aria-hidden className={styles.icon15} /></Button>
       </>
     }
-    if (step === STEP.BASICS) return <><Button href="/hq">キャンセル</Button><Button variant="primary" onClick={nextFromBasics}><ArrowRight aria-hidden className={styles.icon15} />次へ</Button></>
-    if (step === STEP.OFFICIAL_ACCOUNT) return <><Button onClick={() => setStep(STEP.BASICS)}>戻る</Button><Button variant="primary" disabled={!officialAccountReady} onClick={() => setStep(STEP.CREDENTIALS)}><ArrowRight aria-hidden className={styles.icon15} />次へ</Button></>
-    if (step === STEP.CREDENTIALS) return <><Button onClick={() => setStep(STEP.OFFICIAL_ACCOUNT)}>戻る</Button><Button variant="primary" onClick={nextFromCredentials}><ArrowRight aria-hidden className={styles.icon15} />次へ</Button></>
+    if (step === STEP.BASICS) return <><Button href="/hq">キャンセル</Button><Button variant="primary" onClick={nextFromBasics}>次へ<ArrowRight aria-hidden className={styles.icon15} /></Button></>
+    if (step === STEP.OFFICIAL_ACCOUNT) return <><Button onClick={() => setStep(STEP.BASICS)}>戻る</Button><Button variant="primary" disabled={!officialAccountReady} onClick={() => setStep(STEP.CREDENTIALS)}>次へ<ArrowRight aria-hidden className={styles.icon15} /></Button></>
+    if (step === STEP.CREDENTIALS) return <><Button onClick={() => setStep(STEP.OFFICIAL_ACCOUNT)}>戻る</Button><Button variant="primary" onClick={nextFromCredentials}>次へ<ArrowRight aria-hidden className={styles.icon15} /></Button></>
     if (created) {
       return selectedAccountId
         ? <Button variant="primary" disabled={saving} onClick={() => enterStore()} busy={Boolean(saving)} busyLabel="処理中…">この店舗の管理画面へ</Button>

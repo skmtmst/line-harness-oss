@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 // @vitest-environment-options { "url": "http://localhost/rich-menus/edit/" }
 import React, { act } from 'react'
@@ -101,7 +102,7 @@ describe('現役V8へ残す旧編集の動き', () => {
     fireEvent.change(input, { target: { value: '1' } })
     fireEvent.click(within(dialog).getByRole('button', { name: '順番を変える' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '出す順番' })).toBeNull())
-    fireEvent.click(screen.getByRole('button', { name: '下書きを保存' }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(net.update).toHaveBeenCalledWith('g1', expect.objectContaining({ targetingPriority: 0 })))
   })
   it('順番の窓を取り消すと元の値を保つ', async () => {

@@ -4,7 +4,7 @@ import type { TagEditFormProps } from './edit-form-types'
 export type { TagEditHost } from './edit-form-types'
 
 import { SettingsFormRow } from '@/components/shared/settings-form-card';
-import { Plus, Trash2, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react';
+import { Plus, Trash2, Check, ChevronDown, ChevronUp, GitCompare, TriangleAlert } from 'lucide-react';
 import { RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4';
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
@@ -16,7 +16,8 @@ import { formatDay } from '@/lib/format';
 import { StickyBarAction } from '@/components/shared/sticky-bar';
 import { CreatePage } from '@/components/templates';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
-import Button from '@/components/shared/button';
+import Button from '@/components/shared/button'
+import { RowMenu } from '@/components/shared/row-actions';
 import Card, { CardHeader } from '@/components/shared/card';
 import { SaveConflictBand } from '@/components/shared/save-conflict';
 import HelpTip from '@/components/shared/help-tip';
@@ -212,6 +213,7 @@ export function TagEditForm({
         notice={<>{host?.notice}{readOnly ? <div className={styles.roBand}><ReadOnlyNotice role="note" data-design-node="fkGUR">{host ? '閲覧のみで見ています。変える操作は統括の管理者に頼んでください。' : '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'}</ReadOnlyNotice></div> : null}{conflictBand}</>}
         title={host?.title ?? (tag.name || 'タグを編集')}
         identity={host ? undefined : <></>}
+        actions={!host && !readOnly ? <RowMenu label="タグの操作" items={[{ id: 'duplicate', label: '複製して作る', href: `/tags/new?copy=${tag.id}` }]} /> : undefined}
         help={host?.description ?? `${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
         previewLabel="使用状況を見る"
         previewTitle="使っている所"
@@ -221,7 +223,7 @@ export function TagEditForm({
           <>
             <Button onClick={onCancel}>キャンセル</Button>
             {/* 閲覧のみには押せない操作を置かない（隠す）。 */}
-            {readOnly ? null : <>{host?.onSaveDraft ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveDraft?.(values)}>下書きを保存</Button> : null}{host ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveAnother(values)}><Plus size={16} aria-hidden="true" />保存して続けて作る</Button> : <Button href={`/tags/new?copy=${tag.id}`}><Copy size={16} aria-hidden="true" />複製して作る</Button>}</>}
+            {readOnly ? null : <>{host?.onSaveDraft ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveDraft?.(values)}>下書きを保存</Button> : null}{host ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveAnother(values)}><Plus size={16} aria-hidden="true" />保存して続けて作る</Button> : null}</>}
             {readOnly ? null : (
               <Button variant="primary" onClick={conflict ? onCompare : requestSave} busy={saving} disabled={Boolean(host) && !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined}>
                 {conflict ? <GitCompare size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}

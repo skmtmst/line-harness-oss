@@ -250,7 +250,7 @@ function MembersInner() {
               <KpiCard icon={<Building2 />} title="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" detail={`全アカウントを担当 ${kpis.allScope}人`} />
             </KpiBand>
 
-            <GridTable label="権限者の一覧" design={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-hq-col-role) minmax(0, 1fr) var(--tpl-hq-col-state) var(--tpl-hq-col-login) var(--tpl-hq-col-action)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
+            <GridTable label="権限者の一覧" columnSizing="content" design={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-hq-col-role) minmax(0, 1fr) var(--tpl-hq-col-state) var(--tpl-hq-col-login) var(--tpl-hq-col-action)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
               <GridHeadRow>
                 <GridCell role="columnheader">名前</GridCell>
                 <GridCell role="columnheader">メールアドレス</GridCell>

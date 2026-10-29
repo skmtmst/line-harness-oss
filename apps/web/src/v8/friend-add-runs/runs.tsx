@@ -16,7 +16,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state';
 import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { FriendAddEventAttributionStatus, FriendAddEventKind, FriendAddEventRoutingStatus } from '@line-crm/shared';
+import { withHonorific, type FriendAddEventAttributionStatus, type FriendAddEventKind, type FriendAddEventRoutingStatus } from '@line-crm/shared';
 import { UserPlus, Send, Play, Download, FileText, MessageCircle, Pause, Pencil, RotateCcw } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 
@@ -560,7 +560,7 @@ function FriendAddRunsInner() {
                     <ActionCell>
                       <div className={styles.menuBox}>
                         <RowMenu
-                          size="row" label={`${name}さんの記録の操作`}
+                          size="row" label={`${withHonorific(name)}の記録の操作`}
                           items={rowMenuItems(item)}
                           open={menuId === item.id}
                           onOpenChange={(next) => setMenuId(next ? item.id : null)}

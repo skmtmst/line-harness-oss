@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -248,7 +249,7 @@ test('v8 の行の「登録者を管理」「配信予定を見る」「実行�
 })
 
 // 2026-10-06 オーナー決定：閲覧のみには押せないボタン・項目を置かずに隠す（帯は出す）。板 。
-test('v8 の閲覧のみ（a5C1p）は選ぶ枠と作る・一括・変更の操作を出さず、閲覧のみの帯を出す', async () => {
+test('v8 の閲覧のみ（a5C1p）は選択と作成を隠し、フォルダ追加は理由付きで拒否する', async () => {
   document.documentElement.dataset.theme = 'v8'
   handler = (url) => {
     if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'viewer' } })
@@ -262,7 +263,7 @@ test('v8 の閲覧のみ（a5C1p）は選ぶ枠と作る・一括・変更の操
   })
   const actionTexts = [...host.querySelectorAll('button, a')].map((el) => el.textContent ?? '')
   expect(actionTexts.some((text) => text.includes('リマインダを作る'))).toBe(false)
-  expect(actionTexts.some((text) => text.includes('フォルダを追加'))).toBe(false)
+  await expectPermissionLocked([...host.querySelectorAll('button')].find(button => button.textContent?.includes('フォルダを追加')))
   const selections = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
   expect(selections).toHaveLength(0)
   const trigger = [...host.querySelectorAll('button')]

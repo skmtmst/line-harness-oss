@@ -57,7 +57,7 @@ export interface MenuSection {
 export function isHqShellPath(pathname: string | null | undefined): boolean {
   if (!pathname) return false
   // 統括の「アカウント」から開く登録の画面（LINEアカウントを登録・飲食店の店舗を追加とその利用規約）も統括の外側。
-  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new' || pathname === '/restaurant-test/stores/new' || pathname === '/restaurant-test/terms'
+  return pathname === '/hq' || pathname.startsWith('/hq/') || pathname === '/accounts/new' || pathname === '/accounts/new/handover' || pathname === '/restaurant-test/stores/new' || pathname === '/restaurant-test/terms'
 }
 
 export const HQ_MENU_SECTIONS: MenuSection[] = [
@@ -247,6 +247,7 @@ export const MENU_SECTION_BY_ID = new Map(MENU_SECTIONS.map((section) => [sectio
 export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
   // LINEアカウントの登録は統括の「アカウント」から開く（左メニューは統括のまま・絵 ）。
   '/accounts/new': 'hq-stores',
+  '/accounts/new/handover': 'hq-stores',
   // 飲食店の店舗を追加（・）も統括の「アカウント」から開く。左メニューは「アカウント」を選んだ形。
   '/restaurant-test/stores/new': 'hq-stores',
   // 店舗を追加の「利用規約を別画面で読む」も統括の「アカウント」の中。

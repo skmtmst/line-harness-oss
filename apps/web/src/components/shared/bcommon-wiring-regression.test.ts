@@ -1,9 +1,7 @@
 import { readUiSource as readFileSync } from '../../../scripts/test-ui-source.mjs'
 import { expect, it } from 'vitest'
 const read = (path: string) => readFileSync(`src/${path}`, 'utf8')
-it('WEB-006: 枠なしの選ぶ欄も焦点を消さない', () => {
-  expect(read('components/shared/select.module.css')).toMatch(/\.textTrigger:focus-visible\s*\{[^}]*outline:[^}]*var\(--color-focus-ring\)/)
-})
+// 選ぶ欄の青い焦点は shared-surface-layout の実ブラウザ試験で確認する。
 it('WEB-019: 自動応答の未接続のつまみを描かない', () => {
   expect(read('components/auto-replies/inline-action-rows-v8.tsx')).not.toContain('<GripVertical')
 })
@@ -14,9 +12,9 @@ it('共通点検1: 未分類は開いたフォルダ', () => {
   expect(read('components/shared/folder-picker-shell.tsx')).toContain('<FolderPanel readOnly')
   expect(read('components/shared/folder-panel.tsx')).toMatch(/kind === 'unfiled' \? <FolderOpen/)
 })
-it('共通点検2: タグ編集の切替は共通の設定Checkbox', () => {
+it('共通点検2: タグ編集のオン・オフは共通のスイッチ（Toggle）', () => {
   const source = read('v8/tag-edit/edit-form.tsx')
-  expect(source).toContain('<SettingCheckbox')
+  expect(source).not.toContain('<SettingCheckbox')
   expect(source).not.toContain('h-7 w-12')
 })
 it('共通点検3: 会話右欄のタグは共通TagPill', () => {

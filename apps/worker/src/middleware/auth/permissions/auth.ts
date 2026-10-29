@@ -160,6 +160,7 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['POST', '/api/client-errors'],
   ['GET', '/api/capabilities'],
   ['GET', '/api/line-accounts'],
+  ['GET', '/api/line-accounts/profile-pictures'],
   ['GET', '/api/line-accounts/summary'],
   ['GET', '/api/line-account-folders'],
   // 殻の表示に要る最小boolean。管理用の機能設定GETは owner/admin 専用。
@@ -298,6 +299,8 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
 ];
 
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [
+  // 店の入口で引き継ぎ状態を読む。見える店だけ route 側で絞り、開始・進行は管理者に限る。
+  ['GET', /^\/api\/line-accounts\/[^/]+\/follower-import$/],
   // 飲食3：担当者はフォロー・返事・登録情報を読む。開始・編集は管理者だけ。
   ['GET', /^\/api\/restaurant-test\/followups\/[^/]+(?:\/review-history)?$/],
   ['GET', /^\/api\/restaurant-test\/reservations\/[^/]+(?:\/confirmations)?$/],

@@ -166,7 +166,7 @@ async function settle() {
 /** 切り替えられる機能の行（必須行・スイッチを持たない行は除く）。 */
 function toggleableRows(): HTMLLIElement[] {
   return [...host.querySelectorAll<HTMLLIElement>('li')].filter((row) => {
-    const toggle = row.querySelector<HTMLButtonElement>('[type="checkbox"]')
+    const toggle = row.querySelector<HTMLButtonElement>('[role="switch"]')
     return Boolean(toggle) && !toggle.disabled
   })
 }
@@ -211,10 +211,10 @@ describe('N-448 全任意機能の利用状況バッジ', () => {
     // 利用状況はまだ届いていないが、設定は出て切替が触れる。
     const rows = toggleableRows()
     expect(rows.length).toBeGreaterThan(0)
-    const toggle = rows[0].querySelector<HTMLButtonElement>('[type="checkbox"]')!
-    const before = String((toggle as HTMLInputElement).checked)
+    const toggle = rows[0].querySelector<HTMLButtonElement>('[role="switch"]')!
+    const before = String((toggle as HTMLElement).getAttribute('aria-checked') === 'true')
     await act(async () => { toggle.click(); await Promise.resolve() })
-    expect(String((toggle as HTMLInputElement).checked)).not.toBe(before)
+    expect(String((toggle as HTMLElement).getAttribute('aria-checked') === 'true')).not.toBe(before)
 
     // 後から届いたらバッジが足される。
     await act(async () => {

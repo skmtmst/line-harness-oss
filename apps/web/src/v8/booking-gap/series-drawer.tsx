@@ -29,6 +29,7 @@ import type { RecurrenceFrequency as SeriesFreq, SeriesOccurrence } from '@line-
 import { reasonText, createdCount, dayOf, dayWithWeekday, FREQ_OPTIONS, hm, initialPick, ruleLabel, weekdayOf, type Pick } from './series-model'
 import styles from './series-drawer.module.css'
 import { formatNumber } from '@/lib/format'
+import { withHonorific } from '@line-crm/shared'
 
 export type SeriesDrawerSummary = {
   customerName: string
@@ -140,7 +141,7 @@ export default function SeriesBookingDrawer({ open, accountId, summary, onClose,
     <Drawer
       open={open}
       title="予約を入れる"
-      description={`${summary.customerName} さん・${summary.menuName} ${summary.durationMin} 分`}
+      description={`${withHonorific(summary.customerName, 'さん', { space: true })}・${summary.menuName} ${summary.durationMin} 分`}
       closeAppearance="box"
       width="editor"
       heightMode="viewport"

@@ -1108,6 +1108,13 @@
   --tpl-htn6-ring: 16px; --tpl-htn6-ring-w: 2px; --tpl-htn6-err-pad: 12px 14px; --tpl-htn6-err-gap: 4px; --tpl-htn6-ack-gap: 12px; --tpl-htn6-ack-note-pad: 24px;
   --tpl-htn6-qr: 180px; --tpl-htn6-qr-pad: 16px; --tpl-htn6-qr-gap: 12px;
   --tpl-htn6-text-20: 20px; --tpl-htn6-lh-28: 28px; --tpl-htn6-hero: 48px; --tpl-htn6-done-pad: 24px 0 8px; --tpl-htn6-acct-pad: 14px 16px; --tpl-htn6-hand-pad: 16px; --tpl-htn6-hand-gap: 10px; --tpl-htn6-stat-gap: 16px;
+  /* 友だち引き継ぎ_進捗再設計_v01.pen のA〜D。単一カードの位置と進捗の動き。 */
+  --tpl-htn6-handover-card-pad: 36px; --tpl-htn6-handover-card-gap: 18px; --tpl-htn6-handover-icon-size: 44px;
+  --tpl-htn6-handover-title-size: 24px; --tpl-htn6-handover-title-lh: 34px; --tpl-htn6-handover-spin-time: .9s;
+  --tpl-htn6-handover-intro-to-stages: 12px; --tpl-htn6-handover-stage-h: 74px; --tpl-htn6-handover-step-size: 32px;
+  --tpl-htn6-handover-stage-to-metrics: 35px; --tpl-htn6-handover-count-size: 36px; --tpl-htn6-handover-count-lh: 50px;
+  --tpl-htn6-handover-metrics-to-progress: 18px; --tpl-htn6-handover-label-to-bar: 10px; --tpl-htn6-handover-bar-h: 12px;
+  --tpl-htn6-handover-bar-to-status: 22px; --tpl-htn6-handover-status-size: 17px;
   /* ①事前確認（p6zMkA）。カードの頭・答えの一覧・いまの質問・このあとの質問・チェック結果。 */
   --tpl-htn6-pre-head-gap: 8px; --tpl-htn6-pre-group-gap: 12px; --tpl-htn6-pre-row-gap: 6px; --tpl-htn6-pre-row-pad: 8px 12px; --tpl-htn6-pre-mark: 20px; --tpl-htn6-pre-mark-gap: 10px; --tpl-htn6-pre-link-gap: 6px;
   /* 選択肢の下の案内。白地の案内（SwjOv）と注意（Z0v3c）で地・枠・間が違う。 */
@@ -1626,7 +1633,7 @@
   --tpl-sa-notice-pad: 10px 14px; --tpl-sa-notice-gap: 10px; --tpl-sa-notice-lh: 20px; --tpl-sa-notice-radius: var(--polish-radius-control);
   --tpl-sa-kpi-gap: 12px; --tpl-sa-kpi-pad: 14px; --tpl-sa-kpi-inner-gap: 4px; --tpl-sa-kpi-value-size: 20px; --tpl-sa-kpi-value-lh: 24px; --tpl-sa-search-w: 260px; --tpl-sa-tool-gap: 8px; --tpl-sa-head-actions-gap: 12px;
   --tpl-sa-staff-head-pad: 20px 24px 12px; --tpl-sa-staff-head-gap: 8px; --tpl-sa-staff-desc-lh: 17px; --tpl-sa-staff-tab-gap: 24px; --tpl-sa-staff-tab-pad: 12px; --tpl-sa-staff-tab-line: 2px; --tpl-sa-band-pad: 0 24px 8px;
-  --tpl-sa-staff-main-pad: 24px 24px 24px 10px; --tpl-sa-staff-main-gap: 16px; --tpl-sa-staff-aside-w: 380px; --tpl-sa-staff-aside-pad: var(--polish-space-card); --tpl-sa-staff-aside-gap: 14px;
+  --tpl-sa-staff-main-pad: 24px 24px 24px 10px; --tpl-sa-staff-main-gap: 16px; --tpl-sa-staff-aside-w: 380px; --tpl-sa-staff-aside-pad: var(--polish-space-card) var(--polish-space-section); --tpl-sa-staff-aside-gap: 14px;
   --tpl-sa-staff-search-w: 220px; --tpl-sa-staff-search-w-narrow: 200px; --tpl-sa-staff-invite-w: 128px; --tpl-sa-control-h: 36px; --tpl-sa-staff-select-w: 150px;
   --tpl-sa-staff-card-pad: var(--polish-space-card); --tpl-sa-staff-card-gap: var(--polish-space-row); --tpl-sa-staff-sub-lh: 17px; --tpl-sa-staff-row-pad: 10px 8px; --tpl-sa-staff-col-gap: 12px;
   --tpl-sa-staff-scope-w: 102px; --tpl-sa-staff-role-w: 84px; --tpl-sa-staff-last-w: 72px; --tpl-sa-staff-menu-w: 28px; --tpl-sa-staff-scope-w-narrow: 160px; --tpl-sa-staff-last-w-narrow: 147px;
@@ -3100,8 +3107,8 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --color-code-bg: #f5f6f8;
   --color-code-border: #e5e7eb;
   --color-choice-border: #c9ced6;
-  --choice-size: 16px; --choice-checkbox-radius: 4px; --polish-choice-ring: 1px; --polish-choice-border: #8b929e; --polish-choice-mark-stroke: 2;
-  --choice-ring: 1.5px;
+  --choice-size: 16px; --choice-checkbox-radius: 5px; --polish-choice-ring: 1px; --polish-choice-border: var(--color-choice-border); --polish-choice-mark-stroke: 3; /* 入力のチェック・スイッチのオンは緑のグラデ、進み具合は段に区切った緑、済みの印は押せない丸 */ --color-choice-on: #0e8f52; --gradient-choice-on: linear-gradient(180deg, #0e8f52, #087a3e); --shadow-choice-on: inset 0 1px 0 rgb(255 255 255 / 0.18), 0 1px 2px rgb(8 122 62 / 0.35); --shadow-choice-off: 0 1px 1px rgb(0 0 0 / 0.04); --color-progress-on: var(--color-choice-on); --color-progress-track: #e8ebef; --progress-segment-gap: var(--space-4); --step-mark-size: 20px; --step-mark-icon: 12px; --step-mark-ring: 1.5px; --color-step-todo-border: var(--color-choice-border); --color-step-done-bg: #fafafc; --color-step-done-ink: var(--color-ink-secondary); --color-step-next-bg: #f3faf6; --color-step-next-border: var(--color-choice-on);
+  --toggle-width: 36px; --toggle-height: 20px; --choice-ring: 1.5px;
   --choice-dot: 8px;
   --choice-card-ring: 2px;
   /*
@@ -3141,7 +3148,7 @@ html:root input[type='radio'] { border-radius: var(--radius-pill); border: var(-
 html:root input[type='radio']:checked { border-color: var(--color-selection-border); background: radial-gradient(circle, var(--color-selection-border) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
 
 /* 素のチェックも共通の Checkbox と同じ形 */ html:root input[type='checkbox'] { margin: 0; border: 0; border-radius: var(--choice-checkbox-radius); outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); background: var(--color-canvas); }
-html:root input[type='checkbox']:checked { outline-color: var(--color-accent-deep); background: var(--color-accent-deep) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='M4 12l5 5L20 6'/%3E%3C/svg%3E") center/var(--polish-icon-control) no-repeat; }
+html:root input[type='checkbox']:checked { outline-color: transparent; box-shadow: var(--shadow-choice-on); background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' d='M6 12.5l4 4 8-9'/%3E%3C/svg%3E") center/var(--polish-icon-control) no-repeat, var(--gradient-choice-on); }
 html:root input:is([type='radio'], [type='checkbox']):focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
 /* ：素の切り替えも同じ選択の色。ページ内タブはの黒い下線を保つ。フォルダの列の行は列の選んだ形（灰の地）を保つ（選ぶ窓で aria-pressed が付く）。注目の星は黄色い塗りだけ（緑の箱にしない）。曜日のつなげた並びは地の色だけ。ファネルの段の行は薄い緑の地と濃い棒だけ（枠を足さない・絵 ）。表の行の名前は行の地の色で選んだことを示す（名前に枠を足さない・絵 ）。 */
@@ -3178,7 +3185,7 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
   --tpl-people-block-gap: 4px;
 }
 
-:root { --tpl-onboarding-step-ring: inset 0 0 0 var(--choice-ring) var(--color-hairline); --tpl-op-support-negative-gap: calc(-1 * var(--tpl-op-me-gap)); --tpl-op-support-band-bleed: calc(-1 * var(--polish-space-section)); }
+:root { --tpl-onboarding-step-ring: inset 0 0 0 var(--choice-ring) var(--color-hairline); --tpl-op-support-negative-gap: calc(-1 * var(--tpl-op-me-gap)); }
 
 :root { --tpl-rm-review-thumb-w: 165px; --tpl-rm-face-row-h: 38px; --tpl-rm-face-label-lh: 18px; --tpl-rm-face-name-lh: 19px; --tpl-rm-face-summary-lh: 16px; --tpl-ledger-month-lh: normal; --tpl-cv-delete-reason-w: 92px; --tpl-fr-name-content-min: 160px; --tpl-rt-flow-timing-w: 132px; --tpl-rt-flow-row-h: 58px; --tpl-rt-flow-name-lh: 20px; --tpl-rt-flow-note-lh: 18px; --tpl-rm-review-label-lh: 17px; --tpl-rm-review-action-h: 38px; --tpl-rm-review-letter: 22px; }
 

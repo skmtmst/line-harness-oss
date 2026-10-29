@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
@@ -207,19 +208,19 @@ async function flush() {
 }
 
 function buttonByText(label: string): HTMLButtonElement {
-  const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === label)
+  const button = (Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === label) ?? querySupplementaryPageAction(label))
   if (!button) throw new Error(`button not found: ${label}`)
   return button
 }
 
 function buttonContaining(label: string): HTMLButtonElement {
-  const button = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes(label))
+  const button = (Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.includes(label)) ?? querySupplementaryPageAction(label))
   if (!button) throw new Error(`button not found: ${label}`)
   return button
 }
 
 function stepButton(label: string): HTMLButtonElement {
-  const button = [...host.querySelectorAll('[data-part="steps"] button')].find((button) => button.textContent?.includes(label))
+  const button = ([...host.querySelectorAll('[data-part="steps"] button')].find((button) => button.textContent?.includes(label)) ?? querySupplementaryPageAction(label))
   if (!button) throw new Error(`step not found: ${label}`)
   return button as HTMLButtonElement
 }
@@ -244,7 +245,7 @@ const putCalls = () => net.calls.filter((call) => call.method === 'PUT' && call.
 const participantCalls = () => net.calls.filter((call) => call.path.includes('/participants'))
 
 function listLink(): HTMLAnchorElement {
-  const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('キャンセル'))
+  const link = (Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('キャンセル')) ?? querySupplementaryPageAction('キャンセル'))
   if (!link) throw new Error('list link not found')
   return link
 }
@@ -260,7 +261,7 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
     await openNotificationsPane()
 
     /* 6通知のON・時刻変更の身代わり。未保存の印が固定バーに出る。 */
-    await act(async () => { fireEvent.click(host.querySelector('input[type="checkbox"]')!) })
+    await act(async () => { fireEvent.click(host.querySelector('[role="switch"]')!) })
     await flush()
     expect(host.textContent).toContain('保存していない変更があります')
 
@@ -281,7 +282,7 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
 
   it('「保存せずに移る」を選んだときだけ入力を捨てて一覧へ遷移する', async () => {
     await openNotificationsPane()
-    await act(async () => { fireEvent.click(host.querySelector('input[type="checkbox"]')!) })
+    await act(async () => { fireEvent.click(host.querySelector('[role="switch"]')!) })
     await flush()
 
     await act(async () => { listLink().click() })
@@ -294,7 +295,7 @@ describe('DETAIL-04 残存経路: 未保存の通知を持ったまま画面を�
 
   it('通知を保存してから一覧リンクを押すと確認は出ない', async () => {
     await openNotificationsPane()
-    await act(async () => { fireEvent.click(host.querySelector('input[type="checkbox"]')!) })
+    await act(async () => { fireEvent.click(host.querySelector('[role="switch"]')!) })
     await flush()
 
     /* 固定バーの「下書き保存」は通知の保存を呼ぶ。成功で未保存の印が降りる。 */
@@ -313,10 +314,10 @@ describe('Issue #1060 pane内の戻ると公開後の遷移では離脱確認を
     fixture.params = new URLSearchParams('id=webinar-1&pane=notifications')
     await render()
     await flush()
-    await act(async () => { fireEvent.click(host.querySelector('input[type="checkbox"]')!) })
+    await act(async () => { fireEvent.click(host.querySelector('[role="switch"]')!) })
     await flush()
     expect(host.textContent).toContain('保存していない変更があります')
-    expect(host.querySelector('input[type="checkbox"]')?.closest('[hidden]')).toBeNull()
+    expect(host.querySelector('[role="switch"]')?.closest('[hidden]')).toBeNull()
   }
 
   function beforeUnload() {
@@ -338,7 +339,7 @@ describe('Issue #1060 pane内の戻ると公開後の遷移では離脱確認を
     /* 画面内の移動なので履歴を戻さず、確認も出さない。通知の段は畳まれる。 */
     expect(go).not.toHaveBeenCalled()
     expect(host.querySelector('[role="dialog"]')).toBeNull()
-    expect(host.querySelector('input[type="checkbox"]')?.closest('[hidden]')).not.toBeNull()
+    expect(host.querySelector('[role="switch"]')?.closest('[hidden]')).not.toBeNull()
     /* 未保存の入力と印はそのまま残る。 */
     expect(host.textContent).toContain('保存していない変更があります')
   })
@@ -487,7 +488,7 @@ describe('DETAIL-05 無反応のボタンを残さない', () => {
     await render()
     await flush()
 
-    const link = Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('PC で見る'))
+    const link = (Array.from(host.querySelectorAll('a')).find((a) => a.textContent?.includes('PC で見る')) ?? querySupplementaryPageAction('PC で見る'))
     expect(link?.getAttribute('href')).toBe('https://liff.example.test/preview')
   })
 
@@ -499,7 +500,7 @@ describe('DETAIL-05 無反応のボタンを残さない', () => {
     await act(async () => { buttonByText('テストを送る').click() })
     await flush()
     /* 送信前に相手と文面を確認する。押した瞬間に送らない。 */
-    const confirm = Array.from(host.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent?.trim() === 'テストを送る') as HTMLButtonElement | undefined
+    const confirm = (Array.from(host.querySelectorAll('[role="dialog"] button')).find((b) => b.textContent?.trim() === 'テストを送る') ?? querySupplementaryPageAction('テストを送る')) as HTMLButtonElement | undefined
     expect(confirm).toBeDefined()
     await act(async () => { confirm!.click() })
     await flush()
@@ -527,7 +528,7 @@ describe('DETAIL-06 参加者一覧を最後の1人まで読める', () => {
 
   async function loadAllPages() {
     for (let i = 0; i < 20; i += 1) {
-      const more = Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === '続きを読み込む')
+      const more = (Array.from(host.querySelectorAll('button')).find((b) => b.textContent?.trim() === '続きを読み込む') ?? querySupplementaryPageAction('続きを読み込む'))
       if (!more) return
       await act(async () => { more.click() })
       await flush()

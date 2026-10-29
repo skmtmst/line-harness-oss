@@ -2,7 +2,8 @@
 import { isForbiddenOrRateLimited,permissionDeniedMessage } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
-import Checkbox,{ SettingCheckbox } from '@/components/shared/checkbox'
+import Checkbox from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -1090,7 +1091,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   const previewContent = <>
           {previewUrl ? (
             <div className={layout.sideActions}>
-              <Button href={previewUrl} className={styles.sideButton}><Smartphone className={styles.btnIcon} aria-hidden="true" />お客さまに見える画面を確かめる</Button>
+              <Button href={previewUrl} external className={styles.sideButton}><Smartphone className={styles.btnIcon} aria-hidden="true" />お客さまに見える画面を確かめる</Button>
             </div>
           ) : null}
           <p className={layout.sideTitle} title={`お客さまの予約画面（${isSelf ? 'あなた' : `${staff.display_name}さん`}を指名したとき）`}>
@@ -1161,7 +1162,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                 return (
                   <div className={styles.dayRow} key={day.weekday} data-on={row.active || undefined}>
                     <span className={styles.dayName}>{day.short}</span>
-                    {canEdit ? <SaveErrorField names={["active","row.active"]}><SettingCheckbox label={`${day.label}は出勤する`} checked={row.active} onChange={(checked) => updateDraft(day.weekday, { active: checked })} /></SaveErrorField> : null}
+                    {canEdit ? <SaveErrorField names={["active","row.active"]}><Toggle label={`${day.label}は出勤する`} checked={row.active} onChange={(checked) => updateDraft(day.weekday, { active: checked })} /></SaveErrorField> : null}
                     {row.active ? (
                       <>
                         <span className={styles.dayState}>出る</span>

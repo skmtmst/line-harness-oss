@@ -67,7 +67,7 @@ export interface SelectProps {
    * 渡さない箱は今までどおり。
    */
   valueAlign?: 'start'
-  /** 栞付きの絞り込みなど、既存の絵が矢印を持たない欄。開く操作と読み上げは共通。 */
+  /** 互換引数。文字のある選択欄は必ず矢印を出し、印だけの操作では出さない。 */
   showChevron?: boolean
   /** 狭い道具の段では印だけにする。値・候補・読み上げ名は保持する。 */
   iconOnly?: boolean
@@ -78,4 +78,6 @@ export interface SelectProps {
   createAction?: SelectCreateAction
   /** ★V8 の開いた中身の上の小さな見出し（label・選択肢の頭から出ないとき。dLffh の「フォルダ」）。 */
   menuHeading?: string
+  /** 列の右端の操作は、開く板も右端へそろえる。 */
+  menuAlign?: 'start' | 'end'
 }

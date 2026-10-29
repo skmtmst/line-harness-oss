@@ -264,5 +264,10 @@ export function draftKeyOf(accountId: string | null | undefined, chatId: string 
   return `${accountId ?? ''}\u001f${chatId ?? ''}`
 }
 export const CHANNELS = [{ key: 'all', label: 'すべて' }, { key: 'line', label: 'LINE' }, { key: 'email', label: 'メール' }] as const
+
+export function resolveInboxChannel(requested: string | null, emailInboxEnabled: boolean): 'all' | 'line' | 'email' {
+  if (!emailInboxEnabled) return 'line'
+  return requested === 'line' || requested === 'email' ? requested : 'all'
+}
 export const CORRECTION_TEMPLATE = '先ほどのメッセージに誤りがありました。正しくは次のとおりです。\n'
 export type PendingAttachment = PendingAttachmentView & { file: File; job: number; attachment?: ChatAttachment }

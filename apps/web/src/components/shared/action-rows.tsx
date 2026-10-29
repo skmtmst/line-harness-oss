@@ -21,7 +21,7 @@ import styles from './action-rows.module.css'
  * 動き（足す・消す・並べ替え・失敗したときの動き・中身の編集）は InlineActionList と同じ。
  */
 
-type Props = { actions: InlineAction[]; onChange: (next: InlineAction[]) => void } & ActionOptions
+type Props = { actions: InlineAction[]; onChange: (next: InlineAction[]) => void; disabled?: boolean; lockedReason?: string } & ActionOptions
 
 const cfg = (a: InlineAction) => (a.config ?? {}) as Record<string, unknown>
 
@@ -54,7 +54,7 @@ export function actionRowTitle(a: InlineAction, o: ActionOptions): string {
   }
 }
 
-export default function InlineActionRowsV8({ actions, onChange, ...options }: Props) {
+export default function InlineActionRowsV8({ actions, onChange, disabled, lockedReason, ...options }: Props) {
   const { selectedAccountId } = useAccount()
   const visibility = useFeatureVisibility(selectedAccountId)
   const choices: ActionChoice<InlineAction>[] = [
@@ -78,7 +78,7 @@ export default function InlineActionRowsV8({ actions, onChange, ...options }: Pr
   ]
   return <>
     {options.targetsError ? <Notice tone="danger" message={options.targetsError} action={options.retryTargets ? <Button onClick={options.retryTargets}>もう一度読み込む</Button> : undefined} /> : null}
-    <ActionList value={actions} onChange={onChange} choices={choices} idOf={action => action.key}
+    <ActionList value={actions} onChange={onChange} disabled={disabled} lockedReason={lockedReason} choices={choices} idOf={action => action.key}
       titleOf={action => actionRowTitle(action, options)} kindOf={action => action.actionType === 'notify_staff' ? '担当者へ知らせる' : ACTION_KINDS.find(kind => kind.type === action.actionType)?.label ?? '行うこと'} iconOf={action => action.actionType === 'notify_staff' ? Bell : ACTION_KINDS.find(kind => kind.type === action.actionType)?.icon}
       renderHint={action => { const reason = actionIncompleteReason(action.actionType, action.config); return reason ? <p className={styles.reason}>未完成 — {reason}</p> : null }}
       renderExtra={action => actionIncompleteReason(action.actionType, action.config) ? <span className={styles.incomplete}>未完成</span> : null}
