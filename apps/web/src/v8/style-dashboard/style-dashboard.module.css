@@ -19,6 +19,8 @@
 .alertActions { display: flex; gap: var(--polish-space-row); flex-wrap: nowrap; }
 
 .tabRow { padding-block-start: var(--polish-space-field); padding-inline: var(--polish-space-section); }
+/* 追加決まり1: 右の列の開閉はタブの段に入れる。右の列が畳む幅でのみ出す。 */
+.tabAsideToggle { display: none; }
 .content { padding: var(--polish-space-card) var(--polish-space-section) var(--polish-space-section); }
 
 /* 右の列のカード */
@@ -161,4 +163,5 @@
 /* 白い板が 1100 未満のときは右の列を畳む（決まり：右の欄は 1100 未満で畳む）。日付の段は折り返す。 */
 @container v8-page (max-width: 1099px) {
   .filters { flex-wrap: wrap; row-gap: var(--polish-space-row); }
+  .tabAsideToggle { display: contents; }
 }

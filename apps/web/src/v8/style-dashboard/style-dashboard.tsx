@@ -168,6 +168,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
 
   const side = (today?.side ?? []).map((card) => <SideCard key={card.id} card={card} canWrite={canWrite} onAction={(card) => (card.id === 'pay' ? openPayment() : ['care', 'waitlist', 'rebook'].includes(card.id) ? preparing.open(card.title) : router.push('/broadcasts'))}>{card.id === 'pay' && testMode ? <TestModeNote /> : null}</SideCard>)
 
+  const shownRoster = style === 'lesson' && (rosterId === undefined ? view !== 'calendar' : rosterId !== null && roster?.rowId === rosterId) ? roster : null
   let body: ReactNode
   if (!today) {
     body = failed ? <ListState kind="error" title="ダッシュボードを読み込めませんでした" onRetry={() => void reload()} /> : <ListState kind="loading" loadingShape="cards" />
@@ -186,7 +187,6 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     body = <ListState kind="empty" title={`${cfg.tabs[tab]}は今の画面で見られます`} action={<Button href={tab === 'bookings' ? cfg.links.bookings : cfg.links.people}>{`${cfg.tabs[tab]}を開く`}</Button>} />
   } else {
     const rows = today.rows.filter((r) => !search || r.name.includes(search) || (r.sub ?? '').includes(search) || (r.course ?? '').includes(search))
-    const shownRoster = style === 'lesson' && (rosterId === undefined ? view !== 'calendar' : rosterId !== null && roster?.rowId === rosterId) ? roster : null
     let main: ReactNode
     let aside: ReactNode = side.length ? side : null
     if (view === 'calendar') {
@@ -218,9 +218,20 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     if (shownRoster) aside = <LessonRoster roster={shownRoster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={openPayment} onAttend={(name) => void attend(shownRoster, name)} onAbsent={(name) => void attend(shownRoster, name, 'no_show')} onLine={() => router.push('/broadcasts')} onCancelClass={() => { if (canWrite && rosterRow?.id === shownRoster.rowId) setClassRow(rosterRow) }} />
     body = (
       <DetailColumns variant={shownRoster ? 'style-roster' : 'style-dashboard'} aside={aside} asideLabel="今日の動き" expanded={asideOpen} onExpandedChange={setAsideOpen}
-        toggleLabel={asideOpen ? '右の列を畳む' : roster ? '名簿を見る' : '新着・お支払いを見る'}>{main}</DetailColumns>
+        showToggle={false}>{main}</DetailColumns>
     )
   }
+  /* 追加決まり1: 右の列の開閉はタブの段の右端へ。タブの下に1つだけの段を作らない。 */
+  const asideLabel = asideOpen ? '右の列を畳む' : roster ? '名簿を見る' : '新着・お支払いを見る'
+  const mainAside = tab === 'main' && !!today && (shownRoster ? true : view === 'calendar'
+    ? (range === 'month' && !!today.month) || (!today.week && side.length > 0)
+    : side.length > 0)
+  const tabActions = (
+    <>
+      {viewSwitch}
+      {mainAside ? <span className={styles.tabAsideToggle}><Button size="compact" aria-expanded={asideOpen} onClick={() => setAsideOpen(!asideOpen)}>{asideLabel}</Button></span> : null}
+    </>
+  )
 
   const alert = tab !== 'analytics' ? today?.alert : null
 
@@ -242,7 +253,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         ) : null}
       </div>
       <div className={styles.tabRow}>
-        <Tabs items={tabItems} label={`${cfg.title}のタブ`} size="compact" actions={viewSwitch} />
+        <Tabs items={tabItems} label={`${cfg.title}のタブ`} size="compact" actions={tabActions} />
       </div>
       <div className={styles.content}><CalendarPeriod period={view === 'calendar' && today ? range === 'month' ? date.slice(0, 7) : today.week?.days[0]?.date ?? date : ''} scope={`${accountId}/${style}/${view}/${range}`}>{body}</CalendarPeriod></div>
       {style === 'restaurant' && store.store ? (

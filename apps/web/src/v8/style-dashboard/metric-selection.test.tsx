@@ -197,6 +197,15 @@ it('追加決まり1: 読み直すは題の右上で道具の段に1つ落ちな
   expect(within(period!.parentElement as HTMLElement).queryByRole('button', { name: '読み直す' })).toBeNull()
 })
 
+it('追加決まり1: 右の列の開閉はタブの段に入り単独の段を作らない', async () => {
+  render(<StyleDashboard style="salon" />)
+  await waitFor(() => expect(labels()).toHaveLength(4))
+  const toggle = screen.getByRole('button', { name: '新着・お支払いを見る' })
+  // タブの段の中にあり、本文の2列の下の段には無い。
+  expect(toggle.closest('nav')).not.toBeNull()
+  expect(toggle.closest('[data-detail-columns]')).toBeNull()
+})
+
 it('追加決まり1: 一覧の探す欄は左に置く（右に1つ浮かせない）', async () => {
   render(<StyleDashboard style="restaurant" />)
   const box = await screen.findByPlaceholderText('名前・タグ・メモで探す')
