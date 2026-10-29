@@ -217,7 +217,7 @@ describe('POST /webhook — friend-add ledger', () => {
 });
 
 describe('通知専用LINEの受信', () => {
-  test('通常のメッセージには管理画面への案内だけを返し、店舗向け受信箱や自動応答へ渡さない', async () => {
+  test('検証環境でも通常のメッセージには本番管理画面への案内だけを返し、店舗向け受信箱や自動応答へ渡さない', async () => {
     vi.mocked(verifySignature).mockResolvedValue(true);
     vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
       id: 'notice-account', role: 'platform_notice', channel_secret: 'notice-secret',
@@ -240,7 +240,7 @@ describe('通知専用LINEの受信', () => {
     expect(lineClientMocks.replyMessage).toHaveBeenCalledOnce();
     expect(lineClientMocks.replyMessage).toHaveBeenCalledWith('reply-notice', [{
       type: 'text',
-      text: 'こちらはmusubo契約者様向けの通知専用LINEです。\nお問い合わせはmusuboの管理画面にログインし、各店舗アカウントの「お問い合わせ」ボタンよりお送りください。\nhttps://stg-admin.musubo.jp\nこのトークに送った内容はお問い合わせとして受け付けていません。',
+      text: 'こちらはmusubo契約者様向けの通知専用LINEです。\nお問い合わせはmusuboの管理画面にログインし、各店舗アカウントの「お問い合わせ」ボタンよりお送りください。\nhttps://admin.musubo.jp\nこのトークに送った内容はお問い合わせとして受け付けていません。',
     }]);
   });
 
