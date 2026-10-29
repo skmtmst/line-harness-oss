@@ -144,12 +144,12 @@ export default function RestaurantShell({ boardId, title, description, explanati
   templateHeading?: boolean
   /** 既存の頭の内側余白。頭を持つ器の中では none を渡す。 */
   headingInset?: 'none'
-  /** 題下の共通権限帯。権限判定は呼び出し側で行う。 */
-  readOnly?: ComponentProps<typeof PageHeading>['readOnlyBand']
-  readOnlyNeed?: ComponentProps<typeof PageHeading>['readOnlyNeed']
   headSize?: 'compact'
   /** 題の下の説明の行を出さず「？」へ入れる（絵に説明の行が無い板。休業日・貸切 ）。 */
   hideSubtitle?: boolean
+  /** 題下の共通権限帯。権限判定は呼び出し側で行う。 */
+  readOnly?: ComponentProps<typeof PageHeading>['readOnlyBand']
+  readOnlyNeed?: ComponentProps<typeof PageHeading>['readOnlyNeed']
   children?: (ctx: RestaurantV8Context) => ReactNode
   /** 保存状態を持つ子が、既存PageFrameの本文と下部操作を分けて置く場合。 */
   renderPage?: (ctx: RestaurantV8Context, heading: ReactNode, notice: ReactNode) => ReactNode
