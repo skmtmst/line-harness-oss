@@ -428,3 +428,11 @@ describe('共通情報の編集：離脱の確認', () => {
     expect(routerPush).toHaveBeenCalledWith('/contents/vars')
   })
 })
+
+it('対象未指定の編集入口には一覧への道と、その場で選ぶ入口を残す',async()=>{
+ navigation.query=''
+ await mount(<EditCommonVarPage/>); await settle()
+ expect([...host.querySelectorAll('button')].some(el=>el.textContent==='編集する共通情報を選ぶ')).toBe(true)
+ expect(host.querySelector('a[href="/contents/vars"]')?.textContent).toBe('共通情報一覧へ戻る')
+ expect(api.detail).not.toHaveBeenCalled()
+})

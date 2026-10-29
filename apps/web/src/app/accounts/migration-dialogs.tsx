@@ -1,6 +1,6 @@
 'use client'
 import type { LineAccount } from '@line-crm/shared'
-import { canManageRole, isOwnerRole } from '@/lib/staff-role'
+import { isOwnerRole } from '@/lib/staff-role'
 import type { UidMigrationItem } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -73,7 +73,8 @@ export function runStatusView(run: UidMigrationDetail, unresolved: number | null
 export function MigrationItemDialog({
   detailItem,
   active,
-  me,
+  canDecide,
+  lockedReason,
   busy,
   detailError,
   onClose,
@@ -81,7 +82,8 @@ export function MigrationItemDialog({
 }: {
   detailItem: UidMigrationItem | null
   active: UidMigrationDetail | null
-  me: { id: string; role: string } | null
+  canDecide: boolean
+  lockedReason?: string
   busy: boolean
   detailError: string | null
   onClose: () => void
@@ -99,14 +101,12 @@ export function MigrationItemDialog({
         <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
           {active && !['review', 'ready', 'failed'].includes(active.status) ? (
             <span className="text-ink-faint text-xs">この移行の状態では判断を変更できません。</span>
-          ) : !canManageRole(me?.role) ? (
-            <span className="text-ink-faint text-xs">判断の保存はowner/adminが行います。</span>
           ) : (<>
             {detailItem.decision !== 'exclude' && (
-              <Button type="button" disabled={busy} onClick={() => decide(detailItem, 'exclude')}>除外する</Button>
+              <Button type="button" disabled={!canDecide || busy} lockedReason={lockedReason} onClick={() => decide(detailItem, 'exclude')}>除外する</Button>
             )}
             {detailItem.newUid && detailItem.decision !== 'link' && (
-              <Button type="button" variant="primary" disabled={busy} onClick={() => decide(detailItem, 'link')}>この組合せを承認</Button>
+              <Button type="button" variant="primary" disabled={!canDecide || busy} lockedReason={lockedReason} onClick={() => decide(detailItem, 'link')}>この組合せを承認</Button>
             )}
           </>)}
         </div>
@@ -137,6 +137,7 @@ export function ExecuteConfirmDialog({
   open,
   error,
   canRun,
+  lockedReason,
   onConfirm,
   onCancel,
 }: {
@@ -147,6 +148,7 @@ export function ExecuteConfirmDialog({
   open: boolean
   error: string | null
   canRun: boolean
+  lockedReason?: string
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -159,7 +161,9 @@ export function ExecuteConfirmDialog({
       confirmLabel="本移行を実行"
       busy={busy}
       error={error ?? undefined}
-      onConfirm={canRun ? onConfirm : undefined}
+      confirmDisabled={!canRun}
+      confirmLockedReason={lockedReason}
+      onConfirm={onConfirm}
       onCancel={onCancel}
     >
       <ul className="text-ink list-disc space-y-1 pl-5 text-sm">
@@ -168,7 +172,7 @@ export function ExecuteConfirmDialog({
         <li>実行権限：ownerのみ。テスト移行を作成した本人は実行できません。</li>
         <li>復旧：実行後、この履歴から反映済みの分だけ切り戻せます。移行後に別の変更があった行は切り戻しを止めて表示します。</li>
       </ul>
-      {me && !isOwnerRole(me.role) && <p className="text-danger mt-2 text-sm font-semibold">本移行の実行はownerの権限が必要です。</p>}
+      {me && !isOwnerRole(me.role) && !lockedReason && <p className="text-danger mt-2 text-sm font-semibold">本移行の実行はownerの権限が必要です。</p>}
       {me && isOwnerRole(me.role) && me.id === active.createdBy && <p className="text-danger mt-2 text-sm font-semibold">この移行はあなたが作成したため、別のownerが実行してください。</p>}
     </ConfirmDialog>
   )
@@ -183,6 +187,7 @@ export function RollbackConfirmDialog({
   error,
   conflicts,
   canRun,
+  lockedReason,
   onConfirm,
   onCancel,
 }: {
@@ -193,6 +198,7 @@ export function RollbackConfirmDialog({
   error: string | null
   conflicts: Array<{ itemId: string; oldUid: string; reason: string }>
   canRun: boolean
+  lockedReason?: string
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -206,7 +212,9 @@ export function RollbackConfirmDialog({
       destructive
       busy={busy}
       error={error ?? undefined}
-      onConfirm={canRun ? onConfirm : undefined}
+      confirmDisabled={!canRun}
+      confirmLockedReason={lockedReason}
+      onConfirm={onConfirm}
       onCancel={onCancel}
     >
       <ul className="text-ink list-disc space-y-1 pl-5 text-sm">
@@ -219,7 +227,7 @@ export function RollbackConfirmDialog({
           {conflicts.map((conflict) => <li key={conflict.itemId}>{conflict.oldUid}：{conflict.reason}</li>)}
         </ul>
       )}
-      {me && !isOwnerRole(me.role) && <p className="text-danger mt-2 text-sm font-semibold">切り戻しはownerの権限が必要です。</p>}
+      {me && !isOwnerRole(me.role) && !lockedReason && <p className="text-danger mt-2 text-sm font-semibold">切り戻しはownerの権限が必要です。</p>}
     </ConfirmDialog>
   )
 }

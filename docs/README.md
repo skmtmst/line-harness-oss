@@ -461,10 +461,13 @@
 
 - [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
 - [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
+- [共通UIの状態表示・操作の修正](release-log/unreleased/1952-kenta-muse-ui-state.md)
+- [招待・ログインユーザー・予約枠の表示修正](release-log/unreleased/1952-kenta-muse-auth.md)
 - [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/1948-kenta-train-1029f.md)
 - [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
 - [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
 - [お知らせの帯と次の段の間隔そろえ](release-log/unreleased/1950-kenta-muse-fqa-space.md)
+- [社内メモの窓の破棄確認の取り除き](release-log/unreleased/1952-kenta-muse-ui-state-memo.md)
 - [在庫の保存帯と本文の重なり修正](release-log/unreleased/1950-kenta-swbm-b19.md)
 - [新規店舗の専用機能を非表示](release-log/unreleased/1925-masato-new-store-specialized-hidden.md)
 - [一斉配信・シナリオ一覧の自動点検の更新](release-log/unreleased/1930-kenta-muse-broadcast-scenario-reds.md)
@@ -956,3 +959,6 @@
 - [問い合わせのタブ・カルーセルの絵・更新履歴の検索](release-log/unreleased/1951-kenta-swb-x10-x14-x18.md)
 - [アカウント選択と読み込み失敗時の案内](release-log/unreleased/1951-kenta-train-1029h.md)
 - [Googleビジネスの権限表示](release-log/unreleased/0000-kenta-swb-google-permission.md) — 閲覧のみの案内と変更操作の反映履歴。
+- [ECのホームの確認項目](release-log/unreleased/1952-kenta-ec-dashboard.md) — 反映履歴、確認 2026-10-30
+- [共通の型と認証画面の帯の間隔](release-log/unreleased/1952-kenta-muse-fqa-space.md)
+- [UID移行の権限と操作の表示](release-log/unreleased/1952-kenta-uid-permissions.md)

@@ -466,6 +466,8 @@ it('通知の段は初回だけ取得し、段を移ってブラウザで戻っ�
     window.history.replaceState(null, '', '?id=webinar-1&pane=notifications')
     window.dispatchEvent(new Event('popstate'))
   })
+  const leave = await screen.findByRole('dialog', { name: '保存していない変更があります' })
+  await act(async () => { within(leave).getByRole('button', { name: '編集を続ける' }).click() })
   expect(notificationReads).toBe(1)
   const returned = screen.getByRole('switch', { name: '申込のお礼', exact: true }) as HTMLInputElement
   expect(returned).toBe(toggle)

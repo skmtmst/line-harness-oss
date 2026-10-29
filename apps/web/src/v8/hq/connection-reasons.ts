@@ -74,11 +74,11 @@ export function connectionReasons(account: AccountWithStats): ConnectionReason[]
   return reasons
 }
 
-/** カードの1行。理由が複数なら「ほか N 件」を足す。 */
+/** カードの1行。理由が複数なら、残りも接続の確認事項だと伝える。 */
 export function connectionReasonLine(account: AccountWithStats): { text: string; title: string } {
   const reasons = connectionReasons(account)
   if (reasons.length === 0) return { text: FALLBACK_REASON, title: FALLBACK_REASON }
-  const more = reasons.length > 1 ? `（ほか ${reasons.length - 1} 件）` : ''
+  const more = reasons.length > 1 ? `（ほかに接続の確認事項が${reasons.length - 1}件）` : ''
   return { text: `${reasons[0].short}${more}`, title: reasons.map((reason) => reason.detail).join('\n') }
 }
 

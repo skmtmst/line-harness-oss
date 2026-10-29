@@ -316,19 +316,19 @@ describe('UID移行の本実行（FRIEND-33）', () => {
     expect(net.calls.some((call) => call.path.endsWith('/execute'))).toBe(false)
   })
 
-  it('作成者本人には確定ボタンを出さず理由を示す', async () => {
+  it('作成者本人の入口は状態理由でdisabledとなり、確認も書込も始めない', async () => {
     net.me = { id: 'owner-1', role: 'owner' }
     await render()
     await flush()
-    fireEvent.click(buttonByText('本移行を実行'))
+    const entry = buttonByText('本移行を実行')
+    expect(entry.disabled).toBe(true)
+    expect(entry.hasAttribute('data-permission-locked')).toBe(false)
+    expect(document.body.textContent).toContain('別のownerが実行してください')
+    fireEvent.click(entry)
     await flush()
-    const dialog = openDialog()
-    expect(dialog.textContent).toContain('別のownerが実行してください')
-    const confirms = Array.from(dialog.querySelectorAll('button')).filter((button) => button.textContent?.trim() === '本移行を実行')
-    expect(confirms).toHaveLength(0)
+    expect(document.body.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
     expect(net.calls.some((call) => call.path.endsWith('/execute'))).toBe(false)
-  })
-})
+  })})
 
 describe('UID移行の切り戻し（FRIEND-36/15）', () => {
   it('完了履歴は「実データはまだ変更していません」と言わず切り戻しへ進める', async () => {
@@ -582,7 +582,7 @@ describe('R398 一部反映の500で「未変更」と残さない', () => {
 })
 
 describe('UID移行の閲覧のみ', () => {
-  it('一括確認を開いた後に本人確認が失効したら確定窓を閉じる', async () => {
+  it('一括確認を開いた後に本人確認が失効しても内容を残し、普通disabledで確定0', async () => {
     await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
     await flush()
     fireEvent.click(buttonByText('要確認をまとめて「結び付ける」'))
@@ -590,10 +590,14 @@ describe('UID移行の閲覧のみ', () => {
     expect(buttonByText('結び付ける', openDialog())).toBeTruthy()
     await act(async () => { window.dispatchEvent(new Event(SESSION_LOST_EVENT)) })
     await flush()
-    await waitFor(() => expect(document.body.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull())
+    const confirm = buttonByText('結び付ける', openDialog())
+    expect(confirm.disabled).toBe(true)
+    expect(confirm.hasAttribute('data-permission-locked')).toBe(false)
+    fireEvent.click(confirm)
+    await flush()
     expect(writes()).toHaveLength(0)
   })
-  it.each(['legacy', 'v8'])('確認窓を開いた後に本人確認が失効したら承認と除外を隠し、内容は残す: %s', async entry => {
+  it.each(['legacy', 'v8'])('確認窓の本人確認が失効しても内容と操作を残し、普通disabledで保存0: %s', async entry => {
     await act(async () => { root.render(entry === 'v8' ? <UidMigrationV8 initialRunId="run-1" /> : <AccountMigration />) })
     await flush()
     fireEvent.click(entry === 'v8' ? buttonContaining('UOLD-1') : buttonByText('開く'))
@@ -603,22 +607,33 @@ describe('UID移行の閲覧のみ', () => {
     await flush()
     const dialog = openDialog()
     expect(dialog.textContent).toContain('UOLD-1')
-    const labels = [...dialog.querySelectorAll('button')].map(button => button.textContent?.trim())
-    expect(labels).not.toContain('この組合せを承認')
-    expect(labels).not.toContain('除外する')
+    for (const label of ['この組合せを承認', '除外する']) {
+      const action = buttonByText(label, dialog)
+      expect(action.disabled).toBe(true)
+      expect(action.hasAttribute('data-permission-locked')).toBe(false)
+      fireEvent.click(action)
+    }
+    await flush()
     expect(writes()).toHaveLength(0)
   })
   it.each([
     { id: 'owner-2', role: 'owner', readOnly: true },
     { id: 'owner-2', role: 'owner', roleBundle: 'view_only' },
-  ])('履歴は読めるが登録・判断・本移行・切り戻しを出さない: %j', async identity => {
+  ])('履歴は読めて変更の入口は灰色で残り、書き込まない: %j', async identity => {
     net.me = identity
     await act(async () => { root.render(<UidMigrationV8 initialRunId="run-1" />) })
     await flush()
     expect(host.querySelector('[aria-labelledby="uid-history"]')).toBeTruthy()
     expect(host.textContent).toContain('閲覧のみで見ています')
-    const labels = [...host.querySelectorAll('button')].map(button => button.textContent?.trim())
-    for (const label of ['テスト移行を実行', '新しい移行を作る', '本移行へ進む', '切り戻す']) expect(labels).not.toContain(label)
+    for (const label of ['新しい移行を作る', '本移行へ進む', '要確認をまとめて「結び付ける」']) {
+      const action = buttonByText(label)
+      expect(action.disabled).toBe(false)
+      expect(action.getAttribute('aria-disabled')).toBe('true')
+      expect(action.hasAttribute('data-permission-locked')).toBe(true)
+      fireEvent.click(action)
+    }
+    expect(buttonByText('表示中をCSVで書き出す').disabled).toBe(false)
+    await flush()
     expect(net.calls.filter(call => call.method !== 'GET')).toHaveLength(0)
   })
 })
