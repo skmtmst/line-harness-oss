@@ -55,6 +55,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { formatNumber } from '@/lib/format'
 import { PostImageCrop, type CropSource, type CropTarget } from './post-image-crop'
+import { PostMediaPickerDialog } from './post-media-picker-dialog'
 
 /*
  * ★V8 Googleビジネス 投稿（一覧 ・投稿を作る ）と公開前の確認。
@@ -386,7 +387,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   const [loading, setLoading] = useState(Boolean(postId))
   const [loadError, setLoadError] = useState('')
   const [editable, setEditable] = useState(true)
-  const [picker, setPicker] = useState<{ target: CropTarget | null; items: MediaItem[]; loading: boolean; error: string }>({ target: null, items: [], loading: false, error: '' })
+  const [picker, setPicker] = useState<CropTarget | null>(null)
   const [crop, setCrop] = useState<{ target: CropTarget; source: CropSource; preserveOriginal: boolean } | null>(null)
   const [cropSources, setCropSources] = useState<Partial<Record<CropTarget, CropSource>>>({})
   const [busy, setBusy] = useState<'save' | 'confirm' | null>(null)
@@ -438,16 +439,11 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   const dirty = JSON.stringify(form) !== JSON.stringify(initial)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: busy !== null })
 
-  const openPicker = async (target: CropTarget) => {
-    setPicker({ target, items: [], loading: true, error: '' })
-    try {
-      const response = await api.media.list(accountId, { kind: 'image', limit: 60, sort: 'newest' })
-      if (!response.success) throw new ApiError(500, response.error)
-      setPicker({ target, items: response.data.items, loading: false, error: '' })
-    } catch (err) {
-      saveErrors.capture(err)
-      setPicker({ target, items: [], loading: false, error: errorMessage(err, '登録メディアを読み込めませんでした。') })
-    }
+  const selectRegisteredMedia = async (item: MediaItem) => {
+    if (!picker) return
+    const blob = await api.media.download(item.id, accountId)
+    setCrop({ target: picker, source: { file: new File([blob], item.filename, { type: blob.type || item.mimeType || 'image/jpeg' }), name: item.filename, mediaId: item.id }, preserveOriginal: false })
+    setPicker(null)
   }
 
   const uploadMedia = async (file: File): Promise<MediaItem> => {
@@ -526,7 +522,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
       set(patch)
       setCropSources((current) => ({ ...current, [crop.target]: { ...crop.source, mediaId: originalMediaId ?? undefined } }))
       setCrop(null)
-      setPicker({ target: null, items: [], loading: false, error: '' })
+      setPicker(null)
       setUpload({ busy: false, progress: 100, error: '' })
     } catch (err) {
       saveErrors.capture(err)
@@ -644,7 +640,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
           <SaveErrorField names={["summary","form.summary"]}><TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" /></SaveErrorField>
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>
-        <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><PostImagePanel target="google" filename={form.mediaFilename} url={form.mediaSourceUrl} editable={editable} busy={busy !== null || upload.busy} onFile={(file) => chooseFile('google', file)} onMediaPick={() => void openPicker('google')} onAdjust={() => adjustCrop('google')} /></SaveErrorField>
+        <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><PostImagePanel target="google" filename={form.mediaFilename} url={form.mediaSourceUrl} editable={editable} busy={busy !== null || upload.busy} onFile={(file) => chooseFile('google', file)} onMediaPick={() => setPicker('google')} onAdjust={() => adjustCrop('google')} /></SaveErrorField>
         <div className={styles.postDetails} data-post-details>
           <SectionHeader size="small" title="投稿の詳細" />
           <div className={styles.fieldPair}>
@@ -673,25 +669,6 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
             />
           </Field>
         </div>
-        {picker.target === 'google' ? (
-          <div className={styles.picker} role="group" aria-label="Google 用の登録画像を選ぶ">
-            <div className={styles.pickerHead}>
-              <SectionHeader size="small" title="登録メディアの画像" />
-              <span className={styles.spacer} aria-hidden="true" />
-              <Button onClick={() => setPicker({ ...picker, target: null })}>閉じる</Button>
-            </div>
-            {picker.loading ? <ListState kind="loading" title="登録メディアを読み込んでいます" /> : null}
-            {picker.error ? <Notice tone="danger">{picker.error}</Notice> : null}
-            {!picker.loading && !picker.error && picker.items.length === 0 ? <p className={styles.muted}>このLINEアカウントの登録メディアに画像がありません。先に「登録メディア」で画像を追加してください。</p> : null}
-            <div className={styles.pickerGrid}>
-              {picker.items.map((m) => (
-                <Button key={m.id} variant="text" size="thumbnail" title={m.filename} aria-label={`${m.filename} を選ぶ`} onClick={() => { void openCropFromMedia('google', m.id, m.filename); setPicker({ ...picker, target: null }) }}>
-                  <img width={120} height={120} src={m.url} alt="" />
-                </Button>
-              ))}
-            </div>
-          </div>
-        ) : null}
         {form.kind === 'offer' ? (
           <div className={styles.fieldGroup}>
             <div className={styles.fieldPair}>
@@ -730,8 +707,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
           </div>
         ) : null}
         {igAvailable && form.igEnabled ? <>
-          <PostImagePanel target="instagram" filename={form.igMediaFilename} url={form.igMediaSourceUrl} editable={editable} busy={busy !== null || upload.busy} onFile={(file) => chooseFile('instagram', file)} onMediaPick={() => void openPicker('instagram')} onAdjust={() => adjustCrop('instagram')} onUseGoogle={form.mediaId ? useGoogleImage : undefined} />
-          {picker.target === 'instagram' ? <div className={styles.picker} role="group" aria-label="Instagram 用の登録画像を選ぶ"><div className={styles.pickerHead}><SectionHeader size="small" title="登録メディアの画像" /><span className={styles.spacer} aria-hidden="true" /><Button onClick={() => setPicker({ ...picker, target: null })}>閉じる</Button></div>{picker.loading ? <ListState kind="loading" title="登録メディアを読み込んでいます" /> : null}{picker.error ? <Notice tone="danger">{picker.error}</Notice> : null}<div className={styles.pickerGrid}>{picker.items.map((m) => <Button key={m.id} variant="text" size="thumbnail" title={m.filename} aria-label={`${m.filename} を選ぶ`} onClick={() => { void openCropFromMedia('instagram', m.id, m.filename); setPicker({ ...picker, target: null }) }}><img width={120} height={120} src={m.url} alt="" /></Button>)}</div></div> : null}
+          <PostImagePanel target="instagram" filename={form.igMediaFilename} url={form.igMediaSourceUrl} editable={editable} busy={busy !== null || upload.busy} onFile={(file) => chooseFile('instagram', file)} onMediaPick={() => setPicker('instagram')} onAdjust={() => adjustCrop('instagram')} onUseGoogle={form.mediaId ? useGoogleImage : undefined} />
         </> : null}
         {upload.error ? <Notice tone="danger">{upload.error}</Notice> : null}
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
@@ -750,6 +726,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
         )}
       </Card>
       <UnsavedLeaveDialog open={leaveTarget !== null} onConfirm={confirmLeave} onCancel={cancelLeave} />
+      {picker ? <PostMediaPickerDialog target={picker} accountId={accountId} onClose={() => setPicker(null)} onSelect={selectRegisteredMedia} /> : null}
       {crop ? <PostImageCrop target={crop.target} source={crop.source} onClose={() => setCrop(null)} onConfirm={confirmCrop} /> : null}
     </></SaveErrorScope>
   )

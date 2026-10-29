@@ -24,6 +24,8 @@ const fixture = vi.hoisted(() => ({
   savePost: vi.fn(),
   publishPost: vi.fn(),
   igConnection: vi.fn(),
+  mediaList: vi.fn(),
+  mediaDownload: vi.fn(),
 }))
 
 vi.mock('@/lib/restaurant-google-api', () => ({
@@ -41,7 +43,10 @@ vi.mock('@/lib/restaurant-google-api', () => ({
 }))
 
 vi.mock('@/lib/api', () => ({
-  api: { instagram: { connection: fixture.igConnection } },
+  api: {
+    instagram: { connection: fixture.igConnection },
+    media: { list: fixture.mediaList, download: fixture.mediaDownload, contentUrl: (id: string) => `https://example.test/media/${id}` },
+  },
   ApiError: class ApiError extends Error {},
 }))
 
@@ -103,7 +108,15 @@ function connection(state: InstagramConnectionStatus['state']) {
 afterEach(() => {
   cleanup()
   vi.resetAllMocks()
+  vi.unstubAllGlobals()
 })
+
+const registeredImage = {
+  id: 'media-1', lineAccountId: 'acc-1', folderId: null, kind: 'image',
+  filename: '料理写真.jpg', mimeType: 'image/jpeg', sizeBytes: 12,
+  width: 1200, height: 900, durationMs: null, url: '', uploadedBy: null,
+  createdAt: '2026-10-29T00:00:00Z',
+}
 
 describe('投稿一覧の Instagram の札（★V8-B `HEEN9`）', () => {
   it('絵のことば3つだけを出し、送る前と未対応の投稿には札を出さない', async () => {
@@ -143,6 +156,28 @@ describe('投稿一覧の Instagram の札（★V8-B `HEEN9`）', () => {
 })
 
 describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', () => {
+  it('登録メディアをポップアップで選ぶと切り取り確認へ進む', async () => {
+    fixture.igConnection.mockReturnValue(connection('connected'))
+    fixture.mediaList.mockResolvedValue({ success: true, data: { items: [registeredImage], total: 1, limit: 20, offset: 0 } })
+    fixture.mediaDownload.mockResolvedValue(new Blob(['image'], { type: 'image/jpeg' }))
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+    const NativeURL = URL
+    vi.stubGlobal('URL', class extends NativeURL {
+      static createObjectURL() { return 'blob:test-image' }
+      static revokeObjectURL() {}
+    })
+
+    render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
+    await screen.findByRole('checkbox', { name: 'Instagram にも投稿する' })
+    const picks = screen.getAllByRole('button', { name: '登録メディアから選ぶ' })
+    fireEvent.click(picks[1])
+    await screen.findByRole('dialog', { name: 'Instagram用画像を登録メディアから選ぶ' })
+    fireEvent.click(await screen.findByRole('radio', { name: /料理写真.jpg/ }))
+    fireEvent.click(screen.getByRole('button', { name: '切り取り位置を確認' }))
+    await waitFor(() => expect(fixture.mediaDownload).toHaveBeenCalledWith('media-1', 'acc-1'))
+    expect(await screen.findByRole('dialog', { name: 'Instagram用画像の切り取り位置を確認' })).toBeTruthy()
+  })
+
   it('Google画像は投稿の詳細より前、Instagram画像はInstagram本文より後に置く', async () => {
     fixture.igConnection.mockReturnValue(connection('connected'))
     render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
