@@ -859,3 +859,4 @@
 - [カルーセルのボタン削除](release-log/unreleased/1879-kenta-carousel-delete.md) — カルーセル内の操作に関する反映履歴。
 - [配達連携の解除ボタン](release-log/unreleased/1880-kenta-delivery-disconnect.md) — 配達連携の画面に関する反映履歴。
 - [SNS連携の操作と案内](release-log/unreleased/1881-kenta-sns-actions.md) — SNS連携の画面に関する反映履歴。
+- [自動処理のシナリオ・共通アクション未選択表示](release-log/unreleased/0000-kenta-muse-automation-unselected.md) — 未選択と設定済みの区別の反映履歴。
