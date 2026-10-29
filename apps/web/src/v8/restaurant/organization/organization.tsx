@@ -151,7 +151,8 @@ function OrganizationBoard({ ctx }: { ctx: RestaurantContext }) {
             aside={readOnly ? null : <Button onClick={() => { setShowStoreForm(true); setEditingStoreId('') }}><Plus aria-hidden className={styles.buttonIcon} />店舗を作る</Button>}
             flush
           >
-            <GridTable label="店舗管理" framed={false} design={{ ...tableDesign, columns: 'minmax(0, 1fr) max-content max-content' }}>
+            {/* CX22：3行の中身に合わせて伸びる行にし（区切り線は同じ1px）、次の店に重ねない。 */}
+            <GridTable label="店舗管理" framed={false} presentation="dashboard" design={{ ...tableDesign, columns: 'minmax(0, 1fr) max-content max-content' }}>
               {data.stores.map((s) => (
                 <GridRow key={s.id}>
                   <GridCell className={styles.storeText}>
