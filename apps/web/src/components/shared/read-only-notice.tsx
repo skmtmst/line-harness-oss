@@ -4,7 +4,7 @@ import { useSyncExternalStore, type HTMLAttributes, type ReactNode } from 'react
 import Notice from './notice'
 import { PERMISSION_LOCK_SUMMARY, type PermissionLockKind } from './permission-lock'
 import { effectiveStaffRole, readStaffIdentity, subscribeStaffIdentity } from '@/lib/staff-identity-state'
-import { readSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
+import { readPermissionSessionSnapshot as readSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
 
 const subscribeSession = (listener: () => void) => {
   window.addEventListener(SESSION_SNAPSHOT_CHANGED, listener)

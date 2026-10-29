@@ -6,7 +6,7 @@ import { HQ_MENU_SECTIONS, MENU_SECTIONS, isHqShellPath, menuOwnerForScreen, typ
 import { canManageRole, loadStaffIdentity, useStaffRole } from '@/lib/staff-role'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
 import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
-import { readSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
+import { readPermissionSessionSnapshot as readSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
 import { LockedCreatePage } from '@/components/templates'
