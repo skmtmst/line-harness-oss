@@ -6,6 +6,7 @@
  * 名前の下に担当スタッフの役割を出す。
  */
 import React from 'react'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import type { BookingConflict, BookingConflictReservation } from '@line-crm/shared'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -38,17 +39,19 @@ const channelsData = {
 const staff = [{ id: 's1', name: '高田誠', display_name: '高田', role: 'トリマー', profile_image_url: null, bio: null, sort_order: 1, is_designation_optional: 0, is_active: 1 }]
 
 beforeEach(() => {
+  verifiedStaffRole('owner')
   for (const fn of Object.values(api)) fn.mockReset()
   api.channels.mockResolvedValue({ success: true, data: channelsData })
   api.conflicts.mockResolvedValue({ success: true, data: { conflicts: [] } })
   api.calendarDetail.mockResolvedValue({ connection: { calendar_id: 'takada@example.com' }, service_account: { configured: true, email: null } })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); verifiedStaffRole(null) })
 
 describe('予約経路の連携（ZyDd6）', () => {
   it('状態ごとの操作と名前の下の役割を出し、予定を見るの窓からつなぎ直せる', async () => {
     render(<ChannelsTabV8 accountId="account-a" canEdit staff={staff} />)
     expect(await screen.findByText('高田誠')).toBeTruthy()
+    expect(screen.queryByText(/いちばん確かなのは/)).toBeNull()
     expect(screen.getByText('トリマー')).toBeTruthy()
     expect(screen.getByRole('button', { name: '予定を見る' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'つなぐ' })).toBeTruthy()
@@ -61,14 +64,20 @@ describe('予約経路の連携（ZyDd6）', () => {
     expect(screen.getByText('高田誠の Google カレンダーをつなぐ')).toBeTruthy()
   })
 
-  it('閲覧のみはつなぐ・つなぎ直すを置かず、予定を見るの窓にもつなぎ直すを置かない', async () => {
+  it('閲覧のみは行の連携操作を理由付きで残して拒み、予定を見る窓は読める', async () => {
+    verifiedStaffRole('viewer')
     render(<ChannelsTabV8 accountId="account-a" canEdit={false} staff={staff} />)
     expect(await screen.findByText('高田誠')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'つなぐ' })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'つなぎ直す' })).toBeNull()
+    for (const name of ['つなぐ', 'つなぎ直す']) {
+      const action = screen.getByRole('button', { name })
+      expect(action.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.click(action)
+    }
+    expect(api.connectCalendar).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '予定を見る' }))
     expect(screen.getByText('高田誠の Google カレンダー')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'つなぎ直す' })).toBeNull()
+    expect(screen.getAllByRole('button', { name: 'つなぎ直す' })).toHaveLength(1)
+    expect(api.connectCalendar).not.toHaveBeenCalled()
   })
 })
 
@@ -143,4 +152,16 @@ it('非表示のGoogle予約を経路数と今日の件数に含めない', () =
   expect(screen.queryByText('114')).toBeNull()
   expect(screen.getAllByText('1')).toHaveLength(2)
   expect(screen.queryByText('2')).toBeNull()
+})
+
+it('外から予約が入ったときも共通カードの余白と題で表示する', async () => {
+  const view = render(<ChannelsTabV8 accountId="account-a" canEdit staff={staff} />)
+  await screen.findByText('高田誠')
+  const heading = screen.getByRole('heading', { name: '外から予約が入ったとき' })
+  const card = heading.closest('[data-design-part="card"]')
+  expect(card?.getAttribute('data-card-padding')).toBe('roomy')
+  expect(heading.className).toBe(screen.getByRole('heading', { name: 'スタッフの Google カレンダー' }).className)
+  expect(view.container.querySelector('#channels-assign-heading')).toBe(heading)
+  expect(card?.querySelector('fieldset')?.disabled).toBe(false)
+  expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true')
 })

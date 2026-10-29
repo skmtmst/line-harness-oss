@@ -1,5 +1,6 @@
 'use client'
 
+import { lineAccountConnectionState } from '@/lib/line-account-state'
 import { useMemo } from 'react'
 import type { Folder, LineAccount } from '@line-crm/shared'
 import { PICKER_ALL, PICKER_UNFILED } from '@/components/shared/entity-picker'
@@ -11,11 +12,12 @@ export type BroadcastAccount = LineAccount & { friendCount: number | null }
 
 /** 行の2段目の状態（絵 ：「1,284 人・つながっています」）。送れない・要確認は色で分ける。 */
 function AccountConnection({ account }: { account: BroadcastAccount }) {
-  const text = account.isActive === false ? '今は送れません（アカウントを停止中）'
+  const state = lineAccountConnectionState(account)
+  const text = state.label === 'アーカイブ' ? '今は送れません（アーカイブ）' : account.isActive === false ? '今は送れません（アカウントを停止中）'
     : account.channelAccessTokenConfigured === false ? '今は送れません（LINE のトークンが未設定）'
-    : account.connection?.status === 'ok' ? 'つながっています'
-    : account.connection?.status === 'warn' ? '接続を確かめてください' : '接続は未確認'
-  const tone = account.isActive === false || account.channelAccessTokenConfigured === false ? 'danger' : account.connection?.status === 'warn' ? 'warning' : undefined
+    : state.tone === 'ok' ? 'つながっています'
+    : state.tone === 'warn' ? '接続を確かめてください' : '接続は未確認'
+  const tone = account.isActive === false || account.channelAccessTokenConfigured === false ? 'danger' : state.tone === 'warn' ? 'warning' : undefined
   return <span className={styles.connection} data-connection-tone={tone} title={tone === 'warning' ? '送れるかは最終確認で確かめます。' : undefined}>{`・${text}`}</span>
 }
 

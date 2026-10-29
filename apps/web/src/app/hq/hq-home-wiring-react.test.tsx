@@ -305,3 +305,158 @@ describe('統括のアカウント：入る', () => {
     expect(mocks.select).not.toHaveBeenCalled()
   })
 })
+
+
+describe('統括のアカウント：未知の件数と本当の0件を分ける', () => {
+  const kpis = () => [...document.querySelectorAll('[data-kpi-presentation]:not([data-kpi-strip])')]
+  const values = () => kpis().map(card => card.querySelector('[data-kpi-number]')?.textContent)
+  const folderCounts = (name: string) => [...document.querySelectorAll('[data-folder-select]')]
+    .filter(row => row.getAttribute('title') === name).map(row => row.textContent)
+
+  it('最初の読込と失敗で0件を作らず、再取得で既知の件数へ戻す', async () => {
+    let fail: (reason: unknown) => void = () => {}
+    mocks.list.mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject }))
+    mocks.folders.mockResolvedValue({ success: true, data: { folders: [
+      { id: 'known', name: '既知の分類', displayOrder: 0, itemCount: 0 },
+      { id: 'pending', name: '未取得の分類', displayOrder: 1 },
+    ] } })
+    render(<HqHomeV8 />)
+    await waitFor(() => expect(folderCounts('既知の分類').length).toBeGreaterThan(0))
+    expect(kpis()).toHaveLength(4)
+    expect(document.querySelectorAll('[data-kpi-skeleton]')).toHaveLength(4)
+    expect(folderCounts('すべて')).toEqual(expect.arrayContaining(['すべて']))
+    expect(folderCounts('未分類').every(text => text === '未分類')).toBe(true)
+    expect(folderCounts('未取得の分類').every(text => text === '未取得の分類')).toBe(true)
+    expect(folderCounts('既知の分類').every(text => text === '既知の分類')).toBe(true)
+    await act(async () => { fail(new ApiError(503, 'account failed')) })
+    const retry = await screen.findByRole('button', { name: 'もう一度読み込む' })
+    expect(kpis()).toHaveLength(4)
+    expect(values()).toEqual(['—', '—', '—', '—'])
+    expect(document.querySelectorAll('[data-kpi-zero]')).toHaveLength(0)
+    expect(folderCounts('すべて').every(text => text === 'すべて')).toBe(true)
+    expect(folderCounts('未分類').every(text => text === '未分類')).toBe(true)
+    mocks.list.mockResolvedValue({ success: true, data: [
+      { ...account('a1', '銀座店'), folderId: 'pending' }, account('a2', '二号店'),
+    ] })
+    await act(async () => { fireEvent.click(retry) })
+    await screen.findAllByText('銀座店')
+    expect(values()).toEqual(['2', '2', '0', '2'])
+    expect(folderCounts('すべて').every(text => text === 'すべて2')).toBe(true)
+    expect(folderCounts('未分類').every(text => text === '未分類1')).toBe(true)
+    expect(folderCounts('未取得の分類').every(text => text === '未取得の分類1')).toBe(true)
+    expect(folderCounts('既知の分類').every(text => text === '既知の分類0')).toBe(true)
+  })
+
+  it('一覧の失敗では分類の件数も未知にし、再取得後は同じ一覧から数える', async () => {
+    mocks.list.mockRejectedValue(new ApiError(503, 'account failed'))
+    mocks.folders.mockResolvedValue({ success: true, data: { folders: [
+      { id: 'known', name: '既知の分類', displayOrder: 0, itemCount: 2 },
+    ], unclassifiedCount: 3 } })
+    render(<HqHomeV8 />)
+    const retry = await screen.findByRole('button', { name: 'もう一度読み込む' })
+    await waitFor(() => expect(folderCounts('既知の分類').length).toBeGreaterThan(0))
+    expect(folderCounts('未分類').every(text => text === '未分類')).toBe(true)
+    expect(folderCounts('未分類').length).toBeGreaterThan(0)
+    expect(folderCounts('既知の分類').every(text => text === '既知の分類')).toBe(true)
+    expect(folderCounts('すべて').every(text => text === 'すべて')).toBe(true)
+    expect(values()).toEqual(['—', '—', '—', '—'])
+    mocks.list.mockResolvedValue({ success: true, data: [
+      { ...account('a1', '銀座店'), folderId: 'known' }, account('a2', '二号店'),
+    ] })
+    await act(async () => { fireEvent.click(retry) })
+    await screen.findAllByText('銀座店')
+    expect(folderCounts('すべて').every(text => text === 'すべて2')).toBe(true)
+    expect(folderCounts('未分類').every(text => text === '未分類1')).toBe(true)
+    expect(folderCounts('既知の分類').every(text => text === '既知の分類1')).toBe(true)
+  })
+
+  it('成功した空の一覧は、本当の0件としてカードとフォルダに残す', async () => {
+    mocks.list.mockResolvedValue({ success: true, data: [] })
+    mocks.folders.mockRejectedValue(new Error('folders unavailable'))
+    render(<HqHomeV8 />)
+    await screen.findByText('まだ LINE 公式アカウントがありません')
+    expect(values()).toEqual(['0', '0', '0', '0'])
+    expect(document.querySelectorAll('[data-kpi-zero]')).toHaveLength(4)
+    expect(folderCounts('すべて').every(text => text === 'すべて0')).toBe(true)
+    expect(folderCounts('未分類').every(text => text === '未分類0')).toBe(true)
+  })
+
+  it('未知の集計は0にせず、既知の接続問題は未確認と分けて残す', async () => {
+    mocks.list.mockResolvedValue({ success: true, data: [account('a1', '銀座店'), {
+      ...account('a2', '二号店'), stats: { messagesThisMonth: 0 }, connection: { status: 'unknown' },
+    }] })
+    render(<HqHomeV8 />)
+    await screen.findAllByText('銀座店')
+    expect(kpis()).toHaveLength(4)
+    expect(values()).toEqual(['2', '—', '0', '1'])
+    expect(kpis()[3].textContent).toContain('ほかに未確認 1 件')
+    expect(document.querySelectorAll('[data-kpi-zero]')).toHaveLength(1)
+    expect(document.querySelectorAll('[data-kpi-detail] [role="note"]')).toHaveLength(4)
+    const card = [...document.querySelectorAll('article')].find(node => node.textContent?.includes('二号店'))!
+    expect([...card.querySelectorAll('dd')].map(node => node.textContent)).toEqual(['—', '0 通'])
+    fireEvent.click(screen.getByRole('button', { name: '表' }))
+    const row = await screen.findByRole('row', { name: /二号店/ })
+    expect([...row.querySelectorAll('td')].slice(-3, -1).map(node => node.textContent)).toEqual(['—', '0'])
+  })
+})
+
+
+describe('統括の接続問題：分かっている数と未確認を分ける', () => {
+  it.each([
+    { statuses: ['warn', 'unknown'], value: '1', detail: 'ほかに未確認 1 件', tab: 2, warning: true },
+    { statuses: ['ok', 'unknown'], value: '—', detail: '未確認 1 件', tab: 1, warning: false },
+    { statuses: ['warn', 'ok'], value: '1', detail: '', tab: 1, warning: true },
+    { statuses: ['ok', 'ok'], value: '0', detail: '', tab: 0, warning: false },
+  ])('$statuses の既知数は $value、要確認は $tab', async ({ statuses, value, detail, tab, warning }) => {
+    mocks.list.mockResolvedValue({ success: true, data: statuses.map((status, index) => ({
+      ...account(`a${index}`, `確認対象${index}`), connection: { status, issues: [] },
+    })) })
+    render(<HqHomeV8 />)
+    await screen.findAllByText('確認対象0')
+    const card = [...document.querySelectorAll('[data-kpi-presentation]:not([data-kpi-strip])')][3]
+    expect(card.querySelector('[data-kpi-number]')?.textContent).toBe(value)
+    if (detail) expect(card.textContent).toContain(detail)
+    else expect(card.textContent).not.toContain('未確認')
+    expect(card.querySelector('[data-kpi-badge="warning"]') !== null).toBe(warning)
+    expect(screen.getByRole('button', { name: new RegExp(`要確認.*${tab}`) })).toBeTruthy()
+  })
+
+  it('停止とアーカイブを要確認の対象へ加えず、未取得の接続は未確認へ数える', async () => {
+    mocks.list.mockResolvedValue({ success: true, data: [
+      { ...account('a1', '確認対象'), connection: undefined },
+      { ...account('a2', '停止'), isActive: false },
+      { ...account('a3', '保管'), archivedAt: '2026-10-01T00:00:00Z' },
+    ] })
+    render(<HqHomeV8 />)
+    await screen.findAllByText('確認対象')
+    const card = [...document.querySelectorAll('[data-kpi-presentation]:not([data-kpi-strip])')][3]
+    expect(card.querySelector('[data-kpi-number]')?.textContent).toBe('—')
+    expect(card.textContent).toContain('未確認 1 件')
+    expect(screen.getByRole('button', { name: /要確認.*1/ })).toBeTruthy()
+  })
+})
+
+describe('フォルダ削除確認：サーバーの既知件数だけを使う', () => {
+  it.each([
+    { itemCount: undefined, failed: true, phrase: '中のアカウントは' },
+    { itemCount: undefined, failed: false, phrase: '中のアカウントは' },
+    { itemCount: 0, failed: true, phrase: '中のアカウント 0 件は' },
+    { itemCount: 7, failed: false, phrase: '中のアカウント 7 件は' },
+  ])('server=$itemCount、一覧失敗=$failed', async ({ itemCount, failed, phrase }) => {
+    mocks.folders.mockResolvedValue({ success: true, data: { folders: [
+      { id: 'target', name: '対象の分類', displayOrder: 0, itemCount },
+    ] } })
+    if (failed) mocks.list.mockRejectedValue(new ApiError(503, 'account failed'))
+    else mocks.list.mockResolvedValue({ success: true, data: [{ ...account('a1', '確認対象'), folderId: 'target' }] })
+    render(<HqHomeV8 />)
+    const menu = await screen.findByRole('button', { name: /対象の分類.*操作/ })
+    fireEvent.click(menu)
+    fireEvent.click(await screen.findByRole('menuitem', { name: /消す/ }))
+    const dialog = await screen.findByRole('alertdialog', { name: '「対象の分類」を削除しますか？' })
+    expect(dialog.textContent).toContain(phrase)
+    if (itemCount === undefined) expect(dialog.textContent).not.toMatch(/アカウント \d+ 件/)
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(mocks.fetchApi).not.toHaveBeenCalled()
+  })
+})

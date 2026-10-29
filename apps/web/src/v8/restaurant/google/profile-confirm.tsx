@@ -1,4 +1,5 @@
 'use client'
+import { useGooglePermission } from './use-google-permission'
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
@@ -69,6 +70,8 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
   const [store, setStore] = useState<{ name: string; timeZone: string } | null>(null)
   const [writeEnabled, setWriteEnabled] = useState(true)
   const [canSend, setCanSend] = useState(false)
+  const { allowed: canEdit, lockedReason } = useGooglePermission('manager')
+  const { allowed: canPublish, lockedReason: sendReason } = useGooglePermission('manager', canSend)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [checked, setChecked] = useState(false)
@@ -100,7 +103,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
   useEffect(() => { void load() }, [load])
 
   const send = async () => {
-    if (operationLock.current || !checked || !canSend || !writeEnabled) return
+    if (!canPublish || operationLock.current || !checked || !writeEnabled) return
     operationLock.current = true
     setBusy(true)
     setActionError('')
@@ -127,7 +130,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
   }
 
   const cancel = async () => {
-    if (operationLock.current) return
+    if (!canEdit || operationLock.current) return
     operationLock.current = true
     setBusy(true)
     try {
@@ -171,7 +174,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
           : 'Googleの審査後に反映されることがあります。'
   const beforeNode = isHours ? describeHours(change.before, change.kind) : <p className={styles.factValue}>{describeProfileValue(field ?? '', change.before)}</p>
   const afterNode = isHours ? describeHours(change.after, change.kind) : <p className={styles.factValue}>{describeProfileValue(field ?? '', change.after)}</p>
-  const canPress = canSend && writeEnabled && checked && !busy && !done && change.status !== 'cancelled' && conflict === null
+  const canPress = canPublish && writeEnabled && checked && !busy && !done && change.status !== 'cancelled' && conflict === null
 
   return (
     <>
@@ -215,9 +218,9 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
         {ids.length > 1 && index < ids.length - 1 ? <Button variant="primary" onClick={() => setIndex(index + 1)}>次の変更へ</Button> : null}
         <Button onClick={() => go({ tab: 'profile', view: 'history' })}>変更履歴を見る</Button>
       </> : <>
-        <Button onClick={backTo} disabled={busy}>修正する</Button>
-        {canSend && (change.status === 'failed' || change.status === 'conflict') ? <Button onClick={() => void cancel()} disabled={busy}>キャンセル</Button> : null}
-        {canSend && writeEnabled ? <Button variant="primary" onClick={() => void send()} disabled={!canPress} busy={busy} busyLabel="送信中…">Googleに変更を送信する</Button> : null}
+        <Button lockedReason={lockedReason} onClick={() => { if (canEdit) backTo() }} disabled={!canEdit || busy}>修正する</Button>
+        {change.status === 'failed' || change.status === 'conflict' ? <Button lockedReason={lockedReason} onClick={() => void cancel()} disabled={!canEdit || busy}>キャンセル</Button> : null}
+        {writeEnabled ? <Button variant="primary" lockedReason={sendReason} onClick={() => void send()} disabled={!canPress} busy={busy} busyLabel="送信中…">Googleに変更を送信する</Button> : null}
       </>} />
     </>
   )

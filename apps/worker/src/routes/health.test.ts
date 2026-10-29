@@ -9,7 +9,7 @@ vi.mock('@line-crm/db', () => ({
   getStaffByApiKey: vi.fn(async () => null),
   getAccountHealthLogs: vi.fn(async () => []),
   getLatestRiskLevel: vi.fn(async () => null),
-  getLatestRiskLevels: vi.fn(async () => []),
+  getLineAccountListStats: vi.fn(async () => ({})),
   getAccountMigrations: vi.fn(async () => []),
   getAccountMigrationById: vi.fn(async () => null),
   createAccountMigration: vi.fn(),
@@ -93,11 +93,10 @@ describe('GET /api/accounts/health-summary', () => {
       ids: ['a1', 'a2'],
       isAccountScoped: true,
     });
-    vi.mocked(db.getLatestRiskLevels).mockResolvedValue([
-      { line_account_id: 'a1', risk_level: 'danger' },
-      // 範囲外の行が混ざっても数えない。
-      { line_account_id: 'a9', risk_level: 'warning' },
-    ]);
+    vi.mocked(db.getLineAccountListStats).mockResolvedValue({
+      a1: { connection: { status: 'warn', issues: [{ kind: 'bot_info', httpStatus: 403 }] } },
+      a9: { connection: { status: 'warn' } },
+    } as unknown as Awaited<ReturnType<typeof db.getLineAccountListStats>>);
 
     const res = await app().request(
       '/api/accounts/health-summary',
@@ -105,7 +104,7 @@ describe('GET /api/accounts/health-summary', () => {
       env(),
     );
     expect(res.status).toBe(200);
-    expect(db.getLatestRiskLevels).toHaveBeenCalledWith(expect.anything(), ['a1', 'a2']);
+    expect(db.getLineAccountListStats).toHaveBeenCalledWith(expect.anything(), ['a1', 'a2']);
     const body = (await res.json()) as {
       success: boolean;
       data: {

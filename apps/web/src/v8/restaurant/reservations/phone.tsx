@@ -398,7 +398,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
               <Field labelSize="compact" label="コース">
                 <SaveErrorField names={["courseId","course_id"]}><EntitySelect aria-label="コース" size="full" value={courseId} onChange={setCourseId} options={[
                   { value: '', label: '席のみ' },
-                  ...courses.map((c) => ({ ...entityOptionMetadata(c), value: c.id, label: `${c.name} ${c.price.toLocaleString()}円` })),
+                  ...courses.map((c) => ({ ...entityOptionMetadata(c), value: c.id, label: `${c.name} ${polishFormatYen(c.price)}` })),
                 ]} /></SaveErrorField>
               </Field>
             </SettingsFormRow>

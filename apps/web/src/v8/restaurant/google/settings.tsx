@@ -1,4 +1,5 @@
 'use client'
+import { useGooglePermission } from './use-google-permission'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import { useState } from 'react'
 import { Link2, RefreshCw } from 'lucide-react'
@@ -25,7 +26,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 
 export default function SettingsBoard({ accountId, data, onChanged }: { accountId: string; data: GoogleConnectionData; onChanged: () => void }) {
   const saveErrors = useSaveFormErrors()
-  const canManage = data.permissions.canManageConnection
+  const { allowed: canManage, lockedReason } = useGooglePermission('tenantWide', data.permissions.canManageConnection)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState('')
   const [confirmDisconnect, setConfirmDisconnect] = useState(false)
@@ -38,6 +39,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   const switchingLocation = Boolean(connection.locationName) && selectedLocation !== '' && selectedLocation !== connection.locationName
 
   const startConnect = async () => {
+    if (!canManage || busy || !data.oauthConfigured) return
     setBusy(true)
     setActionError('')
     try {
@@ -53,7 +55,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   }
 
   const selectLocation = async (confirmedSwitch = false) => {
-    if (!selectedLocation) return
+    if (!canManage || busy || !selectedLocation) return
     setBusy(true)
     setActionError('')
     try {
@@ -72,6 +74,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   }
 
   const disconnect = async () => {
+    if (!canManage || busy) return
     setBusy(true)
     setActionError('')
     try {
@@ -88,7 +91,6 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
     }
   }
 
-  const manageNote = !canManage ? <p className={styles.muted}>Googleアカウントの接続は、統括の管理者へ依頼してください。</p> : null
 
   if (connection.status === 'disconnected') {
     return (
@@ -97,13 +99,12 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         <p className={styles.preText}>{'店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。'}</p>
         {!data.oauthConfigured ? <Notice tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</Notice> : null}
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
-        {canManage ? (
+        {(
           <div className={styles.buttonRow}>
-            <Button variant="primary" onClick={() => void startConnect()} disabled={busy || !data.oauthConfigured} busy={Boolean(busy)} busyLabel="処理中…"><Link2 aria-hidden className={styles.icon16} />接続する</Button>
+            <Button lockedReason={lockedReason} variant="primary" onClick={() => void startConnect()} disabled={!canManage || busy || !data.oauthConfigured} busy={Boolean(busy)} busyLabel="処理中…"><Link2 aria-hidden className={styles.icon16} />接続する</Button>
           </div>
-        ) : null}
+        )}
         <p className={styles.grayNote}>初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。接続後は、このLINEアカウントの店舗だけを表示します。</p>
-        {manageNote}
       </Card></SaveErrorScope>
     )
   }
@@ -125,24 +126,25 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
               name="location"
               value={candidate.locationName}
               checked={selectedLocation === candidate.locationName}
-              onChange={() => { setSelectedLocation(candidate.locationName); setLocationSaved(false) }}
+              disabled={!canManage || busy}
+              onChange={() => { if (!canManage || busy) return; setSelectedLocation(candidate.locationName); setLocationSaved(false) }}
               title={candidate.locationTitle}
               note={candidate.addressText ?? undefined}
             />
           ))}
         </RadioCardGroup>
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
-        {canManage ? (
+        {(
           <div className={styles.buttonRowEnd}>
-            <Button onClick={() => setConfirmDisconnect(true)} disabled={busy}>接続を取り消す</Button>
-            <Button onClick={() => void startConnect()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">別のGoogleアカウントでやり直す</Button>
-            <Button variant="primary" onClick={() => (switchingLocation ? setConfirmSwitch(true) : void selectLocation())} disabled={busy || !selectedLocation} busy={Boolean(busy)} busyLabel="処理中…">
+            <Button lockedReason={lockedReason} onClick={() => { if (canManage && !busy) setConfirmDisconnect(true) }} disabled={!canManage || busy}>接続を取り消す</Button>
+            <Button lockedReason={lockedReason} onClick={() => void startConnect()} disabled={!canManage || busy} busy={Boolean(busy)} busyLabel="処理中…">別のGoogleアカウントでやり直す</Button>
+            <Button lockedReason={lockedReason} variant="primary" onClick={() => canManage && !busy && (switchingLocation ? setConfirmSwitch(true) : void selectLocation())} disabled={!canManage || busy || !selectedLocation} busy={Boolean(busy)} busyLabel="処理中…">
               {switchingLocation ? 'この店舗に切り替える' : 'この店舗を接続する'}
             </Button>
           </div>
-        ) : manageNote}
-        <ConfirmDialog open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} onConfirm={() => disconnect()} onCancel={() => setConfirmDisconnect(false)} />
-        <ConfirmDialog
+        )}
+        <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason} open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} onConfirm={() => disconnect()} onCancel={() => setConfirmDisconnect(false)} />
+        <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason}
           open={confirmSwitch}
           title="接続する店舗を切り替えますか？"
           description={`「${previousTitle ?? ''}」から切り替えます。これまでに取り込んだ口コミ・返信の下書き・プロフィール・投稿・数値は消え、戻せません。新しい店舗の分はこのあと取り込み直します。`}
@@ -171,15 +173,15 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
           <div className={styles.factRow}><dt className={styles.factKey}>つないだ日</dt><dd className={styles.factValue}>{formatYmd(connection.connectedAt)}</dd></div>
           <div className={styles.factRow}><dt className={styles.factKey}>状態</dt><dd className={styles.factValue}><StatusBadge tone={connectionState.tone} size="compact">{connectionState.label}</StatusBadge></dd></div>
         </dl>
-        {canManage ? (
+        {(
           <div className={styles.buttonRowEnd}>
-            <Button variant="danger-outline" onClick={() => setConfirmDisconnect(true)} disabled={busy}>接続を解除する</Button>
-            <Button onClick={() => void startConnect()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden className={styles.icon16} />つなぎ直す</Button>
+            <Button lockedReason={lockedReason} variant="danger-outline" onClick={() => { if (canManage && !busy) setConfirmDisconnect(true) }} disabled={!canManage || busy}>接続を解除する</Button>
+            <Button lockedReason={lockedReason} onClick={() => void startConnect()} disabled={!canManage || busy} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden className={styles.icon16} />つなぎ直す</Button>
           </div>
-        ) : manageNote}
+        )}
       </Card>
       <p className={styles.footCaption}>{`LINEアカウント：${data.store.name}・接続店舗：${connection.locationTitle ?? emptyValue('unknown')}・最後に取り込んだ日時：${formatStampFull(connection.lastSyncedAt)}`}</p>
-      <ConfirmDialog
+      <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason}
         open={confirmDisconnect}
         title="Googleアカウントの接続を解除しますか？"
         description="解除すると、Google側の許可を取り消し、保存しているトークンと、Googleから取得した口コミ・プロフィール・指標・取り込んだ投稿を削除します。返信の下書きも消えます。だれがいつ何をGoogleへ送ったかの記録だけ残ります。この操作は取り消せません。もう一度使うには再接続が必要です。"

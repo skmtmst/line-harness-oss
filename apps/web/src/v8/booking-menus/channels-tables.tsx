@@ -1,11 +1,11 @@
 'use client'
 
 import Card, { CardHeader } from '@/components/shared/card'
-import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import TruncatedText from '@/components/shared/truncated-text'
 import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
-import { RowMenu } from '@/components/shared/row-actions'
+import { RowActions } from '@/components/shared/row-actions'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { emptyValue } from '@/components/shared/empty-value'
 import { formatDate, formatNumber } from '@/lib/format'
@@ -20,12 +20,10 @@ const CHANNEL_LABEL: Record<string, { name: string; sub: string; how: string }> 
   epark: { name: 'EPARK', sub: '予約通知メール', how: '予約通知メールを読む' },
 }
 /*
- * 外の予約サイト（Hot Pepper・EPARK）の行末の「…」（絵の行末の決まり ）。
- * 連携を始める・止める口はまだ無い（Codex 待ち）ので、今ある行き先だけを出す：
+ * 予約経路の行末には、今ある行き先だけを出す：
  * 入った予約を見る（予約管理）と、Google カレンダー経由の媒体はスタッフのカレンダーの段へ。
  */
-const OUTSIDE_CHANNELS = new Set(['hot_pepper_beauty', 'epark'])
-function outsideChannelMenu(key: string): ActionMenuItem[] {
+function channelMenu(key: string): ActionMenuItem[] {
   return [
     { id: 'bookings', label: '予約管理で見る', href: '/booking/bookings' },
     ...(key === 'hot_pepper_beauty' ? [{ id: 'calendar', label: 'スタッフのカレンダーを確かめる', onSelect: () => document.getElementById('channels-calendar-heading')?.scrollIntoView({ block: 'start' }) }] : []),
@@ -54,6 +52,8 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
   onDetail: (person: BookingChannelStaff) => void
   onConnect: (person: BookingChannelStaff) => void
 }) {
+  const editLock = usePermissionLockReason(canEdit)
+  const connect = (person: BookingChannelStaff) => { if (canEdit && !editLock) onConnect(person) }
   return <>
     <Card variant="records" aria-labelledby="channels-calendar-heading">
       <CardHeader size="content" titleId="channels-calendar-heading" title="スタッフの Google カレンダー" />
@@ -66,7 +66,15 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
           <Td><StaffStatusChip status={person.status} /></Td>
           <Td align="right"><TruncatedText value={person.externalEventsThisWeek == null ? emptyValue('unknown') : `${person.externalEventsThisWeek}件`} /></Td>
           <Td collapseAt="narrow"><TruncatedText value={formatReadAt(person.lastReadAt)} /></Td>
-          <ActionCell>{person.status === 'connected' ? <Button onClick={() => onDetail(person)}>予定を見る</Button> : canEdit ? <Button onClick={() => onConnect(person)}>{person.status === 'not_connected' ? 'つなぐ' : 'つなぎ直す'}</Button> : null}</ActionCell>
+          <ActionCell><RowActions
+            subjectName={person.displayName}
+            detail={person.status === 'connected'
+              ? { label: '予定を見る', onClick: () => onDetail(person) }
+              : { label: person.status === 'not_connected' ? 'つなぐ' : 'つなぎ直す', onClick: () => connect(person), disabled: !canEdit, lockedReason: editLock }}
+            menuItems={[person.status === 'connected'
+              ? { id: 'calendar', label: '予定を見る', onSelect: () => onDetail(person) }
+              : { id: 'connect', label: person.status === 'not_connected' ? 'つなぐ' : 'つなぎ直す', onSelect: () => connect(person), disabled: !canEdit, lockedReason: editLock }]}
+          /></ActionCell>
         </Tr>)}</tbody>
       </DataTable>
     </Card>
@@ -74,19 +82,22 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
       <CardHeader size="content" titleId="channels-route-heading" title="予約経路" />
       <p data-card-footer className={ch.cardDesc}>どこから入った予約も「予約管理」に集めます。入り口ごとの受け取り方と、今日の件数です。</p>
       <DataTable aria-label="予約経路" columnSizing="content" columnLayout={TABLE_LAYOUT}>
-        <thead><TableHeadRow data-table-layout="columns"><Th grow truncate>予約経路</Th><Th collapseAt="narrow" truncate>受け取り方</Th><Th truncate>状態</Th><Th align="right" truncate>今日</Th><Th collapseAt="narrow" truncate>最後に届いた</Th><Th showActionLabel>操作</Th></TableHeadRow></thead>
+        <thead><TableHeadRow data-table-layout="columns"><Th grow truncate>予約経路</Th><Th collapseAt="narrow" truncate>受け取り方</Th><Th truncate>状態</Th><Th align="right" truncate>今日の予約</Th><Th collapseAt="narrow" truncate>最後に届いた</Th><Th showActionLabel>操作</Th></TableHeadRow></thead>
         <tbody>{data.channels.filter(channel => channel.key !== 'google_reserve').map(channel => {
           const label = CHANNEL_LABEL[channel.key] ?? { name: channel.key, sub: '', how: '' }
           return <Tr key={channel.key} data-table-layout="columns">
             <Td grow title={`受け取り方：${label.how || emptyValue('unknown')}`}><span className={ch.nameCell}><OneLine text={label.name} tone="name" />{label.sub ? <OneLine text={label.sub} tone="sub" /> : null}</span></Td>
             <Td collapseAt="narrow"><TruncatedText value={label.how || emptyValue('unknown')} /></Td>
-            <Td><ChannelStatusChip channel={channel} /></Td><Td align="right"><TruncatedText value={channel.todayCount == null ? emptyValue('unknown') : `${formatNumber(channel.todayCount)}件`} /></Td>
+            <Td><ChannelStatusChip channel={channel} /></Td><Td align="right" data-list-number><TruncatedText value={channel.todayCount == null ? emptyValue('unknown') : `${formatNumber(channel.todayCount)}件`} /></Td>
             <Td collapseAt="narrow">{emptyValue('unknown')}</Td>
-            <ActionCell>{channel.status === 'active' && ['line', 'manual'].includes(channel.key) ? <Button href="/booking/bookings">予約管理へ</Button> : null}{OUTSIDE_CHANNELS.has(channel.key) ? <RowMenu appearance="box" label={`${label.name}の操作`} items={outsideChannelMenu(channel.key)} /> : null}</ActionCell>
+            <ActionCell><RowActions
+              subjectName={label.name}
+              detail={{ label: '予約管理へ', href: '/booking/bookings' }}
+              menuItems={channelMenu(channel.key)}
+            /></ActionCell>
           </Tr>
         })}</tbody>
       </DataTable>
-      <p data-card-footer className={ch.note}>Google カレンダーに書き出せない入り口は、予約通知メールを取り込みアドレスへ転送して読み取ります（見本のメールがそろった媒体から順に）。</p>
     </Card>
   </>
 }

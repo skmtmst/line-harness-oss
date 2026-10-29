@@ -35,11 +35,11 @@ async function credentialStatusAt(now: number) {
 }
 
 describe('鍵の期限の稼働確認', () => {
-  it('30日の鍵を残り7日未満で取り替えている間は、1か月を通して注意にならない', async () => {
+  it('正常に自動交換される間は14日前の予告で運用の注意を鳴らさない', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ type: 'unlimited' })));
     const warnings: number[] = [];
     for (let day = 0; day < 60; day += 1) {
-      const now = START + day * DAY;
+      const now = START + day * DAY + 60_000;
       const row = testDb.raw.prepare('SELECT token_expires_at FROM line_accounts WHERE id = ?')
         .get('account-1') as { token_expires_at: string };
       // 取り替えの処理と同じ「残り7日未満なら新しい30日の鍵」を、1日1回に縮めて回す。
@@ -47,13 +47,13 @@ describe('鍵の期限の稼働確認', () => {
         testDb.raw.prepare('UPDATE line_accounts SET token_expires_at = ? WHERE id = ?')
           .run(new Date(now + 30 * DAY).toISOString(), 'account-1');
       }
-      const check = await credentialStatusAt(now + 60_000);
+      const check = await credentialStatusAt(now);
       if (check?.status !== 'normal') warnings.push(day);
     }
     expect(warnings).toEqual([]);
   }, 30_000);
 
-  it('取り替えの前（残り10日）は注意にせず、取り替えの時期を1日過ぎても古いまま（残り5日）なら注意', async () => {
+  it('期限の14日前の注意を、自動で取り替える7日前の窓と混ぜない', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ type: 'unlimited' })));
     testDb.raw.prepare('UPDATE line_accounts SET token_expires_at = ? WHERE id = ?')
       .run(new Date(START + 10 * DAY + 60_000).toISOString(), 'account-1');
@@ -121,7 +121,7 @@ describe('鍵の期限の知らせ', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       event_type: 'line_token_expiring',
-      title: 'LINEの鍵があと6日で切れます',
+      title: 'トークンがあと6日で切れます',
       category: 'error',
       channel: 'dashboard',
       line_account_id: 'account-1',
@@ -245,3 +245,18 @@ describe('鍵の期限の知らせ', () => {
     expect(other).toEqual([]);
   });
 });
+
+ it.each([14,10,7])('期限まで%s日なら画面の予告だけで運用の注意を鳴らさない',async(days)=>{
+   vi.stubGlobal('fetch',vi.fn(async()=>Response.json({type:'unlimited'})))
+   testDb.raw.prepare('UPDATE line_accounts SET token_expires_at=? WHERE id=?').run(new Date(START+days*DAY).toISOString(),'account-1')
+   expect(await credentialStatusAt(START)).toMatchObject({status:'normal'})
+ })
+ it('7日を切った未交換と、期限不明でも判明した交換失敗は注意にする',async()=>{
+   vi.stubGlobal('fetch',vi.fn(async()=>Response.json({type:'unlimited'})))
+   testDb.raw.prepare('UPDATE line_accounts SET token_expires_at=? WHERE id=?').run(new Date(START+7*DAY-1).toISOString(),'account-1')
+   expect(await credentialStatusAt(START)).toMatchObject({status:'warning',value:{refreshFailed:false}})
+   testDb.raw.prepare('UPDATE line_accounts SET token_expires_at=NULL WHERE id=?').run('account-1')
+   const {recordLineTokenRefreshFailure}=await import('./line-token-notices.js')
+   await recordLineTokenRefreshFailure(testDb.db,{id:'account-1',token_expires_at:null},'credentials',START+10*60_000)
+   expect(await credentialStatusAt(START+10*60_000)).toMatchObject({status:'warning',value:{daysLeft:null,refreshFailed:true}})
+ })

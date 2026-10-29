@@ -20,6 +20,11 @@ import styles from './edit.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { ToggleField } from '@/components/shared/toggle'
 
+/** ［保存して公開］の手前の一言。公開は版の切替で、友だちへの送信はしない。 */
+export function TemplatePublishNote() {
+  return <p className={styles.publishNote}>公開しても、この操作では友だちに送信しません</p>
+}
+
 export function TemplateEditFrame({
   boardId,
   title,
@@ -28,6 +33,7 @@ export function TemplateEditFrame({
   children,
   side,
   footerActions,
+  footerInfo,
   status,
   composerHost,
   onComposerInsert,
@@ -42,6 +48,8 @@ export function TemplateEditFrame({
   side: ReactNode | ((inDialog: boolean) => ReactNode)
   /** 閲覧のみでは渡さない（押せない操作は置かない）。 */
   footerActions?: ReactNode
+  /** 操作の手前に添える読むだけの一言（下の帯の左）。 */
+  footerInfo?: ReactNode
   /** 下の帯の左の文（下書きの自動保存の状態）。 */
   status?: ReactNode
 }) {
@@ -68,7 +76,7 @@ export function TemplateEditFrame({
         </aside>
       </div>
       {footerActions ? (
-        <div className={tpl.footer} data-template-region="footer"><StickyBar actions={footerActions} status={status} /></div>
+        <div className={tpl.footer} data-template-region="footer"><StickyBar actions={footerActions} status={status} info={footerInfo} /></div>
       ) : null}
     </PageFrame>
   )

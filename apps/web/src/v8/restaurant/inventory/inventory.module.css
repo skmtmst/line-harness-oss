@@ -3,6 +3,23 @@
  * 寸法は板の書き出しから読み、globals.css の --tpl-rs-* に置いた値だけを使う。
  */
 
+.stockBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rs-body-gap);
+  margin-top: var(--tpl-rs-tabs-body-top);
+  min-width: 0;
+}
+
+.tabs {
+  min-width: 0;
+}
+
+/* 休業日・貸切：検証環境の帯が無いので、店のタブの下にタブを置く（切り替えの文字の高さにそろえる） */
+.tabsClosures {
+  margin-top: var(--tpl-e10-tabs-top);
+}
+
 /* 左（配分・在庫・開ける時間）と右（その時間帯の卓 320） */
 .columns {
   display: flex;
@@ -425,11 +442,6 @@
 .pair {
   display: flex;
   gap: var(--tpl-rs-pair-gap);
-}
-
-/* 下の帯：絵では開ける時間の段の下に 8 空けて置く */
-.stickyBar {
-  margin-top: var(--tpl-rs-inv-bar-gap);
 }
 
 .manualFields { display: flex; flex-direction: column; gap: var(--tpl-rs-dlg-gap); }

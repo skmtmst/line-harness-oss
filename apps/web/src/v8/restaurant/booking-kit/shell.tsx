@@ -2,7 +2,7 @@
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { notifySaved } from '@/components/shared/toast'
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { type ComponentProps, ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 
 import {
@@ -114,7 +114,7 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, children, renderPage }: {
+export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, readOnly, readOnlyNeed, children, renderPage }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
@@ -148,6 +148,9 @@ export default function RestaurantShell({ boardId, title, description, explanati
   headSize?: 'compact'
   /** 題の下の説明の行を出さず「？」へ入れる（絵に説明の行が無い板。休業日・貸切 ）。 */
   hideSubtitle?: boolean
+  /** 題下の共通権限帯。権限判定は呼び出し側で行う。 */
+  readOnly?: ComponentProps<typeof PageHeading>['readOnlyBand']
+  readOnlyNeed?: ComponentProps<typeof PageHeading>['readOnlyNeed']
   children?: (ctx: RestaurantV8Context) => ReactNode
   /** 保存状態を持つ子が、既存PageFrameの本文と下部操作を分けて置く場合。 */
   renderPage?: (ctx: RestaurantV8Context, heading: ReactNode, notice: ReactNode) => ReactNode
@@ -246,6 +249,9 @@ export default function RestaurantShell({ boardId, title, description, explanati
     <>
       {templateHeading ? <PageHeading
         inset="none"
+        noticeRow="full"
+        readOnlyBand={readOnly}
+        readOnlyNeed={readOnlyNeed}
         title={title}
         /* 題の下の店名は出さない（店舗は右の欄で分かる・）。店舗で変わる説明の行（関数）だけ出す。 */
         subtitle={hideSubtitle || typeof description !== 'function' ? undefined : description(ctx)}
@@ -256,7 +262,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
       /> : (
       <div className={`${styles.head} ${layout === 'standard' ? '' : styles.headLedger}`}>
         <div className={styles.headText}>
-          <PageHeading inset={headingInset} title={title} help={typeof description === 'function' ? description(ctx) : description} explanation={explanation} />
+          <PageHeading inset={headingInset} readOnlyBand={readOnly} readOnlyNeed={readOnlyNeed} title={title} help={typeof description === 'function' ? description(ctx) : description} explanation={explanation} />
 
         </div>
         {headAfter ? headAfter(ctx, storePicker) : storePicker}

@@ -102,9 +102,9 @@ export const scenariosMethods = {
             items: (Scenario & {
               stepCount?: number
               /** いま流れている人 */
-              subscriberCount?: number
+              subscriberCount?: number | null
               /** 最後まで届いた人 */
-              completedCount?: number
+              completedCount?: number | null
             })[]
             total: number
             limit: number
@@ -119,7 +119,7 @@ export const scenariosMethods = {
       if (params?.accountId) query.set('lineAccountId', params.accountId)
       query.set('limit', String(params?.limit ?? 200))
       const response = await fetchApi<ApiResponse<{
-        items: (Scenario & { stepCount?: number; subscriberCount?: number; completedCount?: number })[]
+        items: (Scenario & { stepCount?: number; subscriberCount?: number | null; completedCount?: number | null })[]
         total: number
         limit: number
         sort: Array<{ field: string; direction: 'asc' | 'desc' }>

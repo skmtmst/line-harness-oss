@@ -1,6 +1,7 @@
 'use client'
 
 import choiceStyles from './choice-field.module.css'
+import { usePermissionLockTip } from './permission-lock-tip'
 import { type EntityPickerItem, type EntityPickerFolder, type EntityPickerCategory, type SingleProps, type EntityPickerWindowProps, type MultiBodyProps, type MultiProps, type FieldBase, type SingleField, type MultiField } from './entity-picker-types'
 export { type EntityPickerItem, type EntityPickerFolder, type EntityPickerCategory, type EntityPickerWindowProps } from './entity-picker-types'
 
@@ -15,7 +16,7 @@ import FilterChip from './filter-chip'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
 import SearchField from './search-field'
 import Select from './select'
-import { SelectValueText, isAllOption } from './select-menu'
+import { SelectValueText, filterHead, isAllOption } from './select-menu'
 import StatusBadge, { type StatusBadgeTone } from './status-badge'
 import shell from './source-picker-dialog.module.css'
 import styles from './entity-picker.module.css'
@@ -44,8 +45,9 @@ function matches(item: EntityPickerItem, query: string) {
   return !q || item.name.toLocaleLowerCase().includes(q) || Boolean(item.keywords?.toLocaleLowerCase().includes(q)) || Boolean(item.content?.toLocaleLowerCase().includes(q))
 }
 
-function CreateLink({ href, label }: { href?: string; label?: string }) {
+function CreateLink({ href, label, lockedReason }: { href?: string; label?: string; lockedReason?: string }) {
   if (!href || !label) return null
+  if (lockedReason) return <Button variant="text" size="inline" lockedReason={lockedReason}>{`作る画面へ：${label}`}<ArrowUpRight size={16} aria-hidden="true" /></Button>
   return <Link className={styles.createLink} href={href} target="_blank" rel="noopener">{`作る画面へ：${label}`}<ArrowUpRight size={16} aria-hidden="true" /></Link>
 }
 
@@ -69,7 +71,7 @@ export function EntityPickerDialog(props: SingleProps | EntityPickerWindowProps)
 /** 行を選ぶ間は仮の選択。確定したときだけ呼ぶ側の値を変える。 */
 function SingleEntityPickerDialog({
   title, description, scrollBody = false, confirmLabel = '選ぶ', items, folders = [], foldersFailed = false, categories = [], initialId = '',
-  state, listFooter, preview, error, busy = false, confirmDisabled = false, readOnly = false, createHref, createLabel,
+  state, listFooter, preview, error, busy = false, confirmDisabled = false, confirmLockedReason, readOnly = false, createHref, createLabel,
   searchPlaceholder = '名前で探す', designNode = 'M0393', query: controlledQuery, onQueryChange, createAction, onSelect, onConfirm, onCancel,
 }: SingleProps) {
   const id = useId()
@@ -97,12 +99,12 @@ function SingleEntityPickerDialog({
     footer={<>
       <div className={styles.tpFootLead}>
         {!readOnly ?
-      <CreateLink href={createHref} label={createLabel} /> : null}
+      <CreateLink href={createHref} label={createLabel} lockedReason={confirmLockedReason} /> : null}
       <span className={styles.selection} title={picked?.name}>{picked ? `選んだもの：${picked.name}` : 'まだ選んでいません'}</span>
       </div>
       <div className={styles.tpFootActions}>
       <Button disabled={busy} onClick={onCancel}>{readOnly ? '閉じる' : 'キャンセル'}</Button>
-      {readOnly ? null : <Button variant="primary" widthReserve="idle" busy={busy} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} title={listState ? '候補を読み込める状態になってから選んでください。' : !picked ? '候補を選んでください。' : picked.disabled ? picked.meta : confirmDisabled ? error : undefined} onClick={() => onConfirm(selected)}>{confirmLabel}</Button>}
+      {readOnly ? null : <Button variant="primary" widthReserve="idle" busy={busy} lockedReason={confirmLockedReason} disabled={busy || !picked || picked.disabled || listState || confirmDisabled} title={confirmLockedReason ? undefined : listState ? '候補を読み込める状態になってから選んでください。' : !picked ? '候補を選んでください。' : picked.disabled ? picked.meta : confirmDisabled ? error : undefined} onClick={() => onConfirm(selected)}>{confirmLabel}</Button>}
     </div>
     </>}
   >
@@ -125,7 +127,7 @@ function SingleEntityPickerDialog({
               {item.content || item.meta ? <span className={styles.tpCardBody} title={item.content ?? item.meta}>{item.content ?? item.meta}</span> : null}
             </span>{item.categoryLabel ? <StatusBadge tone={item.tone} dot={false} size="compact">{item.categoryLabel}</StatusBadge> : null}</label>) : <p className={styles.tpNote}>当てはまる候補がありません。</p>)}
         </div>
-        {createAction && !readOnly && query.trim() && !items.some((item) => item.name === query.trim()) ? <Button disabled={busy || listState} onClick={() => createAction.onCreate(query.trim())}>{createAction.label(query.trim())}</Button> : null}
+        {createAction && !readOnly && query.trim() && !items.some((item) => item.name === query.trim()) ? <Button disabled={busy || listState} lockedReason={confirmLockedReason} onClick={() => { if (!confirmLockedReason) createAction.onCreate(query.trim()) }}>{createAction.label(query.trim())}</Button> : null}
         {!listState ? <div className={shell.more}><span>{`${formatNumber(rows.length)}件中 ${rows.length ? 1 : 0}〜${Math.min(visibleLimit, rows.length)}件`}</span>{rows.length > visibleLimit ? <Button size="compact" onClick={() => setLimit((value) => value + 20)}>続きを読み込む</Button> : null}</div> : null}
       {listFooter}
         {preview !== undefined && picked ? <div className={styles.itemPreview} aria-label="選んだ候補の見え方">{previewNode}</div> : null}
@@ -271,12 +273,13 @@ export function EntityMultiPickerDialog({ title, description, items, folders, fo
 }
 
 /** 欄の1行だけ（窓は呼ぶ側が開く）。一括配信の送るアカウントのように窓を自前で持つ画面が使う。 */
-export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta, placeholder, disabled = false, disabledReason, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel, valuePrefix, prefixedValue, compact = false, actionHidden = false }: {
+export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta, placeholder, disabled = false, disabledReason, lockedReason, readOnly = false, invalid = false, id, buttonRef, describedBy, 'aria-describedby': ariaDescribedBy, onOpen, onClear, selection, ariaLabel, valuePrefix, prefixedValue, compact = false, actionHidden = false }: {
   label: string; noun: string; icon?: LucideIcon
   name?: string; meta?: string; placeholder?: string
   color?: string | null
   disabled?: boolean; readOnly?: boolean; invalid?: boolean; id?: string
   disabledReason?: string
+  lockedReason?: string
   buttonRef?: Ref<HTMLButtonElement>
   describedBy?: string
   'aria-describedby'?: string
@@ -292,13 +295,20 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
   actionHidden?: boolean | 'label'
 }) {
   const field = useFieldContext()
+  const lock = usePermissionLockTip<HTMLButtonElement>(readOnly ? undefined : lockedReason, joinDescribedBy(describedBy, ariaDescribedBy, field?.describedBy))
+  const clearLock = usePermissionLockTip<HTMLButtonElement>(lockedReason)
+  const setButtonRef = (element: HTMLButtonElement | null) => {
+    lock.ref.current = element
+    if (typeof buttonRef === 'function') return buttonRef(element)
+    if (buttonRef) buttonRef.current = element
+  }
   const empty = !name
   const actionLabel = readOnly ? '見る' : empty ? '選ぶ' : '変える'
   const isInvalid = invalid || Boolean(field?.invalid)
-  return <div className={`${styles.field} ${choiceStyles.frame}`} data-choice-field data-choice-active={prefixedValue?.filterState === 'active' || undefined} data-choice-invalid={isInvalid || undefined} data-choice-disabled={disabled || undefined} data-entity-picker-field data-value-prefix={valuePrefix ? '' : undefined} data-filter-active={prefixedValue?.filterState === 'active' || undefined} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || undefined} data-multiple={selection ? '' : undefined}>
-    {readOnly && empty ? null : <button type="button" data-choice-trigger className={styles.fieldTrigger} ref={buttonRef} id={id ?? field?.controlId}
-      disabled={disabled} title={disabled ? disabledReason : undefined} aria-label={ariaLabel ?? `${label}：${actionLabel}`} aria-haspopup="dialog"
-      aria-invalid={isInvalid || undefined} aria-describedby={joinDescribedBy(describedBy, ariaDescribedBy, field?.describedBy)} onClick={onOpen} />}
+  return <div className={`${styles.field} ${choiceStyles.frame}`} data-choice-field data-choice-active={prefixedValue?.filterState === 'active' || undefined} data-choice-invalid={isInvalid || undefined} data-choice-disabled={disabled || Boolean(lockedReason && !readOnly) || undefined} data-entity-picker-field data-value-prefix={valuePrefix ? '' : undefined} data-filter-active={prefixedValue?.filterState === 'active' || undefined} data-empty={empty || undefined} data-invalid={isInvalid || undefined} data-disabled={disabled || Boolean(lockedReason && !readOnly) || undefined} data-multiple={selection ? '' : undefined}>
+    {readOnly && empty ? null : <button type="button" data-choice-trigger className={styles.fieldTrigger} ref={lockedReason ? setButtonRef : buttonRef} id={id ?? field?.controlId}
+      disabled={disabled} title={disabled && !lockedReason ? disabledReason : undefined} aria-label={ariaLabel ?? `${label}：${actionLabel}`} aria-haspopup="dialog"
+      aria-invalid={isInvalid || undefined} aria-describedby={joinDescribedBy(describedBy, ariaDescribedBy, field?.describedBy)} onClick={onOpen} {...lock.handlers} />}
     {Icon ? <Icon className={styles.fieldIcon} size={16} aria-hidden="true" /> : null}
     {selection ? <span data-choice-selection className={styles.fieldChips}>{selection}</span> :
     <span className={styles.fieldValue}>
@@ -307,8 +317,9 @@ export function EntityPickerSummary({ label, noun, icon: Icon, name, color, meta
         {meta ? <small className={styles.fieldMeta} title={meta}>{meta}</small> : null}
       </>}
     </span>}
-    {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} title={disabled ? disabledReason : undefined} aria-label={`${label}を外す`} onClick={onClear}>外す</button> : null}
+    {onClear && !empty && !readOnly ? <button type="button" className={styles.fieldClear} disabled={disabled} title={disabled && !lockedReason ? disabledReason : undefined} aria-label={`${label}を外す`} onClick={onClear} ref={clearLock.ref} {...clearLock.handlers}>外す</button> : null}
     {readOnly && empty ? null : <ChevronDown data-choice-chevron aria-hidden="true" size={16} />}
+    {lock.node}{clearLock.node}
   </div>
 }
 
@@ -328,7 +339,7 @@ export function describePicked(items: EntityPickerItem[], folders: EntityPickerF
 
 /** 画面の欄。「選んだもの（印・名前・補足）＋［選ぶ］／［変える］」の1行。押すと窓が開く。 */
 export function EntityPickerField(props: SingleField | MultiField) {
-  const { label, noun, icon, items, folders = [], foldersFailed, onOpen, state, placeholder, disabled = false, disabledReason, readOnly = false, invalid = false, createHref, createLabel, description, id, buttonRef, describedBy } = props
+  const { label, noun, icon, items, folders = [], foldersFailed, onOpen, state, placeholder, disabled = false, disabledReason, lockedReason, readOnly = false, invalid = false, createHref, createLabel, description, id, buttonRef, describedBy } = props
   const [open, setOpen] = useState(props.defaultOpen ??false)
   const title = props.title ?? `${noun}を選ぶ`
   const picked = describePicked(items, folders, props.value, props.multiple ? props.unit : undefined, props.multiple ? props.summarize : undefined)
@@ -337,28 +348,31 @@ export function EntityPickerField(props: SingleField | MultiField) {
   const prefixedValue = props.valuePrefix && !props.multiple && picked.name
     ? { head: props.valuePrefix, value: picked.name, filterState: allItem ? (props.value === allItem.id ? 'default' as const : 'active' as const) : undefined }
     : undefined
+  const currentLock = useRef(lockedReason)
+  currentLock.current = lockedReason
+  useEffect(() => { if (lockedReason && !readOnly) setOpen(false) }, [lockedReason, readOnly])
   const close = () => setOpen(false)
   return <>
-    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? `${props.valuePrefix ?? ''}${picked.name}` : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} disabledReason={disabledReason} readOnly={readOnly}
+    <EntityPickerSummary label={label} noun={noun} icon={icon} name={picked.name ? (props.valuePrefix ? `${filterHead(props.valuePrefix)}${picked.name}` : picked.name) : picked.name} color={pickedColor} meta={picked.meta} placeholder={placeholder} disabled={disabled} disabledReason={disabledReason} lockedReason={lockedReason} readOnly={readOnly}
       ariaLabel={props.ariaLabel} valuePrefix={props.valuePrefix} prefixedValue={prefixedValue} compact={props.compact} actionHidden={props.actionHidden}
       selection={props.multiple && props.value.length ? props.value.map((value) => {
         const item = items.find((candidate) => candidate.id === value)
         const folder = item ? folderOf(item, folders) : null
-        return <TagPill key={value} name={item?.name ?? '見つかりません'} color={folder ? folderDisplayColor(folder) : null}
-          onRemove={readOnly || disabled || item?.locked ? undefined : () => props.onChange(props.value.filter((id) => id !== value))} />
+        return <TagPill key={value} name={item?.name ?? '見つかりません'} color={folder ? folderDisplayColor(folder) : null} lockedReason={lockedReason}
+          onRemove={readOnly || disabled && !lockedReason || item?.locked ? undefined : () => { if (!currentLock.current) props.onChange(props.value.filter((id) => id !== value)) }} />
       }) : undefined}
-      invalid={invalid || picked.missing} id={id} buttonRef={buttonRef} describedBy={joinDescribedBy(describedBy, props['aria-describedby'])} onOpen={() => { onOpen?.(); setOpen(true) }}
-      onClear={!props.multiple && props.clearable ? () => props.onChange('') : undefined} />
+      invalid={invalid || picked.missing} id={id} buttonRef={buttonRef} describedBy={joinDescribedBy(describedBy, props['aria-describedby'])} onOpen={() => { if (currentLock.current && !readOnly) return; onOpen?.(); setOpen(true) }}
+      onClear={!props.multiple && props.clearable ? () => { if (!currentLock.current) props.onChange('') } : undefined} />
     {open ? props.multiple
       ? <EntityMultiPickerDialog title={title} description={description} items={items} folders={folders} foldersFailed={foldersFailed} initialIds={props.value} unit={props.unit} state={state} listFooter={props.listFooter} readOnly={readOnly}
         query={props.query} onQueryChange={props.onQueryChange} maxSelected={props.maxSelected}
-        createHref={createHref} createLabel={createLabel} createAction={props.headerCreate} note={props.note} allowEmpty={props.allowEmpty} rowExtra={props.rowExtra} searchPlaceholder={props.searchPlaceholder}
-        onCancel={close} onConfirm={(ids) => { props.onChange(ids); close() }} />
+        createHref={createHref} createLabel={createLabel} createAction={props.headerCreate ? { ...props.headerCreate, onCreate: (name) => currentLock.current ? Promise.reject(new Error(currentLock.current)) : props.headerCreate!.onCreate(name) } : undefined} note={props.note} allowEmpty={props.allowEmpty} rowExtra={props.rowExtra} searchPlaceholder={props.searchPlaceholder}
+        onCancel={close} onConfirm={(ids) => { if (currentLock.current) return; props.onChange(ids); close() }} />
       : <EntityPickerDialog title={title} description={description} items={items} folders={folders} foldersFailed={foldersFailed} categories={props.categories} initialId={props.value ?? ''} state={state} listFooter={props.listFooter}
         query={props.query} onQueryChange={props.onQueryChange}
-        createAction={props.createAction ? { ...props.createAction, onCreate: (query) => { props.createAction?.onCreate(query); close() } } : undefined}
-        preview={props.preview} readOnly={readOnly} createHref={createHref} createLabel={createLabel} confirmLabel={props.confirmLabel} onSelect={props.onSelect} confirmDisabled={props.confirmDisabled}
-        searchPlaceholder={props.searchPlaceholder} designNode="dJZ7Q" onCancel={close} onConfirm={(value) => { props.onChange(value); close() }} />
+        createAction={props.createAction ? { ...props.createAction, onCreate: (query) => { if (currentLock.current) return; props.createAction?.onCreate(query); close() } } : undefined}
+        preview={props.preview} readOnly={readOnly} createHref={createHref} createLabel={createLabel} confirmLabel={props.confirmLabel} onSelect={props.onSelect ? (item) => { if (!currentLock.current || readOnly) props.onSelect?.(item) } : undefined} confirmDisabled={props.confirmDisabled}
+        searchPlaceholder={props.searchPlaceholder} designNode="dJZ7Q" onCancel={close} onConfirm={(value) => { if (currentLock.current) return; props.onChange(value); close() }} />
       : null}
   </>
 }

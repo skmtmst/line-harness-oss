@@ -36,6 +36,7 @@ export function usePermissionLockTip<T extends HTMLElement>(reason: string | nul
     'aria-disabled': true as const,
     'aria-describedby': [describedBy, reasonId].filter(Boolean).join(' '),
     'data-permission-locked': '',
+    'data-no-name-tip': '',
     onPointerEnter: (event: PointerEvent<T>) => { if (event.pointerType !== 'touch') show() },
     onPointerLeave: (event: PointerEvent<T>) => { if (event.pointerType !== 'touch' && document.activeElement !== event.currentTarget) hide() },
     onPointerDown: (event: PointerEvent<T>) => { if (event.pointerType === 'touch') show() },

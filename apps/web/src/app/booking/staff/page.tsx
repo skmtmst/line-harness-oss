@@ -2,13 +2,11 @@
 
 import { usePermissionAccess } from '@/lib/use-feature-access'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { PageHeading } from '@/components/templates/page-frame'
+import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MoreHorizontal } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
-import IconButton from '@/components/shared/icon-button'
-import ActionMenu from '@/components/shared/action-menu'
+import { RowActions } from '@/components/shared/row-actions'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import ListState from '@/components/shared/list-state'
 import { isForbidden, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -16,7 +14,7 @@ import { ActionCell, DataTable, TableHeadRow, Td, Th, Tr } from '@/components/sh
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
-import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
 import { EMPTY_STAFF as EMPTY, StaffEditModal } from './staff-edit-dialog'
 
 // 編集窓は V8 予約設定の担当スタッフタブ（menus/settings-v8.tsx）と共用。
@@ -63,7 +61,6 @@ function StaffTableSkeleton() {
 }
 
 export default function BookingStaffPage() {
-  /* パンくずは上の帯だけ（板の中の2つ目のパンくずは置かない）。 */
   usePageTitle('担当スタッフ')
   usePageCrumbs([{ label: '予約設定', href: '/booking/menus' }])
   const { selectedAccountId } = useAccount()
@@ -78,9 +75,7 @@ export default function BookingStaffPage() {
   const [removeError, setRemoveError] = useState('')
   // N-411: 予約スタッフの登録・変更・削除は 'booking.settings' の実効permission。
   const canManageStaff = usePermissionAccess('booking.settings')
-  // 行の「その他」メニューの開き先（#641）
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
-  const router = useRouter()
+  const staffLock = usePermissionLockReason(canManageStaff)
   const loadRequestRef = useRef(0)
 
   const load = useCallback(async () => {
@@ -119,6 +114,7 @@ export default function BookingStaffPage() {
 
   async function save(s: Partial<BookingStaff>) {
     if (!selectedAccountId) return
+    if (!canManageStaff || staffLock) throw new Error(staffLock || '権限を確認しています。')
     if (s.id) {
       await bookingApi.updateStaff(selectedAccountId, s.id, s)
     } else {
@@ -134,7 +130,7 @@ export default function BookingStaffPage() {
    * 画像比較にも写らない（確認の絵をそもそも撮れない）。
    */
   async function remove(id: string) {
-    if (!selectedAccountId) return
+    if (!selectedAccountId || !canManageStaff || staffLock) return
     setDeleting(true)
     setRemoveError('')
     try {
@@ -150,23 +146,18 @@ export default function BookingStaffPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div><PageHeading title="担当スタッフ" /></div>
-      {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-      {/*
-        作る操作は一覧のすぐ上の左。見出しの行の右端には置かない。
-        押せない理由はボタンの説明に出す。押せないボタンを黙って置かない。
-      */}
-      <div data-design="Actions" className="flex flex-wrap items-center gap-2">
-        {canManageStaff ? <Button
+    <PageFrame kind="list">
+      <PageHeading title="担当スタッフ" actions={
+        <Button
           variant="primary"
-          onClick={() => setEditing(EMPTY)}
+          onClick={() => { if (canManageStaff && !staffLock) setEditing(EMPTY) }}
           disabled={!canManageStaff || !selectedAccountId || loadStatus !== 'ready'}
-          title={canManageStaff ? undefined : '予約設定の変更権限がありません'}
+          lockedReason={staffLock}
         >
           ＋ スタッフを作る
-        </Button> : null}
-      </div>
+        </Button>
+      } />
+      <PageContent>
 
       {!canManageStaff ? <ReadOnlyNotice>閲覧のみで見ています。予約スタッフの変更には予約設定の変更権限が必要です。</ReadOnlyNotice> : null}
 
@@ -254,47 +245,23 @@ export default function BookingStaffPage() {
                       )}
                     </Td>
                     <ActionCell>
-                      {/* 行の操作は「主な1つ＋…メニュー」。削除は行に直に置かず、メニューの中の危ない操作へ。 */}
-                      <div className="relative inline-flex items-center justify-end gap-1.5">
-                        {canManageStaff ? (
-                          <>
-
-                            <IconButton
-                              aria-label={`${s.display_name}のその他操作`}
-                              aria-expanded={openMenuId === s.id}
-                              onClick={() => setOpenMenuId((current) => (current === s.id ? null : s.id))}
-                            >
-                              <MoreHorizontal aria-hidden />
-                            </IconButton>
-                            <ActionMenu
-                              open={openMenuId === s.id}
-                              ariaLabel={`${s.display_name}の操作`}
-                              onClose={() => setOpenMenuId(null)}
-                              items={[{ id: 'edit', label: '編集する', onSelect: () => setEditing(s) }, {
-                                id: 'shift',
-                                label: 'シフト',
-                                onSelect: () => router.push(`/booking/staff/shifts?staff_id=${s.id}`),
-                              }, {
-                                id: 'delete',
-                                label: '削除する',
-                                tone: 'danger',
-                                dividerBefore: true,
-                                onSelect: () => { setRemoveError(''); setRemoveTarget(s) },
-                              }]}
-                            />
-                          </>
-                        ) : (
-                          <Button href={`/booking/staff/shifts?staff_id=${s.id}`} variant="secondary" size="compact">
-                            シフト
-                          </Button>
-                        )}
-                      </div>
+                      <RowActions
+                        subjectName={s.display_name}
+                        detail={{ label: 'シフト', href: `/booking/staff/shifts?staff_id=${s.id}` }}
+                        edit={{ onClick: () => { if (canManageStaff && !staffLock) setEditing(s) }, disabled: !canManageStaff, lockedReason: staffLock }}
+                        destructiveItem={{
+                          id: 'delete', label: '削除する', disabled: !canManageStaff, lockedReason: staffLock,
+                          onSelect: () => { if (canManageStaff && !staffLock) { setRemoveError(''); setRemoveTarget(s) } },
+                        }}
+                      />
                     </ActionCell>
                   </Tr>
                 ))}
               </tbody>
         </DataTable>
       )}
+
+      </PageContent>
 
       {editing && <StaffEditModal staff={editing} onSave={save} onClose={() => setEditing(null)} />}
 
@@ -313,6 +280,6 @@ export default function BookingStaffPage() {
         }}
         onConfirm={() => { if (removeTarget) void remove(removeTarget.id) }}
       />
-    </div>
+    </PageFrame>
   )
 }

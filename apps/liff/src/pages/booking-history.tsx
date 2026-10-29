@@ -1,6 +1,5 @@
 import { useCustomerWords, useCustomerStyle } from '../components/customer-style-scope.js';
 import { PAYMENT_UNKNOWN } from '../lib/customer-words.js';
-import PaymentPreparingNote from '../components/payment-preparing-note.js';
 import BookingHistoryCancelDialog from '../components/booking-history-cancel-dialog.js';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -255,7 +254,6 @@ export default function BookingHistory() {
             )}
             {tab === 'upcoming' ? <LessonHistorySection onPicking={setPicking} onLater={() => navigate({ pathname: '/mypage', search })} /> : null}
             {tab === 'upcoming' ? <WaitlistSection upcomingHeading={list.length > 0} onChanged={() => setReloadKey((k) => k + 1)} /> : null}
-            {Object.values(payments).some((view) => view && view.kind !== 'onsite') ? <PaymentPreparingNote /> : null}
             {notice && (
               <p role="status" className="text-[13px] leading-5 text-ink-secondary">{notice}</p>
             )}
@@ -264,7 +262,7 @@ export default function BookingHistory() {
                 <StatusView
                   icon="calendar"
                   title="これからの予約はありません"
-                  body={style === 'ec' ? undefined : '空いている日時から、そのまま予約できます。'}
+                  body={style === 'ec' || style === 'lesson' ? undefined : '空いている日時から、そのまま予約できます。'}
                 />
               ) : (
                 <StatusView icon="calendar" title="これまでの予約はありません" />
@@ -299,7 +297,7 @@ export default function BookingHistory() {
           </>
         )}
       </div>
-      {data && !failed && !picking && style !== 'ec' && (
+      {data && !failed && !picking && style !== 'ec' && style !== 'lesson' && (
         <BottomBar>
           <Button
             variant="primary"
@@ -360,12 +358,12 @@ export default function BookingHistory() {
                         }
                       >
                         <span
-                          className={`liff-num text-sm font-semibold whitespace-nowrap ${selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}
+                          className="liff-num text-sm font-semibold whitespace-nowrap text-ink"
                         >
                           {`${formatMd(slot.date)}（${formatWeekday(slot.date)}） ${slot.start}`}
                         </span>
                         <span
-                          className={`shrink-0 text-xs whitespace-nowrap ${selected ? 'text-(--liff-on-primary)' : 'text-ink-secondary'}`}
+                          className="shrink-0 text-xs whitespace-nowrap text-ink-secondary"
                         >
                           {selected ? 'この日時' : '空きあり'}
                         </span>

@@ -102,6 +102,7 @@ export default function PetsListV8({
         <SaveErrorField names={["product","query.product"]}><EntitySelect
           aria-label="主食で絞り込む"
           noun="主食"
+          valuePrefix="主食"
           width={140}
           value={query.product}
           onChange={(value) => change({ product: value })}

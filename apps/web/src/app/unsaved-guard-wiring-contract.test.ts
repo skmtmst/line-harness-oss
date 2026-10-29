@@ -103,7 +103,7 @@ const GUARDED = [
   'v8/nen-campaigns/edit.tsx',
   'v8/nen-members/lifetime.tsx',
   'v8/nen-members/ranks.tsx',
-  'v8/ops/announcements.tsx',
+  'v8/ops/announcement-edit.tsx',
   'v8/ops/knowledge-article.tsx',
   'v8/reminders/edit.tsx',
   'v8/restaurant/google/posts.tsx',
@@ -147,6 +147,7 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  'v8/friend-add/editor-basic-routes.tsx': 'v8/friend-add/editor.tsx',
   // 登録中のスタッフは親の入力を表示するだけ。入力と離脱確認を持つ親を検査する。
   'v8/booking-staff/phone.tsx': 'v8/booking-staff/staff-new.tsx',
   // U05: state/ref と離脱確認は従来の親が保持する。分割先をその親へ結び直す（対象外の追加ではない）。

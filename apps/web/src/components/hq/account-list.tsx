@@ -1,5 +1,6 @@
 'use client'
 
+import { lineAccountConnectionState } from '@/lib/line-account-state'
 import type { AccountWithStats } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Avatar from '@/components/shared/avatar'
@@ -16,10 +17,10 @@ function AccountIcon({ account }: { account: AccountWithStats }) {
   return <Avatar name={name} src={accountIconUrl(account)} size={36} shape="rounded" alt={name} />
 }
 
-function ConnectionStatus({ status }: { status: 'ok' | 'warn' | 'unknown' | undefined }) {
-  const tone: StatusBadgeTone = status === 'ok' ? 'success' : status === 'warn' ? 'warning' : 'neutral'
-  const label = status === 'ok' ? '正常' : status === 'warn' ? '要確認' : '未確認'
-  return <StatusBadge tone={tone} size="compact">{label}</StatusBadge>
+function ConnectionStatus({ account }: { account: AccountWithStats }) {
+  const state = lineAccountConnectionState(account)
+  const tone: StatusBadgeTone = state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'warning' : 'neutral'
+  return <StatusBadge tone={tone} size="compact">{state.label}</StatusBadge>
 }
 
 export default function HqAccountList({
@@ -52,7 +53,7 @@ export default function HqAccountList({
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <StatusBadge tone={account.isActive ? 'success' : 'neutral'} size="compact">{account.isActive ? '有効' : '停止中'}</StatusBadge>
-              <ConnectionStatus status={account.connection?.status} />
+              <ConnectionStatus account={account} />
             </div>
             <div className="mt-3 flex gap-2">
               {onSettings ? <Button type="button" variant="secondary" onClick={() => onSettings(account)}>設定</Button> : null}
@@ -105,7 +106,7 @@ export default function HqAccountList({
                 </td>
                 <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.friendCount ?? 0))}</td>
                 <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.messagesThisMonth ?? 0))}</td>
-                <td className="px-4 py-2"><ConnectionStatus status={account.connection?.status} /></td>
+                <td className="px-4 py-2"><ConnectionStatus account={account} /></td>
                 <td className="px-4 py-2 text-right text-sm font-semibold tabular-nums text-ink">{formatNumber((account.stats?.staffCount ?? 0))}人</td>
                 <td className="px-4 py-2"><StatusBadge tone={account.isActive ? 'success' : 'neutral'} size="compact">{account.isActive ? '有効' : '停止中'}</StatusBadge></td>
                 <td className="px-5 py-2 text-right">

@@ -1,6 +1,7 @@
 'use client'
 
 import choiceStyles from './choice-field.module.css'
+import { usePermissionLockTip } from './permission-lock-tip'
 import { pageSizeLabel } from './page-size-options'
 import { ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react'
 import React, { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -32,6 +33,7 @@ export default function Select({
   className,
   defaultOpen = false,
   disabled = false,
+  lockedReason,
   error,
   invalid: invalidProp = false,
   id,
@@ -65,7 +67,10 @@ export default function Select({
   const buttonId = id ?? field?.controlId ?? `${generatedId}-button`
   const listboxId = `${generatedId}-listbox`
   const rootRef = useRef<HTMLDivElement>(null)
-  const triggerRef = useRef<HTMLButtonElement>(null)
+  const lock = usePermissionLockTip<HTMLButtonElement>(lockedReason, joinDescribedBy(field?.describedBy))
+  const triggerRef = lock.ref
+  const currentLock = useRef(lockedReason)
+  currentLock.current = lockedReason
   const [open, setOpen] = useState(defaultOpen)
   // 'create' は「＋ 〇〇」を押した後（同じ板で名前を入れている）。閉じたら一覧へ戻す。
   const [mode, setMode] = useState<'list' | 'create'>('list')
@@ -147,8 +152,8 @@ export default function Select({
   }
 
   useEffect(() => {
-    if (disabled) setOpen(false)
-  }, [disabled])
+    if (disabled || lockedReason) setOpen(false)
+  }, [disabled, lockedReason])
 
   useEffect(() => {
     if (open) return
@@ -161,6 +166,7 @@ export default function Select({
   const rowCount = enabledOptions.length + (hasCreate ? 1 : 0)
   const createActive = hasCreate && activeIndex === enabledOptions.length
   const startCreate = () => {
+    if (currentLock.current) return
     createSessionRef.current += 1
     setMode('create')
   }
@@ -176,7 +182,7 @@ export default function Select({
       if (session === createSessionRef.current) backToList()
     },
     finish: (next: string) => {
-      if (session !== createSessionRef.current) return
+      if (currentLock.current || session !== createSessionRef.current) return
       createSessionRef.current += 1
       onChange(next)
       triggerRef.current?.focus()
@@ -189,7 +195,7 @@ export default function Select({
   }, [selectedIndex])
 
   const choose = (option: SelectOption) => {
-    if (option.disabled) return
+    if (currentLock.current || option.disabled) return
     createSessionRef.current += 1
     onChange(option.value)
     setOpen(false)
@@ -229,7 +235,7 @@ export default function Select({
         styles.root,
         styles[size === 'page-size' ? 'pageSize' : size],
         open ? styles.open : null,
-        disabled ? styles.disabled : null,
+        disabled || lockedReason ? styles.disabled : null,
         error || invalid ? styles.invalid : null,
         className,
       ]
@@ -258,13 +264,13 @@ export default function Select({
         data-choice-field={!iconOnly || undefined}
         data-choice-active={filterState === 'active' || undefined}
         data-choice-invalid={Boolean(error) || invalid || undefined}
-        data-choice-disabled={disabled || undefined}
+        data-choice-disabled={disabled || Boolean(lockedReason) || undefined}
         data-tone={treatment === 'pill' ? selected?.tone ?? 'neutral' : undefined}
         data-filter-active={filterState === 'active' || undefined}
         data-value-align={valueAlign}
         data-chevron={!iconOnly || undefined}
         data-icon-only={iconOnly || undefined}
-        title={iconOnly ? ariaLabel : undefined}
+        title={lockedReason ? undefined : iconOnly ? ariaLabel : undefined}
         aria-label={ariaLabel}
         aria-controls={listboxId}
         aria-expanded={open}
@@ -274,6 +280,7 @@ export default function Select({
         disabled={disabled}
         onClick={() => setOpen((current) => !current)}
         onKeyDown={onButtonKeyDown}
+        {...lock.handlers}
       >
         {treatment === 'text' ? (
           <ArrowUpDown className={styles.directionIcon} aria-hidden="true" />
@@ -345,6 +352,7 @@ export default function Select({
         </SelectMenu>
       ) : null}
       {error ? <p className={styles.error} role="alert">{error}</p> : null}
+      {lock.node}
     </div>
   )
 }

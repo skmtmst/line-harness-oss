@@ -1,3 +1,4 @@
+import { lineTokenExpiry } from '@line-crm/shared';
 import type { LineAccount as DbLineAccount } from '@line-crm/db';
 
 export function serializeLineAccount(row: DbLineAccount) {
@@ -22,6 +23,7 @@ export function serializeLineAccount(row: DbLineAccount) {
     role: row.role,
     timezone: row.timezone ?? 'Asia/Tokyo',
     revision: row.revision ?? 1,
+    tokenExpiry: lineTokenExpiry(row.token_expires_at),
     displayOrder: row.display_order,
     // 公開 URL や開発者設定にも出る login_channel_id/liff_id は秘密でないため、別の取得なしで設定有無を示せるよう一覧にも返す。
     loginChannelId: row.login_channel_id,

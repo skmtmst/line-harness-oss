@@ -33,6 +33,12 @@
 :global(:root) .headingTabs { margin-top: 0; }
 :global(:root) .headingNotice { min-width: 0; }
 :global(:root) .headingNotice:empty { display: none; }
+/* 一覧の閲覧帯は見出しと操作の行の下の全幅の行。題の列の中に置くと操作の分だけ幅が足りない。操作の行（crumbs 持ちは order 3）の後・手順（order 5）の前。上との間は題の列の間と同じに見えるよう、行の間との差を戻す。 */
+:global(:root) [data-page-template='list'] .heading > .headingNotice { flex-basis: 100%; order: 4; margin-top: calc(var(--tpl-head-gap) - var(--polish-space-field)); }
+:global(:root) [data-page-template='list'] .heading[data-heading-size='compact'] > .headingNotice { margin-top: calc(var(--tpl-compact-gap) - var(--polish-space-field)); }
+:global(:root) [data-page-template='list'] .heading[data-heading-size='large'] > .headingNotice { margin-top: calc(var(--tpl-head-gap) - var(--tpl-large-gap)); }
+/* 飲食店の器（RestaurantShell の templateHeading）も同じ全幅の行。Shell は頭の大きさを変えないため基本の補正だけ。 */
+:global(:root) [data-page-template='restaurant'] .heading > .headingNotice { flex-basis: 100%; order: 4; margin-top: calc(var(--tpl-head-gap) - var(--polish-space-field)); }
 /* 詳細のタブも headingText の段間だけを使う。 */
 :global(:root) [data-page-template='detail'] .headingTabs { margin-top: 0; }
 /* タブの有無によらず、題の下は共通の余白を使う。 */
@@ -65,9 +71,9 @@
 :global(:root) .toolbar:has(> [data-kpi-strip]) { row-gap: var(--space-16); padding-top: var(--space-8); padding-bottom: var(--space-16); }
 :global(:root) .stats [data-kpi-strip]:last-child { margin-bottom: 0; }
 :global(:root) .stats:has([data-kpi-strip]) + .split > .main > .toolbar:first-child { padding-top: var(--space-16); padding-bottom: var(--space-16); }
-:global(:root) .frame > [data-kpi-strip] + * { margin-top: var(--space-12); }
-/* 板の直下・一覧の本文に直に置いた数の帯も、型の stats と同じ左右の内側の余白に収める（題・道具の行と端をそろえる）。 */
-:global(:root) .frame > [data-kpi-strip] { margin-inline: var(--tpl-list-inset); }
+:global(:root) .frame > [data-kpi-strip] + * { margin-top: var(--space-16); }
+/* 板の直下・一覧の本文に直に置いた数の帯も、型の stats と同じ左右の内側の余白に収める（題・道具の行と端をそろえる）。帯側の下余白は持たせず、帯→次の段を型の16にそろえる。 */
+:global(:root) .frame > [data-kpi-strip] { margin-inline: var(--tpl-list-inset); margin-bottom: 0; }
 :global(:root) .listBody:not([data-table-inset]) .content > [data-kpi-strip] { margin-inline: var(--tpl-list-inset); }
 :global(:root) .content { min-width: 0; }
 :global(:root) .listCards { display: grid; grid-template-columns: repeat(var(--tpl-list-card-columns), minmax(0, 1fr)); gap: var(--polish-space-card); padding-inline: var(--tpl-list-inset); align-items: start; }
@@ -112,6 +118,8 @@
 :global(:root) .dashboardRow[data-aside-size='column'] > .dashboardCell { grid-column: 1 / -2; }
 :global(:root) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: -2 / -1; width: auto; }
 :global(:root) .createContent { padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side); display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; flex: 1; }
+/* 作成の本文が間隔の唯一の持ち主。直下の共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
+:global(:root) .createContent > :global([data-design-part='notice']) { margin-block: 0; }
 :global(:root) .bodyEndActions { display: flex; flex: none; align-items: center; justify-content: center; gap: var(--polish-space-field); width: 100%; padding-block: var(--polish-space-section); }
 :global(:root) .preview { align-self: flex-start; position: sticky; top: 0; max-height: 100%; width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
 /* 作成の右欄は白い板と同じ面。端末の中の地は見え方の部品が持つ。 */
@@ -175,6 +183,10 @@
 :global(:root) .settingsNav { width: var(--tpl-settings-nav-width); flex-shrink: 0; display: flex; flex-direction: column; gap: var(--polish-space-row); padding: var(--tpl-settings-nav-pad-block) var(--tpl-settings-nav-pad-side); }
 :global(:root) .settingsNav:has(> [data-settings-nav='inline']) { width: auto; padding: 0; }
 :global(:root) .settingsContent { flex: 1; max-width: 720px; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-settings-content-gap); padding: var(--tpl-settings-content-pad-block) var(--tpl-settings-content-pad-side); }
+/* 設定の本文が間隔の唯一の持ち主。直下の共有Noticeの上下余白を消し、帯→次の段を段にそろえる。 */
+:global(:root) .settingsContent > :global([data-design-part='notice']) { margin-block: 0; }
+/* SB枠の包み（display:contents）の中の帯も同じ。型の側でそろえる。 */
+:global(:root) .settingsContent > :global([data-sb-settings-screen]) > :global([data-design-part='notice']) { margin-block: 0; }
 /* 採用 B237-5a：設定目次208、右380、各欄の内側24。 */
 :global(:root) .frame[data-template-layout='customer-look'] { --tpl-settings-nav-width:calc(var(--tpl-setnav-w) + var(--tpl-settings-nav-pad-side) * 2); --tpl-settings-gap:0px; --customer-look-preview-width:380px; --customer-look-pane-padding:24px; }
 :global(:root) .frame[data-template-layout='customer-look'] .settingsContent { max-width:none; padding:0; }
@@ -197,6 +209,8 @@
 :global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) { padding-bottom: 0; }
 :global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) > :global([data-read-only-notice]) { margin-bottom: 0; }
 :global(:root) .createNotice[data-content-spacing='notice-after-read-only'] + .split > .createContent[data-content-spacing='notice-after-read-only'] { padding-top: 0; }
+/* 上の集約の例外：閲覧帯の直後の先頭Noticeだけ上余白を共通値に戻す（帯同士が接するのを防ぐ）。 */
+:global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) + .split > .createContent[data-content-spacing='notice-after-read-only'] > :global([data-design-part='notice']):first-child { margin-block-start: var(--polish-space-field); }
 
 :global(:root) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--polish-space-row); }
 
@@ -570,6 +584,8 @@
 :global(:root) .collapsedFolders[data-toolbar-persistent] { display: flex; align-items: center; gap: var(--tpl-toolbar-gap); }
 
 :global(:root) .pageContent { display: flex; flex-direction: column; gap: var(--polish-space-card); padding: var(--polish-space-card) var(--polish-space-section) 0; min-width: 0; }
+/* 頁の本文が間隔の唯一の持ち主。直下の共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
+:global(:root) .pageContent > :global([data-design-part='notice']) { margin-block: 0; }
 :global(:root) .pageContent[data-content-layout='stats'] { padding-block: 0; }
 :global(:root) .pageContent[data-content-layout='columns'] { flex-direction: row; align-items: flex-start; }
 :global(:root) .createColumns { display: grid; grid-template-columns: minmax(0, 1fr) var(--tpl-preview-width); min-height: 0; align-items: stretch; }
@@ -675,3 +691,22 @@
 :global(:root) .settingsFlow:has(> .createNotice:not(:empty)) > .settings > .settingsNav { padding-top: 0; }
 :global(:root) .settingsFlow:has(> .createNotice:not(:empty)) > .settings .customerLookMain,
 :global(:root) .settingsFlow:has(> .createNotice:not(:empty)) > .settings .customerLookPreview { padding-top: 0; }
+
+/* 独立した保存帯付きの板が viewport を明示した時だけ、親の可用高へ収める。
+   対象条件は ../app-shell.module.css の親からの割当てと対で保つ。 */
+@media (min-width: 1024px) {
+  :global(main[id='main-content'] > [data-design-shell]) > .frame[data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']) {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+  }
+}
+
+/* この経路は本文だけを送り、保存帯の内側と外側は通常の流れで場所を持つ。 */
+@media (min-width: 1024px) {
+  :global(main[id='main-content'] > [data-design-shell]) > .frame[data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']) > .footer,
+  :global(main[id='main-content'] > [data-design-shell]) > .frame[data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']) > .footer > :global([data-shared-part='sticky-bar']) {
+    position: static;
+    bottom: auto;
+  }
+}

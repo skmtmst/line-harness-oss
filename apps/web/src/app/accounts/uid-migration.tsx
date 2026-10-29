@@ -3,7 +3,7 @@
 import CsvTemplateDownload from '@/components/shared/csv-template-download'
 import { UID_IMPORT_HEADERS } from '@/lib/csv-import-columns'
 
-import { canManageRole, isOwnerRole } from '@/lib/staff-role'
+import { isOwnerRole } from '@/lib/staff-role'
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
 import Button from '@/components/shared/button'
 import KpiBand from '@/components/shared/kpi-band'
@@ -36,6 +36,8 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockTip } from '@/components/shared/permission-lock-tip'
 
 /*
  * ★V8 UID移行（Pencil  要確認の判断・ 本移行の完了・
@@ -105,6 +107,8 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
     onFilterChange,
     onPageChange,
   } = m
+  const purposeLock = usePermissionLockTip<HTMLDivElement>(m.managerLockReason)
+  const { disabled: _purposeDisabled, ...purposeHandlers } = purposeLock.handlers ?? {}
 
   if (status === 'loading') {
     return <ListState kind="loading" title="UID移行を読み込んでいます" description="移行履歴とアカウントを確認しています。" />
@@ -113,15 +117,11 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
     return <ListState kind="error" title="UID移行を表示できませんでした" description="登録した移行履歴は消えていません。" onRetry={() => void load()} />
   }
 
-  const executeBlockedReason = me
-    ? !isOwnerRole(me.role)
-      ? '本移行の実行はownerの権限が必要です。'
-      : me.id === active?.createdBy
-        ? 'この移行はあなたが作成したため、別のownerが実行してください。'
-        : null
-    : '権限を確認できません。読み直してください。'
-  const rollbackBlockedReason = canRunRollback ? null : '切り戻しはownerの権限が必要です。'
-  const canDecideItems = canManageRole(me?.role)
+  const executeBlockedReason = me && isOwnerRole(me.role) && me.id === active?.createdBy
+    ? 'この移行はあなたが作成したため、別のownerが実行してください。' : null
+  const ownerLockReason = m.ownerLockReason
+  const managerLockReason = m.managerLockReason
+  const canDecideItems = m.canDecide
 
   const currentStep = !active
     ? 0
@@ -157,6 +157,8 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
         }))}
       />
 
+      {me !== null && !canDecideItems ? <ReadOnlyNotice need="manager" /> : null}
+
       {/* FRIEND-15: 「まだ変更していません」は本移行前の履歴だけに出す。 */}
       {(!active || PRE_EXECUTE_STATUSES.includes(active.status)) && (
         <Notice tone="info" role="note">
@@ -173,16 +175,17 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
         <div className={styles.duoCards}>
           <div className={styles.fieldStack}>
             <span className={styles.fieldLabel}>移行元</span>
-            <SaveErrorField names={["fromAccountId","from_account_id"]}><EntitySelect aria-label="移行元アカウント" value={fromAccountId} onChange={(value) => setFromAccountId(value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} size="full" /></SaveErrorField>
+            <SaveErrorField names={["fromAccountId","from_account_id"]}><EntitySelect aria-label="移行元アカウント" disabled={!canDecideItems || busy} lockedReason={managerLockReason} value={fromAccountId} onChange={(value) => setFromAccountId(value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} size="full" /></SaveErrorField>
           </div>
           <div className={styles.fieldStack}>
             <span className={styles.fieldLabel}>移行先</span>
-            <SaveErrorField names={["toAccountId","to_account_id"]}><EntitySelect aria-label="移行先アカウント" value={toAccountId} onChange={(value) => setToAccountId(value)} options={[{ value: '', label: '移行先アカウントを選択' }, ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} size="full" /></SaveErrorField>
+            <SaveErrorField names={["toAccountId","to_account_id"]}><EntitySelect aria-label="移行先アカウント" disabled={!canDecideItems || busy} lockedReason={managerLockReason} value={toAccountId} onChange={(value) => setToAccountId(value)} options={[{ value: '', label: '移行先アカウントを選択' }, ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name }))]} size="full" /></SaveErrorField>
           </div>
         </div>
-        <div className={styles.fieldStack} style={{ marginTop: 12 }}>
+        <div className={styles.fieldStack} style={{ marginTop: 12 }} ref={purposeLock.ref} {...purposeHandlers} tabIndex={m.managerLockReason ? 0 : undefined} role={m.managerLockReason ? "group" : undefined} aria-label={m.managerLockReason ? "利用目的" : undefined}>
           <span className={styles.fieldLabel}>利用目的</span>
-          <SaveErrorField names={["purpose"]}><TextField value={purpose} onChange={(event) => setPurpose(event.target.value)} /></SaveErrorField>
+          <SaveErrorField names={["purpose"]}><TextField aria-label="利用目的" aria-describedby={purposeLock.handlers?.["aria-describedby"]} disabled={!canDecideItems || busy} value={purpose} onChange={(event) => setPurpose(event.target.value)} /></SaveErrorField>
+          {purposeLock.node}
         </div>
         <div style={{ marginTop: 12 }}>
           <CsvTemplateDownload headers={UID_IMPORT_HEADERS} name="UID対応表" />
@@ -191,12 +194,16 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
             hint="old_uid・new_uid 列のCSVを選びます"
             accept=".csv,text/csv"
             chooseLabel="CSVをアップロード"
+            disabled={!canDecideItems || busy}
+            lockedReason={managerLockReason}
             onFiles={(files) => void onUidFile(files)}
           />
         </div>
         <div style={{ marginTop: 8 }}>
           {file ? (
             <AttachmentRow
+              disabled={!canDecideItems || busy}
+              lockedReason={managerLockReason}
               name={file.name}
               meta={`${formatNumber(mappings.length)}行・${formatMappingBytes(file.size)}`}
               onRemove={() => { setFile(null); setMappings([]); setMessage(null) }}
@@ -206,7 +213,7 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
           )}
         </div>
         <div style={{ marginTop: 12 }}>
-          <Button variant="primary" disabled={busy} onClick={() => void createDryRun()} busy={busy} busyLabel="確認中…">テスト移行を実行</Button>
+          <Button variant="primary" disabled={!canDecideItems || busy} lockedReason={managerLockReason} onClick={() => void createDryRun()} busy={busy} busyLabel="確認中…">テスト移行を実行</Button>
         </div>
         {message && <p role="status" className={styles.sectionDesc} style={{ marginTop: 8 }}>{message}</p>}
       </section>
@@ -221,8 +228,11 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
           busy={busy}
           detailBusy={detailBusy}
           canDecide={canDecideItems}
+          managerLockReason={managerLockReason}
+          ownerLockReason={ownerLockReason}
+          canRunExecute={canRunExecute}
+          canRunRollback={canRunRollback}
           executeBlockedReason={executeBlockedReason}
-          rollbackBlockedReason={rollbackBlockedReason}
           onShowDetail={(item) => { setDetailError(null); setDetailItem(item) }}
           onDecide={(item, decision) => void decide(item, decision)}
           onRequestExecute={() => { setExecuteError(null); setConfirmExecute(true) }}
@@ -233,7 +243,7 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
       )}
 
       {active && !showDecisionBoard && (
-        <MigrationResultBoard active={active} rollbackBlockedReason={rollbackBlockedReason} busy={busy} detailBusy={detailBusy} onRequestRollback={() => { setRollbackError(null); setRollbackConflicts([]); setConfirmRollback(true) }} />
+        <MigrationResultBoard active={active} ownerLockReason={ownerLockReason} canRunRollback={canRunRollback} busy={busy} detailBusy={detailBusy} onRequestRollback={() => { setRollbackError(null); setRollbackConflicts([]); setConfirmRollback(true) }} />
       )}
 
       {!active && (
@@ -272,7 +282,10 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
                     accountName={(id) => accounts.find((account) => account.id === id)?.name ?? id}
                     isActive={active?.id === run.id}
                     onSelect={() => selectRun(run.id)}
-                    onRollback={run.rollbackable && !rollbackBlockedReason
+                    canRunRollback={canRunRollback}
+                    lockedReason={ownerLockReason}
+                    busy={busy || detailBusy}
+                    onRollback={run.rollbackable
                       ? () => { selectRun(run.id); setRollbackError(null); setRollbackConflicts([]); setConfirmRollback(true) }
                       : null}
                   />
@@ -286,8 +299,9 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
       <MigrationItemDialog
         detailItem={detailItem}
         active={active}
-        me={me}
-        busy={busy}
+        canDecide={canDecideItems}
+        lockedReason={managerLockReason}
+        busy={busy || detailBusy}
         detailError={detailError}
         onClose={() => { setDetailItem(null); setDetailError(null) }}
         decide={(item, decision) => void decide(item, decision)}
@@ -296,8 +310,9 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
         active={active}
         accounts={accounts}
         me={me}
-        busy={busy}
-        open={confirmExecute && isOwnerRole(me?.role)}
+        busy={busy || detailBusy}
+        lockedReason={ownerLockReason}
+        open={confirmExecute}
         error={executeError}
         canRun={canRunExecute}
         onConfirm={() => void execute()}
@@ -306,8 +321,9 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
       <RollbackConfirmDialog
         active={active}
         me={me}
-        busy={busy}
-        open={confirmRollback && canRunRollback}
+        busy={busy || detailBusy}
+        lockedReason={ownerLockReason}
+        open={confirmRollback}
         error={rollbackError}
         conflicts={rollbackConflicts}
         canRun={canRunRollback}
@@ -333,12 +349,18 @@ function HistoryRow({
   isActive,
   onSelect,
   onRollback,
+  canRunRollback,
+  lockedReason,
+  busy,
 }: {
   run: UidMigrationRun
   accountName: (id: string) => string
   isActive: boolean
   onSelect: () => void
   onRollback: (() => void) | null
+  canRunRollback: boolean
+  lockedReason?: string
+  busy: boolean
 }) {
   const badge = historyBadge(run)
   return (
@@ -353,9 +375,7 @@ function HistoryRow({
       <td><StatusBadge tone={badge.tone}>{badge.label}</StatusBadge></td>
       <td>
         {run.rollbackable
-          ? onRollback
-            ? <button type="button" className={styles.linkAction} onClick={onRollback}>切り戻す</button>
-            : <span className={styles.pairCellSub}>切り戻しはownerのみ</span>
+          ? <Button type="button" variant="text" size="inline" disabled={!canRunRollback || busy} lockedReason={lockedReason} onClick={onRollback ?? undefined}>切り戻す</Button>
           : <span className={styles.pairCellSub}>{emptyValue('unknown')}</span>}
       </td>
     </tr>
@@ -372,8 +392,11 @@ function MigrationReviewBoard({
   busy,
   detailBusy,
   canDecide,
+  managerLockReason,
+  ownerLockReason,
+  canRunExecute,
+  canRunRollback,
   executeBlockedReason,
-  rollbackBlockedReason,
   onShowDetail,
   onDecide,
   onRequestExecute,
@@ -389,8 +412,11 @@ function MigrationReviewBoard({
   busy: boolean
   detailBusy: boolean
   canDecide: boolean
+  managerLockReason?: string
+  ownerLockReason?: string
+  canRunExecute: boolean
+  canRunRollback: boolean
   executeBlockedReason: string | null
-  rollbackBlockedReason: string | null
   onShowDetail: (item: UidMigrationItem) => void
   onDecide: (item: UidMigrationItem, decision: 'link' | 'create' | 'exclude') => void
   onRequestExecute: () => void
@@ -422,7 +448,7 @@ function MigrationReviewBoard({
           <StatusBadge tone={statusView.badgeTone}>{statusView.badgeLabel}</StatusBadge>
         </div>
         <div className={styles.toolbar}>
-          <SaveErrorField names={["classification"]}><Select aria-label="分類で絞り込む" value={classification} onChange={(value) => onFilterChange(value as '' | ItemClassification, pendingOnly)} options={[{ value: '', label: 'すべての分類' }, ...ITEM_CLASSIFICATIONS.map((value) => ({ value, label: classLabel[value] }))]} size="standard" /></SaveErrorField>
+          <SaveErrorField names={["classification"]}><Select aria-label="分類で絞り込む" label="分類" value={classification} onChange={(value) => onFilterChange(value as '' | ItemClassification, pendingOnly)} options={[{ value: '', label: 'すべての分類' }, ...ITEM_CLASSIFICATIONS.map((value) => ({ value, label: classLabel[value] }))]} size="standard" /></SaveErrorField>
           <SaveErrorField names={["pendingOnly","pending_only"]}><Checkbox checked={pendingOnly} onCheckedChange={(checked) => onFilterChange(classification, checked)}>未判断のみ</Checkbox></SaveErrorField>
           <span className={styles.toolbarSpacer} />
           <span className={styles.toolbarCount}>全 {formatNumber(total)} 件{detailBusy ? '・読み込み中…' : ''}</span>
@@ -462,13 +488,14 @@ function MigrationReviewBoard({
                           （一覧の各行が「どうするか」を持つ Z0jHp の形）。
                           まとめて保存のAPIは無いので行ごとの保存のままにする。
                         */}
-                        {decisionsLocked || !canDecide ? (
+                        {decisionsLocked ? (
                           <span className={styles.pairCellSub}>{item.decision === 'pending' ? '未判断' : item.decision === 'link' ? '結び付ける' : item.decision === 'create' ? '新しく作る' : '除く'}</span>
                         ) : (
                           <SaveErrorField names={[`items.${saveFieldIndex}.decision`,"decision","item.decision"]}><Select
                             aria-label={`${item.oldUid} の引き継ぎ方`}
                             size="standard"
-                            disabled={busy || detailBusy}
+                            disabled={!canDecide || busy || detailBusy}
+                            lockedReason={managerLockReason}
                             value={item.decision === 'pending' ? '' : item.decision}
                             onChange={(value) => { if (value) onDecide(item, value as 'link' | 'create' | 'exclude') }}
                             options={[
@@ -502,9 +529,7 @@ function MigrationReviewBoard({
       <StickyBar
         destructive={
           active.rollbackable
-            ? rollbackBlockedReason
-              ? <span className={styles.pairCellSub}>{rollbackBlockedReason}</span>
-              : <Button type="button" variant="danger" disabled={busy || detailBusy} onClick={onRequestRollback}>この移行を切り戻す</Button>
+            ? <Button type="button" variant="danger" disabled={!canRunRollback || busy || detailBusy} lockedReason={ownerLockReason} onClick={onRequestRollback}>この移行を切り戻す</Button>
             : undefined
         }
         status={unresolved !== null && unresolved > 0 ? `要確認 ${formatNumber(unresolved)} 件` : undefined}
@@ -512,16 +537,13 @@ function MigrationReviewBoard({
           <>
             <Button type="button" href="/friends">友だち一覧へ戻る</Button>
             {active.status === 'ready' && (
-              <Button type="button" variant="primary" disabled={busy || detailBusy} onClick={onRequestExecute}>
+              <Button type="button" variant="primary" disabled={!canRunExecute || busy || detailBusy} lockedReason={ownerLockReason} disabledReason={ownerLockReason ? undefined : executeBlockedReason ?? undefined} onClick={onRequestExecute}>
                 本移行へ進む
               </Button>
             )}
           </>
         }
       />
-      {executeBlockedReason && active.status === 'ready' && (
-        <p className={styles.sectionDesc} role="note">{executeBlockedReason}</p>
-      )}
     </>
   )
 }
@@ -529,13 +551,15 @@ function MigrationReviewBoard({
 /** : 本移行と照合が終わった履歴。結果の帯＋照合の内訳。 */
 function MigrationResultBoard({
   active,
-  rollbackBlockedReason,
+  ownerLockReason,
+  canRunRollback,
   busy,
   detailBusy,
   onRequestRollback,
 }: {
   active: UidMigrationDetail
-  rollbackBlockedReason: string | null
+  ownerLockReason?: string
+  canRunRollback: boolean
   busy: boolean
   detailBusy: boolean
   onRequestRollback: () => void
@@ -559,9 +583,7 @@ function MigrationResultBoard({
       </KpiBand>
       {active.rollbackable && (
         <div className={styles.cardCenter}>
-          {rollbackBlockedReason
-            ? <p className={styles.sectionDesc}>{rollbackBlockedReason}</p>
-            : <Button type="button" variant="danger" disabled={busy || detailBusy} onClick={onRequestRollback}>この移行を切り戻す</Button>}
+          <Button type="button" variant="danger" disabled={!canRunRollback || busy || detailBusy} lockedReason={ownerLockReason} onClick={onRequestRollback}>この移行を切り戻す</Button>
         </div>
       )}
     </>

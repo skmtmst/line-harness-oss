@@ -2,15 +2,14 @@ import { inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import {
   getAccountHealthLogs,
-  getLatestRiskLevel,
-  getLatestRiskLevels,
+  getLineAccountListStats,
   getAccountMigrations,
   getAccountMigrationById,
   createAccountMigration,
   updateAccountMigration,
   isLineAccountTenantActive,
 } from '@line-crm/db';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { lineConnectionRisk, DEFAULT_TENANT_ID } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -32,15 +31,14 @@ health.get('/api/health', (c) => {
 // ========== アカウントヘルス ==========
 
 // サイドバーの N+1 解消用。staff 可視範囲のアカウントだけを対象に、
-// 最新 riskLevel だけを1回で返す。ログ本文は含めない。
+// 一覧と同じ接続の判定だけを1回で返す。ログ本文は含めない。
 health.get('/api/accounts/health-summary', async (c) => {
   try {
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    const levels = await getLatestRiskLevels(c.env.DB, scope.allowedAccountIds);
-    const byId = new Map(levels.map((level) => [level.line_account_id, level.risk_level]));
+    const stats = await getLineAccountListStats(c.env.DB, scope.allowedAccountIds);
     const items = scope.allowedAccountIds.map((lineAccountId) => ({
       lineAccountId,
-      riskLevel: byId.get(lineAccountId) ?? null,
+      riskLevel: lineConnectionRisk(stats[lineAccountId]?.connection),
     }));
     return c.json({
       success: true,
@@ -62,15 +60,16 @@ health.get('/api/accounts/:id/health', async (c) => {
     if (!scope.ids.includes(lineAccountId)) {
       return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
-    const [riskLevel, logs] = await Promise.all([
-      getLatestRiskLevel(c.env.DB, lineAccountId),
+    const [stats, logs] = await Promise.all([
+      getLineAccountListStats(c.env.DB, [lineAccountId]),
       getAccountHealthLogs(c.env.DB, lineAccountId),
     ]);
     return c.json({
       success: true,
       data: {
         lineAccountId,
-        riskLevel,
+        riskLevel: lineConnectionRisk(stats[lineAccountId]?.connection),
+        connection: stats[lineAccountId]?.connection ?? null,
         logs: logs.map((l) => ({
           id: l.id,
           errorCode: l.error_code,

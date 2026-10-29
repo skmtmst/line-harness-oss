@@ -160,5 +160,15 @@ describe('権限詳細の説明欄は選択中の権限から生成する (#983)
   })
 })
 
+describe('ログインユーザーの右欄に作る人のメモを出さない (B1)', () => {
+  it('開発用のメモ欄は出さず、役割の案内は残す', async () => {
+    await act(async () => { render(<StaffPage />) })
+    await waitFor(() => expect(screen.getByRole('button', { name: '対象者の中身を見る' })).toBeTruthy())
+    expect(screen.queryByText('直したあとの列')).toBeNull()
+    expect(screen.queryByText(/表に足す列/)).toBeNull()
+    expect(screen.getByText('役割でできること')).toBeTruthy()
+  })
+})
+
 // Self-security loading is covered separately; retain this suite’s original operation assertions.
 vi.mock('@/v8/settings/staff/self-mfa', () => ({ default: () => null }))

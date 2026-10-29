@@ -1,3 +1,5 @@
+import { beforeEach as seedIdentity } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 // @vitest-environment happy-dom
 import React from 'react'
 import { cleanup, render, screen, within } from '@testing-library/react'
@@ -22,3 +24,5 @@ describe('曜日別営業時間のスマホ表示（R109）', () => {
     expect(within(monday).getByRole('button', { name: '月曜 枠1の終了' })).toBeTruthy()
   })
 })
+
+seedIdentity(() => { verifiedStaffRole('owner') })

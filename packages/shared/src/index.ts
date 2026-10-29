@@ -114,3 +114,9 @@ export * from "./gap3.js";
 
 export type { StagingQaRole, StagingQaJob, StagingQaRun, StagingQaSafety, StagingQaSession, StagingQaCronReceipt } from './staging-qa.js';
 export * from './notification-center.js';
+
+export { lineTokenExpiry, LINE_TOKEN_CAUTION_DAYS, LINE_TOKEN_REFRESH_DAYS } from './line-token-expiry.js';
+export type { LineTokenExpiry } from './line-token-expiry.js';
+export { lineAccountConnectionState, lineConnectionRisk } from './line-connection-state.js';
+export type { LineConnection, LineConnectionIssue } from './line-connection-state.js';
+export { lineObservationTime, lineWebhookSilence, LINE_WEBHOOK_SILENCE_MS } from './line-observation-time.js';

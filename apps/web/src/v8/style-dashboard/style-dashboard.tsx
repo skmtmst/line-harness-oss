@@ -12,13 +12,14 @@ import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
+import { lockUnless } from '@/components/shared/permission-lock'
 import Notice from '@/components/shared/notice'
 import { RadioCardGroup } from '@/components/shared/radio-card'
 import Radio from '@/components/shared/radio'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import RestaurantFloorMap from '@/components/shared/restaurant-floor-map'
 import { DetailColumns } from '@/components/templates/detail-columns'
-import ListToolbar from '@/components/shared/list-toolbar'
+import { ListToolbarSearchSlot } from '@/components/shared/list-toolbar'
 import SegmentedControl from '@/components/shared/segmented'
 import { Tabs } from '@/components/shared/tabs'
 import TestModeNote from '@/components/shared/test-mode-note'
@@ -32,6 +33,7 @@ import type { ReactNode } from 'react'
 import { useMemo,useState } from 'react'
 import { PhoneReservationDrawer } from '@/v8/restaurant/front-desk/public/phone-drawer/index'
 import { WalkInDialog } from '@/v8/restaurant/front-desk/public/walk-in-dialog/index'
+import { bookingEmptyState, EmptyBookings } from './empty-bookings'
 import { StyleAnalyticsView } from './analytics'
 import { DayList,MonthCalendar,WeekCalendar } from './calendar'
 import { RANGES,TAB_KEYS,TAB_PARAM,type DashboardTab,type DashboardView } from './config'
@@ -73,30 +75,6 @@ const ALERT_ICON: Record<NonNullable<StyleAlertAction['icon']>, ReactNode> = {
   link: <Link2 size={16} aria-hidden="true" />, people: <Users size={16} aria-hidden="true" />,
 }
 
-/* R11: 帯に入り切らない5つ目の短い1行（「新着予約 今日入った予約 3 件 一覧へ →」の形。項目名を残す）。 */
-function KpiOverflowLine({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
-  const value = kpi.valueText ?? (kpi.value == null ? '—' : formatNumber(kpi.value))
-  return (
-    <p className={styles.fifthLine}>{kpi.title} {kpi.detail} {value}{kpi.unit ? ` ${kpi.unit}` : ''} {kpi.link ? (
-      kpi.link.href === '#preparing-payment'
-        ? <Button variant="text" size="inline" onClick={onPreparing}>{kpi.link.label}へ →</Button>
-        : <Button variant="text" size="inline" href={kpi.link.href}>{kpi.link.label}へ →</Button>
-    ) : null}</p>
-  )
-}
-
-/* R11: 帯は大事な4つまで。ちょうど5つの時は5つ目を帯の下の短い1行に残す。6つ以上は4枚ずつの段。 */
-function StyleKpiBand({ kpis, style, onPreparing }: { kpis: StyleKpi[]; style: IndustryStyle; onPreparing: () => void }) {
-  const fifth = kpis.length === 5 ? kpis[4] : null
-  const shown = fifth ? kpis.slice(0, 4) : kpis
-  return <>
-    <KpiBand layout="link-row" maxColumns={4} data-style-dashboard={style}>
-      {shown.map((kpi) => <Kpi key={kpi.id} kpi={kpi} onPreparing={onPreparing} />)}
-    </KpiBand>
-    {fifth ? <KpiOverflowLine kpi={fifth} onPreparing={onPreparing} /> : null}
-  </>
-}
-
 function Kpi({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
   return (
     <KpiCard
@@ -119,16 +97,17 @@ function Kpi({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
 export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const { cfg, router, tab, subTab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, setCardDefaults, roster, rosterRow, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, KIND, saveClosure, addNew } = useStyleDashboard(style)
 
+  const emptyBookingState = today ? bookingEmptyState(style, today) : null
+  const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && (emptyBookingState === 'no-bookings' || emptyBookingState === 'no-classes')
+  const writeLock = role === null ? undefined : lockUnless(canWrite)
   const viewErrors = useSaveFormErrors()
   const headActions = (
     <>
-      {/* 追加決まり1: 読み直すは補助操作なので題の右上へ。道具の段に1つだけ落ちない。 */}
-      <Button onClick={() => void reload()}><RefreshCw size={16} aria-hidden="true" />読み直す</Button>
-      {canWrite && cfg.walkIn && store.store ? <Button onClick={() => setWalkInOpen(true)}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
-      {canWrite ? <Button href="/broadcasts"><MessageCircle size={16} aria-hidden="true" />LINE を送る</Button> : null}
-      {canWrite ? <Button onClick={() => setClosureOpen(true)}><CalendarX2 size={16} aria-hidden="true" />休みを入れる</Button> : null}
-      {canWrite ? <Button onClick={() => setViewOpen(true)}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button> : null}
-      {canWrite ? <Button variant="primary" onClick={() => addNew()}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button> : null}
+      {cfg.walkIn && store.store ? <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setWalkInOpen(true) }}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
+      <Button lockedReason={writeLock} {...(canWrite ? { href: '/broadcasts' } : { disabled: role === null })}><MessageCircle size={16} aria-hidden="true" />LINE を送る</Button>
+      <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setClosureOpen(true) }}><CalendarX2 size={16} aria-hidden="true" />休みを入れる</Button>
+      <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setViewOpen(true) }}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>
+      {today && !hasEmptyBookingAction ? <Button variant="primary" disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) addNew() }}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button> : null}
     </>
   )
 
@@ -137,9 +116,9 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     <div className={styles.filters}>
       <SegmentedControl aria-label="期間" value={days} onChange={(v) => setParam({ days: v })} options={ANALYTICS_DAYS} />
       <div className={styles.dateBox} data-short><DateField value={date} onChange={setDate} displayFormat="short" clearable={false} /></div>
-      <EntitySelect compact width={112} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
+      <EntitySelect compact width={152} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
       <span className={styles.grow} />
-      <EntitySelect compact width={190} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
+      <EntitySelect compact width={176} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
       <Button disabled disabledReason="書き出しの口をつなぐと使えます。"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
       <Button disabled disabledReason="定期の送信の口をつなぐと使えます。"><Mail size={16} aria-hidden="true" />毎朝メールで送る</Button>
       {loadedAt ? <span className={styles.updated}>更新 {formatDate(loadedAt, { style: 'time' })}</span> : null}
@@ -148,10 +127,12 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     <div className={styles.filters}>
       <SegmentedControl aria-label="期間" value={range} onChange={(v) => setParam({ range: v === 'today' ? null : v })} options={RANGES} />
       <div className={styles.dateBox}><DateField value={date} onChange={setDate} displayFormat="day" clearable={false} /></div>
-      <EntitySelect compact width={112} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
+      <EntitySelect compact width={152} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
       <span className={styles.grow} />
-      <EntitySelect compact width={190} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
+      <EntitySelect compact width={176} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
       {loadedAt ? <span className={styles.updated}>更新 {formatDate(loadedAt, { style: 'time' })}</span> : null}
+      {/* 上の段を軽くするため、読み直しは文字の押し口にする（題右は型が「…」へ畳む）。 */}
+      <Button variant="text" onClick={() => void reload()}><RefreshCw size={16} aria-hidden="true" />読み直す</Button>
     </div>
   )
 
@@ -187,6 +168,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     body = <ListState kind="empty" title={`${cfg.tabs[tab]}は今の画面で見られます`} action={<Button href={tab === 'bookings' ? cfg.links.bookings : cfg.links.people}>{`${cfg.tabs[tab]}を開く`}</Button>} />
   } else {
     const rows = today.rows.filter((r) => !search || r.name.includes(search) || (r.sub ?? '').includes(search) || (r.course ?? '').includes(search))
+    const emptyBookings = hasEmptyBookingAction ? <EmptyBookings style={style} day={date === jstToday() ? '今日' : 'この日'} today={today} canWrite={canWrite} role={role} onBook={() => addNew()} onCreateClass={() => router.push('/events/new')} /> : null
+    const filteredEmpty = <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => setSearch('')}>検索を外す</Button>} />
     let main: ReactNode
     let aside: ReactNode = side.length ? side : null
     if (view === 'calendar') {
@@ -194,23 +177,24 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         main = <MonthCalendar month={today.month} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, 'month', s))} onDay={(d) => setDate(d)} />
         aside = <DayList month={today.month} href={cfg.links.bookings} />
       } else if (today.week) {
-        main = <WeekCalendar week={today.week} period={range === 'today' ? 'day' : 'week'} canWrite={canWrite} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, range === 'today' ? 'today' : 'week', s))} onSlot={(day, time) => addNew({ date: day, time })} onOpen={(id) => { const row = today.rows.find((item) => item.id === id); if (row) openRow(row) }} />
+        main = <WeekCalendar empty={emptyBookings} week={today.week} period={range === 'today' ? 'day' : 'week'} canWrite={canWrite} onMove={(s) => setDate(s === 0 ? jstToday() : shiftDate(date, range === 'today' ? 'today' : 'week', s))} onSlot={(day, time) => addNew({ date: day, time })} onOpen={(id) => { const row = today.rows.find((item) => item.id === id); if (row) openRow(row) }} />
         aside = null
-      } else main = <ListState kind="empty" title="カレンダーに出す予約はまだありません" />
+      } else main = emptyBookings ?? <ListState kind="empty" title="カレンダーに出す予約はまだありません" />
     } else if (view === 'floor') {
       main = floor ? <RestaurantFloorMap floor={floor} labels={tables.map((t) => ({ id: t.id, label: t.code, active: Boolean(t.is_active), capacity: t.max_capacity }))} onSelect={() => router.push('/restaurant-test/tables')} />
         : <ListState kind="empty" title="座席の図がまだありません" action={canWrite ? <Button href="/restaurant-test/tables">座席の図を作る</Button> : undefined} />
     } else if (view === 'board' && today.board) {
-      main = <StaffBoard board={today.board} search={search} onSearch={setSearch} canWrite={canWrite} onSlot={(staffId, time) => addNew({ staffId, time })}
+      main = <StaffBoard empty={search && !today.board.entries.some(e => e.name.includes(search) || e.menu.includes(search)) ? filteredEmpty : emptyBookings} board={today.board} search={search} onSearch={setSearch} canWrite={canWrite} onSlot={(staffId, time) => addNew({ staffId, time })}
         entryItems={(e) => menuFor(today.rows.find((r) => r.id === e.id) ?? { id: e.id, time: e.start, name: e.name })} />
     } else {
       main = (
         <>
-          {/* 追加決まり1: 探す欄は左に置く。右に1つ浮かせて左を空けない。 */}
-          {style !== 'lesson' ? <div className={styles.listTools} data-dashboard-list-tools><div className={styles.search}><ListToolbar search={{ value: search, onChange: setSearch, placeholder: cfg.search, width: 220 }} /></div></div> : null}
+          {/* 探す欄は左に置く（追加決まり1）。帯の余白が付かない包み（ListToolbarSearchSlot）で幅を保つ。 */}
+          {style !== 'lesson' ? <div className={styles.listTools} data-dashboard-list-tools><div className={styles.search}><ListToolbarSearchSlot width={220} search={{ value: search, onChange: setSearch, placeholder: cfg.search }} /></div></div> : null}
+          {rows.length > 0 ? emptyBookings : null}
           <TodayList style={style} rows={rows} note={today.rowsNote} canWrite={canWrite} busyId={busy} menuFor={menuFor} onVisit={(r) => void markVisit(r)} onNoShow={(r) => void markNoShow(r)} onApprove={(r) => void approve(r)} onResult={(r) => setResultRow(r)} onUndo={(r) => void undoVisit(r)}
-            empty={<ListState kind="empty" title={`${range === 'today' ? '今日' : range === 'week' ? '今週' : '今月'}の${style === 'consult' ? '面談' : style === 'lesson' ? 'クラス' : '予約'}はありません`} description={canWrite ? (style === 'consult' ? '予約の URL を案内すると、空いた時間に入ります。' : '空いている時間に予約を入れられます。') : undefined}
-              action={canWrite ? (style === 'consult' ? <Button variant="primary" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/booking`).then(() => notifyToast('予約 URL をコピーしました。')) }}><Copy size={16} aria-hidden="true" />予約 URL をコピー</Button> : <Button variant="primary" onClick={() => addNew()}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button>) : undefined} />}
+            empty={search ? filteredEmpty : emptyBookings ?? <ListState kind="empty" title={`${range === 'today' ? '今日' : range === 'week' ? '今週' : '今月'}の${style === 'consult' ? '面談' : style === 'lesson' ? 'クラス' : '予約'}はありません`} description={canWrite ? (style === 'consult' ? '予約の URL を案内すると、空いた時間に入ります。' : '空いている時間に予約を入れられます。') : undefined}
+              action={style === 'consult' ? <Button variant="primary" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/booking`).then(() => notifyToast('予約 URL をコピーしました。')) }}><Copy size={16} aria-hidden="true" />予約 URL をコピー</Button> : <Button variant="primary" disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) addNew() }}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button>} />}
             selectedId={style === 'lesson' ? (shownRoster ? shownRoster.rowId : null) : undefined} onSelect={style === 'lesson' ? (r) => setRosterId(r.id) : undefined} />
         </>
       )
@@ -243,7 +227,9 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <div className={styles.inset}>
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
         {metricSelectionFallback ? <Notice tone="info" action={<Button onClick={reloadPresentation}>表示設定を読み直す</Button>}>保存した表示設定を確認できないため、業種の初期表示にしています。</Notice> : null}
-        {today && today.kpis.length === 0 ? null : <StyleKpiBand kpis={today?.kpis ?? []} style={style} onPreparing={openPayment} />}
+        {today && today.kpis.length === 0 ? null : <KpiBand layout="link-row" maxColumns={5} data-style-dashboard={style}>
+          {(today?.kpis ?? []).map((kpi) => <Kpi key={kpi.id} kpi={kpi} onPreparing={openPayment} />)}
+        </KpiBand>}
         {alert ? (
           <Notice tone="warn" role="status" heading={alert.title} className={styles.alert}
             action={alert.actions.some((a) => canWrite || a.icon === 'external') ? <div className={styles.alertActions}>{alert.actions.filter((a) => canWrite || a.icon === 'external').map((a) => (

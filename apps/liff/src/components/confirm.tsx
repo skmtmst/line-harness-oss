@@ -282,11 +282,11 @@ export default function Confirm({
             return (
               <Button key={e?.id ?? 'none'} variant="optionRow" selected={selected} aria-pressed={selected}
                 disabled={submitting} onClick={() => setEntitlementId(e?.id ?? null)}>
-                <span className={`min-w-0 truncate text-sm font-semibold ${selected ? 'text-(--liff-on-primary)' : 'text-ink'}`}>
+                <span className="min-w-0 truncate text-sm font-semibold text-ink">
                   {e ? e.name : '使わない'}
                 </span>
                 {e && (
-                  <span className={`shrink-0 text-xs whitespace-nowrap ${selected ? 'text-(--liff-on-primary)' : 'text-ink-secondary'}`}>
+                  <span className="shrink-0 text-xs whitespace-nowrap text-ink-secondary">
                     {e.kind === 'monthly' ? `今月 あと ${e.monthRemaining ?? '—'} 回` : `残り ${e.remaining ?? '—'} 回`}
                   </span>
                 )}

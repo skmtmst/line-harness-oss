@@ -38,24 +38,24 @@ afterEach(cleanup)
 
 it('未選択は呼び戻し・無断率を保ち、変更した数だけ版付き保存して再読込後も順番を復元する', async () => {
   const view = render(<StyleDashboard style="salon" />)
-  // R11: 帯は4枚まで（5つ目の無断キャンセル率は帯の下の1行）。
-  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち']))
+  // 本線形：帯は5枚（5つ目の無断キャンセル率も帯の中）。
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち', '無断キャンセル率']))
   const drawer = await open()
   fireEvent.click(within(drawer).getByRole('switch', { name: '数の帯：無断キャンセル率' }))
   fireEvent.click(within(drawer).getByRole('switch', { name: '数の帯：来店数' }))
   fireEvent.click(within(drawer).getByRole('button', { name: '数の帯：来店数を上へ' }))
   fireEvent.click(within(drawer).getByRole('button', { name: '保存する', exact: true }))
   await waitFor(() => expect(state.save).toHaveBeenCalledWith('a', 2, cards, ['bookings', 'attention', 'nextBookingRate', 'visits', 'recall']))
-  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数']))
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数', '呼び戻し待ち']))
   expect(state.summary.mock.calls.length).toBeGreaterThan(1)
   view.unmount(); render(<StyleDashboard style="salon" />)
-  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数']))
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数', '呼び戻し待ち']))
 })
 
 it('明示customがserver defaultと同値でも保持し、カードのみ保存でmetricIdsを送らない', async () => {
   state.customized = true
   render(<StyleDashboard style="salon" />)
-  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '入金額']))
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '入金額', '新着予約']))
   const drawer = await open()
   fireEvent.click(within(drawer).getByRole('switch', { name: '分析', exact: true }))
   fireEvent.click(within(drawer).getByRole('button', { name: '保存する', exact: true }))
@@ -105,9 +105,9 @@ it('resetだけdefaultへ戻し、空のcustomを未選択へ読み替えない'
   fireEvent.click(within(drawer).getByRole('button', { name: '型に戻す', exact: true }))
   await waitFor(() => expect(state.reset).toHaveBeenCalledWith('a', 2))
   await waitFor(() => expect(labels()).toContain('呼び戻し待ち'))
-  // R11: 5つ目の無断キャンセル率は帯の下の1行。
-  expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち'])
-  expect(screen.getByRole('link', { name: '友だち一覧へ →' })).toBeTruthy()
+  // 本線形：5つ目の無断キャンセル率も帯の中の札。
+  expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち', '無断キャンセル率'])
+  for (const go of screen.getAllByRole('link', { name: '友だち一覧' })) expect(go.closest('[data-kpi-strip]')).not.toBeNull()
   expect(state.customized).toBe(false)
   expect(state.save).not.toHaveBeenCalled()
 })
@@ -147,8 +147,8 @@ it('5超の既存customを切り捨てず共通の複数段へ復元する', asy
   render(<StyleDashboard style="salon" />)
   await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち', '無断キャンセル率', '来店数']))
   const rows = document.querySelectorAll('[data-style-dashboard] > [data-kpi-strip]')
-  // R11: 段は4枚ずつ。
-  expect(Array.from(rows).map(row => row.children.length)).toEqual([4, 2])
+  // 本線形：段は5枚ずつ。
+  expect(Array.from(rows).map(row => row.children.length)).toEqual([5, 1])
   expect(state.save).not.toHaveBeenCalled()
 })
 
@@ -157,49 +157,49 @@ it('32項目の閲覧だけでも内容と順序を保ち、未取得を0にせ�
   render(<StyleDashboard style="salon" />)
   await waitFor(() => expect(labels()).toHaveLength(32))
   const rows = document.querySelectorAll('[data-style-dashboard] > [data-kpi-strip]')
-  // R11: 段は4枚ずつ。
-  expect(Array.from(rows).map(row => row.children.length)).toEqual([4, 4, 4, 4, 4, 4, 4, 4])
+  // 本線形：段は5枚ずつ。
+  expect(Array.from(rows).map(row => row.children.length)).toEqual([5, 5, 5, 5, 5, 5, 2])
   const pending = screen.getByRole('button', { name: '支払い待ちの説明' }).closest('[data-design-version]')!
   expect(within(pending as HTMLElement).getByText('—', { exact: true })).toBeTruthy()
   expect(screen.queryByRole('button', { name: '表示を変える' })).toBeNull()
   expect(state.save).not.toHaveBeenCalled()
 })
 
-it('R11: 5つ目は帯の下の短い1行（行き先付き）', async () => {
+it('R11: 業種盤は5枚を帯に並べる（本線形）', async () => {
   render(<StyleDashboard style="salon" />)
-  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち']))
-  // 5つ目の無断キャンセル率は帯の外の1行。項目名・値・行き先を残す。
-  const go = screen.getByRole('link', { name: '友だち一覧へ →' })
-  expect(go.closest('[data-kpi-strip]')).toBeNull()
-  expect(go.getAttribute('href')).toBe('/friends')
-  const line = go.closest('p')!.textContent!
-  expect(line).toContain('無断キャンセル率')
-  expect(line).toContain('無断／対象の予約')
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち', '無断キャンセル率']))
+  // 5つ目の無断キャンセル率も帯の中の札。項目名・値・行き先を残す。
+  const goes = screen.getAllByRole('link', { name: '友だち一覧' })
+  expect(goes.length).toBeGreaterThan(0)
+  for (const go of goes) { expect(go.closest('[data-kpi-strip]')).not.toBeNull(); expect(go.getAttribute('href')).toBe('/friends') }
 })
 
-it('R11: 並べ替え後の5つ目も項目名つきの1行', async () => {
+it('R11: 並べ替え後の5つ目も帯の中の札', async () => {
   state.customized = true; state.ids = ['bookings', 'attention', 'nextBookingRate', 'visits', 'recall']
   render(<StyleDashboard style="salon" />)
-  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数']))
-  const go = screen.getByRole('link', { name: '友だち一覧へ →' })
-  expect(go.closest('[data-kpi-strip]')).toBeNull()
-  expect(go.closest('p')!.textContent!).toContain('呼び戻し待ち')
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数', '呼び戻し待ち']))
+  const goes = screen.getAllByRole('link', { name: '友だち一覧' })
+  expect(goes.length).toBeGreaterThan(0)
+  for (const go of goes) expect(go.closest('[data-kpi-strip]')).not.toBeNull()
 })
 
-it('追加決まり1: 読み直すは題の右上で道具の段に1つ落ちない', async () => {
+it('追加決まり1: 読み直すは日付の段の中（本線B28形）', async () => {
   render(<StyleDashboard style="salon" />)
-  await waitFor(() => expect(labels()).toHaveLength(4))
-  // 題の右上の操作にある。
-  expect(getPageAction({ name: '読み直す' })).toBeTruthy()
-  // 道具の段（期間の切り替えの行）には無い。
+  await waitFor(() => expect(labels()).toHaveLength(5))
+  // 題の操作には無い。
+  const heading = document.querySelector('[data-page-heading-actions]')
+  expect(heading).not.toBeNull()
+  expect(within(heading as HTMLElement).queryByRole('button', { name: '読み直す' })).toBeNull()
+  // 日付の段（期間の切り替えの行）の中にある。
+  const read = screen.getByRole('button', { name: '読み直す' })
   const period = document.querySelector('[role="group"][aria-label="期間"], [role="radiogroup"][aria-label="期間"]')
   expect(period).not.toBeNull()
-  expect(within(period!.parentElement as HTMLElement).queryByRole('button', { name: '読み直す' })).toBeNull()
+  expect(period!.parentElement!.contains(read)).toBe(true)
 })
 
 it('追加決まり1: 右の列の開閉はタブの段に入り単独の段を作らない', async () => {
   render(<StyleDashboard style="salon" />)
-  await waitFor(() => expect(labels()).toHaveLength(4))
+  await waitFor(() => expect(labels()).toHaveLength(5))
   const toggle = screen.getByRole('button', { name: '新着・お支払いを見る' })
   const columns = document.querySelector('[data-detail-columns]')!
   // タブの段（タブの後・本文の前）にあり、本文の2列の下の段には無い。
@@ -216,14 +216,13 @@ it('追加決まり1: 一覧の探す欄は左に置く（右に1つ浮かせな
   expect(tools!.firstElementChild!.contains(box)).toBe(true)
 })
 
-it('R11: 飲食店の5つ目は「新着予約 今日入った予約 N 件」', async () => {
+it('R11: 飲食店も5枚を帯に並べる（本線形）', async () => {
   render(<StyleDashboard style="restaurant" />)
-  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '空席（いま）', '無断キャンセル率']))
-  expect(document.body.textContent).toContain('新着予約')
-  expect(document.body.textContent).toContain('今日入った予約')
-  const go = screen.getByRole('link', { name: '一覧へ →' })
-  expect(go.closest('[data-kpi-strip]')).toBeNull()
-  expect(go.getAttribute('href')).toBe('/restaurant-test/reservations')
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '空席（いま）', '無断キャンセル率', '新着予約']))
+  // 帯の中に新着予約の札の行き先がある（表示切替の「一覧」は帯の外なので数えない）。
+  const strip = document.querySelector('[data-kpi-strip]')!
+  const goes = within(strip as HTMLElement).getAllByRole('link', { name: '一覧' }).filter((go) => go.getAttribute('href') === '/restaurant-test/reservations')
+  expect(goes.length).toBeGreaterThan(0)
 })
 
 it('旧応答の非保存fallbackから明示した再読込で真のcustomへ戻る', async () => {

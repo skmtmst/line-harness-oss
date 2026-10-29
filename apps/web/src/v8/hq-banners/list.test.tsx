@@ -192,6 +192,16 @@ describe('V8 バナー生成・一覧（src/v8/hq-banners）の動き', () => {
     expect(buttonNamed('画像を取り込む')).toBeTruthy()
   })
 
+  it('ライブラリの道具の段は探す・札・向きの切り替えの1段で、動かない並びの字を置かない', async () => {
+    nav.query = 'tab=library'
+    act(() => { root.render(<HqBannersListV8 />) })
+    await flush()
+    expect(host.querySelector('input[aria-label="テキスト・指示で探す"]')).not.toBeNull()
+    expect(host.querySelector('[role="group"][aria-label="見るもので絞り込む"]')).not.toBeNull()
+    expect(host.querySelector('[role="group"][aria-label="用途"]')).not.toBeNull()
+    expect(host.textContent).not.toContain('並び：作成が新しい順')
+  })
+
   it('閲覧のみには作る・取り込む・星を置かない（押せないボタンを残さない）', async () => {
     roleBox.role = 'viewer'
     act(() => { root.render(<HqBannersListV8 />) })

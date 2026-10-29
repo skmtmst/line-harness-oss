@@ -135,6 +135,8 @@ export interface StyleToday {
   kpis: StyleKpi[]
   alert?: StyleAlert | null
   rows: StyleRow[]
+  /** 会員予約の実集計。クラスの行数から予約数を推測しない。 */
+  bookingCount?: number | null
   rowsNote: string
   board?: StyleBoard | null
   week?: StyleWeek | null

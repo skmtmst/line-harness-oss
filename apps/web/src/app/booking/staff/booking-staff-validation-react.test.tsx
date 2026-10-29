@@ -248,15 +248,25 @@ describe('N-411 項目別権限と画面の一致（実React）', () => {
     storage.setItem('lh_staff_view_permissions', JSON.stringify(viewKeys))
   }
 
-  test('予約設定の権限が無い staff には新規・編集・削除を出さない', async () => {
+  test('予約設定の権限が無い staff にも新規・編集・削除を理由付きで残して実行を止める', async () => {
     asStaff(['/booking/bookings'], [])
     fixture.listStaff.mockResolvedValue({ staff: [STAFF_ROW] })
     render(<BookingStaffPage />)
     await screen.findByText('佐藤')
-    // V8 では閲覧のみの人に押せないボタンを置かず隠す（決まり §2）。
-    expect(screen.queryByRole('button', { name: '＋ スタッフを作る' })).toBeNull()
-    expect(screen.queryByText('編集')).toBeNull()
-    expect(screen.queryByText('削除する')).toBeNull()
+    const create = screen.getByRole('button', { name: '＋ スタッフを作る' })
+    expect(create.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(create)
+    expect(screen.queryByText('新規スタッフ')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '佐藤のその他操作' }))
+    for (const name of ['編集する', '削除する']) {
+      const item = screen.getByRole('menuitem', { name })
+      expect(item.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.click(item)
+    }
+    expect(screen.queryByText('スタッフ編集')).toBeNull()
+    expect(fixture.createStaff).not.toHaveBeenCalled()
+    expect(fixture.updateStaff).not.toHaveBeenCalled()
+    expect(fixture.deleteStaff).not.toHaveBeenCalled()
     // シフトへの導線は残す（閲覧権限があれば本人・他人どちらも開ける）
     expect(screen.getByText('シフト')).toBeTruthy()
   })

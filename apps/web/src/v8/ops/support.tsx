@@ -12,7 +12,6 @@ import { api, type OpsKnowledgeReference, type OpsSupportDetail, type OpsSupport
 import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge-ticket'
 import { planLabel, tenantDetailHref, opsCall, formatDateTime, PLAN_STATUS_LABEL, ROLE_LABEL } from '@/components/ops/ops-ui'
 import { compareLabel, durationLabel, elapsedLabel } from '@/v8/ops/support/format'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { ListToolbarRow } from '@/components/shared/list-toolbar'
@@ -354,7 +353,6 @@ export default function OpsSupportV8() {
       <OpsHead
         title="お問い合わせ"
         description={<span title={summary?.kpis ? `未対応のチケット ${summary.kpis.untouched}件・LINEから受付 ${summary.kpis.untouchedFromLine}件・初回返信 ${durationLabel(summary.kpis.avgFirstReplyMinutes)}（${compareLabel(summary.kpis.avgFirstReplyMinutes, summary.kpis.prevAvgFirstReplyMinutes, 'time')}）・解決率 ${summary.kpis.resolutionRate ?? '—'}%（${compareLabel(summary.kpis.resolutionRate, summary.kpis.prevResolutionRate, 'rate')}）・解決まで ${durationLabel(summary.kpis.avgResolutionMinutes)}（${compareLabel(summary.kpis.avgResolutionMinutes, summary.kpis.prevAvgResolutionMinutes, 'time')}）` : undefined}>統括の管理画面「お問い合わせ」から送られたものが新規として並びます。電話や LINE で受けた相談は、運営が代わりに起票できます</span>}
-        environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         band={(
           <div className={styles.band}>
           <OpsSupportStats summary={summary} loading={loading && summary === null} />

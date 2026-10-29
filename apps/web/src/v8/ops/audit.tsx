@@ -6,7 +6,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsAuditRow } from '@/lib/api'
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { AUDIT_ACTION_LABEL, formatDateTime, opsCall } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import { Tabs } from '@/components/shared/tabs'
@@ -133,7 +132,6 @@ export default function OpsAuditV8() {
       <OpsHead
         title="監査ログ"
         description="運営が行った操作の記録です。代理ログイン・個人情報の表示・契約先の停止・運営メンバーの変更が残ります。"
-        environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
         actions={(
           <Button onClick={() => void exportCsv()} title={exporting ? '書き出しています' : total === 0 ? '記録がないため書き出せません' : undefined} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出しています…">
             <Download aria-hidden="true" />CSVで書き出す
@@ -172,7 +170,7 @@ export default function OpsAuditV8() {
             <thead><TableHeadRow><Th>日時</Th><Th>運営者</Th><Th><span>操作</span></Th><Th>契約先</Th><Th grow>理由</Th></TableHeadRow></thead>
             <tbody>{rows.map((row) => (
               <Tr key={row.id}>
-                <Td title={formatDateTime(row.created_at)}>{shortDateTime(row.created_at)}</Td>
+                <Td title={formatDateTime(row.created_at)} className={styles.atCell}>{shortDateTime(row.created_at)}</Td>
                 <Td><TruncatedText value={row.staff_name ?? ''} /></Td>
                 <Td><RowNameButton title={actionWord(row.action)} onClick={() => setEntry({ occurredAt: row.created_at, target: row.tenant_name ?? '運営全体', status: actionWord(row.action), reason: row.reason ?? '理由の記録なし' })}>{actionWord(row.action)}</RowNameButton></Td>
                 <Td title={row.tenant_name ?? ''}><TruncatedText value={row.tenant_name ?? emptyValue('unknown')} /></Td>

@@ -228,7 +228,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     <Notice tone="info" className="mb-4">だれが、いつ、何をしたかの記録です。いつもと違う場所からのログインは赤く出します。消した・配信した・設定を変えたで絞れます。</Notice>
     <div className="mb-3 flex flex-wrap items-center gap-3">
       <SearchField aria-label="人の名前・操作の内容で検索" value={query} onChange={setQuery} placeholder="人の名前・操作の内容で検索" className="min-w-64 flex-1" />
-      <SaveErrorField names={["periodFilter","period_filter"]}><Select aria-label="期間で絞り込む" value={periodFilter} onChange={setPeriodFilter} options={PERIOD_OPTIONS} /></SaveErrorField>
+      <SaveErrorField names={["periodFilter","period_filter"]}><Select aria-label="期間で絞り込む" label="期間" value={periodFilter} onChange={setPeriodFilter} options={PERIOD_OPTIONS} /></SaveErrorField>
       <SaveErrorField names={["pageSize","limit","page_size"]}><Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={PAGE_SIZE_OPTIONS} /></SaveErrorField>
     </div>
     <div className="mb-3 flex flex-wrap items-center gap-3">

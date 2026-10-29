@@ -11,6 +11,11 @@
   box-shadow: var(--card-shadow);
 }
 
+.noticeStack {
+  display: flow-root;
+  min-width: 0;
+}
+
 .spacer {
   flex: 1 1 0;
 }

@@ -109,6 +109,39 @@ export function toListCursor(
   return { at: last.lastMessageAt, id: last.id, unread: last.isUnread ? 1 : 0 }
 }
 
+/** 対応が必要な会話の行き先（ID27「いちばん古い会話を開く」）。 */
+export type OldestAttentionTarget = { kind: 'chat'; id: string } | { kind: 'email'; threadId: string }
+
+/*
+ * LINE とメールを混ぜて、まだ対応していない物のうち最も古い物を選ぶ。
+ * LINE は status='unread'（自動応答に掛からなかった真の要対応）だけ、
+ * メールは未読だけを見る。時刻が無い・読めない物は選ばない。
+ */
+export function oldestAttentionTarget(
+  chats: Pick<ChatListItem, 'id' | 'status' | 'lastMessageAt'>[],
+  emails: Pick<EmailInboxItem, 'threadId' | 'isUnread' | 'lastMessageAt' | 'lastIncomingAt'>[],
+): OldestAttentionTarget | null {
+  let bestAt = Number.POSITIVE_INFINITY
+  let bestTarget: OldestAttentionTarget | null = null
+  const consider = (at: string | null | undefined, target: OldestAttentionTarget) => {
+    const ms = at ? Date.parse(at) : NaN
+    if (!Number.isFinite(ms)) return
+    if (ms < bestAt) {
+      bestAt = ms
+      bestTarget = target
+    }
+  }
+  for (const chat of chats) {
+    if (chat.status !== 'unread') continue
+    consider(chat.lastMessageAt, { kind: 'chat', id: chat.id })
+  }
+  for (const mail of emails) {
+    if (!mail.isUnread) continue
+    consider(mail.lastMessageAt ?? mail.lastIncomingAt, { kind: 'email', threadId: mail.threadId })
+  }
+  return bestTarget
+}
+
 export function formatInboxDatetime(iso: string | null): string {
   if (!iso) return '—'
   return formatDateTime(iso)

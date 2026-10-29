@@ -18,8 +18,8 @@ describe('受信箱一覧の時刻（24時間は相対表示、それより前�
     expect(formatListRecent('2026-10-18T03:00:00Z', { now: NOW })).toBe('10/18 12:00')
     expect(formatListRecent('2026-10-17T03:00:00Z', { now: NOW })).toBe('10/17 12:00')
   })
-  it('今年と前年は年を省き、それより古い年には年を付ける', () => {
-    expect(formatListRecent('2025-12-31T03:00:00Z', { now: NOW })).toBe('12/31 12:00')
+  it('今年だけ年を省き、前年も含めた別年には年を付ける', () => {
+    expect(formatListRecent('2025-12-31T03:00:00Z', { now: NOW })).toBe('2025/12/31 12:00')
     expect(formatListRecent('2024-12-31T03:00:00Z', { now: NOW })).toBe('2024/12/31 12:00')
   })
   it('時計のずれで未来になった時刻は日付と時刻で出す', () => {

@@ -5,7 +5,7 @@
  */
 
 /* 閲覧のみの帯。数の帯の上。薄い青の地・目の印・枠なし。 */
-.viewerBand { margin: 0 var(--tpl-head-pad-side) var(--tpl-ro-band-after); }
+.viewerBand { margin: 0 0 var(--tpl-ro-band-after); }
 
 .createFull { width: 100%; }
 /* 閲覧のみ：押せない「配信を作る」「フォルダを追加」は置かず、場所だけ空ける。 */
