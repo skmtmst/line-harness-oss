@@ -16,14 +16,17 @@ vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentP
 
 const net = vi.hoisted(() => ({
   check: { status: 200, body: {} as unknown } as { status: number; body: unknown },
+  checkThrows: false,
 }))
 
 beforeEach(() => {
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
+  net.checkThrows = false
   window.history.replaceState(null, '', '/ops/invite#invite=token-1')
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input)
     if (url.includes('/api/auth/ops-invite/check')) {
+      if (net.checkThrows) throw new TypeError('fetch failed')
       return new Response(JSON.stringify(net.check.body), { status: net.check.status, headers: { 'Content-Type': 'application/json' } })
     }
     return new Response(JSON.stringify({ success: false, error: '未設定' }), { status: 500 })
@@ -59,6 +62,8 @@ describe('運営メンバーの招待V8（tVaUh）', () => {
     expect(host.querySelector('[data-design-node="tVaUh"]')).not.toBeNull()
     expect(host.textContent).toContain('この招待はすでに使われています')
     expect(host.textContent).toContain('運営のログインへ')
+    expect(host.textContent).not.toContain('もう一度読み込む')
+    expect(host.textContent).not.toContain('名前とパスワードを決める')
     await unmount()
   })
 
@@ -67,6 +72,42 @@ describe('運営メンバーの招待V8（tVaUh）', () => {
     await render()
     expect(host.textContent).toContain('この招待は期限切れです')
     expect(host.textContent).toContain('送り直し')
+    expect(host.textContent).toContain('運営のログインへ')
+    expect(host.textContent).not.toContain('もう一度読み込む')
+    await unmount()
+  })
+
+  it('見つからない招待でもログインへ案内し、やり直しは出さない', async () => {
+    net.check = { status: 404, body: { success: false, error: 'この招待は使えません' } }
+    await render()
+    expect(host.textContent).toContain('この招待は使えません')
+    expect(host.textContent).toContain('運営のログインへ')
+    expect(host.textContent).not.toContain('もう一度読み込む')
+    expect(host.textContent).not.toContain('名前とパスワードを決める')
+    await unmount()
+  })
+
+  it('混雑の失敗では読み直せる口を残す', async () => {
+    net.check = { status: 429, body: { success: false, error: '混み合っています' } }
+    await render()
+    expect(host.textContent).toContain('招待を読み込めませんでした')
+    expect(host.textContent).toContain('もう一度読み込む')
+    await unmount()
+  })
+
+  it('通信の失敗では読み直せる口を残す', async () => {
+    net.checkThrows = true
+    await render()
+    expect(host.textContent).toContain('招待を読み込めませんでした')
+    expect(host.textContent).toContain('もう一度読み込む')
+    await unmount()
+  })
+
+  it('サーバーの失敗では読み直せる口を残す', async () => {
+    net.check = { status: 500, body: { success: false, error: '混み合っています' } }
+    await render()
+    expect(host.textContent).toContain('招待を読み込めませんでした')
+    expect(host.textContent).toContain('もう一度読み込む')
     await unmount()
   })
 

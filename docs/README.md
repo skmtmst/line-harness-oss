@@ -462,6 +462,7 @@
 - [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
 - [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
 - [共通UIの状態表示・操作の修正](release-log/unreleased/0000-kenta-muse-ui-state.md)
+- [招待・ログインユーザー・予約枠の表示修正](release-log/unreleased/0000-kenta-muse-auth.md)
 - [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/1948-kenta-train-1029f.md)
 - [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
 - [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
