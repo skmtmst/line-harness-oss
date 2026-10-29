@@ -135,8 +135,10 @@ export function AccountProvider({ children }: { children: ReactNode }) {
         setError(res.error || 'アカウント一覧を読み込めませんでした')
         return
       }
-      if (res.data.length > 0) {
-        const list = res.data as AccountWithStats[]
+      // アーカイブ済みは管理画面で復元できるが、店舗の選択肢には出さない。
+      // PC・モバイル・初期着地点で同じ一覧を使うため、ここで揃える。
+      const list = (res.data as AccountWithStats[]).filter((account) => !account.archivedAt)
+      if (list.length > 0) {
         setAccounts(list)
 
         // 無効になった選択だけを解除する。未選択のときに先頭へ勝手に
@@ -151,11 +153,23 @@ export function AccountProvider({ children }: { children: ReactNode }) {
             // localStorage unavailable
           }
           const valid = stored && list.some((a) => a.id === stored)
+          if (!valid && stored) {
+            try {
+              localStorage.removeItem(STORAGE_KEY)
+            } catch {
+              // localStorage unavailable
+            }
+          }
           return valid ? stored : null
         })
       } else {
         setAccounts([])
         setSelectedAccountIdState(null)
+        try {
+          localStorage.removeItem(STORAGE_KEY)
+        } catch {
+          // localStorage unavailable
+        }
       }
       setError(null)
     } catch {

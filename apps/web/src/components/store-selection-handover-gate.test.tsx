@@ -3,9 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import StoreSelectionGate from './store-selection-gate'
 
-const mocks = vi.hoisted(() => ({ state: vi.fn(), replace: vi.fn() }))
+const mocks = vi.hoisted(() => ({ state: vi.fn(), replace: vi.fn(), pathname: '/chats' }))
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/chats', useRouter: () => ({ replace: mocks.replace }),
+  usePathname: () => mocks.pathname, useRouter: () => ({ replace: mocks.replace }),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
   loading: false, selectedAccountId: 'the-shed', accounts: [{ id: 'the-shed' }],
@@ -13,7 +13,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
 }) }))
 vi.mock('@/lib/api', () => ({ api: { lineAccounts: { followerImportState: mocks.state } } }))
 
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => { vi.clearAllMocks(); mocks.pathname = '/chats' })
 afterEach(() => cleanup())
 
 describe('保存済みの店舗選択からの再訪', () => {
@@ -36,5 +36,16 @@ describe('保存済みの店舗選択からの再訪', () => {
     mocks.state.mockResolvedValue({ success: true, data: { phase: 'completed' } })
     render(<StoreSelectionGate><div>店舗画面</div></StoreSelectionGate>)
     await screen.findByText('店舗画面')
+  })
+
+  it('統括と引き継ぎ画面では入店ガードをかけず、進捗を表示できる', () => {
+    for (const pathname of ['/hq', '/accounts/new/handover']) {
+      mocks.pathname = pathname
+      const view = render(<StoreSelectionGate><div>引き継ぎ画面</div></StoreSelectionGate>)
+      expect(screen.getByText('引き継ぎ画面')).toBeTruthy()
+      view.unmount()
+    }
+    expect(mocks.state).not.toHaveBeenCalled()
+    expect(mocks.replace).not.toHaveBeenCalled()
   })
 })
