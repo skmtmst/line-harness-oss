@@ -2,14 +2,14 @@
 import { formatYen } from '@line-crm/shared';
 
 import ReservationBoard from '@/components/shared/reservation-board'
-import { BookingStatus } from '@/components/shared/booking-presentation'
+import { BookingSourceLegend, BookingStatus } from '@/components/shared/booking-presentation'
 import { reservationBookingState } from '@/components/shared/booking-state'
 
 import { PeopleDayList } from '@/v8/booking-bookings/public/day-list/index'
 
 import { PeopleDayFrame } from '@/v8/booking-bookings/public/day-frame/index'
 
-import { peopleBoardEntry } from '@line-crm/shared'
+import { peopleBoardEntry, withHonorific } from '@line-crm/shared'
 
 import { reservationBoardApi, allBoardPages } from '@/lib/api/helpers/reservation-board'
 
@@ -271,6 +271,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             title={`${calendarFrom}〜${calendarTo}の予約`} loadPrintEntries={selectedAccountId?()=>allBoardPages('people',selectedAccountId,new Date(calendarFrom+'T00:00:00+09:00').toISOString(),new Date(moveDay(calendarTo,1)+'T00:00:00+09:00').toISOString()):undefined}
             notice={calendarStatus==='loading'?<ListState kind="loading"/>:availability.status==='error'?<Notice tone="danger">空き枠を読み込めませんでした。予約の記録だけを表示しています。<Button onClick={()=>setSummarySeq(n=>n+1)}>もう一度読み込む</Button></Notice>:availability.status==='loading'?<p>空き枠を読み込んでいます</p>:availability.status==='unconfigured'?<Notice tone="warn" action={<Button href="/booking/menus">設定する</Button>}>担当者か予約メニューが未設定です。予約設定で登録すると空き枠が出ます。</Notice>:null}
             slots={availability.status==='ready'?availability.slots.filter(s=>s.remaining>0&&['available','limited'].includes(s.state)).map(s=>({resourceId:staffList.find(t=>t.display_name===s.staffName)?.id??'',startsAt:s.startUtc??`${s.date}T${s.start}:00+09:00`,href:`/booking/bookings/new?${new URLSearchParams({date:s.date,time:s.start,staff:s.staffName,menu:s.menuId})}`})):[]} entries={(calendarStatus==='ready'?calendarItems:[]).map(r=>peopleBoardEntry({...r,customer_name:r.friend_name,lock_version:(r as unknown as {lock_version:number}).lock_version,line_account_id:selectedAccountId}))}
+            legend={view==='day'||view==='week'?<BookingSourceLegend sources={['line','phone']}/>:undefined}
             trailingToolbar={view==='day'||view==='week'?<><EntitySelect width={146} aria-label={`${words.staff}で絞り込む`} valuePrefix={`${words.staff}：`} value={boardStaff} onChange={setBoardStaff} options={[{value:'all',label:'すべて'},...staffList.map(r=>({value:r.id,label:r.display_name}))]}/><Select size="content" label={SOURCE_FILTER_NAME} aria-label="予約元で絞り込む" value={sourceFilter} onChange={setSourceFilter} options={SOURCE_FILTER_OPTIONS}/></>:undefined}
             resources={staffList.filter(r=>view!=='day'||boardStaff==='all'||r.id===boardStaff).map(r=>({id:r.id,label:r.display_name,active:true,capacity:1}))}
             onOpen={setDetailId} canWrite={canOperate}
@@ -746,7 +747,7 @@ function BookingDetailPanel({
       <aside className="relative h-full w-full overflow-y-auto bg-canvas-sunken shadow-float">
         <div className="border-hairline sticky top-0 z-10 flex min-h-16 items-center justify-between gap-3 border-b bg-canvas px-6 py-3">
           <div className="min-w-0">
-            <p className="text-ink-faint text-xs font-semibold">予約管理　›　{formatJpDay(b.starts_at)}　›　{formatJpTime(b.starts_at)} {b.friend_name ?? 'お客様'}さま</p>
+            <p className="text-ink-faint text-xs font-semibold">予約管理　›　{formatJpDay(b.starts_at)}　›　{formatJpTime(b.starts_at)} {withHonorific(b.friend_name ?? 'お客様', 'さま')}</p>
             <h2 className="text-ink mt-1 truncate text-xl font-semibold">{b.friend_name ?? 'お客様'} ／ {b.menu_name}</h2>
           </div>
           <div className="flex shrink-0 items-center gap-2">
@@ -819,7 +820,7 @@ function BookingDetailPanel({
           <aside className="space-y-4">
           <section className="bg-canvas rounded-card border-hairline border p-5">
             <h3 className="text-ink text-sm font-semibold">お客様とペット</h3>
-            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-pill font-semibold">{b.friend_name?.charAt(0) ?? '?'}</span><div>{b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{b.friend_name ?? '名前未設定'}さま</Link> : <span className="text-ink font-semibold">{b.friend_name ?? '名前未設定'}さま</span>}<p className="text-ink-faint text-xs">{b.friend_id ? 'LINEの友だち情報と来店履歴' : '電話受付のお客さま'}</p></div></div>
+            <div className="mt-3 flex items-center gap-3"><span className="bg-action-soft text-action flex h-10 w-10 items-center justify-center rounded-pill font-semibold">{b.friend_name?.charAt(0) ?? '?'}</span><div>{b.friend_id ? <Link href={`/friends/detail?id=${encodeURIComponent(b.friend_id)}`} className="text-ink font-semibold hover:underline">{withHonorific(b.friend_name ?? '名前未設定', 'さま')}</Link> : <span className="text-ink font-semibold">{withHonorific(b.friend_name ?? '名前未設定', 'さま')}</span>}<p className="text-ink-faint text-xs">{b.friend_id ? 'LINEの友だち情報と来店履歴' : '電話受付のお客さま'}</p></div></div>
             <DetailRow label="ペット">{detail?.customer.petName ?? '登録なし'}</DetailRow>
             <DetailRow label="連絡先">{detail?.customer.phone ?? '登録なし'}</DetailRow>
             {detail?.customer.tags.length ? <DetailRow label="タグ">{detail.customer.tags.map((tag) => tag.name).join('、')}</DetailRow> : null}

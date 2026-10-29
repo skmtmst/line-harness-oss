@@ -66,6 +66,9 @@ export function formatDate(value: string | null | undefined): string {
 }
 
 export const AUDIT_ACTION_LABEL: Record<string, { label: string; tone: ChipTone }> = {
+  'application.contact': { label: '申込の連絡を記録', tone: 'info' },
+  'application.approve': { label: '申込を承認', tone: 'info' },
+  'application.invite': { label: '利用開始メールを送信', tone: 'info' },
   'tenant.create': { label: '契約先を作成', tone: 'info' },
   'tenant.status.change': { label: '契約先の状態を変更', tone: 'warn' },
   'tenant.feature_packs.change': { label: '機能パックを変更', tone: 'info' },

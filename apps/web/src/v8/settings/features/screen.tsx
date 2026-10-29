@@ -27,6 +27,7 @@ import styles from './screen.module.css'
 
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 
 /*
  * ★V8 機能設定（Pencil ・1152 ・競合 ・状態の見本帳 ）。
@@ -39,7 +40,6 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 const TITLE = '機能設定'
 const DESCRIPTION = '使わない機能をオフにすると、左のメニューから消えます。作ったデータは消えません'
-const VIEWER_NOTE = '閲覧のみで見ています。機能のオン・オフと並びは、オーナーか管理者に頼んでください。'
 
 /** 区分ごとの利用数（オン/オフを持たない項目用）。行の名前の横に小さく出す。 */
 function UsageBadge({ category, onRetry }: { category: UsageCategory; onRetry?: () => void }) {
@@ -90,7 +90,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: { usage: FeatureUsage; lab
   return <span className={styles.usage} title={title}>90日で {activity.value}{activityUnit}</span>
 }
 
-function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwitch, canManage, busy, onToggle }: {
+function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwitch, canManage, lockedReason, busy, onToggle }: {
   item: FeatureItem
   features: Record<string, boolean>
   usage?: UsageCategory
@@ -98,6 +98,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
   usageRetry?: () => void
   sharedSwitch: boolean
   canManage: boolean
+  lockedReason?: string
   busy?: boolean
   onToggle: (item: FeatureItem, next: boolean) => void
 }) {
@@ -119,15 +120,14 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
           <Lock className={styles.requiredIcon} aria-hidden="true" />
           消せない
         </span>
-      ) : canManage ? (
+      ) : (
         <SaveErrorField names={["enabled"]}><Toggle
           checked={enabled}
           label={`${item.label}を${enabled ? 'オフ' : 'オン'}にする`}
-          disabled={busy}
-          onChange={(next) => onToggle(item, next)}
+          disabled={busy || !canManage}
+          lockedReason={lockedReason}
+          onChange={(next) => { if (canManage) onToggle(item, next) }}
         /></SaveErrorField>
-      ) : (
-        <span className={styles.stateText}>{enabled ? 'オン' : 'オフ'}</span>
       )}
     </li>
   )
@@ -142,7 +142,7 @@ function settingsGroupLast<T extends { id: string }>(groups: T[]): T[] {
   return [...groups.filter((group) => !LAST_GROUP_IDS.includes(group.id)), ...groups.filter((group) => LAST_GROUP_IDS.includes(group.id))]
 }
 
-function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, usageRetry, open, canManage, busy, onOpenChange, onItemToggle, onGroupToggle }: {
+function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, usageRetry, open, canManage, lockedReason, busy, onOpenChange, onItemToggle, onGroupToggle }: {
   group: FeatureGroup
   features: Record<string, boolean>
   usageByItemId: Map<string, UsageCategory>
@@ -150,6 +150,7 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
   usageRetry?: () => void
   open: boolean
   canManage: boolean
+  lockedReason?: string
   busy?: boolean
   onOpenChange: (open: boolean) => void
   onItemToggle: (item: FeatureItem, next: boolean) => void
@@ -177,11 +178,12 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
           <Chevron className={styles.chevron} aria-hidden="true" />
         </button>
         <h2 className={styles.groupTitle}>{group.label}</h2>
-        {(!canManage || total === 0) && <span className={styles.groupMeta}>{groupSummary(group, features)}</span>}
+        {total === 0 && <span className={styles.groupMeta}>{groupSummary(group, features)}</span>}
         <span className={styles.spacer} />
-        {total > 0 && canManage && (
-          <ToggleGroupActions total={total} enabled={enabled} label={group.label} disabled={busy}
-            onChange={(next) => onGroupToggle(group, next)} />
+        {total > 0 && (
+          <ToggleGroupActions total={total} enabled={enabled} label={group.label} disabled={busy || !canManage} lockedReason={lockedReason}
+            disabledReason={busy ? '変更を反映しています' : null}
+            onChange={(next) => { if (canManage) onGroupToggle(group, next) }} />
         )}
       </div>
       {open && (
@@ -196,6 +198,7 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
               usageRetry={usageRetry}
               sharedSwitch={Boolean(item.keys[0]) && (switchCount.get(item.keys[0]) ?? 0) > 1}
               canManage={canManage}
+              lockedReason={lockedReason}
               busy={busy}
               onToggle={onItemToggle}
             />
@@ -253,9 +256,10 @@ export default function FeatureSettingsScreen() {
     currentOrder,
   } = settings
 
-  /* 変えられるのはオーナー・管理者だけ（サーバの PUT と同じ境目）。役割が分かるまでは今までどおり出す。 */
+  /* 本人未確認は通常disabled。確認後の権限拒否は共通の灰色と理由で示す。 */
   const staffRole = useStaffRole()
-  const canManage = canManageRole(staffRole)
+  const permissionReason = usePermissionLockReason(canManageRole(staffRole), 'manager')
+  const canManage = canManageRole(staffRole) && !permissionReason
 
   const [query, setQuery] = useListUrlValue('q', '')
   const [compareOpen, setCompareOpen] = useState(false)
@@ -263,6 +267,14 @@ export default function FeatureSettingsScreen() {
   const [openGroups, setOpenGroups] = useState<Set<string> | null>(null)
   const conflicted = error === FEATURE_SETTINGS_CONFLICT_MESSAGE
   useEffect(() => { setCompareOpen(false); setReorderOpen(false) }, [selectedAccountId])
+  // 権限を失っても下書きは保ち、変更中の窓だけ閉じる。
+  useEffect(() => {
+    if (canManage) return
+    setCompareOpen(false)
+    setReorderOpen(false)
+    setResetToDefaultsOpen(false)
+    setImpactOpen(false)
+  }, [canManage, setResetToDefaultsOpen, setImpactOpen])
 
   /* 保存ボタンは「保存中 → ✓ 保存しました」でボタンの中だけ変わる。 */
   const [savedTick, setSavedTick] = useState(false)
@@ -332,18 +344,18 @@ export default function FeatureSettingsScreen() {
   }, [conflicted])
   const conflictBand = conflicted ? (
     <div ref={conflictRef} role="status" data-design-node="ziYCN">
-      <SaveConflictBand title="ほかの人が先に機能設定を保存しました" onCompare={() => setCompareOpen(true)} onReload={() => void load()} />
+      <SaveConflictBand title="ほかの人が先に機能設定を保存しました" onCompare={() => { if (canManage) setCompareOpen(true) }} onReload={() => void load()} />
     </div>
   ) : null
 
   return (
     <SbSettingsScreen
       boardId="ywFJT"
-      notice={conflictBand}
+      notice={conflictBand || (staffRole !== null && !canManage) ? <>{conflictBand}{!canManage && <ReadOnlyNotice role="status" need="manager" />}</> : undefined}
       title={TITLE}
       help={DESCRIPTION}
       explanation="公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。"
-      saveActions={ready && canManage && (dirty || saving) ? (
+      saveActions={ready && (dirty || saving) ? (
         <>
           <Button
             variant="secondary"
@@ -355,8 +367,9 @@ export default function FeatureSettingsScreen() {
           </Button>
           <Button
             variant="primary"
-            onClick={() => { if (!validateReason()) return; if (conflicted) setCompareOpen(true); else void save() }}
-            disabled={saving || !dirty}
+            lockedReason={permissionReason}
+            onClick={() => { if (!canManage || !validateReason()) return; if (conflicted) setCompareOpen(true); else void save() }}
+            disabled={saving || !dirty || !canManage}
             busy={saving}
 
             doneLabel="保存しました"
@@ -369,10 +382,6 @@ export default function FeatureSettingsScreen() {
       ) : undefined}
 
     >
-      {!canManage && (
-        <ReadOnlyNotice role="status">{VIEWER_NOTE}</ReadOnlyNotice>
-      )}
-
       {!selectedAccountId ? (
         <p className={styles.stateBox}>先に上部でLINEアカウントを選んでください。</p>
       ) : loading ? (
@@ -406,16 +415,12 @@ export default function FeatureSettingsScreen() {
           <div className={styles.toolbar} data-control-row>
             <SearchField aria-label="機能の名前で探す" placeholder="機能の名前で探す" value={query} onChange={setQuery} className={styles.search} />
             <span className={styles.spacer} />
-            {canManage && (
-              <>
-                <Button variant="secondary" onClick={() => setReorderOpen(true)} disabled={saving}>
+            <Button variant="secondary" lockedReason={permissionReason} onClick={() => { if (canManage) setReorderOpen(true) }} disabled={saving || !canManage}>
                   <ArrowUpDown className={styles.btnIcon} aria-hidden="true" />
                   並びを変える
                 </Button>
-                <RowMenu appearance="box" label="機能設定のほかの操作" triggerProps={{ disabled: saving }}
-                  items={[{ id: 'reset', label: '初期値に戻す', tone: 'danger', icon: null, onSelect: () => setResetToDefaultsOpen(true) }]} />
-              </>
-            )}
+            <RowMenu appearance="box" label="機能設定のほかの操作" triggerProps={{ disabled: saving || staffRole === null }}
+                  items={[{ id: 'reset', label: '初期値に戻す', tone: 'danger', icon: null, disabled: saving || !canManage, lockedReason: permissionReason, onSelect: () => { if (canManage) setResetToDefaultsOpen(true) } }]} />
           </div>
 
           {usageFailed && (
@@ -447,6 +452,7 @@ export default function FeatureSettingsScreen() {
                   usageRetry={() => void loadUsage()}
                   open={isOpen(group)}
                   canManage={canManage}
+                  lockedReason={permissionReason}
                   busy={saving}
                   onOpenChange={(next) => toggleOpen(group.id, next)}
                   onItemToggle={toggleItem}
@@ -481,7 +487,7 @@ export default function FeatureSettingsScreen() {
         confirmLabel="比べてから保存"
         busy={saving}
         onCancel={() => setCompareOpen(false)}
-        onConfirm={() => { if (!validateReason()) { setCompareOpen(false); return }; setCompareOpen(false); return save() }}
+        onConfirm={() => { if (!canManage) return; if (!validateReason()) { setCompareOpen(false); return }; setCompareOpen(false); return save() }}
       >
         <ul className={styles.compareList}>
           {Object.keys(features).filter((key) => features[key] !== savedFeatures[key]).map((key) => (
@@ -498,6 +504,7 @@ export default function FeatureSettingsScreen() {
           moveItemInOrder={moveItemInOrder}
           onCancel={() => setReorderOpen(false)}
           onApply={(order) => {
+            if (!canManage) return
             setItemOrder(order)
             setReorderOpen(false)
           }}
@@ -513,7 +520,7 @@ export default function FeatureSettingsScreen() {
         confirmLabel="初期値を下書きに入れる"
         cancelLabel="キャンセル"
         onCancel={() => { if (!saving) setResetToDefaultsOpen(false) }}
-        onConfirm={resetToDefaults}
+        onConfirm={() => { if (canManage) resetToDefaults() }}
       >
         <DialogContentRow>機能ごとの表示（オン・オフ）</DialogContentRow>
         <DialogContentRow>メニューの並び順</DialogContentRow>
@@ -544,7 +551,7 @@ export default function FeatureSettingsScreen() {
           setImpactOpen(false)
           setImpactError('')
         }}
-        onConfirm={() => confirmImpactSave()}
+        onConfirm={() => { if (canManage) return confirmImpactSave() }}
       >
         <div>
           {impactGroups.map((group) => (

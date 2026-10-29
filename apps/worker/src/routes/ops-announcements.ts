@@ -12,10 +12,13 @@ import {
   countNoticeLinkedStaff,
   countScreenReads,
   createPlatformAnnouncement,
+  createLineAccount,
+  deleteUncommittedLineAccount,
   deletePlatformAnnouncement,
   getLineAccounts,
   getPlatformAnnouncement,
   getPlatformSetting,
+  jstNow,
   listPlatformAnnouncements,
   markAnnouncementSending,
   NOTICE_LINE_ACCOUNT_KEY,
@@ -36,6 +39,11 @@ import { clientIp } from '../services/admin-session.js';
 import { dbFor } from '../services/db-router.js';
 import { isValidIdempotencyKey } from '../services/outbound-idempotency.js';
 import { deliverAnnouncement, loadNoticeLineAccount, previewAudience } from '../services/platform-announcements.js';
+import { prepareNoticeLineConnection, NoticeLineConnectError } from '../services/notice-line-connect.js';
+import { expectedWebhookUrl } from '../lib/webhook-endpoint.js';
+import { fetchBotProfile } from '../lib/bot-profile.js';
+import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
+import { CredentialEncryptionKeyError } from '@line-crm/db';
 
 /** 運営からのお知らせ配信 ★37-7 `q2CokV`。運営マスターだけが呼べる。 */
 export const opsAnnouncements = new Hono<Env>();
@@ -43,6 +51,7 @@ export const opsAnnouncements = new Hono<Env>();
 opsAnnouncements.use('/api/ops/announcements', requirePlatformAdmin());
 opsAnnouncements.use('/api/ops/announcements/*', requirePlatformAdmin());
 opsAnnouncements.use('/api/ops/notice-line-account', requirePlatformAdmin());
+opsAnnouncements.use('/api/ops/notice-line-account/*', requirePlatformAdmin());
 
 const SUBJECT_MAX = 120;
 const BODY_MAX = 4000;
@@ -132,13 +141,14 @@ opsAnnouncements.get('/api/ops/notice-line-account', async (c) => {
   const current = await getPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY);
   const accounts = (await getLineAccounts(db)).filter((a) => (a.tenant_id ?? DEFAULT_TENANT_ID) === DEFAULT_TENANT_ID && !a.archived_at);
   const notice = await loadNoticeLineAccount(c.env);
+  const liveName = notice ? (await fetchBotProfile(notice.channelAccessToken)).displayName?.trim() : null;
   const linked = await countNoticeLinkedStaff(db, DEFAULT_TENANT_ID);
   return c.json({
     success: true,
     data: {
       currentId: current,
-      current: notice ? { id: notice.id, name: notice.name, basicId: notice.basicId, addFriendUrl: notice.addFriendUrl } : null,
-      candidates: accounts.map((a) => ({ id: a.id, name: a.name, basicId: a.line_basic_id })),
+      current: notice ? { id: notice.id, name: liveName || notice.name, basicId: notice.basicId, addFriendUrl: notice.addFriendUrl } : null,
+      candidates: accounts.map((a) => ({ id: a.id, name: a.id === notice?.id && liveName ? liveName : a.name, basicId: a.line_basic_id })),
       linked,
     },
   });
@@ -158,6 +168,62 @@ opsAnnouncements.put('/api/ops/notice-line-account', requirePlatformAdminWrite()
   await setPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY, id, c.get('staff').id);
   await audit(c, 'notice_line_account.change', { from: before, to: id });
   return c.json({ success: true, data: { currentId: id } });
+});
+
+/** 契約者向け通知専用LINE。LIFFやLINE Loginを作らず、Messaging APIの資格情報だけで接続する。 */
+opsAnnouncements.post('/api/ops/notice-line-account/connect', requirePlatformAdminWrite(), inputJsonBoundary(), async (c) => {
+  if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
+    return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
+  }
+  const body = await c.req.json<{ channelId?: unknown; channelSecret?: unknown; basicId?: unknown }>().catch(() => null);
+  const channelId = typeof body?.channelId === 'string' ? body.channelId.trim() : '';
+  const channelSecret = typeof body?.channelSecret === 'string' ? body.channelSecret.trim() : '';
+  const basicId = typeof body?.basicId === 'string' ? body.basicId.trim() : '';
+  if (!/^\d{6,30}$/.test(channelId) || !channelSecret || channelSecret.length > 200 || !/^@[A-Za-z0-9_-]{3,40}$/.test(basicId)) {
+    return inputError(c, { success: false, error: 'チャネルID、チャネルシークレット、LINEの@IDを確認してください' }, 422, ['channelId', 'channelSecret', 'basicId']);
+  }
+  const db = dbFor(c.env);
+  if (await db.prepare('SELECT id FROM line_accounts WHERE channel_id = ?').bind(channelId).first()) {
+    return c.json({ success: false, error: 'このMessaging APIチャネルは登録済みです' }, 409);
+  }
+  const base = (c.env.WORKER_PUBLIC_URL || c.env.WORKER_URL || new URL(c.req.url).origin).replace(/\/$/, '');
+  let prepared: Awaited<ReturnType<typeof prepareNoticeLineConnection>>;
+  try {
+    prepared = await prepareNoticeLineConnection({ channelId, channelSecret, expectedBasicId: basicId, webhookUrl: expectedWebhookUrl(base, channelId) });
+  } catch (error) {
+    const messages: Record<NoticeLineConnectError['code'], string> = {
+      credentials: 'Messaging APIのチャネルIDとシークレットを確認してください',
+      profile: 'LINE公式アカウントの情報を取得できませんでした',
+      identity: '入力した@IDとMessaging APIの公式アカウントが一致しません',
+      webhook_in_use: '別のWebhook URLが設定されています。接続先を確認してください',
+      webhook_inactive: 'LINE DevelopersでWebhookの利用をONにしてから再試行してください',
+      webhook_test: 'Webhookの受信確認に失敗しました。設定を確認して再試行してください',
+    };
+    return c.json({ success: false, error: error instanceof NoticeLineConnectError ? messages[error.code] : 'LINEへの接続を確認できませんでした' }, 400);
+  }
+  let account: Awaited<ReturnType<typeof createLineAccount>> | null = null;
+  const before = await getPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY);
+  let assigned = false;
+  try {
+    account = await createLineAccount(db, {
+      channelId, channelSecret, channelAccessToken: prepared.accessToken,
+      name: prepared.profile.displayName, role: 'platform_notice',
+      tenantId: DEFAULT_TENANT_ID, createdByStaffId: c.get('staff').id,
+      lineDisplayName: prepared.profile.displayName,
+      linePictureUrl: prepared.profile.pictureUrl,
+      lineBasicId: prepared.profile.basicId,
+      lineProfileSyncedAt: jstNow(),
+    }, c.env.LINE_CREDENTIAL_ENCRYPTION_KEY);
+    await setPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY, account.id, c.get('staff').id);
+    assigned = true;
+    await audit(c, 'notice_line_account.change', { operation: 'connect', accountId: account.id, basicId, channelId });
+  } catch (error) {
+    if (assigned) await setPlatformSetting(db, NOTICE_LINE_ACCOUNT_KEY, before, c.get('staff').id).catch(() => undefined);
+    if (account) await deleteUncommittedLineAccount(db, account.id).catch(() => undefined);
+    if (error instanceof CredentialEncryptionKeyError) return c.json({ success: false, error: 'LINE資格情報の暗号鍵が未設定です' }, 503);
+    throw error;
+  }
+  return c.json({ success: true, data: { accountId: account.id, name: account.name, basicId: prepared.profile.basicId } }, 201);
 });
 
 // ---------------------------------------------------------------------------

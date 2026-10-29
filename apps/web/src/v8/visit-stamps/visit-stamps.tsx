@@ -43,6 +43,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { visitStampsApi } from '@/lib/visit-stamps-api';
 import { MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount } from './display';
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs';
+import { withHonorific } from '@line-crm/shared'
 import HistoryTable from './history-table'
 import styles from './visit-stamps.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format';
@@ -691,7 +692,7 @@ function VisitStampsScreen() {
                             return (
                               <Tr key={row.id} className={`${styles.row} ${styles.paperLine}`} data-row-id={row.id}>
                                 <Td className={styles.colPhoto}>
-                                  <button type="button" className={styles.thumb} onClick={() => setPhoto(row)} aria-label={`${names.name}さんの写真を大きく見る`}>
+                                  <button type="button" className={styles.thumb} onClick={() => setPhoto(row)} aria-label={`${withHonorific(names.name)}の写真を大きく見る`}>
                                     <PaperThumb accountId={selectedAccountId} url={row.photo_url} />
                                   </button>
                                 </Td>
@@ -712,10 +713,10 @@ function VisitStampsScreen() {
                                     {row.status === 'pending' && canStamp ? (
                                       <>
                                         <Button size="compact" disabled={!!busy} onClick={() => { setDialogError(''); setRejecting(row) }}>却下</Button>
-                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${names.name}さんの ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />承認</Button>
+                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${withHonorific(names.name)}の ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />承認</Button>
                                       </>
                                     ) : null}
-                                    <RowActions subjectName={`${names.name}さんの申請`} menuItems={[
+                                    <RowActions subjectName={`${withHonorific(names.name)}の申請`} menuItems={[
                                       { id: 'photo', label: '写真を大きく見る', onSelect: () => setPhoto(row) },
                                       { id: 'friend', label: '友だちの詳細を開く', external: false, href: `/friends/detail?id=${encodeURIComponent(row.friend_id)}`, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friend_id)}`) } },
                                     ]} />

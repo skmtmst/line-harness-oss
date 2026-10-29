@@ -5,19 +5,20 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
+import PasswordRequirements from '@/components/auth/password-requirements'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import { TextField } from '@/components/shared/text-field'
-import { storeAdminSession } from '@/lib/admin-session'
-import { authRequest, confirmError, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
+import { storeAdminSession, twoFactorChallengeHandoffPath } from '@/lib/admin-session'
+import { authRequest, confirmError, CONTACT_URL, internalAuthFailureCopy, passwordError, readDeviceMarker, storeDeviceMarker } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
+import styles from './complete.module.css'
 
 /**
  * 会員登録の本登録。★管理画面 36-4-B（`jk88n`、カード `oVX3x`）。
  *
- * メールの URL（`?token=`）から開く。会社名・名前・パスワードを入れると
- * 統括（トライアル 30 日）とオーナー権限者ができ、そのまま統括の画面へ。
+ * 承認メールの URL（`?token=`）から開く。申込済み会社名・担当者名を確認してパスワードを入れると
+ * 統括（トライアル 30 日）とオーナー権限者を作り、二段階認証の設定へ進む。
  */
 export default function RegisterCompletePage() {
   return (
@@ -27,14 +28,12 @@ export default function RegisterCompletePage() {
   )
 }
 
-type TokenCheck = { state: 'checking' } | { state: 'ok'; email: string; trialDays: number } | { state: 'bad'; message: string }
+type TokenCheck = { state: 'checking' } | { state: 'ok'; email: string; trialDays: number; companyName: string; contactName: string } | { state: 'pending' } | { state: 'bad'; message: string }
 
 function CompleteInner() {
   const params = useSearchParams()
   const token = params.get('token') ?? ''
   const [check, setCheck] = useState<TokenCheck>({ state: 'checking' })
-  const [tenantName, setTenantName] = useState('')
-  const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [messages, setMessages] = useState<Record<string, string | null>>({})
@@ -47,9 +46,10 @@ function CompleteInner() {
       setCheck({ state: 'bad', message: 'この URL は正しくありません。メールの URL をそのまま開いてください' })
       return
     }
-    void authRequest<{ email: string; trialDays: number }>(`/api/auth/register/check?token=${encodeURIComponent(token)}`).then((res) => {
+    void authRequest<{ email: string; trialDays: number; companyName: string; contactName: string }>(`/api/auth/register/check?token=${encodeURIComponent(token)}`).then((res) => {
       if (!alive) return
-      if (res.ok && res.data) setCheck({ state: 'ok', email: res.data.email, trialDays: res.data.trialDays })
+      if (res.ok && res.data) setCheck({ state: 'ok', email: res.data.email, trialDays: res.data.trialDays, companyName: res.data.companyName, contactName: res.data.contactName })
+      else if (res.code === 'approval_required') setCheck({ state: 'pending' })
       else setCheck({ state: 'bad', message: res.error || 'この URL は使えません' })
     })
     return () => {
@@ -60,8 +60,6 @@ function CompleteInner() {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     const next: Record<string, string | null> = {
-      tenantName: tenantName.trim() ? null : '会社名・統括名を入力してください',
-      name: name.trim() ? null : 'お名前を入力してください',
       password: passwordError(password),
       confirm: confirmError(password, confirm),
     }
@@ -71,8 +69,6 @@ function CompleteInner() {
     setError('')
     const res = await authRequest<{ tenantId: string; deviceMarker: string; sessionToken?: string; twoFactorSetup?: boolean; challengeToken?: string }>('/api/auth/register/complete', {
       token,
-      tenantName: tenantName.trim(),
-      name: name.trim(),
       password,
       deviceMarker: readDeviceMarker(),
     })
@@ -86,7 +82,7 @@ function CompleteInner() {
     resetAuthSelectionCleared(localStorage, sessionStorage)
     // オーナーは二段階認証が必須（N-426）。設定画面へ進み、完了後にセッションが出る。
     if (res.data.twoFactorSetup && res.data.challengeToken) {
-      window.location.assign(`/login/two-factor/setup#${new URLSearchParams({ lh_2fa: res.data.challengeToken }).toString()}`)
+      window.location.assign(twoFactorChallengeHandoffPath('/login/two-factor/setup', res.data.challengeToken))
       return
     }
     if (res.data.sessionToken) storeAdminSession(res.data.sessionToken, res.csrfToken)
@@ -117,55 +113,52 @@ function CompleteInner() {
       </AuthCard>
     )
   }
+  if (check.state === 'pending') {
+    return <AuthCard node="VA42o" applicationFlow="pending" title="お申し込みを確認中です"
+      description="担当者からご連絡します。承認のご案内が届くまで、musuboへのログインはできません。">
+      <div className={styles.pendingNext}>
+        <strong>次に行うこと</strong>
+        お申し込み時のメールをご確認ください。担当者からの連絡がない場合はお問い合わせください。
+      </div>
+      <a href={CONTACT_URL} target="_blank" rel="noreferrer" className={styles.contact}>お問い合わせ</a>
+      <a href="/login" className={styles.login}>ログイン画面に戻る</a>
+    </AuthCard>
+  }
 
   return (
     <AuthCard
-      node="jk88n"
-      cardNode="oVX3x"
-      title="本登録"
-      description={`メールアドレスの確認ができました。会社名・お名前・パスワードを入れると登録が完了し、そのまま統括の画面に入れます（${check.trialDays}日間の無料トライアル）。`}
+      node="x73h3"
+      applicationFlow="setup"
+      title="利用開始の設定"
+      description={`お申し込みが承認されました。設定を完了すると${check.trialDays}日間無料でmusuboを利用できます。`}
     >
+      <div className={styles.approved}>✓ 承認済み　初期設定を完了してください</div>
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
           <Notice tone="danger" message={error} />
         ) : null}
-        <AuthField label="メールアドレス" hint="確認済み・ここでは変えられません" htmlFor="complete-email">
-          <div id="complete-email" className="flex h-11 w-full items-center justify-between rounded-control border border-hairline bg-surface-pearl px-3 text-label text-ink-secondary">
-            <span className="truncate">{check.email}</span>
-            <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-accent-deep" />
-          </div>
-        </AuthField>
-        <AuthField label="会社名・統括名" hint="あとから変えられます" htmlFor="complete-tenant" error={messages.tenantName}>
-          <TextField
-            id="complete-tenant"
-            value={tenantName}
-            onChange={(event) => setTenantName(event.target.value)}
-            invalid={Boolean(messages.tenantName)}
-            autoComplete="organization"
-            maxLength={80}
-            placeholder="例：株式会社サンプル"
-          />
-        </AuthField>
-        <AuthField label="あなたの名前" htmlFor="complete-name" error={messages.name}>
-          <TextField
-            id="complete-name"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            invalid={Boolean(messages.name)}
-            autoComplete="name"
-            maxLength={80}
-            placeholder="例：山田 太郎"
-          />
-        </AuthField>
-        <AuthField label="パスワード" hint="8文字以上・英字と数字" htmlFor="complete-password" error={messages.password}>
-          <PasswordField id="complete-password" value={password} onChange={setPassword} invalid={Boolean(messages.password)} autoComplete="new-password" />
+        <ConfirmedField label="メールアドレス" id="complete-email" value={check.email} />
+        <ConfirmedField label="会社名" id="complete-tenant" value={check.companyName} />
+        <ConfirmedField label="担当者名" id="complete-name" value={check.contactName} />
+        <AuthField label="パスワード" htmlFor="complete-password" error={messages.password}>
+          <PasswordField id="complete-password" value={password} onChange={setPassword} invalid={Boolean(messages.password)} autoComplete="new-password" placeholder="新しいパスワードを入力" />
+          <PasswordRequirements value={password} />
         </AuthField>
         <AuthField label="パスワード（確認）" htmlFor="complete-confirm" error={messages.confirm}>
           <PasswordField id="complete-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(messages.confirm)} autoComplete="new-password" />
         </AuthField>
-        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="登録しています…">無料で始める
+        <Button type="submit" variant="primary" disabled={busy} className="w-full" busy={busy} busyLabel="設定しています…">設定を完了してmusuboを始める
         </Button>
       </form>
     </AuthCard>
   )
+}
+
+function ConfirmedField({ label, id, value }: { label: string; id: string; value: string }) {
+  return <AuthField label={label} htmlFor={id}>
+    <output id={id} className="flex h-11 w-full items-center justify-between rounded-control border border-hairline bg-surface-pearl px-3 text-label text-ink-secondary">
+      <span className="truncate">{value}</span>
+      <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-accent-deep" />
+    </output>
+  </AuthField>
 }

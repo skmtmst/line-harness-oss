@@ -4,6 +4,7 @@ import type {
   OpsMe,
   OpsTenantRow,
   OpsTenantSummary,
+  OpsApplication,
   OpsTenantDetail,
   OpsImpersonation,
   OpsAuditRow,
@@ -38,6 +39,13 @@ export const opsMethods = {
 /** 運営コンソール（★管理画面 37）。形は `apps/worker/src/routes/ops.ts`。 */
   ops: {
     me: () => fetchApi<ApiResponse<OpsMe>>('/api/ops/me'),
+    applications: {
+      list: () => fetchApi<ApiResponse<OpsApplication[]>>('/api/ops/applications'),
+      get: (id: string) => fetchApi<ApiResponse<OpsApplication>>(`/api/ops/applications/${encodeURIComponent(id)}`),
+      contact: (id: string, note: string) => fetchApi<ApiResponse<OpsApplication>>(`/api/ops/applications/${encodeURIComponent(id)}/contact`, { method: 'POST', body: JSON.stringify({ note }) }),
+      approve: (id: string) => fetchApi<ApiResponse<{ application: OpsApplication; mailSent: boolean }>>(`/api/ops/applications/${encodeURIComponent(id)}/approve`, { method: 'POST', body: '{}' }),
+      resendInvite: (id: string) => fetchApi<ApiResponse<OpsApplication>>(`/api/ops/applications/${encodeURIComponent(id)}/resend-invite`, { method: 'POST', body: '{}' }),
+    },
     tenants: (params?: { q?: string; status?: string }) => {
       const query = new URLSearchParams()
       if (params?.q) query.set('q', params.q)
@@ -137,6 +145,12 @@ export const opsMethods = {
       remove: (id: string) => fetchApi<ApiResponse<null>>(`/api/ops/announcements/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     },
     noticeLineAccount: () => fetchApi<ApiResponse<OpsNoticeLineAccount>>('/api/ops/notice-line-account'),
+    connectNoticeLineAccount: (input: { channelId: string; channelSecret: string; basicId: string }, stepUpToken?: string) =>
+      fetchApi<ApiResponse<{ accountId: string; name: string; basicId: string }>>('/api/ops/notice-line-account/connect', {
+        method: 'POST',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+        body: JSON.stringify(input),
+      }),
     setNoticeLineAccount: (lineAccountId: string | null) =>
       fetchApi<ApiResponse<{ currentId: string | null }>>('/api/ops/notice-line-account', { method: 'PUT', body: JSON.stringify({ lineAccountId }) }),
     /** お問い合わせ（チケット）★管理画面 37-6。 */

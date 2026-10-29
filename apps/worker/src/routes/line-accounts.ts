@@ -14,13 +14,13 @@ import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOpti
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
 import { getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
-import type { LineAccount as DbLineAccount, LineAccountConnectionCheck, LineAccountScopeEntry } from '@line-crm/db';
+import type { LineAccount as DbLineAccount, LineAccountConnectionCheck } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
 import { auditLog } from '../lib/audit-log.js';
 import { fetchBotProfile, type BotProfile } from '../lib/bot-profile.js';
-import { detectFollowerImportCapability, getFollowerImportState, processFollowerImportStep, startFollowerImport } from '../services/follower-import.js';
+import { detectFollowerImportCapability, getFollowerImportState, processFollowerImportStep, scheduleInitialFollowerImport, startFollowerImport } from '../services/follower-import.js';
 import type { FollowerImportClient } from '../services/follower-import-state.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope, validateAccountHierarchy } from '../services/account-access.js';
 import { copyLineAccountSettings, normalizeCopyItems } from '../services/account-copy.js';
@@ -29,13 +29,22 @@ import { fetchLineMonthlyPlan } from '../services/line-monthly-plan.js';
 import { fetchWebhookEndpointState } from '../services/line-webhook-state.js';
 import { lineConnectStep, prepareLineConnection, type LineConnectStep } from '../services/line-account-connect.js';
 import { getLineRegistrationReceipt } from '../services/line-registration-receipt.js';
+import { getAuthorizedLineAccount, getVisibleLineAccountEntry } from './line-account-access.js';
 import type { Env } from '../worker-env.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
+import { getStaffById } from '@line-crm/db';
 
 import { readCapacity, normalizeOptionalString, validateLoginChannelPair } from './line-accounts-input.js';
 import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-view.js';
 
 const lineAccounts = new Hono<Env>();
+
+async function mayRegisterLineAccount(c: Context<Env>): Promise<boolean> {
+  const actor = c.get('staff');
+  if (actor.id === 'env-owner') return true;
+  const member = await getStaffById(c.env.DB, actor.id);
+  return Boolean(member?.is_active && member.account_scope === 'all');
+}
 
 function lifecycleConflict(error: unknown): { success: false; error: string } | null {
   if (!(error instanceof LineAccountLifecycleError)) return null;
@@ -81,13 +90,14 @@ lineAccounts.get('/api/line-accounts', async (c) => {
       if(folderId && !await getLineAccountTag(db,c.get('staff').tenantId ?? DEFAULT_TENANT_ID,folderId)) return c.json({success:false,error:'フォルダが見つかりません'},404);
       items=items.filter(item=>(item.folder_id ?? null)===folderId);
     }
-    const { tagsByAccount, foldersByAccount, statsByAccount } = await readLineAccountListMetadata(
+    const { tagsByAccount, foldersByAccount, statsByAccount, emailInboxAccountIds } = await readLineAccountListMetadata(
       db, c.get('staff').tenantId ?? DEFAULT_TENANT_ID, items.map((item) => item.id),
     );
     const serializeWithStats = (item: DbLineAccount) => {
       const overview = statsByAccount[item.id];
       return {
         ...serializeLineAccount(item),
+        emailInboxEnabled: emailInboxAccountIds.has(item.id),
         tags: tagsByAccount[item.id] ?? [],
         folderId: foldersByAccount[item.id]?.id ?? null,
         folder: foldersByAccount[item.id] ?? null,
@@ -135,6 +145,25 @@ lineAccounts.get('/api/line-accounts', async (c) => {
   } catch (err) {
     throw err;
   }
+});
+
+// 一覧の軽量なスナップショットを表示した後、LINE公式アカウントの画像だけを
+// 最新の状態へ差し替える。接続確認・プラン照会や DB 更新は行わない。
+lineAccounts.get('/api/line-accounts/profile-pictures', async (c) => {
+  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const accounts = (await getLineAccountsByIds(
+    c.env.DB,
+    scope.allowedAccountIds,
+    c.env.LINE_CREDENTIAL_ENCRYPTION_KEY,
+  )).filter((account) => account.is_active && !account.archived_at && account.channel_access_token);
+  const pictures = await mapWithConcurrency(accounts, LINE_LIVE_ACCOUNT_CONCURRENCY, async (account) => {
+    const profile = await fetchBotProfile(account.channel_access_token);
+    // LINEへの問い合わせに失敗した場合、保存済みの画像を消さない。
+    if (!profile.displayName && !profile.basicId) return null;
+    return { id: account.id, pictureUrl: profile.pictureUrl ?? null };
+  });
+  c.header('Cache-Control', 'no-store');
+  return c.json({ success: true, data: pictures.filter((picture) => picture !== null) });
 });
 
 // 可視範囲内のアカウントだけを要約する。
@@ -399,22 +428,6 @@ async function verifyConnection(input: {
     }
   }
   return result;
-}
-
-async function getVisibleLineAccountEntry(
-  c: Context<Env>,
-  id: string,
-): Promise<LineAccountScopeEntry | null> {
-  const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-  return scope.accounts.find((account) => account.id === id) ?? null;
-}
-
-async function getAuthorizedLineAccount(
-  c: Context<Env>,
-  id: string,
-): Promise<DbLineAccount | null> {
-  if (!await getVisibleLineAccountEntry(c, id)) return null;
-  return getLineAccountById(c.env.DB, id);
 }
 
 // 保存前の接続確認。成功してもDBには一切書き込まない。
@@ -1092,6 +1105,7 @@ function publicConnectData(
 
 // UI用の自動接続確認。LINE側のWebhook・LIFFは設定するが、musuboのDBには書き込まない。
 lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
+  if (!await mayRegisterLineAccount(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   const parsed = await readConnectRequest(c);
   if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 'status' in parsed ? parsed.status : 422, ["name","channelId","channelSecret"]);
   let registration;
@@ -1127,6 +1141,7 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner', 'admi
 
 // UI用の自動接続・保存。5段目が完了しなければ作成途中の行を必ず巻き戻す。
 lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
+  if (!await mayRegisterLineAccount(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   // LINE の接続（新しいアカウントの接続）は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
@@ -1159,6 +1174,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
   let savingStyle = false;
   try {
     account = await createLineAccount(c.env.DB, {
+      createdByStaffId: c.get('staff').id,
       channelId: parsed.value.channelId,
       name: parsed.value.name || prepared.bot.displayName,
       channelAccessToken: prepared.channelAccessToken,
@@ -1216,7 +1232,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
     const started = followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
     savingStyle = true;
     await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style);
-    savingStyle = false;
+    savingStyle = false; try { scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }
     const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed')];
     return c.json({
       success: true,
@@ -1251,6 +1267,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
 
 // POST /api/line-accounts - create
 lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
+  if (!await mayRegisterLineAccount(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   // LINE の接続の追加は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
@@ -1391,6 +1408,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
     }
 
     const account = await createLineAccount(c.env.DB, {
+      createdByStaffId: currentStaff.id,
       channelId: body.channelId.trim(),
       name,
       channelAccessToken: body.channelAccessToken,

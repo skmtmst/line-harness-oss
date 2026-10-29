@@ -8,7 +8,7 @@
  * - 「入る」は選んだアカウントを覚え、店舗未選択から来たときは元の画面へ戻す
  */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
 import { loadFailureNotice } from '@/components/shared/api-error-message'
@@ -18,7 +18,7 @@ vi.hoisted(() => {
 })
 
 const mocks = vi.hoisted(() => ({
-  list: vi.fn(), fetchApi: vi.fn(), select: vi.fn(), refresh: vi.fn(), push: vi.fn(), folders: vi.fn(),
+  list: vi.fn(), fetchApi: vi.fn(), select: vi.fn(), refresh: vi.fn(), push: vi.fn(), folders: vi.fn(), importState: vi.fn(),
   role: 'owner', editProps: null as null | Record<string, unknown>,
 }))
 
@@ -29,7 +29,7 @@ vi.mock('next/navigation', async () => ({
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children) }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/hq/platform-notices', () => ({ default: () => null }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ setSelectedAccountId: mocks.select, refreshAccounts: mocks.refresh }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], setSelectedAccountId: mocks.select, refreshAccounts: mocks.refresh }) }))
 vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => mocks.role }))
 /* 設定の窓と編集の窓の中身は、それぞれの試験が見る。ここでは画面からの受け渡しだけを見る。 */
 vi.mock('@/v8/hq/account-dialogs', async (original) => ({
@@ -56,7 +56,7 @@ vi.mock('@/lib/api', async (original) => {
     fetchApi: mocks.fetchApi,
     api: {
       ...actual.api,
-      lineAccounts: { ...actual.api.lineAccounts, list: mocks.list, stepFollowerImport: vi.fn(async () => ({ success: true, data: {} })) },
+      lineAccounts: { ...actual.api.lineAccounts, list: mocks.list, followerImportState: mocks.importState },
       lineAccountFolders: { ...actual.api.lineAccountFolders, list: mocks.folders },
       tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '統括' } })) },
     },
@@ -81,6 +81,7 @@ beforeEach(() => {
   mocks.folders.mockResolvedValue({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })
   mocks.refresh.mockResolvedValue(undefined)
   mocks.fetchApi.mockResolvedValue({ success: true, data: {} })
+  mocks.importState.mockResolvedValue({ success: true, data: { phase: 'not_started' } })
 })
 afterEach(() => { cleanup(); window.history.replaceState(null, '', '/') })
 
@@ -263,7 +264,7 @@ describe('統括のアカウント：入る', () => {
     render(<HqHomeV8 />)
     await screen.findAllByText('銀座店')
     fireEvent.click(screen.getByRole('button', { name: '銀座店 へ入る' }))
-    expect(mocks.select).toHaveBeenCalledWith('a1')
+    await waitFor(() => expect(mocks.select).toHaveBeenCalledWith('a1'))
     expect(mocks.push).toHaveBeenCalledTimes(1)
     expect(mocks.push.mock.calls[0][0]).toBe('/')
   })
@@ -273,7 +274,7 @@ describe('統括のアカウント：入る', () => {
     render(<HqHomeV8 />)
     await screen.findAllByText('銀座店')
     fireEvent.click(screen.getByRole('button', { name: '銀座店 へ入る' }))
-    expect(mocks.push.mock.calls[0][0]).toBe('/friends?tab=all')
+    await waitFor(() => expect(mocks.push.mock.calls[0][0]).toBe('/friends?tab=all'))
     for (const back of ['https%3A%2F%2Fevil.example%2F', '%2Fhq%2Fmembers']) {
       cleanup()
       mocks.push.mockClear()
@@ -282,7 +283,25 @@ describe('統括のアカウント：入る', () => {
       await screen.findAllByText('銀座店')
       fireEvent.click(screen.getByRole('button', { name: '銀座店 へ入る' }))
       // 外の住所と、店を選ばなくても開ける統括の画面へは戻さず、店のホームへ移る。
-      expect(mocks.push.mock.calls[0][0]).toBe('/')
+      await waitFor(() => expect(mocks.push.mock.calls[0][0]).toBe('/'))
     }
+  })
+
+  it('引き継ぎ中は店舗を選択せず登録時と同じ進捗画面へ戻す', async () => {
+    mocks.importState.mockResolvedValue({ success: true, data: { phase: 'importing_ids' } })
+    render(<HqHomeV8 />)
+    await screen.findAllByText('銀座店')
+    fireEvent.click(screen.getByRole('button', { name: '銀座店 へ入る' }))
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/accounts/new/handover?accountId=a1'))
+    expect(mocks.select).not.toHaveBeenCalled()
+  })
+
+  it('引き継ぎ状態を読めないときも店舗へ入れない', async () => {
+    mocks.importState.mockRejectedValue(new Error('network error'))
+    render(<HqHomeV8 />)
+    await screen.findAllByText('銀座店')
+    fireEvent.click(screen.getByRole('button', { name: '銀座店 へ入る' }))
+    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/accounts/new/handover?accountId=a1'))
+    expect(mocks.select).not.toHaveBeenCalled()
   })
 })

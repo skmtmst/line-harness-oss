@@ -148,3 +148,6 @@ html:root :is([data-toolbar-row], [data-control-row]) .button { width: var(--con
 :global(tr):is(:hover, :focus-within) .button[data-variant='attention'] > svg,
 .button[data-variant='attention']:is(:hover, :focus-visible) > svg { opacity: 1; }
 @media (hover: none) { .button[data-variant='attention'][aria-pressed='false']:not(:focus-visible):not(:hover) > svg { opacity: var(--polish-disabled-opacity); } }
+
+/* 権限の操作は焦点を保ち、入力不足と区別できる灰色にする。 */
+html:root .button[data-permission-locked] { background: var(--color-canvas-sunken); color: var(--color-ink-faint); opacity: var(--polish-disabled-opacity); cursor: not-allowed; filter: none; scale: none; }

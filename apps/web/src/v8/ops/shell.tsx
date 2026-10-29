@@ -11,14 +11,13 @@ import {
   Menu,
   ScrollText,
   ShieldCheck,
-  Users,
   X,
 } from 'lucide-react'
 import TopBar from '@/components/shared/top-bar'
 import { PageChromeProvider, usePageChrome } from '@/components/shell/page-chrome'
 import SidebarUserMenu from '@/components/shared/sidebar-user-menu'
 import SidebarVersion from '@/components/layout/sidebar-version'
-import { SidebarBrand } from '@/components/layout/sidebar-identity'
+import OpsBrand from './ops-brand'
 import { SIDEBAR_AUTO_COLLAPSE_BELOW } from '@/components/layout/sidebar-collapse'
 import Notice from '@/components/shared/notice'
 import { humanizeErrorText } from '@/components/shared/human-error-text'
@@ -43,6 +42,7 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
 
 export const OPS_MENU: Array<{ href: string; label: string; icon: typeof LayoutDashboard }> = [
   { href: '/ops/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
+  { href: '/ops/applications', label: '申込アカウント', icon: Building2 },
   { href: '/ops/tenants', label: '契約先アカウント', icon: Building2 },
   { href: '/ops/support', label: 'お問い合わせ', icon: LifeBuoy },
   { href: '/ops/announcements', label: 'お知らせ', icon: Megaphone },
@@ -50,17 +50,13 @@ export const OPS_MENU: Array<{ href: string; label: string; icon: typeof LayoutD
   { href: '/ops/audit', label: '監査ログ', icon: ScrollText },
 ]
 
-/** 下端の入口。二段階認証とログアウトは左下の本人カードから開く。 */
-const OPS_FOOT: Array<{ href: string; label: string; icon: typeof LayoutDashboard }> = [
-  { href: '/ops/members', label: 'メンバー管理', icon: Users },
-]
-
 /** 道から画面名を引く（パンくずの最後の段）。 */
 export function opsTitleForPath(pathname: string): string {
-  const all = [...OPS_MENU, ...OPS_FOOT, { href: '/ops/invite', label: 'メンバーの招待' }, { href: '/ops/two-factor', label: '二段階認証' }]
+  const all = [...OPS_MENU, { href: '/ops/members', label: 'メンバー管理' }, { href: '/ops/invite', label: 'メンバーの招待' }, { href: '/ops/two-factor', label: '二段階認証' }]
   const hit = all.filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0]
   if (pathname.startsWith('/ops/tenants/detail')) return '契約先の詳細'
+  if (pathname.startsWith('/ops/applications/detail')) return '申込アカウント › 詳細'
   return hit?.label ?? ''
 }
 
@@ -107,7 +103,7 @@ function OpsShellFrame({
 
   const menu = (
     <>
-      <SidebarBrand name="musubo 運営" mark="m" />
+      <OpsBrand compact={collapsed && !drawer} />
       <nav className={nav.nav} aria-label="運営メニュー">
         <div className={nav.section}>
           <p className={nav.sectionToggle}>
@@ -132,34 +128,16 @@ function OpsShellFrame({
           })}
         </div>
       </nav>
-      <div className={nav.settingsEntry}>
-        {OPS_FOOT.map((item) => {
-          const Icon = item.icon
-          const active = isActive(item.href)
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch={false}
-              title={item.label}
-              aria-current={active ? 'page' : undefined}
-              className={`${nav.item} ${active ? nav.active : ''}`}
-            >
-              <Icon aria-hidden="true" />
-              <span className={`${nav.itemLabel} min-w-0 flex-1 truncate`}>{item.label}</span>
-            </Link>
-          )
-        })}
-        {!me ? (
+      {!me ? (
+        <div className={nav.settingsEntry}>
           <p className={styles.meNote} role="status">
             {humanizeErrorText(meError || '担当者を読み込んでいます')}
             {meError ? <button type="button" onClick={onRetryMe} className={styles.meRetry}>もう一度</button> : null}
           </p>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
       <div className={nav.collapseHide}><SidebarVersion /></div>
       <SidebarUserMenu name={me?.name || '—'} role="運営" collapsed={collapsed && !drawer} pathname={pathname} items={[
-        { id: 'profile', label: 'プロフィールを編集', href: '/staff' },
         { id: 'members', label: 'メンバー管理', href: '/ops/members' },
         { id: 'two-factor', label: me?.totpEnabled ? '二段階認証（設定済み）' : '二段階認証の設定', href: '/ops/two-factor' },
         { id: 'logout', label: 'ログアウト', tone: 'danger', dividerBefore: true, onSelect: () => void logoutAndGoToLogin('/ops/login') },

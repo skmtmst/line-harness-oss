@@ -36,6 +36,7 @@ import { useOpsReadOnly } from './use-ops-read-only'
  */
 
 const FILTERS: Array<{ key: string; label: string; actions: string }> = [
+  { key: 'applications', label: '申込アカウント', actions: 'application.contact,application.approve,application.invite' },
   { key: 'impersonation', label: '代理ログイン', actions: 'impersonation.start,impersonation.write,impersonation.end' },
   { key: 'pii', label: '個人情報の表示', actions: 'pii.reveal' },
   { key: 'status', label: '契約先の停止', actions: 'tenant.status.change' },

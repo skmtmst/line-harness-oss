@@ -4,6 +4,7 @@
 export interface LineAccount {
   folder_id?: string | null;
   id: string;
+  created_by_staff_id?: string | null;
   channel_id: string;
   name: string;
   channel_access_token: string;
@@ -116,6 +117,7 @@ export interface LineAccountCredentialHealth {
 }
 
 export interface CreateLineAccountInput {
+  createdByStaffId?: string | null;
   channelId: string;
   name: string;
   channelAccessToken: string;

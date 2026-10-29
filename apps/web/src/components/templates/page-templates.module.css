@@ -295,9 +295,11 @@
 }
 
 /* 入力と見え方は別々に送る。本文全体のスクロールバーで左右の列幅を削らない。 */
-:global(:root) [data-page-template='create'][data-has-footer] > .split { align-items: flex-start; overflow: hidden; }
+:global(:root) [data-page-template='create'][data-has-footer] > .split,
+:global(:root) [data-page-template='create'][data-has-footer] > .createFlow > .split { align-items: flex-start; overflow: hidden; }
 @media (min-width: 1024px) {
-  :global(:root) [data-page-template='create'][data-has-footer] > .split {
+  :global(:root) [data-page-template='create'][data-has-footer] > .split,
+:global(:root) [data-page-template='create'][data-has-footer] > .createFlow > .split {
     display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr);
     align-items: start;
   }
@@ -636,3 +638,22 @@
 }
 
 .heading [data-page-heading-actions] { display: inline-flex; align-items: center; gap: var(--polish-space-row); }
+
+/* The create flow owns spacing between its notice, preview launcher and columns. */
+:global(:root) .createFlow {
+  display: flex; flex-direction: column; flex: 1; min-height: 0;
+  gap: var(--tpl-create-content-gap); padding-top: var(--tpl-create-content-pad-block);
+}
+:global(:root) .createFlow:has(> .createNotice:not(:empty)) { padding-top: var(--polish-space-field); }
+:global(:root) .createFlow > .createNotice {
+  display: flex; flex: none; flex-direction: column; gap: inherit;
+  padding: 0 var(--polish-space-section);
+}
+:global(:root) .createFlow > .createNotice:empty { display: none; }
+:global(:root) .createFlow > .createNotice > :global([data-design-part='notice']) { margin-block: 0; }
+:global(:root) .createFlow > .asideToggle { flex: none; padding-block: 0; }
+:global(:root) .createFlow > .split { min-height: 0; }
+:global(:root) .createFlow > .split > :is(.createContent, .preview) { padding-top: 0; }
+@container v8-page (max-width: 1099px) {
+  :global(:root) .createFlow:has(> .asideToggle) { padding-top: var(--polish-space-field); }
+}

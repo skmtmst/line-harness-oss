@@ -68,10 +68,7 @@ export function CreatePage({ step = null, readOnly, contentDisabled, contentLabe
   const readOnlyAfterHeading = !!readOnly && contentSpacing === 'notice-after-read-only'
   const aside = typeof preview === 'function' ? preview(false) : preview
   const dialogPreview = typeof preview === 'function' ? preview(true) : preview
-  return <PageFrame kind="create" boardId={boardId} elementRef={elementRef} standalone={standalone} heightMode={heightMode ?? (footerActions ? 'viewport' : 'content')} hasFooter={!!footerActions}>
-    {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
-    {/* 閲覧帯は頭の中に置く（tagf）。本文先頭にも知らせが続く画面（notice-after-read-only）だけは、余白を後の知らせへ集約するため頭の直下に置く。 */}
-    <PageHeading {...heading} readOnlyBand={readOnlyAfterHeading ? heading.readOnlyBand : readOnly || heading.readOnlyBand} actions={<>{heading.actions}{formActions.secondary.length ? <FormSecondaryActions buttons={formActions.secondary} /> : null}</>} />
+  const body = <>
     {readOnlyAfterHeading ? <div className={styles.createNotice} data-template-region="notice" data-content-spacing={contentSpacing}><ReadOnlyNotice scope={heading.readOnlyBand === 'hq' ? 'hq' : 'store'} need={heading.readOnlyNeed} /></div> : null}
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing={noticeSpacing}>{notice}</div> : null}
@@ -83,6 +80,12 @@ export function CreatePage({ step = null, readOnly, contentDisabled, contentLabe
       </Content>
       {preview ? <aside aria-label={previewLabel} className={styles.preview} data-template-region="preview" data-preview-narrow={hidePreviewWhenNarrow ? 'hidden' : previewCompactWhenNarrow ? 'compact' : undefined} data-content-spacing={contentSpacing} data-preview-surface={previewSurface}><div className={styles.previewContent}>{aside}</div></aside> : null}
     </div>
+  </>
+  return <PageFrame kind="create" boardId={boardId} elementRef={elementRef} standalone={standalone} heightMode={heightMode ?? (footerActions ? 'viewport' : 'content')} hasFooter={!!footerActions}>
+    {dirty === undefined ? <AutoFormLeaveGuard busy={busy} /> : dirty ? <FormLeaveGuard dirty busy={busy} /> : null}
+    {/* 閲覧帯は頭の中に置く（tagf）。本文先頭にも知らせが続く画面（notice-after-read-only）だけは、余白を後の知らせへ集約するため頭の直下に置く。 */}
+    <PageHeading {...heading} readOnlyBand={readOnlyAfterHeading ? heading.readOnlyBand : readOnly || heading.readOnlyBand} actions={<>{heading.actions}{formActions.secondary.length ? <FormSecondaryActions buttons={formActions.secondary} /> : null}</>} />
+    {contentSpacing === undefined ? <div className={styles.createFlow} data-template-region="create-flow">{body}</div> : body}
     {footerActions ? <div className={styles.footer} data-template-region="footer" data-footer-placement={footerPlacement}><StickyBar actions={formActions.main} outlined={footerOutlined} destructive={destructive} status={status} /></div> : null}
   </PageFrame>
 }

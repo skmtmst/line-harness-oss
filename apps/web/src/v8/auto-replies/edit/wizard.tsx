@@ -2,6 +2,9 @@
 
 import { readLineImageContent } from '@/lib/line-image-content'
 
+import { canEditWizardNow } from './wizard-access'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { WizardBasicStep } from './wizard-basic-step'
 import { WizardConfirmStep } from './wizard-confirm-step'
 import { buildWizardInput } from './wizard-input'
@@ -34,7 +37,7 @@ import type { StepperStep } from '@/components/shared/stepper'
 import TargetMissing from '@/components/shared/target-missing'
 import { notifyToast } from '@/components/shared/toast'
 import { usePageTitle } from '@/components/shell/page-chrome'
-import { CreatePage } from '@/components/templates'
+import { CreatePage, LockedCreatePage } from '@/components/templates'
 import { PageFrame,PageHeading } from '@/components/templates/page-frame'
 import { Steps } from '@/components/templates/steps'
 import { useAccount } from '@/contexts/account-context'
@@ -75,6 +78,11 @@ function AutoReplyWizardV8Inner() {
   const params = useSearchParams()
   const staffRole = useStaffRole()
   const canManage = useFeatureAccess('autoReplies')
+  const resolvedReason = usePermissionLockReason(canManage)
+  const lockedReason = staffRole === null ? undefined : resolvedReason
+  const inputsDisabled = staffRole === null || !canManage || Boolean(lockedReason)
+  const conflictsReadable = !inputsDisabled
+  const permissionPending = staffRole === null
   const { selectedAccountId, accounts } = useAccount()
 
   const initialId = params.get('id')
@@ -141,7 +149,10 @@ function AutoReplyWizardV8Inner() {
   const createKeyRef = useRef(crypto.randomUUID())
   const publishKeyRef = useRef(crypto.randomUUID())
 
+  const editForm: typeof setForm = next => { if (canEditWizardNow()) setForm(next) }
+  const editAcknowledged: typeof setAcknowledged = next => { if (canEditWizardNow()) setAcknowledged(next) }
   const patch = (part: Partial<WizardForm>) => {
+    if (!canEditWizardNow()) return
     setInputIssue(null)
     setForm((current) => ({ ...current, ...part }))
   }
@@ -221,9 +232,10 @@ function AutoReplyWizardV8Inner() {
   /* ===== 手順4・5で読むもの（ルールの並び・重なり・試す相手） ===== */
   /** 評価順の表示に要る「全ルール」と「この下書きと重なるルール」を読む。 */
   const loadOrder = useCallback(async (ruleId: string, accountId: string | null) => {
+    const subject = assessmentSubjectRef.current
     const [listRes, conflictRes] = await Promise.all([
       api.autoReplies.list(accountId ? { accountId } : undefined),
-      api.autoReplies.conflicts(ruleId).catch(() => null),
+      canEditWizardNow() ? api.autoReplies.conflicts(ruleId).catch(() => null) : Promise.resolve(null),
     ])
     if (!listRes.success || !Array.isArray(listRes.data)) throw new Error('list failed')
     setRules(
@@ -239,7 +251,7 @@ function AutoReplyWizardV8Inner() {
         activeUntil: r.activeUntil ?? null,
       })),
     )
-    if (conflictRes?.success) {
+    if (canEditWizardNow() && subject === assessmentSubjectRef.current && conflictRes?.success) {
       setConflicts(Array.isArray(conflictRes.data?.conflicts) ? conflictRes.data.conflicts : [])
     }
   }, [])
@@ -312,11 +324,12 @@ function AutoReplyWizardV8Inner() {
 
   /* ===== 手順5で読むもの（公開前チェック） ===== */
   const loadValidation = useCallback(async (ruleId: string) => {
+    if (!canEditWizardNow()) return
     const subject = assessmentSubjectRef.current
     setConfirmState('loading')
     try {
       const res = await api.autoReplies.validateDraft(ruleId)
-      if (subject !== assessmentSubjectRef.current) return
+      if (!canEditWizardNow() || subject !== assessmentSubjectRef.current) return
       if (!res.success || !res.data) throw new Error('validate failed')
       setValidation(res.data)
       setConflicts(res.data.conflicts ?? [])
@@ -347,12 +360,17 @@ function AutoReplyWizardV8Inner() {
 
   // 「最新を読み込んで続ける」。入力中の内容は最新の版で置き換わる。
   const inputFingerprint = JSON.stringify(form)
+  const accessEpoch = useRef({ readable: conflictsReadable, value: 0 })
+  if (accessEpoch.current.readable !== conflictsReadable) {
+    accessEpoch.current = { readable: conflictsReadable, value: accessEpoch.current.value + 1 }
+  }
   const assessmentSubjectRef = useRef('')
-  assessmentSubjectRef.current = `${autoReplyId}:${versionNumber}:${inputFingerprint}`
+  assessmentSubjectRef.current = `${autoReplyId}:${versionNumber}:${inputFingerprint}:${accessEpoch.current.value}`
   useEffect(() => {
     setValidation(null); setDryRun(null); setAcknowledged(new Set())
     setConfirmState('idle')
-  }, [inputFingerprint])
+    if (!conflictsReadable) { setConflicts([]); setStaleTest(false) }
+  }, [inputFingerprint, conflictsReadable])
   useEffect(() => {
     if (loadState !== 'ready' || !autoReplyId || (step !== 'priority' && step !== 'confirm')) return
     const key = `${step}:${assessmentSubjectRef.current}`
@@ -362,7 +380,7 @@ function AutoReplyWizardV8Inner() {
     void (async () => {
       let ruleId = autoReplyId
       let accountId = matchedAccountId ?? selectedAccountId ?? null
-      if (dirty) {
+      if (dirty && canEditWizardNow()) {
         const saved = await saveDraftNow()
         if (!saved) { stepDataRequested.current.delete(key); return }
         ruleId = saved.id; accountId = saved.accountId
@@ -373,7 +391,7 @@ function AutoReplyWizardV8Inner() {
       if (step === 'priority') await loadPriorityData(ruleId, accountId)
       else { await loadValidation(ruleId); await loadOrder(ruleId, accountId).catch(() => setPriorityState('error')) }
     })()
-  }, [loadState, autoReplyId, step, versionNumber, inputFingerprint, dirty, matchedAccountId, selectedAccountId, saveDraftNow, loadPriorityData, loadValidation, loadOrder])
+  }, [loadState, autoReplyId, step, versionNumber, inputFingerprint, dirty, matchedAccountId, selectedAccountId, saveDraftNow, loadPriorityData, loadValidation, loadOrder, conflictsReadable])
 
   const reloadAfterConflict = useCallback(async () => {
     setSaveConflict(false)
@@ -426,6 +444,7 @@ function AutoReplyWizardV8Inner() {
     const nextIndex = STEP_ORDER.indexOf(step) + 1
     if (nextIndex >= STEP_ORDER.length) return
     const next = STEP_ORDER[nextIndex]
+    if (autoReplyId && !canEditWizardNow()) { goToStep(next); return }
     if (step === 'trigger') {
       const input = buildInput()
       if ('error' in input && input.step === 'trigger') {
@@ -517,8 +536,9 @@ function AutoReplyWizardV8Inner() {
 
   /* ===== 手順4：試しに送る ===== */
   const runTest = useCallback(async () => {
-    if (!autoReplyId || !selectedFriendId || !testMessage.trim()) return
+    if (!canEditWizardNow() || !autoReplyId || !selectedFriendId || !testMessage.trim()) return
     const testedInput = formFingerprintRef.current
+    const testedAccessEpoch = accessEpoch.current.value
     setInputIssue(null)
     setSaving(true)
     setError('')
@@ -530,13 +550,13 @@ function AutoReplyWizardV8Inner() {
         if (!saved) return
         ruleId = saved.id
       }
-      if (!ruleId) return
+      if (!ruleId || !canEditWizardNow()) return
       const testedVersion = savedVersionRef.current
       const res = await api.autoReplies.testDraft(ruleId, {
         friendId: selectedFriendId,
         incomingText: testMessage.trim(),
       })
-      if (ruleIdRef.current !== ruleId || savedVersionRef.current !== testedVersion || formFingerprintRef.current !== testedInput) return
+      if (!canEditWizardNow() || accessEpoch.current.value !== testedAccessEpoch || ruleIdRef.current !== ruleId || savedVersionRef.current !== testedVersion || formFingerprintRef.current !== testedInput) return
       if (!res.success) throw new Error(res.error || 'test failed')
       if (res.data.staleTest) {
         setDryRun(null)
@@ -564,7 +584,7 @@ function AutoReplyWizardV8Inner() {
   const publishReady = !dirty && canPublish(gates)
 
   const publish = useCallback(async () => {
-    if (!autoReplyId || !publishReady || saving) return
+    if (!canEditWizardNow() || !autoReplyId || !publishReady || saving) return
     setInputIssue(null)
     setSaving(true)
     setError('')
@@ -702,15 +722,8 @@ function AutoReplyWizardV8Inner() {
       /></SaveErrorScope>
     )
   }
-  if (!canManage) {
-    return (
-      <SaveErrorScope errors={saveErrors}><ListState
-        kind="forbidden"
-        title="自動応答の作成・変更はできません"
-        description="作成と変更はオーナーと管理者だけができます。必要なときはオーナーか管理者に頼んでください。"
-        action={<Button href="/auto-replies">自動応答の一覧へ戻る</Button>}
-      /></SaveErrorScope>
-    )
+  if (!autoReplyId && staffRole !== null && inputsDisabled) {
+    return <SaveErrorScope errors={saveErrors}><LockedCreatePage title="ルールを作る" backHref="/auto-replies" backLabel="自動応答の一覧へ戻る" /></SaveErrorScope>
   }
 
   /* ===== 完了 ===== */
@@ -785,7 +798,7 @@ function AutoReplyWizardV8Inner() {
   ) : null
 
   // 1152 の板では右の列にスマホを置かず、上の「LINEでの見え方を見る」から窓で開く。
-  const renderPreview = (withPhone: boolean) => renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryRun, form, imageContent, isActive, matchedLast28Days, myIndex, myPositionLabel, orderedRules, previewAccountName, replyPreviewText, selectedTemplate, setAcknowledged, step, testMessage, triggerSamples }, withPhone)
+  const renderPreview = (withPhone: boolean) => renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryRun, form, imageContent, isActive, matchedLast28Days, myIndex, myPositionLabel, orderedRules, previewAccountName, replyPreviewText, selectedTemplate, setAcknowledged: editAcknowledged, step, testMessage, triggerSamples, conflictsReadable }, withPhone)
 
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage step={STEP_ORDER.indexOf(step)} footerPlacement="floating" boardId={step === 'trigger' && narrow ? 'Z2LIUx' : STEP_DESIGN_NODES[step]} title={pageTitle} help={<>
@@ -814,7 +827,8 @@ function AutoReplyWizardV8Inner() {
                   if (saved) setSaveNotice('下書きを保存しました')
                 })
               }
-              disabled={saving}
+              disabled={inputsDisabled || saving}
+              lockedReason={lockedReason}
               busy={saving}
               busyLabel="保存中…"
               done={saveDone}
@@ -826,7 +840,7 @@ function AutoReplyWizardV8Inner() {
                 type="button"
                 variant="primary"
                 onClick={() => void goNext()}
-                disabled={saving}
+                disabled={staffRole === null || saving}
                 busy={saving}
                 busyLabel="進んでいます…"
               >
@@ -837,7 +851,9 @@ function AutoReplyWizardV8Inner() {
                 type="button"
                 variant="primary"
                 onClick={() => void publish()}
-                disabled={!publishReady || saving}
+                disabled={inputsDisabled || !publishReady || saving}
+                lockedReason={lockedReason}
+                disabledReason={!inputsDisabled && !publishReady ? (dirty ? '変更を下書きに保存してください。' : '有効にする前の確認を完了してください。') : undefined}
                 title={publishReady ? undefined : dirty
                   ? '変更を下書きに保存してから、テストと有効にする前の確認を完了してください。'
                   : [...new Set(gates.filter(gate => gate.state !== 'ok').map(gate => gate.detail))].join(' / ')}
@@ -850,15 +866,16 @@ function AutoReplyWizardV8Inner() {
               </Button>
             )}
           </>
-        } noticeSpacing="band" notice={saveConflict ? (
-          <SaveConflictBand
+        } noticeSpacing="band" notice={lockedReason || saveConflict ? (<>
+          {lockedReason ? <ReadOnlyNotice need="feature" /> : null}
+          {saveConflict ? <SaveConflictBand
             title={`ほかの人がルール「${thisRuleName}」を先に保存しました`}
             designNode="UGrd2"
             compareBusy={compareBusy}
             onCompare={() => void openCompare()}
             onReload={() => void reloadAfterConflict()}
-          />
-        ) : undefined} status={dirty ? '下書きに未保存の変更があります' : undefined}>
+          /> : null}
+        </>) : undefined} status={dirty ? '下書きに未保存の変更があります' : undefined}>
 
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {saveNotice ? <Notice tone="success" message={saveNotice} onClose={() => setSaveNotice('')} /> : null}
@@ -871,23 +888,23 @@ function AutoReplyWizardV8Inner() {
       ) : null}
 
           {step === 'basic' && (
-            <WizardBasicStep accountId={matchedAccountId ?? selectedAccountId ?? null} {...{ canManage, folders, folderState, loadFolders, form, goToStep, patch, setFolders, setForm }} />
+            <WizardBasicStep accountId={matchedAccountId ?? selectedAccountId ?? null} {...{ canManage, folders, folderState, loadFolders, form, goToStep, patch, setFolders, setForm: editForm, disabled: inputsDisabled, lockedReason }} />
           )}
 
           {step === 'trigger' && (
-            <WizardTriggerStep {...{ effectiveKeywords, fieldError, form, moreKindsButton, narrow, patch, setWeekdayNotice, showMoreKinds, weekdayNotice }} />
+            <WizardTriggerStep {...{ effectiveKeywords, fieldError, form, moreKindsButton, narrow, patch, setWeekdayNotice, showMoreKinds, weekdayNotice, disabled: inputsDisabled, lockedReason }} />
           )}
 
           {step === 'response' && (
-            <WizardResponseStep {...{ actionOptions, fieldError, form, imageContent, matchedAccountId, patch, templates }} />
+            <WizardResponseStep {...{ actionOptions, fieldError, form, imageContent, matchedAccountId, patch, templates, disabled: inputsDisabled, lockedReason }} />
           )}
 
           {step === 'priority' && (
-            <WizardPriorityStep {...{ autoReplyId, conflicts, dryRun, effectiveKeywords, firstConflictAbove, friendLoadState, friendQuery, friends, friendTotal, loadPriorityData, matchedAccountId, moveBeforeFirstConflict, moveUp, myIndex, myPositionLabel, orderedRules, priorityState, runTest, saving, searchFriends, selectedFriendId, setFriendQuery, setSelectedFriendId, setTestMessage, testMessage, thisRuleName }} />
+            <WizardPriorityStep {...{ autoReplyId, conflicts, dryRun, effectiveKeywords, firstConflictAbove, friendLoadState, friendQuery, friends, friendTotal, loadPriorityData, matchedAccountId, moveBeforeFirstConflict, moveUp, myIndex, myPositionLabel, orderedRules, priorityState, runTest, saving, searchFriends, selectedFriendId, setFriendQuery, setSelectedFriendId, setTestMessage, testMessage, thisRuleName, canEdit: !inputsDisabled, lockedReason, conflictsReadable, permissionPending }} />
           )}
 
           {step === 'confirm' && (
-            <WizardConfirmStep {...{ actionOptions, autoReplyId, confirmState, effectiveKeywords, folders, form, goToStep, loadValidation, myPositionLabel, selectedTemplate, thisRuleName, v8Checks }} />
+            <WizardConfirmStep {...{ actionOptions, autoReplyId, confirmState, effectiveKeywords, folders, form, goToStep, loadValidation, myPositionLabel, selectedTemplate, thisRuleName, v8Checks, conflictsReadable, permissionPending }} />
           )}
 
       {/* ===== 下の帯 ===== */}
@@ -910,6 +927,8 @@ function AutoReplyWizardV8Inner() {
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
         busy={saving}
+        saveDisabled={inputsDisabled}
+        saveLockedReason={lockedReason}
         onSave={async () => {
           const saved = await saveDraftNow()
           return saved !== null

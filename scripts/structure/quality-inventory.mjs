@@ -47,7 +47,8 @@ export function qualityInventory(files, packages = new Map()) {
     if (!/^(?:apps\/|packages\/|scripts\/)/.test(file)) continue
     if (history.test(file.split('/').at(-1))) add('history-name', file, 1, file)
     const lines = source.split('\n').length - Number(source.endsWith('\n'))
-    if (/\.(?:[cm]?[jt]sx?|css|sql|sh|py)$/.test(file) && lines >= 1500) {
+    // migration から自動で作るファイルで、詰めて直せないため長さの数え上げから外す。
+    if (file !== 'packages/db/bootstrap.sql' && /\.(?:[cm]?[jt]sx?|css|sql|sh|py)$/.test(file) && lines >= 1500) {
       add('long-files', file, 1, `${lines} lines`)
       add('long-file-lines', file, 1, `${lines} lines`, lines)
     }

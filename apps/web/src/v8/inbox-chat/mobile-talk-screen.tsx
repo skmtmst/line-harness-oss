@@ -81,6 +81,7 @@ function MobileTalkInbox() {
     EMAIL_PAGE_SIZE: 1,
     nameQuery,
     selectedAccountId,
+    emailInboxEnabled: false,
     statusFilter: 'all',
     assigneeFilter: 'all',
     unreadOnly: filter === 'unread',
@@ -171,7 +172,7 @@ function MobileTalkThread() {
 
   /* 会話の指定は PC と同じ照合を通す（いま選んでいるアカウントの相手でなければ開かない）。 */
   const { deepLinkNotice, setDeepLinkNotice, deepLinkIdRef } = useInboxDeepLink({
-    params, setSelectedChatId, setSelectedThreadId, accountsLoading, selectedAccountId, router, channel: 'line', savedViewParam: '',
+    params, setSelectedChatId, setSelectedThreadId, accountsLoading, emailInboxEnabled: false, selectedAccountId, router, channel: 'line', savedViewParam: '',
   })
 
   const draft = useInboxDraft({ selectedAccountId, selectedChatId })

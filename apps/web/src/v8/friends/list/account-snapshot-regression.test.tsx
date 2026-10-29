@@ -54,15 +54,16 @@ const statsFixture = (overrides: Partial<FriendStats> = {}): FriendStats => ({
 const kpiCard = (title: string) => screen.getByText(title, { selector: '[data-kpi-label] span' }).closest<HTMLElement>('[data-kpi-presentation]')!
 const deltaSlot = (title: string) => kpiCard(title).querySelector<HTMLElement>('[data-kpi-delta-slot]')
 
-it('増加と要確認を共通の印で出し、既存の符号と読み上げる文字を保つ', async () => {
+it('増加は緑の札に改善と全角の符号で出し、要確認は今のまま（R1・10-29）', async () => {
   fx.account = 'A'; fx.stats = statsFixture()
   render(<List />)
   await screen.findByText('前月 1人')
-  for (const [title, text] of [['有効な友だち', '+2'], ['今月の追加', '+3']] as const) {
+  for (const [title, text] of [['有効な友だち', '＋2'], ['今月の追加', '＋3']] as const) {
     const slot = deltaSlot(title)!
     expect(slot.querySelector('svg')).toBeNull()
     expect(slot.querySelector('[data-delta-word]')?.textContent).toBe('改善')
     expect(slot.firstElementChild?.firstElementChild?.textContent).toBe(text)
+    expect(slot.textContent).not.toMatch(/[+-]/)
     expect(screen.getByText(text).closest('[aria-hidden="true"]')).toBeNull()
   }
   const attention = deltaSlot('未対応')!
@@ -72,16 +73,18 @@ it('増加と要確認を共通の印で出し、既存の符号と読み上げ�
   expect(kpiCard('有効な友だち').textContent).toContain('総友だち 12')
 })
 
-it('減少の符号と灰色の意味を保ち、悪化の赤へ読み替えない', async () => {
+it('減少は赤の札に悪化と全角の符号で出し、1つの札にまとめる（R1・10-29）', async () => {
   fx.account = 'A'; fx.stats = statsFixture({ activeMonthDelta: -1200, addedThisMonth: 2, addedLastMonth: 5, unanswered: 0 })
   render(<List />)
   await screen.findByText('前月 5人')
-  for (const [title, text] of [['有効な友だち', '-1,200'], ['今月の追加', '-3']] as const) {
+  for (const [title, text] of [['有効な友だち', '−1,200'], ['今月の追加', '−3']] as const) {
     const slot = deltaSlot(title)!
-    expect(slot.textContent).toBe(text)
-    expect(slot.querySelector('[data-tone="neutral"]')).not.toBeNull()
     expect(slot.querySelector('svg')).toBeNull()
-    expect(slot.querySelector('[data-delta-word]')).toBeNull()
+    expect(slot.querySelector('[data-delta-word]')?.textContent).toBe('悪化')
+    expect(slot.firstElementChild?.firstElementChild?.textContent).toBe(text)
+    expect(slot.firstElementChild?.textContent).toBe(`${text}悪化`)
+    expect(slot.textContent).not.toMatch(/[+-]/)
+    expect(slot.querySelector('[data-tone="neutral"]')).toBeNull()
   }
   expect(deltaSlot('未対応')).toBeNull()
 })

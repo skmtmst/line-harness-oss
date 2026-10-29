@@ -1,7 +1,6 @@
 'use client'
 
 import TextLink from '@/components/shared/text-link'
-import { PRODUCT_SCOPE } from '@/lib/product-scope'
 import { useRouter } from 'next/navigation'
 import { useCallback, useRef, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
@@ -10,18 +9,24 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
 import { TextField } from '@/components/shared/text-field'
+import Select from '@/components/shared/select'
 import { authRequest, CONTACT_URL, emailError, LEGAL_LINKS, readDeviceMarker, rememberSignupEmail, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 
-/**
- * 会員登録の 1 歩目。V8（`JBd7P`、カード `NIOtl`）。
- *
- * メールアドレスだけを入れ、本登録の URL をメールで受け取る（決定 2026-09-13）。
- * 誤ったメールでは先に進めない。返事は登録済みでも同じ「送りました」。
- */
+const REFERRAL_OPTIONS = [
+  { value: '', label: '選択してください' },
+  ...['知人・取引先からの紹介', 'インターネット検索', 'SNS', '広告', 'イベント・セミナー', 'その他']
+    .map((label) => ({ value: label, label })),
+]
+
+/** 利用申込。担当者の連絡と運営の承認後にだけ初期設定の案内を送る。 */
 export default function RegisterPage() {
   const router = useRouter()
+  const [companyName, setCompanyName] = useState('')
+  const [contactName, setContactName] = useState('')
   const [email, setEmail] = useState('')
-  const [emailMessage, setEmailMessage] = useState<string | null>(null)
+  const [phone, setPhone] = useState('')
+  const [referralSource, setReferralSource] = useState('')
+  const [messages, setMessages] = useState<Record<string, string>>({})
   const [agreed, setAgreed] = useState(false)
   const [agreeMessage, setAgreeMessage] = useState<string | null>(null)
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
@@ -35,9 +40,15 @@ export default function RegisterPage() {
   const submit = async (event: FormEvent) => {
     event.preventDefault()
     const emailProblem = emailError(email)
-    setEmailMessage(emailProblem)
+    const next: Record<string, string> = {}
+    if (!companyName.trim()) next.companyName = '会社名を入力してください'
+    if (!contactName.trim()) next.contactName = '担当者名を入力してください'
+    if (emailProblem) next.email = emailProblem
+    if (!/^[+0-9()\- ]{9,24}$/.test(phone.trim()) || phone.replace(/\D/g, '').length < 9) next.phone = '電話番号を正しく入力してください'
+    if (!referralSource) next.referralSource = 'musuboを知ったきっかけを選んでください'
+    setMessages(next)
     setAgreeMessage(agreed ? null : '利用規約とプライバシーポリシーに同意してください')
-    if (emailProblem || !agreed) return
+    if (Object.keys(next).length || !agreed) return
     if (!turnstileToken) {
       setError('「私はロボットではありません」の確認を済ませてください')
       return
@@ -46,6 +57,10 @@ export default function RegisterPage() {
     setError('')
     const res = await authRequest<{ sent: boolean }>('/api/auth/register/request', {
       email: email.trim(),
+      companyName: companyName.trim(),
+      contactName: contactName.trim(),
+      phone: phone.trim(),
+      referralSource,
       agreed: true,
       turnstileToken,
       deviceMarker: readDeviceMarker(),
@@ -62,29 +77,49 @@ export default function RegisterPage() {
 
   return (
     <AuthCard
-      node="JBd7P"
-      cardNode="NIOtl"
-      title="無料で始める"
-      description={`${PRODUCT_SCOPE.trial} まずメールアドレスを入れてください。本登録の URL をお送りします。`}
+      node="Bo15C"
+      applicationFlow="form"
+      title="利用を申し込む"
+      description="必要事項を送信すると、musuboの担当者からご連絡します。承認後に利用を開始できます。"
     >
-      <p className="text-caption text-ink-secondary">{PRODUCT_SCOPE.boundaries}</p>
+      <div className="w-full rounded-control bg-accent-soft px-4 py-3 text-caption text-ink-secondary">
+        <strong className="block text-ink">お申し込み後の流れ</strong>
+        内容確認 → 担当者から連絡 → 承認・利用開始（30日間無料）
+      </div>
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
           <Notice tone="danger" message={error} />
         ) : null}
-        <AuthField label="メールアドレス" hint="本登録の URL が届きます。間違いがないか確かめてください" htmlFor="register-email" error={emailMessage}>
+        <AuthField label="会社名" htmlFor="register-company" error={messages.companyName}>
+          <TextField id="register-company" value={companyName} onChange={(event) => setCompanyName(event.target.value)}
+            autoComplete="organization" maxLength={80} placeholder="株式会社〇〇" invalid={Boolean(messages.companyName)} />
+        </AuthField>
+        <AuthField label="担当者名" htmlFor="register-contact" error={messages.contactName}>
+          <TextField id="register-contact" value={contactName} onChange={(event) => setContactName(event.target.value)}
+            autoComplete="name" maxLength={80} placeholder="山田 太郎" invalid={Boolean(messages.contactName)} />
+        </AuthField>
+        <AuthField label="メールアドレス" htmlFor="register-email" error={messages.email}>
           <TextField
             id="register-email"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            invalid={Boolean(emailMessage)}
+            invalid={Boolean(messages.email)}
             autoComplete="email"
             inputMode="email"
             placeholder="you@example.com"
-            aria-describedby={emailMessage ? 'register-email-error' : undefined}
+            aria-describedby={messages.email ? 'register-email-error' : undefined}
           />
         </AuthField>
+        <AuthField label="電話番号" htmlFor="register-phone" error={messages.phone}>
+          <TextField id="register-phone" type="tel" value={phone} onChange={(event) => setPhone(event.target.value)}
+            autoComplete="tel" maxLength={24} placeholder="03-1234-5678" invalid={Boolean(messages.phone)} />
+        </AuthField>
+        <AuthField label="musuboを知ったきっかけ" htmlFor="register-referral" error={messages.referralSource}>
+          <Select id="register-referral" aria-label="musuboを知ったきっかけ" size="full" value={referralSource} onChange={setReferralSource}
+            options={REFERRAL_OPTIONS} invalid={Boolean(messages.referralSource)} />
+        </AuthField>
+        <p className="text-micro text-ink-faint">知人・取引先からの紹介／インターネット検索／SNS／広告／イベント・セミナー／その他</p>
 
         <Turnstile onToken={setTurnstileToken} handleRef={setTurnstileHandle} />
 
@@ -113,7 +148,7 @@ export default function RegisterPage() {
           ) : null}
         </div>
 
-        <Button type="submit" variant="primary" disabled={busy || !TURNSTILE_SITE_KEY} className="w-full" busy={busy} busyLabel="送っています…">確認メールを送る
+        <Button type="submit" variant="primary" disabled={busy || !TURNSTILE_SITE_KEY} className="w-full" busy={busy} busyLabel="送っています…">申し込みを送信する
         </Button>
       </form>
 

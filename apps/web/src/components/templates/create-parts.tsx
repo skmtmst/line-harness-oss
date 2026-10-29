@@ -56,7 +56,7 @@ export function CreatePreviewNote({ children }: { children: ReactNode }) {
   return <p className={styles.note} data-part="create-preview-note">{children}</p>
 }
 
-export type StarterItem = { key: string; name: string; lines: string[]; onUse: () => void; useLabel?: string }
+export type StarterItem = { key: string; name: string; lines: string[]; onUse: () => void; useLabel?: string; disabled?: boolean; lockedReason?: string }
 
 /** 「ひな形から作る（任意）」のカード列。カードの中は1行ずつ、入りきらないときだけ「…」＋title。 */
 export function CreateStarterCards({
@@ -86,7 +86,7 @@ export function CreateStarterCards({
               <p key={line} className={styles.starterLine} title={line}>{line}</p>
             ))}
             <div className={styles.starterActions}>
-              <Button type="button" onClick={item.onUse}>{item.useLabel ?? 'このひな形を使う'}</Button>
+              <Button type="button" onClick={item.onUse} disabled={item.disabled} lockedReason={item.lockedReason}>{item.useLabel ?? 'このひな形を使う'}</Button>
             </div>
           </div>
         ))}

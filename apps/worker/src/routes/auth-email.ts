@@ -13,6 +13,8 @@ import {
   createAuthEmailToken,
   createStaffMember,
   createTrialTenant,
+  createRegistrationApplication,
+  getRegistrationApplication,
   getActiveStaffByEmail,
   getAuthEmailToken,
   getPlatformAdminRecord,
@@ -20,6 +22,7 @@ import {
   getStaffWithPasswordByEmail,
   hasStaffWithEmail,
   hasTenantWithDeviceMarker,
+  markRegistrationApplicationActivated,
   readAuthThrottle,
   recordAuditEvent,
   recordLoginAudit,
@@ -35,16 +38,16 @@ import { turnstileErrorMessage, verifyTurnstile } from '../services/turnstile.js
 import { candidateFromStaffRow, isPlatformAdminRow } from '../middleware/platform-admin.js';
 import {
   PASSWORD_RESET_TOKEN_TTL_MS,
-  SIGNUP_TOKEN_TTL_MS,
   sendAlreadyRegisteredMail,
   sendPasswordResetMail,
-  sendSignupVerifyMail,
+  sendRegistrationReceiptMail,
 } from '../services/auth-mail.js';
 import { TRIAL_DAYS } from '../services/billing-plans.js';
 
 /**
- * 会員登録・メールとパスワードによるログイン・パスワード再設定を扱う。
- * 誤入力のメールで登録を進めないよう、確認 URL の先で会社名・名前・パスワードを受け取り、30日トライアルの統括とオーナー権限者を作る。
+ * 利用申込・メールとパスワードによるログイン・パスワード再設定を扱う。
+ * 申込内容を保存し、運営による連絡・承認の後にだけ招待 URL を送る。
+ * 招待 URL から承認済みの会社名・担当者名とパスワードで、30日トライアルの統括とオーナー権限者を作る。
  * Turnstile の秘密鍵がなければ受け付けない。同一ブラウザの重複登録は localStorage と Cookie の両方で拒む。
  * 再起動後も回数制限を保つため、接続元・メール別の送信数を D1 へ残す。
  * 登録済みメールの有無は応答から漏らさず、本人へメールで伝える。確認 URL は元の値でなくハッシュを保存し、一度だけ使えるようにする。
@@ -56,6 +59,8 @@ authEmail.use('/api/auth/*', async (c, next) => { c.header('Cache-Control', 'pri
 
 const EMAIL_MAX = 254;
 const NAME_MAX = 80;
+const PHONE_MAX = 24;
+const REFERRAL_SOURCES = new Set(['知人・取引先からの紹介', 'インターネット検索', 'SNS', '広告', 'イベント・セミナー', 'その他']);
 const DEVICE_MARKER_COOKIE = 'lh_signup_marker';
 const DEVICE_MARKER_MAX_AGE = 365 * 24 * 60 * 60;
 
@@ -138,18 +143,25 @@ function readToken(c: Context<Env>, body?: Body): string {
 
 /**
  * POST /api/auth/register/request
- * { email, turnstileToken, agreed: true, deviceMarker? }
+ * { companyName, contactName, email, phone, referralSource, turnstileToken, agreed: true, deviceMarker? }
  *
- * 返事はいつも同じ「送りました」。登録済みのメールには本人向けの案内メールを送る。
+ * 返事は登録済みでも同じ「受け付けました」。登録済みのメールには本人向けの案内を送る。
  */
 authEmail.post('/api/auth/register/request', inputJsonBoundary(), async (c) => {
-  const base = adminBase(c);
-  if (!base) return c.json({ success: false, error: '管理画面の URL が設定されていません' }, 500);
-
   const body = await readBody(c);
   const email = normalizeEmail(body.email);
   if (!email) return inputError(c, { success: false, error: 'メールアドレスの形式が正しくありません' }, 400, ["email"]);
   if (body.agreed !== true) return inputError(c, { success: false, error: '利用規約とプライバシーポリシーに同意してください' }, 400, ["agreed"]);
+  const companyName = text(body.companyName, NAME_MAX);
+  const contactName = text(body.contactName, NAME_MAX);
+  const phone = text(body.phone, PHONE_MAX);
+  const referralSource = text(body.referralSource, 40);
+  const errors: Record<string, string> = {};
+  if (!companyName || companyName.length > NAME_MAX) errors.companyName = '会社名を1〜80文字で入力してください';
+  if (!contactName || contactName.length > NAME_MAX) errors.contactName = '担当者名を1〜80文字で入力してください';
+  if (phone.length > PHONE_MAX || !/^[+0-9()\- ]{9,24}$/.test(phone) || phone.replace(/\D/g, '').length < 9) errors.phone = '電話番号を正しく入力してください';
+  if (!REFERRAL_SOURCES.has(referralSource)) errors.referralSource = 'musuboを知ったきっかけを選んでください';
+  if (Object.keys(errors).length) return inputError(c, { success: false, error: Object.values(errors)[0], errors }, 400, Object.keys(errors));
 
   const turnstile = await verifyTurnstile(c.env, body.turnstileToken as string | undefined, clientIp(c));
   if (!turnstile.ok) {
@@ -174,23 +186,22 @@ authEmail.post('/api/auth/register/request', inputJsonBoundary(), async (c) => {
 
   try {
     if (await hasStaffWithEmail(c.env.DB, email)) {
-      await sendAlreadyRegisteredMail(c.env, { email, loginUrl: `${base}/login`, forgotUrl: `${base}/password/forgot` });
+      const base = adminBase(c);
+      if (base) await sendAlreadyRegisteredMail(c.env, { email, loginUrl: `${base}/login`, forgotUrl: `${base}/password/forgot` });
       return c.json({ success: true, data: { sent: true } });
     }
-    const token = randomToken();
-    await createAuthEmailToken(c.env.DB, {
-      purpose: 'signup',
-      tokenHash: await sha256Hex(token),
-      email,
-      ipHash,
-      deviceMarker: markers[0] ?? null,
-      expiresAt: toJstString(new Date(Date.now() + SIGNUP_TOKEN_TTL_MS)),
+    const created = await createRegistrationApplication(c.env.DB, {
+      companyName, contactName, email, phone, referralSource, ipHash, deviceMarker: markers[0] ?? null,
     });
-    await sendSignupVerifyMail(c.env, { email, completeUrl: `${base}/register/complete?token=${encodeURIComponent(token)}` });
-    return c.json({ success: true, data: { sent: true } });
-  } catch (error) {
+    let receiptSent = false;
+    if (created) {
+      try { await sendRegistrationReceiptMail(c.env, { email, companyName }); receiptSent = true; }
+      catch { logger.error('auth_email.registration_receipt_failed'); }
+    }
+    return c.json({ success: true, data: { sent: true, receiptSent } });
+  } catch {
     logger.error("auth_email.auth_register_request_create_failed");
-    return c.json({ success: false, error: 'メールを送れませんでした。しばらく待ってからもう一度お試しください' }, 502);
+    return c.json({ success: false, error: 'お申し込みを受け付けられませんでした。しばらく待ってからもう一度お試しください' }, 502);
   }
 });
 
@@ -200,12 +211,17 @@ authEmail.get('/api/auth/register/check', async (c) => {
   const row = token ? await getAuthEmailToken(c.env.DB, 'signup', await sha256Hex(token)) : null;
   const state = tokenState(row);
   if (state !== 'valid') return inputError(c, { success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410, []);
-  return c.json({ success: true, data: { email: row!.email, trialDays: TRIAL_DAYS } });
+  const application = row!.application_id ? await getRegistrationApplication(c.env.DB, row!.application_id) : null;
+  if (!application || application.status !== 'approved' || application.email !== row!.email) {
+    return c.json({ success: false, code: 'approval_required', error: 'お申し込みを確認中です。承認のご案内をお待ちください' }, 403);
+  }
+  return c.json({ success: true, data: { email: row!.email, trialDays: TRIAL_DAYS,
+    companyName: application.company_name, contactName: application.contact_name } });
 });
 
 /**
  * POST /api/auth/register/complete
- * { token, tenantName, name, password, deviceMarker? }
+ * { token, password, deviceMarker? }。会社名と担当者名は承認済み申込から使う。
  *
  * 統括（トライアル）とオーナー権限者を作り、そのままログインした状態にする。
  */
@@ -219,8 +235,13 @@ authEmail.post('/api/auth/register/complete', inputJsonBoundary(), async (c) => 
   const state = tokenState(row);
   if (state !== 'valid') return inputError(c, { success: false, error: TOKEN_STATE_MESSAGE[state], code: state }, state === 'invalid' ? 404 : 410, []);
 
-  const tenantName = text(body.tenantName, NAME_MAX);
-  const name = text(body.name, NAME_MAX);
+  const application = row!.application_id ? await getRegistrationApplication(c.env.DB, row!.application_id) : null;
+  if (!application || application.status !== 'approved' || application.email !== row!.email) {
+    return c.json({ success: false, code: 'approval_required', error: 'お申し込みを確認中です。承認のご案内をお待ちください' }, 403);
+  }
+
+  const tenantName = application.company_name;
+  const name = application.contact_name;
   const password = typeof body.password === 'string' ? body.password : '';
   const errors: Record<string, string> = {};
   if (!tenantName) errors.tenantName = '会社名・統括名を入力してください';
@@ -267,6 +288,7 @@ authEmail.post('/api/auth/register/complete', inputJsonBoundary(), async (c) => 
     email_verified_at: toJstString(now),
   });
   if (!staff) return c.json({ success: false, error: '登録を完了できませんでした' }, 500);
+  await markRegistrationApplicationActivated(c.env.DB, application.id, tenantId);
 
   const challenge = await loginMfaChallenge(c, staff, false);
   await mfaAudit(c, staff.id, 'auth.register', 'success');

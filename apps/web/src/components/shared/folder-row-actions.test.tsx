@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
+import { expectLockedFolderMenu } from '@/test-utils/permission-locked-control'
 /*
  * フォルダの列の「…」（V8.pen 共通部品4 の H・）の動き。
  * V8 の言葉（名前を変える・色を変える・並べ替える・消す）、消す前の確認の窓、
- * 消すと共通のフォルダの口へ DELETE を送って読み直す。閲覧のみには「…」を出さない。
+ * 消すと共通のフォルダの口へ DELETE を送って読み直す。閲覧のみでも「…」を開け、変更項目は理由付きで拒否する。
  */
 import { within } from '@testing-library/react'
 import React, { act } from 'react'
@@ -104,9 +105,12 @@ describe('フォルダの「…」（共通）', () => {
     expect(swap).toHaveBeenCalledWith('f-2', 'f-1', 'acc-1')
   })
 
-  it('変えられない人には「…」を出さない', async () => {
+  it('変えられない人にも「…」を出し、変更項目は理由付きで拒否する', async () => {
     await act(async () => { root.render(<Screen enabled={false} onChanged={() => {}} onDeleted={() => {}} />) })
-    expect(menuButton('キャンペーン')).toBeNull()
+    await expectLockedFolderMenu(menuButton('キャンペーン'))
+    expect(update).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
+    expect(swap).not.toHaveBeenCalled()
     expect(document.body.textContent).not.toContain('フォルダを追加する')
     expect(document.body.textContent).not.toContain('色を変える')
   })

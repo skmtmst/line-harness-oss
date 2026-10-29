@@ -1,5 +1,5 @@
 'use client'
-import { formatYen } from '@line-crm/shared';
+import { formatYen, withHonorific } from '@line-crm/shared';
 
 /*
  * ★V8-B ：EC連携 注文の状況（引き出し）。取り込みの記録の行の「…」→「注文の状況を見る」で開く。
@@ -203,8 +203,8 @@ export default function OrderDrawer({
     <Drawer open={open} width="order" heightMode="viewport" title={order ? `注文 ${order.orderNumber}` : '注文の状況'}
       description={order ? <>
         {friendId && order.customerName
-          ? <Link className={styles.subLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}`}>{`${order.customerName}さん`}</Link>
-          : order.customerName ? `${order.customerName}さん` : null}
+          ? <Link className={styles.subLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}`}>{withHonorific(order.customerName)}</Link>
+          : order.customerName ? withHonorific(order.customerName) : null}
         {`${order.customerName ? '・' : ''}${friendId ? 'LINE の友だちと結びついています' : 'LINE の友だちと結びついていません'}${ORDER_STATUS_TEXT[order.status] ? `・${ORDER_STATUS_TEXT[order.status]}` : ''}`}
       </> : undefined}
       onClose={onClose}

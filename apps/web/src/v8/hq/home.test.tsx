@@ -3,7 +3,8 @@
  * V8 統括のアカウント（src/v8/hq/home.tsx）の動きの試験。
  * LINE ID の @ を二重にしない、要確認のカードに引っかかった確認の言葉を出す（全文は title）、
  * 閲覧のみには「更新する」を置かない。
- * 「入る」は見た目のまま、押すと友だちの引き継ぎを続きから進める（2026-10-15 の決まり）。
+ * 「入る」は押すと引き継ぎの状態を確かめ、終わっていれば店へ進み、
+ * 未完了・確認失敗なら登録時と同じ進捗画面へ戻す。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -15,7 +16,9 @@ vi.hoisted(() => {
 
 const accounts = vi.hoisted(() => vi.fn())
 const checkConnection = vi.hoisted(() => vi.fn())
-const stepImport = vi.hoisted(() => vi.fn())
+const importState = vi.hoisted(() => vi.fn())
+const push = vi.hoisted(() => vi.fn())
+const select = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -25,7 +28,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     fetchApi: checkConnection,
     api: {
       ...actual.api,
-      lineAccounts: { ...actual.api.lineAccounts, list: accounts, stepFollowerImport: stepImport },
+      lineAccounts: { ...actual.api.lineAccounts, list: accounts, followerImportState: importState },
       lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })) },
       tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '然 -NEN-' } })) },
     },
@@ -35,7 +38,7 @@ vi.mock('next/link', () => ({
   default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children),
 }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
+  useRouter: () => ({ push, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/hq',
 }))
@@ -43,7 +46,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePa
 vi.mock('@/components/hq/platform-notices', () => ({ default: () => null }))
 vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => role.value }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ setSelectedAccountId: () => {}, refreshAccounts: async () => {} }),
+  useAccount: () => ({ accounts: [], setSelectedAccountId: select, refreshAccounts: async () => {} }),
 }))
 
 import HqHomeV8 from './home'
@@ -73,8 +76,10 @@ beforeEach(() => {
   accounts.mockResolvedValue({ success: true, data: [warnedAccount] })
   checkConnection.mockReset()
   checkConnection.mockResolvedValue({ success: true, data: {} })
-  stepImport.mockReset()
-  stepImport.mockResolvedValue({ success: true, data: { state: { phase: 'completed' }, busy: false, profilesFetched: 0 } })
+  importState.mockReset()
+  importState.mockResolvedValue({ success: true, data: { phase: 'completed' } })
+  push.mockReset()
+  select.mockReset()
   role.value = 'owner'
 })
 
@@ -132,32 +137,50 @@ describe('統括のアカウント', () => {
     expect(card.querySelector('button[aria-label$="へ入る"]')).not.toBeNull()
   })
 
-  it('「入る」を押すと、友だちの引き継ぎを続きから進める口を叩く', async () => {
+  it('「入る」を押すと引き継ぎの状態を確かめ、終わっていればそのアカウントを覚えて店へ進む', async () => {
     await render()
     const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
-    await act(async () => { enter.click() })
-    expect(stepImport).toHaveBeenCalledWith('acc-1')
-  })
-
-  it('口が返らなくても、口が転んでも「入る」は止まらない', async () => {
-    // 返らない場合（答えを待たない）と、転んだ場合（遷移を止めない）の両方。
-    stepImport.mockReturnValueOnce(new Promise(() => {}))
-    await render()
-    const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
-    await act(async () => { enter.click() })
-    expect(stepImport).toHaveBeenCalledTimes(1)
-    stepImport.mockRejectedValueOnce(new Error('worker unavailable'))
     await act(async () => { enter.click() })
     await act(async () => { await Promise.resolve() })
-    expect(stepImport).toHaveBeenCalledTimes(2)
+    expect(importState).toHaveBeenCalledWith('acc-1')
+    expect(select).toHaveBeenCalledWith('acc-1')
+    expect(push).toHaveBeenCalledTimes(1)
+    expect(push.mock.calls[0][0]).toBe('/')
   })
 
-  it('閲覧のみは引き継ぎを動かさない', async () => {
+  it('引き継ぎ中は店舗を選択せず登録時と同じ進捗画面へ戻す', async () => {
+    importState.mockResolvedValue({ success: true, data: { phase: 'importing_ids' } })
+    await render()
+    const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
+    await act(async () => { enter.click() })
+    await act(async () => { await Promise.resolve() })
+    expect(importState).toHaveBeenCalledWith('acc-1')
+    expect(push).toHaveBeenCalledWith('/accounts/new/handover?accountId=acc-1')
+    expect(select).not.toHaveBeenCalled()
+  })
+
+  it('引き継ぎ状態を読めないときも進捗画面へ戻し、次は止まらない', async () => {
+    importState.mockRejectedValueOnce(new Error('worker unavailable'))
+    await render()
+    const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
+    await act(async () => { enter.click() })
+    await act(async () => { await Promise.resolve() })
+    expect(push).toHaveBeenCalledWith('/accounts/new/handover?accountId=acc-1')
+    expect(select).not.toHaveBeenCalled()
+    importState.mockResolvedValue({ success: true, data: { phase: 'completed' } })
+    await act(async () => { enter.click() })
+    await act(async () => { await Promise.resolve() })
+    expect(select).toHaveBeenCalledWith('acc-1')
+  })
+
+  it('閲覧のみでも引き継ぎが終わっていれば入れる（状態の確認は読み取りだけ）', async () => {
     role.value = 'viewer'
     await render()
     const enter = container.querySelector<HTMLButtonElement>('button[aria-label="然 -NEN- TEST へ入る"]')!
     await act(async () => { enter.click() })
-    expect(stepImport).not.toHaveBeenCalled()
+    await act(async () => { await Promise.resolve() })
+    expect(importState).toHaveBeenCalledWith('acc-1')
+    expect(select).toHaveBeenCalledWith('acc-1')
   })
 
   it('カードの更新は押した1件だけに送り、失敗したアカウント名を伝える', async () => {

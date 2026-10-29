@@ -1,13 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { api, type OpsNoticeLineAccount } from '@/lib/api'
+import { api, ApiError, type OpsNoticeLineAccount } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
-import Select from '@/components/shared/select'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { formatNumber } from '@/lib/format'
+import { TextField } from '@/components/shared/text-field'
+import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
 
 /**
  * 契約者専用LINEに使うアカウントの指定（決定 2026-09-18 案A）。
@@ -19,6 +20,10 @@ export default function NoticeLineAccountCard() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
+  const [channelId, setChannelId] = useState('')
+  const [channelSecret, setChannelSecret] = useState('')
+  const [basicId, setBasicId] = useState('')
+  const { gate, prompt } = useStepUpGate()
 
   const load = useCallback(async () => {
     const res = await opsCall(api.ops.noticeLineAccount())
@@ -38,11 +43,38 @@ export default function NoticeLineAccountCard() {
     await load()
   }
 
+  const connect = async () => {
+    if (busy) return
+    setBusy(true)
+    setError('')
+    setNotice('')
+    const input = { channelId: channelId.trim(), channelSecret: channelSecret.trim(), basicId: basicId.trim() }
+    try {
+      let result
+      try {
+        result = await api.ops.connectNoticeLineAccount(input)
+      } catch (failure) {
+        if (!isStepUpRequired(failure)) throw failure
+        const token = await gate('line_account.connect', '契約者専用LINEを接続する')
+        if (!token) return
+        result = await api.ops.connectNoticeLineAccount(input, token)
+      }
+      if (!result.success) { setError(result.error || '接続できませんでした'); return }
+      setChannelSecret('')
+      setNotice(`${result.data.name}（${result.data.basicId}）を契約者専用LINEに指定しました`)
+      await load()
+    } catch (failure) {
+      setError(failure instanceof ApiError ? failure.message : 'LINEに接続できませんでした。時間をおいて再試行してください')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section aria-label="契約者専用LINE" className="grid gap-3 rounded-card border content-card bg-canvas px-5 py-4">
       <div>
         <h3 className="text-label font-semibold text-ink">契約者専用LINE</h3>
-        <p className="text-micro text-ink-secondary">契約先の権限者へ大事なお知らせを送る公式アカウントです。運営会社のアカウントとして登録したものから選びます。</p>
+        <p className="text-micro text-ink-secondary">契約先の権限者へ大事なお知らせを送る通知専用の公式アカウントです。問い合わせは各アカウントの管理画面から受け付けます。</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <SaveErrorField names={["selected"]}><EntitySelect
@@ -63,8 +95,29 @@ export default function NoticeLineAccountCard() {
       ) : (
         <p className="text-caption text-ink-secondary">未指定です。指定するまで、お知らせは画面とメールだけで送れます。</p>
       )}
+      {data && !data.current ? (
+        <div className="grid gap-3 border-t border-hairline pt-4">
+          <div>
+            <h4 className="text-label font-semibold text-ink">通知専用LINEを接続</h4>
+            <p className="text-micro text-ink-secondary">LINE公式アカウントのMessaging APIを接続します。LINEログインとLIFFは不要です。Webhookの利用をONにしてから接続してください。</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <label className="grid gap-1 text-caption text-ink">LINEの@ID
+              <TextField value={basicId} onChange={(event) => setBasicId(event.target.value)} placeholder="@から始まるID" autoComplete="off" required />
+            </label>
+            <label className="grid gap-1 text-caption text-ink">Messaging APIのチャネルID
+              <TextField value={channelId} onChange={(event) => setChannelId(event.target.value)} inputMode="numeric" autoComplete="off" required />
+            </label>
+            <label className="grid gap-1 text-caption text-ink">チャネルシークレット
+              <TextField type="password" value={channelSecret} onChange={(event) => setChannelSecret(event.target.value)} autoComplete="off" required />
+            </label>
+          </div>
+          <div><Button variant="primary" onClick={() => void connect()} busy={busy} disabled={!basicId.trim() || !channelId.trim() || !channelSecret.trim()}>接続して指定する</Button></div>
+        </div>
+      ) : null}
       {notice ? <p role="status" className="text-caption text-accent-deep">{notice}</p> : null}
       {error ? <p role="alert" className="text-caption text-danger">{error}</p> : null}
+      {prompt}
     </section>
   )
 }

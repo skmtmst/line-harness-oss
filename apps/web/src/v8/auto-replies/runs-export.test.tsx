@@ -25,6 +25,9 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 
 import AutoReplyRunsPage from '@/app/auto-replies/runs/page'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 
 function runItem(index: number) {
   return {
@@ -54,6 +57,8 @@ const downloads: string[] = []
 let createObjectURL: ReturnType<typeof vi.spyOn>
 
 beforeEach(() => {
+  forgetSessionSnapshot()
+  verifiedStaffRole('owner')
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   downloads.length = 0
   createObjectURL = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:runs')
@@ -63,6 +68,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  forgetStaffIdentity()
+  forgetSessionSnapshot()
   vi.restoreAllMocks()
   vi.unstubAllGlobals()
   mocks.runs.mockReset()

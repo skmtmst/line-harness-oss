@@ -81,7 +81,7 @@ describe('会社設定のHTTPと実SQLite', () => {
     expect((await request('PUT', input)).status).toBe(403);
     sql.exec("UPDATE staff_members SET access_level='full',account_scope='accounts' WHERE id='owner'");
     expect((await request('PUT', input)).status).toBe(403);
-    expect((await request()).status).toBe(200);
+    expect((await request()).status).toBe(403);
   });
   test('所属は認証から決まり、本文やクエリで別会社を選べない', async () => {
     expect((await request('PUT', { ...input, tenantId: 'tenant-b' }, '?tenantId=tenant-b')).status).toBe(200);

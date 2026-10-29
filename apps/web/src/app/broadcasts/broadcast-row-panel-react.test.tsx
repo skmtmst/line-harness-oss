@@ -123,3 +123,18 @@ test('パネルの「開く」は詳細へ進む', async () => {
   await act(async () => { open.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
   expect(pushes).toEqual(['/broadcasts/detail?id=b1'])
 })
+
+test('権限不足の応答では権限の案内を描き、読み込み失敗の案内を出さない', async () => {
+  vi.stubGlobal('fetch', (input: URL | RequestInfo, init?: RequestInit) => {
+    const url = new URL(String(input))
+    return Promise.resolve(url.pathname === '/api/broadcasts'
+      ? response({ success: false, error: '権限がありません' }, 403)
+      : handler(url, init))
+  })
+  await act(async () => { root.render(<BroadcastsPage />) })
+  await eventually(() => {
+    expect(host.textContent).toContain('配信を見る権限がありません')
+  })
+  expect(host.textContent).not.toContain('一斉配信を読み込めませんでした')
+  expect(host.textContent).not.toContain('まだ一斉配信がありません')
+})

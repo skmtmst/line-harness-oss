@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { CloudOff, FileSearch, List, RotateCw, SearchX } from 'lucide-react'
+import { CloudOff, FileSearch, List, Lock, RotateCw, SearchX } from 'lucide-react'
 import Button from './button'
 import { loadFailureCopy, type PermissionScope } from './api-error-message'
 import styles from './target-missing.module.css'
@@ -25,12 +25,14 @@ import styles from './target-missing.module.css'
  * 右の案内カード・下の固定バーなど、対象が無いと意味のない部品は
  * 呼び出し側で出さない（設計の決まり）。
  */
-export type TargetMissingKind = 'unspecified' | 'not-found' | 'error'
+/** forbiddenは権限が確認済みの入口拒否。通信の読込失敗とは区別して戻る道を出す。 */
+export type TargetMissingKind = 'unspecified' | 'not-found' | 'error' | 'forbidden'
 
 const ICONS = {
   unspecified: FileSearch,
   'not-found': SearchX,
   error: CloudOff,
+  forbidden: Lock,
 } as const
 
 export type TargetMissingProps = {
@@ -83,7 +85,7 @@ export default function TargetMissing({
    * 画面が渡す「〇〇を表示できませんでした」を、v8 では「〇〇を読み込めませんでした」で出す。
    */
   const shownTitle = kind === 'error' ? title.replace(/表示できませんでした$/, '読み込めませんでした') : title
-  const showBack = (kind === 'unspecified' || kind === 'not-found') && backHref && backLabel
+  const showBack = (kind === 'unspecified' || kind === 'not-found' || kind === 'forbidden') && backHref && backLabel
   // 権限の案内を残し、権限変更後にも同じ口から読み直せる。
   // 文言は画面の指定どおり（出し分け文言が要るときは ListState の `error` を使う）。
   const failure = kind === 'error' && error !== undefined ? loadFailureCopy(error, 'この画面', permissionScope) : null

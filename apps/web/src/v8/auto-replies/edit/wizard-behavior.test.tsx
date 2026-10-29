@@ -1,3 +1,5 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
@@ -18,7 +20,6 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: (url: string) =
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'synthetic-account', accounts: [{ id: 'synthetic-account' }] }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => false, status: 'ready' }) }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => !net.wide }))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({ default: () => null, useActionOptions: () => ({ tags: [], fields: [], marks: [], scenarios: [], vars: [] }) }))
 vi.mock('@/lib/api', async (importOriginal) => {
@@ -62,6 +63,7 @@ const otherRule = {
 }
 
 beforeEach(() => {
+ verifiedStaffRole('owner')
   net.query = 'id=synthetic-rule&step=priority'; net.liveStatus = 'draft'; net.wide = false
   vi.clearAllMocks()
   net.getDraft.mockResolvedValue(draft())
@@ -71,7 +73,7 @@ beforeEach(() => {
   net.saveDraft.mockResolvedValue({ ...draft(), data: { ...draft().data, versionNumber: 2 } })
   net.friends.mockResolvedValue({ success: true, data: { items: [{ id: 'friend-1', displayName: '試す友だち' }], total: 3 } })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); forgetStaffIdentity() })
 
 const orderNames = () => [...document.querySelectorAll('ol li p:first-child')].map((node) => node.textContent)
 

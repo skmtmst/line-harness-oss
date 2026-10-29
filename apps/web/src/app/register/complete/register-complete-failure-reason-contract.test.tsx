@@ -33,7 +33,7 @@ vi.mock('@/lib/auth-email', async (importOriginal) => {
     ...actual,
     authRequest: vi.fn(async (path: string) => {
       if (path.startsWith('/api/auth/register/check')) {
-        return { ok: true, status: 200, data: { email: 'new@example.com', trialDays: 30 } }
+        return { ok: true, status: 200, data: { email: 'new@example.com', trialDays: 30, companyName: 'テスト統括', contactName: '山田 太郎' } }
       }
       return fixture.completeResponse
     }),
@@ -76,18 +76,19 @@ describe('本登録の失敗理由案内（M045）', () => {
   it('503 audit_unavailable は生コードを出さず日本語の理由と再試行案内を出す', async () => {
     await act(async () => { root.render(<RegisterCompletePage />) })
     await act(async () => { await Promise.resolve() })
-    setInput('#complete-tenant', 'テスト統括')
-    setInput('#complete-name', '山田 太郎')
-    setInput('#complete-password', 'Passw0rd1')
-    setInput('#complete-confirm', 'Passw0rd1')
+    expect(host.querySelector('#complete-tenant')?.textContent).toBe('テスト統括')
+    expect(host.querySelector('#complete-name')?.textContent).toBe('山田 太郎')
+    expect(host.querySelectorAll('#complete-tenant input, #complete-name input')).toHaveLength(0)
+    setInput('#complete-password', 'StrongPass123!')
+    setInput('#complete-confirm', 'StrongPass123!')
     await submitForm()
 
     const alert = host.querySelector('[role="alert"]')?.textContent ?? ''
     expect(alert).not.toContain('audit_unavailable')
     expect(alert).toContain('もう一度お試しください')
     // 入力値は保持される。
-    expect((host.querySelector('#complete-tenant') as HTMLInputElement).value).toBe('テスト統括')
-    expect((host.querySelector('#complete-password') as HTMLInputElement).value).toBe('Passw0rd1')
+    expect(host.querySelector('#complete-tenant')?.textContent).toBe('テスト統括')
+    expect((host.querySelector('#complete-password') as HTMLInputElement).value).toBe('StrongPass123!')
     // busy が戻り、再送信できる。
     expect(host.querySelector('button[type="submit"]')?.hasAttribute('disabled')).toBe(false)
   })
@@ -96,10 +97,8 @@ describe('本登録の失敗理由案内（M045）', () => {
     fixture.completeResponse = { ok: false, status: 429, error: 'rate_limited' }
     await act(async () => { root.render(<RegisterCompletePage />) })
     await act(async () => { await Promise.resolve() })
-    setInput('#complete-tenant', 'テスト統括')
-    setInput('#complete-name', '山田 太郎')
-    setInput('#complete-password', 'Passw0rd1')
-    setInput('#complete-confirm', 'Passw0rd1')
+    setInput('#complete-password', 'StrongPass123!')
+    setInput('#complete-confirm', 'StrongPass123!')
     await submitForm()
 
     const alert = host.querySelector('[role="alert"]')?.textContent ?? ''

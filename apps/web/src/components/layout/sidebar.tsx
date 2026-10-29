@@ -377,6 +377,7 @@ export default function Sidebar({
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (!featureKey) return true
         if (!currentVisibility || currentVisibility[featureKey] !== true) return false
+        if (section.id === 'specialized' && featureKey === 'ec_commerce' && currentVisibility.specialized_ec_commerce !== true) return false
         if (SPECIALIZED_FEATURE_KEYS.includes(featureKey) && !specializedFeatureKeys.includes(featureKey)) return false
         return true
       }).map(item => isHq ? item : { ...item, label: styleMenuLabel(item, accountStyle.data?.style ?? null) }),
@@ -670,8 +671,7 @@ export default function Sidebar({
    * 幅で文字を出し分けていたのは 64px のアイコンレールがあったから。
    * レールをやめたので、出し分けも要らない。
    *
-   * @param drawer ドロワーとして開いているか。先頭の見出しだけ変える
-   *   （ドロワーは公式アカウントの名前、常時表示は「管理メニュー」）。
+   * @param drawer ドロワーとして開いているか。先頭に共通ロゴを置く。
    */
   const showRailTip = (target: EventTarget) => {
     if (!collapsed || !(target instanceof Element)) return
@@ -685,28 +685,15 @@ export default function Sidebar({
     <>
       {drawer ? (
         <div className="flex h-16 shrink-0 items-center gap-3 border-b border-hairline px-4 pr-16">
-          {brand.iconUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element -- LINE の CDN。静的アセットではない */
-            <img width={36} height={36} src={brand.iconUrl} alt="" className="h-9 w-9 shrink-0 rounded-card object-cover" />
-          ) : (
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-card text-sm font-bold text-on-accent" style={{ backgroundColor: 'var(--color-accent)' }}>{brandInitial(brand.name ?? '') || 'm'}</div>
-          )}
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold text-ink">{brand.name ?? 'musubo LINE管理システム'}</p>
-            <p className="mt-0.5 text-micro font-medium text-ink-faint">管理メニュー</p>
-          </div>
+          <SidebarIdentity compact />
         </div>
       ) : (
         null
       )}
 
-      {isHq ? (
+      {drawer ? null : isHq ? (
         <>
-          {/*
-            ★V8 殻合わせ（絵 `V8-B/JKjsE`）：脇の頭は店の画面と同じ部品（会社の印＋会社名＋小さく musubo）。
-            会社名と頭の1字（「株式会社」などを外す）は店の画面と同じ決め方にする（オーナー 2026-10-07）。
-            統括の名前（統括名）は上の帯の切り替えの札に出す。v7 は上の札のまま。
-          */}
+          {/* 店舗と同じ共通ロゴ。統括名は上の切替表示に置く。 */}
           <div><SidebarIdentity /></div>
         </>
       ) : preview ? (
@@ -723,7 +710,7 @@ export default function Sidebar({
         </div>
       ) : <SidebarIdentity />}
 
-      {/* 会社名とメニューの間の線。Pencil `J33xq/pN2aM`。 */}
+      {/* ロゴとメニューの間の線。Pencil `J33xq/pN2aM`。 */}
       <div className={styles.identityRule} />
 
       {/* ナビゲーション */}
@@ -877,6 +864,8 @@ export default function Sidebar({
             title={collapsed ? undefined : "設定"}
             aria-label={collapsed ? "設定" : undefined}
             data-rail-label="設定"
+            aria-current={settingsActive ? 'page' : undefined}
+            data-nav-active={settingsActive ? '' : undefined}
             className={`${styles.item} ${settingsActive ? styles.active : ''}`}
           >
             <span className="shrink-0"><V8_SETTINGS_ICON className={styles.v8NavIcon} aria-hidden="true" /></span>
@@ -897,6 +886,8 @@ export default function Sidebar({
             title={collapsed ? undefined : "統括の設定"}
             aria-label={collapsed ? "統括の設定" : undefined}
             data-rail-label="統括の設定"
+            aria-current={hqSettingsActive ? 'page' : undefined}
+            data-nav-active={hqSettingsActive ? '' : undefined}
             className={`${styles.item} ${hqSettingsActive ? styles.active : ''}`}
           >
             <span className="shrink-0"><V8_SETTINGS_ICON className={styles.v8NavIcon} aria-hidden="true" /></span>

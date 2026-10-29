@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { createLineAccount } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { tenantScopeMiddleware } from '../middleware/tenant-scope.js';
@@ -10,6 +11,7 @@ import {
   NEN_SPECIALIZED_FEATURES,
   specializedCatalog,
 } from './feature-settings.js';
+import { loadFeatureVisibility } from './feature-settings-definition-clean-sidebar-order-strict.js';
 
 let testDb: SqliteD1;
 let warn: ReturnType<typeof vi.spyOn>;
@@ -66,6 +68,38 @@ afterEach(() => {
 });
 
 describe('専用機能目録 API', () => {
+  it('新規店舗は空の専用目録で作成し、通常のEC連携とLINE通知は残す', async () => {
+    const created = await createLineAccount(testDb.db, {
+      channelId: 'new-store-channel',
+      name: '新規店舗',
+      channelAccessToken: 'test-token',
+      channelSecret: 'test-secret',
+      tenantId: 'new-store-tenant',
+    }, btoa('0123456789abcdef0123456789abcdef'));
+    expect(testDb.raw.prepare(
+      "SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'feature.specialized.catalog'",
+    ).get(created.id)).toEqual({ value: '[]' });
+    const visibility = await loadFeatureVisibility(testDb.db, created.id, false);
+    expect(visibility.features.nen_campaigns).toBe(false);
+    expect(visibility.features.photo_review).toBe(false);
+    expect(visibility.features.specialized_ec_commerce).toBe(false);
+    expect(visibility.features.ec_commerce).toBe(true);
+    expect(visibility.features.line_notifications).toBe(true);
+    const sameTenantStore = await createLineAccount(testDb.db, {
+      channelId: 'same-tenant-new-store',
+      name: '同じ統括の新店舗',
+      channelAccessToken: 'test-token',
+      channelSecret: 'test-secret',
+      tenantId: DEFAULT_TENANT_ID,
+    }, btoa('0123456789abcdef0123456789abcdef'));
+    expect(testDb.raw.prepare(
+      "SELECT value FROM account_settings WHERE line_account_id = ? AND key = 'feature.specialized.catalog'",
+    ).get(sameTenantStore.id)).toEqual({ value: '[]' });
+    expect((await loadFeatureVisibility(testDb.db, sameTenantStore.id, false)).features.specialized_ec_commerce).toBe(false);
+    const legacy = await loadFeatureVisibility(testDb.db, 'default-account', false);
+    expect(legacy.features.specialized_ec_commerce).toBe(true);
+  });
+
   it('本番相当の無効環境では保存値に関係なく飲食店テストを無効で返す', async () => {
     const bindings = { ...environment(), RESTAURANT_TEST_ENABLED: 'false' };
     const response = await app().request(

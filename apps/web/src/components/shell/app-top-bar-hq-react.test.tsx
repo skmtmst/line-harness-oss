@@ -24,6 +24,7 @@ const fixture = vi.hoisted(() => ({
   selectedAccountId: null as string | null,
   accounts: [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }],
   notificationList: vi.fn(),
+  followerImportState: vi.fn(),
   restoreApi: undefined as (() => void) | undefined,
 }))
 
@@ -66,7 +67,8 @@ describe('★V8 統括の上の帯', () => {
   beforeEach(() => {
     const list = vi.spyOn(api.notifications.center, 'list').mockImplementation(fixture.notificationList)
     const tenants = vi.spyOn(api.tenants, 'me').mockImplementation(fixture.tenantsMe)
-    fixture.restoreApi = () => { list.mockRestore(); tenants.mockRestore() }
+    const importState = vi.spyOn(api.lineAccounts, 'followerImportState').mockImplementation(fixture.followerImportState)
+    fixture.restoreApi = () => { list.mockRestore(); tenants.mockRestore(); importState.mockRestore() }
     forgetStaffIdentity()
     fixture.pathname = '/hq'
     fixture.theme = 'v8'
@@ -78,6 +80,8 @@ describe('★V8 統括の上の帯', () => {
     fixture.accounts = [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }]
     fixture.notificationList.mockReset()
     fixture.notificationList.mockResolvedValue({ success: true, data: { items: [], counts: { all: 0, error: 0, update: 0, unread: 0 }, unreadCount: 0 } })
+    fixture.followerImportState.mockReset()
+    fixture.followerImportState.mockResolvedValue({ success: true, data: { phase: 'not_started' } })
     document.documentElement.dataset.theme = fixture.theme
     window.localStorage.setItem('lh_staff_name', 'Kenta Kawano')
     window.localStorage.setItem('lh_staff_role', 'owner')
@@ -206,8 +210,18 @@ describe('★V8 統括の上の帯', () => {
     await act(async () => { await Promise.resolve() })
     fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
     fireEvent.click(await view.findByRole('menuitemradio', { name: /然-NEN- 本店/ }))
-    expect(fixture.setSelectedAccountId).toHaveBeenCalledWith('account-1')
+    await waitFor(() => expect(fixture.setSelectedAccountId).toHaveBeenCalledWith('account-1'))
     expect(fixture.push).toHaveBeenCalledWith('/')
+  })
+
+  it('札から引き継ぎ中の店を選んでも店舗へ入れない', async () => {
+    fixture.followerImportState.mockResolvedValue({ success: true, data: { phase: 'hydrating_profiles' } })
+    const view = render(<AppTopBar />)
+    await act(async () => { await Promise.resolve() })
+    fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
+    fireEvent.click(await view.findByRole('menuitemradio', { name: /然-NEN- 本店/ }))
+    await waitFor(() => expect(fixture.push).toHaveBeenCalledWith('/accounts/new/handover?accountId=account-1'))
+    expect(fixture.setSelectedAccountId).not.toHaveBeenCalled()
   })
 
   it('店の画面は今までどおり（「LINEアカウント」・役割はオーナー・ホームは /・選んでも移らない）', async () => {

@@ -96,7 +96,7 @@ describe('運営コンソールの V8 外枠', () => {
       expect(text()).toContain(label)
     }
     expect(text()).toContain('運営 › メンバー管理')
-    expect(document.querySelector('a[aria-current="page"]')?.textContent).toContain('メンバー管理')
+    expect(document.querySelector('a[aria-current="page"]')).toBeNull()
   })
 })
 

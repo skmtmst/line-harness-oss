@@ -2,7 +2,7 @@
 
 import type { ActionMenuItem } from './action-menu'
 import { effectiveStaffRole, readStaffIdentity } from '@/lib/staff-identity-state'
-import { readSessionSnapshot } from '@/lib/session-snapshot'
+import { readPermissionSessionSnapshot as readSessionSnapshot } from '@/lib/session-snapshot'
 
 /**
  * 権限で使えない操作の理由。言い回しはここだけで持ち、画面で書き足さない。

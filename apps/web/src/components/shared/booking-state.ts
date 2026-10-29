@@ -27,3 +27,8 @@ export function calendarBookingState(state: string): BookingState {
 export function reservationGapMinutes(entry: Pick<ReservationBoardEntry, 'endsAt'>, next: Pick<ReservationBoardEntry, 'startsAt'>): number {
   return Math.max(0, Math.floor((Date.parse(next.startsAt) - Date.parse(entry.endsAt)) / 60000))
 }
+
+/** 取消・拒否などは色の区分が同じでも、元の状態名を保つ。 */
+export function reservationStatusLabel(entry: Pick<ReservationBoardEntry, 'status'>, state: BookingState): string {
+  return ({ cancelled: 'キャンセル', rejected: '拒否', expired: '期限切れ' } as Record<string, string>)[entry.status] ?? bookingStateLabels[state]
+}

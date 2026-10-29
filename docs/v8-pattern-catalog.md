@@ -44,7 +44,7 @@
 ## 使い方（必ず守る）
 
 - 外側の看板は `layout/sidebar-identity.tsx` の `SidebarBrand`（店は `SidebarIdentity` が取得した値を渡す）。運営も同じ横並びを使う。
-- 左下の本人操作は `shared/sidebar-user-menu.tsx`。既存の本人カードと `ActionMenu` を使い、運営の本人情報・プロフィール・2要素認証・ログアウトを渡す。店・統括の権限取得は既存 `hq/account-menu.tsx` が持つ。
+- 左下の本人操作は `shared/sidebar-user-menu.tsx`。既存の本人カードと `ActionMenu` を使い、運営の本人情報・メンバー管理・2要素認証・ログアウトを渡す。店・統括の権限取得は既存 `hq/account-menu.tsx` が持つ。
 - 運営の注意帯は `Notice` の `presentation="ops"`。琥珀色・右の環境札なし。環境と版は左下の `SidebarVersion` で確認する。
 
 1. **画面を作る・直す前に**、その画面に出る型をこの表で探し、**持ち主（正の部品）だけを使う**。画面の中で同じ役目の物を書かない（§2・§6.20）。
@@ -1164,6 +1164,7 @@
 
 ## 予約の状態・種類・現在時刻（2026-10-23）
 
+- 予約の内容は `shared/booking-presentation.tsx` の BookingCardContent（名前と時刻／メニュー、電話だけの札）、担当の受付説明は BookingStaffHeading、休憩は BookingRest を使う。
 - 持ち主：`shared/booking-controls.tsx` の BookingBlock、`shared/booking-state.ts` と同CSS、`shared/booking-presentation.tsx`。札・一覧の状態・凡例は同じ面を使う。来店中は濃い緑と白字、確定は白と細線、終了は灰。要対応（承認待ち）は赤の2px点線、期限付きの仮押さえは灰の点線、無断キャンセルは薄赤と赤の2px実線。予約の重なりの要対応は薄赤と赤い点線、注意は薄琥珀。状態は文字でも伝える。
 - 種類の色：BookingCategoryとReservationSourceは既存TagPillのTagColorDotを名前の前へ置く。丸は装飾、名前は文字。経路を札の地色へ混ぜない。BookingNowLineは中間の灰の線と、同じ灰に白字の時刻の札。
 - 使用先：ReservationBoard（時間×卓・一覧・月）、ReservationPeopleGrid、CalendarTimeEntries、スタイル別StaffBoard。月の日付の今日／選択と空き枠の操作は既存の口を保つ。

@@ -104,7 +104,7 @@ export function nextFirstStepKey(summary: FirstStepsSummary): string | null {
 export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigure, setupTasks, feedback }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onConfigure?: () => void; setupTasks?: ReactNode; feedback?: ReactNode }) {
   const nextKey = summary ? nextFirstStepKey(summary) : null
   return (
-    <Card as="section" layout="vertical" contentPadding="var(--space-16) var(--space-20)" gap="var(--tpl-d23-ob-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34" actions={!folded && onConfigure ? <Button variant="primary" onClick={onConfigure}>使い方の設定を開く</Button> : undefined}>
+    <Card as="section" layout="vertical" contentPadding="var(--space-16) var(--space-20)" gap="var(--tpl-d23-ob-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34" actions={onConfigure ? <Button variant="primary" onClick={onConfigure}>使い方の設定を開く</Button> : undefined}>
       <div className={styles.head}>
         <h2 id="first-steps-title" className={styles.title}>はじめにやること</h2>
         {summary ? <>
@@ -113,13 +113,13 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigu
         </> : null}
         <span className={styles.spacer} />
         {onRecheck ? <Button size="compact" onClick={onRecheck} title="最初の1通の自動の確かめを止めました">もう一度確かめる</Button> : null}
-        <button type="button" className={styles.fold} onClick={onToggle} aria-expanded={!folded} aria-controls={summary ? 'first-steps-list' : undefined}>
+        {summary ? <button type="button" className={styles.fold} onClick={onToggle} aria-expanded={!folded} aria-controls="first-steps-list">
           {folded ? '開く' : '畳む'}
           {folded ? <ChevronDown className={styles.foldIcon} aria-hidden="true" /> : <ChevronUp className={styles.foldIcon} aria-hidden="true" />}
-        </button>
+        </button> : null}
       </div>
       {feedback}
-      {!folded ? setupTasks : null}
+      {setupTasks}
       {summary ? <ul id="first-steps-list" className={styles.grid} hidden={folded}>
         {summary.steps.map((step) => (
           <li key={step.key} className={styles.step} data-done={step.done ? '' : undefined} data-next={step.key === nextKey ? '' : undefined}>

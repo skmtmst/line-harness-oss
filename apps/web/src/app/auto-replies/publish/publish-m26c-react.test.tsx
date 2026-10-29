@@ -15,6 +15,8 @@ import React, { act } from 'react'
 import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 
 const mocks = vi.hoisted(() => {
   class MockApiError extends Error {
@@ -227,6 +229,7 @@ async function click(label: string, scope?: ParentNode) {
 }
 
 beforeEach(() => {
+  verifiedStaffRole('owner')
   currentQuery = 'id=r1&step=priority'
   mocks.get.mockResolvedValue({ success: true, data: { isActive: false, lifecycleStatus: 'draft' } })
   mocks.list.mockResolvedValue({ success: true, data: [{ ...draftSettings(), id: 'r1', isActive: true, lifecycleStatus: 'published', priority: 10, createdAt: '2026-10-01T00:00:00Z', updatedAt: '2026-10-01T00:00:00Z' }] })
@@ -245,6 +248,7 @@ afterEach(() => {
     root.unmount()
   })
   container.remove()
+  forgetStaffIdentity()
   vi.clearAllMocks()
 })
 
