@@ -146,7 +146,13 @@ function inspect(target: Target): Row[] {
     // _migrations がまだ無い。seed がその状態を想定している。
   }
   return migrationFiles().map((file) => {
-    const verdict = judge(markersOf(readFileSync(join(MIGRATIONS_DIR, file), 'utf8'), final), live);
+    const sql = readFileSync(join(MIGRATIONS_DIR, file), 'utf8');
+    // CHECK 制約だけを直す再建は列・索引だけでは判定できない。
+    // D1 がファイル単位で原子的に適用し、その後 _migrations に記録する。
+    const ledgerOnly = /^-- migration-state: ledger-only\s*$/m.test(sql);
+    const verdict = ledgerOnly
+      ? { state: recorded.has(file) ? 'applied' : 'missing', missing: [] as Marker[] }
+      : judge(markersOf(sql, final), live);
     return {
       file,
       state: verdict.state,
