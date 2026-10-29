@@ -24,19 +24,19 @@ const run = vi.hoisted(() => (id: string, channel: 'line' | 'email', reason: str
 }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
-  const page = {
+  const page = () => ({
     success: true,
     data: { items: [run('r1', 'line', 'ブロックされていました'), run('r2', 'email', 'メールが届きませんでした')], summary: { failed: 57 }, coverage: { source: 'notification_delivery_ledger' } },
     pagination: { total: 57, limit: 20, offset: 0 },
-  }
+  })
   return {
     ...actual,
     fetchApi: mutation,
     api: {
       ...actual.api,
       staff: { ...actual.api.staff, me: async () => ({ success: true, data: identity }) },
-      lineNotifications: { ...actual.api.lineNotifications, deliveries: async () => page, notificationRuns: async () => page, retryDelivery: mutation },
-      ecCommerce: { ...actual.api.ecCommerce, notificationRuns: async () => page },
+      lineNotifications: { ...actual.api.lineNotifications, deliveries: async () => page(), notificationRuns: async () => page(), retryDelivery: mutation },
+      ecCommerce: { ...actual.api.ecCommerce, notificationRuns: async () => page() },
     },
   }
 })
