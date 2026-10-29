@@ -39,7 +39,7 @@ export default function ResumeRegistrationStyle({ accountId }: { accountId: stri
     </PageContent>
     {!done ? <StickyBar actions={<>
       <Button type="button" onClick={() => setDialogOpen(true)} disabled={state.busy}>スタイルを選ぶ</Button>
-      <Button type="button" onClick={() => void finish('skip')} disabled={state.busy || state.version === null} busy={state.busy}>あとから設定する</Button>
+      <Button type="button" onClick={() => void finish('skip')} disabled={state.busy || state.version === null} busy={state.busy}>あとで設定する</Button>
     </>} /> : null}
   </PageFrame>
 }

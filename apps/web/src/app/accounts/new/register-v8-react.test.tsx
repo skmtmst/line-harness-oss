@@ -195,7 +195,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     await waitFor(() => expect(current()).toContain('使い方を選ぶ'))
   })
 
-  it('④のポップアップを閉じても、登録画面の「あとから設定する」で保留を保存して⑤へ進める', async () => {
+  it('④のポップアップを閉じても、登録画面の「あとで設定する」で保留を保存して⑤へ進める', async () => {
     enterCheckStep()
     await runCheck()
     fireEvent.click(screen.getByRole('button', { name: '登録する' }))
@@ -205,7 +205,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
     fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull())
-    const skip = screen.getByRole('button', { name: 'あとから設定する' }) as HTMLButtonElement
+    const skip = screen.getByRole('button', { name: 'あとで設定する' }) as HTMLButtonElement
     await waitFor(() => expect(skip.disabled).toBe(false))
     fireEvent.click(skip)
     expect(await screen.findByText('準備ができました')).toBeTruthy()
