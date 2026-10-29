@@ -252,6 +252,12 @@ function DaySlots({
           })}
         </div>
       )}
+      {times.length > 0 && onWaitlist && times.some((t) => !t.open) ? (
+        <p className="mt-2 flex items-center gap-1 text-xs leading-[18px] text-liff-sub">
+          <Icon name="bell" className="h-[14px] w-[14px] shrink-0" />
+          満席の時間の鈴は「空いたら知らせる」の登録です
+        </p>
+      ) : null}
     </section>
   );
 }
@@ -926,7 +932,7 @@ export default function DateTimePicker({
                           {/* 空きの点 (緑＝空き・金＝残りわずか)。消す設定では点を出さない。 */}
                           {settings.vacancyDots && (state === 'open' || state === 'few') && (
                             <span
-                              className={`block h-[5px] w-[5px] rounded-full ${active ? 'bg-transparent' : state === 'few' ? 'bg-liff-dot-few' : 'bg-liff-primary'}`}
+                              className={`block h-[5px] w-[5px] rounded-full ${state === 'few' ? 'bg-liff-dot-few' : 'bg-liff-primary'}`}
                               aria-hidden="true"
                             />
                           )}
