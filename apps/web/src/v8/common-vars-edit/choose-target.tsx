@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { CommonVar } from '@line-crm/shared'
+import { CardActionRow } from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import { EntityPickerDialog } from '@/components/shared/entity-picker'
 import ListState from '@/components/shared/list-state'
@@ -25,7 +26,7 @@ export default function ChooseCommonVarTarget({ accountId, onSelect }: { account
   return <>
     <TargetMissing kind="unspecified" title="編集する共通情報が指定されていません"
       description="この画面で編集する共通情報を選ぶか、一覧から選び直してください。"
-      action={<><Button variant="secondary" disabled={!accountId} disabledReason={!accountId ? 'LINEアカウントを選んでください' : undefined} onClick={() => setOpen(true)}>編集する共通情報を選ぶ</Button><Button variant="secondary" href="/contents/vars">共通情報一覧へ戻る</Button></>} />
+      action={<CardActionRow><Button variant="secondary" disabled={!accountId} disabledReason={!accountId ? 'LINEアカウントを選んでください' : undefined} onClick={() => setOpen(true)}>編集する共通情報を選ぶ</Button><Button variant="secondary" href="/contents/vars">共通情報一覧へ戻る</Button></CardActionRow>} />
     {open ? <EntityPickerDialog title="編集する共通情報を選ぶ" items={(current?.items ?? []).map(item => ({ id: item.id, name: item.name }))}
       state={!accountId ? <ListState kind="empty" title="LINEアカウントを選んでください" /> : current?.failed ? <ListState kind="error" title="共通情報を読み込めませんでした" onRetry={() => setAttempt(value => value + 1)} /> : !current?.items ? <ListState kind="loading" /> : undefined}
       confirmLabel="編集する" confirmDisabled={!accountId || !current?.items || current.failed}
