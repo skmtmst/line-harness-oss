@@ -29,6 +29,17 @@ const VALUES: Record<Step2Field, string> = {
 
 afterEach(cleanup)
 
+describe('Messaging API の取得先', () => {
+  it('Step 1 は公式アカウントマネージャーを開き、プロバイダーIDは設定画面からコピーするよう案内する', () => {
+    const view = render(
+      <Step2Connect sub={1} badge="Step 1 / 3" values={VALUES} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,
+    )
+    expect(view.getByRole('link', { name: 'LINE公式アカウントマネージャーを開く' }).getAttribute('href')).toBe('https://manager.line.biz/')
+    expect(view.queryByRole('link', { name: 'LINE Developers を開く' })).toBeNull()
+    expect(view.getByText(/「プロバイダー設定」→「プロバイダーID」の右のコピーアイコン/)).toBeTruthy()
+  })
+})
+
 /** ②Step2 を描いて、Ds3E2 の中の URL の枠（内側の Card）を取り出す。 */
 function urlFrame() {
   const { container } = render(

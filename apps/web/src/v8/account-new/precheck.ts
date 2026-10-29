@@ -135,7 +135,7 @@ export function precheckUpcoming(at: PrecheckAt, answers: PrecheckAnswers): Prec
 /** ①-7「あなたの接続前チェック結果」の4項目（絵 tLhTV〜IvIdn の固定文）。 */
 export interface PrecheckResultItem { title: string; body: string }
 export const PRECHECK_RESULT: readonly PrecheckResultItem[] = [
-  { title: '用意するもの', body: 'Messaging API と LINEログインのチャネルID・チャネルシークレット（計4つ）と、Messaging API チャネルが属するプロバイダーID。プロバイダーIDは LINE Developers のプロバイダー画面URLで確認できます。' },
+  { title: '用意するもの', body: 'Messaging API と LINEログインのチャネルID・チャネルシークレット（計4つ）と、Messaging API チャネルが属するプロバイダーID。プロバイダーIDは LINE Developers の「プロバイダー設定」にあるコピーアイコンから取得できます。' },
   { title: '接続後に変わること', body: 'メッセージの受け取りがmusuboに切り替わります。LINE公式アカウントの「チャット」はオフにします。' },
   { title: '作り直すもの', body: 'あいさつメッセージとリッチメニューは引き継げません。musuboで作り直してから切り替えます。' },
   { title: 'かかる時間', body: '入力から接続の確認まで、およそ10〜15分です。' },
