@@ -4,7 +4,7 @@ import { shortPublishAt, longPublishAt } from './announcement-dates'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { Send } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ApiError, api, type OpsAnnouncement, type OpsAnnouncementAudience, type OpsAnnouncementChannel, type OpsAnnouncementInput, type OpsAudiencePreview, type OpsTenantRow } from '@/lib/api'
 import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
@@ -22,7 +22,8 @@ import Radio from '@/components/shared/radio'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
-import { useOpsReadOnly } from './use-ops-read-only'
+import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
+import { createPageReturnHref } from '@/components/shared/create-page'
 import { useFormErrors } from '@/lib/use-form-errors'
 import ValidationSummary from '@/components/shared/validation-summary'
 import { FieldError, Field } from '@/components/shared/form-controls'
@@ -39,7 +40,9 @@ import Notice from '@/components/shared/notice'
  * 一覧（/ops/announcements）の右上の［お知らせを作る］→ここ。
  * 下の帯に［下書きを保存］［今すぐ送る］（日時を入れたら［配信を予約する］）。
  * ?id= で下書き・予約の直し、?copy= で送ったものの中身を写して新しく作る。
- * 作ったら一覧に戻して作った行を光らせる。直して保存したらその場に残る。
+ * 作ったら一覧に戻して作った行を光らせる。下書きの直しはその場に残り、
+ * 直して送信・予約したら一覧へ戻す。送ったものを ?id= で開いたら写しに切り替える。
+ * 離脱の確認はこの画面の番兵だけ（CreatePage 側は dirty={false} で止める）。
  */
 
 const AUDIENCES: Array<{ key: OpsAnnouncementAudience; label: string }> = [
@@ -116,6 +119,9 @@ function loadDescription(err: unknown): string | undefined {
 export default function OpsAnnouncementEditV8() {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
+  // 読み直しから使う移動の口。描画ごとの参照に縛られないよう ref 越しに呼ぶ。
+  const routerRef = useRef(router)
+  routerRef.current = router
   const params = useSearchParams()
   const editId = params.get('id')
   const copyId = params.get('copy')
@@ -123,6 +129,7 @@ export default function OpsAnnouncementEditV8() {
   const [source, setSource] = useState<OpsAnnouncement | null>(null)
   const [sourceLoaded, setSourceLoaded] = useState(false)
   const [sourceError, setSourceError] = useState<unknown>(null)
+  const [sourceMissing, setSourceMissing] = useState(false)
   const [lineConfigured, setLineConfigured] = useState(true)
   const [tenants, setTenants] = useState<OpsTenantRow[]>([])
   const [form, setForm] = useState<Form>(EMPTY)
@@ -138,7 +145,9 @@ export default function OpsAnnouncementEditV8() {
   const [confirmSend, setConfirmSend] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [baseline, setBaseline] = useState<Form>(EMPTY)
-  const readOnly = useOpsReadOnly()
+  const access = useOpsReadOnlyState()
+  const readOnly = access !== 'writer'
+  const unknown = access === 'unknown'
 
   const loadSource = useCallback(async () => {
     const wanted = editId ?? copyId
@@ -149,8 +158,13 @@ export default function OpsAnnouncementEditV8() {
       if (!res.success) { setSourceError(new Error(res.error || '読み込めませんでした')); return }
       setLineConfigured(res.noticeLineConfigured)
       const found = res.data.find((row) => row.id === wanted) ?? null
-      if (!found) { setSourceError(new Error('not-found')); return }
+      if (!found) { setSourceMissing(true); setSourceLoaded(true); return }
       setSource(found)
+      // 送ったもの・送信中のものを ?id= で開いたら、写しに切り替える（直しは下書き・予約だけ）。
+      if (editId && found.status !== 'draft' && found.status !== 'scheduled') {
+        routerRef.current.replace(`/ops/announcements/new?copy=${encodeURIComponent(found.id)}`)
+        return
+      }
       const next = toForm(found)
       if (editId) {
         setEditingId(found.id)
@@ -253,13 +267,12 @@ export default function OpsAnnouncementEditV8() {
       setConfirmSend(false)
       notifySaved(mode === 'draft' ? '下書きとして保存しました' : mode === 'schedule' ? `${formatDateTime(res.data.publishAt)} に配信を予約しました` : `送りました（${formatNumber(res.data.recipientsTotal)}人。LINE ${res.data.lineSent}・メール ${res.data.mailSent}）`)
       collision.clear()
-      if (editingId) {
-        // 直して保存したらその場に残る。
+      if (editingId && mode === 'draft') {
+        // 下書きの直しはその場に残る。送信・予約したら一覧へ戻して行を光らせる。
         setBaseline(form)
         setEditingUpdatedAt(res.data.updatedAt)
       } else {
-        // 作ったら一覧に戻して作った行を光らせる。
-        router.push(`/ops/announcements?highlight=${encodeURIComponent(res.data.id)}`)
+        router.push(createPageReturnHref('/ops/announcements', res.data.id))
       }
     } catch (error) {
       const fieldFailure = saveErrors.capture(error);
@@ -271,10 +284,17 @@ export default function OpsAnnouncementEditV8() {
           setCreateKey(crypto.randomUUID())
           return
         }
-        collision.mark()
-        setConfirmSend(false)
+        // 版の違いだけを競合として扱う。配信済みの変更・送信の準備の失敗は文を出す。
+        if (error.code === 'VERSION_CONFLICT') {
+          collision.mark()
+          setConfirmSend(false)
+          { if (!fieldFailure)
+          setFormError('') }
+          return
+        }
         { if (!fieldFailure)
-        setFormError('') }
+        setFormError(opsErrorMessage(error)) }
+        setConfirmSend(false)
         return
       }
       { if (!fieldFailure)
@@ -297,18 +317,24 @@ export default function OpsAnnouncementEditV8() {
   const scheduled = form.publishAt.trim().length > 0
   // 下書き・予約だけ消せる。送信済みの写し・新規には削除を出さない。
   const deletable = editingId !== null && (source?.status === 'draft' || source?.status === 'scheduled')
-  const lock = readOnly ? '閲覧のみの運営メンバーはお知らせを作れません。書き込める運営メンバーに頼んでください。' : undefined
+  const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
 
   if (!sourceLoaded) return <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />
-  if (sourceError) {
-    const notFound = sourceError instanceof Error && sourceError.message === 'not-found'
+  if (sourceMissing) {
     return (
       <ListState permissionScope="hq" kind="error"
-        title={notFound ? 'お知らせが見つかりませんでした' : 'お知らせを表示できませんでした'}
-        description={notFound ? '一覧から選び直してください。' : loadDescription(sourceError)}
-        error={notFound ? undefined : (sourceError ?? undefined)}
-        onRetry={notFound ? undefined : () => void loadSource()}
-        action={notFound ? <Button href="/ops/announcements">一覧へ戻る</Button> : undefined} />
+        title="お知らせが見つかりませんでした"
+        description="一覧から選び直してください。"
+        action={<Button href="/ops/announcements">一覧へ戻る</Button>} />
+    )
+  }
+  if (sourceError) {
+    return (
+      <ListState permissionScope="hq" kind="error"
+        title="お知らせを表示できませんでした"
+        description={loadDescription(sourceError)}
+        error={sourceError ?? undefined}
+        onRetry={() => void loadSource()} />
     )
   }
 
@@ -317,19 +343,18 @@ export default function OpsAnnouncementEditV8() {
       <CreatePage
         title={editingId ? 'お知らせを直す' : 'お知らせを作る'}
         help="契約先へ、画面のお知らせ・メール・契約者専用LINE でお知らせを送ります。"
-        readOnly={readOnly}
         contentDisabled={readOnly || busy}
         contentLabel="お知らせの入力"
-        dirty={dirty}
+        dirty={false}
         busy={busy}
         footerActions={<>
           <Button href="/ops/announcements">キャンセル</Button>
-          <Button variant="secondary" lockedReason={lock} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…" onClick={() => void submit('draft')}>下書きを保存する</Button>
-          <Button variant="primary" lockedReason={lock} disabled={busy} onClick={() => { setFormError(''); if (fields.submit().length === 0) setConfirmSend(true) }}>
+          <Button variant="secondary" lockedReason={lock} disabled={busy || unknown} busy={Boolean(busy)} busyLabel="処理中…" onClick={() => void submit('draft')}>下書きを保存する</Button>
+          <Button variant="primary" lockedReason={lock} disabled={busy || unknown} onClick={() => { setFormError(''); if (fields.submit().length === 0) setConfirmSend(true) }}>
             <Send aria-hidden="true" />{scheduled ? '配信を予約する' : '今すぐ送る'}
           </Button>
         </>}
-        destructive={deletable && !readOnly ? <Button variant="danger" disabled={busy} onClick={() => setDeleting(true)}>削除する</Button> : null}
+        destructive={deletable ? <Button variant="danger" lockedReason={lock} disabled={busy || unknown} onClick={() => setDeleting(true)}>削除する</Button> : null}
       >
         <div className={styles.formPage}>
           {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}

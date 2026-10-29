@@ -7,6 +7,8 @@ import OpsAnnouncementsPage from './page'
 import OpsAnnouncementNewPage from './new/page'
 import { pickDateTime } from '@/test-utils/rich-menu-editor'
 import { notifySaved } from '@/components/shared/toast'
+import { flushListUrlState } from '@/components/shared/list-url-state'
+import { OPS_READONLY_LOCK_REASON } from '@/v8/ops/use-ops-read-only'
 import { screen, fireEvent } from '@testing-library/react'
 
 vi.mock('@/components/shared/toast', async (importOriginal) => ({
@@ -17,12 +19,12 @@ vi.mock('@/components/shared/toast', async (importOriginal) => ({
 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
-const navigation = vi.hoisted(() => ({ push: vi.fn() }))
+const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
 const search = vi.hoisted(() => ({ value: '' }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   usePathname: () => '/ops/announcements',
   useSearchParams: () => new URLSearchParams(search.value),
-  useRouter: () => ({ push: navigation.push, replace: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ push: navigation.push, replace: navigation.replace, back: vi.fn() }),
 }))
 
 /*
@@ -61,6 +63,9 @@ let announcements: unknown[] = []
 let previewReady: Promise<void> | null = null
 /** M513: PUT の応答を差し替えて競合を起こす（null のときは通常応答）。 */
 let putOverride: { status: number; payload: unknown } | null = null
+/** 役割の応答を止めて「分からない」状態を作る（null のときはすぐ返す）。 */
+let meReady: Promise<void> | null = null
+let releaseMe: (() => void) | null = null
 
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
@@ -71,8 +76,13 @@ beforeEach(() => {
   announcements = [sent, draft]
   previewReady = null
   putOverride = null
+  meReady = null
+  releaseMe = null
   navigation.push.mockClear()
+  navigation.replace.mockClear()
   search.value = ''
+  flushListUrlState()
+  window.history.replaceState(null, '', '/')
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
@@ -95,7 +105,10 @@ beforeEach(() => {
     }
     else if (url.endsWith('/api/ops/announcements') && method === 'POST') payload = { success: true, data: { ...sent, id: 'a3', recipientsTotal: 24, lineSent: 21, mailSent: 24 } }
     else if (url.endsWith('/api/ops/announcements')) payload = { success: true, data: announcements, linked: { linked: 21, total: 24 }, noticeLineConfigured: lineConfigured }
-    else if (url.endsWith('/api/ops/me')) payload = { success: true, data: { readOnly: readOnlyMe } }
+    else if (url.endsWith('/api/ops/me')) {
+      if (meReady) await meReady
+      payload = { success: true, data: { readOnly: readOnlyMe } }
+    }
     else if (url.includes('/api/ops/tenants')) payload = { success: true, data: [] }
     else payload = { success: true, data: null }
     return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } })
@@ -189,7 +202,7 @@ describe('一覧', () => {
     expect(calls.filter((c) => c.url.endsWith('/api/ops/announcements') && c.method === 'GET').length).toBeGreaterThan(1)
   })
 
-  it('閲覧のみは作るボタンを押せない形＋理由で出し、行の操作は出さない', async () => {
+  it('閲覧のみは作るボタンも行の操作も押せない形＋理由で出す', async () => {
     readOnlyMe = true
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
@@ -197,15 +210,42 @@ describe('一覧', () => {
     const locked = button('お知らせを作る')
     expect(locked).not.toBeUndefined()
     expect(locked?.getAttribute('aria-disabled')).toBe('true')
-    expect(host.querySelector('button[aria-label="「料金改定のご案内（下書き）」の操作"]')).toBeNull()
+    expect(locked?.hasAttribute('data-permission-locked')).toBe(true)
+    expect(document.getElementById(locked!.getAttribute('aria-describedby')!)?.textContent).toBe(OPS_READONLY_LOCK_REASON)
+    const items = await openRowMenu('料金改定のご案内（下書き）')
+    const edit = items.find((el) => el.textContent?.includes('編集する'))!
+    const remove = items.find((el) => el.textContent?.includes('削除する'))!
+    expect(edit.getAttribute('aria-disabled')).toBe('true')
+    expect(edit.hasAttribute('data-permission-locked')).toBe(true)
+    expect(document.getElementById(edit.getAttribute('aria-describedby')!)?.textContent).toBe(OPS_READONLY_LOCK_REASON)
+    expect(remove.getAttribute('aria-disabled')).toBe('true')
+    expect(remove.hasAttribute('data-permission-locked')).toBe(true)
+    expect(edit.getAttribute('href')).toBeNull()
   })
 
-  it('?highlight= の行を光らせる', async () => {
-    search.value = 'highlight=a2'
+  it('役割が分かるまでは理由なしの押せない形で出し、分かったら切り替える', async () => {
+    meReady = new Promise<void>((resolve) => { releaseMe = resolve })
+    await act(async () => { root.render(<OpsAnnouncementsPage />) })
+    await flush()
+    expect(document.querySelector('a[href="/ops/announcements/new"]')).toBeNull()
+    const waiting = button('お知らせを作る')
+    expect(waiting?.disabled).toBe(true)
+    expect(waiting?.hasAttribute('data-permission-locked')).toBe(false)
+    const items = await openRowMenu('料金改定のご案内（下書き）')
+    expect(items.find((el) => el.textContent?.includes('編集する'))?.hasAttribute('disabled')).toBe(true)
+    await act(async () => { releaseMe!() })
+    await flush()
+    expect(document.querySelector<HTMLAnchorElement>('a[href="/ops/announcements/new"]')?.textContent).toContain('お知らせを作る')
+  })
+
+  it('?highlight= の行を光らせ、印は1回だけ使って消す', async () => {
+    window.history.replaceState(null, '', '/ops/announcements?highlight=a2')
     await act(async () => { root.render(<OpsAnnouncementsPage />) })
     await flush()
     expect(host.querySelector('[data-row-id="a2"]')?.getAttribute('data-highlight')).toBe('true')
     expect(host.querySelector('[data-row-id="a1"]')?.getAttribute('data-highlight')).toBeNull()
+    flushListUrlState()
+    expect(window.location.search).toBe('')
   })
 })
 
@@ -385,6 +425,55 @@ describe('作る画面', () => {
     expect(item?.getAttribute('aria-disabled')).toBe('true')
     expect(item?.hasAttribute('data-permission-locked')).toBe(true)
   })
+
+  it('閲覧のみは直す画面の削除も押せない形＋理由で出す', async () => {
+    readOnlyMe = true
+    search.value = 'id=a2'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    const remove = button('削除する')
+    expect(remove).not.toBeUndefined()
+    expect(remove?.getAttribute('aria-disabled')).toBe('true')
+    expect(remove?.hasAttribute('data-permission-locked')).toBe(true)
+    expect(document.getElementById(remove!.getAttribute('aria-describedby')!)?.textContent).toBe(OPS_READONLY_LOCK_REASON)
+  })
+
+  it('?id= で直して送ると一覧へ戻して送った行を光らせる', async () => {
+    search.value = 'id=a2'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    putOverride = { status: 200, payload: { success: true, data: { ...draft, id: 'a2', status: 'sent', statusLabel: '送信済み', updatedAt: '2026-10-09T11:00:00.000+09:00', publishAt: '2026-10-09T11:00:00+09:00' } } }
+    await act(async () => { button('今すぐ送る')!.click() })
+    await flush()
+    const confirm = document.body.querySelector('[data-design-node="TJUUl"]')
+    const sendInDialog = Array.from(confirm?.querySelectorAll('button') ?? []).find((b) => b.textContent?.trim() === '今すぐ送る') as HTMLButtonElement
+    await act(async () => { sendInDialog.click() })
+    await flush()
+    expect(calls.some((c) => c.url.includes('/api/ops/announcements/a2') && c.method === 'PUT')).toBe(true)
+    expect(navigation.push).toHaveBeenCalledWith('/ops/announcements?highlight=a2')
+  })
+
+  it('送ったものを ?id= で開いたら写しに切り替える', async () => {
+    search.value = 'id=a1'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    expect(navigation.replace).toHaveBeenCalledWith('/ops/announcements/new?copy=a1')
+  })
+
+  it('?id= の削除は確認の窓を挟み、実行したら一覧へ戻る', async () => {
+    search.value = 'id=a2'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    await act(async () => { button('削除する')!.click() })
+    await flush()
+    const dialog = document.querySelector('[role="alertdialog"], [role="dialog"]')!
+    expect(dialog.textContent).toContain('「料金改定のご案内（下書き）」を削除しますか？')
+    const confirmRemove = Array.from(dialog.querySelectorAll('button')).find((b) => b.textContent?.trim() === '削除する')!
+    await act(async () => { confirmRemove.click() })
+    await flush()
+    expect(calls.some((c) => c.url.endsWith('/api/ops/announcements/a2') && c.method === 'DELETE')).toBe(true)
+    expect(navigation.push).toHaveBeenCalledWith('/ops/announcements')
+  })
 })
 
 describe('二重押しと同時保存（M512/M513）', () => {
@@ -430,6 +519,18 @@ describe('二重押しと同時保存（M512/M513）', () => {
     expect(document.body.textContent).toContain('ほかの人が先にお知らせを保存しました')
     // 入力は消えない。
     expect(document.querySelector<HTMLInputElement>('input[placeholder^="例："]')!.value).toBe('料金改定のご案内（修正）')
+  })
+
+  it('配信済みへの保存の409は競合と分け、届いた文を出す', async () => {
+    search.value = 'id=a2'
+    await act(async () => { root.render(<OpsAnnouncementNewPage />) })
+    await flush()
+    // 版の違いではない409（符号なし）。
+    putOverride = { status: 409, payload: { success: false, error: '配信済みのお知らせは変えられません' } }
+    await clickDraftSave()
+    await flush()
+    expect(document.body.textContent).toContain('配信済みのお知らせは変えられません')
+    expect(document.body.textContent).not.toContain('ほかの人が先にお知らせを保存しました')
   })
 })
 
