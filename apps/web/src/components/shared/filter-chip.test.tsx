@@ -97,6 +97,8 @@ describe('絞り込み札 FilterChip（m13i）', () => {
     expect(CODE).toMatch(
       /@media \(pointer: coarse\)\s*\{\s*\.v6-filter-chip\s*\{\s*min-height:\s*44px;/,
     )
+  })
+
   it('押せない札から状態の変更を送らない', () => {
     const change = vi.fn()
     const { container } = render(<FilterChip selected={false} disabled onChange={change}>未対応</FilterChip>)
