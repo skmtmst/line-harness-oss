@@ -5,8 +5,8 @@
 .card[data-flow='sent'] { min-height: 600px; padding-top: 32px; }
 .card[data-flow='setup'] { min-height: 940px; }
 .card[data-flow='pending'] { min-height: 574px; }
-.brand { display: flex; align-items: center; gap: 10px; font-size: 27px; line-height: 39px; font-weight: 700; }
-.brand span { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 8px; background: #087a3e; color: white; font-size: 23px; line-height: 1; }
+.brandViewport { position: relative; display: block; flex: none; width: 158px; height: 36px; overflow: hidden; }
+.brandImage { position: absolute; top: -12px; left: -15px; display: block; width: 188px; max-width: none; height: auto; }
 .stateIcon { display: grid; place-items: center; width: 72px; height: 72px; margin-top: 26px; border-radius: 50%; }
 .stateIcon svg { width: 30px; height: 30px; }
 .stateIcon[data-tone='success'] { background: #e8f8ee; color: #087a3e; }
