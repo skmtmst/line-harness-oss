@@ -1,6 +1,7 @@
 'use client'
 
 import { useBrand } from '@/lib/use-brand'
+import { useTenantName } from '@/lib/use-tenant-name'
 import styles from './sidebar-identity.module.css'
 import { brandInitial } from './brand-initial'
 
@@ -16,9 +17,8 @@ import { brandInitial } from './brand-initial'
  */
 export default function SidebarIdentity() {
   const brand = useBrand()
-
-  const name = brand.name || '管理画面'
-  const initial = brandInitial(name)
+  const name = useTenantName()
+  const initial = brandInitial(brand.name || name)
 
   return <SidebarBrand name={name} mark={initial} />
 }
