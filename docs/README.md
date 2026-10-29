@@ -459,6 +459,7 @@
 
 ## 反映履歴
 
+- [新規店舗の専用機能を非表示](release-log/unreleased/1925-masato-new-store-specialized-hidden.md)
 - [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
 - [一斉配信の一覧の受け付け数の表示修正](release-log/unreleased/1916-kenta-muse-broadcast-received-wording.md)
 - [アカウント設定の親アカウント欄を非表示](release-log/unreleased/1900-masato-hide-parent-account.md) — 未使用の欄を隠し、既存の親子関係を保つ変更の反映履歴。

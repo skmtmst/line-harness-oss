@@ -377,6 +377,7 @@ export default function Sidebar({
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (!featureKey) return true
         if (!currentVisibility || currentVisibility[featureKey] !== true) return false
+        if (section.id === 'specialized' && featureKey === 'ec_commerce' && currentVisibility.specialized_ec_commerce !== true) return false
         if (SPECIALIZED_FEATURE_KEYS.includes(featureKey) && !specializedFeatureKeys.includes(featureKey)) return false
         return true
       }).map(item => isHq ? item : { ...item, label: styleMenuLabel(item, accountStyle.data?.style ?? null) }),
