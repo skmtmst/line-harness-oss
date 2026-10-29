@@ -1,4 +1,5 @@
 'use client'
+import { lockMenuItems } from '@/components/shared/permission-lock'
 import { useGooglePermission } from './use-google-permission'
 
 import { statusBadge } from './post-status'
@@ -130,7 +131,9 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
   const [confirmRemove, setConfirmRemove] = useState<GooglePost | null>(null)
   const [actionError, setActionError] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
-  const { allowed: canPublish, lockedReason: publishReason } = useGooglePermission('manager', data?.permissions?.canPublish ?? false)
+  const { allowed: canPublish, lockedReason: publishReason, canView } = useGooglePermission('manager', data?.permissions?.canPublish ?? false)
+
+  useEffect(() => { if (!canView) setMenuFor(null) }, [canView])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -196,13 +199,15 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
   const menuItems = (post: GooglePost): ActionMenuItem[] => {
     const actionable = post.status === 'draft' || post.status === 'rejected' || post.status === 'failed'
     const items: ActionMenuItem[] = [
-      { id: 'open', label: actionable ? '編集' : '中身を見る', onSelect: () => { if (canSync) go({ tab: 'posts', view: 'edit', id: post.id }) } },
+      { id: 'open', label: '中身を見る', onSelect: () => { if (canView) go({ tab: 'posts', view: 'edit', id: post.id }) } },
     ]
+    if (actionable) items.push({ id: 'edit', label: '編集', disabled: !canSync, onSelect: () => { if (canSync) go({ tab: 'posts', view: 'edit', id: post.id }) } })
     if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
     if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublish) setConfirmRemove(post) } })
-    return items
+    if (!canView) return items.map(item => ({ ...item, disabled: true, lockedReason: undefined }))
+    return lockMenuItems(canSync, items, 'feature', item => item.id === 'open' || item.id === 'google')
   }
 
   const pageCount = data ? Math.max(1, Math.ceil(data.total / data.perPage)) : 1
@@ -245,7 +250,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
                     <Chip tone={badge.tone === 'success' ? 'ok' : badge.tone === 'warning' ? 'warn' : badge.tone === 'danger' ? 'danger' : badge.tone === 'info' ? 'info' : 'neutral'}>{badge.label}</Chip>
                     {igBadge ? <span title={igBadge.title}><Chip tone={igBadge.tone === 'success' ? 'ok' : igBadge.tone === 'danger' ? 'danger' : 'neutral'}>{igBadge.label}</Chip></span> : null}
                     <span className={styles.menuBox}>
-                      <RowMenu label={`投稿「${name}」の操作`} items={menuItems(post)} lockedReason={lockedReason} triggerProps={{ disabled: !canSync }} open={canSync && menuFor === post.id} onOpenChange={(next) => { if (canSync || !next) setMenuFor(next ? post.id : null) }} />
+                      <RowMenu label={`投稿「${name}」の操作`} items={menuItems(post)} triggerProps={{ disabled: !canView }} open={canView && menuFor === post.id} onOpenChange={(next) => { if (canView || !next) setMenuFor(next ? post.id : null) }} />
                     </span>
                   </div>
                 )
@@ -693,10 +698,12 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
         {igAvailable ? (
           <div className={styles.igBand} data-design-node="hsiwQ">
             <div className={styles.igToggleRow}>
+              {draftEditable ? <>
               <SaveErrorField names={["igEnabled","form.igEnabled","ig_enabled","enabled","form.ig_enabled"]}>
                 <Toggle checked={form.igEnabled} label="Instagram にも投稿する" lockedReason={lockedReason} disabled={!editable} onChange={(next) => { if (editable) set({ igEnabled: next }) }} />
               </SaveErrorField>
               <span className={styles.igToggleLabel}>Instagram にも投稿する</span>
+              </> : <span className={styles.igToggleLabel}>{`Instagram にも投稿する：${form.igEnabled ? 'はい' : 'いいえ'}`}</span>}
             </div>
             {form.igEnabled ? (
               <>
@@ -744,6 +751,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
   const [writeEnabled, setWriteEnabled] = useState(true)
   const [canPublish, setCanPublish] = useState(false)
   const { allowed: canSend, lockedReason } = useGooglePermission('manager', canPublish)
+  const { allowed: canEdit, lockedReason: editReason } = useGooglePermission()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [checked, setChecked] = useState(false)
@@ -825,10 +833,10 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
         <div className={styles.factRow}><dt className={styles.factKey}>種類</dt><dd className={styles.factValue}>{KIND_LABELS[post.kind]}</dd></div>
         <div className={styles.factRow}><dt className={styles.factKey}>公開予定</dt><dd className={styles.factValue}>今すぐ（日本時間）</dd></div>
         {post.cta ? <div className={styles.factRow}><dt className={styles.factKey}>ボタン</dt><dd className={styles.factValue}>{`${CTA_LABELS[post.cta.type]}${post.cta.url ? ` → ${post.cta.url}` : ''}`}</dd></div> : null}
-        {post.media[0] ? <div className={styles.factRow}><dt className={styles.factKey}>Google画像</dt><dd className={styles.factValue}><div className={styles.confirmImage}><div className={`${styles.confirmThumb} ${styles.confirmThumbGoogle}`}><img src={post.media[0].sourceUrl} alt="Google用画像" /></div><div><strong>Google ビジネス ・4:3</strong><span>{post.media[0].filename}</span>{post.status === 'draft' ? <div className={styles.confirmImageLinks}><Button variant="text" lockedReason={lockedReason} disabled={!canSend} onClick={() => { if (canSend) go({ tab: 'posts', view: 'edit', id }) }}>画像を変更</Button><Button variant="text" lockedReason={lockedReason} disabled={!canSend} onClick={() => { if (canSend) go({ tab: 'posts', view: 'edit', id, adjust: 'google' }) }}>切り取りを調整</Button></div> : null}</div></div></dd></div> : null}
+        {post.media[0] ? <div className={styles.factRow}><dt className={styles.factKey}>Google画像</dt><dd className={styles.factValue}><div className={styles.confirmImage}><div className={`${styles.confirmThumb} ${styles.confirmThumbGoogle}`}><img src={post.media[0].sourceUrl} alt="Google用画像" /></div><div><strong>Google ビジネス ・4:3</strong><span>{post.media[0].filename}</span>{post.status === 'draft' ? <div className={styles.confirmImageLinks}><Button variant="text" lockedReason={editReason} disabled={!canEdit || busy} onClick={() => { if (canEdit && !busy) go({ tab: 'posts', view: 'edit', id }) }}>画像を変更</Button><Button variant="text" lockedReason={editReason} disabled={!canEdit || busy} onClick={() => { if (canEdit && !busy) go({ tab: 'posts', view: 'edit', id, adjust: 'google' }) }}>切り取りを調整</Button></div> : null}</div></div></dd></div> : null}
         {post.instagram ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram</dt><dd className={styles.factValue}>{instagramFact(post.instagram)}</dd></div> : null}
         {post.instagram?.enabled ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram本文</dt><dd className={styles.factValue}>{post.instagram.caption || post.summary}</dd></div> : null}
-        {post.instagram?.enabled && igPreview ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram画像</dt><dd className={styles.factValue}><div className={styles.confirmImage}><div className={`${styles.confirmThumb} ${styles.confirmThumbInstagram}`}><img src={igPreview.url} alt="Instagram用画像" /></div><div><strong>Instagram ・4:5</strong><span>{igPreview.filename}</span>{post.status === 'draft' ? <div className={styles.confirmImageLinks}><Button variant="text" lockedReason={lockedReason} disabled={!canSend} onClick={() => { if (canSend) go({ tab: 'posts', view: 'edit', id }) }}>画像を変更</Button><Button variant="text" lockedReason={lockedReason} disabled={!canSend} onClick={() => { if (canSend) go({ tab: 'posts', view: 'edit', id, adjust: 'instagram' }) }}>切り取りを調整</Button></div> : null}</div></div></dd></div> : null}
+        {post.instagram?.enabled && igPreview ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram画像</dt><dd className={styles.factValue}><div className={styles.confirmImage}><div className={`${styles.confirmThumb} ${styles.confirmThumbInstagram}`}><img src={igPreview.url} alt="Instagram用画像" /></div><div><strong>Instagram ・4:5</strong><span>{igPreview.filename}</span>{post.status === 'draft' ? <div className={styles.confirmImageLinks}><Button variant="text" lockedReason={editReason} disabled={!canEdit || busy} onClick={() => { if (canEdit && !busy) go({ tab: 'posts', view: 'edit', id }) }}>画像を変更</Button><Button variant="text" lockedReason={editReason} disabled={!canEdit || busy} onClick={() => { if (canEdit && !busy) go({ tab: 'posts', view: 'edit', id, adjust: 'instagram' }) }}>切り取りを調整</Button></div> : null}</div></div></dd></div> : null}
       </dl>
       {post.title ? <SectionHeader size="small" title={post.title} /> : null}
       <p className={styles.preText}>{post.summary}</p>
@@ -837,7 +845,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
           <SaveErrorField names={["checked"]}><Checkbox checked={checked} onCheckedChange={setChecked}>公開先・本文・画像・切り取り位置・日時を確認しました</Checkbox></SaveErrorField>
           <p className={styles.grayNote}>予約後も編集・取消できます。送信後はGoogleとInstagramの状態を確認できます。</p>
           <div className={styles.formActions}>
-            <Button lockedReason={lockedReason} onClick={() => { if (canSend) go({ tab: 'posts', view: 'edit', id }) }} disabled={!canSend || busy}>修正する</Button>
+            <Button lockedReason={editReason} onClick={() => { if (canEdit && !busy) go({ tab: 'posts', view: 'edit', id }) }} disabled={!canEdit || busy}>修正する</Button>
             <Button variant="primary" onClick={() => void publish()} lockedReason={lockedReason} disabled={!canPress} busy={busy} busyLabel="送信中…">この内容で予約する</Button>
           </div>
         </>

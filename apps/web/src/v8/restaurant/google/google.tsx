@@ -76,7 +76,7 @@ const RETURN_MESSAGES: Record<string, { tone: 'info' | 'warn' | 'danger'; text: 
 
 function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   const saveErrors = useSaveFormErrors()
-  const { allowed: canEdit } = useGooglePermission()
+  const { allowed: canEdit, known } = useGooglePermission()
   usePageTitle('Googleビジネス')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const samePageUrl = useSamePageUrl()
@@ -226,7 +226,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       title="Googleビジネス"
       description={draftOpen ? HELP_BASE : TAB_HELP[tab]}
       picker={picker}
-      readOnly={!(tab === 'profile' || tab === 'settings' ? canManage : canEdit)}
+      readOnly={!accountLoading && !loading && !error && Boolean(data) && known && !(tab === 'profile' || tab === 'settings' ? canManage : canEdit)}
       readOnlyNeed={tab === 'settings' ? 'tenantWide' : tab === 'profile' ? 'manager' : 'feature'}
     >
       <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : tab === 'settings' && data && !data.writeEnabled ? '外部への更新は止めています' : undefined} />

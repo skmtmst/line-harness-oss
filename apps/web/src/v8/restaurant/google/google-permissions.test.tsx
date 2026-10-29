@@ -47,7 +47,10 @@ const profile = {
   holidays: [], closed: false, googleUpdates: null, photoCount: 0,
 } as unknown as GoogleProfileData
 const post = { id: 'p', kind: 'standard', status: 'draft', summary: '合成の投稿', title: null, media: [], instagram: null }
-function role(next: string | null) { fixture.role = verifiedStaffRole(next) }
+function role(next: string | null) {
+  fixture.role = verifiedStaffRole(next)
+  if (next !== null) rememberStaffIdentity({ ...readStaffIdentity()!, ...(next === 'viewer' ? { role: 'staff' as const, readOnly: true, roleBundle: 'view_only' as const } : {}), permissionViewKeys: ['/restaurant-test/google'] })
+}
 function locked(name: string, current: string | null) {
   const button = screen.getByRole('button', { name }) as HTMLButtonElement
   if (current === null) {
@@ -71,13 +74,25 @@ beforeEach(() => {
 afterEach(() => { cleanup(); forgetSessionSnapshot() })
 
 describe.each(['viewer', null])('Googleの閲覧状態 %s', current => {
-  it('投稿の作成と行メニューを残して止め、作成handlerも拒否する', async () => {
+  it('投稿の作成は止め、行メニューの読む操作は残す', async () => {
     role(current); const go = vi.fn()
     render(<PostsBoard accountId="a" go={go} />)
     await screen.findByText('合成の投稿')
     locked('投稿を作る', current)
     locked('Googleの状態を確認する', current)
-    locked('投稿「合成の投稿」の操作', current)
+    if (current === null) locked('投稿「合成の投稿」の操作', current)
+    else {
+      fireEvent.click(screen.getByRole('button', { name: '投稿「合成の投稿」の操作' }))
+      const read = await screen.findByRole('menuitem', { name: '中身を見る' })
+      expect(read.getAttribute('aria-disabled')).not.toBe('true')
+      const edit = screen.getByRole('menuitem', { name: '編集する' })
+      expect(edit.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.click(edit)
+      expect(go).not.toHaveBeenCalled()
+      fireEvent.click(read)
+      expect(go).toHaveBeenCalledExactlyOnceWith({ tab: 'posts', view: 'edit', id: 'p' })
+      go.mockClear()
+    }
     await act(async () => { await fixture.handlers.get('投稿を作る')?.() })
     expect(go).not.toHaveBeenCalled(); expect(fixture.syncPosts).not.toHaveBeenCalled()
     expect(screen.queryByRole('menu')).toBeNull()
@@ -190,4 +205,43 @@ it('オーナーでも閲覧の代理ログインへ切り替われば理由とh
   expect(document.getElementById(button.getAttribute('aria-describedby')!)?.textContent).toBe(PERMISSION_LOCK_REASON.impersonation)
   await act(async () => { await fixture.handlers.get('つなぎ直す')?.() })
   expect(fixture.connectStart).not.toHaveBeenCalled()
+})
+
+it('下書きを任されたstaffは公開確認から本文・画像を直せるが、公開はできない', async () => {
+  role('staff')
+  rememberStaffIdentity({ ...readStaffIdentity()!, permissionKeys: ['/restaurant-test/google'] })
+  fixture.post.mockResolvedValue({ post: { ...post, media: [{ mediaId: 'm', filename: '合成画像', sourceUrl: 'data:image/png;base64,' }] }, store: { name: '合成店' }, writeEnabled: true, canPublish: false })
+  const go = vi.fn(); render(<PostConfirm accountId="a" id="p" go={go} />)
+  await screen.findByText('この投稿を予約しますか？')
+  for (const name of ['修正する', '画像を変更', '切り取りを調整']) {
+    const button = screen.getByRole('button', { name })
+    expect(button.getAttribute('aria-disabled')).not.toBe('true')
+    expect(button).toHaveProperty('disabled', false)
+    fireEvent.click(button)
+  }
+  expect(go).toHaveBeenCalledTimes(3)
+  const publish = screen.getByRole('button', { name: 'この内容で予約する' })
+  expect(publish.getAttribute('aria-disabled')).toBe('true')
+  expect(document.getElementById(publish.getAttribute('aria-describedby')!)?.textContent).toBe(PERMISSION_LOCK_REASON.manager)
+  await act(async () => { await fixture.handlers.get('この内容で予約する')?.() })
+  expect(fixture.publishPost).not.toHaveBeenCalled()
+})
+
+it('閲覧のみでも送信済み投稿の中身とGoogleの表示先を読める', async () => {
+  role('viewer')
+  fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published', searchUrl: 'https://example.invalid/google-post' }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
+  const go = vi.fn(); render(<PostsBoard accountId="a" go={go} />)
+  fireEvent.click(await screen.findByRole('button', { name: '投稿「合成の投稿」の操作' }))
+  const detail = await screen.findByRole('menuitem', { name: '中身を見る' })
+  const google = screen.getByRole('menuitem', { name: 'Googleで表示' })
+  expect(detail.getAttribute('aria-disabled')).not.toBe('true')
+  expect(google.getAttribute('aria-disabled')).not.toBe('true')
+  expect(google.getAttribute('href')).toBe('https://example.invalid/google-post')
+  const remove = screen.getByRole('menuitem', { name: 'Google から削除' })
+  expect(remove.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.click(remove)
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  expect(fixture.removePost).not.toHaveBeenCalled()
+  fireEvent.click(detail)
+  expect(go).toHaveBeenCalledWith({ tab: 'posts', view: 'edit', id: 'p' })
 })

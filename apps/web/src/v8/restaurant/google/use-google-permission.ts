@@ -7,8 +7,9 @@ import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 export function useGooglePermission(need: 'feature' | 'manager' | 'tenantWide' = 'feature', serverAllowed = true) {
   const role = useStaffRole()
   const featureAllowed = usePermissionAccess('/restaurant-test/google')
+  const canView = usePermissionAccess('/restaurant-test/google', true)
   const permitted = featureAllowed && serverAllowed && (need === 'feature' || canManageRole(role))
   const lockedReason = usePermissionLockReason(permitted, need)
   const allowed = permitted && lockedReason !== PERMISSION_LOCK_REASON.impersonation
-  return { allowed, lockedReason }
+  return { allowed, canView, known: role !== null, lockedReason }
 }
