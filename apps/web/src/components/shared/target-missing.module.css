@@ -22,6 +22,11 @@
   box-shadow: var(--card-shadow);
 }
 
+/* 板の直下に1つだけ置かれるときは、板の端にくっつけない（ほかの置き方は変えない）。 */
+:global([data-page-template]) > .root {
+  margin-inline: var(--space-24);
+}
+
 /* 設計の「印」。40px の丸・地は canvas-sunken。 */
 .mark {
   display: flex;
