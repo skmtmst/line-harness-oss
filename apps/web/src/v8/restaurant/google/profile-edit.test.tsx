@@ -1,3 +1,5 @@
+import { beforeEach as seedIdentity } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 // @vitest-environment happy-dom
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -94,16 +96,16 @@ describe('Googleプロフィールを現在の共通部品で編集する', () =
     fireEvent.click(await screen.findByRole('button', { name: /保存せずに/ }))
     expect(go).toHaveBeenCalledWith({ tab: 'profile' })
   })
-  it('休業中は入力と作成を止め、閲覧のみでは変更の操作を出さない', async () => {
+  it('休業中は入力と作成を止め、閲覧のみでは変更の操作を灰色にする', async () => {
     mocks.profile.mockResolvedValue({ ...data, closed: true })
     await open()
     expect(screen.getByRole('textbox', { name: '店舗名' })).toHaveProperty('disabled', true)
     expect(screen.getByRole('button', { name: '変更内容を確認する' })).toHaveProperty('disabled', true)
-    cleanup(); mocks.role = 'viewer'; mocks.profile.mockResolvedValue(data)
+    cleanup(); mocks.role = verifiedStaffRole('viewer'); mocks.profile.mockResolvedValue(data)
     await open()
     expect(screen.getByRole('textbox', { name: '店舗名' })).toHaveProperty('disabled', true)
-    expect(screen.queryByRole('button', { name: '変更内容を確認する' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '写真1を削除' })).toBeNull()
+    expect(screen.getByRole('button', { name: '変更内容を確認する' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: '写真1を削除' }).getAttribute('aria-disabled')).toBe('true')
     expect(mocks.proposeProfile).not.toHaveBeenCalled()
   })
   it('写真の取消と入力クリアで変更が無くなれば変更案を作らない', async () => {
@@ -131,3 +133,5 @@ describe('Googleプロフィールを現在の共通部品で編集する', () =
     await screen.findByRole('button', { name: '追加する写真.jpg を追加' })
   })
 })
+
+seedIdentity(() => { verifiedStaffRole('owner') })

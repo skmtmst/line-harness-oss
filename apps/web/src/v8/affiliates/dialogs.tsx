@@ -142,7 +142,7 @@ export function AffiliateArchiveDialog({
               成果地点の設定へ迷い込ませない。承認待ちは成果承認タブをこの
               紹介者で絞ったもの、リンクはこの紹介者の内訳（リンク一覧）を開く。
             */}
-            <dl className="mt-2 divide-y divide-danger/20 text-sm">
+            <dl className="mt-2 divide-y divide-hairline text-sm">
               <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-xs font-semibold">発行ずみの紹介リンク</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.activeLinks)}本</dd></div><Button variant="danger-outline" size="compact" href={`/affiliates?affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</Button></div>
               <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-xs font-semibold">支払いを確定していない報酬</dt><dd className="text-ink mt-0.5 font-semibold">{yen(impact.unsettledReward)}</dd></div><Button variant="danger-outline" size="compact" href="/affiliates?tab=payment">ここを開く</Button></div>
               <div className="flex items-center gap-3 py-2"><div className="min-w-0 flex-1"><dt className="text-xs font-semibold">認めるのを待っている成果</dt><dd className="text-ink mt-0.5 font-semibold">{formatNumber(impact.pendingConversions)} 件</dd></div><Button variant="danger-outline" size="compact" href={`/affiliates?tab=approvals&affiliate=${encodeURIComponent(target?.id ?? '')}`}>ここを開く</Button></div>

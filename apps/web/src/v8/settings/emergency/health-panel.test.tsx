@@ -211,6 +211,16 @@ describe('健全性チェックの表', () => {
     render(<HealthPanelV8 canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
     expect(await screen.findByRole('heading', { name: '開いている異常 2 件' })).toBeTruthy()
   })
+
+  it('E33: 48時間より古い確認は日に直す（72時間前→3日前）', async () => {
+    calls.healthResponse = () => Promise.resolve(snapshot([
+      { checkKey: 'webhook', status: 'normal', summary: '受け取れています', observedAt: minutesAgo(3 * 24 * 60) },
+    ]))
+    render(<HealthPanelV8 canManage accountId="account-1" manualRunRequest={0} onSeverity={vi.fn()} />)
+    const row = rowOf('Webhook が届いているか')
+    await waitFor(() => expect(row.textContent).toContain('3日前'))
+    expect(row.textContent).not.toContain('時間前')
+  })
 })
 
 describe('読み込みと取り直し', () => {

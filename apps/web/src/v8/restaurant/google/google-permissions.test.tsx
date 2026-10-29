@@ -1,0 +1,251 @@
+import { deferImpersonationSnapshot, forgetSessionSnapshot } from '@/lib/session-snapshot'
+import type { OpsImpersonation } from '@/lib/api'
+// @vitest-environment happy-dom
+import React from 'react'
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
+import { rememberStaffIdentity, readStaffIdentity } from '@/lib/staff-identity-state'
+import { useGooglePermission } from './use-google-permission'
+import type { GoogleConnectionData, GoogleProfileData } from '@/lib/restaurant-google-api'
+import { PostsBoard, PostEditor, PostConfirm } from './posts'
+import { ReviewsBoard } from './reviews'
+import ProfileBoard from './profile'
+import SettingsBoard from './settings'
+import { ChangeConfirmScreen } from './profile-confirm'
+
+const fixture = vi.hoisted(() => ({
+  role: 'owner' as string | null,
+  handlers: new Map<string, () => unknown>(),
+  posts: vi.fn(), syncPosts: vi.fn(), cancelPost: vi.fn(), removePost: vi.fn(), retryInstagram: vi.fn(),
+  post: vi.fn(), publishPost: vi.fn(), createPost: vi.fn(), savePost: vi.fn(),
+  listReviews: vi.fn(), syncReviews: vi.fn(), profile: vi.fn(), syncProfile: vi.fn(), proposeHours: vi.fn(),
+  connectStart: vi.fn(), selectLocation: vi.fn(), disconnect: vi.fn(), change: vi.fn(), sendChange: vi.fn(), cancelChange: vi.fn(),
+}))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string | null) => role === 'owner' || role === 'admin' }))
+vi.mock('@/lib/restaurant-google-api', () => ({ restaurantGoogleApi: fixture }))
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+// Keep the actual button's DOM and lock behavior; capture the feature's raw callback to check its own guard too.
+vi.mock('@/components/shared/button', async (original) => {
+  const actual = await original<typeof import('@/components/shared/button')>()
+  const text = (node: React.ReactNode): string => React.Children.toArray(node).map(child => typeof child === 'string' ? child : React.isValidElement<{ children?: React.ReactNode }>(child) ? text(child.props.children) : '').join('')
+  return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    if (props.onClick) fixture.handlers.set(text(props.children), props.onClick as () => unknown)
+    return <actual.default {...props} />
+  } }
+})
+const connection = (status = 'connected') => ({
+  store: { id: 's', name: '合成店', lineAccountId: 'a' }, connection: { status, locationName: 'locations/a', locationTitle: '合成店' },
+  candidates: [{ locationName: 'locations/b', locationTitle: '別の合成店' }],
+  summary: { storedCount: 1, unrepliedCount: 1, attentionCount: 0, syncStale: true },
+  permissions: { canManageConnection: true, canPublishReply: true }, oauthConfigured: true, writeEnabled: true,
+}) as unknown as GoogleConnectionData
+const profile = {
+  profile: { title: '合成店', specialHours: [], regularHours: [], address: null },
+  today: { date: '2026-10-30', periods: [{ open: '11:00', close: '20:00' }], closed: false },
+  holidays: [], closed: false, googleUpdates: null, photoCount: 0,
+} as unknown as GoogleProfileData
+const post = { id: 'p', kind: 'standard', status: 'draft', summary: '合成の投稿', title: null, media: [], instagram: null }
+function role(next: string | null) {
+  fixture.role = verifiedStaffRole(next)
+  if (next !== null) rememberStaffIdentity({ ...readStaffIdentity()!, ...(next === 'viewer' ? { role: 'staff' as const, readOnly: true, roleBundle: 'view_only' as const } : {}), permissionViewKeys: ['/restaurant-test/google'] })
+}
+function locked(name: string, current: string | null) {
+  const button = screen.getByRole('button', { name }) as HTMLButtonElement
+  if (current === null) {
+    expect(button.disabled).toBe(true)
+    expect(button.hasAttribute('aria-describedby')).toBe(false)
+  } else {
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+    expect(document.getElementById(button.getAttribute('aria-describedby')!)?.textContent).toBe(PERMISSION_LOCK_REASON.viewer)
+  }
+  fireEvent.click(button)
+  return button
+}
+beforeEach(() => {
+  vi.clearAllMocks(); fixture.handlers.clear(); role('owner')
+  fixture.posts.mockResolvedValue({ posts: [post], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
+  fixture.listReviews.mockResolvedValue({ reviews: [{ id: 'r', reviewerDisplayName: '合成の投稿者', starRating: 5, comment: '合成', replyStatus: 'unreplied', replyDraft: null }], total: 1, page: 1, perPage: 20 })
+  fixture.profile.mockResolvedValue(profile)
+  fixture.post.mockResolvedValue({ post, store: { name: '合成店' }, writeEnabled: true, canPublish: true })
+  fixture.change.mockResolvedValue({ change: { id: 'c', kind: 'profile', target: { field: 'title' }, before: '前', after: '後', status: 'failed' }, store: { name: '合成店' }, writeEnabled: true, canSend: true })
+})
+afterEach(() => { cleanup(); forgetSessionSnapshot() })
+
+describe.each(['viewer', null])('Googleの閲覧状態 %s', current => {
+  it('投稿の作成は止め、行メニューの読む操作は残す', async () => {
+    role(current); const go = vi.fn()
+    render(<PostsBoard accountId="a" go={go} />)
+    await screen.findByText('合成の投稿')
+    locked('投稿を作る', current)
+    locked('Googleの状態を確認する', current)
+    if (current === null) locked('投稿「合成の投稿」の操作', current)
+    else {
+      fireEvent.click(screen.getByRole('button', { name: '投稿「合成の投稿」の操作' }))
+      const read = await screen.findByRole('menuitem', { name: '中身を見る' })
+      expect(read.getAttribute('aria-disabled')).not.toBe('true')
+      const edit = screen.getByRole('menuitem', { name: '編集する' })
+      expect(edit.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.click(edit)
+      expect(go).not.toHaveBeenCalled()
+      fireEvent.click(read)
+      expect(go).toHaveBeenCalledExactlyOnceWith({ tab: 'posts', view: 'edit', id: 'p' })
+      go.mockClear()
+    }
+    await act(async () => { await fixture.handlers.get('投稿を作る')?.() })
+    expect(go).not.toHaveBeenCalled(); expect(fixture.syncPosts).not.toHaveBeenCalled()
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
+  it('口コミの同期と新しい下書きを灰色にし、自動同期もhandlerも拒否する', async () => {
+    role(current); const go = vi.fn()
+    render(<ReviewsBoard accountId="a" data={connection()} go={go} onSynced={vi.fn()} />)
+    await screen.findByText('合成の投稿者')
+    locked('Googleから同期する', current); locked('下書きを作る', current)
+    await act(async () => { await fixture.handlers.get('下書きを作る')?.() })
+    expect(go).not.toHaveBeenCalled(); expect(fixture.syncReviews).not.toHaveBeenCalled()
+  })
+  it('プロフィールの変更と同期は灰色、営業時間を読む操作は残す', async () => {
+    role(current); const go = vi.fn()
+    render(<ProfileBoard accountId="a" go={go} />)
+    await screen.findByText('合成店')
+    for (const name of ['営業時間を変える', '今日を休みにする', '今日は早く閉める', 'プロフィールを編集する', '同期する']) locked(name, current)
+    await act(async () => {
+      await fixture.handlers.get('今日を休みにする')?.()
+      await fixture.handlers.get('同期する')?.()
+      await fixture.handlers.get('プロフィールを編集する')?.()
+    })
+    expect(go).not.toHaveBeenCalled(); expect(fixture.proposeHours).not.toHaveBeenCalled(); expect(fixture.syncProfile).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: '祝日の営業時間を確認する' })).toHaveProperty('disabled', false)
+    expect(document.querySelector('[data-read-only-notice]')).toBeNull()
+  })
+  it.each(['disconnected', 'pending_location', 'connected'])('設定の %s でもAPIの許可だけでは操作できない', async status => {
+    role(current); render(<SettingsBoard accountId="a" data={connection(status)} onChanged={vi.fn()} />)
+    const names = status === 'disconnected' ? ['接続する'] : status === 'pending_location' ? ['接続を取り消す', '別のGoogleアカウントでやり直す', 'この店舗を接続する'] : ['接続を解除する', 'つなぎ直す']
+    for (const name of names) locked(name, current)
+    await act(async () => { for (const name of names) await fixture.handlers.get(name)?.() })
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(fixture.connectStart).not.toHaveBeenCalled(); expect(fixture.selectLocation).not.toHaveBeenCalled(); expect(fixture.disconnect).not.toHaveBeenCalled()
+  })
+  it('投稿の作成URLと公開確認URLを直接開いてもAPIとhandlerを止める', async () => {
+    role(current); const view = render(<PostEditor accountId="a" postId={null} kind="standard" go={vi.fn()} />)
+    locked('下書きを保存する', current); locked('公開内容を確認する', current)
+    await act(async () => { await fixture.handlers.get('下書きを保存する')?.(); await fixture.handlers.get('公開内容を確認する')?.() })
+    expect(fixture.createPost).not.toHaveBeenCalled(); expect(fixture.savePost).not.toHaveBeenCalled()
+    view.unmount(); role(current)
+    render(<PostConfirm accountId="a" id="p" go={vi.fn()} />)
+    await screen.findByText('この投稿を予約しますか？')
+    locked('この内容で予約する', current)
+    await act(async () => { await fixture.handlers.get('この内容で予約する')?.() })
+    expect(fixture.publishPost).not.toHaveBeenCalled()
+  })
+  it('プロフィール確認URLを直接開いても送信と取消handlerを止める', async () => {
+    role(current); render(<ChangeConfirmScreen accountId="a" ids={['c']} go={vi.fn()} />)
+    await screen.findByText('この内容でプロフィールを変更しますか？')
+    locked('Googleに変更を送信する', current); locked('キャンセル', current)
+    await act(async () => { await fixture.handlers.get('Googleに変更を送信する')?.(); await fixture.handlers.get('キャンセル')?.() })
+    expect(fixture.sendChange).not.toHaveBeenCalled(); expect(fixture.cancelChange).not.toHaveBeenCalled()
+  })
+})
+it('オーナーは作成と行操作、設定の確認を開けるが、確認前には解除しない', async () => {
+  const go = vi.fn(); const view = render(<PostsBoard accountId="a" go={go} />)
+  fireEvent.click(await screen.findByRole('button', { name: '投稿を作る' }))
+  expect(go).toHaveBeenCalledWith({ tab: 'posts', view: 'new', kind: 'standard' })
+  fireEvent.click(await screen.findByRole('button', { name: '投稿「合成の投稿」の操作' }))
+  expect(await screen.findByRole('menu')).toBeTruthy()
+  view.unmount(); role('owner')
+  render(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '接続を解除する' }))
+  expect(await screen.findByRole('alertdialog')).toBeTruthy(); expect(fixture.disconnect).not.toHaveBeenCalled()
+})
+it('接続の確認を開いた後に権限が落ちても、灰色の確認とhandlerで解除を止める', async () => {
+  const view = render(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '接続を解除する' }))
+  await screen.findByRole('alertdialog'); role('viewer')
+  view.rerender(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+  const buttons = screen.getAllByRole('button', { name: '接続を解除する' })
+  expect(buttons.every(button => button.getAttribute('aria-disabled') === 'true')).toBe(true)
+  await act(async () => { for (const button of buttons) fireEvent.click(button) })
+  expect(fixture.disconnect).not.toHaveBeenCalled()
+})
+it('編集の鍵を持つ担当者だけが機能を変えられ、管理者専用の操作は許可しない', () => {
+  role('staff')
+  rememberStaffIdentity({ ...readStaffIdentity()!, permissionKeys: ['/restaurant-test/google'] })
+  const feature = renderHook(() => useGooglePermission())
+  expect(feature.result.current.allowed).toBe(true)
+  const manager = renderHook(() => useGooglePermission('manager'))
+  expect(manager.result.current.allowed).toBe(false)
+  expect(manager.result.current.lockedReason).toBe(PERMISSION_LOCK_REASON.manager)
+})
+
+it('オーナーの予約済み投稿でも従来の確認から送信できる', async () => {
+  fixture.post.mockResolvedValue({ post: { ...post, status: 'scheduled' }, store: { name: '合成店' }, writeEnabled: true, canPublish: true })
+  fixture.publishPost.mockResolvedValue({ post: { ...post, status: 'accepted' }, alreadyPublished: false })
+  render(<PostConfirm accountId="a" id="p" go={vi.fn()} />)
+  fireEvent.click(await screen.findByRole('checkbox', { name: '公開先・本文・画像・切り取り位置・日時を確認しました' }))
+  fireEvent.click(screen.getByRole('button', { name: 'この内容で予約する' }))
+  await waitFor(() => expect(fixture.publishPost).toHaveBeenCalledWith('a', 'p'))
+})
+
+it('統括以外の管理者はAPIが接続管理を許可しなければ灰色と統括の理由で止める', async () => {
+  role('admin')
+  const data = connection(); data.permissions.canManageConnection = false
+  render(<SettingsBoard accountId="a" data={data} onChanged={vi.fn()} />)
+  const button = screen.getByRole('button', { name: 'つなぎ直す' })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  expect(document.getElementById(button.getAttribute('aria-describedby')!)?.textContent).toBe(PERMISSION_LOCK_REASON.tenantWide)
+  await act(async () => { await fixture.handlers.get('つなぎ直す')?.() })
+  expect(fixture.connectStart).not.toHaveBeenCalled()
+})
+it('オーナーでも閲覧の代理ログインへ切り替われば理由とhandlerで止める', async () => {
+  render(<SettingsBoard accountId="a" data={connection()} onChanged={vi.fn()} />)
+  act(() => { deferImpersonationSnapshot({ mode: 'read' } as OpsImpersonation) })
+  const button = screen.getByRole('button', { name: 'つなぎ直す' })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  expect(document.getElementById(button.getAttribute('aria-describedby')!)?.textContent).toBe(PERMISSION_LOCK_REASON.impersonation)
+  await act(async () => { await fixture.handlers.get('つなぎ直す')?.() })
+  expect(fixture.connectStart).not.toHaveBeenCalled()
+})
+
+it('下書きを任されたstaffは公開確認から本文・画像を直せるが、公開はできない', async () => {
+  role('staff')
+  rememberStaffIdentity({ ...readStaffIdentity()!, permissionKeys: ['/restaurant-test/google'] })
+  fixture.post.mockResolvedValue({ post: { ...post, media: [{ mediaId: 'm', filename: '合成画像', sourceUrl: 'data:image/png;base64,' }] }, store: { name: '合成店' }, writeEnabled: true, canPublish: false })
+  const go = vi.fn(); render(<PostConfirm accountId="a" id="p" go={go} />)
+  await screen.findByText('この投稿を予約しますか？')
+  for (const name of ['修正する', '画像を変更', '切り取りを調整']) {
+    const button = screen.getByRole('button', { name })
+    expect(button.getAttribute('aria-disabled')).not.toBe('true')
+    expect(button).toHaveProperty('disabled', false)
+    fireEvent.click(button)
+  }
+  expect(go).toHaveBeenCalledTimes(3)
+  const publish = screen.getByRole('button', { name: 'この内容で予約する' })
+  expect(publish.getAttribute('aria-disabled')).toBe('true')
+  expect(document.getElementById(publish.getAttribute('aria-describedby')!)?.textContent).toBe(PERMISSION_LOCK_REASON.manager)
+  await act(async () => { await fixture.handlers.get('この内容で予約する')?.() })
+  expect(fixture.publishPost).not.toHaveBeenCalled()
+})
+
+it('閲覧のみでも送信済み投稿の中身とGoogleの表示先を読める', async () => {
+  role('viewer')
+  fixture.posts.mockResolvedValue({ posts: [{ ...post, status: 'published', searchUrl: 'https://example.invalid/google-post' }], total: 1, page: 1, perPage: 20, counts: {}, permissions: { canPublish: true } })
+  const go = vi.fn(); render(<PostsBoard accountId="a" go={go} />)
+  fireEvent.click(await screen.findByRole('button', { name: '投稿「合成の投稿」の操作' }))
+  const detail = await screen.findByRole('menuitem', { name: '中身を見る' })
+  const google = screen.getByRole('menuitem', { name: 'Googleで表示' })
+  expect(detail.getAttribute('aria-disabled')).not.toBe('true')
+  expect(google.getAttribute('aria-disabled')).not.toBe('true')
+  expect(google.getAttribute('href')).toBe('https://example.invalid/google-post')
+  expect(google.closest('[data-menu-group]')?.getAttribute('data-menu-group')).toBe('view')
+  expect(google.querySelector('.lucide-eye')).toBeTruthy()
+  expect(google.querySelector('.lucide-arrow-up-right')).toBeTruthy()
+  expect(google.querySelector('.lucide-pencil')).toBeNull()
+  const remove = screen.getByRole('menuitem', { name: 'Google から削除' })
+  expect(remove.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.click(remove)
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  expect(fixture.removePost).not.toHaveBeenCalled()
+  fireEvent.click(detail)
+  expect(go).toHaveBeenCalledWith({ tab: 'posts', view: 'edit', id: 'p' })
+})

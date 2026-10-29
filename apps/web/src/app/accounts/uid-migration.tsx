@@ -448,7 +448,7 @@ function MigrationReviewBoard({
           <StatusBadge tone={statusView.badgeTone}>{statusView.badgeLabel}</StatusBadge>
         </div>
         <div className={styles.toolbar}>
-          <SaveErrorField names={["classification"]}><Select aria-label="分類で絞り込む" value={classification} onChange={(value) => onFilterChange(value as '' | ItemClassification, pendingOnly)} options={[{ value: '', label: 'すべての分類' }, ...ITEM_CLASSIFICATIONS.map((value) => ({ value, label: classLabel[value] }))]} size="standard" /></SaveErrorField>
+          <SaveErrorField names={["classification"]}><Select aria-label="分類で絞り込む" label="分類" value={classification} onChange={(value) => onFilterChange(value as '' | ItemClassification, pendingOnly)} options={[{ value: '', label: 'すべての分類' }, ...ITEM_CLASSIFICATIONS.map((value) => ({ value, label: classLabel[value] }))]} size="standard" /></SaveErrorField>
           <SaveErrorField names={["pendingOnly","pending_only"]}><Checkbox checked={pendingOnly} onCheckedChange={(checked) => onFilterChange(classification, checked)}>未判断のみ</Checkbox></SaveErrorField>
           <span className={styles.toolbarSpacer} />
           <span className={styles.toolbarCount}>全 {formatNumber(total)} 件{detailBusy ? '・読み込み中…' : ''}</span>
