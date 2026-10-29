@@ -145,6 +145,12 @@ export const opsMethods = {
       remove: (id: string) => fetchApi<ApiResponse<null>>(`/api/ops/announcements/${encodeURIComponent(id)}`, { method: 'DELETE' }),
     },
     noticeLineAccount: () => fetchApi<ApiResponse<OpsNoticeLineAccount>>('/api/ops/notice-line-account'),
+    connectNoticeLineAccount: (input: { channelId: string; channelSecret: string; basicId: string }, stepUpToken?: string) =>
+      fetchApi<ApiResponse<{ accountId: string; name: string; basicId: string }>>('/api/ops/notice-line-account/connect', {
+        method: 'POST',
+        headers: stepUpToken ? { 'X-Step-Up-Token': stepUpToken } : undefined,
+        body: JSON.stringify(input),
+      }),
     setNoticeLineAccount: (lineAccountId: string | null) =>
       fetchApi<ApiResponse<{ currentId: string | null }>>('/api/ops/notice-line-account', { method: 'PUT', body: JSON.stringify({ lineAccountId }) }),
     /** お問い合わせ（チケット）★管理画面 37-6。 */
