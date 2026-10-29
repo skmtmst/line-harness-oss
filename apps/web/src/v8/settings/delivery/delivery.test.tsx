@@ -1,10 +1,13 @@
-import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { PERMISSION_LOCK_REASON, PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
+import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import DeliverySettingsPage, { SERVICES, type DeliveryService } from './delivery'
 
 /**
@@ -120,8 +123,12 @@ const STORES = [
   { id: 'store-2', name: '新宿店', address: '東京都新宿区西新宿4-5-6' },
 ]
 
+beforeEach(() => { fixture.role.value = verifiedStaffRole('owner'); forgetSessionSnapshot() })
+
 afterEach(() => {
   cleanup()
+  verifiedStaffRole(null)
+  forgetSessionSnapshot()
   fixture.role.value = 'owner'
   fixture.search.value = ''
   fixture.accountId.value = null
@@ -218,13 +225,85 @@ describe('設定 › デリバリー連携', () => {
     expect(uberCard.getByText('つないだお店')).toBeTruthy()
   })
 
-  it('閲覧のみの担当にはボタンを出さない', () => {
+  it('閲覧のみの担当にも操作と理由を示し、実行は拒否する', async () => {
     fixture.role.value = verifiedStaffRole('staff')
     render(<DeliverySettingsPage />)
 
-    expect(screen.queryByRole('button', { name: 'Uber Eats にログインしてつなぐ' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '連携を申し込む' })).toBeNull()
-    expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
+    await expectPermissionLocked(button('Uber Eats にログインしてつなぐ'))
+    for (const control of screen.getAllByRole('button', { name: '連携を申し込む' })) await expectPermissionLocked(control)
+    expect(screen.getByText(PERMISSION_LOCK_SUMMARY.manager)).toBeTruthy()
+    expect(screen.queryByText('現在準備中です')).toBeNull()
+    expect(fixture.connectStart).not.toHaveBeenCalled()
+  })
+
+  describe.each(['staff', 'viewer', 'impersonation'] as const)('%s の操作制限', (mode) => {
+    it.each(['disconnected', 'applying', 'connected', 'error'] as const)('%s の操作を理由付きで残し、通信や窓を開かない', async (status) => {
+      fixture.role.value = verifiedStaffRole(mode === 'impersonation' ? 'owner' : mode)
+      if (mode === 'impersonation') rememberSessionSnapshot({
+        impersonation: { id: 'proxy', tenantId: 'tenant', mode: 'read', piiRevealed: false, startedAt: '' },
+        unfamiliarAt: null, stepUpMethod: 'none',
+      })
+      fixture.accountId.value = 'acc-1'
+      render(<DeliverySettingsPage services={[uber({ status, needsReauthorization: status === 'error' })]} />)
+      const summary = mode === 'viewer' ? READ_ONLY_MESSAGE : PERMISSION_LOCK_SUMMARY[mode === 'staff' ? 'manager' : 'impersonation']
+      expect(screen.getAllByText(summary).filter(element => element.closest('[data-read-only-notice]'))).toHaveLength(1)
+      const controls = card('Uber Eats').getAllByRole('button') as HTMLButtonElement[]
+      expect(controls).toHaveLength(status === 'error' ? 3 : status === 'connected' ? 2 : 1)
+      for (const control of controls) {
+        await expectPermissionLocked(control)
+        expect(document.activeElement).toBe(control)
+        fireEvent.keyDown(control, { key: ' ' })
+        const reasonId = control.getAttribute('aria-describedby')!.split(/\s+/).at(-1)!
+        expect(document.getElementById(reasonId)?.textContent).toBe(PERMISSION_LOCK_REASON[mode === 'staff' ? 'manager' : mode === 'viewer' ? 'viewer' : 'impersonation'])
+      }
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(screen.queryByRole('alertdialog')).toBeNull()
+      for (const call of [fixture.connection, fixture.connectStart, fixture.checkConnection, fixture.disconnect, fixture.stores, fixture.selectStore]) expect(call).not.toHaveBeenCalled()
+    })
+  })
+
+  it.each(['disconnected', 'applying', 'connected', 'error'] as const)('本人未確認の%sでは操作を残し、理由を捏造せず無効にする', (status) => {
+    fixture.role.value = verifiedStaffRole(null)
+    fixture.accountId.value = 'acc-1'
+    render(<DeliverySettingsPage services={[uber({ status, needsReauthorization: status === 'error' })]} />)
+    for (const control of card('Uber Eats').getAllByRole('button') as HTMLButtonElement[]) {
+      expect(control.disabled).toBe(true)
+      expect(control.hasAttribute('data-permission-locked')).toBe(false)
+      fireEvent.click(control)
+    }
+    expect(screen.queryByRole('dialog')).toBeNull()
+    for (const call of [fixture.connection, fixture.connectStart, fixture.checkConnection, fixture.disconnect]) expect(call).not.toHaveBeenCalled()
+  })
+
+  it('確認中に閲覧代理へ変わると遅い結果を捨て、書込へ戻すまで操作を拒否する', async () => {
+    fixture.accountId.value = 'acc-1'
+    fixture.connection.mockResolvedValue(connection({ status: 'connected', storeName: '渋谷店' }))
+    const oldCheck = deferred<ReturnType<typeof connectionMutation>>()
+    fixture.checkConnection.mockReturnValue(oldCheck.promise)
+    render(<DeliverySettingsPage />)
+    expect(await screen.findByText('渋谷店')).toBeTruthy()
+    fireEvent.click(button('接続を確かめる'))
+    act(() => rememberSessionSnapshot({
+      impersonation: { id: 'proxy', tenantId: 'tenant', mode: 'read', piiRevealed: false, startedAt: '' },
+      unfamiliarAt: null, stepUpMethod: 'none',
+    }))
+    await act(async () => oldCheck.resolve(connectionMutation({ status: 'connected', storeName: '古い店舗' })))
+    expect(card('Uber Eats').getByText('渋谷店')).toBeTruthy()
+    expect(screen.queryByText('古い店舗')).toBeNull()
+    await expectPermissionLocked(button('接続を確かめる'))
+    await expectPermissionLocked(button('連携を解除する'))
+    expect(fixture.checkConnection).toHaveBeenCalledTimes(1)
+    expect(fixture.disconnect).not.toHaveBeenCalled()
+    act(() => forgetSessionSnapshot())
+    await waitFor(() => expect(button('接続を確かめる').getAttribute('aria-disabled')).toBeNull())
+    fireEvent.click(button('連携を解除する'))
+    expect(screen.getByRole('alertdialog')).toBeTruthy()
+    act(() => rememberSessionSnapshot({
+      impersonation: { id: 'proxy', tenantId: 'tenant', mode: 'read', piiRevealed: false, startedAt: '' },
+      unfamiliarAt: null, stepUpMethod: 'none',
+    }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+    expect(fixture.disconnect).not.toHaveBeenCalled()
   })
 
   it('DL-2：接続中はつないだお店・つないだ日・最後に確かめた時刻が出る', () => {
@@ -573,7 +652,7 @@ describe('設定 › デリバリー連携', () => {
     fixture.connection.mockResolvedValue(connection({ status: 'pending_store' }))
     fixture.stores.mockResolvedValue({ success: true, stores: STORES })
     render(<DeliverySettingsPage />)
-    expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
+    expect(screen.getByText(PERMISSION_LOCK_SUMMARY.manager)).toBeTruthy()
     expect(screen.queryByText('つなぐお店を選んでください')).toBeNull()
     expect(fixture.connection).not.toHaveBeenCalled()
     expect(fixture.stores).not.toHaveBeenCalled()
@@ -629,13 +708,15 @@ describe('設定 › デリバリー連携', () => {
     fireEvent.click(button('接続を確かめる'))
     fixture.role.value = verifiedStaffRole('staff')
     rerender(<DeliverySettingsPage />)
-    expect(await screen.findByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
+    expect(await screen.findByText(PERMISSION_LOCK_SUMMARY.manager)).toBeTruthy()
     await act(async () => oldCheck.resolve(connectionMutation({ status: 'connected', storeName: '古い店舗' })))
 
     expect(card('Uber Eats').getByText('渋谷店')).toBeTruthy()
     expect(card('Uber Eats').queryByText('古い店舗')).toBeNull()
-    expect(card('Uber Eats').queryByRole('button', { name: '接続を確かめる' })).toBeNull()
-    expect(card('Uber Eats').queryByRole('button', { name: '連携を解除する' })).toBeNull()
+    await expectPermissionLocked(button('接続を確かめる'))
+    await expectPermissionLocked(button('連携を解除する'))
+    expect(fixture.checkConnection).toHaveBeenCalledTimes(1)
+    expect(fixture.disconnect).not.toHaveBeenCalled()
   })
 
   it('LINE公式アカウントを替えた後は、前のアカウントの遅い読み取りを反映しない', async () => {
@@ -733,5 +814,3 @@ describe('設定 › デリバリー連携', () => {
   })
 
 })
-
-afterEach(() => { verifiedStaffRole(null) })

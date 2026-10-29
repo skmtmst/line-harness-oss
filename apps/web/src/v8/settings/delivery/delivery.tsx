@@ -8,7 +8,7 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import { CustomerInfoRows } from '@/components/shared/customer-info-rows'
 import { usePreparingDialog } from '@/components/shared/preparing-dialog'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
@@ -99,7 +99,9 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
   usePageCrumbs([{ label: '設定', href: '/settings' }])
   useHideSettingsNav()
   const role = useStaffRole()
-  const canManage = canManageRole(role)
+  const roleCanManage = canManageRole(role)
+  const permissionReason = usePermissionLockReason(roleCanManage, 'manager')
+  const canManage = roleCanManage && !permissionReason
   const { selectedAccountId } = useAccount()
   const searchParams = useSearchParams()
   /** Uber から戻ったときに付く符号（`?ubereats=pending_store` など）。 */
@@ -339,11 +341,12 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
 
   /** Uber Eats 側の状態を明示的に確認し、確定した結果だけを表示へ反映する。 */
   const checkConnection = useCallback(async (service: DeliveryService) => {
+    if (!canManage) return
     if (service.id !== 'uber') {
       preparing.open(`${service.name}の接続の確認`)
       return
     }
-    if (!canManage || !selectedAccountId) return
+    if (!selectedAccountId) return
     const accountId = selectedAccountId
     const request = beginOperation(service.id, 'check')
     if (request === null) return
@@ -444,6 +447,8 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
             つながっている会社があるかどうかで書き分け、そのまま「？」の中身にする。 */}
         <PageHeading
           headingSize="compact"
+          readOnlyBand={role !== null && !canManage}
+          readOnlyNeed="manager"
           title="デリバリー連携"
           help={`デリバリーサービスへの接続を設定します。Uber Eats の注文の取り込みと注文ごとの操作は、連携の利用準備が整った店舗では受注画面に表示されます。営業状態の変更・メニューの同期はまだ利用できません。${
             anyConnected
@@ -452,7 +457,6 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           }`}
         />
         <div className={styles.body}>
-          {role !== null && !canManage ? <ReadOnlyNotice /> : null}
           {services.map((service) => {
             const state = STATUS[service.status]
             const connectable = service.connect !== 'login' || service.ready
@@ -492,68 +496,71 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                   ]} />
                 )}
 
-                {canManage ? (
-                  <div className={styles.actions}>
-                    {service.status === 'disconnected' ? (
+                <div className={styles.actions}>
+                  {service.status === 'disconnected' ? (
+                    <Button
+                      variant="primary"
+                      lockedReason={permissionReason}
+                      disabled={!canManage || !connectable || busy !== null}
+                      title={connectable ? undefined : WAITING}
+                      busy={serviceBusy && (busy?.action === 'connect' || busy?.action === 'stores')}
+                      busyLabel="開いています…"
+                      onClick={() => void connect(service)}
+                    >
+                      {service.connect === 'login' ? <LogIn size={16} aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
+                      {connectLabel(service)}
+                    </Button>
+                  ) : service.status === 'applying' ? (
+                    <>
                       <Button
-                        variant="primary"
-                        disabled={!connectable || busy !== null}
-                        title={connectable ? undefined : WAITING}
-                        busy={serviceBusy && (busy?.action === 'connect' || busy?.action === 'stores')}
-                        busyLabel="開いています…"
-                        onClick={() => void connect(service)}
+                        variant="secondary"
+                        lockedReason={permissionReason}
+                        disabled={!canManage || busy !== null}
+                        onClick={() => { if (canManage) preparing.open(`${service.name}の申し込みの取り消し`) }}
                       >
-                        {service.connect === 'login' ? <LogIn size={16} aria-hidden="true" /> : <Send size={16} aria-hidden="true" />}
-                        {connectLabel(service)}
+                        <X size={16} aria-hidden="true" />
+                        申し込みを取り消す
                       </Button>
-                    ) : service.status === 'applying' ? (
-                      <>
+                    </>
+                  ) : (
+                    <>
+                      {service.needsReauthorization ? (
                         <Button
                           variant="secondary"
-                          disabled={busy !== null}
-                          onClick={() => preparing.open(`${service.name}の申し込みの取り消し`)}
+                          lockedReason={permissionReason}
+                          disabled={!canManage || !service.ready || busy !== null}
+                          busy={serviceBusy && busy?.action === 'reauthorize'}
+                          busyLabel="開いています…"
+                          onClick={() => void startUberOAuth(service, true)}
                         >
-                          <X size={16} aria-hidden="true" />
-                          申し込みを取り消す
+                          <LogIn size={16} aria-hidden="true" />
+                          Uber Eats にログインし直す
                         </Button>
-                      </>
-                    ) : (
-                      <>
-                        {service.needsReauthorization ? (
-                          <Button
-                            variant="secondary"
-                            disabled={!service.ready || busy !== null}
-                            busy={serviceBusy && busy?.action === 'reauthorize'}
-                            busyLabel="開いています…"
-                            onClick={() => void startUberOAuth(service, true)}
-                          >
-                            <LogIn size={16} aria-hidden="true" />
-                            Uber Eats にログインし直す
-                          </Button>
-                        ) : null}
-                        <Button
-                          variant="secondary"
-                          disabled={busy !== null || service.connectionCheckBlocked}
-                          title={service.connectionCheckBlocked ? '結果の確認が終わるまで操作できません' : undefined}
-                          busy={serviceBusy && busy?.action === 'check'}
-                          busyLabel="確認しています…"
-                          onClick={() => void checkConnection(service)}
-                        >
-                          <Plug size={16} aria-hidden="true" />
-                          接続を確かめる
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          disabled={busy !== null || service.connectionDisconnectBlocked}
-                          title={service.connectionDisconnectBlocked ? '結果の確認が終わるまで操作できません' : undefined}
-                          onClick={() => { setDisconnectError(''); setDisconnectBlocked(false); setDisconnecting(service) }}
-                        >
-                          連携を解除する
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                ) : null}
+                      ) : null}
+                      <Button
+                        variant="secondary"
+                        lockedReason={permissionReason}
+                        disabled={!canManage || busy !== null || service.connectionCheckBlocked}
+                        title={service.connectionCheckBlocked ? '結果の確認が終わるまで操作できません' : undefined}
+                        busy={serviceBusy && busy?.action === 'check'}
+                        busyLabel="確認しています…"
+                        onClick={() => void checkConnection(service)}
+                      >
+                        <Plug size={16} aria-hidden="true" />
+                        接続を確かめる
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        lockedReason={permissionReason}
+                        disabled={!canManage || busy !== null || service.connectionDisconnectBlocked}
+                        title={service.connectionDisconnectBlocked ? '結果の確認が終わるまで操作できません' : undefined}
+                        onClick={() => { if (!canManage) return; setDisconnectError(''); setDisconnectBlocked(false); setDisconnecting(service) }}
+                      >
+                        連携を解除する
+                      </Button>
+                    </>
+                  )}
+                </div>
               </Card>
             )
           })}
