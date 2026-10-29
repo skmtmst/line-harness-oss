@@ -859,4 +859,5 @@
 - [プロバイダーの画面を開く](release-log/unreleased/1885-masato-line-provider-step3.md) — LINEアカウント登録の画面に関する反映履歴。
 - [投稿画像を登録メディアから選ぶ](release-log/unreleased/1886-masato-post-media-picker.md) — GoogleビジネスとInstagramの投稿画像に関する反映履歴。
 - [既存のLINEログインチャネルの案内](release-log/unreleased/1887-masato-provider-existing-login-copy.md) — LINEアカウント登録の画面に関する反映履歴。
+- [LINE公式アカウントマネージャーでの設定案内](release-log/unreleased/1889-masato-line-manager-step1.md) — LINEアカウント登録の画面に関する反映履歴。
 - [登録メディアの画像の読み込み](release-log/unreleased/1890-masato-post-media-content.md) — GoogleビジネスとInstagramの投稿画像に関する反映履歴。
