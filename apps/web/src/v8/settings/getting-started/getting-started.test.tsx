@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const state = vi.hoisted(() => ({ stepState: 'done' as 'done' | 'todo' | 'forbidden', style: 'standard' as import('@line-crm/shared').AccountStyle, role: 'owner' as string | null, allowed: true, reload: vi.fn() }))
 vi.mock('@/hooks/use-account-style', async original => ({ ...await original<typeof import('@/hooks/use-account-style')>(), useAccountStyle: () => ({ status: 'ready', data: { style: state.style }, error: null, stale: false, reload: vi.fn() }) }))
@@ -18,15 +18,24 @@ vi.mock('@/v8/onboarding/use-first-run', async () => {
   return { useFirstRun: () => ({ status: 'ready', error: null, reload: state.reload, steps: buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map((key) => ({ key, state: state.stepState, href: state.allowed ? '/' : null, reason: null }))) }) }
 })
 import GettingStarted from './getting-started'
-beforeEach(() => { state.role = 'owner'; state.allowed = true; state.style = 'standard'; state.stepState = 'done' })
+beforeEach(() => { state.reload.mockClear(); state.role = 'owner'; state.allowed = true; state.style = 'standard'; state.stepState = 'done' })
 afterEach(cleanup)
 
 it('送信せずに2つの確認経路へ案内し、受信後の読み直しを置く', () => {
   render(<GettingStarted />)
   expect(screen.getByRole('link', { name: '友だち追加のQRを開く' }).getAttribute('href')).toBe('/?qr=base')
   expect(screen.getByRole('link', { name: 'シナリオを選んでテスト送信する' }).getAttribute('href')).toBe('/scenarios')
-  expect(screen.getByText(/送らずに判定するテストと受信箱の手動返信は完了に数えません/)).toBeTruthy()
+  const card = screen.getByRole('region', { name: '最初の1通の確認方法' })
+  const reload = within(card).getByRole('button', { name: '受信後に状態を読み直す' })
+  expect(reload.textContent).toBe('読み直す')
+  expect(reload.closest('[data-design-node="t0jk8p"]')?.contains(within(card).getByRole('heading', { name: '最初の1通の確認方法' }))).toBe(true)
+  expect(card.querySelectorAll('p')).toHaveLength(1)
+  expect(within(card).queryByText(/送らずに判定するテスト/)).toBeNull()
+  fireEvent.click(within(card).getByRole('button', { name: '最初の1通の判定と確認方法' }))
+  expect(within(card).getByRole('note').textContent).toContain('送らずに判定するテストと受信箱の手動返信は完了に数えません')
   expect(state.reload).not.toHaveBeenCalled()
+  fireEvent.click(reload)
+  expect(state.reload).toHaveBeenCalledTimes(1)
 })
 it('閲覧のみ・送信権限のない人にも入口を灰色のボタンで残し、移動させない', () => {
   state.role = 'viewer'

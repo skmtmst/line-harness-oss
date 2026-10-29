@@ -948,3 +948,4 @@
 - [LINE通知の説明の置き場所](release-log/unreleased/1950-kenta-notification-help.md)
 - [LINE通知の送信内訳の表示](release-log/unreleased/1950-kenta-notification-kpi-detail.md)
 - [業種別の初期設定の確認](release-log/unreleased/1950-kenta-style-setup-progress.md) — 反映履歴、確認 2026-10-29
+- [最初の1通の確認と読み直しの操作](release-log/unreleased/1951-kenta-first-message-guide.md)
