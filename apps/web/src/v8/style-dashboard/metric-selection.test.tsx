@@ -174,6 +174,26 @@ it('R11: 5つ目は帯の下の短い1行（行き先付き）', async () => {
   expect(go.getAttribute('href')).toBe('/friends')
 })
 
+it('追加決まり1: 読み直すは題の右上で道具の段に1つ落ちない', async () => {
+  render(<StyleDashboard style="salon" />)
+  await waitFor(() => expect(labels()).toHaveLength(4))
+  // 題の右上の操作にある。
+  expect(getPageAction({ name: '読み直す' })).toBeTruthy()
+  // 道具の段（期間の切り替えの行）には無い。
+  const period = document.querySelector('[role="group"][aria-label="期間"], [role="radiogroup"][aria-label="期間"]')
+  expect(period).not.toBeNull()
+  expect(within(period!.parentElement as HTMLElement).queryByRole('button', { name: '読み直す' })).toBeNull()
+})
+
+it('追加決まり1: 一覧の探す欄は左に置く（右に1つ浮かせない）', async () => {
+  render(<StyleDashboard style="restaurant" />)
+  const box = await screen.findByPlaceholderText('名前・タグ・メモで探す')
+  const tools = box.closest('[data-dashboard-list-tools]')
+  expect(tools).not.toBeNull()
+  // 探す欄が段の最初＝左寄せ。前に余白詰めは無い。
+  expect(tools!.firstElementChild!.contains(box)).toBe(true)
+})
+
 it('R11: 飲食店の5つ目は「今日入った予約 N 件 一覧へ →」', async () => {
   render(<StyleDashboard style="restaurant" />)
   await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '空席（いま）', '無断キャンセル率']))

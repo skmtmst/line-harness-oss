@@ -122,6 +122,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const viewErrors = useSaveFormErrors()
   const headActions = (
     <>
+      {/* 追加決まり1: 読み直すは補助操作なので題の右上へ。道具の段に1つだけ落ちない。 */}
+      <Button onClick={() => void reload()}><RefreshCw size={16} aria-hidden="true" />読み直す</Button>
       {canWrite && cfg.walkIn && store.store ? <Button onClick={() => setWalkInOpen(true)}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
       {canWrite ? <Button href="/broadcasts"><MessageCircle size={16} aria-hidden="true" />LINE を送る</Button> : null}
       {canWrite ? <Button onClick={() => setClosureOpen(true)}><CalendarX2 size={16} aria-hidden="true" />休みを入れる</Button> : null}
@@ -150,7 +152,6 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <span className={styles.grow} />
       <EntitySelect compact width={190} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
       {loadedAt ? <span className={styles.updated}>更新 {formatDate(loadedAt, { style: 'time' })}</span> : null}
-      <Button onClick={() => void reload()}><RefreshCw size={16} aria-hidden="true" />読み直す</Button>
     </div>
   )
 
@@ -205,7 +206,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     } else {
       main = (
         <>
-          {style !== 'lesson' ? <div className={styles.listTools}><span className={styles.grow} /><div className={styles.search}><ListToolbar search={{ value: search, onChange: setSearch, placeholder: cfg.search, width: 220 }} /></div></div> : null}
+          {/* 追加決まり1: 探す欄は左に置く。右に1つ浮かせて左を空けない。 */}
+          {style !== 'lesson' ? <div className={styles.listTools} data-dashboard-list-tools><div className={styles.search}><ListToolbar search={{ value: search, onChange: setSearch, placeholder: cfg.search, width: 220 }} /></div></div> : null}
           <TodayList style={style} rows={rows} note={today.rowsNote} canWrite={canWrite} busyId={busy} menuFor={menuFor} onVisit={(r) => void markVisit(r)} onNoShow={(r) => void markNoShow(r)} onApprove={(r) => void approve(r)} onResult={(r) => setResultRow(r)} onUndo={(r) => void undoVisit(r)}
             empty={<ListState kind="empty" title={`${range === 'today' ? '今日' : range === 'week' ? '今週' : '今月'}の${style === 'consult' ? '面談' : style === 'lesson' ? 'クラス' : '予約'}はありません`} description={canWrite ? (style === 'consult' ? '予約の URL を案内すると、空いた時間に入ります。' : '空いている時間に予約を入れられます。') : undefined}
               action={canWrite ? (style === 'consult' ? <Button variant="primary" onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/booking`).then(() => notifyToast('予約 URL をコピーしました。')) }}><Copy size={16} aria-hidden="true" />予約 URL をコピー</Button> : <Button variant="primary" onClick={() => addNew()}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button>) : undefined} />}
