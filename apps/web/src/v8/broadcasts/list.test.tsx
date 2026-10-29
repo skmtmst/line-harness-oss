@@ -1062,4 +1062,28 @@ describe('保持した一斉配信一覧の変更操作', () => {
     expect((input as HTMLInputElement).value).toBe('残す名前')
   })
 
+  it.each(['owner', 'admin'])('%sの左のフォルダ欄から追加と名前変更が実際の保存へつながる', async manager => {
+    resetUrl(); role.current = manager; rememberStaffIdentity(person(manager))
+    listFolders.mockResolvedValue({ success: true, data: [{ id: 'a', name: '分類A', kind: 'broadcast' }], unfiledCount: 2 })
+    act(() => root.render(<BroadcastListV8 />)); await flush()
+    const add = buttonByText('フォルダを追加')!
+    expect(add.closest('nav[aria-label="フォルダ"]')).toBeTruthy()
+    act(() => fireEvent.click(add)); await flush()
+    let dialog = document.querySelector('[role="dialog"]')!
+    act(() => fireEvent.change(dialog.querySelector('input')!, { target: { value: '新しい分類' } }))
+    let confirm = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.trim() === '追加する')!
+    expect(confirm.disabled).toBe(false)
+    act(() => fireEvent.click(confirm)); await flush()
+    expect(createFolder).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'broadcast', name: '新しい分類', accountId: 'account-a' }))
+    expect(dialog.isConnected).toBe(false)
+    act(() => fireEvent.click(host.querySelector('[aria-label="フォルダ「分類A」の操作"]')!))
+    act(() => fireEvent.click(menuItem('名前を変える'))); await flush()
+    dialog = document.querySelector('[role="dialog"]')!
+    act(() => fireEvent.change(dialog.querySelector('input')!, { target: { value: '変更した分類' } }))
+    confirm = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(b => b.textContent?.trim() === '保存する')!
+    act(() => fireEvent.click(confirm)); await flush()
+    expect(updateFolder).toHaveBeenCalledExactlyOnceWith('a', expect.objectContaining({ name: '変更した分類' }), undefined)
+    expect(dialog.isConnected).toBe(false)
+  })
+
 })
