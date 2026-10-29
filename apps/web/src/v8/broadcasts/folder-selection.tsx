@@ -1,13 +1,14 @@
 'use client'
 
 import type { Folder } from '@line-crm/shared'
-import { useFolderMove } from '@/components/shared/use-folder-move'
+import { FolderMovePermissionError, useFolderMove } from '@/components/shared/use-folder-move'
 import { api, type ApiBroadcast } from '@/lib/api'
-import { captureBroadcastWriteAccess } from './write-access'
+import { canEditBroadcastNow, captureBroadcastWriteAccess } from './write-access'
 
-export function useBroadcastFolderSelection({ accountId, canEdit, broadcasts, folders, onChanged }: {
+export function useBroadcastFolderSelection({ accountId, canEdit, lockedReason, broadcasts, folders, onChanged }: {
   accountId: string | null
   canEdit: boolean
+  lockedReason?: string
   broadcasts: ApiBroadcast[]
   folders: Folder[]
   onChanged: () => Promise<void>
@@ -16,8 +17,9 @@ export function useBroadcastFolderSelection({ accountId, canEdit, broadcasts, fo
   const items = broadcasts.map(broadcast => ({ ...broadcast, name: broadcast.title }))
   const selection = useFolderMove({
     accountId, canEdit, items, folders, onChanged,
+    permission: { lockedReason, canWriteNow: canEditBroadcastNow },
     move: async (item, folderId) => {
-      if (!permitted(item)) throw new Error('権限が変わったため、フォルダへの移動を中止しました。')
+      if (!permitted(item)) throw new FolderMovePermissionError()
       const response = await api.broadcasts.update(item.id, { folderId, expectedVersion: item.version ?? 0 })
       if (!response.success) throw new Error(response.error || 'フォルダへ移せませんでした')
     },
