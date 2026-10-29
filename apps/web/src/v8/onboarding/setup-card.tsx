@@ -10,7 +10,7 @@ import Notice from '@/components/shared/notice'
 import { ProgressBar, StepMark } from '@/components/shared/progress'
 import StatusBadge from '@/components/shared/status-badge'
 import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
-import { FEATURES, featureHref, sampleMenuFor, featureName, summarizeSetup, type SetupSummary, type TodoRow } from './model'
+import { FEATURES, featureHref, sampleMenuFor, featureName, summarizeSetup, setupWarningsForStyle, type SetupSummary, type TodoRow } from './model'
 import type { StyleSetupData } from './use-style-setup'
 import styles from './setup-card.module.css'
 
@@ -31,7 +31,7 @@ export function setupSummary(data: StyleSetupData | null): SetupSummary | null {
 export function SetupWarningBands({ data }: { data: StyleSetupData }) {
   const preparing = usePreparingDialog()
   const seen = new Set<string>()
-  const warnings = data.warnings.filter((warning) => (seen.has(warning.feature) ? false : (seen.add(warning.feature), true)))
+  const warnings = setupWarningsForStyle(data.state.style, data.warnings).filter((warning) => (seen.has(warning.feature) ? false : (seen.add(warning.feature), true)))
   if (warnings.length === 0) return null
   const tiles = sampleMenuFor(data.state.style).tiles
   return (

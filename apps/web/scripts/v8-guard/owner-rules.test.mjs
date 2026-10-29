@@ -1,3 +1,5 @@
+import './floating-surface.test.mjs'
+import './floating-surface-components.test.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { connectGuardBrowser } from './browser-session.mjs'
@@ -6,7 +8,6 @@ import scanPolish from './polish-rules-browser.mjs'
 import scanRowHeights from './control-row-height-browser.mjs'
 import scanRowCentering from './row-centering-browser.mjs'
 import scanHoverReveal from './hover-reveal-browser.mjs'
-
 test('a framed box clipped by its parent fails; scrollable and restored boxes remain usable', async () => {
   const browser = await connectGuardBrowser()
   try {
@@ -20,7 +21,6 @@ test('a framed box clipped by its parent fails; scrollable and restored boxes re
     assert.deepEqual(await page.evaluate(scan),[])
   } finally { await browser.close() }
 })
-
 test('高さをそろえる段で、同じ行のカードの高さか下端の操作がずれると落ち、そろえば通る', async () => {
   const browser = await connectGuardBrowser()
   try {

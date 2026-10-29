@@ -569,3 +569,5 @@
     background-color: var(--color-scroll-thumb);
   }
 }
+
+.nav[aria-busy='true'] a { color: var(--color-ink-faint); }

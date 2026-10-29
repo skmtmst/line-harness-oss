@@ -77,3 +77,18 @@ describe('お客さまの分け方', () => {
     expect(screen.getAllByRole('button', { name: /^マス\d+ / })[0].hasAttribute('disabled')).toBe(true)
   })
 })
+
+it('読込中・失敗でも通常の本文と同じ共通の段に収め、再読込できる', async () => {
+  let reject!: (reason: Error) => void
+  api.get.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+  const { container } = render(<SegmentsV8 accountId="a" canManage />)
+  const loadingContainer = container.firstElementChild
+  expect(loadingContainer?.children).toHaveLength(1)
+  const layoutClass = loadingContainer?.className
+  await act(async () => { reject(new Error('fixture failure')) })
+  expect(container.firstElementChild?.className).toBe(layoutClass)
+  expect(container.firstElementChild?.children).toHaveLength(1)
+  fireEvent.click(screen.getByRole('button', { name: /もう一度|読み直す|やり直す/ }))
+  await screen.findByText('全員 1,284 人')
+  expect(container.firstElementChild?.className).toBe(layoutClass)
+})

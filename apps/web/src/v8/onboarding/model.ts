@@ -239,6 +239,11 @@ export function needsActivation(state: StarterItemState): boolean {
 export type StyleState = StyleSelectionStatus & { style: AccountStyle; version: number; answers: Record<string, SetupAnswer> }
 export type StyleWarning = { feature: string; areaId: string; groupId: string; href?: string; customerState: 'preparing' }
 
+/** 業種に合う警告を、上の帯と設定の一覧でそろえる。 */
+export function setupWarningsForStyle(style: AccountStyle, warnings: ReadonlyArray<StyleWarning>): StyleWarning[] {
+  return warnings.filter(warning => style !== 'ec' || warning.feature !== 'stamps')
+}
+
 export type TodoRow = {
   key: string
   title: string
@@ -265,7 +270,7 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
   const doneKeys = steps.filter((step) => step.key === 'style' ? state.styleSelected : answers[step.key]?.mode === 'configured').map((step) => step.key)
   const rows: TodoRow[] = []
   const warned = new Set<string>()
-  for (const warning of warnings) {
+  for (const warning of setupWarningsForStyle(state.style, warnings)) {
     if (warned.has(warning.feature)) continue
     warned.add(warning.feature)
     const preparing = FEATURES[warning.feature]?.preparing
@@ -280,6 +285,7 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
   }
   if (!state.styleSelected && state.styleMode !== 'manual') rows.push({ key: 'style', title: '使い方のスタイルを選ぶ', note: '答えに合わせて、メニュー・見本・設定をまとめて入れます', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '選ぶ', step: 'style' } })
   for (const question of questions) {
+    if (state.style === 'ec' && question.key === 'stamps') continue
     const answer = answers[question.key]
     if (!answer || answer.mode === 'configured') continue
     if (warned.has(question.key)) continue

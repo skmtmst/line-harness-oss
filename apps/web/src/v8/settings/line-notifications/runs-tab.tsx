@@ -189,7 +189,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
 
     <div className={styles.toolbar}>
       <div className={styles.runSearch}>
-        <SearchField aria-label="お客様の名前・注文番号で探す" placeholder="お客様の名前・注文番号で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
+        <SearchField aria-label="このページ内で名前・注文番号を探す" placeholder="このページ内で名前・注文番号を探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
       </div>
       <div className={styles.runRecipient}>
         <SaveErrorField names={["recipientFilter","recipient","recipient_filter"]}><Select aria-label="対象を絞り込み" label="対象" value={recipientFilter} onChange={(value) => setRecipientFilter(value as RecipientFilter)} options={[
@@ -249,6 +249,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
 
     {visibleState === 'ready' && items.length > 0 ? (
       <>
+        <p className={styles.minor}>{`このページ内の絞り込み：${formatNumber(visibleItems.length)}件（対象 ${formatNumber(items.length)}件）`}</p>
         {mode === 'failures'
           ? <Notice tone="info" icon={null}>個人の既読は見られません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。</Notice>
           : <p className={styles.minor}>表示中の20件を絞り込み</p>}

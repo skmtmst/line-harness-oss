@@ -214,7 +214,7 @@ describe('R463 履歴から固定結果を開ける', () => {
 })
 
 describe('R456 アカウント切替後に旧応答で置き換えない', () => {
-  it('再読込中にBへ移ると遅いA応答を捨て、しまう確認も閉じる', async () => {
+  it('再読込中にBへ移ると遅いA応答を捨てる', async () => {
     const state = { snapshotsMode: 'ok' as const, snapshotsFailedOnce: true, recentOneTime: [] }
     const base = listHandler(state)
     let releaseA: ((value: unknown) => void) | null = null
@@ -233,15 +233,10 @@ describe('R456 アカウント切替後に旧応答で置き換えない', () =>
     await render()
     expect(host.textContent).toContain('Aのレポート')
 
-    // しまう確認を開いておく（確認窓はポータルのため document 全体で見る）
-    await act(async () => { (await scheduleMenuItem('しまう')).click() })
-    expect(document.body.textContent).toContain('定期レポートをしまいますか')
-
     // 止める→失敗→再読込が始まる（応答はまだ返さない）
     await act(async () => { (await scheduleMenuItem('止める')).click() })
     expect(releaseA).not.toBeNull()
 
-    // しまう確認を開いたままBへ切り替える
     fixture.accountId = 'account-b'
     await render()
     expect(host.textContent).toContain('Bのレポート')
@@ -257,6 +252,18 @@ describe('R456 アカウント切替後に旧応答で置き換えない', () =>
     })
     expect(host.textContent).toContain('Bのレポート')
     expect(host.textContent).not.toContain('Aのレポート')
+  })
+
+  it('Aのしまう確認を開いてBへ切り替えると確認窓を閉じる', async () => {
+    net.handler = listHandler({ snapshotsMode: 'ok', snapshotsFailedOnce: true, recentOneTime: [] })
+    await render()
+    await act(async () => { (await scheduleMenuItem('しまう')).click() })
+    expect(document.body.textContent).toContain('定期レポートをしまいますか')
+    fixture.accountId = 'account-b'
+    await render()
+    expect(host.textContent).toContain('Bのレポート')
+    expect(document.body.textContent).not.toContain('定期レポートをしまいますか')
+    expect(net.calls.filter(call => call.method === 'PUT')).toHaveLength(0)
   })
 })
 

@@ -185,6 +185,7 @@ export default function AutomationListV8() {
   const [page, setPage] = useListUrlValue('page', 1)
   const [view, setView] = useListUrlState({ archived: '' })
   const onlyArchived = view.archived === '1'
+  const folderItems = items.filter(item => (item.status === 'archived') === onlyArchived)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [rowBusyId, setRowBusyId] = useState<string | null>(null)
   const { error: actionError, setError: setActionError } = useActionError(selectedAccountId ?? '')
@@ -617,9 +618,9 @@ export default function AutomationListV8() {
           onSelect={setFolderFilter}
           allId=""
           unfiledId={UNFILED}
-          allCount={ready ? items.length : null}
-          unfiledCount={ready ? items.filter((item) => !item.folderId).length : null}
-          countOf={(folder) => folder.itemCount ?? null}
+          allCount={ready ? folderItems.length : null}
+          unfiledCount={ready ? folderItems.filter((item) => !item.folderId).length : null}
+          countOf={folder => ready ? folderItems.filter(item => item.folderId === folder.id).length : null}
           placeholder="例： 予約・購入"
         />
       </>}
