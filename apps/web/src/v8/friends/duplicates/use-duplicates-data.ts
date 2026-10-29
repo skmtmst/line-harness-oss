@@ -47,7 +47,9 @@ export function formatRelative(iso: string): string {
   const min = Math.floor(sec / 60)
   if (min < 60) return `${min}分前`
   const hr = Math.floor(min / 60)
-  return `${hr}時間前`
+  // E33：24時間以上は日に直す（1282時間前→53日前）。
+  if (hr < 24) return `${hr}時間前`
+  return `${Math.floor(hr / 24)}日前`
 }
 
 export const CANDIDATE_PAGE_SIZE = 50

@@ -116,7 +116,9 @@ function formatCheckedAt(iso: string | null | undefined, now = Date.now()): stri
   const clock = polishFormatTime(new Date(time))
   const minutes = Math.round((now - time) / 60000)
   if (minutes < 10) return clock
-  return `${clock}（${minutes >= 60 ? `${Math.round(minutes / 60)}時間前` : `${minutes}分前`}）`
+  // E33：24時間以上は日に直す。
+  const ago = minutes >= 1440 ? `${Math.round(minutes / 1440)}日前` : minutes >= 60 ? `${Math.round(minutes / 60)}時間前` : `${minutes}分前`
+  return `${clock}（${ago}）`
 }
 
 function formatMonthDayTime(iso: string | null | undefined): string {

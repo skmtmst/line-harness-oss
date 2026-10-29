@@ -49,6 +49,12 @@ describe('xGLVe 一覧の行（日付・待ち時間・担当）', () => {
     expect(formatWaitingDuration(before(72), now)).toBe('1時間12分')
     expect(formatWaitingDuration(before(180), now)).toBe('3時間0分')
   })
+
+  it('23: 48時間以上の待ちは日に直す（72時間5分→3日5分）', () => {
+    expect(formatWaitingDuration(before(47 * 60), now)).toBe('47時間0分')
+    expect(formatWaitingDuration(before(72 * 60 + 5), now)).toBe('3日5分')
+    expect(formatWaitingDuration(before(49 * 60), now)).toBe('2日1時間')
+  })
 })
 
 describe('H3lAOB / LAY-01 顧客情報の出し方で戻さない形', () => {
