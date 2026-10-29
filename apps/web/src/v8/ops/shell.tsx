@@ -43,6 +43,7 @@ const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayout
 
 export const OPS_MENU: Array<{ href: string; label: string; icon: typeof LayoutDashboard }> = [
   { href: '/ops/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
+  { href: '/ops/applications', label: '申込アカウント', icon: Building2 },
   { href: '/ops/tenants', label: '契約先アカウント', icon: Building2 },
   { href: '/ops/support', label: 'お問い合わせ', icon: LifeBuoy },
   { href: '/ops/announcements', label: 'お知らせ', icon: Megaphone },
@@ -61,6 +62,7 @@ export function opsTitleForPath(pathname: string): string {
   const hit = all.filter((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))
     .sort((a, b) => b.href.length - a.href.length)[0]
   if (pathname.startsWith('/ops/tenants/detail')) return '契約先の詳細'
+  if (pathname.startsWith('/ops/applications/detail')) return '申込アカウントの詳細'
   return hit?.label ?? ''
 }
 

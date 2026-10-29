@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useState, type FormEvent } from 'react'
 import AuthCard, { AuthField } from '@/components/auth/auth-card'
 import PasswordField from '@/components/auth/password-field'
+import PasswordRequirements from '@/components/auth/password-requirements'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -115,8 +116,9 @@ function ResetInner() {
             <Check aria-hidden="true" className="h-4 w-4 shrink-0 text-accent-deep" />
           </div>
         </AuthField>
-        <AuthField label="パスワード" hint="8文字以上・英字と数字" htmlFor="reset-password" error={messages.password}>
+        <AuthField label="パスワード" htmlFor="reset-password" error={messages.password}>
           <PasswordField id="reset-password" value={password} onChange={setPassword} invalid={Boolean(messages.password)} autoComplete="new-password" />
+          <PasswordRequirements value={password} />
         </AuthField>
         <AuthField label="パスワード（確認）" htmlFor="reset-confirm" error={messages.confirm}>
           <PasswordField id="reset-confirm" value={confirm} onChange={setConfirm} invalid={Boolean(messages.confirm)} autoComplete="new-password" />

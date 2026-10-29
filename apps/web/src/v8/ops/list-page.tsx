@@ -7,9 +7,9 @@ import Notice from '@/components/shared/notice'
 import FilterChip from '@/components/shared/filter-chip'
 import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
 
-export function OpsListPage({ stats, ...props }: ListPageProps) {
+export function OpsListPage({ stats, opsNotice, ...props }: ListPageProps & { opsNotice?: string }) {
   return <ListPage {...props} bottomSpacing={props.bottomSpacing ?? 'compact'} stats={<>
-    <PageContent><Notice tone="warn" presentation="ops" icon={<ShieldCheck aria-hidden="true" />}>運営コンソール：契約先のデータを扱います。操作はすべて記録されます</Notice></PageContent>
+    <PageContent><Notice tone="warn" presentation="ops" icon={<ShieldCheck aria-hidden="true" />}>{opsNotice ?? '運営コンソール：契約先のデータを扱います。操作はすべて記録されます'}</Notice></PageContent>
     {stats ? <PageContent layout="stats">{stats}</PageContent> : null}
   </>} />
 }

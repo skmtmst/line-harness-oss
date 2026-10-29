@@ -190,6 +190,7 @@ import { restaurantGooglePerformance } from './routes/restaurant-google-performa
 import { restaurantDelivery } from './routes/restaurant-delivery.js';
 import { tenants } from './routes/tenants.js';
 import { ops } from './routes/ops.js';
+import { opsApplications } from './routes/ops-applications.js';
 import { piiMaskMiddleware } from './middleware/impersonation.js';
 import { outputAuditMiddleware } from './middleware/output-audit.js';
 import { hqBanners } from './routes/hq-banners.js';
@@ -322,6 +323,7 @@ app.route('/', hqTemplates);
 app.route('/', hqFormTests);
 app.route('/', hqBroadcasts);
 app.route('/', ops);
+app.route('/', opsApplications);
 app.route('/', manualLinks);
 app.route('/', errorMessages);
 app.route('/', accountHandovers);

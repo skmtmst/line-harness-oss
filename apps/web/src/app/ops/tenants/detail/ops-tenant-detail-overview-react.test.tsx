@@ -11,7 +11,7 @@ vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigat
 
 /**
  * 契約先の詳細「概要」タブ。1440px の撮影で「契約先の情報」「契約の状況」の
- * 行が見出しと同じ左端に付かず、最後の「機能パック」が下端で切れていた。
+ * 行が見出しと同じ左端に付かず、最後の行が下端で切れていた。
  * 行の入れ物に見出しと同じ横の余白と下の余白を持たせた。再発防止。
  */
 
@@ -61,15 +61,17 @@ async function flush() {
 }
 
 describe('契約先の詳細の概要', () => {
-  it('2つのカードの見出しと行（統括名〜機能パック）が出る', async () => {
+  it('2つのカードの見出しと契約情報が出る', async () => {
     await act(async () => { root.render(<OpsTenantDetailPage />) })
     await flush()
     const text = host.textContent ?? ''
     expect(text).toContain('契約先の情報')
     expect(text).toContain('契約の状況')
-    for (const row of ['統括名', '登録日', '使用量', '店舗 1', '権限者 1', '最終ログイン', '飲食店機能']) {
+    for (const row of ['統括名', '登録日', '使用量', '店舗 1', '権限者 1', '最終ログイン']) {
       expect(text, `行「${row}」がない`).toContain(row)
     }
+    expect(text).not.toContain('飲食店機能')
+    expect(host.querySelector('button[role="switch"]')).toBeNull()
     expect(text).toContain('検証商事')
   })
 
@@ -84,95 +86,5 @@ describe('契約先の詳細の概要', () => {
       expect(card).not.toBeNull()
       expect((card as HTMLElement).style.getPropertyValue('--card-content-padding')).toBe('var(--polish-space-section)')
     }
-  })
-})
-
-describe('契約先の詳細：飲食店機能トグル', () => {
-  it('オフの統括でトグルを押すとPATCHで["restaurant"]を送り、再読込する', async () => {
-    let patchBody: unknown = null
-    let getCount = 0
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input)
-    if (url.endsWith('/api/ops/me')) return new Response(JSON.stringify({ success: true, data: { id: 'ops-1', readOnly: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-      if (url.endsWith('/api/ops/tenants/t1') && (!init || init.method === undefined)) {
-        getCount += 1
-        return new Response(JSON.stringify({
-          success: true,
-          data: { ...payload, tenant: { ...payload.tenant, featurePacks: [] } },
-        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-      }
-      if (url.endsWith('/api/ops/tenants/t1/feature-packs') && init?.method === 'PATCH') {
-        patchBody = JSON.parse(String(init.body))
-        return new Response(JSON.stringify({ success: true, data: { featurePacks: ['restaurant'] } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-      }
-      return new Response(JSON.stringify({ success: false, error: `unexpected ${url}` }), { status: 404, headers: { 'Content-Type': 'application/json' } })
-    }))
-
-    await act(async () => { root.render(<OpsTenantDetailPage />) })
-    await flush()
-    const toggle = host.querySelector('button[role="switch"]') as HTMLButtonElement
-    expect(toggle).toBeTruthy()
-    expect(toggle.getAttribute('aria-checked')).toBe('false')
-
-    await act(async () => { toggle.click() })
-    await flush()
-
-    expect(patchBody).toEqual({ featurePacks: ['restaurant'] })
-    expect(getCount).toBe(2) // 初回読込＋トグル後の再読込
-  })
-
-  it('オンの統括でトグルを押すとPATCHで空配列を送る', async () => {
-    let patchBody: unknown = null
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input)
-    if (url.endsWith('/api/ops/me')) return new Response(JSON.stringify({ success: true, data: { id: 'ops-1', readOnly: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-      if (url.endsWith('/api/ops/tenants/t1') && (!init || init.method === undefined)) {
-        return new Response(JSON.stringify({
-          success: true,
-          data: { ...payload, tenant: { ...payload.tenant, featurePacks: ['restaurant'] } },
-        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-      }
-      if (url.endsWith('/api/ops/tenants/t1/feature-packs') && init?.method === 'PATCH') {
-        patchBody = JSON.parse(String(init.body))
-        return new Response(JSON.stringify({ success: true, data: { featurePacks: [] } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-      }
-      return new Response(JSON.stringify({ success: false, error: `unexpected ${url}` }), { status: 404, headers: { 'Content-Type': 'application/json' } })
-    }))
-
-    await act(async () => { root.render(<OpsTenantDetailPage />) })
-    await flush()
-    const toggle = host.querySelector('button[role="switch"]') as HTMLButtonElement
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
-
-    await act(async () => { toggle.click() })
-    await flush()
-
-    expect(patchBody).toEqual({ featurePacks: [] })
-  })
-
-  it('保存に失敗するとエラーを表示し、featurePacksは変わらない', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input)
-    if (url.endsWith('/api/ops/me')) return new Response(JSON.stringify({ success: true, data: { id: 'ops-1', readOnly: false } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-      if (url.endsWith('/api/ops/tenants/t1') && (!init || init.method === undefined)) {
-        return new Response(JSON.stringify({
-          success: true,
-          data: { ...payload, tenant: { ...payload.tenant, featurePacks: [] } },
-        }), { status: 200, headers: { 'Content-Type': 'application/json' } })
-      }
-      if (url.endsWith('/api/ops/tenants/t1/feature-packs') && init?.method === 'PATCH') {
-        return new Response(JSON.stringify({ success: false, error: '権限がありません' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
-      }
-      return new Response(JSON.stringify({ success: false, error: `unexpected ${url}` }), { status: 404, headers: { 'Content-Type': 'application/json' } })
-    }))
-
-    await act(async () => { root.render(<OpsTenantDetailPage />) })
-    await flush()
-    const toggle = host.querySelector('button[role="switch"]') as HTMLButtonElement
-    await act(async () => { toggle.click() })
-    await flush()
-
-    expect(host.textContent ?? '').toContain('権限がありません')
-    expect(toggle.getAttribute('aria-checked')).toBe('false')
   })
 })
