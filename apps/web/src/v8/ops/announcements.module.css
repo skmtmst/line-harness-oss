@@ -93,10 +93,9 @@
   gap: var(--tpl-op-row-gap);
 }
 
-/* 作った行の光らせ（?highlight= で戻ってきたとき）。 */
+/* 作った行の光らせ（?highlight= で戻ってきたとき。表の共通部品と同じ洗い出し）。 */
 .row[data-highlight='true'] {
-  outline: 2px solid var(--color-action);
-  outline-offset: -2px;
+  background: var(--polish-selection-bg);
   border-radius: var(--radius-mini);
 }
 
