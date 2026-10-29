@@ -1,3 +1,4 @@
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
@@ -246,7 +247,7 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     expect(named('ルールを作る').length).toBeGreaterThan(0)
   })
 
-  it('閲覧のみでは、帯を出し、作る・編集・フォルダを追加・見本から作るを置かない（押せないボタンも無い）', async () => {
+  it('閲覧のみでは、帯を出し、フォルダ追加を理由付きで残して拒否する', async () => {
     role.value = verifiedStaffRole('staff')
     await render(<AutomationListV8 />)
     await waitFor(() => host.textContent?.includes('問い合わせを担当へ知らせる') ?? false, 'ルールの行')
@@ -254,10 +255,12 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
     expect(named('編集する')).toHaveLength(0)
     expect(named('ルールを作る')).toHaveLength(0)
-    expect(named('フォルダを追加')).toHaveLength(0)
+    for (const folderAdd of named('フォルダを追加')) await expectPermissionLocked(folderAdd)
+    expect(named('フォルダを追加').length).toBeGreaterThan(0)
     expect(named('見本から作る')).toHaveLength(0)
     const disabled = buttons().filter((element) => !element.closest('[data-pagination]') && element.matches(':disabled, [aria-disabled="true"]'))
-    expect(disabled.map((element) => element.textContent)).toEqual([])
+    expect(disabled.length).toBeGreaterThan(0)
+    for (const element of disabled) await expectPermissionLocked(element)
     expect(host.querySelector('[aria-label="ルール一覧のページ送り"]')).toBeNull()
     expect(host.querySelector('[data-pagination]')?.textContent).toContain('2件中 1〜2件')
     // 「…」は動いた記録を見るだけ。
@@ -282,7 +285,7 @@ describe('V8 オートメーションの動いた記録（g98F9）', () => {
 })
 
 describe('V8 オートメーションの共通アクション（LnGNw）', () => {
-  it('行の「中身を見る」は版と使われている場所へ。閲覧のみでは作るボタンを置かない', async () => {
+  it('行の「中身を見る」は版と使われている場所へ。閲覧のみのフォルダ追加は拒否する', async () => {
     await render(<CommonActionsV8 />)
     await waitFor(() => host.textContent?.includes('購入のお礼') ?? false, '共通アクションの行')
     const open = named('中身を見る')[0] as HTMLAnchorElement
@@ -295,7 +298,8 @@ describe('V8 オートメーションの共通アクション（LnGNw）', () =>
     await render(<CommonActionsV8 />)
     await waitFor(() => host.textContent?.includes('購入のお礼') ?? false, '共通アクションの行（閲覧のみ）')
     expect(named('共通アクションを作る')).toHaveLength(0)
-    expect(named('フォルダを追加')).toHaveLength(0)
+    for (const folderAdd of named('フォルダを追加')) await expectPermissionLocked(folderAdd)
+    expect(named('フォルダを追加').length).toBeGreaterThan(0)
     expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
   })
 })

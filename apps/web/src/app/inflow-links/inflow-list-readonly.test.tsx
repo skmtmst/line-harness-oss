@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 /*
  * （一覧・閲覧のみ）: staff は変える操作が出ず、帯が出る。
  * 本物のReactで動かして見る。
@@ -68,7 +69,7 @@ afterEach(() => {
 })
 
 describe('EMUl9 一覧の閲覧のみ', () => {
-  it('staffには帯を出し、作る・チェック・操作列を出さない', async () => {
+  it('staffには帯と理由付きの作成操作を出し、チェック・操作列を出さない', async () => {
     staffRole = 'staff'
     await act(async () => {
       root.render(<InflowLinksPage />)
@@ -77,7 +78,7 @@ describe('EMUl9 一覧の閲覧のみ', () => {
     await settle()
 
     expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
-    expect(host.textContent).not.toContain('流入リンクを作る')
+    await expectPermissionLocked([...host.querySelectorAll('button')].find(button => button.textContent?.includes('流入リンクを作る')))
     expect(host.querySelector('th [aria-label="表示中の登録済み経路をすべて選ぶ"]')).toBeNull()
     expect(host.textContent).not.toContain('まとめて操作')
   })

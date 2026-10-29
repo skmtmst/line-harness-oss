@@ -1053,7 +1053,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const suspendedCount = accessUsers.filter((user) => user.status === 'suspended').length
   const roleOf = (user: AccessUserItem): RoleKey => {
     const member = memberById.get(user.id)
-    if (member?.role === 'owner' || (me?.role === 'owner' && me.id === user.id)) return 'owner'
+    if (!selectedAccountId && (member?.role === 'owner' || (me?.role === 'owner' && me.id === user.id))) return 'owner'
     return user.roleBundle
   }
   /* 右の「直したあとの列」：状態ごとに1人ずつの例（二段階認証 オン・確認が必要・無効）。 */

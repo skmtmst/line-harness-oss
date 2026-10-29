@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { expectLockedFolderMenu } from '@/test-utils/permission-locked-control'
 /*
  * ★V8 登録メディア一覧（src/v8/contents/list.tsx）の見え方と絞り込みの動き。
  * 道具の段・数の帯・札の中身・選べる札・0件の言い分け・フォルダの列を、
@@ -319,10 +320,10 @@ describe('フォルダの列（R37）', () => {
     expect(calls.filter((call) => call.path === '/api/media').length).toBeGreaterThan(listReads)
   })
 
-  it('閲覧のみにはフォルダの「…」を出さない', async () => {
+  it('閲覧のみにはフォルダの「…」を残し、変更を理由付きで拒否する', async () => {
     fixture.role = 'staff'
     await render()
-    expect(host.querySelector('button[aria-label="フォルダ「01_商品写真」の操作"]')).toBeNull()
+    await expectLockedFolderMenu(host.querySelector('button[aria-label="フォルダ「01_商品写真」の操作"]'))
     expect(host.textContent).toContain('01_商品写真')
   })
 })

@@ -4600,6 +4600,13 @@ CREATE TABLE line_account_connection_checks (
   UNIQUE (line_account_id, idempotency_key, check_kind)
 );
 
+CREATE TABLE line_account_hq_admin_memberships (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
+  staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', '+9 hours')),
+  PRIMARY KEY (line_account_id, staff_id)
+);
+
 CREATE TABLE line_account_tag_links (
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
   tag_id TEXT NOT NULL,
@@ -10451,6 +10458,9 @@ CREATE INDEX idx_line_account_connection_checks_correlation
 
 CREATE INDEX idx_line_account_connection_checks_latest
   ON line_account_connection_checks(line_account_id, checked_at DESC);
+
+CREATE INDEX idx_line_account_hq_admin_memberships_staff
+  ON line_account_hq_admin_memberships(staff_id);
 
 CREATE INDEX idx_line_account_tag_links_tag ON line_account_tag_links(tag_id, line_account_id);
 
