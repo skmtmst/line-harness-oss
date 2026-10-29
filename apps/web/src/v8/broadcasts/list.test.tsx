@@ -582,7 +582,7 @@ it('検索の通信失敗は内部の英語を出さず、読み直す案内を�
   act(() => { root.render(<BroadcastListV8 />) })
   await flush()
   expect(host.textContent).not.toContain('API error: 500')
-  expect(host.textContent).toContain('再読み込みしても直らない場合はエラー報告へ')
+  expect(host.textContent).toContain('管理者にお問い合わせください。')
   expect(buttonByText('もう一度読み込む')).toBeTruthy()
   expect(host.textContent).not.toContain('まだ一斉配信がありません')
   const calls = listBroadcasts.mock.calls.length
