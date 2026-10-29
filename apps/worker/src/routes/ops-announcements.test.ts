@@ -6,6 +6,15 @@ import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 const mail = vi.hoisted(() => ({ send: vi.fn(async (_env: unknown, _m: { to: string; subject: string; body: string }) => {}) }));
 vi.mock('../services/plain-mail.js', () => ({ sendPlainMail: mail.send }));
+const noticeConnect = vi.hoisted(() => ({ prepare: vi.fn() }));
+vi.mock('../services/notice-line-connect.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../services/notice-line-connect.js')>(),
+  prepareNoticeLineConnection: noticeConnect.prepare,
+}));
+vi.mock('../lib/step-up.js', async (importOriginal) => ({
+  ...await importOriginal<typeof import('../lib/step-up.js')>(),
+  sensitiveStepUpSatisfied: async () => true,
+}));
 const line = vi.hoisted(() => ({ pushMessage: vi.fn(async (_to: string, _messages: unknown[]) => ({})), replyMessage: vi.fn(async () => ({})) }));
 vi.mock('@line-crm/line-sdk', async () => {
   const actual = await vi.importActual<typeof import('@line-crm/line-sdk')>('@line-crm/line-sdk');
@@ -23,7 +32,7 @@ const { processDueAnnouncements, tryLinkStaffByCode } = await import('../service
 let testDb: SqliteD1;
 
 function env(): Env['Bindings'] {
-  return { DB: testDb.db, ADMIN_PUBLIC_URL: 'https://admin.example.com', CONTACT_EMAIL: 'ops@example.com' } as Env['Bindings'];
+  return { DB: testDb.db, ADMIN_PUBLIC_URL: 'https://admin.example.com', CONTACT_EMAIL: 'ops@example.com', WORKER_PUBLIC_URL: 'https://stg-api.musubo.jp', LINE_CREDENTIAL_ENCRYPTION_KEY: btoa('q'.repeat(32)) } as Env['Bindings'];
 }
 function app(staff: AuthenticatedStaff) {
   const instance = new Hono<Env>();
@@ -45,6 +54,7 @@ beforeEach(() => {
   mail.send.mockReset();
   line.pushMessage.mockReset();
   line.replyMessage.mockReset();
+  noticeConnect.prepare.mockReset();
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_key, plan_status) VALUES ('tenant-a', '株式会社サンプル', 'active', 'standard', 'active')`).run();
   testDb.raw.prepare(`INSERT INTO tenants (id, name, status, plan_key, plan_status) VALUES ('tenant-b', 'カフェ ムスビ', 'active', 'light', 'trialing')`).run();
   testDb.raw.prepare(`INSERT INTO staff_members (id, name, role, api_key, tenant_id) VALUES ('master-1', '坂本 真人', 'owner', 'k0', NULL)`).run();
@@ -57,6 +67,17 @@ beforeEach(() => {
 });
 
 describe('契約者専用LINEの設定', () => {
+  it('Messaging APIだけで接続した公式アカウントを指定し、正しい友だち追加URLを出す', async () => {
+    noticeConnect.prepare.mockResolvedValue({ accessToken: 'fixture-token', profile: { displayName: 'musubo契約者様 問い合わせ/通知', pictureUrl: null, basicId: '@540qlkhn' } });
+    const response = await app(master).request('/api/ops/notice-line-account/connect', json({ channelId: '2011579318', channelSecret: 'fixture-secret', basicId: '@540qlkhn' }));
+    expect(response.status).toBe(201);
+    expect(noticeConnect.prepare).toHaveBeenCalledWith(expect.objectContaining({ webhookUrl: 'https://stg-api.musubo.jp/webhook/2011579318' }));
+    const account = testDb.raw.prepare('SELECT login_channel_id, liff_id, line_basic_id FROM line_accounts WHERE channel_id = ?').get('2011579318') as { login_channel_id: string | null; liff_id: string | null; line_basic_id: string };
+    expect(account).toMatchObject({ login_channel_id: null, liff_id: null, line_basic_id: '@540qlkhn' });
+    const after = await (await app(master).request('/api/ops/notice-line-account')).json() as { data: { current: { addFriendUrl: string } } };
+    expect(after.data.current.addFriendUrl).toBe('https://line.me/R/ti/p/@540qlkhn');
+  });
+
   it('運営会社のアカウントだけを候補にし、指定を保存する', async () => {
     const list = await (await app(master).request('/api/ops/notice-line-account')).json() as { data: { currentId: string | null; candidates: Array<{ id: string }> } };
     expect(list.data.currentId).toBeNull();
