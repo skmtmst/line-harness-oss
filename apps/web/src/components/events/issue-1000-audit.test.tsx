@@ -8,7 +8,7 @@ import { querySupplementaryPageAction } from '@/test-utils/page-action'
 */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { beforeEach, afterEach, it, expect, vi } from 'vitest'
 import EventForm, { formatJpSlotRange } from '@/v8/events/edit-form'
 import EventsCreate from '@/v8/events/create'
@@ -219,8 +219,9 @@ it('D09: 早い枠が先頭へ入っても、選んだ元の枠IDだけを更新
   await renderSlots()
   await addEarlierSlot()
   const row = [...host.querySelectorAll('tbody tr')].find((row) => row.textContent?.includes(formatJpSlotRange(old.starts_at, old.ends_at)))!
-  await act(async () => { (row.querySelector('[aria-label="そのほかの操作"]') as HTMLButtonElement).click() })
-  await act(async () => { (document.querySelector('[role="menuitem"]') as HTMLButtonElement).click() })
+  await act(async () => { (row.querySelector('button[aria-haspopup="menu"]') as HTMLButtonElement).click() })
+  const edit = await screen.findByRole('menuitem', { name: '編集', exact: true })
+  await act(async () => { edit.click() })
   await click('保存する')
   await click('1. 概要')
   await click('概要を保存する')

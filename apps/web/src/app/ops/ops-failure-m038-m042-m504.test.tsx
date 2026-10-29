@@ -82,7 +82,10 @@ describe('M039/M041/M504 の契約（ソース）', () => {
   it.each([503, 404, 410])('招待の確認失敗%sを一時的な失敗と使えない招待に分ける', async status => {
     window.history.replaceState(null, '', '/ops/invite#invite=test-token')
     let calls = 0
-    vi.stubGlobal('fetch', vi.fn(async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      if (!String(input).includes('/api/auth/ops-invite/check')) {
+        return new Response(JSON.stringify({ success: true, data: null }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
       calls += 1
       const body = calls === 1
         ? { success: false, error: '招待を確認できません', code: status === 410 ? 'expired' : undefined }

@@ -462,6 +462,16 @@ it('通知の段は初回だけ取得し、段を移ってブラウザで戻っ�
   expect(host.textContent).toContain('保存していない変更があります')
   expect(puts.filter(row => row.path.endsWith('/notifications'))).toHaveLength(0)
   await act(async () => { screen.getByRole('button', { name: '基本設定に戻る', exact: true }).click() })
+  const leave = await screen.findByRole('dialog', { name: '保存していない変更があります' })
+  await act(async () => { within(leave).getByRole('button', { name: '編集を続ける' }).click() })
+  const save = getPageAction({ name: '下書きを保存', exact: true }) as HTMLButtonElement
+  expect(save.disabled).toBe(false)
+  await act(async () => { save.click() })
+  const writes = puts.filter(row => row.path.endsWith('/notifications'))
+  expect(writes).toHaveLength(1)
+  expect(writes[0].body).toMatchObject({ registrationEnabled: false })
+  expect(host.textContent).not.toContain('保存していない変更があります')
+  await act(async () => { screen.getByRole('button', { name: '基本設定に戻る', exact: true }).click() })
   await act(async () => {
     window.history.replaceState(null, '', '?id=webinar-1&pane=notifications')
     window.dispatchEvent(new Event('popstate'))
@@ -470,12 +480,6 @@ it('通知の段は初回だけ取得し、段を移ってブラウザで戻っ�
   const returned = screen.getByRole('switch', { name: '申込のお礼', exact: true }) as HTMLInputElement
   expect(returned).toBe(toggle)
   expect((returned.getAttribute('aria-checked') === 'true')).toBe(false)
-  const save = getPageAction({ name: '下書きを保存', exact: true }) as HTMLButtonElement
-  expect(save.disabled).toBe(false)
-  await act(async () => { save.click() })
-  const writes = puts.filter(row => row.path.endsWith('/notifications'))
-  expect(writes).toHaveLength(1)
-  expect(writes[0].body).toMatchObject({ registrationEnabled: false })
   expect((returned.getAttribute('aria-checked') === 'true')).toBe(false)
   expect(host.textContent).not.toContain('保存していない変更があります')
 })
