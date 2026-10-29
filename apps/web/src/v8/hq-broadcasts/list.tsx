@@ -403,7 +403,7 @@ export default function HqBroadcastList() {
           addFolderLabel="フォルダを追加"
           rows={folderRows}
         >
-          {canManage ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
+          {canManage && !firstEmpty ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
           <FolderPanelNote>フォルダを消しても、入っていたものは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       )}

@@ -23,6 +23,7 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: 
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => React.createElement('a', { href }, children) }))
 
 import HqBroadcastList from './list'
+import styles from '../broadcasts/list.module.css'
 import HqBroadcastDetail, { deliveryWayText } from './detail'
 
 const target = (accountId: string, status: string, success: number, opened: number | null) => ({
@@ -84,6 +85,8 @@ describe('統括の一括配信の一覧（U4Eep0）', () => {
     await screen.findByText('一括配信はまだありません')
     expect(screen.getByText('最初の一括配信を作る')).toBeTruthy()
     expect(screen.queryByText('配信を作る')).toBeNull()
+    /* 空のときも左の列の場所を空け、1件目で列が動かない */
+    expect(document.querySelector(`.${styles.viewerAddSpace}`)).toBeTruthy()
     cleanup()
     hq.list.mockResolvedValue({ data: [run('r1', 'ある配信', [target('a', 'sent', 100, 50)])] })
     render(<HqBroadcastList />)
