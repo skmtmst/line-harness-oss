@@ -127,8 +127,9 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <Button type="button" size="compact" className={`h-8 w-8 p-0 ${styles.tool}`} aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+        <Button type="button" size="compact" className={`${styles.tool} ${styles.toolCaption}`} aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
           <ListFilter aria-hidden size={16} />
+          <span aria-hidden="true" className={styles.toolCaptionLabel}>絞り込み</span>
         </Button>
         {/*
           INBOX-11: メニューは「保存した検索」ボタンではなく、画面幅いっぱいの
@@ -141,7 +142,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           <Button
             type="button"
             size="compact"
-            className={`h-8 w-8 p-0 ${styles.tool}`} aria-label="保存した検索" title="保存した検索"
+            className={`${styles.tool} ${styles.toolCaption} ${styles.toolDotWrap}`} aria-label="保存した検索" title="保存した検索"
             onClick={() => {
               setSavedViewsOpen((open) => !open)
               setSavedViewError('')
@@ -149,6 +150,8 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             aria-expanded={savedViewsOpen}
           >
             <Bookmark aria-hidden size={16} />
+            <span aria-hidden="true" className={styles.toolCaptionLabel}>保存した検索</span>
+            {hasInboxFilters ? <span aria-hidden="true" className={styles.toolDot} /> : null}
           </Button>
           <InboxFloatingPanel open={savedViewsOpen} placement="below">
               <p className="text-ink text-sm font-bold">保存した検索</p>
@@ -221,7 +224,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   setSavedViewSuccess(false)
                   setSaveDialogOpen(true)
                 }}>
-                  現在の条件を保存する
+                  今の条件を保存する
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
