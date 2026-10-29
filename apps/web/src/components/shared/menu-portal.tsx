@@ -1,12 +1,35 @@
 'use client'
 
 import { createPortal } from 'react-dom'
-import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { isImeComposing } from './ime'
-import { OVERLAY_MODAL_OPEN_EVENT, OverlayDepthContext, useV8Leave } from './overlay-utils'
+import { OVERLAY_MODAL_OPEN_EVENT, useV8Leave } from './overlay-utils'
 import styles from './menu-portal.module.css'
 
 const openPanels: HTMLDivElement[] = []
+const panelAnchors = new WeakMap<HTMLElement, HTMLElement>()
+
+/** bodyへ移した選択欄も、その押し元をたどって現在の窓の内側か確かめる。 */
+function belongsToModal(anchor: HTMLElement | null, modal: Element): boolean {
+  const seen = new Set<HTMLElement>()
+  while (anchor && !seen.has(anchor)) {
+    if (modal.contains(anchor)) return true
+    seen.add(anchor)
+    const portal = anchor.closest<HTMLElement>('[data-menu-portal]')
+    anchor = portal ? panelAnchors.get(portal) ?? null : null
+  }
+  return false
+}
+function topModal(): Element | undefined {
+  const layer = (el: Element) => {
+    let highest = 0
+    for (let parent: Element | null = el; parent; parent = parent.parentElement) highest = Math.max(highest, Number(getComputedStyle(parent).zIndex) || 0)
+    return highest
+  }
+  return [...document.querySelectorAll('[aria-modal="true"]')]
+    .filter(el => !el.closest('[hidden],[inert],[aria-hidden="true"],[data-closing]'))
+    .sort((a, b) => layer(a) - layer(b)).at(-1)
+}
 
 export type MenuPortalAlign = 'start' | 'end'
 export type MenuPortalPlacement = 'down' | 'up'
@@ -114,7 +137,6 @@ export default function MenuPortal({
   exitDuration,
   focusPanel = false,
 }: MenuPortalProps) {
-  const depth = useContext(OverlayDepthContext)
   const leaving = useV8Leave(open, exitDuration)
   const [mounted, setMounted] = useState(false)
   const [geometry, setGeometry] = useState<Geometry | null>(null)
@@ -132,12 +154,12 @@ export default function MenuPortal({
 
   useEffect(() => {
     if (!open) return
-    const modal = document.querySelector('[aria-modal="true"]:not([aria-hidden="true"])')
-    if (depth === 0 && modal && !modal.closest('[data-closing]')) { closeRef.current(); return }
+    const modal = topModal()
+    if (modal && !belongsToModal(anchorRef.current(), modal)) { closeRef.current(); return }
     const closeForModal = () => closeRef.current()
     document.addEventListener(OVERLAY_MODAL_OPEN_EVENT, closeForModal)
     return () => document.removeEventListener(OVERLAY_MODAL_OPEN_EVENT, closeForModal)
-  }, [open, depth])
+  }, [open])
   const positionRef = useRef(getPositionRect)
   positionRef.current = getPositionRect
 
@@ -321,6 +343,7 @@ export default function MenuPortal({
     if (!panel) return
     const anchor = anchorRef.current()
     openPanels.push(panel)
+    if (anchor) panelAnchors.set(panel, anchor)
     const onPointerDown = (event: PointerEvent) => {
       const target = event.target as Node
       if (panelRef.current?.contains(target)) return
@@ -340,6 +363,7 @@ export default function MenuPortal({
     document.addEventListener('keydown', onKeyDown)
     return () => {
       openPanels.splice(openPanels.indexOf(panel), 1)
+      panelAnchors.delete(panel)
       if (focusPanel && (panel.contains(document.activeElement) || document.activeElement === document.body)) anchor?.focus({ preventScroll: true })
       document.removeEventListener('pointerdown', onPointerDown)
       document.removeEventListener('keydown', onKeyDown)

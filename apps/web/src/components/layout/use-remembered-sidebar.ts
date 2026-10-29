@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import type { MenuSection } from '@/lib/menu'
 import { readStaffIdentity } from '@/lib/staff-identity-state'
+
+const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 type Selection = Array<{ id: string; items: string[] }>
 /** 本人・担当店舗・権限が一致する前回の項目だけを、設定を読み直す間に出す。 */
@@ -9,7 +11,7 @@ export function useRememberedSidebar(current: MenuSection[], available: MenuSect
   const key = staff?.id && accountId ? `musubo:sidebar:${JSON.stringify([staff.id, staff.tenantId, accountId, staff.accountScope, staff.scopedLineAccountIds, staff.policyVersion, staff.role, staff.permissionKeys, staff.permissionViewKeys, staff.readOnly, staff.roleBundle])}` : null
   const [saved, setSaved] = useState<{ key: string; selection: Selection } | null>(null)
   const selectionJson = JSON.stringify(current.map(section => ({ id: section.id, items: section.items.map(item => item.id) })))
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     if (!key) { setSaved(null); return }
     try {
       if (ready) {

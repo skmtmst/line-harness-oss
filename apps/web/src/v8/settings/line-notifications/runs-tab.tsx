@@ -186,7 +186,7 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
 
     <div className={styles.toolbar}>
       <div className={styles.runSearch}>
-        <SearchField aria-label="このページ内で探す" placeholder="このページ内で探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
+        <SearchField aria-label="このページ内で名前・注文番号を探す" placeholder="このページ内で名前・注文番号を探す" value={query} onChange={setQuery} onClear={() => setQuery('')} />
       </div>
       <div className={styles.runRecipient}>
         <SaveErrorField names={["recipientFilter","recipient","recipient_filter"]}><Select aria-label="対象を絞り込み" label="対象" value={recipientFilter} onChange={(value) => setRecipientFilter(value as RecipientFilter)} options={[

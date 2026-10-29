@@ -58,10 +58,10 @@ test('ページだけから数えたと書き、メールで送ったは数え�
 test('ページ内で絞り込んでも全体の件数と検索範囲の案内を保つ', async () => {
   render(<RunsTab lineAccountId="acc" mode="failures" />)
   await screen.findByText('57件中 1〜20件')
-  fireEvent.change(screen.getByRole('searchbox', { name: 'このページ内で探す' }), { target: { value: '存在しない通知' } })
+  fireEvent.change(screen.getByRole('searchbox', { name: 'このページ内で名前・注文番号を探す' }), { target: { value: '存在しない通知' } })
   expect(await screen.findByText('条件に合う記録はありません')).toBeTruthy()
   expect(screen.getByText('このページ内の絞り込み：0件（対象 2件）')).toBeTruthy()
-  expect(screen.getByRole('searchbox', { name: 'このページ内で探す' }).getAttribute('placeholder')).toBe('このページ内で探す')
+  expect(screen.getByRole('searchbox', { name: 'このページ内で名前・注文番号を探す' }).getAttribute('placeholder')).toBe('このページ内で名前・注文番号を探す')
   expect(screen.getByText('57件中 1〜20件')).toBeTruthy()
   expect(screen.getByText('個人の既読は見られません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。')).toBeTruthy()
 })

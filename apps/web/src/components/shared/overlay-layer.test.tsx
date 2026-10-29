@@ -10,6 +10,8 @@ import Dialog from './dialog'
 import Drawer from './drawer'
 import PreparingDialog from './preparing-dialog'
 import MenuPortal from './menu-portal'
+import Select from './select'
+import DateField from './date-field'
 
 afterEach(cleanup)
 
@@ -90,4 +92,31 @@ it('モーダルを先に開いた時は外の通知を開かず、窓内の選�
  expect(screen.queryByRole('menu',{name:'通知を開くの内容'})).toBeNull()
  await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'窓内で選ぶ'}))})
  expect(screen.getByRole('menu',{name:'窓内で選ぶの内容'})).toBeTruthy()
+})
+
+
+it('手作りのモーダル内では選択欄・日付欄を開け、外の通知は拒否する', async () => {
+  function ManualModal() {
+    const [open, setOpen] = useState(false)
+    const anchor = React.useRef<HTMLButtonElement>(null)
+    return <>
+      <button ref={anchor} onClick={() => setOpen(true)}>外の通知</button>
+      <MenuPortal open={open} getAnchor={() => anchor.current} onClose={() => setOpen(false)}>
+        <section role="menu" aria-label="外の通知の内容">通知</section>
+      </MenuPortal>
+      <section role="dialog" aria-modal="true" aria-label="手作りの絞り込み">
+        <Select aria-label="手作り窓の選択" value="a" onChange={() => {}} options={[{ value: 'a', label: 'すべて' }, { value: 'b', label: '未対応' }]} />
+        <DateField aria-label="手作り窓の日付" value="2026-10-30" onChange={() => {}} />
+      </section>
+    </>
+  }
+  render(<ManualModal />)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '外の通知' })) })
+  expect(screen.queryByRole('menu', { name: '外の通知の内容' })).toBeNull()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '手作り窓の選択' })) })
+  expect(screen.getByRole('listbox')).toBeTruthy()
+  await act(async () => { fireEvent.click(screen.getByRole('option', { name: '未対応' })) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '手作り窓の日付' })) })
+  expect(screen.getByRole('dialog', { name: '日付を選ぶ' })).toBeTruthy()
+  expect(screen.getAllByRole('gridcell')).toHaveLength(42)
 })
