@@ -459,7 +459,7 @@
 
 ## 反映履歴
 
-- [配信・シナリオ・自動応答の日時・題・下見の修正](release-log/unreleased/0000-kenta-muse-delivery.md)
+- [配信・シナリオ・自動応答の日時・題・下見の修正](release-log/unreleased/1954-kenta-muse-delivery.md)
 - [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
 - [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
 - [共通UIの状態表示・操作の修正](release-log/unreleased/1952-kenta-muse-ui-state.md)
@@ -953,7 +953,7 @@
 - [利用開始設定から二段階認証への引き継ぎ](release-log/unreleased/1949-masato-registration-mfa-flow.md) — 登録後の認証とアカウント登録への案内の反映履歴。
 - [LINE通知の操作権限の反映履歴](release-log/unreleased/1950-kenta-notification-permission.md)
 - [LINE通知の説明の置き場所](release-log/unreleased/1950-kenta-notification-help.md)
-- [LINEの接続状態の統一](release-log/unreleased/0000-kenta-line-connection-state.md) — 反映履歴、確認 2026-10-30
+- [LINEの接続状態の統一](release-log/unreleased/1954-kenta-line-connection-state.md) — 反映履歴、確認 2026-10-30
 - [LINE通知の送信内訳の表示](release-log/unreleased/1950-kenta-notification-kpi-detail.md)
 - [業種別の初期設定の確認](release-log/unreleased/1950-kenta-style-setup-progress.md) — 反映履歴、確認 2026-10-29
 - [最初の1通の確認と読み直しの操作](release-log/unreleased/1951-kenta-first-message-guide.md)
@@ -970,3 +970,5 @@
 - [飲食店の左メニューの予約項目](release-log/unreleased/1953-kenta-restaurant-sidebar.md) — 反映履歴、確認 2026-10-30
 - [LIFFの小さな直し](release-log/unreleased/1953-kenta-muse-liff.md) — 写真・次へ・鈴・選択色・支払い案内・読み込み中・業種の出し分けの反映履歴。
 - [一覧の案内と予約の行の操作](release-log/unreleased/1953-kenta-train-1029j.md)
+
+- [アカウントの説明と権限・予約の見出し](release-log/unreleased/1954-kenta-train-1029k.md)
