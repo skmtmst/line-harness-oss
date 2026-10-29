@@ -85,18 +85,20 @@ export function StatRow({ children, compact = false, fusion = false }: { childre
 }
 
 /** 白い枠。題・説明・右端の操作を持つ。 */
-export function Panel({ title, description, aside, flush = false, children,fusion=false }: {
+export function Panel({ title, description, aside, flush = false, children,fusion=false, help }: {
   fusion?:boolean
   title: ReactNode
   description?: ReactNode
   aside?: ReactNode
+  /** 題の横の「？」に入れる説明（決まり2: いつも同じ帯はここへ）。 */
+  help?: ReactNode
   /** 表など枠いっぱいの中身のとき true（内側の余白を付けない）。 */
   flush?: boolean
   children: ReactNode
 }) {
   return (
     <Card layout="vertical" surface="inset" overflow="hidden">
-      <CardHeader size={fusion?'restaurant':'panel'} title={title} meta={description} action={aside} />
+      <CardHeader size={fusion?'restaurant':'panel'} title={title} meta={description} action={aside} help={help} />
       {flush ? children : <div className={fusion?styles.panelBodyFusion:styles.panelBody}>{children}</div>}
     </Card>
   )

@@ -6,7 +6,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
-import Notice from '@/components/shared/notice'
+import HelpTip from '@/components/shared/help-tip'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { DataTable, TableHeadRow, Td, Th, Tr, ActionCell, NameCell, RowNameButton } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
@@ -102,8 +102,8 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
           <Button variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</Button>
         ) : null}
         flush
+        help={<HelpTip label="メニュー一覧の説明">「…」の中身：有効＝変更・停止／アーカイブ＝変更・再開／一度も公開していない下書き＝変更・削除</HelpTip>}
       >
-        <Notice tone="info">「…」の中身：有効＝変更・停止／アーカイブ＝変更・再開／一度も公開していない下書き＝変更・削除</Notice>
         <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
           <thead>
             <TableHeadRow data-table-layout="columns">

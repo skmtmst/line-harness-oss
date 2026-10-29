@@ -112,3 +112,12 @@ it('開いた行は白のまま開いている印が出る（選んだ札の灰�
   expect(container.querySelectorAll('[data-design-part="card"][data-open]').length).toBe(1)
   expect(screen.getByRole('button', { name: '来店後（退店のきっかけ）' }).closest('[data-design-part="card"]')?.getAttribute('data-open')).not.toBeNull()
 })
+
+// 決まり2: いつも同じ説明は帯にせず、題の横の「？」へ入れる。
+it('ひな形の説明は帯に出さず題の「？」に入れる', async () => {
+  render(<LineFollowupV8 />)
+  await screen.findByRole('button', { name: '予約 24時間前' })
+  expect(screen.queryByText(/シナリオのひな形/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'LINE来店フォローの説明' }))
+  expect(await screen.findByText(/シナリオのひな形/)).toBeTruthy()
+})

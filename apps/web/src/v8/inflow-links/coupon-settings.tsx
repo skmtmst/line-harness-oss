@@ -9,7 +9,7 @@ import { Field } from '@/components/shared/form-controls'
 import Toggle from '@/components/shared/toggle'
 import Radio from '@/components/shared/radio'
 import { Ticket } from 'lucide-react'
-import Notice from '@/components/shared/notice'
+import HelpTip from '@/components/shared/help-tip'
 import StatusBadge from '@/components/shared/status-badge'
 import ListState from '@/components/shared/list-state'
 import styles from './new/create.module.css'
@@ -47,7 +47,7 @@ export default function CouponSettings({ accountId, value, onChange, onOptionsLo
   const selected = items.find((item) => item.id === value.couponAssetId)
   const payload = selected?.publishedPayload ?? selected?.payload
   return <>
-    <CardHeader size="stacked" title="読み取った人にクーポンを渡す" meta="LINE公式の「クーポンQRコード」と同じ。友だち追加のあと、トークにクーポンが届きます" />
+    <CardHeader size="stacked" title="読み取った人にクーポンを渡す" meta="LINE公式の「クーポンQRコード」と同じ。友だち追加のあと、トークにクーポンが届きます" help={<HelpTip label="クーポンを渡す条件の説明">1人1回だけ渡します。同じ人が何度読み取っても、2枚目は渡しません。すでに友だちの人にも渡す設定では、読み取るとクーポンの画面が開きます。</HelpTip>} />
     {/* 絵 QUF2R：スイッチは左、名前を横に。オンのときだけ右に「クーポン付き QR」。 */}
     <div className={styles.couponSwitchRow}>
       <Toggle checked={value.couponEnabled} disabled={disabled} label="クーポンを渡す"
@@ -69,7 +69,7 @@ export default function CouponSettings({ accountId, value, onChange, onOptionsLo
           ))}
         </RadioCardGroup>
       </Field>
-      <Notice tone="info" message="1人1回だけ渡します。同じ人が何度読み取っても、2枚目は渡しません。すでに友だちの人にも渡す設定では、読み取るとクーポンの画面が開きます。" />
+      {/* 決まり2: 渡す条件の説明は帯にせず、題の横の「？」へ入れる。 */}
       {open ? <EntityPickerDialog title="クーポンを選ぶ" initialId={value.couponAssetId ?? undefined}
         items={items.map((item) => ({ id: item.id, name: item.name, meta: `${String((item.publishedPayload ?? item.payload).description ?? '')}・期限 ${String((item.publishedPayload ?? item.payload).endsAt ?? '')}` }))}
         state={state === 'loading' ? <ListState kind="loading" /> : state === 'error' ? <ListState kind="error" title="クーポンを読み込めませんでした" onRetry={() => setAttempt((n) => n + 1)} /> : undefined}

@@ -5,7 +5,6 @@ import { useState, type ComponentType } from 'react'
 import { Bell, CalendarPlus, Check, ChevronDown, IdCard, LogOut, MessageSquare, Star } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -64,7 +63,7 @@ function LineFollowupBoard({ ctx, selectedId, setSelectedId, drafts, setDrafts, 
   const draft = selected ? drafts[selected.id] ?? { title: selected.title, body: selected.body } : null
   return (
     <>
-      <Notice tone="info">LINE来店フォローは、来店・退店のきっかけを使う「シナリオのひな形」としてまとめる。行を押すと、その中身をシナリオの一歩と同じ形で直せる。</Notice>
+      {/* 決まり2: いつも同じ説明は帯にせず、題の横の「？」（description）へ入れる。 */}
       {readOnly ? <ReadOnlyNotice role="note" /> : null}
       <DetailColumns presentation="notification" asideLabel="LINEでの見え方" expanded={previewExpanded} onExpandedChange={setPreviewExpanded}
         aside={selected && draft ? <FlowPreview flow={selected} draft={draft} accountName={store?.line_account_name || store?.name || 'LINE公式アカウント'} /> : null}>
@@ -120,7 +119,7 @@ export default function LineFollowupV8() {
     <RestaurantFrame
       boardId="n9vvGx"
       title="LINE来店フォロー"
-      description="予約前・来店後・口コミ依頼・会員証を、来店・退店のきっかけで送るひな形として作ります。"
+      description="予約前・来店後・口コミ依頼・会員証を、来店・退店のきっかけで送るひな形として作ります。LINE来店フォローは、来店・退店のきっかけを使う「シナリオのひな形」としてまとめる。行を押すと、その中身をシナリオの一歩と同じ形で直せる。"
       pickerAs="select"
       banner={false}
       subtitle={(store) => `${store ? `${store.name}・` : ''}本送信は停止中（プレビューのみ）`}

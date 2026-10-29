@@ -176,7 +176,9 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
   return (
     <>
       <SectionHeader title={done ? (isHours ? '営業時間の変更をGoogleに送信しました' : 'プロフィールの変更をGoogleに送信しました') : isHours ? 'この内容で営業時間を変更しますか？' : 'この内容でプロフィールを変更しますか？'}
-        note={<StatusBadge tone={status.tone}>{status.label}</StatusBadge>} />
+        note={<StatusBadge tone={status.tone}>{status.label}</StatusBadge>}
+        help={isHours ? '反映直前にGoogleの最新情報を再確認します。他の担当者が変更していた場合は、差分を表示して止めます。' : '反映直前にGoogleの最新情報を再確認します。他の担当者が同じ項目を変更していた場合は、差分を表示して止めます。'}
+        helpLabel="変更の確かめ方の説明" />
       <p className={styles.muted}>{`対象店舗：${store.name} / ${isHours ? store.timeZone : `変更する項目：${FIELD_LABEL[field ?? ''] ?? ''}`}`}</p>
       {ids.length > 1 ? <p className={styles.muted}>{index + 1} / {formatNumber(ids.length)}件目</p> : null}
       {sent ? <Notice tone="success">{sent.alreadyApplied ? 'この内容はすでにGoogleに反映されていました。送信はしていません。' : change.status === 'applied' ? 'Googleに変更を送信し、反映を確認しました。' : 'Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します。審査・同期に時間がかかることがあります。'}</Notice> : null}
@@ -201,7 +203,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
         {isHours ? <p className={styles.muted}>{change.reservationImpactCount > 0 ? `予約への影響：変更後の営業時間の外に始まる予約が ${formatNumber(change.reservationImpactCount)}件 あります（予約台帳で確認してください）` : '予約への影響はありません'}</p> : null}
         {change.inputText ? <p className={styles.muted}>入力した文章：「{change.inputText}」</p> : null}
       </Card>
-      <Notice tone="info">反映直前にGoogleの最新情報を再確認します。他の担当者が{isHours ? '' : '同じ項目を'}変更していた場合は、差分を表示して止めます。</Notice>
+      {/* 決まり2: 確かめ方の説明は帯にせず、題の横の「？」へ入れる。 */}
       {!done && change.status !== 'cancelled' ? <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
         <Checkbox checked={checked} onCheckedChange={setChecked} description={null}>
           {isHours ? '店舗・日付・時間を確認しました' : '店舗・項目・内容を確認しました'}

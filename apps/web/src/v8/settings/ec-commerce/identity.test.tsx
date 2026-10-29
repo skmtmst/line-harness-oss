@@ -78,3 +78,12 @@ it('閲覧のみでは候補は確認でき、決める操作は隠す', async (
   expect(await screen.findByRole('menuitem', { name: '候補を見る' })).toBeTruthy()
   expect(screen.queryByRole('menuitem', { name: '決める' })).toBeNull()
 })
+
+// 決まり2: 結び付け方の説明は帯にせず、題の横の「？」へ入れる。
+it('自動で結びつく条件は帯に出さず題の「？」に入れる', async () => {
+  render(<EcIdentityCandidatesScreen />)
+  await screen.findByRole('table', { name: '会員のつき合わせの候補' })
+  expect(screen.queryByText(/自動で結びつきます/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'この画面の説明' }))
+  expect(await screen.findByText(/自動で結びつきます/)).toBeTruthy()
+})

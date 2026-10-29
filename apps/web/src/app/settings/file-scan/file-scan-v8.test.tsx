@@ -89,19 +89,12 @@ describe('PfA4o 状態の札', () => {
     expect(screen.getByRole('button', { name: /確かめ中/ }).textContent).toContain('0')
     expect(screen.getByRole('button', { name: /戻した/ })).toBeTruthy()
     expect(screen.getByText('invoice.pdf')).toBeTruthy()
-    const safeguard = screen.getByText('確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。').closest('[data-design-part="notice"]')!
-    expect(safeguard).toBeTruthy()
-    expect(safeguard.querySelector('[data-notice-dot]')).toBeTruthy()
+    // 決まり2: いつも同じ説明は帯にせず、題の横の「？」へ入れる。
+    expect(screen.queryByText(/確かめ終わるまで、上げたファイルは配信・公開・審査に出せません/)).toBeNull()
     const toggle = screen.getByRole('button', { name: 'この画面の説明' })
     fireEvent.click(toggle)
-    expect(safeguard.isConnected).toBe(true)
-
-
-    const safetyText = screen.getByText('確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。')
-    const safety = safetyText.closest('[data-design-part="notice"]')
-    expect(safety).not.toBeNull()
-    expect(safety?.querySelector('[data-notice-dot]')).not.toBeNull()
-    expect(safetyText.closest('[data-page-explanation-body]')).toBeNull()
+    const safetyText = await screen.findByText(/確かめ終わるまで、上げたファイルは配信・公開・審査に出せません/)
+    expect(safetyText.closest('[data-design-part="notice"]')).toBeNull()
     const settings = screen.getByRole('button', { name: /設定を編集/ })
     expect(settings.querySelector('svg.lucide-sliders-horizontal')).not.toBeNull()
     fireEvent.click(settings)

@@ -91,6 +91,13 @@ describe('Google変更案を現在の確認画面から送信する', () => {
     await waitFor(() => expect(go).toHaveBeenCalledWith({ tab: 'profile' }))
     expect(mocks.cancelChange).toHaveBeenCalledTimes(2)
   })
+  // 決まり2: 確かめ方の説明は帯にせず、題の横の「？」へ入れる。
+  it('再確認の説明は帯に出さず題の「？」に入れる', async () => {
+    await open()
+    expect(screen.queryByText(/最新情報を再確認します/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '変更の確かめ方の説明' }))
+    expect(await screen.findByText(/最新情報を再確認します/)).toBeTruthy()
+  })
   it('複数の変更は1件ずつ送り、次の変更では確認をやり直す', async () => {
     mocks.change.mockResolvedValueOnce(response).mockResolvedValueOnce({ ...response, change: { ...change, id: 'proposal-2', after: '次の変更' } })
     await open(['proposal-1', 'proposal-2']); check()

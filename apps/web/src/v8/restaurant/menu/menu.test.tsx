@@ -47,11 +47,15 @@ const openMenu = (name: string) => fireEvent.click(screen.getByRole('button', { 
 
 /* ★V8 メニュー管理（板 ・停止 ・追加と変更 ）の動き。 */
 describe('MJoJR メニュー管理', () => {
-  it('数5・「…」の決まりの帯・一覧が出て、アーカイブだけ再開が出る', async () => {
+  it('数5・一覧が出て、アーカイブだけ再開が出る（「…」の決まりは題の？へ）', async () => {
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
     const board = document.querySelector('[data-design-node="MJoJR"]')!
-    for (const label of ['全メニュー', 'コース', '単品', '要承認', 'アレルギー登録', '「…」の中身']) expect(board.textContent).toContain(label)
+    for (const label of ['全メニュー', 'コース', '単品', '要承認', 'アレルギー登録']) expect(board.textContent).toContain(label)
+    // 決まり2: 「…」の決まりは帯に出さず題の「？」へ。
+    expect(board.textContent).not.toContain('「…」の中身')
+    fireEvent.click(screen.getByRole('button', { name: 'メニュー一覧の説明' }))
+    expect(await screen.findByText(/「…」の中身/)).toBeTruthy()
     expect(screen.getAllByRole('button', { name: '再開' })).toHaveLength(1)
   })
 
