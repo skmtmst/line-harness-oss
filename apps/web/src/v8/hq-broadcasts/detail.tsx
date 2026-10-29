@@ -359,6 +359,11 @@ export function deliveryWayText(input: Pick<HqBroadcastRun['input'], 'stealthSpr
 }
 
 export default function HqBroadcastDetail() {
+  const params = useSearchParams()
+  return <HqBroadcastDetailBody key={params.get('id') ?? ''} />
+}
+
+function HqBroadcastDetailBody() {
   usePageCrumbs([{ label: '一括配信', href: '/hq/broadcasts' }])
   const params = useSearchParams()
   const samePageUrl = useSamePageUrl()
@@ -603,7 +608,7 @@ export default function HqBroadcastDetail() {
             ) : null}
             </ListPageSection>
           </div>
-          <aside className={detailStyles.side} aria-label="配信した設定とメッセージ">
+          {run ? <aside className={detailStyles.side} aria-label="配信した設定とメッセージ">
             <h3 className={detailStyles.secTitle}>配信した設定</h3>
             <dl className={detailStyles.rows}>
               {[
@@ -627,7 +632,7 @@ export default function HqBroadcastDetail() {
                 />
               </>
             ) : null}
-          </aside>
+          </aside> : null}
         </div>
       </PageFrame>
       {ask ? (

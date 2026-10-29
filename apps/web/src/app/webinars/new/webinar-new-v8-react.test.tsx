@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
+import { fireEvent } from '@testing-library/react'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -73,4 +74,21 @@ test('v8 では j7PP04 の作る画面（5段の帯・開催形式・見え方�
   expect(board?.textContent).toContain('日時指定配信')
   expect(board?.querySelector('[data-template-region="preview"]')?.textContent).toContain('▶ 申込はこちら')
   expect(board?.textContent).toContain('動画の設定へ')
+})
+
+test('名前と案内文を入れると保存前に下見へ映り、消すと空の案内へ戻る', async () => {
+  document.documentElement.dataset.theme = 'v8'
+  await renderPage()
+  const title = host.querySelector('#webinar-new-title') as HTMLInputElement
+  const description = host.querySelector('#webinar-new-description') as HTMLInputElement
+  await act(async () => {
+    fireEvent.change(title, { target: { value: '新商品の説明会' } })
+    fireEvent.change(description, { target: { value: '使い方を一緒に確認します' } })
+  })
+  const preview = () => host.querySelector('[data-template-region="preview"]')?.textContent
+  expect(preview()).toContain('新商品の説明会')
+  expect(preview()).toContain('使い方を一緒に確認します')
+  expect(preview()).not.toContain('（ウェビナー名）')
+  await act(async () => { fireEvent.change(title, { target: { value: '' } }) })
+  expect(preview()).toContain('（ウェビナー名）')
 })

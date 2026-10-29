@@ -9,11 +9,14 @@ import { act, cleanup, render, screen, waitFor,fireEvent,within } from '@testing
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BookingException, BookingSettings } from '@/lib/api'
 import { closedOn, closedRanges, closedSpan } from './lib/closed-ranges'
+import type { StaffMember } from '@line-crm/shared'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 
-const net = vi.hoisted(() => ({ deleteException: vi.fn() }))
+const net = vi.hoisted(() => ({ deleteException: vi.fn(), listRequests: vi.fn().mockResolvedValue({ requests: [], total: 0 }) }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
-  return { ...actual, bookingApi: { ...actual.bookingApi, deleteException: net.deleteException } }
+  return { ...actual, bookingApi: { ...actual.bookingApi, deleteException: net.deleteException, listRequests: net.listRequests } }
 })
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, replace: () => {}, refresh: () => {}, back: () => {}, forward: () => {}, prefetch: () => {} }),
@@ -21,7 +24,7 @@ vi.mock('next/navigation', () => ({
 
 const { HolidaysTabV8 } = await import('./tabs/holidays-tab')
 
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); forgetStaffIdentity(); vi.clearAllMocks() })
 
 const exception = (id: string, dateFrom: string, dateTo: string): BookingException => ({
   id, lineAccountId: 'a', scopeKind: 'store', scopeId: null, date: null, dateFrom, dateTo, kind: 'closed',
@@ -93,4 +96,32 @@ it('Q01：日付は必須・理由は任意。空と逆順は欄下に示して�
   expect(from.textContent).toContain('2026年10月20日')
   expect(to.textContent).toContain('2026年10月19日')
   expect(reason.value).toBe('入力を残す')
+})
+
+it('期間の途中の日を選んだら、その日の予約を確かめる', async () => {
+  const { jstDate } = await import('@/lib/jst-datetime')
+  const today = jstDate()
+  const first = `${today.slice(0, 7)}-01`
+  const item = exception('range', first, today)
+  render(<HolidaysTabV8 accountId="a" settings={{ exceptions: [item] } as unknown as BookingSettings} status="ready" error={null} exceptions={[item]} closedWeekdays={[]} bookingCountOnClosed={null} canEdit onSaved={() => {}} onReload={() => {}} />)
+  const day = Number(today.slice(8, 10))
+  fireEvent.click(screen.getAllByRole('gridcell').find((cell) => cell.querySelector('span')?.textContent === String(day))!)
+  const dialog = screen.getByRole('dialog', { name: '休業日を直す' })
+  await waitFor(() => expect(within(dialog).getByRole('link', { name: 'この日の予約へ' }).getAttribute('href')).toContain(`date=${today}`))
+})
+
+it('閲覧のみの休業削除は理由付きで拒否し、確認もAPIも開かない', async () => {
+  rememberStaffIdentity({ id: 'viewer', role: 'viewer' } as StaffMember)
+  const item = exception('closed', '2026-10-13', '2026-10-14')
+  render(<HolidaysTabV8 accountId="a" settings={{ exceptions: [item] } as unknown as BookingSettings} status="ready" error={null} exceptions={[item]} closedWeekdays={[]} bookingCountOnClosed={null} canEdit={false} onSaved={() => {}} onReload={() => {}} />)
+  await expectPermissionLocked(screen.getByRole('button', { name: '削除', exact: true }))
+  const grid = screen.getByRole('grid', { name: /の休業日$/ })
+  expect(within(grid).getAllByRole('gridcell').length).toBeGreaterThan(27)
+  expect(grid.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])')).toHaveLength(0)
+  for (const cell of within(grid).getAllByRole('gridcell')) {
+    fireEvent.click(cell)
+    fireEvent.keyDown(cell, { key: 'Enter' })
+  }
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(net.deleteException).not.toHaveBeenCalled()
 })

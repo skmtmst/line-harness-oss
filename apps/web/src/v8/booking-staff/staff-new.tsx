@@ -10,12 +10,12 @@ import { api, bookingApi, type BookingMenu, type BookingStaff } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
-import Checkbox from '@/components/shared/checkbox'
+import Toggle from '@/components/shared/toggle'
 import ListState from '@/components/shared/list-state'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
-import { describeApiFailure, isForbiddenOrRateLimited, permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { PhoneStaffStep, priceLabel } from './phone'
@@ -28,6 +28,7 @@ import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import Notice from '@/components/shared/notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 
 /*
  * ★V8「予約スタッフを登録」（板 ）。
@@ -169,6 +170,7 @@ export default function StaffNewV8() {
 
   // N-411: 予約スタッフ登録は 'booking.settings' の実効 permission 必須。
   const canManageStaff = usePermissionAccess('booking.settings')
+  const staffLockedReason = usePermissionLockReason(canManageStaff)
 
   /* 登録途中の離脱確認。どれかに手を付けていたら、キャンセルや左メニューで確認窓を出す。 */
   const dirty = Boolean(
@@ -216,6 +218,7 @@ export default function StaffNewV8() {
 
 
   async function save() {
+    if (!canManageStaff || staffLockedReason || saving) return
 
     const validationError = validate()
     if (validationError) {
@@ -285,29 +288,27 @@ export default function StaffNewV8() {
 
   if (!canManageStaff) {
     return <CreatePage title="予約スタッフを登録" boardId="CcA4k" readOnly dirty={false}
-      footerActions={<Button href="/booking/menus?tab=staff">キャンセル</Button>}>
-      <ListState kind="error" title="予約設定の変更権限がありません" description={permissionDeniedMessage('store')} />
+      footerActions={<><Button href="/booking/menus?tab=staff">キャンセル</Button><Button variant="primary" disabled lockedReason={staffLockedReason}>スタッフを登録する</Button></>}>
+      {staffLockedReason ? <ListState kind="forbidden" title="予約設定の変更権限がありません" description={staffLockedReason} /> : <ListState kind="loading" title="予約設定の権限を確認しています" />}
     </CreatePage>
   }
 
   /* 右のスマホ：登録中のスタッフも見本に混ぜて、出方を確かめられるようにする。 */
-  const previewStaff: BookingStaff[] = [
-    ...staffList,
-    {
+  const draftStaff: BookingStaff | null = (displayName.trim() || name.trim()) ? {
       id: '__new__',
       name: name.trim() || 'スタッフ',
       display_name: shownName,
       role: role.trim() || null,
       profile_image_url: imageUrl.trim() || null,
       bio: bio.trim() || null,
-      sort_order: Number.MAX_SAFE_INTEGER,
+      sort_order: -1,
       is_designation_optional: isDesignationOptional ? 1 : 0,
       is_active: isActive ? 1 : 0,
       nomination_fee: canEditFee ? Number(nominationFee.trim() || '0') || 0 : 0,
-    },
-  ]
+    } : null
+  const previewStaff = staffList
   // お客さまの画面の「指名なし」は、指名なしの枠に入る担当が1人でもいれば出る。
-  const designationFree = previewStaff.some((s) => s.is_active && s.is_designation_optional)
+  const designationFree = (isActive && isDesignationOptional) || previewStaff.some((s) => s.is_active && s.is_designation_optional)
   const previewMenu = menus.find((m) => m.is_active && offered.has(m.id))
     ?? menus.find((m) => m.is_active)
     ?? menus[0]
@@ -325,7 +326,7 @@ export default function StaffNewV8() {
             {previewUrl ? <Button href={previewUrl} external><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
             <CardHeader size="stacked" title="予約画面での見え方" />
             {staffPreviewError ? <ListState kind="error" title="担当の見本を読み込めませんでした" onRetry={() => setStaffPreviewRetry(value => value + 1)} /> : null}
-            <PhoneStaffStep menu={previewMenu} staff={previewStaff} designationFree={designationFree}
+            <PhoneStaffStep menu={previewMenu} staff={previewStaff} draft={draftStaff} designationFree={designationFree}
               status={menusLoading || staffPreviewLoading ? 'loading' : menusError || staffPreviewError ? 'error' : 'ready'} />
             {previewUrl ? null : <Notice tone="info">このアカウントには予約画面のURLがまだありません</Notice>}
           </>}
@@ -391,14 +392,12 @@ export default function StaffNewV8() {
           <Card variant="form" gap="normal" aria-labelledby="bs-card-accept">
             <CardHeader size="stacked" title="受付と表示" titleId="bs-card-accept" />
             <Notice tone="info">最初は店舗の営業時間に合わせます。個別に変えるときは、登録後に「勤務とシフト」で調整できます。</Notice>
-            <SaveErrorField names={["isDesignationOptional", "is_designation_optional"]}>
-              <Checkbox checked={isDesignationOptional} onCheckedChange={setIsDesignationOptional} aria-label="「指名なし」の枠にも含める"
-                description="お客さまが担当者を選ばなかったときの割り当て先になります。">「指名なし」の枠にも含める</Checkbox>
-            </SaveErrorField>
-            <SaveErrorField names={["isActive", "is_active"]}>
-              <Checkbox checked={isActive} onCheckedChange={setIsActive} aria-label="登録したらすぐ予約を受ける"
-                description="オフにすると予約画面に出ません。">登録したらすぐ予約を受ける</Checkbox>
-            </SaveErrorField>
+            <Field label="「指名なし」の枠にも含める" note="お客さまが担当者を選ばなかったときの割り当て先になります。"><SaveErrorField names={["isDesignationOptional", "is_designation_optional"]}>
+              <Toggle checked={isDesignationOptional} onChange={setIsDesignationOptional} label="「指名なし」の枠にも含める" disabled={saving} />
+            </SaveErrorField></Field>
+            <Field label="登録したらすぐ予約を受ける" note="オフにすると予約画面に出ません。"><SaveErrorField names={["isActive", "is_active"]}>
+              <Toggle checked={isActive} onChange={setIsActive} label="登録したらすぐ予約を受ける" disabled={saving} />
+            </SaveErrorField></Field>
             <Notice tone="info">予約枠の色は現在グリーンで固定です。カレンダーでの見分けに使います。</Notice>
             {canEditFee ? (
               <Field label="指名料" htmlFor="bs-fee" optional note="お客さまが指名したときだけ掛かります。指名なしで自動で割り当てたときは掛かりません。">

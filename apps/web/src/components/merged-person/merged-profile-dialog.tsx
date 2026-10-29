@@ -1,9 +1,10 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
+import DifferencesFilter, { sameKnownValues } from '@/components/shared/differences-filter'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
 import Select from '@/components/shared/select'
 import type { FriendProfileCandidate } from '@/lib/api'
@@ -40,6 +41,7 @@ export function selectedProfileCandidateCount(
 export default function MergedProfileDialog({
   open,
   candidates,
+  sourceLabels = {},
   draft,
   revision,
   busy,
@@ -50,6 +52,7 @@ export default function MergedProfileDialog({
 }: {
   open: boolean
   candidates: FriendProfileCandidate[]
+  sourceLabels?: Record<string, string>
   draft: ProfileCandidateDraft
   revision: number
   busy: boolean
@@ -58,6 +61,10 @@ export default function MergedProfileDialog({
   onCancel: () => void
   onSave: () => void
 }) {
+  const [differencesOnly, setDifferencesOnly] = useState(true)
+  useEffect(() => { if (open) setDifferencesOnly(true) }, [open])
+  useEffect(() => { if (error) setDifferencesOnly(false) }, [error])
+  const visibleCandidates = candidates.filter((field) => !differencesOnly || !sameKnownValues(field.options.map((option) => option.valuePreview)))
   const selectedCount = selectedProfileCandidateCount(candidates, draft)
   return (
     <Dialog
@@ -69,21 +76,23 @@ export default function MergedProfileDialog({
       onCancel={onCancel}
       designNode="Hn9eE"
       footer={(
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <DialogActions>
           <Button type="button" onClick={onCancel} disabled={busy}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={onSave} disabled={busy || selectedCount === 0} busy={busy}>
+          <Button type="button" variant="primary" onClick={onSave} disabled={busy || selectedCount === 0} disabledReason={selectedCount === 0 ? '保存する値を選んでください。' : undefined} busy={busy}>
             {`選んだ${selectedCount}項目を保存`}
           </Button>
-        </div>
+        </DialogActions>
       )}
     >
       <div className="flex flex-col gap-3">
         <p className="rounded-control bg-canvas-sunken px-3 py-2 text-xs leading-5 text-ink-secondary">
           読み込んだのは第{revision}版です。先に別の人が変更した場合は上書きしません。
         </p>
+        <DifferencesFilter checked={differencesOnly} onChange={setDifferencesOnly} />
+        {candidates.length > 0 && visibleCandidates.length === 0 ? <p>違う項目はありません。</p> : null}
         {candidates.length === 0 ? (
           <p className="text-xs leading-5 text-ink-faint">採用する値の候補はまだありません。</p>
-        ) : candidates.map((field) => {
+        ) : visibleCandidates.map((field) => {
           const row = draft[field.fieldKey] ?? { optionIndex: '', updateMode: 'fixed' as const }
           return (
             <Card key={field.fieldKey} padding="default">
@@ -103,7 +112,7 @@ export default function MergedProfileDialog({
                       { value: '', label: '変更しない' },
                       ...field.options.map((option, index) => ({
                         value: String(index),
-                        label: `${option.valuePreview ?? '値は未取得'} ／ ${option.sourceLabel}`,
+                        label: `${sourceLabels[option.sourceFriendId] || option.sourceLabel}：${option.valuePreview ?? '値は未取得'}`,
                       })),
                     ]}
                   /></SaveErrorField>

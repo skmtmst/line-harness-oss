@@ -7,6 +7,9 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 
 const apiMock = vi.hoisted(() => ({ createDraft: vi.fn(), saveDraft: vi.fn(), conflicts: vi.fn(), publishDraft: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/api')>()), api: { autoReplies: apiMock } }))
@@ -16,10 +19,11 @@ vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; chil
 import QuickCreate from '@/v8/auto-replies/quick-create'
 
 beforeEach(() => {
+  verifiedStaffRole('owner'); forgetSessionSnapshot()
   document.documentElement.dataset.theme = 'v8'
   vi.clearAllMocks()
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot() })
 
 it('共通の窓として板 G4GejG の印で開く', () => {
   render(<QuickCreate accountId="account-1" onClose={vi.fn()} onCreated={vi.fn()} />)
