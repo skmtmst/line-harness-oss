@@ -29,7 +29,8 @@ describe('共通一覧フックの状態表示', () => {
     expect(loading).toContain('data-list-state="loading"')
     expect(empty).toContain('data-list-state="empty"')
     expect(failed).toContain('data-list-state="error"')
-    expect(failed).toContain('再読み込み')
+    expect(failed).toContain('もう一度読み込む')
+    expect(failed).toContain('管理者にお問い合わせください。')
   })
 
   it('取得済みの行があれば一覧を共通状態で覆わない', () => {
