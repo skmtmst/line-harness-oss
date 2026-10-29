@@ -177,7 +177,7 @@
 :global(:root) .settingsNav { width: var(--tpl-settings-nav-width); flex-shrink: 0; display: flex; flex-direction: column; gap: var(--polish-space-row); padding: var(--tpl-settings-nav-pad-block) var(--tpl-settings-nav-pad-side); }
 :global(:root) .settingsNav:has(> [data-settings-nav='inline']) { width: auto; padding: 0; }
 :global(:root) .settingsContent { flex: 1; max-width: 720px; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-settings-content-gap); padding: var(--tpl-settings-content-pad-block) var(--tpl-settings-content-pad-side); }
-/* 設定の本文が間隔の唯一の持ち主。直下の共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
+/* 設定の本文が間隔の唯一の持ち主。直下の共有Noticeの上下余白を消し、帯→次の段を段にそろえる。 */
 :global(:root) .settingsContent > :global([data-design-part='notice']) { margin-block: 0; }
 /* SB枠の包み（display:contents）の中の帯も同じ。型の側でそろえる。 */
 :global(:root) .settingsContent > :global([data-sb-settings-screen]) > :global([data-design-part='notice']) { margin-block: 0; }
@@ -203,6 +203,8 @@
 :global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) { padding-bottom: 0; }
 :global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) > :global([data-read-only-notice]) { margin-bottom: 0; }
 :global(:root) .createNotice[data-content-spacing='notice-after-read-only'] + .split > .createContent[data-content-spacing='notice-after-read-only'] { padding-top: 0; }
+/* 上の集約の例外：閲覧帯の直後の先頭Noticeだけ上余白を共通値に戻す（帯同士が接するのを防ぐ）。 */
+:global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) + .split > .createContent[data-content-spacing='notice-after-read-only'] > :global([data-design-part='notice']):first-child { margin-block-start: var(--polish-space-field); }
 
 :global(:root) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--polish-space-row); }
 
