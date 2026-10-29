@@ -74,7 +74,7 @@ describe('V8 統括のアカウントを探す', () => {
     expect(explanation).not.toBeNull()
     expect(explanation?.getAttribute('role')).toBe('note')
     expect(explanation?.textContent).toContain('アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです')
-    expect(explanation?.textContent).toContain('「戻す」はオーナーのみ。本人確認のあと「停止中」に戻ります')
+    expect(explanation?.textContent).toContain('「戻す」を使えるのはオーナーだけです。本人確認のあと、アカウントは「停止中」になります')
     fireEvent.keyDown(document, { key: 'Escape' })
     fireEvent.click(screen.getByRole('button', { name: /^アーカイブ/ }))
     await screen.findByText('旧キャンペーン')

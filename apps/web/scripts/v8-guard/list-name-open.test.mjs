@@ -88,7 +88,7 @@ async function openList(browser, route) {
 }
 
 /** 押した名前の行が画面から外れる・別画面へ行く・窓が開くのどれか。 */
-async function openedDetail(page, handle, listUrl) {
+async function openedDetail(page, handle, listUrl, hadDialog) {
   const deadline = Date.now() + 8000
   for (;;) {
     const state = await page.evaluate(() => ({
@@ -97,7 +97,8 @@ async function openedDetail(page, handle, listUrl) {
     })).catch(() => null)
     if (!state) return 'navigated'
     const detached = await handle.evaluate((el) => !el.isConnected).catch(() => true)
-    if (detached || new URL(state.url).pathname !== new URL(listUrl).pathname || state.dialog) return 'opened'
+    // 窓は「押したあとに新しく現れた」ものだけ数える（前からある窓での見逃しを防ぐ）。
+    if (detached || new URL(state.url).pathname !== new URL(listUrl).pathname || (state.dialog && !hadDialog)) return 'opened'
     if (state.url !== listUrl && Date.now() > deadline - 4000) {
       // URL だけ変わって止まった（F1 の形）。少し待って確定させる。
       await page.waitForTimeout(500)
@@ -118,13 +119,15 @@ test('一覧の名前を押したら一覧のままにならず詳細が開く',
       try {
         const links = page.locator('a[data-row-link]')
         const count = await links.count()
-        assert.ok(count > 0, `${route} に押せる名前が無い（偽APIの行を確認）`)
+        // 行が無い画面があっても後ろの画面まで見て、最後にまとめて落とす。
+        if (count === 0) { failures.push(`${route} に押せる名前が無い（偽APIの行を確認）`); continue }
         const first = links.first()
         await first.scrollIntoViewIfNeeded()
         const handle = await first.elementHandle()
         const listUrl = page.url()
+        const hadDialog = await page.evaluate(() => Boolean(document.querySelector('[role="dialog"], [data-dialog], [data-drawer]'))).catch(() => false)
         await first.click()
-        const result = await openedDetail(page, handle, listUrl)
+        const result = await openedDetail(page, handle, listUrl, hadDialog)
         console.log(`${route}: ${count}行 → ${result} ${page.url().replace(base, '')}`)
         if (result !== 'opened' && result !== 'navigated') failures.push(`${route} は ${result}（${page.url().replace(base, '')}）`)
       } finally { await page.close() }
