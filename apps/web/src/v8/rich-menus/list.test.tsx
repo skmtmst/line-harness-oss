@@ -228,8 +228,9 @@ test('押されたボタンが分かるときは回数を未知の数にせず�
   await waitFor(() => {
     const label = [...view.container.querySelectorAll('[data-kpi-label]')].find(el => el.textContent?.includes('いちばん押された'))
     const card = label?.closest('[data-kpi-presentation]')
-    expect(card?.querySelector('[data-kpi-number]')?.textContent).toBe('12')
-    expect(card?.querySelector('[data-kpi-detail]')?.textContent).toContain('商品を見る')
+    expect(card?.querySelector('[data-kpi-text-value]')?.textContent).toBe('商品を見る')
+    expect(card?.querySelector('[data-kpi-number]')).toBeNull()
+    expect(card?.querySelector('[data-kpi-detail]')?.textContent).toContain('12 回')
   })
   const scheduled = await view.findByText('予約中')
   expect(scheduled.textContent).not.toContain('10/05')
