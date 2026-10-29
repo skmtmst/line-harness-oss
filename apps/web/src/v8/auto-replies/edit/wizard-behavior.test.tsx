@@ -20,7 +20,6 @@ vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: (url: string) =
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'synthetic-account', accounts: [{ id: 'synthetic-account' }] }) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => false, status: 'ready' }) }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => !net.wide }))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({ default: () => null, useActionOptions: () => ({ tags: [], fields: [], marks: [], scenarios: [], vars: [] }) }))
 vi.mock('@/lib/api', async (importOriginal) => {
