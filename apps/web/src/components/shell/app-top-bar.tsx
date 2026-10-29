@@ -4,6 +4,8 @@ import { useStaffRole, useStaffIdentity } from '@/lib/staff-role'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TopBar from '@/components/shared/top-bar'
+import Notice from '@/components/shared/notice'
+import { isAccountIndependentRoute } from '@/lib/store-route-guard'
 import BellNotifications from './bell-notifications'
 import { loadNotificationCenter, type NotificationAccount, type NotificationScope } from './notification-center-data'
 import { useAccount } from '@/contexts/account-context'
@@ -141,7 +143,7 @@ export default function AppTopBar() {
   const pathname = usePathname() ?? '/'
   const { title, crumbs: pageCrumbs } = usePageChrome()
   const router = useRouter()
-  const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId } = useAccount()
+  const { accounts, selectedAccountId, setSelectedAccountId, clearSelectedAccountId, loading, error, refreshing, refreshAccounts } = useAccount()
   const [staffName, setStaffName] = useState('')
   const staffRole = useStaffRole()
   const staffIdentity = useStaffIdentity()
@@ -286,6 +288,9 @@ export default function AppTopBar() {
    * `?q=` の受け口自体は友だち一覧が持ち続ける。
    */
 
+  const isHq = pathname === '/hq' || pathname.startsWith('/hq/')
+  const accountsLoadFailed = !isHq && isAccountIndependentRoute(pathname) && !loading && Boolean(error) && accounts.length === 0
+
   return (
     <>
     {/*
@@ -333,6 +338,23 @@ export default function AppTopBar() {
       showIdentity={false}
     />
     </div>
+    {accountsLoadFailed ? (
+      <Notice
+        tone="danger"
+        action={(
+          <button
+            type="button"
+            onClick={() => { void refreshAccounts() }}
+            disabled={refreshing}
+            className="font-semibold underline underline-offset-2"
+          >
+            {refreshing ? '読み込んでいます' : '再読み込み'}
+          </button>
+        )}
+      >
+        LINEアカウントの一覧を読み込めませんでした。
+      </Notice>
+    ) : null}
     </>
   )
 }

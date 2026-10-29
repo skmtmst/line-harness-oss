@@ -159,13 +159,31 @@ describe('★V8 統括の上の帯', () => {
     expect(view.queryByText('アカウント一覧を読み込めませんでした')).toBeNull()
   })
 
-  it('統括のアカウント一覧の失敗は画面本体に任せ、上部バーには重ねない', async () => {
+  it.each(['/settings/customer-look', '/staff', '/accounts', '/emergency'])('選択不要の%sでもアカウント一覧の失敗と再読み込みを1か所に残す', async (pathname) => {
+    fixture.pathname = pathname
     fixture.accounts = []
     fixture.error = 'アカウント一覧を読み込めませんでした'
-    const view = render(<AppTopBar />)
-    await act(async () => { await Promise.resolve() })
+    const content = () => <><AppTopBar /><StoreSelectionGate><p>選択不要の画面本体</p></StoreSelectionGate></>
+    const view = render(content())
+    await view.findByText('LINEアカウントの一覧を読み込めませんでした。')
+    expect(view.getAllByText('LINEアカウントの一覧を読み込めませんでした。')).toHaveLength(1)
+    expect(view.getAllByRole('button', { name: /^(もう一度読み込む|再読み込み)$/ })).toHaveLength(1)
+    expect(view.getByText('選択不要の画面本体')).toBeTruthy()
+    fireEvent.click(view.getByRole('button', { name: '再読み込み' }))
+    expect(fixture.refreshAccounts).toHaveBeenCalledTimes(1)
+    fixture.refreshing = true
+    view.rerender(content())
+    const busy = view.getByRole('button', { name: '読み込んでいます' }) as HTMLButtonElement
+    expect(busy.disabled).toBe(true)
+    fireEvent.click(busy)
+    expect(fixture.refreshAccounts).toHaveBeenCalledTimes(1)
+    fixture.refreshing = false
+    fixture.error = null
+    fixture.accounts = [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }]
+    view.rerender(content())
     expect(view.queryByText('LINEアカウントの一覧を読み込めませんでした。')).toBeNull()
-    expect(view.queryByRole('button', { name: /^(もう一度読み込む|再読み込み)$/ })).toBeNull()
+    expect(view.queryByRole('button', { name: '再読み込み' })).toBeNull()
+    expect(view.getByText('選択不要の画面本体')).toBeTruthy()
   })
 
   it.each(['/hq', '/friends'])('前の選択が残る%sでも、統括だけ全アカウントの通知を読む', async (pathname) => {
