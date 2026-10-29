@@ -1,3 +1,4 @@
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
@@ -167,7 +168,7 @@ it('W2: readonly users retain folder filtering without adding or moving folders'
   role.manage=false
   verifiedStaffRole('staff')
   await render()
-  expect(screen.queryByRole('button',{name:'フォルダを追加',exact:true})).toBeNull()
+  await expectPermissionLocked(screen.getByRole('button',{name:'フォルダを追加',exact:true}))
   const menu=host.querySelector('[aria-label="多い人の操作"]')!
   fireEvent.click(menu)
   expect(screen.queryByRole('menuitem',{name:'フォルダへ移す'})).toBeNull()

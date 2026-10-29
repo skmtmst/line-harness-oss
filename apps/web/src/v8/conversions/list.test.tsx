@@ -1,3 +1,4 @@
+import { expectPermissionLocked, expectLockedFolderMenu } from '@/test-utils/permission-locked-control'
 import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
@@ -323,7 +324,7 @@ describe('V8 コンバージョンの一覧', () => {
     expect(screen.getByText('資料をダウンロードした')).toBeTruthy()
   })
 
-  it('左のフォルダの列（共通・種類 conversion）：すべて・通販・未分類で絞り、名前の前にフォルダの色の丸。閲覧のみは追加・「…」を出さない', async () => {
+  it('左のフォルダの列（共通・種類 conversion）：すべて・通販・未分類で絞り、名前の前にフォルダの色の丸。閲覧のみは追加・「…」の変更を理由付きで拒否する', async () => {
     await mount()
     expect(calls).toContain('GET /api/folders')
     const folderNav = screen.getByRole('navigation', { name: 'フォルダ' })
@@ -347,8 +348,8 @@ describe('V8 コンバージョンの一覧', () => {
     root = createRoot(host)
     role.value = verifiedStaffRole('viewer')
     await mount()
-    expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'フォルダ「通販」の操作' })).toBeNull()
+    await expectPermissionLocked(screen.getByRole('button', { name: /フォルダを追加/ }))
+    await expectLockedFolderMenu(screen.getByRole('button', { name: 'フォルダ「通販」の操作' }))
   })
 })
 
