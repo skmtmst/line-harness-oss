@@ -146,6 +146,12 @@ function applicantsPayload() {
 let host: HTMLDivElement
 let root: Root
 
+function bookingPrimaryAction(id: string, action: string): HTMLButtonElement {
+  const button = host.querySelector<HTMLButtonElement>(`[data-booking-id="${id}"][data-booking-action="${action}"]`)
+  if (!button) throw new Error(`primary action not found: ${id}/${action}`)
+  return button
+}
+
 beforeEach(() => {
   account.id = 'acc-1'
   document.documentElement.dataset.theme = 'v8'
@@ -285,7 +291,7 @@ describe('V8-B 申込者（Mu8qW）', () => {
     const details = host.querySelector('details')!
     await act(async () => { details.open = true; fireEvent(details, new Event('toggle')) })
     await flush()
-    const button = details.querySelector<HTMLButtonElement>('[data-booking-id="r1"][data-booking-action="attended"]')!
+    const button = bookingPrimaryAction('r1', 'attended')
     await act(async () => { button.click() })
     await flush()
     expect(updateBooking).toHaveBeenCalledWith('acc-1', 'e1', 'r1', { status: 'attended' })
@@ -391,6 +397,23 @@ describe('V8-B 申込者（Mu8qW）', () => {
     await renderV8()
     const approve = [...document.querySelectorAll('button')].find((b) => b.textContent === '承認する')
     expect(approve, '承認する口がある').toBeTruthy()
+    const applicantRow = [...document.querySelectorAll<HTMLElement>('[role="row"]')].find((row) => row.textContent?.includes('山田 太郎'))!
+    expect(applicantRow.querySelectorAll('button')).toHaveLength(2)
+    const more = applicantRow.querySelector<HTMLButtonElement>('[data-row-menu]')!
+    await act(async () => { more.click() })
+    await flush()
+    expect(document.querySelector('[role="menuitem"]')?.textContent?.trim()).toBe('断る')
+    await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
+    expect(bookingPrimaryAction('b2', 'attended').textContent).toContain('参加済にする')
+    const confirmedMenu = host.querySelector<HTMLButtonElement>('[data-booking-id="b2"][data-booking-action="menu"]')!
+    await act(async () => { confirmedMenu.click() })
+    await flush()
+    const confirmedItems = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].map((item) => item.textContent?.trim())
+    expect(confirmedItems).toContain('無断')
+    expect(confirmedItems).toContain('キャンセルにする')
+    await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
+    expect(bookingPrimaryAction('w1', 'promote').textContent).toContain('予約に繰上げ')
+    expect(host.querySelector('[data-booking-id="w1"][data-booking-action="menu"]')).toBeTruthy()
     await act(async () => { approve!.click() })
     await flush()
     expect(decideBooking).toHaveBeenCalledWith('acc-1', 'e1', 'b1', 'confirm', undefined)
@@ -500,24 +523,27 @@ describe('V8-B 申込者（Mu8qW）', () => {
   it('参加印の二重押しは一度だけ送り、戻った後の再操作は古い応答で終わらない', async () => {
     const old = deferred<unknown>()
     const fresh = deferred<unknown>()
+    const payload = applicantsPayload()
+    payload.applicants[0].status = 'confirmed'
+    getOccurrenceApplicants.mockResolvedValue(payload)
     updateBooking.mockReturnValueOnce(old.promise).mockReturnValueOnce(fresh.promise)
-    const mark = () => [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === '参加済')!
     await renderV8()
-    await act(async () => { const button = mark(); button.click(); button.click() })
+    const initialMark = bookingPrimaryAction('b1', 'attended')
+    await act(async () => { initialMark.click(); initialMark.click() })
     expect(updateBooking).toHaveBeenCalledTimes(1)
     account.id = 'acc-2'
     await renderV8()
     account.id = 'acc-1'
     await renderV8()
-    expect(mark().disabled).toBe(false)
-    await act(async () => { mark().click() })
+    expect(bookingPrimaryAction('b1', 'attended').disabled).toBe(false)
+    await act(async () => { bookingPrimaryAction('b1', 'attended').click() })
     expect(updateBooking).toHaveBeenCalledTimes(2)
     old.resolve({ ok: true })
     await flush()
-    expect(mark().disabled).toBe(true)
+    expect(bookingPrimaryAction('b1', 'attended').disabled).toBe(true)
     fresh.resolve({ ok: true })
     await flush()
-    expect(mark().disabled).toBe(false)
+    expect(bookingPrimaryAction('b1', 'attended').disabled).toBe(false)
   })
 
   it('別の行の参加印は並行更新でき、成功の再読込で他方の失敗を消さない', async () => {
@@ -528,8 +554,8 @@ describe('V8-B 申込者（Mu8qW）', () => {
     const second = deferred<unknown>()
     updateBooking.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
     await renderV8()
-    const buttons = [...host.querySelectorAll<HTMLButtonElement>('button')].filter((button) => button.textContent?.trim() === '参加済')
-    await act(async () => { buttons[0].click(); buttons[1].click() })
+    await act(async () => { bookingPrimaryAction('b1', 'attended').click() })
+    await act(async () => { bookingPrimaryAction('b2', 'attended').click() })
     expect(updateBooking).toHaveBeenCalledTimes(2)
     second.reject(new Error('down'))
     await flush()
