@@ -7,7 +7,6 @@ import { Pencil, Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ApiError, api, type OpsAnnouncement, type OpsAnnouncementAudience, type OpsAnnouncementChannel, type OpsAnnouncementInput, type OpsAudiencePreview, type OpsTenantRow } from '@/lib/api'
 import { formatDateTime, opsCall, opsErrorMessage } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -324,7 +323,6 @@ export default function OpsAnnouncementsV8() {
       <OpsHead
         title="お知らせ"
         description="契約先へ、画面のお知らせ・メール・契約者専用LINE でお知らせを送ります。"
-        environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
       />
       {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}
       <div className={styles.columns}>
