@@ -1,12 +1,12 @@
 // @vitest-environment happy-dom
 /*
  * V8 統括のメンバー（src/v8/hq/members.tsx・member-dialog.tsx）の動きの試験。
- * 招待の始まり（閲覧のみ・指定したアカウントだけ・アーカイブは選ばせない）、
+ * 招待の始まり（閲覧のみ・統括の全アカウント固定・範囲の選択は無い #1928）、
  * 変更→確認の間は変更の窓を閉じる、確認をやめたら中身のまま戻る、
  * 役割を変えないときは役割を送らない（担当者が管理者に上がらない）。
  */
 import React, { act } from 'react'
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -95,46 +95,40 @@ afterEach(async () => {
 })
 
 describe('V8 統括のメンバーの窓', () => {
-  it('招待は閲覧のみ・指定したアカウントだけから始め、アーカイブしたアカウントは選ばせない', async () => {
+  it('招待は閲覧のみから始め、範囲の選択は無く全アカウントを付けて送る', async () => {
     await act(async () => { buttonByText('権限者を招待')!.click() })
     await flush()
     expect(dialogTitles()).toContain('権限者を招待')
-    const radios = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]'))
-    expect(radios.find((r) => r.value === 'accounts')?.checked).toBe(true)
-    expect(document.querySelector('[role="dialog"] input[type="checkbox"]')).toBeNull()
-    await act(async () => { screen.getByRole('button', { name: '担当アカウント：変える' }).click() })
-    const picker = screen.getByRole('dialog', { name: '担当アカウントを選ぶ' })
-    const checks = within(picker).getAllByRole('checkbox').map(el => el.getAttribute('aria-label')).filter(label => !label?.endsWith('をまとめて選ぶ'))
-    expect(checks).toEqual(['然 -NEN- 本店', '然 -NEN- 渋谷店'])
-    await act(async () => { within(picker).getByRole('checkbox', { name: '然 -NEN- 渋谷店' }).click() })
-    await act(async () => { within(picker).getByRole('button', { name: 'キャンセル' }).click() })
-    await act(async () => { screen.getByRole('button', { name: '担当アカウント：変える' }).click() })
-    const reopened = screen.getByRole('dialog', { name: '担当アカウントを選ぶ' })
-    expect((within(reopened).getByRole('checkbox', { name: '然 -NEN- 本店' }) as HTMLInputElement).checked).toBe(true)
-    expect((within(reopened).getByRole('checkbox', { name: '然 -NEN- 渋谷店' }) as HTMLInputElement).checked).toBe(false)
-    await act(async () => { within(reopened).getByRole('button', { name: 'キャンセル' }).click() })
-    expect(document.querySelector('[role="dialog"]')!.textContent).toContain('閲覧のみ（見るだけ）')
+    const dialog = document.querySelector('[role="dialog"]')!
+    // 範囲の選び直しは無い（#1928：統括の招待は全アカウント固定）。
+    expect(screen.queryByRole('radio', { name: '指定したアカウントだけ' })).toBeNull()
+    expect(dialog.textContent).toContain('統括のすべてのアカウントを見て操作できます。')
+    expect(dialog.textContent).toContain('閲覧のみ（見るだけ）')
+    const name = screen.getByRole('textbox', { name: '名前' }) as HTMLInputElement
+    const email = screen.getByRole('textbox', { name: 'メールアドレス' }) as HTMLInputElement
+    await act(async () => { fireEvent.change(name, { target: { value: '新井 一郎' } }) })
+    await act(async () => { fireEvent.change(email, { target: { value: 'arai@example.com' } }) })
+    await act(async () => { buttonByText('招待メールを送る')!.click() })
+    await flush()
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(create.mock.calls[0][0]).toEqual(expect.objectContaining({
+      name: '新井 一郎', email: 'arai@example.com', role: 'viewer',
+      accountScope: 'all', scopedLineAccountIds: [], assignedLineAccountId: 'acc-1',
+    }))
   })
 
-  it("招待で名前が空・担当するアカウントが0なら送らず、両方の欄に理由を出し、名前の欄へ移る", async () => {
+  it('招待で名前が空なら送らず、名前の欄に理由を出して名前の欄へ移る', async () => {
     await act(async () => { buttonByText('権限者を招待')!.click() })
     await flush()
     const dialog = document.querySelector('[role="dialog"]')!
     const email = screen.getByRole('textbox', { name: 'メールアドレス' }) as HTMLInputElement
     await act(async () => { fireEvent.change(email, { target: { value: 'staff@example.com' } }) })
-    await act(async () => { screen.getByRole('button', { name: '担当アカウント：変える' }).click() })
-    const picker = screen.getByRole('dialog', { name: '担当アカウントを選ぶ' })
-    await act(async () => { within(picker).getByRole('checkbox', { name: '然 -NEN- 本店' }).click() })
-    await act(async () => { within(picker).getByRole('button', { name: '選ぶ（0件）' }).click() })
     await act(async () => { buttonByText('招待メールを送る')!.click() })
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     expect(create).not.toHaveBeenCalled()
     expect(dialog.textContent).toContain('名前を入力してください')
     expect(dialog.querySelector('input[id$="-name"]')?.closest('[data-form-requirement]')?.getAttribute('data-form-requirement')).toBe('required')
     expect(email.closest('[data-form-requirement]')?.getAttribute('data-form-requirement')).toBe('required')
-    const scope = screen.getByRole('button', { name: '担当アカウント：選ぶ' })
-    expect(scope.getAttribute('aria-describedby')).toMatch(/-scope-error$/)
-    expect(dialog.textContent).toContain('担当するアカウントを1つ以上選んでください')
     expect((document.activeElement as HTMLInputElement | null)?.id).toMatch(/-name$/)
   })
 
@@ -167,7 +161,7 @@ describe('V8 統括のメンバーの窓', () => {
     expect(body.isActive).toBe(false)
   })
 
-  it('WEB216：統括（owner）の範囲だけを変えても、役割（owner→admin）を送らない', async () => {
+  it('WEB216：統括（owner）の状態だけを変えても、役割（owner→admin）を送らない', async () => {
     const ownerMember = { ...staffMember, id: 'stf-owner', name: '本部 太郎', role: 'owner', accountScope: 'all', scopedLineAccountIds: [] }
     list.mockResolvedValue({ success: true, data: [ownerMember, staffMember] })
     await act(async () => { root!.render(<HqMembersV8 key="again" />) })
@@ -178,20 +172,20 @@ describe('V8 統括のメンバーの窓', () => {
     await flush()
     await act(async () => { buttonByText('権限を変更する')!.click() })
     await flush()
-    const accountsOnly = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'accounts')!
-    await act(async () => { accountsOnly.click() })
-    await act(async () => { screen.getByRole('button', { name: '担当アカウント：選ぶ' }).click() })
-    const picker = screen.getByRole('dialog', { name: '担当アカウントを選ぶ' })
-    await act(async () => { within(picker).getByRole('checkbox', { name: '然 -NEN- 本店' }).click() })
-    await act(async () => { within(picker).getByRole('button', { name: '選ぶ（1件）' }).click() })
+    // 範囲は選べない（#1928）。状態だけ無効にする。
+    expect(screen.queryByRole('radio', { name: '指定したアカウントだけ' })).toBeNull()
+    const inactive = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'inactive')!
+    await act(async () => { inactive.click() })
     await act(async () => { buttonByText('変更を保存する')!.click() })
     await flush()
-    const confirm = buttonByText('変える')
-    if (confirm) await act(async () => { confirm.click() })
+    expect(dialogTitles()).toEqual(['本部 太郎 さんの権限を変えますか？'])
+    // 管理者を止めるので本人確認つきの確定になる。
+    await act(async () => { buttonByText('確認コードを入れて変える')!.click() })
     await flush()
     expect(update).toHaveBeenCalled()
     const body = update.mock.calls.at(-1)![1] as Record<string, unknown>
     expect(body).not.toHaveProperty('role')
+    expect(body.isActive).toBe(false)
   })
 })
 
