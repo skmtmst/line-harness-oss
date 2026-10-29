@@ -103,8 +103,16 @@ const SAVED_FILTER_OPTIONS = [
 
 type ScenarioRow = Scenario & {
   stepCount?: number
-  subscriberCount?: number
-  completedCount?: number
+  subscriberCount?: number | null
+  completedCount?: number | null
+}
+
+function isKnownScenarioCount(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
+function scenarioCountLabel(value: number | null | undefined): string {
+  return isKnownScenarioCount(value) ? formatNumber(value) : emptyValue('unknown')
 }
 
 /** 実際の配信時刻の起点を、利用者向けの言葉で示す。 */
@@ -899,7 +907,8 @@ export default function ScenariosListV8() {
                 ].join('・')
                 /* 絵：送り方・通数・フォルダのあとに全角の間を空けて説明。1つの文字列で書く。 */
                 const sub = s.description ? `${meta}　${s.description}` : meta
-                const subscribers = s.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(s.subscriberCount)
+                const subscribers = scenarioCountLabel(s.subscriberCount)
+                const completedLabel = scenarioCountLabel(s.completedCount)
                 return (
                   <Tr selected={selectedIds.has(s.id)}
                     interactive
@@ -961,17 +970,18 @@ export default function ScenariosListV8() {
                     />
                     <Td
                       className={styles.countCell}
-                      title={`配信中 ${subscribers} 人・最後まで配信 ${formatNumber(s.completedCount ?? 0)} 人`}
+                      title={`配信中 ${subscribers} 人・最後まで配信 ${completedLabel} 人`}
                     >
                       {/* 配信中と最後まで配信は別の人。割らずに並べ、棒は「最後まで ÷ 登録した人（＝足した数）」で分母を言葉で書く。 */}
-                      <div className={styles.countMain}>{`配信中 ${subscribers} 人・最後まで配信 ${formatNumber(s.completedCount ?? 0)} 人`}</div>
-                      {s.subscriberCount === undefined ? null : (() => {
-                        const completed = s.completedCount ?? 0
-                        const enrolled = (s.subscriberCount ?? 0) + completed
-                        return enrolled === 0 ? <div className={styles.countSub}>{emptyValue('unknown')}</div> : (
+                      <div className={styles.countMain}>{`配信中 ${subscribers} 人・最後まで配信 ${completedLabel} 人`}</div>
+                      {(() => {
+                        if (!isKnownScenarioCount(s.subscriberCount) || !isKnownScenarioCount(s.completedCount)) return null
+                        const completed = s.completedCount
+                        const enrolled = s.subscriberCount + completed
+                        return enrolled === 0 ? <div className={styles.countSub}>登録した 0 人</div> : (
                           <div className={styles.countRow}>
                             <ProgressBar value={completed} max={enrolled} label={`${s.name ?? 'シナリオ'}を最後まで配信した割合`} className={styles.countBar} />
-                            <span className={styles.countSub}>{scenarioCompletionDetail(s.subscriberCount ?? 0, completed)}</span>
+                            <span className={styles.countSub}>{scenarioCompletionDetail(s.subscriberCount, completed)}</span>
                           </div>
                         )
                       })()}
@@ -1217,7 +1227,7 @@ export default function ScenariosListV8() {
               <CardHeader size="stacked" title="配信状況" headingLevel={3}
                 action={<StatusBadge status={panelRow.isActive ? 'active' : 'stopped'} tone={panelRow.isActive ? 'success' : 'neutral'} />}
                 help={<HelpTip label="配信状況の説明">配信中は、このシナリオに登録されていて最後までの配信が終わっていない人です。シナリオが停止中の間は送信されません。最後まで配信は、最終ステップまで処理が終わった人です。既読人数ではありません。</HelpTip>} />
-              <p>配信中 {panelRow.subscriberCount == null ? emptyValue('unknown') : formatNumber(panelRow.subscriberCount)} 人・最後まで配信 {panelRow.completedCount == null ? emptyValue('unknown') : formatNumber(panelRow.completedCount)} 人</p>
+              <p>配信中 {scenarioCountLabel(panelRow.subscriberCount)} 人・最後まで配信 {scenarioCountLabel(panelRow.completedCount)} 人</p>
             </Card>
             {panelRow.description ? <Card variant="panel" layout="vertical" gap="tight" aria-label="シナリオの説明">
               <CardHeader size="stacked" title="説明" headingLevel={3} />
@@ -1281,7 +1291,7 @@ export default function ScenariosListV8() {
             <div className={styles.deleteBody}>
               <MoveReferrersNotice scenarioId={deleteTarget.id} />
               <p>
-                購読中 {formatNumber(deleteTarget.subscriberCount ?? 0)} 人 ／ 通数{' '}
+                配信中 {scenarioCountLabel(deleteTarget.subscriberCount)} 人 ／ 通数{' '}
                 {deleteTarget.stepCount === undefined ? '— 読み込めませんでした' : `${deleteTarget.stepCount} 通`}
               </p>
               {deleteTarget.lineAccountId === null && (

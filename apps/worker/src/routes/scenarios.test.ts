@@ -269,6 +269,98 @@ describe('GET /api/scenarios?lineAccountId=X', () => {
     ]);
   });
 
+  test('最初の20件が0人でも次ページに人数があれば、全体の数と全ページの合計は一致する', async () => {
+    const { db, raw } = createTestD1();
+    try {
+      const addScenario = raw.prepare(`INSERT INTO scenarios
+        (id, name, trigger_type, line_account_id, created_at, updated_at)
+        VALUES (?, '案内', 'manual', 'acc-1', ?, '2026-10-27')`);
+      for (let index = 1; index <= 24; index++) {
+        addScenario.run(`scenario-${index}`, `2026-10-${String(index).padStart(2, '0')}`);
+        const completed = [2, 2, 2, 4][index - 1] ?? 0;
+        for (let friend = 0; friend < completed; friend++) {
+          const id = `friend-${index}-${friend}`;
+          insertFriend(raw, id, { line_account_id: 'acc-1' });
+          raw.prepare(`INSERT INTO friend_scenarios (id, friend_id, scenario_id, status)
+            VALUES (?, ?, ?, 'completed')`).run(id, id, `scenario-${index}`);
+        }
+      }
+      const app = setupApp(db);
+      const readPage = async (page: number) => {
+        const response = await app.request(`/api/scenarios?lineAccountId=acc-1&limit=20&page=${page}`);
+        expect(response.status).toBe(200);
+        return await response.json() as { data: { total: number; items: Array<{ completedCount: number }> } };
+      };
+      const first = await readPage(1);
+      const second = await readPage(2);
+      expect(first.data.total).toBe(24);
+      expect(first.data.items).toHaveLength(20);
+      expect(first.data.items.every(row => row.completedCount === 0)).toBe(true);
+      const { getListStats } = await vi.importActual<typeof import('@line-crm/db')>('@line-crm/db');
+      const stats = await getListStats(db, { allowedAccountIds: ['acc-1'], includeUnassigned: false });
+      expect(stats.scenarios.completed).toBe(10);
+      expect(second.data.items.reduce((sum, row) => sum + row.completedCount, 0)).toBe(stats.scenarios.completed);
+    } finally { raw.close(); }
+  });
+
+  test('人数の集計だけ失敗しても一覧を返し、人数は0ではなく不明にする', async () => {
+    const { db } = makeScenarioDb([{ id: 's-one', name: '読めるシナリオ', line_account_id: 'acc-1', ...rowBase }]);
+    const prepare = db.prepare.bind(db);
+    vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
+      if (sql.includes('FROM friend_scenarios fs')) throw new Error('counts unavailable');
+      return prepare(sql);
+    });
+    const res = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1');
+    expect(res.status).toBe(200);
+    const body = await res.json() as { data: { items: Array<{ id: string; subscriberCount: number | null; completedCount: number | null }> } };
+    expect(body.data.items).toEqual([expect.objectContaining({ id: 's-one', subscriberCount: null, completedCount: null })]);
+  });
+
+  test('閲覧対象のアカウントが空でも共通シナリオを残し、対象人数は実0人を返す', async () => {
+    const { db, raw } = createTestD1();
+    try {
+      raw.prepare(`INSERT INTO scenarios (id, name, trigger_type, line_account_id)
+        VALUES ('s-global', '共通の案内', 'manual', NULL)`).run();
+      accountAccessMocks.getVisibleLineAccountScope.mockResolvedValue({
+        allowedAccountIds: [], canSeeUnassigned: true,
+      });
+      const prepare = vi.spyOn(db, 'prepare');
+      const response = await setupApp(db).request('/api/scenarios');
+      expect(response.status).toBe(200);
+      const body = await response.json() as { data: { total: number; items: unknown[] } };
+      expect(body.data.total).toBe(1);
+      expect(body.data.items).toEqual([expect.objectContaining({
+        id: 's-global', subscriberCount: 0, completedCount: 0,
+      })]);
+      expect(prepare.mock.calls.some(([sql]) => sql.includes('FROM friend_scenarios fs'))).toBe(false);
+    } finally { raw.close(); }
+  });
+
+  test.each([
+    [null, 2, null, 2],
+    [10, null, 10, null],
+    [0, 0, 0, 0],
+    [NaN, 2, null, 2],
+    [10, -1, 10, null],
+  ])('集計結果%s/%sの既知側と実0を保持する', async (active, completed, expectedActive, expectedCompleted) => {
+    const { db } = makeScenarioDb([{ id: 's-one', name: '案内', line_account_id: 'acc-1', ...rowBase }]);
+    const prepare = db.prepare.bind(db);
+    vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
+      if (!sql.includes('FROM friend_scenarios fs')) return prepare(sql);
+      const statement = { bind: () => statement, all: async () => ({ results: [
+        { scenario_id: 's-one', active_count: active, completed_count: completed },
+      ] }) };
+      return statement as unknown as ReturnType<typeof db.prepare>;
+    });
+    const response = await setupApp(db).request('/api/scenarios?lineAccountId=acc-1');
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: { total: number; items: unknown[] } };
+    expect(body.data.total).toBe(1);
+    expect(body.data.items).toEqual([expect.objectContaining({
+      id: 's-one', subscriberCount: expectedActive, completedCount: expectedCompleted,
+    })]);
+  });
+
   test('閲覧権限がない利用者には一覧を返さない', async () => {
     const { db } = makeScenarioDb([]);
     const res = await setupApp(db, [], 'staff').request('/api/scenarios');
