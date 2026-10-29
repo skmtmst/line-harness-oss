@@ -196,6 +196,18 @@ describe('mauOC コースの編集ページ', () => {
     expect(screen.getByText('変更予定の価格')).toBeTruthy()
     expect(screen.getByText('¥2,500')).toBeTruthy()
   })
+
+  it('R11: 帯は4枚まで、5つ目のアレルギー登録は帯の下の1行', async () => {
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    const strip = document.querySelector('[data-kpi-strip]')!
+    expect(Array.from(strip.querySelectorAll('[data-kpi-label]')).map((n) => n.getAttribute('title'))).toEqual(['全メニュー', 'コース', '単品', '要承認'])
+    // 5つ目は帯の外の1行に項目名と値を残す。
+    const line = strip.nextElementSibling!
+    expect(line.tagName).toBe('P')
+    expect(line.textContent).toContain('アレルギー登録')
+    expect(line.textContent).toContain('2 件')
+  })
 })
 
 afterEach(() => { verifiedStaffRole(null) })

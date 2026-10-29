@@ -93,8 +93,9 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <KpiCard title="コース" value={rows.filter((item) => item.kind === 'course').length} unit="件" detail="予約時に選択" detailLayout="single" presentation="band" />
         <KpiCard title="単品" value={rows.filter((item) => item.kind !== 'course').length} unit="件" detail="アラカルト" detailLayout="single" presentation="band" />
         <KpiCard title="要承認" value={pendingApprovals.length} unit="件" detail="価格・内容改定" detailLayout="single" valueTone={pendingApprovals.length > 0 ? 'warning' : 'default'} presentation="band" />
-        <KpiCard title="アレルギー登録" value={rows.filter((item) => safeArray(item.allergens_json).length > 0).length} unit="件" detail="注意品目あり" detailLayout="single" presentation="band" />
       </StatRow>
+      {/* R11: 帯は4枚まで。5つ目は帯の下の短い1行に残す（行き先の絞り込みは無いため行だけ）。 */}
+      <p className={styles.fifthLine}>アレルギー登録 {rows.filter((item) => safeArray(item.allergens_json).length > 0).length} 件 注意品目あり</p>
       <Panel
         title="メニュー一覧"
         description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。価格の改定は承認の流れを通り、決めた開始日時から新しい価格になります。"
