@@ -6,6 +6,8 @@ import { PageHeading } from '@/components/templates/page-frame'
 import authStyles from '@/components/templates/auth-page.module.css'
 import { CONTACT_URL, LEGAL_LINKS } from '@/lib/auth-email'
 import { nameInitial } from '@/lib/name-initial'
+import { Check, Clock3 } from 'lucide-react'
+import applicationStyles from './application-auth.module.css'
 
 /**
  * ログイン前の画面の入れ物。★管理画面 0-1／36-4／36-6 の「登録カード」（幅 520）。
@@ -27,6 +29,7 @@ export default function AuthCard({
   brandNote,
   step,
   wide,
+  applicationFlow,
 }: {
   title: string
   description: ReactNode
@@ -46,6 +49,8 @@ export default function AuthCard({
   step?: { current: number; total: number }
   /** 中身が広いカード（二段階認証の設定）。 */
   wide?: boolean
+  /** 申込承認フロー v01 のカード。既存のログイン画面には適用しない。 */
+  applicationFlow?: 'form' | 'sent' | 'setup' | 'pending'
 }) {
   // ログイン前の画面もタブの題を「<見出し> | musubo」にする。
   useEffect(() => { setDocumentTitle(title) }, [title])
@@ -81,6 +86,17 @@ export default function AuthCard({
     </footer>
   )
 
+  if (applicationFlow) return <main data-design-node={node} className={applicationStyles.page} data-flow={applicationFlow}>
+    <section data-design-node={cardNode} className={applicationStyles.card} data-flow={applicationFlow} aria-label={title}>
+      <AuthBrandLogo />
+      {applicationFlow === 'sent' ? <div className={applicationStyles.stateIcon} data-tone="success"><Check aria-hidden="true" /></div> : null}
+      {applicationFlow === 'pending' ? <div className={applicationStyles.stateIcon} data-tone="warning"><Clock3 aria-hidden="true" /></div> : null}
+      <header className={applicationStyles.heading}><h1>{title}</h1><p>{description}</p></header>
+      <div className={applicationStyles.body}>{children}</div>
+    </section>
+    {applicationFlow === 'form' ? <div className={applicationStyles.legal}>{legal}</div> : <footer className={applicationStyles.simpleFooter}><span>musubo</span><a href={CONTACT_URL} target="_blank" rel="noreferrer">お問い合わせ</a></footer>}
+  </main>
+
   // ログインの 1 段目：二段階認証（2 段目）と同じ地・同じ幅・同じカード（枠の線なしで影だけ）。
   if (step) return (
     <main data-design-node={node} className={authStyles.page} data-auth-layout="admin" data-auth-foot="">
@@ -99,12 +115,7 @@ export default function AuthCard({
         data-design-node={cardNode}
         className="flex w-full max-w-130 flex-col items-center gap-5 rounded-large border border-hairline bg-canvas px-6 py-9 shadow-float sm:px-10"
       >
-        <div className="flex items-center gap-2">
-          <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-control bg-accent-deep text-heading font-bold text-on-accent">
-            m
-          </span>
-          <span className="text-display font-bold text-ink">musubo</span>
-        </div>
+        <AuthBrandLogo />
         <div className="flex w-full flex-col items-center gap-2 text-center">
           <h1 className="text-heading font-bold text-ink">{title}</h1>
           <p className="text-caption text-balance text-ink-faint">{description}</p>
@@ -114,6 +125,13 @@ export default function AuthCard({
       <div className="mt-6">{legal}</div>
     </main>
   )
+}
+
+function AuthBrandLogo() {
+  return <span className={applicationStyles.brandViewport}>
+    {/* eslint-disable-next-line @next/next/no-img-element -- 提供されたロゴの透過余白を表示領域で切る */}
+    <img className={applicationStyles.brandImage} src="/brand/musubo-color.png" width={3020} height={890} alt="musubo" />
+  </span>
 }
 
 /** カードの頭：会社の印・会社名・musubo、右に「2 / 2」、下に薄い線（統括のアカウントのカードと同じ作り）。 */
