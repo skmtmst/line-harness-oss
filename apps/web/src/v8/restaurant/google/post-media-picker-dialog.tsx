@@ -71,7 +71,7 @@ export function PostMediaPickerDialog({ target, accountId, onClose, onSelect }: 
     setSelected(null)
     setPage(next)
   }
-  const confirm = async () => {
+  const applySelection = async () => {
     if (!selected || confirming) return
     setConfirming(true)
     setError('')
@@ -99,7 +99,7 @@ export function PostMediaPickerDialog({ target, accountId, onClose, onSelect }: 
     footer={<div className={styles.footer}>
       <span>選択後、切り取り位置を確認します。</span>
       <Button className={styles.cancel} onClick={onClose} disabled={confirming}>キャンセル</Button>
-      <Button className={styles.confirm} variant="primary" onClick={() => void confirm()} disabled={!selected || loading || confirming} busy={confirming} busyLabel="画像を読み込み中…">切り取り位置を確認</Button>
+      <Button className={styles.confirm} variant="primary" onClick={() => void applySelection()} disabled={!selected || loading || confirming} busy={confirming} busyLabel="画像を読み込み中…">切り取り位置を確認</Button>
     </div>}
   >
     <div className={styles.body}>

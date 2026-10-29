@@ -3,6 +3,8 @@ import React, { act, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
+import { readStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
 
 const apiMocks = vi.hoisted(() => ({
   listBookings: vi.fn(),
@@ -179,13 +181,26 @@ function propsOf(element: HTMLElement): Record<string, unknown> {
 }
 
 function actionButton(container: HTMLElement, bookingId: string, action: string): HTMLElement {
+  const label = action === 'no_show' ? '無断' : action === 'cancel' ? 'キャンセルにする' : action
+  if (action === 'attended') {
+    const primary = elements(container).find((element) => (
+      element.tagName === 'BUTTON'
+      && element.getAttribute('data-booking-id') === bookingId
+      && element.getAttribute('data-booking-action') === action
+    ))
+    if (!primary) throw new Error(`primary action not found: ${bookingId}/${action}`)
+    return primary
+  }
   const found = elements(container).find((element) => (
     element.tagName === 'BUTTON'
     && element.getAttribute('data-booking-id') === bookingId
-    && element.getAttribute('data-booking-action') === action
+    && element.getAttribute('data-booking-action') === 'menu'
   ))
   if (!found) throw new Error(`button not found: ${bookingId}/${action}`)
-  return found
+  fireEvent.click(found)
+  const menuItem = elements(document.body).find((element) => element.getAttribute('role') === 'menuitem' && (element.getAttribute('aria-label') ?? element.textContent?.trim()) === label)
+  if (!menuItem) throw new Error(`menu item not found: ${bookingId}/${action}`)
+  return menuItem
 }
 
 function occurrenceActionButton(container: HTMLElement, _action: string): HTMLElement {
@@ -436,15 +451,47 @@ describe('Issue #684 イベント予約の実操作', () => {
     expect(elements(adminView.container).some((element) => element.tagName === 'INPUT' && element.id === 'ev-bk-message')).toBe(true)
   })
 
-  it.each([null, 'staff', 'unknown'] as const)('権限が%sのときは一斉送信だけを隠し、申込者操作は残す', async (role) => {
+  it.each([null, 'staff', 'unknown'] as const)('権限が%sのときも一斉送信の場所を残し、実行を止める', async (role) => {
     accountMock.role = role
     const view = await mount(<EventBookingsPage />)
 
-    expect(view.container.textContent).not.toContain('お知らせを送る')
-    expect(elements(view.container).some((element) => element.tagName === 'INPUT' && element.id === 'ev-bk-message')).toBe(false)
+    expect(view.container.textContent).toContain('お知らせを送る')
+    expect(view.container.querySelector<HTMLInputElement>('#ev-bk-message')?.readOnly).toBe(true)
+    const send = buttonByText(view.container, '送る') as HTMLButtonElement
+    expect(send.disabled || send.getAttribute('aria-disabled') === 'true').toBe(true)
+    await click(send)
+    expect(apiMocks.previewOccurrenceBroadcast).not.toHaveBeenCalled()
     expect(view.container.textContent).toContain('CSVで書き出す')
     expect(view.container.textContent).toContain('個別トーク')
-    expect(occurrenceActionButton(view.container, 'promote-waitlist')).toBeDefined()
+    expect(view.container.textContent).toContain('次の方へ案内する')
+  })
+
+  it('閲覧のみでも申込操作を残し、焦点と理由を示して全ての更新を拒否する', async () => {
+    accountMock.role = 'viewer'
+    const view = await mount(<EventBookingsPage />)
+    expect(view.container.querySelector('[data-read-only-notice]')).toBeTruthy()
+    await expectPermissionLocked(actionButton(view.container, 'booking-1', 'attended'))
+    await expectPermissionLocked(occurrenceActionButton(view.container, 'promote-waitlist'))
+    await expectPermissionLocked(buttonByText(view.container, 'CSVで書き出す'))
+    await expectPermissionLocked(buttonByText(view.container, '送る'))
+    await expectPermissionLocked(actionButton(view.container, 'booking-1', 'no_show'))
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeNull()
+    for (const method of [apiMocks.updateBooking, apiMocks.decideBooking, apiMocks.adminCancelBooking,
+      apiMocks.promoteOccurrenceWaitlist, apiMocks.reorderOccurrenceWaitlist, apiMocks.skipOccurrenceWaitlist,
+      apiMocks.downloadOccurrenceApplicantsCsv, apiMocks.previewOccurrenceBroadcast, apiMocks.sendOccurrenceBroadcast]) {
+      expect(method).not.toHaveBeenCalled()
+    }
+  })
+
+  it('確認窓を開いた後で閲覧のみへ変わったら窓を閉じ、更新しない', async () => {
+    const view = await mount(<EventBookingsPage />)
+    await click(actionButton(view.container, 'booking-1', 'cancel'))
+    expect(document.querySelector('[role="dialog"], [role="alertdialog"]')).toBeTruthy()
+    await act(async () => { rememberStaffIdentity({ ...readStaffIdentity()!, role: 'viewer' }) })
+    await flush()
+    expect(elements(document.body).some((element) => ['dialog', 'alertdialog'].includes(element.getAttribute('role') ?? ''))).toBe(false)
+    await expectPermissionLocked(actionButton(view.container, 'booking-1', 'attended'))
+    expect(apiMocks.adminCancelBooking).not.toHaveBeenCalled()
   })
 
   it('一斉送信はサーバーで固定した対象を確認してから送り、二重押しでpreviewを増やさない', async () => {
@@ -708,11 +755,9 @@ describe('Issue #684 イベント予約の実操作', () => {
     apiMocks.updateBooking.mockReturnValue(pending.promise)
     const view = await mount(<EventBookingsPage />)
     const button = actionButton(view.container, 'booking-a', 'attended')
-    const onClick = propsOf(button).onClick as (event: unknown) => void
-
     await act(async () => {
-      onClick({})
-      onClick({})
+      button.click()
+      button.click()
     })
     await flush()
 

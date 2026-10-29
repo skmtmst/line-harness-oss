@@ -41,6 +41,7 @@ it('月のメニュー絞り込みは左の列と畳んだ欄で同じ選択を�
   const page = container.querySelector('[data-page-template="list"]')!
   expect(page.querySelector('[data-list-skeleton="templates"] [data-template-region="stats"]')?.textContent).toContain('今月の予約3件')
   expect(page.querySelector('[data-template-region="pagination"] [data-pagination-summary]')?.textContent).toContain('3件中 1〜3件')
+  expect(screen.queryByRole('button', { name: '前のページ' })).toBeNull()
   expect(screen.queryByRole('button', { name: '次のページ' })).toBeNull()
 })
 

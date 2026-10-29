@@ -84,3 +84,16 @@ it('リンクが20本なら発行操作を出さず、上限を知らせる', as
   expect(await screen.findByText('リンクの上限（20本）に達しています')).toBeTruthy();
   expect(screen.queryByRole('button', { name: /SNSごとのリンクを発行/ })).toBeNull();
 });
+
+it.each([
+  [0, 500, '+500マイル'],
+  [1000, 0, '1件 ¥1,000'],
+  [1000, 500, '1件 ¥1,000 +500マイル'],
+  [0, 0, '報酬はこれから決まります'],
+])('金額%s・マイル%sで矛盾しない報酬を出す', async (rewardAmount, rewardMiles, expected) => {
+  vi.mocked(profile.fetchOffers).mockResolvedValue([{ ...offer, rewardAmount, rewardMiles }]);
+  render(<Affiliate />);
+  const region = await screen.findByRole('region', { name: '参加中の案件' });
+  expect(within(region).getByText(expected)).toBeTruthy();
+  expect(within(region).queryByText(/報酬未設定/)).toBeNull();
+});

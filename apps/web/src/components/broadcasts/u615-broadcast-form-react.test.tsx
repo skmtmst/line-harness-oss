@@ -140,6 +140,7 @@ describe('監査 #615：一斉配信の受け入れ', () => {
     await act(async () => { setNativeValue(textarea()!, 'おはようございます') })
     await flush()
     expect(textarea()!.value).toBe('おはようございます')
+    expect(container.querySelector('#broadcast-line-preview')?.textContent).toContain('おはようございます')
 
     // 画像へ切り替えると本文欄は画像の入力へ変わる
     await clickTab('画像')
@@ -149,6 +150,7 @@ describe('監査 #615：一斉配信の受け入れ', () => {
     await clickTab('テキスト')
     expect(textarea(), 'テキストへ戻しても本文欄が出ない').not.toBeNull()
     expect(textarea()!.value).toBe('おはようございます')
+    expect(container.querySelector('#broadcast-line-preview')?.textContent).toContain('おはようございます')
   })
 
   it('BC-02: 「テンプレートから選ぶ」は見出しだけでなく候補まで出る', async () => {

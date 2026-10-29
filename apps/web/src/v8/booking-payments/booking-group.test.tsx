@@ -1,11 +1,11 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const net = vi.hoisted(() => ({ group: vi.fn(), cancelGroup: vi.fn() }))
 vi.mock('@/lib/api/helpers/booking-advanced', () => ({ bookingAdvancedApi: net }))
 vi.mock('@/components/shared/toast', () => ({ notifySaved: vi.fn() }))
 import { BookingGroupSection } from './booking-group'
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.resetAllMocks() })
 const group = (version: number) => ({ success: true, data: { groupId: 'g1', ownerName: '確認用の人', version, members: [1, 2].map((n) => ({ bookingId: `b${n}`, label: `${n}人目`, personName: `${n}人目`, menuName: 'メニュー', staffName: null, startsAt: '2026-10-18T01:00:00Z', endsAt: '2026-10-18T02:00:00Z', status: 'confirmed' })) } })
 it('競合から読み直しても理由を保持し、新しい版でだけ再試行する', async () => {
   net.group.mockResolvedValueOnce(group(2)).mockResolvedValue(group(3))
@@ -22,5 +22,58 @@ it('競合から読み直しても理由を保持し、新しい版でだけ再�
   expect((screen.getByRole('textbox', { name: '取り消す理由' }) as HTMLInputElement).value).toBe('予定の変更')
   fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
   await waitFor(() => expect(changed).toHaveBeenCalledOnce())
+  expect(net.cancelGroup).toHaveBeenLastCalledWith('a1', 'g1', '予定の変更', 3)
+})
+
+it('組の再取得失敗は権限不足と区別し、理由を残して取消を送れなくする', async () => {
+  net.group.mockResolvedValueOnce(group(2)).mockRejectedValue(new Error('read failed'))
+  net.cancelGroup.mockRejectedValueOnce(new Error('conflict'))
+  render(<BookingGroupSection accountId="a1" bookingId="b1" canOperate />)
+  fireEvent.click(await screen.findByRole('button', { name: '組をまとめて取り消す' }))
+  const input = screen.getByRole('textbox', { name: '取り消す理由' }) as HTMLInputElement
+  fireEvent.change(input, { target: { value: '予定の変更' } })
+  fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
+  await screen.findByText(/取り消せませんでした。入力は残っています/)
+  fireEvent.click(screen.getByRole('button', { name: 'この組を読み直す' }))
+  await screen.findByText('失敗：この組を読み込めませんでした')
+  expect(screen.getByText('前に読み込んだ内容を表示しています。読み直すまで取消はできません。')).toBeTruthy()
+  const confirm = screen.getByRole('button', { name: 'まとめて取り消す' })
+  expect(confirm.hasAttribute('disabled')).toBe(true)
+  expect(confirm.getAttribute('aria-description')).toBe('組の状態を確かめられません。この組を読み直してください。')
+  expect(input.value).toBe('予定の変更')
+  fireEvent.click(confirm)
+  expect(net.cancelGroup).toHaveBeenCalledTimes(1)
+})
+
+it('最初から組を読めない時は0人とせず、人数が分からないと知らせる', async () => {
+  net.group.mockRejectedValue(new Error('read failed'))
+  render(<BookingGroupSection accountId="a1" bookingId="b1" canOperate />)
+  expect(await screen.findByText('失敗：この組を読み込めませんでした')).toBeTruthy()
+  expect(screen.getByText('読み込めていないため人数は分かりません。')).toBeTruthy()
+  expect(screen.queryByText('この組（0 人）')).toBeNull()
+  expect(net.cancelGroup).not.toHaveBeenCalled()
+})
+
+it('読み直し中には前の版で送れず、応答後に入力した理由と新しい版で再試行する', async () => {
+  let finish!: (value: ReturnType<typeof group>) => void
+  net.group.mockResolvedValueOnce(group(2)).mockImplementationOnce(() => new Promise((resolve) => { finish = resolve })).mockResolvedValue(group(4))
+  net.cancelGroup.mockRejectedValueOnce(new Error('conflict')).mockResolvedValue({ success: true, data: { cancelled: 2, version: 4 } })
+  render(<BookingGroupSection accountId="a1" bookingId="b1" canOperate />)
+  fireEvent.click(await screen.findByRole('button', { name: '組をまとめて取り消す' }))
+  const input = screen.getByRole('textbox', { name: '取り消す理由' }) as HTMLInputElement
+  fireEvent.change(input, { target: { value: '予定の変更' } })
+  fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
+  await screen.findByText(/取り消せませんでした。入力は残っています/)
+  fireEvent.click(screen.getByRole('button', { name: 'この組を読み直す' }))
+  await waitFor(() => expect(net.group).toHaveBeenCalledTimes(2))
+  const waiting = screen.getByRole('button', { name: 'まとめて取り消す' })
+  expect(waiting.hasAttribute('disabled')).toBe(true)
+  expect(waiting.getAttribute('aria-description')).toBe('組の状態を読み直しています。完了してから操作してください。')
+  fireEvent.click(waiting)
+  expect(net.cancelGroup).toHaveBeenCalledTimes(1)
+  expect(input.value).toBe('予定の変更')
+  await act(async () => { finish(group(3)) })
+  fireEvent.click(screen.getByRole('button', { name: 'まとめて取り消す' }))
+  await waitFor(() => expect(net.cancelGroup).toHaveBeenCalledTimes(2))
   expect(net.cancelGroup).toHaveBeenLastCalledWith('a1', 'g1', '予定の変更', 3)
 })

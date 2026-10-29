@@ -5,15 +5,17 @@ import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Search } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateField from '@/components/shared/date-field'
 import HelpTip from '@/components/shared/help-tip'
 import TextLink from '@/components/shared/text-link'
 import { TimeField } from '@/components/shared/date-time-field'
-import Checkbox from '@/components/shared/checkbox'
+import { TextField } from '@/components/shared/text-field'
+import Toggle from '@/components/shared/toggle'
 import { RowMenu } from '@/components/shared/row-actions'
 import { ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingSlotCheckResult, type BookingStaff } from '@/lib/api'
 import { slotReasonLabel } from '../lib/slot-reason'
@@ -24,8 +26,9 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ListState from '@/components/shared/list-state'
+import HoursCopyDialog from './hours-copy-dialog'
 import Notice from '@/components/shared/notice'
-import { TextField as SharedTextField } from '@/components/shared/text-field'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 
 export function HoursTabV8({ accountId, settings, settingsStatus, settingsError, resources, resourcesStatus, resourcesError, canEdit, menus, onSaved, onReload, onResourceSaved, onResourceCreated, onResourceDeleted, onResourcesRetry }: {
   accountId: string
@@ -44,8 +47,10 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
   onResourceDeleted: (id: string) => void
   onResourcesRetry: () => void
 }) {
+  const lockedReason = usePermissionLockReason(canEdit)
   const saveErrors = useSaveFormErrors()
   const [draft, setDraft] = useState<BusinessHoursDay[] | null>(null)
+  const [copySource, setCopySource] = useState<BusinessHoursDay | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saveConflict, setSaveConflict] = useState(false)
@@ -56,6 +61,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
   const saveGenerationRef = useRef(0)
   useEffect(() => {
     saveGenerationRef.current += 1
+    setCopySource(null)
     inFlightRef.current = false
     setSaving(false)
     setSaveError(null)
@@ -81,6 +87,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
   })
 
   function updateDay(weekday: number, update: (intervals: BusinessHourInterval[]) => BusinessHourInterval[]) {
+    if (!canEdit) return
     setDraft((current) => current?.map((day) => day.weekday === weekday
       ? { ...day, intervals: update(day.intervals) }
       : day) ?? current)
@@ -166,12 +173,20 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Week">
+      {canEdit && copySource ? <HoursCopyDialog key={`${accountId}:${copySource.weekday}`} source={copySource} days={draft}
+        onCancel={() => setCopySource(null)} onCopy={(targets) => {
+          setDraft((current) => current?.map((day) => targets.includes(day.weekday) && day.intervals.length > 0
+            ? { ...day, intervals: copySource.intervals.map((interval) => ({ ...interval })) } : day) ?? current)
+          setSaveError(null)
+          setBadHours(null)
+          setCopySource(null)
+        }} /> : null}
       <Notice tone="info">「同時」は1時間に受けられる数ではなく、同じ時間に重ねられる予約の数です。</Notice>
       {!settings.businessHoursConfigured ? (
         <Band tone="warn">まだ週全体の営業時間を保存していません。時間帯がない曜日は現在は担当者の勤務時間どおりに受け付けます。保存すると、その曜日は休業になります。</Band>
       ) : null}
 
-      <section className={styles.section}>
+      <Card layout="vertical" padding="roomy" gap="normal">
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>開ける時間</h2>
           <p className={styles.sectionDesc}>曜日ごとに受付の時間と休憩を決めます</p>
@@ -184,34 +199,15 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
             const closedText = settings.businessHoursConfigured
               ? '休み（定休日）・お客さまの画面に出ません'
               : '未設定（現在は担当者の勤務時間どおり）'
-            // 閲覧のみ：つまみ・時刻の欄・足す／消す口は置かず、いまの時間を文字で見せる（2026-10-06 オーナー決定）。
-            if (!canEdit) {
-              return (
-                <div key={weekday} className={styles.dayRow}>
-                  <div className={styles.dayName}>
-                    <span className={styles.dayLabel}>{label.replace('曜日', '')}</span>
-                  </div>
-                  <div className={styles.dayBody}>
-                    {intervals.length === 0 ? (
-                      <span className={styles.dayOff}>{closedText}</span>
-                    ) : intervals.map((interval, index) => (
-                      <p key={index} className={styles.intervalLine}>
-                        {interval.start}〜{interval.end}
-                        <span className={styles.sameTimeLabel}>同時 {interval.capacity ?? 1}</span>
-                      </p>
-                    ))}
-                  </div>
-                </div>
-              )
-            }
             return (
               <div key={weekday} className={styles.dayRow}>
                 <div className={styles.dayName}>
-                  {/* 保存してから効く設定なのでチェック（決まり14：スイッチはその場で効く物だけ・絵 yRPxl）。 */}
-                  <SaveErrorField names={["isOpen","is_open"]}><Checkbox
-                    aria-label={`${label}を開ける`}
+                  <SaveErrorField names={["isOpen","is_open"]}><Toggle
+                    label={`${label}を開ける`}
                     checked={isOpen}
-                    onCheckedChange={(next) => updateDay(weekday, () => next ? [{ start: '09:00', end: '18:00', capacity: 1 }] : [])}
+                    disabled={!canEdit || saving}
+                    lockedReason={lockedReason}
+                    onChange={(next) => updateDay(weekday, () => next ? [{ start: '09:00', end: '18:00', capacity: 1 }] : [])}
                   /></SaveErrorField>
                   <span className={styles.dayLabel}>{label.replace('曜日', '')}</span>
                 </div>
@@ -222,6 +218,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                   {intervals.map((interval, index) => (
                   <div key={index} className={styles.intervalLine}>
                     <SaveErrorField names={[`intervals.${index}.start`,"start","interval.start"]}><TimeField
+                      disabled={!canEdit || saving}
                       invalid={isBad(weekday, index, 'start')}
                       aria-label={`${label}の開始時刻（${index + 1}区間目）`}
                       value={interval.start}
@@ -232,6 +229,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                     /></SaveErrorField>
                     <span className={styles.intervalTilde}>〜</span>
                     <SaveErrorField names={[`intervals.${index}.end`,"end","interval.end"]}><TimeField
+                      disabled={!canEdit || saving}
                       invalid={isBad(weekday, index, 'end')}
                       aria-label={`${label}の終了時刻（${index + 1}区間目）`}
                       value={interval.end}
@@ -242,6 +240,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                     /></SaveErrorField>
                     <span className={styles.sameTimeLabel}>同時</span>
                     <SaveErrorField names={[`intervals.${index}.capacity`,"capacity","interval.capacity"]}><NumberInput
+                      disabled={!canEdit || saving}
                       aria-label={`${label}の同時受付数（${index + 1}区間目）`}
                       aria-invalid={isBad(weekday, index, 'capacity') || undefined}
                       type="number"
@@ -253,24 +252,24 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
                       onChange={(event) => updateDay(weekday, (list) => list.map((entry, i) => i === index ? { ...entry, capacity: Number(event.target.value) } : entry))}
                       className={styles.numInput}
                     /></SaveErrorField>
-                    <button
-                      type="button"
-                      className={styles.iconRemove}
+                    <Button
+                      type="button" variant="text" size="inline" disabled={!canEdit || saving} lockedReason={lockedReason}
                       aria-label={`${label}の${index + 1}区間目を削除`}
                       onClick={() => updateDay(weekday, (list) => list.filter((_, i) => i !== index))}
                     >
                       <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden="true"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" strokeLinecap="round" /></svg>
-                    </button>
+                    </Button>
                   </div>
                   ))}
+                  {isOpen ? <Button variant="text" disabled={!canEdit || saving} lockedReason={lockedReason} aria-label={`${label}の時間をほかの曜日に写す`}
+                    onClick={() => { if (canEdit) setCopySource({ weekday, intervals: intervals.map((interval) => ({ ...interval })) }) }}>ほかの曜日に写す</Button> : null}
                   {isOpen && intervals.length < 8 ? (
-                    <button
-                      type="button"
-                      className={styles.addLine}
+                    <Button
+                      type="button" variant="text" size="inline" disabled={!canEdit || saving} lockedReason={lockedReason}
                       onClick={() => updateDay(weekday, (list) => [...list, { start: '09:00', end: '18:00', capacity: 1 }])}
                     >
                       <Plus size={16} aria-hidden="true" />時間帯を足す
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </div>
@@ -285,9 +284,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
         <h3 id="hours-equip-title" className={styles.sectionTitle}>設備</h3>
         <div className={styles.innerHeadRow}>
           <p className={styles.sectionDesc}>設備ごとに、同じ時間に使える数を決めます。</p>
-          {canEdit ? (
-            <Button onClick={() => setAddingResource(true)}>設備を作る</Button>
-          ) : null}
+          <Button disabled={!canEdit} lockedReason={lockedReason} onClick={() => { if (canEdit) setAddingResource(true) }}>設備を作る</Button>
         </div>
         {resourcesStatus === 'loading' ? <SkeletonRows rows={2} /> : null}
         {resourcesStatus === 'error' ? (
@@ -330,7 +327,7 @@ export function HoursTabV8({ accountId, settings, settingsStatus, settingsError,
 
       <SlotCheckV8 accountId={accountId} menus={menus} />
         </div>
-      </section>
+      </Card>
     </div></SaveErrorScope>
   )
 }
@@ -555,16 +552,16 @@ export function ResourceDialog({ open, onClose, accountId, resource, onSaved }: 
       title={resource ? `「${resource.name}」を編集` : '設備を作る'}
       onCancel={() => { if (!saving) onClose() }}
       busy={saving}
-      footer={<div className="flex justify-end gap-2">
+      footer={<DialogActions>
           <Button onClick={() => { if (!saving) onClose() }} disabled={saving}>キャンセル</Button>
           <Button variant="primary" onClick={() => void submit()} disabled={saving} busy={saving}>保存する</Button>
-        </div>}
+        </DialogActions>}
     >
       <div className="grid gap-3">
-        <Field label="設備名"><SaveErrorField names={["name"]}><SharedTextField aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
-        <Field label="種類"><SaveErrorField names={["type"]}><SharedTextField aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例：部屋・席・機器" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
-        <Field label="受付上限"><SaveErrorField names={["capacity"]}><NumberInput aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm tabular-nums focus:outline-none focus:ring-2" /></SaveErrorField></Field>
-        {error ? <Notice tone="danger" >{error}</Notice> : null}
+        <Field label="設備名"><SaveErrorField names={["name"]}><TextField aria-label="設備名" value={name} onChange={(event) => setName(event.target.value)} disabled={saving} maxLength={100} /></SaveErrorField></Field>
+        <Field label="種類"><SaveErrorField names={["type"]}><TextField aria-label="種類" value={type} onChange={(event) => setType(event.target.value)} disabled={saving} maxLength={50} placeholder="例：部屋・席・機器" /></SaveErrorField></Field>
+        <Field label="受付上限"><SaveErrorField names={["capacity"]}><NumberInput aria-label="受付上限" type="number" min={1} max={1000} value={capacity} onChange={(event) => setCapacity(event.target.value)} disabled={saving} /></SaveErrorField></Field>
+        {error ? <Notice tone="danger" marker="dot" heading="失敗：設備を保存できませんでした">{error}</Notice> : null}
 
       </div>
     </Dialog></SaveErrorScope>

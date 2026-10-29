@@ -23,8 +23,10 @@ type State =
   | { phase: 'registered'; affiliate: AffiliateData; links: AffiliateLinkData[]; offers: OfferData[] }
   | { phase: 'error'; message: string };
 
-const rewardText = (amount: number) =>
-  amount > 0 ? `1件 ${formatYen(amount)}` : '報酬未設定';
+const rewardText = (amount: number, miles: number) => {
+  const parts = [amount > 0 ? `1件 ${formatYen(amount)}` : '', miles > 0 ? `+${miles.toLocaleString()}マイル` : ''].filter(Boolean);
+  return parts.join(' ') || '報酬はこれから決まります';
+};
 
 function formatMileageDate(value: string): string {
   const parsed = new Date(value.includes('T') ? value : value.replace(' ', 'T'));
@@ -559,8 +561,7 @@ function OfferCard({
           )}
         </div>
         <p className="shrink-0 text-xs font-bold whitespace-nowrap text-ok-ink tabular-nums">
-          {rewardText(offer.rewardAmount)}
-          {offer.rewardMiles > 0 && ` +${offer.rewardMiles.toLocaleString()}マイル`}
+          {rewardText(offer.rewardAmount, offer.rewardMiles)}
         </p>
       </div>
 

@@ -70,3 +70,25 @@ it('大きすぎるCSVと未確認の反映はAPIへ送らない', async () => {
   expect(m.previewImport).not.toHaveBeenCalled()
   expect(m.executeImport).not.toHaveBeenCalled()
 })
+
+it('確認後に閲覧のみや本人未取得へ変わっても、管理APIを起動しない', async () => {
+  const h = await ready()
+  const file = new NodeFile(['LINEユーザーID,LINE表示名\nU1,花子'], 'friends.csv', { type: 'text/csv' })
+  await act(async () => h.result.current.onPickFile(file as unknown as File))
+  await act(async () => h.result.current.previewImport())
+  expect(m.previewImport).toHaveBeenCalledOnce()
+  for (const role of ['viewer', null]) {
+    m.role = role as unknown as string
+    h.rerender()
+    expect(h.result.current.manageLocked).toBe(true)
+    await act(async () => {
+      await h.result.current.createExport()
+      await h.result.current.previewImport()
+      await h.result.current.executeImport()
+      await h.result.current.downloadExport('job')
+    })
+  }
+  expect(m.createExport).not.toHaveBeenCalled()
+  expect(m.executeImport).not.toHaveBeenCalled()
+  expect(m.previewImport).toHaveBeenCalledOnce()
+})

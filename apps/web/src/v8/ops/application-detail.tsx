@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 import { api, type OpsApplication } from '@/lib/api'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus, useOverlayLayer } from '@/components/shared/overlay-utils'
@@ -38,11 +39,11 @@ function Detail() {
     if (!id) { setError('申込が指定されていません'); setLoading(false); return }
     try {
       const result = await api.ops.applications.get(id)
-      if (!result.success) throw new Error(result.error || '申込を読み込めませんでした')
+      if (!result.success) { setError(result.error || '申込を読み込めませんでした'); return }
       setApplication(result.data)
       setNote(result.data.contact_note || '')
       setError('')
-    } catch (caught) { setError(caught instanceof Error ? caught.message : '申込を読み込めませんでした') }
+    } catch (caught) { setError(japaneseDetailOf(caught) || '申込を読み込めませんでした') }
     finally { setLoading(false) }
   }, [id])
   useEffect(() => { void load() }, [load])
@@ -52,9 +53,9 @@ function Detail() {
     setBusy(true); setError(''); setMessage('')
     try {
       const result = await api.ops.applications.contact(application.id, note.trim())
-      if (!result.success) throw new Error(result.error || '保存できませんでした')
+      if (!result.success) { setError(result.error || '保存できませんでした'); return }
       setApplication(result.data); setMessage('連絡内容を保存しました')
-    } catch (caught) { setError(caught instanceof Error ? caught.message : '保存できませんでした') }
+    } catch (caught) { setError(japaneseDetailOf(caught) || '保存できませんでした') }
     finally { setBusy(false) }
   }
 
@@ -63,11 +64,11 @@ function Detail() {
     setBusy(true); setError(''); setMessage('')
     try {
       const result = await api.ops.applications.approve(application.id)
-      if (!result.success) throw new Error(result.error || '承認できませんでした')
+      if (!result.success) { setError(result.error || '承認できませんでした'); return }
       setApplication(result.data.application)
       setConfirmOpen(false)
       setMessage(result.data.mailSent ? '承認し、招待メールを送りました' : '承認しました。招待メールの送信に失敗したため、再送してください')
-    } catch (caught) { setError(caught instanceof Error ? caught.message : '承認できませんでした') }
+    } catch (caught) { setError(japaneseDetailOf(caught) || '承認できませんでした') }
     finally { setBusy(false) }
   }
 
@@ -76,9 +77,9 @@ function Detail() {
     setBusy(true); setError(''); setMessage('')
     try {
       const result = await api.ops.applications.resendInvite(application.id)
-      if (!result.success) throw new Error(result.error || '再送できませんでした')
+      if (!result.success) { setError(result.error || '再送できませんでした'); return }
       setApplication(result.data); setMessage('招待メールを再送しました')
-    } catch (caught) { setError(caught instanceof Error ? caught.message : '再送できませんでした') }
+    } catch (caught) { setError(japaneseDetailOf(caught) || '再送できませんでした') }
     finally { setBusy(false) }
   }
 

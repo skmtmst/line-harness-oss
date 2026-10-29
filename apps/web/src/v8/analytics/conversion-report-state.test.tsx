@@ -9,7 +9,7 @@ vi.mock('./routes', () => ({ RoutesFrame: ({ children }: {children: () => React.
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 import ConversionReport from './conversion-report'
 import { ApiError } from '@/lib/api'
-beforeEach(() => m.report.mockReset())
+beforeEach(() => { m.report.mockReset(); m.range = { from: '2026-10-01', to: '2026-10-12' } })
 afterEach(cleanup)
 it('成果地点の操作は共通の印ボタンから開き、日ごとの表へ絞り込める', async () => {
   m.report.mockResolvedValue({ success: true, data: { daily: [], kpis: { netCount: 4, previousNetCount: 2 }, byDefinition: [
@@ -25,6 +25,7 @@ it('成果地点の操作は共通の印ボタンから開き、日ごとの表�
   expect(container.querySelector('[role="menu"]')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'すべてに戻す' }))
   expect(screen.getByText('日ごとの成果（成果地点すべて）')).toBeTruthy()
+  expect(screen.getByText('この期間 4 件・前の期間 2 件')).toBeTruthy()
 })
 it('E2：404は未集計、500は失敗。再試行の連打で要求を増やさない', async () => {
   m.report.mockRejectedValueOnce(new ApiError(404, 'Not found'))
@@ -40,4 +41,41 @@ it('E2：404は未集計、500は失敗。再試行の連打で要求を増や�
   expect(screen.queryByRole('button', { name: '集計する' })).toBeNull()
   reject(new ApiError(500, 'fixture'))
   await waitFor(() => expect(container.querySelector('[data-aggregation-state=failed]')?.textContent).toContain('成果レポートを読み込めませんでした'))
+})
+
+it('選んだ期間と異なる応答をグラフとして出さない', async () => {
+  m.report.mockResolvedValue({ success: true, data: { range: { from: '2026-09-01', to: '2026-09-30' }, daily: [{ day: '2026-09-20', netCount: 5 }], byDefinition: [], kpis: {} } })
+  const { container } = render(<ConversionReport accountId="a" />)
+  await waitFor(() => expect(container.querySelector('[data-aggregation-state=failed]')).toBeTruthy())
+  expect(screen.queryByText('日ごとの成果（成果地点すべて）')).toBeNull()
+})
+
+it('取得できた時刻を表示し、成功した集計を未取得とは呼ばない', async () => {
+  m.report.mockResolvedValue({ success: true, data: { range: m.range, daily: [], byDefinition: [], kpis: { netCount: 0, previousNetCount: 0 } } })
+  const { container } = render(<ConversionReport accountId="a" />)
+  await waitFor(() => expect(container.querySelector('[data-aggregation-state=complete]')).toBeTruthy())
+  expect(container.querySelector('[data-aggregation-state=complete]')?.textContent).not.toContain('未取得')
+})
+
+it('期間を替えた最初の描画から、前の期間のグラフを隠す', async () => {
+  m.report.mockResolvedValue({ success: true, data: { range: m.range, daily: [], byDefinition: [], kpis: { netCount: 9, previousNetCount: 0 } } })
+  let observed = ''
+  function Probe() {
+    React.useLayoutEffect(() => { observed = document.body.textContent ?? '' })
+    return <ConversionReport accountId="a" />
+  }
+  const view = render(<Probe />)
+  await screen.findByText('日ごとの成果（成果地点すべて）')
+  m.report.mockImplementation(() => new Promise(() => {}))
+  m.range = { from: '2026-10-13', to: '2026-10-14' }
+  view.rerender(<Probe />)
+  expect(observed).not.toContain('日ごとの成果（成果地点すべて）')
+})
+
+it('日本時間の日時で返った期間は、同じ暦日なら正しい応答として出す', async () => {
+  m.report.mockResolvedValue({ success: true, data: { range: { from: '2026-10-01 00:00:00', to: '2026-10-12 23:59:59' }, daily: [{ day: '2026-10-12', conversionPointId: 'cp', netCount: 1 }], byDefinition: [], kpis: { netCount: 1, previousNetCount: 0 } } })
+  const { container } = render(<ConversionReport accountId="a" />)
+  await waitFor(() => expect(container.querySelector('[data-aggregation-state=complete]')).toBeTruthy())
+  expect(screen.getByText('日ごとの成果（成果地点すべて）')).toBeTruthy()
+  expect(screen.getByText('この期間 1 件・前の期間 0 件')).toBeTruthy()
 })

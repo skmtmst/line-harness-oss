@@ -16,6 +16,7 @@ import { StrictMode, useCallback, useEffect, useRef, useState, type ReactNode } 
 import { createRoot, type Root } from 'react-dom/client';
 
 
+import { countdownParts, countdownText } from './countdown.js';
 import { buildMeetingDateOptions } from './date-options.js';
 import './styles.css';
 import '../../../../liff/src/index.css';
@@ -305,13 +306,8 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
         void load();
         return;
       }
-      const h = Math.floor(remain / 3600);
-      const m = Math.floor((remain % 3600) / 60);
-      const s = remain % 60;
       setRemainSec(Math.max(0, remain));
-      setCountdown(
-        h > 0 ? `${h}時間${String(m).padStart(2, '0')}分` : `${m}分${String(s).padStart(2, '0')}秒`,
-      );
+      setCountdown(countdownText(remain));
     }, 1000);
     return () => clearInterval(timer);
   }, [state, load, error]);
@@ -803,8 +799,8 @@ export function WebinarApp({ ctx, slug }: { ctx: WebinarContext; slug: string })
         {state.nextSessionAt !== null ? (
           <>
             <p className="text-lg">{formatJp(state.nextSessionAt)} 開始</p>
-            <div className="mt-4 flex gap-2" role="timer" aria-label={`開始まであと${remainSec}秒`}>
-              {[{ value: Math.floor(remainSec / 60), unit: '分' }, { value: remainSec % 60, unit: '秒' }].map(box => <div key={box.unit} className="flex min-w-20 flex-col items-center rounded-xl bg-liff-chip px-4 py-3"><span className="text-3xl font-bold tabular-nums">{String(box.value).padStart(2, '0')}</span><span>{box.unit}</span></div>)}
+            <div className="mt-4 flex gap-2" role="timer" aria-label={`開始まであと${countdownText(remainSec)}`}>
+              {countdownParts(remainSec).map(box => <div key={box.unit} className="flex min-w-20 flex-col items-center rounded-xl bg-liff-chip px-4 py-3"><span className="text-3xl font-bold tabular-nums">{String(box.value).padStart(2, '0')}</span><span>{box.unit}</span></div>)}
             </div>
             <p className="mt-6 text-sm text-liff-sub">開始時刻になると自動的に始まります</p>
           </>

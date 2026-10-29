@@ -72,7 +72,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
                     ? <p className={styles.progressNote}>{`LINEで確認した ${polishFormatNumber(handover.confirmed ?? handover.foundSoFar)} 人のうち、新しく ${polishFormatNumber(handover.imported)} 人を取り込みました。登録済み ${polishFormatNumber(handover.alreadyPresent)} 人、再登録 ${polishFormatNumber(handover.restored)} 人です。`}</p>
                     : <p className={styles.progressNote}>いまの友だちの引き継ぎはオフになっています。引き継ぐときはアカウントの詳細から始めてください。</p>}
                   {handover.needsReview > 0 ? <Notice tone="warn" compact>{polishFormatNumber(handover.needsReview)}件は取り込めず、確認が必要です。</Notice> : null}
-                  {importState && importState.profileErrors > 0 ? <Notice tone="warn" compact>一部のプロフィールは取得できませんでした。友だち一覧で確認してください。</Notice> : null}
+                  {importState && importState.profileErrors > 0 ? <Notice tone="warn" compact>一部のプロフィールを読み込めませんでした。友だち一覧で確認してください。</Notice> : null}
                   <p className={styles.progressNote}>LINE の都合で引き継げないアカウントでは、友だちが話しかけた順に登録されます。</p>
                 </Card>
                 {connection.remainingActions.length > 0 && (
