@@ -55,26 +55,26 @@ type RowMenuTriggerProps = Omit<
 }
 
 export type ReferenceProps = {
-  
+
   items: ActionMenuItem[]
-  
+
   label: string
-  
+
   menuLabel?: string
-  
+
   note?: string
-  
+
   open?: boolean
   onOpenChange?: (open: boolean) => void
-  
+
   appearance?: 'box' | 'plain'
-  
+
   size?: 'row' | 'small'
-  
+
   className?: string
-  
+
   title?: string
-  
+
   triggerProps?: RowMenuTriggerProps
 }
 
@@ -100,7 +100,7 @@ export function RowMenuReference({
   }
   const triggerRef = useRef<HTMLButtonElement>(null)
   const toggle = (event: MouseEvent<HTMLButtonElement>) => {
-    
+
     event.stopPropagation()
     setOpen(!open)
   }
@@ -130,4 +130,3 @@ export function RowMenuReference({
     </>
   )
 }
-
