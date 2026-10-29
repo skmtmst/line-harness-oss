@@ -138,7 +138,7 @@ export function ListPage({ readOnly, readOnlyNeed, readOnlyBand, boardId, layout
   const resolvedBody = headingCreates.length ? { ...body, collapsedFolders: undefined, folderNav: navs.map(nav => ({ ...nav, createAction: undefined })) } : body
   const headingActions = headingCreates.length ? <>{headingCreates.map((nav,index) => <Fragment key={index}>{nav.createAction}</Fragment>)}{actions}</> : actions
   const page = <PageFrame kind="list" createPlacement={createPlacement} boardId={boardId} layout={layout} heightMode={heightMode} standalone={standalone} skeleton={body.skeleton}>
-    <PageHeading readOnlyBand={readOnly || readOnlyBand} readOnlyNeed={readOnlyNeed} {...{ title, help, titleAccessory, explanationToggle: explanationToggle !== undefined ? explanationToggle : explanation ? <PageExplanationToggle /> : undefined, identity, actions: headingActions, crumbs, subtitle, steps, headingSize, bottomSpacing }} />
+    <PageHeading readOnlyBand={readOnly || readOnlyBand} readOnlyNeed={readOnlyNeed} noticeRow="full" {...{ title, help, titleAccessory, explanationToggle: explanationToggle !== undefined ? explanationToggle : explanation ? <PageExplanationToggle /> : undefined, identity, actions: headingActions, crumbs, subtitle, steps, headingSize, bottomSpacing }} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     <ListPageBody {...resolvedBody} explanation={explanation} />
   </PageFrame>
