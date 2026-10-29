@@ -113,6 +113,7 @@ export default function AuthCard({
     <main data-design-node={node} className="flex min-h-svh flex-col items-center justify-center bg-shell px-4 py-8 sm:px-6">
       <section
         data-design-node={cardNode}
+        data-auth-layout="default"
         className="flex w-full max-w-130 flex-col items-center gap-5 rounded-large border border-hairline bg-canvas px-6 py-9 shadow-float sm:px-10"
       >
         <AuthBrandLogo />
