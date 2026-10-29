@@ -11,7 +11,7 @@ import {seatBoardEntry} from '@line-crm/shared'
 /*
  * ★V8 予約台帳「一覧」（板 `Z3FoM`）。今週・今月もこの形で、その期間の予約を出す。
  *
- * 数5（予約・ご来店人数・LINE予約・媒体予約・未配席）→ 期間・状態の絞り込みと
+ * 数4（予約・ご来店人数・LINE予約・媒体予約）＋帯の下の短い1行（未配席）→ 期間・状態の絞り込みと
  * 受信データを試す・手動で予約を作る → 予約タイムラインの表（時刻・予約元・お客さま・人数・卓・
  * コース・注意事項・状態・操作）→ ページ送り（一覧だけ）。
  */
@@ -39,7 +39,7 @@ import { formatNumber } from '@/lib/format'
 /*
  * ★V8 予約台帳「一覧」（板 `Z3FoM`）。今週・今月もこの形で、その期間の予約を出す。
  *
- * 数5（予約・ご来店人数・LINE予約・媒体予約・未配席）→ 期間・状態の絞り込みと
+ * 数4（予約・ご来店人数・LINE予約・媒体予約）＋帯の下の短い1行（未配席）→ 期間・状態の絞り込みと
  * 受信データを試す・手動で予約を作る → 予約タイムラインの表（時刻・予約元・お客さま・人数・卓・
  * コース・注意事項・状態・操作）→ ページ送り（一覧だけ）。
  */
@@ -104,8 +104,9 @@ export default function ListView({ view, rows, total, tables, page, period, stat
         <KpiCard title="ご来店人数" value={guests} unit="名" detail={cancelledGuests > 0 ? `取消 ${cancelledGuests}名を除く` : `表示中 ${formatNumber(rows.length)}件`} icon={undefined} presentation="band" />
         <KpiCard title="LINE予約" value={lineCount} unit="件" detail="自社導線" icon={undefined} presentation="band" />
         <KpiCard title="媒体予約" value={mediaCount} unit="件" detail="受信した予約" icon={undefined} presentation="band" />
-        <KpiCard title="未配席" value={unseated} unit="件" detail="卓の割当が必要" valueTone={unseated > 0 ? 'warning' : 'default'} icon={undefined} presentation="band" />
       </StatRow>
+      {/* R11: 5つ目は帯の下の短い1行に残す。配席は今日の盤で付ける。 */}
+      <p className={styles.fifthLine}>未配席 {formatNumber(unseated)} 件 <Button variant="text" size="inline" onClick={() => onView('today')}>今日の配席へ →</Button></p>
       <ReservationBoard selectedId={selectedId} printContext={`${storeName??storeId} ／ ${view==='week'?'今週':view==='month'?'今月':period==='past'?'過去の予約':period==='upcoming'?'今後の予約':'すべての予約'} ／ ${LEDGER_STATUS_OPTIONS.find(o=>o.value===status)?.label??status}`} title="予約台帳" loadPrintEntries={printEntries} axis={axis} floor={floor} dates={[toYmd(day)]} onAxis={v=>{setAxis(v);if(v==='resource')onView('today');else if(v==='month')onView('month');else if(v==='list')onView('list')}} columns="dining" diningContentColumns monthNamePresentation="readable" entries={rows.map(r=>seatBoardEntry(r as unknown as Record<string,unknown>))} resources={tables.map(t=>({id:t.id,label:t.code,active:!!t.is_active,capacity:t.max_capacity}))} onOpen={onOpen} actions={e=><RowActions subjectName={e.customerName} edit={{label:'変更',disabled:busy,onClick:()=>onEdit(e.id)}} menuItems={[{id:'detail',label:'詳細を見る',onSelect:()=>onOpen(e.id)},...(INACTIVE_STATUSES.includes(e.status)?[{id:'restore',label:'予約を有効に戻す',onSelect:()=>onRestore(e.id)}]:[{id:'cancel',label:'取消',tone:'danger' as const,onSelect:()=>onCancel(e.id)}])]} />} canWrite={canWrite} busy={busy}
         toolbar={      <>
         {view === 'list' ? (

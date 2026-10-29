@@ -111,6 +111,26 @@ describe('流入経路の詳細（WEB035/036）', () => {
   })
 })
 
+describe('R11: 流入後の成果の帯は4枚、5つ目は下の1行', () => {
+  it('返金・取消は帯の下の短い1行で注文明細へ行ける', async () => {
+    await act(async () => { root.render(<InflowDetailV8 />) })
+    await settle()
+    const band = host.querySelector('[aria-label="流入後の成果"]')
+    expect(band).not.toBeNull()
+    // 帯の中は4枚だけ。
+    expect(band!.querySelectorAll('[data-kpi-presentation]').length).toBe(4)
+    // 5つ目は帯の外の短い1行。
+    expect(host.textContent).toContain('返金・取消')
+    const go = [...host.querySelectorAll('button')].find((button) => button.textContent === '注文明細へ →')
+    expect(go).not.toBeUndefined()
+    expect(go!.closest('[aria-label="流入後の成果"]')).toBeNull()
+    await act(async () => { go!.click() })
+    await settle()
+    const toggle = [...host.querySelectorAll('button')].find((button) => button.textContent === '注文を見る')
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
 describe('月の区切りは日本時間（WEB038）', () => {
   it('日本時間で10月1日1時の友だちは10月に数える', async () => {
     const { monthKeyOf } = await import('./detail')
