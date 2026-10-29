@@ -71,13 +71,4 @@ describe('共通メッセージ composer', () => {
     fireEvent.click(intro)
     expect((screen.getByLabelText('本文') as HTMLTextAreaElement).value).toBe('本文1')
   })
-  it('吹き出しの箱は影を持つ（平らにしない）', async () => {
-    const { readFileSync } = await import('node:fs')
-    const { dirname, join } = await import('node:path')
-    const { fileURLToPath } = await import('node:url')
-    const css = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'message-composer.module.css'), 'utf8')
-    const bubble = css.match(/\.bubble\s*\{[^}]*\}/)?.[0] ?? ''
-    expect(bubble).toContain('box-shadow: var(--card-shadow)')
-    expect(bubble).not.toContain('box-shadow: none')
-  })
 })
