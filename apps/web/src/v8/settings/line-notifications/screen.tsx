@@ -126,7 +126,7 @@ function sortCustomerSettingsBySentCount(
 }
 
 /**
- * 「今日 送った」の内訳の文。名前は読み込んだ設定の `label` から引く。
+ * 「今日 送った」の内訳の文。読み込んだ設定の `label` から表示名を引く。
  *
  * 設定に無い eventType は「その他」にまとめる。`ec.order.confirmed` のような
  * 内部のイベントキーをそのまま文にしない。名前で出すのは上位3件までで、
