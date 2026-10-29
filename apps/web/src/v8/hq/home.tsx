@@ -506,6 +506,7 @@ export default function HqHomeV8() {
           /></SaveErrorField>
           </ListToolbarEnd>
         </ListToolbarRow>
+        {tokenExpirySummary(currentAccounts) ? <ListToolbarRow><TruncatedText className="text-body text-ink-secondary" value={tokenExpirySummary(currentAccounts)!} /></ListToolbarRow> : null}
       </ListToolbarFrame> : null}
   </>
 
@@ -529,7 +530,6 @@ export default function HqHomeV8() {
     />
   ) : (
     <>
-      {accountsReadable && tokenExpirySummary(currentAccounts) ? <TruncatedText value={tokenExpirySummary(currentAccounts)!} /> : null}
       {connectionProgress ? <p className={styles.progress} role="status">{connectionProgress}</p> : null}
       {connectionResult ? <Notice tone={connectionResult.tone} message={connectionResult.message}
         action={connectionResult.needsReload ? <Button type="button" onClick={() => void reloadConnections()} disabled={checkingConnections}>もう一度読み込む</Button> : undefined}
