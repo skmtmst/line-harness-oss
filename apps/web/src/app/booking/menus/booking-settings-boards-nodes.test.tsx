@@ -83,6 +83,7 @@ it('予約経路の常設説明は題横の説明から読めて、別のタブ�
   expect(help.closest('header')?.contains(screen.getByRole('heading', { name: '予約設定' }))).toBe(true)
   fireEvent.click(help)
   await waitFor(() => expect(document.getElementById(help.getAttribute('aria-describedby')!)).toHaveProperty('textContent', expect.stringContaining('スタッフの Google カレンダー')))
+  expect(document.getElementById(help.getAttribute('aria-describedby')!)).toHaveProperty('textContent', expect.stringContaining('Google カレンダーに書き出せない入り口は、予約通知メールを取り込みアドレスへ転送して読み取ります（見本のメールがそろった媒体から順に）。'))
   fireEvent.keyDown(document, { key: 'Escape' })
   await waitFor(() => expect(help.getAttribute('aria-expanded')).toBe('false'))
   cleanup(); state.tab = 'hours'; await draw()

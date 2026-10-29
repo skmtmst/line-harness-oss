@@ -32,6 +32,7 @@ it('状態や経路によらず行末は主操作1つとメニュー1つ、未�
   expect(screen.getByRole('columnheader', { name: '今日の予約' })).toBeTruthy()
   expect(screen.getByText('14件')).toBeTruthy()
   expect(screen.queryByText('0件')).toBeNull()
+  expect(screen.queryByText(/Google カレンダーに書き出せない入り口は/)).toBeNull()
 })
 
 it('既存の予定表示と接続の対象をそのまま渡す', () => {
