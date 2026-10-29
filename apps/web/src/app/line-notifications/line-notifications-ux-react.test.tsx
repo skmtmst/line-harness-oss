@@ -125,13 +125,22 @@ it('顧客タブの読み込み中は骨組みが出て「読み込み中」の�
   delete document.documentElement.dataset.theme
 })
 
-it('LINE通知は題の用語説明と画面の説明を「？」1つで開ける', async () => {
-  fixture.tab = 'failures'
+it.each([
+  ['customer', 'これは「お知らせ」であって「売り込みの配信」ではありません。お客さまが配信を止めていても、取引に必要な連絡は届きます。'],
+  ['operator', 'この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。'],
+  ['failures', '送れなかった理由や再試行の予定を確かめます。ブロックなどの対象外と、再試行が必要な失敗を分けて確認してください。'],
+])('%sの常設説明は帯に出さず題の「？」1つで開ける', async (tab, explanation) => {
+  fixture.tab = tab
   render(<LineNotificationsPage />)
   expect(screen.queryByRole('button', { name: 'LINE通知の説明' })).toBeNull()
+  expect(screen.queryByText(explanation)).toBeNull()
   const help = screen.getByRole('button', { name: 'この画面の説明' })
   await act(async () => { help.click() })
-  expect(screen.getByText(/送れなかった理由や再試行の予定/)).toBeTruthy()
+  const note = document.getElementById(help.getAttribute('aria-describedby') ?? '')!
+  expect(note.getAttribute('role')).toBe('note')
+  expect(within(note).getByText(explanation)).toBeTruthy()
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.queryByText(explanation)).toBeNull()
 })
 
 it('未設定の絞り込み件数と行の状態が一致し、任意の前後文が空でも出す・停止の状態を保つ', async () => {

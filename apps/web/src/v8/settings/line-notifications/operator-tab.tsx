@@ -1,6 +1,7 @@
 'use client'
 
 import { requiredText } from '@/lib/form-requirement'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 const FIELD_REQUIREMENTS = {
   exportReason: requiredText("書き出す理由を入れてください。"),
 }
@@ -83,6 +84,8 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
 }) {
   // 上の帯の最後はタブ名ではなく画面名「LINE通知」。題は左メニューの名前に任せる。
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const manageLockReason = usePermissionLockReason(canManage, 'manager')
+  const canChange = canManage && !manageLockReason
   const [rules, setRules] = useState<OperatorNotificationRule[]>([])
   const [summary, setSummary] = useState<OperatorNotificationSummary | null>(null)
   const [state, setState] = useState<LoadState>('loading')
@@ -122,7 +125,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
   }, [query, rules])
 
   const run = async (rule: OperatorNotificationRule, action: () => Promise<unknown>, done: string, failed: string) => {
-    if (!lineAccountId || busy) return
+    if (!canChange || !lineAccountId || busy) return
     setBusy(rule.id); setNotice(null)
     try {
       await action()
@@ -134,7 +137,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
   }
 
   const testSend = async (rule: OperatorNotificationRule) => {
-    if (!lineAccountId || busy) return
+    if (!canChange || !lineAccountId || busy) return
     setBusy(rule.id); setNotice(null)
     try {
       const result = await api.lineNotifications.operatorRules.test(rule.id, lineAccountId)
@@ -148,7 +151,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
 
   const closeExport = () => { if (busy === 'csv') return; setExportError(''); setExportReasonError(''); onExportClose() }
   const exportCsv = async () => {
-    if (!lineAccountId || busy) return
+    if (!canChange || !lineAccountId || busy) return
     if ((FIELD_REQUIREMENTS.exportReason.check(exportReason) !== null)) {
       setExportReasonError('書き出す理由を入れてください。')
       exportReasonRef.current?.focus()
@@ -201,7 +204,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
         : state === 'loading' ? <ListState kind="loading" title="運用者へのお知らせを読み込んでいます" />
         : state === 'error' ? <ListState kind="error" title="運用者へのお知らせを表示できませんでした" onRetry={() => void load()} />
         : state === 'forbidden' ? <ListState kind="forbidden" onRetry={() => void load()} />
-        : rules.length === 0 ? <ListState kind="empty" title="運用者へのお知らせがまだありません" action={canManage ? <Button href="/line-notifications/operator/new" variant="primary">運用者へのお知らせを作る</Button> : undefined} />
+        : rules.length === 0 ? <ListState kind="empty" title="運用者へのお知らせがまだありません" action={<Button {...(canChange ? { href: "/line-notifications/operator/new" } : { disabled: true })} variant="primary" lockedReason={manageLockReason}>運用者へのお知らせを作る</Button>} />
         : visible.length === 0 ? <ListState kind="empty" emptyPreset="filtered" title="条件に合うお知らせはありません" description="検索語を変えてください。" action={<Button variant="secondary" onClick={() => setQuery('')}>検索を消す</Button>} />
         : <DataTable label="運用者へのお知らせ" grid={{ columns: 'var(--tpl-rest3-op-cols)', compactColumns: 'minmax(0, 1.5fr) minmax(0, 1fr) minmax(0, 1fr) var(--tpl-sb-ln-col-count) var(--tpl-sb-ln-col-status) var(--tpl-ml-col-ops-wide)', padding: 'var(--tpl-rest3-run-row-pad)', headPadding: 'var(--tpl-rest3-op-head-pad)' }}>
           <thead>
@@ -212,8 +215,8 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
               <Th className={styles.opSchedule}>送る時間</Th>
               <Th><span className={styles.opNum}>今日</span></Th>
               <Th>状態</Th>
-              {/* 絵 u8xibp は操作の列にも見出しを出す。閲覧のみは操作が無いので空。 */}
-              <Th showActionLabel>{canManage ? '操作' : ''}</Th>
+              {/* 権限が無い場合も操作と共通の理由を同じ列に残す。 */}
+              <Th showActionLabel>操作</Th>
             </TableHeadRow>
           </thead>
           <tbody>
@@ -233,17 +236,17 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
                 <Td><span className={`${styles.opNum} ${rule.occurredToday > 0 ? styles.numStrong : styles.numFaint}`}>{rule.occurredToday > 0 ? `${rule.occurredToday}` : emptyValue('unknown')}</span></Td>
                 <Td><StatusBadge tone={published ? 'success' : 'neutral'}>{published ? '出している' : '停止中'}</StatusBadge></Td>
                 <Td className={styles.opActions}>
-                  {canManage ? <>
-                    <Button variant="secondary" onClick={() => void testSend(rule)} disabled={busy === rule.id}>自分にテスト</Button>
+                  <>
+                    <Button variant="secondary" onClick={() => void testSend(rule)} disabled={busy === rule.id || !canChange} lockedReason={manageLockReason}>自分にテスト</Button>
                     <RowMenu
                       label={`${rule.name}の操作`}
                       open={openMenuId === rule.id}
                       onOpenChange={(next) => setOpenMenuId(next ? rule.id : null)}
                       items={rule.status === 'draft'
-                        ? [{ id: 'publish', label: '公開', disabled: busy === rule.id || rule.recipientCount === 0, disabledReason: rule.recipientCount === 0 ? '受け取る人を決めてください' : undefined, onSelect: () => { setOpenMenuId(null); void run(rule, () => api.lineNotifications.operatorRules.publish(rule.id, lineAccountId), `「${rule.name}」を公開しました。`, '公開できませんでした。') } }]
-                        : [{ id: 'stop', label: '止める', disabled: busy === rule.id, onSelect: () => { setOpenMenuId(null); void run(rule, () => api.lineNotifications.operatorRules.stop(rule.id, lineAccountId), `「${rule.name}」を止めました。`, '停止できませんでした。') } }]}
+                        ? [{ id: 'publish', label: '公開', lockedReason: manageLockReason, disabled: !canChange || busy === rule.id || rule.recipientCount === 0, disabledReason: rule.recipientCount === 0 ? '受け取る人を決めてください' : undefined, onSelect: () => { setOpenMenuId(null); void run(rule, () => api.lineNotifications.operatorRules.publish(rule.id, lineAccountId), `「${rule.name}」を公開しました。`, '公開できませんでした。') } }]
+                        : [{ id: 'stop', label: '止める', lockedReason: manageLockReason, disabled: !canChange || busy === rule.id, onSelect: () => { setOpenMenuId(null); void run(rule, () => api.lineNotifications.operatorRules.stop(rule.id, lineAccountId), `「${rule.name}」を止めました。`, '停止できませんでした。') } }]}
                     />
-                  </> : null}
+                  </>
                 </Td>
               </Tr>
             })}
@@ -253,7 +256,7 @@ export default function OperatorTab({ lineAccountId, canManage, exportOpen, onEx
     {ready && rules.length > 0 ? <ListRange total={summary?.total ?? rules.length} first={1} last={rules.length} /> : null}
 
     <ConfirmDialog
-      open={exportOpen && canManage}
+      open={exportOpen && canChange}
       title="CSVで書き出す理由"
       description="個人情報を含むため、確認した目的を記録します。"
       confirmLabel="書き出す"
