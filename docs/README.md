@@ -932,3 +932,4 @@
 - [一覧のページ範囲の補正](release-log/unreleased/1933-kenta-muse-history-pagination.md) — 削除後に最後のページへ戻す修正の反映履歴。
 - [登録の確認画面の表示とロゴ](release-log/unreleased/1945-masato-registration-confirmed-logo.md) — 登録の確認項目と正式ロゴの修正履歴。
 - [登録画面の補足文の削除](release-log/unreleased/1947-masato-registration-hints.md) — 確定済みの3項目の補足文を外した修正履歴。
+- [設定の画面のお知らせとカードの間隔](release-log/unreleased/0000-kenta-muse-settings-gap.md) — お知らせとカードの間の空きをそろえた修正履歴。
