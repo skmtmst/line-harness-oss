@@ -122,14 +122,14 @@ function Detail() {
             <div className={styles.memo}>
               <label htmlFor="application-contact-note">担当者からの連絡メモ</label>
               <TextArea id="application-contact-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} placeholder="電話・メールで確認した内容を記録" readOnly={!canEdit || !writer} />
-              {canEdit ? <Button className={styles.save} lockedReason={lock} disabled={!note.trim() || busy || unknown} busy={busy} busyLabel="保存しています…" onClick={() => void contact()}>連絡済みとして保存</Button> : null}
+              {canEdit ? <Button variant="secondary" fullWidth lockedReason={lock} disabled={!note.trim() || busy || unknown} busy={busy} busyLabel="保存しています…" onClick={() => void contact()}>連絡済みとして保存</Button> : null}
             </div>
           </section>
         </div>
         <div className={styles.actionBand}>
           <p>担当者から連絡し、内容を確認してから承認してください。<br />連絡済みを保存すると、承認して招待できます。</p>
-          {application.status === 'approved' ? <Button className={styles.approve} lockedReason={lock} disabled={busy || unknown} onClick={() => void resend()}>{application.invite_sent_at ? '招待メールを再送' : '招待メールを送る'}</Button>
-            : <Button className={styles.approve} lockedReason={lock} disabled={!canApprove || busy || unknown} onClick={() => setConfirmOpen(true)}>承認して招待メールを送る</Button>}
+          {application.status === 'approved' ? <Button variant="primary" className={styles.approve} lockedReason={lock} disabled={busy || unknown} onClick={() => void resend()}>{application.invite_sent_at ? '招待メールを再送' : '招待メールを送る'}</Button>
+            : <Button variant="primary" className={styles.approve} lockedReason={lock} disabled={!canApprove || busy || unknown} onClick={() => setConfirmOpen(true)}>承認して招待メールを送る</Button>}
         </div>
       </>}
     </article>
