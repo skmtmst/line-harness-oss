@@ -25,7 +25,7 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-const api = vi.hoisted(() => ({ listAccounts: vi.fn() }))
+const api = vi.hoisted(() => ({ listAccounts: vi.fn(), profilePictures: vi.fn() }))
 
 const fixture = vi.hoisted(() => ({ pathname: '/friends' }))
 const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }))
@@ -77,6 +77,7 @@ function Probe() {
       <span data-probe="refreshing">{String(refreshing)}</span>
       <span data-probe="error">{error ?? ''}</span>
       <span data-probe="count">{accounts.length}</span>
+      <span data-probe="picture">{accounts[0]?.pictureUrl ?? ''}</span>
       <span data-probe="selected">{selectedAccountId ?? ''}</span>
       <button type="button" data-probe="refresh" onClick={() => { void refreshAccounts() }}>
         refresh
@@ -108,14 +109,18 @@ let storage: MemoryStorage
 
 beforeEach(() => {
   vi.clearAllMocks()
+  api.profilePictures.mockResolvedValue({ success: true, data: [] })
   clearLineAccountsCache()
   storage = new MemoryStorage()
   storage.setItem('lh_csrf', 'fixture-session')
   vi.stubGlobal('localStorage', storage)
   vi.stubGlobal('fetch', vi.fn(async (input: string) => {
-    const response = new URL(input).pathname === '/api/staff/me'
+    const path = new URL(input).pathname
+    const response = path === '/api/staff/me'
       ? { success: true, data: { id: 'staff-a', role: 'owner' } }
-      : await api.listAccounts()
+      : path === '/api/line-accounts/profile-pictures'
+        ? await api.profilePictures()
+        : await api.listAccounts()
     return new Response(JSON.stringify(response))
   }))
   fixture.pathname = '/friends'
@@ -127,10 +132,27 @@ beforeEach(() => {
 afterEach(() => {
   act(() => { root.unmount() })
   host.remove()
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
 })
 
 describe('アカウント一覧の取得失敗（Issue #978）', () => {
+  it('後からLINE公式アカウント画像が登録されても一覧のアイコンへ反映する', async () => {
+    let now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    api.listAccounts.mockResolvedValue({ success: true, data: [ACCOUNT] })
+    api.profilePictures.mockResolvedValueOnce({ success: true, data: [{ id: ACCOUNT.id, pictureUrl: null }] })
+      .mockResolvedValue({ success: true, data: [{ id: ACCOUNT.id, pictureUrl: 'https://line.example/icon.png' }] })
+    await act(async () => { root.render(<AccountProvider><Probe /></AccountProvider>) })
+    await eventually(() => { expect(api.profilePictures).toHaveBeenCalledTimes(1) })
+    expect(probe('picture').textContent).toBe('')
+    now += 31_000
+    await act(async () => { window.dispatchEvent(new Event('focus')) })
+    await eventually(() => { expect(probe('picture').textContent).toBe('https://line.example/icon.png') })
+    expect(probe('count').textContent).toBe('1')
+    clock.mockRestore()
+  })
+
   it('アーカイブ済みは切り替え一覧から除き、保存された選択も解除する', async () => {
     const archived = { ...ACCOUNT, id: 'old-shed', name: 'THE SHED（旧登録）', archivedAt: '2026-10-28T00:00:00Z' }
     const active = { ...ACCOUNT, id: 'current-shed', name: 'THE SHED', archivedAt: null }
