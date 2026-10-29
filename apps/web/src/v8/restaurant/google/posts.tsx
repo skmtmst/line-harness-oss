@@ -14,6 +14,8 @@ const FIELD_REQUIREMENTS = {
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import ListToolbar from '@/components/shared/list-toolbar'
 import PageSizeSelect from '@/components/shared/page-size-select'
+import LastChecked from '@/components/shared/last-checked'
+import { usePostStatusCheck } from './use-post-status-check'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, RefreshCw, Send } from 'lucide-react'
 import type { InstagramConnectionStatus, MediaItem } from '@line-crm/shared'
@@ -122,8 +124,6 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
   const [data, setData] = useState<GooglePostListData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [syncing, setSyncing] = useState(false)
-  const [syncError, setSyncError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<GooglePost | null>(null)
   const [actionError, setActionError] = useState('')
@@ -144,18 +144,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
 
   useEffect(() => { void load() }, [load])
 
-  const sync = async () => {
-    setSyncing(true)
-    setSyncError('')
-    try {
-      await restaurantGoogleApi.syncPosts(accountId)
-      await load()
-    } catch (err) {
-      setSyncError(errorMessage(err, 'Googleから投稿の状態を確認できませんでした。'))
-    } finally {
-      setSyncing(false)
-    }
-  }
+  const { sync, syncing, syncError, lastChecked, canSync, lockedReason } = usePostStatusCheck(accountId, load)
 
   const cancelDraft = async (post: GooglePost) => {
     setBusyId(post.id)
@@ -222,10 +211,11 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
         </>}
         trailing={<>
           <PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); setPage(1) }} />
-          <Button onClick={() => void sync()} disabled={syncing} busy={syncing} busyLabel="確認中…"><RefreshCw aria-hidden className={styles.icon16} />Googleの状態を確認する</Button>
+          <Button key={accountId} onClick={() => void sync()} disabled={!canSync || syncing} lockedReason={lockedReason} busy={syncing} busyLabel="確認中…"><RefreshCw aria-hidden className={styles.icon16} />Googleの状態を確認する</Button>
           <Button variant="primary" onClick={() => go({ tab: 'posts', view: 'new', kind: 'standard' })}><Plus aria-hidden className={styles.icon16} />投稿を作る</Button>
         </>}
       />
+      <LastChecked at={lastChecked} inSession busy={syncing} />
       {syncError ? <Notice tone="warn">{syncError}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       {loading && !data ? <div className={styles.stateBox}><ListState kind="loading" title="投稿を読み込んでいます" /></div> : null}
