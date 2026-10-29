@@ -570,13 +570,13 @@ export function OnCompleteDialog({
           {candidatesState === 'error' ? (
             <p className="text-danger mt-1.5 flex flex-wrap items-center gap-3 text-sm" role="alert">
               移動先の候補を読み込めませんでした。
-              <button
-                type="button"
-                className="text-info font-medium hover:underline"
+              <Button
+                variant="text"
+                presentation="account-inline"
                 onClick={() => loadCandidates(() => false)}
               >
                 もう一度読み込む
-              </button>
+              </Button>
             </p>
           ) : (
             <>

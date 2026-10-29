@@ -21,6 +21,7 @@ import Card from '@/components/shared/card'
 import StickyBar from '@/components/shared/sticky-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
+import TextLink from '@/components/shared/text-link'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
   DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, channelErrors, checkActionLabel, checkErrorText,
@@ -728,7 +729,7 @@ function AccountRegistrationForm() {
                       <p>このアカウントの LINE トークから「接続テスト」と送ってください。QR を開き直すだけでは確認できません。</p>
                     </div>
                     <p className={styles.receiptHelp}>変わらない場合は LINE Developers で Webhook の利用がオンか確認してください。</p>
-                    <p className={styles.receiptHelp}><a href="/hq/support">変わらない場合はサポートに問い合わせ</a></p>
+                    <p className={styles.receiptHelp}><TextLink href="/hq/support" inline>変わらない場合はサポートに問い合わせ</TextLink></p>
                   </div>
                 </div>
               </Card>
