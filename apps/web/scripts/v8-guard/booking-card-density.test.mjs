@@ -126,3 +126,16 @@ test('cell/calendarの正の予約部品へtimelineの縮退を広げない',asy
     }
   }finally{await page.close();await browser.close()}
 })
+
+for(const width of [1152,1440])test(`省略した注意文を電話札の重なりと混同せず、実重なりは検出する ${width}`,async()=>{
+  const browser=await connectGuardBrowser(),page=await browser.newPage({viewport:{width,height:1600},reducedMotion:'reduce'})
+  try{
+    await mount(page,width,'normal')
+    const overlaps=async()=>(await page.evaluate(scanPolishRules)).filter(f=>f.kind==='badge-overlap')
+    assert.deepEqual(await overlaps(),[],'省略されて見えない文字を重なりと判定しない')
+    await page.locator('[data-booking-warning]').evaluateAll(nodes=>nodes.forEach(node=>node.style.overflow='visible'))
+    assert.ok((await overlaps()).length>0,'省略を壊して実際に電話札へ重ねると必ず検出する')
+    await page.locator('[data-booking-warning]').evaluateAll(nodes=>nodes.forEach(node=>node.style.removeProperty('overflow')))
+    assert.deepEqual(await overlaps(),[],'元の省略表示へ戻すと解消する')
+  }finally{await page.close();await browser.close()}
+})

@@ -176,7 +176,7 @@ it('狭い予約箱でも注意の印から全文を確認でき、焦点では�
   render(<ReservationBoard entries={[{ ...base, status: 'requested', source: 'phone', currentAllergy: 'そば・小麦' }]} resources={resources} dates={['2026-10-23']} onOpen={open} />)
   const card = screen.getByRole('button', { name: /予約のお客さま/ })
   const warning = within(card).getByTitle('⚠ そば・小麦')
-  expect(warning.textContent).toBe('⚠')
+  expect(warning.textContent).toBe('⚠ そば・小麦')
   expect(card.getAttribute('aria-description')).toContain('要対応（承認待ち）')
   expect(card.getAttribute('aria-description')).toContain('注意：そば・小麦')
   expect(within(card).getByTitle('要対応（承認待ち）').textContent).toBe('要対応')
