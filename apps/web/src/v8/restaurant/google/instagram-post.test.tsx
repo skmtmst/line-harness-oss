@@ -26,6 +26,7 @@ const fixture = vi.hoisted(() => ({
   igConnection: vi.fn(),
   mediaList: vi.fn(),
   mediaDownload: vi.fn(),
+  mediaReadContent: vi.fn(),
 }))
 
 vi.mock('@/lib/restaurant-google-api', () => ({
@@ -45,7 +46,7 @@ vi.mock('@/lib/restaurant-google-api', () => ({
 vi.mock('@/lib/api', () => ({
   api: {
     instagram: { connection: fixture.igConnection },
-    media: { list: fixture.mediaList, download: fixture.mediaDownload, contentUrl: (id: string) => `https://example.test/media/${id}` },
+    media: { list: fixture.mediaList, download: fixture.mediaDownload, readContent: fixture.mediaReadContent, contentUrl: (id: string) => `https://example.test/media/${id}` },
   },
   ApiError: class ApiError extends Error {},
 }))
@@ -156,10 +157,11 @@ describe('投稿一覧の Instagram の札（★V8-B `HEEN9`）', () => {
 })
 
 describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', () => {
-  it('登録メディアをポップアップで選ぶと切り取り確認へ進む', async () => {
+  it.each(['Google', 'Instagram'] as const)('%s の登録メディアを閲覧経路で読み、切り取り確認へ進む', async (target) => {
     fixture.igConnection.mockReturnValue(connection('connected'))
     fixture.mediaList.mockResolvedValue({ success: true, data: { items: [registeredImage], total: 1, limit: 20, offset: 0 } })
-    fixture.mediaDownload.mockResolvedValue(new Blob(['image'], { type: 'image/jpeg' }))
+    fixture.mediaReadContent.mockResolvedValue(new Blob(['image'], { type: 'image/jpeg' }))
+    fixture.mediaDownload.mockRejectedValue(new Error('追加の本人確認が必要です'))
     vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
     const NativeURL = URL
     vi.stubGlobal('URL', class extends NativeURL {
@@ -170,12 +172,13 @@ describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', (
     render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
     await screen.findByRole('checkbox', { name: 'Instagram にも投稿する' })
     const picks = screen.getAllByRole('button', { name: '登録メディアから選ぶ' })
-    fireEvent.click(picks[1])
-    await screen.findByRole('dialog', { name: 'Instagram用画像を登録メディアから選ぶ' })
+    fireEvent.click(picks[target === 'Google' ? 0 : 1])
+    await screen.findByRole('dialog', { name: `${target}用画像を登録メディアから選ぶ` })
     fireEvent.click(await screen.findByRole('radio', { name: /料理写真.jpg/ }))
     fireEvent.click(screen.getByRole('button', { name: '切り取り位置を確認' }))
-    await waitFor(() => expect(fixture.mediaDownload).toHaveBeenCalledWith('media-1', 'acc-1'))
-    expect(await screen.findByRole('dialog', { name: 'Instagram用画像の切り取り位置を確認' })).toBeTruthy()
+    await waitFor(() => expect(fixture.mediaReadContent).toHaveBeenCalledWith('media-1', 'acc-1'))
+    expect(fixture.mediaDownload).not.toHaveBeenCalled()
+    expect(await screen.findByRole('dialog', { name: `${target}用画像の切り取り位置を確認` })).toBeTruthy()
   })
 
   it('Google画像は投稿の詳細より前、Instagram画像はInstagram本文より後に置く', async () => {
