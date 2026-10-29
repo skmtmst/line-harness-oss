@@ -121,7 +121,7 @@ const friend = {
 
 const timeline = [
   { id: 'a', type: 'message_received', summary: '『秋の新商品はいつ届きますか？』', status: null, source: { kind: 'message', id: 'm1', parentId: null, url: null }, occurredAt: '2026-10-01T10:12:00+09:00', lineAccount: { id: 'x', name: '然-NEN-TEST' } },
-  { id: 'b', type: 'message_sent', summary: '『10月5日に発送予定です』', status: null, source: { kind: 'message', id: 'm2', parentId: null, url: null }, occurredAt: '2026-10-01T10:20:00+09:00', lineAccount: { id: 'x', name: '然-NEN-TEST' } },
+  { id: 'b', type: 'message_sent', summary: '『10月5日に発送予定です』', status: null, source: { kind: 'message', id: 'm2', parentId: null, url: 'https://shop.example.test/orders/sample' }, occurredAt: '2026-10-01T10:20:00+09:00', lineAccount: { id: 'x', name: '然-NEN-TEST' } },
   { id: 'c', type: 'tag_change', summary: 'タグ『VIP』が付いた', status: null, source: null, occurredAt: '2026-09-26T12:40:00+09:00', lineAccount: { id: 'x', name: '然-NEN-TEST' } },
 ]
 
@@ -188,6 +188,17 @@ describe('V8 友だち詳細（src/v8）の動き', () => {
     expect(host.querySelectorAll('[role="tab"]').length).toBe(10)
     // 履歴は概要を開いたときに8件だけ取る。
     expect(fetchApi).toHaveBeenCalledWith(expect.stringContaining('/api/friends/friend-1/timeline?limit=8'), expect.anything())
+  })
+
+  it('履歴の外部リンクは別タブの印を出し、内部リンクと区別する', async () => {
+    await render()
+    const external = links('『10月5日に発送予定です』')[0]
+    expect(external?.getAttribute('target')).toBe('_blank')
+    expect(external?.getAttribute('rel')).toContain('noopener')
+    expect(external?.querySelector('[data-external-icon]')).toBeTruthy()
+    const internal = links('『秋の新商品はいつ届きますか？』')[0]
+    expect(internal?.getAttribute('target')).toBeNull()
+    expect(internal?.querySelector('[data-external-icon]')).toBeNull()
   })
 
   it('鍵の無い運用担当（閲覧のみ）は帯が出て、変える操作を置かない', async () => {

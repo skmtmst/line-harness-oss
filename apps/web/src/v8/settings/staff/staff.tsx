@@ -26,6 +26,7 @@ import { Tabs } from '@/components/shared/tabs';
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import Disclosure from '@/components/shared/disclosure'
 import Notice from '@/components/shared/notice'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt';
 import NotificationSwitch from '@/components/ui/notification-switch'
@@ -1193,7 +1194,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                   <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} />
                 </div>
               ) : null}
-              {tab === 'members' ? <details className={styles.sessions}><summary>ログイン中の端末を確認</summary><SessionsCard /></details> : null}
+              {tab === 'members' ? <Disclosure appearance="inset" size="compact" title="ログイン中の端末を確認"><SessionsCard /></Disclosure> : null}
             </>
           )}
         </div>

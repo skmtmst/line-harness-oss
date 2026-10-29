@@ -140,6 +140,7 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 
 import ScenarioDetailV8 from './detail'
 import ScenarioDetailPage from '@/app/scenarios/detail/page'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { ApiError } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -168,6 +169,8 @@ beforeEach(() => {
   updateScenario.mockResolvedValue({ success: true, data: { id: 'sc-1' } })
   getScenario.mockReset()
   getScenario.mockResolvedValue({ success: true, data: { ...scenario, updatedAt: '2026-10-01T05:10:00.000Z' } })
+  vi.mocked(scenarioReferenceData.scenario).mockReset()
+  vi.mocked(scenarioReferenceData.scenario).mockResolvedValue({ success: true, data: scenario })
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -182,6 +185,33 @@ afterEach(() => {
 })
 
 describe('V8 シナリオ配信の編集', () => {
+  it.each([
+    'こんにちは、{{name}}さん。{{reservation_datetime}}からです。',
+    'こんにちは、{名前}さん。{予約日時}からです。',
+  ])('下見は差し込みを共通の見本値に置き換える（%s）', async (messageContent) => {
+    vi.mocked(scenarioReferenceData.scenario).mockResolvedValueOnce({ success: true, data: {
+      ...scenario,
+      steps: [{ ...scenario.steps[0], messageContent }, scenario.steps[1]],
+    } } as never)
+    await render()
+    const preview = screen.getByRole('region', { name: 'LINEでの見え方' })
+    expect(within(preview).getByText('選んだ通（1通目）の見え方')).toBeTruthy()
+    expect(within(preview).getByText('こんにちは、山田 花子さん。10月2日 18:00からです。')).toBeTruthy()
+    expect(document.querySelector('[data-preview-sample-note]')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方の説明' }))
+    expect(screen.getByText('名前や日時は見本の値です。')).toBeTruthy()
+    expect(within(preview).queryByText(messageContent)).toBeNull()
+  })
+
+  it('本文が空なら見本の説明を出さない', async () => {
+    vi.mocked(scenarioReferenceData.scenario).mockResolvedValueOnce({ success: true, data: {
+      ...scenario,
+      steps: [{ ...scenario.steps[0], messageContent: '' }],
+    } } as never)
+    await render()
+    expect(screen.queryByRole('button', { name: 'LINEでの見え方の説明' })).toBeNull()
+  })
+
   it('絵（PMLkX）の操作と3つの箱・数の帯が出る', async () => {
     await render(<ScenarioDetailPage />)
     expect(screen.getByText('購読開始から0日後 10:00').closest('[data-page-template="detail"]')).toBeTruthy()

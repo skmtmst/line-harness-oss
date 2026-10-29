@@ -1211,8 +1211,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                     下書きを保存
                   </Button>
                   <Button type="button" variant="primary" disabled={busy} busy={saving} busyLabel="保存中…" onClick={() => void goNext()}>
-                    <ArrowRight size={16} aria-hidden="true" />
                     {nextLabel(step as Exclude<StepKey, 'publish'>)}
+                    <ArrowRight size={16} aria-hidden="true" />
                   </Button>
                 </>
               )}
@@ -1253,15 +1253,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
                 </Button>
                 <Button
                   type="button"
-                  variant="primary" icon={step === 'audience' ? <ArrowRight size={16} aria-hidden="true" /> : undefined}
+                  variant="primary"
                   disabled={busy}
                   busy={saving}
                   busyLabel="保存中…"
                   onClick={() => void goNext()}
                 >
-                  {/* 板 `JeINq`：絵は印→文字の順（印が左・文字は絵x894）。 */}
-                  <ArrowRight size={16} aria-hidden="true" />
                   {NEXT_LABEL[step as Exclude<StepKey, 'publish'>]}
+                  <ArrowRight size={16} aria-hidden="true" />
                 </Button>
               </>
             )}

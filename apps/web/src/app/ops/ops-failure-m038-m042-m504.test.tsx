@@ -89,7 +89,7 @@ describe('M039/M041/M504 の契約（ソース）', () => {
     expect(LOG).toContain("try { localStorage.setItem('lh_csrf', res.csrfToken) } catch")
   })
 
-  it('M504 2要素認証のQR失敗は表示し直しの口を出す', () => {
+  it('M504 二段階認証のQR失敗は表示し直しの口を出す', () => {
     expect(TFA).toContain('qrFailed')
     expect(TFA).toContain('QRをもう一度表示する')
     expect(TFA).toContain('もう一度読み込む')

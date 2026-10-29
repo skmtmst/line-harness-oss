@@ -453,6 +453,7 @@
 
 ## 反映履歴
 
+- [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)

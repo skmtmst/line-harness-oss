@@ -705,7 +705,7 @@ function AccountRegistrationForm() {
             {canBack
               ? <Button type="button" disabled={busy} onClick={moveBack}><ArrowLeft size={16} aria-hidden="true" />{backLabel}</Button>
               : currentStep === 1 ? <Button href="/hq">キャンセル</Button> : null}
-            <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save' || registrationStyle.busy} busyLabel={currentStep === 4 ? '保存しています…' : '登録しています…'}><ArrowRight size={16} aria-hidden="true" />{nextLabel}</Button>
+            <Button type="submit" variant="primary" disabled={busy || nextBlocked} busy={busyAction === 'save' || registrationStyle.busy} busyLabel={currentStep === 4 ? '保存しています…' : '登録しています…'}>{nextLabel}<ArrowRight size={16} aria-hidden="true" /></Button>
           </>} />
       </form>
       <NoticeLineRegisterDialog open={noticeDialog === 'open'} onClose={() => setNoticeDialog('done')} />

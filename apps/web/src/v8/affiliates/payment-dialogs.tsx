@@ -159,7 +159,7 @@ export function PayoutStepUpDialog({
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [exportKey, setExportKey] = useState('')
-  /* 2段階認証を使っている人は6桁、無い人はパスワードで確認する。6桁の人も「パスワードで本人確認」に切り替えられる。 */
+  /* 二段階認証を使っている人は6桁、無い人はパスワードで確認する。6桁の人も「パスワードで本人確認」に切り替えられる。 */
   const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
   const [preferPassword, setPreferPassword] = useState(false)
   const usePassword = stepUpMethod === 'password' || (stepUpMethod === 'totp' && preferPassword)

@@ -940,7 +940,7 @@ export default function MenuFormV8() {
 
   const previewContent = <>
           <div className={shell.sideActions}>
-            {previewUrl ? <Button href={previewUrl}><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
+            {previewUrl ? <Button href={previewUrl} external><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
           </div>
           <p className={shell.sideTitle}>お客さまの予約画面</p>
           {hiddenMenuFields ? <Notice tone="warn">{`${hiddenMenuFields.name}さんには「${draftMenu.name}」は見えません（${hiddenMenuFields.reason}）`}</Notice> : null}
