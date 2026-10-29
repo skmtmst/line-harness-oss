@@ -196,6 +196,7 @@ describe('★V8 ベルの小窓', () => {
     const dialog = await openPopover()
     expect(await within(dialog).findByRole('alert')).toBeTruthy()
     expect(within(dialog).queryByText('未読 0')).toBeNull()
+    expect(within(dialog).queryByText('通知はまだありません。')).toBeNull()
     const markAll = within(dialog).getByRole('button', { name: 'すべて既読にする' }) as HTMLButtonElement
     expect(markAll.disabled).toBe(true)
     expect(within(dialog).getByRole('status').textContent).toContain('未読件数を確認できないため')
