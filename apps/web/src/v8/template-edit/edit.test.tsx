@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 テンプレートの作る・編集（src/v8/template-edit）の動きの試験。V8 のテーマで描いて確かめる。
  * 保存の口・断り方・保存の 409 の帯・差し込み・閲覧のみ（押せない操作を置かない）・クーポン／リサーチの保存。
@@ -62,6 +63,8 @@ vi.mock('@/components/auto-replies/inline-action-list', async (importOriginal: (
 
 import { ApiError } from '@/lib/api'
 import TemplateEditV8 from './edit'
+import TemplateMessageEditor from './message'
+import type { TemplateEditHost } from './host'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -95,7 +98,7 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   narrow.value = false
   push.mockReset()
   for (const fn of Object.values(templatesApi)) fn.mockReset()
@@ -257,7 +260,7 @@ describe('V8 メッセージを作る・編集', () => {
   })
 
   it('閲覧のみ（staff）では保存・公開・キャンセルを置かず、帯で知らせる。押せないボタンも置かない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await mount('id=template-1')
     expect(screen.getByText(/閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます/)).toBeTruthy()
     for (const name of ['下書きを保存', '保存して公開', 'キャンセル']) expect(screen.queryByRole('button', { name })).toBeNull()
@@ -327,7 +330,7 @@ describe('V8 テンプレートの下書き自動保存（一斉配信と同じ�
   })
 
   it('閲覧のみ（staff）は自動保存しない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await mount('id=template-1')
     await wait(5000)
     expect(templatesApi.update).not.toHaveBeenCalled()
@@ -476,7 +479,9 @@ describe('V8 メッセージを作る：フォルダ・読み込めないとき�
 
   it('本文のURLを並べ、差し込みは見本の名前で見せ、値を確かめられない差し込みは知らせる', async () => {
     await mount()
-    expect(document.body.textContent).toContain('本文にURLはありません。')
+    const hint = screen.getByText('URLを入れると、リンクごとの設定がここに出ます。')
+    expect(hint.closest('[data-design-part="card"]')).toBeNull()
+    expect(screen.queryByRole('heading', { name: '本文の中のURL' })).toBeNull()
     type(screen.getByLabelText('本文'), '{{name}}さん、ご予約はこちら https://example.com/booking {{field.unknown_key}}')
     await flush()
     const tracking = screen.getByRole('switch', { name: 'https://example.com/bookingを短縮して数える（いつもオン）' }) as HTMLButtonElement
@@ -485,6 +490,59 @@ describe('V8 メッセージを作る：フォルダ・読み込めないとき�
     const preview = host.querySelector('[data-template-region="preview"]')!
     expect(preview.textContent).toContain('山田 太郎さん、ご予約はこちら')
     expect(preview.textContent).toContain('値を確認できない差し込みがあります：{{field.unknown_key}}')
+  })
+})
+
+describe('本文URLの案内と下書き', () => {
+  const hintText = 'URLを入れると、リンクごとの設定がここに出ます。'
+  const url = 'https://example.com/booking'
+
+  it('URLの追加・重複・削除で名前と本文を保ち、最後の本文だけを保存する', async () => {
+    templatesApi.update.mockResolvedValue({ success: true, data: { id: 'template-1' } })
+    await mount('id=template-1')
+    type(screen.getByLabelText('テンプレート名'), 'URLを確認した下書き')
+    const content = screen.getByLabelText('本文')
+    const withUrl = `ご予約はこちら ${url} 同じ案内 ${url}`
+    type(content, withUrl)
+    await flush()
+    expect(screen.queryByText(hintText)).toBeNull()
+    const heading = screen.getByRole('heading', { name: '本文の中のURL' })
+    expect(heading.closest('[data-design-part="card"]')).toBeTruthy()
+    const checks = screen.getAllByRole('switch', { name: `${url}を短縮して数える（いつもオン）` }) as HTMLButtonElement[]
+    expect(checks).toHaveLength(1)
+    expect(checks[0].getAttribute('aria-checked')).toBe('true')
+    expect(checks[0].disabled).toBe(true)
+    expect((content as HTMLTextAreaElement).value).toBe(withUrl)
+    type(content, 'URLを外してもご予約の本文は残ります。')
+    await flush()
+    expect(screen.getByText(hintText).closest('[data-design-part="card"]')).toBeNull()
+    expect(screen.queryByRole('heading', { name: '本文の中のURL' })).toBeNull()
+    expect((screen.getByLabelText('テンプレート名') as HTMLInputElement).value).toBe('URLを確認した下書き')
+    expect(templatesApi.update).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    await flush()
+    expect(templatesApi.update).toHaveBeenCalledTimes(1)
+    expect(templatesApi.update).toHaveBeenCalledWith('template-1', expect.objectContaining({ name: 'URLを確認した下書き', messageType: 'text', messageContent: 'URLを外してもご予約の本文は残ります。', folderId: null, expectedVersion: 3, expectedDraftRevision: 2 }))
+    expect(templatesApi.create).not.toHaveBeenCalled()
+    expect(templatesApi.publish).not.toHaveBeenCalled()
+  })
+
+  it('親の保存口でもURL案内だけが切り替わり、店舗APIを呼ばない', async () => {
+    const save = vi.fn()
+    const parent: TemplateEditHost = { description: '統括のひな形', folders: [], folder: '', onFolderChange: vi.fn(), busy: false, onSave: save, onCancel: vi.fn(), primaryLabel: '親へ保存', initialMessage: { name: '親の下書き', messageType: 'text', messageContent: '元の本文' } }
+    await act(async () => { root.render(<TemplateMessageEditor id={null} visual={false} host={parent} />) })
+    await flush()
+    expect(screen.getByText(hintText).closest('[data-design-part="card"]')).toBeNull()
+    type(screen.getByLabelText('本文'), `元の本文 ${url}`)
+    await flush()
+    expect(screen.getByRole('heading', { name: '本文の中のURL' })).toBeTruthy()
+    const check = screen.getByRole('switch', { name: `${url}を短縮して数える（いつもオン）` }) as HTMLButtonElement
+    expect(check.getAttribute('aria-checked') === 'true' && check.disabled).toBe(true)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '親へ保存' })) })
+    expect(save).toHaveBeenCalledExactlyOnceWith({ kind: 'message', name: '親の下書き', messageType: 'text', messageContent: `元の本文 ${url}` }, true)
+    expect(templatesApi.create).not.toHaveBeenCalled()
+    expect(templatesApi.update).not.toHaveBeenCalled()
+    expect(templatesApi.publish).not.toHaveBeenCalled()
   })
 })
 
@@ -525,3 +583,5 @@ describe('V8 クーポン・リサーチ：保存のあと', () => {
     }
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

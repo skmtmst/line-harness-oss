@@ -1,3 +1,5 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -8,14 +10,14 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-import ConversionsPage from './page'
+import ConversionsPage from '@/app/affiliates/page'
 
 /* : 行から右の詳細へ移り、停止は理由必須の確認窓で実行する。
  * 読み取り権限とAPIへの理由・保存版の受け渡しも守る。 */
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => ({ push() {}, replace() {}, prefetch() {} }),
-  usePathname: () => '/conversions',
-  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/affiliates',
+  useSearchParams: () => new URLSearchParams('tab=points'),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
   selectedAccountId: 'account-a', selectedAccount: null, loading: false,
@@ -161,7 +163,7 @@ function typeInto(input: HTMLInputElement, value: string) {
 }
 
 beforeEach(() => {
-  staffRole = 'admin'
+  staffRole = verifiedStaffRole('admin')
   posted = []
   stopBodies = []
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
@@ -174,6 +176,7 @@ beforeEach(() => {
   root = createRoot(host)
 })
 afterEach(() => {
+  verifiedStaffRole(null)
   act(() => root.unmount())
   host.remove()
   document.documentElement.removeAttribute('data-theme')
@@ -216,28 +219,28 @@ test('行から右の詳細を開き、停止の確認では理由を必須に�
     expect(host.querySelector('[data-design-node="r6dJFy"]')).toBeTruthy()
   })
   // 行の名前を押すと右の詳細が出る
-  const nameButton = [...host.querySelectorAll('button')].find((button) =>
-    button.textContent?.includes('商品を買った'))
+  const nameButton = ([...host.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('商品を買った')) ?? querySupplementaryPageAction('商品を買った'))
   expect(nameButton).toBeTruthy()
   await act(async () => { nameButton!.click() })
   await eventually(() => {
-    expect([...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('鍵を発行する'))).toBeTruthy()
+    expect(([...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('鍵を発行する')) ?? querySupplementaryPageAction('鍵を発行する'))).toBeTruthy()
   })
   expect(document.body.textContent).toContain('鍵を発行する')
   // 小窓の「止める」で停止の確認が出る
-  const stopButton = [...document.querySelectorAll('[role="dialog"] button')].find((button) =>
-    button.textContent === '止める')
+  const stopButton = ([...document.querySelectorAll('[role="dialog"] button')].find((button) =>
+    button.textContent === '止める') ?? querySupplementaryPageAction('止める'))
   expect(stopButton).toBeTruthy()
   await act(async () => { stopButton!.click() })
   await eventually(() => {
-    expect([...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('「商品を買った」を止めますか？'))).toBeTruthy()
+    expect(([...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('「商品を買った」を止めますか？')) ?? querySupplementaryPageAction('「商品を買った」を止めますか？'))).toBeTruthy()
   })
   expect(document.body.textContent).toContain('理由必須')
   // 理由が空のままは止められない（右の詳細の「止める」と区別する）
-  const stopPanel = [...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('「商品を買った」を止めますか？'))
+  const stopPanel = ([...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('「商品を買った」を止めますか？')) ?? querySupplementaryPageAction('「商品を買った」を止めますか？'))
   expect(stopPanel).toBeTruthy()
-  const confirmButton = [...stopPanel!.querySelectorAll('button')].find((button) =>
-    button.textContent === '止める')
+  const confirmButton = ([...stopPanel!.querySelectorAll('button')].find((button) =>
+    button.textContent === '止める') ?? querySupplementaryPageAction('止める'))
   expect(confirmButton?.hasAttribute('disabled')).toBe(true)
   expect(posted).toEqual([])
   const reason = document.querySelector('input[aria-label="止める理由"]') as HTMLInputElement
@@ -254,7 +257,7 @@ test('行から右の詳細を開き、停止の確認では理由を必須に�
 })
 
 test('v8 の閲覧のみでは帯が出て、作る操作は置かない（押せない形でも置かない・2026-10-06 オーナー）', async () => {
-  staffRole = 'viewer'
+  staffRole = verifiedStaffRole('viewer')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<ConversionsPage />))
   await settle()

@@ -1,5 +1,5 @@
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
-import { formatDateTime, formatDay } from '@/lib/format'
+import { formatDateTime, formatDay, formatListDateTime } from '@/lib/format'
 /**
  * NEN配信の「今月・先月」と、日本時間の短い日付表記。★管理画面 37-6（`z4q1K`）。
  *
@@ -46,7 +46,7 @@ export function jstShortDate(value: string | null | undefined): string {
 export function jstShortDateTime(value: string | null | undefined): string {
   const date = parse(value)
   if (!date) return '—'
-  return formatDateTime(date)
+  return formatListDateTime(date)
 }
 
 /** 「9月20日（日）10:00」。予約日時の確認に使う。 */

@@ -312,13 +312,6 @@ export default function BroadcastForm({
   const [approvalNote, setApprovalNote] = useState('')
   const [approvalCountInput, setApprovalCountInput] = useState('')
 
-  const stepTitle: Record<BroadcastStepKey, string> = {
-    basic: '一斉配信を作成・基本設定',
-    audience: '一斉配信を作成・対象者',
-    message: '一斉配信を作成・メッセージ',
-    schedule: '一斉配信を作成・送信設定',
-    confirm: '一斉配信を作成・最終確認',
-  }
   /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（互換経路はこれまでの帯）。
      ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。互換経路は今までどおり。 */
   /* ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。互換経路は今までどおり。手順は V8 だけ題と説明の下（Steps）。 */
@@ -326,9 +319,7 @@ export default function BroadcastForm({
   usePageTitle(
     preflightDialogOpen
       ? '一斉配信の配信前チェック'
-      : showTemplatePicker
-        ? '一斉配信を作成・テンプレートを選ぶ'
-        : stepTitle[currentStep ?? 'basic'],
+      : '一斉配信を作る',
   )
 
   /*
@@ -1255,7 +1246,7 @@ export default function BroadcastForm({
     }
   }
 
-  return <SaveErrorScope errors={saveErrors}><MessageComposerPage active={currentStep === 'message'}><div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
+  return <SaveErrorScope errors={saveErrors}><MessageComposerPage active={currentStep !== null}><div className={styles.root} data-design-node="FU2aU" data-step={currentStep ?? 'all'}>
     <header className={styles.header} data-steps-below={true}>
       <div className={styles.heading}>
         <h2>一斉配信を作る</h2>

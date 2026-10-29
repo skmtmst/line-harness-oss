@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * V8 流入と計測の一覧（src/v8）の動きの試験。BEHAVIOR.md の主な動きを守る。
@@ -122,15 +123,15 @@ describe('V8 流入と計測の一覧', () => {
     })
     await render()
     await act(async () => buttonByLabel('「夏のInstagram投稿」の操作')!.click())
-    await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('受付を止める')) as HTMLElement).click())
+    await act(async () => (([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('受付を止める')) ?? querySupplementaryPageAction('受付を止める')) as HTMLElement).click())
     expect(updates).toHaveLength(0)
     expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('受付を停止しますか？')
-    const stop = [...document.querySelectorAll('[role="alertdialog"] button')].find(el => el.textContent === '受付を停止する') as HTMLElement
+    const stop = ([...document.querySelectorAll('[role="alertdialog"] button')].find(el => el.textContent === '受付を停止する') ?? querySupplementaryPageAction('受付を停止する')) as HTMLElement
     await act(async () => stop.click())
     expect(updates).toHaveLength(1)
     expect(updates[0].active).toBe(false)
     await act(async () => buttonByLabel('「チラシ計測リンク」の操作')!.click())
-    await act(async () => ([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('受付を再開する')) as HTMLElement).click())
+    await act(async () => (([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('受付を再開する')) ?? querySupplementaryPageAction('受付を再開する')) as HTMLElement).click())
     expect(updates).toHaveLength(2)
     expect(updates[1].active).toBe(true)
     expect(document.querySelector('[role="dialog"]')).toBeNull()
@@ -141,7 +142,7 @@ describe('V8 流入と計測の一覧', () => {
     const more = buttonByLabel('「夏のInstagram投稿」の操作')
     expect(more).toBeTruthy()
     await act(async () => { more!.click() })
-    const qr = [...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes('QRコードを見る')) as HTMLElement
+    const qr = ([...document.querySelectorAll('[role="menuitem"]')].find((el) => el.textContent?.includes('QRコードを見る')) ?? querySupplementaryPageAction('QRコードを見る')) as HTMLElement
     expect(qr).toBeTruthy()
     await act(async () => { qr.click() })
     const dialog = document.querySelector('[role="dialog"]')
@@ -160,7 +161,7 @@ describe('V8 流入と計測の一覧', () => {
     await act(async () => { buttonByLabel('「チラシ計測リンク」の操作')!.click() })
     const labels = [...document.querySelectorAll('[role="menuitem"]')].map((el) => el.textContent)
     expect(labels.some((text) => text?.includes('QRコード'))).toBe(true)
-    const qr = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('QRコード')) as HTMLElement
+    const qr = ([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.includes('QRコード')) ?? querySupplementaryPageAction('QRコード')) as HTMLElement
     await act(async () => qr.click())
     expect(document.querySelector('[role="dialog"]')?.textContent).toContain('停止しています')
     expect([...document.querySelectorAll('a')].some(a => a.download.endsWith('.png'))).toBe(false)
@@ -188,7 +189,7 @@ describe('V8 流入と計測の一覧', () => {
     expect(band.querySelector('[data-row-menu],button[aria-haspopup="menu"]')).toBeNull()
     expect(band.querySelector('a[href*="tab=ads"]')?.textContent).toContain('広告連携を開く')
     expect(host.querySelector('a[href*="tab=connections"]')?.textContent).toContain('広告とのつなぎ')
-    const filter = [...band.querySelectorAll('button')].find(button => button.textContent === '未設定を見る')!
+    const filter = ([...band.querySelectorAll('button')].find(button => button.textContent === '未設定を見る') ?? querySupplementaryPageAction('未設定を見る'))!
     expect(rowOf('summer-ig')).toBeTruthy()
     await act(async () => { filter.click() })
     expect(currentListLocation().search).toContain('filter=unconfigured')
@@ -202,7 +203,7 @@ describe('V8 流入と計測の一覧', () => {
     role.value = 'staff'
     rememberStaffIdentity({ role: 'staff', permissionKeys: [] } as StaffMember)
     await render()
-    expect(host.textContent).toContain('閲覧のみで見ています')
+    expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
     const create = [...host.querySelectorAll('button')].filter((button) => button.textContent?.includes('流入リンクを作る'))
     expect(create).toHaveLength(0)
     expect(buttonByLabel('夏のInstagram投稿のリンクを編集')).toBeFalsy()
@@ -232,7 +233,7 @@ describe('V8 流入と計測の一覧', () => {
       return json({ success: true, data: [] })
     })
     await render()
-    const retry = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('もう一度'))
+    const retry = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('もう一度')) ?? querySupplementaryPageAction('もう一度'))
     expect(retry).toBeTruthy()
     await act(async () => { retry!.click() })
     for (let i = 0; i < 4; i += 1) await act(async () => {})
@@ -242,11 +243,23 @@ describe('V8 流入と計測の一覧', () => {
   })
 
   it('WEB034（対照）: オーナーにはフォルダを追加がある', async () => {
+    const requests = vi.fn(globalThis.fetch)
+    vi.stubGlobal('fetch', requests)
     await render()
     expect([...host.querySelectorAll('button')].some((el) => (el.textContent ?? '').includes('フォルダを追加'))).toBe(true)
+    const createLinks = [...host.querySelectorAll('a')].filter(link => link.textContent?.trim() === '流入リンクを作る')
+    expect(createLinks.length).toBeGreaterThan(0)
+    expect(createLinks.map(link => link.getAttribute('href'))).toEqual(createLinks.map(() => '/inflow-links/new'))
+    const addFolder = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === 'フォルダを追加')!
+    await act(async () => { addFolder.click() })
+    expect(document.querySelector('[role="dialog"] input')).toBeTruthy()
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('フォルダを追加')
+    expect(requests.mock.calls.filter(([, init]) => (init?.method ?? 'GET') !== 'GET')).toHaveLength(0)
   })
 
   it('WEB034: 「流入」を任された staff には作る・編集を出し、フォルダの作成は出さない', async () => {
+    const requests = vi.fn(globalThis.fetch)
+    vi.stubGlobal('fetch', requests)
     role.value = 'staff'
     rememberStaffIdentity({ role: 'staff', permissionKeys: ['/inflow-links'] } as StaffMember)
     vi.stubGlobal('localStorage', {
@@ -261,6 +274,7 @@ describe('V8 流入と計測の一覧', () => {
     await act(async () => { host.querySelector<HTMLButtonElement>('[aria-label="「夏のInstagram投稿」の操作"]')!.click() })
     expect(document.querySelector('[role="menu"]')?.textContent).toContain('リンクを編集')
     expect([...host.querySelectorAll('button')].some((el) => (el.getAttribute('aria-label') ?? el.textContent ?? '').includes('フォルダを追加'))).toBe(false)
+    expect(requests.mock.calls.filter(([, init]) => (init?.method ?? 'GET') !== 'GET')).toHaveLength(0)
   })
 })
 
@@ -272,7 +286,7 @@ it.each(['/api/entry-route-genres','/api/scenarios','/api/message-templates','/a
   return fixtureFetch(input,init)
  })
  await render()
- const error=[...host.querySelectorAll('[data-list-state="error"]')].find(el=>el.textContent?.includes('読み込めませんでした'))
+ const error=([...host.querySelectorAll('[data-list-state="error"]')].find(el=>el.textContent?.includes('読み込めませんでした')) ?? querySupplementaryPageAction('読み込めませんでした'))
  expect(error).toBeTruthy()
  failed=false
  await act(async()=>{(error!.querySelector('button') as HTMLButtonElement).click()})

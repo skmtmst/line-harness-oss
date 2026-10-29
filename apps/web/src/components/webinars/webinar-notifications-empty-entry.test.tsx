@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -77,7 +78,7 @@ async function mount() {
 }
 
 function button(text: string): HTMLButtonElement {
-  const found = [...host.querySelectorAll('button')].find((node) => node.textContent === text)
+  const found = ([...host.querySelectorAll('button')].find((node) => node.textContent === text) ?? querySupplementaryPageAction(text))
   if (!found) throw new Error(`ボタンが見つかりません: ${text}`)
   return found as HTMLButtonElement
 }

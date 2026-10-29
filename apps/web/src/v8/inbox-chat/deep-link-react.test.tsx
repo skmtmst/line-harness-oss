@@ -28,7 +28,7 @@ beforeEach(() => {
   root = createRoot(container)
   options = {
     params: new URLSearchParams('friend=friend-a') as Options['params'],
-    selectedAccountId: 'account-a', accountsLoading: false,
+    selectedAccountId: 'account-a', accountsLoading: false, emailInboxEnabled: true,
     setSelectedChatId: selectChat, setSelectedThreadId: selectThread,
     router, channel: 'all', savedViewParam: '',
   }
@@ -36,6 +36,12 @@ beforeEach(() => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove() })
 
 describe('URLから開く会話の再照合', () => {
+  it('新規アカウントでは共有URLのメール会話も開かない', async () => {
+    options = { ...options, params: new URLSearchParams('thread=old-mail') as Options['params'], emailInboxEnabled: false }
+    await render()
+    expect(selectThread).toHaveBeenLastCalledWith(null)
+    expect(container.textContent).toContain('メールを接続していません')
+  })
   it('URLを変更すると新しい相手を照合し、戻る操作でも開き直す', async () => {
     await render()
     expect(selectChat).toHaveBeenLastCalledWith('friend-a')

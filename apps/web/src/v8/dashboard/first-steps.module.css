@@ -4,16 +4,6 @@
  * 頭：題 15/700・数 13・進みの線 160×6・畳む／開く 13/500＋矢印16（間4）。
  * 手順：3列×2行（間8）。済みは緑の丸に白い ✓・薄い文字・ごく薄い灰の地、まだは白い丸、次の 1 つは緑の枠。
  */
-.card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-d23-ob-gap);
-  padding: var(--tpl-d23-ob-pad);
-  border: 1px solid var(--card-edge);
-  border-radius: var(--tpl-d23-ob-radius);
-  background: var(--color-canvas);
-  box-shadow: var(--card-shadow);
-}
 
 .head {
   display: flex;

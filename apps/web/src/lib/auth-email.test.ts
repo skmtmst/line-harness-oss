@@ -9,11 +9,14 @@ describe('会員登録・ログインの入力の決まり（36-4）', () => {
     expect(emailError(' owner@example.com ')).toBeNull()
   })
 
-  it('パスワードは Worker と同じ決まり（8文字以上・英数・空白なし）', () => {
-    expect(passwordError('abc1')).toContain('8文字')
-    expect(passwordError('abcdefgh')).toContain('英字と数字')
-    expect(passwordError('abcd 1234')).toContain('空白')
-    expect(passwordError('abcdefg1')).toBeNull()
+  it('パスワードは Worker と同じ決まり（13文字以上・大小英字・数字・特殊記号）', () => {
+    expect(passwordError('abc1')).toContain('13文字')
+    expect(passwordError('a'.repeat(13))).toContain('英大文字')
+    expect(passwordError('A'.repeat(13))).toContain('英小文字')
+    expect(passwordError('Aa'.repeat(7))).toContain('数字')
+    expect(passwordError('Aa1'.repeat(5))).toContain('特殊記号')
+    expect(passwordError('Aa1! '.repeat(3))).toContain('空白')
+    expect(passwordError('StrongPassword1!')).toBeNull()
   })
 
   it('確認は一致だけを見る', () => {

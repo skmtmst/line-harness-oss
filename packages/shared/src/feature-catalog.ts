@@ -40,6 +40,9 @@ export const FEATURE_CATALOG = [
 export type FeatureId = (typeof FEATURE_CATALOG)[number]['featureId'];
 export type FeatureEntitlementKey = (typeof FEATURE_CATALOG)[number]['entitlementKey'];
 
+/** 然専用メニューの登録。新規店舗では空配列を保存する。 */
+export const SPECIALIZED_CATALOG_SETTING_KEY = 'feature.specialized.catalog';
+
 export const FEATURE_IDS = FEATURE_CATALOG.map(({ featureId }) => featureId) as FeatureId[];
 
 export function featureCatalogEntry(featureId: FeatureId) {

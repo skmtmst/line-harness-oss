@@ -2745,6 +2745,12 @@
         ],
         "signals": [
           {
+            "id": "raw-button",
+            "re": "<button\\b",
+            "ext": ".tsx",
+            "why": "画面の押し口は共通Button・IconButtonへ渡す"
+          },
+          {
             "id": "green-fill",
             "css": {
               "all": [
@@ -3730,6 +3736,51 @@
       },
       "pen": {
         "markers": []
+      }
+    },
+    {
+      "id": "booking-card-content",
+      "name": "予約の箱の内容",
+      "role": "予約の名前と時刻・メニュー・必要な札を共通の2段で示す",
+      "rules": [
+        "§2"
+      ],
+      "owner": {
+        "code": {
+          "files": [
+            "apps/web/src/components/shared/booking-presentation.tsx",
+            "apps/web/src/components/shared/booking-state.module.css"
+          ],
+          "components": [
+            "BookingCardContent",
+            "BookingStaffHeading",
+            "BookingRest",
+            "BookingVisibleLegend"
+          ],
+          "vars": []
+        },
+        "pen": [],
+        "status": "予約の箱と担当・休憩は共通の表示を使う"
+      },
+      "code": {
+        "selectorHint": "bookingCard|staffHeading",
+        "signals": [
+          {
+            "id": "own-booking-content",
+            "re": "<BookingBlock\\b(?:[^<>]|=>){0,2400}?>\\s*<BookingName\\b",
+            "why": "予約の箱の内容を手で組む（BookingCardContentを使う）"
+          }
+        ]
+      },
+      "pen": {
+        "ancestorNot": [],
+        "markers": []
+      },
+      "guard": {
+        "tests": [
+          "apps/web/src/components/shared/booking-presentation.test.tsx"
+        ],
+        "needed": "共通の予約内容を通らない手組みの再導入を止める"
       }
     }
   ]

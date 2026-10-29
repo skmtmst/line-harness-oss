@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createElement } from 'react'
-import { cleanup, render, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
 import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
@@ -13,10 +13,11 @@ vi.mock('next/navigation', () => ({ usePathname: () => fixture.pathname }))
 vi.mock('next/link', () => ({ default: ({ children, ...props }: React.ComponentProps<'a'>) => createElement('a', props, children) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: null, loading: false }) }))
 vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: 'standard' }, status: 'ready' }) }))
-vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '試験会社', iconUrl: null }) }))
+vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: 'LINEアカウント', iconUrl: null }) }))
+vi.mock('@/lib/use-tenant-name', () => ({ useTenantName: () => 'Shed Products株式会社' }))
 vi.mock('@/components/hq/account-menu', () => ({ SidebarAccountMenu: () => null }))
 vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: fixture.version }))
-vi.mock('@/components/update/use-update-status', () => ({ useUpdateStatus: () => ({ kind: 'latest', version: '2.7.0' }) }))
+vi.mock('@/components/update/use-update-status', async (original) => ({ ...await original<typeof import('@/components/update/use-update-status')>(), useUpdateStatus: () => ({ kind: 'latest', version: '2.7.0' }) }))
 vi.mock('@/lib/api/helpers/styles', () => ({ hqStyleApi: { attention: async () => ({ success: true, data: { items: [] } }) } }))
 
 import Sidebar from './sidebar'
@@ -44,18 +45,22 @@ describe('サイドバーの会社表示・設定・版', () => {
     const view = render(createElement(Sidebar))
     // 非表示のモバイル複製ではなく、常設のサイドバーを検証する。
     const desktop = within(view.container.querySelector('aside:not(#mobile-menu)') as HTMLElement)
-    expect(desktop.getByTitle('試験会社').textContent).toBe('試験会社')
+    expect(desktop.getByTitle('Shed Products株式会社').textContent).toBe('Shed Products株式会社')
+    expect(desktop.queryByTitle('LINEアカウント')).toBeNull()
+    expect(desktop.getByTitle('Shed Products株式会社').closest('[data-design-node="J33xq/V2WbXF"]')?.querySelector('[aria-hidden="true"]')).toBeNull()
     expect(desktop.getByText('musubo')).toBeTruthy()
     expect(desktop.getByRole('link', { name: label }).getAttribute('href')).toBe(href)
     expect(desktop.queryByRole('link', { name: otherLabel })).toBeNull()
-    expect(await desktop.findByText('Ver. 2.7.0（a1b2c3d）')).toBeTruthy()
-    expect(desktop.getByText('検証環境')).toBeTruthy()
+    // 閉じた状態は版と環境の1行。詳細は共通の浮く面で開いて確かめる。
+    fireEvent.click(await desktop.findByRole('button', { name: '2.7.0・検証環境' }))
+    expect(await screen.findByText('Ver. 2.7.0（a1b2c3d）')).toBeTruthy()
+    expect(screen.getAllByText(/検証環境/).length).toBeGreaterThan(0)
     expect(fixture.version).toHaveBeenCalled()
   })
 
   it.each([
     ['/', 'サンプルアカウント'],
-    ['/hq', '試験会社'],
+    ['/hq', 'Shed Products株式会社'],
   ])('%sの見本では見出しを保ち、設定と版の取得を出さない', (pathname, heading) => {
     fixture.pathname = pathname
     const view = render(createElement<NonNullable<Parameters<typeof Sidebar>[0]>>(Sidebar, { preview: true }))

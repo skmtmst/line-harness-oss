@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
+  query: '',
   role: 'owner' as string,
   replace: vi.fn(),
   push: vi.fn(),
@@ -20,7 +21,7 @@ const fixture = vi.hoisted(() => ({
 }))
 
 const stableRouter = { replace: (...args: unknown[]) => fixture.replace(...args), push: (...args: unknown[]) => fixture.push(...args) }
-vi.mock('next/navigation', () => ({ useRouter: () => stableRouter, useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({ useRouter: () => stableRouter, useSearchParams: () => new URLSearchParams(fixture.query) }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined, usePageCrumbs: () => undefined }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null }) }))
 
@@ -62,6 +63,7 @@ vi.mock('@/components/shared/date-field', () => ({ default: (p: { value: string;
 
 import { ApiError } from '@/lib/api'
 import StaffShiftsV8, { groupBreaks, shortDay, weekdaySetLabel } from './shifts'
+import StaffShiftsPage from '@/app/booking/staff/shifts/page'
 
 const memStorage = vi.hoisted(() => {
   const values = new Map<string, string>()
@@ -77,6 +79,7 @@ const memStorage = vi.hoisted(() => {
 vi.stubGlobal('localStorage', memStorage)
 
 beforeEach(() => {
+  fixture.query = ''
   memStorage.setItem('lh_staff_role', 'owner')
   fixture.role = 'owner'
   fixture.myStaff = []
@@ -130,6 +133,14 @@ describe('休憩の曜日のまとまり', () => {
 })
 
 describe('役割はサーバーで決める', () => {
+  test('実入口の担当者を読み、作る型の本文へ勤務の入力を描く', async () => {
+    fixture.query = 'staff_id=bs-1'
+    render(<StaffShiftsPage />)
+    const weekday = await screen.findByRole('button', { name: '休憩の曜日（月〜金）を選ぶ' })
+    expect(weekday.closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
+    expect(fixture.getBreaks).toHaveBeenCalledWith('account-a', 'bs-1')
+  })
+
   test('手元が owner でもサーバーが staff なら、ひも付けなしの案内を出す（受付枠へ送らない）', async () => {
     fixture.role = 'staff'
     render(<StaffShiftsV8 staffId="" />)

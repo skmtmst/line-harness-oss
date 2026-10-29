@@ -54,7 +54,9 @@ import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
 
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
+import Card, { CardHeader } from '@/components/shared/card'
+import HelpTip from '@/components/shared/help-tip'
 import type { ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import ContextMenu, { type ContextMenuItem } from '@/components/shared/context-menu';
@@ -105,9 +107,9 @@ type ScenarioRow = Scenario & {
   completedCount?: number
 }
 
-/* 板  の行の補足に出る送り方の言い方。relative は 028 以前の作り方で、いまは新しく作れない。 */
+/** 実際の配信時刻の起点を、利用者向けの言葉で示す。 */
 const deliveryModeLabels: Record<DeliveryMode, string> = {
-  relative: 'Legacy',
+  relative: '前の配信からの間隔',
   elapsed: '経過時間で指定',
   absolute_time: '時刻で指定',
 }
@@ -1035,7 +1037,7 @@ export default function ScenariosListV8() {
   /* ページ送りは型の pagination 枠へ。 */
   const listPager = scenarioList.loaded && !scenarioList.error ? (
     <ListPagePagination>
-      <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage}
+      <Pagination page={scenarioList.page} pageCount={scenarioList.pageCount} onPageChange={scenarioList.setPage} correctOutOfRange={scenarioList.loaded && !scenarioList.error}
         range={{ total: scenarioList.total, first: (scenarioList.page - 1) * scenarioList.limit + 1, last: Math.min(scenarioList.page * scenarioList.limit, scenarioList.total) }} />
     </ListPagePagination>
   ) : null
@@ -1175,10 +1177,11 @@ export default function ScenariosListV8() {
         {panelRow && (
           <DetailPanel
             open
+            contentSpacing="sections"
             title={panelRow.name}
             description={[
-              deliveryModeLabels[panelRow.deliveryMode ?? 'relative'],
-              panelRow.stepCount === undefined ? '—通' : `${panelRow.stepCount} 通`,
+              panelRow.deliveryMode ? deliveryModeLabels[panelRow.deliveryMode] : '配信方法は未確認',
+              panelRow.stepCount == null ? '通数は未確認' : `${panelRow.stepCount} 通`,
             ].join('・')}
             onClose={() => setPanelId(null)}
             onPrev={panelIndex > 0 ? () => setPanelId(scenarios[panelIndex - 1].id) : undefined}
@@ -1186,7 +1189,7 @@ export default function ScenariosListV8() {
             hasPrev={panelIndex > 0}
             hasNext={panelIndex < scenarios.length - 1}
             footer={
-              <>
+              <DialogActions padding="none">
                 <Button variant="primary" onClick={() => goDetail(panelRow.id)}>
                   開く
                 </Button>
@@ -1198,37 +1201,38 @@ export default function ScenariosListV8() {
                     })
                   }
                  busyLabel="移動中…">
-                  配信結果を見る
+                  配信結果
                 </Button>
-                {canEdit && <Button variant="secondary" onClick={() => openDuplicate(panelRow)}>
-                  複製する
-                </Button>}
-                {canEdit && <Button
-                  variant="secondary"
-                  onClick={() => {
+                {canEdit ? <RowMenu label={`「${panelRow.name}」のその他操作`} items={[
+                  { id: 'duplicate', label: '複製する', onSelect: () => openDuplicate(panelRow) },
+                  { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => {
                     setPanelId(null)
                     void requestDelete(panelRow)
-                  }}
-                >
-                  削除する
-                </Button>}
-              </>
+                  } },
+                ]} /> : null}
+              </DialogActions>
             }
           >
-            <p>
-              {panelRow.isActive ? '有効' : '停止中'} ／ 購読{' '}
-              {panelRow.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(panelRow.subscriberCount)}人 ／
-              読了 {formatNumber(panelRow.completedCount ?? 0)}人
-            </p>
-            {panelRow.description && <p>{panelRow.description}</p>}
-            {canEdit && (
+            <Card variant="panel" layout="vertical" gap="tight" aria-label="配信状況">
+              <CardHeader size="stacked" title="配信状況" headingLevel={3}
+                action={<StatusBadge status={panelRow.isActive ? 'active' : 'stopped'} tone={panelRow.isActive ? 'success' : 'neutral'} />}
+                help={<HelpTip label="配信状況の説明">配信中は、このシナリオに登録されていて最後までの配信が終わっていない人です。シナリオが停止中の間は送信されません。最後まで配信は、最終ステップまで処理が終わった人です。既読人数ではありません。</HelpTip>} />
+              <p>配信中 {panelRow.subscriberCount == null ? emptyValue('unknown') : formatNumber(panelRow.subscriberCount)} 人・最後まで配信 {panelRow.completedCount == null ? emptyValue('unknown') : formatNumber(panelRow.completedCount)} 人</p>
+            </Card>
+            {panelRow.description ? <Card variant="panel" layout="vertical" gap="tight" aria-label="シナリオの説明">
+              <CardHeader size="stacked" title="説明" headingLevel={3} />
+              <p>{panelRow.description}</p>
+            </Card> : null}
+            {canEdit ? <Card variant="panel" layout="vertical" gap="tight" aria-label="シナリオ名の変更">
+              <CardHeader size="stacked" title="名前を変更" headingLevel={3}
+                help={<HelpTip label="名前の変更方法">下の名前を押すと編集できます。Enterで保存し、Escで取り消します。</HelpTip>} />
               <InlineEdit
                 value={panelRow.name}
                 label="シナリオ名"
                 onSave={(next) => renameScenario(panelRow.id, next)}
                 maxLength={80}
               />
-            )}
+            </Card> : null}
           </DetailPanel>
         )}
 

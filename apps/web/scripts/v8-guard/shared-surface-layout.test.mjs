@@ -17,7 +17,7 @@ const webRoot = new URL('../..', import.meta.url).pathname
 const sheets = new Set()
 const compiled = await build({
   stdin: { resolveDir: webRoot, loader: 'tsx', contents: `
-import React,{useState} from 'react'; import {createRoot} from 'react-dom/client';
+import React,{useState,useRef} from 'react'; import {createRoot} from 'react-dom/client';
 import {Steps} from './src/components/templates/steps';
 import {PageHeading} from './src/components/templates/page-frame';
 import Checkbox,{SettingCheckbox} from './src/components/shared/checkbox';
@@ -47,15 +47,20 @@ import Dialog from './src/components/shared/dialog';
 import ConfirmDialog from './src/components/shared/confirm-dialog';
 import Drawer from './src/components/shared/drawer';
 import Button from './src/components/shared/button';
+import ActionMenu from './src/components/shared/action-menu';
+import StickyBar from './src/components/shared/sticky-bar';
 import {ListToolbarRow} from './src/components/shared/list-toolbar';
 import {FilterPopover} from './src/components/shared/filter-popover';
 import CommandPalette from './src/components/shared/command-palette';
 import Notice from './src/components/shared/notice';
 import {DialogContentRow} from './src/components/shared/dialog-form-row';
+import {EntityPickerField} from './src/components/shared/entity-picker';
 import KpiBand from './src/components/shared/kpi-band';
 import KpiCard from './src/components/shared/kpi-card';
 function Fixture(){
- const [window,setWindow]=useState(''),[value,setValue]=useState(false),[current,setCurrent]=useState('now'),[countState,setCountState]=useState('active');
+ const [menuOpen,setMenuOpen]=useState(false),menuAnchor=useRef(null);
+ const reasonFault=globalThis.inputReasonFault;
+ const [window,setWindow]=useState(''),[value,setValue]=useState(false),[current,setCurrent]=useState('now'),[failureCalls]=useState({}),[countState,setCountState]=useState('active');
  const [filterOpen,setFilterOpen]=useState(false);
  const steps=[{key:'done',label:'事前確認',state:'done',onSelect:()=>setCurrent('done')},{key:'now',label:'アカウント接続',state:'current'}, {key:'next',label:'接続確認',state:'todo'}, {key:'choice',label:'使い方を選ぶ',state:'todo'}, {key:'finish',label:'完了',state:'todo'}];
  const props={open:!!window,onCancel:()=>setWindow(''),onConfirm:()=>setWindow(''),title:'新しく作る',description:'名前を入力してください。内容は作成する前に確認できます。',headerIcon:<svg viewBox="0 0 16 16"><path d="M2 2h12v12H2z" fill="none" stroke="currentColor"/></svg>};
@@ -97,7 +102,7 @@ function Fixture(){
     <div data-intrinsic-case="narrow" style={{width:240}}><SegmentedControl aria-label="狭い表示" fit="fill" value="line" options={[{value:'line',label:'LINEの友だち',count:128},{value:'phone',label:'LINE未連携の電話客',count:64}]} onChange={()=>{}}/></div>
   </section>
   <section id="empty-choices"><SegmentedControl aria-label="件数の切り替え" value={countState} options={[{value:'empty',label:'保留',count:0},{value:'active',label:'対応中',count:2},{value:'unknown',label:'未取得',count:'—'}]} onChange={setCountState}/></section>
-  <EntityPickerField label="親候補" noun="アカウント" items={Array.from({length:20},(_,i)=>({id:String(i),name:"親候補"+i,meta:"候補の説明"}))} value="0" onChange={()=>{}} /><ToggleGroupActions total={6} enabled={4} label="配信" onChange={()=>{}} /><section id="favorites"><IconButton variant="attention" pressed aria-label="お気に入り済み"><Star /></IconButton><IconButton variant="attention" pressed={false} aria-label="お気に入りにする"><Star /></IconButton></section>
+  <section id="entity-selection"><EntityPickerField label="親候補" noun="アカウント" items={Array.from({length:20},(_,i)=>({id:String(i),name:"親候補"+i,meta:"候補の説明"}))} value="0" onChange={()=>{}} /></section><ToggleGroupActions total={6} enabled={4} label="配信" onChange={()=>{}} /><section id="favorites"><IconButton variant="attention" pressed aria-label="お気に入り済み"><Star /></IconButton><IconButton variant="attention" pressed={false} aria-label="お気に入りにする"><Star /></IconButton></section>
   <section id="filter-states" style={{display:'flex',alignItems:'center',gap:12}}>
     <FilterChip selected={value} onChange={setValue}>すばやく絞る</FilterChip>
     <FilterChip selected showCheck={false} onChange={()=>{}}>状態</FilterChip>
@@ -140,10 +145,20 @@ function Fixture(){
    <KpiCard presentation="band" title="接続に問題" icon={<svg viewBox="0 0 16 16"/>} value={12345} unit="通" valueTone="warning" detail="枠 200 通のうち 2%" action={{label:'配信へ',href:'/broadcasts'}}/>
    <KpiCard presentation="band" title="今日の予約" icon={<svg viewBox="0 0 16 16"/>} value={0} unit="件" badge="なし" badgeTone="neutral" detail="次の予定はありません" action={{label:'予約へ',href:'/booking'}}/>
   </KpiBand></section>)}
+  <section id="saving-bars">{[false,true,'input'].map(info=><StickyBar key={String(info)} status="未保存" info={info===true?<span>幅1200 × 高さ628</span>:null} destructive={<Button>削除する</Button>} actions={<><Button disabled={info==='input'} disabledReason={info==='input'?'名前を入れてください':undefined}>キャンセル</Button><Button variant="primary" disabled={info==='input'} disabledReason={info==='input'?'名前を入れてください':undefined}>保存する</Button></>}/>)}</section>
+  {['normal','split','inline'].map(mode=><section key={mode} data-failing-bar={mode}><input aria-label="失敗時にも保持する入力" defaultValue="残す内容"/><StickyBar split={mode==='split'?{lead:<span>別の一覧</span>,trailingWidth:'360px'}:undefined} presentation={mode==='inline'?'distribution':undefined} actions={<><Button>キャンセル</Button><Button variant="primary" onClick={()=>{failureCalls[mode]=(failureCalls[mode]||0)+1;globalThis.failureCalls=failureCalls[mode];if(failureCalls[mode]===1)throw new Error('offline')}}>失敗を確かめる</Button></>}/></section>)}
+  <section id="input-action"><Button disabled disabledReason="名前を入れてください" lockedReason={reasonFault?"名前を入れてください":undefined}>入力を保存する</Button></section>
+  <section id="permission-action"><Button variant="primary" lockedReason="統括の担当者だけが作れます" onClick={()=>{globalThis.permissionCalls=(globalThis.permissionCalls||0)+1}}>送り先を作る</Button><Button count={3}>絞り込み</Button></section>
+  <section id="permission-menu"><button ref={menuAnchor} onClick={()=>setMenuOpen(!menuOpen)}>権限メニュー</button><ActionMenu open={menuOpen} anchorRef={menuAnchor} onClose={()=>setMenuOpen(false)} items={[
+   {id:'locked',label:'権限の操作',group:'destructive',lockedReason:'統括の担当者だけが作れます',href:'/unexpected',onSelect:()=>{globalThis.menuLockedCalls=(globalThis.menuLockedCalls||0)+1}},
+   {id:'input',label:'入力不足の操作',group:'destructive',disabled:true,disabledReason:'名前を入れてください',onSelect:()=>{globalThis.menuInputCalls=(globalThis.menuInputCalls||0)+1}},
+   {id:'allowed',label:'許可の操作',group:'destructive',onSelect:()=>{globalThis.menuAllowedCalls=(globalThis.menuAllowedCalls||0)+1}}
+  ]}/></section>
   <section id="windows">{['通常','確認','危険','警告','手順','選択','長文','引き出し'].map(name=><Button key={name} onClick={()=>setWindow(name)}>{name}</Button>)}</section>
+  <section><Button onClick={()=>setWindow('left-actions')}>左操作の窓を開く</Button></section>
   {window==='引き出し'?<Drawer open title="設定を編集する" headerIcon={props.headerIcon} description={props.description} onClose={()=>setWindow('')} footer={<Button onClick={()=>setWindow('')}>保存する</Button>}><input aria-label="名前" defaultValue="保持する名前"/></Drawer>:
    ['確認','危険','警告'].includes(window)?<ConfirmDialog {...props} title="内容を確認しますか？" destructive={window==='危険'} warning={window==='警告'}/>:
-   <Dialog {...props} open={!!window} widthPreset={window==='選択'?'picker':undefined} steps={window==='手順'?<Steps label="窓の手順" steps={steps} currentKey="now"/>:null}>
+   <Dialog {...props} open={!!window} footerLead={window==='left-actions'?<Button onClick={()=>{globalThis.dialogLeadCalls=(globalThis.dialogLeadCalls||0)+1}}>左の操作</Button>:undefined} widthPreset={window==='選択'?'picker':undefined} steps={window==='手順'?<Steps label="窓の手順" steps={steps} currentKey="now"/>:null}>
     <DialogContentRow tone="muted"><label>名前<input aria-label="名前" defaultValue="保持する名前"/></label></DialogContentRow><Notice tone="warn">入力した内容を確認してください。</Notice>{window==='長文'?<div style={{height:1600}}>長い内容</div>:null}
    </Dialog>}
  </main>
@@ -177,17 +192,212 @@ function Fixture(){
     b.onLoad({ filter: /\.css$/ }, args => { sheets.add(readFileSync(args.path, 'utf8')); return { contents: '', loader: 'js' } })
   } }],
 })
-const globals = await compileUiStyles(new URL('../../src/app/globals.css', import.meta.url).pathname)
+const globals = await compileUiStyles(new URL('../../src/app/globals.css', import.meta.url).pathname, ['fixed', 'min-w-0'])
 const css = [globals, ...sheets].join('\n').replace(/:global\(([^()]*)\)/g, '$1')
 
-async function mount(page, width) {
+async function mount(page, width, inputReasonFault = false) {
   await page.setViewportSize({ width, height: 900 })
   await page.setContent(`<html data-theme="v8"><style>${css}*{box-sizing:border-box}.fixed{position:fixed}body{margin:0}main{margin:24px 24px 24px 264px}#selection{margin-top:24px}#windows{display:flex;gap:8px}[data-center-row]{height:40px;display:flex;align-items:center}#selection>label{margin-block:12px}</style><div id="root"></div></html>`)
-  await page.addScriptTag({ content: compiled.outputFiles[0].text })
+  await page.addScriptTag({ content: `globalThis.inputReasonFault=${JSON.stringify(inputReasonFault)};` + compiled.outputFiles[0].text })
   await page.getByRole('button', { name: '通常', exact: true }).waitFor()
 }
 
+test('権限メニューは理由と焦点を保ち、実キー・タップでも起動しない', async () => {
+  const browser = await connectGuardBrowser()
+  const page = await browser.newPage({ hasTouch: true })
+  try {
+    for (const width of [1152, 1440]) {
+      await mount(page, width)
+      await page.evaluate(() => { globalThis.menuLockedCalls = 0; globalThis.menuInputCalls = 0; globalThis.menuAllowedCalls = 0 })
+      const trigger = page.getByRole('button', { name: '権限メニュー', exact: true })
+      await trigger.click()
+      const locked = page.getByRole('menuitem', { name: /^権限の操作/ })
+      const allowed = page.getByRole('menuitem', { name: '許可の操作', exact: true })
+      await expect(locked).toBeFocused()
+      await locked.evaluate(async el => {
+        const portal = el.closest('[data-menu-portal]')
+        await Promise.all(portal.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {})))
+      })
+      assert.equal(await locked.evaluate(el => getComputedStyle(el.closest('[data-menu-portal]')).position), 'fixed')
+      await expect(locked).toHaveAttribute('aria-disabled', 'true')
+      assert.deepEqual(await locked.evaluate(el => ({ tag: el.tagName, disabled: el.disabled, href: el.getAttribute('href') })), { tag: 'BUTTON', disabled: false, href: null })
+      const lockStyle = await locked.evaluate(el => ({ height: el.getBoundingClientRect().height, color: getComputedStyle(el).color, icon: getComputedStyle(el.querySelector('svg').parentElement).color, reasonHidden: document.getElementById(el.getAttribute('aria-describedby')).hidden }))
+      assert.equal(lockStyle.height, await allowed.evaluate(el => el.getBoundingClientRect().height))
+      assert.equal(lockStyle.color, lockStyle.icon)
+      assert.equal(lockStyle.reasonHidden, true)
+      await expect(page.getByRole('tooltip')).toHaveText('統括の担当者だけが作れます')
+      if (process.env.V8_GUARD_ARTIFACT_DIR) {
+        mkdirSync(process.env.V8_GUARD_ARTIFACT_DIR, { recursive: true })
+        await page.screenshot({ path: `${process.env.V8_GUARD_ARTIFACT_DIR}/permission-menu-${width}.png` })
+      }
+      await page.keyboard.press('Enter')
+      await page.keyboard.press('Space')
+      const tapRect = await locked.boundingBox()
+      assert.ok(tapRect)
+      assert.ok(tapRect.x >= 0 && tapRect.y >= 0 && tapRect.x + tapRect.width <= width && tapRect.y + tapRect.height <= 900)
+      assert.equal(await locked.evaluate(el => { const rect = el.getBoundingClientRect(); return el.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)) }), true)
+      await page.touchscreen.tap(tapRect.x + tapRect.width / 2, tapRect.y + tapRect.height / 2)
+      assert.equal(await page.evaluate(() => globalThis.menuLockedCalls || 0), 0)
+      assert.equal(await page.evaluate(() => location.pathname), 'blank')
+      await page.keyboard.press('ArrowDown')
+      await expect(allowed).toBeFocused()
+      await page.keyboard.press('Home')
+      await expect(locked).toBeFocused()
+      await page.keyboard.press('End')
+      await expect(allowed).toBeFocused()
+      await page.keyboard.press('ArrowUp')
+      await expect(locked).toBeFocused()
+      await trigger.focus()
+      await expect(page.getByRole('tooltip')).toHaveCount(0)
+      await locked.hover()
+      await expect(page.getByRole('tooltip')).toHaveText('統括の担当者だけが作れます')
+      const reason = await locked.evaluate(el => document.getElementById(el.getAttribute('aria-describedby'))?.textContent)
+      assert.equal(reason, '統括の担当者だけが作れます')
+      await allowed.click()
+      assert.equal(await page.evaluate(() => globalThis.menuAllowedCalls || 0), 1)
+      assert.equal(await page.evaluate(() => globalThis.menuInputCalls || 0), 0)
+    }
+  } finally { await page.close(); await browser.close() }
+})
+
+test('入力理由の既定を権限tooltipへ戻す故障を検出する', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage({ reducedMotion: 'reduce' })
+    const inspect = () => page.locator('#input-action').evaluate(host => {
+      const button = host.querySelector('button')
+      return { disabled: button.disabled, permission: button.hasAttribute('data-permission-locked'), inline: host.querySelector('[role="status"]')?.textContent }
+    })
+    const conforms = row => row.disabled && !row.permission && row.inline === '名前を入れてください'
+    await mount(page, 1152)
+    assert.equal(conforms(await inspect()), true)
+    // 以前の誤った既定を再現：入力理由までlockedReasonとして解釈する。
+    await mount(page, 1152, true)
+    const fault = await inspect()
+    assert.equal(fault.disabled, false)
+    assert.equal(fault.permission, true)
+    assert.equal(conforms(fault), false)
+  } finally { await browser.close() }
+})
+
+for (const width of [1024, 1152, 1440]) {
+  test(`窓の取消と保存は中央、独立した操作は左に保ち、配置故障を検出する ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ reducedMotion: 'reduce' })
+      await mount(page, width)
+      await page.evaluate(() => { globalThis.dialogLeadCalls = 0 })
+      await page.getByRole('button', { name: '左操作の窓を開く', exact: true }).click()
+      const dialog = page.getByRole('dialog', { name: '新しく作る', exact: true })
+      const measure = () => dialog.evaluate(root => {
+        const actions = root.querySelector('[data-dialog-action-pair]'), box = actions.getBoundingClientRect()
+        const lead = [...actions.querySelectorAll('button')].find(el => el.textContent === '左の操作').getBoundingClientRect()
+        const pair = actions.querySelector('[data-dialog-action]').parentElement.getBoundingClientRect()
+        return { center: Math.abs((pair.left + pair.right) / 2 - (box.left + box.right) / 2), leadInside: lead.left >= box.left && lead.right <= pair.left }
+      })
+      assert.ok((await measure()).center <= 0.5)
+      assert.equal((await measure()).leadInside, true)
+      const actions = dialog.locator('[data-dialog-action-pair]')
+      const original = await actions.getAttribute('style')
+      try {
+        await actions.evaluate(el => { el.style.gridTemplateColumns = 'auto auto' })
+        assert.ok((await measure()).center > 1)
+      } finally {
+        await actions.evaluate((el, original) => { if (original === null) el.removeAttribute('style'); else el.setAttribute('style', original) }, original)
+      }
+      assert.ok((await measure()).center <= 0.5)
+      assert.equal((await measure()).leadInside, true)
+      await dialog.getByRole('button', { name: '左の操作', exact: true }).click()
+      assert.equal(await page.evaluate(() => globalThis.dialogLeadCalls), 1)
+      await expect(dialog).toBeVisible()
+      await dialog.getByRole('button', { name: 'キャンセル', exact: true }).click()
+      await expect(dialog).toHaveCount(0)
+    } finally { await browser.close() }
+  })
+
+  test(`補足付きの保存帯も操作を中央に置き、権限の灰ボタンと条件数を保つ ${width}`, async () => {
+    const browser = await connectGuardBrowser()
+    try {
+      const page = await browser.newPage({ reducedMotion: 'reduce' })
+      await mount(page, width)
+      const offsets = () => page.locator('#saving-bars [data-shared-part="sticky-bar"]').evaluateAll(bars => bars.map(bar => {
+        const b = bar.getBoundingClientRect(), a = bar.querySelector('[data-sticky-actions]').getBoundingClientRect()
+        return { center: Math.abs(a.left + a.width / 2 - b.left - b.width / 2), overflow: bar.scrollWidth - bar.clientWidth }
+      }))
+      assert.ok((await offsets()).every(row => row.center <= 0.5 && row.overflow === 0), JSON.stringify(await offsets()))
+      const fault = await page.addStyleTag({ content: '#saving-bars [data-shared-part="sticky-bar"]{display:flex!important;justify-content:flex-end!important}' })
+      assert.ok((await offsets()).some(row => row.center > 1))
+      await fault.evaluate(el => el.remove())
+      assert.ok((await offsets()).every(row => row.center <= 0.5))
+      for (const mode of ['normal', 'split', 'inline']) {
+      const failing = page.locator(`[data-failing-bar="${mode}"]`)
+      const actionCenter = () => failing.evaluate(host => {
+        const barElement = host.querySelector('[data-shared-part="sticky-bar"]')
+        const bar = (barElement.querySelector('[data-sticky-actions]')?.parentElement !== barElement ? barElement.querySelector('[data-sticky-actions]')?.parentElement ?? barElement : barElement).getBoundingClientRect()
+        const buttons = [...host.querySelectorAll('button')].map(el => el.getBoundingClientRect())
+        const error = host.querySelector('[role="alert"]')?.getBoundingClientRect()
+        return { center: Math.abs((buttons[0].left + buttons[1].right) / 2 - (bar.left + bar.width / 2)), top: buttons[0].top - buttons[1].top, errorBelow: !error || error.top >= Math.max(...buttons.map(button => button.bottom)) }
+      })
+      const before = await actionCenter()
+      assert.equal(await failing.getByRole('alert').count(), 0)
+      await failing.getByRole('button', { name: '失敗を確かめる' }).click()
+      await expect(failing.getByRole('alert')).toContainText('処理できませんでした')
+      const after = await actionCenter()
+      assert.ok(await failing.evaluate(host => host.querySelector('[role="alert"]').getBoundingClientRect().top >= Math.max(...[...host.querySelectorAll('button')].map(el => el.getBoundingClientRect().bottom))))
+      assert.ok(after.center <= 0.5 && after.top === 0, JSON.stringify({ before, after }))
+      const errorFault = await page.addStyleTag({ content: `[data-failing-bar="${mode}"] [data-sticky-actions],[data-failing-bar="${mode}"] [data-shared-part="sticky-bar"][data-presentation]{flex-wrap:nowrap!important}[data-failing-bar="${mode}"] [data-button-error]{flex-basis:auto!important;width:auto!important}` })
+      const broken = await actionCenter()
+      assert.ok(broken.center > 0.5 || broken.top !== 0 || !broken.errorBelow, JSON.stringify({mode, broken}))
+      await errorFault.evaluate(el => el.remove())
+      assert.ok((await actionCenter()).center <= 0.5)
+      await expect(failing.getByRole('textbox')).toHaveValue('残す内容')
+      await failing.getByRole('button', { name: '失敗を確かめる' }).click()
+      await expect(failing.getByRole('alert')).toHaveCount(0)
+      assert.equal(await page.evaluate(() => globalThis.failureCalls), 2)
+      }
+      const button = page.getByRole('button', { name: '送り先を作る', exact: true })
+      const grey = await button.evaluate(el => ({ bg: getComputedStyle(el).backgroundColor, color: getComputedStyle(el).color, disabled: el.disabled }))
+      assert.equal(grey.disabled, false)
+      const channels = grey.bg.match(/[\d.]+/g).slice(0, 3).map(Number)
+      assert.ok(Math.max(...channels) - Math.min(...channels) <= 20, JSON.stringify(grey))
+      await button.focus()
+      await expect(page.getByRole('tooltip')).toHaveText('統括の担当者だけが作れます')
+      await button.press('Enter')
+      await button.press('Space')
+      await button.dispatchEvent('click')
+      assert.equal(await page.evaluate(() => globalThis.permissionCalls || 0), 0)
+      assert.equal(await page.locator('#saving-bars [role="status"]').count(), 1)
+      assert.equal(await button.getAttribute('aria-disabled'), 'true')
+      assert.equal(await page.getByLabel('3件の条件').textContent(), '3')
+      if (process.env.V8_GUARD_ARTIFACT_DIR) await page.screenshot({ path: `${process.env.V8_GUARD_ARTIFACT_DIR}/shared-permission-count-${width}.png` })
+    } finally { await browser.close() }
+  })
+}
+
 for (const width of [1152,1440,1920]) {
+  test(`EntityPickerの選択印は行内中央で、最後の候補まで表示する ${width}`, async () => {
+    const browser=await connectGuardBrowser()
+    try {
+      const page=await browser.newPage({reducedMotion:'reduce'})
+      await mount(page,width)
+      await page.getByRole('button',{name:'親候補：変える',exact:true}).click()
+      const dialog=page.getByRole('dialog',{name:'アカウントを選ぶ'})
+      await dialog.waitFor()
+      const radios=dialog.getByRole('radio')
+      assert.equal(await radios.count(),20)
+      const last=radios.last()
+      await last.scrollIntoViewIfNeeded()
+      const geometry=await last.evaluate(el=>{const row=el.closest('label'),r=row.getBoundingClientRect(),b=el.getBoundingClientRect();return {dy:b.y+b.height/2-r.y-r.height/2,contained:b.bottom<=r.bottom&&b.right<=r.right,marks:row.querySelectorAll('input[type="radio"]').length}})
+      assert.ok(Math.abs(geometry.dy)<=1,JSON.stringify(geometry))
+      assert.ok(geometry.contained,JSON.stringify(geometry))
+      assert.equal(geometry.marks,1)
+      await last.check()
+      assert.equal(await last.isChecked(),true)
+      const bounds=await last.evaluate(el=>({y:el.getBoundingClientRect().y,height:innerHeight}))
+      assert.ok(bounds.y>=0&&bounds.y<bounds.height,JSON.stringify(bounds))
+    } finally { await browser.close() }
+  })
+
   test(`手順は名前を丸の下に置き、状態と接続と戻る操作を保つ ${width}`, async () => {
     const browser = await connectGuardBrowser()
     try {

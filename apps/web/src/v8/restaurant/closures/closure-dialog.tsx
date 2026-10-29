@@ -29,6 +29,7 @@ import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { formatNumber } from '@/lib/format'
+import { withHonorific } from '@line-crm/shared'
 
 
 /*
@@ -294,7 +295,7 @@ export default function ClosureDialog({
                 {rows.map((row) => (
                   <div key={row.id} className={styles.affectedRow}>
                     <span className={styles.affectedTime}>{input.startDate === input.endDate ? clock(row.startsAt, timezone) : `${dayShort(dayOfIso(row.startsAt, timezone))} ${clock(row.startsAt, timezone)}`}</span>
-                    <span className={styles.affectedName} title={row.customerName}>{`${row.customerName} さま・${row.guestCount}名`}</span>
+                    <span className={styles.affectedName} title={row.customerName}>{`${withHonorific(row.customerName, 'さま', { space: true })}・${row.guestCount}名`}</span>
                     <span className={styles.route}>{sourceLabel(row.source, media)}</span>
                     {row.contacted && row.friendId ? (
                       <Button variant="text" data-contacted="" href={`/chats?friend=${encodeURIComponent(row.friendId)}`}>連絡済み（会話を見る）</Button>

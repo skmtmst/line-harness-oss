@@ -2,7 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import ConversionsPage from './page'
+import ConversionsPage from '@/app/affiliates/page'
 
 /*
  * R595/R596: 一覧と集計は別々に失敗する。失敗した側だけを未取得として
@@ -22,7 +22,7 @@ const mode = vi.hoisted(() => ({
 
 vi.mock('next/link', () => ({ default: () => null }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams('tab=points'),
   useRouter: () => ({ replace: () => {}, push: () => {} }),
 }))
 vi.mock('@/contexts/account-context', () => ({

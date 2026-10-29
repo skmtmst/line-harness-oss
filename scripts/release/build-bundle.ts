@@ -74,10 +74,11 @@ export function buildBundle(args: BuildBundleArgs): void {
     const absOut = resolve(outPath);
     mkdirSync(dirname(absOut), { recursive: true });
 
-    // Build the tarball. -C makes paths inside the tar relative to staging.
+    // Exclude macOS AppleDouble metadata so archived files match the stamped hashes.
+    // -C makes paths inside the tar relative to staging.
     execSync(
       `tar czf ${shellQuote(absOut)} -C ${shellQuote(staging)} worker worker-assets admin liff migrations notices`,
-      { stdio: 'inherit' },
+      { stdio: 'inherit', env: { ...process.env, COPYFILE_DISABLE: '1' } },
     );
 
     // Log final size (stat -> MB, two decimal places).

@@ -44,7 +44,7 @@
 ## 使い方（必ず守る）
 
 - 外側の看板は `layout/sidebar-identity.tsx` の `SidebarBrand`（店は `SidebarIdentity` が取得した値を渡す）。運営も同じ横並びを使う。
-- 左下の本人操作は `shared/sidebar-user-menu.tsx`。既存の本人カードと `ActionMenu` を使い、運営の本人情報・プロフィール・2要素認証・ログアウトを渡す。店・統括の権限取得は既存 `hq/account-menu.tsx` が持つ。
+- 左下の本人操作は `shared/sidebar-user-menu.tsx`。既存の本人カードと `ActionMenu` を使い、運営の本人情報・メンバー管理・2要素認証・ログアウトを渡す。店・統括の権限取得は既存 `hq/account-menu.tsx` が持つ。
 - 運営の注意帯は `Notice` の `presentation="ops"`。琥珀色・右の環境札なし。環境と版は左下の `SidebarVersion` で確認する。
 
 1. **画面を作る・直す前に**、その画面に出る型をこの表で探し、**持ち主（正の部品）だけを使う**。画面の中で同じ役目の物を書かない（§2・§6.20）。
@@ -129,7 +129,7 @@
 - 一覧のカード配置は一覧型の `ListPageCards`（`list-page.tsx` と `page-templates.module.css`）が列数と共通16の間隔を持つ。カードの面と内側は `Card`・`CardContent`・`CardHeader`（card.tsx）、操作は `RowNameButton`・`IconButton` が持つ（L7メディア・バナー）。CardContentは端の16を1回だけ持つ。
 - 分析のカード本文は `ListPageSection` が共通16/24の余白、`DetailColumns(presentation="analysis")` が左右の列と狭幅の折り畳みを持つ。カードの面/題はCard/CardHeader。ほかの提示と既定は保つ（L11 ws9wt）。
 
-- **役目**：中身のまとまりを白地＋薄い縁＋影＋角丸12で1枚に見せる
+- **役目**：中身のまとまりを白地＋線なし＋影＋角丸12で1枚に見せる
 - **持ち主（コード）**：`apps/web/src/components/shared/card.tsx`・`apps/web/src/components/shared/card.module.css`（部品 `Card`・`CardHeader`）
   - 読む変数：`--card-shadow`・`--card-edge`・`--radius-card`
 - **持ち主（Pen）**：**未定**
@@ -837,6 +837,8 @@
 <a id="primary-button"></a>
 ## primary-button 主ボタン・ボタン
 
+- アカウントの［入る・詳細・設定・戻す］は `shared/button.tsx` の `AccountActionButton`。文字と印を対応表で決め、詳細には印を付けない。要対応の数は `shared/attention-count.tsx` の `AttentionCount`。通常は黒、急ぐ数だけ赤の札、0件は灰の「—」にする。
+
 - 設定行の操作は `Button` の `presentation="row-action"`（白地・欄と同じ細枠）。注意行は `textTone="accent"` で緑の枠と文字。札と操作の並びは `RowStatusActions` が中央と操作幅をそろえる。通常の副操作は灰色を保つ（2026-10-23オーナー）。
 
 - **役目**：主＝文字の幅・高さ36・濃い緑の縁＋カードの影・角丸8。言葉は「〇〇を作る」「〜する」
@@ -845,6 +847,7 @@
 - **持ち主（Pen）**：`doYdE`「ボタン/主」・`u101P`「ボタン/副」・`LrB2L`「ボタン/危険」・`wDPmk`「ボタン/文字」・`KspUx`「アイコンボタン」
   - 注：主ボタンの縁 #06612f・角丸8の変数は未実装（§6.4）
 - **見つけ方（コード）**：
+  - raw-button：画面の JSX にある `<button>` を拾う。共通部品の実装・文字列の見本・コメントは数えない。
   - green-fill：CSS の規則に `(button|btn|primary|cta|create|submit|save|action)[^{]*\{` と `background(-color)?:\s*(var\(--color-(primary|accent|brand|action-primary)[\w-]*\)|#087a3e|#06c755)` があり、`hover|:disabled` が無い — 緑の主ボタンを CSS で手書き
   - words：`(?:>|['"'])[^<'"']{0,40}(?:新規作成|作成する|新しく作る|変更を保存(?!する)|コピーする)` — ボタンの言葉が決まりと違う（B-146）
   - (b) の割り当て：画面の CSS の上書きの selector が `\bbutton\b|btn|primary` に当たればこの型
@@ -881,7 +884,7 @@
 
 - **10-12の差し戻し（axFrW）**：一覧の選択は共通Checkboxの16px・角4（`--choice-checkbox-radius`）。画面のCSSで丸みを上書きせず、クリック・Space・一部選択・権限の動きは維持。絵の16px・角4と司令塔の16:47 JST判定に従う。
 
-- **役目**：その場で効く＝Toggle、保存して効く＝Checkbox、3つ以上＝SegmentedControl か RadioCard
+- **役目**：設定のオン・オフ＝Toggle、複数選択・同意確認＝Checkbox、3つ以上の択一＝SegmentedControl か RadioCard。保存して反映する設定は、既存の保存操作を保つ。
 - **持ち主（コード）**：`apps/web/src/components/shared/toggle.tsx`・`apps/web/src/components/shared/checkbox.tsx`・`apps/web/src/components/shared/segmented.tsx`・`apps/web/src/components/shared/radio-card.tsx`・`apps/web/src/components/shared/radio.tsx`・`apps/web/src/components/shared/check-card.tsx`（部品 `Toggle`・`Checkbox`・`UnavailableSelection`・`SegmentedControl`・`RadioCard`・`RadioCardGroup`・`CheckCard`）
   - 読む変数：`--shadow-controls-toggle`
 - **持ち主（Pen）**：`bkjTv`「トグル/オン」・`LxHpj`「トグル/オフ」・`dQCCN`「チェック/オン」・`S9U7v`「チェック/オフ」・`dtJVi`「切り替え（3つ）」・`fNPdg`「選ぶカード/オン」・`r3xz1W`「選ぶカード/オフ」
@@ -1051,6 +1054,7 @@
 ## 受信箱の列・入力・補助面（inbox-frame）
 
 - **役目**：受信箱の3列、会話の媒体、返信入力、保存した検索と内部メモの補助面。
+- 絞り込みと並びの操作は `InboxFilterSlot`・`InboxSortSlot` に入れ、`InboxFilterControls` の中で内容幅を保つ。未読名は `InboxListName`。`InboxFilterPanel` の `value.quickFilter` は一覧と同じ期限条件、`slaEnabled` は期限超過／1時間以上待ちの区別、`auxiliaryActions` は対応ルール等の操作、`unassignedUnreadCount` は未割り当ての集計値（未取得はnull、0件は0）を受ける。取得・保存・URL更新は画面が持つ。
 - **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-conversation-head.tsx`・同CSSと`inbox-head-menus.tsx`（会話の頭・担当・対応・検索・顧客欄の開閉）、`components/shared/inbox-thread.tsx`・同CSS（日付・吹き出し・時刻・送り手・引用、送信状態と `InboxThreadLoading` の骨組み）、`components/shared/inbox-list.tsx`・同CSS（題・札・探す欄・担当と経路、`InboxListRow` の選択表示）、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
 - **持ち主（Pen）**：受信箱 eovoG。媒体と補助面の従来寸法は共通トークンへ移し、画面から上書きしない。
 - **確認**：送信・引用・添付・予約・遅延応答・入力時の確認を既存試験で守る。見た目の候補は測定と左右画像の確認後だけ記録する。
@@ -1125,6 +1129,8 @@
 
 ## G9：共通表の人の欄（Z1）
 
+- 名前と、既存APIが返す質問数などの補足は `NameCell` の `description` で分ける。名前そのものは1行を保つ。格子の名簿は `GridTable columnSizing="content"` で全行の内容から幅を配り、短い状態・日時の余りを長いメールへ回す。
+
 - 役目：顔と名前を横並び1行で読む。持ち主は shared/table.tsx の PersonCell、顔は shared/avatar.tsx。名前と既存の行き先を name、表示名を avatarName へ渡す。幅が狭い時は名前だけ省略し全文を title で読む。フォルダ付きの NameCell とは役目を分ける。
 - 件数は shared/pagination.tsx の range（total/first/last）へ。手書きの件数文を足さない。
 
@@ -1158,6 +1164,7 @@
 
 ## 予約の状態・種類・現在時刻（2026-10-23）
 
+- 予約の内容は `shared/booking-presentation.tsx` の BookingCardContent（名前と時刻／メニュー、電話だけの札）、担当の受付説明は BookingStaffHeading、休憩は BookingRest を使う。
 - 持ち主：`shared/booking-controls.tsx` の BookingBlock、`shared/booking-state.ts` と同CSS、`shared/booking-presentation.tsx`。札・一覧の状態・凡例は同じ面を使う。来店中は濃い緑と白字、確定は白と細線、終了は灰。要対応（承認待ち）は赤の2px点線、期限付きの仮押さえは灰の点線、無断キャンセルは薄赤と赤の2px実線。予約の重なりの要対応は薄赤と赤い点線、注意は薄琥珀。状態は文字でも伝える。
 - 種類の色：BookingCategoryとReservationSourceは既存TagPillのTagColorDotを名前の前へ置く。丸は装飾、名前は文字。経路を札の地色へ混ぜない。BookingNowLineは中間の灰の線と、同じ灰に白字の時刻の札。
 - 使用先：ReservationBoard（時間×卓・一覧・月）、ReservationPeopleGrid、CalendarTimeEntries、スタイル別StaffBoard。月の日付の今日／選択と空き枠の操作は既存の口を保つ。

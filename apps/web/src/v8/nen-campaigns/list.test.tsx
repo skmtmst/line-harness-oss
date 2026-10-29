@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 NEN配信の一覧（src/v8/nen-campaigns/list.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * V8 のテーマで出す・自動配信は止めている配信も同じ表に並ぶ・絞り込み札・行の「…」・
@@ -85,7 +86,7 @@ let root: Root
 
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -113,7 +114,7 @@ it('旧一覧のヘッダー操作を残し、閲覧のみでは隠す', async (
   expect(host.querySelectorAll('h1')).toHaveLength(1)
   await act(async () => { button('ECのコラムを取り込む')!.click() })
   expect(action).toHaveBeenCalledTimes(1)
-  role.value = 'viewer'
+  role.value = verifiedStaffRole('viewer')
   await render(props)
   expect(button('ECのコラムを取り込む')).toBeUndefined()
 })
@@ -207,7 +208,7 @@ describe('V8 NEN配信の一覧', () => {
   })
 
   it('閲覧のみの人には帯を出し、変える操作（CSV 以外の作る・止める・テスト送信・コラムを書く）を置かない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await render(baseProps())
     expect(host.textContent).toContain('閲覧のみで見ています')
     await act(async () => { fireEvent.click(button('「注文ありがとうございます」の操作')!) })
@@ -268,3 +269,5 @@ describe('V8 NEN配信の一覧', () => {
     expect(props.onChangeDeliveryView).toHaveBeenCalledWith('failed', undefined, '')
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

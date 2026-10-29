@@ -22,6 +22,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect from '@/components/shared/entity-select'
+import { withHonorific } from '@line-crm/shared'
 
 /*
  * ★V8 予約台帳の窓：予約の変更（取消・復活・押さえの解除もここ）・取消の確認・受信データの試し。
@@ -114,7 +115,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     <RsDialog
       noValidate
       open
-      title={hold ? `押さえ（${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}）` : `${reservation.customer_name}さんの予約${canWrite ? 'を変更' : ''}`}
+      title={hold ? `押さえ（${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}）` : `${withHonorific(reservation.customer_name)}の予約${canWrite ? 'を変更' : ''}`}
       width={600}
       top={120}
       busy={busy}
@@ -203,7 +204,7 @@ export function CancelReservationDialog({ reservation, busy, onClose, onConfirm 
         </>
       )}
     >
-      {reservation ? <p className={styles.dialogStrong}>{hold ? `押さえ ${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}` : `${monthDayWeek(reservation.starts_at)} ${hm(reservation.starts_at)} ${reservation.customer_name}さん ${reservation.guest_count}名`}</p> : null}
+      {reservation ? <p className={styles.dialogStrong}>{hold ? `押さえ ${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}` : `${monthDayWeek(reservation.starts_at)} ${hm(reservation.starts_at)} ${withHonorific(reservation.customer_name)} ${reservation.guest_count}名`}</p> : null}
       <DialogNote>{hold ? '押さえを解除すると、その時間の卓は空きに戻ります。台帳には履歴が残ります。' : '台帳には取消として残ります。その時間帯の卓は空きに戻ります。取り消した予約は「復活」で戻せます。'}</DialogNote>
     </RsDialog>
   )

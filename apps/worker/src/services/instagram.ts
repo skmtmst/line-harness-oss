@@ -547,7 +547,8 @@ export async function instagramPublish(
 const INSTAGRAM_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 /**
  * 登録メディアの画像を Instagram が取りに来られる JPEG の公開URLにする。
- * すでに JPEG なら元のURLをそのまま使い、PNG のときだけ変換して置き直す。
+ * JPEG でも投稿可能な縦横比（4:5〜1.91:1）や最大幅を外れた場合は、
+ * 写真を切らずに余白を足して変換する。PNG も JPEG に変換して置き直す。
  * 元ファイルは読むだけで、変換結果は別のキーに入れる。
  */
 export async function instagramImageUrl(
@@ -559,14 +560,26 @@ export async function instagramImageUrl(
   const bytes = new Uint8Array(await object.arrayBuffer());
   const meta = detectImageMeta(bytes);
   if (!meta) throw new InstagramError('instagram_image_unsupported', 422);
-  if (meta.format === 'jpeg') {
-    if (bytes.byteLength > INSTAGRAM_IMAGE_MAX_BYTES)
-      throw new InstagramError('instagram_image_too_large', 422);
+  if (meta.format === 'jpeg' && bytes.byteLength > INSTAGRAM_IMAGE_MAX_BYTES)
+    throw new InstagramError('instagram_image_too_large', 422);
+  if (meta.width < 1 || meta.height < 1)
+    throw new InstagramError('instagram_image_unsupported', 422);
+  const ratio = meta.width / meta.height;
+  const needsPadding = ratio < 0.8 || ratio > 1.91;
+  if (meta.format === 'jpeg' && !needsPadding && meta.width <= 1440)
     return input.sourceUrl;
-  }
   if (!env.CF_IMAGES) throw new InstagramError('instagram_images_unconfigured', 503);
+  const width = Math.min(meta.width, 1440);
+  const transform = needsPadding
+    ? {
+        width,
+        height: ratio < 0.8 ? Math.floor(width / 0.8) : Math.ceil(width / 1.91),
+        fit: 'pad' as const,
+        background: 'white',
+      }
+    : { width };
   const output = await env.CF_IMAGES.input(new Blob([bytes]).stream())
-    .transform({ width: Math.min(meta.width, 1440) })
+    .transform(transform)
     .output({ format: 'image/jpeg' });
   const converted = await new Response(output.image()).arrayBuffer();
   if (!converted.byteLength || converted.byteLength > INSTAGRAM_IMAGE_MAX_BYTES)

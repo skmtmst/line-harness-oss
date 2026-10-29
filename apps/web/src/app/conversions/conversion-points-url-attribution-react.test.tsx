@@ -2,7 +2,7 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import ConversionsPage from './page'
+import ConversionsPage from '@/app/affiliates/page'
 import EditPage from './edit/page'
 const editNavigation = vi.hoisted(() => ({ query: '' }))
 
@@ -21,7 +21,7 @@ const net = vi.hoisted(() => ({
 
 vi.mock('next/link', () => ({ default: () => null }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
-  useSearchParams: () => new URLSearchParams(editNavigation.query),
+  useSearchParams: () => new URLSearchParams(`tab=points&${editNavigation.query}`),
   useRouter: () => ({ replace: () => {}, push: (href: string) => { editNavigation.query = href.split('?')[1] ?? '' } }),
 }))
 vi.mock('@/contexts/account-context', () => ({

@@ -3,6 +3,8 @@ import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { hashPassword } from '../services/password-hash.js';
+import { createAuthEmailToken, toJstString } from '@line-crm/db';
+import { sha256Hex } from '../middleware/auth.js';
 
 const mail = vi.hoisted(() => ({
   sendPlainMail: vi.fn(async (_env: unknown, _message: { to: string; subject: string; body: string }) => {}),
@@ -94,25 +96,34 @@ beforeEach(() => {
   turnstile.result = { ok: true };
 });
 
-const validRequest = { email: 'Owner@Example.com', turnstileToken: 'tok', agreed: true };
+const validRequest = { email: 'Owner@Example.com', companyName: '株式会社サンプル', contactName: '山田 太郎', phone: '03-1234-5678', referralSource: 'インターネット検索', turnstileToken: 'tok', agreed: true };
+
+async function issueApprovedInvite(): Promise<string> {
+  const application = testDb.raw.prepare('SELECT id FROM registration_applications WHERE email = ?').get('owner@example.com') as { id: string };
+  testDb.raw.prepare("UPDATE registration_applications SET status = 'approved', contact_note = '連絡済み', contacted_at = '2026-10-29 12:00:00', approved_at = '2026-10-29 12:01:00' WHERE id = ?").run(application.id);
+  const token = 'approved_registration_token_0123456789';
+  await createAuthEmailToken(testDb.db, { purpose: 'signup', tokenHash: await sha256Hex(token), email: 'owner@example.com', applicationId: application.id, expiresAt: toJstString(new Date(Date.now() + 3600000)) });
+  return token;
+}
 
 describe('会員登録（36-4）', () => {
-  it('メールを入れると本登録 URL のメールを送り、URL から統括とオーナーができてログイン状態になる', async () => {
+  it('申込後は承認まで登録できず、承認招待から統括とオーナーができる', async () => {
     const requested = await call('POST', '/api/auth/register/request', validRequest);
     expect(requested.status).toBe(200);
-    expect(lastMailSubject()).toBe('【musubo】メールアドレスの確認と本登録');
-    const token = lastMailToken();
-    expect(token.length).toBeGreaterThan(20);
+    expect(lastMailSubject()).toBe('【musubo】お申し込みを受け付けました');
+    expect(lastMailToken()).toBe('');
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM auth_email_tokens').get()).toEqual({ n: 0 });
+    const token = await issueApprovedInvite();
 
     const check = await call('GET', `/api/auth/register/check?token=${encodeURIComponent(token)}`);
     expect(check.status).toBe(200);
-    expect((await json(check)).data).toEqual({ email: 'owner@example.com', trialDays: 30 });
+    expect((await json(check)).data).toEqual({ email: 'owner@example.com', trialDays: 30, companyName: '株式会社サンプル', contactName: '山田 太郎' });
 
     const completed = await call('POST', '/api/auth/register/complete', {
       token,
       tenantName: '株式会社サンプル',
       name: '山田 太郎',
-      password: 'Abcdefg1',
+      password: 'StrongPassword1!',
     });
     expect(completed.status).toBe(200);
     const body = await json(completed);
@@ -139,7 +150,7 @@ describe('会員登録（36-4）', () => {
     expect(String(staff.password_hash)).toContain('pbkdf2-sha256$');
 
     // 同じ URL は 2 回使えない
-    const again = await call('POST', '/api/auth/register/complete', { token, tenantName: 'x', name: 'y', password: 'Abcdefg1' });
+    const again = await call('POST', '/api/auth/register/complete', { token, tenantName: 'x', name: 'y', password: 'StrongPassword1!' });
     expect(again.status).toBe(410);
   });
 
@@ -162,12 +173,16 @@ describe('会員登録（36-4）', () => {
   it('同意が無い・メールの形が違うと 400', async () => {
     expect((await call('POST', '/api/auth/register/request', { ...validRequest, agreed: false })).status).toBe(400);
     expect((await call('POST', '/api/auth/register/request', { ...validRequest, email: 'not-an-email' })).status).toBe(400);
+    expect((await call('POST', '/api/auth/register/request', { ...validRequest, companyName: '' })).status).toBe(400);
+    expect((await call('POST', '/api/auth/register/request', { ...validRequest, phone: '123' })).status).toBe(400);
+    expect((await call('POST', '/api/auth/register/request', { ...validRequest, referralSource: '未定義' })).status).toBe(400);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM registration_applications').get()).toEqual({ n: 0 });
   });
 
   it('同じブラウザ（印）からの 2 回目は 409 で断る。localStorage の印でも Cookie の印でも', async () => {
     await call('POST', '/api/auth/register/request', validRequest);
-    const token = lastMailToken();
-    const completed = await call('POST', '/api/auth/register/complete', { token, tenantName: 'A', name: 'a', password: 'Abcdefg1' });
+    const token = await issueApprovedInvite();
+    const completed = await call('POST', '/api/auth/register/complete', { token, tenantName: 'A', name: 'a', password: 'StrongPassword1!' });
     const marker = (await json(completed)).data.deviceMarker;
 
     const viaBody = await call('POST', '/api/auth/register/request', { ...validRequest, email: 'second@example.com', deviceMarker: marker });
@@ -191,23 +206,33 @@ describe('会員登録（36-4）', () => {
     expect((await call('POST', '/api/auth/register/request', { ...validRequest, email: 'c@example.com' })).status).toBe(429);
   });
 
-  it('本登録の入力: 会社名・名前・パスワードの決まり', async () => {
+  it('本登録では承認済みの会社名・担当者名を使用し、パスワード条件を確認する', async () => {
     await call('POST', '/api/auth/register/request', validRequest);
-    const token = lastMailToken();
+    const token = await issueApprovedInvite();
     const res = await call('POST', '/api/auth/register/complete', { token, tenantName: '', name: '', password: 'short' });
     expect(res.status).toBe(400);
     const body = await json(res);
-    expect(body.errors).toMatchObject({ tenantName: expect.any(String), name: expect.any(String), password: expect.any(String) });
+    expect(body.errors).toMatchObject({ password: expect.any(String) });
     // 失敗しても URL は消費されない
     expect((await call('GET', `/api/auth/register/check?token=${token}`)).status).toBe(200);
   });
 
   it('期限切れ・でたらめな URL は 410／404', async () => {
     await call('POST', '/api/auth/register/request', validRequest);
-    const token = lastMailToken();
+    const token = await issueApprovedInvite();
     testDb.raw.prepare(`UPDATE auth_email_tokens SET expires_at = '2000-01-01T00:00:00.000+09:00'`).run();
     expect((await call('GET', `/api/auth/register/check?token=${token}`)).status).toBe(410);
     expect((await call('GET', '/api/auth/register/check?token=zzzzzzzzzzzzzzzzzzzzzzzz')).status).toBe(404);
+  });
+
+  it('承認前の申込と旧方式の URL は利用開始に使えない', async () => {
+    await call('POST', '/api/auth/register/request', validRequest);
+    const token = 'pending_registration_token_0123456789';
+    const row = testDb.raw.prepare('SELECT id FROM registration_applications WHERE email = ?').get('owner@example.com') as { id: string };
+    await createAuthEmailToken(testDb.db, { purpose: 'signup', tokenHash: await sha256Hex(token), email: 'owner@example.com', applicationId: row.id, expiresAt: toJstString(new Date(Date.now() + 3600000)) });
+    expect((await call('GET', `/api/auth/register/check?token=${token}`)).status).toBe(403);
+    expect((await call('POST', '/api/auth/register/complete', { token, password: 'StrongPassword1!' })).status).toBe(403);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM tenants').get()).toMatchObject({ n: 1 });
   });
 });
 
@@ -351,13 +376,13 @@ describe('パスワード再設定（36-6）', () => {
     const token = lastMailToken();
 
     expect((await call('GET', `/api/auth/password/reset/check?token=${token}`)).status).toBe(200);
-    const reset = await call('POST', '/api/auth/password/reset', { token, password: 'Newpass99' });
+    const reset = await call('POST', '/api/auth/password/reset', { token, password: 'NewPassword99!' });
     expect(reset.status).toBe(200);
     expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM admin_sessions').get()).toEqual({ n: 0 });
 
     expect((await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Abcdefg1' })).status).toBe(401);
     // 新しいパスワードでは入れる（二段階認証は一時解除中）
-    const relogin = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'Newpass99' });
+    const relogin = await call('POST', '/api/auth/password/login', { email: 'owner@example.com', password: 'NewPassword99!' });
     expect(relogin.status).toBe(200);
     expect((await json(relogin)).csrfToken).toBeTruthy();
     expect((await call('POST', '/api/auth/password/reset', { token, password: 'Another11' })).status).toBe(410);
@@ -368,9 +393,9 @@ describe('パスワード再設定（36-6）', () => {
     await call('POST', '/api/auth/password/forgot', { email: 'line@example.com', turnstileToken: 'tok' });
     const token = lastMailToken();
     expect(token).toBeTruthy();
-    expect((await call('POST', '/api/auth/password/reset', { token, password: 'Newpass99' })).status).toBe(200);
+    expect((await call('POST', '/api/auth/password/reset', { token, password: 'NewPassword99!' })).status).toBe(200);
     // 二段階認証は一時解除中なので、そのままセッションが出る
-    const login = await call('POST', '/api/auth/password/login', { email: 'line@example.com', password: 'Newpass99' });
+    const login = await call('POST', '/api/auth/password/login', { email: 'line@example.com', password: 'NewPassword99!' });
     expect(login.status).toBe(200);
     expect((await json(login)).csrfToken).toBeTruthy();
   });

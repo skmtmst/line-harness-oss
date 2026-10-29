@@ -81,6 +81,7 @@ let instagramFailStatus: number | null;
 /** R2 の `IMAGES` の代わり。キーごとのバイト列を持つだけ。 */
 let imageStore: Map<string, Uint8Array>;
 let cfImagesEnabled: boolean;
+let imageTransforms: unknown[];
 
 /**
  * instagramConfig の必須条件（v形式のバージョン・base64で32バイトの鍵・httpsのredirect）を
@@ -233,6 +234,7 @@ beforeEach(async () => {
   instagramCalls = [];
   instagramFailStatus = null;
   imageStore = new Map();
+  imageTransforms = [];
   vi.stubGlobal(
     'fetch',
     // instagramGraph は URL オブジェクトを渡してくるので、文字列に正規化してから見分ける。
@@ -300,9 +302,12 @@ beforeEach(async () => {
     // PNG のときだけ通る変換。JPEGのバイト列を返すだけの差し替え。
     CF_IMAGES: {
       input: () => ({
-        transform: () => ({
+        transform: (options: unknown) => {
+          imageTransforms.push(options);
+          return ({
           output: async () => ({ image: () => new Blob([jpegBytes()]).stream() }),
-        }),
+          });
+        },
       }),
     } as unknown as Env['Bindings']['CF_IMAGES'],
   } as Env['Bindings'];
@@ -332,7 +337,7 @@ describe('下書き（GB-4/5/6/7）', () => {
     expect(ok.status).toBe(200);
     const get = await call(`/api/restaurant-test/google/posts/${ok.json.post!.id}`);
     const body = (await get.json()) as { post: { media: Array<{ sourceUrl: string }> } };
-    expect(body.post.media).toEqual([{ mediaId: 'media-1', filename: 'gaikan.jpg', sourceUrl: 'https://worker.example.test/images/images/gaikan.jpg' }]);
+    expect(body.post.media).toMatchObject([{ mediaId: 'media-1', filename: 'gaikan.jpg', sourceUrl: 'https://worker.example.test/images/images/gaikan.jpg' }]);
   });
 });
 
@@ -366,6 +371,39 @@ describe('書き込みガード', () => {
     const r = await publish(draft.json.post!.id, undefined, false);
     expect(r.status).toBe(400);
     expect((r.json as { code?: string }).code).toBe('confirmation_required');
+  });
+
+  it('検証環境では指定アカウントの投稿作成だけを許可し、削除は止める', async () => {
+    env.DEPLOY_ENV = 'staging';
+    env.GOOGLE_BUSINESS_WRITE_ENABLED = 'false';
+    env.GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID = 'account-2';
+    const draft = await createDraft();
+    const detail = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
+    expect(await detail.json()).toMatchObject({ writeEnabled: true });
+    const published = await publish(draft.json.post!.id);
+    expect(published.status).toBe(200);
+    expect(createCalls()).toHaveLength(1);
+    const removed = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}/remove`, {
+      body: { confirmed: true },
+    });
+    expect(removed.status).toBe(403);
+    expect((await removed.json()) as { code: string }).toMatchObject({ code: 'write_disabled' });
+  });
+
+  it.each([
+    ['staging', ''],
+    ['staging', 'account-1'],
+    ['production', 'account-2'],
+  ])('対象外では投稿も停止する（環境=%s、許可先=%s）', async (deployEnv, accountId) => {
+    env.DEPLOY_ENV = deployEnv;
+    env.GOOGLE_BUSINESS_WRITE_ENABLED = 'false';
+    env.GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID = accountId;
+    const draft = await createDraft();
+    const detail = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
+    expect(await detail.json()).toMatchObject({ writeEnabled: false });
+    const result = await publish(draft.json.post!.id);
+    expect(result.status).toBe(403);
+    expect(createCalls()).toHaveLength(0);
   });
 });
 
@@ -501,7 +539,7 @@ describe('取り込み（sync）', () => {
     expect(created).toBeTruthy();
     const get = await call(`/api/restaurant-test/google/posts/${created!.id}`);
     const detail = (await get.json()) as { post: { media: Array<{ sourceUrl: string }> } };
-    expect(detail.post.media).toEqual([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo1' }]);
+    expect(detail.post.media).toMatchObject([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo1' }]);
 
     // 2回目の同期でGoogle側の画像が変わっても最新化される（自己修復）。
     googlePostsOnGoogle = googlePostsOnGoogle.map((p) =>
@@ -511,7 +549,7 @@ describe('取り込み（sync）', () => {
     expect(s2.status).toBe(200);
     const get2 = await call(`/api/restaurant-test/google/posts/${created!.id}`);
     const detail2 = (await get2.json()) as { post: { media: Array<{ sourceUrl: string }> } };
-    expect(detail2.post.media).toEqual([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo2' }]);
+    expect(detail2.post.media).toMatchObject([{ mediaId: '', filename: '', sourceUrl: 'https://lh3.googleusercontent.com/photo2' }]);
   });
 
   it('アプリ発の投稿がGoogleに反映された後も、登録メディアの参照を保持する（Google側のmedia_jsonで上書きしない）', async () => {
@@ -523,7 +561,7 @@ describe('取り込み（sync）', () => {
     expect(s.status).toBe(200);
     const get = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
     const detail = (await get.json()) as { post: { media: Array<{ mediaId: string; sourceUrl: string }> } };
-    expect(detail.post.media).toEqual([{ mediaId: 'media-own', filename: 'mise.jpg', sourceUrl: 'https://worker.example.test/images/images/mise.jpg' }]);
+    expect(detail.post.media).toMatchObject([{ mediaId: 'media-own', filename: 'mise.jpg', sourceUrl: 'https://worker.example.test/images/images/mise.jpg' }]);
   });
 });
 
@@ -556,7 +594,7 @@ describe('Instagram 同時投稿', () => {
   it('画像を選ばずにInstagramへ出す設定にすると下書きで止める', async () => {
     const r = await createDraft({ ...standardBody, mediaId: null, instagram: { enabled: true, caption: null } });
     expect(r.status).toBe(400);
-    expect(r.json).toMatchObject({ error: expect.any(String), fields: { mediaId: expect.any(String) } });
+    expect(r.json).toMatchObject({ error: expect.any(String), fields: { 'instagram.mediaId': expect.any(String) } });
     expect(instagramCalls).toHaveLength(0);
   });
 
@@ -586,10 +624,60 @@ describe('Instagram 同時投稿', () => {
     expect(post.instagram).toEqual({
       enabled: true,
       caption: null,
+      mediaId: 'media-ig',
+      originalMediaId: null,
       status: 'published',
       permalink: 'https://www.instagram.com/p/abc123/',
       error: null,
     });
+  });
+
+  it('GoogleとInstagramに別の画像を保存し、Instagramには専用画像を送る', async () => {
+    await seedInstagramConnection();
+    seedMedia('media-google', 'google.jpg', 'account-2');
+    seedMedia('media-instagram', 'instagram.jpg', 'account-2');
+    seedMedia('original-google', 'source-google.jpg', 'account-2');
+    seedMedia('original-instagram', 'source-instagram.jpg', 'account-2');
+    const draft = await createDraft({ ...standardBody, mediaId: 'media-google', mediaOriginalId: 'original-google', instagram: { enabled: true, caption: null, mediaId: 'media-instagram', originalMediaId: 'original-instagram' } });
+    expect(draft.status).toBe(200);
+    const detail = await call(`/api/restaurant-test/google/posts/${draft.json.post!.id}`);
+    const stored = (await detail.json()) as { post: { media: Array<{ mediaId: string; originalMediaId: string }>; instagram: { mediaId: string; originalMediaId: string } } };
+    expect(stored.post.media[0].mediaId).toBe('media-google');
+    expect(stored.post.media[0].originalMediaId).toBe('original-google');
+    expect(stored.post.instagram.mediaId).toBe('media-instagram');
+    expect(stored.post.instagram.originalMediaId).toBe('original-instagram');
+    const published = await publish(draft.json.post!.id);
+    expect(published.status).toBe(200);
+    expect(new URL(instagramCalls[0].url).searchParams.get('image_url')).toBe('https://worker.example.test/images/images/instagram.jpg');
+  });
+
+  it('Instagram専用画像が別アカウントのものなら下書きを保存しない', async () => {
+    seedMedia('media-google', 'google.jpg', 'account-2');
+    seedMedia('media-other', 'other.jpg', 'account-1');
+    const result = await createDraft({ ...standardBody, mediaId: 'media-google', instagram: { enabled: true, caption: null, mediaId: 'media-other' } });
+    expect(result.status).toBe(404);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_posts').get()).toEqual({ n: 0 });
+  });
+
+  it('再切り取り用の元画像も同じアカウントに属していることを確認する', async () => {
+    seedMedia('media-google', 'google.jpg', 'account-2');
+    seedMedia('media-instagram', 'instagram.jpg', 'account-2');
+    seedMedia('media-other', 'source.jpg', 'account-1');
+    const result = await createDraft({ ...standardBody, mediaId: 'media-google', instagram: { enabled: true, caption: null, mediaId: 'media-instagram', originalMediaId: 'media-other' } });
+    expect(result.status).toBe(404);
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS n FROM rt_google_posts').get()).toEqual({ n: 0 });
+  });
+
+  it('検証環境の投稿専用許可でもGoogleとInstagramへ1回ずつ出す', async () => {
+    env.DEPLOY_ENV = 'staging';
+    env.GOOGLE_BUSINESS_WRITE_ENABLED = 'false';
+    env.GOOGLE_BUSINESS_POST_TEST_LINE_ACCOUNT_ID = 'account-2';
+    await seedInstagramConnection();
+    const result = await publishWithInstagram();
+    expect(result.status).toBe(200);
+    expect(createCalls()).toHaveLength(1);
+    expect(graphPaths()).toEqual(['ig-1/media', 'ig-1/media_publish', 'ig-media-1']);
+    expect((await instagramOf(result.id)).instagram.status).toBe('published');
   });
 
   it('Instagram用の文章を入れたときはそちらを使う', async () => {
@@ -611,6 +699,20 @@ describe('Instagram 同時投稿', () => {
     const key = imageUrl.replace('https://worker.example.test/images/', '');
     expect(imageStore.get(key)?.slice(0, 2)).toEqual(jpegBytes().slice(0, 2));
     expect(imageStore.has('images/ig.png')).toBe(true);
+    expect((await instagramOf(draft.json.post!.id)).instagram.status).toBe('published');
+  });
+
+  it('縦長JPEGは写真を切らず4:5の余白付き画像にしてMetaへ渡す', async () => {
+    await seedInstagramConnection();
+    seedMedia('media-ig', 'ig-tall.jpg', 'account-2', jpegBytes(1024, 1536));
+    const draft = await createDraft({ ...standardBody, mediaId: 'media-ig', instagram: { enabled: true, caption: null } });
+    const p = await publish(draft.json.post!.id);
+    expect(p.status).toBe(200);
+    expect(imageTransforms).toContainEqual({ width: 1024, height: 1280, fit: 'pad', background: 'white' });
+    expect(new URL(instagramCalls[0].url).searchParams.get('image_url')).toMatch(
+      /^https:\/\/worker\.example\.test\/images\/instagram-jpeg\/[0-9a-f-]+\.jpg$/,
+    );
+    expect(imageStore.has('images/ig-tall.jpg')).toBe(true);
     expect((await instagramOf(draft.json.post!.id)).instagram.status).toBe('published');
   });
 
@@ -708,7 +810,7 @@ describe('Instagram 同時投稿', () => {
     await publish(draft.json.post!.id);
     expect(instagramCalls).toHaveLength(0);
     const post = await instagramOf(draft.json.post!.id);
-    expect(post.instagram).toEqual({ enabled: false, caption: null, status: 'none', permalink: null, error: null });
+    expect(post.instagram).toEqual({ enabled: false, caption: null, mediaId: null, originalMediaId: null, status: 'none', permalink: null, error: null });
   });
 });
 

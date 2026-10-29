@@ -16,10 +16,11 @@ import { collectListRows } from '@/components/shared/collect-list-rows';
 import Link from '@/components/shared/list-navigation';
 import { useListScrollMemory,useListUrlJsonValue,useListUrlValue } from '@/components/shared/list-url-state';
 import StatusBadge from '@/components/shared/status-badge';
+import DeltaChip from '@/components/shared/delta-chip';
 import { statusLabel } from '@/lib/status-labels';
 import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
 import TagOverflow from '@/components/shared/tag-overflow';
-import { Bookmark,CircleDot,Columns3,Download,Megaphone,MessageSquare,SlidersHorizontal,Star,TrendingUp,Upload,UserPlus,UserRoundX,Users } from 'lucide-react';
+import { Bookmark,CircleDot,Columns3,Download,Megaphone,MessageSquare,SlidersHorizontal,Star,Upload,UserPlus,UserRoundX,Users,type LucideIcon } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
 
@@ -71,7 +72,7 @@ import { loadOperators } from '@/lib/operators-cache';
 import { canManageRole,useStaffRole } from '@/lib/staff-role';
 import { useFeatureVisibility } from '@/lib/use-feature-visibility';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { BASIC_FRIEND_FIELDS,type Folder,type FriendField,type Scenario,type Tag } from '@line-crm/shared';
+import { BASIC_FRIEND_FIELDS,kpiChangeTone,type Folder,type FriendField,type Scenario,type Tag } from '@line-crm/shared';
 import { FriendsTabs } from '../shared/head';
 import { canEditFeature } from '@/lib/staff-capability'
 import { csvExportLine } from './csv-export';
@@ -99,6 +100,20 @@ type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
 type Notice = { title: string; message: string } | null
 const EMPTY_URL_FILTERS = { q: '', tag: '', advanced: '', responseFilter: 'all', operatorId: '', scenarioId: '', attentionOnly: '', scoreMin: '', scoreMax: '', scoredOnly: '', audienceId: '', savedSearch: '', page: '1' }
+
+/** 増減の符号を全角の＋／−にそろえる（R1・10-29 オーナー「おすすめで」）。半角の - は使わない。 */
+const signedDeltaText = (value: number, digits: string) =>
+  value < 0 ? digits.replace(/^-/, '−') : `＋${digits}`
+
+/** 友だち一覧の数の帯の1マス。増減の向きは共通の kpiChangeTone（増えると良い）で決め、画面で色は選ばない。 */
+type FriendKpi = {
+  key: string; title: string; icon: LucideIcon; value: number | null; detail: string
+  delta: { text: string; tone: 'up' | 'down' | 'warn' } | null; href: string
+}
+
+/** 札の色の口。要確認は黄、ほかは増減の向きのまま緑・赤へつなぐ。 */
+const deltaTone = (tone: 'up' | 'down' | 'warn'): 'up' | 'down' | 'attention' =>
+  tone === 'warn' ? 'attention' : tone
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type Column = string
@@ -619,11 +634,11 @@ export default function FriendsListV8() {
   /* ── 数の帯 ── */
   const addedDiff = stats ? stats.addedThisMonth - stats.addedLastMonth : 0
   const activeDelta = stats?.activeMonthDelta ?? null
-  const kpis = [
+  const kpis: FriendKpi[] = [
     {
       key: 'active', title: '有効な友だち', icon: Users, value: stats?.active ?? null,
       detail: stats ? `総友だち ${formatNumber(stats.total)}` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
-      delta: activeDelta != null && activeDelta !== 0 ? { text: `${activeDelta >= 0 ? '+' : ''}${formatNumber(activeDelta)}`, tone: activeDelta < 0 ? 'neutral' : 'up' } : null,
+      delta: activeDelta != null && activeDelta !== 0 ? { text: signedDeltaText(activeDelta, formatNumber(activeDelta)), tone: kpiChangeTone('high', activeDelta) === 'good' ? 'up' : 'down' } : null,
       href: '/chats',
     },
     {
@@ -641,10 +656,10 @@ export default function FriendsListV8() {
     {
       key: 'added', title: '今月の追加', icon: UserPlus, value: stats?.addedThisMonth ?? null,
       detail: stats ? `前月 ${formatNumber(stats.addedLastMonth)}人` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
-      delta: stats && addedDiff !== 0 ? { text: `${addedDiff >= 0 ? '+' : ''}${addedDiff}`, tone: addedDiff < 0 ? 'neutral' : 'up' } : null,
+      delta: stats && addedDiff !== 0 ? { text: signedDeltaText(addedDiff, String(addedDiff)), tone: kpiChangeTone('high', addedDiff) === 'good' ? 'up' : 'down' } : null,
       href: '/chats',
     },
-  ] as const
+  ]
 
   const statsBand = (
     <KpiBand data-design="V8FriendKpis">
@@ -661,10 +676,7 @@ export default function FriendsListV8() {
           detail={kpi.detail}
           onRetry={statsFailed ? () => void loadStats(selectedAccountId) : undefined}
           delta={kpi.delta ? (
-            <span className={kpi.delta.tone === 'warn' ? `${styles.delta} ${styles.deltaWarn}` : kpi.delta.tone === 'up' ? `${styles.delta} ${styles.deltaUp}` : styles.delta}>
-              {kpi.delta.tone === 'up' ? <TrendingUp size={16} aria-hidden="true" /> : null}
-              {kpi.delta.text}
-            </span>
+            <DeltaChip tone={deltaTone(kpi.delta.tone)}>{kpi.delta.text}</DeltaChip>
           ) : undefined}
         />
       ))}
@@ -673,7 +685,11 @@ export default function FriendsListV8() {
 
   const headActions = (
     <>
-      {/* 取り込みの権限がある人だけに入口を出す。 */}
+      <Button type="button" variant="text" onClick={exportCurrentPage} disabled={loadStatus !== 'ready'}>
+        <Download size={16} aria-hidden="true" />
+        表示中をCSVで書き出す
+      </Button>
+      {/* 閲覧のみは押せないボタンを置かない。CSV が右端へ寄る（絵 x6QsVz）。 */}
       {canImport ? (
         <Button variant="primary" href="/friends/migrations">
           <Upload size={16} aria-hidden="true" />

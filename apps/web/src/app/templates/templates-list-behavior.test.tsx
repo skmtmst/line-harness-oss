@@ -166,7 +166,7 @@ describe('状態の板と見るための印', () => {
   it('見るだけの人には閲覧のみの帯（hEDTK）を出し、変えられる人には出さない', async () => {
     fixture.role = 'staff'
     const staff = await renderList()
-    expect(document.querySelector('[data-design-node="hEDTK"]')?.textContent).toContain('閲覧のみで見ています')
+    expect(document.querySelector('[data-design-node="hEDTK"]')?.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
     staff.unmount()
 
     fixture.role = 'owner'

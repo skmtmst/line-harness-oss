@@ -11,10 +11,9 @@
   background: var(--color-ink-faint);
 }
 
-/* 未分類は色の無い輪。 */
+/* 未分類は灰色の丸。色の「灰」のフォルダと見分けられる薄い灰。 */
 .unfiled {
-  background: transparent;
-  border: 1px solid var(--color-ink-faint);
+  background: var(--color-ink-disabled);
 }
 
 .line {

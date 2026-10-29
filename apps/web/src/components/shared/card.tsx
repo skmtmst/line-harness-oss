@@ -1,17 +1,18 @@
 'use client'
 
 import { useCardHeights } from './use-card-heights'
-import React, { type CSSProperties, type HTMLAttributes, type ReactNode } from 'react'
+import React, { useCallback, type CSSProperties, type HTMLAttributes, type ReactNode, type Ref } from 'react'
 import styles from './card.module.css'
 import { OptionalBadge } from './form-controls'
 
 export interface CardProps extends Omit<HTMLAttributes<HTMLElement>, 'children'> {
+  ref?: Ref<HTMLElement>
   children: ReactNode
-  as?: 'section' | 'article'
+  as?: 'section' | 'article' | 'form'
   /** 情報とは別に下端へ寄せる操作。間隔はカードのgapだけが持つ。 */
   actions?: ReactNode
-  /** flat は影なしの1px線。raised は従来の影、ring は内側の線だけ。 */
-  frame?: 'raised' | 'flat' | 'inset' | 'ring'
+  /** 既定は白地＋共通影。inset は内側の面、ring は選択枠。 */
+  frame?: 'raised' | 'inset' | 'ring'
   layout?: 'block' | 'vertical' | 'horizontal' | 'media'
   /**
    * 設定の箱。'settings' は16の余白・10の間（EC設定）。
@@ -47,9 +48,10 @@ function hasSides(value: string): boolean {
   return /\s/.test(flat.trim())
 }
 
-/** 情報の面。平らな一覧と、影を持つ面を明示して使い分ける。 */
+/** 情報の面。白地と共通影を既定にし、入れ子・選択中だけ面を変える。 */
 export default function Card({
   children,
+  ref: forwardedRef,
   as: CardTag = 'section',
   actions,
   className,
@@ -69,6 +71,11 @@ export default function Card({
   ...props
 }: CardProps) {
   const cardRef = useCardHeights()
+  const setCardRef = useCallback((node: HTMLElement | null) => {
+    cardRef.current = node
+    if (typeof forwardedRef === 'function') forwardedRef(node)
+    else if (forwardedRef) forwardedRef.current = node
+  }, [cardRef, forwardedRef])
   const gapToken = gap === 'tight' || gap === 'normal' || gap === 'loose' ? gap : undefined
   const gapValue = gapToken ? undefined : gap
   const classes = [
@@ -98,8 +105,8 @@ export default function Card({
     .join(' ')
 
   return (
-    <CardTag ref={cardRef} className={classes} data-design-part="card" data-appearance={appearance} data-gap={gapToken} data-spacing={spacing}
-      data-card-frame={frame === 'ring' || frame === 'flat' ? frame : undefined} data-card-selected={selected || undefined} data-card-padding={padding} data-card-variant={variant}
+    <CardTag ref={setCardRef} className={classes} data-design-part="card" data-appearance={appearance} data-gap={gapToken} data-spacing={spacing}
+      data-card-frame={frame === 'ring' ? frame : undefined} data-card-selected={selected || undefined} data-card-padding={padding} data-card-variant={variant}
       data-card-surface={surface === 'standard' ? undefined : surface} data-card-corner={corner === 'control' ? corner : undefined}
       data-card-spacing={contentPadding || gapValue ? '' : undefined}
       data-card-spacing-sides={contentPadding && hasSides(contentPadding) ? '' : undefined}
@@ -114,13 +121,17 @@ export function CardContent({ children, className }: { children: ReactNode; clas
   return <div className={[styles.content, className].filter(Boolean).join(' ')}>{children}</div>
 }
 
+/** カード内の同格操作を均等幅で並べる。 */
+export function CardActionRow({ children, className, ...props }: Omit<HTMLAttributes<HTMLDivElement>, 'children' | 'style'> & { children: ReactNode }) {
+  return <div {...props} className={[styles.actionRow, className].filter(Boolean).join(' ')} data-card-action-row>{children}</div>
+}
+
 export function CardHeader({
   title,
   optional = false,
   meta,
   action,
   size = 'standard',
-  actionTone = 'accent',
   headingLevel = 2,
   titleId,
   help,
@@ -132,7 +143,6 @@ export function CardHeader({
   meta?: ReactNode
   action?: ReactNode
   size?: 'standard' | 'roomy' | 'stacked' | 'panel' | 'restaurant' | 'content'
-  actionTone?: 'accent' | 'info'
   headingLevel?: 2 | 3
   titleId?: string
 }) {
@@ -152,7 +162,7 @@ export function CardHeader({
         {meta ? <span className={styles.meta}>{meta}</span> : null}
       </div>
       {action ? (
-        <div className={`${styles.action} ${actionTone === 'info' ? styles.actionInfo : ''}`}>
+        <div className={styles.action}>
           {action}
         </div>
       ) : null}

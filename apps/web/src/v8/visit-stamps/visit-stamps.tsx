@@ -25,6 +25,7 @@ import { FieldError, Field } from '@/components/shared/form-controls';
 import IconButton from '@/components/shared/icon-button'
 import ListState from '@/components/shared/list-state'
 import Pagination from '@/components/shared/pagination'
+import { ListToolbarRow, ListToolbarEnd } from '@/components/shared/list-toolbar'
 import Radio from '@/components/shared/radio'
 import { RowActions } from '@/components/shared/row-actions';
 import Select from '@/components/shared/select'
@@ -42,6 +43,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { visitStampsApi } from '@/lib/visit-stamps-api';
 import { MANUAL_REASONS, STACKING_ORDERS, type ManualReason, defaultSettings, previewExpiry, friendLabel, friendNames, historyRows, manualReasonText, multiplierDetail, multiplierName, previewSlots, rankDetail, rewardNote, settingsIssue, type StampSettingField, shortDateTime, slotCount, sortedRewards, stackedCap, withSlotCount } from './display';
 import { BonusDialog, MultiplierDialog, PhotoDialog, PinDialog, RankDialog, ReasonDialog, RewardDialog, StoresDialog } from './dialogs';
+import { withHonorific } from '@line-crm/shared'
 import HistoryTable from './history-table'
 import styles from './visit-stamps.module.css'
 import { formatNumber as polishFormatNumber } from '@/lib/format';
@@ -154,6 +156,7 @@ function VisitStampsScreen() {
   const [name, setName] = useState('')
   const [settings, setSettings] = useState<VisitStampSettings>(defaultSettings)
   const [accountIds, setAccountIds] = useState<string[]>([])
+  const [draftReady, setDraftReady] = useState(false)
   const [saving, setSaving] = useState(false)
   const [imageBusy, setImageBusy] = useState(false)
   const [issue, setIssue] = useState<{ field: StampSettingField; message: string } | null>(null)
@@ -180,6 +183,7 @@ function VisitStampsScreen() {
     setName(c?.name ?? '来店スタンプカード')
     setSettings(c?.settings ?? defaultSettings())
     setAccountIds(c?.accountIds ?? (selectedAccountId ? [selectedAccountId] : []))
+    setDraftReady(true)
   }, [selectedAccountId])
 
   const loadCards = useCallback(async () => {
@@ -191,13 +195,17 @@ function VisitStampsScreen() {
  { if (!fieldFailure) setLoadError(caught) }
   }
   }, [saveErrors])
+  useEffect(() => { setDraftReady(false) }, [selectedAccountId])
   useEffect(() => { void loadCards() }, [loadCards])
   useEffect(() => { if (cards) resetDraft(card) }, [cards, card, resetDraft])
 
   const dirty = useMemo(() => {
+    // 一覧の読込前は初期値が空で、比較対象のカードもまだ無い。読込中に
+    // 「保存していない変更」を出さない。
+    if (!cards || !draftReady) return false
     const base = card ? { name: card.name, settings: card.settings, accountIds: card.accountIds } : null
     return !base || JSON.stringify(base) !== JSON.stringify({ name, settings, accountIds })
-  }, [card, name, settings, accountIds])
+  }, [cards, draftReady, card, name, settings, accountIds])
 
   /* ①② の下書きを保存せずに離れるときは確かめる（保存できる人だけ。閲覧のみは変えられない）。 */
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({
@@ -684,7 +692,7 @@ function VisitStampsScreen() {
                             return (
                               <Tr key={row.id} className={`${styles.row} ${styles.paperLine}`} data-row-id={row.id}>
                                 <Td className={styles.colPhoto}>
-                                  <button type="button" className={styles.thumb} onClick={() => setPhoto(row)} aria-label={`${names.name}さんの写真を大きく見る`}>
+                                  <button type="button" className={styles.thumb} onClick={() => setPhoto(row)} aria-label={`${withHonorific(names.name)}の写真を大きく見る`}>
                                     <PaperThumb accountId={selectedAccountId} url={row.photo_url} />
                                   </button>
                                 </Td>
@@ -705,10 +713,10 @@ function VisitStampsScreen() {
                                     {row.status === 'pending' && canStamp ? (
                                       <>
                                         <Button size="compact" disabled={!!busy} onClick={() => { setDialogError(''); setRejecting(row) }}>却下</Button>
-                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${names.name}さんの ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />承認</Button>
+                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${withHonorific(names.name)}の ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />承認</Button>
                                       </>
                                     ) : null}
-                                    <RowActions subjectName={`${names.name}さんの申請`} menuItems={[
+                                    <RowActions subjectName={`${withHonorific(names.name)}の申請`} menuItems={[
                                       { id: 'photo', label: '写真を大きく見る', onSelect: () => setPhoto(row) },
                                       { id: 'friend', label: '友だちの詳細を開く', external: false, href: `/friends/detail?id=${encodeURIComponent(row.friend_id)}`, onSelect: () => { router.push(`/friends/detail?id=${encodeURIComponent(row.friend_id)}`) } },
                                     ]} />
@@ -730,6 +738,14 @@ function VisitStampsScreen() {
                 <SectionTitle
                   help="この店で押した・使った記録です（共通のカードでも、この店で押した・使ったものだけ）。来店・会計で自動で押したもの、店で足したもの、紙のカードから移したもの、特典で使ったものが新しい順に並びます。まちがいは「…」から取り消せます（取り消しも記録に残ります）。"
                 >押した・使った記録</SectionTitle>
+                {log ? (
+                  <ListToolbarRow>
+                    <ListToolbarEnd>
+                      <SaveErrorField names={["logPageSize","pageSize","log_page_size"]}><Select aria-label="記録の表示件数" value={String(logPageSize)} onChange={v => { setLogPageSize(Number(v)); setLogPage(1) }}
+                      options={[10, 20, 50].map(n => ({ value: String(n), label: `${n} 件ずつ` }))} /></SaveErrorField>
+                    </ListToolbarEnd>
+                  </ListToolbarRow>
+                ) : null}
                 {logError && log === null ? <ListState kind="error" error={logError} onRetry={() => void loadLog()} />
                   : log === null ? <ListState kind="loading" />
                     : rows.length === 0 ? <p className={styles.empty}>この店の記録はまだありません。来店・会計で押したり、店で手入力したりすると、ここに出ます。</p>
@@ -740,12 +756,8 @@ function VisitStampsScreen() {
                             onReverse={id => { setDialogError(''); setReversing(id) }} />
                         )}
                 {log ? (
-                  <div className={styles.historyFooter}>
-                    <SaveErrorField names={["logPageSize","pageSize","log_page_size"]}><Select aria-label="記録の表示件数" value={String(logPageSize)} onChange={v => { setLogPageSize(Number(v)); setLogPage(1) }}
-                      options={[10, 20, 50].map(n => ({ value: String(n), label: `${n} 件ずつ` }))} /></SaveErrorField>
-                    <span className={styles.sub}>{`${polishFormatNumber(logTotal)} 件中 ${logTotal ? (logPage - 1) * logPageSize + 1 : 0}〜${Math.min(logPage * logPageSize, logTotal)} 件`}</span>
-                    <Pagination page={logPage} pageCount={logPages} onPageChange={setLogPage} ariaLabel="記録のページ送り" />
-                  </div>
+                  <Pagination page={logPage} pageCount={logPages} onPageChange={setLogPage} ariaLabel="記録のページ送り"
+                    range={{ total: log.total, first: logTotal ? (logPage - 1) * logPageSize + 1 : 0, last: Math.min(logPage * logPageSize, logTotal) }} />
                 ) : null}
               </section>
               {canStamp ? (

@@ -9,6 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FirstStepsCard, firstStepsLegacyDismissedKey, firstStepsStorageKey, readFirstStepsFolded, summarizeFirstSteps } from './first-steps'
 
 import { buildStepsFromApi } from '@/v8/settings/getting-started/steps'
+import ListState from '@/components/shared/list-state'
+import { SetupTasks } from '@/v8/onboarding/public/setup-card/index'
+import type { SetupSummary } from '@/v8/onboarding/model'
 const summary = summarizeFirstSteps(buildStepsFromApi([{ key: 'accounts', state: 'done', href: '/accounts', reason: null }, { key: 'featureSet', state: 'done', href: '/settings', reason: null }]))
 
 beforeEach(() => {
@@ -62,4 +65,55 @@ describe('はじめにやることを畳む', () => {
     expect(readFirstStepsFolded('acc-3')).toBe(false)
     expect(readFirstStepsFolded(null)).toBe(false)
   })
+})
+
+it('使い方の質問も同じ手順カードの操作から開き、進捗の数を増やさない', async () => {
+  const configure = vi.fn()
+  await act(async () => { render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}} onConfigure={configure} />) })
+  expect(screen.getAllByRole('progressbar')).toHaveLength(1)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '使い方の設定を開く' })) })
+  expect(configure).toHaveBeenCalledTimes(1)
+})
+
+const deferredSetup: SetupSummary = {
+  style: 'restaurant', done: 1, total: 3, doneNames: ['使い方'], nextStep: 1,
+  rows: [{ key: 'image', title: '見た目を決める', note: 'あとで決める設定です', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '決める', step: 'image' } }],
+}
+
+it('基本の手順が未取得でも、既知の設定の進捗と操作・再試行を残す', async () => {
+  const retry = vi.fn(), openStep = vi.fn(), configure = vi.fn()
+  await act(async () => { render(<FirstStepsCard summary={null} folded={false} onToggle={() => {}} onConfigure={configure}
+    setupTasks={<SetupTasks heading summary={deferredSetup} onOpenStep={openStep} />}
+    feedback={<ListState kind="error" title="はじめの設定の状態を確認できませんでした" error={new Error('unavailable')} onRetry={retry} />} />) })
+  expect(screen.queryByRole('progressbar', { name: 'はじめにやることの進み' })).toBeNull()
+  const setupProgress = screen.getByRole('progressbar', { name: '使い方の設定の進み' })
+  expect(setupProgress.getAttribute('aria-valuenow')).toBe('1')
+  expect(setupProgress.getAttribute('aria-valuemax')).toBe('3')
+  expect(screen.queryByRole('button', { name: '畳む', exact: true })).toBeNull()
+  expect(screen.getByText('見た目を決める')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '決める', exact: true }))
+  expect(openStep).toHaveBeenCalledWith('image')
+  fireEvent.click(screen.getByRole('button', { name: '使い方の設定を開く', exact: true }))
+  expect(configure).toHaveBeenCalledTimes(1)
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む', exact: true }))
+  expect(retry).toHaveBeenCalledTimes(1)
+})
+
+it('基本と使い方の進捗を分け、畳んでも設定行と入口を残す', async () => {
+  const allDone = { ...summary, done: summary.total, steps: summary.steps.map(step => ({ ...step, done: true, state: 'done' as const })) }
+  function SetupHost() {
+    const [folded, setFolded] = useState(false)
+    return <FirstStepsCard summary={allDone} folded={folded} onToggle={() => setFolded(value => !value)} onConfigure={() => {}}
+      setupTasks={<SetupTasks heading summary={deferredSetup} onOpenStep={() => {}} />} />
+  }
+  await act(async () => { render(<SetupHost />) })
+  expect(screen.getAllByRole('progressbar')).toHaveLength(2)
+  expect(screen.getByRole('button', { name: '決める', exact: true })).toBeTruthy()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '畳む', exact: true })) })
+  expect(screen.getByRole('button', { name: '決める', exact: true })).toBeTruthy()
+  expect(screen.getByRole('button', { name: '使い方の設定を開く', exact: true })).toBeTruthy()
+  expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
+  expect(screen.getAllByRole('progressbar')).toHaveLength(2)
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '開く', exact: true })) })
+  expect(screen.getByRole('button', { name: '決める', exact: true })).toBeTruthy()
 })

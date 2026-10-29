@@ -108,6 +108,8 @@
   --color-canvas-sunken: #f7f7f5;
   --color-surface-pearl: #f7f8fa;
   --color-shell: #f5f5f7;
+  --color-ground: #f2f3f5; /* 外の地：左メニュー・板の外 */
+  --color-board-tint: #fafafb; /* 板の地。板の中のまとまりは白（canvas）のカード */
   --color-hairline: #1d1d1f12;
 
   /* 状態。アクセントと混ぜない。 */
@@ -129,7 +131,7 @@
   --color-status-info-soft: #2563eb1a;
   --color-status-warn: #f5c56b;
   --color-status-warn-soft: #f973161a;
-  --color-status-warn-deep: #c2410c;
+  --color-status-warn-deep: #ad3a0b; /* #F2F3F5 上で 5.58:1 */
   --color-status-danger: #b91c1c;
   --color-status-danger-soft: #ef44441a;
   --color-step-idle: #eef0f3;
@@ -618,13 +620,11 @@
 
 :root {
   /*
-   * カード（線で囲んだ箱）の線と影（2026-10-09 案A：ブラーを抑え、境目をくっきりさせる）。
-   * 影は 0 1px 1px / 黒16% ＋ 0 2px 4px / 黒8%、線は黒8%。
-   * 既定のカードはこの2つを読む。一覧の平らなカードは Card.frame="flat" で影を外す。
+   * カードの縁は線なし・やわらかい影だけ。既定のカード・一覧の表の塊・数の帯・知らせがこの影を読む。
    * 選ぶカード（ラジオ・チェック）・入力欄・ボタン・浮く面（メニュー・窓）は別の値のまま。
    */
-  --card-edge: transparent; --surface-edge: rgba(29, 29, 31, 0.08); /* カードの縁は影の外周 1px が描く。影を持たない面（浮く窓・帯）は surface-edge の薄い縁 */
-  --card-shadow: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.05), 0 2px 3px -1px rgba(0, 0, 0, 0.07), 0 6px 8px -4px rgba(0, 0, 0, 0.07);
+  --card-edge: transparent; --surface-edge: rgba(29, 29, 31, 0.08); /* カードは線なし。影を持たない面（浮く窓・入れ子の面）は surface-edge の薄い縁 */
+  --card-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 4px 8px -2px rgba(16, 24, 40, 0.08); /* 線はやめ、やわらかい影だけで浮かせる（ぼかしは 8px まで） */
   /* --- 動き（管理画面）------------------------------------------------------------
    * Pencil ★管理画面「基礎 動き」（管理画面 文書 `bi8Au`）の物差し。部品の CSS は ms を
    * 直接書かず、この4段と2本の曲線だけを使う。
@@ -1108,6 +1108,13 @@
   --tpl-htn6-ring: 16px; --tpl-htn6-ring-w: 2px; --tpl-htn6-err-pad: 12px 14px; --tpl-htn6-err-gap: 4px; --tpl-htn6-ack-gap: 12px; --tpl-htn6-ack-note-pad: 24px;
   --tpl-htn6-qr: 180px; --tpl-htn6-qr-pad: 16px; --tpl-htn6-qr-gap: 12px;
   --tpl-htn6-text-20: 20px; --tpl-htn6-lh-28: 28px; --tpl-htn6-hero: 48px; --tpl-htn6-done-pad: 24px 0 8px; --tpl-htn6-acct-pad: 14px 16px; --tpl-htn6-hand-pad: 16px; --tpl-htn6-hand-gap: 10px; --tpl-htn6-stat-gap: 16px;
+  /* 友だち引き継ぎ_進捗再設計_v01.pen のA〜D。単一カードの位置と進捗の動き。 */
+  --tpl-htn6-handover-card-pad: 36px; --tpl-htn6-handover-card-gap: 18px; --tpl-htn6-handover-icon-size: 44px;
+  --tpl-htn6-handover-title-size: 24px; --tpl-htn6-handover-title-lh: 34px; --tpl-htn6-handover-spin-time: .9s;
+  --tpl-htn6-handover-intro-to-stages: 12px; --tpl-htn6-handover-stage-h: 74px; --tpl-htn6-handover-step-size: 32px;
+  --tpl-htn6-handover-stage-to-metrics: 35px; --tpl-htn6-handover-count-size: 36px; --tpl-htn6-handover-count-lh: 50px;
+  --tpl-htn6-handover-metrics-to-progress: 18px; --tpl-htn6-handover-label-to-bar: 10px; --tpl-htn6-handover-bar-h: 12px;
+  --tpl-htn6-handover-bar-to-status: 22px; --tpl-htn6-handover-status-size: 17px;
   /* ①事前確認（p6zMkA）。カードの頭・答えの一覧・いまの質問・このあとの質問・チェック結果。 */
   --tpl-htn6-pre-head-gap: 8px; --tpl-htn6-pre-group-gap: 12px; --tpl-htn6-pre-row-gap: 6px; --tpl-htn6-pre-row-pad: 8px 12px; --tpl-htn6-pre-mark: 20px; --tpl-htn6-pre-mark-gap: 10px; --tpl-htn6-pre-link-gap: 6px;
   /* 選択肢の下の案内。白地の案内（SwjOv）と注意（Z0v3c）で地・枠・間が違う。 */
@@ -1561,7 +1568,7 @@
   /* 作っていない画面の一式（運営 ログイン2段目  ほか）。 */
   --tpl-ms-otp-page-pad: 32px 16px; --tpl-ms-otp-card-w: 420px; --tpl-ms-otp-card-pad: var(--polish-space-card); --tpl-ms-otp-card-gap: var(--polish-space-row); --tpl-ms-otp-card-radius: var(--polish-radius-card); --tpl-ms-otp-card-shadow: var(--card-shadow);
   --tpl-ms-otp-title-size: var(--polish-text-section); --tpl-ms-otp-title-lh: 29px; --tpl-ms-otp-desc-size: var(--polish-text-body); --tpl-ms-otp-desc-lh: 19px; --tpl-ms-otp-label-size: var(--polish-text-support); --tpl-ms-otp-label-lh: 20px; --tpl-ms-otp-field-gap: var(--polish-space-field);
-  --tpl-ms-otp-btn-h: 36px; --tpl-ms-otp-icon: 16px; --tpl-ms-otp-foot-size: 12px; --tpl-ms-otp-foot-lh: 16px; --tpl-auth-card-w: 400px; --tpl-auth-page-bg: #f2f3f5; --tpl-auth-card-shadow: 0 1px 1px rgba(0, 0, 0, 0.05), 0 2px 3px -1px rgba(0, 0, 0, 0.07), 0 6px 8px -4px rgba(0, 0, 0, 0.07); --tpl-auth-card-w-wide: 440px; --tpl-auth-card-pad: var(--space-24) var(--space-24) var(--space-16); --tpl-auth-card-gap: var(--space-16); --tpl-auth-card-radius: var(--radius-raised-card); --tpl-auth-head-mark: 32px; --tpl-auth-head-mark-radius: var(--radius-control); --tpl-auth-head-gap: 10px; --tpl-auth-head-pad: var(--space-16); --tpl-auth-head-name-lh: 17px; --tpl-auth-title-size: var(--text-title); --tpl-auth-title-lh: 28px; --tpl-auth-status-lh: 18px; /* ログイン・二段階認証の白いカード（統括のアカウントのカードと同じ作り：左寄せ・頭に会社の印・くっきりした影・角 14）。ログインの 1 段目と 2 段目は同じ地・同じ幅・枠の線なしで影だけ。 */
+  --tpl-ms-otp-btn-h: 36px; --tpl-ms-otp-icon: 16px; --tpl-ms-otp-foot-size: 12px; --tpl-ms-otp-foot-lh: 16px; --tpl-auth-card-w: 400px; --tpl-auth-page-bg: var(--color-ground); --tpl-auth-card-shadow: var(--card-shadow); --tpl-auth-card-w-wide: 440px; --tpl-auth-card-pad: var(--space-24) var(--space-24) var(--space-16); --tpl-auth-card-gap: var(--space-16); --tpl-auth-card-radius: var(--radius-raised-card); --tpl-auth-head-mark: 32px; --tpl-auth-head-mark-radius: var(--radius-control); --tpl-auth-head-gap: 10px; --tpl-auth-head-pad: var(--space-16); --tpl-auth-head-name-lh: 17px; --tpl-auth-title-size: var(--text-title); --tpl-auth-title-lh: 28px; --tpl-auth-status-lh: 18px; /* ログイン・二段階認証の白いカード（統括のアカウントのカードと同じ作り：左寄せ・頭に会社の印・くっきりした影・角 14）。ログインの 1 段目と 2 段目は同じ地・同じ幅・枠の線なしで影だけ。 */
   --tpl-ms-key-gap: 14px; --tpl-ms-key-box-pad: 10px 12px; --tpl-ms-key-box-radius: var(--polish-radius-control); --tpl-ms-key-row-gap: 8px; --tpl-ms-key-note-lh: 17px; --tpl-ms-key-token-size: 12px; --tpl-ms-key-btn-h: 36px;
   --tpl-ms-key-head-pad: 24px 24px 0; --tpl-ms-key-title-size: var(--polish-text-section); --tpl-ms-key-title-lh: 25px; --tpl-ms-key-content-pad: 14px 24px 0; --tpl-ms-key-foot-margin: 14px 24px 24px;
   --tpl-ms-key-body-gap: 12px; --tpl-ms-key-micro-lh: 16px; --tpl-ms-key-info-gap: 10px; --tpl-ms-key-info-pad: 10px 14px; --tpl-ms-key-info-lh: 20px; --tpl-ms-key-col-gap: 12px; --tpl-ms-key-head-row-pad: 10px 16px;
@@ -1626,7 +1633,7 @@
   --tpl-sa-notice-pad: 10px 14px; --tpl-sa-notice-gap: 10px; --tpl-sa-notice-lh: 20px; --tpl-sa-notice-radius: var(--polish-radius-control);
   --tpl-sa-kpi-gap: 12px; --tpl-sa-kpi-pad: 14px; --tpl-sa-kpi-inner-gap: 4px; --tpl-sa-kpi-value-size: 20px; --tpl-sa-kpi-value-lh: 24px; --tpl-sa-search-w: 260px; --tpl-sa-tool-gap: 8px; --tpl-sa-head-actions-gap: 12px;
   --tpl-sa-staff-head-pad: 20px 24px 12px; --tpl-sa-staff-head-gap: 8px; --tpl-sa-staff-desc-lh: 17px; --tpl-sa-staff-tab-gap: 24px; --tpl-sa-staff-tab-pad: 12px; --tpl-sa-staff-tab-line: 2px; --tpl-sa-band-pad: 0 24px 8px;
-  --tpl-sa-staff-main-pad: 24px 24px 24px 10px; --tpl-sa-staff-main-gap: 16px; --tpl-sa-staff-aside-w: 380px; --tpl-sa-staff-aside-pad: var(--polish-space-card); --tpl-sa-staff-aside-gap: 14px;
+  --tpl-sa-staff-main-pad: 24px 24px 24px 10px; --tpl-sa-staff-main-gap: 16px; --tpl-sa-staff-aside-w: 380px; --tpl-sa-staff-aside-pad: var(--polish-space-card) var(--polish-space-section); --tpl-sa-staff-aside-gap: 14px;
   --tpl-sa-staff-search-w: 220px; --tpl-sa-staff-search-w-narrow: 200px; --tpl-sa-staff-invite-w: 128px; --tpl-sa-control-h: 36px; --tpl-sa-staff-select-w: 150px;
   --tpl-sa-staff-card-pad: var(--polish-space-card); --tpl-sa-staff-card-gap: var(--polish-space-row); --tpl-sa-staff-sub-lh: 17px; --tpl-sa-staff-row-pad: 10px 8px; --tpl-sa-staff-col-gap: 12px;
   --tpl-sa-staff-scope-w: 102px; --tpl-sa-staff-role-w: 84px; --tpl-sa-staff-last-w: 72px; --tpl-sa-staff-menu-w: 28px; --tpl-sa-staff-scope-w-narrow: 160px; --tpl-sa-staff-last-w-narrow: 147px;
@@ -1911,7 +1918,7 @@
   --tpl-fr-shadow-control: inset 0 0 0 1px var(--color-control-border); --tpl-fr-shadow-tab: inset 0 -2px 0 var(--color-ink);
   --tpl-fr-mp-rail-w: 364px; --tpl-fr-mp-rail-pad: 24px; --tpl-fr-mp-rail-gap: 14px; --tpl-fr-mp-values-pull: -16px; --tpl-fr-mp-value-h: 39px;
   --tpl-fr-mp-col-account-wide: 360px; --tpl-fr-mp-col-account: 320px; --tpl-fr-mp-col-name: 152px; --tpl-fr-mp-col-date: 123px;
-  --tpl-fr-cmp-history-date: 259px; --tpl-fr-cmp-col-item: 160px; --tpl-fr-cmp-col-use: 208px; --tpl-fr-cmp-card-min: 220px; --tpl-fr-cmp-attr-label-n: 82px;
+  --tpl-fr-cmp-history-date: 259px; --tpl-fr-cmp-col-item: clamp(112px, calc(100vw - 1040px), 168px); --tpl-fr-cmp-col-use: clamp(272px, calc(100vw - 736px), 416px); --tpl-fr-cmp-card-min: 220px; --tpl-fr-cmp-attr-label-n: 82px;
 }
 
 /*
@@ -1961,7 +1968,7 @@
   --tpl-inbox-row-gap: 10px;              /* 顔と文の間 */
   --tpl-inbox-row-line-gap: 2px;          /* 名前・内容・札の段の間 */
   --tpl-inbox-row-preview-lh: 20px;       /* 内容1行の高さ */
-  --tpl-inbox-unread-dot: 10px;           /* 顔の右上の赤い点 */
+  --tpl-inbox-unread-dot: 10px;           /* 顔の右上の赤い点 */ --tpl-inbox-unread-weight: 700;
   --tpl-inbox-unread-dot-ring: 2px;       /* 赤い点の白い縁 */
   --tpl-inbox-unread-dot-right: -1px;     /* 赤い点の右（顔34の左25から10） */
   --tpl-inbox-badge-pad: 1px 6px;         /* 経路の札（LINE・メール）の内側 */
@@ -2129,9 +2136,9 @@
  * CSS Module が `:root` で定義する。
  */
 
-/* v8 の地は全体が shell の灰。板の白が浮くのはこの差で作る。 */
+/* v8 の外の地は ground の灰。板（board-tint）が浮くのはこの差で作る。 */
 :root body {
-  background-color: var(--color-shell);
+  background-color: var(--color-ground);
 }
 
 /*
@@ -2819,7 +2826,6 @@ select:not([multiple]):not(.appearance-none) {
   :root #main-content { margin-left: 0; border: 0; outline: 1px solid var(--color-board-line); outline-offset: -1px; }
 }
 
-:root { --color-status-warn-deep: #c2410c; }
 :root aside[aria-label="フォルダ"] { box-shadow: none; }
 
 :root { --shadow-frozen-column: 6px 0 12px #1d1d1f14; --color-scroll-thumb: #1d1d1f40; --gradient-scroll-edge: linear-gradient(-90deg, #1d1d1f00 0%, #1d1d1f14 100%); }
@@ -3179,7 +3185,7 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
   --tpl-people-block-gap: 4px;
 }
 
-:root { --tpl-onboarding-step-ring: inset 0 0 0 var(--choice-ring) var(--color-hairline); --tpl-op-support-negative-gap: calc(-1 * var(--tpl-op-me-gap)); --tpl-op-support-band-bleed: calc(-1 * var(--polish-space-section)); }
+:root { --tpl-onboarding-step-ring: inset 0 0 0 var(--choice-ring) var(--color-hairline); --tpl-op-support-negative-gap: calc(-1 * var(--tpl-op-me-gap)); }
 
 :root { --tpl-rm-review-thumb-w: 165px; --tpl-rm-face-row-h: 38px; --tpl-rm-face-label-lh: 18px; --tpl-rm-face-name-lh: 19px; --tpl-rm-face-summary-lh: 16px; --tpl-ledger-month-lh: normal; --tpl-cv-delete-reason-w: 92px; --tpl-fr-name-content-min: 160px; --tpl-rt-flow-timing-w: 132px; --tpl-rt-flow-row-h: 58px; --tpl-rt-flow-name-lh: 20px; --tpl-rt-flow-note-lh: 18px; --tpl-rm-review-label-lh: 17px; --tpl-rm-review-action-h: 38px; --tpl-rm-review-letter: 22px; }
 
@@ -3197,5 +3203,5 @@ html:root button:not([role='tab']):not([data-folder-select]):not([data-part='att
 /* 数の帯・表の数・件数・時刻は桁をそろえる */ html:root :is([data-kpi-number], time, td[data-align='right'], [role='cell'][data-align='right'], [data-count], [data-part='count']) { font-variant-numeric: var(--font-numeric); }
 
 /* 共通の値。部品と画面はここを読むだけで、影・ボタンの高さ・文字の太さを画面ごとに書かない。余白 --space-*・角丸 部品 --radius-control／主ボタン --radius-primary-action／カード --radius-card・文字 題32/600 本文13 ラベル12 補足12 数34/500・太さ 14px以下のUI文字500 読み物400 見出しとボタン600・影 くっきり版（ぼかし最大8px）・ボタン ふつう36 小さい32 アイコン32角（押せる所28以上）・動き 押すと0.98倍（主ボタンは0.5px沈む）押せるカードは乗せると2px浮く。 主ボタンの地は上端が深い緑のまま下へ少し濃く（白い文字との比はどこでも 5.44:1 以上）。白い部品と選んだ黒い札の地。上の帯は下へ流しても見た目を変えない（地の色のまま・線なし）。 小さいアイコンの押し口は見た目を変えずに押せる所を 28px 以上へ（部品が data-hit-area を付ける。位置を自分で決めた部品はそちらが勝つ）。 カード全体が1つのリンク・ボタンの時だけ data-pressable-card を付け、乗せると浮いて影が深くなる。押せないカードは浮かせない。 */
-:root { --font-weight-ui: 500; --font-weight-reading: 400; --font-numeric: tabular-nums; --text-optical-shift: 0.5px; --control-h: 36px; --control-h-compact: 32px; --control-icon-size: 32px; --control-icon-min: 28px; --card-hover-lift: translateY(-2px); --motion-card-lift: 150ms; --motion-switch-glide: 180ms; --press-primary-shift: translateY(0.5px); --card-shadow-hover: 0 0 0 1px rgba(0, 0, 0, 0.07), 0 1px 1px rgba(0, 0, 0, 0.05), 0 3px 4px -1px rgba(0, 0, 0, 0.08), 0 8px 10px -5px rgba(0, 0, 0, 0.09); --shadow-primary-action-hover: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 4px rgba(8, 122, 62, 0.35), 0 3px 5px -2px rgba(8, 122, 62, 0.3); --gradient-primary-action: linear-gradient(180deg, #087a3e, #066a35); --gradient-raised-control: linear-gradient(180deg, #fff, #fafafc); --gradient-selected-chip: linear-gradient(180deg, #34343a, #1d1d1f); --shadow-selected-chip: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 1px 2px rgba(0, 0, 0, 0.25); }
+:root { --font-weight-ui: 500; --font-weight-reading: 400; --font-numeric: tabular-nums; --text-optical-shift: 0.5px; --control-h: 36px; --control-h-compact: 32px; --control-icon-size: 32px; --control-icon-min: 28px; --card-hover-lift: translateY(-2px); --motion-card-lift: 150ms; --motion-switch-glide: 180ms; --press-primary-shift: translateY(0.5px); --card-shadow-hover: 0 1px 2px rgba(16, 24, 40, 0.07), 0 6px 8px -2px rgba(16, 24, 40, 0.1); --shadow-primary-action-hover: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 2px 4px rgba(8, 122, 62, 0.35), 0 3px 5px -2px rgba(8, 122, 62, 0.3); --gradient-primary-action: linear-gradient(180deg, #087a3e, #066a35); --gradient-raised-control: linear-gradient(180deg, #fff, #fafafc); --gradient-selected-chip: linear-gradient(180deg, #34343a, #1d1d1f); --shadow-selected-chip: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 1px 2px rgba(0, 0, 0, 0.25); }
 :where([data-hit-area]) { position: relative; } :root [data-hit-area]::after { content: ''; position: absolute; left: 50%; top: 50%; width: max(100%, var(--control-icon-min)); height: max(100%, var(--control-icon-min)); transform: translate(-50%, -50%); } :root [data-pressable-card] { transition: transform var(--motion-card-lift) var(--motion-ease-out), box-shadow var(--motion-card-lift) var(--motion-ease-out); } :root [data-pressable-card]:hover { box-shadow: var(--card-shadow-hover); } @media (prefers-reduced-motion: no-preference) { :root [data-pressable-card]:hover { transform: var(--card-hover-lift); } } @media (prefers-reduced-motion: reduce) { :root [data-pressable-card] { transition: none; } }

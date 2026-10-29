@@ -18,7 +18,7 @@ import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai/index'
 import { useRouter,useSearchParams } from 'next/navigation';
 import { Suspense,useEffect,useRef,useState } from 'react';
-import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,inboxSortFromParam,statusFilters,statusFiltersV8 } from './inbox-model';
+import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,inboxSortFromParam,resolveInboxChannel,statusFilters,statusFiltersV8 } from './inbox-model';
 
 import InboxConversation from './inbox-conversation-view';
 import InboxCustomerPanel from './inbox-customer-panel';
@@ -43,7 +43,7 @@ const CHAT_PAGE_SIZE = 200
 const EMAIL_PAGE_SIZE = 200
 const CHAT_MESSAGE_PAGE_SIZE = 100
 
-function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
+function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line' | 'email'; emailInboxEnabled: boolean }) {
 
   const saveErrors = useSaveFormErrors()
 
@@ -58,6 +58,8 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 
   // 中央ペインで開いているメール。LINEのトークと排他。
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null)
+  // 切替直後の1描画でも、前のアカウントで開いたメールを表示しない。
+  const visibleThreadId = emailInboxEnabled ? selectedThreadId : null
 
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null)
 
@@ -247,6 +249,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     EMAIL_PAGE_SIZE,
     nameQuery,
     selectedAccountId,
+    emailInboxEnabled: emailInboxEnabled && channel !== 'line',
     statusFilter,
     assigneeFilter,
     unreadOnly,
@@ -472,6 +475,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     setSelectedChatId,
     setSelectedThreadId,
     accountsLoading,
+    emailInboxEnabled,
     selectedAccountId,
     router,
     channel,
@@ -698,6 +702,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
     detailAccountRef.current = selectedAccountId
     detailRequestIdRef.current += 1
     setSelectedChatId(null)
+    setSelectedThreadId(null)
     setChatDetail(null)
     setDetailLoading(false)
     setAttentionSaving(false)
@@ -758,13 +763,13 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
             メールを開いたときも同じ。ここが LINE だけを見ていたので、
             メールを開いても一覧が残って中央が半分のままだった。 */}
         <InboxList {...{
-          unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen,
+          unreadOnly, selectedChatId, selectedThreadId: visibleThreadId, setFilterOpen, filterOpen, setSavedViewsOpen,
           setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId,
           savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen,
           savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter,
           dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators,
           savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter,
-          setAssigneeFilter, setUnreadOnly, channel, router, nameQuery, setNameQuery, assigneeUnreadStatus,
+          setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus,
           assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef,
           emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef,
           setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats,
@@ -780,7 +785,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           顧客情報は狭い幅では列ではなくドロワーで開く（下の aside 参照）。
         */}
         <InboxConversation {...{
-          operators, selectedChatId, selectedThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo,
+          operators, selectedChatId, selectedThreadId: visibleThreadId, setSelectedThreadId, showFriendInfo, setShowFriendInfo,
           loadEmails, deepLinkNotice, clearDeepLink, detailLoading, chatDetail, setSelectedChatId,
           attentionSaving, handleAttentionUpdate, handleOperatorUpdate, handleStatusUpdate, chatSearch,
           openChatSearch, inboxAi, selectedAccountId, chatSearchFocusSeq, chatSearchFilling, messagesScrollRef,
@@ -822,7 +827,7 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
           lineContent={lineContent}
           showFriendInfo={showFriendInfo}
           selectedChatId={selectedChatId}
-          selectedThreadId={selectedThreadId}
+          selectedThreadId={visibleThreadId}
           wideInfoPanel={wideInfoPanel}
           setShowFriendInfo={setShowFriendInfo}
           customerPanelRef={customerPanelRef}
@@ -853,12 +858,10 @@ function ChatsPageInner({ channel }: { channel: 'all' | 'line' | 'email' }) {
 // lastIncomingAt）で返す。つまり1つの一覧に混ぜられる。
 function ChatsPageHost() {
   const params = useSearchParams()
-  // すべて / LINE / メール。既定はすべて。
-  // 出どころを気にせず「返信を待っている人」を見たいのが普通なので、
-  // 最初から絞った状態で出さない。
-  const raw = params.get('channel')
-  const channel: 'all' | 'line' | 'email' =
-    raw === 'line' || raw === 'email' ? raw : 'all'
+  const { selectedAccountId, selectedAccount, loading } = useAccount()
+  // 既存アカウントはこれまでどおり。新規アカウントはメール接続が未設計なのでLINEだけ。
+  const emailInboxEnabled = !loading && (!selectedAccountId || selectedAccount?.emailInboxEnabled === true)
+  const channel = resolveInboxChannel(params.get('channel'), emailInboxEnabled)
 
   return (
     <div className="space-y-3">
@@ -869,7 +872,7 @@ function ChatsPageHost() {
         2か所で探すことになっていた。設計 `V2 2-1 受信箱` の一覧も
         「✉ 定期便の解約について」のように1本に混ざっている。
       */}
-      <ChatsPageInner channel={channel} />
+      <ChatsPageInner channel={channel} emailInboxEnabled={emailInboxEnabled} />
 
     </div>
   )

@@ -4,7 +4,7 @@
 
   border-radius: var(--radius-card);
   background: var(--color-canvas);
-  border: 1px solid var(--card-edge);
+  border: 0;
   box-shadow: var(--card-shadow);
 }
 
@@ -93,20 +93,13 @@
   font-size: var(--text-caption);
 }
 
-/*
- * #669 カード頭の操作（「すべて見る →」など）はテキストリンクなので
- * リンク色（action）にする。緑だと主操作ボタンと見分けがつかない。
- */
+/* カード頭の行き先リンク（「〇〇へ →」）は文字のリンクの緑。色の口は1つだけ。 */
 .action {
   display: flex;
   flex-shrink: 0;
   align-items: center;
-  color: var(--color-action);
+  color: var(--color-link);
   white-space: nowrap;
-}
-
-.actionInfo {
-  color: var(--color-status-info);
 }
 
 .action :is(a, button):focus-visible {
@@ -218,11 +211,9 @@ html:root .headerContent .meta { display: flex; flex-direction: column; align-it
 :root .headerRestaurant .meta{font-size:14px;line-height:21px;}
 
 /* ・208：枠から中身は最低16。段の間は spacing・gap・variant の指定を使う。 */
-/* 固定HTMLの枠は内側のoutline。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
+/* 縁は .card の影（--card-shadow）だけ。borderで本文を狭めると、段ごとに2pxずつ積み上がる。 */
 html:root .card[data-card-variant='default']:not(.inset):not([data-card-surface='muted']):where(:not([data-card-frame='ring'])) {
   border: 0;
-  outline: 1px solid var(--surface-edge);
-  outline-offset: -1px;
 }
 html:root .paddingCompact { padding: var(--space-16); }
 html:root .card[data-card-spacing] { padding: max(var(--space-16), var(--card-content-padding, 0px)); }
@@ -238,7 +229,7 @@ html:root .card[data-card-surface='danger'] { border: 0; outline-color: transpar
 /* 回答など、頭・表・ページ送りの段がそれぞれ端の余白を持つ記録の箱。 */
 html:root .records {
   display: flex; flex-direction: column; gap: var(--polish-space-field);
-  padding-block: var(--polish-space-section); border: 0; outline: 1px solid var(--surface-edge); outline-offset: -1px;
+  padding-block: var(--polish-space-section); border: 0;
 }
 html:root .records > .header { padding-inline: var(--polish-space-section); }
 html:root .records > [data-card-footer] { padding-inline: var(--polish-space-section); }
@@ -247,7 +238,7 @@ html:root .records > [data-card-footer] { padding-inline: var(--polish-space-sec
 html:root .headerStacked { padding: 0; }
 
 /* 内側の薄い面は平らにする。form/asideの外枠を重ねない。 */
-html:root .card[data-card-surface='muted'] { border: 0; outline: revert; box-shadow: none; background: var(--color-surface-pearl); }
+html:root .card[data-card-surface='muted'] { border: 0; outline-color: transparent; box-shadow: none; background: var(--color-surface-pearl); }
 
 html:root .card[data-card-selected] { --card-edge: var(--color-control-border); background: var(--polish-selection-bg); }
 
@@ -256,18 +247,15 @@ html:root .card[data-card-frame='ring'] {
   border: 0; box-shadow: var(--tpl-sa-ring);
 }
 
-/* 一覧の平らな面。内側の線なので、既存の本文幅・高さは変えない。 */
-html:root .card[data-card-frame='flat'] {
-  border: 0;
-  outline: 1px solid var(--surface-edge);
-  outline-offset: -1px;
-  box-shadow: none;
-}
-
 /* 情報内と操作前の間は親のgapを1回だけ使う。高さ合わせで増えた分だけ操作の上へ回す。 */
 html:root .withActions { display: flex; flex-direction: column; }
 .information { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: inherit; }
 .bottomActions { min-width: 0; }
+.actionRow { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--polish-space-field); min-width: 0; }
+.actionRow > * { min-width: 0; width: 100%; }
+html:root .actionRow > :is(button, a) { grid-row: 1; padding-inline: var(--polish-space-row); }
+.actionRow > :is([role='status'], [role='alert']) { grid-column: 1 / -1; }
+
 
 /* 通常の白いカードは影だけで浮かせ、枠の線を重ねない。 */
 html:root .card[data-card-variant='default']:not([data-card-frame]):not([data-card-surface]):not([data-appearance]):not(:focus-visible) { border: 0; outline-color: transparent; }

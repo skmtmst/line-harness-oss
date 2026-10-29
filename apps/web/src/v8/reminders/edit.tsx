@@ -43,8 +43,9 @@ type BasicsValue
 import { describeReminderDiff } from './conflict-diff'
 import styles from './edit.module.css'
 import { BackToReminders, ReminderV8Stepper, type ReminderV8StepKey, ChoiceCardV8, PhoneV8, SummaryCardV8, WizardFooterV8 } from './ui';
-import { reminderTriggerLabel, renderReminderBodySample } from '@/components/reminders/reminder-labels';
 import Toggle from '@/components/shared/toggle';
+import { reminderTriggerLabel } from '@/components/reminders/reminder-labels'
+import { fillPreviewSample } from '@/components/shared/preview-sample'
 import Dialog from '@/components/shared/dialog';
 import { emptyValue } from '@/components/shared/empty-value';
 import { CreatePage } from '@/components/templates';
@@ -682,7 +683,8 @@ export function TargetStageV8({
             accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
             chip={firstStep ? '1通目の通知' : '通知は手順3で作ります'}
             empty={!firstStep}
-            message={firstStep ? renderReminderBodySample(firstStep.messageContent || '本文はまだありません') : undefined}
+            hasSampledBody={Boolean(firstStep?.messageContent.trim())}
+            message={firstStep ? fillPreviewSample(firstStep.messageContent || '本文はまだありません').text : undefined}
           />
         </>
       )}

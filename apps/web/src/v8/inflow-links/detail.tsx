@@ -26,6 +26,7 @@ import Card from '@/components/shared/card'
 import SegmentedControl from '@/components/shared/segmented'
 import { INFLOW_TABLE_LAYOUT } from './table-layout'
 import Dialog from '@/components/shared/dialog'
+import Disclosure from '@/components/shared/disclosure'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -527,8 +528,7 @@ function InflowDetailContent() {
             )}
             {funnel?.monthly && funnel.monthly.length > 0 ? (
               <section aria-label="月別内訳">
-              <details className={styles.monthly}>
-                <summary>月別内訳（友だちになった月）</summary>
+              <Disclosure appearance="inset" size="compact" title="月別内訳（友だちになった月）">
                 <DataTable className={styles.monthlyTable}>
                   <thead><TableHeadRow><Th>月</Th><Th>友だち追加</Th><Th>いま残っている</Th><Th>ブロック</Th><Th>成果</Th><Th>金額</Th></TableHeadRow></thead>
                   <tbody>{funnel.monthly.map((month) => (
@@ -539,7 +539,7 @@ function InflowDetailContent() {
                     </Tr>
                   ))}</tbody>
                 </DataTable>
-              </details>
+              </Disclosure>
               </section>
             ) : null}
             <div className={styles.ordersRow}>
@@ -745,7 +745,7 @@ function InflowDetailContent() {
           onCancel={() => { if (!deleting) setDeleteOpen(false) }}
         >
           <div className={styles.deleteBody}>
-            <Notice tone="danger" message="削除すると、次のことが起きます">
+            <Notice tone="warn" role="alert" message="削除すると、次のことが起きます">
               <ul className={styles.deleteEffects}>
                 <li>貼り付けたURL・QRコード：このURLを置いた投稿や広告から開けなくなります（差し替えが必要）</li>
                 <li>{`この経路から来た記録：${formatNumber(funnel?.friend_add_count ?? 0)} 人の流入元と成果は過去の記録として残ります`}</li>

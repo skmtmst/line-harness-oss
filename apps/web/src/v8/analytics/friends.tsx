@@ -34,7 +34,7 @@ import {
 } from './parts'
 import Card, { CardHeader } from '@/components/shared/card'
 import { DetailColumns } from '@/components/templates/detail-columns'
-import { ListPageSection } from '@/components/templates/list-page'
+import { ListPageSection, ListPageStats } from '@/components/templates/list-page'
 import styles from './analytics.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { useReportPeriod } from '@/components/shared/period-picker'
@@ -99,12 +99,12 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
   const caption = periodCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)
 
   return <>
-    <KpiBand className={styles.band}>
+    <ListPageStats><KpiBand className={styles.band}>
       <KpiCard presentation="band" title="増えた" icon={<Users size={16} aria-hidden="true" />} value={addedValue} unit="人" {...metricCardState(overview.metrics.added, { detail: `この${days}日。初回 ${metricText(overview.metrics.firstTime)} 人` }, state.retry)} />
       <KpiCard presentation="band" title="減った" icon={<UserMinus size={16} aria-hidden="true" />} value={removedValue} unit="人" {...metricCardState(overview.metrics.removed, { detail: `この${days}日・解除を含む` }, state.retry)} />
       <KpiCard presentation="band" title="差し引き" icon={<ArrowLeftRight size={16} aria-hidden="true" />} value={netValue} unit="人" signed {...metricCardState(overview.metrics.net, { detail: `友だちは ${metricText(overview.metrics.currentFriends)} 人` }, state.retry)} />
       <KpiCard presentation="band" title="ブロック率" icon={<CircleHelp size={16} aria-hidden="true" />} value={null} unit="%" detail="ブロックの数は未取得" />
-    </KpiBand>
+    </KpiBand></ListPageStats>
     <ListPageSection>
       {reasonShownInBanner ? <Notice tone="warn">{overview.stateReason}</Notice> : null}
       <DetailColumns presentation="analysis" asideLabel="流入と減った友だちを見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<>

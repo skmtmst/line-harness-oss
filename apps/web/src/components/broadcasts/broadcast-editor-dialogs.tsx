@@ -204,7 +204,7 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
             宛先と本文を確かめてから、もう一度お試しください。
           </Notice>
         ) : audienceCount === 0 ? (
-          <Notice tone="danger" className="mt-3">
+          <Notice tone="warn" role="alert" className="mt-3">
             いま届く人が0人です。宛先の条件を見直してください。
           </Notice>
         ) : null}

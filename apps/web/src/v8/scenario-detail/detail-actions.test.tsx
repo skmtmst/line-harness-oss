@@ -1,3 +1,4 @@
+import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * シナリオ配信の編集（src/v8/scenario-detail）で、消す・写す・始めた直後・テスト送信・置き場の動きを、
@@ -258,6 +259,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  vi.useRealTimers()
   delete document.documentElement.dataset.theme
   vi.clearAllMocks()
 })
@@ -462,10 +464,12 @@ describe('シナリオの複製は通の中身を落とさない', () => {
 
 describe('始めた直後の知らせ', () => {
   it('始めた直後だけ知らせの帯を出し、試算の人数・開始の記録を読み、配信結果へ進める', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-28T00:00:00Z'))
     stubStats(undefined)
     await render({ showStarted: true })
     const band = await waitFor(() => {
-      const found = screen.getAllByRole('status').find((el) => el.textContent?.includes('配信を始めました'))
+      const found = (screen.getAllByRole('status').find((el) => el.textContent?.includes('配信を始めました')) ?? querySupplementaryPageAction('配信を始めました'))
       expect(found).toBeTruthy()
       return found!
     })
@@ -474,7 +478,7 @@ describe('始めた直後の知らせ', () => {
     expect(band.textContent).toContain('予約中の 128 人へ')
     const link = within(band).getByRole('link', { name: '始めた記録を見る' })
     expect(link.getAttribute('href')).toBe('/scenarios/results?id=sc-1')
-    expect(link.getAttribute('title')).toBe('開始日時：2026年10月2日 10:00')
+    expect(link.getAttribute('title')).toBe('開始日時：10月2日 10:00')
   })
 
   it('開始の記録が読めないときは、開始日時を作らず読み直しを案内する。始めていない時は帯を出さない', async () => {
@@ -492,7 +496,7 @@ describe('始めた直後の知らせ', () => {
 describe('まとめてテストを送る', () => {
   it('上の「まとめてテストを送る」で全部の通のテスト送信を開き、シナリオの LINE アカウントの友だちから選ぶ', async () => {
     await render()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'まとめてテストを送る' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: 'まとめてテストを送る' })) })
     await screen.findByText('試験 花子')
     expect(calls.friends).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'account-a' }))
     // 送る通は、配信の時刻の書き方で1通ずつ並ぶ（詳細画面の行にも同じ時刻が出るので、送る内容の行の中だけを見る）。
@@ -505,7 +509,7 @@ describe('まとめてテストを送る', () => {
   it('全アカウント共通のシナリオは、選んでいるアカウントの友だちから選ぶ', async () => {
     stubScenario({ lineAccountId: null })
     await render()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'まとめてテストを送る' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: 'まとめてテストを送る' })) })
     await screen.findByText('試験 花子')
     expect(calls.friends).toHaveBeenCalledWith(expect.objectContaining({ accountId: 'account-selected' }))
   })
@@ -513,7 +517,7 @@ describe('まとめてテストを送る', () => {
   it('友だちを読めなかったら、読めなかったと出す（0人と混ぜない）', async () => {
     calls.friends.mockRejectedValue(new Error('offline'))
     await render()
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'まとめてテストを送る' })) })
+    await act(async () => { fireEvent.click(getPageAction({ name: 'まとめてテストを送る' })) })
     await screen.findByText('友だちを読み込めませんでした。')
   })
 })

@@ -408,7 +408,7 @@ export default function HqStoreList(props: HqStoreListProps) {
       const label = !row.kind || row.kind === 'message' ? hqMessageTypeLabel(row) : KIND_LABEL[row.kind] ?? emptyValue('unknown')
       return boxedTd('kind', label === emptyValue('unknown') ? label : <TagPill name={label} />)
     } },
-    { key: 'state', head: '公開', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'state', head: '配布状況', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
     { key: 'sent', head: '今月送った数', col: <col key="sent" className={storeStyles.colMonthly} />, cell: (row) => plainTd('sent', sentLabel(row.this_month_sent_count), row.this_month_sent_count == null ? '今月送った数は、この種類では数えていません' : undefined) },
     ...(!narrow ? [{ key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row: HqTemplate) => plainTd('updated', <ListDateTime value={row.updated_at} />, row.updated_at) },] : []),
@@ -418,15 +418,15 @@ export default function HqStoreList(props: HqStoreListProps) {
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
   ] : type === 'rich_menu' ? [
     { key: 'audience', head: '誰に出すか', col: <col key="audience" className={storeStyles.colPublish} />, cell: (row) => plainTd('audience', <TruncatedText value={row.display_audience ?? emptyValue('unknown')} />, row.display_audience ?? undefined) },
-    { key: 'state', head: '状態', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'state', head: '配布状況', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colUsage} />, cell: (row) => boxedTd('dest', destCell(row)) },
     { key: 'taps', head: '今月押された', col: <col key="taps" className={storeStyles.colMonthly} />, cell: (row) => plainTd('taps', row.tap_count == null ? emptyValue('unknown') : `${formatNumber(row.tap_count)}回`, '配った先のアカウントで押された回数の合計') },
   ] : type === 'form' ? [
     { key: 'storage', head: '保存先', col: <col key="storage" className={hqStyles.colFormStorage} />, cell: () => plainTd('storage', '—', '保存先の情報は未取得です') },
-    { key: 'state', head: '状態', col: <col key="state" className={hqStyles.colFormState} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'state', head: '配布状況', col: <col key="state" className={hqStyles.colFormState} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={hqStyles.colFormDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
   ] : [
-    { key: 'state', head: '状態', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
+    { key: 'state', head: '配布状況', col: <col key="state" className={storeStyles.colPublish} />, cell: (row) => boxedTd('state', stateCell(row)) },
     { key: 'dest', head: '配布先', col: <col key="dest" className={storeStyles.colHqDest} />, cell: (row) => boxedTd('dest', destCell(row)) },
     { key: 'updated', head: '更新', col: <col key="updated" className={storeStyles.colUpdated} />, cell: (row) => plainTd('updated', <ListDateTime value={row.updated_at} />, row.updated_at) },
   ]
@@ -458,7 +458,7 @@ export default function HqStoreList(props: HqStoreListProps) {
           <TableHeadRow>
             {type === 'rich_menu' ? <Th className={storeStyles.headCell}>順</Th> : null}
             {type === 'template' ? <Th className={storeStyles.headCell}><Checkbox aria-label="表示中のテンプレートをすべて選ぶ" checked={shown.length > 0 && shown.every((row) => selectedIds.includes(row.id))} onCheckedChange={(checked) => setSelectedIds((current) => checked ? [...new Set([...current, ...shown.map((row) => row.id)])] : current.filter((id) => !shown.some((row) => row.id === id)))} /></Th> : null}
-            <Th className={storeStyles.headCell}>{words.column}</Th>
+            <Th className={storeStyles.headCell}>{ordered.length > 0 && ordered.every(row => row.content_summary) ? words.column : words.column.replace(/（[^）]+）/, '')}</Th>
             {columns.map((column) => <Th key={column.key} className={storeStyles.headCell}>{column.head}</Th>)}
             <Th aria-label="操作" />
           </TableHeadRow>
@@ -486,7 +486,7 @@ export default function HqStoreList(props: HqStoreListProps) {
                         <button type="button" className={`${storeStyles.cellTitle} ${hqStyles.hqNameButton}`} title={row.name} onClick={() => (onOpen ?? onEdit)(row)}>{row.name}</button>
                       ) : <span className={storeStyles.cellTitle} title={row.name}>{row.name}</span>}
                     </div>
-                  )} folder={folder ? { name: folder.name, color: folder.color } : null}
+                  )} description={sub} folder={folder ? { name: folder.name, color: folder.color } : null}
                 />}
                 {columns.map((column) => column.cell(row))}
                 <Td className={storeStyles.menuCell}>

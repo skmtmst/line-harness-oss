@@ -46,7 +46,11 @@ vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/tes
   usePageChrome: () => ({}),
 }))
 
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: true } })) } }))
+
 import AccountsPage from './page'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 vi.mock('@/lib/staff-role', async original => ({ ...await original(), useStaffRole: () => staff.role }))
 vi.mock('@/components/accounts/account-ordering', () => ({
   default: () => <div role="dialog" aria-label="LINEアカウント階層を編集" data-testid="account-ordering" />,
@@ -62,6 +66,9 @@ beforeEach(() => {
   window.history.replaceState(null,'','/accounts')
   push.mockClear()
   staff.role = 'owner'
+  verifiedStaffRole('owner')
+  // 設定ナビの機能表示GETは見本で返す。この試験から外へ通信させない。
+  vi.stubGlobal('fetch', vi.fn(async () => new Response('{"success":true,"data":{}}', { status: 200, headers: { 'content-type': 'application/json' } })))
   listAccounts.mockImplementation(async () => ({
     success: true,
     data: [{
@@ -88,6 +95,10 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  forgetStaffIdentity()
+  const writes = (fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([, init]) => init?.method && !['GET', 'HEAD', 'OPTIONS'].includes(init.method))
+  expect(writes).toHaveLength(0)
+  vi.unstubAllGlobals()
   document.documentElement.removeAttribute('data-theme')
 })
 
@@ -148,6 +159,7 @@ function listOf(...rows: Array<Record<string, unknown>>) {
 const rowNames = () => [...host.querySelectorAll('tbody tr[data-row-id]')].map((row) => row.getAttribute('data-row-id'))
 
 async function renderList() {
+  verifiedStaffRole(staff.role)
   await act(async () => { root.render(<AccountsPage />) })
   await flush()
 }
@@ -236,14 +248,19 @@ describe('V7vn3 LINEアカウント一覧の骨組みと道具の段', () => {
     expect(items).not.toContain('アーカイブ')
   })
 
-  it('閲覧のみには、行の操作を詳細と確かめ直しだけにして、頭の変える操作を出さない', async () => {
+  it('変更権限のない担当者にも変える操作を理由付きで残し、読取は妨げない', async () => {
     staff.role = 'staff'
     await renderList()
-    expect([...host.querySelectorAll('button')].some((button) => button.textContent?.includes('並び順と親子を変える'))).toBe(false)
+    const ordering = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('並び順と親子を変える'))!
+    expect(ordering.getAttribute('aria-disabled')).toBe('true')
+    await act(async () => { ordering.click() })
+    expect(document.querySelector('[data-testid="account-ordering"]')).toBeNull()
     const menu = host.querySelector('button[aria-label="本店の操作"]') as HTMLButtonElement
     await act(async () => { menu.click() })
     await flush()
-    const items = [...document.body.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent?.trim())
-    expect(items).toEqual(['詳細', '接続をもう一度確かめる'])
+    const nodes = [...document.body.querySelectorAll('[role="menuitem"]')]
+    expect(nodes.map(item => item.getAttribute('aria-label') ?? item.textContent?.trim())).toEqual(['詳細', '接続をもう一度確かめる', '引き継ぎ', 'アーカイブ'])
+    for (const item of nodes.slice(2)) expect(item.getAttribute('aria-disabled')).toBe('true')
+    for (const item of nodes.slice(0, 2)) expect(item.getAttribute('aria-disabled')).toBeNull()
   })
 })

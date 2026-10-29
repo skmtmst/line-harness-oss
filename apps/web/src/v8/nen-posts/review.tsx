@@ -37,6 +37,7 @@ import { reviewVersionOf,text } from './text'
 import Checkbox from '@/components/shared/checkbox';
 import Chip from '@/components/shared/chip';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
+import Disclosure from '@/components/shared/disclosure';
 import Notice from '@/components/shared/notice';
 import { RowActions } from '@/components/shared/row-actions';
 import StatusBadge from '@/components/shared/status-badge';
@@ -940,10 +941,10 @@ function PublicationsV8({
               </DataTable>
             </div>
             <p className={styles.listHint}>{`公式サイト掲載中 ${publishedCount ?? emptyValue('unknown')}枚のうち ${formatNumber(items.length)}枚を表示（使っている場所で絞る：サイト・NENコラム・リッチメニュー・回答フォーム・登録メディア）`}</p>
-            <details className={styles.publicationHistory}><summary>掲載の整理と外した履歴（{pendingWithdrawals.length + withdrawnItems.length}件）</summary>
-              {pendingWithdrawals.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p>{canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setNotice(''); setWithdrawTarget(item) }} busy={Boolean(busyId)} busyLabel="処理中…">掲載先から外す</Button> : null}</div>)}
-              {withdrawnItems.map((item) => <div key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || '—'}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
-            </details>
+            <Disclosure className={styles.publicationHistory} appearance="inset" size="compact" title={`掲載の整理と外した履歴（${pendingWithdrawals.length + withdrawnItems.length}件）`}>
+              {pendingWithdrawals.map((item) => <div className={styles.publicationHistoryItem} key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>{text(item.publication_withdrawn_at) ? 'ご本人が公開の同意を撤回しました' : '公開の同意と採用状態を確認してください'}</p><p>まだ残っている掲載先：{placementLabels(item)}</p>{canEdit ? <Button variant="secondary" disabled={Boolean(busyId)} onClick={() => { setNotice(''); setWithdrawTarget(item) }} busy={Boolean(busyId)} busyLabel="処理中…">掲載先から外す</Button> : null}</div>)}
+              {withdrawnItems.map((item) => <div className={styles.publicationHistoryItem} key={text(item.id)}><strong>{text(item.pet_name) || '写真'}</strong><p>外した日時：{formatPhotoReceivedAt(item.withdrawn_at)}・{text(item.withdrawn_by_name) || '—'}</p>{(item.placements ?? []).map((placement) => <p key={text(placement.id)}>{text(placement.placement_label)}・{text(placement.removed_at) ? `${formatPhotoReceivedAt(placement.removed_at)}に外しました` : '記録あり'}</p>)}</div>)}
+            </Disclosure>
           </section>
         </DetailColumns>
       )}

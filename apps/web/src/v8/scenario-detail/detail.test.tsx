@@ -1,3 +1,6 @@
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import type { StaffMember } from '@line-crm/shared'
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * V8 シナリオ配信の編集（src/v8/scenario-detail）の動きの試験。BEHAVIOR.md の「今までと変えたところ」を守る。
@@ -136,6 +139,8 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 
 import ScenarioDetailV8 from './detail'
+import ScenarioDetailPage from '@/app/scenarios/detail/page'
+import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data'
 import { ApiError } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -143,9 +148,10 @@ import { ApiError } from '@/lib/api'
 let host: HTMLDivElement
 let root: Root
 
-async function render() {
+async function render(node: React.ReactNode = <ScenarioDetailV8 scenarioId="sc-1" showStarted={false} />) {
+  if (role.value) rememberStaffIdentity({ role: role.value } as StaffMember); else forgetStaffIdentity()
   act(() => {
-    root.render(<ScenarioDetailV8 scenarioId="sc-1" showStarted={false} />)
+    root.render(node)
   })
   for (let i = 0; i < 10; i++) {
     await act(async () => {
@@ -163,6 +169,8 @@ beforeEach(() => {
   updateScenario.mockResolvedValue({ success: true, data: { id: 'sc-1' } })
   getScenario.mockReset()
   getScenario.mockResolvedValue({ success: true, data: { ...scenario, updatedAt: '2026-10-01T05:10:00.000Z' } })
+  vi.mocked(scenarioReferenceData.scenario).mockReset()
+  vi.mocked(scenarioReferenceData.scenario).mockResolvedValue({ success: true, data: scenario })
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -171,17 +179,46 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  forgetStaffIdentity()
   delete document.documentElement.dataset.theme
   vi.clearAllMocks()
 })
 
 describe('V8 シナリオ配信の編集', () => {
-  it('絵（PMLkX）の操作と3つの箱・数の帯が出る', async () => {
+  it.each([
+    'こんにちは、{{name}}さん。{{reservation_datetime}}からです。',
+    'こんにちは、{名前}さん。{予約日時}からです。',
+  ])('下見は差し込みを共通の見本値に置き換える（%s）', async (messageContent) => {
+    vi.mocked(scenarioReferenceData.scenario).mockResolvedValueOnce({ success: true, data: {
+      ...scenario,
+      steps: [{ ...scenario.steps[0], messageContent }, scenario.steps[1]],
+    } } as never)
     await render()
+    const preview = screen.getByRole('region', { name: 'LINEでの見え方' })
+    expect(within(preview).getByText('選んだ通（1通目）の見え方')).toBeTruthy()
+    expect(within(preview).getByText('こんにちは、山田 花子さん。10月2日 18:00からです。')).toBeTruthy()
+    expect(document.querySelector('[data-preview-sample-note]')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'LINEでの見え方の説明' }))
+    expect(screen.getByText('名前や日時は見本の値です。')).toBeTruthy()
+    expect(within(preview).queryByText(messageContent)).toBeNull()
+  })
+
+  it('本文が空なら見本の説明を出さない', async () => {
+    vi.mocked(scenarioReferenceData.scenario).mockResolvedValueOnce({ success: true, data: {
+      ...scenario,
+      steps: [{ ...scenario.steps[0], messageContent: '' }],
+    } } as never)
+    await render()
+    expect(screen.queryByRole('button', { name: 'LINEでの見え方の説明' })).toBeNull()
+  })
+
+  it('絵（PMLkX）の操作と3つの箱・数の帯が出る', async () => {
+    await render(<ScenarioDetailPage />)
+    expect(screen.getByText('購読開始から0日後 10:00').closest('[data-page-template="detail"]')).toBeTruthy()
     for (const name of ['配信結果を見る', 'まとめて下見', 'まとめてテストを送る', '設定を変える', '一時停止する', 'このシナリオを削除する', 'キャンセル', '複製する', '保存する']) {
-      expect(screen.getAllByRole(name === '配信結果を見る' ? 'link' : 'button', { name }).length, name).toBeGreaterThan(0)
+      expect(name === '配信結果を見る' ? screen.getByRole('link', { name }) : getPageAction({ name }), name).toBeTruthy()
     }
-    expect(screen.getByText('保存済み 2026年10月1日 14:02')).toBeTruthy()
+    expect(screen.getByText('保存済み 10月1日 14:02')).toBeTruthy()
     expect(screen.getByText('友だち追加のとき')).toBeTruthy()
     expect(screen.getByText('送っています')).toBeTruthy()
     expect(screen.getByText('何もしない（一時停止）')).toBeTruthy()
@@ -209,12 +246,12 @@ describe('V8 シナリオ配信の編集', () => {
   it('閲覧のみ：帯が出て、変える操作のボタンを置かない（押せないボタンも残さない）', async () => {
     role.value = 'staff'
     await render()
-    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')).toBeTruthy()
     for (const name of ['まとめてテストを送る', '設定を変える', '一時停止する', '変える', 'このシナリオを削除する', '複製する', '保存する', 'メッセージを追加する', 'テンプレートを追加する', '＋ ここに挿入', '名前・説明・置き場を変える', 'このシナリオのその他操作', '1通目を上へ']) {
       expect(screen.queryByRole('button', { name }), name).toBeNull()
     }
     // 見る操作は残す。残ったボタンはどれも押せる。
-    expect(screen.getByRole('button', { name: 'まとめて下見' })).toBeTruthy()
+    expect(getPageAction({ name: 'まとめて下見' })).toBeTruthy()
     const disabled = [...host.querySelectorAll('button')].filter((b) => b.disabled).map((b) => b.textContent || b.getAttribute('aria-label'))
     expect(disabled).toEqual([])
   })

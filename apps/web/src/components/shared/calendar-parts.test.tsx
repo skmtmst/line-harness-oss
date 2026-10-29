@@ -81,3 +81,19 @@ it('closes an available-time list when edit access is revoked, and drops stale I
   expect(onSlot).not.toHaveBeenCalled()
   expect(onOpen).not.toHaveBeenCalled()
 })
+
+it('電話の札と状態の読み上げを保ち、手入力から電話を推定しない', () => {
+  const onOpen = vi.fn()
+  const base = { ...entry('phone'), state: 'pending' as const }
+  const props = { days: [day], free: [], canWrite: false, position, onOpen, onSlot: vi.fn() }
+  const { rerender } = render(<CalendarTimeEntries {...props} entries={[{ ...base, source: 'phone' }]} />)
+  const phone = screen.getByRole('button', { name: '10:00〜11:00 予約phone 名前phone' })
+  expect(within(phone).getByText('電話')).toBeTruthy()
+  expect(phone.getAttribute('aria-description')).toBe('要対応（承認待ち）・電話')
+  fireEvent.click(phone)
+  expect(onOpen).toHaveBeenCalledWith('phone')
+  rerender(<CalendarTimeEntries {...props} entries={[{ ...base, source: 'manual' }]} />)
+  expect(screen.queryByText('電話')).toBeNull()
+  expect(screen.getByRole('button', { name: '10:00〜11:00 予約phone 名前phone' }).getAttribute('aria-description')).toBe('要対応（承認待ち）')
+  expect(screen.queryByRole('button', { name: /予約を入れる/ })).toBeNull()
+})

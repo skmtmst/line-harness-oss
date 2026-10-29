@@ -4,8 +4,8 @@ import type { ApiResponse, StaffMember } from '@line-crm/shared'
 
 export const staffMethods = {
   staff: {
-    list: () =>
-      fetchApi<ApiResponse<StaffMember[]>>('/api/staff'),
+    list: (lineAccountId?: string) =>
+      fetchApi<ApiResponse<StaffMember[]>>(`/api/staff${lineAccountId ? `?lineAccountId=${encodeURIComponent(lineAccountId)}` : ''}`),
     get: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`),
     me: () => fetchPrefetchedRead<ApiResponse<StaffMember>>('/api/staff/me'),

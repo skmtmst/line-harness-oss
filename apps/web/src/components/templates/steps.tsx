@@ -30,6 +30,7 @@ export function Steps({
   connectorSize,
   layout = 'horizontal',
   summaries,
+  summaryLayout = 'default',
   readOnly = false,
   variant = 'default',
   animate = false,
@@ -44,6 +45,7 @@ export function Steps({
   layout?: 'horizontal' | 'sidebar'
   /** 済んだ入力の要約。値を持つ画面だけが渡す。 */
   summaries?: Readonly<Record<string, string>>
+  summaryLayout?: 'default' | 'aligned'
   readOnly?: boolean
   /** `auth` はログイン前の画面の小さな帯（丸 24・文字 12・線 2）。 */
   variant?: 'default' | 'auth'
@@ -158,7 +160,7 @@ export function Steps({
           )
         })}
       </ol>
-      {summaries && summaryItems.length > 0 ? <div role="list" aria-label="設定済みの内容" className={styles.summaries}>
+      {summaries && summaryItems.length > 0 ? <div role="list" aria-label="設定済みの内容" data-summary-layout={summaryLayout} className={styles.summaries}>
         {summaryItems.map((step) => <div role="listitem" key={step.key} className={styles.sectionHead}>
           <span className={styles.sectionTitle}>{step.label}</span>
           <span className={styles.sectionSummary} title={summaries[step.key]}>{summaries[step.key]}</span>

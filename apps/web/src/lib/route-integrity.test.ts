@@ -234,7 +234,7 @@ describe('旧住所の転送とクエリを扱う専用の入口を維持する'
     expect(line).toContain('308');
   });
 
-  it('/affiliates は _redirects に戻さず、画面側が ?tab= を保って /conversions へ送る', () => {
+  it('/affiliates は _redirects に戻さず、画面側で統合後のタブを開く', () => {
     // Pages の _redirects はクエリを条件にできない。静的 308 で
     // /conversions?tab=affiliates へ固定すると、/affiliates?tab=offers の
     // tab が落ちる。受け皿は /affiliates の page.tsx（クライアント側で

@@ -44,7 +44,8 @@ import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
 import { Tabs } from '@/components/shared/tabs';
 import PageSizeSelect from '@/components/shared/page-size-select'
-import { reminderTriggerLabel, reminderStopSummary, renderReminderBodySample } from '@/components/reminders/reminder-labels';
+import { reminderTriggerLabel, reminderStopSummary } from '@/components/reminders/reminder-labels'
+import { fillPreviewSample } from '@/components/shared/preview-sample'
 import SheetDialog from './sheet-dialog'
 import styles from './detail.module.css'
 import { csvFileName } from '@/lib/csv-file-name';
@@ -452,7 +453,7 @@ function ReminderDetailV8() {
     )
   }
   if (error || !data) {
-    return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="詳細を表示できませんでした" description={error || '詳細を読み込めませんでした。'} onRetry={() => void load()} /></SaveErrorScope>
+    return <SaveErrorScope errors={saveErrors}><TargetMissing kind="error" title="リマインダを読み込めませんでした" description={error || '詳細を読み込めませんでした。'} onRetry={() => void load()} /></SaveErrorScope>
   }
 
   const hasErrors = data.summary.errors > 0
@@ -527,12 +528,12 @@ function ReminderDetailV8() {
             <LinePreview
               accountName={accountName}
               caption={data.summary.nextScheduledAt ? formatMd(data.summary.nextScheduledAt) : '次の送信予定はありません'}
-              note="届き方：次に送る通知が、友だちのLINEにこう届きます。差し込みは見本の値です。"
+              note={firstStep?.messageContent.trim() ? '届き方：次に送る通知が、友だちのLINEにこう届きます。差し込みは見本の値です。' : undefined}
               empty={!firstStep}
             >
               {firstStep ? (
                 <LinePreviewMessage accountName={accountName} avatar={accountName.slice(0, 1)} time={nextTime}>
-                  {renderReminderBodySample(firstStep.messageContent || '本文はまだありません')}
+                  {fillPreviewSample(firstStep.messageContent || '本文はまだありません').text}
                 </LinePreviewMessage>
               ) : null}
             </LinePreview>
@@ -631,7 +632,7 @@ function OverviewTab({
     <>
       {hasErrors ? (
         <Notice tone="danger" heading={<> 送れなかった通知が {formatNumber(data.summary.errors)}通あります </>} action={<> <Button onClick={onShowErrors}>
-            <ArrowRight size={16} aria-hidden="true" />実行結果を見る
+            実行結果を見る<ArrowRight size={16} aria-hidden="true" />
           </Button> </>} >友だちがブロックしていたか、LINE が受け付けませんでした。理由を見て、送り直せます。</Notice>
       ) : null}
 
@@ -698,7 +699,7 @@ function OverviewTab({
             </div>
             <div className={styles.moreRow}>
               <Button variant="text" onClick={onShowAllRuns}>
-                <ArrowRight size={16} aria-hidden="true" />すべての実行結果
+                すべての実行結果<ArrowRight size={16} aria-hidden="true" />
               </Button>
             </div>
           </>

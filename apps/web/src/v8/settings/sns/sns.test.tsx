@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * 設定 › SNS 連携の Instagram のカード（★V8-B `YINmJ`・`DFnll`／2026-10-07 利用者承認）。
  * 守るのは BEHAVIOR.md に書いた決めごと：
@@ -167,10 +169,10 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
   })
 
   it('閲覧のみには閲覧のみの帯を出し、接続・解除・確認のボタンを置かない', async () => {
-    fixture.role.value = 'staff'
+    fixture.role.value = verifiedStaffRole('staff')
     setup('connected', CONNECTED)
 
-    expect(await screen.findByText(/閲覧のみで見ています/)).toBeTruthy()
+    expect(await screen.findByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
     expect(await screen.findByText('接続済み')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /接続を確かめる/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /その他操作/ })).toBeNull()
@@ -183,6 +185,37 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     fireEvent.click(await screen.findByRole('button', { name: /接続を確かめる/ }))
     await waitFor(() => expect(fixture.igRefresh).toHaveBeenCalledWith('acc-1'))
     await waitFor(() => expect(fixture.igConnection.mock.calls.length).toBeGreaterThan(1))
+  })
+
+  it.each(['disconnected', 'expired'] as const)('%s の閲覧のみには接続操作とログイン案内を出さない', async (state) => {
+    fixture.role.value = verifiedStaffRole('staff')
+    setup(state, state === 'expired' ? CONNECTED : undefined)
+
+    await screen.findByText(PERMISSION_LOCK_SUMMARY.feature)
+    await igCard().findByText(state === 'expired' ? '接続の異常' : '未接続')
+    expect(igCard().queryByRole('button', { name: 'Instagram にログインして接続する' })).toBeNull()
+    expect(igCard().queryByText(/個人のアカウントは接続できません/)).toBeNull()
+    expect(fixture.igStart).not.toHaveBeenCalled()
+  })
+
+  it('接続開始の処理中は操作を止め、失敗後も案内を保って再試行できる', async () => {
+    let rejectStart!: (reason: Error) => void
+    fixture.igStart.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectStart = reject }))
+    setup('disconnected')
+
+    const start = await screen.findByRole('button', { name: 'Instagram にログインして接続する' })
+    fireEvent.click(start)
+    expect(start.hasAttribute('disabled')).toBe(true)
+    expect(igCard().getByText(/個人のアカウントは接続できません/)).toBeTruthy()
+    fireEvent.click(start)
+    expect(fixture.igStart).toHaveBeenCalledTimes(1)
+    expect(fixture.igStart).toHaveBeenCalledWith('acc-1')
+
+    rejectStart(new Error('offline'))
+    await screen.findByText('Instagram のログイン画面を開けませんでした。もう一度お試しください。')
+    expect(start.hasAttribute('disabled')).toBe(false)
+    expect(igCard().getByText(/個人のアカウントは接続できません/)).toBeTruthy()
+    expect(fixture.igDisconnect).not.toHaveBeenCalled()
   })
 
   it('［接続を解除する］は確認の小窓をはさみ、いまの版の番号を渡す', async () => {
@@ -246,3 +279,5 @@ describe('Instagram のログインから戻ったときの帯', () => {
     expect(screen.queryByText(/status=400/)).toBeNull()
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

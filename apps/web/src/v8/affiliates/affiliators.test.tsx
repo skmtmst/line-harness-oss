@@ -1,4 +1,7 @@
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 成果とアフィリエイト「アフィリエイター」（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
  * 行が成果の多い順に並ぶ・閲覧のみでは作る／選ぶ／編集を出さない（帯は出す）・行の「…」に変える操作が出る。
@@ -84,6 +87,7 @@ beforeEach(() => {
   updateAffiliate.mockReset().mockResolvedValue({ success: true })
   folderList.mockResolvedValue({success:true,data:[{id:'f1',name:'紹介の仲間',color:'#228b22',kind:'affiliate',accountId:'account-a',displayOrder:0}]})
   role.manage = true
+  verifiedStaffRole('owner')
   affiliatesList.mockResolvedValue({ success: true, data: affiliates })
   allReport.mockResolvedValue({ success: true, data: report })
   settlementPreview.mockResolvedValue({ success: true, data: { totalAmount: 13000, conversionCount: 11, affiliates: [], periodFrom: '', periodTo: '' } })
@@ -104,15 +108,17 @@ describe('V8 アフィリエイター', () => {
     await render()
     const names = [...host.querySelectorAll('tbody tr')].map((row) => row.querySelector('a[data-row-link]')?.textContent)
     expect(names).toEqual(['多い人', '少ない人'])
-    expect(host.textContent).toContain('アフィリエイターを作る')
+    expect(host.textContent).toContain('アフィリエイター登録')
+    expect(host.querySelector('[aria-label="アフィリエイターを作る"]')).not.toBeNull()
     expect(host.querySelector('[aria-label="多い人を選ぶ"]')).not.toBeNull()
     expect(host.textContent).not.toContain('閲覧のみで見ています')
   })
 
   it('閲覧のみは選ぶ枠と作る・一括操作・行の変更操作を出さず、見る操作を残す', async () => {
     role.manage = false
+    verifiedStaffRole('staff')
     await render()
-    expect(host.textContent).toContain('閲覧のみで見ています')
+    expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
     expect(host.textContent).not.toContain('アフィリエイターを作る')
     const selection = host.querySelector('[aria-label="多い人を選ぶ"]') as HTMLInputElement
     expect(selection).toBeNull()
@@ -160,8 +166,9 @@ it('W2: managed folders offer creation, filtering and each row uses its actual f
 
 it('W2: readonly users retain folder filtering without adding or moving folders', async () => {
   role.manage=false
+  verifiedStaffRole('staff')
   await render()
-  expect(screen.queryByRole('button',{name:'フォルダを追加',exact:true})).toBeNull()
+  await expectPermissionLocked(screen.getByRole('button',{name:'フォルダを追加',exact:true}))
   const menu=host.querySelector('[aria-label="多い人の操作"]')!
   fireEvent.click(menu)
   expect(screen.queryByRole('menuitem',{name:'フォルダへ移す'})).toBeNull()
@@ -196,3 +203,5 @@ describe('V8 アフィリエイター：読み込みの状態と報酬', () => {
     expect(reward('多い人')).toContain('¥10,000')
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

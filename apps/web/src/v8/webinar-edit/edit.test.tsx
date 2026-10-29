@@ -1,3 +1,4 @@
+import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
 
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import React, { act } from 'react'
@@ -156,7 +157,7 @@ async function render(node: React.ReactNode) {
 }
 
 const buttons = () => [...document.querySelectorAll('button')] as HTMLButtonElement[]
-const buttonText = (text: string) => buttons().find((button) => button.textContent?.trim() === text)
+const buttonText = (text: string) => (buttons().find((button) => button.textContent?.trim() === text) ?? querySupplementaryPageAction(text))
 
 describe('V8 ウェビナーの編集', () => {
   it('現在の通知の補足は有効フラグで組み立て、切ってある通知の時刻を出さない', async () => {
@@ -207,10 +208,10 @@ describe('V8 ウェビナーの編集', () => {
     nav.search = 'id=webinar-1&pane=analytics'
     await render(<WebinarEditV8 />)
     const funnel = host.querySelector('#webinar-analytics-funnel')
-    const row = [...(funnel?.querySelectorAll('button') ?? [])].find((item) => item.textContent?.includes('フォーム送信'))
+    const row = ([...(funnel?.querySelectorAll('button') ?? [])].find((item) => item.textContent?.includes('フォーム送信')) ?? querySupplementaryPageAction('フォーム送信'))
     expect(row?.textContent).toContain('9人')
     const stats = host.querySelector('[data-template-region="stats"]')
-    const metric = [...(stats?.querySelectorAll('[data-kpi-presentation]') ?? [])].find(item => item.querySelector('[data-kpi-label]')?.textContent === 'フォーム送信')
+    const metric = ([...(stats?.querySelectorAll('[data-kpi-presentation]') ?? [])].find(item => item.querySelector('[data-kpi-label]')?.textContent === 'フォーム送信') ?? querySupplementaryPageAction('フォーム送信'))
     expect(metric?.querySelector('[data-kpi-number]')?.textContent).toBe('9')
     expect(metric?.textContent).toContain('9人')
     expect(metric?.textContent).not.toContain('9件')
@@ -237,8 +238,9 @@ describe('V8 ウェビナーの編集', () => {
 
   it('作る手順の段（④通知）：5段の帯から別の段へ移れる', async () => {
     nav.search = 'id=webinar-1&pane=notifications'
-    await render(<WebinarEditV8 />)
+    await render(<EditPage />)
     expect(host.textContent).toContain('通知と視聴後のこと')
+    expect(host.querySelector('[data-page-template="create"] [data-template-region="content"]')?.textContent).toContain('通知とリマインド')
     expect(host.querySelector('[aria-current="step"]')?.textContent).toContain('通知')
     expect(host.querySelector('[aria-label="設定済みの内容"]')?.textContent).toContain('動画あり・配信枠 1件')
     const video = host.querySelector('[aria-label="動画を変える"]') as HTMLButtonElement | null
@@ -300,7 +302,7 @@ describe('V8 ウェビナーの編集', () => {
       setter.call(body, 'とてもわかりやすい')
       body.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    const save = buttons().find((button) => button.textContent?.includes('保存する'))
+    const save = (buttons().find((button) => button.textContent?.includes('保存する')) ?? querySupplementaryPageAction('保存する'))
     expect(save).toBeTruthy()
     await act(async () => { save!.click() })
     for (let i = 0; i < 4; i += 1) await act(async () => {})
@@ -347,7 +349,7 @@ describe('V8 ウェビナーの編集', () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(minutes, '')
       minutes.dispatchEvent(new Event('input', { bubbles: true }))
     })
-    await act(async () => { [...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent?.trim() === '保存する')!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await act(async () => { ([...document.querySelectorAll('[role="dialog"] button')].find((b) => b.textContent?.trim() === '保存する') ?? querySupplementaryPageAction('保存する'))!.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
     await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     expect(puts.length).toBe(before)
     expect(document.getElementById('wd-minutes-error')?.textContent).toBe('動画の長さ（分）を入れてください。')
@@ -408,10 +410,10 @@ it('WEB-166：公開中は編集の…から版を確認して停止する', asy
   const menu = buttons().find(b => b.getAttribute('aria-label') === 'ウェビナーの操作')!
   expect(menu).toBeTruthy()
   await act(async () => { menu.click() })
-  const pause = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '停止') as HTMLElement
+  const pause = ([...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '停止') ?? querySupplementaryPageAction('停止')) as HTMLElement
   expect(pause.textContent).toContain('停止')
   await act(async () => { pause.click() })
-  const confirm = buttons().find(b => b.textContent?.trim() === '停止する')!
+  const confirm = (buttons().find(b => b.textContent?.trim() === '停止する') ?? querySupplementaryPageAction('停止する'))!
   expect(confirm).toBeTruthy()
   await act(async () => { confirm.click() })
   expect(puts.some(p => p.path.endsWith('/pause') && (p.body as { expectedVersion: number }).expectedVersion === 3)).toBe(true)
@@ -422,7 +424,7 @@ it('編集の複製は保存済みの版を送り、一覧で下書きを光ら�
   nav.search = 'id=webinar-1&pane=participants'
   await render(<WebinarEditV8 />)
   await act(async () => { buttons().find(b => b.getAttribute('aria-label') === 'ウェビナーの操作')!.click() })
-  const duplicate = [...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '複製する') as HTMLElement
+  const duplicate = ([...document.querySelectorAll('[role="menuitem"]')].find(item => item.textContent?.trim() === '複製する') ?? querySupplementaryPageAction('複製する')) as HTMLElement
   await act(async () => { duplicate.click() })
   expect(puts).toContainEqual({ path: '/api/webinars/webinar-1/duplicate', body: { expectedVersion: 3 } })
   expect(routerPush).toHaveBeenCalledWith('/webinars?status=draft&highlight=copied-webinar')
@@ -468,7 +470,7 @@ it('通知の段は初回だけ取得し、段を移ってブラウザで戻っ�
   const returned = screen.getByRole('switch', { name: '申込のお礼', exact: true }) as HTMLInputElement
   expect(returned).toBe(toggle)
   expect((returned.getAttribute('aria-checked') === 'true')).toBe(false)
-  const save = screen.getByRole('button', { name: '下書きを保存', exact: true }) as HTMLButtonElement
+  const save = getPageAction({ name: '下書きを保存', exact: true }) as HTMLButtonElement
   expect(save.disabled).toBe(false)
   await act(async () => { save.click() })
   const writes = puts.filter(row => row.path.endsWith('/notifications'))

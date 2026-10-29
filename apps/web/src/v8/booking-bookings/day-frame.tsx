@@ -20,6 +20,7 @@ import { jstDate } from '@/lib/jst-datetime'
 import type { BookingRequest } from '@/lib/api'
 import type { AccountStyle } from '@line-crm/shared'
 import { bookingWords } from './words'
+import { withHonorific } from '@line-crm/shared'
 
 type Availability = { status: 'loading' | 'ready' | 'error' | 'unconfigured'; slots: { staffId: string; date: string; start: string; remaining: number; state: string }[] }
 export function dayBookingSummary(rows: BookingRequest[], date: string, availability: Availability) {
@@ -61,7 +62,7 @@ export default function PeopleDayFrame({ view, date, rows, ready, availability, 
           <div className={styles.who}>
             <Avatar name={next.friend_name} size={32} />
             <div className={styles.names}>
-              <span className={styles.name} title={next.friend_name ?? undefined}>{next.friend_name ? `${next.friend_name} さん` : '名前の登録なし'}</span>
+              <span className={styles.name} title={next.friend_name ?? undefined}>{next.friend_name ? `${withHonorific(next.friend_name, 'さん', { space: true })}` : '名前の登録なし'}</span>
               <span className={styles.menu} title={next.menu_name}>{next.menu_name}</span>
             </div>
           </div>

@@ -205,7 +205,7 @@ export default function AccountEditModal({
         aria-modal="true"
         aria-labelledby={modalTitleId}
         data-design-node={initialSection === 'credentials' ? 'Msb1j' : 'n9Z2P'}
-        className="my-2 w-full max-w-2xl overflow-hidden rounded-control bg-canvas shadow-float sm:my-4"
+        className="my-2 flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-control bg-canvas shadow-float sm:my-4 sm:max-h-[calc(100dvh-2rem)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-hairline bg-canvas px-4 py-4 sm:px-6">
@@ -213,7 +213,7 @@ export default function AccountEditModal({
           <CloseButton onClick={onClose} />
         </div>
 
-        <form onSubmit={handleSave} className="space-y-4 p-4 sm:p-6">
+        <form onSubmit={handleSave} className="flex min-h-0 flex-1 flex-col space-y-4 overflow-y-auto p-4 sm:p-6">
           <div>
             <label className="block text-xs font-medium text-ink-secondary mb-1">アカウント名</label>
             <SaveErrorField names={["name","state.name"]}><SharedTextField
@@ -300,7 +300,7 @@ export default function AccountEditModal({
                 className="border-hairline rounded-control w-full border px-3 py-2 text-sm"
               /></SaveErrorField>
               <p className="text-ink-faint mt-1 text-xs">
-                管理画面の一覧で使います。共有時に出る画像（OGP）とは別の欄です。
+                このURLを優先表示します。未指定ならLINE公式アカウントの画像を自動取得します。LINEログインチャネルの画像とは別です。
               </p>
             </div>
           </div>
@@ -316,7 +316,7 @@ export default function AccountEditModal({
             </Notice>
           )}
 
-          <div className="sticky bottom-0 -mx-4 flex justify-end gap-2 border-t border-divider-soft bg-canvas px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">
+          <div className="sticky bottom-0 -mx-4 flex justify-center gap-2 border-t border-divider-soft bg-canvas px-4 pb-1 pt-3 sm:-mx-6 sm:px-6">
             <Button variant="secondary" className="px-4 py-2 font-medium hover:bg-surface-pearl h-auto whitespace-normal" type="button" onClick={onClose}>
               キャンセル
             </Button>

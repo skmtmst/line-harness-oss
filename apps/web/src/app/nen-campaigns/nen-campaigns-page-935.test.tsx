@@ -212,6 +212,7 @@ describe('紹介文の書きかけを守る（#935 N-301）', () => {
   it('書きかけのまま別のコラムを選ぶと確認し、やめるなら選び直さない', async () => {
     await mount()
     await openColumn()
+    expect(columnLink('題名c1').closest('[data-template-region="content"]')?.closest('[data-page-template="list"]')).toBeTruthy()
     await typeIntro('書きかけの紹介文')
 
     await click(columnLink('題名c2'))

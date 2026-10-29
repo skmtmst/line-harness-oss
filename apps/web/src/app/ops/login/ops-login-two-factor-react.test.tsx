@@ -57,7 +57,7 @@ describe('運営ログインの二段階認証', () => {
     await act(async () => { root.render(<OpsLoginPage />) })
 
     expect(host.querySelector('[role="alert"]')?.textContent).toBe(
-      'LINEログインを完了できませんでした。もう一度お試しください。',
+      '失敗：LINEログインを完了できませんでした。もう一度お試しください。',
     )
   })
 

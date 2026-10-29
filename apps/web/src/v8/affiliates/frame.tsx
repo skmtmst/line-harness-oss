@@ -2,10 +2,9 @@
 
 /*
  * ★V8 成果とアフィリエイトの外枠（Pencil「★V8-B 画面の地図」の成果とアフィリエイトの行）。
- * アフィリエイター ・1152 ・閲覧のみ ・案件 ・
- * 成果承認 ・支払い ・レポート （状態は見本帳 ）。
+ * アフィリエイター ・1152 ・閲覧のみ ・案件 ・成果承認 ・支払い ・レポート ・コンバージョン。
  *
- * 板の頭（題・説明・右の操作）とタブの段・閲覧のみの帯は5つのタブで同じ。
+ * 板の頭（題・説明・右の操作）とタブの段・閲覧のみの帯は一覧タブで同じ。
  * 数の帯・フォルダの列・道具の段・表は各タブが一覧の型（ListPage）の枠へ渡す。
  */
 import { createContext, useContext, type ReactNode } from 'react'
@@ -17,7 +16,7 @@ import styles from './affiliates.module.css'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
-/** 5つの一覧が同じ共通表の口へ渡す寸法。 */
+/** 一覧タブが同じ共通表の口へ渡す寸法。 */
 export const AFFILIATE_TABLE_LAYOUT = {
   headHeight: 'var(--tpl-af-head-h)',
   rowHeight: 'var(--tpl-af-row-h)',
@@ -34,6 +33,7 @@ export const AFFILIATE_TABS = [
   { key: 'approvals', label: '成果承認', board: 'OylSV' },
   { key: 'payment', label: '支払い', board: 'aINnz' },
   { key: 'report', label: 'レポート', board: 'Eo56k' },
+  { key: 'points', label: 'コンバージョン', board: 'r6dJFy' },
 ] as const
 
 export type AffiliateTabKey = (typeof AFFILIATE_TABS)[number]['key']
@@ -71,6 +71,23 @@ export function useAffiliateShell(): AffiliateShellContext {
   return useContext(AffiliateShell)
 }
 
+/** 成果とアフィリエイト内の一覧切り替え。成果地点一覧でも同じ段を使う。 */
+export function AffiliateTabs() {
+  const { tab, counts } = useAffiliateShell()
+  return (
+    <div className={styles.tabsBox}>
+      <Tabs
+        label="成果とアフィリエイトのタブ"
+        items={AFFILIATE_TABS.map((item) => ({
+          label: counts[item.key] ? `${item.label} ${counts[item.key]}` : item.label,
+          href: affiliateTabHref(item.key),
+          current: item.key === tab,
+        }))}
+      />
+    </div>
+  )
+}
+
 /** 閲覧のみの帯。数の帯の上。 */
 export function ViewerBand() {
   return (
@@ -87,17 +104,21 @@ export function CreateButton({
   onClick,
   readonly,
   full,
+  ariaLabel,
+  title,
   children,
 }: {
   href?: string
   onClick?: () => void
   readonly: boolean
   full?: boolean
+  ariaLabel?: string
+  title?: string
   children: ReactNode
 }) {
   if (readonly) return null
   return (
-    <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href={href} onClick={onClick}>
+    <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href={href} onClick={onClick} aria-label={ariaLabel} title={title}>
       {children}
     </Button>
   )
@@ -121,9 +142,9 @@ export interface AffiliateFrameProps {
   children: ReactNode
 }
 
-/** 5つのタブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
+/** 一覧タブの共通の外側。題・説明・タブの段・閲覧のみの帯をここで持つ。 */
 export function AffiliateFrame({ help, listHelp, explanation, explanationKey, actions, stats, folders, folderNav, toolbar, pagination, overlays, children }: AffiliateFrameProps) {
-  const { tab, readonly, narrow, counts } = useAffiliateShell()
+  const { tab, readonly, narrow } = useAffiliateShell()
   const board = tab === 'affiliates' && narrow
     ? 'KdFRI'
     : tab === 'affiliates' && readonly
@@ -131,7 +152,7 @@ export function AffiliateFrame({ help, listHelp, explanation, explanationKey, ac
       : AFFILIATE_TABS.find((item) => item.key === tab)?.board
   return (
     <ListPage
-      help={<>{"紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。"}{help}</>}
+      help={<> {"紹介してくれる人（アフィリエイター）と案件を登録し、成果を認めて報酬を払います。成果の数え方はコンバージョンで決めます。"}{help}</>}
       skeleton
       explanation={explanation}
       explanationKey={explanationKey ?? `affiliates:${tab}`}
@@ -140,19 +161,7 @@ export function AffiliateFrame({ help, listHelp, explanation, explanationKey, ac
       title="成果とアフィリエイト"
 
       actions={actions}
-      tabs={
-        <div className={styles.tabsBox}>
-          <Tabs
-            label="成果とアフィリエイトのタブ"
-            items={AFFILIATE_TABS.map((item) => ({
-              /* 絵は「アフィリエイター 6」で1つの文字。数を別の札に分けない。 */
-              label: counts[item.key] ? `${item.label} ${counts[item.key]}` : item.label,
-              href: affiliateTabHref(item.key),
-              current: item.key === tab,
-            }))}
-          />
-        </div>
-      }
+      tabs={<AffiliateTabs />}
       stats={stats ? <>{readonly ? <ViewerBand /> : null}{stats}</> : readonly ? <ViewerBand /> : undefined}
       folders={folders}
       folderNav={folderNav}

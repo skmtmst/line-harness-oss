@@ -219,7 +219,7 @@ function MembersInner() {
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="r4ARpV"
       title="メンバー"
-      help="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。"
+      help="統括の画面に入れる人です。役割と、見られるアカウント（担当範囲）を決めます。役割は、オーナー（請求・メンバーまで全部）、管理者、担当者（担当範囲のアカウントだけ）、閲覧のみ（見るだけ）です。"
       actions={ready && canManage ? (
         <Button variant="primary" onClick={openInvite}>
           <Plus aria-hidden="true" className={styles.buttonIcon} />
@@ -250,7 +250,7 @@ function MembersInner() {
               <KpiCard icon={<Building2 />} title="担当アカウント" value={kpis.scopedAccounts} unit="アカウント" detail={`全アカウントを担当 ${kpis.allScope}人`} />
             </KpiBand>
 
-            <GridTable label="権限者の一覧" design={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-hq-col-role) minmax(0, 1fr) var(--tpl-hq-col-state) var(--tpl-hq-col-login) var(--tpl-hq-col-action)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
+            <GridTable label="権限者の一覧" columnSizing="content" design={{ columns: 'minmax(0, 1fr) minmax(0, 1fr) var(--tpl-hq-col-role) minmax(0, 1fr) var(--tpl-hq-col-state) var(--tpl-hq-col-login) var(--tpl-hq-col-action)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--tpl-list-inset)', fontSize: 'var(--polish-text-body)' }}>
               <GridHeadRow>
                 <GridCell role="columnheader">名前</GridCell>
                 <GridCell role="columnheader">メールアドレス</GridCell>
@@ -282,7 +282,6 @@ function MembersInner() {
               })}
             </GridTable>
 
-            <p className={styles.legend}>役割：オーナー（請求・メンバーまで全部）／管理者／担当者（担当範囲のアカウントだけ）／閲覧のみ（見るだけ）</p>
           </>
         )}
       </PageContent>

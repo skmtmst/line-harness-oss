@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -20,7 +22,7 @@ const data = {
 }
 
 beforeEach(() => {
-  fixture.role = 'owner'
+  fixture.role = verifiedStaffRole('owner')
   fixture.snapshot.mockResolvedValue({ data })
   fixture.decideApproval.mockResolvedValue({ data: { menuChangeStatus: 'applied' } })
 })
@@ -54,19 +56,21 @@ it('管理者は承認待ちのカードで承認でき、改定の前後と差�
   expect(screen.getByText('¥3,800')).toBeTruthy()
   const reason = screen.getByText('期限を書いてください').closest('[role=note]')!
   expect(reason.getAttribute('data-appearance')).toBe('soft')
-  expect(reason.querySelector('svg')).toBeNull()
+  expect(reason.querySelector('[data-notice-dot]')).not.toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '承認する' }))
   await waitFor(() => expect(fixture.decideApproval).toHaveBeenCalledWith('account-1', 'apr-1', 'approve', undefined))
 })
 
 it('閲覧のみには帯を出し、差戻し・承認するのボタンを置かない', async () => {
-  fixture.role = 'staff'
+  fixture.role = verifiedStaffRole('staff')
   render(<ApprovalsV8 />)
   expect(await screen.findByText('価格改定')).toBeTruthy()
-  expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
+  expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
   expect(document.querySelectorAll('[data-kpi-number]')).toHaveLength(4)
   expect(document.querySelectorAll('[data-kpi-icon]')).toHaveLength(0)
   expect(screen.queryByRole('button', { name: '承認する' })).toBeNull()
   expect(screen.queryByRole('button', { name: '差戻し' })).toBeNull()
   expect(fixture.decideApproval).not.toHaveBeenCalled()
 })
+
+afterEach(() => { verifiedStaffRole(null) })

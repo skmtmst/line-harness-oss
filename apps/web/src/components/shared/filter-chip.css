@@ -29,8 +29,8 @@
  */
 
 /*
- * #669: 選んだ札は「有効状態」なので濃い緑の地に白文字＋✓。
- * `--color-accent-deep`(#087a3e)と`--color-on-accent`(#ffffff)は5.44:1。
+ * 選んだ札は薄い緑の地に緑の枠と文字を使う。
+ * 選択色は共通の変数から読む。
  */
 .v6-filter-chip[aria-pressed='true'] {
   border-color: var(--color-accent-deep);
@@ -104,8 +104,6 @@
 /* 道具の文字は13/500。選択は色を増やさず面の違いで伝える。 */
 :root .v6-filter-chip { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); outline-color: var(--color-control-border); box-shadow: none; background: var(--color-canvas); }
 :root .v6-filter-chip:not([aria-pressed='true']):hover:not(:disabled) { background: var(--polish-control-hover); }
-:root .v6-filter-chip[aria-pressed='true'] { background: var(--color-ink); color: var(--color-canvas); outline-color: var(--color-ink); box-shadow: none; }
-:root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: var(--color-ink-secondary); }
 :root .v6-filter-chip__icon svg { width: var(--polish-icon-control); height: var(--polish-icon-control); }
 
 :root .v6-filter-chip { padding-block: 0; }
@@ -114,9 +112,9 @@
 
 :root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: inherit; }
 
-:root .v6-filter-chip[aria-haspopup] { background: var(--color-canvas); color: var(--color-ink); outline-color: var(--color-control-border); }
+:root .v6-filter-chip[aria-haspopup]:not([aria-pressed='true']) { background: var(--color-canvas); color: var(--color-ink); outline-color: var(--color-control-border); }
 :root .v6-filter-chip__chevron { width: var(--polish-icon-control); height: var(--polish-icon-control); flex: none; color: var(--color-ink-faint); order: 1; }
-:root .v6-filter-chip[aria-haspopup]:hover:not(:disabled) { background: var(--color-canvas-sunken); }
+:root .v6-filter-chip[aria-haspopup]:not([aria-pressed='true']):hover:not(:disabled) { background: var(--color-canvas-sunken); }
 
 /*
  * 奥行き（くっきり版）。押していない札は白い副ボタンと同じ薄いグラデと外周 1px の影、

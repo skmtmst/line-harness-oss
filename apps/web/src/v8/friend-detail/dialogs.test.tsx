@@ -55,7 +55,7 @@ const settle = async () => {
   for (let i = 0; i < 6; i += 1) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)) })
 }
 const button = (name: string) => [...document.querySelectorAll('button')].find((el) => el.textContent?.trim() === name) as HTMLButtonElement | undefined
-const chat = (friendId: string, status: string, revision: number) => ({ success: true, data: { id: `chat-${friendId}`, friendId, status, operatorId: null, revision } })
+const chat = (friendId: string, status: string, revision: number) => ({ success: true, data: { id: `chat-${friendId}`, friendId, status, operatorId: null, notes: '折り返し予定', revision } })
 
 beforeEach(() => {
   saved.mockReset()
@@ -83,6 +83,7 @@ describe('対応状況の窓は開いた友だちに固定する（WEB125）', (
     await act(async () => { button('開く')!.click() })
     await settle()
     expect(document.querySelector('[data-support-editor]')).not.toBeNull()
+    expect((document.querySelector('textarea[aria-label="メモ"]') as HTMLTextAreaElement).value).toBe('折り返し予定')
 
     await act(async () => root.render(<Support id="friend-b" />))
     await settle()
@@ -108,8 +109,22 @@ describe('対応状況の窓は開いた友だちに固定する（WEB125）', (
     await act(async () => { button('保存する')!.click() })
     await settle()
     expect(chatUpdate).toHaveBeenCalledTimes(1)
-    expect(chatUpdate).toHaveBeenCalledWith('friend-b', { status: 'on_hold', operatorId: null, revision: 9 })
+    expect(chatUpdate).toHaveBeenCalledWith('friend-b', { status: 'on_hold', operatorId: null, notes: '折り返し予定', revision: 9 })
   })
+})
+
+it('メモが空でも文字列で送り、保存できる（Worker の入口は notes を文字列だけ受ける）', async () => {
+  chatGet.mockImplementation(async (id: string) => ({ success: true, data: { id: `chat-${id}`, friendId: id, status: 'in_progress', operatorId: null, notes: null, revision: 2 } }))
+  await act(async () => root.render(<Support id="friend-a" />))
+  await act(async () => { button('開く')!.click() })
+  await settle()
+  expect((document.querySelector('textarea[aria-label="メモ"]') as HTMLTextAreaElement).value).toBe('')
+  await act(async () => { button('保存する')!.click() })
+  await settle()
+  expect(chatUpdate).toHaveBeenCalledTimes(1)
+  const body = chatUpdate.mock.calls[0][1] as { notes: unknown }
+  expect(body.notes).toBe('')
+  expect(saved).toHaveBeenCalledWith('対応状況とメモを更新しました')
 })
 
 describe('シナリオの窓も開いた友だちに固定する（WEB125）', () => {
@@ -156,7 +171,7 @@ it('WEB-125: 同じ人の競合では窓の入力を残して改訂値だけ読�
   await act(async () => { button('保存する')!.click() }); await settle()
   expect(document.querySelector('[data-support-editor]')).not.toBeNull()
   await act(async () => { button('保存する')!.click() }); await settle()
-  expect(chatUpdate).toHaveBeenLastCalledWith('friend-a', { status: 'on_hold', operatorId: null, revision: 4 })
+  expect(chatUpdate).toHaveBeenLastCalledWith('friend-a', { status: 'on_hold', operatorId: null, notes: '折り返し予定', revision: 4 })
 })
 
 it.each(['success', 'failure', 'throw'])('WEB-125: Aの保存の%sでBの窓・読込待ちを変えない', async (outcome) => {
@@ -183,7 +198,7 @@ it.each(['success', 'failure', 'throw'])('WEB-125: Aの保存の%sでBの窓・�
   await act(async () => resolveB(chat('friend-b', 'in_progress', 8))); await settle()
   expect(button('保存する')!.disabled).toBe(false)
   await act(async () => button('保存する')!.click()); await settle()
-  expect(chatUpdate).toHaveBeenLastCalledWith('friend-b', { status: 'in_progress', operatorId: null, revision: 8 })
+  expect(chatUpdate).toHaveBeenLastCalledWith('friend-b', { status: 'in_progress', operatorId: null, notes: '折り返し予定', revision: 8 })
 })
 
 it('WEB-125: シナリオの窓も同じIDのアカウント切り替えで捨てる', async () => {

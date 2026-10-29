@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,7 +21,7 @@ function deferred() {
   const promise = new Promise<GoogleProfileData>((ok, fail) => { resolve = ok; reject = fail })
   return { promise, resolve, reject }
 }
-beforeEach(() => { vi.clearAllMocks(); mocks.role = 'owner'; mocks.profile.mockResolvedValue(data) })
+beforeEach(() => { vi.clearAllMocks(); mocks.role = verifiedStaffRole('owner'); mocks.profile.mockResolvedValue(data) })
 afterEach(cleanup)
 
 describe('Googleプロフィールの再取得（実Googleへ送らず保留APIで確認）', () => {
@@ -70,11 +71,26 @@ describe('Googleプロフィールの再取得（実Googleへ送らず保留API�
     expect(screen.queryByRole('button', { name: 'もう一度取得' })).toBeNull()
   })
   it('閲覧のみでは店舗を変更する操作を出さない', async () => {
-    mocks.role = 'viewer'
+    mocks.role = verifiedStaffRole('viewer')
     render(<ProfileBoard accountId="busy-test" go={() => {}} />)
     await screen.findByText('試験用店舗')
     expect(screen.queryByRole('button', { name: 'プロフィールを編集する' })).toBeNull()
     expect(screen.queryByRole('button', { name: '営業時間を変える' })).toBeNull()
     expect(screen.getByText(/閲覧のみです/)).toBeTruthy()
   })
+  it('比較できないGoogle項目に管理画面へのリンクを表示する', async () => {
+    mocks.profile.mockResolvedValue({
+      ...data,
+      stale: false,
+      googleUpdates: { fields: [{ mask: 'unknownField', label: '営業時間の補足' }], updated: {} },
+    })
+    render(<ProfileBoard accountId="busy-test" go={() => {}} />)
+    await screen.findByText('試験用店舗')
+    fireEvent.click(screen.getByRole('button', { name: '差分を見る' }))
+    const link = await screen.findByRole('link', { name: 'Googleの管理画面へ' })
+    expect(link.getAttribute('href')).toBe('https://business.google.com/')
+    expect(screen.getByText('この項目はこの画面で比較できません。')).toBeTruthy()
+  })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

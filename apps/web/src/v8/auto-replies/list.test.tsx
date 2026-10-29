@@ -241,3 +241,51 @@ it('未分類の件数は一覧と同じ選択中の店舗だけを数える', a
     expect(host.querySelector('button[title="未分類"]')?.textContent).toBe('未分類0')
   } finally { restore() }
 })
+
+
+describe('読込骨格の表示時間と完了への切替', () => {
+  it.each(['ready', 'error'])('遅い応答から%sへ進むとき表示後400msを保つ', async (outcome) => {
+    vi.useFakeTimers()
+    let complete!: (value: unknown) => void
+    listReplies.mockImplementation(() => new Promise(resolve => { complete = resolve }))
+    const shownBones = () => [...host.querySelectorAll('[aria-busy="true"] [data-skeleton]')]
+      .filter(bone => !bone.closest('[data-skeleton-reserve]'))
+    try {
+      act(() => { root.render(<AutoRepliesListV8 />) })
+      await flush()
+      await act(async () => { await vi.advanceTimersByTimeAsync(299) })
+      expect(shownBones()).toHaveLength(0)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+      expect(shownBones().length).toBeGreaterThan(0)
+      expect(shownBones().every(bone => bone.tagName === 'SPAN' && bone.children.length === 0)).toBe(true)
+      await act(async () => { await vi.advanceTimersByTimeAsync(50) })
+      await act(async () => { complete(outcome === 'ready'
+        ? { success: true, data: [ruleA] }
+        : { success: false, error: '画面確認用の読込失敗' }) })
+      await flush()
+      expect(shownBones().length).toBeGreaterThan(0)
+      expect(host.querySelector('[data-row-id]')).toBeNull()
+      await act(async () => { await vi.advanceTimersByTimeAsync(349) })
+      expect(shownBones().length).toBeGreaterThan(0)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+      expect(shownBones()).toHaveLength(0)
+      if (outcome === 'ready') expect(host.querySelector('[data-row-id]')).toBeTruthy()
+      else expect(host.textContent).toContain('読み込めませんでした')
+    } finally { vi.useRealTimers() }
+  })
+
+  it('300ms以内の応答は骨格を見せず行へ切り替える', async () => {
+    vi.useFakeTimers()
+    let complete!: (value: unknown) => void
+    listReplies.mockImplementation(() => new Promise(resolve => { complete = resolve }))
+    try {
+      act(() => { root.render(<AutoRepliesListV8 />) }); await flush()
+      await act(async () => { await vi.advanceTimersByTimeAsync(250); complete({ success: true, data: [ruleA] }) })
+      await flush()
+      expect(host.querySelector('[data-row-id]')).toBeTruthy()
+      expect(host.querySelector('[aria-busy="true"] [data-skeleton]')).toBeNull()
+      await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+      expect(host.querySelector('[aria-busy="true"] [data-skeleton]')).toBeNull()
+    } finally { vi.useRealTimers() }
+  })
+})

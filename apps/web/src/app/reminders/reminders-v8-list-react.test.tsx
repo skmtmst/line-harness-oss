@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -135,8 +136,17 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   await eventually(() => {
     expect(host.querySelector('[data-design-node="apLqS"], [data-design-node="Iffil"]')).toBeTruthy()
   })
+  const folderColumn = host.querySelector('aside[data-template-region="folders"][data-shared-part="folder-column"]')
+  expect(folderColumn, '共通のフォルダ領域に接続されている').not.toBeNull()
+  expect(folderColumn?.closest('[data-list-folders]')?.getAttribute('data-list-folders')).toBe('true')
+  const folderPanel = folderColumn!.querySelector('aside[aria-label="フォルダ"]')
+  expect(folderPanel?.closest('[data-shared-part="folder-column"]')).toBe(folderColumn)
+  expect(folderPanel?.querySelector('button[data-folder-select][title="未分類"]')?.textContent).toBe('未分類0')
   // 見本が決めた帯と見出し
   expect(host.textContent).toContain('リマインダを作る')
+  const createLinks = [...host.querySelectorAll('a')].filter(link => link.textContent?.trim() === '＋ リマインダを作る')
+  expect(createLinks.length).toBeGreaterThan(0)
+  expect(createLinks.map(link => link.getAttribute('href'))).toEqual(createLinks.map(() => '/reminders/new'))
   expect(host.textContent).toContain('有効')
   expect(host.textContent).toContain('これから送る')
   expect(host.textContent).toContain('今月送った')
@@ -154,6 +164,17 @@ test('v8 の下では Pencil apLqS の新しい一覧に切り替わる', async 
   expect(host.querySelector('[data-list-name]')?.textContent).not.toContain('基準日の 3日前 09:00')
   expect(host.textContent).toContain('5通')
   expect(host.textContent).toContain('10/10')
+  const band = host.querySelector('[data-design="KPIs"]')!
+  const failureActions = Array.from(band.querySelectorAll('button')).filter(button => button.textContent === '失敗を見る')
+  expect(failureActions).toHaveLength(1)
+  expect(band.textContent).not.toContain('理由を見る')
+  const requestedStatuses: Array<string | null> = []
+  handler = url => {
+    if (url.pathname === '/api/reminders') requestedStatuses.push(url.searchParams.get('status'))
+    return base(url)
+  }
+  await act(async () => { failureActions[0].dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+  await eventually(() => expect(requestedStatuses).toContain('failed'))
 })
 
 test('v8 の一覧で失敗のある行は「失敗 N」の札を出す', async () => {
@@ -228,7 +249,7 @@ test('v8 の行の「登録者を管理」「配信予定を見る」「実行�
 })
 
 // 2026-10-06 オーナー決定：閲覧のみには押せないボタン・項目を置かずに隠す（帯は出す）。板 。
-test('v8 の閲覧のみ（a5C1p）は選ぶ枠と作る・一括・変更の操作を出さず、閲覧のみの帯を出す', async () => {
+test('v8 の閲覧のみ（a5C1p）は選択と作成を隠し、フォルダ追加は理由付きで拒否する', async () => {
   document.documentElement.dataset.theme = 'v8'
   handler = (url) => {
     if (url.pathname === '/api/staff/me') return response({ success: true, data: { role: 'viewer' } })
@@ -242,7 +263,7 @@ test('v8 の閲覧のみ（a5C1p）は選ぶ枠と作る・一括・変更の操
   })
   const actionTexts = [...host.querySelectorAll('button, a')].map((el) => el.textContent ?? '')
   expect(actionTexts.some((text) => text.includes('リマインダを作る'))).toBe(false)
-  expect(actionTexts.some((text) => text.includes('フォルダを追加'))).toBe(false)
+  await expectPermissionLocked([...host.querySelectorAll('button')].find(button => button.textContent?.includes('フォルダを追加')))
   const selections = [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
   expect(selections).toHaveLength(0)
   const trigger = [...host.querySelectorAll('button')]

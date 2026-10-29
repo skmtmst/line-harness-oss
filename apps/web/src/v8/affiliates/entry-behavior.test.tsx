@@ -1,4 +1,8 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * 成果とアフィリエイトの動きの試験を、今の入口（app/affiliates/page.tsx・new/page.tsx）から通す。
  *
@@ -19,12 +23,13 @@ vi.hoisted(() => {
   process.env.NEXT_PUBLIC_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://worker.test'
 })
 
-const fixture = vi.hoisted(() => ({ role: null as string | null }))
+const fixture = vi.hoisted(() => ({ role: null as string | null, searchParams: new URLSearchParams('') }))
 const create = vi.hoisted(() => vi.fn())
 const update = vi.hoisted(() => vi.fn())
 const getAffiliate = vi.hoisted(() => vi.fn())
 const friendsList = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
+const replace = vi.hoisted(() => vi.fn())
 const pageTitle = vi.hoisted(() => vi.fn())
 const approvalsList = vi.hoisted(() => vi.fn())
 
@@ -60,8 +65,8 @@ vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: { children: React.ReactNode; href: string }) => React.createElement('a', { href, ...rest }, children),
 }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push, replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(''),
+  useRouter: () => ({ push, replace, refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }),
+  useSearchParams: () => fixture.searchParams,
   usePathname: () => '/affiliates',
 }))
 vi.mock('@/contexts/account-context', () => ({
@@ -79,15 +84,22 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: pageTitle, useP
 vi.mock('@/lib/use-unsaved-guard', () => ({
   useUnsavedGuard: () => ({ leaveTarget: null, confirmLeave: () => {}, cancelLeave: () => {} }),
 }))
+vi.mock('@/v8/conversions', () => ({
+  ConversionListV8: ({ embedded }: { embedded?: boolean }) => React.createElement('div', { 'data-testid': embedded ? 'embedded-conversions' : 'standalone-conversions' }),
+}))
 
 // 今の入口そのものを通す（入口が別の画面を出すように変われば、この試験も追いかける）。
 import AffiliatesPage from '@/app/affiliates/page'
 import NewAffiliatePage from '@/app/affiliates/new/page'
+import LegacyConversionsPage from '@/app/conversions/page'
+import { AffiliateTabs } from './frame'
 import { ApiError } from '@/lib/api'
 
 beforeEach(() => {
-  fixture.role = null
+  fixture.role = verifiedStaffRole(null)
+  fixture.searchParams = new URLSearchParams('')
   push.mockReset()
+  replace.mockReset()
   pageTitle.mockClear()
   friendsList.mockReset().mockResolvedValue({ success: true, data: { items: [], total: 0 } })
   create.mockReset().mockResolvedValue({ success: false, error: 'このコードは既に使われています' })
@@ -104,25 +116,25 @@ describe('権限（今の入口 /affiliates）', () => {
   })
   it('権限を確かめる前と閲覧担当は変えられず、管理者と分かった後だけ作れる', async () => {
     const { rerender } = render(<AffiliatesPage />)
-    // 確かめる前：作るボタンを出さない（閲覧のみの帯で断る）
-    await waitFor(() => expect(document.body.textContent).toContain('閲覧のみで見ています'))
+    // 確かめる前：変更操作を隠し、未確認の本人へ拒否理由を決めつけない。
+    expect(document.querySelector('[data-read-only-notice]')).toBeNull()
     expect(screen.queryByRole('link', { name: /アフィリエイターを作る/ })).toBeNull()
 
-    fixture.role = 'staff'
+    fixture.role = verifiedStaffRole('staff')
     rerender(<AffiliatesPage />)
-    expect(document.body.textContent).toContain('閲覧のみで見ています')
+    expect(document.querySelector('[data-read-only-notice]')?.textContent).toBe(PERMISSION_LOCK_SUMMARY.feature)
     expect(screen.queryByRole('link', { name: /アフィリエイターを作る/ })).toBeNull()
 
-    fixture.role = 'owner'
+    fixture.role = verifiedStaffRole('owner')
     rerender(<AffiliatesPage />)
     await waitFor(() => expect(screen.getAllByRole('link', { name: /アフィリエイターを作る/ }).length).toBeGreaterThan(0))
-    expect(document.body.textContent).not.toContain('閲覧のみで見ています')
+    expect(document.querySelector('[data-read-only-notice]')).toBeNull()
   })
 })
 
 describe('承認待ちの読み込み（WEB003）', () => {
   it('タブの件数とアフィリエイターの一覧が同時に開いても、承認待ちの全件読みは1本にまとまる', async () => {
-    fixture.role = 'owner'
+    fixture.role = verifiedStaffRole('owner')
     render(<AffiliatesPage />)
     await waitFor(() => expect(approvalsList).toHaveBeenCalled())
     await new Promise((resolve) => setTimeout(resolve, 20))
@@ -131,16 +143,36 @@ describe('承認待ちの読み込み（WEB003）', () => {
   })
 })
 
+describe('成果地点タブの統合', () => {
+  it('成果とアフィリエイト内のタブで成果地点一覧を開く', () => {
+    fixture.searchParams = new URLSearchParams('tab=points')
+    render(<AffiliatesPage />)
+    expect(screen.getByTestId('embedded-conversions')).toBeTruthy()
+  })
+
+  it('コンバージョンのタブは統合後の一覧URLへつなぐ', () => {
+    render(<AffiliateTabs />)
+    expect(document.querySelector('a[href="/affiliates?tab=points"]')?.textContent).toContain('コンバージョン')
+  })
+
+  it('旧コンバージョン一覧URLを同じタブへ検索条件つきで移す', async () => {
+    fixture.searchParams = new URLSearchParams('q=月次&tab=points&folder=unfiled')
+    render(<LegacyConversionsPage />)
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/affiliates?q=%E6%9C%88%E6%AC%A1&tab=points&folder=unfiled'))
+  })
+})
+
 describe('アフィリエイターを作る（今の入口 /affiliates/new）', () => {
-  beforeEach(() => { fixture.role = 'owner' })
+  beforeEach(() => { fixture.role = verifiedStaffRole('owner') })
 
   it.each([null, 'staff', 'viewer'])('作る入口でも役割%sには保存と友だちの変更を出さない', role => {
-    fixture.role = role
+    fixture.role = verifiedStaffRole(role)
     render(<NewAffiliatePage />)
     expect(screen.queryByRole('button', { name: '保存して続けて作る' })).toBeNull()
     expect(screen.queryByRole('button', { name: /登録して紹介リンクを発行する/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'LINE の友だちと結びつける' })).toBeNull()
-    expect(document.body.textContent).toContain('閲覧のみで見ています')
+    if (role === null) expect(document.querySelector('[data-read-only-notice]')).toBeNull()
+    else expect(document.querySelector('[data-read-only-notice]')?.textContent).toBe(role === 'viewer' ? READ_ONLY_MESSAGE : PERMISSION_LOCK_SUMMARY.feature)
     expect(screen.queryByRole('textbox', { name: /名前（表示名）/ })).toBeNull()
     expect(screen.queryByRole('checkbox', { name: 'すぐに計測を始める' })).toBeNull()
     expect(screen.getByRole('link', { name: '一覧へ戻る' })).toBeTruthy()
@@ -242,7 +274,7 @@ describe('アフィリエイターを作る（今の入口 /affiliates/new）', 
     fillName('計測だけ')
     fillCode('measure2026')
     fireEvent.click(screen.getByRole('radio', { name: /報酬なし/ }))
-    fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
+    fireEvent.click(getPageAction({ name: '保存して続けて作る' }))
     await waitFor(() => expect(create).toHaveBeenCalledWith(expect.objectContaining({ rewardMode: 'none' })))
   })
 
@@ -253,7 +285,7 @@ describe('アフィリエイターを作る（今の入口 /affiliates/new）', 
     fillCode('petlife2026')
     const code = screen.getByRole('textbox', { name: /紹介コード（/ }) as HTMLInputElement
     code.scrollIntoView = scroll
-    fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
+    fireEvent.click(getPageAction({ name: '保存して続けて作る' }))
     await waitFor(() => expect(code.getAttribute('aria-invalid')).toBe('true'))
     await waitFor(() => expect(document.activeElement).toBe(code))
     expect(scroll).toHaveBeenCalledWith({ block: 'center' })
@@ -267,7 +299,7 @@ describe('アフィリエイターを作る（今の入口 /affiliates/new）', 
   it('未入力と不正な紹介コードは欄で知らせ、最初の誤りへ移り、登録を呼ばない', async () => {
     render(<NewAffiliatePage />)
     fillCode('bad!')
-    fireEvent.click(screen.getByRole('button', { name: '保存して続けて作る' }))
+    fireEvent.click(getPageAction({ name: '保存して続けて作る' }))
     const name = screen.getByLabelText(/名前（表示名）/)
     await waitFor(() => expect(document.activeElement).toBe(name))
     expect(name.getAttribute('aria-invalid')).toBe('true')
@@ -320,10 +352,12 @@ describe('アフィリエイターを作る（今の入口 /affiliates/new）', 
   it('足元の3つと報酬の決め方の文言（絵 Gqve5）', async () => {
     render(<NewAffiliatePage />)
     expect(screen.getByRole('link', { name: 'キャンセル' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '保存して続けて作る' })).toBeTruthy()
+    expect(getPageAction({ name: '保存して続けて作る' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /登録して紹介リンクを発行する/ })).toBeTruthy()
     expect(screen.getByText('報酬の決め方は、案件ごとの額より先にこの人の決まりが使われます')).toBeTruthy()
     expect(screen.getByText('注文金額の ◯% を報酬に')).toBeTruthy()
     expect(screen.getByText('金額は案件の「報酬額」で')).toBeTruthy()
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

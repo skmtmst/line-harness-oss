@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * ★V8 通知と視聴後のこと（）の描画。
@@ -71,8 +72,8 @@ function render(): HTMLElement {
   return host
 }
 
-describe('通知と視聴後のことのV8（E7iAYs）', () => {
   beforeEach(() => {
+    Object.values(apiMocks).forEach(mock => mock.mockReset())
     apiMocks.notifications.mockResolvedValue({
       data: { settings: SETTINGS, overview: { total: 423, sent: 412, failed: 3, skipped: 8 } },
     })
@@ -89,6 +90,7 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     vi.clearAllMocks()
   })
 
+describe('通知と視聴後のことのV8（E7iAYs）', () => {
   it('板IDと通知の段・実績・視聴後の段を描く', async () => {
     const host = render()
     await act(async () => undefined)
@@ -110,7 +112,7 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
       fireEvent.click(toggle!)
     })
     expect(apiMocks.saveNotifications).not.toHaveBeenCalled()
-    await act(async () => { [...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存')!.click() })
+    await act(async () => { ([...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!.click() })
     expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
     const input = apiMocks.saveNotifications.mock.calls[0][1] as { registrationEnabled: boolean }
     expect(input.registrationEnabled).toBe(false)
@@ -121,12 +123,12 @@ describe('通知と視聴後のことのV8（E7iAYs）', () => {
     await act(async () => undefined)
     const toggle = host.querySelector('[role="switch"][aria-label="申込のお礼"]') as HTMLInputElement
     await act(async () => { fireEvent.click(toggle) })
-    const save = [...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存')!
-    await act(async () => { save.click() })
+    const save = ([...host.querySelectorAll('button')].find((el) => el.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
+    await act(async () => { querySupplementaryPageAction('下書きを保存')!.click() })
     expect(host.textContent).toContain('入力を残しました')
     expect((toggle.getAttribute('aria-checked') === 'true')).toBe(false)
     expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
-    await act(async () => { save.click() })
+    await act(async () => { querySupplementaryPageAction('下書きを保存')!.click() })
     expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(2)
     expect(apiMocks.saveNotifications.mock.calls[1][1].registrationEnabled).toBe(false)
   })
@@ -138,10 +140,10 @@ it('送信済みの結果は後続GETの失敗で消さず、再試行はGETだ�
   apiMocks.editor.mockRejectedValueOnce(new Error('reload'))
   const host = render()
   await act(async () => undefined)
-  const trigger = [...host.querySelectorAll('button')].find(el => el.textContent?.trim() === 'テストを送る')!
+  const trigger = ([...host.querySelectorAll('button')].find(el => el.textContent?.trim() === 'テストを送る') ?? querySupplementaryPageAction('テストを送る'))!
   await act(async () => { trigger.click() })
   const dialog = document.querySelector('[role="dialog"]')!
-  const confirm = [...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === 'テストを送る')!
+  const confirm = ([...dialog.querySelectorAll('button')].find(el => el.textContent?.trim() === 'テストを送る') ?? querySupplementaryPageAction('テストを送る'))!
   await act(async () => { confirm.click(); confirm.click() })
   expect(apiMocks.testNotifications).toHaveBeenCalledTimes(1)
   expect(host.textContent).toContain('テスト送信しました。成功 2 件・失敗 0 件')
@@ -151,7 +153,7 @@ it('送信済みの結果は後続GETの失敗で消さず、再試行はGETだ�
     expect(button.disabled).toBe(true)
     expect(button.title).toContain('送信済みの結果を読み直してください')
   }
-  const retry = [...host.querySelectorAll('button')].find(el => el.textContent?.trim() === '送信結果を読み直す')!
+  const retry = ([...host.querySelectorAll('button')].find(el => el.textContent?.trim() === '送信結果を読み直す') ?? querySupplementaryPageAction('送信結果を読み直す'))!
   await act(async () => { retry.click() })
   expect(apiMocks.editor).toHaveBeenCalledTimes(2)
   expect(apiMocks.testNotifications).toHaveBeenCalledTimes(1)
@@ -165,12 +167,12 @@ it('通知保存後に版の読込が失敗しても、再開時は保存を繰�
   await act(async () => undefined)
   await act(async () => { fireEvent.click(host.querySelector('[role="switch"][aria-label="申込のお礼"]')!) })
   await act(async () => { fireEvent.change(host.querySelector('input[aria-label="視聴完了メッセージ本文"]')!, { target: { value: '再開後も残す本文' } }) })
-  const save = [...host.querySelectorAll('button')].find(el => el.textContent === '下書きを保存')!
-  await act(async () => { save.click() })
+  const save = ([...host.querySelectorAll('button')].find(el => el.textContent === '下書きを保存') ?? querySupplementaryPageAction('下書きを保存'))!
+  await act(async () => { querySupplementaryPageAction('下書きを保存')!.click() })
   expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
   expect(host.textContent).toContain('入力を残しました')
   expect(apiMocks.saveEditor).not.toHaveBeenCalled()
-  await act(async () => { save.click() })
+  await act(async () => { querySupplementaryPageAction('下書きを保存')!.click() })
   expect(apiMocks.saveNotifications).toHaveBeenCalledTimes(1)
   expect(apiMocks.editor).toHaveBeenCalledTimes(2)
   expect(apiMocks.saveEditor).toHaveBeenCalledExactlyOnceWith('webinar-1', { expectedVersion: 9, actionTemplateBody: '再開後も残す本文', missingResultPolicy: 'escalate' })

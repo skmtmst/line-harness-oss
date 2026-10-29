@@ -183,7 +183,7 @@ export function AppearanceTab(props: Props) {
             <RadioCard name="form-design-mode" value="account" checked={mode === 'account'} onChange={() => onChangeOptions({customerDesign:{mode:'account',preset:'line'}})} icon={<Store size={props.portable ? 16 : 14} />} title={props.portable?'配った先の店のデザインに合わせる（おすすめ）':'店の設定に合わせる'} note={props.portable?'店ごとに決めたデザインで出ます':`今：${accountLabel}`} />
             <RadioCard name="form-design-mode" value="fixed" checked={mode === 'fixed'} onChange={() => onChangeOptions({customerDesign:{mode:'fixed',preset:options.theme?'custom':'line'}})} icon={<Palette size={props.portable ? 16 : 14} />} title={props.portable?'色を決めて配る（型かカスタム）':'このフォームだけ変える'} note={props.portable?'どの店でも同じ色で出ます':'型かカスタムを選ぶ'} />
           </RadioCardGroup>
-          {!props.portable ? <span><TextLink external href="/settings/customer-look">店のデザインを変える</TextLink></span> : mode === 'fixed' ? <Notice tone="info" compact>このフォームは色を固定して配ります。配った先の店のデザインは使いません。</Notice> : null}
+          {!props.portable ? <span><TextLink external href="/settings/customer-look">店のデザイン設定へ</TextLink></span> : mode === 'fixed' ? <Notice tone="info" compact>このフォームは色を固定して配ります。配った先の店のデザインは使いません。</Notice> : null}
           {props.accountLookError && !props.portable ? <FieldError id="account-look-error">{props.accountLookError}</FieldError> : null}
           {mode === 'fixed' ? <><p className={styles.fieldLabelPlain}>デザインの型</p><CustomerDesignPicker value={preset} onChange={next => onChangeOptions({customerDesign:{mode:'fixed',preset:next}})} /></> : null}
           {mode === 'fixed' && preset === 'custom' ? <>

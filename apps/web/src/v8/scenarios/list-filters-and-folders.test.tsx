@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 /*
  * シナリオ一覧（V8）の絞り込み・フォルダ・まとめての操作を、描いて押して確かめる。
  * - 「今月作った」は日本時間の月初を、「停止中のみ」「有効のみ」は1つの値にまとめて、一覧の口へ渡す
@@ -134,13 +135,13 @@ describe('状態で絞り込む', () => {
 })
 
 describe('左のフォルダの列', () => {
-  it('変えられる人には「フォルダを追加」を出し、閲覧のみには出さない', async () => {
+  it('フォルダ追加を両方に出し、閲覧のみには理由付きで拒否する', async () => {
     await renderList()
     expect(screen.getAllByRole('button', { name: /フォルダを追加/ }).length).toBeGreaterThan(0)
     cleanup()
     state.role = 'staff'
     await renderList()
-    expect(screen.queryByRole('button', { name: /フォルダを追加/ })).toBeNull()
+    await expectPermissionLocked(screen.getByRole('button', { name: /フォルダを追加/ }))
   })
 })
 

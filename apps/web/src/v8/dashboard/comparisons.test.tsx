@@ -71,13 +71,13 @@ describe('比べる値', () => {
 
 describe('いつ時点か', () => {
   it('時刻は口の集計時刻を日本時間で出す', () => {
-    expect(asOfLine({ generatedAt: '2026-10-25T08:51:00Z', asOf: '2026-10-25T08:40:00Z', freshness: 'fresh' }, true)).toBe('10/25 17:51 時点・先週の同じ曜日と比べています')
-    expect(asOfLine({ generatedAt: '2026-10-25T08:51:00Z', freshness: 'fresh' }, false)).toBe('10/25 17:51 時点')
+    expect(asOfLine({ generatedAt: '2026-10-25T08:51:00Z', asOf: '2026-10-25T08:40:00Z', freshness: 'fresh' }, true)).toBe('10月25日 17:51 時点・先週の同じ曜日と比べています')
+    expect(asOfLine({ generatedAt: '2026-10-25T08:51:00Z', freshness: 'fresh' }, false)).toBe('10月25日 17:51 時点')
   })
 
   it('数のもとが古い時は一番古い時刻（D1 の形は日本時間）と「更新が遅れています」', () => {
-    expect(asOfLine({ generatedAt: '2026-10-25T08:51:00Z', asOf: '2026-10-25 16:05:00', freshness: 'stale' }, true)).toBe('10/25 16:05 時点（更新が遅れています）・先週の同じ曜日と比べています')
-    expect(asOfLine({ generatedAt: '2026-10-25T08:51:00Z', asOf: null, freshness: 'stale' }, false)).toBe('10/25 17:51 時点（更新が遅れています）')
+    expect(asOfLine({ generatedAt: '2026-10-25T08:51:00Z', asOf: '2026-10-25 16:05:00', freshness: 'stale' }, true)).toBe('10月25日 16:05 時点（更新が遅れています）・先週の同じ曜日と比べています')
+    expect(asOfLine({ generatedAt: '2026-10-25T08:51:00Z', asOf: null, freshness: 'stale' }, false)).toBe('10月25日 17:51 時点（更新が遅れています）')
   })
 
   it('概要が無い・時刻が読めない時は行を出さない', () => {

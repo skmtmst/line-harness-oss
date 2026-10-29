@@ -1,10 +1,15 @@
-import type { CSSProperties, ReactNode, Ref } from 'react'
+import type { ComponentProps, CSSProperties, ReactNode, Ref } from 'react'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { PageHelp } from '@/components/shared/page-explanation'
 import ScreenExplanation from '@/components/shared/screen-explanation'
 import styles from './page-templates.module.css'
+import PageHeadingActions from './page-heading-actions'
 export { PageFooter } from './page-footer'
 
 export interface PageHeadingProps {
+  readOnlyBand?: boolean | 'hq'
+  /** 上の権限帯と押せない操作で同じ理由を使う。 */
+  readOnlyNeed?: ComponentProps<typeof ReadOnlyNotice>['need']
   title: ReactNode
   subtitle?:ReactNode
   /** 認証画面では h1。管理画面内では外側の h1 に続く h2。 */
@@ -31,6 +36,8 @@ export interface PageHeadingProps {
   subtitleSize?: 'body'
   /** 一覧・詳細の頭と本文の間を詰める口。指定しない画面には効かない。 */
   bottomSpacing?: 'compact'
+  /** 下のタブが区切り線を持つときだけ、見出しの線を外す。 */
+  separator?: 'none'
   /** ：画面全体の説明。題の横から開閉し、人ごと・画面ごとに覚える。 */
   help?: ReactNode
   /** 詳細の顔など、題の前に置く識別の印。 */
@@ -70,7 +77,7 @@ export function PageTitle({ children, as: Tag = 'h1', className }: {
 }
 
 /** 板の頭の寸法は型が持つ。操作・意味の説明は画面から渡す。 */
-export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', titleId, titleTabIndex, help, explanation, explanationKey, leading, titleAccessory, explanationToggle, actions, crumbs, steps, tabs, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, inset, stepsSpacing }: PageHeadingProps) {
+export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', titleId, titleTabIndex, help, explanation, explanationKey, leading, titleAccessory, explanationToggle, actions, crumbs, steps, tabs, readOnlyBand, readOnlyNeed, headingSize, padTop, textGap, titleSize, subtitleSize, bottomSpacing, separator, inset, stepsSpacing }: PageHeadingProps) {
   /* 戻る（identity）は描かない。戻るのは上の帯のパンくずと下の帯の［キャンセル］だけ（オーナー 2026-10-08）。 */
   /*
    * 絵の値を渡された分だけ、この頭の中だけに効く変数で下へ流す。`.heading`・`.title` は
@@ -84,24 +91,25 @@ export function PageHeading({ title, subtitle, titleAs: HeadingTag = 'h1', title
         ...(textGap === undefined ? null : { '--tpl-head-gap': `${textGap}px` }),
         ...(titleSize === 'sub' ? { '--tpl-title-size': '18px', '--tpl-title-lh': '27px' } : null),
       } as CSSProperties)
-  return <header className={styles.heading} style={headStyle} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-subtitle-size={subtitleSize} data-bottom-spacing={bottomSpacing} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
+  return <header className={styles.heading} style={headStyle} data-template-region="heading" data-heading-inset={inset} data-heading-size={headingSize} data-subtitle-size={subtitleSize} data-bottom-spacing={bottomSpacing} data-heading-separator={separator} data-has-steps={!!steps || undefined} data-steps-spacing={stepsSpacing} data-has-crumbs={!!crumbs || undefined}>
     {leading}
     <div className={styles.headingText}>
       <ScreenExplanation titleClassName={styles.titleRow} screenKey={explanationKey} title={<><HeadingTag id={titleId} tabIndex={titleTabIndex} className={styles.title} title={typeof title === 'string' ? title : undefined}>{title}</HeadingTag>{titleAccessory}<PageHelp label={typeof title === 'string' ? `${title}の説明` : '画面の説明'} help={help} toggle={explanationToggle} explanation={explanation} /></>} />
       {subtitle?<p className={styles.subtitle}>{subtitle}</p>:null}
+      {readOnlyBand ? <div className={styles.headingNotice} data-template-region="notice"><ReadOnlyNotice scope={readOnlyBand === 'hq' ? 'hq' : 'store'} need={readOnlyNeed} /></div> : null}
       {tabs ? <div className={styles.headingTabs} data-template-region="heading-tabs">{tabs}</div> : null}
     </div>
     {crumbs ? <div className={styles.crumbs} data-template-region="crumbs">{crumbs}</div> : null}
     {steps ? <div className={styles.steps} data-template-region="steps">{steps}</div> : null}
-    {actions ? <div className={styles.actions}>{actions}</div> : null}
+    {actions ? <div className={styles.actions}><PageHeadingActions>{actions}</PageHeadingActions></div> : null}
   </header>
 }
 
-export function PageFrame({ kind, children, boardId, layout, heightMode, standalone = false, hasFooter = false, skeleton = false, elementRef }: {
-  kind: string; children: ReactNode; boardId?: string; layout?: string; heightMode?: 'viewport' | 'content'; standalone?: boolean; hasFooter?: boolean; skeleton?: boolean; elementRef?: Ref<HTMLDivElement>
+export function PageFrame({ kind, children, boardId, layout, heightMode, standalone = false, hasFooter = false, skeleton = false, elementRef, createPlacement }: {
+  kind: string; children: ReactNode; boardId?: string; layout?: string; heightMode?: 'viewport' | 'content'; standalone?: boolean; hasFooter?: boolean; skeleton?: boolean; elementRef?: Ref<HTMLDivElement>; createPlacement?: 'heading'
 }) {
   const resolvedHeight = heightMode ?? (kind === 'list' && !standalone ? 'content' : undefined)
-  return <div ref={elementRef} className={styles.frame} data-frame-height={resolvedHeight} data-height-mode={resolvedHeight} data-list-skeleton={skeleton || kind === 'list' ? 'templates' : undefined} data-page-template={kind} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
+  return <div ref={elementRef} className={styles.frame} data-frame-height={resolvedHeight} data-height-mode={resolvedHeight} data-list-skeleton={skeleton || kind === 'list' ? 'templates' : undefined} data-page-template={kind} data-list-create-placement={createPlacement} data-template-layout={layout} data-design-node={boardId} data-standalone={standalone || undefined} data-has-footer={hasFooter || undefined}>{children}</div>
 }
 
 /** 内容で終わる板の本文。下の24はPageFrameが持ち、本文と二重にしない。 */

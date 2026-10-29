@@ -37,6 +37,7 @@ const scenario = (id: string, name: string, folderId: string | null, isActive = 
 })
 
 const state = vi.hoisted(() => ({
+  role: 'owner' as 'owner' | 'viewer' | null,
   account: 'account-a' as string | null,
   /** 絞り込み無しの全体件数（全アカウント共通のシナリオを含む）。 */
   overall: 7,
@@ -48,6 +49,13 @@ const folderList = vi.hoisted(() => vi.fn())
 const statsGet = vi.hoisted(() => vi.fn())
 const update = vi.hoisted(() => vi.fn())
 const create = vi.hoisted(() => vi.fn())
+const remove = vi.hoisted(() => vi.fn())
+const duplicate = vi.hoisted(() => vi.fn())
+
+vi.mock('@/components/scenarios/duplicate-scenario', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@/components/scenarios/duplicate-scenario')>(),
+  duplicateScenario: duplicate,
+}))
 
 /* 取り消しの5秒を待たずに送る。失敗したら画面を戻し、画面が渡した文で知らせる（本物と同じ順）。 */
 vi.mock('@/lib/undoable', async (importOriginal: () => Promise<typeof import('@/lib/undoable')>) => {
@@ -88,7 +96,7 @@ vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => undefined
 
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
-  return { ...actual, useStaffRole: () => 'owner', useStaffIdentity: () => ({ id: 'staff-one' }) }
+  return { ...actual, useStaffRole: () => state.role, useStaffIdentity: () => ({ id: 'staff-one' }) }
 })
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -98,7 +106,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...api,
-      scenarios: { ...api.scenarios, listPage, update, create, reorder: vi.fn(async () => ({ success: true })) },
+      scenarios: { ...api.scenarios, listPage, update, create, delete: remove, moveReferrers: vi.fn(async () => ({ success: true, data: { items: [] } })), reorder: vi.fn(async () => ({ success: true })) },
       folders: { ...api.folders, list: folderList },
       listStats: { get: statsGet },
     },
@@ -136,6 +144,7 @@ beforeEach(() => {
   // 絞り込みは URL に残るので、前の試験の絞り込みを持ち越さない。
   window.history.replaceState(null, '', '/scenarios')
   state.account = 'account-a'
+  state.role = 'owner'
   state.overall = 7
   state.stats = { scenarios: { total: 5, active: 4, subscribers: 30, completed: 10, sentThisWeek: 12 } }
   listPage.mockImplementation(async (input: { limit?: number; folderId?: string }) => ({
@@ -151,6 +160,7 @@ beforeEach(() => {
   }))
   statsGet.mockImplementation(async () => ({ success: true, data: state.stats }))
   update.mockResolvedValue({ success: true, data: {} })
+  duplicate.mockResolvedValue('duplicate-result')
 })
 
 afterEach(() => {
@@ -164,6 +174,7 @@ describe('読了率の母数', () => {
     await mount()
     await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('登録した 40 人の 25%'))
     expect(kpi('配信中').textContent?.replace(/\n/g, '')).toContain('いま途中にいる人（重複を含む）')
+    expect(screen.getAllByTitle('配信中 10 人・最後まで配信 2 人')).toHaveLength(2)
   })
 
   test('登録した人が0なら0%と言わず「—」にする', async () => {
@@ -309,5 +320,82 @@ describe('操作の失敗', () => {
     expect(document.body.textContent).not.toContain('Internal Server Error')
     const row = screen.getByText('新規登録7日間フォロー').closest('tr') as HTMLElement
     await waitFor(() => expect(row.querySelector('[data-folder-dot]')?.getAttribute('aria-label')).toBe('フォルダ：初回案内'))
+  })
+})
+
+
+describe('右詳細の情報と操作', () => {
+  async function panel() {
+    window.history.replaceState(null, '', '/scenarios?scenario=s-filed')
+    render(<><ScenariosListV8 /><ToastHost /></>)
+    return screen.findByRole('dialog', { name: '新規登録7日間フォロー', exact: true })
+  }
+
+  test('人数は配信の状態として示し、複製と削除はメニューへ置く', async () => {
+    const detail = await panel()
+    const scoped = within(detail)
+    expect(scoped.getByRole('region', { name: '配信状況' }).textContent).toContain('配信中 10 人・最後まで配信 2 人')
+    expect(detail.textContent).not.toContain('既読人数ではありません。')
+    fireEvent.click(scoped.getByRole('button', { name: '配信状況の説明', exact: true }))
+    expect((await scoped.findByRole('note')).textContent).toContain('既読人数ではありません。')
+    fireEvent.click(scoped.getByRole('button', { name: '配信状況の説明', exact: true }))
+    expect(scoped.getByRole('heading', { name: '名前を変更' })).toBeTruthy()
+    expect(scoped.getByRole('button', { name: 'シナリオ名を変更する' })).toBeTruthy()
+    fireEvent.click(scoped.getByRole('button', { name: '「新規登録7日間フォロー」のその他操作' }))
+    expect(screen.getByRole('menuitem', { name: '複製する', exact: true })).toBeTruthy()
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: '複製する', exact: true }), { key: 'Escape' })
+    expect(scoped.getByRole('button', { name: '開く', exact: true })).toBeTruthy()
+    fireEvent.click(scoped.getByRole('button', { name: '配信結果', exact: true }))
+    expect(push).toHaveBeenCalledTimes(1)
+    const target = new URL(push.mock.calls[0][0] as string, 'http://admin.test')
+    expect(target.pathname).toBe('/scenarios/results')
+    expect(target.searchParams.get('id')).toBe('s-filed')
+    expect(target.searchParams.get('returnTo')).toBe('/scenarios?scenario=s-filed')
+    expect(update).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  test('未取得の人数や方式を0人や前の配信からの間隔へ推測しない', async () => {
+    listPage.mockResolvedValue({ success: true, data: { items: [{ ...rows[0], deliveryMode: undefined, stepCount: undefined, subscriberCount: undefined, completedCount: undefined }], total: 1, limit: 20, sort: [] } })
+    const detail = await panel()
+    expect(detail.textContent).toContain('配信方法は未確認・通数は未確認')
+    const facts = within(detail).getByRole('region', { name: '配信状況' })
+    expect(facts.textContent).toContain('配信中 — 人・最後まで配信 — 人')
+    expect(facts.textContent).not.toContain('0 人')
+  })
+
+  test('メニューからの削除は同じ確認窓を経て、取消では削除しない', async () => {
+    const detail = await panel()
+    fireEvent.click(within(detail).getByRole('button', { name: '「新規登録7日間フォロー」のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する', exact: true }))
+    const confirmation = await screen.findByRole('alertdialog', { name: '「新規登録7日間フォロー」を削除しますか？', exact: true })
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'キャンセル', exact: true }))
+    expect(remove).not.toHaveBeenCalled()
+  })
+
+  test('名前の編集失敗でも入力を残し、同じ値で再試行する', async () => {
+    update.mockResolvedValueOnce({ success: false, error: 'offline' }).mockResolvedValueOnce({ success: true, data: {} })
+    const detail = await panel()
+    fireEvent.click(within(detail).getByRole('button', { name: 'シナリオ名を変更する' }))
+    const input = within(detail).getByRole('textbox', { name: 'シナリオ名', exact: true }) as HTMLInputElement
+    fireEvent.change(input, { target: { value: '変更した名前' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(await within(detail).findByRole('alert')).toBeTruthy()
+    expect(input.value).toBe('変更した名前')
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(2))
+    expect(update).toHaveBeenNthCalledWith(1, 's-filed', { name: '変更した名前' })
+    expect(update).toHaveBeenNthCalledWith(2, 's-filed', { name: '変更した名前' })
+  })
+
+  test.each(['viewer', null] as const)('役割%sでは既存の編集操作を起動しない', async (role) => {
+    state.role = role
+    const detail = await panel()
+    expect(within(detail).queryByRole('button', { name: 'シナリオ名を変更する' })).toBeNull()
+    expect(within(detail).queryByRole('button', { name: /その他操作/ })).toBeNull()
+    expect(within(detail).getByRole('button', { name: '開く', exact: true })).toBeTruthy()
+    expect(update).not.toHaveBeenCalled()
+    expect(remove).not.toHaveBeenCalled()
+    expect(duplicate).not.toHaveBeenCalled()
   })
 })

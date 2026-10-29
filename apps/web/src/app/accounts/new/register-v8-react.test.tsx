@@ -9,6 +9,7 @@ const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), list: vi.fn(), registrationReceipt: vi.fn(),
   followerImportState: vi.fn(), stepFollowerImport: vi.fn(), followerInsight: vi.fn(),
   staffList: vi.fn(), tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(), friendsList: vi.fn(),
+  styleGet: vi.fn(), styleSave: vi.fn(),
 }))
 vi.mock('@/lib/api', () => ({
   api: {
@@ -26,7 +27,7 @@ vi.mock('@/lib/api', () => ({
     lineAccountTags: { list: calls.tagList, create: calls.tagCreate, setForAccount: calls.tagSet },
   },
 }))
-vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn(async () => ({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })), save: vi.fn(async () => ({ success: true, data: { version: 1 } })) } }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: calls.styleGet, save: calls.styleSave } }))
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('@/components/step-up-prompt', () => ({
@@ -79,10 +80,20 @@ beforeEach(() => {
   calls.tagList.mockResolvedValue({ success: true, data: [] })
   calls.followerInsight.mockResolvedValue({ success: true, data: { followers: null } })
   calls.friendsList.mockResolvedValue({ success: true, data: { total: 0 } })
+  calls.styleGet.mockResolvedValue({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })
+  calls.styleSave.mockResolvedValue({ success: true, data: { version: 1 } })
 })
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
 const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }))
+const chooseStyle = async (label: string) => {
+  const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  fireEvent.click(within(dialog).getByRole('button', { name: label }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'このスタイルにする' }))
+  const save = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
+  await waitFor(() => expect(save.disabled).toBe(false))
+  fireEvent.click(save)
+}
 /** ②の中だけ進むボタンの名前が違う（v07 Fqy29）。 */
 const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
 const back = (name: string) => fireEvent.click(screen.getByRole('button', { name }))
@@ -96,16 +107,13 @@ const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name 
  */
 function clearPrecheck() {
   pick('はい、あります')
-  next()
   pick('いいえ、引き継ぎません')
-  next()
   pick('使っていません')
-  next()
   next()
 }
 
 /**
- * v07（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
+ * ①→②-1 Messaging API→②-2 プロバイダーID→②-3 Webhook→②-4 LINEログイン→③Step1。
  * 入力を変えると確認がやり直しになるので先に全部入れる。
  */
 function enterCheckStep() {
@@ -113,6 +121,8 @@ function enterCheckStep() {
   clearPrecheck()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
+  nextStep()
+  fill('v8-provider-id', '2005648758')
   nextStep()
   ack('Webhook URL を貼り付けて「更新」を押した')
   ack('Webhookの利用をONにした')
@@ -165,9 +175,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     next()
     await waitFor(() => expect(shownNode()).toBe('X0pGdw'))
     expect(calls.registrationReceipt.mock.calls.length).toBeGreaterThanOrEqual(2)
-    fireEvent.click(await screen.findByRole('radio', { name: /飲食店/ }))
-    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
-    next()
+    await chooseStyle('飲食店')
     await waitFor(() => expect(shownNode()).toBe('Plmq1'))
     expect(await screen.findByText('準備ができました')).toBeTruthy()
   })
@@ -187,12 +195,31 @@ describe('V8 登録ウィザードの gated 進行', () => {
     await waitFor(() => expect(current()).toContain('使い方を選ぶ'))
   })
 
+  it('④のポップアップを閉じても、登録画面の「あとで設定する」で保留を保存して⑤へ進める', async () => {
+    enterCheckStep()
+    await runCheck()
+    fireEvent.click(screen.getByRole('button', { name: '登録する' }))
+    await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
+    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
+    next()
+    const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull())
+    const skip = screen.getByRole('button', { name: 'あとで設定する' }) as HTMLButtonElement
+    await waitFor(() => expect(skip.disabled).toBe(false))
+    fireEvent.click(skip)
+    expect(await screen.findByText('準備ができました')).toBeTruthy()
+    expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, styleMode: 'later' })
+    expect(sessionStorage.getItem('musubo-registration-style')).toBeNull()
+  })
+
   it('登録までは済んだ段を押して戻れ、入れた値は残る。登録したら戻れない', async () => {
     enterCheckStep()
     const nav = () => screen.getByRole('navigation', { name: '登録の進捗' })
     fireEvent.click(within(nav()).getByRole('button', { name: 'アカウント接続に戻る' }))
     expect(nav().querySelector('[aria-current="step"]')?.textContent).toContain('アカウント接続')
     expect((document.getElementById('v8-channel-id') as HTMLInputElement).value).toBe('123456789')
+    nextStep()
     nextStep()
     nextStep()
     nextStep()
@@ -236,25 +263,29 @@ describe('V8 登録ウィザードの gated 進行', () => {
 
   /*
     手順の順番は絵の正本がすべて（利用者指示 2026-10-17）。
-    `Fqy29` の `②-1 Step1 Messaging API`／`②-2 Step2 Webhook の設定`／`②-3 Step3 LINEログインの2項目`、
-    戻るの行き先の名前（事前確認へ戻る→Messaging API へ戻る→Webhook の設定へ戻る）、
+    `②-1 Step1 Messaging API`／`②-2 Step2 プロバイダーID`／`②-3 Step3 Webhook の設定`／`②-4 Step4 LINEログインの2項目`、
+    戻るの行き先の名前（事前確認へ戻る→Messaging API へ戻る→プロバイダーIDへ戻る→Webhook の設定へ戻る）、
     `Lwxyh` Step1 の「LINEログインへ戻る」を、実際のボタン操作でたどって確かめる。
   */
   /** 出ている段は、描かれた札（Card の aria-label）で見る。 */
-  const PANELS = ['Messaging API の情報を入れる', 'Webhook（受信のつなぎ）を設定する', 'LINEログインの情報を入れる'] as const
+  const PANELS = ['Messaging API の情報を入れる', 'プロバイダーIDを確認する', 'Webhook（受信のつなぎ）を設定する', 'LINEログインの情報を入れる'] as const
   const shownPanel = () => PANELS.find((label) => document.querySelector(`[aria-label="${label}"]`))
-  const stepBadgeText = () => screen.getByText(/^Step \d \/ 3$/).textContent
+  const stepBadgeText = () => screen.getByText(/^Step \d \/ 4$/).textContent
 
-  it('②は絵の正本どおり Messaging API→Webhook→LINEログイン の順に進む', () => {
+  it('②は承認済みの絵どおり Messaging API→プロバイダーID→Webhook→LINEログイン の順に進む', () => {
     render(<RegisterV8 />)
     clearPrecheck()
-    expect(stepBadgeText()).toBe('Step 1 / 3')
+    expect(stepBadgeText()).toBe('Step 1 / 4')
     expect(shownPanel()).toBe('Messaging API の情報を入れる')
 
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
     nextStep()
-    expect(stepBadgeText()).toBe('Step 2 / 3')
+    expect(stepBadgeText()).toBe('Step 2 / 4')
+    expect(shownPanel()).toBe('プロバイダーIDを確認する')
+    fill('v8-provider-id', '2005648758')
+    nextStep()
+    expect(stepBadgeText()).toBe('Step 3 / 4')
     expect(shownPanel()).toBe('Webhook（受信のつなぎ）を設定する')
     expect(document.getElementById('v8-login-channel-id')).toBeNull()
 
@@ -263,7 +294,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     ack('Webhookの再送をONにした')
     ack('エラーの統計情報をONにした')
     nextStep()
-    expect(stepBadgeText()).toBe('Step 3 / 3')
+    expect(stepBadgeText()).toBe('Step 4 / 4')
     expect(shownPanel()).toBe('LINEログインの情報を入れる')
   })
 
@@ -272,6 +303,8 @@ describe('V8 登録ウィザードの gated 進行', () => {
     clearPrecheck()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
+    nextStep()
+    fill('v8-provider-id', '2005648758')
     nextStep()
     const button = () => screen.getByRole('button', { name: '次のステップへ' }) as HTMLButtonElement
     expect(button().disabled).toBe(true)
@@ -291,6 +324,8 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(shownPanel()).toBe('LINEログインの情報を入れる')
     back('Webhook の設定へ戻る')
     expect(shownPanel()).toBe('Webhook（受信のつなぎ）を設定する')
+    back('プロバイダーIDへ戻る')
+    expect(shownPanel()).toBe('プロバイダーIDを確認する')
     back('Messaging API へ戻る')
     expect(shownPanel()).toBe('Messaging API の情報を入れる')
     back('事前確認へ戻る')
@@ -325,9 +360,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
     await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
     next()
-    fireEvent.click(await screen.findByRole('radio', { name: /飲食店/ }))
-    await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
-    next()
+    await chooseStyle('飲食店')
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledWith('new-account'))
     expect(calls.followerImportState).not.toHaveBeenCalled()
     expect(await screen.findByText('準備ができました')).toBeTruthy()

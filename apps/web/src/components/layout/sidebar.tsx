@@ -8,6 +8,7 @@ import { readStaffIdentity } from '@/lib/staff-identity-state'
 
 import { SidebarAccountMenu } from '@/components/hq/account-menu'
 import Notice from '@/components/shared/notice'
+import { ShellStaleStyleNotice } from '@/components/shared/stale-style-notice'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -376,6 +377,7 @@ export default function Sidebar({
         const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
         if (!featureKey) return true
         if (!currentVisibility || currentVisibility[featureKey] !== true) return false
+        if (section.id === 'specialized' && featureKey === 'ec_commerce' && currentVisibility.specialized_ec_commerce !== true) return false
         if (SPECIALIZED_FEATURE_KEYS.includes(featureKey) && !specializedFeatureKeys.includes(featureKey)) return false
         return true
       }).map(item => isHq ? item : { ...item, label: styleMenuLabel(item, accountStyle.data?.style ?? null) }),
@@ -750,6 +752,8 @@ export default function Sidebar({
             {accountStyle.error ? '使い方のスタイルを読み込めませんでした。' : '機能設定を読み込めませんでした。'}
           </Notice>
         )}
+        {/* 前に読めたスタイルで出している時の 1 行。本文が同じ 1 行を出す画面（ホーム・予約台帳など）では出さない。 */}
+        {accountStyle.stale && selectedAccountId ? <ShellStaleStyleNotice className="mx-3 mb-2" onRetry={accountStyle.reload} /> : null}
         {/* B-261: 設定の入口は下の歯車。定義と現在地の判定は残す。 */}
         {visibleSections.filter((section) => isHq || section.id !== 'settings').map((section) => {
           /*
@@ -874,6 +878,8 @@ export default function Sidebar({
             title={collapsed ? undefined : "設定"}
             aria-label={collapsed ? "設定" : undefined}
             data-rail-label="設定"
+            aria-current={settingsActive ? 'page' : undefined}
+            data-nav-active={settingsActive ? '' : undefined}
             className={`${styles.item} ${settingsActive ? styles.active : ''}`}
           >
             <span className="shrink-0"><V8_SETTINGS_ICON className={styles.v8NavIcon} aria-hidden="true" /></span>
@@ -894,6 +900,8 @@ export default function Sidebar({
             title={collapsed ? undefined : "統括の設定"}
             aria-label={collapsed ? "統括の設定" : undefined}
             data-rail-label="統括の設定"
+            aria-current={hqSettingsActive ? 'page' : undefined}
+            data-nav-active={hqSettingsActive ? '' : undefined}
             className={`${styles.item} ${hqSettingsActive ? styles.active : ''}`}
           >
             <span className="shrink-0"><V8_SETTINGS_ICON className={styles.v8NavIcon} aria-hidden="true" /></span>

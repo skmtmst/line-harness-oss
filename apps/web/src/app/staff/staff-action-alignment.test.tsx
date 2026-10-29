@@ -16,6 +16,7 @@ import type { StaffMember } from '@line-crm/shared'
 const fixture = vi.hoisted(() => ({
   updateStaff: vi.fn(),
   deleteStaff: vi.fn(),
+  disableTwoFactor: vi.fn(),
 }))
 
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
@@ -85,6 +86,7 @@ vi.mock('@/lib/api', async importOriginal => {
         me: async () => ({ success: true, data: state.members.find((item) => item.id === 'me')! }),
         update: fixture.updateStaff,
         delete: fixture.deleteStaff,
+        disableTwoFactor: fixture.disableTwoFactor,
         loginSummary: async () => ({ success: true, data: { loginCount: 1 } }),
       },
       lineAccounts: { list: async () => ({ success: true, data: [] }) },
@@ -125,6 +127,7 @@ function rowFor(name: string): HTMLTableRowElement {
 beforeEach(() => {
   fixture.updateStaff.mockReset().mockResolvedValue({ success: true, data: state.members[0] })
   fixture.deleteStaff.mockReset().mockResolvedValue({ success: true, data: state.members[0] })
+  fixture.disableTwoFactor.mockReset()
   clearToastsForTest()
 })
 
@@ -221,6 +224,25 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     expect(screen.getByRole('menuitem', { name: '二段階認証を設定する' })).toBeTruthy()
   })
 
+  it('二段階認証を解除する前に設定し直せると説明し、取消では解除しない', async () => {
+    const me = state.members.find(member => member.id === 'me')!
+    const old = me.twoFactorEnabled
+    me.twoFactorEnabled = true
+    try {
+      await mount()
+      fireEvent.click(within(rowFor('ログイン中の人')).getByRole('button', { name: 'ログイン中の人の操作' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: '二段階認証を解除する' }))
+      const dialog = screen.getByRole('dialog', { name: /二段階認証を解除しますか/ })
+      expect(dialog.textContent).toContain('LINEログインだけでログインできるようになります。')
+      expect(dialog.textContent).toContain('あとから「二段階認証を設定する」で、設定し直せます。')
+      expect(fixture.disableTwoFactor).not.toHaveBeenCalled()
+      expect(fixture.updateStaff).not.toHaveBeenCalled()
+      fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+      expect(screen.queryByRole('dialog', { name: /二段階認証を解除しますか/ })).toBeNull()
+      expect(fixture.disableTwoFactor).not.toHaveBeenCalled()
+    } finally { me.twoFactorEnabled = old }
+  })
+
   it('外す操作は確認前に呼ばず、確認後の素早い二度押しでも1回だけ呼ぶ', async () => {
     let release: (() => void) | null = null
     fixture.deleteStaff.mockImplementation(() => new Promise((resolve) => {
@@ -291,7 +313,7 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     fixture.updateStaff.mockRejectedValueOnce(new Error('保存できません'))
     fireEvent.click(screen.getByRole('button', { name: /見せる範囲を保存/ }))
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('保存できません'))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toBe('失敗：保存できません'))
     expect(screen.getByRole('button', { name: '保存する' })).toBeTruthy()
 
     fixture.updateStaff.mockResolvedValueOnce({ success: true, data: state.members[0] })

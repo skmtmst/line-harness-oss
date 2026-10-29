@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import NewLineAccountPage from './page'
+import { DRAFT_KEY } from '@/v8/account-new/logic'
 
 /*
  * v07（LINE新規追加_v07.pen・2026-10-18承認）の5段の通し。
- * ②は3つ、③は2つの小さな段に分かれ、登録は③Step1の「登録する」で行う。
+ * ②は4つ、③は2つの小さな段に分かれ、登録は③Step1の「登録する」で行う。
  * 登録前のタグ・親アカウント・担当範囲・既存LIFF IDの入力は承認済みの設計で外したので、
  * ここでは確かめない（wire の tagIds などは空のまま送る）。
  */
@@ -61,25 +62,22 @@ const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }
 /** ②の中だけ進むボタンの名前が違う（v07 Fqy29）。 */
 const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
 const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
-const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name }))
+const pick = (name: string | RegExp) => fireEvent.click(screen.getByRole('radio', { name }))
 
 /**
- * ①事前確認（v07 p6zMkA）を最短で通す。質問は1つずつ出るので、答えるたびに「次へ」を押す。
+ * ①事前確認を最短で通す。回答時に次の質問へ進み、チェック結果で「次へ」を押す。
  * Q1=はい → Q2=いいえ（Q3は尋ねない）→ Q4=使っていません（Q5は尋ねない）→ チェック結果 → ②へ。
  */
 function passPrecheck() {
   pick('はい、あります')
-  next()
   pick('いいえ、引き継ぎません')
-  next()
   pick('使っていません')
-  next()
   expect(screen.getByText('あなたの接続前チェック結果')).toBeTruthy()
   next()
 }
 
 /**
- * v07（Fqy29）の順番どおり：①→②-1 Messaging API→②-2 Webhook→②-3 LINEログイン→③Step1。
+ * ①→②-1 Messaging API→②-2 プロバイダーID→②-3 Webhook→②-4 LINEログイン→③Step1。
  * 入力を変えると確認がやり直しになるので、先に全部入れる。
  */
 function enterCheckStep() {
@@ -87,6 +85,8 @@ function enterCheckStep() {
   passPrecheck()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
+  nextStep()
+  fill('v8-provider-id', '2005648758')
   nextStep()
   ack('Webhook URL を貼り付けて「更新」を押した')
   ack('Webhookの利用をONにした')
@@ -113,31 +113,52 @@ async function saveAndFinish() {
   await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
   await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
   next()
-  fireEvent.click(await screen.findByRole('radio', { name: /飲食店/ }))
-  await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
-  next()
+  const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  const skip = within(dialog).getByRole('button', { name: 'あとで設定する' })
+  await waitFor(() => expect((skip as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(skip)
 }
 
 describe('LINEアカウント作成ウィザード', () => {
-  it('①の質問に答えてから②の3つの小さな段へ順に進む', () => {
+  it('①の質問に答えてから②の4つの小さな段へ順に進む', () => {
     render(<NewLineAccountPage />)
     expect(screen.getByText('ご利用環境の確認', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('質問 1')).toBeTruthy()
+    expect(screen.queryByText('このあとの質問')).toBeNull()
     passPrecheck()
     expect(screen.getByText('Messaging API の情報を入れる', { selector: 'h2' })).toBeTruthy()
-    expect(screen.getByText('Step 1 / 3')).toBeTruthy()
+    expect(screen.getByText('Step 1 / 4')).toBeTruthy()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
     nextStep()
+    expect(screen.getByText('プロバイダーIDを確認する', { selector: 'h2' })).toBeTruthy()
+    expect(screen.getByText('Step 2 / 4')).toBeTruthy()
+    fill('v8-provider-id', '2005648758')
+    nextStep()
     expect(screen.getByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeTruthy()
-    expect(screen.getByText('Step 2 / 3')).toBeTruthy()
+    expect(screen.getByText('Step 3 / 4')).toBeTruthy()
     ack('Webhook URL を貼り付けて「更新」を押した')
     ack('Webhookの利用をONにした')
     ack('Webhookの再送をONにした')
     ack('エラーの統計情報をONにした')
     nextStep()
     expect(screen.getByText('LINEログインの情報を入れる', { selector: 'h2' })).toBeTruthy()
-    expect(screen.getByText('Step 3 / 3')).toBeTruthy()
+    expect(screen.getByText('Step 4 / 4')).toBeTruthy()
+    const providerLink = screen.getByRole('link', { name: 'LINE Developers のプロバイダーを開く' })
+    expect(providerLink.getAttribute('href')).toBe('https://developers.line.biz/console/provider/2005648758')
+    expect(providerLink.getAttribute('target')).toBe('_blank')
+  })
+
+  it('下書きで選択済みの回答をもう一度押しても次の質問へ進む', async () => {
+    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: 1, precheckAt: 'q1', precheck: { q1: 'yes' } }))
+    render(<NewLineAccountPage />)
+    const selected = await screen.findByRole('radio', { name: 'はい、あります' }) as HTMLInputElement
+    await waitFor(() => expect(selected.checked).toBe(true))
+    expect(screen.getByText('Q1. LINE公式アカウントはありますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByText('このあとの質問')).toBeNull()
+    fireEvent.click(selected.closest('label')!)
+    expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByText('このあとの質問')).toBeNull()
   })
 
   it('LINE側でやることの印が残っていると次の段へ進めない', () => {
@@ -145,6 +166,8 @@ describe('LINEアカウント作成ウィザード', () => {
     passPrecheck()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
+    nextStep()
+    fill('v8-provider-id', '2005648758')
     nextStep()
     ack('Webhook URL を貼り付けて「更新」を押した')
     ack('Webhookの利用をONにした')
@@ -167,47 +190,75 @@ describe('LINEアカウント作成ウィザード', () => {
     const link = screen.getByRole('link', { name: /LINE公式アカウントを作る/ })
     expect(link.getAttribute('href')).toBe('https://manager.line.biz/')
     expect(link.getAttribute('target')).toBe('_blank')
-    expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
   })
 
   it('①-9 Q2がはいなら認証済みアカウントの印にチェックするまで進めない', () => {
     render(<NewLineAccountPage />)
     pick('はい、あります')
-    next()
+    expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
     pick('はい、引き継ぎます')
-    const step = () => screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement
-    expect(step().disabled).toBe(true)
+    expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
     ack('認証済みアカウントであることを確認した')
-    expect(step().disabled).toBe(false)
+    expect(screen.getByText('Q3. 友だちの数は50万人を超えていますか？', { selector: 'h3' })).toBeTruthy()
+  })
+
+  it('①の条件付き質問を自動で進め、最後の次へだけで②へ進む', () => {
+    render(<NewLineAccountPage />)
+    pick('はい、あります')
+    pick('いいえ、引き継ぎません')
+    expect(screen.getByText('Q4. ほかのLINE配信ツールを使っていますか？', { selector: 'h3' })).toBeTruthy()
+    pick('使っています')
+    expect(screen.getByText('Q5. そのツールを、これからどうしますか？', { selector: 'h3' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
+    pick(/musuboに乗り換える/)
+    expect(screen.getByText('あなたの接続前チェック結果')).toBeTruthy()
+    expect(screen.getByText('二重に届かない切り替え方をご案内します')).toBeTruthy()
+    next()
+    expect(screen.getByText('Messaging API の情報を入れる', { selector: 'h2' })).toBeTruthy()
+  })
+
+  it('回答を変更すると新しい分岐の質問へ進み、戻る操作も使える', () => {
+    render(<NewLineAccountPage />)
+    pick('はい、あります')
+    pick('いいえ、引き継ぎません')
+    pick('使っていません')
+    fireEvent.click(screen.getAllByRole('button', { name: '変更' })[1])
+    expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
+    pick('はい、引き継ぎます')
+    ack('認証済みアカウントであることを確認した')
+    expect(screen.getByText('Q3. 友だちの数は50万人を超えていますか？', { selector: 'h3' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '戻る' }))
+    expect(screen.getByText('Q2. いまの友だちを引き継ぎますか？', { selector: 'h3' })).toBeTruthy()
   })
 
   it('①-2 Q3がはいなら相談の案内を出し、先へ進めない', () => {
     render(<NewLineAccountPage />)
     pick('はい、あります')
-    next()
     pick('はい、引き継ぎます')
     ack('認証済みアカウントであることを確認した')
-    next()
     expect(screen.getByText('Q3. 友だちの数は50万人を超えていますか？', { selector: 'h3' })).toBeTruthy()
     pick('はい、超えています')
     const link = screen.getByRole('link', { name: /サポートへ問い合わせる/ })
     expect(link.getAttribute('href')).toBe('/hq/support')
     expect(link.getAttribute('target')).toBeNull()
-    expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByRole('button', { name: '次へ' })).toBeNull()
   })
 
-  it('②Step1は Messaging API の2項目だけを必須にし、マニュアルを別タブで開く', () => {
+  it('②Step1は Messaging API の2項目を必須にし、マニュアルを別タブで開く', () => {
     render(<NewLineAccountPage />)
     passPrecheck()
     const ids = ['v8-channel-id', 'v8-channel-secret']
     expect(ids.every((id) => (document.getElementById(id) as HTMLInputElement).required)).toBe(true)
+    expect(document.getElementById('v8-provider-id')).toBeNull()
     expect(document.getElementById('channel-access-token')).toBeNull()
     expect(document.getElementById('liff-id')).toBeNull()
-    /* 承認済み v07 の ②-1（A2cEg1）では、取りに行く先は青い囲みの「LINE Developers を開く」1つ。
-       マニュアルは右の列からいつでも開ける。どちらも別タブ。 */
-    const developers = screen.getByRole('link', { name: /LINE Developers を開く/ })
-    expect(developers.getAttribute('href')).toBe('https://developers.line.biz/console/')
-    expect(developers.getAttribute('target')).toBe('_blank')
+    /* ②-1は公式アカウントマネージャーからMessaging API設定を開く。 */
+    const manager = screen.getByRole('link', { name: /LINE公式アカウントマネージャーを開く/ })
+    expect(manager.getAttribute('href')).toBe('https://manager.line.biz/')
+    expect(manager.getAttribute('target')).toBe('_blank')
     const manual = screen.getByRole('link', { name: /マニュアルを開く/ })
     expect(manual.getAttribute('href')).toBe('/manuals/line-connect/index.html')
     expect(manual.getAttribute('target')).toBe('_blank')
@@ -270,7 +321,7 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(notices.lineRegistration).toHaveBeenCalledTimes(1)
   })
 
-  it('引き継ぎ中は進み具合だけを出し、終わってから登録したアカウントを見るを出す', async () => {
+  it('Penの探索中は円形ローダーだけが動き、完了後は人数と満タンの棒を表示する', async () => {
     let finishStep!: (value: unknown) => void
     calls.connect.mockResolvedValue({
       success: true,
@@ -282,17 +333,74 @@ describe('LINEアカウント作成ウィザード', () => {
     })
     /* 画面を開いている間は step で続きを進める（読むだけでは自動処理を待つことになる）。 */
     calls.stepFollowerImport.mockImplementation(() => new Promise((resolve) => { finishStep = resolve }))
+    calls.followerImportState.mockResolvedValue({ success: true, data: {
+      capability: 'available', phase: 'importing_ids', received: 0, imported: 0,
+      alreadyPresent: 0, reactivated: 0, claimedUnassigned: 0, conflicts: 0, invalid: 0,
+      profilesProcessed: 0, profilesUpdated: 0,
+    } })
     enterCheckStep()
     await runCheck()
     await saveAndFinish()
-    await screen.findByText('いまの友だちを引き継いでいます', { selector: 'h2' })
-    expect(screen.getByRole('progressbar', { name: '友だちの引き継ぎ' })).toBeTruthy()
+    await screen.findByText('友だちを確認しています', { selector: 'h2' })
+    const progress = screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' })
+    expect(progress.getAttribute('aria-valuenow')).toBeNull()
+    expect(progress.getAttribute('aria-valuetext')).toBe('対象人数を確認中')
+    expect(progress.childElementCount).toBe(0)
+    expect(screen.getByText('友だちを確認しています', { selector: 'h2' }).previousElementSibling?.firstElementChild?.getAttribute('class')).toContain('handoverSpinner')
     expect(screen.queryByRole('link', { name: '登録したアカウントを見る' })).toBeNull()
     await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalled())
     finishStep({ success: true, data: {
       state: { capability: 'available', phase: 'completed', received: 10, imported: 10 },
       busy: false, profilesFetched: 10,
     } })
-    await waitFor(() => expect(screen.getByRole('link', { name: '登録したアカウントを見る' })).toBeTruthy())
+    await screen.findByText('友だちの引き継ぎが完了しました', { selector: 'h2' })
+    expect(screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' }).getAttribute('aria-valuenow')).toBe('10')
+    expect(screen.getByText('10人の友だちを引き継ぎました')).toBeTruthy()
+  })
+
+  it('Penの進行中は前日集計と現在の4人を区別し、1人処理で棒を25%にする', async () => {
+    calls.connect.mockResolvedValue({ success: true, data: {
+      ...checked.data, id: 'partial-account',
+      verification: { ...checked.data.verification, followerTotal: 2 },
+      followerImport: { capability: 'available', phase: 'importing_ids' },
+    } })
+    calls.stepFollowerImport
+      .mockResolvedValueOnce({ success: true, data: { state: {
+        capability: 'available', phase: 'hydrating_profiles', received: 4,
+        imported: 1, alreadyPresent: 0, profilesProcessed: 0, profilesUpdated: 0,
+      }, busy: true, profilesFetched: 0 } })
+      .mockImplementation(() => new Promise(() => {}))
+    enterCheckStep()
+    await runCheck()
+    await saveAndFinish()
+    await screen.findByText('4人のうち1人を引き継ぎました。残り3人を処理中です。')
+    expect(screen.getByText('前日集計は2人でした。現在の対象数は4人です。')).toBeTruthy()
+    const progress = screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' })
+    expect(progress.getAttribute('aria-valuenow')).toBe('1')
+    expect(progress.getAttribute('aria-valuemax')).toBe('4')
+    expect(progress.firstElementChild?.getAttribute('style')).toContain('scaleX(0.25)')
+  })
+
+  it('引き継ぎ要求が失敗しても理由を示し、画面を開いている間に再試行する', async () => {
+    calls.connect.mockResolvedValue({
+      success: true,
+      data: { ...checked.data, id: 'retry-account', followerImport: { capability: 'available', phase: 'importing_ids' } },
+    })
+    calls.stepFollowerImport
+      .mockResolvedValueOnce({ success: false, error: 'temporarily_unavailable' })
+      .mockResolvedValueOnce({ success: true, data: { state: {
+        capability: 'available', phase: 'completed', received: 4, imported: 3, alreadyPresent: 1,
+        profilesProcessed: 4, profilesUpdated: 3,
+      }, busy: false, profilesFetched: 3 } })
+    enterCheckStep()
+    await runCheck()
+    await saveAndFinish()
+    await screen.findByText('進み具合を確認できません', { selector: 'h2' })
+    expect(screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' }).childElementCount).toBe(0)
+    expect(screen.getByText('進み具合を確認できません', { selector: 'h2' }).previousElementSibling?.firstElementChild?.getAttribute('class')).toContain('handoverSpinner')
+    expect(screen.getByRole('button', { name: '状態を再確認' })).toBeTruthy()
+    await waitFor(() => expect(calls.stepFollowerImport).toHaveBeenCalledTimes(2), { timeout: 6500 })
+    await screen.findByText('友だちの引き継ぎが完了しました', { selector: 'h2' })
+    expect(screen.getByRole('progressbar', { name: '友だちの引き継ぎ進捗' }).getAttribute('aria-valuenow')).toBe('4')
   })
 })

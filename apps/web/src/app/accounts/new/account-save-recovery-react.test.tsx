@@ -66,11 +66,8 @@ const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name 
  */
 function clearPrecheck() {
   pick('はい、あります')
-  next()
   pick('いいえ、引き継ぎません')
-  next()
   pick('使っていません')
-  next()
   next()
 }
 
@@ -83,6 +80,8 @@ function enterCheckStep() {
   clearPrecheck()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
+  nextStep()
+  fill('v8-provider-id', '2005648758')
   nextStep()
   ack('Webhook URL を貼り付けて「更新」を押した')
   ack('Webhookの利用をONにした')
@@ -167,6 +166,7 @@ describe('接続確認の失敗後も入力と権限の案内を保つ', () => {
     expect((document.getElementById('v8-login-channel-id') as HTMLInputElement).value).toBe('2007123456')
     expect((document.getElementById('v8-login-channel-secret') as HTMLInputElement).value).toBe('synthetic-login-secret')
     fireEvent.click(screen.getByRole('button', { name: 'Webhook の設定へ戻る' }))
+    fireEvent.click(screen.getByRole('button', { name: 'プロバイダーIDへ戻る' }))
     fireEvent.click(screen.getByRole('button', { name: 'Messaging API へ戻る' }))
     expect((document.getElementById('v8-channel-id') as HTMLInputElement).value).toBe('123456789')
     expect((document.getElementById('v8-channel-secret') as HTMLInputElement).value).toBe('synthetic-secret')

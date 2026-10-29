@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { expectLockedFolderMenu } from '@/test-utils/permission-locked-control'
 /*
  * R527: 作成できない運用担当（staff）には自動応答の作成入口を出さない。
  * owner/admin には出す。役割×操作の表を実マウントで固定する。
@@ -130,7 +131,7 @@ describe('R527 自動応答一覧の出し分け（役割×操作）', () => {
     // 順番の入れ替え（更新口）も出さない。
     expect(host.querySelector('button[aria-label="自動応答「旧キーワードルール」を1つ上へ"]')).toBeNull()
     expect(host.textContent).toContain(
-      '閲覧のみで見ています',
+      'この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。',
     )
   })
 
@@ -171,7 +172,9 @@ describe('R527 フォルダの列の出し分け', () => {
       await act(async () => { root.render(<AutoRepliesPage />) })
       await flush()
       expect(host.textContent).toContain('営業時間')
-      expect(Boolean(host.querySelector('button[aria-label="フォルダ「営業時間」の操作"]'))).toBe(shown)
+      const folderMenu = host.querySelector('button[aria-label="フォルダ「営業時間」の操作"]')
+      expect(folderMenu).not.toBeNull()
+      if (!shown) await expectLockedFolderMenu(folderMenu)
     } finally { restore() }
   })
 })

@@ -7,8 +7,8 @@ import IconButton from '@/components/shared/icon-button'
 import { InsertText } from '@/components/shared/insert-text-field'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import LinePreview, { LinePreviewSampleNote } from '@/components/shared/line-preview'
-import { fillPreviewSample, previewSampleNote } from '@/components/shared/preview-sample'
+import LinePreview from '@/components/shared/line-preview'
+import { fillPreviewSample } from '@/components/shared/preview-sample'
 import Link from '@/components/shared/list-navigation'
 import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -477,11 +477,8 @@ export function ScenarioDetailBody({
 
         {/* 右の欄：選んだ通のスマホ。 */}
         <aside className={styles.right} data-template-region="preview" data-preview-narrow="hidden">
-          <h2 className={styles.rightTitle}>
-            {`選んだ通（${shownStep ? `${shownStep.stepOrder}通目` : emptyValue('unknown')}）の見え方`}
-          </h2>
-          <div className={styles.phoneSlot}>
             <LinePreview
+              title={`選んだ通（${shownStep ? `${shownStep.stepOrder}通目` : emptyValue('unknown')}）の見え方`}
               accountName={startAccountLabel === '全アカウント共通' ? '公式アカウント' : startAccountLabel}
               caption={
                 shownStep
@@ -489,6 +486,7 @@ export function ScenarioDetailBody({
                   : undefined
               }
               empty={shownStep ? false : '配る内容がまだありません'}
+              note={shownStep && (shownTpl?.messageContent ?? shownStep.messageContent).trim() ? '名前や日時は見本の値です。' : undefined}
             >
               {shownStep
                 ? (() => {
@@ -524,12 +522,10 @@ export function ScenarioDetailBody({
                       )
                     }
                     const sample = fillPreviewSample(c)
-                    const sampleNote = previewSampleNote(sample.kinds)
-                    return <><div className={styles.talkBubble}>{sample.text}</div>{sampleNote ? <LinePreviewSampleNote>{sampleNote}</LinePreviewSampleNote> : null}</>
+                    return <div className={styles.talkBubble}>{sample.text}</div>
                   })()
                 : null}
             </LinePreview>
-          </div>
         </aside>
       </div>
 )

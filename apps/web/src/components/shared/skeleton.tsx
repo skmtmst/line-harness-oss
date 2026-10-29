@@ -34,7 +34,10 @@ export function Skeleton({
   height?: number | string
 }) {
   const style: CSSProperties = {}
-  if (width !== undefined) style.width = typeof width === 'number' ? `${width}px` : width
+  if (width !== undefined) {
+    style.width = typeof width === 'number' ? `${width}px` : width
+    style.maxWidth = '100%'
+  }
   if (height !== undefined) style.height = typeof height === 'number' ? `${height}px` : height
   return (
     <span

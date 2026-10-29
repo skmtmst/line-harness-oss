@@ -168,6 +168,7 @@ describe('V8 流入リンクを作る', () => {
     await mount()
     fireEvent.click(screen.getByRole('button', { name: /発行して URL を受け取る/ }))
     await flush()
+    expect(posted).toHaveLength(1)
     expect(posted[0]).toMatchObject({ name: '秋の店頭POP', refCode: 'autumn-pop', lineAccountId: 'account-a', isActive: true, tagId: null })
     expect(push).toHaveBeenCalledWith('/inflow-links?highlight=er-new')
   })

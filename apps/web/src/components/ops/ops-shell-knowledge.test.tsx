@@ -55,13 +55,11 @@ it.each(['/ops/knowledge', '/ops/support'])('%s でもメニューを開き、Es
     expect(document.body.style.overflow).toBe('')
     const self = host.querySelector('button[aria-label="自分のメニュー"]') as HTMLButtonElement
     await act(async () => self.click())
-    await waitFor(() => expect(document.querySelector('[role="menuitem"][href="/staff"]')).not.toBeNull())
-    const profile = document.querySelector('[role="menuitem"][href="/staff"]') as HTMLAnchorElement
-    expect(profile.textContent).toBe('プロフィールを編集')
-    profile.focus()
-    fireEvent.keyDown(profile, { key: 'ArrowDown' })
-    expect(document.activeElement?.getAttribute('href')).toBe('/ops/members')
-    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' })
+    await waitFor(() => expect(document.querySelector('[role="menuitem"][href="/ops/members"]')).not.toBeNull())
+    expect(document.querySelector('[role="menuitem"][href="/staff"]')).toBeNull()
+    const members = document.querySelector('[role="menuitem"][href="/ops/members"]') as HTMLAnchorElement
+    members.focus()
+    fireEvent.keyDown(members, { key: 'ArrowDown' })
     expect(document.activeElement?.getAttribute('href')).toBe('/ops/two-factor')
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
     await waitFor(() => expect(self.getAttribute('aria-expanded')).toBe('false'))

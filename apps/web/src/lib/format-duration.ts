@@ -1,8 +1,7 @@
 /*
- * このファイルの3関数の使い分け（名前が似ているので先に書く）:
- * - formatDurationMinutes …「残り時間」。受信箱など、あと何分かが効く面で精密表示。
- * - formatWaitRough       …「経過時間」。最長◯日前・最も古い未対応◯日前の粗い表示。
- * - formatMinutesRough    …「長さ」。平均◯時間・約◯ヶ月のように単位を替えた概数。
+ * このファイルの関数の使い分け（名前が似ているので先に書く）:
+ * - formatTimeSpan        …時間の長さ。1時間未満は分、48時間未満は時間、それより先は日。
+ * - formatElapsedMinutes  …経過時間。1分未満は「たった今」、以降は共通の単位。
  */
 
 /** 分数を、長い待ち時間でも読みやすい「日・時間・分」に直す。 */
@@ -21,6 +20,19 @@ export function formatDurationMinutes(minutes: number): string {
   return `${restMinutes}分`
 }
 
+export function formatTimeSpan(minutes: number, { gap = false }: { gap?: boolean } = {}): string {
+  const total = Number.isFinite(minutes) ? Math.max(0, Math.floor(minutes)) : 0
+  const join = (value: number, unit: string) => gap ? `${value} ${unit}` : `${value}${unit}`
+  if (total < 60) return join(total, '分')
+  if (total < 48 * 60) return join(Math.floor(total / 60), '時間')
+  return join(Math.floor(total / (24 * 60)), '日')
+}
+
+export function formatElapsedMinutes(minutes: number): string {
+  if (!Number.isFinite(minutes)) return '—'
+  return minutes < 1 ? 'たった今' : `${formatTimeSpan(minutes)}前`
+}
+
 /**
  * 待ち時間を、ひと目で分かる粗さで言う。
  *
@@ -36,10 +48,7 @@ export function formatDurationMinutes(minutes: number): string {
  * 1枚の中に「6日前」と「6日7時間50分」が並んでいた。
  */
 export function formatWaitRough(minutes: number): string {
-  const total = Math.max(0, Math.floor(minutes))
-  if (total < 60) return `${total}分前`
-  if (total < 60 * 24) return `${Math.floor(total / 60)}時間前`
-  return `${Math.floor(total / (60 * 24))}日前`
+  return formatElapsedMinutes(minutes)
 }
 
 /**
@@ -52,11 +61,7 @@ export function formatWaitRough(minutes: number): string {
  * `formatDurationMinutes` と役割が違うので、ここは長さの表現だけを返す。
  */
 export function formatMinutesRough(minutes: number): string {
-  const total = Math.max(0, Math.round(minutes))
-  if (total < 60) return `${total}分`
-  if (total < 60 * 24) return `約${Math.round(total / 60)}時間`
-  if (total <= 60 * 24 * 30) return `約${Math.round(total / (60 * 24))}日`
-  return `約${Math.round(total / (60 * 24 * 30))}ヶ月`
+  return formatTimeSpan(minutes)
 }
 
 /**

@@ -1,6 +1,5 @@
 /* 対応が要るもの（Kyf8U）。件数の列は 5 つ同じ幅、行の高さ 60。 */
-.buttonIcon,
-.helpIcon {
+.buttonIcon {
   width: var(--polish-icon-control);
   height: var(--polish-icon-control);
   flex: none;

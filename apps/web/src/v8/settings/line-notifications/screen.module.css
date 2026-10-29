@@ -256,11 +256,6 @@
 .runOpen:hover { text-decoration: underline; }
 .runOpen:focus-visible { outline: var(--tpl-sb-focus-ring); }
 
-.runFoot {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-sb-ctl-gap);
-}
 
 .runDetail {
   display: flex;
