@@ -20,7 +20,7 @@ export const operationsMethods = {
     accounts: () =>
       fetchApi<ApiResponse<LineAccount[]>>('/api/line-accounts'),
     getHealth: (accountId: string) =>
-      fetchApi<ApiResponse<{ riskLevel: string; logs: AccountHealthLog[] }>>(
+      fetchApi<ApiResponse<{ riskLevel: string | null; connection?: import('@line-crm/shared').LineConnection | null; logs: AccountHealthLog[] }>>(
         `/api/accounts/${accountId}/health`,
       ),
     /** サイドバーの警告数用。staff可視範囲の最新riskLevelだけを1回で取る。ログ本文なし。 */

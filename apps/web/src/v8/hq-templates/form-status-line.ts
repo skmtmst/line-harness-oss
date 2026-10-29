@@ -20,5 +20,5 @@ export function formDistributedLine(row: HqTemplateListItem | undefined): string
   const names = (row.distributed_account_names ?? []).map((name) => name.replace(/^然\s*-NEN-\s*/, ''))
   const more = row.distributed_account_more ?? 0
   const list = names.length ? `（${names.join('・')}${more > 0 ? `・ほか${more}` : ''}）` : ''
-  return `配った先：${count} アカウント${list}。各アカウントでは回答フォームとして使えます。`
+  return `${count} アカウント${list}に配っています。各アカウントでは回答フォームとして使えます。`
 }

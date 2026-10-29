@@ -13,19 +13,19 @@ afterEach(cleanup)
 describe('フォームの動作は行の下で編集する', () => {
   it('本文の改訂を保存用の値へ返す', () => {
     render(<Editor initial={[{ kind: 'send_text', text: 'ありがとうございます' }]} />)
-    fireEvent.click(screen.getByRole('button', { name: 'テキストを送る「ありがとうございます」' }))
+    fireEvent.click(screen.getByRole('button', { name: '「ありがとうございます」' }))
     fireEvent.change(screen.getByRole('textbox', { name: '送る文面' }), { target: { value: 'またお越しください' } })
     expect(screen.getByTestId('value').textContent).toContain('またお越しください')
   })
   it('友だち情報の値を保って編集する', () => {
     render(<Editor initial={[{ kind: 'friend_field', fieldId: '', value: '123' }]} />)
-    fireEvent.click(screen.getByRole('button', { name: /未設定/ }))
+    fireEvent.click(screen.getByRole('button', { name: /未選択/ }))
     fireEvent.change(screen.getByRole('textbox', { name: '書き込む値' }), { target: { value: '456' } })
     expect(screen.getByTestId('value').textContent).toContain('456')
   })
   it('リマインダには本文の入力を出さない', () => {
     render(<Editor initial={[{ kind: 'reminder', reminderId: '' }]} />)
-    fireEvent.click(screen.getByRole('button', { name: /未設定/ }))
+    fireEvent.click(screen.getByRole('button', { name: /未選択/ }))
     expect(screen.queryByRole('textbox', { name: '送る文面' })).toBeNull()
     expect(screen.queryByRole('textbox', { name: '書き込む値' })).toBeNull()
   })

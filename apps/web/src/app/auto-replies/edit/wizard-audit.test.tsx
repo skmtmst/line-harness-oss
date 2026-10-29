@@ -116,7 +116,7 @@ it('反応の右欄は短い題と保存前の説明を分け、未取得を0に
 
 it.each(['draft','published'])('Y3 IDを持つ%sの状態から、題とパンくずの両方を決める',async status=>{
  net.liveStatus=status;net.query='id=synthetic-rule&step=basic';render(<Page/>);await act(async()=>{});
- const title=status==='draft'?'自動応答のルールを作る':'自動応答のルールを編集';
+ const title=status==='draft'?'自動応答を作る':'自動応答を編集';
  expect(screen.getByRole('heading',{name:title,level:1})).toBeTruthy();
  expect(net.pageTitle).toHaveBeenLastCalledWith(`${title}・基本設定`);
  expect(net.getDraft).toHaveBeenCalledTimes(1);

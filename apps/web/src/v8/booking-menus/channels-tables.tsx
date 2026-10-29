@@ -98,7 +98,6 @@ export default function ChannelsTables({ data, canEdit, roles, calendars, onDeta
           </Tr>
         })}</tbody>
       </DataTable>
-      <p data-card-footer className={ch.note}>Google カレンダーに書き出せない入り口は、予約通知メールを取り込みアドレスへ転送して読み取ります（見本のメールがそろった媒体から順に）。</p>
     </Card>
   </>
 }

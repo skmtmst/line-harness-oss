@@ -2,10 +2,10 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
-const fixture = vi.hoisted(() => ({ allowed: true, remove: vi.fn() }))
+const fixture = vi.hoisted(() => ({ allowed: true, remove: vi.fn(), crumbs: [] as unknown[] }))
 vi.mock('@/lib/use-feature-access', () => ({ usePermissionAccess: () => fixture.allowed }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a' }) }))
-vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/test-utils/page-chrome-mock')).pageChromeMock(), usePageTitle: () => {}, usePageCrumbs: (crumbs: unknown[]) => { fixture.crumbs = crumbs } }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock() }))
 vi.mock('./staff-edit-dialog', () => ({ EMPTY_STAFF: {}, StaffEditModal: () => <div role="dialog" aria-label="スタッフ編集" /> }))
 vi.mock('@/lib/api', async original => ({ ...(await original<typeof import('@/lib/api')>()), bookingApi: {
@@ -13,12 +13,17 @@ vi.mock('@/lib/api', async original => ({ ...(await original<typeof import('@/li
   deleteStaff: (...args: unknown[]) => fixture.remove(...args),
 } }))
 import StaffPage from './page'
-beforeEach(() => { verifiedStaffRole('owner'); fixture.allowed = true; fixture.remove.mockReset().mockResolvedValue({ ok: true }) })
+beforeEach(() => { verifiedStaffRole('owner'); fixture.allowed = true; fixture.crumbs = []; fixture.remove.mockReset().mockResolvedValue({ ok: true }) })
 afterEach(() => { cleanup(); verifiedStaffRole(null) })
 
 it('どのスタッフにもシフト1つとメニュー1つ、編集と最後の削除を保つ', async () => {
   const view = render(<StaffPage />)
   await screen.findByText('佐藤')
+  const heading = screen.getByRole('heading', { name: '担当スタッフ' })
+  expect(heading.closest('[data-page-template="list"]')).toBeTruthy()
+  expect(heading.closest('header')?.contains(screen.getByRole('button', { name: '＋ スタッフを作る' }))).toBe(true)
+  expect(view.container.querySelector('nav[aria-label="パンくず"]')).toBeNull()
+  expect(fixture.crumbs).toEqual([{ label: '予約設定', href: '/booking/menus' }])
   for (const row of view.container.querySelectorAll('tbody tr')) {
     const actions = row.querySelector('[data-row-actions]')!
     expect(actions?.querySelectorAll(':scope > a, :scope > button')).toHaveLength(2)

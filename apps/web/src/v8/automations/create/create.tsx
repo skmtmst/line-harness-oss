@@ -37,7 +37,7 @@ import { useAutomationTest } from './use-automation-test'
 export { actionDraftToPayload,draftDetailToForm } from './draft-model'
 
 /*
- * ★V8-B ルールを作る（板 ・競合 ）。src/v8 に一から書いた画面。
+ * ★V8-B オートメーションを作る（板 ・競合 ）。src/v8 に一から書いた画面。
  *
  * 型（CreatePage）に、戻る・題・説明・左の段（名前・どんなときに・だれに・何をするか）、
  * 右の列（文章にすると・人数・1人で試す・気をつけること・つながる先）、
@@ -57,7 +57,7 @@ export function NewAutomationV8({
   chrome?: 'create' | 'draft'
 }) {
   const saveErrors = useSaveFormErrors()
-  usePageTitle(chrome === 'draft' ? '下書きを仕上げる' : '自動処理のルールを作る')
+  usePageTitle(chrome === 'draft' ? '下書きを仕上げる' : 'オートメーションを作る')
   usePageCrumbs([{ label: 'オートメーション', href: '/automations' }])
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -757,7 +757,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
   return (
     <SaveErrorScope errors={saveScopeErrors}><CreatePage
       boardId={conflict ? 'tJqST' : isDraft ? 'J1VA8' : 'M4torY'}
-      title={isDraft ? '下書きを仕上げる' : '自動処理のルールを作る'}
+      title={isDraft ? '下書きを仕上げる' : 'オートメーションを作る'}
       /* 見本の帯は頭の中、説明のすぐ下（絵では頭の線より上）。 */
       help={isDraft
         ? (
@@ -810,7 +810,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
       )} dirty={false}
     >
       {canManage === false ? (
-        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。ルールを作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
+        <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。オートメーションを作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
       ) : null}
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
       {resumeTarget && resumeStatus === 'failed' ? (

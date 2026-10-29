@@ -20,6 +20,8 @@
 .cardHead { display: flex; flex-direction: column; gap: var(--tpl-te-head-gap); }
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 700; line-height: var(--tpl-te-card-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); }
+/* 下の帯の［保存して公開］の手前の一言。公開と送信の違いを灰の1行で添える。 */
+.publishNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); line-height: var(--tpl-text-sm-lh); overflow-wrap: anywhere; }
 .hint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-te-hint-lh); }
 
 /* 名前とフォルダの並び：名前は伸びる・フォルダ 220・間12・下でそろえる。 */

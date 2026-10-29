@@ -93,6 +93,14 @@ export async function scheduled(
   }
   if (lane !== 'delivery') return;
 
+  // 接続の運用確認とリマインドより先にトークンを取り替える (失効直後トークンでの 401 送信を防ぐ。
+  // 送信前に有効なトークンを準備する)。
+  try {
+    await refreshLineAccessTokens(env.DB);
+  } catch (e) {
+    logger.error("src_index_failed");
+  }
+
   // 管理画面を開いていなくても、各LINEアカウントの確認項目を5分窓ごとに保存する。
   // 各checkと各accountは独立しており、失敗しても配信ジョブを止めない。
   try {
@@ -188,14 +196,6 @@ export async function scheduled(
   // 開始前の通知期限を守るため、重い配信・insight ジョブより先に実行する。
   // 手前のジョブが invocation を止めると数時間分のリマインドが未送信のまま
   // starts_at を過ぎると送信ガードにより送れなくなるため、後続ジョブで遅延させない。
-
-  // token refresh はリマインドより先に済ませる (失効直後トークンでの 401 送信を防ぐ。
-  // 送信前に有効なトークンを準備する)。
-  try {
-    await refreshLineAccessTokens(env.DB);
-  } catch (e) {
-    logger.error("src_index_failed");
-  }
 
   // オートメーションの日時指定を起動し、待機・一時失敗中の実行を再開する。
   // 同じ5分Cronにまとめても、実行・処理ごとの冪等キーで二重実行を防ぐ。

@@ -1,0 +1,28 @@
+import type { LineAccount } from '@line-crm/shared'
+
+type ConnectionAccount = Pick<LineAccount, 'connection' | 'isActive'> & { archivedAt?: string | null }
+
+export { lineAccountConnectionState } from '@line-crm/shared'
+import { lineAccountConnectionState } from '@line-crm/shared'
+
+export function hasLineConnectionProblem(account: ConnectionAccount): boolean {
+  return lineAccountConnectionState(account).tone === 'warn'
+}
+
+type TokenAccount = Pick<LineAccount, 'tokenExpiry'> & { archivedAt?: string | null }
+
+/** 一覧の行・カードにトークンの期限を出すのは、切れた・近い時だけ（アーカイブは除く）。 */
+export function tokenExpiryNotice(account: TokenAccount): string | null {
+  const expiry = account.tokenExpiry
+  if (account.archivedAt || !expiry) return null
+  return expiry.status === 'expired' || expiry.status === 'expiring' ? expiry.label : null
+}
+
+/** 数の帯の下の1行。接続とは別に、期限の切れた・近いアカウントの数を言う。無ければ出さない。 */
+export function tokenExpirySummary(accounts: readonly TokenAccount[]): string | null {
+  const live = accounts.filter(account => !account.archivedAt)
+  const expired = live.filter(account => account.tokenExpiry?.status === 'expired').length
+  const expiring = live.filter(account => account.tokenExpiry?.status === 'expiring').length
+  const parts = [expired > 0 ? `期限が切れたトークン ${expired} 件` : null, expiring > 0 ? `期限が近い ${expiring} 件` : null].filter(Boolean)
+  return parts.length > 0 ? parts.join('・') : null
+}

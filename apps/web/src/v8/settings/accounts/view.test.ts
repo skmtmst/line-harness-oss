@@ -15,7 +15,7 @@ describe('★V8 LINEアカウント一覧（V7vn3）の数と並び', () => {
       account('b', { isActive: false, webhook: { status: 'mismatched' } as LineAccount['webhook'], stats: { friendCount: 14, activeScenarios: 0, messagesThisMonth: 0 } }),
       account('c', { isActive: false, archivedAt: '2026-04-01T00:00:00.000Z', webhook: { status: 'mismatched' } as LineAccount['webhook'], stats: { friendCount: 900, activeScenarios: 0, messagesThisMonth: 0 } }),
     ])
-    expect(kpis).toEqual({ connected: 3, active: 1, problem: 1, friends: 1298 })
+    expect(kpis).toEqual({ connected: 3, active: 1, problem: 0, friends: 1298 })
   })
 
   it('並びは「並び順と親子を変える」で決めた順（displayOrder）。同じ値は届いた順のまま', () => {
@@ -33,4 +33,8 @@ describe('★V8 LINEアカウント一覧（V7vn3）の数と並び', () => {
     expect(matchesFilter(archived, 'inactive')).toBe(false)
     expect(matchesFilter(archived, 'archived')).toBe(true)
   })
+})
+
+it('接続の問題はWebhookの補足でなく保存したconnectionを使う', () => {
+  expect(accountKpis([account('warning', { connection: { status: 'warn' } }), account('unknown'), account('old-hook', { connection: { status: 'ok' }, webhook: { status: 'mismatched' } as LineAccount['webhook'] })]).problem).toBe(1)
 })
