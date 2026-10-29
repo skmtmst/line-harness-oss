@@ -68,3 +68,11 @@ it('再取得より遅れて戻った旧集計では、新しい件数を上書�
   expect(view.result.current.quickCountsNow?.all).toBe(10)
   expect(view.result.current.statusCountsNow?.resolved).toBe(10)
 })
+
+it('未読で絞った件数にも一覧と同じアカウント・検索・担当・経路を送る', async () => {
+  const filtered = { ...options, selectedAccountId: 'account-b', debouncedNameQuery: '確認', assigneeFilter: 'staff-b', unreadOnly: true }
+  const view = renderHook(() => useInboxStats(filtered))
+  await act(async () => {})
+  expect(api.chats.quickCounts).toHaveBeenCalledWith({ status: undefined, accountId: 'account-b', q: '確認', operatorId: 'staff-b', unreadOnly: true, channel: 'line' })
+  expect(view.result.current.quickCountsNow?.all).toBe(230)
+})

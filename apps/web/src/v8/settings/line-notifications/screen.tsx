@@ -126,6 +126,33 @@ function sortCustomerSettingsBySentCount(
 }
 
 /**
+ * 「今日 送った」の内訳の文。読み込んだ設定の `label` から表示名を引く。
+ *
+ * 設定に無い eventType は「その他」にまとめる。`ec.order.confirmed` のような
+ * 内部のイベントキーをそのまま文にしない。名前で出すのは上位3件までで、
+ * 4件目以降の設定にある種類も「その他」に足す（内訳の合計が今日の合計と合う）。
+ * 読めていないときは空文字を返し、呼び出し側の「種類別の件数は未取得」の
+ * ままにする（0 とは書かない）。
+ */
+export function buildSentBreakdown(
+  byEventType: LineNotificationSendCounts['byEventType'] | null | undefined,
+  settings: EcNotificationSetting[],
+): string {
+  if (!Array.isArray(byEventType)) return ''
+  const labelOf = new Map(settings.map((setting) => [setting.eventType, setting.label]))
+  const ranked = [...byEventType]
+    .filter((item) => item.today > 0)
+    .sort((a, b) => b.today - a.today)
+  const knownAll = ranked.filter((item) => labelOf.has(item.eventType))
+  const known = knownAll.slice(0, 3)
+  const otherTotal = knownAll.slice(3).reduce((sum, item) => sum + item.today, 0)
+    + ranked.filter((item) => !labelOf.has(item.eventType)).reduce((sum, item) => sum + item.today, 0)
+  const parts = known.map((item) => `${labelOf.get(item.eventType)} ${item.today}`)
+  if (otherTotal > 0) parts.push(`その他 ${otherTotal}`)
+  return parts.join('・')
+}
+
+/**
  * send-counts の形の見張り。偽APIや段階配備中の旧Workerが想定外の形
  * （配列・byEventTypeなし）を返しても `.map` で落ちないようにする。
  * 形が違うときは「読み込めなかった」として null 扱いにする。
@@ -946,15 +973,7 @@ function LineNotificationsPage() {
     if (value === 'incomplete') return settings.filter(isIncomplete).length
     return settings.length
   }
-  const sentBreakdown = useMemo(() => {
-    if (!sendCounts || !Array.isArray(sendCounts.byEventType)) return ''
-    const labelOf = new Map(settings.map((setting) => [setting.eventType, setting.label]))
-    const ranked = [...sendCounts.byEventType]
-      .filter((item) => item.today > 0)
-      .sort((a, b) => b.today - a.today)
-      .slice(0, 3)
-    return ranked.map((item) => `${labelOf.get(item.eventType) ?? item.eventType} ${item.today}`).join('・')
-  }, [sendCounts, settings])
+  const sentBreakdown = useMemo(() => buildSentBreakdown(sendCounts?.byEventType, settings), [sendCounts, settings])
   /*
    * R611: 一覧の取得に失敗したときは、上部の件数・送信枠も「取得中」の
    * ままにしない。値は「—」のまま、注記を失敗の言葉へ変える。
@@ -1387,6 +1406,7 @@ function LineNotificationsPage() {
 const LineNotificationsPageWithTestSupport = Object.assign(LineNotificationsPage, {
   __testing: {
     CustomerNotificationEditor,
+    buildSentBreakdown,
     clearCustomerDraft,
     canSettleDraft,
     customerDraftFingerprint,

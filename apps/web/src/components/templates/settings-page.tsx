@@ -28,10 +28,13 @@ export function SettingsPage({ readOnly, boardId, heightMode, standalone, layout
   const footer = saveActions ? <div className={styles.footer} style={savePlacement === 'content' ? { marginBlock: 0 } : undefined} data-template-region="footer"><StickyBar actions={saveActions} status={saveStatus} /></div> : null
   const page = <PageFrame kind="settings" heightMode={heightMode} layout={layout} boardId={boardId} standalone={standalone} hasFooter={!!saveActions}>
     <PageHeading {...heading} readOnlyBand={readOnly || heading.readOnlyBand} titleAccessory={titleAccessory} explanationToggle={explanation ? <PageExplanationToggle /> : undefined} />
-    {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing="band">{notice}</div> : null}
-    <div className={styles.settings} data-template-region="body" data-content-layout={contentLayout}>
-      <nav aria-label="この設定の目次" className={styles.settingsNav} data-template-region="navigation">{navigation}</nav>
-      <div className={styles.settingsContent} data-template-region="content" data-content-layout={contentLayout}>{explanation ? <PageExplanationBody keepMounted>{explanation}</PageExplanationBody> : null}{preview ? <div className={styles.asideToggle}><PreviewLauncher title="プレビュー" label="プレビューを開く">{preview}</PreviewLauncher></div> : null}{preview ? <div className={styles.customerLookSplit} data-preview-layout={previewLayout}><div className={styles.customerLookMain}>{children}</div><aside className={styles.customerLookPreview} aria-label="プレビュー">{preview}</aside></div> : children}{savePlacement === 'content' ? footer : null}</div>
+    {/* 帯と本文の間の空きは流れの gap だけが持つ（作成の型の createFlow と同じ考え方）。 */}
+    <div className={styles.settingsFlow} data-template-region="settings-flow">
+      {notice ? <div className={styles.createNotice} data-template-region="notice" data-notice-spacing="band">{notice}</div> : null}
+      <div className={styles.settings} data-template-region="body" data-content-layout={contentLayout}>
+        <nav aria-label="この設定の目次" className={styles.settingsNav} data-template-region="navigation">{navigation}</nav>
+        <div className={styles.settingsContent} data-template-region="content" data-content-layout={contentLayout}>{explanation ? <PageExplanationBody keepMounted>{explanation}</PageExplanationBody> : null}{preview ? <div className={styles.asideToggle}><PreviewLauncher title="プレビュー" label="プレビューを開く">{preview}</PreviewLauncher></div> : null}{preview ? <div className={styles.customerLookSplit} data-preview-layout={previewLayout}><div className={styles.customerLookMain}>{children}</div><aside className={styles.customerLookPreview} aria-label="プレビュー">{preview}</aside></div> : children}{savePlacement === 'content' ? footer : null}</div>
+      </div>
     </div>
     {savePlacement === 'content' ? null : footer}
   </PageFrame>

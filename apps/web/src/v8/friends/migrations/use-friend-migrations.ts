@@ -10,6 +10,7 @@
  * 権限の言い分けはここでだけ変える。
  */
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { useCallback, useEffect, useState, useRef } from 'react'
 import type { LineAccount } from '@line-crm/shared'
 import { api, ApiError, downloadApiFile, type FriendMigrationJob } from '@/lib/api'
@@ -86,13 +87,15 @@ export function useFriendMigrations() {
   const operationFailureMessage = (caught: unknown, action: string): string =>
     japaneseDetailOf(caught) || describeApiFailure(caught, action, { forbidden: MANAGE_FORBIDDEN })
   // 役割が分かっていて owner/admin でないときだけ、ボタンの近くに理由を出す。
-  const manageLocked = !canManageRole(role)
+  const managerReason = usePermissionLockReason(canManageRole(role), 'manager')
+  const manageLocked = !canManageRole(role) || Boolean(managerReason)
 
   const toggleColumn = (column: 'basic' | 'tags_fields' | 'support') => {
     setColumns((current) => current.includes(column) ? current.filter((value) => value !== column) : [...current, column])
   }
 
   const createExport = async () => {
+    if (manageLocked || busy) return
     if (!accountId || columns.length === 0) { setMessage('対象と書き出す項目を選んでください。'); return }
     setBusy(true); setMessage(null)
     try {
@@ -141,6 +144,7 @@ export function useFriendMigrations() {
   }
 
   const previewImport = async () => {
+    if (manageLocked || busy) return
     if (!accountId || !file || rows.length === 0) { setMessage('このシステムから書き出したCSVを選んでください。'); return }
     setBusy(true); setMessage(null)
     try {
@@ -162,7 +166,7 @@ export function useFriendMigrations() {
    * 履歴を読み直す。
    */
   const executeImport = async () => {
-    if (!importId || busy) return
+    if (manageLocked || !importId || busy) return
     setBusy(true)
     try {
       const response = await api.friendMigrations.executeImport(importId)

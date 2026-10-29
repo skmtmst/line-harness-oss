@@ -34,6 +34,8 @@ export interface EmptyListProps {
   create?: EmptyListCreate
   /** 作れる人か。falseの時は作る操作を理由付きで残す。 */
   canCreate?: boolean
+  /** 本人確認中はnullで理由を出さず、canCreate=falseで操作を止める。省略は従来どおり。 */
+  lockedReason?: string | null
   /** 絞り込み・検索の結果が0件。 */
   filtered?: boolean
   /** 「条件を外す」。無ければボタンを出さない。 */
@@ -56,6 +58,7 @@ export default function EmptyList({
   description,
   create,
   canCreate = true,
+  lockedReason,
   filtered = false,
   onClearFilters,
   filteredDescription,
@@ -77,11 +80,11 @@ export default function EmptyList({
       </div>
     )
   }
-  const reason = lockReason(canCreate)
+  const reason = lockedReason === undefined ? lockReason(canCreate) : lockedReason || undefined
   const button = (canCreate && !reason ? action : null) ?? (create
-    ? create.href
+    ? create.href && (canCreate || reason)
       ? <Button href={create.href} variant="primary" lockedReason={reason}><Plus aria-hidden="true" />{create.label}</Button>
-      : <Button type="button" variant="primary" onClick={create.onClick} lockedReason={reason}><Plus aria-hidden="true" />{create.label}</Button>
+      : <Button type="button" variant="primary" disabled={!canCreate && !reason} onClick={canCreate ? create.onClick : undefined} lockedReason={reason}><Plus aria-hidden="true" />{create.label}</Button>
     : null)
   return (
     <div className={styles.root} data-empty-list="first" data-design-node={designNode ?? 'gIaJZ'} role="status">

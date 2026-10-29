@@ -1,6 +1,5 @@
 'use client'
-import { useRef, useState } from 'react'
-import Link from '@/components/shared/list-navigation'
+import { useEffect, useRef, useState } from 'react'
 import { HelpCircle, ListOrdered, Send, X } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
@@ -16,6 +15,13 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
+import { useFeatureAccess } from '@/lib/use-feature-access'
+import { useStaffRole } from '@/lib/staff-role'
+import { subscribeStaffIdentity } from '@/lib/staff-identity-state'
+import { SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
+import { canEditAutoReplyNow } from './write-access'
 
 /*
  * ★V8 自動応答 かんたんに作る（板 、小窓 560）。
@@ -55,6 +61,20 @@ export default function QuickCreateV8({
   onCreated: () => void
 }) {
   const saveErrors = useSaveFormErrors()
+  const role = useStaffRole()
+  const featureAccess = useFeatureAccess('autoReplies')
+  const resolvedReason = usePermissionLockReason(featureAccess)
+  const lockedReason = role === null ? undefined : resolvedReason
+  const initialAccountId = useRef(accountId)
+  const accessEpoch = useRef(0)
+  const accountIdRef = useRef(accountId)
+  if (accountIdRef.current !== accountId) accessEpoch.current++
+  accountIdRef.current = accountId
+  const accountChanged = accountId !== initialAccountId.current
+  const inputsDisabled = role === null || !featureAccess || Boolean(lockedReason) || accountChanged
+  const mounted = useRef(true)
+  const saveLock = useRef(false)
+  const canEditNow = () => canEditAutoReplyNow() && accountIdRef.current === initialAccountId.current
   const [keywords, setKeywords] = useState<string[]>([])
   const [draft, setDraft] = useState('')
   const [reply, setReply] = useState('')
@@ -71,10 +91,24 @@ export default function QuickCreateV8({
   const draftKeyRef = useRef<string>(crypto.randomUUID())
   const publishKeyRef = useRef<string>(crypto.randomUUID())
 
+  useEffect(() => {
+    mounted.current = true
+    const invalidate = () => { accessEpoch.current++; acknowledgedRef.current = [] }
+    const unsubscribe = subscribeStaffIdentity(invalidate)
+    window.addEventListener(SESSION_SNAPSHOT_CHANGED, invalidate)
+    return () => {
+      mounted.current = false
+      invalidate(); unsubscribe()
+      window.removeEventListener(SESSION_SNAPSHOT_CHANGED, invalidate)
+    }
+  }, [])
+  useEffect(() => { acknowledgedRef.current = [] }, [accountId])
+
   const saving = phase === 'saving'
   const guard = useUnsavedGuard({ dirty: keywords.length > 0 || draft !== '' || reply !== '', busy: saving, onDiscard: onClose })
 
   const addKeyword = (value: string) => {
+    if (!canEditNow() || saveLock.current) return
     const word = value.trim()
     if (!word || keywords.includes(word)) return
     const next = [...keywords, word]
@@ -83,11 +117,13 @@ export default function QuickCreateV8({
   }
 
   const removeKeyword = (value: string) => {
+    if (!canEditNow() || saveLock.current) return
     setKeywords((current) => current.filter((keyword) => keyword !== value))
   }
 
   /* 欄を離れたとき、入れかけの言葉があれば札にする（Enter を押し忘れても消えない）。 */
   const blurKeywords = () => {
+    if (!canEditNow() || saveLock.current) return
     const word = draft.trim()
     if (word) {
       const next = keywords.includes(word) ? keywords : [...keywords, word]
@@ -98,7 +134,7 @@ export default function QuickCreateV8({
     }
     setKeywordError(validateKeywords(keywords) ?? '')
   }
-  const blurReply = () => setReplyError(validateReply(reply) ?? '')
+  const blurReply = () => { if (canEditNow() && !saveLock.current) setReplyError(validateReply(reply) ?? '') }
 
   const buildInput = (words: string[], text: string): AutoReplyDraftInput => ({
     keyword: words[0] ?? '',
@@ -129,7 +165,8 @@ export default function QuickCreateV8({
     unmatchedAction: null,
   })
 
-  const publish = async (id: string, acknowledged: string[]) => {
+  const publish = async (id: string, acknowledged: string[], isCurrent: () => boolean) => {
+    if (!isCurrent()) return false
     const res = await api.autoReplies.publishDraft(
       id,
       { acknowledgedConflictIds: acknowledged },
@@ -141,10 +178,11 @@ export default function QuickCreateV8({
       }
       throw new Error(res.error || '自動応答を有効にできませんでした。時間をおいて、もう一度お試しください。')
     }
+    return true
   }
 
   const save = async () => {
-
+    if (!canEditNow() || saveLock.current) return
     const keywordMessage = validateKeywords(keywords)
     const replyMessage = validateReply(reply)
     setKeywordError(keywordMessage ?? '')
@@ -154,8 +192,17 @@ export default function QuickCreateV8({
       setSaveError('上のバーでLINE公式アカウントを選んでください')
       return
     }
+    saveLock.current = true
+    const requestedEpoch = accessEpoch.current
+    const isCurrent = () => mounted.current && canEditNow() && requestedEpoch === accessEpoch.current
+    const interrupted = () => {
+      if (isCurrent()) return false
+      if (mounted.current) setSaveError('操作する人やアカウントの状態が変わりました。内容を確認して、もう一度お試しください。')
+      return true
+    }
     setPhase('saving')
     setSaveError('')
+    let completed = false
     try {
       const input = buildInput(keywords, reply)
       const snapshot = JSON.stringify(input)
@@ -176,8 +223,10 @@ export default function QuickCreateV8({
         savedInputRef.current = snapshot
         publishKeyRef.current = crypto.randomUUID()
       }
+      if (interrupted()) return
       // 通信失敗を「重なりなし」と扱わず、公開の直前にも最新の重なりを確認する。
       const found = await api.autoReplies.conflicts(id)
+      if (interrupted()) return
       if (!found.success) throw new Error(found.error || '重なりを確認できませんでした。時間をおいて、もう一度お試しください。')
       const list = found.data.conflicts
       const acknowledged = list.map(conflict => conflict.autoReplyId)
@@ -189,17 +238,22 @@ export default function QuickCreateV8({
         return
       }
       acknowledgedRef.current = acknowledged
-      await publish(id, acknowledged)
+      if (!await publish(id, acknowledged, isCurrent) || interrupted()) return
+      completed = true
       publishKeyRef.current = crypto.randomUUID()
       guard.disarm()
       onCreated()
       onClose()
     } catch (cause) {
+      if (interrupted()) return
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
       setSaveError(describeApiFailure(cause, '保存')) }
       setPhase(draftIdRef.current ? 'confirming' : 'editing')
+    } finally {
+      saveLock.current = completed
+      if (mounted.current && !completed) setPhase(current => current === 'saving' ? 'editing' : current)
     }
   }
 
@@ -216,10 +270,10 @@ export default function QuickCreateV8({
       onCancel={onClose}
       footer={(
         <div className={styles.footer}>
-          <Link href="/auto-replies/edit" className={styles.detailLink}>
+          <Button {...(!inputsDisabled ? { href: '/auto-replies/edit' } : { type: 'button', disabled: true })} variant="text" lockedReason={lockedReason}>
             <ListOrdered size={16} aria-hidden="true" />
             詳しく作るへ
-          </Link>
+          </Button>
           <span className={styles.footerSpacer} aria-hidden="true" />
           <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>
             キャンセル
@@ -227,7 +281,8 @@ export default function QuickCreateV8({
           <Button
             type="button"
             variant="primary"
-            disabled={saving}
+            disabled={saving || inputsDisabled}
+            lockedReason={lockedReason}
             busy={saving}
             busyLabel={phase === 'confirming' ? '有効にしています…' : '保存しています…'}
             onClick={() => save()}
@@ -242,6 +297,8 @@ export default function QuickCreateV8({
       )}
     >
       <div className={styles.body}>
+        {lockedReason ? <ReadOnlyNotice need="feature" /> : null}
+        {accountChanged ? <Notice tone="warn">アカウントが切り替わりました。いったん閉じて作り直してください。</Notice> : null}
         <div className={styles.field}>
           <p className={styles.label} id="quick-create-keywords-label">この言葉が来たら（どれか1つを含む）</p>
           <div className={styles.chipBox} role="group" aria-labelledby="quick-create-keywords-label">
@@ -251,7 +308,9 @@ export default function QuickCreateV8({
                 <button
                   type="button"
                   className={styles.chipRemove}
+                  data-hit-area=""
                   aria-label={`「${keyword}」を外す`}
+                  disabled={saving || inputsDisabled}
                   onClick={() => removeKeyword(keyword)}
                 >
                   <X size={16} aria-hidden="true" />
@@ -260,9 +319,11 @@ export default function QuickCreateV8({
             ))}
             <SaveErrorField names={["draft","keyword"]}><SharedTextField
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              disabled={saving || inputsDisabled}
+              onChange={(event) => { if (canEditNow() && !saveLock.current) setDraft(event.target.value) }}
               onBlur={blurKeywords}
               onKeyDown={(event) => {
+                if (!canEditNow() || saveLock.current) return
                 // 日本語の変換中のキー（確定の Enter・変換の取り消し）は入力欄のもの。札にしない。
                 if (isImeComposing(event)) return
                 // 空の欄で Backspace を押すと、最後の札を外す（札の×は指を乗せたとき・選んだときだけ見せる）。
@@ -286,7 +347,9 @@ export default function QuickCreateV8({
         <div className={styles.field}><Field label="返す文" htmlFor="quick-create-reply" requirement={replyRequirement}><SaveErrorField names={["reply"]}><SharedTextArea
             id="quick-create-reply"
             value={reply}
+            disabled={saving || inputsDisabled}
             onChange={(event) => {
+              if (!canEditNow() || saveLock.current) return
               const next = event.target.value
               setReply(next)
               if (replyError && validateReply(next) === null) setReplyError('')

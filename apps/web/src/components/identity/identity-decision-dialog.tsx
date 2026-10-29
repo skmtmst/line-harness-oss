@@ -7,11 +7,13 @@ import type {
   DecideIdentityCandidateRequest,
   IdentityReprocessMode,
 } from '@line-crm/shared'
+import DifferencesFilter, { comparisonSourceLabels, sameKnownValues } from '@/components/shared/differences-filter'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
+import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import {
   canSubmitDecision,
@@ -66,6 +68,7 @@ export default function IdentityDecisionDialog({
   }) => void
 }) {
   const disabledReasonId = useId()
+  const [differencesOnly, setDifferencesOnly] = useState(true)
   const [decision, setDecision] = useState<IdentityCandidateDecision>('linked')
   const [reason, setReason] = useState('')
   const [mode, setMode] = useState<IdentityReprocessMode>('future_only')
@@ -75,6 +78,7 @@ export default function IdentityDecisionDialog({
   // 別の候補を開いたら、前の候補の入力を持ち越さない。
   useEffect(() => {
     if (!open) return
+    setDifferencesOnly(true)
     setDecision(initialDecision)
     setReason('')
     setMode('future_only')
@@ -83,6 +87,8 @@ export default function IdentityDecisionDialog({
     setConsents([false, false, false])
   }, [open, candidate, initialDecision])
 
+  useEffect(() => { if (error) setDifferencesOnly(false) }, [error])
+  const sourceLabels = comparisonSourceLabels([candidate.left, candidate.right].map((subject) => ({ id: subject.id, name: subject.label, source: subject.lineAccountName })))
   const ec = candidate.kind === 'ec_member'
   const canReprocess = ec && decision === 'linked'
   const profileCandidates = 'profileCandidates' in candidate ? candidate.profileCandidates : []
@@ -130,7 +136,7 @@ export default function IdentityDecisionDialog({
       error={error}
       onCancel={onCancel}
       designNode={candidate.kind === 'friend_duplicate' ? 'InCDe' : 'ELayY'}
-      footer={ec ? <DialogActions>{actions}</DialogActions> : <div className={styles.actions}>{actions}</div>}
+      footer={<DialogActions>{actions}</DialogActions>}
       footerAlign={ec ? 'center' : undefined}
     >
       <div className={styles.dialogBody}>
@@ -168,7 +174,11 @@ export default function IdentityDecisionDialog({
         {!ec && decision === 'linked' && profileCandidates.length > 0 ? (
           <div className={styles.field}>
             <p className={styles.fieldLabel}>統合プロフィールに採用する値</p>
-            {profileCandidates.map((field) => (
+            <DifferencesFilter checked={differencesOnly} onChange={setDifferencesOnly} />
+            {profileCandidates.filter((field) => !differencesOnly || !sameKnownValues([
+              field.options.find((option) => option.sourceFriendId === candidate.left.id)?.valuePreview,
+              field.options.find((option) => option.sourceFriendId === candidate.right.id)?.valuePreview,
+            ])).map((field) => (
               <label key={field.fieldKey} className={styles.fieldLabel}>
                 {field.fieldLabel}
                 <SaveErrorField names={["profileSelections","profile_selections"]}><Select
@@ -177,7 +187,7 @@ export default function IdentityDecisionDialog({
                   onChange={(value) => setProfileSelections((current) => ({ ...current, [field.fieldKey]: value }))}
                   options={field.options.map((option) => ({
                     value: option.sourceFriendId,
-                    label: `${option.sourceLabel}：${option.valuePreview ?? '未登録'}${option.verified ? '（確認済み）' : ''}`,
+                    label: `${sourceLabels[option.sourceFriendId] || option.sourceLabel}：${option.valuePreview ?? '未登録'}${option.verified ? '（確認済み）' : ''}`,
                   }))}
                   size="full"
                 /></SaveErrorField>
@@ -189,17 +199,17 @@ export default function IdentityDecisionDialog({
         {!ec && decision === 'linked' ? (
           <div className={styles.field}>
             <p className={styles.fieldLabel}>利用目的と同意・規約の確認</p>
-            {[
+            <DataTable><thead><TableHeadRow><Th>確かめること</Th></TableHeadRow></thead><tbody>{[
               'この統合の利用目的が、友だちが同意した範囲におさまっている',
               'プライバシーポリシーと利用規約に、この使い方が書いてある',
               'LINEの規約と、プロバイダーの決めごとに反していない',
             ].map((label, index) => (
-              <SaveErrorField names={["consents"]} key={label}><Checkbox
+              <Tr key={label}><Td><SaveErrorField names={["consents"]}><Checkbox
                 key={label}
                 checked={consents[index]}
                 onCheckedChange={(checked) => setConsents((current) => current.map((value, itemIndex) => itemIndex === index ? checked : value))}
-              >{label}</Checkbox></SaveErrorField>
-            ))}
+              >{label}</Checkbox></SaveErrorField></Td></Tr>
+            ))}</tbody></DataTable>
           </div>
         ) : null}
 

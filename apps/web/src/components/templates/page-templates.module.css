@@ -285,8 +285,10 @@
 :global(:root) .frame[data-frame-height='content'] { height: auto; min-height: 0; max-height: calc(100dvh - 74px); }
 :global(:root) .frame[data-frame-height='content']:not([data-has-footer]) { max-height: none; }
 :global(:root) .frame[data-has-footer] > .split,
-:global(:root) .frame[data-has-footer] > .settings { min-height: 0; overflow-y: auto; }
-:global(:root) .frame[data-has-footer] > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
+:global(:root) .frame[data-has-footer] > .settings,
+:global(:root) .frame[data-has-footer] > .settingsFlow > .settings { min-height: 0; overflow-y: auto; }
+:global(:root) .frame[data-has-footer] > [data-template-region='body'],
+:global(:root) .frame[data-has-footer] > .settingsFlow > [data-template-region='body'] { flex: 1; min-height: 0; overflow-y: auto; }
 :global(:root) .frame [data-template-region='preview'][data-preview-narrow='hidden'] { align-self: flex-start; }
 :global(:root) .footer { flex-shrink: 0; }
 /* 帯の位置は保ち、入力のスクロール領域は帯の上までに収める。 */
@@ -387,6 +389,8 @@
 :global(:root) [data-page-template='create'] .heading > .headingText > .description { flex-basis: 100%; order: 3; }
 /* 状態の短い補足も題の下の行。compact の間2を display:contents で失わない。 */
 :global(:root) [data-page-template='create'] .heading > .headingText > .subtitle { flex-basis: 100%; order: 3; }
+/* 閲覧のみの帯も題の行の下・横いっぱい。display:contents で頭の並びに加わるため order が要る。説明と同じ 3（DOM順で説明の後）にし、空きの値は触らない。 */
+:global(:root) [data-page-template='create'] .heading > .headingText > .headingNotice { flex-basis: 100%; order: 3; }
 :global(:root) [data-page-template='create'] .heading[data-heading-size='compact'] { row-gap: var(--tpl-compact-gap); }
 :global(:root) [data-page-template='create'] .heading > .crumbs { flex-basis: 100%; order: 4; }
 :global(:root) [data-page-template='create'] .heading > .steps { flex-basis: 100%; order: 5; margin-top: 0; }
@@ -657,6 +661,20 @@
 @container v8-page (max-width: 1099px) {
   :global(:root) .createFlow:has(> .asideToggle) { padding-top: var(--polish-space-field); }
 }
+
+/* The settings flow owns spacing between its notice and body. Cards keep their own gaps. */
+:global(:root) .settingsFlow {
+  display: flex; flex-direction: column; flex: 1; min-height: 0;
+  gap: var(--polish-space-card);
+}
+:global(:root) .settingsFlow > .createNotice { flex: none; }
+:global(:root) .settingsFlow > .createNotice[data-notice-spacing='band'] { padding-bottom: 0; }
+:global(:root) .settingsFlow > .createNotice > :global([data-design-part='notice']) { margin-bottom: 0; }
+:global(:root) .settingsFlow > .settings { min-height: 0; }
+:global(:root) .settingsFlow:has(> .createNotice:not(:empty)) > .settings > .settingsContent,
+:global(:root) .settingsFlow:has(> .createNotice:not(:empty)) > .settings > .settingsNav { padding-top: 0; }
+:global(:root) .settingsFlow:has(> .createNotice:not(:empty)) > .settings .customerLookMain,
+:global(:root) .settingsFlow:has(> .createNotice:not(:empty)) > .settings .customerLookPreview { padding-top: 0; }
 
 /* 独立した保存帯付きの板が viewport を明示した時だけ、親の可用高へ収める。
    対象条件は ../app-shell.module.css の親からの割当てと対で保つ。 */
