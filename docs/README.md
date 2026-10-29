@@ -453,6 +453,7 @@
 
 ## 反映履歴
 
+- [LINE接続マニュアルの現行4ステップへの更新](release-log/unreleased/1897-masato-line-connect-manual.md)
 - [Google口コミのAI下書き案内文の削除](release-log/unreleased/1896-masato-google-review-ai-note-remove.md)
 - [LINEアカウント登録のMessaging API設定への直リンク](release-log/unreleased/1895-masato-messaging-api-deeplink.md)
 - [Google口コミのAI下書き生成の修正](release-log/unreleased/1892-masato-google-review-ai-draft.md)
