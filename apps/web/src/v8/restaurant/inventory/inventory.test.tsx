@@ -155,12 +155,16 @@ describe('Y8SjT2 予約枠・在庫', () => {
       expect(input.value).toBe(savedValue)
     }
     const controls = [
+      ...screen.getAllByRole('switch'),
       screen.getByRole('button', { name: /開ける時間と配分を保存/ }),
       screen.getAllByRole('button', { name: '＋ 時間帯を足す' })[0],
       screen.getByRole('button', { name: '火曜日の1つ目の時間帯を外す' }),
       screen.getByRole('button', { name: 'この時間帯だけ保存' }),
       screen.getByRole('button', { name: '媒体の受付を閉じる' }),
     ]
+    expect(screen.getAllByRole('switch')).toHaveLength(7)
+    expect(screen.getByRole('switch', { name: '月曜日に予約を受ける' }).getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByRole('switch', { name: '火曜日に予約を受ける' }).getAttribute('aria-checked')).toBe('true')
     for (const control of controls) {
       expect(control.getAttribute('aria-disabled')).toBe('true')
       expect((control as HTMLButtonElement).disabled).toBe(false)
@@ -171,6 +175,8 @@ describe('Y8SjT2 予約枠・在庫', () => {
       expect(fireEvent.keyDown(control, { key: ' ' })).toBe(false)
       fireEvent.click(control)
     }
+    expect(screen.getByRole('switch', { name: '月曜日に予約を受ける' }).getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByRole('switch', { name: '火曜日に予約を受ける' }).getAttribute('aria-checked')).toBe('true')
     expect(fixture.saveOpeningHours).not.toHaveBeenCalled()
     expect(fixture.saveInventoryAllocation).not.toHaveBeenCalled()
     expect(fixture.updateInventory).not.toHaveBeenCalled()
@@ -186,6 +192,12 @@ describe('Y8SjT2 予約枠・在庫', () => {
     const save = screen.getByRole('button', { name: /開ける時間と配分を保存/ }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
     expect(save.hasAttribute('data-permission-locked')).toBe(false)
+    for (const control of screen.getAllByRole('switch')) {
+      expect((control as HTMLButtonElement).disabled).toBe(true)
+      expect(control.hasAttribute('data-permission-locked')).toBe(false)
+      fireEvent.click(control)
+    }
+    expect(screen.getByRole('switch', { name: '月曜日に予約を受ける' }).getAttribute('aria-checked')).toBe('false')
     expect(screen.queryByText(/閲覧のみで見ています/)).toBeNull()
     fireEvent.click(save)
     expect(fixture.saveOpeningHours).not.toHaveBeenCalled()
