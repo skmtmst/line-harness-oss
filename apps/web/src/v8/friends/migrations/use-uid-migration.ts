@@ -2,7 +2,10 @@
 import { UID_IMPORT_COLUMNS } from '@/lib/csv-import-columns'
 
 import { useStaffIdentity, useStaffRole, isOwnerRole, canManageRole } from '@/lib/staff-role'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react'
+import { effectiveStaffRole, readStaffIdentity, subscribeStaffIdentity } from '@/lib/staff-identity-state'
+import { readPermissionSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import type { ApiResponse, LineAccount } from '@line-crm/shared'
 import { api, ApiError, fetchApi, type UidMigrationItem, type UidMigrationRun } from '@/lib/api'
 import { splitCsvRecords } from './friend-csv'
@@ -13,6 +16,13 @@ import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-er
  * ★V8 の写し（app/accounts/use-uid-migration.ts から。src/v8 は @/app を読めない）。
  * 判断・実行・切り戻しの口と失敗時の扱いは同じ。違いは最初に開く履歴を `?run=` で選べることだけ。
  */
+/** API直前の本人・代理モード。理由の有無を認可に使わない。 */
+function canWriteMigrationNow(ownerOnly = false): boolean {
+  if (readPermissionSessionSnapshot()?.impersonation?.mode === 'read') return false
+  const role = effectiveStaffRole(readStaffIdentity())
+  return ownerOnly ? isOwnerRole(role) : canManageRole(role)
+}
+
 export const MIGRATION_STEPS: readonly string[] = ['移行の登録', '対応表の取込', '事前確認', '要確認の判断', '本移行と照合']
 
 /**
@@ -111,6 +121,8 @@ export function useUidMigration(initialRunId: string | null = null) {
   const [purpose, setPurpose] = useState('友だち情報と配信停止状態を新しいアカウントへ引き継ぐ')
   const [file, setFile] = useState<File | null>(null)
   const [mappings, setMappings] = useState<ReturnType<typeof parseUidCsv>>([])
+  const fileSeq = useRef(0)
+  const [mappingsFile, setMappingsFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [page, setPage] = useState(0)
@@ -126,6 +138,21 @@ export function useUidMigration(initialRunId: string | null = null) {
   const identity = useStaffIdentity()
   const staffRole = useStaffRole()
   const me = identity && staffRole ? { id: identity.id, role: staffRole } : null
+  const canDecide = canWriteMigrationNow()
+  const managerLockReason = usePermissionLockReason(canDecide, 'manager')
+  const ownerLockReason = usePermissionLockReason(canWriteMigrationNow(true), 'owner')
+  const accessEpoch = useRef(0), inputEpoch = useRef(0), writeLock = useRef(false), mounted = useRef(false)
+  const current = useRef({ active, detailBusy, file, mappingsFile, mappings, fromAccountId, toAccountId, purpose })
+  current.current = { active, detailBusy, file, mappingsFile, mappings, fromAccountId, toAccountId, purpose }
+  const renderedDetailTicket = detailTicket.current
+  const isCurrentRun = (id: string) => mounted.current && current.current.active?.id === id && detailTicket.current === renderedDetailTicket
+  useEffect(() => {
+    mounted.current = true
+    const invalidate = () => { accessEpoch.current++ }
+    const unsubscribe = subscribeStaffIdentity(invalidate)
+    window.addEventListener(SESSION_SNAPSHOT_CHANGED, invalidate)
+    return () => { mounted.current = false; invalidate(); unsubscribe(); window.removeEventListener(SESSION_SNAPSHOT_CHANGED, invalidate) }
+  }, [])
   /* FRIEND-14: 「詳細を見る」は読み取り専用。判断はダイアログ内の明示操作だけ。 */
   const [detailItem, setDetailItem] = useState<UidMigrationItem | null>(null)
   const [detailError, setDetailError] = useState<string | null>(null)
@@ -200,12 +227,24 @@ export function useUidMigration(initialRunId: string | null = null) {
     受け付ける種類（accept）・読み方・読み飛ばしの文は変えない。
   */
   const onUidFile = async (files: File[]) => {
+    if (!canWriteMigrationNow() || writeLock.current) return
+    const permissionEpoch = accessEpoch.current
     const selected = files[0] ?? null
+    const seq = ++fileSeq.current
+    setMappings([])
+    setMappingsFile(null)
     setFile(selected)
     if (!selected) { setMappings([]); return }
     const text = await selected.text()
+    if (!mounted.current) return
+    if (seq !== fileSeq.current) return
+    if (permissionEpoch !== accessEpoch.current || !canWriteMigrationNow()) {
+      setMessage('権限が変わったため、CSVの読み込みを中止しました。')
+      return
+    }
     const parsed = parseUidCsv(text)
     setMappings(parsed)
+    setMappingsFile(selected)
     const dataLines = Math.max(text.replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim()).length - 1, 0)
     setMessage(dataLines > parsed.length
       ? `対応表のうち ${dataLines - parsed.length} 行は読み取れなかったため除いています。列の数と引用符を確認してください。`
@@ -213,16 +252,29 @@ export function useUidMigration(initialRunId: string | null = null) {
   }
 
   const createDryRun = async () => {
-    if (!canManageRole(me?.role) || busy) return
-    if (!file || mappings.length === 0 || !fromAccountId || !toAccountId || !purpose.trim()) {
+    if (!mounted.current || !canWriteMigrationNow() || busy || writeLock.current) return
+    if (!file || mappingsFile !== file || mappings.length === 0 || !fromAccountId || !toAccountId || !purpose.trim()) {
       setMessage('移行元・移行先・利用目的と、old_uid / new_uid 列を持つCSVを選んでください。')
       return
     }
+    const permissionEpoch = accessEpoch.current, selectionEpoch = inputEpoch.current
+    writeLock.current = true
     setBusy(true)
     setMessage(null)
     try {
       const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(await file.text()))
       const sourceChecksum = Array.from(new Uint8Array(digest)).map((value) => value.toString(16).padStart(2, '0')).join('')
+      const latest = current.current
+      if (!mounted.current) return
+      if (!canWriteMigrationNow() || permissionEpoch !== accessEpoch.current) {
+        setMessage('権限が変わったため、テスト移行を中止しました。')
+        return
+      }
+      if (selectionEpoch !== inputEpoch.current || latest.file !== file || latest.mappingsFile !== file || latest.mappings !== mappings
+        || latest.fromAccountId !== fromAccountId || latest.toAccountId !== toAccountId || latest.purpose !== purpose) {
+        setMessage('入力が変わったため、テスト移行を中止しました。内容を確認してから実行してください。')
+        return
+      }
       const response = await api.friendMigrations.dryRun({
         fromAccountId, toAccountId, purpose: purpose.trim(), sourceFilename: file.name, sourceChecksum, mappings,
       })
@@ -237,12 +289,14 @@ export function useUidMigration(initialRunId: string | null = null) {
     } catch (error) {
       setMessage(apiErrorMessage(error, 'テスト移行を実行できませんでした。'))
     } finally {
+      writeLock.current = false
       setBusy(false)
     }
   }
 
   const decide = async (item: UidMigrationItem, decision: UidMigrationDecision) => {
-    if (!canManageRole(me?.role) || !active || busy || detailBusy) return
+    if (!canWriteMigrationNow() || !active || !isCurrentRun(active.id) || writeLock.current || busy || current.current.detailBusy || !['review', 'ready', 'failed'].includes(current.current.active!.status)) return
+    writeLock.current = true
     setBusy(true)
     setMessage(null)
     setDetailError(null)
@@ -271,6 +325,7 @@ export function useUidMigration(initialRunId: string | null = null) {
       setDetailError(text)
       if (!(error instanceof ApiError)) void loadDetail(active.id, page, classification, pendingOnly)
     } finally {
+      writeLock.current = false
       setBusy(false)
     }
   }
@@ -284,11 +339,13 @@ export function useUidMigration(initialRunId: string | null = null) {
     作成者本人・owner以外はここで理由を示し、確定ボタンを出さない
     （サーバー側でも 409/403 で拒否する）。
   */
-  const canRunExecute = Boolean(me && isOwnerRole(me.role) && me.id !== active?.createdBy)
-  const canRunRollback = Boolean(me && isOwnerRole(me.role))
+  const canRunExecute = Boolean(me && canWriteMigrationNow(true) && me.id !== active?.createdBy)
+  const canRunRollback = Boolean(me && canWriteMigrationNow(true))
 
   const execute = async () => {
-    if (!canRunExecute || !active || busy) return
+    if (!canWriteMigrationNow(true) || !active || !isCurrentRun(active.id) || current.current.active!.createdBy === readStaffIdentity()?.id
+      || writeLock.current || busy || current.current.detailBusy || !['ready', 'failed'].includes(current.current.active!.status) || unresolved !== 0) return
+    writeLock.current = true
     setBusy(true)
     setExecuteError(null)
     try {
@@ -334,6 +391,7 @@ export function useUidMigration(initialRunId: string | null = null) {
         void loadDetail(active.id, page, classification, pendingOnly)
       }
     } finally {
+      writeLock.current = false
       setBusy(false)
     }
   }
@@ -343,7 +401,9 @@ export function useUidMigration(initialRunId: string | null = null) {
     対象件数・制約・権限を示し、競合があればサーバーの409をそのまま表示する。
   */
   const rollback = async () => {
-    if (!canRunRollback || !active || busy) return
+    if (!canWriteMigrationNow(true) || !active || !isCurrentRun(active.id) || writeLock.current || busy || current.current.detailBusy
+      || !(current.current.active!.status === 'completed' || current.current.active!.status === 'failed' && current.current.active!.counts.applied > 0)) return
+    writeLock.current = true
     setBusy(true)
     setRollbackError(null)
     setRollbackConflicts([])
@@ -374,6 +434,7 @@ export function useUidMigration(initialRunId: string | null = null) {
         void loadDetail(active.id, 0, '', false)
       }
     } finally {
+      writeLock.current = false
       setBusy(false)
     }
   }
@@ -404,15 +465,15 @@ export function useUidMigration(initialRunId: string | null = null) {
     active,
     status,
     fromAccountId,
-    setFromAccountId,
+    setFromAccountId: (next: SetStateAction<string>) => { if (canWriteMigrationNow() && !writeLock.current) { inputEpoch.current++; setFromAccountId(next) } },
     toAccountId,
-    setToAccountId,
+    setToAccountId: (next: SetStateAction<string>) => { if (canWriteMigrationNow() && !writeLock.current) { inputEpoch.current++; setToAccountId(next) } },
     purpose,
-    setPurpose,
+    setPurpose: (next: SetStateAction<string>) => { if (canWriteMigrationNow() && !writeLock.current) { inputEpoch.current++; setPurpose(next) } },
     file,
-    setFile,
+    setFile: (next: SetStateAction<File | null>) => { if (canWriteMigrationNow() && !writeLock.current) { inputEpoch.current++; fileSeq.current++; setMappingsFile(null); setFile(next) } },
     mappings,
-    setMappings,
+    setMappings: (next: SetStateAction<ReturnType<typeof parseUidCsv>>) => { if (canWriteMigrationNow() && !writeLock.current) { inputEpoch.current++; setMappings(next) } },
     busy,
     message,
     setMessage,
@@ -424,6 +485,9 @@ export function useUidMigration(initialRunId: string | null = null) {
     setPendingOnly,
     detailBusy,
     me,
+    canDecide,
+    managerLockReason: me ? managerLockReason : undefined,
+    ownerLockReason: me ? ownerLockReason : undefined,
     detailItem,
     setDetailItem,
     detailError,
