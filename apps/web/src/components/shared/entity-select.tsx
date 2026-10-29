@@ -44,6 +44,7 @@ type CommonProps = {
   className?: string
   disabled?: boolean
   disabledReason?: string
+  lockedReason?: string
   readOnly?: boolean
   /** 移行前のComboboxなど、任意の選択を空へ戻せる欄。 */
   clearable?: boolean
@@ -96,7 +97,7 @@ export default function EntitySelect(props: EntitySelectProps) {
   const noun = props.noun ?? (kind ? ENTITY_KINDS[kind].noun : props.label ?? label.replace(/で絞り込む.*$|を変える$|を選ぶ$/, ''))
   const common = {
     compact: props.compact, label, ariaLabel: label, noun, items, createHref: kind ? ENTITY_KINDS[kind].createHref : undefined, createLabel: kind ? ENTITY_KINDS[kind].createLabel : undefined, folders: loadedFolders ?? localFolders, foldersFailed: failed,
-    onOpen: hasFolderInfo && kind ? load : undefined, disabled, disabledReason: props.disabledReason, readOnly, invalid: Boolean(error) || invalid, id,
+    onOpen: hasFolderInfo && kind ? load : undefined, disabled, disabledReason: props.disabledReason, lockedReason: props.lockedReason, readOnly, invalid: Boolean(error) || invalid, id,
     placeholder: props.placeholder ?? options.find((option) => option.value === '')?.label ?? `${noun}を選ぶ`,
     state: loading ? <p role="status">読み込んでいます。</p> : undefined,
     describedBy: [props['aria-describedby'], error ? errorId : undefined].filter(Boolean).join(' ') || undefined, defaultOpen: props.defaultOpen, valuePrefix: props.valuePrefix, actionHidden: props.actionHidden,

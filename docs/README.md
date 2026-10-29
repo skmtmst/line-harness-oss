@@ -459,9 +459,13 @@
 
 ## 反映履歴
 
+- [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
+- [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
 - [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/1948-kenta-train-1029f.md)
 - [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
 - [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
+- [お知らせの帯と次の段の間隔そろえ](release-log/unreleased/1950-kenta-muse-fqa-space.md)
+- [在庫の保存帯と本文の重なり修正](release-log/unreleased/1950-kenta-swbm-b19.md)
 - [新規店舗の専用機能を非表示](release-log/unreleased/1925-masato-new-store-specialized-hidden.md)
 - [一斉配信・シナリオ一覧の自動点検の更新](release-log/unreleased/1930-kenta-muse-broadcast-scenario-reds.md)
 - [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
@@ -502,6 +506,7 @@
 - [契約者向けLINEの通知専用化](release-log/unreleased/1941-masato-notice-line-only.md)
 - [申込受付と承認画面の調整](release-log/unreleased/1943-masato-registration-approval-pen.md)
 - [接続マニュアルのチャット注意書き復元と画像軽量化](release-log/unreleased/1946-kenta-muse-red-accounts.md)
+- [友だち分析の日付と縦軸の重なり修正](release-log/unreleased/1950-kenta-chart-date-axis.md)
 - [投稿メディアの内容選択](release-log/unreleased/1890-masato-post-media-content.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
@@ -939,5 +944,8 @@
 - [押せない理由の表示](release-log/unreleased/1948-kenta-muse-fqa-table.md) — 閲覧のみの帯と除外の理由結び付けの反映履歴。
 - [今日送った内訳の名前表示](release-log/unreleased/1948-kenta-line-notify-kpi-label.md) — LINE通知の内訳を内部名でなくお知らせ名で出す反映履歴。
 - [利用開始設定から二段階認証への引き継ぎ](release-log/unreleased/1949-masato-registration-mfa-flow.md) — 登録後の認証とアカウント登録への案内の反映履歴。
-
-- [業種別の初期設定の確認](release-log/unreleased/0000-kenta-style-setup-progress.md) — 反映履歴、確認 2026-10-29
+- [LINE通知の操作権限の反映履歴](release-log/unreleased/1950-kenta-notification-permission.md)
+- [LINE通知の説明の置き場所](release-log/unreleased/1950-kenta-notification-help.md)
+- [LINE通知の送信内訳の表示](release-log/unreleased/1950-kenta-notification-kpi-detail.md)
+- [業種別の初期設定の確認](release-log/unreleased/1950-kenta-style-setup-progress.md) — 反映履歴、確認 2026-10-29
+- [業種別の初期設定の確認](release-log/unreleased/0000-kenta-first-message-guide.md) — 反映履歴、確認 2026-10-29

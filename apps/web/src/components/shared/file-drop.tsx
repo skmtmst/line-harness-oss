@@ -1,9 +1,10 @@
 'use client'
 
 import { Ban, FileText, LoaderCircle, RotateCcw, Upload, X } from 'lucide-react'
-import { useId, useRef, useState, type ClipboardEventHandler, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ClipboardEventHandler, type ReactNode } from 'react'
 import Button from './button'
 import IconButton from './icon-button'
+import { usePermissionLockTip } from './permission-lock-tip'
 import styles from './file-drop.module.css'
 
 /**
@@ -30,6 +31,7 @@ export default function FileDropzone({
   accept,
   multiple = false,
   disabled = false,
+  lockedReason,
   busy = false,
   busyTitle = '取り込んでいます…',
   busyNote,
@@ -56,6 +58,8 @@ export default function FileDropzone({
   accept?: string
   multiple?: boolean
   disabled?: boolean
+  /** 権限による選択・ドロップ・貼り付けの拒否理由。secondary の操作は呼び出し側で制御する。 */
+  lockedReason?: string
   /** 取り込み中。押せなくなり、進みの表示に切り替わる。 */
   busy?: boolean
   busyTitle?: string
@@ -76,15 +80,20 @@ export default function FileDropzone({
   const inputRef = useRef<HTMLInputElement>(null)
   const dragCount = useRef(0)
   const [drag, setDrag] = useState<'idle' | 'active' | 'reject'>('idle')
-  const interactive = !disabled && !busy
+  const interactive = !disabled && !busy && !lockedReason
   const wholeZonePicker = variant === 'composer' || variant === 'upload'
+  const lock = usePermissionLockTip<HTMLDivElement>(wholeZonePicker ? lockedReason : undefined)
+  const { disabled: _nativeDisabled, ...zoneLockHandlers } = lock.handlers ?? {}
+  useEffect(() => {
+    if (lockedReason) { dragCount.current = 0; setDrag('idle') }
+  }, [lockedReason])
 
   const openPicker = () => {
     if (interactive) inputRef.current?.click()
   }
 
   // 見本固定があればそれを見せ、無ければ今のドラッグ状態を見せる。
-  const shown = previewState ?? drag
+  const shown = lockedReason ? 'idle' : previewState ?? drag
 
   const checkDrag = (event: React.DragEvent) => {
     event.preventDefault()
@@ -116,9 +125,10 @@ export default function FileDropzone({
     if (files.length > 0) onFiles(multiple ? files : files.slice(0, 1))
   }
 
-  return (
+  return (<>
     <div
-      role={variant === 'upload' ? disabled ? 'group' : 'button' : variant === 'composer' ? 'button' : 'group'}
+      ref={lock.ref}
+      role={variant === 'upload' ? disabled && !lockedReason ? 'group' : 'button' : variant === 'composer' ? 'button' : 'group'}
       aria-disabled={variant === 'upload' && !interactive || undefined}
       aria-label={ariaLabel ?? title}
       aria-busy={busy || undefined}
@@ -128,9 +138,9 @@ export default function FileDropzone({
       data-variant={variant}
       data-drag={shown}
       data-busy={busy || undefined}
-      data-disabled={disabled || undefined}
+      data-disabled={disabled || Boolean(lockedReason) || undefined}
       className={[styles.zone, className].filter(Boolean).join(' ')}
-      tabIndex={wholeZonePicker && interactive ? 0 : undefined}
+      tabIndex={wholeZonePicker && (interactive || lockedReason) ? 0 : undefined}
       onKeyDown={(event) => { if (wholeZonePicker && ['Enter', ' '].includes(event.key)) { event.preventDefault(); openPicker() } }}
       onClick={(event) => {
         // input 自身の click はここへ泡立ってくる。拾うと input.click が再帰する。
@@ -141,7 +151,8 @@ export default function FileDropzone({
       onDragOver={checkDrag}
       onDragLeave={leaveDrag}
       onDrop={dropFiles}
-      onPaste={onPaste}
+      onPaste={lockedReason ? (event) => { event.preventDefault(); event.stopPropagation() } : onPaste}
+      {...zoneLockHandlers}
     >
       {busy ? (
         <>
@@ -169,6 +180,7 @@ export default function FileDropzone({
             <Button
               type="button"
               disabled={!interactive}
+              lockedReason={lockedReason}
               onClick={(event) => {
                 event.stopPropagation()
                 openPicker()
@@ -194,11 +206,13 @@ export default function FileDropzone({
           const files = [...(event.target.files ?? [])]
           // 同じファイルを選び直せるよう、毎回空に戻す。
           event.target.value = ''
+          if (lockedReason) return
           if (files.length > 0) onFiles(multiple ? files : files.slice(0, 1))
         }}
       />
     </div>
-  )
+    {lock.node}
+  </>)
 }
 
 function matchesAccept(item: DataTransferItem, accept?: string): boolean {
@@ -236,6 +250,8 @@ export function AttachmentRow({
   errorText,
   onRemove,
   onRetry,
+  disabled,
+  lockedReason,
   thumbnail,
   tone = 'document',
   className,
@@ -254,6 +270,9 @@ export function AttachmentRow({
   onRemove?: () => void
   /** 渡すと「選び直す」を出す。error 用。 */
   onRetry?: () => void
+  disabled?: boolean
+  /** 権限による外す・選び直す操作の拒否理由。 */
+  lockedReason?: string
   /** 縮小画像（36px に収まる img など）。無いときは書類の印になる。 */
   thumbnail?: ReactNode
   /** 縮小画像の地。写真は薄い緑、書類は薄い灰（設計 NQMnx）。 */
@@ -297,11 +316,11 @@ export function AttachmentRow({
         ) : null}
       </span>
       {status === 'error' && onRetry ? (
-        <IconButton aria-label={`「${name}」を選び直す`} aria-describedby={describedId} onClick={onRetry}>
+        <IconButton aria-label={`「${name}」を選び直す`} aria-describedby={describedId} disabled={disabled} lockedReason={lockedReason} onClick={onRetry}>
           <RotateCcw aria-hidden="true" size={16} />
         </IconButton>
       ) : onRemove ? (
-        <IconButton aria-label={`「${name}」を外す`} onClick={onRemove}>
+        <IconButton aria-label={`「${name}」を外す`} disabled={disabled} lockedReason={lockedReason} onClick={onRemove}>
           <X aria-hidden="true" size={16} />
         </IconButton>
       ) : null}
