@@ -35,8 +35,8 @@ export function BookingCategory({ name, color }: { name: string; color?: string 
   return <span className={styles.category} title={name}><TagColorDot color={color} /><span className={styles.categoryText}>{name}</span></span>
 }
 
-const sourceNames: Record<string, string> = { line: 'LINE', liff: 'LINE', restaurant_board: 'レストランボード', tabelog: '食べログ', hotpepper: 'ホットペッパー', ikyu: '一休', phone: '電話', manual: '手入力', walk_in: 'ウォークイン', counter: '店頭', operator: '手入力', import: '取り込み' }
-const sourceColors: Record<string, string> = { phone: 'var(--color-status-info)', line: 'var(--color-accent-deep)', liff: 'var(--color-accent-deep)', restaurant_board: 'var(--color-accent-deep)', tabelog: 'var(--color-danger)', hotpepper: 'var(--color-danger)', ikyu: 'var(--color-danger)' }
+const sourceNames: Record<string, string> = { line: 'LINE', liff: 'LINE', restaurant_board: 'レストランボード', tabelog: '食べログ', hotpepper: 'ホットペッパー', ikyu: '一休', phone: '電話', manual: '電話', walk_in: 'ウォークイン', counter: '店頭', operator: '手入力', import: '取り込み' }
+const sourceColors: Record<string, string> = { phone: 'var(--color-status-info)', manual: 'var(--color-status-info)', line: 'var(--color-accent-deep)', liff: 'var(--color-accent-deep)', restaurant_board: 'var(--color-accent-deep)', tabelog: 'var(--color-danger)', hotpepper: 'var(--color-danger)', ikyu: 'var(--color-danger)' }
 export function ReservationSource({ value, note, label }: { value: string; note?: string | null; label?: string }) {
   const name = label ?? (value === 'manual' && note?.startsWith('ウォークイン') ? 'ウォークイン' : sourceNames[value] ?? value)
   return <span data-source={value}><BookingCategory name={name} color={sourceColors[value]} /></span>

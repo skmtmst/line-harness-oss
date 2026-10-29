@@ -79,9 +79,13 @@ it.each(['line', 'liff', 'manual', 'walk_in', 'counter', 'tabelog'])('予約の�
   expect(container.querySelector('[data-source]')).toBeNull()
 })
 
-it('詳細と一覧では手入力・ウォークインの経路名を保持する', () => {
+it('詳細と一覧では手入力の予約を電話と青い丸で示し、ウォークインの経路名を保持する', () => {
   const { rerender, container } = render(<ReservationSource value="manual" />)
-  expect(container.textContent).toBe('手入力')
+  expect(container.textContent).toBe('電話')
+  expect(container.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain('background-color: var(--color-status-info)')
+  rerender(<ReservationSource value="phone" />)
+  expect(container.textContent).toBe('電話')
+  expect(container.querySelector('[aria-hidden="true"]')?.getAttribute('style')).toContain('background-color: var(--color-status-info)')
   rerender(<ReservationSource value="manual" note="ウォークイン（予約なしの来店）" />)
   expect(container.textContent).toBe('ウォークイン')
 })
