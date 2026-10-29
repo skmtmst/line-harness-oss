@@ -1,5 +1,6 @@
 'use client'
 
+import { useListSnapshot } from '@/lib/use-list-snapshot'
 import { jstDate, jstDateOffset } from '@/lib/jst-datetime'
 
 /*
@@ -41,6 +42,10 @@ export function useRegisterExport(onClick: () => void, disabled: boolean) {
 
 export const RANGES = [7, 30, 90]
 
+export function reportPeriodLabel(days: number, hasCustomRange: boolean): string {
+  return hasCustomRange ? 'この期間' : `この${days}日`
+}
+
 /** 今の画面と同じ日本時間の暦日の範囲。 */
 export function rangeFor(days: number, now = new Date()): { from: string; to: string } {
   return { from: jstDateOffset(-days, now), to: jstDate(now) }
@@ -52,7 +57,7 @@ export type OverviewResult<T> =
 
 /** 概要の読み込み。key が変わった時と retry の時だけ読み直す。 */
 export function useOverview<T>(load: () => Promise<OverviewResult<T>>, key: string) {
-  const [data, setData] = useState<T | null>(null)
+  const { value: data, setValue: setData } = useListSnapshot<T | null>(key, null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [reloadSeq, setReloadSeq] = useState(0)
@@ -75,7 +80,7 @@ export function useOverview<T>(load: () => Promise<OverviewResult<T>>, key: stri
       })
     return () => { active = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, reloadSeq])
+  }, [key, reloadSeq, setData])
   return { data, loading, error, retry: () => setReloadSeq((n) => n + 1) }
 }
 

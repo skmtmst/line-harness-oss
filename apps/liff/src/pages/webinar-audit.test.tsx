@@ -233,11 +233,11 @@ it('開始までの残り時間を分秒で出し、時計を進めると減る'
   await act(async () => {});
   await advanceSeconds(1);
   const timer = screen.getByRole('timer');
-  expect(timer.getAttribute('aria-label')).toBe('開始まであと124秒');
+  expect(timer.getAttribute('aria-label')).toBe('開始まであと2分4秒');
   expect(timer.textContent).toContain('02分');
   expect(timer.textContent).toContain('04秒');
   await advanceSeconds(2);
-  expect(screen.getByRole('timer').getAttribute('aria-label')).toBe('開始まであと122秒');
+  expect(screen.getByRole('timer').getAttribute('aria-label')).toBe('開始まであと2分2秒');
 });
 
 it('視聴終了時刻で動画を止め、終了を伝える', async () => {
@@ -283,4 +283,16 @@ it('動画を再生できない端末には別の端末を使う案内を出す'
   open();
   expect(await screen.findByText('この端末では再生できません')).toBeTruthy();
   expect(screen.getByText('別の端末かブラウザで開いてください。')).toBeTruthy();
+});
+
+it('19日以上先の開始を、実際の待機画面で日と時間にまとめる', async () => {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date('2026-10-01T00:00:00Z'));
+  webinarState.mockResolvedValue({ live: false, title: '説明会', nextSessionAt: Math.floor(Date.now() / 1000) + 19 * 86400 + 17 * 3600 + 10 } as WebinarState);
+  open();
+  await advanceSeconds(2);
+  const timer = screen.getByRole('timer');
+  expect(timer.textContent).toContain('日');
+  expect(timer.getAttribute('aria-label')).toContain('19日');
+  expect(timer.textContent).not.toContain('28417');
 });

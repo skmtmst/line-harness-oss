@@ -3,6 +3,7 @@ import { jstDate } from '@/lib/jst-datetime'
 import { closedOn, closedRanges } from '../lib/closed-ranges'
 import { useMemo, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -13,7 +14,9 @@ import styles from '../settings.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { requiredText, optionalText } from '@/lib/form-requirement'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import HolidayBookings from './holiday-bookings'
 import Notice from '@/components/shared/notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /* ③ 休業日（settings-v8.tsx から分割。見た目・動きは変えない） */
@@ -61,10 +64,12 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
   onSaved: (settings: BookingSettings) => void
   onReload: () => void
 }) {
+  const lockedReason = usePermissionLockReason(canEdit)
   const saveErrors = useSaveFormErrors()
   const today = useMemo(() => jstDate(), [])
   const [month, setMonth] = useState(today.slice(0, 7))
   const [editing, setEditing] = useState<BookingException | 'new' | null>(null)
+  const [selectedDate, setSelectedDate] = useState('')
   const [editFrom, setEditFrom] = useState('')
   const [editTo, setEditTo] = useState('')
   const [editReason, setEditReason] = useState('')
@@ -96,6 +101,8 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
   })
 
   function openNew(date?: string) {
+    if (!canEdit) return
+    setSelectedDate(date ?? '')
     setEditing('new')
     setEditFrom(date ?? '')
     setEditTo(date ?? '')
@@ -103,7 +110,8 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
     setEditError(null)
     setDateErrors({})
   }
-  function openEdit(item: BookingException) {
+  function openEdit(item: BookingException, date?: string) {
+    setSelectedDate(date ?? (item.dateFrom || item.date || ''))
     setEditing(item)
     setEditFrom(item.dateFrom || item.date || '')
     setEditTo(item.dateTo || item.date || '')
@@ -192,10 +200,11 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
 
   const weeks = monthWeeks(month)
   const monthLabel = `${Number(month.slice(0, 4))}年${Number(month.slice(5, 7))}月`
+  const reviewDate = selectedDate >= editFrom && selectedDate <= editTo ? selectedDate : editFrom
 
   return (
     <SaveErrorScope errors={saveErrors}><div className={styles.tabStack} data-design="Special">
-      <section className={styles.section}>
+      <Card layout="vertical" padding="roomy" gap="normal">
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>{monthLabel}</h2>
           <p className={styles.sectionDesc}>日にちを押すと休みにできます。定休日（毎週）は受付枠で決めます</p>
@@ -204,9 +213,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
           <button type="button" className={styles.calNavButton} aria-label="前の月" onClick={() => setMonth(shiftMonth(month, -1))}><ChevronLeft size={16} aria-hidden="true" /></button>
           <span className={styles.calMonth}>{monthLabel}</span>
           <button type="button" className={styles.calNavButton} aria-label="次の月" onClick={() => setMonth(shiftMonth(month, 1))}><ChevronRight size={16} aria-hidden="true" /></button>
-          {canEdit ? (
-            <button type="button" className={styles.calAdd} onClick={() => openNew()}><Plus size={16} aria-hidden="true" />臨時休業を足す</button>
-          ) : null}
+          <Button type="button" variant="text" disabled={!canEdit} lockedReason={lockedReason} onClick={() => openNew()}><Plus size={16} aria-hidden="true" />臨時休業を足す</Button>
         </div>
 
       <div className={styles.calGrid} role="grid" aria-label={`${monthLabel}の休業日`}>
@@ -237,24 +244,24 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
               ) : null}
             </>
           )
-          // 閲覧のみ：日を押して休業を足す・直す口は置かず、日と印だけを見せる（2026-10-06 オーナー決定）。
-          const DayCell = canEdit ? 'button' : 'span'
+          if (!canEdit) return <span key={date} role="gridcell" aria-label={dayLabel} className={dayClass}>{dayBody}</span>
           return (
-            <DayCell
+            <Button
               key={date}
-              {...(canEdit ? { type: 'button' as const, onClick: () => { if (exception) openEdit(exception); else openNew(date) } } : {})}
+              type="button" variant="text" disabled={!canEdit} lockedReason={lockedReason}
+              onClick={() => { if (!canEdit) return; if (exception) openEdit(exception, date); else openNew(date) }}
               role="gridcell"
               aria-label={dayLabel}
               className={dayClass}
             >
               {dayBody}
-            </DayCell>
+            </Button>
           )
         })}
       </div>
-      </section>
+      </Card>
 
-      <section className={styles.section}>
+      <Card layout="vertical" padding="roomy" gap="normal">
         <div className={styles.sectionHead}>
           <h2 className={styles.sectionTitle}>臨時休業</h2>
         </div>
@@ -265,28 +272,12 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
             const to = item.dateTo || item.date || ''
             return (
               <div key={item.id} className={styles.exceptionRow}>
-                {canEdit ? (
-                  <button
-                    type="button"
-                    className={styles.exceptionDates}
-                    onClick={() => openEdit(item)}
-                  >
-                    {from !== to ? `${jpDate(from)}・${jpDate(to)}` : jpDate(from)}
-                  </button>
-                ) : (
-                  // 閲覧のみ：直す口は置かず、日付だけを見せる。
-                  <span className={styles.exceptionDates}>{from !== to ? `${jpDate(from)}・${jpDate(to)}` : jpDate(from)}</span>
-                )}
+                <Button type="button" variant="text" size="inline" disabled={!canEdit} lockedReason={lockedReason} onClick={() => { if (canEdit) openEdit(item) }}>
+                  {from !== to ? `${jpDate(from)}・${jpDate(to)}` : jpDate(from)}
+                </Button>
                 <span className={styles.exceptionReason} title={item.reason || item.note || '臨時休業'}>{item.reason || item.note || '臨時休業'}</span>
-                {canEdit ? (
-                  <button
-                    type="button"
-                    className="text-danger text-xs font-semibold"
-                    onClick={() => { setEditError(null); setDeleteError(null); setDeleteTarget(item) }}
-                  >
-                    削除
-                  </button>
-                ) : null}
+                <Button type="button" variant="text" textTone={canEdit ? 'danger' : undefined} size="inline" disabled={!canEdit} lockedReason={lockedReason}
+                  onClick={() => { if (!canEdit) return; setEditError(null); setDeleteError(null); setDeleteTarget(item) }}>削除</Button>
               </div>
             )
           })}
@@ -300,23 +291,22 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
           ? `すでに入っている予約は消えません。休みにした日に予約がある人には、お店から連絡してください（${bookingCountOnClosed} 件）。`
           : 'すでに入っている予約は消えません。休みにした日に予約がある人には、お店から連絡してください。'}
       </p>
-      </section>
+      </Card>
 
       <Dialog
         open={editing !== null}
         title={editing === 'new' ? '臨時休業を足す' : '休業日を直す'}
         onCancel={() => { if (!busy) setEditing(null) }}
         busy={busy}
+        confirmLabel="休業日を保存する"
+        onConfirm={() => void save()}
       >
         <div className="grid gap-3">
-          <Field label="開始日" requirement={holidayRequirements.from} error={dateErrors.from}><SaveErrorField names={["editFrom","dateFrom","edit_from"]}><DateField aria-label="休業の開始日" value={editFrom} onChange={(value) => { setEditFrom(value); setDateErrors(current => ({ ...current, from: undefined })) }} disabled={busy} className="mt-1" /></SaveErrorField></Field>
+          <Field label="開始日" requirement={holidayRequirements.from} error={dateErrors.from}><SaveErrorField names={["editFrom","dateFrom","edit_from"]}><DateField aria-label="休業の開始日" value={editFrom} onChange={(value) => { setEditFrom(value); setSelectedDate(value); setDateErrors(current => ({ ...current, from: undefined })) }} disabled={busy} className="mt-1" /></SaveErrorField></Field>
           <Field label="終了日" requirement={holidayRequirements.to} error={dateErrors.to}><SaveErrorField names={["editTo","dateTo","edit_to"]}><DateField aria-label="休業の終了日" value={editTo} onChange={(value) => { setEditTo(value); setDateErrors(current => ({ ...current, to: undefined })) }} disabled={busy} className="mt-1" /></SaveErrorField></Field>
           <Field label="理由" requirement={holidayRequirements.reason}><SaveErrorField names={["editReason","reason","edit_reason"]}><SharedTextField aria-label="休業の理由" value={editReason} onChange={(event) => setEditReason(event.target.value)} disabled={busy} placeholder="例：お盆・店舗の改装" className="border-hairline rounded-control focus:ring-accent mt-1 w-full border bg-canvas px-3 h-10 text-sm focus:outline-none focus:ring-2" /></SaveErrorField></Field>
+          {editing !== null && reviewDate ? <HolidayBookings key={`${accountId}:${reviewDate}`} accountId={accountId} date={reviewDate} /> : null}
           {editError ? <Notice tone="danger" >{editError}</Notice> : null}
-          <div className="flex justify-end gap-2">
-            <Button onClick={() => { if (!busy) setEditing(null) }} disabled={busy}>キャンセル</Button>
-            <Button variant="primary" onClick={() => void save()} disabled={busy} busy={busy}>休業日を保存する</Button>
-          </div>
         </div>
       </Dialog>
 

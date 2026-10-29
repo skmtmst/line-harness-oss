@@ -1,7 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { api, ApiError, type OpsNoticeLineAccount } from '@/lib/api'
+import { api, type OpsNoticeLineAccount } from '@/lib/api'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { opsCall } from '@/components/ops/ops-ui'
 import Button from '@/components/shared/button'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -64,7 +65,7 @@ export default function NoticeLineAccountCard() {
       setNotice(`${result.data.name}（${result.data.basicId}）を契約者専用LINEに指定しました`)
       await load()
     } catch (failure) {
-      setError(failure instanceof ApiError ? failure.message : 'LINEに接続できませんでした。時間をおいて再試行してください')
+      setError(japaneseDetailOf(failure) || 'LINEに接続できませんでした。時間をおいて再試行してください')
     } finally {
       setBusy(false)
     }

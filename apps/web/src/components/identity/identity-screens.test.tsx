@@ -169,7 +169,7 @@ describe('判定窓', () => {
       <IdentityDecisionDialog open candidate={CANDIDATE_WITH_PROFILES} busy={false} onCancel={() => {}} onSubmit={() => {}} />,
     )
     expect(html).toContain('統合プロフィールに採用する値')
-    expect(html).toContain('候補A：田中 はなこ')
+    expect(html).toContain('画面確認アカウント・田中 はなこ：田中 はなこ')
     expect(html).toContain('利用目的と同意・規約の確認')
     expect(html.match(/type="checkbox"/g)).toHaveLength(3)
   })

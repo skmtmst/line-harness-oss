@@ -1,5 +1,8 @@
 'use client'
 
+import CsvTemplateDownload from '@/components/shared/csv-template-download'
+import { UID_IMPORT_HEADERS } from '@/lib/csv-import-columns'
+
 import { canManageRole, isOwnerRole } from '@/lib/staff-role'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { shortUid, historyBadge } from './uid-labels'
@@ -117,14 +120,13 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
         <span className={styles.fieldLabel}>利用目的</span>
         <SaveErrorField names={["purpose","m.purpose"]}><TextField value={m.purpose} onChange={(event) => m.setPurpose(event.target.value)} aria-label="利用目的" /></SaveErrorField>
       </div>
+      <CsvTemplateDownload headers={UID_IMPORT_HEADERS} name="UID対応表" />
       <FileDropzone title="対応表のCSVをここに置く" hint="old_uid・new_uid 列のCSVを選びます" accept=".csv,text/csv" chooseLabel="CSVをアップロード" onFiles={(files) => void m.onUidFile(files)} />
       {m.file ? (
         <AttachmentRow name={m.file.name} meta={`${formatNumber(m.mappings.length)} 行・${formatMappingBytes(m.file.size)}`} onRemove={() => { m.setFile(null); m.setMappings([]); m.setMessage(null) }} />
       ) : <p className={styles.small}>ファイルは未選択です</p>}
       <div className={styles.cardFoot}>
-        {canDecideItems ? (
-          <Button variant="primary" disabled={m.busy} onClick={() => void m.createDryRun()} busy={m.busy} busyLabel="確認中…">テスト移行を実行</Button>
-        ) : <p className={styles.small}>移行の登録はowner/adminが行います。</p>}
+        <Button variant={canDecideItems ? 'primary' : 'secondary'} disabled={!canDecideItems || m.busy} disabledReason={!canDecideItems ? '移行の登録はオーナーか管理者に頼んでください。' : undefined} onClick={() => void m.createDryRun()} busy={m.busy} busyLabel="確認中…">テスト移行を実行</Button>
       </div>
     </section>
   )

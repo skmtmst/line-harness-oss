@@ -13,6 +13,7 @@ import Toggle from '@/components/shared/toggle'
 import { TextArea } from '@/components/shared/text-field'
 import { DataTable, TableHeadRow, Th, Tr, Td, RowNameLink, TableStateRow } from '@/components/shared/table'
 import MergedDeliveryDialog from '@/components/merged-person/merged-delivery-dialog'
+import { comparisonSourceLabels } from '@/components/shared/differences-filter'
 import MergedProfileDialog from '@/components/merged-person/merged-profile-dialog'
 import { useMergedPerson } from '@/components/merged-person/use-merged-person'
 import { deliveryPriorityDetails, linkedFriendDetails, personDetails, profileValueDetails } from '@/components/merged-person/merged-person-metadata'
@@ -21,6 +22,8 @@ import { Field } from '@/components/shared/form-controls'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import TruncatedText from '@/components/shared/truncated-text'
 
 /*
@@ -44,6 +47,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
   const m = useMergedPerson(personId)
   const staffRole = useStaffRole()
   const canManage = canManageRole(staffRole)
+  const manageLockedReason = usePermissionLockReason(canManage, 'manager')
   const [valuesExpanded, setValuesExpanded] = useState(false)
 
   const head = (title: string, description: string) => (
@@ -77,11 +81,10 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
     <PageFrame kind="detail" boardId="Hn9eE">
       {head(person.primaryDisplayName, `統合ユーザー・結び付いた友だち ${person.linkedFriends.length}${earliestLink ? `・${shortDate(earliestLink)} に結び付けた` : ''}`)}
 
+      {!canManage ? <ReadOnlyNotice need="manager" /> : null}
       <PageContent><DetailColumns asideLabel="使っている値" expanded={valuesExpanded} onExpandedChange={setValuesExpanded} aside={
         <div className={styles.rail}>
-          {canManage ? (
-            <Button type="button" variant="secondary" className={styles.railButton} onClick={m.openProfileEditor} data-qa-open="Hn9eE-profile"><Pencil aria-hidden="true" />使う値を編集する</Button>
-          ) : null}
+          <Button type="button" variant="secondary" className={styles.railButton} disabled={!canManage} lockedReason={manageLockedReason} onClick={m.openProfileEditor} data-qa-open="Hn9eE-profile"><Pencil aria-hidden="true" />使う値を編集する</Button>
           <section className={styles.valuesCard} aria-labelledby="mp-values">
             <h3 id="mp-values" className={styles.valuesTitle} title={personDetails(person)}>使っている値</h3>
             <ul className={styles.values}>
@@ -109,9 +112,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
             <div className={styles.cardHead}>
               <div className={styles.cardTitleRow}>
                 <h3 id="mp-delivery" className={styles.cardTitle}>同じ人に重なって届かないようにする</h3>
-                {canManage ? (
-                  <button type="button" className={styles.linkRight} onClick={() => { m.setSaveError(''); m.setEditing(true) }}>目的ごとの順位を編集 →</button>
-                ) : null}
+                <Button type="button" variant="text" size="inline" disabled={!canManage} lockedReason={manageLockedReason} onClick={() => { if (!canManage) return; m.setSaveError(''); m.setEditing(true) }}>目的ごとの順位を編集 →</Button>
               </div>
               <p className={styles.cardSub} title={deliveryPriorityDetails(person.deliveryPriorities)}>どのアカウントから送るかを決めます。全部「使わない」にすると、どこからも送れなくなります</p>
             </div>
@@ -131,9 +132,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
                     <Td><RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`}>{friend.displayName}</RowNameLink></Td>
                     <Td><span className={friend.isFollowing ? `${styles.pill} ${styles.pillOk}` : `${styles.pill} ${styles.pillMuted}`}>{friend.isFollowing ? '友だち' : 'ブロック・削除'}</span></Td>
                     <Td>
-                      {canManage ? (
-                        <SaveErrorField names={["active","deliveryActive","delivery_active"]}><Toggle checked={active} label={`${friend.lineAccountName} の配信に使う`} onChange={m.saving ? undefined : (next) => m.setDeliveryActive(friend.friendId, next)} /></SaveErrorField>
-                      ) : <span className={styles.small}>{active ? '使う' : '使わない'}</span>}
+                      <SaveErrorField names={["active","deliveryActive","delivery_active"]}><Toggle checked={active} disabled={!canManage || m.saving} lockedReason={manageLockedReason} label={`${friend.lineAccountName} の配信に使う`} onChange={!canManage || m.saving ? undefined : (next) => m.setDeliveryActive(friend.friendId, next)} /></SaveErrorField>
                     </Td>
                   </Tr>
                 ))}
@@ -163,12 +162,9 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
                     <Td><RowNameLink href={`/friends/detail?id=${encodeURIComponent(friend.friendId)}`}>{friend.displayName}</RowNameLink></Td>
                     <Td title={linkedFriendDetails(friend)}>{shortDate(friend.linkedAt)}</Td>
                     <Td>
-                      {canManage ? (
-                        <button type="button" className={styles.textButton} disabled={m.saving} onClick={() => m.setUnlinkTarget(friend)}>
-                          <Unlink size={16} aria-hidden="true" />
-                          解除する
-                        </button>
-                      ) : null}
+                      <Button type="button" variant="text" size="inline" disabled={!canManage || m.saving} lockedReason={manageLockedReason} onClick={() => { if (canManage) m.setUnlinkTarget(friend) }}>
+                        <Unlink size={16} aria-hidden="true" />解除する
+                      </Button>
                     </Td>
                   </Tr>
                 ))}
@@ -207,6 +203,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
       <MergedProfileDialog
         open={m.profileEditing}
         candidates={person.profileCandidates}
+        sourceLabels={comparisonSourceLabels(person.linkedFriends.map((friend) => ({ id: friend.friendId, name: friend.displayName, source: friend.lineAccountName })))}
         draft={m.profileDraft}
         revision={person.revision}
         busy={m.profileSaving}

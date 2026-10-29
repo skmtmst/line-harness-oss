@@ -17,35 +17,11 @@
 
 .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--tpl-fr-stack-gap); align-items: stretch; }
 
-.subject,
-.card,
-.panel,
-.historyCard {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-/* : 中身のカードと、その中の判定・履歴の小箱を分ける。 */
-.subject,
-.card {
-  border-radius: var(--radius-card);
-  border: 1px solid var(--card-edge);
-  box-shadow: var(--card-shadow);
-}
-
-.panel,
-.historyCard {
-  border-radius: var(--radius-card);
-  box-shadow: var(--tpl-fr-shadow-outline);
-}
-
-.subject { padding: var(--tpl-fr-cmp-subject-pad); }
 .side { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); font-weight: 600; line-height: var(--tpl-fr-sub-lh); }
-.subjectName { margin: var(--tpl-fr-cmp-name-gap) 0 0; color: var(--color-ink); font-size: var(--tpl-fr-cmp-name-size); font-weight: 700; line-height: var(--tpl-fr-cmp-name-lh); }
-.subjectSub { margin: var(--tpl-fr-cmp-sub-gap) 0 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-fr-desc-lh); }
+.subjectName { margin: 0; color: var(--color-ink); font-size: var(--tpl-fr-cmp-name-size); font-weight: 700; line-height: var(--tpl-fr-cmp-name-lh); }
+.subjectSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-fr-desc-lh); }
 
-.attrs { margin: var(--tpl-fr-cmp-attrs-gap) 0 0; }
+.attrs { margin: 0; }
 .attr { display: flex; align-items: center; gap: var(--tpl-fr-stack-gap); min-height: var(--tpl-fr-cmp-attr-h); }
 .attr dt { width: var(--tpl-fr-cmp-attr-label); flex-shrink: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .attr dd { margin: 0; }
@@ -55,7 +31,6 @@
 .pillOk { background: var(--color-accent-soft); color: var(--color-accent-deep); }
 .pillMuted { background: var(--color-canvas-sunken); color: var(--color-ink-faint); }
 
-.card { gap: var(--tpl-fr-cmp-card-gap); padding: var(--tpl-fr-panel-pad); }
 .cardTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-fr-panel-title-size); font-weight: 700; line-height: var(--tpl-fr-panel-title-lh); }
 .cardNote { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); line-height: var(--tpl-fr-sub-lh); }
 
@@ -77,21 +52,14 @@
 .weak { color: var(--color-ink-faint); font-weight: 600; white-space: nowrap; }
 .lineValue { font-weight: 700; white-space: nowrap; }
 
-/* 「結び付けた人に使う値」は題と中身の間が12。 */
-.card:has(> .table),
-.card:has(> div > table) { gap: var(--tpl-fr-stack-gap); }
-
-.panel { gap: var(--tpl-fr-stack-gap); padding: var(--tpl-fr-cmp-panel-pad); }
 .panelTitle { margin: 0; color: var(--color-ink); font-size: var(--text-label); font-weight: 700; line-height: var(--tpl-fr-cmp-panel-lh); }
 .radios { display: flex; align-items: center; gap: var(--tpl-fr-cmp-radio-gap); }
 
 .checks { display: flex; flex-direction: column; gap: var(--tpl-fr-cmp-check-gap); }
 .fieldLabel { color: var(--color-ink); font-size: var(--text-label); font-weight: 600; line-height: var(--tpl-fr-cmp-panel-lh); margin-bottom: calc(var(--tpl-fr-cmp-check-gap) - var(--tpl-fr-stack-gap)); }
-.panelActions { display: flex; justify-content: flex-end; gap: var(--tpl-toolbar-gap); }
 
 .note { margin: 0; color: var(--color-ink-faint); font-size: var(--text-micro); }
 
-.historyCard { align-self: flex-start; width: 100%; gap: var(--tpl-fr-cmp-card-gap); padding: var(--tpl-fr-cmp-panel-pad); }
 .historyLine {
   display: grid;
   grid-template-columns: var(--tpl-fr-cmp-history-date) minmax(0, 1fr);

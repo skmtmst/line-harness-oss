@@ -8,6 +8,9 @@ import type { IdentityCandidateWithProfiles } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import { DashboardColumns } from '@/components/templates'
+import { DialogActions } from '@/components/shared/dialog'
+import DifferencesFilter, { comparisonSourceLabels, sameKnownValues } from '@/components/shared/differences-filter'
+import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import { PageFooter } from '@/components/templates/page-footer'
 import Checkbox from '@/components/shared/checkbox'
@@ -27,6 +30,9 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
+import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 
 /*
  * ★V8 重複候補を比べて決める（Pencil ：判定の小窓を開いた形、1152 は ：閉じた形）。
@@ -54,6 +60,8 @@ function CompareInner() {
   usePageTitle('重複候補を比べて決める')
   /* 板の頭の「← 〇〇へ」は 2026-10-08 に無くした。一覧へは上の帯のパンくずで戻る。 */
   usePageCrumbs([{ label: '友だち', href: '/friends' }, { label: '重複検出', href: '/friends?tab=duplicates' }])
+  const canManage = canManageRole(useStaffRole())
+  const lockedReason = usePermissionLockReason(canManage, 'manager')
   const review = useIdentityReview('friend_duplicate')
   const searchParams = useSearchParams()
   const wantedId = searchParams.get('id')
@@ -76,15 +84,18 @@ function CompareInner() {
   const decisive = detail?.evidence.find((item) => item.strength === 'strong') ?? detail?.evidence[0]
 
   /* ── 判定の小窓 ── */
+  const [differencesOnly, setDifferencesOnly] = useState(true)
   const [panelOpen, setPanelOpen] = useState(false)
   const [decision, setDecision] = useState<IdentityCandidateDecision>('linked')
   const [reason, setReason] = useState('')
   const [consents, setConsents] = useState([false, false, false])
   const [selections, setSelections] = useState<Record<string, string>>({})
   const panelRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (review.decideError) setDifferencesOnly(false) }, [review.decideError])
 
   // 別の候補を開いたら、前の候補の入力を持ち越さない。
   useEffect(() => {
+    setDifferencesOnly(true)
     setPanelOpen(false)
     setReason('')
     setConsents([false, false, false])
@@ -92,6 +103,7 @@ function CompareInner() {
   }, [detail?.id, profileCandidates])
 
   const openPanel = (next: IdentityCandidateDecision) => {
+    if (!canManage || lockedReason) return
     setDecision(next)
     setPanelOpen(true)
     requestAnimationFrame(() => panelRef.current?.scrollIntoView({ block: 'center', behavior: scrollMotion() }))
@@ -100,7 +112,7 @@ function CompareInner() {
   const linkedReady = decision !== 'linked' || (
     profileCandidates.every((field) => Boolean(selections[field.fieldKey])) && consents.every(Boolean)
   )
-  const ready = Boolean(detail) && canSubmitDecision({ canDecide: detail?.canDecide ?? false, reason, busy: review.deciding }) && linkedReady
+  const ready = canManage && !lockedReason && Boolean(detail) && canSubmitDecision({ canDecide: detail?.canDecide ?? false, reason, busy: review.deciding }) && linkedReady
 
   const submit = () => {
     if (!detail || !ready) return
@@ -117,11 +129,23 @@ function CompareInner() {
     })
   }
 
-  const sideLetter = (friendId: string | undefined) => (!detail || !friendId ? '' : friendId === detail.left.id ? 'A' : friendId === detail.right.id ? 'B' : '')
+  const sourceLabels = comparisonSourceLabels(detail ? [detail.left, detail.right].map((subject) => ({ id: subject.id, name: subject.label, source: subject.lineAccountName })) : [])
+  const sourceName = (friendId: string | undefined, fallback = '') => friendId ? sourceLabels[friendId] || fallback : fallback
+  const sameField = (field: typeof profileCandidates[number]) => sameKnownValues([
+    field.options.find((option) => option.sourceFriendId === detail?.left.id)?.valuePreview,
+    field.options.find((option) => option.sourceFriendId === detail?.right.id)?.valuePreview,
+  ])
+  const visibleProfileCandidates = profileCandidates.filter((field) => !differencesOnly || !sameField(field))
+  const showTags = tagCandidates.length > 0 && (!differencesOnly || tagCandidates.some((tag) => tag.sourceFriendIds.includes(detail?.left.id ?? '') !== tag.sourceFriendIds.includes(detail?.right.id ?? '')))
+  const sameAttribute = (label: string) => {
+    const left = detail?.left.attributes.find((item) => item.label === label)
+    const right = detail?.right.attributes.find((item) => item.label === label)
+    return left?.verified === right?.verified && sameKnownValues([left?.valuePreview, right?.valuePreview])
+  }
   const firstSelection = profileCandidates[0]
   const firstChosen = firstSelection?.options.find((option) => option.sourceFriendId === selections[firstSelection.fieldKey])
   const selectionSummary = firstChosen
-    ? `採用する値：表で選んだ値（${sideLetter(firstChosen.sourceFriendId)}：${firstChosen.valuePreview ?? emptyValue('unconfigured')}${profileCandidates.length > 1 ? ' ほか' : ''}）`
+    ? `採用する値：表で選んだ値（${sourceName(firstChosen.sourceFriendId, firstChosen.sourceLabel)}：${firstChosen.valuePreview ?? emptyValue('unconfigured')}${profileCandidates.length > 1 ? ' ほか' : ''}）`
     : '採用する値：表で選んだ値'
 
   return (
@@ -129,6 +153,7 @@ function CompareInner() {
       <PageHeading title={detail ? `${detail.left.label} ↔ ${detail.right.label}` : '重複候補を比べて決める'}
         help={<>{detail ? `確からしさ：${CONFIDENCE_WORD[detail.confidence.label]}${decisive ? `・根拠：${decisive.label}` : ''}` : '同じ人かどうかを、根拠を見て決めます'}</>} />
 
+      {!canManage ? <ReadOnlyNotice need="manager" /> : null}
       <div className={styles.body} data-template-region="body">
         <IdentityStateBlock
           state={review.state}
@@ -150,14 +175,15 @@ function CompareInner() {
               <span>結び付けても、元の友だち・注文・LINEアカウントは消えません。2件は残したまま、同じ人として扱います。一斉配信は結び付けた人へ1通になります。</span>
             </Notice>
 
+            <DifferencesFilter checked={differencesOnly} onChange={setDifferencesOnly} />
             <div className={styles.pair}>
-              {[{ side: '候補 A', subject: detail.left }, { side: '候補 B', subject: detail.right }].map(({ side, subject }) => (
-                <section key={side} className={styles.subject} aria-label={side}>
+              {[{ side: sourceName(detail.left.id), subject: detail.left }, { side: sourceName(detail.right.id), subject: detail.right }].map(({ side, subject }) => (
+                <Card key={subject.id} layout="vertical" padding="default" gap="tight" aria-label={side}>
                   <p className={styles.side}>{side}</p>
                   <p className={styles.subjectName}>{subject.label}</p>
                   <p className={styles.subjectSub}>{[subject.detail, subject.lineAccountName].filter(Boolean).join('・') || emptyValue('unknown')}</p>
                   <dl className={styles.attrs}>
-                    {subject.attributes.map((attribute) => (
+                    {subject.attributes.filter((attribute) => !differencesOnly || !sameAttribute(attribute.label)).map((attribute) => (
                       <div key={attribute.label} className={styles.attr}>
                         <dt>{ATTRIBUTE_WORD[attribute.label] ?? attribute.label}</dt>
                         <dd className={styles.mono}>{attribute.valuePreview ?? '—（未取得）'}</dd>
@@ -165,12 +191,12 @@ function CompareInner() {
                       </div>
                     ))}
                   </dl>
-                </section>
+                </Card>
               ))}
             </div>
 
             <div className={styles.pair}>
-              <section className={styles.card} aria-labelledby="compare-evidence">
+              <Card layout="vertical" padding="default" gap="normal" aria-labelledby="compare-evidence">
                 <h3 id="compare-evidence" className={styles.cardTitle}>根拠</h3>
                 <ul className={styles.lines}>
                   {detail.evidence.map((item) => (
@@ -181,8 +207,8 @@ function CompareInner() {
                   ))}
                 </ul>
                 <p className={styles.cardNote}>名前やプロフィール画像だけの一致は、決め手にしません。</p>
-              </section>
-              <section className={styles.card} aria-labelledby="compare-impact">
+              </Card>
+              <Card layout="vertical" padding="default" gap="normal" aria-labelledby="compare-impact">
                 <h3 id="compare-impact" className={styles.cardTitle}>結び付けたときの影響</h3>
                 <ul className={styles.lines}>
                   {detail.impact.map((metric) => (
@@ -194,15 +220,15 @@ function CompareInner() {
                     </li>
                   ))}
                 </ul>
-              </section>
+              </Card>
             </div>
 
-            <section className={styles.card} aria-labelledby="compare-values">
+            <Card layout="vertical" padding="default" gap="normal" aria-labelledby="compare-values">
               <h3 id="compare-values" className={styles.cardTitle}>結び付けた人に使う値</h3>
 
               {panelOpen ? (
                 <DashboardColumns layout="cards" cardHeight="natural">{[
-                  <div key="decision" ref={panelRef} className={styles.panel} role="group" aria-label="この2件の判定"><p id="compare-decide" className={styles.panelTitle}>判定</p>
+                  <Card key="decision" layout="vertical" padding="default" gap="normal"><div ref={panelRef} className="grid gap-3" role="group" aria-label="この2件の判定"><p id="compare-decide" className={styles.panelTitle}>判定</p>
 <div className={styles.radios} role="radiogroup" aria-label="判定">
                       {DECISIONS.map((item) => (
                         <SaveErrorField names={["compare-decision","value","item.value","decision"]} key={item.value}><Radio key={item.value} name="compare-decision" value={item.value} checked={decision === item.value} onChange={() => setDecision(item.value)}>
@@ -216,7 +242,7 @@ function CompareInner() {
                         <Select aria-label="過去の扱い" size="full" value="merge" onChange={() => undefined}
                           options={[{ value: 'merge', label: '過去の扱い：これまでの履歴を1人分にまとめる' }]} />
                         {/* 採用する値は表の「使う値」の要約。A・B どちらかにまとめて切り替えることもできる。 */}
-                        <Select aria-label="採用する値" size="full" disabled={!detail.canDecide}
+                        <Select aria-label="採用する値" size="full" disabled={!canManage || !detail.canDecide}
                           value="table"
                           onChange={(value) => {
                             if (value !== 'A' && value !== 'B') return
@@ -225,20 +251,20 @@ function CompareInner() {
                           }}
                           options={[
                             { value: 'table', label: selectionSummary },
-                            { value: 'A', label: `採用する値：すべて A（${detail.left.label}）` },
-                            { value: 'B', label: `採用する値：すべて B（${detail.right.label}）` },
+                            { value: 'A', label: `採用する値：すべて ${sourceName(detail.left.id)}` },
+                            { value: 'B', label: `採用する値：すべて ${sourceName(detail.right.id)}` },
                           ]} />
-                        <div className={styles.checks}>
+                        <DataTable aria-label="結び付ける前の確認"><thead><TableHeadRow><Th>確かめること</Th></TableHeadRow></thead><tbody>
                           {CONSENTS.map((label, index) => (
-                            <SaveErrorField names={["consents"]} key={label}><Checkbox
+                            <Tr key={label}><Td><SaveErrorField names={["consents"]}><Checkbox
                               key={label}
                               checked={consents[index]}
                               onCheckedChange={(checked) => setConsents((current) => current.map((value, itemIndex) => (itemIndex === index ? checked : value)))}
                             >
                               {label}
-                            </Checkbox></SaveErrorField>
+                            </Checkbox></SaveErrorField></Td></Tr>
                           ))}
-                        </div>
+                        </tbody></DataTable>
                       </>
                     ) : null}
 <Field label="判定の理由" htmlFor="compare-reason" required><SaveErrorField names={["reason"]}><TextField
@@ -248,14 +274,11 @@ function CompareInner() {
                       placeholder={decisive ? `${decisive.label}` : '何を見てそう判断したか'}
                     /></SaveErrorField></Field>
 {review.decideError ? <Notice tone="danger" >{review.decideError}</Notice> : null}
-{!ready && reason.trim() !== '' && decision === 'linked' && !linkedReady ? (
-                      <p className={styles.note} role="status">3つの確認をそろえると判定できます。</p>
-                    ) : null}
-<div className={styles.panelActions}>
+<DialogActions padding="none">
                       <Button type="button" variant="secondary" onClick={() => setPanelOpen(false)} disabled={review.deciding}>キャンセル</Button>
-                      <Button type="button" variant="primary" onClick={submit} disabled={!ready} disabledReason={!detail.canDecide ? 'この候補は今は判定できません' : !reason.trim() ? '判定の理由を入れてください' : !linkedReady ? '使う値と3つの確認を選んでください' : undefined} busy={review.deciding} busyLabel="処理中…">判定する</Button>
-                    </div></div>,
-                  <div key="history" className={styles.historyCard}>
+                      <Button type="button" variant={detail.canDecide ? 'primary' : 'secondary'} onClick={submit} lockedReason={lockedReason} disabled={!ready} disabledReason={!detail.canDecide ? 'この候補は今は判定できません' : !reason.trim() ? '判定の理由を入れてください' : !linkedReady ? '使う値と3つの確認を選んでください' : undefined} busy={review.deciding} busyLabel="処理中…">判定する</Button>
+                    </DialogActions></div></Card>,
+                  <Card key="history" layout="vertical" padding="default" gap="normal">
                     <p className={styles.panelTitle}>判定の履歴</p>
                     <ul className={styles.lines}>
                       {detail.history.map((item) => (
@@ -269,7 +292,7 @@ function CompareInner() {
                         <span>{`候補に上がった（${decisive?.label ?? '根拠を確認'}）`}</span>
                       </li>
                     </ul>
-                  </div>,
+                  </Card>,
                 ]}</DashboardColumns>
               ) : null}
 
@@ -283,16 +306,15 @@ function CompareInner() {
                 <thead>
                   <TableHeadRow presentation="embedded">
                     <Th>項目</Th>
-                    <Th>候補A</Th>
-                    <Th>候補B</Th>
+                    <Th><TruncatedText value={sourceName(detail.left.id)} /></Th>
+                    <Th><TruncatedText value={sourceName(detail.right.id)} /></Th>
                     <Th>使う値</Th>
                   </TableHeadRow>
                 </thead>
                 <tbody>
-                  {profileCandidates.map((field) => {
+                  {visibleProfileCandidates.map((field) => {
                     const left = field.options.find((option) => option.sourceFriendId === detail.left.id)
                     const right = field.options.find((option) => option.sourceFriendId === detail.right.id)
-                    const same = left?.valuePreview != null && left.valuePreview === right?.valuePreview
                     return (
                       <Tr key={field.fieldKey} className={styles.row}>
                         <Td><TruncatedText className={styles.itemName} value={field.fieldLabel === 'メールアドレス' ? 'メール' : field.fieldLabel} /></Td>
@@ -303,46 +325,45 @@ function CompareInner() {
                             aria-label={`${field.fieldLabel}に使う値`}
                             size="full"
                             value={selections[field.fieldKey] ?? ''}
-                            disabled={!detail.canDecide}
+                            disabled={!canManage || !detail.canDecide}
                             onChange={(value) => setSelections((current) => ({ ...current, [field.fieldKey]: value }))}
-                            options={field.options.map((option, index) => ({
+                            options={field.options.map((option) => ({
                               value: option.sourceFriendId,
-                              label: same && index === 0 ? '同じ' : `${sideLetter(option.sourceFriendId) || option.sourceLabel}：${option.valuePreview ?? emptyValue('unconfigured')}`,
+                              label: `${sourceName(option.sourceFriendId, option.sourceLabel)}：${option.valuePreview ?? emptyValue('unconfigured')}`,
                             }))}
                           /></SaveErrorField>
                         </Td>
                       </Tr>
                     )
                   })}
-                  {tagCandidates.length > 0 ? (
+                  {visibleProfileCandidates.length === 0 && !showTags ? <Tr><Td colSpan={4}>{profileCandidates.length === 0 && tagCandidates.length === 0 ? '比べる項目はまだありません。' : '違う項目はありません。一致した項目は切り替えて確認できます。'}</Td></Tr> : null}
+                  {showTags ? (
                     <Tr className={styles.rowPlain}>
                       <Td><span className={styles.itemName}>タグ</span></Td>
                       <Td>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.left.id)).map((tag) => tag.name).join('・') || emptyValue('unknown')}</Td>
-                      <Td>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.right.id) && !tag.sourceFriendIds.includes(detail.left.id)).map((tag) => tag.name).join('・') || emptyValue('unknown')}</Td>
+                      <Td>{tagCandidates.filter((tag) => tag.sourceFriendIds.includes(detail.right.id)).map((tag) => tag.name).join('・') || emptyValue('unknown')}</Td>
                       <Td><span className={styles.faint}>元の友だちに残す</span></Td>
                     </Tr>
                   ) : null}
                 </tbody>
               </DataTable>
-            </section>
+            </Card>
           </>
         ) : null}
       </div>
       {review.state === 'ready' && detail ? (
         <PageFooter
-          destructive={(
-            <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('different')}>
-              <UserX size={16} aria-hidden="true" />
-              別の人だった
-            </Button>
-          )}
           actions={(
             <>
-              <Button type="button" variant="secondary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('deferred')}>
+              <Button type="button" variant="secondary" lockedReason={lockedReason} disabled={!canManage || !detail.canDecide || review.deciding} disabledReason={!detail.canDecide ? 'この候補は今は判定できません' : undefined} onClick={() => openPanel('different')}>
+                <UserX size={16} aria-hidden="true" />
+                別の人だった
+              </Button>
+              <Button type="button" variant="secondary" lockedReason={lockedReason} disabled={!canManage || !detail.canDecide || review.deciding} disabledReason={!detail.canDecide ? 'この候補は今は判定できません' : undefined} onClick={() => openPanel('deferred')}>
                 <Clock size={16} aria-hidden="true" />
                 あとで決める（保留）
               </Button>
-              <Button type="button" variant="primary" disabled={!detail.canDecide || review.deciding} onClick={() => openPanel('linked')}>
+              <Button type="button" variant={detail.canDecide ? 'primary' : 'secondary'} lockedReason={lockedReason} disabled={!canManage || !detail.canDecide || review.deciding} disabledReason={!detail.canDecide ? 'この候補は今は判定できません' : undefined} onClick={() => openPanel('linked')}>
                 <LinkIcon size={16} aria-hidden="true" />
                 同じ人として結び付ける
               </Button>

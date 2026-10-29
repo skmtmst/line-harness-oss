@@ -142,6 +142,33 @@ describe('監査 R315: 選択状態を意味で伝える', () => {
     expect(await screen.findByPlaceholderText('お客さま名で検索')).toBeTruthy()
   })
 
+  it('状態は共通の札で一つを選び、期間の札は選択と解除ができる', async () => {
+    nav.search = 'view=list'
+    render(<BookingsPage />)
+    const done = await screen.findByRole('button', { name: '完了' })
+    const confirmed = screen.getByRole('button', { name: '確定' })
+    const today = screen.getByRole('button', { name: '今日' })
+    const week = screen.getByRole('button', { name: '今週' })
+    for (const control of [done, confirmed, today, week]) {
+      expect(control.getAttribute('data-part')).toBe('filter-chip')
+    }
+    fireEvent.click(done)
+    expect(done.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(confirmed)
+    expect(confirmed.getAttribute('aria-pressed')).toBe('true')
+    expect(done.getAttribute('aria-pressed')).toBe('false')
+    expect(confirmed.querySelector('svg')).toBeNull()
+    fireEvent.click(today)
+    expect(today.getAttribute('aria-pressed')).toBe('true')
+    expect(today.querySelector('svg')).not.toBeNull()
+    fireEvent.click(week)
+    expect(week.getAttribute('aria-pressed')).toBe('true')
+    expect(today.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(week)
+    expect(week.getAttribute('aria-pressed')).toBe('false')
+    expect(confirmed.getAttribute('aria-pressed')).toBe('true')
+  })
+
   it('状態と期間の絞り込みは押下状態を持つ', async () => {
     nav.search = 'view=list'
     render(<BookingsPage />)
@@ -280,10 +307,27 @@ describe('監査 R317: 条件と表示日をURLへ持ち、再読み込みで復
     })
     // 検索欄にも戻り、運用者が条件を見失わない。
     expect((screen.getByPlaceholderText('お客さま名で検索') as HTMLInputElement).value).toBe('QA_R317')
+    expect(screen.getByRole('button', { name: '完了' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: '今週' }).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button', { name: '今日' }).getAttribute('aria-pressed')).toBe('false')
     // 状態をURLへ写す（再読み込みで同じになる）。
     await waitFor(() => {
       const writes = nav.replace.mock.calls.map((call) => String(call[0]))
       expect(writes.some((url) => url.includes('view=list') && url.includes('status=completed') && url.includes('q=QA_R317'))).toBe(true)
+    })
+  })
+
+  it('休業日のリンクで指定日の一覧を開き、日付の解除で全期間へ戻る', async () => {
+    nav.search = 'view=list&status=all&range=date&date=2026-10-26'
+    render(<BookingsPage />)
+    await waitFor(() => expect(fixture.listRequests).toHaveBeenCalledWith('account-a', 'all', expect.objectContaining({
+      from: '2026-10-25T15:00:00.000Z', to: '2026-10-26T15:00:00.000Z',
+    })))
+    fireEvent.click(screen.getByRole('button', { name: /10月26日（月）の予約/ }))
+    await waitFor(() => {
+      const last = fixture.listRequests.mock.calls.at(-1)?.[2]
+      expect(last?.from).toBeUndefined()
+      expect(last?.to).toBeUndefined()
     })
   })
 

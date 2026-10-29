@@ -13,6 +13,7 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 import { jstDate } from '@/lib/jst-datetime'
 import type { ReactNode } from 'react'
 import type { BookingAvailabilitySlot, BookingMenu, BookingStaff } from '@/lib/api'
+import StatusBadge from '@/components/shared/status-badge'
 import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import styles from './phone.module.css'
@@ -60,16 +61,28 @@ function ListSkeleton() {
   )
 }
 
+function StaffPreviewCard({ person, draft = false }: { person: BookingStaff; draft?: boolean }) {
+  return <div className={styles.card}>
+    <span className={styles.avatar} aria-hidden="true">{person.display_name.slice(0, 1)}</span>
+    <span className={styles.cardText}>
+      {draft ? <StatusBadge tone="neutral" dot={false}>入力中・未保存</StatusBadge> : null}
+      <span className={styles.cardName}>{person.display_name}</span>
+      <span className={styles.cardDesc}>{person.role ?? 'スタッフ'}・{draft && !person.is_active ? '登録後は非表示' : (person.nomination_fee ?? 0) > 0 ? `指名料 +¥${polishFormatNumber(person.nomination_fee ?? 0)}` : '指名料なし'}</span>
+    </span>
+  </div>
+}
+
 /** ② 担当を選ぶ。指名なしを受ける担当がいれば、先頭に「指名なし」を選んだ形で出す。 */
-export function PhoneStaffStep({ menu, staff, designationFree, status = 'ready' }: {
+export function PhoneStaffStep({ menu, staff, draft, designationFree, status = 'ready' }: {
   menu: BookingMenu | null
   staff: BookingStaff[]
+  draft?: BookingStaff | null
   designationFree: boolean
   status?: 'loading' | 'ready' | 'error'
 }) {
   const shown = staff.filter((s) => s.is_active).sort((a, b) => a.sort_order - b.sort_order)
   const people = shown
-  const empty = shown.length === 0 && !designationFree
+  const empty = shown.length === 0 && !designationFree && !draft?.is_active
   return (
     <PhoneChrome
       step={2}
@@ -81,6 +94,7 @@ export function PhoneStaffStep({ menu, staff, designationFree, status = 'ready' 
     >
       <h3 className={styles.title}>担当を選んでください</h3>
       {menu ? <p className={styles.sub}>{menu.name}・{menu.duration_minutes}分・{priceLabel(menu)}</p> : null}
+      {draft !== undefined ? (draft ? <StaffPreviewCard person={draft} draft /> : <p className={styles.sub}>表示名を入れるとここに出ます</p>) : null}
       {status === 'loading' ? <DelayedSkeleton loading skeleton={<ListSkeleton />} />
         : status === 'error' ? <p className={styles.sub}>読み込めませんでした。</p>
           : (
@@ -97,14 +111,8 @@ export function PhoneStaffStep({ menu, staff, designationFree, status = 'ready' 
                   <CheckMark />
                 </div>
               ) : null}
-              {empty ? <p className={styles.sub}>担当できるスタッフはまだいません。</p> : people.map((person) => (
-                <div key={person.id} className={styles.card}>
-                  <span className={styles.avatar} aria-hidden="true">{person.display_name.slice(0, 1)}</span>
-                  <span className={styles.cardText}>
-                    <span className={styles.cardName}>{person.display_name}</span>
-                    <span className={styles.cardDesc}>{`${person.role ?? 'スタッフ'}・${(person.nomination_fee ?? 0) > 0 ? `指名料 +¥${polishFormatNumber(person.nomination_fee ?? 0)}` : '指名料なし'}`}</span>
-                  </span>
-                </div>
+              {empty ? (draft ? null : <p className={styles.sub}>担当できるスタッフはまだいません。</p>) : people.map((person) => (
+                <StaffPreviewCard key={person.id} person={person} />
               ))}
             </>
           )}
