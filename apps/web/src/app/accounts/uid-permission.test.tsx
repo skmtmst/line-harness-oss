@@ -190,6 +190,56 @@ for (const [entry, useMigration] of [['旧入口', useLegacy], ['友だち入口
       expect(fixture.decide).not.toHaveBeenCalled()
     })
 
+    it('一括判断は自分の再読取だけを引き継ぎ、2件を1回ずつ保存する', async () => {
+      const { result } = await mount()
+      fixture.decide.mockResolvedValue({ success: true, data: { unresolved: 0 } })
+      await act(async () => { await result.current.decideMany([item, { ...item, id: 'item-2' }], 'link') })
+      expect(fixture.decide.mock.calls).toEqual([['run', 'item', 'link'], ['run', 'item-2', 'link']])
+    })
+
+    it('単発の古い判断は、自身の保存後でも自動で新しい世代を引き継がない', async () => {
+      const { result } = await mount()
+      fixture.decide.mockResolvedValue({ success: true, data: { unresolved: 0 } })
+      const retained = result.current.decide
+      await act(async () => { await retained(item, 'link') })
+      await act(async () => { await retained({ ...item, id: 'item-2' }, 'link') })
+      expect(fixture.decide).toHaveBeenCalledTimes(1)
+    })
+
+    it.each(['read', 'read-write'] as const)('一括判断の途中の%s切替で残りは保存せず、読取は続ける', async transition => {
+      const { result } = await mount()
+      const reads = fixture.detail.mock.calls.length
+      fixture.decide.mockImplementationOnce(async () => { mode('read'); if (transition === 'read-write') mode('write'); return { success: true, data: { unresolved: 0 } } })
+      await act(async () => { await result.current.decideMany([item, { ...item, id: 'item-2' }], 'link') })
+      expect(fixture.decide).toHaveBeenCalledTimes(1)
+      expect(fixture.detail.mock.calls.length).toBeGreaterThan(reads)
+      expect(result.current.message).toMatch(/権限.*中止/)
+    })
+
+    it.each(['run', 'filter'] as const)('一括判断のPATCH待ちに外部%sが変われば、前の画面へ戻さず残り0', async change => {
+      const { result } = await mount()
+      const response = deferred<{ success: true; data: { unresolved: number } }>()
+      fixture.decide.mockReturnValueOnce(response.promise)
+      let pending!: Promise<void>
+      await act(async () => { pending = result.current.decideMany([item, { ...item, id: 'item-2' }], 'link') })
+      if (change === 'run') await act(async () => { await result.current.loadDetail('other', 0, '', false) })
+      else await act(async () => { result.current.onFilterChange('run', 'review', true) })
+      const reads = fixture.detail.mock.calls.length
+      await act(async () => { response.resolve({ success: true, data: { unresolved: 0 } }); await pending })
+      expect(fixture.decide).toHaveBeenCalledTimes(1)
+      expect(fixture.detail).toHaveBeenCalledTimes(reads)
+      expect(result.current.message).toMatch(/1件目で止めました。理由：表示内容/)
+      if (change === 'run') expect(result.current.active?.id).toBe('other')
+      else { expect(result.current.classification).toBe('review'); expect(result.current.pendingOnly).toBe(true) }
+    })
+
+    it('一括判断の1件目が拒否されたら、残りを勝手に送らない', async () => {
+      const { result } = await mount()
+      await act(async () => { await result.current.decideMany([item, { ...item, id: 'item-2' }], 'link') })
+      expect(fixture.decide).toHaveBeenCalledTimes(1)
+      expect(result.current.message).toMatch(/1件目で止めました。理由：/)
+    })
+
     it('別の履歴へ移ったら前の本移行callbackは使えない', async () => {
       const { result } = await mount()
       const execute = result.current.execute

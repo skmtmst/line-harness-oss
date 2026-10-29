@@ -147,7 +147,7 @@ export function useUidMigration() {
   const current = useRef({ active, detailBusy, file, mappingsFile, mappings, fromAccountId, toAccountId, purpose })
   current.current = { active, detailBusy, file, mappingsFile, mappings, fromAccountId, toAccountId, purpose }
   const renderedDetailTicket = detailTicket.current
-  const isCurrentRun = (id: string) => mounted.current && current.current.active?.id === id && detailTicket.current === renderedDetailTicket
+  const isCurrentRun = (id: string, ticket = renderedDetailTicket) => mounted.current && current.current.active?.id === id && detailTicket.current === ticket
   useEffect(() => {
     mounted.current = true
     const invalidate = () => { accessEpoch.current++ }
@@ -295,8 +295,8 @@ export function useUidMigration() {
     }
   }
 
-  const decide = async (item: UidMigrationItem, decision: UidMigrationDecision) => {
-    if (!canWriteMigrationNow() || !active || !isCurrentRun(active.id) || writeLock.current || busy || current.current.detailBusy || !['review', 'ready', 'failed'].includes(current.current.active!.status)) return
+  const decideChecked = async (item: UidMigrationItem, decision: UidMigrationDecision, ticket: number) => {
+    if (!canWriteMigrationNow() || !active || !isCurrentRun(active.id, ticket) || writeLock.current || busy || current.current.detailBusy || !['review', 'ready', 'failed'].includes(current.current.active!.status)) return
     writeLock.current = true
     setBusy(true)
     setMessage(null)
@@ -304,14 +304,22 @@ export function useUidMigration() {
     try {
       const response = await api.friendMigrations.decide(active.id, item.id, decision)
       if (!response.success) throw new ApiError(400, response.error)
-      const detail = await loadDetail(active.id, page, classification, pendingOnly)
+      if (detailTicket.current !== ticket || current.current.active?.id !== active.id) return
+      let reading = loadDetail(active.id, page, classification, pendingOnly)
+      let ownTicket = detailTicket.current
+      let detail = await reading
       // 絞り込みで今のページが空になったら1ページ戻る。
       if (detail && (detail.items?.length ?? 0) === 0 && page > 0) {
         setPage(page - 1)
-        await loadDetail(active.id, page - 1, classification, pendingOnly)
+        reading = loadDetail(active.id, page - 1, classification, pendingOnly)
+        ownTicket = detailTicket.current
+        detail = await reading
       }
+      if (!detail || detailTicket.current !== ownTicket) return
+      current.current = { ...current.current, active: detail, detailBusy: false }
       // 詳細ダイアログを開いたままの判断は、中の表示も追従させる。
       setDetailItem((current) => (current && current.id === item.id ? { ...current, decision } : current))
+      return ownTicket
     } catch (error) {
       /*
         TECH-07: 通信断・タイムアウト（ApiError ではない例外）は
@@ -324,10 +332,31 @@ export function useUidMigration() {
         : '応答を確認できませんでした。判断が保存されている可能性があります。対応表を読み直してから確認してください。'
       setMessage(text)
       setDetailError(text)
-      if (!(error instanceof ApiError)) void loadDetail(active.id, page, classification, pendingOnly)
+      if (!(error instanceof ApiError) && detailTicket.current === ticket && current.current.active?.id === active.id) void loadDetail(active.id, page, classification, pendingOnly)
     } finally {
       writeLock.current = false
       setBusy(false)
+    }
+  }
+
+  const decide = (item: UidMigrationItem, decision: UidMigrationDecision) => decideChecked(item, decision, renderedDetailTicket)
+
+  /** 一括判断は自分の再読取で進んだ世代だけを引き継ぎ、外部の画面切替では止める。 */
+  const decideMany = async (items: UidMigrationItem[], decision: UidMigrationDecision) => {
+    const permissionEpoch = accessEpoch.current
+    let ticket = renderedDetailTicket
+    for (const [index, item] of items.entries()) {
+      if (!mounted.current) return
+      if (permissionEpoch !== accessEpoch.current) {
+        setMessage(`${index + 1}件目で止めました。理由：権限が変わったため、残りの判断を中止しました。`)
+        return
+      }
+      const next = await decideChecked(item, decision, ticket)
+      if (next === undefined) {
+        if (mounted.current) setMessage(reason => `${index + 1}件目で止めました。理由：${reason ?? '表示内容または操作できる状態が変わりました。対応表を確認してください。'}`)
+        return
+      }
+      ticket = next
     }
   }
 
@@ -508,6 +537,7 @@ export function useUidMigration() {
     onUidFile,
     createDryRun,
     decide,
+    decideMany,
     unresolved,
     canRunExecute,
     canRunRollback,
