@@ -24,7 +24,7 @@ import { DEFAULT_FEATURES, SPECIALIZED_FEATURE_KEYS, itemIsEnabled, visibleFeatu
 import { formatNumber } from '@/lib/format'
 import { RangePickerV8, shortWhen } from './common'
 import { MetricText } from './reactions'
-import { METRIC_STATE_TEXT, downloadCsv, metricCardState, metricText, periodCaption, rangeFor, shownValue, useOverview, useRegisterExport, formatAnalyticsDateTime } from './parts'
+import { METRIC_STATE_TEXT, downloadCsv, metricCardState, metricText, periodCaption, rangeFor, reportPeriodLabel, shownValue, useOverview, useRegisterExport, formatAnalyticsDateTime } from './parts'
 import styles from './analytics.module.css'
 import { useReportPeriod } from '@/components/shared/period-picker'
 import { csvFileName } from '@/lib/csv-file-name'
@@ -57,6 +57,7 @@ const canTidyUsage = (item: Category) => item.unused.value !== null && item.unus
 
 export default function UsageV8({ accountId }: { accountId: string }) {
   const { days, setDays, range, customRange, setRange } = useReportPeriod()
+  const periodLabel = reportPeriodLabel(days, Boolean(customRange))
   const [observationsExpanded, setObservationsExpanded] = useState(false)
   const [menuFeatures, setMenuFeatures] = useState<{ enabled: number; total: number } | null>(null)
   const [menuFeaturesError, setMenuFeaturesError] = useState('')
@@ -100,7 +101,7 @@ export default function UsageV8({ accountId }: { accountId: string }) {
   return <>
     <ListPageStats><KpiBand className={styles.band}>
       <KpiCard presentation="band" title="使っている機能" icon={<LayoutGrid size={16} aria-hidden="true" />} value={menuFeatures?.enabled ?? null} unit={menuFeatures ? `/ ${menuFeatures.total}` : ''} detail={menuFeaturesError || 'メニューに出している機能のうち'} />
-      <KpiCard presentation="band" title="自動で動いた回数" icon={<Zap size={16} aria-hidden="true" />} value={shownValue(overview.summary.automaticRuns)} unit="回" {...metricCardState(overview.summary.automaticRuns, { detail: `この${days}日・手で送ったのは${formatNumber(overview.summary.manualSends.value)} 回` }, state.retry)} />
+      <KpiCard presentation="band" title="自動で動いた回数" icon={<Zap size={16} aria-hidden="true" />} value={shownValue(overview.summary.automaticRuns)} unit="回" {...metricCardState(overview.summary.automaticRuns, { detail: `${periodLabel}・手で送ったのは${formatNumber(overview.summary.manualSends.value)} 回` }, state.retry)} />
       <KpiCard presentation="band" title="手作業が減った時間" icon={<Clock size={16} aria-hidden="true" />} value={hoursValue} unit="時間" detail={hours.reason ? (METRIC_STATE_TEXT[hours.state] || '未取得') : '1件30秒として試算'} description={hours.reason ?? undefined} onRetry={hours.state === 'failed' ? state.retry : undefined} />
       <KpiCard presentation="band" title="作ったのに使っていない" icon={<PackageOpen size={16} aria-hidden="true" />} value={shownValue(overview.summary.unusedItems)} unit="個" {...metricCardState(overview.summary.unusedItems, { detail: `参照切れ ${metricText(overview.summary.brokenReferences)} 件` }, state.retry)} description={overview.summary.brokenReferences.reason ?? overview.summary.unusedItems.reason ?? undefined} />
     </KpiBand></ListPageStats>
@@ -142,7 +143,7 @@ export default function UsageV8({ accountId }: { accountId: string }) {
             </tbody>
           </DataTable>
           <p className={styles.caption}>{`${periodCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)} ／ 利用関係を最後に確認: ${formatAnalyticsDateTime(overview.checkedAt)}`}</p>
-          <Disclosure title="集計期間を変える" hint={`この${days}日`} size="compact"><RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} /></Disclosure>
+          <Disclosure title="集計期間を変える" hint={periodLabel} size="compact"><RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} /></Disclosure>
         </div>
       </DetailColumns>
     </div>

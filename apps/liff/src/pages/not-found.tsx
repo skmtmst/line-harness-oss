@@ -23,7 +23,7 @@ export function closeOrBackToLine(kind: 'line' | 'close'): void {
 export default function NotFound() {
   return (
     <LiffLookScope className="min-h-screen bg-canvas" designNode="aLU3r">
-      <LiffHeader title="ご予約" />
+      <LiffHeader title="ご案内" />
       <div className="mx-auto w-full max-w-md px-4 pt-[66px] pb-[142px]">
         <StatusView
           large

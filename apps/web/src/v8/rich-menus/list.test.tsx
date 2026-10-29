@@ -81,7 +81,7 @@ vi.mock('@/lib/api', () => ({
       deleteExternal: (id: string, accountId: string) => fixture.deleteExternal(id, accountId),
       tapStats: () => Promise.resolve({
         success: true,
-        data: { from: '2026-09-01', to: '2026-10-01', total: 12, byGroup: [{ groupId: 'g-default', taps: 12 }], byArea: [] },
+        data: { from: '2026-09-01', to: '2026-10-01', total: 12, byGroup: [{ groupId: 'g-default', taps: 12 }], byArea: [{ groupId: 'g-default', pageId: 'p1', areaId: 'a1', label: '商品を見る', taps: 12 }] },
       }),
       deleteImpact: (id: string) => fixture.deleteImpact(id),
       imageUrl: (key: string) => `/img/${key}`,
@@ -161,10 +161,10 @@ describe('V8 リッチメニュー一覧', () => {
     expect(first.textContent).toContain('12回')
     expect(first.textContent).toContain('（既定）')
     const second = view.getByText('秋のキャンペーン').closest('tr') as HTMLElement
-    expect(second.textContent).toContain('10/05 公開')
+    expect(second.textContent).toContain('予約中2027/10/05')
     expect(second.textContent).toContain('10/05 から既定')
     expect(second.textContent).toContain('—')
-    expect(within(second).getByText('2027/10/05 公開').closest('[aria-hidden="true"]')).toBeNull()
+    expect(within(second).getByText('予約中').closest('[aria-hidden="true"]')).toBeNull()
     expect(second.closest('[data-column-sizing]')?.getAttribute('data-column-sizing')).toBe('controls')
   })
 
@@ -221,4 +221,17 @@ describe('V8 リッチメニュー一覧', () => {
     // 読み込み中に出ていた確認窓は閉じの動き（160ms）のあと外れる。
     await waitFor(() => expect(view.getAllByRole('button', { name: '閉じる' }).length).toBe(2))
   })
+})
+
+test('押されたボタンが分かるときは回数を未知の数にせず、予約日は状態の下に出す', async () => {
+  const view = render(<RichMenusListV8 />)
+  await waitFor(() => {
+    const label = [...view.container.querySelectorAll('[data-kpi-label]')].find(el => el.textContent?.includes('いちばん押された'))
+    const card = label?.closest('[data-kpi-presentation]')
+    expect(card?.querySelector('[data-kpi-number]')?.textContent).toBe('12')
+    expect(card?.querySelector('[data-kpi-detail]')?.textContent).toContain('商品を見る')
+  })
+  const scheduled = await view.findByText('予約中')
+  expect(scheduled.textContent).not.toContain('10/05')
+  expect(scheduled.closest('td')?.textContent).toContain('10/05')
 })
