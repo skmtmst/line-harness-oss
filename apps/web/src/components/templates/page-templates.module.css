@@ -33,6 +33,10 @@
 :global(:root) .headingTabs { margin-top: 0; }
 :global(:root) .headingNotice { min-width: 0; }
 :global(:root) .headingNotice:empty { display: none; }
+/* 一覧の閲覧帯は見出しと操作の行の下の全幅の行。題の列の中に置くと操作の分だけ幅が足りない。操作の行（crumbs 持ちは order 3）の後・手順（order 5）の前。上との間は題の列の間と同じに見えるよう、行の間との差を戻す。 */
+:global(:root) [data-page-template='list'] .heading > .headingNotice { flex-basis: 100%; order: 4; margin-top: calc(var(--tpl-head-gap) - var(--polish-space-field)); }
+:global(:root) [data-page-template='list'] .heading[data-heading-size='compact'] > .headingNotice { margin-top: calc(var(--tpl-compact-gap) - var(--polish-space-field)); }
+:global(:root) [data-page-template='list'] .heading[data-heading-size='large'] > .headingNotice { margin-top: calc(var(--tpl-head-gap) - var(--tpl-large-gap)); }
 /* 詳細のタブも headingText の段間だけを使う。 */
 :global(:root) [data-page-template='detail'] .headingTabs { margin-top: 0; }
 /* タブの有無によらず、題の下は共通の余白を使う。 */
