@@ -70,7 +70,8 @@ describe('契約者専用LINEの登録案内', () => {
     await act(async () => { root.render(<NoticeLineRegisterDialog open onClose={onClose} />) })
     await flush()
     const text = document.body.textContent ?? ''
-    expect(text).toContain('musubo 運営（契約者専用）の LINE を登録してください')
+    expect(text).toContain('運営からの通知を LINE で受け取る')
+    expect(text).toContain('このLINEは問い合わせを受け付けません')
     expect(text).toContain('musubo 運営（契約者専用）（@musubo）')
     expect(text).toContain('123456')
     expect(document.querySelector('img[src^="data:image/png"]')).not.toBeNull()
