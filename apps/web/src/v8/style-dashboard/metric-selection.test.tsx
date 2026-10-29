@@ -38,23 +38,24 @@ afterEach(cleanup)
 
 it('未選択は呼び戻し・無断率を保ち、変更した数だけ版付き保存して再読込後も順番を復元する', async () => {
   const view = render(<StyleDashboard style="salon" />)
-  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち', '無断キャンセル率']))
+  // R11: 帯は4枚まで（5つ目の無断キャンセル率は帯の下の1行）。
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち']))
   const drawer = await open()
   fireEvent.click(within(drawer).getByRole('switch', { name: '数の帯：無断キャンセル率' }))
   fireEvent.click(within(drawer).getByRole('switch', { name: '数の帯：来店数' }))
   fireEvent.click(within(drawer).getByRole('button', { name: '数の帯：来店数を上へ' }))
   fireEvent.click(within(drawer).getByRole('button', { name: '保存する', exact: true }))
   await waitFor(() => expect(state.save).toHaveBeenCalledWith('a', 2, cards, ['bookings', 'attention', 'nextBookingRate', 'visits', 'recall']))
-  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数', '呼び戻し待ち']))
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数']))
   expect(state.summary.mock.calls.length).toBeGreaterThan(1)
   view.unmount(); render(<StyleDashboard style="salon" />)
-  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数', '呼び戻し待ち']))
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数']))
 })
 
 it('明示customがserver defaultと同値でも保持し、カードのみ保存でmetricIdsを送らない', async () => {
   state.customized = true
   render(<StyleDashboard style="salon" />)
-  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '入金額', '新着予約']))
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '入金額']))
   const drawer = await open()
   fireEvent.click(within(drawer).getByRole('switch', { name: '分析', exact: true }))
   fireEvent.click(within(drawer).getByRole('button', { name: '保存する', exact: true }))
@@ -104,7 +105,9 @@ it('resetだけdefaultへ戻し、空のcustomを未選択へ読み替えない'
   fireEvent.click(within(drawer).getByRole('button', { name: '型に戻す', exact: true }))
   await waitFor(() => expect(state.reset).toHaveBeenCalledWith('a', 2))
   await waitFor(() => expect(labels()).toContain('呼び戻し待ち'))
-  expect(labels()).toContain('無断キャンセル率')
+  // R11: 5つ目の無断キャンセル率は帯の下の1行。
+  expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち'])
+  expect(screen.getByRole('link', { name: '友だち一覧へ →' })).toBeTruthy()
   expect(state.customized).toBe(false)
   expect(state.save).not.toHaveBeenCalled()
 })
@@ -144,7 +147,8 @@ it('5超の既存customを切り捨てず共通の複数段へ復元する', asy
   render(<StyleDashboard style="salon" />)
   await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち', '無断キャンセル率', '来店数']))
   const rows = document.querySelectorAll('[data-style-dashboard] > [data-kpi-strip]')
-  expect(Array.from(rows).map(row => row.children.length)).toEqual([5, 1])
+  // R11: 段は4枚ずつ。
+  expect(Array.from(rows).map(row => row.children.length)).toEqual([4, 2])
   expect(state.save).not.toHaveBeenCalled()
 })
 
@@ -153,11 +157,30 @@ it('32項目の閲覧だけでも内容と順序を保ち、未取得を0にせ�
   render(<StyleDashboard style="salon" />)
   await waitFor(() => expect(labels()).toHaveLength(32))
   const rows = document.querySelectorAll('[data-style-dashboard] > [data-kpi-strip]')
-  expect(Array.from(rows).map(row => row.children.length)).toEqual([5, 5, 5, 5, 5, 5, 2])
+  // R11: 段は4枚ずつ。
+  expect(Array.from(rows).map(row => row.children.length)).toEqual([4, 4, 4, 4, 4, 4, 4, 4])
   const pending = screen.getByRole('button', { name: '支払い待ちの説明' }).closest('[data-design-version]')!
   expect(within(pending as HTMLElement).getByText('—', { exact: true })).toBeTruthy()
   expect(screen.queryByRole('button', { name: '表示を変える' })).toBeNull()
   expect(state.save).not.toHaveBeenCalled()
+})
+
+it('R11: 5つ目は帯の下の短い1行（行き先付き）', async () => {
+  render(<StyleDashboard style="salon" />)
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち']))
+  // 5つ目の無断キャンセル率は帯の外の1行。
+  const go = screen.getByRole('link', { name: '友だち一覧へ →' })
+  expect(go.closest('[data-kpi-strip]')).toBeNull()
+  expect(go.getAttribute('href')).toBe('/friends')
+})
+
+it('R11: 飲食店の5つ目は「今日入った予約 N 件 一覧へ →」', async () => {
+  render(<StyleDashboard style="restaurant" />)
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '空席（いま）', '無断キャンセル率']))
+  expect(document.body.textContent).toContain('今日入った予約')
+  const go = screen.getByRole('link', { name: '一覧へ →' })
+  expect(go.closest('[data-kpi-strip]')).toBeNull()
+  expect(go.getAttribute('href')).toBe('/restaurant-test/reservations')
 })
 
 it('旧応答の非保存fallbackから明示した再読込で真のcustomへ戻る', async () => {

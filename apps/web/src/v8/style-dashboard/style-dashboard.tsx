@@ -73,6 +73,30 @@ const ALERT_ICON: Record<NonNullable<StyleAlertAction['icon']>, ReactNode> = {
   link: <Link2 size={16} aria-hidden="true" />, people: <Users size={16} aria-hidden="true" />,
 }
 
+/* R11: 帯に入り切らない5つ目の短い1行（「今日入った予約 3 件 一覧へ →」の形）。 */
+function KpiOverflowLine({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
+  const value = kpi.valueText ?? (kpi.value == null ? '—' : formatNumber(kpi.value))
+  return (
+    <p className={styles.fifthLine}>{kpi.detail} {value}{kpi.unit ? ` ${kpi.unit}` : ''} {kpi.link ? (
+      kpi.link.href === '#preparing-payment'
+        ? <Button variant="text" size="inline" onClick={onPreparing}>{kpi.link.label}へ →</Button>
+        : <Button variant="text" size="inline" href={kpi.link.href}>{kpi.link.label}へ →</Button>
+    ) : null}</p>
+  )
+}
+
+/* R11: 帯は大事な4つまで。ちょうど5つの時は5つ目を帯の下の短い1行に残す。6つ以上は4枚ずつの段。 */
+function StyleKpiBand({ kpis, style, onPreparing }: { kpis: StyleKpi[]; style: IndustryStyle; onPreparing: () => void }) {
+  const fifth = kpis.length === 5 ? kpis[4] : null
+  const shown = fifth ? kpis.slice(0, 4) : kpis
+  return <>
+    <KpiBand layout="link-row" maxColumns={4} data-style-dashboard={style}>
+      {shown.map((kpi) => <Kpi key={kpi.id} kpi={kpi} onPreparing={onPreparing} />)}
+    </KpiBand>
+    {fifth ? <KpiOverflowLine kpi={fifth} onPreparing={onPreparing} /> : null}
+  </>
+}
+
 function Kpi({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
   return (
     <KpiCard
@@ -205,9 +229,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <div className={styles.inset}>
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
         {metricSelectionFallback ? <Notice tone="info" action={<Button onClick={reloadPresentation}>表示設定を読み直す</Button>}>保存した表示設定を確認できないため、業種の初期表示にしています。</Notice> : null}
-        {today && today.kpis.length === 0 ? null : <KpiBand layout="link-row" maxColumns={5} data-style-dashboard={style}>
-          {(today?.kpis ?? []).map((kpi) => <Kpi key={kpi.id} kpi={kpi} onPreparing={openPayment} />)}
-        </KpiBand>}
+        {today && today.kpis.length === 0 ? null : <StyleKpiBand kpis={today?.kpis ?? []} style={style} onPreparing={openPayment} />}
         {alert ? (
           <Notice tone="warn" role="status" heading={alert.title} className={styles.alert}
             action={alert.actions.some((a) => canWrite || a.icon === 'external') ? <div className={styles.alertActions}>{alert.actions.filter((a) => canWrite || a.icon === 'external').map((a) => (

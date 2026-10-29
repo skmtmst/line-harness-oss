@@ -13,6 +13,8 @@
 .updated { color: var(--color-ink-faint); font-size: var(--text-label); white-space: nowrap; }
 
 .inset { display: flex; flex-direction: column; gap: var(--polish-space-field); padding-inline: var(--polish-space-section); }
+/* R11: 帯の下の5つ目の短い1行。 */
+.fifthLine { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-label); }
 .alert { min-inline-size: 0; }
 .alertActions { display: flex; gap: var(--polish-space-row); flex-wrap: nowrap; }
 
