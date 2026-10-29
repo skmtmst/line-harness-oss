@@ -7,6 +7,7 @@ import { api, type OpsApplication } from '@/lib/api'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
+import { TextArea } from '@/components/shared/text-field'
 import { useOverlayFocus, useOverlayLayer } from '@/components/shared/overlay-utils'
 import { PageFrame } from '@/components/templates/page-frame'
 import { useOpsReadOnly } from './use-ops-read-only'
@@ -116,8 +117,8 @@ function Detail() {
             </ol>
             <div className={styles.memo}>
               <label htmlFor="application-contact-note">担当者からの連絡メモ</label>
-              <textarea id="application-contact-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} placeholder="電話・メールで確認した内容を記録" readOnly={!canEdit} />
-              {canEdit ? <button type="button" className={styles.save} onClick={() => void contact()} disabled={!note.trim() || busy}>{busy ? '保存しています…' : '連絡済みとして保存'}</button> : null}
+              <TextArea id="application-contact-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} placeholder="電話・メールで確認した内容を記録" readOnly={!canEdit} />
+              {canEdit ? <button type="button" className={styles.save} onClick={() => void contact()} disabled={!note.trim() || busy}>連絡済みとして保存</button> : null}
             </div>
           </section>
         </div>
