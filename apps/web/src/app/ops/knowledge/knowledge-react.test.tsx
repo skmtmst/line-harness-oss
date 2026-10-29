@@ -9,8 +9,8 @@ import { KnowledgeReferences, TicketKnowledge } from '@/components/ops/knowledge
 import type { OpsSupportDetail } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
-const mocks = vi.hoisted(() => ({ list: vi.fn(), article: vi.fn(), update: vi.fn(), review: vi.fn(), feedback: vi.fn(), retry: vi.fn(), ticket: vi.fn() }))
-vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { ops: { knowledge: mocks, support: { ticket: mocks.ticket } } } }))
+const mocks = vi.hoisted(() => ({ list: vi.fn(), article: vi.fn(), update: vi.fn(), review: vi.fn(), feedback: vi.fn(), retry: vi.fn(), ticket: vi.fn(), me: vi.fn() }))
+vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { ops: { knowledge: mocks, support: { ticket: mocks.ticket }, me: mocks.me } } }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/ops/knowledge', useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 
@@ -35,6 +35,7 @@ beforeEach(() => {
   mocks.review.mockResolvedValue({ success: true, data: { ...article, version: 3 } })
   mocks.feedback.mockResolvedValue({ success: true, data: null })
   mocks.retry.mockResolvedValue({ success: true, data: null })
+  mocks.me.mockResolvedValue({ success: true, data: { id: 'ops-1', readOnly: false } })
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
 })
 afterEach(() => { act(() => root.unmount()); host.remove(); vi.useRealTimers() })

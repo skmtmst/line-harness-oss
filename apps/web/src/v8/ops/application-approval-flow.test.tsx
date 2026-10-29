@@ -5,9 +5,10 @@ import type { OpsApplication } from '@/lib/api'
 
 const state = vi.hoisted(() => ({
   get: vi.fn(), contact: vi.fn(), approve: vi.fn(), resendInvite: vi.fn(),
+  access: 'writer' as 'unknown' | 'readonly' | 'writer',
 }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams('id=application-1') }))
-vi.mock('./use-ops-read-only', () => ({ useOpsReadOnly: () => false }))
+vi.mock('./use-ops-read-only', async (importOriginal) => ({ ...(await importOriginal<typeof import('./use-ops-read-only')>()), useOpsReadOnlyState: () => state.access }))
 vi.mock('@/lib/api', () => ({ api: { ops: { applications: state } } }))
 
 import OpsApplicationDetail from './application-detail'
@@ -19,7 +20,7 @@ const initial = {
   invite_sent_at: null, tenant_id: null, created_at: '2026-10-29T01:40:00.000Z',
 } as OpsApplication
 
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.clearAllMocks(); state.access = 'writer' })
 
 describe('申込詳細の連絡から承認まで', () => {
   it('連絡内容を保存した後だけ承認確認を開き、確定すると招待結果を表示する', async () => {
@@ -41,5 +42,21 @@ describe('申込詳細の連絡から承認まで', () => {
     fireEvent.click(screen.getByRole('button', { name: '承認して招待を送る' }))
     await waitFor(() => expect(state.approve).toHaveBeenCalledWith('application-1'))
     expect(await screen.findByText('承認し、招待メールを送りました')).not.toBeNull()
+  })
+
+  it('閲覧のみは保存も承認も押せない形＋理由で出し、処理も止める', async () => {
+    state.access = 'readonly'
+    state.get.mockResolvedValue({ success: true, data: initial })
+    render(<OpsApplicationDetail />)
+    const save = await screen.findByRole('button', { name: '連絡済みとして保存' }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    expect(save.title).toContain('閲覧のみ')
+    const approve = screen.getByRole('button', { name: '承認して招待メールを送る' }) as HTMLButtonElement
+    expect(approve.disabled).toBe(true)
+    fireEvent.click(save)
+    fireEvent.click(approve)
+    expect(state.contact).not.toHaveBeenCalled()
+    expect(state.approve).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: 'この申込を承認しますか？' })).toBeNull()
   })
 })

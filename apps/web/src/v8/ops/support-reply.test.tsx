@@ -45,7 +45,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
     },
   }
 })
-vi.mock('./use-ops-read-only', () => ({ useOpsReadOnly: () => false }))
+vi.mock('./use-ops-read-only', () => ({ useOpsReadOnly: () => false, useOpsReadOnlyState: () => 'writer' as const }))
 
 import OpsSupportV8 from './support'
 
