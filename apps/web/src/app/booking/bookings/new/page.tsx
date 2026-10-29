@@ -842,7 +842,7 @@ export default function NewProxyBookingPage() {
                     onClose={() => setFriendSuggestOpen(false)}
                   >
                     <div
-                      className="border-hairline bg-canvas max-h-64 divide-y overflow-y-auto rounded-control border shadow-float"
+                      className="border-hairline bg-canvas max-h-64 divide-y divide-hairline overflow-y-auto rounded-control border shadow-float"
                       // 最上層では absolute 指定を無効にする（位置は器が決める）。
                       style={{ position: 'static', width: '100%' }}
                     >
