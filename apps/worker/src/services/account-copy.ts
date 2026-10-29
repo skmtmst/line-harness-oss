@@ -1,3 +1,5 @@
+import { SPECIALIZED_CATALOG_SETTING_KEY } from '@line-crm/shared';
+
 export type AccountCopyItem = 'accountSettings' | 'scenarios' | 'autoReplies';
 
 const ALLOWED_COPY_ITEMS = new Set<AccountCopyItem>([
@@ -63,7 +65,9 @@ export async function copyLineAccountSettings(
   const statements: D1PreparedStatement[] = [];
 
   if (items.includes('accountSettings')) {
-    for (const row of await rows(db, "SELECT * FROM account_settings WHERE line_account_id = ? AND key <> 'inbox_email_legacy_enabled'", sourceAccountId)) {
+    for (const row of await rows(db, 'SELECT * FROM account_settings WHERE line_account_id = ?', sourceAccountId)) {
+      // 店舗固有の初期目録を、然のテンプレートから引き継がない。
+      if (row.key === 'inbox_email_legacy_enabled' || row.key === SPECIALIZED_CATALOG_SETTING_KEY) continue;
       statements.push(insertStatement(db, 'account_settings', {
         ...row,
         id: crypto.randomUUID(),

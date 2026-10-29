@@ -1,5 +1,5 @@
 import { jstNow } from './utils.js';
-import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, SPECIALIZED_CATALOG_SETTING_KEY } from '@line-crm/shared';
 import { encryptCredential } from './credential-crypto.js';
 import { type CreateLineAccountInput, type LineAccount, type LineAccountConnectionCheck, type SaveLineAccountConnectionChecksInput } from './line-accounts-types.js';
 import { resolveCredentialEncryptionKey } from './line-accounts-credentials.js';
@@ -27,7 +27,7 @@ export async function createLineAccount(
     input.loginChannelSecret ? encryptCredential(input.loginChannelSecret, encryptionKey) : null,
   ]);
 
-  await db
+  const accountInsert = db
     .prepare(
       `INSERT INTO line_accounts
          (id, channel_id, name, channel_access_token, channel_secret,
@@ -82,8 +82,17 @@ export async function createLineAccount(
       input.lineProfileSyncedAt ?? null,
       now,
       now,
-    )
-    .run();
+    );
+
+  // テナントに関係なく、今後作成する店舗アカウントへ然専用機能は渡さない。
+  // 既存アカウントは書き換えず、作成と初期設定を同一トランザクションにする。
+  await db.batch([
+    accountInsert,
+    db.prepare(`INSERT INTO account_settings (id, line_account_id, key, value, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?)`).bind(
+      crypto.randomUUID(), id, SPECIALIZED_CATALOG_SETTING_KEY, '[]', now, now,
+    ),
+  ]);
 
   return (await getLineAccountById(db, id, encryptionKey))!;
 }
