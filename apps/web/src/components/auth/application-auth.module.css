@@ -24,8 +24,6 @@
 .body form { gap: 14px; }
 /* 申込・ログインのフォームが間隔の唯一の持ち主。直下の共有Noticeの上下余白を消し、帯→次の段を段にそろえる。 */
 :global(:root) .body form > :global([data-design-part='notice']) { margin-block: 0; }
-/* 既定の認証カード（パスワード再発行など）のフォームも同じ。 */
-:global(:root section[data-auth-layout='default'] form > [data-design-part='notice']) { margin-block: 0; }
 .body input, .body select { min-height: 44px; }
 .body label { font-size: 13px; }
 .body button[type='submit'] { min-height: 44px; background: #087a3e; }
