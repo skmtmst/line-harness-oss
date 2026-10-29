@@ -38,4 +38,13 @@ describe('736 アカウントフォルダの色制約', () => {
       VALUES ('new','00000000-0000-4000-8000-000000000001','新規',?,'2026-10-29','2026-10-29')`).run('#ec4899');
     expect(() => db.prepare("UPDATE line_account_tags SET color='#ec48z9' WHERE id='new'").run()).toThrow();
   });
+
+  it('アーカイブ済みアカウントの旧タグリンクも失わない', () => {
+    db.prepare("UPDATE line_accounts SET archived_at='2026-10-28' WHERE id='account'").run();
+    db.exec(migration);
+    expect(db.prepare('SELECT line_account_id,tag_id FROM line_account_tag_links').all()).toEqual([
+      { line_account_id: 'account', tag_id: 'folder' },
+    ]);
+    expect(db.pragma('foreign_key_check')).toEqual([]);
+  });
 });

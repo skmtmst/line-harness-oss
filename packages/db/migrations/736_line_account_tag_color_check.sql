@@ -7,8 +7,14 @@ PRAGMA defer_foreign_keys = ON;
 -- The two known dependents have ON DELETE actions; stop if another table appears.
 SELECT json(CASE WHEN (
   SELECT count(*) FROM sqlite_schema
-  WHERE type='table' AND lower(sql) LIKE '%references line_account_tags%'
-)=2 THEN '{}' ELSE 'unexpected line_account_tags references: stop migration 736' END);
+  WHERE type='table' AND instr(lower(sql),'references line_account_tags')>0
+)=2 AND EXISTS (
+  SELECT 1 FROM sqlite_schema WHERE type='table' AND name='line_accounts'
+    AND instr(lower(sql),'folder_id text references line_account_tags(id) on delete set null')>0
+) AND EXISTS (
+  SELECT 1 FROM sqlite_schema WHERE type='table' AND name='line_account_tag_links'
+    AND instr(lower(sql),'references line_account_tags(id, tenant_id) on delete cascade')>0
+) THEN '{}' ELSE 'unexpected line_account_tags references: stop migration 736' END);
 
 CREATE TABLE migration_736_account_folder_refs_backup AS
   SELECT id, folder_id FROM line_accounts WHERE folder_id IS NOT NULL;
@@ -17,6 +23,7 @@ CREATE TABLE migration_736_account_tag_links_backup AS
 
 DROP TRIGGER line_accounts_folder_scope_insert;
 DROP TRIGGER line_accounts_folder_scope_update;
+DROP TRIGGER line_account_tag_links_scope;
 
 DELETE FROM line_account_tag_links;
 UPDATE line_accounts SET folder_id=NULL WHERE folder_id IS NOT NULL;
@@ -56,6 +63,14 @@ UPDATE line_accounts SET folder_id=(
 ) WHERE id IN (SELECT id FROM migration_736_account_folder_refs_backup);
 INSERT INTO line_account_tag_links (line_account_id,tag_id,tenant_id)
   SELECT line_account_id,tag_id,tenant_id FROM migration_736_account_tag_links_backup;
+CREATE TRIGGER line_account_tag_links_scope
+BEFORE INSERT ON line_account_tag_links
+WHEN NOT EXISTS (
+  SELECT 1 FROM line_accounts WHERE id = NEW.line_account_id
+    AND COALESCE(tenant_id, '00000000-0000-4000-8000-000000000001') = NEW.tenant_id
+    AND archived_at IS NULL
+)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_TAG_SCOPE_INVALID'); END;
 
 -- The migration must roll back if any dependent row is lost.
 SELECT json(CASE WHEN (
