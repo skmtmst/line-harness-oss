@@ -9,7 +9,8 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { useOverlayFocus, useOverlayLayer } from '@/components/shared/overlay-utils'
 import { PageFrame } from '@/components/templates/page-frame'
-import { useOpsReadOnly } from './use-ops-read-only'
+import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
+import { TextArea } from '@/components/shared/text-field'
 import styles from './application-detail.module.css'
 
 const statusLabel: Record<OpsApplication['status'], string> = {
@@ -26,7 +27,8 @@ export default function OpsApplicationDetail() {
 
 function Detail() {
   const id = useSearchParams().get('id') ?? ''
-  const readOnly = useOpsReadOnly()
+  const access = useOpsReadOnlyState()
+  const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
   const [application, setApplication] = useState<OpsApplication | null>(null)
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(true)
@@ -49,7 +51,7 @@ function Detail() {
   useEffect(() => { void load() }, [load])
 
   const contact = async () => {
-    if (!application || busy || !note.trim()) return
+    if (!application || busy || !note.trim() || access !== 'writer') return
     setBusy(true); setError(''); setMessage('')
     try {
       const result = await api.ops.applications.contact(application.id, note.trim())
@@ -60,7 +62,7 @@ function Detail() {
   }
 
   const approve = async () => {
-    if (!application || busy) return
+    if (!application || busy || access !== 'writer') return
     setBusy(true); setError(''); setMessage('')
     try {
       const result = await api.ops.applications.approve(application.id)
@@ -73,7 +75,7 @@ function Detail() {
   }
 
   const resend = async () => {
-    if (!application || busy) return
+    if (!application || busy || access !== 'writer') return
     setBusy(true); setError(''); setMessage('')
     try {
       const result = await api.ops.applications.resendInvite(application.id)
@@ -83,8 +85,9 @@ function Detail() {
     finally { setBusy(false) }
   }
 
-  const canEdit = !!application && !readOnly && ['pending', 'contacted'].includes(application.status)
-  const canApprove = application?.status === 'contacted' && !!application.contact_note && !readOnly
+  const canEdit = !!application && ['pending', 'contacted'].includes(application.status)
+  const canApprove = application?.status === 'contacted' && !!application.contact_note
+  const writer = access === 'writer'
 
   return <PageFrame kind="detail" boardId="g6NuH" standalone>
     <article className={styles.panel}>
@@ -116,15 +119,15 @@ function Detail() {
             </ol>
             <div className={styles.memo}>
               <label htmlFor="application-contact-note">担当者からの連絡メモ</label>
-              <textarea id="application-contact-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} placeholder="電話・メールで確認した内容を記録" readOnly={!canEdit} />
-              {canEdit ? <button type="button" className={styles.save} onClick={() => void contact()} disabled={!note.trim() || busy}>{busy ? '保存しています…' : '連絡済みとして保存'}</button> : null}
+              <TextArea id="application-contact-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} placeholder="電話・メールで確認した内容を記録" readOnly={!canEdit || !writer} />
+              {canEdit ? <button type="button" className={styles.save} onClick={() => void contact()} disabled={!note.trim() || busy || !writer} title={lock}>連絡済みとして保存</button> : null}
             </div>
           </section>
         </div>
         <div className={styles.actionBand}>
           <p>担当者から連絡し、内容を確認してから承認してください。<br />連絡済みを保存すると、承認して招待できます。</p>
-          {application.status === 'approved' && !readOnly ? <button type="button" className={styles.approve} onClick={() => void resend()} disabled={busy}>{application.invite_sent_at ? '招待メールを再送' : '招待メールを送る'}</button>
-            : <button type="button" className={styles.approve} onClick={() => setConfirmOpen(true)} disabled={!canApprove || busy}>承認して招待メールを送る</button>}
+          {application.status === 'approved' ? <button type="button" className={styles.approve} onClick={() => void resend()} disabled={busy || !writer} title={lock}>{application.invite_sent_at ? '招待メールを再送' : '招待メールを送る'}</button>
+            : <button type="button" className={styles.approve} onClick={() => setConfirmOpen(true)} disabled={!canApprove || busy || !writer} title={lock}>承認して招待メールを送る</button>}
         </div>
       </>}
     </article>

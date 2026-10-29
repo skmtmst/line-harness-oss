@@ -20,6 +20,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import PeriodPicker from '@/components/shared/period-picker'
 import { OpsHead } from './shell'
+import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
 import { PageFrame } from '@/components/templates/page-frame'
 import { DashboardColumns } from '@/components/templates/dashboard-page'
 import Card from '@/components/shared/card'
@@ -49,7 +50,8 @@ export default function OpsDashboardV8() {
   const [period, setPeriod] = useState<OpsDashboardPeriod>('month')
   const [data, setData] = useState<OpsDashboard | null>(null)
   const [error, setError] = useState('')
-  const [canSyncBilling, setCanSyncBilling] = useState(false)
+  const access = useOpsReadOnlyState()
+  const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
   const [syncingBilling, setSyncingBilling] = useState(false)
   const [billingSyncNotice, setBillingSyncNotice] = useState('')
   const [billingSyncError, setBillingSyncError] = useState('')
@@ -66,15 +68,6 @@ export default function OpsDashboardV8() {
 
   useEffect(() => { void load() }, [load])
 
-  useEffect(() => {
-    let active = true
-    void (async () => {
-      const res = await opsCall(api.ops.me())
-      if (active) setCanSyncBilling(Boolean(res.success && !res.data.readOnly))
-    })()
-    return () => { active = false }
-  }, [])
-
   // 下の「未登録の権限者」の1行のため、先に読む（窓を開いたときの読み直しは openUnregistered）。
   useEffect(() => {
     if (!data || unregistered || unregisteredError) return
@@ -89,6 +82,7 @@ export default function OpsDashboardV8() {
   }, [data, unregistered, unregisteredError])
 
   const syncBilling = async () => {
+    if (access !== 'writer') return
     setSyncingBilling(true)
     setBillingSyncNotice('')
     setBillingSyncError('')
@@ -160,9 +154,7 @@ export default function OpsDashboardV8() {
               {data ? <RevenueColumns rows={data.revenueByMonth} /> : <ListState permissionScope="hq" kind="loading" title="読み込んでいます" />}
               <div className={styles.chartFoot}>
                 <p className={parts.note}>単位：千円（月額の合計）・{data ? revenueSourceLabel(data.pricing, data.lastSyncedAt) : emptyValue('unknown')}</p>
-                {canSyncBilling ? (
-                  <Button size="compact" disabled={syncingBilling} busy={syncingBilling} busyLabel="同期しています…" onClick={() => void syncBilling()}>Stripe と同期</Button>
-                ) : null}
+                <Button size="compact" lockedReason={lock} disabled={syncingBilling || access === 'unknown'} busy={syncingBilling} busyLabel="同期しています…" onClick={() => void syncBilling()}>Stripe と同期</Button>
               </div>
               {billingSyncNotice ? <p role="status" className={parts.status}>{billingSyncNotice}</p> : null}
               {billingSyncError ? <Notice tone="danger" className={parts.alertNoticePlacement} >{billingSyncError}</Notice> : null}
