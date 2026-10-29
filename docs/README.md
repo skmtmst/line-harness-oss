@@ -537,6 +537,7 @@
 - [スマートフォンの幅でカードを1列に](release-log/unreleased/1801-kenta-cards-one-column.md)
 - [スマートフォンの幅で店名を切れにくく](release-log/unreleased/1804-kenta-hq-card-narrow.md)
 - [統括のカードの札・要対応の数・表の幅](release-log/unreleased/0000-kenta-hq-card-fixes.md)
+- [運営の閲覧のみの操作を隠さず押せない形と理由で表示](release-log/unreleased/0000-kenta-muse-opsviewer.md)
 - [統括トップ・店の比較・お店画面の直し](release-log/unreleased/1953-kenta-muse-dash-store.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [二段階認証の画面を見やすく](release-log/unreleased/1843-kenta-two-factor-card.md)

@@ -9,6 +9,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsTenantDetailPage from './page'
+import { getPageAction } from '@/test-utils/page-action'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 const mocks = vi.hoisted(() => ({ tenant: vi.fn(), start: vi.fn() }))
@@ -57,11 +58,17 @@ async function render() {
 const button = (label: string) =>
   Array.from(document.querySelectorAll('button')).find(b => (b.textContent ?? '').trim() === label)
 
+async function openImpersonate() {
+  const trigger = document.querySelector('[data-page-heading-actions] button[aria-haspopup="menu"]') as HTMLButtonElement | null
+  if (trigger && trigger.getAttribute('aria-expanded') !== 'true') await act(async () => { trigger.click() })
+  await act(async () => { getPageAction({ name: '代理ログイン（閲覧のみ）' }).click() })
+}
+
 describe('代理ログイン開始の確認窓', () => {
   it('始める前に契約先名・閲覧のみ・記録を確かめる', async () => {
     await render()
     expect(mocks.start).not.toHaveBeenCalled()
-    await act(async () => { button('代理ログイン（閲覧のみ）')!.click() })
+    await openImpersonate()
     // いきなり始めず、確認の小窓が出る
     expect(mocks.start).not.toHaveBeenCalled()
     expect(document.body.textContent).toContain('「契約先A」に代理ログインする')
@@ -74,7 +81,7 @@ describe('代理ログイン開始の確認窓', () => {
   it('失敗したら理由を出して、もう一度押せる', async () => {
     mocks.start.mockResolvedValueOnce({ success: false, error: '代理ログインを始められませんでした' })
     await render()
-    await act(async () => { button('代理ログイン（閲覧のみ）')!.click() })
+    await openImpersonate()
     await act(async () => { button('代理ログインを始める')!.click() })
     expect(document.querySelector('[role="alert"]')?.textContent).toContain('代理ログインを始められませんでした')
     expect(button('代理ログインを始める')!.disabled).toBe(false)
