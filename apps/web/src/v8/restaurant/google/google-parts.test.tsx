@@ -64,7 +64,7 @@ describe('返信を作る：送れない設定のときは送信へ進むボタ�
     fireEvent.click(await screen.findByRole('button', { name: 'AIで下書きを作る' }))
     await waitFor(() => expect(fixture.generateDraft).toHaveBeenCalledWith('a', 'rv-2'))
     expect((screen.getByRole('textbox', { name: '返信文' }) as HTMLTextAreaElement).value).toBe('ご来店ありがとうございます。')
-    expect(screen.getByText(/口コミの評価・本文と店舗名をAIの提供会社に送ります/)).toBeTruthy()
+    expect(screen.queryByText(/口コミの評価・本文と店舗名をAIの提供会社に送ります/)).toBeNull()
     expect(fixture.publishReply).not.toHaveBeenCalled()
   })
   it('検証環境（writeEnabled=false）では「返信内容を確認する」を置かず、下書きの保存はできる', async () => {
