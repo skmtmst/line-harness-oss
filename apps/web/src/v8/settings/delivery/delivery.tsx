@@ -508,7 +508,6 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                       </Button>
                     ) : service.status === 'applying' ? (
                       <>
-                        <span className={styles.rowSpacer} />
                         <Button
                           variant="secondary"
                           disabled={busy !== null}
@@ -543,7 +542,6 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                           <Plug size={16} aria-hidden="true" />
                           接続を確かめる
                         </Button>
-                        <span className={styles.rowSpacer} />
                         <Button
                           variant="secondary"
                           disabled={busy !== null || service.connectionDisconnectBlocked}

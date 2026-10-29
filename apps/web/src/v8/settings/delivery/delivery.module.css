@@ -15,7 +15,6 @@
 .cardSub { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); line-height: var(--tpl-e1-dl-sub-lh); }
 
 /* 行（ことば＋こたえ）は共通の CustomerInfoRows が持つ。ここには置かない。 */
-.rowSpacer { flex: 1 1 0; min-width: 0; }
 
 /* サービスごとの手順の注記：地は真珠色（承認案の $surface-pearl）。図柄は描かない。
    状態の色（接続エラー・申し込み受付中）はここで塗らず、共通の帯（Notice）に任せる
@@ -28,8 +27,8 @@
   font-size: var(--tpl-e1-dl-note-size); line-height: var(--tpl-e1-dl-note-lh);
 }
 
-/* ボタンの行：左から並べる */
-.actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-e1-dl-row-gap); }
+/* 主な操作はカードの中央に並べる。 */
+.actions { display: flex; justify-content: center; flex-wrap: wrap; align-items: center; gap: var(--tpl-e1-dl-row-gap); }
 
 /* つなぐお店を選ぶ窓（DL-4 `X5d8UF`）：行の並びだけを持つ。
    1つだけ選ぶ箱の形と選んだときの色は共通の RadioCard（variant="form"）に任せる。 */
