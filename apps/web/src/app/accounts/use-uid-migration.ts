@@ -1,4 +1,5 @@
 'use client'
+import { UID_IMPORT_COLUMNS } from '@/lib/csv-import-columns'
 
 import { useStaffIdentity, useStaffRole, isOwnerRole, canManageRole } from '@/lib/staff-role'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -41,8 +42,8 @@ export function parseUidCsv(text: string) {
   const records = splitCsvRecords(text).filter((cells) => cells.some((cell) => cell.trim()))
   if (records.length < 2) return []
   const headers = records[0].map((value) => value.trim().toLowerCase())
-  const oldIndex = headers.findIndex((value) => ['old_uid', '旧uid', '移行元uid'].includes(value))
-  const newIndex = headers.findIndex((value) => ['new_uid', '新uid', '移行先uid'].includes(value))
+  const oldIndex = headers.findIndex((value) => UID_IMPORT_COLUMNS.oldUid.some((name) => name === value))
+  const newIndex = headers.findIndex((value) => UID_IMPORT_COLUMNS.newUid.some((name) => name === value))
   if (oldIndex < 0 || newIndex < 0) return []
   const rows: Array<{ oldUid: string; newUid: string | null; evidenceType: 'operator_csv' }> = []
   for (const cells of records.slice(1)) {

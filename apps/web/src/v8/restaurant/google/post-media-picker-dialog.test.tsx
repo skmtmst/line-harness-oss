@@ -47,6 +47,14 @@ describe('投稿画像の登録メディア選択窓', () => {
     await waitFor(() => expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ id: 'old' })))
   })
 
+  it('キャンセルでonCloseを呼ぶ', async () => {
+    const onClose = vi.fn()
+    render(<PostMediaPickerDialog target="google" accountId="account-1" onClose={onClose} onSelect={vi.fn()} />)
+    await screen.findByText('new.jpg')
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
   it('画像名で検索し、該当しない結果と通信失敗を区別する', async () => {
     fixture.list.mockResolvedValueOnce({ success: true, data: { items: [], total: 0, limit: 20, offset: 0 } })
     render(<PostMediaPickerDialog target="google" accountId="account-1" onClose={vi.fn()} onSelect={vi.fn()} />)

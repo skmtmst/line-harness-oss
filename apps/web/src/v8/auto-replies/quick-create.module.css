@@ -64,57 +64,36 @@
   outline-offset: var(--tpl-ms-focus-offset);
 }
 
+/* 言葉と外す印は編集画面と同じ札の中で並べる。 */
 .chip {
-  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: var(--tpl-ms-qc-chip-gap);
-  padding: var(--tpl-ms-qc-chip-pad);
+  gap: var(--tpl-label-tag-gap);
+  padding: var(--tpl-kw-chip-pad);
+  border: 0;
   border-radius: var(--radius-pill);
-  outline: 1px solid var(--color-focus-ring);
-  outline-offset: -1px;
   background: var(--color-success-bg);
-  color: var(--color-action);
-  font-size: var(--tpl-ms-key-token-size);
+  color: var(--color-success);
+  font-size: var(--text-caption);
   font-weight: 600;
   line-height: var(--tpl-ms-key-cell-lh);
   white-space: nowrap;
 }
 
-/* 札の×は札の右の余白に重ね、指を乗せたとき・キーボードで選んだときだけ見せる（札の幅を変えない）。 */
 .chipRemove {
-  position: absolute;
-  top: 50%;
-  right: var(--tpl-ms-qc-chip-x-inset);
   display: inline-flex;
-  width: var(--tpl-ms-qc-chip-x);
-  height: var(--tpl-ms-qc-chip-x);
-  min-width: 0;
-  min-height: 0;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: var(--radius-pill);
-  opacity: 0;
-  transform: translateY(-50%);
   border: 0;
   background: transparent;
-  color: var(--color-action);
+  color: var(--color-ink-faint);
   cursor: pointer;
+  margin-block: var(--tpl-ar-ed-chip-x-pull);
 }
 
-.chip:hover .chipRemove,
-.chipRemove:focus-visible {
-  opacity: 1;
-  background: var(--color-canvas);
-}
-
-/* タッチの端末では乗せられないので、外す印を常に出す。 */
-@media (hover: none) {
-  .chipRemove {
-    opacity: 1;
-  }
-}
+.chipRemove:disabled { color: var(--color-ink-faint); cursor: not-allowed; }
+.chipRemove:hover:not(:disabled) { color: var(--color-danger); }
 
 .chipInput {
   min-width: var(--tpl-ms-qc-input-min);
@@ -169,25 +148,6 @@
   gap: var(--tpl-ms-key-row-gap);
   margin: var(--tpl-ms-qc-foot-margin);
   padding-top: var(--tpl-ms-key-row-gap);
-}
-
-.detailLink {
-  display: inline-flex;
-  height: var(--tpl-ms-key-btn-h);
-  align-items: center;
-  gap: var(--tpl-ms-fn-field-gap);
-  padding: var(--tpl-ms-qc-text-btn-pad);
-  border-radius: var(--radius-control);
-  color: var(--color-ink-secondary);
-  font-size: var(--text-label);
-  font-weight: 600;
-  line-height: var(--tpl-ms-key-info-lh);
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.detailLink:hover {
-  color: var(--color-ink);
 }
 
 .footerSpacer {

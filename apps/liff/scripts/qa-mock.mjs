@@ -1005,11 +1005,11 @@ const server = createServer(async (req, res) => {
         json(res, 403, { error: 'forbidden' });
         return;
       }
-      if (slug === 'qa-webinar-waiting') {
+      if (slug === 'qa-webinar-waiting' || slug === 'qa-webinar-long-wait') {
         json(res, 200, {
           live: false,
           title: 'QA ウェビナー',
-          nextSessionAt: Math.floor(Date.now() / 1000) + 3600,
+          nextSessionAt: Math.floor(Date.now() / 1000) + (slug === 'qa-webinar-long-wait' ? 19 * 86400 + 17 * 3600 : 3600),
         });
         return;
       }

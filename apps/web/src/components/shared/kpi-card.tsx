@@ -75,6 +75,8 @@ export type KpiCardProps = {
    * 渡したときは value と unit を使わない（★管理画面 37-6 の数値カード帯）。
    */
   valueText?: string
+  /** 名前などを主の値として表示する。狭い幅は1行で省略し、titleで全文を読める。 */
+  primaryText?: string
   /** 数字の範囲を数と単位で読む。片方を取得できないときは範囲全体が不明。 */
   valueRange?: { from: number | null | undefined; to: number | null | undefined }
   /** 「18 / 20人」のように、整形した値にも単位を添える。 */
@@ -185,6 +187,7 @@ export default function KpiCard({
   className,
   valueTone = 'default',
   valueText,
+  primaryText,
   valueRange,
   valueTextWithUnit = false,
   meter,
@@ -202,7 +205,7 @@ export default function KpiCard({
     : isCountableValue(valueRange.from) && isCountableValue(valueRange.to)
       ? `${formatNumber(valueRange.from)} → ${formatNumber(valueRange.to)}` : '—'
   const textIsNumber = valueRange !== undefined || valueText === undefined || isKpiNumberText(valueText)
-  const statusText = textIsNumber ? undefined : valueText
+  const statusText = primaryText !== undefined || textIsNumber ? undefined : valueText
   const numberText = rangeText ?? (textIsNumber ? valueText : undefined)
   const menuDescription = help == null && description == null ? staticMenuDescription(menu) : undefined
   const tip = help ?? description ?? menuDescription
@@ -226,7 +229,9 @@ export default function KpiCard({
   const toneBadge = !loading && (valueTone === 'warning' || valueTone === 'danger') ? valueTone : null
   const shownBadge = badge ?? (toneBadge === 'warning' ? '要確認' : toneBadge === 'danger' ? '要対応' : undefined)
   const shownBadgeTone = badge ? badgeTone : toneBadge ?? badgeTone
-  const numberAndUnit = <>
+  const numberAndUnit = primaryText !== undefined ? (
+    <span data-kpi-text-value className={styles.textValue} title={primaryText}>{primaryText || '—'}</span>
+  ) : <>
     <KpiRollingValue text={displayedNumber} identity={cardProps.id ?? title} loading={loading || Boolean(cardProps.hidden)} />
     {showUnit ? <span data-kpi-unit className={styles.unit}>{unit}</span> : null}
   </>
@@ -238,7 +243,7 @@ export default function KpiCard({
       data-kpi-density={density}
       data-kpi-range={valueRange !== undefined || undefined}
       data-kpi-detail-layout={detailLayout}
-      data-kpi-zero={!loading && valueText === undefined && valueRange === undefined && value === 0 ? '' : undefined}
+      data-kpi-zero={!loading && primaryText === undefined && valueText === undefined && valueRange === undefined && value === 0 ? '' : undefined}
       aria-busy={loading || undefined}
       data-design-version="v8"
       {...cardProps}
@@ -290,6 +295,7 @@ export default function KpiCard({
         <p
           className={[
             styles.value,
+            primaryText !== undefined ? styles.textValueContainer : null,
             valueTone === 'faint' ? styles.valueFaint : null,
           ]
             .filter(Boolean)

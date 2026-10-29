@@ -6,6 +6,7 @@ import { api,ApiError } from '@/lib/api'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { AutoReply,displayName } from './list-model'
 import { NO_WRITE_PERMISSION } from './words'
+import { canEditAutoReplyListNow } from './list-access'
 
 type DuplicateAutoReplyContext = {
   duplicateFeedback: { highlightedId: string | null; clear(): void; mark(sourceId: string, copyId: string): void; order<T extends { id: string; }>(rows: readonly T[], allRows?: readonly T[]): readonly T[]; }
@@ -21,6 +22,7 @@ type DuplicateAutoReplyContext = {
 }
 
 export async function duplicateAutoReply({ duplicateFeedback, duplicateKeysRef, duplicateLock, duplicating, load, nextPriority, saveErrors, selectedAccountId, setDuplicateError, setDuplicating }: DuplicateAutoReplyContext, duplicateTarget: AutoReply) {
+    if (!canEditAutoReplyListNow()) return
     if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
     duplicateLock.current = true

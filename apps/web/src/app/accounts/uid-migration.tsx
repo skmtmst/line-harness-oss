@@ -1,5 +1,8 @@
 'use client'
 
+import CsvTemplateDownload from '@/components/shared/csv-template-download'
+import { UID_IMPORT_HEADERS } from '@/lib/csv-import-columns'
+
 import { canManageRole, isOwnerRole } from '@/lib/staff-role'
 import type { UidMigrationItem, UidMigrationRun } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -182,6 +185,7 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
           <SaveErrorField names={["purpose"]}><TextField value={purpose} onChange={(event) => setPurpose(event.target.value)} /></SaveErrorField>
         </div>
         <div style={{ marginTop: 12 }}>
+          <CsvTemplateDownload headers={UID_IMPORT_HEADERS} name="UID対応表" />
           <FileDropzone
             title="対応表のCSVをここに置く"
             hint="old_uid・new_uid 列のCSVを選びます"

@@ -1,4 +1,5 @@
 'use client'
+import { formatDay, formatListDateTime } from '@/lib/format'
 import { formatYen } from '@line-crm/shared';
 
 import ReservationBoard from '@/components/shared/reservation-board'
@@ -88,7 +89,7 @@ import { formatNumber } from '@/lib/format'
 
 import { DetailRow, ActionButtons } from "./page-gap-parts"
 
-import { STATUS_TABS, SOURCE_FILTER_OPTIONS, SOURCE_FILTER_NAME, sourceFilterText, statusBadgeColor, sourceLabel, formatLedgerDateTime, statusLabel, actionLabel, PAGE_SIZE, formatJpDateTime, formatJpTime, formatJpDay, jstDay } from './ledger-model'
+import { STATUS_TABS, SOURCE_FILTER_OPTIONS, SOURCE_FILTER_NAME, sourceFilterText, statusBadgeColor, sourceLabel, statusLabel, actionLabel, PAGE_SIZE, formatJpDateTime, formatJpTime, formatJpDay, jstDay } from './ledger-model'
 
 import type { BookingLedgerModel } from './use-booking-ledger'
 import { bookingWords } from '@/v8/booking-bookings/public/words/index'
@@ -385,7 +386,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
           </ListToolbarRow>
           <ListToolbarRow>
             <BookingChipsLabel />
-            <ResponsiveFilterChips label="状態">{STATUS_TABS.map(({ key, label }) => <FilterChip key={key} selected={tab === key} onChange={() => setTab(key)}>{label}</FilterChip>)}</ResponsiveFilterChips>
+            <ResponsiveFilterChips label="状態">{STATUS_TABS.map(({ key, label }) => <FilterChip key={key} selected={tab === key} showCheck={false} onChange={() => setTab(key)}>{label}</FilterChip>)}</ResponsiveFilterChips>
           </ListToolbarRow>
         </> : <>
             <ListToolbar
@@ -393,31 +394,20 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             filters={
               <>
                 <>
+                {range === 'date' ? <FilterChip selected onChange={() => setRange('all')} title="押すと日付の絞り込みを解除します">{formatDay(calendarAnchor)}の予約</FilterChip> : null}
                 <span className="text-ink-faint text-xs">よく使う</span>
                 {STATUS_TABS.map(({ key, label }) => (
-                  <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium transition-colors ${
-                      tab === key
-                        ? 'bg-accent-deep text-on-accent'
-                        : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                    }`) + ' border-0 h-auto whitespace-normal'} key={key} onClick={() => setTab(key)} aria-pressed={tab === key}>
+                  <FilterChip key={key} selected={tab === key} showCheck={false} onChange={() => setTab(key)}>
                     {label}
-                  </Button>
+                  </FilterChip>
                 ))}
                 <span className="border-hairline mx-1 h-4 border-l" />
-                <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium ${
-                    range === 'today'
-                      ? 'bg-accent-deep text-on-accent'
-                      : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                  }`) + ' border-0 h-auto whitespace-normal'} onClick={() => setRange(range === 'today' ? 'all' : 'today')} aria-pressed={range === 'today'}>
+                <FilterChip selected={range === 'today'} onChange={(selected) => setRange(selected ? 'today' : 'all')}>
                   今日
-                </Button>
-                <Button variant="primary" className={(`rounded-pill px-3 py-1 text-xs font-medium ${
-                    range === 'week'
-                      ? 'bg-accent-deep text-on-accent'
-                      : 'bg-canvas-sunken text-ink-secondary hover:bg-hairline'
-                  }`) + ' border-0 h-auto whitespace-normal'} onClick={() => setRange(range === 'week' ? 'all' : 'week')} aria-pressed={range === 'week'}>
+                </FilterChip>
+                <FilterChip selected={range === 'week'} onChange={(selected) => setRange(selected ? 'week' : 'all')}>
                   今週
-                </Button>
+                </FilterChip>
 
                 </>
                 {/* 担当者と予約経路は一覧と件数の両方を絞り込む。 */}
@@ -426,7 +416,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                   value={staffFilter}
                   onChange={setStaffFilter}
                   options={[
-                    { value: 'all', label: '担当: すべて' },
+                    { value: 'all', label: `${words.staff}：すべて` },
                     ...staffList.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.display_name })),
                   ]}
                 />
@@ -532,7 +522,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                               },
                             })}
                       >
-                        <DateCell>{formatLedgerDateTime(b.starts_at)}</DateCell>
+                        <DateCell title={formatJpDateTime(b.starts_at)}>{formatListDateTime(b.starts_at)}</DateCell>
                         <Td>
                           {/* R11: 行の物は予約のため、お客さま名から別画面へ飛ばさない。名前は黒文字。 */}
                           <ContextMenu label={`予約「${b.friend_name ?? words.person}」の操作`} items={bookingContextItems(b)}>
