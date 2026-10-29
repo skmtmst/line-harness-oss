@@ -5,16 +5,16 @@ import { cleanup, fireEvent, render, screen, within, waitFor } from '@testing-li
 import type { AccountWithStats } from '@/contexts/account-context'
 import AccountBrowser from '@/v8/hq/home'
 
-const mocks = vi.hoisted(() => ({ list: vi.fn(), select: vi.fn(), refresh: vi.fn(), push: vi.fn(), restore: vi.fn(), stepUp: vi.fn(), role: 'owner' }))
+const mocks = vi.hoisted(() => ({ list: vi.fn(), select: vi.fn(), refresh: vi.fn(), push: vi.fn(), restore: vi.fn(), stepUp: vi.fn(), importState: vi.fn(), role: 'owner' }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => ({ push: mocks.push, replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() }) }))
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/components/hq/platform-notices', () => ({ default: () => null }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ setSelectedAccountId: mocks.select, refreshAccounts: mocks.refresh }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [], setSelectedAccountId: mocks.select, refreshAccounts: mocks.refresh }) }))
 vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => mocks.role }))
 vi.mock('@/lib/api', async (original) => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api,
-    lineAccounts: { ...actual.api.lineAccounts, list: mocks.list, restore: mocks.restore, stepFollowerImport: vi.fn(async () => ({ success: true, data: {} })) },
+    lineAccounts: { ...actual.api.lineAccounts, list: mocks.list, restore: mocks.restore, followerImportState: mocks.importState },
     lineAccountFolders: { ...actual.api.lineAccountFolders, list: vi.fn(async () => ({ success: true, data: { folders: [], total: 0, unclassifiedCount: 0 } })) },
     tenants: { ...actual.api.tenants, me: vi.fn(async () => ({ success: true, data: { name: '統括' } })) },
     auth: { ...actual.api.auth, stepUp: mocks.stepUp },
@@ -29,6 +29,7 @@ beforeEach(() => {
   mocks.refresh.mockResolvedValue(undefined)
   mocks.restore.mockResolvedValue({ success: true, data: {} })
   mocks.stepUp.mockResolvedValue({ success: true, data: { token: 'grant-1' } })
+  mocks.importState.mockResolvedValue({ success: true, data: { phase: 'completed' } })
 })
 afterEach(() => { cleanup(); window.history.replaceState(null, '', '/') })
 
@@ -38,7 +39,8 @@ describe('V8 統括のアカウントを探す', () => {
     expect(screen.queryByText('店舗00')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '2ページ目へ' }))
     fireEvent.click(screen.getAllByRole('button', { name: / へ入る$/ })[0])
-    expect(mocks.select).toHaveBeenCalledWith('a2')
+    // 入る前に引き継ぎ状態の確認を挟むので、非同期で待つ。
+    await waitFor(() => expect(mocks.select).toHaveBeenCalledWith('a2'))
     expect(screen.getByText(/21〜23\s*件/)).toBeTruthy()
   })
   it('LINE ID検索でページを戻し、閲覧者の設定操作を出さない', async () => {

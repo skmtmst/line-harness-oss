@@ -174,7 +174,7 @@ beforeEach(() => {
   dbMocks.getLineAccountFoldersByAccountIds.mockResolvedValue({});
   dbMocks.getLineAccountTag.mockResolvedValue({id:'folder-1'});
   dbMocks.listLineAccountTags.mockResolvedValue([{id:'tag-own',tenant_id:'tenant-1'}]);
-  dbMocks.getStaffById.mockResolvedValue({ account_scope: 'all' });
+  dbMocks.getStaffById.mockResolvedValue({ is_active: 1, account_scope: 'all' });
   dbMocks.getStaffAccountScopeIds.mockResolvedValue([]);
   dbMocks.getLineAccounts.mockResolvedValue([{ ...fakeAccount, parent_line_account_id: null }]);
   dbMocks.getLineAccountScopeEntries.mockImplementation(async () =>

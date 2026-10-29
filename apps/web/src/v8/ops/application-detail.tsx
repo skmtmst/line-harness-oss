@@ -1,18 +1,13 @@
 'use client'
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'next/navigation'
 import { api, type OpsApplication } from '@/lib/api'
-import Button from '@/components/shared/button'
-import Card from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import SectionHeader from '@/components/shared/section-header'
-import StatusBadge from '@/components/shared/status-badge'
-import { TextArea } from '@/components/shared/text-field'
+import { useOverlayFocus, useOverlayLayer } from '@/components/shared/overlay-utils'
 import { PageFrame } from '@/components/templates/page-frame'
-import { OpsHead } from './shell'
 import { useOpsReadOnly } from './use-ops-read-only'
 import styles from './application-detail.module.css'
 
@@ -20,6 +15,9 @@ const statusLabel: Record<OpsApplication['status'], string> = {
   pending: '未対応', contacted: '連絡中', approved: '承認済み',
   rejected: '見送り', activated: '利用開始済み',
 }
+
+const dateTime = (value: string) => new Date(value).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+const shortDateTime = (value: string) => new Date(value).toLocaleString('ja-JP', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 
 export default function OpsApplicationDetail() {
   return <Suspense fallback={<PageFrame kind="detail" boardId="g6NuH" standalone><ListState kind="loading" title="申込を読み込んでいます" /></PageFrame>}><Detail /></Suspense>
@@ -84,53 +82,74 @@ function Detail() {
     finally { setBusy(false) }
   }
 
+  const canEdit = !!application && !readOnly && ['pending', 'contacted'].includes(application.status)
+  const canApprove = application?.status === 'contacted' && !!application.contact_note && !readOnly
+
   return <PageFrame kind="detail" boardId="g6NuH" standalone>
-    <OpsHead title={application?.company_name ?? '申込の詳細'} description={application ? `受付日 ${new Date(application.created_at).toLocaleString('ja-JP')}` : undefined} />
-    <div className={styles.stack}>
-      <a href="/ops/applications" className={styles.back}>← 申込アカウントへ戻る</a>
+    <article className={styles.panel}>
+      <a href="/ops/applications" className={styles.back}>← 申込アカウントに戻る</a>
       {error ? <Notice tone="danger" message={error} /> : null}
       {message ? <Notice tone={message.includes('失敗') ? 'warn' : 'success'} message={message} /> : null}
       {loading ? <ListState kind="loading" title="申込を読み込んでいます" /> : !application ? <ListState kind="error" title="申込を表示できませんでした" description={error} onRetry={() => void load()} /> : <>
-        <div className={styles.heading}><StatusBadge tone={application.status === 'activated' ? 'success' : application.status === 'contacted' ? 'warning' : 'neutral'}>{statusLabel[application.status]}</StatusBadge></div>
+        <header className={styles.heading}>
+          <div><h1>{application.company_name}</h1><p>受付日 {dateTime(application.created_at)}</p></div>
+          <span className={styles.status} data-status={application.status}>{statusLabel[application.status]}</span>
+        </header>
         <div className={styles.columns}>
-          <Card contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
-            <SectionHeader title="申込内容" />
+          <section className={styles.details} aria-labelledby="application-details-heading">
+            <h2 id="application-details-heading">申込内容</h2>
             <dl className={styles.fields}>
               <div><dt>会社名</dt><dd>{application.company_name}</dd></div>
               <div><dt>担当者名</dt><dd>{application.contact_name}</dd></div>
               <div><dt>メールアドレス</dt><dd>{application.email}</dd></div>
               <div><dt>電話番号</dt><dd>{application.phone}</dd></div>
               <div><dt>musuboを知ったきっかけ</dt><dd>{application.referral_source}</dd></div>
-              <div><dt>申込日時</dt><dd>{new Date(application.created_at).toLocaleString('ja-JP')}</dd></div>
             </dl>
-          </Card>
-          <Card contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
-            <SectionHeader title="対応状況" />
+          </section>
+          <section className={styles.progress} aria-labelledby="application-progress-heading">
+            <h2 id="application-progress-heading">対応状況</h2>
             <ol className={styles.steps}>
-              <li>申込受付 <span>完了</span></li>
-              <li>担当者から連絡 <span>{application.contacted_at ? '完了' : '未対応'}</span></li>
-              <li>承認・招待メール <span>{application.invite_sent_at ? '送信済み' : application.approved_at ? '送信待ち' : '未対応'}</span></li>
-              <li>利用開始 <span>{application.tenant_id ? '完了' : '未対応'}</span></li>
+              <li data-done><strong>申込受付</strong><small>{shortDateTime(application.created_at)}</small></li>
+              <li data-done={application.contacted_at ? '' : undefined}><strong>担当者から連絡</strong><small>{application.contacted_at ? shortDateTime(application.contacted_at) : 'まだ記録がありません'}</small></li>
+              <li data-done={application.approved_at ? '' : undefined}><strong>承認・招待</strong><small>{application.invite_sent_at ? `メール送信 ${shortDateTime(application.invite_sent_at)}` : application.approved_at ? '招待メールの送信待ち' : '承認後にメールを送信'}</small></li>
             </ol>
-            {application.invite_sent_at ? <p className={styles.muted}>招待メール送信：{new Date(application.invite_sent_at).toLocaleString('ja-JP')}</p> : null}
-          </Card>
+            <div className={styles.memo}>
+              <label htmlFor="application-contact-note">担当者からの連絡メモ</label>
+              <textarea id="application-contact-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} placeholder="電話・メールで確認した内容を記録" readOnly={!canEdit} />
+              {canEdit ? <button type="button" className={styles.save} onClick={() => void contact()} disabled={!note.trim() || busy}>{busy ? '保存しています…' : '連絡済みとして保存'}</button> : null}
+            </div>
+          </section>
         </div>
-        <Card contentPadding="var(--polish-space-section)" layout="vertical" gap="normal">
-          <SectionHeader title="担当者からの連絡メモ" />
-          <label htmlFor="application-contact-note">連絡内容・メモ</label>
-          <TextArea id="application-contact-note" value={note} onChange={(event) => setNote(event.target.value)} maxLength={2000} placeholder="電話・メールで確認した内容を記録" readOnly={readOnly || !['pending', 'contacted'].includes(application.status)} />
-          {!readOnly && ['pending', 'contacted'].includes(application.status) ? <div className={styles.actions}><Button onClick={() => void contact()} disabled={!note.trim() || busy}>連絡済みとして保存</Button></div> : null}
-        </Card>
-        {application.status === 'contacted' && !readOnly ? <div className={styles.actions}><Button variant="primary" onClick={() => setConfirmOpen(true)} disabled={busy}>承認して招待メールを送る</Button></div> : null}
-        {application.status === 'approved' && !readOnly ? <div className={styles.actions}><Button onClick={() => void resend()} disabled={busy}>{application.invite_sent_at ? '招待メールを再送' : '招待メールを送る'}</Button></div> : null}
+        <div className={styles.actionBand}>
+          <p>担当者から連絡し、内容を確認してから承認してください。<br />連絡済みを保存すると、承認して招待できます。</p>
+          {application.status === 'approved' && !readOnly ? <button type="button" className={styles.approve} onClick={() => void resend()} disabled={busy}>{application.invite_sent_at ? '招待メールを再送' : '招待メールを送る'}</button>
+            : <button type="button" className={styles.approve} onClick={() => setConfirmOpen(true)} disabled={!canApprove || busy}>承認して招待メールを送る</button>}
+        </div>
       </>}
-    </div>
-    <Dialog open={confirmOpen} title="この申込を承認しますか？" description="承認すると、申込者に利用開始のご案内を送ります。初期設定が完了するまではログインできません。" confirmLabel="承認して招待を送る" onConfirm={() => void approve()} onCancel={() => setConfirmOpen(false)} busy={busy} designNode="SVAtm" confirmation>
-      <dl className={styles.fields}>
-        <div><dt>会社名</dt><dd>{application?.company_name}</dd></div>
-        <div><dt>招待メール送信先</dt><dd>{application?.email}</dd></div>
-      </dl>
-      <p className={styles.muted}>申込内容と連絡記録を確認してから進めてください。</p>
-    </Dialog>
+    </article>
+    <ApprovalConfirm open={confirmOpen} application={application} busy={busy} onConfirm={() => void approve()} onCancel={() => setConfirmOpen(false)} />
   </PageFrame>
+}
+
+function ApprovalConfirm({ open, application, busy, onConfirm, onCancel }: { open: boolean; application: OpsApplication | null; busy: boolean; onConfirm: () => void; onCancel: () => void }) {
+  const ref = useOverlayFocus<HTMLDivElement>(open, onCancel, busy)
+  const layer = useOverlayLayer(open)
+  if (!open || !application || typeof document === 'undefined') return null
+  return createPortal(<div className={styles.overlay} data-design-node="SVAtm" style={{ zIndex: layer }} onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) onCancel() }}>
+    <div ref={ref} role="dialog" aria-modal="true" aria-labelledby="approval-title" className={styles.modal} tabIndex={-1}>
+      <div className={styles.modalBody}>
+        <h2 id="approval-title">この申込を承認しますか？</h2>
+        <p>承認すると、申込者に利用開始のご案内を送ります。初期設定が完了するまではログインできません。</p>
+        <dl className={styles.confirmFields}>
+          <div><dt>会社名</dt><dd>{application.company_name}</dd></div>
+          <div><dt>招待メール送信先</dt><dd>{application.email}</dd></div>
+        </dl>
+        <p className={styles.confirmNote}>申込内容と連絡記録を確認してから進めてください。</p>
+      </div>
+      <div className={styles.modalFooter}>
+        <button type="button" onClick={onCancel} disabled={busy}>キャンセル</button>
+        <button type="button" onClick={onConfirm} disabled={busy}>{busy ? '承認しています…' : '承認して招待を送る'}</button>
+      </div>
+    </div>
+  </div>, document.body)
 }

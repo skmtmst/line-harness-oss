@@ -18,7 +18,8 @@ describe('統括コンソール', () => {
     expect(page).not.toContain('NoteBar')
     expect(page).not.toContain('LINE公式アカウントごとに管理画面へ入れます。')
     for (const source of [page, openPage]) {
-      expect(source).not.toContain('?account')
+      // 引き継ぎの進捗画面（/accounts/new/handover?accountId=）は意図した形。古い ?account=・?store= だけ禁じる。
+      expect(source).not.toContain('?account=')
       expect(source).not.toContain('?store')
     }
     // 本文に浮いていた「統括」ボタンは左下の自分のメニューへ畳んだ。
