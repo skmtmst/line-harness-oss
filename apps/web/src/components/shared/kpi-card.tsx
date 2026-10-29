@@ -34,6 +34,18 @@ function titleParts(title: string) {
   return <><span className={styles.labelMain}>{m[1]}</span><span className={styles.labelQualifier}>{m[2]}</span></>
 }
 
+/*
+ * 14：valueText で渡された 0（「0」「0件」「¥0」など）も value={0} と同じく
+ * 帯では薄い灰にする。数でない文字（停止中・日付など）は対象外にする。
+ */
+function isZeroNumberText(text: string): boolean {
+  const stripped = text.replace(/[\s,¥￥%％]/g, '')
+  const m = /^[+-]?0+(\.0+)?(.*)$/.exec(stripped)
+  if (!m) return false
+  const rest = m[2] ?? ''
+  return rest === '' || /^(件|名|回|人|通目|通|円|個|枚|組|枠|席|社|マス|頭|匹|台|日|時間|分|秒)(以上)?$/.test(rest)
+}
+
 /** ・：旧いtitleだけの「…」は、説明を共通の「？」へ渡す。 */
 function staticMenuDescription(menu: ReactNode): string | undefined {
   if (!React.isValidElement<React.ButtonHTMLAttributes<HTMLButtonElement>>(menu) || menu.type !== 'button') return
@@ -243,7 +255,7 @@ export default function KpiCard({
       data-kpi-density={density}
       data-kpi-range={valueRange !== undefined || undefined}
       data-kpi-detail-layout={detailLayout}
-      data-kpi-zero={!loading && primaryText === undefined && valueText === undefined && valueRange === undefined && value === 0 ? '' : undefined}
+      data-kpi-zero={!loading && primaryText === undefined && valueRange === undefined && (valueText === undefined ? value === 0 : isZeroNumberText(valueText)) ? '' : undefined}
       aria-busy={loading || undefined}
       data-design-version="v8"
       {...cardProps}
