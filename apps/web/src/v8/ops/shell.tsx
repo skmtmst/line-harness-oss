@@ -129,7 +129,7 @@ function OpsShellFrame({
       </nav>
       <p className={styles.auditMark} title="契約先のデータを扱います。操作はすべて記録されます">
         <ShieldCheck aria-hidden="true" />
-        {collapsed && !drawer ? null : <span>操作は記録されます</span>}
+        {collapsed && !drawer ? <span className="sr-only">操作は記録されます</span> : <span>操作は記録されます</span>}
       </p>
       {!me ? (
         <div className={nav.settingsEntry}>

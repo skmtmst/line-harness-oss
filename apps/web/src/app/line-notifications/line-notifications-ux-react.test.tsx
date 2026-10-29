@@ -125,6 +125,11 @@ it('顧客タブの読み込み中は骨組みが出て「読み込み中」の�
   delete document.documentElement.dataset.theme
 })
 
+it('E27: 設定の板はほかの設定画面と同じ wide-nav で出す', () => {
+  const { container } = render(<LineNotificationsPage />)
+  expect(container.querySelector('[data-sb-settings-screen]')?.getAttribute('data-sb-layout')).toBe('wide-nav')
+})
+
 it('LINE通知は題の用語説明と画面の説明を「？」1つで開ける', async () => {
   fixture.tab = 'failures'
   render(<LineNotificationsPage />)
