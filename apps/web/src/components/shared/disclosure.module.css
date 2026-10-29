@@ -38,6 +38,15 @@
   cursor: pointer;
 }
 
+.summary[data-selected]::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
 .summary::-webkit-details-marker {
   display: none;
 }

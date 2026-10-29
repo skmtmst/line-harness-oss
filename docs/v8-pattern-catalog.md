@@ -129,7 +129,7 @@
 - 一覧のカード配置は一覧型の `ListPageCards`（`list-page.tsx` と `page-templates.module.css`）が列数と共通16の間隔を持つ。カードの面と内側は `Card`・`CardContent`・`CardHeader`（card.tsx）、操作は `RowNameButton`・`IconButton` が持つ（L7メディア・バナー）。CardContentは端の16を1回だけ持つ。
 - 分析のカード本文は `ListPageSection` が共通16/24の余白、`DetailColumns(presentation="analysis")` が左右の列と狭幅の折り畳みを持つ。カードの面/題はCard/CardHeader。ほかの提示と既定は保つ（L11 ws9wt）。
 
-- **役目**：中身のまとまりを白地＋薄い縁＋影＋角丸12で1枚に見せる
+- **役目**：中身のまとまりを白地＋線なし＋影＋角丸12で1枚に見せる
 - **持ち主（コード）**：`apps/web/src/components/shared/card.tsx`・`apps/web/src/components/shared/card.module.css`（部品 `Card`・`CardHeader`）
   - 読む変数：`--card-shadow`・`--card-edge`・`--radius-card`
 - **持ち主（Pen）**：**未定**
@@ -837,6 +837,8 @@
 <a id="primary-button"></a>
 ## primary-button 主ボタン・ボタン
 
+- アカウントの［入る・詳細・設定・戻す］は `shared/button.tsx` の `AccountActionButton`。文字と印を対応表で決め、詳細には印を付けない。要対応の数は `shared/attention-count.tsx` の `AttentionCount`。通常は黒、急ぐ数だけ赤の札、0件は灰の「—」にする。
+
 - 設定行の操作は `Button` の `presentation="row-action"`（白地・欄と同じ細枠）。注意行は `textTone="accent"` で緑の枠と文字。札と操作の並びは `RowStatusActions` が中央と操作幅をそろえる。通常の副操作は灰色を保つ（2026-10-23オーナー）。
 
 - **役目**：主＝文字の幅・高さ36・濃い緑の縁＋カードの影・角丸8。言葉は「〇〇を作る」「〜する」
@@ -845,6 +847,7 @@
 - **持ち主（Pen）**：`doYdE`「ボタン/主」・`u101P`「ボタン/副」・`LrB2L`「ボタン/危険」・`wDPmk`「ボタン/文字」・`KspUx`「アイコンボタン」
   - 注：主ボタンの縁 #06612f・角丸8の変数は未実装（§6.4）
 - **見つけ方（コード）**：
+  - raw-button：画面の JSX にある `<button>` を拾う。共通部品の実装・文字列の見本・コメントは数えない。
   - green-fill：CSS の規則に `(button|btn|primary|cta|create|submit|save|action)[^{]*\{` と `background(-color)?:\s*(var\(--color-(primary|accent|brand|action-primary)[\w-]*\)|#087a3e|#06c755)` があり、`hover|:disabled` が無い — 緑の主ボタンを CSS で手書き
   - words：`(?:>|['"'])[^<'"']{0,40}(?:新規作成|作成する|新しく作る|変更を保存(?!する)|コピーする)` — ボタンの言葉が決まりと違う（B-146）
   - (b) の割り当て：画面の CSS の上書きの selector が `\bbutton\b|btn|primary` に当たればこの型
@@ -1051,6 +1054,7 @@
 ## 受信箱の列・入力・補助面（inbox-frame）
 
 - **役目**：受信箱の3列、会話の媒体、返信入力、保存した検索と内部メモの補助面。
+- 絞り込みと並びの操作は `InboxFilterSlot`・`InboxSortSlot` に入れ、`InboxFilterControls` の中で内容幅を保つ。未読名は `InboxListName`。`InboxFilterPanel` の `value.quickFilter` は一覧と同じ期限条件、`slaEnabled` は期限超過／1時間以上待ちの区別、`auxiliaryActions` は対応ルール等の操作、`unassignedUnreadCount` は未割り当ての集計値（未取得はnull、0件は0）を受ける。取得・保存・URL更新は画面が持つ。
 - **持ち主（コード）**：`components/templates/inbox-page.tsx`、`components/shared/inbox-conversation-head.tsx`・同CSSと`inbox-head-menus.tsx`（会話の頭・担当・対応・検索・顧客欄の開閉）、`components/shared/inbox-thread.tsx`・同CSS（日付・吹き出し・時刻・送り手・引用、送信状態と `InboxThreadLoading` の骨組み）、`components/shared/inbox-list.tsx`・同CSS（題・札・探す欄・担当と経路、`InboxListRow` の選択表示）、`components/shared/inbox-composer.tsx`・同CSS、`components/shared/inbox-content.tsx`・同CSS。欄の保存・送信・開閉は画面が渡す。
 - **持ち主（Pen）**：受信箱 eovoG。媒体と補助面の従来寸法は共通トークンへ移し、画面から上書きしない。
 - **確認**：送信・引用・添付・予約・遅延応答・入力時の確認を既存試験で守る。見た目の候補は測定と左右画像の確認後だけ記録する。
@@ -1124,6 +1128,8 @@
 - 条件を足す種類も `ConditionBuilder` の `EntityPickerDialog` で選ぶ。種類の制限・AND/ORの保存形を保ち、取消では条件を追加しない。条件のかたまりの箱と頭は共通 `Card` / `CardHeader`。
 
 ## G9：共通表の人の欄（Z1）
+
+- 名前と、既存APIが返す質問数などの補足は `NameCell` の `description` で分ける。名前そのものは1行を保つ。格子の名簿は `GridTable columnSizing="content"` で全行の内容から幅を配り、短い状態・日時の余りを長いメールへ回す。
 
 - 役目：顔と名前を横並び1行で読む。持ち主は shared/table.tsx の PersonCell、顔は shared/avatar.tsx。名前と既存の行き先を name、表示名を avatarName へ渡す。幅が狭い時は名前だけ省略し全文を title で読む。フォルダ付きの NameCell とは役目を分ける。
 - 件数は shared/pagination.tsx の range（total/first/last）へ。手書きの件数文を足さない。

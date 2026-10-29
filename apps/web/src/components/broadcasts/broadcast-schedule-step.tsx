@@ -15,6 +15,7 @@ import { useBroadcastAb } from '@/v8/broadcast-ab/public/use-ab/index'
 import type { Dispatch,SetStateAction } from 'react'
 import { formatScheduleTime } from './broadcast-form-model'
 import styles from './broadcast-form-v8.module.css'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 type BroadcastScheduleStepContext = {
   ab: ReturnType<typeof useBroadcastAb>
@@ -97,7 +98,7 @@ export function BroadcastScheduleStep({ ab, approvalConfig, audienceCount, concu
         </span>
       </label>
       <div className="flex items-center gap-1.5">
-        <SaveErrorField names={["spreadMinutes","spread_minutes"]}><input
+        <SaveErrorField names={["spreadMinutes","spread_minutes"]}><SharedTextField
           id="bc-spread"
           type="number"
           min={0}

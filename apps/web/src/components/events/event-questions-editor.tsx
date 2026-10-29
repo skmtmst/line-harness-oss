@@ -6,6 +6,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 const TYPE_LABELS: Record<EventQuestion['type'], string> = {
   text: '1行テキスト',
@@ -66,7 +67,7 @@ export default function EventQuestionsEditor({
               <label htmlFor={`eq-label-${q.id}`} className="sr-only">
                 質問{index + 1}の文面
               </label>
-              <SaveErrorField names={[`questions.${index}.label`,"label","q.label","at"]}><input
+              <SaveErrorField names={[`questions.${index}.label`,"label","q.label","at"]}><SharedTextField
                 id={`eq-label-${q.id}`}
                 value={q.label}
                 onChange={(e) => setAt(index, { label: e.target.value })}
@@ -112,7 +113,7 @@ export default function EventQuestionsEditor({
                   <label htmlFor={`eq-opt-${q.id}-${oi}`} className="sr-only">
                     選択肢{oi + 1}
                   </label>
-                  <SaveErrorField names={["opt","at"]}><input
+                  <SaveErrorField names={["opt","at"]}><SharedTextField
                     id={`eq-opt-${q.id}-${oi}`}
                     value={opt}
                     onChange={(e) =>

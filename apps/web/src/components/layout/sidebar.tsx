@@ -8,6 +8,7 @@ import { readStaffIdentity } from '@/lib/staff-identity-state'
 
 import { SidebarAccountMenu } from '@/components/hq/account-menu'
 import Notice from '@/components/shared/notice'
+import { ShellStaleStyleNotice } from '@/components/shared/stale-style-notice'
 import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
@@ -750,6 +751,8 @@ export default function Sidebar({
             {accountStyle.error ? '使い方のスタイルを読み込めませんでした。' : '機能設定を読み込めませんでした。'}
           </Notice>
         )}
+        {/* 前に読めたスタイルで出している時の 1 行。本文が同じ 1 行を出す画面（ホーム・予約台帳など）では出さない。 */}
+        {accountStyle.stale && selectedAccountId ? <ShellStaleStyleNotice className="mx-3 mb-2" onRetry={accountStyle.reload} /> : null}
         {/* B-261: 設定の入口は下の歯車。定義と現在地の判定は残す。 */}
         {visibleSections.filter((section) => isHq || section.id !== 'settings').map((section) => {
           /*

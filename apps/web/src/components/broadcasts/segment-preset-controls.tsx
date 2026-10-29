@@ -15,6 +15,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { NOT_AVAILABLE, NotConnected } from '@/components/shared/not-connected'
 import { conditionFromSegmentPreset } from './segment-preset'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /**
  * 保存した対象条件の数（設計 `sqFXf` のKPI3枚）。
@@ -237,7 +238,7 @@ export default function SegmentPresetControls({
         <div className="space-y-4" data-design-node="sqFXf">
           <label className="block">
             <span className="text-ink block text-sm font-bold">条件の名前</span>
-            <SaveErrorField names={["name"]}><input
+            <SaveErrorField names={["name"]}><SharedTextField
               value={name}
               onChange={(event) => setName(event.target.value)}
               maxLength={80}

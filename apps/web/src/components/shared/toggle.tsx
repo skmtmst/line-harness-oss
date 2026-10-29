@@ -1,4 +1,6 @@
-import { useFieldContext } from './field-context'
+import { useId, type ReactNode } from 'react'
+import { joinDescribedBy, useFieldContext } from './field-context'
+import Button from './button'
 import styles from './toggle.module.css'
 
 /**
@@ -14,6 +16,8 @@ export default function Toggle({
   locked,
   disabled,
   label,
+  labelledBy,
+  describedBy,
   onChange,
   className,
 }: {
@@ -26,6 +30,8 @@ export default function Toggle({
   disabled?: boolean
   /** 読み上げ用の名前。何のスイッチかを必ず渡す。 */
   label: string
+  labelledBy?: string
+  describedBy?: string
   onChange?: (next: boolean) => void
   className?: string
 }) {
@@ -34,14 +40,16 @@ export default function Toggle({
   const on = locked || checked
   return (
     <button
-      id={id}
+      id={id ?? field?.controlId}
       aria-invalid={bad || undefined}
-      aria-describedby={field?.describedBy}
+      aria-describedby={joinDescribedBy(describedBy, field?.describedBy)}
       style={bad ? { outline: '1px solid var(--color-danger)' } : undefined}
       type="button"
       role="switch"
       aria-checked={on}
-      aria-label={label}
+      aria-label={labelledBy ? undefined : label}
+      aria-labelledby={labelledBy}
+      aria-description={locked ? 'この設定はいつもオンで変更できません' : undefined}
       disabled={locked || disabled}
       onClick={onChange ? () => onChange(!checked) : undefined}
       className={[styles.toggle, on && !locked && styles.on, locked && styles.locked, className]
@@ -49,4 +57,43 @@ export default function Toggle({
         .join(' ')}
     />
   )
+}
+
+/** 説明のある設定行。文字とスイッチの配置を全画面で共通にする。 */
+export function ToggleField({ children, description, 'aria-label': label, title, className, ...props }: {
+  children: ReactNode
+  description?: ReactNode
+  'aria-label'?: string
+  title?: string
+  className?: string
+  checked: boolean
+  disabled?: boolean
+  locked?: boolean
+  invalid?: boolean
+  onChange?: (next: boolean) => void
+}) {
+  const id = useId()
+  const field = useFieldContext()
+  const switchId = field?.controlId ?? `${id}-switch`
+  const descriptionId = `${id}-description`
+  return <span className={[styles.field, className].filter(Boolean).join(' ')} title={title}>
+    <span className={styles.fieldBody}><label id={id} htmlFor={switchId}>{children}</label>{description ? <span id={descriptionId} className={styles.description}>{description}</span> : null}</span>
+    <Toggle {...props} id={switchId} label={label ?? ''} labelledBy={label ? undefined : id} describedBy={description ? descriptionId : undefined} />
+  </span>
+}
+
+/** まとまりの状態を件数で伝え、行ごとの設定を一括で切り替える。 */
+export function ToggleGroupActions({ total, enabled, label, disabled, onChange }: {
+  total: number
+  enabled: number
+  label: string
+  disabled?: boolean
+  onChange: (next: boolean) => void
+}) {
+  const summaryId = useId()
+  return <span role="group" aria-label={`${label}の一括設定`} aria-describedby={summaryId} className={styles.groupActions}>
+    <span id={summaryId} className={styles.description}>{total} 件中 {enabled} 件オン</span>
+    <Button variant="text" textTone="accent" disabled={disabled} disabledReason="変更を反映しています" aria-describedby={summaryId} aria-label={`${label}をすべてオン`} onClick={() => onChange(true)}>すべてオン</Button>
+    <Button variant="text" textTone="accent" disabled={disabled} disabledReason="変更を反映しています" aria-describedby={summaryId} aria-label={`${label}をすべてオフ`} onClick={() => onChange(false)}>すべてオフ</Button>
+  </span>
 }

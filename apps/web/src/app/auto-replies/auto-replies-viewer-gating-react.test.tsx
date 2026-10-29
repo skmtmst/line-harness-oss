@@ -130,7 +130,7 @@ describe('R527 自動応答一覧の出し分け（役割×操作）', () => {
     // 順番の入れ替え（更新口）も出さない。
     expect(host.querySelector('button[aria-label="自動応答「旧キーワードルール」を1つ上へ"]')).toBeNull()
     expect(host.textContent).toContain(
-      '閲覧のみで見ています',
+      'この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。',
     )
   })
 

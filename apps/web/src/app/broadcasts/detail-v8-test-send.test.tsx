@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * ★V8 （詳細の下書きの頭出し）。
@@ -92,7 +93,7 @@ describe('詳細の下書きのテスト送信（Q28Gb）', () => {
     act(() => {
       root.render(<BroadcastDetailV8 {...baseProps} />)
     })
-    const button = Array.from(host.querySelectorAll('button')).find((el) => el.textContent === 'テストを送る')
+    const button = (Array.from(host.querySelectorAll('button')).find((el) => el.textContent === 'テストを送る') ?? querySupplementaryPageAction('テストを送る'))
     expect(button).toBeDefined()
     await act(async () => {
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -105,7 +106,7 @@ describe('詳細の下書きのテスト送信（Q28Gb）', () => {
       root.render(<BroadcastDetailV8 {...baseProps} broadcast={{ ...draft, status: 'sent' } as unknown as ApiBroadcast} />)
     })
     expect(
-      Array.from(host.querySelectorAll('button')).find((el) => el.textContent === 'テストを送る'),
+      (Array.from(host.querySelectorAll('button')).find((el) => el.textContent === 'テストを送る') ?? querySupplementaryPageAction('テストを送る')),
     ).toBeUndefined()
   })
 })

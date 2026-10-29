@@ -3,7 +3,7 @@
 import { useActionOptions } from '@/components/auto-replies/inline-action-list';
 import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8';
 import Card,{ CardHeader } from '@/components/shared/card';
-import { SettingCheckbox } from '@/components/shared/checkbox';
+import Toggle from '@/components/shared/toggle';
 import { EntityKindField } from '@/components/shared/entity-picker-sources';
 import { Field,FieldError } from '@/components/shared/form-controls';
 import ImageUploader from '@/components/shared/image-uploader';
@@ -190,7 +190,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                     ) : (
                       <span className={styles.toggleNote}>何度でも返す</span>
                     )}
-                    <SaveErrorField names={["cooldownOn","form.cooldownOn","cooldown_on","form.cooldown_on"]}><SettingCheckbox
+                    <SaveErrorField names={["cooldownOn","form.cooldownOn","cooldown_on","form.cooldown_on"]}><Toggle
                       label="同じ人へ続けて返さない"
                       checked={form.cooldownOn}
                       onChange={(on) => patch({ cooldownOn: on })}
@@ -202,7 +202,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                   <div className={styles.toggleText}>
                     <p className={styles.toggleTitle}>担当者が対応中のトークには返さない</p>
                   </div>
-                  <SaveErrorField names={["skipWhenOperatorActive","form.skipWhenOperatorActive","skip_when_operator_active","form.skip_when_operator_active"]}><SettingCheckbox
+                  <SaveErrorField names={["skipWhenOperatorActive","form.skipWhenOperatorActive","skip_when_operator_active","form.skip_when_operator_active"]}><Toggle
                     label="担当者が対応中のトークには返さない"
                     checked={form.skipWhenOperatorActive}
                     onChange={(on) => patch({ skipWhenOperatorActive: on })}
@@ -215,7 +215,7 @@ export function WizardResponseStep({ actionOptions, fieldError, form, imageConte
                       オフのときは、同じ人が何度送っても返します（上の「続けて返さない」の時間は守ります）
                     </p>
                   </div>
-                  <SaveErrorField names={["oncePerFriend","form.oncePerFriend","once_per_friend","form.once_per_friend"]}><SettingCheckbox
+                  <SaveErrorField names={["oncePerFriend","form.oncePerFriend","once_per_friend","form.once_per_friend"]}><Toggle
                     label="1人につき1回だけ返す"
                     checked={form.oncePerFriend}
                     onChange={(on) => patch({ oncePerFriend: on })}

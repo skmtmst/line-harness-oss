@@ -9,6 +9,7 @@
 /* 器（MenuPortal）そのものが白い板。影を器の外に出すため、ここに見た目を置く。 */
 .surface {
   box-sizing: border-box;
+  width: max-content;
   border: 1px solid var(--color-hairline);
   border-radius: var(--select-menu-radius);
   background: var(--color-canvas);
@@ -205,3 +206,8 @@
 :root .surface { border-color: var(--surface-edge); }
 
 :root .item { padding-block: 8px 6px; }
+
+/* 閉じた欄の「見出し：値」。絞り込みの既定（すべて）は値を灰、選んだときは黒の太字。 */
+.valueHead { color: var(--color-ink); }
+.valueCurrent[data-filter-state='default'] { color: var(--color-ink-faint); }
+.valueCurrent[data-filter-state='active'] { color: var(--color-ink); font-weight: 700; }

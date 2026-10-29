@@ -11,6 +11,7 @@ import { type MessageKindState } from '@/components/scenarios/message-kind-field
 import Button from '@/components/shared/button';
 import { ComposerCarouselPreview } from '@/components/shared/message-composer';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 
 /** 選んだ時点で止める文。上限と今の大きさを両方言う（例「動画は200MBまでです。今のファイルは350MBです」）。 */
@@ -87,7 +88,7 @@ export function MediaUpload({ bubble, onChange, lineAccountId, mediaAccountId = 
       </div>
     ) : main}
     {isVideo ? <p className="text-xs text-ink-faint">プレビュー画像は LINE 側で必須です（https・JPEG/PNG・1MBまで）。</p> : null}
-    {bubble.type === 'rich_video' && <SaveErrorField names={["actionUrl","content.actionUrl","action_url","content.action_url"]}><input value={String(content.actionUrl ?? '')} onChange={(e) => onChange({ ...content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" /></SaveErrorField>}
+    {bubble.type === 'rich_video' && <SaveErrorField names={["actionUrl","content.actionUrl","action_url","content.action_url"]}><SharedTextField value={String(content.actionUrl ?? '')} onChange={(e) => onChange({ ...content, actionUrl: e.target.value })} placeholder="再生終了後に開くURL" className="w-full rounded-control border border-hairline px-3 py-2 text-sm" /></SaveErrorField>}
     <MediaPickerDialog
       open={picking !== null}
       accountId={pickFrom}

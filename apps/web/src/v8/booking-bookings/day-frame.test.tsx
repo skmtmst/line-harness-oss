@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import type { BookingRequest } from '@/lib/api'
@@ -42,6 +43,7 @@ test('次の予約は実データから詳細を開き、狭い板の入口か�
 })
 
 test('未取得の一覧に前の数と次の予約を出さず、閲覧者の変更入口を隠す', () => {
+  verifiedStaffRole('viewer')
   render(<PeopleDayFrame view="day" date="2026-10-15" rows={[row]} ready={false} availability={{ status: 'error', slots: [] }} actions={null} canWrite={false} onOpen={() => {}}>盤</PeopleDayFrame>)
   expect(screen.queryByRole('button', { name: '詳細を見る' })).toBeNull()
   expect(screen.queryByRole('link', { name: '日時を変える' })).toBeNull()
@@ -66,3 +68,4 @@ test.each(['マロン さん', 'マロン様', 'マロンさま'])('次の予約
   expect(container.querySelector(`[title="${name}"]`)?.textContent).toBe(name)
   expect(container.textContent).not.toMatch(/(?:さん|様|さま)\s*(?:さん|様|さま)/)
 })
+afterEach(() => { verifiedStaffRole(null) })

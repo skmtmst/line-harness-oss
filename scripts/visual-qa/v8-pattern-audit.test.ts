@@ -123,6 +123,81 @@ describe('型の対応表の点検', () => {
     put(root, file, "import { CreatePage } from '@/components/templates'; export const P = () => <CreatePage help=\"タグを付ける条件を設定します\" />")
     expect(findings()).toHaveLength(1)
   })
+  it('持ち主ファイルでhelpを題へ一度だけ渡す入口の説明を通し、操作への転用は止める', () => {
+    const { root } = fixture()
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', 'export function PageHeading() { return null }')
+    const owner = 'apps/web/src/components/templates/create-page.tsx'
+    const forward = "import { PageHeading } from './page-frame'; export function LockedCreatePage({help}) { return <PageHeading help={help} /> }"
+    put(root, owner, forward)
+    put(root, 'apps/web/src/components/templates/index.ts', "export { LockedCreatePage } from './create-page'")
+    const file = 'apps/web/src/v8/demo/locked-help.tsx'
+    const source = "import { LockedCreatePage as Page } from '@/components/templates'; export const P = () => <Page help=\"タグを付ける条件を設定します\" />"
+    const findings = () => run({ code: root }).code.a['tap-extra'].filter((hit: { file: string }) => hit.file === file)
+    put(root, file, source)
+    expect(findings()).toHaveLength(0)
+    for (const body of [
+      "const PageHeading = (p) => <button>{p.help}</button>; return <PageHeading help={help}/>",
+      "return <><PageHeading help={help}/><button>{arguments[0].help}</button></>",
+      "return <><PageHeading help={help}/><PageHeading help={help}/></>",
+      "return <PageHeading title={help} help={help}/>",
+      "return <button><PageHeading help={help}/></button>",
+      "return <Button><PageHeading help={help}/></Button>",
+      "return <Link><PageHeading help={help}/></Link>",
+      "return <div role='button' tabIndex={0}><PageHeading help={help}/></div>",
+      "return <div onClick={()=>{}}><PageHeading help={help}/></div>",
+      "return <div ref={()=>{}}><PageHeading help={help}/></div>",
+      "return <div elementRef={()=>{}}><PageHeading help={help}/></div>",
+      "return <div onPointerUp={()=>{}}><PageHeading help={help}/></div>",
+      "return <div id={function callback(){}}><PageHeading help={help}/></div>",
+    ]) {
+      put(root, owner, `import { PageHeading } from './page-frame'; export function LockedCreatePage({help}) { ${body} }`)
+      expect(findings()).toHaveLength(1)
+    }
+    put(root, owner, "import { PageHeading } from './page-frame'; export function LockedCreatePage({help, PageHeading}) { return <PageHeading help={help}/> }")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', 'export function PageHeading() { return null }; export function PageFrame({children}) { return <div>{children}</div> }')
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { return <PageFrame kind='create'><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(0)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', readFileSync(join(ROOT, 'apps/web/src/components/templates/page-frame.tsx'), 'utf8'))
+    expect(findings()).toHaveLength(0)
+    put(root, 'apps/web/src/components/templates/frame-entry.tsx', "export { PageFrame } from './page-frame'")
+    put(root, owner, "import { PageHeading } from './page-frame'; import { PageFrame } from './frame-entry'; export function LockedCreatePage({help}) { return <PageFrame><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(0)
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { return <PageFrame elementRef={()=>{}}><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(1)
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { return <PageFrame><PageHeading help={help}/></PageFrame> }")
+    const realFrame = readFileSync(join(ROOT, 'apps/web/src/components/templates/page-frame.tsx'), 'utf8')
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', realFrame.replace('ref={elementRef}', 'ref={el => el?.addEventListener("click", () => {})}'))
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', realFrame.replace('ref={elementRef}', 'ref={callbackRef}'))
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', realFrame.replace('const resolvedHeight =', "const attach = (() => { document.addEventListener('click', () => {}) })(); const resolvedHeight ="))
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', realFrame)
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { const PageFrame=({children})=><button>{children}</button>; return <PageFrame><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(1)
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { return <PageFrame role='button'><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', 'export function PageHeading() { return null }; export function PageFrame({children}) { return <button>{children}</button> }')
+    put(root, owner, "import { PageHeading, PageFrame } from './page-frame'; export function LockedCreatePage({help}) { return <PageFrame><PageHeading help={help}/></PageFrame> }")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/components/templates/page-frame.tsx', 'export function PageHeading() { return null }')
+    put(root, owner, "import { PageHeading } from './page-frame'; export function LockedCreatePage({help, help: h}) { return <><PageHeading help={help}/><button>{h}</button></> }")
+    expect(findings()).toHaveLength(1)
+    put(root, owner, "import { PageHeading } from './fake-heading'; export function LockedCreatePage({help}) { return <PageHeading help={help}/> }")
+    put(root, 'apps/web/src/components/templates/fake-heading.tsx', 'export function PageHeading() { return null }')
+    expect(findings()).toHaveLength(1)
+    put(root, owner, "import { PageHeading } from './page-frame'; export function Inner({help}) { return <PageHeading help={help}/> }; export function LockedCreatePage({help}) { return <Inner help={help}/> }")
+    expect(findings()).toHaveLength(1)
+    put(root, owner, "import { PageHeading } from './page-frame'; export function LockedCreatePage({help}) { return <><PageHeading help={help}/><button>{help}</button></> }")
+    expect(findings()).toHaveLength(1)
+    put(root, owner, forward)
+    put(root, file, "import { LockedCreatePage as Page } from '@/components/templates'; export const P = () => <Page help={<button>タグを付ける</button>} />")
+    expect(findings()).toHaveLength(1)
+    put(root, 'apps/web/src/v8/demo/own-page.tsx', forward)
+    put(root, file, source.replace("'@/components/templates'", "'./own-page'"))
+    expect(findings()).toHaveLength(1)
+  })
   it('正の行うことの選択肢データを通し、同じ語の手書きや偽の持ち主は止める', () => {
     const { root } = fixture()
     put(root, 'apps/web/src/components/shared/action-list.tsx', 'export default function ActionList() { return null }')
@@ -537,4 +612,17 @@ it('名前と属性が同じパネルの移動は保持し、コピー・見た�
   put(root, old, 'export const empty = true')
   put(root, next, moved.replace('styles.rail', 'styles.changed'))
   expect(newCodeFindings(before, run({ code: root, pen })).filter((h: { pattern: string }) => h.pattern === 'detail-panel')).toHaveLength(1)
+})
+
+describe('画面の押し口は共通部品を通す', () => {
+  it('共通Buttonの隣に手書きを足したら拾い、共通へ戻せば消える', () => {
+    const catalog = loadCatalog(DEFAULT_CATALOG)
+    const pattern = catalog.patterns.find((item: { id: string }) => item.id === 'primary-button')
+    const scan = (body: string) => scanCodeFile(pattern, 'apps/web/src/v8/demo/actions.tsx', body, catalog._global).filter((hit: { signal: string }) => hit.signal === 'raw-button')
+    const common = "import Button from '@/components/shared/button'; export const A = () => <Button>詳細</Button>"
+    expect(scan(common)).toHaveLength(0)
+    expect(scan(common + '; export const B = () => <button>詳細</button>')).toHaveLength(1)
+    expect(scan(common + '; const sample = "<button>詳細</button>"')).toHaveLength(0)
+    expect(scan(common)).toHaveLength(0)
+  })
 })

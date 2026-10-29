@@ -28,7 +28,7 @@ async function mount(data: unknown = detail) {
   return view
 }
 function open() {
-  const trigger = screen.getByRole('button', { name: 'v2.7.0・検証環境' })
+  const trigger = screen.getByRole('button', { name: '2.7.0・検証環境' })
   fireEvent.click(trigger)
   return { trigger, dialog: screen.getByRole('dialog', { name: '版の情報' }) }
 }
@@ -53,7 +53,7 @@ describe('左メニューの版は1行、詳細と更新は開いて確かめる
   it.each(['fork', 'upgrade', 'latest', 'loading'])('%sの更新案内は閉じた版の行でも伝える', async kind => {
     update.kind = kind
     await mount()
-    const trigger = screen.getByRole('button', { name: 'v2.7.0・検証環境' })
+    const trigger = screen.getByRole('button', { name: '2.7.0・検証環境' })
     const notice = kind === 'fork' || kind === 'upgrade'
     expect(trigger.querySelector('[data-version-update]') !== null).toBe(notice)
     expect(trigger.getAttribute('aria-description')).toBe(kind === 'upgrade' ? '更新あり' : kind === 'fork' ? 'カスタマイズ版の更新案内' : null)
@@ -63,7 +63,7 @@ describe('左メニューの版は1行、詳細と更新は開いて確かめる
 
   it('日時は閉じた状態で描画せず、実版と環境を出す', async () => {
     await mount()
-    expect(screen.getByRole('button', { name: 'v2.7.0・検証環境' }).title).toBe('v2.7.0・検証環境')
+    expect(screen.getByRole('button', { name: '2.7.0・検証環境' }).title).toBe('2.7.0・検証環境')
     expect(screen.queryByRole('dialog')).toBeNull()
     expect(screen.queryByText(/配備/)).toBeNull()
     expect(fetchMock).toHaveBeenCalledTimes(1)
@@ -143,7 +143,7 @@ describe('左メニューの版は1行、詳細と更新は開いて確かめる
     fireEvent.click(trigger)
     await act(async () => { resolve(json(detail)) })
     expect(container.querySelector('[data-sidebar-version]')).toBe(frame)
-    expect(screen.getByRole('button', { name: 'v2.7.0・検証環境' })).toBe(trigger)
+    expect(screen.getByRole('button', { name: '2.7.0・検証環境' })).toBe(trigger)
     expect(trigger.className).toBe(classes)
     expect(frame.getAttribute('aria-busy')).toBe('false')
     expect(screen.getByRole('dialog').textContent).toContain('a1b2c3d')
@@ -166,7 +166,7 @@ describe('左メニューの版は1行、詳細と更新は開いて確かめる
 
   it.each([null, 'preview-east-with-a-long-environment-name'])('環境%sを捏造せず、長い実値をtitleにも残す', async env => {
     await mount({ ...detail, deploy_env: env, git_commit: 'unknown', released_at: '' })
-    const label = `v2.7.0${env ? `・${env}` : ''}`
+    const label = `2.7.0${env ? `・${env}` : ''}`
     const trigger = screen.getByRole('button', { name: label })
     expect(trigger.title).toBe(label)
     fireEvent.click(trigger)
@@ -182,7 +182,7 @@ describe('左メニューの版は1行、詳細と更新は開いて確かめる
     clearAdminVersionCache()
     await mount({ ...detail, version: '2.8.0' })
     await act(async () => { resolve(json(detail)) })
-    expect(screen.getByRole('button', { name: 'v2.8.0・検証環境' })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'v2.7.0・検証環境' })).toBeNull()
+    expect(screen.getByRole('button', { name: '2.8.0・検証環境' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '2.7.0・検証環境' })).toBeNull()
   })
 })

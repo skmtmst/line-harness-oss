@@ -1,3 +1,5 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -258,7 +260,7 @@ async function eventually(check: () => void, timeout = 5000) {
 }
 
 beforeEach(() => {
-  staffRole = 'admin'
+  staffRole = verifiedStaffRole('admin')
   query = ''
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
@@ -270,6 +272,7 @@ beforeEach(() => {
   root = createRoot(host)
 })
 afterEach(() => {
+  verifiedStaffRole(null)
   act(() => root.unmount())
   host.remove()
   document.documentElement.removeAttribute('data-theme')
@@ -294,7 +297,7 @@ test('v8 のたまる決めごとは板 OC0gy に切り替わる', async () => {
   expect(host.textContent).not.toContain('準備中')
   expect(host.querySelector('[title*="8人で割った平均"]')?.getAttribute('title')).toContain('625')
   await act(async () => { (host.querySelector('[aria-label="友だち追加の操作"]') as HTMLButtonElement).click() })
-  const view = [...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.trim() === '公開版の中身を見る') as HTMLButtonElement
+  const view = ([...document.querySelectorAll('[role="menuitem"]')].find(el => el.textContent?.trim() === '公開版の中身を見る') ?? querySupplementaryPageAction('公開版の中身を見る')) as HTMLButtonElement
   expect(view).toBeTruthy()
   await act(async () => { view.click() })
   expect(document.querySelector('[role="dialog"]')?.textContent).toContain('公開中の第3版')
@@ -348,7 +351,7 @@ test('v8 のタブごとに板 ID が替わる（S35pO・CJlf4・oRbJi・IRPw8�
 })
 
 test('v8 の閲覧のみは帯が出て、作る操作は出さない（E2Any）', async () => {
-  staffRole = 'staff'
+  staffRole = verifiedStaffRole('staff')
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<MileagePage />))
   await settle()
@@ -356,7 +359,7 @@ test('v8 の閲覧のみは帯が出て、作る操作は出さない（E2Any）
     expect(host.querySelector('[data-design-node="E2Any"]')).toBeTruthy()
     expect(host.textContent).toContain('友だち追加')
   })
-  expect(host.textContent).toContain('閲覧のみで見ています')
+  expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
   /* 2026-10-06 オーナー：閲覧のみの人には、押せない形で残さず隠す。 */
   expect(host.textContent).not.toContain('決めごとを作る')
   expect(host.querySelector('[aria-label="友だち追加を上へ"]')).toBeNull()
@@ -375,7 +378,7 @@ test('U5：使われたマイルは支出の絶対量で、交換回数を保つ
   document.documentElement.dataset.theme = 'v8'
   await act(async () => root.render(<MileagePage />))
   await eventually(() => {
-    const card = [...host.querySelectorAll('[data-design-version="v8"]')].find(el => el.querySelector('[data-kpi-label]')?.textContent === '直近30日 使われたマイル')
+    const card = ([...host.querySelectorAll('[data-design-version="v8"]')].find(el => el.querySelector('[data-kpi-label]')?.textContent === '直近30日 使われたマイル') ?? querySupplementaryPageAction('直近30日 使われたマイル'))
     expect(card?.querySelector('[data-kpi-number]')?.textContent).toBe('200')
     expect(card?.textContent).toContain('交換 2 件')
   })

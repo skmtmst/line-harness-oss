@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 NEN配信の一覧（src/v8/nen-campaigns/list.tsx）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * V8 のテーマで出す・自動配信は止めている配信も同じ表に並ぶ・絞り込み札・行の「…」・
@@ -85,7 +86,7 @@ let root: Root
 
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -113,7 +114,7 @@ it('旧一覧のヘッダー操作を残し、閲覧のみでは隠す', async (
   expect(host.querySelectorAll('h1')).toHaveLength(1)
   await act(async () => { button('ECのコラムを取り込む')!.click() })
   expect(action).toHaveBeenCalledTimes(1)
-  role.value = 'viewer'
+  role.value = verifiedStaffRole('viewer')
   await render(props)
   expect(button('ECのコラムを取り込む')).toBeUndefined()
 })
@@ -155,12 +156,12 @@ it('下書きの配信したい日時を日本時間で残し、予約済みと�
 })
 
 describe('V8 NEN配信の一覧', () => {
-  it.each(['columns', 'history'] as const)('%sは1ページでも件数とページ送りを同じ帯に出す', async (tab) => {
+  it.each(['columns', 'history'] as const)('%sは1ページは件数だけを帯に出す', async (tab) => {
     await render(baseProps({ tab }))
-    const pager = within(host).getByRole('navigation', { name: 'ページ送り' })
+    const pager = host.querySelector('[data-pagination]')!
     expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe(tab === 'columns' ? '2件中 1〜2件' : '1件中 1〜1件')
-    expect(within(pager).getByRole('button', { name: '前のページ' }).hasAttribute('disabled')).toBe(true)
-    expect(within(pager).getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
+    expect(within(pager as HTMLElement).queryByRole('button', { name: '前のページ' })).toBeNull()
+    expect(within(pager as HTMLElement).queryByRole('button', { name: '次のページ' })).toBeNull()
   })
 
   it('送信履歴の総数と実際に読めた範囲を分け、次ページのカーソルを渡す', async () => {
@@ -207,7 +208,7 @@ describe('V8 NEN配信の一覧', () => {
   })
 
   it('閲覧のみの人には帯を出し、変える操作（CSV 以外の作る・止める・テスト送信・コラムを書く）を置かない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await render(baseProps())
     expect(host.textContent).toContain('閲覧のみで見ています')
     await act(async () => { fireEvent.click(button('「注文ありがとうございます」の操作')!) })
@@ -216,8 +217,8 @@ describe('V8 NEN配信の一覧', () => {
     expect(items).not.toContain('テスト送信')
     expect(items).not.toContain('編集する')
     // 閲覧のみには押せない更新を置かない。ページ送りの境界は残す。
-    expect(host.querySelector('[data-pagination] button[aria-label="前のページ"]')).toHaveProperty('disabled', true)
-    expect(host.querySelector('[data-pagination] button[aria-label="次のページ"]')).toHaveProperty('disabled', true)
+    expect(host.querySelector('[data-pagination] button[aria-label="前のページ"]')).toBeNull()
+    expect(host.querySelector('[data-pagination] button[aria-label="次のページ"]')).toBeNull()
     expect([...host.querySelectorAll('button[disabled]')].filter(b => !b.closest('[data-pagination]'))).toEqual([])
     await render(baseProps({ tab: 'columns' }))
     expect(host.textContent).not.toContain('コラムを書く')
@@ -268,3 +269,5 @@ describe('V8 NEN配信の一覧', () => {
     expect(props.onChangeDeliveryView).toHaveBeenCalledWith('failed', undefined, '')
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

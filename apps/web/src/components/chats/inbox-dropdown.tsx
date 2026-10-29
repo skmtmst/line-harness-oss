@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import MenuPortal from '@/components/shared/menu-portal'
 import Notice from '@/components/shared/notice'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /**
  * 受信箱のプルダウン。
@@ -212,7 +213,7 @@ export function OperatorDropdown({
         >
           {/* 担当が増えるほど縦に伸びる。探す手段が無いと使えない。 */}
           <div className="border-hairline border-b p-2">
-            <SaveErrorField names={["query"]}><input
+            <SaveErrorField names={["query"]}><SharedTextField
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
@@ -410,7 +411,7 @@ export function FolderDropdown({
           panelClassName={`${panelClass} right-0 w-70`}
         >
           <div className="border-hairline border-b p-2">
-            <SaveErrorField names={["query"]}><input
+            <SaveErrorField names={["query"]}><SharedTextField
               type="text"
               value={query}
               onChange={(event) => setQuery(event.target.value)}

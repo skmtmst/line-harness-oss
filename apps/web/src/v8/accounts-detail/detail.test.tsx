@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * ★V8 LINEアカウントの詳細・乗り換え（src/v8/accounts-detail）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * 閲覧のみには変える操作を置かず帯を出す・動いているアカウントはアーカイブを押せない・
@@ -30,7 +32,8 @@ vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('
 })
 // 設定の中のメニューは共通部品（自分の試験がある）。ここでは置き場所だけ。
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => <nav aria-label="設定の中のメニュー" /> }))
-vi.mock('@/lib/session-snapshot', () => ({ readSessionSnapshot: () => ({ impersonation: null, unfamiliarAt: null, stepUpMethod: 'totp' }) }))
+const sessionSnapshot = vi.hoisted(() => ({ impersonation: null, unfamiliarAt: null, stepUpMethod: 'totp' }))
+vi.mock('@/lib/session-snapshot', async (load) => ({ ...(await load<typeof import('@/lib/session-snapshot')>()), readSessionSnapshot: () => sessionSnapshot }))
 
 import AccountDetailV8 from './detail'
 import { CredentialsDialog } from './dialogs'
@@ -66,7 +69,7 @@ let sent: Array<{ url: string; method: string; body: unknown; stepUp: string | n
 let gateA: Promise<void> | null = null
 
 beforeEach(() => {
-  role = 'owner'
+  role = verifiedStaffRole('owner')
   search = 'id=acc-1'
   account = ACCOUNT
   sent = []
@@ -159,7 +162,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
   })
 
   it('閲覧のみには変える操作を置かず、閲覧のみの帯を出す', async () => {
-    role = 'staff'
+    role = verifiedStaffRole('staff')
     await act(async () => root.render(<AccountDetailV8 />))
     await settle()
     expect(buttons('編集する')).toHaveLength(0)
@@ -167,7 +170,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
     expect(buttons('送受信を止める')).toHaveLength(0)
     expect(buttons('アーカイブする')).toHaveLength(0)
     expect(buttons('変える')).toHaveLength(0)
-    expect(document.body.textContent).toContain('閲覧のみで見ています')
+    expect(document.body.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
     // 乗り換えは見るための入口なので残す。
     expect(buttons('乗り換え')).toHaveLength(1)
   })
@@ -291,7 +294,7 @@ describe('LINEアカウントの詳細（V8 ihjfd）', () => {
   })
 
   it('管理者（オーナーでない）にはタイムゾーンの欄を出さない', async () => {
-    role = 'admin'
+    role = verifiedStaffRole('admin')
     await act(async () => root.render(<AccountDetailV8 />))
     await settle()
     await click(buttons('編集する')[0])
@@ -395,7 +398,7 @@ describe('LINEアカウントの乗り換え（V8 x2dSNv）', () => {
   })
 
   it('閲覧のみには判断の選択・やめる・本実行を出さない', async () => {
-    role = 'staff'
+    role = verifiedStaffRole('staff')
     await act(async () => root.render(<AccountHandoverV8 />))
     await settle()
     expect(document.querySelector('[aria-label="高橋 直人の判断"]')).toBeNull()
@@ -425,3 +428,5 @@ describe('言葉', () => {
     expect(countsLine({ sourceTotal: 12, auto: 10, review: 0, unmatched: 2, lookalike: 0 })).toBe('元の友だち 12 人：自動で同じ人 10・要確認 0・一致しない 2')
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

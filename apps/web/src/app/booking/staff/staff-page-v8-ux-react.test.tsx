@@ -100,7 +100,7 @@ describe('担当一覧（V8）の読み込みと保存ボタン', () => {
     await screen.findByText('山田')
 
     fireEvent.click(screen.getByRole('button', { name: '＋ スタッフを作る' }))
-    fireEvent.change(screen.getByPlaceholderText('例: yamada-taro'), { target: { value: 'sato' } })
+    fireEvent.change(screen.getByPlaceholderText('例：yamada-taro'), { target: { value: 'sato' } })
     fireEvent.change(screen.getByPlaceholderText('顧客に表示される名前'), { target: { value: '佐藤' } })
     fireEvent.click(screen.getByRole('button', { name: '保存する' }))
 

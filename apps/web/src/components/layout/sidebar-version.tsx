@@ -35,7 +35,7 @@ export default function SidebarVersion() {
   const lines = formatDeployInfo(detail)
   const environment = deployEnvLabel(detail?.deploy_env)
   const summary = lines && detail
-    ? `v${detail.version.trim()}${environment ? `・${environment}` : ''}`
+    ? `${detail.version.trim()}${environment ? `・${environment}` : ''}`
     : ready ? '版の情報なし' : '版の情報を取得中'
   const notice = update.kind === 'upgrade' || update.kind === 'fork'
   const noticeText = update.kind === 'upgrade' ? '更新あり' : update.kind === 'fork' ? 'カスタマイズ版の更新案内' : undefined

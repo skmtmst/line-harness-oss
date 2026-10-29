@@ -1,4 +1,6 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * ★V8 外部連携（src/v8/webhooks）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * 受け取り口を作る窓・閲覧のみで押せない物を置かない・同期の記録の束ね方・
@@ -54,7 +56,7 @@ let posted: Array<{ url: string; body: unknown }> = []
 
 beforeEach(() => {
   accountId = 'account-a'
-  role = 'owner'
+  role = verifiedStaffRole('owner')
   narrow = false
   search = ''
   posted = []
@@ -169,7 +171,7 @@ describe('外部連携 V8', () => {
   })
 
   it('届物があっても閲覧のみでは結び付けを出さず、見本の省略文字は全文を残す', async () => {
-    role = 'staff'
+    role = verifiedStaffRole('staff')
     const fixture = unmatchedFixture()
     await render(<WebhooksIncomingV8 />)
     expect(within(host).queryByRole('button', { name: '結び付ける' })).toBeNull()
@@ -182,12 +184,12 @@ describe('外部連携 V8', () => {
     }
   })
 
-  it('やり取りの記録は1ページでも件数とページ送りを同じ帯に出す', async () => {
+  it('やり取りの記録は1ページは件数だけを帯に出す', async () => {
     await render(<WebhooksInteractionsV8 />)
-    const pager = within(host).getByRole('navigation', { name: 'やり取りの記録のページ送り' })
+    const pager = host.querySelector('[data-pagination]')!
     expect(pager.querySelector('[data-pagination-summary]')?.textContent).toBe('1件中 1〜1件')
-    expect(within(pager).getByRole('button', { name: '前のページ' }).hasAttribute('disabled')).toBe(true)
-    expect(within(pager).getByRole('button', { name: '次のページ' }).hasAttribute('disabled')).toBe(true)
+    expect(within(pager as HTMLElement).queryByRole('button', { name: '前のページ' })).toBeNull()
+    expect(within(pager as HTMLElement).queryByRole('button', { name: '次のページ' })).toBeNull()
     expect(within(host).getByRole('button', { name: '表示件数' }).closest('[data-template-region="toolbar"]')).not.toBeNull()
   })
 
@@ -281,9 +283,9 @@ describe('外部連携 V8', () => {
   })
 
   it('閲覧のみ：受け取り口を作る・見本で作る・まとめてやり直すを置かず、閲覧のみの帯を出す', async () => {
-    role = 'staff'
+    role = verifiedStaffRole('staff')
     await render(<WebhooksIncomingV8 />)
-    expect(host.textContent).toContain('閲覧のみで見ています')
+    expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
     expect(buttons().some((element) => element.textContent?.includes('受け取り口を作る'))).toBe(false)
     act(() => { root.unmount() })
     root = createRoot(host)
@@ -365,7 +367,7 @@ describe('外部連携 V8', () => {
   })
 
   it('やり取りの中身：閲覧のみは JSON を読めるが写す操作は出さない', async () => {
-    role = 'viewer'
+    role = verifiedStaffRole('viewer')
     await render(<WebhooksInteractionsV8 />)
     const row = host.querySelector('tr[data-row-id="wi-1"]') as HTMLElement
     await act(async () => { fireEvent.click(within(row).getByRole('button', { name: '「予約台帳」の操作' })) })
@@ -499,3 +501,5 @@ describe('外部連携 V8', () => {
     expect(toggle()?.getAttribute('aria-checked')).toBe('true')
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

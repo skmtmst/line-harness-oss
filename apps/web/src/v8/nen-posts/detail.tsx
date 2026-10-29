@@ -75,7 +75,7 @@ export function PhotoReviewDetail({
   const [downloadCode, setDownloadCode] = useState('')
   const [downloadBusy, setDownloadBusy] = useState(false)
   const [downloadError, setDownloadError] = useState('')
-  /* V-1: 2段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
+  /* V-1: 二段階認証を使っている人は6桁、無い人はパスワードで確認する。 */
   const stepUpMethod = readSessionSnapshot()?.stepUpMethod ?? 'totp'
   const downloadReady = stepUpMethod === 'password' ? downloadCode.length > 0 : /^\d{6}$/.test(downloadCode)
   if (loading) return <div><DetailLoading label="写真を読み込んでいます" /></div>

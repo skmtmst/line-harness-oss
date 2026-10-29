@@ -20,6 +20,7 @@ import { api, ApiError, bookingApi, type BookingAvailabilitySlot, type BookingCo
 import { describeApiFailure, isForbidden, isForbiddenOrRateLimited, loadFailureNotice } from '@/components/shared/api-error-message';
 import { formatDateTime, formatDay, formatTime } from '@/lib/format';
 import { Card, NotificationToggle, RelatedLinks } from "./page-gap-parts"
+import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 type Step = 'input' | 'confirm' | 'done' | 'conflict'
 
 /**
@@ -805,9 +806,9 @@ export default function NewProxyBookingPage() {
               </div>
               {phoneCustomer ? (
                 <div className="space-y-2">
-                  <input aria-label="電話客の名前" value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="お客様の名前" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
-                  <input aria-label="電話客の電話番号" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="電話番号" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
-                  <input aria-label="電話客のペット名" value={petName} onChange={(event) => setPetName(event.target.value)} placeholder="ペットの名前（任意）" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                  <SharedTextField aria-label="電話客の名前" value={customerName} onChange={(event) => setCustomerName(event.target.value)} placeholder="お客様の名前" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                  <SharedTextField aria-label="電話客の電話番号" value={customerPhone} onChange={(event) => setCustomerPhone(event.target.value)} placeholder="電話番号" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
+                  <SharedTextField aria-label="電話客のペット名" value={petName} onChange={(event) => setPetName(event.target.value)} placeholder="ペットの名前（任意）" className="border-hairline rounded-control w-full border px-3 py-2 text-sm" />
                   {customer && savedMatchesInput ? <p className="text-success text-xs">顧客台帳に保存済み（電話末尾 {customer.phone_last4}）</p> : <p className="text-ink-faint text-xs">「この内容で予約を入れる」を押すと顧客台帳へ保存します。入力へ戻って直せます。</p>}
                 </div>
               ) : friend ? (
@@ -823,7 +824,7 @@ export default function NewProxyBookingPage() {
                 </div>
               ) : (
                 <div className="relative">
-                  <input
+                  <SharedTextField
                     ref={friendInputRef}
                     value={friendQuery}
                     onChange={(event) => {
@@ -908,7 +909,7 @@ export default function NewProxyBookingPage() {
             </Card>
 
             <Card title="お客様からの要望">
-              <textarea aria-label="お客様からの要望" value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={4} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" placeholder="予約時に確認した内容を入力" />
+              <SharedTextArea aria-label="お客様からの要望" value={customerNote} onChange={(event) => setCustomerNote(event.target.value)} rows={4} className="border-hairline rounded-control w-full border px-3 py-2 text-sm" placeholder="予約時に確認した内容を入力" />
             </Card>
 
             <Card title="お客様に何を送りますか" note="LINEと結びついている方には、予約後の案内を送ります。送らない選択もできます。">

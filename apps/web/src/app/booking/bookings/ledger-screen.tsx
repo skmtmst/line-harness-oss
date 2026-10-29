@@ -93,6 +93,7 @@ import { STATUS_TABS, SOURCE_FILTER_OPTIONS, SOURCE_FILTER_NAME, sourceFilterTex
 import type { BookingLedgerModel } from './use-booking-ledger'
 import { bookingWords } from '@/v8/booking-bookings/public/words/index'
 import { reminderDeliveryStatusLabel } from '@/lib/status-labels'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 export default function BookingLedgerScreen({ model }: { model: BookingLedgerModel }) {
   if (model.selectedAccountId && model.styleProfile && !model.styleProfile.data) return <BookingLedgerFrame view={model.view}>
@@ -572,7 +573,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
             {shareUrl ? (
               <div className="mt-2 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <input
+                  <SharedTextField
                     readOnly
                     value={shareUrl}
                     aria-label="友だち予約URL"
@@ -587,7 +588,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                 {/* N-396: 履歴URLは別画面を開く。両方発行できることを注記と揃える。 */}
                 {historyUrl ? (
                   <div className="flex flex-wrap items-center gap-2">
-                    <input
+                    <SharedTextField
                       readOnly
                       value={historyUrl}
                       aria-label="予約履歴URL"

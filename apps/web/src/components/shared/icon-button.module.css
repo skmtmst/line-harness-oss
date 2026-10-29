@@ -126,6 +126,7 @@
 
 /* 行の「…」は普段は枠も地も無し。行に乗せた時・乗せた時・焦点・開いている時だけ薄い灰の地。寸法と押せる大きさは既存の口のまま。 */
 html:root .button[data-row-menu]:not(:focus-visible) {
+  border-color: transparent;
   outline: 1px solid transparent;
   outline-offset: -1px;
   background: transparent;
@@ -135,3 +136,15 @@ html:root :is(tr, [role='row']):hover .button[data-row-menu],
 html:root .button[data-row-menu]:is(:hover, :focus-visible, [aria-expanded='true']) {
   background: var(--polish-row-menu-hover-bg);
 }
+
+html:root :is([data-toolbar-row], [data-control-row]) .button { width: var(--control-h); height: var(--control-h); min-height: var(--control-h); flex-basis: var(--control-h); }
+
+/* 注目の星。未注目でも押せる範囲と焦点は保ち、印だけ行の操作時に見せる。 */
+:root .button[data-variant='attention'] { box-shadow: none; background: transparent; }
+:root .button[data-variant='attention']:not(:focus-visible) { outline-color: transparent; }
+:root .button[data-variant='attention'][aria-pressed='true'] { color: var(--color-star-on); }
+.button[data-variant='attention'][aria-pressed='true'] > svg { color: var(--color-star-on-edge); fill: var(--color-star-on); stroke: var(--color-star-on-edge); }
+.button[data-variant='attention'][aria-pressed='false'] > svg { opacity: 0; }
+:global(tr):is(:hover, :focus-within) .button[data-variant='attention'] > svg,
+.button[data-variant='attention']:is(:hover, :focus-visible) > svg { opacity: 1; }
+@media (hover: none) { .button[data-variant='attention'][aria-pressed='false']:not(:focus-visible):not(:hover) > svg { opacity: var(--polish-disabled-opacity); } }

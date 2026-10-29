@@ -373,6 +373,8 @@ export async function listEcOrders(
     lineAccountId: string;
     status?: EcOrderState | null;
     query?: string;
+    from?: string | null;
+    to?: string | null;
     limit: number;
     offset: number;
   },
@@ -392,7 +394,13 @@ export async function listEcOrders(
     const escaped = input.query.replace(/[\\%_]/g, (value) => `\\${value}`);
     bindings.push(`%${escaped}%`, `%${escaped}%`);
   }
+  if (input.from) { clauses.push('julianday(o.ordered_at) >= julianday(?)'); bindings.push(input.from); }
+  if (input.to) { clauses.push('julianday(o.ordered_at) < julianday(?)'); bindings.push(input.to); }
   const where = clauses.join(' AND ');
+  const summaryClauses = ['line_account_id = ?'];
+  const summaryBindings: Array<string | number> = [input.lineAccountId];
+  if (input.from) { summaryClauses.push('julianday(ordered_at) >= julianday(?)'); summaryBindings.push(input.from); }
+  if (input.to) { summaryClauses.push('julianday(ordered_at) < julianday(?)'); summaryBindings.push(input.to); }
   const [rows, count, summary] = await Promise.all([
     db.prepare(
       `SELECT o.*, f.display_name AS customer_name
@@ -409,8 +417,8 @@ export async function listEcOrders(
               SUM(CASE WHEN normalized_status = 'refunded' THEN 1 ELSE 0 END) AS refunded_count,
               SUM(CASE WHEN normalized_status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_count,
               COALESCE(SUM(total_amount_minor), 0) AS total_amount
-         FROM ec_orders WHERE line_account_id = ?`,
-    ).bind(input.lineAccountId).first<Record<string, number>>(),
+         FROM ec_orders WHERE ${summaryClauses.join(' AND ')}`,
+    ).bind(...summaryBindings).first<Record<string, number>>(),
   ]);
   const ids = rows.results.map((row) => String(row.id));
   const lineRows = ids.length

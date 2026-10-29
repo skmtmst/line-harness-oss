@@ -96,6 +96,26 @@ async function openTallMenu() {
 }
 
 describe('器は使える高さまで使う（1440×900 の撮影条件）', () => {
+  it('ダイアログ内では色パレットが本文の終端より下へ出ない', async () => {
+    mockViewport(560, 900)
+    const content = document.createElement('div')
+    content.setAttribute('data-dialog-content', '')
+    content.appendChild(anchor)
+    host.appendChild(content)
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      const rect = this === content
+        ? { top: 180, bottom: 420, left: 0, right: 560 }
+        : { top: 370, bottom: 402, left: 440, right: 480 }
+      return { x: rect.left, y: rect.top, width: rect.right - rect.left, height: rect.bottom - rect.top, ...rect, toJSON: () => ({}) } as DOMRect
+    })
+    mockPanelLayout(64, 64)
+    await openTallMenu()
+    const panel = portal()
+    expect(panel?.getAttribute('data-placement')).toBe('up')
+    expect(Number.parseFloat(panel?.style.top ?? '0') + 64).toBeLessThanOrEqual(370)
+    expect(panel?.style.top).toBe('302px')
+  })
+
   it('入る時は上限が使える高さいっぱいで、影もスクロールもない', async () => {
     // 12項目 ≒ 500px が下の空き 656px に入る置き方。
     mockViewport(1440, 900)

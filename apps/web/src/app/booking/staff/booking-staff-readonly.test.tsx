@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 const permission = vi.hoisted(() => ({ value: false }))
@@ -14,6 +15,7 @@ import BookingStaffPage from './page'
 afterEach(cleanup)
 it('PKG-CAND-booking-staff-readonly: 閲覧のみは作成を隠し、スタッフとシフトは読める', async () => {
   permission.value = false
+  verifiedStaffRole('viewer')
   render(<BookingStaffPage />)
   await screen.findByText('佐野')
   expect(screen.queryByRole('button', { name: '＋ スタッフを作る' })).toBeNull()
@@ -27,3 +29,5 @@ it('PKG-CAND-booking-staff-readonly: 設定権限がある人には作成を残�
   await screen.findByText('佐野')
   expect((screen.getByRole('button', { name: '＋ スタッフを作る' }) as HTMLButtonElement).disabled).toBe(false)
 })
+
+afterEach(() => { verifiedStaffRole(null) })

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { render, cleanup, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -17,8 +18,11 @@ describe('共通の案内と閲覧のみの知らせ', () => {
     expect(screen.getByRole('list', { name: '保存の状態' }).children).toHaveLength(2)
   })
   it('閲覧のみの文言とstatusの役割を保つ', () => {
+    verifiedStaffRole('viewer')
     render(React.createElement(ReadOnlyNotice))
     expect(screen.getByRole('status').textContent).toBe(READ_ONLY_MESSAGE)
     expect(screen.queryByRole('button')).toBeNull()
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

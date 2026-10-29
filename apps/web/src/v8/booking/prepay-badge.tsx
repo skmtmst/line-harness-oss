@@ -8,6 +8,7 @@ import styles from '../../app/booking/prepay-badge-v8.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 function jstMonthDay(iso: string): string {
   return formatListDay(iso, '')
@@ -128,7 +129,7 @@ export default function PrepayBadgeV8({ accountId, friendId, canEdit = true, onC
         onConfirm={() => void clearPrepay()}
         onCancel={() => setDialogOpen(false)}
       >
-        <Field label="外す理由（1行）"><SaveErrorField names={["reason"]}><input
+        <Field label="外す理由（1行）"><SaveErrorField names={["reason"]}><SharedTextField
             aria-label="外す理由"
             value={reason}
             maxLength={200}

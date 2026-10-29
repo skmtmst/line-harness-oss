@@ -13,6 +13,7 @@ import { TextArea } from '@/components/shared/text-field'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /**
  * 1人だけ選んだときの操作（設計 `BulkBar` の6つ）。
@@ -369,14 +370,14 @@ function FieldPanel({ friendId, busy, run }: { friendId: string; busy: boolean; 
   const [value, setValue] = useState('')
   return (
     <Row>
-      <SaveErrorField names={["key"]}><input
+      <SaveErrorField names={["key"]}><SharedTextField
         aria-label="項目名"
         value={key}
         onChange={(e) => setKey(e.target.value)}
         placeholder="項目名"
         className={SELECT}
       /></SaveErrorField>
-      <SaveErrorField names={["value"]}><input
+      <SaveErrorField names={["value"]}><SharedTextField
         aria-label="値"
         value={value}
         onChange={(e) => setValue(e.target.value)}

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 オートメーションの見本の動きの試験。BEHAVIOR.md の「見本」の節を守る。
  * きっかけの札（先に出てきた順に6つまで・かっこの補足はまとめる）、見本から下書きを作る、
@@ -58,7 +59,7 @@ let host: HTMLDivElement
 
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   push.mockReset()
   posted.length = 0
   host = document.createElement('div')
@@ -143,7 +144,7 @@ describe('V8 オートメーションの見本（c7dxp）', () => {
   })
 
   it('閲覧のみでは、帯を出し、下書きを作る・見本から作るを置かない（押せないボタンも無い）', async () => {
-    role.value = 'viewer'
+    role.value = verifiedStaffRole('viewer')
     await render()
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(named('この見本で下書きを作る')).toHaveLength(0)
@@ -151,3 +152,5 @@ describe('V8 オートメーションの見本（c7dxp）', () => {
     expect(host.querySelectorAll('[role="listitem"]')).toHaveLength(8)
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

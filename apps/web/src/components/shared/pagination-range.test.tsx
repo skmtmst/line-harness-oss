@@ -42,6 +42,7 @@ it.each([
   expect(screen.getByText(text)).toBeTruthy()
   expect(document.querySelectorAll('[data-pagination-summary]')).toHaveLength(1)
   const next = screen.queryByLabelText('次のページ')
+  if (pageCount === 1) expect(next).toBeNull()
   if (next) fireEvent.click(next)
   if (page < pageCount) expect(change).toHaveBeenCalledWith(page + 1)
   else expect(change).not.toHaveBeenCalled()
