@@ -63,6 +63,7 @@ import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 
 /*
  * ★V8 マイル「行動スコア」（板 、点数を手で直す 、
@@ -984,7 +985,7 @@ export function ScoreAdjustDialog({
           /></SaveErrorField>
 <FieldError id="ml-score-amount-error">{fields.error('amount')}</FieldError></Field></DialogFormRow>
 
-        <DialogFormRow><Field label="理由" htmlFor="ml-score-reason" requirement={FIELD_REQUIREMENTS.reason}><SaveErrorField names={["reason"]}><textarea
+        <DialogFormRow><Field label="理由" htmlFor="ml-score-reason" requirement={FIELD_REQUIREMENTS.reason}><SaveErrorField names={["reason"]}><SharedTextArea
             id="ml-score-reason"
             className={styles.dlgTextarea}
             value={reason}

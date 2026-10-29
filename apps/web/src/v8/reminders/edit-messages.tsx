@@ -2,7 +2,7 @@
 
 import { StageFrame } from './edit-model'
 
-import { renderReminderBodySample } from '@/components/reminders/reminder-labels'
+import { fillPreviewSample } from '@/components/shared/preview-sample'
 import ActionMenu,{ type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -146,7 +146,8 @@ export function MessagesStageV8({
       accountName={selectedAccount?.name ?? 'LINE公式アカウント'}
       chip={selectedStep ? formatMd(exampleSendAt(selectedStep, settings.deliveryMode, sampleBase.current)) : '通知はまだありません'}
       empty={!selectedStep}
-      message={selectedStep ? (selectedStep.messageContent ? renderReminderBodySample(selectedStep.messageContent) : '本文を入力すると、ここに表示例が出ます。') : undefined}
+      hasSampledBody={Boolean(selectedStep?.messageContent.trim())}
+      message={selectedStep ? (selectedStep.messageContent ? fillPreviewSample(selectedStep.messageContent).text : '本文を入力すると、ここに表示例が出ます。') : undefined}
     />
   )
 

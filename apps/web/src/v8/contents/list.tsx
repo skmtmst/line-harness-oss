@@ -54,6 +54,7 @@ import { MediaQuotaGuidance } from './media-quota-guidance'
 import MediaReplacementDialog from './media-replacement-dialog'
 import MediaUploadDialog from './media-upload-dialog'
 import { formatMediaSize } from './media-usage-display'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 const EMPTY_KPIS: MediaKpis = {
   known: false,
@@ -1225,7 +1226,7 @@ export default function MediaLibraryListV8() {
           </div>
         }
       >
-        <Field label="理由（あとから履歴で確認できます）" required><SaveErrorField names={["archiveReason","archive_reason"]}><input
+        <Field label="理由（あとから履歴で確認できます）" required><SaveErrorField names={["archiveReason","archive_reason"]}><SharedTextField
             type="text"
             autoFocus
             value={archiveReason}

@@ -1,4 +1,5 @@
 'use client'
+import { ListPageStats } from '@/components/templates/list-page'
 import { ValueBarChart } from '@/components/shared/charts'
 import { useEffect, useState } from 'react'
 import { Download, Eye, ListOrdered, MousePointerClick, Percent, SlidersHorizontal } from 'lucide-react'
@@ -145,7 +146,7 @@ export default function SearchConsoleV8() {
         <SetupCard setup={setup} denied={denied} />
       </div>
       : <>
-        <KpiBand>
+        <ListPageStats><KpiBand>
           {metrics.map((item) => {
             const value = data.summary[item.key] * (item.key === 'ctr' ? 100 : 1)
             const previous = data.previousSummary[item.key] * (item.key === 'ctr' ? 100 : 1)
@@ -153,7 +154,7 @@ export default function SearchConsoleV8() {
             const detail = item.key === 'clicks' || item.key === 'impressions' ? `前の${data.rangeDays}日より ${difference >= 0 ? '+' : ''}${formatNumber(difference)}` : item.help
             return <KpiCard key={item.key} presentation="band" title={item.label} icon={<item.icon size={16} aria-hidden="true" />} value={Math.round(value * 10) / 10} unit={item.unit} detail={detail} />
           })}
-        </KpiBand>
+        </KpiBand></ListPageStats>
         <div className={styles.body} data-gap="tab">
           <div className={styles.controls} data-gap="narrow">
             <div className={styles.property}><Field label="対象プロパティ"><SaveErrorField names={["siteUrl","data.siteUrl","site_url","data.site_url"]}><TextField id="search-property" readOnly value={data.siteUrl} title={data.siteUrl} /></SaveErrorField></Field></div>

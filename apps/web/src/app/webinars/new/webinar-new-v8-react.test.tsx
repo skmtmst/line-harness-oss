@@ -68,6 +68,8 @@ test('v8 では j7PP04 の作る画面（5段の帯・開催形式・見え方�
   expect(board?.textContent).toContain('ウェビナーを作る')
   expect(board?.textContent).toContain('基本設定')
   expect(board?.textContent).toContain('オンデマンド配信')
+  expect(board?.querySelector('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBe(board)
+  expect(board?.querySelector('[data-template-region="content"]')?.textContent).toContain('オンデマンド配信')
   expect(board?.textContent).toContain('日時指定配信')
   expect(board?.querySelector('[data-template-region="preview"]')?.textContent).toContain('▶ 申込はこちら')
   expect(board?.textContent).toContain('動画の設定へ')

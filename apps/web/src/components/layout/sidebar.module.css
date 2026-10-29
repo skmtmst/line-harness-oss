@@ -5,10 +5,9 @@
   padding: 0 12px 8px;
 }
 
-/* 送られているとき、端で途中まで出ている項目は丸ごと隠す（帯の線で半分に切れて見せない）。 */
+/* 送られているとき、下の端で途中まで出ている項目は丸ごと隠す（設定の線で半分に切れて見せない）。 */
 .nav[data-clipped] {
   mask-image: linear-gradient(to bottom,
-    transparent var(--nav-cut-top, 0px), var(--tpl-sidebar-mask-color) var(--nav-cut-top, 0px),
     var(--tpl-sidebar-mask-color) calc(100% - var(--nav-cut-bottom, 0px)), transparent calc(100% - var(--nav-cut-bottom, 0px)));
 }
 
@@ -218,6 +217,21 @@
   flex-shrink: 0;
 }
 
+/*
+ * 会社名の塊は中身の高さだけにし、その下の余白は流れる側（.nav）が持つ。
+ * 流れる領域の上の端＝会社名の塊の下の端なので、項目は会社名の真下で潜る。
+ * 上の端はマスクせず、会社名の下から項目が自然に続く。流した時だけ線を出す。
+ * 線の分の 1px は最初から透明で取っておき、流しても項目の位置を動かさない。
+ */
+:root .nav {
+  border-top: 1px solid transparent;
+  padding-top: 6px;
+}
+
+:root .nav[data-scrolled] {
+  border-top-color: var(--color-hairline);
+}
+
 /* 1152 の絵（35 枚）は開いたまま 240。狭い幅でも 216 に詰めない（2026-10-06 司令塔、絵が正本）。 */
 
 :root .identityRule {
@@ -348,6 +362,29 @@
 /* 畳んでいる組は右を向く（開いているときは下向き）。 */
 .sectionChevronClosed {
   transform: rotate(-90deg);
+}
+
+/*
+ * 開いている組の「⌄」は、見出しにマウスを乗せた時と焦点の時だけ出す。
+ * 畳んだ組の「›」は出したまま。場所は取ったままにして、出し入れで見出しの文字を動かさない。
+ * 触れない端末では常に出す。
+ */
+@media (hover: hover) {
+  .sectionChevron:not(.sectionChevronClosed) {
+    opacity: 0;
+    transition: opacity var(--motion-fast) var(--motion-ease-out), transform var(--motion-fast) var(--motion-ease-out);
+  }
+
+  .sectionToggle:hover .sectionChevron,
+  .sectionToggle:focus-visible .sectionChevron {
+    opacity: 1;
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: reduce) {
+  .sectionChevron:not(.sectionChevronClosed) {
+    transition: none;
+  }
 }
 
 /*

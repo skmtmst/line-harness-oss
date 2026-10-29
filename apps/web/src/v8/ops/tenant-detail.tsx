@@ -17,7 +17,6 @@ import StatusBadge from '@/components/shared/status-badge'
 import TargetMissing from '@/components/shared/target-missing'
 import { Tabs } from '@/components/shared/tabs'
 import { TextField } from '@/components/shared/text-field'
-import Toggle from '@/components/shared/toggle'
 import { formatNumber, formatDate as polishFormatDate } from '@/lib/format'
 import { OpsHead } from './shell'
 import { PageFrame } from '@/components/templates/page-frame'
@@ -40,8 +39,8 @@ import TenantOverviewStats from './tenant-overview-stats'
  * 運営の契約先の詳細 V8（絵の停止の窓 ）。
  *
  * 動きは 管理画面（app/ops/tenants/detail）と同じ口：`?id=` で /api/ops/tenants/:id を読む。
- * 代理ログイン（閲覧のみ・確認つき）・停止・アーカイブ・再開（名前と理由の確認つき）・
- * 飲食店機能の入り切り。閲覧のみの運営メンバーには、状態を変えるボタンとスイッチを出さない。
+ * 代理ログイン（閲覧のみ・確認つき）・停止・アーカイブ・再開（名前と理由の確認つき）。
+ * 閲覧のみの運営メンバーには、状態を変えるボタンを出さない。
  */
 
 const TABS = [
@@ -102,18 +101,6 @@ function DetailContent() {
     window.location.assign('/hq')
   }
 
-  const toggleRestaurantFeature = async (next: boolean) => {
-    if (!detail || busy) return
-    const current = detail.tenant.featurePacks
-    const featurePacks = next ? [...new Set([...current, 'restaurant'])] : current.filter((pack) => pack !== 'restaurant')
-    setBusy(true)
-    const res = await opsCall(api.ops.setTenantFeaturePacks(detail.tenant.id, featurePacks))
-    setBusy(false)
-    if (!res.success) { setError(res.error || '機能パックを変更できませんでした。時間をおいて、もう一度お試しください。'); return }
-    setError('')
-    await load()
-  }
-
   const environment = opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)
 
   if (!id) {
@@ -139,7 +126,6 @@ function DetailContent() {
 
   const { tenant, accounts, members, audit } = detail
   const owner = members.find((m) => m.role === 'owner' && m.email) ?? members.find((m) => m.email)
-  const restaurant = tenant.featurePacks.includes('restaurant')
   const billing = tenant.plan_status === 'trialing' && tenant.trial_ends_at
     ? `トライアル（${formatDate(tenant.trial_ends_at)} まで）`
     : `${PLAN_STATUS_LABEL[tenant.plan_status] ?? tenant.plan_status}${tenant.current_period_ends_at ? `・次回 ${formatDate(tenant.current_period_ends_at)}` : ''}`
@@ -191,15 +177,6 @@ function DetailContent() {
                 <Kv k="プラン" v={planLabel(tenant.plan_key)} />
                 <Kv k="請求" v={<span title={`次回の請求日 ${formatDate(tenant.current_period_ends_at)}・トライアル ${tenant.trial_ends_at ? `${formatDate(tenant.trial_ends_at)} まで` : emptyValue('none')}`}>{billing}</span>} />
                 <Kv k="使用量" v={`店舗 ${accounts.filter((a) => !a.archived_at).length}・権限者 ${members.filter((m) => m.is_active).length}・請求の詳細は Stripe`} />
-                <Kv
-                  k="飲食店機能"
-                  v={readOnly ? (restaurant ? '使う' : '使わない') : (
-                    <span className={styles.toggleRow}>
-                      <span>{restaurant ? '使う' : '使わない'}</span>
-                      <SaveErrorField names={["restaurant"]}><Toggle checked={restaurant} label={`飲食店機能を${restaurant ? 'オフ' : 'オン'}にする`} onChange={(next) => void toggleRestaurantFeature(next)} /></SaveErrorField>
-                    </span>
-                  )}
-                />
               </dl>
             </Card>
           ]}</DashboardColumns>

@@ -24,6 +24,7 @@ import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { formatListDate,formatVarValue } from './list-model'
 import styles from './list.module.css'
 import { blockedReason,canDelete as canDeleteVar,checkedAtText,consequenceText,placeholderText,reasonRequirement,splitItems,typedKeyRequirement,unavailableText,usageText } from './model'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 type RenderCommonVarDialogsContext = {
   activeIndex: number
@@ -139,7 +140,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
             ) : null}
             <Field label={<><span className={styles.dialogLabel}>
                 {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
-              </span></>} requirement={reasonRequirement} error={statusError && reasonRequirement.check(statusReason)}><SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
+              </span></>} requirement={reasonRequirement} error={statusError && reasonRequirement.check(statusReason)}><SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><SharedTextField
                 value={statusReason}
                 onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
                 placeholder={statusAction === 'stop' ? 'キャンペーンが終わったため' : '新しい期間の案内を始めるため'}
@@ -178,7 +179,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
             {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
             {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
               /* 必須は欄の中の文（理由（必須…））と aria-required で伝え、下の帯を1行に保つ（帯の高さ）。 */
-              <span><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+              <span><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><SharedTextField
                 aria-required={reasonRequirement.required}
                 value={deleteReason}
                 onChange={(e) => setDeleteReason(e.target.value)}
@@ -375,7 +376,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                   <p className={styles.dialogHint}>{unavailableText(deleteImpact)}</p>
                 ) : null}
 
-                <Field label={deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'} requirement={reasonRequirement} error={deleteError && reasonRequirement.check(deleteReason)}><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><input
+                <Field label={deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'} requirement={reasonRequirement} error={deleteError && reasonRequirement.check(deleteReason)}><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><SharedTextField
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
                     placeholder="店舗情報の変更のため"
@@ -383,7 +384,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                   /></SaveErrorField></Field>
 
                 {deleteImpact.canDelete ? (
-                  <Field label="削除する場合は、差し込みキーを入力してください" requirement={typedKeyRequirement(deleteImpact)}><SaveErrorField names={["typedKey","typed_key"]}><input
+                  <Field label="削除する場合は、差し込みキーを入力してください" requirement={typedKeyRequirement(deleteImpact)}><SaveErrorField names={["typedKey","typed_key"]}><SharedTextField
                       value={typedKey}
                       onChange={(e) => setTypedKey(e.target.value)}
                       placeholder={placeholderText(deleteImpact.variable.varKey)}
@@ -426,7 +427,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
           setDeleteTargets([])
         }}
       >
-        <Field label="消した理由" requirement={reasonRequirement}><SaveErrorField names={["batchReason","batch_reason"]}><input
+        <Field label="消した理由" requirement={reasonRequirement}><SaveErrorField names={["batchReason","batch_reason"]}><SharedTextField
             value={batchReason}
             onChange={(e) => setBatchReason(e.target.value)}
             placeholder="店舗情報の変更のため"
@@ -518,7 +519,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                   {statusAction === 'stop' ? '止める理由（記録に残ります）' : '再開する理由（記録に残ります）'}
                 </p>
                 <div className={styles.panelBody}>
-                  <SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><input
+                  <SaveErrorField names={["statusReason","statusError","changeReason","status_reason","status_error"]}><SharedTextField
                     value={statusReason}
                     onChange={(e) => { setStatusError(''); setStatusReason(e.target.value) }}
                     placeholder={statusAction === 'stop' ? 'キャンペーンが終わったため' : '新しい期間の案内を始めるため'}

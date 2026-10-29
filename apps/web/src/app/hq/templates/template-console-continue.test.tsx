@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * R561: HQタグひな形の「保存して続けて作る」は、保存後に空の新規入力画面へ
@@ -58,13 +59,13 @@ it('下書きの保存後に新しく作ると、保存済みを残して空の�
   render(<><TemplateConsole type="tag" /><ToastHost /></>)
   fireEvent.click((await screen.findAllByRole('button', { name: 'タグを作る', exact: true }))[0])
   fireEvent.change(await screen.findByPlaceholderText("例：定期購入者"), { target: { value: '一つ目' } })
-  fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true }))
+  fireEvent.click(getPageAction({ name: '下書きを保存', exact: true }))
   await screen.findByText('ひな形を保存しました。')
   expect(calls.create).toHaveBeenCalledTimes(1)
   fireEvent.click(screen.getAllByRole('button', { name: 'タグを作る', exact: true })[0])
   expect((await screen.findByPlaceholderText("例：定期購入者") as HTMLInputElement).value).toBe('')
   fireEvent.change(screen.getByPlaceholderText("例：定期購入者"), { target: { value: '二つ目' } })
-  fireEvent.click(screen.getByRole('button', { name: '下書きを保存', exact: true }))
+  fireEvent.click(getPageAction({ name: '下書きを保存', exact: true }))
   await waitFor(() => expect(calls.create).toHaveBeenCalledTimes(2))
   await screen.findByText('一つ目')
   expect(screen.getByText('二つ目')).toBeTruthy()

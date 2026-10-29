@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import { hqRichMenuDefinitionFromSeed,type HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
 import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
@@ -29,7 +30,7 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(() => { throw new Error('統括から店舗のAPIを呼んではいけません') }))
 })
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); document.documentElement.removeAttribute('data-theme') })
-const click = (name: string) => fireEvent.click(screen.getByRole('button', { name, exact: true }))
+const click = (name: string) => fireEvent.click(getPageAction({ name, exact: true }))
 const start = async (count = 'なし') => {
   render(<RichMenuCreateV8 host={host} />)
   fireEvent.change(screen.getByLabelText('メニュー名（友だちには見えません）'), { target: { value: '統括メニュー' } })
@@ -106,7 +107,7 @@ describe('統括リッチメニューのオーナー指摘の回帰', () => {
     await start()
     expect(screen.getAllByRole('button', { name: /^面 [A-F]、動きは/ })).toHaveLength(6)
     selectArea('A'); pickIntent('URLを開く')
-    fireEvent.change(screen.getByPlaceholderText('https://...'), { target: { value: 'https://example.com/booking' } })
+    fireEvent.change(screen.getByPlaceholderText('例：https://...'), { target: { value: 'https://example.com/booking' } })
     selectArea('B'); pickIntent('テキストを送る')
     fireEvent.change(screen.getByLabelText('このボタンの送る文'), { target: { value: '予約を確認する' } })
     await save()

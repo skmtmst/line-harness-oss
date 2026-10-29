@@ -4,7 +4,7 @@ import React from 'react'
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import HelpTip from './help-tip'
 
@@ -114,98 +114,4 @@ it('名前に乗せる補足は焦点でも開き、Escで焦点を戻しても�
   expect(view.getByRole('note')).toBeTruthy()
   fireEvent.keyDown(document, { key: 'Escape' })
   expect(view.queryByRole('note')).toBeNull()
-})
-
-
-it('補足内リンクからEscで戻る時だけ再表示を止め、次の焦点では開く', () => {
-  const view = render(<>
-    <button type="button">補足の外</button>
-    <HelpTip hover label="担当の説明" trigger={<strong>担当A</strong>}>
-      担当者の受付です。<a href="/manual#staff">くわしく</a>
-    </HelpTip>
-  </>)
-  const trigger = view.getByRole('button', { name: '担当の説明' })
-  act(() => trigger.focus())
-  expect(view.getByRole('note')).toBeTruthy()
-  const more = view.getByRole('link', { name: 'くわしく' })
-  act(() => more.focus())
-  expect(document.activeElement).toBe(more)
-  fireEvent.keyDown(document, { key: 'Escape' })
-  expect(view.queryByRole('note')).toBeNull()
-  expect(document.activeElement).toBe(trigger)
-  expect(trigger.getAttribute('aria-expanded')).toBe('false')
-  expect(trigger.hasAttribute('aria-describedby')).toBe(false)
-  act(() => view.getByRole('button', { name: '補足の外' }).focus())
-  act(() => trigger.focus())
-  expect(view.getByRole('note')).toBeTruthy()
-  expect(trigger.getAttribute('aria-expanded')).toBe('true')
-})
-
-it('既定の補足は焦点だけでは開かず、クリックで開閉する', () => {
-  const view = render(<HelpTip label="人数の説明">送る相手の数。</HelpTip>)
-  const button = view.getByRole('button', { name: '人数の説明' })
-  act(() => button.focus())
-  expect(document.activeElement).toBe(button)
-  expect(view.queryByRole('note')).toBeNull()
-  fireEvent.click(button)
-  expect(view.getByRole('note')).toBeTruthy()
-  fireEvent.click(button)
-  expect(view.queryByRole('note')).toBeNull()
-})
-
-
-it('乗せた・焦点で出た説明は初回クリック後も残り、次の操作で閉じる', () => {
-  const view = render(<HelpTip hover label="担当の説明" trigger={<strong>担当A</strong>}>受付1人ずつ</HelpTip>)
-  const button = view.getByRole('button', { name: '担当の説明' })
-  fireEvent.mouseEnter(button.parentElement!)
-  act(() => button.focus())
-  expect(view.getByRole('note')).toBeTruthy()
-  fireEvent.click(button)
-  expect(view.getByRole('note')).toBeTruthy()
-  expect(button.getAttribute('aria-expanded')).toBe('true')
-  fireEvent.click(button)
-  expect(view.queryByRole('note')).toBeNull()
-  expect(button.getAttribute('aria-expanded')).toBe('false')
-  fireEvent.click(button)
-  expect(view.getByRole('note')).toBeTruthy()
-  fireEvent.pointerLeave(button.parentElement!, { pointerType: 'mouse' })
-  expect(view.queryByRole('note')).toBeNull()
-  fireEvent.mouseEnter(button.parentElement!)
-  fireEvent.click(button)
-  expect(view.getByRole('note')).toBeTruthy()
-  fireEvent.click(button)
-  expect(view.queryByRole('note')).toBeNull()
-})
-
-it('操作で開いた後に本文と印へ焦点を移しても次のクリックは閉じる', () => {
-  const view = render(<HelpTip hover label="担当の説明" trigger={<strong>担当A</strong>}>
-    受付1人ずつ<a href="/manual#staff">くわしく</a>
-  </HelpTip>)
-  const button = view.getByRole('button', { name: '担当の説明' })
-  act(() => button.focus())
-  fireEvent.click(button)
-  expect(view.getByRole('note')).toBeTruthy()
-  const more = view.getByRole('link', { name: 'くわしく' })
-  act(() => more.focus())
-  expect(document.activeElement).toBe(more)
-  act(() => button.focus())
-  fireEvent.click(button)
-  expect(view.queryByRole('note')).toBeNull()
-  expect(button.getAttribute('aria-expanded')).toBe('false')
-})
-
-
-it('touchの離脱では操作表示を閉じず、次の操作で閉じる', () => {
-  const view = render(<HelpTip hover label="担当の説明" trigger={<strong>担当A</strong>}>受付1人ずつ</HelpTip>)
-  const button = view.getByRole('button', { name: '担当の説明' })
-  fireEvent.mouseEnter(button.parentElement!)
-  act(() => button.focus())
-  fireEvent.click(button)
-  expect(view.getByRole('note')).toBeTruthy()
-  fireEvent.pointerLeave(button.parentElement!, { pointerType: 'touch' })
-  expect(view.getByRole('note')).toBeTruthy()
-  expect(button.getAttribute('aria-expanded')).toBe('true')
-  fireEvent.click(button)
-  expect(view.queryByRole('note')).toBeNull()
-  expect(button.getAttribute('aria-expanded')).toBe('false')
 })

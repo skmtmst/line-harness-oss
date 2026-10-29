@@ -11,6 +11,7 @@
 import { useState, type ReactNode } from 'react'
 import type { Folder } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { lockReason } from './permission-lock'
 import ConfirmDialog from './confirm-dialog'
 import FolderAddDialog from './folder-add-dialog'
 import { describeFolderFailure } from './folder-failure'
@@ -23,8 +24,10 @@ export interface FolderRowActionsOptions {
   kind: string
   folders: Folder[]
   accountId?: string | null
-  /** 変えてよい人だけ true。false のときは「…」を出さない（閲覧のみには押せない口を置かない）。 */
+  /** 変えてよい人だけtrue。falseでも操作を残し、実行は拒否する。 */
   enabled: boolean
+  /** nullは権限未確定などで理由をまだ表示しない。拒否そのものは維持する。 */
+  lockedReason?: string | null
   /** 確認の窓の言葉に使う中身の呼び名（例：リッチメニュー）。 */
   itemLabel: string
   /** フォルダの中の件数。数えていないときは null（言葉から件数を外す）。 */
@@ -42,9 +45,9 @@ export function deleteFolderDescription(itemLabel: string, count: number | null 
 }
 
 export function useFolderRowActions({
-  kind, folders, accountId, enabled, itemLabel, countOf, onChanged, onDeleted, placeholder,
+  kind, folders, accountId, enabled, lockedReason, itemLabel, countOf, onChanged, onDeleted, placeholder,
 }: FolderRowActionsOptions): {
-  rowActions: (folder: Folder, index: number) => Pick<FolderPanelRow, 'onEdit' | 'onMoveUp' | 'onMoveDown' | 'onDelete'>
+  rowActions: (folder: Folder, index: number) => Pick<FolderPanelRow, 'onEdit' | 'onMoveUp' | 'onMoveDown' | 'onDelete' | 'lockedReason' | 'actionsDisabled'>
   dialogs: ReactNode
 } {
   const [editing, setEditing] = useState<Folder | null>(null)
@@ -57,7 +60,7 @@ export function useFolderRowActions({
   const move = async (index: number, direction: -1 | 1) => {
     const target = folders[index]
     const neighbor = folders[index + direction]
-    if (!target || !neighbor || busy) return
+    if (!enabled || lockReason(enabled) || !target || !neighbor || busy) return
     setBusy(true)
     try {
       await api.folders.swapOrder(target.id, neighbor.id, accountId ?? undefined)
@@ -70,7 +73,7 @@ export function useFolderRowActions({
   }
 
   const remove = async () => {
-    if (!deleting || busy) return
+    if (!enabled || lockReason(enabled) || !deleting || busy) return
     setBusy(true)
     setError('')
     try {
@@ -96,14 +99,16 @@ export function useFolderRowActions({
     }
   }
 
-  const rowActions = (folder: Folder, index: number) => (enabled ? {
-    onEdit: () => setEditing(folder),
+  const rowActions = (folder: Folder, index: number) => ({
+    lockedReason: lockedReason === undefined ? lockReason(enabled) : lockedReason ?? undefined,
+    actionsDisabled: !enabled || Boolean(lockReason(enabled)),
+    onEdit: () => { if (enabled && !lockReason(enabled)) setEditing(folder) },
     onMoveUp: index > 0 ? () => void move(index, -1) : undefined,
     onMoveDown: index < folders.length - 1 ? () => void move(index, 1) : undefined,
-    onDelete: () => { setError(''); setDeletingCount(countOf?.(folder.id) ?? null); setDeleting(folder) },
-  } : {})
+    onDelete: () => { if (!enabled || lockReason(enabled)) return; setError(''); setDeletingCount(countOf?.(folder.id) ?? null); setDeleting(folder) },
+  })
 
-  const dialogs = (
+  const dialogs = enabled && !lockReason(enabled) ? (
     <>
       {editing ? (
         <FolderAddDialog
@@ -130,7 +135,7 @@ export function useFolderRowActions({
         onConfirm={() => void remove()}
       />
     </>
-  )
+  ) : null
 
   return { rowActions, dialogs }
 }

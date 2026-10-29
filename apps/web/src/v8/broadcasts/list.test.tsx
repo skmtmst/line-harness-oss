@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 一斉配信一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
  * 行が出る・言葉で絞れる・札と並びが口へ渡る・閲覧のみは帯が出て作れない。
@@ -19,7 +20,7 @@ vi.mock('@/components/broadcasts/broadcast-form', () => {
 })
 const listBroadcasts = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
-const createView = vi.hoisted(() => vi.fn(async () => ({ success: true, data: { id: 'new-view', name: '古い配信', filters: {} } })))
+const createView = vi.hoisted(() => vi.fn(async (_accountId: string, input: Record<string, unknown>) => ({ success: true, data: { id: 'new-view', ...input } })))
 const listViews = vi.hoisted(() => vi.fn())
 const deleteBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
 const updateBroadcast = vi.hoisted(() => vi.fn(async () => ({ success: true, data: null })))
@@ -120,7 +121,7 @@ beforeEach(() => {
   updateBroadcast.mockClear()
   forgetStaffIdentity()
   document.documentElement.dataset.theme = 'v8'
-  role.current = 'owner'
+  role.current = verifiedStaffRole('owner')
   store.clear()
   /* 広い板（1440）のふり。happy-dom は狭い板扱いになる。 */
   Object.defineProperty(window, 'matchMedia', {
@@ -226,6 +227,8 @@ describe('V8 一斉配信一覧の結果の列', () => {
     expect(heads).not.toContain('クリック')
     expect(sent.textContent).toContain('624 人')
     expect(sent.textContent).toContain('開封 71.2%・クリック 15.4%')
+    const resultCell = [...sent.querySelectorAll('td')].find((cell) => cell.textContent?.includes('開封 71.2%・クリック 15.4%'))
+    expect(resultCell?.getAttribute('data-align')).toBe('right')
     expect(unsent.textContent).not.toMatch(/0\s*人/)
   })
 })
@@ -319,7 +322,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
   })
 
   it('編集キーの無い運用担当は閲覧のみの帯が出て、作る・保存・フォルダ追加のボタンを置かない', async () => {
-    role.current = 'staff'
+    role.current = verifiedStaffRole('staff')
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
     expect(host.textContent).toContain('閲覧のみで見ています')
@@ -335,7 +338,7 @@ describe('V8 一斉配信一覧（src/v8）の動き', () => {
   })
 
   it('編集キーを持つ運用担当は作れる', async () => {
-    role.current = 'staff'
+    role.current = verifiedStaffRole('staff')
     rememberStaffIdentity({ role: 'staff', permissionKeys: ['/broadcasts', 'broadcast.definition.edit'] } as StaffMember)
     act(() => { root.render(<BroadcastListV8 />) })
     await flush()
@@ -700,3 +703,131 @@ it('行が消える途中で別の絞り込みを選んでも、古い条件を�
     expect(listBroadcasts).toHaveBeenCalledTimes(reads)
   } finally { vi.useRealTimers() }
 })
+
+afterEach(() => { verifiedStaffRole(null) })
+
+describe('読込骨格の表示時間と完了への切替', () => {
+  it.each(['ready', 'error'])('遅い応答から%sへ進むとき表示後400msを保つ', async (outcome) => {
+    vi.useFakeTimers()
+    let complete!: (value: unknown) => void
+    listBroadcasts.mockImplementation(() => new Promise(resolve => { complete = resolve }))
+    const shownBones = () => [...host.querySelectorAll('[aria-busy="true"] [data-skeleton]')]
+      .filter(bone => !bone.closest('[data-skeleton-reserve]'))
+    try {
+      act(() => { root.render(<BroadcastListV8 />) })
+      await flush()
+      await act(async () => { await vi.advanceTimersByTimeAsync(299) })
+      expect(shownBones()).toHaveLength(0)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+      expect(shownBones().length).toBeGreaterThan(0)
+      const table = host.querySelector('[aria-busy="true"] table')!
+      expect(table.querySelector('tbody tr')?.children.length).toBe(table.querySelectorAll('thead th').length)
+      await act(async () => { await vi.advanceTimersByTimeAsync(50) })
+      await act(async () => { complete(outcome === 'ready'
+        ? { success: true, data: [base] }
+        : { success: false, error: '画面確認用の読込失敗' }) })
+      await flush()
+      expect(shownBones().length).toBeGreaterThan(0)
+      expect(host.querySelector('[data-row-id]')).toBeNull()
+      await act(async () => { await vi.advanceTimersByTimeAsync(349) })
+      expect(shownBones().length).toBeGreaterThan(0)
+      await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+      expect(shownBones()).toHaveLength(0)
+      if (outcome === 'ready') expect(host.querySelector('[data-row-id]')).toBeTruthy()
+      else expect(host.textContent).toContain('読み込めませんでした')
+    } finally { vi.useRealTimers() }
+  })
+
+  it('300ms以内の応答は骨格を見せず行へ切り替える', async () => {
+    vi.useFakeTimers()
+    let complete!: (value: unknown) => void
+    listBroadcasts.mockImplementation(() => new Promise(resolve => { complete = resolve }))
+    try {
+      act(() => { root.render(<BroadcastListV8 />) }); await flush()
+      await act(async () => { await vi.advanceTimersByTimeAsync(250); complete({ success: true, data: [base] }) })
+      await flush()
+      expect(host.querySelector('[data-row-id]')).toBeTruthy()
+      expect(host.querySelector('[aria-busy="true"] [data-skeleton]')).toBeNull()
+      await act(async () => { await vi.advanceTimersByTimeAsync(500) })
+      expect(host.querySelector('[aria-busy="true"] [data-skeleton]')).toBeNull()
+    } finally { vi.useRealTimers() }
+  })
+})
+
+describe('R4 受け付けた数と届いた数を分ける', () => {
+  /* 集計の無い送信済み。口の getInsight は失敗のふりなので受け付け数が残る。 */
+  const acceptedRow = { ...base, id: 'bc-9', title: '集計まちのお知らせ', status: 'sent', displayStatus: 'sent', displayStatusLabel: '送信済み', scheduledAt: null, sentAt: '2026-08-20T03:00:00.000Z', successCount: 937, insightSummary: null }
+  const renderAccepted = async () => {
+    narrow.value = false
+    listBroadcasts.mockImplementation(async () => ({
+      success: true, data: [acceptedRow], kpis: { scheduled: 1, thisMonth: 1, delivered: 1842, openRate: null, drafts: 0 },
+      statusCounts: { all: 1, sent: 1 }, pagination: { total: 1, limit: 20, cursor: 0, nextCursor: null },
+    }))
+    act(() => { root.render(<BroadcastListV8 />) })
+    await flush()
+    return [...host.querySelectorAll('tbody tr')].find((tr) => tr.textContent?.includes('集計まちのお知らせ')) as HTMLTableRowElement
+  }
+
+  it('数の帯の今月の配信は受け付けの言葉で出し、届いたと言わない', async () => {
+    await renderAccepted()
+    expect(host.textContent).toContain('LINEが受け付けました：1,842人')
+    expect(host.textContent).not.toContain('1,842人に届いた')
+  })
+
+  it('集計の無い送信済みの行は受け付けの言葉で数を出す', async () => {
+    const row = await renderAccepted()
+    const right = [...row.querySelectorAll('td[data-align="right"]')].map((td) => td.textContent?.trim())
+    expect(right[0]).toBe('LINEが受け付けました：937人')
+  })
+
+  it('集計の無い送信済みの詳細パネルは受け付けの言葉で出す', async () => {
+    const row = await renderAccepted()
+    act(() => { fireEvent.click(row) })
+    await flush()
+    const panel = document.body.querySelector('[data-design-part="detail-panel"]') as HTMLElement
+    expect(panel.textContent).toContain('LINEが受け付けました：937人')
+    expect(panel.textContent).not.toContain('人に届いた')
+  })
+})
+it('2ページ目で削除して1ページになると1ページ目に戻って行を出す', async () => {
+  resetUrl()
+  let rows = Array.from({ length: 21 }, (_, i) => ({ ...rowB, id: `pg-${i}`, title: `通常${i}` }))
+  listBroadcasts.mockImplementation(async (params) => {
+    const cursor = Number(params.cursor ?? 0)
+    const limit = params.limit ?? 20
+    return { success: true, data: rows.slice(cursor, cursor + limit), pagination: { total: rows.length, nextCursor: cursor + limit < rows.length ? String(cursor + limit) : null } }
+  })
+  deleteBroadcast.mockImplementation(async (id: string) => { rows = rows.filter((row) => row.id !== id); return { success: true, data: null } })
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  act(() => { (host.querySelector('button[aria-label="次のページ"]') as HTMLButtonElement).click() })
+  await flush()
+  expect(host.textContent).toContain('通常20')
+  const trigger = host.querySelector<HTMLButtonElement>('tr[data-row-id="pg-20"] button[aria-haspopup="menu"]')!
+  act(() => { trigger.focus(); trigger.click() })
+  const remove = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(item => item.textContent?.includes('削除する'))!
+  act(() => remove.click())
+  await flush()
+  const confirm = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(button => button.textContent === '削除する')!
+  act(() => confirm.click())
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 250)) })
+  await flush()
+  expect(host.textContent).toContain('通常0')
+  expect(host.querySelector('[data-pagination-summary]')?.textContent).toBe('20件中 1〜20件')
+}, 20_000)
+
+it('総件数が未取得のときは補正せず2ページ目の行を出す', async () => {
+  flushListUrlState()
+  window.history.replaceState(null, '', '/broadcasts?page=2')
+  const rows = Array.from({ length: 21 }, (_, i) => ({ ...rowB, id: `nt-${i}`, title: `通常${i}` }))
+  listBroadcasts.mockImplementation(async (params) => {
+    const cursor = Number(params.cursor ?? 0)
+    const limit = params.limit ?? 20
+    return { success: true, data: rows.slice(cursor, cursor + limit), pagination: { nextCursor: null } }
+  })
+  act(() => { root.render(<BroadcastListV8 />) })
+  await flush()
+  expect(host.textContent).toContain('通常20')
+  flushListUrlState()
+  expect(window.location.search).toContain('page=2')
+}, 20_000)

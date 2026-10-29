@@ -45,6 +45,7 @@ test('ページだけから数えたと書き、メールで送ったは数え�
   render(<RunsTab lineAccountId="acc" mode="failures" />)
   await waitFor(() => expect(screen.getByText(/このページの2件から・対応不要/)).toBeTruthy())
   expect(screen.queryByText('この7日')).toBeNull()
+  expect(screen.getByText('57件中 1〜20件')).toBeTruthy()
   expect(screen.getAllByTitle('田中')).toHaveLength(2)
   expect(screen.getAllByTitle('顧客・A-1')).toHaveLength(2)
   expect(screen.getAllByTitle('1回・—')).toHaveLength(2)
@@ -52,6 +53,15 @@ test('ページだけから数えたと書き、メールで送ったは数え�
   const blocked = screen.getByText('ブロック').closest('[data-kpi-presentation]')
   expect(blocked).not.toBeNull()
   expect(blocked!.querySelector('svg.lucide-user-x')).not.toBeNull()
+})
+
+test('ページ内で絞り込んでも全体の件数と検索範囲の案内を保つ', async () => {
+  render(<RunsTab lineAccountId="acc" mode="failures" />)
+  await screen.findByText('57件中 1〜20件')
+  fireEvent.change(screen.getByRole('searchbox', { name: 'お客様の名前・注文番号で探す' }), { target: { value: '存在しない通知' } })
+  expect(await screen.findByText('条件に合う記録はありません')).toBeTruthy()
+  expect(screen.getByText('57件中 1〜20件')).toBeTruthy()
+  expect(screen.getByText('個人の既読は見られません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。')).toBeTruthy()
 })
 
 test.each([

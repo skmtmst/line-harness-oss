@@ -27,6 +27,8 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   return { ...actual, api: { ...actual.api, folders: { ...actual.api.folders, list, delete: remove, swapOrder: swap } } }
 })
 
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import ManagedFolderPanel, { useManagedFolders, type ManagedFolderControl } from './managed-folder-panel'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -68,6 +70,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount())
+  forgetStaffIdentity()
   host.remove()
   delete document.documentElement.dataset.theme
 })
@@ -135,11 +138,24 @@ describe('一覧の左のフォルダの列（共通）', () => {
     expect(swap).toHaveBeenCalledWith('f-2', 'f-1', 'acc-1')
   })
 
-  it('閲覧のみには「フォルダを追加」と「…」を出さない（行の選択と注は残す）', async () => {
+  it('閲覧のみも操作を残し、行の選択を保ったまま追加・変更・削除を起動しない', async () => {
+    verifiedStaffRole('viewer')
     await act(async () => { root.render(<Screen kind="scenario" canManage={false} />) })
     expect(rowLabels()).toEqual(['すべて', 'キャンペーン', '会員', '未分類'])
-    expect(host.textContent).not.toContain('フォルダを追加')
-    expect(menuButton('キャンペーン')).toBeNull()
+    const add = buttonByText('フォルダを追加')
+    expect(add?.getAttribute('aria-disabled')).toBe('true')
+    await click(add)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    await click(menuButton('キャンペーン'))
+    const items = [...document.querySelectorAll('[role="menuitem"]')]
+    expect(items.length).toBeGreaterThan(0)
+    for (const item of items) {
+      expect(item.getAttribute('aria-disabled')).toBe('true')
+      await click(item)
+    }
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(remove).not.toHaveBeenCalled()
+    expect(swap).not.toHaveBeenCalled()
   })
 
   it('kind が null（API が無い一覧）は「すべて」だけ。追加・「…」・未分類・注を出さず、読みにも行かない', async () => {

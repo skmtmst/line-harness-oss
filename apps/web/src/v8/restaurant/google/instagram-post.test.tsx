@@ -24,6 +24,9 @@ const fixture = vi.hoisted(() => ({
   savePost: vi.fn(),
   publishPost: vi.fn(),
   igConnection: vi.fn(),
+  mediaList: vi.fn(),
+  mediaDownload: vi.fn(),
+  mediaReadContent: vi.fn(),
 }))
 
 vi.mock('@/lib/restaurant-google-api', () => ({
@@ -41,7 +44,10 @@ vi.mock('@/lib/restaurant-google-api', () => ({
 }))
 
 vi.mock('@/lib/api', () => ({
-  api: { instagram: { connection: fixture.igConnection } },
+  api: {
+    instagram: { connection: fixture.igConnection },
+    media: { list: fixture.mediaList, download: fixture.mediaDownload, readContent: fixture.mediaReadContent, contentUrl: (id: string) => `https://example.test/media/${id}` },
+  },
   ApiError: class ApiError extends Error {},
 }))
 
@@ -54,7 +60,7 @@ vi.mock('next/navigation', () => ({
 const go = vi.fn()
 
 function ig(patch: Partial<GooglePostInstagram>): GooglePostInstagram {
-  return { enabled: true, caption: null, status: 'none', permalink: null, error: null, ...patch }
+  return { enabled: true, caption: null, mediaId: null, status: 'none', permalink: null, error: null, ...patch }
 }
 
 function post(id: string, patch: Partial<GooglePost>): GooglePost {
@@ -103,7 +109,15 @@ function connection(state: InstagramConnectionStatus['state']) {
 afterEach(() => {
   cleanup()
   vi.resetAllMocks()
+  vi.unstubAllGlobals()
 })
+
+const registeredImage = {
+  id: 'media-1', lineAccountId: 'acc-1', folderId: null, kind: 'image',
+  filename: '料理写真.jpg', mimeType: 'image/jpeg', sizeBytes: 12,
+  width: 1200, height: 900, durationMs: null, url: '', uploadedBy: null,
+  createdAt: '2026-10-29T00:00:00Z',
+}
 
 describe('投稿一覧の Instagram の札（★V8-B `HEEN9`）', () => {
   it('絵のことば3つだけを出し、送る前と未対応の投稿には札を出さない', async () => {
@@ -143,15 +157,50 @@ describe('投稿一覧の Instagram の札（★V8-B `HEEN9`）', () => {
 })
 
 describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', () => {
+  it.each(['Google', 'Instagram'] as const)('%s の登録メディアを閲覧経路で読み、切り取り確認へ進む', async (target) => {
+    fixture.igConnection.mockReturnValue(connection('connected'))
+    fixture.mediaList.mockResolvedValue({ success: true, data: { items: [registeredImage], total: 1, limit: 20, offset: 0 } })
+    fixture.mediaReadContent.mockResolvedValue(new Blob(['image'], { type: 'image/jpeg' }))
+    fixture.mediaDownload.mockRejectedValue(new Error('追加の本人確認が必要です'))
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+    const NativeURL = URL
+    vi.stubGlobal('URL', class extends NativeURL {
+      static createObjectURL() { return 'blob:test-image' }
+      static revokeObjectURL() {}
+    })
+
+    render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
+    await screen.findByRole('switch', { name: 'Instagram にも投稿する' })
+    const picks = screen.getAllByRole('button', { name: '登録メディアから選ぶ' })
+    fireEvent.click(picks[target === 'Google' ? 0 : 1])
+    await screen.findByRole('dialog', { name: `${target}用画像を登録メディアから選ぶ` })
+    fireEvent.click(await screen.findByRole('radio', { name: /料理写真.jpg/ }))
+    fireEvent.click(screen.getByRole('button', { name: '切り取り位置を確認' }))
+    await waitFor(() => expect(fixture.mediaReadContent).toHaveBeenCalledWith('media-1', 'acc-1'))
+    expect(fixture.mediaDownload).not.toHaveBeenCalled()
+    expect(await screen.findByRole('dialog', { name: `${target}用画像の切り取り位置を確認` })).toBeTruthy()
+  })
+
+  it('Google画像は投稿の詳細より前、Instagram画像はInstagram本文より後に置く', async () => {
+    fixture.igConnection.mockReturnValue(connection('connected'))
+    render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
+    const instagramImage = await screen.findByText('Instagram 用の画像')
+    const googleImage = screen.getByText('Google ビジネス用の画像')
+    const details = screen.getByText('投稿の詳細')
+    const caption = screen.getByLabelText('Instagram 用の文章（書き換えたいときだけ）')
+    expect(googleImage.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(caption.compareDocumentPosition(instagramImage) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('つないでいるときだけ出し、既定はオン。オフにすると文章の欄をたたむ', async () => {
     fixture.igConnection.mockReturnValue(connection('connected'))
 
     render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
 
-    const toggle = await screen.findByRole('checkbox', { name: 'Instagram にも投稿する' })
-    expect((toggle as HTMLInputElement).checked).toBe(true)
+    const toggle = await screen.findByRole('switch', { name: 'Instagram にも投稿する' })
+    expect((toggle.getAttribute('aria-checked') === 'true')).toBe(true)
     expect(screen.getByLabelText('Instagram 用の文章（書き換えたいときだけ）')).toBeTruthy()
-    expect(screen.getByText('Instagram には画像が 1 枚必要です。PNG の画像は自動で JPEG に変換されます。')).toBeTruthy()
+    expect(screen.getByText('Instagram 用の画像')).toBeTruthy()
 
     fireEvent.click(toggle)
     await waitFor(() => expect(screen.queryByLabelText('Instagram 用の文章（書き換えたいときだけ）')).toBeNull())
@@ -163,7 +212,9 @@ describe('投稿を作る画面の Instagram の区画（★V8-B `U1X7T2`）', (
     render(<PostEditor accountId="acc-1" kind="standard" postId={null} go={go} />)
 
     await screen.findByText('投稿を作る')
+    expect(screen.queryByRole('switch', { name: 'Instagram にも投稿する' })).toBeNull()
     expect(screen.queryByRole('checkbox', { name: 'Instagram にも投稿する' })).toBeNull()
+    expect(screen.queryByText('Instagram 用の画像')).toBeNull()
     expect(screen.queryByText(/Instagram には画像が 1 枚必要です/)).toBeNull()
   })
 })

@@ -18,7 +18,6 @@ import { useMergedTab } from '@/components/layout/merged-tabs';
 import LoginAudit from '@/components/staff/login-audit'
 import Button from '@/components/shared/button'
 import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/components/shared/grid-table';
-import Checkbox from '@/components/shared/checkbox'
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
 
@@ -27,6 +26,7 @@ import { Tabs } from '@/components/shared/tabs';
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
+import Disclosure from '@/components/shared/disclosure'
 import Notice from '@/components/shared/notice'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt';
 import NotificationSwitch from '@/components/ui/notification-switch'
@@ -63,6 +63,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { formatNumber } from '@/lib/format'
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
+import { ToggleField } from '@/components/shared/toggle'
 
 type Channel = { email: boolean; line: boolean }
 type CopyableAccessUser = AccessUserItem & { roleBundle: Exclude<AccessRoleBundle, 'custom'> }
@@ -674,7 +675,7 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
     {policy.showAccountActions && <section className={`mt-5 rounded-card border p-4 ${member.isActive ? 'border-accent bg-accent-soft' : 'border-warning bg-warning-bg'}`} aria-label="ユーザーの利用状態"><div className="flex flex-wrap items-center justify-between gap-4"><div><p className="text-sm font-semibold text-ink">ログイン状態：{member.isActive ? '有効' : '無効'}</p><p className="mt-1 text-xs leading-5 text-ink-secondary">{member.isActive ? '無効にすると、このユーザーはログインできなくなります。' : '有効にすると、このユーザーは再びログインできます。'}</p><div className="mt-2"><LoginHistoryNote count={loginCount} loading={loginHistoryLoading} failed={loginHistoryFailed} /></div></div><Button variant="primary" className={(`min-w-48 rounded-control px-4 py-2.5 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${member.isActive ? 'border border-warning bg-canvas text-warning hover:bg-warning-bg' : 'bg-accent-deep text-on-accent hover:brightness-90'}`) + ' h-auto whitespace-normal'} type="button" onClick={() => toggleActive()} disabled={statusSaving || Boolean(policy.statusBlockedReason)} busy={Boolean(statusSaving)} busyLabel="変更中…">{member.isActive ? 'このユーザーを無効にする' : 'このユーザーを有効にする'}</Button></div>{policy.statusBlockedReason && <p className="mt-3 rounded-control bg-canvas p-3 text-xs font-semibold text-warning">{policy.statusBlockedReason}</p>}</section>}
     <div className="mt-5 grid gap-4 sm:grid-cols-2">{administrator && <Field label="名前" required htmlFor="staff-edit-name" error={fieldErrors.name}><SaveErrorField names={["name"]}><TextField ref={nameRef} id="staff-edit-name" value={name} onChange={(e) => { setName(e.target.value); setFieldErrors((current) => ({ ...current, name: undefined })) }} /></SaveErrorField></Field>}<Field label="メールアドレス" required htmlFor="staff-edit-email" error={fieldErrors.email}><SaveErrorField names={["email"]}><TextField ref={emailRef} id="staff-edit-email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setFieldErrors((current) => ({ ...current, email: undefined })) }} /></SaveErrorField></Field></div>
     {administrator && <div className="mt-5"><p className="text-sm font-semibold text-ink">役割</p><div className="mt-2 grid grid-cols-3 gap-2">{(['admin', 'staff', 'viewer'] as const).map((value) => <Button variant="secondary" className={(`cursor-pointer rounded-control border px-3 py-3 text-sm ${role === value ? 'border-accent bg-accent-soft font-medium text-accent-deep' : 'border-hairline text-ink-secondary'}`) + ' h-auto whitespace-normal'} key={value} onClick={() => setRole(value)}>{ROLE_LABEL[value]}</Button>)}</div></div>}
-    {administrator && role === 'staff' && <div className="mt-5"><p className="text-sm font-semibold text-ink">スタッフに表示する機能</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{PERMISSIONS.map(([key, label]) => <SaveErrorField names={["key","permissions"]} key={key}><Checkbox key={key} checked={permissions.includes(key)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, key))}>{label}</Checkbox></SaveErrorField>)}</div><p className="mt-3 text-sm font-medium text-ink">成果の操作権限</p><p className="mt-1 text-xs text-ink-faint">選ぶと「成果とアフィリエイト」の表示も組で付きます。表示を外すと操作権限も外れます。</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><SaveErrorField names={["CONVERSION_APPROVAL_EDIT_KEY","permissions","_c_o_n_v_e_r_s_i_o_n__a_p_p_r_o_v_a_l__e_d_i_t__k_e_y"]}><Checkbox checked={permissions.includes(CONVERSION_APPROVAL_EDIT_KEY)} onCheckedChange={() => setPermissions((current) => toggleStaffPermissionKey(current, CONVERSION_APPROVAL_EDIT_KEY))} aria-label="成果を承認・却下する">{PERMISSION_LABELS[CONVERSION_APPROVAL_EDIT_KEY]}</Checkbox></SaveErrorField></div></div>}
+    {administrator && role === 'staff' && <div className="mt-5"><p className="text-sm font-semibold text-ink">スタッフに表示する機能</p><div className="mt-2 grid gap-2 sm:grid-cols-3">{PERMISSIONS.map(([key, label]) => <SaveErrorField names={["key","permissions"]} key={key}><ToggleField key={key} checked={permissions.includes(key)} onChange={() => setPermissions((current) => toggleStaffPermissionKey(current, key))}>{label}</ToggleField></SaveErrorField>)}</div><p className="mt-3 text-sm font-medium text-ink">成果の操作権限</p><p className="mt-1 text-xs text-ink-faint">選ぶと「成果とアフィリエイト」の表示も組で付きます。表示を外すと操作権限も外れます。</p><div className="mt-2 grid gap-2 sm:grid-cols-3"><SaveErrorField names={["CONVERSION_APPROVAL_EDIT_KEY","permissions","_c_o_n_v_e_r_s_i_o_n__a_p_p_r_o_v_a_l__e_d_i_t__k_e_y"]}><ToggleField checked={permissions.includes(CONVERSION_APPROVAL_EDIT_KEY)} onChange={() => setPermissions((current) => toggleStaffPermissionKey(current, CONVERSION_APPROVAL_EDIT_KEY))} aria-label="成果を承認・却下する">{PERMISSION_LABELS[CONVERSION_APPROVAL_EDIT_KEY]}</ToggleField></SaveErrorField></div></div>}
     <div className="mt-5"><p className="text-sm font-semibold text-ink">LINE連携</p><div className={`mt-2 flex items-center justify-between rounded-control border p-3 ${member.lineLinked ? 'border-accent bg-accent-soft' : 'border-hairline'}`}><div><p className={`text-sm font-semibold ${member.lineLinked ? 'text-success' : 'text-ink-secondary'}`}>{member.lineLinked ? '連携済み' : '未連携'}</p><p className="text-xs text-ink-faint">{member.lineLinked ? `LINE：${member.name}` : '招待メールからLINE認証を行います'}</p></div>{member.lineLinked && <Button variant="secondary" className="px-3 py-1.5 text-xs h-auto whitespace-normal" onClick={() => { setUnlinkError(''); setUnlinkOpen(true) }}>連携解除</Button>}</div></div>
     <div className="mt-5"><p className="text-sm font-semibold text-ink">通知設定</p><div className="mt-2 divide-y divide-hairline overflow-hidden rounded-card border border-hairline">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className={`${styles.notifyRow} items-center gap-4 p-3`}><div><p className="text-sm text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs">メール<NotificationSwitch checked={notifications[key].email} onChange={() => toggleNotification(key, 'email')} label={`${label}メール`} /></div><div className="flex items-center gap-2 text-xs">LINE<NotificationSwitch checked={notifications[key].line} onChange={() => toggleNotification(key, 'line')} label={`${label}LINE`} /></div></div>)}</div></div>
     {/* 連携はあとから張り直せる。赤は本当に戻せない操作に取っておく。 */}
@@ -828,8 +829,9 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     setSummaryReady(false)
     try {
       const scope = selectedAccountId ?? undefined
+      if (!scope) throw new Error('アカウントを選択してください')
       const [staffResult, meResult, accountsResult, usersResult, rolesResult] = await Promise.all([
-        api.staff.list(),
+        api.staff.list(scope),
         loadStaffIdentity(),
         api.lineAccounts.list(),
         api.access.users({ lineAccountId: scope, limit: 200 }),
@@ -940,7 +942,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   useEffect(() => { setUserPage(1) }, [query, statusFilter, tab])
   const activeAdministratorCount = members.filter(isActiveAdministrator).length
   const missing = Math.max(accessSummary.active - accessSummary.mfaEnabled, 0)
-  const canEdit = (member: StaffMember) => Boolean(administrator || (staffRole === 'staff' && me?.id === member.id))
+  const canEdit = (member: StaffMember) => Boolean(member.canManageInAccount !== false && (administrator || (staffRole === 'staff' && me?.id === member.id)))
   const openTwoFactor = (member: StaffMember) => { if (member.twoFactorEnabled) { setDisableError(''); setDisablingTarget(member) } else setSettingTwoFactor(member) }
   /**
    * 二段階認証を外す。
@@ -1043,7 +1045,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       candidate.id !== permissionTarget.id && candidate.roleBundle !== 'custom'
     ))
     const permissionMember = memberById.get(permissionTarget.id)
-    return <SaveErrorScope errors={saveErrors}><PermissionScopeView user={permissionTarget} memberId={permissionMember?.id ?? null} canSave={administrator} copyCandidates={copyCandidates} roleCounts={accessSummary.roleCounts} accountNames={accountNames} savedEditKeys={permissionMember?.permissionKeys ?? []} savedViewKeys={permissionMember?.permissionViewKeys ?? []} savedEmailMask={permissionMember?.emailMask ?? null} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} onConflict={handlePermissionConflict} /></SaveErrorScope>
+    return <SaveErrorScope errors={saveErrors}><PermissionScopeView user={permissionTarget} memberId={permissionMember?.id ?? null} canSave={Boolean(administrator && !permissionMember?.isAccountCreator && permissionMember?.canManageInAccount !== false)} copyCandidates={copyCandidates} roleCounts={accessSummary.roleCounts} accountNames={accountNames} savedEditKeys={permissionMember?.permissionKeys ?? []} savedViewKeys={permissionMember?.permissionViewKeys ?? []} savedEmailMask={permissionMember?.emailMask ?? null} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} onConflict={handlePermissionConflict} /></SaveErrorScope>
   }
   const viewer = me !== null && !administrator
   const nowMs = Date.now()
@@ -1051,7 +1053,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const suspendedCount = accessUsers.filter((user) => user.status === 'suspended').length
   const roleOf = (user: AccessUserItem): RoleKey => {
     const member = memberById.get(user.id)
-    if (member?.role === 'owner' || (me?.role === 'owner' && me.id === user.id)) return 'owner'
+    if (!selectedAccountId && (member?.role === 'owner' || (me?.role === 'owner' && me.id === user.id))) return 'owner'
     return user.roleBundle
   }
   /* 右の「直したあとの列」：状態ごとに1人ずつの例（二段階認証 オン・確認が必要・無効）。 */
@@ -1060,7 +1062,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     .filter((user): user is AccessUserItem => Boolean(user))
   const rowMenuItems = (user: AccessUserItem): ActionMenuItem[] => {
     const member = memberById.get(user.id)
-    const editable = member ? canEdit(member) : false
+    const editable = member ? canEdit(member) && !member.isAccountCreator : false
     const isSelf = Boolean(member && me?.id === member.id)
     const resendable = tab === 'invited' && administrator && member !== undefined && member.inviteStatus !== 'active'
     const close = () => setOpenMenuId(null)
@@ -1069,7 +1071,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     items.push({ id: 'scope', label: administrator ? '見える画面' : '見える画面を見る', onSelect: () => { close(); openPermissions(user) } })
     if (isSelf && member && editable) items.push({ id: 'two-factor', label: member.twoFactorEnabled ? '二段階認証を解除する' : '二段階認証を設定する', onSelect: () => { close(); openTwoFactor(member) } })
     if (resendable && member) items.push({ id: 'resend', label: 'もう一度送る', disabled: resendingId !== null, disabledReason: resendingId === member.id ? '送信中…' : undefined, onSelect: () => { close(); void runResend(member) } })
-    if (administrator && member && !isSelf) {
+    if (administrator && member && !isSelf && !member.isAccountCreator && member.canManageInAccount !== false) {
       const policy = staffActionPolicy({ member, currentUserId: me?.id ?? null, administrator: true, activeAdministratorCount })
       items.push(member.isActive
         ? { id: 'suspend', label: '止める', dividerBefore: true, disabled: Boolean(policy.statusBlockedReason), disabledReason: policy.statusBlockedReason ?? undefined, onSelect: () => { close(); setSuspendError(''); setSuspendTarget(member) } }
@@ -1106,7 +1108,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             return (
               <GridRow key={user.id}>
                 {/* 絵 nku0f：顔・名前・メール。担当のLINEアカウントは列にせず、名前に重ねた説明と「見える画面」で見る。 */}
-                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
+                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>{member?.isAccountCreator ? <span className={styles.personSub}>管理者・アカウント作成者</span> : null}{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
                 <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} />}</GridCell>
                 <GridCell className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
@@ -1190,10 +1192,10 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                     <Button variant="secondary" size="compact" onClick={() => void loadMoreUsers()} disabled={moreUsersBusy} busy={moreUsersBusy}>続きを読み込む</Button>
                   ) : null}
                   {moreUsersError ? <Notice tone="danger" >{moreUsersError}</Notice> : null}
-                  <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} />
+                  <Pagination page={userPage} pageCount={pageCount} onPageChange={setUserPage} correctOutOfRange={!loading && !error} />
                 </div>
               ) : null}
-              {tab === 'members' ? <details className={styles.sessions}><summary>ログイン中の端末を確認</summary><SessionsCard /></details> : null}
+              {tab === 'members' ? <Disclosure appearance="inset" size="compact" title="ログイン中の端末を確認"><SessionsCard /></Disclosure> : null}
             </>
           )}
         </div>

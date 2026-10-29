@@ -10,6 +10,7 @@ import { TextField } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { api } from '@/lib/api'
+import { publishTenantName } from '@/lib/use-tenant-name'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import HqSettingsNavV8, { useHqSettingsFolderNav } from './settings-nav'
 import CompanyContactCard from './company-contact'
@@ -67,7 +68,7 @@ export default function HqSettingsV8() {
         <TenantNameCard canEdit={canEdit} draftRef={nameDraft} onDirtyChange={setNameDirty} locked={saving} />
         {canEdit ? <CompanyContactCard canEdit draftRef={contactDraft} onDirtyChange={setContactDirty} locked={saving} /> : null}
       </div>
-      {canEdit && (nameDirty || contactDirty || saving) ? <PageFooter status="変更した項目を保存します" actions={<><Button disabled={saving} onClick={() => { nameDraft.current?.reset(); contactDraft.current?.reset() }}>キャンセル</Button><Button variant="primary" disabled={saving} busy={saving} onClick={() => void saveAll()}>保存する</Button></>} /> : null}
+      {canEdit && (nameDirty || contactDirty || saving) ? <PageFooter status="変更した項目を保存します" actions={<><Button disabled={saving} onClick={() => { nameDraft.current?.reset(); contactDraft.current?.reset() }}>変更を取り消す</Button><Button variant="primary" disabled={saving} busy={saving} onClick={() => void saveAll()}>保存する</Button></>} /> : null}
     </ListPage>
   )
 }
@@ -83,6 +84,8 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
   const [error, setError] = useState('')
   const [nameError, setNameError] = useState('')
   const [ready, setReady] = useState(false)
+  const [nameFocusRequest, setNameFocusRequest] = useState(0)
+  const handledNameFocusRequest = useRef(0)
 
   useEffect(() => {
     let cancelled = false
@@ -107,10 +110,8 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
     const trimmed = name.trim()
     if (!trimmed || trimmed.length > 100) {
       setNameError(!trimmed ? '統括名を入力してください。' : '統括名は100文字以内で入力してください。')
+      setNameFocusRequest(request => request + 1)
       setError('')
-      const input = document.getElementById(`${uid}-name`)
-      input?.focus()
-      input?.scrollIntoView?.({ block: 'center' })
       return false
     }
     setNameError('')
@@ -121,6 +122,7 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
       if (!response.success) throw new Error(response.error)
       setName(response.data.name ?? trimmed)
       setBaseline(response.data.name ?? trimmed)
+      publishTenantName(response.data.name ?? trimmed)
       notifySaved('統括名を保存しました。')
       return true
     } catch (caught) {
@@ -136,6 +138,20 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
       setSaving(false)
     }
   }
+
+  useEffect(() => {
+    if (!canEdit || !ready || loading || !nameError) {
+      handledNameFocusRequest.current = nameFocusRequest
+      return
+    }
+    if (locked || saving || handledNameFocusRequest.current === nameFocusRequest) return
+    handledNameFocusRequest.current = nameFocusRequest
+    const input = document.getElementById(`${uid}-name`)
+    if (input instanceof HTMLInputElement && !input.disabled) {
+      input.focus()
+      input.scrollIntoView?.({ block: 'center' })
+    }
+  }, [canEdit, ready, loading, locked, saving, nameError, nameFocusRequest, uid])
 
   const dirty = ready && name.trim() !== baseline
   const reset = () => { setName(baseline); setNameError(''); setError(''); saveErrors.reset() }
@@ -157,7 +173,7 @@ function TenantNameCard({ canEdit, draftRef, onDirtyChange, locked }: { canEdit:
 
   return (
     <SaveErrorScope errors={saveErrors}><form onSubmit={save} className={styles.form}><Card variant="form" gap="normal">
-      <div className={styles.field}><Field label="統括名" htmlFor={`${uid}-name`} note="会社名やブランド名など、メンバーが見てわかる名前にします"><SaveErrorField names={["name"]}><TextField
+      <div className={styles.field}><Field label="統括名" htmlFor={`${uid}-name`} required note="会社名やブランド名など、メンバーが見てわかる名前にします"><SaveErrorField names={["name"]}><TextField
           id={`${uid}-name`}
           value={name}
           maxLength={100}

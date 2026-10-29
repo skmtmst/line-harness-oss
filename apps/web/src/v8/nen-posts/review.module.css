@@ -680,10 +680,7 @@
   color: var(--color-ink-secondary);
   font-size: var(--tpl-nm-row-size);
 }
-.publicationHistory summary {
-  cursor: pointer;
-}
-.publicationHistory > div {
+.publicationHistoryItem {
   padding: var(--tpl-nm-card-pad);
   border-bottom: 1px solid var(--color-hairline);
 }

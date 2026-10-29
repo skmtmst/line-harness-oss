@@ -10,8 +10,7 @@ import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import EntitySelect from '@/components/shared/entity-select'
 import Select from '@/components/shared/select'
-import StatusBadge from '@/components/shared/status-badge'
-import StatusAction from '@/components/shared/status-action'
+import { AttentionCount } from '@/components/shared/attention-count'
 import { RowMenu } from '@/components/shared/row-actions'
 import { RowNameButton } from '@/components/shared/table'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -21,6 +20,7 @@ import { ListPage } from '@/components/templates'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { api } from '@/lib/api'
+import { notifyToast } from '@/components/shared/toast'
 import type { AccountStyle } from '@line-crm/shared'
 import { hqStyleApi } from '@/lib/api/helpers/styles'
 import { styleLabel } from '@/v8/onboarding/public/model/index'
@@ -97,7 +97,9 @@ export default function HqAttentionV8() {
 
   /* そのアカウントに切り替えてから開く。 */
   const open = (accountId: string, href: string) => {
+    const name = items?.find((item) => item.accountId === accountId)?.name
     setSelectedAccountId(accountId)
+    notifyToast(`${name || '選んだアカウント'} に切り替えました`, { tone: 'info' })
     router.push(href)
   }
 
@@ -163,9 +165,7 @@ export default function HqAttentionV8() {
               {KINDS.map((entry) => {
                 const value = count(item, entry.key)
                 const href = hrefOf(item, entry)
-                if (value === 0) return <GridCell key={entry.key}><span className={styles.none} aria-label="なし">—</span></GridCell>
-                if (entry.key === 'connections') return <GridCell key={entry.key}><StatusAction onClick={() => open(item.accountId, href)}><StatusBadge tone="danger" dot>LINE の接続</StatusBadge></StatusAction></GridCell>
-                return <GridCell key={entry.key}><button type="button" className={styles.count} onClick={() => open(item.accountId, href)} aria-label={`${item.name}の${entry.label} ${value}件を開く`}>{`${value} 件`}</button></GridCell>
+                return <GridCell key={entry.key}><AttentionCount value={value} urgent={entry.key === 'connections' || entry.key === 'unpaid'} onClick={() => open(item.accountId, href)} label={`${item.name}の${entry.label} ${value}件を開く`} /></GridCell>
               })}
               <GridCell>
                 <RowMenu appearance="box" size="row" label={`${item.name}の操作`} items={KINDS.filter((entry) => count(item, entry.key) > 0).map((entry) => ({ id: entry.key, label: `${entry.label}を開く`, onSelect: () => open(item.accountId, hrefOf(item, entry)) }))} />

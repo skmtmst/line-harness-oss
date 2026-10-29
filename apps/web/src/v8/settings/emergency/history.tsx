@@ -5,14 +5,14 @@ import { useRunningVersion } from '@/lib/use-running-version'
  * ★V8 運用状態 更新履歴（板 ）。
  *
  * 並び：数のマス3つ（いまの版・この30日の更新・失敗した更新）→ 1回の更新＝1枚の並び（新しい順）→
- * 下の行に「自前でデプロイしている環境では…」と「手動アップデートガイドを開く」。
+ * 下の行に自動更新の記録への案内と「アップデート履歴を見る」（管理画面の /updates へ。外の手引きへのリンクは置かない）。
  * 1枚には、日付・版・配備の結果・種類の数・3行のまとめ・［すべて見る］。区切りと3行の決め方は
  * history-updates.ts。止めた・戻した記録は緊急コントロールの表で見る。
  * 版と行は更新履歴ファイル（release-log の要約）、結果は配備の記録（運用の履歴の deployment）から引く。
  * 記録が無い値は出さない（0 や成功とは言わない）。
  */
 import { useEffect, useMemo, useState } from 'react'
-import { BookOpen, CircleX, GitBranch, RefreshCw } from 'lucide-react'
+import { CircleX, GitBranch, History, RefreshCw } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import Disclosure from '@/components/shared/disclosure'
@@ -23,7 +23,6 @@ import Pagination from '@/components/shared/pagination'
 import SectionHeader from '@/components/shared/section-header'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { MANUAL_UPDATE_GUIDE_URL } from '@/components/update/use-update-status'
 import releaseLog from '@/generated/release-log-summary.json'
 import { api, type OperationHistoryEntry } from '@/lib/api'
 import { formatCount, formatDate } from '@/lib/format'
@@ -184,8 +183,8 @@ export default function UpdateHistoryV8() {
       )}
 
       <div className={styles.foot}>
-        <p className={styles.footText}>自分のサーバーで動かしている場合は、手動アップデートガイドの手順で更新します。</p>
-        <Button external href={MANUAL_UPDATE_GUIDE_URL}><BookOpen size={16} aria-hidden="true" />手動アップデートガイドを開く</Button>
+        <p className={styles.footText}>自動で更新した記録は、アップデート履歴で見られます。</p>
+        <Button href="/updates"><History size={16} aria-hidden="true" />アップデート履歴を見る</Button>
       </div>
     </div>
   )

@@ -4,7 +4,7 @@ import type { TagEditFormProps } from './edit-form-types'
 export type { TagEditHost } from './edit-form-types'
 
 import { SettingsFormRow } from '@/components/shared/settings-form-card';
-import { Plus, Trash2, Check, ChevronDown, ChevronUp, Copy, GitCompare, TriangleAlert } from 'lucide-react';
+import { Plus, Trash2, Check, ChevronDown, ChevronUp, GitCompare, TriangleAlert } from 'lucide-react';
 import { RetroactiveDialog, type LinkedAction, type TagEditorValues } from '@/components/friend-fields/tag-editor-v4';
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
@@ -16,7 +16,8 @@ import { formatDay } from '@/lib/format';
 import { StickyBarAction } from '@/components/shared/sticky-bar';
 import { CreatePage } from '@/components/templates';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
-import Button from '@/components/shared/button';
+import Button from '@/components/shared/button'
+import { RowMenu } from '@/components/shared/row-actions';
 import Card, { CardHeader } from '@/components/shared/card';
 import { SaveConflictBand } from '@/components/shared/save-conflict';
 import HelpTip from '@/components/shared/help-tip';
@@ -27,7 +28,7 @@ import { tagNameProblem } from '@/v8/tags/public/tag-name/index'
 import { formatNumber } from '@/lib/format'
 import Select from '@/components/shared/select';
 import FolderSelect, { type FolderSelectCreate } from '@/components/shared/folder-select';
-import { SettingCheckbox } from '@/components/shared/checkbox';
+import Toggle from '@/components/shared/toggle';
 import { DuplicateNameNote, findDuplicateNames } from '@/components/friend-fields/attribute-kind-guide';
 import LinkedActionList from '@/components/friend-fields/linked-action-list';
 import { MULTIPLIERS, PRIORITIES, actionsSummary, buildUsageRows, mileageSummary } from './model';
@@ -212,6 +213,7 @@ export function TagEditForm({
         notice={<>{host?.notice}{readOnly ? <div className={styles.roBand}><ReadOnlyNotice role="note" data-design-node="fkGUR">{host ? '閲覧のみで見ています。変える操作は統括の管理者に頼んでください。' : '閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。'}</ReadOnlyNotice></div> : null}{conflictBand}</>}
         title={host?.title ?? (tag.name || 'タグを編集')}
         identity={host ? undefined : <></>}
+        actions={!host && !readOnly ? <RowMenu label="タグの操作" items={[{ id: 'duplicate', label: '複製して作る', href: `/tags/new?copy=${tag.id}` }]} /> : undefined}
         help={host?.description ?? `${groupName}フォルダ・${tag.friendCount ?? 0}人に付いている・${formatDay(tag.createdAt)}作成`}
         previewLabel="使用状況を見る"
         previewTitle="使っている所"
@@ -221,7 +223,7 @@ export function TagEditForm({
           <>
             <Button onClick={onCancel}>キャンセル</Button>
             {/* 閲覧のみには押せない操作を置かない（隠す）。 */}
-            {readOnly ? null : <>{host?.onSaveDraft ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveDraft?.(values)}>下書きを保存</Button> : null}{host ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveAnother(values)}><Plus size={16} aria-hidden="true" />保存して続けて作る</Button> : <Button href={`/tags/new?copy=${tag.id}`}><Copy size={16} aria-hidden="true" />複製して作る</Button>}</>}
+            {readOnly ? null : <>{host?.onSaveDraft ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveDraft?.(values)}>下書きを保存</Button> : null}{host ? <Button disabled={saving || !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined} onClick={() => host.onSaveAnother(values)}><Plus size={16} aria-hidden="true" />保存して続けて作る</Button> : null}</>}
             {readOnly ? null : (
               <Button variant="primary" onClick={conflict ? onCompare : requestSave} busy={saving} disabled={Boolean(host) && !name.trim()} disabledReason={!name.trim() ? 'タグの名前を入れてください' : undefined}>
                 {conflict ? <GitCompare size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}
@@ -251,7 +253,7 @@ export function TagEditForm({
                 <span className={styles.label}>友だち一覧に出す</span>
                 <span className={styles.hint}>オンにすると、友だち一覧の名前の下にこのタグが出ます</span>
               </div>
-              {readOnly ? <span className={styles.linkedState}>{isStarred ? 'オン' : 'オフ'}</span> : <SaveErrorField names={["isStarred","is_starred"]}><SettingCheckbox checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" /></SaveErrorField>}
+              {readOnly ? <span className={styles.linkedState}>{isStarred ? 'オン' : 'オフ'}</span> : <SaveErrorField names={["isStarred","is_starred"]}><Toggle checked={isStarred} onChange={setIsStarred} label="友だち一覧に出す" /></SaveErrorField>}
             </div>
           </Card>
 
@@ -259,7 +261,7 @@ export function TagEditForm({
             <Card variant="form" gap="normal">
             <CardHeader size="stacked" title={host ? <HelpTip label="タグ連動の説明" trigger="タグ連動（このタグが付いたときの動き）">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。<p>タグは分類の目印、友だち情報欄は名前・日付・回答などの値、対応マークは対応の状態、保存した検索は複数の条件をまとめて探すときに使います。</p></HelpTip> : 'タグ連動（このタグが付いたときの動き）'} help={host ? undefined : <HelpTip label="タグ連動の説明">オフのままでも、タグの手動付与・配信の絞り込み・シナリオの条件には使えます。オフに戻すと、これ以降このタグが付いても連動は動きません。すでに積んだマイルは取り消されません。<p>タグは分類の目印、友だち情報欄は名前・日付・回答などの値、対応マークは対応の状態、保存した検索は複数の条件をまとめて探すときに使います。</p></HelpTip>}
               meta="上から順に動きます。並べ替えは上下の印で"
-              action={<span className={styles.actionPair}><span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>{readOnly ? null : <SaveErrorField names={["linked", "linkedEnabled", "tag.linkedEnabled"]}><SettingCheckbox checked={linked} onChange={setLinked} label="タグ連動" /></SaveErrorField>}</span>} />
+              action={<span className={styles.actionPair}><span className={styles.linkedState}>{linked ? 'オン' : 'オフ'}</span>{readOnly ? null : <SaveErrorField names={["linked", "linkedEnabled", "tag.linkedEnabled"]}><Toggle checked={linked} onChange={setLinked} label="タグ連動" /></SaveErrorField>}</span>} />
             {actionsOpen ? <div className={styles.summaryRow}><span className={styles.titleSpacer} /><Button variant="text" onClick={() => setActionsOpen(false)} aria-expanded>閉じる<ChevronUp size={16} aria-hidden="true" /></Button></div> : (
               <div className={styles.summaryRow}>
                 <span className={styles.summaryText}>{host && actions.length === 0 ? 'まだありません。［開く］から連動アクションを足せます' : actionsSummary(actions, linked)}</span>
@@ -311,7 +313,7 @@ export function TagEditForm({
                       <span className={styles.label}>今付いている人にもさかのぼって積む（倍率は次の付与から）</span>
                       <span className={styles.hint}>{`オンにすると、すでに付いている ${tag.friendCount ?? 0} 人にも本人・紹介者のマイルをさかのぼって積みます（倍率は次の付与から）。積む前に人数の確認が開きます`}</span>
                     </div>
-                    {readOnly ? <span className={styles.linkedState}>{applyToExisting ? 'オン' : 'オフ'}</span> : <SaveErrorField names={["applyToExisting","apply_to_existing"]}><SettingCheckbox checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" /></SaveErrorField>}
+                    {readOnly ? <span className={styles.linkedState}>{applyToExisting ? 'オン' : 'オフ'}</span> : <SaveErrorField names={["applyToExisting","apply_to_existing"]}><Toggle checked={applyToExisting} onChange={setApplyToExisting} label="さかのぼって反映" /></SaveErrorField>}
                   </div>
                   }
                   {applyToExisting ? (
@@ -331,7 +333,7 @@ export function TagEditForm({
           {linked || host ? (
             <Card variant="form" gap="normal" aria-label="このタグが付いたらマイル">
               <CardHeader size="stacked" title="このタグが付いたらマイル" meta="付いた本人（と紹介者）に、一度だけマイルを足します"
-                action={readOnly ? <span className={styles.linkedState}>{grantOn ? 'オン' : 'オフ'}</span> : <SettingCheckbox checked={grantOn} onChange={(next) => { setGrantOn(next); if (!next) { setReward('0'); setReferralReward('0') } else if (!(Number(reward) > 0)) setReward('100') }} label="このタグが付いたらマイル" />} />
+                action={readOnly ? <span className={styles.linkedState}>{grantOn ? 'オン' : 'オフ'}</span> : <Toggle checked={grantOn} onChange={(next) => { setGrantOn(next); if (!next) { setReward('0'); setReferralReward('0') } else if (!(Number(reward) > 0)) setReward('100') }} label="このタグが付いたらマイル" />} />
               {grantOn ? (
                 <>
                   <SettingsFormRow layout="columns">
@@ -342,7 +344,7 @@ export function TagEditForm({
                   </SettingsFormRow>
                   <div className={styles.switchRow}>
                     <div className={styles.switchText}><span className={styles.label}>1 人 1 回だけ</span><span className={styles.hint}>タグを外して付け直したときの扱い：外して付け直しても足しません（外すと、付け直すたびに足します）。</span></div>
-                    {readOnly ? <span className={styles.linkedState}>{reapplyMode === 'once' ? 'オン' : 'オフ'}</span> : <SaveErrorField names={["reapplyMode"]}><SettingCheckbox checked={reapplyMode === 'once'} onChange={(next) => setReapplyMode(next ? 'once' : 'every')} label="1 人 1 回だけ" /></SaveErrorField>}
+                    {readOnly ? <span className={styles.linkedState}>{reapplyMode === 'once' ? 'オン' : 'オフ'}</span> : <SaveErrorField names={["reapplyMode"]}><Toggle checked={reapplyMode === 'once'} onChange={(next) => setReapplyMode(next ? 'once' : 'every')} label="1 人 1 回だけ" /></SaveErrorField>}
                   </div>
                   {grantAttachers.length > 0 ? (
                     <div className={styles.attachBox}>

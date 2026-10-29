@@ -424,8 +424,8 @@ export default function AffiliatorsTab() {
   )
 
   const createButton = (full: boolean) => (
-    <CreateButton href="/affiliates/new" readonly={readonly} full={full}>
-      <Plus size={16} aria-hidden="true" /> アフィリエイターを作る
+    <CreateButton href="/affiliates/new" readonly={readonly} full={full} ariaLabel="アフィリエイターを作る" title="アフィリエイターを作る">
+      <Plus size={16} aria-hidden="true" /> アフィリエイター登録
     </CreateButton>
   )
 

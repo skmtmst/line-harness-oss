@@ -30,7 +30,7 @@ vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole:
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '試験会社', iconUrl: null }) }))
 vi.mock('@/components/hq/account-menu', () => ({ SidebarAccountMenu: () => null }))
 vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: async () => null }))
-vi.mock('@/components/update/use-update-status', () => ({ useUpdateStatus: () => ({ kind: 'loading' }) }))
+vi.mock('@/components/update/use-update-status', async (original) => ({ ...await original<typeof import('@/components/update/use-update-status')>(), useUpdateStatus: () => ({ kind: 'loading' }) }))
 vi.mock('@/lib/api/helpers/styles', () => ({ hqStyleApi: { attention: async () => ({ success: true, data: { items: [] } }) } }))
 vi.mock('@/lib/hq-templates-api', async (original) => ({
   ...await original<typeof import('@/lib/hq-templates-api')>(),

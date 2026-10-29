@@ -4,6 +4,8 @@
 
 import { loadStaffIdentity, useStaffIdentity } from '@/lib/staff-role'
 import { canViewManualLinks } from '@/lib/manual-link-access'
+import { lockReason } from '@/components/shared/permission-lock'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { notifySaved } from '@/components/shared/toast'
@@ -25,6 +27,7 @@ import {
  */
 export function useManualLinks() {
   const staff = useStaffIdentity()
+  const permissionReason = usePermissionLockReason(canEditTable(staff), 'ops')
   const [links, setLinks] = useState<ManualLink[]>([])
   const [total, setTotal] = useState(0)
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
@@ -71,7 +74,7 @@ export function useManualLinks() {
   const notice = brokenNotice(rows)
 
   const checkAll = async () => {
-    if (!canEditTable(staff) || checking) return
+    if (!canEditTable(staff) || lockReason(canEditTable(staff), 'ops') || checking) return
     setChecking(true)
     setActionError('')
     try {
@@ -97,7 +100,7 @@ export function useManualLinks() {
   const dirty = editingKey !== null && editingUrl.trim() !== (links.find((item) => item.key === editingKey)?.url ?? '')
   const guard = useUnsavedGuard({ dirty, busy: saving })
   const startEdit = (key: string) => guard.guarded(() => {
-    if (!canEditTable(staff)) return
+    if (!canEditTable(staff) || lockReason(canEditTable(staff), 'ops')) return
     const link = links.find((item) => item.key === key)
     if (!link) return
     setEditingKey(key)
@@ -105,7 +108,7 @@ export function useManualLinks() {
   })
 
   const saveEdit = async () => {
-    if (!canEditTable(staff) || !editingKey || saving || !dirty) return
+    if (!canEditTable(staff) || lockReason(canEditTable(staff), 'ops') || !editingKey || saving || !dirty) return
     const current = links.find((item) => item.key === editingKey)
     if (!current) return
     setSaving(true)
@@ -151,6 +154,7 @@ export function useManualLinks() {
     guard,
     dirty,
     staff,
+    permissionReason,
     rows,
     shown,
     total,
@@ -166,7 +170,7 @@ export function useManualLinks() {
     setFilter,
     actionError,
     notice,
-    canEdit: canEditTable(staff),
+    canEdit: canEditTable(staff) && !permissionReason,
     canView: canViewManualLinks(staff),
     loadInitial,
     checkAll,

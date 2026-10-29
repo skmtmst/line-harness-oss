@@ -152,6 +152,9 @@ afterEach(cleanup)
 describe('SCENARIO-01：分の端数を丸めない', () => {
   it('offsetMinutes=90 の既存1通目をそのまま保存すると90のまま', async () => {
     await mount(<FirstStep />)
+    const body = screen.getByRole('textbox', { name: '本文', exact: true })
+    expect(body.textContent).toBe('監査用本文')
+    expect(body.closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
     // 日・時間・分の3欄に分かれて戻る（0日・1時間・30分）
     const numbers = ['購読開始から何日後', 'さらに何時間後', 'さらに何分後'].map((name) => screen.getByRole('button', { name }).textContent?.trim())
     expect(numbers).toEqual(['0', '1', '30'])

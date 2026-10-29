@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { cleanup, render } from '@testing-library/react'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { getPageAction } from '@/test-utils/page-action'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import HqCreate from '@/v8/hq-broadcasts/create'
 
@@ -22,9 +24,18 @@ import { CreatePage } from '.'
 const WEB = process.cwd()
 const read = (path: string) => readFileSync(join(WEB, path), 'utf8')
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); verifiedStaffRole(null) })
 
 describe('作成の型の余白の口', () => {
+  it('タブが区切りを持つ見出しだけ線を外す口を渡し、既定へ戻せる', () => {
+    const { container, rerender } = render(<CreatePage title="編集" dirty={false} separator="none" steps={<div>タブ</div>} footerActions={null}>本文</CreatePage>)
+    expect(container.querySelector('[data-template-region="heading"]')!.getAttribute('data-heading-separator')).toBe('none')
+    expect(container.querySelector('[data-template-region="steps"]')!.textContent).toBe('タブ')
+    rerender(<CreatePage title="作成" dirty={false} footerActions={null}>本文</CreatePage>)
+    expect(container.querySelector('[data-template-region="heading"]')!.hasAttribute('data-heading-separator')).toBe(false)
+    expect(container.querySelector('[data-template-region="content"]')!.textContent).toBe('本文')
+  })
+
   it('渡さなければ型の既定（印を出さない）', () => {
     const { container } = render(<CreatePage title="作成" preview={<p>見え方</p>} footerActions={null}>入力</CreatePage>)
     const content = container.querySelector('[data-template-region="content"]')!
@@ -32,6 +43,26 @@ describe('作成の型の余白の口', () => {
     expect(content.hasAttribute('data-content-spacing')).toBe(false)
     expect(preview.hasAttribute('data-content-spacing')).toBe(false)
     expect(preview.hasAttribute('data-preview-surface')).toBe(false)
+  })
+
+  it('プレビュー後の案内の余白口は操作と本文へ渡し、既定とflush-topに混ぜない', () => {
+    const { container, rerender } = render(<CreatePage title="作成" dirty={false} preview={<p>見本</p>} previewToggle={<button>見本を開く</button>} contentSpacing="notice-after-preview" footerActions={null}>案内</CreatePage>)
+    expect(container.querySelector('[data-template-region="content"]')!.getAttribute('data-content-spacing')).toBe('notice-after-preview')
+    expect(container.querySelector('button')!.parentElement!.getAttribute('data-content-spacing')).toBe('notice-after-preview')
+    rerender(<CreatePage title="作成" dirty={false} preview={<p>見本</p>} previewToggle={<button>見本を開く</button>} contentSpacing="flush-top" footerActions={null}>案内</CreatePage>)
+    expect(container.querySelector('button')!.parentElement!.hasAttribute('data-content-spacing')).toBe(false)
+    expect(container.querySelector('[data-template-region="content"]')!.getAttribute('data-content-spacing')).toBe('flush-top')
+  })
+
+  it('直に続く閲覧案内だけに余白口を渡し、本文と両方の通知を残す', () => {
+    verifiedStaffRole('viewer')
+    const { container, rerender } = render(<CreatePage title="作成" dirty={false} readOnly contentSpacing="notice-after-read-only" footerActions={null}><p>権限の説明</p></CreatePage>)
+    const slot = container.querySelector('[data-read-only-notice]')!.parentElement!
+    expect(slot.getAttribute('data-content-spacing')).toBe('notice-after-read-only')
+    expect(container.querySelector('[data-template-region="content"]')!.textContent).toBe('権限の説明')
+    expect(slot.nextElementSibling?.getAttribute('data-template-region')).toBe('body')
+    rerender(<CreatePage title="作成" dirty={false} readOnly contentSpacing="flush-top" footerActions={null}>権限の説明</CreatePage>)
+    expect(container.querySelector('[data-read-only-notice]')!.parentElement!.hasAttribute('data-content-spacing')).toBe(false)
   })
 
   it('flush-top・plain を渡すと入力欄と右の列に印が付く', () => {
@@ -60,7 +91,8 @@ describe('作成の型の余白の口', () => {
     expect(frame).toBeTruthy()
     expect(frame.querySelector('[data-template-region="content"] input[aria-label="配信名"]')).toBeTruthy()
     expect(frame.querySelector('[data-template-region="preview"][aria-label="LINEの見え方"]')).toBeTruthy()
-    expect(frame.querySelector('[data-template-region="footer"]')?.textContent).toContain('下書きを保存する')
+    expect(frame.querySelector('[data-template-region="footer"]')?.textContent).toContain('対象設定へ')
+    expect(getPageAction({ name: '下書きを保存する' }).getAttribute('role')).toBe('menuitem')
   })
 })
 

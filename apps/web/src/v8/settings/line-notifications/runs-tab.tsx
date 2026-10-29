@@ -245,12 +245,13 @@ export default function RunsTab({ lineAccountId, mode }: { lineAccountId: string
     </section>
 
     {visibleState === 'ready' && items.length > 0 ? (
-      <div className={styles.runFoot}>
+      <>
         {mode === 'failures'
           ? <Notice tone="info" icon={null}>個人の既読は見られません。試行回数と次の再試行予定は送信台帳の記録を表示します。検索と絞り込みは表示中のページの中だけに効きます。</Notice>
-          : <p className={styles.minor}>{`表示中の20件を絞り込み・${formatNumber(total)} 件中 ${(page - 1) * PAGE_SIZE + 1}〜${Math.min(page * PAGE_SIZE, total)} 件`}</p>}
-        <Pagination page={page} pageCount={pageCount} onPageChange={setPage} />
-      </div>
+          : <p className={styles.minor}>表示中の20件を絞り込み</p>}
+        <Pagination page={page} pageCount={pageCount} onPageChange={setPage}
+          range={{ total, first: (page - 1) * PAGE_SIZE + 1, last: Math.min(page * PAGE_SIZE, total) }} />
+      </>
     ) : null}
 
     <ConfirmDialog

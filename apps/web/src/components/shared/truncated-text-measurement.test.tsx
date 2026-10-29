@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -87,5 +88,6 @@ it('measures tag widths and clipped names in one read phase before either change
   // Both subscribers run inside the same observer delivery, before either commit.
   expect(snapshots).toEqual([{ tab: '0', visibleTags: 2 }])
   expect(screen.getByText('long standalone name').hasAttribute('tabindex')).toBe(false)
-  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか1件）' })).toBeTruthy()
+  expect(getPageAction({ name: 'すべてのタグ（ほか2件）' })).toBeTruthy()
+  expect(document.querySelector('[data-tag-overflow]')?.querySelectorAll(':scope > span:not([aria-hidden])')).toHaveLength(0)
 })

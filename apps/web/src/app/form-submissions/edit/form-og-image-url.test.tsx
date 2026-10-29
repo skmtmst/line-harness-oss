@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * カードの画像URLが https だけを受け付けるかの試験（FORM-18 / #1061）。
@@ -161,14 +162,14 @@ async function show(over: Partial<ApiForm> = {}) {
   await act(async () => {
     for (let step = 0; step < 10; step += 1) await Promise.resolve()
   })
-  const linkAppearance = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('リンクの見え方：'))!
+  const linkAppearance = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('リンクの見え方：')) ?? querySupplementaryPageAction('リンクの見え方：'))!
   await act(async () => linkAppearance.click())
-  const urlButton = [...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'URL で入れる')!
+  const urlButton = ([...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'URL で入れる') ?? querySupplementaryPageAction('URL で入れる'))!
   if (urlButton) await act(async () => urlButton.click())
   else {
-    const remove = [...document.body.querySelectorAll<HTMLButtonElement>('[data-image-frame] button')].find((button) => button.textContent === '消す')!
+    const remove = ([...document.body.querySelectorAll<HTMLButtonElement>('[data-image-frame] button')].find((button) => button.textContent === '消す') ?? querySupplementaryPageAction('消す'))!
     await act(async () => remove.click())
-    const url = [...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'URL で入れる')!
+    const url = ([...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'URL で入れる') ?? querySupplementaryPageAction('URL で入れる'))!
     await act(async () => url.click())
   }
 }
@@ -187,9 +188,9 @@ function setOgUrl(value: string) {
 }
 
 async function clickSave() {
-  const close = [...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === '閉じる')!
+  const close = ([...document.body.querySelectorAll('button')].find((button) => button.textContent?.trim() === '閉じる') ?? querySupplementaryPageAction('閉じる'))!
   await act(async () => close.click())
-  const button = [...host.querySelectorAll('button')].find((b) => b.textContent === '下書きを保存' && !b.disabled)
+  const button = ([...host.querySelectorAll('button')].find((b) => b.textContent === '下書きを保存' && !b.disabled) ?? querySupplementaryPageAction('下書きを保存'))
   expect(button, '「下書きを保存」がある').toBeTruthy()
   await act(async () => {
     button!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -211,7 +212,7 @@ describe('カードの画像URLは https だけ（FORM-18）', () => {
     await clickSave()
     expect(formsUpdate).not.toHaveBeenCalled()
     // 入力は消えない。直してもう一度保存できる。
-    const linkAppearance = [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('リンクの見え方：'))!
+    const linkAppearance = ([...host.querySelectorAll('button')].find((button) => button.textContent?.includes('リンクの見え方：')) ?? querySupplementaryPageAction('リンクの見え方：'))!
     await act(async () => linkAppearance.click())
     expect(document.body.textContent).toContain(OG_IMAGE_URL_ERROR)
     expect(ogInput().value).toBe('http://example.com/og.png')

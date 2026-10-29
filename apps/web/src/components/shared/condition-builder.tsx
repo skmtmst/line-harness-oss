@@ -1,7 +1,7 @@
 'use client'
 
 import Checkbox from './checkbox'
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAccount } from '@/contexts/account-context';
 import { useFeatureVisibility } from '@/lib/use-feature-visibility';
@@ -77,6 +77,8 @@ const SCENARIO_STATES: { value: string; label: string }[] = [
 ]
 
 export interface ConditionBuilderProps {
+  disabled?: boolean
+  lockedReason?: string
   value: SegmentCondition | null
   onChange: (next: SegmentCondition | null) => void
   /** 見出しに出す言葉。「この通の配信対象」など。 */
@@ -97,7 +99,10 @@ export interface ConditionBuilderProps {
   options?: { tags: Option[]; scenarios: Option[]; kinds?: readonly string[] }
 }
 
-export default function ConditionBuilder({ value, onChange, label, showCount = true, options }: ConditionBuilderProps) {
+export default function ConditionBuilder({ value, onChange, label, showCount = true, options, disabled = false, lockedReason }: ConditionBuilderProps) {
+  const blocked = disabled || Boolean(lockedReason)
+  const blockedRef = useRef(blocked)
+  blockedRef.current = blocked
   const { selectedAccountId } = useAccount()
   // 対応マーク・友だち情報は任意機能。オフのaccountでは条件の選択肢ごと出さない。
   const featureVisibility = useFeatureVisibility(selectedAccountId)
@@ -215,6 +220,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
    * いない素の空のときだけ null へ戻す。
    */
   const update = (next: SegmentCondition) => {
+    if (blockedRef.current) return
     onChange(isStructurallyEmpty(next) ? null : next)
   }
 
@@ -262,18 +268,20 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
           key={`${groupIndex ?? 'root'}-${i}`}
           className="border-hairline bg-canvas rounded-card flex flex-wrap items-start gap-2 border p-3"
         >
-          <Button variant="secondary" className="text-ink-faint hover:text-danger h-9 shrink-0 px-2 text-xs whitespace-normal" type="button" onClick={() => removeRule(i, groupIndex)} aria-label="この条件を外す">
+          <Button variant="secondary" disabled={disabled} lockedReason={lockedReason} className="text-ink-faint hover:text-danger h-9 shrink-0 px-2 text-xs whitespace-normal" type="button" onClick={() => removeRule(i, groupIndex)} aria-label="この条件を外す">
             外す
           </Button>
           <div className="min-w-0 flex-1 space-y-2">
+            <fieldset disabled={blocked} className="contents" aria-label="条件の入力">
             <RuleEditor
+              key={blocked ? 'locked' : 'editable'}
               rule={rule}
               onChange={(next) => setRule(i, next, groupIndex)}
               tags={tags}
               fields={fields}
               marks={marks}
               scenarios={scenarios}
-            />
+            /></fieldset>
           </div>
         </div>
       ))}
@@ -288,6 +296,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
   const kindButtons = (groupIndex: number | null) => (
     <div className="mt-2 max-w-md">
       <KindPicker
+        disabled={disabled} lockedReason={lockedReason}
         kinds={RULE_KINDS.filter((kind) => (options?.kinds ? options.kinds.includes(kind.type) : !kind.feature || featureVisibility.enabled(kind.feature)))}
         onPick={(kind) => addRule(kind, groupIndex)}
       />
@@ -313,7 +322,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
         <Card key={gi} surface="muted" corner="control" padding="compact" layout="vertical" gap="var(--polish-space-field)">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardHeader headingLevel={3} size="stacked" title="いずれか1つ以上を満たす条件" />
-            <Button variant="secondary" className="text-ink-faint hover:text-danger h-9 px-3 text-xs whitespace-normal" type="button" onClick={() =>
+            <Button variant="secondary" disabled={disabled} lockedReason={lockedReason} className="text-ink-faint hover:text-danger h-9 px-3 text-xs whitespace-normal" type="button" onClick={() =>
                 update({ ...condition, groups: (condition.groups ?? []).filter((_, i) => i !== gi) })
               }>
               このかたまりを外す
@@ -324,7 +333,7 @@ export default function ConditionBuilder({ value, onChange, label, showCount = t
         </Card>
       ))}
 
-      <Button variant="secondary" aria-label="いずれか条件のかたまりを足す" className="text-ink-secondary rounded-card w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
+      <Button variant="secondary" disabled={disabled} lockedReason={lockedReason} aria-label="いずれか条件のかたまりを足す" className="text-ink-secondary rounded-card w-full px-0 border-dashed whitespace-normal" type="button" onClick={() =>
           update({
             ...condition,
             groups: [...(condition.groups ?? []), { operator: 'OR', rules: [] }],

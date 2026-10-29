@@ -1,3 +1,4 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /**
  * V8 自動応答の通し試験（見た目のみ）。
@@ -272,6 +273,7 @@ describe('V8 自動応答の通し：作る→止める→再開する', () => {
     renderNode(<AutoRepliesPage />)
     await flush()
     const creates = screen.getAllByRole('button', { name: '＋ ルールを作る' })
+    expect(screen.getByText('流れの型').closest('[data-template-region="content"]')?.closest('[data-page-template="list"]')).toBeTruthy()
     expect(creates.length).toBeGreaterThan(0)
     // 絵  の「＋ ルールを作る ▾」は、くわしく作る／かんたんに作るを選ぶ窓を開く。
     act(() => { creates[0].click() })
@@ -340,6 +342,7 @@ describe('V8 自動応答の通し：作って有効にする', () => {
       await goStep('step=trigger')
       fireEvent.click(screen.getByRole('button', { name: /^次へ：/ }))
       const keywordInput = screen.getByLabelText('反応する言葉を足す')
+      expect(keywordInput.closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
       await waitFor(() => expect(document.activeElement).toBe(keywordInput))
       expect(keywordInput.getAttribute('aria-invalid')).toBe('true')
       expect(screen.getAllByText('反応する言葉を入れてください')).toHaveLength(1)
@@ -370,7 +373,7 @@ describe('V8 自動応答の通し：作って有効にする', () => {
   it('別の手順から保存しても入力を残して最初の不足欄へ移る', async () => {
     await goStep('step=basic')
     fireEvent.change(host.querySelector('#wiz-name') as HTMLInputElement, { target: { value: '入力を残すルール' } })
-    fireEvent.click(screen.getByRole('button', { name: '下書きとして保存' }))
+    fireEvent.click(getPageAction({ name: '下書きとして保存' }))
     expect(replaceMock).toHaveBeenLastCalledWith('/auto-replies/edit?step=trigger')
     expect(createDraft).not.toHaveBeenCalled()
     await goStep(navState.replaces[navState.replaces.length - 1])

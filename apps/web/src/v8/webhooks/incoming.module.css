@@ -41,10 +41,6 @@
 .createButton {
   width: 100%;
 }
-.createSpace {
-  display: block;
-  height: var(--tpl-chip-h);
-}
 .inletListLabel {
   margin: 0;
   color: var(--color-ink-secondary);

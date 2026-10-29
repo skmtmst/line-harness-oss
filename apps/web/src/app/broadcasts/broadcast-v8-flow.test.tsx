@@ -109,6 +109,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import BroadcastListV8 from '@/v8/broadcasts/list'
+import BroadcastListPage from './page'
 import BroadcastDetailPage from './detail/page'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -156,8 +157,9 @@ afterEach(() => {
 
 describe('V8 一斉配信の通し', () => {
   it('作る→下書き保存→知らせ→一覧に戻ると増えている', async () => {
-    await mount(<BroadcastListV8 />)
+    await mount(<BroadcastListPage />)
     await screen.findByText('はじめの配信')
+    expect(screen.getByText('はじめの配信').closest('[data-template-region="content"]')?.closest('[data-page-template="list"]')).toBeTruthy()
 
     // 「配信を作る ▾」の「詳しく作る」は5つの手順（/broadcasts/new）へ移る。
     await act(async () => {
@@ -206,6 +208,7 @@ describe('V8 一斉配信の通し', () => {
     mocks.query = 'id=b-2'
     await mount(<BroadcastDetailPage />)
     await screen.findByText('予約ずみ配信')
+    expect(screen.getByText('配信した設定').closest('[data-page-template="detail"]')).toBeTruthy()
 
     const openMenu = async () => {
       await act(async () => {

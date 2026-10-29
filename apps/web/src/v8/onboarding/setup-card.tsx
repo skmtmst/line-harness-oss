@@ -1,13 +1,13 @@
 'use client'
 
-import { ProgressBar } from '@/components/shared/progress'
 import { useMemo } from 'react'
-import { CircleCheck, Circle, TriangleAlert } from 'lucide-react'
+import { CircleCheck, TriangleAlert } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { RowStatusActions } from '@/components/shared/row-actions'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
+import { ProgressBar, StepMark } from '@/components/shared/progress'
 import StatusBadge from '@/components/shared/status-badge'
 import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { FEATURES, featureHref, sampleMenuFor, featureName, summarizeSetup, type SetupSummary, type TodoRow } from './model'
@@ -50,12 +50,6 @@ export function SetupWarningBands({ data }: { data: StyleSetupData }) {
 }
 
 export function SetupCard({ summary, onOpenStep }: { summary: SetupSummary; onOpenStep: (step: string | number) => void }) {
-  const preparing = usePreparingDialog()
-  const rate = summary.total > 0 ? Math.round((summary.done / summary.total) * 100) : 0
-  const doneText = useMemo(() => {
-    const names = summary.doneNames.slice(0, 3).join('・')
-    return `済み ${summary.done}件（${names}${summary.doneNames.length > 3 ? ' ほか' : ''}）`
-  }, [summary])
   return (
     <Card layout="vertical" contentPadding="var(--sc-pad)" gap="var(--sc-gap)" className={styles.card} aria-labelledby="setup-card-title" data-design-node="Bdfxm">
       <div className={styles.head}>
@@ -66,6 +60,24 @@ export function SetupCard({ summary, onOpenStep }: { summary: SetupSummary; onOp
         <Button onClick={() => onOpenStep(summary.nextStep)}>質問の続きを開く</Button>
       </div>
       <ProgressBar appearance="quota" value={summary.done} max={summary.total} label="使い方の設定の進み" />
+      <SetupTasks summary={summary} onOpenStep={onOpenStep} />
+    </Card>
+  )
+}
+/** 同じ手順カードへ差し込み、質問で後回しにした設定への操作を保つ。 */
+export function SetupTasks({ summary, onOpenStep, heading = false }: { summary: SetupSummary; onOpenStep: (step: string | number) => void; heading?: boolean }) {
+  const preparing = usePreparingDialog()
+  const doneText = useMemo(() => {
+    const names = summary.doneNames.slice(0, 3).join('・')
+    return `済み ${summary.done}件（${names}${summary.doneNames.length > 3 ? ' ほか' : ''}）`
+  }, [summary])
+  return <>
+      {heading ? <>
+        <CardHeader title="選んだ機能の設定" headingLevel={3} size="content"
+          meta={`質問 ${summary.done} / ${summary.total} 済み・残りの設定 ${summary.rows.length} 件`}
+          help={<HelpTip label="選んだ機能の設定の説明">質問で後回しにした設定です。基本の手順とは別に、使い方の質問の進みと残りの設定を表示します。</HelpTip>} />
+        <ProgressBar appearance="quota" value={summary.done} max={summary.total} label="使い方の設定の進み" />
+      </> : null}
       <ul className={styles.rows}>
         {summary.rows.map((row) => <SetupRow key={row.key} row={row} onOpenStep={onOpenStep} onPreparing={preparing.open} />)}
       </ul>
@@ -78,15 +90,13 @@ export function SetupCard({ summary, onOpenStep }: { summary: SetupSummary; onOp
         </p>
       ) : null}
       {preparing.dialog}
-    </Card>
-  )
+  </>
 }
 
 function SetupRow({ row, onOpenStep, onPreparing }: { row: TodoRow; onOpenStep: (step: string | number) => void; onPreparing: (feature: string) => void }) {
-  const Icon = row.alert ? TriangleAlert : Circle
   return (
     <li className={styles.row} data-alert={row.alert || undefined}>
-      <Icon aria-hidden="true" className={styles.rowIcon} />
+      {row.alert ? <TriangleAlert aria-hidden="true" className={styles.rowIcon} /> : <StepMark done={false} />}
       <span className={styles.rowText}>
         <span className={styles.rowTitle}>{row.title}</span>
         <span className={styles.rowNote}>{row.note}</span>

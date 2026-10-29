@@ -1,5 +1,6 @@
 import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * ★V8-B プール管理の「プールを作る」（板 ）。
  * 番号つきの節・複数の受け入れ先・部分失敗の伝え方が動くこと。
@@ -51,6 +52,7 @@ vi.mock('@/components/shell/page-chrome', () => ({
 vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
 
 import PoolNewV8 from './create'
+import PoolNewPage from '@/app/pools/new/page'
 
 const v8tsx = readFileSync(join(process.cwd(), 'src/v8/settings/pools/create.tsx'), 'utf8')
 
@@ -63,7 +65,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
-  staff.role = 'owner'
+  staff.role = verifiedStaffRole('owner')
   ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -104,6 +106,15 @@ async function setInput(selector: string, value: string) {
 }
 
 describe('V8-B プールを作る（D0AOyx）', () => {
+  it('実入口から設定の型の本文にプール名の入力欄を描く', async () => {
+    await act(async () => { root.render(<PoolNewPage />) })
+    await flush()
+    const name = host.querySelector('#pl-name')
+    expect(name).toBeTruthy()
+    expect(name?.closest('[data-template-region="content"]')?.closest('[data-page-template="settings"]')).toBeTruthy()
+    expect(lineAccountsList).toHaveBeenCalled()
+  })
+
   it('入力の誤りは該当欄に一度だけ示し、そこへ移動して保存を止める', async () => {
     await renderV8()
     const save = document.querySelector('button[form="pool-create-form"]') as HTMLButtonElement
@@ -212,12 +223,15 @@ it('保存成功後は離脱確認を解除して一覧へ進む', async () => {
 })
 
 it.each([null, 'admin', 'staff', 'viewer'])('owner以外の直接URL（%s）は入力と保存を出さず作成を呼ばない', async (role) => {
-  staff.role = role
+  staff.role = verifiedStaffRole(role)
   await renderV8()
-  expect(host.textContent).toContain('プールを作れるのはオーナーだけです')
+  if (role === null) expect(host.querySelector('[data-read-only-notice]')).toBeNull()
+  else expect(host.textContent).toContain('プールを作れるのはオーナーだけです')
   expect(host.querySelector('#pool-create-form')).toBeNull()
   expect(host.querySelector('button[form="pool-create-form"]')).toBeNull()
   expect(host.querySelector('a[href="/pools"]')).toBeTruthy()
   expect(lineAccountsList).not.toHaveBeenCalled()
   expect(poolsCreate).not.toHaveBeenCalled()
 })
+
+afterEach(() => { verifiedStaffRole(null) })

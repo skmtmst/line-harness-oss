@@ -26,6 +26,8 @@ import styles from './tag-csv-import-dialog.module.css'
 import { formatYmd, formatNumber } from '@/lib/format'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
+import CsvTemplateDownload from '@/components/shared/csv-template-download'
+import { downloadCsv } from '@/components/shared/csv-download'
 
 const PREVIEW_ROW_STEP = 100
 
@@ -38,15 +40,6 @@ const STATUS_LABEL: Record<TagCsvImportRowResult['status'], string> = {
   skipped: '飛ばす',
   invalid: 'エラー',
   failed: 'エラー',
-}
-
-function downloadCsv(content: string, name: string) {
-  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
-  const anchor = document.createElement('a')
-  anchor.href = url
-  anchor.download = name
-  anchor.click()
-  URL.revokeObjectURL(url)
 }
 
 function todayInJapan() {
@@ -210,6 +203,7 @@ export default function TagCsvImportDialog({
               <li>先頭行は「タグ名,フォルダ」の見出しにできます。</li>
               <li>確認画面で、新規・見送り・入力確認を確かめてから登録します。</li>
             </ol>
+            <CsvTemplateDownload headers={['タグ名', 'フォルダ']} name="タグ" />
             {/*
               登録の実行は1回のAPI呼び出しで、途中の割合を測れない。
               実測できない進みは出さない（Progress は足さない）。

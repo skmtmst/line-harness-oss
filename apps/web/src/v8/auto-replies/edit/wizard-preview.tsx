@@ -17,6 +17,7 @@ import { RuleRow,WizardForm,WizardStep } from './wizard-model';
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type RenderWizardPreviewContext = {
+  conflictsReadable?: boolean
   acknowledged: Set<string>
   autoReplyId: string | null
   conflicts: AutoReplyConflict[]
@@ -37,12 +38,12 @@ type RenderWizardPreviewContext = {
   triggerSamples: { text: string; hit: boolean; }[]
 }
 
-export function renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryRun, form, imageContent, isActive, matchedLast28Days, myIndex, myPositionLabel, orderedRules, previewAccountName, replyPreviewText, selectedTemplate, setAcknowledged, step, testMessage, triggerSamples }: RenderWizardPreviewContext, withPhone: boolean) { return (<>
+export function renderWizardPreview({ conflictsReadable = true, acknowledged, autoReplyId, conflicts, dryRun, form, imageContent, isActive, matchedLast28Days, myIndex, myPositionLabel, orderedRules, previewAccountName, replyPreviewText, selectedTemplate, setAcknowledged, step, testMessage, triggerSamples }: RenderWizardPreviewContext, withPhone: boolean) { return (<>
           {step === 'basic' && (
             <CreateSummaryCard rows={[
               { label: '状態', value: '停止中' },
               { label: '動く順番', value: myIndex >= 0 ? myPositionLabel : `いちばん下（${orderedRules.length + 1}番目）` },
-              { label: '同時に当たるルール', value: '手順4で確かめる' },
+              { label: '同時に当たるルール', value: conflictsReadable ? '手順4で確かめる' : emptyValue('unknown') },
             ]} />
           )}
           {step === 'basic' && (
@@ -113,8 +114,8 @@ export function renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryR
               {/* 絵 Guoye：重なりを1件ずつ確かめる（クリーム地）→ 重なりの確認（行3つ）。 */}
               <section className={styles.conflictCard} aria-label="重なりを1件ずつ確かめる">
                 <CardHeader size="stacked" title={<>重なりを1件ずつ確かめる</>} />
-                <p className={styles.conflictDesc}>すべてにチェックを付けるまで、⑤で有効にできません。</p>
-                {conflicts.length === 0 ? (
+                <p className={styles.conflictDesc}>{conflictsReadable ? 'すべてにチェックを付けるまで、⑤で有効にできません。' : '確認結果は表示できません。'}</p>
+                {!conflictsReadable ? <p className={styles.conflictDesc}>{emptyValue('unknown')}</p> : conflicts.length === 0 ? (
                   <p className={styles.conflictDesc}>同時に当たるルールはありません。</p>
                 ) : (
                   conflicts.map((conflict, saveFieldIndex) => {
@@ -127,7 +128,7 @@ export function renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryR
                         <p className={styles.conflictName} title={conflict.reason}>
                           {conflict.name}{pos >= 0 ? `（${pos + 1}番目）` : ''}
                         </p>
-                        <SaveErrorField names={[`conflicts.${saveFieldIndex}.autoReplyId`,`conflicts.${saveFieldIndex}.auto_reply_id`,"autoReplyId","conflict.autoReplyId","acknowledged","id","auto_reply_id","conflict.auto_reply_id"]}><Checkbox
+                        <SaveErrorField names={[`conflicts.${saveFieldIndex}.autoReplyId`,`conflicts.${saveFieldIndex}.auto_reply_id`,"autoReplyId","conflict.autoReplyId","acknowledged","id","auto_reply_id","conflict.auto_reply_id"]}><Checkbox disabled={!conflictsReadable}
                           checked={acknowledged.has(conflict.autoReplyId)}
                           onCheckedChange={(on) =>
                             setAcknowledged((current) => {
@@ -146,24 +147,24 @@ export function renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryR
                   })
                 )}
                 <p className={`${styles.conflictDesc} ${styles.conflictResult}`}>
-                  試した結果：{dryRun ? (dryRun.draftWon ? 'このルールが返す' : `「${dryRun.winner?.name ?? '別のルール'}」が先に動く → このルールは見送り`) : 'まだ試していません'}
+                  試した結果：{!conflictsReadable ? emptyValue('unknown') : dryRun ? (dryRun.draftWon ? 'このルールが返す' : `「${dryRun.winner?.name ?? '別のルール'}」が先に動く → このルールは見送り`) : 'まだ試していません'}
                 </p>
               </section>
               <CreateSummaryCard
                 title="重なりの確認"
                 rows={[
-                  { label: '同時に当たるルール', value: conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none') },
+                  { label: '同時に当たるルール', value: !conflictsReadable ? emptyValue('unknown') : conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none') },
                   { label: '当たる受信（過去28日）', value: matchedLast28Days == null ? emptyValue('unknown') : `${formatNumber(matchedLast28Days)}件` },
-                  { label: '試した結果', value: dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません' },
+                  { label: '試した結果', value: !conflictsReadable ? emptyValue('unknown') : dryRun ? (dryRun.draftWon ? 'このルールが返す' : '見送り') : 'まだ試していません' },
                 ]}
               />
               {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>
                   {testMessage.trim() ? <p className={styles.bubbleIn}>{testMessage.trim()}</p> : null}
                   <LinePreviewMessage density="compact" accountName={previewAccountName} avatar={previewAccountName.slice(0, 1)} time="">
-                    {dryRun?.winner?.responseContent || replyPreviewText}
+                    {(conflictsReadable && dryRun?.winner?.responseContent) || replyPreviewText}
                   </LinePreviewMessage>
-                  {dryRun?.winner && dryRun.winner.autoReplyId !== autoReplyId ? (
+                  {!conflictsReadable ? <p className={styles.bubbleMeta}>設定した返信のプレビューです</p> : dryRun?.winner && dryRun.winner.autoReplyId !== autoReplyId ? (
                     <p className={styles.bubbleMeta}>「{dryRun.winner.name}」が返します</p>
                   ) : (
                     <p className={styles.bubbleMeta}>このルールが返します</p>
@@ -178,7 +179,7 @@ export function renderWizardPreview({ acknowledged, autoReplyId, conflicts, dryR
               <CreateSummaryCard rows={[
                 { label: '状態', value: isActive ? '有効のまま更新' : '停止中 → 有効にする' },
                 { label: '動く順番', value: myPositionLabel },
-                { label: '同時に当たるルール', value: conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none') },
+                { label: '同時に当たるルール', value: !conflictsReadable ? emptyValue('unknown') : conflicts.length > 0 ? `${conflicts.length}つ` : emptyValue('none') },
               ]} />
               {withPhone ? <LinePreview accountName={previewAccountName}>
                 <div className={styles.talkStack}>

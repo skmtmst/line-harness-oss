@@ -337,22 +337,6 @@
   width: var(--tpl-slot-w-compact);
 }
 
-/* 絵 ：投稿の画像は本文の下に幅320（4:3）。 */
-.postImageSlot {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-slot-gap);
-  width: min(100%, var(--tpl-rt-post-image-w));
-}
-
-.imageName {
-  overflow: hidden;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* ★V8-B `U1X7T2`（2026-10-07 承認）Instagram 同時投稿の区画 */
 .igBand {
   display: flex;
@@ -410,6 +394,39 @@
   flex-wrap: wrap;
   gap: var(--tpl-rt-chip-row-gap);
 }
+
+.platformImagePanel { display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: var(--tpl-rt-band-radius); background: var(--color-surface-pearl); min-width: 0; }
+.platformImageHead { display: flex; align-items: center; gap: 16px; color: var(--color-ink); font-size: var(--text-caption); }
+.platformImageHead strong { font-weight: 700; }
+.optionalLabel { color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.requiredLabel { color: var(--color-danger); font-size: var(--text-micro); }
+.platformImageRatio { margin-left: auto; color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.platformImageContent { display: flex; align-items: center; gap: 16px; min-height: 166px; padding: 8px 16px; border: 1px solid var(--color-hairline); border-radius: var(--tpl-rt-inner-radius); background: var(--color-canvas); }
+.platformThumb { display: grid; place-items: center; width: 192px; height: 144px; flex: 0 0 192px; border-radius: 6px; overflow: hidden; background: var(--color-surface-pearl); }
+.platformThumb img { max-width: 100%; max-height: 100%; width: auto; height: 100%; object-fit: contain; }
+.platformThumbGoogle img { width: 100%; object-fit: cover; }
+.platformThumbInstagram img { aspect-ratio: 4 / 5; }
+.platformImageInfo { display: flex; flex-direction: column; gap: 12px; min-width: 0; font-size: var(--text-caption); }
+.platformImageInfo strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.platformImageInfo span { color: var(--color-ink-secondary); }
+.platformImageInfo b { color: var(--color-action); font-size: var(--text-micro); }
+.platformImageEmpty { display: flex; flex-direction: column; gap: 16px; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.platformImageEmpty p { margin: 0; }
+.platformImageActions, .platformImageLinks { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.platformImageLinks button { padding: 0; border: 0; background: transparent; color: var(--color-action); font: inherit; font-size: var(--text-caption); font-weight: 600; cursor: pointer; }
+.platformImageLinks button:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
+.platformImageHelp { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.confirmImage { display: flex; align-items: center; gap: 16px; min-width: 0; padding: 12px; border: 1px solid var(--color-hairline); border-radius: var(--tpl-rt-inner-radius); background: var(--color-surface-pearl); }
+.confirmThumb { display: grid; place-items: center; width: 164px; height: 126px; flex: 0 0 164px; overflow: hidden; border-radius: 6px; background: var(--color-canvas); }
+.confirmThumb img { width: auto; height: 100%; max-width: 100%; object-fit: contain; }
+.confirmThumbGoogle img { width: 100%; object-fit: cover; }
+.confirmThumbInstagram img { aspect-ratio: 4 / 5; }
+.confirmImage > div:last-child { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.confirmImage strong { font-size: var(--text-caption); }
+.confirmImage span { color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.confirmImageLinks { display: flex; gap: 28px; }
+.confirmImageLinks button { padding: 0; border: 0; background: none; color: var(--color-action); font: inherit; font-size: var(--text-caption); font-weight: 600; cursor: pointer; }
+@media (max-width: 600px) { .platformImageContent { flex-direction: column; align-items: stretch; } .platformThumb { width: 100%; } }
 
 .formActions {
   display: flex;
@@ -502,12 +519,5 @@
   gap: var(--tpl-rt-chip-row-gap);
 }
 
-/* 絵 ：本文は横いっぱい、画像はその下に左寄せで置く。 */
-.postCompose { display: grid; grid-template-columns: minmax(0, 1fr); justify-items: start; align-items: start; gap: var(--tpl-rt-half-gap); min-width: 0; }
-.postCompose > :first-child { justify-self: stretch; }
-/* 投稿の画像の右に「投稿の詳細」（ボタン・リンク先・公開方法）。広い幅だけ 2 列、狭い幅は縦に並べる。 */
+/* 投稿の詳細はGoogle画像の下に全幅で置く。 */
 .postDetails { display: flex; flex-direction: column; gap: var(--tpl-rt-half-gap); min-width: 0; justify-self: stretch; }
-@media (min-width: 1280px) {
-  .postCompose { grid-template-columns: min(100%, var(--tpl-rt-post-image-w)) minmax(0, 1fr); column-gap: var(--tpl-rt-half-gap); }
-  .postCompose > :first-child { grid-column: 1 / -1; }
-}

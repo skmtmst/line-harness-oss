@@ -12,6 +12,8 @@ import type { StaffMember } from '@line-crm/shared'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { UNSAVED_ACTION_EVENT } from '@/lib/unsaved-action'
+import { api } from '@/lib/api'
 
 const fixture = vi.hoisted(() => ({
   pathname: '/hq',
@@ -19,6 +21,11 @@ const fixture = vi.hoisted(() => ({
   push: vi.fn(),
   setSelectedAccountId: vi.fn(),
   tenantsMe: vi.fn(),
+  selectedAccountId: null as string | null,
+  accounts: [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }],
+  notificationList: vi.fn(),
+  followerImportState: vi.fn(),
+  restoreApi: undefined as (() => void) | undefined,
 }))
 
 const localStorageValues = new Map<string, string>()
@@ -38,8 +45,8 @@ vi.mock('next/link', async () => {
 })
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
-    accounts: [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }],
-    selectedAccountId: null,
+    accounts: fixture.accounts,
+    selectedAccountId: fixture.selectedAccountId,
     setSelectedAccountId: fixture.setSelectedAccountId,
     clearSelectedAccountId: vi.fn(),
     loading: false,
@@ -51,12 +58,6 @@ vi.mock('@/contexts/account-context', () => ({
 vi.mock('@/components/shell/page-chrome', () => ({ usePageChrome: () => ({ title: null, crumbs: null, fullWidth: false, settingsNavInline: false }) }))
 vi.mock('@/lib/use-manual-href', () => ({ useManualHref: () => null }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '株式会社 然', iconUrl: null }) }))
-vi.mock('@/lib/api', () => ({
-  api: {
-    tenants: { me: fixture.tenantsMe },
-    notifications: { center: { list: vi.fn(async () => ({ success: true, data: { unreadCount: 0 } })) } },
-  },
-}))
 
 import AppTopBar from './app-top-bar'
 
@@ -64,6 +65,10 @@ import AppTopBar from './app-top-bar'
 
 describe('★V8 統括の上の帯', () => {
   beforeEach(() => {
+    const list = vi.spyOn(api.notifications.center, 'list').mockImplementation(fixture.notificationList)
+    const tenants = vi.spyOn(api.tenants, 'me').mockImplementation(fixture.tenantsMe)
+    const importState = vi.spyOn(api.lineAccounts, 'followerImportState').mockImplementation(fixture.followerImportState)
+    fixture.restoreApi = () => { list.mockRestore(); tenants.mockRestore(); importState.mockRestore() }
     forgetStaffIdentity()
     fixture.pathname = '/hq'
     fixture.theme = 'v8'
@@ -71,6 +76,12 @@ describe('★V8 統括の上の帯', () => {
     fixture.setSelectedAccountId.mockReset()
     fixture.tenantsMe.mockReset()
     fixture.tenantsMe.mockResolvedValue({ success: true, data: { name: '然 -NEN- 本部' } })
+    fixture.selectedAccountId = null
+    fixture.accounts = [{ id: 'account-1', name: '然-NEN- 本店', displayName: null }]
+    fixture.notificationList.mockReset()
+    fixture.notificationList.mockResolvedValue({ success: true, data: { items: [], counts: { all: 0, error: 0, update: 0, unread: 0 }, unreadCount: 0 } })
+    fixture.followerImportState.mockReset()
+    fixture.followerImportState.mockResolvedValue({ success: true, data: { phase: 'not_started' } })
     document.documentElement.dataset.theme = fixture.theme
     window.localStorage.setItem('lh_staff_name', 'Kenta Kawano')
     window.localStorage.setItem('lh_staff_role', 'owner')
@@ -79,6 +90,7 @@ describe('★V8 統括の上の帯', () => {
 
   afterEach(() => {
     cleanup()
+    fixture.restoreApi?.()
     delete document.documentElement.dataset.theme
   })
 
@@ -103,13 +115,113 @@ describe('★V8 統括の上の帯', () => {
     expect(view.getAllByText('統括').length).toBeGreaterThanOrEqual(2)
   })
 
+  it.each(['/hq', '/friends'])('前の選択が残る%sでも、統括だけ全アカウントの通知を読む', async (pathname) => {
+    fixture.pathname = pathname
+    fixture.selectedAccountId = 'account-1'
+    fixture.accounts = [...fixture.accounts, { id: 'account-2', name: '第2店', displayName: null }]
+    const view = render(<AppTopBar />)
+    await act(async () => { await Promise.resolve() })
+    await act(async () => { fireEvent.click(view.getByRole('button', { name: /^通知/ })) })
+    await view.findByRole('dialog', { name: '通知' })
+    await waitFor(() => expect(fixture.notificationList).toHaveBeenCalledWith('account-1', { limit: 50 }))
+    if (pathname === '/hq') expect(fixture.notificationList).toHaveBeenCalledWith('account-2', { limit: 50 })
+    else expect(fixture.notificationList.mock.calls.some(([id]) => id === 'account-2')).toBe(false)
+  })
+
+  it.each([null, 'account-1'])('統括の選択%sでも開く前後はA1+B2の合計3件', async (selected) => {
+    fixture.selectedAccountId = selected
+    fixture.accounts = [...fixture.accounts, { id: 'account-2', name: '第2店', displayName: null }]
+    fixture.notificationList.mockImplementation(async (id: string) => ({ success: true, data: { items: [], counts: { all: 3, error: 0, update: 0, unread: id === 'account-1' ? 1 : 2 }, unreadCount: id === 'account-1' ? 1 : 2 } }))
+    const view = render(<AppTopBar />)
+    const bell = await view.findByRole('button', { name: '通知（未読 3 件）' })
+    await act(async () => { fireEvent.click(bell) })
+    await view.findByText('未読 3')
+    expect(bell.getAttribute('aria-label')).toBe('通知（未読 3 件）')
+    await act(async () => { fireEvent.click(bell) })
+    expect(bell.getAttribute('aria-label')).toBe('通知（未読 3 件）')
+  })
+
+  it('個別店の札はその店だけで、切替前の遅い未読結果を採用しない', async () => {
+    fixture.pathname = '/friends'
+    fixture.selectedAccountId = 'account-1'
+    let finish!: (value: unknown) => void
+    fixture.notificationList.mockImplementation((id: string) => id === 'account-1' ? new Promise(resolve => { finish = resolve }) : Promise.resolve({ success: true, data: { items: [], counts: { all: 2, error: 0, update: 0, unread: 2 }, unreadCount: 2 } }))
+    const view = render(<AppTopBar />)
+    await waitFor(() => expect(fixture.notificationList).toHaveBeenCalledWith('account-1', { limit: 1 }))
+    fixture.selectedAccountId = 'account-2'
+    view.rerender(<AppTopBar />)
+    await view.findByRole('button', { name: '通知（未読 2 件）' })
+    await act(async () => { finish({ success: true, data: { items: [], counts: { all: 8, error: 0, update: 0, unread: 8 }, unreadCount: 8 } }) })
+    expect(view.getByRole('button', { name: '通知（未読 2 件）' })).toBeTruthy()
+  })
+
+  it('統括の未読が一部でも取得失敗なら0件ではなく不明として残す', async () => {
+    fixture.accounts = [...fixture.accounts, { id: 'account-2', name: '第2店', displayName: null }]
+    fixture.notificationList.mockImplementation(async (id: string) => id === 'account-2' ? { success: false, error: 'failed' } : { success: true, data: { items: [], counts: { all: 1, error: 0, update: 0, unread: 1 }, unreadCount: 1 } })
+    const view = render(<AppTopBar />)
+    await waitFor(() => expect(fixture.notificationList).toHaveBeenCalledTimes(2))
+    expect(view.getByRole('button', { name: '通知（未読数を確認できません）' })).toBeTruthy()
+    expect(view.queryByRole('button', { name: '通知' })).toBeNull()
+  })
+
+  it('個別画面で店未選択なら、届いた店一覧があっても札/小窓は全店を取得しない', async () => {
+    fixture.pathname = '/friends'
+    fixture.selectedAccountId = null
+    fixture.accounts = [...fixture.accounts, { id: 'account-2', name: '第2店', displayName: null }]
+    const view = render(<AppTopBar />)
+    await act(async () => { await Promise.resolve() })
+    const bell = view.getByRole('button', { name: '通知' })
+    await act(async () => { fireEvent.click(bell) })
+    await view.findByText('LINEアカウントを選ぶと、そのアカウントの通知が出ます。')
+    expect(fixture.notificationList).not.toHaveBeenCalled()
+    expect(bell.getAttribute('aria-label')).toBe('通知')
+  })
+
+  it('最初の未読取得中は取得失敗の印を出さず、失敗した後にだけ不明を出す', async () => {
+    let finish!: (value: unknown) => void
+    fixture.notificationList.mockReturnValue(new Promise(resolve => { finish = resolve }))
+    const view = render(<AppTopBar />)
+    await waitFor(() => expect(fixture.notificationList).toHaveBeenCalled())
+    expect(view.getByRole('button', { name: '通知' })).toBeTruthy()
+    expect(view.queryByRole('button', { name: '通知（未読数を確認できません）' })).toBeNull()
+    await act(async () => { finish({ success: false, error: 'failed' }) })
+    expect(view.getByRole('button', { name: '通知（未読数を確認できません）' })).toBeTruthy()
+  })
+
+  it('統括通知から店へ移るときも未保存の確認で取りやめれば切替/遷移しない', async () => {
+    fixture.accounts = [...fixture.accounts, { id: 'account-2', name: '第2店', displayName: null }]
+    fixture.notificationList.mockImplementation(async (id: string) => ({ success: true, data: { items: [{ id: 'same', eventType: 'broadcast.failed', category: 'error', title: id, body: '', metadata: null, isRead: true, createdAt: '2026-10-27T00:00:00Z' }], counts: { all: 1, error: 1, update: 0, unread: 0 }, unreadCount: 0 } }))
+    const view = render(<AppTopBar />)
+    await act(async () => { fireEvent.click(view.getByRole('button', { name: /^通知/ })) })
+    const target = await view.findByRole('button', { name: /第2店：account-2/ })
+    const refuse = (event: Event) => event.preventDefault()
+    window.addEventListener(UNSAVED_ACTION_EVENT, refuse, { once: true })
+    try {
+      await act(async () => { fireEvent.click(target) })
+      expect(fixture.setSelectedAccountId).not.toHaveBeenCalled()
+      expect(fixture.push).not.toHaveBeenCalled()
+    } finally {
+      window.removeEventListener(UNSAVED_ACTION_EVENT, refuse)
+    }
+  })
+
   it('札から店を選ぶと、その店へ入る', async () => {
     const view = render(<AppTopBar />)
     await act(async () => { await Promise.resolve() })
     fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
     fireEvent.click(await view.findByRole('menuitemradio', { name: /然-NEN- 本店/ }))
-    expect(fixture.setSelectedAccountId).toHaveBeenCalledWith('account-1')
+    await waitFor(() => expect(fixture.setSelectedAccountId).toHaveBeenCalledWith('account-1'))
     expect(fixture.push).toHaveBeenCalledWith('/')
+  })
+
+  it('札から引き継ぎ中の店を選んでも店舗へ入れない', async () => {
+    fixture.followerImportState.mockResolvedValue({ success: true, data: { phase: 'hydrating_profiles' } })
+    const view = render(<AppTopBar />)
+    await act(async () => { await Promise.resolve() })
+    fireEvent.click(view.getByRole('button', { name: 'アカウントを切り替える' }))
+    fireEvent.click(await view.findByRole('menuitemradio', { name: /然-NEN- 本店/ }))
+    await waitFor(() => expect(fixture.push).toHaveBeenCalledWith('/accounts/new/handover?accountId=account-1'))
+    expect(fixture.setSelectedAccountId).not.toHaveBeenCalled()
   })
 
   it('店の画面は今までどおり（「LINEアカウント」・役割はオーナー・ホームは /・選んでも移らない）', async () => {

@@ -9,7 +9,7 @@ import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
  */
 import { useEffect, useRef, useState } from 'react'
 import { Clock3, FileText, ImagePlus } from 'lucide-react'
-import type { MediaItem, Template } from '@line-crm/shared'
+import { withHonorific, type MediaItem, type Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { EntityKindDialog } from '@/components/shared/entity-picker-sources'
@@ -138,7 +138,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
       open
       designWidth={520}
       footerAlign="center"
-      title={`${friendName}さんに予約して送る`}
+      title={`${withHonorific(friendName)}に予約して送る`}
       busy={busy}
       error={error}
       designNode="MyJP7"

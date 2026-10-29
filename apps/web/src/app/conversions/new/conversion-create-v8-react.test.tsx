@@ -1,4 +1,6 @@
+import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { cleanup, fireEvent, screen } from '@testing-library/react'
@@ -76,7 +78,7 @@ beforeEach(() => {
   st.accountId = 'account-a'
   st.created = []
   st.pushed = []
-  st.role = 'admin'
+  st.role = verifiedStaffRole('admin')
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   host = document.createElement('div')
   document.body.append(host)
@@ -118,13 +120,14 @@ describe('★V8-B 成果地点を作る（j8p3yj・競合cXqlS）', () => {
     })
     expect(host.textContent).toContain('成果地点を作る')
     expect(host.textContent).toContain('何が起きたら数えますか')
+    expect(host.querySelector('[data-page-template="create"] [data-template-region="content"]')?.textContent).toContain('何が起きたら数えますか')
     expect(host.textContent).toContain('同じ人を何回まで数えるか')
     expect(host.textContent).toContain('金額をどう出すか')
     expect(host.textContent).toContain('数えない条件')
     expect(host.textContent).toContain('この決めごとを この30日に あてはめると')
     expect(host.textContent).toContain('この成果地点を使う場所')
     // 下の帯の3つ
-    expect(screen.getByRole('button', { name: '保存して続けて作る' })).toBeTruthy()
+    expect(getPageAction({ name: '保存して続けて作る' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /保存して数えはじめる/ })).toBeTruthy()
     // 試算（250ms待ってから読む）
     await eventually(() => {
@@ -170,7 +173,7 @@ describe('★V8-B 成果地点を作る（j8p3yj・競合cXqlS）', () => {
   })
 
   it('v8 の閲覧のみでは帯が出て、保存のボタンは置かない（押せない形でも置かない・2026-10-06 オーナー）', async () => {
-    st.role = 'viewer'
+    st.role = verifiedStaffRole('viewer')
     document.documentElement.dataset.theme = 'v8'
     await renderPage()
     await eventually(() => {
@@ -181,3 +184,5 @@ describe('★V8-B 成果地点を作る（j8p3yj・競合cXqlS）', () => {
     expect(screen.queryByRole('button', { name: '保存して続けて作る' })).toBeNull()
   })
 })
+
+afterEach(() => { verifiedStaffRole(null) })

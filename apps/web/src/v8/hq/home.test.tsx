@@ -14,6 +14,7 @@ vi.hoisted(() => {
 })
 
 const accounts = vi.hoisted(() => vi.fn())
+const checkConnection = vi.hoisted(() => vi.fn())
 const stepImport = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string }))
 
@@ -21,6 +22,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
+    fetchApi: checkConnection,
     api: {
       ...actual.api,
       lineAccounts: { ...actual.api.lineAccounts, list: accounts, stepFollowerImport: stepImport },
@@ -69,6 +71,8 @@ beforeEach(() => {
   document.body.appendChild(container)
   root = createRoot(container)
   accounts.mockResolvedValue({ success: true, data: [warnedAccount] })
+  checkConnection.mockReset()
+  checkConnection.mockResolvedValue({ success: true, data: {} })
   stepImport.mockReset()
   stepImport.mockResolvedValue({ success: true, data: { state: { phase: 'completed' }, busy: false, profilesFetched: 0 } })
   role.value = 'owner'
@@ -156,11 +160,33 @@ describe('統括のアカウント', () => {
     expect(stepImport).not.toHaveBeenCalled()
   })
 
+  it('カードの更新は押した1件だけに送り、失敗したアカウント名を伝える', async () => {
+    accounts.mockResolvedValue({ success: true, data: [warnedAccount, { ...warnedAccount, id: 'acc-2', name: '二号店', displayName: '二号店' }] })
+    checkConnection.mockRejectedValueOnce(new Error('network'))
+    await render()
+    const card = [...container.querySelectorAll('article')].find(item => item.textContent?.includes('二号店'))!
+    const update = [...card.querySelectorAll('button')].find(button => button.textContent === '更新する')!
+    await act(async () => { update.click() })
+    expect(checkConnection).toHaveBeenCalledTimes(1)
+    expect(checkConnection).toHaveBeenCalledWith('/api/line-accounts/acc-2/connection-checks', expect.objectContaining({ method: 'POST' }))
+    expect(container.textContent).toContain('二号店の接続情報を更新できませんでした。')
+  })
+
+  it('更新して正常になったカードの警告は再読込の結果に合わせて消す', async () => {
+    await render()
+    accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, connection: { status: 'ok', issues: [] } }] })
+    const update = [...container.querySelector('article')!.querySelectorAll('button')].find(button => button.textContent === '更新する')!
+    await act(async () => { update.click() })
+    expect(container.querySelector('article [data-design-part="notice"]')).toBeNull()
+    expect(container.querySelector('article')!.textContent).toContain('正常')
+  })
+
   it('閲覧のみには「更新する」を置かない', async () => {
     role.value = 'viewer'
     await render()
     const card = container.querySelector('article')!
     expect([...card.querySelectorAll('button')].some((button) => button.textContent === '更新する')).toBe(false)
+    expect([...container.querySelectorAll('button')].some((button) => button.textContent === '全部を更新')).toBe(false)
   })
   it.each(['owner', 'admin', 'viewer'])('アカウントの用途文から権限を推測せず、現在の人%sで設定の入口を決める', async viewerRole => {
     role.value = viewerRole
@@ -181,4 +207,19 @@ describe('統括のアカウント', () => {
     expect(card.textContent).toContain('権限者 4 人')
     expect([...card.querySelectorAll('button')].some(button => button.textContent === '設定')).toBe(false)
   })
+})
+
+it('フォルダがタグにも返っても札は一つで、アーカイブの詳細には矢印を出さない', async () => {
+  accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, archivedAt: '2026-10-01', folderId: 'area', folder: { name: '渋谷エリア', color: '#0088ff' }, tags: [{ id: 'same', name: '渋谷エリア', color: '#0088ff' }, { id: 'other', name: '本店' }] }] })
+  await render()
+  const archiveFilter = [...container.querySelectorAll('button')].find(el => el.textContent?.startsWith('アーカイブ'))!
+  await act(async () => { archiveFilter.click() })
+  const card = container.querySelector('article')!
+  const labels = [...card.querySelectorAll('[data-icon-label], [role="group"]')].filter(el => !el.closest('[aria-hidden="true"]') && el.textContent === '渋谷エリア')
+  expect(labels).toHaveLength(1)
+  const edit = [...card.querySelectorAll('button')].find(el => el.textContent === '登録内容を編集')!
+  expect(edit).toBeTruthy()
+  expect(edit.querySelectorAll('svg')).toHaveLength(1)
+  expect([...card.querySelectorAll('button')].some(el => el.textContent === '詳細')).toBe(false)
+  expect([...card.querySelectorAll('button')].find(el => el.textContent === '戻す')?.querySelector('svg')).not.toBeNull()
 })

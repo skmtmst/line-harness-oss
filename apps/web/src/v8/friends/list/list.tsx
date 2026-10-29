@@ -5,19 +5,22 @@ import { jstDate } from '@/lib/jst-datetime'
 import { useAttentionStarMotion } from '@/components/shared/use-attention-star-motion'
 
 import Avatar from '@/components/shared/avatar';
+import IconButton from '@/components/shared/icon-button';
 import PageSizeSelect from '@/components/shared/page-size-select';
 import { scoreBoundary,validAdvancedSearch } from './list-search-validation';
 
-import { ListToolbarEnd,ListToolbarFrame,ListToolbarOptional,ListToolbarRow,ListToolbarSearchSlot,ListToolbarSort,ResponsiveFilterChips } from '@/components/shared/list-toolbar';
+import { RowMenu } from '@/components/shared/row-actions';
+import { ListToolbarEnd,ListToolbarFrame,ListToolbarRow,ListToolbarSearchSlot,ListToolbarSort,ResponsiveFilterChips } from '@/components/shared/list-toolbar';
 
 import { collectListRows } from '@/components/shared/collect-list-rows';
 import Link from '@/components/shared/list-navigation';
 import { useListScrollMemory,useListUrlJsonValue,useListUrlValue } from '@/components/shared/list-url-state';
 import StatusBadge from '@/components/shared/status-badge';
+import DeltaChip from '@/components/shared/delta-chip';
 import { statusLabel } from '@/lib/status-labels';
 import { SUPPORT_STATUS_TONES } from '@/components/shared/status-pill';
 import TagOverflow from '@/components/shared/tag-overflow';
-import { Bookmark,CircleDot,Columns3,Download,Megaphone,MessageSquare,SlidersHorizontal,Star,TrendingUp,Upload,UserPlus,UserRoundX,Users } from 'lucide-react';
+import { Bookmark,CircleDot,Columns3,Download,Megaphone,MessageSquare,SlidersHorizontal,Star,Upload,UserPlus,UserRoundX,Users,type LucideIcon } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
 
@@ -38,6 +41,7 @@ import DisplayItemsDialog from '@/components/shared/display-items-dialog';
 import { emptyValue, EmptyCell } from '@/components/shared/empty-value';
 import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select';
 import FilterChip from '@/components/shared/filter-chip';
+import { FilterPopover } from '@/components/shared/filter-popover';
 import KpiBand from '@/components/shared/kpi-band';
 import KpiCard from '@/components/shared/kpi-card';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -68,7 +72,7 @@ import { loadOperators } from '@/lib/operators-cache';
 import { canManageRole,useStaffRole } from '@/lib/staff-role';
 import { useFeatureVisibility } from '@/lib/use-feature-visibility';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
-import { BASIC_FRIEND_FIELDS,type Folder,type FriendField,type Scenario,type Tag } from '@line-crm/shared';
+import { BASIC_FRIEND_FIELDS,kpiChangeTone,type Folder,type FriendField,type Scenario,type Tag } from '@line-crm/shared';
 import { FriendsTabs } from '../shared/head';
 import { canEditFeature } from '@/lib/staff-capability'
 import { csvExportLine } from './csv-export';
@@ -96,6 +100,20 @@ type SortMode = 'recent' | 'oldest'
 type ResponseFilter = 'all' | 'unhandled'
 type Notice = { title: string; message: string } | null
 const EMPTY_URL_FILTERS = { q: '', tag: '', advanced: '', responseFilter: 'all', operatorId: '', scenarioId: '', attentionOnly: '', scoreMin: '', scoreMax: '', scoredOnly: '', audienceId: '', savedSearch: '', page: '1' }
+
+/** 増減の符号を全角の＋／−にそろえる（R1・10-29 オーナー「おすすめで」）。半角の - は使わない。 */
+const signedDeltaText = (value: number, digits: string) =>
+  value < 0 ? digits.replace(/^-/, '−') : `＋${digits}`
+
+/** 友だち一覧の数の帯の1マス。増減の向きは共通の kpiChangeTone（増えると良い）で決め、画面で色は選ばない。 */
+type FriendKpi = {
+  key: string; title: string; icon: LucideIcon; value: number | null; detail: string
+  delta: { text: string; tone: 'up' | 'down' | 'warn' } | null; href: string
+}
+
+/** 札の色の口。要確認は黄、ほかは増減の向きのまま緑・赤へつなぐ。 */
+const deltaTone = (tone: 'up' | 'down' | 'warn'): 'up' | 'down' | 'attention' =>
+  tone === 'warn' ? 'attention' : tone
 
 type LoadStatus = 'loading' | 'ready' | 'error'
 type Column = string
@@ -188,8 +206,8 @@ export default function FriendsListV8() {
   const [visible, setVisible] = useState<Set<Column>>(() => new Set(COLUMNS.map((column) => column.key)))
   const [columnsReady, setColumnsReady] = useState(false)
   const [columnsOpen, setColumnsOpen] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [fieldCatalogRevision, setFieldCatalogRevision] = useState(0)
-  const columnsButtonRef = useRef<HTMLButtonElement>(null)
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('friends.visibleColumns') ?? 'null') as unknown
@@ -616,11 +634,11 @@ export default function FriendsListV8() {
   /* ── 数の帯 ── */
   const addedDiff = stats ? stats.addedThisMonth - stats.addedLastMonth : 0
   const activeDelta = stats?.activeMonthDelta ?? null
-  const kpis = [
+  const kpis: FriendKpi[] = [
     {
       key: 'active', title: '有効な友だち', icon: Users, value: stats?.active ?? null,
       detail: stats ? `総友だち ${formatNumber(stats.total)}` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
-      delta: activeDelta != null && activeDelta !== 0 ? { text: `${activeDelta >= 0 ? '+' : ''}${formatNumber(activeDelta)}`, tone: activeDelta < 0 ? 'neutral' : 'up' } : null,
+      delta: activeDelta != null && activeDelta !== 0 ? { text: signedDeltaText(activeDelta, formatNumber(activeDelta)), tone: kpiChangeTone('high', activeDelta) === 'good' ? 'up' : 'down' } : null,
       href: '/chats',
     },
     {
@@ -638,10 +656,10 @@ export default function FriendsListV8() {
     {
       key: 'added', title: '今月の追加', icon: UserPlus, value: stats?.addedThisMonth ?? null,
       detail: stats ? `前月 ${formatNumber(stats.addedLastMonth)}人` : statsFailed ? '読み込めませんでした' : emptyValue('unknown'),
-      delta: stats && addedDiff !== 0 ? { text: `${addedDiff >= 0 ? '+' : ''}${addedDiff}`, tone: addedDiff < 0 ? 'neutral' : 'up' } : null,
+      delta: stats && addedDiff !== 0 ? { text: signedDeltaText(addedDiff, String(addedDiff)), tone: kpiChangeTone('high', addedDiff) === 'good' ? 'up' : 'down' } : null,
       href: '/chats',
     },
-  ] as const
+  ]
 
   const statsBand = (
     <KpiBand data-design="V8FriendKpis">
@@ -658,10 +676,7 @@ export default function FriendsListV8() {
           detail={kpi.detail}
           onRetry={statsFailed ? () => void loadStats(selectedAccountId) : undefined}
           delta={kpi.delta ? (
-            <span className={kpi.delta.tone === 'warn' ? `${styles.delta} ${styles.deltaWarn}` : kpi.delta.tone === 'up' ? `${styles.delta} ${styles.deltaUp}` : styles.delta}>
-              {kpi.delta.tone === 'up' ? <TrendingUp size={16} aria-hidden="true" /> : null}
-              {kpi.delta.text}
-            </span>
+            <DeltaChip tone={deltaTone(kpi.delta.tone)}>{kpi.delta.text}</DeltaChip>
           ) : undefined}
         />
       ))}
@@ -670,7 +685,7 @@ export default function FriendsListV8() {
 
   const headActions = (
     <>
-      <Button type="button" variant="secondary" onClick={exportCurrentPage} disabled={loadStatus !== 'ready'}>
+      <Button type="button" variant="text" onClick={exportCurrentPage} disabled={loadStatus !== 'ready'}>
         <Download size={16} aria-hidden="true" />
         表示中をCSVで書き出す
       </Button>
@@ -689,8 +704,8 @@ export default function FriendsListV8() {
           onChange={(value) => resetPageWith(() => setSelectedTagId(value))}
           options={prefixed('タグ', [{ value: '', label: 'すべて' }, ...allTags.map((tag) => ({ ...entityOptionMetadata(tag), value: tag.id, label: tag.name }))])} /></SaveErrorField>
   )
-
-  const columnsButton = <Button variant="text" onClick={() => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}}><Columns3 size={16} aria-hidden="true" />表示項目を編集</Button>
+  const openColumns = () => {setFieldCatalogRevision(current => current+1);setColumnsOpen(true)}
+  const extraFilterCount = Number(responseFilter !== 'all') + Number(Boolean(operatorId)) + Number(Boolean(scenarioId)) + Number(advanced !== null)
   const toolbar = (
     <>
     <ListToolbarFrame layout="stacked" data-design="V8SearchPanel">
@@ -720,38 +735,25 @@ export default function FriendsListV8() {
             先頭の口（leading）は白い板が狭い時だけ出るので、広い幅で消えないよう検索の隣に置く。 */}
         {primaryFilter}
 
-        <ListToolbarOptional collapse="overflow" label="ほかの絞り込み・操作">
-        <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" width={119} value={responseFilter}
+        <FilterPopover open={filtersOpen} onClose={() => setFiltersOpen(false)} label="絞り込み"
+          trigger={<FilterChip selected={extraFilterCount > 0} showCheck={false} count={extraFilterCount || undefined} aria-haspopup="dialog" aria-expanded={filtersOpen} onChange={() => setFiltersOpen(!filtersOpen)}>絞り込み</FilterChip>}
+          actions={<Button onClick={() => setFiltersOpen(false)}>閉じる</Button>}>
+        <SaveErrorField names={["responseFilter","response_filter"]}><Select aria-label="対応状況で絞り込む" size="full" value={responseFilter}
           onChange={(value) => resetPageWith(() => setResponseFilter(value as ResponseFilter))}
           options={prefixed('対応', [{ value: 'all', label: 'すべて' }, { value: 'unhandled', label: '未対応のみ' }])} /></SaveErrorField>
-        <SaveErrorField names={["operatorId","operator_id"]}><EntitySelect aria-label="担当で絞り込む" width={132} value={operatorId}
+        <SaveErrorField names={["operatorId","operator_id"]}><EntitySelect aria-label="担当で絞り込む" size="full" value={operatorId}
           onChange={(value) => resetPageWith(() => setOperatorId(value))}
           options={prefixed('担当者', [{ value: '', label: 'すべて' }, ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name }))])} /></SaveErrorField>
-        <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect kind="scenario" aria-label="シナリオで絞り込む" width={147} value={scenarioId}
+        <SaveErrorField names={["scenarioId","scenario_id"]}><EntitySelect kind="scenario" aria-label="シナリオで絞り込む" size="full" value={scenarioId}
           onChange={(value) => resetPageWith(() => setScenarioId(value))}
           options={prefixed('シナリオ', [{ value: '', label: 'すべて' }, ...scenarios.map((scenario) => ({ ...entityOptionMetadata(scenario), value: scenario.id, label: scenario.name }))])} /></SaveErrorField>
-        <FilterChip
-          selected={advanced !== null}
-          onChange={() => setAdvancedOpen(true)}
+        <Button fullWidth filterActive={advanced !== null} aria-haspopup="dialog"
+          onClick={() => { setFiltersOpen(false); setAdvancedOpen(true) }}
         >
           <SlidersHorizontal size={16} aria-hidden="true" />
           詳細条件
-        </FilterChip>
-        <span className={styles.spacer} />
-        {!readOnly && narrow ? columnsButton : null}
-        {savedSearchEnabled ? (
-          <Button type="button" variant="secondary" onClick={() => setSavedOpen(true)}>
-            <Bookmark size={16} aria-hidden="true" />
-            保存した検索
-          </Button>
-        ) : null}
-        {broadcastHandoffHref ? (
-          <Link href={broadcastHandoffHref} data-broadcast-handoff className={styles.handoff} title="今の絞り込み条件を対象に一斉配信を作ります。人数は送信時に最新の友だちへ計算し直します。">
-            <Megaphone size={16} aria-hidden="true" />
-            この条件で配信を作る
-          </Link>
-        ) : null}
-        </ListToolbarOptional>
+        </Button>
+        </FilterPopover>
       </ListToolbarRow>
       <ListToolbarRow>
         {/* 絵 y2n1z：1152 でも［未対応］［注目のみ］は札のまま（「状態」の選ぶ欄に畳まない）。 */}
@@ -767,9 +769,7 @@ export default function FriendsListV8() {
         <span className={styles.spacer} />
         {selectedCount > 0 ? <span className={styles.selectedCount}>{selectedCount} 件選択中</span> : null}
         {columnsOpen && !readOnly ? <DisplayItemsDialog presentation="columns" items={columnItems} selected={[...visible]} maxSelected={maxColumns} manageHref="/tags?tab=fields" onCancel={() => setColumnsOpen(false)} onConfirm={keys => {setVisible(new Set(keys));setColumnsOpen(false)}} /> : null}
-        {/* 絵 nF4ts：表示項目を編集は2段目、件数の切り替えの左。 */}
-        {/* 1152（y2n1z）は札・件数・並び・件数の切り替えを1段に収めるため、「ほかの絞り込み・操作」の中へ移す。 */}
-        {!readOnly && !narrow ? columnsButton : null}
+        {/* 絞り込みと操作を分け、操作は右端へ集める。 */}
         <ListToolbarEnd>
         <SaveErrorField names={["pageSize","limit","page_size"]}><PageSizeSelect label={null} options={PAGE_SIZE_OPTIONS} value={pageSize} onChange={(value) => resetPageWith(() => setPageSize(value as PageSize))} /></SaveErrorField>
         <SaveErrorField names={["sortMode","sort","sort_mode"]}><ListToolbarSort
@@ -780,6 +780,12 @@ export default function FriendsListV8() {
           onChange={(value) => resetPageWith(() => setSortMode(value as SortMode))}
           options={[{ value: 'recent', label: '友だち追加の新しい順' }, { value: 'oldest', label: '友だち追加の古い順' }]}
         /></SaveErrorField>
+        <RowMenu appearance="box" label="一覧のほかの操作" items={[
+          ...(!readOnly ? [{ id: 'columns', label: '表示項目を編集', icon: <Columns3 size={16} aria-hidden="true" />, onSelect: openColumns }] : []),
+          ...(savedSearchEnabled ? [{ id: 'saved-search', label: '保存した検索', icon: <Bookmark size={16} aria-hidden="true" />, onSelect: () => setSavedOpen(true) }] : []),
+          ...(broadcastHandoffHref ? [{ id: 'broadcast', label: 'この条件で配信を作る', icon: <Megaphone size={16} aria-hidden="true" />, href: broadcastHandoffHref }] : []),
+          { id: 'export', label: '表示中をCSVで書き出す', icon: <Download size={16} aria-hidden="true" />, disabled: loadStatus !== 'ready', disabledReason: '一覧の読み込み後に書き出せます', onSelect: exportCurrentPage },
+        ]} />
         </ListToolbarEnd>
       </ListToolbarRow>
       {advanced?.summary.length ? (
@@ -827,17 +833,17 @@ export default function FriendsListV8() {
         ) : null}
         <Td columnKind="star">
           {rowCanEdit ? (
-            <button
-              type="button"
-              className={attention ? `${styles.star} ${styles.starOn}` : styles.star}
+            <IconButton
+              variant="attention"
+              size="row"
               data-part="attention-star"
               data-hit-area=""
-              aria-pressed={attention}
+              pressed={attention}
               aria-label={`${friend.displayName}の注目を${attention ? '外す' : '付ける'}`}
               onClick={(event) => attentionMotion(event, () => toggleAttention(friend))}
             >
               <Star size={16} aria-hidden="true" />
-            </button>
+            </IconButton>
           ) : (
             /* 閲覧のみは押せない星を置かない。注目の印だけ見せる。 */
             <span className={attention ? `${styles.star} ${styles.starOn}` : styles.star} title={attention ? '注目' : undefined}>

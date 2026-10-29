@@ -31,6 +31,8 @@
 :global(:root) .description { color: var(--color-ink-secondary); font-size: var(--tpl-desc-size); line-height: var(--tpl-desc-lh); }
 /* 題とタブの間は headingText の gap が持つ。二重に余白を足さない。 */
 :global(:root) .headingTabs { margin-top: 0; }
+:global(:root) .headingNotice { min-width: 0; }
+:global(:root) .headingNotice:empty { display: none; }
 /* 詳細のタブも headingText の段間だけを使う。 */
 :global(:root) [data-page-template='detail'] .headingTabs { margin-top: 0; }
 /* タブの有無によらず、題の下は共通の余白を使う。 */
@@ -64,6 +66,9 @@
 :global(:root) .stats [data-kpi-strip]:last-child { margin-bottom: 0; }
 :global(:root) .stats:has([data-kpi-strip]) + .split > .main > .toolbar:first-child { padding-top: var(--space-16); padding-bottom: var(--space-16); }
 :global(:root) .frame > [data-kpi-strip] + * { margin-top: var(--space-12); }
+/* 板の直下・一覧の本文に直に置いた数の帯も、型の stats と同じ左右の内側の余白に収める（題・道具の行と端をそろえる）。 */
+:global(:root) .frame > [data-kpi-strip] { margin-inline: var(--tpl-list-inset); }
+:global(:root) .listBody:not([data-table-inset]) .content > [data-kpi-strip] { margin-inline: var(--tpl-list-inset); }
 :global(:root) .content { min-width: 0; }
 :global(:root) .listCards { display: grid; grid-template-columns: repeat(var(--tpl-list-card-columns), minmax(0, 1fr)); gap: var(--polish-space-card); padding-inline: var(--tpl-list-inset); align-items: start; }
 :global(:root) .listCards[data-card-inset='parent'] { padding-inline: 0; }
@@ -107,14 +112,19 @@
 :global(:root) .dashboardRow[data-aside-size='column'] > .dashboardCell { grid-column: 1 / -2; }
 :global(:root) .dashboardRow[data-aside-size='column'] > .dashboardAside { grid-column: -2 / -1; width: auto; }
 :global(:root) .createContent { padding: var(--tpl-create-content-pad-block) var(--tpl-create-content-pad-side); display: flex; flex-direction: column; gap: var(--tpl-create-content-gap); min-width: 0; flex: 1; }
+:global(:root) .bodyEndActions { display: flex; flex: none; align-items: center; justify-content: center; gap: var(--polish-space-field); width: 100%; padding-block: var(--polish-space-section); }
 :global(:root) .preview { align-self: flex-start; position: sticky; top: 0; max-height: 100%; width: 380px; flex-shrink: 0; padding: var(--tpl-preview-pad); border-left: 1px solid var(--color-hairline); background: var(--color-table-head); }
 /* 作成の右欄は白い板と同じ面。端末の中の地は見え方の部品が持つ。 */
 :global(:root) .frame[data-page-template='create'] [data-template-region='preview'] { background: var(--color-canvas); }
 /* 作成の型の余白の口（CreatePage の contentSpacing・previewSurface）。画面の CSS で型の余白を上書きしない。 */
 :global(:root) .createContent[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); gap: var(--tpl-create-flush-gap); }
+/* メニュー先頭の案内と直前の表示面は、幅を問わず同じ8pxで離す。 */
+:global(:root) .createContent[data-content-spacing='notice-after-preview'] { padding-top: 0; }
+:global(:root) .createContent[data-content-spacing='notice-after-preview'] > :first-child > :global([data-design-part='notice']):first-child { margin-top: var(--space-8); }
 :global(:root) .preview[data-content-spacing='flush-top'] { padding: var(--tpl-create-flush-pad); }
 :global(:root) .preview[data-preview-surface='plain'] { background: transparent; }
 :global(:root) [data-page-template='create'] .heading { padding: var(--tpl-create-head-pad-top) var(--tpl-create-head-pad-side) var(--tpl-create-head-pad-bottom); gap: var(--tpl-create-head-gap); box-shadow: var(--shadow-row-line); flex-wrap: wrap; }
+:global(:root) [data-page-template='create'] .heading[data-heading-separator='none'] { box-shadow: none; }
 :global(:root) [data-page-template='detail'] .heading { padding: var(--tpl-detail-head-pad-top) var(--tpl-detail-head-pad-side) var(--tpl-detail-head-pad-bottom); gap: var(--tpl-detail-head-gap); flex-wrap: wrap; }
 /*
  * 来た道の案内（crumbs）は題と説明の下の行で、操作のボタンと同じ行の左。
@@ -183,6 +193,10 @@
 :global(:root) .createNotice { padding: var(--tpl-create-notice-pad); }
 :global(:root) .createNotice:empty { display: none; }
 :global(:root) .createNotice[data-notice-spacing='band'] { padding: var(--tpl-fe-band-slot-pad); }
+/* 閲覧帯と本文先頭の知らせが続くとき、後の知らせの上余白へ間隔を集約する。 */
+:global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) { padding-bottom: 0; }
+:global(:root) .createNotice[data-content-spacing='notice-after-read-only']:has(+ .split > .createContent[data-content-spacing='notice-after-read-only']) > :global([data-read-only-notice]) { margin-bottom: 0; }
+:global(:root) .createNotice[data-content-spacing='notice-after-read-only'] + .split > .createContent[data-content-spacing='notice-after-read-only'] { padding-top: 0; }
 
 :global(:root) .paginationRow { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--polish-space-row); }
 
@@ -216,6 +230,19 @@
 :global(:root) .dashboardAsideSection { display: flex; flex-direction: column; gap: var(--polish-space-field); padding: var(--polish-space-card) var(--polish-space-section); }
 :global(:root) .dashboardAsideSection + .dashboardAsideSection { border-top: 1px solid var(--color-hairline); }
 :global(:root) .dashboardRow[data-row='trend'] .dashboardAsideSection:last-child { padding-bottom: 0; }
+/* grouping="cards" は段の中身と右欄の項目を共通カードに分ける。板が狭い時も本文カードを横幅いっぱいに保つ。 */
+:global(:root) .dashboardRow[data-grouping='cards'] { gap: var(--polish-space-field); margin: 0 var(--tpl-list-inset) var(--polish-space-field); border-bottom: 0; }
+:global(:root) .dashboardRow[data-grouping='cards'] > .dashboardAside { border-left: 0; padding: 0; display: flex; flex-direction: column; gap: var(--polish-space-field); }
+:global(:root) .dashboardRow[data-grouping='cards'] > .dashboardAside > * { gap: var(--polish-space-field); }
+:global(:root) .dashboardRow[data-grouping='cards'] .dashboardAsideSection + .dashboardAsideSection { border-top: 0; }
+:global(:root) .dashboardRow[data-grouping='cards'][data-row='trend'] .dashboardAsideSection:last-child { padding-bottom: var(--polish-space-card); }
+:global(:root) .dashboardColumns[data-grouping='cards'] { column-gap: var(--polish-space-field); }
+:global(:root) .dashboardRow[data-grouping='cards'] .dashboardCell + .dashboardCell { border-left: 0; }
+:global(:root) .dashboardRow[data-grouping='cards'][data-row='inbox'] { min-height: 0; }
+@container v8-page (width >= 1100px) {
+  :global(:root) .dashboardRow[data-grouping='cards'][data-row='inbox'] { align-items: flex-start; }
+  :global(:root) .dashboardRow[data-grouping='cards'][data-row='inbox'] > .dashboardCell { align-self: flex-start; }
+}
 
 /*
  * 段のまとまりをカードで分ける形（DashboardPage grouping="cards"）。線を引かず、
@@ -268,9 +295,11 @@
 }
 
 /* 入力と見え方は別々に送る。本文全体のスクロールバーで左右の列幅を削らない。 */
-:global(:root) [data-page-template='create'][data-has-footer] > .split { align-items: flex-start; overflow: hidden; }
+:global(:root) [data-page-template='create'][data-has-footer] > .split,
+:global(:root) [data-page-template='create'][data-has-footer] > .createFlow > .split { align-items: flex-start; overflow: hidden; }
 @media (min-width: 1024px) {
-  :global(:root) [data-page-template='create'][data-has-footer] > .split {
+  :global(:root) [data-page-template='create'][data-has-footer] > .split,
+:global(:root) [data-page-template='create'][data-has-footer] > .createFlow > .split {
     display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: minmax(0, 1fr);
     align-items: start;
   }
@@ -310,6 +339,8 @@
   :global(:root) .inboxSummary, :global(:root) .analyticsAside, :global(:root) .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global(:root) .dashboardRow[data-row='link'] .dashboardAside:not([data-aside-size='column']) { display: none; }
   :global(:root) .asideToggle { display: block; }
+  /* 先頭の知らせが持つ上余白へ集約し、操作の下と本文の上に重ねて足さない。 */
+  :global(:root) .asideToggle[data-content-spacing='notice-after-preview'] { padding-bottom: 0; }
   :global(:root) .inboxList { width: 348px; }
   :global(:root) .settings { flex-direction: column; gap: var(--polish-space-card); }
   :global(:root) .settingsNav { width: 100%; flex-direction: row; flex-wrap: wrap; }
@@ -375,7 +406,7 @@
 .detailColumns[data-presentation='card'] .detailColumnAside { padding-left: 0; border-left: 0; }
 .detailColumns[data-detail-columns='restaurant-ledger'] { grid-template-columns: minmax(0, 1fr) var(--tpl-board-detail-w); gap: var(--polish-space-card); margin-right: 0; }
 .detailColumns[data-detail-columns='restaurant-tables'] { gap: var(--tpl-rs-body-gap); margin-right: 0; }
-.detailColumns[data-detail-columns='restaurant-inventory'] { grid-template-columns: minmax(0, 1fr) var(--tpl-rs-inv-side-w); }
+.detailColumns[data-detail-columns='restaurant-inventory'] { grid-template-columns: minmax(0, 1fr) var(--tpl-rs-inv-side-w); margin-right: 0; }
 .detailColumns[data-detail-columns='restaurant-ledger'] { grid-template-columns: minmax(0, 1fr) var(--tpl-board-detail-w); gap: var(--polish-space-card); margin-right: 0; }
 .detailColumns[data-detail-columns='restaurant-tables'] { grid-template-columns: minmax(0, 1fr) var(--tpl-floor-aside-w); }
 /* 枠を持つ詳細カードの高さは内容で決め、図面の高さへ引き伸ばさない。 */
@@ -586,6 +617,11 @@
 
 /* 数の帯を白い板の余白の内側へ置く。道具に含む帯は道具の余白を使う。 */
 :global(:root) .stats:has([data-kpi-strip]) { padding: var(--space-8) var(--tpl-list-inset) 0; min-width: 0; max-width: 100%; }
+:global(:root) .listBody > .stats:has([data-kpi-strip]),
+:global(:root) .listBody > .split > .main > .content > .stats:has([data-kpi-strip]) { padding-bottom: var(--space-8); }
+/* 数の帯の次に警告と分析の列が続くとき、段の上と警告の下へ間隔を重ねない。 */
+:global(:root) .stats:has([data-kpi-strip]) + .listSection:has(> :global([data-design-part='notice'][data-tone='warn']):first-child + .detailColumns[data-presentation='analysis']:last-child) { padding-top: 0; gap: var(--space-8); }
+:global(:root) .stats:has([data-kpi-strip]) + .listSection:has(> :global([data-design-part='notice'][data-tone='warn']):first-child + .detailColumns[data-presentation='analysis']:last-child) > :global([data-design-part='notice'][data-tone='warn']):first-child { margin-block: 0; }
 :global(:root) .section { border-bottom: 0; }
 
 @container v8-page (width < 1100px) {
@@ -599,4 +635,25 @@
 
 @container v8-page (width < 1100px) {
  :global(:root) .dashboardRow[data-aside-size='column'] { display: flex; }
+}
+
+.heading [data-page-heading-actions] { display: inline-flex; align-items: center; gap: var(--polish-space-row); }
+
+/* The create flow owns spacing between its notice, preview launcher and columns. */
+:global(:root) .createFlow {
+  display: flex; flex-direction: column; flex: 1; min-height: 0;
+  gap: var(--tpl-create-content-gap); padding-top: var(--tpl-create-content-pad-block);
+}
+:global(:root) .createFlow:has(> .createNotice:not(:empty)) { padding-top: var(--polish-space-field); }
+:global(:root) .createFlow > .createNotice {
+  display: flex; flex: none; flex-direction: column; gap: inherit;
+  padding: 0 var(--polish-space-section);
+}
+:global(:root) .createFlow > .createNotice:empty { display: none; }
+:global(:root) .createFlow > .createNotice > :global([data-design-part='notice']) { margin-block: 0; }
+:global(:root) .createFlow > .asideToggle { flex: none; padding-block: 0; }
+:global(:root) .createFlow > .split { min-height: 0; }
+:global(:root) .createFlow > .split > :is(.createContent, .preview) { padding-top: 0; }
+@container v8-page (max-width: 1099px) {
+  :global(:root) .createFlow:has(> .asideToggle) { padding-top: var(--polish-space-field); }
 }

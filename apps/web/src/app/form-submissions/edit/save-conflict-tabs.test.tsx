@@ -1,3 +1,4 @@
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
  * 409 の知らせが**3つのタブすべて**で DOM に出ることを、本物の React で確かめる
@@ -114,8 +115,8 @@ async function flush() {
 }
 
 function findButton(text: string): HTMLButtonElement | undefined {
-  return [...container.querySelectorAll('button')]
-    .find((node) => (node.textContent ?? '').includes(text)) as HTMLButtonElement | undefined
+  return ([...container.querySelectorAll('button')]
+    .find((node) => (node.textContent ?? '').includes(text)) ?? querySupplementaryPageAction(text)) as HTMLButtonElement | undefined
 }
 
 beforeEach(() => {

@@ -16,6 +16,7 @@ import styles from './dashboard.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import ListState from '@/components/shared/list-state'
+import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 /*
  * 友だち追加リンク（ 段C）。動きは 管理画面 の FriendAddLinkCard と同じ：
@@ -104,7 +105,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
         ) : null}
       </div>
       <div className={styles.linkRow}>
-        <SaveErrorField names={["link"]}><input
+        <SaveErrorField names={["link"]}><SharedTextField
           readOnly
           value={link}
           onFocus={(event) => event.currentTarget.select()}

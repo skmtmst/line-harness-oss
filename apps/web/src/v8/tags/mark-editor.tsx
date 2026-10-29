@@ -16,7 +16,6 @@ import { StickyBarAction } from '@/components/shared/sticky-bar'
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import { Field } from '@/components/shared/form-controls';
-import Checkbox from '@/components/shared/checkbox'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
@@ -34,6 +33,7 @@ import styles from './create.module.css'
 import { formatNumber } from '@/lib/format'
 import { permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { ToggleField } from '@/components/shared/toggle'
 
 /*
  * ★V8 対応マークを作る・編集（Pencil 、確認画面は ）。
@@ -450,7 +450,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
         </Notice>
       ) : null}
       <div ><Field>
-        <SaveErrorField names={["isDefault","is_default"]}><Checkbox checked={isDefault} disabled={selected?.isDefault} onCheckedChange={setIsDefault}>新しい友だちに最初から付ける</Checkbox></SaveErrorField>
+        <SaveErrorField names={["isDefault","is_default"]}><ToggleField checked={isDefault} disabled={selected?.isDefault} onChange={setIsDefault}>新しい友だちに最初から付ける</ToggleField></SaveErrorField>
         <p className={styles.fieldNote}>最初から付けるマークは1つだけ選べます</p>
       </Field></div>
     </div>
@@ -544,7 +544,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
                       ]}
                       size="full"
                     /></SaveErrorField></Field>
-                  <SaveErrorField names={["ruleActive","isActive","rule_active"]}><Checkbox checked={ruleActive} onCheckedChange={setRuleActive}>このきまりを有効にして登録する</Checkbox></SaveErrorField>
+                  <SaveErrorField names={["ruleActive","isActive","rule_active"]}><ToggleField checked={ruleActive} onChange={setRuleActive}>このきまりを有効にして登録する</ToggleField></SaveErrorField>
                   <span><Button type="button" onClick={() => setCreateRule(false)}>きまりを外す</Button></span>
                 </div>
               ) : (

@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useContext, useEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
+import React, { useContext, useEffect, useLayoutEffect, useId, useState, type CSSProperties, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { PanelsTopLeft, X } from 'lucide-react'
-import { OverlayDepthContext, useOverlayFocus, useOverlayLayer, useV8Leave } from './overlay-utils'
+import { OVERLAY_MODAL_OPEN_EVENT, OverlayDepthContext, useOverlayFocus, useOverlayLayer, useV8Leave } from './overlay-utils'
 import styles from './drawer.module.css'
 import Dialog from './dialog'
 import IconButton from './icon-button'
@@ -98,6 +98,9 @@ export default function Drawer({
   const [mounted, setMounted] = useState(false)
   const panelRef: React.RefObject<HTMLElement | null> = useOverlayFocus<HTMLElement>(open && modal, discard.requestClose, busy, initialFocus === 'panel' ? (): HTMLElement | null => panelRef.current : undefined)
   const layer = useOverlayLayer(open && modal)
+  useLayoutEffect(() => {
+    if (open && modal) document.dispatchEvent(new Event(OVERLAY_MODAL_OPEN_EVENT))
+  }, [open, modal])
   /* ★V8 仕上げ（M10）：閉じるときは逆再生してから外す（v8 のみ）。 */
   const leaving = useV8Leave(open)
 

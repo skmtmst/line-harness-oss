@@ -38,6 +38,7 @@ it('名前と差し込み名が空のまま保存して公開すると、口を�
   await act(async () => { root.render(<NewCommonVarV8 />) })
   for (let i = 0; i < 4; i += 1) await act(async () => { await Promise.resolve() })
   const value = document.getElementById('cv-value') as HTMLInputElement
+  expect(value.closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
   fireEvent.change(value, { target: { value: '営業時間 10〜19時' } })
   const submit = Array.from(document.querySelectorAll('button')).find((b) => b.textContent?.trim() === '保存して公開') as HTMLButtonElement
   await act(async () => { submit.click() })

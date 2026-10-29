@@ -180,11 +180,12 @@ html:root :is(.inlineGrip, .grip)[data-reorder-handle] { color: var(--color-ink-
 html:root .action[data-row-menu] {
   position: relative;
   isolation: isolate;
+  border: 0;
   border-radius: var(--polish-radius-control);
   background: transparent;
   box-shadow: none;
 }
-/* 見える枠は28角、押せる所は既存の36角。型の列幅を動かさない。 */
+/* 押せる所の大きさを保ち、通常時は線を見せない。 */
 html:root .action[data-row-menu]:not(:focus-visible) {
   outline: 1px solid transparent;
 }
@@ -228,3 +229,7 @@ html:root .inlineGrip:not(:has(svg)) {
 .statusActions { display: inline-flex; flex: none; align-items: center; gap: var(--polish-space-field); }
 .statusAction { display: inline-flex; flex: none; }
 .statusAction > :is(button, a) { min-width: var(--polish-row-action-width); }
+
+/* 権限の操作は焦点を保ち、入力不足と区別できる灰色にする。 */
+html:root .quickAction[data-permission-locked] { background: var(--color-canvas-sunken); color: var(--color-ink-faint); opacity: var(--polish-disabled-opacity); cursor: not-allowed; filter: none; scale: none; }
+html:root .permissionGrip { color: var(--color-ink-faint); opacity: var(--polish-disabled-opacity); cursor: not-allowed; }

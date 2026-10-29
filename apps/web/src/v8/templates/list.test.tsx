@@ -1,4 +1,7 @@
+import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 テンプレートの一覧（src/v8）の動きの試験。BEHAVIOR.md の主な動きを守る。
  * 行が出る・公開の札・閲覧のみの帯（サーバの役割で決まる）・
@@ -86,7 +89,7 @@ function openMenuAndDelete(name: string) {
 
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   listTemplates.mockResolvedValue({ success: true, data: [used, unused] })
   usages.mockResolvedValue({
     success: true,
@@ -154,16 +157,16 @@ describe('V8 テンプレートの一覧', () => {
 
   // 2026-10-06 オーナー決定：閲覧のみには押せないボタンを置かずに隠す（帯は出す）。
   it('サーバの役割が staff なら閲覧のみの帯が出て、選ぶ枠と作るボタンは出さない', async () => {
-    role.value = 'staff'
+    role.value = verifiedStaffRole('staff')
     await renderList()
-    expect(screen.getByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeTruthy()
+    expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
     expect(screen.queryAllByRole('button', { name: /テンプレートを作る/ })).toHaveLength(0)
     expect(screen.queryAllByRole('checkbox', { name: /を選択$/ })).toHaveLength(0)
   })
 
   it('オーナーには閲覧のみの帯を出さない', async () => {
     await renderList()
-    expect(screen.queryByText('閲覧のみで見ています。変える操作はオーナーか管理者に頼んでください。')).toBeNull()
+    expect(screen.queryByText('閲覧のみで見ています。変えたい時はオーナーか管理者に頼んでください。')).toBeNull()
   })
 
   it('決まり2：未使用の削除も確認してから実行する', async () => {
@@ -191,7 +194,7 @@ describe('V8 テンプレートの一覧', () => {
     expect(screen.getByText('「秋の新商品（画像）」を削除しますか？')).toBeTruthy()
     expect(screen.getByText('削除は元に戻せません。')).toBeTruthy()
     const dialog = screen.getByRole('alertdialog')
-    const confirm = [...dialog.querySelectorAll('button')].find((b) => b.textContent === '削除する') as HTMLButtonElement
+    const confirm = ([...dialog.querySelectorAll('button')].find((b) => b.textContent === '削除する') ?? querySupplementaryPageAction('削除する')) as HTMLButtonElement
     await act(async () => {
       fireEvent.click(confirm)
     })
@@ -216,7 +219,7 @@ describe('V8 テンプレートの一覧', () => {
 
 describe('テンプレートの種類を選ぶ窓（R9XUMr）：見本から作る（F-5）', () => {
   beforeEach(() => {
-    role.value = 'owner'
+    role.value = verifiedStaffRole('owner')
     push.mockReset()
     fetchApi.mockReset()
     listTemplates.mockResolvedValue({ success: true, data: [used] })
@@ -257,7 +260,7 @@ describe('テンプレートの種類を選ぶ窓（R9XUMr）：見本から作�
 })
 
 it('見本の取得失敗を見本なしとして消さず、同じ窓で読み直す',async()=>{
- role.value='owner'
+ role.value = verifiedStaffRole('owner')
  listTemplates.mockResolvedValue({success:true,data:[used]})
  fetchApi.mockReset().mockRejectedValueOnce(new Error('fixture failure')).mockResolvedValue({success:true,data:[]})
  await renderList()
@@ -279,3 +282,5 @@ it('U2：題の共通説明を開いて閉じ、一覧の操作を保つ', async
   expect(document.getElementById(descriptionId)).toBeNull()
   expect(screen.getByText('予約前日のご案内')).toBeTruthy()
 })
+
+afterEach(() => { verifiedStaffRole(null) })

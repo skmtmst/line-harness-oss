@@ -128,7 +128,7 @@ async function renderForm() {
 }
 
 function nameInput(): HTMLInputElement {
-  const input = host.querySelector('input[placeholder="例: 第1回 AAA 説明会"]')
+  const input = host.querySelector('input[placeholder="例：第1回 AAA 説明会"]')
   if (!input) throw new Error('name input not found')
   return input as HTMLInputElement
 }

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -171,6 +172,7 @@ test('新しい制御タブ（OHwbU）が出る', async () => {
 
 test('PKG107: 閲覧のみには停止操作を隠し、状態と記録を残す', async () => {
   canControl = false
+  verifiedStaffRole('viewer')
   await renderControl()
   expect(host?.textContent).toContain('閲覧のみで見ています')
   const stopButton = Array.from(host?.querySelectorAll('button') ?? [])
@@ -395,8 +397,11 @@ test('WEB312: 状態が読めないときは「—」と読み直しを出す', 
 
 test('PKG107: 停止中の閲覧のみでは復旧操作を隠し、停止の状態を読める', async () => {
   canControl = false
+  verifiedStaffRole('viewer')
   activeIncidentId = 'incident-1'
   await renderControl()
   expect(host?.textContent).toContain('止めているとき')
   expect([...host!.querySelectorAll('button')].find((el) => el.textContent?.trim() === '復旧する')).toBeUndefined()
  })
+
+afterEach(() => { verifiedStaffRole(null) })

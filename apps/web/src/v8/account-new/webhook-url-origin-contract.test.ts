@@ -47,15 +47,17 @@ describe('②Step2 の Webhook URL は Worker が正とする元から作る', (
     expect(STAGING_WORKFLOW).toContain('NEXT_PUBLIC_API_URL: ${{ env.STAGING_API_URL }}')
   })
 
-  it('画面に出す字は <APIの元>/webhook', () => {
+  it('画面に出す字は <APIの元>/webhook/<Messaging APIチャネルID>', () => {
     const base = tomlVar(STAGING_WRANGLER, 'WORKER_PUBLIC_URL') as string
     const previous = process.env.NEXT_PUBLIC_API_URL
     try {
       process.env.NEXT_PUBLIC_API_URL = base
-      expect(musuboWebhookUrl()).toBe(`${base}/webhook`)
+      expect(musuboWebhookUrl('2001234567')).toBe(`${base}/webhook/2001234567`)
       // 末尾の / があっても二重にしない。
       process.env.NEXT_PUBLIC_API_URL = `${base}/`
-      expect(musuboWebhookUrl()).toBe(`${base}/webhook`)
+      expect(musuboWebhookUrl(' 2001234567 ')).toBe(`${base}/webhook/2001234567`)
+      expect(musuboWebhookUrl('')).toBe('')
+      expect(musuboWebhookUrl('2001/other')).toBe('')
     } finally {
       if (previous === undefined) delete process.env.NEXT_PUBLIC_API_URL
       else process.env.NEXT_PUBLIC_API_URL = previous
@@ -66,7 +68,7 @@ describe('②Step2 の Webhook URL は Worker が正とする元から作る', (
     const previous = process.env.NEXT_PUBLIC_API_URL
     try {
       delete process.env.NEXT_PUBLIC_API_URL
-      expect(musuboWebhookUrl()).toBe('')
+      expect(musuboWebhookUrl('2001234567')).toBe('')
     } finally {
       if (previous !== undefined) process.env.NEXT_PUBLIC_API_URL = previous
     }

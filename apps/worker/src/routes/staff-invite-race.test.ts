@@ -56,6 +56,7 @@ function app() {
 beforeEach(() => {
   vi.clearAllMocks();
   dbMocks.getStaffMembers.mockResolvedValue([]);
+  dbMocks.getStaffById.mockResolvedValue({ id: 'owner-1', tenant_id: 'tenant-1', account_scope: 'all', is_active: 1 });
 });
 
 describe('M958 同時作成の負け側', () => {

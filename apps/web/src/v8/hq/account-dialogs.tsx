@@ -3,7 +3,7 @@ import { requiredText } from '@/lib/form-requirement'
 const accountNameRequirement = requiredText('名前を入力してください。')
 
 import { useEffect, useState } from 'react'
-import { CircleHelp, RotateCcw, Users } from 'lucide-react'
+import { Pencil, RotateCcw, Users } from 'lucide-react'
 import Dialog from '@/components/shared/dialog'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import Button from '@/components/shared/button'
@@ -18,7 +18,6 @@ import styles from './account-dialogs.module.css'
 import { FALLBACK_REASON, connectionReasons, lineHandle } from './connection-reasons'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 統括のアカウントの3つの窓（板  設定・ アーカイブ・ 戻す）。
@@ -46,15 +45,14 @@ export function accountHandle(account: AccountWithStats): string {
   return lineHandle(account)
 }
 
-/* 板 ：アカウントの設定（名前・親・フォルダ・ほかの設定・アーカイブ）。2026-10-08 タグ→フォルダ（1つだけ・API-17）。 */
-export function AccountSettingsDialogV8({ account, accounts, archived, onClose, onSaved, onArchive, onShowDetails, canCreateFolder = false, onFolderCreated }: {
+/* 板 ：アカウントの設定（名前・フォルダ・ほかの設定・アーカイブ）。2026-10-08 タグ→フォルダ（1つだけ・API-17）。 */
+export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, onArchive, onEditRegistration, canCreateFolder = false, onFolderCreated }: {
   account: AccountWithStats
-  accounts: AccountWithStats[]
   archived: boolean
   onClose: () => void
   onSaved: () => void
   onArchive: () => void
-  onShowDetails: () => void
+  onEditRegistration: () => void
   /** フォルダを選ぶ欄からその場で作れるか（左の列の「フォルダを追加」と同じ権限）。 */
   canCreateFolder?: boolean
   /** その場でフォルダを作ったとき（左の列を読み直す）。 */
@@ -63,7 +61,6 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
   const saveErrors = useSaveFormErrors()
   const [name, setName] = useState(account.name)
   const [nameError, setNameError] = useState('')
-  const [parent, setParent] = useState('')
   const initialFolder = (account as { folderId?: string | null }).folderId ?? ''
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderId, setFolderId] = useState<string>(initialFolder)
@@ -99,15 +96,6 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
           return
         }
       }
-      if (parent !== '') {
-        const res = await api.lineAccounts.updateHierarchy([
-          { id: account.id, parentLineAccountId: parent === 'none' ? null : parent },
-        ])
-        if (!res.success) {
-          setError(res.error)
-          return
-        }
-      }
       if (folderId !== initialFolder) {
         const res = await api.lineAccountFolders.move(account.id, folderId || null)
         if (!res.success) {
@@ -128,9 +116,6 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
     }
   }
 
-  /* 親アカウントの選ぶ欄。今の親があればそれを最初に見せる（絵は「然 -NEN- 本店」）。 */
-  const currentParent = (account as { parentLineAccountId?: string | null }).parentLineAccountId ?? null
-  const parentName = currentParent ? accounts.find((item) => item.id === currentParent) : null
   return (
     <SaveErrorScope errors={saveErrors}><Dialog
       open
@@ -144,11 +129,11 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
       onCancel={onClose}
       footer={
         <div className={`${head.footer} ${head.footerSplit}`}>
-          <Button type="button" variant={archived ? 'secondary' : 'danger'} onClick={onArchive}>
+          <Button type="button" variant="secondary" onClick={onArchive}>
             {archived ? '戻す' : 'アーカイブ'}
           </Button>
           <div className={head.footerGroup}>
-            <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
+            <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
             <Button type="button" variant="primary" onClick={() => save()} disabled={busy} busy={busy} busyLabel="保存中…">保存</Button>
           </div>
         </div>
@@ -166,19 +151,6 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
             className={styles.full}
           /></SaveErrorField>
 {nameError ? <p id="hq-account-settings-name-error" className={styles.error} role="alert">{nameError}</p> : null}</Field></div>
-        <div className={styles.field}><Field label="親アカウント" htmlFor="hq-account-settings-parent"><SaveErrorField names={["parent"]}><EntitySelect
-            id="hq-account-settings-parent"
-            aria-label="親アカウント"
-            size="full"
-            value={parent}
-            disabled={busy}
-            onChange={setParent}
-            options={[
-              { value: '', label: parentName ? (parentName.displayName || parentName.name) : '変えない' },
-              { value: 'none', label: 'なしにする' },
-              ...accounts.filter((item) => item.id !== account.id && item.id !== currentParent).map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.displayName || item.name })),
-            ]}
-          /></SaveErrorField></Field></div>
         <div className={styles.field}><Field note={<>アカウントは1つのフォルダに入ります。アカウント一覧の左の列で絞り込みに使います</>} label="フォルダ" htmlFor="hq-account-folder"><SaveErrorField names={["folderId","folder_id"]}><FolderSelect
             id="hq-account-folder"
             aria-label="フォルダ"
@@ -208,8 +180,8 @@ export function AccountSettingsDialogV8({ account, accounts, archived, onClose, 
         <div className={styles.field}>
           <p className={styles.label}>ほかの設定</p>
           <div className={styles.buttonRow}>
-            <Button type="button" onClick={onShowDetails}>
-              <CircleHelp aria-hidden="true" className={styles.icon} />詳しい数値を見る
+            <Button type="button" onClick={onEditRegistration}>
+              <Pencil aria-hidden="true" className={styles.icon} />LINE の登録内容を編集
             </Button>
             <Button href="/hq/members">
               <Users aria-hidden="true" className={styles.icon} />メンバー・担当範囲

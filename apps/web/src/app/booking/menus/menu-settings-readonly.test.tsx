@@ -1,4 +1,6 @@
 // @vitest-environment happy-dom
+import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
@@ -22,10 +24,13 @@ it('メニュー画面を共通の型とプレビューの入口で描く', () =
   expect(screen.getByRole('button', { name: 'LINEでの見え方を見る' })).toBeTruthy()
 })
 
-it('閲覧では案内を出し作成操作を描かない', async () => {
+it('閲覧では案内と理由付きの作成操作を出し、作成を拒否する', async () => {
+  verifiedStaffRole('viewer')
   const { container } = render(<MenuSettingsPage {...menuSettingsModel()} />)
   expect(container.querySelector('[data-design-node="C9fv7A"] [data-read-only-notice]')).toBeTruthy()
   await screen.findByText('まだ予約メニューがありません')
   expect(screen.queryByRole('link', { name: /予約メニューを作る/ })).toBeNull()
-  expect(screen.queryByRole('button', { name: /予約メニューを作る/ })).toBeNull()
+  await expectPermissionLocked(screen.getByRole('button', { name: /予約メニューを作る/ }))
 })
+
+afterEach(() => { verifiedStaffRole(null) })

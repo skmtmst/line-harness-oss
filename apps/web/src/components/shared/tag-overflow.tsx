@@ -1,7 +1,8 @@
 'use client'
 
-import { Children, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { Children, isValidElement, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import Dialog from './dialog'
+import TooltipBubble from './tooltip-bubble'
 import { TruncatedTextFocus } from './truncated-text'
 import { cancelMeasurement, scheduleMeasurement } from './dom-measurement-batch'
 import { observeElementResize } from './element-resize-observer'
@@ -33,7 +34,19 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
   const measuredContent = useRef('')
   const refreshWidths = useRef<() => void>(() => {})
   const [fit, setFit] = useState(() => Math.min(items.length, maxVisible ?? items.length, 1))
+  const lastFit = useRef(fit)
   const [open, setOpen] = useState(false)
+  const tipId = useId()
+  const [tip, setTip] = useState<{ left: number; top: number; below: boolean } | null>(null)
+  const showTip = (el: HTMLButtonElement) => {
+    const r = el.getBoundingClientRect()
+    const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--polish-tooltip-gap')) || 8
+    setTip({ left: Math.max(gap, Math.min(r.left, innerWidth - 288 - gap)), top: r.bottom + gap, below: true })
+  }
+  const names = (node: ReactNode): string => Children.toArray(node).map(child => {
+    if (typeof child === 'string' || typeof child === 'number') return String(child)
+    return isValidElement<{ name?: string; children?: ReactNode }>(child) ? child.props.name ?? names(child.props.children) : ''
+  }).filter(Boolean).join('、')
   useLayoutEffect(() => {
     const host = root.current
     const samples = measure.current
@@ -56,9 +69,9 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
       const naturalGap = parseFloat(style.getPropertyValue('--tpl-tag-overflow-gap'))
       const gap = Number.isFinite(naturalGap) ? naturalGap : parseFloat(style.columnGap) || 0
       const count = fittingTagCount(widths, host.clientWidth, gap, () => more.current?.getBoundingClientRect().width ?? 0)
-      const fitted = Math.min(Math.max(count, widths.length ? 1 : 0), maxVisible ?? items.length)
-      // 1つも入らない狭い列でも、最初の札は省略して出す（+N だけにしない。絵 ）。
-      return () => { if (active) setFit(fitted) }
+      const fitted = Math.min(count, maxVisible ?? items.length)
+      // 名前全部が収まる札だけを出し、1つも入らない場合は +N から全件を読める。
+      return () => { if (active && lastFit.current !== fitted) { lastFit.current = fitted; setFit(fitted) } }
     }
     const update = () => { if (active) scheduleMeasurement(key, read) }
     const invalidate = () => { widths = null; update() }
@@ -86,11 +99,12 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
   if (items.length === 0) return null
   return <>
     <span ref={root} className={styles.line} data-tag-overflow="" onClick={(event) => event.stopPropagation()}>
-      <TruncatedTextFocus.Provider value={rest === 0}>{items.slice(0, shown).map((item, index) => <span key={index} className={styles.item} data-shrink={shown === 1 && rest > 0 ? '' : undefined}>{item}</span>)}</TruncatedTextFocus.Provider>
-      {rest > 0 ? <button type="button" className={styles.more} aria-label={`${label}（ほか${rest}件）`} aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>+{rest}</button> : null}
+      <TruncatedTextFocus.Provider value={rest === 0}>{items.slice(0, shown).map((item, index) => <span key={index} className={styles.item}>{item}</span>)}</TruncatedTextFocus.Provider>
+      {rest > 0 ? <button type="button" className={styles.more} aria-label={`${label}（ほか${rest}件）`} aria-haspopup="dialog" aria-expanded={open} aria-describedby={tip ? tipId : undefined} onMouseEnter={event => showTip(event.currentTarget)} onMouseLeave={() => setTip(null)} onFocus={event => showTip(event.currentTarget)} onBlur={() => setTip(null)} onKeyDown={event => { if (event.key === 'Escape') setTip(null) }} onClick={() => { setTip(null); setOpen(true) }}>+{rest}</button> : null}
       <span ref={measure} className={styles.measure} data-tag-overflow-measure="" aria-hidden="true" inert>{items.map((item, index) => <span key={index} className={styles.item}>{item}</span>)}</span>
       <button ref={more} type="button" className={`${styles.more} ${styles.sampleMore}`} aria-hidden="true" tabIndex={-1} inert>+{items.length}</button>
     </span>
+    {tip ? <TooltipBubble id={tipId} text={names(children)} {...tip} /> : null}
     <Dialog open={open} title={label} onCancel={() => setOpen(false)}>
       <div className={styles.all} data-tag-overflow-all="">{items}</div>
     </Dialog>

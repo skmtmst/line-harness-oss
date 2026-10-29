@@ -8,7 +8,6 @@ export const PRODUCT_SCOPE = {
 } as const
 
 export function planFeatureLabel(feature: string): string {
-  const estimate = /アカウント|ユーザー|権限者|人数|通数|容量|ストレージ|[\d,]+\s*(?:人|名|通|GB|MB)/i.test(feature)
   const label = feature.replace(/権限者/g, term('N08'))
-  return estimate && !feature.includes('画像') && !feature.includes('目安') ? `${label}（目安）` : label
+  return label.replace(/（目安）/g, '')
 }

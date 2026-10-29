@@ -188,6 +188,11 @@
 }
 :root .delta { display: flex; flex-shrink: 0; }
 :root .valueRow { display: flex; align-items: center; width: 100%; gap: 6px; }
+/* 帯の数＋単位と差の印は、それぞれを分けず、並びきらない時だけ次の行へ送る。 */
+:root .card[data-kpi-presentation='band'] > .valueRow:has(> .value):has(> .delta:not(:empty)) {
+  flex-wrap: wrap;
+  row-gap: var(--space-2);
+}
 /* 数字と単位（人・通・件・%）は同じ下の線（ベースライン）に乗せる。箱の下端でそろえると字の大きさの差でずれる。 */
 :root .value {
   display: flex; align-items: baseline; flex: 1; gap: 2px; min-height: 0;

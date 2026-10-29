@@ -247,8 +247,8 @@ export default function GenerationPanel({
                 {BANNER_REFERENCE_MODES.map((mode) => {
                   const ModeIcon = BANNER_REFERENCE_MODE_ICON[mode]
                   return (
-                    <li key={mode} className="flex gap-2">
-                      <ModeIcon aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-secondary" />
+                    <li key={mode} className="flex items-center gap-2">
+                      <ModeIcon aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-ink-secondary" />
                       <span className={styles.howToText}>
                         <span className={v8Layout ? styles.v8SmallTitle : "text-micro font-semibold text-ink"}>{BANNER_REFERENCE_MODE_LABEL[mode]}</span>
                         <span className={v8Layout ? styles.v8SmallMuted : "text-micro text-ink-faint"}>{BANNER_REFERENCE_MODE_DESCRIPTION[mode]}</span>

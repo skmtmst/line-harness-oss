@@ -109,7 +109,7 @@ describe('続きの通信中に絞り込みを変える（ROOT29〜31 の追加�
       await act(async () => { moreButton().click() })
       expect(moreButton().disabled).toBe(true)
 
-      await chooseFilter('届いた')
+      await chooseFilter('LINEが受け付けました')
       await waitFor(() => expect(screen.getByText('Bの一人目')).toBeTruthy())
       expect(moreButton().disabled).toBe(false)
 

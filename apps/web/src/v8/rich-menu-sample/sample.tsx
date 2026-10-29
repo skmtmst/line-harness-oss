@@ -5,6 +5,7 @@ import { Image as ImageIcon, Info } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
+import StaleStyleNotice from '@/components/shared/stale-style-notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { RowMenu } from '@/components/shared/row-actions'
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
@@ -107,6 +108,7 @@ export default function RichMenuSampleV8() {
       </> : null}
     >
       <DetailColumns presentation="card" aside={aside} asideLabel="お客さまの見え方" expanded={asideOpen} onExpandedChange={setAsideOpen}>
+        {profile.stale ? <StaleStyleNotice onRetry={profile.reload} /> : null}
         {[...warned].filter((feature) => menu.tiles.some((tile) => tile.feature === feature)).map((feature) => (
           <Notice key={feature} tone="warn" appearance="soft" action={canEdit ? configure(feature) : undefined}>
             {`「${menu.tiles.find((tile) => tile.feature === feature)!.label}」のボタンの中身が決まっていません。お客さまが押すと「${PREPARING_WORD}です」と出ます。`}

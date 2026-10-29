@@ -586,10 +586,10 @@ export default function WebhooksIncomingV8() {
         moveSelection(event.key === 'ArrowUp' ? -1 : 1)
       }}
     >
-      {/* 閲覧のみには押せない作るボタンを置かない（場所だけ空ける）。 */}
+      {/* 変更権限が無い人には作る操作も予約領域も置かない。 */}
       {canManage
         ? <Button variant="primary" className={styles.createButton} onClick={openCreate}><Plus size={16} aria-hidden="true" />受け取り口を作る</Button>
-        : <span className={styles.createSpace} aria-hidden="true" />}
+        : null}
       <p className={styles.inletListLabel}>受け取り口</p>
       {incomingStatus === 'loading' && selectedAccountId ? (
         <div aria-busy="true" aria-label="受け取り口を読み込んでいます">

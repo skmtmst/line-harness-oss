@@ -144,7 +144,7 @@ describe('投稿 V8', () => {
     expect(preview.textContent?.split(supplement)).toHaveLength(2)
     expect(preview.textContent).toContain('今回は「写真が暗い・ぼやけている」のため、掲載を見送らせていただきました。')
     expect(preview.textContent).toContain('内容をご確認のうえ、よろしければ別のお写真をご投稿ください。')
-    fireEvent.click(screen.getByRole('checkbox', { name: 'もう一度 送ってもらえるようお願いする' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'もう一度 送ってもらえるようお願いする' }))
     expect(preview.textContent).not.toContain('別のお写真をご投稿ください。')
   })
 

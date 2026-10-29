@@ -6,6 +6,7 @@
  * 名前の下に担当スタッフの役割を出す。
  */
 import React from 'react'
+import type { BookingConflict, BookingConflictReservation } from '@line-crm/shared'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -73,10 +74,22 @@ describe('予約経路の連携（ZyDd6）', () => {
 
 describe('予約経路の世代と閲覧のみ（WEB058/059）', () => {
   it('WEB059：閲覧のみには「重なりを解消する」を置かず、重なりの知らせは出す', async () => {
-    api.conflicts.mockResolvedValue({ success: true, data: { conflicts: [
-      { staffId: 's1', startsAt: '2026-10-03T04:00:00Z', reason: '同じ担当の予約時間が重なっています。' },
-      { staffId: 's2', startsAt: '2026-10-03T04:00:00Z' },
-    ] } })
+    const conflicts: BookingConflict[] = ['s1', 's2'].map((staffId, index) => {
+      const reservation: BookingConflictReservation = {
+        bookingId: `booking-${index}`, customerName: '花子さん', menuName: 'カット', staffId,
+        staffName: index === 0 ? '高田誠' : '佐野直人', startsAt: '2026-10-03T04:00:00Z',
+        endsAt: '2026-10-03T05:00:00Z', source: 'line', sourceLabel: 'LINE', version: 1,
+      }
+      return {
+        staffId, staffName: reservation.staffName, bookingId: reservation.bookingId,
+        otherBookingId: `other-${index}`, startsAt: reservation.startsAt, endsAt: reservation.endsAt,
+        otherStartsAt: reservation.startsAt, otherEndsAt: reservation.endsAt, version: 1, otherVersion: 1,
+        bookings: [reservation, { ...reservation, bookingId: `other-${index}` }],
+        reasonCode: 'same_staff_time_overlap', reason: '同じ担当の予約時間が重なっています。',
+        calendarConnected: false, guidance: null,
+      }
+    })
+    api.conflicts.mockResolvedValue({ success: true, data: { conflicts } })
     render(<ChannelsTabV8 accountId="account-a" canEdit={false} staff={staff} />)
     await screen.findByText(/予約が 2 件重なっています/)
     expect(screen.queryByRole('button', { name: '重なりを解消する' })).toBeNull()

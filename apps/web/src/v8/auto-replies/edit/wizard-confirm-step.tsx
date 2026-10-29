@@ -9,6 +9,7 @@ type KeywordRuleDraft
 import { useActionOptions } from '@/components/auto-replies/inline-action-list';
 import { actionRowTitle } from '@/components/auto-replies/inline-action-rows-v8';
 import Button from '@/components/shared/button';
+import Notice from '@/components/shared/notice';
 import Card,{ CardHeader } from '@/components/shared/card';
 import { emptyValue } from '@/components/shared/empty-value';
 import { formatNumber } from '@/lib/format';
@@ -20,6 +21,8 @@ import { SummaryRow,WizardForm,WizardStep,weekdaySummary } from './wizard-model'
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
 
 type WizardConfirmStepContext = {
+  conflictsReadable?: boolean
+  permissionPending?: boolean
   actionOptions: ReturnType<typeof useActionOptions>
   autoReplyId: string | null
   confirmState: "error" | "idle" | "loading" | "ready"
@@ -34,7 +37,7 @@ type WizardConfirmStepContext = {
   v8Checks: { label: string; state: string; detail: string; back: WizardStep; }[]
 }
 
-export function WizardConfirmStep({ actionOptions, autoReplyId, confirmState, effectiveKeywords, folders, form, goToStep, loadValidation, myPositionLabel, selectedTemplate, thisRuleName, v8Checks }: WizardConfirmStepContext) {
+export function WizardConfirmStep({ conflictsReadable = true, permissionPending = false, actionOptions, autoReplyId, confirmState, effectiveKeywords, folders, form, goToStep, loadValidation, myPositionLabel, selectedTemplate, thisRuleName, v8Checks }: WizardConfirmStepContext) {
   return (<>
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>設定の確認</>} />
@@ -42,8 +45,8 @@ export function WizardConfirmStep({ actionOptions, autoReplyId, confirmState, ef
                   <SummaryRow label="名前・フォルダ" onEdit={() => goToStep('basic')}>
                     {thisRuleName}
                     {form.folderId
-                      ? `・${folders.find((f) => f.id === form.folderId)?.name ?? '分けない'}`
-                      : '・分けない'}
+                      ? `・${folders.find((f) => f.id === form.folderId)?.name ?? '未分類'}`
+                      : '・未分類'}
                   </SummaryRow>
                   <SummaryRow label="反応する言葉" onEdit={() => goToStep('trigger')}>
                     {form.respondToAll
@@ -101,8 +104,9 @@ export function WizardConfirmStep({ actionOptions, autoReplyId, confirmState, ef
 
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>有効にする前の確認</>} />
-                {confirmState === 'loading' && <p className={styles.hint}>確かめています…</p>}
-                {confirmState === 'error' && (
+                {!conflictsReadable ? permissionPending ? <p className={styles.hint}>本人を確認しています…</p> : <Notice tone="info">権限のため確認結果を表示できません。設定の閲覧はできます。</Notice> : null}
+                {conflictsReadable && confirmState === 'loading' && <p className={styles.hint}>確かめています…</p>}
+                {conflictsReadable && confirmState === 'error' && (
                   <p className={styles.hint}>
                     確認を読み込めませんでした。
                     <button
@@ -114,7 +118,7 @@ export function WizardConfirmStep({ actionOptions, autoReplyId, confirmState, ef
                     </button>
                   </p>
                 )}
-                {confirmState === 'ready' &&
+                {conflictsReadable && confirmState === 'ready' &&
                   v8Checks.map((gate) => {
                     const backTo = gate.back
                     return (

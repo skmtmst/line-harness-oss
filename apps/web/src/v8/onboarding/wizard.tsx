@@ -28,7 +28,7 @@ import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
 import { useStarterMenu } from './use-starter-menu'
 import SetupLinks from './setup-links'
-import StyleChoiceStep, { STYLE_CHOICE_ORDER, STYLE_CHOICE_PICK_ID, StyleChoiceStatus, initialViewingStyle } from './style-choice-step'
+import StyleChoiceStep, { STYLE_CHOICE_ORDER, STYLE_CHOICE_START_ID, StyleChoiceStatus, initialViewingStyle } from './style-choice-step'
 import { useState } from 'react'
 import { formatNumber } from '@/lib/format'
 
@@ -70,7 +70,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         {step === 'summary' ? <Button onClick={() => onClose(true)} disabled={busy}>動かさずにダッシュボードへ</Button> : null}
         {step === 'summary'
           ? <Button variant="primary" onClick={() => void activate()} busy={busy && summary !== null} busyLabel="動かしています…" disabled={!summary || onCount === 0}><Play aria-hidden="true" className={styles.buttonIcon} />{`まとめて動かす（${formatNumber(onCount)}件）`}</Button>
-          : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle" disabled={step === 0 && !chosenStyle} disabledReason={step === 0 && !chosenStyle ? 'スタイルを選んでください' : null}><ArrowRight aria-hidden="true" className={styles.buttonIcon} />次へ</Button>}
+          : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle" disabled={step === 0 && !chosenStyle} disabledReason={step === 0 && !chosenStyle ? 'スタイルを選んでください' : null}>次へ<ArrowRight aria-hidden="true" className={styles.buttonIcon} /></Button>}
       </div>
       <div className={step === 0 ? styles.footerEnd : styles.footerSide}>
         {step === 0 ? <StyleChoiceStatus chosen={chosenStyle} /> : null}
@@ -210,7 +210,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         open
         title={head.title}
         description={head.description}
-        initialFocusId={step === 0 ? STYLE_CHOICE_PICK_ID : undefined}
+        initialFocusId={step === 0 ? STYLE_CHOICE_START_ID : undefined}
         titleHelp={step === 0 ? <HelpTip label="使い方のスタイルの説明">ダッシュボード・はじめの質問・初期セットが、このスタイルに合わせて変わります。</HelpTip> : undefined}
         size="wide"
         designTop={step === 'summary' ? 48 : 60}

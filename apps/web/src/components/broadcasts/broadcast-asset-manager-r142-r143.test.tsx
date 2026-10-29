@@ -122,9 +122,9 @@ describe('「もっと見る」パネル', () => {
     await flush()
     clickText('カルーセルを作る')
 
-    const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement | null
+    const checkbox = container.querySelector('[role="switch"]') as HTMLInputElement | null
     if (!checkbox) throw new Error('checkbox not found')
-    expect(checkbox.checked).toBe(true)
+    expect((checkbox.getAttribute('aria-checked') === 'true')).toBe(true)
     act(() => {
       checkbox.click()
     })
@@ -158,9 +158,9 @@ describe('「もっと見る」パネル', () => {
     renderKind('card_message')
     await flush()
     clickText('編集')
-    const checkbox = container.querySelector('input[type="checkbox"]') as HTMLInputElement | null
+    const checkbox = container.querySelector('[role="switch"]') as HTMLInputElement | null
     if (!checkbox) throw new Error('checkbox not found')
-    expect(checkbox.checked).toBe(false)
+    expect((checkbox.getAttribute('aria-checked') === 'true')).toBe(false)
   })
 })
 

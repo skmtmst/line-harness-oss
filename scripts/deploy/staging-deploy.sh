@@ -109,14 +109,24 @@ step "1/4 事前確認（preflight）"
   --remote "$REMOTE" \
   --parent-repo "$PARENT_REPO"
 
+# 公開URLから配備元を照合できるよう、GitHub Actions と同じ版情報を渡す。
+STAGING_SHA="$(git rev-parse HEAD)"
+STAGING_VERSION="$(node -p "require('./package.json').version")"
+STAGING_RELEASED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+BUILD_VARS=(
+  --var "BUILD_GIT_COMMIT:$STAGING_SHA"
+  --var "BUILD_VERSION:$STAGING_VERSION"
+  --var "BUILD_RELEASED_AT:$STAGING_RELEASED_AT"
+)
+
 step "2/4 Worker ビルド"
 pnpm --filter worker build
 
 step "3/4 Worker デプロイ"
 if [ "$APPLY" -eq 1 ]; then
-  "$WRANGLER" deploy --config "$STAGING_CONFIG"
+  "$WRANGLER" deploy --config "$STAGING_CONFIG" "${BUILD_VARS[@]}"
 else
-  "$WRANGLER" deploy --config "$STAGING_CONFIG" --dry-run
+  "$WRANGLER" deploy --config "$STAGING_CONFIG" --dry-run "${BUILD_VARS[@]}"
   echo "(dry-run のため Cloudflare へは反映していません)"
 fi
 

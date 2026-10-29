@@ -1,4 +1,4 @@
-import React, { useId } from 'react'
+import React, { useEffect, useId, useRef } from 'react'
 import styles from './pagination.module.css'
 
 export type PaginationItem = number | 'ellipsis'
@@ -22,6 +22,13 @@ export type PaginationProps = {
   spacing?: 'roomy' | 'restaurant'
   /** カーソル式は前・現在・次だけ。任意の番号へは移動しない。 */
   mode?: 'numbered' | 'cursor'
+  /**
+   * 渡された page が範囲の外（pageCount より大きい）なら、最後のページへ
+   * 戻す知らせ（onPageChange）を出す。絞り込み・削除で全体が縮んだ一覧用。
+   * 印のない呼び出しの動きは変えない。読み込み中（disabled）は出さない。
+   * 呼ぶ側は取得の成功後・確定したページ数のときだけ描くこと。
+   */
+  correctOutOfRange?: boolean
 }
 
 /** Pencil の5枠に収め、先頭・現在地・末尾を常に辿れる並びを返す。 */
@@ -59,7 +66,7 @@ function Ellipsis() {
   )
 }
 
-/** ・固定版jX2Uw。1ページでも現在地と前・次を残す。 */
+/** 2ページ以上のときに移動操作を出し、1ページのときは件数だけ残す。 */
 export default function Pagination({
   page,
   pageCount,
@@ -71,21 +78,38 @@ export default function Pagination({
   range,
   spacing,
   mode = 'numbered',
+  correctOutOfRange = false,
 }: PaginationProps) {
   const reasonId = useId()
   const total = safePage(pageCount, 1)
   const current = Math.min(total, safePage(page, 1))
+
+  const notifiedRef = useRef<number | null>(null)
+  useEffect(() => {
+    // 同じ行き先への知らせは1回だけ（StrictMode の二重実行でも重ねない）。
+    if (!correctOutOfRange || disabled || page <= total) {
+      notifiedRef.current = null
+      return
+    }
+    if (notifiedRef.current === total) return
+    notifiedRef.current = total
+    onPageChange(total)
+  }, [correctOutOfRange, disabled, page, total, onPageChange])
   const classes = [styles.pagination, className].filter(Boolean).join(' ')
   const pausedReason = disabled ? '現在、ページを移動できません。' : undefined
   const previousReason = pausedReason ?? (current <= 1 ? '最初のページです。' : undefined)
   const nextReason = pausedReason ?? (current >= total ? '最後のページです。' : undefined)
 
-  if (!Number.isFinite(pageCount) || pageCount <= 0) return null
+  const summaryNode = range ? <span className={styles.summary} data-pagination-summary>{paginationSummary(range.total, range.first, range.last, range.unit)}</span>
+    : summary ? <span className={styles.summary}>{summary}</span> : null
+
+  if (!Number.isFinite(pageCount) || total <= 1) {
+    return summaryNode ? <div data-pagination className={classes} data-spacing={spacing}>{summaryNode}</div> : null
+  }
 
   return (
     <nav aria-label={ariaLabel} data-pagination className={classes} data-spacing={spacing}>
-      {range ? <span className={styles.summary} data-pagination-summary>{paginationSummary(range.total, range.first, range.last, range.unit)}</span>
-        : summary ? <span className={styles.summary}>{summary}</span> : null}
+      {summaryNode}
       <button
         type="button"
         className={[styles.item, styles.control].join(' ')}
@@ -158,7 +182,9 @@ export function CursorPagination({ page, pageSize, shown, total, hasNext, onPrev
   const current = safePage(page, 1)
   const start = shown > 0 ? (current - 1) * pageSize + 1 : 0
   const end = shown > 0 ? start + shown - 1 : 0
+  const pages = total != null && Number.isFinite(total) && total >= 0 && Number.isFinite(pageSize) && pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : null
+  const summary = <>{paginationSummary(total, start, end)}{pages !== null && pages > 1 ? `（全${pages.toLocaleString('ja-JP')}ページ）` : ''}</>
   return <Pagination mode="cursor" page={current} pageCount={current + (hasNext ? 1 : 0)} disabled={disabled} ariaLabel={ariaLabel}
-    summary={paginationSummary(total, start, end)}
+    summary={summary}
     onPageChange={(next) => { if (next < current) onPrevious(); else if (next > current) onNext() }} />
 }

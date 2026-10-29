@@ -35,12 +35,93 @@ const HERE = dirname(fileURLToPath(import.meta.url))
 export const DEFAULT_CATALOG = join(HERE, 'v8-pattern-catalog.json')
 
 /** 名前だけで通さず、再公開をたどって登録済みの実ファイルに照合する。 */
-function isRegisteredComponent(codeRoot, imported, owners, fromFile, seen = new Set()) {
-  if (!imported) return false
+function componentFile(codeRoot, imported, fromFile) {
+  if (!imported) return null
   const stem = imported.path.startsWith('@/') ? join(codeRoot, 'apps/web/src', imported.path.slice(2))
     : fromFile && imported.path.startsWith('.') ? resolve(dirname(fromFile), imported.path.replace(/\.js$/, '')) : null
-  if (!stem || relative(codeRoot, stem).startsWith('..')) return false
-  const file = [stem, `${stem}.tsx`, `${stem}.ts`, join(stem, 'index.tsx'), join(stem, 'index.ts')].find(path => existsSync(path) && statSync(path).isFile())
+  if (!stem || relative(codeRoot, stem).startsWith('..')) return null
+  return [stem, `${stem}.tsx`, `${stem}.ts`, join(stem, 'index.tsx'), join(stem, 'index.ts')].find(path => existsSync(path) && statSync(path).isFile())
+}
+
+function nonInteractiveAttributes(opening, allowRef = false) {
+  return opening.attributes.properties.every(attribute => ts.isJsxAttribute(attribute)
+    && (allowRef && attribute.name.getText() === 'ref' || !/^(role|tabindex|ref|contenteditable|on)/i.test(attribute.name.getText())))
+}
+
+function nonInteractiveCall(opening) {
+  return nonInteractiveAttributes(opening) && opening.attributes.properties.every(attribute => {
+    if (/ref$/i.test(attribute.name.getText())) return false
+    const expression = attribute.initializer && ts.isJsxExpression(attribute.initializer) ? attribute.initializer.expression : null
+    return !expression || !ts.isArrowFunction(expression) && !ts.isFunctionExpression(expression)
+  })
+}
+
+function staticFrameDeclaration(codeRoot, imported, fromFile, seen = new Set()) {
+  const file = componentFile(codeRoot, imported, fromFile)
+  if (!file || seen.has(`${file}:${imported.name}`)) return null
+  seen.add(`${file}:${imported.name}`)
+  const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  for (const declaration of source.statements) {
+    if (ts.isFunctionDeclaration(declaration) && declaration.name?.text === imported.name) return { file, source, declaration }
+    if (!ts.isExportDeclaration(declaration) || !declaration.moduleSpecifier || !ts.isStringLiteral(declaration.moduleSpecifier) || !declaration.exportClause || !ts.isNamedExports(declaration.exportClause)) continue
+    const binding = declaration.exportClause.elements.find(element => element.name.text === imported.name)
+    if (!binding) continue
+    const result = staticFrameDeclaration(codeRoot, { path: declaration.moduleSpecifier.text, name: binding.propertyName?.text ?? binding.name.text }, file, seen)
+    if (result) return result
+  }
+  return null
+}
+
+/** 正本の静的なdiv wrapperだけを認め、任意の操作部品へ例外を広げない。 */
+function isStaticOwnerFrame(codeRoot, imported, owners, fromFile, callOpening) {
+  if (!isRegisteredComponent(codeRoot, imported, owners, fromFile)) return false
+  const resolved = staticFrameDeclaration(codeRoot, imported, fromFile)
+  if (!resolved || !owners.files.includes(relative(codeRoot, resolved.file).replaceAll('\\', '/')) || !owners.components.includes(resolved.declaration.name?.text)) return false
+  const { source, declaration } = resolved
+  if (!declaration?.body || declaration.parameters.length !== 1 || !ts.isObjectBindingPattern(declaration.parameters[0].name)) return false
+  const bindings = declaration.parameters[0].name.elements
+  const childBindings = bindings.filter(binding => (binding.propertyName?.getText(source) ?? binding.name.getText(source)) === 'children')
+  if (bindings.some(binding => binding.dotDotDotToken) || childBindings.length !== 1 || !ts.isIdentifier(childBindings[0].name)) return false
+  const childName = childBindings[0].name.text
+  const statements = declaration.body.statements
+  if (statements.some(node => !ts.isVariableStatement(node) && !ts.isReturnStatement(node))) return false
+  let activeInitializer = false
+  const inspectInitializer = node => {
+    if (ts.isCallExpression(node) || ts.isArrowFunction(node) || ts.isFunctionExpression(node)) activeInitializer = true
+    ts.forEachChild(node, inspectInitializer)
+  }
+  statements.filter(ts.isVariableStatement).forEach(inspectInitializer)
+  if (activeInitializer) return false
+  const returns = statements.filter(ts.isReturnStatement)
+  const root = returns.length === 1 ? returns[0].expression : null
+  if (!root || !ts.isJsxElement(root) || root.openingElement.tagName.getText(source) !== 'div' || !nonInteractiveAttributes(root.openingElement, true)) return false
+  const ref = root.openingElement.attributes.properties.find(attribute => ts.isJsxAttribute(attribute) && attribute.name.getText(source) === 'ref')
+  if (ref) {
+    const expression = ref.initializer && ts.isJsxExpression(ref.initializer) ? ref.initializer.expression : null
+    if (!expression || !ts.isIdentifier(expression)) return false
+    const binding = bindings.find(element => ts.isIdentifier(element.name) && element.name.text === expression.text && !element.initializer)
+    if (!binding) return false
+    const prop = binding.propertyName?.getText(source) ?? binding.name.getText(source)
+    if (callOpening.attributes.properties.some(attribute => ts.isJsxAttribute(attribute) && attribute.name.getText() === prop)) return false
+    let references = 0
+    const inspectRef = node => { if (ts.isIdentifier(node) && node.text === expression.text) references++; ts.forEachChild(node, inspectRef) }
+    inspectRef(declaration.body)
+    if (references !== 1) return false
+  }
+  const children = root.children.filter(child => !ts.isJsxText(child) || child.text.trim())
+  if (children.length !== 1 || !ts.isJsxExpression(children[0]) || !children[0].expression || !ts.isIdentifier(children[0].expression) || children[0].expression.text !== childName) return false
+  let reads = 0, indirect = false
+  const inspect = node => {
+    if (ts.isIdentifier(node) && node.text === childName) reads++
+    if (ts.isIdentifier(node) && node.text === 'arguments') indirect = true
+    ts.forEachChild(node, inspect)
+  }
+  inspect(declaration.body)
+  return reads === 1 && !indirect
+}
+
+function isRegisteredComponent(codeRoot, imported, owners, fromFile, seen = new Set(), staticAttribute) {
+  const file = componentFile(codeRoot, imported, fromFile)
   if (!file || seen.has(`${file}:${imported.name}`)) return false
   seen.add(`${file}:${imported.name}`)
   const rel = relative(codeRoot, file).replaceAll('\\', '/')
@@ -49,9 +130,57 @@ function isRegisteredComponent(codeRoot, imported, owners, fromFile, seen = new 
   for (const node of source.statements) {
     if (owners.files.includes(rel) && imported.name === 'default' && ts.isFunctionDeclaration(node)
       && owners.components.includes(node.name?.text) && node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DefaultKeyword)) return true
+    // 持ち主の同じファイルの入口がhelpを題へそのまま一度だけ渡す場合も、説明文字は操作ではない。
+    // helpをボタンや処理にも使う入口、別ファイルの自作、JSXの操作そのものは対象にしない。
+    if (staticAttribute === 'help' && owners.files.includes(rel) && ts.isFunctionDeclaration(node)
+      && node.name?.text === imported.name && node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)
+      && node.body && node.parameters.length > 0 && ts.isObjectBindingPattern(node.parameters[0].name)) {
+      const bindings = node.parameters[0].name.elements.filter(element => !element.dotDotDotToken && (element.propertyName?.getText(source) ?? element.name.getText(source)) === 'help')
+      const binding = bindings[0]
+      if (bindings.length === 1 && binding && ts.isIdentifier(binding.name)) {
+        const name = binding.name.text
+        const imports = sourceEvidence(rel, source.text, node.body.getStart(source))?.imports ?? {}
+        let reads = 0, forwarded = false, indirect = false
+        const visit = child => {
+          if (ts.isIdentifier(child) && child.text === 'arguments') indirect = true
+          if (ts.isIdentifier(child) && child.text === name && !(ts.isJsxAttribute(child.parent) && child.parent.name === child)) reads++
+          if (ts.isJsxAttribute(child) && child.name.getText(source) === 'help' && child.initializer && ts.isJsxExpression(child.initializer)
+            && child.initializer.expression && ts.isIdentifier(child.initializer.expression) && child.initializer.expression.text === name) {
+            const tag = child.parent.parent.tagName.getText(source)
+            let shadowed = false, interactive = false
+            const checkTag = candidate => {
+              if (ts.isIdentifier(candidate) && candidate.text === tag
+                && !((ts.isJsxOpeningElement(candidate.parent) || ts.isJsxClosingElement(candidate.parent) || ts.isJsxSelfClosingElement(candidate.parent)) && candidate.parent.tagName === candidate)) shadowed = true
+              ts.forEachChild(candidate, checkTag)
+            }
+            node.parameters.forEach(checkTag)
+            checkTag(node.body)
+            for (let ancestor = child.parent.parent.parent; ancestor && ancestor !== node; ancestor = ancestor.parent) {
+              if (!ts.isJsxElement(ancestor)) continue
+              const opening = ancestor.openingElement
+              const ancestorTag = opening.tagName.getText(source)
+              const staticHtml = ['div', 'section', 'main', 'article', 'header', 'footer', 'aside', 'span', 'p', 'ul', 'ol', 'li'].includes(ancestorTag)
+              let ancestorShadowed = false
+              const checkAncestor = candidate => {
+                if (ts.isIdentifier(candidate) && candidate.text === ancestorTag
+                  && !((ts.isJsxOpeningElement(candidate.parent) || ts.isJsxClosingElement(candidate.parent) || ts.isJsxSelfClosingElement(candidate.parent)) && candidate.parent.tagName === candidate)) ancestorShadowed = true
+                ts.forEachChild(candidate, checkAncestor)
+              }
+              node.parameters.forEach(checkAncestor)
+              checkAncestor(node.body)
+              if (!nonInteractiveCall(opening) || !(staticHtml || !ancestorShadowed && isStaticOwnerFrame(codeRoot, imports[ancestorTag], owners, file, opening))) interactive = true
+            }
+            forwarded ||= !shadowed && !interactive && isRegisteredComponent(codeRoot, imports[tag], owners, file, new Set(seen))
+          }
+          ts.forEachChild(child, visit)
+        }
+        visit(node.body)
+        if (forwarded && reads === 1 && !indirect) return true
+      }
+    }
     if (!ts.isExportDeclaration(node) || !node.moduleSpecifier || !ts.isStringLiteral(node.moduleSpecifier) || !node.exportClause || !ts.isNamedExports(node.exportClause)) continue
     const exported = node.exportClause.elements.find(binding => binding.name.text === imported.name)
-    if (exported && isRegisteredComponent(codeRoot, { path: node.moduleSpecifier.text, name: exported.propertyName?.text ?? exported.name.text }, owners, file, seen)) return true
+    if (exported && isRegisteredComponent(codeRoot, { path: node.moduleSpecifier.text, name: exported.propertyName?.text ?? exported.name.text }, owners, file, seen, staticAttribute)) return true
   }
   return false
 }
@@ -274,6 +403,7 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
       if (m[0].length === 0) { signal._re.lastIndex += 1; continue }
       const proof = sourceEvidence(rel, content, ['own-label', 'limit-text'].includes(signal.id) ? m.index + m[0].length - 1 : m.index, ['own-label', 'limit-text'].includes(signal.id) ? 1 : m[0].length)
       if (proof?.comment) continue
+      if (signal.id === 'raw-button' && (!rel.startsWith('apps/web/src/v8/') || proof?.tag !== 'button' || proof.searchString)) continue
       if (rel.startsWith('apps/liff/') && codeRoot && pattern.owner?.liff
         && isRegisteredComponent(codeRoot, proof?.imports?.[proof.tag], pattern.owner.liff, join(codeRoot, rel))) continue
       if (signal.id === 'limit-text' && proof?.attribute === 'hint' && codeRoot
@@ -285,7 +415,7 @@ export function scanCodeFile(pattern, rel, content, glob = { excludeFiles: [] },
       // 題の型へ直接渡した説明の文字は、操作の手書きとは分ける。
       // help内のbuttonや偽の型は、この照合を通らない。
       if (signal.id === 'own-extra' && proof?.attribute === 'help' && proof.literalAttribute && codeRoot
-        && isRegisteredComponent(codeRoot, proof.imports?.[proof.tag], p.headingOwners)) continue
+        && isRegisteredComponent(codeRoot, proof.imports?.[proof.tag], p.headingOwners, join(codeRoot, rel), new Set(), 'help')) continue
       // 正の行うことの選択肢へ渡す label は、押したらの欄の手書きではない。
       // 実在する持ち主への import と JSX のデータの口を両方照合する。
       if (signal.id === 'own-extra' && proof?.literalProperty === 'label' && ['options', 'choices'].includes(proof.attribute) && codeRoot) {

@@ -42,13 +42,25 @@ describe('スタイルを選ぶ画面（共通節 S）', () => {
     for (const style of STYLE_EXPERIENCE_SCRIPT.order) expect(STYLE_EXPERIENCE_SCRIPT.styles[style].can).toHaveLength(3)
   })
 
+  it('開いた直後は上部の見出しへ焦点を置き、切り替えだけでは保存しない', async () => {
+    render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: '飲食店でできること' })))
+    expect(within(group()).getAllByRole('button')).toHaveLength(6)
+    for (const style of STYLE_EXPERIENCE_SCRIPT.order) {
+      view(style)
+      expect(screen.getByRole('heading', { name: `${styleLabel(style)}でできること` })).toBeTruthy()
+      expect(viewing()).toBe(styleLabel(style))
+    }
+    expect(calls.save).not.toHaveBeenCalled()
+  })
+
   it('見る・選ぶでは保存せず、［次へ］の先の保存で選んだスタイルだけを送る', async () => {
     render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
     expect(viewing()).toBe(styleLabel('restaurant'))
     view('salon')
     fireEvent.click(screen.getByRole('button', { name: 'このスタイルにする' }))
     view('lesson')
-    expect(screen.getByRole('status').textContent).toBe(`選んでいるスタイル：${styleLabel('salon')}`)
+    expect(screen.getByText(`選んでいるスタイル：${styleLabel('salon')}`).getAttribute('role')).toBe('status')
     expect(screen.getByRole('button', { name: 'このスタイルにする' })).toBeTruthy()
     expect(calls.save).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '次へ' }))
@@ -61,7 +73,8 @@ describe('スタイルを選ぶ画面（共通節 S）', () => {
 
   it('選ぶまで［次へ］は押せず、帯は「まだ選んでいません」', () => {
     render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
-    expect(screen.getByRole('status').textContent).toBe('まだ選んでいません')
+    expect(screen.getByText('まだ選んでいません').getAttribute('role')).toBe('status')
+    expect(screen.getByText('スタイルを選んでください')).toBeTruthy()
     const next = screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement
     expect(next.disabled).toBe(true)
     fireEvent.click(next)

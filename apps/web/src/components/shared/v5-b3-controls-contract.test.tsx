@@ -58,7 +58,7 @@ describe('入力・検索・選択部品の操作と安全性', () => {
     // 開いた中身は最上層（MenuPortal→document.body）に出る。静的書き出しには載らない。
     expect(screen.getByRole('listbox')).toBeTruthy()
     expect(screen.getByRole('button', { name: '開いた状態' }).getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByText('状態：有効')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '開いた状態' }).textContent).toBe('状態：有効')
     expect(document.body.innerHTML).toContain('aria-selected="true"')
     const hidden = container.querySelector('input[type="hidden"][name="status"]')
     expect(hidden?.getAttribute('value')).toBe('active')

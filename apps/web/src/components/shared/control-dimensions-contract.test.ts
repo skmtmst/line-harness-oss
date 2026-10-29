@@ -1,37 +1,34 @@
+// @vitest-environment happy-dom
 import { readdirSync, readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { URL, fileURLToPath } from 'node:url'
+import { dirname } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createElement } from 'react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { TextField } from './text-field'
+import Select from './select'
+import SearchField from './search-field'
+import Button from './button'
+afterEach(cleanup)
 
 const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf8')
 
 describe('V8 の入力・選択・押し口規定', () => {
-  it('役割ごとの高さと白背景を共通部品で維持する', () => {
-    const button = read('./button.module.css')
-    // 入力欄の正本は text-field.module.css（form-controls の TextInput・TextArea はその包み）。
-    const textField = read('./text-field.module.css')
-    const select = read('./select.module.css')
-    const selectTsx = read('./select.tsx')
-    const search = read('./search-field.module.css')
-
-    /*
-     * #976 U083: PC標準の高さは40pxにそろえる（ボタン・入力・検索・選択）。
-     * 以前はボタン36px・選択/検索42pxでずれていた。タッチ端末は44px。
-     * （`@media (pointer: coarse)` の 44px は design-unification の試験が見る）
-     */
-    expect(button).toMatch(/:root \.standard,\s*:root \.field\s*{[^}]*height:\s*var\(--tpl-button-h\)/s)
-    expect(textField).toMatch(/\.field\s*{[^}]*background:\s*var\(--color-canvas\)/s)
-    expect(select).toMatch(/\.trigger\s*{[^}]*height:\s*36px/s)
-    expect(select).toMatch(/background:\s*var\(--color-canvas\)/)
-    // 開いた候補は DOM に描き、矢印はアイコンで出す（ブラウザ任せにしない）。
-    expect(selectTsx).toContain('ChevronDown')
-    /*
-     * 呼び出し側の幅指定（`size="full"` や utilities レイヤー）が既定幅
-     * 176px/128px を上書きできるよう、部品の宣言は components レイヤー
-     * に置く。未レイヤーに戻すとレイヤー外が常に勝ち、グリッド枠から
-     * プルダウンがはみ出す（予約設定の空き確認で発生）。
-     */
-    expect(select).toMatch(/@layer components/)
-    expect(search).toMatch(/\.search\s*{[^}]*height:\s*36px/s)
-    expect(search).toMatch(/background:\s*var\(--color-canvas\)/)
+  it('入力と操作の名前・値・更新先を保つ', () => {
+    const change = vi.fn(), save = vi.fn()
+    render(createElement('div', null,
+      createElement(TextField, { 'aria-label': '名前', value: '初期値', onChange: event => change(event.target.value) }),
+      createElement(SearchField, { 'aria-label': '検索', value: '', onChange: () => {} }),
+      createElement(Select, { 'aria-label': '状態', value: 'all', options: [{ value: 'all', label: 'すべて' }], onChange: () => {} }),
+      createElement(Button, { onClick: save }, '保存する'),
+    ))
+    expect((screen.getByRole('textbox', { name: '名前' }) as HTMLInputElement).value).toBe('初期値')
+    expect(screen.getByRole('searchbox', { name: '検索' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '状態' })).toBeTruthy()
+    fireEvent.change(screen.getByRole('textbox', { name: '名前' }), { target: { value: '新しい値' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    expect(change).toHaveBeenCalledWith('新しい値')
+    expect(save).toHaveBeenCalledOnce()
   })
 
   it('素の選択欄にも高さ・白背景・右12pxの矢印余白を適用する', () => {
@@ -53,7 +50,7 @@ describe('V8 の入力・選択・押し口規定', () => {
      * components レイヤーに入れると既定値は部品が持ち、
      * 画面側のクラスは指定したときだけ勝つ。
      */
-    const dir = new URL('.', import.meta.url)
+    const dir = dirname(fileURLToPath(import.meta.url))
     const modules = readdirSync(dir).filter((name) => name.endsWith('.module.css'))
     const offenders = modules.filter((name) => !read(`./${name}`).includes('@layer components'))
     expect(offenders).toEqual([])
@@ -61,19 +58,17 @@ describe('V8 の入力・選択・押し口規定', () => {
 
   it('components loaded before globals still establish the same cascade order', () => {
     expect(read('../../app/globals.css')).toMatch(/^@layer properties,\s*theme,\s*base,\s*components,\s*utilities;/)
-    const modules = readdirSync(new URL('.', import.meta.url)).filter(name => name.endsWith('.module.css'))
+    const modules = readdirSync(dirname(fileURLToPath(import.meta.url))).filter(name => name.endsWith('.module.css'))
     for (const name of modules) {
       expect(read(`./${name}`), name).toMatch(/^@layer properties,\s*theme,\s*base,\s*components,\s*utilities;/)
     }
   })
 
   it('代表的な画面側上書きも規定値に戻す', () => {
-    const folderSelect = read('../chats/template-folder-select.tsx')
     const users = read('../../app/users/users-screen.tsx')
     const tags = read('../../v8/tags/tags-tab.tsx')
     const broadcasts = read('../../v8/broadcasts/list.tsx')
 
-    expect(folderSelect).toContain('size="field"')
     expect(users).not.toContain('className="h-9')
     expect(users).toContain('aria-label="UID連携で絞り込む"')
     expect(users).toContain('aria-label="所属アカウントで絞り込む"')

@@ -2,7 +2,7 @@
 'use client'
 
 import { PageExplanationProvider, PageExplanationToggle, PageExplanationBody } from '@/components/shared/page-explanation'
-import type { CSSProperties, ReactNode } from 'react'
+import { Fragment, type CSSProperties, type ReactNode } from 'react'
 import { CollapsedFolderActions, type FolderPanelRow } from '@/components/shared/folder-panel'
 import Select from '@/components/shared/select'
 import { ListToolbarLeading } from '@/components/shared/list-toolbar'
@@ -32,7 +32,8 @@ export interface ListFolderNav {
 export interface ListPageBodyProps {
   /** ：テンプレート一覧を基準にした段・寸法。窓や設定内の一覧は対象外。 */
   skeleton?: boolean
-  readOnly?: boolean
+  readOnly?: boolean | 'hq'
+  readOnlyNeed?: PageHeadingProps['readOnlyNeed']
   stats?: ReactNode
   folders?: ReactNode
   /** 狭い板でも同じフォルダ選択・作る操作へ到達できる口。渡すと folderNav より優先する。 */
@@ -77,6 +78,8 @@ export interface ListPageProps extends PageHeadingProps, ListPageBodyProps {
   boardId?: string
   layout?: 'event-list'
   standalone?: boolean
+  /** 明示された画面では、フォルダ機能を保ったまま主操作を題の右へ置く。 */
+  createPlacement?: 'heading'
   tabs?: ReactNode
 }
 
@@ -87,8 +90,13 @@ function hasListFolders({ folderNav, folders, collapsedFolders }: ListPageBodyPr
   const navs = listFolderNavs(folderNav)
   return navs.length ? navs.some(nav => nav.rows.length > 1) : !!(folders || collapsedFolders)
 }
+/** 数の帯を、一覧の共通の内側余白と次の段との間隔へ置く。 */
+export function ListPageStats({ children }: { children: ReactNode }) {
+  return <div className={styles.stats} data-template-region="stats">{children}</div>
+}
+
 /** 状態・取得処理を持つ子コンポーネントから使う、一覧型の本文。 */
-export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, tableInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, explanationInset = 'notice', listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
+export function ListPageBody({ readOnly, readOnlyNeed, skeleton, stats, folders, collapsedFolders, folderNav, folderInset, folderWidth, contentInset, tableInset, fillWidth, dialogLayout, toolbar, toolbarRowGap, toolbarSpacing, noticeSpacing, explanation, explanationInset = 'notice', listHelp, listHelpPlacement, children, pagination, overlays }: ListPageBodyProps) {
   const navs = listFolderNavs(folderNav)
   const hasFolders = hasListFolders({ folderNav, folders, collapsedFolders, children })
   const noFolderChoices = navs.length > 0 && navs.every(nav => nav.rows.length <= 1)
@@ -97,8 +105,8 @@ export function ListPageBody({ readOnly, skeleton, stats, folders, collapsedFold
   const help = listHelp ? <HelpTip label="一覧の操作の説明">{listHelp}</HelpTip> : null
   const helpAtEnd = listHelpPlacement === 'end' && Boolean(toolbar)
   return <ListFolderContext.Provider value={hasFolders}><div className={styles.listBody} data-list-folders={hasFolders} data-list-skeleton={skeleton ? 'templates' : undefined} data-dialog-layout={dialogLayout || undefined} data-table-inset={tableInset || undefined} style={fillWidth ? { width: '100%' } : undefined}>
-    {readOnly ? <ReadOnlyNotice /> : null}
-    {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
+    {readOnly ? <ReadOnlyNotice scope={readOnly === 'hq' ? 'hq' : 'store'} need={readOnlyNeed} /> : null}
+    {stats ? <ListPageStats>{stats}</ListPageStats> : null}
     <div className={styles.split} data-template-region="body">
       {folders && !noFolderChoices ? <aside className={styles.folders} data-template-region="folders" data-shared-part="folder-column" data-folder-inset={folderInset || undefined} data-folder-width={folderWidth ? true : undefined} style={folderWidth ? { width: folderWidth, boxSizing: 'border-box' } : undefined}>{folders}</aside> : null}
       <div className={styles.main}>
@@ -124,13 +132,13 @@ function CollapsedFolderNav({ rows, activeId, onSelect, createAction, label = '�
     {selected?.leadingActions?.length ? <CollapsedFolderActions row={{ ...selected, count: selected.count ?? null }} /> : null}
   </>
 }
-export function ListPage({ boardId, layout, heightMode, standalone, tabs, title, help, explanation, explanationKey, titleAccessory, explanationToggle, identity, actions, crumbs, subtitle, steps, headingSize, bottomSpacing, ...body }: ListPageProps) {
+export function ListPage({ readOnly, readOnlyNeed, readOnlyBand, boardId, layout, heightMode, standalone, createPlacement, tabs, title, help, explanation, explanationKey, titleAccessory, explanationToggle, identity, actions, crumbs, subtitle, steps, headingSize, bottomSpacing, ...body }: ListPageProps) {
   const navs = listFolderNavs(body.folderNav)
-  const headingCreates = !hasListFolders(body) ? navs.filter(nav => nav.createAction) : []
+  const headingCreates = createPlacement === 'heading' || !hasListFolders(body) ? navs.filter(nav => nav.createAction) : []
   const resolvedBody = headingCreates.length ? { ...body, collapsedFolders: undefined, folderNav: navs.map(nav => ({ ...nav, createAction: undefined })) } : body
-  const headingActions = headingCreates.length ? <>{headingCreates.map((nav,index) => <span key={index} data-list-heading-create>{nav.createAction}</span>)}{actions}</> : actions
-  const page = <PageFrame kind="list" boardId={boardId} layout={layout} heightMode={heightMode} standalone={standalone} skeleton={body.skeleton}>
-    <PageHeading {...{ title, help, titleAccessory, explanationToggle: explanationToggle !== undefined ? explanationToggle : explanation ? <PageExplanationToggle /> : undefined, identity, actions: headingActions, crumbs, subtitle, steps, headingSize, bottomSpacing }} />
+  const headingActions = headingCreates.length ? <>{headingCreates.map((nav,index) => <Fragment key={index}>{nav.createAction}</Fragment>)}{actions}</> : actions
+  const page = <PageFrame kind="list" createPlacement={createPlacement} boardId={boardId} layout={layout} heightMode={heightMode} standalone={standalone} skeleton={body.skeleton}>
+    <PageHeading readOnlyBand={readOnly || readOnlyBand} readOnlyNeed={readOnlyNeed} {...{ title, help, titleAccessory, explanationToggle: explanationToggle !== undefined ? explanationToggle : explanation ? <PageExplanationToggle /> : undefined, identity, actions: headingActions, crumbs, subtitle, steps, headingSize, bottomSpacing }} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     <ListPageBody {...resolvedBody} explanation={explanation} />
   </PageFrame>
