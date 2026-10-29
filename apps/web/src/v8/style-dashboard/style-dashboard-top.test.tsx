@@ -42,10 +42,13 @@ it('探す欄は帯の道具段に包まず幅いっぱいに置く（B18）', a
   expect((input.closest('div') as HTMLElement).style.width).not.toBe('')
 })
 
-it('数の帯の補足は1行省略にせず文節で折り返す（B18）', async () => {
+it('数の帯の対応待ちの補足は1行に収まる短さにする（B18）', async () => {
   render(<StyleDashboard style="restaurant" />)
-  const band = await screen.findByText('未配席 1・枠を閉じる 2')
-  const strip = band.closest('[data-style-dashboard]')!
-  expect(strip.querySelectorAll('[data-kpi-detail]').length).toBeGreaterThan(0)
-  expect(strip.querySelectorAll('[data-kpi-detail-layout="single"]').length).toBe(0)
+  expect(await screen.findByText('未配席 1・他サイト 2')).toBeTruthy()
+  expect(screen.queryByText(/枠を閉じる/)).toBeNull()
+})
+
+it('サロンの対応待ちの補足も1行に収まる短さにする（B18）', async () => {
+  render(<StyleDashboard style="salon" />)
+  expect(await screen.findByText('承認待ち・来店印まだ')).toBeTruthy()
 })

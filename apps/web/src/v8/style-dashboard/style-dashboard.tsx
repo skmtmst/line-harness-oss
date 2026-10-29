@@ -86,6 +86,7 @@ function Kpi({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
       unit={kpi.unit}
       delta={kpi.delta ? <DeltaChip tone={kpi.delta.tone}>{kpi.delta.text}</DeltaChip> : undefined}
       detail={kpi.detail}
+      detailLayout="single"
       action={kpi.link ? kpi.link.href === '#preparing-payment' ? { label: kpi.link.label, onClick: onPreparing } : { label: kpi.link.label, href: kpi.link.href } : undefined}
     />
   )
