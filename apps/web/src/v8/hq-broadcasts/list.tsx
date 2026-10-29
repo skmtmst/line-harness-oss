@@ -287,6 +287,10 @@ export default function HqBroadcastList() {
     </ListToolbarFrame>
   )
 
+  /* まだ1件も無いときは、空の案内の主ボタンだけにする（左の列の「配信を作る」と2つ並べない）。 */
+  const hasFilters = Boolean(query || status !== 'all' || folderFilter !== 'all')
+  const firstEmpty = !error && runs != null && filtered.length === 0 && !hasFilters
+
   let content
   if (error && !runs) content = <ListState permissionScope="hq" kind="error" error={error} onRetry={() => void load()} />
   else if (!runs) content = <ListState permissionScope="hq" kind="loading" />
@@ -298,7 +302,7 @@ export default function HqBroadcastList() {
         description="送るアカウントを選んで、同じ内容を一度に送れます。各店のアカウントに入らずに送れます。"
         create={{ label: '最初の一括配信を作る', href: NEW_HREF }}
         canCreate={canManage}
-        filtered={Boolean(query || status !== 'all' || folderFilter !== 'all')}
+        filtered={hasFilters}
         onClearFilters={() => { setQuery(''); setStatus('all'); setFolderFilter('all'); setPage(1) }}
         filteredDescription="検索や状態の絞り込みを外すと、すべて出ます"
       />
@@ -342,8 +346,8 @@ export default function HqBroadcastList() {
                   <span className={styles.cellSub}>{audienceText(run)}</span>
                 </Td>
                 <Td>
-                  <span className={styles.cellMain}>{run.scheduledAt ? <ListDateTime value={run.scheduledAt} /> : run.status === 'prepared' ? emptyValue('unconfigured') : 'すぐ送った'}</span>
-                  {statusKeyOf(run) === 'scheduled' && run.scheduledAt ? <span className={styles.cellSub}>予約</span> : null}
+                  {/* 日時だけの1行。予約中（まだ先）の日時だけ少し濃くする。「予約」は状態の札にあるので重ねない。 */}
+                  <span className={styles.cellMain} data-upcoming={statusKeyOf(run) === 'scheduled' && run.scheduledAt ? true : undefined}>{run.scheduledAt ? <ListDateTime value={run.scheduledAt} /> : run.status === 'prepared' ? emptyValue('unconfigured') : 'すぐ送った'}</span>
                 </Td>
                 {!narrow && <Td>
                   {sent ? (
@@ -389,17 +393,17 @@ export default function HqBroadcastList() {
           ))}
         </KpiBand>
       )}
-      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: selectFolder, createAction: createButton(false) ?? undefined }}
+      folderNav={{ rows: folderRows, activeId: folderFilter, onSelect: selectFolder, createAction: firstEmpty ? undefined : createButton(false) ?? undefined }}
       folders={(
         <FolderPanel
-          createAction={createButton(true)}
+          createAction={firstEmpty ? null : createButton(true)}
           activeId={folderFilter}
           onSelect={selectFolder}
           onAddFolder={canManage ? () => { setFolderError(''); setFolderNameError(''); setFolderName(''); setFolderColor(FOLDER_SELECT_COLORS[0].value); setFolderDialog({ editing: null }) } : undefined}
           addFolderLabel="フォルダを追加"
           rows={folderRows}
         >
-          {canManage ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
+          {canManage && !firstEmpty ? null : <span className={styles.viewerAddSpace} aria-hidden="true" />}
           <FolderPanelNote>フォルダを消しても、入っていたものは未分類に残ります</FolderPanelNote>
         </FolderPanel>
       )}

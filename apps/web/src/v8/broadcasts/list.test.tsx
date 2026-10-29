@@ -868,18 +868,49 @@ it('総件数が未取得のときは補正せず2ページ目の行を出す', 
 }, 20_000)
 
 describe('V8 一斉配信一覧の送信枠の行き先', () => {
-  it('送信枠が読めないときはトークンを入れ直す場所（アカウント設定）への行き先を出す', async () => {
-    dashboardOverview.mockResolvedValue({ success: false })
+  it('未接続・取得失敗のときはトークンを入れ直す場所（アカウント設定）への行き先を出す', async () => {
+    dashboardOverview.mockResolvedValue({ success: true, data: { delivery: { quotaLimit: null, quotaUsed: null }, metrics: { monthlyQuota: { state: 'unavailable', reason: 'not_connected', value: null } } } })
     act(() => { root.render(<BroadcastListV8 />) })
     await waitFor(() => expect(host.textContent).toContain('送信枠を確認できません'))
     const link = [...host.querySelectorAll('a')].find((a) => a.textContent?.includes('アカウント設定へ'))
     expect(link?.getAttribute('href')).toBe('/accounts/detail?id=account-a')
   })
 
+  it('口そのものが失敗したときは理由が分からないので行き先を出さない', async () => {
+    dashboardOverview.mockResolvedValue({ success: false })
+    act(() => { root.render(<BroadcastListV8 />) })
+    await waitFor(() => expect(host.textContent).toContain('送信枠を確認できません'))
+    expect([...host.querySelectorAll('a')].some((a) => a.textContent?.includes('アカウント設定へ'))).toBe(false)
+  })
+
   it('送信枠が読めたときは行き先を出さない', async () => {
     act(() => { root.render(<BroadcastListV8 />) })
     await waitFor(() => expect(host.textContent).toContain('5,000 通のうち 1,842 通を使用'))
     expect([...host.querySelectorAll('a')].some((a) => a.textContent?.includes('アカウント設定へ'))).toBe(false)
+  })
+
+  it('上限なしの契約では使用数と「上限なし」を出し、行き先を出さない', async () => {
+    dashboardOverview.mockResolvedValue({ success: true, data: { delivery: { quotaLimit: null, quotaUsed: 1842 }, metrics: { monthlyQuota: { state: 'available', reason: null, value: { used: 1842, limit: null, remaining: null, unlimited: true } } } } })
+    act(() => { root.render(<BroadcastListV8 />) })
+    await waitFor(() => expect(host.textContent).toContain('上限なし'))
+    expect(host.textContent).toContain('1,842')
+    expect(host.textContent).not.toContain('送信枠を確認できません')
+    expect([...host.querySelectorAll('a')].some((a) => a.textContent?.includes('アカウント設定へ'))).toBe(false)
+  })
+
+  it('読み込み中は骨組みで待ち、行き先を出さない', async () => {
+    dashboardOverview.mockImplementation(() => new Promise<never>(() => {}))
+    act(() => { root.render(<BroadcastListV8 />) })
+    await waitFor(() => expect(host.textContent).toContain('読み込んでいます'))
+    expect(host.textContent).not.toContain('送信枠を確認できません')
+    expect([...host.querySelectorAll('a')].some((a) => a.textContent?.includes('アカウント設定へ'))).toBe(false)
+  })
+
+  it('metric が失敗のときも行き先を出す', async () => {
+    dashboardOverview.mockResolvedValue({ success: true, data: { delivery: { quotaLimit: null, quotaUsed: null }, metrics: { monthlyQuota: { state: 'unavailable', reason: 'fetch_failed', value: { used: null, limit: null, remaining: null } } } } })
+    act(() => { root.render(<BroadcastListV8 />) })
+    await waitFor(() => expect(host.textContent).toContain('送信枠を確認できません'))
+    expect([...host.querySelectorAll('a')].some((a) => a.textContent?.includes('アカウント設定へ'))).toBe(true)
   })
 })
 

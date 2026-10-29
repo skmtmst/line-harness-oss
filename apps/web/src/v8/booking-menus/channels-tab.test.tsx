@@ -51,6 +51,7 @@ describe('予約経路の連携（ZyDd6）', () => {
   it('状態ごとの操作と名前の下の役割を出し、予定を見るの窓からつなぎ直せる', async () => {
     render(<ChannelsTabV8 accountId="account-a" canEdit staff={staff} />)
     expect(await screen.findByText('高田誠')).toBeTruthy()
+    expect(screen.queryByText(/いちばん確かなのは/)).toBeNull()
     expect(screen.getByText('トリマー')).toBeTruthy()
     expect(screen.getByRole('button', { name: '予定を見る' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'つなぐ' })).toBeTruthy()
@@ -151,4 +152,16 @@ it('非表示のGoogle予約を経路数と今日の件数に含めない', () =
   expect(screen.queryByText('114')).toBeNull()
   expect(screen.getAllByText('1')).toHaveLength(2)
   expect(screen.queryByText('2')).toBeNull()
+})
+
+it('外から予約が入ったときも共通カードの余白と題で表示する', async () => {
+  const view = render(<ChannelsTabV8 accountId="account-a" canEdit staff={staff} />)
+  await screen.findByText('高田誠')
+  const heading = screen.getByRole('heading', { name: '外から予約が入ったとき' })
+  const card = heading.closest('[data-design-part="card"]')
+  expect(card?.getAttribute('data-card-padding')).toBe('roomy')
+  expect(heading.className).toBe(screen.getByRole('heading', { name: 'スタッフの Google カレンダー' }).className)
+  expect(view.container.querySelector('#channels-assign-heading')).toBe(heading)
+  expect(card?.querySelector('fieldset')?.disabled).toBe(false)
+  expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true')
 })

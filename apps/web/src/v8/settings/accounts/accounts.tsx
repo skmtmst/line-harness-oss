@@ -1,5 +1,7 @@
 'use client'
 
+import { tokenExpiryNotice, tokenExpirySummary } from '@/lib/line-account-state'
+
 import { notifySaved } from '@/components/shared/toast'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -224,6 +226,7 @@ export default function AccountsV8() {
           />
         </div>
 
+        {ready && tokenExpirySummary(accounts) ? <TruncatedText value={tokenExpirySummary(accounts)!} /> : null}
         {status === 'loading' ? (
           <ListState kind="loading" />
         ) : status === 'error' ? (
@@ -266,6 +269,7 @@ export default function AccountsV8() {
                 <Tr data-row-id={account.id} key={account.id} interactive>
                   <Td className={styles.colName}><span className={styles.name} title={account.name}>{account.name}</span></Td>
                   <Td className={styles.colConn}><StatusBadge tone={connection.tone}>{connection.label}</StatusBadge>
+                    {tokenExpiryNotice(account) ? <TruncatedText className={styles.sub} value={tokenExpiryNotice(account)!} /> : null}
                     <TruncatedText className={styles.sub} value={account.channelId ? `チャネル ${account.channelId}` : `チャネル ${emptyValue("unconfigured")}`} />
                   </Td>
                   <Td className={styles.colHook}>

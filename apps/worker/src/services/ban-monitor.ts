@@ -1,4 +1,4 @@
-import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { lineWebhookSilence, jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger, tracedFetch as fetch } from '@line-crm/shared/server';
 /**
  * BAN検知モニター — cronトリガーで定期実行
@@ -20,8 +20,6 @@ import {
 } from '@line-crm/db';
 
 
-/** Webhook が無いまま警告を出すまでの時間（-33 §11-1 の既定24時間）。 */
-const WEBHOOK_SILENCE_WARNING_MS = 24 * 60 * 60 * 1000;
 /** 「正常」が続いたらプールへ自動で戻すまでの時間（X の確定値・24時間）。 */
 const POOL_RETURN_NORMAL_MS = 24 * 60 * 60 * 1000;
 
@@ -89,13 +87,7 @@ async function checkSingleAccount(
 
   // Webhook 受信が想定時間（既定24時間）無いときは warning。
   // 受信しない運用のアカウントは webhook_silence_exempt で外せる。
-  const silent = !account.webhook_silence_exempt
-    && (account.last_webhook_received_at
-      ? new Date(account.last_webhook_received_at).getTime() < Date.now() - WEBHOOK_SILENCE_WARNING_MS
-      // 受信実績がまだ無いときは、作られてから24時間経ったものだけを対象にする。
-      : account.created_at
-        ? new Date(account.created_at).getTime() < Date.now() - WEBHOOK_SILENCE_WARNING_MS
-        : false);
+  const silent = lineWebhookSilence({ lastReceivedAt: account.last_webhook_received_at, createdAt: account.created_at, exempt: Boolean(account.webhook_silence_exempt) });
 
   // リスクレベル判定
   let riskLevel = 'normal';
@@ -121,10 +113,10 @@ async function checkSingleAccount(
         eventType: `account_health_${riskLevel}`,
         title: riskLevel === 'danger'
           ? 'LINE公式アカウントの接続を確認してください'
-          : 'LINE公式アカウントの送信状況を確認してください',
+          : silent ? 'Webhook が届いていません' : 'LINE公式アカウントの送信状況を確認してください',
         body: riskLevel === 'danger'
           ? 'LINEとの接続に問題が見つかりました。運用状態から確認してください。'
-          : '送信量またはLINEの応答に注意が必要です。運用状態から確認してください。',
+          : silent ? 'Webhookを24時間以上受信していません。運用状態から確認してください。' : '送信量またはLINEの応答に注意が必要です。運用状態から確認してください。',
         channel: 'dashboard',
         lineAccountId: account.id,
         category: 'error',

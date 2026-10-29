@@ -122,10 +122,10 @@ const deliveryModeLabels: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
 }
 
-/** 読み終えた人の補足行（板 ：「登録した 1,756 人の 41%」）。 */
+/** 読み終えた人の補足行（板 ：「登録した 1,756 人の 41%」）。0 人は割合が決まらないので人数だけ薄い灰で出す。 */
 function scenarioCompletionDetail(active: number, completed: number): string {
   const enrolled = active + completed
-  if (enrolled === 0) return '—'
+  if (enrolled === 0) return '登録した 0 人'
   const rate = Math.round((completed / enrolled) * 100)
   return `登録した ${formatNumber(enrolled)} 人の ${rate}%`
 }

@@ -1,4 +1,4 @@
-import { jstCalendar as japanCalendar, type LineTokenRefreshFailureReason } from '@line-crm/shared';
+import { lineObservationTime, jstCalendar as japanCalendar, type LineTokenRefreshFailureReason } from '@line-crm/shared';
 import { tracedFetch as fetch, logger } from '@line-crm/shared/server';
 /** LINE の client_credentials で有効期限30日のトークンを発行する。5分の cron ごとに、期限まで7日以内か期限不明のアカウントだけを更新し、失効前に交換する。 */
 
@@ -16,7 +16,7 @@ function jstNow(): string {
 
 function shouldRefresh(account: LineAccount): boolean {
   if (!account.token_expires_at) return true; // 期限が分からない場合も、一度更新して以後の期限を追えるようにする。
-  const expiresAt = new Date(account.token_expires_at).getTime();
+  const expiresAt = lineObservationTime(account.token_expires_at);
   return expiresAt - Date.now() < REFRESH_THRESHOLD_MS;
 }
 
