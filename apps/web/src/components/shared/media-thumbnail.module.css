@@ -7,3 +7,5 @@
 }
 
 html:root .placeholder[data-media-thumbnail] > :global(svg.lucide) { width: var(--tpl-media-thumbnail-icon); height: var(--tpl-media-thumbnail-icon); }
+
+html:root .placeholder[data-media-thumbnail][data-size='compact'] > :global(svg.lucide) { width: var(--polish-icon-control); height: var(--polish-icon-control); }

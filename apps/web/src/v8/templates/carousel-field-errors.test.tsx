@@ -35,7 +35,7 @@ const fillFirst = () => {
 }
 
 describe('カルーセルの欄ごとの誤り', () => {
-  it.each(['shop', 'hq'] as const)('閲覧のみでは編集・削除・保存の口を出さない: %s', scope => {
+  it.each(['shop', 'hq'] as const)('閲覧のみでは順番の絵を灰色と理由で出し、変更を送らない: %s', scope => {
     const onSave = vi.fn()
     if (scope === 'shop') staffRole.value = 'viewer'
     render(<Carousel host={scope === 'hq' ? {
@@ -43,10 +43,29 @@ describe('カルーセルの欄ごとの誤り', () => {
       onSave, onCancel: vi.fn(), readOnly: true,
     } : undefined} />)
     expect(screen.getByText('一覧で中身を確認できます。')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /を外す$|ボタンを足す|下書きを保存|保存して公開|保存して配る/ })).toBeNull()
+    const chip = screen.getByRole('button', { name: /^1 カード 1$/ })
+    expect(chip.getAttribute('aria-disabled')).toBe('true')
+    expect(chip.getAttribute('draggable')).toBe('false')
+    fireEvent.click(chip)
+    fireEvent.keyDown(chip, { key: 'ArrowRight', altKey: true })
     expect(calls.create).not.toHaveBeenCalled()
     expect(calls.update).not.toHaveBeenCalled()
     expect(onSave).not.toHaveBeenCalled()
+  })
+  it('順番の札に小さな代わりの絵と題を出し、Alt矢印で入れ替えても中身を保つ', async () => {
+    render(<Carousel />)
+    fillFirst()
+    fireEvent.click(screen.getByRole('button', { name: 'カードを足す' }))
+    fireEvent.change(screen.getByLabelText('タイトル（40文字まで）'), { target: { value: '2枚目' } })
+    const second = screen.getByRole('button', { name: '2 2枚目' })
+    expect(within(second).getByRole('img', { name: '画像なし' })).toBeTruthy()
+    expect(second.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.keyDown(second, { key: 'ArrowLeft', altKey: true })
+    expect(screen.getByRole('button', { name: '1 2枚目' }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: '2 1枚目' }))
+    expect((screen.getByLabelText('タイトル（40文字まで）') as HTMLInputElement).value).toBe('1枚目')
+    expect(calls.create).not.toHaveBeenCalled()
+    expect(calls.update).not.toHaveBeenCalled()
   })
   it('ボタンごとに文字と動きの題を付け、最後の一つを隠し、削除後も残りの値を保つ', async () => {
     render(<Carousel />)

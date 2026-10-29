@@ -9,25 +9,7 @@
   gap: var(--tpl-cn-field-gap);
 }
 
-.chip {
-  padding: var(--tpl-tg2-seg-pad);
-  border: 0;
-  border-radius: var(--radius-pill);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-cn-main-lh);
-  cursor: grab;
-}
-
-.chip[aria-pressed='true'] {
-  outline: 0;
-  background: var(--color-ink);
-  color: var(--color-canvas);
-}
+.chip { max-width: 100%; cursor: grab; }
 
 .count {
   margin-left: auto;
@@ -296,3 +278,6 @@
 /* 保存で落ちた欄：ボタンの行の真下に理由。札の右に直す欄の数の赤い丸。 */
 .buttonBlock { display: flex; flex-direction: column; gap: var(--tpl-cn-field-gap); min-width: 0; }
 .chip:has([data-design-part='error-count-badge']) { display: inline-flex; align-items: center; gap: var(--tpl-cn-field-gap); }
+
+.chipImage { display: block; flex-shrink: 0; width: var(--space-24); height: var(--space-24); border-radius: var(--radius-mini); overflow: hidden; }
+.chipTitle { min-width: 0; }
