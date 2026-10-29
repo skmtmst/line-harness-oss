@@ -102,7 +102,7 @@ export default function HqHomeV8() {
   const [folderDialog, setFolderDialog] = useState<{ editing: Folder | null } | null>(null)
   const [folderName, setFolderName] = useState('')
   const [folderColor, setFolderColor] = useState<string | null>(null)
-  const [deleteFolder, setDeleteFolder] = useState<Folder | null>(null)
+  const [deleteFolder, setDeleteFolder] = useState<(Folder & { itemCount?: number }) | null>(null)
   const [folderError, setFolderError] = useState('')
   const [folderSaving, setFolderSaving] = useState(false)
 
@@ -245,11 +245,13 @@ export default function HqHomeV8() {
     router.push(back ?? '/')
   }
 
-  const totals = useMemo(() => currentAccounts.reduce((sum, account) => ({
-    friends: sum.friends + (account.stats?.friendCount ?? 0),
-    messages: sum.messages + (account.stats?.messagesThisMonth ?? 0),
-    warnings: sum.warnings + (account.connection?.status === 'warn' ? 1 : 0),
-  }), { friends: 0, messages: 0, warnings: 0 }), [currentAccounts])
+  const accountsReadable = !loading && !loadError
+  const totals = useMemo(() => currentAccounts.reduce<{ friends: number | null; messages: number | null; warnings: number; unconfirmed: number }>((sum, account) => ({
+    friends: sum.friends !== null && typeof account.stats?.friendCount === 'number' ? sum.friends + account.stats.friendCount : null,
+    messages: sum.messages !== null && typeof account.stats?.messagesThisMonth === 'number' ? sum.messages + account.stats.messagesThisMonth : null,
+    warnings: sum.warnings + (matchesStatus(account, 'warn') && account.connection?.status === 'warn' ? 1 : 0),
+    unconfirmed: sum.unconfirmed + (matchesStatus(account, 'warn') && account.connection?.status !== 'warn' ? 1 : 0),
+  }), { friends: 0, messages: 0, warnings: 0, unconfirmed: 0 }), [currentAccounts])
 
   /* 所属は1つ（API-17 の folderId）。サーバーの数が無いときは手元で数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
@@ -383,12 +385,12 @@ export default function HqHomeV8() {
   }
 
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: ALL, label: 'すべて', count: currentAccounts.length, icon: <Inbox size={16} aria-hidden="true" /> },
+    { kind: 'all' as const, id: ALL, label: 'すべて', count: accountsReadable ? currentAccounts.length : null, icon: <Inbox size={16} aria-hidden="true" /> },
     ...folders.map((f, index) => ({
       kind: 'folder' as const,
       id: f.id,
       label: f.name,
-      count: typeof f.itemCount === 'number' ? f.itemCount : (folderCounts.get(f.id) ?? 0),
+      count: typeof f.itemCount === 'number' ? f.itemCount : accountsReadable ? (folderCounts.get(f.id) ?? 0) : null,
       color: f.color,
       icon: <FolderDot folder={{ name: f.name, color: f.color }} />,
       onEdit: canManage ? () => openFolderDialog(f) : undefined,
@@ -396,7 +398,7 @@ export default function HqHomeV8() {
       onMoveDown: canManage && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
       onDelete: canManage ? () => { setFolderError(''); setDeleteFolder(f) } : undefined,
     })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount ?? localUnfiled },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount ?? (accountsReadable ? localUnfiled : null) },
   ]
 
   const createAccount = canManage ? (
@@ -460,16 +462,16 @@ export default function HqHomeV8() {
   }
 
 
-  const toolbar = loadError || loading || accounts.length === 0 ? null : <>
+  const toolbar = <>
       <PlatformNotices />
       <KpiBand className={styles.full} data-design="KPIs">
-        <KpiCard title="アカウント" value={currentAccounts.length} unit="件" detail={null} />
-        <KpiCard title="友だち合計" value={totals.friends} unit="人" detail={null} help="アーカイブを除くアカウントの合計" />
-        <KpiCard title="今月の配信" value={totals.messages} unit="通" detail={null} />
-        <KpiCard title="接続に問題" value={totals.warnings} unit="件" detail={null} valueTone={totals.warnings > 0 ? 'warning' : 'default'} />
+        <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
+        <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
+        <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
+        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} />
       </KpiBand>
 
-      <ListToolbarFrame layout="stacked">
+      {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">
         <ListToolbarRow><div className={styles.searchBox}>
           <SearchField
             aria-label="名前・LINE ID・フォルダで探す"
@@ -505,7 +507,7 @@ export default function HqHomeV8() {
           /></SaveErrorField>
           </ListToolbarEnd>
         </ListToolbarRow>
-      </ListToolbarFrame>
+      </ListToolbarFrame> : null}
   </>
 
   const body = loadError ? (
@@ -576,11 +578,11 @@ export default function HqHomeV8() {
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
                     <dt>友だち</dt>
-                    <dd>{isArchived(account) && !account.stats?.friendCount ? emptyValue('unknown') : formatNumber(account.stats?.friendCount ?? 0)}</dd>
+                    <dd>{typeof account.stats?.friendCount !== 'number' || (isArchived(account) && !account.stats.friendCount) ? emptyValue('unknown') : formatNumber(account.stats.friendCount)}</dd>
                   </div>
                   <div className={styles.stat}>
                     <dt>今月の配信</dt>
-                    <dd>{`${formatNumber(account.stats?.messagesThisMonth ?? 0)} 通`}</dd>
+                    <dd>{typeof account.stats?.messagesThisMonth === 'number' ? `${formatNumber(account.stats.messagesThisMonth)} 通` : emptyValue('unknown')}</dd>
                   </div>
                 </dl>
                 {warned ? (() => {
@@ -622,8 +624,8 @@ export default function HqHomeV8() {
                   return <StatusBadge tone={pay === 'live' ? 'success' : pay === 'test' ? 'warning' : 'neutral'}>{pay === 'live' ? 'つながっている' : pay === 'test' ? '試験モード' : 'つなぐ前'}</StatusBadge>
                 })()}</Td>
                 <Td>{state.tone === 'warn' ? `${Math.max(1, account.connection?.issues?.length ?? 0)} 件` : <span>—</span>}</Td>
-                <Td>{formatNumber(account.stats?.friendCount ?? 0)}</Td>
-                <Td>{formatNumber(account.stats?.messagesThisMonth ?? 0)}</Td>
+                <Td>{typeof account.stats?.friendCount === 'number' ? formatNumber(account.stats.friendCount) : emptyValue('unknown')}</Td>
+                <Td>{typeof account.stats?.messagesThisMonth === 'number' ? formatNumber(account.stats.messagesThisMonth) : emptyValue('unknown')}</Td>
                 <Td>{tableMenu(account)}</Td>
               </Tr>
             )
@@ -654,7 +656,6 @@ export default function HqHomeV8() {
       folderNav={{ rows: folderRows, activeId: folder, onSelect: selectFolder, createAction: createAccount, label: 'フォルダ' }}
     >
       <div className={styles.body}>
-        {toolbar ? null : <PlatformNotices />}
         {body}
       </div>
 
@@ -714,7 +715,7 @@ export default function HqHomeV8() {
         <ConfirmDialog
           open
           title={`フォルダ「${deleteFolder.name}」を消しますか？`}
-          description={`中のアカウント ${formatNumber(folderCounts.get(deleteFolder.id) ?? 0)} 件は消えずに「未分類」へ移ります。消したフォルダは元に戻せません。`}
+          description={`中のアカウント${typeof deleteFolder.itemCount === 'number' ? ` ${formatNumber(deleteFolder.itemCount)} 件` : ''}は消えずに「未分類」へ移ります。消したフォルダは元に戻せません。`}
           confirmLabel="フォルダを消す"
           cancelLabel="キャンセル"
           destructive

@@ -246,3 +246,22 @@ it('フォルダがタグにも返っても札は一つで、アーカイブの�
   expect([...card.querySelectorAll('button')].some(el => el.textContent === '詳細')).toBe(false)
   expect([...card.querySelectorAll('button')].find(el => el.textContent === '戻す')?.querySelector('svg')).not.toBeNull()
 })
+
+
+it.each([
+  { staffCount: undefined, label: '権限者 —' },
+  { staffCount: 0, label: '権限者 0 人' },
+])('権限者数の未取得と本当の0人をカードと表で分ける：$label', async ({ staffCount, label }) => {
+  window.history.replaceState(null, '', '/hq')
+  accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, stats: { ...warnedAccount.stats, staffCount } }] })
+  await render()
+  const card = container.querySelector('article')!
+  expect(card.textContent).toContain(label)
+  expect(card.querySelector('[title*="権限者"]')?.getAttribute('title')).toContain(label)
+  if (staffCount === undefined) expect(card.textContent).not.toContain('権限者 0 人')
+  const table = container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!
+  await act(async () => { table.click() })
+  const row = container.querySelector('tbody tr')!
+  expect(row.textContent).toContain(label)
+  expect(row.querySelector('[title*="権限者"]')?.getAttribute('title')).toContain(label)
+})
