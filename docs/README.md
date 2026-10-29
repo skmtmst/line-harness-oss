@@ -21,34 +21,34 @@
 - [LINE Harness](../README.zh-CN.md)
 - [setup-placeholder.svg](../apps/docs/public/manual/setup-placeholder.svg) — 図・手引きの資料、確認 2026-10-19
 - [page.mdx](../apps/docs/src/app/manual/line-account-setup/page.mdx)
-- [m1-dev-id.webp](../apps/web/public/manuals/line-connect/images/m1-dev-id.webp) — 図・手引きの資料、確認 2026-10-19
-- [m1-dev-secret.webp](../apps/web/public/manuals/line-connect/images/m1-dev-secret.webp) — 図・手引きの資料、確認 2026-10-19
-- [m1-oam-confirm.webp](../apps/web/public/manuals/line-connect/images/m1-oam-confirm.webp) — 図・手引きの資料、確認 2026-10-19
-- [m1-oam-inuse.webp](../apps/web/public/manuals/line-connect/images/m1-oam-inuse.webp) — 図・手引きの資料、確認 2026-10-19
+- [m1-dev-id.webp](../apps/web/public/manuals/line-connect/images/m1-dev-id.webp) — 図・手引きの資料、確認 2026-10-29
+- [m1-dev-secret.webp](../apps/web/public/manuals/line-connect/images/m1-dev-secret.webp) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-confirm.webp](../apps/web/public/manuals/line-connect/images/m1-oam-confirm.webp) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-inuse.webp](../apps/web/public/manuals/line-connect/images/m1-oam-inuse.webp) — 図・手引きの資料、確認 2026-10-29
 - [m1-oam-messaging-api.webp](../apps/web/public/manuals/line-connect/images/m1-oam-messaging-api.webp) — 図・手引きの資料、確認 2026-10-19
-- [m1-oam-privacy.webp](../apps/web/public/manuals/line-connect/images/m1-oam-privacy.webp) — 図・手引きの資料、確認 2026-10-19
-- [m1-oam-provider.webp](../apps/web/public/manuals/line-connect/images/m1-oam-provider.webp) — 図・手引きの資料、確認 2026-10-19
-- [m1-oam-unused.webp](../apps/web/public/manuals/line-connect/images/m1-oam-unused.webp) — 図・手引きの資料、確認 2026-10-19
+- [m1-oam-privacy.webp](../apps/web/public/manuals/line-connect/images/m1-oam-privacy.webp) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-provider.webp](../apps/web/public/manuals/line-connect/images/m1-oam-provider.webp) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-unused.webp](../apps/web/public/manuals/line-connect/images/m1-oam-unused.webp) — 図・手引きの資料、確認 2026-10-29
 - [m2-create-1.webp](../apps/web/public/manuals/line-connect/images/m2-create-1.webp) — 図・手引きの資料、確認 2026-10-19
 - [m2-create-2.webp](../apps/web/public/manuals/line-connect/images/m2-create-2.webp) — 図・手引きの資料、確認 2026-10-19
 - [m2-create-3.webp](../apps/web/public/manuals/line-connect/images/m2-create-3.webp) — 図・手引きの資料、確認 2026-10-19
-- [m2-create-4.webp](../apps/web/public/manuals/line-connect/images/m2-create-4.webp) — 図・手引きの資料、確認 2026-10-19
+- [m2-create-4.webp](../apps/web/public/manuals/line-connect/images/m2-create-4.webp) — 図・手引きの資料、確認 2026-10-29
 - [m2-create-5.webp](../apps/web/public/manuals/line-connect/images/m2-create-5.webp) — 図・手引きの資料、確認 2026-10-19
 - [m2-home.webp](../apps/web/public/manuals/line-connect/images/m2-home.webp) — 図・手引きの資料、確認 2026-10-19
-- [m2-login-id.webp](../apps/web/public/manuals/line-connect/images/m2-login-id.webp) — 図・手引きの資料、確認 2026-10-19
+- [m2-login-id.webp](../apps/web/public/manuals/line-connect/images/m2-login-id.webp) — 図・手引きの資料、確認 2026-10-29
 - [m2-login-secret.webp](../apps/web/public/manuals/line-connect/images/m2-login-secret.webp) — 図・手引きの資料、確認 2026-10-19
 - [m2-provider-id-musubo.webp](../apps/web/public/manuals/line-connect/images/m2-provider-id-musubo.webp) — Step 2のプロバイダーIDコピー位置、確認 2026-10-29
 - [m2-provider.webp](../apps/web/public/manuals/line-connect/images/m2-provider.webp) — 図・手引きの資料、確認 2026-10-19
 - [m2-publish.webp](../apps/web/public/manuals/line-connect/images/m2-publish.webp) — 図・手引きの資料、確認 2026-10-19
 - [m3-callback-1.webp](../apps/web/public/manuals/line-connect/images/m3-callback-1.webp) — 図・手引きの資料、確認 2026-10-19
-- [m3-callback-2.webp](../apps/web/public/manuals/line-connect/images/m3-callback-2.webp) — 図・手引きの資料、確認 2026-10-19
+- [m3-callback-2.webp](../apps/web/public/manuals/line-connect/images/m3-callback-2.webp) — 図・手引きの資料、確認 2026-10-29
 - [m3-dev-response.webp](../apps/web/public/manuals/line-connect/images/m3-dev-response.webp) — 図・手引きの資料、確認 2026-10-19
-- [m3-linked-edit.webp](../apps/web/public/manuals/line-connect/images/m3-linked-edit.webp) — 図・手引きの資料、確認 2026-10-19
-- [m3-linked-oa.webp](../apps/web/public/manuals/line-connect/images/m3-linked-oa.webp) — 図・手引きの資料、確認 2026-10-19
-- [m3-login-tab.webp](../apps/web/public/manuals/line-connect/images/m3-login-tab.webp) — 図・手引きの資料、確認 2026-10-19
-- [m3-oam-response.webp](../apps/web/public/manuals/line-connect/images/m3-oam-response.webp) — 図・手引きの資料、確認 2026-10-19
-- [m3-tab.webp](../apps/web/public/manuals/line-connect/images/m3-tab.webp) — 図・手引きの資料、確認 2026-10-19
-- [m3-webhook-on.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-on.webp) — 図・手引きの資料、確認 2026-10-19
+- [m3-linked-edit.webp](../apps/web/public/manuals/line-connect/images/m3-linked-edit.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-linked-oa.webp](../apps/web/public/manuals/line-connect/images/m3-linked-oa.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-login-tab.webp](../apps/web/public/manuals/line-connect/images/m3-login-tab.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-oam-response.webp](../apps/web/public/manuals/line-connect/images/m3-oam-response.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-tab.webp](../apps/web/public/manuals/line-connect/images/m3-tab.webp) — 図・手引きの資料、確認 2026-10-29
+- [m3-webhook-on.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-on.webp) — 図・手引きの資料、確認 2026-10-29
 - [m3-webhook-configured-musubo.webp](../apps/web/public/manuals/line-connect/images/m3-webhook-configured-musubo.webp) — Webhook設定後の確認画面、確認 2026-10-29
 - [m3-musubo-webhook.png](../apps/web/public/manuals/line-connect/images/m3-musubo-webhook.png) — musuboのWebhook設定画面、確認 2026-10-29
 - [index.html](../apps/web/public/manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
@@ -56,34 +56,34 @@
 - [Googleビジネスプロフィール連携 機能対応表（申請用・根拠付き）](manuals/google-business-feature-matrix.md)
 - [Googleビジネスプロフィール API 審査パッケージ（撮影チェックリスト・公開URL・想定質問）](manuals/google-business-review-package.md)
 - [申請書類：Googleビジネス連携（機密スコープ business.manage）の審査申請](manuals/google-business-verification-application.md)
-- [m1-dev-id.jpg](manuals/line-connect/images/m1-dev-id.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m1-dev-secret.jpg](manuals/line-connect/images/m1-dev-secret.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m1-oam-confirm.jpg](manuals/line-connect/images/m1-oam-confirm.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m1-oam-inuse.jpg](manuals/line-connect/images/m1-oam-inuse.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m1-dev-id.jpg](manuals/line-connect/images/m1-dev-id.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m1-dev-secret.jpg](manuals/line-connect/images/m1-dev-secret.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-confirm.jpg](manuals/line-connect/images/m1-oam-confirm.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-inuse.jpg](manuals/line-connect/images/m1-oam-inuse.jpg) — 図・手引きの資料、確認 2026-10-29
 - [m1-oam-messaging-api.jpg](manuals/line-connect/images/m1-oam-messaging-api.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m1-oam-privacy.jpg](manuals/line-connect/images/m1-oam-privacy.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m1-oam-provider.jpg](manuals/line-connect/images/m1-oam-provider.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m1-oam-unused.jpg](manuals/line-connect/images/m1-oam-unused.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m1-oam-privacy.jpg](manuals/line-connect/images/m1-oam-privacy.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-provider.jpg](manuals/line-connect/images/m1-oam-provider.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m1-oam-unused.jpg](manuals/line-connect/images/m1-oam-unused.jpg) — 図・手引きの資料、確認 2026-10-29
 - [m2-create-1.jpg](manuals/line-connect/images/m2-create-1.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m2-create-2.jpg](manuals/line-connect/images/m2-create-2.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m2-create-3.jpg](manuals/line-connect/images/m2-create-3.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m2-create-4.jpg](manuals/line-connect/images/m2-create-4.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m2-create-4.jpg](manuals/line-connect/images/m2-create-4.jpg) — 図・手引きの資料、確認 2026-10-29
 - [m2-create-5.jpg](manuals/line-connect/images/m2-create-5.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m2-home.jpg](manuals/line-connect/images/m2-home.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m2-login-id.jpg](manuals/line-connect/images/m2-login-id.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m2-login-id.jpg](manuals/line-connect/images/m2-login-id.jpg) — 図・手引きの資料、確認 2026-10-29
 - [m2-login-secret.jpg](manuals/line-connect/images/m2-login-secret.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m2-provider-id-musubo.jpg](manuals/line-connect/images/m2-provider-id-musubo.jpg) — Step 2のプロバイダーIDコピー位置、確認 2026-10-29
 - [m2-provider.jpg](manuals/line-connect/images/m2-provider.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m2-publish.jpg](manuals/line-connect/images/m2-publish.jpg) — 図・手引きの資料、確認 2026-10-19
 - [m3-callback-1.jpg](manuals/line-connect/images/m3-callback-1.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m3-callback-2.jpg](manuals/line-connect/images/m3-callback-2.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m3-callback-2.jpg](manuals/line-connect/images/m3-callback-2.jpg) — 図・手引きの資料、確認 2026-10-29
 - [m3-dev-response.jpg](manuals/line-connect/images/m3-dev-response.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m3-linked-edit.jpg](manuals/line-connect/images/m3-linked-edit.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m3-linked-oa.jpg](manuals/line-connect/images/m3-linked-oa.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m3-login-tab.jpg](manuals/line-connect/images/m3-login-tab.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m3-oam-response.jpg](manuals/line-connect/images/m3-oam-response.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m3-tab.jpg](manuals/line-connect/images/m3-tab.jpg) — 図・手引きの資料、確認 2026-10-19
-- [m3-webhook-on.jpg](manuals/line-connect/images/m3-webhook-on.jpg) — 図・手引きの資料、確認 2026-10-19
+- [m3-linked-edit.jpg](manuals/line-connect/images/m3-linked-edit.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-linked-oa.jpg](manuals/line-connect/images/m3-linked-oa.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-login-tab.jpg](manuals/line-connect/images/m3-login-tab.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-oam-response.jpg](manuals/line-connect/images/m3-oam-response.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-tab.jpg](manuals/line-connect/images/m3-tab.jpg) — 図・手引きの資料、確認 2026-10-29
+- [m3-webhook-on.jpg](manuals/line-connect/images/m3-webhook-on.jpg) — 図・手引きの資料、確認 2026-10-29
 - [m3-webhook-configured-musubo.jpg](manuals/line-connect/images/m3-webhook-configured-musubo.jpg) — Webhook設定後の確認画面、確認 2026-10-29
 - [m3-musubo-webhook.png](manuals/line-connect/images/m3-musubo-webhook.png) — musuboのWebhook設定画面、確認 2026-10-29
 - [index.html](manuals/line-connect/index.html) — 説明用データ・付随資料、確認 2026-10-29
@@ -896,3 +896,5 @@
 - [LINE接続マニュアルStep 4の友だち追加画像更新](release-log/unreleased/1910-masato-line-linked-oa-guide-screen.md) — 現行画面の編集箇所と秘匿表示の反映履歴。
 - [まとめ列車 1029](release-log/unreleased/1905-kenta-train-all-1029.md) — メモの保存の直しと各担当の完成分の反映履歴。
 - [友だち引き継ぎの進捗表示](release-log/unreleased/1914-masato-follower-handover-progress.md) — Penに合わせた動的な進捗画面の反映履歴。
+- [友だち引き継ぎの再開](release-log/unreleased/1915-masato-follower-import-resume.md) — 進捗画面からの再開と人数表示の反映履歴。
+- [LINE接続マニュアルの参考値秘匿](release-log/unreleased/1917-masato-line-manual-redaction-audit.md) — 画像と本文を全点検した反映履歴。
