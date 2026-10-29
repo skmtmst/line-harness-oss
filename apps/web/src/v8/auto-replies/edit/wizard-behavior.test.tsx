@@ -180,7 +180,7 @@ it('下書きを読めなかったら、同じ下書きをその場で読み直�
   net.query = 'id=synthetic-rule&step=basic'
   net.getDraft.mockRejectedValueOnce(new ApiError(500, 'failed')).mockResolvedValue(draft())
   render(<Page />); await act(async () => {})
-  expect(document.body.textContent).toContain('再読み込みしても直らない場合はエラー報告へ。')
+  expect(document.body.textContent).toContain('管理者にお問い合わせください。')
   await act(async () => fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' })))
   expect(net.getDraft).toHaveBeenCalledTimes(2)
   expect(net.getDraft.mock.calls.every(([id]) => id === 'synthetic-rule')).toBe(true)

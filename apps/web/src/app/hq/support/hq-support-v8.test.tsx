@@ -75,7 +75,7 @@ describe('b8xBtZ お問い合わせの並び', () => {
   it('統括の設定メニューで今の画面が分かる', async () => {
     await act(async () => { root.render(<HqSupportPage />) })
     await settle()
-    const current = host.querySelector('[aria-current="page"]')
+    const current = host.querySelector('a[aria-current="page"]')
     expect(current?.textContent).toContain('お問い合わせ')
   })
 })

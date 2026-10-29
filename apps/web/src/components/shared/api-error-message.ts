@@ -32,6 +32,7 @@ export function withPermissionFailure(err: unknown, fallback: string, scope: Per
 export type ApiFailureKind = 'forbidden' | 'invalid' | 'missing' | 'rateLimited' | 'retryable'
 
 export function classifyApiFailure(err: unknown): ApiFailureKind {
+  if (err == null) return 'retryable'
   if (err && typeof err === 'object' && 'status' in err && err.status === 403) return 'forbidden'
   if (err instanceof ApiError) {
     if (err.status === 403) return 'forbidden'
