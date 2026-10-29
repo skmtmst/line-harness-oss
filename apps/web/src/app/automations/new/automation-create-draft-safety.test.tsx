@@ -9,6 +9,7 @@ import { resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NewAutomationV8 } from '@/v8/automations/create/create'
 import { pickAutomationTag, pickAutomationTestFriend, replaceFirstAutomationAction, openFirstAutomationAction } from '@/test-utils/automation-v8-interactions'
+import { usePageTitle } from '@/components/shell/page-chrome'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 
 const account = vi.hoisted(() => ({ id: 'account-a' }))
@@ -469,6 +470,8 @@ async function sentNotice() {
 describe('M4torYの保存・送信の誤操作防止（DOMと実API境界）', () => {
   it('保存の422を名前の下へ出し、焦点と入力を保ち、直した欄だけ消す', async () => {
     const { transport } = await openPage()
+    expect(screen.getByRole('heading', { name: '自動処理のルールを作る' })).toBeTruthy()
+    expect(usePageTitle).toHaveBeenCalledWith('自動処理のルールを作る')
     await fillTagRule('入力を残すルール')
     await transport.route(`${API_ORIGIN}/api/automation-drafts/`, async route => {
       await json(route, { success: false, error: '入力を確認してください', fields: { name: 'この名前は使われています' } }, 422)

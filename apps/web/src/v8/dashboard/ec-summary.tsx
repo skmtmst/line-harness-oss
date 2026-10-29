@@ -33,9 +33,9 @@ export default function EcSummary({ accountId, period = 'today' }: { accountId: 
     {error ? <ListState kind="error" title="ECの状況を読み込めませんでした" error={error} onRetry={() => setTick(n => n + 1)} /> : null}
     <EcPeriodSummary accountId={accountId} period={period} />
     <KpiBand>
-      <KpiCard presentation="band" title="注文" value={values?.orders.summary.current ?? null} unit="件" detail="全期間・取消と返金を除く" action={{ label: '注文へ', href: '/ec-commerce' }} />
-      <KpiCard presentation="band" title="定期便" value={values?.overview.subscriptions ?? null} unit="件" detail="現在の契約数" action={{ label: '定期便へ', href: '/ec-commerce?tab=subscriptions' }} />
-      <KpiCard presentation="band" title="つき合わせ待ち" value={values?.overview.identityPending ?? null} unit="件" detail="友だちとのつき合わせ" action={{ label: 'つき合わせへ', href: '/ec-commerce/identity-candidates' }} />
+      <KpiCard loading={!data && !error} presentation="band" title="注文" value={values?.orders.summary.current ?? null} unit="件" detail="全期間・取消と返金を除く" action={{ label: '注文へ', href: '/ec-commerce' }} />
+      <KpiCard loading={!data && !error} presentation="band" title="定期便" value={values?.overview.subscriptions ?? null} unit="件" detail="現在の契約数" action={{ label: '定期便へ', href: '/ec-commerce?tab=subscriptions' }} />
+      <KpiCard loading={!data && !error} presentation="band" title="つき合わせ待ち" value={values?.overview.identityPending ?? null} unit="件" detail="友だちとのつき合わせ" action={{ label: 'つき合わせへ', href: '/ec-commerce/identity-candidates' }} />
     </KpiBand>
     <Notice tone="info" action={<Button href="/ec-commerce?tab=connector">ECの接続を確認する</Button>}>未接続・未取得の数字は「—」です。自動のLINEの設定と模擬確認は、EC連携の「自動LINE」から確認できます。</Notice>
   </DashboardRow>

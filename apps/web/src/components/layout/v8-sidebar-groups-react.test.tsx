@@ -200,7 +200,18 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     window.history.replaceState({}, '', '/')
   })
 
-  it('いちばん下に「設定」が出るのはオーナー・管理者だけ', async () => {
+  it('統合された成果画面への入口と設定はそれぞれ1つにまとめる', async () => {
+    fixture.pathname = '/conversions'
+    const view = await renderSidebar()
+    const desktop = view.container.querySelector('aside[data-design-node="J33xq"]')!
+    const links = [...desktop.querySelectorAll('a')]
+    expect(links.filter(link => link.textContent?.trim() === '成果とアフィリエイト')).toHaveLength(1)
+    expect(links.filter(link => link.textContent?.trim() === 'コンバージョン')).toHaveLength(0)
+    expect(links.filter(link => link.getAttribute('href') === '/settings')).toHaveLength(1)
+    expect(links.filter(link => link.getAttribute('aria-current') === 'page')[0]?.textContent).toBe('成果とアフィリエイト')
+  })
+
+  it('いちばん下に「設定」が出るのはオーナー・管理者だけ' , async () => {
     const view = await renderSidebar()
     const gear = view.getAllByRole('link', { name: '設定' })
     expect(gear.length).toBeGreaterThan(0)

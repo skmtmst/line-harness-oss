@@ -57,7 +57,7 @@ export function NewAutomationV8({
   chrome?: 'create' | 'draft'
 }) {
   const saveErrors = useSaveFormErrors()
-  usePageTitle(chrome === 'draft' ? '下書きを仕上げる' : 'ルールを作る')
+  usePageTitle(chrome === 'draft' ? '下書きを仕上げる' : '自動処理のルールを作る')
   usePageCrumbs([{ label: 'オートメーション', href: '/automations' }])
   const router = useRouter()
   const { selectedAccountId } = useAccount()
@@ -757,7 +757,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
   return (
     <SaveErrorScope errors={saveScopeErrors}><CreatePage
       boardId={conflict ? 'tJqST' : isDraft ? 'J1VA8' : 'M4torY'}
-      title={isDraft ? '下書きを仕上げる' : 'ルールを作る'}
+      title={isDraft ? '下書きを仕上げる' : '自動処理のルールを作る'}
       /* 見本の帯は頭の中、説明のすぐ下（絵では頭の線より上）。 */
       help={isDraft
         ? (

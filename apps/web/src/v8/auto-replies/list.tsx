@@ -116,7 +116,7 @@ export default function AutoRepliesListV8() {
   const [conflictCount, setConflictCount] = useState<number | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('loading')
   const [loadError, setLoadError] = useState<unknown>(null)
-  const { folders, unfiledCount, reload: loadFolders } = useManagedFolders('auto_reply', selectedAccountId)
+  const { folders, reload: loadFolders } = useManagedFolders('auto_reply', selectedAccountId)
   const [folderFilter, setFolderFilter] = useListUrlParam('folder')
   const [sortKey, setSortKey] = useListUrlValue<SortKey>('sortKey', 'priority')
   const [savedFilter, setSavedFilter] = useListUrlParam('view')
@@ -639,8 +639,9 @@ export default function AutoRepliesListV8() {
       }}
       allId=""
       unfiledId={UNFILED}
-      allCount={rules.length}
-      unfiledCount={unfiledCount}
+      allCount={visibleLoadState === 'ready' ? rules.length : null}
+      unfiledCount={visibleLoadState === 'ready' ? rules.filter(rule => !rule.folderId).length : null}
+      countOf={folder => visibleLoadState === 'ready' ? rules.filter(rule => rule.folderId === folder.id).length : null}
       placeholder="例：01_営業時間外"
     />
   )

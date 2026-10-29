@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import EcSummary from './ec-summary'
 import EcPeriodSummary from './ec-period'
@@ -55,4 +55,19 @@ it('T01の割合0〜1を%で表示し、選んだ期間と分母を渡して示�
   const query = new URL(net.period.mock.calls[0][0], 'https://fixture.test').searchParams
   expect(query.get('account_id')).toBe('ec-account')
   expect(new Date(query.get('to')!).getTime() - new Date(query.get('from')!).getTime()).toBe(7 * 86400000)
+})
+
+it('全ての数を読み込み中は骨組みで示し、読了後の値なしと区別する',async()=>{
+ const periodResponse=await net.period()
+ let finishOverview!: (response:unknown)=>void,finishPeriod!: (response:unknown)=>void
+ net.overview.mockImplementationOnce(()=>new Promise(resolve=>{finishOverview=resolve}))
+ net.period.mockImplementationOnce(()=>new Promise(resolve=>{finishPeriod=resolve}))
+ const view=render(<EcSummary accountId="ec-account"/>)
+ expect(view.container.querySelectorAll('[data-kpi-skeleton]')).toHaveLength(5)
+ expect(view.container.querySelectorAll('[data-kpi-presentation] [data-kpi-unit]')).toHaveLength(0)
+ await act(async()=>finishOverview({success:true,data:{total:1,subscriptions:12,identityPending:3}}))
+ await waitFor(()=>expect(view.container.querySelectorAll('[data-kpi-skeleton]')).toHaveLength(2))
+ await act(async()=>finishPeriod(periodResponse))
+ expect(view.container.querySelectorAll('[data-kpi-skeleton]')).toHaveLength(0)
+ expect(screen.getAllByText('—')).toHaveLength(2)
 })

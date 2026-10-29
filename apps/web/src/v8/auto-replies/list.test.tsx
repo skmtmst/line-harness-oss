@@ -294,3 +294,11 @@ describe('読込骨格の表示時間と完了への切替', () => {
     } finally { vi.useRealTimers() }
   })
 })
+
+it('すべて・フォルダ・未分類を同じ一覧で数え、別の集計を混ぜない', async()=>{
+ listReplies.mockResolvedValueOnce({success:true,data:[{...ruleA,folderId:'folder-a'},ruleB]})
+ listFolders.mockResolvedValueOnce({success:true,data:[{id:'folder-a',name:'問合せ',itemCount:99}],unfiledCount:98})
+ act(()=>root.render(<AutoRepliesListV8/>)); await flush()
+ const rows=[...host.querySelectorAll('aside [data-part="folder-row"]')].map(el=>el.textContent?.replace(/\s/g,''))
+ expect(rows).toEqual(expect.arrayContaining(['すべて2','問合せ1','未分類1']))
+})
