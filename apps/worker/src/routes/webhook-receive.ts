@@ -10,6 +10,16 @@ import { processLineWebhookEvents } from '../services/line-webhook-events.js';
 import { MAX_WEBHOOK_BODY_SIZE, ensureFriendFromWebhookUser, handleStoppedTenantEvent, handleNoticeLinkCode, handleEvent } from './webhook-definition.js';
 import type { Context } from 'hono';
 
+function noticeLineInquiryReply(adminPublicUrl: string | undefined): string {
+  const adminUrl = adminPublicUrl?.trim().replace(/\/+$/, '');
+  return [
+    'こちらはmusubo契約者様向けの通知専用LINEです。',
+    'お問い合わせはmusuboの管理画面にログインし、各店舗アカウントの「お問い合わせ」ボタンよりお送りください。',
+    ...(adminUrl ? [adminUrl] : []),
+    'このトークに送った内容はお問い合わせとして受け付けていません。',
+  ].join('\n');
+}
+
 export const post__webhook_1 = async (c: Context<Env>) => {
   // 大きすぎる Content-Length は、本文の読込前に拒む。
   const contentLengthHeader = c.req.header('Content-Length');
@@ -103,7 +113,7 @@ export const post__webhook_1 = async (c: Context<Env>) => {
         );
       }
       // 通知専用の公式アカウントは店舗の受信箱・自動応答・シナリオへ流さない。
-      // 友だちの状態と管理画面の確認コードだけを扱い、お知らせの push に必要な紐づけを保つ。
+      // 友だちの状態と管理画面の確認コードを扱い、通常メッセージには問い合わせ先だけを返す。
       if (matched.role === 'platform_notice') {
         const userId = event.source.type === 'user' ? event.source.userId : undefined;
         if (event.type === 'follow' && userId) {
@@ -115,7 +125,10 @@ export const post__webhook_1 = async (c: Context<Env>) => {
           await updateFriendFollowStatus(execution.mutationDb('notice_unfollow_status'), userId, false, matchedAccountId, toJstString(new Date(event.timestamp)));
           return;
         }
-        await handleNoticeLinkCode(c.env, execution.mutationDb('notice_code'), ownedClient, event, matchedAccountId);
+        if (await handleNoticeLinkCode(c.env, execution.mutationDb('notice_code'), ownedClient, event, matchedAccountId)) return;
+        if (event.type === 'message' && event.source.type === 'user' && event.replyToken) {
+          await ownedClient.replyMessage(event.replyToken, [{ type: 'text', text: noticeLineInquiryReply(c.env.ADMIN_PUBLIC_URL) }]);
+        }
         return;
       }
       // 契約者専用LINE（★37-7）: 6 桁の確認コードなら権限者の紐づけとして受ける。
