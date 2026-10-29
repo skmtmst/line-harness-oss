@@ -44,7 +44,7 @@
 - ②Step3 の題は「Webhook（受信のつなぎ）を設定する」。段の名前（戻るボタンの行き先）は「Webhook の設定」。
 - **②Step3 に Webhook URL の控え（写す欄）と［コピー］を置く**（承認済み `LINE新規追加_v07.pen`・2026-10-18承認の `Ds3E2`）。LINE の「Messaging API設定」に URL を貼って「更新」を押すまで、LINE 側に Webhook の3つのスイッチが出てこないため、利用者が自分で貼る必要がある。字は `musuboWebhookUrl(channelId)`（`<NEXT_PUBLIC_API_URL>/webhook/<Messaging APIチャネルID>`・`apps/worker` の `expectedWebhookUrl` と同じ形）。チャネルIDが数字で確定するまではURLを出さず、コピーもできない。
 - そのため印は4つで、先頭が「Webhook URL を貼り付けて「更新」を押した」（`dqe2M`）。左の細い列の「musubo が自動で行うこと」からは **「Webhook URL の登録」を外した**（自動登録しないので・`iaTqO`）。③の接続チェックの行「Webhook URL の登録」は、貼られた URL が musubo のものと合っているかの確認として残す。
-- ②Step1 の青い囲みから **「LINE公式アカウントマネージャーを開く」**（別タブ）。②Step2 はLINE Developersのコンソールを開く。②Step3 はMessaging APIチャネルのWebhook設定を開く（`developerChannelUrl`）。②Step4 はStep2で入力されたプロバイダー画面を開く（`developerProviderUrl`）。マニュアル全文は②の右の列の「マニュアルを開く」（`/manuals/line-connect/index.html`・別タブ）から。
+- ②Step1 の青い囲みから **「LINE公式アカウントマネージャーを開く」**（別タブ）。②Step2 はLINE Developersのコンソールを開く。②Step3 はStep1で入力した数字のチャネルIDで `/console/channel/<チャネルID>/messaging-api` を直接開く（`developerChannelUrl`）。IDがない・数字でない古い下書きではリンクを出さずStep1へ戻す。②Step4 はStep2で入力されたプロバイダー画面を開く（`developerProviderUrl`）。マニュアル全文は②の右の列の「マニュアルを開く」（`/manuals/line-connect/index.html`・別タブ）から。
 
 ## ②の左の列（操作ステップ）
 - 絵の正本の ② は左にも細い列を持つ（`AC左 操作ステップ` `g48QV`）。②の4つの小さな段で同じものを出す（`CreateStepColumns` の `outline`）。

@@ -1691,3 +1691,7 @@
 日付：2026-10-29
 指摘：プロバイダーIDをMessaging APIと同じStep1に置くと、LINE Developersを開く操作が埋もれる。登録画面の右側の操作欄も現在のmusubo画面と形が違う。
 今後：プロバイダーIDは独立したStep2で案内し、承認された現行画面の操作欄と4ステップのデザインを基準に照合する。
+
+日付：2026-10-29
+指摘：Webhook設定の「LINE Developersを開く」からチャネルのトップ画面へ飛ぶと、Messaging API設定を探し直す必要がある。
+今後：Step1で入力したMessaging APIチャネルIDを使い、Step3のボタンは `/console/channel/<チャネルID>/messaging-api` を直接開く。IDが不正ならリンクを出さない。
