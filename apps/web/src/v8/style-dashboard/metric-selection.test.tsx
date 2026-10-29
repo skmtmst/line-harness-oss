@@ -201,9 +201,10 @@ it('追加決まり1: 右の列の開閉はタブの段に入り単独の段を�
   render(<StyleDashboard style="salon" />)
   await waitFor(() => expect(labels()).toHaveLength(4))
   const toggle = screen.getByRole('button', { name: '新着・お支払いを見る' })
-  // タブの段の中にあり、本文の2列の下の段には無い。
-  expect(toggle.closest('nav')).not.toBeNull()
+  const columns = document.querySelector('[data-detail-columns]')!
+  // タブの段（タブの後・本文の前）にあり、本文の2列の下の段には無い。
   expect(toggle.closest('[data-detail-columns]')).toBeNull()
+  expect(toggle.compareDocumentPosition(columns) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 
 it('追加決まり1: 一覧の探す欄は左に置く（右に1つ浮かせない）', async () => {

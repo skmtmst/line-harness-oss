@@ -226,12 +226,13 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const mainAside = tab === 'main' && !!today && (shownRoster ? true : view === 'calendar'
     ? (range === 'month' && !!today.month) || (!today.week && side.length > 0)
     : side.length > 0)
-  const tabActions = (
-    <>
+  /* タブの段の右端の操作。狭い幅ではタブの下へ折り返す（タブに重ねない）。 */
+  const tabRowActions = viewSwitch || mainAside ? (
+    <div className={styles.tabRowActions}>
       {viewSwitch}
       {mainAside ? <span className={styles.tabAsideToggle}><Button size="compact" aria-expanded={asideOpen} onClick={() => setAsideOpen(!asideOpen)}>{asideLabel}</Button></span> : null}
-    </>
-  )
+    </div>
+  ) : null
 
   const alert = tab !== 'analytics' ? today?.alert : null
 
@@ -253,7 +254,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         ) : null}
       </div>
       <div className={styles.tabRow}>
-        <Tabs items={tabItems} label={`${cfg.title}のタブ`} size="compact" actions={tabActions} />
+        <Tabs items={tabItems} label={`${cfg.title}のタブ`} size="compact" />
+        {tabRowActions}
       </div>
       <div className={styles.content}><CalendarPeriod period={view === 'calendar' && today ? range === 'month' ? date.slice(0, 7) : today.week?.days[0]?.date ?? date : ''} scope={`${accountId}/${style}/${view}/${range}`}>{body}</CalendarPeriod></div>
       {style === 'restaurant' && store.store ? (
