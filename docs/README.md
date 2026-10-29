@@ -453,6 +453,7 @@
 
 ## 反映履歴
 
+- [予約枠・在庫の操作サイズの更新](release-log/unreleased/0000-kenta-swbm.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
 - [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
