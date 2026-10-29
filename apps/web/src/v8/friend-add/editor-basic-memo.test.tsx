@@ -33,6 +33,8 @@ beforeEach(() => { window.history.replaceState(null, '', '/friend-add-settings?v
 afterEach(async () => { await act(async () => { root.unmount() }); host.remove(); vi.restoreAllMocks() })
 async function render() { await act(async () => { root.render(<Editor />); await Promise.resolve(); await new Promise((resolve) => setTimeout(resolve, 0)); await Promise.resolve() }) }
 function button(label: string, exact = false) { const node = [...document.querySelectorAll('button')].find((item) => !item.disabled && (item.getAttribute('aria-label') === label || (exact ? item.textContent === label : item.textContent?.includes(label)))); if (!node) throw new Error(`${label}: ${document.body.textContent?.slice(0, 500)}`); return node }
+/* 窓の下の［閉じる］だけを選ぶ（右上の×は aria-label のみで本文を持たない）。 */
+function footerClose() { const node = [...document.querySelectorAll('[data-window-actions] button')].find((item) => !item.disabled && item.textContent?.trim() === '閉じる'); if (!node) throw new Error(`footer-close: ${document.body.textContent?.slice(0, 500)}`); return node as HTMLButtonElement }
 async function name(value: string) { const input = host.querySelector('input'); if (!input) throw new Error('name'); await act(async () => { const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set; setter?.call(input, value); input.dispatchEvent(new Event('input', { bubbles: true })); input.dispatchEvent(new Event('change', { bubbles: true })) }) }
 function memoArea() { const area = document.querySelector('#fa-internal-memo') as HTMLTextAreaElement | null; if (!area) throw new Error(`memo: ${document.body.textContent?.slice(0, 500)}`); return area }
 async function waitClosed() { for (let i = 0; i < 50 && document.querySelector('#fa-internal-memo'); i++) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)) }) }
@@ -42,7 +44,7 @@ describe('社内メモの窓は破棄確認を出さず閉じる', () => {
     await render()
     await act(async () => { button('社内メモ').click() })
     await act(async () => { fireEvent.change(memoArea(), { target: { value: '引き継ぎあり' } }) })
-    await act(async () => { button('閉じる', true).click() })
+    await act(async () => { footerClose().click() })
     expect(document.body.textContent).not.toContain('入力を破棄しますか？')
     await waitClosed()
     expect(document.querySelector('#fa-internal-memo')).toBeNull()
@@ -54,7 +56,7 @@ describe('社内メモの窓は破棄確認を出さず閉じる', () => {
     await name('秋の案内')
     await act(async () => { button('社内メモ').click() })
     await act(async () => { fireEvent.change(memoArea(), { target: { value: '引き継ぎあり' } }) })
-    await act(async () => { button('閉じる', true).click() })
+    await act(async () => { footerClose().click() })
     expect(document.body.textContent).not.toContain('入力を破棄しますか？')
     await waitClosed()
     await act(async () => { button('作成・編集のその他の操作').click() })
