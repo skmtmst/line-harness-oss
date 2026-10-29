@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * ★V8 機能設定：閲覧のみ（オーナー・管理者以外）には、押せない操作を置かずに隠す
- * （2026-10-06 オーナー決定）。閲覧のみの帯は出し、オン／オフは文字で見せる。
+ * 機能設定：権限がない時も灰色の操作と共通理由を保ち、下書きと送信を変更しない。
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -11,8 +10,11 @@ import { fireEvent, renderHook, within } from '@testing-library/react'
 import { useFeatureSettings } from './use-feature-settings'
 import { CATALOG_DEFAULT_FEATURES } from './feature-settings-view'
 import type { FeatureGroup } from '@/lib/feature-settings'
+import { PERMISSION_LOCK_REASON, PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
+import { rememberStaffIdentity, readStaffIdentity } from '@/lib/staff-identity-state'
 
-const fixture = vi.hoisted(() => ({ role: 'owner' }))
+const fixture = vi.hoisted(() => ({ role: 'owner', identity: 'ready' }))
 
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a>,
@@ -36,10 +38,13 @@ let root: Root
 
 beforeEach(() => {
   clearFeatureSettingsCache()
+  fixture.identity = 'ready'
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
   vi.stubGlobal('fetch', async (input: string | URL | Request) => {
     const path = String(input)
+    if (path.includes('/api/staff/me') && fixture.identity === 'pending') return new Promise<Response>(() => {})
+    if (path.includes('/api/staff/me') && fixture.identity === 'failed') return response({ success: false, error: '読み込めませんでした' }, 503)
     if (path.includes('/api/staff/me')) return response({ success: true, data: { id: 'staff-1', role: fixture.role, permissionKeys: [] } })
     if (path.includes('/api/settings/features')) {
       return response({
@@ -208,17 +213,83 @@ describe('★V8 機能設定の閲覧のみ', () => {
     expect(host.textContent).not.toContain('閲覧のみで見ています')
   })
 
-  it('閲覧のみには押せない操作を置かず、帯とオン／オフの文字だけ出す', async () => {
-    fixture.role = 'staff'
-    await act(async () => { root.render(<FeatureSettingsScreen />) })
-    await flush()
-    expect(host.textContent).toContain('閲覧のみで見ています')
-    expect(host.querySelectorAll('[role="switch"]:not([aria-label*="まとめて"])')).toHaveLength(0)
-    expect(buttonNames()).not.toContain('並びを変える')
-    expect(buttonNames()).not.toContain('まとめて')
-    expect(buttonNames().some((name) => name.includes('機能設定を保存'))).toBe(false)
-    expect(buttonNames().some((name) => name.includes('初期値に戻す'))).toBe(false)
-    expect(host.textContent).toContain('オフ')
+  it.each(['staff', 'viewer'])('%sにも行・一括・並び・初期値の操作を灰色と理由付きで残し、下書きも送信も変更しない', async role => {
+    fixture.role = role
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    try {
+      await act(async () => { root.render(<FeatureSettingsScreen />) })
+      await flush()
+      expect(host.textContent).toContain(role === 'viewer' ? READ_ONLY_MESSAGE : PERMISSION_LOCK_SUMMARY.manager)
+      const controls = [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')]
+      expect(controls.length).toBeGreaterThan(0)
+      const before = controls.map(button => button.getAttribute('aria-checked'))
+      const actions = within(host)
+      const locked = [...controls, actions.getByRole('button', { name: '並びを変える' }) as HTMLButtonElement,
+        ...actions.getAllByRole('button', { name: /をすべて(?:オン|オフ)$/ }) as HTMLButtonElement[]]
+      const reason = role === 'viewer' ? PERMISSION_LOCK_REASON.viewer : PERMISSION_LOCK_REASON.manager
+      for (const button of locked) {
+        expect(button.disabled).toBe(false)
+        expect(button.getAttribute('aria-disabled')).toBe('true')
+        expect(button.getAttribute('aria-describedby')!.split(/\s+/).map(id => document.getElementById(id)?.textContent)).toContain(reason)
+        await act(async () => { fireEvent.click(button); fireEvent.keyDown(button, { key: 'Enter' }); fireEvent.keyDown(button, { key: ' ' }) })
+      }
+      await act(async () => { fireEvent.click(actions.getByRole('button', { name: '機能設定のほかの操作' })) })
+      await flush()
+      const reset = within(document.body).getByRole('menuitem', { name: '初期値に戻す', exact: true })
+      expect(reset.getAttribute('aria-disabled')).toBe('true')
+      await act(async () => { fireEvent.click(reset) })
+      expect(within(document.body).queryByRole('dialog')).toBeNull()
+      expect(controls.map(button => button.getAttribute('aria-checked'))).toEqual(before)
+      expect(fetchSpy.mock.calls.filter(([, init]) => !['GET', 'HEAD'].includes((init?.method ?? 'GET').toUpperCase()))).toHaveLength(0)
+    } finally { fetchSpy.mockRestore() }
+  })
+
+  it.each(['pending', 'failed'])('本人が%sの間は共通理由を出さず通常disabledにして、設定を変更・送信しない', async identity => {
+    fixture.role = 'owner'; fixture.identity = identity
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    try {
+      await act(async () => { root.render(<FeatureSettingsScreen />) })
+      await flush()
+      const controls = [...host.querySelectorAll<HTMLButtonElement>('[role="switch"]')]
+      expect(controls.length).toBeGreaterThan(0)
+      for (const button of controls) {
+        expect(button.disabled).toBe(true)
+        expect(button.hasAttribute('data-permission-locked')).toBe(false)
+        await act(async () => { fireEvent.click(button) })
+      }
+      expect((within(host).getByRole('button', { name: '並びを変える' }) as HTMLButtonElement).disabled).toBe(true)
+      expect(host.querySelector('[data-read-only-notice]')).toBeNull()
+      expect(within(document.body).queryByRole('tooltip')).toBeNull()
+      const writes = fetchSpy.mock.calls.filter(([, init]) => !['GET', 'HEAD'].includes((init?.method ?? 'GET').toUpperCase()))
+      expect(writes.map(([input, init]) => ({ path: new URL(String(input), 'http://localhost').pathname, method: init?.method }))).toEqual(
+        identity === 'failed' ? [{ path: '/api/client-errors', method: 'POST' }] : [],
+      )
+      if (identity === 'failed') expect(JSON.parse(String(writes[0][1]?.body)).message).toBe('API 503: /api/staff/me')
+    } finally { fetchSpy.mockRestore() }
+  })
+
+  it('編集中に閲覧のみへ変わっても下書きを保ち、確認中のresetと保存を起動しない', async () => {
+    fixture.role = 'owner'
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    try {
+      await act(async () => { root.render(<FeatureSettingsScreen />) })
+      await flush()
+      await act(async () => { fireEvent.click(host.querySelector('[role="switch"]')!) })
+      const before = [...host.querySelectorAll('[role="switch"]')].map(button => button.getAttribute('aria-checked'))
+      await act(async () => { fireEvent.click(within(host).getByRole('button', { name: '機能設定のほかの操作' })) })
+      await flush()
+      await act(async () => { fireEvent.click(within(document.body).getByRole('menuitem', { name: '初期値に戻す', exact: true })) })
+      await flush()
+      expect(within(document.body).getByRole('dialog', { name: '初期値に戻しますか？' })).toBeTruthy()
+      await act(async () => { rememberStaffIdentity({ ...readStaffIdentity()!, role: 'viewer' }) })
+      await flush()
+      expect(within(document.body).queryByRole('dialog')).toBeNull()
+      const save = within(host).getByRole('button', { name: '機能設定を保存' })
+      expect(save.getAttribute('aria-disabled')).toBe('true')
+      await act(async () => { fireEvent.click(save) })
+      expect([...host.querySelectorAll('[role="switch"]')].map(button => button.getAttribute('aria-checked'))).toEqual(before)
+      expect(fetchSpy.mock.calls.filter(([, init]) => !['GET', 'HEAD'].includes((init?.method ?? 'GET').toUpperCase()))).toHaveLength(0)
+    } finally { fetchSpy.mockRestore() }
   })
 
   it('探す言葉に合う機能が無いときは「条件を外す」を出し、押すと一覧へ戻る', async () => {
