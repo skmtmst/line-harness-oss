@@ -1009,7 +1009,7 @@ export default function RichMenusListV8() {
           {tableCols}
           {tableHead}
           <tbody ref={bodyRef}>
-            {duplicateFeedback.order(liveOrder.shown).map((g) => {
+            {duplicateFeedback.order(liveOrder.shown).map((g, position) => {
               const cells = thumbCells(g)
               const shape = menuShapeText(g)
               const audienceMain = audienceMainText(g, tagNameById)
@@ -1051,7 +1051,8 @@ export default function RichMenusListV8() {
                       >
                         <span aria-hidden>⠿</span>
                       </ReorderHandle>}
-                      <span className={styles.orderNumber}>{g.targetingPriority + 1}</span>
+                      {/* 並び順の数字は見えている並びの位置（古い行は優先度が 0 のままなので、保存値ではなく位置を出す）。 */}
+                      <span className={styles.orderNumber} data-order-number={position + 1}>{position + 1}</span>
                     </span>
                   </Td>
                   <Td>

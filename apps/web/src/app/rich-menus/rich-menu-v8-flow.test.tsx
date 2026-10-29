@@ -255,6 +255,18 @@ afterEach(() => {
 })
 
 describe('V8 リッチメニューの通し：作る→押す所→保存→既定', () => {
+  it('優先度が全部 0 でも並び順の数字は 1・2・3 と位置で出す', async () => {
+    store.rows = [
+      { ...rowGroup, id: 'g-1', name: 'メニュー1', targetingPriority: 0 },
+      { ...rowGroup, id: 'g-2', name: 'メニュー2', targetingPriority: 0 },
+      { ...rowGroup, id: 'g-3', name: 'メニュー3', targetingPriority: 0 },
+    ]
+    renderNode(<RichMenusPage />)
+    await flush()
+    const numbers = Array.from(host.querySelectorAll('[data-order-number]')).map((el) => el.textContent)
+    expect(numbers).toEqual(['1', '2', '3'])
+  })
+
   it('一覧の「メニューを作る」は作成へ進む', async () => {
     renderNode(<RichMenusPage />)
     await flush()
