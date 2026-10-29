@@ -237,7 +237,7 @@ describe('★V8 統括の上の帯', () => {
     const bell = view.getByRole('button', { name: '通知（未読数を確認できません）' })
     const unknownBadge = bell.querySelector('[data-count-unknown]')
     expect(unknownBadge?.textContent).toBe('')
-    expect(unknownBadge?.getAttribute('aria-label')).toBe('未読件数を確認できません')
+    expect(unknownBadge?.getAttribute('aria-hidden')).toBe('true')
     expect(view.queryByRole('button', { name: '通知' })).toBeNull()
   })
 
