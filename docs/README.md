@@ -460,7 +460,7 @@
 ## 反映履歴
 
 - [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
-- [一斉配信の一覧の受け付け数の表示修正](release-log/unreleased/0000-kenta-muse-broadcast-received-wording.md)
+- [一斉配信の一覧の受け付け数の表示修正](release-log/unreleased/1916-kenta-muse-broadcast-received-wording.md)
 - [アカウント設定の親アカウント欄を非表示](release-log/unreleased/1900-masato-hide-parent-account.md) — 未使用の欄を隠し、既存の親子関係を保つ変更の反映履歴。
 - [LINEアカウント登録の使い方選択ポップアップ](release-log/unreleased/1898-masato-register-style-dialog.md) — 登録時に使い方の見本を見て選ぶか、後で設定する変更の反映履歴。
 - [LINE接続マニュアルの現行4ステップへの更新](release-log/unreleased/1897-masato-line-connect-manual.md)
@@ -858,7 +858,7 @@
 
 - [管理画面APIの待ち時間](api-read-latency.md) — 調査記録・共通処理の往復数と再計測、確認2026-10-22
 
-- [左メニューのスクロール・予約表示・敬称の修正](release-log/unreleased/0000-kenta-sidebar-scroll.md)
+- [左メニューのスクロール・予約表示・敬称の修正](release-log/unreleased/1916-kenta-sidebar-scroll.md)
 - [増減の符号と未分類の灰丸](release-log/unreleased/1858-kenta-delta-folder.md) — 増減の印とフォルダ表示の反映履歴。
 - [一斉配信の作成画面名と外枠](release-log/unreleased/1859-kenta-broadcast-title.md) — 作成手順の反映履歴。
 - [ページ送りの現在地と表示条件](release-log/unreleased/1860-kenta-pagination.md) — 一覧操作の反映履歴。
@@ -870,7 +870,7 @@
 - [予約メニューの案内の間隔](release-log/unreleased/1856-kenta-booking-notice-spacing.md)
 
 - [友だち一覧の差の印](release-log/unreleased/1862-kenta-friends-delta.md) — 増減と要確認の共通表示の反映履歴。
-- [友だち一覧の増減の札の色と符号](release-log/unreleased/0000-kenta-muse-friends-delta-color.md) — 減少の赤い札・悪化・全角符号の反映履歴。
+- [友だち一覧の増減の札の色と符号](release-log/unreleased/1916-kenta-muse-friends-delta-color.md) — 減少の赤い札・悪化・全角符号の反映履歴。
 - [版表示と窓の最初の操作](release-log/unreleased/1863-kenta-version-focus.md) — 表示と初期焦点の反映履歴。
 - [一覧の読み込み表示](release-log/unreleased/1864-kenta-list-loading.md) — 一斉配信の列ずれと自動応答の読み込み表示の反映履歴。
 - [統括の接続情報の更新](release-log/unreleased/1865-kenta-connection-refresh.md) — 単件・全件と再読み込みの反映履歴。
@@ -898,7 +898,7 @@
 - [LINE接続マニュアルStep 4の画像更新](release-log/unreleased/1909-masato-line-login-guide-real-screens.md) — LINEログイン実画面と秘匿表示の反映履歴。
 - [LINE接続マニュアルStep 4の友だち追加画像更新](release-log/unreleased/1910-masato-line-linked-oa-guide-screen.md) — 現行画面の編集箇所と秘匿表示の反映履歴。
 - [まとめ列車 1029](release-log/unreleased/1905-kenta-train-all-1029.md) — メモの保存の直しと各担当の完成分の反映履歴。
-- [LINE通知の未設定表示](release-log/unreleased/0000-kenta-exa-notification-status.md) — 絞り込み件数と一覧の状態表示の反映履歴。
-- [畳んだ初期案内の設定表示](release-log/unreleased/0000-kenta-onboarding-fold.md) — 後回しの設定と進みを確認する反映履歴。
-- [自動処理のシナリオ・共通アクション未選択表示](release-log/unreleased/0000-kenta-muse-automation-unselected.md) — 未選択と設定済みの区別の反映履歴。
+- [LINE通知の未設定表示](release-log/unreleased/1916-kenta-exa-notification-status.md) — 絞り込み件数と一覧の状態表示の反映履歴。
+- [畳んだ初期案内の設定表示](release-log/unreleased/1916-kenta-onboarding-fold.md) — 後回しの設定と進みを確認する反映履歴。
+- [自動処理のシナリオ・共通アクション未選択表示](release-log/unreleased/1916-kenta-muse-automation-unselected.md) — 未選択と設定済みの区別の反映履歴。
 - [友だち引き継ぎの進捗表示](release-log/unreleased/1914-masato-follower-handover-progress.md) — Penに合わせた動的な進捗画面の反映履歴。
