@@ -14,6 +14,7 @@ describe('access users for a selected account', () => {
       VALUES (?,?,'admin',?,?,?)`);
     staff.run('creator', '作成者', 'key-creator', DEFAULT_TENANT_ID, 'all');
     staff.run('hq-other', '他の統括', 'key-hq-other', DEFAULT_TENANT_ID, 'all');
+    staff.run('hq-admin', '兼任管理者', 'key-hq-admin', DEFAULT_TENANT_ID, 'all');
     staff.run('account-member', '担当者', 'key-account-member', DEFAULT_TENANT_ID, 'accounts');
     staff.run('other-account-member', '別アカウント担当者', 'key-other', DEFAULT_TENANT_ID, 'accounts');
     const account = sqlite.prepare(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret,tenant_id,created_by_staff_id)
@@ -24,14 +25,17 @@ describe('access users for a selected account', () => {
     scope.run('account-member', 'account-a');
     scope.run('account-member', 'account-b');
     scope.run('other-account-member', 'account-b');
+    sqlite.prepare('INSERT INTO line_account_hq_admin_memberships(line_account_id,staff_id) VALUES (?,?)')
+      .run('account-a', 'hq-admin');
 
     const result = await listAccessUsers(asD1(sqlite), {
       tenantId: DEFAULT_TENANT_ID,
       allowedLineAccountIds: ['account-a'],
       lineAccountId: 'account-a',
     });
-    expect(result.items.map((item) => item.id).sort()).toEqual(['account-member', 'creator']);
+    expect(result.items.map((item) => item.id).sort()).toEqual(['account-member', 'creator', 'hq-admin']);
     expect(result.items.find((item) => item.id === 'account-member')?.accountScope.lineAccountIds).toEqual(['account-a']);
+    expect(result.items.find((item) => item.id === 'hq-admin')?.roleBundle).toBe('administrator');
     sqlite.close();
   });
 });
