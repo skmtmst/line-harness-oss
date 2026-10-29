@@ -21,6 +21,7 @@ vi.mock('@/lib/api/helpers/styles', () => ({ hqStyleApi: { attention: async () =
 
 import Sidebar from './sidebar'
 import SuspendedSidebar from './suspended-sidebar'
+import OpsBrand from '@/v8/ops/ops-brand'
 
 beforeEach(() => {
   window.localStorage.clear()
@@ -81,5 +82,10 @@ describe('サイドバーの共通ロゴ・設定・版', () => {
     const desktop = within(view.container.querySelector('aside') as HTMLElement)
     expect((desktop.getByRole('img', { name: 'musubo' }) as HTMLImageElement).getAttribute('src')).toBe('/brand/musubo-color.png')
     expect(desktop.queryByText('musubo 統括コンソール')).toBeNull()
+  })
+
+  it('運営メニューでも同じ公式ロゴを出す', () => {
+    const view = render(createElement(OpsBrand, { compact: true }))
+    expect((within(view.container).getByRole('img', { name: 'musubo' }) as HTMLImageElement).getAttribute('src')).toBe('/brand/musubo-color.png')
   })
 })
