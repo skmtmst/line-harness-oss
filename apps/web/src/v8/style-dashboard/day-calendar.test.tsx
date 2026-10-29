@@ -333,3 +333,132 @@ it('取消だけの日も記録は消さず、有効な予約がない案内と�
     result.unmount()
   }
 })
+
+it.each([
+  { status: 'available', value: 0, expected: 0 },
+  { status: 'available', value: 3, expected: 3 },
+  { status: 'available', value: null, expected: null },
+  { status: 'unconfigured', value: 0, expected: null },
+  { status: 'insufficient_sample', value: 2, expected: null },
+] as const)('教室の予約実集計は$status/$valueを$expectedとして渡す', ({ status, value, expected }) => {
+  const { snapshot, schedule } = fixture('lesson')
+  snapshot.metrics.bookings = { value, status, unit: '件' }
+  expect(toToday('lesson', snapshot, schedule, '2026-10-21', 'today').bookingCount).toBe(expected)
+  delete snapshot.metrics.bookings
+  expect(toToday('lesson', snapshot, schedule, '2026-10-21', 'today').bookingCount).toBeNull()
+})
+function lessonDay(noClasses: boolean, count: number | null) {
+  state.summary.mockImplementation((_account, query) => {
+    const data = fixture(query.style, query.date, query.range).snapshot
+    data.metrics.bookings = { value: count, status: count === null ? 'unconfigured' : 'available', unit: '件' }
+    return Promise.resolve({ data })
+  })
+  if (noClasses) emptySchedule()
+}
+it.each(['list', 'board', 'calendar'])('教室の%sはクラス無しと会員予約0を分け、正しい入口を1回だけ出す', async view => {
+  for (const noClasses of [true, false]) {
+    lessonDay(noClasses, 0); state.search = 'view=' + view
+    if (!noClasses) state.schedule.mockImplementation((_account, query) => Promise.resolve({ data: fixture(query.style, query.date, query.range).schedule }))
+    const result = render(<StyleDashboard style="lesson" />)
+    const title = noClasses ? '今日のクラスはありません' : '今日の予約はありません'
+    await screen.findByText(title)
+    expect(screen.getAllByText(title)).toHaveLength(1)
+    expect(screen.queryByText(noClasses ? '今日の予約はありません' : '今日のクラスはありません')).toBeNull()
+    const button = screen.getByRole('button', { name: noClasses ? 'クラスを作る' : '会員を予約する', exact: true })
+    expect(screen.getAllByRole('button', { name: /^(クラスを作る|会員を予約する)$/ })).toHaveLength(1)
+    if (!noClasses) {
+      expect(screen.getAllByText(/朝の予約/).length).toBeGreaterThan(0)
+      if (view === 'calendar') fireEvent.click(screen.getByRole('button', { name: '10:00〜11:00 朝の予約', exact: true }))
+      else if (view === 'list') fireEvent.click(screen.getByRole('button', { name: '朝の予約', exact: true }))
+      if (view !== 'board') {
+        await screen.findByRole('region', { name: '朝の予約の名簿' })
+        expect(state.bookings).toHaveBeenCalledWith('calendar-account', 'event-real', { slot_id: 'slot-real', limit: 50, page: 1 }, { signal: expect.any(AbortSignal) })
+      }
+    }
+    state.push.mockClear(); fireEvent.click(button)
+    expect(state.push).toHaveBeenCalledWith(noClasses ? '/events/new' : '/events')
+    result.unmount()
+  }
+})
+it.each(['list', 'board', 'calendar'])('教室の%sも閲覧のみと役割未取得の空状態操作を止める', async view => {
+  for (const noClasses of [true, false]) for (const role of ['viewer', null]) {
+    lessonDay(noClasses, 0); state.search = 'view=' + view; state.role = role
+    if (!noClasses) state.schedule.mockImplementation((_account, query) => Promise.resolve({ data: fixture(query.style, query.date, query.range).schedule }))
+    const result = render(<StyleDashboard style="lesson" />)
+    const button = await screen.findByRole('button', { name: noClasses ? 'クラスを作る' : '会員を予約する', exact: true })
+    expect(button.hasAttribute('data-permission-locked')).toBe(role === 'viewer')
+    expect(button.hasAttribute('disabled')).toBe(role === null)
+    expect(button.getAttribute('aria-describedby') !== null).toBe(role === 'viewer')
+    state.push.mockClear(); fireEvent.click(button)
+    expect(state.push).not.toHaveBeenCalled()
+    result.unmount()
+  }
+})
+it.each([null, 2])('教室の予約数%sなら既存の回を保ち、予約0の主張をしない', async count => {
+  lessonDay(false, count)
+  render(<StyleDashboard style="lesson" />)
+  await screen.findByRole('region', { name: '1日のカレンダー' })
+  expect(screen.getByRole('button', { name: '10:00〜11:00 朝の予約', exact: true })).toBeTruthy()
+  expect(screen.queryByText('今日の予約はありません')).toBeNull()
+  expect(screen.queryByText('今日のクラスはありません')).toBeNull()
+  expect(screen.getAllByRole('button', { name: '会員を予約する', exact: true })).toHaveLength(1)
+})
+it('教室の取得失敗もクラス無しと誤認せず、翌日はこの日のクラスと示す', async () => {
+  state.schedule.mockRejectedValueOnce(new Error('offline'))
+  const result = render(<StyleDashboard style="lesson" />)
+  await screen.findByText('ダッシュボードを読み込めませんでした')
+  expect(screen.queryByText('今日のクラスはありません')).toBeNull()
+  result.unmount(); lessonDay(true, 0)
+  render(<StyleDashboard style="lesson" />)
+  await screen.findByText('今日のクラスはありません')
+  fireEvent.click(within(screen.getByRole('region', { name: '1日のカレンダー' })).getByRole('button', { name: '次へ', exact: true }))
+  await screen.findByText('この日のクラスはありません')
+})
+
+it('教室の日送りは選択日のsummaryを取り直し、今日0件を翌日の予約数へ持ち越さない', async () => {
+  state.summary.mockImplementation((_account, query) => {
+    const data = fixture(query.style, query.date, query.range).snapshot
+    data.metrics.bookings = { value: query.date === '2026-10-21' ? 0 : 2, status: 'available', unit: '件' }
+    return Promise.resolve({ data })
+  })
+  render(<StyleDashboard style="lesson" />)
+  await screen.findByText('今日の予約はありません')
+  fireEvent.click(within(screen.getByRole('region', { name: '1日のカレンダー' })).getByRole('button', { name: '次へ', exact: true }))
+  await waitFor(() => expect(state.summary).toHaveBeenLastCalledWith('calendar-account', expect.objectContaining({ style: 'lesson', date: '2026-10-22', range: 'today' })))
+  await waitFor(() => expect(screen.queryByText('今日の予約はありません')).toBeNull())
+  await screen.findByRole('button', { name: '10:00〜11:00 朝の予約', exact: true })
+  expect(screen.queryByText('この日の予約はありません')).toBeNull()
+  expect(screen.queryByText('この日のクラスはありません')).toBeNull()
+  expect(screen.getAllByRole('button', { name: '会員を予約する', exact: true })).toHaveLength(1)
+})
+
+it.each<IndustryStyle>(['lesson', 'salon', 'consult', 'restaurant'])('%sのクラスも空きもない日の補足は教室だけクラスなしにする', style => {
+  const { snapshot, schedule } = fixture(style)
+  schedule.entries = []; schedule.availability.slots = []
+  const day = toToday(style, snapshot, schedule, '2026-10-21', 'today').week!.days[0]
+  expect(day.sub).toBe(style === 'lesson' ? 'クラスなし' : '満')
+})
+it('教室のクラスがあって空きがない日は満、空きがある日は空きを保つ', () => {
+  const { snapshot, schedule } = fixture('lesson')
+  schedule.availability.slots = []
+  expect(toToday('lesson', snapshot, schedule, '2026-10-21', 'today').week!.days[0].sub).toBe('満')
+  schedule.availability.slots = fixture('lesson').schedule.availability.slots
+  expect(toToday('lesson', snapshot, schedule, '2026-10-21', 'today').week!.days[0].sub).toBe('空き 1')
+  schedule.entries = []
+  expect(toToday('lesson', snapshot, schedule, '2026-10-21', 'today').week!.days[0].sub).toBe('空き 1')
+})
+it('教室の週は日ごとのクラスを判定し、休業日と日またぎの回も保つ', () => {
+  const { snapshot, schedule } = fixture('lesson', '2026-10-21', 'week')
+  schedule.availability.slots = []
+  schedule.days.push({ date: '2026-10-22', entryIds: [], bookings: 0, people: 0 })
+  const weekdays = () => toToday('lesson', snapshot, schedule, '2026-10-21', 'week').week!.days.map(day => day.sub)
+  expect(weekdays()).toEqual(['満', 'クラスなし'])
+  schedule.availability.closedDates = ['2026-10-22']
+  expect(weekdays()).toEqual(['満', '定休日'])
+  schedule.availability.closedDates = []
+  schedule.entries[0].startsAt = '2026-10-21T23:00:00+09:00'
+  schedule.entries[0].endsAt = '2026-10-22T01:00:00+09:00'
+  expect(weekdays()).toEqual(['満', '満'])
+  schedule.entries[0].endsAt = '2026-10-22T00:00:00+09:00'
+  expect(weekdays()).toEqual(['満', 'クラスなし'])
+})

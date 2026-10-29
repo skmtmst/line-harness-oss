@@ -97,7 +97,8 @@ function Kpi({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
 export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const { cfg, router, tab, subTab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, setCardDefaults, roster, rosterRow, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, KIND, saveClosure, addNew } = useStyleDashboard(style)
 
-  const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && bookingEmptyState(style, today) === 'no-bookings'
+  const emptyBookingState = today ? bookingEmptyState(style, today) : null
+  const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && (emptyBookingState === 'no-bookings' || emptyBookingState === 'no-classes')
   const writeLock = role === null ? undefined : lockUnless(canWrite)
   const viewErrors = useSaveFormErrors()
   const headActions = (
@@ -166,7 +167,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   } else {
     const rows = today.rows.filter((r) => !search || r.name.includes(search) || (r.sub ?? '').includes(search) || (r.course ?? '').includes(search))
     const shownRoster = style === 'lesson' && (rosterId === undefined ? view !== 'calendar' : rosterId !== null && roster?.rowId === rosterId) ? roster : null
-    const emptyBookings = hasEmptyBookingAction ? <EmptyBookings style={style} day={date === jstToday() ? '今日' : 'この日'} today={today} canWrite={canWrite} role={role} onBook={() => addNew()} /> : null
+    const emptyBookings = hasEmptyBookingAction ? <EmptyBookings style={style} day={date === jstToday() ? '今日' : 'この日'} today={today} canWrite={canWrite} role={role} onBook={() => addNew()} onCreateClass={() => router.push('/events/new')} /> : null
     const filteredEmpty = <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => setSearch('')}>検索を外す</Button>} />
     let main: ReactNode
     let aside: ReactNode = side.length ? side : null

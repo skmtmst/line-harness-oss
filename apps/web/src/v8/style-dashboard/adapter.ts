@@ -217,9 +217,10 @@ function weekOf(sch: StyleSchedule, now: Date): StyleWeek {
     // A clipped continuation is not a new bookable start. Keep the API candidate's original action.
     return segments(s.startsAt, s.endsAt).map(slot => slot.day === original.date ? slot : { ...slot, bookingDay: original.date, bookingStart: original.time })
   })
+  const classDays = new Set(sch.entries.filter(entry => entry.kind === 'class').flatMap(entry => segments(entry.startsAt, entry.endsAt).map(slot => slot.day)))
   const first = days[0]?.date ?? sch.from.slice(0, 10), last = days.at(-1)?.date ?? first
   const jp = (d: string) => { const x = new Date(`${d}T00:00:00Z`); return `${x.getUTCMonth() + 1}月${x.getUTCDate()}日（${WEEK[x.getUTCDay()]}）` }
-  return { title: first === last ? jp(first) : `${jp(first)} 〜 ${jp(last)}`, from: first, to: last, days: days.map(day => ({ ...day, sub: day.closed ? '定休日' : free.some(slot => slot.day === day.date) ? `空き ${free.filter(slot => slot.day === day.date).length}` : '満' })), entries, free }
+  return { title: first === last ? jp(first) : `${jp(first)} 〜 ${jp(last)}`, from: first, to: last, days: days.map(day => ({ ...day, sub: day.closed ? '定休日' : free.some(slot => slot.day === day.date) ? `空き ${free.filter(slot => slot.day === day.date).length}` : sch.style === 'lesson' && !classDays.has(day.date) ? 'クラスなし' : '満' })), entries, free }
 }
 
 function monthOf(sch: StyleSchedule, selected: string, now: Date, rows: StyleRow[]): StyleMonth {
@@ -280,6 +281,7 @@ export function toToday(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedu
     kpis: kpisFor(style, s, range),
     alert: null,
     rows, rowsNote: `${formatNumber(rows.length)}件中 1〜${formatNumber(rows.length)}件`,
+    bookingCount: s.metrics.bookings?.status === 'available' ? s.metrics.bookings.value : null,
     board: boardOf(style, sch, now),
     week: sch.calendarView === 'week' || range === 'week' || (sch.display === 'calendar' && sch.calendarView === 'day') ? weekOf(sch, now) : null,
     month: range === 'month' ? monthOf(sch, selected, now, dayRows) : null,
