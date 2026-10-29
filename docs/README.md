@@ -952,6 +952,7 @@
 - [利用開始設定から二段階認証への引き継ぎ](release-log/unreleased/1949-masato-registration-mfa-flow.md) — 登録後の認証とアカウント登録への案内の反映履歴。
 - [LINE通知の操作権限の反映履歴](release-log/unreleased/1950-kenta-notification-permission.md)
 - [LINE通知の説明の置き場所](release-log/unreleased/1950-kenta-notification-help.md)
+- [LINEの接続状態の統一](release-log/unreleased/0000-kenta-line-connection-state.md) — 反映履歴、確認 2026-10-30
 - [LINE通知の送信内訳の表示](release-log/unreleased/1950-kenta-notification-kpi-detail.md)
 - [業種別の初期設定の確認](release-log/unreleased/1950-kenta-style-setup-progress.md) — 反映履歴、確認 2026-10-29
 - [最初の1通の確認と読み直しの操作](release-log/unreleased/1951-kenta-first-message-guide.md)

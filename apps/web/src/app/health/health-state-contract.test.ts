@@ -30,10 +30,11 @@ describe('監視の状態と個別の読み直し', () => {
     [{ success: true, data: { riskLevel: 'normal' } }, '正常'],
     [{ success: true, data: { riskLevel: 'warning' } }, '警告'],
     [{ success: true, data: { riskLevel: 'danger' } }, '危険'],
-    [{ success: true, data: { logs: [log('warning')] } }, '警告'],
-    [{ success: true, data: { riskLevel: 'invalid', logs: [log('danger')] } }, '危険'],
+    [{ success: true, data: { logs: [log('warning')] } }, '未確認'],
+    [{ success: true, data: { riskLevel: 'invalid', logs: [log('danger')] } }, '未確認'],
     [{ success: true, data: { riskLevel: 'normal', logs: [log('danger')] } }, '正常'],
     [{ success: true, data: { riskLevel: 'invalid' } }, '未確認'],
+    [{ success: true, data: { riskLevel: null, logs: [log('danger')] } }, '未確認'],
     [{ success: true, data: null }, '未確認'],
     [{ success: false, data: { riskLevel: 'normal' } }, '取得失敗'],
   ])('%jを%sとして表示する', async (response, label) => {
@@ -69,7 +70,7 @@ describe('監視の状態と個別の読み直し', () => {
 
   it.each(['normal', 'danger'])('古い%sの記録を現在の結果とせず、最後の日時と確認停止を示す', async (riskLevel) => {
     const last = log(riskLevel, new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
-    calls.health.mockResolvedValue({ success: true, data: { riskLevel, logs: [last] } })
+    calls.health.mockResolvedValue({ success: true, data: { riskLevel, connection: { checkedAt: last.createdAt }, logs: [last] } })
     render(createElement(HealthPage))
     await screen.findByRole('button', { name: /アカウントa/ })
     expect(within(accountButton()).getByText('確認停止中')).toBeTruthy()
@@ -85,7 +86,7 @@ describe('監視の状態と個別の読み直し', () => {
     await screen.findByRole('button', { name: /アカウントa/ })
     expect(within(accountButton()).getByText('最終確認 —')).toBeTruthy()
     fireEvent.click(accountButton())
-    expect(screen.getByText('まだ確認結果がありません。')).toBeTruthy()
+    expect(screen.getByText('接続の確認がまだです。')).toBeTruthy()
     calls.health.mockResolvedValue({ success: true, data: { riskLevel: 'normal' } })
     fireEvent.click(screen.getByRole('button', { name: '再試行' }))
     await waitFor(() => expect(within(accountButton()).getByText('正常')).toBeTruthy())
@@ -97,3 +98,13 @@ describe('監視の状態と個別の読み直し', () => {
     expect(PAGE).not.toContain("latestRisk[account.id] || 'normal'")
   })
 })
+
+ it('古い監視ログに引きずられず、接続を確認した時刻で古さを決める', async () => {
+   const old = new Date(Date.now()-2*60*60*1000).toISOString()
+   const fresh = new Date().toISOString()
+   calls.health.mockResolvedValue({ success: true, data: { riskLevel: 'normal', connection: { checkedAt: fresh }, logs: [log('danger', old)] } })
+   render(createElement(HealthPage))
+   await screen.findByRole('button', { name: /アカウントa/ })
+   expect(within(accountButton()).getByText('正常', { exact:true })).toBeTruthy()
+   expect(within(accountButton()).getByText(`最終確認 ${shortDateTime(fresh)}`)).toBeTruthy()
+ })

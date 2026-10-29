@@ -13,7 +13,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import { getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
+import { getLineAccountListStats, getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
 import type { LineAccount as DbLineAccount, LineAccountConnectionCheck } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
@@ -783,7 +783,7 @@ lineAccounts.get('/api/line-accounts/:id', async (c) => {
     if (!account) {
       return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
-    return c.json({ success: true, data: serializeLineAccount(account) });
+    return c.json({ success: true, data: { ...serializeLineAccount(account), connection: (await getLineAccountListStats(c.env.DB, [account.id]))[account.id]?.connection ?? { status: 'unknown', checkedAt: null, tokenExpired: false, issues: [] } } });
   } catch (err) {
     throw err;
   }

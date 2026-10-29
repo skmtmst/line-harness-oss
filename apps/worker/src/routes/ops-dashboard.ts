@@ -101,7 +101,6 @@ opsDashboard.get('/api/ops/dashboard', async (c) => {
       excludeTenantId: DEFAULT_TENANT_ID,
       now: nowIso,
       trialDeadline: jstIso(now + 3 * 24 * 60 * 60 * 1000),
-      tokenDeadline: jstIso(now + 14 * 24 * 60 * 60 * 1000),
     }),
     dashboardTickets(db, { from: range.from, to: range.to }),
     dashboardLineRegistration(db, DEFAULT_TENANT_ID),

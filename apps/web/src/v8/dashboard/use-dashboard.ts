@@ -446,7 +446,7 @@ export function useDashboard(usageStyle?: 'standard' | 'ec') {
         setHealthRisk(healthData ? (healthData.riskLevel as HealthRisk) : null)
         setHealthIssueCount(
           healthData
-            ? healthData.logs.filter((log) => log.riskLevel === 'warning' || log.riskLevel === 'danger').length
+            ? Number(healthData.riskLevel === 'warning' || healthData.riskLevel === 'danger')
             : null,
         )
         setHealthFailed(healthData === null)

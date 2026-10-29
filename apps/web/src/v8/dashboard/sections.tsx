@@ -1,5 +1,7 @@
 'use client'
 
+import { lineAccountConnectionState } from '@/lib/line-account-state'
+
 import Card from '@/components/shared/card'
 import { ProgressBar } from '@/components/shared/progress'
 import StatusBadge from '@/components/shared/status-badge'
@@ -218,20 +220,15 @@ export function SupportStatus({ inbox, autoOnInbound }: { inbox: DashboardOvervi
 }
 
 /* ── 右の列：接続状態 ─────────────────────────────── */
-export type WebhookState = { label: '正常' | '要確認' | '未確認'; reason: { text: string; title: string } | null }
+export type WebhookState = { label: string; reason: { text: string; title: string } | null }
 
 /**
  * LINE Webhook の値。統括のアカウントの接続（connection）と同じ判定・理由の言葉を使う。
  * 「確認中」は確かめるを押して走らせている間だけ（ここでは出さない）。
  */
-export function webhookState(account: Pick<AccountWithStats, 'connection' | 'webhook' | 'basicId' | 'channelId'> | null | undefined): WebhookState {
-  const connection = account?.connection
-  const webhook = account?.webhook?.status
-  if (connection?.status === 'warn' || webhook === 'mismatched' || webhook === 'unconfigured') {
-    return { label: '要確認', reason: account ? connectionReasonLine(account as AccountWithStats) : null }
-  }
-  if (connection?.status === 'ok' || (!connection && webhook === 'matched')) return { label: '正常', reason: null }
-  return { label: '未確認', reason: null }
+export function webhookState(account: Pick<AccountWithStats, 'connection' | 'webhook' | 'basicId' | 'channelId' | 'isActive' | 'archivedAt'> | null | undefined): WebhookState {
+  const state = lineAccountConnectionState(account ?? {})
+  return { label: state.label, reason: state.tone === 'warn' && account ? connectionReasonLine(account as AccountWithStats) : null }
 }
 
 /**
@@ -305,6 +302,7 @@ export function ConnectionStatus({ account, canCheck, onChecked, risk, activeFri
       </div>
       {state.label === '要確認' && state.reason && !checking ? <p className={`${styles.stale} ${styles.connectionReason}`} title={state.reason.title}>{state.reason.text}</p> : null}
       {checkError ? <p className={styles.alert} role="alert">{checkError}</p> : null}
+      {account?.tokenExpiry ? <KeyValue label="トークンの期限" value={account.tokenExpiry.label} /> : null}
       <KeyValue label="自動処理" value={autoLabel} dot={dotOf(autoLabel)} tone={autoLabel === '要確認' ? 'danger' : 'default'} />
       <KeyValue label="有効友だち" value={activeFriends === null ? emptyValue('unknown') : <span className={styles.kvDelta}>
         {activeFriendsCompare ? <KpiDelta current={activeFriendsCompare.current} previous={activeFriendsCompare.previous} better={activeFriendsCompare.better} unit="人" /> : null}

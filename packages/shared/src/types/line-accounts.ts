@@ -110,10 +110,8 @@ export interface LineAccount {
     messagesThisMonth: number;
     staffCount: number;
   };
-  connection?: {
-    /** 一覧APIの最新接続判定。 */
-    status?: 'ok' | 'warn' | 'unknown';
-    checkedAt?: string | null;
+  tokenExpiry?: import('../line-token-expiry.js').LineTokenExpiry;
+  connection?: import('../line-connection-state.js').LineConnection & {
     /** 詳細APIのWebhook試験・受信履歴。 */
     lastTestAt?: string | null;
     lastTestStatus?: 'succeeded' | 'failed' | null;

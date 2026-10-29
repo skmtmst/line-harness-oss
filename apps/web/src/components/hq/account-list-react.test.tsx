@@ -35,7 +35,7 @@ describe('統括のアカウントを選ぶ一覧', () => {
     expect(row('銀座店').textContent).toContain('@ginza')
     expect(row('銀座店').querySelector('img')?.getAttribute('src')).toBe('https://line.example/ginza.png')
     const umeda = [...row('梅田店').querySelectorAll('td')].map((td) => td.textContent?.trim())
-    expect(umeda.slice(1, 6)).toEqual(['0', '0', '要確認', '0人', '停止中'])
+    expect(umeda.slice(1, 6)).toEqual(['0', '0', '停止中', '0人', '停止中'])
     expect(row('梅田店').textContent).toContain('LINE ID未取得')
   })
 
