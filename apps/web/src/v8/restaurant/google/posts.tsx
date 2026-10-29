@@ -82,9 +82,8 @@ const FILTER_OPTIONS: Array<{ value: GooglePostFilter; label: string }> = [
 const CTA_LABELS: Record<GooglePostCtaType, string> = { book: '予約', order: '注文', shop: '購入', learn_more: '詳細', sign_up: '申し込み', call: '電話' }
 
 
-/** 種類の札は全部同じ chip（種類＝灰）。 */
 function KindChip({ kind }: { kind: GooglePostKind }) {
-  return <Chip>{KIND_LABELS[kind]}</Chip>
+  return <Chip tone={kind === 'event' ? 'warn' : 'neutral'}>{KIND_LABELS[kind]}</Chip>
 }
 
 function postWhen(post: GooglePost): string {
