@@ -73,11 +73,11 @@ const ALERT_ICON: Record<NonNullable<StyleAlertAction['icon']>, ReactNode> = {
   link: <Link2 size={16} aria-hidden="true" />, people: <Users size={16} aria-hidden="true" />,
 }
 
-/* R11: 帯に入り切らない5つ目の短い1行（「今日入った予約 3 件 一覧へ →」の形）。 */
+/* R11: 帯に入り切らない5つ目の短い1行（「新着予約 今日入った予約 3 件 一覧へ →」の形。項目名を残す）。 */
 function KpiOverflowLine({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
   const value = kpi.valueText ?? (kpi.value == null ? '—' : formatNumber(kpi.value))
   return (
-    <p className={styles.fifthLine}>{kpi.detail} {value}{kpi.unit ? ` ${kpi.unit}` : ''} {kpi.link ? (
+    <p className={styles.fifthLine}>{kpi.title} {kpi.detail} {value}{kpi.unit ? ` ${kpi.unit}` : ''} {kpi.link ? (
       kpi.link.href === '#preparing-payment'
         ? <Button variant="text" size="inline" onClick={onPreparing}>{kpi.link.label}へ →</Button>
         : <Button variant="text" size="inline" href={kpi.link.href}>{kpi.link.label}へ →</Button>

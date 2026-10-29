@@ -168,10 +168,22 @@ it('32項目の閲覧だけでも内容と順序を保ち、未取得を0にせ�
 it('R11: 5つ目は帯の下の短い1行（行き先付き）', async () => {
   render(<StyleDashboard style="salon" />)
   await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち']))
-  // 5つ目の無断キャンセル率は帯の外の1行。
+  // 5つ目の無断キャンセル率は帯の外の1行。項目名・値・行き先を残す。
   const go = screen.getByRole('link', { name: '友だち一覧へ →' })
   expect(go.closest('[data-kpi-strip]')).toBeNull()
   expect(go.getAttribute('href')).toBe('/friends')
+  const line = go.closest('p')!.textContent!
+  expect(line).toContain('無断キャンセル率')
+  expect(line).toContain('無断／対象の予約')
+})
+
+it('R11: 並べ替え後の5つ目も項目名つきの1行', async () => {
+  state.customized = true; state.ids = ['bookings', 'attention', 'nextBookingRate', 'visits', 'recall']
+  render(<StyleDashboard style="salon" />)
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数']))
+  const go = screen.getByRole('link', { name: '友だち一覧へ →' })
+  expect(go.closest('[data-kpi-strip]')).toBeNull()
+  expect(go.closest('p')!.textContent!).toContain('呼び戻し待ち')
 })
 
 it('追加決まり1: 読み直すは題の右上で道具の段に1つ落ちない', async () => {
@@ -194,9 +206,10 @@ it('追加決まり1: 一覧の探す欄は左に置く（右に1つ浮かせな
   expect(tools!.firstElementChild!.contains(box)).toBe(true)
 })
 
-it('R11: 飲食店の5つ目は「今日入った予約 N 件 一覧へ →」', async () => {
+it('R11: 飲食店の5つ目は「新着予約 今日入った予約 N 件」', async () => {
   render(<StyleDashboard style="restaurant" />)
   await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '空席（いま）', '無断キャンセル率']))
+  expect(document.body.textContent).toContain('新着予約')
   expect(document.body.textContent).toContain('今日入った予約')
   const go = screen.getByRole('link', { name: '一覧へ →' })
   expect(go.closest('[data-kpi-strip]')).toBeNull()
