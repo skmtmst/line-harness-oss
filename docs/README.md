@@ -912,3 +912,5 @@
 - [左上に統括名を表示](release-log/unreleased/1924-masato-sidebar-tenant-name.md) — 左上の名前を統括名に直した修正履歴。
 
 - [担当者が店の画面を開けない不具合の修正](release-log/unreleased/0000-kenta-follower-import-staff.md)
+- [閲覧のみの操作と理由の表示](release-log/unreleased/0000-kenta-perm-rebuild.md) — 閲覧時の操作表示と代理ログインの権限制御の反映履歴。
+- [左上の統括名の表示幅](release-log/unreleased/1926-masato-sidebar-name-width.md) — 統括名の表示幅を調整した反映履歴。
