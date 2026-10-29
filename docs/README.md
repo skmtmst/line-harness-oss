@@ -453,6 +453,7 @@
 
 ## 反映履歴
 
+- [Google口コミのAI下書き生成の修正](release-log/unreleased/1892-masato-google-review-ai-draft.md)
 - [LINEアカウント登録の事前確認を回答時に進める変更](release-log/unreleased/1891-masato-line-precheck-auto-next.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
