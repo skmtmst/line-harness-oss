@@ -19,6 +19,8 @@ export interface AccountWithStats {
   pictureUrl?: string | null
   basicId?: string | null
   isActive: boolean
+  /** 既存のメール受信箱をこのアカウントで表示できるか。新規アカウントは未接続。 */
+  emailInboxEnabled?: boolean
   country: string | null
   role: string | null
   displayOrder: number

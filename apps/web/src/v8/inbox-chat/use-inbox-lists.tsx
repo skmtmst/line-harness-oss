@@ -15,6 +15,7 @@ type Options = {
   EMAIL_PAGE_SIZE: number
   nameQuery: string
   selectedAccountId: string | null
+  emailInboxEnabled: boolean
   statusFilter: StatusFilter
   assigneeFilter: string
   unreadOnly: boolean
@@ -24,7 +25,7 @@ type Options = {
   setError: Dispatch<SetStateAction<string>>
 }
 
-export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, selectedAccountId, statusFilter, assigneeFilter, unreadOnly, quickFilter, sort = 'unread_first', setError }: Options) {
+export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, selectedAccountId, emailInboxEnabled, statusFilter, assigneeFilter, unreadOnly, quickFilter, sort = 'unread_first', setError }: Options) {
 
   /*
    * メール一覧だけの失敗表示。LINE側の `error` とは別にする。
@@ -117,7 +118,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
   }, [statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort, CHAT_PAGE_SIZE])
 
   // Compare at render time too: an old request can finish before the next effect runs.
-  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort])
+  const listFilterKey = JSON.stringify([statusFilter, selectedAccountId, emailInboxEnabled, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, slaEnabled, sort])
 
   const { value: chats, setValue: setChats } = useListSnapshot<Chat[]>(listFilterKey, [])
   const { value: emailItems, setValue: setEmailItems } = useListSnapshot<EmailInboxItem[]>(listFilterKey, [])
@@ -155,6 +156,16 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
 
   /** メールの問い合わせを取る。LINEと同じ一覧に混ぜるため。 */
   const loadEmails = useCallback(async (offset = 0, append = false) => {
+    if (!emailInboxEnabled) {
+      emailListRequestRef.current += 1
+      setEmailItems([])
+      setEmailError('')
+      setHasMoreEmails(false)
+      setLoadingMoreEmails(false)
+      setEmailLoading(false)
+      setEmailListCompletedKey(listFilterKey)
+      return
+    }
     const requestId = append ? emailListRequestRef.current : ++emailListRequestRef.current
     if (append) {
       if (emailMoreLockRef.current) return
@@ -216,7 +227,7 @@ export function useInboxLists({ CHAT_PAGE_SIZE, EMAIL_PAGE_SIZE, nameQuery, sele
         setEmailLoading(false)
       }
     }
-  }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey, EMAIL_PAGE_SIZE, setEmailItems])
+  }, [statusFilter, debouncedNameQuery, assigneeFilter, unreadOnly, quickFilter, listFilterKey, EMAIL_PAGE_SIZE, emailInboxEnabled, setEmailItems])
 
   useEffect(() => {
     void loadEmails()
