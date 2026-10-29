@@ -134,3 +134,87 @@ it.each(['loading', 'failed', 'missing', 'empty-name', 'named'] as const)('保�
   expect(getDraft).toHaveBeenCalledWith('summary-draft', 'account')
   expect(createDraft).not.toHaveBeenCalled()
 })
+
+it.each(['ready', 'loading', 'failed'] as const)('シナリオIDが空なら%sでも未選択を示し、保存を始めない', async state => {
+  if (state === 'loading') resources.mockImplementationOnce(() => new Promise(() => {}))
+  if (state === 'failed') resources.mockRejectedValueOnce(new Error('resources unavailable'))
+  getDraft.mockResolvedValueOnce({ success: true, data: {
+    id: 'scenario-draft', draftVersionId: 'v1', name: 'シナリオの確認', description: null,
+    eventType: 'friend_add', triggerConfig: {}, conditions: {},
+    actions: [{ id: 'scenario-step', type: 'start_scenario', params: {}, onFailure: 'stop' }],
+  } })
+  window.history.replaceState(null, '', '/automations/new?draft=scenario-draft')
+  render(<NewAutomationV8 />)
+  await waitFor(() => expect((screen.getByRole('textbox', { name: '名前', exact: true }) as HTMLInputElement).value).toBe('シナリオの確認'))
+  expect(screen.getByText('友だちになったら、シナリオ（未選択）を始めます。')).toBeTruthy()
+  expect(summaries.mock.lastCall?.[0]).toBe('シナリオ（未選択）')
+  fireEvent.click(screen.getByRole('button', { name: 'つくって動かす', exact: true }))
+  expect(await screen.findByText('始めるシナリオを選んでください')).toBeTruthy()
+  expect(screen.queryByRole('dialog', { name: 'この内容で動かし始めますか' })).toBeNull()
+  expect(createDraft).not.toHaveBeenCalled()
+})
+
+it.each(['ready', 'loading', 'failed'] as const)('共通アクションIDが空なら%sでも未選択を示し、保存を始めない', async state => {
+  if (state === 'loading') resources.mockImplementationOnce(() => new Promise(() => {}))
+  if (state === 'failed') resources.mockRejectedValueOnce(new Error('resources unavailable'))
+  getDraft.mockResolvedValueOnce({ success: true, data: {
+    id: 'common-action-draft', draftVersionId: 'v1', name: '共通アクションの確認', description: null,
+    eventType: 'friend_add', triggerConfig: {}, conditions: {},
+    actions: [{ id: 'common-action-step', type: 'common_action', params: {}, onFailure: 'stop' }],
+  } })
+  window.history.replaceState(null, '', '/automations/new?draft=common-action-draft')
+  render(<NewAutomationV8 />)
+  await waitFor(() => expect((screen.getByRole('textbox', { name: '名前', exact: true }) as HTMLInputElement).value).toBe('共通アクションの確認'))
+  expect(screen.getByText('友だちになったら、共通アクション（未選択）を実行します。')).toBeTruthy()
+  expect(summaries.mock.lastCall?.[0]).toBe('共通アクション（未選択）')
+  fireEvent.click(screen.getByRole('button', { name: 'つくって動かす', exact: true }))
+  expect(await screen.findByText('使う共通アクションを選んでください')).toBeTruthy()
+  expect(screen.queryByRole('dialog', { name: 'この内容で動かし始めますか' })).toBeNull()
+  expect(createDraft).not.toHaveBeenCalled()
+})
+
+it.each(['loading', 'failed', 'missing', 'empty-name', 'named'] as const)('保存済みシナリオ非空IDを%sで未選択に読み替えず、確認へ同じ要約を渡す', async state => {
+  if (state === 'loading') resources.mockImplementationOnce(() => new Promise(() => {}))
+  else if (state === 'failed') resources.mockRejectedValueOnce(new Error('resources unavailable'))
+  else resources.mockResolvedValueOnce({ success: true, data: { tags: [], scenarios: state === 'missing' ? [] : [{ id: 'retained-scenario', name: state === 'empty-name' ? '' : '来店フォロー' }], commonActions: [] } })
+  getDraft.mockResolvedValueOnce({ success: true, data: {
+    id: 'scenario-draft', draftVersionId: 'v1', name: 'シナリオの確認', description: null,
+    eventType: 'friend_add', triggerConfig: {}, conditions: {},
+    actions: [{ id: 'scenario-step', type: 'start_scenario', params: { scenarioId: 'retained-scenario' }, onFailure: 'stop' }],
+  } })
+  window.history.replaceState(null, '', '/automations/new?draft=scenario-draft')
+  render(<NewAutomationV8 />)
+  await waitFor(() => expect((screen.getByRole('textbox', { name: '名前', exact: true }) as HTMLInputElement).value).toBe('シナリオの確認'))
+  const named = state === 'named'
+  await waitFor(() => expect(summaries.mock.lastCall?.[0]).toBe(named ? 'シナリオ「来店フォロー」を始める' : 'シナリオを始める'))
+  expect(screen.getByText(named ? '友だちになったら、シナリオ「来店フォロー」を始めます。' : '友だちになったら、シナリオを始めます。')).toBeTruthy()
+  expect(screen.queryByText(/シナリオ（未選択）/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'つくって動かす', exact: true }))
+  const confirm = await screen.findByRole('dialog', { name: 'この内容で動かし始めますか' })
+  expect(confirm.textContent).toContain(named ? 'シナリオ「来店フォロー」を始める' : 'シナリオを始める')
+  expect(getDraft).toHaveBeenCalledWith('scenario-draft', 'account')
+  expect(createDraft).not.toHaveBeenCalled()
+})
+
+it.each(['loading', 'failed', 'missing', 'empty-name', 'named'] as const)('保存済み共通アクション非空IDを%sで未選択に読み替えず、確認へ同じ要約を渡す', async state => {
+  if (state === 'loading') resources.mockImplementationOnce(() => new Promise(() => {}))
+  else if (state === 'failed') resources.mockRejectedValueOnce(new Error('resources unavailable'))
+  else resources.mockResolvedValueOnce({ success: true, data: { tags: [], scenarios: [], commonActions: state === 'missing' ? [] : [{ id: 'retained-common-action', name: state === 'empty-name' ? '' : '予約の案内' }] } })
+  getDraft.mockResolvedValueOnce({ success: true, data: {
+    id: 'common-action-draft', draftVersionId: 'v1', name: '共通アクションの確認', description: null,
+    eventType: 'friend_add', triggerConfig: {}, conditions: {},
+    actions: [{ id: 'common-action-step', type: 'common_action', params: { commonActionId: 'retained-common-action' }, onFailure: 'stop' }],
+  } })
+  window.history.replaceState(null, '', '/automations/new?draft=common-action-draft')
+  render(<NewAutomationV8 />)
+  await waitFor(() => expect((screen.getByRole('textbox', { name: '名前', exact: true }) as HTMLInputElement).value).toBe('共通アクションの確認'))
+  const named = state === 'named'
+  await waitFor(() => expect(summaries.mock.lastCall?.[0]).toBe(named ? '共通アクション「予約の案内」を実行' : '共通アクションを実行'))
+  expect(screen.getByText(named ? '友だちになったら、共通アクション「予約の案内」を実行します。' : '友だちになったら、共通アクションを実行します。')).toBeTruthy()
+  expect(screen.queryByText(/共通アクション（未選択）/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'つくって動かす', exact: true }))
+  const confirm = await screen.findByRole('dialog', { name: 'この内容で動かし始めますか' })
+  expect(confirm.textContent).toContain(named ? '共通アクション「予約の案内」を実行' : '共通アクションを実行')
+  expect(getDraft).toHaveBeenCalledWith('common-action-draft', 'account')
+  expect(createDraft).not.toHaveBeenCalled()
+})

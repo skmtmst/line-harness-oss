@@ -70,6 +70,25 @@ function fixture() {
 }
 
 describe('型の対応表の点検', () => {
+  it('顧客名への敬称は共有関数を通し、同じ直書きを増やさない', () => {
+    const files = execFileSync('rg', ['--files', join(ROOT, 'apps/web/src/v8'), '-g', '*.tsx'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean)
+    const directHonorific = /\$\{[^}]*\b(?:friendName|customerName|customer_name|displayName|friend_name|owner_name|names\.name|owner\.name)[^}]*\}\s*(?:さん|様|さま)/u
+    const findings = files.flatMap(file => {
+      const source = readFileSync(file, 'utf8')
+      return directHonorific.test(source) ? [file.slice(ROOT.length + 1)] : []
+    })
+    expect(findings).toEqual([])
+    expect(directHonorific.test('${customerName}さん')).toBe(true)
+  })
+
+  it('V8の画面は全状態の凡例を直接出さず、表示中の状態を共通部品へ渡す', () => {
+    const files = execFileSync('rg', ['--files', join(ROOT, 'apps/web/src/v8'), '-g', '*.tsx'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean)
+    const directLegend = /<BookingLegend(?:\s|\/|>)/u
+    const findings = files.flatMap(file => directLegend.test(readFileSync(file, 'utf8')) ? [file.slice(ROOT.length + 1)] : [])
+    expect(findings).toEqual([])
+    expect(directLegend.test('<BookingLegend />')).toBe(true)
+  })
+
   it('正の道具列のsearchSlotは通し、隣の検索欄と同名の自作は検出する', () => {
     const { root } = fixture()
     put(root, 'apps/web/src/components/shared/list-toolbar.tsx', 'export default function ListToolbar() { return null }')
@@ -196,6 +215,17 @@ describe('型の対応表の点検', () => {
     expect(findings()).toHaveLength(1)
     put(root, 'apps/web/src/v8/demo/choices.tsx', "import FixedActionList from '@/components/shared/fixed-action-list'; export const P = () => <FixedActionList options={[{label:'別の動作',editor:<button>タグを付ける</button>}]} />")
     expect(findings()).toHaveLength(1)
+  })
+  it('予約の箱を手で組む追加を検出し、共通の内容へ戻すと通る', () => {
+    const { root } = fixture()
+    const file = 'apps/web/src/v8/demo/booking.tsx'
+    put(root, file, 'export const P = () => <BookingBlock><BookingCardContent name="花子" time="10:00" menu="カット" /></BookingBlock>')
+    const audit = () => run({ code: root, only: ['booking-card-content'] })
+    const before = audit()
+    put(root, file, 'export const P = () => <BookingBlock state="confirmed" onClick={() => open()}><BookingName>花子</BookingName><BookingTime>10:00</BookingTime></BookingBlock>')
+    expect(newCodeFindings(before, audit())).toHaveLength(1)
+    put(root, file, 'export const P = () => <BookingBlock><BookingCardContent name="花子" time="10:00" menu="カット" /></BookingBlock>')
+    expect(newCodeFindings(before, audit())).toHaveLength(0)
   })
   it('ページ送りの件数文の再導入を止め、共通部品へ渡す数値は通す', () => {
     const { root } = fixture()

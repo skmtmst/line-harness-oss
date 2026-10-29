@@ -649,7 +649,8 @@
     "733_event_booking_entitlement_uses.sql",
     "734_unlimited_monthly_passes.sql",
     "735_booking_photos.sql",
-    "736_line_account_tag_color_check.sql"
+    "736_line_account_tag_color_check.sql",
+    "737_existing_account_email_inbox.sql"
   ],
-  "migrationCount": 650
+  "migrationCount": 651
 }

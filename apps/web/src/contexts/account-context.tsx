@@ -7,6 +7,7 @@ import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { loadLineAccounts } from '@/lib/line-accounts-cache'
 import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { clearApiReadCache } from '@/lib/api/transport/read-cache'
+import { api } from '@/lib/api'
 
 const STORAGE_KEY = 'lh_selected_account'
 
@@ -19,6 +20,8 @@ export interface AccountWithStats {
   pictureUrl?: string | null
   basicId?: string | null
   isActive: boolean
+  /** 既存のメール受信箱をこのアカウントで表示できるか。新規アカウントは未接続。 */
+  emailInboxEnabled?: boolean
   country: string | null
   role: string | null
   displayOrder: number
@@ -185,6 +188,43 @@ export function AccountProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void loadAccounts(false)
   }, [loadAccounts])
+
+  useEffect(() => {
+    if (loading || error || accounts.length === 0) return
+    let cancelled = false
+    let inFlight = false
+    let lastAttempt = 0
+    const refreshPictures = async () => {
+      if (inFlight || document.visibilityState === 'hidden' || Date.now() - lastAttempt < 30_000) return
+      inFlight = true
+      lastAttempt = Date.now()
+      try {
+        const response = await api.lineAccounts.profilePictures()
+        if (cancelled || !response.success) return
+        const byId = new Map(response.data.map((item) => [item.id, item.pictureUrl]))
+        setAccounts((current) => current.map((account) => {
+          if (!byId.has(account.id)) return account
+          const pictureUrl = byId.get(account.id) ?? null
+          return account.pictureUrl === pictureUrl ? account : { ...account, pictureUrl }
+        }))
+      } catch {
+        // アイコン更新だけの失敗で、アカウント一覧を消さない。
+      } finally {
+        inFlight = false
+      }
+    }
+    const onVisible = () => { void refreshPictures() }
+    void refreshPictures()
+    window.addEventListener('focus', onVisible)
+    document.addEventListener('visibilitychange', onVisible)
+    const timer = window.setInterval(onVisible, 5 * 60_000)
+    return () => {
+      cancelled = true
+      window.removeEventListener('focus', onVisible)
+      document.removeEventListener('visibilitychange', onVisible)
+      window.clearInterval(timer)
+    }
+  }, [loading, error, accounts.length])
 
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? null
 

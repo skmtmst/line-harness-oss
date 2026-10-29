@@ -19,6 +19,7 @@ import { normalizeBirthdayInput } from './parts'
 import styles from './pets.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { withHonorific } from '@line-crm/shared'
 
 
 /*
@@ -128,7 +129,7 @@ export default function PetEditorV8({ accountId, pet, onClose, onSaved }: {
           <span aria-hidden="true" className={styles.editorFace}>{(pet.name || '?').slice(0, 1)}</span>
           <span className={styles.stack}>
             <span className={styles.cellStrong}>{pet.name || pet.callName}</span>
-            <span className={styles.sub}>{`飼い主 ${pet.owner.name}さん・${pet.owner.customerId ? `EC-${pet.owner.customerId}` : 'EC未連携'}`}</span>
+            <span className={styles.sub}>{`飼い主 ${withHonorific(pet.owner.name)}・${pet.owner.customerId ? `EC-${pet.owner.customerId}` : 'EC未連携'}`}</span>
           </span>
         </div>
         <div className={styles.editorGroup}>

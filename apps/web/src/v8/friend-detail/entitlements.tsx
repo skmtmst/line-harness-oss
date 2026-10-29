@@ -35,6 +35,7 @@ import { isNotReadyError } from '@/lib/api/helpers/booking-payment-admin'
 import { formatListTimestamp } from '@/lib/format'
 import { jstDate } from '@/lib/jst-datetime'
 import styles from './entitlements.module.css'
+import { withHonorific } from '@line-crm/shared'
 
 /*
  * 友だち詳細 › 予約タブの「回数券・月謝」（ 追記・絵 t7AmhL＝手で入れる窓、XrfOE＝履歴の引き出し）。
@@ -202,7 +203,7 @@ export function EntitlementDialog({ open, initial, accountId, friendId, friendNa
   }
 
   return (<SaveErrorScope errors={saveErrors}>{(
-    <Dialog open={open} title="回数券を手で入れる" titleNote={`${friendName || 'この友だち'} さん・店頭で売った・紙の回数券の引き継ぎなど`} onCancel={onClose} size="medium" busy={busy}
+    <Dialog open={open} title="回数券を手で入れる" titleNote={`${withHonorific(friendName || 'この友だち', 'さん', { space: true })}・店頭で売った・紙の回数券の引き継ぎなど`} onCancel={onClose} size="medium" busy={busy}
       cancelLabel="キャンセル" confirmLabel={submitLabel} onConfirm={() => void submit()}>
       <div className={styles.dialogBody}>
         <RadioCardGroup legend="すること" legendVisible columns={2}>
@@ -284,7 +285,7 @@ export function EntitlementDrawer({ item, accountId, friendName, canEdit, onClos
   }, [accountId, item])
   const used = Array.isArray(events) ? events.filter((event) => event.action === 'consume').length : null
   return (
-    <Drawer open={item !== null} title={item?.name ?? ''} description={`${friendName || 'この友だち'} さん`} onClose={onClose} width="editor" closeAppearance="box" heightMode="viewport">
+    <Drawer open={item !== null} title={item?.name ?? ''} description={withHonorific(friendName || 'この友だち', 'さん', { space: true })} onClose={onClose} width="editor" closeAppearance="box" heightMode="viewport">
       {item ? (
         <div className={styles.drawerBody}>
           <KpiBand presentation="band" density="compact" gridClassName="grid grid-cols-3" aria-label={`${item.name}の残り・期限・使った回数`}>

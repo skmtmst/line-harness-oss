@@ -295,7 +295,20 @@ export default function scanPolishRules() {
     for (let node = walker.nextNode(); node; node = walker.nextNode()) {
       if (badge.contains(node) || !node.textContent.trim() || !visible(node.parentElement)) continue
       const range = document.createRange(); range.selectNodeContents(node)
-      const overlap = [...range.getClientRects()].some((x) => x.width > 0 && Math.min(x.right, br.right) - Math.max(x.left, br.left) > 0.5 && Math.min(x.bottom, br.bottom) - Math.max(x.top, br.top) > 0.5)
+      const clips = []
+      for (let ancestor = node.parentElement; ancestor; ancestor = ancestor.parentElement) {
+        const style = css(ancestor), box = ancestor.getBoundingClientRect()
+        clips.push({ box, x: /^(hidden|clip|auto|scroll)$/.test(style.overflowX), y: /^(hidden|clip|auto|scroll)$/.test(style.overflowY) })
+        if (ancestor === parent) break
+      }
+      const overlap = [...range.getClientRects()].some((x) => {
+        let { left, right, top, bottom } = x
+        for (const clip of clips) {
+          if (clip.x) { left = Math.max(left, clip.box.left); right = Math.min(right, clip.box.right) }
+          if (clip.y) { top = Math.max(top, clip.box.top); bottom = Math.min(bottom, clip.box.bottom) }
+        }
+        return right > left && bottom > top && Math.min(right, br.right) - Math.max(left, br.left) > 0.5 && Math.min(bottom, br.bottom) - Math.max(top, br.top) > 0.5
+      })
       if (overlap) { add('badge-overlap', badge, {}, badge.textContent); break }
     }
   }
