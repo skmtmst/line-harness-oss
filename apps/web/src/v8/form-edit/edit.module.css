@@ -233,6 +233,11 @@
 .phoneForm { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); padding: var(--tpl-fe-phone-form-pad); }
 .phoneBlockSlot { flex: none; display: flex; flex-direction: column; min-width: 0; }
 .phoneEmpty { margin: 0; font-size: var(--tpl-fe-small-size); color: var(--color-ink-faint); }
+/* 「答え終わったあと」のタブで出すお礼の画面。✓・お礼の文・URLの順。 */
+.thanksBox { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--tpl-fe-open-gap); text-align: center; }
+.thanksMark { font-size: var(--tpl-fe-title-size); font-weight: 600; line-height: 1; }
+.thanksText { margin: 0; font-size: var(--tpl-fe-body-size); font-weight: 600; line-height: var(--tpl-fe-title-lh); white-space: pre-wrap; }
+.thanksSub { margin: 0; font-size: var(--tpl-fe-small-size); line-height: var(--tpl-fe-small-lh); color: var(--color-ink-faint); overflow-wrap: anywhere; }
 .phoneImage { flex: none; display: block; width: 100%; height: var(--tpl-fe-phone-image-h); object-fit: cover; border-radius: var(--tpl-fe-phone-r); background: var(--tpl-fe-phone-image-bg); }
 .phoneHeading { margin: 0; font-size: var(--tpl-fe-title-size); font-weight: 700; line-height: var(--tpl-fe-title-lh); color: var(--color-ink); }
 .phoneHeading[data-level='3'] { font-size: var(--tpl-fe-body-size); }

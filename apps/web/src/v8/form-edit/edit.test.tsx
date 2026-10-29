@@ -167,7 +167,7 @@ describe('回答フォームの編集（V8）', () => {
     for (const name of ['ページを足す', '公開前に試す（試しのURLを作る）']) expect(screen.queryByRole('button', { name })).toBeNull()
     expect(host.querySelector('[data-fe-root] input, [data-fe-root] textarea')).toBeNull()
     fireEvent.click(screen.getByRole('tab', { name: '答え終わったあと' }))
-    expect(screen.getByText('テキストを送る「ご回答ありがとうございます」')).toBeTruthy()
+    expect(screen.getByText('「ご回答ありがとうございます」')).toBeTruthy()
     expect(host.querySelector('[data-fe-root] input, [data-fe-root] textarea')).toBeNull()
     fireEvent.click(screen.getByRole('tab', { name: '受付と見た目' }))
     expect(screen.getAllByText('来店アンケート').length).toBeGreaterThan(0)
@@ -211,10 +211,24 @@ describe('回答フォームの編集（V8）', () => {
     expect(screen.getByText('予約メニューへ').closest('a')?.getAttribute('href')).toBe('/booking/menus')
   })
 
+  it('「答え終わったあと」のタブでは右のスマホにお礼の画面を出し、中身のタブでは質問に戻す', async () => {
+    await render('id=form-1&tab=after')
+    expect(await screen.findByText('答え終わったら行うこと')).toBeTruthy()
+    expect(screen.getByText('ご回答ありがとうございました。')).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: '中身' }))
+    expect(await screen.findByText('ページ1 のブロック')).toBeTruthy()
+    expect(screen.queryByText('ご回答ありがとうございました。')).toBeNull()
+    expect(screen.getAllByText('今日のご来店の目的は？').length).toBeGreaterThan(0)
+  })
+
   it('?tab= で答え終わったあと・受付と見た目を開け、タブでも切り替わる', async () => {
     await render('id=form-1&tab=after')
     expect(await screen.findByText('答え終わったら行うこと')).toBeTruthy()
-    expect(screen.getByText('テキストを送る「ご回答ありがとうございます」')).toBeTruthy()
+    expect(screen.getByText('「ご回答ありがとうございます」')).toBeTruthy()
+    /* 種類と題で同じ言葉を2回言わない（種類「テキストを送る」＋題「本文」）。 */
+    const row = screen.getByText('「ご回答ありがとうございます」').closest('[data-action-row]')
+    expect(within(row as HTMLElement).getByText('テキストを送る')).toBeTruthy()
+    expect(within(row as HTMLElement).getByRole('button', { name: '「ご回答ありがとうございます」' })).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: '受付と見た目' }))
     expect(await screen.findByText('受付のきまり（つづき）')).toBeTruthy()
     expect(screen.getByDisplayValue('来店アンケート')).toBeTruthy()

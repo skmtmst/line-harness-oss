@@ -274,7 +274,7 @@ describe('統括の回答フォームの編集（u5MM7：店の回答フォー�
     render(<HqTemplatesV8 type="form" />)
     fireEvent.click((await screen.findByRole('link', { name: '来店アンケート' })).closest('tr')!)
     expect(await screen.findByRole('heading', { name: '配った先' })).toBeTruthy()
-    expect(screen.getByText('配った先：3 アカウント（本店・渋谷店・イベント）。各アカウントでは回答フォームとして使えます。')).toBeTruthy()
+    expect(screen.getByText('3 アカウント（本店・渋谷店・イベント）に配っています。各アカウントでは回答フォームとして使えます。')).toBeTruthy()
     expect(screen.getByRole('tab', { name: '答え終わったあと' })).toBeTruthy()
     /* 店の口（回答用URL・公開・公開前に試す）は出さない。 */
     expect(screen.queryByText('回答用URL')).toBeNull()
