@@ -598,6 +598,7 @@ export type {
   OpsMe,
   OpsTenantRow,
   OpsTenantSummary,
+  OpsApplication,
   OpsTenantDetail,
   OpsAuditRow,
   OpsMember,

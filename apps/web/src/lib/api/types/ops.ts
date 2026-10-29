@@ -42,6 +42,22 @@ export type OpsTenantRow = {
 
 export type OpsTenantSummary = { active: number; trialing: number; suspended: number; pastDue: number }
 
+export type OpsApplication = {
+  id: string
+  company_name: string
+  contact_name: string
+  email: string
+  phone: string
+  referral_source: string
+  status: 'pending' | 'contacted' | 'approved' | 'rejected' | 'activated'
+  contact_note: string | null
+  contacted_at: string | null
+  approved_at: string | null
+  invite_sent_at: string | null
+  tenant_id: string | null
+  created_at: string
+}
+
 export type OpsTenantDetail = {
   tenant: OpsTenantRow
   accounts: Array<{ id: string; name: string; is_active: number; archived_at: string | null; updated_at: string; friend_count: number }>
