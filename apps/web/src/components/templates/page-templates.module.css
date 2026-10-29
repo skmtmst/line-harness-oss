@@ -179,6 +179,8 @@
 :global(:root) .settingsContent { flex: 1; max-width: 720px; min-width: 0; display: flex; flex-direction: column; gap: var(--tpl-settings-content-gap); padding: var(--tpl-settings-content-pad-block) var(--tpl-settings-content-pad-side); }
 /* 設定の本文が間隔の唯一の持ち主。直下の共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
 :global(:root) .settingsContent > :global([data-design-part='notice']) { margin-block: 0; }
+/* SB枠の包み（display:contents）の中の帯も同じ。型の側でそろえる。 */
+:global(:root) .settingsContent > :global([data-sb-settings-screen]) > :global([data-design-part='notice']) { margin-block: 0; }
 /* 採用 B237-5a：設定目次208、右380、各欄の内側24。 */
 :global(:root) .frame[data-template-layout='customer-look'] { --tpl-settings-nav-width:calc(var(--tpl-setnav-w) + var(--tpl-settings-nav-pad-side) * 2); --tpl-settings-gap:0px; --customer-look-preview-width:380px; --customer-look-pane-padding:24px; }
 :global(:root) .frame[data-template-layout='customer-look'] .settingsContent { max-width:none; padding:0; }
