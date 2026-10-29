@@ -71,6 +71,7 @@ type Props = {
   setAssigneeFilter: Dispatch<SetStateAction<string>>
   setUnreadOnly: Dispatch<SetStateAction<boolean>>
   channel: "email" | "all" | "line"
+  emailInboxEnabled: boolean
   router: ReturnType<typeof useRouter>
   nameQuery: string
   setNameQuery: Dispatch<SetStateAction<string>>
@@ -108,7 +109,7 @@ type Props = {
   setSortOrder: (next: InboxSort) => void
 }
 
-export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef, setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats, handleSelectChat, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
+export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef, setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats, handleSelectChat, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
   return (<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
     {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
@@ -255,6 +256,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
       />
       <SavedViewDialog
         open={saveDialogOpen}
+        emailInboxEnabled={emailInboxEnabled}
         initialValue={{
           status: statusFilter,
           quickFilter,
@@ -284,6 +286,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
       ) : null}
       <InboxFilterPanel
         open={filterOpen}
+        emailInboxEnabled={emailInboxEnabled}
         value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}
         operators={operators}
         onChange={(next) => {
@@ -348,7 +351,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             />
           )}
         </>
-        <EntitySelect
+        {emailInboxEnabled && <EntitySelect
           width={124}
           aria-label="受信経路で絞り込む"
           label="経路"
@@ -356,7 +359,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           value={channel}
           onChange={(value) => router.push(buildInboxUrl(value as 'all' | 'line' | 'email', null))}
           options={CHANNELS.map((item) => ({ value: item.key, label: item.label }))}
-        />
+        />}
       </InboxFilterControls>
     </InboxListSearch>
 
