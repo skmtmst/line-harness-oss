@@ -10,11 +10,14 @@ const lineClientMocks = vi.hoisted(() => ({
 
 // Webhook の境界と初回友だち作成を試すため、DB と LINE の外部依存を差し替える。
 vi.mock('@line-crm/db', () => ({
+  NOTICE_LINE_ACCOUNT_KEY: 'notice_line_account_id',
   isOperationCapabilityStopped: vi.fn(async () => false),
   upsertFriend: vi.fn(),
   updateFriendFollowStatus: vi.fn(),
   getFriendByLineUserIdForAccount: vi.fn(),
   getFriendById: vi.fn(),
+  getPlatformSetting: vi.fn().mockResolvedValue(null),
+  consumeStaffLineLinkCode: vi.fn().mockResolvedValue(null),
   getScenarios: vi.fn(),
   enrollFriendInScenario: vi.fn(),
   getScenarioSteps: vi.fn(),
@@ -105,6 +108,8 @@ import {
   enrollFriendInScenario,
   getEntryRouteByRefCode,
   getFriendByLineUserIdForAccount,
+  getPlatformSetting,
+  consumeStaffLineLinkCode,
   listLineAccountsWithTenantStatus,
   getMessageTemplateById,
   getScenarioSteps,
@@ -159,6 +164,8 @@ const baseExecutionCtx = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.mocked(getPlatformSetting).mockResolvedValue(null);
+  vi.mocked(consumeStaffLineLinkCode).mockResolvedValue(null);
   vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{id:'account-main',channel_secret:'env-default-secret',channel_access_token:'account-token',is_active:1,tenant_status:'active'} as never]);
 });
 
@@ -206,6 +213,83 @@ describe('POST /webhook — friend-add ledger', () => {
       eventId: 'friend-add-event-1', lineAccountId: 'account-main', status: 'partial_failed',
       errorCode: 'send_failed', scenarioEnrollmentId: null, deliveryCount: 0,
     }));
+  });
+});
+
+describe('通知専用LINEの受信', () => {
+  test('通常のメッセージを店舗向け受信箱や自動応答へ渡さない', async () => {
+    vi.mocked(verifySignature).mockResolvedValue(true);
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
+      id: 'notice-account', role: 'platform_notice', channel_secret: 'notice-secret',
+      channel_access_token: 'notice-token', is_active: 1, tenant_status: 'active',
+    } as never]);
+    const waitUntil = vi.fn();
+    const response = await setupApp().request('/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
+      body: JSON.stringify({ destination: 'notice-bot', events: [{
+        type: 'message', webhookEventId: 'notice-message-1', timestamp: 1787530800000,
+        source: { type: 'user', userId: 'U-notice' }, replyToken: 'reply-notice',
+        message: { type: 'text', id: 'line-message-1', text: '問い合わせたいです' },
+      }] }),
+    }, baseEnv, { ...baseExecutionCtx, waitUntil } as ExecutionContext);
+    expect(response.status).toBe(200);
+    await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
+    expect(recordIncomingLineMessage).not.toHaveBeenCalled();
+    expect(upsertChatOnMessage).not.toHaveBeenCalled();
+    expect(lineClientMocks.replyMessage).not.toHaveBeenCalled();
+  });
+
+  test('友だち追加だけ記録し、店舗用の友だち追加配信を起動しない', async () => {
+    vi.mocked(verifySignature).mockResolvedValue(true);
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
+      id: 'notice-account', role: 'platform_notice', channel_secret: 'notice-secret',
+      channel_access_token: 'notice-token', is_active: 1, tenant_status: 'active',
+    } as never]);
+    lineClientMocks.getProfile.mockResolvedValue({ displayName: '通知を受け取る人' });
+    vi.mocked(upsertFriend).mockResolvedValue({ id: 'notice-friend', line_account_id: 'notice-account' } as never);
+    const waitUntil = vi.fn();
+    const response = await setupApp().request('/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
+      body: JSON.stringify({ destination: 'notice-bot', events: [{
+        type: 'follow', webhookEventId: 'notice-follow-1', timestamp: 1787530800000,
+        source: { type: 'user', userId: 'U-notice' }, replyToken: 'reply-notice',
+        follow: { isUnblocked: false },
+      }] }),
+    }, baseEnv, { ...baseExecutionCtx, waitUntil } as ExecutionContext);
+    expect(response.status).toBe(200);
+    await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
+    expect(updateFriendFollowStatus).toHaveBeenCalledWith(expect.anything(), 'U-notice', true, 'notice-account', expect.any(String));
+    expect(recordFriendAddEvent).not.toHaveBeenCalled();
+    expect(lineClientMocks.replyMessage).not.toHaveBeenCalled();
+  });
+
+  test('6桁の確認コードでは管理画面との紐づけを保つ', async () => {
+    vi.mocked(verifySignature).mockResolvedValue(true);
+    vi.mocked(listLineAccountsWithTenantStatus).mockResolvedValue([{
+      id: 'notice-account', role: 'platform_notice', channel_secret: 'notice-secret',
+      channel_access_token: 'notice-token', is_active: 1, tenant_status: 'active',
+    } as never]);
+    vi.mocked(getPlatformSetting).mockResolvedValue('notice-account');
+    vi.mocked(consumeStaffLineLinkCode).mockResolvedValue({ staffId: 'staff-1', staffName: '通知を受け取る人' } as never);
+    lineClientMocks.getProfile.mockResolvedValue({ displayName: '通知を受け取る人' });
+    vi.mocked(upsertFriend).mockResolvedValue({ id: 'notice-friend', line_account_id: 'notice-account' } as never);
+    const waitUntil = vi.fn();
+    const response = await setupApp().request('/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Line-Signature': 'x'.repeat(44) },
+      body: JSON.stringify({ destination: 'notice-bot', events: [{
+        type: 'message', webhookEventId: 'notice-code-1', timestamp: 1787530800000,
+        source: { type: 'user', userId: 'U-notice' }, replyToken: 'reply-notice',
+        message: { type: 'text', id: 'line-code-1', text: '123456' },
+      }] }),
+    }, baseEnv, { ...baseExecutionCtx, waitUntil } as ExecutionContext);
+    expect(response.status).toBe(200);
+    await (waitUntil.mock.calls[0]?.[0] as Promise<void>);
+    expect(consumeStaffLineLinkCode).toHaveBeenCalledWith(expect.anything(), { code: '123456', friendId: 'notice-friend' });
+    expect(lineClientMocks.replyMessage).toHaveBeenCalledWith('reply-notice', expect.arrayContaining([expect.objectContaining({ type: 'text' })]));
+    expect(recordIncomingLineMessage).not.toHaveBeenCalled();
   });
 });
 

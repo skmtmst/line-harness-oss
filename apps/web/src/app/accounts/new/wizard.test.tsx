@@ -314,10 +314,10 @@ describe('LINEアカウント作成ウィザード', () => {
     await runCheck()
     await saveAndFinish()
     await screen.findByText('準備ができました')
-    await screen.findByText('musubo 運営（契約者専用）の LINE を登録してください')
+    await screen.findByText('運営からの通知を LINE で受け取る')
     await screen.findByText('123456')
     fireEvent.click(screen.getByRole('button', { name: 'あとで確認する' }))
-    await waitFor(() => expect(screen.queryByText('musubo 運営（契約者専用）の LINE を登録してください')).toBeNull())
+    await waitFor(() => expect(screen.queryByText('運営からの通知を LINE で受け取る')).toBeNull())
     expect(notices.lineRegistration).toHaveBeenCalledTimes(1)
   })
 

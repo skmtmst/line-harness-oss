@@ -4,10 +4,10 @@ import { workflowLineClient } from '../services/workflow-line-client.js';
 
 import { verifySignature, LineClient } from '@line-crm/line-sdk';
 import type { WebhookRequestBody } from '@line-crm/line-sdk';
-import { listLineAccountsWithTenantStatus } from '@line-crm/db';
+import { listLineAccountsWithTenantStatus, toJstString, updateFriendFollowStatus } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { processLineWebhookEvents } from '../services/line-webhook-events.js';
-import { MAX_WEBHOOK_BODY_SIZE, handleStoppedTenantEvent, handleNoticeLinkCode, handleEvent } from './webhook-definition.js';
+import { MAX_WEBHOOK_BODY_SIZE, ensureFriendFromWebhookUser, handleStoppedTenantEvent, handleNoticeLinkCode, handleEvent } from './webhook-definition.js';
 import type { Context } from 'hono';
 
 export const post__webhook_1 = async (c: Context<Env>) => {
@@ -101,6 +101,22 @@ export const post__webhook_1 = async (c: Context<Env>) => {
           lineMessageAccountKey,
           legacyLineMessageAccountKey,
         );
+      }
+      // 通知専用の公式アカウントは店舗の受信箱・自動応答・シナリオへ流さない。
+      // 友だちの状態と管理画面の確認コードだけを扱い、お知らせの push に必要な紐づけを保つ。
+      if (matched.role === 'platform_notice') {
+        const userId = event.source.type === 'user' ? event.source.userId : undefined;
+        if (event.type === 'follow' && userId) {
+          const friend = await ensureFriendFromWebhookUser(execution.mutationDb('notice_follow'), ownedClient, userId, matchedAccountId, toJstString(new Date(event.timestamp)));
+          if (friend) await updateFriendFollowStatus(execution.mutationDb('notice_follow_status'), userId, true, matchedAccountId, toJstString(new Date(event.timestamp)));
+          return;
+        }
+        if (event.type === 'unfollow' && userId) {
+          await updateFriendFollowStatus(execution.mutationDb('notice_unfollow_status'), userId, false, matchedAccountId, toJstString(new Date(event.timestamp)));
+          return;
+        }
+        await handleNoticeLinkCode(c.env, execution.mutationDb('notice_code'), ownedClient, event, matchedAccountId);
+        return;
       }
       // 契約者専用LINE（★37-7）: 6 桁の確認コードなら権限者の紐づけとして受ける。
       // 対象アカウント以外・コード以外は何もしないので、店舗のアカウントには影響しない。

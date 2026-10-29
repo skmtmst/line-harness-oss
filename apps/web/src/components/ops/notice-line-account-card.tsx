@@ -74,7 +74,7 @@ export default function NoticeLineAccountCard() {
     <section aria-label="契約者専用LINE" className="grid gap-3 rounded-card border content-card bg-canvas px-5 py-4">
       <div>
         <h3 className="text-label font-semibold text-ink">契約者専用LINE</h3>
-        <p className="text-micro text-ink-secondary">契約先の権限者へ大事なお知らせを送る公式アカウントです。運営会社のアカウントとして登録したものから選びます。</p>
+        <p className="text-micro text-ink-secondary">契約先の権限者へ大事なお知らせを送る通知専用の公式アカウントです。問い合わせは各アカウントの管理画面から受け付けます。</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <SaveErrorField names={["selected"]}><EntitySelect
