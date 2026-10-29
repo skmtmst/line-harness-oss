@@ -55,6 +55,7 @@ import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton';
 import { audienceSummary, messageTypeLabel } from '@/lib/broadcast-summary';
 import { runOptimistic } from '@/lib/undoable';
 import { formatDateTime, formatNumber } from '@/lib/format';
+import { terms } from '@/lib/terms';
 import QuickSendV8 from './quick-send'
 import styles from './list.module.css'
 import { emptyValue, EmptyCell } from '@/components/shared/empty-value';
@@ -138,14 +139,23 @@ function percent(rate: number | null | undefined): string | null {
   return rate != null ? `${(rate * 100).toFixed(1)}%` : null
 }
 
+/** R4：受け付けた数。宛先のタブの札と同じ言葉と出し方。届いたとは言わない。 */
+function acceptedCountText(count: number): string {
+  return `${terms.W07}：${formatNumber(count)}人`
+}
+
 /**
  * 結果の列。広い幅は「届いた・開封・クリック」の3列で右にそろえ、狭い幅（1280 以下）は
  * 1列の2段（上に人数・下に開封とクリック）。どちらも省略しない。
  * まだ送っていない配信は数を作らず — にする（0件・0人は「届かなかった」に読める）。
+ * R4：届いたと言えるのはLINE集計がある時だけ。無い時は受け付けた数を
+ * 受け付けの言葉（宛先のタブと同じ）で出す。
  */
 function BroadcastResultCells({ broadcast, insight, narrow }: { broadcast: ApiBroadcast; insight: BroadcastInsight | undefined; narrow: boolean }) {
   const sent = broadcast.status === 'sent'
-  const delivered = sent ? `${formatNumber(insight?.delivered ?? broadcast.successCount)} 人` : null
+  const delivered = !sent ? null : insight?.delivered != null
+    ? `${formatNumber(insight.delivered)} 人`
+    : acceptedCountText(broadcast.successCount)
   const open = sent ? percent(insight?.openRate) : null
   const click = sent ? percent(insight?.clickRate) : null
   if (!narrow) {
@@ -661,7 +671,7 @@ export default function BroadcastListV8() {
       icon: Send,
       value: kpiPending ? null : (listKpis?.thisMonth ?? null),
       unit: '件',
-      detail: `${listKpis?.delivered == null ? emptyValue('unknown') : `${formatNumber(listKpis.delivered)}人`}に届いた`,
+      detail: listKpis?.delivered == null ? emptyValue('unknown') : acceptedCountText(listKpis.delivered),
     },
     {
       key: 'openRate',
@@ -1238,7 +1248,7 @@ export default function BroadcastListV8() {
                 {panelRow.status === 'sent'
                   ? (panelRow.sentAt ? `送信済み：${formatDateTime(panelRow.sentAt)}` : '送信済み')
                   : (panelRow.scheduledAt ? `予約：${formatDateTime(panelRow.scheduledAt)}` : '下書き')}
-                {panelRow.status === 'sent' ? ` ／ ${formatNumber(insight?.delivered ?? panelRow.successCount)} 人に届いた` : ''}
+                {panelRow.status === 'sent' ? (insight?.delivered != null ? ` ／ ${formatNumber(insight.delivered)} 人に届いた` : ` ／ ${acceptedCountText(panelRow.successCount)}`) : ''}
               </p>
             </DetailPanel>
           )
