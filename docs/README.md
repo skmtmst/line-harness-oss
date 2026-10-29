@@ -942,3 +942,4 @@
 
 - [LINE通知の操作権限の反映履歴](release-log/unreleased/0000-kenta-notification-permission.md)
 - [LINE通知の説明の置き場所](release-log/unreleased/0000-kenta-notification-help.md)
+- [LINE通知の送信内訳の表示](release-log/unreleased/0000-kenta-notification-kpi-detail.md)
