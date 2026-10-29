@@ -165,9 +165,9 @@
   cursor: pointer;
   margin-block: var(--tpl-ar-ed-chip-x-pull);
 }
-.chipRemove:hover {
-  color: var(--color-danger);
-}
+.chipRemove:disabled { color: var(--color-ink-faint); cursor: not-allowed; }
+
+.chipRemove:hover:not(:disabled) { color: var(--color-danger); }
 
 /* 反応するメッセージの種類の押せる札。選んだものは濃く。 */
 .pickChip {
@@ -701,7 +701,7 @@
 .conflictChipCertain { color: var(--color-status-danger); }
 .conflictChipPossible { color: var(--color-warning); }
 .conflictResult { min-height: calc(var(--tpl-conflict-desc-lh) * 2); } /* 試すと2行になる。先に場所を取って、出たときに下が動かないように */
-.testRow { display: flex; align-items: center; gap: var(--tpl-body-gap); }
+.testRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tpl-body-gap); }
 .testGrow { flex: 1 1 0; min-width: 0; }
 
 /*

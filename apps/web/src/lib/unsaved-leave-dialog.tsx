@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
@@ -28,6 +28,8 @@ interface UnsavedLeaveDialogProps {
    * 保存に async 処理が要る画面だけ渡す。省略すると「編集を続ける」＋
    * 「保存せずに移る」の2択のまま。
    */
+  saveDisabled?: boolean
+  saveLockedReason?: string
   onSave?: () => Promise<boolean>
   onConfirm: () => void
   onCancel: () => void
@@ -56,16 +58,20 @@ export function UnsavedLeaveDialog({
   cancelLabel = '編集を続ける',
   busy = false,
   onSave,
+  saveDisabled = false,
+  saveLockedReason,
   onConfirm,
   onCancel,
 }: UnsavedLeaveDialogProps) {
   const [savingLeave, setSavingLeave] = useState(false)
+  const saveBlocked = useRef(false)
+  saveBlocked.current = saveDisabled || Boolean(saveLockedReason)
   const body = description ?? `このまま移ると、${subject}が消えます。`
 
   // 「保存して移る」があるとき: 移る系の2択だけ出し、残る口は右上の×（UI-25）
   if (onSave) {
     const saveAndLeave = async () => {
-      if (savingLeave || busy) return
+      if (savingLeave || busy || saveBlocked.current) return
       setSavingLeave(true)
       try {
         const saved = await onSave()
@@ -93,7 +99,7 @@ export function UnsavedLeaveDialog({
             <Button variant="secondary" onClick={onConfirm} disabled={busy || savingLeave}>
               保存せずに移る
             </Button>
-            <Button variant="primary" onClick={() => void saveAndLeave()} disabled={busy} busy={savingLeave} busyLabel="保存中…">
+            <Button variant="primary" onClick={() => void saveAndLeave()} disabled={busy || saveDisabled} lockedReason={saveLockedReason} busy={savingLeave} busyLabel="保存中…">
               保存して移る
             </Button>
           </div>

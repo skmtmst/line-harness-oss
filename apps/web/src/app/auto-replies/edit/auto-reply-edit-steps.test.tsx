@@ -6,6 +6,8 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
  * 390px でも現在地の追い方がウェビナー作成（/webinars/new）と同じになるよう、
  * 同じ部品・同じ置き場で出す。
  */
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { fireEvent, screen } from '@testing-library/react'
@@ -52,6 +54,7 @@ let host: HTMLDivElement
 let root: Root
 
 beforeEach(() => {
+  verifiedStaffRole('owner')
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -61,6 +64,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  forgetStaffIdentity()
   vi.restoreAllMocks()
 })
 
