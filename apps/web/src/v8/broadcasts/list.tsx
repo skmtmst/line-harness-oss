@@ -155,15 +155,17 @@ function acceptedCountText(count: number): string {
  */
 function BroadcastResultCells({ broadcast, insight, narrow }: { broadcast: ApiBroadcast; insight: BroadcastInsight | undefined; narrow: boolean }) {
   const sent = broadcast.status === 'sent'
+  /* 集計なしの受け付け数は、列に収めるため数だけ出す。説明の全文は title に残す。 */
+  const acceptedFull = !sent ? null : insight?.delivered == null ? acceptedCountText(broadcast.successCount) : null
   const delivered = !sent ? null : insight?.delivered != null
     ? `${formatNumber(insight.delivered)} 人`
-    : acceptedCountText(broadcast.successCount)
+    : `${formatNumber(broadcast.successCount)} 人`
   const open = sent ? percent(insight?.openRate) : null
   const click = sent ? percent(insight?.clickRate) : null
   if (!narrow) {
     return (
       <>
-        <Td align="right"><span className={styles.resultNumber}>{delivered ?? emptyValue('unknown')}</span></Td>
+        <Td align="right"><span className={styles.resultNumber} title={acceptedFull ?? undefined}>{delivered ?? emptyValue('unknown')}</span></Td>
         <Td align="right"><span className={styles.resultNumber}>{open ?? emptyValue('unknown')}</span></Td>
         <Td align="right"><span className={styles.resultNumber}>{click ?? emptyValue('unknown')}</span></Td>
       </>
@@ -173,7 +175,7 @@ function BroadcastResultCells({ broadcast, insight, narrow }: { broadcast: ApiBr
     <Td align="right">
       {delivered === null ? <span className={styles.cellMain}>{emptyValue('unknown')}</span> : (
         <>
-          <span className={styles.resultMain}>{delivered}</span>
+          <span className={styles.resultMain} title={acceptedFull ?? undefined}>{delivered}</span>
           {open !== null || click !== null ? (
             <span className={styles.resultSub}>{[open !== null ? `開封 ${open}` : '', click !== null ? `クリック ${click}` : ''].filter(Boolean).join('・')}</span>
           ) : null}

@@ -809,10 +809,12 @@ describe('R4 受け付けた数と届いた数を分ける', () => {
     expect(host.textContent).not.toContain('1,842人に届いた')
   })
 
-  it('集計の無い送信済みの行は受け付けの言葉で数を出す', async () => {
+  it('集計の無い送信済みの行は数を出し、受け付けの説明は title に残す', async () => {
     const row = await renderAccepted()
-    const right = [...row.querySelectorAll('td[data-align="right"]')].map((td) => td.textContent?.trim())
-    expect(right[0]).toBe('LINEが受け付けました：937人')
+    const right = [...row.querySelectorAll('td[data-align="right"]')]
+    expect(right[0].textContent?.trim()).toBe('937 人')
+    expect(right[0].querySelector('span')?.getAttribute('title')).toBe('LINEが受け付けました：937人')
+    expect(right[0].textContent).not.toContain('LINEが受け付けました')
   })
 
   it('集計の無い送信済みの詳細パネルは受け付けの言葉で出す', async () => {
