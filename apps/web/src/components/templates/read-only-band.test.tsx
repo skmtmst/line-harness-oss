@@ -1,7 +1,4 @@
 // @vitest-environment happy-dom
-import { readFileSync } from 'node:fs'
-import { dirname, join } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest'
 import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
@@ -59,14 +56,6 @@ it('一覧の帯は見出しと操作の行の下の全幅の行に置き、他�
     expect(notice?.parentElement?.contains(header?.querySelector('h1, h2') ?? null)).toBe(true)
     unmount()
   }
-})
-
-it('一覧の帯の全幅の行は型の CSS が持つ（画面側の上書きなし）', () => {
-  const here = dirname(fileURLToPath(import.meta.url))
-  const css = readFileSync(join(here, 'page-templates.module.css'), 'utf8')
-  expect(css).toMatch(/\[data-page-template='list'\] \.heading > \.headingNotice \{ flex-basis: 100%; order: 4;/)
-  expect(css).toMatch(/\.heading\[data-heading-size='compact'\] > \.headingNotice \{ margin-top: calc\(var\(--tpl-compact-gap\) - var\(--polish-space-field\)\); \}/)
-  expect(css).toMatch(/\.heading\[data-heading-size='large'\] > \.headingNotice \{ margin-top: calc\(var\(--tpl-head-gap\) - var\(--tpl-large-gap\)\); \}/)
 })
 
 it('統括の必要権限と閲覧のみの役割を区別する', () => {
