@@ -133,12 +133,13 @@ export function allAcked(acks: ReadonlyArray<{ key: string }>, checked: Record<s
 
 /**
  * 承認済み v07 ②Step2 の「musubo の Webhook URL」（Ds3E2 の vnh17）に出す字。
- * 受け取り口は apps/worker の expectedWebhookUrl と同じ `<APIの元>/webhook`。
- * 元が未設定のときは字を作らない（画面側で「不明」を出す）。
+ * 受け取り口は apps/worker の expectedWebhookUrl と同じ `<APIの元>/webhook/<Messaging APIチャネルID>`。
+ * 元や数字のチャネルIDが未設定のときは字を作らない（画面側で「不明」を出す）。
  */
-export function musuboWebhookUrl(): string {
+export function musuboWebhookUrl(channelId: string): string {
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/+$/, '')
-  return base ? `${base}/webhook` : ''
+  const id = channelId.trim()
+  return base && /^\d+$/.test(id) ? `${base}/webhook/${id}` : ''
 }
 
 /** LINE Developers のチャネル画面。配下の画面名は未確認なのでチャネルの入口まで。 */

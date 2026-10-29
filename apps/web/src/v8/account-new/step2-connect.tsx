@@ -21,9 +21,6 @@ import Notice from '@/components/shared/notice'
 
 const MANUAL = '/manuals/line-connect/index.html'
 
-/* 承認済み v07 Ds3E2 に出す受け取り口。APIの元は組み立てのときに決まるので、一度だけ作る。 */
-const WEBHOOK_URL = musuboWebhookUrl()
-
 /* 正本 v07 ②の左の細い列「AC左 操作ステップ」（fbgO8）。いまどこを触っているかを3段で見せる。 */
 const AC_OUTLINE: ReadonlyArray<{ title: string; note: string }> = [
   { title: 'Messaging API の2項目', note: 'LINE Developers からコピー' },
@@ -81,6 +78,7 @@ export default function Step2Connect({
   onUpdate: (key: Step2Field, value: string) => void
   onToggleAck: (key: string, next: boolean) => void
 }) {
+  const webhookUrl = musuboWebhookUrl(values.channelId)
   return (
     /* 正本 v07 ②の右の列（Step1 msf5n／Step2 RtWJZ／Step3 J84XB は同じ中身）。
        白い板の中に、マニュアル → 区切り → 途中保存して閉じる → 区切り → うまくいかないとき → サポートに聞く。 */
@@ -130,8 +128,8 @@ export default function Step2Connect({
         </Card>
       )}
       {sub === 2 && (
-        /* 正本 v07 Fqy29 → ②Step2 の S1KaUa。LINE は Webhook URL を書き換える API を出していないので、
-           利用者が「Messaging API設定」へ貼り付ける。貼って「更新」を押すまで3つのスイッチが出てこないため、
+        /* 正本 v07 Fqy29 → ②Step2 の S1KaUa。利用者が個別 URL を「Messaging API設定」へ貼り付ける。
+           貼って「更新」を押すまで3つのスイッチが出てこないため、
            URLの控えと［コピー］（Ds3E2）を置き、印は「貼り付けた」を先頭にして全4つにした。 */
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Webhook（受信のつなぎ）を設定する">
           <p className={styles.subBadge}>{badge}</p>
@@ -158,9 +156,9 @@ export default function Step2Connect({
                   CSS として成り立たず余白が 0 に落ちる（枠が1行ぶんに潰れて字が線に付く）。
                   ⑤の同じ形の枠（register.tsx）と同じく、値を空白で分けて渡す。 */}
               <Card layout="horizontal" surface="bordered" corner="control" contentPadding="var(--space-8) var(--space-12)">
-                <span className={styles.endpointValue}><TruncatedText value={WEBHOOK_URL || String(emptyValue('unknown'))} url /></span>
+                <span className={styles.endpointValue}><TruncatedText value={webhookUrl || String(emptyValue('unknown'))} /></span>
               </Card>
-              <CopyTextButton value={WEBHOOK_URL} label="コピー" variant="secondary" icon={<Copy size={16} aria-hidden="true" />} aria-label="Webhook URL をコピー" disabled={!WEBHOOK_URL} />
+              <CopyTextButton value={webhookUrl} label="コピー" variant="secondary" icon={<Copy size={16} aria-hidden="true" />} aria-label="Webhook URL をコピー" disabled={!webhookUrl} />
             </div>
           </Card>
           <Notice tone="warn" heading={<>すでにほかのツールのURLが入っているとき</>}>
