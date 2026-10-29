@@ -117,7 +117,7 @@ describe('閲覧のみには隠さず押せない形＋理由で出す', () => {
     const selfMenu = document.querySelector<HTMLButtonElement>('button[aria-label="検証 太郎のその他操作"]')!
     expect(selfMenu).not.toBeNull()
     expect(selfMenu.disabled).toBe(true)
-    expect(text()).toContain('自分の運営アカウントは停止・取り消しできません')
+    expect(selfMenu.getAttribute('title')).toBe('自分の運営アカウントは停止・取り消しできません')
     act(() => selfMenu.click())
     await settle()
     expect(document.querySelector('[role="menu"]')).toBeNull()
