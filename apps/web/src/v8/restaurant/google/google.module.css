@@ -12,9 +12,7 @@
 }
 
 .noticeStack {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
+  display: flow-root;
   min-width: 0;
 }
 
