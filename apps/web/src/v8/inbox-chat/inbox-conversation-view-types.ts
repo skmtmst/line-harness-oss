@@ -1,10 +1,10 @@
 import { type ImageUploaderValue } from '@/components/shared/image-uploader';
-import { type ChatDetail as ApiChatDetail, type ChatDetailMessage, type ScheduledChatSend } from '@/lib/api';
+import { type ChatDetail as ApiChatDetail, type ChatDetailMessage, type ChatListItem, type ScheduledChatSend } from '@/lib/api';
 import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai/index'
 import { type AttachSlot } from '@/v8/inbox-chat/attachments';
 import { useChatSearch } from '@/v8/inbox-search/public/use-chat-search/index'
 import type { Dispatch, RefObject, SetStateAction } from 'react';
-import type { PendingAttachment } from './inbox-model';
+import type { EmailInboxItem, OldestAttentionTarget, PendingAttachment } from './inbox-model';
 import { Chat } from './inbox-model';
 export type Props = {
   operators: { id: string; name: string }[]
@@ -99,4 +99,14 @@ export type Props = {
   pendingPack: { texts: string[]; chatId: string; accountId: string | null; revision?: number; } | null
   handleSendPack: (pack: NonNullable<{ texts: string[]; chatId: string; accountId: string | null; revision?: number; } | null>) => Promise<void>
   imagePreviewOpen: boolean
+  /** 未選択の中央の「次にやること」（ID27）。件数はサーバー集計（読めない時は null）。 */
+  quickCountsNow: { all: number; reply: number; overdue: number; } | null
+  statusCountsNow: Record<'in_progress' | 'resolved' | 'unread' | 'on_hold', number> | null
+  slaEnabled: boolean
+  /** 上の札と同じ期限超過の総数（SLA有りの時だけ数が入る）。 */
+  overdueTotal: number | null
+  hasInboxFilters: boolean
+  chats: ChatListItem[]
+  emailItems: EmailInboxItem[]
+  onOpenAttentionTarget: (target: OldestAttentionTarget) => void
 }

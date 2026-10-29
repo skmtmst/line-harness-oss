@@ -292,3 +292,48 @@ test('全条件の結果0件を区別し、解除後に会話を戻す', async (
     else expect(email.searchParams.has(key), `email:${key}`).toBe(false)
   }
 })
+
+test('未選択の中央に件数と行き先を出し、押すと最も古い会話を開く（ID27）', async () => {
+  const row = (name: string, at: string) => ({
+    id: `chat-${name}`, friendId: `friend-${name}`, friendName: name, operatorId: 'operator-a',
+    status: 'unread', isUnread: true, lastMessageAt: at,
+    lastMessageContent: name, lastMessageType: 'text', lastMessageDirection: 'incoming',
+  })
+  handler = (url) => {
+    if (url.pathname === '/api/chats/quick-counts') {
+      const status = url.searchParams.get('status')
+      if (status === 'unread') return response({ success: true, data: { all: 2, reply: 2, overdue: 0 } })
+      if (status) return response({ success: true, data: { all: 0, reply: 0, overdue: 0 } })
+      return response({ success: true, data: { all: 5, reply: 2, overdue: 1 } })
+    }
+    if (url.pathname === '/api/chats') {
+      return response({ success: true, data: [
+        row('新しい会話', '2026-09-02T00:00:00.000Z'),
+        row('古い会話', '2026-09-01T00:00:00.000Z'),
+      ] })
+    }
+    const single = url.pathname.match(/^\/api\/chats\/([^/]+)$/)
+    if (single && single[1].startsWith('chat-')) {
+      const name = single[1].slice(5)
+      return response({ success: true, data: {
+        id: single[1], friendId: `friend-${name}`, friendName: name, friendRealName: null, friendPictureUrl: null,
+        isAttention: false, operatorId: null, status: 'unread', notes: null, revision: 1,
+        lastMessageAt: '2026-09-01T00:00:00.000Z', createdAt: '2026-09-01T00:00:00.000Z', total: 1,
+        messages: [{
+          id: 'm1', direction: 'incoming', messageType: 'text', content: 'こんにちは', isUnsent: false,
+          source: 'user', originKind: null, sentByStaffId: null, sentByStaffName: null,
+          scenarioName: null, quoted: null, createdAt: '2026-09-01T00:00:00.000Z',
+        }],
+        hasMoreMessages: false,
+      } })
+    }
+    return base(url)
+  }
+  await act(async () => root.render(<ChatsPage />))
+  await eventually(() => expect(document.body.textContent).toContain('対応が必要な会話があります'))
+  // SLA無し（期限の口が無い試験）なので「1時間以上待ち」。件数はサーバー集計。
+  expect(document.body.textContent).toContain('未対応 2 件・1時間以上待ち 1 件')
+  await click('いちばん古い会話を開く')
+  await eventually(() => expect(document.body.textContent).toContain('こんにちは'))
+  expect(document.body.textContent).not.toContain('対応が必要な会話があります')
+})

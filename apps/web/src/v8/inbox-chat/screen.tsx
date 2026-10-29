@@ -10,7 +10,7 @@ import Notice from '@/components/shared/notice';
 import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { InboxPage } from '@/components/templates/inbox-page';
 import { useAccount } from '@/contexts/account-context';
-import { api,type ChatDetailMessage } from '@/lib/api';
+import { api,fetchApi,type ChatDetailMessage } from '@/lib/api';
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store';
 import { useStaffRole } from '@/lib/staff-role';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
@@ -18,7 +18,7 @@ import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai/index'
 import { useRouter,useSearchParams } from 'next/navigation';
 import { Suspense,useEffect,useRef,useState } from 'react';
-import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,inboxSortFromParam,resolveInboxChannel,statusFilters,statusFiltersV8 } from './inbox-model';
+import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,inboxSortFromParam,resolveInboxChannel,statusFilters,statusFiltersV8,type OldestAttentionTarget } from './inbox-model';
 
 import InboxConversation from './inbox-conversation-view';
 import InboxCustomerPanel from './inbox-customer-panel';
@@ -513,6 +513,26 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     // 切り替えただけで書きかけが消える。預け・戻しは上の効果が担う。
   }
 
+  // 未選択の中央の「いちばん古い会話を開く」（ID27）。一覧の行を押した時と同じ開き方。
+  const openAttentionTarget = (target: OldestAttentionTarget) => {
+    if (target.kind === 'chat') {
+      handleSelectChat(target.id)
+      return
+    }
+    deepLinkRequestIdRef.current += 1
+    deepLinkIdRef.current = null
+    setDeepLinkNotice('')
+    setSelectedChatId(null)
+    setSelectedThreadId(target.threadId)
+    router.replace(buildInboxUrl(channel, savedViewParam || null))
+    setEmailItems((prev) => prev.map((email) => (
+      email.threadId === target.threadId ? { ...email, isUnread: false } : email
+    )))
+    void fetchApi(`/api/support/email/threads/${encodeURIComponent(target.threadId)}/read`, {
+      method: 'POST',
+    }).catch(() => undefined)
+  }
+
   const {
     chatDetail,
     setChatDetail,
@@ -801,7 +821,8 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput,
           handleScheduleSend, error, scheduledSendsFailed, loadScheduledSends, handleReschedule,
           handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack,
-          imagePreviewOpen, sendError, pendingMessages,
+          imagePreviewOpen, sendError, pendingMessages, quickCountsNow, statusCountsNow, slaEnabled,
+          overdueTotal, hasInboxFilters, chats, emailItems, onOpenAttentionTarget: openAttentionTarget,
         }} />
 
         {/*
