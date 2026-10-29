@@ -87,6 +87,7 @@ function enterCheckStep() {
   passPrecheck()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
+  fill('v8-provider-id', '2005648758')
   nextStep()
   ack('Webhook URL を貼り付けて「更新」を押した')
   ack('Webhookの利用をONにした')
@@ -128,6 +129,7 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.getByText('Step 1 / 3')).toBeTruthy()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
+    fill('v8-provider-id', '2005648758')
     nextStep()
     expect(screen.getByText('Webhook（受信のつなぎ）を設定する', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 2 / 3')).toBeTruthy()
@@ -138,6 +140,9 @@ describe('LINEアカウント作成ウィザード', () => {
     nextStep()
     expect(screen.getByText('LINEログインの情報を入れる', { selector: 'h2' })).toBeTruthy()
     expect(screen.getByText('Step 3 / 3')).toBeTruthy()
+    const providerLink = screen.getByRole('link', { name: 'LINE Developers のプロバイダーを開く' })
+    expect(providerLink.getAttribute('href')).toBe('https://developers.line.biz/console/provider/2005648758')
+    expect(providerLink.getAttribute('target')).toBe('_blank')
   })
 
   it('LINE側でやることの印が残っていると次の段へ進めない', () => {
@@ -145,6 +150,7 @@ describe('LINEアカウント作成ウィザード', () => {
     passPrecheck()
     fill('v8-channel-id', '123456789')
     fill('v8-channel-secret', 'synthetic-secret')
+    fill('v8-provider-id', '2005648758')
     nextStep()
     ack('Webhook URL を貼り付けて「更新」を押した')
     ack('Webhookの利用をONにした')
@@ -196,10 +202,10 @@ describe('LINEアカウント作成ウィザード', () => {
     expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('②Step1は Messaging API の2項目だけを必須にし、マニュアルを別タブで開く', () => {
+  it('②Step1は Messaging API の2項目とプロバイダーIDを必須にし、マニュアルを別タブで開く', () => {
     render(<NewLineAccountPage />)
     passPrecheck()
-    const ids = ['v8-channel-id', 'v8-channel-secret']
+    const ids = ['v8-channel-id', 'v8-channel-secret', 'v8-provider-id']
     expect(ids.every((id) => (document.getElementById(id) as HTMLInputElement).required)).toBe(true)
     expect(document.getElementById('channel-access-token')).toBeNull()
     expect(document.getElementById('liff-id')).toBeNull()

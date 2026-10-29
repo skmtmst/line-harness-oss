@@ -83,6 +83,7 @@ function enterCheckStep() {
   clearPrecheck()
   fill('v8-channel-id', '123456789')
   fill('v8-channel-secret', 'synthetic-secret')
+  fill('v8-provider-id', '2005648758')
   nextStep()
   ack('Webhook URL を貼り付けて「更新」を押した')
   ack('Webhookの利用をONにした')

@@ -60,11 +60,11 @@ const V8_STEPS: ReadonlyArray<{ number: StepNumber; label: string; node: string;
 
 type BusyAction = 'check' | 'save' | null
 interface FormState {
-  name: string; channelId: string; channelSecret: string; loginChannelId: string; loginChannelSecret: string
+  name: string; channelId: string; channelSecret: string; providerId: string; loginChannelId: string; loginChannelSecret: string
   lineId: string; tagIds: string[]; parentId: string; staffIds: string[]; liffId: string; importFriends: boolean
 }
 const emptyForm: FormState = {
-  name: '', channelId: '', channelSecret: '', loginChannelId: '', loginChannelSecret: '',
+  name: '', channelId: '', channelSecret: '', providerId: '', loginChannelId: '', loginChannelSecret: '',
   lineId: '', tagIds: [], parentId: '', staffIds: [], liffId: '', importFriends: true,
 }
 
@@ -163,7 +163,7 @@ function AccountRegistrationForm() {
     setCurrentStep(draft.step)
     setSub(draft.sub)
     setForm((current) => ({
-      ...current, name: draft.name, channelId: draft.channelId, loginChannelId: draft.loginChannelId, lineId: draft.lineId,
+      ...current, name: draft.name, channelId: draft.channelId, providerId: draft.providerId, loginChannelId: draft.loginChannelId, lineId: draft.lineId,
       tagIds: draft.tagIds, parentId: draft.parentId, staffIds: draft.staffIds, liffId: draft.liffId, importFriends: draft.importFriends,
     }))
     setDraftRestored(true)
@@ -178,13 +178,13 @@ function AccountRegistrationForm() {
     }
     const draft: DraftState = {
       step: currentStep, sub, accountMethod, precheck, precheckAt,
-      name: form.name, channelId: form.channelId, loginChannelId: form.loginChannelId,
+      name: form.name, channelId: form.channelId, providerId: form.providerId, loginChannelId: form.loginChannelId,
       lineId: form.lineId, tagIds: form.tagIds, parentId: form.parentId, staffIds: form.staffIds, liffId: form.liffId,
       importFriends: form.importFriends,
     }
     try { window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)) } catch (saveFailure) {
       saveErrors.capture(saveFailure) /* 書けなくても入力は続ける。 */ }
-  }, [createdId, currentStep, sub, accountMethod, precheck, precheckAt, form.name, form.channelId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, saveErrors])
+  }, [createdId, currentStep, sub, accountMethod, precheck, precheckAt, form.name, form.channelId, form.providerId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, saveErrors])
 
   /* ③-1：応答が返ったあと、5行を1行ずつ送る。止まった行（error）が出たらそこで終わる。 */
   useEffect(() => {

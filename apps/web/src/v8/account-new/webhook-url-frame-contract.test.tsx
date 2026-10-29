@@ -22,6 +22,7 @@ import Step2Connect, { type Step2Field } from './step2-connect'
 const VALUES: Record<Step2Field, string> = {
   channelId: '',
   channelSecret: '',
+  providerId: '',
   loginChannelId: '',
   loginChannelSecret: '',
 }
@@ -41,6 +42,14 @@ function urlFrame() {
 }
 
 describe('②Step2 の Webhook URL の枠は承認済み v07 どおり', () => {
+  it('プロバイダーIDがない古い下書きでは、Step3から別チャネルへ飛ばさない', () => {
+    const view = render(
+      <Step2Connect sub={3} badge="Step 3 / 3" values={VALUES} fieldErrors={{}} acks={{}} onUpdate={() => {}} onToggleAck={() => {}} />,
+    )
+    expect(view.queryByRole('link', { name: 'LINE Developers のプロバイダーを開く' })).toBeNull()
+    expect(view.getByText('プロバイダーIDがありません。Messaging API の情報へ戻って入力してください。')).toBeTruthy()
+  })
+
   it('表示とコピーが同じチャネル専用URLになる', async () => {
     const previousApiUrl = process.env.NEXT_PUBLIC_API_URL
     const previousClipboard = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
