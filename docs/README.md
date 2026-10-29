@@ -455,6 +455,7 @@
 
 - [Google口コミのAI下書き生成の修正](release-log/unreleased/1892-masato-google-review-ai-draft.md)
 - [LINEアカウント登録の事前確認を回答時に進める変更](release-log/unreleased/1891-masato-line-precheck-auto-next.md)
+- [LINEアカウント登録の選択済み回答と質問一覧の修正](release-log/unreleased/1894-masato-line-precheck-restored-choice.md)
 - [LINEアカウント登録でプロバイダーIDを独立した手順にした変更](release-log/unreleased/1893-masato-provider-id-step2.md)
 - [LINEアカウント登録のチャネル専用Webhook URL](release-log/unreleased/1882-masato-channel-webhook-url.md)
 - [Google・Instagram画像の切り取り](release-log/unreleased/1883-masato-google-instagram-image-crop.md)
