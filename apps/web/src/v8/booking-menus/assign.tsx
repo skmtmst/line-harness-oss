@@ -12,6 +12,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { describeApiFailure, classifyApiFailure, isForbiddenOrRateLimited, loadFailureCopy, withPermissionFailure } from '@/components/shared/api-error-message'
 import { useAccount } from '@/contexts/account-context'
+import { useStaffRole } from '@/lib/staff-role'
 import { useBookingEdit } from './lib/edit-permission'
 import { CreatePage } from '@/components/templates/create-page'
 import { Check } from 'lucide-react'
@@ -112,6 +113,8 @@ export default function AssignMatrixV8() {
   /** 升を押したあと、時間・料金を変える段が対象にする升。 */
   const [selected, setSelected] = useState<SelectedCell | null>(null)
   const canEditMenus = useBookingEdit('/booking/menus')
+  // 役割が読めるまで帯は出さない（空の div で段間を空けない。他画面と同じ）。
+  const role = useStaffRole()
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
@@ -377,7 +380,7 @@ export default function AssignMatrixV8() {
           /></>} >
 
           {/* R5：同じ理由が並ぶ画面は上に1回だけ短い文（題の下・自前の帯。他画面と同じ置き方）。 */}
-          {selectedAccountId && !canEditMenus ? (
+          {selectedAccountId && role !== null && !canEditMenus ? (
             <div className={styles.viewerBand}><ReadOnlyNotice role="status" /></div>
           ) : null}
 
