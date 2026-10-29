@@ -77,3 +77,17 @@ describe('後から開いた窓・引き出しが前に出る', () => {
     expect(layerOf('現在準備中です')).toBeGreaterThan(layerOf('詳細条件'))
   })
 })
+
+
+it('モーダルを先に開いた時は外の通知を開かず、窓内の選ぶメニューだけ使える',async()=>{
+ function Trigger({name}: {name:string}) {
+  const [open,setOpen]=useState(false),anchor=React.useRef<HTMLButtonElement>(null)
+  return <><button ref={anchor} onClick={()=>setOpen(true)}>{name}</button>
+    <MenuPortal open={open} getAnchor={()=>anchor.current} onClose={()=>setOpen(false)}><section role="menu" aria-label={name+'の内容'}>候補</section></MenuPortal></>
+ }
+ render(<><Trigger name="通知を開く"/><Dialog open title="設定" onCancel={()=>{}}><Trigger name="窓内で選ぶ"/></Dialog></>)
+ await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'通知を開く'}))})
+ expect(screen.queryByRole('menu',{name:'通知を開くの内容'})).toBeNull()
+ await act(async()=>{fireEvent.click(screen.getByRole('button',{name:'窓内で選ぶ'}))})
+ expect(screen.getByRole('menu',{name:'窓内で選ぶの内容'})).toBeTruthy()
+})

@@ -1,9 +1,9 @@
 'use client'
 
 import { createPortal } from 'react-dom'
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useContext, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { isImeComposing } from './ime'
-import { OVERLAY_MODAL_OPEN_EVENT, useV8Leave } from './overlay-utils'
+import { OVERLAY_MODAL_OPEN_EVENT, OverlayDepthContext, useV8Leave } from './overlay-utils'
 import styles from './menu-portal.module.css'
 
 const openPanels: HTMLDivElement[] = []
@@ -114,6 +114,7 @@ export default function MenuPortal({
   exitDuration,
   focusPanel = false,
 }: MenuPortalProps) {
+  const depth = useContext(OverlayDepthContext)
   const leaving = useV8Leave(open, exitDuration)
   const [mounted, setMounted] = useState(false)
   const [geometry, setGeometry] = useState<Geometry | null>(null)
@@ -131,10 +132,12 @@ export default function MenuPortal({
 
   useEffect(() => {
     if (!open) return
+    const modal = document.querySelector('[aria-modal="true"]:not([aria-hidden="true"])')
+    if (depth === 0 && modal && !modal.closest('[data-closing]')) { closeRef.current(); return }
     const closeForModal = () => closeRef.current()
     document.addEventListener(OVERLAY_MODAL_OPEN_EVENT, closeForModal)
     return () => document.removeEventListener(OVERLAY_MODAL_OPEN_EVENT, closeForModal)
-  }, [open])
+  }, [open, depth])
   const positionRef = useRef(getPositionRect)
   positionRef.current = getPositionRect
 
