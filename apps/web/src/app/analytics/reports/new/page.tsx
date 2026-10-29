@@ -29,7 +29,8 @@ import { TextField } from '@/components/shared/text-field'
 import NumberInput from '@/components/shared/number-field'
 import HelpTip from '@/components/shared/help-tip'
 import { Field, RequiredBadge } from '@/components/shared/form-controls'
-import PeriodPicker from '@/components/shared/period-picker'
+import PeriodPicker, { pastPeriod } from '@/components/shared/period-picker'
+import { shownValue } from '@/v8/analytics/parts'
 import { Check, ChevronDown, GitCompareArrows, RefreshCw } from 'lucide-react'
 import { formatDateTime, formatTime, formatNumber } from '@/lib/format'
 import {
@@ -291,6 +292,8 @@ function AnalyticsReportFormPage() {
   const [monthDay, setMonthDay] = useState('1')
   const [sendTime, setSendTime] = useState('09:00')
   const [periodDays, setPeriodDays] = useState('7')
+  // 右の見本に出す、前の期間の本当の数（読めた所だけ。読めない所は「送信時に集計」のまま）。
+  const [previewNumbers, setPreviewNumbers] = useState<Partial<Record<string, string>>>({})
   // 宛先の初期値は空にする。例のアドレスが入ったまま作ると、選んでいない
   // 相手へ数字の入ったレポートが送られる。受信者の自動チェックもしない。
   const [staffIds, setStaffIds] = useState<string[]>([])
@@ -323,7 +326,47 @@ function AnalyticsReportFormPage() {
     setBaseline(editId ? null : NEW_BASELINE)
   }, [selectedAccountId, editId])
 
-
+  // 見本の数：選んだ区画だけ、前の期間の本当の数を順に読む（重い集計を同時に走らせない）。
+  useEffect(() => {
+    if (!selectedAccountId) return
+    const days = Number(periodDays)
+    if (!Number.isFinite(days) || days <= 0) return
+    const wanted = sections.filter((id) => id === 'friends' || id === 'reactions' || id === 'routes')
+    if (wanted.length === 0) { setPreviewNumbers({}); return }
+    let cancelled = false
+    const range = pastPeriod(days)
+    void (async () => {
+      const next: Partial<Record<string, string>> = {}
+      try {
+        if (wanted.includes('friends')) {
+          const res = await api.analytics.friendsOverview(selectedAccountId, range)
+          if (res.success) {
+            const net = shownValue(res.data.data.metrics.net)
+            if (net !== null) next.friends = `${net >= 0 ? '+' : ''}${formatNumber(net)}人`
+          }
+        }
+        if (wanted.includes('reactions')) {
+          const res = await api.analytics.reactionsOverview(selectedAccountId, range)
+          if (res.success) {
+            const opened = shownValue(res.data.data.metrics.opened)
+            const delivered = shownValue(res.data.data.metrics.delivered)
+            if (opened !== null && delivered !== null && delivered > 0) next.reactions = `${Math.round((opened / delivered) * 100)}%`
+          }
+        }
+        if (wanted.includes('routes')) {
+          const res = await api.analytics.routesOverview(selectedAccountId, range)
+          if (res.success) {
+            const values = res.data.data.routes.map((route) => shownValue(route.conversions.approved)).filter((v): v is number => v !== null)
+            if (values.length > 0) next.routes = `${formatNumber(values.reduce((a, b) => a + b, 0))}件`
+          }
+        }
+      } catch {
+        // 見本の数が読めなければ「送信時に集計」のまま。作る流れは止めない。
+      }
+      if (!cancelled) setPreviewNumbers(next)
+    })()
+    return () => { cancelled = true }
+  }, [selectedAccountId, periodDays, sections])
 
   // 読み直し用の数え直し。入力の状態には触らない(点検#508軽8)。
   const [reloadSeq, setReloadSeq] = useState(0)
@@ -1055,7 +1098,7 @@ function AnalyticsReportFormPage() {
         preview={        <>
           <Card variant="aside">
             <CardHeader size="stacked" title={`${nextLabel} に、こう届きます`} meta="見本" />
-            <Card surface="muted" corner="control" padding="compact" layout="vertical" gap="tight"><p className="report-v8-previewTitle">{name.trim() || '（名前なし）'}（前の{periodDays}日）</p>{sections.filter((id) => id !== 'usage').map((id) => <p className="report-v8-previewRow" key={id}>{PREVIEW_LABEL[id] ?? sectionTitleOf(id)} <strong>送信時に集計</strong></p>)}<p className="report-v8-previewMore">くわしくは musubo の分析で</p></Card>
+            <Card surface="muted" corner="control" padding="compact" layout="vertical" gap="tight"><p className="report-v8-previewTitle">{name.trim() || '（名前なし）'}（前の{periodDays}日）</p>{sections.filter((id) => id !== 'usage').map((id) => <p className="report-v8-previewRow" key={id}>{PREVIEW_LABEL[id] ?? sectionTitleOf(id)} <strong>{previewNumbers[id] ?? '送信時に集計'}</strong></p>)}{Object.keys(previewNumbers).length > 0 ? <p className="report-v8-previewMore">これは前の{periodDays}日の数での見本です</p> : null}<p className="report-v8-previewMore">くわしくは musubo の分析で</p></Card>
           </Card>
           <Card variant="aside"><CardHeader size="stacked" title="レポートが見ているもの" /><p className="report-v8-kvRow">LINE アカウント <strong>{selectedAccount?.name ?? '選択中のアカウント'}</strong></p><p className="report-v8-kvRow">保存した分析 <strong>{formatNumber(savedAnalysisIds.length)} 件</strong></p></Card>
           <Card variant="aside"><CardHeader size="stacked" title="気をつけること" /><ul className="report-v8-notes"><li>数は送る時刻の時点で集めます</li><li>宛先がブロックしていると、LINE では届きません</li></ul></Card>

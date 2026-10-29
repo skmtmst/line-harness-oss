@@ -104,6 +104,33 @@ function installFetch() {
         data: { items: [{ ...SCHEDULE, name, updatedAt: net.latestVersion }], options: net.noStaff ? { ...OPTIONS, recipients: [] } : OPTIONS },
       }), { status: 200 })
     }
+    // 見本の数：前の期間の本当の数（友だち+12人・開いた68%・成果3件）。
+    if (url.pathname === '/api/analytics/friends' || url.pathname === '/api/analytics/reactions' || url.pathname === '/api/analytics/routes') {
+      const ok = (value: number) => ({ value, state: 'available', reason: null })
+      const na = { value: null, state: 'unavailable', reason: null }
+      const envelope = (data: unknown) => ({ success: true, data: { lineAccountId: 'account-a', timeZone: 'Asia/Tokyo', period: { from: '2026-09-01', to: '2026-09-07' }, dataCutoffAt: '2026-09-07T00:00:00.000Z', data } })
+      if (url.pathname === '/api/analytics/friends') {
+        return new Response(JSON.stringify(envelope({
+          state: 'available', stateReason: null,
+          metrics: { added: ok(15), removed: ok(3), net: ok(12), currentFriends: ok(100), firstTime: ok(10), returning: ok(5) },
+          days: [], campaigns: [], historyAvailableFrom: null,
+        })), { status: 200 })
+      }
+      if (url.pathname === '/api/analytics/reactions') {
+        return new Response(JSON.stringify(envelope({
+          metrics: { sent: ok(120), delivered: ok(100), opened: ok(68), lineClicked: ok(10), trackedClicks: ok(5), unavailableCampaigns: ok(0) },
+          campaigns: [], campaignsTruncation: { limit: 50, broadcast: false, scenario: false }, trackedClickHours: [], clickDefinition: '',
+        })), { status: 200 })
+      }
+      return new Response(JSON.stringify(envelope({
+        attributionModel: 'first_touch', attributionLabel: '', searchConsoleHref: '',
+        routes: [{
+          id: 'r1', refCode: null, name: 'リンク1', clicks: na, friendAdds: na, currentFriends: na, reactionPeople: na,
+          conversions: { approved: ok(3), pending: ok(0), rejected: ok(0), revenue: na },
+          adCost: na, costPerFriend: na, costPerConversion: na, profitAfterAdCost: na,
+        }],
+      })), { status: 200 })
+    }
     return new Response(JSON.stringify({ success: false, error: '未設定' }), { status: 500 })
   })
 }
@@ -208,6 +235,14 @@ describe('V8 レポート作成（H5UoIu）', () => {
     expect(container.textContent).toContain('レポートが見ているもの')
     expect(container.textContent).toContain('数は送る時刻の時点で集めます')
     expect(container.textContent).toContain('宛先がブロックしていると、LINE では届きません')
+  })
+
+  it('右欄の見本に前の期間の本当の数を出す', async () => {
+    await mount()
+    await waitFor(() => expect(container.textContent).toContain('これは前の7日の数での見本です'))
+    expect(container.textContent).toContain('+12人')
+    expect(container.textContent).toContain('68%')
+    expect(container.textContent).toContain('3件')
   })
 
   it.each([
