@@ -1,65 +1,38 @@
-/* 会社名と製品名の固定部分。下の余白は流れるメニューに持たせる。 */
-.root {
+/* 提供された横長ロゴの透明余白だけを表示領域で切る。 */
+.logoRoot {
   display: flex;
   min-width: 0;
+  height: 54px;
   align-items: center;
-  gap: 10px;
+  padding: 4px 20px 0;
 }
 
-.mark {
-  display: flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-control);
-}
-
-.text {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.textOnly .text {
-  flex: 1;
-}
-
-.name {
+.logoViewport {
+  position: relative;
+  display: block;
+  width: 100%;
+  max-width: 176px;
+  height: 34px;
   overflow: hidden;
-  color: var(--color-ink);
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.version {
-  color: var(--color-ink-faint);
+.logoImage {
+  position: absolute;
+  top: -14px;
+  left: -17px;
+  display: block;
+  width: 210px;
+  max-width: none;
+  height: auto;
 }
 
-/* ★V8 外側：印のタイルは濃い緑＋白文字（Pencil `y3gx8R`）。
-   メニューを畳んだときは名前の列を隠して印だけ残す。 */
-:root .mark {
-  background: var(--color-accent-deep);
-  color: var(--color-canvas);
-}
+.compact { padding: 0; }
 
-:root [data-collapsed] .text {
-  display: none;
-}
-
-:root [data-collapsed] .textOnly {
-  display: none;
-}
-
-:root [data-collapsed] .root {
+:root [data-collapsed] .logoRoot {
+  height: 40px;
   justify-content: center;
-  padding-right: 0;
-  padding-left: 0;
+  padding: 0;
 }
 
-:root .root { height: auto; padding: 4px 20px 0; }
-:root .mark { width: 36px; height: 36px; font-size: 15px; font-weight: 700; line-height: 23px; }
-:root .name { font-size: 14px; line-height: 18px; }
-:root .version { font-family: var(--font-inter), Inter, sans-serif; font-size: 12px; font-weight: var(--font-weight-ui); line-height: 18px; }
-
-:root [data-collapsed] .root { height: 36px; padding: 0; }
+:root [data-collapsed] .logoViewport { width: 34px; height: 34px; }
+:root [data-collapsed] .logoImage { top: -21px; left: -22px; width: 260px; }
