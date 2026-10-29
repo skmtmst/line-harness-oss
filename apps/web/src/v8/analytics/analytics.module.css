@@ -699,6 +699,11 @@
   gap: var(--tpl-an-split-gap);
   min-width: 0;
 }
+
+/* 報告の縦積みが間隔の唯一の持ち主。共有Noticeの上下余白を消し、帯→次の段を16にそろえる。 */
+:global(:root) .reportStack > :global([data-design-part='notice']) {
+  margin-block: 0;
+}
 .reportCard {
   display: flex;
   flex-direction: column;
