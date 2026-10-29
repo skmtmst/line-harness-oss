@@ -466,7 +466,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={currentAccounts.length} unit="件" detail={null} />
         <KpiCard title="友だち合計" value={totals.friends} unit="人" detail={null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={totals.messages} unit="通" detail={null} />
-        <KpiCard title="接続に問題" value={totals.warnings} unit="件" detail={null} valueTone={totals.warnings > 0 ? 'warning' : 'default'} />
+        <KpiCard title="接続に問題" value={totals.warnings} unit="件" detail={null} valueTone={totals.warnings > 0 ? 'warning' : 'default'} action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
       <ListToolbarFrame layout="stacked">

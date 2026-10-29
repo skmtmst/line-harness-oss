@@ -51,3 +51,18 @@ it('アカウントの詳細を見るだけなら切り替えも通知もしな�
   expect(fixture.select).not.toHaveBeenCalled()
   expect(fixture.toast).not.toHaveBeenCalled()
 })
+
+it('?kind=connections で来たら種類を接続の異常に絞る', async () => {
+  window.history.replaceState(null, '', '/hq/attention?kind=connections')
+  try {
+    fixture.attention.mockResolvedValue({ success: true, data: { items: [
+      { accountId: 'account-a', name: '本店', counts: { connections: 1 }, details: {} },
+      { accountId: 'account-b', name: '支店', counts: { unhandledChats: 2 }, details: {} },
+    ] } })
+    render(<AttentionPage />)
+    expect(await screen.findByRole('button', { name: '本店' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: '支店' })).toBeNull()
+  } finally {
+    window.history.replaceState(null, '', '/hq/attention')
+  }
+})
