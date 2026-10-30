@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 
 import { useEffect, useRef, useState } from 'react'
 import type { Folder } from '@line-crm/shared'
@@ -85,7 +86,7 @@ export function useFolderMove<T extends Item>({ accountId, canEdit, items, folde
       if (account.current !== startedAccount) return
       setTargets(failed)
       setSelected(new Set(failed.map((item) => item.id)))
-      if (failed.length) setError(`${formatNumber(failed.length)}件を移せませんでした。${cause instanceof FolderMovePermissionError ? cause.message : cause instanceof ApiError && cause.status === 409 ? '別の人が先に変更しました。一覧を読み直してください。' : '一覧とフォルダを読み直してお試しください。'}`)
+      if (failed.length) setError(`${formatNumber(failed.length)}件を移せませんでした。${cause instanceof FolderMovePermissionError ? describeApiFailure(cause, 'フォルダへの移動') : cause instanceof ApiError && cause.status === 409 ? '別の人が先に変更しました。一覧を読み直してください。' : '一覧とフォルダを読み直してお試しください。'}`)
       if (done) notifyToast(`${done}件をフォルダへ移しました`)
       await onChanged()
     } catch {
