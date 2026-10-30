@@ -323,12 +323,17 @@ describe('受信箱の保存検索URL復元(N-021)', () => {
     await flush()
     await applyNavigation()
 
-    // 手で対応状況を変える = 保存検索の条件から外れる操作。
-    const resolvedButton = [...host.querySelectorAll('button')].find(
-      (button) => button.textContent?.trim() === '対応済み',
-    )
-    expect(resolvedButton).toBeTruthy()
-    await act(async () => { resolvedButton!.click() })
+    // 手で対応状況を変える = 保存検索の条件から外れる操作（絞り込みパネルで選ぶ）。
+    const filterButton = host.querySelector('button[aria-label="絞り込み"]') as HTMLButtonElement | null
+    expect(filterButton).not.toBeNull()
+    await act(async () => { filterButton!.click() })
+    const statusTrigger = document.querySelector('button[aria-label="対応状況で絞り込む"]') as HTMLButtonElement | null
+    expect(statusTrigger).not.toBeNull()
+    await act(async () => { statusTrigger!.click() })
+    const resolvedOption = [...document.querySelectorAll<HTMLElement>('[role="option"]')]
+      .find((el) => el.textContent === '対応済み')?.querySelector('button')
+    expect(resolvedOption).not.toBeNull()
+    await act(async () => { resolvedOption!.click() })
     await flush()
 
     // URLから savedView が外れている(channelは残る)。
