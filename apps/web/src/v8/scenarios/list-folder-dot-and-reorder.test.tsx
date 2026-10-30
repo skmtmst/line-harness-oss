@@ -4,8 +4,11 @@
  * つまみを出さず理由を言う（一部の行だけで番号を振り直さない）。
  */
 import React from 'react'
+import type { StaffMember } from '@line-crm/shared'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
 
 const scenario = (id: string, name: string, folderId: string | null) => ({
   id,
@@ -124,7 +127,13 @@ test('シナリオの説明本文を型へつなぎ、開閉と同じ人の保�
   }
 })
 
+beforeEach(() => {
+  forgetStaffIdentity(); forgetSessionSnapshot()
+  rememberStaffIdentity({ id: 'scenario-owner', role: 'owner', permissionKeys: [] } as unknown as StaffMember)
+})
+
 afterEach(() => {
+  forgetStaffIdentity(); forgetSessionSnapshot()
   cleanup()
   window.history.replaceState(null, '', '/scenarios')
 })

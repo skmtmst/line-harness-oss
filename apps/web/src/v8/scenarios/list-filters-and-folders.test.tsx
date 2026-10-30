@@ -1,4 +1,7 @@
 // @vitest-environment happy-dom
+import type { StaffMember } from '@line-crm/shared'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 /*
  * シナリオ一覧（V8）の絞り込み・フォルダ・まとめての操作を、描いて押して確かめる。
@@ -92,12 +95,15 @@ import ScenariosListV8 from './list'
 const ROWS = [scenario('s-1', '新規登録フォロー'), scenario('s-2', '休眠の呼び戻し')]
 
 beforeEach(() => {
+  forgetStaffIdentity(); forgetSessionSnapshot()
+  rememberStaffIdentity({ id: 'scenario-owner', role: 'owner', permissionKeys: [] } as unknown as StaffMember)
   state.role = 'owner'
   state.listPage.mockImplementation(async (input: { limit?: number }) => ({ success: true, data: { items: ROWS, total: ROWS.length, limit: input.limit ?? 20, sort: [] } }))
   state.update.mockResolvedValue({ success: true, data: {} })
 })
 
 afterEach(() => {
+  forgetStaffIdentity(); forgetSessionSnapshot()
   cleanup()
   vi.clearAllMocks()
 })
@@ -140,6 +146,7 @@ describe('左のフォルダの列', () => {
     expect(screen.getAllByRole('button', { name: /フォルダを追加/ }).length).toBeGreaterThan(0)
     cleanup()
     state.role = 'staff'
+    rememberStaffIdentity({ id: 'scenario-staff', role: 'staff', permissionKeys: [] } as unknown as StaffMember)
     await renderList()
     await expectPermissionLocked(screen.getByRole('button', { name: /フォルダを追加/ }))
   })
