@@ -1,3 +1,4 @@
+import './coupon-preview.test.mjs'
 import './single-choice-filters.test.mjs'
 import './notice-line-break.test.mjs'
 import './pick-field-surface.test.mjs'

@@ -47,6 +47,7 @@ vi.mock('@/lib/api', () => ({
   api: {
     folders: { list: emptyList },
     broadcastMessageAssets: {
+      folders: { list: emptyList },
       create: (input: { lineAccountId: string; kind: string; name: string; payload: Record<string, unknown> }) => {
         fixture.createCalls.push(input)
         return Promise.resolve({ success: true, data: { id: 'asset-1' } })
@@ -178,6 +179,10 @@ async function nameAndSave() {
   const nameInput = document.querySelector<HTMLInputElement>('input[type="text"]')!
   await act(async () => {
     setInputValue(nameInput, '監査用テンプレート')
+    const title = document.getElementById('te-coupon-title') as HTMLInputElement | null
+    const amount = document.getElementById('te-coupon-amount') as HTMLInputElement | null
+    if (title) setInputValue(title, '監査用クーポン')
+    if (amount) setInputValue(amount, '500')
     await settle()
   })
   await act(async () => {
@@ -211,28 +216,28 @@ describe('NEXT-17: クーポンの設定が保存値へ入る', () => {
     await setDateTime('使える期間の終了', '2026-10-31T23:59')
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: '期間中なら何回でも' }))
-      fireEvent.click(screen.getByRole('button', { name: 'リンクを知っている人' }))
+      expect(screen.queryByRole('button', { name: 'リンクを知っている人' })).toBeNull()
     })
     expect(screen.queryByRole('spinbutton', { name: /当たる確率/ })).toBeNull()
     expect(screen.queryByRole('spinbutton', { name: /当選人数/ })).toBeNull()
     await nameAndSave()
     expect(fixture.createCalls).toHaveLength(1)
     const payload = fixture.createCalls[0].payload
-    expect(payload).toMatchObject({ startsAt: '2026-10-01T09:00', endsAt: '2026-10-31T23:59', oncePerFriend: false, visibility: 'link', lottery: false })
+    expect(payload).toMatchObject({ startsAt: '2026-10-01T09:00', endsAt: '2026-10-31T23:59', oncePerFriend: false, visibility: 'friends', lottery: false })
     expect(payload).not.toHaveProperty('lotteryRate')
     expect(payload).not.toHaveProperty('winnerLimit')
   })
-  it('抽選ありでは確率・当選上限の入力値がそのまま保存される', async () => {
-    await renderEditor('coupon')
-    await act(async () => { fireEvent.click(screen.getByRole('switch', { name: '抽選する' })) })
-    await setDateTime('使える期間の開始', '2026-10-01T09:00')
-    await setDateTime('使える期間の終了', '2026-11-30T23:59')
+  it('保存済みの抽選は無断で公開せず、条件なしへの明示変更を促す', async () => {
+    const onSave = vi.fn()
+    const payload = { title: '昔の抽選券', description: 'ご案内', lottery: true, lotteryRate: 35, winnerLimit: 120, startsAt: '2026-10-01T09:00', endsAt: '2026-11-30T23:59' }
     await act(async () => {
-      fireEvent.change(screen.getByRole('spinbutton', { name: /当たる確率/ }), { target: { value: '35' } })
-      fireEvent.change(screen.getByRole('spinbutton', { name: /当選人数の上限/ }), { target: { value: '120' } })
+      root.render(<TemplateAssetEditorV8 kind="coupon" host={{ description: '', folders: [], folder: '', onFolderChange: () => {}, busy: false, onSave, onCancel: () => {}, initialContent: { kind: 'coupon', name: '昔の券', payload } }} />)
+      await settle()
     })
-    await nameAndSave()
-    expect(fixture.createCalls[0].payload).toMatchObject({ lottery: true, lotteryRate: 35, winnerLimit: 120, oncePerFriend: true, visibility: 'friends' })
+    await act(async () => { buttonByText('保存する').click(); await settle() })
+    expect(onSave).not.toHaveBeenCalled()
+    expect(host.textContent).toContain('抽選には対応していません。条件なしへ変更してください')
+    expect(payload).toMatchObject({ lottery: true, lotteryRate: 35, winnerLimit: 120 })
   })
   it('期間が未入力だと保存せず理由を出す', async () => {
     await renderEditor('coupon')

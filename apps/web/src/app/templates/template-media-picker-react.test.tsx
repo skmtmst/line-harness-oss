@@ -45,6 +45,7 @@ vi.mock('@/lib/api', () => ({
   api: {
     folders: { list: emptyList },
     broadcastMessageAssets: {
+      folders: { list: emptyList },
       create: (input: { lineAccountId: string; kind: string; name: string; payload: Record<string, unknown> }) => {
         fixture.createCalls.push(input)
         return Promise.resolve({ success: true, data: { id: 'asset-1' } })

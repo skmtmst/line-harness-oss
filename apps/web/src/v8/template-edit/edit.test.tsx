@@ -15,6 +15,10 @@ vi.hoisted(() => {
 
 const templatesApi = vi.hoisted(() => ({ get: vi.fn(), create: vi.fn(), update: vi.fn(), publish: vi.fn() }))
 const assetsCreate = vi.hoisted(() => vi.fn())
+const assetsPublish = vi.hoisted(() => vi.fn())
+const assetsList = vi.hoisted(() => vi.fn())
+const assetsUpdate = vi.hoisted(() => vi.fn())
+const assetFoldersList = vi.hoisted(() => vi.fn())
 const listFolders = vi.hoisted(() => vi.fn())
 const push = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
@@ -30,7 +34,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     api: {
       ...api,
       templates: { ...api.templates, ...templatesApi },
-      broadcastMessageAssets: { ...api.broadcastMessageAssets, create: assetsCreate },
+      broadcastMessageAssets: { ...api.broadcastMessageAssets, create: assetsCreate, publish: assetsPublish, list: assetsList, update: assetsUpdate, folders: { list: assetFoldersList } },
       folders: { ...api.folders, list: listFolders },
       friendFields: { list: async () => ({ success: true, data: [{ fieldKey: 'plan', name: 'プラン', canInsertText: true, defaultValue: '定期便' }] }) },
       commonVars: { list: async () => ({ success: true, data: [] }) },
@@ -64,6 +68,7 @@ vi.mock('@/components/auto-replies/inline-action-list', async (importOriginal: (
 import { ApiError } from '@/lib/api'
 import TemplateEditV8 from './edit'
 import TemplateMessageEditor from './message'
+import TemplateAssetEditor from './asset'
 import type { TemplateEditHost } from './host'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 
@@ -103,6 +108,12 @@ beforeEach(() => {
   push.mockReset()
   for (const fn of Object.values(templatesApi)) fn.mockReset()
   assetsCreate.mockReset()
+  assetsPublish.mockReset()
+  assetsList.mockReset()
+  assetsUpdate.mockReset()
+  assetFoldersList.mockReset()
+  assetFoldersList.mockResolvedValue({ success: true, data: [{ id: 'asset-folder-1', name: '販促' }] })
+  assetsPublish.mockResolvedValue({ success: true, data: { id: 'asset-1', publishedVersion: 1, draftRevision: 0 } })
   listFolders.mockReset()
   listFolders.mockResolvedValue({ success: true, data: [{ id: 'fol-1', kind: 'template', name: '予約', itemCount: 1 }] })
   templatesApi.get.mockResolvedValue(detail())
@@ -343,6 +354,8 @@ describe('V8 クーポン・リサーチを作る', () => {
     await mount('kind=coupon')
     expect(document.querySelector('[data-design-node="S6FEuB"]')).toBeTruthy()
     type(screen.getByLabelText('テンプレート名'), '夏の20%オフ')
+    type(screen.getByLabelText('クーポン名'), '夏の20%オフ')
+    type(screen.getByLabelText('割引額'), '500')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
     await flush()
     expect(assetsCreate).not.toHaveBeenCalled()
@@ -353,8 +366,8 @@ describe('V8 クーポン・リサーチを作る', () => {
     expect(document.getElementById('te-coupon-start')?.contains(document.activeElement) || document.activeElement?.id === 'te-coupon-start').toBe(true)
   })
 
-  it('クーポン：見本の中身で保存すると、資産の口へクーポン名・期間・フォルダ名を送る', async () => {
-    assetsCreate.mockResolvedValue({ success: true, data: { id: 'asset-1' } })
+  it('クーポン：見本の中身を保存した版で実際に公開する', async () => {
+    assetsCreate.mockResolvedValue({ success: true, data: { id: 'asset-1', publishedVersion: 0, draftRevision: 1 } })
     await mount('kind=coupon&visual=1')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
     await flush()
@@ -362,8 +375,10 @@ describe('V8 クーポン・リサーチを作る', () => {
       lineAccountId: 'account-a',
       kind: 'coupon',
       name: '夏の20%オフ',
-      payload: expect.objectContaining({ title: '夏の20%オフ', startsAt: '2026-08-01T00:00', endsAt: '2026-08-31T23:59', oncePerFriend: true, folder: '03_販促・クーポン' }),
+      payload: expect.objectContaining({ title: '夏の20%オフ', startsAt: '2026-08-01T00:00', endsAt: '2026-08-31T23:59', oncePerFriend: true, folder: '', description: expect.any(String), instructions: expect.any(String), couponType: 'discount', discount: { mode: 'percent', percent: 20 } }),
     }))
+    expect(assetsCreate.mock.calls[0][0].payload.description).toBe(assetsCreate.mock.calls[0][0].payload.instructions)
+    expect(assetsPublish).toHaveBeenCalledWith('asset-1', { expectedVersion: 0, expectedDraftRevision: 1 }, expect.any(String))
     expect(push).toHaveBeenCalledWith('/templates?highlight=asset-1')
   })
 
@@ -603,6 +618,7 @@ describe('V8 クーポン・リサーチ：保存のあと', () => {
       await act(async () => { finish({ success: true, data: { id: 'asset-1' } }) })
       await flush()
       expect(toastHost.textContent).toContain('下書きを保存しました')
+      expect(assetsPublish).not.toHaveBeenCalled()
       expect(push).toHaveBeenCalledWith('/templates?highlight=asset-1')
       expect(assetsCreate).toHaveBeenCalledTimes(1)
     } finally {
@@ -614,3 +630,55 @@ describe('V8 クーポン・リサーチ：保存のあと', () => {
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+
+describe('クーポンの同じ編集画面と公開の失敗', () => {
+  const payload = { title: '昔の券', description: '元の説明', instructions: '元のガイド', startsAt: '2026-01-01T00:00', endsAt: '2027-01-01T00:00', maxUsesPerFriend: 3, oncePerFriend: true, visibility: 'link', imageUrl: 'https://example.com/old.png', imageMediaId: 'media-old', imageMediaKind: 'image', useActions: [{ type: 'tag_add', tagId: 'tag-old', unknown: '保持' }], legacyNote: '保持', folder: '旧名' }
+  const asset = { id: 'coupon-old', lineAccountId: 'account-a', kind: 'coupon', name: '昔の管理名', payload, folderId: 'asset-folder-1', publishedVersion: 2, draftRevision: 0 }
+  it('一覧からの編集も同じ画面で、旧回数・処理・画像・未知の値を失わず保存する', async () => {
+    assetsList.mockResolvedValue({ success: true, data: [asset] })
+    assetsUpdate.mockResolvedValue({ success: true, data: { ...asset, draftRevision: 1 } })
+    await mount('kind=coupon&id=coupon-old')
+    expect(screen.getByRole('heading', { name: 'クーポンを編集する' })).toBeTruthy()
+    expect((screen.getByLabelText('使うときの説明') as HTMLTextAreaElement).value).toBe('元のガイド')
+    expect(screen.getByRole('button', { name: '1人3回' })).toBeTruthy()
+    type(screen.getByLabelText('テンプレート名'), '管理名だけ変更')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+    expect(assetsUpdate).toHaveBeenCalledWith('coupon-old', expect.objectContaining({ folderId: 'asset-folder-1', payload: expect.objectContaining(payload) }))
+    expect(assetsUpdate.mock.calls[0][1].payload).not.toHaveProperty('couponType')
+    expect(assetsCreate).not.toHaveBeenCalled(); expect(assetsPublish).not.toHaveBeenCalled()
+  })
+  it('公開409は下書きを作り直さず同じ確認キーで再試行し、成功前に一覧へ移らない', async () => {
+    assetsCreate.mockResolvedValue({ success: true, data: { id: 'asset-1', publishedVersion: 0, draftRevision: 1 } })
+    assetsPublish.mockRejectedValueOnce(new ApiError(409, '別の人が変更しました'))
+    await mount('kind=coupon&visual=1')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+    expect(push).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('別の人が変更しました')
+    const first = assetsPublish.mock.calls[0]
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+    expect(assetsCreate).toHaveBeenCalledTimes(1)
+    expect(assetsPublish.mock.calls[1]).toEqual(first)
+    expect(push).toHaveBeenCalledWith('/templates?highlight=asset-1')
+  })
+  it('閲覧のみでは欄と公開操作を残して灰色にし、保存の口を呼ばない', async () => {
+    role.value = verifiedStaffRole('viewer')
+    await mount('kind=coupon&visual=1')
+    expect(screen.getByLabelText('クーポン名')).toBeTruthy()
+    expect((screen.getByLabelText('クーポン名').closest('fieldset') as HTMLFieldSetElement).disabled).toBe(true)
+    for (const label of ['下書きを保存', '保存して公開']) {
+      const button = screen.getByRole('button', { name: label })
+      expect(button.getAttribute('aria-disabled') === 'true' || (button as HTMLButtonElement).disabled).toBe(true)
+      await act(async () => { fireEvent.click(button) })
+    }
+    expect(assetsCreate).not.toHaveBeenCalled(); expect(assetsPublish).not.toHaveBeenCalled()
+  })
+  it('統括の親へ保存する時も旧payloadを保ち、店の保存口やフォルダを呼ばない', async () => {
+    const save = vi.fn().mockResolvedValue(false)
+    const parent: TemplateEditHost = { description: '統括の見本', folders: [], folder: '', onFolderChange: vi.fn(), busy: false, onSave: save, onCancel: vi.fn(), initialContent: { kind: 'coupon', name: '親の券', payload } }
+    await act(async () => { root.render(<TemplateAssetEditor kind="coupon" host={parent} />) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存する' })) })
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ kind: 'coupon', payload: expect.objectContaining(payload) }), true)
+    expect(assetFoldersList).not.toHaveBeenCalled(); expect(assetsCreate).not.toHaveBeenCalled(); expect(assetsUpdate).not.toHaveBeenCalled()
+  })
+})
