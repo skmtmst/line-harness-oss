@@ -1,4 +1,5 @@
 'use client'
+import SegmentedControl from '@/components/shared/segmented'
 
 import CsvTemplateDownload from '@/components/shared/csv-template-download'
 import { UID_IMPORT_HEADERS } from '@/lib/csv-import-columns'
@@ -174,15 +175,10 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
               </div>
               <div className={styles.toolRow}>
                 <div role="group" aria-label="分類で絞り込む" className={styles.chipRow}>
-                  {([
-                    ['review', `要確認 ${formatNumber(active.counts.review)}`],
-                    ['conflict', `競合 ${formatNumber(active.counts.conflict)}`],
-                    ['unmatched', `一致しない ${formatNumber(active.counts.unmatched)}`],
-                  ] as Array<[ItemClassification, string]>).map(([value, label]) => (
-                    <FilterChip key={value} selected={m.classification === value} onChange={() => m.onFilterChange(active.id, m.classification === value ? '' : value, m.pendingOnly)}>
-                      {label}
-                    </FilterChip>
-                  ))}
+                  <SegmentedControl<ItemClassification | ''> aria-label="分類で絞り込む" fit="content" value={m.classification} onClear={() => m.onFilterChange(active.id, '', m.pendingOnly)} onChange={(value) => m.onFilterChange(active.id, value, m.pendingOnly)} options={[
+                    { value: '', label: 'すべて' }, { value: 'review', label: '要確認', count: active.counts.review },
+                    { value: 'conflict', label: '競合', count: active.counts.conflict }, { value: 'unmatched', label: '一致しない', count: active.counts.unmatched },
+                  ]} />
                   <FilterChip selected={m.pendingOnly} onChange={() => m.onFilterChange(active.id, m.classification, !m.pendingOnly)}>
                     {`未判断 ${m.unresolved == null ? emptyValue('unknown') : formatNumber(m.unresolved)}`}
                   </FilterChip>

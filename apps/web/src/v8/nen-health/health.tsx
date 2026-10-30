@@ -1,11 +1,12 @@
 'use client'
+import SegmentedControl from '@/components/shared/segmented'
 
 import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-url-state';
 
 
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Activity, Bookmark, CalendarCheck, CalendarDays, Columns2, FileText, History, PawPrint } from 'lucide-react';
+import { Activity, Bookmark, CalendarCheck, CalendarDays, FileText, History, PawPrint } from 'lucide-react';
 import { ListPage } from '@/components/templates';
 import Button from '@/components/shared/button'
 import ActionMenu, { type ActionMenuItem } from '@/components/shared/action-menu';
@@ -306,14 +307,13 @@ function HealthListV8({
         </ListToolbarSearchSlot>
         {concernOnly ? null : (
           <span className={styles.chips} role="group" aria-label="よく使う絞り込み">
-            <FilterChip selected={filters.change === 'concern'} onChange={(next) => set({ change: next ? 'concern' : '' })} icon={<Columns2 size={16} aria-hidden="true" />} title="体重の±10%の変化・便の異常・食いつき不良が3回続いたペットだけ出します">
-              {kpis ? `気になる変化 ${kpis.concerning}` : '気になる変化'}
-            </FilterChip>
+            <SegmentedControl<HealthFilters['change']> aria-label="記録の変化" fit="content" value={filters.change} onClear={() => set({ change: '' })} onChange={(value) => set({ change: value })} options={[
+              { value: '', label: 'すべて' },
+              { value: 'concern', label: '気になる変化', count: kpis?.concerning, title: '体重の±10%の変化・便の異常・食いつき不良が3回続いたペットだけ出します' },
+              { value: 'silent', label: '30日 記録なし', count: kpis?.silent30, title: '30日以上 記録のないペットだけ出します' },
+            ]} />
             <FilterChip selected={filters.last === '7'} onChange={(next) => set({ last: next ? '7' : '' })} icon={<CalendarDays size={16} aria-hidden="true" />} title="7日以内に記録が付いたペットだけ出します">
               今週 記録あり
-            </FilterChip>
-            <FilterChip selected={filters.change === 'silent'} onChange={(next) => set({ change: next ? 'silent' : '' })} icon={<CalendarDays size={16} aria-hidden="true" />} title="30日以上 記録のないペットだけ出します">
-              {kpis ? `30日 記録なし ${kpis.silent30}` : '30日 記録なし'}
             </FilterChip>
           </span>
         )}
