@@ -97,6 +97,7 @@ function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, r
   bubbles: BroadcastBubble[]
   onBubbles: (next: BroadcastBubble[]) => void
 }) {
+  const templateVersion = live.templateVersion
   const binding = step?.binding ?? null
   const enabled = binding?.enabled === 1
   const currentOffset = binding?.offset_minutes ?? row.defaultOffsetMinutes
@@ -143,11 +144,11 @@ function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, r
       <Button variant="secondary" disabled={toggleLocked} busy={busy === 'toggle'}
         lockedReason={permReason}
         onClick={() => {
-          if (!binding || !step) return
+          if (!binding || !step || templateVersion === null) return
           const next = !enabled
           void run('toggle', async () => {
             unwrap(await saveFollowupBinding(accountId, storeId, binding.step_id, 'PATCH', {
-              expectedVersion: live.templateVersion, trigger: row.trigger,
+              expectedVersion: templateVersion, trigger: row.trigger,
               offsetMinutes: binding.offset_minutes, enabled: next,
             }), 'オン/オフを変えられませんでした')
           })
@@ -171,10 +172,10 @@ function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, r
           if (offset === null) { failed('時期は0以上の整数で入れてください'); return }
           const invalid = timingError(row.trigger, offset)
           if (invalid) { failed(invalid); return }
-          if (!binding) return
+          if (!binding || templateVersion === null) return
           void run('timing', async () => {
             unwrap(await saveFollowupBinding(accountId, storeId, binding.step_id, 'PATCH', {
-              expectedVersion: live.templateVersion, trigger: row.trigger,
+              expectedVersion: templateVersion, trigger: row.trigger,
               offsetMinutes: offset, enabled,
             }), '時期を変えられませんでした')
           })
@@ -188,18 +189,18 @@ function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, r
       <Button variant="primary" disabled={bodyLocked} busy={busy === 'body'}
         lockedReason={permReason}
         onClick={() => {
-          if (!binding || !step?.step || unsupportedBody) return
+          if (!binding || !step?.step || unsupportedBody || templateVersion === null) return
           const next = bubbles.length ? bubbles : [{ id: 'draft', type: 'text' as const, content: { text: '' } }]
           if (!next.some(item => item.type !== 'text' || bubbleText(item).trim())) { failed('本文を入れてください'); return }
           void run('body', async () => {
             unwrap(await saveFollowupMessages(accountId, storeId, binding.step_id, {
-              expectedVersion: live.templateVersion, messageBubbles: next,
+              expectedVersion: templateVersion, messageBubbles: next,
             }), '本文を保存できませんでした')
           })
         }}>
         <Check size={16} aria-hidden />本文を保存する
       </Button>
-      <Button variant="text" href={`/scenarios/detail?id=${encodeURIComponent(live.scenarioId)}`}>くわしく設定する →</Button>
+      {live.scenarioId ? <Button variant="text" href={`/scenarios/detail?id=${encodeURIComponent(live.scenarioId)}`}>くわしく設定する →</Button> : <Button variant="text" disabled>くわしく設定する →</Button>}
     </div>
     {row.trigger === 'review_request' ? (
       <p role="status">{reviewCount === null ? '送信履歴は読めませんでした' : `送信履歴 ${reviewCount}件`}</p>
@@ -311,6 +312,7 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
           <Button variant="secondary" disabled={startStopLocked} busy={busy === 'start'}
             lockedReason={permReason}
             onClick={() => {
+              if (!live.scenarioId) return
               setBusy('start')
               /* 申請は公開版を対象にする。直前に公開し、公開で増えた版を取り直してから申請する。 */
               publishFollowupScenario(live.scenarioId).then(
@@ -324,7 +326,7 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
                   }
                   fetchRestaurantFollowup(accountId, storeId, storeName).then(
                     fresh => {
-                      if (!fresh) {
+                      if (!fresh || fresh.templateVersion === null) {
                         setBusy(null)
                         setActionError('フォローの設定を読み直せませんでした')
                         return

@@ -6,6 +6,7 @@ import type {
   BroadcastBubble,
   RestaurantFollowupBinding,
   RestaurantFollowupPage,
+  RestaurantFollowupRow,
   RestaurantFollowupTrigger,
   ScenarioStep,
 } from '@line-crm/shared'
@@ -25,6 +26,7 @@ export type FollowupStepState = 'sending' | 'ready' | 'stopped'
 /** 画面の1行分。本文はシナリオ（本体）の一歩から読む。 */
 export interface FollowupStepLive {
   trigger: RestaurantFollowupTrigger
+  row?: RestaurantFollowupRow
   binding: RestaurantFollowupBinding | null
   step: ScenarioStep | null
   bubbles: BroadcastBubble[]
@@ -36,8 +38,8 @@ export interface FollowupStepLive {
 export interface FollowupLive {
   storeId: string
   storeName: string
-  scenarioId: string
-  templateVersion: number
+  scenarioId: string | null
+  templateVersion: number | null
   sendingStatus: string
   approvalId: string | null
   steps: FollowupStepLive[]
@@ -84,37 +86,39 @@ export async function fetchRestaurantFollowup(accountId: string, storeId: string
     if (error instanceof ApiError && error.status === 404) return null
     throw error
   }
-  const scenario = unwrap(
+  const scenario = page.template ? unwrap(
     await scenariosMethods.scenarios.get(page.template.scenario_id),
     'シナリオを読み込めませんでした',
-  )
-  const byId = new Map(scenario.steps.map(step => [step.id, step]))
-  const sending = page.template.sending_status === 'active'
+  ) : null
+  const byId = new Map((scenario?.steps ?? []).map(step => [step.id, step]))
+  const sending = page.template?.sending_status === 'active'
   const triggers: RestaurantFollowupTrigger[] = [
     'reservation_created', 'reservation_24h', 'reservation_2h', 'post_visit',
     'review_request', 'waitlist_invited', 'anniversary_before',
   ]
   const steps: FollowupStepLive[] = triggers.map(trigger => {
-    const binding = page.bindings.find(item => item.trigger === trigger) ?? null
+    const row = page.rows?.find(item => item.trigger === trigger)
+    const binding = page.bindings.find(item => item.trigger === trigger && (!row?.step_id || item.step_id === row.step_id)) ?? null
     const step = binding ? byId.get(binding.step_id) ?? null : null
-    const bubbles = step ? stepBubbles(step) : []
+    const bubbles: BroadcastBubble[] = step ? stepBubbles(step) : row ? [{ id: `initial-${trigger}`, type: 'text', content: { text: row.initial_message } }] : []
     const enabled = binding?.enabled === 1
     return {
       trigger,
+      row,
       binding,
       step,
       bubbles,
-      offsetMinutes: binding?.offset_minutes ?? null,
+      offsetMinutes: binding?.offset_minutes ?? row?.default_offset_minutes ?? null,
       state: !enabled ? 'stopped' : sending ? 'sending' : 'ready',
     }
   })
   return {
     storeId,
     storeName,
-    scenarioId: page.template.scenario_id,
-    templateVersion: page.template.template_version,
-    sendingStatus: page.template.sending_status,
-    approvalId: page.template.approval_id,
+    scenarioId: page.template?.scenario_id ?? null,
+    templateVersion: page.template?.template_version ?? null,
+    sendingStatus: page.template?.sending_status ?? 'stopped',
+    approvalId: page.template?.approval_id ?? null,
     steps,
     reviewInvitations: null,
   }

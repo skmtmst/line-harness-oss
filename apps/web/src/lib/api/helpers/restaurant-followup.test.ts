@@ -108,3 +108,18 @@ describe('中身の読み替え', () => {
     expect(live.steps[1]).toMatchObject({ trigger: 'reservation_24h', binding: null, offsetMinutes: null })
   })
 })
+
+
+it('本体がまだない店は行の初期文を読み、架空のシナリオを取得しない', async () => {
+  fixture.fetchApi.mockResolvedValue({ success: true, data: {
+    template: null, bindings: [], jobs: [], editor: 'common_scenario',
+    rows: [{ store_id: 'new', trigger: 'reservation_24h', initial_key: 'reservation_24h', step_id: null,
+      version: 1, default_offset_minutes: -1440, initial_message: '明日のご予約です' }],
+  } })
+  const live = (await fetchRestaurantFollowup('account-1', 'new'))!
+  expect(fixture.scenarioGet).not.toHaveBeenCalled()
+  expect(live).toMatchObject({ scenarioId: null, templateVersion: null, sendingStatus: 'stopped' })
+  expect(live.steps).toHaveLength(7)
+  expect(live.steps[1]).toMatchObject({ binding: null, step: null, row: { version: 1 }, offsetMinutes: -1440, state: 'stopped' })
+  expect(live.steps[1]!.bubbles[0]!.content).toEqual({ text: '明日のご予約です' })
+})

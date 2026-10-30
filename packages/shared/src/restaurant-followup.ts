@@ -32,8 +32,19 @@ export interface RestaurantFollowupJob {
     idempotency_key: string;
     message_log_id: string | null;
 }
+/** 本体をまだ作っていない送り方も表す。本文は作成後のシナリオが正本。 */
+export interface RestaurantFollowupRow {
+    store_id: string;
+    trigger: RestaurantFollowupTrigger;
+    initial_key: string;
+    step_id: string | null;
+    version: number;
+    default_offset_minutes: number;
+    initial_message: string;
+}
 export interface RestaurantFollowupPage {
-    template: RestaurantFollowupTemplate;
+    template: RestaurantFollowupTemplate | null;
+    rows?: RestaurantFollowupRow[];
     bindings: RestaurantFollowupBinding[];
     jobs: RestaurantFollowupJob[];
     editor: 'common_scenario';
