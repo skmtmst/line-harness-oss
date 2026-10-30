@@ -23,6 +23,13 @@ test('予約台帳は卓なし・空き卓・予約ありを区別し、空き�
             }
             for (const [key, value] of Object.entries({ lh_csrf: 'visual-qa-csrf', lh_staff_role: 'owner', lh_staff_name: 'K', lh_staff_permissions: '[]', lh_staff_view_permissions: '[]', lh_selected_account: 'visual-qa-account', lh_auth_selection_cleared: '1' })) localStorage.setItem(key, value)
           })
+          await page.route('**/api/dashboard/style?*', async route => {
+            const response = await route.fetch()
+            const body = await response.json()
+            body.data.style = 'restaurant'
+            body.data.styleSelected = true
+            await route.fulfill({ response, json: body })
+          })
           await page.route('**/api/restaurant-test/**', async route => {
             const response = await route.fetch()
             const body = await response.json()
@@ -44,6 +51,7 @@ test('予約台帳は卓なし・空き卓・予約ありを区別し、空き�
             assert.equal(await page.getByRole('link', { name: '座席・卓を設定する', exact: true }).getAttribute('href'), '/restaurant-test/tables')
           } else if (state === 'no-reservations') {
             const slot = page.getByRole('button', { name: /T1 2名 18:00に予約を入れる/ })
+            assert.ok((await slot.textContent()).includes('＋'), '空きマスの予約操作に＋を出す')
             await slot.focus()
             await page.waitForFunction(() => document.activeElement?.hasAttribute('data-booking-add') && getComputedStyle(document.activeElement).opacity === '1')
             assert.equal(await slot.evaluate(node => getComputedStyle(node).opacity), '1')
