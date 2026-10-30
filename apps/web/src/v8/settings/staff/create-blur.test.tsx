@@ -69,7 +69,7 @@ describe('ログインユーザーを追加する：欄を離れたときの検�
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '招待メールを送る' })) })
     expect(createStaff).not.toHaveBeenCalled()
     const summary = document.querySelector('[data-design-part="validation-summary"]') as HTMLElement
-    expect(summary.textContent).toContain('3か所直してください')
+    expect(summary.textContent).toContain('2か所直してください')
     expect(summary.textContent).toContain('名前')
     expect(summary.textContent).toContain('メールアドレス')
     expect(screen.getByText('名前を入力してください')).toBeTruthy()
@@ -77,5 +77,22 @@ describe('ログインユーザーを追加する：欄を離れたときの検�
     const jump = within(summary).getAllByRole('button').at(-1)!
     await act(async () => { fireEvent.click(jump) })
     expect(document.activeElement).toBe(nameField())
+  })
+
+  it('アカウント選択を見せず、追加元だけの担当範囲で招待する', async () => {
+    createStaff.mockResolvedValue({ success: true, data: { id: 'new-staff' } })
+    await act(async () => { render(<NewStaffPage />) })
+    expect(screen.queryByText('最初に表示するLINEアカウント')).toBeNull()
+    expect(screen.queryByText('この店舗より下のアカウントにも権限を付ける')).toBeNull()
+    expect(screen.getByText('本店のみを閲覧・操作できる担当者として追加されます。')).toBeTruthy()
+    fireEvent.change(nameField(), { target: { value: '山田 花子' } })
+    fireEvent.change(document.getElementById('staff-email')!, { target: { value: 'hanako@example.test' } })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '招待メールを送る' })) })
+    expect(createStaff).toHaveBeenCalledWith(expect.objectContaining({
+      assignedLineAccountId: 'account-a',
+      accountScope: 'accounts',
+      scopedLineAccountIds: ['account-a'],
+      canAccessDescendantAccounts: false,
+    }))
   })
 })

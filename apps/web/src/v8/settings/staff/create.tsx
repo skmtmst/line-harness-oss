@@ -1,9 +1,6 @@
 'use client'
 
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-
-import { useEffect, useState } from 'react'
-import type { LineAccount } from '@line-crm/shared'
+import { useState } from 'react'
 import { api } from '@/lib/api'
 import CreatePage, { AsideCard, FormSection, Field } from '@/components/shared/create-page'
 import Checkbox from '@/components/shared/checkbox'
@@ -25,9 +22,9 @@ type Role = 'admin' | 'staff' | 'viewer'
 type Channel = { email: boolean; line: boolean }
 
 const ROLES: Array<{ value: Role; label: string; note: string }> = [
-  { value: 'admin', label: '管理者', note: 'すべての権限で設定・操作できます' },
-  { value: 'staff', label: 'スタッフ', note: '選択した機能だけを操作できます' },
-  { value: 'viewer', label: '閲覧のみ', note: 'すべて閲覧できますが、操作はできません' },
+  { value: 'admin', label: '管理者', note: 'このアカウントのすべての機能を設定・操作できます' },
+  { value: 'staff', label: 'スタッフ', note: 'このアカウントで選択した機能だけを操作できます' },
+  { value: 'viewer', label: '閲覧のみ', note: 'このアカウントだけを閲覧でき、操作はできません' },
 ]
 
 const PERMISSION_GROUPS = [
@@ -58,9 +55,6 @@ export default function NewStaffPage() {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<Role>('admin')
   const [permissionKeys, setPermissionKeys] = useState<string[]>([])
-  const [accounts, setAccounts] = useState<LineAccount[]>([])
-  const [assignedLineAccountId, setAssignedLineAccountId] = useState('')
-  const [inheritAccounts, setInheritAccounts] = useState(false)
   const [notifications, setNotifications] = useState<Record<string, Channel>>({ ...INITIAL_NOTIFICATIONS })
   /*
    * 欄の検査。欄から離れた時点で1回だけ理由を出し、
@@ -75,8 +69,6 @@ export default function NewStaffPage() {
     if (email.trim().length > 254) return 'メールアドレスは254文字以内で入力してください'
     return null
   })
-  fields.define('account', '最初に表示するLINEアカウント', () =>
-    assignedLineAccountId ? null : '最初に表示するLINEアカウントを選択してください')
   fields.define('permissions', 'スタッフに表示する機能', () =>
     role === 'staff' && permissionKeys.length === 0
       ? 'スタッフに表示する機能を1つ以上選択してください'
@@ -87,11 +79,6 @@ export default function NewStaffPage() {
     setPermissionKeys((current) => toggleStaffPermissionKey(current, key))
   }
   const toggleChannel = (key: string, channel: keyof Channel) => setNotifications((current) => ({ ...current, [key]: { ...current[key], [channel]: !current[key][channel] } }))
-  useEffect(() => {
-    void api.lineAccounts.list().then((response) => {
-      if (response.success) setAccounts(response.data)
-    })
-  }, [])
 
   /*
    * 追加途中の離脱確認。名前・アドレス・役割・権限・通知先のどれかに
@@ -99,8 +86,7 @@ export default function NewStaffPage() {
    * 招待メールを送ると一覧へ router.push するので、成功後に警告は出ない。
    */
   const dirty = Boolean(
-    name || email || assignedLineAccountId || permissionKeys.length > 0 ||
-    inheritAccounts || role !== 'admin' ||
+    name || email || permissionKeys.length > 0 || role !== 'admin' ||
     JSON.stringify(notifications) !== JSON.stringify(INITIAL_NOTIFICATIONS)
   )
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty })
@@ -112,13 +98,13 @@ export default function NewStaffPage() {
     parent={['ログインユーザー', '/staff?tab=members']}
     saveLabel="招待メールを送る"
     fields={fields}
-    onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys: normalizeStaffPermissionKeys(permissionKeys), notificationPreferences: notifications, assignedLineAccountId, canAccessDescendantAccounts: inheritAccounts, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
+    onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys: normalizeStaffPermissionKeys(permissionKeys), notificationPreferences: notifications, assignedLineAccountId: selectedAccountId, canAccessDescendantAccounts: false, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}
     aside={<>
       <AsideCard title="追加後の流れ"><ol className="space-y-3 text-sm text-ink-secondary"><li><b className="text-ink">1.</b> 招待メールでアドレスを確認</li><li><b className="text-ink">2.</b> 続けて届くメールからLINE認証</li><li><b className="text-ink">3.</b> 連携完了後はLINE認証でログイン</li></ol></AsideCard>
       <AsideCard title="設定内容"><dl className="space-y-2 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">役割</dt><dd className="text-ink">{ROLES.find((item) => item.value === role)?.label}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">表示機能</dt><dd className="text-ink">{role === 'staff' ? `${formatNumber(permissionKeys.length)}件` : 'すべて'}</dd></div></dl></AsideCard>
     </>}
   >
-    <Notice tone="info">{selectedAccount?.name ? `${selectedAccount.name}の担当として追加されます。` : 'この店舗の担当として追加されます。'}</Notice>
+    <Notice tone="info">{selectedAccount?.name ? `${selectedAccount.name}のみを閲覧・操作できる担当者として追加されます。` : 'この店舗のみを閲覧・操作できる担当者として追加されます。'}</Notice>
     <FormSection step={1} label="どなたを追加するか">
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="名前" htmlFor="staff-name" required error={fields.error('name')}><TextInput {...fields.bind('name')} id="staff-name" value={name} onChange={(e) => setName(e.target.value)} invalid={fields.invalid('name')} /></Field>
@@ -130,33 +116,12 @@ export default function NewStaffPage() {
       <RadioCardGroup legend="役割" className="grid gap-3 lg:grid-cols-3">{ROLES.map((item) => <RadioCard key={item.value} name="staff-role" value={item.value} checked={role === item.value} onChange={(value) => setRole(value as Role)} title={item.label} note={item.note} />)}</RadioCardGroup>
     </FormSection>
 
-    <FormSection step={3} label="最初に表示するLINEアカウント" note="ログイン直後の表示だけを決めます。組織内のほかのアカウントにも切り替えて操作できます。">
-      <Field label="最初に表示するアカウント" htmlFor="staff-account" required>
-        <EntitySelect
-          id="staff-account"
-          aria-label="最初に表示するアカウント"
-          size="full"
-          value={assignedLineAccountId}
-          error={fields.error('account') ?? undefined}
-          onChange={(value) => { fields.touch('account'); setAssignedLineAccountId(value) }}
-          options={[
-            { value: '', label: '選択してください' },
-            ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name })),
-          ]}
-        />
-      </Field>
-      <Checkbox checked={inheritAccounts} onCheckedChange={setInheritAccounts} className="mt-4">
-        この店舗より下のアカウントにも権限を付ける
-      </Checkbox>
-      <p className="mt-2 text-xs text-ink-faint">担当範囲は{selectedAccount?.name ? `${selectedAccount.name}のみ` : 'この店舗のみ'}です。上のチェックを入れない限り、下のアカウントは付きません。</p>
-    </FormSection>
-
-    {role === 'staff' && <FormSection step={4} label="スタッフに表示する機能" note="選択した機能だけが左のメニューに表示され、操作できます。">
+    {role === 'staff' && <FormSection step={3} label="スタッフに表示する機能" note="選択した機能だけが左のメニューに表示され、操作できます。">
       {fields.error('permissions') ? <p className="text-danger text-xs" role="alert">{fields.error('permissions')}</p> : null}
       <div className="space-y-4">{PERMISSION_GROUPS.map((group) => <div key={group.label}><p className="mb-2 text-xs font-semibold text-ink-faint">{group.label}</p><div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">{group.items.map(([key, label]) => <Checkbox key={key} checked={permissionKeys.includes(key)} onCheckedChange={() => togglePermission(key)}>{label}</Checkbox>)}</div></div>)}</div>
     </FormSection>}
 
-    <FormSection step={role === 'staff' ? 5 : 4} label="通知先" note="通知の種類ごとに、メールとLINEへの送信を切り替えます。">
+    <FormSection step={role === 'staff' ? 4 : 3} label="通知先" note="通知の種類ごとに、メールとLINEへの送信を切り替えます。">
       <Card frame="inset" className="divide-hairline overflow-hidden divide-y">{NOTIFICATIONS.map(([key, label, note]) => <div key={key} className="grid grid-cols-[1fr_auto_auto] items-center gap-5 px-4 py-3"><div><p className="text-sm font-medium text-ink">{label}</p><p className="text-xs text-ink-faint">{note}</p></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>メール</span><NotificationSwitch checked={notifications[key].email} onChange={() => toggleChannel(key, 'email')} label={`${label}をメールで通知`} /></div><div className="flex items-center gap-2 text-xs text-ink-secondary"><span>LINE</span><NotificationSwitch checked={notifications[key].line} onChange={() => toggleChannel(key, 'line')} label={`${label}をLINEで通知`} /></div></div>)}</Card>
     </FormSection>
   </CreatePage>

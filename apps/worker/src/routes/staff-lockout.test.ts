@@ -123,8 +123,8 @@ describe('スタッフの店舗権限範囲', () => {
     expect(await res.json()).toMatchObject({ error: { message: '担当範囲を選んでください' } });
   });
 
-  it('全店舗では紐付けを空にして保存する', async () => {
-    const res = await send('/api/staff', 'POST', invitation('all', ['line-1']));
+  it('統括からの招待は全店舗の紐付けを空にして保存する', async () => {
+    const res = await send('/api/staff', 'POST', { ...invitation('all', ['line-1']), assignedLineAccountId: null, managementContext: 'hq' });
     expect(res.status).toBe(201);
     // 本人と担当範囲は同じ取引で書く。範囲は作成の第2引数で渡す。
     expect(dbMocks.createStaffMemberWithScopes).toHaveBeenCalledWith(
@@ -132,11 +132,59 @@ describe('スタッフの店舗権限範囲', () => {
     );
   });
 
-  it('指定店舗を2つ保存する', async () => {
-    const res = await send('/api/staff', 'POST', invitation('accounts', ['line-1', 'line-2']));
+  it('統括の権限者は初期表示アカウントなしで招待できる', async () => {
+    const res = await send('/api/staff', 'POST', {
+      ...invitation('all', []), assignedLineAccountId: null, managementContext: 'hq',
+    });
     expect(res.status).toBe(201);
     expect(dbMocks.createStaffMemberWithScopes).toHaveBeenCalledWith(
-      env.DB, expect.objectContaining({ account_scope: 'accounts' }), ['line-1', 'line-2'],
+      env.DB, expect.objectContaining({ account_scope: 'all', assigned_line_account_id: null }), [],
+    );
+  });
+
+  it('店舗の権限者は担当アカウントなしで招待できない', async () => {
+    const res = await send('/api/staff', 'POST', {
+      ...invitation('accounts', ['line-1']), assignedLineAccountId: null,
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.createStaffMemberWithScopes).not.toHaveBeenCalled();
+  });
+
+  it('統括の権限者から既定アカウントを外しても全体権限を保つ', async () => {
+    const res = await send('/api/staff/target', 'PATCH', {
+      assignedLineAccountId: null, accountScope: 'all', scopedLineAccountIds: [], managementContext: 'hq',
+    });
+    expect(res.status).toBe(200);
+    expect(dbMocks.updateStaffMember).toHaveBeenCalledWith(
+      env.DB, 'target', expect.objectContaining({ assigned_line_account_id: null, account_scope: 'all' }),
+    );
+  });
+
+  it('店舗の担当範囲で既定アカウントを空にする変更を拒否する', async () => {
+    const res = await send('/api/staff/target', 'PATCH', {
+      assignedLineAccountId: null, accountScope: 'accounts', scopedLineAccountIds: ['line-1'],
+    });
+    expect(res.status).toBe(400);
+    expect(dbMocks.updateStaffMember).not.toHaveBeenCalled();
+  });
+
+  it('店舗からの招待で別の店舗を追加できない', async () => {
+    const res = await send('/api/staff', 'POST', invitation('accounts', ['line-1', 'line-2']));
+    expect(res.status).toBe(400);
+    expect(dbMocks.createStaffMemberWithScopes).not.toHaveBeenCalled();
+  });
+
+  it('店舗からの招待で配下の店舗まで許可できない', async () => {
+    const res = await send('/api/staff', 'POST', { ...invitation('accounts', ['line-1']), canAccessDescendantAccounts: true });
+    expect(res.status).toBe(400);
+    expect(dbMocks.createStaffMemberWithScopes).not.toHaveBeenCalled();
+  });
+
+  it('店舗からの招待は担当店舗1件だけを保存する', async () => {
+    const res = await send('/api/staff', 'POST', invitation('accounts', ['line-1']));
+    expect(res.status).toBe(201);
+    expect(dbMocks.createStaffMemberWithScopes).toHaveBeenCalledWith(
+      env.DB, expect.objectContaining({ account_scope: 'accounts', assigned_line_account_id: 'line-1', can_access_descendant_accounts: false }), ['line-1'],
     );
   });
 
@@ -250,14 +298,14 @@ describe('スタッフ招待の統括', () => {
       name: '招待する担当者',
       email: 'invitee@example.test',
       role: 'staff',
-      assignedLineAccountId: 'line-1', accountScope: 'all', scopedLineAccountIds: [],
+      assignedLineAccountId: 'line-1', accountScope: 'accounts', scopedLineAccountIds: ['line-1'],
     }, 'inviter-key');
 
     expect(res.status).toBe(201);
     expect(dbMocks.createStaffMemberWithScopes).toHaveBeenCalledWith(
       env.DB,
       expect.objectContaining({ tenant_id: 'tenant-inviter' }),
-      [],
+      ['line-1'],
     );
   });
 
@@ -271,7 +319,7 @@ describe('スタッフ招待の統括', () => {
     dbMocks.createStaffMemberWithScopes.mockResolvedValue(row({ id: 'new-b', role: 'staff', is_active: 0, tenant_id: 'tenant-b' }));
 
     const res = await send('/api/staff', 'POST', {
-      name: '統括Bの担当者', email: 'shared@example.test', role: 'staff', assignedLineAccountId: 'line-b', accountScope: 'all', scopedLineAccountIds: [],
+      name: '統括Bの担当者', email: 'shared@example.test', role: 'staff', assignedLineAccountId: 'line-b', accountScope: 'accounts', scopedLineAccountIds: ['line-b'],
     }, 'tenant-b-key');
 
     expect(res.status).toBe(201);
