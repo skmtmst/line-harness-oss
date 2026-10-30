@@ -1,4 +1,6 @@
 'use client'
+import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog } from '@/v8/dashboard/public/first-steps/index'
+import { canManageRole } from '@/lib/staff-role'
 import CalendarPeriod from '@/components/shared/calendar-period'
 import { formatYen } from '@line-crm/shared';
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -97,6 +99,7 @@ function Kpi({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
 export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const { cfg, router, tab, subTab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, setCardDefaults, roster, rosterRow, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, KIND, saveClosure, addNew } = useStyleDashboard(style)
 
+  const start = useFirstSteps(accountId || null, role, { style })
   const emptyBookingState = today ? bookingEmptyState(style, today) : null
   const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && (emptyBookingState === 'no-bookings' || emptyBookingState === 'no-classes')
   const writeLock = role === null ? undefined : lockUnless(canWrite)
@@ -224,6 +227,9 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <div className={styles.head}>{filters}</div>
       <div className={styles.inset}>
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
+        {role !== null && (start.summary || start.error) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'}
+          onRecheck={start.watchExpired ? start.rewatch : undefined}
+          feedback={start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : undefined} /> : null}
         {metricSelectionFallback ? <Notice tone="info" action={<Button onClick={reloadPresentation}>表示設定を読み直す</Button>}>保存した表示設定を確認できないため、業種の初期表示にしています。</Notice> : null}
         {today && today.kpis.length === 0 ? null : <KpiBand layout="link-row" maxColumns={5} data-style-dashboard={style}>
           {(today?.kpis ?? []).map((kpi) => <Kpi key={kpi.id} kpi={kpi} onPreparing={openPayment} />)}
@@ -269,6 +275,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         }}
         overlapMessage={(input) => `〇〇さま　${input.date.slice(5).replace('-', '/')} はお店の都合でお休みをいただくことになりました。ご予約の日を変えるか、取り消すかを選んでください。`}
         mediaNote={style === 'restaurant' ? '他の予約サイトの同じ時間の枠は、それぞれの管理画面で閉じてください。' : null} />
+      {start.arrived && accountId && canManageRole(role) ? <FirstRunDoneDialog accountId={accountId} style={style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
       {preparing.dialog}
       {cancelRow ? (
         <CancelReservationDialog open title={`${withHonorific(cancelRow.name, 'さま')}の予約を取り消しますか？`} subtitle={[cancelRow.time, cancelRow.people ? `${formatNumber(cancelRow.people)}名` : null, cancelRow.seat ?? cancelRow.staff, cancelRow.course].filter(Boolean).join('・')}
