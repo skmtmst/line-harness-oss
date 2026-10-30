@@ -104,14 +104,13 @@ describe('頭の3つの印と保存した検索', () => {
     vi.unstubAllGlobals()
   })
 
-  it('3つの印に字と吹き出しが付く（F12）', async () => {
+  it('3つの印は字なしのアイコンだけで吹き出しが付く（F12・オーナー指摘）', async () => {
     await act(async () => root.render(<ChatsPage />))
     for (const label of ['絞り込み', '保存した検索', '対応ルール']) {
       const button = host.querySelector(`button[aria-label="${label}"]`) as HTMLButtonElement | null
       expect(button).not.toBeNull()
-      // 見える字（印の下の小さな字）。印だけの時は span が無い。
-      const caption = [...button!.querySelectorAll(':scope > span')].find((span) => span.textContent === label)
-      expect(caption).not.toBeUndefined()
+      // 見える字は無い（アイコンだけ）。名前は読み上げ名と吹き出しで出す。
+      expect(button!.textContent).toBe('')
       expect(button!.getAttribute('title')).toBe(label)
     }
   })
