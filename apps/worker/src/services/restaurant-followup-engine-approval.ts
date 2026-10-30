@@ -1,3 +1,4 @@
+import { hasDatabaseTable } from './schema-presence.js';
 import { activeTenantLineAccountSql, type V6WriteGuard } from '@line-crm/db';
 import { buildExecutionPlan, parseActions, type ActionDefinition } from '../features/automations/automation-plan/index.js';
 
@@ -91,7 +92,7 @@ async function readFollowupEngineGateUncached(db: D1Database, input: {
   executionPlanJson?: string | null;
 }): Promise<FollowupEngineGate> {
   // Workerを先に出す段階では対応表がまだ無く、管理する実物もまだ存在しない。
-  if (!await hasFollowupTargets(db))
+  if (!await hasDatabaseTable(db,'rt_store_followup_targets'))
     return {managed:false,allowed:true};
   const column = input.engine === 'reminder' ? 'reminder_id' : 'automation_id';
   const target = await db.prepare(`SELECT store_id,trigger FROM rt_store_followup_targets WHERE ${column}=?`)
@@ -126,13 +127,6 @@ async function readFollowupEngineGateUncached(db: D1Database, input: {
   return {managed:true,allowed:true,storeId:target.store_id,trigger:target.trigger,snapshot,guard:{sql,binds}};
 }
 
-const schemaPresence=new WeakMap<D1Database,{present:boolean;checkedAt:number}>();
-async function hasFollowupTargets(db:D1Database):Promise<boolean>{
-  const saved=schemaPresence.get(db);
-  if(saved&&(saved.present||Date.now()-saved.checkedAt<5000))return saved.present;
-  const present=!!await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='rt_store_followup_targets'").first();
-  schemaPresence.set(db,{present,checkedAt:Date.now()});return present;
-}
 export type FollowupApprovalScope=Map<string,Promise<FollowupEngineGate>>;
 /** 同じ実行では写しを共有し、許可の結果でなくSQLの証明を毎回照合する。 */
 export async function readFollowupEngineGate(db:D1Database,input:Parameters<typeof readFollowupEngineGateUncached>[1],scope?:FollowupApprovalScope):Promise<FollowupEngineGate>{

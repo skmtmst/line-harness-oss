@@ -4,7 +4,7 @@ import { validateClosure, publicClosure, closurePreview, type ClosureRow } from 
 import { readCloseNotificationSettings, saveCloseNotificationSettings } from '../services/restaurant-close-settings.js';
 import { StampError } from '../services/visit-stamps.js';
 import { updateRestaurantFollowupBinding } from './restaurant-followup-binding.js';
-import { putRestaurantFollowupRow, get__api_restaurant_test_followups_storeId_15 } from './restaurant-followup-row.js';
+import { putRestaurantFollowupSetup, putRestaurantFollowupRow, get__api_restaurant_test_followups_storeId_15 } from './restaurant-followup-row.js';
 import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
@@ -173,6 +173,7 @@ restaurantTest.put('/api/restaurant-test/gbp/reviews/:id/draft', requireRole('ow
 
 restaurantTest.get('/api/restaurant-test/followups/:storeId',requireRole('owner','admin','staff'),get__api_restaurant_test_followups_storeId_15);
 
+restaurantTest.put('/api/restaurant-test/followups/:storeId/setup',requireRole('owner','admin'),inputJsonBoundary(),putRestaurantFollowupSetup);
 restaurantTest.put('/api/restaurant-test/followups/:storeId/rows/:trigger',requireRole('owner','admin'),inputJsonBoundary(),putRestaurantFollowupRow);
 
 // 同じ共通シナリオの行へ保存し、既存トリガーで旧承認を失効させる。
