@@ -1,9 +1,9 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 
 import { notifySaved } from '@/components/shared/toast'
 import { type ComponentProps, type CSSProperties, type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
-import { ApiError } from '@/lib/api'
 import {
   restaurantTestApi,
   type ReservationQuery,
@@ -199,7 +199,7 @@ export default function RestaurantFrame({
       notifySaved(success)
       return true
     } catch (error) {
-      setNotice({ tone: 'error', text: error instanceof ApiError ? error.message : '保存できませんでした。' })
+      setNotice({ tone: 'error', text: describeApiFailure(error, '保存') })
       return false
     } finally {
       setBusy(false)

@@ -54,7 +54,8 @@ const scenario = vi.hoisted(() => ({
 }))
 
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ status: 'ready', enabled: () => true }) }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   ApiError: class ApiError extends Error {
     status: number
     constructor(status: number, message?: string) {

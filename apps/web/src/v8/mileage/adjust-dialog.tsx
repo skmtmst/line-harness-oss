@@ -12,7 +12,7 @@ import { formatNumber } from '@/lib/format'
 import { FieldError } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
 import styles from './mileage.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { permissionDeniedMessage, describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -35,7 +35,7 @@ import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/comp
 /** 手でマイルを動かすときの失敗の言葉（app/mileage/friends/detail/mileage-adjustment-dialog.tsx から写した）。 */
 export function mileageAdjustmentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 400) return error.message
+    if (error.status === 400) return japaneseDetailOf(error) || describeApiFailure(error, '入力内容の確認')
     if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 404) return '対象の友だちまたはLINEアカウントを確認できませんでした。'
     if (error.status === 405) return 'この環境ではマイル変更を実行できません。'
@@ -241,7 +241,7 @@ export default function MileageAdjustDialog({
 
       { if (!fieldFailure)
 
-      setError(caught instanceof ApiError ? caught.message : '通知を再送できませんでした。時間をおいてもう一度お試しください。') }
+      setError(describeApiFailure(caught, '通知の再送')) }
     } finally {
       setRetrying(false)
     }
