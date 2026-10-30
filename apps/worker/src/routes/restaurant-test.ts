@@ -1,10 +1,11 @@
+import { registerRestaurantSetupProgressRoutes } from './restaurant-setup-progress.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateClosure, publicClosure, closurePreview, type ClosureRow } from '../services/restaurant-closures.js';
 
 import { readCloseNotificationSettings, saveCloseNotificationSettings } from '../services/restaurant-close-settings.js';
 import { StampError } from '../services/visit-stamps.js';
 import { updateRestaurantFollowupBinding } from './restaurant-followup-binding.js';
-import { putRestaurantFollowupRow, get__api_restaurant_test_followups_storeId_15 } from './restaurant-followup-row.js';
+import { putRestaurantFollowupSetup, putRestaurantFollowupRow, get__api_restaurant_test_followups_storeId_15 } from './restaurant-followup-row.js';
 import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
@@ -44,6 +45,8 @@ restaurantTest.use('/api/restaurant-test/*', use__api_restaurant_test__4);
 restaurantTest.get('/api/restaurant-test/assignment-settings', requireRole('owner', 'admin', 'staff'), get__api_restaurant_test_assignment_settings_5);
 
 restaurantTest.put('/api/restaurant-test/assignment-settings', requireRole('owner', 'admin', 'staff'), requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), put__api_restaurant_test_assignment_settings_6);
+
+registerRestaurantSetupProgressRoutes(restaurantTest);
 
 restaurantTest.get('/api/restaurant-test/stores', requireRole('owner', 'admin', 'staff'), get__api_restaurant_test_stores_7);
 
@@ -173,6 +176,7 @@ restaurantTest.put('/api/restaurant-test/gbp/reviews/:id/draft', requireRole('ow
 
 restaurantTest.get('/api/restaurant-test/followups/:storeId',requireRole('owner','admin','staff'),get__api_restaurant_test_followups_storeId_15);
 
+restaurantTest.put('/api/restaurant-test/followups/:storeId/setup',requireRole('owner','admin'),inputJsonBoundary(),putRestaurantFollowupSetup);
 restaurantTest.put('/api/restaurant-test/followups/:storeId/rows/:trigger',requireRole('owner','admin'),inputJsonBoundary(),putRestaurantFollowupRow);
 
 // 同じ共通シナリオの行へ保存し、既存トリガーで旧承認を失効させる。

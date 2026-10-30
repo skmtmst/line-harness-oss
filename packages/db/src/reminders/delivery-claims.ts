@@ -25,10 +25,12 @@ export async function claimReminderDeliveryRun(
      * 握る。未指定なら従来どおり起点を問わない。
      */
     expectedTargetDate?: string | null;
+    /** 指定時は起点と本文の写しを表すキー。変更後に古い要求を再送しない。 */
+    idempotencyKey?: string;
   },
 ): Promise<ReminderDeliveryRunRow | null> {
   const id = crypto.randomUUID();
-  const idempotencyKey = crypto.randomUUID();
+  const idempotencyKey = input.idempotencyKey ?? crypto.randomUUID();
   const lineRetryKey = crypto.randomUUID();
   await db.prepare(
     `INSERT OR IGNORE INTO reminder_delivery_runs
@@ -50,12 +52,23 @@ export async function claimReminderDeliveryRun(
     input.now,
   ).run();
 
+  if(input.idempotencyKey){
+    // 外部へ一度も出していない予定だけ、新しい起点の要求へ置き換えられる。
+    await db.prepare(`UPDATE reminder_delivery_runs SET idempotency_key=? WHERE friend_reminder_id=? AND reminder_step_id=?
+      AND scheduled_at=? AND status='queued' AND attempt_count=0 AND sent_message_content IS NULL`)
+      .bind(input.idempotencyKey,input.friendReminderId,input.reminderStepId,input.scheduledAt).run();
+    await db.prepare(`UPDATE reminder_delivery_runs SET status='permanent_failed',last_error_code='restaurant_source_changed',
+      last_error_message='予約や承認の内容が変わったため自動では再送しません。',lease_expires_at=NULL,next_retry_at=NULL,completed_at=?,updated_at=?
+      WHERE friend_reminder_id=? AND reminder_step_id=? AND scheduled_at=? AND idempotency_key<>?
+        AND status IN ('queued','retry_wait')`)
+      .bind(input.now,input.now,input.friendReminderId,input.reminderStepId,input.scheduledAt,input.idempotencyKey).run();
+  }
   const row = await db.prepare(
     `SELECT * FROM reminder_delivery_runs
       WHERE friend_reminder_id = ? AND reminder_step_id = ? AND scheduled_at = ?`,
   ).bind(input.friendReminderId, input.reminderStepId, input.scheduledAt)
     .first<ReminderDeliveryRunRow>();
-  if (!row) return null;
+  if (!row || input.idempotencyKey && row.idempotency_key !== input.idempotencyKey) return null;
 
   // Reclaiming a lease cannot establish that a physical send never happened.
   // Keep the original run/key and hold it for reconciliation instead of sending.

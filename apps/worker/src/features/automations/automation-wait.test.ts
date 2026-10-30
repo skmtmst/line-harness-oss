@@ -23,13 +23,17 @@ async function startWait(params: Record<string, unknown>, eventType = 'friend_ad
   t.raw.prepare(`INSERT INTO automation_versions(id,automation_id,version_number,status,trigger_type,action_config,published_at)
     VALUES('v','auto',1,'published',?,?,?)`).run(eventType, JSON.stringify(actions), createdAt);
   t.raw.exec("UPDATE automation_definitions SET current_published_version_id='v' WHERE id='auto'");
+  if (eventType.startsWith('restaurant.') && sourceId === 'event') sourceId = 'rt:r:2:restaurant.departed';
   const result = await startAutomationRun(t.db, { lineAccountId: 'a', automationId: 'auto', sourceEventId: sourceId,
     idempotencyKey: sourceId, friendId: 'f', inputEvent: { type: eventType }, conditionMatched: true, now: createdAt });
   return result.runId!;
 }
 function origin(at = '2026-03-07T22:00:00Z') {
-  t.raw.prepare(`INSERT INTO rt_reservation_events(id,store_id,event_type,reservation_version,occurred_at,request_id,line_account_id,friend_id,payload_json)
-    VALUES('event','s','restaurant.departed',1,?,'request','a','f','{}')`).run(at);
+  t.raw.prepare(`INSERT INTO rt_reservations(id,store_id,source,customer_name,line_uid,guest_count,starts_at,ends_at,status)
+    VALUES('r','s','line','友だち','UID',2,?,?,'confirmed')`).run(new Date(Date.parse(at)-7200000).toISOString(),new Date(Date.parse(at)-1800000).toISOString());
+  t.raw.prepare("INSERT INTO rt_seat_visit_marks(id,reservation_id,store_id,kind,marked_at) VALUES('visit','r','s','visited',?)").run(new Date(Date.parse(at)-3600000).toISOString());
+  t.raw.prepare("UPDATE rt_reservations SET status='visited',departed_at=?,customer_version=customer_version+1 WHERE id='r'").run(at);
+  t.raw.prepare("UPDATE rt_reservation_events SET occurred_at=? WHERE id='rt:r:2:restaurant.departed'").run(at);
 }
 const runState = (id: string) => t.raw.prepare('SELECT status,resume_at FROM automation_runs WHERE id=?').get(id);
 
@@ -89,9 +93,9 @@ it.each(['missing', 'account', 'friend', 'type'])('飲食の出来事が一致�
     if (kind === 'type') t.raw.exec("UPDATE rt_reservation_events SET event_type='restaurant.arrived'");
   }
   const id = await startWait({ mode: 'next_day', sendAtTime: '10:00' }, 'restaurant.departed'), record = vi.fn(async () => {});
-  expect(await processAutomationRun(t.db, id, { now: startAt, executors: { record } })).toBe('failed');
+  expect(id).toBeNull();
   expect(record).not.toHaveBeenCalled();
-  expect(t.raw.prepare('SELECT error_code FROM automation_run_steps WHERE step_key=?').get('wait')).toEqual({ error_code: 'wait_origin_not_found' });
+  expect(t.raw.prepare('SELECT count(*) AS total FROM automation_runs').get()).toEqual({ total: 0 });
 });
 it.each([{ durationMinutes: 30 }, { mode: 'next_day', sendAtTime: '10:15' }])('下書きと共通アクションの両方で保存して読み直せる: %j', async (params) => {
   const created = await createAutomationDraftFromTemplate(t.db, { templateKey: 'received-message-tag', lineAccountId: 'a', operationKey: 'wait-edit-operation' });

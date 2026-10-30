@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
@@ -195,4 +195,16 @@ it('本人が別のownerへ替わっても古い下書き削除は使わず、�
   expect(calls.draftDelete).toHaveBeenCalledTimes(1)
   expect(calls.draftDelete).toHaveBeenCalledWith('a', 'scenario:sc-a:first-step', 'version-a')
   expect(calls.update).not.toHaveBeenCalled(); expect(calls.add).not.toHaveBeenCalled()
+})
+
+
+it('スタンプを復元して別の物を選ぶと、LINEの下見も同じ画像へ変わり、書込はしない', async () => {
+  calls.read.mockResolvedValue({ success: true, data: { ...row(), steps: [{ ...step, messageType: 'sticker', messageContent: JSON.stringify({ packageId: '789', stickerId: '10855' }) }] } })
+  const view = render(<FirstStep />)
+  const preview = await screen.findByRole('region', { name: 'LINEでの見え方' })
+  await waitFor(() => expect(within(preview).getByRole('img', { name: 'スタンプ', exact: true }).getAttribute('src')).toContain('/10855/android/sticker.png'))
+  fireEvent.click(screen.getByRole('button', { name: 'はい', exact: true }))
+  expect(within(preview).getByRole('img', { name: 'スタンプ', exact: true }).getAttribute('src')).toContain('/10856/android/sticker.png')
+  expect(calls.update).not.toHaveBeenCalled(); expect(calls.add).not.toHaveBeenCalled()
+  view.unmount()
 })

@@ -19,6 +19,7 @@ const PERMISSION = read('..', '..', 'components', 'automations', 'use-can-manage
 const API = readApi('..', '..', 'lib', 'api.ts')
 // Workerの分岐・参照版・保管の動きは services/common-actions.test.ts の実DB試験で守る。
 const ENGINE = read('..', '..', '..', '..', 'worker', 'src', 'features', 'automations', 'automation-engine.ts')
+const PLAN = read('..', '..', '..', '..', 'worker', 'src', 'features', 'automations', 'automation-plan.ts')
 const FOUNDATION = read('..', '..', '..', '..', '..', 'packages', 'db', 'migrations', '181_automation_v6_foundation.sql')
 
 describe("管理画面共通アクションの画面契約", () => {
@@ -49,7 +50,7 @@ describe("管理画面共通アクションの画面契約", () => {
     expect(BRANCH_EDITOR).toContain('条件の組み合わせ')
     expect(BRANCH_EDITOR).toContain('当てはまるとき')
     expect(BRANCH_EDITOR).toContain('当てはまらないとき')
-    expect(ENGINE).toContain("type: 'branch_marker'")
+    expect(PLAN).toContain("type: 'branch_marker'")
     expect(ENGINE).toContain('branch_not_selected')
   })
 

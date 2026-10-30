@@ -1,6 +1,6 @@
 import { snapshotReminderTemplateVersions } from '../reminder-template-snapshot.js';
 import { jstNow } from '../utils.js';
-import { type FriendFieldReminderRow, type FriendReminderRow } from './types.js';
+import { type V6WriteGuard, type FriendFieldReminderRow, type FriendReminderRow } from './types.js';
 import { getReminderById } from './definitions.js';
 import { ensureReminderPublishedVersion, getReminderVersionSteps } from './versions.js';
 
@@ -166,6 +166,7 @@ export async function enrollFriendsInReminderOnce(
   db: D1Database,
   reminderId: string,
   candidates: Array<{ friendId: string; targetDate: string }>,
+  policy?: { sourceFingerprint:string; writeGuard:V6WriteGuard },
 ): Promise<number> {
   if (candidates.length === 0) return 0;
   const reminder = await getReminderById(db, reminderId);
@@ -194,7 +195,9 @@ export async function enrollFriendsInReminderOnce(
         candidate.targetDate,
       );
     }
-    bindings.push(reminderId, versionId, bulkTemplateSnapshot, now, now);
+    bindings.push(reminderId, versionId, policy
+      ? JSON.stringify({...JSON.parse(bulkTemplateSnapshot??'{}'),__source:{fingerprint:policy.sourceFingerprint}})
+      : bulkTemplateSnapshot, now, now);
 
     const result = await db.prepare(
       `WITH candidates(id, friend_id, target_date) AS (VALUES ${values})
@@ -208,8 +211,8 @@ export async function enrollFriendsInReminderOnce(
            WHERE existing.friend_id = c.friend_id
              AND existing.reminder_id = ?
              AND existing.target_date = c.target_date
-        )`,
-    ).bind(...bindings, reminderId).run();
+        )${policy?` AND (${policy.writeGuard.sql})`:''}`,
+    ).bind(...bindings, reminderId,...(policy?.writeGuard.binds??[])).run();
     enrolled += Number(result.meta?.changes ?? 0);
   }
 

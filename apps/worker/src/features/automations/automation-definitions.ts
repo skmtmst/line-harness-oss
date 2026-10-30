@@ -1,3 +1,4 @@
+import { readFollowupEngineGate } from '../../services/restaurant-followup-engine-approval.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { processAutomationRun, resolveCommonActionVersion, startAutomationRun, type ActionDefinition } from './automation-engine.js';
 import { type RunStatus } from './run-types.js';
@@ -460,6 +461,9 @@ export async function runAutomationTest(
    * `cancelAutomationRunBeforeSend` の注釈）。
    */
   const version = await requireCurrentVersion(db, input, { requireFingerprint: true });
+  if((await readFollowupEngineGate(db,{engine:'automation',targetId:input.automationId,lineAccountId:input.lineAccountId,versionId:version.version_id})).managed)
+    throw new AutomationDefinitionError('version_conflict','来店フォローの試し送りは、専用画面から登録済みのテスト送信先へ行ってください');
+
   /*
    * 確認時に見せた共通アクションの版が、いま解決される版と同じか。
    * 束の切り替えは下書きの版・指紋を変えないので、ここで別に照合する。
