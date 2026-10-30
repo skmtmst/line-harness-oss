@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import type { Hono } from 'hono';
 import type { RestaurantSetupProgress } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -7,8 +7,7 @@ import { dbFor } from '../services/db-router.js';
 import { hasOrganizationSelector, organizationFor, requiredAccount, storeBelongsTo } from './restaurant-test-definition.js';
 
 /** 一覧の上限や満席に左右されず、選択店舗の設定の実物だけを読む。書込・送信をしない。 */
-export function createRestaurantSetupProgressRoutes() {
-  const routes = new Hono<Env>();
+export function registerRestaurantSetupProgressRoutes(routes: Hono<Env>) {
   routes.get('/api/restaurant-test/setup-progress', requireRole('owner', 'admin', 'staff'), async (c) => {
     if (!hasOrganizationSelector(c)) return requiredAccount(c);
     const organization = await organizationFor(c);
@@ -42,5 +41,4 @@ export function createRestaurantSetupProgressRoutes() {
     c.header('Cache-Control', 'no-store');
     return c.json({ success: true, data });
   });
-  return routes;
 }
