@@ -273,7 +273,7 @@ export default function SnsSettingsPage() {
                     <>
                       <Button variant="primary" onClick={() => void connectInstagram()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
                         <Link2 size={16} aria-hidden />
-                        Instagram にログインして接続する
+                        接続する
                       </Button>
                     </>
                   )}

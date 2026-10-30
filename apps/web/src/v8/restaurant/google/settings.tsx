@@ -8,7 +8,6 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import StatusBadge from '@/components/shared/status-badge'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import { errorMessage, formatYmd } from './format'
 import styles from './google.module.css'
@@ -93,7 +92,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
   if (connection.status === 'disconnected') {
     return (
       <SaveErrorScope errors={saveErrors}><div className={styles.connectionPanel}>
-        <SectionHeader size="small" title={<span id="google-connect-title">Googleアカウントを接続 <StatusBadge tone="neutral">未接続</StatusBadge></span>} />
+        <SectionHeader size="small" title={<span id="google-connect-title">Googleアカウントを接続</span>} />
         <p className={styles.preText}>{'店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。'}</p>
         {!data.oauthConfigured ? <Notice tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</Notice> : null}
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}

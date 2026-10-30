@@ -24,7 +24,7 @@
 - 口：`GET /api/instagram/connection`（`api.instagram.connection`）。
 - 説明：「Googleビジネスの投稿を、Instagram にも同時に出せます」。
 - 状態の札：接続済み／未接続／接続の異常／未設定。
-- 未接続・認可切れ：注記「Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。」＋［Instagram にログインして接続］（主ボタン・管理できる人だけ）。押すと `POST /api/instagram/oauth/start` で受け取った URL へ飛ぶ。**ページを選ぶ段は出さない**（利用者の決め：Instagram にログインするだけでつながる）。
+- 未接続・認可切れ：注記「Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。」＋［接続する］（主ボタン・管理できる人だけ）。押すと `POST /api/instagram/oauth/start` で受け取った URL へ飛ぶ。**ページを選ぶ段は出さない**（利用者の決め：Instagram にログインするだけでつながる）。
 - 認可切れのときは右端に［接続を解除する］も出す。
 - 接続済み：行「接続しているアカウント」＝`@ユーザー名（ビジネス）`、行「できること」＝「写真つき投稿の同時公開」。ボタンの行は［接続を確かめる］（`POST /api/instagram/refresh`）＋右端に［接続を解除する］（確認の小窓 → `DELETE /api/instagram/connection`・`expectedVersion` に `connection.version` を渡す）。
 - 「設定がありません」（`unconfigured`／この環境に Meta の設定が無い）：注記だけを出し、**押せないボタンは置かない**（「出す＝使える」）。
