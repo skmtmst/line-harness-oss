@@ -14,6 +14,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 const identity = vi.hoisted(() => ({ role: 'owner' as string | null }))
 const templateGet = vi.hoisted(() => vi.fn())
 const assetList = vi.hoisted(() => vi.fn())
+const assetFolderCreate = vi.hoisted(() => vi.fn())
 const searchParams = vi.hoisted(() => ({ value: new URLSearchParams() }))
 
 const TEMPLATES = [
@@ -51,7 +52,7 @@ vi.mock('@/lib/api', () => ({
     },
     broadcastMessageAssets: {
       list: assetList,
-      folders: { list: async () => ({ success: true, data: [] }), create: vi.fn() },
+      folders: { list: async () => ({ success: true, data: [] }), create: assetFolderCreate },
       counts: () => Promise.resolve({ success: true, data: { card_message: 0, rich_message: 0, coupon: 0, research: 0 } }),
     },
     folders: {
@@ -105,6 +106,7 @@ beforeEach(() => {
   searchParams.value = new URLSearchParams()
   templateGet.mockReset()
   assetList.mockReset()
+  assetFolderCreate.mockReset()
   assetList.mockImplementation(() => Promise.resolve({ success: true, data: ASSETS }))
   templateGet.mockImplementation((id: string) => Promise.resolve({
     success: true,
@@ -354,5 +356,39 @@ describe('質問テンプレート画面のstaffゲート (N-144)', () => {
     fireEvent.click(screen.getByRole('button', { name: '質問テンプレートの説明' }))
     expect(screen.getByText('質問テンプレートの作成・変更はオーナーと管理者だけができます')).toBeTruthy()
     expect(screen.getByText('一覧で中身を確認できます。')).toBeTruthy()
+  })
+})
+
+describe('資産フォルダ保存の失敗', () => {
+  async function openFolder() {
+    stubRole('owner')
+    await renderListAndWait()
+    fireEvent.click(screen.getByText('クーポン'))
+    await screen.findByText('秋キャンペーン')
+    const column = document.querySelector('[data-template-region="folders"]')!
+    fireEvent.click(within(column as HTMLElement).getByRole('button', { name: 'フォルダを追加する' }))
+    const dialog = await screen.findByRole('dialog', { name: 'フォルダを追加する' })
+    const input = within(dialog).getByRole('textbox', { name: 'フォルダ名' })
+    fireEvent.change(input, { target: { value: '予約' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '追加する' }))
+    return { dialog, input }
+  }
+  test('欄の理由を赤枠と先頭焦点へ返し、値と窓を残す', async () => {
+    assetFolderCreate.mockRejectedValue({ status: 422, fields: { name: '名前を短くしてください' } })
+    const { dialog, input } = await openFolder()
+    expect(await within(dialog).findByText('名前を短くしてください')).toBeTruthy()
+    expect(input.getAttribute('aria-invalid')).toBe('true')
+    await vi.waitFor(() => expect(document.activeElement).toBe(input))
+    expect((input as HTMLInputElement).value).toBe('予約')
+    expect(assetFolderCreate).toHaveBeenCalledWith('account-a', '予約')
+  })
+  test('APIの日本語の理由を残し、再試行で成功した時だけ閉じる', async () => {
+    assetFolderCreate.mockResolvedValueOnce({ success: false, error: '同じ名前のフォルダがあります' })
+    const { dialog } = await openFolder()
+    expect(await within(dialog).findByText('同じ名前のフォルダがあります')).toBeTruthy()
+    assetFolderCreate.mockResolvedValueOnce({ success: true, data: { id: 'asset-folder-new', name: '予約' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: '追加する' }))
+    await vi.waitFor(() => expect(screen.queryByRole('dialog', { name: 'フォルダを追加する' })).toBeNull())
+    expect(assetFolderCreate).toHaveBeenCalledTimes(2)
   })
 })
