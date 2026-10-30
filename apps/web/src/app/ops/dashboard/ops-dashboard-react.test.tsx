@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsDashboardPage from './page'
+import { OPS_READONLY_LOCK_REASON } from '../../../v8/ops/use-ops-read-only'
 import { contractDetail, deltaLabel, minutesLabel, revenueDetail, revenueSourceLabel } from '../../../v8/ops/dashboard/format'
 import { formatBytes, formatYen, formatYenShort, niceCeiling } from '@/components/ops/ops-charts'
 
@@ -145,9 +146,10 @@ describe('画面', () => {
     expect(button?.disabled).toBe(false)
   })
 
-  it('閲覧のみの運営メンバーには Stripe 同期ボタンを出さない', async () => {
+  it('閲覧のみの運営メンバーには Stripe 同期ボタンを押せない形＋理由で出し、押しても口を呼ばない', async () => {
     stubDashboardFetch(async (input: RequestInfo | URL) => {
       const url = String(input)
+      requests.push({ url })
       const body = url.endsWith('/api/ops/me')
         ? { success: true, data: { id: 'staff-2', name: '閲覧担当', email: null, readOnly: true, totpEnabled: true, lineLinked: false, legacy: false, impersonation: null } }
         : { success: true, data: payload }
@@ -155,7 +157,12 @@ describe('画面', () => {
     })
     await act(async () => { root.render(<OpsDashboardPage />) })
     await flush()
-    expect(Array.from(host.querySelectorAll('button')).some((item) => item.textContent?.includes('Stripe と同期'))).toBe(false)
+    const button = Array.from(host.querySelectorAll('button')).find((item) => item.textContent?.includes('Stripe と同期')) as HTMLButtonElement
+    expect(button).toBeTruthy()
+    expect(host.textContent).toContain(OPS_READONLY_LOCK_REASON)
+    await act(async () => { button.click(); await Promise.resolve() })
+    await flush()
+    expect(requests.some((item) => item.url.endsWith('/api/ops/billing/sync'))).toBe(false)
   })
 
   it('同期中はボタンを無効にし、12か月同期の完了後に結果を出してダッシュボードを読み直す', async () => {

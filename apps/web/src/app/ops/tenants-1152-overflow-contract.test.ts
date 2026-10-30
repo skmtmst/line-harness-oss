@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import OpsTenantsV8 from '@/v8/ops/tenants'
 
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), usePathname: () => '/ops/tenants' }))
-vi.mock('@/v8/ops/use-ops-read-only', () => ({ useOpsReadOnly: () => false }))
+vi.mock('@/v8/ops/use-ops-read-only', () => ({ useOpsReadOnly: () => false, useOpsReadOnlyState: () => 'writer' as const }))
 vi.mock('@/lib/api', async importOriginal => ({
   ...await importOriginal<typeof import('@/lib/api')>(),
   api: { ops: { tenants: async () => ({ success: true, summary: { active: 1, trialing: 0, suspended: 0, pastDue: 0 }, data: [{

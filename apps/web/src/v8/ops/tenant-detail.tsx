@@ -22,7 +22,7 @@ import { PageFrame } from '@/components/templates/page-frame'
 import { DashboardColumns } from '@/components/templates/dashboard-page'
 import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
-import { useOpsReadOnly } from './use-ops-read-only'
+import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenant-detail.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -79,7 +79,9 @@ function DetailContent() {
   const [statusDialog, setStatusDialog] = useState<StatusTarget | null>(null)
   const [busy, setBusy] = useState(false)
   const [impersonateConfirm, setImpersonateConfirm] = useState(false)
-  const readOnly = useOpsReadOnly()
+  const access = useOpsReadOnlyState()
+  const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
+  const unknown = access === 'unknown'
 
   const load = useCallback(async () => {
     if (!id) { setError('契約先が指定されていません'); return }
@@ -135,11 +137,11 @@ function DetailContent() {
         band={<TenantOverviewStats detail={detail} />}
         actions={(
           <>
-            {!readOnly && tenant.status === 'active' ? <Button onClick={() => setStatusDialog('archived')}>アーカイブ</Button> : null}
+            {tenant.status === 'active' ? <Button lockedReason={lock} disabled={unknown} onClick={() => setStatusDialog('archived')}>アーカイブ</Button> : null}
             <Button onClick={() => setImpersonateConfirm(true)} disabled={busy || tenant.status === 'archived'}><LogIn aria-hidden="true" />代理ログイン（閲覧のみ）</Button>
-            {readOnly ? null : tenant.status === 'active'
-              ? <Button variant="danger" onClick={() => setStatusDialog('suspended')}>停止</Button>
-              : <Button onClick={() => setStatusDialog('active')}>再開</Button>}
+            {tenant.status === 'active'
+              ? <Button variant="danger" lockedReason={lock} disabled={unknown} onClick={() => setStatusDialog('suspended')}>停止</Button>
+              : <Button lockedReason={lock} disabled={unknown} onClick={() => setStatusDialog('active')}>再開</Button>}
           </>
         )}
       />
@@ -304,9 +306,10 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
   const nameRequirement: FormRequirement = { required: needsName, check: value => !needsName || value === tenantName ? null : '契約先の名前をそのまま入力してください' }
   const reasonRequirement: FormRequirement = { required: true, check: value => value.trim().length >= 4 ? null : '理由を4文字以上で入力してください' }
   const problem = nameRequirement.check(confirmName) ?? reasonRequirement.check(reason)
+  const dialogAccess = useOpsReadOnlyState()
 
   const submit = async () => {
-
+    if (dialogAccess !== 'writer') return
     if (problem) {
       setError(problem)
       return
@@ -328,6 +331,8 @@ function StatusDialog({ tenantId, target, tenantName, onClose, onDone }: { tenan
       tone={needsName ? 'destructive' : 'default'}
       confirmation
       confirmLabel={label}
+      confirmLockedReason={dialogAccess === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined}
+      confirmDisabled={dialogAccess === 'unknown'}
       busy={busy}
       error={error || undefined}
       designNode={target === 'suspended' ? 'okXoi' : undefined}
