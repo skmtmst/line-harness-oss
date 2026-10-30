@@ -1,5 +1,8 @@
 import './pick-field-surface.test.mjs'
 import './kpi-delta-row.test.mjs'
+import './ledger-band-align.test.mjs'
+import './ledger-empty.test.mjs'
+import './restaurant-navigation.test.mjs'
 import './floating-surface.test.mjs'
 import './floating-surface-components.test.mjs'
 import './floating-surface-all.test.mjs'
