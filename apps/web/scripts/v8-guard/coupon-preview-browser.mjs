@@ -24,6 +24,12 @@ export default function couponPreviewClipping() {
       if (Math.abs(a.top - b.top) < 60 && b.left - a.right > gap + 2) findings.push({ kind: 'coupon-media-gap', gap: b.left - a.right })
     }
     for (const row of document.querySelector('#coupon-benefit')?.closest('[data-design-part="card"]')?.querySelectorAll('[data-form-row="compact"]') ?? []) {
+      const numbers = [...row.querySelectorAll('[data-short]')].filter(e => e.getBoundingClientRect().width)
+      for (let i = 1; i < numbers.length; i++) {
+        const a = numbers[i-1].getBoundingClientRect(), b = numbers[i].getBoundingClientRect()
+        const gap = parseFloat(getComputedStyle(row).columnGap) || 0
+        if (Math.abs(a.top-b.top) < 2 && b.left-a.right > gap+2) findings.push({kind:'coupon-compact-gap', gap:b.left-a.right})
+      }
       const columns = [...row.children].filter(e => e.getBoundingClientRect().width)
       const gap = parseFloat(getComputedStyle(row).columnGap) || 0
       for (let i = 1; i < columns.length; i++) {
@@ -36,6 +42,13 @@ export default function couponPreviewClipping() {
       const short = input.closest('[data-short]')
       if (rect.width && (!short || short.getBoundingClientRect().width > 180)) findings.push({kind:'coupon-number-wide', id:input.id, width:rect.width})
     }
+  }
+  const actions = document.querySelector('#coupon-use-actions')
+  const card = actions?.closest('[data-design-part="card"]')
+  if (card) for (const button of card.querySelectorAll('button[data-shared-button]')) {
+    if (!button.textContent.includes('行うことを足す')) continue
+    const rect=button.getBoundingClientRect(), title=actions.getBoundingClientRect()
+    if (rect.width && (Math.abs(rect.left-title.left)>1 || button.getAttribute('data-variant')!=='secondary')) findings.push({kind:'coupon-action-start',gap:rect.left-title.left})
   }
   return findings
 }

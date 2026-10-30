@@ -34,3 +34,32 @@ test('coupon fields keep the shared gap and short numeric width; spacing and wid
     }
   } finally { await browser.close() }
 })
+
+
+test('a shared numeric error stays below its compact row; moving it into a column fails',async()=>{
+ const browser=await connectGuardBrowser()
+ try{
+  const page=await browser.newPage()
+  await page.setContent('<section data-design-part="card"><h2 id="coupon-basics">基本設定</h2></section><section data-design-part="card"><h2 id="coupon-benefit">特典</h2><div data-form-row="compact" style="display:flex;gap:12px"><div id="first"><span data-short style="display:block;width:128px"><input type="number" style="width:100%"></span></div><div><span data-short style="display:block;width:128px"><input type="number" style="width:100%"></span></div></div><p role="alert" style="width:400px">割引後の金額を確認してください</p></section>')
+  assert.deepEqual(await page.evaluate(scan),[])
+  await page.evaluate(()=>document.querySelector('#first').append(document.querySelector('[role="alert"]')))
+  assert.ok((await page.evaluate(scan)).some(f=>f.kind==='coupon-compact-gap'))
+  await page.evaluate(()=>document.querySelector('[data-form-row]').after(document.querySelector('[role="alert"]')))
+  assert.deepEqual(await page.evaluate(scan),[])
+ }finally{await browser.close()}
+})
+
+test('coupon action entry uses the shared border and starts at the heading edge',async()=>{
+ const browser=await connectGuardBrowser()
+ try{
+  const page=await browser.newPage()
+  await page.setContent('<section data-design-part="card" style="padding:24px"><h2 id="coupon-use-actions">使用時の処理</h2><button data-shared-button data-variant="secondary">行うことを足す</button></section>')
+  assert.deepEqual(await page.evaluate(scan),[])
+  await page.locator('button').evaluate(e=>{e.style.marginLeft='19px'})
+  assert.ok((await page.evaluate(scan)).some(f=>f.kind==='coupon-action-start'))
+  await page.locator('button').evaluate(e=>{e.style.marginLeft='';e.setAttribute('data-variant','text')})
+  assert.ok((await page.evaluate(scan)).some(f=>f.kind==='coupon-action-start'))
+  await page.locator('button').evaluate(e=>{e.setAttribute('data-variant','secondary')})
+  assert.deepEqual(await page.evaluate(scan),[])
+ }finally{await browser.close()}
+})

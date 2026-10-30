@@ -594,7 +594,7 @@ describe('V8 テンプレートの公開と送信の違い', () => {
 describe('V8 クーポン・リサーチ：保存のあと', () => {
   it('クーポンは「使われたときに行うこと」、リサーチは「回答フォームとの使い分け」を同じ画面で読める', async () => {
     await mount('kind=coupon&visual=1')
-    expect(screen.getByRole('heading', { name: '使われたときに行うこと' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'クーポンを使ったときに行うこと' })).toBeTruthy()
     act(() => root.unmount())
     root = createRoot(host)
     await mount('kind=research&visual=1')
@@ -664,6 +664,26 @@ describe('クーポンの同じ編集画面と公開の失敗', () => {
     expect(screen.queryByRole('button',{name:'友だちだけ'})).toBeNull()
     expect(screen.queryByText('当選した数')).toBeNull()
     expect(screen.getByRole('button',{name:'押されたときにあわせて行うことを足す'}).closest('[data-design-part="card"]')).toBeTruthy()
+  })
+  it('金額2欄の誤りは行の下の1つにまとめ、両方の入力へ説明を結ぶ', async () => {
+    assetsList.mockResolvedValue({success:true,data:[{...asset,payload:{...payload,couponType:'discount',discount:{mode:'price',beforeYen:1000,afterYen:500}}}]})
+    await mount('kind=coupon&id=coupon-old')
+    const before=screen.getByLabelText('割引前の金額'),after=screen.getByLabelText('割引後の金額')
+    type(before,'0');await act(async()=>{fireEvent.blur(before)})
+    const error=document.getElementById('coupon-benefit-error')!
+    expect(error.textContent).toContain('割引前より低い')
+    expect(error.closest('[data-form-row]')).toBeNull()
+    for(const input of [before,after]){expect(input.getAttribute('aria-invalid')).toBe('true');expect(input.getAttribute('aria-describedby')?.split(' ')).toContain(error.id)}
+    type(before,'1000');expect(document.getElementById('coupon-benefit-error')).toBeNull()
+    expect(assetsUpdate).not.toHaveBeenCalled()
+  })
+  it('使用記録時の2種類の処理を同じカードに置き、追加入口は枠付きでそろえる', async()=>{
+    await mount('kind=coupon&visual=1')
+    const card=screen.getByRole('heading',{name:'クーポンを使ったときに行うこと'}).closest('[data-design-part="card"]')!
+    const add=within(card as HTMLElement).getByRole('button',{name:'押されたときにあわせて行うことを足す'})
+    expect(add.getAttribute('data-variant')).toBe('secondary')
+    expect(within(card as HTMLElement).getByRole('button',{name:'行うことを足す'}).getAttribute('data-variant')).toBe('secondary')
+    expect(screen.queryByRole('heading',{name:'ボタンを押されたときに行うこと'})).toBeNull()
   })
   it('公開409は下書きを作り直さず同じ確認キーで再試行し、成功前に一覧へ移らない', async () => {
     assetsCreate.mockResolvedValue({ success: true, data: { id: 'asset-1', publishedVersion: 0, draftRevision: 1 } })

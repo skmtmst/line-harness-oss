@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import FormSection from '@/components/shared/form-section'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
-import { Field } from '@/components/shared/form-controls'
+import { Field, FieldError } from '@/components/shared/form-controls'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import NumberInput from '@/components/shared/number-field'
 import Select from '@/components/shared/select'
@@ -18,7 +18,7 @@ export default function CouponSettings({ disabled = false, draft, onChange, titl
   title: string; onTitleChange: (title: string) => void
   fields: ReturnType<typeof useFormErrors>; image: ReactNode; lottery: boolean; onRemoveLottery: () => void
 }) {
-  const bind = (key: string) => ({ ...fields.bind(key), invalid: fields.invalid(key) })
+  const bind = (key: string) => ({ ...fields.bind(key), invalid: fields.invalid(key), ...(key === 'benefit' && fields.invalid(key) ? { 'aria-describedby': 'coupon-benefit-error' } : {}) })
   return <>
     <FormSection title="基本設定" id="coupon-basics">
       <SettingsFormRow layout="media-fields">
@@ -42,16 +42,16 @@ export default function CouponSettings({ disabled = false, draft, onChange, titl
           <SaveErrorField names={['discount']}><Select size="content" aria-label="割引の表示" value={draft.mode} onChange={value => onChange({ mode: value as CouponDraft['mode'] })} options={[{ value: 'amount', label: '円引き' }, { value: 'percent', label: '%引き' }, { value: 'price', label: '割引前・割引後の金額' }, { value: 'none', label: '金額を表示しない' }]} /></SaveErrorField>
         </Field> : null}
       </SettingsFormRow>
-      {draft.couponType === 'discount' && draft.mode !== 'none' ? <SettingsFormRow layout="compact">
-        {draft.mode === 'amount' ? <Field label="割引額" htmlFor="te-coupon-amount" required error={fields.error('benefit')}>
+      {draft.couponType === 'discount' && draft.mode !== 'none' ? <><SettingsFormRow layout="compact">
+        {draft.mode === 'amount' ? <Field label="割引額" htmlFor="te-coupon-amount" required>
           <SaveErrorField names={['discount', 'discount.amountYen']}><NumberInput short {...bind('benefit')} id="te-coupon-amount" value={draft.amount} onChange={event => onChange({ amount: event.target.value })} unit="円" min={1} max={9999999} /></SaveErrorField>
-        </Field> : draft.mode === 'percent' ? <Field label="割引率" htmlFor="te-coupon-percent" required error={fields.error('benefit')}>
+        </Field> : draft.mode === 'percent' ? <Field label="割引率" htmlFor="te-coupon-percent" required>
           <SaveErrorField names={['discount', 'discount.percent']}><NumberInput short {...bind('benefit')} id="te-coupon-percent" value={draft.percent} onChange={event => onChange({ percent: event.target.value })} unit="%" min={1} max={99} /></SaveErrorField>
         </Field> : <>
-          <Field label="割引前の金額" htmlFor="te-coupon-before" required error={fields.error('benefit')}><SaveErrorField names={['discount', 'discount.beforeYen']}><NumberInput short {...bind('benefit')} id="te-coupon-before" value={draft.before} onChange={event => onChange({ before: event.target.value })} unit="円" min={1} max={9999999} /></SaveErrorField></Field>
+          <Field label="割引前の金額" htmlFor="te-coupon-before" required><SaveErrorField names={['discount', 'discount.beforeYen']}><NumberInput short {...bind('benefit')} id="te-coupon-before" value={draft.before} onChange={event => onChange({ before: event.target.value })} unit="円" min={1} max={9999999} /></SaveErrorField></Field>
           <Field label="割引後の金額" htmlFor="te-coupon-after" required><SaveErrorField names={['discount', 'discount.afterYen']}><NumberInput short {...bind('benefit')} id="te-coupon-after" value={draft.after} onChange={event => onChange({ after: event.target.value })} unit="円" min={0} max={9999999} /></SaveErrorField></Field>
         </>}
-      </SettingsFormRow> : null}
+      </SettingsFormRow><FieldError id="coupon-benefit-error">{fields.error('benefit')}</FieldError></> : null}
       <Field label="利用条件" htmlFor="te-coupon-conditions" count={{ value: draft.conditions.length, max: 30 }} error={fields.error('conditions')}>
         <SaveErrorField names={['conditions']}><TextField {...bind('conditions')} id="te-coupon-conditions" value={draft.conditions} onChange={event => onChange({ conditions: event.target.value })} placeholder="例：1,000円以上のお支払いで利用可能" /></SaveErrorField>
       </Field>
