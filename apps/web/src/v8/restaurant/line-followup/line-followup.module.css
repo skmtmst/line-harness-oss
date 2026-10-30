@@ -30,7 +30,7 @@
   left: 0;
   top: 0;
   bottom: 0;
-  width: 3px;
+  width: var(--tpl-rt-flow-open-w);
   border-radius: var(--radius-card) 0 0 var(--radius-card);
   background: var(--color-accent-deep);
 }
