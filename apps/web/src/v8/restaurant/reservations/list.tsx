@@ -133,7 +133,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
         {canImport ? <Button presentation="restaurant" disabled={busy} onClick={onImport}><Inbox size={16} aria-hidden="true" />受信データを試す</Button> : null}
         {canWrite ? <Button presentation="restaurant" disabled={busy} onClick={onCreate}><Plus size={16} aria-hidden="true" />手動で予約を作る</Button> : null}
       </>} renderBody={body=><DetailColumns variant="restaurant-ledger" asideLabel="予約の詳細を見る" expanded={detailExpanded} onExpandedChange={setDetailExpanded} aside={detail}>
-        {tables.length===0 ? <LedgerEmpty noTables canWrite={canWrite} busy={busy} onCreate={onCreate}/> : rows.length===0 ? <LedgerEmpty noTables={false} filtered={status!=='all'||view==='list'} canWrite={canWrite} busy={busy} onCreate={onCreate}/> : null}
+        {tables.length===0 ? <LedgerEmpty noTables canWrite={canWrite} busy={busy} onCreate={onCreate}/> : rows.length===0 ? <LedgerEmpty noTables={false} filtered={status!=='all'||view==='list'&&period!=='all'} canWrite={canWrite} busy={busy} onCreate={onCreate}/> : null}
         {rows.length===0 || axis==='floor' && floorError ? null : body}
         {view === 'list' && pageCount > 1 ? (
           <Pagination spacing="restaurant" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total} 件中 ${(page - 1) * pageSize + 1}〜${Math.min((page - 1) * pageSize + rows.length, total)} 件`} />

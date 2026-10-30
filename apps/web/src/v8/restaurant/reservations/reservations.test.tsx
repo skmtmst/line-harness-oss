@@ -17,6 +17,9 @@ vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 
 import ReservationsPage from './reservations'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
+import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 import { at, reservation, snapshotOf } from '../booking-kit/test-data'
 
 /* 今日：佐藤（LINE・T1）・山田（食べログ・承認待ち・T3・乳）・押さえ（T4）。 */
@@ -32,7 +35,7 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   today = reservationsToday()
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   fixture.floors.mockResolvedValue({success:true,data:[]})
   fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 3 }) })
   fixture.reservationsDay.mockResolvedValue({ data: { date: '', reservations: today } })
@@ -42,7 +45,7 @@ beforeEach(() => {
   fixture.customerSearch.mockResolvedValue({ data: [] })
   fixture.customerHistory.mockResolvedValue({ data: { visitCount: 0, visits: [] } })
 })
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); verifiedStaffRole(null); forgetSessionSnapshot(); vi.useRealTimers(); vi.clearAllMocks() })
 
 describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
   it('その日が臨時休業・貸切なら、帯と「休業日・貸切を見る」を出す（予約は取り消さない）', async () => {
@@ -164,7 +167,7 @@ describe('l9NlC0 予約台帳（今日・時間×卓）', () => {
   })
 
   it('閲覧者の一覧は予約を読めても行の変更メニューを出さない', async () => {
-    role.value = 'viewer'
+    role.value = verifiedStaffRole('viewer')
     render(<ReservationsPage />)
     await screen.findByText('山田 太郎')
     fireEvent.click(screen.getByRole('button', { name: '一覧' }))
@@ -259,13 +262,13 @@ describe('予約台帳の初期状態', () => {
   })
   it.each(['viewer','staff'])('%s は卓の設定操作を残し、権限理由を出して移動を止める', async value => {
     emptyStore()
-    role.value=value
+    role.value=verifiedStaffRole(value)
     render(<ReservationsPage />)
     await screen.findByText('卓がまだ設定されていません')
     const action=screen.getByRole('button',{name:'座席・卓を設定する'})
     expect(action.getAttribute('aria-disabled')).toBe('true')
     fireEvent.focus(action)
-    expect(await screen.findByRole('tooltip')).toHaveProperty('textContent','座席・卓の設定には管理者の権限が必要です。')
+    expect(await screen.findByRole('tooltip')).toHaveProperty('textContent',value==='viewer' ? PERMISSION_LOCK_REASON.viewer : PERMISSION_LOCK_REASON.manager)
   })
   it('卓があれば予約0件でも空きマスから選んだ卓と時刻で電話予約へ進む', async () => {
     emptyStore(false)
@@ -335,4 +338,44 @@ it('電話予約の作成でも共通タブを出さず、戻る操作を保つ'
   await screen.findByText('何を入れますか',{selector:'h2'})
   expect(screen.queryByRole('tablist',{name:'店の中の画面'})).toBeNull()
   expect(screen.getByRole('button',{name:'キャンセル',exact:true})).toBeTruthy()
+})
+
+
+it('停止中の卓しかない空の台帳は有効化の案内を出す', async () => {
+  const empty=snapshotOf({reservations:[],reservationTotal:0})
+  empty.tables=empty.tables.map(table=>({...table,is_active:0}))
+  fixture.snapshot.mockResolvedValue({data:empty})
+  fixture.reservationsDay.mockResolvedValue({data:{reservations:[],closures:[]}})
+  render(<ReservationsPage />)
+  expect(await screen.findByText('利用できる卓がありません')).toBeTruthy()
+  expect(screen.getByRole('link',{name:'座席・卓を設定する'})).toBeTruthy()
+})
+
+it('卓がない店の既存予約は一覧への操作から確認できる', async () => {
+  fixture.snapshot.mockResolvedValue({data:snapshotOf({tables:[],reservations:today,reservationTotal:today.length})})
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button',{name:'一覧で予約を見る'}))
+  expect(await screen.findByRole('button',{name:'山田 太郎',exact:true})).toBeTruthy()
+})
+
+
+it('一覧ですべての期間・状態が空なら新しい予約の案内を出す', async () => {
+  fixture.snapshot.mockResolvedValue({data:snapshotOf({reservations:[],reservationTotal:0})})
+  fixture.reservationsDay.mockResolvedValue({data:{reservations:[],closures:[]}})
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button',{name:'一覧',exact:true}))
+  fireEvent.click(await screen.findByRole('button',{name:'期間',exact:true}))
+  fireEvent.click(within(await screen.findByRole('option',{name:'すべての期間',exact:true})).getByRole('button'))
+  expect(await screen.findByText('予約はまだありません')).toBeTruthy()
+})
+
+
+it('座席表が読めなくても時間と一覧の取得済み予約は残す', async () => {
+  fixture.floors.mockRejectedValue(new Error('synthetic floor failure'))
+  render(<ReservationsPage />)
+  expect(await screen.findByText('座席表を読み込めませんでした')).toBeTruthy()
+  expect(await screen.findByText('山田 太郎')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button',{name:'一覧',exact:true}))
+  expect(await screen.findByRole('button',{name:'山田 太郎',exact:true})).toBeTruthy()
+  expect(await screen.findByText('座席表を読み込めませんでした')).toBeTruthy()
 })
