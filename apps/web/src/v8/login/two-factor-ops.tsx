@@ -121,7 +121,8 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
       if (!verifyResponse.ok || !verifyBody.success) throw new Error(verifyBody.error || 'パスキーを確認できませんでした。')
       await completeLogin(verifyBody)
     } catch (caught) {
-      setError(caught instanceof Error && caught.name === 'NotAllowedError'
+      const fieldFailure = saveErrors.capture(caught)
+      if (!fieldFailure) setError(caught instanceof Error && caught.name === 'NotAllowedError'
         ? 'パスキーの操作を中止しました。もう一度試すか、認証アプリを使用してください。'
         : opsTwoFactorFailureMessage(caught, 'パスキーを確認できませんでした。認証アプリでもログインできます。'))
     } finally { setLoading(false) }
