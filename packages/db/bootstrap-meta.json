@@ -653,7 +653,8 @@
     "737_existing_account_email_inbox.sql",
     "738_line_account_creator.sql",
     "739_line_account_hq_admin_memberships.sql",
-    "740_registration_applications.sql"
+    "740_registration_applications.sql",
+    "741_staff_passkeys.sql"
   ],
-  "migrationCount": 654
+  "migrationCount": 655
 }

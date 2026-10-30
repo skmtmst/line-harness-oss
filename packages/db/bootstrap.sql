@@ -8374,6 +8374,28 @@ CREATE TABLE staff_notification_reads (
   PRIMARY KEY (notification_id, staff_id)
 );
 
+CREATE TABLE staff_passkey_challenges (
+  token_hash TEXT PRIMARY KEY,
+  challenge TEXT NOT NULL,
+  purpose TEXT NOT NULL CHECK(purpose IN ('register', 'login')),
+  staff_id TEXT REFERENCES staff_members(id) ON DELETE CASCADE,
+  session_token_hash TEXT,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE staff_passkeys (
+  credential_id TEXT PRIMARY KEY,
+  staff_id TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
+  public_key TEXT NOT NULL,
+  counter INTEGER NOT NULL DEFAULT 0,
+  transports TEXT NOT NULL DEFAULT '[]' CHECK(json_valid(transports)),
+  device_type TEXT NOT NULL,
+  backed_up INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  last_used_at TEXT
+);
+
 CREATE TABLE staff_permission_receipts (
   idempotency_key TEXT NOT NULL,
   staff_id        TEXT NOT NULL REFERENCES staff_members(id) ON DELETE CASCADE,
@@ -11312,6 +11334,10 @@ CREATE UNIQUE INDEX idx_staff_members_tenant_email_unique
 
 CREATE INDEX idx_staff_notification_reads_staff
   ON staff_notification_reads(staff_id, read_at DESC);
+
+CREATE INDEX idx_staff_passkey_challenges_expires ON staff_passkey_challenges(expires_at);
+
+CREATE INDEX idx_staff_passkeys_staff ON staff_passkeys(staff_id, created_at);
 
 CREATE INDEX idx_staff_permission_receipts_staff_v527
   ON staff_permission_receipts (staff_id, created_at DESC);
