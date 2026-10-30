@@ -657,7 +657,8 @@
     "741_staff_passkeys.sql",
     "742_style_starter_text_body.sql",
     "743_restaurant_followup_rows.sql",
-    "744_restaurant_followup_targets.sql"
+    "744_restaurant_followup_targets.sql",
+    "747_restaurant_followup_preferences.sql"
   ],
-  "migrationCount": 658
+  "migrationCount": 659
 }

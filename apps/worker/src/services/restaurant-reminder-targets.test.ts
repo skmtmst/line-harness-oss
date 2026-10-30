@@ -1,3 +1,4 @@
+import { readFollowupEngineSnapshot } from './restaurant-followup-engine-approval.js';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { createReminderWithDraftVersion, publishReminderDraftVersion, recordReminderDraftTest, type ReminderDraftSettings } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -22,10 +23,11 @@ async function target(trigger='reservation_24h', account='a') {
   await recordReminderDraftTest(t.db,version.id,{succeeded:true,staffId:null});
   const published=await publishReminderDraftVersion(t.db,reminder.id,null);
   const approval=crypto.randomUUID();
-  const payload={operation:'start_restaurant_followup_engines',lineAccountId:'a',targets:[{trigger,engine:'reminder',targetId:reminder.id,versionId:published.id,contentHash:'fixture'}]};
-  t.raw.prepare(`INSERT INTO rt_approval_requests(id,organization_id,store_id,kind,title,status,payload_json) VALUES(?,'o','s','menu_change','承認','approved',?)`).run(approval,JSON.stringify(payload));
+  const fingerprint=(await readFollowupEngineSnapshot(t.db,{engine:'reminder',targetId:reminder.id,lineAccountId:account,storeId:'s'}))?.contentHash??'foreign';
+  const payload={operation:'start_restaurant_followup_engines',lineAccountId:'a',targets:[{trigger,engine:'reminder',targetId:reminder.id,versionId:published.id,contentHash:fingerprint}]};
+  t.raw.prepare(`INSERT INTO rt_approval_requests(id,organization_id,store_id,kind,title,status,payload_json) VALUES(?,'o','s','line_message','承認','approved',?)`).run(approval,JSON.stringify(payload));
   t.raw.prepare(`INSERT INTO rt_store_followup_targets(store_id,trigger,engine,reminder_id,enabled,sending_status,approved_version_id,approved_content_hash,approval_id)
-    VALUES('s',?,'reminder',?,1,'active',?,'fixture',?)`).run(trigger,reminder.id,published.id,approval);
+    VALUES('s',?,'reminder',?,1,'active',?,?,?)`).run(trigger,reminder.id,published.id,fingerprint,approval);
   return {reminderId:reminder.id,versionId:published.id,approval};
 }
 function reservation(id='r',at='2026-11-02T10:00:00Z') {

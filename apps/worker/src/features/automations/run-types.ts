@@ -26,6 +26,7 @@ export interface RunRow {
   input_event_json: string;
   is_test: number;
   action_config: string;
+  trigger_type?: string;
   execution_plan_json: string | null;
   created_at: string;
 }

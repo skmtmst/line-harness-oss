@@ -156,3 +156,62 @@ it('LINE未接続は版競合と区別して案内する',async()=>{
  const response=await requestWithMethod(path+'/rows/reservation_created'+scope,'PUT',{expectedRowVersion:1,enabled:true});
  expect(response.status).toBe(409);expect(await response.json()).toMatchObject({code:'line_account_required'});
 });
+
+describe('来店フォローを使わない判断の保存',()=>{
+ it('未保存は未確認、全オフの明示保存は店ごとに残り、古い版を拒否する',async()=>{
+  newStore();
+  expect(await (await request(path+scope)).json()).toMatchObject({data:{setup:{notUsing:false,decidedAt:null,version:0}}});
+  const url=path+'/setup'+scope;
+  const saved=await requestWithMethod(url,'PUT',{notUsing:true,expectedVersion:0});expect(saved.status).toBe(200);
+  expect(await saved.json()).toMatchObject({data:{notUsing:true,version:1,decidedAt:expect.any(String)}});
+  expect((await requestWithMethod(url,'PUT',{notUsing:true,expectedVersion:0})).status).toBe(409);
+  expect(testDb.raw.prepare('SELECT count(*) n FROM scenarios').get()).toEqual({n:0});
+  expect(testDb.raw.prepare("SELECT count(*) n FROM rt_store_followup_preferences WHERE store_id='foreign'").get()).toEqual({n:0});
+ });
+ it('送り方がオンの時は使わない判断を保存せず、後からオンにすると判断を解除する',async()=>{
+  newStore();const url=path+'/setup'+scope;
+  await requestWithMethod(url,'PUT',{notUsing:true,expectedVersion:0});
+  await requestWithMethod(path+'/rows/reservation_created'+scope,'PUT',{expectedRowVersion:1,enabled:true});
+  expect(await (await request(path+scope)).json()).toMatchObject({data:{setup:{notUsing:false,decidedAt:null,version:2},rows:expect.arrayContaining([expect.objectContaining({trigger:'reservation_created',enabled:true})])}});
+  const rejected=await requestWithMethod(url,'PUT',{notUsing:true,expectedVersion:2});expect(rejected.status).toBe(409);
+  expect(await rejected.json()).toMatchObject({code:'followup_rows_enabled',enabledTriggers:['reservation_created'],error:expect.stringContaining('予約したとき')});
+ });
+ it('入力違い・別組織・閲覧のみ・staffは保存できない',async()=>{
+  newStore();const url=path+'/setup'+scope;
+  for(const body of [{notUsing:false,expectedVersion:0},{notUsing:true,expectedVersion:-1},{notUsing:true,expectedVersion:'0'}])expect((await requestWithMethod(url,'PUT',body)).status).toBe(400);
+  expect((await requestWithMethod('/api/restaurant-test/followups/foreign/setup'+scope,'PUT',{notUsing:true,expectedVersion:0})).status).toBe(404);
+  for(const staff of [{id:'viewer',role:'admin' as const,access_level:'read_only' as const},{id:'staff',role:'staff' as const,access_level:'full' as const}]){
+   authMocks.getStaffByApiKey.mockResolvedValue({...staff,name:'担当者',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1});
+   expect((await requestWithMethod(url,'PUT',{notUsing:true,expectedVersion:0},staff.id)).status).toBe(403);
+  }
+  expect(testDb.raw.prepare('SELECT count(*) n FROM rt_store_followup_preferences').get()).toEqual({n:0});
+ });
+});
+
+it('使わない判断は認証されたテナントの外から読み書きできない',async()=>{
+ newStore();
+ authMocks.getStaffByApiKey.mockResolvedValue({id:'admin',name:'担当',role:'admin',access_level:'full',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:0,tenant_id:'00000000-0000-4000-8000-000000000001'});
+ const other='?tenant_id=00000000-0000-4000-8000-000000000099';
+ expect((await requestWithMethod(path+'/setup'+other,'PUT',{notUsing:true,expectedVersion:0},'admin')).status).toBe(403);
+ expect((await requestAs(path+other,'admin')).status).toBe(403);
+ expect(testDb.raw.prepare('SELECT count(*) n FROM rt_store_followup_preferences').get()).toEqual({n:0});
+});
+
+it('新しい送り手のオンでも見送りを解除し、同時の判断は1件だけを保存する',async()=>{
+ newStore();const url=path+'/setup'+scope;
+ const results=await Promise.all([requestWithMethod(url,'PUT',{notUsing:true,expectedVersion:0}),requestWithMethod(url,'PUT',{notUsing:true,expectedVersion:0})]);
+ expect(results.map(r=>r.status).sort()).toEqual([200,409]);
+ testDb.raw.exec(`INSERT INTO automation_definitions(id,line_account_id,name) VALUES('target','account-1','お礼');
+ INSERT INTO rt_store_followup_targets(store_id,trigger,engine,automation_id,enabled) VALUES('new','post_visit','automation','target',1);`);
+ expect(await (await request(path+scope)).json()).toMatchObject({data:{setup:{notUsing:false,version:2},rows:expect.arrayContaining([expect.objectContaining({trigger:'post_visit',enabled:true})])}});
+ expect((await requestWithMethod(url,'PUT',{notUsing:true,expectedVersion:2})).status).toBe(409);
+ testDb.raw.exec("UPDATE rt_store_followup_targets SET enabled=0");
+ expect((await requestWithMethod(url,'PUT',{notUsing:true,expectedVersion:2})).status).toBe(200);
+ testDb.raw.exec("UPDATE rt_store_followup_targets SET enabled=1");
+ expect(testDb.raw.prepare("SELECT not_using,version FROM rt_store_followup_preferences WHERE store_id='new'").get()).toEqual({not_using:0,version:4});
+});
+it('判断者の識別が無い要求は空の記録を保存せず401で止める',async()=>{
+ newStore();authMocks.getStaffByApiKey.mockResolvedValue({id:'',name:'担当',role:'admin',access_level:'full',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1});
+ expect((await requestWithMethod(path+'/setup'+scope,'PUT',{notUsing:true,expectedVersion:0},'unknown')).status).toBe(401);
+ expect(testDb.raw.prepare('SELECT count(*) n FROM rt_store_followup_preferences').get()).toEqual({n:0});
+});

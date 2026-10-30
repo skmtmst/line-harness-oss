@@ -7865,6 +7865,14 @@ CREATE TABLE rt_store_feature_flags (
   PRIMARY KEY (store_id, feature)
 );
 
+CREATE TABLE rt_store_followup_preferences (
+ store_id TEXT PRIMARY KEY REFERENCES rt_stores(id),
+ not_using INTEGER NOT NULL DEFAULT 0 CHECK(not_using IN(0,1)),
+ decided_at TEXT,
+ decided_by TEXT,
+ version INTEGER NOT NULL DEFAULT 1 CHECK(version>=1)
+);
+
 CREATE TABLE rt_store_followup_rows (
  store_id TEXT NOT NULL REFERENCES rt_stores(id),
  trigger TEXT NOT NULL CHECK(trigger IN('reservation_created','reservation_24h','reservation_2h','post_visit','review_request','waitlist_invited','anniversary_before')),
@@ -12555,6 +12563,18 @@ CREATE TRIGGER rt_followup_event_receipt AFTER INSERT ON rt_reservation_events B
 CREATE TRIGGER rt_followup_legacy_edit BEFORE UPDATE ON rt_line_flows WHEN EXISTS(SELECT 1 FROM rt_store_followup_templates WHERE store_id=OLD.store_id) OR EXISTS(SELECT 1 FROM rt_store_followup_rows WHERE store_id=OLD.store_id) BEGIN SELECT RAISE(ABORT,'edit_restaurant_followup_in_common_scenario'); END;
 
 CREATE TRIGGER rt_followup_no_enrollment BEFORE INSERT ON friend_scenarios WHEN EXISTS(SELECT 1 FROM rt_store_followup_templates WHERE scenario_id=NEW.scenario_id) BEGIN SELECT RAISE(ABORT,'restaurant_followup_requires_source_job'); END;
+
+CREATE TRIGGER rt_followup_preference_binding_enabled AFTER UPDATE OF enabled ON rt_store_followup_step_bindings WHEN NEW.enabled=1
+ BEGIN UPDATE rt_store_followup_preferences SET not_using=0,decided_at=NULL,decided_by=NULL,version=version+1 WHERE store_id=NEW.store_id AND not_using=1; END;
+
+CREATE TRIGGER rt_followup_preference_binding_inserted AFTER INSERT ON rt_store_followup_step_bindings WHEN NEW.enabled=1
+ BEGIN UPDATE rt_store_followup_preferences SET not_using=0,decided_at=NULL,decided_by=NULL,version=version+1 WHERE store_id=NEW.store_id AND not_using=1; END;
+
+CREATE TRIGGER rt_followup_preference_target_enabled AFTER UPDATE OF enabled ON rt_store_followup_targets WHEN NEW.enabled=1
+ BEGIN UPDATE rt_store_followup_preferences SET not_using=0,decided_at=NULL,decided_by=NULL,version=version+1 WHERE store_id=NEW.store_id AND not_using=1; END;
+
+CREATE TRIGGER rt_followup_preference_target_inserted AFTER INSERT ON rt_store_followup_targets WHEN NEW.enabled=1
+ BEGIN UPDATE rt_store_followup_preferences SET not_using=0,decided_at=NULL,decided_by=NULL,version=version+1 WHERE store_id=NEW.store_id AND not_using=1; END;
 
 CREATE TRIGGER rt_followup_published AFTER UPDATE OF current_published_version_id ON scenarios WHEN NEW.current_published_version_id IS NOT OLD.current_published_version_id BEGIN UPDATE rt_store_followup_templates SET template_version=template_version+1,sending_status='stopped',approved_version_id=NULL,approval_id=NULL WHERE scenario_id=NEW.id; END;
 

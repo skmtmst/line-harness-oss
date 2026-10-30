@@ -145,6 +145,8 @@ function app() {
   }));
   a.use('*', authMiddleware);
   a.route('/', adminAuth);
+  a.get('/api/restaurant-test/setup-progress', (c) => c.json({ success: true }));
+  a.post('/api/restaurant-test/setup-progress', (c) => c.json({ success: true }));
   a.get('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
   a.post('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
   a.all('/api/line-accounts/:id/follower-import', (c) => c.json({ success: true }));
@@ -1239,4 +1241,10 @@ describe('SEC-02 管理フォームの下書き権限', () => {
   expect((await app().request('/api/forms/form-1?account_id=a',{headers:{Authorization:'Bearer env-key'}},crossSiteEnv())).status).toBe(200);
   expect((await app().request('/api/forms/form-1',{},crossSiteEnv())).status).toBe(200);
  });
+});
+
+test.each(['no-permissions-key', 'viewer-key'])('店舗の設定状況は %s でもGETだけ読める', async token => {
+ const headers = { Authorization: `Bearer ${token}` };
+ expect((await app().request('/api/restaurant-test/setup-progress', { headers }, crossSiteEnv())).status).toBe(200);
+ expect((await app().request('/api/restaurant-test/setup-progress', { method: 'POST', headers }, crossSiteEnv())).status).toBe(403);
 });
