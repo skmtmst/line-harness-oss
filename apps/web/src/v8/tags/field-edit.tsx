@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Notice from '@/components/shared/notice'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
@@ -104,7 +105,7 @@ export default function FieldEdit() {
         setError('')
         setNotFound(true)
       } else {
-        setError(reason instanceof ApiError ? reason.message : '項目を読み込めませんでした')
+        setError(describeApiFailure(reason, '項目の読み込み'))
       }
     }).finally(() => {
       if (!cancelled) setLoading(false)
@@ -187,7 +188,7 @@ export default function FieldEdit() {
         await handleVersionConflict(sent)
       } else {
         { if (!fieldFailure)
-        setError(reason instanceof ApiError ? reason.message : '項目を保存できませんでした。時間をおいて、もう一度お試しください。') }
+        setError(describeApiFailure(reason, '項目の保存')) }
       }
     } finally {
       setSaving(false)

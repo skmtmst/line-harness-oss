@@ -7865,6 +7865,14 @@ CREATE TABLE rt_store_feature_flags (
   PRIMARY KEY (store_id, feature)
 );
 
+CREATE TABLE rt_store_followup_preferences (
+ store_id TEXT PRIMARY KEY REFERENCES rt_stores(id),
+ not_using INTEGER NOT NULL DEFAULT 0 CHECK(not_using IN(0,1)),
+ decided_at TEXT,
+ decided_by TEXT,
+ version INTEGER NOT NULL DEFAULT 1 CHECK(version>=1)
+);
+
 CREATE TABLE rt_store_followup_rows (
  store_id TEXT NOT NULL REFERENCES rt_stores(id),
  trigger TEXT NOT NULL CHECK(trigger IN('reservation_created','reservation_24h','reservation_2h','post_visit','review_request','waitlist_invited','anniversary_before')),
@@ -7883,6 +7891,25 @@ CREATE TABLE rt_store_followup_step_bindings (
  version INTEGER NOT NULL DEFAULT 1, anniversary_time TEXT NOT NULL DEFAULT '10:00'
  CHECK(anniversary_time GLOB '[0-2][0-9]:[0-5][0-9]' AND anniversary_time<'24:00'),
  PRIMARY KEY(store_id,trigger,step_id)
+);
+
+CREATE TABLE rt_store_followup_targets (
+ store_id TEXT NOT NULL,
+ trigger TEXT NOT NULL,
+ engine TEXT NOT NULL DEFAULT 'scenario' CHECK(engine IN ('scenario','reminder','automation')),
+ reminder_id TEXT UNIQUE REFERENCES reminders(id),
+ automation_id TEXT UNIQUE REFERENCES automation_definitions(id),
+ enabled INTEGER NOT NULL DEFAULT 0 CHECK(enabled IN (0,1)),
+ sending_status TEXT NOT NULL DEFAULT 'stopped' CHECK(sending_status IN ('stopped','pending','active')),
+ approved_version_id TEXT,
+ approved_content_hash TEXT,
+ approval_id TEXT REFERENCES rt_approval_requests(id),
+ version INTEGER NOT NULL DEFAULT 1 CHECK(version >= 1),
+ PRIMARY KEY(store_id,trigger),
+ FOREIGN KEY(store_id,trigger) REFERENCES rt_store_followup_rows(store_id,trigger),
+ CHECK(engine != 'reminder' OR reminder_id IS NOT NULL),
+ CHECK(engine != 'automation' OR automation_id IS NOT NULL),
+ CHECK(sending_status != 'active' OR (approval_id IS NOT NULL AND approved_version_id IS NOT NULL AND approved_content_hash IS NOT NULL))
 );
 
 CREATE TABLE rt_store_followup_templates (
@@ -11130,6 +11157,8 @@ CREATE UNIQUE INDEX idx_rt_customer_request ON rt_reservations(store_id,line_uid
 CREATE INDEX idx_rt_email_digests_store_date
   ON rt_email_digests (store_id, target_date, media_id);
 
+CREATE INDEX idx_rt_followup_targets_approval ON rt_store_followup_targets(approval_id);
+
 CREATE INDEX idx_rt_gbp_reviews_store ON rt_gbp_reviews(store_id, reply_status, reviewed_at DESC);
 
 CREATE INDEX idx_rt_google_changes_status ON rt_google_changes(store_id, status);
@@ -12535,6 +12564,18 @@ CREATE TRIGGER rt_followup_legacy_edit BEFORE UPDATE ON rt_line_flows WHEN EXIST
 
 CREATE TRIGGER rt_followup_no_enrollment BEFORE INSERT ON friend_scenarios WHEN EXISTS(SELECT 1 FROM rt_store_followup_templates WHERE scenario_id=NEW.scenario_id) BEGIN SELECT RAISE(ABORT,'restaurant_followup_requires_source_job'); END;
 
+CREATE TRIGGER rt_followup_preference_binding_enabled AFTER UPDATE OF enabled ON rt_store_followup_step_bindings WHEN NEW.enabled=1
+ BEGIN UPDATE rt_store_followup_preferences SET not_using=0,decided_at=NULL,decided_by=NULL,version=version+1 WHERE store_id=NEW.store_id AND not_using=1; END;
+
+CREATE TRIGGER rt_followup_preference_binding_inserted AFTER INSERT ON rt_store_followup_step_bindings WHEN NEW.enabled=1
+ BEGIN UPDATE rt_store_followup_preferences SET not_using=0,decided_at=NULL,decided_by=NULL,version=version+1 WHERE store_id=NEW.store_id AND not_using=1; END;
+
+CREATE TRIGGER rt_followup_preference_target_enabled AFTER UPDATE OF enabled ON rt_store_followup_targets WHEN NEW.enabled=1
+ BEGIN UPDATE rt_store_followup_preferences SET not_using=0,decided_at=NULL,decided_by=NULL,version=version+1 WHERE store_id=NEW.store_id AND not_using=1; END;
+
+CREATE TRIGGER rt_followup_preference_target_inserted AFTER INSERT ON rt_store_followup_targets WHEN NEW.enabled=1
+ BEGIN UPDATE rt_store_followup_preferences SET not_using=0,decided_at=NULL,decided_by=NULL,version=version+1 WHERE store_id=NEW.store_id AND not_using=1; END;
+
 CREATE TRIGGER rt_followup_published AFTER UPDATE OF current_published_version_id ON scenarios WHEN NEW.current_published_version_id IS NOT OLD.current_published_version_id BEGIN UPDATE rt_store_followup_templates SET template_version=template_version+1,sending_status='stopped',approved_version_id=NULL,approval_id=NULL WHERE scenario_id=NEW.id; END;
 
 CREATE TRIGGER rt_followup_row_binding_deleted AFTER DELETE ON rt_store_followup_step_bindings BEGIN UPDATE rt_store_followup_rows SET version=version+1 WHERE store_id=OLD.store_id AND trigger=OLD.trigger; END;
@@ -12556,6 +12597,10 @@ CREATE TRIGGER rt_followup_step_updated AFTER UPDATE ON scenario_steps BEGIN UPD
 CREATE TRIGGER rt_followup_store_added AFTER INSERT ON rt_stores BEGIN INSERT OR IGNORE INTO rt_store_followup_rows(store_id,trigger,initial_key) SELECT NEW.id,value,value FROM json_each('["reservation_created","reservation_24h","reservation_2h","post_visit","review_request","waitlist_invited","anniversary_before"]') WHERE NEW.line_account_id IS NOT NULL; END;
 
 CREATE TRIGGER rt_followup_store_connected AFTER UPDATE OF line_account_id ON rt_stores WHEN OLD.line_account_id IS NULL AND NEW.line_account_id IS NOT NULL BEGIN INSERT OR IGNORE INTO rt_store_followup_rows(store_id,trigger,initial_key) SELECT NEW.id,value,value FROM json_each('["reservation_created","reservation_24h","reservation_2h","post_visit","review_request","waitlist_invited","anniversary_before"]') WHERE NEW.line_account_id IS NOT NULL; END;
+
+CREATE TRIGGER rt_followup_target_event_receipt AFTER INSERT ON rt_reservation_events
+ WHEN NEW.reservation_id IS NOT NULL AND NEW.event_type LIKE 'restaurant.reservation.%'
+ BEGIN INSERT INTO rt_reservation_event_receipts(event_id,consumer_key) VALUES(NEW.id,'followup_targets'); END;
 
 CREATE TRIGGER rt_inventory_reservation_delete AFTER DELETE ON rt_reservations BEGIN UPDATE rt_inventory_slots SET version=version+1, updated_at=datetime('now'), reserved_count=COALESCE((SELECT SUM(r.guest_count) FROM rt_reservations r WHERE r.store_id=rt_inventory_slots.store_id AND r.status NOT IN ('cancelled','no_show') AND r.departed_at IS NULL AND (r.status<>'pending' OR r.hold_expires_at IS NULL OR datetime(r.hold_expires_at)>datetime('now')) AND datetime(r.starts_at)<datetime(rt_inventory_slots.starts_at, '+' || rt_inventory_slots.slot_minutes || ' minutes') AND datetime(r.ends_at)>datetime(rt_inventory_slots.starts_at)),0) WHERE (store_id=OLD.store_id AND datetime(starts_at)<datetime(OLD.ends_at) AND datetime(starts_at, '+' || slot_minutes || ' minutes')>datetime(OLD.starts_at)); END;
 

@@ -47,5 +47,5 @@ export default function MessageInsertRow({ children, count, more, readOnly = fal
 }
 /** 本文の入力欄と差し込み行を1つの枠に置く。 */
 export function MessageBody({ children }: { children: ReactNode }) {
-  return <div data-message-body className={styles.body}>{children}</div>
+  return <div data-input-field data-message-body className={styles.body}>{children}</div>
 }

@@ -42,7 +42,7 @@ import { filterSavedSearches, savedSearchKpiValues, type SavedSearchUsageFilter 
 import { formatDay, formatNumber } from '@/lib/format';
 import styles from './list.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { permissionDeniedMessage, describeApiFailure } from '@/components/shared/api-error-message';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import { ListToolbarEnd, ListToolbarSearchSlot } from '@/components/shared/list-toolbar';
@@ -168,7 +168,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
 
       if (sequence === loadSequence.current) {
         if (reason instanceof ApiError && reason.status === 403) setForbidden(true)
-        else { if (!fieldFailure) setLoadError(reason instanceof ApiError ? reason.message : '保存した検索を読み込めませんでした') }
+        else { if (!fieldFailure) setLoadError(describeApiFailure(reason, '保存した検索の読み込み')) }
       }
     } finally {
       if (sequence === loadSequence.current) setLoading(false)
@@ -198,7 +198,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
 
       { if (!fieldFailure)
 
-      setError(reason instanceof ApiError ? reason.message : '削除に失敗しました。通信を確かめて、もう一度お試しください。') }
+      setError(describeApiFailure(reason, '削除')) }
     }
   }
 
@@ -221,7 +221,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
 
       { if (!fieldFailure)
 
-      setError(reason instanceof ApiError ? `複製できませんでした（${reason.message}）` : '複製できませんでした。時間をおいて、もう一度お試しください。') }
+      setError(describeApiFailure(reason, '複製')) }
     }
   }
 
@@ -240,7 +240,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
       const fieldFailure = saveErrors.capture(reason)
       setItems(previous);
 
-      const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
+      const message = describeApiFailure(reason, '並び順の保存')
       { if (!fieldFailure)
 
       setError(message) }

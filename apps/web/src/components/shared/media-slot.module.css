@@ -75,11 +75,6 @@
   opacity: var(--tpl-slot-disabled-opacity);
 }
 
-.frame:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
 .center {
   display: flex;
   flex-direction: column;
@@ -104,11 +99,6 @@
   font: inherit;
   text-align: center;
   cursor: inherit;
-}
-
-.hit:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 4px;
 }
 
 .icon {

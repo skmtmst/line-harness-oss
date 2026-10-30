@@ -24,7 +24,7 @@ import ApplicationPreview from './application-preview'
 import { EVENT_DEFAULT_DRAFT, ENTRY_CUTOFF_OPTIONS, NONE, jstToUtcIso, todayJst } from './shared'
 import styles from './create.module.css'
 import { Field, OptionalBadge, RequiredBadge } from '@/components/shared/form-controls'
-import { permissionDeniedMessage} from '@/components/shared/api-error-message'
+import { permissionDeniedMessage, describeApiFailure } from '@/components/shared/api-error-message'
 import NumberInput from '@/components/shared/number-field'
 import { saveInitialSlot, type InitialSlotCache } from './save-initial-slot'
 import SaveFeedback, { useSaveFeedback } from '@/components/shared/save-feedback'
@@ -226,7 +226,7 @@ function EventsCreateV8Inner() {
 
       const reason = cause instanceof ApiError && cause.status === 403
         ? permissionDeniedMessage('store')
-        : cause instanceof Error ? cause.message : '保存できませんでした。もう一度お試しください。'
+        : describeApiFailure(cause, '保存')
       { if (!fieldFailure)
       setError(eventId
         ? `イベントは${saved?.is_published === 1 ? '公開済みですが' : '下書きで作りましたが'}、${stage === 'slots' ? '最初の予約枠を作れませんでした' : '変更を保存できませんでした'}。もう一度押すと続きから作ります。（${reason}）`

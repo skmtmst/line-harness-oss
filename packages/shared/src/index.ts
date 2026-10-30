@@ -22,6 +22,7 @@ export * from "./identity-candidates";
 export * from "./merged-people";
 export * from "./template-message";
 export * from "./broadcast-asset-conversion";
+export * from "./coupon-presentation.js";
 export * from "./feature-catalog";
 export * from "./rich-menu";
 export * from "./automation-labels";
@@ -121,3 +122,9 @@ export type { LineTokenExpiry } from './line-token-expiry.js';
 export { lineAccountConnectionState, lineConnectionRisk } from './line-connection-state.js';
 export type { LineConnection, LineConnectionIssue } from './line-connection-state.js';
 export { lineObservationTime, lineWebhookSilence, LINE_WEBHOOK_SILENCE_MS } from './line-observation-time.js';
+
+export { zonedWallTime } from './zoned-time.js';
+export { parseAutomationWait, nextDayWaitAt, automationWaitLabel } from './automation-wait.js';
+export type { AutomationWait } from './automation-wait.js';
+
+export type { RestaurantSetupProgress } from './restaurant-setup-progress.js';

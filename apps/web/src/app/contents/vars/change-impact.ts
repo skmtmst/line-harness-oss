@@ -1,3 +1,4 @@
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import type { CommonVarChangeImpact, CommonVarDeleteImpact } from '@line-crm/shared'
 import { ApiError } from '@/lib/api'
 import { STATE_TEXT, notConnectedText } from '@/components/shared/not-connected'
@@ -48,10 +49,7 @@ export function impactStateFromError(err: unknown): ChangeImpactState {
  * 500の `Internal server error` は出さず、予約用の定型文に写す。
  */
 export function scheduleErrorText(err: unknown): string {
-  if (err instanceof ApiError && err.status === 400 && err.message
-    && !/^API error: /.test(err.message)) {
-    return err.message
-  }
+  if (err instanceof ApiError && err.status === 400 && japaneseDetailOf(err)) return japaneseDetailOf(err)
   if (err instanceof ApiError && err.status === 403) {
     return `${STATE_TEXT.forbiddenAct}。更新予約を作れるのは管理者だけです。`
   }
@@ -213,9 +211,7 @@ export function saveErrorText(err: unknown): string {
     return '保存できませんでした。通信が切れている可能性があります。'
       + '接続を確かめて、もう一度お試しください。'
   }
-  if (err.status === 400 && err.message && !/^API error: /.test(err.message)) {
-    return err.message
-  }
+  if (err.status === 400 && japaneseDetailOf(err)) return japaneseDetailOf(err)
   switch (err.status) {
     case 400:
       return '入力の内容が受け付けられませんでした。名前と値を確かめてください。'

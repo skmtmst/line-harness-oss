@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { jstDate } from '@/lib/jst-datetime';
 import { formatNumber } from '@/lib/format';
 import { notifySaved } from '@/components/shared/toast';
@@ -34,6 +35,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import Notice from '@/components/shared/notice'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
+import StickerPreview from '@/components/shared/sticker-preview'
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -43,13 +45,19 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { restoreFirstStep, scheduleToPayload } from './first-step-form';
 import styles from './first-step.module.css'
 import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft/index'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { scenarioDraftStatus, BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
 import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+export function firstStepFailureMessage(reason: unknown, phase: 'load' | 'save'): string {
+  if (phase === 'load') return describeApiFailure(reason, '読み込み')
+  if (!(reason instanceof ApiError) || reason.status >= 500) return '保存できませんでした。入力内容は残っています。通信状態を確認して、もう一度お試しください。'
+  return `${describeApiFailure(reason, '保存')}入力内容は残っています。`
+}
 
 /*
  * ★V8 シナリオを作る②：1通目を設定（Pencil ・1152 ）。
@@ -197,7 +205,7 @@ export default function ScenarioFirstStepV8() {
         if (!res.success) {
           // 失敗の応答がキャッシュに残ると、再読み込みでも同じ失敗が返る。
           scenarioReferenceData.invalidateScenario(id)
-          setError(res.error)
+          setError(firstStepFailureMessage(new Error(res.error), 'load'))
           setLoadState('error')
           return
         }
@@ -454,7 +462,7 @@ export default function ScenarioFirstStepV8() {
         return
       }
       if (!res.success) {
-        setError(res.error)
+        setError(describeApiFailure(new Error(res.error), '保存'))
         return
       }
       scenarioReferenceData.invalidateScenario(id)
@@ -465,14 +473,9 @@ export default function ScenarioFirstStepV8() {
       if (!canSaveNow()) return
       const fieldFailure = saveErrors.capture(submitError)
       // 例外でも「保存中」のままにしない（SCENARIO-05）。入力は残し、同じ場所からやり直せる。
-      const detail = submitError instanceof ApiError ? submitError.message : ''
       { if (!fieldFailure)
 
-      setError(
-        detail
-          ? `保存できませんでした（${detail}）。入力内容は残っています。もう一度お試しください。`
-          : '保存できませんでした。通信状態を確認して、もう一度お試しください。',
-      ) }
+      setError(firstStepFailureMessage(submitError, 'save')) }
     } finally {
       if (saveOperation.current === ticket) saveOperation.current = null
       if (currentScope()) setSaving(false)
@@ -560,6 +563,8 @@ export default function ScenarioFirstStepV8() {
           : kind === 'image'
             ? (image ? '画像' : '')
             : STEP_MESSAGE_KINDS.find((k) => k.value === kind)?.label ?? ''
+  const stickerPreview = !preserved && contentMode === 'compose' && kind === 'sticker' && kindState.sticker.packageId && kindState.sticker.stickerId
+    ? <StickerPreview stickerId={kindState.sticker.stickerId} /> : null
   const phone = (
     <LinePreview
       accountName={accountName}
@@ -567,8 +572,8 @@ export default function ScenarioFirstStepV8() {
       empty={bubble ? false : '1通目の内容を入れると、ここに届く形が出ます'}
     >
       {bubble ? (
-        <LinePreviewMessage accountName={accountName} avatar={accountName.slice(0, 1)} time={bubbleTime}>
-          {bubble}
+        <LinePreviewMessage accountName={accountName} avatar={accountName.slice(0, 1)} time={bubbleTime} bare={Boolean(stickerPreview)}>
+          {stickerPreview ?? bubble}
         </LinePreviewMessage>
       ) : null}
     </LinePreview>
@@ -608,7 +613,7 @@ export default function ScenarioFirstStepV8() {
       help={`配信方式：${modeLabel[mode]}・シナリオ：${scenario?.name ?? '読み込み中'}`}
       preview={preview}
       notice={!canEdit ? <ReadOnlyNotice role="status">閲覧のみで見ています。1通目を作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice> : undefined}
-      status={saving ? '保存しています' : browserDraft.label ?? undefined}
+      status={saving ? '保存しています' : scenarioDraftStatus(browserDraft.label) ?? undefined}
       footerActions={(
         <>
           <Button type="button" onClick={cancel}>キャンセル</Button>

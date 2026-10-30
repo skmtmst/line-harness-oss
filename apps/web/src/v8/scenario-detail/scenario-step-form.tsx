@@ -21,7 +21,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Select from '@/components/shared/select'
 import { formatNumber } from '@/lib/format'
 import { useFormErrors } from '@/lib/use-form-errors'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { scenarioDraftStatus, BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
 import { useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import type { DeliveryMode, MessageType, ScenarioStep } from '@line-crm/shared'
 import type { Dispatch, RefObject, SetStateAction } from 'react'
@@ -378,7 +378,7 @@ export function ScenarioStepForm({
           >
             キャンセル
           </Button>
-          {stepDraft.label ? <p className="text-ink-secondary self-center text-xs" aria-live="polite" data-autosave-status>{stepDraft.label}</p> : null}
+          {stepDraft.label ? <p className="text-ink-secondary self-center text-xs" aria-live="polite" data-autosave-status>{scenarioDraftStatus(stepDraft.label)}</p> : null}
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 'use client'
+import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from '@/components/shared/list-navigation'
@@ -16,7 +17,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft/index'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { scenarioDraftStatus, BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
 import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import { TextField } from '@/components/shared/text-field';
@@ -448,7 +449,7 @@ export default function ScenarioCreateV8() {
           ]}
         />
       )}
-      status={saving ? '作成しています' : detailsSaving ? '保存しています' : browserDraft.label ?? undefined}
+      status={saving ? '作成しています' : detailsSaving ? '保存しています' : scenarioDraftStatus(browserDraft.label) ?? undefined}
       footerActions={(
         <>
           <Button type="button" onClick={cancel}>キャンセル</Button>
@@ -605,7 +606,7 @@ function scenarioSaveError(cause: unknown): string {
 
 function scenarioModeError(cause: unknown): string {
   if (cause instanceof ApiError) {
-    if (cause.status === 400 && !cause.message.startsWith('API error:')) return cause.message
+    if (cause.status === 400) return japaneseDetailOf(cause) || describeApiFailure(cause, '入力内容の確認')
     if (cause.status === 403) return permissionDeniedMessage('store')
     if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
   }

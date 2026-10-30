@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { TAP_ACTION_DEFS, tapActionFromSavedUri, tapActionFromUri, tapActionLiffUrl, tapActionProblem, tapActionToUri } from './tap-actions'
+import { TAP_ACTION_DEFS, tapExtraSaveError, tapActionFromSavedUri, tapActionFromUri, tapActionLiffUrl, tapActionProblem, tapActionToUri } from './tap-actions'
 
 describe('押したらの決まり（YPzmo）', () => {
   test('フォーム未選択とLIFF未設定の編集値を持ち、保存前に止める', () => {
@@ -52,4 +52,16 @@ describe('押したらの決まり（YPzmo）', () => {
     expect(tapActionProblem({ kind: 'message', uri: '', text: 'あいう', refId: '' }, { where, hasLiff: true, textMax: 2 })).toBe('ボタン1の送る文は2文字までです')
     expect(tapActionProblem({ kind: 'template', uri: '', text: '', refId: '' }, { where, hasLiff: false })).toBeNull()
   })
+})
+
+
+test.each(['D1_ERROR: SELECT secret FROM tenant', '入力の誤り D1_ERROR: SELECT secret FROM tenant', 'Failed to fetch'])('追加動作の入力の失敗に内部原文を出さない: %s', message => {
+  const error = Object.assign(new Error(message), { code: 'TAP_EXTRA_INVALID' })
+  expect(tapExtraSaveError(error)).toMatch(/[ぁ-んァ-ヶ一-龠]/u)
+  expect(tapExtraSaveError(error)).not.toMatch(/D1_ERROR|SELECT|secret|Failed to fetch|API error/)
+})
+
+test('追加動作の具体的な直し方と対象外の区別を保つ', () => {
+  expect(tapExtraSaveError(Object.assign(new Error('開始するシナリオを選んでください'), { code: 'TAP_EXTRA_INVALID' }))).toBe('開始するシナリオを選んでください')
+  expect(tapExtraSaveError(new Error('対象外'))).toBeNull()
 })

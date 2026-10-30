@@ -411,7 +411,7 @@ export default function TagsTab({
       const fieldFailure = saveErrors.capture(reason)
       setItems((current) => current.map((item) => item.id === tag.id ? { ...item, groupId: previous } : item));
 
-      const message = reason instanceof ApiError ? reason.message : 'フォルダへ移せませんでした。'
+      const message = describeApiFailure(reason, 'フォルダへの移動')
       { if (!fieldFailure)
       setActionError(message) }
       notifyToast(message, {

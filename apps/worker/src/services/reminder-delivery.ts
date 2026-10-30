@@ -1,3 +1,7 @@
+import { hashOutboundPayload } from './outbound-idempotency.js';
+import { readRestaurantReminderDeliveryGate } from './restaurant-reminder-delivery-gate.js';
+import { restaurantBookingVariables, substituteRestaurantBooking, type RestaurantBookingContext } from './restaurant-booking-context.js';
+import type { FollowupEngineSnapshot } from './restaurant-followup-engine-approval.js';
 import { logger } from '@line-crm/shared/server';
 import { formatBookingDatetime } from './reminder-date-format.js';
 export { formatBookingDatetime } from './reminder-date-format.js';
@@ -160,7 +164,7 @@ export async function buildReminderStepMessage(
   sourceKind: 'reminder' | 'test_send' = 'reminder',
   // 登録時のテンプレート版の写し {"テンプレートID": 公開版番号}。
   // 無いときは今までどおり最新の版を読む（下書き試験・古い登録）。
-  options?: { pinnedTemplateVersions?: Record<string, number> | null; previewOnly?: boolean },
+  options?: { pinnedTemplateVersions?: Record<string, number> | null; previewOnly?: boolean; restaurantContext?: RestaurantBookingContext|null; approvedTemplates?: FollowupEngineSnapshot['templates'] },
 ): Promise<{
   message: Message;
   messageType: string;
@@ -171,7 +175,11 @@ export async function buildReminderStepMessage(
   let messageType = step.message_type;
   let messageContent = step.message_content;
   let templateVersion: number | null = null;
-  if (step.template_id) {
+  if (step.template_id && options?.approvedTemplates) {
+    const template=options.approvedTemplates.get(step.template_id);
+    if(!template||template.message_bubbles_json)throw new Error('APPROVED_TEMPLATE_UNAVAILABLE');
+    messageType=template.message_type;messageContent=template.message_content;templateVersion=template.published_version;
+  } else if (step.template_id) {
     // 登録時の版があるときはその版で送る。新しい版にするのは
     // 登録し直した時だけ。版履歴に無いときは今の版へ落ちる。
     const pinned = options?.pinnedTemplateVersions?.[step.template_id];
@@ -198,21 +206,24 @@ export async function buildReminderStepMessage(
   const resolvedMeta = await resolveMetadata(db, friend);
   // F10: 予約日時・Meet URL は送る側で置き換える。共通展開より先に潰すので、
   // 利用者が入れた値に同じ文字があっても二重に展開しない。
-  const bookingContent = contentNeedsBookingPlaceholders(messageContent)
+  const bookingContent = options?.restaurantContext ? substituteRestaurantBooking(messageContent,options.restaurantContext)
+    : contentNeedsBookingPlaceholders(messageContent)
     ? substituteBookingPlaceholders(
       messageContent,
       await resolveBookingInterpolation(db, friend.id, deliveredAt),
     )
     : messageContent;
+  const vars=options?.restaurantContext ? restaurantBookingVariables(options.restaurantContext) : null;
+  const scanned=vars ? bookingContent.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g,(match,key:string)=>key in vars?'':match) : bookingContent;
   const extra = options?.previewOnly
-    ? await resolveInterpolationExtra(db,friend.id,bookingContent)
-    : await resolveSendInterpolationExtra(db, friend.id, bookingContent, { kind: sourceKind, id: step.id });
+    ? await resolveInterpolationExtra(db,friend.id,scanned)
+    : await resolveSendInterpolationExtra(db, friend.id, scanned, { kind: sourceKind, id: step.id });
   const expanded = expandVariables(
     bookingContent,
     { ...friend, metadata: resolvedMeta },
     undefined,
     messageType,
-    { ...extra, deliveredAt },
+    { ...extra, ...(vars?{vars:{...extra.vars,...vars}}:{}), deliveredAt },
   );
   return {
     message: buildMessage(messageType, expanded),
@@ -238,6 +249,7 @@ async function resolveReminderRunMessage(
   pinnedTemplateVersions: Record<string, number> | null,
   ownedLeases: string[],
   nowIso: string,
+  restaurantOptions?: { restaurantContext:RestaurantBookingContext|null; approvedTemplates:FollowupEngineSnapshot['templates'] },
 ): Promise<{
   message: Message;
   messageType: string;
@@ -255,6 +267,7 @@ async function resolveReminderRunMessage(
   }
   const fresh = await buildReminderStepMessage(db, step, friend, sendAt, 'reminder', {
     pinnedTemplateVersions,
+    ...restaurantOptions,
   });
   // 先に残した処理があるときはそちらを使う（同じ実行の二重保存をしない）。
   const persisted = await saveReminderDeliveryRunSentPayload(db, {
@@ -355,6 +368,7 @@ export async function processReminderDeliveries(
             offsetMinutes: step.offset_minutes,
           },
           enrollment.delivery_mode === 'time' ? 'time' : 'countdown',
+          enrollment.source_kind === 'restaurant_reservation' ? enrollment.timezone : 'Asia/Tokyo',
         );
         if (sendAt.getTime() > now.getTime()) continue;
         const run = await claimReminderDeliveryRun(db, {
@@ -393,6 +407,7 @@ export async function processReminderDeliveries(
             offsetMinutes: step.offset_minutes,
           },
           enrollment.delivery_mode === 'time' ? 'time' : 'countdown',
+          enrollment.source_kind === 'restaurant_reservation' ? enrollment.timezone : 'Asia/Tokyo',
         );
         if (sendAt.getTime() > now.getTime()) continue;
         const run = await claimReminderDeliveryRun(db, {
@@ -438,6 +453,8 @@ export async function processReminderDeliveries(
       continue;
     }
 
+    const restaurantKnown={reminderId:enrollment.reminder_id,versionId:enrollment.reminder_version_id??'',
+      lineAccountId:accountId??'',sourceKind:enrollment.source_kind,scope:new Map()};
     for (const step of enrollment.steps) {
       // claim の直前にも停止を確かめる。登録ごとの判定の後で止まった分は、
       // 実行行を新しく積まずにこの登録の残り全部を保留へ回す。
@@ -450,6 +467,8 @@ export async function processReminderDeliveries(
       // 次の tick で読み直すためここでは何も積まない。
       const gate = await getFriendReminderSendGate(db, enrollment.id);
       if (!gate || gate.status !== 'active' || gate.targetDate !== enrollment.target_date) continue;
+      const restaurantGate=await readRestaurantReminderDeliveryGate(db,enrollment.id,restaurantKnown);
+      if(!restaurantGate.allowed){result.held++;continue;}
       const sendAt = resolveReminderSendAt(
         new Date(gate.targetDate),
         {
@@ -458,6 +477,7 @@ export async function processReminderDeliveries(
           offsetMinutes: step.offset_minutes,
         },
         enrollment.delivery_mode === 'time' ? 'time' : 'countdown',
+          enrollment.source_kind === 'restaurant_reservation' ? enrollment.timezone : 'Asia/Tokyo',
       );
       const run = await claimReminderDeliveryRun(db, {
         lineAccountId: accountId,
@@ -469,6 +489,9 @@ export async function processReminderDeliveries(
         now: nowIso,
         leaseExpiresAt,
         expectedTargetDate: gate.targetDate,
+        ...(restaurantGate.approval.managed?{idempotencyKey:`restaurant:${await hashOutboundPayload(JSON.stringify([
+          enrollment.id,step.id,sendAt.toISOString(),restaurantGate.approval.snapshot.contentHash,restaurantGate.context,
+        ]))}`}:{ }),
       });
       // 別cronが送信中、再試行時刻前、または既に終端状態なら何もしない。
       if (!run) continue;
@@ -561,6 +584,7 @@ export async function processReminderDeliveries(
         );
         const built = await resolveReminderRunMessage(
           db, run, step, friend, sendAt, pinnedTemplateVersions, ownedLeases, nowIso,
+          restaurantGate.approval.managed?{restaurantContext:restaurantGate.context,approvedTemplates:restaurantGate.approval.snapshot.templates}:undefined,
         );
         // 取消と送信の競合対策: push の直前に送る権利を1文で確かめる。
         // この後も beforePush・再検証・関係確認・停止確認のawaitがあり、
@@ -648,9 +672,14 @@ export async function processReminderDeliveries(
             continue enrollmentLoop;
           }
         }
+        const finalRestaurantGate=await readRestaurantReminderDeliveryGate(db,enrollment.id,restaurantKnown);
+        if(!finalRestaurantGate.allowed){
+          await releaseClaimedReminderRun(db,{id:run.id,now:nowIso,expectedLeaseExpiresAt:ownedLeases});
+          result.held++;continue enrollmentLoop;
+        }
         const marker=await db.prepare(`UPDATE reminder_delivery_runs SET last_error_code='delivery_started',updated_at=?
-          WHERE id=? AND status='claimed' AND lease_expires_at IN (${ownedLeases.map(()=>'?').join(',')})`)
-          .bind(nowIso,run.id,...ownedLeases).run();
+          WHERE id=? AND status='claimed' AND lease_expires_at IN (${ownedLeases.map(()=>'?').join(',')}) AND (${restaurantGate.guard.sql}) AND (${finalRestaurantGate.guard.sql})`)
+          .bind(nowIso,run.id,...ownedLeases,...restaurantGate.guard.binds,...finalRestaurantGate.guard.binds).run();
         if(marker.meta.changes!==1)continue;
         sendStarted=true;
         const response = await deliveryClient.pushMessageWithRequestId(

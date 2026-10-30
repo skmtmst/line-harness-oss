@@ -64,25 +64,12 @@ describe('入力・検索・選択部品の操作と安全性', () => {
     expect(hidden?.getAttribute('value')).toBe('active')
   })
 
-  it('CSSモジュールは生の色とローカル変数を持たず、フォーカス輪郭を消さない', () => {
-    // 2026-09-25・使いやすさ点検 §8: 入力欄の輪郭は `2px・action 色・offset 2px`
-    // にそろえた（緑は「正常」の意味）。`outline: revert`（ブラウザ既定）と
-    // 同等以上に見える輪郭なので、ここでは両方を保証として認める。
-    // 複合部品のうち外枠の `:focus-within` を正本にするものは、中の input の
-    // `outline: none` をその場合だけ許す（二重の輪郭を避けるため）。
-    // V8 SearchField は :has(:focus-visible) で検索欄全体に輪郭を出す。
-    // 入力欄の正本は text-field.module.css（form-controls の TextInput・TextArea はその包み）。
+  it('CSSモジュールは生の色とローカル変数を持たない', () => {
+    // 焦点の色・本数・消失は invalid-focus-ring / double-focus-ring の実ブラウザ検査で確かめる。
     for (const name of ['text-field.module.css', 'search-field.module.css', 'select.module.css']) {
       const css = withoutComments(read(name))
       expect(css, `${name} に生の色がある`).not.toMatch(/#[0-9a-fA-F]{3,8}\b/)
       expect(css, `${name} がローカル変数を定義している`).not.toMatch(/^\s*--(?!tw-)[a-z-]+:/m)
-      const hasOuterRing = /:(?:focus-within|has\(:focus-visible\))\s*\{[^}]*outline:\s*2px solid var\(--color-focus-ring\)/.test(css)
-      if (!hasOuterRing) {
-        expect(css, `${name} がフォーカス輪郭を消している`).not.toMatch(/outline:\s*(?:0|none)/)
-      }
-      expect(css, `${name} がfocus-visibleを保証していない`).toMatch(
-        /:focus-visible[^{]*\{[^}]*outline:\s*(?:revert|2px solid var\(--color-focus-ring\))/s,
-      )
     }
   })
 })

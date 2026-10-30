@@ -1,9 +1,12 @@
 @layer properties, theme, base, components, utilities;
 @layer components {
 .field { display: flex; align-items: center; gap: var(--tap-action-gap); width: 100%; min-width: 0; min-height: var(--tap-action-row-h); padding: var(--tap-action-pad); border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); color: var(--color-ink); text-align: left; cursor: pointer; }
-.field:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
 .field[aria-invalid=true] { border-color: var(--color-danger); }
 .field:disabled { opacity: var(--tpl-disabled-opacity, .5); cursor: not-allowed; }
+.field[data-permission-locked] { opacity: var(--tpl-disabled-opacity, .5); cursor: not-allowed; }
+.field[data-permission-locked] .change { color: var(--color-ink-secondary); }
+.item[data-permission-locked] { cursor: not-allowed; }
 .selection { display: flex; flex-wrap: wrap; align-items: center; gap: var(--tap-action-gap); flex: 1; min-width: 0; }
 .placeholder { color: var(--color-ink-faint); font-size: var(--text-body); }
 .change { color: var(--color-action); font-size: var(--text-caption); white-space: nowrap; }
@@ -20,4 +23,4 @@
 }
 
 /* 印と文字の上下の真ん中をそろえる（差 0.5 以内。§6.5 の 2）。英数字の書体は字の箱が上に寄るので、共通の補正値で文字を下げる。 */
-:root .field > :is(.selection, .change) { translate: 0 var(--text-optical-shift); }
+:root .field > :is(.selection, .change) { translate: 0 var(--text-optical-shift); }/* 誤り＋焦点は赤1本（青を重ねない）。層の外に置く（全体の青輪より勝つため）。 */

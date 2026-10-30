@@ -5,8 +5,8 @@ export async function getRun(db: D1Database, runId: string): Promise<RunRow | nu
   return db.prepare(
     `SELECT r.id, r.line_account_id, r.automation_id, r.automation_version_id,
             r.friend_id, r.source_event_id, r.idempotency_key, r.status,
-            r.current_step, r.input_event_json, r.is_test, v.action_config,
-            r.execution_plan_json
+            r.current_step, r.input_event_json, r.is_test, v.action_config, v.trigger_type,
+            r.execution_plan_json, r.created_at
        FROM automation_runs r
        JOIN automation_versions v
          ON v.id = r.automation_version_id AND v.automation_id = r.automation_id

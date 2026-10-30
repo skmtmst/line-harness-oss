@@ -70,9 +70,9 @@ export function describeRateLimited(seconds: number | undefined): string {
 
 /** 日本語の本文だけを運用者に見せる。英語の検証文は欄の直し方へ回す。 */
 export function japaneseDetailOf(err: unknown): string {
-  if (err instanceof ApiError && err.status !== 403 && err.message && !/^API error: /.test(err.message)
-    && /[ぁ-んァ-ヶ一-龠]/u.test(err.message)) {
-    return err.message
+  if (err instanceof ApiError && err.status !== 403) {
+    const detail = extractApiErrorMessage(JSON.stringify({ error: err.message }), err.status)
+    if (/[ぁ-んァ-ヶ一-龠]/u.test(detail)) return detail
   }
   return ''
 }

@@ -4,6 +4,7 @@ import Select from '@/components/shared/select'
 import TapActionField from '@/components/shared/tap-action-field'
 import { Play } from 'lucide-react'
 import { describeApiFailure } from '@/components/shared/api-error-message'
+import { extractApiErrorMessage } from '@/lib/api'
 import EntitySelect from '@/components/shared/entity-select'
 
 
@@ -18,7 +19,6 @@ import { HqTagEditorV8 } from '@/v8/hq-templates/public/tag-editor/index'
 import HqFormDefinitionEditor from '@/components/forms/hq-form-definition-editor'
 import type { FormRefs } from '@/components/forms/form-refs'
 import {
-  HqRichMenuCompatibilityError,
   hqDefinitionToRichMenuCreateValue,
   richMenuCreateValueToHqDefinition,
 } from '@/lib/hq-rich-menu-create'
@@ -35,6 +35,14 @@ import type {
 } from '@/lib/hq-templates-api'
 import styles from './template-console.module.css'
 import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
+
+export function templateCompatibilityFailure(reason: unknown, phase: 'load' | 'change'): string {
+  const detail = extractApiErrorMessage(JSON.stringify({ error: reason instanceof Error ? reason.message : '' }), 400)
+  if (/[ぁ-んァ-ヶ一-龠]/u.test(detail)) return detail
+  return phase === 'load'
+    ? '内容を安全に読み込めないため停止しました。設定を確認してください。'
+    : '内容を安全に変換できないため停止しました。設定を確認してください。'
+}
 
 export function definitionName(type: TemplateType, definition: TemplateDefinition): string {
   if (type === 'scenario' && 'scenario' in definition) return definition.scenario.name
@@ -60,7 +68,7 @@ export function definitionError(type: TemplateType, definition: TemplateDefiniti
   if (type === 'tag' && 'tag' in definition) return definition.folders.some(folder => !folder.name.trim()) ? 'タググループ名を入力してください。' : null
   if (type === 'template' && 'template' in definition) {
     if (definition.card) {
-      try { parseHqMessageCard(definition.card) } catch (error) { return error instanceof Error ? error.message : '入力内容を確認してください。' }
+      try { parseHqMessageCard(definition.card) } catch (error) { return describeApiFailure(error, '入力内容の確認') }
     }
     return definition.template.messageContent.trim() ? null : '配信する本文を入力してください。'
   }
@@ -219,7 +227,7 @@ function RichMenuEditor({ value, disabled, onChange, onBusyChange, onNameChange,
   let compatibilityError: string | null = null
   let draft = freshRichMenuCreateValue()
   try { draft = hqDefinitionToRichMenuCreateValue(value) }
-  catch (error) { compatibilityError = error instanceof Error ? error.message : '内容を安全に読み込めないため停止しました。' }
+  catch (error) { compatibilityError = templateCompatibilityFailure(error, 'load') }
   const page = value.richMenu.pages[0]
   // R568: 今の大きさで採用できる寸法。合わない画像は送る前に止める。
   const expectedSize = value.richMenu.size === 'large' ? { width: 2500, height: 1686 } : { width: 2500, height: 843 }
@@ -234,7 +242,7 @@ function RichMenuEditor({ value, disabled, onChange, onBusyChange, onNameChange,
     trackedLinks={references.trackedLinks}
     onChange={next => {
       try { const converted = richMenuCreateValueToHqDefinition(next, value); onChange(converted); if (next.name !== value.richMenu.name) onNameChange?.(next.name); setChangeError(null) }
-      catch (error) { setChangeError(error instanceof HqRichMenuCompatibilityError ? error.message : '変更を安全に保存できないため停止しました。') }
+      catch (error) { setChangeError(templateCompatibilityFailure(error, 'change')) }
     }}
     imageAction={page ? <ImageUpload purpose="rich_menu" disabled={disabled || Boolean(compatibilityError)} expectedSize={expectedSize} onBusyChange={onBusyChange} onReceipt={onReceipt} onUploaded={media => {
       if (media.width !== 2500 || media.height !== (value.richMenu.size === 'large' ? 1686 : 843)) throw new Error('選択中のサイズに合う画像を指定してください。')

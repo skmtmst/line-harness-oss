@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { CreatePage } from '@/components/templates/create-page'
@@ -125,7 +126,7 @@ function fieldError(error: unknown) {
     // R130: 422の本文はWorkerが付けた日本語の検証文だけ（`lib/api.ts`の
     // BODY_MESSAGE_STATUSESで監査済み）。400と同じくそのまま出す。
     // 落とすと入力ミスが「時間をおいてもう一度」に化けて直し方が分からない。
-    if (error.status === 400 || error.status === 422) return error.message
+    if (error.status === 400 || error.status === 422) return japaneseDetailOf(error) || describeApiFailure(error, '入力内容の確認')
     if (error.status === 403) return 'スコアのルールを変更する権限がありません。'
     if (error.status === 404) return '対象のLINEアカウントを確認できませんでした。'
     if (error.status === 405) return 'この環境ではスコアのルールを変更できません。'
@@ -679,3 +680,5 @@ export default function ActionScoreRulesPage() {
     </CreatePage></SaveErrorScope>
   )
 }
+
+export { fieldError as scoreRuleErrorMessage }

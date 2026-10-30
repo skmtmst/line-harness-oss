@@ -116,12 +116,6 @@
   display: none;
 }
 
-/* キーボードで場所へ来たときの輪郭。緑は「正常」の意味なので輪郭に使わない。 */
-.zone:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
 .row {
   display: flex;
   align-items: center;
@@ -223,11 +217,9 @@
 .zone[data-variant='composer'] { height: var(--tpl-msg-composer-media-h); min-height: var(--tpl-msg-composer-media-h); padding: 0; gap: var(--tpl-msg-composer-gap-s); }
 .zone[data-variant='composer'] .zoneTitle { font-size: var(--text-label); line-height: var(--tpl-msg-composer-text-lh); }
 .zone[data-variant='composer'] .zoneHint { font-size: var(--text-micro); line-height: var(--tpl-msg-composer-tab-lh); }
-.zone[data-variant='composer']:focus-visible { outline: 2px solid var(--color-focus-ring); }
 
 @layer components {
 .zone[data-variant='upload'] .zoneTitle { font-size: var(--text-heading); }
-.zone[data-variant='upload']:focus-visible { outline: 2px solid var(--color-focus-ring); }
 }
 
 /* 欄の中の別の入れ方（「ライブラリから選ぶ」）。 */

@@ -12,7 +12,7 @@ const oldDone = (): StepResult[] => keys.map((key, index) => ({
 describe('業種に合う初期設定の実測', () => {
   it.each(styles)('%sでは旧タグや配信が済みでも、実物を読めなければ済みにしない', style => {
     const input = oldDone()
-    const output = stepsForStyle(input, style)
+    const output = stepsForStyle(input, style).filter(step => keys.includes(step.key as typeof keys[number]))
     expect(output.map(step => step.state)).toEqual(['unknown', 'unknown', 'unknown'])
     for (const step of output) {
       expect(step.next).toContain('確認できません')
@@ -31,7 +31,7 @@ describe('業種に合う初期設定の実測', () => {
     }
     const result = stepsForStyle(oldDone(), style, { style, steps: {
       attributes: { complete: false }, friendAdd: { complete: null, reason: '設定の読み込みに失敗しました' },
-    } })
+    } }).filter(step => keys.includes(step.key as typeof keys[number]))
     expect(result.map(step => step.state)).toEqual(['todo', 'unknown', 'unknown'])
     expect(result[0].next).not.toMatch(/タグ|シナリオ/)
     expect(result[1].next).toBe('設定の読み込みに失敗しました')
@@ -62,7 +62,7 @@ describe('業種に合う初期設定の実測', () => {
     for (const state of ['todo', 'stalled', 'unknown'] as const) {
       const input = oldDone().map(step => ({ ...step, state }))
       const copy = structuredClone(input)
-      const output = stepsForStyle(input, 'restaurant', { style: 'restaurant', steps: { attributes: { complete: true }, friendAdd: { complete: null, reason: '   ' } } })
+      const output = stepsForStyle(input, 'restaurant', { style: 'restaurant', steps: { attributes: { complete: true }, friendAdd: { complete: null, reason: '   ' } } }).filter(step => keys.includes(step.key as typeof keys[number]))
       expect(output.map(step => step.state)).toEqual(['done', 'unknown', 'unknown'])
       expect(output[1].next).toContain('予約で受け付ける内容')
       expect(output[0].action?.href).toBe('/restaurant-test/tables')

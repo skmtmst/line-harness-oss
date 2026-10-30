@@ -1,3 +1,4 @@
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api'
 import { formatTime } from '@/lib/format'
 
@@ -77,9 +78,7 @@ export function describeSendFailure(error: unknown, now: Date = new Date()): str
      * 従来の言い換えを使う。検証文は fetchApi が内部文言を除いた
      * 安全なものだけを載せる。
      */
-    const detail = typeof error.message === 'string' && error.message && !error.message.startsWith('API error:')
-      ? error.message
-      : ''
+    const detail = japaneseDetailOf(error)
     return detail || 'LINEがこの送信を受け付けませんでした。内容を見直して送り直してください。'
   }
 

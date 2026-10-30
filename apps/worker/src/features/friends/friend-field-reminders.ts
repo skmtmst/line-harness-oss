@@ -1,3 +1,4 @@
+import { readFollowupEngineGate } from '../../services/restaurant-followup-engine-approval.js';
 import { logger } from '@line-crm/shared/server';
 import {
   getFriendFieldReminders,
@@ -73,6 +74,11 @@ export async function processFriendFieldReminders(
       continue;
     }
     try {
+      const definition=await db.prepare('SELECT current_published_version_id FROM reminders WHERE id=?').bind(reminder.id)
+        .first<{current_published_version_id:string|null}>();
+      const approval=await readFollowupEngineGate(db,{engine:'reminder',targetId:reminder.id,
+        lineAccountId:reminder.line_account_id??'',versionId:definition?.current_published_version_id??''});
+      if(!approval.allowed){hasMore=true;continue;}
       const limit = Math.min(pageSize, remaining);
       const friends = await getFriendsWithFieldValuePage(
         db,
@@ -133,7 +139,9 @@ export async function processFriendFieldReminders(
         });
       }
 
-      const newlyEnrolled = await enrollFriendsInReminderOnce(db, reminder.id, candidates);
+      const newlyEnrolled = approval.managed
+        ? await enrollFriendsInReminderOnce(db,reminder.id,candidates,{sourceFingerprint:approval.snapshot.contentHash,writeGuard:approval.guard})
+        : await enrollFriendsInReminderOnce(db, reminder.id, candidates);
       enrolled += newlyEnrolled;
       skipped += candidates.length - newlyEnrolled;
 

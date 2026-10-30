@@ -42,3 +42,16 @@ it('共通LIFFへ渡す回答後処理の本文・種類・失敗時動作を保
     answerActions: [{ actionType: 'send_message', config: { content: '回答ありがとうございます' }, onFailure: 'stop' }],
   }) }))
 })
+
+it('選択肢が空なら保存を止め、各入力から理由を読み上げられる', async () => {
+  await act(async () => { render(<TemplateAssetEditor kind="research" visual />) })
+  const choices = screen.getAllByRole('textbox', { name: /^問 1 の選択肢 [1-3]$/ })
+  for (const choice of choices) fireEvent.change(choice, { target: { value: '' } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '下書きを保存' })) })
+  expect(create).not.toHaveBeenCalled()
+  for (const choice of choices) {
+    expect(choice.getAttribute('aria-invalid')).toBe('true')
+    const described = (choice.getAttribute('aria-describedby') ?? '').split(/\s+/).map(id => document.getElementById(id)?.textContent).join(' ')
+    expect(described).toContain('選択肢を1つ以上入力してください')
+  }
+})

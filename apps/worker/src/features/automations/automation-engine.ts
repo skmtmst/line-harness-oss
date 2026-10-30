@@ -1,3 +1,9 @@
+import { readFollowupEngineGate } from '../../services/restaurant-followup-engine-approval.js';
+import { readRestaurantAutomationSource } from '../../services/restaurant-automation-source.js';
+import { readRestaurantAutomationDeliveryGate, type RestaurantAutomationDeliveryScope } from '../../services/restaurant-automation-delivery-gate.js';
+import { buildExecutionPlan, parseActions, resolveCommonActionVersion, type ActionDefinition } from './automation-plan.js';
+export { resolveCommonActionVersion, COMMON_ACTION_MAX_BRANCH_DEPTH, COMMON_ACTION_MAX_DEPTH, COMMON_ACTION_MAX_STEPS } from './automation-plan.js';
+export type { ActionDefinition } from './automation-plan.js';
 export type { RunStatus, RunRow, StepRow } from './run-types.js';
 import type { RunStatus, RunRow, StepRow, StepStatus } from './run-types.js';
 import { getRun, getStep } from './automation-run-state.js';
@@ -9,35 +15,16 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
  * 固定し、外部処理は注入された executor に同じ stepExecutionId を渡す。
 */
 
+import type { SegmentCondition } from '@line-crm/shared';
 import { matchesCondition } from '../../services/segment-query.js';
-import { type SegmentCondition } from '@line-crm/shared';
+import { AutomationActionError } from './automation-action-error.js';
+import { addMinutes, expireNextDayWait, scheduleAutomationWait } from './automation-wait.js';
 import { featureJobCanRun } from '../../services/feature-enforcement.js';
 import { isOperationCapabilityStopped, listLineAccountsWithTenantStatus } from '@line-crm/db';
 
 const DEFAULT_LEASE_MINUTES = 5;
 const RETRY_DELAYS_MINUTES = [1, 5, 30] as const;
 const MAX_ATTEMPTS = RETRY_DELAYS_MINUTES.length + 1;
-
-/*
- * 監査 : 共通アクション参照の展開上限。公開前の検査
- * （common-actions.ts の assertPublishableExpansion）と実行時の計画
- * （buildExecutionPlan）で同じ値を使う。片方だけ変えない。
- */
-export const COMMON_ACTION_MAX_DEPTH = 20;
-export const COMMON_ACTION_MAX_BRANCH_DEPTH = 3;
-export const COMMON_ACTION_MAX_STEPS = 1000;
-type FailureMode = 'stop' | 'continue';
-
-export interface ActionDefinition {
-  id: string;
-  type: string;
-  params: Record<string, unknown>;
-  onFailure: FailureMode;
-  /** 実行開始時に固定した共通アクション版。実行計画だけが持つ。 */
-  commonActionVersionId?: string | null;
-  /** 実行計画で固定した、親分岐の通過条件。保存APIから直接は受け取らない。 */
-  branchConditions?: Array<{ condition: SegmentCondition; expected: boolean; branchStepKey?: string }>;
-}
 
 export interface AutomationRunStartInput {
   lineAccountId: string;
@@ -75,6 +62,7 @@ export interface AutomationActionContext {
   attemptNumber: number;
   commonActionVersionId: string | null;
   isTest: boolean;
+  restaurantDeliveryScope?: RestaurantAutomationDeliveryScope;
 }
 
 export type AutomationActionExecutor = (
@@ -89,16 +77,7 @@ export interface AutomationEngineOptions {
   tenantStatusByAccount?: ReadonlyMap<string, 'active' | 'suspended' | 'archived'>;
 }
 
-export class AutomationActionError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-    public readonly retryable: boolean,
-  ) {
-    super(message);
-    this.name = 'AutomationActionError';
-  }
-}
+export { AutomationActionError } from './automation-action-error.js';
 
 /** 再試行は配送 outbox が管理するため、ポーリングでアクションの再試行予算を使わない。 */
 export class AutomationActionDeferred extends Error {}
@@ -123,11 +102,6 @@ export class AutomationRunCancelError extends Error {
   }
 }
 
-function addMinutes(value: string, minutes: number): string {
-  const date = new Date(value);
-  date.setMinutes(date.getMinutes() + minutes);
-  return date.toISOString();
-}
 
 function nowIso(value?: string): string {
   return value ?? new Date().toISOString();
@@ -141,56 +115,6 @@ function parseObject(text: string): Record<string, unknown> {
   const value: unknown = JSON.parse(text);
   if (!isRecord(value)) throw new AutomationActionError('invalid_input_event', '実行入力が不正です', false);
   return value;
-}
-
-function parseActions(text: string): ActionDefinition[] {
-  let value: unknown;
-  try {
-    value = JSON.parse(text);
-  } catch {
-    throw new AutomationActionError('invalid_action_config_json', '処理定義のJSONが不正です', false);
-  }
-  if (!Array.isArray(value)) {
-    throw new AutomationActionError('invalid_action_config', '処理定義は配列である必要があります', false);
-  }
-
-  const ids = new Set<string>();
-  return value.map((item, index) => {
-    if (!isRecord(item)) {
-      throw new AutomationActionError('invalid_action_shape', `${index + 1}番目の処理定義が不正です`, false);
-    }
-    const id = typeof item.id === 'string' ? item.id.trim() : '';
-    const type = typeof item.type === 'string' ? item.type.trim() : '';
-    const params = item.params;
-    const onFailure = item.onFailure ?? 'stop';
-    if (!id || !type || !isRecord(params) || (onFailure !== 'stop' && onFailure !== 'continue')) {
-      throw new AutomationActionError('invalid_action_shape', `${index + 1}番目の処理定義が不正です`, false);
-    }
-    if (ids.has(id)) {
-      throw new AutomationActionError('duplicate_action_id', `処理ID ${id} が重複しています`, false);
-    }
-    ids.add(id);
-    const commonActionVersionId = typeof item.commonActionVersionId === 'string'
-      ? item.commonActionVersionId.trim() || null
-      : null;
-    let branchConditions: ActionDefinition['branchConditions'];
-    if (item.branchConditions !== undefined) {
-      if (!Array.isArray(item.branchConditions)) {
-        throw new AutomationActionError('invalid_branch_condition', '分岐の実行条件が不正です', false);
-      }
-      branchConditions = item.branchConditions.map((entry) => {
-        if (!isRecord(entry) || !isRecord(entry.condition) || typeof entry.expected !== 'boolean') {
-          throw new AutomationActionError('invalid_branch_condition', '分岐の実行条件が不正です', false);
-        }
-        if (entry.branchStepKey !== undefined && (typeof entry.branchStepKey !== 'string' || !entry.branchStepKey)) {
-          throw new AutomationActionError('invalid_branch_condition', '分岐の記録先が不正です', false);
-        }
-        return { condition: entry.condition as unknown as SegmentCondition, expected: entry.expected,
-          branchStepKey: entry.branchStepKey as string | undefined };
-      });
-    }
-    return { id, type, params, onFailure, commonActionVersionId, branchConditions };
-  });
 }
 
 /** 親分岐の完了記録だけを読む。旧計画は通のパスから親を特定する。 */
@@ -220,154 +144,6 @@ async function recordedBranchSelected(
     if (output.matched !== item.expected) return false;
   }
   return true;
-}
-
-export async function resolveCommonActionVersion(
-  db: D1Database,
-  input: { lineAccountId: string; automationId: string; action: ActionDefinition },
-): Promise<string | null> {
-  if (input.action.type !== 'common_action') return null;
-  const commonActionId = input.action.params.commonActionId;
-  if (typeof commonActionId !== 'string' || !commonActionId.trim()) return null;
-
-  const explicitVersionId = input.action.params.commonActionVersionId;
-  if (typeof explicitVersionId === 'string' && explicitVersionId.trim()) {
-    const explicit = await db.prepare(
-      `SELECT cav.id
-         FROM common_action_versions cav
-         JOIN common_actions ca ON ca.id = cav.common_action_id
-        WHERE cav.id = ? AND cav.common_action_id = ? AND cav.status = 'published'
-          AND ca.line_account_id = ?`,
-    ).bind(explicitVersionId, commonActionId, input.lineAccountId).first<{ id: string }>();
-    return explicit?.id ?? null;
-  }
-
-  const binding = await db.prepare(
-    `SELECT b.common_action_version_id AS id
-       FROM common_action_bindings b
-       JOIN common_action_versions cav
-         ON cav.id = b.common_action_version_id AND cav.common_action_id = b.common_action_id
-      WHERE b.line_account_id = ? AND b.consumer_type = 'automation'
-        AND b.consumer_id = ? AND b.consumer_path = ? AND b.common_action_id = ?
-        AND cav.status = 'published'
-      LIMIT 1`,
-  ).bind(input.lineAccountId, input.automationId, input.action.id, commonActionId)
-    .first<{ id: string }>();
-  return binding?.id ?? null;
-}
-
-async function buildExecutionPlan(
-  db: D1Database,
-  input: {
-    lineAccountId: string;
-    automationId: string;
-    actions: ActionDefinition[];
-    prefix?: string;
-    depth?: number;
-    budget?: { count: number };
-    branchDepth?: number;
-    branchConditions?: ActionDefinition['branchConditions'];
-  },
-): Promise<ActionDefinition[]> {
-  const depth = input.depth ?? 0;
-  const branchDepth = input.branchDepth ?? 0;
-  const budget = input.budget ?? { count: 0 };
-  if (depth > COMMON_ACTION_MAX_DEPTH) {
-    throw new AutomationActionError('common_action_too_deep', '共通アクションの呼び出しが深すぎます', false);
-  }
-  const plan: ActionDefinition[] = [];
-  for (const action of input.actions) {
-    budget.count += 1;
-    if (budget.count > COMMON_ACTION_MAX_STEPS) {
-      throw new AutomationActionError('execution_plan_too_large', '実行する処理が多すぎます', false);
-    }
-    const stepKey = input.prefix ? `${input.prefix}/${action.id}` : action.id;
-    if (action.type === 'branch') {
-      if (branchDepth >= COMMON_ACTION_MAX_BRANCH_DEPTH) {
-        throw new AutomationActionError('branch_too_deep', '条件分岐の入れ子は3段までです', false);
-      }
-      const condition = action.params.condition as SegmentCondition;
-      const thenActions = action.params.then as ActionDefinition[];
-      const elseActions = action.params.else as ActionDefinition[];
-      if (!condition || !Array.isArray(thenActions) || !Array.isArray(elseActions)) {
-        throw new AutomationActionError('branch_invalid', '条件分岐の設定が壊れています', false);
-      }
-      plan.push({
-        ...action,
-        id: stepKey,
-        type: 'branch_marker',
-        params: { condition },
-        branchConditions: input.branchConditions,
-      });
-      plan.push(...await buildExecutionPlan(db, {
-        ...input,
-        actions: thenActions,
-        prefix: `${stepKey}/then`,
-        branchDepth: branchDepth + 1,
-        branchConditions: [...(input.branchConditions ?? []), { condition, expected: true, branchStepKey: stepKey }],
-        budget,
-      }));
-      plan.push(...await buildExecutionPlan(db, {
-        ...input,
-        actions: elseActions,
-        prefix: `${stepKey}/else`,
-        branchDepth: branchDepth + 1,
-        branchConditions: [...(input.branchConditions ?? []), { condition, expected: false, branchStepKey: stepKey }],
-        budget,
-      }));
-      continue;
-    }
-    if (action.type !== 'common_action') {
-      const params = action.type === 'wait' && action.params.durationMinutes === undefined
-        ? { ...action.params, durationMinutes: action.params.minutes }
-        : action.params;
-      plan.push({ ...action, id: stepKey, params, branchConditions: input.branchConditions });
-      continue;
-    }
-
-    const commonActionVersionId = await resolveCommonActionVersion(db, {
-      lineAccountId: input.lineAccountId,
-      automationId: input.automationId,
-      action,
-    });
-    if (!commonActionVersionId) {
-      throw new AutomationActionError(
-        'common_action_version_not_pinned',
-        '公開済みの共通アクション版を固定できませんでした',
-        false,
-      );
-    }
-    const version = await db.prepare(
-      `SELECT cav.action_config
-         FROM common_action_versions cav
-         JOIN common_actions ca ON ca.id = cav.common_action_id
-        WHERE cav.id = ? AND cav.status = 'published' AND ca.line_account_id = ?`,
-    ).bind(commonActionVersionId, input.lineAccountId).first<{ action_config: string }>();
-    if (!version) {
-      throw new AutomationActionError('common_action_version_not_found', '固定した共通アクション版が見つかりません', false);
-    }
-
-    // 利用版を実行履歴に1行残し、その後ろへ実際の処理を展開する。
-    plan.push({
-      id: stepKey,
-      type: 'common_action_marker',
-      params: { commonActionId: action.params.commonActionId },
-      onFailure: action.onFailure,
-      commonActionVersionId,
-      branchConditions: input.branchConditions,
-    });
-    plan.push(...await buildExecutionPlan(db, {
-      lineAccountId: input.lineAccountId,
-      automationId: input.automationId,
-      actions: parseActions(version.action_config),
-      prefix: stepKey,
-      depth: depth + 1,
-      branchDepth,
-      branchConditions: input.branchConditions,
-      budget,
-    }));
-  }
-  return plan;
 }
 
 async function precreateSteps(db: D1Database, run: RunRow, actions: ActionDefinition[]): Promise<void> {
@@ -402,7 +178,7 @@ export async function startAutomationRun(
   const now = nowIso(input.now);
   const published = await db.prepare(
     `SELECT d.id AS automation_id, v.id AS version_id,
-            v.action_config
+            v.action_config, v.trigger_type
        FROM automation_definitions d
        JOIN automation_versions v
          ON v.id = CASE WHEN ? = 1 THEN ? ELSE d.current_published_version_id END
@@ -423,6 +199,7 @@ export async function startAutomationRun(
     automation_id: string;
     version_id: string;
     action_config: string;
+    trigger_type: string;
   }>();
   if (!published) {
     return { kind: 'not_active', runId: null, status: null, automationVersionId: null };
@@ -447,12 +224,25 @@ export async function startAutomationRun(
       }];
     }
   }
+  const approval = await readFollowupEngineGate(db,{
+    engine:'automation',targetId:input.automationId,lineAccountId:input.lineAccountId,versionId:published.version_id,
+    ...(status==='queued'?{executionPlanJson:JSON.stringify(executionPlan)}:{}),
+  });
+  if(!approval.allowed||input.isTest&&approval.managed)return {kind:'not_active',runId:null,status:null,automationVersionId:null};
+  const source = input.isTest ? {restaurant:false as const,allowed:true as const} : await readRestaurantAutomationSource(db,{
+    eventType:published.trigger_type,eventId:input.sourceEventId,lineAccountId:input.lineAccountId,friendId:input.friendId??null,now,strict:approval.managed,
+  });
+  if(!source.allowed || (approval.managed&&(!source.restaurant||source.context.store_id!==approval.storeId)))
+    return {kind:'not_active',runId:null,status:null,automationVersionId:null};
+  const guards=[...(approval.managed?[approval.guard]:[]),...(source.restaurant?[source.guard]:[])];
+  const writeGuard=guards.length?{sql:guards.map(item=>`(${item.sql})`).join(' AND '),binds:guards.flatMap(item=>item.binds)}:null;
+  const runInput=approval.managed?{...(input.inputEvent??{}),__restaurantFollowup:{contentHash:approval.snapshot.contentHash}}:input.inputEvent??{};
   const inserted = await db.prepare(
     `INSERT OR IGNORE INTO automation_runs
        (id, line_account_id, automation_id, automation_version_id, friend_id,
         source_event_id, idempotency_key, status, input_event_json, is_test,
         completed_at, created_at, execution_plan_json)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     ${writeGuard?'SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? WHERE '+writeGuard.sql:'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'}`,
   ).bind(
     runId,
     input.lineAccountId,
@@ -462,11 +252,12 @@ export async function startAutomationRun(
     input.sourceEventId,
     input.idempotencyKey,
     status,
-    JSON.stringify(input.inputEvent ?? {}),
+    JSON.stringify(runInput),
     input.isTest ? 1 : 0,
     status === 'skipped_condition' ? now : null,
     now,
     status === 'queued' ? JSON.stringify(executionPlan) : null,
+    ...(writeGuard?.binds??[]),
   ).run();
 
   if ((inserted.meta?.changes ?? 0) !== 1) {
@@ -479,6 +270,7 @@ export async function startAutomationRun(
       status: RunStatus;
       automation_version_id: string;
     }>();
+    if (!existing && writeGuard) return {kind:'not_active',runId:null,status:null,automationVersionId:null};
     if (!existing) throw new Error('automation_run_idempotency_lookup_failed');
     return {
       kind: 'existing',
@@ -632,34 +424,6 @@ async function finishRun(db: D1Database, runId: string, now: string): Promise<Ru
   return status;
 }
 
-async function scheduleWait(
-  db: D1Database,
-  run: RunRow,
-  step: StepRow,
-  action: ActionDefinition,
-  now: string,
-): Promise<void> {
-  const durationMinutes = action.params.durationMinutes;
-  if (
-    typeof durationMinutes !== 'number'
-    || !Number.isInteger(durationMinutes)
-    || durationMinutes <= 0
-    || durationMinutes % 5 !== 0
-  ) {
-    throw new AutomationActionError('invalid_wait_duration', '待機時間は5分単位で指定してください', false);
-  }
-  const resumeAt = addMinutes(now, durationMinutes);
-  await db.prepare(
-    `UPDATE automation_run_steps
-        SET status = 'waiting', output_json = ?, retry_at = NULL, lease_expires_at = NULL
-      WHERE id = ? AND status = 'running'`,
-  ).bind(JSON.stringify({ resumeAt }), step.id).run();
-  await db.prepare(
-    `UPDATE automation_runs
-        SET status = 'waiting', resume_at = ?, lease_expires_at = NULL
-      WHERE id = ? AND status = 'running'`,
-  ).bind(resumeAt, run.id).run();
-}
 
 export async function processAutomationRun(
   db: D1Database,
@@ -717,6 +481,8 @@ export async function processAutomationRun(
     return 'failed';
   }
 
+  const restaurantDeliveryScope:RestaurantAutomationDeliveryScope={approval:new Map(),run:{...run,trigger_type:run.trigger_type??''}};
+  const hasNextDayWait = actions.some(action => action.type === 'wait' && action.params.mode === 'next_day');
   for (let index = run.current_step; index < actions.length; index += 1) {
     const action = actions[index];
     /*
@@ -728,6 +494,14 @@ export async function processAutomationRun(
       .bind(run.id).first<{ status: RunStatus }>();
     if (!latest) return 'not_found';
     if (latest.status === 'cancelled') return 'cancelled';
+    const deliveryGate=await readRestaurantAutomationDeliveryGate(db,run.id,now,undefined,restaurantDeliveryScope);
+    if(!deliveryGate.allowed){
+      await cancelAutomationRun(db,{runId:run.id,allowedAccountIds:[run.line_account_id],now});
+      await db.prepare(`UPDATE automation_run_steps SET error_code=?,error_message='予約または承認の内容が変わったため送信しませんでした'
+        WHERE automation_run_id=? AND status='cancelled' AND error_code IS NULL`).bind(deliveryGate.reason,run.id).run();
+      return 'cancelled';
+    }
+    if (hasNextDayWait && await expireNextDayWait(db, run.id, now)) return 'cancelled';
     /*
      * 緊急停止  も step の境目で効かせる。claim 後に止まった分は
      * run を queued へ戻し、現在の step から再開できるようにする。
@@ -813,7 +587,8 @@ export async function processAutomationRun(
 
     try {
       if (action.type === 'wait') {
-        await scheduleWait(db, run, step, action, now);
+        await scheduleAutomationWait(db, run, step, action.params, now, inputEvent);
+        if (hasNextDayWait && await expireNextDayWait(db, run.id, now)) return 'cancelled';
         return 'waiting';
       }
       if (action.type === 'common_action_marker') {
@@ -867,6 +642,7 @@ export async function processAutomationRun(
         sourceEventId: run.source_event_id,
         inputEvent,
         action,
+        restaurantDeliveryScope,
         stepExecutionId: step.id,
         idempotencyKey: step.id,
         attemptNumber: step.attempt_number,

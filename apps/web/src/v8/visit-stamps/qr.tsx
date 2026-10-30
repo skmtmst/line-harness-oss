@@ -1,5 +1,5 @@
 'use client'
-import { ApiError } from '@/lib/api'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 
 import {useCallback,useEffect,useRef,useState} from 'react'
 import {ArrowRight,Check,Minus,Plus,QrCode,RefreshCw} from 'lucide-react'
@@ -20,7 +20,7 @@ import { formatNumber } from '@/lib/format'
 import { withHonorific } from '@line-crm/shared'
 
 const requestId=()=>crypto.randomUUID()
-const reason=(e:unknown)=>{const text=e instanceof ApiError?e.message:(e as {body?:{error?:string}})?.body?.error;return text&&/[ぁ-んァ-ン一-龥]/.test(text)?text:'QRを確認できませんでした。もう一度試してください。'}
+const reason = (error: unknown) => describeApiFailure(error, 'QRの確認')
 function useQrImage(url:string|undefined,width:number) {
   const [image,setImage]=useState<{url:string;src:string}|null>(null)
   const [error,setError]=useState('')

@@ -1,4 +1,8 @@
 export type RestaurantFollowupTrigger = 'reservation_created' | 'reservation_24h' | 'reservation_2h' | 'post_visit' | 'review_request' | 'waitlist_invited' | 'anniversary_before';
+export const RESTAURANT_FOLLOWUP_LABELS:Record<RestaurantFollowupTrigger,string> = {
+    reservation_created:'予約したとき',reservation_24h:'前日の確認',reservation_2h:'当日の来店前',
+    post_visit:'来店後のお礼',review_request:'口コミのお願い',waitlist_invited:'キャンセル待ちの案内',anniversary_before:'記念日前のご案内',
+};
 export interface RestaurantFollowupTemplate {
     store_id: string;
     scenario_id: string;
@@ -38,12 +42,19 @@ export interface RestaurantFollowupRow {
     store_id: string;
     trigger: RestaurantFollowupTrigger;
     initial_key: string;
+    enabled?: boolean;
     step_id: string | null;
     version: number;
     default_offset_minutes: number;
     initial_message: string;
 }
+export interface RestaurantFollowupSetup {
+    notUsing: boolean;
+    decidedAt: string | null;
+    version: number;
+}
 export interface RestaurantFollowupPage {
+    setup?: RestaurantFollowupSetup;
     template: RestaurantFollowupTemplate | null;
     rows?: RestaurantFollowupRow[];
     bindings: RestaurantFollowupBinding[];

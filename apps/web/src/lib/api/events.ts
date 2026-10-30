@@ -1,3 +1,4 @@
+import { describeSaveFailure } from './transport/errors'
 import type {
   EventSlot,
   EventDetail,
@@ -120,7 +121,7 @@ export const eventsApi = {
         )
         items.push(...response.items)
       } catch (error) {
-        const detail = error instanceof Error ? `（${error.message}）` : ''
+        const detail = `（${describeSaveFailure(error)}）`
         throw new EventSlotsPartialError(
           `${formatNumber(items.length)}件まで追加されました。残りを確認してから、もう一度追加してください${detail}`,
           [...items],

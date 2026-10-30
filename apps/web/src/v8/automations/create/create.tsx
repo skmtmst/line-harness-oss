@@ -1,5 +1,7 @@
 'use client'
 
+import { automationWaitLabel } from '@line-crm/shared'
+
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import Button from '@/components/shared/button'
 import { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
@@ -266,6 +268,7 @@ const { syncResumeUrl, bindAccountDraft, captureFormSnapshot, resumeBase } = use
       const scenarioName = scenarios.find((item) => item.id === row.scenarioId)?.name
       return row.scenarioId === '' ? 'シナリオ（未選択）' : scenarioName ? `シナリオ「${scenarioName}」を始める` : 'シナリオを始める'
     }
+    if (row.type === 'wait') return automationWaitLabel(row.kept ?? {})
     if (row.type === 'notify_staff') return '担当へ知らせる'
     return row.message.trim() ? '入力したメッセージを送る' : 'メッセージを送る'
   }).join('、')
@@ -297,8 +300,7 @@ const { syncResumeUrl, bindAccountDraft, captureFormSnapshot, resumeBase } = use
         return step.type === 'add_tag' ? `タグ「${tagName}」を付ける` : `タグ「${tagName}」を外す`
       }
       if (step.type === 'wait') {
-        const minutes = String(params.durationMinutes ?? params.minutes ?? '')
-        return `${minutes}分待つ`
+        return automationWaitLabel(params)
       }
       if (step.type === 'start_scenario' || step.type === 'stop_scenario' || step.type === 'resume_scenario') {
         const scenarioId = String(params.scenarioId ?? '')
@@ -641,6 +643,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
     : null
   /* することの1行の下の小さな文（どれを・何を）。 */
   const actionRowDetail = (row: ActionDraft): string => {
+    if (row.type === 'wait') return automationWaitLabel(row.kept ?? {})
     if (row.type === 'add_tag') {
       const tagName = tags.find((tag) => tag.id === row.tagId)?.name
       return tagName ? `タグ「${tagName}」` : 'タグを選んでください'
@@ -689,6 +692,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
     if (row.type === 'add_tag') return `${row.tagId === '' ? 'タグ（未選択）' : tagName ? `タグ「${tagName}」` : 'タグ'}を付け${last ? 'ます' : 'て'}`
     if (row.type === 'start_scenario') return `${row.scenarioId === '' ? 'シナリオ（未選択）' : scenarioName ? `シナリオ「${scenarioName}」` : 'シナリオ'}を始め${last ? 'ます' : 'て'}`
     if (row.type === 'common_action') return `${row.commonActionId === '' ? '共通アクション（未選択）' : commonName ? `共通アクション「${commonName}」` : '共通アクション'}を実行し${last ? 'ます' : 'て'}`
+    if (row.type === 'wait') return automationWaitLabel(row.kept ?? {}).replace(/待つ$/, last ? '待ちます' : '待って')
     if (row.type === 'notify_staff') return `担当へ知らせ${last ? 'ます' : 'て'}`
     return `メッセージを送${last ? 'ります' : 'り'}`
   })

@@ -131,6 +131,50 @@ describe('統括のアカウント', () => {
     expect(container.querySelector('article [data-design-part="notice"]')).toBeNull()
   })
 
+  it('期限切れのカードは知らせ1つにまとめ、素の期限の文字を出さない', async () => {
+    accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, tokenExpiry: { status: 'expired', label: 'トークンの期限が切れています' } }] })
+    await render()
+    const card = container.querySelector('article')!
+    const notices = card.querySelectorAll('[data-design-part="notice"]')
+    expect(notices).toHaveLength(1)
+    expect(notices[0].textContent).toContain('LINE のトークンの期限が切れています')
+    expect(notices[0].textContent).toContain('ほかに接続の確認事項が1件')
+    expect(card.querySelector('[title="トークンの期限が切れています"]')).toBeNull()
+  })
+
+  it('期限が近いだけのカードも同じ形の知らせを1つ出す', async () => {
+    accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, connection: { status: 'ok', issues: [] }, tokenExpiry: { status: 'expiring', label: 'トークンの期限が近づいています' } }] })
+    await render()
+    const card = container.querySelector('article')!
+    const notices = card.querySelectorAll('[data-design-part="notice"]')
+    expect(notices).toHaveLength(1)
+    expect(notices[0].textContent).toContain('LINE のトークンの期限が近づいています')
+    expect(card.querySelector('[title="トークンの期限が近づいています"]')).toBeNull()
+  })
+
+  it('一覧の上の期限の行は共通の知らせで出す', async () => {
+    accounts.mockResolvedValue({ success: true, data: [
+      { ...warnedAccount, tokenExpiry: { status: 'expired', label: 'トークンの期限が切れています' } },
+      { ...warnedAccount, id: 'acc-2', name: '二号店', displayName: '二号店', connection: { status: 'ok', issues: [] }, tokenExpiry: { status: 'expiring', label: 'トークンの期限が近づいています' } },
+    ] })
+    await render()
+    const bands = [...container.querySelectorAll('[data-design-part="notice"]')]
+      .filter((band) => !band.closest('article'))
+    expect(bands).toHaveLength(1)
+    expect(bands[0].textContent).toContain('期限が切れたトークン 1 件・期限が近い 1 件')
+  })
+
+  it('表の LINE 接続は状態の札に期限の札を添え、素の期限の文字を出さない', async () => {
+    accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, tokenExpiry: { status: 'expired', label: 'トークンの期限が切れています' } }] })
+    await render()
+    const table = container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!
+    await act(async () => { table.click() })
+    const row = container.querySelector('tbody tr')!
+    expect(row.textContent).toContain('期限切れ')
+    expect(row.textContent).not.toContain('トークンの期限が切れています')
+    window.history.replaceState(null, '', '/hq')
+  })
+
   it('分類のないカードではLINE IDの情報の次に数を読み、正常ならそのまま操作へ進める', async () => {
     accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, connection: { status: 'ok', issues: [] } }] })
     await render()

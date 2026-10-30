@@ -152,3 +152,14 @@ it('期限切れの招待は期限と次の操作を残す', () => {
   expect(describeApiFailure(new ApiError(410, 'この招待は期限切れです。招待を送り直してもらってください。'), '招待の確認'))
     .toBe('この招待は期限切れです。招待を送り直してもらってください。')
 })
+
+
+it.each([400, 409, 422, 500, 503])('HTTP %s の日本語に内部文が混ざっても詳細として表示しない', status => {
+  const error = new ApiError(status, '入力を確認 D1_ERROR: SELECT secret FROM tenant')
+  expect(japaneseDetailOf(error)).toBe('')
+  expect(describeApiFailure(error, '保存')).not.toMatch(/D1_ERROR|SELECT secret/)
+})
+
+it('5xxの本文は日本語でも詳細として信用しない', () => {
+  expect(japaneseDetailOf(new ApiError(500, '内部の処理に失敗しました。'))).toBe('')
+})

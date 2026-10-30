@@ -19,9 +19,8 @@ import MediaPickerDialog from '@/components/shared/media-picker-dialog'
 import { uploadToMediaLibrary } from '@/components/shared/media-library-upload'
 import { extractMediaMetadata } from '@/v8/contents/public/media-direct-upload/index'
 import styles from './message-kind-fields.module.css'
-import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import Button from '@/components/shared/button'
-import ComposerStickers from '@/components/shared/composer-stickers'
+import ComposerStickers, { STICKER_LABELS, STICKER_IMAGE_PATHS } from '@/components/shared/composer-stickers'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
 
@@ -166,71 +165,6 @@ export function serializeMessageKind(kind: MessageKind, state: MessageKindState)
   }
 }
 
-/*
- * 送れるスタンプ。
- *
- * Messaging API から送れるのは LINE が公開している**基本スタンプだけ**。
- * 買ったスタンプやクリエイターズスタンプは送れない。番号を手で入れさせると
- * 送れないものを入れてしまうので、送れるものから選ばせる。
- *
- * 番号は LINE の「送信可能なスタンプ一覧」に載っているもの。
- */
-const BASIC_STICKERS: { packageId: string; stickerId: string; label: string }[] = [
-  { packageId: '446', stickerId: '1988', label: 'にっこり' },
-  { packageId: '446', stickerId: '1989', label: 'うれしい' },
-  { packageId: '446', stickerId: '1990', label: 'ありがとう' },
-  { packageId: '446', stickerId: '1991', label: 'よろしく' },
-  { packageId: '446', stickerId: '1992', label: 'おねがい' },
-  { packageId: '446', stickerId: '1993', label: 'なるほど' },
-  { packageId: '446', stickerId: '2000', label: 'ごめんなさい' },
-  { packageId: '446', stickerId: '2001', label: 'びっくり' },
-  { packageId: '789', stickerId: '10855', label: 'OK' },
-  { packageId: '789', stickerId: '10856', label: 'はい' },
-  { packageId: '789', stickerId: '10857', label: 'いいね' },
-  { packageId: '789', stickerId: '10877', label: 'おつかれさま' },
-]
-
-/*
- * LINE が配っているスタンプ画像。選ぶときの目印に使う。
- *
- * **スタンプによって置き場所が違う。** 446 番台は android/sticker.png、
- * 789 番台は iPhone/sticker@2x.png でしか取れない（検証環境で1枚ずつ
- * 確かめた）。どちらか片方に決め打つと、半分が壊れた画像になる。
- *
- * 片方で取れなければもう片方に切り替える。それでも取れなければ、
- * 壊れた画像ではなく文字を出す（下の StickerThumb）。
- */
-const STICKER_IMAGE_PATHS = ['android/sticker.png', 'iPhone/sticker@2x.png'] as const
-
-function stickerImageUrl(stickerId: string, attempt: number): string {
-  const path = STICKER_IMAGE_PATHS[attempt] ?? STICKER_IMAGE_PATHS[0]
-  return `https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerId}/${path}`
-}
-
-/** スタンプ1枚の絵。取れなければ名前だけ出す。 */
-function StickerThumb({ stickerId, label }: { stickerId: string; label: string }) {
-  const [attempt, setAttempt] = useState(0)
-  const failed = attempt >= STICKER_IMAGE_PATHS.length
-
-  if (failed) {
-    return (
-      <span className="text-ink-secondary flex h-12 w-12 items-center justify-center text-center text-nano leading-tight">
-        {label}
-      </span>
-    )
-  }
-  return (
-    // 目印なので次の最適化には載せない。
-    // eslint-disable-next-line @next/next/no-img-element
-    <img width={48} height={48}
-      src={stickerImageUrl(stickerId, attempt)}
-      alt={label}
-      className="h-12 w-12"
-      onError={() => setAttempt((n) => n + 1)}
-    />
-  )
-}
-
 const inputClass =
   'border-hairline rounded-control bg-canvas text-ink focus:ring-accent w-full border px-3 py-2 text-sm focus:ring-2 focus:outline-none'
 const labelClass = 'text-ink-secondary mb-1 block text-xs font-medium'
@@ -307,7 +241,6 @@ async function readDurationSeconds(file: File): Promise<string> {
 }
 
 export default function MessageKindFields({ kind, value, onChange, composer = false, mediaAccountId }: MessageKindFieldsProps) {
-  const [stickerMode, setStickerMode] = useState<'pick' | 'manual'>('pick')
   const pickFrom = mediaAccountId ?? null
   const [picking, setPicking] = useState<{ kind: MediaItem['kind']; apply: (url: string, item?: MediaItem) => void } | null>(null)
   /** 長さをファイル・登録メディアから読んで入れたか（読めたら手で入れる欄は出さない）。 */
@@ -494,85 +427,8 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
     )
   }
 
-  const v = value.sticker
-  const set = (patch: Partial<MessageKindState['sticker']>) =>
-    onChange({ ...value, sticker: { ...v, ...patch } })
-  const selected = BASIC_STICKERS.find(
-    (s) => s.packageId === v.packageId && s.stickerId === v.stickerId,
-  )
-
-  return (
-    <div className="space-y-3">
-      <p className={hintClass}>
-        送れるのは LINE の基本スタンプだけです。買ったスタンプやクリエイターズスタンプは、
-        LINE側の決まりで送れません。
-      </p>
-
-      <SaveErrorField names={["stickerMode","value","o.value"]}><RadioCardGroup legend="スタンプの決め方" className="flex flex-wrap gap-4">
-        {(
-          [
-            { value: 'pick' as const, label: '一覧から選ぶ' },
-            { value: 'manual' as const, label: '番号を直接入れる' },
-          ]
-        ).map((o) => (
-          <RadioCard
-            key={o.value}
-            name="stickerMode"
-            value={o.value}
-            checked={stickerMode === o.value}
-            onChange={() => setStickerMode(o.value)}
-            title={o.label}
-          />
-        ))}
-      </RadioCardGroup></SaveErrorField>
-
-      {stickerMode === 'pick' ? (
-        <div className="flex flex-wrap gap-2">
-          {BASIC_STICKERS.map((s) => {
-            const on = s.packageId === v.packageId && s.stickerId === v.stickerId
-            return (
-              <Button variant="secondary" className={(`rounded-card border p-1.5 transition-colors ${
-                  on ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken'
-                }`) + ' h-auto whitespace-normal'} key={`${s.packageId}-${s.stickerId}`} type="button" onClick={() => set({ packageId: s.packageId, stickerId: s.stickerId })} title={s.label} aria-label={s.label} aria-pressed={on}>
-                <StickerThumb stickerId={s.stickerId} label={s.label} />
-              </Button>
-            )
-          })}
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-3">
-          <label className="min-w-0 flex-1">
-            <span className={labelClass}>
-              パッケージID <span className="text-danger">*</span>
-            </span>
-            <SaveErrorField names={["packageId","v.packageId","package_id","v.package_id"]}><SharedTextField
-              value={v.packageId}
-              onChange={(e) => set({ packageId: e.target.value })}
-              inputMode="numeric"
-              placeholder="446"
-              className={inputClass}
-            /></SaveErrorField>
-          </label>
-          <label className="min-w-0 flex-1">
-            <span className={labelClass}>
-              スタンプID <span className="text-danger">*</span>
-            </span>
-            <SaveErrorField names={["stickerId","v.stickerId","sticker_id","v.sticker_id"]}><SharedTextField
-              value={v.stickerId}
-              onChange={(e) => set({ stickerId: e.target.value })}
-              inputMode="numeric"
-              placeholder="1988"
-              className={inputClass}
-            /></SaveErrorField>
-          </label>
-        </div>
-      )}
-
-      {v.packageId && v.stickerId && (
-        <p className="text-ink-secondary text-xs">
-          選択中：{selected ? selected.label : `パッケージ ${v.packageId} / スタンプ ${v.stickerId}`}
-        </p>
-      )}
-    </div>
-  )
+  return <ComposerStickers value={value.sticker} onChange={(sticker) => onChange({ ...value, sticker })}
+    syncSelection labels={STICKER_LABELS} imagePaths={STICKER_IMAGE_PATHS}
+    description="送れるのは LINE の基本スタンプだけです。買ったスタンプやクリエイターズスタンプは、LINE側の決まりで送れません。"
+    fieldNames={{ mode: ['stickerMode', 'value', 'o.value'], packageId: ['packageId', 'v.packageId', 'package_id', 'v.package_id'], stickerId: ['stickerId', 'v.stickerId', 'sticker_id', 'v.sticker_id'] }} />
 }

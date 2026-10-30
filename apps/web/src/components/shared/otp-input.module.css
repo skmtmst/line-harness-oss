@@ -22,18 +22,12 @@
   padding: 0; /* stroke: $hairline */ /* cornerRadius: $radius-sm */ /* fill: $canvas */
   color: var(--color-ink); /* fill: $ink */ /* fontSize: 22 */ /* fontWeight: 600 */
   text-align: center;
-}
-
-/*
+}/*
  * 入力中のマス（4桁目に入力の目印 `mGMMH`）。緑は「正常」の意味なので輪郭に使わない。
  * 輪郭を消して別の線で描くと、共通の決まり（focus-visible-contract）に反し、
  * 画面の読み上げやキーボード操作で今どこにいるかが見えなくなる。
  */
-.slot:focus,
-.slot:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
+
 
 /* 誤り（違うコード）`Q10xgy`。読み上げと同じ aria-invalid を根拠に見た目を変える。 */
 .slot[aria-invalid='true'] { /* stroke: $status-danger */
@@ -77,10 +71,6 @@
   border-color: var(--color-status-danger);
 }
 
-:root .slot:focus,
-:root .slot:focus-visible {
-  outline-color: var(--color-focus-ring);
-}
 
 /* 確認できた：緑の輪郭が描かれる。 */
 :root .group[data-state='success'] .slot {
@@ -134,8 +124,7 @@
 
 /* V8 正本HTMLの実寸。管理画面には適用しない。 */
 :root .slot { height: 52px; border: 0; outline-color: transparent; background: var(--color-canvas); box-shadow: var(--shadow-raised-control); font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 24px; font-weight: 600; line-height: normal; caret-color: var(--color-ink); }
-:root .slot:focus,
-:root .slot:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
 :root .group[data-state='success'] .slot { outline-color: transparent; background: var(--color-canvas); box-shadow: var(--shadow-raised-control), inset 0 0 0 1.5px var(--color-success); }
 :root .slot[aria-invalid='true'] { border-color: var(--color-status-danger); outline-color: var(--color-status-danger); background: var(--color-canvas); box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-status-danger); }
 
@@ -206,16 +195,13 @@
 :root .group[data-format='recovery'] .slot { width: 40px; }
 .separator { color: var(--color-ink-secondary); font-size: var(--polish-text-body); }
 
-}
-
-/*
+}/*
  * 入力中のマスは緑の輪郭（★V8 RfHCo・板 ）。共通のキーボードの輪（globals.css の
  * html:root :is(input, …):focus-visible・青）は層の外にあって上の層の中の決まりより強いので、
  * このマスだけ層の外で緑に戻す。誤りの赤と、空のマスの入力の目印（2×24）も同じ理由で層の外に置く。
  */
-html:root .group .slot:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 
-html:root .group .slot[aria-invalid='true']:focus-visible { outline-color: var(--color-status-danger); }
+
 html:root .group .slot[value='']:focus { background-image: linear-gradient(var(--color-ink), var(--color-ink)); }
 
 /* 狭い電話でも 3＋3 の6マスが1行に収まるように、組の中の間だけを詰める。 */

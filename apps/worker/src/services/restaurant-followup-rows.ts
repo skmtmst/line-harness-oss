@@ -1,3 +1,4 @@
+import { restaurantFollowupEnabledRowsSql } from './restaurant-followup-enabled.js';
 import type { RestaurantFollowupRow, RestaurantFollowupTrigger } from '@line-crm/shared';
 
 const initialRows: Record<RestaurantFollowupTrigger, { offset: number; message: string }> = {
@@ -25,7 +26,8 @@ export function restaurantFollowupSeedStatement(db: D1Database, selector: { stor
 export async function readRestaurantFollowupRows(db: D1Database, storeId: string): Promise<RestaurantFollowupRow[]> {
   await restaurantFollowupSeedStatement(db,{storeId}).run();
   const rows=(await db.prepare('SELECT * FROM rt_store_followup_rows WHERE store_id=? ORDER BY trigger').bind(storeId).all<Omit<RestaurantFollowupRow,'default_offset_minutes'|'initial_message'>>()).results;
-  return rows.map(row=>({...row,default_offset_minutes:initialRows[row.trigger].offset,initial_message:initialRows[row.trigger].message}));
+  const enabled=(await db.prepare(`SELECT trigger FROM (${restaurantFollowupEnabledRowsSql}) WHERE store_id=?`).bind(storeId).all<{trigger:string}>()).results;
+  return rows.map(row=>({...row,enabled:enabled.some(item=>item.trigger===row.trigger),default_offset_minutes:initialRows[row.trigger].offset,initial_message:initialRows[row.trigger].message}));
 }
 function initialMessage(trigger: RestaurantFollowupTrigger) {
   const message=initialRows[trigger].message;

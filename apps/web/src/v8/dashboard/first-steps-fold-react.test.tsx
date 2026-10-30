@@ -47,7 +47,7 @@ describe('はじめにやることを畳む', () => {
       condition: 'condition', next: 'next', action: { label: 'same secondary action', href: '/' }, blockedReason: null,
     }))
     const cases = [
-      ['restaurant', ['卓と席を登録する', 'コースとメニューを登録する', '予約の受付を開ける']],
+      ['restaurant', ['卓と席を登録する', '営業時間を設定する', 'コースとメニューを登録する', '予約の受付を開ける', 'LINE来店フォローを確認する']],
       ['salon', ['メニューを登録する', '担当者を登録する', '予約の受付を確認する']],
       ['consult', ['面談の枠を作る', '面談の URL を用意する', '面談の受付を確認する']],
       ['lesson', ['クラスを作る', '会員を登録する', 'クラスの予約を受け付ける']],
@@ -57,7 +57,7 @@ describe('はじめにやることを畳む', () => {
     for (const [style, labels] of cases) {
       const result = summarizeFirstSteps(steps, style)
       expect(result.steps.map((step) => step.label)).toEqual(labels)
-      expect(result.steps.map((step) => step.state)).toEqual(style === 'standard' ? ['stalled', 'stalled', 'stalled'] : ['unknown', 'unknown', 'unknown'])
+      expect(result.steps.map((step) => step.state)).toEqual(labels.map(() => style === 'standard' ? 'stalled' : 'unknown'))
     }
   })
 

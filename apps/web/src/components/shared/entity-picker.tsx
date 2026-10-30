@@ -13,7 +13,6 @@ import Link from 'next/link'
 import Button from './button'
 import IconButton from './icon-button'
 import Checkbox from './checkbox'
-import FilterChip from './filter-chip'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
 import SearchField from './search-field'
 import Select from './select'
@@ -149,11 +148,12 @@ function SingleEntityPickerDialog({
       {hasFolders && !narrow ? <div className={shell.folders}>
         <FolderPanel readOnly reserveCreateSpace={false} headingAfterAll disabled={busy || listState} rows={folderRows} activeId={folder} onSelect={setFolder} />
       </div> : null}
-      <section className={styles.tpList} aria-label="候補の一覧"> <SearchField id={`${id}-search`} aria-label={`${title}：${searchPlaceholder}`} placeholder={searchPlaceholder} value={query} onChange={setQuery} onClear={() => setQuery('')} />
-        {foldersFailed ? <p className={styles.note}>フォルダを読み込めませんでした。すべての候補から選べます。</p> : null}
+      <section className={styles.tpList} aria-label="候補の一覧">
+        <div className={styles.searchRow}><SearchField id={`${id}-search`} aria-label={`${title}：${searchPlaceholder}`} placeholder={searchPlaceholder} value={query} onChange={setQuery} onClear={() => setQuery('')} />
         {categories.length ? <div className={shell.categories} aria-label="候補の絞り込み">
-          {[{ id: '', label: 'すべて' }, ...categories].map((c) => <FilterChip key={c.id} selected={category === c.id} disabled={busy || listState} count={listState ? undefined : folderItems.filter((item) => !c.id || item.category === c.id).length} onChange={() => setCategory(c.id)}>{c.label}</FilterChip>)}
-        </div> : null}
+          <Select aria-label="候補の絞り込み" value={category} onChange={setCategory} disabled={busy || listState} options={[{ id: '', label: 'すべて' }, ...categories].map((c) => ({ value: c.id, label: listState ? c.label : `${c.label} ${formatNumber(folderItems.filter((item) => !c.id || item.category === c.id).length)}` }))} />
+        </div> : null}</div>
+        {foldersFailed ? <p className={styles.note}>フォルダを読み込めませんでした。すべての候補から選べます。</p> : null}
         <div className={styles.tpCards}>
           {state || (rows.length ? rows.slice(0, visibleLimit).map((item) => <label key={item.id} className={styles.tpCard} data-selected={selected === item.id || undefined} data-disabled={busy || item.disabled || undefined}>
             <input type="radio" name={`${id}-candidate`} className={styles.cardRadio} aria-label={item.name} value={item.id} checked={selected === item.id} disabled={busy || item.disabled} onChange={() => { setSelected(item.id); onSelect?.(item.id) }} />

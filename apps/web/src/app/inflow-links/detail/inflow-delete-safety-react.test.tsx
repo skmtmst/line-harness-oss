@@ -41,7 +41,8 @@ vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ accounts: [], selectedAccountId: 'acc-1' }),
 }))
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   ApiError: fixture.ApiError,
   fetchApi: fixture.fetchApi,
   api: {
@@ -153,6 +154,22 @@ describe('流入経路の削除確認操作 (N-246/N-250 #906)', () => {
     })
 
     expect(await within(dialog).findByText(/利用履歴がある経路は完全削除できません/)).toBeTruthy()
+    expect(screen.getByRole('alertdialog')).toBe(dialog)
+    expect(fixture.replace).not.toHaveBeenCalled()
+  })
+
+  it('名前が変わった422は入力の修正ではなく読み直しを案内する', async () => {
+    const text = '経路名が変更されています。画面を読み直してから、もう一度確認してください。'
+    fixture.fetchApi.mockImplementation(async (path: string) => {
+      if (path.startsWith('/api/analytics/ref/')) return { success: true, data: { friends: [] } }
+      throw new fixture.ApiError(422, text, 'ENTRY_ROUTE_NAME_CONFIRMATION_MISMATCH')
+    })
+    const { dialog } = await mountAndOpen()
+    fireEvent.click(within(dialog).getByRole('radio', { name: /このまま削除する/ }))
+    fireEvent.change(within(dialog).getByLabelText('完全削除するには「店頭QR」と入力'), { target: { value: '店頭QR' } })
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '削除する' })) })
+    expect(await within(dialog).findByText(text)).toBeTruthy()
+    expect(within(dialog).queryByText(/入力を直してください/)).toBeNull()
     expect(screen.getByRole('alertdialog')).toBe(dialog)
     expect(fixture.replace).not.toHaveBeenCalled()
   })

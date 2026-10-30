@@ -117,7 +117,7 @@ export type AutomationTemplateSummary = {
 
 export type AutomationDraftAction = {
   id: string
-  type: 'add_tag' | 'start_scenario' | 'send_message' | 'common_action'
+  type: 'add_tag' | 'start_scenario' | 'send_message' | 'common_action' | 'notify_staff' | 'wait'
   params: Record<string, unknown>
   onFailure: 'stop'
 }

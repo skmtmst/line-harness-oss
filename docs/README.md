@@ -481,6 +481,8 @@
 - [招待・ログインユーザー・予約枠の表示修正](release-log/unreleased/1952-kenta-muse-auth.md)
 - [受信箱の空き・題横の印・保存の入口・カードの縦崩れ](release-log/unreleased/1953-kenta-muse-inbox.md)
 - [フォルダ追加の色の板の重なり修正](release-log/unreleased/1970-kenta-muse-check-b.md)
+- [誤りの欄の焦点の輪を赤1本に](release-log/unreleased/1988-kenta-muse-invalid-focus.md)
+- [箱で囲んだ入力の焦点の輪を外枠1本に](release-log/unreleased/1988-kenta-muse-double-ring.md)
 - [運営・監査・分析・問い合わせ・リッチメニューの修正](release-log/unreleased/1953-kenta-muse-ops-misc.md)
 - [受信箱の絞り込み・自動応答の題・バナー生成・機能設定の住所・マイル履歴の操作](release-log/unreleased/1971-kenta-muse-fix-d.md)
 - [統括の一覧の名前押下・友だちCSVのタブ・統括アカウント説明の修正](release-log/unreleased/1953-kenta-muse-list-settings.md)
@@ -1010,6 +1012,7 @@
 - [統括からのLINEアカウント管理](release-log/unreleased/1963-masato-line-account-hq-scope.md) — 反映履歴。
 - [シナリオ一覧の権限とお知らせのベル](release-log/unreleased/1964-kenta-train-1029n.md) — 反映履歴。
 - [シナリオ一覧の操作と途中の失敗の案内](release-log/unreleased/1968-kenta-train-1029o.md) — 反映履歴。
+- [統括のアカウントのトークン期限の知らせの統一](release-log/unreleased/1988-kenta-muse-hq-token-notice.md) — 反映履歴。
 
 - [友だちの履歴の日付区切り](release-log/unreleased/1972-kenta-swb-date-group.md) — 反映履歴。
 - [ユーザー管理と二段階認証の配置](release-log/unreleased/1976-masato-staff-security-placement.md) — 反映履歴。
@@ -1024,3 +1027,14 @@
 - [Google とSNSの接続](release-log/unreleased/1983-masato-google-sns-connection.md) — 反映履歴。
 - [LINE通知の登録](release-log/unreleased/1985-masato-notice-line-registration.md) — 反映履歴。
 - [SNS接続の表記](release-log/unreleased/1986-masato-sns-connection-labels.md) — 反映履歴。
+
+- [失敗した時の案内](release-log/unreleased/1988-kenta-japanese-error-details.md) — 保存・削除などの失敗理由の日本語表示。
+
+- [フォルダを作れない理由の表示](release-log/unreleased/1988-kenta-folder-create-errors.md)
+- [来店フォローとリマインダの接続](release-log/unreleased/1988-kenta-line-followup-engines.md)
+
+- [自動送信の翌日時刻の待機と期限切れの記録](release-log/unreleased/1988-kenta-automation-next-day-wait.md) — 反映履歴、確認 2026-10-31。
+- [選ぶ操作の権限と絞り込み](release-log/unreleased/1988-kenta-train-1029t.md) — 反映履歴。
+- [来店フォローの送信直前の承認と予約の確認](release-log/unreleased/1989-kenta-followup-delivery-approval.md) — 反映履歴、確認 2026-10-31。
+- [LINE来店フォローを使わない判断](release-log/unreleased/1989-kenta-followup-not-using.md) — 反映履歴、確認 2026-10-31。
+- [シナリオ配信と初期設定の案内](release-log/unreleased/1989-kenta-train-1029u.md) — 反映履歴、確認 2026-10-31。

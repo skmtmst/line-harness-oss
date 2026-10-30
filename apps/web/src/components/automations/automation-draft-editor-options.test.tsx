@@ -4,6 +4,7 @@ import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  automationWaitLabel,
   AUTOMATION_DRAFT_ACTION_OPTIONS,
   AUTOMATION_DRAFT_TRIGGER_OPTIONS,
 } from '@line-crm/shared'
@@ -148,6 +149,7 @@ describe('下書き編集の選択可能一覧(#734)', () => {
     await act(async () => { add.click() })
     const labels = Array.from(document.querySelectorAll('[role="menuitem"]')).map(option => option.textContent)
     // 通知は旧編集で選んでも通常の本文へ化けていた。現役では既存通知の中身を保持し、新規の選び口には出さない。
+    expect(labels).not.toContain('待つ')
     expect(labels).toEqual(AUTOMATION_DRAFT_ACTION_OPTIONS.filter(option => option.value !== 'notify_staff').map(option => option.label))
     expect(el.textContent).toContain(AUTOMATION_DRAFT_ACTION_OPTIONS.find(option => option.value === 'notify_staff')!.label)
     await act(async () => { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })) })
@@ -235,4 +237,12 @@ describe('下書き編集の選択可能一覧(#734)', () => {
     expect(mockUpdateDraft.mock.calls.map(call => call.slice(0, 2))).toEqual([['draft-1', 'account-1'], ['draft-1', 'account-1']])
     expect(mockUpdateDraft.mock.calls[1][2].name).toBe('直したルール名')
   })
+})
+
+it.each([{ durationMinutes: 30 }, { mode: 'next_day', sendAtTime: '10:15' }])('待機の下書きを読んで保存しても設定を保つ: %j', async (params) => {
+  const actions = [{ id: 'wait-step', type: 'wait', params, onFailure: 'stop' }]
+  const el = await mountWithDraft('friend_add', {}, actions)
+  expect(el.textContent).toContain(`友だちになったら、${automationWaitLabel(params).replace(/待つ$/, '待ちます')}。`)
+  await act(async () => { saveButton(el).click(); await drainMicrotasks() })
+  expect(mockUpdateDraft.mock.calls[0][2].actions).toEqual(actions)
 })
