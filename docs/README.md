@@ -481,6 +481,8 @@
 - [招待・ログインユーザー・予約枠の表示修正](release-log/unreleased/1952-kenta-muse-auth.md)
 - [受信箱の空き・題横の印・保存の入口・カードの縦崩れ](release-log/unreleased/1953-kenta-muse-inbox.md)
 - [フォルダ追加の色の板の重なり修正](release-log/unreleased/1970-kenta-muse-check-b.md)
+- [誤りの欄の焦点の輪を赤1本に](release-log/unreleased/0000-kenta-muse-invalid-focus.md)
+- [箱で囲んだ入力の焦点の輪を外枠1本に](release-log/unreleased/0000-kenta-muse-double-ring.md)
 - [運営・監査・分析・問い合わせ・リッチメニューの修正](release-log/unreleased/1953-kenta-muse-ops-misc.md)
 - [受信箱の絞り込み・自動応答の題・バナー生成・機能設定の住所・マイル履歴の操作](release-log/unreleased/1971-kenta-muse-fix-d.md)
 - [統括の一覧の名前押下・友だちCSVのタブ・統括アカウント説明の修正](release-log/unreleased/1953-kenta-muse-list-settings.md)

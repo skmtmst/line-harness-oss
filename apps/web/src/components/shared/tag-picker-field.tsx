@@ -79,7 +79,7 @@ export default function TagPickerField({ label = 'タグを付ける', value, on
     return <TagPill size="xs" key={key} name={names[index]} color={folder ? folderDisplayColor(folder) : null} />
   }) : <span className={styles.placeholder}>タグを選ぶ</span>}</span>
   return <>
-    {readOnly ? <div className={styles.field}>{selection}</div> : <button id={fieldId} ref={lockedReason ? node => { lock.ref.current = node; if (typeof buttonRef === 'function') buttonRef(node); else if (buttonRef) buttonRef.current = node } : buttonRef} aria-describedby={describedBy} type="button" className={styles.field} aria-label={`${label}：${value.length ? '変える' : '選ぶ'}`} aria-haspopup="dialog" aria-invalid={invalid || undefined} disabled={changeDisabled} title={changeDisabled ? disabledReason : undefined} onClick={() => { if (!canChangeNow()) return; setOpen(true); void load() }} {...lock.handlers}>
+    {readOnly ? <div className={styles.field}>{selection}</div> : <button data-input-field id={fieldId} ref={lockedReason ? node => { lock.ref.current = node; if (typeof buttonRef === 'function') buttonRef(node); else if (buttonRef) buttonRef.current = node } : buttonRef} aria-describedby={describedBy} type="button" className={styles.field} aria-label={`${label}：${value.length ? '変える' : '選ぶ'}`} aria-haspopup="dialog" aria-invalid={invalid || undefined} disabled={changeDisabled} title={changeDisabled ? disabledReason : undefined} onClick={() => { if (!canChangeNow()) return; setOpen(true); void load() }} {...lock.handlers}>
       <TagIcon size={16} aria-hidden="true" />{selection}<span className={styles.change}>{value.length ? '変える' : '選ぶ'}</span><ChevronRight size={16} aria-hidden="true" />
     </button>}
     {lock.node}

@@ -110,9 +110,17 @@
 html:root .boxWrap { display: block; width: var(--choice-size); height: var(--choice-size); line-height: 0; }
 html:root .card:has(input:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 html:root .invalid { outline-color: var(--color-danger); }
+/* 誤り＋焦点は赤1本（青を重ねない）。 */
+html:root .card.invalid:has(input:focus-visible) { outline: var(--polish-focus-width) solid var(--color-danger); outline-offset: var(--polish-focus-offset); }
 
 /* 単独の確認行（・ の担当の札）：上の共通の内側16（--tpl-card-pad）に負けないよう、高さ36・内側 8/10・印は真ん中。 */
 html:root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; }
 
 /* 箱と説明のかたまりを、カードの高さの中央にそろえる。 */
 html:root .card { align-items: center; }
+
+/* カード内の四角は輪を持たず、カードを焦点の持ち主にする。層の外で共通チェックの輪だけを抑える。 */
+html:root .card input:focus-visible + span { outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); }
+html:root .card input:is(:checked, :indeterminate):focus-visible + span { outline-color: transparent; }
+html:root .card input[aria-invalid="true"]:focus-visible + span { outline-color: var(--color-status-danger); }
+html:root .card input:focus-visible { outline: var(--polish-focus-width) solid transparent; }
