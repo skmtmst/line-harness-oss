@@ -1036,3 +1036,4 @@
 - [来店フォローの送信直前の承認と予約の確認](release-log/unreleased/1989-kenta-followup-delivery-approval.md) — 反映履歴、確認 2026-10-31。
 - [LINE来店フォローを使わない判断](release-log/unreleased/1989-kenta-followup-not-using.md) — 反映履歴、確認 2026-10-31。
 - [シナリオ配信と初期設定の案内](release-log/unreleased/1989-kenta-train-1029u.md) — 反映履歴、確認 2026-10-31。
+- [デリバリー受注の予告表示](release-log/unreleased/1990-masato-delivery-sidebar-overflow.md) — 反映履歴、確認 2026-10-31。
