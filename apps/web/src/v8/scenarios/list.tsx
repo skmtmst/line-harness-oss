@@ -14,7 +14,7 @@ import SharedStatusPill from '@/components/shared/status-pill'
 import { collectListRows } from '@/components/shared/collect-list-rows';
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
 import { useListUrlValue, readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state';
-import { useFeatureAccess } from '@/lib/use-feature-access';
+import { captureScenarioWriteAccess, useScenarioWriteAccess, type ScenarioWriteOperation } from './write-access'
 import { RovingTbody } from '@/components/shared/row-roving';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Bookmark, CalendarPlus, CheckCheck, Folder as FolderIcon, ListVideo, Pause, Play, Plus, Send, Square, Users, Workflow } from 'lucide-react';
@@ -151,14 +151,11 @@ export default function ScenariosListV8() {
   // 1152 の板（）。板IDと道具の段の並びだけを切り替える。
   const narrow = useNarrowViewport()
 
-  /*
-   * 閲覧のみ（staff）：作る・複製・削除・止める/再開・並べ替え・フォルダ追加は
-   * 押せない形で出す。役割が取れるまで null なので、そのあいだは今までどおり
-   * 押せる見た目にしておく（最後の守りはサーバの 403）。
-   */
+  // 表示と実行直前の判定は、本人APIの控えと代理モードにそろえる。
   const staffRole = useStaffRole()
-  const featureAccess = useFeatureAccess('scenarios')
-  const canEdit = featureAccess
+  const editAccess = useScenarioWriteAccess()
+  const folderAccess = useScenarioWriteAccess('manageFolders')
+  const canEdit = editAccess.allowed
 
   /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
   const [nameQuery, setNameQuery] = useListUrlParam('q')
@@ -213,6 +210,36 @@ export default function ScenariosListV8() {
    */
   const activeAccountRef = useRef<string | null>(selectedAccountId)
 
+  const scope = useRef({ accountId: selectedAccountId, loading: accountLoading })
+  const mounted = useRef(true)
+  if (scope.current.accountId !== selectedAccountId || scope.current.loading !== accountLoading) scope.current = { accountId: selectedAccountId, loading: accountLoading }
+  const renderedScope = scope.current
+  const currentScope = () => mounted.current && scope.current === renderedScope
+  const leases = {
+    edit: captureScenarioWriteAccess(),
+    publish: captureScenarioWriteAccess('publish'),
+    manageFolders: captureScenarioWriteAccess('manageFolders'),
+  }
+  const canWriteHere = (operation: ScenarioWriteOperation = 'edit') => currentScope() && !accountLoading && scenarioList.loaded && leases[operation]()
+  const stoppedMessage = (completed = 0, total?: number) => total === undefined
+    ? '本人・権限・LINEアカウントを確認できないため、変更を中止しました。'
+    : `${formatNumber(total)} 件中 ${formatNumber(completed)} 件を保存しました。残りは本人・権限・LINEアカウントが変わったため送っていません。`
+  const requireWrite = (operation: ScenarioWriteOperation = 'edit', completed = 0, total?: number) => {
+    if (canWriteHere(operation)) return true
+    if (currentScope()) setActionError(stoppedMessage(completed, total))
+    return false
+  }
+  const deleteRun = useRef<object | null>(null)
+  const duplicateRun = useRef<object | null>(null)
+  const toggleRun = useRef<object | null>(null)
+  const deleteWindow = useRef<object | null>(null)
+  const moveWindow = useRef<object | null>(null)
+  const renderedDeleteWindow = deleteWindow.current
+  const renderedMoveWindow = moveWindow.current
+  const deleteWindowScope = useRef(scope.current)
+  const moveWindowScope = useRef(scope.current)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+
   /* アカウントを切り替えたときだけフォルダの絞り込みを外す（最初の描画では URL の値を残す）。 */
   const previousAccountRef = useRef(selectedAccountId)
   useEffect(() => {
@@ -227,6 +254,12 @@ export default function ScenariosListV8() {
     setSelectedIds(new Set())
     setPendingStop(null)
     toggleBusyRef.current = false
+    toggleRun.current = null
+    deleteRun.current = null
+    duplicateRun.current = null
+    duplicateLock.current = false
+    setDuplicating(false)
+    setDeleting(false)
   }, [selectedAccountId])
 
   const loadFolders = useCallback(async () => {
@@ -364,6 +397,7 @@ export default function ScenariosListV8() {
 
   /** 配信方式の選択へ送るだけ。ここでは作らない。作るのは方式を選んで確定したとき。 */
   const handleCreate = () => {
+    if (!requireWrite()) return
     router.push('/scenarios/mode')
   }
 
@@ -383,6 +417,7 @@ export default function ScenariosListV8() {
    * 5秒のあいだは知らせの「元に戻す」で送らずに戻せる。
    */
   const handleReorder = (ids: string[]) => {
+    if (!requireWrite()) return
     setActionError('')
     const key = listContextKey
     const byId = new Map(scenarios.map((s) => [s.id, s]))
@@ -395,13 +430,18 @@ export default function ScenariosListV8() {
     runUndoable({
       message: '並び順を変えました',
       commit: async () => {
+        if (!currentScope()) return
+        if (!requireWrite()) throw new Error(stoppedMessage())
         const fullOrder = await completeReorder(ids, loadScenarioPage)
+        if (!currentScope()) return
+        if (!requireWrite()) throw new Error(stoppedMessage())
         const res = await api.scenarios.reorder(fullOrder)
         if (!res.success) throw new Error(res.error)
       },
-      undo: () => setOptimisticRows(null),
+      undo: () => { if (currentScope()) setOptimisticRows(null) },
       failureMessage: '並び順を保存できませんでした。',
       onCommitted: () => {
+        if (!currentScope()) return
         setOptimisticRows(null)
         void loadScenarios()
       },
@@ -409,9 +449,11 @@ export default function ScenariosListV8() {
   }
 
   const handleDelete = async (id: string) => {
+    if (!requireWrite()) throw new Error(stoppedMessage())
     try {
       const res = await api.scenarios.delete(id)
       if (!res.success) throw new Error(res.error)
+      if (!currentScope()) return
       void loadScenarios()
       void loadFolders()
       void loadOverallTotal()
@@ -422,7 +464,7 @@ export default function ScenariosListV8() {
   }
 
   /* 削除は、利用状況にかかわらず確認してから実行する。 */
-  const requestDelete = (s: ScenarioRow) => { setDeleteError(''); setDeleteTarget(s) }
+  const requestDelete = (s: ScenarioRow) => { if (!requireWrite()) return; deleteWindow.current = {}; deleteWindowScope.current = renderedScope; setDeleteError(''); setDeleteTarget(s) }
 
   /* ===== まとめて「止める／再開」 ===== */
 
@@ -465,23 +507,26 @@ export default function ScenariosListV8() {
    * 「元に戻す」で送らずに戻せる。1本ずつの開始前チェックは詳細画面で行う。
    */
   const runBulkToggle = (next: boolean, ids: string[]) => {
-    if (ids.length === 0 || !canEdit || toggleBusyRef.current) return
+    if (!requireWrite('publish')) return
+    if (ids.length === 0 || toggleBusyRef.current) return
     toggleBusyRef.current = true
-    const account = selectedAccountId
+    const ticket = {}; toggleRun.current = ticket
     const key = listContextKey
     setOptimisticRows({
       key,
       rows: scenarios.map((s) => (ids.includes(s.id) ? { ...s, isActive: next } : s)),
     })
     runOptimistic({
-      isCurrent: () => activeAccountRef.current === account,
+      isCurrent: () => currentScope() && toggleRun.current === ticket,
       request: async () => {
-        const results = await Promise.all(
-          ids.map((id) => api.scenarios.update(id, { isActive: next }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
-        );
-
-        const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${formatNumber(failed)} 件の保存に失敗しました`)
+        let saved = 0
+        for (const id of ids) {
+          if (!currentScope()) return
+          if (!requireWrite('publish', saved, ids.length)) throw new Error(stoppedMessage(saved, ids.length))
+          const res = await api.scenarios.update(id, { isActive: next })
+          if (!res.success) throw new Error(res.error)
+          saved++
+        }
       },
       revert: () => { toggleBusyRef.current = false; setOptimisticRows(null); void loadScenarios() },
       failureMessage: next ? '配信を始められませんでした。' : '停止できませんでした。',
@@ -498,7 +543,9 @@ export default function ScenariosListV8() {
   /* ===== フォルダ移動の窓 ===== */
 
   const openMove = (ids: string[]) => {
+    if (!requireWrite()) return
     if (ids.length === 0) return
+    moveWindow.current = {}; moveWindowScope.current = renderedScope
     setMoveDraft('')
     setMoveIds(ids)
   }
@@ -508,6 +555,9 @@ export default function ScenariosListV8() {
    * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で送らずに戻せる。
    */
   const runMove = () => {
+    if (moveWindow.current !== renderedMoveWindow) return
+    if (moveWindowScope.current !== renderedScope) { if (currentScope()) setActionError('LINEアカウントが変わったため、この窓では保存できません。閉じて選び直してください。'); return }
+    if (!requireWrite()) return
     if (!moveIds || moveIds.length === 0) return
     const ids = moveIds
     const folderId = moveDraft || null
@@ -520,16 +570,19 @@ export default function ScenariosListV8() {
     runUndoable({
       message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
       commit: async () => {
-        const results = await Promise.all(
-          ids.map((id) => api.scenarios.update(id, { folderId }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
-        );
-
-        const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${formatNumber(failed)} 件のフォルダ移動に失敗しました`)
+        let saved = 0
+        for (const id of ids) {
+          if (!currentScope()) return
+          if (!requireWrite('edit', saved, ids.length)) throw new Error(stoppedMessage(saved, ids.length))
+          const res = await api.scenarios.update(id, { folderId })
+          if (!res.success) throw new Error(res.error)
+          saved++
+        }
       },
-      undo: () => setOptimisticRows(null),
+      undo: () => { if (currentScope()) setOptimisticRows(null) },
       failureMessage: 'フォルダを移動できませんでした。',
       onCommitted: () => {
+        if (!currentScope()) return
         setOptimisticRows(null)
         const moved = new Set(ids)
         setSelectedIds((current) => new Set([...current].filter((id) => !moved.has(id))))
@@ -549,16 +602,22 @@ export default function ScenariosListV8() {
     deleteTarget !== null && scenarios.some((s) => s.id === deleteTarget.id)
 
   const runDelete = async () => {
+    if (deleteWindow.current !== renderedDeleteWindow) return
+    if (deleteWindowScope.current !== renderedScope) { if (currentScope()) setActionError('LINEアカウントが変わったため、この窓では保存できません。閉じて選び直してください。'); return }
+    if (!requireWrite()) return
     if (!deleteTarget || deleting || !targetStillListed) return
+    const ticket = {}; deleteRun.current = ticket
     setDeleting(true)
     setDeleteError('')
     try {
       await handleDelete(deleteTarget.id)
+      if (!canWriteHere() || deleteRun.current !== ticket) return
       setDeleteTarget(null)
     } catch {
+      if (!currentScope() || deleteRun.current !== ticket) return
       setDeleteError('このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setDeleting(false)
+      if (currentScope() && deleteRun.current === ticket) setDeleting(false)
     }
   }
 
@@ -568,14 +627,18 @@ export default function ScenariosListV8() {
   }
 
   const runDuplicate = async (duplicateTarget: ScenarioRow) => {
+    if (!requireWrite()) return
     if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
     duplicateLock.current = true
+    const ticket = {}; duplicateRun.current = ticket
     const name = `${duplicateTarget.name}のコピー`
     setDuplicating(true)
     setDuplicateError('')
     try {
-      const copyId = await duplicateScenario(duplicateTarget.id, name)
+      const copyId = await duplicateScenario(duplicateTarget.id, name, canWriteHere)
+      if (!currentScope() || duplicateRun.current !== ticket) return
+      if (!canWriteHere()) { setDuplicateError('本人・権限が変わったため処理を止めました。作成済みのコピーを一覧で確認してください。'); void loadScenarios(); return }
 
       notifyToast('複製しました', { tone: 'success' })
       void loadScenarios()
@@ -583,15 +646,15 @@ export default function ScenariosListV8() {
       void loadStats()
       duplicateFeedback.mark(duplicateTarget.id, copyId)
     } catch (e) {
+      if (!currentScope() || duplicateRun.current !== ticket) return
       if (e instanceof DuplicateAborted) {
-        setDuplicateError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが一覧に残っています。`)
+        setDuplicateError(`複製が「${e.stage}」で止まりました。作成済みのコピーを一覧で確認してください。`)
       } else {
         setDuplicateError(describeApiFailure(e, '複製'))
       }
       void loadScenarios()
     } finally {
-      duplicateLock.current = false
-      setDuplicating(false)
+      if (currentScope() && duplicateRun.current === ticket) { duplicateLock.current = false; setDuplicating(false) }
     }
   }
 
@@ -679,7 +742,9 @@ export default function ScenariosListV8() {
       accountId={selectedAccountId ?? null}
       folders={folders}
       onChanged={loadFolders}
-      canManage={canEdit}
+      canManage={folderAccess.allowed}
+      canWriteNow={() => canWriteHere('manageFolders')}
+      lockedReason={folderAccess.reason ?? null}
       itemLabel="シナリオ"
       activeId={folderFilter}
       onSelect={setFolderFilter}
@@ -780,9 +845,10 @@ export default function ScenariosListV8() {
 
   /** パネル内の名前のその場の書き換え。失敗したら InlineEdit が戻す。 */
   const renameScenario = async (id: string, next: string): Promise<unknown> => {
+    if (!requireWrite()) throw new Error(stoppedMessage())
     const res = await api.scenarios.update(id, { name: next })
     if (!res.success) throw new Error(res.error)
-    await loadScenarios()
+    if (currentScope()) await loadScenarios()
     return res
   }
 
