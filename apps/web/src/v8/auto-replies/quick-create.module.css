@@ -59,10 +59,6 @@
   background: var(--color-canvas);
 }
 
-.chipBox:focus-within {
-  outline: var(--tpl-ms-focus-w) solid var(--color-focus-ring);
-  outline-offset: var(--tpl-ms-focus-offset);
-}
 
 /* 言葉と外す印は編集画面と同じ札の中で並べる。 */
 .chip {

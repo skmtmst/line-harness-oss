@@ -13,6 +13,7 @@ import ChoiceTable from './choice-table'
 import FormFileSettings from '@/components/shared/form-file-settings'
 import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
+import DateField from '@/components/shared/date-field'
 import { describeInputUpdates } from './form-update-summary'
 import { cellInput, fieldInput, type FormRefs } from './form-refs'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -554,11 +555,10 @@ export default function BlockEditor({
                 ) : block.type === 'date' ? (
                   <label className="block">
                     <span className="text-ink-secondary mb-1 block text-xs font-medium">初期値</span>
-                    <SaveErrorField names={["defaultValue","block.defaultValue","default_value","block.default_value"]}><input
-                      type="date"
+                    <SaveErrorField names={["defaultValue","block.defaultValue","default_value","block.default_value"]}><DateField
+                      aria-label="日付の初期値"
                       value={block.defaultValue ?? ''}
-                      onChange={(e) => patchInput({ defaultValue: e.target.value })}
-                      className={fieldInput}
+                      onChange={(defaultValue) => patchInput({ defaultValue })}
                     /></SaveErrorField>
                   </label>
                 ) : block.type === 'prefecture' ? (

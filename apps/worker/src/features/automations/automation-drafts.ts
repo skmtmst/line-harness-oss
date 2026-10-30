@@ -2,12 +2,13 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 import { readFolderAssignment, FolderAssignmentError } from '@line-crm/db';
 import { resolveCommonActionVersion } from './automation-engine.js';
 import { buildSegmentWhere, parseCondition } from '../../services/segment-query.js';
-import { type SegmentCondition } from '@line-crm/shared';
+import { parseAutomationWait, type SegmentCondition } from '@line-crm/shared';
 
 export type AutomationDraftActionType =
   | 'add_tag'
   | 'start_scenario'
   | 'send_message'
+  | 'wait'
   | 'common_action'
   | 'notify_staff';
 export type AutomationDraftTriggerType =
@@ -889,7 +890,7 @@ export async function updateAutomationDraft(
   const commonActionBindings: Array<{ path: string; commonActionId: string; versionId: string }> = [];
   for (const [index, candidate] of input.actions.entries()) {
     const raw = candidate as Partial<AutomationDraftAction>;
-    if (!raw || !new Set(['add_tag', 'start_scenario', 'send_message', 'common_action', 'notify_staff']).has(String(raw.type))) {
+    if (!raw || !new Set(['add_tag', 'start_scenario', 'send_message', 'common_action', 'notify_staff', 'wait']).has(String(raw.type))) {
       throw new AutomationDraftError('action_unsupported', 'この処理はまだ実行まで接続されていません', `actions.${index}`);
     }
     const params = raw.params && typeof raw.params === 'object' && !Array.isArray(raw.params)
@@ -924,6 +925,11 @@ export async function updateAutomationDraft(
         commonActionId,
         versionId: commonAction.current_published_version_id,
       });
+    } else if (raw.type === 'wait') {
+      const wait = parseAutomationWait(params);
+      if (!wait) throw new AutomationDraftError('wait_invalid', '待つ時間は5分単位、翌日の時刻は時と分で指定してください', `actions.${index}.params.${params.mode === 'next_day' ? 'sendAtTime' : 'durationMinutes'}`);
+      for (const key of Object.keys(params)) delete params[key];
+      Object.assign(params,wait);
     } else if (raw.type === 'notify_staff') {
       // 担当者通知のルールは、有効ないまの版をこの店の範囲で指す。
       // 送り先・文面の初期値はルール側、追加のひと言はここで足す。

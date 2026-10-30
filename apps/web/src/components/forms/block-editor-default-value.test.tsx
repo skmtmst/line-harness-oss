@@ -23,7 +23,7 @@ afterEach(async () => {
   vi.restoreAllMocks()
 })
 
-function mount(block: FormBlock) {
+function mount(block: FormBlock, onChange = vi.fn()) {
   act(() => {
     root.render(
       <BlockEditor
@@ -33,7 +33,7 @@ function mount(block: FormBlock) {
         refs={EMPTY_REFS}
         selected
         onSelect={() => {}}
-        onChange={() => {}}
+        onChange={onChange}
       />,
     )
   })
@@ -59,10 +59,16 @@ function defaultControl() {
 }
 
 describe('R196 初期値はその欄の形で入れる', () => {
-  it('日付は日付入力になる', () => {
-    mount(inputBlock('date'))
-    const control = defaultControl().querySelector('input')
-    expect(control?.type).toBe('date')
+  it('日付は共通の暦から選べ、初期値を更新する', async () => {
+    const changed = vi.fn()
+    mount({ ...inputBlock('date'), defaultValue: '2026-11-05' }, changed)
+    const control = defaultControl().querySelector<HTMLButtonElement>('button[aria-label="日付の初期値"]')
+    expect(control).not.toBeNull()
+    await act(async () => { control!.click() })
+    const day = [...document.querySelectorAll<HTMLButtonElement>('[role="gridcell"] button')].find(el => el.textContent === '6' && !el.hasAttribute('data-outside'))
+    expect(day).toBeDefined()
+    await act(async () => { day!.click() })
+    expect(changed).toHaveBeenCalledWith(expect.objectContaining({ defaultValue: '2026-11-06' }))
   })
 
   it('都道府県は選択欄になり47都道府県から選べる', async () => {

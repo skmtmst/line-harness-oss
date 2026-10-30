@@ -166,6 +166,7 @@ export default function DateField({
         id={fieldId}
         type="button"
         className={styles.field}
+        data-input-field
         data-size={size}
         data-clearable={selected && !disabled && clearable || undefined}
         disabled={disabled}

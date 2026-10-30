@@ -1,6 +1,6 @@
-/* app/common-actions/version-diff.ts の写し（src/v8 から @/app は読めないため）。直すときは両方。 */
 import type { CommonActionStep } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
+import { automationWaitLabel } from '@line-crm/shared'
 
 /*
  * 監査 R468: 版の切替確認で、処理の数だけでなく待ち時間・失敗時の動き・
@@ -72,7 +72,11 @@ function describeStepChange(oldStep: CommonActionStep, newStep: CommonActionStep
   if (newStep.type === 'wait') {
     const before = waitMinutes(oldStep.params)
     const after = waitMinutes(newStep.params)
-    if (before !== null && after !== null && before !== after) {
+    if (oldStep.params.mode === 'next_day' || newStep.params.mode === 'next_day') {
+      const oldLabel = automationWaitLabel(oldStep.params)
+      const newLabel = automationWaitLabel(newStep.params)
+      if (oldLabel !== newLabel) lines.push(`「${oldLabel}」から「${newLabel}」にした`)
+    } else if (before !== null && after !== null && before !== after) {
       lines.push(`「待つ」を${before}分から${after}分にした`)
     }
   }
@@ -81,7 +85,7 @@ function describeStepChange(oldStep: CommonActionStep, newStep: CommonActionStep
   }
   if (newStep.type === 'branch') {
     lines.push(...describeBranchChange(oldStep, newStep))
-  } else if (JSON.stringify({ ...oldStep.params, durationMinutes: undefined, minutes: undefined })
+  } else if (newStep.type !== 'wait' && JSON.stringify({ ...oldStep.params, durationMinutes: undefined, minutes: undefined })
     !== JSON.stringify({ ...newStep.params, durationMinutes: undefined, minutes: undefined })) {
     // 待ち時間と失敗時は上で個別に出す。残りの設定差は1行にまとめる。
     lines.push(`「${label}」の内容を変えた`)

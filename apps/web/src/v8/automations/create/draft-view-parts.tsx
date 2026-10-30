@@ -19,6 +19,7 @@ export function actionRowTitle(type: string): string {
   if (type === 'start_scenario') return 'シナリオを始める'
   if (type === 'common_action') return '共通アクションを実行'
   if (type === 'notify_staff') return '担当へ知らせる'
+  if (type === 'wait') return '待つ'
   return 'メッセージを送る'
 }
 

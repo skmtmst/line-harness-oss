@@ -1,4 +1,5 @@
 'use client'
+import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
 import { formatYen } from '@line-crm/shared';
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import PageSizeSelect, { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
@@ -309,7 +310,7 @@ function InflowDetailContent() {
         cause.code === 'ENTRY_ROUTE_IN_USE'
         || cause.code === 'ENTRY_ROUTE_NAME_CONFIRMATION_MISMATCH'
       )
-        ? cause.message
+        ? japaneseDetailOf(cause) || describeApiFailure(cause, '削除')
         : '選んだ処理を完了できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
       setDeleting(false)

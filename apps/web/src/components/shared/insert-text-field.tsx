@@ -637,6 +637,7 @@ const ChipEditor = forwardRef<InsertTextFieldHandle, InsertTextFieldProps>(funct
       aria-placeholder={placeholder}
       {...({ placeholder } as Record<string, string | undefined>)}
       data-insert-field=""
+      data-input-field
       className={`${styles.editor} ${editorSize ? styles.editorMessage : ''} ${editorSize === 'code' ? styles.editorCode : ''} ${compact ? styles.editorCompact : ''} ${className ?? ''}`}
       style={{ ...minHeight, ...style }}
       contentEditable={editable}

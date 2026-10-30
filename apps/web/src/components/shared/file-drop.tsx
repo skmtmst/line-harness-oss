@@ -134,6 +134,7 @@ export default function FileDropzone({
       aria-busy={busy || undefined}
       aria-invalid={invalid || undefined}
       data-invalid={invalid || undefined}
+      data-input-field
       data-design-node="NQMnx"
       data-variant={variant}
       data-drag={shown}

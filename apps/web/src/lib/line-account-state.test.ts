@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { hasLineConnectionProblem, lineAccountConnectionState, tokenExpiryNotice, tokenExpirySummary } from './line-account-state'
+import { hasLineConnectionProblem, lineAccountConnectionState, tokenExpiryBadge, tokenExpiryNotice, tokenExpirySummary } from './line-account-state'
 
 it('稼働中の要確認だけを問題として数え、未確認・停止中・アーカイブを混ぜない', () => {
   const warning = { isActive: true, connection: { status: 'warn' as const } }
@@ -18,6 +18,13 @@ it('トークンの期限は切れた・近い時だけ行に出し、記録な�
   expect(tokenExpiryNotice({ tokenExpiry: expiry('unknown') })).toBeNull()
   expect(tokenExpiryNotice({ tokenExpiry: expiry('valid') })).toBeNull()
   expect(tokenExpiryNotice({ tokenExpiry: expiry('expired'), archivedAt: '2026-10-01' })).toBeNull()
+})
+
+it('表の期限の札は短い文字で、全文は title に持つ', () => {
+  expect(tokenExpiryBadge({ tokenExpiry: expiry('expired') })).toEqual({ text: '期限切れ', title: '期限:expired' })
+  expect(tokenExpiryBadge({ tokenExpiry: expiry('expiring') })).toEqual({ text: '期限が近い', title: '期限:expiring' })
+  expect(tokenExpiryBadge({ tokenExpiry: expiry('valid') })).toBeNull()
+  expect(tokenExpiryBadge({ tokenExpiry: expiry('expired'), archivedAt: '2026-10-01' })).toBeNull()
 })
 
 it('帯の下の期限の1行は、接続とは別に数え、0件なら出さない', () => {

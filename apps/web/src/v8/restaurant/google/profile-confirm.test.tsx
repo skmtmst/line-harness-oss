@@ -87,7 +87,7 @@ describe('Google変更案を現在の確認画面から送信する', () => {
     mocks.cancelChange.mockRejectedValueOnce(new ApiError(500, '取消に失敗しました')).mockResolvedValueOnce({})
     await open()
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
-    await screen.findByText('取消に失敗しました')
+    await screen.findByText('取り消せませんでした。')
     expect(screen.getByText('変更後の店')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }))
     await waitFor(() => expect(go).toHaveBeenCalledWith({ tab: 'profile' }))

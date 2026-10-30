@@ -236,6 +236,7 @@ export default function OtpInput({
       aria-invalid={invalid || undefined}
       disabled={locked}
       value={digits[index] ?? ''}
+      data-input-field
       className={styles.slot}
       onKeyDown={(event) => onKeyDown(index, event)}
       onPaste={(event) => onPaste(index, event)}

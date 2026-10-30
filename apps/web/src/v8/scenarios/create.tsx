@@ -1,4 +1,5 @@
 'use client'
+import { japaneseDetailOf, describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from '@/components/shared/list-navigation'
@@ -605,7 +606,7 @@ function scenarioSaveError(cause: unknown): string {
 
 function scenarioModeError(cause: unknown): string {
   if (cause instanceof ApiError) {
-    if (cause.status === 400 && !cause.message.startsWith('API error:')) return cause.message
+    if (cause.status === 400) return japaneseDetailOf(cause) || describeApiFailure(cause, '入力内容の確認')
     if (cause.status === 403) return permissionDeniedMessage('store')
     if (cause.status === 404) return 'シナリオが見つかりませんでした。一覧から開き直してください。'
   }
