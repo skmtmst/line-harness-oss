@@ -177,7 +177,7 @@ export default function BellNotifications({
     }
   })
   const partialNotice = data && data.failedAccountLabels.length > 0 ? (
-    <Notice tone="warn" compact role="status" message={`${data.failedAccountLabels.join('、')} の通知を読み込めませんでした。読めた店舗の通知を表示しています。全店の未読件数は確認できません。`} />
+    <Notice tone="warn" compact role="status" message={`${data.failedAccountLabels.join('、')} の通知を読み込めませんでした。読めた店舗の通知を表示しています。${data.unreadCount === null ? '全店の未読件数を確認できないため、すべて既読にできません。' : '全店の未読件数は確認できません。'}`} />
   ) : undefined
 
   const select = (id: string) => {
