@@ -8,4 +8,3 @@ export class AutomationActionError extends Error {
     this.name = 'AutomationActionError';
   }
 }
-
