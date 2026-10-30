@@ -1,3 +1,4 @@
+import { seedExistingRestaurantFollowup } from '../test-utils/restaurant-followup-fixture.js';
 import { publishScenarioVersion } from '@line-crm/db';
 import { requestRestaurantFollowupApproval } from '../services/restaurant-followup.js';
 /**
@@ -75,6 +76,7 @@ function seedStore() {
     `INSERT INTO line_accounts (id, name, channel_id, channel_secret, channel_access_token)
      VALUES (?, ?, ?, ?, ?)`,
   ).run('account-9', 'S店', 'channel-s', 'secret-s', 'token-s');
+  seedExistingRestaurantFollowup(testDb,'store-s');
 }
 
 function seedReservation(id: string, status = 'confirmed', tableId: string | null = 'table-1') {

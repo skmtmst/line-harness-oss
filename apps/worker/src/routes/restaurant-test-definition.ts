@@ -462,19 +462,3 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
   if (priceChange?.status === 'failed') return c.json({ success: false, error: '価格が先に変更されたため反映できませんでした。画面を読み直してください' }, 409);
   return c.json({ success: true, data: { id: c.req.param('id'), approvalId, requestId, pendingPrice: priceChange?.status === 'approved' ? price : null } });
 };
-
-export const updateRestaurantFollowupBinding=async(c:Context<Env>)=>{
- if(!hasOrganizationSelector(c))return requiredAccount(c);
- const org=await organizationFor(c),storeId=c.req.param('storeId')??'';
- if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
- const b=await c.req.json<{expectedVersion?:number;trigger?:string;offsetMinutes?:number;enabled?:boolean}>().catch(()=>null);
- if(!b||!Number.isSafeInteger(b.expectedVersion)||Number(b.expectedVersion)<1||!['reservation_created','reservation_24h','reservation_2h','post_visit','review_request','waitlist_invited','anniversary_before'].includes(b.trigger??'')||!Number.isSafeInteger(b.offsetMinutes)||Math.abs(Number(b.offsetMinutes))>525600||typeof b.enabled!=='boolean')return inputError(c,{success:false,error:'invalid_binding'},400,['expectedVersion','trigger','offsetMinutes','enabled']);
- if((['reservation_24h','reservation_2h','anniversary_before'].includes(b.trigger!)&&Number(b.offsetMinutes)>=0)||(['reservation_created','post_visit','review_request','waitlist_invited','anniversary_before'].includes(b.trigger!)&&Number(b.offsetMinutes)<0))return inputError(c,{success:false,error:'invalid_timing'},400,['offsetMinutes']);
- const changed=await dbFor(c.env,storeId).prepare(`INSERT INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled)
-  SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_store_followup_templates t JOIN scenario_steps step ON step.scenario_id=t.scenario_id
-   WHERE t.store_id=? AND t.template_version=? AND step.id=?)
-  AND (?='POST' OR EXISTS(SELECT 1 FROM rt_store_followup_step_bindings WHERE store_id=? AND trigger=? AND step_id=?))
-  ON CONFLICT(store_id,trigger,step_id) DO UPDATE SET offset_minutes=excluded.offset_minutes,enabled=excluded.enabled,version=version+1`)
-  .bind(storeId,b.trigger,c.req.param('stepId'),b.offsetMinutes,b.enabled?1:0,storeId,b.expectedVersion,c.req.param('stepId'),c.req.method,storeId,b.trigger,c.req.param('stepId')).run();
- return changed.meta.changes?c.json({success:true,data:{stopped:true}}):c.json({success:false,error:'version_conflict'},409);
-};

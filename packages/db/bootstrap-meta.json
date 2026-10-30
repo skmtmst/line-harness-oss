@@ -654,7 +654,8 @@
     "738_line_account_creator.sql",
     "739_line_account_hq_admin_memberships.sql",
     "740_registration_applications.sql",
-    "741_staff_passkeys.sql"
+    "741_staff_passkeys.sql",
+    "743_restaurant_followup_rows.sql"
   ],
-  "migrationCount": 655
+  "migrationCount": 656
 }

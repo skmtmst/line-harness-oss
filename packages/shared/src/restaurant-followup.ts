@@ -12,6 +12,7 @@ export interface RestaurantFollowupBinding {
     trigger: RestaurantFollowupTrigger;
     step_id: string;
     offset_minutes: number;
+    anniversary_time?: string;
     enabled: 0 | 1;
     version: number;
 }
