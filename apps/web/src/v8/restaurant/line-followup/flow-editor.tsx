@@ -6,7 +6,7 @@ import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { TextArea } from '@/components/shared/text-field'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
-import MessageComposer from '@/components/shared/message-composer'
+import MessageComposer, { composerLabel } from '@/components/shared/message-composer'
 import styles from './line-followup.module.css'
 
 /*
@@ -64,10 +64,15 @@ export function StepEditor({ name, bubbles, readOnly, busy, onChange }: {
   </Card>
 }
 
+/* 描けない通も消さず、その位置に未対応の説明を出す。 */
+export function previewBubbleText(bubble: BroadcastBubble): string {
+  if (bubble.type === 'text') return bubbleText(bubble)
+  return `（${composerLabel(bubble.type)}はこの画面では見られません）`
+}
+
 /* 送る中身そのままの見え方。送らない画像やボタンは付けない。吹き出しは共通の部品。 */
 export function StepPreview({ bubbles, accountName }: { bubbles: BroadcastBubble[]; accountName: string }) {
-  const texts = bubbles.map(bubbleText).filter(text => text !== '')
-  const shown = texts.length ? texts : ['本文']
+  const shown = bubbles.length ? bubbles.map(previewBubbleText) : ['本文']
   return <LinePreview title={null} accountName={accountName} fit>
     {shown.map((text, index) => <LinePreviewMessage key={index} accountName={accountName} avatar={accountName.slice(0, 1)} time="今">{text}</LinePreviewMessage>)}
   </LinePreview>

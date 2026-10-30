@@ -202,6 +202,23 @@ describe('7つの行と状態', () => {
       expectedVersion: 3, messageBubbles: [bubble('1通目', 'b1'), bubble('直した2通目', 'b2')],
     }))
   })
+  it('吹き出しの中の画像は消さず、見え方に未対応の説明を出す', async () => {
+    const image = { id: 'b2', type: 'image', content: { originalContentUrl: 'https://example.test/o.jpg', previewImageUrl: 'https://example.test/p.jpg' } }
+    const live = liveOf()
+    live.steps = live.steps.map(step => step.trigger === 'post_visit'
+      ? { ...step, bubbles: [bubble('1通目', 'b1'), image as BroadcastBubble] }
+      : step)
+    fixture.fetchLive.mockResolvedValue(live)
+    render(<LineFollowupV8 />)
+    await screen.findByRole('button', { name: '来店後' })
+    fireEvent.click(screen.getByRole('button', { name: '来店後' }))
+    expect(screen.getByText('（画像はこの画面では見られません）')).toBeTruthy()
+    // 保存しても画像の通は保つ。
+    fireEvent.click(screen.getByRole('button', { name: '本文を保存する' }))
+    await waitFor(() => expect(fixture.saveMessages).toHaveBeenCalledWith('account-1', 'store', 'step-post_visit', {
+      expectedVersion: 3, messageBubbles: [bubble('1通目', 'b1'), image],
+    }))
+  })
   it('テキスト以外の古い本文は空欄に見せず編集を止める', async () => {
     const live = liveOf()
     live.steps = live.steps.map(step => step.trigger === 'reservation_24h'
@@ -220,12 +237,14 @@ describe('7つの行と状態', () => {
     expect(screen.getByRole('link', { name: 'くわしく設定する →' }).getAttribute('href')).toBe('/scenarios/detail?id=scn-1')
   })
   it('承認の申請と停止ができる', async () => {
+    // 公開で版が3→4に増える再現。
+    fixture.fetchLive.mockResolvedValueOnce(liveOf()).mockResolvedValue(liveOf({ templateVersion: 4 }))
     render(<LineFollowupV8 />)
     await screen.findByRole('button', { name: '予約完了時' })
     fireEvent.click(screen.getByRole('button', { name: '承認を申請する' }))
-    // 申請の前に本体を公開して、画面の本文と承認対象の一致を保つ。
+    // 申請の前に本体を公開し、増えた版を取り直してから申請する。
     await waitFor(() => expect(fixture.publishScenario).toHaveBeenCalledWith('scn-1'))
-    await waitFor(() => expect(fixture.requestStart).toHaveBeenCalledWith('account-1', 'store', 3))
+    await waitFor(() => expect(fixture.requestStart).toHaveBeenCalledWith('account-1', 'store', 4))
     // 申請後は読み直すので、終わってから止めるを押す。
     fireEvent.click(await screen.findByRole('button', { name: '本送信を止める' }))
     await waitFor(() => expect(fixture.stop).toHaveBeenCalledWith('account-1', 'store'))

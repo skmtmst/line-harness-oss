@@ -302,7 +302,7 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
             lockedReason={permReason}
             onClick={() => {
               setBusy('start')
-              /* 申請は公開版を対象にする。直前に公開して画面の本文との一致を保つ。 */
+              /* 申請は公開版を対象にする。直前に公開し、公開で増えた版を取り直してから申請する。 */
               publishFollowupScenario(live.scenarioId).then(
                 publishResponse => {
                   try {
@@ -312,25 +312,38 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
                     setActionError(error instanceof Error ? error.message : '本体のシナリオを公開できませんでした')
                     return
                   }
-                  requestFollowupStart(accountId, storeId, live.templateVersion).then(
-                    response => {
-                      setBusy(null)
-                      try {
-                        unwrap(response, '承認を申請できませんでした')
-                      } catch (error) {
-                        setActionError(error instanceof Error ? error.message : '承認を申請できませんでした')
+                  fetchRestaurantFollowup(accountId, storeId, storeName).then(
+                    fresh => {
+                      if (!fresh) {
+                        setBusy(null)
+                        setActionError('フォローの設定を読み直せませんでした')
                         return
                       }
-                      reload()
+                      requestFollowupStart(accountId, storeId, fresh.templateVersion).then(
+                        response => {
+                          setBusy(null)
+                          try {
+                            unwrap(response, '承認を申請できませんでした')
+                          } catch (error) {
+                            setActionError(error instanceof Error ? error.message : '承認を申請できませんでした')
+                            return
+                          }
+                          reload()
+                        },
+                        (error: unknown) => {
+                          setBusy(null)
+                          if (error instanceof ApiError && error.status === 409) {
+                            reload()
+                            setActionError('承認を申請できませんでした。ほかの担当者が先に保存しました。読み直しました。')
+                          } else {
+                            setActionError(describeSaveFailure(error))
+                          }
+                        },
+                      )
                     },
                     (error: unknown) => {
                       setBusy(null)
-                      if (error instanceof ApiError && error.status === 409) {
-                        reload()
-                        setActionError('承認を申請できませんでした。ほかの担当者が先に保存しました。読み直しました。')
-                      } else {
-                        setActionError(describeSaveFailure(error))
-                      }
+                      setActionError(describeSaveFailure(error))
                     },
                   )
                 },
