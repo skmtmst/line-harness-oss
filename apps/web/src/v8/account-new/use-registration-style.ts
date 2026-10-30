@@ -5,11 +5,14 @@ import type { AccountStyle } from '@line-crm/shared'
 import { styleApi } from '@/lib/api/helpers/styles'
 import { accountStyleUpdated } from '@/hooks/use-account-style'
 import { describeApiFailure } from '@/components/shared/api-error-message'
+import { readStaffIdentity } from '@/lib/staff-identity-state'
+import { registrationStorageKey } from './registration-storage'
 
 export const REGISTRATION_STYLE_KEY = 'musubo-registration-style'
 
 /** アカウント作成の後半だけ再開する。接続・作成をもう一度呼ばない。 */
 export function useRegistrationStyle(accountId: string, enabled: boolean) {
+  const resumeKey = registrationStorageKey(REGISTRATION_STYLE_KEY, readStaffIdentity())
   const [choice, setChoice] = useState<AccountStyle | ''>('')
   const [version, setVersion] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
@@ -37,7 +40,7 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
       if (!res.success) throw new Error('使い方を保存できませんでした。時間をおいて、もう一度お試しください。')
       setVersion(res.data.version)
       accountStyleUpdated(accountId)
-      try { sessionStorage.removeItem(REGISTRATION_STYLE_KEY) } catch { /* 保存済みの版を再読すれば再開できる。 */ }
+      try { if (resumeKey) sessionStorage.removeItem(resumeKey) } catch { /* 保存済みの版を再読すれば再開できる。 */ }
       return true
     } catch (caught) {
       setError(describeApiFailure(caught, '保存'))
@@ -54,7 +57,7 @@ export function useRegistrationStyle(accountId: string, enabled: boolean) {
       setVersion(res.data.version)
       setChoice('')
       accountStyleUpdated(accountId)
-      try { sessionStorage.removeItem(REGISTRATION_STYLE_KEY) } catch { /* 設定画面であとから変更できる。 */ }
+      try { if (resumeKey) sessionStorage.removeItem(resumeKey) } catch { /* 設定画面であとから変更できる。 */ }
       return true
     } catch (caught) {
       setError(describeApiFailure(caught, 'スキップ'))
