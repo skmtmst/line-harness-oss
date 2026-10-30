@@ -1,3 +1,4 @@
+import { couponPresentation, couponPresentationError, hasCouponPresentation, type CouponPresentationInput } from './coupon-presentation.js';
 import { researchFormLayout } from './research-form.js';
 import { validateTapExtrasTree, type TapExtras } from './tap-extras.js';
 import { validateFlexMessage } from './line-message-limits.js';
@@ -26,7 +27,7 @@ export interface AssetCardInput {
   actionText?: unknown;
 }
 
-export interface AssetPayloadInput {
+export interface AssetPayloadInput extends CouponPresentationInput {
   cards?: unknown;
   moreCard?: unknown;
   tapExtras?: TapExtras;
@@ -267,13 +268,29 @@ function convertCoupon(name: string, payload: AssetPayloadInput): AssetConversio
   const error = couponPayloadError(payload);
   if (error) return { ok: false, error };
   const title = text(payload.title) || name || 'クーポン';
-  const body = [
+  let body: Record<string, unknown>[] = [
     { type: 'text', text: title, weight: 'bold', wrap: true },
-    { type: 'text', text: text(payload.description), wrap: true },
+    ...(text(payload.description) ? [{ type: 'text', text: text(payload.description), wrap: true }] : []),
     { type: 'text', text: `有効期間：${text(payload.startsAt)}〜${text(payload.endsAt)}`, wrap: true, size: 'sm' },
     { type: 'text', text: text(payload.instructions) || 'お店で確認してから「使う」を押してください', wrap: true, size: 'sm' },
     { type: 'text', text: payload.oncePerFriend === false && payload.maxUsesPerFriend == null ? '期間中は何回でも使えます' : `1人${Number(payload.maxUsesPerFriend ?? 1)}回まで`, wrap: true, size: 'sm' },
   ];
+  if (hasCouponPresentation(payload)) {
+    const view = couponPresentation(payload, name);
+    const count = payload.oncePerFriend === false && payload.maxUsesPerFriend == null
+      ? '期間中は何回でも' : `${Number(payload.maxUsesPerFriend ?? 1)}回のみ使用可能`;
+    body = [
+      { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [view.kindLabel, count].filter(Boolean).map(value => ({ type: 'text', text: value, size: 'xs', wrap: true })) },
+      { type: 'text', text: view.title, weight: 'bold', wrap: true },
+      ...(view.beforePrice ? [{ type: 'text', text: view.beforePrice, decoration: 'line-through', size: 'sm' }] : []),
+      ...(view.benefit ? [{ type: 'text', text: view.benefit, weight: 'bold', size: 'xxl', wrap: true }] : []),
+      ...(view.conditions ? [{ type: 'text', text: view.conditions, size: 'sm', wrap: true }] : []),
+      ...(view.code ? [{ type: 'text', text: `クーポンコード：${view.code}`, size: 'sm', wrap: true }] : []),
+      { type: 'text', text: `有効期間：${text(payload.startsAt)}〜${text(payload.endsAt)}`, size: 'sm', wrap: true },
+      ...(view.instructions ? [{ type: 'text', text: view.instructions, size: 'sm', wrap: true }] : []),
+      { type: 'text', text: '日本時間（UTC+09:00）', size: 'xs' },
+    ];
+  }
   const bubble = { type: 'bubble',
     ...(text(payload.imageUrl) ? { hero: { type: 'image', url: text(payload.imageUrl), size: 'full', aspectMode: 'fit' } } : {}),
     body: { type: 'box', layout: 'vertical', spacing: 'md', contents: body },
@@ -286,7 +303,9 @@ function convertCoupon(name: string, payload: AssetPayloadInput): AssetConversio
 
 /** 日付入力は日本時間。期限・上限を欠いたクーポンを文章に落とさない。 */
 export function couponPayloadError(payload: AssetPayloadInput): string | null {
-  if (!text(payload.description)) return 'クーポンの内容を入力してください';
+  if (!text(payload.description) && !text(payload.instructions)) return 'クーポンの内容を入力してください';
+  const presentationError = couponPresentationError(payload);
+  if (presentationError) return presentationError;
   const from = couponDate(text(payload.startsAt));
   const until = couponDate(text(payload.endsAt));
   if (!Number.isFinite(from) || !Number.isFinite(until) || until <= from) return 'クーポンの開始と終了を正しい順で入力してください';

@@ -256,3 +256,43 @@ describe('押下の追加処理の保存HTTP', () => {
     expect(await after.json()).toMatchObject({data:[{payload}]});
   });
 });
+
+it('クーポンの割引・条件・コード・ガイドは保存・公開・再編集でも欠けず、旧公開版を変えない', async () => {
+  const payload = {
+    ...COUPON, couponType: 'discount', discount: { mode: 'price', beforeYen: 1000, afterYen: 500 },
+    conditions: '1,000円以上のお支払いで利用可能', code: { text: 'WELCOME500' },
+    instructions: 'スタッフに提示してください。\n利用前にご確認ください。',
+    maxUsesPerFriend: 3, legacyNote: '既存の追加情報',
+  };
+  const createdResponse = await createAsset({ lineAccountId: 'account-1', kind: 'coupon', name: '値引き券', payload });
+  expect(createdResponse.status).toBe(201);
+  const created = await createdResponse.json() as { data: { id: string } };
+  const id = created.data.id;
+  const first = await app().request(`/api/broadcast-message-assets/${id}/publish`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'coupon-fields-publish-1' },
+    body: JSON.stringify({ expectedVersion: 0, expectedDraftRevision: 1 }),
+  }, bindings);
+  expect(first.status).toBe(200);
+  const original = await getBroadcastMessageAsset(store.db, id);
+  expect(JSON.parse(original!.payload_json)).toEqual(payload);
+  const edited = { ...payload, discount: { mode: 'percent', percent: 20 }, code: null };
+  const saved = await app().request(`/api/broadcast-message-assets/${id}`, {
+    method: 'PUT', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: '値引き券', payload: edited }),
+  }, bindings);
+  expect(saved.status).toBe(200);
+  const read = await app().request('/api/broadcast-message-assets?lineAccountId=account-1&kind=coupon', {}, bindings);
+  expect(read.status).toBe(200);
+  const listed = await read.json() as { data: Array<{ id: string; payload: Record<string, unknown>; publishedPayload: Record<string, unknown> }> };
+  expect(listed.data.find(row => row.id === id)).toMatchObject({ payload: edited, publishedPayload: payload });
+  const row = await getBroadcastMessageAsset(store.db, id);
+  expect(JSON.parse(row!.draft_payload_json!)).toEqual(edited);
+  expect(JSON.parse(row!.payload_json)).toEqual(payload);
+  const second = await app().request(`/api/broadcast-message-assets/${id}/publish`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'Idempotency-Key': 'coupon-fields-publish-2' },
+    body: JSON.stringify({ expectedVersion: 1, expectedDraftRevision: row!.draft_revision }),
+  }, bindings);
+  expect(second.status).toBe(200);
+  const versions = store.raw.prepare('SELECT payload_json FROM broadcast_asset_versions WHERE asset_id = ? ORDER BY version_number').all(id) as Array<{ payload_json: string }>;
+  expect(versions.map(version => JSON.parse(version.payload_json))).toEqual([payload, edited]);
+});
