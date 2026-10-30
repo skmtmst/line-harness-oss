@@ -9,9 +9,14 @@ html:root :is([data-input-field], [data-choice-field]:not([data-tone]), input:wh
   --polish-input-ring-color: var(--color-danger);
 }
 
-html:root :is([data-input-field], [data-choice-field]:not([data-tone]), input:where(:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='hidden'], [type='submit'], [type='button'], [type='reset'])), textarea, select, [contenteditable='true']):not(:where([data-input-field] *, [data-choice-field] *)):is(:focus-visible, :has(> [data-choice-trigger]:focus-visible), :has(:is(input, textarea, [data-insert-field]):focus-visible), [aria-invalid='true'], [data-invalid], [data-choice-invalid], :has(:is(input, textarea, [data-insert-field])[aria-invalid='true'])) {
+html:root :is([data-input-field], [data-choice-field]:not([data-tone]), input:where(:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color'], [type='hidden'], [type='submit'], [type='button'], [type='reset'])), textarea, select, [contenteditable='true']):not(:where([data-input-field] *, [data-choice-field] *)):is(:focus-visible, :has(> [data-choice-trigger]:focus-visible), :has(:is(input, textarea, [data-insert-field], [data-input-hit]):focus-visible), [aria-invalid='true'], [data-invalid], [data-choice-invalid], :has(:is(input, textarea, [data-insert-field])[aria-invalid='true'])) {
   outline: var(--polish-focus-width) solid var(--polish-input-ring-color);
   outline-offset: var(--polish-focus-input-offset);
+}
+
+/* 入力面全体を押す入口は枠へ焦点を渡す。補助の操作ボタンは含めない。 */
+html:root [data-input-field] [data-input-hit]:focus-visible {
+  outline-color: transparent;
 }
 
 /* 箱が線を持つ入力は、中の文字欄に線を重ねない。補助ボタンの輪は残す。 */

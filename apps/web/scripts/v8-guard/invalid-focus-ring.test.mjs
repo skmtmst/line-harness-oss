@@ -28,6 +28,7 @@ import {TimeField} from './src/components/shared/date-time-field';
 import TagPickerField from './src/components/shared/tag-picker-field';
 import CheckCard from './src/components/shared/check-card';
 import FileDropzone from './src/components/shared/file-drop';
+import MediaSlot from './src/components/shared/media-slot';
 import fsStyles from './src/components/shared/folder-select.module.css';
 function Case({id,expect,ring,children}){return <div data-case={id} data-expect={expect} data-ring={ring} style={{margin:'8px 0',padding:'8px'}}>{children}</div>}
 function Fixture(){return <main>
@@ -63,6 +64,8 @@ function Fixture(){return <main>
 <Case id="drop-bad" expect="red" ring="self"><FileDropzone variant="upload" aria-label="足す" onFiles={()=>{}} invalid /></Case>
 <Case id="composer-ok" expect="blue" ring="self"><FileDropzone variant="composer" title="ファイルを追加" aria-label="添付" onFiles={()=>{}} /></Case>
 <Case id="composer-bad" expect="red" ring="self"><FileDropzone variant="composer" title="ファイルを追加" aria-label="添付誤" onFiles={()=>{}} invalid /></Case>
+<Case id="media-ok" expect="blue" ring="input"><MediaSlot title="画像を追加" onFile={()=>{}} /></Case>
+<Case id="media-bad" expect="red" ring="input"><MediaSlot title="画像を追加" onFile={()=>{}} invalid /></Case>
 <Case id="otp-ok" expect="blue" ring="self"><OtpInput label="確認コード" value="123456" onChange={()=>{}} /></Case>
 <Case id="otp-bad" expect="red" ring="self"><OtpInput label="確認コード誤" value="123456" onChange={()=>{}} invalid /></Case>
 <Case id="insert-ok" expect="blue" ring="self"><InsertTextField aria-label="差し込み本文" value="本文" onValueChange={()=>{}} /></Case>
@@ -71,6 +74,8 @@ function Fixture(){return <main>
 <Case id="insertcompact-bad" expect="red" ring="self"><InsertTextField compact aria-label="短い本文誤" value="" onValueChange={()=>{}} aria-invalid="true" /></Case>
 <Case id="fs-ok" expect="blue" ring="self"><input type="text" aria-label="箱名" className={fsStyles.field} defaultValue="" onChange={()=>{}} /></Case>
 <Case id="fs-bad" expect="red" ring="self"><input type="text" aria-label="箱名誤" className={fsStyles.field} aria-invalid="true" defaultValue="" onChange={()=>{}} /></Case>
+{['default','video'].map(variant=><div key={variant} data-static-drop={variant}><FileDropzone variant={variant} title="画像を追加" onFiles={()=>{}} invalid /></div>)}
+{[false,true].map(invalid=><div key={String(invalid)} data-filled-media={invalid?'bad':'ok'}><MediaSlot title="画像" value="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10'/%3E" onFile={()=>{}} onUrl={()=>{}} invalid={invalid} /></div>)}
 </main>}
 createRoot(document.getElementById('root')).render(<Fixture/>);`},
  bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',tsconfig: webRoot+'/tsconfig.json',define:{'process.env.NODE_ENV':'"production"'},banner:{js:'var process=typeof process!=="undefined"?process:{env:{NODE_ENV:"production",NEXT_PUBLIC_API_URL:"http://127.0.0.1:8788"}};'},
@@ -109,16 +114,18 @@ const RING = () => {
   const el = kind === 'search' ? active.closest('[data-search-field]')
     : kind === 'check' ? active.nextElementSibling
     : kind === 'combo' ? active.closest('[data-choice-field]')
+    : kind === 'input' ? active.closest('[data-input-field]')
     : kind === 'card' ? active.closest('label')
     : active
   if (!el) return null
   document.querySelectorAll('[data-ring-probe]').forEach(item=>item.removeAttribute('data-ring-probe'))
   el.setAttribute('data-ring-probe','')
   const c = getComputedStyle(el)
-  return { id: host.getAttribute('data-case'), expect: host.getAttribute('data-expect'), color: c.outlineColor, style: c.outlineStyle, width: c.outlineWidth, offset: c.outlineOffset, shadow: c.boxShadow, boxColor: kind === 'card' ? getComputedStyle(active.nextElementSibling).outlineColor : null }
+  return { id: host.getAttribute('data-case'), expect: host.getAttribute('data-expect'), color: c.outlineColor, style: c.outlineStyle, width: c.outlineWidth, offset: c.outlineOffset, shadow: c.boxShadow, boxColor: kind === 'card' ? getComputedStyle(active.nextElementSibling).outlineColor : null, hitColor: active.hasAttribute('data-input-hit') ? getComputedStyle(active).outlineColor : null }
 }
 /** 直線の辺を画像で読む。色の線が枠から離れて2本になっていないかを確かめる。 */
 async function paintedStroke(page, color) {
+  await page.locator('[data-ring-probe]').scrollIntoViewIfNeeded()
   const rect = await page.locator('[data-ring-probe]').boundingBox()
   assert.ok(rect)
   const left = Math.floor(rect.x) - 6
@@ -170,7 +177,7 @@ for (const width of [1152, 1440]) test(`誤りの欄の焦点は赤1本、誤り
       assert.ok(ring, `Tab ${i + 1}: 欄に焦点が当たる`)
       seen.push(ring.id)
       offsets.set(ring.id, ring.offset)
-      if (process.env.MUSE_SHOTS && ['fs-ok', 'fs-bad', 'composer-bad', 'insert-ok', 'insert-bad', 'insertcompact-ok', 'insertcompact-bad'].includes(ring.id)) {
+      if (process.env.MUSE_SHOTS && ['fs-ok', 'fs-bad', 'composer-bad', 'insert-ok', 'insert-bad', 'insertcompact-ok', 'insertcompact-bad', 'media-ok', 'media-bad'].includes(ring.id)) {
         mkdirSync(process.env.MUSE_SHOTS, { recursive: true })
         await page.locator(`[data-case="${ring.id}"]`).screenshot({ path: `${process.env.MUSE_SHOTS}/${ring.id}-${width}.png` })
       }
@@ -181,9 +188,13 @@ for (const width of [1152, 1440]) test(`誤りの欄の焦点は赤1本、誤り
       assert.equal(ring.width, '2px', `${ring.id}: 輪は2px`)
       if (ring.id.startsWith('card-')) assert.equal(ring.offset, '2px', 'カードの輪は共通の位置を使う')
       if (ring.id.startsWith('cardwindow-')) assert.equal(ring.offset, '-2px', '窓の中のカードは内側に輪を出す')
-      if (!/^(check|card|drop|composer)/.test(ring.id)) assert.equal(ring.offset, '-2px', `${ring.id}: 入力欄は枠の上に重ねる`)
+      if (ring.id.startsWith('media-')) {
+        assert.match(ring.hitColor,/^rgba\(.+, 0\)$/,'画像追加面の中に2つ目の輪を出さない')
+        assert.equal(await page.locator('[data-ring-probe]').evaluate(el=>getComputedStyle(el.parentElement).outlineStyle),'none','画像枠の外箱に誤りの線を重ねない')
+      }
+      if (!/^(check|card)/.test(ring.id)) assert.equal(ring.offset, '-2px', `${ring.id}: 入力欄は枠の上に重ねる`)
       if (ring.expect === 'red') assert.ok(!ring.shadow.includes('37, 99, 235'), `${ring.id}: 青を重ねない`)
-      if (!/^(check|card|drop|composer)/.test(ring.id)) {
+      if (!/^(check|card)/.test(ring.id)) {
         assertSingleStroke(await paintedStroke(page,want), `${ring.id} focus`)
         if (ring.id === 'tf-ok') {
           await page.evaluate(()=>document.documentElement.style.setProperty('--polish-focus-input-offset','2px'))
@@ -196,11 +207,39 @@ for (const width of [1152, 1440]) test(`誤りの欄の焦点は赤1本、誤り
         await page.waitForTimeout(150)
         if (ring.expect === 'red') assertSingleStroke(await paintedStroke(page,RED), `${ring.id} error without focus`)
         else assert.equal((await paintedStroke(page,BLUE)).length,0, `${ring.id}: 普段は青い線を出さない`)
-        await page.locator('[data-ring-probe]').evaluate(el=>el.focus())
+        if (ring.id.startsWith('media-') && process.env.MUSE_SHOTS) await page.locator(`[data-case="${ring.id}"]`).screenshot({path:`${process.env.MUSE_SHOTS}/${ring.id}-blur-${width}.png`})
+        if (ring.id.startsWith('media-')) await page.locator(`[data-case="${ring.id}"] [data-input-hit]`).focus()
+        else await page.locator('[data-ring-probe]').evaluate(el=>el.focus())
       }
 
     }
     for (const id of seen.filter(id => id.endsWith('-bad'))) assert.equal(offsets.get(id), offsets.get(id.replace(/-bad$/, '-ok')), `${id}: 青と赤で輪の位置を変えない`)
     assert.equal(new Set(seen).size, total, '全部の欄を1回ずつ回った')
+    for (const variant of ['default','video']) {
+      const host = page.locator(`[data-static-drop="${variant}"]`)
+      const field = host.locator('[data-input-field]')
+      await page.evaluate(()=>document.querySelectorAll('[data-ring-probe]').forEach(el=>el.removeAttribute('data-ring-probe')))
+      await field.evaluate(el=>el.setAttribute('data-ring-probe',''))
+      assertSingleStroke(await paintedStroke(page,RED), `${variant}: 誤りの追加面も赤1本`)
+      const button = host.getByRole('button', {name:'ファイルを選ぶ'})
+      await button.focus()
+      const ring = await button.evaluate(el=>{const c=getComputedStyle(el);return {width:c.outlineWidth,offset:c.outlineOffset}})
+      assert.deepEqual(ring,{width:'2px',offset:'2px'},`${variant}: 中の操作ボタンの輪は従来の位置`)
+    }
+    for (const state of ['ok','bad']) {
+      const host = page.locator(`[data-filled-media="${state}"]`)
+      await host.getByRole('button',{name:'差し替える'}).focus()
+      const buttonRing = await host.getByRole('button',{name:'差し替える'}).evaluate(el=>{const c=getComputedStyle(el);return {width:c.outlineWidth,offset:c.outlineOffset}})
+      assert.deepEqual(buttonRing,{width:'2px',offset:'2px'},'画像ありの補助ボタンは従来の外側の輪')
+      const frame = host.locator('[data-media-slot]')
+      const frameRing = await frame.evaluate(el=>{const c=getComputedStyle(el);return {color:c.outlineColor,style:c.outlineStyle}})
+      assert.equal(frameRing.color===BLUE && frameRing.style==='solid',false,'補助ボタンの焦点を画像枠に重ねない')
+      if (state==='bad') {
+        await page.evaluate(()=>document.querySelectorAll('[data-ring-probe]').forEach(el=>el.removeAttribute('data-ring-probe')))
+        await frame.evaluate(el=>el.setAttribute('data-ring-probe',''))
+        assertSingleStroke(await paintedStroke(page,RED),'画像ありの誤りも枠へ赤1本')
+      }
+      if(process.env.MUSE_SHOTS) await host.screenshot({path:`${process.env.MUSE_SHOTS}/media-filled-${state}-${width}.png`})
+    }
   } finally { await browser.close() }
 })
