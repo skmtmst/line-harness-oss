@@ -1019,3 +1019,6 @@
 - [右の詳細欄の文字と操作の統一](release-log/unreleased/1984-kenta-drawer-unify.md) — 反映履歴、確認 2026-10-30。
 - [受信箱でテンプレートの中身を見て選ぶ](release-log/unreleased/1984-kenta-inbox-template-preview.md) — 反映履歴。
 - [画像欄・受信箱・飲食店と見本の本文](release-log/unreleased/1984-kenta-train-1029s.md) — 反映履歴。
+- [Google とSNSの接続](release-log/unreleased/1983-masato-google-sns-connection.md) — 反映履歴。
+- [LINE通知の登録](release-log/unreleased/1985-masato-notice-line-registration.md) — 反映履歴。
+- [SNS接続の表記](release-log/unreleased/1986-masato-sns-connection-labels.md) — 反映履歴。
