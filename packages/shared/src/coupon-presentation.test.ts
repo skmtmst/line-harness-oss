@@ -45,8 +45,8 @@ describe('クーポンの追加情報', () => {
     if (beforePrice) expect(card.body.contents.find((item: { text: string }) => item.text === beforePrice)).toMatchObject({ decoration: 'line-through' });
   });
 
-  it('種類・コード非表示と無制限を保持し、説明がなくてもガイドだけで保存できる', () => {
-    const payload = { ...extended, couponType: 'none', discount: { mode: 'none' }, code: null, description: '', oncePerFriend: false };
+  it('種類・コード非表示と無制限を保持する', () => {
+    const payload = { ...extended, couponType: 'none', discount: { mode: 'none' }, code: null, oncePerFriend: false };
     expect(validateAssetPayload('coupon', payload)).toBeNull();
     const card = flex(payload), text = JSON.stringify(card);
     expect(card.body.contents[0].contents.map((item: { text: string }) => item.text)).toEqual(['期間中は何回でも']);
@@ -68,6 +68,14 @@ describe('クーポンの追加情報', () => {
     const payload = { ...extended, ...patch };
     expect(validateAssetPayload('coupon', payload)).not.toBeNull();
     expect(convertBroadcastAsset('coupon', '名前', payload).ok).toBe(false);
+  });
+
+  it('LIFFがガイドを読むまでは説明なしの形を保存・配信しない', () => {
+    for (const instructions of ['案内', 'あ'.repeat(600)]) {
+      const payload = { ...legacy, description: '', instructions };
+      expect(validateAssetPayload('coupon', payload)).not.toBeNull();
+      expect(convertBroadcastAsset('coupon', '名前', payload).ok).toBe(false);
+    }
   });
 
   it('新しい表示でも抽選拒否・期間・利用回数の検査を外さない', () => {

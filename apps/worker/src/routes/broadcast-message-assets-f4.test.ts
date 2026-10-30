@@ -293,6 +293,14 @@ it('クーポンの割引・条件・コード・ガイドは保存・公開・�
     body: JSON.stringify({ expectedVersion: 1, expectedDraftRevision: row!.draft_revision }),
   }, bindings);
   expect(second.status).toBe(200);
+  const republished = await getBroadcastMessageAsset(store.db, id);
+  expect(JSON.parse(republished!.payload_json)).toEqual(edited);
+  expect(republished!.draft_payload_json).toBeNull();
+  expect(republished!.published_version).toBe(2);
+  const publishedList = await app().request('/api/broadcast-message-assets?lineAccountId=account-1&kind=coupon', {}, bindings);
+  expect(publishedList.status).toBe(200);
+  const publishedBody = await publishedList.json() as { data: Array<{ id: string; publishedPayload: Record<string, unknown> }> };
+  expect(publishedBody.data.find(asset => asset.id === id)?.publishedPayload).toEqual(edited);
   const versions = store.raw.prepare('SELECT payload_json FROM broadcast_asset_versions WHERE asset_id = ? ORDER BY version_number').all(id) as Array<{ payload_json: string }>;
   expect(versions.map(version => JSON.parse(version.payload_json))).toEqual([payload, edited]);
 });

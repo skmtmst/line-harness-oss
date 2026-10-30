@@ -303,7 +303,7 @@ function convertCoupon(name: string, payload: AssetPayloadInput): AssetConversio
 
 /** 日付入力は日本時間。期限・上限を欠いたクーポンを文章に落とさない。 */
 export function couponPayloadError(payload: AssetPayloadInput): string | null {
-  if (!text(payload.description) && !text(payload.instructions)) return 'クーポンの内容を入力してください';
+  if (!text(payload.description)) return 'クーポンの内容を入力してください';
   const presentationError = couponPresentationError(payload);
   if (presentationError) return presentationError;
   const from = couponDate(text(payload.startsAt));
