@@ -49,8 +49,8 @@ createRoot(document.getElementById('root')).render(<Fixture/>);`},
 const css = [await compileUiStyles(fileURLToPath(new URL('../../src/app/globals.css',import.meta.url)),[]),...sheets].join('\n')
 
 // 字の座標から行を復元する。禁則処理で残る1〜2文字分と、句切りで大きく空く行を区別する。
-const measureLines = () => {
-  const message = document.querySelector('#login [data-notice-message]')
+const measureLines = (selector = '#login [data-notice-message]') => {
+  const message = document.querySelector(selector)
   const lines = [], walker = document.createTreeWalker(message, NodeFilter.SHOW_TEXT)
   let node
   while ((node = walker.nextNode())) {
@@ -67,15 +67,30 @@ const measureLines = () => {
   return lines.sort((a, b) => a.y - b.y).map(line => ({ text: line.text, gap: message.getBoundingClientRect().right - line.right }))
 }
 const hasEarlyWrap = lines => lines.slice(0, -1).some(line => line.gap > 24)
+// 句読点を字数へ含めず、『い。』も本文1字だけの行として数える。
+const finalLineLength = lines => Array.from((lines.at(-1)?.text ?? '').replace(/[\s\p{P}]/gu, '')).length
+const hasSingleCharacterLastLine = lines => lines.length > 1 && finalLineLength(lines) === 1
+const findTextOverflow = () => [...document.querySelectorAll('[data-notice-message]')].flatMap(message => {
+  if (getComputedStyle(message).whiteSpace === 'nowrap') return []
+  const edge = message.getBoundingClientRect().right
+  const walker = document.createTreeWalker(message, NodeFilter.SHOW_TEXT)
+  let node
+  while ((node = walker.nextNode())) {
+    const range = document.createRange(); range.selectNodeContents(node)
+    if ([...range.getClientRects()].some(rect => rect.width > 0 && rect.right > edge + 1)) return [{ tone: message.closest('[data-tone]').dataset.tone }]
+  }
+  return []
+})
 
-test('知らせは文・段落・リンクを幅まで折り返し、短い案内の1行省略を保つ', async () => {
+
+test('知らせは文・段落・リンクを幅まで折り返し、短い案内の1行省略を保つ', async (t) => {
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     for (const width of [420, 1152, 1440]) {
       await page.setViewportSize({ width, height: 1100 })
       await page.setContent(`<html lang="ja" data-theme="v8"><style>${css}
-body{margin:0;font-family:sans-serif}main{max-width:1100px;margin:auto;padding:24px}section{min-width:0;margin-bottom:24px}#login{width:340px;max-width:100%}h2{font-size:14px;margin:0}p{margin:0}
+body{margin:0;font-family:sans-serif}main{max-width:1100px;margin:auto;padding:24px}section{min-width:0;margin-bottom:24px}#login{width:352px;max-width:100%}@media(max-width:440px){#login{width:340px}}h2{font-size:14px;margin:0}p{margin:0}
 </style><div id="root"></div></html>`)
       await page.addScriptTag({ content: compiled.outputFiles[0].text })
       await page.locator('[data-notice-message]').first().waitFor()
@@ -84,8 +99,11 @@ body{margin:0;font-family:sans-serif}main{max-width:1100px;margin:auto;padding:2
       assert.ok((await page.locator('[data-notice-heading], [data-notice-status-word]').evaluateAll(elements => elements.map(el => getComputedStyle(el).wordBreak))).every(value => value === 'auto-phrase'), '短い題と頭の言葉は句切りを保つ')
       const lines = await page.evaluate(measureLines)
       assert.equal(hasEarlyWrap(lines), false, JSON.stringify(lines))
+      assert.ok(finalLineLength(lines) >= 2, `最後の行に本文2字以上が入る: ${JSON.stringify(lines)}`)
+      t.diagnostic(`${width}px: 最終行 ${finalLineLength(lines)}字・${lines.at(-1).text}`)
       assert.ok(lines.some(line => line.text.includes('お問い合わせ')), '再現幅ではお問い合わせを途中で切らない')
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'URLも横にはみ出さない')
+      assert.deepEqual(await page.evaluate(findTextOverflow), [], '全文を出す知らせは、文字が本文の右端を超えない')
       const compact = page.locator('[data-tone="info"][data-compact] [data-notice-message]')
       assert.equal(await compact.evaluate(el => getComputedStyle(el).whiteSpace), 'nowrap', '短い案内の省略は維持')
       assert.equal(await page.locator('[data-tone="danger"][data-compact] [data-notice-message]').evaluate(el => getComputedStyle(el).whiteSpace), 'normal', '失敗の文は全文を折り返す')
@@ -94,6 +112,25 @@ body{margin:0;font-family:sans-serif}main{max-width:1100px;margin:auto;padding:2
       if (process.env.NOTICE_SHOTS) {
         mkdirSync(process.env.NOTICE_SHOTS, { recursive: true })
         await page.screenshot({ path: `${process.env.NOTICE_SHOTS}/notice-variants-${width}.png`, fullPage: true })
+      }
+      // 故障対照：通常改行で1字だけが残る幅を探し、同じ幅のprettyが解消することを測る。
+      const message = page.locator('#login [data-notice-message]')
+      let orphanWidth = null
+      for (let candidate = 280; candidate <= 330; candidate++) {
+        await message.evaluate((el, value) => { el.style.flex = 'none'; el.style.width = `${value}px`; el.style.textWrap = 'wrap' }, candidate)
+        if (hasSingleCharacterLastLine(await page.evaluate(measureLines))) { orphanWidth = candidate; break }
+      }
+      assert.notEqual(orphanWidth, null, '故障対照の1字残りを実際に再現する')
+      t.diagnostic(`${width}px: 本文幅${orphanWidth}pxで通常改行の1字残りを検出`)
+      await message.evaluate(el => { el.style.removeProperty('text-wrap') })
+      assert.equal(hasSingleCharacterLastLine(await page.evaluate(measureLines)), false, 'prettyで同じ幅の1字残りが解消する')
+      await message.evaluate(el => { el.style.removeProperty('flex'); el.style.removeProperty('width'); el.style.removeProperty('text-wrap') })
+      if (width === 420) {
+        const url = page.locator('[data-tone="danger"] a')
+        await url.evaluate(el => { el.closest('[data-notice-message]').style.textWrap = 'pretty' })
+        assert.ok((await page.evaluate(findTextOverflow)).length > 0, 'floatと長いURLのprettyは本文のはみ出しとして検出する')
+        await url.evaluate(el => { el.closest('[data-notice-message]').style.removeProperty('text-wrap') })
+        assert.deepEqual(await page.evaluate(findTextOverflow), [], 'リンクの通常改行ではみ出しが解消する')
       }
       // 故障対照：自動句切りによる不要な空きを検出し、通常改行で解消する。
       const fault = await page.addStyleTag({ content: '#login [data-notice-message], #login [data-notice-message] * {word-break:auto-phrase!important}' })
