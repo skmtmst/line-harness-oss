@@ -5,12 +5,13 @@ import { usePermissionLockTip } from './permission-lock-tip'
 import { type EntityPickerItem, type EntityPickerFolder, type EntityPickerCategory, type SingleProps, type EntityPickerWindowProps, type MultiBodyProps, type MultiProps, type FieldBase, type SingleField, type MultiField } from './entity-picker-types'
 export { type EntityPickerItem, type EntityPickerFolder, type EntityPickerCategory, type EntityPickerWindowProps } from './entity-picker-types'
 
-import { ChevronDown, ArrowUpRight, Plus, type LucideIcon } from 'lucide-react'
+import { ChevronDown, ArrowUpRight, Plus, X, type LucideIcon } from 'lucide-react'
 import { folderDisplayColor, FolderDot } from './folder-dot'
 import { useFieldContext, joinDescribedBy } from './field-context'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import Link from 'next/link'
 import Button from './button'
+import IconButton from './icon-button'
 import Checkbox from './checkbox'
 import FilterChip from './filter-chip'
 import FolderPanel, { type FolderPanelRow } from './folder-panel'
@@ -62,16 +63,28 @@ function CreateLink({ href, label, lockedReason, disabled, canChangeNow }: { hre
 }
 
 export function EntityPickerWindow(props: EntityPickerWindowProps) {
+  const body = props.preview ? <div className={styles.withPreview}>
+    {props.children}
+    <section className={styles.preview} aria-label="テンプレートの中身">
+      <header className={styles.previewHeader}>
+        <h2 className={styles.previewTitle} title={props.preview.title}>{props.preview.title}</h2>
+        <IconButton aria-label="中身の表示を閉じる" onClick={props.preview.onClose}><X size={16} aria-hidden="true" /></IconButton>
+      </header>
+      <div className={styles.previewBody}>{props.preview.content}</div>
+      {props.preview.actions ? <footer className={styles.previewActions}>{props.preview.actions}</footer> : null}
+    </section>
+  </div> : props.children
+  const content = props.navigation ? <><div className={styles.navigation}>{props.navigation}</div>{body}</> : body
   return <Dialog open dirty={false} title={props.title} description={props.description}
-    designNode={props.designNode} designWidth={640} widthPreset="picker" designHeaderPadding="var(--tpl-inbox-tp-head-pad)"
+    designNode={props.designNode} designWidth={props.preview || props.wide ? undefined : 640} widthPreset={props.preview || props.wide ? undefined : 'picker'} size={props.preview || props.wide ? 'wide' : undefined} designHeaderPadding="var(--tpl-inbox-tp-head-pad)"
     contentLayout={props.scrollBody ? 'form' : undefined} designContentPadding={props.scrollBody ? '0' : undefined}
     busy={props.busy} initialFocusId={props.initialFocusId} onCancel={props.onCancel} headerAction={props.headerAction}
     footer={<>
-      {props.scrollBody ? null : props.children}
+      {props.scrollBody ? null : content}
       {props.error ? <p className={styles.tpError} role="alert">{props.error}</p> : null}
       {props.band}
       <div className={styles.tpFoot}>{props.footer}</div>
-    </>}>{props.scrollBody ? props.children : null}</Dialog>
+    </>}>{props.scrollBody ? content : null}</Dialog>
 }
 
 export function EntityPickerDialog(props: SingleProps | EntityPickerWindowProps) {
