@@ -155,3 +155,13 @@ it.each(['/login', '/login?next=m'])('ログインの題の下に重複する説
   expect(host.querySelector('button[type="submit"]')).not.toBeNull()
   expect(fixture.bodies).toEqual([])
 })
+
+it('入力不足のログインは押せないまま、入力を促す理由行は出さない', async () => {
+  await render()
+  const submit = host.querySelector<HTMLButtonElement>('button[type="submit"]')
+  expect(submit?.disabled).toBe(true)
+  expect(submit?.getAttribute('aria-describedby')).toBeNull()
+  expect(host.querySelector('[data-auth-submit-reason]')).toBeNull()
+  expect(host.textContent).not.toContain('入れると押せます')
+  expect(fixture.bodies).toEqual([])
+})
