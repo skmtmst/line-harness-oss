@@ -863,6 +863,7 @@
 ## date-time 日付・時刻の欄
 
 - **役目**：DateField・TimeField・DateTimeField。高さ36・日本時間
+- 待機設定の組み合わせは `apps/web/src/components/automations/wait-fields.tsx` の `WaitFields` が持つ。通常の自動化と共通アクションで同じSelect・TextField・TimeFieldを使い、分数と翌日の時刻を保存する。
 - **持ち主（コード）**：`apps/web/src/components/shared/date-field.tsx`・`apps/web/src/components/shared/date-time-field.tsx`・`apps/web/src/components/shared/time-field-v8.tsx`（部品 `DateField`・`DateTimeField`・`TimeField`・`TimeFieldV8`）
 - **持ち主（Pen）**：**未定**
   - 注：Pen の部品 ID が対応表に無い（YCOoR は提案の板）

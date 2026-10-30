@@ -1024,3 +1024,5 @@
 - [SNS接続の表記](release-log/unreleased/1986-masato-sns-connection-labels.md) — 反映履歴。
 
 - [来店フォローとリマインダの接続](release-log/unreleased/0000-kenta-line-followup-engines.md)
+
+- [自動送信の翌日時刻の待機と期限切れの記録](release-log/unreleased/0000-kenta-automation-next-day-wait.md) — 反映履歴、確認 2026-10-31。

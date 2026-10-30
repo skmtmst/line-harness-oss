@@ -123,3 +123,5 @@ export type { LineConnection, LineConnectionIssue } from './line-connection-stat
 export { lineObservationTime, lineWebhookSilence, LINE_WEBHOOK_SILENCE_MS } from './line-observation-time.js';
 
 export { zonedWallTime } from './zoned-time.js';
+export { parseAutomationWait, nextDayWaitAt, automationWaitLabel } from './automation-wait.js';
+export type { AutomationWait } from './automation-wait.js';
