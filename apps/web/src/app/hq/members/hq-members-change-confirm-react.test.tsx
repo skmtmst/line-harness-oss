@@ -189,6 +189,6 @@ describe('権限を変える確認（板 M4jS9）', () => {
     await flush()
     expect(mocks.update).toHaveBeenCalledTimes(1)
     expect(mocks.update.mock.calls[0][1]).toMatchObject({ accountScope: 'all', scopedLineAccountIds: [] })
-    expect(mocks.update.mock.calls[0][1]).not.toHaveProperty('assignedLineAccountId')
+    expect(mocks.update.mock.calls[0][1]).toHaveProperty('assignedLineAccountId', null)
   })
 })
