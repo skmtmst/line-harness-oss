@@ -1,4 +1,5 @@
 'use client'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { useRunningVersion } from '@/lib/use-running-version'
 
 import { formatMonthDay, stopMinutes } from './control-time'
@@ -83,9 +84,7 @@ function blockedText(code: string | null | undefined): string | null {
  * `ApiError.message` が内部向けの作り置きに落ちるため、固定の案内文へ倒す。
  */
 function failureText(error: unknown, fallback: string): string {
-  if (error instanceof ApiError && error.message && !/^API error: \d+$/.test(error.message)) {
-    return error.message
-  }
+  if (japaneseDetailOf(error)) return japaneseDetailOf(error)
   return fallback
 }
 

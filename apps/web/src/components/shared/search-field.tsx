@@ -81,6 +81,7 @@ const SearchField = forwardRef<HTMLInputElement, SearchFieldProps>(function Sear
       aria-busy={loading || undefined}
       hidden={hidden}
       data-design-node="phlR1"
+      data-input-field
       data-search-field
     >
       <Search className={styles.searchIcon} aria-hidden="true" />

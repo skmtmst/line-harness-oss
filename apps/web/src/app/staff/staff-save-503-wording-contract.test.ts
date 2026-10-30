@@ -24,8 +24,8 @@ describe('R497-SAVE-WORDING 保存503の文言', () => {
     expect(text).not.toContain('API error')
   })
 
-  it('日本語本文つき503は本文をそのまま出す', () => {
+  it('日本語の本文つき503も共通のサーバー失敗へ寄せる', () => {
     const body = 'サーバーが混み合っています。時間をおいてお試しください。'
-    expect(describeSaveFailure(new ApiError(503, body))).toBe(body)
+    expect(describeSaveFailure(new ApiError(503, body))).toBe('サーバー側で保存できませんでした。時間をおいて、もう一度お試しください。続く場合は管理者へ連絡してください。')
   })
 })

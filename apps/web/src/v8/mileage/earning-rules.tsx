@@ -663,9 +663,9 @@ export default function EarningRulesTab() {
   )
 
   const savedBox = (
-    <ListToolbarOptional compact label="保存した絞り込み"><div className={styles.savedBox}>
+    <ListToolbarOptional compact label="保存した絞り込み">
 
-      <SaveErrorField names={["presetValue","page","preset_value"]}><Select
+      <SaveErrorField names={["presetValue","page","preset_value"]}><Select size="content"
         icon={<Bookmark size={16} aria-hidden="true" />}
         aria-label="よく使う絞り込み"
         value={presetValue}
@@ -683,7 +683,7 @@ export default function EarningRulesTab() {
           setSort(preset.sort)
         }}
       /></SaveErrorField>
-    </div></ListToolbarOptional>
+    </ListToolbarOptional>
   )
 
   const perPageBox = (

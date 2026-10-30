@@ -208,11 +208,11 @@ export async function saveMenuDraft({ createDraft, group, host, persistDraft, re
         }
         return false
       }
-      const raw = e instanceof Error && !/^API error: /.test(e.message) ? e.message : ''
+      const targetingPriorityInvalid = e instanceof Error && /targetingPriority/.test(e.message)
       { if (!fieldFailure)
 
       setError(
-        /targetingPriority/.test(raw)
+        targetingPriorityInvalid
           ? '出す順番は1以上の整数で入力してください。小数は使えません。'
           : describeApiFailure(e, '下書きの保存', {
               scope: 'store',

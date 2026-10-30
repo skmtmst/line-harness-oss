@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { canManageRole, useStaffRole, isOwnerRole } from '@/lib/staff-role'
 import { mileageAssignee as assignee } from './display'
 import PageSizeSelect from '@/components/shared/page-size-select'
@@ -202,7 +203,7 @@ function FriendDetailInner() {
       if (!response.success) throw new ApiError(500, response.error || '通知を再送できませんでした。')
       await load()
     } catch (caught) {
-      setNotificationRetryError(caught instanceof ApiError ? caught.message : '通知を再送できませんでした。時間をおいてもう一度お試しください。')
+      setNotificationRetryError(describeApiFailure(caught, '通知の再送'))
     } finally {
       setNotificationRetryId(null)
     }
@@ -226,7 +227,7 @@ function FriendDetailInner() {
       setPendingReason('')
       await load()
     } catch (caught) {
-      setPendingError(caught instanceof ApiError ? caught.message : '処理できませんでした。もう一度お試しください。')
+      setPendingError(describeApiFailure(caught, '処理'))
     } finally {
       setPendingBusy(false)
     }

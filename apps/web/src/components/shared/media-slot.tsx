@@ -547,7 +547,7 @@ export default function MediaSlot({
         {readOnly || !canFile ? (
           inner
         ) : (
-          <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange} type="button" className={styles.hit} disabled={!interactive} onClick={(event) => { stop(event); openPicker() }} onKeyDown={onKey}>
+          <MediaSlotButton data-input-hit lockedReason={lockedReason} canPressNow={canChange} type="button" className={styles.hit} disabled={!interactive} onClick={(event) => { stop(event); openPicker() }} onKeyDown={onKey}>
             {inner}
           </MediaSlotButton>
         )}
@@ -581,13 +581,14 @@ export default function MediaSlot({
   if (renderTrigger) return <>{renderTrigger(openPicker)}{picker}{error ? <p role="alert">{error}</p> : null}</>
 
   return (
-    <div id={id} className={styles.root} data-has-help={extraHelp ? true : undefined} data-controls-below={controlsBelow || undefined} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined}>
+    <div id={id} className={styles.root} data-has-help={extraHelp ? true : undefined} data-controls-below={controlsBelow || undefined} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription}>
       {extraHelp ? <HelpTip className={styles.help} label={`${title}の補足`}>{extraHelp}</HelpTip> : null}
       <div
         role="group"
         aria-label={title}
         aria-busy={busy || undefined}
-        aria-invalid={state === 'error' || undefined}
+        aria-invalid={invalid || state === 'error' || undefined}
+        data-input-field
         data-design-node="Z7vd2"
         data-media-slot=""
         data-shared-part={framePart}

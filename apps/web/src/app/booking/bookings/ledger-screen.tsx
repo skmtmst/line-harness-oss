@@ -57,7 +57,7 @@ import { monthKey, monthLabel } from '@/v8/booking-bookings/public/month-navigat
 
 import FilterChip from '@/components/shared/filter-chip'
 
-import { ListToolbarEnd, ListToolbarRow, ListToolbarSearchSlot, ResponsiveFilterChips } from '@/components/shared/list-toolbar'
+import { ListToolbarEnd, ListToolbarRow, ListToolbarSearchSlot} from '@/components/shared/list-toolbar'
 
 import { RowMenu } from '@/components/shared/row-actions'
 
@@ -386,7 +386,7 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
           </ListToolbarRow>
           <ListToolbarRow>
             <BookingChipsLabel />
-            <ResponsiveFilterChips label="状態">{STATUS_TABS.map(({ key, label }) => <FilterChip key={key} selected={tab === key} showCheck={false} onChange={() => setTab(key)}>{label}</FilterChip>)}</ResponsiveFilterChips>
+            <SegmentedControl aria-label="予約の状態" fit="content" value={tab} onChange={setTab} options={STATUS_TABS.map(({ key, label }) => ({ value: key, label }))} />
           </ListToolbarRow>
         </> : <>
             <ListToolbar
@@ -396,18 +396,10 @@ export default function BookingLedgerScreen({ model }: { model: BookingLedgerMod
                 <>
                 {range === 'date' ? <FilterChip selected onChange={() => setRange('all')} title="押すと日付の絞り込みを解除します">{formatDay(calendarAnchor)}の予約</FilterChip> : null}
                 <span className="text-ink-faint text-xs">よく使う</span>
-                {STATUS_TABS.map(({ key, label }) => (
-                  <FilterChip key={key} selected={tab === key} showCheck={false} onChange={() => setTab(key)}>
-                    {label}
-                  </FilterChip>
-                ))}
-                <span className="border-hairline mx-1 h-4 border-l" />
-                <FilterChip selected={range === 'today'} onChange={(selected) => setRange(selected ? 'today' : 'all')}>
-                  今日
-                </FilterChip>
-                <FilterChip selected={range === 'week'} onChange={(selected) => setRange(selected ? 'week' : 'all')}>
-                  今週
-                </FilterChip>
+                <SegmentedControl aria-label="予約の状態" fit="content" value={tab} onChange={setTab} options={STATUS_TABS.map(({ key, label }) => ({ value: key, label }))} />
+                <SegmentedControl aria-label="予約の期間" fit="content" value={range} onClear={() => setRange('all')} onChange={setRange} options={[
+                  { value: 'all', label: 'すべて' }, { value: 'today', label: '今日' }, { value: 'week', label: '今週' },
+                ]} />
 
                 </>
                 {/* 担当者と予約経路は一覧と件数の両方を絞り込む。 */}

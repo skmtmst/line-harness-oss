@@ -24,7 +24,7 @@ import { formatDateTime, formatNumber } from '@/lib/format';
 import { FIELD_TYPE_WORDS } from './field-editor';
 import styles from './create.module.css'
 import { Field } from '@/components/shared/form-controls';
-import { permissionDeniedMessage, withPermissionFailure } from '@/components/shared/api-error-message';
+import { permissionDeniedMessage, withPermissionFailure, describeApiFailure } from '@/components/shared/api-error-message';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -44,6 +44,12 @@ import { CreateSummaryCard } from '@/components/templates/create-parts'
  * 事前確認したあとは、結果・切り替わる使用先・実行の結果の段を足す。
  * 受け付ける URL：`/tags/fields/migrate?id=<移行元の項目>`。
  */
+
+export function fieldMigrationFailureMessage(reason: unknown, phase: 'start' | 'resume'): string {
+  const action = phase === 'start' ? '開始' : '再開'
+  if (!(reason instanceof ApiError) || reason.status >= 500) return `移行を${action}できませんでした。事前確認からやり直してください。`
+  return describeApiFailure(reason, `移行の${action}`)
+}
 
 const TYPES = Object.keys(FIELD_TYPE_WORDS) as FriendFieldType[]
 
@@ -303,7 +309,7 @@ function FieldMigrate() {
       const fieldFailure = saveErrors.capture(reason)
       { if (!fieldFailure)
 
-      setError(reason instanceof ApiError ? reason.message : '事前確認を実行できませんでした。時間をおいて、もう一度お試しください。') }
+      setError(describeApiFailure(reason, '事前確認')) }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setChecking(false)
     }
@@ -356,7 +362,7 @@ function FieldMigrate() {
       const fieldFailure = saveErrors.capture(reason)
       { if (!fieldFailure)
 
-      setError(reason instanceof ApiError ? reason.message : '移行を開始できませんでした。事前確認からやり直してください。') }
+      setError(fieldMigrationFailureMessage(reason, 'start')) }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
     }
@@ -402,7 +408,7 @@ function FieldMigrate() {
         saveErrors.capture(saveFailure) /* 下の説明へ */ }
       { if (!fieldFailure)
 
-      setError(reason instanceof ApiError ? reason.message : '移行を再開できませんでした。事前確認からやり直してください。') }
+      setError(fieldMigrationFailureMessage(reason, 'resume')) }
     } finally {
       if (gateRef.current.current(token) && accountRef.current === account) setExecuting(false)
     }

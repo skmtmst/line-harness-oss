@@ -233,19 +233,19 @@ describe('二段階認証の6桁（自動で確かめる・間違い・回復コ
     }
   })
 
-  it('入れ終わるまでは主ボタンを押せない形にし、下の1行で6桁目で自動でログインすると伝える', async () => {
+  it('入れ終わるまでは主ボタンを押せない形を保ち、理由行なしで6桁目に自動でログインする', async () => {
     await openAdmin()
     const submit = () => [...host.querySelectorAll('button')].find((button) => button.textContent === '確認してログイン') as HTMLButtonElement | undefined
     const reason = () => host.querySelector('#ops-two-factor-submit-reason')
     expect(submit()?.disabled).toBe(true)
-    expect(reason()?.textContent).toBe('6 桁を入れると自動でログインします')
-    expect(submit()?.getAttribute('aria-describedby')).toBe('ops-two-factor-submit-reason')
+    expect(reason()).toBeNull()
+    expect(submit()?.getAttribute('aria-describedby')).toBeNull()
     verifyAnswer = () => new Promise<Response>(() => {}) as unknown as Response
     await act(async () => {
       fireEvent.change(slots()[0], { target: { value: '482917' } })
       await Promise.resolve()
     })
-    // 6 桁目で自動で確かめ始めたら、理由の 1 行は消える。
+    // 6 桁目で自動で確かめ始めても、理由の行は出さない。
     expect(bodies[0]).toMatchObject({ code: '482917' })
     expect(reason()).toBeNull()
   })
@@ -262,6 +262,26 @@ describe('二段階認証の6桁（自動で確かめる・間違い・回復コ
     expect(document.activeElement).toBe(slots()[0])
   })
 
+  it.each(['admin', 'ops'])('%s の回復コードも理由行を出さず8文字でだけ押せる', async (scope) => {
+    await open(`/login/two-factor${scope === 'ops' ? '?next=ops' : ''}#lh_2fa=challenge-1&lh_method=password`, 'v8')
+    if (scope === 'admin') {
+      const help = [...host.querySelectorAll('button')].find(button => button.textContent === 'コードが使えない場合')
+      await act(async () => { help?.click() })
+    }
+    const recovery = [...host.querySelectorAll('button')].find(button => button.textContent === '回復コードを使う')
+    await act(async () => { recovery?.click() })
+    expect(slots()).toHaveLength(8)
+    const submit = () => [...host.querySelectorAll('button')].find(button => button.textContent === '確認してログイン')
+    expect(submit()?.disabled).toBe(true)
+    expect(host.querySelector('[data-auth-submit-reason]')).toBeNull()
+    expect(submit()?.getAttribute('aria-describedby')).toBeNull()
+    await act(async () => { fireEvent.change(slots()[0], { target: { value: 'K7PN9X4' } }) })
+    expect(submit()?.disabled).toBe(true)
+    await act(async () => { fireEvent.change(slots()[0], { target: { value: 'K7PN9X4T' } }) })
+    expect(submit()?.disabled).toBe(false)
+    expect(bodies).toEqual([])
+  })
+
   it('回復コードを使う道とログインへ戻る道を小さなリンクから開く', async () => {
     await openAdmin()
     // 「別のアカウントで入る」はカードの下にいつも出し、ログインの 1 段目に戻る。
@@ -274,6 +294,8 @@ describe('二段階認証の6桁（自動で確かめる・間違い・回復コ
     expect(host.querySelector('h1')?.textContent).toBe('回復コードでログイン')
     expect(slots()).toHaveLength(8)
     expect(host.textContent).toContain('回復コード（8文字）')
+    expect(host.querySelector('[data-auth-submit-reason]')).toBeNull()
+    expect([...host.querySelectorAll('button')].find(button => button.textContent === '確認してログイン')?.disabled).toBe(true)
     const useDigits = [...host.querySelectorAll('button')].find((button) => button.textContent === '6桁のコードで入る')
     await act(async () => { useDigits?.click() })
     expect(host.querySelector('h1')?.textContent).toBe('二段階認証')

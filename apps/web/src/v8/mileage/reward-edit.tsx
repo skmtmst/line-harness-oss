@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Card, { CardHeader } from '@/components/shared/card'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 
@@ -311,14 +312,12 @@ function RewardEditorInner() {
       notifySaved(thenPublish ? '公開しました' : '下書きを保存しました')
       if (!editing) router.push(createPageReturnHref('/mileage?tab=rewards', saved.id))
     } catch (err) {
-      feedback.failure(err instanceof ApiError && err.message && !/^API error/.test(err.message) ? err.message : '保存できませんでした。時間をおいてもう一度お試しください。', savedDraft ? ['マイルの使い道の下書き'] : [], savedDraft ? ['公開'] : ['マイルの使い道の保存'])
+      feedback.failure(describeApiFailure(err, '保存'), savedDraft ? ['マイルの使い道の下書き'] : [], savedDraft ? ['公開'] : ['マイルの使い道の保存'])
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
       setFailure(
-        err instanceof ApiError && err.message && !/^API error/.test(err.message)
-          ? err.message
-          : '保存できませんでした。時間をおいてもう一度お試しください。',
+        describeApiFailure(err, '保存'),
       ) }
     } finally {
       setSaving(false)
@@ -341,9 +340,7 @@ function RewardEditorInner() {
 
       { if (!fieldFailure)
       setFailure(
-        err instanceof ApiError && err.message && !/^API error/.test(err.message)
-          ? err.message
-          : '交換テストを実行できませんでした。時間をおいてもう一度お試しください。',
+        describeApiFailure(err, '交換テスト'),
       ) }
     } finally {
       setTesting(false)

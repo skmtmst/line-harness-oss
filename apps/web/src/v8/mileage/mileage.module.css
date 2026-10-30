@@ -121,7 +121,6 @@
 }
 
 /* 道具の段の右：よく使う絞り込み（左に印）。 */
-.savedBox { position: relative; width: var(--tpl-ml-saved-w); }
 
 /* 1152 の板：案内の帯 → 1段目 → 2段目。 */
 .narrowTools {

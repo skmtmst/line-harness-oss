@@ -11,4 +11,4 @@
 html:root .row input[data-design-node] { flex: 1 1 0; width: 0; min-width: calc(var(--space-24) * 2); font-variant-numeric: tabular-nums; }
 html:root .row[data-number-formatted] input { color: transparent; }
 
-html:root .row:has(input:disabled) > [data-affixed-layout='field']:not([data-look='derived']):first-child { background: transparent; border: 0; outline: 0; box-shadow: none; }
+html:root .row:has(input:disabled) > [data-affixed-layout='field']:not([data-look='derived']):not(:focus-visible):first-child { background: transparent; border: 0; outline: 0; box-shadow: none; }

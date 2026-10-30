@@ -18,6 +18,17 @@ export function tokenExpiryNotice(account: TokenAccount): string | null {
   return expiry.status === 'expired' || expiry.status === 'expiring' ? expiry.label : null
 }
 
+/**
+ * 表の LINE 接続の欄の札（共通の札。短い文字で、全文は title）。出すものが無ければ null。
+ * 札の色は呼び出し側で付ける（期限切れは赤、接近は注意）。
+ */
+export function tokenExpiryBadge(account: TokenAccount): { text: string; title: string } | null {
+  const notice = tokenExpiryNotice(account)
+  if (!notice) return null
+  const text = account.tokenExpiry?.status === 'expired' ? '期限切れ' : '期限が近い'
+  return { text, title: notice }
+}
+
 /** 数の帯の下の1行。接続とは別に、期限の切れた・近いアカウントの数を言う。無ければ出さない。 */
 export function tokenExpirySummary(accounts: readonly TokenAccount[]): string | null {
   const live = accounts.filter(account => !account.archivedAt)

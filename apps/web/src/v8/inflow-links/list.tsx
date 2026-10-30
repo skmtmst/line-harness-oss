@@ -10,7 +10,7 @@ import { useListUrlValue } from '@/components/shared/list-url-state';
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Bookmark, CircleAlert, Code, Inbox, Link2, Megaphone, Plus, UserPlus, Users } from 'lucide-react';
+import { Bookmark, CircleAlert, Code, Inbox, Link2, Megaphone, Plus, Users } from 'lucide-react';
 import Link from '@/components/shared/list-navigation'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye } from 'lucide-react';
@@ -33,7 +33,6 @@ import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
 import SegmentedControl from '@/components/shared/segmented'
-import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
@@ -529,28 +528,12 @@ export default function InflowListV8({
     : <Button variant="primary" href="/inflow-links/new"><Plus size={16} aria-hidden="true" />流入リンクを作る</Button>
 
   /* ===== 道具の段 ===== */
-  const toggleFilter = (next: RouteFilter) => {
-    setFilter((current) => (current === next ? 'all' : next))
-    setPage(1)
-  }
   const filterChips = (
-    <div role="group" aria-label="流入経路の絞り込み" className={styles.chips}>
-      <FilterChip
-        selected={filter === 'has-friends'}
-        onChange={() => toggleFilter('has-friends')}
-        icon={<UserPlus size={16} aria-hidden="true" />}
-        title={routeCountAvailable ? `友だち追加あり ${formatNumber(hasFriendsCount)} 件` : undefined}
-      >
-        友だち追加あり
-      </FilterChip>
-      <FilterChip
-        selected={filter === 'unconfigured'}
-        onChange={() => toggleFilter('unconfigured')}
-        icon={<CircleAlert size={16} aria-hidden="true" />}
-      >
-        {routeCountAvailable ? `動きが未設定 ${formatNumber(unconfiguredCount)}` : '動きが未設定'}
-      </FilterChip>
-    </div>
+    <SegmentedControl<RouteFilter> aria-label="流入経路の絞り込み" fit="content" value={filter} onClear={() => { setFilter('all'); setPage(1) }} onChange={(value) => { setFilter(value); setPage(1) }} options={[
+      { value: 'all', label: 'すべて' },
+      { value: 'has-friends', label: '友だち追加あり', title: routeCountAvailable ? `友だち追加あり ${formatNumber(hasFriendsCount)} 件` : undefined },
+      { value: 'unconfigured', label: '動きが未設定', count: routeCountAvailable ? unconfiguredCount : undefined },
+    ]} />
   )
   const presetCounts: Array<[RouteFilter, string, number]> = [
     ['all', 'すべて', genreRows.length],

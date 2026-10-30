@@ -7,6 +7,7 @@ export function singleChoiceFilters(source, file = 'screen.tsx') {
   const chips = []
   const falseFields = new Set()
   const calls = new Map()
+  const opposedPredicates = new Map()
   function visit(node) {
     if (ts.isImportDeclaration(node) && /(?:^|\/)filter-chip$/.test(node.moduleSpecifier.text)) {
       if (node.importClause?.name) names.add(node.importClause.name.text)
@@ -35,6 +36,16 @@ export function singleChoiceFilters(source, file = 'screen.tsx') {
         chips.push({ node, selected, refs, repeated })
       }
     }
+    if (ts.isIfStatement(node) && ts.isBinaryExpression(node.expression) && node.expression.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken) {
+      const { left, right } = node.expression
+      if (ts.isCallExpression(left) && ts.isPropertyAccessExpression(left.expression) && left.expression.name.text === 'includes' && ts.isStringLiteral(left.arguments[0]) && /return\s+false/.test(node.thenStatement.getText(ast))) {
+        const negative = ts.isPrefixUnaryExpression(right) && right.operator === ts.SyntaxKind.ExclamationToken
+        const predicate = negative ? right.operand.getText(ast) : right.getText(ast)
+        const group = `${left.expression.expression.getText(ast)}:${predicate}`
+        const entries = opposedPredicates.get(group) ?? []
+        entries.push({ negative, selection: left.getText(ast) }); opposedPredicates.set(group, entries)
+      }
+    }
     ts.forEachChild(node, visit)
   }
   visit(ast)
@@ -51,7 +62,8 @@ export function singleChoiceFilters(source, file = 'screen.tsx') {
     const group = chip.selected.expression.getText(ast)
     booleanGroups.set(group, (booleanGroups.get(group) ?? 0) + 1)
   }
-  return chips.filter(chip => chip.refs.some(ref => chip.repeated || (frequencies.get(ref) ?? 0) > 1)
+  const exclusiveMemberships = new Set([...opposedPredicates.values()].filter(entries => entries.some(x => x.negative) && entries.some(x => !x.negative)).flatMap(entries => entries.map(x => x.selection)))
+  return chips.filter(chip => exclusiveMemberships.has(chip.selected.getText(ast)) || chip.refs.some(ref => chip.repeated || (frequencies.get(ref) ?? 0) > 1)
     || (ts.isPropertyAccessExpression(chip.selected) && falseFields.has(chip.selected.name.text)
       && (booleanGroups.get(chip.selected.expression.getText(ast)) ?? 0) > 1))
     .map(chip => ({ file, line: ast.getLineAndCharacterOfPosition(chip.node.getStart(ast)).line + 1,

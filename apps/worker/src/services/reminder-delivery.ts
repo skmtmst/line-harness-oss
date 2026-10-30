@@ -355,6 +355,7 @@ export async function processReminderDeliveries(
             offsetMinutes: step.offset_minutes,
           },
           enrollment.delivery_mode === 'time' ? 'time' : 'countdown',
+          enrollment.source_kind === 'restaurant_reservation' ? enrollment.timezone : 'Asia/Tokyo',
         );
         if (sendAt.getTime() > now.getTime()) continue;
         const run = await claimReminderDeliveryRun(db, {
@@ -393,6 +394,7 @@ export async function processReminderDeliveries(
             offsetMinutes: step.offset_minutes,
           },
           enrollment.delivery_mode === 'time' ? 'time' : 'countdown',
+          enrollment.source_kind === 'restaurant_reservation' ? enrollment.timezone : 'Asia/Tokyo',
         );
         if (sendAt.getTime() > now.getTime()) continue;
         const run = await claimReminderDeliveryRun(db, {
@@ -458,6 +460,7 @@ export async function processReminderDeliveries(
           offsetMinutes: step.offset_minutes,
         },
         enrollment.delivery_mode === 'time' ? 'time' : 'countdown',
+          enrollment.source_kind === 'restaurant_reservation' ? enrollment.timezone : 'Asia/Tokyo',
       );
       const run = await claimReminderDeliveryRun(db, {
         lineAccountId: accountId,

@@ -1,17 +1,17 @@
 'use client'
+import SegmentedControl from '@/components/shared/segmented'
 
 import { TAG_ADD_ACTION_LABEL } from '@/components/shared/action-words'
 import { useListUrlJsonValue, useListUrlValue } from '@/components/shared/list-url-state'
 import { jstDate } from '@/lib/jst-datetime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Banknote, CircleDot, Coins, Download, FilePen, Plus, Trophy, Briefcase } from 'lucide-react'
+import { Banknote, Coins, Download, Plus, Trophy, Briefcase } from 'lucide-react'
 import type { LineAccount, Scenario, Tag } from '@line-crm/shared'
 import { api, type AffiliateOffer, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
 import StatusBadge from '@/components/shared/status-badge'
 import EmptyList from '@/components/shared/empty-list'
-import FilterChip from '@/components/shared/filter-chip'
 import ManagedFolderPanel, { managedFolderNavRows, useManagedFolders, folderDotFor } from '@/components/shared/managed-folder-panel'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import { FolderDotName } from '@/components/shared/folder-dot'
@@ -270,10 +270,6 @@ export default function OffersTab() {
     setSaved('')
     setPage(1)
   }
-  const toggleFilter = (key: FilterKey, on: boolean) => resetPage(() => {
-    setSaved('')
-    setFilters((cur) => (on ? [...cur, key] : cur.filter((value) => value !== key)))
-  })
 
   const rewardText = (offer: AffiliateOffer) => (offer.rewardAmount && offer.rewardAmount > 0 ? `1件ごと ${formatYen(offer.rewardAmount)}` : '報酬なし')
   const actionText = (offer: AffiliateOffer) => {
@@ -438,14 +434,9 @@ export default function OffersTab() {
   })
 
   const chips = (
-    <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
-      <FilterChip selected={filters.includes('open')} icon={<CircleDot size={16} aria-hidden="true" />} onChange={(on) => toggleFilter('open', on)}>
-        {ready ? `公開中 ${formatNumber(openCount)}` : '公開中'}
-      </FilterChip>
-      <FilterChip selected={filters.includes('draft')} icon={<FilePen size={16} aria-hidden="true" />} onChange={(on) => toggleFilter('draft', on)}>
-        {ready ? `下書き ${formatNumber(draftCount)}` : '下書き'}
-      </FilterChip>
-    </div>
+    <SegmentedControl<FilterKey | 'all' | ''> aria-label="状態で絞り込む" fit="content" onClear={() => resetPage(() => { setSaved(''); setFilters([]) })} value={filters.length === 0 ? 'all' : filters.length === 1 ? filters[0] : ''} onChange={(value) => resetPage(() => { setSaved(''); setFilters(value === 'all' || value === '' ? [] : [value]) })} options={[
+      { value: 'all', label: 'すべて' }, { value: 'open', label: '公開中', count: ready ? openCount : undefined }, { value: 'draft', label: '下書き', count: ready ? draftCount : undefined },
+    ]} />
   )
 
   const trailing = (

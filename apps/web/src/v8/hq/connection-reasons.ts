@@ -79,6 +79,24 @@ export function connectionReasonLine(account: AccountWithStats): { text: string;
   return { text: `${reasons[0].short}${more}`, title: reasons.map((reason) => reason.detail).join('\n') }
 }
 
+/**
+ * カードの知らせ1つ。トークンの期限切れ・接近を先にし、残りの理由は件数で添える。
+ * 出すものが無ければ null（素の文字の期限切れは出さない）。
+ */
+export function connectionNoticeLine(account: AccountWithStats, warned: boolean): { text: string; title: string } | null {
+  if (account.archivedAt) return null
+  const status = account.tokenExpiry?.status
+  const lead = status === 'expired' ? 'LINE のトークンの期限が切れています'
+    : status === 'expiring' ? 'LINE のトークンの期限が近づいています' : null
+  const reasons = connectionReasons(account)
+  if (!lead) {
+    if (!warned) return null
+    return connectionReasonLine(account)
+  }
+  const more = reasons.length > 0 ? `（ほかに接続の確認事項が${reasons.length}件）` : ''
+  return { text: `${lead}${more}`, title: reasons.map((reason) => reason.detail).join('\n') }
+}
+
 /** LINE ID の表示。LINE から @ 付きで来ても @ は1つだけにする。 */
 export function lineHandle(account: Pick<AccountWithStats, 'basicId' | 'channelId'>): string {
   const raw = (account.basicId || account.channelId || '').trim().replace(/^@+/, '')
