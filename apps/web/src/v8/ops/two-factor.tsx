@@ -18,6 +18,7 @@ import { api } from '@/lib/api'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { qrToDataURL } from '@/lib/qr-image'
 import { opsCall } from '@/components/ops/ops-ui'
+import MusuboLogo from '@/components/shared/musubo-logo'
 import styles from './auth.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import Card from '@/components/shared/card'
@@ -135,11 +136,8 @@ export default function OpsTwoFactorV8() {
   return (
     <SaveErrorScope errors={saveErrors}><main className={styles.page} data-design-node="qod6X">
       <div className={styles.brand}>
-        <span className={styles.mark} aria-hidden="true">m</span>
-        <span className={styles.brandText}>
-          <span className={styles.brandName}>musubo</span>
-          <span className={styles.brandSub}>運営コンソール</span>
-        </span>
+        <MusuboLogo size="ops" />
+        <span className={styles.brandSub}>運営コンソール</span>
       </div>
       <Card variant="form" className={styles.card} aria-labelledby="ops-totp-title">
         <PageHeading inset="none" title="二段階認証を設定" titleId="ops-totp-title" titleAs="h1" subtitleSize="body" help={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} subtitle={<> 認証アプリ（Google Authenticator など）で QR を読み取り、表示された6桁を入れます。</>} />

@@ -86,13 +86,6 @@ html:root .frame :is(input:not([type='checkbox']):not([type='radio']), textarea,
   height: var(--phone-tab-icon);
 }
 
-.brand {
-  flex: none;
-  color: var(--color-accent-deep);
-  font-size: var(--phone-support-text);
-  font-weight: var(--font-weight-ui);
-}
-
 .title {
   flex: 1;
   min-width: 0;

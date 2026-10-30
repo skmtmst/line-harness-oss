@@ -116,7 +116,7 @@ describe('N-426: 初回設定画面', () => {
       body: { challengeToken: 'setup-tok-1' },
     })
     expect(host.textContent).toContain('二段階認証を設定')
-    expect(host.querySelector('img')).toBeTruthy()
+    expect(host.querySelector('img[alt="認証アプリ登録用のQRコード"]')).toBeTruthy()
     expect(host.textContent).toContain('GEZD GNBV GY3T QOJQ')
     expect(host.querySelector('#totp-setup-code')).toBeTruthy()
   })
@@ -247,7 +247,7 @@ describe('N-426: 初回設定画面', () => {
     expect(host.textContent).toContain('設定の有効時間が切れました')
     // 無効なQRと入力欄は再試行可能に見せない。
     expect(host.querySelector('form')).toBeNull()
-    expect(host.querySelector('img')).toBeNull()
+    expect(host.querySelector('img[alt="認証アプリ登録用のQRコード"]')).toBeNull()
     const loginLink = host.querySelector('a[href="/login"]')
     expect(loginLink).not.toBeNull()
     expect(loginLink?.textContent).toContain('ログイン')

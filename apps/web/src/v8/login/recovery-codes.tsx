@@ -31,6 +31,6 @@ export function RecoveryCodePanel({ codes, onContinue, continueLabel = '控え�
   </AuthStack>
 }
 
-export default function RecoveryCodes({ brandName, ...props }: { brandName?: string; codes: string[]; onContinue: () => void }) {
-  return <AuthPage brandName={brandName} title="回復コードを控えてください" help="認証アプリが使えない時に、1つにつき1回だけ使えます。"><RecoveryCodePanel {...props} /></AuthPage>
+export default function RecoveryCodes(props: { codes: string[]; onContinue: () => void }) {
+  return <AuthPage title="回復コードを控えてください" help="認証アプリが使えない時に、1つにつき1回だけ使えます。"><RecoveryCodePanel {...props} /></AuthPage>
 }

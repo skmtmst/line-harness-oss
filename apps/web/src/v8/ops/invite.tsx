@@ -14,6 +14,7 @@ import { adminSessionHandoffPath, storeAdminSession } from '@/lib/admin-session'
 import { authRequest, passwordError } from '@/lib/auth-email'
 import { ApiError } from '@/lib/api'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
+import MusuboLogo from '@/components/shared/musubo-logo'
 import styles from './auth.module.css'
 import { Field } from '@/components/shared/form-controls'
 import Card from '@/components/shared/card'
@@ -125,11 +126,8 @@ export default function OpsInviteV8() {
   return (
     <main className={styles.page} data-design-node="tVaUh">
       <div className={styles.brand}>
-        <span className={styles.mark} aria-hidden="true">m</span>
-        <span className={styles.brandText}>
-          <span className={styles.brandName}>musubo</span>
-          <span className={styles.brandSub}>運営コンソール</span>
-        </span>
+        <MusuboLogo size="ops" />
+        <span className={styles.brandSub}>運営コンソール</span>
       </div>
       <Card variant="form" className={styles.card} aria-labelledby="ops-invite-title">
         <PageHeading inset="none" title="運営メンバーの招待" titleId="ops-invite-title" titleAs="h1" subtitleSize="body" subtitle={headingSubtitle} />
