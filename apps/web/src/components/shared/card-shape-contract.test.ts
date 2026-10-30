@@ -74,7 +74,6 @@ const EXCEPTIONS: [file: string, selector: string, reason: string][] = [
   ["components/scenarios/carousel-picker.tsx", "className=\"border-hairline rounded-card border border-dashed px-4 py-6 text-center\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/scenarios/insert-toolbar.tsx", "className=\"border-hairline rounded-card bg-canvas max-h-64 w-64 overflow-y-auto border shadow-float\"", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
   ["components/scenarios/insert-toolbar.tsx", "className=\"border-hairline rounded-card bg-canvas w-72 border p-3 shadow-float\"", "開いた窓・メニュー。浮く面の影を使い、カードの影を重ねない。"],
-  ["components/scenarios/message-kind-fields.tsx", "className={(`rounded-card border p-1.5 transition-colors ${ on ? 'border-accent bg-accent-soft' : 'border-hairline hover:bg-canvas-sunken' }`) + ' h-auto whitespace-normal'}", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
   ["components/scenarios/question-editor.tsx", "className=\"border-hairline rounded-card border\"", "絞り込み・段の切り替え・選択の枠。中身のカードではない。"],
   ["components/scenarios/step-preview.tsx", "className=\"border-hairline rounded-card text-ink-faint border border-dashed px-3 py-6 text-center text-micro\"", "未取得・未選択・空の状態・警告。線とメッセージで区別する。"],
   ["components/scenarios/trigger-editor.tsx", "className=\"border-hairline rounded-card flex flex-wrap items-center justify-between gap-2 border px-4 py-3\"", "カード内の小箱・入力のまとまり・内容の見本。影を重ねない。"],
