@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Folder, Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
+import { readTemplateText } from '@/lib/template-message-text'
 import { useAccount } from '@/contexts/account-context'
 import type {
   TemplateFolderOption,
@@ -20,6 +21,10 @@ type UsageAwareTemplate = Template & {
   usageCount?: number
   monthlySendCount?: number | null
   totalSendCount?: number | null
+}
+
+function textTemplates(items: UsageAwareTemplate[]): UsageAwareTemplate[] {
+  return items.map(template => ({ ...template, messageContent: readTemplateText(template.messageContent) }))
 }
 
 /** 「よく使う」の並べ方。直近の送信数→累計→使用箇所数の順で見る。 */
@@ -43,6 +48,9 @@ export default function TemplatePicker({
   onPick,
   onPickPack,
   chatId,
+  channel = 'line',
+  canPick = true,
+  lockedReason,
 }: {
   open: boolean
   onClose: () => void
@@ -56,6 +64,9 @@ export default function TemplatePicker({
   // N-026: 差し込みを含むテンプレートのプレビューを、送信と同じ解決器で
   // 表示するために会話IDを受け取る。無いときは生の本文を見せる従来表示。
   chatId?: string | null
+  channel?: 'line' | 'email'
+  canPick?: boolean
+  lockedReason?: string
 }) {
   const { selectedAccountId } = useAccount()
   // PERF-12: templates は「届いた区画」だけ。全件を持たず、絞り込みは
@@ -68,6 +79,7 @@ export default function TemplatePicker({
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [folderId, setFolderId] = useState('')
   const [selectedId, setSelectedId] = useState('')
+  const [previewId, setPreviewId] = useState<string | null>(null)
   const [category, setCategory] = useState<'all' | 'frequent'>('all')
   // パック呼出しの下書き。選んだ順が送る順になる（あいさつ→案内→締め）。
   // 本文ごと持つのは、絞り込みを変えて一覧から外れても選んだものが
@@ -124,6 +136,7 @@ export default function TemplatePicker({
       setFolderCounts(null)
       setFolders([])
       setSelectedId('')
+      setPreviewId(null)
       setFolderId('')
       setSearch('')
       setDebouncedSearch('')
@@ -183,13 +196,14 @@ export default function TemplatePicker({
       folderId: folderId || undefined,
       quick: category === 'all' ? undefined : category,
       messageType: 'text',
+      textOnly: true,
       page: 1,
       limit: 100,
       folderCounts: true,
     }).then((res) => {
       if (listGenRef.current !== myGen) return
       if (res.success) {
-        setTemplates(res.data.items as unknown as UsageAwareTemplate[])
+        setTemplates(textTemplates(res.data.items as unknown as UsageAwareTemplate[]))
         setTotal(res.data.total)
         if (res.data.folderCounts) setFolderCounts(res.data.folderCounts)
         nextPageRef.current = 2
@@ -214,6 +228,7 @@ export default function TemplatePicker({
       folderId: folderId || undefined,
       quick: category === 'all' ? undefined : category,
       messageType: 'text',
+      textOnly: true,
       page,
       limit: 100,
     }).then((res) => {
@@ -221,7 +236,7 @@ export default function TemplatePicker({
       if (res.success) {
         setTemplates((prev) => {
           const seen = new Set(prev.map((t) => t.id))
-          return [...prev, ...(res.data.items as unknown as UsageAwareTemplate[]).filter((t) => !seen.has(t.id))]
+          return [...prev, ...textTemplates(res.data.items as unknown as UsageAwareTemplate[]).filter((t) => !seen.has(t.id))]
         })
         setTotal(res.data.total)
         nextPageRef.current = page + 1
@@ -290,6 +305,8 @@ export default function TemplatePicker({
     () => shown.find((t) => t.id === selectedId) ?? shown[0] ?? null,
     [selectedId, shown],
   )
+  const previewTemplate = shown.find(template => template.id === previewId) ?? null
+  const renderTarget = previewTemplate ?? selectedTemplate
 
   /* INBOX-15: よく使うの実績が1件も無いときは、推測と実績を区別して断る。 */
   const frequentHasUsage = useMemo(
@@ -301,14 +318,14 @@ export default function TemplatePicker({
   // 出す。生の `{{name}}` のまま見せると「送ったらどう届くか」が分からず、
   // 解決できない差し込みも送信まで気づけない。
   useEffect(() => {
-    if (!open || !selectedTemplate || !chatId || !selectedTemplate.messageContent.includes('{{')) {
+    if (!open || !renderTarget || !chatId || !renderTarget.messageContent.includes('{{')) {
       setResolvedPreview(null)
       return
     }
     let cancelled = false
-    const templateId = selectedTemplate.id
+    const templateId = renderTarget.id
     void api.chats.renderPreview(chatId, {
-      content: selectedTemplate.messageContent,
+      content: renderTarget.messageContent,
       messageType: 'text',
     }).then((res) => {
       if (cancelled) return
@@ -323,13 +340,13 @@ export default function TemplatePicker({
     return () => {
       cancelled = true
     }
-  }, [open, selectedTemplate, chatId])
+  }, [open, renderTarget, chatId])
 
   if (!open) return null
 
   const selected = selectedTemplate
   const previewContent =
-    resolvedPreview && selected && resolvedPreview.forId === selected.id && resolvedPreview.chatId === chatId
+    resolvedPreview && renderTarget && resolvedPreview.forId === renderTarget.id && resolvedPreview.chatId === chatId
       ? resolvedPreview.content
       : null
 
@@ -341,7 +358,9 @@ export default function TemplatePicker({
     })
   }
 
+  const canPickNow = canPick && !lockedReason
   const confirmPick = () => {
+    if (!canPickNow) return
     if (packMode && onPickPack) {
       if (packItems.length === 0) return
       onPickPack(packItems.map((item) => item.content))
@@ -368,6 +387,9 @@ export default function TemplatePicker({
   return (
     <TemplatePickerView
       onClose={onClose}
+      channel={channel}
+      canPick={canPickNow}
+      lockedReason={lockedReason}
       search={search}
       onSearch={setSearch}
       searchInputRef={searchInputRef}
@@ -390,8 +412,21 @@ export default function TemplatePicker({
       frequentNote={category === 'frequent' && visibleTemplatesStatus === 'ready' && shown.length > 0 && !frequentHasUsage}
       templates={shown.map((template) => ({ id: template.id, name: template.name, content: template.messageContent }))}
       selectedId={selected?.id ?? null}
+      previewId={previewTemplate?.id ?? null}
+      onPreview={(id) => {
+        setPreviewId(id)
+        setSelectedId(id)
+        if (!packMode) return
+        const template = shown.find(item => item.id === id)
+        if (!template) return
+        setPackItems(items => items.some(item => item.id === id) || items.length >= 5
+          ? items
+          : [...items, { id: template.id, name: template.name, content: template.messageContent }])
+      }}
+      onClosePreview={() => setPreviewId(null)}
       onSelect={(id) => {
         setSelectedId(id)
+        if (previewId !== null) setPreviewId(id)
         if (!packMode) return
         const template = shown.find((item) => item.id === id)
         if (template) togglePackItem(template)
@@ -403,7 +438,7 @@ export default function TemplatePicker({
       remaining={visibleTemplatesStatus === 'ready' && category !== 'frequent' ? Math.max(0, total - templates.length) : 0}
       loadingMore={loadingMore}
       onLoadMore={loadMore}
-      resolvedPreview={previewContent === null || !selected ? null : { id: selected.id, content: previewContent }}
+      resolvedPreview={previewContent === null || !renderTarget ? null : { id: renderTarget.id, content: previewContent }}
       unresolved={previewContent !== null && resolvedPreview?.unresolved.length ? resolvedPreview.unresolved : null}
       onConfirm={confirmPick}
       confirmDisabled={packMode && onPickPack ? packItems.length === 0 : !selected}

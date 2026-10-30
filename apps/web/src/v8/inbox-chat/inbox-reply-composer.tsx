@@ -1,6 +1,8 @@
 'use client'
 import TemplatePicker from '@/components/chats/template-picker';
 import Button from '@/components/shared/button';
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason';
+import { canEditFeature } from '@/lib/staff-capability';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
 import { InboxComposerActions, InboxComposerBottom, InboxComposerTools, InboxDraftArea, InboxDraftCount, InboxInputBox, InboxToolButton } from '@/components/shared/inbox-composer';
 import { InboxFloatingPanel } from '@/components/shared/inbox-content';
@@ -21,6 +23,8 @@ import { MESSAGE_MAX_LENGTH, formatByteSize, formatJstScheduledAt, isoToJstDatet
 import { TextArea as SharedTextArea } from '@/components/shared/text-field'
 type Props = Pick<ConversationProps, 'dropOver' | 'setDropOver' | 'handlePickAttachment' | 'chatPollStalled' | 'setChatPollRetryKey' | 'setShowTemplatePicker' | 'showComposerOptions' | 'setShowComposerOptions' | 'showMemoEditor' | 'setShowMemoEditor' | 'sendMode' | 'setSendMode' | 'memoPopoverRef' | 'memoDraft' | 'setMemoDraft' | 'memoError' | 'closeMemoEditor' | 'handleSaveMemo' | 'memoSaving' | 'chatDetail' | 'quotedMessage' | 'setQuotedMessage' | 'pendingImage' | 'setImagePreviewOpen' | 'pendingImageMeta' | 'imageInputRef' | 'imageUploading' | 'clearPendingImage' | 'pendingAttachment' | 'sending' | 'scheduling' | 'clearPendingAttachment' | 'retryAttachment' | 'textareaRef' | 'messageContent' | 'setMessageContent' | 'handleKeyDown' | 'isComposingRef' | 'messageOverLimit' | 'messageLength' | 'selectedChatId' | 'imageError' | 'staffRole' | 'selectedAccountId' | 'senderId' | 'setSenderId' | 'setShowSchedulePanel' | 'showSchedulePanel' | 'scheduledSends' | 'handleSendMessage' | 'scheduleInput' | 'setScheduleInput' | 'handleScheduleSend' | 'sendError' | 'error' | 'scheduledSendsFailed' | 'loadScheduledSends' | 'handleReschedule' | 'handleCancelScheduled' | 'showTemplatePicker' | 'setPendingPack' | 'pendingPack' | 'handleSendPack'>
 export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAttachment, chatPollStalled, setChatPollRetryKey, setShowTemplatePicker, showComposerOptions, setShowComposerOptions, showMemoEditor, setShowMemoEditor, sendMode, setSendMode, memoPopoverRef, memoDraft, setMemoDraft, memoError, closeMemoEditor, handleSaveMemo, memoSaving, chatDetail, quotedMessage, setQuotedMessage, pendingImage, setImagePreviewOpen, pendingImageMeta, imageInputRef, imageUploading, clearPendingImage, pendingAttachment, sending, scheduling, clearPendingAttachment, retryAttachment, textareaRef, messageContent, setMessageContent, handleKeyDown, isComposingRef, messageOverLimit, messageLength, selectedChatId, imageError, staffRole, selectedAccountId, senderId, setSenderId, setShowSchedulePanel, showSchedulePanel, scheduledSends, handleSendMessage, scheduleInput, setScheduleInput, handleScheduleSend, sendError, error, scheduledSendsFailed, loadScheduledSends, handleReschedule, handleCancelScheduled, showTemplatePicker, setPendingPack, pendingPack, handleSendPack }: Props) {
+  const canInsertTemplate = staffRole !== null && canEditFeature('/chats', staffRole)
+  const templateLockReason = usePermissionLockReason(canInsertTemplate)
   return (<InboxComposer
     data-inbox-v4="composer"
     data-drop-over={dropOver ? '' : undefined}
@@ -391,6 +395,9 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
         )}
         <TemplatePicker
           open={showTemplatePicker}
+          channel="line"
+          canPick={canInsertTemplate}
+          lockedReason={templateLockReason}
           onClose={() => setShowTemplatePicker(false)}
           chatId={selectedChatId}
           onPick={(content) =>
