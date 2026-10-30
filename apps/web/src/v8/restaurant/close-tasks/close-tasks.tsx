@@ -189,7 +189,6 @@ export default function CloseTasksPage() {
                       </Button>
                     ) : null}
                     <RowMenu
-                      appearance="box"
                       label={`${slotTitle(group.startsAt)}の操作`}
                       items={[
                         ...(canWrite ? remaining.slice(1).map((item) => ({ id: item.id, label: `${item.name}を閉じた`, onSelect: () => void close(item.id, item.name) })) : []),

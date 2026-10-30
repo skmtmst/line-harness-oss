@@ -102,7 +102,7 @@ export default function EntitlementsCard({ accountId, friendId, friendName, canE
                         <RowNameButton onClick={() => setDrawerId(item.id)} title={`${item.name}の履歴を見る`}>{item.name}</RowNameButton>
                         <span className={styles.rowSub}>{`${remainingText(item)}・${shortDay(item.expires_at)} まで`}</span>
                       </span>
-                      {canEdit ? <RowMenu appearance="box" size="row" label={`${item.name}の操作`} open={openMenu === item.id} onOpenChange={(next) => setOpenMenu(next ? item.id : null)} items={[
+                      {canEdit ? <RowMenu size="row" label={`${item.name}の操作`} open={openMenu === item.id} onOpenChange={(next) => setOpenMenu(next ? item.id : null)} items={[
                         { id: 'history', label: '履歴を見る', onSelect: () => setDrawerId(item.id) },
                         { id: 'give', label: '回数を足す', onSelect: () => setDialog({ action: 'give', id: item.id }) },
                         { id: 'adjust', label: '残りを直す', onSelect: () => setDialog({ action: 'adjust', id: item.id }) },
