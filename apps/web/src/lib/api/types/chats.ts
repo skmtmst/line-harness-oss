@@ -53,6 +53,8 @@ export type ChatListItem = Chat & {
   lastMessageType: string | null
   /** ログイン中の担当者だけの未読。対応状況とは別。 */
   isUnread: boolean
+  /** 友だち一覧と共通の注目印。旧応答では未指定。 */
+  isAttention?: boolean
 }
 
 /** `GET /api/chats/:id` の実応答。一覧にだけある値は省略される。 */
