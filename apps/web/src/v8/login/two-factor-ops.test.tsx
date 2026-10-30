@@ -4,6 +4,7 @@ import React, { act, type ReactNode } from 'react'
 import { fireEvent } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { startAuthentication } from '@simplewebauthn/browser'
 
 import TwoFactorLoginPage from '@/app/login/two-factor/page'
 
@@ -22,6 +23,7 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push() {}, replace() {}, refresh() {}, back() {}, forward() {}, prefetch() {} }),
 }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: 'テスト統括' }) }))
+vi.mock('@simplewebauthn/browser', () => ({ startAuthentication: vi.fn(async () => ({ id: 'key-1' })) }))
 
 let host: HTMLDivElement
 let root: Root
@@ -47,6 +49,44 @@ afterEach(() => {
 })
 
 describe('運営 ログイン 2段目（V8 の入口）', () => {
+  it('登録済みの統括と運営はパスキーを先に表示し、認証アプリへ切り替えられる', async () => {
+    process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ success: true, data: { available: true } }), { status: 200 })))
+    try {
+      await open('/login/two-factor?next=ops#lh_2fa=challenge-1&lh_method=password', 'v8')
+      expect(host.textContent).toContain('パスキーで確認')
+      expect(host.textContent).toContain('パスキーで認証する')
+      const switchMethod = [...host.querySelectorAll('button')].find(button => button.textContent === '認証アプリで確認')
+      await act(async () => { switchMethod?.click() })
+      expect(host.textContent).toContain('6桁の確認')
+      expect(host.textContent).toContain('パスキーを使う')
+    } finally { vi.unstubAllGlobals() }
+  })
+  it('パスキー確認後も運営権限を確かめてからコンソールへ進む', async () => {
+    process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+    const calls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      calls.push(url)
+      const data = url.endsWith('/passkeys/login/options')
+        ? { success: true, data: { available: true, options: { challenge: 'fixture' }, challengeToken: 'passkey-challenge' } }
+        : url.endsWith('/passkeys/login/verify')
+          ? { success: true, data: { sessionToken: 'session-1' }, csrfToken: 'csrf-1' }
+          : { success: true, data: { platformAdmin: true } }
+      return new Response(JSON.stringify(data), { status: 200 })
+    }))
+    try {
+      await open('/login/two-factor?next=ops#lh_2fa=challenge-1&lh_method=password', 'v8')
+      const submit = [...host.querySelectorAll('button')].find(button => button.textContent === 'パスキーで認証する')
+      await act(async () => { submit?.click(); await new Promise(resolve => setTimeout(resolve, 10)) })
+      expect(startAuthentication).toHaveBeenCalled()
+      expect(calls.some(url => url.endsWith('/passkeys/login/verify'))).toBe(true)
+      expect(calls.some(url => url.endsWith('/api/auth/session'))).toBe(true)
+      await act(async () => { await new Promise(resolve => setTimeout(resolve, 500)) })
+      expect(assign).toHaveBeenCalledTimes(1)
+    } finally { assign.mockRestore(); vi.unstubAllGlobals() }
+  })
   it('V8 で運営から来たら「6桁の確認」を出し、ログインのボタンを押せる', async () => {
     await open('/login/two-factor?next=ops#lh_2fa=challenge-1&lh_method=password', 'v8')
     expect(host.querySelector('[data-design-node="tOPeY"]')).not.toBeNull()

@@ -166,17 +166,14 @@ export function AppearanceTab(props: Props) {
               onChange={(e) => onChangeOptions({ totalLimit: { ...options.totalLimit, enabled: true, max: Math.max(1, Number(e.target.value) || 1) } })}
             /></SaveErrorField></Field></div>
         ) : null}
+        {/* 受付のきまりは1枚のカードにまとめる（つづきで割らない）。 */}
+        <SaveErrorField names={["restorePrevious","options.restorePrevious","restore_previous","options.restore_previous"]}><ToggleField checked={options.restorePrevious ?? false} onChange={(restorePrevious) => onChangeOptions({ restorePrevious })}>前回の答えを最初から入れておく</ToggleField></SaveErrorField>
+        <SaveErrorField names={["enabled","options.confirmDialog?.enabled","confirmDialog?.enabled","options.confirm_dialog?.enabled","confirm_dialog?.enabled"]}><ToggleField checked={options.confirmDialog?.enabled ?? false} onChange={(enabled) => onChangeOptions({ confirmDialog: { ...options.confirmDialog, enabled } })}>送る前に確認の画面を出す</ToggleField></SaveErrorField>
+        <div className={styles.field}><Field label="期限を過ぎた人に出す文" htmlFor="fe-deadline-message"><SaveErrorField names={["message","options.deadline?.message","deadline?.message"]}><TextField id="fe-deadline-message" value={options.deadline?.message ?? ''} placeholder="受付は終了しました" onChange={(e) => onChangeOptions({ deadline: { ...options.deadline, enabled: options.deadline?.enabled ?? false, message: e.target.value } })} /></SaveErrorField></Field></div>
+        <div className={styles.field}><Field label="ページの題名（LINE の上に出る）" htmlFor="fe-page-title"><SaveErrorField names={["pageTitle","options.pageTitle","page_title","options.page_title"]}><TextField id="fe-page-title" value={options.pageTitle ?? ''} placeholder="回答フォーム" onChange={(e) => onChangeOptions({ pageTitle: e.target.value || null })} /></SaveErrorField></Field></div>
       </Card>
 
-      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-label="受付のつづきと見た目">
-        <div className={styles.subBox}>
-          <h3 className={styles.subTitle}>受付のきまり（つづき）</h3>
-          <SaveErrorField names={["restorePrevious","options.restorePrevious","restore_previous","options.restore_previous"]}><ToggleField checked={options.restorePrevious ?? false} onChange={(restorePrevious) => onChangeOptions({ restorePrevious })}>前回の答えを最初から入れておく</ToggleField></SaveErrorField>
-          <SaveErrorField names={["enabled","options.confirmDialog?.enabled","confirmDialog?.enabled","options.confirm_dialog?.enabled","confirm_dialog?.enabled"]}><ToggleField checked={options.confirmDialog?.enabled ?? false} onChange={(enabled) => onChangeOptions({ confirmDialog: { ...options.confirmDialog, enabled } })}>送る前に確認の画面を出す</ToggleField></SaveErrorField>
-          <div className={styles.field}><Field label="期限を過ぎた人に出す文" htmlFor="fe-deadline-message"><SaveErrorField names={["message","options.deadline?.message","deadline?.message"]}><TextField id="fe-deadline-message" value={options.deadline?.message ?? ''} placeholder="受付は終了しました" onChange={(e) => onChangeOptions({ deadline: { ...options.deadline, enabled: options.deadline?.enabled ?? false, message: e.target.value } })} /></SaveErrorField></Field></div>
-          <div className={styles.field}><Field label="ページの題名（LINE の上に出る）" htmlFor="fe-page-title"><SaveErrorField names={["pageTitle","options.pageTitle","page_title","options.page_title"]}><TextField id="fe-page-title" value={options.pageTitle ?? ''} placeholder="回答フォーム" onChange={(e) => onChangeOptions({ pageTitle: e.target.value || null })} /></SaveErrorField></Field></div>
-        </div>
-
+      <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-label="見た目の設定">
         <div className={styles.subBox}>
           <h3 className={styles.subTitle}>色と文字</h3>
           <RadioCardGroup legend="見た目の使い方" className={styles.designModes}>

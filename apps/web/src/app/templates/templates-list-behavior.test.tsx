@@ -49,6 +49,7 @@ vi.mock('@/lib/api', () => {
         delete: fixture.templatesDelete,
       },
       broadcastMessageAssets: {
+        folders: { list: async () => ({ success: true, data: [] }) },
         list: fixture.assetsList,
         counts: () => Promise.resolve({ success: true, data: { card_message: 0, rich_message: 0, coupon: 0, research: 0 } }),
       },
@@ -232,7 +233,7 @@ describe('読み込みの失敗と読み直し', () => {
     let finish!: (value: unknown) => void
     fixture.templatesList.mockReturnValue(new Promise((resolve) => { finish = resolve }))
     await renderList()
-    const create = () => screen.getAllByRole('button', { name: /テンプレートを作る/ })[0] as HTMLButtonElement
+    const create = () => screen.getAllByRole('button', { name: /メッセージを作る/ })[0] as HTMLButtonElement
     expect(create().disabled).toBe(true)
     expect(create().title).toBe('読み込んでいます')
     await act(async () => { finish({ success: false, error: 'unavailable' }) })
@@ -242,7 +243,7 @@ describe('読み込みの失敗と読み直し', () => {
     fixture.templatesList.mockResolvedValue({ success: true, data: [row('tpl-1', '来店お礼')] })
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' })) })
     await settle()
-    expect(create().disabled).toBe(false)
+    expect(screen.getAllByRole('link', { name: 'メッセージを作る' })[0].getAttribute('href')).toBe('/templates/edit')
   })
 })
 

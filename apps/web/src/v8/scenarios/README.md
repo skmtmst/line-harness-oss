@@ -1,4 +1,4 @@
-> 文書：scenarios のコード案内｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+> 文書：scenarios のコード案内｜区分：今の説明｜最終確認：2026-10-30（日本時間）
 
 # シナリオ配信一覧の動き：コードの入口
 
@@ -15,7 +15,7 @@
 
 ## 外に見せる名前（index.ts）
 
-- [index.ts](index.ts)：`ScenarioCreateV8`・`ScenariosListV8`・`ScenarioResultsV8`
+- [index.ts](index.ts)：`ScenarioCreateV8`・`ScenariosListV8`・`ScenarioResultsV8`・`captureScenarioWriteAccess`・`useScenarioWriteAccess`（1通目の保存も同じ本人/代理判定を使う）
 
 機能の内部は宣言元を直接読み、外部は明示された公開入口を使います。Nextのpage・layoutとWorkerのroute登録は直接接続します。決まりは [コードの構成と名前](../../../../../docs/code-structure.md)。
 

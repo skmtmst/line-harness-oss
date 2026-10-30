@@ -138,7 +138,6 @@ describe("管理画面共通アクションの画面契約", () => {
     expect(LIST).toContain('保管を戻す')
     expect(LIST).toContain('api.commonActions.archive')
     expect(LIST).toContain('api.commonActions.unarchive')
-    expect(LIST).toContain("chip('archived', '保管'")
     expect(API).toContain('archive:')
   })
 

@@ -45,3 +45,11 @@ hqNotices.get('/api/hq/notices/line-registration', async (c) => {
     },
   });
 });
+
+/** 開いたままの案内が紐づけ完了を検知する。LINE API と確認コードの発行は行わない。 */
+hqNotices.get('/api/hq/notices/line-registration/status', async (c) => {
+  const staff = c.get('staff');
+  const row = await c.env.DB.prepare('SELECT notice_friend_id FROM staff_members WHERE id = ?')
+    .bind(staff.id).first<{ notice_friend_id: string | null }>();
+  return c.json({ success: true, data: { linked: Boolean(row?.notice_friend_id) } });
+});

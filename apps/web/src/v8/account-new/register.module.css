@@ -39,6 +39,7 @@
 .label { font-size: var(--tpl-htn-text-13); line-height: var(--tpl-htn-lh-20); font-weight: 600; color: var(--color-ink); }
 .fieldError { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-17); color: var(--color-danger); }
 .help { margin: 0; font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); color: var(--color-ink-faint); }
+.inputWarning { margin: 0; color: var(--color-warning); font-size: var(--tpl-htn-text-12); line-height: var(--tpl-htn-lh-16); }
 .secretRow { display: flex; align-items: center; justify-content: space-between; gap: var(--tpl-htn-panel-gap); }
 .secretNote {
   display: inline-flex; align-items: center; gap: var(--tpl-htn-gap-s);

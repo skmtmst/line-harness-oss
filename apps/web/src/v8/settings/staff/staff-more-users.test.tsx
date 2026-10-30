@@ -81,14 +81,19 @@ test('読み込んだ人数が全員より少ないときは、黙って切ら�
 test('役割の区別を共通札へ渡し、名前と権限の読み取りを保つ', async () => {
   const roles = ['administrator', 'operations', 'reception', 'view_only', 'custom']
   net.users.mockResolvedValue({ success: true, data: {
-    items: roles.map((roleBundle, index) => ({ ...user(index), roleBundle })),
+    items: roles.map((roleBundle, index) => ({ ...user(index), roleBundle, lastLoginAt: index === 0 ? new Date().toISOString() : null })),
     pagination: { total: roles.length, limit: 200, offset: 0 },
     summary: { active: roles.length, suspended: 0, mfaEnabled: 0, invited: 0 },
   } })
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
   vi.stubGlobal('sessionStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
   render(<StaffV8 />)
-  const table = await screen.findByRole('table', { name: 'いまいる人の一覧' })
+  const table = await screen.findByRole('table', { name: 'ユーザーの一覧' })
+  expect(screen.getByRole('columnheader', { name: 'ユーザー情報' })).toBeTruthy()
+  expect(screen.getByRole('columnheader', { name: '権限' })).toBeTruthy()
+  expect(screen.getByRole('columnheader', { name: '最終ログイン' })).toBeTruthy()
+  expect(table.textContent).toMatch(/\d{2}\/\d{2}/)
+  expect(table.textContent).not.toContain('いま')
   await waitFor(() => expect(table.querySelectorAll('[data-role]')).toHaveLength(5))
   const badges = [...table.querySelectorAll('[data-role]')].map(badge => [badge.getAttribute('data-role'), badge.getAttribute('data-tone'), badge.textContent])
   expect(badges).toEqual([

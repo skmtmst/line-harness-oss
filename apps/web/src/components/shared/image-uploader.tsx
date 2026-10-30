@@ -26,6 +26,10 @@ export interface ImageUploaderProps {
   onMediaPick?: () => void
   readOnly?: boolean
   disabled?: boolean
+  /** 画像・消去・URL・登録メディアを、隠さず理由付きで拒む。未指定の表示は従来どおり。 */
+  lockedReason?: string
+  /** 値の変更・取り込みの前後で確かめる、呼ぶ側の有効な権限。 */
+  canChangeNow?: () => boolean
   size?: 'regular' | 'compact'
   /** url の形の上限（MB）。既定 10。 */
   maxMB?: number
@@ -50,9 +54,19 @@ export default function ImageUploader({
   onMediaPick,
   readOnly = false,
   disabled = false,
+  lockedReason,
+  canChangeNow,
   size = 'regular',
   maxMB = 10,
 }: ImageUploaderProps) {
+  const permissionRef = useRef({ lockedReason, canChangeNow, readOnly, disabled })
+  permissionRef.current = { lockedReason, canChangeNow, readOnly, disabled }
+  const canChange = () => {
+    const latest = permissionRef.current
+    return !lockedReason && canChangeNow?.() !== false && !latest.lockedReason && latest.canChangeNow?.() !== false
+      && !readOnly && !disabled && !latest.readOnly && !latest.disabled
+  }
+  const hasPermissionGate = lockedReason !== undefined || canChangeNow !== undefined
   const [manualUrlMode, setManualUrlMode] = useState(false)
   const lineImage = mode === 'line-image'
   const onChangeRef = useRef(onChange)
@@ -95,6 +109,8 @@ export default function ImageUploader({
         onMediaPick={readOnly ? undefined : onMediaPick}
         readOnly={readOnly}
         disabled={disabled}
+        lockedReason={lockedReason}
+        canChangeNow={hasPermissionGate ? canChange : undefined}
         size={size}
         acceptPaste
       >
@@ -103,8 +119,9 @@ export default function ImageUploader({
             type="url"
             aria-label={`${title.replace(/を追加$/, '')}の URL`}
             value={url}
-            disabled={disabled}
+            disabled={disabled || Boolean(lockedReason) || canChangeNow?.() === false}
             onChange={(event) => {
+              if ((hasPermissionGate || permissionRef.current.lockedReason !== undefined || permissionRef.current.canChangeNow !== undefined) && !canChange()) return
               const next = event.target.value
               onChangeRef.current(next ? toValue(next) : null)
             }}

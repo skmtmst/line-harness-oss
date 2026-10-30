@@ -34,7 +34,7 @@ import {
   pageOf,
   previousSettlementPeriod,
 } from './display'
-import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, CreateButton, useAffiliateShell } from './frame'
+import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
 import OfferFormModal from './offer-form'
 import OfferTermsDialog from './offer-terms'
 import {
@@ -413,10 +413,13 @@ export default function OffersTab() {
     </KpiBand>
   )
 
+  /* 主ボタンは素の Button で渡し、題の右の自動整列（副→主）に載せる。 */
   const createButton = (full: boolean) => (
-    <CreateButton onClick={openCreate} readonly={readonly} full={full}>
-      <Plus size={16} aria-hidden="true" /> 案件を作る
-    </CreateButton>
+    readonly ? null : (
+      <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} onClick={openCreate}>
+        <Plus size={16} aria-hidden="true" /> 案件を作る
+      </Button>
+    )
   )
 
   const chooseFolder = (id: string) => resetPage(() => setFolderId(id))

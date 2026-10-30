@@ -243,7 +243,10 @@ describe('回答フォームの編集（V8）', () => {
     expect(within(row as HTMLElement).getByText('テキストを送る')).toBeTruthy()
     expect(within(row as HTMLElement).getByRole('button', { name: '「ご回答ありがとうございます」' })).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: '受付と見た目' }))
-    expect(await screen.findByText('受付のきまり（つづき）')).toBeTruthy()
+    /* 受付のきまりは1枚のカードにまとまり、つづきの見出しは無い（91）。 */
+    expect(await screen.findByRole('heading', { name: '受付のきまり' })).toBeTruthy()
+    expect(screen.queryByText('受付のきまり（つづき）')).toBeNull()
+    expect(screen.getByText('前回の答えを最初から入れておく')).toBeTruthy()
     expect(screen.getByDisplayValue('来店アンケート')).toBeTruthy()
   })
 
@@ -252,7 +255,7 @@ describe('回答フォームの編集（V8）', () => {
     ;(broken.layout.sections[1].blocks[0] as { label: string }).label = ''
     formsGet.mockImplementation(async () => ({ success: true, data: broken }))
     await render('id=form-1&tab=appearance')
-    await screen.findByText('受付のきまり（つづき）')
+    await screen.findByRole('heading', { name: '受付のきまり' })
     fireEvent.click(getPageAction({ name: '下書きを保存' }))
     for (let i = 0; i < 3; i++) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     expect(formsUpdate).not.toHaveBeenCalled()

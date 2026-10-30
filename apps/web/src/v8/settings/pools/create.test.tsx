@@ -138,6 +138,22 @@ describe('V8-B プールを作る（D0AOyx）', () => {
     expect(routerPush).not.toHaveBeenCalled()
   })
 
+  it('保存帯は本文の外に置き、保存ボタンは元の作成フォームへ接続する', async () => {
+    await renderV8()
+    const frame = document.querySelector('[data-design-node="D0AOyx"]')!
+    const footer = frame.querySelector(':scope > [data-template-region="footer"]')
+    expect(footer).not.toBeNull()
+    const body = frame.querySelector('[data-template-region="body"]')!
+    expect(body.contains(footer)).toBe(false)
+    const save = [...footer!.querySelectorAll('button')].find(button => button.textContent?.includes('保存してURLを発行'))!
+    expect(save.form).toBe(document.getElementById('pool-create-form'))
+    const cancel = [...footer!.querySelectorAll('a')].find(link => link.textContent === 'キャンセル')!
+    expect(cancel).toBeTruthy()
+    expect(cancel.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(footer!.textContent).not.toContain('保存して続けて作る')
+    expect(poolsCreate).not.toHaveBeenCalled()
+  })
+
   it('番号つきの節とプレビューが出る', async () => {
     await renderV8()
     expect(document.querySelector('[data-design-node="D0AOyx"]'), '板IDの枠がある').toBeTruthy()

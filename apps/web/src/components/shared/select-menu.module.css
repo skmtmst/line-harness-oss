@@ -211,3 +211,13 @@
 .valueHead { color: var(--color-ink); }
 .valueCurrent[data-filter-state='default'] { color: var(--color-ink-faint); }
 .valueCurrent[data-filter-state='active'] { color: var(--color-ink); font-weight: 700; }
+
+/* 権限のある候補選択を残し、＋行だけを共通の灰色にする。 */
+:root .action[data-permission-locked],
+:root .action[data-permission-locked]:hover,
+:root .action[data-permission-locked][data-active='true'] {
+  color: var(--color-ink-secondary);
+  background: var(--color-canvas-sunken);
+  cursor: not-allowed;
+  opacity: var(--polish-disabled-opacity);
+}

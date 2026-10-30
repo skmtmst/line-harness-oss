@@ -30,6 +30,8 @@ export const STEP_UP_PURPOSES = [
   'auth.mfa.policy',
   'auth.mfa.recovery',
   'auth.mfa.reenroll',
+  'auth.passkey.register',
+  'auth.passkey.remove',
   'operations.control',
   'affiliate.payout.export',
   'photo.original.download',

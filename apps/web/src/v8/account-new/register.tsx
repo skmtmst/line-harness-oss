@@ -25,7 +25,7 @@ import Notice from '@/components/shared/notice'
 import TextLink from '@/components/shared/text-link'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
-  DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, channelErrors, checkActionLabel, checkErrorText,
+  DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, channelErrors, channelLengthWarning, checkActionLabel, checkErrorText,
   checkStage, handoverProgress, isDuplicateChannelError, latestFollowerImportState,
   loginChannelErrors, matchRegisteredAccountId, messagingApiErrors, nextCursor, providerIdErrors, readDraft, stepLabel, subTotal,
   toV06CheckRows,
@@ -33,7 +33,7 @@ import {
   type DraftState, type PrecheckAnswers, type PrecheckAt, type PrecheckKey, type StepNumber,
 } from './logic'
 import Step1Precheck from './step1-precheck'
-import Step2Connect from './step2-connect'
+import Step2Connect, { type Step2Field } from './step2-connect'
 import Step4Template from './step4-template'
 import RegistrationStyleDialog from './registration-style-dialog'
 import Step5Completion from './step5-completion'
@@ -105,6 +105,8 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const [importState, setImportState] = useState<FollowerImportState | null>(null)
   const [busyAction, setBusyAction] = useState<BusyAction>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const [touchedFields, setTouchedFields] = useState<Partial<Record<Step2Field, boolean>>>({})
+  const [reviewedLengthStep, setReviewedLengthStep] = useState<number | null>(null)
   const [error, setError] = useState('')
   const [recoveredAccountId, setRecoveredAccountId] = useState('')
   const [stepUp, setStepUp] = useState<StepUpRequest | null>(null)
@@ -322,11 +324,21 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const update = (key: keyof FormState, value: string | string[] | boolean) => {
     setForm((current) => ({ ...current, [key]: value } as FormState))
     setFieldErrors((current) => {
-      if (!(key in current)) return current
       const next = { ...current }
-      delete next[key]
+      if (key === 'channelId' || key === 'channelSecret' || key === 'providerId' || key === 'loginChannelId' || key === 'loginChannelSecret') {
+        const values = { ...form, [key]: value } as FormState
+        const fieldError = channelErrors(values)[key]
+        if (fieldError && (Boolean(value) || touchedFields[key])) next[key] = fieldError
+        else delete next[key]
+        if (key === 'channelId' && touchedFields.loginChannelId) {
+          const loginError = channelErrors(values).loginChannelId
+          if (loginError) next.loginChannelId = loginError
+          else delete next.loginChannelId
+        }
+      } else delete next[key]
       return next
     })
+    if (key === 'channelId' || key === 'channelSecret' || key === 'providerId' || key === 'loginChannelId' || key === 'loginChannelSecret') setReviewedLengthStep(null)
     if (key === 'channelId' || key === 'channelSecret' || key === 'loginChannelId' || key === 'loginChannelSecret') {
       setConnection(null)
       setCheckCursor(0)
@@ -335,6 +347,25 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
     }
     setError('')
     setRecoveredAccountId('')
+  }
+
+  const validateChannelField = (key: Step2Field) => {
+    setTouchedFields((current) => ({ ...current, [key]: true }))
+    const fieldError = channelErrors(form)[key]
+    setFieldErrors((current) => {
+      const next = { ...current }
+      if (fieldError) next[key] = fieldError
+      else delete next[key]
+      return next
+    })
+  }
+
+  const reviewLengthWarnings = (fields: Step2Field[]) => {
+    const unusual = fields.filter((key) => channelLengthWarning(key, form[key]))
+    if (!unusual.length || reviewedLengthStep === sub) return false
+    setTouchedFields((current) => ({ ...current, ...Object.fromEntries(unusual.map((key) => [key, true])) }))
+    setReviewedLengthStep(sub)
+    return true
   }
 
   const toggleAck = (key: string, next: boolean) => {
@@ -478,12 +509,14 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       if (sub === 1) {
         const nextErrors = messagingApiErrors(form)
         if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); return }
+        if (reviewLengthWarnings(['channelId', 'channelSecret'])) return
         setSub(2)
         return
       }
       if (sub === 2) {
         const nextErrors = providerIdErrors(form)
         if (Object.keys(nextErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...nextErrors })); return }
+        if (reviewLengthWarnings(['providerId'])) return
         setSub(3)
         return
       }
@@ -494,6 +527,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
       }
       const loginErrors = loginChannelErrors(form)
       if (Object.keys(loginErrors).length > 0) { setFieldErrors((current) => ({ ...current, ...loginErrors })); return }
+      if (reviewLengthWarnings(['loginChannelId', 'loginChannelSecret'])) return
       if (!allAcked(LOGIN_ACKS, acks)) return
       setCurrentStep(3)
       setSub(1)
@@ -639,8 +673,11 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
               badge={badge}
               values={form}
               fieldErrors={fieldErrors}
+              touchedFields={touchedFields}
               acks={acks}
               onUpdate={update}
+              onTouchField={(key) => setTouchedFields((current) => ({ ...current, [key]: true }))}
+              onValidateField={validateChannelField}
               onToggleAck={toggleAck}
             />
           )}

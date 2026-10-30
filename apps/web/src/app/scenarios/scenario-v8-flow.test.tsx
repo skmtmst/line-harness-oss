@@ -1,3 +1,6 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity, readStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 // @vitest-environment happy-dom
 /**
  * V8 シナリオの通し試験（見た目のみ）。
@@ -99,7 +102,7 @@ vi.mock('@/lib/api', () => ({
         data: { scenarios: { active: 1, subscribers: 10, completed: 4, sentThisWeek: 3 } },
       })),
     },
-    staff: { me: vi.fn(async () => ({ success: true, data: { role: 'owner' } })) },
+    staff: { me: vi.fn(async () => ({ success: true, data: readStaffIdentity() })) },
   },
 }))
 
@@ -166,6 +169,8 @@ function setInputValue(element: HTMLInputElement | HTMLTextAreaElement, value: s
 }
 
 beforeEach(() => {
+  forgetSessionSnapshot()
+  verifiedStaffRole('owner')
   const g = globalThis as unknown as { crypto?: { randomUUID?: () => string } }
   if (!g.crypto) g.crypto = {}
   if (!g.crypto.randomUUID) g.crypto.randomUUID = () => 'test-uuid-1'
@@ -211,6 +216,8 @@ afterEach(() => {
   act(() => { root.unmount() })
   host.remove()
   clearToastsForTest()
+  forgetStaffIdentity()
+  forgetSessionSnapshot()
   delete document.documentElement.dataset.theme
   vi.clearAllMocks()
 })

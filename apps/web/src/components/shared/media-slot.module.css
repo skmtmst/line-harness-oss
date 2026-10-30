@@ -312,3 +312,8 @@
 }
 
 :root .frame { gap: var(--polish-space-field); }
+
+/* 権限の時だけ、元の操作の形と焦点を残して灰色にする。 */
+:root :is(.hit, .pill, .link)[data-permission-locked],
+:root :is(.hit, .pill, .link)[data-permission-locked]:hover { color: var(--color-ink-faint); cursor: not-allowed; }
+:root .root > .links .link[data-permission-locked] { opacity: var(--polish-disabled-opacity); }

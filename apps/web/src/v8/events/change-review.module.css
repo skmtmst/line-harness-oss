@@ -159,21 +159,6 @@
 .linkRow {
   display: flex;
 }
-.linkButton {
-  min-height: 0;
-  height: auto;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-action);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: var(--tpl-wh-cell-lh);
-  cursor: pointer;
-}
-.linkButton:hover {
-  text-decoration: underline;
-}
 
 /* 右の列。 */
 .side {

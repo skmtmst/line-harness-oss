@@ -8,7 +8,9 @@ import { renderTemplateList } from './list-table'
 
 
 
-import BroadcastAssetManager from '@/components/broadcasts/broadcast-asset-manager'
+import AssetTemplatesList from './asset-list'
+import { KIND_CARDS } from './list-model'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import ActionMenu,{ type ActionMenuItem } from '@/components/shared/action-menu'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { useEscapeToClearSelection } from '@/components/shared/bulk-bar'
@@ -18,7 +20,7 @@ import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import { emptyValue } from '@/components/shared/empty-value'
 import FilterChip from '@/components/shared/filter-chip'
 import { type FolderDotFolder } from '@/components/shared/folder-dot'
-import FolderPanel,{ FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
+import FolderPanel,{ FOLDER_RAIL_WIDTH,FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -48,7 +50,6 @@ import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import { loadTemplateExamples,type TemplateExample } from './examples'
 import styles from './list.module.css'
 import { useTemplatePanelDetail } from './panel-detail'
-import StaffAssetList from './staff-asset-list'
 import { createBlockedReason,failureOf,failureOfResponse,listView,usageRows,type TemplatesFailure,type UsageDetail } from './words'
 import { formatNumber } from '@/lib/format'
 
@@ -66,6 +67,7 @@ export default function TemplatesListV8() {
   const staffRole = useStaffRole()
   const featureAccess = useFeatureAccess('templates')
   const canMutateTemplates = featureAccess
+  const lockedReason = usePermissionLockReason(canMutateTemplates)
   /* 1152 の板（）。フォルダの列は型が畳み、道具の段を2段にする。 */
   const narrow = useNarrowViewport()
 
@@ -772,17 +774,13 @@ export default function TemplatesListV8() {
   ]
 
   const openPicker = () => setPickerOpen(true)
-  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。権限以外の理由（createBlocked）は押せない形のまま。
-  const createButton = (full: boolean) => !canMutateTemplates ? null : (
-    <Button
-      type="button"
-      variant="primary"
+  const createKind = KIND_CARDS.find(card => card.key === activeSection)!
+  const createButton = (full: boolean) => (
+    <Button variant="primary"
+      {...(canMutateTemplates && createBlocked === null ? { href: createKind.href } : { disabled: true })}
       className={full ? 'v8-folder-create w-full' : undefined}
-      disabled={createBlocked !== null}
-      title={createBlocked ?? undefined}
-      onClick={openPicker}
-    >
-      <Plus size={16} aria-hidden="true" />テンプレートを作る
+      lockedReason={lockedReason} title={createBlocked ?? undefined}>
+      <Plus size={16} aria-hidden="true" />{createKind.title}を作る
     </Button>
   )
 
@@ -792,6 +790,7 @@ export default function TemplatesListV8() {
   }
   const folderPanel = (
     <FolderPanel
+      createAction={createButton(true)}
       activeId={selectedCategory}
       onSelect={selectCategory}
       onAddFolder={canMutateTemplates ? () => setFolderDialogOpen(true) : undefined}
@@ -899,7 +898,7 @@ export default function TemplatesListV8() {
 
   /* ===== 一覧の中身（：読込中・読み込めない・空・0件を分ける） ===== */
   const sectionWord = activeSection === 'rich_video' ? 'リッチビデオのテンプレート' : activeSection === 'question' ? '質問のテンプレート' : 'メッセージのテンプレート'
-  const listBody = renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, openPicker, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view })
+  const listBody = renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, createHref: createKind.href, createLabel: createKind.title, lockedReason, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view })
 
   /* ページ送りは型の pagination 枠へ。件数は部品の summary に入れる（絵：左に「26件中 1〜20件」、右に頁。帯の内側は部品の 10・20）。 */
   const showPager = view === 'ready' && filteredTemplates.length > 0
@@ -947,32 +946,20 @@ export default function TemplatesListV8() {
     help: '一斉配信・自動応答・シナリオなどで使う、メッセージのひな形です。直して公開すると、使っている所に反映されます。',
   }
 
-  /* 資産タブ（カルーセル・リッチメッセージ・クーポン・リサーチ）。中身の管理は既存の部品のまま。 */
-  if (!isTemplateSection) {
-    return (
-      <SaveErrorScope errors={saveErrors}><ListPage boardId={narrow ? 'L7zA7C' : 'v19Ivv'} headingSize="regular" {...heading} tabs={tabs} overlays={overlays}>
-        <div className={styles.assetBody}>
-          {canMutateTemplates ? (
-            <BroadcastAssetManager kind={activeSection} onChanged={() => void loadAssetCounts()} />
-          ) : (
-            <>
-              <p className={styles.faintText}>
-                カルーセル・リッチメッセージ・クーポン・リサーチの作成・変更・削除はオーナーと管理者だけができます。一覧の閲覧はこのまま使えます。
-              </p>
-              <StaffAssetList kind={activeSection} />
-            </>
-          )}
-        </div>
-      </ListPage></SaveErrorScope>
-    )
+  if (!isTemplateSection && selectedAccountId) {
+    return <AssetTemplatesList key={`${selectedAccountId}:${activeSection}`} kind={activeSection}
+      accountId={selectedAccountId} tabs={tabs} canMutate={canMutateTemplates}
+      lockedReason={lockedReason} onChanged={() => void loadAssetCounts()} />
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content" createPlacement="heading"
+    <SaveErrorScope errors={saveErrors}><ListPage heightMode="content" tableInset folderWidth={FOLDER_RAIL_WIDTH}
       skeleton
       boardId={narrow ? 'L7zA7C' : 'v19Ivv'}
       headingSize="regular"
       {...heading}
+      actions={activeSection === 'message' ? <Button onClick={openPicker}
+        disabled={!canMutateTemplates} lockedReason={lockedReason}>見本から作る</Button> : undefined}
       tabs={tabs}
       stats={
         /* 数の帯 4つ。並びと間は共有の帯に任せる。 */

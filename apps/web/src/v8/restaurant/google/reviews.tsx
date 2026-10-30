@@ -156,8 +156,8 @@ export function ReviewsBoard({ accountId, data, go, onSynced }: { accountId: str
           <ListToolbarSort aria-label="並び順" value={order} onChange={(value) => { setOrder(value as GoogleReviewOrder); setPage(1) }} options={ORDER_OPTIONS} />
         </>}
       />
-      {connection.status === 'expired' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で再接続</Link>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
-      {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/restaurant-test/google?tab=settings" className={styles.textLink}>設定で接続を確認する</Link>}>この店舗を操作する権限がありません。</Notice> : null}
+      {connection.status === 'expired' ? <Notice tone="danger" action={<Link href="/settings/sns" className={styles.textLink}>SNS連携で再接続</Link>}>Googleとの接続を確認してください（認可切れ）。前回取得した口コミを表示しています。</Notice> : null}
+      {connection.status === 'no_permission' ? <Notice tone="danger" action={<Link href="/settings/sns" className={styles.textLink}>SNS連携で接続を確認する</Link>}>この店舗を操作する権限がありません。</Notice> : null}
       {syncError ? <Notice tone="warn" action={<Button variant="text" disabled={!canEdit} lockedReason={lockedReason} onClick={() => sync()} busy={syncing} busyLabel="取得中…">もう一度</Button>}>{syncError}</Notice> : null}
       {syncing && (list?.total ?? 0) === 0 ? <Notice tone="info">口コミを取得中… すべてのページを取得してから表示します。</Notice> : null}
       {listLoading && !list ? <div className={styles.stateBox}><ListState kind="loading" title="口コミを読み込んでいます" /></div> : null}

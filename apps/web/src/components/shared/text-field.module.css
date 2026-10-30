@@ -156,7 +156,7 @@ html:root .affixed .affixedControl:disabled { opacity: 1; }
  * 前後の固定文字つきの欄は外枠だけに付け、中の入力は透明のまま。
  */
 html:root .field:is(.single, .multi):not(.affixedControl):not([data-look='derived']) {
-  background: var(--gradient-raised-control) var(--color-canvas);
+  background: var(--color-canvas);
   box-shadow: var(--shadow-raised-control);
 }
 html:root .field:is(.single, .multi):not(.affixedControl):not([data-look='derived']):not([aria-invalid='true']):not(:focus-visible):not(:focus-within) {

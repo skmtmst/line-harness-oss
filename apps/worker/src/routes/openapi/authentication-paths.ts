@@ -3,6 +3,24 @@ import { STEP_UP_PURPOSES } from '../../lib/step-up.js';
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const authenticationPaths = {
 
+  '/api/auth/passkeys/login/options': {
+    post: { tags: ['Auth'], summary: '一次認証後のパスキー認証課題を発行', security: [], responses: { '200': { description: '登録済みの場合だけWebAuthn optionsを返す' }, '401': { description: '一次認証が無効' } } },
+  },
+  '/api/auth/passkeys/login/verify': {
+    post: { tags: ['Auth'], summary: 'パスキーを確認してログインを完了', security: [], responses: { '200': { description: '本人セッションを発行' }, '401': { description: '課題またはパスキーが無効' }, '429': { description: '試行回数の上限' } } },
+  },
+
+  '/api/auth/passkeys/self': {
+    get: { tags: ['Auth'], summary: '本人の登録済みパスキー一覧', responses: { '200': { description: '登録日と最終使用日。公開鍵は返さない' }, '403': { description: '本人セッションが必要' } } },
+    delete: { tags: ['Auth'], summary: '本人確認後に本人のパスキーを削除', responses: { '200': { description: '削除済み' }, '401': { description: '再確認が必要' }, '403': { description: '本人セッションが必要' } } },
+  },
+  '/api/auth/passkeys/register/options': {
+    post: { tags: ['Auth'], summary: '本人の登録用WebAuthn課題を発行', responses: { '200': { description: 'WebAuthn options and challenge token' }, '403': { description: '本人セッションが必要' } } },
+  },
+  '/api/auth/passkeys/register/verify': {
+    post: { tags: ['Auth'], summary: '本人確認後にパスキーを登録', responses: { '200': { description: '登録済み' }, '401': { description: '課題または本人確認が無効' }, '403': { description: '本人セッションが必要' } } },
+  },
+
   // ── Email authentication ───────────────────────────────────────────────
   '/api/auth/register/request': {
     post: {

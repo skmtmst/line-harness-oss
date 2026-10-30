@@ -121,7 +121,7 @@ describe('★V8 設定の中のメニュー', () => {
       'はじめの設定',
       'LINEアカウント',
       'プール管理',
-      'ログインユーザー',
+      'ユーザー管理',
       '機能設定',
       '運用状態',
       'EC連携',
@@ -233,7 +233,7 @@ describe('★V8 設定の中のメニュー', () => {
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
     const labels = view.getAllByRole('link').map((link) => link.textContent)
-    expect(labels).not.toContain('ログインユーザー')
+    expect(labels).not.toContain('ユーザー管理')
     expect(labels).not.toContain('LINEアカウント')
     // 必須項目（はじめの設定・機能設定・運用状態）は残る
     expect(labels).toContain('はじめの設定')
@@ -246,7 +246,7 @@ describe('★V8 設定の中のメニュー', () => {
     fixture.pathname = '/staff'
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
-    const link = view.getByRole('link', { name: 'ログインユーザー' })
+    const link = view.getByRole('link', { name: 'ユーザー管理' })
     expect(link.getAttribute('aria-current')).toBe('page')
     expect(view.queryByRole('link', { name: 'LINEアカウント' })).toBeNull()
   })
