@@ -81,7 +81,7 @@ test('読み込んだ人数が全員より少ないときは、黙って切ら�
 test('役割の区別を共通札へ渡し、名前と権限の読み取りを保つ', async () => {
   const roles = ['administrator', 'operations', 'reception', 'view_only', 'custom']
   net.users.mockResolvedValue({ success: true, data: {
-    items: roles.map((roleBundle, index) => ({ ...user(index), roleBundle, lastLoginAt: index === 0 ? new Date().toISOString() : null })),
+    items: roles.map((roleBundle, index) => ({ ...user(index), roleBundle, lastLoginAt: index === 0 ? '2026-09-01T16:30:00.000Z' : null })),
     pagination: { total: roles.length, limit: 200, offset: 0 },
     summary: { active: roles.length, suspended: 0, mfaEnabled: 0, invited: 0 },
   } })
@@ -94,6 +94,11 @@ test('役割の区別を共通札へ渡し、名前と権限の読み取りを�
   expect(screen.getByRole('columnheader', { name: '最終ログイン' })).toBeTruthy()
   expect(table.textContent).toMatch(/\d{2}\/\d{2}/)
   expect(table.textContent).not.toContain('いま')
+  const dated = [...table.querySelectorAll('[role="cell"]')].find(cell => cell.textContent === '09/02')
+  expect(dated).toBeTruthy()
+  expect(dated?.getAttribute('title')).toContain('2026/09/02')
+  expect(dated?.getAttribute('title')).toContain('01:30')
+  expect(table.textContent).not.toContain('最後の操作：')
   await waitFor(() => expect(table.querySelectorAll('[data-role]')).toHaveLength(5))
   const badges = [...table.querySelectorAll('[data-role]')].map(badge => [badge.getAttribute('data-role'), badge.getAttribute('data-tone'), badge.textContent])
   expect(badges).toEqual([

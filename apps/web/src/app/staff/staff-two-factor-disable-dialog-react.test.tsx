@@ -103,7 +103,7 @@ afterEach(() => cleanup())
 it('自分の行の「二段階認証を解除する」で、止まる物と戻し方を書いた確認窓を開く', async () => {
   await act(async () => { render(<StaffPage />) })
   const table = await screen.findByRole('table', { name: 'ユーザーの一覧' })
-  await waitFor(() => expect(within(table).getByText('ログイン中の人')).toBeTruthy())
+  await waitFor(() => expect(within(table).getByRole('button', { name: 'ログイン中の人の中身を見る' })).toBeTruthy())
   fireEvent.click(within(table).getByRole('button', { name: 'ログイン中の人の操作' }))
   fireEvent.click(await screen.findByRole('menuitem', { name: '二段階認証を解除する' }))
   const dialog = await screen.findByRole('dialog', { name: 'ログイン中の人 の二段階認証を解除しますか？' })
