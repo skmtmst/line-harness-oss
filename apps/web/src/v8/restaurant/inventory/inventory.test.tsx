@@ -257,13 +257,13 @@ it('inventory channel read failure does not become no channels',async()=>{
 
 afterEach(() => { verifiedStaffRole(null) })
 
-describe('88 二段の切り替え', () => {
-  it('店の行き来は下線のタブ、中の切り替えは灰の箱の切り替え', async () => {
+describe('予約枠・在庫の切り替え', () => {
+  it('共通タブを外し、画面内の切り替えと座席・卓管理への行き先を保つ', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    // 上の段（店の行き来）だけが下線のタブ。
-    expect(screen.getAllByRole('tablist')).toHaveLength(1)
-    // 下の段（中の切り替え）は箱の切り替え。
+    expect(screen.queryByRole('tablist', {name:'店の中の画面'})).toBeNull()
+    expect(screen.getByRole('link',{name:'座席・卓管理で変える →'}).getAttribute('href')).toBe('/restaurant-test/tables')
+    // 席・枠の配分や予約経路などの切り替えは残す。
     const inner = screen.getByRole('group', { name: '予約枠・在庫の切り替え' })
     expect(within(inner).getAllByRole('button')).toHaveLength(4)
   })

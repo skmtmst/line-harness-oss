@@ -376,10 +376,10 @@ export default function TablesPage() {
   /* ?view=assign：卓の割り当て方（jmVYJ・）。座席表へは［座席表を直す］で戻る。 */
   const assignView=useSearchParams().get('view')==='assign'
   if(assignView) return (
-    <RestaurantShell templateHeading boundary={false} storeTab="tables" boardId="jmVYJ" title="座席・卓管理" description={ctx=>ctx?.store?.name??''} headAfter={(_ctx,picker)=><>{picker}<Button presentation="restaurant" href="/restaurant-test/tables"><MapIcon size={16} aria-hidden="true"/>座席表を直す</Button></>} renderPage={(ctx, heading, notice) => <TablesAssignBoard ctx={ctx} canEdit={canEdit} heading={heading} notice={notice} />} />
+    <RestaurantShell templateHeading boundary={false} boardId="jmVYJ" title="座席・卓管理" description={ctx=>ctx?.store?.name??''} headAfter={(_ctx,picker)=><>{picker}<Button presentation="restaurant" href="/restaurant-test/tables"><MapIcon size={16} aria-hidden="true"/>座席表を直す</Button></>} renderPage={(ctx, heading, notice) => <TablesAssignBoard ctx={ctx} canEdit={canEdit} heading={heading} notice={notice} />} />
   )
   return (
-    <RestaurantShell templateHeading boundary={false} storeTab="tables" boardId="BERxg" title="座席・卓管理" description={ctx=>ctx?.store?.name??''} headAfter={(_ctx,picker)=><>{picker}<Button presentation="restaurant" href="/restaurant-test/tables?view=assign"><Scale size={16} aria-hidden="true"/>卓の割り当て方</Button>{canEdit?<Button presentation="restaurant" variant="primary" onClick={()=>setAddRequest(n=>n+1)}><Plus size={16}/>卓を作る</Button>:null}</>}>
+    <RestaurantShell templateHeading boundary={false} boardId="BERxg" title="座席・卓管理" description={ctx=>ctx?.store?.name??''} headAfter={(_ctx,picker)=><>{picker}<Button presentation="restaurant" href="/restaurant-test/tables?view=assign"><Scale size={16} aria-hidden="true"/>卓の割り当て方</Button>{canEdit?<Button presentation="restaurant" variant="primary" onClick={()=>setAddRequest(n=>n+1)}><Plus size={16}/>卓を作る</Button>:null}</>}>
       {(ctx) => <TablesBoard ctx={ctx} addRequest={addRequest} />}
     </RestaurantShell>
   )

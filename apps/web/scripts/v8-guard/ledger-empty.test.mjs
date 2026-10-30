@@ -4,7 +4,7 @@ import { mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { connectGuardBrowser } from './browser-session.mjs'
 
-const base = process.env.V8_GUARD_BASE || 'http://127.0.0.1:4311'
+const base = process.env.V8_GUARD_BASE || 'http://127.0.0.1:4310'
 const output = process.env.LEDGER_SHOTS
 
 test('予約台帳は卓なし・空き卓・予約ありを区別し、空き卓から予約へ進める', async () => {

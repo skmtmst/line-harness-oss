@@ -319,3 +319,20 @@ describe('予約台帳の初期状態', () => {
     expect(fixture.floors).toHaveBeenCalledTimes(2)
   })
 })
+
+
+it('共通タブを外し、reservationsの画面内操作を保つ', async () => {
+  render(<ReservationsPage />)
+  await screen.findByText('山田 太郎')
+  expect(screen.queryByRole('tablist', {name:'店の中の画面'})).toBeNull()
+})
+
+
+it('電話予約の作成でも共通タブを出さず、戻る操作を保つ', async () => {
+  render(<ReservationsPage />)
+  await screen.findByText('山田 太郎')
+  fireEvent.click(screen.getByRole('button',{name:/電話の予約を入れる/}))
+  await screen.findByText('何を入れますか',{selector:'h2'})
+  expect(screen.queryByRole('tablist',{name:'店の中の画面'})).toBeNull()
+  expect(screen.getByRole('button',{name:'キャンセル',exact:true})).toBeTruthy()
+})
