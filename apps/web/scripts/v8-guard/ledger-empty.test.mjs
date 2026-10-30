@@ -4,6 +4,9 @@ import { mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { connectGuardBrowser } from './browser-session.mjs'
 
+import { stubApi } from './speed-budget.mjs'
+import { mockFetch } from './mock-local.mjs'
+
 const base = process.env.V8_GUARD_BASE || 'http://127.0.0.1:4310'
 const output = process.env.LEDGER_SHOTS
 
@@ -23,25 +26,24 @@ test('予約台帳は卓なし・空き卓・予約ありを区別し、空き�
             }
             for (const [key, value] of Object.entries({ lh_csrf: 'visual-qa-csrf', lh_staff_role: 'owner', lh_staff_name: 'K', lh_staff_permissions: '[]', lh_staff_view_permissions: '[]', lh_selected_account: 'visual-qa-account', lh_auth_selection_cleared: '1' })) localStorage.setItem(key, value)
           })
-          await page.route('**/api/dashboard/style?*', async route => {
-            const response = await route.fetch()
-            const body = await response.json()
-            body.data.style = 'restaurant'
-            body.data.styleSelected = true
-            await route.fulfill({ response, json: body })
-          })
-          await page.route('**/api/restaurant-test/**', async route => {
-            const response = await route.fetch()
-            const body = await response.json()
-            const path = new URL(route.request().url()).pathname
-            if (state !== 'reserved' && path.endsWith('/snapshot')) {
-              body.data.reservations = []
-              body.data.reservationTotal = 0
-              if (state === 'no-tables') body.data.tables = []
+          await stubApi(page, async (method, path) => {
+            const response = await mockFetch(method, path)
+            const body = JSON.parse(response.body)
+            const pathname = new URL(path, 'http://visual-qa.local').pathname
+            if (pathname === '/api/dashboard/style') {
+              body.data.style = 'restaurant'
+              body.data.styleSelected = true
             }
-            if (state !== 'reserved' && path.endsWith('/reservations/day')) body.data.reservations = []
-            if (state === 'no-tables' && path.endsWith('/floors')) body.data = body.data.map(floor => ({ ...floor, tables: [] }))
-            await route.fulfill({ response, json: body })
+            if (pathname.startsWith('/api/restaurant-test/')) {
+              if (state !== 'reserved' && pathname.endsWith('/snapshot')) {
+                body.data.reservations = []
+                body.data.reservationTotal = 0
+                if (state === 'no-tables') body.data.tables = []
+              }
+              if (state !== 'reserved' && pathname.endsWith('/reservations/day')) body.data.reservations = []
+              if (state === 'no-tables' && pathname.endsWith('/floors')) body.data = body.data.map(floor => ({ ...floor, tables: [] }))
+            }
+            return { ...response, body: JSON.stringify(body) }
           })
           await page.goto(`${base}/restaurant-test/reservations`, { waitUntil: 'networkidle' })
           await page.locator('[data-reservation-board]').waitFor()

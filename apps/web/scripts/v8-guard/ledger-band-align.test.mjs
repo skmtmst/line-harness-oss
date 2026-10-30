@@ -1,6 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { connectGuardBrowser } from './browser-session.mjs'
+import { stubApi } from './speed-budget.mjs'
+import { mockFetch } from './mock-local.mjs'
+import { styleDashboardMock } from '../../../../scripts/visual-qa/style-dashboard-mock.mjs'
 import scan from './ledger-band-align-browser.mjs'
 
 /* 予約台帳の数の帯：左右の端を下の段（盤＋右の列）と±2pxで合わせる。 */
@@ -11,6 +14,8 @@ test('予約台帳の数の帯の左右端は下の段と±2pxで一致する', 
       const baseUrl = process.env.V8_GUARD_BASE || 'http://127.0.0.1:4310'
       const page = await browser.newPage({ viewport: { width, height: 900 }, reducedMotion: 'reduce' })
       try {
+        styleDashboardMock('PUT', '/api/dashboard/style', new URLSearchParams(), { style: 'restaurant' })
+        await stubApi(page, mockFetch)
         await page.addInitScript(() => {
           for (const [key, value] of Object.entries({ lh_csrf: 'visual-qa-csrf', lh_staff_role: 'owner', lh_staff_name: 'K', lh_staff_permissions: '[]', lh_staff_view_permissions: '[]', lh_selected_account: 'visual-qa-account', lh_auth_selection_cleared: '1' })) localStorage.setItem(key, value)
         })
