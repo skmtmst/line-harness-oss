@@ -1,6 +1,7 @@
-import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { jstCalendar as japanCalendar, expectedRestaurantMenuItemOrder, RESTAURANT_OPTIONAL_ITEM_IDS } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { inputError } from '../lib/input-errors.js';
+import { cleanStringArray } from './feature-settings-definition-collect-feature-impact.js';
 
 import { auditDeviceFamily, auditEventStatement, getAccountSetting, getVersionedAccountSetting, maskAuditIp, setAccountSetting } from '@line-crm/db';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
@@ -83,6 +84,8 @@ export const get__api_settings_features_2 = async (c: Context<Env, "/api/setting
         featureStates,
         sidebarOrder: state.sidebarOrder,
         sidebarItemOrder: state.sidebarItemOrder,
+        favoriteItemIds: state.favoriteItemIds ?? [],
+        restaurantHiddenItemIds: state.restaurantHiddenItemIds ?? [],
         version: state.version,
         parentChildMode: settingIsEnabled(parentChildRaw),
         specializedFeatureKeys: specializedCatalog(specializedRaw),
@@ -190,11 +193,16 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
       return c.json({ success: false, error: 'Forbidden' }, 403);
     }
     const restaurantEnabled = await restaurantEffectivelyEnabledForTenant(c);
+    const accountStyle = await c.env.DB.prepare('SELECT style FROM account_styles WHERE line_account_id=?')
+      .bind(accountId).first<{ style: string }>();
+    const restaurantStyle = accountStyle?.style === 'restaurant';
 
     const body = await c.req.json<{
       features?: Record<string, unknown>;
       sidebarOrder?: unknown;
       sidebarItemOrder?: unknown;
+      favoriteItemIds?: unknown;
+      restaurantHiddenItemIds?: unknown;
       catalog?: unknown;
       expectedVersion?: unknown;
       impactToken?: unknown;
@@ -236,8 +244,11 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
     }
 
     let sidebarOrder: string[] | null | undefined;
+    if (restaurantStyle && (body.features?.restaurant_test === false || body.features?.visit_stamps === false)) {
+      return inputError(c, { success: false, error: 'メインの予約台帳と来店スタンプはオフにできません' }, 400, ["features"]);
+    }
     if (body.sidebarOrder !== undefined) {
-      sidebarOrder = cleanSidebarOrderStrict(body.sidebarOrder);
+      sidebarOrder = cleanSidebarOrderStrict(body.sidebarOrder, restaurantStyle);
       if (!sidebarOrder) {
         return inputError(c, {
           success: false,
@@ -259,7 +270,7 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
         : new Set(specializedCatalog(
             await getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY),
           ));
-      sidebarItemOrder = cleanItemOrderStrict(body.sidebarItemOrder, specializedKeys);
+      sidebarItemOrder = cleanItemOrderStrict(body.sidebarItemOrder, specializedKeys, restaurantStyle);
       if (!sidebarItemOrder) {
         return inputError(c, {
           success: false,
@@ -268,9 +279,33 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
       }
     }
 
+    let favoriteItemIds: string[] | undefined;
+    if (body.favoriteItemIds !== undefined) {
+      const favorites = cleanStringArray(body.favoriteItemIds);
+      const allowed = expectedRestaurantMenuItemOrder(new Set(specializedCatalog(
+        await getAccountSetting(c.env.DB, accountId, SPECIALIZED_CATALOG_KEY),
+      )));
+      const knownIds = new Set(Object.values(allowed).flat());
+      if (!restaurantStyle || !favorites || new Set(favorites).size !== favorites.length
+        || favorites.some((id) => !knownIds.has(id))) {
+        return inputError(c, { success: false, error: 'お気に入りに指定できない項目があります' }, 400, ["favoriteItemIds"]);
+      }
+      favoriteItemIds = favorites;
+    }
+    let restaurantHiddenItemIds: string[] | undefined;
+    if (body.restaurantHiddenItemIds !== undefined) {
+      const hidden = cleanStringArray(body.restaurantHiddenItemIds);
+      if (!restaurantStyle || !hidden || hidden.some((id) => !(RESTAURANT_OPTIONAL_ITEM_IDS as readonly string[]).includes(id))) {
+        return inputError(c, { success: false, error: '飲食店メニューに指定できない項目があります' }, 400, ["restaurantHiddenItemIds"]);
+      }
+      restaurantHiddenItemIds = hidden;
+    }
+
     const hasBundleUpdate = body.features !== undefined
       || body.sidebarOrder !== undefined
-      || body.sidebarItemOrder !== undefined;
+      || body.sidebarItemOrder !== undefined
+      || body.favoriteItemIds !== undefined
+      || body.restaurantHiddenItemIds !== undefined;
 
     /*
      * 変更理由の必須化。あとから「なぜ変えたか」を追えるよう、
@@ -405,6 +440,8 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
           sidebarItemOrder: sidebarItemOrder === undefined
             ? current.sidebarItemOrder
             : sidebarItemOrder,
+          favoriteItemIds: favoriteItemIds === undefined ? current.favoriteItemIds ?? [] : favoriteItemIds,
+          restaurantHiddenItemIds: restaurantHiddenItemIds === undefined ? current.restaurantHiddenItemIds ?? [] : restaurantHiddenItemIds,
         },
       });
       const now = japanCalendar()
@@ -469,6 +506,8 @@ export const put__api_settings_features_4 = async (c: Context<Env, "/api/setting
         sidebarItemOrder: sidebarItemOrder === undefined
           ? current.sidebarItemOrder
           : sidebarItemOrder,
+        favoriteItemIds: favoriteItemIds === undefined ? current.favoriteItemIds ?? [] : favoriteItemIds,
+        restaurantHiddenItemIds: restaurantHiddenItemIds === undefined ? current.restaurantHiddenItemIds ?? [] : restaurantHiddenItemIds,
       };
       statements.push(auditEventStatement(
         c.env.DB,

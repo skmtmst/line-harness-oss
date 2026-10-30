@@ -31,11 +31,15 @@ export type FeatureSettingsData = {
   features: Record<string, boolean>;
   sidebarOrder: string[] | null;
   sidebarItemOrder: Record<string, string[]> | null;
+  favoriteItemIds?: string[];
+  restaurantHiddenItemIds?: string[];
 };
 
 export type FeatureSettingsState = FeatureSettingsData & { version: number };
 
 export type FeatureVisibilityData = {
+  favoriteItemIds: string[];
+  restaurantHiddenItemIds: string[];
   /**
    * サイドバーに項目を出せるかだけを返す。会社の保存値、契約、依存理由は
    * 管理情報なので、一般staff向けの応答へ混ぜない。
