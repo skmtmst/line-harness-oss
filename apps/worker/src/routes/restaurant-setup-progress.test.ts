@@ -67,3 +67,15 @@ it('店に絞られたアカウントから同じ統括の別店舗を読ませ�
  expect((await request('store-yokohama', '', 'account-2')).status).toBe(404);
  expect((await request('store-ginza', '', 'account-2')).status).toBe(200);
 });
+
+it('未確認・使わない保存・送り方オンの根拠を同じ店舗の初期設定へ返す', async () => {
+  expect(await progress()).toMatchObject({ followupSetup: { notUsing: false, decidedAt: null, version: 0, anyEnabled: false } });
+  database.raw.exec(`INSERT INTO rt_store_followup_preferences(store_id,not_using,decided_at,decided_by)
+    VALUES('store-ginza',1,'2026-10-31T00:00:00Z','owner')`);
+  expect(await progress()).toMatchObject({ followupSetup: { notUsing: true, version: 1, anyEnabled: false } });
+  expect(await progress('store-yokohama')).toMatchObject({ followupSetup: { notUsing: false, version: 0, anyEnabled: false } });
+  database.raw.exec(`INSERT INTO automation_definitions(id,line_account_id,name) VALUES('setup-target','account-2','お礼');
+    INSERT INTO rt_store_followup_targets(store_id,trigger,engine,automation_id,enabled)
+    VALUES('store-ginza','post_visit','automation','setup-target',1)`);
+  expect(await progress()).toMatchObject({ followupSetup: { notUsing: false, decidedAt: null, version: 2, anyEnabled: true } });
+});
