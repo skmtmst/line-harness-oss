@@ -82,6 +82,13 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     expect(withoutDesign.some((group) => group.id === 'specialized')).toBe(false)
   })
 
+  it('共通の機能設定からLINE通知を隠す', () => {
+    for (const keys of [[], ['line_notifications']]) {
+      const groups = visibleFeatureGroups({ specializedFeatureKeys: keys })
+      expect(groups.flatMap((group) => group.items).some((item) => item.id === 'line-notifications')).toBe(false)
+    }
+  })
+
   it('画面のスイッチとサイドメニュー項目が対応している', () => {
     expect(SIDEBAR_FEATURE_BY_HREF['/scenarios']).toBe('scenarios')
     expect(SIDEBAR_FEATURE_BY_HREF['/webinars']).toBe('webinars')

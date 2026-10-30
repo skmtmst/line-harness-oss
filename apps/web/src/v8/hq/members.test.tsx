@@ -113,7 +113,7 @@ describe('V8 統括のメンバーの窓', () => {
     expect(create).toHaveBeenCalledTimes(1)
     expect(create.mock.calls[0][0]).toEqual(expect.objectContaining({
       name: '新井 一郎', email: 'arai@example.com', role: 'viewer',
-      accountScope: 'all', scopedLineAccountIds: [], assignedLineAccountId: 'acc-1',
+      accountScope: 'all', scopedLineAccountIds: [], assignedLineAccountId: null,
     }))
   })
 
@@ -138,6 +138,7 @@ describe('V8 統括のメンバーの窓', () => {
     await act(async () => { buttonByText('権限を変更する')!.click() })
     await flush()
     expect(dialogTitles()).toEqual(['メンバーの権限を変更する'])
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('担当するアカウントだけを見て操作できます。')
     // 担当者のまま。状態だけ無効にする。
     const inactive = Array.from(document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="radio"]')).find((r) => r.value === 'inactive')!
     await act(async () => { inactive.click() })
@@ -159,6 +160,9 @@ describe('V8 統括のメンバーの窓', () => {
     const body = update.mock.calls[0][1] as Record<string, unknown>
     expect(body).not.toHaveProperty('role')
     expect(body.isActive).toBe(false)
+    expect(body).toEqual(expect.objectContaining({
+      assignedLineAccountId: 'acc-1', accountScope: 'accounts', scopedLineAccountIds: ['acc-1'],
+    }))
   })
 
   it('WEB216：統括（owner）の状態だけを変えても、役割（owner→admin）を送らない', async () => {

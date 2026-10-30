@@ -4,11 +4,9 @@ import { canManageRole } from '@/lib/staff-role'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import { Field } from '@/components/shared/form-controls'
 import { useEffect, useId, useState, type ReactNode } from 'react'
-import { MessageCircle, Send, ShieldCheck } from 'lucide-react'
-import type { LineAccount, StaffMember } from '@line-crm/shared'
+import { Send, ShieldCheck } from 'lucide-react'
+import type { StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import { EntityPickerField } from '@/components/shared/entity-picker'
-import { toHqAccountItems, toPickerFolders, useHqAccountFolders } from '@/components/shared/hq-account-picker'
 import Dialog from '@/components/shared/dialog'
 import { Field as FormField, FieldError } from '@/components/shared/form-controls'
 import { focusFieldById } from '@/lib/use-form-errors'
@@ -21,15 +19,14 @@ import head from './dialog-head.module.css'
 import styles from './member-dialog.module.css'
 import { inviteRequirements } from './member-requirements'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
-import { folderDisplayColor } from '@/components/shared/folder-dot'
 
 
 /*
  * ★V8 統括のメンバーの窓（Pencil  権限者を招待・ 権限を変更する・ 変える前の確認）。
  *
  * 読み書きの中身は 管理画面（components/hq/members/member-dialog.tsx）と同じ：
- *   招待＝名前・メール・役割・担当範囲・最初に表示するアカウント
- *   変更＝役割・担当範囲・最初に表示するアカウント・状態（名前とメールは本人が持つ）
+ *   招待＝名前・メール・役割・担当範囲
+ *   変更＝役割・担当範囲・状態（名前とメールは本人が持つ）
  * 見た目だけを絵どおりに組んだ：幅 620・上から 110 の窓、欄は全幅で縦に並べ、担当範囲と状態は
  * 行内のラジオ、担当するアカウントは専用の窓で選び、下の帯は線の下で真ん中寄せ。
  * 窓の枠・×・題は共通の Dialog、頭の寸法は dialog-head.module.css。
@@ -47,7 +44,6 @@ export type MemberDialogValue = {
   name: string
   email: string
   role: MemberRole
-  assignedLineAccountId: string
   accountScope: 'all' | 'accounts'
   scopedLineAccountIds: string[]
   isActive: boolean
@@ -61,7 +57,7 @@ export function inviteExpiryLabel(now: Date = new Date()): string {
   return polishFormatDate(new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), { style: 'detail', now })
 }
 
-function initial(member: StaffMember | null, accounts: LineAccount[]): MemberDialogValue {
+function initial(member: StaffMember | null): MemberDialogValue {
   return {
     name: member?.name ?? '',
     email: member?.email ?? '',
@@ -70,10 +66,9 @@ function initial(member: StaffMember | null, accounts: LineAccount[]): MemberDia
      * 変更は今の役割のまま（互換経路は担当者を管理者に置き換えていた）。
      */
     role: member ? (member.role === 'viewer' ? 'viewer' : member.role === 'staff' ? 'staff' : 'admin') : 'viewer',
-    assignedLineAccountId: member?.assignedLineAccountId ?? accounts[0]?.id ?? '',
-    /* 招待は「指定したアカウントだけ」＋最初に表示するアカウントから始める。 */
-    accountScope: 'all',
-    scopedLineAccountIds: [],
+    /* 統括からの新規招待は全体権限。既存メンバーの編集では保存済みの範囲を保つ。 */
+    accountScope: member?.accountScope ?? 'all',
+    scopedLineAccountIds: member?.scopedLineAccountIds ?? [],
     isActive: member?.isActive ?? true,
   }
 }
@@ -85,7 +80,6 @@ export default function MemberDialogV8({
   open,
   session,
   member,
-  accounts,
   isSelf,
   busy,
   error,
@@ -100,7 +94,6 @@ export default function MemberDialogV8({
   session: number
   /** 変えるとき。招待は null。 */
   member: StaffMember | null
-  accounts: LineAccount[]
   /** 自分自身を変えるとき。役割と状態は触らせない（自分の管理者権限を外す事故を防ぐ）。 */
   isSelf?: boolean
   busy?: boolean
@@ -109,23 +102,21 @@ export default function MemberDialogV8({
   onCancel: () => void
 }) {
   const uid = useId()
-  const [value, setValue] = useState<MemberDialogValue>(initial(member, accounts))
+  const [value, setValue] = useState<MemberDialogValue>(initial(member))
   const [localError, setLocalError] = useState('')
-  const accountFolders = useHqAccountFolders(open)
   /* 板 ：名前・メールの間違いは欄の下に赤で出し、直すまで送るボタンを押せなくする。 */
-  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; scope?: string; assigned?: string }>({})
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; email?: string; scope?: string }>({})
 
   useEffect(() => {
-    setValue(initial(member, accounts))
+    setValue(initial(member))
     setLocalError('')
     setFieldErrors({})
-  }, [session, member, accounts])
+  }, [session, member])
 
   const set = <K extends keyof MemberDialogValue>(key: K, next: MemberDialogValue[K]) => {
     setValue((v) => ({ ...v, [key]: next }))
-    const field: 'name' | 'email' | 'scope' | 'assigned' | null = key === 'name' || key === 'email' ? key
-      : key === 'scopedLineAccountIds' || key === 'accountScope' ? 'scope'
-        : key === 'assignedLineAccountId' ? 'assigned' : null
+    const field: 'name' | 'email' | 'scope' | null = key === 'name' || key === 'email' ? key
+      : key === 'scopedLineAccountIds' || key === 'accountScope' ? 'scope' : null
     if (field) setFieldErrors((errors) => (errors[field] ? { ...errors, [field]: undefined } : errors))
   }
 
@@ -135,10 +126,9 @@ export default function MemberDialogV8({
       name: member ? undefined : inviteRequirements.name.check(value.name) ?? undefined,
       email: member ? undefined : inviteRequirements.email.check(value.email) ?? undefined,
       scope: value.accountScope === 'accounts' && value.scopedLineAccountIds.length === 0 ? '担当するアカウントを1つ以上選んでください' : undefined,
-      assigned: !member && !value.assignedLineAccountId ? '最初に表示するアカウントを選んでください' : undefined,
     }
     setFieldErrors(errors)
-    const first = (['name', 'email', 'scope', 'assigned'] as const).find((key) => errors[key])
+    const first = (['name', 'email', 'scope'] as const).find((key) => errors[key])
     if (first) {
       setLocalError('')
       focusFieldById(`${uid}-${first}`)
@@ -156,11 +146,6 @@ export default function MemberDialogV8({
     ...(member?.role === 'staff' ? [{ value: 'staff', label: '担当者（担当範囲のアカウントだけ）' }] : []),
     { value: 'viewer', label: '閲覧のみ（見るだけ）' },
   ]
-  const accountItems = toHqAccountItems(accounts, accountFolders).map((item) => {
-    const folder = accountFolders.membership?.get(item.id)?.folder
-    return { ...item, color: folder ? folderDisplayColor(folder) : undefined }
-  })
-  const folders = toPickerFolders(accountFolders.folders)
 
   return (
     <Dialog
@@ -225,21 +210,9 @@ export default function MemberDialogV8({
 
         <div className={styles.group} role="group" aria-labelledby={`${uid}-scope-label`}>
           <span id={`${uid}-scope-label`} className={styles.label}>担当範囲</span>
-          <p className={styles.note}>統括のすべてのアカウントを見て操作できます。</p>
+          <p className={styles.note}>{value.accountScope === 'all' ? '統括のすべてのアカウントを見て操作できます。' : 'この権限者は担当するアカウントだけを見て操作できます。'}</p>
           <FieldError id={`${uid}-scope-error`}>{fieldErrors.scope}</FieldError>
         </div>
-
-        <Field label="最初に表示するアカウント" htmlFor={`${uid}-assigned`}>
-          <SaveErrorField names={["assignedLineAccountId","value.assignedLineAccountId","assigned_line_account_id","value.assigned_line_account_id"]}><EntityPickerField
-            label="最初に表示するアカウント" noun="アカウント" icon={MessageCircle} items={accountItems} folders={folders} foldersFailed={accountFolders.failed}
-            id={`${uid}-assigned`}
-            value={value.assignedLineAccountId}
-            disabled={busy}
-            invalid={Boolean(fieldErrors.assigned)}
-            onChange={(next) => set('assignedLineAccountId', next)}
-          /></SaveErrorField>
-          <FieldError id={`${uid}-assigned-error`}>{fieldErrors.assigned}</FieldError>
-        </Field>
 
         {member ? (
           <div className={styles.group} role="radiogroup" aria-labelledby={`${uid}-active-label`}>

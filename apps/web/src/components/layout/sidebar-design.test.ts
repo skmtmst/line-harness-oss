@@ -50,7 +50,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
   },
   { section: '自動化', items: ['オートメーション', '外部連携'] },
   // 2026-09-16（Masato の決定）: 専用機能は「会員／投稿／NEN配信」。写真審査は「投稿」に改名。
-  // EC連携・LINE通知は「ECとLINEをつなぐ配管の点検口」なので「設定」へ移した。
+  // EC連携は「ECとLINEをつなぐ配管の点検口」なので「設定」へ移した。
   // 2026-09-16 採用（★管理画面 37-3／37-4）: 会員の次に「マイペット」「健康日記」。
   { section: '専用機能', items: ['会員', 'マイペット', '健康日記', '投稿', 'NEN配信'] },
   // D-3: 店舗の追加・設定・一覧は統括へ集約し、店舗側の重複導線を戻さない。
@@ -60,7 +60,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
     LINEアカウントはその段1の飛び先。LINEアカウントは要件 管理画面-33 §5-3。
     **統括の店舗管理（/hq）とは別**で、送受信に使う LINE公式アカウントそのものの設定。
   */
-  { section: '設定', items: ['はじめの設定', 'LINEアカウント', 'プール管理', 'ログインユーザー', '機能設定', '運用状態', 'EC連携', 'LINE通知'] },
+  { section: '設定', items: ['はじめの設定', 'LINEアカウント', 'プール管理', 'ログインユーザー', '機能設定', '運用状態', 'EC連携'] },
   {
     section: '飲食店向け（テスト）',
     items: [
@@ -129,7 +129,6 @@ const ROUTES: Record<string, string> = {
   // 統合すると書いているので、そちらに合わせている。
   投稿: '/nen-members',
   EC連携: '/ec-commerce',
-  LINE通知: '/line-notifications',
   はじめの設定: '/getting-started',
   LINEアカウント: '/accounts',
   プール管理: '/pools',
@@ -174,8 +173,8 @@ describe('サイドバーが V8の共通メニューの契約と一致する', (
     const total = actual.reduce((sum, s) => sum + s.items.length, 0);
     // 2026-10-07 提案 E-7: 「予約」の組に「来店スタンプ」を足して 49。
     // 2026-10-09 承認（デリバリー受注_v02.pen）: 「飲食店向け（テスト）」に
-    // 「デリバリー受注」を足して 50。
-    expect(total).toBe(50);
+    // 「デリバリー受注」を足して 50。その後 LINE通知を共通設定から隠して 49。
+    expect(total).toBe(49);
   });
 
   it('項目の行き先が仕様どおり', () => {
