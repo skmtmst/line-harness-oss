@@ -90,15 +90,6 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.linkAction {
-  color: var(--color-action);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: normal;
-}
-.linkAction:hover {
-  text-decoration: underline;
-}
 
 .muted {
   margin: 0;

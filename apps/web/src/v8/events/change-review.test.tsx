@@ -71,4 +71,10 @@ describe('イベント変更の入力確認', () => {
     expect(screen.getByRole('alert').textContent).toBe('終了日時は開始日時より後にしてください')
     expect(apply).not.toHaveBeenCalled()
   })
+
+  it('ID69: 会場・URLの変える操作は押せる形（text）', () => {
+    render(<ChangeReview />)
+    /* 直す前の素のbuttonだと data-variant が無く落ちる。 */
+    expect(screen.getByRole('button', { name: '会場・オンラインの URL も変える' }).getAttribute('data-variant')).toBe('text')
+  })
 })
