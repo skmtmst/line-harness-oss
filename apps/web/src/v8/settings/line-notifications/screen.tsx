@@ -1247,7 +1247,7 @@ function LineNotificationsPage() {
       <Notice tone="danger" className={styles.minorNoticePlacement} >{isForbiddenOrRateLimited(operatorCountError)
           ? loadFailureNotice(operatorCountError, '運用者へのお知らせ')
           : '運用者へのお知らせの件数を読み込めませんでした。'}
-        <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度読み込む</button></Notice>
+        <Button variant="text" size="inline" type="button" onClick={() => void load()} data-notice-inline-action>もう一度読み込む</Button></Notice>
     ) : null}
     {staffRole !== null && !canChange && expandedSetting === null ? <section className={styles.viewerBand} aria-label="操作権限の案内">
       {staffRole === 'viewer' && manageLockReason !== PERMISSION_LOCK_REASON.impersonation

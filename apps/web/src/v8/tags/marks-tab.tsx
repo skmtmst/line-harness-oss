@@ -541,9 +541,9 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       >
         {actionError ? (
           <Notice tone="danger" >{actionError}{retryOrder ? (
-              <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
+              <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</Button>
             ) : (
-              <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
+              <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => { setActionError(''); void load() }}>状態を確認する</Button>
             )}</Notice>
         ) : null}
         <RefreshCover refreshing={status === 'loading' && loaded}>{table}</RefreshCover>

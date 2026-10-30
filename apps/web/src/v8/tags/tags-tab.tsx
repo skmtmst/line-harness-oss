@@ -667,7 +667,7 @@ export default function TagsTab({
       <FolderPanelNote>フォルダを消しても、中のタグは未分類に残ります</FolderPanelNote>
       {folderError ? (
         <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}
-          <button type="button" onClick={() => void load()} className={styles.inlineRetry}>もう一度</button></Notice>
+          <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void load()}>もう一度</Button></Notice>
       ) : null}
     </>
   )
@@ -851,7 +851,7 @@ export default function TagsTab({
         </ListToolbarRow></ListToolbarFrame>}
       >
         {actionError ? (
-          <Notice tone="danger" >{actionError}<button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button></Notice>
+          <Notice tone="danger" >{actionError}<Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => { setActionError(''); void load() }}>状態を確認する</Button></Notice>
         ) : null}
         <RefreshCover refreshing={status === 'loading' && loaded}>{table}</RefreshCover>
       </ListPageBody>

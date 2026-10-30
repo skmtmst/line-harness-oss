@@ -1,4 +1,5 @@
 'use client'
+import SharedButton from '@/components/shared/button'
 import { formatYen as yen } from '@line-crm/shared';
 
 import Notice from '@/components/shared/notice'
@@ -135,7 +136,7 @@ export default function SeriesScopeDialog({ open, mode, accountId, target, newSt
             note={changing ? `${dayOf(target.startsAt)} から ${dayOf(last)} まで ${newTime} に変える。埋まっている回は前のまま` : `${dayOf(target.startsAt)} から ${dayOf(last)} まで取り消す。繰り返しはここで終わる`} />
         </RadioCardGroup>
         <h3 className={styles.heading}>{changing ? (items && count !== items.length ? `変わる日（${formatNumber(items.length)} 件のうち ${formatNumber(count)} 件）` : `変わる日（${items?.length ?? '…'} 件）`) : `取り消す日（${items?.length ?? '…'} 件）`}</h3>
-        {loadError ? <Notice tone="danger">対象の日とキャンセル料の見込みを確認できませんでした。<button type="button" className={styles.retry} onClick={() => setRetry((n) => n + 1)}>もう一度</button></Notice> : null}
+        {loadError ? <Notice tone="danger">対象の日とキャンセル料の見込みを確認できませんでした。<SharedButton variant="text" size="inline" data-notice-inline-action type="button" onClick={() => setRetry((n) => n + 1)}>もう一度</SharedButton></Notice> : null}
         {!loadError ? <DataTable aria-busy={!items}>
           <thead><Tr><Th>日</Th><Th>{changing ? '前' : '時間'}</Th><Th>{changing ? '後' : 'キャンセル料'}</Th></Tr></thead>
           <tbody>

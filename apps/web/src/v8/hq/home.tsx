@@ -51,6 +51,7 @@ import TagOverflow from '@/components/shared/tag-overflow';
 import TruncatedText from '@/components/shared/truncated-text';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { type StatusFilter, type View, UNFILED, ALL, STATUS_FILTERS, SORT_OPTIONS, PAGE_SIZES, isArchived, matchesStatus, statusOf, accountMeta } from "./home-gap-parts"
 export default function HqHomeV8() {
   const saveErrors = useSaveFormErrors()
@@ -64,6 +65,7 @@ export default function HqHomeV8() {
    */
   const readOnlyImpersonation = readSessionSnapshot()?.impersonation?.mode === 'read'
   const canManage = !readOnlyImpersonation && (canManageRole(role))
+  const manageLockReason = usePermissionLockReason(canManage, 'tenantWide')
   const isOwner = !readOnlyImpersonation && role === 'owner'
   const { accounts: shellAccounts, setSelectedAccountId, refreshAccounts } = useAccount()
   const [snapshotAccounts, setAccounts] = useState<AccountWithStats[]>([])
@@ -589,7 +591,7 @@ export default function HqHomeV8() {
                 {warned ? (() => {
                   const reason = connectionReasonLine(account)
                   return <Notice tone="warn" compact title={reason.title} message={reason.text}
-                    action={canManage ? <button type="button" onClick={() => void refreshConnectionInfo(account)} disabled={checkingConnections} className={styles.linkButton}>更新する</button> : undefined}
+                    action={<Button variant="text" size="inline" data-notice-inline-action type="button" lockedReason={manageLockReason} onClick={() => void refreshConnectionInfo(account)} disabled={!canManage || checkingConnections}>更新する</Button>}
                   />
                 })() : null}
               </Card>
