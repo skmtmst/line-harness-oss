@@ -52,9 +52,14 @@ describe('最初の1通が届いた時の窓', () => {
     expect(waitingForFirstMessage(steps({}))).toBe(false)
   })
 
-  it('閲覧のみには読み直しも窓も出さない', () => {
+  it('閲覧のみは状態を1回読み、自動の読み直しと窓を出さない', async () => {
+    net.progress.mockResolvedValue({success:true,data:{steps:KEYS.map(key=>({key,state:key==='firstMessage'?'todo':'done',href:'/getting-started',reason:null})),firstRun:null,starter:null}})
+    const timer = vi.spyOn(window,'setInterval')
     const { result } = renderHook(() => useFirstSteps('a', 'viewer', { qrOpen: true }))
-    expect(net.progress).not.toHaveBeenCalled()
+    await waitFor(() => expect(result.current.summary).not.toBeNull())
+    expect(net.progress).toHaveBeenCalledTimes(1)
+    expect(timer.mock.calls.filter(([, delay]) => delay === 10_000)).toHaveLength(0)
+    timer.mockRestore()
     expect(result.current.arrived).toBe(false)
   })
 
@@ -92,9 +97,9 @@ describe('最初の1通が届いた時の窓', () => {
     await waitFor(() => expect(screen.getByText('止めています')).toBeTruthy())
     expect(screen.queryByText(/読まれ/)).toBeNull()
     const next = screen.getAllByRole('link', { name: '開く' }).map((link) => link.getAttribute('href'))
-    expect(next).toEqual(['/restaurant-test/tables', '/restaurant-test/inventory'])
+    expect(next).toEqual(['/restaurant-test/tables', '/restaurant-test/inventory#rs-hours-title', '/restaurant-test/inventory', '/restaurant-test/line-followup'])
     expect(screen.queryByText('コースとメニューを登録する')).toBeNull()
-    expect(next).toHaveLength(2)
+    expect(next).toHaveLength(4)
     for (const button of screen.getAllByRole('button', { name: '閉じる' })) fireEvent.click(button)
     expect(onClose).toHaveBeenCalled()
     expect(net.dismiss).not.toHaveBeenCalled()

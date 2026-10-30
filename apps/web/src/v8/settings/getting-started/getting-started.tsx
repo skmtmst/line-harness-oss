@@ -63,7 +63,7 @@ export default function GettingStartedV8() {
       <SettingsPage layout="accounts" heightMode="content"
         boardId="xuJ7D"
         title="はじめの設定"
-        help="musubo を使いはじめるまでの6つの手順です。上から順に進めると、最初の1通が届くまでたどり着けます。"
+        help="musubo を使いはじめるまでの手順です。選んだスタイルに合わせて、残りの設定を確認できます。"
         navigation={<SettingsInnerNav inline />}
         notice={<>{role === 'viewer' ? <ReadOnlyNotice /> : null}{profile.stale ? <Notice tone="warn">{STALE_STYLE_TEXT}</Notice> : null}</>}
       >

@@ -4520,6 +4520,7 @@
   },
   "rt_store_followup_rows": {"category":"purge","scope":{"by":"parent","column":"store_id","parent":"rt_stores","parentColumn":"id"}},
   "rt_store_followup_targets": {"category":"purge","scope":{"by":"parent","column":"store_id","parent":"rt_stores","parentColumn":"id"}},
+  "rt_store_followup_preferences": {"category":"purge","scope":{"by":"parent","column":"store_id","parent":"rt_stores","parentColumn":"id"}},
   "rt_store_followup_templates": {
     "category": "purge",
     "scope": {

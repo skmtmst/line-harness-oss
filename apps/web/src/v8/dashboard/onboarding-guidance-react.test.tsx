@@ -174,22 +174,31 @@ it('基本6段と使い方の進捗を分け、畳んでも後回しの設定操
   expect(window.localStorage.getItem('lh:v8:first-steps-folded:A')).toBe('0')
 })
 
-it('基本が全完了で後回しの設定行が無ければ案内カードを出さない', async () => {
+it('基本が全完了で後回しの設定行が無ければ済みの1行へ畳む', async () => {
   net.progress.mockResolvedValue(basic(true)); net.style.mockResolvedValue(style(false))
   render(<DashboardV8 />)
   await waitFor(() => { expect(net.progress).toHaveBeenCalledTimes(1); expect(net.style).toHaveBeenCalledTimes(1) })
   await act(async () => { await Promise.resolve() })
-  expect(screen.queryByRole('heading', { name: 'はじめにやること', exact: true })).toBeNull()
-  expect(screen.queryByRole('progressbar')).toBeNull()
+  expect(screen.getByRole('heading', { name: 'はじめにやること', exact: true })).toBeTruthy()
+  expect(within(guide()).getByText('6 / 6 済み')).toBeTruthy()
+  expect(within(guide()).queryByRole('list')).toBeNull()
+  expect(screen.getByRole('progressbar', {name:'はじめにやることの進み'})).toBeTruthy()
 })
 
-it.each(['viewer', 'staff', null])('役割%sには設定操作と初期案内GETを出さない', async role => {
+it.each(['viewer', 'staff', null])('役割%sは許可された状態だけ読み、使い方の変更を出さない', async role => {
   net.role = role
   render(<DashboardV8 />)
   await act(async () => { await Promise.resolve() })
-  expect(screen.queryByRole('heading', { name: 'はじめにやること', exact: true })).toBeNull()
+  if (role === null) {
+    expect(screen.queryByRole('heading', { name: 'はじめにやること', exact: true })).toBeNull()
+    expect(net.progress).not.toHaveBeenCalled()
+  } else {
+    expect(await screen.findByRole('heading', { name: 'はじめにやること', exact: true })).toBeTruthy()
+    expect(net.progress).toHaveBeenCalledTimes(1)
+    if (role === 'viewer') expect(within(guide()).queryAllByRole('link')).toHaveLength(0)
+  }
   expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
-  expect(net.progress).not.toHaveBeenCalled(); expect(net.style).not.toHaveBeenCalled()
+  expect(net.style).not.toHaveBeenCalled()
   expect(net.warnings).not.toHaveBeenCalled(); expect(net.items).not.toHaveBeenCalled()
   expect(net.save).not.toHaveBeenCalled()
 })
