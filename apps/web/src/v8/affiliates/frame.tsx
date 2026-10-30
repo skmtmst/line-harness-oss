@@ -11,7 +11,6 @@ import { createContext, useContext, type ReactNode } from 'react'
 
 import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
-import Button from '@/components/shared/button'
 import styles from './affiliates.module.css'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -96,33 +95,10 @@ export function ViewerBand() {
 }
 
 /**
- * 作るボタン。閲覧のみの人には出さない（2026-10-06 オーナー：押せない形で
- * 残さず隠す）。隠した作成操作のための空白も置かない。
+ * 作るボタンは各タブで素の Button（variant="primary"）を直接渡す。ラッパーで
+ * 包むと題の右の自動整列が主ボタンを見分けられず、副ボタンの右に出てしまう。
+ * 閲覧のみの人には出さない（2026-10-06 オーナー：押せない形で残さず隠す）。
  */
-export function CreateButton({
-  href,
-  onClick,
-  readonly,
-  full,
-  ariaLabel,
-  title,
-  children,
-}: {
-  href?: string
-  onClick?: () => void
-  readonly: boolean
-  full?: boolean
-  ariaLabel?: string
-  title?: string
-  children: ReactNode
-}) {
-  if (readonly) return null
-  return (
-    <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href={href} onClick={onClick} aria-label={ariaLabel} title={title}>
-      {children}
-    </Button>
-  )
-}
 
 export interface AffiliateFrameProps {
   /** 板の頭の右（CSV など）。 */
