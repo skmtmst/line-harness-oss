@@ -1,4 +1,5 @@
 import './kpi-delta-row.test.mjs'
+import './media-slot-fit.test.mjs'
 import './floating-surface.test.mjs'
 import './floating-surface-components.test.mjs'
 import './floating-surface-all.test.mjs'
