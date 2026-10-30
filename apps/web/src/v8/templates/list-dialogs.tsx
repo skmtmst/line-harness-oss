@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailField, DetailInlineEdit } from '@/components/shared/detail-content'
 
 import type { BroadcastBubble } from '@/lib/api'
 import type { UsageRow } from './words'
@@ -342,67 +343,42 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
           hasNext={activeIndex >= 0 && activeIndex < navItems.length - 1}
           onPrev={() => setActiveId(navItems[activeIndex - 1]?.id ?? null)}
           onNext={() => setActiveId(navItems[activeIndex + 1]?.id ?? null)}
-          footer={
-            <div className={styles.panelActions}>
-              <Button type="button" variant="primary" onClick={() => withViewTransition(() => router.push(detailHref(activeTemplate)))} busyLabel="移動中…">
+          actions={{ primary: ((panelMove ? <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => void runMove()} busyLabel="移動中…">
+                    移動する
+                  </Button> : null)) ?? (<Button type="button" variant="primary" onClick={() => withViewTransition(() => router.push(detailHref(activeTemplate)))} busyLabel="移動中…">
                 詳細を見る
-              </Button>
-              {/* 閲覧のみ：変えるボタンは置かない（2026-10-06 オーナー決定） */}
-              {canMutateTemplates ? <>
-                {panelDetail.detail?.hasDraft ? <Button type="button" variant="secondary" busy={panelDetail.publishing} onClick={() => void panelDetail.publish()}>公開する</Button> : null}
-                <Button type="button" variant="secondary" onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))} busyLabel="移動中…">
+              </Button>),
+    secondary: (<Button type="button" variant="secondary" onClick={() => withViewTransition(() => router.push(editHref(activeTemplate)))} busyLabel="移動中…">
                   編集する
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    setDuplicateError('')
-                    void runDuplicate(activeTemplate)
-                  }}
-                >
-                  複製する
-                </Button>
-                <Button type="button" variant="secondary" onClick={() => openMove([activeTemplate.id])}>
-                  フォルダへ移す
-                </Button>
-                <Button type="button" variant="danger" onClick={() => handleDelete(activeTemplate)}>
-                  削除する
-                </Button>
-              </> : null}
-            </div>
-          }
-        >
+                </Button>),
+    menuItems: [...(panelDetail.detail?.hasDraft ? [{ allowed: canMutateTemplates, id: 'detail-0', label: "公開する", disabled: panelDetail.publishing, onSelect: () => void panelDetail.publish() }] : []),
+        ...([{ allowed: canMutateTemplates, id: 'detail-1', label: "複製する", onSelect: () => {
+                    setDuplicateError('');
+                    void runDuplicate(activeTemplate);
+                } }]),
+        ...([{ allowed: canMutateTemplates, id: 'detail-2', label: "フォルダへ移す", onSelect: () => openMove([activeTemplate.id]) }]),
+        ...([{ allowed: canMutateTemplates, id: 'detail-3', label: "削除する", onSelect: () => handleDelete(activeTemplate), tone: 'danger' as const }])], primaryAllowed: !panelMove || canMutateTemplates, secondaryAllowed: canMutateTemplates }}
+         status={<StatusBadge tone={PUBLISH_TONE[publishStateOf(activeTemplate).tone]}>{publishStateOf(activeTemplate).label}</StatusBadge>}>
+<DetailContent>
           <div className={styles.panelBody}>
-            <p className={styles.panelLabel}>名前</p>
-            {canMutateTemplates ? (
-              <InlineEdit
+            <DetailField label="名前"> <DetailInlineEdit allowed={canMutateTemplates}
                 value={activeTemplate.name}
                 label="テンプレートの名前"
                 maxLength={100}
                 onSave={(next) => renameTemplate(activeTemplate, next)}
-              />
-            ) : (
-              // 閲覧のみ：鉛筆は置かず、名前だけを見せる。
-              <p className={styles.panelText}>{activeTemplate.name}</p>
-            )}
-            <p className={styles.panelLabel}>中身の抜粋</p>
-            <p className={styles.panelText}>
+              /> </DetailField>
+            <DetailField label="中身の抜粋">
               {latestContentOf(activeTemplate).slice(0, 120)}
               {latestContentOf(activeTemplate).length > 120 ? '…' : ''}
-            </p>
-            <p className={styles.panelLabel}>公開</p>
-            <p className={styles.panelText}>
-              <StatusBadge tone={PUBLISH_TONE[publishStateOf(activeTemplate).tone]}>{publishStateOf(activeTemplate).label}</StatusBadge>
-            </p>
-            <p className={styles.panelLabel}>使っている所</p>
-            <p className={styles.panelText}>
+             </DetailField>
+
+            <DetailField label="使っている所">
               {typeof activeTemplate.usageCount !== 'number'
                 ? '使っている所を確認できません'
                 : activeTemplate.usageCount === 0
                   ? emptyValue('none')
                   : `${activeTemplate.usageCount}か所`}
-            </p>
+             </DetailField>
             {panelDetail.error ? <Notice tone="danger">{panelDetail.error}</Notice> : null}
             {panelUsageRows.length > 0 ? <div className={styles.usageList}><ul>
               {panelUsageRows.map((row) => <li key={row.key} className={styles.usageRow}>
@@ -423,15 +399,15 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
                     disabled={moving}
                     folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
                   /></SaveErrorField>
-                  <Button type="button" variant="primary" disabled={moving} busy={moving} onClick={() => void runMove()} busyLabel="移動中…">
-                    移動する
-                  </Button>
+
                 </div>
                 {moveError ? <Notice tone="danger" className={styles.alertTextNoticePlacement} >{moveError}</Notice> : null}
               </>
             ) : null}
           </div>
-        </DetailPanel>
+
+</DetailContent>
+</DetailPanel>
       ) : null}
     </>
   ))

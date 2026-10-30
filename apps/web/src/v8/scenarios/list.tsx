@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailField, DetailSection } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import FolderSelect from '@/components/shared/folder-select'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
@@ -1298,12 +1299,10 @@ export default function ScenariosListV8() {
             onNext={panelIndex < scenarios.length - 1 ? () => setPanelId(scenarios[panelIndex + 1].id) : undefined}
             hasPrev={panelIndex > 0}
             hasNext={panelIndex < scenarios.length - 1}
-            footer={
-              <DialogActions padding="none">
-                <Button variant="primary" onClick={() => goDetail(panelRow.id)}>
+            actions={{menuLabel: `「${panelRow.name}」のその他操作`,primary: <Button variant="primary" onClick={() => goDetail(panelRow.id)}>
                   開く
-                </Button>
-                <Button
+                </Button>,
+secondary: <Button
                   variant="secondary"
                   onClick={() =>
                     withViewTransition(() => {
@@ -1312,24 +1311,18 @@ export default function ScenariosListV8() {
                   }
                  busyLabel="移動中…">
                   配信結果
-                </Button>
-                <RowMenu label={`「${panelRow.name}」のその他操作`} items={rowMenuItems(panelRow).filter(item => item.id !== 'results').map(item => item.id === 'delete' ? { ...item, onSelect: () => { if (!requireWrite()) return; setPanelId(null); requestDelete(panelRow) } } : item)} />
-              </DialogActions>
-            }
-          >
-            <Card variant="panel" layout="vertical" gap="tight" aria-label="配信状況">
-              <CardHeader size="stacked" title="配信状況" headingLevel={3}
-                action={<StatusBadge status={panelRow.isActive ? 'active' : 'stopped'} tone={panelRow.isActive ? 'success' : 'neutral'} />}
-                help={<HelpTip label="配信状況の説明">配信中は、このシナリオに登録されていて最後までの配信が終わっていない人です。シナリオが停止中の間は送信されません。最後まで配信は、最終ステップまで処理が終わった人です。既読人数ではありません。</HelpTip>} />
-              <p>配信中 {scenarioCountLabel(panelRow.subscriberCount)}・最後まで配信 {scenarioCountLabel(panelRow.completedCount)}</p>
-            </Card>
-            {panelRow.description ? <Card variant="panel" layout="vertical" gap="tight" aria-label="シナリオの説明">
-              <CardHeader size="stacked" title="説明" headingLevel={3} />
-              <p>{panelRow.description}</p>
-            </Card> : null}
-            <Card variant="panel" layout="vertical" gap="tight" aria-label="シナリオ名の変更">
-              <CardHeader size="stacked" title="名前を変更" headingLevel={3}
-                help={<HelpTip label="名前の変更方法">下の名前を押すと編集できます。Enterで保存し、Escで取り消します。</HelpTip>} />
+                </Button>,
+menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map(item => item.id === 'delete' ? { ...item, onSelect: () => { if (!requireWrite()) return; setPanelId(null); requestDelete(panelRow) } } : item))]}}
+           status={<StatusBadge status={panelRow.isActive ? 'active' : 'stopped'} tone={panelRow.isActive ? 'success' : 'neutral'} />}>
+<DetailContent>
+            <DetailSection label="配信状況" title="配信状況" help={<HelpTip label="配信状況の説明">配信中は、このシナリオに登録されていて最後までの配信が終わっていない人です。シナリオが停止中の間は送信されません。最後まで配信は、最終ステップまで処理が終わった人です。既読人数ではありません。</HelpTip>}>
+              <DetailField label="人数">配信中 {scenarioCountLabel(panelRow.subscriberCount)}・最後まで配信 {scenarioCountLabel(panelRow.completedCount)}</DetailField>
+            </DetailSection>
+            {panelRow.description ? <DetailSection label="シナリオの説明">
+              <DetailField label="説明">
+              {panelRow.description}</DetailField>
+            </DetailSection> : null}
+            <DetailSection label="シナリオ名の変更" title="名前を変更" help={<HelpTip label="名前の変更方法">下の名前を押すと編集できます。Enterで保存し、Escで取り消します。</HelpTip>}>
               <InlineEdit
                 value={panelRow.name}
                 label="シナリオ名"
@@ -1339,8 +1332,10 @@ export default function ScenariosListV8() {
                 lockedReason={editAccess.reason}
                 canSaveNow={canWriteHere}
               />
-            </Card>
-          </DetailPanel>
+            </DetailSection>
+
+</DetailContent>
+</DetailPanel>
         )}
 
         {/* フォルダ移動の窓。1件でも複数件でも同じ形。 */}

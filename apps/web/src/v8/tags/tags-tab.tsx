@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailFields } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import { useListSnapshot } from '@/lib/use-list-snapshot'
 
@@ -866,15 +867,12 @@ export default function TagsTab({
           hasNext={activeTagIndex >= 0 && activeTagIndex < visible.length - 1}
           onPrev={activeTagIndex > 0 ? () => setActiveTagId(visible[activeTagIndex - 1].id) : undefined}
           onNext={activeTagIndex >= 0 && activeTagIndex < visible.length - 1 ? () => setActiveTagId(visible[activeTagIndex + 1].id) : undefined}
-          footer={activeTag && canEdit ? (
-            <>
-              <Button href={`/tags/edit?id=${activeTag.id}`}>編集する</Button>
-              <Button href={`/tags/new?copy=${activeTag.id}`}>複製して作る</Button>
-            </>
-          ) : undefined}
+          actions={{ primary: (activeTag ? <Button variant="primary" href={`/tags/edit?id=${activeTag.id}`}>編集する</Button> : null),
+    menuItems: [...(activeTag ? [{ allowed: canEdit, id: 'detail-0', label: "複製して作る", "href": `/tags/new?copy=${activeTag.id}` }] : [])], primaryAllowed: canEdit }}
         >
+<DetailContent>
           {activeTag ? (
-            <dl className={styles.detailList}>
+            <DetailFields>
               <div><dt>フォルダ</dt><dd>{activeGroup?.name ?? '未分類'}</dd></div>
               <div>
                 <dt>人数</dt>
@@ -888,9 +886,11 @@ export default function TagsTab({
               <div><dt>連動</dt><dd>{tagLinkText(activeTag)}</dd></div>
               <div><dt>使っている所</dt><dd>{usageLabel(activeTag)}</dd></div>
               <div><dt>登録日</dt><dd>{formatDate(activeTag.createdAt)}</dd></div>
-            </dl>
+            </DetailFields>
           ) : null}
-        </DetailPanel>
+
+</DetailContent>
+</DetailPanel>
       )}
 
       {csvOpen ? <TagCsvImportDialog open onClose={onCsvClose} onCompleted={() => void load()} /> : null}

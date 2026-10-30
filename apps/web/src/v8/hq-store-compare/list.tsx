@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailField, DetailSection, DetailSectionTitle } from '@/components/shared/detail-content'
 
 import PeriodPicker from '@/components/shared/period-picker'
 
@@ -375,17 +376,15 @@ function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onCl
       closeAppearance="box"
       heightMode="viewport"
       onClose={onClose}
-      footer={row ? (
-        <div className={styles.footer}>
-          <Button variant="primary" onClick={() => { notifyToast(`${row.name} に切り替えました`, { tone: 'info' }); setSelectedAccountId(row.accountId); router.push('/') }}>この店を開く</Button>
-        </div>
-      ) : undefined}
+      actions={{primary: ((row) ? <Button variant="primary" onClick={() => { notifyToast(`${row.name} に切り替えました`, { tone: 'info' }); setSelectedAccountId(row.accountId); router.push('/') }}>この店を開く</Button> : null),
+menuItems: []}}
     >
+<DetailContent>
       {row ? (
         <div className={styles.drawerBody}>
-          <Card padding="default" layout="vertical" gap="normal" aria-label="7つの数">
+          <DetailSection label="7つの数">
             <div className={styles.cardHead}>
-              <h3 className={styles.cardTitle}>7 つの数</h3>
+              <DetailSectionTitle>7 つの数</DetailSectionTitle>
               <DiffOnlyToggle checked={diffOnly} onChange={onDiffOnly} />
             </div>
             <div>
@@ -396,13 +395,10 @@ function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onCl
                 const coverage = metric?.available && metric.value !== null ? coverageLabel(def.key, row) : null
                 return (
                   <div key={def.key}>
-                  <div className={styles.metricRow}>
-                    <span className={styles.metricName}>{def.label}</span>
-                    <span className={styles.metricValue}>
+                  <DetailField label={def.label}>
                       {metric?.available && metric.value !== null ? formatMetric(def.key, metric.value) : <EmptyCell />}
                       {diff && tone ? <DeltaChip tone={tone} direction={(metric.diff ?? 0) > 0 ? 'up' : 'down'}>{diff}</DeltaChip> : coverage ? <span className={styles.coverage}>{coverage}</span> : null}
-                    </span>
-                  </div>
+                  </DetailField>
                   {current.status === 'ready' && current.data?.trend?.length ? <ValueBarChart label={`${def.label}の日ごとの推移`} unit={metric?.unit ?? ''} signed={def.key === 'friendChange'} items={current.data.trend.map(day => ({key:day.date,label:day.date,value:day.values[def.key],note:day.state==='failed'?'集計に失敗':day.state==='missing'?'取得待ち':undefined}))} /> : null}
                   {current.status === 'loading' ? <p className={styles.mute}>推移を読み込んでいます</p> : null}
                   {current.status === 'error' ? <p className={styles.mute}>推移を読み込めませんでした。</p> : null}
@@ -417,9 +413,9 @@ function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onCl
                 <Button variant="text" onClick={() => onDiffOnly(false)}>すべて表示</Button>
               </div>
             ) : null}
-          </Card>
-          <Card padding="default" layout="vertical" gap="normal" aria-label="最近の配信">
-            <h3 className={styles.cardTitle}>最近の配信</h3>
+          </DetailSection>
+          <DetailSection label="最近の配信">
+            <DetailSectionTitle>最近の配信</DetailSectionTitle>
             {current.status === 'loading' ? <p className={styles.mute}>読み込んでいます</p> : null}
             {current.status === 'error' ? <p className={styles.mute}>最近の配信を読み込めませんでした。</p> : null}
             {current.status === 'ready' && (current.data?.recentBroadcasts.length ?? 0) === 0 ? <p className={styles.mute}>この店の配信はまだありません。</p> : null}
@@ -433,18 +429,20 @@ function StoreDrawer({ row, period, compare, average, diffOnly, onDiffOnly, onCl
                 ))}
               </div>
             ) : null}
-          </Card>
-          <Card padding="default" layout="vertical" gap="normal" aria-label="対応が要るもの">
-            <h3 className={styles.cardTitle}>対応が要るもの</h3>
+          </DetailSection>
+          <DetailSection label="対応が要るもの">
+            <DetailSectionTitle>対応が要るもの</DetailSectionTitle>
             {current.status === 'loading' ? <p className={styles.mute}>読み込んでいます</p> : null}
             {current.status === 'error' || (current.status === 'ready' && attention?.status !== 'ready') ? <p className={styles.mute}>対応が要るものを読み込めませんでした。</p> : null}
             {current.status === 'ready' && attention?.status === 'ready' ? ATTENTION.map(item => <div key={item.key}>
               <p>{item.label} {attention.counts[item.key]}件</p>
               {(attention.targets?.[item.key] ?? []).map(target => <Button key={target.href} variant="text" textTone="ink" onClick={() => { notifyToast(`${row.name} に切り替えました`, { tone: 'info' }); setSelectedAccountId(row.accountId); router.push(target.href) }}>{attentionTargetLabel(target.href)} {formatNumber(target.count)}件</Button>)}
             </div>) : null}
-          </Card>
+          </DetailSection>
         </div>
       ) : null}
-    </Drawer>
+
+</DetailContent>
+</Drawer>
   )
 }

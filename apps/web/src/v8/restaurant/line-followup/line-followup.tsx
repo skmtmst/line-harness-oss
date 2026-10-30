@@ -1,5 +1,6 @@
 'use client'
 
+import { DetailPreview } from '@/components/shared/detail-content'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useState, type ComponentType } from 'react'
 import { Bell, CalendarPlus, Check, ChevronDown, IdCard, LogOut, MessageSquare, Star } from 'lucide-react'
@@ -65,8 +66,8 @@ function LineFollowupBoard({ ctx, selectedId, setSelectedId, drafts, setDrafts, 
     <>
       {/* 決まり2: いつも同じ説明は帯にせず、題の横の「？」（description）へ入れる。 */}
       {readOnly ? <ReadOnlyNotice role="note" /> : null}
-      <DetailColumns presentation="notification" asideLabel="LINEでの見え方" expanded={previewExpanded} onExpandedChange={setPreviewExpanded}
-        aside={selected && draft ? <FlowPreview flow={selected} draft={draft} accountName={store?.line_account_name || store?.name || 'LINE公式アカウント'} /> : null}>
+      <DetailColumns asideLayout="detail" presentation="notification" asideLabel="LINEでの見え方" expanded={previewExpanded} onExpandedChange={setPreviewExpanded}
+        aside={selected && draft ? <DetailPreview title="LINEでの見え方"><FlowPreview flow={selected} draft={draft} accountName={store?.line_account_name || store?.name || 'LINE公式アカウント'} /></DetailPreview> : null}>
         <div className={styles.flowList}>
           {flows.map(flow => {
             const kind = kindOf(flow)

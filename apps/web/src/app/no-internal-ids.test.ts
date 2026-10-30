@@ -156,8 +156,8 @@ describe('成果承認 n5VVTb の友だち列', () => {
 describe('紹介者 jwrbf の内訳', () => {
   const TABS = read('../v8/affiliates/drawer.tsx')
 
-  it('集計カードの見出しに表名を出さない', () => {
-    const CARDS = between(TABS, 'title="今月の成果"', '</KpiBand>')
+  it('集計の項目名に表名を出さない', () => {
+    const CARDS = between(TABS, 'label="今月の成果"', '</DetailSection>')
     expect(CARDS).toContain('value={report?.conversions}')
     expect(CARDS).not.toContain('ref_tracking')
   })

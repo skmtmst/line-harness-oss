@@ -1,4 +1,5 @@
 import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
+import { findDetailMenuItem } from '@/test-utils/detail-menu'
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /**
@@ -7,7 +8,7 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, within, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Tag } from '@line-crm/shared'
 
@@ -120,14 +121,18 @@ describe('V8 タグ タグの一覧', () => {
     expect(screen.queryAllByRole('button', { name: /^タグ「.+」の操作$/ })).toHaveLength(0)
   })
 
-  it.each(['staff', 'owner', 'admin'])('タグの詳細の編集・複製は権限で隠す（%s）', async (staffRole) => {
+  it.each(['staff', 'owner', 'admin'])('タグの編集・複製は権限のある人だけが使える（%s）', async (staffRole) => {
     role.value = staffRole
     await render(<TagsList fixture={fixture} />)
     await act(async () => { fireEvent.click(container.querySelector('tbody tr')!) })
-    expect(screen.getByRole('dialog', { name: fixture.items[0].name })).toBeTruthy()
-    for (const name of ['編集する', '複製して作る']) {
-      expect(screen.queryByRole('link', { name }) !== null).toBe(staffRole !== 'staff')
-    }
+    const panel = screen.getByRole('dialog', { name: fixture.items[0].name })
+    if (staffRole === 'staff') {
+      expect(within(panel).getByRole('button', { name: '編集する' }).getAttribute('aria-disabled')).toBe('true')
+      expect(within(panel).queryByRole('link', { name: '編集する' })).toBeNull()
+    } else expect(within(panel).getByRole('link', { name: '編集する' }).getAttribute('href')).toContain('/tags/edit')
+    const duplicate = await findDetailMenuItem('複製して作る', panel)
+    expect(duplicate.getAttribute('aria-disabled') === 'true').toBe(staffRole === 'staff')
+    expect(duplicate.getAttribute('href') !== null).toBe(staffRole !== 'staff')
   })
 
   it('「よく使う絞り込み」に星を出さず、残った未使用の絞り込みは動く', async () => {

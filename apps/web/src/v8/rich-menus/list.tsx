@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailField } from '@/components/shared/detail-content'
 
 import { PAGE_SIZE_SELECT_OPTIONS } from '@/components/shared/page-size-select'
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
@@ -1388,9 +1389,13 @@ export default function RichMenusListV8() {
 
         {blockedDialog}
         {deleteConfirm}
-        <DetailPanel open={detailId !== null && groups.some(group => group.id === detailId)} title={groups.find(group => group.id === detailId)?.name ?? 'リッチメニュー'} onClose={() => setDetailId(null)} footer={detailId ? <Button href={`/rich-menus/edit?id=${encodeURIComponent(detailId)}`}>{canEdit ? '編集する' : '詳しく見る'}</Button> : undefined}>
-        <p>このリッチメニューの中身や設定は「{canEdit ? '編集する' : '詳しく見る'}」から確認できます。</p>
-      </DetailPanel>
+        <DetailPanel open={detailId !== null && groups.some(group => group.id === detailId)} title={groups.find(group => group.id === detailId)?.name ?? 'リッチメニュー'} onClose={() => setDetailId(null)} actions={{primary: ((detailId) ? <Button variant="primary" href={`/rich-menus/edit?id=${encodeURIComponent(detailId)}`}>{canEdit ? '編集する' : '詳しく見る'}</Button> : null),
+menuItems: []}}>
+<DetailContent>
+        <DetailField label="中身・設定">このリッチメニューの中身や設定は「{canEdit ? '編集する' : '詳しく見る'}」から確認できます。</DetailField>
+
+</DetailContent>
+</DetailPanel>
     </>}
     >
       {actionError ? (

@@ -1,9 +1,13 @@
 'use client'
+import { DetailContent, DetailSectionTitle } from '@/components/shared/detail-content'
 
 import { useActionError } from '@/lib/use-action-error'
 
 import { useCallback, useEffect, useState } from 'react'
 import Drawer from '@/components/shared/drawer'
+import Button from '@/components/shared/button'
+import { useStaffRole } from '@/lib/staff-role'
+import { lockReason } from '@/components/shared/permission-lock'
 import ListState from '@/components/shared/list-state'
 import VersionCompare from '@/components/shared/version-compare'
 import VersionHistory, { type HistoryVersion } from '@/components/shared/version-history'
@@ -115,6 +119,7 @@ export default function MenuVersionHistory({
     }
   }
 
+  const role = useStaffRole()
   return (
     <Drawer
       open
@@ -122,7 +127,12 @@ export default function MenuVersionHistory({
       description="保存するたびに版が1つ増えます。前の版は変わりません。"
       busy={reverting}
       onClose={onClose}
+      actions={loadState === 'ready' && versions.length > 0 ? {
+        secondary: <Button variant="secondary" disabled={!selectedVersion || reverting} onClick={() => setComparing(true)}>いまと比べる</Button>,
+        primary: <Button variant="primary" disabled={!selectedVersion || !canRevert || reverting} lockedReason={role === null ? undefined : lockReason(canRevert)} onClick={() => { if (canRevert) setConfirming(true) }}>この版に戻す</Button>,
+      } : undefined}
     >
+<DetailContent>
       {loadState === 'loading' ? (
         <ListState kind="loading" title="版の履歴を読み込んでいます" />
       ) : loadState === 'error' ? (
@@ -138,6 +148,7 @@ export default function MenuVersionHistory({
             <Notice tone="danger" >{revertError}</Notice>
           ) : null}
           <VersionHistory
+            showActions={false}
             versions={history}
             selectedVersionNumber={selected}
             onSelect={(versionNumber) => {
@@ -154,9 +165,9 @@ export default function MenuVersionHistory({
           />
           {comparing && selectedVersion ? (
             <section aria-label="版の比べ">
-              <h3 className="text-ink mb-2 text-sm font-semibold">
+              <DetailSectionTitle>
                 {selectedVersion.title}と{current?.title ?? 'いまの版'}の比べ
-              </h3>
+              </DetailSectionTitle>
               <VersionCompare
                 before={selectedVersion.lines.join('\n')}
                 after={(selectedVersion.version_number === current?.version_number
@@ -177,6 +188,8 @@ export default function MenuVersionHistory({
         onCancel={() => setConfirming(false)}
         onConfirm={() => doRevert()}
       />
-    </Drawer>
+
+</DetailContent>
+</Drawer>
   )
 }
