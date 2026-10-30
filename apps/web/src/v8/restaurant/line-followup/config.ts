@@ -79,15 +79,15 @@ export function exactTiming(absMinutes: number, units: OffsetUnit[]): { amount: 
 }
 
 /*
- * 鯖と同じ時期の規則（Worker restaurant-test-definition.ts）。
- * anniversary_before は今の鯖ではどの値も通らない（口の一覧の3件目）。
+ * Workerと同じ時期の規則。前なら負、後なら0以上。
  */
 export function timingError(trigger: RestaurantFollowupTrigger, offsetMinutes: number): string | null {
+  if (trigger === 'anniversary_before' && offsetMinutes % 1440 !== 0) return '記念日は日単位で入れてください'
   if (!Number.isSafeInteger(offsetMinutes) || Math.abs(offsetMinutes) > 525600) return '時期は525600分（365日）以内で入れてください'
   if ((trigger === 'reservation_24h' || trigger === 'reservation_2h' || trigger === 'anniversary_before') && offsetMinutes >= 0) {
     return '前の日時は0より小さい値で入れてください'
   }
-  if ((trigger === 'reservation_created' || trigger === 'post_visit' || trigger === 'review_request' || trigger === 'waitlist_invited' || trigger === 'anniversary_before') && offsetMinutes < 0) {
+  if ((trigger === 'reservation_created' || trigger === 'post_visit' || trigger === 'review_request' || trigger === 'waitlist_invited') && offsetMinutes < 0) {
     return '後の日時は0以上の値で入れてください'
   }
   return null
