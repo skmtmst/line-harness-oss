@@ -6,7 +6,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import { Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
-import Notice from '@/components/shared/notice'
+import HelpTip from '@/components/shared/help-tip'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { DataTable, TableHeadRow, Td, Th, Tr, ActionCell, NameCell, RowNameButton } from '@/components/shared/table'
 import { useAccount } from '@/contexts/account-context'
@@ -94,8 +94,9 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <KpiCard title="コース" value={rows.filter((item) => item.kind === 'course').length} unit="件" detail="予約時に選択" detailLayout="single" presentation="band" />
         <KpiCard title="単品" value={rows.filter((item) => item.kind !== 'course').length} unit="件" detail="アラカルト" detailLayout="single" presentation="band" />
         <KpiCard title="開始待ち" value={scheduledPrices.length} unit="件" detail="確定済みの新価格" detailLayout="single" presentation="band" />
-        <KpiCard title="アレルギー登録" value={rows.filter((item) => safeArray(item.allergens_json).length > 0).length} unit="件" detail="注意品目あり" detailLayout="single" presentation="band" />
       </StatRow>
+      {/* R11: 帯は4枚まで。5つ目は帯の下の短い1行に残す（行き先の絞り込みは無いため行だけ）。 */}
+      <p className={styles.fifthLine}>アレルギー登録 {rows.filter((item) => safeArray(item.allergens_json).length > 0).length} 件 注意品目あり</p>
       <Panel
         title="メニュー一覧"
         description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。価格変更は保存時に確定し、指定した開始日時から新価格になります。"
@@ -103,9 +104,9 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
           <Button variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</Button>
         ) : null}
         flush
+        help={<HelpTip label="メニュー一覧の説明">「…」の中身：有効＝変更・停止／アーカイブ＝変更・再開／一度も公開していない下書き＝変更・削除</HelpTip>}
       >
         {legacyPending ? <Notice tone="warn">以前の価格変更申請が残っています。{canEdit ? <Button onClick={() => router.push('/restaurant-test/approvals')}>以前の申請を確認する</Button> : '管理者に確認を依頼してください。'}</Notice> : null}
-        <Notice tone="info">「…」の中身：有効＝変更・停止／アーカイブ＝変更・再開／一度も公開していない下書き＝変更・削除</Notice>
         <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
           <thead>
             <TableHeadRow data-table-layout="columns">

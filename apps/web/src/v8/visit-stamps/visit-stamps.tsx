@@ -712,8 +712,9 @@ function VisitStampsScreen() {
                                     <span className={styles.grow} aria-hidden="true" />
                                     {row.status === 'pending' && canStamp ? (
                                       <>
-                                        <Button size="compact" disabled={!!busy} onClick={() => { setDialogError(''); setRejecting(row) }}>却下</Button>
-                                        <Button size="compact" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${withHonorific(names.name)}の ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />承認</Button>
+                                        {/* 109: 承認は主（右）、却下は赤い文字だけ。並びは［却下］［承認］。 */}
+                                        <Button size="compact" variant="text" textTone="danger" disabled={!!busy} onClick={() => { setDialogError(''); setRejecting(row) }}>却下</Button>
+                                        <Button size="compact" variant="primary" disabled={!!busy} onClick={() => void review(row, 'approve', '紙のカードの写真を確認しました')} aria-label={`${withHonorific(names.name)}の ${row.stamps}個を承認`} busy={Boolean(busy)} busyLabel="処理中…"><Check size={16} aria-hidden="true" />承認</Button>
                                       </>
                                     ) : null}
                                     <RowActions subjectName={`${withHonorific(names.name)}の申請`} menuItems={[

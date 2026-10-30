@@ -29,9 +29,10 @@
   white-space: nowrap;
 }
 
+/* 追加決まり1: 続きの読み込みは左に置く。1つだけ中央に浮かせない。 */
 .more {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 .detail {

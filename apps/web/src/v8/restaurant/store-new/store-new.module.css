@@ -223,10 +223,10 @@
   white-space: pre-line;
 }
 
-/* 下：上に細い線・上14、ボタンは中央・間8。 */
+/* 下：上に細い線・上14、ボタンは右に1行・間8（追加決まり1: 中央に浮かせない）。 */
 .footer {
   display: flex;
-  justify-content: center;
+  justify-content: flex-end;
   gap: var(--tpl-rt-chip-row-gap);
   padding-top: var(--tpl-rt-footer-pad-top);
   box-shadow: var(--tpl-rt-line-top);

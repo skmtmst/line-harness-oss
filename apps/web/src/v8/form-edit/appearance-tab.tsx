@@ -108,7 +108,7 @@ export function AppearanceTab(props: Props) {
       ['書体', FONT_LABEL[theme.fontFamily]],
       ['角の丸み', RADIUS_LABEL[theme.cornerRadius]],
       ...COLOR_ROLES.map(({ key, label }) => [label, theme[key]]),
-      ['背景の画像', theme.backgroundImageUrl || 'なし'],
+      ['背景の画像', theme.backgroundImageUrl || '未設定'],
       ['カードの見出し', props.ogTitle || '自動で作る'],
       ['カードの説明', props.ogDescription || '自動で作る'],
       ['カードの画像', props.ogImageUrl || '自動で作る'],
@@ -116,7 +116,7 @@ export function AppearanceTab(props: Props) {
       ['次へ', options.nextLabel || '次へ'],
       ['送る', options.submitLabel || '送信する'],
       ['フォーム名', props.name],
-      ['覚え書き', props.description || 'なし'],
+      ['覚え書き', props.description || '未設定'],
     ]
     return <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)">
       <h2 className={styles.cardTitle}>受付と見た目</h2>

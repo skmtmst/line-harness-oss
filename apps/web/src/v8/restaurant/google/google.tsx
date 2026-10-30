@@ -28,9 +28,8 @@ import { ProfileEditScreen } from './profile-edit'
 import { HoursEditor } from './profile-hours'
 import SettingsBoard from './settings'
 import styles from './google.module.css'
-import StoreFilterTabs from '@/components/shared/store-filter-tabs'
+import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { entityOptionMetadata } from '@/components/shared/entity-select'
 
 /*
  * ★V8 Googleビジネス（Pencil：口コミ ・返信を作る ・投稿 ・投稿を作る ・
@@ -151,9 +150,11 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   const currentStoreId = useMemo(() => stores.find((item) => item.line_account_id === selectedAccountId)?.id
     ?? stores.find((item) => item.id === data?.store.id)?.id ?? '', [stores, selectedAccountId, data])
 
-  const picker = stores.length > 0 ? (
-    <SaveErrorField names={["currentStoreId","selectedAccountId"]}><StoreFilterTabs
-
+  /* 86: 店の切り替えは［店舗：…］の選ぶ欄1つに統一。店が1つしか無い時は出さない。 */
+  const picker = stores.length > 1 ? (
+    <SaveErrorField names={["currentStoreId","selectedAccountId"]}><EntitySelect
+      aria-label="店舗"
+      noun="店舗"
       value={currentStoreId}
       onChange={(value) => {
         const next = stores.find((item) => item.id === value)
@@ -162,7 +163,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
           requestUnsavedAction(() => setSelectedAccountId(nextAccountId))
         }
       }}
-      options={stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id, disabledReason: !item.line_account_id ? 'LINE公式アカウントが結び付いていません' : undefined }))}
+      options={stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}`, disabled: !item.line_account_id, description: !item.line_account_id ? 'LINE公式アカウントが結び付いていません' : undefined }))}
     /></SaveErrorField>
   ) : null
 

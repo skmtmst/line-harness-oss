@@ -383,6 +383,17 @@ it('変更していない設定は保存しない理由を出し、変更後に�
  expect(save.disabled).toBe(false); expect(save.hasAttribute('aria-description')).toBe(false)
 })
 
+// 109: 承認は主（右）、却下は赤い文字だけ。並びは［却下］［承認］。
+it('紙のカードの移行は［却下］［承認］の並びで承認が主', async () => {
+  render(<VisitStampsV8 />)
+  fireEvent.click(await screen.findByRole('tab', { name: /紙のカードの移行/ }))
+  const approve = await screen.findByRole('button', { name: /さんの .*個を承認/ })
+  const reject = screen.getByRole('button', { name: '却下' })
+  expect(reject.getAttribute('data-variant')).toBe('text')
+  expect(approve.getAttribute('data-variant')).toBe('primary')
+  expect(Boolean(reject.compareDocumentPosition(approve) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+})
+
 it('B24: 開いた直後もキャンセルは押せる（保存中・画像登録中だけ押せない）', async () => {
  render(<VisitStampsV8 />)
  await screen.findByDisplayValue(card.name)

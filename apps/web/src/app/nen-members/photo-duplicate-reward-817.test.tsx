@@ -143,3 +143,38 @@ describe('#817 重複の表示', () => {
     await act(async () => { root.unmount() })
   })
 })
+
+// 109: 断る側は赤い文字だけ、採用は主（右）。
+describe('109 承認が主・断る側は文字だけ', () => {
+  const variants = () => {
+    const buttons = [...host.querySelectorAll('button')]
+    return {
+      pass: buttons.find((b) => b.textContent === '見送る（理由を選ぶ）'),
+      reject: buttons.find((b) => b.textContent === '却下する'),
+      adopt: buttons.find((b) => b.textContent === 'このまま採用'),
+      adoptFree: buttons.find((b) => b.textContent === '報酬なしで採用'),
+    }
+  }
+  it('重複なし：見送るは文字だけ・このまま採用が主で右', async () => {
+    const root = await renderDetail(basePhoto(), host)
+    const { pass, adopt } = variants()
+    expect(pass?.getAttribute('data-variant')).toBe('text')
+    expect(adopt?.getAttribute('data-variant')).toBe('primary')
+    expect(Boolean(pass!.compareDocumentPosition(adopt!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+    await act(async () => { root.unmount() })
+  })
+  it('重複あり：却下するは文字だけ・報酬なしで採用が主で右', async () => {
+    const root = await renderDetail({
+      ...basePhoto(),
+      duplicate: {
+        photoId: 'photo-old', imageUrl: 'https://img/photo-old.jpg',
+        petName: 'モカ', createdAt: '2026-08-12T10:00:00+09:00', awardedPoints: 5,
+      },
+    }, host)
+    const { reject, adoptFree } = variants()
+    expect(reject?.getAttribute('data-variant')).toBe('text')
+    expect(adoptFree?.getAttribute('data-variant')).toBe('primary')
+    expect(Boolean(reject!.compareDocumentPosition(adoptFree!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+    await act(async () => { root.unmount() })
+  })
+})

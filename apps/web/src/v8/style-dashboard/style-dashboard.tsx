@@ -149,6 +149,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
 
   const side = (today?.side ?? []).map((card) => <SideCard key={card.id} card={card} canWrite={canWrite} onAction={(card) => (card.id === 'pay' ? openPayment() : ['care', 'waitlist', 'rebook'].includes(card.id) ? preparing.open(card.title) : router.push('/broadcasts'))}>{card.id === 'pay' && testMode ? <TestModeNote /> : null}</SideCard>)
 
+  const shownRoster = style === 'lesson' && (rosterId === undefined ? view !== 'calendar' : rosterId !== null && roster?.rowId === rosterId) ? roster : null
   let body: ReactNode
   if (!today) {
     body = failed ? <ListState kind="error" title="ダッシュボードを読み込めませんでした" onRetry={() => void reload()} /> : <ListState kind="loading" loadingShape="cards" />
@@ -167,7 +168,6 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     body = <ListState kind="empty" title={`${cfg.tabs[tab]}は今の画面で見られます`} action={<Button href={tab === 'bookings' ? cfg.links.bookings : cfg.links.people}>{`${cfg.tabs[tab]}を開く`}</Button>} />
   } else {
     const rows = today.rows.filter((r) => !search || r.name.includes(search) || (r.sub ?? '').includes(search) || (r.course ?? '').includes(search))
-    const shownRoster = style === 'lesson' && (rosterId === undefined ? view !== 'calendar' : rosterId !== null && roster?.rowId === rosterId) ? roster : null
     const emptyBookings = hasEmptyBookingAction ? <EmptyBookings style={style} day={date === jstToday() ? '今日' : 'この日'} today={today} canWrite={canWrite} role={role} onBook={() => addNew()} onCreateClass={() => router.push('/events/new')} /> : null
     const filteredEmpty = <ListState kind="empty" emptyPreset="filtered" action={<Button onClick={() => setSearch('')}>検索を外す</Button>} />
     let main: ReactNode
@@ -189,8 +189,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     } else {
       main = (
         <>
-          {/* 1つの探す欄に帯の道具段を使うと余白で狭まり文が切れるので、帯の余白が付かない正の包み（ListToolbarSearchSlot）で幅を保つ。 */}
-          {style !== 'lesson' ? <div className={styles.listTools}><span className={styles.grow} /><div className={styles.search}><ListToolbarSearchSlot width={220} search={{ value: search, onChange: setSearch, placeholder: cfg.search }} /></div></div> : null}
+          {/* 探す欄は左に置く（追加決まり1）。帯の余白が付かない包み（ListToolbarSearchSlot）で幅を保つ。 */}
+          {style !== 'lesson' ? <div className={styles.listTools} data-dashboard-list-tools><div className={styles.search}><ListToolbarSearchSlot width={220} search={{ value: search, onChange: setSearch, placeholder: cfg.search }} /></div></div> : null}
           {rows.length > 0 ? emptyBookings : null}
           <TodayList style={style} rows={rows} note={today.rowsNote} canWrite={canWrite} busyId={busy} menuFor={menuFor} onVisit={(r) => void markVisit(r)} onNoShow={(r) => void markNoShow(r)} onApprove={(r) => void approve(r)} onResult={(r) => setResultRow(r)} onUndo={(r) => void undoVisit(r)}
             empty={search ? filteredEmpty : emptyBookings ?? <ListState kind="empty" title={`${range === 'today' ? '今日' : range === 'week' ? '今週' : '今月'}の${style === 'consult' ? '面談' : style === 'lesson' ? 'クラス' : '予約'}はありません`} description={canWrite ? (style === 'consult' ? '予約の URL を案内すると、空いた時間に入ります。' : '空いている時間に予約を入れられます。') : undefined}
@@ -202,9 +202,21 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     if (shownRoster) aside = <LessonRoster roster={shownRoster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={openPayment} onAttend={(name) => void attend(shownRoster, name)} onAbsent={(name) => void attend(shownRoster, name, 'no_show')} onLine={() => router.push('/broadcasts')} onCancelClass={() => { if (canWrite && rosterRow?.id === shownRoster.rowId) setClassRow(rosterRow) }} />
     body = (
       <DetailColumns variant={shownRoster ? 'style-roster' : 'style-dashboard'} aside={aside} asideLabel="今日の動き" expanded={asideOpen} onExpandedChange={setAsideOpen}
-        toggleLabel={asideOpen ? '右の列を畳む' : roster ? '名簿を見る' : '新着・お支払いを見る'}>{main}</DetailColumns>
+        showToggle={false}>{main}</DetailColumns>
     )
   }
+  /* 追加決まり1: 右の列の開閉はタブの段の右端へ。タブの下に1つだけの段を作らない。 */
+  const asideLabel = asideOpen ? '右の列を畳む' : roster ? '名簿を見る' : '新着・お支払いを見る'
+  const mainAside = tab === 'main' && !!today && (shownRoster ? true : view === 'calendar'
+    ? (range === 'month' && !!today.month) || (!today.week && side.length > 0)
+    : side.length > 0)
+  /* タブの段の右端の操作。狭い幅ではタブの下へ折り返す（タブに重ねない）。 */
+  const tabRowActions = viewSwitch || mainAside ? (
+    <div className={styles.tabRowActions}>
+      {viewSwitch}
+      {mainAside ? <span className={styles.tabAsideToggle}><Button size="compact" aria-expanded={asideOpen} onClick={() => setAsideOpen(!asideOpen)}>{asideLabel}</Button></span> : null}
+    </div>
+  ) : null
 
   const alert = tab !== 'analytics' ? today?.alert : null
 
@@ -228,7 +240,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         ) : null}
       </div>
       <div className={styles.tabRow}>
-        <Tabs items={tabItems} label={`${cfg.title}のタブ`} size="compact" actions={viewSwitch} />
+        <Tabs items={tabItems} label={`${cfg.title}のタブ`} size="compact" />
+        {tabRowActions}
       </div>
       <div className={styles.content}><CalendarPeriod period={view === 'calendar' && today ? range === 'month' ? date.slice(0, 7) : today.week?.days[0]?.date ?? date : ''} scope={`${accountId}/${style}/${view}/${range}`}>{body}</CalendarPeriod></div>
       {style === 'restaurant' && store.store ? (

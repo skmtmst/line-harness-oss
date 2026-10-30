@@ -117,6 +117,7 @@ export default function PoolsV8() {
         boardId="u3iab3"
         title={TITLE}
         help={DESCRIPTION}
+        explanation="「外す」と、これから来たお客さまはそのアカウントへ振り分けられなくなります。アカウント自体と、これまでの流入の記録は残ります。"
         actions={canManage && !isEmpty ? createButton : undefined}
         navigation={<SettingsInnerNav inline />}
       >
@@ -136,7 +137,7 @@ export default function PoolsV8() {
                 <PoolCard key={pool.id} pool={pool} accounts={accounts} canManage={canManage} onChange={() => void load()} />
               ))}
             </div>
-            <Notice tone="info">「外す」と、これから来たお客さまはそのアカウントへ振り分けられなくなります。アカウント自体と、これまでの流入の記録は残ります。</Notice>
+            {/* 決まり2: 外した時の説明は帯にせず、題の横の「？」（explanation）へ入れる。 */}
           </>
         )}
       </SettingsPage>

@@ -8,7 +8,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { api, ApiError, type Recipe } from '@/lib/api'
 import { useResponseGate } from '@/lib/use-response-gate'
 import { useAccount } from '@/contexts/account-context'
-import { usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
 import { isForbiddenOrRateLimited, loadFailureCopy } from '@/components/shared/api-error-message'
 import TargetMissing from '@/components/shared/target-missing'
@@ -57,6 +57,8 @@ function RecipeClone() {
   const cloneKeyRef = useRef<{ intent: string; key: string } | null>(null)
 
   usePageTitle(recipe ? `${recipe.name}を作る` : null)
+  /* パンくずは上の帯だけ（板の中の2つ目のパンくずは置かない）。 */
+  usePageCrumbs([{ label: 'レシピ', href: '/recipes' }])
 
   /*
    * WEB321：レシピ・アカウントを変えたら、前の遅い応答（読み込み・作成の結果）を
@@ -190,11 +192,6 @@ function RecipeClone() {
   return (
     <div className={styles.page}>
       <div><PageHeading title="レシピを複製する" /></div>
-      <nav className={styles.breadcrumb} aria-label="パンくず">
-        <Link href="/recipes">レシピ</Link>
-        <span aria-hidden>›</span>
-        <span>{recipe.name}</span>
-      </nav>
 
       <>
           <div className={styles.columns}>

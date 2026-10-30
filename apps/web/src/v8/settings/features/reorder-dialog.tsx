@@ -30,7 +30,6 @@ export function ReorderDialog({ groups, initialOrder, onCancel, onApply }: {
       designHeaderPadding="24px 24px 0"
       designContentPadding="4px 24px 0"
       designFooterPadding="10px 24px 24px"
-      footerAlign="start"
       footerDivider={false}
       footerLeadFlexible={false}
       confirmIcon={<Check size={16} aria-hidden="true" />}
