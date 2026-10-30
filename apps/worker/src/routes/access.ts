@@ -161,6 +161,9 @@ access.get(
   requireRole('owner', 'admin', 'staff'),
   requirePermission('access.audit.view'),
   async (c) => {
+    if (!c.req.query('lineAccountId')?.trim()) {
+      return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    }
     const category = enumQuery(c.req.query('category'), AUDIT_CATEGORIES);
     const result = enumQuery(c.req.query('result'), AUDIT_RESULTS);
     const attention = booleanQuery(c.req.query('attention'));
@@ -182,7 +185,6 @@ access.get(
       const audit = await listAuditEvents(c.env.DB, {
         tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID,
         allowedLineAccountIds: accessScope.scope.allowedAccountIds,
-        includeTenantWide: !accessScope.scope.isAccountScoped,
         lineAccountId: accessScope.lineAccountId,
         category,
         result,

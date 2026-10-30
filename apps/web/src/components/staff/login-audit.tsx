@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import SearchField from '@/components/shared/search-field'
@@ -116,7 +116,7 @@ function locationLabel(row: AuditEventItem): string {
 }
 
 export default function LoginAudit({ userId }: { userId?: string }) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, loading: accountsLoading } = useAccount()
   const [rows, setRows] = useState<AuditEventItem[]>([])
   const [summary, setSummary] = useState<AuditEventSummary>(EMPTY_SUMMARY)
   const [total, setTotal] = useState(0)
@@ -142,12 +142,21 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     const requestId = ++requestSeq.current
     setLoading(true)
     setError('')
+    if (!selectedAccountId) {
+      setRows([])
+      setSummary(EMPTY_SUMMARY)
+      setTotal(0)
+      setLoadedPeriod(null)
+      setLoading(accountsLoading)
+      setError(accountsLoading ? '' : 'LINEアカウントを選択してください。')
+      return
+    }
     try {
       const from = periodFilter === 'all'
         ? undefined
         : new Date(Date.now() - Number(periodFilter) * 24 * 60 * 60 * 1000).toISOString()
       const auditResult = await api.audit.events({
-        lineAccountId: selectedAccountId ?? undefined,
+        lineAccountId: selectedAccountId,
         actorId: userId,
         query: query.trim() || undefined,
         from,
@@ -180,8 +189,17 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     } finally {
       if (requestId === requestSeq.current) setLoading(false)
     }
-  }, [actionFilter, page, pageSize, periodFilter, query, selectedAccountId, sort, userId])
+  }, [accountsLoading, actionFilter, page, pageSize, periodFilter, query, selectedAccountId, sort, userId])
 
+  useLayoutEffect(() => {
+    requestSeq.current += 1
+    setRows([])
+    setSummary(EMPTY_SUMMARY)
+    setTotal(0)
+    setLoadedPeriod(null)
+    setDetail(null)
+    setError('')
+  }, [selectedAccountId])
   useEffect(() => { void load() }, [load])
 
   const counts = {

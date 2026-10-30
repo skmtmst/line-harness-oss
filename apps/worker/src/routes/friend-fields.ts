@@ -801,6 +801,7 @@ friendFields.get(
       // 「項目があること」を見ただけでは閲覧にあたらない。
       const audit = recordLoginAudit(c.env.DB, {
         adminUserId: staff?.id ?? null,
+        lineAccountId: friend?.line_account_id ?? null,
         action: 'view_personal',
         screen: `/friends/${friendId}`,
       });
