@@ -149,5 +149,7 @@ html:root :is([data-toolbar-row], [data-control-row]) .button { width: var(--con
 .button[data-variant='attention']:is(:hover, :focus-visible) > svg { opacity: 1; }
 @media (hover: none) { .button[data-variant='attention'][aria-pressed='false']:not(:focus-visible):not(:hover) > svg { opacity: var(--polish-disabled-opacity); } }
 
+html:root .button[data-permission-locked][aria-pressed='true']:not([data-variant='attention']):not(:focus-visible) { outline: var(--choice-card-ring) solid var(--color-ink-secondary); }
+
 /* 権限の操作は焦点を保ち、入力不足と区別できる灰色にする。 */
 html:root .button[data-permission-locked] { background: var(--color-canvas-sunken); color: var(--color-ink-faint); opacity: var(--polish-disabled-opacity); cursor: not-allowed; filter: none; scale: none; }
