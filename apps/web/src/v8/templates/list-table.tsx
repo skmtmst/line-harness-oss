@@ -182,7 +182,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                           aria-label={`「${t.name}」を選択`}
                         /></SaveErrorField>) : <UnavailableSelection label={`「${t.name}」を選択`} />}
                     </Td>
-                    <NameCell name={
+                    <NameCell weight={narrow ? undefined : 1} name={
                         <div className={styles.dotLine}>
                           <>
                             <RowNameLink href={detailHref(t)} title={t.name} className={styles.cellTitle} onClick={(event) => event.stopPropagation()}>
@@ -198,7 +198,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                         <IconLabel icon={kindIcon(isRichVideoTemplate(t) ? 'video' : kindLabel)} aria-label={`種類：${kindText}`}>{kindText}</IconLabel>
                       </Td>
                     ) : (
-                      <Td className={styles.previewCell} title={`種類：${kindText}`}>
+                      <Td weight={1} className={styles.previewCell} title={`種類：${kindText}`}>
                         <span className="sr-only">{`種類：${kindText}`}</span>
                         <LineBubbleThumb thumb={bubbleThumbOf({ messageType: t.messageType, content: latestContentOf(t), question: t.question })} />
                       </Td>
