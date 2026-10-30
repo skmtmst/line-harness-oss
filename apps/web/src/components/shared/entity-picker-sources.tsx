@@ -89,6 +89,12 @@ type KindFieldBase = {
   placeholder?: string
   disabled?: boolean
   disabledReason?: string
+  lockedReason?: string
+  canChangeNow?: () => boolean
+  /** タグを作る権限は、既存のタグを選ぶ権限とは別に渡す。 */
+  createDisabled?: boolean
+  createLockedReason?: string
+  canCreateNow?: () => boolean
   readOnly?: boolean
   invalid?: boolean
   description?: string
@@ -121,10 +127,10 @@ export function EntityKindField(props: KindFieldBase & ({ multiple?: false; valu
   const common = {
     label, noun: def.noun, icon: def.icon, items, folders: hasFolderInfo ? folders : undefined, foldersFailed: hasFolderInfo && failed,
     onOpen: hasFolderInfo ? load : undefined, placeholder, disabled, disabledReason, readOnly, invalid, description, id, buttonRef, describedBy,
-    createHref: def.createHref, createLabel: def.createLabel, actionHidden: props.actionHidden,
+    createHref: def.createHref, createLabel: def.createLabel, actionHidden: props.actionHidden, lockedReason: props.lockedReason, canChangeNow: props.canChangeNow,
   }
   if (kind === 'tag') {
-    return <TagPickerField id={id} buttonRef={buttonRef} describedBy={describedBy} multiple={Boolean(props.multiple)} label={label} options={options.map(row => ({ id: row.id, name: row.name ?? row.label ?? '', groupId: row.groupId }))} accountId={accountId} value={props.multiple ? props.value : props.value ? [props.value] : []} onChange={ids => props.multiple ? props.onChange(ids) : props.onChange(ids[0] ?? '')} disabled={disabled} disabledReason={disabledReason} readOnly={readOnly} invalid={invalid} />
+    return <TagPickerField id={id} buttonRef={buttonRef} describedBy={describedBy} multiple={Boolean(props.multiple)} label={label} options={options.map(row => ({ id: row.id, name: row.name ?? row.label ?? '', groupId: row.groupId }))} accountId={accountId} value={props.multiple ? props.value : props.value ? [props.value] : []} onChange={ids => props.multiple ? props.onChange(ids) : props.onChange(ids[0] ?? '')} disabled={disabled} disabledReason={disabledReason} readOnly={readOnly} invalid={invalid} lockedReason={props.lockedReason} canChangeNow={props.canChangeNow} createDisabled={props.createDisabled} createLockedReason={props.createLockedReason} canCreateNow={props.canCreateNow} />
   }
   if (props.multiple) {
     return <EntityPickerField {...common} multiple value={props.value} onChange={props.onChange} unit={def.unit} allowEmpty={props.allowEmpty ?? true} />
@@ -138,11 +144,14 @@ export function EntityKindField(props: KindFieldBase & ({ multiple?: false; valu
 }
 
 /** 欄を使わず窓だけを開く（「テンプレートを選択」ボタンから本文へ入れる など）。 */
-export function EntityKindDialog({ kind, options, initialId = '', confirmLabel, accountId: givenAccountId, onConfirm, onCancel }: {
+export function EntityKindDialog({ kind, options, initialId = '', confirmLabel, accountId: givenAccountId, onConfirm, onCancel, confirmDisabled, confirmLockedReason, canChangeNow }: {
   kind: EntityKind
   options: ReadonlyArray<EntityLike>
   initialId?: string
   confirmLabel?: string
+  confirmDisabled?: boolean
+  confirmLockedReason?: string
+  canChangeNow?: () => boolean
   accountId?: string | null
   onConfirm: (id: string) => void
   onCancel: () => void
@@ -159,7 +168,7 @@ export function EntityKindDialog({ kind, options, initialId = '', confirmLabel, 
     : undefined
   const categories = kind === 'template' ? TEMPLATE_CATEGORIES.filter((c) => items.some((item) => item.category === c.id)) : []
   return <EntityPickerDialog title={`${def.noun}を選ぶ`} items={items} folders={hasFolderInfo ? folders : undefined} foldersFailed={hasFolderInfo && failed}
-    categories={categories.length > 1 ? categories : undefined} initialId={initialId} preview={preview} confirmLabel={confirmLabel}
+    categories={categories.length > 1 ? categories : undefined} initialId={initialId} preview={preview} confirmLabel={confirmLabel} confirmDisabled={confirmDisabled} confirmLockedReason={confirmLockedReason} canChangeNow={canChangeNow}
     description={kind === 'form' ? 'ボタンを押したときに開く回答フォームを1つ選びます。' : undefined} searchPlaceholder={kind === 'form' ? `${def.noun}名で探す` : undefined}
     createHref={def.createHref} createLabel={def.createLabel} designNode="dJZ7Q" onConfirm={onConfirm} onCancel={onCancel} />
 }
