@@ -270,6 +270,54 @@ describe('名前を入れる（iBuZH）', () => {
   })
 })
 
+describe('全画面で共用する作成失敗の理由', () => {
+  it.each([
+    [new ApiError(401), 'ログインし直し'],
+    [new ApiError(403), '権限がありません'],
+    [new ApiError(409), '同じ名前のフォルダ'],
+    [new ApiError(409, '同じ名前のフォルダがあります'), '同じ名前のフォルダがあります'],
+    [new ApiError(422, 'フォルダ名は1〜60文字で入力してください'), '1〜60文字'],
+    [new ApiError(429, undefined, undefined, undefined, undefined, 30), '30秒'],
+    [new ApiError(500, undefined, undefined, undefined, 'fixture-incident-500'), 'お問い合わせ番号 fixture-incident-500'],
+    [new ApiError(503), 'サーバー側'],
+    [new FolderCreateError('入力内容を確認してください。D1_ERROR: SELECT secret FROM private_table'), 'フォルダの作成に失敗'],
+  ])('%s は通信のせいにせず回復の理由を出し、名前と色を残して再試行する', async (failure, expected) => {
+    const onCreate = vi.fn<FolderSelectCreate>()
+      .mockRejectedValueOnce(failure)
+      .mockResolvedValueOnce({ value: 'created', label: '挨拶', color: '#3b82f6' })
+    const onChange = vi.fn()
+    await openMenu({ onCreate, onChange })
+    const input = await startCreate()
+    await act(async () => { fireEvent.change(input, { target: { value: '挨拶' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' })) })
+    const message = screen.getByRole('alert').textContent
+    expect(message).toContain(expected)
+    expect(message).not.toMatch(/API error:|D1_ERROR|SELECT|private_table|通信を確かめて/)
+    if (failure instanceof ApiError && failure.status >= 500 && !failure.trackingId) expect(message).not.toContain('お問い合わせ番号')
+    expect(input.value).toBe('挨拶')
+    expect(screen.getByRole('button', { name: 'フォルダの色：青' })).toBeTruthy()
+    expect(onChange).not.toHaveBeenCalled()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'もう一度試す' })) })
+    expect(onCreate.mock.calls).toEqual([['挨拶', '#3b82f6'], ['挨拶', '#3b82f6']])
+    expect(onChange).toHaveBeenCalledOnce()
+    expect(onChange).toHaveBeenCalledWith('created')
+  })
+
+  it('作成中にもう一度押しても呼び出しを重ねない', async () => {
+    let finish: (folder: FolderSelectFolder) => void = () => {}
+    const onCreate = vi.fn<FolderSelectCreate>().mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const onChange = vi.fn()
+    await openMenu({ onCreate, onChange })
+    const input = await startCreate()
+    await act(async () => { fireEvent.change(input, { target: { value: '挨拶' } }) })
+    const button = screen.getByRole('button', { name: '作って選ぶ' })
+    await act(async () => { fireEvent.click(button); fireEvent.click(button) })
+    expect(onCreate).toHaveBeenCalledOnce()
+    await act(async () => { finish({ value: 'created', label: '挨拶' }) })
+    expect(onChange).toHaveBeenCalledOnce()
+  })
+})
+
 describe('folderCreateResult', () => {
   it('失敗の答えは理由の Error、成功はフォルダに直す', () => {
     expect(() => folderCreateResult({ success: false, error: '同じ名前があります' }, () => ({ value: '', label: '' }))).toThrow(FolderCreateError)

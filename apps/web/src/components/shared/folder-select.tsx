@@ -21,7 +21,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import FolderDot from './folder-dot'
 import Select, { type SelectCreateContext, type SelectProps } from './select'
 import { isImeComposing } from './ime'
-import { japaneseDetailOf } from './api-error-message'
+import { describeApiFailure, japaneseDetailOf } from './api-error-message'
+import { ApiError, describeSaveFailure } from '@/lib/api'
 import styles from './folder-select.module.css'
 import FolderColorButton from './folder-color-button'
 import { FOLDER_SELECT_COLORS } from '@line-crm/shared'
@@ -80,8 +81,17 @@ export function folderCreateResult<T>(
 
 /** 板に出す理由。API の答え（同じ名前がある など）を日本語で出し、英語・内部の文は出さない。 */
 function reasonOf(caught: unknown): string {
-  const detail = caught instanceof FolderCreateError ? caught.reason : japaneseDetailOf(caught)
-  return detail || 'フォルダを作れませんでした。通信を確かめて、もう一度試してください'
+  if (caught instanceof ApiError && caught.status === 409) {
+    return japaneseDetailOf(caught) || '同じ名前のフォルダがあります。別の名前で作ってください。'
+  }
+  if (caught instanceof ApiError && caught.status >= 500) {
+    const message = describeSaveFailure(caught)
+    const trackingId = caught.trackingId
+    return trackingId && /^[a-zA-Z0-9_-]{1,128}$/.test(trackingId)
+      ? `${message}（お問い合わせ番号 ${trackingId}）`
+      : message
+  }
+  return describeApiFailure(caught, 'フォルダの作成')
 }
 
 /**
