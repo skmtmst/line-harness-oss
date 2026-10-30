@@ -984,3 +984,4 @@
 - [アカウントごとの監査履歴](release-log/unreleased/1962-masato-audit-account-isolation.md) — 反映履歴。
 - [担当者のアカウント範囲](release-log/unreleased/1961-masato-single-account-staff-scope.md) — 反映履歴。
 - [統括からのLINEアカウント管理](release-log/unreleased/1963-masato-line-account-hq-scope.md) — 反映履歴。
+- [シナリオ一覧の権限とお知らせのベル](release-log/unreleased/1964-kenta-train-1029n.md) — 反映履歴。
