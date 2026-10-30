@@ -1,4 +1,6 @@
 'use client'
+import StatusBadge from '@/components/shared/status-badge'
+import { DetailContent, DetailField } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import FolderSelect from '@/components/shared/folder-select'
 
@@ -990,49 +992,24 @@ export default function RemindersListV8() {
                 }
                 hasPrev={panelIndex > 0}
                 hasNext={panelIndex < reminders.length - 1}
-                footer={
-                  <>
-                    <Button variant="primary" onClick={() => goDetail(detailHref(panelRow.id))}>
+                actions={{ primary: <Button variant="primary" onClick={() => goDetail(detailHref(panelRow.id))}>
                       詳細を見る
-                    </Button>
-                    {/* 閲覧のみの人には押せないボタンを置かない（行の「…」と同じ。監査 WEB-015）。 */}
-                    {canEdit ? (
-                      <>
-                        <Button
-                          variant="secondary"
-                          onClick={() => goDetail(`/reminders/edit?id=${encodeURIComponent(panelRow.id)}`)}
-                        >
+                    </Button>,
+    secondary: (<Button variant="secondary" onClick={() => goDetail(`/reminders/edit?id=${encodeURIComponent(panelRow.id)}`)}>
                           編集する
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            setDuplicateError('')
-                            void runDuplicate(panelRow)
-                            setPanelId(null)
-                          }}
-                        >
-                          複製する
-                        </Button>
-                        <Button
-                          variant="secondary"
-                          onClick={() => {
-                            setPanelId(null)
-                            requestDelete(panelRow)
-                          }}
-                        >
-                          削除する
-                        </Button>
-                      </>
-                    ) : null}
-                  </>
-                }
-              >
-                <p>
-                  {view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'} ／
-                  これから送る {planned} ／ 次に送る {nextSend}
-                </p>
-              </DetailPanel>
+                        </Button>),
+    menuItems: [...([{ allowed: canEdit, id: 'detail-0', label: "複製する", onSelect: () => {
+                    setDuplicateError('');
+                    void runDuplicate(panelRow);
+                    setPanelId(null);
+                } }]),
+        ...([{ allowed: canEdit, id: 'detail-1', label: "削除する", onSelect: () => {
+                    setPanelId(null);
+                    requestDelete(panelRow);
+                } }])], secondaryAllowed: canEdit }}
+               status={<StatusBadge tone={view.status === 'active' ? 'success' : 'neutral'}>{view.status === 'active' ? '有効' : view.status === 'draft' ? '下書き' : '停止中'}</StatusBadge>}>
+<DetailContent><DetailField label="これから送る">{planned}</DetailField><DetailField label="次に送る">{nextSend}</DetailField></DetailContent>
+</DetailPanel>
             )
           })()}
 

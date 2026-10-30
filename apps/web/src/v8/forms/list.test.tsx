@@ -202,8 +202,8 @@ describe('V8 回答フォーム一覧', () => {
     expect(screen.queryByRole('menuitem', { name: '削除' })).toBeNull()
     fireEvent.click(host.querySelector('[data-row-id="f-1"]')!)
     await flush()
-    expect(screen.queryByRole('button', { name: 'フォーム名を変更する' })).toBeNull()
-    expect(screen.queryByText('編集する')).toBeNull()
+    expect(screen.getByRole('button', { name: 'フォーム名を変更する' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: '編集する' }).getAttribute('aria-disabled')).toBe('true')
     expect(screen.queryByRole('button', { name: '複製' })).toBeNull()
   })
 

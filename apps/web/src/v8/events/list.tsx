@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailField, DetailInlineEdit } from '@/components/shared/detail-content'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { RowNameLink } from '@/components/shared/table'
@@ -616,32 +617,22 @@ export default function EventsListV8() {
         hasNext={activeIndex >= 0 && activeIndex < items.length - 1}
         onPrev={activeIndex > 0 ? () => goDetail(-1) : undefined}
         onNext={activeIndex >= 0 && activeIndex < items.length - 1 ? () => goDetail(1) : undefined}
-        footer={active ? (
-          <div className={styles.panelActions}>
-            <Button href={`/events/edit?id=${active.id}`}>中身を見る</Button>
-            {canEdit ? <Button variant="danger" onClick={() => { const transition = closeDetail(); requestDelete(active); return transition }} busyLabel="処理中…">削除する</Button> : null}
-          </div>
-        ) : undefined}
-      >
+        actions={{permissionNeed: "manager", primary: (active ? <Button variant="primary" href={`/events/edit?id=${active.id}`}>中身を見る</Button> : null),
+    menuItems: [...(active ? [{ id: 'body-1', label: "プレビュー", onSelect: () => router.push(`/events/preview?id=${active.id}`) }] : []), ...(active ? [{ allowed: canEdit, id: 'detail-0', label: "削除する", onSelect: () => { const transition = closeDetail(); requestDelete(active); return transition; }, tone: 'danger' as const }] : [])], secondary: (active ? <Button variant="secondary" onClick={() => router.push(`/events/bookings?id=${active.id}`)}>申込者を見る</Button> : null) }}
+       status={active ? <StatusBadge tone={eventRowState(active) === 'open' ? 'success' : 'neutral'}>{STATE_LABEL[eventRowState(active)]}</StatusBadge> : null}>
+<DetailContent>
         {active ? (
           <div className={styles.panelBody}>
-            <p className={styles.panelLabel}>イベント名</p>
-            {/* 閲覧のみ：鉛筆は置かず、名前だけを見せる（2026-10-06 オーナー決定）。 */}
-            {canEdit
-              ? <InlineEdit value={active.name} label="イベント名" onSave={(next) => renameEvent(active, next)} />
-              : <p className={styles.panelText}>{active.name}</p>}
-            <p className={styles.panelLabel}>状態</p>
-            <p className={styles.panelText}>{STATE_LABEL[eventRowState(active)]}</p>
-            <p className={styles.panelLabel}>予約・承認待ち</p>
-            <p className={styles.panelText}>{`予約 ${active.total_active} / ${active.total_capacity ?? emptyValue('unknown')}　承認待ち ${active.pending_count > 0 ? active.pending_count : emptyValue('unknown')}`}</p>
-            <div className={styles.panelActions}>
-              <Button onClick={() => router.push(`/events/bookings?id=${active.id}`)}>申込者を見る</Button>
-              <Button onClick={() => router.push(`/events/preview?id=${active.id}`)}>プレビュー</Button>
-            </div>
-            {!canEdit ? <p className={styles.folderNote}>名前の変更・削除には統括か管理者の権限が要ります。</p> : null}
+            <DetailField label="イベント名"> <DetailInlineEdit need="manager" allowed={canEdit} value={active.name} label="イベント名" onSave={(next) => renameEvent(active, next)} /> </DetailField>
+
+            <DetailField label="予約・承認待ち"> {`予約 ${active.total_active} / ${active.total_capacity ?? emptyValue('unknown')}　承認待ち ${active.pending_count > 0 ? active.pending_count : emptyValue('unknown')}`} </DetailField>
+
+            {!canEdit ? <p className={styles.folderNote}>名前の変更・削除は、オーナーか管理者だけができます。</p> : null}
           </div>
         ) : null}
-      </DetailPanel>
+
+</DetailContent>
+</DetailPanel>
       <ConfirmDialog
         open={deleteTarget !== null}
         destructive

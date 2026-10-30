@@ -1015,3 +1015,4 @@
 - [ユーザー一覧の最終ログイン日](release-log/unreleased/1980-masato-staff-login-date.md) — 反映履歴。
 - [ユーザー管理画面の見た目](release-log/unreleased/1981-masato-staff-visual-cleanup.md) — 反映履歴。
 - [LINEチャネル情報の入力確認](release-log/unreleased/1982-masato-line-channel-input-validation.md) — 反映履歴、確認 2026-10-30。
+- [右の詳細欄の文字と操作の統一](release-log/unreleased/0000-kenta-drawer-unify.md) — 反映履歴、確認 2026-10-30。

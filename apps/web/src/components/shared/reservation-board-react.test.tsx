@@ -2,7 +2,7 @@
 import {afterEach,describe,expect,it,vi} from 'vitest'
 import {cleanup,createEvent,fireEvent,render,screen,waitFor} from '@testing-library/react'
 import type {ReservationBoardEntry} from '@line-crm/shared'
-import ReservationBoard from './reservation-board'
+import ReservationBoard, { ReservationDining } from './reservation-board'
 const entry:ReservationBoardEntry={id:'r',kind:'seats',version:4,scopeId:'s',startsAt:'2027-02-01T09:00:00Z',endsAt:'2027-02-01T11:00:00Z',status:'confirmed',customerName:'予約のお客さま',guestCount:2,resourceIds:['t1'],resourceLabel:'T1',source:'phone',courseName:null,note:null,dining:null,holdExpiresAt:null}
 const resources=[{id:'t1',label:'T1',capacity:2,active:true},{id:'t2',label:'T2',capacity:2,active:true}]
 afterEach(()=>{cleanup();vi.restoreAllMocks()})
@@ -58,4 +58,19 @@ describe('共通盤の操作',()=>{
   render(<ReservationBoard axis="month" entries={[entry]} resources={resources} onOpen={()=>{}} dates={['2027-02-01']}/>)
   expect(screen.getByText('28日')).toBeTruthy();expect(screen.queryByText('31日')).toBeNull()
  })
+})
+
+it('飲食の項目の任意指定は右欄だけに作用し、既定の内容は保つ', () => {
+ const row={...entry,currentAllergy:'小麦',dining:{allergy:'えび',anniversary:'誕生日',seatPreference:'窓側',courseAllergens:['乳']}}
+ const view=render(<ReservationDining dense entry={row}/>)
+ const original=view.container.innerHTML
+ const originalText=view.container.textContent
+ expect(view.container.querySelector('[data-detail-fields]')).toBeNull()
+ view.rerender(<ReservationDining dense presentation={undefined} entry={row}/>)
+ expect(view.container.innerHTML).toBe(original)
+ view.rerender(<ReservationDining dense presentation="detail" entry={row}/>)
+ expect(view.container.querySelector('[data-detail-fields]')).toBeTruthy()
+ for(const text of ['小麦','えび','誕生日','窓側','乳','今回の注意']) expect(view.container.textContent).toContain(text)
+ expect(originalText).toContain('今回の注意')
+ expect(screen.getByRole('region',{name:'飲食'})).toBeTruthy()
 })

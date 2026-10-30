@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailField, DetailNumber, DetailSection, DetailSectionTitle } from '@/components/shared/detail-content'
 
 import { jstDateOffset } from '@/lib/jst-datetime'
 
@@ -15,8 +16,6 @@ import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '@/components/shared/button'
 import Drawer from '@/components/shared/drawer'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -82,7 +81,10 @@ export default function SummaryDrawerV8({
       title="健康日記 30日のまとめ"
       description={status === 'ready' && summary ? petLine(summary) : 'まとめを作っています'}
       onClose={onClose}
-    >
+     actions={{primary: ((!(status === 'loading')) && (!(status === 'error' || !summary || !s)) ? <Button variant="primary" type="button" onClick={onPrint} title="ブラウザの印刷で PDF に保存します">
+                印刷・PDF に保存する
+              </Button> : null)}}>
+<DetailContent>
       <div className={styles.summaryBody} data-design-node="BVuYh">
         {status === 'loading' ? (
           <ListState kind="loading" title="まとめを作っています" />
@@ -99,15 +101,15 @@ export default function SummaryDrawerV8({
                 <Notice tone="info">
                   お客さまがマイページで付けた記録をまとめたものです。診断や治療の判断は含みません。
                 </Notice>
-            <KpiBand density="compact">
-              <KpiCard density="compact" icon={null} title="記録" value={s.records} unit="日" detail={null} />
-              <KpiCard density="compact" icon={null} title="体重" value={null} valueRange={{ from: s.weight?.first, to: s.weight?.last }} unit="kg" detail={null} />
-              <KpiCard density="compact" icon={null} title="呼吸数（平均）" value={s.respiratoryRateAvg} unit="回／分" detail={null} />
-              <KpiCard density="compact" icon={null} title="心拍数（平均）" value={s.heartRateAvg} unit="回／分" detail={null} />
-            </KpiBand>
+            <DetailSection>
+              <DetailField label="記録" note={null}><DetailNumber value={s.records} unit="日" /></DetailField>
+              <DetailField label="体重" note={null}><DetailNumber value={null} range={{ from: s.weight?.first, to: s.weight?.last }} unit="kg" /></DetailField>
+              <DetailField label="呼吸数（平均）" note={null}><DetailNumber value={s.respiratoryRateAvg} unit="回／分" /></DetailField>
+              <DetailField label="心拍数（平均）" note={null}><DetailNumber value={s.heartRateAvg} unit="回／分" /></DetailField>
+            </DetailSection>
             <section className={styles.chart} aria-label="体重の30日の推移">
               <div className={styles.chartHead}>
-                <h3 className={styles.chartTitle}>体重</h3>
+                <DetailSectionTitle>体重</DetailSectionTitle>
                 {weightDelta !== null && weightPercent !== null ? (
                   <p className={styles.chartCaption} data-tone={weightWarn ? 'warn' : undefined}>{`30日で ${signed(weightDelta, 1)}kg（${signed(weightPercent, 0)}%）`}</p>
                 ) : null}
@@ -138,15 +140,13 @@ export default function SummaryDrawerV8({
             ) : (
               <p className={styles.summaryEmpty}>この30日の記録はありません。</p>
             )}
-            <div className={styles.summaryFoot}>
-              <Button type="button" onClick={onPrint} title="ブラウザの印刷で PDF に保存します">
-                印刷・PDF に保存する
-              </Button>
-            </div>
+
           </>
         )}
       </div>
-    </Drawer>
+
+</DetailContent>
+</Drawer>
   )
 }
 

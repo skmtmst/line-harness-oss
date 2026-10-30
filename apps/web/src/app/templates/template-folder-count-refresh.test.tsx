@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { findDetailMenuItem } from '@/test-utils/detail-menu'
 /*
  * R195: テンプレートの作成・移動・削除のあと、フォルダの件数
  * （「すべて」「未分類」・各フォルダの数）を読み直す。
@@ -128,7 +129,7 @@ describe('R195 フォルダ件数の読み直し', () => {
     await renderReady()
     const row = within(screen.getByRole('table')).getByText('来店お礼').closest('tr')!
     fireEvent.keyDown(row, { key: 'Enter' })
-    fireEvent.click(await screen.findByRole('button', { name: 'フォルダへ移す' }))
+    fireEvent.click(await findDetailMenuItem('フォルダへ移す'))
     fireEvent.click(await screen.findByRole('button', { name: '移動先のフォルダ' }))
     const option = await screen.findByRole('option', { name: /営業/ })
     fireEvent.click(within(option).getByRole('button'))
@@ -155,7 +156,7 @@ describe('R195 フォルダ件数の読み直し', () => {
       expect(fixture.templatesList.mock.calls.length).toBeGreaterThan(beforeList)
       expect(fixture.foldersList.mock.calls.length).toBeGreaterThan(beforeFolders)
     })
-    expect(screen.getByRole('dialog').querySelector('p')?.textContent).toBe('未分類')
+    expect(screen.getByRole('dialog').querySelector('header')?.textContent).toContain('未分類')
   })
 
   test('削除したあと、一覧と一緒にフォルダ件数も読み直す', async () => {
@@ -179,7 +180,7 @@ describe('R195 フォルダ件数の読み直し', () => {
     // 行を開いて詳細を出す
     const table = screen.getByRole('table')
     fireEvent.keyDown(within(table).getByText('来店お礼').closest('tr')!, { key: 'Enter' })
-    fireEvent.click(await screen.findByRole('button', { name: 'フォルダへ移す' }))
+    fireEvent.click(await findDetailMenuItem('フォルダへ移す'))
     const beforeCalls = fixture.foldersList.mock.calls.length
 
     const selectButton = await screen.findByRole('button', { name: '移動先のフォルダ' })

@@ -1,5 +1,6 @@
 'use client'
 
+import { DetailPreview } from '@/components/shared/detail-content'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { Bell, CalendarClock, CalendarHeart, Check, ChevronDown, Clock, HeartHandshake, MessageSquare, MessageSquareText, Star } from 'lucide-react'
@@ -271,8 +272,8 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
   return <>
     {readOnly ? <ReadOnlyNotice role="note" /> : null}
     {actionError ? <p role="alert">{actionError}</p> : null}
-    <DetailColumns presentation="notification" asideLabel="LINEでの見え方" expanded={previewExpanded} onExpandedChange={setPreviewExpanded}
-      aside={<StepPreview bubbles={previewBubbles} accountName={storeName || 'LINE公式アカウント'} />}>
+    <DetailColumns asideLayout="detail" presentation="notification" asideLabel="LINEでの見え方" expanded={previewExpanded} onExpandedChange={setPreviewExpanded}
+      aside={<DetailPreview title="LINEでの見え方"><StepPreview bubbles={previewBubbles} accountName={storeName || 'LINE公式アカウント'} /></DetailPreview>}>
       {live ? <SendingLine live={live} /> : null}
       <div className={styles.flowList}>
         {rows.map(row => {

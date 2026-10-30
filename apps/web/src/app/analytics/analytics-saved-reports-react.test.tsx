@@ -248,7 +248,10 @@ describe('管理画面 保存タブの定期レポート', () => {
     fixture.role = 'staff'
     await render()
     expect(host.textContent).toContain('週次まとめ')
-    for (const label of ['止める', 'また送る', 'しまう', '内容を変える', '定期レポートを作る']) {
+    const edit = [...host.querySelectorAll('button')].find(item => item.textContent?.trim() === '内容を変える')!
+    expect(edit.getAttribute('aria-disabled') === 'true' || edit.hasAttribute('disabled')).toBe(true)
+    expect(host.querySelector('a[title="条件を変えるときは、元の分析で集計し直してから保存します"]')).toBeNull()
+    for (const label of ['止める', 'また送る', 'しまう', '定期レポートを作る']) {
       expect(Array.from(host.querySelectorAll('button, a')).some((item) => item.textContent?.trim() === label)).toBe(false)
     }
   })

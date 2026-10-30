@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { findDetailMenuItem } from '@/test-utils/detail-menu'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 /*
  * V8 一斉配信一覧（src/v8）の動きの試験。BEHAVIOR.md の主要な動きを守る。
@@ -1205,8 +1206,10 @@ describe('保持した一斉配信一覧の変更操作', () => {
     expect(panel.isConnected).toBe(true)
     expect(panel.textContent).toContain('下書き')
     for (const label of ['編集を続ける', '複製する', '削除する']) {
-      const button = [...panel.querySelectorAll<HTMLButtonElement>('button')].find(e => e.textContent?.trim() === label)!
-      expect(button.disabled).toBe(false); expect(button.getAttribute('aria-disabled')).toBe('true')
+      const button = label === '編集を続ける'
+        ? [...panel.querySelectorAll<HTMLButtonElement>('button')].find(e => e.textContent?.trim() === label)!
+        : await findDetailMenuItem(label, panel)
+      expect(button.hasAttribute('disabled')).toBe(false); expect(button.getAttribute('aria-disabled')).toBe('true')
       act(() => fireEvent.focus(button))
       expect(document.querySelector('[role="tooltip"]')?.textContent).toContain(PERMISSION_LOCK_REASON.impersonation)
       act(() => { fireEvent.blur(button); fireEvent.click(button) })

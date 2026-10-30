@@ -8,6 +8,8 @@ import { createPortal } from 'react-dom'
 import React, { useCallback, useEffect, useId, useRef, type ReactNode } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import styles from './detail-panel.module.css'
+import detailStyles from './detail-content.module.css'
+import DetailActions, { hasDetailActions, type DetailActionsProps } from './detail-actions'
 import { DETAIL_PANEL_WIDTH } from './panel-sizes'
 import { isImeComposing } from './ime'
 
@@ -26,6 +28,8 @@ export type DetailPanelProps = {
   busy?: boolean
   children?: ReactNode
   footer?: ReactNode
+  actions?: DetailActionsProps
+  status?: ReactNode
 }
 
 /**
@@ -72,6 +76,8 @@ export default function DetailPanel({
   busy = false,
   children,
   footer,
+  actions,
+  status,
 }: DetailPanelProps) {
   const titleId = useId()
   const descriptionId = useId()
@@ -119,7 +125,7 @@ export default function DetailPanel({
   const panel = (
     <aside
       ref={panelRef}
-      className={styles.panel} style={{ width: DETAIL_PANEL_WIDTH }}
+      className={`${styles.panel} ${detailStyles.surface}`} style={{ width: DETAIL_PANEL_WIDTH }}
       role="dialog"
       aria-labelledby={titleId}
       aria-describedby={description ? descriptionId : undefined}
@@ -129,8 +135,8 @@ export default function DetailPanel({
     >
       <header className={styles.header}>
         <div className={styles.heading}>
-          <h2 id={titleId} className={styles.title}>{title}</h2>
-          {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
+          <h2 id={titleId} title={title} className={`${styles.title} ${detailStyles.title}`}>{title}</h2>
+          {actions !== undefined || status !== undefined ? (status || description ? <div className={detailStyles.summary}>{status}{description ? <span id={descriptionId} className={detailStyles.summaryText} title={description}>{description}</span> : null}</div> : null) : description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
         </div>
         <div className={styles.nav} role="group" aria-label="行の移動">
           <button type="button" className={styles.navButton} onClick={onPrev} disabled={!onPrev || !hasPrev || busy} aria-label="前の行">
@@ -145,7 +151,7 @@ export default function DetailPanel({
         </div>
       </header>
       <div className={styles.body} data-content-spacing={contentSpacing}>{children}</div>
-      {footer ? <footer className={styles.footer}>{footer}</footer> : null}
+      {hasDetailActions(actions) ? <footer className={styles.actionFooter}><DetailActions {...actions} /></footer> : actions ? null : footer ? <footer className={styles.footer}>{footer}</footer> : null}
     </aside>
   )
   return typeof document === 'undefined' ? null : createPortal(panel, document.body)

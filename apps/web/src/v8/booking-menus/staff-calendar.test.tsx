@@ -57,3 +57,16 @@ it('固定の会議URLの保存が欄の理由を返したら、入力を残し�
   expect(field.getAttribute('aria-invalid')).toBe('true')
   expect((field as HTMLInputElement).value).toBe('https://meet.google.com/changed')
 })
+
+it('会議URLの保存は下の操作帯に置き、まとまりの読み上げ名も保つ', async () => {
+  render(<StaffCalendarPanel accountId="acc-1" person={person} menuCount={4} canEdit onClose={() => undefined} />)
+  const field = await screen.findByRole('textbox', { name: '固定の会議の URL' })
+  expect(screen.getByRole('region', { name: 'カレンダー' })).toBeTruthy()
+  expect(screen.getByRole('region', { name: '会議の URL' })).toBeTruthy()
+  fireEvent.change(field, { target: { value: 'https://meet.example.invalid/new' } })
+  const save = screen.getByRole('button', { name: '保存する' })
+  expect(save.closest('footer')?.querySelector('[data-detail-actions]')).toBeTruthy()
+  expect(document.querySelector('[data-detail-content] [data-variant="primary"]')).toBeNull()
+  fireEvent.click(save)
+  await waitFor(() => expect(net.saveStaffUrl).toHaveBeenCalledWith('acc-1', 'bs-1', 'https://meet.example.invalid/new', 1))
+})
