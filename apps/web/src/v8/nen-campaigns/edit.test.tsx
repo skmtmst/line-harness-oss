@@ -249,6 +249,16 @@ describe('V8 NEN配信「コラムを書く」（yRDwW）', () => {
     expect(host.querySelector('input[aria-label="題名"]')).toBeNull()
     expect([...document.querySelectorAll('button[disabled]')].map((b) => b.textContent)).toEqual([])
   })
+
+  it('ID69: 元のコラムを選ぶ道は共通の文字リンク（TextLink）', async () => {
+    await act(async () => { root.render(<ColumnNew />) })
+    await flush()
+    const link = [...host.querySelectorAll('a')].find((a) => (a.textContent ?? '').includes('一覧で元のコラムを選びます'))!
+    expect(link.getAttribute('href')).toBe('/nen-campaigns?tab=columns')
+    /* TextLink は矢印の印（svg）を足す。直す前の素のLinkだと印が無く、手書きの「→」が文字に残る。 */
+    expect(link.querySelector('svg')).not.toBeNull()
+    expect(link.textContent).not.toContain('→')
+  })
 })
 
 it('保存のぶつかりでは入力を残し、比較では変えず、読み直すときだけ最新を入れる', async () => {
