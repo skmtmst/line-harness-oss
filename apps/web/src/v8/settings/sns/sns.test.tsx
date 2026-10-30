@@ -5,7 +5,7 @@ import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
  * 設定 › SNS 連携の Instagram のカード（★V8-B `YINmJ`・`DFnll`／2026-10-07 利用者承認）。
  * 守るのは BEHAVIOR.md に書いた決めごと：
  *  - 状態のことばは4つ（接続しています／未接続／認可が切れています／設定がありません）。
- *  - 未接続・認可切れは注記＋［Instagram にログインして接続］。ページを選ぶ段は出さない。
+ *  - 未接続・認可切れは注記＋［接続する］。ページを選ぶ段は出さない。
  *  - 接続済みは `@ユーザー名（ビジネス）`・「写真つき投稿の同時公開」＋［接続を確かめる］［接続を解除する］。
  *  - 「設定がありません」は注記だけ。押せないボタンは置かない。
  *  - 閲覧のみにはボタンを置かない。
@@ -129,12 +129,12 @@ afterEach(() => {
 })
 
 describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
-  it('未接続では注記と［Instagram にログインして接続］を出し、ページを選ぶ段は出さない', async () => {
+  it('未接続では注記と［接続する］を出し、ページを選ぶ段は出さない', async () => {
     setup('disconnected')
 
     expect(await igCard().findByText('未接続')).toBeTruthy()
     expect(screen.getByText('Instagram のビジネスアカウント（またはクリエイターアカウント）でログインしてください。個人のアカウントは接続できません。')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Instagram にログインして接続する' })).toBeTruthy()
+    expect(igCard().getByRole('button', { name: '接続する' })).toBeTruthy()
     // ページを選ぶ段（利用者の決めで出さない）
     expect(screen.queryByText(/ページを選/)).toBeNull()
     // 未接続では解除・確認のボタンは出ない。
@@ -160,7 +160,7 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     setup('expired', CONNECTED)
 
     expect((await screen.findAllByText('接続の異常')).length).toBeGreaterThan(0)
-    expect(screen.getByRole('button', { name: 'Instagram にログインして接続する' })).toBeTruthy()
+    expect(igCard().getByRole('button', { name: '接続する' })).toBeTruthy()
     await openIgMenu()
     expect(screen.getAllByRole('menuitem', { name: '接続を解除する' }).length).toBeGreaterThan(0)
   })
@@ -170,7 +170,7 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
 
     expect((await screen.findAllByText('未設定')).length).toBeGreaterThan(0)
     expect(screen.getByText('この環境には Instagram 接続の設定がありません。')).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'Instagram にログインして接続する' })).toBeNull()
+    expect(igCard().queryByRole('button', { name: '接続する' })).toBeNull()
     expect(screen.queryByRole('button', { name: /接続を確かめる/ })).toBeNull()
   })
 
@@ -182,7 +182,7 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     expect(await screen.findByText('接続済み')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /接続を確かめる/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /その他操作/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Instagram にログインして接続する' })).toBeNull()
+    expect(igCard().queryByRole('button', { name: '接続する' })).toBeNull()
   })
 
   it('［接続を確かめる］で確かめの口を呼び、読み直す', async () => {
@@ -199,7 +199,7 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
 
     await screen.findByText(PERMISSION_LOCK_SUMMARY.feature)
     await igCard().findByText(state === 'expired' ? '接続の異常' : '未接続')
-    expect(igCard().queryByRole('button', { name: 'Instagram にログインして接続する' })).toBeNull()
+    expect(igCard().queryByRole('button', { name: '接続する' })).toBeNull()
     expect(igCard().queryByText(/個人のアカウントは接続できません/)).toBeNull()
     expect(fixture.igStart).not.toHaveBeenCalled()
   })
@@ -209,7 +209,7 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
     fixture.igStart.mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectStart = reject }))
     setup('disconnected')
 
-    const start = await screen.findByRole('button', { name: 'Instagram にログインして接続する' })
+    const start = await igCard().findByRole('button', { name: '接続する' })
     fireEvent.click(start)
     expect(start.hasAttribute('disabled')).toBe(true)
     expect(igCard().getByText(/個人のアカウントは接続できません/)).toBeTruthy()
@@ -264,6 +264,7 @@ describe('Google のカード', () => {
     fixture.googleConnectStart.mockRejectedValueOnce(new Error('offline'))
     setup('disconnected')
     const card = within(await screen.findByRole('region', { name: 'Google ビジネス' }))
+    expect(card.getAllByText('未接続')).toHaveLength(1)
     fireEvent.click(await card.findByRole('button', { name: '接続する' }))
     await waitFor(() => expect(fixture.googleConnectStart).toHaveBeenCalledWith('acc-1'))
     expect(await card.findByText('Googleの認可画面を開けませんでした。')).toBeTruthy()
