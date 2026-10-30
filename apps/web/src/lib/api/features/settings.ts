@@ -9,7 +9,7 @@ export const settingsMethods = {
   featureSettings: {
     /** 一般staffの画面の殻に使う、表示可否booleanだけの応答。 */
     visibility: (accountId: string) =>
-      fetchApi<ApiResponse<{ features: Record<string, boolean> }>>(
+      fetchApi<ApiResponse<{ features: Record<string, boolean>; favoriteItemIds: string[]; restaurantHiddenItemIds: string[] }>>(
         `/api/settings/features/visibility?account_id=${encodeURIComponent(accountId)}`,
       ),
     get: (accountId: string) =>
@@ -18,6 +18,8 @@ export const settingsMethods = {
         sidebarOrder: string[] | null
         /** 区分ごとの項目の並び。区分の目印 → 項目の目印の並び。 */
         sidebarItemOrder: Record<string, string[]> | null
+        favoriteItemIds: string[]
+        restaurantHiddenItemIds: string[]
         parentChildMode: boolean
         specializedFeatureKeys: string[]
         /** 保存時に送り返す版。一括保存の競合検出に使う。 */
@@ -29,6 +31,8 @@ export const settingsMethods = {
       features?: Record<string, boolean>
       sidebarOrder?: string[]
       sidebarItemOrder?: Record<string, string[]>
+      favoriteItemIds?: string[]
+      restaurantHiddenItemIds?: string[]
       /** GET で受けた版。付けると1行でまとめて保存し、古ければ409で返す。 */
       expectedVersion: number
       /** 変更理由。空白だけはサーバーが400で拒否する。監査へ残る。 */

@@ -1,5 +1,5 @@
 import { getAccountSetting, getAccountSettings, getVersionedAccountSetting } from '@line-crm/db';
-import { MENU_SECTION_LABELS, expectedMenuItemOrder, isMenuSectionId, type FeatureId } from '@line-crm/shared';
+import { MENU_SECTION_LABELS, RESTAURANT_MENU_LAYOUT, RESTAURANT_OPTIONAL_ITEM_IDS, expectedMenuItemOrder, expectedRestaurantMenuItemOrder, isMenuSectionId, type FeatureId } from '@line-crm/shared';
 
 import { accountFeatureAvailabilityMap } from '../services/feature-enforcement.js';
 import { cleanStringArray, cleanItemOrder } from './feature-settings-definition-collect-feature-impact.js';
@@ -13,11 +13,12 @@ export /**
  * 未知の区分や過不足を通すと、読み出し側の「知らない値は捨てる」
  * 処理で並びが黙って欠ける。
  */
-function cleanSidebarOrderStrict(raw: unknown): string[] | null {
+function cleanSidebarOrderStrict(raw: unknown, restaurantStyle = false): string[] | null {
   const values = cleanStringArray(raw);
   if (!values) return null;
-  if (values.length !== MENU_SECTION_LABELS.length) return null;
-  const known = new Set(MENU_SECTION_LABELS);
+  const labels = restaurantStyle ? RESTAURANT_MENU_LAYOUT.map((section) => section.label) : MENU_SECTION_LABELS;
+  if (values.length !== labels.length) return null;
+  const known = new Set<string>(labels);
   return values.every((label) => known.has(label)) ? values : null;
 }
 
@@ -32,12 +33,15 @@ export /**
 function cleanItemOrderStrict(
   raw: unknown,
   specializedFeatureKeys: ReadonlySet<string>,
+  restaurantStyle = false,
 ): Record<string, string[]> | null {
   const cleaned = cleanItemOrder(raw);
   if (!cleaned) return null;
-  const expected = expectedMenuItemOrder(specializedFeatureKeys);
+  const expected = restaurantStyle
+    ? expectedRestaurantMenuItemOrder(specializedFeatureKeys)
+    : expectedMenuItemOrder(specializedFeatureKeys);
   for (const sectionId of Object.keys(cleaned)) {
-    if (!isMenuSectionId(sectionId)) return null;
+    if (!(restaurantStyle ? RESTAURANT_MENU_LAYOUT.some((section) => section.id === sectionId) : isMenuSectionId(sectionId))) return null;
   }
   for (const [sectionId, ids] of Object.entries(cleaned)) {
     const wanted = expected[sectionId] ?? [];
@@ -83,7 +87,7 @@ export async function loadLegacyFeatureSettings(
   } catch {
     sidebarItemOrder = null;
   }
-  return { features, sidebarOrder, sidebarItemOrder };
+  return { features, sidebarOrder, sidebarItemOrder, favoriteItemIds: [], restaurantHiddenItemIds: [] };
 }
 
 export async function loadFeatureSettings(
@@ -115,6 +119,9 @@ export async function loadFeatureSettings(
     features,
     sidebarOrder: cleanStringArray(saved.data.sidebarOrder) ?? null,
     sidebarItemOrder: cleanItemOrder(saved.data.sidebarItemOrder) ?? null,
+    favoriteItemIds: cleanStringArray(saved.data.favoriteItemIds) ?? [],
+    restaurantHiddenItemIds: (cleanStringArray(saved.data.restaurantHiddenItemIds) ?? [])
+      .filter((id) => (RESTAURANT_OPTIONAL_ITEM_IDS as readonly string[]).includes(id)),
   };
 }
 
@@ -131,6 +138,8 @@ export async function loadFeatureVisibility(
   const featureStates = await accountFeatureAvailabilityMap(db, accountId, state.features);
   const specialized = new Set(specializedCatalog(specializedRaw));
   return {
+    favoriteItemIds: state.favoriteItemIds ?? [],
+    restaurantHiddenItemIds: state.restaurantHiddenItemIds ?? [],
     features: {
       ...Object.fromEntries(TOGGLEABLE_FEATURES.map((featureId) => [
         featureId,

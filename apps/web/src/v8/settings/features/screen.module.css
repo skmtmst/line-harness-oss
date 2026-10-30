@@ -360,3 +360,9 @@
 .live {
   display: contents;
 }
+.favoriteButton { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 32px; height: 32px; border: 0; background: transparent; color: #94a3b8; cursor: pointer; }
+.favoriteButton svg { width: 19px; height: 19px; }
+.favoriteButton:hover { color: #ca8a04; }
+.favoriteButton:disabled { opacity: .45; cursor: not-allowed; }
+.favoriteActive { color: #eab308; }
+.favoriteActive svg { fill: currentColor; }

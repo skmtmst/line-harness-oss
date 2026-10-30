@@ -1,6 +1,6 @@
 export { starter } from './style-starter-set.js';
 import { starter } from './style-starter-set.js';
-import { type AccountStyle, type SetupAnswer } from '@line-crm/shared';
+import { restaurantDefaultFeatures, type AccountStyle, type SetupAnswer } from '@line-crm/shared';
 import { storeFeatureInitialization } from '@line-crm/db/src/store-feature-initialization.js';
 
 export * from './style-setup-core.js';
@@ -125,6 +125,15 @@ export async function saveProfile(
         styleMode,
       ),
   );
+  if (selected && style === 'restaurant') {
+    // 既存の手動設定は守る。初めて飲食店を選んだ時だけ、サイドバーと同じ初期値を一括保存する。
+    statements.push(db.prepare(`INSERT OR IGNORE INTO account_settings
+      (id, line_account_id, key, value, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)`)
+      .bind(crypto.randomUUID(), account, 'feature.settings_bundle_v1', JSON.stringify({
+        version: 1,
+        data: { features: restaurantDefaultFeatures(), sidebarOrder: null, sidebarItemOrder: null },
+      }), now, now));
+  }
   if (selected && style === 'restaurant') statements.push(restaurantFollowupSeedStatement(db,{accountId:account}));
   const previousAnswers = JSON.parse(current?.answers_json ?? '{}') as Record<
     string,
