@@ -977,3 +977,8 @@
 - [アカウントの説明と権限・予約の見出し](release-log/unreleased/1954-kenta-train-1029k.md)
 - [一斉配信の権限と結果の列](release-log/unreleased/1955-kenta-train-1029l.md) — 閲覧のみの操作と受付件数の反映履歴。
 - [すばやく送る操作と複製・フォルダの権限確認](release-log/unreleased/1956-kenta-train-1029m.md) — 反映履歴。
+- [musuboの公式ロゴ](release-log/unreleased/1957-masato-musubo-official-logo.md) — 反映履歴。
+- [アカウント登録の入口](release-log/unreleased/1958-masato-registration-entry.md) — 反映履歴。
+- [アカウントごとの二段階認証の件数](release-log/unreleased/1959-masato-account-mfa-count.md) — 反映履歴。
+- [musuboの表記と案内](release-log/unreleased/1960-masato-musubo-branding.md) — 反映履歴。
+- [アカウントごとの監査履歴](release-log/unreleased/1962-masato-audit-account-isolation.md) — 反映履歴。
