@@ -1,3 +1,4 @@
+import './kpi-delta-row.test.mjs'
 import './floating-surface.test.mjs'
 import './floating-surface-components.test.mjs'
 import test from 'node:test'
