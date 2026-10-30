@@ -185,10 +185,10 @@ describe('定期レポートの「入れる項目」(N-284)', () => {
     const mileage = sectionCheckbox('マイル')
     expect(mileage.disabled).toBe(true)
     expect(mileage.checked).toBe(false)
-    // 48: 理由は短く、名前の横に灰の札「準備中」。
+    // 48: 理由は短く、名前の横に灰の札「未集計」。
     expect(host.textContent).toContain('集計ができたら選べます')
     expect(host.textContent).not.toContain('まだ集計できません')
-    expect(within(host).getByText('準備中')).toBeTruthy()
+    expect(within(host).getByText('未集計')).toBeTruthy()
 
     // ほかの節はふつうに選べる。
     expect(sectionCheckbox('友だちの増減').disabled).toBe(false)

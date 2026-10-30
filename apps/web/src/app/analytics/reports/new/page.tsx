@@ -61,7 +61,7 @@ const SECTION_CHOICES: Array<{ id: AnalyticsReportSection; title: string; detail
   { id: 'usage', title: '使われ方', detail: '作ったのに使っていないもの' },
   // マイルの期間別集計は未接続で、入れてもレポートは「未取得」になるだけ。
   // 新たに選ばせず、既に入っている既存レポートからは外せるようにする。
-  // 48: 理由は短く「集計ができたら選べます」。名前の横には灰の札「準備中」。
+  // 48: 理由は短く「集計ができたら選べます」。名前の横には灰の札「未集計」。
   { id: 'mileage', title: 'マイル', detail: '付けたマイル・交換', unavailable: '集計ができたら選べます' },
 ]
 
@@ -1165,7 +1165,7 @@ function AnalyticsReportFormPage() {
                 const checked = sections.includes(choice.id)
                 const locked = Boolean(choice.unavailable) && !checked
                 return <Card surface="inset" corner="control" padding="compact" layout="vertical" gap="tight" key={choice.id}>
-                  <Checkbox checked={checked} disabled={locked} onCheckedChange={() => toggleSection(choice.id)} description={<span title={choice.unavailable}>{choice.detail}{choice.unavailable && <>（{choice.unavailable}）</>}</span>}>{choice.unavailable ? <span className="report-v8-sectionTitle">{choice.title} <StatusBadge tone="neutral">準備中</StatusBadge></span> : choice.title}</Checkbox>
+                  <Checkbox checked={checked} disabled={locked} onCheckedChange={() => toggleSection(choice.id)} description={<span title={choice.unavailable}>{choice.detail}{choice.unavailable && <>（{choice.unavailable}）</>}</span>}>{choice.unavailable ? <span className="report-v8-sectionTitle">{choice.title} <StatusBadge tone="neutral">未集計</StatusBadge></span> : choice.title}</Checkbox>
                 </Card>
               })}
             </div>
