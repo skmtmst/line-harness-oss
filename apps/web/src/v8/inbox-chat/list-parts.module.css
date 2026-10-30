@@ -5,41 +5,7 @@
  * まとめ、線は並び順の下の1本だけ。互換経路は段ごとに線で区切る作りのままにするので、
  * ここは v8 のときだけ効かせる。値は globals.css の [data-theme="v8"] の --tpl-inbox-*。
  */
-:global(:root) .tool {
-  width: var(--tpl-inbox-tool-size);
-  height: var(--tpl-inbox-tool-size);
-}
-
-/* 印は絵（XqSvX）の list-filter・bookmark・settings-2 を 14・墨の薄い字（ink-secondary）。 */
-:global(:root) .tool {
-  color: var(--color-ink-secondary);
-}
-
-:global(:root) .tool svg {
-  width: var(--tpl-inbox-tool-icon);
-  height: var(--tpl-inbox-tool-icon);
-}
-
-/*
- * F12：題の横の3つの印に字を付ける。並びは変えず、印の下に小さな字を置く
- * （横に字を置くと狭い列に入らない）。印だけの時と同じ副ボタンのまま。
- */
-:global(:root) .toolCaption {
-  width: auto;
-  height: auto;
-  min-width: var(--tpl-inbox-tool-size);
-  flex-direction: column;
-  gap: var(--tpl-inbox-row-line-gap);
-  /* 横の余白は2pxまで。1152幅の列（見出し315px）に題と3つを1行で収める。値は既存の受信箱の変数だけ。 */
-  padding: var(--tpl-inbox-chip-gap) var(--tpl-inbox-seg-gap);
-}
-
-:global(:root) .toolCaptionLabel {
-  font-size: var(--text-micro);
-  line-height: 1.25;
-  font-weight: 500;
-  white-space: nowrap;
-}
+/* 題の横の印は共通の IconButton にした（F12の字付きは廃止）。点の置き場だけ残す。 */
 
 /* ID33：絞り込み中だけ、保存した検索の肩に小さな緑の点を付ける。 */
 :global(:root) .toolDotWrap {

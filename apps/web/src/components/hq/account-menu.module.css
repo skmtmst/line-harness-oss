@@ -181,5 +181,3 @@
   flex-shrink: 0;
   color: var(--color-ink-secondary);
 }
-
-.returnLink { display: block; margin-bottom: var(--space-6); padding: var(--space-4); color: var(--color-action); font-size: var(--text-caption); text-decoration: underline; }

@@ -19,6 +19,15 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
 
 type SetupData = { provisioningUri: string; manualKey: string }
 
+/* ホームへの遷移先：口座が無ければ新規作成へ。一覧を読めなければ通常のホームへ進む（読みの失敗は欄の理由にしない）。 */
+async function resolveHomePath(): Promise<string> {
+  try {
+    const accounts = await api.lineAccounts.list(false, undefined, { cache: 'no-store' })
+    if (accounts.success && accounts.data.length === 0) return '/accounts/new'
+  } catch { /* 一覧を確認できない場合は通常のホームへ進む */ }
+  return '/'
+}
+
 /**
  * 二段階認証の初回設定（N-426）。
  *
@@ -141,10 +150,7 @@ export default function TwoFactorSetupPage() {
         }
       }
       if (nextPath === '/') {
-        try {
-          const accounts = await api.lineAccounts.list(false, undefined, { cache: 'no-store' })
-          if (accounts.success && accounts.data.length === 0) nextPath = '/accounts/new'
-        } catch { /* 一覧を確認できない場合は通常のホームへ進む */ }
+        nextPath = await resolveHomePath()
       }
       clearTwoFactorChallenge()
       const path = adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken)

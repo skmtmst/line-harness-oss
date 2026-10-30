@@ -76,6 +76,12 @@ export default function Select({
   const [mode, setMode] = useState<'list' | 'create'>('list')
   // 作る板の回。閉じる・一覧へ戻る・ほかを選ぶ・作り直すで進め、古い回の遅い応答に今の選択を上書きさせない。
   const createSessionRef = useRef(0)
+  const createPermission = { disabled: Boolean(createAction?.disabled), reason: createAction?.lockedReason }
+  const currentCreatePermission = useRef(createPermission)
+  if (currentCreatePermission.current.disabled !== createPermission.disabled || currentCreatePermission.current.reason !== createPermission.reason) {
+    createSessionRef.current += 1
+  }
+  currentCreatePermission.current = createPermission
   const menuRef = useRef<HTMLDivElement>(null)
   const enabledOptions = options.filter((option) => !option.disabled)
   const selectedIndex = Math.max(0, enabledOptions.findIndex((option) => option.value === value))
@@ -167,6 +173,11 @@ export default function Select({
   const createActive = hasCreate && activeIndex === enabledOptions.length
   const startCreate = () => {
     if (currentLock.current) return
+    const permission = currentCreatePermission.current
+    if (permission.disabled || permission.reason) {
+      if (permission.reason) menuRef.current?.querySelector<HTMLButtonElement>('[data-select-menu-action]')?.focus()
+      return
+    }
     createSessionRef.current += 1
     setMode('create')
   }
@@ -182,7 +193,7 @@ export default function Select({
       if (session === createSessionRef.current) backToList()
     },
     finish: (next: string) => {
-      if (currentLock.current || session !== createSessionRef.current) return
+      if (currentLock.current || currentCreatePermission.current.disabled || currentCreatePermission.current.reason || session !== createSessionRef.current) return
       createSessionRef.current += 1
       onChange(next)
       triggerRef.current?.focus()
@@ -209,6 +220,11 @@ export default function Select({
   const onButtonKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     // 日本語の変換中のキー（確定の Enter・候補の上下）は選ぶ欄で使わない。
     if (isImeComposing(event)) return
+    // ＋行だけが権限ロックの時は、Tabで理由を読める行へ渡す。未指定時の順序は変えない。
+    if (event.key === 'Tab' && !event.shiftKey && open && currentCreatePermission.current.reason) {
+      const action = menuRef.current?.querySelector<HTMLButtonElement>('[data-select-menu-action]')
+      if (action) { event.preventDefault(); action.focus(); return }
+    }
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       if (!open) setOpen(true)
@@ -322,6 +338,8 @@ export default function Select({
             <SelectMenuAction
               label={createAction.label}
               active={createActive}
+              disabled={createAction.disabled}
+              lockedReason={createAction.lockedReason}
               onHover={() => setActiveIndex(enabledOptions.length)}
               onSelect={startCreate}
             />

@@ -207,7 +207,6 @@ html:root .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset:
 :root .tpList > :first-child:not(.tpCards) { margin-bottom: var(--space-8); }
 
 /* 画面の選択入口だけをそろえ、窓内の候補・確定処理には触れない。 */
-:root .field { border-color: var(--color-control-border); box-shadow: none; background: var(--color-canvas); }
 :root .field:has(.fieldTrigger:hover:not(:disabled)) { background: var(--color-canvas-sunken); }
 :root .field[data-invalid] { border-color: var(--color-danger); }
 :root .field :is(.fieldName, .fieldPlaceholder, .fieldAction) { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
@@ -218,7 +217,7 @@ html:root .cardRadio:focus-visible { outline: var(--focus-ring); outline-offset:
 /* 画面の選ぶ欄も線ではなく影で浮かせる。 */
 :root .field {
   border: 0;
-  background: var(--gradient-raised-control) var(--color-canvas);
+  background: var(--color-canvas);
   box-shadow: var(--shadow-raised-control);
 }
 

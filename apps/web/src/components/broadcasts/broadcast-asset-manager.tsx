@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { api, type BroadcastAssetKind, type BroadcastMessageAsset } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import Button from '@/components/shared/button'
@@ -48,7 +48,21 @@ function formatAssetBytes(bytes: number): string {
  * 件数）へ知らせる口。以前は件数の取り直しがアカウント切替のときだけで、
  * 作った直後のタブが0件のままになっていた。渡さなければ今までどおり。
  */
-export default function BroadcastAssetManager({ kind, onChanged }: { kind: BroadcastAssetKind; onChanged?: () => void }) {
+export interface BroadcastAssetListLayout {
+  items: BroadcastMessageAsset[]
+  loadState: 'loading' | 'ready' | 'error'
+  reload: () => Promise<void>
+  onEdit: (item: BroadcastMessageAsset) => void
+  onDelete: (item: BroadcastMessageAsset) => void
+  editor: ReactNode
+  deleteDialog: ReactNode
+}
+
+export default function BroadcastAssetManager({ kind, onChanged, renderLayout }: {
+  kind: BroadcastAssetKind
+  onChanged?: () => void
+  renderLayout?: (state: BroadcastAssetListLayout) => ReactNode
+}) {
   const saveErrors = useSaveFormErrors()
 
   const { selectedAccountId } = useAccount()
@@ -202,9 +216,7 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
   }
 
   const meta = LABELS[kind]
-  return <SaveErrorScope errors={saveErrors}><div className="space-y-5">
-    <div className="flex flex-wrap items-center justify-between gap-3" data-design-node="FuBeQ"><div className="flex flex-wrap gap-2"><Button onClick={() => { reset(); setShowForm(true) }} variant="primary">{meta.singular}を作る</Button></div><Button href="/broadcasts/new?templatePicker=1">一斉配信で使う</Button></div>
-    {showForm && <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface">
+  const editor = showForm && <section className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface">
       <div className="mb-5 flex items-center justify-between"><h3 className="font-bold">{editing ? '編集' : `新しい${meta.singular}`}</h3><button onClick={reset} className="text-sm text-ink-faint">閉じる</button></div>
       <div className="space-y-4"><Field label="名前" htmlFor={nameId} required><SaveErrorField names={["name"]}><TextField id={nameId} value={name} onChange={(e) => setName(e.target.value)} placeholder={`${meta.singular}の管理名`} /></SaveErrorField></Field>
       {kind === 'rich_message' && <>
@@ -228,14 +240,8 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
       {kind === 'card_message' && <div className="space-y-3">{cards.map((card, index) => <div key={card.id} className="rounded-card border bg-surface-pearl p-4"><div className="mb-3 flex justify-between"><b className="text-sm">パネル {index + 1}</b><button disabled={cards.length === 1} onClick={() => setCards((all) => all.filter((_, i) => i !== index))} className="text-xs text-status-danger">削除する</button></div><div className="grid gap-3 md:grid-cols-2"><SaveErrorField names={[`cards.${index}.template`,"template","card.template","cards"]}><Select aria-label={`パネル ${index + 1} の種類`} value={card.template} onChange={(value) => setCards((all) => all.map((c,i) => i===index ? {...c,template:value}:c))} options={[{ value: 'product', label: 'プロダクト' }, { value: 'location', label: 'ロケーション' }, { value: 'person', label: '人物' }, { value: 'image', label: '画像' }]} size="full" /></SaveErrorField><SaveErrorField names={[`cards.${index}.imageUrl`,`cards.${index}.image_url`,"imageUrl","card.imageUrl","image_url","card.image_url"]}><MediaSlot size="compact" title="画像を追加" previewAlt={`パネル ${index + 1} の画像`} value={card.imageUrl || null} accept="image/jpeg,image/png" limitText="10MB 以内" onFile={(f) => void upload(f,index)} onRemove={() => setCards((all) => all.map((c,i) => i===index ? {...c,imageUrl:''}:c))} /></SaveErrorField><SaveErrorField names={[`cards.${index}.title`,"card.title","cards"]}><SharedTextField value={card.title} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,title:e.target.value}:c))} placeholder="タイトル" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField><SaveErrorField names={[`cards.${index}.description`,"description","card.description","cards"]}><SharedTextField value={card.description} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,description:e.target.value}:c))} placeholder="説明" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField><SaveErrorField names={[`cards.${index}.actionLabel`,`cards.${index}.action_label`,"actionLabel","card.actionLabel","cards","action_label","card.action_label"]}><SharedTextField value={card.actionLabel} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionLabel:e.target.value}:c))} placeholder="ボタン名" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField><SaveErrorField names={[`cards.${index}.actionUrl`,`cards.${index}.action_url`,"actionUrl","card.actionUrl","cards","action_url","card.action_url"]}><SharedTextField value={card.actionUrl} onChange={(e) => setCards((all) => all.map((c,i) => i===index ? {...c,actionUrl:e.target.value}:c))} placeholder="アクションURL" className="rounded-control border px-3 py-2 text-sm"/></SaveErrorField></div></div>)}<button disabled={cards.length >= maxCards} onClick={() => setCards((all) => [...all,newCard()])} className="w-full rounded-card border border-dashed py-3 text-sm font-medium text-success">＋ パネルを追加する（{cards.length}/{MAX_PANELS}）</button><SaveErrorField names={["moreCard","more_card"]}><ToggleField checked={moreCard} onChange={setMoreCard}>末尾に「もっと見る」パネルを表示</ToggleField></SaveErrorField>{moreCard && <p className="text-xs text-ink-faint">「もっと見る」で1枠使うため、パネルは{MAX_PANELS - 1}枚までです。</p>}</div>}
       {(kind === 'coupon' || kind === 'research') && <><SaveErrorField names={["description"]}><SharedTextArea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={kind === 'coupon' ? '特典内容・利用条件' : 'アンケートの説明'} className="w-full rounded-card border p-3 text-sm" rows={3}/></SaveErrorField><SaveErrorField names={["actionUrl","action_url"]}><SharedTextField value={actionUrl} onChange={(e) => setActionUrl(e.target.value)} placeholder={kind === 'coupon' ? 'クーポンを開くURL' : '回答フォームURL'} className="w-full rounded-card border px-3 py-2.5 text-sm" /></SaveErrorField></>}
       {error && <p className="text-sm text-status-danger">{error}</p>}<div className="flex justify-end gap-2"><button onClick={reset} className="rounded-control border px-4 py-2 text-sm">キャンセル</button><Button variant="primary" className="px-5 py-2 font-bold disabled:opacity-50 border-0 h-auto whitespace-normal" disabled={saving} onClick={() => save()} busy={saving} busyLabel="保存中…" widthReserve="idle">{'保存する'}</Button></div></div>
-    </section>}
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.id} className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="rounded-pill bg-accent-soft px-2 py-1 text-micro font-bold text-success">{meta.title}</span><h3 className="mt-3 truncate font-bold text-ink">{item.name}</h3><p className="mt-1 text-xs text-ink-faint">更新 {formatDateTime(item.updatedAt)}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="rounded-control border border-accent-border px-3 py-2 text-sm font-bold text-success">一斉配信で使う</a><button onClick={() => startEdit(item)} className="min-w-24 flex-1 rounded-control border px-3 py-2 text-sm font-bold">編集</button><button onClick={() => { setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId }) }} className="rounded-control border border-status-danger-border px-3 py-2 text-sm font-bold text-status-danger">削除する</button></div></article>)}{loadState === 'loading' && <p role="status">テンプレートを読み込んでいます…</p>}{loadState === 'error' && <div role="alert">テンプレートを読み込めませんでした。<Button onClick={() => load()}>再読み込み</Button></div>}{loadState === 'ready' && items.length === 0 && <div className="col-span-full rounded-card border border-dashed bg-canvas p-12 text-center text-sm text-ink-faint">まだ{meta.singular}テンプレートがありません。「{meta.singular}を作る」から追加してください。</div>}</div>
-
-    {/*
-      取り消せない操作なので `destructive` を付ける。消したテンプレートは
-      戻せない（DBの行を消すだけで、控えは残らない）。
-    */}
-    <ConfirmDialog
+    </section>
+  const deleteDialog = (    <ConfirmDialog
       open={deleteTarget !== null}
       title={deleteTarget ? `「${deleteTarget.item.name}」を削除しますか？` : ''}
       description={`この${meta.singular}テンプレートを一覧から削除します。この操作は取り消せません。`}
@@ -262,6 +268,21 @@ export default function BroadcastAssetManager({ kind, onChanged }: { kind: Broad
         <li>・残ること: アップロードした画像そのものは残ります。この操作では消えません。</li>
         <li>・戻せません: 同じ{meta.singular}が必要になったときは、作り直してください。</li>
       </ul>
-    </ConfirmDialog>
+    </ConfirmDialog>)
+  if (renderLayout) return <SaveErrorScope errors={saveErrors}>{renderLayout({
+    items, loadState, reload: load, onEdit: startEdit,
+    onDelete: item => { setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId }) },
+    editor, deleteDialog,
+  })}</SaveErrorScope>
+  return <SaveErrorScope errors={saveErrors}><div className="space-y-5">
+    <div className="flex flex-wrap items-center justify-between gap-3" data-design-node="FuBeQ"><div className="flex flex-wrap gap-2"><Button onClick={() => { reset(); setShowForm(true) }} variant="primary">{meta.singular}を作る</Button></div><Button href="/broadcasts/new?templatePicker=1">一斉配信で使う</Button></div>
+    {editor}
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={item.id} className="rounded-card border border-hairline bg-canvas p-5 shadow-card-surface"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="rounded-pill bg-accent-soft px-2 py-1 text-micro font-bold text-success">{meta.title}</span><h3 className="mt-3 truncate font-bold text-ink">{item.name}</h3><p className="mt-1 text-xs text-ink-faint">更新 {formatDateTime(item.updatedAt)}</p></div></div><div className="mt-4 flex flex-wrap gap-2"><a href={`/broadcasts/new?contentTemplateId=${encodeURIComponent(item.id)}`} className="rounded-control border border-accent-border px-3 py-2 text-sm font-bold text-success">一斉配信で使う</a><button onClick={() => startEdit(item)} className="min-w-24 flex-1 rounded-control border px-3 py-2 text-sm font-bold">編集</button><button onClick={() => { setDeleteError(''); setDeleteTarget({ item, accountId: selectedAccountId }) }} className="rounded-control border border-status-danger-border px-3 py-2 text-sm font-bold text-status-danger">削除する</button></div></article>)}{loadState === 'loading' && <p role="status">テンプレートを読み込んでいます…</p>}{loadState === 'error' && <div role="alert">テンプレートを読み込めませんでした。<Button onClick={() => load()}>再読み込み</Button></div>}{loadState === 'ready' && items.length === 0 && <div className="col-span-full rounded-card border border-dashed bg-canvas p-12 text-center text-sm text-ink-faint">まだ{meta.singular}テンプレートがありません。「{meta.singular}を作る」から追加してください。</div>}</div>
+
+    {/*
+      取り消せない操作なので `destructive` を付ける。消したテンプレートは
+      戻せない（DBの行を消すだけで、控えは残らない）。
+    */}
+    {deleteDialog}
   </div></SaveErrorScope>
 }

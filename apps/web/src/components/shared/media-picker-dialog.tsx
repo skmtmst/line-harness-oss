@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ButtonHTMLAttributes } from 'react'
 import type { MediaItem } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
@@ -9,6 +9,7 @@ import Pagination from '@/components/shared/pagination'
 import ListState from '@/components/shared/list-state'
 import { TextField } from '@/components/shared/text-field'
 import { formatNumber } from '@/lib/format'
+import { usePermissionLockTip } from './permission-lock-tip'
 
 /** 1ページに並べる候補数。検索と併用するので多すぎない数に抑える。 */
 export const MEDIA_PICKER_PAGE_SIZE = 20
@@ -21,6 +22,13 @@ const KIND_LABEL: Record<MediaItem['kind'], string> = {
 }
 
 type Phase = 'loading' | 'ready' | 'empty' | 'error'
+
+function MediaOption({ lockedReason, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { lockedReason?: string }) {
+  const lock = usePermissionLockTip<HTMLButtonElement>(lockedReason, props['aria-describedby'])
+  return <><button {...props} ref={lock.ref} {...lock.handlers} style={props.disabled || lockedReason ? {
+    opacity: 'var(--polish-disabled-opacity)', cursor: 'not-allowed', background: 'var(--color-canvas-sunken)',
+  } : undefined} />{lock.node}</>
+}
 
 /**
  * 登録メディアを別の機能から選ぶ共通の窓（N-193 / N-205）。
@@ -43,6 +51,9 @@ export default function MediaPickerDialog({
   accountOnly = false,
   onClose,
   onSelect,
+  disabled,
+  lockedReason,
+  canSelectNow,
 }: {
   open: boolean
   accountId: string | null
@@ -54,7 +65,13 @@ export default function MediaPickerDialog({
   accountOnly?: boolean
   onClose: () => void
   onSelect: (item: MediaItem) => void
+  /** 本人未確定時などは理由を出さず選択だけを止め、読む操作は残す。 */
+  disabled?: boolean
+  lockedReason?: string
+  /** 選択直前に確かめる。失効した処理を再開しないleaseを渡す。 */
+  canSelectNow?: () => boolean
 }) {
+  const selectionBlocked = Boolean(disabled || canSelectNow?.() === false)
   /** いま有効な要求。開き直し・切替・検索で番号を進め、遅れた応答を捨てる。 */
   const requestRef = useRef(0)
   const [input, setInput] = useState('')
@@ -184,12 +201,12 @@ export default function MediaPickerDialog({
             >
               {items.map((item) => (
                 <li key={item.id}>
-                  <button
+                  <MediaOption disabled={selectionBlocked} lockedReason={lockedReason}
                     type="button"
                     role="option"
                     aria-selected={false}
                     className="hover:bg-canvas-sunken focus:bg-canvas-sunken flex w-full items-center gap-3 px-3 py-2 text-left focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus-ring"
-                    onClick={() => onSelect(item)}
+                    onClick={() => { if (!disabled && !lockedReason && canSelectNow?.() !== false) onSelect(item) }}
                   >
                     {item.kind === 'image' && accountId ? (
                       <img width={40} height={40}
@@ -208,7 +225,7 @@ export default function MediaPickerDialog({
                       </span>
                       <span className="text-ink-faint block text-micro">{KIND_LABEL[item.kind]}</span>
                     </span>
-                  </button>
+                  </MediaOption>
                 </li>
               ))}
             </ul>

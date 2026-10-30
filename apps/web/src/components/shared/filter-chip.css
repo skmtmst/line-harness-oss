@@ -117,10 +117,10 @@
 :root .v6-filter-chip[aria-haspopup]:not([aria-pressed='true']):hover:not(:disabled) { background: var(--color-canvas-sunken); }
 
 /*
- * 奥行き（くっきり版）。押していない札は白い副ボタンと同じ薄いグラデと外周 1px の影、
+ * 奥行き（くっきり版）。押していない札は白い地と外周 1px の影、
  * 押した札は薄い緑の地・緑の文字・左に ✓（黒い札は使わない）。値は globals.css の共通の値。
  */
-:root .v6-filter-chip:not([aria-pressed='true']):not(:hover) { outline-color: transparent; background: var(--gradient-raised-control) var(--color-canvas); box-shadow: var(--shadow-raised-control); }
+:root .v6-filter-chip:not([aria-pressed='true']):not(:hover) { outline-color: transparent; background: var(--color-canvas); box-shadow: var(--shadow-raised-control); }
 :root .v6-filter-chip:not([aria-pressed='true']):hover:not(:disabled) { outline-color: transparent; box-shadow: var(--shadow-raised-control); }
 :root .v6-filter-chip[aria-pressed='true'] { outline-color: transparent; background: var(--color-selection-bg); color: var(--color-selection-border); box-shadow: inset 0 0 0 1px var(--color-accent-border); }
 :root .v6-filter-chip[aria-pressed='true'] .v6-filter-chip__count { color: inherit; }

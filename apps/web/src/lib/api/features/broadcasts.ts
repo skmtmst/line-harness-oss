@@ -12,6 +12,7 @@ import type {
   BroadcastSavedView,
   BroadcastAssetKind,
   BroadcastMessageAsset,
+  BroadcastAssetFolder,
 } from '../types/broadcasts'
 import type { BroadcastListKpis } from '../types/statistics'
 import type { SegmentCondition } from '../../segment-condition'
@@ -348,6 +349,15 @@ export const broadcastsMethods = {
     },
   },
   broadcastMessageAssets: {
+    folders: {
+      list: (lineAccountId: string) => fetchApi<ApiResponse<BroadcastAssetFolder[]>>(
+        `/api/broadcast-message-assets/folders?lineAccountId=${encodeURIComponent(lineAccountId)}`,
+      ),
+      create: (lineAccountId: string, name: string) => fetchApi<ApiResponse<BroadcastAssetFolder | null>>(
+        '/api/broadcast-message-assets/folders',
+        { method: 'POST', body: JSON.stringify({ lineAccountId, name }) },
+      ),
+    },
     list: (params?: { accountId?: string; kind?: BroadcastAssetKind }) => {
       const query = new URLSearchParams()
       if (params?.accountId) query.set('lineAccountId', params.accountId)

@@ -575,6 +575,13 @@ jobs:
         run: >-
           pnpm exec playwright test
           --config apps/web/src/components/friend-fields/tag-archived-edit.config.mjs
+      # 左メニューの上端・左端そろえ（オーナー指摘）。組の見出しの文字の
+      # 上端と板の上端の差・ロゴの縦中心・箱の左端は、実ブラウザで測らないと
+      # 検知できないため、書き出した `out` を実ブラウザで開いて確かめる。
+      - name: Verify sidebar top and left alignment on the built admin
+        run: >-
+          pnpm exec playwright test
+          --config apps/web/src/components/layout/sidebar-top-alignment.config.mjs
       - name: MFA auth input and button behavior at three widths
         run: pnpm exec playwright test --config scripts/browser/auth-isolated.config.mjs
       - name: Verify admin security headers and auth interactions
