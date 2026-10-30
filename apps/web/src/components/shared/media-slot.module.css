@@ -8,15 +8,23 @@
  *   取り込み中  回る印と「アップロード中… 62%」
  *   入った     画像を枠いっぱいに。右上に［差し替える］［消す］
  *   失敗      赤い線と理由1行（$status-danger）
- *   小さい所   compact：高さ 140・文字を減らす
+ *   小さい所   compact：高さ 180（印・題・説明・制限・文字リンクが余裕を持って収まる）・文字を減らす
  *   大きさは状態が変わっても変えない
  */
 
 .root {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--tpl-slot-gap);
   min-width: 0;
+}
+
+.root > .help {
+  position: absolute;
+  top: var(--tpl-slot-pill-inset);
+  right: var(--tpl-slot-pill-inset);
+  z-index: 1;
 }
 
 .frame {

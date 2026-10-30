@@ -16,6 +16,7 @@ vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 
 import ReservationsPage from '../restaurant/reservations/reservations'
+import ReservationDetailDialog from './detail-dialog'
 import { at, reservation, snapshotOf } from '../restaurant/booking-kit/test-data'
 
 
@@ -49,6 +50,22 @@ const openDetail = async () => {
 }
 
 describe('AjZhH 予約台帳 予約の詳細', () => {
+  it('埋込の操作は下のメニュー1つにまとめ、予約元を名前と別の段で読む', async () => {
+    const attendance = vi.fn()
+    const data = snapshotOf({ reservations: today, reservationTotal: 2 })
+    render(<ReservationDetailDialog inline reservation={today[0]} accountId="account-1" tables={data.tables} courses={data.menuItems}
+      busy={false} canWrite onClose={() => {}} onCancel={() => {}} onRestore={() => {}} onEdit={() => {}} onAttendance={attendance} />)
+    const panel = await screen.findByRole('region', { name: '予約の詳細' })
+    expect(panel.querySelector('header [data-row-menu]')).toBeNull()
+    expect(panel.querySelectorAll('footer [data-row-menu]').length).toBe(1)
+    const customer = within(panel).getByText('お客さま').parentElement!
+    expect(customer.textContent).toContain('鈴木 真理 さま')
+    expect(customer.querySelector('[data-source]')).toBeNull()
+    expect(within(panel).getByText('予約元').parentElement?.textContent).toContain('ホットペッパー')
+    fireEvent.click(within(panel).getByRole('button', { name: '詳細のその他操作' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: '来店にする' }))
+    expect(attendance).toHaveBeenCalledWith('r1', 'visited')
+  })
   it('予約の箱で開き、日時と卓・コースと予約元・アレルギー・これまでの来店が出る', async () => {
     const dialog = await openDetail()
     const text = () => dialog.textContent ?? ''

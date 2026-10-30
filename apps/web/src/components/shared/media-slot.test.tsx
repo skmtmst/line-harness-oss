@@ -167,3 +167,20 @@ it('外せないもの（removable=false）は［差し替える］だけを出�
   expect(screen.getByRole('button', { name: '差し替える' })).toBeTruthy()
   expect(screen.queryByRole('button', { name: '消す' })).toBeNull()
 })
+
+
+it.each(['regular', 'compact'] as const)('補足は%sの枠の外に置き、開いてもファイルを選ばずEscで焦点を戻す', size => {
+  const { container } = render(<MediaSlot title="メイン画像を追加" size={size} help="1029 × 1029px" onFile={vi.fn()} />)
+  const frame = frameOf()
+  const help = screen.getByRole('button', { name: 'メイン画像を追加の補足' })
+  expect(frame.contains(help)).toBe(false)
+  const chooseFile = vi.spyOn(inputOf(container), 'click')
+  fireEvent.click(help)
+  expect(screen.getByRole('note').textContent).toBe('1029 × 1029px')
+  expect(chooseFile).not.toHaveBeenCalled()
+  fireEvent.keyDown(help, { key: 'Escape' })
+  expect(screen.queryByRole('note')).toBeNull()
+  expect(document.activeElement).toBe(help)
+  fireEvent.click(frame)
+  expect(chooseFile).toHaveBeenCalledTimes(1)
+})

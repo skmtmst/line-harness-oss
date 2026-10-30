@@ -1,4 +1,5 @@
 'use client'
+import { DetailPreview, DetailSection } from '@/components/shared/detail-content'
 import type { Alloc, Hours, SlotInfo, Conflict } from './stock-types'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -355,10 +356,9 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
           description={`このまま保存すると、${conflict.who}の変更（${conflict.scope}）が消えます`}
           onCompare={() => setDiffOpen(true)} onReload={reloadLatest} />
       ) : null}
-      <DetailColumns variant="restaurant-inventory" asideLabel="この時間帯の卓を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={(
-        <div className={styles.sideColumn}>
-          <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-tables-title">
-            <CardHeader size="stacked" titleId="rs-tables-title" title={selected ? `${selected.time} の卓` : '卓の埋まりぐあい'} meta="赤＝埋まっている・白＝空き・灰＝停止中" />
+      <DetailColumns variant="restaurant-inventory" asideLabel="この時間帯の卓を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title={selected ? `${selected.time} の卓` : '卓の埋まりぐあい'} description={'赤＝埋まっている・白＝空き・灰＝停止中'} actions={{primary: ((selected) ? <Button variant="primary" href={`/restaurant-test/reservations?date=${encodeURIComponent(date)}`}><BookOpen size={16} aria-hidden="true" />{`予約台帳で ${selected.time} を見る`}</Button> : null),secondary: ((selected) && (canCloseNote) ? <Button variant="secondary" lockedReason={lockedReason} disabled={!canEdit} onClick={() => { if (!canEdit) return; setClosedChannels([]); setCloseNoteOpen(true) }}>媒体の受付を閉じる</Button> : null)}}>
+          <DetailSection>
+
             <ul className={styles.tablesGrid}>
               {gridTables.map((item) => {
                 const occupied = occupiedIds.has(item.id)
@@ -380,17 +380,9 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                 ) : <p className={styles.freeTitle}>空きの卓がありません</p>}
               </div>
             ) : null}
-            {selected ? (
-              <div className={styles.sideActions}>
-                <Button href={`/restaurant-test/reservations?date=${encodeURIComponent(date)}`}><BookOpen size={16} aria-hidden="true" />{`予約台帳で ${selected.time} を見る`}</Button>
-                {canCloseNote ? (
-                  <Button lockedReason={lockedReason} disabled={!canEdit} onClick={() => { if (!canEdit) return; setClosedChannels([]); setCloseNoteOpen(true) }}>媒体の受付を閉じる</Button>
-                ) : null}
-              </div>
-            ) : null}
-          </Card>
-        </div>
-      )}>
+
+          </DetailSection>
+        </DetailPreview>} asideLayout="detail">
         <div className={styles.mainColumn}>
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-alloc-title">
             <CardHeader size="stacked" titleId="rs-alloc-title" title="席と枠の配分（卓とつながる）" meta="総数は「座席・卓管理」の有効の卓から自動で決まります。ここで入れた配分を全部の時間帯に入れ、時間帯ごとに直すときは下の表の行を押します。" />

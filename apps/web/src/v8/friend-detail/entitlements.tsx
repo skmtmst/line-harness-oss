@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailSection, DetailField, DetailNumber, DetailSectionTitle } from '@/components/shared/detail-content'
 
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
@@ -6,8 +7,6 @@ import EntitySelect from '@/components/shared/entity-select'
 
 import { isConflictResponse, CONFLICT_TEXT } from '@/components/shared/save-conflict'
 
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Ban, CalendarPlus, Info, Pencil, Plus, Ticket } from 'lucide-react'
@@ -285,22 +284,23 @@ export function EntitlementDrawer({ item, accountId, friendName, canEdit, onClos
   }, [accountId, item])
   const used = Array.isArray(events) ? events.filter((event) => event.action === 'consume').length : null
   return (
-    <Drawer open={item !== null} title={item?.name ?? ''} description={withHonorific(friendName || 'この友だち', 'さん', { space: true })} onClose={onClose} width="editor" closeAppearance="box" heightMode="viewport">
+    <Drawer open={item !== null} title={item?.name ?? ''} description={withHonorific(friendName || 'この友だち', 'さん', { space: true })} onClose={onClose} width="editor" closeAppearance="box" heightMode="viewport" actions={{ primary: (item ? <Button variant="primary" onClick={() => onAdd(item.id)}><Plus size={16} aria-hidden="true"/>手で入れる</Button> : null), primaryAllowed: canEdit }}>
+<DetailContent>
       {item ? (
         <div className={styles.drawerBody}>
-          <KpiBand presentation="band" density="compact" gridClassName="grid grid-cols-3" aria-label={`${item.name}の残り・期限・使った回数`}>
-            <KpiCard presentation="band" density="compact" icon={null} title="残り" value={item.kind === 'monthly' ? item.monthRemaining : item.remaining ?? 0} unit="回" detail="" />
-            <KpiCard presentation="band" density="compact" icon={null} title="期限" value={null} valueText={shortDay(item.expires_at)} unit="" detail="" />
-            <KpiCard presentation="band" density="compact" icon={null} title="使った" value={used} unit="回" detail="" />
-          </KpiBand>
+          <DetailSection label={`${item.name}の残り・期限・使った回数`}>
+            <DetailField label="残り" note=""><DetailNumber value={item.kind === 'monthly' ? item.monthRemaining : item.remaining ?? 0} unit="回" /></DetailField>
+            <DetailField label="期限" note=""><DetailNumber value={null} text={shortDay(item.expires_at)} unit="" /></DetailField>
+            <DetailField label="使った" note=""><DetailNumber value={used} unit="回" /></DetailField>
+          </DetailSection>
           <div className={styles.historyHead}>
-            <h3 className={styles.historyTitle}>履歴</h3>
-            {canEdit ? <Button onClick={() => onAdd(item.id)}><Plus size={16} aria-hidden="true" />手で入れる</Button> : null}
+            <DetailSectionTitle>履歴</DetailSectionTitle>
+
           </div>
           {events === null ? <ListState kind="loading" title="履歴を読み込んでいます" />
             : events === 'error' ? <ListState kind="error" title="履歴を表示できませんでした" />
               : (
-                <Card overflow="hidden">
+                <DetailSection>
                   <DataTable aria-label={`${item.name}の履歴`} columnSizing="content" columnLayout={TABLE_LAYOUT}>
                     <thead><TableHeadRow data-table-layout="columns"><Th truncate>日時</Th><Th grow truncate>したこと</Th><Th truncate>前→後</Th><Th truncate>だれ</Th></TableHeadRow></thead>
                     <tbody>{events.map((event) => {
@@ -321,12 +321,14 @@ export function EntitlementDrawer({ item, accountId, friendName, canEdit, onClos
                       )
                     })}</tbody>
                   </DataTable>
-                </Card>
+                </DetailSection>
               )}
           <p className={styles.footNote}><Info size={16} aria-hidden="true" />予約で使った行は、押すとその予約を開きます。手で入れた行には理由が必ず残ります。</p>
           {item.kind === 'monthly' ? <StatusBadge tone="info">{`今月 ${item.monthUsed} 回使いました`}</StatusBadge> : null}
         </div>
       ) : null}
-    </Drawer>
+
+</DetailContent>
+</Drawer>
   )
 }

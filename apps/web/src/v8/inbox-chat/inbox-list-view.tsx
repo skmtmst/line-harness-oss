@@ -9,7 +9,7 @@ import Button from '@/components/shared/button';
 import IconButton from '@/components/shared/icon-button';
 import SegmentedControl from '@/components/shared/segmented';
 import { InboxFloatingPanel } from '@/components/shared/inbox-content';
-import { InboxHistoryButton, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
+import { InboxHistoryButton, InboxListAttention, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
 import { InboxListEmpty, InboxListFailure } from '@/components/shared/inbox-list-states';
 import { RowMenu } from '@/components/shared/row-actions';
 import SearchField from '@/components/shared/search-field';
@@ -123,7 +123,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <IconButton aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+        <IconButton variant="plain" aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
           <ListFilter aria-hidden size={16} />
         </IconButton>
         {/*
@@ -135,6 +135,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         <div>
           {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
           <IconButton
+            variant="plain"
             className={styles.toolDotWrap} aria-label={savedSearchLabel} title={savedSearchLabel}
             onClick={() => {
               setSavedViewsOpen((open) => !open)
@@ -232,7 +233,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         )}
         {!slaEnabled ? (
           <>
-            <IconButton ref={sortButtonRef} aria-label="並び順" title={`並び順：${sortLabel}`} aria-haspopup="menu" aria-expanded={sortMenuOpen} onClick={() => setSortMenuOpen((open) => !open)}>
+            <IconButton variant="plain" ref={sortButtonRef} aria-label="並び順" title={`並び順：${sortLabel}`} aria-haspopup="menu" aria-expanded={sortMenuOpen} onClick={() => setSortMenuOpen((open) => !open)}>
               <ArrowUpDown aria-hidden size={16} />
             </IconButton>
             <ActionMenu
@@ -487,7 +488,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                       onClick={() => handleSelectChat(chat.id)}
                       /* 名前は相手の名前だけ、未読と本文は説明に回す（読み上げで名前から入れる）。 */
                       aria-labelledby={(`chat-row-name-${chat.id}`)}
-                      aria-describedby={(`${chat.isUnread ? `chat-row-unread-${chat.id} ` : ''}chat-row-preview-${chat.id}`)}
+                      aria-describedby={[chat.isUnread ? `chat-row-unread-${chat.id}` : null, chat.isAttention ? `chat-row-attention-${chat.id}` : null, `chat-row-preview-${chat.id}`].filter(Boolean).join(' ')}
                     >
                       <div className={`flex items-start gap-3 ${styles.rowInner}`}>
                         <div className="relative shrink-0">
@@ -503,6 +504,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                               {/* 板 `M0393`：未対応は名前の太字。行の地は塗らない。 */}
                               <p id={`chat-row-name-${chat.id}`} className={`text-sm text-ink truncate ${chat.isUnread ? 'font-semibold' : 'font-medium'}`}>{chat.friendName}</p>
                             </div>
+                            <InboxListAttention on={chat.isAttention} id={`chat-row-attention-${chat.id}`} />
                             {(
                               /* 右上は「17:51」「昨日」「木曜日」「10/18」。未読は濃い字・太字。待ち時間の札は置かず、全文と一緒に title へ。 */
                               <span className={styles.rowTime} data-unread={chat.isUnread || undefined} title={[formatListRecentTitle(chat.lastMessageAt), waitingLabel].filter(Boolean).join('・') || undefined}>{formatListRecent(chat.lastMessageAt)}</span>

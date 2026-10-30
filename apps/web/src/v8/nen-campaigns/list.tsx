@@ -1,4 +1,6 @@
 'use client'
+import { lockReason } from '@/components/shared/permission-lock'
+import { DetailContent, DetailField, DetailSection } from '@/components/shared/detail-content'
 
 import Toggle from '@/components/shared/toggle'
 import { useListUrlValue } from '@/components/shared/list-url-state';
@@ -453,31 +455,29 @@ function CampaignPreviewDrawer(props: NenCampaignsListProps & { canEdit: boolean
       title={setting ? `${setting.label}の中身` : '配信の中身'}
       description="お客様ごとの情報は見本に置き換えています。"
       onClose={() => props.onPreviewCampaign(null)}
-      footer={setting && props.canEdit ? (
-        <div className={styles.drawerFoot}>
-          <TestRecipientPicker friends={props.friends} value={props.testFriendId} onChange={props.onTestFriendChange} accountId={props.accountId} />
-          <Button type="button" variant="primary" disabled={!props.testFriendId || props.testing === setting.campaignKey} busy={props.testing === setting.campaignKey} busyLabel="送信中…" onClick={() => props.onTestSend(setting)}>自分にテストを送る</Button>
-        </div>
-      ) : undefined}
+      actions={{ primary: (setting ? <Button type="button" variant="primary" disabled={!props.testFriendId || props.testing === setting.campaignKey} busy={props.testing === setting.campaignKey} busyLabel="送信中…" onClick={() => props.onTestSend(setting)}>自分にテストを送る</Button> : null),
+    menuItems: [], primaryAllowed: props.canEdit }}
     >
-      {setting ? (
-        <div className={styles.drawerBody}>
-          <p className={styles.muted}>{formatCampaignTiming(setting)}に、{formatCampaignAudience(setting)}へ届きます。</p>
-          <div className={styles.sample}>
-            <span className={styles.sampleLabel}>届く見本</span>
-            <strong className={styles.sampleTitle}>{replaceCampaignSamples(setting.title)}</strong>
-            <span className={styles.sampleText}>{replaceCampaignSamples(setting.bodyText)}</span>
-            {setting.buttonLabel ? <span className={styles.sampleText}>▶ {setting.buttonLabel}</span> : null}
-          </div>
-          <p className={styles.muted}>テスト送信は「設定 › アカウント › テスト送信先」に登録した、友だち追加中の人にだけ送ります。</p>
-        </div>
-      ) : null}
-    </Drawer>
+<DetailContent>
+<DetailField label="テスト送信先"><TestRecipientPicker canEdit={props.canEdit} friends={props.friends} value={props.testFriendId} onChange={props.onTestFriendChange} accountId={props.accountId} /></DetailField>
+{setting ? <>
+  <DetailField label="送るタイミング">{formatCampaignTiming(setting)}</DetailField>
+  <DetailField label="送り先">{formatCampaignAudience(setting)}</DetailField>
+  <DetailSection title="届く見本">
+    <DetailField label="題">{replaceCampaignSamples(setting.title)}</DetailField>
+    <DetailField label="本文" multiline>{replaceCampaignSamples(setting.bodyText)}</DetailField>
+    {setting.buttonLabel ? <DetailField label="ボタン">{setting.buttonLabel}</DetailField> : null}
+  </DetailSection>
+  <p className={styles.muted}>テスト送信は「設定 › アカウント › テスト送信先」に登録した、友だち追加中の人にだけ送ります。</p>
+</> : null}
+</DetailContent>
+</Drawer>
   )
 }
 
 /** テスト送信先。登録した人だけを候補にし、いなければ登録先へ案内する。 */
-function TestRecipientPicker({ friends, value, onChange, accountId }: { friends: FriendOption[]; value: string; onChange: (id: string) => void; accountId: string | null }) {
+function TestRecipientPicker({ friends, value, onChange, accountId, canEdit = true }: { canEdit?: boolean; friends: FriendOption[]; value: string; onChange: (id: string) => void; accountId: string | null }) {
+  const role = useStaffRole()
   if (friends.length === 0) {
     return (
       <span className={styles.muted}>
@@ -486,7 +486,7 @@ function TestRecipientPicker({ friends, value, onChange, accountId }: { friends:
       </span>
     )
   }
-  return <SaveErrorField names={["value"]}><EntitySelect aria-label="テスト送信先" width={220} valuePrefix="送り先：" value={value} onChange={onChange} options={friends.map((friend) => ({ ...entityOptionMetadata(friend), value: friend.id, label: friend.displayName || '名前未取得' }))} /></SaveErrorField>
+  return <SaveErrorField names={["value"]}><EntitySelect aria-label="テスト送信先" disabled={!canEdit} lockedReason={!canEdit && role !== null ? lockReason(false) : undefined} width={220} valuePrefix="送り先：" value={value} onChange={next => { if (canEdit) onChange(next) }} options={friends.map((friend) => ({ ...entityOptionMetadata(friend), value: friend.id, label: friend.displayName || '名前未取得' }))} /></SaveErrorField>
 }
 
 /* ───────────── 誕生日クーポンの決めごと ───────────── */

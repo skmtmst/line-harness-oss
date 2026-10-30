@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailField, DetailInlineEdit } from '@/components/shared/detail-content'
 
 import type { AccountWithStats } from '@/contexts/account-context';
 
@@ -154,53 +155,40 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
         hasNext={activeIndex >= 0 && activeIndex < visibleForms.length - 1}
         onPrev={activeIndex > 0 ? () => goDetail(-1) : undefined}
         onNext={activeIndex >= 0 && activeIndex < visibleForms.length - 1 ? () => goDetail(1) : undefined}
-        footer={active ? (
-          <div className={styles.panelFooterSplit}>
-            <Button type="button" variant="secondary" href={`/form-submissions/responses?id=${encodeURIComponent(active.id)}`}>
-              集まった回答
-            </Button>
-            {canEditForms ? <Button type="button" variant="primary" href={`/form-submissions/edit?id=${encodeURIComponent(active.id)}&tab=basic`}>
+        actions={{ primary: (active ? <Button type="button" variant="primary" href={`/form-submissions/edit?id=${encodeURIComponent(active.id)}&tab=basic`}>
               編集する
-            </Button> : null}
-          </div>
-        ) : undefined}
-      >
+            </Button> : null),
+    secondary: (active ? <Button type="button" variant="secondary" href={`/form-submissions/responses?id=${encodeURIComponent(active.id)}`}>
+              集まった回答
+            </Button> : null),
+    menuItems: [...(active ? [{ allowed: canEditForms, id: 'body-0', label: "複製", onSelect: () => { closeDetail(); openDuplicate(active); } }] : []),
+        ...(active && active.isActive ? [{ allowed: canEditForms, id: 'body-1', label: "受付を止める", onSelect: () => { closeDetail(); return openStop(active); } }] : []),
+        ...(active ? [{ allowed: canEditForms, id: 'body-2', label: "フォルダへ移す", onSelect: () => { closeDetail(); openMove(active); } }] : []),
+        ...(active ? [{ allowed: canEditForms, id: 'body-3', label: "アーカイブ・削除", onSelect: () => { closeDetail(); return openDelete(active); } }] : []),], primaryAllowed: canEditForms }}
+       status={active ? <><StatusBadge tone={active.isActive ? 'success' : 'neutral'}>{active.isActive ? '公開中' : '下書き'}</StatusBadge>{(active.pendingPostActionCount ?? 0) > 0 ? <StatusBadge tone="danger">{'後処理の未完 ' + active.pendingPostActionCount}</StatusBadge> : null}</> : null}>
+<DetailContent>
         {active ? (
           <div>
-            <p className={styles.panelLabel}>フォーム名</p>
-            {canEditForms ? <InlineEdit
+            <DetailField label="フォーム名"> <DetailInlineEdit allowed={canEditForms}
               value={active.name}
               label="フォーム名"
               placeholder="名称未設定のフォーム"
               onSave={(next) => renameForm(active, next)}
-            /> : <p className={styles.panelValue}>{displayFormName(active.name)}</p>}
-            <p className={styles.panelLabel}>状態</p>
-            <p className={styles.panelValueRow}>
-              <StatusBadge tone={active.isActive ? 'success' : 'neutral'}>{active.isActive ? '公開中' : '下書き'}</StatusBadge>
-              {(active.pendingPostActionCount ?? 0) > 0 ? (
-                <StatusBadge tone="danger">{`後処理の未完 ${active.pendingPostActionCount}`}</StatusBadge>
-              ) : null}
-            </p>
-            <p className={styles.panelLabel}>保存先</p>
-            <p className={styles.panelValue}>{destinationText(active)}</p>
-            <p className={styles.panelLabel}>回答</p>
-            <p className={styles.panelValue}>
+            /> </DetailField>
+
+            <DetailField label="保存先"> {destinationText(active)} </DetailField>
+            <DetailField label="回答">
               {`${formatNumber(formAnswerCount(active))} 件　${answerSubText(active)}`}
-            </p>
+             </DetailField>
             <div className={styles.panelButtons}>
-              {canEditForms ? <>
-              <Button type="button" variant="secondary" onClick={() => { closeDetail(); openDuplicate(active) }}>複製</Button>
-              {active.isActive ? (
-                <Button type="button" variant="secondary" onClick={() => { closeDetail(); return openStop(active) }} busyLabel="処理中…">受付を止める</Button>
-              ) : null}
-              <Button type="button" variant="secondary" onClick={() => { closeDetail(); openMove(active) }}>フォルダへ移す</Button>
-              <Button type="button" variant="secondary" onClick={() => { closeDetail(); return openDelete(active) }} busyLabel="処理中…">アーカイブ・削除</Button>
-              </> : null}
+
               <CopyTextButton value={formAnswerUrl(selectedAccount?.liffId, active.id) ?? ''} aria-label="回答フォームのURLをコピー" disabled={!formAnswerUrl(selectedAccount?.liffId, active.id)} />
             </div>
           </div>
         ) : null}
-      </DetailPanel>
+
+</DetailContent>
+</DetailPanel>
 
       {/* 受付を止める（メニューから直行）。止めると URL を開いた人には「受付を終了しました」が出る。 */}
       <ConfirmDialog

@@ -1,4 +1,5 @@
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { findDetailMenuItem } from '@/test-utils/detail-menu'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import React, { act } from 'react'
@@ -223,13 +224,9 @@ test('行から右の詳細を開き、停止の確認では理由を必須に�
     button.textContent?.includes('商品を買った')) ?? querySupplementaryPageAction('商品を買った'))
   expect(nameButton).toBeTruthy()
   await act(async () => { nameButton!.click() })
-  await eventually(() => {
-    expect(([...document.querySelectorAll('[role="dialog"]')].find(el => el.textContent?.includes('鍵を発行する')) ?? querySupplementaryPageAction('鍵を発行する'))).toBeTruthy()
-  })
-  expect(document.body.textContent).toContain('鍵を発行する')
-  // 小窓の「止める」で停止の確認が出る
-  const stopButton = ([...document.querySelectorAll('[role="dialog"] button')].find((button) =>
-    button.textContent === '止める') ?? querySupplementaryPageAction('止める'))
+  expect(await findDetailMenuItem('鍵を発行する')).toBeTruthy()
+  // 操作帯の「止める」から、同じ理由必須の確認へ進む。
+  const stopButton = await findDetailMenuItem('止める')
   expect(stopButton).toBeTruthy()
   await act(async () => { stopButton!.click() })
   await eventually(() => {

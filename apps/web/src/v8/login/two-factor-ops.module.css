@@ -83,8 +83,8 @@
 .passkeyNotice {
   padding: var(--space-12) var(--space-16);
   border-radius: var(--radius-control);
-  background: var(--color-success-subtle, #e8f7ee);
-  color: var(--color-success, #087443);
+  background: var(--tpl-ms-otp-passkey-status-bg);
+  color: var(--color-success);
   font-weight: 700;
 }
 
@@ -110,7 +110,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: var(--color-border, #e5e8eb);
+  background: var(--tpl-ms-otp-passkey-divider);
 }
 
 .footRow {

@@ -1,9 +1,10 @@
 'use client'
+import { DetailContent, DetailField } from '@/components/shared/detail-content'
 import ListDateTime from '@/components/shared/list-date-time'
 import { canChangeBroadcastNow, canEditBroadcastNow, canManageBroadcastListNow, captureBroadcastWriteAccess, isFromHeadquarters, useBroadcastEditAccess, useBroadcastManagementAccess } from './write-access'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
-import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd, ListToolbarOptional, ResponsiveFilterChips } from '@/components/shared/list-toolbar';
+import { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort, ListToolbarEnd, ListToolbarOptional } from '@/components/shared/list-toolbar';
 import { RowNameLink } from '@/components/shared/table';
 
 
@@ -43,6 +44,7 @@ import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
 import DateField from '@/components/shared/date-field'
 import SearchField from '@/components/shared/search-field'
+import SegmentedControl from '@/components/shared/segmented'
 import FilterChip from '@/components/shared/filter-chip'
 import { FilterPopover } from '@/components/shared/filter-popover'
 import { useRowLeaving } from '@/lib/use-row-leaving'
@@ -116,11 +118,6 @@ function chipCount(statusCounts: Record<string, number> | null, key: StatusChipK
   if (key === 'all') return statusCounts.all ?? null
   if (key === 'error') return (statusCounts.failed ?? 0) + (statusCounts.partial_failed ?? 0)
   return statusCounts[key] ?? null
-}
-
-/** 札の文字は「すべて 24」の1つの文字列（絵どおり）。件数が無いときは名前だけ。 */
-function chipText(label: string, count: number | null): string {
-  return count == null ? label : `${label} ${count}`
 }
 
 /** 状態の札の色。10 の状態を5色に畳む（色は CSS の data-tone）。 */
@@ -940,19 +937,9 @@ export default function BroadcastListV8() {
   )
 
   const statusChips = (
-    <ResponsiveFilterChips preserveChips label="状態">
-      {STATUS_CHIPS.map((chip) => (
-        <FilterChip
-          key={chip.key}
-          selected={statusFilter === chip.key}
-          showCheck={false}
-          onChange={() => setStatusFilter(chip.key)}
-          icon={<chip.icon size={16} aria-hidden="true" />}
-        >
-          {chipText(chip.label, chipCount(statusCounts, chip.key))}
-        </FilterChip>
-      ))}
-    </ResponsiveFilterChips>
+    <SegmentedControl aria-label="状態" value={statusFilter} onChange={setStatusFilter}
+      options={STATUS_CHIPS.map(chip => ({ value: chip.key, label: chip.label,
+        count: chipCount(statusCounts, chip.key) ?? undefined }))} />
   )
 
   const pageSizeBox = (
@@ -1293,48 +1280,23 @@ export default function BroadcastListV8() {
               onNext={panelIndex < visibleBroadcasts.length - 1 ? () => setPanelId(visibleBroadcasts[panelIndex + 1].id) : undefined}
               hasPrev={panelIndex > 0}
               hasNext={panelIndex < visibleBroadcasts.length - 1}
-              footer={<>
-                <Button variant="primary" onClick={() => goDetail(panelRow.id)}>開く</Button>
-                {canResume ? (
-                  <Button
+              actions={{primary: <Button variant="primary" onClick={() => goDetail(panelRow.id)}>開く</Button>,
+secondary: ((canResume) ? <Button
                     variant="secondary"
                     lockedReason={editAccess.reason}
                     disabled={!canEdit}
                     onClick={withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?draft=${encodeURIComponent(panelRow.id)}`) }))}
                    busyLabel="移動中…">
                     編集を続ける
-                  </Button>
-                ) : null}
-                {/* 同じ操作を残し、実行直前の現在の許可でも守る。 */}
-                {<>
-                  <Button
-                    variant="secondary"
-                    lockedReason={editAccess.reason}
-                    disabled={!canEdit}
-                    onClick={withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) }))}
-                   busyLabel="移動中…">
-                    複製する
-                  </Button>
-                  {fromHq ? null : (
-                    <Button
-                      variant="secondary"
-                      lockedReason={editAccess.reason}
-                      disabled={!canEdit}
-                      onClick={withCurrentEdit(() => { setPanelId(null); requestDelete(panelRow) })}
-                    >
-                      削除する
-                    </Button>
-                  )}
-                </>}
-              </>}
-            >
-              <p>
-                {panelRow.status === 'sent'
-                  ? (panelRow.sentAt ? `送信済み：${formatDateTime(panelRow.sentAt)}` : '送信済み')
-                  : (panelRow.scheduledAt ? `予約：${formatDateTime(panelRow.scheduledAt)}` : '下書き')}
-                {panelRow.status === 'sent' ? (insight?.delivered != null ? ` ／ ${formatNumber(insight.delivered)} 人に届いた` : ` ／ ${acceptedCountText(panelRow.successCount)}`) : ''}
-              </p>
-            </DetailPanel>
+                  </Button> : null),
+menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) }))},
+...((!(fromHq)) ? [{id: 'detail-1', label: "削除する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => { setPanelId(null); requestDelete(panelRow) })}] : [])]}}
+             status={<StatusBadge broadcast={panelRow} />}>
+<DetailContent>
+<DetailField label={panelRow.status === 'sent' ? '送信日時' : '送る日時'}>{panelRow.status === 'sent' ? (panelRow.sentAt ? formatDateTime(panelRow.sentAt) : '送信済み') : (panelRow.scheduledAt ? formatDateTime(panelRow.scheduledAt) : '下書き')}</DetailField>
+{panelRow.status === 'sent' ? <DetailField label="届いた人数">{insight?.delivered != null ? formatNumber(insight.delivered) + ' 人に届いた' : acceptedCountText(panelRow.successCount)}</DetailField> : null}
+</DetailContent>
+</DetailPanel>
           )
         })() : null}
         <ConfirmDialog

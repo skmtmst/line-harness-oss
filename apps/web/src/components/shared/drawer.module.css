@@ -339,8 +339,8 @@
 
 /* ：幅の指定がある引き出しでも窓の題の段をそろえる。 */
 :root .panel.panel .title {
-  font-size: var(--tpl-dialog-title-size);
-  font-weight: var(--tpl-dialog-title-weight);
+  font-size: var(--detail-title-size);
+  font-weight: var(--polish-value-weight);
 }
 
 html:root .body[data-content-spacing='sections'] { display: flex; flex-direction: column; gap: var(--space-16); }
@@ -404,3 +404,8 @@ html:root .panel:not(.inline):not([data-layout='inset']):not([data-width='order'
 
 /* 引き出しの主な操作は共通の中央の並びを使う。 */
 html:root .panel .footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: var(--space-8); }
+
+/* 題の長さで閉じる操作を押し出さず、全文は title に残す。 */
+html:root .panel .title { display: flex; align-items: center; min-width: 0; }
+.titleText { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; min-width: 0; }
+.actionFooter { flex: none; height: var(--detail-footer-height); border-top: 1px solid var(--color-hairline); }
