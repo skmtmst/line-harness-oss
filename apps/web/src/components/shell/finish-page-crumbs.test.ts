@@ -8,7 +8,7 @@ describe('上の帯のパンくずの仕上げ', () => {
   })
 
   it('設定の組の画面は手前に「設定」を置く', () => {
-    expect(finishPageCrumbs('/line-notifications', null, 'LINE通知')).toEqual([{ label: '設定', href: '/settings' }])
+    expect(finishPageCrumbs('/line-notifications', null, 'LINE通知')).toBeNull()
     expect(finishPageCrumbs('/emergency', null, '運用状態')).toEqual([{ label: '設定', href: '/settings' }])
     expect(finishPageCrumbs('/pools/new', [{ label: 'プール管理', href: '/pools' }], 'プールを作る'))
       .toEqual([{ label: '設定', href: '/settings' }, { label: 'プール管理', href: '/pools' }])

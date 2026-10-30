@@ -166,7 +166,7 @@ describe('権限を変える確認（板 M4jS9）', () => {
     expect(mocks.update.mock.calls[0][1]).toMatchObject({ role: 'viewer' })
   })
 
-  it('変更の窓に最初に表示するアカウントが出て保存口へ送る（板 BHEl9）', async () => {
+  it('変更の窓は担当範囲を示し、初期表示のアカウント欄を出さず保存する', async () => {
     await act(async () => { root.render(<HqMembersPage />) })
     await flush()
     const change = host.querySelector('button[aria-label="佐藤 直人のその他操作"]')
@@ -177,7 +177,8 @@ describe('権限を変える確認（板 M4jS9）', () => {
     await flush()
     const edit = document.body.querySelector('[data-design-node="BHEl9"]')
     expect(edit, '変更の窓に目印がない').not.toBeNull()
-    expect(edit?.textContent ?? '').toContain('最初に表示するアカウント')
+    expect(edit?.textContent ?? '').not.toContain('最初に表示するアカウント')
+    expect(edit?.textContent ?? '').toContain('統括のすべてのアカウントを見て操作できます。')
     const save = Array.from(document.body.querySelectorAll('button')).find((b) => (b.textContent ?? '').trim() === '変更を保存する')
     await act(async () => { (save as HTMLButtonElement).click() })
     await flush()
@@ -187,6 +188,7 @@ describe('権限を変える確認（板 M4jS9）', () => {
     await act(async () => { (go as HTMLButtonElement).click() })
     await flush()
     expect(mocks.update).toHaveBeenCalledTimes(1)
-    expect(mocks.update.mock.calls[0][1]).toMatchObject({ assignedLineAccountId: expect.any(String) })
+    expect(mocks.update.mock.calls[0][1]).toMatchObject({ accountScope: 'all', scopedLineAccountIds: [] })
+    expect(mocks.update.mock.calls[0][1]).not.toHaveProperty('assignedLineAccountId')
   })
 })
