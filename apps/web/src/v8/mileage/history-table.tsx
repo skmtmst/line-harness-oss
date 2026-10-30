@@ -83,7 +83,9 @@ export default function HistoryTable({ items, readonly, menuId, setMenuId, openP
                         open={menuId === item.id}
                         onOpenChange={(next) => setMenuId(next ? item.id : null)}
                         items={[
-                          ...(pending ? [{ id: 'void', label: '取り消す', onSelect: () => openPending('void', item) }] : []),
+                          // 108：行の右は「主操作1つ＋…」。「…」の中にも行のボタンと同じ主操作を入れる。
+                          ...(pending ? [{ id: 'confirm', label: '確定する', onSelect: () => openPending('confirm', item) }] : []),
+                          ...(pending || reversible ? [{ id: 'void', label: '取り消す', onSelect: () => openPending('void', item) }] : []),
                           { id: 'friend', label: '友だちを見る', external: false, href: friendHref, onSelect: () => router.push(friendHref) },
                         ]}
                       />

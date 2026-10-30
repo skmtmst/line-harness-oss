@@ -70,7 +70,7 @@ describe('受信箱の期限と補助操作', () => {
 
   it.each([null, 0, 27])('未割り当ての未読数%sを渡し、候補を選んでも期限条件を保つ', (count) => {
     render(<Panel count={count} />)
-    fireEvent.click(screen.getByRole('button', { name: '担当者で絞り込む（パネル）' }))
+    fireEvent.click(screen.getByRole('button', { name: '担当者で絞り込む' }))
     const picker = screen.getAllByRole('dialog').at(-1)!
     expect(within(picker).getByText(count === null ? '未読 —' : `未読 ${count}件`)).toBeTruthy()
     fireEvent.click(within(picker).getByRole('radio', { name: '未割り当て' }))

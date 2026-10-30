@@ -475,6 +475,7 @@
 - [受信箱の空き・題横の印・保存の入口・カードの縦崩れ](release-log/unreleased/1953-kenta-muse-inbox.md)
 - [フォルダ追加の色の板の重なり修正](release-log/unreleased/1970-kenta-muse-check-b.md)
 - [運営・監査・分析・問い合わせ・リッチメニューの修正](release-log/unreleased/1953-kenta-muse-ops-misc.md)
+- [受信箱の絞り込み・自動応答の題・バナー生成・機能設定の住所・マイル履歴の操作](release-log/unreleased/0000-kenta-muse-fix-d.md)
 - [統括の一覧の名前押下・友だちCSVのタブ・統括アカウント説明の修正](release-log/unreleased/1953-kenta-muse-list-settings.md)
 - [絞り込みの見出し・0の灰色・日付の年・経過の日数](release-log/unreleased/1955-kenta-muse-ui-color.md)
 - [行の「…」の枠なし・押せる文字の形](release-log/unreleased/0000-kenta-muse-fix-c.md)

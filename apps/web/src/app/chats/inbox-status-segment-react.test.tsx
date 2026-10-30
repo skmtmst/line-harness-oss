@@ -59,10 +59,25 @@ async function eventually(check: () => void, timeout = 1000) {
   }
 }
 
-function radios() {
-  const group = host.querySelector<HTMLElement>('[role="radiogroup"][aria-label="対応状況で絞り込む"]')!
-  const items = [...group.querySelectorAll<HTMLElement>('[role="radio"]')]
-  return { group, items }
+async function openFilters() {
+  await act(async () => {
+    document.querySelector<HTMLButtonElement>('button[aria-label="絞り込み"]')!.click()
+  })
+}
+
+async function pickStatus(label: string) {
+  await openFilters()
+  await act(async () => {
+    document.querySelector<HTMLButtonElement>('button[aria-label="対応状況で絞り込む"]')!.click()
+  })
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((el) => el.textContent === label)!
+  await act(async () => { option.querySelector('button')!.click() })
+}
+
+function threads() {
+  return [...host.querySelectorAll('li')]
+    .map((li) => li.textContent ?? '')
+    .filter((text) => /未対応|対応中|対応済み/.test(text))
 }
 
 beforeEach(() => {
@@ -111,69 +126,43 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-test('押すと絞り込みが変わる。これまでの動きのまま', async () => {
+test('パネルで選ぶと絞り込みが変わる。これまでの動きのまま', async () => {
   await act(async () => root.render(<ChatsPage />))
   await eventually(() => expect(host.textContent).toContain('A未対応'))
 
-  const { items } = radios()
-  await act(async () => items[1].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+  await pickStatus('対応中')
 
   await eventually(() => {
     expect(host.textContent).toContain('B対応中')
     expect(host.textContent).not.toContain('A未対応')
     expect(host.textContent).not.toContain('C対応済み')
   })
-  const { items: after } = radios()
-  expect(after[1].getAttribute('aria-checked')).toBe('true')
+  // パネルを開き直しても選択が残る。
+  await openFilters()
+  expect(document.querySelector('button[aria-label="対応状況で絞り込む"]')?.textContent).toContain('対応中')
 })
 
-test('左右のキーで選ぶ所が動く', async () => {
+test('「すべて」に戻すと絞り込みが外れる', async () => {
   await act(async () => root.render(<ChatsPage />))
   await eventually(() => expect(host.textContent).toContain('A未対応'))
 
-  const { items } = radios()
-  items[0].focus()
-  await act(async () => {
-    items[0].dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-  })
+  await pickStatus('未対応')
+  await eventually(() => expect(host.textContent).not.toContain('B対応中'))
 
+  await pickStatus('すべて')
   await eventually(() => {
-    const { items: after } = radios()
-    expect(after[1].getAttribute('aria-checked')).toBe('true')
-    expect(document.activeElement).toBe(after[1])
-  })
-  // キーで選んだら絞り込みも動く。
-  await eventually(() => {
-    expect(host.textContent).toContain('B対応中')
-    expect(host.textContent).not.toContain('A未対応')
+    expect(host.textContent).toContain('A未対応')
+    expect(host.textContent).toContain('C対応済み')
   })
 })
 
-/* ★V8（ XqSvX「状態」）：「すべて」の所は無く、4つに件数。選んだ所をもう一度押すとすべてに戻る。 */
-test('V8：4つに件数が付き、選んだ所をもう一度押すと絞り込みが外れる', async () => {
-  document.documentElement.dataset.theme = 'v8'
-  try {
-    await act(async () => root.render(<ChatsPage />))
-    await eventually(() => expect(host.textContent).toContain('A未対応'))
-    await eventually(() => {
-      const { items } = radios()
-      expect(items.map((item) => item.textContent?.trim())).toEqual(['未対応1', '対応中1', '保留0', '対応済み1'])
-    })
-    const { items } = radios()
-    // 何も選んでいない（すべて）ときは先頭に Tab で入れる。
-    expect(items.map((item) => item.tabIndex)).toEqual([0, -1, -1, -1])
-    await act(async () => items[1].dispatchEvent(new MouseEvent('click', { bubbles: true })))
-    await eventually(() => {
-      expect(host.textContent).not.toContain('A未対応')
-      expect(radios().items[1].getAttribute('aria-checked')).toBe('true')
-    })
-    await act(async () => radios().items[1].dispatchEvent(new MouseEvent('click', { bubbles: true })))
-    await eventually(() => {
-      expect(host.textContent).toContain('A未対応')
-      expect(host.textContent).toContain('C対応済み')
-      expect(radios().items.every((item) => item.getAttribute('aria-checked') === 'false')).toBe(true)
-    })
-  } finally {
-    delete document.documentElement.dataset.theme
-  }
+/* 一覧の上の段はクイックと名前の検索の2段だけ。状態・担当者は「絞り込み」のパネルにまとめる。 */
+test('一覧の上に状態と担当者の段を置かない', async () => {
+  await act(async () => root.render(<ChatsPage />))
+  await eventually(() => expect(host.textContent).toContain('A未対応'))
+  expect(host.querySelector('[role="radiogroup"][aria-label="対応状況で絞り込む"]')).toBeNull()
+  expect(host.querySelector('button[aria-label="担当者で絞り込む"]')).toBeNull()
+  // クイックと検索は残る。
+  expect(host.querySelector('[aria-label="受信箱のクイック絞り込み"]')).not.toBeNull()
+  expect(host.querySelector('input[aria-label="名前・メールアドレス・内容で検索"]')).not.toBeNull()
 })
