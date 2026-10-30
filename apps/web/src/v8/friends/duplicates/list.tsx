@@ -1,7 +1,7 @@
 'use client'
 
 import { jstDate } from '@/lib/jst-datetime';
-import { Inbox, Download, Info, RotateCw } from 'lucide-react';
+import { Inbox, Download, RotateCw } from 'lucide-react';
 
 import { formatNumber } from '@/lib/format';
 import { usePageTitle } from '@/components/shell/page-chrome';
@@ -16,7 +16,6 @@ import Pagination from '@/components/shared/pagination'
 import SegmentedControl from '@/components/shared/segmented'
 import StatusBadge from '@/components/shared/status-badge'
 import SearchField from '@/components/shared/search-field'
-import Notice from '@/components/shared/notice'
 import { ActionCell, DataTable, TableHeadRow, Th, Tr, Td, RowNameLink } from '@/components/shared/table';
 import { loadFailureCopy, isForbidden } from '@/components/shared/api-error-message';
 import { FriendsTabs } from '../shared/head';
@@ -115,8 +114,8 @@ export default function DuplicatesListV8() {
         )} />}
       />
       <div className={styles.body}>
-        <PageExplanationBody inset="notice">{FRIENDS_TAB_NOTES.duplicates}</PageExplanationBody>
-        <Notice tone="info" appearance="soft" icon={<Info size={16} aria-hidden="true" />}>自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、名前やプロフィール画像だけの一致は参考です。結び付けても元の友だちと履歴は残ります。</Notice>
+        {/* 決まり2: 結び付け方の説明は帯にせず、題の横の「？」へ入れる。 */}
+        <PageExplanationBody inset="notice">{FRIENDS_TAB_NOTES.duplicates}自動では結び付けません。確定済みID・連携UID・メール／電話の一致は強い根拠、名前やプロフィール画像だけの一致は参考です。結び付けても元の友だちと履歴は残ります。</PageExplanationBody>
 
         <KpiBand gridClassName="grid grid-cols-4">
           {kpis.map((kpi) => (

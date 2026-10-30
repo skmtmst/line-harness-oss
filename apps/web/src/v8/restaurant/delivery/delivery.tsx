@@ -619,7 +619,8 @@ function DeliveryInner() {
 
   // 作ってある店舗から選ぶ欄なので、共通の EntitySelect（EntityPickerField）を使う。
   // 置き場（フォルダ）は無いので kind は渡さない。
-  const storePicker = stores.length > 0 ? (
+  // 86: 店が1つしか無い時は選ぶ欄を出さない。
+  const storePicker = stores.length > 1 ? (
     <EntitySelect
       aria-label="店舗"
       noun="店舗"

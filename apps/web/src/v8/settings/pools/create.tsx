@@ -172,7 +172,6 @@ function PoolCreateBody() {
           </Card>
         </>
       )}
-      savePlacement="content"
       saveActions={(
         <>
           <Button href={LIST_HREF}>キャンセル</Button>

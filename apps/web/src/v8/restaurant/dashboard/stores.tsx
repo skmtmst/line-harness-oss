@@ -43,8 +43,9 @@ export function DashboardBoard({ data }: { data: RestaurantSnapshot }) {
         <KpiCard title="ご来店予定" valueText={`${guestCount}名`} detail="今日以降の人数合計" help="今日以降の有効予約の人数の合計です。来店済みの過去分は含みません。" icon={null} presentation="band" value={null} unit="" />
         <KpiCard title="空席率" valueText={`${Math.max(0, Math.round((1 - guestCount / Math.max(totalCapacity, 1)) * 100))}%`} detail="全店舗の概算" help="分母は全店舗の収容数の合計、分子は今日以降の有効予約の人数の合計です。時間帯ごとの空きではありません。" icon={null} presentation="band" value={null} unit="" />
         <KpiCard title="売上予測" valueText={priced.length ? formatYen(revenue) : '—'} detail={priced.length ? `コース設定 ${formatNumber(priced.length)}件分` : 'コース設定がありません'} help="コース単価×人数の合計です。席のみ（コース未設定）の予約は含みません。固定の客単価では計算しません。" icon={null} presentation="band" value={null} unit="" />
-        <KpiCard title="未返信口コミ" valueText={`${unreplied}件`} detail="Google口コミ" valueTone={unreplied > 0 ? 'warning' : 'default'} icon={null} presentation="band" value={null} unit="" />
       </StatRow>
+      {/* R11: 帯は4枚まで。5つ目は帯の下の短い1行に残す。返信はGoogleの口コミタブで付ける。 */}
+      <p className={styles.fifthLine}>未返信口コミ {formatNumber(unreplied)} 件 <Button variant="text" size="inline" href="/restaurant-test/google?tab=reviews">口コミへ →</Button></p>
       <Panel
         title="店舗一覧"
         description="本部から全店の予約と接続状態を確認します。"

@@ -68,7 +68,8 @@ describe('V8の閲覧と実測値の保護', () => {
     expect(window.location.pathname).toBe('/analytics')
     expect(host.textContent).toContain('閲覧のみで見ています')
     expect(host.querySelector('[role="tablist"][aria-label="分析の組"] [aria-current="page"]')?.textContent).toBe('ふだん見る')
-    expect(host.querySelector('a[href="/analytics?tab=routes"]')).not.toBeNull()
+    // 88: 見かたの切り替えは灰の箱の押し釦。閲覧者にも残る。
+    expect([...host.querySelector('[role="group"][aria-label="分析の見かた"]')!.querySelectorAll('button')].map((button) => button.textContent)).toContain('経路と成果')
     expect(host.textContent).toContain('37')
     expect(host.textContent).not.toContain('+47')
   })

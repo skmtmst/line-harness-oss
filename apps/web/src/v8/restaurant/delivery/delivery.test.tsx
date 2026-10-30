@@ -373,6 +373,8 @@ describe('kDQHr デリバリー受注', () => {
   })
 
   it('店舗を選ぶ欄は共通の選ぶ部品（押すと選ぶ窓が開く）にする', async () => {
+    // 86: 選ぶ意味があるのは2店以上の時。1店では欄を出さない。
+    fixture.snapshot.mockResolvedValue({ success: true, data: { stores: [store(), { ...store(), id: 'store-2', name: '二号店' }] } })
     render(<DeliveryPage />)
     await screen.findByText('#UE-1001')
 
@@ -380,6 +382,13 @@ describe('kDQHr デリバリー受注', () => {
     const picker = screen.getByRole('button', { name: '店舗' })
     fireEvent.click(picker)
     expect(await screen.findByRole('dialog', { name: '店舗を選ぶ' })).toBeTruthy()
+  })
+
+  it('86: 店が1つしか無い時は選ぶ欄を出さない', async () => {
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    expect(screen.queryByRole('button', { name: '店舗' })).toBeNull()
+    expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
   })
 })
 

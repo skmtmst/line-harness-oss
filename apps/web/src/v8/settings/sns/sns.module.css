@@ -48,10 +48,10 @@
   line-height: var(--tpl-e1-sns-sub-lh);
 }
 
-/* 主な操作はカードの中央に並べる。 */
+/* 追加決まり1: 操作は左に1行で並べる。1つだけ中央に浮かせない。 */
 .actions {
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--tpl-e1-sns-row-gap);

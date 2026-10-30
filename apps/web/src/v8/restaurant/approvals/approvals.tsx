@@ -121,8 +121,9 @@ function ApprovalCard({ item, data, store, busy, readOnly, onApprove, onReturn }
         <span className={styles.spacer} aria-hidden="true" />
         {pending && !readOnly ? (
           <>
-            <Button disabled={busy} textTone="danger" onClick={() => onReturn(item)}><Undo2 aria-hidden className={styles.buttonIcon} />差戻し</Button>
-            <Button disabled={busy} onClick={() => onApprove(item)}><Check aria-hidden className={styles.buttonIcon} />承認する</Button>
+            {/* 109: 承認は主（右）、差戻しは赤い文字だけ。並びは［差戻し］［承認する］。 */}
+            <Button disabled={busy} variant="text" textTone="danger" onClick={() => onReturn(item)}><Undo2 aria-hidden className={styles.buttonIcon} />差戻し</Button>
+            <Button disabled={busy} variant="primary" onClick={() => onApprove(item)}><Check aria-hidden className={styles.buttonIcon} />承認する</Button>
           </>
         ) : pending ? (
           /* 閲覧のみ：ボタンは置かず、ボタンの高さだけ空ける（下の並びを動かさない）。 */

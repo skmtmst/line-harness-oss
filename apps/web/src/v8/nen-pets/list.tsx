@@ -236,7 +236,12 @@ function PetRow({ pet, canEdit, onEdit }: { pet: NenPetRow; canEdit: boolean; on
       <Td className={styles.colActivity}><span className={styles.cell} title={pet.activityLabel}>{pet.activityLabel}</span></Td>
       <Td className={styles.colProduct}><span className={styles.cell} title={pet.productName ?? '（未設定）'}>{pet.productName ?? '（未設定）'}</span></Td>
       <Td className={styles.colUpdated}>
-        {pet.weightStale && updated !== '—' ? <Pill tone="warn" title="体重が90日更新されていません">{updated}</Pill> : <span className={styles.cell}>{updated}</span>}
+        {pet.weightStale && updated !== '—' ? (
+          <span className={styles.stack}>
+            <span className={styles.cell}>{updated}</span>
+            <Pill tone="warn" title="体重が90日更新されていません">90日以上前</Pill>
+          </span>
+        ) : <span className={styles.cell}>{updated}</span>}
       </Td>
       <Td className={styles.colMenu}><RowMenu subject={name} items={items} /></Td>
     </Tr>

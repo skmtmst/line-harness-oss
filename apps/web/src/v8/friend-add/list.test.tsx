@@ -180,6 +180,18 @@ describe('友だち追加時の配信の一覧（V8）', () => {
     expect(sink).not.toContain('保管する')
   })
 
+  it('81: 止められない案内の窓は［キャンセル］［受け皿の中身を編集する］の順', async () => {
+    await render()
+    await openMenu('経路が分からなかった人')
+    const item = Array.from(document.querySelectorAll('[role="menuitem"]'))
+      .find((el) => el.textContent?.includes('止められない理由を見る')) as HTMLElement
+    await act(async () => { item.click() })
+    const dialog = await screen.findByRole('dialog')
+    const pair = dialog.querySelector('[data-dialog-action-pair]') as HTMLElement
+    const labels = Array.from(pair.querySelectorAll('button')).map((button) => (button.textContent ?? '').replace(/\s+/g, ''))
+    expect(labels).toEqual(['キャンセル', '受け皿の中身を編集する'])
+  })
+
   it('行の名前の前に、左のフォルダの列と同じフォルダの丸が付く（未分類は灰色の丸）。閲覧のみでも出す', async () => {
     roleState.role = verifiedStaffRole('viewer')
     await render()

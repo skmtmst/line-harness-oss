@@ -221,7 +221,7 @@ function VersionsInner() {
       boardId="ziSgL"
       headingSize="regular"
       title={`${detail.name}（版と使われている場所）`}
-      help="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。"
+      help="公開した版は書き換えられません。公開しても、呼び出し元は自動で変わりません。使う場所ごとに新しい版へ更新します。更新しても、実行中・待機中の処理は変えず、次に始まる処理から新版を使います。"
       stats={<PageContent layout="stats"><KpiBand aria-label="版と利用先の集計">
         <KpiCard presentation="band" title="いまの版" icon={<GitBranch size={16} aria-hidden="true" />} value={null} valueText={published ? `第${published.versionNumber}版` : emptyValue('unknown')} unit="" detail={published?.publishedAt ? `${monthDay(published.publishedAt)} 公開` : 'まだ公開していません'} />
         <KpiCard presentation="band" title="呼び出し元" icon={<Link2 size={16} aria-hidden="true" />} value={detail.bindings.length} unit="か所" detail={consumerBreakdown(detail.bindings)} />
@@ -339,7 +339,7 @@ function VersionsInner() {
             </DataTable></Card>
         )}
       </section>
-      <Notice tone="info" presentation="account-note" icon={null}>更新しても、実行中・待機中の処理は変えず、次に始まる処理から新版を使います。</Notice>
+      {/* 決まり2: 新版の効き目の説明は帯にせず、題の横の「？」へ入れる。 */}
 
       <Dialog
         open={Boolean(pendingBinding && published)}

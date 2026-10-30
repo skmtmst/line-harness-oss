@@ -2,10 +2,9 @@
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useState, type ComponentType } from 'react'
-import { Bell, CalendarPlus, Check, IdCard, LogOut, MessageSquare, Star } from 'lucide-react'
+import { Bell, CalendarPlus, Check, ChevronDown, IdCard, LogOut, MessageSquare, Star } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import Notice from '@/components/shared/notice'
 import StatusBadge from '@/components/shared/status-badge'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
@@ -64,7 +63,7 @@ function LineFollowupBoard({ ctx, selectedId, setSelectedId, drafts, setDrafts, 
   const draft = selected ? drafts[selected.id] ?? { title: selected.title, body: selected.body } : null
   return (
     <>
-      <Notice tone="info">LINE来店フォローは、来店・退店のきっかけを使う「シナリオのひな形」としてまとめる。行を押すと、その中身をシナリオの一歩と同じ形で直せる。</Notice>
+      {/* 決まり2: いつも同じ説明は帯にせず、題の横の「？」（description）へ入れる。 */}
       {readOnly ? <ReadOnlyNotice role="note" /> : null}
       <DetailColumns presentation="notification" asideLabel="LINEでの見え方" expanded={previewExpanded} onExpandedChange={setPreviewExpanded}
         aside={selected && draft ? <FlowPreview flow={selected} draft={draft} accountName={store?.line_account_name || store?.name || 'LINE公式アカウント'} /> : null}>
@@ -74,7 +73,8 @@ function LineFollowupBoard({ ctx, selectedId, setSelectedId, drafts, setDrafts, 
             const Icon = kind.icon
             const isSelected = selected?.id === flow.id
             return <div key={flow.id} className={styles.flowItem}>
-              <Card padding="none" contentPadding="0px 0px" selected={isSelected}>
+              {/* 118: 開いた行は白のまま。開いている印は左の緑の線と右端の ⌃ で示す（押している途中の灰にしない）。 */}
+              <Card padding="none" contentPadding="0px 0px" data-open={isSelected || undefined} className={isSelected ? styles.flowCardOpen : undefined}>
                 <button type="button" className={styles.flowButton} aria-expanded={isSelected} aria-label={kind.name} onClick={() => setSelectedId(flow.id)}>
                   <span className={styles.flowIcon}><Icon size={16} aria-hidden /></span>
                   <span className={styles.flowText}>
@@ -83,6 +83,7 @@ function LineFollowupBoard({ ctx, selectedId, setSelectedId, drafts, setDrafts, 
                   </span>
                   <span className={styles.flowTiming}>{timingLabel(flow)}</span>
                   <span className={styles.flowStatus}><StatusBadge tone="neutral">{flow.delivery_mode === 'disabled' ? '送信しない' : '確認用'}</StatusBadge></span>
+                  <ChevronDown size={18} aria-hidden="true" data-flow-chevron className={styles.flowChevron} data-open={isSelected || undefined} />
                 </button>
               </Card>
               {isSelected && draft ? <FlowEditor key={flow.id} flow={flow} name={kind.name} draft={draft} readOnly={readOnly} busy={busy}
@@ -118,7 +119,7 @@ export default function LineFollowupV8() {
     <RestaurantFrame
       boardId="n9vvGx"
       title="LINE来店フォロー"
-      description="予約前・来店後・口コミ依頼・会員証を、来店・退店のきっかけで送るひな形として作ります。"
+      description="予約前・来店後・口コミ依頼・会員証を、来店・退店のきっかけで送るひな形として作ります。LINE来店フォローは、来店・退店のきっかけを使う「シナリオのひな形」としてまとめる。行を押すと、その中身をシナリオの一歩と同じ形で直せる。"
       pickerAs="select"
       banner={false}
       subtitle={(store) => `${store ? `${store.name}・` : ''}本送信は停止中（プレビューのみ）`}

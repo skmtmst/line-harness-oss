@@ -15,7 +15,7 @@ import { useState, type ReactNode } from 'react'
 import { Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
-import { Tabs } from '@/components/shared/tabs'
+import SegmentedControl from '@/components/shared/segmented'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { RestaurantShell, type RestaurantV8Context } from '@/v8/restaurant/booking-kit/public/shell/index'
@@ -44,16 +44,17 @@ function InventoryTabs({ ctx, tab, onTab, dialog, onDialog, heading, notice }: {
   /* 変更の可否を各画面へ渡し、変更操作は共通の理由付きロックで残す。 */
   const canEdit = canManageRole(role)
   const today = todayIn(ctx.store?.timezone)
+  /* 88: 店の行き来（上の段）が下線のタブなので、中の切り替え（下の段）は灰の箱の切り替えにする。 */
   const tabs = (
-    <Tabs
-      className={`${styles.tabs} ${tab === 'closures' ? styles.tabsClosures : ''}`}
-      label="予約枠・在庫の切り替え"
-      size="compact"
-      items={[
-        { label: '時間帯ごとの在庫', current: tab === 'stock', onClick: () => onTab('stock') },
-        { label: '予約経路の連携', current: tab === 'channels', onClick: () => onTab('channels') },
-        { label: '自動で合わせるルール', current: tab === 'rules', onClick: () => onTab('rules') },
-        { label: '休業日・貸切', current: tab === 'closures', onClick: () => onTab('closures') },
+    <SegmentedControl<InventoryTab>
+      aria-label="予約枠・在庫の切り替え"
+      value={tab}
+      onChange={onTab}
+      options={[
+        { value: 'stock', label: '時間帯ごとの在庫' },
+        { value: 'channels', label: '予約経路の連携' },
+        { value: 'rules', label: '自動で合わせるルール' },
+        { value: 'closures', label: '休業日・貸切' },
       ]}
     />
   )

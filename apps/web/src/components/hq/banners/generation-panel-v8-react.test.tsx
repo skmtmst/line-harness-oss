@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /*
  * ★V8 の生成パネル（統括のバナー生成・プロジェクトの中で使う形 v8Layout）。
- * 品質やクレジットは選ばせない。追加の指示は任意と上限を添え、
+ * 品質やクレジットは選ばせない。作りたい内容は任意と上限を添え、
  * 参照画像は3枚まで・使い方の説明を選ぶ前から読める・手元の画像は PNG/JPEG/WebP だけ受け付ける。
  */
 import React from 'react'
@@ -36,20 +36,22 @@ function open(value: Partial<BannerGenerationInput> = {}, handlers: { onPickRefe
 }
 
 describe('★V8 の生成パネル', () => {
-  it('出力サイズ・テキスト・色・人物・追加の指示・つくる枚数を並べ、品質やクレジットは選ばせない', () => {
+  it('作りたい内容・テキスト・色・人物・つくる枚数を並べ、品質やクレジットは選ばせない', () => {
     const view = open()
     const text = view.container.textContent ?? ''
     // 見出しは読み上げ用の legend ではなく、目に見える見出しの字で数える。
     const headings = [...view.container.querySelectorAll('*:not(legend)')].filter((node) => node.childElementCount === 0).map((node) => node.textContent?.trim())
-    for (const label of ['出力サイズ', '画像に入れるテキスト', '色', '人物', '追加の指示', 'つくる枚数']) expect(headings).toContain(label)
+    for (const label of ['作りたい内容', '画像に入れるテキスト', '色', '人物', 'つくる枚数']) expect(headings).toContain(label)
+    // 大きさは今の値の1行と変える口だけ（選択肢は窓の中）。
+    expect(screen.getByRole('button', { name: '大きさを変える' })).toBeTruthy()
     expect(text).not.toMatch(/品質|クレジット|高精細|quality/i)
     expect(screen.queryByRole('button', { name: /生成する/ })).toBeNull()
   })
 
-  it('追加の指示は任意と文字数の上限を添え、例を入れる前から見せる', () => {
+  it('作りたい内容は任意と文字数の上限を添え、例を入れる前から見せる', () => {
     open()
     expect(screen.getByText(`任意・${CUSTOM_PROMPT_MAX}文字まで`)).toBeTruthy()
-    expect(screen.getByPlaceholderText('例：桜の花びらと餃子・生ビールの写真風。和風で温かみのある雰囲気')).toBeTruthy()
+    expect(screen.getByPlaceholderText('例：桜と料理の写真を使った、春らしい案内')).toBeTruthy()
   })
 
   it('参照画像はライブラリか手元の PNG・JPEG・WebP から選べ、使い方の説明を選ぶ前から読める', () => {

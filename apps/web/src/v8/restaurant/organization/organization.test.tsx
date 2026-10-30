@@ -33,6 +33,21 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
 
+it('86: 店が1つしか無い時は選ぶ欄を出さない', async () => {
+  render(<OrganizationV8 />)
+  expect(await screen.findByText('試験担当')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '店舗' })).toBeNull()
+  expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+})
+
+it('86: 2店以上の時は［店舗：…］の選ぶ欄を出す', async () => {
+  fixture.snapshot.mockResolvedValue({ data: { ...data, stores: [...data.stores, { ...data.stores[0], id: 'store-2', name: '二号店' }] } })
+  render(<OrganizationV8 />)
+  expect(await screen.findByText('試験担当')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '店舗' })).toBeTruthy()
+  expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+})
+
 it('店舗管理の表は3行の中身に合わせて伸びる', async () => {
   render(<OrganizationV8 />)
   const table = await screen.findByRole('table', { name: '店舗管理' })

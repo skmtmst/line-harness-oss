@@ -1,18 +1,15 @@
 'use client'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import { formatNumber } from '@/lib/format'
-import { unreadLookup } from '@/components/chats/assignee-unread';
 import ChatListWindow, { type ChatListWindowItem } from '@/components/chats/chat-list-window';
-import { buildOperatorRows } from '@/components/chats/inbox-dropdown';
 import InboxFilterPanel from '@/components/chats/inbox-filter-panel';
 import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog';
 import Avatar from '@/components/shared/avatar';
 import Button from '@/components/shared/button';
-import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import SegmentedControl from '@/components/shared/segmented';
 import Select from '@/components/shared/select';
 import { InboxFloatingPanel } from '@/components/shared/inbox-content';
-import { InboxFilterControls, InboxHistoryButton, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
+import { InboxHistoryButton, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
 import { InboxListEmpty, InboxListFailure } from '@/components/shared/inbox-list-states';
 import { RowMenu } from '@/components/shared/row-actions';
 import SearchField from '@/components/shared/search-field';
@@ -26,7 +23,7 @@ import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
 import { Bookmark, ListFilter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
-import { CHANNELS, ChannelBadge, EmailInboxItem, INBOX_SORT_OPTIONS, InboxSavedView, InboxSort, StatusFilter, buildInboxUrl, formatWaitingDuration, sameYmd, statusFiltersV8 } from './inbox-model';
+import { ChannelBadge, EmailInboxItem, INBOX_SORT_OPTIONS, InboxSavedView, InboxSort, StatusFilter, buildInboxUrl, formatWaitingDuration, sameYmd } from './inbox-model';
 import { chatListPreview } from './list-preview';
 import styles from './list-parts.module.css';
 import { savedViewSummary } from './saved-view-summary';
@@ -77,9 +74,6 @@ type Props = {
   setNameQuery: Dispatch<SetStateAction<string>>
   assigneeUnreadStatus: "error" | "ready" | "loading"
   assigneeUnread: { operatorId: string | null; operatorName: string | null; unread: number; }[] | null
-  handleStatusFilterKeyDown: (event: React.KeyboardEvent) => void
-  statusCountsNow: Record<"in_progress" | "resolved" | "unread" | "on_hold", number> | null
-  statusFilterButtonRefs: RefObject<(HTMLButtonElement | null)[]>
   listScrollRef: RefObject<HTMLDivElement | null>
   emailError: string
   loadEmails: (offset?: number, append?: boolean) => Promise<void>
@@ -103,7 +97,7 @@ type Props = {
   setSortOrder: (next: InboxSort) => void
 }
 
-export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
+export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
   // 緑の点は目で見る印。読み上げには名前で絞り込み中を伝える。
   const savedSearchLabel = hasInboxFilters ? '保存した検索（絞り込み中）' : '保存した検索'
   return (<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
@@ -288,6 +282,8 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         emailInboxEnabled={emailInboxEnabled}
         value={{ status: statusFilter === 'all' ? 'all' : statusFilter, assignee: assigneeFilter, channel, unreadOnly }}
         operators={operators}
+        assigneeUnread={assigneeUnread}
+        assigneeUnreadStatus={assigneeUnreadStatus}
         onChange={(next) => {
           setStatusFilter(next.status as StatusFilter)
           setAssigneeFilter(next.assignee)
@@ -322,88 +318,10 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         />
       )}
       {/*
-              #670 02: 外の「担当者」と中の「担当者：すべて」が二重だった。
-              プルダウンが自分で名乗るため、外の字は置かない。
-            */}
-      <InboxFilterControls>
-        <>
-          {/*
-                  未読数は集計の口から渡す。**画面に見えている行から数えない**
-                  ——一覧はページ送りされるので、2ページ目の未読が落ちる。
-                  0件の担当者も選択肢に残す（契約上、0件は配列に載らないので実値0として描く）。
-                */}
-          {(
-            /* ★V8：共通の選ぶ欄（選んだ行は ✓ だけ）。担当者ごとの未読数は名前の後ろのに添える（未取得は「—」）。 */
-            <EntitySelect
-              aria-label="担当者で絞り込む"
-              label="担当者"
-              valuePrefix="担当者："
-              width={138}
-              size="full"
-              value={assigneeFilter}
-              onChange={(next) => { setAssigneeFilter(next); dropSavedViewParam() }}
-              options={buildOperatorRows(operators, true).map((row) => {
-                if (row.id === 'all') return { ...entityOptionMetadata(row), value: row.id, label: row.name }
-                const unread = assigneeUnreadStatus === 'error' ? null : unreadLookup(assigneeUnread)(row.id)
-                return { ...entityOptionMetadata(row), value: row.id, label: `${row.name}（${unread === null ? '—' : unread}）` }
-              })}
-            />
-          )}
-        </>
-        {emailInboxEnabled && <EntitySelect
-          width={124}
-          aria-label="受信経路で絞り込む"
-          label="経路"
-          valuePrefix="経路："
-          value={channel}
-          onChange={(value) => router.push(buildInboxUrl(value as 'all' | 'line' | 'email', null))}
-          options={CHANNELS.map((item) => ({ value: item.key, label: item.label }))}
-        />}
-      </InboxFilterControls>
+        絞り込みは2段（クイック・名前で検索）だけ上に置く。担当者・受信経路・
+        対応状況は「絞り込み」のパネルにまとめる（設計 bXyEA）。
+      */}
     </InboxListSearch>
-
-    {/*
-            状態の絞り込みは5等分の切り替え。左の欄（開いている間は288px）でも
-            必ず1行に収まるよう、折り返さない・5つで幅いっぱいにする。
-            選んだ所は白地に濃い文字。読み上げはラジオの決まり。
-          */}
-    <div className={`border-b border-hairline px-3 py-2 ${styles.statusBlock}`}>
-      <div
-        role="radiogroup"
-        aria-label="対応状況で絞り込む"
-        onKeyDown={handleStatusFilterKeyDown}
-        className={`bg-shell flex h-8 flex-nowrap items-stretch rounded-control p-0.5 ${styles.statusSeg}`}
-      >
-        {statusFiltersV8.map((f, index) => {
-          const selected = statusFilter === f.key
-          // V8：「すべて」の所が無いので、何も選んでいない（すべて）ときは先頭に Tab で入れる。
-          const focusable = selected || ((statusFilter === 'all') && index === 0)
-          const count = statusCountsNow ? statusCountsNow[f.key as Exclude<StatusFilter, 'all'>] : null
-          return (
-            <button
-              key={f.key}
-              ref={(el) => { statusFilterButtonRefs.current[index] = el }}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              tabIndex={focusable ? 0 : -1}
-              title={selected ? `${f.label}（もう一度押すとすべて）` : f.label}
-              onClick={() => { setStatusFilter(selected ? 'all' : f.key); dropSavedViewParam() }}
-              // #639 の素のボタンの最小高さ32pxをここだけ外す。
-              // 切り替え全体の高さ32pxの中に収めるため。
-              style={{ minHeight: 0 }}
-              className={`min-w-0 flex-1 truncate rounded-mini px-1 text-center text-xs whitespace-nowrap transition-colors ${styles.statusItem} ${selected
-                  ? 'bg-canvas font-semibold text-ink shadow-card'
-                  : 'text-ink-secondary hover:text-ink font-medium'
-                }`}
-            >
-              {f.label}
-              {count === null || count === undefined ? null : <span className={styles.statusCount}>{count}</span>}
-            </button>
-          )
-        })}
-      </div>
-    </div>
 
     {slaEnabled ? (
       <p data-inbox-sort="fixed" className={`border-b border-hairline px-3 pb-3 text-micro text-ink-secondary ${styles.sortLine}`}>並び順：期限が近い順（過ぎた物が先）</p>

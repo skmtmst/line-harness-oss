@@ -6,6 +6,7 @@
 import { useState } from 'react'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import { RowMenu } from '@/components/shared/row-actions'
 import styles from './external-import.module.css'
@@ -114,13 +115,13 @@ export function ExternalImportWorkspace({
             </section>
 
             <section className="border-hairline bg-canvas rounded-card border p-4 shadow-card-surface">
-              <h2 className="text-ink mb-3 text-sm font-bold">取り込むと、できるようになること</h2>
+              <h2 className="text-ink mb-3 text-sm font-bold">取り込むと、できるようになること <HelpTip label="取り込んでも変わらない物の説明">取り込んでも、お客さまに出ているメニューは変わりません。中身をこちらで持つようになるだけです。</HelpTip></h2>
               <ul className="space-y-3 text-xs text-ink-secondary">
                 <li>✓ 面ごとのボタンを、この画面から書き換えられます</li>
                 <li>{`✓ 「誰に出すか」の条件を付けられます${selected ? (selected.isCurrentDefault ? '（いまは全員に出ています）' : '（いまは全員向けの既定ではありません）') : ''}`}</li>
                 <li>✓ 面ごとのタップ数が取れるようになります</li>
               </ul>
-              <Notice tone="info" className="mt-4">ⓘ 取り込んでも、お客さまに出ているメニューは変わりません。中身をこちらで持つようになるだけです。</Notice>
+              {/* 決まり2: 変わらない物の説明は帯にせず、題の横の「？」へ入れる。 */}
             </section>
           </div>
 

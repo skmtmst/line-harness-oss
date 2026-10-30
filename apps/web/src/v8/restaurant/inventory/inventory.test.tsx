@@ -117,7 +117,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
   it('予約経路の連携（hQQlt）は媒体ごとの受け取りと読めなかったものを出す', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    fireEvent.click(screen.getByRole('tab', { name: '予約経路の連携' }))
+    fireEvent.click(screen.getByRole('button', { name: '予約経路の連携' }))
     await screen.findByText('Hot Pepper グルメ')
     expect(screen.getByText('7日届いていない')).not.toBeNull()
     expect(screen.getByText('読めなかったもの')).not.toBeNull()
@@ -127,7 +127,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
   it('読めなかった予約の空入力は欄で知らせ、最初の欄へ移動して取り込まない', async () => {
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    fireEvent.click(screen.getByRole('tab', { name: '予約経路の連携' }))
+    fireEvent.click(screen.getByRole('button', { name: '予約経路の連携' }))
     fireEvent.click(await screen.findByRole('button', { name: '手で直して取り込む' }))
     fireEvent.click(screen.getByRole('button', { name: '台帳へ取り込む' }))
     const name = screen.getByLabelText('お客さまのお名前')
@@ -202,7 +202,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     fireEvent.click(save)
     expect(fixture.saveOpeningHours).not.toHaveBeenCalled()
     expect(fixture.saveInventoryAllocation).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('tab', { name: '予約経路の連携' }))
+    fireEvent.click(screen.getByRole('button', { name: '予約経路の連携' }))
     const issue = await screen.findByRole('button', { name: '発行する' }) as HTMLButtonElement
     expect(document.querySelector('[data-read-only-notice]')).toBeNull()
     expect(issue.disabled).toBe(true)
@@ -214,7 +214,7 @@ describe('Y8SjT2 予約枠・在庫', () => {
     role.value = verifiedStaffRole('viewer')
     render(<InventoryPage />)
     await screen.findByText('19:00 の卓')
-    fireEvent.click(screen.getByRole('tab', { name: '予約経路の連携' }))
+    fireEvent.click(screen.getByRole('button', { name: '予約経路の連携' }))
     const issue = await screen.findByRole('button', { name: '発行する' })
     expect(issue.getAttribute('aria-disabled')).toBe('true')
     fireEvent.click(issue)
@@ -235,12 +235,12 @@ it('OP-R04 未保存の配分があるタブの移動は確認し、取り消す
  render(<InventoryPage/>)
  const input=await screen.findByRole('spinbutton',{name:'予約サイト'})
  fireEvent.change(input,{target:{value:'7'}})
- fireEvent.click(screen.getByRole('tab',{name:'予約経路の連携'}))
+ fireEvent.click(screen.getByRole('button',{name:'予約経路の連携'}))
  const dialog=await screen.findByRole('dialog',{name:'保存していない変更があります'})
  expect((input as HTMLInputElement).value).toBe('7')
  fireEvent.click(within(dialog).getByRole('button',{name:'編集を続ける'}))
  expect((input as HTMLInputElement).value).toBe('7')
- fireEvent.click(screen.getByRole('tab',{name:'予約経路の連携'}))
+ fireEvent.click(screen.getByRole('button',{name:'予約経路の連携'}))
  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button',{name:'保存せずに移る'}))
  await screen.findByText('Hot Pepper グルメ')
  expect(fixture.saveInventoryAllocation).not.toHaveBeenCalled()
@@ -256,3 +256,15 @@ it('inventory channel read failure does not become no channels',async()=>{
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+describe('88 二段の切り替え', () => {
+  it('店の行き来は下線のタブ、中の切り替えは灰の箱の切り替え', async () => {
+    render(<InventoryPage />)
+    await screen.findByText('19:00 の卓')
+    // 上の段（店の行き来）だけが下線のタブ。
+    expect(screen.getAllByRole('tablist')).toHaveLength(1)
+    // 下の段（中の切り替え）は箱の切り替え。
+    const inner = screen.getByRole('group', { name: '予約枠・在庫の切り替え' })
+    expect(within(inner).getAllByRole('button')).toHaveLength(4)
+  })
+})

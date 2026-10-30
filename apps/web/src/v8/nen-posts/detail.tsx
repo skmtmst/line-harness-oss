@@ -318,11 +318,12 @@ export function PhotoReviewDetail({
           ? `${formatNumber(total)} 枚のうち ${position + 1} 枚目。重複のため、却下か報酬なしで採用を選んでください。`
           : `${formatNumber(total)} 枚のうち ${position + 1} 枚目。あと${Math.max(0, total - position - 1)} 枚あります。`}
         actions={!canEdit ? undefined : duplicate ? <>
-        <Button disabled={reviewing} onClick={onReturn}>却下する</Button>
+        {/* 109: 断る側は赤い文字だけ。採用は主（右）のまま。 */}
+        <Button variant="text" textTone="danger" disabled={reviewing} onClick={onReturn}>却下する</Button>
         <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
         <Button variant="primary" disabled={reviewing} onClick={adoptWithoutReward} busy={reviewing} busyLabel="処理中…">報酬なしで採用</Button>
         </> : <>
-        <Button disabled={reviewing} onClick={onReturn}>見送る（理由を選ぶ）</Button>
+        <Button variant="text" textTone="danger" disabled={reviewing} onClick={onReturn}>見送る（理由を選ぶ）</Button>
         <Button disabled title="切り取り版の生成口を接続後に使えます">切り取ってから採用</Button>
         <Button variant="primary" disabled={reviewing} onClick={onApprove} busy={reviewing} busyLabel="処理中…">このまま採用</Button>
         </>}

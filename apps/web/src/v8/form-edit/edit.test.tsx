@@ -175,6 +175,17 @@ describe('回答フォームの編集（V8）', () => {
     expect(formsUpdate).not.toHaveBeenCalled()
   })
 
+  it('19: 書いていない覚え書き・背景の画像は「未設定」と出す', async () => {
+    staffMe.mockResolvedValue({ success: true, data: { role: 'staff' } })
+    await render('id=form-1')
+    fireEvent.click(screen.getByRole('tab', { name: '受付と見た目' }))
+    const card = screen.getByRole('heading', { name: '受付と見た目' }).closest('section') ?? host
+    const rowOf = (label: string) => Array.from(card.querySelectorAll('dt'))
+      .find((term) => term.textContent === label)?.parentElement?.textContent ?? ''
+    expect(rowOf('覚え書き')).toContain('未設定')
+    expect(rowOf('背景の画像')).toContain('未設定')
+  })
+
   it('競合が残っていてもstaffに変わると保存と比較の入口を隠す', async () => {
     formsUpdate.mockRejectedValue(new ApiError(409, 'conflict', 'VERSION_CONFLICT', { updatedAt: '' }))
     formsGet.mockResolvedValueOnce({ success: true, data: structuredClone(formData) })
@@ -232,7 +243,10 @@ describe('回答フォームの編集（V8）', () => {
     expect(within(row as HTMLElement).getByText('テキストを送る')).toBeTruthy()
     expect(within(row as HTMLElement).getByRole('button', { name: '「ご回答ありがとうございます」' })).toBeTruthy()
     fireEvent.click(screen.getByRole('tab', { name: '受付と見た目' }))
-    expect(await screen.findByText('受付のきまり（つづき）')).toBeTruthy()
+    /* 受付のきまりは1枚のカードにまとまり、つづきの見出しは無い（91）。 */
+    expect(await screen.findByRole('heading', { name: '受付のきまり' })).toBeTruthy()
+    expect(screen.queryByText('受付のきまり（つづき）')).toBeNull()
+    expect(screen.getByText('前回の答えを最初から入れておく')).toBeTruthy()
     expect(screen.getByDisplayValue('来店アンケート')).toBeTruthy()
   })
 
@@ -241,7 +255,7 @@ describe('回答フォームの編集（V8）', () => {
     ;(broken.layout.sections[1].blocks[0] as { label: string }).label = ''
     formsGet.mockImplementation(async () => ({ success: true, data: broken }))
     await render('id=form-1&tab=appearance')
-    await screen.findByText('受付のきまり（つづき）')
+    await screen.findByRole('heading', { name: '受付のきまり' })
     fireEvent.click(getPageAction({ name: '下書きを保存' }))
     for (let i = 0; i < 3; i++) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })
     expect(formsUpdate).not.toHaveBeenCalled()

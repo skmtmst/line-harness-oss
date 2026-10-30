@@ -987,7 +987,7 @@ export default function FriendsListV8() {
           ) : friends.length === 0 ? (
             <tr>
               <td colSpan={colCount} className={styles.stateCell}>
-                <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} emptyPreset={emptyFiltered ? 'filtered' : 'readonly'} action={emptyFiltered ? <Button onClick={clearEmptyFilters}>条件を外す</Button> : undefined} />
+                <ListState kind="empty" title={emptyMessage.title} description={emptyMessage.description} emptyPreset={emptyFiltered ? 'filtered' : 'readonly'} action={emptyFiltered ? <Button onClick={clearEmptyFilters}>条件を外す</Button> : readOnly ? undefined : <Button href="/inflow-links">友だち追加の URL を作る</Button>} />
               </td>
             </tr>
           ) : null}

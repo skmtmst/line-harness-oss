@@ -260,7 +260,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
           <dl className={styles.kvList}>
             <Kv label="システム表示名">{friend.systemDisplayName || <span className={styles.faint}>未設定</span>}</Kv>
             <Kv label="追加日">{friend.createdAt ? formatDay(friend.createdAt) : emptyValue('unknown')}</Kv>
-            <Kv label="流入元">{friend.firstTrackedLinkName ?? '不明'}</Kv>
+            <Kv label="流入元">{friend.firstTrackedLinkName ?? emptyValue('unknown')}</Kv>
           </dl>
         </section>
         <section className={styles.group} aria-label="フォーム回答">

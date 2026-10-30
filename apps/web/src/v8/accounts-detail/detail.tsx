@@ -32,7 +32,7 @@ import styles from './detail.module.css';
 import { emptyValue } from '@/components/shared/empty-value';
 import { DetailLoading } from '@/components/templates/detail-page';
 import ReadOnlyNotice from '@/components/shared/read-only-notice';
-import { Row, Pair, ActionValue } from "./detail-gap-parts"
+import { Row, ActionValue } from "./detail-gap-parts"
 type Skipped = Array<{ id: string; kind: string; title: string | null; skippedAt: string }>
 
 const CAN_DO = ['・友だち追加URLとQRはここに出ます', '・人ごとの既定のアカウントはここで決めます', '・接続の異常や停止は、ここで見張ります'].join('\n')
@@ -267,17 +267,15 @@ export default function AccountDetailV8() {
               <Row label="テスト送信先">
                 <ActionValue value={recipientValue} action={canManage ? <Button type="button" variant="text" presentation="account-inline" onClick={() => setRecipientsOpen(true)}>変える</Button> : null} />
               </Row>
+              {/* 登録の内容は1枚のカードにまとめる（つづきで割らない）。 */}
+              <Row label="友だち数"><span title={capacityDetails(account)}>{friendsLine(account)}</span></Row>
+              <Row label="状態"><span className={styles.end}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span></Row>
+              <Row label="国・地域">{account.country ?? emptyValue('unconfigured')}</Row>
+              <Row label="役割メモ"><TruncatedText value={account.role ?? emptyValue('unconfigured')} /></Row>
             </Card>
 
             <SendersCard accountId={account.id} accountName={account.name} />
             <Card variant="form" aria-labelledby="acd-credentials">
-              <Card surface="inset" layout="vertical" padding="compact" gap="var(--polish-space-row)">
-                <CardHeader size="stacked" headingLevel={3} title="登録の内容（つづき）" />
-                <Pair label="友だち数"><span title={capacityDetails(account)}>{friendsLine(account)}</span></Pair>
-                <Pair label="状態"><span className={styles.end}><StatusBadge tone={state.tone}>{state.label}</StatusBadge></span></Pair>
-                <Pair label="国・地域">{account.country ?? emptyValue('unconfigured')}</Pair>
-                <Pair label="役割メモ"><TruncatedText value={account.role ?? emptyValue('unconfigured')} /></Pair>
-              </Card>
               <CardHeader size="stacked" headingLevel={3} titleId="acd-credentials" title="資格情報" meta="秘密値そのものは表示しません。差し替えるときは、新しい値を入れて保存し直します。" />
               <Row label="チャネルシークレット">
                 <ActionValue

@@ -131,17 +131,22 @@
   white-space: nowrap;
 }
 
-.footDanger,
-.foot {
-  margin: 0;
+/* 114: 件数の札は表の上。赤は札だけ、添え文は墨の薄字。 */
+.brokenSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--tpl-sb-ctl-gap);
+  margin: 0 0 var(--tpl-sb-ctl-gap);
   font-size: var(--tpl-sb-note-text);
 }
 
-.footDanger {
-  color: var(--color-danger);
+.brokenNote {
+  color: var(--color-ink-secondary);
 }
 
 .foot {
+  margin: 0;
+  font-size: var(--tpl-sb-note-text);
   color: var(--color-ink-faint);
 }
 

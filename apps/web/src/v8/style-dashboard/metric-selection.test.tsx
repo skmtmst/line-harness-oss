@@ -38,6 +38,7 @@ afterEach(cleanup)
 
 it('未選択は呼び戻し・無断率を保ち、変更した数だけ版付き保存して再読込後も順番を復元する', async () => {
   const view = render(<StyleDashboard style="salon" />)
+  // 本線形：帯は5枚（5つ目の無断キャンセル率も帯の中）。
   await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち', '無断キャンセル率']))
   const drawer = await open()
   fireEvent.click(within(drawer).getByRole('switch', { name: '数の帯：無断キャンセル率' }))
@@ -104,7 +105,9 @@ it('resetだけdefaultへ戻し、空のcustomを未選択へ読み替えない'
   fireEvent.click(within(drawer).getByRole('button', { name: '型に戻す', exact: true }))
   await waitFor(() => expect(state.reset).toHaveBeenCalledWith('a', 2))
   await waitFor(() => expect(labels()).toContain('呼び戻し待ち'))
-  expect(labels()).toContain('無断キャンセル率')
+  // 本線形：5つ目の無断キャンセル率も帯の中の札。
+  expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち', '無断キャンセル率'])
+  for (const go of screen.getAllByRole('link', { name: '友だち一覧' })) expect(go.closest('[data-kpi-strip]')).not.toBeNull()
   expect(state.customized).toBe(false)
   expect(state.save).not.toHaveBeenCalled()
 })
@@ -144,6 +147,7 @@ it('5超の既存customを切り捨てず共通の複数段へ復元する', asy
   render(<StyleDashboard style="salon" />)
   await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち', '無断キャンセル率', '来店数']))
   const rows = document.querySelectorAll('[data-style-dashboard] > [data-kpi-strip]')
+  // 本線形：段は5枚ずつ。
   expect(Array.from(rows).map(row => row.children.length)).toEqual([5, 1])
   expect(state.save).not.toHaveBeenCalled()
 })
@@ -153,11 +157,72 @@ it('32項目の閲覧だけでも内容と順序を保ち、未取得を0にせ�
   render(<StyleDashboard style="salon" />)
   await waitFor(() => expect(labels()).toHaveLength(32))
   const rows = document.querySelectorAll('[data-style-dashboard] > [data-kpi-strip]')
+  // 本線形：段は5枚ずつ。
   expect(Array.from(rows).map(row => row.children.length)).toEqual([5, 5, 5, 5, 5, 5, 2])
   const pending = screen.getByRole('button', { name: '支払い待ちの説明' }).closest('[data-design-version]')!
   expect(within(pending as HTMLElement).getByText('—', { exact: true })).toBeTruthy()
   expect(screen.queryByRole('button', { name: '表示を変える' })).toBeNull()
   expect(state.save).not.toHaveBeenCalled()
+})
+
+it('R11: 業種盤は5枚を帯に並べる（本線形）', async () => {
+  render(<StyleDashboard style="salon" />)
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '呼び戻し待ち', '無断キャンセル率']))
+  // 5つ目の無断キャンセル率も帯の中の札。項目名・値・行き先を残す。
+  const goes = screen.getAllByRole('link', { name: '友だち一覧' })
+  expect(goes.length).toBeGreaterThan(0)
+  for (const go of goes) { expect(go.closest('[data-kpi-strip]')).not.toBeNull(); expect(go.getAttribute('href')).toBe('/friends') }
+})
+
+it('R11: 並べ替え後の5つ目も帯の中の札', async () => {
+  state.customized = true; state.ids = ['bookings', 'attention', 'nextBookingRate', 'visits', 'recall']
+  render(<StyleDashboard style="salon" />)
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '次回予約率', '来店数', '呼び戻し待ち']))
+  const goes = screen.getAllByRole('link', { name: '友だち一覧' })
+  expect(goes.length).toBeGreaterThan(0)
+  for (const go of goes) expect(go.closest('[data-kpi-strip]')).not.toBeNull()
+})
+
+it('追加決まり1: 読み直すは日付の段の中（本線B28形）', async () => {
+  render(<StyleDashboard style="salon" />)
+  await waitFor(() => expect(labels()).toHaveLength(5))
+  // 題の操作には無い。
+  const heading = document.querySelector('[data-page-heading-actions]')
+  expect(heading).not.toBeNull()
+  expect(within(heading as HTMLElement).queryByRole('button', { name: '読み直す' })).toBeNull()
+  // 日付の段（期間の切り替えの行）の中にある。
+  const read = screen.getByRole('button', { name: '読み直す' })
+  const period = document.querySelector('[role="group"][aria-label="期間"], [role="radiogroup"][aria-label="期間"]')
+  expect(period).not.toBeNull()
+  expect(period!.parentElement!.contains(read)).toBe(true)
+})
+
+it('追加決まり1: 右の列の開閉はタブの段に入り単独の段を作らない', async () => {
+  render(<StyleDashboard style="salon" />)
+  await waitFor(() => expect(labels()).toHaveLength(5))
+  const toggle = screen.getByRole('button', { name: '新着・お支払いを見る' })
+  const columns = document.querySelector('[data-detail-columns]')!
+  // タブの段（タブの後・本文の前）にあり、本文の2列の下の段には無い。
+  expect(toggle.closest('[data-detail-columns]')).toBeNull()
+  expect(toggle.compareDocumentPosition(columns) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+it('追加決まり1: 一覧の探す欄は左に置く（右に1つ浮かせない）', async () => {
+  render(<StyleDashboard style="restaurant" />)
+  const box = await screen.findByPlaceholderText('名前・タグ・メモで探す')
+  const tools = box.closest('[data-dashboard-list-tools]')
+  expect(tools).not.toBeNull()
+  // 探す欄が段の最初＝左寄せ。前に余白詰めは無い。
+  expect(tools!.firstElementChild!.contains(box)).toBe(true)
+})
+
+it('R11: 飲食店も5枚を帯に並べる（本線形）', async () => {
+  render(<StyleDashboard style="restaurant" />)
+  await waitFor(() => expect(labels()).toEqual(['今日の予約', '対応待ち', '空席（いま）', '無断キャンセル率', '新着予約']))
+  // 帯の中に新着予約の札の行き先がある（表示切替の「一覧」は帯の外なので数えない）。
+  const strip = document.querySelector('[data-kpi-strip]')!
+  const goes = within(strip as HTMLElement).getAllByRole('link', { name: '一覧' }).filter((go) => go.getAttribute('href') === '/restaurant-test/reservations')
+  expect(goes.length).toBeGreaterThan(0)
 })
 
 it('旧応答の非保存fallbackから明示した再読込で真のcustomへ戻る', async () => {
