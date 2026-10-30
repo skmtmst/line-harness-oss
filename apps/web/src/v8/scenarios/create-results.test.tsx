@@ -172,6 +172,11 @@ describe('作る①（dnzqC）', () => {
     expect((screen.getByRole('radio', { name: /経過時間で指定/ }) as HTMLInputElement).checked).toBe(true)
     expect(diagrams[0].getAttribute('data-selected')).toBe('false')
     expect(diagrams[1].getAttribute('data-selected')).toBe('true')
+    fireEvent.click(diagrams[0])
+    expect(absolute.checked).toBe(true)
+    expect((screen.getByRole('radio', { name: /経過時間で指定/ }) as HTMLInputElement).checked).toBe(false)
+    expect(diagrams[0].getAttribute('data-selected')).toBe('true')
+    expect(diagrams[1].getAttribute('data-selected')).toBe('false')
     // 下の見本の表は置かない（図に入ったため・絵 ）。
     expect(screen.queryByRole('table', { name: '選んだ配信方式の見本' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '配信方式の説明' }))
