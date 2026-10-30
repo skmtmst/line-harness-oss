@@ -11,6 +11,7 @@ import { useState, type ReactNode } from 'react'
 import { ChevronLeft, PanelRight, Search, Star } from 'lucide-react'
 import type { OperatorOption } from '@/components/chats/inbox-dropdown'
 import Avatar from '@/components/shared/avatar'
+import IconButton from './icon-button'
 import { HeadOperatorMenu, HeadStatusMenu, type HeadStatus } from './inbox-head-menus'
 import styles from './inbox-conversation-head.module.css'
 
@@ -34,7 +35,7 @@ export default function ConversationHead({
   subTitle?: string
   /** 狭い幅で一覧へ戻る */
   onBack?: () => void
-  attention?: { on: boolean; saving: boolean; onToggle: () => void }
+  attention?: { on: boolean; saving: boolean; onToggle: () => void; lockedReason?: string; disabled?: boolean }
   operator: { value: string; operators: OperatorOption[]; onChange: (next: string) => void }
   status: { value: HeadStatus; onChange: (next: HeadStatus) => void }
   search?: { open: boolean; onToggle: () => void }
@@ -69,16 +70,18 @@ export default function ConversationHead({
       <div className={styles.cheadTools}>
         <HeadOperatorMenu value={operator.value} operators={operator.operators} onChange={operator.onChange} />
         {attention ? (
-          <button
-            type="button"
-            className={`${styles.cheadSquare} ${styles.cheadStar}`}
+          <IconButton
+            variant="plain"
+            data-part="attention-star"
             aria-label={attention.on ? '注目から外す' : '注目にする'}
-            aria-pressed={attention.on}
-            disabled={attention.saving}
+            title={attention.on ? '注目から外す' : '注目にする'}
+            pressed={attention.on}
+            disabled={attention.saving || attention.disabled}
+            lockedReason={attention.lockedReason}
             onClick={attention.onToggle}
           >
-            <Star aria-hidden="true" fill={attention.on ? 'currentColor' : 'none'} />
-          </button>
+            <Star aria-hidden="true" />
+          </IconButton>
         ) : null}
         <HeadStatusMenu value={status.value} onChange={status.onChange} />
         {extra}

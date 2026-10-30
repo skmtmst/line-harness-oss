@@ -84,4 +84,16 @@ describe('会話の頭のメニュー', () => {
     expect(onToggle).toHaveBeenCalled()
     expect(screen.getByRole('button', { name: '会話の中を探す（⌘F）' })).toBeTruthy()
   })
+
+  test('閲覧のみの注目は焦点と理由を残し、押しても変えない', () => {
+    const onToggle = vi.fn()
+    const reason = '閲覧のみのため変更できません。オーナーか管理者に頼んでください。'
+    mount({ attention: { on: true, saving: false, onToggle, lockedReason: reason } })
+    const button = screen.getByRole('button', { name: '注目から外す' })
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+    expect(button.getAttribute('aria-pressed')).toBe('true')
+    expect(document.getElementById(button.getAttribute('aria-describedby')!)?.textContent).toBe(reason)
+    fireEvent.click(button)
+    expect(onToggle).not.toHaveBeenCalled()
+  })
 })

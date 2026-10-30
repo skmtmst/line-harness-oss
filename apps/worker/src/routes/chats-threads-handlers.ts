@@ -61,6 +61,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       // json_each へID配列を1 bindで渡すため、D1の100 bind上限にも当たらない。
       const chatRows = await c.env.DB.prepare(
         `SELECT f.id AS friend_id, f.display_name, f.picture_url,
+                CASE WHEN json_valid(f.metadata) THEN json_extract(f.metadata, '$.__attention') = '1' ELSE 0 END AS is_attention,
                 c.operator_id, c.status, c.revision, c.notes,
                 CASE
                   WHEN c.last_customer_message_at IS NOT NULL
@@ -85,6 +86,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
           friendId: row.friendId,
           friendName: row.displayName || '名前なし',
           friendPictureUrl: row.pictureUrl,
+          isAttention: Boolean(chat.is_attention),
           operatorId: chat.operator_id,
           status: chat.status,
           revision: Number(chat.revision ?? 0),
@@ -303,6 +305,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
         f.id AS friend_id,
         f.display_name,
         f.picture_url,
+        CASE WHEN json_valid(f.metadata) THEN json_extract(f.metadata, '$.__attention') = '1' ELSE 0 END AS is_attention,
         f.line_user_id,
         f.line_account_id,
         c.operator_id,
@@ -355,6 +358,7 @@ export const get__api_chats_1 = async (c: Context<Env, "/api/chats">) => {
       friendId: ch.friend_id,
       friendName: ch.display_name || '名前なし',
       friendPictureUrl: ch.picture_url || null,
+      isAttention: Boolean(ch.is_attention),
       operatorId: ch.operator_id,
       status: ch.status,
       revision: Number(ch.revision ?? 0),

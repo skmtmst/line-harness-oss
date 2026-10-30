@@ -56,6 +56,7 @@ export default function InboxRulesPopover({ accountId, onRoutingSaved }: { accou
   return (
     <div ref={wrapRef} className={styles.popWrap}>
       <IconButton
+        variant="plain"
         aria-label="対応ルール"
         title="対応ルール"
         aria-haspopup="dialog"
