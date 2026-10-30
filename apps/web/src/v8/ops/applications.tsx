@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { api, type OpsApplication } from '@/lib/api'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import ListState from '@/components/shared/list-state'
+import SearchField from '@/components/shared/search-field'
 import { PageFrame } from '@/components/templates/page-frame'
 import styles from './applications.module.css'
 
@@ -45,7 +46,7 @@ export default function OpsApplications() {
         {([['未対応', count('pending'), '新しい申し込み'], ['連絡中', count('contacted'), '担当者の対応待ち'], ['承認済み', count('approved') + count('activated'), '招待メール送信済み'], ['見送り', count('rejected'), '利用不可']] as const).map(([label, value, description]) => <div key={label}><strong>{label}</strong><b>{loading ? '—' : value}件</b><small>{description}</small></div>)}
       </div>
       <div className={styles.toolbar}>
-        <label className={styles.search}><span aria-hidden="true">⌕</span><span className="sr-only">申込を探す</span><input value={q} onChange={(event) => setQ(event.target.value)} placeholder="会社名・担当者・メールで探す" /></label>
+        <SearchField updateMode="immediate" value={q} onChange={setQ} onClear={() => setQ('')} placeholder="会社名・担当者・メールで探す" aria-label="申込を探す" />
         <div className={styles.filters}>
           <button type="button" data-active={!filter || undefined} onClick={() => setFilter('')}>すべて {rows.length}</button>
           {(['pending', 'contacted', 'approved', 'rejected'] as const).map((key) => <button key={key} type="button" data-active={filter === key || undefined} onClick={() => setFilter(key)}>{STATUS[key]}</button>)}
