@@ -265,7 +265,7 @@ export async function cancelV6RemindersForSource(
  */
 export async function rescheduleV6RemindersForSource(
   db: D1Database,
-  input: V6SourceMatcher & { moves: V6TargetDateMove[]; now?: string },
+  input: V6SourceMatcher & { moves: V6TargetDateMove[]; now?: string; writeGuard?: V6WriteGuard },
 ): Promise<RescheduleV6RemindersResult> {
   const now = input.now ?? jstNow();
   const effective = input.moves.filter((move) => move.fromTargetDate !== move.toTargetDate);
@@ -300,8 +300,8 @@ export async function rescheduleV6RemindersForSource(
         db.prepare(
           `UPDATE friend_reminders
               SET target_date = ?, updated_at = ?
-            WHERE status = 'active' AND target_date = ? AND id IN (${placeholders})`,
-        ).bind(move.toTargetDate, now, move.fromTargetDate, ...chunk),
+            WHERE status = 'active' AND target_date = ? AND id IN (${placeholders}) ${input.writeGuard ? `AND (${input.writeGuard.sql})` : ''}`,
+        ).bind(move.toTargetDate, now, move.fromTargetDate, ...chunk, ...(input.writeGuard?.binds ?? [])),
       );
       movedIds.push(...chunk);
     }
@@ -319,8 +319,8 @@ export async function rescheduleV6RemindersForSource(
       db.prepare(
         `UPDATE reminder_delivery_runs
             SET status = 'cancelled', completed_at = ?, updated_at = ?
-          WHERE status IN ('queued', 'retry_wait', 'claimed') AND friend_reminder_id IN (${placeholders})`,
-      ).bind(now, now, ...chunk),
+          WHERE status IN ('queued', 'retry_wait', 'claimed') AND friend_reminder_id IN (${placeholders}) ${input.writeGuard ? `AND (${input.writeGuard.sql})` : ''}`,
+      ).bind(now, now, ...chunk, ...(input.writeGuard?.binds ?? [])),
     );
   }
   const results = await db.batch(statements);

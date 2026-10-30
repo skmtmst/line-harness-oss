@@ -1022,3 +1022,5 @@
 - [Google とSNSの接続](release-log/unreleased/1983-masato-google-sns-connection.md) — 反映履歴。
 - [LINE通知の登録](release-log/unreleased/1985-masato-notice-line-registration.md) — 反映履歴。
 - [SNS接続の表記](release-log/unreleased/1986-masato-sns-connection-labels.md) — 反映履歴。
+
+- [来店フォローとリマインダの接続](release-log/unreleased/0000-kenta-line-followup-engines.md)

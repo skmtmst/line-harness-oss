@@ -1,4 +1,5 @@
-import { effectiveAnniversaryMonthDay, parseMonthDay } from '@line-crm/shared';
+import { logger } from '@line-crm/shared/server';
+import { effectiveAnniversaryMonthDay, parseMonthDay, zonedWallTime } from '@line-crm/shared';
 import { activeTenantLineAccountSql, parseScenarioVersionSteps, type ScenarioVersion } from '@line-crm/db';
 
 import type { ScenarioSourceJob } from '../features/scenarios/source-job-types/index.js';
@@ -19,24 +20,14 @@ const anniversarySql=()=>`SELECT v.*,s.id store_id,s.line_account_id,s.name stor
  AND json_extract(a.payload_json,'$.scenarioVersionId')=t.approved_version_id AND json_extract(a.payload_json,'$.lineAccountId')=s.line_account_id`;
 
 function localInstant(date:string,timeZone:string,time:string,offset:number) {
-  // 現地の暦で何日前かを引いてからUTCへ変換する。DSTで送る時刻をずらさない。
-  const wall=Date.parse(date+'T'+time+':00Z')+offset*60000;
-  const formatter=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
-  const civilAt=(at:number)=>{
-    const p=Object.fromEntries(formatter.formatToParts(new Date(at)).map(x=>[x.type,x.value]));
-    return Date.parse(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}Z`);
-  };
-  const offsets=new Set([-86400000,86400000].map(delta=>civilAt(wall+delta)-(wall+delta)));
-  const candidates=[...offsets].map(zoneOffset=>({at:wall-zoneOffset,civil:civilAt(wall-zoneOffset)}));
-  // 時計が戻る日は先の1回、存在しない時刻は時計を進めた側へ寄せる。
-  const exact=candidates.filter(item=>item.civil===wall).sort((a,b)=>a.at-b.at);
-  return exact[0]?.at??candidates.filter(item=>item.civil>wall).sort((a,b)=>a.civil-b.civil)[0]!.at;
+  return Date.parse(zonedWallTime(date,time,timeZone,offset/1440));
 }
 
 async function key(row:Candidate,date:string) {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([row.store_id,row.friend_id,date])))),x=>x.toString(16).padStart(2,'0')).join('');
 }
 function dates(row:Candidate,now:Date) {
+  if (!Number.isSafeInteger(row.offset_minutes) || row.offset_minutes%1440!==0) { logger.warn('restaurant_followup.invalid_anniversary_day_offset'); return []; }
   const md=parseMonthDay(row.value); if(!md)return [];
   // 部分的な保存形式を読む処理でも、実在しない暦日は拒む。
   if(md.day>new Date(Date.UTC(2000,md.month,0)).getUTCDate())return [];
