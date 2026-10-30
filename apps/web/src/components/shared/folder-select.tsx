@@ -53,6 +53,10 @@ export interface FolderSelectProps extends Pick<SelectProps, 'aria-label' | 'lab
   onCreate?: FolderSelectCreate
   /** false のときは色のボタンを出さず、作成時に null を渡す。 */
   colors?: boolean
+  /** ＋行だけを入力・状態の理由で止める。既存フォルダは選べる。 */
+  createDisabled?: boolean
+  /** ＋行だけの権限理由。既存フォルダは選べる。 */
+  createLockedReason?: string
 }
 
 /** API の答え（{ success, data } / { success: false, error }）を、作れたフォルダか Error に直す。 */
@@ -122,6 +126,8 @@ export default function FolderSelect({
   unfiled = { value: '', label: '未分類' },
   onCreate,
   colors = true,
+  createDisabled,
+  createLockedReason,
   ...selectProps
 }: FolderSelectProps) {
   // 作ったフォルダは、画面が一覧を読み直す前でも選べて名前が出るよう、ここでも持つ。
@@ -145,6 +151,8 @@ export default function FolderSelect({
       menuHeading="フォルダ"
       createAction={onCreate ? {
         label: '新しいフォルダを作る',
+        disabled: createDisabled,
+        lockedReason: createLockedReason,
         render: (context) => (
           <FolderCreatePanel
             context={context}

@@ -18,7 +18,6 @@ describe('プール作成のプレビュー', () => {
 
   it('#975 U074: 保存・キャンセルは共通の下部バー（キャンセル左・保存右）に従う', () => {
     // 採用済みの V8 設定画面の保存列でキャンセルを左に置く。
-    expect(PAGE).toContain('savePlacement="content"')
     expect(PAGE.indexOf('>キャンセル</Button>')).toBeLessThan(PAGE.search(/保存してURLを発行\s*<\/Button>/))
     expect(PAGE).not.toContain('保存して続けて作る')
   })

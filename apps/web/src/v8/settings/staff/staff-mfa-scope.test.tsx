@@ -6,10 +6,10 @@ import type { StaffMember } from '@line-crm/shared'
 import StaffV8 from './staff'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 
-const state = vi.hoisted(() => ({ account: 'account-a', members: vi.fn(), fetch: vi.fn() }))
+const state = vi.hoisted(() => ({ account: 'account-a', tab: 'roles', members: vi.fn(), fetch: vi.fn() }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/staff',
-  useSearchParams: () => new URLSearchParams('tab=members'),
+  useSearchParams: () => new URLSearchParams(`tab=${state.tab}`),
 }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, loading: false }) }))
@@ -38,7 +38,7 @@ function person(id: string, twoFactorEnabled: boolean): StaffMember {
 const response = (id: string, enabled: boolean) => ({ success: true, data: [person(id, enabled)] })
 
 beforeEach(() => {
-  state.account = 'account-a'; state.members.mockReset(); state.fetch.mockReset()
+  state.account = 'account-a'; state.tab = 'roles'; state.members.mockReset(); state.fetch.mockReset()
   verifiedStaffRole('owner')
   state.fetch.mockImplementation(async (path: string) => ({ success: true, data: path.endsWith('/policy')
     ? { required: false, canEdit: true, registered: 5, total: 7 }
@@ -46,12 +46,21 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); verifiedStaffRole(null) })
 
-it('feeds the selected account staff into the security count instead of the tenant policy totals', async () => {
+it('shows the selected account security count on roles, not the tenant policy totals', async () => {
   state.members.mockResolvedValue(response('me', true))
   render(<StaffV8 />)
   await screen.findByText('1 / 1 人')
   expect(state.members).toHaveBeenCalledWith('account-a')
   expect(screen.queryByText('5 / 7 人')).toBeNull()
+})
+
+it('keeps the users tab focused on the list without the organization policy card', async () => {
+  state.tab = 'members'
+  state.members.mockResolvedValue(response('me', true))
+  render(<StaffV8 />)
+  await screen.findByRole('region', { name: 'ユーザー' })
+  expect(screen.queryByText('ログインの安全')).toBeNull()
+  expect(screen.queryByText('ログイン時の二段階認証')).toBeNull()
 })
 
 it('ignores a late staff response from the account selected before switching', async () => {

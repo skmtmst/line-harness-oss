@@ -1,3 +1,6 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 // @vitest-environment happy-dom
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 /*
@@ -138,6 +141,7 @@ async function click(name: string) {
 }
 
 beforeEach(() => {
+  forgetSessionSnapshot(); verifiedStaffRole('owner')
   vi.clearAllMocks()
   m.params = new URLSearchParams('id=sc-a')
   m.get.mockResolvedValue(ok(scenario()))
@@ -147,7 +151,7 @@ beforeEach(() => {
   m.updateStep.mockResolvedValue(ok({}))
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot() })
 
 describe('SCENARIO-01：分の端数を丸めない', () => {
   it('offsetMinutes=90 の既存1通目をそのまま保存すると90のまま', async () => {

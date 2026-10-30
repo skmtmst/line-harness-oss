@@ -1,9 +1,7 @@
 'use client'
-import { useStaffRole } from '@/lib/staff-role';
 import { jstDate } from '@/lib/jst-datetime';
 import { formatNumber } from '@/lib/format';
 import { notifySaved } from '@/components/shared/toast';
-import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from '@/components/shared/list-navigation'
@@ -40,6 +38,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { useAccount } from '@/contexts/account-context';
+import { captureScenarioWriteAccess, useScenarioWriteAccess } from '@/v8/scenarios'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { restoreFirstStep, scheduleToPayload } from './first-step-form';
 import styles from './first-step.module.css'
@@ -91,11 +90,9 @@ export default function ScenarioFirstStepV8() {
   const params = useSearchParams()
   const id = params.get('id') ?? ''
   const narrow = useNarrowViewport()
-  const role = useStaffRole()
-  // 役割が読めるまでは今までどおり出す。staff と分かったら変える操作を隠す（最後の守りはサーバ）。
-  const featureAccess = useFeatureAccess('scenarios')
-  const canEdit = featureAccess
-  const { accounts, selectedAccountId } = useAccount()
+  const access = useScenarioWriteAccess()
+  const canEdit = access.allowed
+  const { accounts, selectedAccountId, loading: accountLoading } = useAccount()
 
   const [scenario, setScenario] = useState<(Scenario & { steps: ScenarioStep[] }) | null>(null)
   const [loadState, setLoadState] = useState<LoadState>('idle')
@@ -142,6 +139,22 @@ export default function ScenarioFirstStepV8() {
   const [offsetMinutesRemainder, setOffsetMinutesRemainder] = useState(0)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [savedWhileBlocked, setSavedWhileBlocked] = useState(false)
+  const mounted = useRef(true)
+  const scope = useRef({ id, accountId: selectedAccountId, accountLoading, loadState, loadSeq: loadSeq.current })
+  if (scope.current.id !== id || scope.current.accountId !== selectedAccountId || scope.current.accountLoading !== accountLoading
+    || scope.current.loadState !== loadState || scope.current.loadSeq !== loadSeq.current) {
+    scope.current = { id, accountId: selectedAccountId, accountLoading, loadState, loadSeq: loadSeq.current }
+  }
+  const renderedScope = scope.current
+  const currentScope = () => mounted.current && scope.current === renderedScope
+  const editLease = captureScenarioWriteAccess()
+  const canSaveNow = () => currentScope() && !accountLoading && loadState === 'ready' && Boolean(scenario) && editLease()
+  const saveOperation = useRef<{ scope: typeof renderedScope } | null>(null)
+  const recordedStep = useRef<{ scope: typeof renderedScope; id: string } | null>(null)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  useEffect(() => { setSaving(false); setSavedWhileBlocked(false) }, [renderedScope])
+
 
   /** 別のシナリオへ切り替わったとき、前のシナリオの入力を持ち越さない。 */
   const resetForm = () => {
@@ -273,7 +286,8 @@ export default function ScenarioFirstStepV8() {
     legacyKey: scenario ? browserDraftKey(['scenario-first-step', scenario.lineAccountId, id]) : null,
     value: formValue,
     baseline: formBaseline ?? formValue,
-    active: canEdit,
+    active: canEdit && !accountLoading,
+    canSaveNow,
   })
   const restoreBrowserDraft = () => {
     const stored = browserDraft.restore()
@@ -284,7 +298,7 @@ export default function ScenarioFirstStepV8() {
     if (latest) applyDraft(latest)
   }
   const cancel = () => {
-    browserDraft.clear()
+    if (canSaveNow()) browserDraft.clear()
     router.push('/scenarios')
   }
   function applyDraft(stored: typeof formValue) {
@@ -331,7 +345,10 @@ export default function ScenarioFirstStepV8() {
 
   const submit = async () => {
     // ボタンの disabled だけに頼らない。上限超え・未取得のままの保存を通さない。
-    if (saving || bodyOverLimit || loadState !== 'ready' || !scenario) return
+    if (!canSaveNow() || saving || bodyOverLimit || loadState !== 'ready' || !scenario || saveOperation.current?.scope === renderedScope) return
+    const ticket = { scope: renderedScope }
+    saveOperation.current = ticket
+    setSavedWhileBlocked(false)
     setSaving(true)
     setError('')
     setTargetError('')
@@ -424,9 +441,18 @@ export default function ScenarioFirstStepV8() {
         targetCondition: stepTargetCondition(),
         question: contentMode === 'compose' && kind === 'question' ? question : null,
       }
-      const res = existingStepId
-        ? await api.scenarios.updateStep(id, existingStepId, stepPayload)
+      const targetStepId = recordedStep.current?.scope === renderedScope ? recordedStep.current.id : existingStepId
+      const res = targetStepId
+        ? await api.scenarios.updateStep(id, targetStepId, stepPayload)
         : await api.scenarios.addStep(id, stepPayload)
+      if (res.success && currentScope() && res.data.id) {
+        recordedStep.current = { scope: renderedScope, id: res.data.id }
+        setExistingStepId(res.data.id)
+      }
+      if (!canSaveNow()) {
+        if (res.success && currentScope()) setSavedWhileBlocked(true)
+        return
+      }
       if (!res.success) {
         setError(res.error)
         return
@@ -436,6 +462,7 @@ export default function ScenarioFirstStepV8() {
       notifySaved('1通目を保存しました')
       goDetail()
     } catch (submitError) {
+      if (!canSaveNow()) return
       const fieldFailure = saveErrors.capture(submitError)
       // 例外でも「保存中」のままにしない（SCENARIO-05）。入力は残し、同じ場所からやり直せる。
       const detail = submitError instanceof ApiError ? submitError.message : ''
@@ -447,7 +474,8 @@ export default function ScenarioFirstStepV8() {
           : '保存できませんでした。通信状態を確認して、もう一度お試しください。',
       ) }
     } finally {
-      setSaving(false)
+      if (saveOperation.current === ticket) saveOperation.current = null
+      if (currentScope()) setSaving(false)
     }
   }
 
@@ -602,6 +630,7 @@ export default function ScenarioFirstStepV8() {
     >
 
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
+      {savedWhileBlocked ? <Notice tone="info">1通目は保存されています。確認状態が変わったため、続く操作を中止しました。<Link href={`/scenarios/detail?id=${encodeURIComponent(id)}`}>保存したシナリオを見る</Link></Notice> : null}
       <BrowserDraftNotice ago={browserDraft.pendingAgo} onRestore={restoreBrowserDraft} onDiscard={browserDraft.clear} />
       <ScenarioDraftConflictNotice ago={browserDraft.conflictAgo} onLoadLatest={loadLatestDraft} onOverwrite={browserDraft.overwrite} />
 

@@ -22,6 +22,10 @@ export interface SelectCreateContext {
 }
 
 export interface SelectCreateAction {
+  /** ＋行だけの入力・状態の禁止。候補の選択には影響しない。 */
+  disabled?: boolean
+  /** ＋行だけの権限理由。候補の選択には影響しない。 */
+  lockedReason?: string
   /** 一覧の下の行の文（「新しいフォルダを作る」）。 */
   label: string
   /** 押した後、同じ板に出す中身（iBuZH）。 */

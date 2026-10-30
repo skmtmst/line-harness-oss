@@ -46,7 +46,15 @@ export function bubbleThumbOf(input: { messageType: string; content: string; que
   const content = typeof input.content === 'string' ? input.content.trim() : ''
   if (input.messageType === 'text') {
     if (!content) return { kind: 'empty' }
-    const oneLine = content.replace(/\s+/g, ' ')
+    let message = content
+    if (content.startsWith('{')) {
+      try {
+        const payload = record(JSON.parse(content))
+        if (typeof payload?.text === 'string') message = payload.text
+      } catch { /* 通常の文章にある括弧は、そのまま表示する。 */ }
+    }
+    const oneLine = message.replace(/\s+/g, ' ').trim()
+    if (!oneLine) return { kind: 'empty' }
     return { kind: 'text', text: oneLine.length > TEXT_KEEP ? oneLine.slice(0, TEXT_KEEP).replace(/\{\{[^}]*\}?$/, '') : oneLine }
   }
   if (!['image', 'flex', 'carousel', 'imagemap'].includes(input.messageType)) return { kind: 'unavailable' }

@@ -159,7 +159,7 @@ describe('V8 オートメーションのルール一覧（LWQXd）', () => {
     await render(<AutomationListV8 />)
     await chooseRowAction('保管する')
     const dialog = document.querySelector('[role="alertdialog"]')!
-    expect(dialog.textContent).toContain('通常の一覧から外します。動いた記録と設定は残り、「保管」の絞り込みから戻せます。')
+    expect(dialog.textContent).toContain('通常の一覧から外します。動いた記録と設定は残り、「保管したもの」の絞り込みから戻せます。')
     await act(async () => { within(dialog as HTMLElement).getByRole('button', { name: 'キャンセル' }).click() })
     expect(document.querySelector('[role="alertdialog"]')).toBeNull()
   })
@@ -302,6 +302,14 @@ describe('V8 オートメーションの共通アクション（LnGNw）', () =>
     expect(named('フォルダを追加').length).toBeGreaterThan(0)
     expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
   })
+
+  it('状態の札は「保管したもの」と書き、何を見る札か分かるようにする（87）', async () => {
+    await render(<CommonActionsV8 />)
+    await waitFor(() => host.textContent?.includes('購入のお礼') ?? false, '共通アクションの行')
+    const chip = buttons().find((element) => (element.textContent ?? '').startsWith('保管したもの'))
+    expect(chip).toBeTruthy()
+    expect(named('保管')).toHaveLength(0)
+  })
 })
 
  it.each([['ルール',AutomationListV8],['共通アクション',CommonActionsV8]])('%sのフォルダ取得失敗と空を分け、読込だけやり直す', async (_label,Component) => {
@@ -333,7 +341,7 @@ it('自動処理のフォルダ数も、すべてと同じルール一覧で数�
  await waitFor(()=>Boolean(host.textContent?.includes('分類あり')),'一覧')
  const rows=[...host.querySelectorAll('aside [data-part="folder-row"]')].map(el=>el.textContent?.replace(/\s/g,''))
  expect(rows).toEqual(expect.arrayContaining(['すべて2','問合せ1','未分類1']))
- await act(async()=>{within(host).getByRole('button',{name:'保管',exact:true}).click()})
+ await act(async()=>{within(host).getByRole('button',{name:'保管したもの',exact:true}).click()})
  const archivedRows=[...host.querySelectorAll('aside [data-part="folder-row"]')].map(el=>el.textContent?.replace(/\s/g,''))
  expect(archivedRows).toEqual(expect.arrayContaining(['すべて1','問合せ1','未分類0']))
  expect(host.textContent).toContain('保管したルール')

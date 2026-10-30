@@ -18,7 +18,7 @@ export const ROUTES = [
   // D 受信箱（3カラム全画面）
   { name: 'chats', path: '/chats', type: 'D' },
   // 設定系
-  { name: 'settings-features', path: '/settings/features', type: 'L' },
+  { name: 'settings-features', path: '/settings', type: 'L' },
   { name: 'staff', path: '/staff', type: 'L' },
   // S ダッシュボード（カードを並べる画面）
   /*

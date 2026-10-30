@@ -61,7 +61,7 @@ describe('一覧の保管から戻す操作', () => {
     expect(screen.queryByRole('menuitem', { name: '削除する' })).toBeNull()
     fireEvent.click(screen.getByRole('menuitem', { name: '保管する' }))
     const dialog = await screen.findByRole('alertdialog')
-    expect(dialog.textContent).toContain('通常の一覧から外します。動いた記録と設定は残り、「保管」の絞り込みから戻せます。')
+    expect(dialog.textContent).toContain('通常の一覧から外します。動いた記録と設定は残り、「保管したもの」の絞り込みから戻せます。')
     expect(calls.status).not.toHaveBeenCalled()
     fireEvent.click(within(dialog).getByRole('button', { name: '保管する' }))
     await waitFor(() => expect(calls.status).toHaveBeenCalledWith('old', 'archived'))
@@ -70,7 +70,7 @@ describe('一覧の保管から戻す操作', () => {
     it(`${entry.name}を保管の札で探し、確認後だけ戻すAPIを呼ぶ`, async () => {
       render(entry.node())
       expect(screen.queryByText(entry.title)).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: '保管', exact: true }))
+      fireEvent.click(screen.getByRole('button', { name: entry.name === 'ルール' ? '保管したもの' : '保管', exact: true }))
       await screen.findByText(entry.title)
       fireEvent.click(screen.getByRole('button', { name: entry.menu }))
       fireEvent.click(await screen.findByRole('menuitem', { name: '保管から戻す' }))
@@ -83,7 +83,7 @@ describe('一覧の保管から戻す操作', () => {
     it(`${entry.name}の失敗は確認窓に残り、再試行できる`, async () => {
       entry.call.mockResolvedValueOnce({ success: false, error: '状態が変わりました' })
       render(entry.node())
-      fireEvent.click(screen.getByRole('button', { name: '保管', exact: true }))
+      fireEvent.click(screen.getByRole('button', { name: entry.name === 'ルール' ? '保管したもの' : '保管', exact: true }))
       await screen.findByText(entry.title)
       fireEvent.click(screen.getByRole('button', { name: entry.menu }))
       fireEvent.click(await screen.findByRole('menuitem', { name: '保管から戻す' }))
@@ -98,7 +98,7 @@ describe('一覧の保管から戻す操作', () => {
     it(`${entry.name}を閲覧のみで見ると戻す操作を出さない`, async () => {
       state.canEdit = false
       render(entry.node())
-      fireEvent.click(screen.getByRole('button', { name: '保管', exact: true }))
+      fireEvent.click(screen.getByRole('button', { name: entry.name === 'ルール' ? '保管したもの' : '保管', exact: true }))
       await screen.findByText(entry.title)
       const menu = screen.queryByRole('button', { name: entry.menu })
       if (menu) fireEvent.click(menu)

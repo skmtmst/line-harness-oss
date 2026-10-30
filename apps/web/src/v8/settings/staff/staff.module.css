@@ -154,11 +154,11 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-sa-staff-card-gap);
+  gap: 0;
   min-width: 0;
   padding: var(--tpl-sa-staff-card-pad);
   border-radius: var(--radius-card);
-  border: 1px solid var(--card-edge);
+  border: 0;
   box-shadow: var(--card-shadow);
   background: var(--color-canvas);
 }
@@ -168,6 +168,8 @@
   align-items: flex-start;
   gap: var(--tpl-sa-staff-col-gap);
   min-width: 0;
+  padding-bottom: var(--polish-space-section);
+  border-bottom: 1px solid var(--tpl-sa-staff-divider);
 }
 
 .cardHeadText {
@@ -181,7 +183,7 @@
 .cardTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--tpl-sa-pool-name-size);
+  font-size: var(--tpl-sa-staff-card-title-size);
   font-weight: 700;
   line-height: var(--tpl-sa-pool-name-lh);
 }
@@ -201,6 +203,7 @@
 }
 
 .cardWarn {
+  margin: 0;
   min-width: 0;
   color: var(--color-status-warn-deep);
   font-size: var(--text-micro);
@@ -263,7 +266,7 @@
   border: 0;
   background: none;
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   font-weight: 600;
   line-height: var(--tpl-sa-staff-name-lh);
   text-align: left;
@@ -394,6 +397,79 @@
   box-shadow: var(--card-shadow);
 }
 
+.selfSecurityCard {
+  width: 100%;
+  max-width: 288px;
+  margin-inline-start: auto;
+  gap: var(--polish-space-row);
+}
+
+.selfSecurityTitle {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 24px;
+}
+
+.securityState {
+  margin: 0;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-body);
+  font-weight: 600;
+}
+
+.securityHint {
+  margin: 0;
+  color: var(--color-ink-faint);
+  font-size: var(--text-micro);
+  line-height: 1.5;
+}
+
+.passkeyBlock,
+.authenticatorBlock,
+.passkeyList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--polish-space-row);
+  min-width: 0;
+}
+
+.passkeyItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--polish-space-row);
+  min-height: 59px;
+  padding: var(--polish-space-row);
+  border: 1px solid var(--card-edge);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.passkeyItem > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+  font-size: var(--text-micro);
+}
+
+.passkeyItem strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+
+.passkeyItem span {
+  color: var(--color-ink-faint);
+}
+
+.securityDivider {
+  height: 1px;
+  background: var(--color-divider);
+  margin-block: var(--polish-space-row);
+}
+
 .asideTitle {
   margin: 0;
   color: var(--color-ink);
@@ -461,10 +537,20 @@
   font-size: var(--text-label);
 }
 
-/* 狭い幅は右の補足を畳み、列は広い幅と同じDOM順を保つ。 */
+/* 狭い幅でも本人の認証設定を操作できるよう、右欄を一覧の下へ送る。 */
 @media (max-width: 1279.98px) {
+  .body {
+    flex-wrap: wrap;
+  }
+
   .aside {
-    display: none;
+    flex: 0 0 100%;
+    width: 100%;
+    box-shadow: none;
+  }
+
+  .selfSecurityCard {
+    max-width: none;
   }
 
   .search {
@@ -506,4 +592,30 @@
 @media (max-width: 1279px) { .table { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-menu-w); } }
 @media (max-width: 1279px) {
   .readOnlyTable { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-menu-w); }
+}
+
+/* ユーザー一覧はカードの余白を起点に列をそろえ、見本の区切りを最後まで通す。 */
+html:root .table.table :global([data-shared-part='list-head']),
+html:root .table.table :global([data-shared-part='list-row']) {
+  padding-inline: 0;
+  border-bottom: 1px solid var(--tpl-sa-staff-divider);
+  box-shadow: none;
+}
+
+html:root .table.table :global([data-shared-part='list-head']) {
+  height: var(--tpl-sa-staff-head-h);
+  min-height: var(--tpl-sa-staff-head-h);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+html:root .table.table :global([data-shared-part='list-row']) {
+  height: var(--tpl-sa-staff-row-h);
+  min-height: var(--tpl-sa-staff-row-h);
+}
+
+.colRole :global([data-role]) {
+  min-width: var(--tpl-sa-staff-role-chip-w);
+  height: var(--tpl-sa-staff-role-chip-h);
+  justify-content: center;
 }

@@ -73,6 +73,15 @@ async function click(label: string) {
   expect(button, label).toBeTruthy()
   await act(async () => { button!.click() })
 }
+/** 対応状況は絞り込みパネルの中。開いていなければ開いてから選ぶ。 */
+async function pickStatus(label: string) {
+  if (!document.querySelector('[aria-label="対応状況で絞り込む"]')) await click('絞り込み')
+  await click('対応状況で絞り込む')
+  await act(async () => {
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((el) => el.textContent === label)!
+    option.querySelector('button')!.click()
+  })
+}
 const isFilteredRequest = (url: URL) => Boolean(
   url.searchParams.get('q')
     || (url.searchParams.get('status') && url.searchParams.get('status') !== 'all')
@@ -101,12 +110,12 @@ async function applySingleFilter(kind: 'search' | 'status' | 'quick' | 'assignee
     ).toBe('該当なし'))
     return
   }
-  if (kind === 'status') { await click('未対応'); return }
+  if (kind === 'status') { await pickStatus('未対応'); return }
   if (kind === 'quick') { await click('1時間以上待ち'); return }
   await click('絞り込み')
   if (kind === 'assignee') {
     // 担当者の選択は候補つき入力へ移した。表示名を打って候補を押す。
-    await pickEntity('担当者で絞り込む（パネル）', '担当A')
+    await pickEntity('担当者で絞り込む', '担当A（0）', '選ぶ', '担当者を選ぶ')
     return
   }
   await act(async () => { document.querySelector<HTMLInputElement>('[aria-label="未読だけ表示"]')!.click() })
@@ -219,9 +228,11 @@ test.each([
 test('条件変更の描画から新条件取得開始まで旧0件を空状態として出さない', async () => {
   await act(async () => root.render(<ChatsPage />))
   expect(state('empty')).toBeTruthy()
+  await click('絞り込み')
+  await click('対応状況で絞り込む')
   const next = hold()
   handler = (url) => isFilteredRequest(url) ? next.promise.then((value) => value.clone()) : base(url)
-  const button = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === '未対応')!
+  const button = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((el) => el.textContent === '未対応')!.querySelector('button')!
   act(() => {
     flushSync(() => button.click())
     expect(state('loading')).toBeTruthy()
@@ -236,7 +247,7 @@ test('条件解除の描画から再取得開始まで旧0件を通常0件とし
     return base(url)
   }
   await act(async () => root.render(<ChatsPage />))
-  await click('未対応')
+  await pickStatus('未対応')
   await eventually(() => expect(state('filtered-empty')).toBeTruthy())
 
   const next = hold()
@@ -268,9 +279,8 @@ test('全条件の結果0件を区別し、解除後に会話を戻す', async (
     const searchCall = calls.filter((url) => url.pathname === '/api/chats').at(-1)!
     expect(searchCall.searchParams.get('q')).toBe('見つからない')
   })
-  await click('未対応')
-  await click('絞り込み')
-  await pickEntity('担当者で絞り込む（パネル）', '担当A')
+  await pickStatus('未対応')
+  await pickEntity('担当者で絞り込む', '担当A（0）', '選ぶ', '担当者を選ぶ')
   await eventually(() => {
     const assigneeCall = calls.filter((url) => url.pathname === '/api/chats').at(-1)!
     expect(assigneeCall.searchParams.get('operatorId')).toBe('operator-a')

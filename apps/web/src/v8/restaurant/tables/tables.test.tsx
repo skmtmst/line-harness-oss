@@ -240,3 +240,10 @@ describe('BERxg 座席・卓管理', () => {
     expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
   })
 })
+
+
+it('共通タブを外し、tablesの画面内操作を保つ', async () => {
+  render(<TablesPage />)
+  await screen.findByText('卓の詳細')
+  expect(screen.queryByRole('tablist', {name:'店の中の画面'})).toBeNull()
+})

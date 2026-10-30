@@ -93,7 +93,7 @@ export default function NewStaffPage() {
       <CreatePage
     title="ユーザーを追加する"
     help="管理画面にログインできる人を追加し、できることの範囲を決めます。"
-    parent={['ログインユーザー', '/staff?tab=members']}
+    parent={['ユーザー管理', '/staff?tab=members']}
     saveLabel="招待メールを送る"
     fields={fields}
     onSave={async () => { if (!selectedAccountId) throw new Error('店舗を選択してください'); const res = await api.staff.create({ name: name.trim(), email: email.trim(), role, permissionKeys: normalizeStaffPermissionKeys(permissionKeys), notificationPreferences: notifications, assignedLineAccountId: selectedAccountId, canAccessDescendantAccounts: false, accountScope: 'accounts', scopedLineAccountIds: [selectedAccountId] }); if (!res.success) throw new Error(res.error); return res.data.id }}

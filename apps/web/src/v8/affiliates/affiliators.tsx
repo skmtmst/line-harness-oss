@@ -50,7 +50,7 @@ import { AffiliateArchiveDialog } from './dialogs'
 import AffiliateDrawer from './drawer'
 import { useFolderMove } from '@/components/shared/use-folder-move'
 import MonthlyFlow from './monthly-flow'
-import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, CreateButton, useAffiliateShell } from './frame'
+import { AFFILIATE_TABLE_LAYOUT, AffiliateFrame, useAffiliateShell } from './frame'
 import {
   AffiliateToolbar,
   PerPageSelect,
@@ -423,10 +423,13 @@ export default function AffiliatorsTab() {
     </KpiBand>
   )
 
+  /* 主ボタンは素の Button で渡し、題の右の自動整列（副→主）に載せる。 */
   const createButton = (full: boolean) => (
-    <CreateButton href="/affiliates/new" readonly={readonly} full={full} ariaLabel="アフィリエイターを作る" title="アフィリエイターを作る">
-      <Plus size={16} aria-hidden="true" /> アフィリエイター登録
-    </CreateButton>
+    readonly ? null : (
+      <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href="/affiliates/new" aria-label="アフィリエイターを作る" title="アフィリエイターを作る">
+        <Plus size={16} aria-hidden="true" /> アフィリエイター登録
+      </Button>
+    )
   )
 
   const groupCount = (key: GroupKey) => rows.filter(GROUPS.find((g) => g.key === key)?.match ?? (() => true)).length

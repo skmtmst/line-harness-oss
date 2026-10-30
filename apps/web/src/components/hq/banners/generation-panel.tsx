@@ -1,6 +1,8 @@
 'use client'
 
 import Button from '@/components/shared/button'
+import Card from '@/components/shared/card'
+import Dialog from '@/components/shared/dialog'
 import ColorWell from '@/components/shared/color-well'
 import ImageMultiUpload from '@/components/shared/image-multi-upload'
 import HelpTip from '@/components/shared/help-tip'
@@ -20,7 +22,6 @@ CUSTOM_PROMPT_MAX,
 TEXT_LINE_LENGTH_MAX,
 TEXT_LINE_MAX,
 alignEmphasis,
-groupPresets,
 presetCardLabel,
 presetSizeLabel,
 tileCaption,
@@ -31,7 +32,7 @@ type BannerPreset,
 type BannerReferenceMode,
 type BannerUsage,
 } from '@/lib/hq-banners'
-import { ChevronDown,Images,Layers,Plus,Scissors,Sparkles,Upload,X } from 'lucide-react'
+import { Images,Layers,Plus,Scissors,Sparkles,Upload,X } from 'lucide-react'
 import { useId,useRef,useState,type ReactNode } from 'react'
 import styles from './generation-panel.module.css'
 import { UsageBars } from './generation-usage'
@@ -51,7 +52,7 @@ const BANNER_REFERENCE_MODE_ICON: Record<BannerReferenceMode, typeof Layers> = {
 /**
  * 右 390px の生成パネル。Pencil 35-2 `GcJHv`（2026-09-13 に参照画像欄を足して作り直し）。
  *
- * 運用者に見せるのは「用途・参照画像・テキスト・色・人物・追加の指示・枚数」だけ。
+ * 運用者に見せるのは「作りたい内容・参照画像・用途・テキスト・色・人物・枚数」だけ。
  * 品質やクレジットの選択は置かない（2026-09-12 決定、`docs/hq-banner-generation.md`）。
  *
  * 2026-10-06（オーナー指示）：
@@ -115,9 +116,11 @@ export default function GenerationPanel({
     onChange({ ...value, textLines, emphasisLines: alignEmphasis(textLines, emphasisLines) })
 
   return (
-    <aside
+    <Card
+      variant="form"
+      gap="normal"
       data-design-node="GcJHv"
-      className="flex w-full shrink-0 flex-col self-start rounded-card border content-card bg-canvas xl:sticky xl:top-4"
+      className="w-full shrink-0 self-start xl:sticky xl:top-4"
       style={{ maxWidth: 390 }}
       aria-label="画像を生成"
     >
@@ -127,21 +130,19 @@ export default function GenerationPanel({
         押せる大きさに保つための最小高さだった。切替が無い今は題だけの行なので外す。
         板Δ（`S0ay0i`画像を生成 → `RJIyX`出力サイズ）49 に対し、外すと 55 → 46 になる。
       */}
-      <div className={v8Layout ? 'flex flex-wrap items-center gap-2 px-4 pt-4' : 'flex flex-wrap items-center gap-2 px-4 py-2'}>
+      <div className="flex flex-wrap items-center gap-2">
         <Sparkles aria-hidden="true" className="h-4.5 w-4.5 text-ink-faint" />
         <h2 className={v8Layout ? styles.v8HeadTitle : 'text-body font-bold text-ink'}>画像を生成</h2>
       </div>
-      <div className="border-t border-hairline" />
 
-      <div data-design-node="E8oZc" className={v8Layout ? styles.v8Body : 'flex flex-col gap-4 p-4'}>
-        <OutputSize
-          name={`${uid}-preset`}
-          presets={presets}
-          value={value.presetKey}
-          disabled={disabled}
-          onSelect={(key) => set('presetKey', key)}
-          v8Layout={v8Layout}
-        />
+      <div data-design-node="E8oZc" className="flex flex-col gap-4">
+        <Field v8Layout={v8Layout} label="作りたい内容" note={`任意・${CUSTOM_PROMPT_MAX}文字まで`} htmlFor={`${uid}-custom`}>
+          <SaveErrorField names={["customPrompt", "value.customPrompt", "custom_prompt", "value.custom_prompt"]}>
+            <TextArea id={`${uid}-custom`} rows={3} maxLength={CUSTOM_PROMPT_MAX} disabled={disabled}
+              value={value.customPrompt} placeholder="例：桜と料理の写真を使った、春らしい案内"
+              onChange={(event) => set('customPrompt', event.target.value)} />
+          </SaveErrorField>
+        </Field>
 
         {/*
           参照画像（承認済み ★BG-B `L1ax1Y`）。最大 3 枚で、1 枚ずつ使い方を決める。
@@ -261,6 +262,15 @@ export default function GenerationPanel({
           </div>
         </Field>
 
+        <OutputSize
+          name={`${uid}-preset`}
+          presets={presets}
+          value={value.presetKey}
+          disabled={disabled}
+          onSelect={(key) => set('presetKey', key)}
+          v8Layout={v8Layout}
+        />
+
         {/*
           * ★修正案 `g64HOD`（2026-10-06 承認）：行ごとに「強調」を入れ切りできる。
           * 入れた行だけを強調カラーで目立たせる。丸やタグの印は出さず、
@@ -357,30 +367,6 @@ export default function GenerationPanel({
           </fieldset>
         </Field>
 
-        {/* ★BG-B `dT1xq`: 任意であることと上限を同じ行に出す */}
-        <Field v8Layout={v8Layout} label="追加の指示" note={`任意・${CUSTOM_PROMPT_MAX}文字まで`} htmlFor={`${uid}-custom`}>
-          {/*
-            板はこの欄を 1 行ぶんの高さで描いている。板の間隔定数（組と組の間 16px・
-            組の中 6px）で板Δ（`WMhuQ`任意・600文字まで → `coo4b`つくる枚数）90 を割ると
-            90 − 16 − 6 − 題17 = 51px。共通部品の `.multi` は 2 行ぶん（min-height 120px）
-            なので、この 1 か所だけ最小高さを外して 1 行ぶん（上下の余白14×2＋1行23.8＋枠2
-            ＝54px）にする。共通部品そのものは V5 公認の `keKe3`（22 か所）なので変えない。
-            たたんだ高さを板に合わせるだけで、`.multi` の `resize: vertical` は残るので
-            長い指示は引き伸ばして書ける。
-          */}
-          <SaveErrorField names={["customPrompt","value.customPrompt","custom_prompt","value.custom_prompt"]}><TextArea
-            id={`${uid}-custom`}
-            rows={1}
-            style={v8Layout ? { minHeight: 0, height: 50, padding: "8px 10px", fontSize: 12, lineHeight: "18px" } : { minHeight: 0 }}
-            maxLength={CUSTOM_PROMPT_MAX}
-            disabled={disabled}
-            value={value.customPrompt}
-            placeholder="例: 桜の花びらと餃子・生ビールの写真風。和風で温かみのある雰囲気"
-            onChange={(event) => set('customPrompt', event.target.value)}
-            className="w-full"
-          /></SaveErrorField>
-        </Field>
-
         {/*
           * ★BG-B `ELZIS`：枚数の注記は2つとも「つくる枚数」に付く。
           * 置き場所も絵のまま——`KCFAX`「一度に 4 枚まで」はラベル行
@@ -423,7 +409,7 @@ export default function GenerationPanel({
           * 下の帯で `exportSizeText()` を出す。
           */}
       </div>
-    </aside>
+    </Card>
   )
 }
 
@@ -534,16 +520,7 @@ function Field({
   )
 }
 
-/**
- * 出力サイズ。Pencil ★BG-B `xy4EW` の小さい箱（`o2XyUk`/`aCyxg`）。
- *
- * LINE の規格を小さいカードで並べ（V8 は絵の どおり1列の低い行：左に全文の名前と寸法、右に丸）、選んだカードを淡い緑にする（共通のラジオカード）。
- * 390px の脇のパネルに収まる細さにするため `variant="compact"` を使う
- * （2026-10-06 オーナー指示「出力サイズのボタンが大きい。もっとスマートな幅に」）。
- * Instagram・X・OGP などは普段使わないので、最初は畳んで「ほかの用途から選ぶ」の
- * 1行だけ置く。畳んだ中に選択中の規格が入っている場合（「同じ設定でもう一度」など）は
- * 開いた状態で出す。選べない選択肢は描かない（`docs/v8-design-rules.md` §5）。
- */
+/** 現在の用途を短く示し、大きさの選択肢は窓で開く。 */
 function OutputSize({
   name,
   presets,
@@ -560,45 +537,25 @@ function OutputSize({
   v8Layout?: boolean
 }) {
   const [opened, setOpened] = useState(false)
-  const groups = groupPresets(presets)
-  const line = groups.find((g) => g.group === 'line')?.items ?? []
-  const others = groups.find((g) => g.group === 'sns')?.items ?? []
-  const showOthers = opened || others.some((p) => p.key === value)
+  const selected = presets.find((preset) => preset.key === value)
 
   return (
     <div data-design-node="xy4EW" className="flex flex-col gap-2">
-      <div className="flex items-center gap-1.5">
-        <span className="shrink-0 text-caption font-semibold text-ink">出力サイズ</span>
-        <span className="min-w-0 text-micro text-ink-faint">LINEの規格から選ぶ</span>
-      </div>
-      <SaveErrorField names={["key","preset.key","value"]}><RadioCardGroup legend="出力サイズ" className={v8Layout ? 'grid grid-cols-1 gap-2' : 'grid grid-cols-2 gap-1.5'}>
-        {[...line, ...(showOthers ? others : [])].map((preset) => (
-          <RadioCard
-            key={preset.key}
-            name={name}
-            value={preset.key}
-            checked={value === preset.key}
-            disabled={disabled}
-            onChange={onSelect}
-            variant="compact"
-            compactTypography={v8Layout ? 'banner' : 'default'}
-            title={presetCardLabel(preset)}
-            note={presetSizeLabel(preset)}
-          />
-        ))}
-      </RadioCardGroup></SaveErrorField>
-      {showOthers ? null : (
-        <Button
-          variant="secondary"
-          size="compact"
-          className="w-full justify-center"
-          disabled={disabled}
-          onClick={() => setOpened(true)}
-        >
-          <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" />
-          ほかの用途から選ぶ（Instagram・X・OGPなど）
-        </Button>
-      )}
+      <p className="truncate text-caption text-ink" title={selected ? `${presetCardLabel(selected)}・${presetSizeLabel(selected)}` : undefined}>
+        {selected ? `${presetCardLabel(selected)}・${presetSizeLabel(selected)}` : '用途と大きさを選んでください'}
+      </p>
+      <div className="flex justify-center"><Button disabled={disabled} onClick={() => setOpened(true)}>大きさを変える</Button></div>
+      <Dialog footerAlign="center" open={opened} title="用途と大きさを選ぶ" onCancel={() => setOpened(false)} cancelLabel="閉じる">
+        <SaveErrorField names={["key", "preset.key", "value"]}>
+          <RadioCardGroup legend="出力サイズ" columns={2}>
+            {presets.map((preset) => (
+              <RadioCard key={preset.key} name={name} value={preset.key} checked={value === preset.key}
+                disabled={disabled} onChange={(key) => { onSelect(key); setOpened(false) }} variant="compact"
+                compactTypography={v8Layout ? 'banner' : 'default'} title={presetCardLabel(preset)} note={presetSizeLabel(preset)} />
+            ))}
+          </RadioCardGroup>
+        </SaveErrorField>
+      </Dialog>
     </div>
   )
 }

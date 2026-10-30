@@ -12,10 +12,13 @@ export async function uploadToMediaLibrary(
   accountId: string,
   kind: MediaItem['kind'],
   onProgress: (percent: number) => void = () => {},
+  /** 各書込の直前に確認する。失効した処理ではfalseを返し続けるleaseを渡す。 */
+  canUploadNow?: () => boolean,
 ): Promise<{ url: string; durationMs?: number; item: MediaItem }> {
   const invalid = validateMediaFile(file)
   if (invalid) throw new Error(invalid)
   const metadata = await extractMediaMetadata(file)
+  if (canUploadNow?.() === false) throw new Error('権限が変わったため、ファイルの登録を中止しました。')
   const prepared = await api.media.prepareUploads({
     accountId,
     files: [{ filename: file.name, mimeType: file.type, sizeBytes: file.size, folderId: null, metadata }],
@@ -24,7 +27,9 @@ export async function uploadToMediaLibrary(
     throw new Error((!prepared.success && prepared.error) || 'ファイルを送る準備ができませんでした。時間をおいて、もう一度お試しください。')
   }
   const session = prepared.data.sessions[0]
+  if (canUploadNow?.() === false) throw new Error('権限が変わったため、ファイルの登録を中止しました。')
   const etag = await putMediaFile(session, file, onProgress)
+  if (canUploadNow?.() === false) throw new Error('権限が変わったため、ファイルの登録を中止しました。')
   const completed = await api.media.completeUpload(session.id, { accountId, etag })
   if (!completed.success) throw new Error(completed.error || '登録を完了できませんでした。時間をおいて、もう一度お試しください。')
   if (completed.data.status !== 'completed' || !completed.data.mediaId) throw new Error('登録を完了できませんでした。時間をおいて、もう一度お試しください。')

@@ -40,6 +40,9 @@ type RenderTemplateListContext = {
   allOnPageSelected: boolean
   bulkDeleting: boolean
   canMutateTemplates: boolean
+  createHref: string
+  createLabel: string
+  lockedReason?: string
   clearFilters: () => void
   clearSelection: () => void
   contextMenuItems: ContextMenuItem[]
@@ -55,7 +58,6 @@ type RenderTemplateListContext = {
   narrow: boolean
   openMenuId: string | null
   openMove: (ids: string[]) => void
-  openPicker: () => void
   removableSelected: Template[]
   rowMenuItems: (t: Template) => ActionMenuItem[]
   sectionWord: "リッチビデオのテンプレート" | "質問のテンプレート" | "メッセージのテンプレート"
@@ -80,7 +82,7 @@ type RenderTemplateListContext = {
 const KIND_ICONS = { image: ImageIcon, flex: LayoutTemplate, carousel: GalleryHorizontal, question: HelpCircle, video: Video } as const
 const kindIcon = (kind: string) => KIND_ICONS[kind as keyof typeof KIND_ICONS] ?? FileText
 
-export function renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, openPicker, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view }: RenderTemplateListContext) {
+export function renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, createHref, createLabel, lockedReason, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view }: RenderTemplateListContext) {
   return (accountLoading || view === 'loading' ? (
     <div className={styles.skeletonRows} aria-label="読み込み中" data-design-node="susGP">
       {[0, 1, 2, 3].map((i) => (
@@ -107,7 +109,8 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
       icon={<FileText aria-hidden="true" />}
       title={`まだ${sectionWord}がありません`}
       description="よく送る文を保存しておくと、一斉配信・自動応答・シナリオから選べます。"
-      create={{ label: '最初のテンプレートを作る', onClick: openPicker }}
+      create={{ label: `最初の${createLabel}を作る`, href: createHref }}
+      lockedReason={lockedReason ?? null}
       canCreate={canMutateTemplates}
       filtered={filterActive}
       onClearFilters={clearFilters}

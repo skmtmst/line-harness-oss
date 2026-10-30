@@ -55,6 +55,8 @@
 /* 表（見出し 36・行 56・欄の間 16・左右 24）。行の線は内側の影（行ごとに 1px 増やさない）。 */
 .table {
   border: 0;
+  /* 「90日以上前」の札が切れない幅。 */
+  --tpl-nph-col-updated: 108px;
 }
 :global(:root) .table .headRow[data-table-layout='columns'] {
   display: flex;

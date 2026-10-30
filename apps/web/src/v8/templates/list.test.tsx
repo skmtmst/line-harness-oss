@@ -160,7 +160,7 @@ describe('V8 テンプレートの一覧', () => {
     role.value = verifiedStaffRole('staff')
     await renderList()
     expect(screen.getByText(PERMISSION_LOCK_SUMMARY.feature)).toBeTruthy()
-    expect(screen.queryAllByRole('button', { name: /テンプレートを作る/ })).toHaveLength(0)
+    expect(screen.getByRole('button', { name: '見本から作る' }).getAttribute('aria-disabled')).toBe('true')
     expect(screen.queryAllByRole('checkbox', { name: /を選択$/ })).toHaveLength(0)
   })
 
@@ -236,7 +236,7 @@ describe('テンプレートの種類を選ぶ窓（R9XUMr）：見本から作�
     })
     await renderList()
     await act(async () => {
-      fireEvent.click(screen.getAllByRole('button', { name: /テンプレートを作る/ })[0])
+      fireEvent.click(screen.getAllByRole('button', { name: '見本から作る' })[0])
     })
     await act(async () => { await Promise.resolve() })
     expect(fetchApi).toHaveBeenCalledWith('/api/templates/examples')
@@ -251,7 +251,7 @@ describe('テンプレートの種類を選ぶ窓（R9XUMr）：見本から作�
     fetchApi.mockRejectedValue(new Error('network'))
     await renderList()
     await act(async () => {
-      fireEvent.click(screen.getAllByRole('button', { name: /テンプレートを作る/ })[0])
+      fireEvent.click(screen.getAllByRole('button', { name: '見本から作る' })[0])
     })
     await act(async () => { await Promise.resolve() })
     expect(screen.queryByRole('heading', { name: '見本から作る' })).toBeNull()
@@ -264,7 +264,7 @@ it('見本の取得失敗を見本なしとして消さず、同じ窓で読み�
  listTemplates.mockResolvedValue({success:true,data:[used]})
  fetchApi.mockReset().mockRejectedValueOnce(new Error('fixture failure')).mockResolvedValue({success:true,data:[]})
  await renderList()
- fireEvent.click(screen.getAllByRole('button',{name:/テンプレートを作る/})[0])
+ fireEvent.click(screen.getAllByRole('button',{name:'見本から作る'})[0])
  const error=await screen.findByText('見本を読み込めませんでした')
  fireEvent.click(error.closest('[data-list-state="error"]')!.querySelector('button')!)
  await act(async()=>{})

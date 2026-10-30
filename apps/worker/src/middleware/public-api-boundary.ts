@@ -53,6 +53,7 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
     path === '/api/auth/line' ||
     path === '/api/auth/line/callback' ||
     path === '/api/auth/two-factor/verify' ||
+    (normalizedMethod === 'POST' && (path === '/api/auth/passkeys/login/options' || path === '/api/auth/passkeys/login/verify')) ||
     // TOTP未登録の管理者の初回設定。合言葉で本人確認する公開経路。
     path === '/api/auth/two-factor/setup' ||
     path === '/api/auth/two-factor/setup/confirm' ||

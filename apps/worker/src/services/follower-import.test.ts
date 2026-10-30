@@ -163,6 +163,37 @@ function makeDb(initialFriends: StoredFriend[] = [], control: DbControl = {}) {
 }
 
 describe('persisted one-time follower import', () => {
+  test('claims preserved friends only when LINE returns their IDs for the reconnected account', async () => {
+    const retained = seedFriends(4).map((friend) => ({
+      ...friend,
+      line_account_id: null,
+      display_name: '保存済みの友だち',
+    }));
+    const { db, friends } = makeDb(retained);
+    const returnedIds = retained.slice(0, 3).map((friend) => friend.line_user_id);
+    const client = {
+      getFollowerIds: vi.fn()
+        .mockResolvedValueOnce({ userIds: [] })
+        .mockResolvedValueOnce({ userIds: returnedIds }),
+      getProfile: vi.fn(),
+    };
+
+    await detectFollowerImportCapability(db, client, 'new-account');
+    await startFollowerImport(db, 'new-account');
+    const run = await processFollowerImportStep(db, client, 'new-account');
+
+    expect(run.state.phase).toBe('completed');
+    expect(run.state.received).toBe(3);
+    expect(run.state.claimedUnassigned).toBe(3);
+    expect(run.state.imported).toBe(0);
+    expect(client.getFollowerIds).toHaveBeenCalledTimes(2);
+    expect(client.getProfile).not.toHaveBeenCalled();
+    expect(retained.map((friend) => friends.get(friend.line_user_id)?.line_account_id))
+      .toEqual(['new-account', 'new-account', 'new-account', null]);
+    expect(friends.get(retained[0].line_user_id)?.id).toBe(retained[0].id);
+    expect(friends.get(retained[0].line_user_id)?.display_name).toBe('保存済みの友だち');
+  });
+
   test('detects an unavailable account once and stores the result', async () => {
     const { db, getSetting } = makeDb();
     const client = {

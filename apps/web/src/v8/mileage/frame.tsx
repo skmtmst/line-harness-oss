@@ -12,7 +12,6 @@ import { createContext, useContext, type ReactNode } from 'react'
 
 import { ListPage, type ListFolderNav } from '@/components/templates'
 import { Tabs } from '@/components/shared/tabs'
-import Button from '@/components/shared/button'
 import styles from './mileage.module.css'
 
 export const MILEAGE_TABLE_LAYOUT = {
@@ -74,28 +73,10 @@ export function ViewerBand() {
 }
 
 /**
- * 作るボタン。閲覧のみの人には出さない（2026-10-06 オーナー：押せない形で
- * 残さず隠す。絵  は押せない形で描いているが、決定を優先する）。
+ * 作るボタンは各タブで素の Button（variant="primary"）を直接渡す。ラッパーで
+ * 包むと題の右の自動整列が主ボタンを見分けられず、副ボタンの右に出てしまう。
+ * 閲覧のみの人には出さない（2026-10-06 オーナー：押せない形で残さず隠す）。
  */
-export function CreateButton({
-  href,
-  readonly,
-  full,
-  children,
-}: {
-  href: string
-  readonly: boolean
-  full?: boolean
-  children: ReactNode
-}) {
-  // 閲覧のみの作成操作は隠す。
-  if (readonly) return null
-  return (
-    <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href={href}>
-      {children}
-    </Button>
-  )
-}
 
 export interface MileageFrameProps {
   /** 板の頭の右（CSV など）。 */
