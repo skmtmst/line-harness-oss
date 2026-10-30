@@ -1,3 +1,4 @@
+import { describeApiFailure } from '@/components/shared/api-error-message'
 /*
  * ★V8 統括のテンプレート（・・）の、画面に依らない小さな計算。
  * src/v8 からは @/app を読めないので、今の画面（app/hq/templates/template-console.tsx・
@@ -32,7 +33,7 @@ export function definitionError(type: TemplateType, definition: TemplateDefiniti
   if (type === 'tag' && 'tag' in definition) return definition.folders.some((folder) => !folder.name.trim()) ? 'タググループ名を入力してください。' : null
   if (type === 'template' && 'template' in definition) {
     if (definition.card) {
-      try { parseHqMessageCard(definition.card) } catch (error) { return error instanceof Error ? error.message : '入力内容を確認してください。' }
+      try { parseHqMessageCard(definition.card) } catch (error) { return describeApiFailure(error, '入力内容の確認') }
     }
     /* クーポン・リサーチ・カルーセル（素材）と質問は本文を持たない（店の素材と同じ形の payload・質問の JSON が中身）。 */
     if (definition.asset || definition.template.questionJson) return null

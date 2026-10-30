@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useListSnapshot } from '@/lib/use-list-snapshot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -155,7 +156,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
       await load()
     } catch (reason) {
       setItems(previous)
-      const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
+      const message = describeApiFailure(reason, '並び順の保存')
       setActionError(message)
       setRetryOrder(next)
       notifyToast(message, { tone: 'error', actionLabel: 'もう一度', onAction: () => { void applyOrder(next) } })
@@ -199,7 +200,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
       await api.friendFields.delete(field.id, accountId)
       leave(field.id, () => load())
     } catch (reason) {
-      setActionError(reason instanceof ApiError ? reason.message : '削除できませんでした。時間をおいて、もう一度お試しください。')
+      setActionError(describeApiFailure(reason, '削除'))
     }
   }
 

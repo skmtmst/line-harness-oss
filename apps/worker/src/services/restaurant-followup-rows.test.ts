@@ -155,3 +155,14 @@ it('本体のない管理対象も旧予約通知と旧待ち通知を送らず�
  t.raw.exec("INSERT INTO rt_customer_notice_outbox(id,store_id,reservation_id,customer_version,line_uid,message,retry_key) VALUES('old-notice','s','r',1,'UID','旧通知','old-retry')");
  expect(t.raw.prepare("SELECT valid FROM rt_customer_notice_outbox WHERE id='old-notice'").get()).toEqual({valid:1});
 });
+
+it('日単位でない古い結びがあっても、ほかの記念日の予定は作る',async()=>{
+ const first=await enable('anniversary_before');
+ t.raw.prepare("INSERT INTO scenario_steps(id,scenario_id,step_order,message_type,message_content,is_draft) SELECT 'bad-step',scenario_id,step_order+1,'text','古い結び',0 FROM scenario_steps WHERE id=?").run(first.step_id);
+ t.raw.exec("INSERT INTO rt_store_followup_step_bindings(store_id,trigger,step_id,offset_minutes,enabled,anniversary_time) VALUES('s','anniversary_before','bad-step',-10079,1,'10:00');INSERT INTO friend_field_values(friend_id,field_id,value) VALUES('f','fixed-anniversary','2000-10-18')");
+ await approve();const now=new Date('2026-10-11T01:00:00Z');
+ await scheduleRestaurantAnniversaries(t.db,now);expect(count('scenario_source_jobs')).toBe(1);
+ const job=t.raw.prepare('SELECT * FROM scenario_source_jobs').get() as ScenarioSourceJob;
+ expect(await restaurantAnniversaryState(t.db,job,now)).not.toBeNull();
+ expect(await restaurantAnniversaryState(t.db,{...job,step_id:`${job.scenario_version_id}:1`},now)).toBeNull();
+});

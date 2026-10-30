@@ -555,6 +555,7 @@
 - **10-12の追加（F組・B-260）**：`CreatePage`の`contentDisabled`／`contentLabel`で本文をネイティブfieldsetにする。余白と段間は型が持ち、保存中・比較中・閲覧のみの入力をまとめて止める。通知と下の帯はfieldsetの外へ渡す。レポート作成の動作試験で保存・失敗・競合・権限を保つ。
 
 - **10-12の変わり形（F組・B-260）**：同じ入力欄の前後に固定文字を置く`AffixedTextField`は`text-field.tsx`／`text-field.module.css`が持つ。値は入力部分だけ、前後の文字は保存しない。Fieldの必須・誤り・説明・フォーカスと同じ契約を保つ。画面で別の枠や焦点の輪を作らない。
+- 札や補助ボタンを含む入力の外枠は `text-field.tsx` の `InputFieldFrame`。線は `input-field-ring.css` と共通の `--polish-focus-*` が持ち、内側の文字欄に重ねない。焦点は青2px、誤りは赤2pxを枠の上に1本描く。
 - 招待のメール欄は `shared/email-chip-field.tsx`。既存の TextField・Chip を使い、Enter・貼り付け・欄から離れる操作で1件を札にする。複数件は切り捨てず入力に残して理由を示す。送信値・名前・権限は画面が持つ。
 - 言葉を足す欄は `shared/keyword-input.tsx`。枠と検索印は `AffixedTextField`、幅は既存の言葉入力用の値を使う。Enter・カンマ・離れる操作で確定し、日本語の変換中は確定しない。条件や重複の判断は画面が渡す。
 
@@ -863,6 +864,7 @@
 ## date-time 日付・時刻の欄
 
 - **役目**：DateField・TimeField・DateTimeField。高さ36・日本時間
+- 待機設定の組み合わせは `apps/web/src/components/automations/wait-fields.tsx` の `WaitFields` が持つ。通常の自動化と共通アクションで同じSelect・TextField・TimeFieldを使い、分数と翌日の時刻を保存する。
 - **持ち主（コード）**：`apps/web/src/components/shared/date-field.tsx`・`apps/web/src/components/shared/date-time-field.tsx`・`apps/web/src/components/shared/time-field-v8.tsx`（部品 `DateField`・`DateTimeField`・`TimeField`・`TimeFieldV8`）
 - **持ち主（Pen）**：**未定**
   - 注：Pen の部品 ID が対応表に無い（YCOoR は提案の板）

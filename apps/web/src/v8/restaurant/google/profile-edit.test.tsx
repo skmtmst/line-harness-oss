@@ -120,9 +120,9 @@ describe('Googleプロフィールを現在の共通部品で編集する', () =
   it('写真の取得/選択候補の失敗を示し、候補を再取得でき、閉じた後の古い応答を捨てる', async () => {
     mocks.photos.mockRejectedValue(new ApiError(500, '写真の取得に失敗しました'))
     mocks.media.mockRejectedValueOnce(new ApiError(500, '候補の取得に失敗しました'))
-    await open(); await screen.findByText('写真の取得に失敗しました')
+    await open(); await screen.findByText('写真を読み込めませんでした。')
     fireEvent.click(screen.getByRole('button', { name: '登録メディアから追加する' }))
-    await screen.findByText('候補の取得に失敗しました')
+    await screen.findByText('登録メディアを読み込めませんでした。')
     let finish!: (value: unknown) => void
     mocks.media.mockReturnValueOnce(new Promise((resolve) => { finish = resolve }))
     fireEvent.click(screen.getByRole('button', { name: /もう一度/ }))

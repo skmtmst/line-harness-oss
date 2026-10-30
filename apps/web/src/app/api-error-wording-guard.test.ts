@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import ts from 'typescript'
 
 import { describe, expect, it } from 'vitest'
 
@@ -21,16 +22,110 @@ const SRC = path.join(__dirname, '..')
 
 function code(src: string): string {
   return src
-    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/^\s*\/\/.*$/gm, '')
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, match => match.replace(/[^\n]/g, ' '))
+    .replace(/\/\*[\s\S]*?\*\//g, match => match.replace(/[^\n]/g, ' '))
+    .replace(/^[^\S\n]*\/\/.*$/gm, match => ' '.repeat(match.length))
 }
 
 /** message をそのまま画面の文にしている形。 */
 export const RAW_MESSAGE = /instanceof (?:Api)?Error(?: \|\| \w+ instanceof (?:Api)?Error)?(?: && \w+\.message)? \? \w+\.message\b|&& \w+\.message\) return \w+\.message/
 
+const SAFE_MESSAGE_CALL = /^(?:extractApiErrorMessage|describeApiFailure|describeSaveFailure|japaneseDetailOf)$/
+
+function directMessage(node: ts.Node): boolean {
+  if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node) || ts.isSatisfiesExpression(node)) return directMessage(node.expression)
+  if (ts.isPropertyAccessExpression(node)) {
+    if (node.name.text === 'message' && ts.isCallExpression(node.expression) && /^(?:describeFriendAddFailure|describeFolderFailure)$/.test(node.expression.expression.getText())) return false
+    return node.name.text === 'message' || directMessage(node.expression)
+  }
+  if (ts.isBinaryExpression(node)) return directMessage(node.left) || directMessage(node.right)
+  if (ts.isConditionalExpression(node)) return directMessage(node.whenTrue) || directMessage(node.whenFalse)
+  if (ts.isCallExpression(node)) return node.expression.getText() !== 'extractApiErrorCode' && !SAFE_MESSAGE_CALL.test(node.expression.getText()) && (directMessage(node.expression) || node.arguments.some(directMessage))
+  if (ts.isTemplateExpression(node)) return node.templateSpans.some(span => directMessage(span.expression))
+  if (ts.isObjectLiteralExpression(node)) return node.properties.some(property => ts.isPropertyAssignment(property) && directMessage(property.initializer))
+  return false
+}
+
 export function countRawMessageLines(source: string): number {
-  return code(source).split('\n').filter((line) => RAW_MESSAGE.test(line) && !line.includes('API error')).length
+  const parsed = ts.createSourceFile('screen.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const lines = new Set<number>()
+  const mark = (node: ts.Node) => lines.add(parsed.getLineAndCharacterOfPosition(node.getStart(parsed)).line)
+  const errorCheck = (condition: ts.Expression) => /\binstanceof\s+\w*Error\b|\bisApiError\s*\(/.test(condition.getText(parsed))
+  const sanitized = (node: ts.Node) => {
+    let parent = node.parent
+    while (parent && !ts.isFunctionLike(parent)) {
+      if (ts.isCallExpression(parent) && SAFE_MESSAGE_CALL.test(parent.expression.getText(parsed))) return true
+      parent = parent.parent
+    }
+    return false
+  }
+  const errorValue = (node: ts.Node): boolean => {
+    const roots = new Set(['caught', 'error', 'err', 'e', 'reason', 'cause', 'submitError', 'saveError', 'deleteError'])
+    let boundary: ts.Node | undefined = node
+    while (boundary && !ts.isFunctionLike(boundary)) boundary = boundary.parent
+    if (boundary && (ts.isArrowFunction(boundary) || ts.isFunctionExpression(boundary))) {
+      const call = boundary.parent
+      if (ts.isCallExpression(call) && ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === 'catch') {
+        for (const parameter of boundary.parameters) if (ts.isIdentifier(parameter.name)) roots.add(parameter.name.text)
+      }
+    }
+    let parent: ts.Node | undefined = node
+    while (parent && !ts.isFunctionLike(parent)) {
+      if (ts.isCatchClause(parent) && parent.variableDeclaration && ts.isIdentifier(parent.variableDeclaration.name)) {
+        roots.add(parent.variableDeclaration.name.text)
+        let changed = true
+        while (changed) {
+          changed = false
+          const aliases = (child: ts.Node) => {
+            if (ts.isVariableDeclaration(child) && ts.isIdentifier(child.name) && child.initializer) {
+              let value = child.initializer
+              while (ts.isAsExpression(value) || ts.isParenthesizedExpression(value) || ts.isNonNullExpression(value)) value = value.expression
+              if (ts.isIdentifier(value) && roots.has(value.text) && !roots.has(child.name.text)) { roots.add(child.name.text); changed = true }
+            }
+            ts.forEachChild(child, aliases)
+          }
+          aliases(parent.block)
+        }
+      }
+      parent = parent.parent
+    }
+    let found = false
+    const inspect = (child: ts.Node) => {
+      if (ts.isPropertyAccessExpression(child) && child.name.text === 'message') {
+        let receiver = child.expression
+        while (ts.isAsExpression(receiver) || ts.isParenthesizedExpression(receiver) || ts.isNonNullExpression(receiver)) receiver = receiver.expression
+        if (ts.isIdentifier(receiver) && roots.has(receiver.text)) found = true
+      }
+      ts.forEachChild(child, inspect)
+    }
+    inspect(node)
+    return found
+  }
+  function visit(node: ts.Node) {
+    if (ts.isConditionalExpression(node) && errorCheck(node.condition) && !sanitized(node)
+      && (directMessage(node.whenTrue) || directMessage(node.whenFalse))) mark(node)
+    if (ts.isCallExpression(node) && /^(?:set\w*(?:Error|Errors|Message|Notice|Status|State)|notifyToast|toast\.(?:error|warning))$/.test(node.expression.getText(parsed))) {
+      for (const argument of node.arguments) {
+        if (directMessage(argument) && errorValue(argument) && !sanitized(argument)) mark(node)
+      }
+    }
+    if (ts.isReturnStatement(node) && node.expression && !ts.isObjectLiteralExpression(node.expression) && directMessage(node.expression)) {
+      let parent: ts.Node | undefined = node.parent
+      let checked = false
+      while (parent && !ts.isFunctionLike(parent)) {
+        if (ts.isIfStatement(parent)) { checked ||= errorCheck(parent.expression) }
+        parent = parent.parent
+      }
+      if (!sanitized(node) && (checked || errorValue(node.expression))) mark(node)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(parsed)
+  // 既存の直接 return の形も、構文を解析する見張りと併用する。
+  code(source).split('\n').forEach((line, index) => {
+    if (RAW_MESSAGE.test(line) && !line.includes('extractApiErrorMessage')) lines.add(index)
+  })
+  return lines.size
 }
 
 function collect(dir: string, found: Record<string, number> = {}): Record<string, number> {
@@ -39,7 +134,7 @@ function collect(dir: string, found: Record<string, number> = {}): Record<string
     if (entry.isDirectory()) {
       if (entry.name === 'node_modules' || entry.name.startsWith('.') || entry.name === 'generated') continue
       collect(full, found)
-    } else if (/\.(ts|tsx)$/.test(entry.name) && !/\.test\.tsx?$/.test(entry.name)) {
+    } else if (/\.(ts|tsx)$/.test(entry.name) && !/\.(?:test|spec)\.tsx?$/.test(entry.name)) {
       const n = countRawMessageLines(fs.readFileSync(full, 'utf8'))
       if (n > 0) found[path.relative(SRC, full)] = n
     }
@@ -47,115 +142,58 @@ function collect(dir: string, found: Record<string, number> = {}): Record<string
   return found
 }
 
-/* 2026-10-07 時点の持ち越し（173 ファイル・304 か所）。直したら数を減らす。 */
+/* 表示には使わないコード・通信・競合の判定だけ。元の27か所の残りを用途別に記録する。 */
 const BASELINE: Record<string, number> = {
-  'app/analytics/page.tsx': 1,
-  'app/analytics/reports/new/page.tsx': 1,
-  'app/auto-replies/edit/page.tsx': 1,
-  'app/booking/menus/staff/page.tsx': 1,
-  'app/booking/staff/staff-edit-dialog.tsx': 1,
-  'app/chats/page.tsx': 1,
-  'v8/automations/common-action-edit.tsx': 1,
-  'app/hq/banners/project/page.tsx': 6,
-  'app/hq/templates/template-definition-editor.tsx': 3,
-  'app/login/two-factor/setup/page.tsx': 1,
-  'v8/login/two-factor/two-factor-error.ts': 1,
-  'app/mileage/earning-rules/edit/v8-earning-rule-edit.tsx': 1,
-  'app/mileage/page.tsx': 2,
-  'v8/nen-campaigns/column-intros.tsx': 1,
-  'app/reminders/new/page.tsx': 1,
-  'app/scenarios/first-step/page.tsx': 1,
-  'app/staff/email-change/page.tsx': 1,
-  'app/staff/invite/page.tsx': 1,
-  'app/tags/fields/edit/page.tsx': 2,
-  'app/tags/fields/migrate/page.tsx': 3,
-  'app/tags/searches/edit/page.tsx': 3,
-  'app/templates/page.tsx': 1,
   'app/updates/page.tsx': 1,
-  'app/webhooks/webhook-runtime.spec.ts': 1,
-  'v8/events/edit-form.tsx': 5,
-  'components/friend-fields/tag-csv-import-dialog.tsx': 2,
-  'components/friends/advanced-search-dialog.tsx': 1,
-  'components/hq/banners/upload-button.tsx': 1,
-  'components/hq/banners/upload-target-dialog.tsx': 1,
-  'components/ops/ops-ui.tsx': 1,
-  'components/rich-menus/apply-to-tag-modal.tsx': 1,
-  'components/scenarios/duplicate-scenario.ts': 2,
-  'components/scenarios/scenario-dialogs.tsx': 1,
-  'components/step-up-prompt.tsx': 1,
-  'components/update/update-button.tsx': 1,
   'components/webinars/webinar-error-text.ts': 1,
-  'v8/affiliate-offer-new/create.tsx': 1,
-  'v8/affiliates/approvals.tsx': 2,
-  'v8/affiliates/create.tsx': 1,
-  'v8/affiliates/drawer.tsx': 1,
-  'v8/affiliates/offer-form.tsx': 1,
-  'v8/affiliates/payment-dialogs.tsx': 2,
-  'v8/affiliates/payment.tsx': 2,
-  'v8/affiliates/report.tsx': 1,
-  'v8/analytics/cross.tsx': 2,
+  'v8/analytics/cross.tsx': 1,
   'v8/analytics/funnel.tsx': 2,
-  'v8/analytics/saved.tsx': 4,
-  'v8/auto-replies/quick-create.tsx': 1,
-  'v8/automations/common-action-new.tsx': 1,
-  'v8/automations/common-actions.tsx': 2,
-  'v8/automations/runs.tsx': 2,
-  'v8/automations/versions.tsx': 1,
-  'v8/booking-menus/assign.tsx': 1,
-  'v8/booking-menus/menu-form.tsx': 1,
-  'v8/booking-menus/staff-edit-dialog.tsx': 1,
-  'v8/broadcasts/quick-send.tsx': 1,
-  'v8/contents/list.tsx': 2,
-  'v8/contents/media-detail-dialog.tsx': 2,
-  'v8/contents/media-replacement-dialog.tsx': 1,
-  'v8/conversions/list.tsx': 2,
-  'v8/events/create.tsx': 1,
-  'v8/hq-banners/dialogs.tsx': 1,
-  'v8/hq-banners/project.tsx': 5,
-  'v8/hq-templates/console.tsx': 1,
-  'v8/hq-templates/definition.ts': 1,
-  'v8/hq-templates/message-form.tsx': 1,
-  'v8/hq/home.tsx': 2,
-  'v8/inflow-links/site-script.tsx': 3,
-  'v8/line-notifications/operator-edit.tsx': 1,
-  'v8/login/two-factor-ops.tsx': 1,
-  'v8/mileage/adjust-dialog.tsx': 1,
-  'v8/mileage/balances.tsx': 1,
-  'v8/mileage/earning-rule-new/create.tsx': 2,
-  'v8/mileage/earning-rules.tsx': 1,
-  'v8/mileage/friend-detail.tsx': 2,
-  'v8/mileage/history.tsx': 1,
-  'v8/nen-posts/detail.tsx': 1,
-  'v8/nen-posts/review.tsx': 1,
-  'v8/restaurant/booking-kit/shell.tsx': 1,
-  'v8/restaurant/close-tasks/close-tasks.tsx': 1,
-  'v8/restaurant/closures/closure-dialog.tsx': 1,
-  'v8/restaurant/common-a/frame.tsx': 1,
-  'v8/restaurant/front-desk/phone-drawer.tsx': 1,
-  'v8/restaurant/front-desk/walk-in-dialog.tsx': 1,
-  'v8/restaurant/inventory/channels.tsx': 1,
-  'v8/restaurant/store-new/store-new.tsx': 3,
-  'v8/scenario-first-step/first-step.tsx': 1,
-  'v8/scenarios/list.tsx': 1,
-  'v8/settings/staff/staff.tsx': 1,
-  'v8/tag-edit/edit.tsx': 1,
-  'v8/tag-edit/search-edit.tsx': 3,
-  'v8/tags/create.tsx': 1,
-  'v8/tags/field-edit.tsx': 2,
-  'v8/tags/field-migrate.tsx': 3,
-  'v8/tags/use-fields-tab.tsx': 1,
-  'v8/tags/searches-tab.tsx': 2,
-  'v8/tags/tags-tab.tsx': 4,
-  'v8/templates/carousel-core.ts': 1,
-  'v8/webinar-edit/comments.tsx': 1,
+  'v8/conversions/list.tsx': 1,
+  'v8/login/two-factor/two-factor-error.ts': 1,
 }
 
 describe('「API error: 500」を画面に出さない', () => {
   it('見張りの形が、そのまま出す書き方を拾い、弾いている書き方は拾わない', () => {
     expect(countRawMessageLines("setError(caught instanceof Error ? caught.message : '保存できませんでした')")).toBe(1)
     expect(countRawMessageLines("if (error instanceof ApiError && error.message) return error.message")).toBe(1)
-    expect(countRawMessageLines("return caught instanceof ApiError && caught.message && !/^API error: /.test(caught.message) ? caught.message : fb")).toBe(0)
+    expect(countRawMessageLines("return caught instanceof ApiError && caught.message && !/^API error: /.test(caught.message) ? caught.message : fb")).toBe(1)
     expect(countRawMessageLines("return japaneseDetailOf(caught) || '保存できませんでした'")).toBe(0)
+  })
+
+  it.each([
+    "setError(error.message)",
+    "try {} catch (problem) { setError(otpFailureMessage(problem.message)) }",
+    "request.catch(problem => setError(problem.message))",
+    "request.catch(function(problem) { setError(otpFailureMessage(problem.message)) })",
+    "setError(error.message || '保存できませんでした')",
+    "setError(error.message ?? '保存できませんでした')",
+    "setError(caught?.message)",
+    "setError((e as Error).message)",
+    "setError(e.message.slice(0, 80))",
+    "try {} catch (problem) { const alias = problem as Error; setError(alias?.message) }",
+    "return e instanceof ApiError && !/^API error: /.test(e.message) ? e.message : fallback",
+    "return error.message",
+    "if (!(error instanceof ApiError)) return '失敗'; return error.message",
+    "setError(`保存できませんでした（${error.message}）`)",
+    "setNotice({ tone: 'error', text: error.message })",
+    "const message = error instanceof ApiError ? `失敗（${error.message}）` : '失敗しました'",
+    "const message = error instanceof ApiError && error.status === 400\n ? error.message\n : '失敗しました'",
+    "if (error instanceof ApiError) { if (error.status === 400) return error.message }",
+    "setError(error instanceof ApiError ? error.message : 'API errorを表示しない')",
+    "return error instanceof ApiError && (!/^API error: /.test(error.message) || allowed) ? error.message : fallback",
+  ])('原文表示の故障を拾う: %s', source => {
+    expect(countRawMessageLines(source)).toBeGreaterThan(0)
+  })
+
+  it.each([
+    "setError(describeApiFailure(error, '保存'))",
+    "try {} catch (problem) { setError(otpFailureMessage(describeApiFailure(problem, '保存'))) }",
+    "setError(japaneseDetailOf(error) || '保存できませんでした')",
+    "const detail = extractApiErrorMessage(JSON.stringify({error: caught instanceof Error ? caught.message : ''}), 400)",
+    "const code = extractApiErrorCode(error instanceof Error ? error.message : '')",
+  ])('共通表示の呼び出しとコードへの変換は表示の直接代入にしない: %s', source => {
+    // 最後の形は既存のコード判定用の持ち越しとして全画面の検査で監視する。
+    expect(countRawMessageLines(source)).toBe(source.includes('extractApiErrorCode') ? 1 : 0)
   })
 
   it('message をそのまま画面に出す箇所を増やさない（japaneseDetailOf・describeSaveFailure に寄せる）', () => {

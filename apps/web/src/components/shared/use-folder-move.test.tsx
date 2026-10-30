@@ -1,3 +1,4 @@
+import { ApiError } from '@/lib/api'
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -76,4 +77,19 @@ it('閲覧のみでは選択の操作を描かず、行からの移動も送ら�
   fireEvent.click(screen.getByText('移す:one'))
   expect(screen.queryByRole('dialog')).toBeNull()
   expect(net.move).not.toHaveBeenCalled()
+})
+
+
+it('409でも成功した行を残し、失敗した行だけを明示して再送する', async () => {
+  net.move.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new ApiError(409, 'D1_ERROR SELECT secret FROM tenant')).mockResolvedValue(undefined)
+  render(<Harness />)
+  fireEvent.click(screen.getByLabelText('このページを全部選ぶ'))
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダへ移す' }))
+  fireEvent.click(screen.getByText('分類へ確定'))
+  await waitFor(() => expect(screen.getByRole('dialog').textContent).toContain('別の人が先に変更しました。一覧を読み直してください。'))
+  expect(screen.getByRole('dialog').textContent).not.toMatch(/D1_ERROR|SELECT|secret/)
+  expect(net.move.mock.calls.map(([item]) => item.id)).toEqual(['one', 'two'])
+  fireEvent.click(screen.getByText('分類へ確定'))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(net.move.mock.calls.map(([item]) => item.id)).toEqual(['one', 'two', 'two'])
 })

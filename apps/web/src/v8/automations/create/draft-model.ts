@@ -167,7 +167,9 @@ export const actionDraftToPayload = (row: ActionDraft, index: number, rows?: Act
     }
   }
   return (
-  row.type === 'notify_staff'
+  row.type === 'wait'
+    ? { id, type: 'wait', params: { ...(row.kept ?? { durationMinutes: 5 }) }, onFailure: 'stop' }
+    : row.type === 'notify_staff'
     /* 担当へ知らせる：読んだときの知らせのルール・文面をそのまま戻す（口は F-14 で受け付ける）。 */
     ? ({ id, type: 'notify_staff', params: { ...(row.kept ?? {}) }, onFailure: 'stop' } as unknown as AutomationDraftAction)
     : row.type === 'add_tag'
@@ -320,7 +322,7 @@ export const draftDetailToForm = (detail: AutomationDraftDetail): {
         message: String(step.params.content ?? ''),
         scenarioId: String(step.params.scenarioId ?? ''),
         commonActionId: String(step.params.commonActionId ?? ''),
-        kept: (step.type as string) === 'notify_staff' ? { ...step.params } : undefined,
+        kept: step.type === 'notify_staff' || step.type === 'wait' ? { ...step.params } : undefined,
       }))
   return {
     name: detail.name,

@@ -111,7 +111,7 @@ export default function TagCsvImportDialog({
     } catch (reason) {
       const fieldFailure = saveErrors.capture(reason)
 
-      { if (!fieldFailure) setError(reason instanceof TagCsvParseError ? reason.message : 'CSVを読み取れませんでした') }
+      { if (!fieldFailure) setError(reason instanceof TagCsvParseError ? describeApiFailure(reason, 'CSVの読み取り') : 'CSVを読み取れませんでした') }
     }
   }
 

@@ -1,8 +1,9 @@
 'use client'
+import SegmentedControl from '@/components/shared/segmented'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { Activity, CircleDot, FileWarning, Filter, LayoutTemplate, ListChecks, RefreshCw } from 'lucide-react'
+import { Activity, FileWarning, Filter, LayoutTemplate, ListChecks, RefreshCw } from 'lucide-react'
 import { api, fetchApi, type AutomationListItem, type AutomationTemplateSummary } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
@@ -10,7 +11,6 @@ import { ListPage, ListPageCards, ListPageSection } from '@/components/templates
 import Card from '@/components/shared/card'
 import TruncatedText from '@/components/shared/truncated-text'
 import Button from '@/components/shared/button'
-import FilterChip from '@/components/shared/filter-chip'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import {
@@ -193,22 +193,13 @@ export default function AutomationTemplatesV8() {
         <ListPageSection><div className={styles.tools}>
           <span className={styles.toolsLabel}>きっかけ</span>
           <div role="group" aria-label="きっかけで絞り込む" className={styles.chips}>
-            <FilterChip selected={trigger === ''} onChange={() => setTrigger('')} icon={<CircleDot size={16} aria-hidden="true" />}>
-              {`すべて ${items.length}`}
-            </FilterChip>
-            {shownChips.map((chip) => (
-              <FilterChip
-                key={chip}
-                selected={trigger === chip}
-                onChange={(selected) => setTrigger(selected ? chip : '')}
-              >
-                {chip}
-              </FilterChip>
-            ))}
+            <SegmentedControl aria-label="きっかけで絞り込む" fit="content" value={trigger} onClear={() => setTrigger('')} onChange={setTrigger} options={[
+              { value: '', label: 'すべて', count: items.length }, ...shownChips.map((chip) => ({ value: chip, label: chip })),
+            ]} />
             {hiddenChipCount > 0 ? (
-              <FilterChip selected={false} aria-expanded={false} onChange={() => setChipsOpen(true)}>
+              <Button variant="text" aria-expanded={false} onClick={() => setChipsOpen(true)}>
                 {`+${hiddenChipCount}`}
-              </FilterChip>
+              </Button>
             ) : null}
           </div>
           <Button variant="secondary" onClick={() => load()} busyLabel="処理中…">

@@ -194,7 +194,7 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
       await load()
     } catch (reason) {
       setItems(previous)
-      const message = reason instanceof ApiError ? `並び順を保存できませんでした（${reason.message}）` : '並び順を保存できませんでした'
+      const message = describeApiFailure(reason, '並び順の保存')
       setActionError(message)
       setRetryOrder(next)
       notifyToast(message, { tone: 'error', actionLabel: 'もう一度', onAction: () => { void applyOrder(next) } })

@@ -27,6 +27,7 @@ export interface RunRow {
   is_test: number;
   action_config: string;
   execution_plan_json: string | null;
+  created_at: string;
 }
 
 

@@ -58,7 +58,7 @@ import { FieldError } from '@/components/shared/form-controls'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import TruncatedText from '@/components/shared/truncated-text'
 import { Field } from '@/components/shared/form-controls'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { permissionDeniedMessage, describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { csvFileName } from '@/lib/csv-file-name'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
@@ -137,7 +137,7 @@ type FriendsItem = ActionScoreOverview['items'][number]
 /** 手で直すときの失敗の言葉（現役の調整窓で使う）。 */
 function actionScoreAdjustmentErrorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    if (error.status === 400) return error.message
+    if (error.status === 400) return japaneseDetailOf(error) || describeApiFailure(error, '入力内容の確認')
     if (error.status === 403) return permissionDeniedMessage('store')
     if (error.status === 404) return '対象の友だちまたはLINEアカウントを確認できませんでした。'
     if (error.status === 405) return 'この環境では点数を変更できません。'

@@ -1,5 +1,6 @@
 export type { RestaurantEvent } from './restaurant-event-types.js';
 import type { RestaurantEvent } from './restaurant-event-types.js';
+import { syncRestaurantReminderTargets } from './restaurant-reminder-targets.js';
 import { scheduleRestaurantFollowup } from './restaurant-followup.js';
 import type { Env } from '../worker-env.js';
 import { getLineAccountById, applyMileageRulesForEvent, getWorkflowStep } from '@line-crm/db';
@@ -55,11 +56,13 @@ export async function processRestaurantEvents(env:Env['Bindings'],storeId?:strin
  AND (? IS NULL OR e.store_id=?) AND (r.next_attempt_at IS NULL OR julianday(r.next_attempt_at)<=julianday('now')) ORDER BY julianday(COALESCE(r.next_attempt_at,e.occurred_at)),e.reservation_version,e.id,r.consumer_key LIMIT 100`).bind(storeId??null,storeId??null).all<RestaurantEvent&{consumer_key:string}>();
  for(const event of rows.results)await deliverRestaurantEvent(db,event,event.consumer_key,async(owned,e,execution)=>{
   if(event.consumer_key==='followup') { await scheduleRestaurantFollowup(owned,e); return; }
+  if(event.consumer_key==='followup_targets') { await syncRestaurantReminderTargets(owned,e); return; }
   if(event.consumer_key==='visit_stamp_queue') {
    await processVisitStampQueue(env);
    if(await db.prepare("SELECT 1 FROM visit_stamp_visit_queue WHERE kind='restaurant' AND visit_id=?").bind(e.reservation_id).first())throw new Error('stamp_queue_pending');
    return;
   }
+  if(event.consumer_key!=='event_bus' && event.consumer_key!=='mileage')throw new Error('unknown_restaurant_event_consumer');
   if(!e.line_account_id||!e.friend_id)return;
   // 発生時の所属を固定。後日別アカウントへ移った友だちには配送しない。
   const friend=await db.prepare('SELECT id FROM friends WHERE id=? AND line_account_id=? AND is_following=1').bind(e.friend_id,e.line_account_id).first();if(!friend)return;

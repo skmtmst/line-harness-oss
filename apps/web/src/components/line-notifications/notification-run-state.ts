@@ -1,3 +1,4 @@
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ApiError, type api, type EcNotificationRun, type EcNotificationRunList } from '@/lib/api'
 
 import { DEFAULT_PAGE_SIZE as PAGE_SIZE } from '@/components/shared/page-size-options'
@@ -171,7 +172,8 @@ export function retryNotificationErrorMessage(error: unknown): string {
   if (error.status === 403) return '送信の再試行は店長だけができます。'
   if (error.code === 'quota_insufficient') return '今月の送信枠が足りないため、再試行を止めました。'
   if (error.code === 'quota_unavailable') return '送信枠を確認できないため、再試行を止めました。'
-  if (error.code === 'retry_unavailable' || error.code === 'invalid_template') return error.message
+  if (error.code === 'retry_unavailable') return japaneseDetailOf(error) || 'この送信は再試行できません。記録を読み直して確認してください。'
+  if (error.code === 'invalid_template') return japaneseDetailOf(error) || '送る内容を確認できないため、再試行できません。テンプレートを確認してください。'
   if (error.status === 409) return 'ほかの担当者が先に再試行しました。最新の記録を読み直してください。'
   return '送信を再試行できませんでした。時間をおいて読み直してください。'
 }

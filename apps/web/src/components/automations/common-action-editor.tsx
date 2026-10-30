@@ -7,6 +7,8 @@ import type { CommonActionResources, CommonActionStep } from '@/lib/api'
 import Select from '@/components/shared/select'
 import { EntityKindField, type EntityKind } from '@/components/shared/entity-picker-sources'
 import { TextArea, TextField } from '@/components/shared/text-field'
+import { automationWaitLabel } from '@line-crm/shared'
+import WaitFields from './wait-fields'
 
 export const ACTION_OPTIONS: Array<{ value: CommonActionStep['type']; label: string }> = [
   { value: 'add_tag', label: 'タグを付ける' },
@@ -19,7 +21,6 @@ export const ACTION_OPTIONS: Array<{ value: CommonActionStep['type']; label: str
   { value: 'send_webhook', label: '外部サービスへ送る' },
   { value: 'switch_rich_menu', label: 'リッチメニューを切り替える' },
   { value: 'remove_rich_menu', label: 'リッチメニューを外す' },
-  { value: 'wait', label: '待つ' },
   { value: 'common_action', label: '別の共通アクションを呼ぶ' },
 ]
 
@@ -78,7 +79,7 @@ export default function CommonActionEditor({
   const numberOf = (index: number, step: CommonActionStep) => stepNumbers?.[step.id] ?? index + 1
 
   return <ActionList value={value} onChange={onChange} choices={commonActionChoices(resources)} idOf={step => step.id} numberOf={(step, index) => numberOf(index, step)}
-    titleOf={step => commonActionSummary(step, resources)} kindOf={step => ACTION_OPTIONS.find(item => item.value === step.type)?.label ?? step.type}
+    titleOf={step => commonActionSummary(step, resources)} kindOf={step => step.type === 'wait' ? '待つ' : ACTION_OPTIONS.find(item => item.value === step.type)?.label ?? step.type}
     renderEditor={(step, patch, index) => <CommonActionConfig index={index} step={step} resources={resources} resourcesFailed={resourcesFailed} onChange={patch} />} />
 }
 
@@ -104,7 +105,7 @@ export function commonActionSummary(step: CommonActionStep, resources: CommonAct
   const id = String(params.tagId ?? params.scenarioId ?? params.templateId ?? params.webhookId ?? params.richMenuPageId ?? params.commonActionId ?? '')
   if (id) return [...resources.tags, ...resources.scenarios, ...resources.templates, ...resources.webhooks, ...resources.richMenus, ...resources.commonActions].find(item => item.id === id)?.name ?? '未設定'
   if (step.type === 'send_message') return String(params.content || '未設定')
-  if (step.type === 'wait') return `${params.durationMinutes ?? 0} 分`
+  if (step.type === 'wait') return automationWaitLabel(params)
   return ACTION_OPTIONS.find(item => item.value === step.type)?.label ?? step.type
 }
 export function CommonActionConfig({ step, resources, resourcesFailed = false, onChange, index = 0 }: {
@@ -179,12 +180,7 @@ function ActionParams({
     )
   }
   if (step.type === 'wait') {
-    return (
-      <label className="text-ink-secondary block max-w-xs text-sm">
-        待つ時間（5分単位）
-        <SaveErrorField names={["durationMinutes","step.params.durationMinutes","params.durationMinutes","duration_minutes","step.params.duration_minutes","params.duration_minutes"]}><TextField type="number" min={5} step={5} max={525600} value={Number(step.params.durationMinutes ?? 5)} onChange={(event) => onChange({ durationMinutes: Number(event.target.value) })} className="mt-1" /></SaveErrorField>
-      </label>
-    )
+    return <WaitFields value={step.params} onChange={onChange} />
   }
   if (step.type === 'send_message') {
     const templateId = String(step.params.templateId ?? '')

@@ -455,14 +455,11 @@ export default function AutomationListV8() {
     />
   )
   const savedBox = (
-    <div className={styles.savedBox}>
-      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
-      <SaveErrorField names={["saved"]}><Select aria-label="よく使う絞り込み" value={saved} onChange={(value) => {
+      <SaveErrorField names={["saved"]}><Select size="content" icon={<Bookmark size={16} aria-hidden="true" />} showChevron={false} aria-label="よく使う絞り込み" value={saved} onChange={(value) => {
         setSaved(value as SavedKey)
         if (value === 'name' || value === 'runs') setSort(value)
         else setSort('updated')
       }} options={SAVED_OPTIONS} /></SaveErrorField>
-    </div>
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (

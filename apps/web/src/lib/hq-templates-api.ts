@@ -1,4 +1,4 @@
-import { ApiError, fetchApi } from './api'
+import { ApiError, fetchApi, extractApiErrorMessage } from './api'
 import { readSaveFieldErrors } from './api/helpers/field-errors'
 import type { FormLayout, HqTemplateListDisplay } from '@line-crm/shared'
 
@@ -109,12 +109,13 @@ async function request<T>(path: string, method = 'GET', body?: unknown, headers?
       ? error as { status?: number; code?: string; message?: string }
       : {}
     const safeBodyMessage = error instanceof ApiError && [400, 409, 422, 428].includes(error.status)
-      ? error.message
+      ? extractApiErrorMessage(JSON.stringify({ error: error.message }), error.status)
       : ''
+    const japaneseBody = /[ぁ-んァ-ヶ一-龠]/u.test(safeBodyMessage) ? safeBodyMessage : ''
     const message = detail.code === 'UNSUPPORTED' ? 'この種類のひな形は未対応です（UNSUPPORTED）。'
       : detail.status === 401 ? 'ログインし直してから再確認してください。'
       : detail.status === 403 ? 'ひな形を操作する権限がありません。管理者に確認してください。'
-      : safeBodyMessage || (detail.status === 409 || detail.code === 'VERSION_CONFLICT'
+      : japaneseBody || (detail.status === 409 || detail.code === 'VERSION_CONFLICT'
         ? '内容が更新されました。もう一度確認してください。'
         : '処理できませんでした。接続と入力内容を確認し、もう一度お試しください。')
     // A gateway/timeout response can arrive after the Worker committed. Receiving

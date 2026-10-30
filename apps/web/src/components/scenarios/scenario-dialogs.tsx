@@ -1,8 +1,9 @@
 'use client'
 
 import CloseButton from '@/components/shared/close-button'
+import { useContentChangeAccess, type ContentChangeAccess } from '@/components/shared/use-content-change-access'
 import { describeApiFailure } from '@/components/shared/api-error-message'
-import { useCallback, useEffect, useId, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { api, type ScenarioFriendPlan } from '@/lib/api';
 import { shortDateTime } from '@/lib/hq-banners';
 import { scenarioReferenceData } from './scenario-reference-data';
@@ -105,22 +106,36 @@ function describeRule(rule: SegmentRule): string {
   return isRuleComplete(rule) ? label : `${label}（書きかけ）`
 }
 
+function ConditionRemoveButton({ permission, onRemove }: { permission: ReturnType<typeof useContentChangeAccess>; onRemove: () => void }) {
+  if (!permission.provided) return <button type="button" onClick={onRemove} className="text-danger shrink-0 text-xs">削除する</button>
+  return <Button variant="text" size="inline" textTone="danger" className="shrink-0" disabled={permission.disabled} lockedReason={permission.lockedReason} onClick={onRemove}>削除する</Button>
+}
+
 export function ConditionDialog({
   title,
   description,
   value,
   onSave,
   onClose,
+  disabled,
+  lockedReason,
+  canChangeNow,
 }: {
   title: string
   description: string
   value: SegmentCondition | null
   onSave: (next: SegmentCondition | null) => Promise<void>
   onClose: () => void
-}) {
+} & ContentChangeAccess) {
+  const permission = useContentChangeAccess({ disabled, lockedReason, canChangeNow })
+  const mounted = useRef(true)
+  const savingRef = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+  const canChange = () => (!permission.provided || mounted.current) && permission.canChangeNow()
   const saveErrors = useSaveFormErrors()
 
   const [draft, setDraft] = useState<SegmentCondition | null>(value)
+  const updateDraft: typeof setDraft = permission.provided ? next => { if (canChange()) setDraft(next) } : setDraft
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   /* R247: 入力済みの不正範囲は欄の下で知らせて止める。保存済みは維持する。 */
@@ -139,7 +154,8 @@ export function ConditionDialog({
           <Button variant="secondary" className="text-ink-secondary px-5 whitespace-normal" type="button" onClick={onClose}>
             キャンセル
           </Button>
-          <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving} onClick={async () => {
+          <Button variant="primary" className="px-5 font-medium disabled:opacity-50 border-0 whitespace-normal" type="button" disabled={saving || permission.disabled} lockedReason={permission.lockedReason} onClick={async () => {
+              if (!canChange() || (permission.provided && savingRef.current)) return
               /*
                * R247: 入力済みの不正範囲（上下限の逆転など）は落とさず、
                * 欄の下で知らせて止める。保存済みの条件は維持する。
@@ -160,14 +176,17 @@ export function ConditionDialog({
                 return
               }
               setDraftError('')
+              if (permission.provided) savingRef.current = true
               setSaving(true)
               setError('')
               try {
                 // 書きかけの行は落として保存する。残すと、誰にも一致しない
                 // 条件になって配信が黙って止まる。
                 await onSave(pruneCondition(draft))
+                if (permission.provided && (!mounted.current || !permission.canChangeNow())) return
                 onClose()
               } catch (saveFailure) {
+                if (permission.provided && (!mounted.current || !permission.canChangeNow())) return
                 const fieldFailure = saveErrors.capture(saveFailure)
 
                 /*
@@ -176,7 +195,8 @@ export function ConditionDialog({
                  */
                 { if (!fieldFailure) setError('条件を保存できませんでした。通信状態を確認して、もう一度お試しください。') }
               } finally {
-                setSaving(false)
+                savingRef.current = false
+                if (!permission.provided || mounted.current) setSaving(false)
               }
             }} busy={saving} busyLabel="保存中…" widthReserve="idle">
             {'この条件を反映'}
@@ -204,7 +224,7 @@ export function ConditionDialog({
             */}
             <p className="text-ink mt-2 text-sm font-bold">{describeCondition(draft)}</p>
           </div>
-          <Button onClick={() => setDraft(null)}>
+          <Button disabled={permission.disabled} lockedReason={permission.lockedReason} onClick={() => updateDraft(null)}>
             条件を初期化
           </Button>
         </div>
@@ -220,20 +240,16 @@ export function ConditionDialog({
                     {describeRule(rule)}
                   </span>
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
+                <ConditionRemoveButton permission={permission}
+                  onRemove={() => {
                     const next = { ...draft, rules: draft.rules.filter((_, r) => r !== i) }
                     /*
                      * S4-OR: 残った空のかたまりは下書きとして残す。素の空
                      * （行もかたまりも無し）のときだけ null へ戻す。
                      */
-                    setDraft(isStructurallyEmpty(next) ? null : next)
+                    updateDraft(isStructurallyEmpty(next) ? null : next)
                   }}
-                  className="text-danger shrink-0 text-xs"
-                >
-                  削除する
-                </button>
+                />
               </li>
             ))}
             {(draft.groups ?? []).map((group, gi) => (
@@ -244,20 +260,16 @@ export function ConditionDialog({
                     {formatNumber(group.rules.length)}件
                   </span>
                 </p>
-                <button
-                  type="button"
-                  onClick={() => {
+                <ConditionRemoveButton permission={permission}
+                  onRemove={() => {
                     const next = {
                       ...draft,
                       groups: (draft.groups ?? []).filter((_, g) => g !== gi),
                     }
                     /* S4-OR: 消したかたまり以外は残す。素の空のときだけ null。 */
-                    setDraft(isStructurallyEmpty(next) ? null : next)
+                    updateDraft(isStructurallyEmpty(next) ? null : next)
                   }}
-                  className="text-danger shrink-0 text-xs"
-                >
-                  削除する
-                </button>
+                />
               </li>
             ))}
           </ul>
@@ -288,7 +300,7 @@ export function ConditionDialog({
         <p className="text-ink-faint mt-2 text-xs">対応マーク・友だち情報は、任意機能をオンにしているアカウントだけで出ます。</p>
       </section>
       <Notice tone="info" className="mt-5">複数条件は「すべて一致（AND）」または「いずれか一致（OR）」で結合できます。</Notice>
-      <details className="mt-3"><summary className="text-action cursor-pointer text-xs">詳しい条件を編集</summary><div className="mt-3"><ConditionBuilder value={draft} onChange={setDraft} /></div></details>
+      <details className="mt-3"><summary className="text-action cursor-pointer text-xs">詳しい条件を編集</summary><div className="mt-3"><ConditionBuilder value={draft} onChange={updateDraft} disabled={permission.disabled} lockedReason={permission.lockedReason} /></div></details>
     </Shell></SaveErrorScope>
   )
 }
