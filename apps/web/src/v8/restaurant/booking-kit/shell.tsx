@@ -73,7 +73,7 @@ export function Status({ value, label }: { value: string; label?: string }) {
 export function BoundaryBanner() {
   return (
     <Notice tone="warn" marker="dot" heading={<span className={styles.boundaryBadge}>検証環境専用</span>}>
-      既存の然-NEN運用とは分離された飲食店向けテスト領域です。{' '}
+      既存のmusubo運用とは分離された飲食店向けテスト領域です。{' '}
       予約サイトは受信専用・外部更新なし
     </Notice>
   )

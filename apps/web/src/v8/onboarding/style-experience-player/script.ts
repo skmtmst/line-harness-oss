@@ -149,7 +149,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
   styles: {
     restaurant: {
       label: '飲食店',
-      account: '然 - 和食 -',
+      account: 'musubo - 和食 -',
       can: [
         { text: 'LINE から席・人数・コースの予約を受けられます', basis: 'apps/liff/src/pages/seat' },
         { text: '空いている卓へ割り当て、空席と卓の稼働率を数えます', basis: 'STYLE_DEFAULT_METRIC_IDS.restaurant.freeTables・tableUtilization' },
@@ -165,7 +165,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
         },
         {
           step: 'accept', ms: 3500, line: '空いている卓に割り当てられ、台帳に入ります',
-          phone: { part: 'booking-facts', title: 'ご予約', step: 2, steps: ['人数・日時・コース', '確認'], data: { heading: 'ご予約を受け付けました', body: '確認の LINE をお送りしました。', done: true, facts: [{ label: '日時', at: { day: 1, time: '18:00' } }, { label: '人数', value: '4名' }, { label: 'コース', value: 'おまかせコース' }, { label: 'お店', value: '然 - 和食 -' }, { label: '状態', value: '確定' }] } },
+          phone: { part: 'booking-facts', title: 'ご予約', step: 2, steps: ['人数・日時・コース', '確認'], data: { heading: 'ご予約を受け付けました', body: '確認の LINE をお送りしました。', done: true, facts: [{ label: '日時', at: { day: 1, time: '18:00' } }, { label: '人数', value: '4名' }, { label: 'コース', value: 'おまかせコース' }, { label: 'お店', value: 'musubo - 和食 -' }, { label: '状態', value: '確定' }] } },
           dashboard: { kpis: restaurantKpis(9, 3, 62, 3), rows: restaurantRows({ label: '予約確定', tone: 'info' }), side: [NEW_BOOKING] },
           board: { kind: 'reservation-board', data: { entries: [...BOOKED, SAKURA], resources: TABLES }, selectedId: 'r-sakura' },
         },
@@ -195,7 +195,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
     },
     salon: {
       label: 'サロン',
-      account: 'Hair Salon 然',
+      account: 'Hair Salon musubo',
       can: [
         { text: '担当者とメニューを選んで、LINE から予約を受けられます', basis: 'apps/liff/src/components/menu-list・staff-list' },
         { text: '担当ごとの盤で予定を見て、次回予約率を数えます', basis: 'STYLE_DEFAULT_METRIC_IDS.salon.nextBookingRate・StaffBoard' },
@@ -211,7 +211,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
         },
         {
           step: 'accept', ms: 3500, line: '担当の予定に入ります',
-          phone: { part: 'booking-facts', title: 'ご予約', step: 4, steps: ['メニュー', '担当', '日時', '確認'], data: { heading: 'ご予約を受け付けました', done: true, facts: [{ label: 'メニュー', value: 'カット' }, { label: '担当', value: '見本 あおい' }, { label: '日時', at: { day: 1, time: '11:30' } }, { label: 'お店', value: 'Hair Salon 然' }] } },
+          phone: { part: 'booking-facts', title: 'ご予約', step: 4, steps: ['メニュー', '担当', '日時', '確認'], data: { heading: 'ご予約を受け付けました', done: true, facts: [{ label: 'メニュー', value: 'カット' }, { label: '担当', value: '見本 あおい' }, { label: '日時', at: { day: 1, time: '11:30' } }, { label: 'お店', value: 'Hair Salon musubo' }] } },
           dashboard: { kpis: salonKpis(7, 48, 2), side: [{ id: 'new-bookings', title: '新着予約', rows: [{ label: '見本 みお さま', value: 'カット・11:30' }] }] },
           board: { kind: 'staff-board', data: salonBoard('booked', true) },
         },
@@ -241,7 +241,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
     },
     consult: {
       label: '面談・相談',
-      account: '然 相談窓口',
+      account: 'musubo 相談窓口',
       can: [
         { text: 'LINE から面談の予約を受け、オンラインか対面を選べます', basis: 'apps/liff/src/components/online-meeting-card・MeetingModeChoices' },
         { text: '担当ごとの予定と、結果待ちの数を見られます', basis: 'STYLE_DEFAULT_METRIC_IDS.consult.resultPending・StaffBoard' },
@@ -287,7 +287,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
     },
     lesson: {
       label: '教室・レッスン',
-      account: '然 ヨガスタジオ',
+      account: 'musubo ヨガスタジオ',
       can: [
         { text: 'LINE からクラスの予約を受け、回数券を自動で使えます', basis: 'apps/liff/src/pages/event・worker event-entitlements' },
         { text: 'クラスの埋まりと出欠待ちを数え、名簿で出席をつけられます', basis: 'STYLE_DEFAULT_METRIC_IDS.lesson.classroomOccupancy・attendancePending・LessonRoster' },

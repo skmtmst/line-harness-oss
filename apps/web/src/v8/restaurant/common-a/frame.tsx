@@ -51,7 +51,7 @@ export const STORE_PICKER_WIDTH = 210
 export function BoundaryBanner({ note = '予約サイトは受信専用・外部更新なし' }: { note?: string }) {
   return (
     <Notice tone="warn" marker="dot" heading={<span className={styles.boundaryBadge}>検証環境専用</span>}>
-      <TruncatedText value="既存の然-NEN運用とは分離された飲食店向けテスト領域です。" />
+      <TruncatedText value="既存のmusubo運用とは分離された飲食店向けテスト領域です。" />
       <TruncatedText value={note} />
     </Notice>
   )
