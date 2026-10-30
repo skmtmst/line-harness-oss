@@ -254,6 +254,18 @@ describe('style setup', () => {
     ).toBe(400);
     expect((await value(await get())).data.version).toBe(2);
   });
+  test('newly selected restaurant starts with the agreed menu features', async () => {
+    const response = await write('', { expectedVersion: 1, style: 'restaurant' });
+    expect(response.status).toBe(200);
+    const row = raw.prepare("SELECT value FROM account_settings WHERE line_account_id='a' AND key='feature.settings_bundle_v1'").get() as { value: string };
+    const saved = JSON.parse(row.value) as { data: { features: Record<string, boolean> } };
+    expect(saved.data.features.restaurant_test).toBe(true);
+    expect(saved.data.features.visit_stamps).toBe(true);
+    expect(saved.data.features.events).toBe(false);
+    expect(saved.data.features.webinars).toBe(false);
+    expect(saved.data.features.automations).toBe(false);
+    expect(saved.data.features.external_integrations).toBe(false);
+  });
   test.each(['later', 'manual'])(
     'style %s persists without creating samples or enabling booking',
     async (mode) => {

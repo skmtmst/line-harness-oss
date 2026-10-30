@@ -1,4 +1,5 @@
 import type { FeatureKey } from './feature-key'
+import { RESTAURANT_MENU_LAYOUT } from '@line-crm/shared'
 
 /**
  * サイドメニューの項目。**ここが正本。**
@@ -103,7 +104,7 @@ export const MENU_SECTIONS: MenuSection[] = [
       { href: '/broadcasts', label: '一斉配信', icon: 'M12 19l9 2-9-18-9 18 9-2zm0 0v-8' , id: 'broadcasts', note: '条件を指定した友だちへのまとめ送信', featureKey: 'broadcasts' },
       { href: '/reminders', label: 'リマインダ', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9' , id: 'reminders', note: '日付を起点にした事前・事後の配信', featureKey: 'reminders' },
       { href: '/auto-replies', label: '自動応答', icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z' , id: 'auto-replies', note: '受信メッセージへの自動返信', featureKey: 'auto_replies' },
-      { href: '/friend-add-settings', label: '友だち追加時の配信', icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z' , id: 'friend-add-settings', note: '友だち追加のきっかけごとに、流すシナリオを分けます', featureKey: 'friend_add_routing' },
+      { href: '/friend-add-settings', label: '友だちの追加時', icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z' , id: 'friend-add-settings', note: '友だち追加のきっかけごとに、流すシナリオを分けます', featureKey: 'friend_add_routing' },
       { href: '/webinars', label: 'ウェビナー', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z' , id: 'webinars', note: '動画セミナーの申込と視聴管理', featureKey: 'webinars' },
     ],
   },
@@ -217,6 +218,17 @@ export const MENU_SECTIONS: MenuSection[] = [
 
 /** 区分の目印から中身を引く。 */
 export const MENU_SECTION_BY_ID = new Map(MENU_SECTIONS.map((section) => [section.id, section]))
+
+/** 飲食店の初期構成。元の項目を参照するので URL・権限・機能キーは共通のまま。 */
+export function restaurantMenuSections(sections: MenuSection[], itemOrder?: Record<string, string[]> | null): MenuSection[] {
+  const items = new Map(sections.flatMap((section) => section.items.map((item) => [item.id, item] as const)))
+  return RESTAURANT_MENU_LAYOUT.map((group) => applyItemOrder({
+    id: group.id,
+    label: group.label,
+    title: group.label,
+    items: group.itemIds.flatMap((id) => items.get(id) ? [items.get(id)!] : []),
+  }, itemOrder?.[group.id])).filter((group) => group.items.length > 0)
+}
 
 /**
  * 画面 → 左メニューの所属の正本（#984 LAY-15）。

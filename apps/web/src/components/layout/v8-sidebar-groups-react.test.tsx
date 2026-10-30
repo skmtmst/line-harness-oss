@@ -74,7 +74,7 @@ const ALL_FEATURES_ON: Record<string, boolean> = Object.fromEntries(
 ALL_FEATURES_ON.specialized_ec_commerce = true
 
 /** : 設定は下の歯車から開く。定義は設定内のナビゲーションに残す。 */
-const VISIBLE_GROUP_LABELS = ['メイン', '配信', 'コンテンツ', '成果と分析', '自動化', '予約', '専用機能']
+const VISIBLE_GROUP_LABELS = ['メイン', '予約・来店', '店舗運営', '配信', 'コンテンツ', '成果と分析', '自動化', '専用機能']
 
 async function renderSidebar(props: { friendAttributesV2Mode?: boolean } = {}) {
   const view = render(<Sidebar {...props} />)
@@ -136,6 +136,28 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     const view = await renderSidebar()
     await waitFor(() => expect(view.queryAllByRole('button', { name: '専用機能' })).toHaveLength(0))
     expect(view.getAllByRole('button', { name: '配信' }).length).toBeGreaterThan(0)
+  })
+
+  it('お気に入りが空なら見出しを隠し、登録すると先頭へ移す。個別オフも反映する', async () => {
+    vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')
+    fixture.visibility.mockResolvedValue({ success: true, data: {
+      features: ALL_FEATURES_ON,
+      favoriteItemIds: ['restaurant-reservations', 'restaurant-google'],
+      restaurantHiddenItemIds: ['restaurant-tables'],
+    } })
+    const view = await renderSidebar()
+    const desktop = view.container.querySelector('aside[data-design-node="J33xq"]')!
+    const headings = [...desktop.querySelectorAll('nav button[aria-expanded]')].map((button) => button.textContent?.trim())
+    expect(headings[0]).toBe('お気に入り')
+    expect(headings[1]).toBe('メイン')
+    expect(desktop.querySelectorAll('a[href="/restaurant-test/reservations"]')).toHaveLength(1)
+    expect(desktop.querySelectorAll('a[href="/restaurant-test/tables"]')).toHaveLength(0)
+    expect(desktop.textContent).not.toContain('★')
+  })
+
+  it('お気に入りがない飲食店には見出しを出さない', async () => {
+    const view = await renderSidebar()
+    expect(view.queryAllByRole('button', { name: 'お気に入り' })).toHaveLength(0)
   })
 
   it('主要4組ははじめから開き、ほかの組は見出しだけ', async () => {
@@ -253,7 +275,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
 
   it('V2 のタグモードでも、v8 では組を丸ごと隠さない', async () => {
     const view = await renderSidebar({ friendAttributesV2Mode: true })
-    for (const label of ['自動化', '予約']) {
+    for (const label of ['自動化', '予約・来店']) {
       expect(view.getAllByRole('button', { name: label }).length, `組「${label}」が消えている`).toBeGreaterThan(0)
     }
     expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
@@ -276,7 +298,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     document.documentElement.dataset.theme = 'v7'
     const view = await renderSidebar({ friendAttributesV2Mode: true })
     expect(view.getAllByRole('button', { name: '自動化' }).length).toBeGreaterThan(0)
-    expect(view.getAllByRole('button', { name: '予約' }).length).toBeGreaterThan(0)
+    expect(view.getAllByRole('button', { name: '予約・来店' }).length).toBeGreaterThan(0)
   })
 })
 
@@ -361,7 +383,7 @@ describe('統括の左メニューを出す住所', () => {
 
 describe("本番の入口", () => {
   afterEach(() => vi.unstubAllEnvs())
-  it('Google と飲食店の入口を残し、飲食店を押すと共通の窓を出す', async () => {
+  it('Google の入口を残し、デリバリー受注は本番で案内表示だけにする', async () => {
     vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')
     vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'false')
     fixture.pathname = '/restaurant-test/google'
@@ -371,10 +393,8 @@ describe("本番の入口", () => {
     fixture.get.mockResolvedValue({ success: true, data: { sidebarOrder: [], sidebarItemOrder: {} } })
     const view = await renderSidebar()
     expect(view.getAllByRole('link', { name: 'Googleビジネス' })[0].getAttribute('href')).toBe('/restaurant-test/google')
-    const delivery = view.getAllByRole('link', { name: 'デリバリー受注' })[0]
+    const delivery = view.getAllByRole('link', { name: /デリバリー受注/ })[0]
     expect(fireEvent.click(delivery)).toBe(false)
-    expect(view.getByRole('dialog', { name: '現在準備中です' })).toBeTruthy()
-    fireEvent.click(view.getAllByRole('button', { name: '閉じる' }).at(-1)!)
     expect(view.queryByRole('dialog')).toBeNull()
   })
 })
