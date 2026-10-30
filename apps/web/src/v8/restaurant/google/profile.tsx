@@ -1,5 +1,6 @@
 'use client'
 import { useGooglePermission } from './use-google-permission'
+import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { CalendarDays, CalendarX, Clock, GitCompare, History, Pencil, RefreshCw, Timer } from 'lucide-react'
 import Card from '@/components/shared/card'
@@ -87,7 +88,7 @@ export default function ProfileBoard({ accountId, go }: { accountId: string; go:
 
   if (loading && !data) return <div className={styles.stateBox}><ListState kind="loading" title="プロフィールを読み込んでいます" /></div>
   if (!data) {
-    return <ListState kind="error" title="プロフィールを表示できませんでした" description={error} onRetry={() => void load()} action={<Button onClick={() => go({ tab: 'settings' })}>設定で接続を確認する</Button>} />
+    return <ListState kind="error" title="プロフィールを表示できませんでした" description={error} onRetry={() => void load()} action={<Link href="/settings/sns" className={styles.textLink}>SNS連携で接続を確認する</Link>} />
   }
 
   const { profile, today } = data

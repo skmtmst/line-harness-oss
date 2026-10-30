@@ -3,23 +3,21 @@ import { useGooglePermission } from './use-google-permission'
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
 import { useState } from 'react'
 import { Link2, RefreshCw } from 'lucide-react'
-import Card from '@/components/shared/card'
 import SectionHeader from '@/components/shared/section-header'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge from '@/components/shared/status-badge'
-import { GOOGLE_CONNECTION_STATUS } from '@/lib/status-labels'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
-import { errorMessage, formatStampFull, formatYmd } from './format'
+import { errorMessage, formatYmd } from './format'
 import styles from './google.module.css'
 import { emptyValue } from '@/components/shared/empty-value'
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 
 /*
- * ★V8 Googleビジネス 設定（：接続済み）。未接続・店舗の選択待ちも同じ場所で出す（今の画面と同じ口）。
+ * 設定 › SNS連携のGoogle接続操作。未接続・店舗の選択待ち・接続済みを扱う。
  * 接続・再接続は Google の認可画面へ移る。解除・取り消し・切り替えは確認画面を経る。
  * 接続を管理できない人には、接続・解除のボタンを置かない。
  */
@@ -94,7 +92,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
 
   if (connection.status === 'disconnected') {
     return (
-      <SaveErrorScope errors={saveErrors}><Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-connect-title">
+      <SaveErrorScope errors={saveErrors}><div className={styles.connectionPanel}>
         <SectionHeader size="small" title={<span id="google-connect-title">Googleアカウントを接続 <StatusBadge tone="neutral">未接続</StatusBadge></span>} />
         <p className={styles.preText}>{'店舗を管理しているGoogleアカウントでログインしてください。\n接続する店舗は、1つのLINEアカウントにつき1店舗です。'}</p>
         {!data.oauthConfigured ? <Notice tone="warn">この環境にはGoogle接続の設定がありません。運営に連絡してください。</Notice> : null}
@@ -105,13 +103,13 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
           </div>
         )}
         <p className={styles.grayNote}>初回接続時に、Googleで管理できる店舗から接続先を1店舗確認します。接続後は、このLINEアカウントの店舗だけを表示します。</p>
-      </Card></SaveErrorScope>
+      </div></SaveErrorScope>
     )
   }
 
   if (connection.status === 'pending_location') {
     return (
-      <SaveErrorScope errors={saveErrors}><Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-location-title">
+      <SaveErrorScope errors={saveErrors}><div className={styles.connectionPanel}>
         <FormLeaveGuard dirty={Boolean(selectedLocation) && !locationSaved} busy={busy} />
         <SectionHeader size="small" title={<span id="google-location-title">接続する店舗を選ぶ</span>} />
         <p className={styles.muted}>{`Googleアカウントの認証は完了しています${connection.googleAccountEmail ? `（${connection.googleAccountEmail}）` : ''}`}</p>
@@ -154,24 +152,21 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
           onConfirm={() => selectLocation(true)}
           onCancel={() => setConfirmSwitch(false)}
         />
-      </Card></SaveErrorScope>
+      </div></SaveErrorScope>
     )
   }
 
   /* 状態は札で出す。理由と直し方は上の帯が書いている。検証環境で外へ送らない注記は検証環境の帯（google.tsx）へ。 */
-  const connectionState = GOOGLE_CONNECTION_STATUS[connection.status]
-
   return (
     <SaveErrorScope errors={saveErrors}><>
       {connection.status === 'expired' ? <Notice tone="danger">Googleとの接続を確認してください。認可が切れています。店舗を管理するGoogleアカウントで再接続してください。保存中の返信の下書きはいま残っていますが、Googleから取得した口コミは最終更新から30日以内に削除するため、再接続しないままだと下書きも一緒に消えます。</Notice> : null}
       {connection.status === 'no_permission' ? <Notice tone="danger">この店舗を操作する権限がありません。接続済み店舗の管理権限をGoogle側で確認してください。</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
-      <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-labelledby="google-account-title">
+      <div className={styles.connectionPanel}>
         <SectionHeader size="small" title={<span id="google-account-title">Googleアカウント</span>} />
         <dl className={styles.facts}>
           <div className={styles.factRow}><dt className={styles.factKey}>つないでいるアカウント</dt><dd className={styles.factValue}>{connection.googleAccountEmail ?? emptyValue('unknown')}</dd></div>
           <div className={styles.factRow}><dt className={styles.factKey}>つないだ日</dt><dd className={styles.factValue}>{formatYmd(connection.connectedAt)}</dd></div>
-          <div className={styles.factRow}><dt className={styles.factKey}>状態</dt><dd className={styles.factValue}><StatusBadge tone={connectionState.tone} size="compact">{connectionState.label}</StatusBadge></dd></div>
         </dl>
         {(
           <div className={styles.buttonRowEnd}>
@@ -179,8 +174,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
             <Button lockedReason={lockedReason} onClick={() => void startConnect()} disabled={!canManage || busy} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden className={styles.icon16} />つなぎ直す</Button>
           </div>
         )}
-      </Card>
-      <p className={styles.footCaption}>{`LINEアカウント：${data.store.name}・接続店舗：${connection.locationTitle ?? emptyValue('unknown')}・最後に取り込んだ日時：${formatStampFull(connection.lastSyncedAt)}`}</p>
+      </div>
       <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason}
         open={confirmDisconnect}
         title="Googleアカウントの接続を解除しますか？"

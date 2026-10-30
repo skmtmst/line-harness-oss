@@ -20,6 +20,8 @@ import SnsSettingsPage from './sns'
 
 const fixture = vi.hoisted(() => ({
   googleConnection: vi.fn(),
+  googleConnectStart: vi.fn(),
+  googleSelectLocation: vi.fn(),
   googleDisconnect: vi.fn(),
   igConnection: vi.fn(),
   igStart: vi.fn(),
@@ -28,10 +30,12 @@ const fixture = vi.hoisted(() => ({
   replace: vi.fn(),
   role: { value: 'owner' as string | null },
   search: { value: '' },
+  account: { selected: 'acc-1', accounts: [] as Array<{ id: string }> },
+  selectAccount: vi.fn(),
 }))
 
 vi.mock('@/lib/restaurant-google-api', () => ({
-  restaurantGoogleApi: { connection: fixture.googleConnection, disconnect: fixture.googleDisconnect },
+  restaurantGoogleApi: { connection: fixture.googleConnection, connectStart: fixture.googleConnectStart, selectLocation: fixture.googleSelectLocation, disconnect: fixture.googleDisconnect },
 }))
 
 vi.mock('@/lib/api', () => ({
@@ -53,7 +57,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', accounts: [] }),
+  useAccount: () => ({ selectedAccountId: fixture.account.selected, accounts: fixture.account.accounts, setSelectedAccountId: fixture.selectAccount }),
 }))
 
 vi.mock('@/lib/staff-role', () => ({
@@ -119,6 +123,8 @@ afterEach(() => {
   cleanup()
   fixture.role.value = 'owner'
   fixture.search.value = ''
+  fixture.account.selected = 'acc-1'
+  fixture.account.accounts = []
   vi.resetAllMocks()
 })
 
@@ -231,15 +237,61 @@ describe('Instagram のカード（★V8-B `YINmJ`・`DFnll`）', () => {
 })
 
 describe('Google のカード', () => {
-  it('接続・解除は Google ビジネスの［設定］タブ 1 か所に置き、カードは行き先のリンクだけを出す', async () => {
+  it('認可後の戻り先で指定されたLINEアカウントの接続状態を読む', async () => {
+    fixture.search.value = 'google=connected&account_id=acc-2'
+    fixture.account.accounts = [{ id: 'acc-1' }, { id: 'acc-2' }]
+    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { status: 'connected', locationTitle: '新宿店' } })
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    render(<SnsSettingsPage />)
+    expect(await screen.findByText('新宿店')).toBeTruthy()
+    expect(fixture.googleConnection).toHaveBeenCalledWith('acc-2')
+    expect(fixture.selectAccount).toHaveBeenCalledWith('acc-2')
+  })
+
+  it('LINEアカウントを切り替えた直後に前のアカウントの接続操作を出さない', async () => {
+    fixture.googleConnection.mockResolvedValueOnce({ ...googleData(), connection: { status: 'connected', locationTitle: '旧店舗' } })
+      .mockImplementationOnce(() => new Promise(() => {}))
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    const view = render(<SnsSettingsPage />)
+    expect(await screen.findByRole('button', { name: 'つなぎ直す' })).toBeTruthy()
+    fixture.account.selected = 'acc-2'
+    view.rerender(<SnsSettingsPage />)
+    expect(screen.queryByRole('button', { name: 'つなぎ直す' })).toBeNull()
+    expect(screen.queryByText('旧店舗')).toBeNull()
+  })
+
+  it('未接続ならSNS連携内に接続ボタンを表示し、接続開始APIを呼ぶ', async () => {
+    fixture.googleConnectStart.mockRejectedValueOnce(new Error('offline'))
+    setup('disconnected')
+    const card = within(await screen.findByRole('region', { name: 'Google ビジネス' }))
+    fireEvent.click(await card.findByRole('button', { name: '接続する' }))
+    await waitFor(() => expect(fixture.googleConnectStart).toHaveBeenCalledWith('acc-1'))
+    expect(await card.findByText('Googleの認可画面を開けませんでした。')).toBeTruthy()
+    expect(card.queryByRole('link', { name: /接続の設定へ/ })).toBeNull()
+  })
+
+  it('接続済みならSNS連携内に再接続と解除を表示する', async () => {
     fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { status: 'connected', locationTitle: '然カフェ 本店' } })
     fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
     render(<SnsSettingsPage />)
 
     const card = within(await screen.findByRole('region', { name: 'Google ビジネス' }))
     expect(await card.findByText('接続済み')).toBeTruthy()
-    expect(card.queryByRole('button', { name: /その他操作/ })).toBeNull()
-    expect(card.getByRole('link', { name: /接続の設定へ/ }).getAttribute('href')).toBe('/restaurant-test/google?tab=settings')
+    expect(card.getByRole('button', { name: 'つなぎ直す' })).toBeTruthy()
+    fireEvent.click(card.getByRole('button', { name: '接続を解除する' }))
+    expect(await screen.findByText('Googleアカウントの接続を解除しますか？')).toBeTruthy()
+    expect(fixture.googleDisconnect).not.toHaveBeenCalled()
+  })
+
+  it('店舗の選択待ちなら候補を選んで接続できる', async () => {
+    fixture.googleSelectLocation.mockResolvedValueOnce({ success: true })
+    fixture.googleConnection.mockResolvedValue({ ...googleData(), connection: { status: 'pending_location', locationTitle: null }, candidates: [{ locationName: 'accounts/1/locations/2', locationTitle: '渋谷店', addressText: '東京都' }] })
+    fixture.igConnection.mockResolvedValue({ success: true, data: status('disconnected') })
+    render(<SnsSettingsPage />)
+    const card = within(await screen.findByRole('region', { name: 'Google ビジネス' }))
+    fireEvent.click(await card.findByText('渋谷店'))
+    fireEvent.click(card.getByRole('button', { name: 'この店舗を接続する' }))
+    await waitFor(() => expect(fixture.googleSelectLocation).toHaveBeenCalledWith('acc-1', 'accounts/1/locations/2', false))
   })
 })
 
