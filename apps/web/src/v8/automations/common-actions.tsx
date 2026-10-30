@@ -279,7 +279,7 @@ export default function CommonActionsV8() {
       {chip('draft', '下書き', <FilePen size={16} aria-hidden="true" />, summary?.draft)}
       {chip('old_version', '古い版あり', <GitBranch size={16} aria-hidden="true" />, summary?.oldVersion)}
       {chip('unused', '呼ばれていない', <PhoneOff size={16} aria-hidden="true" />, summary?.unused)}
-      {chip('archived', '保管', <Archive size={16} aria-hidden="true" />, summary?.archived)}
+      {chip('archived', '保管したもの', <Archive size={16} aria-hidden="true" />, summary?.archived)}
     </div>
   )
   const savedBox = (
