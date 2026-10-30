@@ -310,7 +310,7 @@ export function StatusCell({ primary, children, ...cellProps }: Omit<TdProps, 'c
 }
 
 /** : 名前のセルはフォルダの丸と名前1行だけ。 */
-export function NameCell({ name, description, folder, nameCarriesDot, annotation, selection, className, grow }: {
+export function NameCell({ name, description, folder, nameCarriesDot, annotation, selection, className, grow, weight }: {
   name: ReactNode
   description?: string | null
   /** 名前が色の丸を持つ札（タグの札）のとき、フォルダの丸を置かない。 */
@@ -323,9 +323,11 @@ export function NameCell({ name, description, folder, nameCarriesDot, annotation
   className?: string
   /** 列の余りを名前へ配る。見出しの Th と同じ役割を渡す。 */
   grow?: boolean
+  /** 補助列と残りの幅を分け合う割合。未指定なら名前へ余りを配る。 */
+  weight?: number
 }) {
   return (
-    <td data-list-name-cell="" data-cell-grow={grow || undefined} className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
+    <td data-list-name-cell="" data-cell-grow={grow || undefined} data-cell-weight={weight} className={[shell.bodyCell, className].filter(Boolean).join(' ')}>
       <div className={shell.name}><FolderDotName folder={folder} nameCarriesDot={nameCarriesDot} annotation={annotation} selection={selection}>{name}</FolderDotName></div>
       {description ? <TruncatedText data-list-name-description="" className={shell.nameDescription} value={description} /> : null}
     </td>
