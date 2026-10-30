@@ -1,14 +1,15 @@
 import type { FeatureKey } from './feature-key'
 export type { FeatureKey } from './feature-key'
 import { MENU_SECTIONS, type MenuItem } from './menu'
+import { RESTAURANT_MENU_LAYOUT, RESTAURANT_OPTIONAL_ITEM_IDS } from '@line-crm/shared'
 
 export interface FeatureItem {
   id: string
   label: string
   note: string
   /** オン／オフに使うキー。空なら常に有効。 */
-  keys: FeatureKey[]
-  badge?: '専用'
+  keys: string[]
+  badge?: '専用' | 'Coming soon'
   required?: boolean
 }
 
@@ -20,6 +21,14 @@ export interface FeatureGroup {
 
 export { FEATURE_SETTINGS_UPDATED_EVENT } from './feature-settings-event'
 export const SPECIALIZED_FEATURE_KEYS: FeatureKey[] = ['nen_campaigns', 'photo_review', 'ec_commerce', 'line_notifications']
+export const restaurantItemKey = (id: string) => `restaurant_menu_${id}`
+export function withRestaurantMenuFeatures(features: Record<string, boolean>, hiddenIds: string[] = []) {
+  const hidden = new Set(hiddenIds)
+  return { ...features, ...Object.fromEntries(RESTAURANT_OPTIONAL_ITEM_IDS.map((id) => [restaurantItemKey(id), !hidden.has(id)])) }
+}
+export function restaurantHiddenIds(features: Record<string, boolean>): string[] {
+  return RESTAURANT_OPTIONAL_ITEM_IDS.filter((id) => features[restaurantItemKey(id)] === false)
+}
 
 /**
  * 記録が無い契約の初期状態。
@@ -67,7 +76,9 @@ function toFeatureItem(item: MenuItem): FeatureItem {
     note: item.note,
     keys: item.featureKey ? [item.featureKey] : [],
     required: item.required,
-    badge: item.featureKey && SPECIALIZED_FEATURE_KEYS.includes(item.featureKey) ? '専用' : undefined,
+    badge: item.id === 'restaurant-delivery'
+      ? 'Coming soon'
+      : item.featureKey && SPECIALIZED_FEATURE_KEYS.includes(item.featureKey) ? '専用' : undefined,
   }
 }
 
@@ -117,15 +128,31 @@ export function groupEnabledCount(group: FeatureGroup, features: Record<string, 
 export function visibleFeatureGroups(options: {
   specializedFeatureKeys: string[]
   includeRestaurantTest?: boolean
+  restaurantStyle?: boolean
 }): FeatureGroup[] {
   const specialized = new Set(options.specializedFeatureKeys)
-  return FEATURE_GROUPS.map((group) =>
+  const base = FEATURE_GROUPS.map((group) =>
     group.id === 'specialized'
       ? { ...group, items: group.items.filter((item) => item.keys.some((key) => specialized.has(key))) }
       : group,
   ).filter((group) =>
     group.items.length > 0 && (options.includeRestaurantTest || group.id !== 'restaurant-test'),
   )
+  if (!options.restaurantStyle) return base
+  const items = new Map(base.flatMap((group) => group.items.map((item) => [item.id, item] as const)))
+  return RESTAURANT_MENU_LAYOUT.map((section) => ({
+    id: section.id,
+    label: section.label,
+    items: section.itemIds.flatMap((id) => {
+      const item = items.get(id)
+      if (!item) return []
+      // メインと飲食店専用の入口は運用の基盤。共通の試験ゲートは個別のオン／オフに使わない。
+      if ((RESTAURANT_OPTIONAL_ITEM_IDS as readonly string[]).includes(id)) {
+        return [{ ...item, keys: [restaurantItemKey(id)], required: false }]
+      }
+      return [{ ...item, required: item.required || id === 'visit-stamps' || id === 'restaurant-reservations' }]
+    }),
+  })).filter((group) => group.items.length > 0)
 }
 
 /** 並び順の保存の形。区分の目印ごとに、項目の目印を並べて持つ。 */

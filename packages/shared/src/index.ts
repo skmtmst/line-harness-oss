@@ -32,6 +32,7 @@ export * from "./form-submit-idempotency";
 export * from "./booking-staff";
 export * from "./staff-permissions";
 export * from "./menu-catalog";
+export * from './restaurant-menu-layout';
 export * from "./dashboard-cards";
 export * from "./kpi-comparison";
 export * from "./saved-search-conditions";
