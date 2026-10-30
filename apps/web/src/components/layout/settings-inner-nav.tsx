@@ -10,7 +10,7 @@ import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { styleMenuItemVisible } from './style-menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
-import { Activity, BookOpen, ShieldCheck, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
+import { Activity, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
 
@@ -68,12 +68,6 @@ const SETTINGS_ONLY_ITEMS: MenuItem[] = [
   { id: 'settings-booking-media', href: '/settings/booking-media', label: '予約サイト・グルメ媒体', icon: '', note: '店ごとの予約サイト・グルメ媒体の URL と、他のサイトの枠を閉じる知らせ', required: true },
   { id: 'settings-delivery', href: '/settings/delivery', label: 'デリバリー連携', icon: '', note: 'Uber Eats・出前館・ロケットナウの注文をまとめて受け取ります', required: true },
 ]
-
-/** 機能設定に続けて、ほかと同じ段に並べる設定画面。 */
-const SETTINGS_CHILDREN = [
-  { href: '/settings/manual-links', label: 'マニュアルの対応表', Icon: BookOpen },
-  { href: '/settings/file-scan', label: 'ファイルの安全確認', Icon: ShieldCheck },
-] as const
 
 /** この中のメニューを出す画面（左のメニューの「設定」が光る画面と同じ範囲）。 */
 const SETTINGS_AREA_PATHS = [...SETTINGS_ORDER]
@@ -184,19 +178,16 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
       return itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item)
     })
 
-  const entries: SettingsMenuEntry[] = items.flatMap((item) => {
+  const entries: SettingsMenuEntry[] = items.map((item) => {
     const active = item.href === '/settings'
       ? pathname === '/settings'
       : itemActive(item.href)
-    const entry: SettingsMenuEntry = {
+    return {
       href: item.href,
       label: item.label,
       Icon: SETTINGS_ICONS[item.href as (typeof SETTINGS_ORDER)[number]],
       active,
     }
-    return item.href === '/settings'
-      ? [entry, ...SETTINGS_CHILDREN.map((child) => ({ ...child, active: itemActive(child.href) }))]
-      : [entry]
   })
 
   return <SettingsMenu heading="設定" label="設定の中のメニュー" entries={entries} placement={inline ? 'inline' : 'outer'} />
