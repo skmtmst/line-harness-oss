@@ -141,7 +141,7 @@ describe('GET /api/audit/events attention filter', () => {
   });
 
   it('never mixes another account into the attention result', async () => {
-    const response = await request('/api/audit/events?attention=true&limit=20');
+    const response = await request('/api/audit/events?lineAccountId=account-a&attention=true&limit=20');
     const body = await response.json() as { data: { items: Array<{ id: string }>; pagination: { total: number } } };
 
     expect(response.status).toBe(200);
@@ -153,7 +153,7 @@ describe('GET /api/audit/events attention filter', () => {
     const brokenDb = {
       prepare: () => { throw new Error('raw database detail customer@example.com'); },
     } as unknown as D1Database;
-    const response = await request('/api/audit/events?attention=true', brokenDb);
+    const response = await request('/api/audit/events?lineAccountId=account-a&attention=true', brokenDb);
 
     expect(response.status).toBe(500);
     const body = await response.json<{ success: boolean; error: string; incidentId: string }>();

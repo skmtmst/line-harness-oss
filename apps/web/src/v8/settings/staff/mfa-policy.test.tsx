@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import MfaPolicy from './mfa-policy'
 const mocks = vi.hoisted(() => ({ fetch: vi.fn(), gate: vi.fn() }))
 vi.mock('@/lib/api', async original => ({ ...await original<typeof import('@/lib/api')>(), fetchApi: mocks.fetch }))
@@ -44,4 +44,53 @@ it('shows the missing-key notice and prevents enabling unavailable MFA', async (
   expect((screen.getByRole('switch') as HTMLButtonElement).disabled).toBe(true)
   fireEvent.click(screen.getByRole('switch'))
   expect(mocks.fetch).toHaveBeenCalledTimes(1)
+})
+
+const accountPerson = (name: string, twoFactorEnabled = false) => ({ name, twoFactorEnabled, isActive: true, inviteStatus: 'active' as const })
+const tenantPolicy = () => ({ success: true, data: { required: false, canEdit: true, registered: 5, total: 7 } })
+
+it('counts the selected account members instead of the seven people in the tenant policy', async () => {
+  mocks.fetch.mockResolvedValue(tenantPolicy())
+  render(<MfaPolicy accountMembers={[accountPerson('自分', true)]} />)
+  await screen.findByText('1 / 1 人')
+  expect(screen.queryByText('5 / 7 人')).toBeNull()
+  expect(screen.getByText('登録済み（このアカウント）')).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: '未登録の人を見る →' }))
+  await screen.findByText('未登録の人はいません')
+  expect(mocks.fetch).toHaveBeenCalledTimes(1)
+})
+
+it('excludes stopped and invited people and shows unregistered names only from the selected account', async () => {
+  mocks.fetch.mockResolvedValue(tenantPolicy())
+  render(<MfaPolicy accountMembers={[
+    accountPerson('自分', true), accountPerson('このアカウントの未登録者'),
+    { ...accountPerson('停止中の人'), isActive: false },
+    { ...accountPerson('招待中の人'), inviteStatus: 'pending_email' },
+  ]} />)
+  await screen.findByText('1 / 2 人')
+  fireEvent.click(screen.getByRole('button', { name: '未登録の人を見る →' }))
+  const dialog = within(await screen.findByRole('dialog', { name: '二段階認証が未登録の人' }))
+  expect(dialog.getByText('このアカウントの未登録者')).toBeTruthy()
+  expect(dialog.queryByText('停止中の人')).toBeNull()
+  expect(dialog.queryByText('招待中の人')).toBeNull()
+  expect(mocks.fetch).not.toHaveBeenCalledWith('/api/staff')
+})
+
+it('does not substitute tenant totals while the selected account is loading or unavailable', async () => {
+  mocks.fetch.mockResolvedValue(tenantPolicy())
+  const view = render(<MfaPolicy accountMembers={null} />)
+  await screen.findByText('— / — 人')
+  expect((screen.getByRole('button', { name: '未登録の人を見る →' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(screen.queryByText('5 / 7 人')).toBeNull()
+  view.rerender(<MfaPolicy accountMembers={[]} />)
+  expect(screen.getByText('0 / 0 人')).toBeTruthy()
+})
+
+it('retains tenant totals for the operations policy view', async () => {
+  mocks.fetch.mockResolvedValueOnce(tenantPolicy()).mockResolvedValueOnce({ success: true, data: [accountPerson('統括の未登録者')] })
+  render(<MfaPolicy loginPath="/ops/login" />)
+  await screen.findByText('5 / 7 人')
+  fireEvent.click(screen.getByRole('button', { name: '未登録の人を見る →' }))
+  await screen.findByText('統括の未登録者')
+  expect(mocks.fetch).toHaveBeenLastCalledWith('/api/staff')
 })

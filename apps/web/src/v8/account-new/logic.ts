@@ -44,10 +44,10 @@ export interface DraftState {
   tagIds: string[]; parentId: string; staffIds: string[]; liffId: string; importFriends: boolean
 }
 
-/** 端末の下書き（秘密値は書かない）。今の登録と同じ名前・同じ形。 */
-export function readDraft(storage: Pick<Storage, 'getItem'>): DraftState | null {
+/** 指定した保存キーの下書きを読む。秘密値は復元しない。 */
+export function readDraft(storage: Pick<Storage, 'getItem'>, key = DRAFT_KEY): DraftState | null {
   try {
-    const raw = storage.getItem(DRAFT_KEY)
+    const raw = storage.getItem(key)
     if (!raw) return null
     const parsed = JSON.parse(raw) as Partial<DraftState>
     if (parsed.step !== 1 && parsed.step !== 2 && parsed.step !== 3 && parsed.step !== 4) return null

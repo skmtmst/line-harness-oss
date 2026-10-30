@@ -1254,7 +1254,7 @@ describe('PATCH /api/line-accounts/hierarchy', () => {
     expect(batch.mock.calls[0][0]).toHaveLength(1);
   });
 
-  test('担当外の同一統括アカウントを含めて循環を拒否する', async () => {
+  test('店舗の管理者による統括の親子構成変更を拒否する', async () => {
     dbMocks.getLineAccounts.mockResolvedValue([
       { ...fakeAccount, id: 'account-a', parent_line_account_id: 'unassigned' },
       { ...fakeAccount, id: 'unassigned', parent_line_account_id: 'account-b' },
@@ -1273,8 +1273,8 @@ describe('PATCH /api/line-accounts/hierarchy', () => {
       }),
     });
 
-    expect(res.status).toBe(400);
-    expect(await res.json()).toMatchObject({ error: expect.stringMatching(/循環/) });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toMatchObject({ error: '統括の権限が必要です' });
     expect(batch).not.toHaveBeenCalled();
   });
 });
@@ -1323,7 +1323,7 @@ describe('GET /api/line-accounts', () => {
     expect(serialized).not.toContain('full-login-secret');
   });
 
-  test('担当店舗だけを返し、担当外店舗を一覧から除外する', async () => {
+  test.each(['staff', 'admin'] as const)('%s は担当店舗だけを返し、担当外店舗を一覧から除外する', async (role) => {
     dbMocks.getLineAccounts.mockResolvedValue([
       fakeAccount,
       { ...fakeAccount, id: 'acc-2', channel_id: '987654321', name: '担当外' },
@@ -1331,7 +1331,7 @@ describe('GET /api/line-accounts', () => {
     dbMocks.getStaffById.mockResolvedValue({ account_scope: 'accounts' });
     dbMocks.getStaffAccountScopeIds.mockResolvedValue(['acc-1']);
 
-    const res = await setupApp('staff').request('/api/line-accounts');
+    const res = await setupApp(role).request('/api/line-accounts');
 
     expect(res.status).toBe(200);
     await expect(res.json()).resolves.toMatchObject({
@@ -1466,6 +1466,23 @@ describe('GET /api/line-accounts', () => {
     expect(((await res.json()) as { data: unknown[] }).data).toHaveLength(8);
     expect(maximum).toBeLessThanOrEqual(6);
   });
+});
+
+test.each([
+  ['PUT', '/api/line-accounts/default', { accountId: 'acc-1' }],
+  ['PATCH', '/api/line-accounts/order', { ordered: [{ id: 'acc-1', displayOrder: 1 }] }],
+  ['PATCH', '/api/line-accounts/hierarchy', { relationships: [{ id: 'acc-1', parentLineAccountId: null }] }],
+  ['POST', '/api/line-accounts/acc-1/archive', { reason: 'test' }],
+  ['POST', '/api/line-accounts/acc-1/restore', {}],
+] as const)('店舗の管理者は統括の構成変更 %s %s を実行できない', async (method, path, body) => {
+  dbMocks.getStaffById.mockResolvedValue({ is_active: 1, account_scope: 'accounts' });
+  dbMocks.getStaffAccountScopeIds.mockResolvedValue(['acc-1']);
+  const response = await setupApp('owner').request(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  expect(response.status).toBe(403);
 });
 
 describe('GET /api/line-accounts/profile-pictures', () => {

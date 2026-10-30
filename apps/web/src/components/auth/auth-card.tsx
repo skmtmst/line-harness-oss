@@ -5,7 +5,7 @@ import { setDocumentTitle } from '@/lib/document-title'
 import { PageHeading } from '@/components/templates/page-frame'
 import authStyles from '@/components/templates/auth-page.module.css'
 import { CONTACT_URL, LEGAL_LINKS } from '@/lib/auth-email'
-import { nameInitial } from '@/lib/name-initial'
+import MusuboLogo from '@/components/shared/musubo-logo'
 import { Check, Clock3 } from 'lucide-react'
 import applicationStyles from './application-auth.module.css'
 
@@ -13,7 +13,7 @@ import applicationStyles from './application-auth.module.css'
  * ログイン前の画面の入れ物。★管理画面 0-1／36-4／36-6 の「登録カード」（幅 520）。
  *
  * 地は `$canvas-parchment`（= `bg-shell` #f5f5f7）で、白いカード（角丸 18 = `rounded-large`）を真ん中に置く。
- * ロゴ「m musubo」→ 見出し → 説明 → 中身。フッターに規約などのリンク。
+ * 公式ロゴ → 見出し → 説明 → 中身。フッターに規約などのリンク。
  * リンク先がまだ無いものは文字だけ出す（`LEGAL_LINKS`）。
  */
 export default function AuthCard({
@@ -25,8 +25,6 @@ export default function AuthCard({
   variant,
   titleId,
   authLayout,
-  brandName,
-  brandNote,
   step,
   wide,
   applicationFlow,
@@ -41,10 +39,6 @@ export default function AuthCard({
   variant?: 'totp'
   titleId?: string
   authLayout?: 'admin' | 'ops'
-  /** カードの頭に出す会社名。無ければ musubo。 */
-  brandName?: string
-  /** 会社名の下の小さな文字。 */
-  brandNote?: string
   /** ログインの何段目か（「2 / 2」）。カードの頭の右に出す。 */
   step?: { current: number; total: number }
   /** 中身が広いカード（二段階認証の設定）。 */
@@ -57,7 +51,7 @@ export default function AuthCard({
   // V8 login confirmation/enrollment inherits its existing card tokens.
   if (variant === 'totp') return <main className={authStyles.page} data-auth-layout={authLayout}>
     <section className={authStyles.card} aria-label={title} data-auth-layout={authLayout} data-auth-width={wide ? 'wide' : undefined} data-design-node={cardNode}>
-    <AuthCardHead brandName={brandName} brandNote={brandNote} step={step} />
+    <AuthCardHead step={step} />
     {/* 題 20/600 と説明 1 行を 1 組の見出しとして渡す。 */}
     <PageHeading
       title={title}
@@ -88,7 +82,7 @@ export default function AuthCard({
 
   if (applicationFlow) return <main data-design-node={node} className={applicationStyles.page} data-flow={applicationFlow}>
     <section data-design-node={cardNode} className={applicationStyles.card} data-flow={applicationFlow} aria-label={title}>
-      <AuthBrandLogo />
+      <MusuboLogo />
       {applicationFlow === 'sent' ? <div className={applicationStyles.stateIcon} data-tone="success"><Check aria-hidden="true" /></div> : null}
       {applicationFlow === 'pending' ? <div className={applicationStyles.stateIcon} data-tone="warning"><Clock3 aria-hidden="true" /></div> : null}
       <header className={applicationStyles.heading}><h1>{title}</h1><p>{description}</p></header>
@@ -101,7 +95,7 @@ export default function AuthCard({
   if (step) return (
     <main data-design-node={node} className={authStyles.page} data-auth-layout="admin" data-auth-foot="">
       <section data-design-node={cardNode} className={authStyles.card} aria-label={title} data-auth-layout="admin">
-        <AuthCardHead brandName={brandName} brandNote={brandNote} step={step} />
+        <AuthCardHead step={step} />
         <PageHeading title={title} titleAs="h1" titleId={titleId} inset="none" subtitle={description} subtitleSize="body" />
         {children}
       </section>
@@ -115,7 +109,7 @@ export default function AuthCard({
         data-design-node={cardNode}
         className="flex w-full max-w-130 flex-col items-center gap-5 rounded-large border border-hairline bg-canvas px-6 py-9 shadow-float sm:px-10"
       >
-        <AuthBrandLogo />
+        <MusuboLogo />
         <div className="flex w-full flex-col items-center gap-2 text-center">
           <h1 className="text-heading font-bold text-ink">{title}</h1>
           <p className="text-caption text-balance text-ink-faint">{description}</p>
@@ -127,20 +121,10 @@ export default function AuthCard({
   )
 }
 
-function AuthBrandLogo() {
-  return <span className={applicationStyles.brandViewport}>
-    {/* eslint-disable-next-line @next/next/no-img-element -- 提供されたロゴの透過余白を表示領域で切る */}
-    <img className={applicationStyles.brandImage} src="/brand/musubo-color.png" width={3020} height={890} alt="musubo" />
-  </span>
-}
-
-/** カードの頭：会社の印・会社名・musubo、右に「2 / 2」、下に薄い線（統括のアカウントのカードと同じ作り）。 */
-function AuthCardHead({ brandName, brandNote = 'musubo', step }: { brandName?: string; brandNote?: string; step?: { current: number; total: number } }) {
-  const name = brandName || 'musubo'
-  // 会社名が無い時は「musubo」を 2 回並べない。
+/** 認証のカードでは店舗名を出さず、公式ロゴと手順だけを表示する。 */
+function AuthCardHead({ step }: { step?: { current: number; total: number } }) {
   return <div className={authStyles.head} data-auth-head="">
-    <span className={authStyles.headMark} aria-hidden="true" data-auth-brand-mark="">{nameInitial(name)}</span>
-    <div className={authStyles.headName}><strong>{name}</strong>{brandName || brandNote !== 'musubo' ? <small>{brandNote}</small> : null}</div>
+    <MusuboLogo />
     {step ? <span className={authStyles.headStep}><span className="sr-only">ログインの手順 </span>{step.current} / {step.total}</span> : null}
   </div>
 }

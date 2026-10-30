@@ -6,7 +6,7 @@ import type { StaffMember } from '@line-crm/shared'
  *
  *   - 絵の並び（会社とロゴは API ができるまで出さない）
  *   - マニュアルの対応表・ファイルの安全確認も同じ段の項目
- *   - 「専用」の小見出しの下に EC連携・LINE通知
+ *   - EC連携は出し、専用のLINE通知は共通メニューに出さない
  *   - いまの画面が選ばれた形になる
  *   - 見るだけの人には、見られる画面だけ出す（左のメニューと同じ決まり）
  */
@@ -60,7 +60,7 @@ describe('★V8 設定の中のメニュー', () => {
     })
     window.localStorage.clear()
     window.localStorage.setItem('lh_staff_role', 'owner')
-    rememberStaffIdentity({ role: 'owner' } as StaffMember)
+    rememberStaffIdentity({ role: 'owner', accountScope: 'all' } as StaffMember)
   })
 
   afterEach(() => { cleanup(); vi.unstubAllEnvs() })
@@ -80,7 +80,7 @@ describe('★V8 設定の中のメニュー', () => {
   })
 
   // 2026-10-06：設定の板（ ほか 8 枚）の並びへ。見出し「設定」・印つき・プール管理あり・「専用」の小見出しなし。
-  it('絵の並びで出す：はじめの設定・LINEアカウント・プール管理・ログインユーザー・機能設定・運用状態・EC連携・LINE通知（SNS 連携は末尾）', async () => {
+  it('絵の並びで出す：はじめの設定・LINEアカウント・プール管理・ログインユーザー・機能設定・運用状態・EC連携（SNS 連携は末尾）', async () => {
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { ec_commerce: true, line_notifications: true, multi_store_hierarchy: true } },
@@ -101,7 +101,6 @@ describe('★V8 設定の中のメニュー', () => {
       'ファイルの安全確認',
       '運用状態',
       'EC連携',
-      'LINE通知',
       // 提案 E-6：今ある絵の並びを動かさないよう末尾に足した
       'SNS 連携', '予約サイト・グルメ媒体', 'デリバリー連携',
     ])
@@ -109,6 +108,14 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.queryByText('専用')).toBeNull()
     // 「会社とロゴ」は API ができるまで出さない
     expect(view.queryByText('会社とロゴ')).toBeNull()
+  })
+
+  it('店舗に所属する管理者の設定メニューにLINEアカウント管理を出さない', async () => {
+    rememberStaffIdentity({ role: 'admin', accountScope: 'accounts' } as StaffMember)
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: 'LINEアカウント' })).toBeNull()
+    expect(view.getByRole('link', { name: '機能設定' })).toBeTruthy()
   })
 
   // 2026-10-12：デリバリー連携（承認案 DL-1 `dF4Ov`）を予約サイト・グルメ媒体の下に足した
@@ -139,13 +146,15 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.getByRole('link', { name: 'ファイルの安全確認' }).getAttribute('href')).toBe('/settings/file-scan')
   })
 
-  it('LINE通知の画面では機能設定を同時に選択しない', async () => {
-    fixture.pathname = '/line-notifications'
+  it('LINE通知は直接開いた画面でも共通の設定メニューに出さない', async () => {
     const view = render(<SettingsInnerNav />)
-    await waitFor(() => expect(view.getByRole('link', { name: 'LINE通知' })).toBeTruthy())
-    expect(view.getByRole('link', { name: 'LINE通知' }).getAttribute('aria-current')).toBe('page')
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: 'LINE通知' })).toBeNull()
+    fixture.pathname = '/line-notifications'
+    view.rerender(<SettingsInnerNav />)
+    expect(view.queryByRole('link', { name: 'LINE通知' })).toBeNull()
     expect(view.getByRole('link', { name: '機能設定' }).getAttribute('aria-current')).toBeNull()
-    expect(view.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page')).toHaveLength(1)
+    expect(view.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page')).toHaveLength(0)
   })
 
   it('2つの設定は、ほかの設定画面でも同じ段に残す', async () => {

@@ -4,15 +4,21 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { ACCOUNT_STYLES } from '@line-crm/shared'
 import { STYLE_EXPERIENCE_SCRIPT } from '@/v8/onboarding/style-experience-player'
 import ResumeRegistrationStyle from './resume-style'
-import { REGISTRATION_STYLE_KEY } from './use-registration-style'
+import { REGISTRATION_STYLE_KEY as STYLE_KEY } from './use-registration-style'
+import { registrationStorageKey } from './registration-storage'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { readStaffIdentity, rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+const REGISTRATION_STYLE_KEY = registrationStorageKey(STYLE_KEY, { id: 'style-owner', tenantId: 'style-tenant' })!
 const net = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn() }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: net }))
 beforeEach(() => {
+  verifiedStaffRole('owner')
+  rememberStaffIdentity({ ...readStaffIdentity()!, id: 'style-owner', tenantId: 'style-tenant' })
   sessionStorage.clear()
   net.get.mockReset().mockResolvedValue({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })
   net.save.mockReset().mockResolvedValue({ success: true, data: { version: 1 } })
 })
-afterEach(cleanup)
+afterEach(() => { cleanup(); forgetStaffIdentity() })
 
 it.each(ACCOUNT_STYLES)('%sをポップアップで選び、同じアカウントへ保存して登録をやり直さない', async style => {
   sessionStorage.setItem(REGISTRATION_STYLE_KEY, 'created-account')

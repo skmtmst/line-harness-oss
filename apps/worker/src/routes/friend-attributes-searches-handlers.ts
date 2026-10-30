@@ -436,11 +436,19 @@ export const delete__api_saved_searches_id_8 = async (c: Context<Env, "/api/save
 
 export const get__api_login_audit_9 = async (c: Context<Env, "/api/login-audit">) => {
   try {
+    const lineAccountId = c.req.query('lineAccountId')?.trim();
+    if (!lineAccountId) return c.json({ success: false, error: 'LINEアカウントを選択してください' }, 400);
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    if (!scope.allowedAccountIds.includes(lineAccountId)) {
+      return c.json({ success: false, error: '対象が見つかりません' }, 404);
+    }
     const rawAction = c.req.query('action');
     const action = (LOGIN_AUDIT_ACTIONS as readonly string[]).includes(rawAction ?? '')
       ? (rawAction as LoginAuditAction)
       : undefined;
     const items = await getLoginAudit(c.env.DB, {
+      tenantId: c.get('staff').tenantId ?? DEFAULT_TENANT_ID,
+      lineAccountId,
       adminUserId: c.req.query('userId') || undefined,
       action,
       limit: parseOffsetPaging({ limit: c.req.query('limit') }, { defaultLimit: 100, limitPolicy: {} }).limit,

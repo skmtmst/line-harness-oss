@@ -634,7 +634,7 @@ describe('個人情報の項目', () => {
     expect(body.data.items).toHaveLength(1);
     expect(mocks.recordLoginAudit).toHaveBeenCalledWith(
       env.DB,
-      expect.objectContaining({ action: 'view_personal', adminUserId: 'u-1' }),
+      expect.objectContaining({ action: 'view_personal', adminUserId: 'u-1', lineAccountId: 'account-1' }),
     );
   });
 
@@ -1112,7 +1112,7 @@ describe('個人情報の個別権限（N-045）', () => {
     expect(body.data.hiddenPersonalCount).toBe(0);
     expect(mocks.recordLoginAudit).toHaveBeenCalledWith(
       env.DB,
-      expect.objectContaining({ action: 'view_personal', adminUserId: 'u-1' }),
+      expect.objectContaining({ action: 'view_personal', adminUserId: 'u-1', lineAccountId: 'account-1' }),
     );
   });
 

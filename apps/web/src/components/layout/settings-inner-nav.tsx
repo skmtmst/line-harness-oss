@@ -1,6 +1,6 @@
 'use client'
 
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { effectiveStaffRole, useStaffIdentity, canManageRole } from '@/lib/staff-role'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -8,7 +8,7 @@ import { useAccount } from '@/contexts/account-context'
 import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
-import { Activity, BellRing, BookOpen, ShieldCheck, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
+import { Activity, BookOpen, ShieldCheck, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
 
@@ -39,7 +39,6 @@ const SETTINGS_ORDER = [
   '/settings', // 機能設定
   '/emergency', // 運用状態
   '/ec-commerce', // EC連携
-  '/line-notifications', // LINE通知
   '/settings/sns', // SNS 連携（提案 E-6）。今ある絵の並びを動かさないよう末尾に足す
   '/settings/booking-media', // 予約サイト・グルメ媒体（提案 E-4）。飲食店向け（テスト）が使える環境だけ出す
   '/settings/delivery', // デリバリー連携（承認案 DL-1 `dF4Ov`）。飲食店向け（テスト）が使える環境だけ出す
@@ -55,7 +54,6 @@ const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
   '/settings': SlidersHorizontal,
   '/emergency': Activity,
   '/ec-commerce': ShoppingCart,
-  '/line-notifications': BellRing,
   '/settings/sns': Share2,
   '/settings/booking-media': Store,
   '/settings/delivery': Truck,
@@ -102,7 +100,8 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   useSettingsNavInline(inline)
   const pathname = usePathname() ?? ''
   const { selectedAccountId } = useAccount()
-  const staffRole = useStaffRole()
+  const staffIdentity = useStaffIdentity()
+  const staffRole = effectiveStaffRole(staffIdentity)
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
   const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Record<string, boolean> | null>(null)
@@ -155,7 +154,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
    */
   const itemVisible = (item: MenuItem): boolean => {
     if ((item.href === '/staff' || item.href === '/settings/customer-look') && !canManageRole(staffRole)) return false
-    if (item.href === '/accounts' && staffRole === 'staff') return false
+    if (item.href === '/accounts' && (staffRole === 'staff' || staffIdentity?.accountScope !== 'all')) return false
     const permissionKey = item.permissionKey ?? item.href
     if (staffRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
     const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
@@ -172,7 +171,10 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   const items = SETTINGS_ORDER
     .map((href) => byHref.get(href))
     .filter((item): item is MenuItem => Boolean(item))
-    .filter((item) => itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item))
+    .filter((item) => {
+      if (item.href === '/accounts' && staffIdentity?.accountScope !== 'all') return false
+      return itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item)
+    })
 
   const entries: SettingsMenuEntry[] = items.flatMap((item) => {
     const active = item.href === '/settings'

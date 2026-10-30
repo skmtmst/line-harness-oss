@@ -781,6 +781,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const tab = useMergedTab(STAFF_TAB_KEYS, 'tab', 'members')
   const { selectedAccountId } = useAccount()
   const [members, setMembers] = useState<StaffMember[]>([])
+  const [membersAccountId, setMembersAccountId] = useState<string | null>(null)
   const [accessUsers, setAccessUsers] = useState<AccessUserItem[]>([])
   const [usersTotal, setUsersTotal] = useState(0)
   const [accessSummary, setAccessSummary] = useState<AccessUserSummary>(EMPTY_ACCESS_SUMMARY)
@@ -794,6 +795,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const [error, setError] = useState('')
   // ★管理画面 `x63W5x`：集計が取れていない間、KPI に 0 を出さない。「—」と出す。
   const [summaryReady, setSummaryReady] = useState(false)
+  const membersLoadVersion = useRef(0)
   const [editing, setEditing] = useState<StaffMember | null>(null), [settingTwoFactor, setSettingTwoFactor] = useState<StaffMember | null>(null), [permissionTarget, setPermissionTarget] = useState<AccessUserItem | null>(null)
   const [userPage, setUserPage] = useListUrlValue('userPage', 1)
   const USER_PAGE_SIZE = 6
@@ -812,6 +814,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   const administrator = canManageRole(staffRole)
   usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ログインユーザー')
   const load = useCallback(async () => {
+    const version = ++membersLoadVersion.current
     setLoading(true)
     setError('')
     setSummaryReady(false)
@@ -825,10 +828,12 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
         api.access.users({ lineAccountId: scope, limit: 200 }),
         api.access.roles(scope),
       ])
+      if (version !== membersLoadVersion.current) return
       if (!staffResult.success || !meResult.success || !accountsResult.success || !usersResult.success || !rolesResult.success) {
         throw new Error('必要な情報を読み込めませんでした')
       }
       setMembers(staffResult.data)
+      setMembersAccountId(scope)
       setAccountNames(Object.fromEntries(accountsResult.data.map((account) => [account.id, account.name])))
       setAccessUsers(usersResult.data.items)
       setUsersTotal(usersResult.data.pagination?.total ?? usersResult.data.items.length)
@@ -836,13 +841,14 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       setAccessRoles(rolesResult.data.items)
       setSummaryReady(true)
     } catch (saveFailure) {
+      if (version !== membersLoadVersion.current) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
 
       setError('ログインユーザーを読み込めませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
-      setLoading(false)
+      if (version === membersLoadVersion.current) setLoading(false)
     }
   }, [selectedAccountId, saveErrors])
   useEffect(() => { void load() }, [load])
@@ -1125,7 +1131,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       <div className={styles.body}>
         <SettingsInnerNav inline />
         <div className={styles.main}>
-          {administrator ? <MfaPolicy /> : null}
+          {administrator ? <MfaPolicy key={selectedAccountId ?? 'unselected'} accountMembers={summaryReady && !loading && membersAccountId === selectedAccountId ? members : null} /> : null}
           <SelfMfa />
           {tab === 'audit' ? (
             <>

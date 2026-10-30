@@ -75,7 +75,7 @@ export function BasicForm({
             value={values.title}
             disabled={disabled}
             readOnly={readOnly}
-            placeholder="NEN活用スタートセミナー"
+            placeholder="musubo活用スタートセミナー"
             invalid={Boolean(fieldErrors.title)}
             onChange={(event) => onChange({ title: event.target.value })}
             onBlur={onBlurTitle}
@@ -108,7 +108,7 @@ export function BasicForm({
             value={values.description}
             disabled={disabled}
             readOnly={readOnly}
-            placeholder="15分で NEN の使い方がわかる無料セミナーです"
+            placeholder="15分で musubo の使い方がわかる無料セミナーです"
             onChange={(event) => onChange({ description: event.target.value })}
           /></SaveErrorField></Field></div>
       </Card>

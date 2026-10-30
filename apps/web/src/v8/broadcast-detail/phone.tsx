@@ -1,5 +1,6 @@
 import { ImageIcon } from 'lucide-react'
 import LinePreview, { LinePreviewCarousel, LinePreviewMessage } from '@/components/shared/line-preview'
+import MusuboMark from '@/components/shared/musubo-mark'
 import BroadcastMessagePreview from '@/components/broadcasts/broadcast-message-preview'
 import type { BroadcastBubble, BroadcastMessageButton } from '@/lib/api'
 import styles from './phone.module.css'
@@ -30,7 +31,8 @@ export default function BroadcastPhone({
   /** 吹き出しの横の時刻。まだ決まっていなければ「—」。 */
   time: string
 }) {
-  const initial = accountName.trim().charAt(0) || '然'
+  const previewName = accountName.trim() || 'musubo'
+  const initial = accountName.trim() ? accountName.trim().charAt(0) : <MusuboMark />
   const single = !(broadcast.messageBubbles?.length)
   const plainText = broadcast.messageType === 'text' && single && !broadcast.messageOptions?.buttons?.length
   /* 写真1枚は絵の「画像」（200×200・角丸16）。URL が読めないときは枠と「写真」だけ。 */
@@ -39,14 +41,14 @@ export default function BroadcastPhone({
   const carousel = broadcast.messageType === 'carousel' && single ? carouselColumnsOf(broadcast.messageContent) : null
   if (carousel) {
     return (
-      <LinePreview title={null} accountName={accountName} caption={chip}>
+      <LinePreview title={null} accountName={previewName} caption={chip}>
         <LinePreviewCarousel columns={carousel} />
       </LinePreview>
     )
   }
   return (
-    <LinePreview title={null} accountName={accountName} caption={chip}>
-      <LinePreviewMessage accountName={accountName} avatar={initial} time={time} bare={Boolean(photo)}>
+    <LinePreview title={null} accountName={previewName} caption={chip}>
+      <LinePreviewMessage accountName={previewName} avatar={initial} time={time} bare={Boolean(photo)}>
                 {plainText ? (
                   <p className={styles.bubble}>{broadcast.messageContent}</p>
                 ) : photo ? (

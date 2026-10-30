@@ -12,7 +12,6 @@ import Notice from '@/components/shared/notice'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '@/v8/login/two-factor/two-factor-error'
 
-import { useBrand } from '@/lib/use-brand'
 import { AuthPage, AuthForm, AuthHelp } from '@/components/templates/auth-page'
 import TotpQr from '@/components/shared/totp-qr'
 import RecoveryCodes from './recovery-codes'
@@ -30,7 +29,6 @@ type SetupData = { provisioningUri: string; manualKey: string }
  */
 export default function TwoFactorSetupPage() {
   const saveErrors = useSaveFormErrors()
-  const brand = useBrand()
   const [challenge, setChallenge] = useState('')
   const [setup, setSetup] = useState<SetupData | null>(null)
   const [qr, setQr] = useState('')
@@ -159,8 +157,8 @@ export default function TwoFactorSetupPage() {
     } finally { setBusy(false) }
   }
 
-  if (recoveryCodes.length) return <RecoveryCodes brandName={brand.name ?? undefined} codes={recoveryCodes} onContinue={() => { setRecoveryCodes([]); window.location.assign(destination) }} />
-  return <SaveErrorScope errors={saveErrors}><AuthPage wide brandName={brand.name ?? undefined} title="二段階認証を設定">
+  if (recoveryCodes.length) return <RecoveryCodes codes={recoveryCodes} onContinue={() => { setRecoveryCodes([]); window.location.assign(destination) }} />
+  return <SaveErrorScope errors={saveErrors}><AuthPage wide title="二段階認証を設定">
     {error ? <Notice tone="danger" message={error} /> : null}
     {loading ? <ListState kind="loading" title="QRコードを用意しています…" /> : setup ? (
       <AuthForm onSubmit={event => void submit(event)}>

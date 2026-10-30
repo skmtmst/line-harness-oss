@@ -16,6 +16,7 @@ import { withMessageCard, withUploadedImage } from '@/lib/hq-template-authoring'
 import { LEGACY_MESSAGE_NOTICE, MessageTemplateEditor } from '@/components/templates/message-template-editor'
 import { EMPTY_TEMPLATE_REFERENCES } from '../../components/templates/template-preview-model'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import MusuboMark from '@/components/shared/musubo-mark'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -249,10 +250,10 @@ export default function MessageForm({
       </section>
 
       <aside className={styles.previewColumn} aria-label="LINE の見え方">
-        <LinePreview accountName="然 - NEN -" empty={!card.title && !card.body && !current.messageContent ? '中身を入れると、ここに LINE での見え方が出ます。' : false}>
+        <LinePreview accountName="musubo" empty={!card.title && !card.body && !current.messageContent ? '中身を入れると、ここに LINE での見え方が出ます。' : false}>
           {usesCard && card.format === 'flex' ? (
             <div className={styles.previewRow}>
-            <span className={styles.previewAvatar} aria-hidden="true">然</span>
+            <span className={styles.previewAvatar} aria-hidden="true"><MusuboMark /></span>
             <div className={styles.previewCard}>
               {image?.publicUrl ? <span className={styles.previewImage} style={{ backgroundImage: `url(${JSON.stringify(image.publicUrl)})` }} aria-hidden="true" /> : <span className={styles.previewImage} aria-hidden="true" />}
               <span className={styles.previewCopy}>
@@ -264,7 +265,7 @@ export default function MessageForm({
             <span className={styles.previewTime}>10:00</span>
             </div>
           ) : (
-            <LinePreviewMessage accountName="然 - NEN -" avatar="然" time="10:00">{usesCard ? [card.title, card.body].filter(Boolean).join('\n') : current.messageContent}</LinePreviewMessage>
+            <LinePreviewMessage accountName="musubo" avatar={<MusuboMark />} time="10:00">{usesCard ? [card.title, card.body].filter(Boolean).join('\n') : current.messageContent}</LinePreviewMessage>
           )}
         </LinePreview>
       </aside>

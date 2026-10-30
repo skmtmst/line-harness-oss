@@ -27,10 +27,10 @@ describe('mailFromName', () => {
     expect(mailFromName('【musubo運用】お知らせ')).toBe(MUSUBO_FROM_NAME);
   });
 
-  it('それ以外は 然-NEN- の窓口名から送る', () => {
+  it('然-NEN- の明示的な件名だけ専用の窓口名から送る', () => {
     expect(mailFromName('【然-NEN-】ご注文ありがとうございます')).toBe(NEN_FROM_NAME);
-    expect(mailFromName('お問い合わせへの返信')).toBe(NEN_FROM_NAME);
-    expect(mailFromName('')).toBe(NEN_FROM_NAME);
+    expect(mailFromName('お問い合わせへの返信')).toBe(MUSUBO_FROM_NAME);
+    expect(mailFromName('')).toBe(MUSUBO_FROM_NAME);
   });
 
   it('表示名に改行は入らない（From ヘッダーを壊さない）', () => {
