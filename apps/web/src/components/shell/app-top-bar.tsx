@@ -15,7 +15,7 @@ import { HQ_MENU_SECTIONS, MENU_SECTIONS, isHqShellPath } from '@/lib/menu'
 import { brandInitial } from '@/components/layout/brand-initial'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useManualHref } from '@/lib/use-manual-href'
-import { setDocumentTitle } from '@/lib/document-title'
+import { defaultTitleForPath } from '@/lib/page-title'
 import { canReturnToHqFrom } from '@/lib/hq-return'
 
 /**
@@ -25,41 +25,7 @@ import { canReturnToHqFrom } from '@/lib/hq-return'
  * 分けているのは、部品を1つの画面にも縛らないため（`docs/v8-design-rules.md` §5）。
  */
 
-/** ルート → メニューのラベル。長いほうから当てるので、`/tags/new` は「タグ」になる。 */
-const MENU_LABELS: Array<[string, string]> = MENU_SECTIONS
-  .flatMap((section) => section.items.map((item): [string, string] => [item.href, item.label]))
-  .sort((a, b) => b[0].length - a[0].length)
-
-/** ルートから既定の画面名を引く。当たらなければ空。 */
-export function defaultTitleForPath(pathname: string): string {
-  for (const [href, label] of MENU_LABELS) {
-    if (pathname === href) return label
-    if (href !== '/' && pathname.startsWith(`${href}/`)) return label
-  }
-  return ''
-}
-
-/**
- * タブの題だけに使う画面名（上の帯の文字は変えない）。統括のメニューと、
- * 左メニューに無い画面。上の帯の名前が無いときだけ使う。
- */
-const DOCUMENT_ONLY_LABELS: Array<[string, string]> = [
-  ...HQ_MENU_SECTIONS.flatMap((section) => section.items.map((item): [string, string] => [item.href, `${item.label}（統括）`])),
-  ['/hq/support', 'お問い合わせ'] as [string, string],
-  ['/common-actions', '共通アクション'] as [string, string],
-  ['/scoring', 'スコアリング'] as [string, string],
-  ['/updates', 'アップデート履歴'] as [string, string],
-  ['/notifications', '通知'] as [string, string],
-].sort((a, b) => b[0].length - a[0].length)
-
-/** タブの題に使う画面名。上の帯の名前を先に、無ければ上の表から引く。 */
-export function documentTitleForPath(pathname: string, shownTitle: string): string {
-  if (shownTitle) return shownTitle
-  for (const [href, label] of DOCUMENT_ONLY_LABELS) {
-    if (pathname === href || pathname.startsWith(`${href}/`)) return label
-  }
-  return ''
-}
+export { defaultTitleForPath, documentTitleForPath } from '@/lib/page-title'
 
 /**
  * ★V8：画面がパンくずを渡さないときの「親の画面」（2026-10-08 オーナー「全部消す」）。
@@ -199,8 +165,6 @@ export default function AppTopBar() {
   const manualHref = useManualHref(pathname)
 
   const shownTitle = title ?? defaultTitleForPath(pathname)
-  // タブの題も上の帯と同じ画面名にする（「<画面名> | musubo」）。
-  useEffect(() => { setDocumentTitle(documentTitleForPath(pathname, shownTitle)) }, [pathname, shownTitle])
   /*
    * ★V8 統括の外側（絵のオーナー 2026-10-07）：統括の画面（LINEアカウントの登録も含む）では、
    * 切替の札に「統括」と統括名、名前の下に「統括」を出す。互換経路は今までどおり。

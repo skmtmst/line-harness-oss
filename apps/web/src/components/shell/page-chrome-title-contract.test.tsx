@@ -1,8 +1,12 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { act, cleanup, render, screen } from '@testing-library/react'
 import { PageChromeProvider, usePageTitle, usePageChrome } from './page-chrome'
 import { formatDocumentTitle } from '@/lib/document-title'
+import { DocumentTitleProvider, useDocumentTitle } from './document-title'
+
+beforeEach(() => { cleanup(); document.querySelectorAll('title').forEach(node => node.remove()) })
+afterEach(cleanup)
 
 /*
  * ブラウザのタブの題は「<画面名> | musubo」（リリース前点検 2026-10-07）。
@@ -66,10 +70,43 @@ describe('タブの題', () => {
 
 describe('上の帯に名前が無い画面のタブの題', () => {
   it('統括のメニューは「（統括）」付き、左メニューに無い画面も名前を引く', async () => {
-    const { documentTitleForPath } = await import('./app-top-bar')
+    const { documentTitleForPath } = await import('@/lib/page-title')
     expect(documentTitleForPath('/hq/templates', '')).toBe('テンプレート（統括）')
     expect(documentTitleForPath('/scoring/new', '')).toBe('スコアリング')
     expect(documentTitleForPath('/friends', '友だち')).toBe('友だち')
     expect(documentTitleForPath('/no-such', '')).toBe('')
+  })
+})
+
+function StandaloneTitle({ name }: { name: string }) { useDocumentTitle(name); return null }
+
+describe('文書の題の持ち主', () => {
+  it('親子の境界があっても title は1つ。題が確定したあと既定へ戻らない', async () => {
+    const { rerender, unmount } = render(<DocumentTitleProvider pathname="/form-submissions/edit"><PageChromeProvider><Titled name="春のアンケート" /></PageChromeProvider></DocumentTitleProvider>)
+    expect(document.querySelectorAll('title')).toHaveLength(1)
+    expect(document.title).toBe('春のアンケート | musubo')
+    rerender(<DocumentTitleProvider pathname="/form-submissions/edit"><PageChromeProvider><Titled name="春のアンケート" /></PageChromeProvider></DocumentTitleProvider>)
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 10)) })
+    expect(document.title).toBe('春のアンケート | musubo')
+    expect(document.querySelectorAll('title')).toHaveLength(1)
+    unmount()
+  })
+
+  it('別の道では前の登録を使わず、同じ道の再描画は確定名を保つ', () => {
+    const { rerender, unmount } = render(<DocumentTitleProvider pathname="/friends"><StandaloneTitle name="ももちゃん" /></DocumentTitleProvider>)
+    expect(document.title).toBe('ももちゃん | musubo')
+    rerender(<DocumentTitleProvider pathname="/settings">本文</DocumentTitleProvider>)
+    expect(document.title).toBe('機能設定 | musubo')
+    expect(document.querySelectorAll('title')).toHaveLength(1)
+    unmount()
+  })
+
+  it('認証・スマホも同じ登録で題を更新し、解除済みの登録が次の題を消さない', () => {
+    const { rerender, unmount } = render(<DocumentTitleProvider pathname="/login"><StandaloneTitle name="ログイン" /></DocumentTitleProvider>)
+    expect(document.title).toBe('ログイン | musubo')
+    rerender(<DocumentTitleProvider pathname="/m"><StandaloneTitle key="mobile" name="今日の予定" /></DocumentTitleProvider>)
+    expect(document.title).toBe('今日の予定 | musubo')
+    expect(document.querySelectorAll('title')).toHaveLength(1)
+    unmount()
   })
 })
