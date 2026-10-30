@@ -85,6 +85,9 @@
   padding: var(--tpl-inbox-tp-list-pad);
   overflow-y: auto;
 }
+.searchRow { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+.searchRow > :first-child { flex: 1; min-width: 0; }
+.searchRow > :last-child:not(:first-child) { flex: none; }
 .tpSearchField { flex: none; }
 .tpNote { color: var(--color-ink-faint); font-size: var(--text-caption); }
 .tpError { width: 100%; padding: var(--tpl-inbox-tp-band-pad); color: var(--color-danger); font-size: var(--text-caption); }
