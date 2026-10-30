@@ -123,7 +123,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <IconButton aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+        <IconButton variant="plain" aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
           <ListFilter aria-hidden size={16} />
         </IconButton>
         {/*
@@ -135,6 +135,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         <div>
           {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
           <IconButton
+            variant="plain"
             className={styles.toolDotWrap} aria-label={savedSearchLabel} title={savedSearchLabel}
             onClick={() => {
               setSavedViewsOpen((open) => !open)
@@ -232,7 +233,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         )}
         {!slaEnabled ? (
           <>
-            <IconButton ref={sortButtonRef} aria-label="並び順" title={`並び順：${sortLabel}`} aria-haspopup="menu" aria-expanded={sortMenuOpen} onClick={() => setSortMenuOpen((open) => !open)}>
+            <IconButton variant="plain" ref={sortButtonRef} aria-label="並び順" title={`並び順：${sortLabel}`} aria-haspopup="menu" aria-expanded={sortMenuOpen} onClick={() => setSortMenuOpen((open) => !open)}>
               <ArrowUpDown aria-hidden size={16} />
             </IconButton>
             <ActionMenu
