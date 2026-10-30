@@ -17,7 +17,7 @@ import { useStepUpGate } from '@/components/step-up-prompt'
 
 type Policy = { required: boolean; canEdit: boolean; impersonating?: boolean; configured?: boolean; notice?: string | null; registered?: number; total?: number }
 type AccountMember = Pick<StaffMember, 'name' | 'twoFactorEnabled' | 'isActive' | 'inviteStatus'>
-export default function MfaPolicy({ loginPath = '/login', accountMembers }: { loginPath?: '/login' | '/ops/login'; accountMembers?: readonly AccountMember[] | null }) {
+export default function MfaPolicy({ loginPath = '/login', accountMembers, compact = false }: { loginPath?: '/login' | '/ops/login'; accountMembers?: readonly AccountMember[] | null; compact?: boolean }) {
   const saveErrors = useSaveFormErrors()
   const [policy, setPolicy] = useState<Policy | null>(null)
   const [error, setError] = useState('')
@@ -64,14 +64,14 @@ export default function MfaPolicy({ loginPath = '/login', accountMembers }: { lo
     finally { setBusy(false) }
   }
   if (policy?.impersonating) return null
+  const toggle = policy?.canEdit ? <SaveErrorField names={["required"]}><Toggle checked={policy.required} label="ログインで二段階認証を必須にする" disabled={busy || policy.configured === false} onChange={value => value ? setTurnOn(true) : void save(false)} /></SaveErrorField> : undefined
   return <SaveErrorScope errors={saveErrors}>
-    <FormSection id="mfa-policy-title" title="ログインの安全" description="管理画面へ入る時の確かめ方を決めます">
-      <SectionHeader title="ログインで二段階認証を必須にする" description={policy?.required ? '全員が、ログインのたびに認証アプリの6桁を入れます。まだ登録していない人は、次のログインで登録します。' : 'パスワードやLINEだけで入れます。自分で登録した人には、確かめが出ます。'}
-        actions={policy?.canEdit ? <SaveErrorField names={["required"]}><Toggle checked={policy.required} label="ログインで二段階認証を必須にする" disabled={busy || policy.configured === false} onChange={value => value ? setTurnOn(true) : void save(false)} /></SaveErrorField> : undefined} />
+    <FormSection id="mfa-policy-title" title={compact ? 'ログイン時の二段階認証' : 'ログインの安全'} description={compact ? '統括全体で必須にする' : '管理画面へ入る時の確かめ方を決めます'} action={compact ? toggle : undefined}>
+      {!compact ? <SectionHeader title="ログインで二段階認証を必須にする" description={policy?.required ? '全員が、ログインのたびに認証アプリの6桁を入れます。まだ登録していない人は、次のログインで登録します。' : 'パスワードやLINEだけで入れます。自分で登録した人には、確かめが出ます。'} actions={toggle} /> : null}
       {error ? <Notice tone="danger" message={error} /> : null}
       {policy?.notice ? <Notice tone="warn" message={policy.notice} /> : null}
-      {policy ? <Card surface="muted" padding="compact"><AuthDetailRow label={accountMembers === undefined ? '登録済み' : '登録済み（このアカウント）'} value={`${registered ?? '—'} / ${total ?? '—'} 人`} actions={policy.canEdit ? <Button variant="text" size="inline" disabled={accountMembers === null} onClick={() => showUnregistered()}>未登録の人を見る →</Button> : undefined} /></Card> : <ListState kind={error ? 'error' : 'loading'} onRetry={() => void load()} />}
-      <AuthHelp>{accountMembers !== undefined ? '必須設定は統括全体に適用されます。' : ''}切り替えられるのはオーナー（運営）だけです。切り替えは記録に残ります。</AuthHelp>
+      {policy ? compact ? <AuthDetailRow label="登録済み" value={`${registered ?? '—'} / ${total ?? '—'} 人`} /> : <Card surface="muted" padding="compact"><AuthDetailRow label={accountMembers === undefined ? '登録済み' : '登録済み（このアカウント）'} value={`${registered ?? '—'} / ${total ?? '—'} 人`} actions={policy.canEdit ? <Button variant="text" size="inline" disabled={accountMembers === null} onClick={() => showUnregistered()}>未登録の人を見る →</Button> : undefined} /></Card> : <ListState kind={error ? 'error' : 'loading'} onRetry={() => void load()} />}
+      {!compact ? <AuthHelp>{accountMembers !== undefined ? '必須設定は統括全体に適用されます。' : ''}切り替えられるのはオーナー（運営）だけです。切り替えは記録に残ります。</AuthHelp> : null}
       <ConfirmDialog open={turnOn} title="二段階認証をオンにする" description="全員が一度ログアウトします。まだ登録していない人は、次のログインで登録できます。" confirmLabel="オンにする" onConfirm={() => save(true)} onCancel={() => setTurnOn(false)} busy={busy} error={error} />
       <Dialog open={unregistered !== null} title="二段階認証が未登録の人" onCancel={() => setUnregistered(null)} cancelLabel="閉じる" error={peopleError}>
         {peopleLoading ? <ListState kind="loading" /> : unregistered?.length ? <ul>{unregistered.map((name, index) => <li key={index}>{name}</li>)}</ul> : peopleError ? null : <p>未登録の人はいません</p>}

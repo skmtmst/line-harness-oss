@@ -1106,7 +1106,6 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       <div className={styles.body}>
         <SettingsInnerNav inline />
         <div className={styles.main}>
-          {administrator && tab === 'members' ? <MfaPolicy key={selectedAccountId ?? 'unselected'} accountMembers={summaryReady && !loading && membersAccountId === selectedAccountId ? members : null} /> : null}
           {tab === 'audit' ? (
             <>
               {tabAction ? <div className={styles.toolbar}><span className={styles.spacer} />{tabAction}</div> : null}
@@ -1160,6 +1159,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                 </div>
               ) : null}
               {tab === 'members' ? <Disclosure appearance="inset" size="compact" title="ログイン中の端末を確認"><SessionsCard /></Disclosure> : null}
+              {administrator && tab === 'roles' ? <MfaPolicy compact key={selectedAccountId ?? 'unselected'} accountMembers={summaryReady && !loading && membersAccountId === selectedAccountId ? members : null} /> : null}
             </>
           )}
         </div>
