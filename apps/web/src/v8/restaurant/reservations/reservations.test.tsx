@@ -6,11 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), reservationsDay: vi.fn(), updateReservation: vi.fn(), createReservation: vi.fn(), holdReservation: vi.fn(),
-  importReservation: vi.fn(), openingHours: vi.fn(), customerSearch: vi.fn(), customerHistory: vi.fn(),
+  floors: vi.fn(), importReservation: vi.fn(), openingHours: vi.fn(), customerSearch: vi.fn(), customerHistory: vi.fn(),
 }))
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 
-vi.mock('@/lib/api/helpers/reservation-board',async importOriginal=>{const original=await importOriginal<typeof import('@/lib/api/helpers/reservation-board')>();return {...original,reservationBoardApi:{...original.reservationBoardApi,floors:vi.fn().mockResolvedValue({success:true,data:[]})}}})
+vi.mock('@/lib/api/helpers/reservation-board',async importOriginal=>{const original=await importOriginal<typeof import('@/lib/api/helpers/reservation-board')>();return {...original,reservationBoardApi:{...original.reservationBoardApi,floors:fixture.floors}}})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/restaurant-test/reservations', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
@@ -33,6 +33,7 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   today = reservationsToday()
   role.value = 'owner'
+  fixture.floors.mockResolvedValue({success:true,data:[]})
   fixture.snapshot.mockResolvedValue({ success: true, data: snapshotOf({ reservations: today, reservationTotal: 3 }) })
   fixture.reservationsDay.mockResolvedValue({ data: { date: '', reservations: today } })
   fixture.openingHours.mockResolvedValue({ data: { storeId: 'store-1', hours: null, version: 1, updatedBy: null, updatedAt: null } })
@@ -240,3 +241,81 @@ describe('日本時間の今日（端末の時間帯とは別）', () => {
   expect(fixture.reservationsDay).toHaveBeenCalledTimes(2)
   expect(screen.queryByRole('alert')).toBeNull()
  })
+
+
+describe('予約台帳の初期状態', () => {
+  const emptyStore = (noTables = true) => {
+    fixture.snapshot.mockResolvedValue({success:true,data:snapshotOf({...(noTables ? {tables:[]} : {}),reservations:[],reservationTotal:0})})
+    fixture.reservationsDay.mockResolvedValue({data:{reservations:[],closures:[]}})
+  }
+  it('卓がない店は盤の中に設定の理由と座席・卓管理への行き先を出す', async () => {
+    emptyStore()
+    render(<ReservationsPage />)
+    const title = await screen.findByText('卓がまだ設定されていません')
+    expect(title.closest('[data-reservation-board]')).toBeTruthy()
+    expect(screen.getByRole('link',{name:'座席・卓を設定する'}).getAttribute('href')).toBe('/restaurant-test/tables')
+    expect(screen.getByText(/先に座席・卓を登録してください/)).toBeTruthy()
+    expect(document.querySelector('[data-booking-add]')).toBeNull()
+  })
+  it.each(['viewer','staff'])('%s は卓の設定操作を残し、権限理由を出して移動を止める', async value => {
+    emptyStore()
+    role.value=value
+    render(<ReservationsPage />)
+    await screen.findByText('卓がまだ設定されていません')
+    const action=screen.getByRole('button',{name:'座席・卓を設定する'})
+    expect(action.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.focus(action)
+    expect(await screen.findByRole('tooltip')).toHaveProperty('textContent','座席・卓の設定には管理者の権限が必要です。')
+  })
+  it('卓があれば予約0件でも空きマスから選んだ卓と時刻で電話予約へ進む', async () => {
+    emptyStore(false)
+    render(<ReservationsPage />)
+    const slot=await screen.findByRole('button',{name:'T2 2名 18:00に予約を入れる'})
+    fireEvent.focus(slot)
+    fireEvent.click(slot)
+    await screen.findByText('何を入れますか',{selector:'h2'})
+    expect(screen.getByRole('button',{name:'18:00',exact:true}).getAttribute('aria-pressed')).toBe('true')
+    expect(screen.getByRole('button',{name:/T2/}).getAttribute('aria-pressed')).toBe('true')
+    expect(fixture.createReservation).not.toHaveBeenCalled()
+  })
+  it('月と一覧の見方でも卓の設定案内を出す', async () => {
+    emptyStore()
+    render(<ReservationsPage />)
+    await screen.findByText('卓がまだ設定されていません')
+    fireEvent.click(screen.getByRole('button',{name:'月',exact:true}))
+    expect(await screen.findByText('卓がまだ設定されていません')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button',{name:'一覧',exact:true}))
+    expect(await screen.findByText('卓がまだ設定されていません')).toBeTruthy()
+  })
+  it('座席表で予約0件の理由を出し、卓の図も保つ', async () => {
+    emptyStore(false)
+    fixture.floors.mockResolvedValue({data:[{id:'f1',storeId:'store-1',name:'1階',width:660,height:420,outline:[],fixtures:[],tables:[],version:1}]})
+    render(<ReservationsPage />)
+    fireEvent.click(await screen.findByRole('button',{name:'座席表',exact:true}))
+    expect(await screen.findByText('予約はまだありません')).toBeTruthy()
+    expect(screen.getByRole('group',{name:'1階の座席表'})).toBeTruthy()
+  })
+  it('月の予約0件は案内から電話予約へ進める', async () => {
+    emptyStore(false)
+    render(<ReservationsPage />)
+    fireEvent.click(await screen.findByRole('button',{name:'月',exact:true}))
+    const empty=await screen.findByText('予約はまだありません')
+    fireEvent.click(within(empty.closest('[data-list-state]') as HTMLElement).getByRole('button',{name:'電話の予約を入れる'}))
+    expect(await screen.findByText('何を入れますか',{selector:'h2'})).toBeTruthy()
+  })
+  it('一覧の読込失敗は卓なしの案内に置き換えない', async () => {
+    fixture.snapshot.mockRejectedValue(new Error('synthetic snapshot failure'))
+    render(<ReservationsPage />)
+    expect((await screen.findAllByRole('alert')).length).toBeGreaterThan(0)
+    expect(screen.queryByText('卓がまだ設定されていません')).toBeNull()
+  })
+  it('座席表が読めない場合は予約0件と区別し、再読込できる', async () => {
+    emptyStore(false)
+    fixture.floors.mockRejectedValueOnce(new Error('synthetic floor failure')).mockResolvedValue({data:[]})
+    render(<ReservationsPage />)
+    const title=await screen.findByText('座席表を読み込めませんでした')
+    fireEvent.click(within(title.closest('[role="alert"]') as HTMLElement).getByRole('button',{name:/もう一度/}))
+    await waitFor(()=>expect(screen.queryByText('座席表を読み込めませんでした')).toBeNull())
+    expect(fixture.floors).toHaveBeenCalledTimes(2)
+  })
+})

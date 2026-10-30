@@ -459,6 +459,7 @@
 
 ## 反映履歴
 
+- [予約台帳の卓・予約なしの案内](release-log/unreleased/0000-kenta-muse-ledger-empty.md)
 - [予約台帳の数の帯の幅そろえ](release-log/unreleased/0000-kenta-muse-ledger-band.md)
 - [数の帯の増減の札の直し](release-log/unreleased/1970-kenta-muse-kpi-delta-row.md)
 - [シナリオ作成の権限確認](release-log/unreleased/1971-kenta-train-1029q.md)
