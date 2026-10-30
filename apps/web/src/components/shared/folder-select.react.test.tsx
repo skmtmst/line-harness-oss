@@ -278,7 +278,7 @@ describe('全画面で共用する作成失敗の理由', () => {
     [new ApiError(409, '同じ名前のフォルダがあります'), '同じ名前のフォルダがあります'],
     [new ApiError(422, 'フォルダ名は1〜60文字で入力してください'), '1〜60文字'],
     [new ApiError(429, undefined, undefined, undefined, undefined, 30), '30秒'],
-    [new ApiError(500, undefined, undefined, undefined, 'fixture-incident-500'), 'お問い合わせ番号 fixture-incident-500'],
+    [new ApiError(500, undefined, undefined, undefined, 'fixture-incident-500'), '追跡番号 fixture-incident-500'],
     [new ApiError(503), 'サーバー側'],
     [new FolderCreateError('入力内容を確認してください。D1_ERROR: SELECT secret FROM private_table'), 'フォルダの作成に失敗'],
   ])('%s は通信のせいにせず回復の理由を出し、名前と色を残して再試行する', async (failure, expected) => {
@@ -293,7 +293,7 @@ describe('全画面で共用する作成失敗の理由', () => {
     const message = screen.getByRole('alert').textContent
     expect(message).toContain(expected)
     expect(message).not.toMatch(/API error:|D1_ERROR|SELECT|private_table|通信を確かめて/)
-    if (failure instanceof ApiError && failure.status >= 500 && !failure.trackingId) expect(message).not.toContain('お問い合わせ番号')
+    if (failure instanceof ApiError && failure.status >= 500 && !failure.trackingId) expect(message).not.toContain('追跡番号')
     expect(input.value).toBe('挨拶')
     expect(screen.getByRole('button', { name: 'フォルダの色：青' })).toBeTruthy()
     expect(onChange).not.toHaveBeenCalled()
@@ -381,4 +381,18 @@ describe('左の列のフォルダアイコンと、選ぶ欄・表の丸の色�
     view.rerender(<FolderSelect aria-label="所属フォルダ" folders={[]} value="none" unfiled={{ value: 'none', label: '分けない' }} onChange={vi.fn()} />)
     expect(screen.getByRole('button', { name: '所属フォルダ' }).querySelector<HTMLElement>('[data-folder-dot]')!.dataset.folderDot).toBe('unfiled')
   })
+})
+
+
+it.each(['<script>', '番号 with space', 'a'.repeat(129), ''])('使えない追跡番号は表示せず、作成の失敗と入力を残す: %s', async trackingId => {
+  const onCreate = vi.fn().mockRejectedValue(new ApiError(500, undefined, undefined, undefined, trackingId))
+  await openMenu({ onCreate })
+  const input = await startCreate()
+  fireEvent.change(input, { target: { value: '挨拶' } })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '作って選ぶ' })) })
+  const text = screen.getByRole('alert').textContent
+  expect(text).toContain('サーバー側')
+  expect(text).not.toContain('追跡番号')
+  expect(input.value).toBe('挨拶')
+  expect(onCreate).toHaveBeenCalledTimes(1)
 })

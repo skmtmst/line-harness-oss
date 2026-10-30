@@ -88,7 +88,7 @@ function reasonOf(caught: unknown): string {
     const message = describeSaveFailure(caught)
     const trackingId = caught.trackingId
     return trackingId && /^[a-zA-Z0-9_-]{1,128}$/.test(trackingId)
-      ? `${message}（お問い合わせ番号 ${trackingId}）`
+      ? `${message}（追跡番号 ${trackingId}）`
       : message
   }
   return describeApiFailure(caught, 'フォルダの作成')
