@@ -1,3 +1,4 @@
+import './single-choice-filters.test.mjs'
 import './pick-field-surface.test.mjs'
 import './date-group.test.mjs'
 import './kpi-delta-row.test.mjs'

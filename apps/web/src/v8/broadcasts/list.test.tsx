@@ -1272,3 +1272,20 @@ describe('保持した一斉配信一覧の変更操作', () => {
   })
 
 })
+
+it('状態の切り替えは件数とAPI条件を保ち、矢印で1つだけ選べる', async () => {
+  act(() => root.render(<BroadcastListV8 />)); await flush()
+  const group = host.querySelector('[data-segmented-control][aria-label="状態"]')!
+  expect(group).toBeTruthy()
+  const options = [...group.querySelectorAll('button')]
+  expect(options).toHaveLength(6)
+  expect(group.querySelector('svg')).toBeNull()
+  fireEvent.keyDown(options[0], { key: 'Home' }); await flush()
+  fireEvent.keyDown(options[0], { key: 'ArrowRight' }); await flush()
+  expect(options.filter(button => button.getAttribute('aria-pressed') === 'true')).toEqual([options[1]])
+  expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({ displayStatus: 'scheduled', cursor: 0 }))
+  expect(document.activeElement).toBe(options[1])
+  fireEvent.keyDown(options[1], { key: 'End' }); await flush()
+  expect(options[5].getAttribute('aria-pressed')).toBe('true')
+  expect(listBroadcasts).toHaveBeenLastCalledWith(expect.objectContaining({ displayStatus: 'failed,partial_failed', cursor: 0 }))
+})
