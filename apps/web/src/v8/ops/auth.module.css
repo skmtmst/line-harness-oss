@@ -15,7 +15,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
+  gap: var(--tpl-op-brand-logo-gap);
 }
 
 .brandSub {
@@ -88,7 +88,7 @@
 }
 
 .forgot {
-  align-self: flex-start;
+  align-self: flex-end;
   color: var(--color-accent-deep);
   font-size: var(--text-caption);
   font-weight: 600;

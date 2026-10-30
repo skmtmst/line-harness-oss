@@ -42,15 +42,18 @@ const labels = await import('@/v8/settings/staff/permission-labels')
 async function fillBasics() {
   render(<NewStaffPage />)
   await waitFor(() => {
-    expect(screen.getByLabelText('最初に表示するアカウント')).toBeTruthy()
+    expect(screen.getByLabelText(/名前/)).toBeTruthy()
+    expect(screen.queryByLabelText('最初に表示するアカウント')).toBeNull()
   })
   await act(async () => {
     fireEvent.click(screen.getByRole('radio', { name: /スタッフ/ }))
     fireEvent.change(screen.getByLabelText(/名前/), { target: { value: '承認担当' } })
     fireEvent.change(screen.getByLabelText(/メールアドレス/), { target: { value: 'approve@example.test' } })
-    fireEvent.click(screen.getByLabelText('最初に表示するアカウント'))
-    fireEvent.click(await screen.findByRole('radio', { name: '本店' }))
-    fireEvent.click(screen.getByRole('button', { name: '選ぶ' }))
+    expect(screen.getByText('担当範囲は本店のみです。')).toBeTruthy()
+    expect(screen.queryByText('専用機能')).toBeNull()
+    for (const name of ['ECデータ連携', 'LINE通知', 'フォロー配信', '投稿写真審査']) {
+      expect(screen.queryByRole('checkbox', { name })).toBeNull()
+    }
   })
 }
 
@@ -69,6 +72,7 @@ async function save() {
   await waitFor(() => {
     expect(fixture.created).toHaveLength(1)
   })
+  expect(fixture.created[0]).toMatchObject({ assignedLineAccountId: 'acc-1', accountScope: 'accounts', scopedLineAccountIds: ['acc-1'], canAccessDescendantAccounts: false })
   return fixture.created[0] as { permissionKeys: string[] }
 }
 

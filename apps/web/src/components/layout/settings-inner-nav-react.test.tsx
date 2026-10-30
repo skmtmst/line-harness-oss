@@ -5,7 +5,7 @@ import type { StaffMember } from '@line-crm/shared'
  * ★V8（夕41）：設定の画面の、白い板の中の左の「設定の中のメニュー」。
  *
  *   - 絵の並び（会社とロゴは API ができるまで出さない）
- *   - マニュアルの対応表・ファイルの安全確認も同じ段の項目
+ *   - いま使わないマニュアルの対応表・ファイルの安全確認はメニューに出さない
  *   - EC連携は出し、専用のLINE通知は共通メニューに出さない
  *   - いまの画面が選ばれた形になる
  *   - 見るだけの人には、見られる画面だけ出す（左のメニューと同じ決まり）
@@ -123,9 +123,6 @@ describe('★V8 設定の中のメニュー', () => {
       'プール管理',
       'ログインユーザー',
       '機能設定',
-      // 2つの設定も同じ段に並べる
-      'マニュアルの対応表',
-      'ファイルの安全確認',
       '運用状態',
       'EC連携',
       // 提案 E-6：今ある絵の並びを動かさないよう末尾に足した
@@ -193,14 +190,15 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
   })
 
-  it('SNS 連携の画面でも2つの設定の入口を残し、現在地だけを示す', async () => {
+  it('SNS 連携の画面でも現在地だけを示す', async () => {
     fixture.pathname = '/settings/sns'
     fixture.visibility.mockResolvedValue({ success: true, data: { features: {} } })
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(view.queryByRole('link', { name: 'SNS 連携' })).toBeTruthy())
     expect(view.getByRole('link', { name: 'SNS 連携' }).getAttribute('aria-current')).toBe('page')
     expect(view.getByRole('link', { name: '機能設定' }).getAttribute('aria-current')).toBeNull()
-    expect(view.getByRole('link', { name: 'ファイルの安全確認' }).getAttribute('href')).toBe('/settings/file-scan')
+    expect(view.queryByRole('link', { name: 'マニュアルの対応表' })).toBeNull()
+    expect(view.queryByRole('link', { name: 'ファイルの安全確認' })).toBeNull()
   })
 
   it('LINE通知は直接開いた画面でも共通の設定メニューに出さない', async () => {
@@ -214,39 +212,18 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page')).toHaveLength(0)
   })
 
-  it('2つの設定は、ほかの設定画面でも同じ段に残す', async () => {
-    fixture.pathname = '/accounts'
-    const view = render(<SettingsInnerNav />)
-    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
-    expect(view.getByRole('link', { name: 'マニュアルの対応表' }).parentElement?.parentElement).toBe(view.getByRole('link', { name: '機能設定' }).parentElement?.parentElement)
-    expect(view.getByRole('link', { name: 'LINEアカウント' }).className).toContain('itemActive')
-  })
-
-  it('いまの画面は選ばれた形とaria-currentで示す', async () => {
-    fixture.pathname = '/settings/manual-links'
-    const view = render(<SettingsInnerNav />)
-    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
-    const child = view.getByRole('link', { name: 'マニュアルの対応表' })
-    expect(child.className).toContain('itemActive')
-    const parent = view.getByRole('link', { name: '機能設定' })
-    expect(parent.className).not.toContain('itemActive')
-  })
-
-  it.each(['/settings', '/settings/manual-links', '/settings/file-scan', '/settings/sns'])('設定 %s でも項目を入れ子にせず現在地を1つだけ示す', async (pathname) => {
+  it.each(['/settings', '/settings/manual-links', '/settings/file-scan', '/settings/sns'])('設定 %s でも使わない2項目を表示しない', async (pathname) => {
     fixture.pathname = pathname
     const view = render(<SettingsInnerNav inline />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
     const nav = view.getByRole('navigation', { name: '設定の中のメニュー' })
     const parent = view.getByRole('link', { name: '機能設定' })
-    const manual = view.getByRole('link', { name: 'マニュアルの対応表' })
-    const scan = view.getByRole('link', { name: 'ファイルの安全確認' })
-    for (const link of [manual, scan]) {
-      expect(link.parentElement?.parentElement).toBe(parent.parentElement?.parentElement)
-      expect(link.classList[0]).toBe(parent.classList[0])
-      expect(link.querySelector('svg')).toBeTruthy()
-    }
+    expect(view.queryByRole('link', { name: 'マニュアルの対応表' })).toBeNull()
+    expect(view.queryByRole('link', { name: 'ファイルの安全確認' })).toBeNull()
     expect(nav.querySelector('ul ul')).toBeNull()
-    expect(view.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page').map((link) => link.getAttribute('href'))).toEqual([pathname])
+    const active = view.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page').map((link) => link.getAttribute('href'))
+    expect(active).toEqual(pathname === '/settings' || pathname === '/settings/sns' ? [pathname] : [])
+    expect(parent.getAttribute('aria-current')).toBe(pathname === '/settings' ? 'page' : null)
   })
 
   it('見るだけの人には見られる画面だけ出す（スタッフにはログインユーザーを出さない）', async () => {

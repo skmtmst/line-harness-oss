@@ -441,10 +441,12 @@ describe('0件の出し分けとページ', () => {
     expect(view.queryByText('まだリッチメニューがありません')).toBeNull()
     fireEvent.click(view.getByRole('button', { name: '条件を外す' }))
     await waitFor(() => expect(mocks.listPage).toHaveBeenLastCalledWith('account-a', expect.objectContaining({ query: '', filter: '', folderId: '', page: 1 })))
-    const params = new URLSearchParams(window.location.search)
-    expect(params.get('q') ?? '').toBe('')
-    expect(params.get('view') ?? '').toBe('')
-    expect(params.get('folder') ?? '').toBe('')
+    await waitFor(() => {
+      const params = new URLSearchParams(window.location.search)
+      expect(params.get('q') ?? '').toBe('')
+      expect(params.get('view') ?? '').toBe('')
+      expect(params.get('folder') ?? '').toBe('')
+    })
   })
 
   test('何も絞っていない0件は「まだリッチメニューがありません」と作る口を出す', async () => {

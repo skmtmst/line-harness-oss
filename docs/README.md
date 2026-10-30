@@ -460,6 +460,8 @@
 ## 反映履歴
 
 - [飲食店向け設定の表示条件](release-log/unreleased/1965-masato-restaurant-only-settings.md)
+- [EC連携の表示条件](release-log/unreleased/1966-masato-ec-usecase-visibility.md)
+- [飲食店の入口とメニュー価格の保存](release-log/unreleased/1967-masato-restaurant-simplify.md)
 - [配信・シナリオ・自動応答の日時・題・下見の修正](release-log/unreleased/1954-kenta-muse-delivery.md)
 - [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
 - [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
@@ -985,3 +987,4 @@
 - [アカウントごとの監査履歴](release-log/unreleased/1962-masato-audit-account-isolation.md) — 反映履歴。
 - [担当者のアカウント範囲](release-log/unreleased/1961-masato-single-account-staff-scope.md) — 反映履歴。
 - [統括からのLINEアカウント管理](release-log/unreleased/1963-masato-line-account-hq-scope.md) — 反映履歴。
+- [シナリオ一覧の権限とお知らせのベル](release-log/unreleased/1964-kenta-train-1029n.md) — 反映履歴。
