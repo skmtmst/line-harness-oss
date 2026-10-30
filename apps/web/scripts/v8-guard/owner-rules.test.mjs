@@ -1,4 +1,5 @@
 import './pick-field-surface.test.mjs'
+import './date-group.test.mjs'
 import './kpi-delta-row.test.mjs'
 import './ledger-band-align.test.mjs'
 import './ledger-empty.test.mjs'
