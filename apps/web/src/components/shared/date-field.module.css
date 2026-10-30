@@ -322,8 +322,8 @@
 
 :root .field[data-size="compact"] { height: var(--tpl-rt-control-h); }
 
-/* 日付を選ぶ入口は白い地と薄い線。入力の誤りとキーボードの輪は残す。 */
-:root .field { border-color: var(--color-control-border); background: var(--color-canvas); font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
+/* 日付を選ぶ入口は白い地。入力の誤りとキーボードの輪は残す。 */
+:root .field { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
 :root .field:not([data-open]):not([data-invalid]) { border-color: var(--color-control-border); box-shadow: none; }
 :root .field[data-open] { border-color: var(--color-control-border); box-shadow: none; }
 :root .field:hover:not(:disabled):not([data-readonly]) { background: var(--color-canvas-sunken); }
@@ -337,7 +337,7 @@
 /* 日付の欄も線ではなく影で浮かせる。 */
 :root .field {
   border: 0;
-  background: var(--gradient-raised-control) var(--color-canvas);
+  background: var(--color-canvas);
   box-shadow: var(--shadow-raised-control);
 }
 
