@@ -119,3 +119,46 @@ test('生年月日が未登録なら回答年齢を表示して編集でき、�
   expect(screen.queryByText('年齢')).toBeNull()
   expect(JSON.parse(localStorage.getItem('chat.friendInfoSections.v4')!).hidden).toContain('fixed:age')
 })
+
+const diningFields: FriendField[] = [
+  ...fields,
+  { ...fields[0], id: 'anniversary', name: '記念日', fixedKey: 'anniversary', type: 'date', value: '2026-10-10', valueSource: null },
+  { ...fields[0], id: 'seat', name: '席の好み', fixedKey: 'seat_preference', value: null, valueSource: null },
+]
+
+test('飲食の要点は基本の後に同じ順で並び、空の値とアレルギーの重複を作らない', () => {
+  render(<CustomerInfoPanel friendId="f" fields={diningFields} state="ready" canEdit={false} sections={[]} includeDiningFields />)
+  const labels = [...document.querySelectorAll('dt')].map(node => node.textContent)
+  expect(labels.slice(-3)).toEqual(['アレルギー', '記念日', '席の好み'])
+  expect(labels.filter(label => label === 'アレルギー')).toHaveLength(1)
+  expect(screen.getByText('2026年10月10日')).toBeTruthy()
+  expect(screen.getByText('席の好み').parentElement?.querySelector('dd')?.textContent).toBe('未設定')
+  expect(screen.queryByRole('button', { name: '編集' })).toBeNull()
+})
+
+test('標準の要点は飲食の値が残っていても基本だけで、飲食への切替と戻しを分ける', () => {
+  const props = { friendId: 'f', fields: diningFields, state: 'ready' as const, canEdit: false, sections: [] }
+  const view = render(<CustomerInfoPanel {...props} />)
+  expect(screen.queryByText('記念日')).toBeNull()
+  expect(screen.queryByText('席の好み')).toBeNull()
+  view.rerender(<CustomerInfoPanel {...props} includeDiningFields />)
+  expect(screen.getByText('記念日')).toBeTruthy()
+  view.rerender(<CustomerInfoPanel {...props} includeDiningFields={false} />)
+  expect(screen.queryByText('記念日')).toBeNull()
+})
+
+test('飲食の値も変更した欄だけ保存し、表示項目の好みで隠せる', async () => {
+  render(<CustomerInfoPanel friendId="f" fields={diningFields} state="ready" canEdit sections={[]} includeDiningFields />)
+  fireEvent.click(screen.getByRole('button', { name: '編集' }))
+  fireEvent.change(screen.getByRole('textbox', { name: '席の好み' }), { target: { value: '窓側' } })
+  vi.mocked(api.friendFields.saveForFriend).mockResolvedValueOnce({ success: true } as never)
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(screen.getByText('窓側')).toBeTruthy())
+  expect(api.friendFields.saveForFriend).toHaveBeenLastCalledWith('f', { seat: '窓側' })
+  fireEvent.click(screen.getByRole('button', { name: '表示項目を編集' }))
+  expect((screen.getByRole('checkbox', { name: '記念日' }) as HTMLInputElement).checked).toBe(true)
+  fireEvent.click(screen.getByRole('checkbox', { name: '席の好み' }))
+  fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+  expect(screen.queryByText('席の好み')).toBeNull()
+  expect(JSON.parse(localStorage.getItem('chat.friendInfoSections.v4')!).hidden).toContain('fixed:seat_preference')
+})

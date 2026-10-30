@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { FileText, Settings2 } from 'lucide-react'
 import HelpTip from './help-tip'
 import Avatar from './avatar'
-import type { FriendField } from '@line-crm/shared'
+import { FIXED_FRIEND_FIELDS as ALL_FIXED_FRIEND_FIELDS, type FriendField } from '@line-crm/shared'
 import Button from './button'
 import Dialog from './dialog'
 import DisplayItemsDialog from './display-items-dialog'
@@ -24,7 +24,7 @@ export function CustomerInfoViewport({ children }: { children: ReactNode }) {
 }
 /** 友だち概要と受信箱の共通の欄。取得・保存は呼び出し側、表示項目の好みは共通。 */
 export default function CustomerInfoPanel({
-  friendId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false, labelWidth = 'standard',
+  friendId, profile, fields, state, onRetry, canEdit, sections, more, extraSections = [], hiddenPersonalCount = 0, actionWording = false, labelWidth = 'standard', includeDiningFields = false,
 }: {
   friendId: string
   profile?: { name: string | null; pictureUrl?: string | null; addedAt: string }
@@ -39,7 +39,10 @@ export default function CustomerInfoPanel({
   hiddenPersonalCount?: number
   /** 受信箱の右の列では項目名の内容に合わせて幅を決める。 */
   labelWidth?: 'standard' | 'wide'
+  /** 飲食を使うアカウントでは、記念日・席の好みも基本の要点へ含める。 */
+  includeDiningFields?: boolean
 }) {
+  const fixedSpecs = includeDiningFields ? ALL_FIXED_FRIEND_FIELDS : FIXED_FRIEND_FIELDS
   const [expanded, setExpanded] = useState(false)
   const [settings, setSettings] = useState(false)
   const [hidden, setHidden] = useState<string[]>([])
@@ -91,11 +94,11 @@ export default function CustomerInfoPanel({
       {state === 'loading' ? <p className={styles.note}>情報欄を読み込んでいます…</p>
         : state === 'error' ? <p className={styles.note} role="alert">情報欄を読み込めませんでした <Button variant="text" onClick={onRetry}>もう一度読み込む</Button></p>
         : <dl className={styles.rows}>
-          {[...FIXED_FRIEND_FIELDS].sort((a,b) => (order.indexOf(`fixed:${a.key}`) < 0 ? 999 : order.indexOf(`fixed:${a.key}`)) - (order.indexOf(`fixed:${b.key}`) < 0 ? 999 : order.indexOf(`fixed:${b.key}`))).filter(spec => (spec.key !== 'age' || !birthdayVisible) && !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
+          {[...fixedSpecs].sort((a,b) => (order.indexOf(`fixed:${a.key}`) < 0 ? 999 : order.indexOf(`fixed:${a.key}`)) - (order.indexOf(`fixed:${b.key}`) < 0 ? 999 : order.indexOf(`fixed:${b.key}`))).filter(spec => (spec.key !== 'age' || !birthdayVisible) && !hidden.includes(`fixed:${spec.key}`) && fields.some(f => f.fixedKey === spec.key)).map(spec => {
             const { value, source, derived } = fixedFieldValue(shownFields, spec.key)
             const age = spec.key === 'birthday' && !hidden.includes('fixed:age') ? fixedFieldValue(shownFields, 'age').value : null
             // 生年月日は日付の欄と同じ「1988年4月12日」の書き方で出す（狭い欄なので曜日は省き、年齢を添える・）。
-            const ymd = spec.key === 'birthday' && value ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null
+            const ymd = spec.type === 'date' && value ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(value) : null
             const shownValue = ymd ? `${Number(ymd[1])}年${Number(ymd[2])}月${Number(ymd[3])}日` : value
             const display = shownValue && age ? `${shownValue}（${age}歳）` : shownValue
             const field = shownFields.find(field => field.fixedKey === spec.key)!
@@ -111,7 +114,7 @@ export default function CustomerInfoPanel({
         if (!canEdit || saving) return
         const started = generation.current
         setSaving(true); setSaveError('');
-        const values = Object.fromEntries(shownFields.filter(field => FIXED_FRIEND_FIELDS.some(spec => spec.key === field.fixedKey) && draft[field.id] !== (field.value ?? '')).map(field => [field.id, draft[field.id]]))
+        const values = Object.fromEntries(shownFields.filter(field => fixedSpecs.some(spec => spec.key === field.fixedKey) && draft[field.id] !== (field.value ?? '')).map(field => [field.id, draft[field.id]]))
         try { const result = await api.friendFields.saveForFriend(friendId, values); if (generation.current !== started) return; if (!result.success) throw new Error(result.error ?? '保存できませんでした。時間をおいて、もう一度お試しください。'); setSaved(current => ({ ...current, ...values })); setEditing(false); notifyToast('保存しました'); onRetry?.() }
         catch (error) { if (generation.current === started) setSaveError(japaneseDetailOf(error) || '保存できませんでした。時間をおいて、もう一度お試しください。') }
         finally { if (generation.current === started) setSaving(false) }
@@ -136,10 +139,10 @@ export default function CustomerInfoPanel({
     {canEdit ? <Button variant="text" onClick={() => setSettings(true)}><Settings2 aria-hidden="true" />表示項目を編集</Button> : null}
     {settings && canEdit ? <DisplayItemsDialog title="表示項目" items={[
       ...choices.map(choice => ({...choice, group:'顧客情報の段'})),
-      ...FIXED_FRIEND_FIELDS.map(spec => ({key:`fixed:${spec.key}`,label:spec.label,group:'基本'})),
-    ]} selected={[...choices.map(choice => choice.key),...FIXED_FRIEND_FIELDS.map(spec => `fixed:${spec.key}`)].filter(key => !hidden.includes(key)).sort((a,b) => (order.indexOf(a)<0?999:order.indexOf(a))-(order.indexOf(b)<0?999:order.indexOf(b)))}
+      ...fixedSpecs.map(spec => ({key:`fixed:${spec.key}`,label:spec.label,group:'基本'})),
+    ]} selected={[...choices.map(choice => choice.key),...fixedSpecs.map(spec => `fixed:${spec.key}`)].filter(key => !hidden.includes(key)).sort((a,b) => (order.indexOf(a)<0?999:order.indexOf(a))-(order.indexOf(b)<0?999:order.indexOf(b)))}
       manageHref="/friend-fields" onCancel={() => setSettings(false)} onConfirm={keys => {
-        const all = [...choices.map(choice => choice.key),...FIXED_FRIEND_FIELDS.map(spec => `fixed:${spec.key}`)]
+        const all = [...choices.map(choice => choice.key),...fixedSpecs.map(spec => `fixed:${spec.key}`)]
         setHidden(all.filter(key => !keys.includes(key))); setOrder(keys); setSettings(false)
       }} /> : null}
   </div>
