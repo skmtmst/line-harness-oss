@@ -731,13 +731,10 @@ const STAFF_TAB_KEYS = [
   { key: 'audit', label: 'ログイン履歴' }, { key: 'roles', label: '役割と権限' },
 ] as const
 
-/** 最後に入った日の短い言い方（絵：いま・9/30）。10分以内は「いま」。日本時間の 月/日。 */
-function shortWhen(value: string | null | undefined, now: number): string {
+/** 最終ログイン日を日本時間の日付だけで表示する。 */
+function lastLoginDay(value: string | null | undefined): string {
   if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  if (Math.abs(now - date.getTime()) < 10 * 60 * 1000) return 'いま'
-  return polishFormatDate(value, { style: 'list-day', now })
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 /** 二段階認証の札。オン／確認が必要（作る・送る役割で未設定）／無効（見るだけで未設定・止めた人）。 */
@@ -1017,7 +1014,6 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     return <SaveErrorScope errors={saveErrors}><PermissionScopeView user={permissionTarget} memberId={permissionMember?.id ?? null} canSave={Boolean(administrator && !permissionMember?.isAccountCreator && permissionMember?.canManageInAccount !== false)} copyCandidates={copyCandidates} roleCounts={accessSummary.roleCounts} accountNames={accountNames} savedEditKeys={permissionMember?.permissionKeys ?? []} savedViewKeys={permissionMember?.permissionViewKeys ?? []} savedEmailMask={permissionMember?.emailMask ?? null} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} onConflict={handlePermissionConflict} /></SaveErrorScope>
   }
   const viewer = me !== null && !administrator
-  const nowMs = Date.now()
   const activeCount = accessUsers.filter((user) => user.status === 'active').length
   const suspendedCount = accessUsers.filter((user) => user.status === 'suspended').length
   const roleOf = (user: AccessUserItem): RoleKey => {
@@ -1059,9 +1055,9 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       </div>
       <GridTable className={`${styles.table} ${viewer ? styles.readOnlyTable : ''}`} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: 'var(--tpl-sa-staff-card-gap)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>
         <GridHeadRow>
-          <GridCell className={styles.colPerson} role="columnheader">人</GridCell>
-          <GridCell className={styles.colRole} role="columnheader">役割</GridCell>
-          <GridCell className={styles.colLast} role="columnheader">最後に入った</GridCell>
+          <GridCell className={styles.colPerson} role="columnheader">ユーザー情報</GridCell>
+          <GridCell className={styles.colRole} role="columnheader">権限</GridCell>
+          <GridCell className={styles.colLast} role="columnheader">最終ログイン</GridCell>
           <GridCell className={styles.colMenu} role="columnheader"><span className={styles.srOnly}>操作</span></GridCell>
         </GridHeadRow>
         {loading ? <p className={styles.stateRow} role="status">ログインユーザーを読み込んでいます…</p>
@@ -1075,7 +1071,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                 {/* 絵 nku0f：顔・名前・メール。担当のLINEアカウントは列にせず、名前に重ねた説明と「見える画面」で見る。 */}
                 <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>{member?.isAccountCreator ? <span className={styles.personSub}>管理者・アカウント作成者</span> : null}{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
                 <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} />}</GridCell>
-                <GridCell className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</GridCell>
+                <GridCell className={styles.colLast} role="cell" title={user.lastLoginAt ? formatStaffDate(user.lastLoginAt) : undefined}>{lastLoginDay(user.lastLoginAt)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
                   <RowMenu size="row" label={`${user.name}の操作`} items={items} open={openMenuId === user.id} onOpenChange={(next) => setOpenMenuId(next ? user.id : null)} />
                 </GridCell>
