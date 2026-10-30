@@ -271,6 +271,13 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
     classification: { kind: 'public', reason: '登録前・ログイン前にTurnstileと回数制限で守る認証経路' },
   },
   {
+    // 一次認証の課題で本人確認する。管理セッション発行前の公開経路。
+    pattern: /^\/api\/auth\/passkeys\/login\/(?:options|verify)$/,
+    methods: ['POST'],
+    accountResolver: 'none',
+    classification: { kind: 'public', reason: '一次認証の課題で本人確認するパスキーログインの入口' },
+  },
+  {
     // 二段階認証の確認と初回設定。セッションはまだ無く、合言葉だけで守る公開経路。
     pattern: /^\/api\/auth\/two-factor\/(verify|setup(?:\/confirm)?)$/,
     methods: ['POST'],
