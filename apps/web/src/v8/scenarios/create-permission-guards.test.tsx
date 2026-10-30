@@ -313,3 +313,34 @@ it.each(['proxy', 'person'] as const)('下書きの守りは保持した捨て�
   expect(calls.draftDelete).not.toHaveBeenCalled()
   expect(calls.draftGet).toHaveBeenCalled()
 })
+
+
+it('保持された空欄保存でもAPI0で、欄の必須理由と焦点を残す', async () => {
+  fixture.search = ''
+  render(<ScenarioCreateV8 />)
+  const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView')
+  await invoke(held.save)
+  expect(calls.create).not.toHaveBeenCalled()
+  expect(name().getAttribute('aria-invalid')).toBe('true')
+  expect(name().getAttribute('aria-describedby')).toContain('scenario-name-error')
+  expect(screen.getByText('シナリオ名を入力してください', { selector: '#scenario-name-error' })).toBeTruthy()
+  expect(document.activeElement).toBe(name())
+  expect(scroll).toHaveBeenCalledWith({ block: 'center' })
+  scroll.mockRestore()
+})
+
+
+it.each(['new', 'existing'] as const)('保持した下書き保存の%sも、空欄の必須理由/焦点/スクロールを守り書込0', async kind => {
+  if (kind === 'new') { fixture.search = ''; render(<ScenarioCreateV8 />) }
+  else { await ready(); fireEvent.change(name(), { target: { value: '' } }) }
+  const scroll = vi.spyOn(HTMLElement.prototype, 'scrollIntoView')
+  try {
+    await invoke(held.draft)
+    expect(name().getAttribute('aria-invalid')).toBe('true')
+    expect(name().getAttribute('aria-describedby')).toContain('scenario-name-error')
+    expect(screen.getByText('シナリオ名を入力してください', { selector: '#scenario-name-error' })).toBeTruthy()
+    expect(document.activeElement).toBe(name())
+    expect(scroll).toHaveBeenCalledWith({ block: 'center' })
+    for (const write of [calls.create, calls.update, calls.draftSave, calls.draftDelete, calls.push]) expect(write).not.toHaveBeenCalled()
+  } finally { scroll.mockRestore() }
+})

@@ -1,11 +1,13 @@
 import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 /*
  * ★V8 シナリオを作る①（create.tsx・）と配信結果（results.tsx・）の動きの試験。
  * BEHAVIOR.md の主な動きを守る：
  * - 作る①：はじめは「時刻で指定」を選び、2方式の図を要約で読める。既存の下書きは保存済みの方式。
- *   閲覧のみには保存の操作を置かず帯を出す。「この方式で保存する」で作って1通目へ進む。
+ *   閲覧のみには保存の操作を灰色と理由付きで残す。「この方式で保存する」で作って1通目へ進む。
  * - 配信結果：購読の状態の札（途中・送れずに止まった・読み終えた）と「何通目まで」。
  *   「…」は配信中・止まっている行だけ、閲覧のみには置かない。配信失敗の行だけ「失敗を再送」。
  */
@@ -141,7 +143,7 @@ beforeEach(() => {
   create.mockReset()
   document.documentElement.dataset.theme = 'v8'
 })
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot() })
 
 describe('作る①（dnzqC）', () => {
   test('F7: 画面の説明が開け、名前の必須と欄の理由を読む', async () => {
@@ -150,11 +152,12 @@ describe('作る①（dnzqC）', () => {
     expect(name.getAttribute('aria-required')).toBe('true')
     fireEvent.click(screen.getByRole('button', { name: 'シナリオを作るの説明' }))
     expect(screen.getByText('名前とフォルダを決め、配信方式を選んでから1通目を設定します。作ったあとは配信方式を変えられません。')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: /この方式で保存する/ }))
-    await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'))
-    expect(name.getAttribute('aria-describedby')).toContain('scenario-name-error')
-    expect(document.getElementById('scenario-name-error')?.textContent).toBe('シナリオ名を入力してください')
-    expect(document.activeElement).toBe(name)
+    const save = screen.getByRole('button', { name: /この方式で保存する/ }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    expect(save.hasAttribute('data-permission-locked')).toBe(false)
+    expect(save.getAttribute('aria-description')).toBe('シナリオ名を入力してください')
+    expect(document.querySelector('[data-template-region="footer"] [role="status"]')?.textContent).toBe('シナリオ名を入力してください')
+    fireEvent.click(save)
     expect(create).not.toHaveBeenCalled()
   })
 
@@ -208,12 +211,17 @@ describe('作る①（dnzqC）', () => {
     expect(push).not.toHaveBeenCalledWith(expect.stringContaining('/scenarios/first-step'))
   })
 
-  test('閲覧のみには保存の操作を置かず、帯を出す', () => {
+  test('編集鍵が無い担当者にも保存の操作を残し、共通の理由と帯で拒む', () => {
     role = verifiedStaffRole('staff')
     render(<ScenarioCreateV8 />)
-    expect(screen.queryByRole('button', { name: /この方式で保存する/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: /あとで決める/ })).toBeNull()
-    expect(screen.getByText(/閲覧のみで見ています/)).toBeTruthy()
+    const save = screen.getByRole('button', { name: /この方式で保存する/ })
+    expect(save.hasAttribute('data-permission-locked')).toBe(true)
+    expect(save.getAttribute('aria-disabled')).toBe('true')
+    const draft = getPageAction({ name: /あとで決める/ })
+    expect(draft.getAttribute('aria-disabled')).toBe('true')
+    expect(document.querySelectorAll('[data-read-only-notice]')).toHaveLength(1)
+    fireEvent.click(save); fireEvent.click(draft)
+    expect(create).not.toHaveBeenCalled()
   })
 })
 
