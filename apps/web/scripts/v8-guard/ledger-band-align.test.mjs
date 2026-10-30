@@ -25,20 +25,26 @@ test('予約台帳の数の帯の左右端は下の段と±2pxで一致する', 
         assert.ok(!m.error, `${width}: ${m.error}`)
         assert.ok(Math.abs(m.dLeft) <= 2, `${width}: left drift ${m.dLeft} (band ${m.bandLeft} / lower ${m.lowerLeft})`)
         assert.ok(Math.abs(m.dRight) <= 2, `${width}: right drift ${m.dRight} (band ${m.bandRight} / lower ${m.lowerRight})`)
-        /* 故障対照：帯を内側に寄せると検出する。 */
+        /* 故障対照：帯を内側に寄せると、本判定と同じ物差しで検出する。 */
         const fault = await page.evaluate(async () => {
-          const board = document.querySelector('[role="region"][aria-label$="の時間×卓"]').getBoundingClientRect()
           for (let i = 0; i < 20; i++) {
             const band = document.querySelector('[data-shared-part="kpi-band"]')
             band.style.setProperty('margin-inline', '24px', 'important')
             await new Promise((resolve) => setTimeout(resolve, 100))
             const again = document.querySelector('[data-shared-part="kpi-band"]')
-            if (again === band && getComputedStyle(band).marginInlineStart === '24px') {
-              const r = band.getBoundingClientRect()
-              return { dLeft: r.left - board.left, dRight: r.right - board.right, stuck: true }
-            }
+            if (again === band && getComputedStyle(band).marginInlineStart === '24px') break
+            if (i === 19) return { dLeft: 0, dRight: 0, stuck: false }
           }
-          return { dLeft: 0, dRight: 0, stuck: false }
+          const band = document.querySelector('[data-shared-part="kpi-band"]').getBoundingClientRect()
+          const board = document.querySelector('[role="region"][aria-label$="の時間×卓"]').getBoundingClientRect()
+          const nextCard = document.querySelector('[aria-labelledby="rs-next-title"]')
+          const side = nextCard ? nextCard.parentElement : null
+          let rightRef = board.right
+          if (side) {
+            const sideRect = side.getBoundingClientRect()
+            if (sideRect.width > 0 && getComputedStyle(side).display !== 'none') rightRef = sideRect.right
+          }
+          return { dLeft: band.left - board.left, dRight: band.right - rightRef, stuck: true }
         })
         assert.ok(fault.stuck, `${width}: fault must stick`)
         assert.ok(Math.abs(fault.dLeft) > 2 || Math.abs(fault.dRight) > 2, `${width}: fault must drift`)
