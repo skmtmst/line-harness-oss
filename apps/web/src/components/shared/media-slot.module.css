@@ -19,6 +19,8 @@
   min-width: 0;
 }
 
+.help { align-self: flex-end; }
+
 .frame {
   position: relative;
   display: flex;
