@@ -38,7 +38,7 @@ import styles from './edit.module.css'
  * ★V8 メニュー管理 › コース・単品の編集（修正案 f4bLF の mauOC）。1枚の編集ページ＋右の説明カード。
  * 前の「追加・変更の窓」は消し、一覧の［変更］［メニューを追加する］はここへ来る。
  * 受け付ける指定：?id=<品目>（変更）・?store=<店舗>（追加）。
- * 送る形は前の窓と同じ（createMenu／updateMenu。価格を変えると承認へ申請）。お支払いは  の段（コースだけ）。
+ * 送る形は前の窓と同じ（createMenu／updateMenu。価格変更は確認後に確定）。お支払いはコースだけ。
  * 「受ける人数」は今のデータに無いので置かない（口待ち）。所要時間は読むだけ。
  */
 
@@ -76,6 +76,7 @@ function MenuEditBody() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [confirmingPrice, setConfirmingPrice] = useState(false)
 
   const load = useCallback(async () => {
     if (!selectedAccountId) return
@@ -97,6 +98,8 @@ function MenuEditBody() {
   const course = draft.kind === 'course'
   const payment = useMenuPayment('course', selectedAccountId, editing && editing.kind === 'course' ? editing.id : null)
   const priceChanged = Boolean(editing && draft.price !== '' && Number(draft.price) !== editing.price)
+  const priceStartsAt = draft.effectiveAt ? new Date(datetimeLocalJstToUtcIso(draft.effectiveAt)) : null
+  const priceStartsLater = Boolean(priceStartsAt && priceStartsAt.getTime() > Date.now())
   const dirty = state === 'ready' && (JSON.stringify(draft) !== JSON.stringify(saved) || payment.dirty)
   const title = editing ? editing.name : course ? 'コースを追加する' : 'メニューを追加する'
   usePageTitle(title)
@@ -116,7 +119,7 @@ function MenuEditBody() {
       if (editing) {
         await restaurantTestApi.updateMenu(selectedAccountId, editing.id, body)
         if (editing.kind === 'course') await payment.save(editing.id)
-        notifySaved(priceChanged ? '価格変更を承認待ちとして申請しました。現在の価格は変わりません。' : 'メニューを更新しました。')
+        notifySaved(priceChanged ? (priceStartsLater ? '価格変更を確定しました。指定した開始日時に反映します。' : '価格を変更しました。') : 'メニューを更新しました。')
       } else {
         if (!storeId) throw new Error('store_missing')
         await restaurantTestApi.createMenu(selectedAccountId, { storeId, ...body })
@@ -171,14 +174,14 @@ function MenuEditBody() {
         busy={busy}
         readOnly={!canEdit}
         title={<span className={styles.title}><span className={styles.titleParent}>メニュー管理 ›</span>{title}</span>}
-        help={<>コースと単品の名前・値段・提供時間・アレルギーと、お支払いの方法を決めます。価格を変えると承認の流れへ回ります。</>}
+        help={<>コースと単品の名前・値段・提供時間・アレルギーと、お支払いの方法を決めます。価格変更は確認して保存すると確定します。</>}
         preview={side}
         previewSurface="plain"
         previewToggle={<PreviewLauncher title="お支払いの説明" label="お支払いの説明を見る">{side}</PreviewLauncher>}
         destructive={canEdit && draftItem ? <Button variant="danger" onClick={() => setDeleting(true)} disabled={busy}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
-          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} onClick={() => void save()}><Check size={16} aria-hidden="true" />{editing ? (priceChanged ? '保存して申請する' : '保存する') : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} onClick={() => priceChanged ? setConfirmingPrice(true) : void save()}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
@@ -213,11 +216,11 @@ function MenuEditBody() {
               <SaveErrorField names={['allergens', 'draft.allergens']}><TextField id="rs-menu-allergens" value={draft.allergens} onChange={(event) => setDraft({ ...draft, allergens: event.target.value })} /></SaveErrorField>
             </Field>
             <p className={styles.note}>{editing
-              ? `価格を変えると承認の流れへ回ります。承認されるまで、いまの価格（${formatYen(editing.price)}）のまま出ます。空欄の開始日時は承認後すぐに反映します。`
+              ? `価格を変える場合は保存時に確認します。開始日時を空欄にすると保存後すぐに反映します。現在の価格は${formatYen(editing.price)}です。`
               : '追加したメニューは、予約台帳・Google投稿・LINEカードで同じマスターとして使われます。'}</p>
           </Card>
         ) : (
-          <CreateSummaryCard title="メニューの内容" description={editing?.pendingPrice != null ? '変更予定の価格は承認後に反映します。開始日時が未設定のときは、承認後すぐに反映します。' : undefined} rows={[
+          <CreateSummaryCard title="メニューの内容" description={editing?.pendingPrice != null ? (editing.priceChangeStatus === 'approved' ? '確定した新価格は指定した開始日時に反映します。' : '以前の価格変更申請が残っています。メニュー一覧から確認してください。') : undefined} rows={[
             { label: '種類', value: draft.kind === 'course' ? 'コース' : '単品' },
             { label: 'メニュー名', value: draft.name || emptyValue('unconfigured') },
             { label: '価格（税込）', value: editing ? formatYen(editing.price) : emptyValue('unconfigured') },
@@ -237,6 +240,9 @@ function MenuEditBody() {
       </CreatePage>
       <ConfirmDialog open={deleting} title="この下書きを削除しますか？" description="一度も公開していない下書きだけ削除できます。元に戻せません。"
         confirmLabel="削除する" destructive busy={busy} onCancel={() => setDeleting(false)} onConfirm={() => void remove()} />
+      <ConfirmDialog open={confirmingPrice} title="価格変更を確定しますか？"
+        description={`${editing?.name ?? 'メニュー'}の価格を${formatYen(editing?.price ?? 0)}から${formatYen(Number(draft.price))}へ変更します。${priceStartsLater && priceStartsAt ? `${polishFormatDateTime(priceStartsAt)}に新価格を反映します。` : '保存後すぐに新価格を反映します。'}`}
+        confirmLabel="確定して保存する" busy={busy} onCancel={() => setConfirmingPrice(false)} onConfirm={() => { setConfirmingPrice(false); void save() }} />
     </SaveErrorScope>
   )
 }

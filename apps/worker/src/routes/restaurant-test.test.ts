@@ -1085,7 +1085,7 @@ describe('飲食店向けテストAPI', () => {
     const path = '/api/restaurant-test/menu/menu-ginza?account_id=account-1';
     expect((await requestWithMethod(path, 'PATCH', { name: '新コース', kind: 'course', price: 9900, allergens: ['卵'], servicePeriods: ['lunch'] })).status).toBe(200);
     expect((await requestWithMethod(path, 'PATCH', { status: 'archived' })).status).toBe(200);
-    expect(testDb.raw.prepare('SELECT name, price, status, allergens_json FROM rt_menu_items WHERE id = ?').get('menu-ginza')).toEqual({ name: '新コース', price: 8800, status: 'archived', allergens_json: '["卵"]' });
+    expect(testDb.raw.prepare('SELECT name, price, status, allergens_json FROM rt_menu_items WHERE id = ?').get('menu-ginza')).toEqual({ name: '新コース', price: 9900, status: 'archived', allergens_json: '["卵"]' });
     expect(testDb.raw.prepare('SELECT course_id FROM rt_reservations WHERE id = ?').get('reservation-ginza')).toEqual({ course_id: 'menu-ginza' });
     const stoppedBooking = await request('/api/restaurant-test/reservations/manual?account_id=account-1', { storeId: 'store-ginza', customerName: '停止確認', guestCount: 2, startsAt: '2026-10-10T10:00:00.000Z', endsAt: '2026-10-10T12:00:00.000Z', courseId: 'menu-ginza' });
     expect(stoppedBooking.status).toBe(400);
@@ -1208,46 +1208,33 @@ describe('V8-B 卓から出す予約枠と週の営業時間', () => {
   });
 });
 
-describe('V8-B メニューの価格承認', () => {
+describe('V8-B メニューの価格確定', () => {
   const menuPath = '/api/restaurant-test/menus/menu-ginza?account_id=account-1';
-  it('価格は申請中に保ち、承認時に一度だけ反映する', async () => {
+  it('権限者の保存で価格を即時確定し、二重承認を受け付けない', async () => {
     seedRestaurantFixture();
     const response = await requestWithMethod(menuPath, 'PATCH', { price: 9900 });
     expect(response.status).toBe(200);
     const { data } = await response.json() as any;
-    expect(data.pendingPrice).toBe(9900);
-    expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 8800 });
-    const list = await request('/api/restaurant-test/menus?account_id=account-1&storeId=store-ginza');
-    expect((await list.json() as any).data[0].pendingPrice).toBe(9900);
-    const snapshot = await request('/api/restaurant-test/snapshot?account_id=account-1');
-    expect((await snapshot.json() as any).data.menuItems[0].pendingPrice).toBe(9900);
-    expect((await requestWithMethod(menuPath, 'PATCH', { name: '二重申請', price: 10000 })).status).toBe(409);
-    expect(testDb.raw.prepare("SELECT name FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ name: 'テストコース' });
-    const approval = `/api/restaurant-test/approvals/${data.approvalId}?account_id=account-1`;
-    const approved = await requestWithMethod(approval, 'PATCH', { action: 'approve' });
-    expect((await approved.json() as any).data.menuChangeStatus).toBe('applied');
+    expect(data.pendingPrice).toBeNull();
     expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 9900 });
+    const list = await request('/api/restaurant-test/menus?account_id=account-1&storeId=store-ginza');
+    expect((await list.json() as any).data[0].pendingPrice).toBeNull();
+    const snapshot = await request('/api/restaurant-test/snapshot?account_id=account-1');
+    expect((await snapshot.json() as any).data.menuItems[0].price).toBe(9900);
+    const approval = `/api/restaurant-test/approvals/${data.approvalId}?account_id=account-1`;
     expect((await requestWithMethod(approval, 'PATCH', { action: 'approve' })).status).toBe(409);
-    expect((await requestWithMethod(approval, 'PATCH', { action: 'return', comment: '戻す' })).status).toBe(409);
     expect(testDb.raw.prepare("SELECT before_price, after_price, requested_by, status FROM rt_menu_change_requests").get()).toMatchObject({ before_price: 8800, after_price: 9900, status: 'applied' });
+    expect(testDb.raw.prepare('SELECT status, reviewed_by FROM rt_approval_requests WHERE id = ?').get(data.approvalId)).toMatchObject({ status: 'approved', reviewed_by: expect.any(String) });
+    expect((await requestWithMethod(menuPath, 'PATCH', { price: 10000 })).status).toBe(200);
+    expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 10000 });
   });
-  it('差し戻しには理由が必要で、価格を変えず再申請できる', async () => {
+  it('以前の申請が残る場合は新しい価格変更を止める', async () => {
     seedRestaurantFixture();
-    const { data } = await (await requestWithMethod(menuPath, 'PATCH', { price: 9900 })).json() as any;
-    const path = `/api/restaurant-test/approvals/${data.approvalId}?account_id=account-1`;
-    expect((await requestWithMethod(path, 'PATCH', { action: 'return' })).status).toBe(400);
-    expect((await requestWithMethod(path, 'PATCH', { action: 'return', comment: '金額を再確認してください' })).status).toBe(200);
-    expect(testDb.raw.prepare('SELECT status, return_reason FROM rt_menu_change_requests').get()).toEqual({ status: 'returned', return_reason: '金額を再確認してください' });
+    testDb.raw.prepare("INSERT INTO rt_approval_requests(id,organization_id,store_id,kind,title,status) VALUES('old-approval','org-fixture','store-ginza','menu_change','以前の申請','pending')").run();
+    testDb.raw.prepare("INSERT INTO rt_menu_change_requests(id,approval_id,menu_id,store_id,before_price,after_price,requested_by) VALUES('old-change','old-approval','menu-ginza','store-ginza',8800,9900,'test')").run();
+    expect((await requestWithMethod(menuPath, 'PATCH', { price: 9500 })).status).toBe(409);
     expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 8800 });
-    expect((await requestWithMethod(menuPath, 'PATCH', { price: 9500 })).status).toBe(200);
-  });
-  it('申請後に価格が変わっていたら上書きせず失敗を記録する', async () => {
-    seedRestaurantFixture();
-    const { data } = await (await requestWithMethod(menuPath, 'PATCH', { price: 9900 })).json() as any;
-    testDb.raw.prepare("UPDATE rt_menu_items SET price = 9000 WHERE id = 'menu-ginza'").run();
-    const res = await requestWithMethod(`/api/restaurant-test/approvals/${data.approvalId}?account_id=account-1`, 'PATCH', { action: 'approve' });
-    expect((await res.json() as any).data).toMatchObject({ status: 'approved', menuChangeStatus: 'failed' });
-    expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id = 'menu-ginza'").get()).toEqual({ price: 9000 });
+    expect(testDb.raw.prepare('SELECT COUNT(*) AS total FROM rt_menu_change_requests').get()).toEqual({ total: 1 });
   });
   it('未公開の下書きだけ削除でき、公開後に下書きへ戻しても削除できない', async () => {
     seedRestaurantFixture();
@@ -1418,11 +1405,11 @@ describe('V8 枠の自動生成と全枠の競合', () => {
 });
 
 describe('V8 新価格の開始日時',()=>{
- it('承認されても未来の開始日時までは現行価格を保つ',async()=>{
+ it('保存時に確定しても未来の開始日時までは現行価格を保つ',async()=>{
   seedRestaurantFixture();
   const res=await requestWithMethod('/api/restaurant-test/menu/menu-ginza?account_id=account-1','PATCH',{price:9900,effectiveAt:'2099-10-10T00:00:00Z'});
   const change=(await res.json() as any).data;
-  expect((await requestWithMethod(`/api/restaurant-test/approvals/${change.approvalId}?account_id=account-1`,'PATCH',{action:'approve'})).status).toBe(200);
+  expect(change.pendingPrice).toBe(9900);
   expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id='menu-ginza'").get()).toEqual({price:8800});
   const snap=await request('/api/restaurant-test/snapshot?account_id=account-1');
   expect((await snap.json() as any).data.menuItems[0]).toMatchObject({pendingPrice:9900,priceChangeStatus:'approved'});
@@ -1431,6 +1418,18 @@ describe('V8 新価格の開始日時',()=>{
   expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id='menu-ginza'").get()).toEqual({price:9900});
   await request('/api/restaurant-test/snapshot?account_id=account-1');
   expect(testDb.raw.prepare('SELECT status FROM rt_menu_change_requests WHERE id=?').get(change.requestId)).toEqual({status:'applied'});
+ });
+ it('確定済みの開始待ち価格は新しい保存で置き換える',async()=>{
+  seedRestaurantFixture();
+  const path='/api/restaurant-test/menu/menu-ginza?account_id=account-1';
+  const first=await requestWithMethod(path,'PATCH',{price:9900,effectiveAt:'2099-10-10T00:00:00Z'});
+  expect(first.status).toBe(200);
+  const firstId=(await first.json() as any).data.requestId;
+  const second=await requestWithMethod(path,'PATCH',{price:9500,effectiveAt:'2099-11-10T00:00:00Z'});
+  expect(second.status).toBe(200);
+  expect(testDb.raw.prepare('SELECT status,return_reason FROM rt_menu_change_requests WHERE id=?').get(firstId)).toEqual({status:'returned',return_reason:'新しい価格変更で置き換え'});
+  expect(testDb.raw.prepare('SELECT after_price,status FROM rt_menu_change_requests WHERE status=?').get('approved')).toEqual({after_price:9500,status:'approved'});
+  expect(testDb.raw.prepare("SELECT price FROM rt_menu_items WHERE id='menu-ginza'").get()).toEqual({price:8800});
  });
  it('価格の開始日時の入力不正では申請を作らない',async()=>{
   seedRestaurantFixture();
@@ -1464,6 +1463,8 @@ describe('V8 店の名簿とログイン権限',()=>{
  it('既存の本人確認を通ると役割を反映し、外側のログイン停止も名簿へ同期する',async()=>{
   seedLogin();
   await requestWithMethod('/api/restaurant-test/memberships/member/login?account_id=account-1','PUT',{staffId:'login'});
+  testDb.raw.prepare(`INSERT INTO staff_members(id,name,role,api_key,account_scope,tenant_id)
+    VALUES('owner-session','Owner','owner','owner-session-key','all','00000000-0000-4000-8000-000000000001')`).run();
   const token='verified-booking-session'; await createAdminSession(token);
   testDb.raw.prepare('UPDATE admin_sessions SET step_up_at=? WHERE token_hash=?').run(new Date().toISOString(),await sha256Hex(token));
   const res=await requestWithMethod('/api/restaurant-test/memberships/member?account_id=account-1','PATCH',{role:'store_manager',expectedPolicyVersion:1},`${ADMIN_SESSION_PREFIX}${token}`);
