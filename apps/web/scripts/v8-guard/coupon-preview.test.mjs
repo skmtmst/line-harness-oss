@@ -15,3 +15,22 @@ test('long coupon cards scroll to their action; flex shrinking that hides it fai
     assert.deepEqual(await page.evaluate(scan), [])
   } finally { await browser.close() }
 })
+
+test('coupon fields keep the shared gap and short numeric width; spacing and width faults fail', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<section data-design-part="card"><h2 id="coupon-basics">基本設定</h2><div data-form-row="media-fields" style="display:grid;grid-template-columns:180px 1fr;gap:12px;width:700px"><div data-media-slot style="height:100px"></div><input id="te-coupon-title"></div></section><section data-design-part="card"><h2 id="coupon-benefit">特典</h2><div data-form-row="compact" style="display:flex;gap:12px;width:700px"><div style="width:176px">種類</div><div style="width:176px">表示</div></div><span data-short style="display:block;width:128px"><input type="number" id="benefit" style="width:100%"></span></section>')
+    assert.deepEqual(await page.evaluate(scan), [])
+    for (const [selector, property, fault, restored, kind] of [
+      ['[data-form-row="media-fields"]', 'gridTemplateColumns', '1fr 1fr', '180px 1fr', 'coupon-media-gap'],
+      ['[data-form-row="compact"]', 'justifyContent', 'space-between', '', 'coupon-compact-gap'],
+      ['[data-short]', 'width', '400px', '128px', 'coupon-number-wide'],
+    ]) {
+      await page.locator(selector).evaluate((element, patch) => { element.style[patch.property] = patch.value }, { property, value: fault })
+      assert.ok((await page.evaluate(scan)).some(finding => finding.kind === kind))
+      await page.locator(selector).evaluate((element, patch) => { element.style[patch.property] = patch.value }, { property, value: restored })
+      assert.deepEqual(await page.evaluate(scan), [])
+    }
+  } finally { await browser.close() }
+})
