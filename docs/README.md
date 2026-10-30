@@ -999,3 +999,5 @@
 - [統括からのLINEアカウント管理](release-log/unreleased/1963-masato-line-account-hq-scope.md) — 反映履歴。
 - [シナリオ一覧の権限とお知らせのベル](release-log/unreleased/1964-kenta-train-1029n.md) — 反映履歴。
 - [シナリオ一覧の操作と途中の失敗の案内](release-log/unreleased/1968-kenta-train-1029o.md) — 反映履歴。
+
+- [友だちの履歴の日付区切り](release-log/unreleased/0000-kenta-swb-date-group.md) — 反映履歴。

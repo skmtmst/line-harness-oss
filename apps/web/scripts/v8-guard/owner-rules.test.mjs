@@ -1,3 +1,4 @@
+import './date-group.test.mjs'
 import './kpi-delta-row.test.mjs'
 import './floating-surface.test.mjs'
 import './floating-surface-components.test.mjs'

@@ -3,11 +3,10 @@
 import SegmentedControl from '@/components/shared/segmented'
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { Fragment } from 'react';
-import { useState } from 'react';
 import Link from '@/components/shared/list-navigation'
 import { CalendarDays, ClipboardList, MailOpen, MessageCircle, Send, ShoppingBag, Tag as TagIcon, Workflow } from 'lucide-react';
 import Button from '@/components/shared/button'
-import { formatTime, formatDay } from '@/lib/format';
+import { formatTime } from '@/lib/format';
 import type { FriendDetail } from '@/lib/api';
 import type { FriendDetailState } from './use-friend-detail';
 import { dayHeading, dayKey, matchesTimelineFilter, timelineKey, timelineSourceHref, timelineStatusLabel, timelineTone, timelineTypeLabel, type TimelineFilter } from './timeline';
@@ -45,15 +44,30 @@ function typeIcon(type: string) {
 export default function HistoryTab({ friend, friendId, data }: { friend: FriendDetail; friendId: string; data: FriendDetailState }) {
   const [filter, setFilter] = useListUrlValue<TimelineFilter>('filter', 'all')
   const { historyItems, historyStatus, historyNextCursor, historyLoadingMore, historyMoreError } = data
-  const rows = historyItems.filter((item) => matchesTimelineFilter(item, filter))
+  const filteredRows = historyItems.filter((item) => matchesTimelineFilter(item, filter))
   const complete = !historyNextCursor
+  // 最後まで読めた時だけ追加記録も合流する。日付の形式やページの境目で同じ日を分断しない。
+  const rows = [...filteredRows]
+  if (complete && filter !== 'received' && filter !== 'sent') {
+    rows.push({
+      id: `friend-add:${friendId}`, type: 'friend_add', occurredAt: friend.createdAt || '',
+      summary: friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました',
+      status: null, source: null, lineAccount: { id: '', name: 'システム' },
+    })
+  }
+  rows.sort((a, b) => {
+    const aTime = Date.parse(a.occurredAt), bTime = Date.parse(b.occurredAt)
+    if (!Number.isFinite(aTime)) return Number.isFinite(bTime) ? 1 : 0
+    if (!Number.isFinite(bTime)) return -1
+    return bTime - aTime
+  })
 
   return (
     <div className={styles.pane}>
       <div className={styles.tools}>
         <SegmentedControl aria-label="履歴の種類" value={filter} onChange={setFilter} options={FILTERS} />
         {historyStatus === 'ready' ? (
-          <span className={styles.count}>{complete ? `${formatNumber(rows.length)} 件` : `${formatNumber(rows.length)} 件を表示中`}</span>
+          <span className={styles.count}>{complete ? `${formatNumber(filteredRows.length)} 件` : `${formatNumber(filteredRows.length)} 件を表示中`}</span>
         ) : null}
       </div>
 
@@ -76,7 +90,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
               const newDay = index === 0 || dayKey(rows[index - 1].occurredAt) !== dayKey(item.occurredAt)
               return (
                 <Fragment key={timelineKey(item)}>
-                  {newDay ? <div className={styles.day} role="row"><span role="cell">{dayHeading(item.occurredAt)}</span></div> : null}
+                  {newDay ? <div className={styles.day} role="row" data-table-date-group={dayKey(item.occurredAt) || 'unknown'}><span role="cell">{dayHeading(item.occurredAt)}</span></div> : null}
                   <div className={styles.tr} role="row">
                     <span role="cell">{formatTime(item.occurredAt)}</span>
                     <span role="cell" className={styles.cellType}>
@@ -99,20 +113,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
                 </Fragment>
               )
             })}
-            {/* 最後まで取れたときだけ、いちばん古い記録として友だち追加を末尾に出す。 */}
-            {complete && filter !== 'received' && filter !== 'sent' ? (
-              <>
-                <div className={styles.day} role="row"><span role="cell">{friend.createdAt ? formatDay(friend.createdAt) : emptyValue('unknown')}</span></div>
-                <div className={styles.tr} role="row">
-                  <span role="cell">{friend.createdAt ? formatTime(friend.createdAt) : emptyValue('unknown')}</span>
-                  <span role="cell" className={styles.cellType}><span className={styles.typeDot}>{typeIcon('friend_add')}</span>友だち追加</span>
-                  <span role="cell" className={styles.cellMain}>{friend.firstTrackedLinkName ? `${friend.firstTrackedLinkName}から追加されました` : '友だちに追加されました'}</span>
-                  <span role="cell" className={styles.cellClip}>システム</span>
-                  <span role="cell" />
-                </div>
-              </>
-            ) : null}
-            {rows.length === 0 && complete ? (
+            {filteredRows.length === 0 && complete ? (
               <p className={styles.paneNote}>
                 {historyItems.length === 0 ? '活動履歴はまだありません。上の「友だち追加の記録」がこの友だちの最初の記録です。' : 'この種類の記録はありません。'}
               </p>
