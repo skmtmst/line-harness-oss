@@ -15,6 +15,10 @@
 
 `apps/web/scripts/v8-guard/permission-flash.test.mjs` は共通の画面ゲートで本人未取得・Suspense・故障・復元を確認します。`permission-navigation.test.mjs` は本番形式の出力を使い、メニュー正本の全URL・画面内のタブ・6スタイルと実際の設定リンクを1152/1440、通常/API600ms遅延で確認します。書き込み操作は行いません。
 
+`V8_GUARD_VIDEO=1` のときは接続先の録画を終了後に `video/navigation.webm` へ明示保存し、ファイルが空なら失敗にします。故障の対照は `V8_GUARD_PERMISSION_FAULT=1` とAPI600msの条件で赤になることを確認し、旗を外した実行で復元を確認します。
+
+巡回用の出力は、CIと同じく `NEXT_PUBLIC_RESTAURANT_TEST_ENABLED=true NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED=true pnpm --filter web build` で作ります。環境の旗がオフの出力では、飲食店の画面へ入れず準備中の窓になるため、全画面の巡回結果として扱えません。
+
 ```sh
 V8_GUARD_BASE=http://127.0.0.1:4310 V8_GUARD_ARTIFACT_DIR=/tmp/permission-navigation node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/permission-flash.test.mjs apps/web/scripts/v8-guard/permission-navigation.test.mjs
 ```
