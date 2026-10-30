@@ -7,6 +7,7 @@ import Card from '@/components/shared/card'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import LiffPhoneFrame from '@/components/shared/liff-phone-frame'
+import MusuboMark from '@/components/shared/musubo-mark'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import ReservationBoard from '@/components/shared/reservation-board'
 import RestaurantFloorMap from '@/components/shared/restaurant-floor-map'
@@ -77,7 +78,7 @@ export function PhonePane({ phone, style, look, base }: { phone: PhoneScene; sty
     case 'form': return <FormPhone {...phone.data} />
     case 'line-talk': {
       const data = phone.data
-      const avatar = <span className={sampleStyles.avatar}>{look.account.includes('然') ? '然' : look.account.slice(0, 1)}</span>
+      const avatar = <span className={sampleStyles.avatar}><MusuboMark /></span>
       return <LinePreview title={null} accountName={look.account} caption={data.caption}
         richMenu={data.richMenu && look.richMenu ? <SampleMenuTiles style={style} buttons={look.richMenu} size="phone" /> : undefined}>
         {data.messages.map((message, index) => message.from === 'shop'
