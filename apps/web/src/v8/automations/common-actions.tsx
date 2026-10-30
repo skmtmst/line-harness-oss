@@ -108,7 +108,7 @@ export default function CommonActionsV8() {
   const router = useRouter()
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const canManage = useAutomationManage()
-  const canEdit = canManage !== false
+  const canEdit = canManage === true
   const viewerOnly = canManage === false
   const runPermissions = useAutomationRunManage()
   const canExportCsv = runPermissions === null || runPermissions.canExport

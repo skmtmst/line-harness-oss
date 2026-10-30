@@ -83,7 +83,7 @@ export default function AccountRegisterV8() {
   // API の接続・登録と同じくオーナー・管理者だけ。権限確認前に下書きの復元や変更処理を起動しない。
   if (!canManageRole(role)) return <PageFrame kind="wizard" boardId="p6zMkA">
     <PageHeading title="LINEアカウントを登録" />
-    <PageContent layout="stats">{role === null ? <ListState kind="loading" title="権限を確認しています" /> : <ReadOnlyNotice>LINEアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。</ReadOnlyNotice>}</PageContent>
+    <PageContent layout="stats">{role === null ? <ListState kind="loading" /> : <ReadOnlyNotice>LINEアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。</ReadOnlyNotice>}</PageContent>
     <StickyBar actions={<Button variant="secondary" href="/accounts">LINEアカウントの一覧へ戻る</Button>} />
   </PageFrame>
   return <RegistrationSession key={draftKey ?? 'unverified'} resumeKey={resumeKey}>

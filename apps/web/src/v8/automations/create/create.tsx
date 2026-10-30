@@ -2,6 +2,7 @@
 
 import { useCanManageCommonActions } from '@/components/automations/use-common-action-permission'
 import Button from '@/components/shared/button'
+import { LOADING_MESSAGE } from '@/components/shared/list-state'
 import { pruneCondition, type SegmentCondition } from '@/components/shared/condition-builder'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Notice from '@/components/shared/notice'
@@ -468,7 +469,7 @@ const { syncResumeUrl, bindAccountDraft, captureFormSnapshot, resumeBase } = use
    * したうえで、理由を本文にも出す。
    */
   const blockedReason = useMemo(() => {
-    if (canManage === null) return '権限を確認しています'
+    if (canManage === null) return LOADING_MESSAGE
     if (!canManage) return '操作する権限がありません'
     // DETAIL-13: 再開した下書きは、中身を読み終わるまで保存できない。
     if (resumeStatus === 'loading') return '下書きを読み込んでいます'
@@ -635,7 +636,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
     .filter((row) => row.type === 'common_action' && row.commonActionId)
     .map((row) => commonActions.find((item) => item.id === row.commonActionId)?.name ?? '選んだ共通アクション')
   /* 見え方：閲覧のみ（権限なし）には、変える操作（足す・直す・保存・動かす・試す）を置かない。 */
-  const canEdit = canManage !== false
+  const canEdit = canManage === true
   const totalForDraft = previewTotal && savedDraft && previewTotal.accountId === selectedAccountId && previewTotal.draftId === savedDraft.id
     ? previewTotal.total
     : null

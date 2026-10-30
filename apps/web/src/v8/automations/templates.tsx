@@ -72,7 +72,7 @@ export default function AutomationTemplatesV8() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   /* 閲覧のみには「この見本で下書きを作る」「見本から作る」を置かない（2026-10-06 オーナー決定）。 */
   const canManage = useAutomationManage()
-  const canEdit = canManage !== false
+  const canEdit = canManage === true
   const viewerOnly = canManage === false
 
   const [items, setItems] = useState<AutomationTemplateSummary[]>([])

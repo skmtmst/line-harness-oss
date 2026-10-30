@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
+import PagePending from '@/components/templates/page-pending'
 import { useAccount } from '@/contexts/account-context'
 import { storeSelectionHref } from '@/lib/hq-navigation'
 import { decideStoreRoute, isAccountIndependentRoute } from '@/lib/store-route-guard'
@@ -43,15 +44,11 @@ export default function StoreSelectionGate({ children }: { children: React.React
     if (!needsHandoverCheck) return <>{children}</>
     if (handoverGate?.id === selectedAccountId && handoverGate.status === 'ready') return <>{children}</>
     if (handoverGate?.id === selectedAccountId && handoverGate.status === 'error') return <ListState kind="error" title="友だちの引き継ぎ状態を確認できません" onRetry={() => setHandoverRetry((value) => value + 1)} />
-    return <div className="flex min-h-64 items-center justify-center" role="status" aria-label="友だちの引き継ぎ状態を確認中"><div className="h-8 w-8 animate-spin rounded-pill border-4 border-hairline border-t-accent" /></div>
+    return <PagePending />
   }
 
   if (decision === 'wait') {
-    return (
-      <div className="flex min-h-64 items-center justify-center" role="status" aria-label="店舗を確認中">
-        <div className="h-8 w-8 animate-spin rounded-pill border-4 border-hairline border-t-accent" />
-      </div>
-    )
+    return <PagePending />
   }
 
   if (decision === 'block-unselected') {

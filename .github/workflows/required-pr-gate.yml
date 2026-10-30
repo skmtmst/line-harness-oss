@@ -692,6 +692,12 @@ jobs:
             echo "::error::速度・画面検査のサーバーが起動しませんでした"
             exit 1
           fi
+      - name: No permission copy flashes during navigation
+        if: steps.scope.outputs.run == 'true'
+        env:
+          V8_GUARD_BASE: http://127.0.0.1:4310
+          V8_GUARD_ARTIFACT_DIR: /tmp/v8-guard/permission-navigation
+        run: node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/permission-flash.test.mjs apps/web/scripts/v8-guard/permission-navigation.test.mjs
       - name: No V8 layout breaks at 1152, 1440 and 1920
         if: steps.scope.outputs.run == 'true'
         run: node apps/web/scripts/v8-guard/layout-overflow.mjs http://127.0.0.1:4310 /tmp/v8-guard/layout.json

@@ -10,3 +10,13 @@
 - `pixel-diff.mjs` は渡された2枚のRGBA画像を比較する純関数だけです。旧V6の画素判定・採点台帳・撮影入口は廃止しました。
 
 崩れの必須検査は `apps/web/scripts/v8-guard/` の実測を使います。外部の板ロック・正式台帳・鍵はこのリポジトリの道具から変更しません。UI隣接の固定値試験の削除はU01〜U07、CIジョブの接続はG02が担当します。
+
+### ページ切り替えの待機表示
+
+`apps/web/scripts/v8-guard/permission-flash.test.mjs` は共通の画面ゲートで本人未取得・Suspense・故障・復元を確認します。`permission-navigation.test.mjs` は本番形式の出力を使い、メニュー正本の全URL・画面内のタブ・6スタイルと実際の設定リンクを1152/1440、通常/API600ms遅延で確認します。書き込み操作は行いません。
+
+```sh
+V8_GUARD_BASE=http://127.0.0.1:4310 V8_GUARD_ARTIFACT_DIR=/tmp/permission-navigation node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/permission-flash.test.mjs apps/web/scripts/v8-guard/permission-navigation.test.mjs
+```
+
+描画フレームごとに題・URL・見えている権限の待機/拒否文・閲覧のみの案内を記録し、オーナーで許可された切り替えに混ざれば失敗にします。写真は代表の切り替えを指定フォルダへ保存します。全操作の写真は `V8_GUARD_CAPTURE_FRAMES=all`、動画は `V8_GUARD_VIDEO=1` で追加できます。画面外や寸法0の読み上げ専用の文は対象外です。正式な権限不足は既存の役割別試験で守り、待機文を消すために許可へ変えません。

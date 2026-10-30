@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
 import ListState from '@/components/shared/list-state'
+import PagePending from '@/components/templates/page-pending'
 import { decideRootLanding } from '@/lib/hq-navigation'
 
 export default function RootLandingGate({ children }: { children: React.ReactNode }) {
@@ -39,11 +40,7 @@ export default function RootLandingGate({ children }: { children: React.ReactNod
   }
 
   if (decision.action !== 'show-dashboard') {
-    return (
-      <div className="flex min-h-64 items-center justify-center" role="status" aria-label="表示先を確認中">
-        <div className="h-8 w-8 animate-spin rounded-pill border-4 border-hairline border-t-accent" />
-      </div>
-    )
+    return <PagePending />
   }
 
   return <>{children}</>

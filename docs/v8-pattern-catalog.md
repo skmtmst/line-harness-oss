@@ -647,7 +647,7 @@
 ## list-state 空・読めない・読み込み中
 
 - **役目**：空・絞り込みで0件・読めなかった（もう一度読み込む）・骨組みを1つの形で出す
-- **持ち主（コード）**：`apps/web/src/components/shared/list-state.tsx`・`apps/web/src/components/shared/list-state.module.css`・`apps/web/src/components/shared/skeleton.tsx`・`apps/web/src/components/shared/skeleton.module.css`・`apps/web/src/components/shared/empty-list.tsx`・`apps/web/src/components/shared/retry-label.tsx`（部品 `ListState`・`TableSkeleton`・`CardsSkeleton`・`Skeleton`・`DelayedSkeleton`・`EmptyList`）
+- **持ち主（コード）**：`apps/web/src/components/templates/page-pending.tsx`・`apps/web/src/components/shared/list-state.tsx`・`apps/web/src/components/shared/list-state.module.css`・`apps/web/src/components/shared/skeleton.tsx`・`apps/web/src/components/shared/skeleton.module.css`・`apps/web/src/components/shared/empty-list.tsx`・`apps/web/src/components/shared/retry-label.tsx`（部品 `PagePending`・`ListState`・`TableSkeleton`・`CardsSkeleton`・`Skeleton`・`DelayedSkeleton`・`EmptyList`）
   - 読む変数：`--radius-mini`
 - **持ち主（Pen）**：`hNXm7`「空の表示」・`jr5Nl`「骨格の行」・`Dr8Wr`「状態/検索結果0件」・`deztM`「状態/取得失敗」・`q0z77i`「状態/読み込み中」
   - 部品の板の html に書き出されていない ID：`Dr8Wr`・`deztM`・`q0z77i`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）

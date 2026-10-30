@@ -1,15 +1,15 @@
 'use client'
 
-import { Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Suspense, useSyncExternalStore, type ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { HQ_MENU_SECTIONS, MENU_SECTIONS, isHqShellPath, menuOwnerForScreen, type MenuItem } from '@/lib/menu'
-import { canManageRole, effectiveStaffRole, loadStaffIdentity, useStaffIdentity } from '@/lib/staff-role'
+import { canManageRole, effectiveStaffRole, useStaffIdentityLoad } from '@/lib/staff-role'
 import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import { readPermissionSessionSnapshot as readSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
 import TargetMissing from '@/components/shared/target-missing'
-import ListState from '@/components/shared/list-state'
 import { LockedCreatePage } from '@/components/templates'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
+import PagePending from '@/components/templates/page-pending'
 
 const MENU_ITEMS = [...MENU_SECTIONS, ...HQ_MENU_SECTIONS].flatMap(section => section.items)
 const subscribeSession = (listener: () => void) => {
@@ -39,30 +39,14 @@ export function menuItemForPath(pathname: string, search = ''): MenuItem | null 
   return menuItemsForPath(pathname, search)[0] ?? null
 }
 
-function CheckingPermission({ failed = false, onRetry }: { failed?: boolean; onRetry?: () => void }) {
-  return <PageFrame kind="detail"><PageHeading title="権限を確認しています" /><ListState kind={failed ? 'error' : 'loading'} onRetry={onRetry} /></PageFrame>
-}
-
 function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '/'
   const search = useSearchParams()?.toString() ?? ''
-  const staffIdentity = useStaffIdentity()
+  const { identity: staffIdentity, failed, retry } = useStaffIdentityLoad()
   const role = effectiveStaffRole(staffIdentity)
   const session = useSyncExternalStore(subscribeSession, readSessionSnapshot, serverSession)
-  const [failed, setFailed] = useState(false)
-  const [attempt, setAttempt] = useState(0)
-  // useStaffRole と同じ本人APIの読み込みを共有し、失敗を許可に変えず読み直せるようにする。
-  useEffect(() => {
-    if (role !== null) { setFailed(false); return }
-    let active = true
-    setFailed(false)
-    void loadStaffIdentity().then(result => {
-      if (active && !result.success) setFailed(true)
-    }).catch(() => { if (active) setFailed(true) })
-    return () => { active = false }
-  }, [role, attempt])
   // 本人の権限が分かるまで子をマウントせず、自動下書きや読込を始めさせない。
-  if (role === null) return <CheckingPermission failed={failed} onRetry={() => setAttempt(value => value + 1)} />
+  if (role === null) return <PagePending failed={failed} onRetry={retry} />
 
   // LINEアカウントの管理画面は統括の所属だけ。店舗の管理者でもURLから開けない。
   if ((pathname === '/accounts' || pathname.startsWith('/accounts/')) && staffIdentity?.accountScope !== 'all') return <PageFrame kind="detail">
@@ -109,5 +93,5 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
 
 /** 閲覧権限と作成権限を、画面の処理を始める前に確認する。 */
 export default function ViewPermissionGate({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<CheckingPermission />}><ResolvedViewPermissionGate>{children}</ResolvedViewPermissionGate></Suspense>
+  return <Suspense fallback={<PagePending />}><ResolvedViewPermissionGate>{children}</ResolvedViewPermissionGate></Suspense>
 }
