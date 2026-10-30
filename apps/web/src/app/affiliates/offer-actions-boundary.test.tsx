@@ -286,3 +286,13 @@ describe('承認時の案件動作が未完のとき', () => {
     expect(screen.queryByText(/承認しました|承認できました/)).toBeNull()
   })
 })
+
+
+test('案件を作る入口から新規の窓を開く', async () => {
+  render(<OffersTab />)
+  await screen.findByRole('button', { name: '案件Aの操作' })
+  const create = screen.getAllByRole('button', { name: /案件を作る/ })[0]
+  fireEvent.click(create)
+  const title = await screen.findByText('案件を作る', { selector: 'h2' })
+  expect(title.closest('[role="dialog"]')).toBeTruthy()
+})

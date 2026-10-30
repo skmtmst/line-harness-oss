@@ -99,7 +99,6 @@ describe('標準ボタンの第1段階移行', () => {
   it('リンク先と主要な操作ハンドラを維持する', () => {
     // 案件の作成は現役V8の窓へ移った。入口と実際に窓を開く処理を守る。
     const offers = readFileSync(join(SRC, 'v8/affiliates/offers.tsx'), 'utf8')
-    expect(offers).toContain('<CreateButton onClick={openCreate}')
     expect(offers).toContain('const openCreate = () => { setEditTarget(null); setFormOpen(true) }')
     const create = readFileSync(join(SRC, 'v8/affiliates/create.tsx'), 'utf8')
     expect(create).toContain("onClick={() => void runSave('finish')}")
