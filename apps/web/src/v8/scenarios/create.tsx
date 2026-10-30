@@ -16,7 +16,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft/index'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { scenarioDraftStatus, BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
 import { forgetNewScenarioDraftKey, newScenarioDraftKey, scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import { TextField } from '@/components/shared/text-field';
@@ -448,7 +448,7 @@ export default function ScenarioCreateV8() {
           ]}
         />
       )}
-      status={saving ? '作成しています' : detailsSaving ? '保存しています' : browserDraft.label ?? undefined}
+      status={saving ? '作成しています' : detailsSaving ? '保存しています' : scenarioDraftStatus(browserDraft.label) ?? undefined}
       footerActions={(
         <>
           <Button type="button" onClick={cancel}>キャンセル</Button>

@@ -34,6 +34,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card';
 import Notice from '@/components/shared/notice'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview';
+import StickerPreview from '@/components/shared/sticker-preview'
 import TargetMissing from '@/components/shared/target-missing'
 import ListState from '@/components/shared/list-state'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
@@ -43,7 +44,7 @@ import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { restoreFirstStep, scheduleToPayload } from './first-step-form';
 import styles from './first-step.module.css'
 import { browserDraftKey } from '@/v8/autosave/public/use-browser-draft/index'
-import { BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
+import { scenarioDraftStatus, BrowserDraftNotice, ScenarioDraftConflictNotice } from '@/v8/autosave/public/browser-draft-notice/index'
 import { scenarioDraftKey, useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared/insert-text-field';
 
@@ -560,6 +561,8 @@ export default function ScenarioFirstStepV8() {
           : kind === 'image'
             ? (image ? '画像' : '')
             : STEP_MESSAGE_KINDS.find((k) => k.value === kind)?.label ?? ''
+  const stickerPreview = !preserved && contentMode === 'compose' && kind === 'sticker' && kindState.sticker.packageId && kindState.sticker.stickerId
+    ? <StickerPreview stickerId={kindState.sticker.stickerId} /> : null
   const phone = (
     <LinePreview
       accountName={accountName}
@@ -567,8 +570,8 @@ export default function ScenarioFirstStepV8() {
       empty={bubble ? false : '1通目の内容を入れると、ここに届く形が出ます'}
     >
       {bubble ? (
-        <LinePreviewMessage accountName={accountName} avatar={accountName.slice(0, 1)} time={bubbleTime}>
-          {bubble}
+        <LinePreviewMessage accountName={accountName} avatar={accountName.slice(0, 1)} time={bubbleTime} bare={Boolean(stickerPreview)}>
+          {stickerPreview ?? bubble}
         </LinePreviewMessage>
       ) : null}
     </LinePreview>
@@ -608,7 +611,7 @@ export default function ScenarioFirstStepV8() {
       help={`配信方式：${modeLabel[mode]}・シナリオ：${scenario?.name ?? '読み込み中'}`}
       preview={preview}
       notice={!canEdit ? <ReadOnlyNotice role="status">閲覧のみで見ています。1通目を作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice> : undefined}
-      status={saving ? '保存しています' : browserDraft.label ?? undefined}
+      status={saving ? '保存しています' : scenarioDraftStatus(browserDraft.label) ?? undefined}
       footerActions={(
         <>
           <Button type="button" onClick={cancel}>キャンセル</Button>
