@@ -17,8 +17,9 @@ const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
   pathname: '/settings',
   accountId: 'account-1',
-  style: 'ec',
+  style: 'ec' as string | null,
   styleSelected: true,
+  stale: false,
 }))
 
 const localStorageValues = new Map<string, string>()
@@ -37,7 +38,7 @@ vi.mock('next/link', async () => {
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement('a', { href, ...props }, children) }
 })
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
-vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: fixture.style, styleSelected: fixture.styleSelected }, status: 'ready', stale: false }) }))
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ status: fixture.style ? 'ready' : 'loading', stale: fixture.stale, data: fixture.style ? { style: fixture.style, styleSelected: fixture.styleSelected } : null }) }))
 vi.mock('@/lib/api', () => ({
   api: {
     featureSettings: { visibility: fixture.visibility },
@@ -59,6 +60,7 @@ describe('★V8 設定の中のメニュー', () => {
     fixture.accountId = 'account-1'
     fixture.style = 'ec'
     fixture.styleSelected = true
+    fixture.stale = false
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { ec_commerce: true, line_notifications: true } },
@@ -105,7 +107,7 @@ describe('★V8 設定の中のメニュー', () => {
   })
 
   // 2026-10-06：設定の板（ ほか 8 枚）の並びへ。見出し「設定」・印つき・プール管理あり・「専用」の小見出しなし。
-  it('絵の並びで出す：はじめの設定・LINEアカウント・プール管理・ログインユーザー・機能設定・運用状態・EC連携（SNS 連携は末尾）', async () => {
+  it('EC用途の設定の並びにEC連携を出し、飲食店専用項目は出さない', async () => {
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { ec_commerce: true, line_notifications: true, multi_store_hierarchy: true } },
@@ -127,7 +129,7 @@ describe('★V8 設定の中のメニュー', () => {
       '運用状態',
       'EC連携',
       // 提案 E-6：今ある絵の並びを動かさないよう末尾に足した
-      'SNS 連携', '予約サイト・グルメ媒体', 'デリバリー連携',
+      'SNS 連携',
     ])
     expect(view.getByText('設定')).toBeTruthy()
     expect(view.queryByText('専用')).toBeNull()
@@ -145,6 +147,7 @@ describe('★V8 設定の中のメニュー', () => {
 
   // 2026-10-12：デリバリー連携（承認案 DL-1 `dF4Ov`）を予約サイト・グルメ媒体の下に足した
   it('検証環境でも予約サイト・グルメ媒体とデリバリー連携へ進める', async () => {
+    fixture.style = 'restaurant'
     vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'true')
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
@@ -156,9 +159,38 @@ describe('★V8 設定の中のメニュー', () => {
   })
 
   it('本番でも飲食店の設定の入口を残す', async () => {
+    fixture.style = 'restaurant'
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
     expect(view.getByRole('link', { name: 'デリバリー連携' }).getAttribute('href')).toBe('/settings/delivery')
+  })
+
+  it('飲食店以外とスタイル未取得では予約サイト・グルメ媒体とデリバリー連携を表示しない', async () => {
+    for (const style of ['standard', 'salon', 'consult', 'lesson', 'ec', null]) {
+      fixture.style = style
+      const view = render(<SettingsInnerNav />)
+      await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+      expect(view.queryByRole('link', { name: '予約サイト・グルメ媒体' })).toBeNull()
+      expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
+      cleanup()
+    }
+  })
+
+  it('別スタイルで直接開いた画面も飲食店専用の入口を表示しない', async () => {
+    fixture.style = 'ec'
+    fixture.pathname = '/settings/delivery'
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
+  })
+
+  it('古い記憶の飲食店スタイルだけでは専用の入口を表示しない', async () => {
+    fixture.style = 'restaurant'
+    fixture.stale = true
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: '予約サイト・グルメ媒体' })).toBeNull()
+    expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
   })
 
   it('SNS 連携の画面でも2つの設定の入口を残し、現在地だけを示す', async () => {

@@ -77,6 +77,7 @@ const SETTINGS_CHILDREN = [
 
 /** この中のメニューを出す画面（左のメニューの「設定」が光る画面と同じ範囲）。 */
 const SETTINGS_AREA_PATHS = [...SETTINGS_ORDER]
+const RESTAURANT_ONLY_SETTINGS = new Set<string>(['/settings/booking-media', '/settings/delivery'])
 
 /** いまのパスが設定の中のメニューを出す画面か。 */
 export function isSettingsAreaPath(pathname: string): boolean {
@@ -103,6 +104,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   const pathname = usePathname() ?? ''
   const { selectedAccountId } = useAccount()
   const accountStyle = useAccountStyle(selectedAccountId)
+  const restaurantSettingsVisible = accountStyle.status === 'ready' && !accountStyle.stale && accountStyle.data?.style === 'restaurant'
   const staffIdentity = useStaffIdentity()
   const staffRole = effectiveStaffRole(staffIdentity)
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
@@ -176,6 +178,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
     .map((href) => byHref.get(href))
     .filter((item): item is MenuItem => Boolean(item))
     .filter((item) => {
+      if (RESTAURANT_ONLY_SETTINGS.has(item.href) && !restaurantSettingsVisible) return false
       if (item.href === '/accounts' && staffIdentity?.accountScope !== 'all') return false
       if (item.featureKey === 'ec_commerce' && !itemVisible(item)) return false
       return itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item)
