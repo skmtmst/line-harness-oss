@@ -249,6 +249,18 @@ describe('7つの行と状態', () => {
     fireEvent.click(await screen.findByRole('button', { name: '本送信を止める' }))
     await waitFor(() => expect(fixture.stop).toHaveBeenCalledWith('account-1', 'store'))
   })
+  it('公開と申請の間にほかの担当者が変えたら申請を止める', async () => {
+    const changed = liveOf({ templateVersion: 4 })
+    changed.steps = changed.steps.map(step => step.trigger === 'reservation_created'
+      ? { ...step, bubbles: [bubble('ほかの担当者の文')] }
+      : step)
+    fixture.fetchLive.mockResolvedValueOnce(liveOf()).mockResolvedValue(changed)
+    render(<LineFollowupV8 />)
+    await screen.findByRole('button', { name: '予約完了時' })
+    fireEvent.click(screen.getByRole('button', { name: '承認を申請する' }))
+    expect(await screen.findByText('ほかの担当者が先に保存しました。公開した中身と変わったため申請を止めました。読み直しました。')).toBeTruthy()
+    expect(fixture.requestStart).not.toHaveBeenCalled()
+  })
   it('公開に失敗したら申請を出さない', async () => {
     fixture.publishScenario.mockResolvedValueOnce({ success: false, error: '公開できません' })
     render(<LineFollowupV8 />)

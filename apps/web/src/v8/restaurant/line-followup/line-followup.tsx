@@ -60,6 +60,15 @@ function RowStatus({ step }: { step: FollowupStepLive }) {
   return <StatusBadge tone="neutral">準備ができました</StatusBadge>
 }
 
+/*
+ * 申請の対象の見分け。公開と申請の間にほかの担当者が変えたら、公開した中身と
+ * 画面の中身がずれる。再取得した中身が公開時と同じか比べ、違えば申請を止める。
+ * 版と送りの状態は公開自体で変わるため比べない。
+ */
+export function liveFingerprint(live: FollowupLive): string {
+  return JSON.stringify(live.steps.map(step => [step.trigger, step.binding, step.bubbles]))
+}
+
 function SendingLine({ live }: { live: FollowupLive }) {
   const text = live.sendingStatus === 'active' ? '本送信しています'
     : live.sendingStatus === 'pending' ? '承認を待っています' : '本送信は止めています'
@@ -317,6 +326,12 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
                       if (!fresh) {
                         setBusy(null)
                         setActionError('フォローの設定を読み直せませんでした')
+                        return
+                      }
+                      if (liveFingerprint(fresh) !== liveFingerprint(live)) {
+                        setBusy(null)
+                        reload()
+                        setActionError('ほかの担当者が先に保存しました。公開した中身と変わったため申請を止めました。読み直しました。')
                         return
                       }
                       requestFollowupStart(accountId, storeId, fresh.templateVersion).then(
