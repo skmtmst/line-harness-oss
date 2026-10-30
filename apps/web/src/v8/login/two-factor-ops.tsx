@@ -1,5 +1,6 @@
 'use client'
 import { twoFactorFailureMessage } from '@/v8/login/two-factor/two-factor-error'
+import { requestPasskeyLoginOptions, verifyPasskeyLogin } from '@/lib/passkey-login-transport'
 import { responseApiError } from '@/lib/api'
 import { useEffect, useState } from 'react'
 import { startAuthentication } from '@simplewebauthn/browser'
@@ -65,10 +66,7 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
   useEffect(() => {
     if (!challenge) return
     let cancelled = false
-    void fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/passkeys/login/options`, {
-      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ challengeToken: challenge }),
-    }).then(response => response.json()).then((body: { success?: boolean; data?: { available?: boolean } }) => {
+    void requestPasskeyLoginOptions(challenge).then(response => response.json()).then((body: { success?: boolean; data?: { available?: boolean } }) => {
       if (cancelled) return
       const available = body.success === true && body.data?.available === true
       setHasPasskey(available)
@@ -114,17 +112,11 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
     setLoading(true)
     setError('')
     try {
-      const optionsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/passkeys/login/options`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ challengeToken: challenge }),
-      })
+      const optionsResponse = await requestPasskeyLoginOptions(challenge)
       const optionsBody = await optionsResponse.json() as { success?: boolean; error?: string; data?: { available?: boolean; options?: PublicKeyCredentialRequestOptionsJSON; challengeToken?: string } }
       if (!optionsResponse.ok || !optionsBody.success || !optionsBody.data?.available || !optionsBody.data.options || !optionsBody.data.challengeToken) throw new Error(optionsBody.error || 'パスキーを使用できません。認証アプリで確認してください。')
       const response = await startAuthentication({ optionsJSON: optionsBody.data.options })
-      const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/passkeys/login/verify`, {
-        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ loginChallengeToken: challenge, challengeToken: optionsBody.data.challengeToken, response }),
-      })
+      const verifyResponse = await verifyPasskeyLogin({ loginChallengeToken: challenge, challengeToken: optionsBody.data.challengeToken, response })
       const verifyBody = await verifyResponse.json() as { success?: boolean; error?: string; data?: { sessionToken?: string }; csrfToken?: string }
       if (!verifyResponse.ok || !verifyBody.success) throw new Error(verifyBody.error || 'パスキーを確認できませんでした。')
       await completeLogin(verifyBody)
