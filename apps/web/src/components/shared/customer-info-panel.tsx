@@ -103,7 +103,7 @@ export default function CustomerInfoPanel({
               <dt>{spec.label}</dt>
               <dd>{spec.key === 'allergy' ? <AllergyField value={editing ? draft[field.id] : field.value ?? null} options={field.options ?? undefined} readOnly={!editing || saving} onChange={next => setDraft(current => ({ ...current, [field.id]: next }))} />
                 : editing && !derived ? <TextField aria-label={spec.label} readOnly={saving} value={draft[field.id] ?? ''} onChange={event => setDraft(current => ({ ...current, [field.id]: event.target.value }))} />
-                : <span className={value ? styles.value : styles.note} title={display ?? undefined}>{display ?? '未設定'}</span>}{source && !editing ? <HelpTip hover label={`${spec.label}の出どころ`} icon={<FileText aria-hidden="true" />}>{source}</HelpTip> : null}</dd>
+                : <span className={value?.trim() ? styles.value : styles.note} title={display?.trim() ? display : undefined}>{display?.trim() ? display : '未設定'}</span>}{source && !editing ? <HelpTip hover label={`${spec.label}の出どころ`} icon={<FileText aria-hidden="true" />}>{source}</HelpTip> : null}</dd>
             </div>
           })}
         </dl>}

@@ -22,7 +22,7 @@ let registration: unknown
 
 beforeEach(() => {
   calls = []
-  registration = { available: true, accountName: 'musubo 運営（契約者専用）', basicId: '@musubo', addFriendUrl: 'https://line.me/R/ti/p/@musubo', linked: false, code: '123456', codeExpiresAt: '2026-09-19T00:00:00.000Z' }
+  registration = { available: true, accountName: 'musubo 運営（契約者専用）', basicId: '@musubo', addFriendUrl: 'https://line.me/R/ti/p/@musubo', linked: false, code: '123456', codeExpiresAt: new Date(Date.now() + 60_000).toISOString() }
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
@@ -32,6 +32,7 @@ beforeEach(() => {
     if (url.endsWith('/api/hq/notices')) payload = { success: true, data: [{ id: 'n1', subject: '9月20日 深夜のメンテナンス', body: '2:00〜4:00 に止まります。', sentAt: '2026-09-17T10:00:00.000+09:00' }] }
     else if (url.endsWith('/read')) payload = { success: true, data: { read: true } }
     else if (url.endsWith('/api/hq/notices/line-registration')) payload = { success: true, data: registration }
+    else if (url.endsWith('/api/hq/notices/line-registration/status')) payload = { success: true, data: { linked: false } }
     else payload = { success: true, data: null }
     return new Response(JSON.stringify(payload), { status: 200, headers: { 'Content-Type': 'application/json' } })
   }))
@@ -65,17 +66,18 @@ describe('運営からのお知らせ', () => {
 })
 
 describe('契約者専用LINEの登録案内', () => {
-  it('QR・確認コード・友だち追加リンクを出し、「あとで確認する」で閉じる', async () => {
+  it('QR・確認コード・紐づけ理由を出し、「あとで確認する」で閉じる', async () => {
     const onClose = vi.fn()
     await act(async () => { root.render(<NoticeLineRegisterDialog open onClose={onClose} />) })
     await flush()
     const text = document.body.textContent ?? ''
-    expect(text).toContain('運営からの通知を LINE で受け取る')
+    expect(text).toContain('運営からの通知をLINEで受け取る')
     expect(text).toContain('このLINEは問い合わせを受け付けません')
     expect(text).toContain('musubo 運営（契約者専用）（@musubo）')
     expect(text).toContain('123456')
     expect(document.querySelector('img[src^="data:image/png"]')).not.toBeNull()
-    expect(document.querySelector('a[href="https://line.me/R/ti/p/@musubo"]')).not.toBeNull()
+    expect(text).toContain('契約先に必要なお知らせだけを')
+    expect(document.querySelector('a[href="https://line.me/R/ti/p/@musubo"]')).toBeNull()
     await act(async () => { button('あとで確認する')!.click() })
     expect(onClose).toHaveBeenCalledTimes(1)
   })
@@ -94,13 +96,13 @@ describe('契約者専用LINEの登録案内', () => {
     await act(async () => { root.render(<NoticeLineRegisterDialog open onClose={onClose2} quietWhenUnavailable={false} />) })
     await flush()
     expect(onClose2).not.toHaveBeenCalled()
-    expect(document.body.textContent).toContain('契約者専用LINEはまだ運営側で設定されていません')
+    expect(document.body.textContent).toContain('通知専用LINEはまだ運営側で設定されていません')
   })
 
   it('登録済みなら確認コードの代わりに登録済みと出す', async () => {
     registration = { available: true, accountName: 'musubo 運営（契約者専用）', basicId: null, addFriendUrl: 'https://line.me/R/ti/p/@musubo', linked: true, code: null, codeExpiresAt: null }
     await act(async () => { root.render(<NoticeLineRegisterDialog open onClose={() => {}} />) })
     await flush()
-    expect(document.body.textContent).toContain('この管理画面はすでに登録済みです')
+    expect(document.body.textContent).toContain('LINEとの連携が完了しています')
   })
 })

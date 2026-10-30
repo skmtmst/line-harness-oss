@@ -43,7 +43,8 @@ export default function SourcePickerDialog({ items, preview, ...rest }: {
 }
 
 function folderName(id: string | null | undefined, folders: SourcePickerFolder[]) {
-  return id ? folders.find((f) => f.id === id)?.name ?? '—' : '未分類'
+  const name = folders.find((f) => f.id === id)?.name
+  return id ? name?.trim() ? name : '—' : '未分類'
 }
 
 /** ①の選び終えた候補。長い名前でも1行の高さを保つ。 */

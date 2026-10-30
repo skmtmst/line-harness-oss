@@ -6,8 +6,8 @@ import InboxFilterPanel from '@/components/chats/inbox-filter-panel';
 import SavedViewDialog, { type SavedViewDraft, type SavedViewSaveResult } from '@/components/chats/saved-view-dialog';
 import Avatar from '@/components/shared/avatar';
 import Button from '@/components/shared/button';
+import IconButton from '@/components/shared/icon-button';
 import SegmentedControl from '@/components/shared/segmented';
-import Select from '@/components/shared/select';
 import { InboxFloatingPanel } from '@/components/shared/inbox-content';
 import { InboxHistoryButton, InboxListHeader, InboxListHeadline, InboxListRow, InboxListSearch } from '@/components/shared/inbox-list';
 import { InboxListEmpty, InboxListFailure } from '@/components/shared/inbox-list-states';
@@ -20,9 +20,11 @@ import { api, type ChatListItem } from '@/lib/api';
 import { SEARCH_QUERY_MAX_LENGTH, clampSearchQuery } from '@/lib/search-query';
 import { formatListRecent, formatListRecentTitle } from '@/lib/format';
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
-import { Bookmark, ListFilter } from 'lucide-react';
+import { ArrowUpDown, Bookmark, ListFilter } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useRef, useState } from 'react';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
+import ActionMenu from '@/components/shared/action-menu';
 import { ChannelBadge, EmailInboxItem, INBOX_SORT_OPTIONS, InboxSavedView, InboxSort, StatusFilter, buildInboxUrl, formatWaitingDuration, sameYmd } from './inbox-model';
 import { chatListPreview } from './list-preview';
 import styles from './list-parts.module.css';
@@ -100,6 +102,10 @@ type Props = {
 export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
   // 緑の点は目で見る印。読み上げには名前で絞り込み中を伝える。
   const savedSearchLabel = hasInboxFilters ? '保存した検索（絞り込み中）' : '保存した検索'
+  // 並びは題の横の印から選ぶ。選んだ並びは吹き出しとメニューの ✓ で分かるようにする。
+  const [sortMenuOpen, setSortMenuOpen] = useState(false)
+  const sortButtonRef = useRef<HTMLButtonElement>(null)
+  const sortLabel = INBOX_SORT_OPTIONS.find((option) => option.value === sortOrder)?.label ?? INBOX_SORT_OPTIONS[0].label
   return (<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
     {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
@@ -117,10 +123,9 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <Button type="button" size="compact" className={`${styles.tool} ${styles.toolCaption}`} aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+        <IconButton aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
           <ListFilter aria-hidden size={16} />
-          <span aria-hidden="true" className={styles.toolCaptionLabel}>絞り込み</span>
-        </Button>
+        </IconButton>
         {/*
           INBOX-11: メニューは「保存した検索」ボタンではなく、画面幅いっぱいの
           この行（section.relative）を基準に右端を合わせる。ボタン基準の
@@ -129,10 +134,8 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
         */}
         <div>
           {/* m22c: 左の札と同じ高さ32にそろえる（行の上端を1つに保つ）。v8 では札が 36 なので同じく 36。 */}
-          <Button
-            type="button"
-            size="compact"
-            className={`${styles.tool} ${styles.toolCaption} ${styles.toolDotWrap}`} aria-label={savedSearchLabel} title={savedSearchLabel}
+          <IconButton
+            className={styles.toolDotWrap} aria-label={savedSearchLabel} title={savedSearchLabel}
             onClick={() => {
               setSavedViewsOpen((open) => !open)
               setSavedViewError('')
@@ -140,9 +143,8 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             aria-expanded={savedViewsOpen}
           >
             <Bookmark aria-hidden size={16} />
-            <span aria-hidden="true" className={styles.toolCaptionLabel}>保存した検索</span>
             {hasInboxFilters ? <span aria-hidden="true" className={styles.toolDot} /> : null}
-          </Button>
+          </IconButton>
           <InboxFloatingPanel open={savedViewsOpen} placement="below">
               <p className="text-ink text-sm font-bold">保存した検索</p>
               <div className="mt-3 space-y-1">
@@ -228,6 +230,26 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
            */
           <InboxRulesPopover accountId={selectedAccountId ?? null} onRoutingSaved={() => setSlaReload((n) => n + 1)} />
         )}
+        {!slaEnabled ? (
+          <>
+            <IconButton ref={sortButtonRef} aria-label="並び順" title={`並び順：${sortLabel}`} aria-haspopup="menu" aria-expanded={sortMenuOpen} onClick={() => setSortMenuOpen((open) => !open)}>
+              <ArrowUpDown aria-hidden size={16} />
+            </IconButton>
+            <ActionMenu
+              open={sortMenuOpen}
+              anchorRef={sortButtonRef}
+              ariaLabel="並び順"
+              onClose={() => setSortMenuOpen(false)}
+              items={INBOX_SORT_OPTIONS.map((option) => ({
+                id: option.value,
+                label: option.value === sortOrder ? `✓ ${option.label}` : option.label,
+                'aria-label': option.value === sortOrder ? `${option.label}（選択中）` : option.label,
+                icon: null,
+                onSelect: () => { setSortMenuOpen(false); setSortOrder(option.value) },
+              }))}
+            />
+          </>
+        ) : null}
       </InboxListHeadline>
       <SegmentedControl<'all' | 'reply' | 'overdue'>
         aria-label="受信箱のクイック絞り込み"
@@ -323,21 +345,13 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
       */}
     </InboxListSearch>
 
+    {/*
+      並びの選択は題の横の印（↑↓）から選ぶ。選んだ並びは URL の ?sort= に残る。
+      期限を使うときは選べない固定の並びなので、1段の表示だけ残す。
+    */}
     {slaEnabled ? (
       <p data-inbox-sort="fixed" className={`border-b border-hairline px-3 pb-3 text-micro text-ink-secondary ${styles.sortLine}`}>並び順：期限が近い順（過ぎた物が先）</p>
-    ) : (
-      /* 並びは「未読が先」「新しい順」から選ぶ。選んだ並びは URL の ?sort= に残る。 */
-      <div data-inbox-sort="choice" className={`border-b border-hairline px-3 pb-3 text-micro text-ink-secondary ${styles.sortLine}`}>
-        <Select
-          aria-label="並び順"
-          treatment="text"
-          size="content"
-          value={sortOrder}
-          onChange={(value) => setSortOrder(value === 'latest' ? 'latest' : 'unread_first')}
-          options={INBOX_SORT_OPTIONS}
-        />
-      </div>
-    )}
+    ) : null}
     {/* Chat List（2026-10-07 速さ：行は ChatListWindow で窓分けして描く） */}
     <div ref={listScrollRef} data-inbox-list-scroller="" className="flex-1 overflow-y-auto" style={{ overflowAnchor: 'none' }}>
       <>

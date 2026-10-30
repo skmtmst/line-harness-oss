@@ -192,6 +192,9 @@ describe('契約者専用LINEの登録案内と紐づけ', () => {
     const info = await (await app(ownerA).request('/api/hq/notices/line-registration')).json() as { data: { available: boolean; addFriendUrl: string; code: string; linked: boolean } };
     expect(info.data).toMatchObject({ available: true, addFriendUrl: 'https://line.me/R/ti/p/@musubo', linked: false });
     expect(info.data.code).toMatch(/^\d{6}$/);
+    const pendingStatus = await (await app(ownerA).request('/api/hq/notices/line-registration/status')).json() as { data: { linked: boolean } };
+    expect(pendingStatus.data.linked).toBe(false);
+    expect(botProfile.fetch).toHaveBeenCalledTimes(1);
     const again = await (await app(ownerA).request('/api/hq/notices/line-registration')).json() as { data: { code: string } };
     expect(again.data.code).toBe(info.data.code);
 
@@ -210,5 +213,8 @@ describe('契約者専用LINEの登録案内と紐づけ', () => {
     expect(row.notice_friend_id).toBe('f-a');
     const linked = await (await app(ownerA).request('/api/hq/notices/line-registration')).json() as { data: { linked: boolean; code: string | null } };
     expect(linked.data).toMatchObject({ linked: true, code: null });
+    const linkedStatus = await (await app(ownerA).request('/api/hq/notices/line-registration/status')).json() as { data: { linked: boolean } };
+    expect(linkedStatus.data.linked).toBe(true);
+    expect(botProfile.fetch).toHaveBeenCalledTimes(3);
   });
 });

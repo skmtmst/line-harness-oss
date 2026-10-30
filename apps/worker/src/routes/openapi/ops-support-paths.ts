@@ -34,6 +34,21 @@ export const opsSupportPaths = {
   '/api/ops/me': {
     get: { tags: ['Ops Console'], summary: 'ログイン中の運営マスター', responses: { '200': { description: 'Platform admin identity and active impersonation' }, '403': { description: 'Not a platform admin' } } },
   },
+  '/api/ops/applications': {
+    get: { tags: ['Ops Console'], summary: '申込アカウント一覧', responses: { '200': { description: 'Applications' }, '403': { description: 'Platform admin required' } } },
+  },
+  '/api/ops/applications/{id}': {
+    get: { tags: ['Ops Console'], summary: '申込アカウント詳細', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Application detail' }, '404': { description: 'Application not found' } } },
+  },
+  '/api/ops/applications/{id}/contact': {
+    post: { tags: ['Ops Console'], summary: '申込先への対応メモを保存', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Contact recorded' }, '403': { description: 'Platform admin required' } } },
+  },
+  '/api/ops/applications/{id}/approve': {
+    post: { tags: ['Ops Console'], summary: '申込を承認し招待メールを送信', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Approved and invitation requested' }, '403': { description: 'Platform admin required' } } },
+  },
+  '/api/ops/applications/{id}/resend-invite': {
+    post: { tags: ['Ops Console'], summary: '承認済み申込の招待メールを再送', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Invitation requested' }, '403': { description: 'Platform admin required' } } },
+  },
   '/api/ops/tenants': {
     get: { tags: ['Ops Console'], summary: '契約先（統括）の一覧', parameters: [{ name: 'q', in: 'query', schema: { type: 'string' } }, { name: 'status', in: 'query', schema: { type: 'string', enum: ['active', 'suspended', 'archived'] } }], responses: { '200': { description: 'Tenants with counts and summary' }, '403': { description: 'Not a platform admin' } } },
   },
@@ -87,9 +102,15 @@ export const opsSupportPaths = {
   '/api/hq/notices/line-registration': {
     get: { tags: ['HQ Support'], summary: '契約者専用LINEの登録案内（友だち追加 URL と本人の確認コード）', responses: { '200': { description: 'Registration info' } } },
   },
+  '/api/hq/notices/line-registration/status': {
+    get: { tags: ['HQ Support'], summary: '本人の通知専用LINE紐づけ状態', responses: { '200': { description: 'Linked status' } } },
+  },
   '/api/ops/notice-line-account': {
     get: { tags: ['Ops Console'], summary: '契約者専用LINEに使うアカウントと候補', responses: { '200': { description: 'Current and candidates' } } },
     put: { tags: ['Ops Console'], summary: '契約者専用LINEに使うアカウントを指定する', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { lineAccountId: { type: 'string', nullable: true } } } } } }, responses: { '200': { description: 'Saved' }, '400': { description: 'Not an ops account' } } },
+  },
+  '/api/ops/notice-line-account/connect': {
+    post: { tags: ['Ops Console'], summary: '運営通知用LINEアカウントを接続', responses: { '200': { description: 'Connected' }, '403': { description: 'Platform admin required' } } },
   },
   '/api/ops/announcements': {
     get: { tags: ['Ops Console'], summary: 'お知らせの一覧（下書き・予約・配信済み）', responses: { '200': { description: 'Announcements' } } },

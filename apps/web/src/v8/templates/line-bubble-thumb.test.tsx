@@ -32,6 +32,18 @@ describe('bubbleThumbOf', () => {
     expect(of('text', '   ')).toEqual({ kind: 'empty' })
   })
 
+  it('テキストpayloadの文を出し、差し込みを札のまま残す', () => {
+    const thumb = of('text', JSON.stringify({ text: '{{name}}さま\nご案内です' }))
+    expect(thumb).toEqual({ kind: 'text', text: '{{name}}さま ご案内です' })
+    const node = draw(thumb)
+    expect(node.textContent).toContain('ご案内です')
+    expect(node.textContent).not.toContain('"text"')
+    expect(node.querySelector('[data-token="{{name}}"]')).toBeTruthy()
+    expect(of('text', '{"text":"   "}')).toEqual({ kind: 'empty' })
+    expect(of('text', '{通常の文章}')).toEqual({ kind: 'text', text: '{通常の文章}' })
+    expect(of('text', '0')).toEqual({ kind: 'text', text: '0' })
+  })
+
   it('長いテキストは途中で切れた差し込みを落とす', () => {
     const thumb = of('text', `${'あ'.repeat(115)}{{name}}`)
     expect(thumb).toEqual({ kind: 'text', text: 'あ'.repeat(115) })

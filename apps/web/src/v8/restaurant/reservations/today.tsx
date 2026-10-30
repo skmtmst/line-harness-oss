@@ -1,4 +1,7 @@
 'use client'
+import { useLedgerFloor } from './use-ledger-floor'
+import LedgerEmpty from './ledger-empty'
+import ListState from '@/components/shared/list-state'
 import ReservationBoard,{ReservationSource} from '@/components/shared/reservation-board'
 import {seatBoardEntry, withHonorific } from '@line-crm/shared'
 import {reservationBoardApi,allBoardPages} from '@/lib/api/helpers/reservation-board'
@@ -12,8 +15,8 @@ import {useAccount} from '@/contexts/account-context'
  * 内訳・つながる先。1152 では右の欄が表の下に積まれる（CSS だけ）。
  * 箱は予約元の色（LINE・レストランボード＝緑、予約媒体＝赤、電話＝灰）、承認待ちは黄の枠、押さえは灰の枠。
  */
-import { useEffect,useMemo,useState } from 'react'
-import type {RestaurantFloor,ReservationAxis} from '@line-crm/shared'
+import { useMemo,useState } from 'react'
+import type {ReservationAxis} from '@line-crm/shared'
 import KpiCard from '@/components/shared/kpi-card'
 import Link from '@/components/shared/list-navigation'
 import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react'
@@ -25,7 +28,7 @@ import IconButton from '@/components/shared/icon-button'
 import Select from '@/components/shared/select'
 
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
-import { StatRow } from '@/v8/restaurant/booking-kit/public/shell/index'
+import KpiBand from '@/components/shared/kpi-band'
 import { INACTIVE_STATUSES, SOURCE_LABEL, dayShort, dayTitle, floorOrder, hm, isHold, mdWeek, minutesOf, addDays, sameDay, shortCourse, slotLabel, sourceName, dayRange, toYmd } from './format'
 import styles from './reservations.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -63,8 +66,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
 }) {
   const {selectedAccountId}=useAccount()
   const [axis,setAxis]=useState<ReservationAxis>('resource')
-  const [floor,setFloor]=useState<RestaurantFloor|undefined>()
-  useEffect(()=>{let active=true;setFloor(undefined);if(selectedAccountId&&storeId)void reservationBoardApi.floors(selectedAccountId,storeId).then(r=>{if(active)setFloor(r.data[0])}).catch(()=>{});return ()=>{active=false}},[selectedAccountId,storeId])
+  const {floor,error:floorError,reload:reloadFloor}=useLedgerFloor(selectedAccountId,storeId)
   const live = useMemo(() => rows.filter((item) => !INACTIVE_STATUSES.includes(item.status)), [rows])
   const shown = useMemo(() => (source === 'all' ? live : live.filter((item) => item.source === source)), [live, source])
   const bookings = useMemo(() => shown.filter((item) => !isHold(item)), [shown])
@@ -112,15 +114,15 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
 
   return (
     <>
-      <StatRow fusion>
+      <KpiBand data-restaurant-fusion>
         <KpiCard title="今日の予約" value={bookings.length} unit="件" detail={`${guests}名`} icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="承認待ち" value={pending.length} unit="件" detail={pendingSources || 'ありません'} valueTone={pending.length > 0 ? 'warning' : 'default'} icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="未配席" value={unseated} unit="件" detail={unseated === 0 ? 'すべて卓に入っています' : '卓の割当が必要'} valueTone={unseated > 0 ? 'warning' : 'default'} icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="押さえ" value={holds.length} unit="枠" detail={holds[0]?.note || holds[0]?.allergy_note || '期限付きの仮押さえ'} icon={<Inbox size={16} aria-hidden />} presentation="band" />
-      </StatRow>
+      </KpiBand>
       <div className={styles.todayColumns}>
         <div className={styles.calendarWrap} role="region" aria-label={`${dayTitle(day)}の時間×卓`}>
-        <ReservationBoard axis={axis} onAxis={v=>{setAxis(v);if(v==='list')onView('list');else if(v==='month')onView('month')}} toolbar={<>
+        <ReservationBoard renderBody={columns.length===0 || axis==='floor' && (shown.length===0 || floorError) ? body=><>{columns.length===0 ? <LedgerEmpty noTables={tables.length===0} inactiveTables={tables.length>0} canWrite={canWrite} busy={busy} onCreate={()=>onAdd({date:day})} onViewList={shown.length>0 ? ()=>onView('list') : undefined}/> : axis==='floor' && shown.length===0 ? <LedgerEmpty noTables={false} filtered={source!=='all'} canWrite={canWrite} busy={busy} onCreate={()=>onAdd({date:day})}/> : null}{columns.length===0 ? null : axis==='floor' && floorError ? null : body}</> : undefined} axis={axis} onAxis={v=>{setAxis(v);if(v==='list')onView('list');else if(v==='month')onView('month')}} toolbar={<>
         <IconButton aria-label="前の日" onClick={() => onDay(addDays(day, -1))}><ChevronLeft size={16} aria-hidden="true" /></IconButton>
         <h2 className={styles.dateTitle}>{dayTitle(day)}</h2>
         <IconButton aria-label="次の日" onClick={() => onDay(addDays(day, 1))}><ChevronRight size={16} aria-hidden="true" /></IconButton>
@@ -134,7 +136,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
             onChange={onSource}
             options={[{ value: 'all', label: '予約元：すべて' }, ...Object.entries(SOURCE_LABEL).map(([value, label]) => ({ value, label: `予約元：${label}` }))]}
           /></SaveErrorField>
-            </span>} notice={hidden.length > 0 ? <Notice tone="warn">
+            </span>} notice={floorError ? <ListState kind="error" title="座席表を読み込めませんでした" error={floorError} onRetry={reloadFloor}/> : hidden.length > 0 ? <Notice tone="warn">
               {`${hidden.map((table) => table.code).join('・')} は停止中のため出していません`}
             </Notice> : null} floor={floor} dates={[toYmd(day)]}
           onSlot={(tableId,startsAt)=>onAdd({date:day,time:hm(startsAt),tableId})} entries={shown.map(r=>seatBoardEntry(r as unknown as Record<string,unknown>))}

@@ -1,6 +1,6 @@
 'use client'
 import { loadStaffIdentity, canManageRole, useStaffRole, useStaffIdentity } from '@/lib/staff-role'
-import SelfMfa from './self-mfa'
+import SelfSecurity from './self-security'
 import MfaPolicy from './mfa-policy'
 import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes/index'
 import TotpQr from '@/components/shared/totp-qr'
@@ -727,17 +727,14 @@ function RoleChip({ role }: { role: RoleKey }) {
 }
 
 const STAFF_TAB_KEYS = [
-  { key: 'members', label: 'いまいる人' }, { key: 'invited', label: '招待中' },
-  { key: 'audit', label: '入った記録' }, { key: 'roles', label: '権限のかたまり' },
+  { key: 'members', label: 'ユーザー' }, { key: 'invited', label: '招待中' },
+  { key: 'audit', label: 'ログイン履歴' }, { key: 'roles', label: '役割と権限' },
 ] as const
 
-/** 最後に入った日の短い言い方（絵：いま・9/30）。10分以内は「いま」。日本時間の 月/日。 */
-function shortWhen(value: string | null | undefined, now: number): string {
+/** 最終ログイン日を日本時間の日付だけで表示する。 */
+function lastLoginDay(value: string | null | undefined): string {
   if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  if (Math.abs(now - date.getTime()) < 10 * 60 * 1000) return 'いま'
-  return polishFormatDate(value, { style: 'list-day', now })
+  return polishFormatDate(value, { style: 'list-day', fallback: '—' })
 }
 
 /** 二段階認証の札。オン／確認が必要（作る・送る役割で未設定）／無効（見るだけで未設定・止めた人）。 */
@@ -746,31 +743,6 @@ function twoFactorState(user: AccessUserItem): { label: string; tone: 'success' 
   if (user.mfaEnabled) return { label: '二段階認証 オン', tone: 'success' }
   if (user.roleBundle === 'view_only') return { label: '無効', tone: 'neutral' }
   return { label: '確認が必要', tone: 'warning' }
-}
-
-/** 右の「役割でできること」。 */
-function StaffRoleGuide() {
-  const rows: Array<{ role: RoleKey; body: string }> = [
-    { role: 'owner', body: 'すべて。お金・会社とロゴ・ほかの人の役割も変えられる' },
-    { role: 'administrator', body: 'すべての機能を作る・変える・送る。ログインユーザーの招待と役割' },
-    { role: 'operations', body: '配信・受信箱・友だち・予約を作る・送る。設定は見るだけ' },
-    { role: 'reception', body: '受信箱の返信と予約の受付だけ' },
-    { role: 'view_only', body: '画面を見られる（操作は出ません）' },
-  ]
-  return (
-    <section aria-label="役割でできること" className={`${styles.asideCard} ${styles.guideCard}`}>
-      <h2 className={styles.asideTitle}>役割でできること</h2>
-      <ul className={styles.guideList}>
-        {rows.map((item) => (
-          <li key={item.role} className={styles.guideRow}>
-            <span className={styles.guideChip}><RoleChip role={item.role} /></span>
-            <span className={styles.guideBody}>{item.body}</span>
-          </li>
-        ))}
-      </ul>
-      <p className={styles.asideNote}>「個別設定」にすると、画面ごと・アカウントごとに細かく決められます。</p>
-    </section>
-  )
 }
 
 function StaffPageHost({ editId }: { editId?: string | null }) {
@@ -812,7 +784,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   // 閲覧専用（代理ログインの見るだけ等）のオーナー・管理者は、変える操作を出さず閲覧のみの形にする。
   const staffRole = useStaffRole()
   const administrator = canManageRole(staffRole)
-  usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ログインユーザー')
+  usePageTitle(permissionTarget ? `${permissionTarget.name}さんに見せる範囲` : 'ユーザー管理')
   const load = useCallback(async () => {
     const version = ++membersLoadVersion.current
     setLoading(true)
@@ -1042,7 +1014,6 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     return <SaveErrorScope errors={saveErrors}><PermissionScopeView user={permissionTarget} memberId={permissionMember?.id ?? null} canSave={Boolean(administrator && !permissionMember?.isAccountCreator && permissionMember?.canManageInAccount !== false)} copyCandidates={copyCandidates} roleCounts={accessSummary.roleCounts} accountNames={accountNames} savedEditKeys={permissionMember?.permissionKeys ?? []} savedViewKeys={permissionMember?.permissionViewKeys ?? []} savedEmailMask={permissionMember?.emailMask ?? null} onClose={() => setPermissionTarget(null)} onSaved={finishPermissionSave} onConflict={handlePermissionConflict} /></SaveErrorScope>
   }
   const viewer = me !== null && !administrator
-  const nowMs = Date.now()
   const activeCount = accessUsers.filter((user) => user.status === 'active').length
   const suspendedCount = accessUsers.filter((user) => user.status === 'suspended').length
   const roleOf = (user: AccessUserItem): RoleKey => {
@@ -1070,7 +1041,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
     }
     return items
   }
-  const sectionTitle = tab === 'invited' ? '招待中' : tab === 'roles' ? '権限のかたまり' : 'いまいる人'
+  const sectionTitle = tab === 'invited' ? '招待中' : tab === 'roles' ? '役割と権限' : 'ユーザー'
   const listCard = (
     <section className={styles.card} aria-label={sectionTitle} id="staff-list" data-list-folders={false}>
       <div className={styles.cardHead}>
@@ -1078,15 +1049,14 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
           <h2 className={styles.cardTitle}>{sectionTitle}</h2>
           <div className={styles.cardSubRow}>
             <span className={styles.cardSub}>{summaryReady ? `${formatNumber(filteredUsers.length)}人` : emptyValue('unknown')}</span>
-            {tab === 'members' && missing > 0 ? <span className={styles.cardWarn}>{`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}</span> : null}
           </div>
         </div>
       </div>
-      <GridTable className={`${styles.table} ${viewer ? styles.readOnlyTable : ''}`} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: 'var(--tpl-sa-staff-card-gap)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>
+      <GridTable className={`${styles.table} ${viewer ? styles.readOnlyTable : ''}`} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: '0', rowHeight: 'var(--tpl-sa-staff-row-h)', headHeight: 'var(--tpl-sa-staff-head-h)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>
         <GridHeadRow>
-          <GridCell className={styles.colPerson} role="columnheader">人</GridCell>
-          <GridCell className={styles.colRole} role="columnheader">役割</GridCell>
-          <GridCell className={styles.colLast} role="columnheader">最後に入った</GridCell>
+          <GridCell className={styles.colPerson} role="columnheader">ユーザー情報</GridCell>
+          <GridCell className={styles.colRole} role="columnheader">権限</GridCell>
+          <GridCell className={styles.colLast} role="columnheader">最終ログイン</GridCell>
           <GridCell className={styles.colMenu} role="columnheader"><span className={styles.srOnly}>操作</span></GridCell>
         </GridHeadRow>
         {loading ? <p className={styles.stateRow} role="status">ログインユーザーを読み込んでいます…</p>
@@ -1098,9 +1068,9 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             return (
               <GridRow key={user.id}>
                 {/* 絵 nku0f：顔・名前・メール。担当のLINEアカウントは列にせず、名前に重ねた説明と「見える画面」で見る。 */}
-                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>{member?.isAccountCreator ? <span className={styles.personSub}>管理者・アカウント作成者</span> : null}{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
+                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}{me?.id === user.id ? '（自分）' : ''}</button>{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
                 <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} />}</GridCell>
-                <GridCell className={styles.colLast} role="cell" title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}` : formatStaffDate(user.lastLoginAt ?? undefined)}>{shortWhen(user.lastLoginAt, nowMs)}</GridCell>
+                <GridCell className={styles.colLast} role="cell" title={user.lastLoginAt ? formatStaffDate(user.lastLoginAt) : undefined}>{lastLoginDay(user.lastLoginAt)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
                   <RowMenu size="row" label={`${user.name}の操作`} items={items} open={openMenuId === user.id} onOpenChange={(next) => setOpenMenuId(next ? user.id : null)} />
                 </GridCell>
@@ -1119,9 +1089,9 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
   return (
     <SaveErrorScope errors={saveErrors}><PageFrame kind="settings" boardId={administrator ? 'nku0f' : 'A35Gh'}>
       <PageHeading
-        title="ログインユーザー"
+        title="ユーザー管理"
         help="管理画面に入る人と、その人ができることを決めます（管理者の設定はここ）"
-        tabs={<Tabs size="compact" label="ログインユーザーの切り替え" items={STAFF_TAB_KEYS.map((item) => ({ label: item.label, href: `/staff?tab=${item.key}`, current: tab === item.key }))} />}
+        tabs={<Tabs size="compact" label="ユーザー管理の切り替え" items={STAFF_TAB_KEYS.map((item) => ({ label: item.label, href: `/staff?tab=${item.key}`, current: tab === item.key }))} />}
       />
       {viewer ? (
         <div className={styles.viewerBandRow}>
@@ -1131,8 +1101,6 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
       <div className={styles.body}>
         <SettingsInnerNav inline />
         <div className={styles.main}>
-          {administrator ? <MfaPolicy key={selectedAccountId ?? 'unselected'} accountMembers={summaryReady && !loading && membersAccountId === selectedAccountId ? members : null} /> : null}
-          <SelfMfa />
           {tab === 'audit' ? (
             <>
               {tabAction ? <div className={styles.toolbar}><span className={styles.spacer} />{tabAction}</div> : null}
@@ -1156,7 +1124,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                 ) : null}
                 <span className={styles.spacer} />
                 {administrator ? (
-                  <Button href="/staff/new" variant="primary"><UserPlus size={16} aria-hidden="true" />人を招待する</Button>
+                  <Button href="/staff/new" variant="primary"><UserPlus size={16} aria-hidden="true" />招待する</Button>
                 ) : (
                   /* 閲覧のみには押せないボタンを置かない。場所だけ空ける（下の物を詰めない）。 */
                   <span className={styles.inviteSpace} aria-hidden="true" />
@@ -1175,9 +1143,10 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                 </div>
               ) : null}
               {listCard}
+              {tab === 'members' && missing > 0 ? <p className={styles.cardWarn}>{`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}</p> : null}
               {!loading && !error ? (
                 <div className={styles.listFoot}>
-                  <p>{`ログインユーザー ${formatNumber(filteredUsers.length)} 人中 ${formatNumber(shown.length)} 人を表示${usersTotal > accessUsers.length ? `（全${formatNumber(usersTotal)} 人中${formatNumber(accessUsers.length)} 人まで読み込み）` : ''}`}</p>
+                  <p>{`ユーザー ${formatNumber(filteredUsers.length)} 人中 ${formatNumber(shown.length)} 人を表示${usersTotal > accessUsers.length ? `（全${formatNumber(usersTotal)} 人中${formatNumber(accessUsers.length)} 人まで読み込み）` : ''}`}</p>
                   {usersTotal > accessUsers.length ? (
                     <Button variant="secondary" size="compact" onClick={() => void loadMoreUsers()} disabled={moreUsersBusy} busy={moreUsersBusy}>続きを読み込む</Button>
                   ) : null}
@@ -1186,12 +1155,13 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                 </div>
               ) : null}
               {tab === 'members' ? <Disclosure appearance="inset" size="compact" title="ログイン中の端末を確認"><SessionsCard /></Disclosure> : null}
+              {administrator && tab === 'roles' ? <MfaPolicy compact key={selectedAccountId ?? 'unselected'} accountMembers={summaryReady && !loading && membersAccountId === selectedAccountId ? members : null} /> : null}
             </>
           )}
         </div>
         {tab === 'members' ? (
           <aside className={styles.aside} aria-label="補足">
-            <StaffRoleGuide />
+            <SelfSecurity />
           </aside>
         ) : null}
       </div>

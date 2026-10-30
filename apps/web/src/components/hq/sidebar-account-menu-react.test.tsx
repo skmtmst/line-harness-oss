@@ -104,27 +104,17 @@ describe('★V8 左下の自分とメニュー', () => {
     cleanup()
   })
 
-  it('統括へ戻れる人にはメニューを開く前から戻るリンクを出す', async () => {
-    rememberStaffIdentity({ role: 'owner', accountScope: 'all' } as StaffMember)
-    const view = await renderMenu()
-    const link = view.getByRole('link', { name: '統括へ →' })
-    expect(link.nextElementSibling).toBe(trigger(view))
-    expect(view.queryByRole('menu')).toBeNull()
-    fireEvent.click(link)
-    expect(fixture.clearSelectedAccountId).toHaveBeenCalledOnce()
-    expect(fixture.push).toHaveBeenCalledWith('/hq')
-  })
-
-  it.each([undefined, 'accounts'] as const)('統括の担当範囲が%sなら常設リンクを出さない', async accountScope => {
-    rememberStaffIdentity({ role: 'owner', accountScope } as StaffMember)
+  it.each([
+    ['オーナー・全店', { role: 'owner', accountScope: 'all' }],
+    ['オーナー・担当店のみ', { role: 'owner', accountScope: 'accounts' }],
+    ['管理者・全店', { role: 'admin', accountScope: 'all' }],
+    ['スタッフ', { role: 'staff' }],
+    ['閲覧のみ', { role: 'viewer' }],
+  ] as const)('%sでも版の下に常設の「統括へ」リンクは出さない（戻る口はメニューの中だけ）', async (_label, identity) => {
+    rememberStaffIdentity(identity as StaffMember)
     const view = await renderMenu()
     expect(view.queryByRole('link', { name: '統括へ →' })).toBeNull()
-  })
-
-  it.each(['staff', 'viewer'])('統括へ戻れない%sには常設リンクを出さない', async role => {
-    rememberStaffIdentity({ role } as StaffMember)
-    const view = await renderMenu()
-    expect(view.queryByRole('link', { name: '統括へ →' })).toBeNull()
+    expect(view.container.textContent).not.toContain('統括へ →')
   })
 
   it('枠は顔・名前・役割。押すまでメニューは出ない' , async () => {

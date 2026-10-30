@@ -148,6 +148,10 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   // 外部入力で対象を選ばせず、認証済みの本人だけから解決する。
   ['GET', '/api/auth/two-factor/self'],
   ['POST', '/api/auth/two-factor/recovery'],
+  ['GET', '/api/auth/passkeys/self'],
+  ['POST', '/api/auth/passkeys/register/options'],
+  ['POST', '/api/auth/passkeys/register/verify'],
+  ['DELETE', '/api/auth/passkeys/self'],
   ['POST', '/api/auth/step-up'],
   // 本人のログイン中セッション一覧と一括失効。handler が本人分だけを対象にする。
   ['GET', '/api/auth/sessions'],
@@ -296,6 +300,7 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   // 運営からのお知らせ（★37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],
+  ['GET', '/api/hq/notices/line-registration/status'],
 ];
 
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [

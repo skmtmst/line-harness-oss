@@ -2,6 +2,8 @@
 import { twoFactorFailureMessage } from '@/v8/login/two-factor/two-factor-error'
 import { responseApiError } from '@/lib/api'
 import { useEffect, useState } from 'react'
+import { startAuthentication } from '@simplewebauthn/browser'
+import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser'
 import { LogIn } from 'lucide-react'
 import {
   adminSessionHandoffPath,
@@ -54,15 +56,83 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
   const [error, setError] = useState('')
   const [method, setMethod] = useState<TwoFactorMethod>('line')
   const [helpOpen, setHelpOpen] = useState(false)
+  const [passkeyMode, setPasskeyMode] = useState<'checking' | 'available' | 'totp' | 'none'>('checking')
+  const [hasPasskey, setHasPasskey] = useState(false)
 
   // 方法の受け取りは合言葉より先に（合言葉の受け取りで hash が消えるため。管理画面 と同じ順）。
   useEffect(() => { setMethod(captureTwoFactorMethod()); setChallenge(captureTwoFactorChallenge()); setReady(true) }, [])
+
+  useEffect(() => {
+    if (!challenge) return
+    let cancelled = false
+    void fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/passkeys/login/options`, {
+      method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ challengeToken: challenge }),
+    }).then(response => response.json()).then((body: { success?: boolean; data?: { available?: boolean } }) => {
+      if (cancelled) return
+      const available = body.success === true && body.data?.available === true
+      setHasPasskey(available)
+      setPasskeyMode(available ? 'available' : 'none')
+    }).catch(() => { if (!cancelled) setPasskeyMode('none') })
+    return () => { cancelled = true }
+  }, [challenge])
 
   const missingChallenge = ready && !challenge
 
   const finish = (href: string) => {
     setSucceeded(true)
     window.setTimeout(() => window.location.assign(href), 420)
+  }
+
+  const completeLogin = async (body: { data?: { sessionToken?: string }; csrfToken?: string }) => {
+    if (body.data?.sessionToken) storeAdminSession(body.data.sessionToken, body.csrfToken)
+    else if (body.csrfToken) {
+      try { localStorage.setItem('lh_csrf', body.csrfToken) } catch (saveFailure) { saveErrors.capture(saveFailure) }
+    }
+    const nextPath = takeTwoFactorNextPath()
+    if (nextPath === '/ops') {
+      const session = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/session`, {
+        credentials: 'include', headers: adminSessionHeaders(body.data?.sessionToken),
+      })
+      const sessionBody = await session.json().catch(() => ({})) as { success?: boolean; data?: { platformAdmin?: boolean; platformAdminState?: string | null } }
+      if (!session.ok || !sessionBody.success || !sessionBody.data) throw new Error('ログイン状態を確認できませんでした。もう一度ログインしてください')
+      if (!sessionBody.data.platformAdmin) {
+        if (sessionBody.data.platformAdminState === 'awaiting_totp') {
+          clearTwoFactorChallenge()
+          finish(adminSessionHandoffPath('/ops/two-factor', body.data?.sessionToken, body.csrfToken))
+          return
+        }
+        throw new Error('このアカウントは運営メンバーとして有効ではありません。招待メールのリンクから登録を完了してください')
+      }
+    }
+    clearTwoFactorChallenge()
+    finish(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
+  }
+
+  const submitPasskey = async () => {
+    if (loading || succeeded || !challenge) return
+    setLoading(true)
+    setError('')
+    try {
+      const optionsResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/passkeys/login/options`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ challengeToken: challenge }),
+      })
+      const optionsBody = await optionsResponse.json() as { success?: boolean; error?: string; data?: { available?: boolean; options?: PublicKeyCredentialRequestOptionsJSON; challengeToken?: string } }
+      if (!optionsResponse.ok || !optionsBody.success || !optionsBody.data?.available || !optionsBody.data.options || !optionsBody.data.challengeToken) throw new Error(optionsBody.error || 'パスキーを使用できません。認証アプリで確認してください。')
+      const response = await startAuthentication({ optionsJSON: optionsBody.data.options })
+      const verifyResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/passkeys/login/verify`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ loginChallengeToken: challenge, challengeToken: optionsBody.data.challengeToken, response }),
+      })
+      const verifyBody = await verifyResponse.json() as { success?: boolean; error?: string; data?: { sessionToken?: string }; csrfToken?: string }
+      if (!verifyResponse.ok || !verifyBody.success) throw new Error(verifyBody.error || 'パスキーを確認できませんでした。')
+      await completeLogin(verifyBody)
+    } catch (caught) {
+      setError(caught instanceof Error && caught.name === 'NotAllowedError'
+        ? 'パスキーの操作を中止しました。もう一度試すか、認証アプリを使用してください。'
+        : opsTwoFactorFailureMessage(caught, 'パスキーを確認できませんでした。認証アプリでもログインできます。'))
+    } finally { setLoading(false) }
   }
 
   /* 6桁目が入った瞬間に送る（送るボタンも残す）。送っている間・送り終えた後は二重に送らない。 */
@@ -81,33 +151,7 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
       })
       const body = await response.json() as { success: boolean; error?: string; data?: { sessionToken?: string }; csrfToken?: string }
       if (!response.ok || !body.success) throw responseApiError(response, JSON.stringify(body), undefined, undefined, { preserveBodyMessage: true, fallbackMessage: '認証できませんでした' })
-      if (body.data?.sessionToken) storeAdminSession(body.data.sessionToken, body.csrfToken)
-      else if (body.csrfToken) {
-        try { localStorage.setItem('lh_csrf', body.csrfToken) } catch (saveFailure) {
-          saveErrors.capture(saveFailure) /* Cookie のセッションで足りる */ }
-      }
-      const nextPath = takeTwoFactorNextPath()
-      // 運営へ戻す前に、セッションと運営権限を確かめる（省くと /ops/login との往復になる）。
-      if (nextPath === '/ops') {
-        const session = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/session`, {
-          credentials: 'include',
-          headers: adminSessionHeaders(body.data?.sessionToken),
-        })
-        const sessionBody = await session.json().catch(() => ({})) as { success?: boolean; data?: { platformAdmin?: boolean; platformAdminState?: string | null } }
-        if (!session.ok || !sessionBody.success || !sessionBody.data) {
-          throw new Error('ログイン状態を確認できませんでした。もう一度ログインしてください')
-        }
-        if (!sessionBody.data.platformAdmin) {
-          if (sessionBody.data.platformAdminState === 'awaiting_totp') {
-            clearTwoFactorChallenge()
-            finish(adminSessionHandoffPath('/ops/two-factor', body.data?.sessionToken, body.csrfToken))
-            return
-          }
-          throw new Error('このアカウントは運営メンバーとして有効ではありません。招待メールのリンクから登録を完了してください')
-        }
-      }
-      clearTwoFactorChallenge()
-      finish(adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken))
+      await completeLogin(body)
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
 
@@ -138,6 +182,27 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
   const incomplete = recovery ? typedCode.length !== 8 : isAdmin && typedCode.length !== 6
   const submitReason = loading || succeeded || missingChallenge || !incomplete ? null
     : recovery ? '回復コードを 8 文字入れると押せます' : '6 桁を入れると自動でログインします'
+
+  if (passkeyMode === 'available') return (
+    <SaveErrorScope errors={saveErrors}><AuthPage layout={scope} title={isAdmin ? '二段階認証' : 'パスキーで確認'} titleId="ops-two-factor-title"
+      help={isAdmin ? `${method === 'password' ? 'パスワード' : 'LINEでのログイン'}を確かめました。パスキーで本人確認してください。` : undefined}>
+      {scope === 'ops' ? <AuthHelp>{`${method === 'password' ? 'パスワード' : 'LINEでのログイン'}を確かめました。パスキーで本人確認してください。`}</AuthHelp> : null}
+      <div className={styles.passkeyNotice}>✓ このアカウントにパスキーが登録されています</div>
+      <p className={styles.passkeyDescription}>端末の顔・指紋・画面ロックで本人確認します。</p>
+      {error ? <Notice tone="danger" message={error} /> : null}
+      <AuthSubmit><Button variant="primary" fullWidth className={styles.submit} onClick={() => void submitPasskey()}
+        disabled={loading || succeeded || missingChallenge} busy={loading || succeeded}
+        busyLabel={succeeded ? '開いています' : '確かめています…'}>パスキーで認証する</Button></AuthSubmit>
+      <p className={styles.passkeyHint}>端末の確認画面が開きます</p>
+      <div className={styles.passkeyDivider}><span>または</span></div>
+      <Button variant="secondary" fullWidth className={styles.submit} disabled={loading || succeeded}
+        onClick={() => { setPasskeyMode('totp'); setError('') }}>認証アプリで確認</Button>
+      <div className={styles.helpArea}>
+        <p className={styles.passkeyHint}>パスキーが使えない場合は認証アプリへ切り替えられます。</p>
+        <TextLink inline href={backHref} onClick={clearTwoFactorChallenge}>別のアカウントで入る</TextLink>
+      </div>
+    </AuthPage></SaveErrorScope>
+  )
 
   return (
     <SaveErrorScope errors={saveErrors}><AuthPage layout={scope} boardId={recovery ? undefined : 'tOPeY'} title={title} titleId="ops-two-factor-title" help={isAdmin ? adminHelp : undefined}>
@@ -173,6 +238,7 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
         >
           {scope === 'ops' && !recovery ? <LogIn aria-hidden="true" className={styles.icon} /> : null}{scope === 'ops' && !recovery ? 'ログイン' : '確認してログイン'}
         </Button></AuthSubmit>
+        {hasPasskey && !recovery ? <Button variant="secondary" fullWidth className={styles.submit} disabled={loading || succeeded} onClick={() => { setPasskeyMode('available'); setError('') }}>パスキーを使う</Button> : null}
         {isAdmin ? (
           <div className={styles.helpArea}>
             <div className={styles.footRow}>
