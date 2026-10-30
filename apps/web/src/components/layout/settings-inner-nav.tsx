@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
+import { useAccountStyle } from '@/hooks/use-account-style'
 import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
+import { styleMenuItemVisible } from './style-menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
 import { Activity, BookOpen, ShieldCheck, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
@@ -75,6 +77,7 @@ const SETTINGS_CHILDREN = [
 
 /** この中のメニューを出す画面（左のメニューの「設定」が光る画面と同じ範囲）。 */
 const SETTINGS_AREA_PATHS = [...SETTINGS_ORDER]
+const RESTAURANT_ONLY_SETTINGS = new Set<string>(['/settings/booking-media', '/settings/delivery'])
 
 /** いまのパスが設定の中のメニューを出す画面か。 */
 export function isSettingsAreaPath(pathname: string): boolean {
@@ -100,6 +103,8 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   useSettingsNavInline(inline)
   const pathname = usePathname() ?? ''
   const { selectedAccountId } = useAccount()
+  const accountStyle = useAccountStyle(selectedAccountId)
+  const restaurantSettingsVisible = accountStyle.status === 'ready' && !accountStyle.stale && accountStyle.data?.style === 'restaurant'
   const staffIdentity = useStaffIdentity()
   const staffRole = effectiveStaffRole(staffIdentity)
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
@@ -153,6 +158,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
    * 設定の中のメニュー）。出し分けの決まりは左のメニューと同じ。
    */
   const itemVisible = (item: MenuItem): boolean => {
+    if (item.href === '/ec-commerce' && !styleMenuItemVisible(item, accountStyle.data?.style ?? null, null, accountStyle.data?.styleSelected === true)) return false
     if ((item.href === '/staff' || item.href === '/settings/customer-look') && !canManageRole(staffRole)) return false
     if (item.href === '/accounts' && (staffRole === 'staff' || staffIdentity?.accountScope !== 'all')) return false
     const permissionKey = item.permissionKey ?? item.href
@@ -172,7 +178,9 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
     .map((href) => byHref.get(href))
     .filter((item): item is MenuItem => Boolean(item))
     .filter((item) => {
+      if (RESTAURANT_ONLY_SETTINGS.has(item.href) && !restaurantSettingsVisible) return false
       if (item.href === '/accounts' && staffIdentity?.accountScope !== 'all') return false
+      if (item.featureKey === 'ec_commerce' && !itemVisible(item)) return false
       return itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item)
     })
 

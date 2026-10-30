@@ -50,7 +50,7 @@ describe('機能設定とサイドメニューが同じ一覧を見る', () => {
     expect(restaurant.id).toBe('restaurant-test')
     expect(restaurant.label).toBe('飲食店向け（テスト）')
     expect(restaurant.items.map((item) => item.label)).toEqual([
-      '店舗ダッシュボード', '組織・権限', '承認の流れ', '予約台帳', '座席・卓管理',
+      '予約台帳', '座席・卓管理',
       '予約枠・在庫', 'メニュー管理', 'デリバリー受注', 'Googleビジネス', 'LINE来店フォロー',
     ])
   })

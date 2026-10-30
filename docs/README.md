@@ -459,6 +459,7 @@
 
 ## 反映履歴
 
+- [飲食店向け設定の表示条件](release-log/unreleased/1965-masato-restaurant-only-settings.md)
 - [配信・シナリオ・自動応答の日時・題・下見の修正](release-log/unreleased/1954-kenta-muse-delivery.md)
 - [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
 - [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
@@ -537,6 +538,7 @@
 - [スマートフォンの幅でカードを1列に](release-log/unreleased/1801-kenta-cards-one-column.md)
 - [スマートフォンの幅で店名を切れにくく](release-log/unreleased/1804-kenta-hq-card-narrow.md)
 - [統括のカードの札・要対応の数・表の幅](release-log/unreleased/0000-kenta-hq-card-fixes.md)
+- [運営の閲覧のみの操作を隠さず押せない形と理由で表示](release-log/unreleased/1956-kenta-muse-opsviewer.md)
 - [統括トップ・店の比較・お店画面の直し](release-log/unreleased/1953-kenta-muse-dash-store.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [二段階認証の画面を見やすく](release-log/unreleased/1843-kenta-two-factor-card.md)
@@ -970,9 +972,16 @@
 - [UID移行の権限と操作の表示](release-log/unreleased/1952-kenta-uid-permissions.md)
 - [サロンと面談の空の日の予約案内](release-log/unreleased/1953-kenta-empty-bookings.md) — 反映履歴、確認 2026-10-30
 - [教室のクラスと会員予約の空状態](release-log/unreleased/1953-kenta-lesson-empty-bookings.md) — 反映履歴、確認 2026-10-30
-
 - [飲食店の左メニューの予約項目](release-log/unreleased/1953-kenta-restaurant-sidebar.md) — 反映履歴、確認 2026-10-30
 - [LIFFの小さな直し](release-log/unreleased/1953-kenta-muse-liff.md) — 写真・次へ・鈴・選択色・支払い案内・読み込み中・業種の出し分けの反映履歴。
 - [一覧の案内と予約の行の操作](release-log/unreleased/1953-kenta-train-1029j.md)
 - [アカウントの説明と権限・予約の見出し](release-log/unreleased/1954-kenta-train-1029k.md)
 - [一斉配信の権限と結果の列](release-log/unreleased/1955-kenta-train-1029l.md) — 閲覧のみの操作と受付件数の反映履歴。
+- [すばやく送る操作と複製・フォルダの権限確認](release-log/unreleased/1956-kenta-train-1029m.md) — 反映履歴。
+- [musuboの公式ロゴ](release-log/unreleased/1957-masato-musubo-official-logo.md) — 反映履歴。
+- [アカウント登録の入口](release-log/unreleased/1958-masato-registration-entry.md) — 反映履歴。
+- [アカウントごとの二段階認証の件数](release-log/unreleased/1959-masato-account-mfa-count.md) — 反映履歴。
+- [musuboの表記と案内](release-log/unreleased/1960-masato-musubo-branding.md) — 反映履歴。
+- [アカウントごとの監査履歴](release-log/unreleased/1962-masato-audit-account-isolation.md) — 反映履歴。
+- [担当者のアカウント範囲](release-log/unreleased/1961-masato-single-account-staff-scope.md) — 反映履歴。
+- [統括からのLINEアカウント管理](release-log/unreleased/1963-masato-line-account-hq-scope.md) — 反映履歴。

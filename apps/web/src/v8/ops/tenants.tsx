@@ -18,7 +18,7 @@ import { DataTable, TableHeadRow, Th, Td, Tr, NameCell, RowNameLink, DateCell } 
 import Select from '@/components/shared/select'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
-import { useOpsReadOnly } from './use-ops-read-only'
+import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
 import parts from './parts.module.css'
 import styles from './tenants.module.css'
 import { formatDate as polishFormatDate } from '@/lib/format'
@@ -75,7 +75,8 @@ export default function OpsTenantsV8() {
   const [filter, setFilter] = useListUrlValue('filter', '')
   const [loading, setLoading] = useState(true)
   const [listLoadError, setListLoadError] = useState<unknown>(null)
-  const readOnly = useOpsReadOnly()
+  const access = useOpsReadOnlyState()
+  const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
   const [newRestaurant, setNewRestaurant] = useState(false)
@@ -123,7 +124,7 @@ export default function OpsTenantsV8() {
   }
 
   const create = async () => {
-
+    if (access !== 'writer') return
     if (!newName.trim()) { setCreateError('統括名を入力してください'); return }
     setCreateBusy(true)
     setCreateError('')
@@ -143,8 +144,8 @@ export default function OpsTenantsV8() {
   const kpiLoading = loading && !summary
 
   return (
-    <OpsListPage boardId="XWtYC" title="契約先アカウント" readOnly={readOnly} help="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。"
-      actions={readOnly ? null : <Button variant="primary" onClick={() => { setCreateError(''); setCreating(true) }}><Plus aria-hidden="true" />契約先を作る</Button>}
+    <OpsListPage boardId="XWtYC" title="契約先アカウント" readOnly={access === 'readonly'} help="契約先を選ぶと詳細が開きます。代理ログインは既定で閲覧のみです。"
+      actions={<Button variant="primary" lockedReason={lock} disabled={access === 'unknown'} onClick={() => { setCreateError(''); setCreating(true) }}><Plus aria-hidden="true" />契約先を作る</Button>}
         stats={<KpiBand>
           <KpiCard presentation="cell" icon={<BadgeCheck size={16} aria-hidden="true" />} title="契約中" value={summary ? summary.active : null} unit="社" detail="請求が生きている契約先（決済失敗を含む）" loading={kpiLoading} />
           <KpiCard presentation="cell" icon={<Hourglass size={16} aria-hidden="true" />} title="トライアル中" value={summary ? summary.trialing : null} unit="社" detail={trialEnd ? `期限 ${monthDay(trialEnd)}` : '期限切れ前に案内'} loading={kpiLoading} />

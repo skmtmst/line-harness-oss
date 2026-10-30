@@ -23,7 +23,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
 import OpsSupportStats from './support-stats'
 import { PageFrame } from '@/components/templates/page-frame'
-import { useOpsReadOnly } from './use-ops-read-only'
+import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { FieldError, Field } from '@/components/shared/form-controls'
 import parts from './parts.module.css'
@@ -84,7 +84,9 @@ function shortDateTime(value: string | null): string {
 const TICKET_PAGE = 50
 
 export default function OpsSupportV8() {
-  const readOnly = useOpsReadOnly()
+  const access = useOpsReadOnlyState()
+  const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
+  const unknown = access === 'unknown'
   const [summary, setSummary] = useState<OpsSupportSummary | null>(null)
   const [tickets, setTickets] = useState<OpsSupportTicket[]>([])
   const [total, setTotal] = useState<number | null>(null)
@@ -231,7 +233,7 @@ export default function OpsSupportV8() {
   }, [loadSummary, loadList, loadDetail, selectedId])
 
   const changeStage = async (next: OpsSupportStage) => {
-    if (!detail) return
+    if (!detail || access !== 'writer') return
     setBusy(true)
     setError('')
     const res = await opsCall(api.ops.support.update(detail.ticket.id, { stage: next }))
@@ -244,7 +246,7 @@ export default function OpsSupportV8() {
   }
 
   const changePriority = async (next: OpsSupportPriority) => {
-    if (!detail) return
+    if (!detail || access !== 'writer') return
     const res = await opsCall(api.ops.support.update(detail.ticket.id, { priority: next }))
     if (!res.success) { setError(res.error || '変更できませんでした。時間をおいて、もう一度お試しください。'); return }
     await Promise.all([loadSummary(), loadList()])
@@ -252,7 +254,7 @@ export default function OpsSupportV8() {
   }
 
   const saveDraft = async () => {
-    if (!detail) return
+    if (!detail || access !== 'writer') return
     setDraftSaving(true)
     setError('')
     const res = await opsCall(api.ops.support.saveDraft(detail.ticket.id, reply))
@@ -264,7 +266,7 @@ export default function OpsSupportV8() {
   }
 
   const generateAi = async (excludeIds = excluded) => {
-    if (!detail) return
+    if (!detail || access !== 'writer') return
     const token = { cancelled: false }
     aiAbort.current = token
     setAiBusy(true)
@@ -284,7 +286,7 @@ export default function OpsSupportV8() {
   }
 
   const discardAi = async () => {
-    if (!detail) return
+    if (!detail || access !== 'writer') return
     const res = await opsCall(api.ops.support.deleteDraft(detail.ticket.id))
     if (!res.success) { setError(res.error || '下書きを消せませんでした'); return }
     setReply('')
@@ -292,7 +294,7 @@ export default function OpsSupportV8() {
   }
 
   const clearDraftFromConfirm = async () => {
-    if (!detail || busy) return
+    if (!detail || busy || access !== 'writer') return
     if (replyFromAi) {
       setBusy(true)
       const res = await opsCall(api.ops.support.deleteDraft(detail.ticket.id))
@@ -305,7 +307,7 @@ export default function OpsSupportV8() {
   }
 
   const send = async () => {
-    if (!detail || !reply.trim()) return
+    if (!detail || !reply.trim() || access !== 'writer') return
     setBusy(true)
     setError('')
     // WEB217：送信時に選んだ状態へ進める。既定は開いたときの状態。
@@ -330,7 +332,7 @@ export default function OpsSupportV8() {
   createFields.define('body', '内容', () => (form.body.trim() ? null : '内容を入れてください'), { required: true })
 
   const create = async () => {
-    if (busy) return
+    if (busy || access !== 'writer') return
     if (createFields.submit().length > 0) { setCreateError(''); return }
     setBusy(true)
     setCreateError('')
@@ -358,8 +360,8 @@ export default function OpsSupportV8() {
           <OpsSupportStats summary={summary} loading={loading && summary === null} />
           </div>
         )}
-        actions={readOnly ? null : (
-          <Button onClick={() => { setCreateError(''); createFields.reset(); setCreating(true) }}><Plus aria-hidden="true" />代わりに起票する</Button>
+        actions={(
+          <Button lockedReason={lock} disabled={unknown} onClick={() => { setCreateError(''); createFields.reset(); setCreating(true) }}><Plus aria-hidden="true" />代わりに起票する</Button>
         )}
       />
       {notice ? <p role="status" className={`${parts.status} ${styles.notice}`}>{notice}</p> : null}
@@ -409,13 +411,11 @@ export default function OpsSupportV8() {
             <>
               <div className={styles.detailHead}>
                 <h2 className={styles.detailTitle} title={`${ticket.ticketLabel} ${ticket.subject}`}>{`${ticket.ticketLabel} ${ticket.subject}`}</h2>
-                {readOnly ? null : (
-                  <span className={styles.prioritySelect}>
-                    <SaveErrorField names={["priority","ticket.priority"]}><Select size="page-size" aria-label="優先度を変える" value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS} /></SaveErrorField>
-                  </span>
-                )}
+                <span className={styles.prioritySelect}>
+                  <SaveErrorField names={["priority","ticket.priority"]}><Select size="page-size" aria-label="優先度を変える" lockedReason={lock} disabled={unknown} value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS} /></SaveErrorField>
+                </span>
                 <Button href={tenantDetailHref(ticket.tenantId)}><Building2 aria-hidden="true" />契約先を開く</Button>
-                {readOnly ? null : <Button disabled={busy} onClick={() => impersonate(ticket.tenantId, setBusy, setError)} busy={Boolean(busy)} busyLabel="処理中…"><LogIn aria-hidden="true" />代理ログイン</Button>}
+                <Button lockedReason={lock} disabled={busy || unknown} onClick={() => { if (access !== 'writer') return; impersonate(ticket.tenantId, setBusy, setError) }} busy={Boolean(busy)} busyLabel="処理中…"><LogIn aria-hidden="true" />代理ログイン</Button>
               </div>
               <div className={styles.detailMeta}>
                 <StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge>
@@ -437,7 +437,7 @@ export default function OpsSupportV8() {
                 ))}
               </ol>
 
-              {readOnly ? null : (
+              {(
                 <>
                   <div className={styles.draft}>
                     <div className={styles.draftHead}>
@@ -448,11 +448,11 @@ export default function OpsSupportV8() {
                         <Button onClick={skipAi}>待たずに手で書く</Button>
                       ) : replyFromAi ? (
                         <>
-                          <Button onClick={() => discardAi()} disabled={busy}>下書きを削除する</Button>
-                          <Button onClick={() => generateAi()} disabled={busy || !detail?.ai.available} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden="true" />作り直す</Button>
+                          <Button lockedReason={lock} onClick={() => discardAi()} disabled={busy || unknown}>下書きを削除する</Button>
+                          <Button lockedReason={lock} onClick={() => generateAi()} disabled={busy || unknown || !detail?.ai.available} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden="true" />作り直す</Button>
                         </>
                       ) : (
-                        <Button onClick={() => generateAi()} disabled={busy || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'} busy={Boolean(busy)} busyLabel="処理中…">
+                        <Button lockedReason={lock} onClick={() => generateAi()} disabled={busy || unknown || closed || !detail?.ai.available} title={detail?.ai.available ? undefined : 'この環境では AI の下書きを使えません'} busy={Boolean(busy)} busyLabel="処理中…">
                           <Sparkles aria-hidden="true" />AIで下書きを作る
                         </Button>
                       )}
@@ -471,7 +471,7 @@ export default function OpsSupportV8() {
                           onChange={(e) => setReply(e.target.value)}
                           placeholder="返信を入力します。「AIで下書きを作る」を押すと、これまでのやり取りから下書きを作ります。"
                           aria-label="返信"
-                          disabled={closed}
+                          disabled={closed || access !== 'writer'}
                           maxLength={4000}
                         /></SaveErrorField>
                         <p className={styles.draftNote}>
@@ -484,13 +484,13 @@ export default function OpsSupportV8() {
                   </div>
                   <DialogActions padding="none" leadingAction={<>
                     {ticket.stage === 'resolved' || ticket.stage === 'closed'
-                      ? <Button disabled={busy} onClick={() => changeStage('in_progress')} busy={Boolean(busy)} busyLabel="処理中…">対応中に戻す</Button>
-                      : <Button disabled={busy} onClick={() => changeStage('resolved')} busy={Boolean(busy)} busyLabel="処理中…"><Check aria-hidden="true" />解決済みにする</Button>}
-                    {closed ? null : <Button disabled={busy} onClick={() => changeStage('closed')} busy={Boolean(busy)} busyLabel="処理中…">クローズする</Button>}
+                      ? <Button lockedReason={lock} disabled={busy || unknown} onClick={() => changeStage('in_progress')} busy={Boolean(busy)} busyLabel="処理中…">対応中に戻す</Button>
+                      : <Button lockedReason={lock} disabled={busy || unknown} onClick={() => changeStage('resolved')} busy={Boolean(busy)} busyLabel="処理中…"><Check aria-hidden="true" />解決済みにする</Button>}
+                    {closed ? null : <Button lockedReason={lock} disabled={busy || unknown} onClick={() => changeStage('closed')} busy={Boolean(busy)} busyLabel="処理中…">クローズする</Button>}
                   </>}>
-                    <Button onClick={() => saveDraft()} disabled={busy || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
-                    <SaveErrorField names={["replyStage","nextStage","reply_stage"]}><Select aria-label="送信後の状態" label="送ったあと" size="content" value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} /></SaveErrorField>
-                    <Button variant="primary" onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || closed || aiBusy || !reply.trim()}><Send aria-hidden="true" />返信する</Button>
+                    <Button lockedReason={lock} onClick={() => saveDraft()} disabled={busy || unknown || draftSaving || closed || aiBusy} busy={draftSaving}>下書きを保存する</Button>
+                    <SaveErrorField names={["replyStage","nextStage","reply_stage"]}><Select aria-label="送信後の状態" label="送ったあと" size="content" lockedReason={lock} value={replyStage} onChange={value => setReplyStage(value as OpsSupportStage)} disabled={busy || unknown || closed || aiBusy} options={STAGE_CHIPS.filter(item => item.key !== 'all').map(item => ({ value: item.key, label: item.key === 'new' ? '未対応' : item.label }))} /></SaveErrorField>
+                    <Button variant="primary" lockedReason={lock} onClick={() => { setError(''); setConfirmReply(true) }} disabled={busy || unknown || closed || aiBusy || !reply.trim()}><Send aria-hidden="true" />返信する</Button>
                   </DialogActions>
                 </>
               )}

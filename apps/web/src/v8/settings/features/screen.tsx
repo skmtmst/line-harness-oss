@@ -19,6 +19,7 @@ import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { useAccountStyle } from '@/hooks/use-account-style'
 import { groupEnabledCount, groupFeatureCount, itemIsEnabled, type FeatureGroup, type FeatureItem } from '@/lib/feature-settings'
 import { SbSettingsScreen } from '../sb-frame/settings-screen'
 import { FEATURE_SETTINGS_CONFLICT_MESSAGE } from './feature-settings-view'
@@ -255,6 +256,12 @@ export default function FeatureSettingsScreen() {
     setSavedItemOrder,
     currentOrder,
   } = settings
+  const accountStyle = useAccountStyle(selectedAccountId)
+  const showEcCommerce = accountStyle.status === 'ready' && accountStyle.data?.style === 'ec' && accountStyle.data.styleSelected === true
+  const styleGroups = useMemo(() => groups.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => item.id !== 'ec-commerce' || showEcCommerce),
+  })).filter((group) => group.items.length > 0), [groups, showEcCommerce])
 
   /* 本人未確認は通常disabled。確認後の権限拒否は共通の灰色と理由で示す。 */
   const staffRole = useStaffRole()
@@ -293,11 +300,11 @@ export default function FeatureSettingsScreen() {
 
   const filteredGroups = useMemo(() => {
     const q = query.trim()
-    if (!q) return settingsGroupLast(groups)
-    return settingsGroupLast(groups)
+    if (!q) return settingsGroupLast(styleGroups)
+    return settingsGroupLast(styleGroups)
       .map((group) => ({ ...group, items: group.items.filter((item) => item.label.includes(q) || item.note.includes(q)) }))
       .filter((group) => group.items.length > 0)
-  }, [groups, query])
+  }, [styleGroups, query])
 
   const isOpen = (group: FeatureGroup) => {
     if (query.trim()) return true
@@ -499,13 +506,22 @@ export default function FeatureSettingsScreen() {
 
       {reorderOpen && (
         <ReorderDialog
-          groups={groups}
+          groups={styleGroups}
           initialOrder={itemOrder}
           moveItemInOrder={moveItemInOrder}
           onCancel={() => setReorderOpen(false)}
           onApply={(order) => {
             if (!canManage) return
-            setItemOrder(order)
+            const next = { ...order }
+            if (!showEcCommerce && order.settings) {
+              const original = groups.find((group) => group.id === 'settings')?.items.map((item) => item.id) ?? []
+              const index = original.indexOf('ec-commerce')
+              if (index !== -1) {
+                next.settings = [...order.settings]
+                next.settings.splice(Math.min(index, next.settings.length), 0, 'ec-commerce')
+              }
+            }
+            setItemOrder(next)
             setReorderOpen(false)
           }}
         />
