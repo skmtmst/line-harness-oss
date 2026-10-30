@@ -29,7 +29,7 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import styles from './new.module.css'
 import { focusFieldById } from '@/lib/use-form-errors';
 import { Field } from '@/components/shared/form-controls';
-import { withPermissionFailure } from '@/components/shared/api-error-message';
+import { withPermissionFailure, describeApiFailure } from '@/components/shared/api-error-message';
 import { emptyValue } from '@/components/shared/empty-value';
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -378,16 +378,17 @@ export default function NewCommonVarV8() {
         { if (!fieldFailure)
         setError(withPermissionFailure(e, describeSaveFailure(e), 'store')) }
         if (e instanceof ApiError && (e.status === 400 || e.status === 422)) {
+          const detail = describeApiFailure(e, '入力内容の確認')
           const target = e.status === 422 ? 'cv-key' : focusTargetForReason(e.message)
           if (target) focusField(target)
           if (target === 'cv-value') {
             { if (!fieldFailure)
-            setValueFieldError(e.message) }
-            valueErrorMessageRef.current = e.message
+            setValueFieldError(detail) }
+            valueErrorMessageRef.current = detail
           } else if (target === 'cv-fallback-value') {
             { if (!fieldFailure)
-            setFallbackFieldError(e.message) }
-            fallbackErrorMessageRef.current = e.message
+            setFallbackFieldError(detail) }
+            fallbackErrorMessageRef.current = detail
           }
         }
       }

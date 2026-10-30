@@ -14,7 +14,7 @@ import { Field } from '@/components/shared/form-controls'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
-import { TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
+import { InputFieldFrame, TextField as SharedTextField, TextArea as SharedTextArea } from '@/components/shared/text-field'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { useFeatureAccess } from '@/lib/use-feature-access'
@@ -301,7 +301,7 @@ export default function QuickCreateV8({
         {accountChanged ? <Notice tone="warn">アカウントが切り替わりました。いったん閉じて作り直してください。</Notice> : null}
         <div className={styles.field}>
           <p className={styles.label} id="quick-create-keywords-label">この言葉が来たら（どれか1つを含む）</p>
-          <div className={styles.chipBox} role="group" aria-labelledby="quick-create-keywords-label">
+          <InputFieldFrame className={styles.chipBox} role="group" aria-labelledby="quick-create-keywords-label">
             {keywords.map((keyword) => (
               <span key={keyword} className={styles.chip}>
                 {keyword}
@@ -341,7 +341,7 @@ export default function QuickCreateV8({
               aria-label="追加する言葉"
               className={styles.chipInput}
             /></SaveErrorField>
-          </div>
+          </InputFieldFrame>
           {keywordError ? <p className={styles.fieldError} role="alert">{keywordError}</p> : null}
         </div>
         <div className={styles.field}><Field label="返す文" htmlFor="quick-create-reply" requirement={replyRequirement}><SaveErrorField names={["reply"]}><SharedTextArea

@@ -1,4 +1,5 @@
 'use client'
+import SegmentedControl from '@/components/shared/segmented'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import StatusBadge from '@/components/shared/status-badge'
 
@@ -10,16 +11,11 @@ import type { ReactNode } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   Activity,
-  Archive,
   Bookmark,
   Download,
-  FilePen,
-  GitBranch,
   Link2,
   ListChecks,
-  PhoneOff,
   Plus,
-  Radio,
   TriangleAlert,
 } from 'lucide-react'
 import type { Folder } from '@line-crm/shared'
@@ -31,7 +27,6 @@ import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { type FolderPanelRow } from '@/components/shared/folder-panel'
@@ -269,23 +264,18 @@ export default function CommonActionsV8() {
     : <span className={styles.createSpace} aria-hidden="true" />
 
   /* ===== 道具の段 ===== */
-  const count = (value: number | undefined) => (value === undefined || !ready ? '' : ` ${formatNumber(value)}`)
-  const chip = (value: Exclude<Filter, 'all'>, label: string, icon: ReactNode, n: number | undefined) => (
-    <FilterChip selected={filter === value} onChange={(next) => setFilter(next ? value : 'all')} icon={icon}>{`${label}${count(n)}`}</FilterChip>
-  )
   const filterChips = (
-    <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
-      {chip('published', '公開中', <Radio size={16} aria-hidden="true" />, summary?.published)}
-      {chip('draft', '下書き', <FilePen size={16} aria-hidden="true" />, summary?.draft)}
-      {chip('old_version', '古い版あり', <GitBranch size={16} aria-hidden="true" />, summary?.oldVersion)}
-      {chip('unused', '呼ばれていない', <PhoneOff size={16} aria-hidden="true" />, summary?.unused)}
-      {chip('archived', '保管したもの', <Archive size={16} aria-hidden="true" />, summary?.archived)}
-    </div>
+    <SegmentedControl<Filter> aria-label="状態で絞り込む" fit="content" value={filter} onClear={() => setFilter('all')} onChange={setFilter} options={[
+      { value: 'all', label: 'すべて' },
+      { value: 'published', label: '公開中', count: ready ? summary?.published : undefined },
+      { value: 'draft', label: '下書き', count: ready ? summary?.draft : undefined },
+      { value: 'old_version', label: '古い版あり', count: ready ? summary?.oldVersion : undefined },
+      { value: 'unused', label: '呼ばれていない', count: ready ? summary?.unused : undefined },
+      { value: 'archived', label: '保管したもの', count: ready ? summary?.archived : undefined },
+    ]} />
   )
   const savedBox = (
-    <div className={styles.savedBox}>
-      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
-      <SaveErrorField names={["filter","status"]}><Select
+      <SaveErrorField names={["filter","status"]}><Select size="content" icon={<Bookmark size={16} aria-hidden="true" />} showChevron={false}
         aria-label="よく使う絞り込み"
         value={filter === 'old_version' || filter === 'unused' ? filter : ''}
         onChange={(value) => setFilter((value || 'all') as Filter)}
@@ -295,7 +285,6 @@ export default function CommonActionsV8() {
           { value: 'unused', label: 'どこからも呼ばれていない' },
         ]}
       /></SaveErrorField>
-    </div>
   )
   const toolbar = (
     <>

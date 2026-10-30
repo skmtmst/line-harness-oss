@@ -43,17 +43,16 @@
   opacity: 1;
 }
 
-.field:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -1px;
-}
-
 .field[aria-invalid='true'] {
   border-color: var(--color-danger);
 }
 
 .nameRow { display: flex; align-items: center; gap: var(--select-menu-swatch-gap); }
 .error {
+  inline-size: 0;
+  min-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
   margin: 0;
   color: var(--color-danger);
   font-size: var(--select-menu-button-size);
@@ -101,8 +100,8 @@
 
 .cancel:focus-visible,
 .primary:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
 }
 
 .cancel:disabled,
@@ -114,4 +113,4 @@
 
 @layer components {
 :root .field { box-shadow: var(--control-shadow); }
-}
+}/* 青の輪は共通の焦点指定を使い、誤りの時だけ色を変える。 */

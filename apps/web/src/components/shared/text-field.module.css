@@ -33,10 +33,6 @@
   color: var(--color-ink-secondary);
 }
 
-.field:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
 
 /* ytG7l 共通 入力欄 */
 .single { /* height: 40 */ /* padding: [0, 12] */
@@ -90,10 +86,9 @@
 /* V8の1行欄。高さ・左右の余白・行間は共通値。 */
 :root .single { height: var(--tpl-field-h); border: 0; padding: 0 var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); line-height: var(--tpl-field-lh); font-family: var(--font-sans); }
 :root .single[aria-invalid='true'] { outline-color: var(--color-danger); }
-:root .single:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
 /* 誤りのある欄へ移したとき、青い枠で赤を消さない（2026-10-08 オーナー：入力が要る欄は周りが赤くなってそこへ移る）。 */
-:root .single[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); }
-:root .multi[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); border-color: var(--color-danger); }
+
+
 :root .single { gap: 0; }
 /* 1行の欄は、入りきらない見本の文・中身を字の途中で切らず「…」で省く（全文は欄を押すと読める）。 */
 :root .single { text-overflow: ellipsis; }
@@ -124,7 +119,7 @@
 :root .multiCompact { min-height: var(--tpl-textarea-compact-h); padding: var(--tpl-e78-pair-gap); line-height: var(--tpl-e78-name-lh); }
 :root .multi[data-density="compact"] { padding: var(--tpl-rt-gray-note-pad); border: 0; border-radius: var(--tpl-rt-inner-radius); outline: 1px solid var(--color-control-border); outline-offset: -1px; font-size: var(--text-caption); line-height: var(--tpl-rt-draft-lh); }
 :root .multi[data-density="compact"][aria-invalid="true"] { outline-color: var(--color-danger); }
-:root .multi[data-density="compact"]:focus-visible { outline-width: 2px; outline-offset: 2px; }
+
 :root .multi[data-height='post'] { min-height: var(--tpl-rt-summary-h); height: var(--tpl-rt-summary-h); }
 :root .multi[data-height='reply'] { min-height: var(--tpl-rt-draft-h); height: var(--tpl-rt-draft-h); }
 
@@ -137,7 +132,7 @@
 
 /* ・仕上げ7 */
 :root .field:disabled { opacity: var(--polish-disabled-opacity); }
-html:root .field:is(.single, .multi)[aria-invalid='true']:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); box-shadow: var(--polish-error-ring); }
+
 
 /* 前後の固定文字も同じ入力枠へ。既定の1行欄の寸法は変えない。 */
 html:root .affixed { display: flex; align-items: center; flex: 1 1 0; gap: var(--space-8); min-width: 0; }
@@ -145,8 +140,8 @@ html:root .affixed[data-affixed-layout="field"] { flex: none; }
 html:root .affixed[data-monospace] { font-family: var(--font-mono); }
 html:root .affixed .affixedControl { width: auto; min-width: 0; max-width: 100%; height: 100%; flex: 0 1 auto; padding: 0; border: 0; outline: 1px solid transparent; box-shadow: none; background: transparent; font: inherit; field-sizing: content; }
 html:root .adornment { flex-shrink: 0; color: var(--color-ink-faint); }
-html:root .affixed:focus-within { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
-html:root .affixed[aria-invalid='true']:focus-within { box-shadow: var(--polish-error-ring); }
+
+
 html:root .affixed[data-disabled] { opacity: var(--polish-disabled-opacity); }
 html:root .affixed .affixedControl:disabled { opacity: 1; }
 
@@ -155,7 +150,7 @@ html:root .affixed .affixedControl:disabled { opacity: 1; }
  * 細い線だけだと平らに見えて埋もれる。焦点の青い輪・誤りの赤い枠・計算で決まる灰色の欄は今のまま。
  * 前後の固定文字つきの欄は外枠だけに付け、中の入力は透明のまま。
  */
-html:root .field:is(.single, .multi):not(.affixedControl):not([data-look='derived']) {
+html:root .field:is(.single, .multi):not(.affixedControl):not([data-look='derived']):not(:global([data-input-field] *)) {
   background: var(--color-canvas);
   box-shadow: var(--shadow-raised-control);
 }
@@ -163,6 +158,6 @@ html:root .field:is(.single, .multi):not(.affixedControl):not([data-look='derive
   outline-color: transparent;
   border-color: transparent;
 }
-html:root .field:is(.single, .multi):not(.affixedControl)[aria-invalid='true']:is(:focus-visible, :focus-within) {
+html:root .field:is(.single, .multi):not(.affixedControl)[aria-invalid='true']:is(:focus-visible, :focus-within):not(:global([data-input-field] *)) {
   box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
 }

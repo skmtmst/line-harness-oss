@@ -74,20 +74,6 @@
 }
 
 /* 道具の段の右：よく使う絞り込み（左に印・右の矢印なし）。 */
-.savedBox { position: relative; width: var(--tpl-am-saved-w); }
-.savedBox :global(*) { max-width: 100%; }
-.savedBox :global(button) { width: 100%; padding-left: calc(var(--tpl-chip-row-gap) * 9); }
-.savedBox :global(button) > svg:last-child { display: none; }
-.savedIcon {
-  position: absolute;
-  top: 50%;
-  left: var(--tpl-rule-row-gap);
-  z-index: 1;
-  color: var(--color-ink-secondary);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
 /* ページ送りの段（絵：件数は左・送りは右。段の上下 12・中の左右 20）。 */
 .pagerRow {
   display: flex;

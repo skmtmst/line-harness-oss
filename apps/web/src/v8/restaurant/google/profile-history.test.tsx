@@ -59,7 +59,7 @@ describe('Googleの変更履歴を現在の共通の一覧で使う', () => {
   it('取得失敗は読み直せて、空の履歴はCSV出力を止める', async () => {
     mocks.history.mockRejectedValueOnce(new ApiError(500, '履歴の取得に失敗しました')).mockResolvedValueOnce({ ...data, total: 0, changes: [] })
     render(<HistoryScreen accountId="account-1" go={go} />)
-    await screen.findByText('履歴の取得に失敗しました')
+    await screen.findByText('変更履歴を読み込めませんでした。')
     fireEvent.click(screen.getByRole('button', { name: /もう一度/ }))
     await screen.findByText('この期間の記録はありません')
     expect(screen.getByRole('button', { name: 'CSVで書き出す' })).toHaveProperty('disabled', true)
@@ -86,7 +86,7 @@ describe('Googleの変更履歴を現在の共通の一覧で使う', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     mocks.history.mockRejectedValueOnce(new ApiError(500, 'CSVの取得に失敗しました')).mockResolvedValueOnce({ ...data, perPage: 100 })
     fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' }))
-    await screen.findByText('CSVの取得に失敗しました')
+    await screen.findByText('CSVを書き出せませんでした。')
     expect(createUrl).not.toHaveBeenCalled()
     const retry = screen.getByRole('button', { name: 'CSVで書き出す' })
     expect(retry).toHaveProperty('disabled', false)

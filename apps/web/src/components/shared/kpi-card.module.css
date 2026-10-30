@@ -188,21 +188,21 @@
 }
 :root .delta { display: flex; flex-shrink: 0; }
 :root .valueRow { display: flex; align-items: center; width: 100%; gap: 6px; }
-/* 帯の数＋単位と差の印は、それぞれを分けず、並びきらない時だけ次の行へ送る。 */
-:root .card[data-kpi-presentation='band'] > .valueRow:has(> .value):has(> .delta:not(:empty)) {
+/* 帯の数＋単位と差の印・行き先は、それぞれを分けず、並びきらない時だけ次の行へ送る。 */
+:root .card:is([data-kpi-presentation='band'], :where(:has(> .valueRow > .valueActionSlot))) > .valueRow:has(> .value):has(> :is(.delta:not(:empty), .valueActionSlot)) {
   flex-wrap: wrap;
   row-gap: var(--space-2);
 }
-/* 差の札がある行は、数の箱を物差しにして札のぶんも差し引く（札を次の行へ落とさない）。 */
-:root .card[data-kpi-presentation='band'] > .valueRow:has(> .delta:not(:empty)) > .value {
+/* 差の札か行き先がある行は、数の箱を物差しにして札のぶんも差し引く（札を次の行へ落とさない）。 */
+:root .card:is([data-kpi-presentation='band'], :where(:has(> .valueRow > .valueActionSlot))) > .valueRow:has(> :is(.delta:not(:empty), .valueActionSlot)) > .value {
   container: kpi-value / inline-size;
   min-width: 0;
 }
-/* 差の札がある行は、数と札の間・札の横の余白も詰めて数の縮みを抑える。 */
-:root .card[data-kpi-presentation='band'] > .valueRow:has(> .delta:not(:empty)) {
+/* 差の札か行き先がある行は、数と札の間・札の横の余白も詰めて数の縮みを抑える。 */
+:root .card:is([data-kpi-presentation='band'], :where(:has(> .valueRow > .valueActionSlot))) > .valueRow:has(> :is(.delta:not(:empty), .valueActionSlot)) {
   gap: var(--space-4);
 }
-:root .card[data-kpi-presentation='band'] > .valueRow:has(> .delta:not(:empty)) > .delta > * {
+:root .card:is([data-kpi-presentation='band'], :where(:has(> .valueRow > .valueActionSlot))) > .valueRow:has(> :is(.delta:not(:empty), .valueActionSlot)) > .delta > * {
   padding-inline: var(--space-6);
 }
 /* 数字と単位（人・通・件・%）は同じ下の線（ベースライン）に乗せる。箱の下端でそろえると字の大きさの差でずれる。 */
@@ -365,3 +365,5 @@
   line-height: var(--tpl-band-number-lh);
   font-weight: var(--tpl-band-number-weight);
 }
+
+.valueActionSlot { display: flex; flex: none; align-items: center; margin-inline-start: auto; }

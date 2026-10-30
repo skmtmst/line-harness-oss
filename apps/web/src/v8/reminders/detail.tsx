@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 
 import { JST_LOCAL, dateTimeLocalJst } from './detail-dates'
 export { dateTimeLocalJst } from './detail-dates'
@@ -286,7 +287,7 @@ function ReminderDetailV8() {
       // API も未公開の再開を 409 で止める。その文面をそのまま出す。
       { if (!fieldFailure)
       setActionMessage(caught instanceof ApiError && caught.status === 409
-        ? caught.message
+        ? describeApiFailure(caught, '状態の変更')
         : isActive
           ? '再開できませんでした。状態を読み直してからお試しください。'
           : '一時停止できませんでした。状態を読み直してからお試しください。') }

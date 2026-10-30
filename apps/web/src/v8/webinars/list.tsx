@@ -787,9 +787,7 @@ function WebinarList() {
       />
   )
   const savedBox = (
-    <div className={styles.savedBox}>
-      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
-      <SaveErrorField names={["savedFilter","status","saved_filter"]}><Select
+      <SaveErrorField names={["savedFilter","status","saved_filter"]}><Select size="content" icon={<Bookmark size={16} aria-hidden="true" />} showChevron={false}
         aria-label="よく使う絞り込み"
         value={savedFilter}
         onChange={(value) => { setSavedFilter(value as SavedFilter); setPage(1) }}
@@ -800,7 +798,6 @@ function WebinarList() {
           { value: 'archived', label: 'アーカイブ済み' },
         ]}
       /></SaveErrorField>
-    </div>
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (

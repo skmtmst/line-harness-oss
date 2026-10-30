@@ -1,4 +1,5 @@
 'use client'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { jstDate } from '@/lib/jst-datetime';
 import { formatNumber } from '@/lib/format';
 import { notifySaved } from '@/components/shared/toast';
@@ -51,6 +52,12 @@ import InsertTextField, { type InsertTextFieldHandle } from '@/components/shared
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors';
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select';
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+
+export function firstStepFailureMessage(reason: unknown, phase: 'load' | 'save'): string {
+  if (phase === 'load') return describeApiFailure(reason, '読み込み')
+  if (!(reason instanceof ApiError) || reason.status >= 500) return '保存できませんでした。入力内容は残っています。通信状態を確認して、もう一度お試しください。'
+  return `${describeApiFailure(reason, '保存')}入力内容は残っています。`
+}
 
 /*
  * ★V8 シナリオを作る②：1通目を設定（Pencil ・1152 ）。
@@ -198,7 +205,7 @@ export default function ScenarioFirstStepV8() {
         if (!res.success) {
           // 失敗の応答がキャッシュに残ると、再読み込みでも同じ失敗が返る。
           scenarioReferenceData.invalidateScenario(id)
-          setError(res.error)
+          setError(firstStepFailureMessage(new Error(res.error), 'load'))
           setLoadState('error')
           return
         }
@@ -455,7 +462,7 @@ export default function ScenarioFirstStepV8() {
         return
       }
       if (!res.success) {
-        setError(res.error)
+        setError(describeApiFailure(new Error(res.error), '保存'))
         return
       }
       scenarioReferenceData.invalidateScenario(id)
@@ -466,14 +473,9 @@ export default function ScenarioFirstStepV8() {
       if (!canSaveNow()) return
       const fieldFailure = saveErrors.capture(submitError)
       // 例外でも「保存中」のままにしない（SCENARIO-05）。入力は残し、同じ場所からやり直せる。
-      const detail = submitError instanceof ApiError ? submitError.message : ''
       { if (!fieldFailure)
 
-      setError(
-        detail
-          ? `保存できませんでした（${detail}）。入力内容は残っています。もう一度お試しください。`
-          : '保存できませんでした。通信状態を確認して、もう一度お試しください。',
-      ) }
+      setError(firstStepFailureMessage(submitError, 'save')) }
     } finally {
       if (saveOperation.current === ticket) saveOperation.current = null
       if (currentScope()) setSaving(false)

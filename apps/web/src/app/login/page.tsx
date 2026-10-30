@@ -136,7 +136,6 @@ export default function LoginPage() {
 
   // 入れ終わるまでは押せない形（本物の緑を薄く）にし、下の灰の 1 行で理由を言う。送る時の検査はそのまま。
   const missingInput = !email.trim() || !password
-  const submitReason = missingInput && busy === null ? 'メールアドレスとパスワードを入れると押せます' : null
 
   return (
     <AuthCard
@@ -144,17 +143,7 @@ export default function LoginPage() {
       cardNode="m3tWJ"
       title="ログイン"
       step={{ current: 1, total: 2 }}
-      description={mobileReturn ? (
-        <>
-          メールアドレスとパスワードでログインします。<br />
-          LINE でログインする人は PC の画面から入ってください。
-        </>
-      ) : (
-        <>
-          メールアドレスとパスワードでログインします。<br />
-          LINE で登録した人は「LINE でログイン」を使ってください。
-        </>
-      )}
+      description={null}
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
@@ -189,8 +178,8 @@ export default function LoginPage() {
           checked={remember}
           onCheckedChange={setRemember}
         >この端末では7日間ログインを保持する</Checkbox>
-        <AuthSubmit reasonId="login-submit-reason" reason={submitReason}>
-          <Button fullWidth type="submit" variant="primary" disabled={busy !== null || !TURNSTILE_SITE_KEY || missingInput} aria-describedby={submitReason ? 'login-submit-reason' : undefined} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
+        <AuthSubmit>
+          <Button fullWidth type="submit" variant="primary" disabled={busy !== null || !TURNSTILE_SITE_KEY || missingInput} className="w-full" busy={busy === 'password'} busyLabel="ログインしています…">ログイン
           </Button>
         </AuthSubmit>
       </form>

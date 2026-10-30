@@ -4,7 +4,7 @@ import styles from './inbox-composer.module.css'
 
 type PartProps = HTMLAttributes<HTMLDivElement>
 export function InboxComposerTools(props: PartProps) { return <div {...props} className={styles.tools} /> }
-export function InboxInputBox(props: PartProps) { return <div {...props} className={styles.input} /> }
+export function InboxInputBox(props: PartProps) { return <div {...props} data-input-field className={styles.input} /> }
 export function InboxDraftArea(props: TextareaHTMLAttributes<HTMLTextAreaElement> & { ref?: Ref<HTMLTextAreaElement> }) { return <textarea {...props} className={styles.draft} /> }
 export function InboxDraftCount(props: HTMLAttributes<HTMLParagraphElement>) { return <p {...props} className={styles.count} /> }
 export function InboxComposerBottom(props: PartProps) { return <div {...props} className={styles.bottom} /> }

@@ -53,7 +53,7 @@ import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ImageFrame from '@/components/shared/image-frame'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
-import { TextField as SharedTextField } from '@/components/shared/text-field'
+import { InputFieldFrame, TextField as SharedTextField } from '@/components/shared/text-field'
 
 /*
  * ★V8「クーポンを作る」・「リサーチを作る」。
@@ -626,12 +626,14 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     <>
                     <div className={styles.choiceRow} role="group" aria-label={`問 ${index + 1} の選択肢`} {...fields.bind(`qc-${question.key}`)} aria-describedby={fields.invalid(`qc-${question.key}`) ? `te-qc-${question.key}-error` : undefined}>
                       {question.choices.map((choice, choiceIndex) => (
-                        <div key={choiceIndex} className={styles.choice} data-selected={choiceIndex === activeChoice(question) || undefined}>
+                        <InputFieldFrame key={choiceIndex} className={styles.choice} aria-invalid={fields.invalid(`qc-${question.key}`) || undefined} data-selected={choiceIndex === activeChoice(question) || undefined}>
                           <SaveErrorField names={["choice"]}><SharedTextField
                             className={styles.choiceInput}
                             value={choice}
                             placeholder={`選択肢 ${choiceIndex + 1}`}
                             aria-label={`問 ${index + 1} の選択肢 ${choiceIndex + 1}`}
+                            aria-invalid={fields.invalid(`qc-${question.key}`) || undefined}
+                            aria-describedby={fields.invalid(`qc-${question.key}`) ? `te-qc-${question.key}-error` : undefined}
                             title="押すと、この選択肢が選ばれたときに行うことを足せます"
                             onFocus={() => setPickedChoice((current) => ({ ...current, [question.key]: choiceIndex }))}
                             onChange={(event) => updateQuestion(index, { choices: question.choices.map((c, i) => (i === choiceIndex ? event.target.value : c)) })}
@@ -646,7 +648,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                               <X size={16} aria-hidden="true" />
                             </button>
                           ) : null}
-                        </div>
+                        </InputFieldFrame>
                       ))}
                       {question.choices.length < MAX_CHOICES ? (
                         <button type="button" className={styles.insertChip} onClick={() => updateQuestion(index, { choices: [...question.choices, ''] })}>

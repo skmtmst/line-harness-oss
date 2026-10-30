@@ -15,6 +15,7 @@ import Select from '@/components/shared/select'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import type { Automation } from '@line-crm/shared'
 import { Zap } from 'lucide-react'
+import WaitFields from '@/components/automations/wait-fields'
 import type { Dispatch, ReactNode, SetStateAction } from 'react'
 import type { ActionDraft } from './action-draft'
 import styles from './create.module.css'
@@ -271,6 +272,10 @@ export function AutomationFields({
                 failed={tagsFailed}
                 failedNote="共通アクションを読み込めませんでした。画面を再読み込みしてください。"
               />
+            ) : row.type === 'wait' ? (
+              <WaitFields id={`v8-wait-${row.key}`} value={row.kept ?? { durationMinutes: 5 }}
+                error={inputError?.target === `v8-wait-${row.key}` ? inputError.message : undefined}
+                onChange={kept => updateAction(row.key, { kept })} />
             ) : row.type === 'notify_staff' ? (
               <p className={styles.cardDesc}>
                 知らせる相手と文面は、見本から作ったときのまま保ちます。変えるときは、することを選び直してください。

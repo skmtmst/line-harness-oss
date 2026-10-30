@@ -477,9 +477,7 @@ export default function AutomationRunsV8() {
     ...([{ value: 'executed', label: '動いた', count: summary?.executed }, { value: 'skipped', label: '条件に外れた', count: summary?.skipped }, { value: 'problems', label: '失敗', count: summary?.failed }] as const).map(item => ({ label: item.label, count: item.count, current: resultFilter === item.value, onClick: () => toggleResult(item.value, true) })),
   ]} />
   const savedBox = (
-    <div className={styles.savedBox}>
-      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
-      <SaveErrorField names={["saved"]}><Select
+      <SaveErrorField names={["saved"]}><Select size="content" icon={<Bookmark size={16} aria-hidden="true" />} showChevron={false}
         aria-label="よく使う絞り込み"
         value={saved}
         onChange={(value) => setSaved(value as SavedKey)}
@@ -488,7 +486,6 @@ export default function AutomationRunsV8() {
           { value: 'include-test', label: 'テスト実行も見る' },
         ]}
       /></SaveErrorField>
-    </div>
   )
   const toolbar = (
     <>

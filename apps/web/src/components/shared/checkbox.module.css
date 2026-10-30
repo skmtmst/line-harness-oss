@@ -186,6 +186,8 @@
 :root .input:checked + .box, :root .input:indeterminate + .box { outline-color: transparent; background: var(--gradient-choice-on); box-shadow: var(--shadow-choice-on); }
 :root .input[aria-invalid='true'] + .box { outline-color: var(--color-status-danger); }
 :root .input:focus-visible + .box { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+/* 誤り＋焦点は赤1本（青を重ねない）。 */
+:root .input[aria-invalid='true']:focus-visible + .box { outline: var(--polish-focus-width) solid var(--color-danger); outline-offset: var(--polish-focus-offset); }
 :root .mark { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-choice-mark-stroke); }
 
 :root .root { gap: 8px; }

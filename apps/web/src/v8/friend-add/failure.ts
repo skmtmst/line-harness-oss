@@ -1,3 +1,5 @@
+import { extractApiErrorMessage } from '@/lib/api/transport/errors'
+
 export type FriendAddFailureAction = 'load' | 'create' | 'delete' | 'retry'
 
 /**
@@ -20,12 +22,8 @@ export function describeFriendAddFailure(
   const verb = action === 'load' ? '表示' : action === 'create' ? '追加' : action === 'delete' ? '削除' : '再試行'
   const shape = caught as { status?: unknown; message?: unknown } | null
   const status = typeof shape?.status === 'number' && Number.isInteger(shape.status) ? shape.status : null
-  const serverMessage = typeof shape?.message === 'string'
-    && shape.message
-    && shape.message.length <= 240
-    && !/^API error: /.test(shape.message)
-    ? shape.message
-    : ''
+  const detail = extractApiErrorMessage(JSON.stringify({ error: typeof shape?.message === 'string' ? shape.message : '' }), status ?? 400)
+  const serverMessage = /[ぁ-んァ-ヶ一-龠]/u.test(detail) ? detail : ''
   if (status !== null) {
     // サーバの回復案内（利用者向けの本文）はそのまま出す。
     if (serverMessage) return { status, message: serverMessage }

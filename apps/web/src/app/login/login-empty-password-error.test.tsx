@@ -143,3 +143,25 @@ describe('R613: 空パスワードの古い案内を消す', () => {
     expect(alertText()).toBe('失敗：しばらくしてからもう一度お試しください')
   })
 })
+
+it.each(['/login', '/login?next=m'])('ログインの題の下に重複する説明を出さず入力と操作は残す: %s', async (path) => {
+  window.history.replaceState(null, '', path)
+  await render()
+  expect(host.querySelector('h1')?.textContent).toBe('ログイン')
+  expect(host.textContent).not.toContain('メールアドレスとパスワードでログインします。')
+  expect(host.textContent).not.toContain('LINE で登録した人は')
+  expect(host.querySelector('label[for="login-email"]')?.textContent).toBe('メールアドレス')
+  expect(host.querySelector('#login-password')).not.toBeNull()
+  expect(host.querySelector('button[type="submit"]')).not.toBeNull()
+  expect(fixture.bodies).toEqual([])
+})
+
+it('入力不足のログインは押せないまま、入力を促す理由行は出さない', async () => {
+  await render()
+  const submit = host.querySelector<HTMLButtonElement>('button[type="submit"]')
+  expect(submit?.disabled).toBe(true)
+  expect(submit?.getAttribute('aria-describedby')).toBeNull()
+  expect(host.querySelector('[data-auth-submit-reason]')).toBeNull()
+  expect(host.textContent).not.toContain('入れると押せます')
+  expect(fixture.bodies).toEqual([])
+})

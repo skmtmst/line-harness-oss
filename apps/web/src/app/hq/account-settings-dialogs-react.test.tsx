@@ -169,3 +169,25 @@ test('戻す窓は板 HFsO9・6桁で復帰の口へ送る', async () => {
   expect(calls.some((call) => call.url === '/api/line-accounts/account-a/restore')).toBe(true)
   expect(done).toBe(true)
 })
+
+test.each([
+  ['archive', 500, 'API error: 500', 'アーカイブに失敗しました。時間をおいて、もう一度お試しください。'],
+  ['restore', 500, 'D1_ERROR SELECT secret FROM tenant', '復元に失敗しました。時間をおいて、もう一度お試しください。'],
+  ['archive', 400, 'invalid payload SQL SELECT secret', '入力を直してください。'],
+  ['restore', 409, '別の人が先に変更しました。読み直してください。', '別の人が先に変更しました。読み直してください。'],
+] as const)('%sの%sを共通の日本語にして窓と再試行を残す', async (action, status, message, expected) => {
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+    const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)
+    if (url.pathname === '/api/auth/step-up') return response({ success: true, data: { token: 'step-up-token' } })
+    return response({ success: false, error: message }, status)
+  }))
+  const done = vi.fn()
+  const Dialog = action === 'archive' ? AccountArchiveDialog : AccountRestoreDialog
+  await act(async () => root.render(<Dialog account={account} onClose={() => {}} onDone={done} />))
+  await fillCode('123456')
+  await settle()
+  expect(document.body.textContent).toContain(expected)
+  expect(document.body.textContent).not.toMatch(/API error|D1_ERROR|SQL|SELECT|secret/)
+  expect(done).not.toHaveBeenCalled()
+  expect(boxes()).toHaveLength(6)
+})
