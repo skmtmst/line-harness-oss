@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { RestaurantSetupProgress } from '@line-crm/shared';
 import type { Env } from '../worker-env.js';
 import { requireRole } from '../middleware/role-guard.js';
+import { readRestaurantFollowupSetupProgress } from '../services/restaurant-followup-preferences.js';
 import { dbFor } from '../services/db-router.js';
 import { hasOrganizationSelector, organizationFor, requiredAccount, storeBelongsTo } from './restaurant-test-definition.js';
 
@@ -31,10 +32,12 @@ export function createRestaurantSetupProgressRoutes() {
     const hoursReady = Array.isArray(hours) && hours.some(day => day && Array.isArray(day.periods)
       && day.periods.some((period: { opensAt?: string; closesAt?: string }) => /^\d{2}:\d{2}$/.test(period.opensAt ?? '')
         && /^\d{2}:\d{2}$/.test(period.closesAt ?? '') && period.opensAt !== period.closesAt));
+    const followupSetup = await readRestaurantFollowupSetupProgress(dbFor(c.env, storeId), storeId);
     const data: RestaurantSetupProgress = {
       storeId: row.id, tables: Boolean(row.tables_ready), hours: hoursReady, menus: Boolean(row.menus_ready),
       reception: Boolean(row.tables_ready && hoursReady && row.reception_ready),
       followup: Boolean(row.followup_ready),
+      ...(followupSetup ? { followupSetup } : {}),
     };
     c.header('Cache-Control', 'no-store');
     return c.json({ success: true, data });
