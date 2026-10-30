@@ -9,7 +9,7 @@ import { SaveErrorField } from '@/components/shared/save-form-errors'
 import { TextField } from '@/components/shared/text-field'
 import TruncatedText from '@/components/shared/truncated-text'
 import { CreateStepColumns } from '@/components/templates/create-step-columns'
-import { LOGIN_ACKS, WEBHOOK_ACKS, developerChannelUrl, developerProviderUrl, musuboWebhookUrl } from './logic'
+import { LOGIN_ACKS, WEBHOOK_ACKS, channelLengthWarning, developerChannelUrl, developerProviderUrl, musuboWebhookUrl } from './logic'
 import styles from './register.module.css'
 import Notice from '@/components/shared/notice'
 
@@ -66,7 +66,7 @@ function AcOutline({ sub }: { sub: number }) {
 export type Step2Field = 'channelId' | 'channelSecret' | 'providerId' | 'loginChannelId' | 'loginChannelSecret'
 
 export default function Step2Connect({
-  sub, badge, values, fieldErrors, acks, onUpdate, onToggleAck,
+  sub, badge, values, fieldErrors, touchedFields, acks, onUpdate, onTouchField, onValidateField, onToggleAck,
 }: {
   /** ②の中の小さな段（1〜4）。 */
   sub: number
@@ -75,13 +75,18 @@ export default function Step2Connect({
   /** いま入っているチャネルの4項目とプロバイダーID。 */
   values: Record<Step2Field, string>
   fieldErrors: Record<string, string>
+  touchedFields: Partial<Record<Step2Field, boolean>>
   acks: Record<string, boolean>
   onUpdate: (key: Step2Field, value: string) => void
+  onTouchField: (key: Step2Field) => void
+  onValidateField: (key: Step2Field) => void
   onToggleAck: (key: string, next: boolean) => void
 }) {
   const webhookUrl = musuboWebhookUrl(values.channelId)
   const messagingApiUrl = developerChannelUrl(values.channelId)
   const providerUrl = developerProviderUrl(values.providerId)
+  const warning = (key: Step2Field) => touchedFields[key] && !fieldErrors[key] ? channelLengthWarning(key, values[key]) : null
+  const warningText = (key: Step2Field) => warning(key) && <p id={`v8-${key}-warning`} className={styles.inputWarning} role="status">{warning(key)}</p>
   return (
     /* 正本 v07 ②の右の列（Step1 msf5n／Step2 RtWJZ／Step3 J84XB は同じ中身）。
        白い板の中に、マニュアル → 区切り → 途中保存して閉じる → 区切り → うまくいかないとき → サポートに聞く。 */
@@ -115,15 +120,17 @@ export default function Step2Connect({
           <div className={styles.acInputs}>
             <div className={styles.acField}>
               <Field htmlFor="v8-channel-id" label="チャネルID" error={fieldErrors.channelId}>
-                <SaveErrorField names={["channelId","form.channelId","channel_id","form.channel_id"]}><TextField id="v8-channel-id" value={values.channelId} onChange={(event) => onUpdate('channelId', event.target.value)} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.channelId ? true : undefined} /></SaveErrorField>
+                <SaveErrorField names={["channelId","form.channelId","channel_id","form.channel_id"]}><TextField id="v8-channel-id" value={values.channelId} onChange={(event) => onUpdate('channelId', event.target.value)} onPaste={() => onTouchField('channelId')} onBlur={() => onValidateField('channelId')} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.channelId ? true : undefined} aria-describedby={warning('channelId') ? 'v8-channelId-warning' : undefined} /></SaveErrorField>
               </Field>
               <p className={styles.help}>公式アカウントマネージャーの「設定」→「Messaging API」にある「Channel ID」の右のコピーから貼り付けてください。LINEログインのチャネルIDとは異なります。</p>
+              {warningText('channelId')}
             </div>
             <div className={styles.acField}>
               <Field htmlFor="v8-channel-secret" label="チャネルシークレット" error={fieldErrors.channelSecret}>
-                <SaveErrorField names={["channelSecret","form.channelSecret","channel_secret","form.channel_secret"]}><TextField id="v8-channel-secret" type="password" autoComplete="new-password" value={values.channelSecret} onChange={(event) => onUpdate('channelSecret', event.target.value)} placeholder="例：abc123def456ghi789…" required aria-invalid={fieldErrors.channelSecret ? true : undefined} /></SaveErrorField>
+                <SaveErrorField names={["channelSecret","form.channelSecret","channel_secret","form.channel_secret"]}><TextField id="v8-channel-secret" type="password" autoComplete="new-password" value={values.channelSecret} onChange={(event) => onUpdate('channelSecret', event.target.value)} onPaste={() => onTouchField('channelSecret')} onBlur={() => onValidateField('channelSecret')} placeholder="例：abc123def456ghi789…" required aria-invalid={fieldErrors.channelSecret ? true : undefined} aria-describedby={warning('channelSecret') ? 'v8-channelSecret-warning' : undefined} /></SaveErrorField>
               </Field>
               <p className={styles.help}>同じ画面の「Channel secret」の右のコピーから貼り付けてください。</p>
+              {warningText('channelSecret')}
             </div>
           </div>
           <span className={styles.secretNote}><Lock size={16} aria-hidden="true" />シークレットは保存したあと画面には出ません。あとから入れ替えはできます。</span>
@@ -147,9 +154,10 @@ export default function Step2Connect({
           </div>
           <div className={styles.acField}>
             <Field htmlFor="v8-provider-id" label="プロバイダーID" error={fieldErrors.providerId}>
-              <SaveErrorField names={["providerId","form.providerId"]}><TextField id="v8-provider-id" value={values.providerId} onChange={(event) => onUpdate('providerId', event.target.value)} inputMode="numeric" placeholder="例：2005648758" required aria-invalid={fieldErrors.providerId ? true : undefined} /></SaveErrorField>
+              <SaveErrorField names={["providerId","form.providerId"]}><TextField id="v8-provider-id" value={values.providerId} onChange={(event) => onUpdate('providerId', event.target.value)} onPaste={() => onTouchField('providerId')} onBlur={() => onValidateField('providerId')} inputMode="numeric" placeholder="例：2005648758" required aria-invalid={fieldErrors.providerId ? true : undefined} aria-describedby={warning('providerId') ? 'v8-providerId-warning' : undefined} /></SaveErrorField>
             </Field>
             <p className={styles.help}>「プロバイダー設定」の「基本情報」にあるプロバイダーIDをコピーして、ここに貼り付けてください。</p>
+            {warningText('providerId')}
           </div>
           <Notice tone="warn" heading={<>Step 1と同じプロバイダーを選んでください</>}>
             <p>別のプロバイダーのIDを入力すると、Step 4で作るLINEログインチャネルを同じアカウントにつなげられません。</p>
@@ -237,15 +245,17 @@ export default function Step2Connect({
           <div className={styles.acInputs}>
             <div className={styles.acField}>
               <Field htmlFor="v8-login-channel-id" label="チャネルID（LINEログイン）" error={fieldErrors.loginChannelId}>
-                <SaveErrorField names={["loginChannelId","form.loginChannelId","login_channel_id","form.login_channel_id"]}><TextField id="v8-login-channel-id" value={values.loginChannelId} onChange={(event) => onUpdate('loginChannelId', event.target.value)} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} /></SaveErrorField>
+                <SaveErrorField names={["loginChannelId","form.loginChannelId","login_channel_id","form.login_channel_id"]}><TextField id="v8-login-channel-id" value={values.loginChannelId} onChange={(event) => onUpdate('loginChannelId', event.target.value)} onPaste={() => onTouchField('loginChannelId')} onBlur={() => onValidateField('loginChannelId')} inputMode="numeric" placeholder="例：2001234567" required aria-invalid={fieldErrors.loginChannelId ? true : undefined} aria-describedby={warning('loginChannelId') ? 'v8-loginChannelId-warning' : undefined} /></SaveErrorField>
               </Field>
               <p className={styles.help}>LINEログインチャネルの「チャネル基本設定」にあります。Messaging API のIDとは違う番号です。</p>
+              {warningText('loginChannelId')}
             </div>
             <div className={styles.acField}>
               <Field htmlFor="v8-login-channel-secret" label="チャネルシークレット（LINEログイン）" error={fieldErrors.loginChannelSecret}>
-                <SaveErrorField names={["loginChannelSecret","form.loginChannelSecret","login_channel_secret","form.login_channel_secret"]}><TextField id="v8-login-channel-secret" type="password" autoComplete="new-password" value={values.loginChannelSecret} onChange={(event) => onUpdate('loginChannelSecret', event.target.value)} placeholder="例：abc123def456ghi789…" required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} /></SaveErrorField>
+                <SaveErrorField names={["loginChannelSecret","form.loginChannelSecret","login_channel_secret","form.login_channel_secret"]}><TextField id="v8-login-channel-secret" type="password" autoComplete="new-password" value={values.loginChannelSecret} onChange={(event) => onUpdate('loginChannelSecret', event.target.value)} onPaste={() => onTouchField('loginChannelSecret')} onBlur={() => onValidateField('loginChannelSecret')} placeholder="例：abc123def456ghi789…" required aria-invalid={fieldErrors.loginChannelSecret ? true : undefined} aria-describedby={warning('loginChannelSecret') ? 'v8-loginChannelSecret-warning' : undefined} /></SaveErrorField>
               </Field>
               <p className={styles.help}>同じ画面の「チャネルシークレット」です。</p>
+              {warningText('loginChannelSecret')}
             </div>
           </div>
           <div className={styles.field}>
