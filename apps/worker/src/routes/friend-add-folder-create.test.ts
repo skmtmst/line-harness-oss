@@ -1,3 +1,8 @@
+import { Hono } from 'hono';
+import { sha256Hex } from '../middleware/auth.js';
+import { apiContractMiddleware } from '../middleware/api-contract.js';
+import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
+import { friendAddRules } from './friend-add-rules.js';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { app } from '../index.js';
 import type { Env } from '../worker-env.js';
@@ -57,5 +62,74 @@ it('担当店舗を明示された管理者も下の店舗に作成でき、担�
   fixture.raw.exec("DELETE FROM staff_account_scopes WHERE line_account_id='fixture-store';");
   const denied = await create(null, 'fixture-no-access-request-key-0003');
   expect(denied.status).toBe(403);
+  expect(await denied.json()).toMatchObject({ error: { code: 'FORBIDDEN' } });
   expect(fixture.raw.prepare('SELECT count(*) AS n FROM friend_add_rule_folders').get()).toEqual({ n: 1 });
+});
+
+
+function isolatedRoutes(actor: AuthenticatedStaff) {
+  const instance = new Hono<Env>();
+  instance.use('*', apiContractMiddleware);
+  instance.use('*', async (c, next) => { c.set('staff', { ...actor }); await next(); });
+  instance.route('/', friendAddRules);
+  return instance;
+}
+const routeActor: AuthenticatedStaff = {
+  id: 'fixture-admin', name: 'Fixture admin', role: 'admin', readOnly: false,
+  tenantId: 'fixture-tenant', assignedLineAccountId: 'fixture-hq', canAccessDescendantAccounts: true,
+};
+function routeBody(body: unknown) {
+  return { method: 'POST', headers: { 'Content-Type': 'application/json', 'Idempotency-Key': 'fixture-route-negative-key-0001' }, body: JSON.stringify(body) };
+}
+function expectNoFolder() {
+  expect(fixture.raw.prepare('SELECT count(*) AS n FROM friend_add_rule_folders').get()).toEqual({ n: 0 });
+}
+
+it('routeの配信権限だけでも権限のないstaffを403で止める', async () => {
+  const actor: AuthenticatedStaff = { ...routeActor, role: 'staff', permissionKeys: [] };
+  const response = await isolatedRoutes(actor).request('http://localhost/api/friend-add-rules/folders', routeBody({ accountId: 'fixture-store', name: '挨拶' }), { DB: fixture.db } as Env['Bindings']);
+  expect(response.status).toBe(403);
+  expect(await response.json()).toMatchObject({ error: { code: 'FORBIDDEN' } });
+  expectNoFolder();
+});
+
+it('routeのアカウント確認だけでも同じ統括内の担当外を404で止める', async () => {
+  fixture.raw.exec("UPDATE staff_members SET account_scope='accounts' WHERE id='fixture-admin'; INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('fixture-admin','fixture-store','now');");
+  const response = await isolatedRoutes(routeActor).request('http://localhost/api/friend-add-rules/folders', routeBody({ accountId: 'fixture-sibling', name: '挨拶' }), { DB: fixture.db } as Env['Bindings']);
+  expect(response.status).toBe(404);
+  expect(await response.json()).toMatchObject({ error: { code: 'NOT_FOUND' } });
+  expectNoFolder();
+});
+
+it('実indexで型違いの名前を400の欄の理由にし、500や作成にしない', async () => {
+  const response = await app.request('http://localhost/api/friend-add-rules/folders', {
+    ...routeBody({ accountId: 'fixture-store', name: 1 }),
+    headers: { ...routeBody({}).headers, Authorization: 'Bearer fixture-folder-admin-key' },
+  }, { DB: fixture.db, DEPLOY_ENV: 'test' } as Env['Bindings']);
+  expect(response.status).toBe(400);
+  expect(await response.json()).toMatchObject({ error: { code: 'BAD_REQUEST', fieldErrors: [{ field: 'name' }] } });
+  expectNoFolder();
+});
+
+it.each([true, false])('ブラウザと同じCookieセッション・Originで、CSRFの有無%sを判定する', async csrf => {
+  const token = 'fixture-browser-folder-session';
+  fixture.raw.prepare('INSERT INTO admin_sessions(token_hash,staff_id,expires_at) VALUES(?,?,?)').run(await sha256Hex(token), 'fixture-admin', new Date(Date.now() + 3600000).toISOString());
+  const response = await app.request('http://localhost/api/friend-add-rules/folders', {
+    ...routeBody({ accountId: 'fixture-store', name: '挨拶', color: '#3b82f6' }),
+    headers: { ...routeBody({}).headers, Cookie: `lh_admin_session=${token}; lh_csrf=fixture-csrf`, Origin: 'http://localhost', ...(csrf ? { 'X-CSRF-Token': 'fixture-csrf' } : {}) },
+  }, { DB: fixture.db, DEPLOY_ENV: 'test' } as Env['Bindings']);
+  expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost');
+  expect(response.status, await response.clone().text()).toBe(csrf ? 201 : 403);
+  if (csrf) expect(await response.json()).toMatchObject({ data: { name: '挨拶', color: '#3b82f6' } });
+  else { expect(await response.json()).toMatchObject({ error: { code: 'CSRF_TOKEN_MISMATCH' } }); expectNoFolder(); }
+  expect(fetch).not.toHaveBeenCalled();
+});
+
+
+it('実indexで初回案内の機能が無効な店舗はFEATURE_DISABLEDで作成を拒む', async () => {
+  fixture.raw.prepare('INSERT INTO account_settings(id,line_account_id,key,value) VALUES(?,?,?,?)').run('fixture-disabled-friend-add', 'fixture-store', 'feature.friend_add_routing', JSON.stringify({ enabled: false }));
+  const response = await create(null);
+  expect(response.status, await response.clone().text()).toBe(403);
+  expect(await response.json()).toMatchObject({ error: { code: 'FEATURE_DISABLED' } });
+  expectNoFolder();
 });
