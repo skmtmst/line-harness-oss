@@ -106,11 +106,14 @@ describe('テンプレートのパック呼出し(G-4)', () => {
     expect(fixture.picked).toEqual(['本文2'])
   })
 
-  test('5通を超えては選べない', async () => {
+  test.each(['行', '中身を見る'])('%sから選んでも5通を超えては選べない', async (source) => {
     await mountPicker()
     await act(async () => { screen.getByRole('switch', { name: '2通以上を続けて送る' }).click() })
     for (const n of [1, 2, 3, 4, 5, 6]) {
-      await act(async () => { listItem(n).click() })
+      await act(async () => {
+        if (source === '行') listItem(n).click()
+        else screen.getByRole('button', { name: `テンプレ${n}の中身を見る` }).click()
+      })
     }
     await act(async () => {
       screen.getByRole('button', { name: '5通を続けて送る' }).click()

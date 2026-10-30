@@ -1,20 +1,20 @@
 'use client'
 
 /*
- * ★V8「テンプレートを選ぶ」の窓（ 段2「4. テンプレートを選ぶ（ダイアログ 640）」）。
- *
- * 前は大きな2列（左に一覧・右にプレビュー）で、絵と違っていた（オーナー指摘）。
- * 絵は幅640の窓：左にテンプレートの画面と同じフォルダの列（よく使う・すべて・フォルダ・未分類）、
- * 右に探す欄とテンプレートのカード。下に「2通以上を続けて送る」のスイッチと キャンセル・入力欄に入れる。
+ * テンプレートの本文を2行まで読み、中身を見る時だけ窓の右に見本を開く。
+ * 左はフォルダ、一覧の下には続けて送る操作と入力欄へ入れる操作を置く。
  * スイッチを入れると番号つきで選べ、帯に送る順が出て「n通を続けて送る」になる（2つの形）。
  *
  * データ（読み込み・絞り込み・続き・差し込みの解決）は components/chats/template-picker の今の処理を使い、
  * ここは見た目だけを受け持つ。
  */
-import type { RefObject } from 'react'
-import { CornerDownLeft, FolderOpen, Send } from 'lucide-react'
+import { useLayoutEffect, useRef, type RefObject } from 'react'
+import { CornerDownLeft, FolderOpen, Search, Send } from 'lucide-react'
 import { EntityPickerDialog } from '@/components/shared/entity-picker'
 import Button from '@/components/shared/button'
+import IconButton from '@/components/shared/icon-button'
+import { Tabs } from '@/components/shared/tabs'
+import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
 import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel'
 import Toggle from '@/components/shared/toggle'
 import SearchField from '@/components/shared/search-field'
@@ -26,6 +26,9 @@ export type TemplatePickerSideKey = 'frequent' | 'all' | 'none' | `folder:${stri
 
 export type TemplatePickerViewProps = {
   onClose: () => void
+  channel: 'line' | 'email'
+  canPick: boolean
+  lockedReason?: string
   search: string
   onSearch: (next: string) => void
   searchInputRef: RefObject<HTMLInputElement | null>
@@ -42,6 +45,9 @@ export type TemplatePickerViewProps = {
   frequentNote: boolean
   templates: Array<{ id: string; name: string; content: string }>
   selectedId: string | null
+  previewId: string | null
+  onPreview: (id: string) => void
+  onClosePreview: () => void
   onSelect: (id: string) => void
   /** 渡されたときだけ「2通以上を続けて送る」が出る */
   canPack: boolean
@@ -61,6 +67,15 @@ const PACK_MAX = 5
 
 export default function TemplatePickerView(props: TemplatePickerViewProps) {
   const { side, packMode, packItems } = props
+  const previewTriggers = useRef(new Map<string, HTMLButtonElement>())
+  const returnFocus = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    if (props.previewId === null && returnFocus.current) {
+      previewTriggers.current.get(returnFocus.current)?.focus()
+      returnFocus.current = null
+    }
+  }, [props.previewId])
+  const preview = props.status === 'ready' ? props.templates.find(template => template.id === props.previewId) : null
   const folderRows: FolderPanelRow[] = [
     { id: 'frequent', kind: 'folder', label: 'よく使う', icon: <FolderOpen size={16} aria-hidden="true" />, count: null },
     { id: 'all', kind: 'all', label: 'すべて', count: side.allCount },
@@ -74,6 +89,26 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
     <EntityPickerDialog
       onCancel={props.onClose}
       title="テンプレートを選ぶ"
+      wide={props.channel === 'line'}
+      navigation={props.channel === 'line' ? <Tabs size="compact" label="テンプレートの種類" items={[
+        { label: 'メッセージ', current: true, count: side.allCount ?? undefined },
+        ...['カルーセル', 'リッチメッセージ', 'リッチビデオ', '質問', 'クーポン', 'リサーチ'].map(label => ({ label, disabled: true, disabledReason: '受信箱からはまだ送れません' })),
+      ]} /> : undefined}
+      preview={props.channel === 'line' && preview ? {
+        title: preview.name,
+        onClose: () => { returnFocus.current = preview.id; props.onClosePreview() },
+        content: <LinePreview fit title={null}><LinePreviewMessage accountName="" avatar={null} time="">{props.resolvedPreview?.id === preview.id ? props.resolvedPreview.content : preview.content}</LinePreviewMessage></LinePreview>,
+      } : undefined}
+      error={props.unresolved?.length ? `解決できない差し込みがあります: ${props.unresolved.map(v => `{{${v}}}`).join(' ')}。このまま送信するとエラーになります。` : undefined}
+      band={packMode && packItems.length > 0 ? (
+            <div className={styles.tpBand}>
+              <span className={styles.tpBandLabel}>続けて送る順：</span>
+              <span className={styles.tpBandOrder} title={packItems.map((item) => item.name).join(' → ')}>
+                {packItems.map((item, index) => `${'①②③④⑤'[index] ?? `${index + 1}.`} ${item.name}`).join(' → ')}
+              </span>
+              <span className={styles.tpBandCount}>{packItems.length} / {PACK_MAX}通</span>
+            </div>
+      ) : undefined}
       footer={<>
             <div className={styles.tpFootLead}>
               {props.canPack ? (
@@ -88,7 +123,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
             </div>
             <div className={styles.tpFootActions}>
               <Button onClick={props.onClose}>キャンセル</Button>
-              <Button variant="primary" onClick={props.onConfirm} disabled={props.confirmDisabled}>
+              <Button variant="primary" onClick={props.onConfirm} lockedReason={props.lockedReason} disabled={!props.canPick || props.confirmDisabled}>
                 {packMode
                   ? <><Send aria-hidden="true" size={16} />{formatNumber(packItems.length)}通を続けて送る</>
                   : <><CornerDownLeft aria-hidden="true" size={16} />入力欄に入れる</>}
@@ -126,7 +161,7 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                     const packIndex = packItems.findIndex((item) => item.id === template.id)
                     const chosen = packMode ? packIndex >= 0 : props.selectedId === template.id
                     return (
-                      <li key={template.id}>
+                      <li key={template.id} className={styles.tpCardRow}>
                         <button
                           type="button"
                           className={styles.tpCard}
@@ -140,11 +175,10 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
                           ) : null}
                           <span className={styles.tpCardText}>
                             <span className={styles.tpCardName} title={template.name}>{template.name}</span>
-                            <span className={styles.tpCardBody}>{props.resolvedPreview?.id === template.id
-                              ? <InsertText value={template.content} resolvedValue={props.resolvedPreview.content} />
-                              : template.content}</span>
+                            <span className={styles.tpCardBody} data-lines={props.channel === 'line' ? '2' : undefined} title={template.content}>{props.channel === 'line' ? <InsertText value={template.content} resolvedValue={props.resolvedPreview?.id === template.id ? props.resolvedPreview.content : undefined} /> : template.content}</span>
                           </span>
                         </button>
+                        {props.channel === 'line' ? <IconButton ref={node => { if (node) previewTriggers.current.set(template.id, node); else previewTriggers.current.delete(template.id) }} aria-label={`${template.name}の中身を見る`} title="中身を見る" onClick={() => props.onPreview(template.id)}><Search size={16} aria-hidden="true" /></IconButton> : null}
                       </li>
                     )
                   })}
@@ -157,20 +191,6 @@ export default function TemplatePickerView(props: TemplatePickerViewProps) {
               ) : null}
             </div>
           </div>
-          {props.unresolved && props.unresolved.length > 0 ? (
-            <p className={styles.tpError} role="alert">
-              解決できない差し込みがあります: {props.unresolved.map((v) => `{{${v}}}`).join(' ')}。このまま送信するとエラーになります。
-            </p>
-          ) : null}
-          {packMode && packItems.length > 0 ? (
-            <div className={styles.tpBand}>
-              <span className={styles.tpBandLabel}>続けて送る順：</span>
-              <span className={styles.tpBandOrder} title={packItems.map((item) => item.name).join(' → ')}>
-                {packItems.map((item, index) => `${'①②③④⑤'[index] ?? `${index + 1}.`} ${item.name}`).join(' → ')}
-              </span>
-              <span className={styles.tpBandCount}>{packItems.length} / {PACK_MAX}通</span>
-            </div>
-          ) : null}
     </EntityPickerDialog>
   )
 }

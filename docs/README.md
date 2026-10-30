@@ -1016,3 +1016,5 @@
 - [ユーザー管理画面の見た目](release-log/unreleased/1981-masato-staff-visual-cleanup.md) — 反映履歴。
 - [LINEチャネル情報の入力確認](release-log/unreleased/1982-masato-line-channel-input-validation.md) — 反映履歴、確認 2026-10-30。
 - [右の詳細欄の文字と操作の統一](release-log/unreleased/0000-kenta-drawer-unify.md) — 反映履歴、確認 2026-10-30。
+
+- [受信箱でテンプレートの中身を見て選ぶ](release-log/unreleased/0000-kenta-inbox-template-preview.md) — 反映履歴。
