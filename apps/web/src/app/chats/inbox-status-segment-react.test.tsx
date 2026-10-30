@@ -140,6 +140,12 @@ test('パネルで選ぶと絞り込みが変わる。これまでの動きの�
   // パネルを開き直しても選択が残る。
   await openFilters()
   expect(document.querySelector('button[aria-label="対応状況で絞り込む"]')?.textContent).toContain('対応中')
+  await act(async () => { document.querySelector<HTMLButtonElement>('button[aria-label="対応状況で絞り込む"]')!.click() })
+  const selected = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(option => option.textContent === '対応中')!
+  expect(selected.getAttribute('aria-selected')).toBe('true')
+  expect(selected.className).not.toMatch(/bg-accent-deep|text-on-accent/)
+  const others = [...document.querySelectorAll<HTMLElement>('[role="option"]')].filter(option => option !== selected)
+  expect(others.every(option => option.getAttribute('aria-selected') === 'false')).toBe(true)
 })
 
 test('「すべて」に戻すと絞り込みが外れる', async () => {
