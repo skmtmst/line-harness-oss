@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import type { AccountWithStats } from '@/contexts/account-context'
-import { FALLBACK_REASON, connectionReasonLine, connectionReasons, lineHandle } from './connection-reasons'
+import { FALLBACK_REASON, connectionNoticeLine, connectionReasonLine, connectionReasons, lineHandle } from './connection-reasons'
 import { accountHandle } from './account-dialogs'
 
 const base: AccountWithStats = {
@@ -77,5 +77,44 @@ describe('要確認の理由', () => {
 
   test('理由が届かない（古い worker）ときは、今までの案内に戻す', () => {
     expect(connectionReasonLine({ ...base, connection: { status: 'warn', checkedAt: null } }).text).toBe(FALLBACK_REASON)
+  })
+})
+
+describe('カードの知らせ1つ', () => {
+  const webhookWarn: AccountWithStats = {
+    ...base,
+    connection: {
+      status: 'warn',
+      checkedAt: '2026-10-07T10:00:00+09:00',
+      issues: [{
+        kind: 'webhook_endpoint',
+        result: 'mismatched',
+        expectedUrl: 'https://stg-api.musubo.jp/webhook',
+        registeredUrl: 'https://api.musubo.jp/webhook',
+        webhookActive: true,
+        httpStatus: 200,
+      }],
+    },
+  }
+  const healthy: AccountWithStats = { ...base, connection: { status: 'ok', checkedAt: '2026-10-07T10:00:00+09:00' } }
+
+  test('期限切れは先に出し、残りの理由は件数で添える', () => {
+    const notice = connectionNoticeLine({ ...webhookWarn, tokenExpiry: { status: 'expired', label: 'トークンの期限が切れています', daysLeft: null } }, true)!
+    expect(notice.text).toBe('LINE のトークンの期限が切れています（ほかに接続の確認事項が1件）')
+    expect(notice.title).toContain('https://api.musubo.jp/webhook')
+  })
+
+  test('期限が近いだけの時も同じ形で出す', () => {
+    const notice = connectionNoticeLine({ ...healthy, tokenExpiry: { status: 'expiring', label: 'トークンの期限が近づいています', daysLeft: 7 } }, false)!
+    expect(notice.text).toBe('LINE のトークンの期限が近づいています')
+  })
+
+  test('期限が絡まなければ今までの理由の1行（要確認でない・正常なら出さない）', () => {
+    expect(connectionNoticeLine(webhookWarn, true)!.text).toContain('Webhook の URL がこの環境と違います')
+    expect(connectionNoticeLine(healthy, false)).toBeNull()
+  })
+
+  test('アーカイブには出さない', () => {
+    expect(connectionNoticeLine({ ...webhookWarn, archivedAt: '2026-10-01', tokenExpiry: { status: 'expired', label: 'トークンの期限が切れています', daysLeft: null } }, true)).toBeNull()
   })
 })
