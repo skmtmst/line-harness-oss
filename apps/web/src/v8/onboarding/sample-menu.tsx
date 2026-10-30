@@ -2,6 +2,7 @@
 
 import type { CSSProperties } from 'react'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import MusuboMark from '@/components/shared/musubo-mark'
 import type { AccountStyle } from '@line-crm/shared'
 import { SetupIcon } from './icons'
 import { sampleMenuFor } from './model'
@@ -46,7 +47,7 @@ export function SampleMenuPhone({ style }: { style: AccountStyle }) {
   const menu = sampleMenuFor(style)
   return (
     <LinePreview title={null} accountName={menu.account} richMenu={<SampleMenuTiles style={style} size="phone" />}>
-      <LinePreviewMessage accountName={menu.account} avatar={<span className={styles.avatar}>然</span>} time="10:00">{menu.greeting}</LinePreviewMessage>
+      <LinePreviewMessage accountName={menu.account} avatar={<span className={styles.avatar}><MusuboMark /></span>} time="10:00">{menu.greeting}</LinePreviewMessage>
     </LinePreview>
   )
 }
