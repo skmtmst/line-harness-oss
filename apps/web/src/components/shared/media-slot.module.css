@@ -13,10 +13,18 @@
  */
 
 .root {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--tpl-slot-gap);
   min-width: 0;
+}
+
+.root > .help {
+  position: absolute;
+  top: var(--tpl-slot-pill-inset);
+  right: var(--tpl-slot-pill-inset);
+  z-index: 1;
 }
 
 .frame {
