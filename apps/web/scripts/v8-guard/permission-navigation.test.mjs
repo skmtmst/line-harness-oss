@@ -30,15 +30,21 @@ for (const width of [1152, 1440]) for (const delay of [0, 600]) {
     if (dir) mkdirSync(dir, { recursive: true })
     const context = await browser.newContext({ viewport: { width, height: 1080 }, locale: 'ja-JP', timezoneId: 'Asia/Tokyo',
       ...(dir && process.env.V8_GUARD_VIDEO === '1' ? { recordVideo: { dir: join(dir, 'video') } } : {}) })
-    const page = await context.newPage(), results = [], errors = []
+    const page = await context.newPage(), results = [], errors = [], runtimeReports = []
     let style = 'ec'
     const selectStyle = next => { style = next; styleDashboardMock('PUT', '/api/dashboard/style', new URLSearchParams(), { style }) }
     selectStyle(style)
     page.on('pageerror', error => errors.push(error.message))
+    if (process.env.V8_GUARD_PERMISSION_FAULT === '1') await page.route('**/_next/static/**/*.js', async route => {
+      const response = await route.fetch()
+      // 実際に配る共通の読み込み文へ故障を入れる。配信ファイルは書き換えない。
+      await route.fulfill({ response, body: (await response.text()).replaceAll('読み込んでいます', '権限を確認しています') })
+    })
     await page.addInitScript(values => { for (const [key, value] of Object.entries(values)) localStorage.setItem(key, value) }, PARITY_INIT)
     await page.addInitScript(observePermissionFrames)
     const answer = async (method, path) => {
       const url = new URL(path, base)
+      if (url.pathname === '/api/client-errors' && method === 'POST') runtimeReports.push(url.pathname)
       if (delay) await new Promise(done => setTimeout(done, delay))
       const response = await mockFetch(method, url.pathname + url.search)
       let body = response.body
@@ -77,6 +83,7 @@ for (const width of [1152, 1440]) for (const delay of [0, 600]) {
       assertNoPermissionFlash(frames)
       assert.ok(await page.locator('main').innerText(), '到着先の本文が空ではない')
       assert.equal(await page.getByText('Application error:', { exact: false }).count(), 0)
+      assert.equal(await page.getByRole('heading', { name: '画面を表示できませんでした', exact: true }).count(), 0)
     }
     const direct = path => observe(`初回 ${path}`, async () => {
       const response = await page.goto(base + path, { waitUntil: 'domcontentloaded' })
@@ -98,11 +105,14 @@ for (const width of [1152, 1440]) for (const delay of [0, 600]) {
       async function tabs(owner) {
         const items = await page.locator('main [role=tab]').evaluateAll(elements => elements
           .filter(element => element.getBoundingClientRect().height > 0 && !element.disabled && element.getAttribute('aria-disabled') !== 'true')
-          .map(element => ({ label: element.textContent, id: element.id })))
+          .map(element => ({ label: element.textContent, id: element.id, href: element.getAttribute('href'), index: [...document.querySelectorAll('main [role=tab]')].indexOf(element) })))
         for (const item of items) {
-          const control = item.id ? page.locator(`[id=${JSON.stringify(item.id)}]`) : page.getByRole('tab', { name: item.label, exact: true })
+          const control = item.id ? page.locator(`[id=${JSON.stringify(item.id)}]`)
+            : item.href ? page.locator(`main [role=tab][href=${JSON.stringify(item.href)}]`)
+              : page.locator('main [role=tab]').nth(item.index)
           assert.equal(await control.count(), 1, `タブの指定 ${owner} ${item.label}`)
           if (!await control.isVisible()) continue
+          assert.equal((await control.textContent()).replace(/\s/g, ''), item.label.replace(/\s/g, ''), '採取したタブと押すタブが同じ')
           await observe(`タブ ${owner} ${item.label}`, () => control.click())
         }
       }
@@ -142,8 +152,9 @@ for (const width of [1152, 1440]) for (const delay of [0, 600]) {
         }
       }
       assert.deepEqual(errors, [], '実画面の未処理エラーを合格扱いしない')
+      assert.deepEqual(runtimeReports, [], 'エラー境界で捕まえた失敗も合格扱いしない')
     } finally {
-      if (dir) writeFileSync(join(dir, 'summary.json'), JSON.stringify({ width, delay, routes, results: results.map(({ frames, ...row }) => ({ ...row, frameCount: frames.length, failures: frames.filter(frame => frame.messages.length) })), errors }, null, 2))
+      if (dir) writeFileSync(join(dir, 'summary.json'), JSON.stringify({ width, delay, routes, results: results.map(({ frames, ...row }) => ({ ...row, frameCount: frames.length, failures: frames.filter(frame => frame.messages.length) })), errors, runtimeReports }, null, 2))
       selectStyle('standard')
       await context.close()
       await browser.close()

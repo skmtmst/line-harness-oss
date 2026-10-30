@@ -106,7 +106,7 @@ export default function CommonActionsV8() {
   const canEdit = canManage === true
   const viewerOnly = canManage === false
   const runPermissions = useAutomationRunManage()
-  const canExportCsv = runPermissions === null || runPermissions.canExport
+  const canExportCsv = runPermissions?.canExport === true
 
   const [items, setItems] = useState<CommonActionSummary[]>([])
   const [summary, setSummary] = useState<Summary | null>(null)

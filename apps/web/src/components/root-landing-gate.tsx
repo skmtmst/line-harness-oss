@@ -40,7 +40,7 @@ export default function RootLandingGate({ children }: { children: React.ReactNod
   }
 
   if (decision.action !== 'show-dashboard') {
-    return <PagePending />
+    return <PagePending stage="root" />
   }
 
   return <>{children}</>

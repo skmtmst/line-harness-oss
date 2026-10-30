@@ -93,5 +93,5 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
 
 /** 閲覧権限と作成権限を、画面の処理を始める前に確認する。 */
 export default function ViewPermissionGate({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<PagePending />}><ResolvedViewPermissionGate>{children}</ResolvedViewPermissionGate></Suspense>
+  return <Suspense fallback={<PagePending stage="route" />}><ResolvedViewPermissionGate>{children}</ResolvedViewPermissionGate></Suspense>
 }
