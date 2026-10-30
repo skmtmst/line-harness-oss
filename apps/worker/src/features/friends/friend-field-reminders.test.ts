@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+vi.mock('../../services/restaurant-followup-engine-approval.js',()=>({readFollowupEngineGate:async()=>({managed:false,allowed:true})}));
+
 const getFriendFieldReminders = vi.fn();
 const getFriendsWithFieldValuePage = vi.fn();
 const setFriendFieldReminderScanCursor = vi.fn();
@@ -33,7 +35,7 @@ vi.mock('../../services/segment-query.js', () => ({
 
 import { processFriendFieldReminders } from './friend-field-reminders.js';
 
-const db = {} as D1Database;
+const db = {prepare:()=>({bind:()=>({first:async()=>null})})} as unknown as D1Database;
 const jst = (text: string) => new Date(`${text}:00+09:00`);
 
 function reminder(patch: Record<string, unknown> = {}) {
