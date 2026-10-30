@@ -125,6 +125,12 @@ export default function scanPolishRules() {
     const button = svg.closest('button') ?? svg.parentElement?.querySelector('button')
     if (!button || !visible(button) || !visible(svg)) continue
     const text = textBox(button), icon = svg.getBoundingClientRect()
+    const value = button.querySelector('[data-select-value]')
+    if (value && !value.hidden && visible(value)
+      && /^(よく使う絞り込み|保存した検索|保存した絞り込み)$/.test(value.textContent.trim())
+      && value.scrollWidth > value.clientWidth + 1) {
+      add('saved-search-label-clipped', button, { content: value.scrollWidth, available: value.clientWidth }, value.textContent)
+    }
     if (text && Math.min(icon.right, text.right) - Math.max(icon.left, text.left) > 0.5
       && Math.min(icon.bottom, text.bottom) - Math.max(icon.top, text.top) > 0.5) {
       add('saved-search-icon-overlap', button, { iconRight: icon.right, textLeft: text.left }, button.textContent)
