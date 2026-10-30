@@ -92,6 +92,7 @@ styleStarterDistribution.post(path + '/distribute', async (c) =>
       c.get('staff').id,
       checkStyle(c.req.param('style')),
       await json(c),
+      {bucket:c.env.IMAGES,publicBaseUrl:c.env.WORKER_URL},
     ),
   }),
 );

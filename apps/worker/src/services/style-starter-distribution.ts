@@ -1,3 +1,5 @@
+import { catalogDistributionPlan, distributeCatalog } from './style-starter-catalog-distribution.js';
+import type { StarterCatalogRuntime } from './style-starter-catalog-apply.js';
 import { sameStarterSnapshot } from './style-starter-snapshot.js';
 import type { AccountStyle, SetupAnswer } from '@line-crm/shared';
 import { checkStyle, StyleError, profile, starter } from './style-setup.js';
@@ -20,7 +22,7 @@ type Binding = {
   pending_update: string | null;
   set_version: number;
 };
-export async function starterDistributionPlan(
+async function legacyStarterDistributionPlan(
   db: D1Database,
   tenant: string,
   style: AccountStyle,
@@ -125,14 +127,20 @@ export async function starterDistributionPlan(
     editedCount: accounts.reduce((n, a) => n + a.editedCount, 0),
   };
 }
+export async function starterDistributionPlan(db:D1Database,tenant:string,style:AccountStyle,input:Record<string,unknown>) {
+  const plan=await legacyStarterDistributionPlan(db,tenant,style,input);
+  return plan.set.definition.mode==='catalog' ? catalogDistributionPlan(db,tenant,style,plan.accounts) : plan;
+}
 export async function distributeStarter(
   db: D1Database,
   tenant: string,
   actor: string,
   style: AccountStyle,
   input: Record<string, unknown>,
+  runtime: StarterCatalogRuntime = {},
 ) {
-  const plan = await starterDistributionPlan(db, tenant, style, input);
+  const plan = await legacyStarterDistributionPlan(db, tenant, style, input);
+  if (plan.set.definition.mode === 'catalog') return distributeCatalog(db,tenant,actor,style,input,await catalogDistributionPlan(db,tenant,style,plan.accounts),runtime);
   if (input.confirmed !== true || input.token !== plan.token)
     throw new StyleError('distribution_confirmation_required', 409);
   if (

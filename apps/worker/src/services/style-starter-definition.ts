@@ -1,4 +1,6 @@
 import { templateSamples } from './style-template-samples.js';
+import { readCatalogDefinition } from './style-starter-catalog-definition.js';
+import type { StarterCatalogSelection } from '@line-crm/shared';
 
 import { type AccountStyle, type StyleCard } from '@line-crm/shared';
 
@@ -72,7 +74,7 @@ export function isCustomerUri(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password; } catch { return false; }
 }
-export type StarterDefinition = { items: StarterItem[] };
+export type StarterDefinition = { items: StarterItem[]; mode?: 'catalog'; selections?: StarterCatalogSelection[] };
 export function standardStarter(style: AccountStyle): StarterDefinition {
   const names: Record<AccountStyle, string> = {
     standard: 'ご案内',
@@ -222,6 +224,7 @@ export function readDefinition(
   value: unknown,
   style: AccountStyle,
 ): StarterDefinition {
+  if ((value as { mode?: unknown })?.mode === 'catalog') return readCatalogDefinition(value);
   const input = value as StarterDefinition;
   if (!input || !Array.isArray(input.items) || input.items.length > 30)
     throw new StyleError('invalid_starter_set');

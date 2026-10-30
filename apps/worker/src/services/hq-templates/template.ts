@@ -68,6 +68,8 @@ export type MessageTemplatePreflightItem = Readonly<{
 }>;
 
 export interface MessageTemplateAdapterDependencies {
+  /** 初期投入は、実体の保存と同じトランザクションで未公開にする。 */
+  initialDraft?: boolean;
   stageSourceObject?: (media: MessageTemplateMediaDefinition, binding: MessageTemplateSourceMediaBinding) => Promise<HqMediaStreamSource>;
   /** 実行時のカード参照は、事前確認のスナップショットと照合する。 */
   cardTargets?: Readonly<Record<string, string>>;
@@ -837,15 +839,25 @@ export async function planMessageTemplateDistribution(input: {
       dbCommit.push(conflictGuard('SELECT 1 FROM broadcast_message_assets WHERE id=? AND line_account_id=? AND updated_at=?', [targetTemplateId,context.targetAccountId,rootItem.expectedRevision]));
       dbCommit.push({sql:`UPDATE broadcast_message_assets SET kind=?,name=?,payload_json=?,published_version=published_version+1,published_at=?,draft_payload_json=NULL,draft_revision=0,updated_at=? WHERE id=? AND line_account_id=? AND updated_at=?`,bindings:[asset.kind,rootName,json,now,now,targetTemplateId,context.targetAccountId,rootItem.expectedRevision]});
     } else dbCommit.push({sql:`INSERT INTO broadcast_message_assets(id,line_account_id,kind,name,payload_json,published_version,published_at,draft_revision,created_at,updated_at) VALUES (?,?,?,?,?,1,?,0,?,?)`,bindings:[targetTemplateId,context.targetAccountId,asset.kind,rootName,json,now,now,now]});
-    dbCommit.push({sql:`INSERT INTO broadcast_asset_versions(id,asset_id,version_number,payload_json,created_at) SELECT ?,id,published_version,payload_json,? FROM broadcast_message_assets WHERE id=? AND line_account_id=?`,bindings:[crypto.randomUUID(),now,targetTemplateId,context.targetAccountId]});
+    if (!dependencies.initialDraft) dbCommit.push({sql:`INSERT INTO broadcast_asset_versions(id,asset_id,version_number,payload_json,created_at) SELECT ?,id,published_version,payload_json,? FROM broadcast_message_assets WHERE id=? AND line_account_id=?`,bindings:[crypto.randomUUID(),now,targetTemplateId,context.targetAccountId]});
     if(asset.kind==='rich_message') for(const m of referencedMedia(definition)) dbCommit.push({sql:'INSERT OR IGNORE INTO imagemap_images(id,line_account_id,r2_key,created_at) VALUES (?,?,?,?)',bindings:[crypto.randomUUID(),context.targetAccountId,replacements.get(m.r2Key)!,now]});
   }
   if(!definition.asset) {
     const bubbles=definition.messageBubbles ? replaceExactLocators(JSON.stringify(replaceLiffActionLocators(definition.messageBubbles,dependencies.liffTargets ?? {})),replacements) : null;
     dbCommit.push({sql:'UPDATE templates SET message_bubbles_json=?,draft_message_bubbles_json=NULL WHERE id=? AND line_account_id=?',bindings:[bubbles,targetTemplateId,context.targetAccountId]});
-    dbCommit.push({sql:`INSERT INTO template_versions(id,template_id,version_number,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json,created_at,hq_template_version_id)
+    if (!dependencies.initialDraft) dbCommit.push({sql:`INSERT INTO template_versions(id,template_id,version_number,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json,created_at,hq_template_version_id)
       SELECT ?,id,published_version,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json,?,? FROM templates WHERE id=? AND line_account_id=?`,bindings:[crypto.randomUUID(),now,source.version.templateVersionId,targetTemplateId,context.targetAccountId]});
   }
+  if (dependencies.initialDraft) {
+    if (rootResolution.mode === 'overwrite') throw new TemplateHqTemplateError('VERSION_CONFLICT', 409);
+    dbCommit.push(definition.asset
+      ? { sql: `UPDATE broadcast_message_assets SET draft_payload_json=payload_json,draft_revision=1,published_version=0,published_at=NULL WHERE id=? AND line_account_id=?`, bindings: [targetTemplateId, context.targetAccountId] }
+      : { sql: `UPDATE templates SET draft_message_type=message_type,draft_message_content=message_content,
+        draft_carousel_actions_json=carousel_actions_json,draft_carousel_tap_limit_mode=carousel_tap_limit_mode,draft_carousel_tap_limit_text=carousel_tap_limit_text,
+        draft_question_json=question_json,draft_question_status=question_status,draft_message_bubbles_json=message_bubbles_json,
+        draft_revision=1,published_version=0,published_at=NULL WHERE id=? AND line_account_id=?`, bindings: [targetTemplateId, context.targetAccountId] });
+  }
+
   for (const media of referencedMedia(definition)) {
     dbCommit.push({
       sql: `INSERT INTO media_usages(media_id,ref_kind,ref_id,scanned_at) VALUES (?,'template',?,?)

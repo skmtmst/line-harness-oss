@@ -45,9 +45,10 @@ function audit(authority: HqTemplateAuthority, action: string, targetId: string,
   return { sql: `INSERT INTO audit_events(id,tenant_id,line_account_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,?,?,'business',?, ?,?,'hq_template',?,?,?)`,
     bindings: [crypto.randomUUID(), authority.tenantId, accountId, authority.actorId, authority.role, `hq_template.${action}`, targetId, result, runId ? JSON.stringify({ runId }) : null] };
 }
-export async function templateDetail(db: D1Database, authority: HqTemplateAuthority, id: string) {
+export async function templateDetail(db: D1Database, authority: HqTemplateAuthority, id: string, versionId?: string) {
   const template = await getHqTemplate(db, authority.tenantId, id);
   if (!template || template.archived_at) throw new HqTemplateError('NOT_FOUND', 404);
+  if (versionId) template.current_version_id = versionId;
   const version = await db.prepare(`SELECT definition_json FROM hq_template_versions WHERE tenant_id=? AND template_id=? AND id=?`)
     .bind(authority.tenantId, id, template.current_version_id).first<{ definition_json: string }>();
   if (!version) throw new HqTemplateError('VERSION_UNAVAILABLE', 409);
@@ -168,9 +169,9 @@ export async function listTemplates(db: D1Database, authority: HqTemplateAuthori
     };
   });
 }
-export async function preflightDistribution(db: D1Database, authority: HqTemplateAuthority, id: string, accountIds: string[], bucket?: R2Bucket, textOverrides?: unknown) {
+export async function preflightDistribution(db: D1Database, authority: HqTemplateAuthority, id: string, accountIds: string[], bucket?: R2Bucket, textOverrides?: unknown, initial?: { versionId: string }) {
   const accounts = await requireTargetAccounts(db, authority, accountIds);
-  const { template, definition } = await templateDetail(db, authority, id);
+  const { template, definition } = await templateDetail(db, authority, id, initial?.versionId);
   const latest = await db.prepare('SELECT version FROM hq_template_versions WHERE id=? AND tenant_id=? AND template_id=?')
     .bind(template.current_version_id!, authority.tenantId, id).first<{ version: number }>();
   if (!latest) throw new HqTemplateError('NOT_FOUND', 404);
@@ -219,6 +220,7 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
     stores.push({ accountId: account.id, accountName: account.name, items, targetVersion,...(catalogDefinition?{warnings:catalogWarnings(catalogDefinition,snapshot!,template.template_type as import('@line-crm/shared').HqCatalogTemplateType)}:{}), ...(form ? {warnings: await formTemplateWarnings(db, account.id, input)} : {}), ...(overrides.has(account.id) ? {textOverride:overrides.get(account.id)} : {}) });
   }
   for (const account of accounts) statements.unshift(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [account.id, authority.tenantId]));
+  if (initial) statements.push({ sql: 'UPDATE hq_template_preflights SET initial_insert=1 WHERE tenant_id=? AND idempotency_fingerprint=?', bindings: [authority.tenantId, preflightId] });
   await batch(db, statements);
   return { preflightId, expiresAt, stores };
 }

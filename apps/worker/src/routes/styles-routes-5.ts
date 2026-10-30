@@ -22,6 +22,7 @@ styles.post(base + '/starter-items/ensure', async (c) => {
       c.get('staff').tenantId ?? null,
       c.get('staff').id,
       await json(c),
+      { bucket: c.env.IMAGES, publicBaseUrl: c.env.WORKER_URL },
     ),
   });
 });

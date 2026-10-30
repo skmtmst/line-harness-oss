@@ -23,6 +23,7 @@ export async function starter(
         autoInsert: !!saved.auto_insert,
         definition: readDefinition(
           {
+            ...JSON.parse(saved.definition_json),
             items: (
               JSON.parse(saved.definition_json)
                 .items as import('./style-starter-definition.js').StarterItem[]

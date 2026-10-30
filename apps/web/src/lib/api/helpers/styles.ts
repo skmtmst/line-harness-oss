@@ -1,4 +1,4 @@
-import type { AccountStyle, StyleTemplateSample } from '@line-crm/shared';
+import type { AccountStyle, StyleTemplateSample, StarterCatalogDefinition, StarterCatalogOption } from '@line-crm/shared';
 import { fetchApi } from '../../api';
 import { fetchSharedRead } from '../transport/cache';
 
@@ -18,6 +18,7 @@ import { methods2 } from './style-methods-2';
 export const styleApi = { ...methods1, ...methods2 };
 
 export const hqStyleApi = {
+  catalog: () => fetchApi<Result<StarterCatalogOption[]>>('/api/hq/style-starter-sets/catalog'),
   templateSamples: (style: AccountStyle) =>
     fetchApi<Result<{ style: AccountStyle; items: StyleTemplateSample[] }>>(
       '/api/hq/style-template-samples?' + new URLSearchParams({ style }),
@@ -30,7 +31,8 @@ export const hqStyleApi = {
       expectedVersion: number;
       name: string;
       autoInsert?: boolean;
-      definition: { items: StarterSetItem[] };
+      definition: { items: StarterSetItem[] } | StarterCatalogDefinition;
+      confirmed?: boolean;
     },
   ) =>
     fetchApi<Result<{ id: string; version: number; autoInsert: boolean }>>(

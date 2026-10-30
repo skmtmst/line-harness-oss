@@ -10,6 +10,7 @@ import { StyleError, checkStyle, readAnswers } from './style-setup-core.js';
 import { readDefinition, standardStarter } from './style-starter-definition.js';
 import { restaurantFollowupSeedStatement } from './restaurant-followup-rows.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
+import { applyCatalogStarter, type StarterCatalogRuntime } from './style-starter-catalog-apply.js';
 export {profile,profileAnswers,type StyleProfile} from './style-profile.js';
 import {profile,profileAnswers,hasPendingStyleSelection} from './style-profile.js';
 function assertVersion(expected: unknown, actual: number) {
@@ -22,7 +23,7 @@ export async function saveProfile(
   tenant: string | null,
   actor: string,
   input: Record<string, unknown>,
-  options: { initialSelectionPending?: boolean } = {},
+  options: { initialSelectionPending?: boolean; catalogRuntime?: StarterCatalogRuntime } = {},
 ) {
   const current = await profile(db, account);
   assertVersion(input.expectedVersion, current?.version ?? 0);
@@ -186,7 +187,11 @@ export async function saveProfile(
       throw new StyleError('version_conflict', 409);
     throw e;
   }
+  const catalogApplication = set.definition.mode === 'catalog' && tenant && selected
+    ? await applyCatalogStarter(db, tenant, account, actor, style, options.catalogRuntime)
+    : undefined;
   return {
+    catalogApplication,
     style,
     styleMode,
     styleSelected: selected,
@@ -208,12 +213,13 @@ export async function initializeAccountStyle(
   tenant: string | null,
   actor: string,
   selectedStyle?: AccountStyle,
+  catalogRuntime?: StarterCatalogRuntime,
 ) {
   if (selectedStyle !== undefined) {
-    return saveProfile(db, account, tenant, actor, { expectedVersion: 0, style: checkStyle(selectedStyle) });
+    return saveProfile(db, account, tenant, actor, { expectedVersion: 0, style: checkStyle(selectedStyle) }, { catalogRuntime });
   }
   return saveProfile(db, account, tenant, actor, {
     expectedVersion: 0,
     style: 'standard',
-  }, { initialSelectionPending: true });
+  }, { initialSelectionPending: true, catalogRuntime });
 }

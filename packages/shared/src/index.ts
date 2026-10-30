@@ -121,3 +121,5 @@ export type { LineTokenExpiry } from './line-token-expiry.js';
 export { lineAccountConnectionState, lineConnectionRisk } from './line-connection-state.js';
 export type { LineConnection, LineConnectionIssue } from './line-connection-state.js';
 export { lineObservationTime, lineWebhookSilence, LINE_WEBHOOK_SILENCE_MS } from './line-observation-time.js';
+export { STARTER_CATALOG_KINDS } from './style-starter-catalog.js';
+export type { StarterCatalogKind, StarterCatalogSelection, StarterCatalogDefinition, StarterCatalogOption, StarterCatalogItemState, StarterCatalogApplyResult } from './style-starter-catalog.js';

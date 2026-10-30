@@ -2,6 +2,8 @@ import type { SetupAnswer } from '@line-crm/shared';
 import { hasPendingStyleSelection, profile, type StyleProfile } from './style-profile.js';
 import { StyleError } from './style-setup-core.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
+import { starter } from './style-starter-set.js';
+import { applyCatalogStarter, type StarterCatalogRuntime } from './style-starter-catalog-apply.js';
 
 /**
  * 今のスタイルの初期セットのうち、まだ入っていない物を決める。
@@ -30,6 +32,14 @@ async function planMissingStarterItems(
 export async function starterApplication(db: D1Database, account: string, tenant: string | null) {
   const p = await profile(db, account);
   if (!p) return null;
+  const set = await starter(db, tenant, p.style);
+  if (set.definition.mode === 'catalog') {
+    const selections = set.definition.selections ?? [];
+    const rows = (await db.prepare("SELECT template_id,template_version_id,state FROM style_starter_catalog_items WHERE line_account_id=? AND tenant_id=?")
+      .bind(account, tenant).all<{template_id:string;template_version_id:string;state:string}>()).results;
+    const count = selections.filter(selection => rows.some(row => row.template_id === selection.templateId && row.template_version_id === selection.versionId && row.state === 'succeeded')).length;
+    return { applied: selections.length === 0 || count > 0, count, missing: set.autoInsert ? selections.length - count : 0 };
+  }
   const count = (await db
     .prepare('SELECT COUNT(*) AS n FROM style_starter_items WHERE line_account_id=?')
     .bind(account)
@@ -56,11 +66,17 @@ export async function ensureStyleStarterItems(
   tenant: string | null,
   actor: string,
   input: Record<string, unknown>,
+  runtime: StarterCatalogRuntime = {},
 ) {
   const p = await profile(db, account);
   if (!p) throw new StyleError('select_style_first', 409);
   if (!Number.isInteger(input.expectedVersion) || input.expectedVersion !== p.version)
     throw new StyleError('version_conflict', 409);
+  const selectedSet = await starter(db, tenant, p.style);
+  if (selectedSet.definition.mode === 'catalog' && tenant) return {
+    inserted: [], skipped: [], existing: 0, starterSet: {id:selectedSet.id,version:selectedSet.version},
+    catalogApplication: await applyCatalogStarter(db, tenant, account, actor, p.style, runtime),
+  };
   const now = new Date().toISOString();
   const { set, inserted, skipped, existing, statements } = await planMissingStarterItems(db, account, tenant, actor, p, now);
   const keys = new Set(set.definition.items.map((item) => item.key));
