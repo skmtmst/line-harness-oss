@@ -1008,3 +1008,4 @@
 - [シナリオ一覧の操作と途中の失敗の案内](release-log/unreleased/1968-kenta-train-1029o.md) — 反映履歴。
 
 - [友だちの履歴の日付区切り](release-log/unreleased/1972-kenta-swb-date-group.md) — 反映履歴。
+- [LINEチャネル情報の入力確認](release-log/unreleased/1982-masato-line-channel-input-validation.md) — 反映履歴、確認 2026-10-30。
