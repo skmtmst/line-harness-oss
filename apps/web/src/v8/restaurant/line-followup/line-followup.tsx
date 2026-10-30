@@ -1,5 +1,6 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import { DetailPreview } from '@/components/shared/detail-content'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { useEffect, useRef, useState, type ComponentType } from 'react'
@@ -263,7 +264,7 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
       }
     }).catch((error: unknown) => {
       if (cancelled) return
-      setState({ kind: 'error', message: error instanceof Error ? error.message : '読み込めませんでした' })
+      setState({ kind: 'error', message: describeApiFailure(error, '読み込み') })
     })
     return () => { cancelled = true }
   }, [accountId, storeId, storeName, reloadKey, storeKey])
@@ -337,7 +338,7 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
                     unwrap(publishResponse, '本体のシナリオを公開できませんでした')
                   } catch (error) {
                     setBusy(null)
-                    setActionError(error instanceof Error ? error.message : '本体のシナリオを公開できませんでした')
+                    setActionError(describeSaveFailure(error))
                     return
                   }
                   fetchRestaurantFollowup(accountId, storeId, storeName).then(
@@ -359,7 +360,7 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
                           try {
                             unwrap(response, '承認を申請できませんでした')
                           } catch (error) {
-                            setActionError(error instanceof Error ? error.message : '承認を申請できませんでした')
+                            setActionError(describeSaveFailure(error))
                             return
                           }
                           reload()

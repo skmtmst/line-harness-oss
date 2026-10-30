@@ -491,3 +491,21 @@ it('LINE未接続の409は接続を案内し、版競合として読み直さな
   expect(await screen.findByText('LINE公式アカウントを接続してから、もう一度お試しください')).toBeTruthy()
   expect(fixture.fetchLive).toHaveBeenCalledTimes(1)
 })
+
+
+describe('申請の失敗の理由とやり直し', () => {
+  it.each(['publish', 'request'])('%s の技術文を出さず、同じ操作をやり直せる', async phase => {
+    const operation = phase === 'publish' ? fixture.publishScenario : fixture.requestStart
+    operation.mockResolvedValueOnce({ success: false, error: 'API error: 503' })
+    render(<LineFollowupV8 />)
+    await screen.findByRole('button', { name: '予約完了時' })
+    fireEvent.click(screen.getByRole('button', { name: '承認を申請する' }))
+    const notice = await screen.findByRole('alert')
+    expect(notice.textContent).not.toContain('API error')
+    expect(notice.textContent).toContain('もう一度お試しください')
+    const retry = screen.getByRole('button', { name: '承認を申請する' }) as HTMLButtonElement
+    await waitFor(() => expect(retry.disabled).toBe(false))
+    fireEvent.click(retry)
+    await waitFor(() => expect(fixture.requestStart).toHaveBeenCalledTimes(phase === 'publish' ? 1 : 2))
+  })
+})
