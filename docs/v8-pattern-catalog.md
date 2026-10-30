@@ -184,6 +184,7 @@
 - **作る型の説明**：`components/templates/create-page.tsx` と `components/shared/create-page.tsx` の `CreatePage` が `help` を題の型へ渡す。監査では直接渡した説明文字列を操作と分け、再公開の入口から実際の持ち主まで照合する。説明内の生のボタンや、同名の手書きの型は操作の検査を続ける。
 - **狭い板の右欄**：`CreatePage` の `preview` と `TemplateEditFrame` の `side` は、窓か右欄かを受け取る描画の口も使える。幅で畳む入口と窓は型へ任せ、窓の中にもう一度見え方を開くボタンを置かない。設定の情報と実際の見え方は保持する。
 - **右欄の役目の文字**：`CreatePage` の `previewLabel` / `previewTitle` は、`PreviewLauncher` の既存の `label` / `title` へ渡す。設定・試算・紹介リンクなどをLINEの見え方と呼ばず、画面は今の右欄の役目だけを渡す。手順で内容が変わる時はその段に合わせる。入口や窓を画面で作り足さない。
+- ブラウザの題は `components/shell/document-title.tsx` の持ち主だけが描く。画面・認証・スマホの名前は登録して渡し、前のURLの名前は次のURLへ流さない。`usePageTitle` を無効にする埋め込み編集は親の題を保つ。
 - **持ち主（コード）**：`apps/web/src/components/templates/page-frame.tsx`・`apps/web/src/components/shared/page-header.tsx`・`apps/web/src/components/shared/help-tip.tsx`（部品 `PageHeading`・`PageTitle`・`PageFrame`・`ListPage`・`CreatePage`・`DetailPage`・`DashboardPage`・`SettingsPage`・`AnalyticsPage`・`InboxPage`）
   - 読む変数：`--text-title`
 - **持ち主（Pen）**：`EnlYo`「板の頭」・`KjC1z`「？」
