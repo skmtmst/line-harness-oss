@@ -126,3 +126,41 @@ describe('PERF-12 テンプレート選択のサーバー絞り込み', () => {
     expect(data.folderCounts?.['']).toBe(1);
   });
 });
+
+describe('入力欄へ入れられる文字の絞り込み', () => {
+  beforeEach(() => {
+    db.raw.prepare(`INSERT INTO templates
+      (id,name,category,message_type,message_content,question_json,folder_id,line_account_id,created_at)
+      VALUES ('tp-question','来店の質問','general','text','いつ来店しますか？',?, 'f2','account-a','2026-01-02T00:00:00Z')`)
+      .run(JSON.stringify({ text: 'いつ来店しますか？', choices: [{ label: '明日', actions: [] }, { label: '来週', actions: [] }] }));
+  });
+  it('指定しない場合と0の場合は、質問も画像も同じ件数・候補に残す', async () => {
+    const original = ((await (await get('page=1&limit=20&folder_counts=1')).json()) as Body).data;
+    const zero = ((await (await get('page=1&limit=20&folder_counts=1&text_only=0')).json()) as Body).data;
+    expect(original.total).toBe(6);
+    expect(original.items.map(item => item.id)).toContain('tp-question');
+    expect(original.items.map(item => item.id)).toContain('tp-05');
+    expect(original.folderCounts).toEqual({ f1: 1, f2: 3, '': 2 });
+    expect(zero).toEqual(original);
+  });
+  it('指定ありは質問をページに切る前に外し、最後まで重複なし・フォルダ件数も同じ条件にする', async () => {
+    const first = ((await (await get('page=1&limit=3&text_only=1&folder_counts=1')).json()) as Body).data;
+    const next = ((await (await get('page=2&limit=3&text_only=1&folder_counts=1')).json()) as Body).data;
+    expect(first.total).toBe(4);
+    expect(next.total).toBe(4);
+    expect(first.items).toHaveLength(3);
+    expect(next.items).toHaveLength(1);
+    expect([...first.items, ...next.items].map(item => item.id).sort()).toEqual(['tp-01', 'tp-02', 'tp-03', 'tp-04']);
+    expect(first.folderCounts).toEqual({ f1: 1, f2: 2, '': 1 });
+    expect(next.folderCounts).toEqual(first.folderCounts);
+    const end = ((await (await get('page=3&limit=3&text_only=1')).json()) as Body).data;
+    expect(end.items).toEqual([]);
+    expect(end.total).toBe(4);
+  });
+  it('検索とフォルダにも重ねられ、正しくない指定は400になる', async () => {
+    const data = ((await (await get('page=1&limit=3&text_only=1&folder_id=f1&q=予約')).json()) as Body).data;
+    expect(data.items.map(item => item.id).sort()).toEqual(['tp-01', 'tp-02']);
+    expect(data.total).toBe(2);
+    expect((await get('page=1&text_only=wrong')).status).toBe(400);
+  });
+});
