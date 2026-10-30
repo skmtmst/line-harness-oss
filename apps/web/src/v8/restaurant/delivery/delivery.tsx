@@ -117,7 +117,7 @@ function DeliveryInner() {
   const meta = PAGE_META[view]
   usePageTitle(meta.title)
   usePageCrumbs(view === 'orders'
-    ? [{ label: '飲食店向け（テスト）', href: '/restaurant-test/dashboard' }]
+    ? [{ label: 'ダッシュボード', href: '/' }]
     : [{ label: 'デリバリー受注', href: '/restaurant-test/delivery' }])
 
   /* ── 注文一覧（kDQHr） ───────────────────────────────────── */
