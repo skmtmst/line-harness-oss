@@ -41,10 +41,10 @@ export function ReservationFacts({items}:{items:Array<{label:string;value:ReactN
 export function ReservationDining({entry,dense=false}:{entry:ReservationBoardEntry;dense?:boolean}) {
  if(dense)return <div className={styles.denseDining}><strong>飲食（顧客情報と同じ段）</strong><ReservationFacts items={[{label:'アレルギー',value:entry.dining?.allergy||entry.currentAllergy?<StatusBadge size="dining" tone="info" surface="white">{entry.dining?.allergy||entry.currentAllergy}</StatusBadge>:'—'},{label:'記念日',value:entry.dining?.anniversary||'—'},...(entry.dining?.seatPreference?[{label:'席の好み',value:entry.dining.seatPreference}]:[]),...(entry.dining?.courseAllergens?.length?[{label:'コースの注意',value:entry.dining.courseAllergens.join('・')}]:[]),...(entry.currentAllergy&&entry.dining?.allergy&&entry.currentAllergy!==entry.dining.allergy?[{label:'今回の注意',value:entry.currentAllergy}]:[])]}/></div>
  return <div className={styles.dining}><strong>飲食</strong><dl>
- <div><dt>今回の注意</dt><dd>{entry.currentAllergy??'—'}</dd></div>
- <div><dt>アレルギー</dt><dd>{entry.dining?.allergy??'—'}</dd></div>
- <div><dt>記念日</dt><dd>{entry.dining?.anniversary??'—'}</dd></div>
- <div><dt>席の好み</dt><dd>{entry.dining?.seatPreference??'—'}</dd></div>
+ <div><dt>今回の注意</dt><dd>{entry.currentAllergy?.trim()?entry.currentAllergy:'—'}</dd></div>
+ <div><dt>アレルギー</dt><dd>{entry.dining?.allergy?.trim()?entry.dining?.allergy:'—'}</dd></div>
+ <div><dt>記念日</dt><dd>{entry.dining?.anniversary?.trim()?entry.dining?.anniversary:'—'}</dd></div>
+ <div><dt>席の好み</dt><dd>{entry.dining?.seatPreference?.trim()?entry.dining?.seatPreference:'—'}</dd></div>
  <div><dt>コースの注意</dt><dd>{entry.dining?.courseAllergens?.join('・')||'—'}</dd></div>
  </dl><p>予約時点の注意情報（店舗で確認してください）</p></div>
 }

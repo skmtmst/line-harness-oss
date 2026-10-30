@@ -67,7 +67,8 @@ export function summarizeByFolder(items: EntityPickerItem[], folders: EntityPick
   if (!items.some((item) => item.folderId !== undefined)) return items.map((item) => item.name).join('・')
   const counts = new Map<string, number>()
   for (const item of items) {
-    const name = item.folderId ? folders.find((folder) => folder.id === item.folderId)?.name ?? '—' : '未分類'
+    const folderName = folders.find((folder) => folder.id === item.folderId)?.name
+    const name = item.folderId ? folderName?.trim() ? folderName : '—' : '未分類'
     counts.set(name, (counts.get(name) ?? 0) + 1)
   }
   return [...counts].map(([name, count]) => `${name} ${count}`).join('・')
