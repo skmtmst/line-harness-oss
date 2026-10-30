@@ -904,6 +904,7 @@
 - [飲食店の閲覧のみの案内](release-log/unreleased/1953-kenta-int.md)
 - [チェックの印・スイッチ・選ぶ欄の見た目の統一](release-log/unreleased/0000-kenta-check-green.md)
 - [電話予約のパンくず・予約経路タブ・来店スタンプ・業種盤の担当欄の修正](release-log/unreleased/1953-kenta-muse-booking-ec.md)
+- [飲食店のLINE来店フォローの本番接続（7行・送受・時期・本文・承認）](release-log/unreleased/0000-kenta-muse-line-followup-live.md)
 - [閲覧のみの帯を題の横並びから題の下へ](release-log/unreleased/1948-kenta-muse-heading-band.md)
 - [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
 - [まとめ列車 7](release-log/unreleased/1848-kenta-train-one7-1027.md)
