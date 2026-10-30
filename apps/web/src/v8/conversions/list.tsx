@@ -1,4 +1,5 @@
 'use client'
+import SegmentedControl from '@/components/shared/segmented'
 import { DetailContent, DetailField } from '@/components/shared/detail-content'
 import { formatYen } from '@line-crm/shared';
 
@@ -30,7 +31,6 @@ import EmptyList from '@/components/shared/empty-list'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Notice from '@/components/shared/notice'
-import FilterChip from '@/components/shared/filter-chip'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import ManagedFolderPanel, { folderDotFor, managedFolderOptions, useManagedFolders } from '@/components/shared/managed-folder-panel';
@@ -827,21 +827,8 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   /* 1152 の板は札を2つ（動いている・止めている）だけ。ほかの状態は「よく使う絞り込み」から選ぶ。 */
   const chipList = narrow || (role !== null && !canEdit) ? CHIPS.slice(0, 2) : CHIPS
   const filterChips = (
-    <div role="group" aria-label="状態で絞り込む">
-      {chipList.map((chip) => {
-        const count = stateCounts?.[chip.value]
-        return (
-          <FilterChip
-            key={chip.value}
-            selected={status === chip.value}
-            onChange={(next) => setStatus(next ? chip.value : 'all')}
-            icon={chip.icon}
-          >
-            {typeof count === 'number' ? `${chip.label} ${formatNumber(count)}` : chip.label}
-          </FilterChip>
-        )
-      })}
-    </div>
+    <SegmentedControl<StatusFilter> aria-label="状態で絞り込む" fit="content" value={status} onClear={() => setStatus('all')} onChange={setStatus}
+      options={[{ value: 'all', label: 'すべて' }, ...chipList.map((chip) => ({ value: chip.value, label: chip.value === 'unused' ? '使っていない' : chip.label, title: chip.label, ariaLabel: stateCounts?.[chip.value] === undefined ? chip.label : `${chip.label} ${formatNumber(stateCounts[chip.value])}`, count: stateCounts?.[chip.value] }))]} />
   )
   const sortBox = (
     <>
@@ -849,9 +836,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
     </>
   )
   const savedBox = (
-    <div className={styles.savedBox}>
-      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
-      <SaveErrorField names={["status","sort"]}><Select
+    <SaveErrorField names={["status","sort"]}><Select size="content" icon={<Bookmark size={16} aria-hidden="true" />} showChevron={false}
         aria-label="よく使う絞り込み"
         value={status === 'all' ? '' : status}
         onChange={(value) => {
@@ -864,7 +849,6 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
           ...(role !== null && !canEdit ? SORT_OPTIONS.map((option) => ({ value: `sort:${option.value}`, label: `並び：${option.label}` })) : []),
         ]}
       /></SaveErrorField>
-    </div>
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (

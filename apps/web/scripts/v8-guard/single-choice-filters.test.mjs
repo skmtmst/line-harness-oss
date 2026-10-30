@@ -18,10 +18,21 @@ test('mutually reset boolean choices fail while combined conditions and popup tr
   assert.equal(singleChoiceFilters(imported + '<div><FilterChip selected={attentionOnly}/><FilterChip selected={response === "unhandled"}/><FilterChip selected={open} aria-haspopup="dialog"/></div>').length, 0)
   assert.equal(singleChoiceFilters(imported + '<div>{days.map(d => <FilterChip selected={chosen.includes(d)}/>)}</div>').length, 0)
 })
-// Each delivery expands the production gate only after converting that complete group.
-for (const file of ['broadcasts/list.tsx', 'templates/list.tsx', 'templates/asset-list.tsx']) {
+test('array choices with opposing boolean predicates are exclusive, independent membership remains valid', () => {
+  const conditions = "if(filters.includes('open') && !offer.isActive)return false;if(filters.includes('draft') && offer.isActive)return false;"
+  const chips = "<div><FilterChip selected={filters.includes('open')}/><FilterChip selected={filters.includes('draft')}/></div>"
+  assert.equal(singleChoiceFilters(imported + conditions + chips).length, 2)
+  assert.equal(singleChoiceFilters(imported + conditions.replace('!offer.isActive','offer.hasImage') + chips).length, 0)
+})
+for (const file of [
+  'v8/broadcasts/list.tsx', 'v8/templates/list.tsx', 'v8/templates/asset-list.tsx',
+  'v8/hq-templates/store-list.tsx', 'v8/conversions/list.tsx', 'v8/common-vars/list.tsx',
+  'v8/inflow-links/list.tsx', 'v8/ops/tenants.tsx', 'v8/automations/common-actions.tsx', 'v8/automations/templates.tsx',
+  'app/booking/bookings/ledger-screen.tsx', 'v8/friends/migrations/uid.tsx', 'v8/nen-health/health.tsx',
+  'v8/affiliates/offers.tsx', 'v8/affiliates/payment.tsx', 'components/shared/entity-picker.tsx',
+]) {
   test(`single-choice filters use the shared switch in ${file}`, () => {
-    const source = readFileSync(new URL(`../../src/v8/${file}`, import.meta.url), 'utf8')
+    const source = readFileSync(new URL(`../../src/${file}`, import.meta.url), 'utf8')
     assert.deepEqual(singleChoiceFilters(source, file), [])
   })
 }

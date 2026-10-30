@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls = vi.hoisted(() => ({ templates: vi.fn(), templateFolders: vi.fn(), template: vi.fn(), runs: vi.fn(), folders: vi.fn(), run: vi.fn() }))
@@ -26,7 +26,10 @@ describe('統括の選択窓と既存の口', () => {
     render(<HqBroadcastSourcePicker {...props} mode="template" />)
     await screen.findByRole('radio', { name: 'researchのひな形' })
     expect(screen.getAllByRole('radio')).toHaveLength(6)
-    fireEvent.click(screen.getByRole('button', { name: /^リッチメッセージ/ }))
+    fireEvent.click(screen.getByRole('button', { name: '候補の絞り込み' }))
+    const rich = await screen.findByRole('option', { name: /^リッチメッセージ/ })
+    expect(screen.getAllByRole('option')).toHaveLength(7)
+    fireEvent.click(within(rich).getByRole('button'))
     expect(screen.getAllByRole('radio')).toHaveLength(1)
     fireEvent.click(screen.getByRole('radio', { name: 'rich_messageのひな形' }))
     await screen.findByText('rich_messageの本文')
@@ -51,7 +54,8 @@ describe('統括の選択窓と既存の口', () => {
     calls.run.mockResolvedValue({ data: { ...source('prepared'), title: '新しく直した配信' } })
     render(<HqBroadcastSourcePicker {...props} mode="duplicate" />)
     await screen.findByRole('radio', { name: 'preparedの配信' })
-    fireEvent.click(screen.getByRole('button', { name: /^下書き/ }))
+    fireEvent.click(screen.getByRole('button', { name: '候補の絞り込み' }))
+    fireEvent.click(within(await screen.findByRole('option', { name: /^下書き/ })).getByRole('button'))
     expect(screen.getAllByRole('radio')).toHaveLength(1)
     fireEvent.click(screen.getByRole('radio', { name: 'preparedの配信' }))
     expect(screen.getByText('見え方：preparedの配信')).toBeTruthy()

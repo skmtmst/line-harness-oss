@@ -1,4 +1,5 @@
 'use client'
+import SegmentedControl from '@/components/shared/segmented'
 import { FOLDER_SELECT_COLORS } from '@/components/shared/folder-select'
 
 import { KIND_LABEL,KIND_TABS,STARTER_SET_TAB,TAG_QUICK_FILTERS,WORDS,type TagQuickFilter } from './store-list-options'
@@ -42,7 +43,7 @@ import { formatNumber } from '@/lib/format'
 import type { HqTemplate } from '@/lib/hq-templates-api'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import type { HqTemplateFolder,TemplateKind } from '@line-crm/shared'
-import { Archive,Bookmark,Braces,Check,CircleDashed,Copy,FileText,Inbox,Layers,Link,MessageSquare,Pencil,Plus,Send,Sparkles,Trash2,Unlink,Users } from 'lucide-react'
+import { Archive,Bookmark,Braces,Check,CircleDashed,Copy,FileText,Inbox,Link,Pencil,Plus,Send,Sparkles,Trash2,Unlink,Users } from 'lucide-react'
 import { useMemo,useState,type ReactNode } from 'react'
 import storeStyles from '../templates/list.module.css'
 import { AttributeTabs,OtherTabPanel,assignmentMethods,cleanupTagCount,cleanupTagIds,matchesTagFilters,unusedTagCount,useAttributeTab,type TagUsageFilter } from './attribute-tabs'
@@ -290,12 +291,9 @@ export default function HqStoreList(props: HqStoreListProps) {
           <div role="group" aria-label="配ったかで絞り込む" className={storeStyles.chipGroup}>
             {type === 'template' ? (
               <>
-                <FilterChip selected={tplCount === 'single'} onChange={() => { setTplCount((value) => (value === 'single' ? null : 'single')); setPage(1) }} title="1通だけのテンプレート" icon={<MessageSquare size={16} aria-hidden="true" />}>
-                  1通のみ
-                </FilterChip>
-                <FilterChip selected={tplCount === 'multiple'} onChange={() => { setTplCount((value) => (value === 'multiple' ? null : 'multiple')); setPage(1) }} title="複数通に分かれるテンプレート" icon={<Layers size={16} aria-hidden="true" />}>
-                  複数通
-                </FilterChip>
+                <SegmentedControl aria-label="メッセージの数" fit="content" value={tplCount ?? 'all'} onClear={() => { setTplCount(null); setPage(1) }} onChange={(value) => { setTplCount(value === 'all' ? null : value); setPage(1) }} options={[
+                  { value: 'all', label: 'すべて' }, { value: 'single', label: '1通のみ', title: '1通だけのテンプレート' }, { value: 'multiple', label: '複数通', title: '複数通に分かれるテンプレート' },
+                ]} />
                 <FilterChip selected={tplVars} onChange={() => { setTplVars((value) => !value); setPage(1) }} title="名前や情報を差し込むテンプレート" icon={<Braces size={16} aria-hidden="true" />}>
                   差し込みあり
                 </FilterChip>

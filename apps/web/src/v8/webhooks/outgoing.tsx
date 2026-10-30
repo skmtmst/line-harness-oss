@@ -455,9 +455,7 @@ export default function WebhooksOutgoingV8() {
   )
   /* 絵に並びの部品は無い。並びは「よく使う絞り込み」の中で選ぶ（機能は残す）。 */
   const savedBox = (
-    <div className={styles.savedBox}>
-      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
-      <SaveErrorField names={["chip","sortKey","sort_key"]}><Select
+      <SaveErrorField names={["chip","sortKey","sort_key"]}><Select size="content" icon={<Bookmark size={16} aria-hidden="true" />} showChevron={false}
         aria-label="よく使う絞り込み"
         value={chip}
         onChange={(value) => {
@@ -473,7 +471,6 @@ export default function WebhooksOutgoingV8() {
           { value: sortKey === 'volume' ? 'sort-name' : 'sort-volume', label: sortKey === 'volume' ? '名前順に並べる' : '送った回数が多い順に並べる' },
         ]}
       /></SaveErrorField>
-    </div>
   )
   const perPage = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (
