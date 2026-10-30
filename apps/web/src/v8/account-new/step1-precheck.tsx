@@ -51,7 +51,7 @@ export default function Step1Precheck({
       )}>
       <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="ご利用環境の確認">
         {draftRestored && (
-          <Notice tone="info" message="端末の下書きから続けます。チャネルシークレットだけ入れ直してください。" onClose={onCloseDraftNotice} />
+          <Notice tone="info" message="保存した入力があります。事前確認から始めます。チャネルシークレットは入れ直してください。" onClose={onCloseDraftNotice} />
         )}
         {/* カードの頭は 題・？・のび・札 の順（v07 B2SpuV）。 */}
         <div className={styles.precheckHead}>

@@ -81,8 +81,9 @@ describe('運営 ログイン 2段目（V8 の入口）', () => {
   it('管理画面の2段目もV8で出し、LINEでのログイン方法を保つ', async () => {
     await open('/login/two-factor#lh_2fa=challenge-1', 'v8')
     expect(host.textContent).toContain('二段階認証')
-    // 頭は会社の印・会社名・「2 / 2」。盾と手順の帯は出さない。
-    expect(host.querySelector('[data-auth-head]')?.textContent).toContain('テスト統括')
+    // 頭は公式ロゴと「2 / 2」。店舗名は混ぜない。
+    expect(host.querySelector('[data-auth-head] img')?.getAttribute('src')).toBe('/brand/musubo-color.png')
+    expect(host.querySelector('[data-auth-head]')?.textContent).not.toContain('テスト統括')
     expect(host.querySelector('[data-auth-head]')?.textContent).toContain('2 / 2')
     const toggle = [...host.querySelectorAll('button')].find((button) => button.textContent === 'コードが使えない場合')
     await act(async () => { toggle?.click() })

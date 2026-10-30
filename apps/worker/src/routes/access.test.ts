@@ -179,25 +179,31 @@ describe('audit event route', () => {
     const response = await request('/api/audit/events?lineAccountId=account-a&category=business&result=failed&query=配信');
     expect(response.status).toBe(200);
     expect(mocks.listAuditEvents).toHaveBeenCalledWith(env.DB, expect.objectContaining({
-      tenantId: 'tenant-a', includeTenantWide: true, lineAccountId: 'account-a',
+      tenantId: 'tenant-a', lineAccountId: 'account-a',
       category: 'business', result: 'failed', query: '配信',
     }));
   });
 
   it('requires a separate audit permission for staff', async () => {
-    expect((await request('/api/audit/events', 'staff', ['access.user.view'])).status).toBe(403);
-    expect((await request('/api/audit/events', 'staff', ['access.audit.view'])).status).toBe(200);
+    expect((await request('/api/audit/events?lineAccountId=account-a', 'staff', ['access.user.view'])).status).toBe(403);
+    expect((await request('/api/audit/events?lineAccountId=account-a', 'staff', ['access.audit.view'])).status).toBe(200);
+  });
+
+  it('requires a selected account and rejects an account outside the viewer scope', async () => {
+    expect((await request('/api/audit/events')).status).toBe(400);
+    expect((await request('/api/audit/events?lineAccountId=account-b')).status).toBe(404);
+    expect(mocks.listAuditEvents).not.toHaveBeenCalled();
   });
 
   it('rejects invalid dates before querying the database', async () => {
-    const response = await request('/api/audit/events?from=not-a-date');
+    const response = await request('/api/audit/events?lineAccountId=account-a&from=not-a-date');
     expect(response.status).toBe(400);
     expect(mocks.listAuditEvents).not.toHaveBeenCalled();
   });
 
   it('returns a safe error when audit search fails', async () => {
     mocks.listAuditEvents.mockRejectedValue(new Error('raw database detail'));
-    const response = await request('/api/audit/events');
+    const response = await request('/api/audit/events?lineAccountId=account-a');
     expect(response.status).toBe(500);
     expect(await response.text()).not.toContain('raw database detail');
   });
