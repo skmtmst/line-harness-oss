@@ -17,6 +17,8 @@ const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
   pathname: '/settings',
   accountId: 'account-1',
+  style: 'restaurant' as string | null,
+  stale: false,
 }))
 
 const localStorageValues = new Map<string, string>()
@@ -35,6 +37,7 @@ vi.mock('next/link', async () => {
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement('a', { href, ...props }, children) }
 })
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ status: fixture.style ? 'ready' : 'loading', stale: fixture.stale, data: fixture.style ? { style: fixture.style } : null }) }))
 vi.mock('@/lib/api', () => ({
   api: {
     featureSettings: { visibility: fixture.visibility },
@@ -54,6 +57,8 @@ describe('★V8 設定の中のメニュー', () => {
     fixture.visibility.mockReset()
     fixture.pathname = '/settings'
     fixture.accountId = 'account-1'
+    fixture.style = 'restaurant'
+    fixture.stale = false
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { ec_commerce: true, line_notifications: true } },
@@ -134,6 +139,33 @@ describe('★V8 設定の中のメニュー', () => {
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
     expect(view.getByRole('link', { name: 'デリバリー連携' }).getAttribute('href')).toBe('/settings/delivery')
+  })
+
+  it('飲食店以外とスタイル未取得では予約サイト・グルメ媒体とデリバリー連携を表示しない', async () => {
+    for (const style of ['standard', 'salon', 'consult', 'lesson', 'ec', null]) {
+      fixture.style = style
+      const view = render(<SettingsInnerNav />)
+      await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+      expect(view.queryByRole('link', { name: '予約サイト・グルメ媒体' })).toBeNull()
+      expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
+      cleanup()
+    }
+  })
+
+  it('別スタイルで直接開いた画面も飲食店専用の入口を表示しない', async () => {
+    fixture.style = 'ec'
+    fixture.pathname = '/settings/delivery'
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
+  })
+
+  it('古い記憶の飲食店スタイルだけでは専用の入口を表示しない', async () => {
+    fixture.stale = true
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: '予約サイト・グルメ媒体' })).toBeNull()
+    expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
   })
 
   it('SNS 連携の画面でも2つの設定の入口を残し、現在地だけを示す', async () => {
