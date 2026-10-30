@@ -175,6 +175,8 @@
 <a id="page-head"></a>
 ## page-head 一覧・画面の頭
 
+- 取得する名前の題は `lib/resource-title.ts` の `resolveResourceTitle` で未取得と取得済み空名を分け、外側の帯と型へ同じ値を渡す。`components/shell/page-resource-scope.tsx` の `PageResourceScope` は店舗・対象IDが変わったときだけ編集状態を作り直し、前の対象名を次へ持ち越さない。内部タブの指定では作り直さず、埋め込みの編集は親の状態管理に任せる。
+
 - **役目**：板の題・「？」・右の主ボタンを1段で出す。画面全体の説明はB-245の「この画面の説明」で灰色の説明を開閉する。
 - **B-245の持ち主**：`components/shared/page-explanation.tsx` の `PageExplanationProvider`・`PageExplanationToggle`・`PageExplanationBody`。型の題の横と既存の説明の位置へ置き、人・画面ごとの開閉を覚える。欄や数の用語説明は `HelpTip`、一時的な失敗・閲覧のみは `Notice` のまま。
 - **作る型の説明**：`components/templates/create-page.tsx` と `components/shared/create-page.tsx` の `CreatePage` が `help` を題の型へ渡す。監査では直接渡した説明文字列を操作と分け、再公開の入口から実際の持ち主まで照合する。説明内の生のボタンや、同名の手書きの型は操作の検査を続ける。
