@@ -17,7 +17,6 @@ import { storeAdminSession } from '@/lib/admin-session'
 import { authRequest, emailError, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
 import { MOBILE_LOGIN_NEXT, MOBILE_ROOT, isMobileLoginReturn } from '@/lib/mobile-shell'
-import { useBrand } from '@/lib/use-brand'
 
 const LINE_LOGIN_FAILURE_CODES = new Set([
   'line_token_failed',
@@ -38,7 +37,6 @@ const EMPTY_PASSWORD_MESSAGE = 'パスワードを入力してください'
  * パスワードのあとに既存の 6 桁コードの画面へ。
  */
 export default function LoginPage() {
-  const brand = useBrand()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
@@ -145,7 +143,6 @@ export default function LoginPage() {
       node="UufG8"
       cardNode="m3tWJ"
       title="ログイン"
-      brandName={brand.name ?? undefined}
       step={{ current: 1, total: 2 }}
       description={mobileReturn ? (
         <>

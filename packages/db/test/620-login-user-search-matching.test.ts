@@ -144,7 +144,7 @@ describe('入った記録検索の照合 (#620)', () => {
 
   it('不存在語は0件を返す', async () => {
     const result = await listAuditEvents(db, {
-      tenantId: TENANT, allowedLineAccountIds: ['account-a'], query: '存在しない語zzz',
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], lineAccountId: 'account-a', query: '存在しない語zzz',
     });
     expect(result.total).toBe(0);
     expect(result.items).toHaveLength(0);
@@ -152,12 +152,12 @@ describe('入った記録検索の照合 (#620)', () => {
 
   it('人の名前・操作内容の部分一致は従来どおり効く', async () => {
     const byName = await listAuditEvents(db, {
-      tenantId: TENANT, allowedLineAccountIds: ['account-a'], query: '管理者',
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], lineAccountId: 'account-a', query: '管理者',
     });
     expect(byName.items.map((item) => item.id).sort()).toEqual(['event-a', 'event-b']);
 
     const byAction = await listAuditEvents(db, {
-      tenantId: TENANT, allowedLineAccountIds: ['account-a'], query: 'broadcast',
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], lineAccountId: 'account-a', query: 'broadcast',
     });
     expect(byAction.items.map((item) => item.id)).toEqual(['event-a']);
   });
@@ -166,7 +166,7 @@ describe('入った記録検索の照合 (#620)', () => {
     // `%語%` の LIKE のままだと、「%」1文字で全件に一致してしまう。
     for (const term of ['%', '_']) {
       const result = await listAuditEvents(db, {
-        tenantId: TENANT, allowedLineAccountIds: ['account-a'], query: term,
+        tenantId: TENANT, allowedLineAccountIds: ['account-a'], lineAccountId: 'account-a', query: term,
       });
       expect(result.total, `query=${term}`).toBe(0);
     }
@@ -174,7 +174,7 @@ describe('入った記録検索の照合 (#620)', () => {
 
   it('action 絞り込みでも % はワイルドカードにしない', async () => {
     const result = await listAuditEvents(db, {
-      tenantId: TENANT, allowedLineAccountIds: ['account-a'], action: '%',
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], lineAccountId: 'account-a', action: '%',
     });
     expect(result.total).toBe(0);
   });
@@ -182,12 +182,12 @@ describe('入った記録検索の照合 (#620)', () => {
   it('長文の検索語・長い action でもエラーにしない（D1 LIKE 50バイト上限対策）', async () => {
     const longQuery = 'な'.repeat(2000);
     const byQuery = await listAuditEvents(db, {
-      tenantId: TENANT, allowedLineAccountIds: ['account-a'], query: longQuery,
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], lineAccountId: 'account-a', query: longQuery,
     });
     expect(byQuery.total).toBe(0);
 
     const byAction = await listAuditEvents(db, {
-      tenantId: TENANT, allowedLineAccountIds: ['account-a'], action: longQuery,
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], lineAccountId: 'account-a', action: longQuery,
     });
     expect(byAction.total).toBe(0);
   });

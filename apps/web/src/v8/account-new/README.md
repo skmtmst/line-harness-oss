@@ -10,6 +10,8 @@
 
 本体：[register.tsx](register.tsx)
 
+初回の入口と本人ごとの再開判定：[registration-session.tsx](registration-session.tsx)・[registration-storage.ts](registration-storage.ts)。保存状態がある場合も、新規登録の事前確認は最初の質問から始めます。
+
 ## 外に見せる名前（index.ts）
 
 - [index.ts](index.ts)：`AccountRegisterV8`
@@ -29,6 +31,7 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 - [logic.test.ts](logic.test.ts)
 - [read-only.test.tsx](read-only.test.tsx)
 - [registration-access.test.tsx](registration-access.test.tsx)
+- [registration-entry.test.tsx](registration-entry.test.tsx)
 - [style-registration.test.tsx](style-registration.test.tsx)
 - [webhook-url-frame-contract.test.tsx](webhook-url-frame-contract.test.tsx)
 - [webhook-url-origin-contract.test.ts](webhook-url-origin-contract.test.ts)

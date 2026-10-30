@@ -32,6 +32,9 @@ const mocks = {
   isFolderKind: () => true,
 };
 vi.mock('@line-crm/db', () => mocks);
+vi.mock('../services/account-access.js', () => ({
+  getVisibleLineAccountScope: vi.fn(async () => ({ allowedAccountIds: ['account-a'] })),
+}));
 
 const { friendAttributes } = await import('./friend-attributes.js');
 
@@ -69,13 +72,20 @@ beforeEach(() => {
 
 describe('ログイン履歴', () => {
   it('オーナーは見られる', async () => {
-    const res = await get('/api/login-audit', 'owner');
+    const res = await get('/api/login-audit?lineAccountId=account-a', 'owner');
     expect(res.status).toBe(200);
+    expect(mocks.getLoginAudit).toHaveBeenCalledWith(env.DB, expect.objectContaining({ lineAccountId: 'account-a' }));
+  });
+
+  it('所属先を指定しない取得と、閲覧権限のないアカウントを拒否する', async () => {
+    expect((await get('/api/login-audit')).status).toBe(400);
+    expect((await get('/api/login-audit?lineAccountId=account-b')).status).toBe(404);
+    expect(mocks.getLoginAudit).not.toHaveBeenCalled();
   });
 
   it('スタッフは見られない', async () => {
     // 誰がいつ入ったかは、それ自体が見せてよい情報とは限らない。
-    const res = await get('/api/login-audit', 'staff');
+    const res = await get('/api/login-audit?lineAccountId=account-a', 'staff');
     expect(res.status).toBe(403);
     expect(mocks.getLoginAudit).not.toHaveBeenCalled();
   });
@@ -83,33 +93,33 @@ describe('ログイン履歴', () => {
   it('IPの末尾を伏せる', async () => {
     // 監査で見たいのは「いつもと違うところから入っていないか」で、
     // 完全な値は要らない。
-    const res = await get('/api/login-audit');
+    const res = await get('/api/login-audit?lineAccountId=account-a');
     const body = (await res.json()) as { data: Array<{ ip: string }> };
     expect(body.data[0].ip).toBe('203.0.113.***');
   });
 
   it('IPv6も伏せる', async () => {
     mocks.getLoginAudit.mockResolvedValue([{ ...ROW, ip: '2001:db8:85a3:0:0:8a2e:370:7334' }]);
-    const res = await get('/api/login-audit');
+    const res = await get('/api/login-audit?lineAccountId=account-a');
     const body = (await res.json()) as { data: Array<{ ip: string }> };
     expect(body.data[0].ip).toBe('2001:db8:85a3:***');
   });
 
   it('IPが無ければ null のまま', async () => {
     mocks.getLoginAudit.mockResolvedValue([{ ...ROW, ip: null }]);
-    const res = await get('/api/login-audit');
+    const res = await get('/api/login-audit?lineAccountId=account-a');
     const body = (await res.json()) as { data: Array<{ ip: string | null }> };
     expect(body.data[0].ip).toBeNull();
   });
 
   it('接続元はIPと短縮したUser-Agentを返す', async () => {
-    const res = await get('/api/login-audit');
+    const res = await get('/api/login-audit?lineAccountId=account-a');
     const body = (await res.json()) as { data: Array<Record<string, unknown>> };
     expect(body.data[0].connectionSource).toBe('203.0.113.*** / test');
   });
 
   it('知らない操作での絞り込みは無視する', async () => {
-    await get('/api/login-audit?action=telepathy');
+    await get('/api/login-audit?lineAccountId=account-a&action=telepathy');
     expect(mocks.getLoginAudit).toHaveBeenCalledWith(
       env.DB,
       expect.objectContaining({ action: undefined }),
@@ -117,7 +127,7 @@ describe('ログイン履歴', () => {
   });
 
   it('操作で絞れる', async () => {
-    await get('/api/login-audit?action=view_personal');
+    await get('/api/login-audit?lineAccountId=account-a&action=view_personal');
     expect(mocks.getLoginAudit).toHaveBeenCalledWith(
       env.DB,
       expect.objectContaining({ action: 'view_personal' }),

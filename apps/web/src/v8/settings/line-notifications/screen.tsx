@@ -557,8 +557,7 @@ function CardPreview({ setting }: { setting: EcNotificationSetting }) {
     {setting.imageUrl && <img width={400} height={180} src={setting.imageUrl} alt="" className={styles.previewImage} />}
     <div className="p-5">
       <div className="border-nen-gold-soft flex items-center gap-2 border-b pb-3">
-        <span className="text-nen-gold font-serif text-xl font-bold">然</span>
-        <span className={`text-nen-green text-nano font-bold ${styles.previewBrand}`}>NEN</span>
+        <span className={`text-nen-green text-xl font-bold ${styles.previewBrand}`}>musubo</span>
         <span className="text-nen-label ml-auto text-nano font-semibold">LINE NOTIFICATION</span>
       </div>
       <h3 className="text-nen-green mt-4 text-xl font-bold leading-7">{setting.title}</h3>
@@ -566,7 +565,7 @@ function CardPreview({ setting }: { setting: EcNotificationSetting }) {
       <div className="border-nen-gold-soft mt-4 space-y-3 border-t pt-4">
         {setting.fixedFields.slice(0, 5).map((field, index) => <div key={field}>
           <p className="text-nen-label text-nano font-bold">{field}</p>
-          <p className="text-nen-ink mt-0.5 text-sm">{index === 0 ? 'NEN-TEST-001' : index === 1 ? '鹿肉ミンチ × 2' : '注文情報から自動表示'}</p>
+          <p className="text-nen-ink mt-0.5 text-sm">{index === 0 ? 'ORDER-TEST-001' : index === 1 ? '商品 × 2' : '注文情報から自動表示'}</p>
         </div>)}
       </div>
       {setting.outroText && <p className="text-nen-muted mt-4 whitespace-pre-wrap text-xs leading-5">{setting.outroText}</p>}

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import TargetMissing from '@/components/shared/target-missing'
+import MusuboLogo from '@/components/shared/musubo-logo'
 import { api } from '@/lib/api'
 
 /*
@@ -53,7 +54,7 @@ export default function StaffEmailChangePage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl items-center px-6 py-16">
       <section className="w-full rounded-card border border-hairline bg-canvas p-8 shadow-card-surface">
-        <p className="text-sm font-semibold text-ink-secondary">musubo</p>
+        <MusuboLogo size="staff" />
         <div role="heading" aria-level={1} className="mt-3 text-2xl font-bold text-ink">メールアドレスの変更</div>
 
         {view === 'reading' && <p className="mt-5 text-sm text-ink-secondary">確認内容を読み込んでいます…</p>}
