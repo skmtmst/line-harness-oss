@@ -41,7 +41,8 @@ describe('EC LINE通知カード', () => {
     }, { title: 'ご注文ありがとうございます', introText: 'いつもありがとうございます', test: true });
     const json = JSON.stringify(message);
     expect(json).not.toContain('letterSpacing');
-    expect(json).toContain('"text":"NEN"');
+    expect(json).toContain('"text":"musubo"');
+    expect(json).not.toContain('"text":"然"');
   });
 
   it('銀行振込以外の注文には口座情報を付けない', () => {

@@ -5,6 +5,7 @@ import type { ReactNode } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import SearchField from '@/components/shared/search-field'
 import SegmentedControl from '@/components/shared/segmented'
+import MusuboLogo from '@/components/shared/musubo-logo'
 import styles from './mobile-frame.module.css'
 
 /*
@@ -66,7 +67,7 @@ export function MobileFrame({
               <ChevronLeft aria-hidden="true" className={styles.backIcon} />
             </Link>
           ) : (
-            <span className={styles.brand} aria-hidden="true">musubo</span>
+            <MusuboLogo size="mobile" />
           )}
           <h1 className={styles.title} title={title}>{title}</h1>
           {headerEnd ? <div className={styles.headerEnd}>{headerEnd}</div> : null}

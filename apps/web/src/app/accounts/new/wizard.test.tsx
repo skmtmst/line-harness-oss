@@ -2,7 +2,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import NewLineAccountPage from './page'
-import { DRAFT_KEY } from '@/v8/account-new/logic'
 
 /*
  * v07（LINE新規追加_v07.pen・2026-10-18承認）の5段の通し。
@@ -149,9 +148,10 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(providerLink.getAttribute('target')).toBe('_blank')
   })
 
-  it('下書きで選択済みの回答をもう一度押しても次の質問へ進む', async () => {
-    window.localStorage.setItem(DRAFT_KEY, JSON.stringify({ step: 1, precheckAt: 'q1', precheck: { q1: 'yes' } }))
+  it('前の質問へ戻り、選択済みの回答をもう一度押しても次の質問へ進む', async () => {
     render(<NewLineAccountPage />)
+    fireEvent.click(screen.getByRole('radio', { name: 'はい、あります' }))
+    fireEvent.click(screen.getByRole('button', { name: '戻る', exact: true }))
     const selected = await screen.findByRole('radio', { name: 'はい、あります' }) as HTMLInputElement
     await waitFor(() => expect(selected.checked).toBe(true))
     expect(screen.getByText('Q1. LINE公式アカウントはありますか？', { selector: 'h3' })).toBeTruthy()

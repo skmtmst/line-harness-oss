@@ -41,7 +41,7 @@ export function opsTwoFactorFailureMessage(caught: unknown, fallback = '認証�
   return twoFactorFailureMessage(caught, fallback)
 }
 
-export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: 'ops' | 'admin'; brandName?: string }) {
+export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'admin' }) {
   const saveErrors = useSaveFormErrors()
   const [typedCode, setCode] = useState('')
   const [recovery, setRecovery] = useState(false)
@@ -140,7 +140,7 @@ export default function OpsTwoFactorV8({ scope = 'ops', brandName }: { scope?: '
     : recovery ? '回復コードを 8 文字入れると押せます' : '6 桁を入れると自動でログインします'
 
   return (
-    <SaveErrorScope errors={saveErrors}><AuthPage layout={scope} brandName={isAdmin ? brandName : 'musubo'} brandNote={isAdmin ? undefined : '運営'} boardId={recovery ? undefined : 'tOPeY'} title={title} titleId="ops-two-factor-title" help={isAdmin ? adminHelp : undefined}>
+    <SaveErrorScope errors={saveErrors}><AuthPage layout={scope} boardId={recovery ? undefined : 'tOPeY'} title={title} titleId="ops-two-factor-title" help={isAdmin ? adminHelp : undefined}>
 
         {scope === 'ops' && ready && challenge ? <AuthHelp>{recovery ? '登録の時に控えた回復コードを1つ入れてください。使ったコードは、もう使えません。' : `${method === 'password' ? 'パスワード' : 'LINEでのログイン'}を確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。`}</AuthHelp> : null}
 
