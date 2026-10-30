@@ -147,6 +147,10 @@ describe('V8-B プールを作る（D0AOyx）', () => {
     expect(body.contains(footer)).toBe(false)
     const save = [...footer!.querySelectorAll('button')].find(button => button.textContent?.includes('保存してURLを発行'))!
     expect(save.form).toBe(document.getElementById('pool-create-form'))
+    const cancel = [...footer!.querySelectorAll('a')].find(link => link.textContent === 'キャンセル')!
+    expect(cancel).toBeTruthy()
+    expect(cancel.compareDocumentPosition(save) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(footer!.textContent).not.toContain('保存して続けて作る')
     expect(poolsCreate).not.toHaveBeenCalled()
   })
 
