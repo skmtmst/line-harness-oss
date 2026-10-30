@@ -104,7 +104,7 @@ export default function NewStaffPage() {
       <AsideCard title="設定内容"><dl className="space-y-2 text-sm"><div className="flex justify-between"><dt className="text-ink-faint">役割</dt><dd className="text-ink">{ROLES.find((item) => item.value === role)?.label}</dd></div><div className="flex justify-between"><dt className="text-ink-faint">表示機能</dt><dd className="text-ink">{role === 'staff' ? `${formatNumber(permissionKeys.length)}件` : 'すべて'}</dd></div></dl></AsideCard>
     </>}
   >
-    <Notice tone="info">{selectedAccount?.name ? `${selectedAccount.name}のみを閲覧・操作できる担当者として追加されます。` : 'この店舗のみを閲覧・操作できる担当者として追加されます。'}</Notice>
+    <Notice tone="info">{selectedAccount?.name ? `担当範囲は${selectedAccount.name}のみです。` : '担当範囲はこの店舗のみです。'}</Notice>
     <FormSection step={1} label="どなたを追加するか">
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="名前" htmlFor="staff-name" required error={fields.error('name')}><TextInput {...fields.bind('name')} id="staff-name" value={name} onChange={(e) => setName(e.target.value)} invalid={fields.invalid('name')} /></Field>
