@@ -244,6 +244,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                 id: option.value,
                 label: option.value === sortOrder ? `✓ ${option.label}` : option.label,
                 'aria-label': option.value === sortOrder ? `${option.label}（選択中）` : option.label,
+                icon: null,
                 onSelect: () => { setSortMenuOpen(false); setSortOrder(option.value) },
               }))}
             />
