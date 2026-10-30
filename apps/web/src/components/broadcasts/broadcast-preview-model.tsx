@@ -2,6 +2,7 @@
 
 import { type MessageKindState } from '@/components/scenarios/message-kind-fields'
 import Button from '@/components/shared/button'
+import StickerPreview from '@/components/shared/sticker-preview'
 import { LinePreviewFlex } from '@/components/shared/line-preview'
 import { ComposerCarouselPreview } from '@/components/shared/message-composer'
 import { type BroadcastBubble,type BroadcastMessageButton } from '@/lib/api'
@@ -17,7 +18,7 @@ export function BubblePreview({ bubble, buttons = [], accountName, composer = fa
   if (bubble.type === 'sticker') {
     const st = (bubble.content.state as MessageKindState | undefined)?.sticker
     return st?.packageId && st?.stickerId
-      ? <img width={96} height={96} src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${st.stickerId}/android/sticker.png`} alt="スタンプ" className="h-24 w-24 object-contain" />
+      ? <StickerPreview stickerId={st.stickerId} />
       : <div className="bg-canvas-sunken text-ink-faint flex h-24 w-24 items-center justify-center rounded-card text-xs">スタンプ</div>
   }
   if (bubble.type === 'location') {
