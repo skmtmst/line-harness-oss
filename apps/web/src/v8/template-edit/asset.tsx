@@ -269,7 +269,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
           ...initialPayload,
           ...couponExtras,
           ...(couponTitle.trim() ? { title: couponTitle.trim() } : {}),
-          description: initialPayload ? description : couponDraft.instructions.trim(),
+          description: initialPayload && couponDraft.instructions === initialCouponDraft(initialPayload).instructions ? description : couponDraft.instructions.trim(),
           imageUrl,
           imageMediaId: pickedMedia?.id ?? (imageUrl === init?.imageUrl ? initialPayload?.imageMediaId ?? null : null),
           imageMediaKind: pickedMedia?.kind ?? (imageUrl === init?.imageUrl ? initialPayload?.imageMediaKind ?? null : null),
@@ -400,7 +400,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
       <dl className={styles.statList}>
         <div className={styles.statRow}><dt>配った数</dt><dd>{emptyValue('unknown')}</dd></div>
         <div className={styles.statRow}><dt>使われた数</dt><dd>{emptyValue('unknown')}</dd></div>
-        <div className={styles.statRow}><dt>当選した数</dt><dd>{lottery ? emptyValue('unknown') : '抽選なし'}</dd></div>
+        {lottery ? <div className={styles.statRow}><dt>当選した数</dt><dd>{emptyValue('unknown')}</dd></div> : null}
       </dl>
     </section>
   ) : (
@@ -512,15 +512,18 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
         {error ? <Notice tone="danger" >{error}</Notice> : null}
         {null}
         {folderProblem ? <Notice tone="warn" message="フォルダを読み込めませんでした。保存先を確認してから保存してください。" action={<Button type="button" onClick={() => setFolderAttempt(value => value + 1)}>再読み込み</Button>} /> : null}
-        <fieldset className="contents" disabled={!canMutate || busy} aria-label="テンプレートの入力">
-        {nameCard}
+        <fieldset className="contents" disabled={kind !== 'coupon' && (!canMutate || busy)} aria-label="テンプレートの入力">
+        {kind === 'coupon' ? <fieldset className="contents" disabled={!canMutate || busy}>{nameCard}</fieldset> : nameCard}
 
         {kind === 'coupon' ? (
           <>
-            <CouponSettings draft={couponDraft} onChange={patch => setCouponDraft(current => ({ ...current, ...patch }))}
+            <CouponSettings disabled={!canMutate || busy} draft={couponDraft} onChange={patch => setCouponDraft(current => ({ ...current, ...patch }))}
               title={couponTitle} onTitleChange={setCouponTitle} fields={fields} lottery={lottery} onRemoveLottery={() => setLottery(false)} image={<div className={styles.couponFields}>
                   <SaveErrorField names={["imageUrl","image_url"]}><ImageFrame
                     title="画像を追加"
+                    lockedReason={permissionReason}
+                    disabled={busy || !canMutate && !permissionReason}
+                    canChangeNow={() => canMutate && !busy}
                     previewAlt="クーポンの画像"
                     value={imageSet ? imageUrl.trim() : null}
                     accept="image/jpeg,image/png"
@@ -538,7 +541,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
                   {pickedMedia ? <p className={styles.hint}>選択中：{pickedMedia.filename}</p> : null}
               </div>} />
 
-            <Card variant="form" gap="normal">
+            <fieldset className="contents" disabled={!canMutate || busy}><Card variant="form" gap="normal">
               <CardHeader size="stacked" title="使える期間と回数" meta="日本時間（UTC+09:00）" />
               <SettingsFormRow layout="columns">
                 <div className={styles.field}><Field label="開始" htmlFor="te-coupon-start" requirement={fields.requirement('start')}><span {...fields.bind('start')}><SaveErrorField names={["couponStartsAt","startsAt","coupon_starts_at"]}><DateTimeField className={styles.dateBox} id="te-coupon-start" value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" required invalid={fields.invalid('start')} aria-describedby={fields.invalid('start') ? 'te-coupon-start-error' : undefined} /></SaveErrorField></span>
@@ -558,24 +561,24 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
               </div>
               <div className={styles.typeRow}>
                 <span className={styles.labelSmall}>受け取れる人</span>
-                <SaveErrorField names={["couponVisibility"]}><SegmentedControl
+                <SaveErrorField names={["couponVisibility"]}>{initialPayload?.visibility === 'link' ? <SegmentedControl
                   aria-label="受け取れる人"
                   options={[{ value: 'friends' as const, label: '友だちだけ' }, ...(initialPayload?.visibility === 'link' ? [{ value: 'link' as const, label: 'リンクを知っている人（保存済み）' }] : [])]}
                   value={couponVisibility}
                   onChange={setCouponVisibility}
-                /></SaveErrorField>
+                /> : <span>友だちだけ</span>}</SaveErrorField>
               </div>
             </Card>
 
             <CouponGuide draft={couponDraft} onChange={patch => setCouponDraft(current => ({ ...current, ...patch }))} fields={fields} />
 
-            <div {...fields.bind("tapExtras")}><TapExtrasField error={fields.error("tapExtras")} name="クーポンのボタン" value={tapExtras} onChange={extra => { fields.clear("tapExtras"); setTapExtras(extra) }} accountId={host ? null : selectedAccountId} /></div>
+            <Card variant="form" gap="normal"><CardHeader size="stacked" title="ボタンを押されたときに行うこと" /><div {...fields.bind("tapExtras")}><TapExtrasField error={fields.error("tapExtras")} name="クーポンのボタン" value={tapExtras} onChange={extra => { fields.clear("tapExtras"); setTapExtras(extra) }} accountId={host ? null : selectedAccountId} /></div></Card>
             {host ? null : (
               <Card variant="form" gap="normal">
                 <CardHeader size="stacked" title="使われたときに行うこと" />
                 <InlineActionRowsV8 actions={couponUseActions} onChange={setCouponUseActions} {...actionOptions} />
               </Card>
-            )}
+            )}</fieldset>
           </>
         ) : (
           <>

@@ -13,8 +13,8 @@ import type { useFormErrors } from '@/lib/use-form-errors'
 import type { CouponDraft } from './coupon-draft'
 import styles from './edit.module.css'
 
-export default function CouponSettings({ draft, onChange, title, onTitleChange, fields, image, lottery, onRemoveLottery }: {
-  draft: CouponDraft; onChange: (patch: Partial<CouponDraft>) => void
+export default function CouponSettings({ disabled = false, draft, onChange, title, onTitleChange, fields, image, lottery, onRemoveLottery }: {
+  disabled?: boolean; draft: CouponDraft; onChange: (patch: Partial<CouponDraft>) => void
   title: string; onTitleChange: (title: string) => void
   fields: ReturnType<typeof useFormErrors>; image: ReactNode; lottery: boolean; onRemoveLottery: () => void
 }) {
@@ -23,23 +23,23 @@ export default function CouponSettings({ draft, onChange, title, onTitleChange, 
     <FormSection title="基本設定" id="coupon-basics">
       <SettingsFormRow layout="media-fields">
         {image}
-        <div className={styles.couponFields}>
+        <div className={styles.couponFields}><fieldset className="contents" disabled={disabled}>
           <Field label="クーポン名" htmlFor="te-coupon-title" requirement={fields.requirement('couponTitle')} error={fields.error('couponTitle')}>
             <SaveErrorField names={['couponTitle', 'title', 'coupon_title']}><TextField {...bind('couponTitle')} id="te-coupon-title" value={title} onChange={event => onTitleChange(event.target.value)} /></SaveErrorField>
           </Field>
           <Field label="獲得条件" error={fields.error('lottery')} help="現在は条件なしで配れます。抽選や友だち紹介の獲得条件には対応していません。">
             <Select aria-label="獲得条件" {...bind('lottery')} value={lottery ? 'lottery' : 'none'} options={[{ value: 'none', label: '条件なし' }, ...(lottery ? [{ value: 'lottery', label: '抽選（保存済み・公開不可）' }] : [])]} onChange={value => { if (value === 'none') onRemoveLottery() }} />
           </Field>
-        </div>
+        </fieldset></div>
       </SettingsFormRow>
     </FormSection>
-    <FormSection title="特典と利用条件" id="coupon-benefit">
+    <fieldset className="contents" disabled={disabled}><FormSection title="特典と利用条件" id="coupon-benefit">
       <SettingsFormRow layout="compact">
         <Field label="クーポンタイプ">
           <SaveErrorField names={['couponType', 'coupon_type']}><Select aria-label="クーポンタイプ" value={draft.couponType} onChange={value => onChange({ couponType: value as CouponDraft['couponType'] })} options={[{ value: 'discount', label: '割引' }, { value: 'none', label: '種類の表示なし' }]} /></SaveErrorField>
         </Field>
         {draft.couponType === 'discount' ? <Field label="割引の表示">
-          <SaveErrorField names={['discount']}><Select aria-label="割引の表示" value={draft.mode} onChange={value => onChange({ mode: value as CouponDraft['mode'] })} options={[{ value: 'amount', label: '円引き' }, { value: 'percent', label: '%引き' }, { value: 'price', label: '割引前・割引後の金額' }, { value: 'none', label: '金額を表示しない' }]} /></SaveErrorField>
+          <SaveErrorField names={['discount']}><Select size="content" aria-label="割引の表示" value={draft.mode} onChange={value => onChange({ mode: value as CouponDraft['mode'] })} options={[{ value: 'amount', label: '円引き' }, { value: 'percent', label: '%引き' }, { value: 'price', label: '割引前・割引後の金額' }, { value: 'none', label: '金額を表示しない' }]} /></SaveErrorField>
         </Field> : null}
       </SettingsFormRow>
       {draft.couponType === 'discount' && draft.mode !== 'none' ? <SettingsFormRow layout="compact">
@@ -63,7 +63,7 @@ export default function CouponSettings({ draft, onChange, title, onTitleChange, 
           <SaveErrorField names={['code', 'code.text']}><TextField {...bind('code')} id="te-coupon-code" value={draft.code} onChange={event => onChange({ code: event.target.value })} /></SaveErrorField>
         </Field> : null}
       </SettingsFormRow>
-    </FormSection>
+    </FormSection></fieldset>
 
   </>
 }

@@ -15,8 +15,8 @@ export default function CouponPreview({ payload, name, accountName }: { payload:
   const [state, setState] = useState<'ready' | 'used' | 'expired'>('ready')
   const numericError = couponPresentationError({ couponType: payload.couponType, discount: payload.discount })
   const view = couponPresentation(numericError ? { ...payload, discount: { mode: 'none' } } : payload, name)
-  const limit = payload.maxUsesPerFriend ?? (payload.oncePerFriend === false ? null : 1)
-  const ready = state === 'ready' || state === 'used' && limit === null
+  const limit = typeof payload.maxUsesPerFriend === 'number' && Number.isInteger(payload.maxUsesPerFriend) && payload.maxUsesPerFriend > 0 ? payload.maxUsesPerFriend : payload.oncePerFriend === false ? null : 1
+  const ready = state === 'ready' || state === 'used' && (limit === null || limit > 1)
   const image = ready && typeof payload.imageUrl === 'string' ? safeFlexAssetUrl(payload.imageUrl) : null
   const reason = state === 'used' ? 'このクーポンは使用済みです' : '有効期限が切れています'
   const date = (value: unknown) => typeof value === 'string' && Number.isFinite(couponDate(value)) ? formatDateTime(new Date(couponDate(value))) : '未設定'
@@ -28,7 +28,7 @@ export default function CouponPreview({ payload, name, accountName }: { payload:
         <div className={styles.body}>
           <div className={styles.badges}>{view.kindLabel ? <StatusBadge tone="success">{view.kindLabel}</StatusBadge> : null}<StatusBadge tone="neutral">{view.countLabel}</StatusBadge></div>
           <p className={styles.title}>{view.title}</p>
-          {state === 'used' && limit === null ? <StatusBadge tone="neutral">1回使用しました</StatusBadge> : null}
+          {state === 'used' && (limit === null || limit > 1) ? <StatusBadge tone="neutral">{limit === null ? '1回使用しました' : `1回使用しました（あと${limit - 1}回）`}</StatusBadge> : null}
           {ready ? <>
             {view.beforePrice ? <del className={styles.note}>{view.beforePrice}</del> : null}
             {view.benefit ? <p className={styles.benefit}>{view.benefit}</p> : null}

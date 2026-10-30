@@ -31,6 +31,14 @@ describe('受け取った人のクーポン見本', () => {
     fireEvent.click(screen.getByRole('button', { name: '期限切れ' }))
     expect(screen.queryByAltText('クーポンの写真')).toBeNull()
   })
+  it('3回券は1回使った見本でも残り2回を示し、画像とコードを使えるままにする', () => {
+    render(<CouponPreview payload={{...payload,maxUsesPerFriend:3}} name="券" />)
+    fireEvent.click(screen.getByRole('button',{name:'使用済み'}))
+    expect(screen.getByText('1回使用しました（あと2回）')).toBeTruthy()
+    expect(screen.getByAltText('クーポンの写真')).toBeTruthy()
+    expect(screen.getByText('クーポンコード：SALE500')).toBeTruthy()
+    expect(screen.getByRole('button',{name:'クーポンを使用する（見本）'}).getAttribute('aria-disabled')).not.toBe('true')
+  })
   it('旧3回券と説明を保持し、不正な編集中の数をNaNにしない', () => {
     const { rerender } = render(<CouponPreview payload={{ description: '昔の説明', maxUsesPerFriend: 3 }} name="昔の券" />)
     expect(screen.getByText('昔の説明')).toBeTruthy(); expect(screen.getByText('3回のみ使用可能')).toBeTruthy()

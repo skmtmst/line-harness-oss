@@ -4,8 +4,11 @@
 .row > span:first-child { width: 100%; }
 .row[data-short] { width: calc(var(--space-32) * 4); max-width: 100%; }
 .unit { flex-shrink: 0; color: var(--color-ink-faint); font-size: var(--text-caption); white-space: nowrap; }
+.row:has(input:disabled) .formatted { opacity: var(--polish-disabled-opacity); }
 .formatted { position: absolute; inset-inline-start: var(--space-12); max-width: calc(100% - (var(--space-24) * 2)); top: 50%; transform: translateY(-50%); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; pointer-events: none; color: var(--color-ink); font-size: var(--polish-control-text); font-variant-numeric: tabular-nums; }
 }
 
 html:root .row input[data-design-node] { flex: 1 1 0; width: 0; min-width: calc(var(--space-24) * 2); font-variant-numeric: tabular-nums; }
 html:root .row[data-number-formatted] input { color: transparent; }
+
+html:root .row:has(input:disabled) > [data-affixed-layout='field']:not([data-look='derived']):first-child { background: transparent; border: 0; outline: 0; box-shadow: none; }

@@ -373,6 +373,7 @@ describe('V8 クーポン・リサーチを作る', () => {
     await flush()
     expect(assetsCreate).toHaveBeenCalledWith(expect.objectContaining({
       lineAccountId: 'account-a',
+      folderId: null,
       kind: 'coupon',
       name: '夏の20%オフ',
       payload: expect.objectContaining({ title: '夏の20%オフ', startsAt: '2026-08-01T00:00', endsAt: '2026-08-31T23:59', oncePerFriend: true, folder: '', description: expect.any(String), instructions: expect.any(String), couponType: 'discount', discount: { mode: 'percent', percent: 20 } }),
@@ -648,6 +649,22 @@ describe('クーポンの同じ編集画面と公開の失敗', () => {
     expect(assetsUpdate.mock.calls[0][1].payload).not.toHaveProperty('couponType')
     expect(assetsCreate).not.toHaveBeenCalled(); expect(assetsPublish).not.toHaveBeenCalled()
   })
+  it('利用ガイドを編集して公開するとLIFF互換の説明にも同じ本文を保存する', async () => {
+    assetsList.mockResolvedValue({ success: true, data: [asset] })
+    assetsUpdate.mockResolvedValue({ success: true, data: { ...asset, draftRevision: 1 } })
+    await mount('kind=coupon&id=coupon-old')
+    type(screen.getByLabelText('使うときの説明'), '3,000円以上で利用可')
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '保存して公開' })) })
+    expect(assetsUpdate).toHaveBeenCalledWith('coupon-old', expect.objectContaining({payload:expect.objectContaining({description:'3,000円以上で利用可',instructions:'3,000円以上で利用可',maxUsesPerFriend:3,legacyNote:'保持'})}))
+    expect(assetsPublish).toHaveBeenCalledWith('coupon-old', {expectedVersion:2,expectedDraftRevision:1}, expect.any(String))
+  })
+  it('新規の受け取れる人は文字だけで、抽選が無い数の行は出さない', async () => {
+    await mount('kind=coupon&visual=1')
+    expect(screen.getByText('友だちだけ')).toBeTruthy()
+    expect(screen.queryByRole('button',{name:'友だちだけ'})).toBeNull()
+    expect(screen.queryByText('当選した数')).toBeNull()
+    expect(screen.getByRole('button',{name:'押されたときにあわせて行うことを足す'}).closest('[data-design-part="card"]')).toBeTruthy()
+  })
   it('公開409は下書きを作り直さず同じ確認キーで再試行し、成功前に一覧へ移らない', async () => {
     assetsCreate.mockResolvedValue({ success: true, data: { id: 'asset-1', publishedVersion: 0, draftRevision: 1 } })
     assetsPublish.mockRejectedValueOnce(new ApiError(409, '別の人が変更しました'))
@@ -672,6 +689,25 @@ describe('クーポンの同じ編集画面と公開の失敗', () => {
       await act(async () => { fireEvent.click(button) })
     }
     expect(assetsCreate).not.toHaveBeenCalled(); expect(assetsPublish).not.toHaveBeenCalled()
+  })
+  it('閲覧のみの画像操作は灰色の理由付きで残り、欄は拒否したまま画像を変えない', async () => {
+    role.value = verifiedStaffRole('viewer')
+    assetsList.mockResolvedValue({success:true,data:[{...asset,payload:{...payload,couponType:'discount',discount:{mode:'price',beforeYen:1000,afterYen:500}}}]})
+    await mount('kind=coupon&id=coupon-old')
+    for(const name of ['差し替える','消す','URL で入れる','登録メディアから選ぶ']){
+      const button=screen.getByRole('button',{name}) as HTMLButtonElement
+      expect(button.disabled).toBe(false)
+      expect(button.closest('fieldset[disabled]')).toBeNull()
+      expect(button.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.focus(button)
+      expect(screen.getAllByRole('tooltip').at(-1)?.textContent).toContain('閲覧のみ')
+      fireEvent.click(button);fireEvent.keyDown(button,{key:'Enter'});fireEvent.keyDown(button,{key:' '});fireEvent.blur(button)
+    }
+    expect((screen.getByLabelText('クーポン名').closest('fieldset') as HTMLFieldSetElement).disabled).toBe(true)
+    expect((screen.getByLabelText('割引前の金額').closest('fieldset') as HTMLFieldSetElement).disabled).toBe(true)
+    expect(screen.queryByLabelText('クーポン画像のURL')).toBeNull()
+    expect(screen.getByAltText('クーポンの画像').getAttribute('src')).toBe('https://example.com/old.png')
+    expect(assetsUpdate).not.toHaveBeenCalled();expect(assetsCreate).not.toHaveBeenCalled();expect(assetsPublish).not.toHaveBeenCalled()
   })
   it('統括の親へ保存する時も旧payloadを保ち、店の保存口やフォルダを呼ばない', async () => {
     const save = vi.fn().mockResolvedValue(false)
