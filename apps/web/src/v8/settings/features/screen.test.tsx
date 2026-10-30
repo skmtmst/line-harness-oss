@@ -82,6 +82,17 @@ async function flush() {
 const buttonNames = () => [...host.querySelectorAll('button')].map((button) => button.textContent?.trim() ?? '')
 
 describe('★V8 機能設定の閲覧のみ', () => {
+  it('飲食店の機能行で星を選ぶと黄色の状態になり、保存対象になる', async () => {
+    fixture.style = 'restaurant'
+    await act(async () => { root.render(<FeatureSettingsScreen />) })
+    await flush()
+    const star = within(host).getByRole('button', { name: '予約台帳をお気に入りに入れる' })
+    expect(star.getAttribute('aria-pressed')).toBe('false')
+    await act(async () => { fireEvent.click(star) })
+    expect(within(host).getByRole('button', { name: '予約台帳をお気に入りから外す' }).getAttribute('aria-pressed')).toBe('true')
+    expect(buttonNames().some((name) => name.includes('機能設定を保存'))).toBe(true)
+  })
+
   it.each([
     ['standard', false],
     ['ec', true],
