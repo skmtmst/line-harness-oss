@@ -205,10 +205,10 @@ html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version]
  * 100cqi は直近の容器（kpi-value＝数の箱）を見る。
  */
 @container (min-width: 1px) {
-  html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] [data-kpi-fit]:has(> [data-kpi-delta-slot]:not(:empty)) :is([data-kpi-value], [data-kpi-number]) {
+  html:root [data-kpi-strip][data-kpi-presentation='band'] > [data-design-version] [data-kpi-fit]:has(> :is([data-kpi-delta-slot]:not(:empty), [data-kpi-action-slot])) :is([data-kpi-value], [data-kpi-number]) {
     font-size: min(var(--tpl-band-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
   }
-  html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] > [data-design-version] [data-kpi-fit]:has(> [data-kpi-delta-slot]:not(:empty)) :is([data-kpi-value], [data-kpi-number]) {
+  html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-density='compact'] > [data-design-version] [data-kpi-fit]:has(> :is([data-kpi-delta-slot]:not(:empty), [data-kpi-action-slot])) :is([data-kpi-value], [data-kpi-number]) {
     font-size: min(var(--tpl-band-compact-number-size), calc((100cqi - var(--kpi-fit-unit, 0px)) / (var(--kpi-fit-chars, 1) * 0.62)));
   }
 }

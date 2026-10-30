@@ -1,3 +1,4 @@
+import './hq-token-notice.test.mjs'
 import './pick-field-surface.test.mjs'
 import './date-group.test.mjs'
 import './kpi-delta-row.test.mjs'

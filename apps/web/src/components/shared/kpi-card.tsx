@@ -124,6 +124,8 @@ export type KpiCardProps = {
   badge?: string
   /** warning は「見ておくとよい」。止まっている・壊れている（danger）ほど強くない注意に使う。 */
   badgeTone?: 'accent' | 'neutral' | 'warning' | 'danger'
+  /** 行き先を数の行の右に置く。省略時・cards型の帯では補足の行（detail）を使う。 */
+  actionPlacement?: 'detail' | 'value-row'
   action?: { label: string; href: string; onClick?: never } | { label: string; onClick: () => void; href?: never }
   loading?: boolean
   /** V8 は画面の絵に合わせてカードか線で区切るマスを選ぶ。 */
@@ -181,6 +183,7 @@ export default function KpiCard({
   badge,
   badgeTone = 'accent',
   action,
+  actionPlacement = 'detail',
   loading = false,
   presentation = 'card',
   density = 'comfortable',
@@ -235,6 +238,14 @@ export default function KpiCard({
     <KpiRollingValue text={displayedNumber} identity={cardProps.id ?? title} loading={loading || Boolean(cardProps.hidden)} />
     {showUnit ? <span data-kpi-unit className={styles.unit}>{unit}</span> : null}
   </>
+
+  const actionNode = action ? (
+    action.href !== undefined ? <Link href={action.href} prefetch={false} className={styles.link}>
+      <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={16} aria-hidden="true" />
+    </Link> : <button type="button" className={styles.link} onClick={action.onClick}>
+      <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={16} aria-hidden="true" />
+    </button>
+  ) : null
 
   return (
     <div
@@ -310,25 +321,20 @@ export default function KpiCard({
 
       {statusText && !loading ? <StatusBadge>{statusText}</StatusBadge> : null}
       {delta ? <span className={styles.delta} data-kpi-delta-slot>{delta}</span> : null}
+      {actionPlacement === 'value-row' && actionNode ? <span className={styles.valueActionSlot} data-kpi-action-slot>{actionNode}</span> : null}
       </div>
 
       {sparkline && sparkline.length > 1 && !loading ? <Sparkline values={sparkline} /> : null}
       {meter && !loading ? <ProgressBar appearance="quota" tone={meter.tone} value={meter.value} label={meter.label} className={styles.meter} /> : null}
       {valueMenu ? <ActionMenu open={valueMenu.open} items={valueMenu.items} ariaLabel={valueMenu.label} anchorRef={valueRef} onClose={() => valueMenu.onOpenChange(false)} /> : null}
-      <p data-kpi-detail data-kpi-detail-present={Boolean(detailText(detail).trim() || onRetry || action) || undefined} className={styles.detail}>
+      <p data-kpi-detail data-kpi-detail-present={Boolean(detailText(detail).trim() || onRetry || (actionPlacement === 'detail' && action)) || undefined} className={styles.detail}>
         <span role="note" className={styles.detailText} title={detailText(detail) || undefined}>{detailLayout === 'qualifier' && typeof detail === 'string' ? detail.replace(/(.)(（)/u, '$1\n$2') : detail}</span>
         {onRetry ? (
           <button type="button" className={styles.retry} onClick={onRetry}>
             {retryLabel ?? <RetryLabel />}
           </button>
         ) : null}
-        {action ? (
-          action.href !== undefined ? <Link href={action.href} prefetch={false} className={styles.link}>
-            <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={16} aria-hidden="true" />
-          </Link> : <button type="button" className={styles.link} onClick={action.onClick}>
-            <span>{normalizeActionLabel(action.label)}</span><ArrowRight size={16} aria-hidden="true" />
-          </button>
-        ) : null}
+        {actionPlacement === 'detail' ? actionNode : null}
       </p>
     </div>
   )

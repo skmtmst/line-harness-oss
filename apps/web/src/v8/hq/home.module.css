@@ -7,19 +7,6 @@
 .buttonIcon { width: var(--tpl-hq-button-icon); height: var(--tpl-hq-button-icon); }
 .full { width: 100%; }
 
-/* 数の帯の行き先（値の行の右。共通の行き先リンクと同じ緑・500・1行）。 */
-.bandAction {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--polish-space-row);
-  color: var(--color-link);
-  font-size: var(--text-caption);
-  font-weight: var(--font-weight-ui);
-  white-space: nowrap;
-  text-decoration: none;
-}
-.bandAction:hover { text-decoration: underline; }
-
 .folderNote {
   margin: 0;
   word-break: normal;

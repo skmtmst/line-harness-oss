@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdir } from 'node:fs/promises'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { openPage } from './browser-env.mjs'
 import { stubApi } from './speed-budget.mjs'
@@ -45,12 +46,14 @@ function bandDetailState() {
   const note = detail?.querySelector('[role="note"]')
   const valueRow = target.querySelector('[data-kpi-fit]')
   const number = valueRow?.querySelector('p')
-  const action = target.querySelector('[data-kpi-delta-slot] a[href*="/hq/attention"]')
-  const r = (el) => { const b = el.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, height: b.height } }
+  const action = target.querySelector('[data-kpi-action-slot] a[href*="/hq/attention"]')
+  const r = (el) => { const b = el.getBoundingClientRect(); return { top: b.top, bottom: b.bottom, height: b.height, left: b.left, right: b.right } }
   return {
+    card: r(target),
     detail: detail ? r(detail) : null,
     clipped: note ? note.scrollWidth > note.clientWidth + 1 : null,
     number: number ? r(number) : null,
+    textRight: Math.max(...[...valueRow.querySelectorAll('[data-kpi-number], [data-kpi-unit]')].map(el => el.getBoundingClientRect().right)),
     action: action ? { ...r(action), href: action.getAttribute('href') } : null,
   }
 }
@@ -76,111 +79,128 @@ function tableBadgeClip([expired, expiring]) {
   })
 }
 
+function checkBand(band) {
+  assert.ok(band?.detail, '接続に問題のカードの補足行がある')
+  assert.ok(band.detail.height <= 20, `補足は1行に収まる（行の高さ ${band.detail.height}）`)
+  assert.equal(band.clipped, false, '補足は切らない')
+  assert.ok(band.action, '共通の行き先が値の行にある')
+  assert.equal(band.action.href, '/hq/attention?kind=connections', '接続の絞り込みへ進む')
+  assert.ok(band.action.right <= band.card.right + 1, '行き先はカードの右端以内')
+  assert.ok(Number.isFinite(band.textRight) && band.textRight <= band.action.left + 1, '数字と行き先は重ならない')
+  assert.ok(band.number && band.action.top >= band.number.top - 1 && band.action.top < band.number.bottom,
+    '行き先は数字の行の中にある')
+}
+
+function checkCards(cards) {
+  assert.ok(cards.length > 0, 'カードがある')
+  for (const card of cards) {
+    assert.ok(card.notices <= 1, '知らせは1つまで')
+    assert.deepEqual(card.bare, [], '素の期限の文字は無い')
+  }
+}
+
+function checkTable(rows) {
+  assert.ok(rows.length > 0, '表の行がある')
+  for (const text of rows) assert.ok(!text.includes(EXPIRED_LABEL) && !text.includes(EXPIRING_LABEL), '素の期限の文字は無い')
+  assert.ok(rows.some(text => text.includes('期限切れ')), '期限切れの札がある')
+  assert.ok(rows.some(text => text.includes('期限が近い')), '期限が近い札がある')
+}
+
+function checkClips(clips) {
+  for (const clip of clips) {
+    assert.equal(clip.found, true, `全文を持つ札がある（${clip.label}）`)
+    assert.equal(clip.clipped, false, `札は切らない（${clip.label}）`)
+  }
+}
+
+async function photograph(page, name, width) {
+  if (!process.env.MUSE_SHOTS) return
+  await mkdir(process.env.MUSE_SHOTS, { recursive: true })
+  await page.screenshot({ path: `${process.env.MUSE_SHOTS}/${name}-${width}.png`, fullPage: true })
+}
+
 for (const width of [1152, 1440]) test(`統括のアカウントは知らせの重複と素の期限切れを出さない ${width}`, async () => {
   const browser = await connectGuardBrowser()
   let page
+  const labels = [EXPIRED_LABEL, EXPIRING_LABEL]
   try {
     const adapter = { newPage: async options => { const page = await browser.newPage(options); await stubApi(page, hqTokenFetch); return page } }
     page = await openPage(adapter, { baseUrl: process.env.V8_GUARD_BASE || 'http://127.0.0.1:4310', route: '/hq', width, stable: true, requireSuccess: true })
     await page.locator('[data-kpi-strip][data-kpi-presentation="band"]').first().waitFor()
     await page.locator('article').first().waitFor()
+    checkBand(await page.evaluate(bandDetailState))
+    checkCards(await page.evaluate(cardNoticeState, labels))
+    await photograph(page, 'cards', width)
 
-    /* 数の帯：補足は1行（切らない）、行き先は値の行の右。 */
-    const band = await page.evaluate(bandDetailState)
-    assert.ok(band?.detail, '接続に問題のカードの補足行がある')
-    assert.ok(band.detail.height <= 20, `補足は1行に収まる（行の高さ ${band.detail.height}）`)
-    assert.equal(band.clipped, false, '補足は切らない')
-    assert.ok(band.action, '行き先が値の行にある')
-    assert.equal(band.action.href, '/hq/attention?kind=connections', '行き先は対応が要るものの接続の絞り込み')
-    assert.ok(band.action.top >= band.number.top - 1 && band.action.top < band.number.bottom,
-      `行き先は数字の行の中にある（行き先の上 ${band.action.top}、数字行 ${band.number.top}〜${band.number.bottom}）`)
-    /* わざと行き先を数字の行から落とすと赤になる */
-    const bandFault = await page.evaluate(() => {
-      const slot = [...document.querySelectorAll('[data-kpi-strip][data-kpi-presentation="band"] > [data-design-version]')]
-        .find((card) => card.textContent.includes('接続に問題'))?.querySelector('[data-kpi-delta-slot]')
-      const row = slot?.closest('[data-kpi-fit]')
-      const number = row?.querySelector('p')
-      if (!slot || !number) return false
-      slot.style.setProperty('position', 'relative')
-      slot.style.setProperty('top', '100px')
-      const box = slot.getBoundingClientRect()
-      const num = number.getBoundingClientRect()
-      const dropped = !(box.top >= num.top - 1 && box.top < num.bottom)
-      slot.style.removeProperty('position')
-      slot.style.removeProperty('top')
-      return dropped
-    })
-    assert.equal(bandFault, true, '行き先が数字の行から落ちると検知する')
+    const number = page.locator('[data-kpi-action-slot]').first().locator('..').locator('[data-kpi-number]').first()
+    const originalNumber = await number.textContent()
+    await number.evaluate(el => { el.textContent = '1234'; el.closest('[data-kpi-fit]').style.setProperty('--kpi-fit-chars', '4') })
+    console.log('four-digit-layout', width, await page.evaluate(bandDetailState))
+    await photograph(page, 'four-digits', width)
+    checkBand(await page.evaluate(bandDetailState))
+    await number.evaluate(el => el.style.setProperty('font-size', '100px'))
+    const unshrunkBand = await page.evaluate(bandDetailState)
+    assert.throws(() => checkBand(unshrunkBand), /重ならない/, '数の字が箱を越えて重なったら赤')
+    await number.evaluate(el => el.style.removeProperty('font-size'))
+    checkBand(await page.evaluate(bandDetailState))
+    await number.evaluate((el, text) => { el.textContent = text; el.closest('[data-kpi-fit]').style.setProperty('--kpi-fit-chars', String(text.length)) }, originalNumber)
 
-    /* カード：知らせは1つまで、素の期限の文字は無い。 */
-    const checkCards = (cards) => {
-      assert.ok(cards.length > 0, 'カードがある')
-      for (const [i, card] of cards.entries()) {
-        assert.ok(card.notices <= 1, `カード${i}の知らせは1つまで（${card.notices}）`)
-        assert.deepEqual(card.bare, [], `カード${i}に素の期限の文字は無い`)
-      }
-    }
-    checkCards(await page.evaluate(cardNoticeState, [EXPIRED_LABEL, EXPIRING_LABEL]))
-    /* わざと知らせを重ね・素の文字を置くと赤になる */
-    const cardFault = await page.evaluate(([expired, expiring]) => {
+    // 本体と同じ検査へ壊した実測値を渡し、復元後の緑まで確かめる。
+    const actionSlot = page.locator('[data-kpi-action-slot]').first()
+    await actionSlot.evaluate(el => { el.style.position = 'relative'; el.style.top = '100px' })
+    const brokenBand = await page.evaluate(bandDetailState)
+    assert.throws(() => checkBand(brokenBand), /数字の行/, '行き先が落ちたら赤')
+    await actionSlot.evaluate(el => { el.style.removeProperty('position'); el.style.removeProperty('top') })
+    checkBand(await page.evaluate(bandDetailState))
+    await actionSlot.evaluate(el => { el.style.position = 'relative'; el.style.left = '100px' })
+    const overflowBand = await page.evaluate(bandDetailState)
+    assert.throws(() => checkBand(overflowBand), /カードの右端/, '行き先が右端を越えたら赤')
+    await actionSlot.evaluate(el => { el.style.left = '-100px' })
+    const overlapBand = await page.evaluate(bandDetailState)
+    assert.throws(() => checkBand(overlapBand), /重ならない/, '数と重なったら赤')
+    await actionSlot.evaluate(el => { el.style.removeProperty('position'); el.style.removeProperty('left') })
+    checkBand(await page.evaluate(bandDetailState))
+
+    await page.evaluate(() => {
       const first = document.querySelector('article')
-      const notice = first?.querySelector('[data-design-part="notice"]')
-      if (!first || !notice) return null
-      const clone = notice.cloneNode(true)
+      const clone = first.querySelector('[data-design-part="notice"]').cloneNode(true)
+      clone.setAttribute('data-notice-fault', '')
       first.appendChild(clone)
+    })
+    const duplicate = await page.evaluate(cardNoticeState, labels)
+    assert.throws(() => checkCards(duplicate), /知らせは1つ/, '重複したら赤')
+    await page.locator('[data-notice-fault]').evaluate(el => el.remove())
+    await page.evaluate(expired => {
       const bare = document.createElement('span')
-      bare.setAttribute('title', expired)
-      bare.textContent = expiring
-      first.appendChild(bare)
-      const found = {
-        notices: first.querySelectorAll('[data-design-part="notice"]').length,
-        bare: [expired, expiring].filter((label) => first.querySelector(`[title="${label}"]`)),
-      }
-      clone.remove()
-      bare.remove()
-      return found.notices > 1 && found.bare.length > 0
-    }, [EXPIRED_LABEL, EXPIRING_LABEL])
-    assert.equal(cardFault, true, '知らせの重複と素の期限切れを検知する')
+      bare.title = expired; bare.textContent = expired; bare.dataset.bareFault = ''
+      document.querySelector('article').appendChild(bare)
+    }, EXPIRED_LABEL)
+    const bareCard = await page.evaluate(cardNoticeState, labels)
+    assert.throws(() => checkCards(bareCard), /素の期限/, '素の期限文字が出たら赤')
+    await page.locator('[data-bare-fault]').evaluate(el => el.remove())
+    checkCards(await page.evaluate(cardNoticeState, labels))
 
-    /* 表：素の期限の文字は出さず、期限の札で添える。 */
     await page.locator('button[aria-label="表"]').click()
     await page.locator('tbody tr').first().waitFor()
-    const rows = await page.evaluate(tableTokenState)
-    assert.ok(rows.length > 0, '表の行がある')
-    for (const [i, text] of rows.entries()) {
-      assert.ok(!text.includes(EXPIRED_LABEL) && !text.includes(EXPIRING_LABEL), `表の行${i}に素の期限の文字は無い`)
-    }
-    assert.ok(rows.some((text) => text.includes('期限切れ')), '期限切れの札がある')
-    assert.ok(rows.some((text) => text.includes('期限が近い')), '期限が近い札がある')
-    const clips = await page.evaluate(tableBadgeClip, [EXPIRED_LABEL, EXPIRING_LABEL])
-    for (const clip of clips) {
-      assert.equal(clip.found, true, `全文を持つ札がある（${clip.label}）`)
-      assert.equal(clip.clipped, false, `札は切らない（${clip.label}）`)
-    }
-    /* わざと札を狭めると赤になる */
-    const clipFault = await page.evaluate(([expired, expiring]) => {
-      const badge = document.querySelector(`tbody tr [title="${expired}"], tbody tr [title="${expiring}"]`)
-      const text = badge?.querySelector('[data-truncated-text]')
-      if (!badge || !text) return false
-      badge.style.setProperty('max-width', '20px')
-      badge.style.setProperty('overflow', 'hidden')
-      const clipped = text.scrollWidth > text.clientWidth + 1
-      badge.style.removeProperty('max-width')
-      badge.style.removeProperty('overflow')
-      return clipped
-    }, [EXPIRED_LABEL, EXPIRING_LABEL])
-    assert.equal(clipFault, true, '札が切れると検知する')
-    /* わざと素の文字を置くと赤になる */
-    const tableFault = await page.evaluate((expired) => {
-      const row = document.querySelector('tbody tr')
-      if (!row) return false
+    checkTable(await page.evaluate(tableTokenState))
+    checkClips(await page.evaluate(tableBadgeClip, labels))
+    await photograph(page, 'table', width)
+
+    const badge = page.locator(`tbody tr [title="${EXPIRED_LABEL}"]`).first()
+    await badge.evaluate(el => { el.style.maxWidth = '20px'; el.style.overflow = 'hidden' })
+    const brokenClips = await page.evaluate(tableBadgeClip, labels)
+    assert.throws(() => checkClips(brokenClips), /札は切らない/, '札が切れたら赤')
+    await badge.evaluate(el => { el.style.removeProperty('max-width'); el.style.removeProperty('overflow') })
+    checkClips(await page.evaluate(tableBadgeClip, labels))
+
+    await page.evaluate(expired => {
       const bare = document.createElement('span')
-      bare.textContent = expired
-      row.appendChild(bare)
-      const found = (row.textContent ?? '').includes(expired)
-      bare.remove()
-      return found
+      bare.textContent = expired; bare.dataset.bareFault = ''
+      document.querySelector('tbody tr').appendChild(bare)
     }, EXPIRED_LABEL)
-    assert.equal(tableFault, true, '表の素の期限切れを検知する')
+    const bareTable = await page.evaluate(tableTokenState)
+    assert.throws(() => checkTable(bareTable), /素の期限/, '表に素の期限文字が出たら赤')
+    await page.locator('[data-bare-fault]').evaluate(el => el.remove())
+    checkTable(await page.evaluate(tableTokenState))
   } finally { await page?.close(); await browser.close() }
 })
