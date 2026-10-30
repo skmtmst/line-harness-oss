@@ -17,6 +17,8 @@ const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
   pathname: '/settings',
   accountId: 'account-1',
+  style: 'ec',
+  styleSelected: true,
 }))
 
 const localStorageValues = new Map<string, string>()
@@ -35,6 +37,7 @@ vi.mock('next/link', async () => {
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement('a', { href, ...props }, children) }
 })
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: fixture.style, styleSelected: fixture.styleSelected }, status: 'ready', stale: false }) }))
 vi.mock('@/lib/api', () => ({
   api: {
     featureSettings: { visibility: fixture.visibility },
@@ -54,6 +57,8 @@ describe('★V8 設定の中のメニュー', () => {
     fixture.visibility.mockReset()
     fixture.pathname = '/settings'
     fixture.accountId = 'account-1'
+    fixture.style = 'ec'
+    fixture.styleSelected = true
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { ec_commerce: true, line_notifications: true } },
@@ -77,6 +82,26 @@ describe('★V8 設定の中のメニュー', () => {
     act(() => window.dispatchEvent(new CustomEvent('line-harness:feature-settings-updated', { detail: { accountId: 'account-2' } })))
     await waitFor(() => expect(fixture.visibility.mock.calls.length).toBe(3))
     await waitFor(() => expect(view.queryByText('EC連携')).toBeTruthy())
+  })
+
+  it('EC用途だけにEC連携を表示し、アカウント切替と直URLでも非ECには出さない', async () => {
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(view.queryByRole('link', { name: 'EC連携' })).toBeTruthy())
+
+    fixture.accountId = 'account-2'
+    fixture.style = 'restaurant'
+    fixture.pathname = '/ec-commerce'
+    view.rerender(<SettingsInnerNav />)
+    expect(view.queryByRole('link', { name: 'EC連携' })).toBeNull()
+
+    fixture.style = 'standard'
+    view.rerender(<SettingsInnerNav />)
+    expect(view.queryByRole('link', { name: 'EC連携' })).toBeNull()
+
+    fixture.style = 'ec'
+    fixture.styleSelected = false
+    view.rerender(<SettingsInnerNav />)
+    expect(view.queryByRole('link', { name: 'EC連携' })).toBeNull()
   })
 
   // 2026-10-06：設定の板（ ほか 8 枚）の並びへ。見出し「設定」・印つき・プール管理あり・「専用」の小見出しなし。

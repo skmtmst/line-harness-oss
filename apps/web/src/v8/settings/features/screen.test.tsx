@@ -14,7 +14,7 @@ import { PERMISSION_LOCK_REASON, PERMISSION_LOCK_SUMMARY } from '@/components/sh
 import { READ_ONLY_MESSAGE } from '@/components/shared/read-only-notice'
 import { rememberStaffIdentity, readStaffIdentity } from '@/lib/staff-identity-state'
 
-const fixture = vi.hoisted(() => ({ role: 'owner', identity: 'ready' }))
+const fixture = vi.hoisted(() => ({ role: 'owner', identity: 'ready', account: 'account-a', style: 'standard', styleSelected: true }))
 
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children?: React.ReactNode }) => <a href={href}>{children}</a>,
@@ -24,7 +24,7 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/settings',
 }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', loading: false }),
+  useAccount: () => ({ selectedAccountId: fixture.account, loading: false }),
 }))
 
 const { default: FeatureSettingsScreen } = await import('./screen')
@@ -39,6 +39,9 @@ let root: Root
 beforeEach(() => {
   clearFeatureSettingsCache()
   fixture.identity = 'ready'
+  fixture.account = 'account-a'
+  fixture.style = 'standard'
+  fixture.styleSelected = true
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   vi.stubGlobal('localStorage', { getItem: () => null, setItem: () => undefined, removeItem: () => undefined })
   vi.stubGlobal('fetch', async (input: string | URL | Request) => {
@@ -46,6 +49,7 @@ beforeEach(() => {
     if (path.includes('/api/staff/me') && fixture.identity === 'pending') return new Promise<Response>(() => {})
     if (path.includes('/api/staff/me') && fixture.identity === 'failed') return response({ success: false, error: '読み込めませんでした' }, 503)
     if (path.includes('/api/staff/me')) return response({ success: true, data: { id: 'staff-1', role: fixture.role, permissionKeys: [] } })
+    if (path.includes('/api/dashboard/style')) return response({ success: true, data: { style: fixture.style, styleSelected: fixture.styleSelected } })
     if (path.includes('/api/settings/features')) {
       return response({
         success: true,
@@ -78,6 +82,18 @@ async function flush() {
 const buttonNames = () => [...host.querySelectorAll('button')].map((button) => button.textContent?.trim() ?? '')
 
 describe('★V8 機能設定の閲覧のみ', () => {
+  it.each([
+    ['standard', false],
+    ['ec', true],
+  ] as const)('使い方が%sの機能設定でEC連携の行を%sにする', async (style, visible) => {
+    fixture.account = `account-${style}`
+    fixture.style = style
+    await act(async () => { root.render(<FeatureSettingsScreen />) })
+    await flush()
+    await act(async () => { fireEvent.click(within(host).getByRole('button', { name: '設定を開く' })) })
+    expect(Boolean(within(host).queryByText('EC連携'))).toBe(visible)
+  })
+
   it('初期値に戻す項目は印なしで、取消は下書きを保ち、確認しても保存するまで送信しない', async () => {
     fixture.role = 'owner'
     const requestMethod = ([input, init]: Parameters<typeof fetch>) =>
