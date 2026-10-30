@@ -58,10 +58,10 @@ async function mount(props: { onPick?: (t: string) => void; onPickPack?: (t: str
 }
 
 describe('★V8 テンプレートを選ぶ', () => {
-  test('左のフォルダの列を押すと、そのフォルダで取り直す。大きな2列（プレビュー）は出さない', async () => {
+  test('左のフォルダの列を押すと、そのフォルダで取り直す。初期状態では見本を出さない', async () => {
     await mount()
     expect(screen.getByRole('heading', { name: 'テンプレートを選ぶ' })).toBeTruthy()
-    expect(screen.queryByLabelText('テンプレートのプレビュー')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'テンプレートの中身' })).toBeNull()
     const folder = await screen.findByRole('button', { name: /お問い合わせ/ })
     fireEvent.click(folder)
     await waitFor(() => expect(fixture.calls.some((c) => c.folderId === 'f-1')).toBe(true))
@@ -71,7 +71,7 @@ describe('★V8 テンプレートを選ぶ', () => {
   test('ふつう：選んで「入力欄に入れる」で本文が入る', async () => {
     const onPick = vi.fn()
     const { onClose } = await mount({ onPick })
-    fireEvent.click(screen.getByRole('button', { name: /テンプレ2/ }))
+    fireEvent.click(screen.getByText('テンプレ2').closest('button')!)
     fireEvent.click(screen.getByRole('button', { name: '入力欄に入れる' }))
     expect(onPick).toHaveBeenCalledWith('本文2')
     expect(onClose).toHaveBeenCalled()
@@ -81,8 +81,8 @@ describe('★V8 テンプレートを選ぶ', () => {
     const onPickPack = vi.fn()
     await mount({ onPickPack })
     fireEvent.click(screen.getByRole('switch', { name: '2通以上を続けて送る' }))
-    fireEvent.click(screen.getByRole('button', { name: /テンプレ3/ }))
-    fireEvent.click(screen.getByRole('button', { name: /テンプレ1/ }))
+    fireEvent.click(screen.getByText('テンプレ3').closest('button')!)
+    fireEvent.click(screen.getByText('テンプレ1').closest('button')!)
     expect(screen.getByText('① テンプレ3 → ② テンプレ1')).toBeTruthy()
     expect(screen.getByText('2 / 5通')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '2通を続けて送る' }))

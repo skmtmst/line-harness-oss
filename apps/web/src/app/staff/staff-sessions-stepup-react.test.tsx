@@ -78,9 +78,10 @@ class MockApiError extends Error {
   }
 }
 
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/api')>()),
   ApiError: MockApiError,
-  fetchApi: vi.fn(),
+  fetchApi: vi.fn().mockResolvedValue({ success: true, data: [] }),
   api: {
     auth: {
       stepUp: (...args: unknown[]) => fixture.staffStepUp(...args),

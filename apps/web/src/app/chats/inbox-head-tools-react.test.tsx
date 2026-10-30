@@ -13,6 +13,7 @@ import ChatsPage from './page'
 
 const fixture = vi.hoisted(() => ({
   params: new URLSearchParams(),
+  attention: false,
 }))
 
 vi.mock('next/link', () => ({ default: () => null }))
@@ -35,7 +36,10 @@ const json = (data: unknown, status = 200) => new Response(JSON.stringify(data),
 })
 
 function responseFor(url: URL): Response {
-  if (url.pathname === '/api/chats') return json({ success: true, data: [] })
+  if (url.pathname === '/api/chats') return json({ success: true, data: fixture.attention ? [
+    { id: 'chat-a', friendId: 'friend-a', friendName: '注目の会話', isAttention: true, isUnread: false, status: 'resolved', lastMessageAt: null },
+    { id: 'chat-b', friendId: 'friend-b', friendName: '通常の会話', isAttention: false, isUnread: false, status: 'resolved', lastMessageAt: null },
+  ] : [] })
   if (url.pathname === '/api/chats/stats') {
     return json({ success: true, data: {
       total: 0, unread: 0, inProgress: 0, onHold: 0, resolved: 0,
@@ -82,6 +86,7 @@ describe('頭の3つの印と保存した検索', () => {
 
   beforeEach(() => {
     fixture.params = new URLSearchParams()
+    fixture.attention = false
     document.documentElement.dataset.theme = 'v8'
     const values = new Map<string, string>()
     vi.stubGlobal('localStorage', {
@@ -128,6 +133,18 @@ describe('頭の3つの印と保存した検索', () => {
     expect(button().getAttribute('aria-label')).toBe('保存した検索（絞り込み中）')
     await act(async () => { typeSearch(host, '') })
     await eventually(() => expect(dots()).toHaveLength(0))
+  })
+
+  it('注目の会話だけ行の右に星を表示し、行の説明でも注目と伝える', async () => {
+    fixture.attention = true
+    await act(async () => root.render(<ChatsPage />))
+    await eventually(() => expect(host.querySelector('#chat-row-attention-chat-a')).not.toBeNull())
+    const star = host.querySelector('#chat-row-attention-chat-a')!
+    expect(star.getAttribute('aria-label')).toBe('注目')
+    const row = star.closest('button')!
+    expect(row.getAttribute('aria-describedby')?.split(' ')).toContain(star.id)
+    expect(star.textContent).toBe('注目')
+    expect(host.querySelector('#chat-row-attention-chat-b')).toBeNull()
   })
 
   it('保存の入口は1つで、上に保存したもの・下に今の条件の保存（ID33）', async () => {

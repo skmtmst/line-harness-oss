@@ -1,4 +1,5 @@
 'use client'
+import { DetailPreview } from '@/components/shared/detail-content'
 
 import { tableRequirements as b244Requirements } from './requirements'
 
@@ -247,8 +248,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
         <KpiCard title="結合可能" value={groups.size} unit="組" detail="結合グループ" icon={<Inbox size={16} aria-hidden />} presentation="band" />
         <KpiCard title="個室" value={rows.filter((item) => item.seat_type === 'private_room').length} unit="室" detail="個室卓" icon={<Inbox size={16} aria-hidden />} presentation="band" />
       </StatRow>
-      <DetailColumns variant="restaurant-tables" asideLabel="卓の詳細を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={(
-        <Panel fusion title="卓の詳細" flush>
+      <DetailColumns variant="restaurant-tables" asideLabel="卓の詳細を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title={'卓の詳細'}>
           <ul className={styles.detailList}>
             {rows.map((item) => (
               <li key={item.id} className={`${styles.detailRow} ${item.id === selectedId ? styles.detailRowSelected : ''}`}>
@@ -262,8 +262,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
               </li>
             ))}
           </ul>
-        </Panel>
-      )}>
+        </DetailPreview>} asideLayout="detail">
         <div className={styles.floorPanel}>
           {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} resources={rows.map(t=>({id:t.id,label:t.code,capacity:t.max_capacity,active:!!t.is_active}))} canEdit={canEdit} onSelect={setSelectedId}/>:null}
         </div>

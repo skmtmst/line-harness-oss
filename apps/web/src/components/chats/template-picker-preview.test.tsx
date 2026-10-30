@@ -107,7 +107,11 @@ describe('テンプレート選択のプレビュー解決(N-026)', () => {
     })
     // プレビュー領域は生の本文のまま。
     await waitFor(() => {
-      expect(screen.getAllByText('{{name}}さん、{{field.pet_name}}の件です {{pet_name}}').length).toBeGreaterThan(0)
+      const body = screen.getByTitle('{{name}}さん、{{field.pet_name}}の件です {{pet_name}}')
+      expect(body.querySelector('[data-token="{{name}}"]')).toBeTruthy()
+      expect(body.querySelector('[data-token="{{field.pet_name}}"]')).toBeTruthy()
+      expect(body.textContent).toContain('さん、')
+      expect(body.textContent).toContain('の件です')
     })
     expect(fixture.renderPreviewCalls).toHaveLength(0)
     expect(screen.queryByRole('alert')).toBeNull()

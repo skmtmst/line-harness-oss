@@ -1,4 +1,6 @@
 'use client'
+import StatusBadge from '@/components/shared/status-badge'
+import { DetailContent, DetailField, DetailInlineEdit } from '@/components/shared/detail-content'
 
 import type { CommonVarDeleteImpactItem } from '@line-crm/shared'
 
@@ -448,71 +450,36 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
           hasNext={activeIndex >= 0 && activeIndex < current.length - 1}
           onPrev={() => setActiveId(current[activeIndex - 1]?.id ?? null)}
           onNext={() => setActiveId(current[activeIndex + 1]?.id ?? null)}
-          footer={
-            <div className={styles.panelActions}>
-              <Button
-                type="button"
-                variant="primary"
-                onClick={() => withViewTransition(() => router.push(`/contents/vars/edit?id=${activeItem.id}`))}
-               busyLabel="移動中…">
+          actions={{ primary: <Button type="button" variant="primary" onClick={() => withViewTransition(() => router.push(`/contents/vars/edit?id=${activeItem.id}`))} busyLabel="移動中…">
                 編集する
-              </Button>
-              {canWrite ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => openStatusDialog(activeItem, activeStopped ? 'resume' : 'stop')}
-                >
-                  {activeStopped ? '再開する' : '止める'}
-                </Button>
-              ) : null}
-              {canWrite ? (
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={() => openDelete(activeItem)}
-                 busyLabel="処理中…">
-                  削除する
-                </Button>
-              ) : null}
-            </div>
-          }
-        >
+              </Button>,
+    menuItems: [...([{ allowed: canWrite, id: 'detail-0', label: (activeStopped ? '再開する' : '止める'), onSelect: () => openStatusDialog(activeItem, activeStopped ? 'resume' : 'stop') }]),
+        ...([{ allowed: canWrite, id: 'detail-1', label: "削除する", onSelect: () => openDelete(activeItem), tone: 'danger' as const }])] }}
+         status={<StatusBadge tone={activeStopped ? 'neutral' : (activeItem.status ?? 'active') === 'draft' ? 'warning' : 'success'}>{activeStopped ? '停止中' : (activeItem.status ?? 'active') === 'draft' ? '下書き' : '使用中'}</StatusBadge>}>
+<DetailContent>
           <div className={styles.panelBody}>
-            <p className={styles.panelLabel}>名前</p>
-            {canWrite ? (
-              <InlineEdit
+            <DetailField label="名前"> <DetailInlineEdit allowed={canWrite}
                 value={activeItem.name}
                 label="共通情報の名前"
                 maxLength={100}
                 onSave={(next) => renameVar(activeItem, next)}
-              />
-            ) : (
-              // 閲覧のみ：鉛筆は置かず、名前だけを見せる。
-              <p className={styles.panelText}>{activeItem.name}</p>
-            )}
-            <p className={styles.panelLabel}>中身</p>
-            <p className={styles.panelText}>
+              /> </DetailField>
+            <DetailField label="中身">
               {formatVarValue(activeItem.type, activeItem.value) || '（空）'}
-            </p>
-            <p className={styles.panelLabel}>状態</p>
-            <p className={styles.panelText}>
-              {activeStopped ? '停止中' : (activeItem.status ?? 'active') === 'draft' ? '下書き' : '使用中'}
-            </p>
-            <p className={styles.panelLabel}>使っている所</p>
-            <p className={styles.panelText}>
+             </DetailField>
+
+            <DetailField label="使っている所">
               {activeItem.usageCount === undefined
                 ? '—（未取得）'
                 : activeItem.usageCount === 0
                   ? emptyValue('none')
                   : `${formatNumber(activeItem.usageCount)}か所`}
-            </p>
-            <p className={styles.panelLabel}>更新・次回</p>
-            <p className={styles.panelText}>
+             </DetailField>
+            <DetailField label="更新・次回">
               {activeItem.nextSchedule
                 ? `${formatListDate(activeItem.updatedAt)} ／ ${formatStamp(activeItem.nextSchedule.effectiveFrom)}に変更`
                 : `${formatListDate(activeItem.updatedAt)} ／ 予定なし`}
-            </p>
+             </DetailField>
             {panelStatus && statusTarget?.id === activeItem.id ? (
               <>
                 <p className={styles.panelLabel}>
@@ -541,7 +508,9 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
               </>
             ) : null}
           </div>
-        </DetailPanel>
+
+</DetailContent>
+</DetailPanel>
       ) : null}
     </>
   ))

@@ -64,9 +64,6 @@
 }
 .cheadSquare:hover { background: var(--color-canvas-sunken); }
 .cheadSquare svg { width: var(--tpl-inbox-chead-panel-icon); height: var(--tpl-inbox-chead-panel-icon); }
-.cheadStar { width: var(--tpl-inbox-chead-star); height: var(--tpl-inbox-chead-star); }
-.cheadStar svg { width: var(--tpl-inbox-chead-star-icon); height: var(--tpl-inbox-chead-star-icon); }
-.cheadStar[aria-pressed='true'] { background: var(--color-status-warn-soft); outline-color: var(--color-warning); color: var(--color-warning); }
 .cheadSquare[aria-expanded='true'] { background: var(--color-surface-pearl); }
 .cheadSquare:disabled { cursor: wait; opacity: var(--polish-disabled-opacity); }
 

@@ -4,6 +4,7 @@ import { getStaffById, getTwoFactorChallenge, clearAuthThrottle } from '@line-cr
 import { Hono, type Context } from 'hono';
 import type { Env } from '../worker-env.js';
 import { sha256Hex } from '../middleware/auth.js';
+import { fail } from '../lib/fail.js';
 import { inputJsonBoundary, validatedInputBody } from '../lib/input-errors.js';
 import { resolveAdminAuthConfig } from '../middleware/admin-auth-config.js';
 import { issueSession, recordSuccessfulLoginAudit } from '../services/admin-session.js';
@@ -79,7 +80,7 @@ adminPasskeysLogin.post('/api/auth/passkeys/login/verify', inputJsonBoundary({},
       primary.staff.id, body.response.id, credential.counter).run();
     if (changed.meta.changes !== 1 || !await consumeMfaChallenge(c.env.DB, primary.tokenHash)) return unavailable(c);
     const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
-    if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
+    if (config.misconfigured) return fail(c, 500, config.misconfigured);
     const session = await issueSession(c, primary.staff.id, config.sameSite, primary.challenge.remember === 1, true);
     await clearAuthThrottle(c.env.DB, `mfa:${primary.staff.id}`);
     await mfaAudit(c, primary.staff.id, 'auth.passkey.login', 'success');

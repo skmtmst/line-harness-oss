@@ -57,7 +57,7 @@ export async function dispatchWaitlistInvites(env: Env['Bindings'], accountId?: 
   for (const [table, rows, featureId] of [['booking_waitlist', people.results, 'booking'], ['rt_seat_waitlist', seats.results, 'restaurant_test']] as const) {
     for (const row of rows) {
       if(table==='rt_seat_waitlist') {
-        const managed=await db.prepare(`SELECT t.store_id FROM rt_store_followup_templates t JOIN rt_seat_waitlist w ON w.store_id=t.store_id JOIN rt_reservation_events e ON json_extract(e.payload_json,'$.waitlistId')=w.id JOIN rt_reservation_event_receipts r ON r.event_id=e.id AND r.consumer_key='followup' WHERE w.id=?`).bind(row.id).first<{store_id:string}>();
+        const managed=await db.prepare(`SELECT w.store_id FROM rt_seat_waitlist w JOIN rt_reservation_events e ON json_extract(e.payload_json,'$.waitlistId')=w.id JOIN rt_reservation_event_receipts r ON r.event_id=e.id AND r.consumer_key='followup' WHERE w.id=? AND (EXISTS(SELECT 1 FROM rt_store_followup_templates WHERE store_id=w.store_id) OR EXISTS(SELECT 1 FROM rt_store_followup_rows WHERE store_id=w.store_id))`).bind(row.id).first<{store_id:string}>();
         if(managed){const {processRestaurantEvents}=await import('../../services/restaurant-events.js');const {processScenarioSourceJobs}=await import('../scenarios/scenario-source-jobs/index.js');await processRestaurantEvents(env,managed.store_id);await processScenarioSourceJobs(env);continue;}
       }
 

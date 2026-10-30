@@ -87,6 +87,34 @@ describe('運営 ログイン 2段目（V8 の入口）', () => {
       expect(assign).toHaveBeenCalledTimes(1)
     } finally { assign.mockRestore(); vi.unstubAllGlobals() }
   })
+  it('パスキーの失敗は日本語で知らせ、再試行で確認を完了できる', async () => {
+    const previousApiUrl = process.env.NEXT_PUBLIC_API_URL
+    process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+    let verifies = 0
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith('/passkeys/login/options')) return new Response(JSON.stringify({ success: true, data: { available: true, options: { challenge: 'fixture' }, challengeToken: 'passkey-challenge' } }), { status: 200 })
+      if (url.endsWith('/passkeys/login/verify') && ++verifies === 1) return new Response(JSON.stringify({ success: false, error: 'API error: 503' }), { status: 503 })
+      return new Response(JSON.stringify(url.endsWith('/api/auth/session') ? { success: true, data: { platformAdmin: true } } : { success: true, data: { sessionToken: 'session-1' }, csrfToken: 'csrf-1' }), { status: 200 })
+    }))
+    try {
+      await open('/login/two-factor?next=ops#lh_2fa=challenge-1&lh_method=password', 'v8')
+      const submit = () => [...host.querySelectorAll('button')].find(button => button.textContent === 'パスキーで認証する')!
+      await act(async () => { submit().click(); await new Promise(resolve => setTimeout(resolve, 10)) })
+      const reason = host.querySelector('[role="alert"]')?.textContent ?? ''
+      expect(reason).toMatch(/[ぁ-んァ-ヶ一-龠]/)
+      expect(reason).not.toContain('API error')
+      expect(submit().disabled).toBe(false)
+      await act(async () => { submit().click(); await new Promise(resolve => setTimeout(resolve, 500)) })
+      expect(verifies).toBe(2)
+      expect(assign).toHaveBeenCalledTimes(1)
+    } finally {
+      assign.mockRestore(); vi.unstubAllGlobals()
+      if (previousApiUrl === undefined) delete process.env.NEXT_PUBLIC_API_URL
+      else process.env.NEXT_PUBLIC_API_URL = previousApiUrl
+    }
+  })
   it('V8 で運営から来たら「6桁の確認」を出し、ログインのボタンを押せる', async () => {
     await open('/login/two-factor?next=ops#lh_2fa=challenge-1&lh_method=password', 'v8')
     expect(host.querySelector('[data-design-node="tOPeY"]')).not.toBeNull()

@@ -90,6 +90,12 @@ export type EntityPickerWindowProps = {
   band?: ReactNode
   /** 頭の×の左の操作（S2Vgi の「＋タグを作る」）。 */
   headerAction?: ReactNode
+  /** 指定した窓だけ、一覧と並ぶ読み取り用の見本を出す。 */
+  preview?: { title: string; content: ReactNode; actions?: ReactNode; onClose: () => void }
+  /** 種類の切替など、一覧と見本に共通する頭の段。 */
+  navigation?: ReactNode
+  /** 指定した窓だけ既存の広い段を使う。 */
+  wide?: boolean
 }
 
 export type MultiBodyProps = {

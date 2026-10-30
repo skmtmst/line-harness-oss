@@ -43,9 +43,8 @@ describe("全V8画面の行き先の見張り", () => {
     expect(violations('broken.tsx', `const item = { label: '見る', external: true, onSelect: () => router.push('/friends') }; const view = <ConfirmDialog open={duplicateTarget !== null} />`)).toHaveLength(2)
     expect(violations('valid.tsx', `const item = { label: '見る', external: true, href: 'https://example.com' }; const view = <ConfirmDialog open={deleteTarget !== null} />`)).toEqual([])
   })
-  it('選ぶ窓の幅640を共通の決まりで守る', () => {
+  it('選ぶ窓の共通幅の値を守る', () => {
     expect(readFileSync(join(root, 'app/globals.css'), 'utf8')).toContain('--tpl-picker-narrow-width: 640px')
-    expect(readFileSync(join(root, 'components/shared/entity-picker.tsx'), 'utf8').match(/widthPreset="picker"/g)).toHaveLength(1)
   })
   it('主要な一覧の外枠を保つ', () => {
     for (const feature of ['auto-replies', 'templates', 'rich-menus', 'forms', 'scenarios']) {

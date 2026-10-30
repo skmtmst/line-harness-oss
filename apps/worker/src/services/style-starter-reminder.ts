@@ -29,7 +29,7 @@ export async function reminderReplacement(
       offsetDays: item.offsetDays ?? null,
       sendAtTime: item.sendAtTime ?? null,
       messageType: 'text',
-      messageContent: JSON.stringify({ text: item.text ?? item.name }),
+      messageContent: item.text ?? item.name,
     },
   ];
   return [
@@ -54,7 +54,7 @@ export async function reminderReplacement(
         item.offsetMinutes ?? -1440,
         item.offsetDays ?? null,
         item.sendAtTime ?? null,
-        JSON.stringify({ text: item.text ?? item.name }),
+        item.text ?? item.name,
         now,
       ),
     db

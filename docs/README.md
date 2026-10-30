@@ -459,6 +459,7 @@
 
 ## 反映履歴
 
+- [リッチメニューを作る画像欄の箱の大きさ](release-log/unreleased/1984-kenta-muse-media-drop.md)
 - [飲食店3画面の共通タブ整理](release-log/unreleased/1972-kenta-muse-ledger-tabs.md)
 - [予約台帳の卓・予約なしの案内](release-log/unreleased/1972-kenta-muse-ledger-empty.md)
 - [予約台帳の数の帯の幅そろえ](release-log/unreleased/1972-kenta-muse-ledger-band.md)
@@ -904,6 +905,7 @@
 - [飲食店の閲覧のみの案内](release-log/unreleased/1953-kenta-int.md)
 - [チェックの印・スイッチ・選ぶ欄の見た目の統一](release-log/unreleased/0000-kenta-check-green.md)
 - [電話予約のパンくず・予約経路タブ・来店スタンプ・業種盤の担当欄の修正](release-log/unreleased/1953-kenta-muse-booking-ec.md)
+- [飲食店のLINE来店フォローの本番接続（7行・送受・時期・本文・承認）](release-log/unreleased/1984-kenta-muse-line-followup-live.md)
 - [閲覧のみの帯を題の横並びから題の下へ](release-log/unreleased/1948-kenta-muse-heading-band.md)
 - [画面の言葉をそろえ](release-log/unreleased/1847-kenta-int.md)
 - [まとめ列車 7](release-log/unreleased/1848-kenta-train-one7-1027.md)
@@ -1014,3 +1016,9 @@
 - [ユーザー一覧の最終ログイン日](release-log/unreleased/1980-masato-staff-login-date.md) — 反映履歴。
 - [ユーザー管理画面の見た目](release-log/unreleased/1981-masato-staff-visual-cleanup.md) — 反映履歴。
 - [LINEチャネル情報の入力確認](release-log/unreleased/1982-masato-line-channel-input-validation.md) — 反映履歴、確認 2026-10-30。
+- [右の詳細欄の文字と操作の統一](release-log/unreleased/1984-kenta-drawer-unify.md) — 反映履歴、確認 2026-10-30。
+- [受信箱でテンプレートの中身を見て選ぶ](release-log/unreleased/1984-kenta-inbox-template-preview.md) — 反映履歴。
+- [画像欄・受信箱・飲食店と見本の本文](release-log/unreleased/1984-kenta-train-1029s.md) — 反映履歴。
+- [Google とSNSの接続](release-log/unreleased/1983-masato-google-sns-connection.md) — 反映履歴。
+- [LINE通知の登録](release-log/unreleased/1985-masato-notice-line-registration.md) — 反映履歴。
+- [SNS接続の表記](release-log/unreleased/1986-masato-sns-connection-labels.md) — 反映履歴。

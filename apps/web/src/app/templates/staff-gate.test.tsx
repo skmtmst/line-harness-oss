@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { findDetailMenuItem } from '@/test-utils/detail-menu'
 /*
  * N-144: staff はテンプレートを「読めるが変えられない」。
  *
@@ -205,8 +206,8 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
     fireEvent.keyDown(table().getByText('来店お礼').closest('tr')!, { key: 'Enter' })
     await act(async () => { await Promise.resolve() })
     await act(async () => { await Promise.resolve() })
-    expect(screen.getByText('公開する')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'フォルダへ移す' }))
+    expect(await findDetailMenuItem('公開する')).toBeTruthy()
+    fireEvent.click(await findDetailMenuItem('フォルダへ移す'))
     expect(screen.getByLabelText('移動先のフォルダ')).toBeTruthy()
   })
 

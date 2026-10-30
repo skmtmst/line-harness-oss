@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailField, DetailInlineEdit } from '@/components/shared/detail-content'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
 import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarSort as SortSelect } from '@/components/shared/list-toolbar';
@@ -1024,41 +1025,26 @@ function WebinarList() {
           hasNext={activeIndex >= 0 && activeIndex < visibleItems.length - 1}
           onPrev={activeIndex > 0 ? () => goDetail(-1) : undefined}
           onNext={activeIndex >= 0 && activeIndex < visibleItems.length - 1 ? () => goDetail(1) : undefined}
-          footer={active ? (
-            <div className={styles.formActions}>
-              {canEdit ? <Button href={`/webinars/edit?id=${active.id}`}>編集する</Button> : null}
-              {canEdit ? <Button
-                variant="secondary"
-                onClick={() => { closeDetail(); openArchive(active) }}
-              >
-                {active.status === 'archived' ? '下書きに戻す' : 'アーカイブする'}
-              </Button> : null}
-            </div>
-          ) : undefined}
-        >
+          actions={{ primary: (active ? <Button variant="primary" href={`/webinars/edit?id=${active.id}`}>編集する</Button> : null),
+    menuItems: [...(active ? [{ id: 'body-1', label: "分析を見る", onSelect: () => go(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=analytics`) }] : []),
+        ...(active ? [{ id: 'body-2', label: "コメント演出を開く", onSelect: () => go(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=comments`) }] : []), ...(active ? [{ allowed: canEdit, id: 'detail-0', label: (active.status === 'archived' ? '下書きに戻す' : 'アーカイブする'), onSelect: () => { closeDetail(); openArchive(active); } }] : [])], secondary: (active ? <Button variant="secondary" onClick={() => go(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=participants`)}>参加者を見る</Button> : null), primaryAllowed: canEdit }}
+         status={active ? <StatusPill webinar={active} /> : null}>
+<DetailContent>
           {active ? (
             <div className={styles.detail}>
-              <p className={styles.dialogLabel}>ウェビナー名</p>
-              {canEdit
-                ? <InlineEdit value={active.title} label="ウェビナー名" onSave={(next) => renameWebinar(active, next)} />
-                : <p className={styles.dialogValue}>{active.title}</p>}
-              <p className={styles.dialogLabel}>状態</p>
-              <p className={styles.dialogValue}><StatusPill webinar={active} /></p>
-              <p className={styles.dialogLabel}>申込・視聴</p>
-              <p className={styles.dialogValue}>
+              <DetailField label="ウェビナー名"> <DetailInlineEdit allowed={canEdit} value={active.title} label="ウェビナー名" onSave={(next) => renameWebinar(active, next)} /> </DetailField>
+
+              <DetailField label="申込・視聴">
                 申込 {showsCounts(active) ? peopleText(active.registrationCount) : emptyValue('unknown')}　視聴開始 {showsCounts(active) ? peopleText(active.viewerCount) : emptyValue('unknown')}
-              </p>
-              <p className={styles.dialogLabel}>公開ページ</p>
-              <p className={styles.dialogValue}>{publicPath(active)}</p>
-              <div className={styles.detailActions}>
-                <Button variant="secondary" onClick={() => go(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=participants`)}>参加者を見る</Button>
-                <Button variant="secondary" onClick={() => go(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=analytics`)}>分析を見る</Button>
-                <Button variant="secondary" onClick={() => go(`/webinars/edit?id=${encodeURIComponent(active.id)}&pane=comments`)}>コメント演出を開く</Button>
-              </div>
+               </DetailField>
+              <DetailField label="公開ページ"> {publicPath(active)} </DetailField>
+
               {!canEdit ? <p className={styles.dialogValue}>{READONLY_REASON}</p> : null}
             </div>
           ) : null}
-        </DetailPanel>
+
+</DetailContent>
+</DetailPanel>
         <ConfirmDialog
           open={deletingFolder !== null}
           title={`フォルダ「${deletingFolder?.name ?? ''}」を削除しますか？`}

@@ -146,65 +146,6 @@
   text-overflow: ellipsis;
 }
 
-.rich {
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--tpl-rt-rich-radius);
-  background: var(--color-canvas);
-  overflow: hidden;
-}
-
-.photo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: var(--tpl-rt-photo-h);
-  color: var(--color-on-accent);
-}
-
-.photoA { background: var(--tpl-rt-photo-a); }
-.photoB { background: var(--tpl-rt-photo-b); }
-.photoC { background: var(--tpl-rt-photo-c); }
-.photoD { background: var(--tpl-rt-photo-d); }
-
-.photoIcon {
-  width: var(--tpl-rt-photo-icon);
-  height: var(--tpl-rt-photo-icon);
-}
-
-.richText {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-rt-payload-gap);
-  padding: var(--tpl-rt-rich-pad);
-}
-
-.richTitle {
-  margin: 0;
-  word-break: normal;
-  color: var(--tpl-rt-rich-ink);
-  font-size: var(--text-label);
-  font-weight: 700;
-  line-height: normal;
-}
-
-.richBody {
-  margin: 0;
-  word-break: normal;
-  color: var(--tpl-rt-rich-sub);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-rt-rich-body-lh);
-}
-
-.richAction {
-  margin: 0;
-  padding: var(--tpl-rt-rich-action-pad);
-  box-shadow: var(--tpl-rt-line-top);
-  color: var(--tpl-rt-rich-link);
-  font-size: var(--text-caption);
-  font-weight: 600;
-  line-height: normal;
-  text-align: center;
-}
+/* 送りの見え方の吹き出しは共通の LinePreviewMessage を使う（専用の形は作らない）。 */
 
 /* LINE ミニアプリ連携：中身は2列・間16・余白20。カードは余白18・間6。 */

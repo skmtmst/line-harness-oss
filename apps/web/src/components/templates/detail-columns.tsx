@@ -3,9 +3,11 @@
 import { useId, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import styles from './page-templates.module.css'
+import detailStyles from '@/components/shared/detail-content.module.css'
 
 /** 詳細の本文と補助欄。狭い板では補助欄を畳み、操作は開いて使う。 */
-export function DetailColumns({ children, aside, asideLabel, expanded, onExpandedChange, presentation, variant, toggleLabel, showToggle = true }: {
+export function DetailColumns({ children, aside, asideLabel, expanded, onExpandedChange, presentation, variant, toggleLabel, showToggle = true, asideLayout }: {
+  asideLayout?: 'detail'
   variant?: 'restaurant-inventory' | 'restaurant-tables' | 'restaurant-ledger' | 'analysis-history' | 'style-dashboard' | 'style-roster'
   children: ReactNode
   aside: ReactNode
@@ -23,6 +25,6 @@ export function DetailColumns({ children, aside, asideLabel, expanded, onExpande
       <Button aria-expanded={expanded} aria-controls={asideId} onClick={() => onExpandedChange(!expanded)}>{toggleLabel ?? asideLabel}</Button>
     </div> : null}
     <div className={styles.detailColumnMain}>{children}</div>
-    {aside ? <aside id={asideId} className={styles.detailColumnAside} aria-label={asideLabel} data-expanded={expanded || undefined}>{aside}</aside> : null}
+    {aside ? <aside id={asideId} className={`${styles.detailColumnAside} ${detailStyles.surface}`} aria-label={asideLabel} data-expanded={expanded || undefined} data-detail-layout={asideLayout}>{aside}</aside> : null}
   </div>
 }

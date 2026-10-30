@@ -1,3 +1,4 @@
+import { sameStarterSnapshot } from './style-starter-snapshot.js';
 import {prepareStarterInsert} from './style-starter-insert-context.js';
 import { styleMenuButtons } from './style-menu-buttons.js';
 import { friendAddStarterStatements } from './style-starter-friend-add.js';
@@ -68,7 +69,7 @@ export async function insertStyleStarterItems(
             old.kind,
             old.target_id,
           );
-          if (snapshot === old.source_snapshot) {
+          if (sameStarterSnapshot(old.kind, snapshot, old.source_snapshot)) {
             statements.push(
               snapshotGuard(db, account, old.kind, old.target_id, snapshot),
             );
@@ -184,7 +185,7 @@ export async function insertStyleStarterItems(
             id,
             account,
             '【見本】' + item.name,
-            JSON.stringify({ text: item.text ?? item.name }),
+            item.text ?? item.name,
           ),
       );
     else if (item.kind === 'automation') {
@@ -243,7 +244,7 @@ export async function insertStyleStarterItems(
             sendAtTime: item.sendAtTime ?? null,
             offsetMinutes: item.offsetMinutes ?? -1440,
             messageType: 'text',
-            messageContent: JSON.stringify({ text: item.text ?? item.name }),
+            messageContent: item.text ?? item.name,
           },
         ],
         lineAccountId: account,
@@ -287,7 +288,7 @@ export async function insertStyleStarterItems(
             item.offsetMinutes ?? -1440,
             item.offsetDays ?? null,
             item.sendAtTime ?? null,
-            JSON.stringify({ text: item.text ?? item.name }),
+            item.text ?? item.name,
             now,
           ),
       );

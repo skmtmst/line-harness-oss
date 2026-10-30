@@ -849,9 +849,13 @@ export type TemplateListFilter = {
   folderIds?: string[] | 'none';
   /** 文字テンプレートだけに絞るなど。 */
   messageType?: string;
+  /** 入力欄へ入れられる文字本文だけ。質問付きの文字は含めない。 */
+  textOnly?: boolean;
   /** 選択画面の分類。reservation/ec は名称・本文の文字一致、frequent は送信実績順。 */
   quick?: 'reservation' | 'ec' | 'frequent';
 };
+
+const plainTextTemplateWhere = "message_type = 'text' AND (question_json IS NULL OR TRIM(question_json) IN ('', 'null'))";
 
 const QUICK_KEYWORDS: Record<'reservation' | 'ec', string[]> = {
   // 選択画面がこれまでクライアント側で使っていた正規表現と同じ語。
@@ -892,6 +896,7 @@ export async function getTemplatesWithUsageCount(
     filters.push('message_type = ?');
     values.push(filter.messageType);
   }
+  if (filter?.textOnly) filters.push(plainTextTemplateWhere);
   if (filter?.q && filter.q.trim() !== '') {
     const like = `%${likeEscape(filter.q.trim())}%`;
     filters.push(`(name LIKE ? ESCAPE '\\' OR message_content LIKE ? ESCAPE '\\')`);
@@ -1094,6 +1099,7 @@ export async function getTemplateFolderCounts(
   db: D1Database,
   scope?: TemplateListScope,
   messageType?: string,
+  textOnly = false,
 ): Promise<Map<string, number>> {
   const filters: string[] = ['deleted_at IS NULL'];
   const values: unknown[] = [];
@@ -1101,6 +1107,7 @@ export async function getTemplateFolderCounts(
     filters.push('message_type = ?');
     values.push(messageType);
   }
+  if (textOnly) filters.push(plainTextTemplateWhere);
   if (scope) {
     if (scope.accountIds.length > 0) {
       filters.push(

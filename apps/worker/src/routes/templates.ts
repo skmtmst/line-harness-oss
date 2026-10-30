@@ -220,6 +220,11 @@ templates.get('/api/templates', async (c) => {
     */
     const q = c.req.query('q') ?? undefined;
     const messageType = c.req.query('message_type') ?? undefined;
+    const textOnlyParam = c.req.query('text_only');
+    if (textOnlyParam !== undefined && textOnlyParam !== '0' && textOnlyParam !== '1') {
+      return c.json({ success: false, error: 'text_only が正しくありません' }, 400);
+    }
+    const textOnly = textOnlyParam === '1';
     const quickParam = c.req.query('quick');
     const quick: 'frequent' | 'reservation' | 'ec' | undefined =
       quickParam === 'frequent' || quickParam === 'reservation' || quickParam === 'ec'
@@ -239,8 +244,8 @@ templates.get('/api/templates', async (c) => {
       folderIds = (childRows.results ?? []).map((row) => row.id);
       if (!folderIds.includes(folderParam)) folderIds.push(folderParam);
     }
-    const filter = (q || messageType || quick || folderIds !== undefined)
-      ? { q, messageType, quick, folderIds }
+    const filter = (q || messageType || textOnly || quick || folderIds !== undefined)
+      ? { q, messageType, textOnly, quick, folderIds }
       : undefined;
     const { items, total } = await getTemplatesWithUsageCount(c.env.DB, category, {
       accountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
@@ -300,7 +305,7 @@ templates.get('/api/templates', async (c) => {
         ? Object.fromEntries(await getTemplateFolderCounts(c.env.DB, {
           accountIds: requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
           includeUnassigned: requestedAccountId ? false : scope.canSeeUnassigned,
-        }, messageType))
+        }, messageType, textOnly))
         : undefined;
       return c.json({
         success: true,

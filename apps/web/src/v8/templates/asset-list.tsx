@@ -9,7 +9,7 @@ import BroadcastAssetManager, { type BroadcastAssetListLayout } from '@/componen
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import EmptyList from '@/components/shared/empty-list'
-import FilterChip from '@/components/shared/filter-chip'
+import SegmentedControl from '@/components/shared/segmented'
 import FolderPanel, { FOLDER_RAIL_WIDTH, type FolderPanelRow } from '@/components/shared/folder-panel'
 import ListState from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
@@ -113,11 +113,9 @@ function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, items
     </FolderPanel>}
     toolbar={<ListToolbar search={{ value: query, onChange: value => { setQuery(value); setPage(1) },
       placeholder: `${meta.title}を探す` }} filters={
-      <div role="group" aria-label="公開の状態">
-        {([{ id: 'all', label: 'すべて' }, { id: 'published', label: '公開中' }, { id: 'draft', label: '下書き' }])
-          .map(option => <FilterChip key={option.id} selected={status === option.id}
-            onChange={() => { setStatus(option.id); setPage(1) }}>{option.label}</FilterChip>)}
-      </div>
+      <SegmentedControl aria-label="公開の状態" value={status}
+        onChange={value => { setStatus(value); setPage(1) }}
+        options={[{ value: 'all', label: 'すべて' }, { value: 'published', label: '公開中' }, { value: 'draft', label: '下書き' }]} />
     } />}
     pagination={ready ? <Pagination page={page} pageCount={Math.ceil(filtered.length / 20)} correctOutOfRange
       range={{ total: filtered.length, first: (page - 1) * 20 + 1, last: Math.min(page * 20, filtered.length) }}

@@ -6,6 +6,8 @@ import { runOptimistic } from '@/lib/undoable';
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { Chat } from './inbox-model';
+import { useStaffRole } from '@/lib/staff-role';
+import { canEditFeature } from '@/lib/staff-capability';
 
 type Options = {
   chatDetail: ApiChatDetail | null
@@ -18,6 +20,7 @@ type Options = {
 }
 
 export function useInboxActions({ chatDetail, selectedChatId, loadChatDetail, loadChats, setError, setChatDetail, setChats }: Options) {
+  const staffRole = useStaffRole()
 
   const [showMemoEditor, setShowMemoEditor] = useState(false)
 
@@ -65,11 +68,16 @@ export function useInboxActions({ chatDetail, selectedChatId, loadChatDetail, lo
 
   /** 友だち一覧と同じ「注目」を受信箱の★から切り替える。 */
   const handleAttentionUpdate = async () => {
-    if (!chatDetail || attentionSaving) return
+    if (!chatDetail || attentionSaving || !canEditFeature('/friends', staffRole)) return
     const updatingChatId = chatDetail.id
+    const updatingFriendId = chatDetail.friendId
     const next = !chatDetail.isAttention
+    const apply = (isAttention: boolean) => {
+      setChatDetail((current) => current?.id === updatingChatId ? { ...current, isAttention } : current)
+      setChats((current) => current.map((chat) => chat.friendId === updatingFriendId ? { ...chat, isAttention } : chat))
+    }
     setAttentionSaving(true)
-    setChatDetail((current) => current?.id === updatingChatId ? { ...current, isAttention: next } : current)
+    apply(next)
     try {
       // N-040(#808): 友だちの現行改訂値を読んでから送り、競合は上書きしない。
       const detail = await fetchApi<{ success: boolean; data: { updatedAt: string } }>(
@@ -79,8 +87,9 @@ export function useInboxActions({ chatDetail, selectedChatId, loadChatDetail, lo
         `/api/friends/${chatDetail.friendId}/metadata?expectedUpdatedAt=${encodeURIComponent(detail.data.updatedAt)}`,
         { method: 'PUT', body: JSON.stringify({ __attention: next ? '1' : null }) },
       )
+      apply(next)
     } catch (error) {
-      setChatDetail((current) => current?.id === updatingChatId ? { ...current, isAttention: !next } : current)
+      apply(!next)
       if (error instanceof ApiError && error.status === 409) {
         setError('ほかの変更が先に保存されました。最新の状態で確認してもう一度お試しください。')
       } else {

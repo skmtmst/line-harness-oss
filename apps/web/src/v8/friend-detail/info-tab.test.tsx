@@ -26,3 +26,25 @@ test('保存前の入力があるとき、ほかへのリンクを押すと「�
  fireEvent.click(screen.getByText('情報欄を管理'))
  expect(await screen.findByRole('dialog',{name:'保存していない変更があります'})).toBeTruthy()
 })
+
+test('空の氏名欄と編集用アレルギーに値や未設定行を重ねない', () => {
+ const fields=[{id:'name',name:'名前',type:'text',fixedKey:'name',value:null},{id:'allergy',name:'アレルギー',type:'checkbox',fixedKey:'allergy',value:null}];
+ const data={fields,values:{name:'',allergy:''},fieldsStatus:'ready',fieldFolders:[],fieldFoldersStatus:'ready',hiddenPersonalCount:0,warnings:[],setValues:vi.fn(),saving:false};
+ render(<InfoTab friendId="f" group="all" data={data as never} perms={{canEditField:()=>true,saveFields:true} as never}/>);
+ const name=screen.getByLabelText('名前') as HTMLInputElement;
+ expect(name.value).toBe('');expect(name.placeholder).toBe('未設定');
+ const allergy=screen.getByText('アレルギー').closest('label')!.parentElement!;
+ expect(within(allergy).queryByText('未設定')).toBeNull();
+ expect(within(allergy).getByRole('button',{name:'選んで足す'})).toBeTruthy();
+ expect(data.setValues).not.toHaveBeenCalled();
+})
+
+test('閲覧のみの空の日付は架空の値を入れず、アレルギーの未設定は残す', () => {
+ const fields=[{id:'anniversary',name:'記念日',type:'date',fixedKey:'anniversary',value:null},{id:'allergy',name:'アレルギー',type:'checkbox',fixedKey:'allergy',value:null}];
+ const data={fields,values:{anniversary:'',allergy:''},fieldsStatus:'ready',fieldFolders:[],fieldFoldersStatus:'ready',hiddenPersonalCount:0,warnings:[],setValues:vi.fn()};
+ render(<InfoTab friendId="f" group="all" data={data as never} perms={{canEditField:()=>false} as never}/>);
+ const date=screen.getByRole('textbox',{name:'記念日の値'}) as HTMLInputElement;
+ expect(date.value).toBe('');expect(date.placeholder).toBe('未設定');expect(date.readOnly).toBe(true);
+ const allergy=screen.getByText('アレルギー').closest('label')!.parentElement!;
+ expect(within(allergy).getByText('未設定')).toBeTruthy();expect(within(allergy).queryByRole('button')).toBeNull();
+})
