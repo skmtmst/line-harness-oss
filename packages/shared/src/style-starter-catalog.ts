@@ -31,3 +31,7 @@ export interface StarterCatalogApplyResult {
   mode: 'catalog';
   items: Array<StarterCatalogSelection & { state: StarterCatalogItemState; reason: string | null }>;
 }
+export interface StarterCatalogDetails extends StarterCatalogOption {
+  lines: Array<{ label:string; value:string }>;
+  pages?: Array<{name:string;width:number;height:number;areas:Array<{label:string;destination:string;x:number;y:number;width:number;height:number}>}>;
+}

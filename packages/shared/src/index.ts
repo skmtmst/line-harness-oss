@@ -123,7 +123,7 @@ export { lineAccountConnectionState, lineConnectionRisk } from './line-connectio
 export type { LineConnection, LineConnectionIssue } from './line-connection-state.js';
 export { lineObservationTime, lineWebhookSilence, LINE_WEBHOOK_SILENCE_MS } from './line-observation-time.js';
 export { STARTER_CATALOG_KINDS } from './style-starter-catalog.js';
-export type { StarterCatalogKind, StarterCatalogSelection, StarterCatalogDefinition, StarterCatalogOption, StarterCatalogItemState, StarterCatalogApplyResult } from './style-starter-catalog.js';
+export type { StarterCatalogKind, StarterCatalogSelection, StarterCatalogDefinition, StarterCatalogOption, StarterCatalogItemState, StarterCatalogApplyResult, StarterCatalogDetails } from './style-starter-catalog.js';
 
 export { zonedWallTime } from './zoned-time.js';
 export { parseAutomationWait, nextDayWaitAt, automationWaitLabel } from './automation-wait.js';
