@@ -31,6 +31,7 @@ import type {
   OpsSupportDraft,
   HqNotice,
   HqLineRegistration,
+  HqLineRegistrationStatus,
   OperatorHistoryRow,
 } from '../types/ops'
 import { ApiError } from '../transport/errors'
@@ -187,6 +188,7 @@ export const opsMethods = {
     list: () => fetchApi<ApiResponse<HqNotice[]>>('/api/hq/notices'),
     markRead: (id: string) => fetchApi<ApiResponse<{ read: boolean }>>(`/api/hq/notices/${encodeURIComponent(id)}/read`, { method: 'POST', body: '{}' }),
     lineRegistration: () => fetchApi<ApiResponse<HqLineRegistration>>('/api/hq/notices/line-registration'),
+    lineRegistrationStatus: () => fetchApi<ApiResponse<HqLineRegistrationStatus>>('/api/hq/notices/line-registration/status'),
   },
 /** 契約先（統括）から見える運営の操作履歴。書き込みを伴ったものだけ。 */
   operatorHistory: () => fetchApi<ApiResponse<OperatorHistoryRow[]>>('/api/hq/operator-history'),

@@ -7,11 +7,11 @@ import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError } from '@/lib/api'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import ListState from '@/components/shared/list-state'
-import Notice from '@/components/shared/notice'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 
 import { Tabs } from '@/components/shared/tabs'
@@ -26,23 +26,22 @@ import { ChangeConfirmScreen } from './profile-confirm'
 import { HistoryScreen } from './profile-history'
 import { ProfileEditScreen } from './profile-edit'
 import { HoursEditor } from './profile-hours'
-import SettingsBoard from './settings'
 import styles from './google.module.css'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 /*
  * ★V8 Googleビジネス（Pencil：口コミ ・返信を作る ・投稿 ・投稿を作る ・
- * パフォーマンス ・プロフィール ・設定 ）。
+ * パフォーマンス ・プロフィール ）。
  *
- * 板の頭（題・説明・店舗を選ぶ欄）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール・設定）
+ * 板の頭（題・説明・店舗を選ぶ欄）→ 検証環境の帯 → タブ（口コミ・投稿・パフォーマンス・プロフィール）
  * → タブの中身。受け付ける URL は今の画面と同じ（?tab=・?view=・?id=・?kind=・?google=）。
  * 営業時間・確認・履歴・編集も共通の V8 部品で出す。動きは BEHAVIOR.md。
  */
 
 export type { MediaUploadHelpers } from './posts'
 
-export const TAB_LABELS = { reviews: '口コミ', posts: '投稿', performance: 'パフォーマンス', profile: 'プロフィール', settings: '設定' } as const
+export const TAB_LABELS = { reviews: '口コミ', posts: '投稿', performance: 'パフォーマンス', profile: 'プロフィール' } as const
 export type GoogleTab = keyof typeof TAB_LABELS
 
 /** 口コミの一覧の帯だけ、返信が実際に Google に届くことを知らせる。 */
@@ -56,23 +55,9 @@ const TAB_HELP: Record<GoogleTab, string> = {
   posts: `${HELP_BASE}投稿は Google に出す最新情報・イベント・特典・お知らせです。行の「…」から、中身を見る・Google から削除・Instagram へもう一度送るができます。削除は元に戻せません（確認の窓が出ます）。Instagram が失敗した投稿は再送でき、Google への公開はそのまま残ります。時刻はすべて日本時間（Asia/Tokyo）です。`,
   performance: `${HELP_BASE}Google の検索・地図でどれだけ見られたかを出します。数字は Google ビジネス プロフィールの集計です（前日までの分。2〜3日遅れることがあります）。`,
   profile: HELP_BASE,
-  settings: `${HELP_BASE}接続を解除すると、口コミ・投稿・パフォーマンスの取り込みが止まります。解除の前に確認の窓が出ます。`,
 }
 
 const REVIEWS_BANNER_NOTE = 'Google への返信は、つないだ設定で実際に Google に届きます。送れない設定のときは送信ボタンを出しません'
-
-/** Googleからの戻り（?google=connected など）の知らせ（今の画面と同じ文）。 */
-const RETURN_MESSAGES: Record<string, { tone: 'info' | 'warn' | 'danger'; text: string }> = {
-  connected: { tone: 'info', text: 'Googleアカウントを接続しました。口コミを取得します。' },
-  reconnected: { tone: 'info', text: 'Googleアカウントを再接続しました。' },
-  select_location: { tone: 'warn', text: 'このLINEアカウントに結びつける店舗を1つ選んでください。前につないでいた店舗とは別の店舗を選ぶと、切り替える前に確認します。' },
-  'error:invalid_state': { tone: 'danger', text: '認可の確認に失敗しました。もう一度「接続する」からやり直してください。' },
-  'error:denied': { tone: 'danger', text: 'Googleでの許可が取り消されました。接続は変更していません。' },
-  'error:location_mismatch': { tone: 'danger', text: '選んだ店舗をGoogleで確認できなかったため保存しませんでした。店舗一覧をもう一度読み込んでから選び直してください。' },
-  'error:no_locations': { tone: 'danger', text: 'このGoogleアカウントで管理できる店舗が見つかりませんでした。店舗を管理しているGoogleアカウントでログインしてください。' },
-  'error:oauth_not_configured': { tone: 'danger', text: 'この環境にはGoogle接続の設定がありません。' },
-  'error:no_permission': { tone: 'danger', text: 'Googleの許可画面で「ビジネス情報の管理」の許可が外れていたため、接続していません。もう一度「接続する」から進み、この許可を付けたままにしてください。' },
-}
 
 function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   const saveErrors = useSaveFormErrors()
@@ -86,7 +71,6 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
   const [stores, setStores] = useState<GoogleBusinessStore[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [banner, setBanner] = useState<{ tone: 'info' | 'warn' | 'danger'; text: string } | null>(null)
 
   const load = useCallback(async () => {
     if (!selectedAccountId) { setData(null); setLoading(false); return }
@@ -112,14 +96,15 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
 
   useEffect(() => { void load() }, [load])
 
-  // Googleからの戻り（?google=…）を1回だけ帯に出して、URLから消す（今の画面と同じ）。
+  // 旧ブックマークと旧OAuth戻り先は、接続操作のあるSNS連携へ案内する。
   useEffect(() => {
-    const result = searchParams.get('google')
-    if (!result) return
-    setBanner(RETURN_MESSAGES[result] ?? { tone: 'danger', text: 'Googleとの接続に失敗しました。あとでもう一度お試しください。' })
-    const next = new URLSearchParams(searchParams.toString())
-    next.delete('google')
-    samePageUrl.replace(`/restaurant-test/google${next.toString() ? `?${next.toString()}` : ''}`)
+    if (searchParams.get('tab') !== 'settings' && !searchParams.has('google')) return
+    const next = new URLSearchParams()
+    for (const key of ['google', 'account_id']) {
+      const value = searchParams.get(key)
+      if (value) next.set(key, value)
+    }
+    samePageUrl.replace(`/settings/sns${next.toString() ? `?${next.toString()}` : ''}`)
   }, [samePageUrl, searchParams])
 
   const go = useCallback<GoogleNav>((params) => {
@@ -130,8 +115,8 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
 
   const connected = data?.connection.status === 'connected' || data?.connection.status === 'expired' || data?.connection.status === 'no_permission'
   const requestedTab = searchParams.get('tab') as GoogleTab | null
-  const tab: GoogleTab = !connected ? 'settings' : requestedTab && requestedTab in TAB_LABELS ? requestedTab : 'reviews'
-  const { allowed: canManage } = useGooglePermission(tab === 'settings' ? 'tenantWide' : 'manager', tab !== 'settings' || Boolean(data?.permissions.canManageConnection))
+  const tab: GoogleTab = requestedTab && requestedTab in TAB_LABELS ? requestedTab : 'reviews'
+  const { allowed: canManage } = useGooglePermission('manager')
   const view = searchParams.get('view')
   const id = searchParams.get('id')
   const kindParam = searchParams.get('kind')
@@ -144,8 +129,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     : tab === 'posts' ? (postsView === 'list' ? 'Cfed0' : 'T1j2Sw')
       : tab === 'performance' ? 'SrmVs'
         : tab === 'profile' ? 'JUTGz'
-          : tab === 'settings' ? 'CuHXG'
-            : 'j0Wcg'
+          : 'j0Wcg'
 
   const currentStoreId = useMemo(() => stores.find((item) => item.line_account_id === selectedAccountId)?.id
     ?? stores.find((item) => item.id === data?.store.id)?.id ?? '', [stores, selectedAccountId, data])
@@ -174,6 +158,7 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
     }
     if (error || !data) return <ListState kind="error" title="Googleビジネスを表示できませんでした" description={error} onRetry={() => void load()} />
     const accountId = selectedAccountId
+    if (!connected) return <ListState kind="empty" title="Googleビジネスは未接続です" description="設定のSNS連携からGoogleアカウントを接続してください。" action={<Link href="/settings/sns">SNS連携を開く</Link>} />
     return (
       <>
         <Tabs
@@ -185,14 +170,10 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
             return {
               label: count ? `${TAB_LABELS[key]} ${count}` : TAB_LABELS[key],
               current: tab === key,
-              disabled: !connected && key !== 'settings',
               onClick: () => requestUnsavedAction(() => samePageUrl.replace(`/restaurant-test/google?tab=${key}`)),
             }
           })}
         />
-        {banner && data.connection.status !== 'pending_location' ? (
-          <Notice tone={banner.tone} onClose={() => setBanner(null)}>{banner.text}</Notice>
-        ) : null}
         {draftOpen && id ? (
           <ReviewDraft key={id} accountId={accountId} reviewId={id} data={data} go={go} onPublished={() => { void load() }} />
         ) : postsView === 'new' || postsView === 'edit' ? (
@@ -213,8 +194,6 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
           <HoursEditor key={`${accountId}-${searchParams.get('mode') ?? 'text'}-${searchParams.get('date') ?? ''}`} accountId={accountId} mode={searchParams.get('mode') === 'calendar' ? 'calendar' : searchParams.get('mode') === 'weekly' ? 'weekly' : 'text'} initialDate={searchParams.get('date')} go={go} />
         ) : tab === 'profile' ? (
           <ProfileBoard accountId={accountId} go={go} />
-        ) : tab === 'settings' ? (
-          <SettingsBoard accountId={accountId} data={data} onChanged={() => { void load() }} />
         ) : (
           <ReviewsBoard accountId={accountId} data={data} go={go} onSynced={() => { void load() }} />
         )}
@@ -230,9 +209,9 @@ function GoogleInner({ mediaUpload }: { mediaUpload?: MediaUploadHelpers }) {
       picker={picker}
     >
       <div className={styles.noticeStack} data-google-notices>
-        {!accountLoading && !loading && !error && Boolean(data) && known && !(tab === 'profile' || tab === 'settings' ? canManage : canEdit)
-          ? <ReadOnlyNotice need={tab === 'settings' ? 'tenantWide' : tab === 'profile' ? 'manager' : 'feature'} /> : null}
-        <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : tab === 'settings' && data && !data.writeEnabled ? '外部への更新は止めています' : undefined} />
+        {!accountLoading && !loading && !error && Boolean(data) && known && !(tab === 'profile' ? canManage : canEdit)
+          ? <ReadOnlyNotice need={tab === 'profile' ? 'manager' : 'feature'} /> : null}
+        <BoundaryBanner note={boardId === 'j0Wcg' ? REVIEWS_BANNER_NOTE : undefined} />
       </div>
       {body}
     </RestaurantPage></SaveErrorScope>

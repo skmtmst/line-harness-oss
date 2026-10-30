@@ -421,7 +421,7 @@ describe('Googleビジネス：設定（接続）', () => {
     const response = await startAndCallback((state) => `state=${state}&code=auth-code`, null);
     expect(response.status).toBe(302);
     const location = new URL(response.headers.get('location')!);
-    expect(location.origin + location.pathname).toBe('https://admin.example.test/restaurant-test/google');
+    expect(location.origin + location.pathname).toBe('https://admin.example.test/settings/sns');
     expect(location.searchParams.get('google')).toBe('connected');
     expect(location.searchParams.get('account_id')).toBe('account-2');
 

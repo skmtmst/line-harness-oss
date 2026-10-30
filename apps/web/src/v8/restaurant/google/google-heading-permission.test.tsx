@@ -55,7 +55,7 @@ it('アカウント自体を読んでいる間も帯を出さない', async () =
   expect(notices()).toHaveLength(0)
 })
 it.each([
-  ['reviews', 'feature'], ['posts', 'feature'], ['performance', 'feature'], ['profile', 'manager'], ['settings', 'tenantWide'],
+  ['reviews', 'feature'], ['posts', 'feature'], ['performance', 'feature'], ['profile', 'manager'],
 ] as const)('%s はデータを読んだ後に %s の帯を題の下へ1本だけ出す', async (tab, need) => {
   fixture.tab = tab; identity('staff'); render(<GoogleV8 />)
   await act(async () => { resolve(data(false)) })
@@ -70,7 +70,7 @@ it.each([
   expect(group.lastElementChild?.textContent).toContain('検証環境専用')
   expect(header.compareDocumentPosition(group) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
-it.each(['reviews', 'posts', 'performance', 'profile', 'settings'])('閲覧のみの %s も標準の帯が1本だけ', async tab => {
+it.each(['reviews', 'posts', 'performance', 'profile'])('閲覧のみの %s も標準の帯が1本だけ', async tab => {
   fixture.tab = tab; identity('viewer'); render(<GoogleV8 />)
   await act(async () => { resolve(data()) })
   await waitFor(() => expect(notices()).toHaveLength(1))

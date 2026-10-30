@@ -45,6 +45,7 @@ describe('86 Googleビジネス：店の切り替えは選ぶ欄1つ', () => {
     render(<GoogleV8 />)
     expect(await screen.findByRole('button', { name: '店舗' })).toBeTruthy()
     expect(screen.queryByRole('tablist', { name: '店舗で絞り込む' })).toBeNull()
+    expect(screen.queryByText('設定')).toBeNull()
   })
 
   it('店が1つしか無い時は選ぶ欄を出さない', async () => {
