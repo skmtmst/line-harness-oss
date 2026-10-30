@@ -5,7 +5,9 @@
   文字列検査ではないので、組の見出しの文字の上端が右の板の上端と
   そろっているか、ロゴが上の帯の縦の中心にあるか、項目・設定の箱の
   左端がロゴの箱と同じ線にあるかをブラウザの側から見る。
-  店の画面（/friends）と統括の画面（/hq）を 1440px と 1152px で見る。
+  店の画面（/friends）と統括の画面（/hq）を 1440px・1366px・1152px で見る。
+  1366px は谷間帯（1280〜1439px）の上書きが効く幅で、左端のそろえが
+  崩れないことを確かめる。
 
   APIは1か所で受けて必ず `fulfill` する。**外へは1本も出さない。**
   （`tag-archived-edit.spec.mjs` と同じ作法。）
@@ -78,7 +80,7 @@ async function measure(page, heading) {
   }, heading)
 }
 
-for (const width of [1440, 1152]) {
+for (const width of [1440, 1366, 1152]) {
   test.describe(`左メニューのそろえ ${width}px`, () => {
     test.use({ viewport: { width, height: 900 }, timezoneId: 'Asia/Tokyo' })
     for (const [title, route, scope, heading] of [

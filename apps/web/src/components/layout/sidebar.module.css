@@ -149,7 +149,8 @@
   }
 
   .nav {
-    padding: 0 8px 8px;
+    /* 谷間帯でも項目の箱の左端はロゴの箱と同じ線（--space-20）にそろえる。 */
+    padding: 0 var(--space-20) 8px;
   }
 
   .item {
