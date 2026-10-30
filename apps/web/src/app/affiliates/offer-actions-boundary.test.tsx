@@ -293,6 +293,6 @@ test('案件を作る入口から新規の窓を開く', async () => {
   await screen.findByRole('button', { name: '案件Aの操作' })
   const create = screen.getAllByRole('button', { name: /案件を作る/ })[0]
   fireEvent.click(create)
-  const title = await screen.findByText('案件を作る', { selector: 'h2' })
-  expect(title.closest('[role="dialog"]')).toBeTruthy()
+  const dialog = await screen.findByRole('dialog')
+  expect(within(dialog).getByRole('heading', { name: /案件を作る/ })).toBeTruthy()
 })
