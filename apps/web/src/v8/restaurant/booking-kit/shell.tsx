@@ -228,7 +228,13 @@ export default function RestaurantShell({ boardId, title, description, explanati
     children?.(ctx)
   )
   /* 86: 店の切り替えは［店舗：…］の選ぶ欄1つに統一。店が1つしか無い時は出さない。 */
-  const storePicker = snapshot && snapshot.stores.length > 1 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect compact size="full" aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/></SaveErrorField></span> : <SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect compact size="full" aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/></SaveErrorField> : null
+  const storePicker = snapshot && snapshot.stores.length > 1 ? (
+    <span className={templateHeading ? styles.fusionStore : styles.storePicker}>
+      <SaveErrorField names={["selectedStoreId", "selected_store_id"]}>
+        <EntitySelect compact size="full" aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item => ({ value: item.id, label: item.name }))} />
+      </SaveErrorField>
+    </span>
+  ) : null
   const noticeBand = loadError !== null && snapshot?.organization ? <ListState kind="error" title={savedButUnread ? "保存しましたが、最新の表示を読み込めませんでした" : "最新の表示を読み込めませんでした"} error={loadError} onRetry={()=>void load()}/> : notice ? (
     <Notice role="status" tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />
   ) : null
