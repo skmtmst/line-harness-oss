@@ -605,3 +605,17 @@ test('1 つの操作の段で高さが違う操作が並ぶと落ち、36px に�
     assert.deepEqual(await page.evaluate(scanRowHeights), [])
   } finally { await browser.close() }
 })
+
+test('保存した検索の印が文字へ交差すると落ち、離した印と文字なしのボタンは通る', async () => {
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><div style="position:relative"><svg class="lucide-bookmark" style="position:absolute;left:8px;top:8px;width:16px;height:16px"></svg><button style="height:36px;padding:0 8px">よく使う絞り込み</button></div></main>')
+    const kinds = async () => (await page.evaluate(scanPolish)).filter(f => f.kind === 'saved-search-icon-overlap')
+    assert.equal((await kinds()).length, 1)
+    await page.locator('button').evaluate(el => { el.style.paddingLeft = '32px' })
+    assert.deepEqual(await kinds(), [])
+    await page.locator('button').evaluate(el => { el.style.paddingLeft = '8px'; el.textContent = '' })
+    assert.deepEqual(await kinds(), [])
+  } finally { await browser.close() }
+})

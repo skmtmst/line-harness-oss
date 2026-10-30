@@ -83,20 +83,6 @@
   gap: var(--tpl-toolbar-gap);
 }
 
-.savedBox { position: relative; width: var(--tpl-am-saved-w); }
-.savedBox :global(*) { max-width: 100%; }
-.savedBox :global(button) { width: 100%; padding-left: calc(var(--tpl-chip-row-gap) * 9); }
-.savedBox :global(button) > svg:last-child { display: none; }
-.savedIcon {
-  position: absolute;
-  top: 50%;
-  left: var(--tpl-rule-row-gap);
-  z-index: 1;
-  color: var(--color-ink-secondary);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
 .pagerCount {
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);

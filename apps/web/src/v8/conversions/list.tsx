@@ -835,9 +835,7 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
     </>
   )
   const savedBox = (
-    <div className={styles.savedBox}>
-      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
-      <SaveErrorField names={["status","sort"]}><Select
+    <SaveErrorField names={["status","sort"]}><Select size="content" icon={<Bookmark size={16} aria-hidden="true" />} showChevron={false}
         aria-label="よく使う絞り込み"
         value={status === 'all' ? '' : status}
         onChange={(value) => {
@@ -850,7 +848,6 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
           ...(role !== null && !canEdit ? SORT_OPTIONS.map((option) => ({ value: `sort:${option.value}`, label: `並び：${option.label}` })) : []),
         ]}
       /></SaveErrorField>
-    </div>
   )
   const perPageBox = <PageSizeSelect value={pageSize} onChange={setPageSize} options={[10, 20, 50]} label={null} />
   const notice = (

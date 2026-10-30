@@ -275,9 +275,7 @@ export default function CommonActionsV8() {
     ]} />
   )
   const savedBox = (
-    <div className={styles.savedBox}>
-      <Bookmark size={16} aria-hidden="true" className={styles.savedIcon} />
-      <SaveErrorField names={["filter","status"]}><Select
+      <SaveErrorField names={["filter","status"]}><Select size="content" icon={<Bookmark size={16} aria-hidden="true" />} showChevron={false}
         aria-label="よく使う絞り込み"
         value={filter === 'old_version' || filter === 'unused' ? filter : ''}
         onChange={(value) => setFilter((value || 'all') as Filter)}
@@ -287,7 +285,6 @@ export default function CommonActionsV8() {
           { value: 'unused', label: 'どこからも呼ばれていない' },
         ]}
       /></SaveErrorField>
-    </div>
   )
   const toolbar = (
     <>

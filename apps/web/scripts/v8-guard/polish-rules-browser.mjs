@@ -120,6 +120,16 @@ export default function scanPolishRules() {
     const gap = r.right <= text.left + 0.5 ? text.left - r.right : r.left >= text.right - 0.5 ? r.left - text.right : null
     if (gap !== null && Math.abs(gap - 8) > 0.5) add('button-icon-gap', el, { gap: Math.round(gap * 10) / 10 }, el.textContent)
   }
+  // 保存した検索の印は、ボタン内・旧来の外置きどちらでも文字と交差させない。
+  for (const svg of document.querySelectorAll('svg.lucide-bookmark')) {
+    const button = svg.closest('button') ?? svg.parentElement?.querySelector('button')
+    if (!button || !visible(button) || !visible(svg)) continue
+    const text = textBox(button), icon = svg.getBoundingClientRect()
+    if (text && Math.min(icon.right, text.right) - Math.max(icon.left, text.left) > 0.5
+      && Math.min(icon.bottom, text.bottom) - Math.max(icon.top, text.top) > 0.5) {
+      add('saved-search-icon-overlap', button, { iconRight: icon.right, textLeft: text.left }, button.textContent)
+    }
+  }
   // 仕上げ（§6.5 の 7）：文字を選んだ時の地（ブランドの深い緑の薄い色）・端末のタップの光なし・画像の幅と高さ・動きを減らす設定の遅れなし。
   // 画面全体の値なので、アプリの CSS を読んだ V8 の画面（data-theme="v8"）だけで見る。
   if (document.documentElement.dataset.theme === 'v8') {
