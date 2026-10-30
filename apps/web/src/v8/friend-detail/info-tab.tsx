@@ -104,7 +104,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
   const leaveDialog = <UnsavedLeaveDialog open={leaveTarget !== null} subject="情報欄への変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
 
   if (fieldsStatus === 'loading' || fieldsStatus === 'idle') {
-    return <div className={styles.pane}><DetailLoading /></div>
+    return <div className={`${styles.pane} ${styles.infoPane}`}><DetailLoading /></div>
   }
   if (fieldsStatus === 'error') {
     return (
@@ -147,7 +147,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
   const base = `/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`
 
   return (
-    <div className={styles.pane}>
+    <div className={`${styles.pane} ${styles.infoPane}`}>
       <div className={styles.chips} role="group" aria-label="情報欄の分類">
         {chips.map((chip) => (
           <FilterLink

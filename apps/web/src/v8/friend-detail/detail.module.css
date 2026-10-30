@@ -97,6 +97,7 @@ a.recentTitle:hover { text-decoration: underline; }
 .skeletonRow { height: var(--tpl-fdt-hist-row-h); box-shadow: var(--shadow-row-line); background: linear-gradient(90deg, var(--color-surface-pearl), var(--color-canvas), var(--color-surface-pearl)); }
 
 /* ---- 情報欄タブ ---- */
+.infoPane { flex: 1 1 0; }
 .chips { display: flex; flex-wrap: wrap; gap: var(--tpl-fdt-tag-gap); }
 .fieldGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--tpl-fdt-info-col-gap); row-gap: var(--tpl-fdt-info-row-gap); }
 .infoGroup { display: flex; flex-direction: column; gap: var(--tpl-fdt-info-gap); }
@@ -146,7 +147,6 @@ a.recentTitle:hover { text-decoration: underline; }
 @container v8-page (max-width: 900px) {
   .overview { flex-direction: column; }
   .summary { width: 100%; border-right: 0; border-bottom: 1px solid var(--color-hairline); }
-  .fieldGrid { grid-template-columns: minmax(0, 1fr); }
 }
 
 .secNote, .secNoteNoticePlacement { margin: 0; }
@@ -157,3 +157,7 @@ a.recentTitle:hover { text-decoration: underline; }
 /* ：狭い幅の要点は共通の欄で開く。本文の上に長い列を積まない。 */
 .overview:has(:global([data-customer-rail][data-collapsed])) { flex-direction: column; }
 .summary { padding: var(--tpl-customer-rail-pad); }
+
+@container v8-page (max-width: 600px) {
+  .fieldGrid { grid-template-columns: minmax(0, 1fr); }
+}
