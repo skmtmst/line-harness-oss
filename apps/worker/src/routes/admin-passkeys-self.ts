@@ -10,7 +10,7 @@ import { getActiveImpersonation } from '@line-crm/db';
 import { inputJsonBoundary, readBoundedText, validatedInputBody } from '../lib/input-errors.js';
 
 /** WebAuthn runs on the canonical admin origin, not on the separate API origin. */
-function relyingParty(c: Context<Env>): { origin: string; rpID: string } | null {
+export function relyingParty(c: Context<Env>): { origin: string; rpID: string } | null {
   try {
     const configured = new URL(c.env.ADMIN_PUBLIC_URL ?? '');
     if (configured.protocol !== 'https:' && configured.hostname !== 'localhost') return null;
@@ -19,7 +19,7 @@ function relyingParty(c: Context<Env>): { origin: string; rpID: string } | null 
   } catch { return null; }
 }
 
-function encode(bytes: Uint8Array): string {
+export function encode(bytes: Uint8Array): string {
   let binary = '';
   for (const value of bytes) binary += String.fromCharCode(value);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
@@ -37,8 +37,8 @@ async function currentOwner(c: Context<Env>) {
   return { staff, sessionHash };
 }
 
-type Challenge = { challenge: string; purpose: 'register'; staff_id: string | null; session_token_hash: string | null };
-async function createChallenge(c: Context<Env>, purpose: Challenge['purpose'], challenge: string, staffId: string | null, sessionHash: string | null) {
+export type PasskeyChallenge = { challenge: string; purpose: 'register' | 'login'; staff_id: string | null; session_token_hash: string | null };
+export async function createChallenge(c: Context<Env>, purpose: PasskeyChallenge['purpose'], challenge: string, staffId: string | null, sessionHash: string | null) {
   const token = randomToken();
   const now = new Date();
   await c.env.DB.prepare('DELETE FROM staff_passkey_challenges WHERE expires_at<=?').bind(now.toISOString()).run();
@@ -47,10 +47,10 @@ async function createChallenge(c: Context<Env>, purpose: Challenge['purpose'], c
     new Date(now.getTime() + 5 * 60_000).toISOString(), now.toISOString()).run();
   return token;
 }
-async function consumeChallenge(c: Context<Env>, token: string, purpose: Challenge['purpose']): Promise<Challenge | null> {
+export async function consumeChallenge(c: Context<Env>, token: string, purpose: PasskeyChallenge['purpose']): Promise<PasskeyChallenge | null> {
   if (!/^[A-Za-z0-9_-]{30,128}$/.test(token)) return null;
   return c.env.DB.prepare(`DELETE FROM staff_passkey_challenges WHERE token_hash=? AND purpose=? AND expires_at>?
-    RETURNING challenge,purpose,staff_id,session_token_hash`).bind(await sha256Hex(token), purpose, new Date().toISOString()).first<Challenge>();
+    RETURNING challenge,purpose,staff_id,session_token_hash`).bind(await sha256Hex(token), purpose, new Date().toISOString()).first<PasskeyChallenge>();
 }
 
 export const adminPasskeysSelf = new Hono<Env>();
