@@ -63,7 +63,7 @@ export default function TablesAssignBoard({ ctx, canEdit, heading, notice }: { c
                 <Td><StatusBadge tone={level.tone} size="compact">{level.label}</StatusBadge></Td>
                 <Td><TruncatedText value={setting?.dailyLimit ? `${setting.dailyLimit} 組` : '上限なし'} /></Td>
                 <Td><TruncatedText value={`${todayCount(table.id)} 組`} /></Td>
-                <ActionCell>{canEdit ? <RowMenu size="row" label={`${name}の操作`} open={openMenu === table.id} onOpenChange={(next) => setOpenMenu(next ? table.id : null)}
+                <ActionCell>{canEdit ? <RowMenu appearance="box" size="row" label={`${name}の操作`} open={openMenu === table.id} onOpenChange={(next) => setOpenMenu(next ? table.id : null)}
                   items={[{ id: 'assign', label: '割り当ての設定', onSelect: () => setTarget(table) }]} /> : null}</ActionCell>
               </Tr>
             )

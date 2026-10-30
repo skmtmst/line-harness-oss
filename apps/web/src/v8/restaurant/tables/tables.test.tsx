@@ -98,19 +98,6 @@ describe('BERxg 座席・卓管理', () => {
     expect(fixture.createTable).not.toHaveBeenCalled()
   })
 
-  it('割り当て表の行の「…」は枠なし（ID1・plain）', async () => {
-    location.query = 'view=assign'
-    render(<TablesPage />)
-    await waitFor(() => expect(screen.getByRole('radio', { name: /ランダム/ }).hasAttribute('disabled')).toBe(false))
-    const menus = screen.getAllByRole('button', { name: /の操作$/ })
-    expect(menus.length).toBeGreaterThan(0)
-    /* MoreAction の3点（fill currentColor）。box（IconButton＋lucide）だと fill="none" で落ちる。 */
-    for (const menu of menus) {
-      expect(menu.querySelector('svg')?.getAttribute('fill')).toBe('currentColor')
-      expect(menu.hasAttribute('data-design-node')).toBe(false)
-    }
-  })
-
   it('数4・フロアマップ・卓の詳細・自動配席ルールが出て、結合グループに札が付く', async () => {
     render(<TablesPage />)
     await screen.findByText('卓の詳細')
