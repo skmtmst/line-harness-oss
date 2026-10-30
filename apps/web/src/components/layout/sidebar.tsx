@@ -14,6 +14,7 @@ import { defaultTitleForPath } from '@/components/shell/app-top-bar'
 import { usePageChrome } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { useAccountStyle } from '@/hooks/use-account-style'
+import { restaurantTestUiEnabled } from '@/lib/environment-features'
 import { styleMenuItemVisible, styleMenuLabel } from './style-menu'
 import { allowFeatureNavigation, featureGateVisibility, usePreparingDialog } from './sidebar-feature-gate'
 import { SIDEBAR_TOGGLE_EVENT,UNANSWERED_REFRESH_EVENT } from '@/lib/events'
@@ -22,7 +23,7 @@ FEATURE_SETTINGS_UPDATED_EVENT,
 SIDEBAR_FEATURE_BY_HREF,
 SPECIALIZED_FEATURE_KEYS,
 } from '@/lib/feature-settings'
-import { HQ_MENU_SECTIONS,isHqShellPath,menuOwnerForScreen,orderedMenuSections,type MenuItem,type MenuSection } from '@/lib/menu'
+import { HQ_MENU_SECTIONS,isHqShellPath,menuOwnerForScreen,orderedMenuSections,restaurantMenuSections,type MenuItem,type MenuSection } from '@/lib/menu'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
 import { useBrand } from '@/lib/use-brand'
 import Link from 'next/link'
@@ -48,7 +49,7 @@ function NavIcon({ d, className }: { d: string; className?: string }) {
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect
 
 /** ★V8（夕44-A）：はじめから開く4組。ほかは見出しだけで畳む。 */
-const V8_GROUPS_OPEN_BY_DEFAULT = new Set(['basic', 'delivery', 'contents', 'booking', 'hq'])
+const V8_GROUPS_OPEN_BY_DEFAULT = new Set(['favorites', 'basic', 'restaurant-booking', 'restaurant-operations', 'delivery', 'contents', 'booking', 'hq'])
 
 /** 統括の左メニューの組の見出し。 */
 const HQ_V8_SECTION_LABEL = '統括'
@@ -226,6 +227,8 @@ export default function Sidebar({
   const [sectionOrder, setSectionOrder] = useState<string[] | null>(null)
   /** 区分の中の項目の並び。機能設定の↑↓で決めたもの。 */
   const [itemOrder, setItemOrder] = useState<Record<string, string[]> | null>(null)
+  const [favoriteItemIds, setFavoriteItemIds] = useState<string[]>([])
+  const [restaurantHiddenItemIds, setRestaurantHiddenItemIds] = useState<string[]>([])
   const [featureVisibility, setFeatureVisibility] = useState<Record<string, boolean> | null>(null)
   /** 成功した可視性read-modelのaccount。切替直後に古い表示を使わない。 */
   const [visibilityAccountId, setVisibilityAccountId] = useState<string | null>(null)
@@ -273,6 +276,8 @@ export default function Sidebar({
     if (!selectedAccountId) {
       setSectionOrder(null)
       setItemOrder(null)
+      setFavoriteItemIds([])
+      setRestaurantHiddenItemIds([])
       setFeatureVisibility(null)
       setVisibilityAccountId(null)
       setVisibilityStatus('ready')
@@ -283,6 +288,8 @@ export default function Sidebar({
     const accountId = selectedAccountId
     const canManageFeatureSettings = canManageRole(staffRole)
     setFeatureVisibility(null)
+    setFavoriteItemIds([])
+    setRestaurantHiddenItemIds([])
     setExplicitSettings(null)
     setVisibilityAccountId(null)
     setVisibilityStatus('loading')
@@ -299,6 +306,8 @@ export default function Sidebar({
             setSectionOrder(null)
             setItemOrder(null)
             setFeatureVisibility(features)
+            setFavoriteItemIds(visibility.success ? visibility.data.favoriteItemIds ?? [] : [])
+            setRestaurantHiddenItemIds(visibility.success ? visibility.data.restaurantHiddenItemIds ?? [] : [])
             setVisibilityAccountId(accountId)
             setVisibilityStatus('ready')
             setSpecializedFeatureKeys(SPECIALIZED_FEATURE_KEYS)
@@ -337,7 +346,10 @@ export default function Sidebar({
   }, [selectedAccountId, staffRole, visibilityRetry])
   // 区分の中の並びを当ててから、区分そのものの並びを当てる。
   const currentVisibility = visibilityAccountId === selectedAccountId ? featureVisibility : null
-  const storeSections = orderedMenuSections(itemOrder)
+  const restaurantStyle = accountStyle.status === 'ready' && accountStyle.data?.style === 'restaurant'
+  const storeSections = restaurantStyle
+    ? restaurantMenuSections(orderedMenuSections(null), itemOrder)
+    : orderedMenuSections(itemOrder)
   const normalizedSectionOrder = sectionOrder?.map((label) => label === 'NEN運用' ? '専用機能' : label)
   const orderedStoreSections = normalizedSectionOrder
     ? [
@@ -362,6 +374,7 @@ export default function Sidebar({
          */
 
         if (isHq) return true
+        if (restaurantStyle && restaurantHiddenItemIds.includes(item.id)) return false
         const savedSettings = explicitSettings?.accountId === selectedAccountId ? explicitSettings.value : canManageRole(staffRole) ? false : null
         if (!styleMenuItemVisible(item, accountStyle.data?.style ?? null, savedSettings, accountStyle.data?.styleSelected === true)) return false
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
@@ -393,8 +406,16 @@ export default function Sidebar({
      */
     .filter((_section, index) => isHq || currentVisibility !== null || visibilityStatus !== 'loading' || (!selectedAccountId && !accountLoading) || index === 0)
 
+  const favoriteIds = restaurantStyle ? new Set(favoriteItemIds) : new Set<string>()
+  const favoriteItems = freshSections.flatMap((section) => section.items.filter((item) => favoriteIds.has(item.id)))
+  const displayedSections = favoriteItems.length === 0 ? freshSections : [
+    { id: 'favorites', label: 'お気に入り', title: 'お気に入り', items: favoriteItems },
+    ...freshSections.map((section) => ({ ...section, items: section.items.filter((item) => !favoriteIds.has(item.id)) }))
+      .filter((section) => section.items.length > 0),
+  ]
+
   const menuLoading = !isHq && (visibilityStatus === 'loading' || accountStyle.status === 'loading')
-  const visibleSections = useRememberedSidebar(freshSections, sections, selectedAccountId, menuLoading,
+  const visibleSections = useRememberedSidebar(displayedSections, sections, selectedAccountId, menuLoading,
     !isHq && visibilityStatus === 'ready' && accountStyle.status === 'ready')
 
   /*
@@ -798,7 +819,10 @@ export default function Sidebar({
                   href={item.href}
                   // V8は多数の別画面を先読みせず、選んだ画面だけ読み込む。
                   prefetch={false}
-                  onClick={(event) => allowFeatureNavigation(event, item.href, item.label, preparing) && setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')}
+                  onClick={(event) => {
+                    if (item.id === 'restaurant-delivery' && !restaurantTestUiEnabled()) { event.preventDefault(); return }
+                    if (allowFeatureNavigation(event, item.href, item.label, preparing)) setCurrentSearch(item.href.includes('?') ? `?${item.href.split('?')[1]}` : '')
+                  }}
                   title={collapsed && !drawer ? undefined : visibleLabel}
                   // 件数の札がある時は「名前、N件」と区切って読ませる（札の数字は読ませない）。
                   aria-label={badgeCount(item) > 0 ? `${visibleLabel}、${badgeCount(item)}件` : collapsed && !drawer ? visibleLabel : undefined}
@@ -827,6 +851,7 @@ export default function Sidebar({
                     return V8Icon ? <V8Icon className={styles.v8NavIcon} aria-hidden="true" /> : <NavIcon className={styles.v8NavIcon} d={item.iconV8 ? item.iconV8 : item.icon} />
                   })()}</span>
                   <span className={`${styles.itemLabel} min-w-0 flex-1 truncate`}>{visibleLabel}</span>
+                  {item.id === 'restaurant-delivery' && <span className={styles.comingSoon}>Coming soon</span>}
                   {badgeCount(item) > 0 && (
                     <>
                       {/* レール幅では数字が入らないので点だけ。件数は名前と一緒に出す。 */}

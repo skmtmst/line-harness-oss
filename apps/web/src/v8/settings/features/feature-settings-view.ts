@@ -55,9 +55,13 @@ export function featureSettingsAreDirty(input: {
   features: Record<string, boolean>
   savedOrder: MenuItemOrder
   currentOrder: MenuItemOrder
+  savedFavorites?: string[]
+  favorites?: string[]
 }): boolean {
-  return FEATURE_IDS.some((key) => input.features[key] !== input.savedFeatures[key])
+  return [...new Set([...FEATURE_IDS, ...Object.keys(input.features), ...Object.keys(input.savedFeatures)])]
+    .some((key) => input.features[key] !== input.savedFeatures[key])
     || JSON.stringify(input.currentOrder) !== JSON.stringify(input.savedOrder)
+    || JSON.stringify(input.favorites ?? []) !== JSON.stringify(input.savedFavorites ?? [])
 }
 
 export const FEATURE_SETTINGS_CONFLICT_MESSAGE =

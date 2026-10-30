@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { notifyToast } from '@/components/shared/toast'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { useAccount } from '@/contexts/account-context'
+import { useAccountStyle } from '@/hooks/use-account-style'
 import { api, ApiError, fetchApi, type AnalyticsUsageOverview } from '@/lib/api'
 import { clearFeatureSettingsCache, loadFeatureSettings } from '@/lib/feature-settings-cache'
 import { createAccountRequestGuard } from './account-request-guard'
@@ -15,6 +16,8 @@ import {
   groupFeatureCount,
   itemOrderFromGroups,
   moveItemWithinGroup,
+  withRestaurantMenuFeatures,
+  restaurantHiddenIds,
   visibleFeatureGroups,
   type FeatureGroup,
   type FeatureItem,
@@ -32,6 +35,7 @@ import {
 } from './feature-settings-view'
 import { formatDay, formatNumber } from '@/lib/format'
 import { formatDate as polishFormatDate } from '@/lib/format'
+import { FEATURE_IDS, restaurantDefaultFeatures } from '@line-crm/shared'
 
 
 export type UsageCategory = AnalyticsUsageOverview['data']['categories'][number]
@@ -97,10 +101,15 @@ export function groupSummary(group: FeatureGroup, features: Record<string, boole
  */
 export function useFeatureSettings() {
   const { selectedAccountId } = useAccount()
+  const accountStyle = useAccountStyle(selectedAccountId)
+  const restaurantStyle = accountStyle.status === 'ready' && accountStyle.data?.style === 'restaurant'
+  const defaultFeatures = restaurantStyle ? withRestaurantMenuFeatures(restaurantDefaultFeatures()) : CATALOG_DEFAULT_FEATURES
   const [savedFeatures, setSavedFeatures] = useState<Record<string, boolean>>(CATALOG_DEFAULT_FEATURES)
   const [features, setFeatures] = useState<Record<string, boolean>>(CATALOG_DEFAULT_FEATURES)
   const [savedItemOrder, setSavedItemOrder] = useState<MenuItemOrder>({})
   const [itemOrder, setItemOrder] = useState<MenuItemOrder>({})
+  const [savedFavorites, setSavedFavorites] = useState<string[]>([])
+  const [favorites, setFavorites] = useState<string[]>([])
   const [specializedFeatureKeys, setSpecializedFeatureKeys] = useState<string[]>([])
   const [usageCategories, setUsageCategories] = useState<UsageCategory[]>([])
   /** 全任意機能の利用状況（N-448）。共有カタログの featureId で照合する。 */
@@ -146,21 +155,23 @@ export function useFeatureSettings() {
   /** 並び順を当てたあとの区分。画面も見え方の欄もこれを見る。 */
   const groups = useMemo(() => {
     return applyItemOrder(
-      visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
+      visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true, restaurantStyle }),
       itemOrder,
     )
-  }, [itemOrder, specializedFeatureKeys])
+  }, [itemOrder, specializedFeatureKeys, restaurantStyle])
 
   const currentOrder = useMemo(() => itemOrderFromGroups(groups), [groups])
   const savedGroups = useMemo(() => applyItemOrder(
-    visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true }),
+    visibleFeatureGroups({ specializedFeatureKeys, includeRestaurantTest: true, restaurantStyle }),
     savedItemOrder,
-  ), [savedItemOrder, specializedFeatureKeys])
+  ), [savedItemOrder, specializedFeatureKeys, restaurantStyle])
   const dirty = featureSettingsAreDirty({
     savedFeatures,
     features,
     savedOrder: itemOrderFromGroups(savedGroups),
     currentOrder,
+    savedFavorites,
+    favorites,
   })
 
   /*
@@ -178,6 +189,8 @@ export function useFeatureSettings() {
       setFeatures(CATALOG_DEFAULT_FEATURES)
       setSavedItemOrder({})
       setItemOrder({})
+      setSavedFavorites([])
+      setFavorites([])
       setSettingsVersion(0)
       setSpecializedFeatureKeys([])
       setUsageCategories([])
@@ -228,6 +241,8 @@ export function useFeatureSettings() {
       setFeatures(CATALOG_DEFAULT_FEATURES)
       setSavedItemOrder({})
       setItemOrder({})
+      setSavedFavorites([])
+      setFavorites([])
       setSettingsVersion(0)
       setSpecializedFeatureKeys([])
       setUsageCategories([])
@@ -252,13 +267,17 @@ export function useFeatureSettings() {
         setLoadFailed(true)
         return
       }
-      const next = normalizeFeatureSettings(response.data.features)
+      const next = restaurantStyle
+        ? withRestaurantMenuFeatures(normalizeFeatureSettings(response.data.features), response.data.restaurantHiddenItemIds)
+        : normalizeFeatureSettings(response.data.features)
       setSavedFeatures(next)
       setFeatures(next)
       const nextOrder = response.data.sidebarItemOrder ?? {}
       setSavedItemOrder(nextOrder)
       setSettingsVersion(response.data.version ?? 0)
       setItemOrder(nextOrder)
+      setSavedFavorites(response.data.favoriteItemIds ?? [])
+      setFavorites(response.data.favoriteItemIds ?? [])
       setSpecializedFeatureKeys(response.data.specializedFeatureKeys ?? [])
       // 設定を先に出し、利用数は後から足す（表示を集計で待たせない）。
       void loadUsage()
@@ -271,7 +290,7 @@ export function useFeatureSettings() {
     } finally {
       if (accountGuard.isCurrent(ticket, selectedAccountId)) setLoading(false)
     }
-  }, [selectedAccountId, loadUsage, accountGuard, cancelLeave])
+  }, [selectedAccountId, loadUsage, accountGuard, cancelLeave, restaurantStyle])
 
   useEffect(() => { void load() }, [load])
 
@@ -306,6 +325,13 @@ export function useFeatureSettings() {
       for (const key of item.keys) changed[key] = next
       return changed
     })
+  }
+
+  const toggleFavorite = (itemId: string) => {
+    if (saving || !restaurantStyle) return
+    setFavorites((current) => current.includes(itemId)
+      ? current.filter((id) => id !== itemId)
+      : [...current, itemId])
   }
 
   const toggleGroup = (group: FeatureGroup, next: boolean) => {
@@ -346,6 +372,7 @@ export function useFeatureSettings() {
     if (loading || saving) return
     setFeatures({ ...savedFeatures })
     setItemOrder({ ...savedItemOrder })
+    setFavorites([...savedFavorites])
     setReason('')
     setError('')
     notifyToast('保存済みの機能設定に戻しました。')
@@ -354,8 +381,9 @@ export function useFeatureSettings() {
   /** 既定値を下書きへ入れる。ここではAPIを呼ばず、保存を押すまでサーバーは変えない。 */
   const resetToDefaults = () => {
     if (loading || saving) return
-    setFeatures({ ...CATALOG_DEFAULT_FEATURES })
+    setFeatures({ ...defaultFeatures })
     setItemOrder({})
+    setFavorites([])
     setError('')
     notifyToast('初期値を下書きに入れました。保存すると反映されます。')
     setResetToDefaultsOpen(false)
@@ -382,14 +410,17 @@ export function useFeatureSettings() {
       const latest = await api.featureSettings.get(selectedAccountId)
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (latest.success) {
-        setSavedFeatures(normalizeFeatureSettings(latest.data.features))
+        setSavedFeatures(restaurantStyle
+          ? withRestaurantMenuFeatures(normalizeFeatureSettings(latest.data.features), latest.data.restaurantHiddenItemIds)
+          : normalizeFeatureSettings(latest.data.features))
         setSavedItemOrder(latest.data.sidebarItemOrder ?? {})
+        setSavedFavorites(latest.data.favoriteItemIds ?? [])
         setSettingsVersion(latest.data.version ?? 0)
       }
     } catch {
       // 読み直しに失敗しても編集中身は残す。
     }
-  }, [selectedAccountId, accountGuard])
+  }, [selectedAccountId, accountGuard, restaurantStyle])
 
   /**
    * オフ前の影響確認(票643)。変更案だけ送り、保存はしない。
@@ -404,7 +435,7 @@ export function useFeatureSettings() {
         `/api/settings/features/impact?account_id=${encodeURIComponent(selectedAccountId)}`,
         {
           method: 'POST',
-          body: JSON.stringify({ features, expectedVersion: settingsVersion }),
+          body: JSON.stringify({ features: Object.fromEntries(FEATURE_IDS.map((id) => [id, features[id]])), expectedVersion: settingsVersion }),
         },
       )
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return null
@@ -441,8 +472,10 @@ export function useFeatureSettings() {
         {
           method: 'PUT',
           body: JSON.stringify({
-            features,
+            features: Object.fromEntries(FEATURE_IDS.map((id) => [id, features[id]])),
             sidebarItemOrder: currentOrder,
+            ...(restaurantStyle ? { favoriteItemIds: favorites } : {}),
+            ...(restaurantStyle ? { restaurantHiddenItemIds: restaurantHiddenIds(features) } : {}),
             expectedVersion: settingsVersion,
             reason: reason.trim(),
             ...(impactToken ? { impactToken } : {}),
@@ -466,12 +499,16 @@ export function useFeatureSettings() {
         const latest = await loadFeatureSettings(selectedAccountId)
         if (!accountGuard.isCurrent(ticket, selectedAccountId)) return false
         if (latest.success) {
-          const serverFeatures = normalizeFeatureSettings(latest.data.features)
+          const serverFeatures = restaurantStyle
+            ? withRestaurantMenuFeatures(normalizeFeatureSettings(latest.data.features), latest.data.restaurantHiddenItemIds)
+            : normalizeFeatureSettings(latest.data.features)
           setSavedFeatures(serverFeatures)
           setFeatures(serverFeatures)
           const serverOrder = latest.data.sidebarItemOrder ?? {}
           setSavedItemOrder(serverOrder)
           setItemOrder(serverOrder)
+          setSavedFavorites(latest.data.favoriteItemIds ?? [])
+          setFavorites(latest.data.favoriteItemIds ?? [])
           setSettingsVersion(latest.data.version ?? response.data.version)
           setSpecializedFeatureKeys(latest.data.specializedFeatureKeys ?? [])
         } else {
@@ -479,6 +516,7 @@ export function useFeatureSettings() {
           setSavedFeatures({ ...features })
           setSavedItemOrder(currentOrder)
           setItemOrder(currentOrder)
+          setSavedFavorites([...favorites])
         }
       } catch {
         // WEB190：読み直しの失敗でも、途中でアカウントが変わっていたら
@@ -488,6 +526,7 @@ export function useFeatureSettings() {
         setSavedFeatures({ ...features })
         setSavedItemOrder(currentOrder)
         setItemOrder(currentOrder)
+        setSavedFavorites([...favorites])
       }
       setReason('')
       setConflict(false)
@@ -600,6 +639,10 @@ export function useFeatureSettings() {
     selectedAccountId,
     features,
     itemOrder,
+    favorites,
+    savedFavorites,
+    toggleFavorite,
+    setSavedFavorites,
     setItemOrder,
     savedFeatures,
     groups,

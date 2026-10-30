@@ -2,7 +2,7 @@
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowUpDown, ChevronDown, ChevronRight, GitCompare, Lock, RotateCcw, Save } from 'lucide-react'
+import { ArrowUpDown, ChevronDown, ChevronRight, GitCompare, Lock, RotateCcw, Save, Star } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -91,7 +91,7 @@ function FeatureUsageBadge({ usage, label, onRetry }: { usage: FeatureUsage; lab
   return <span className={styles.usage} title={title}>90日で {activity.value}{activityUnit}</span>
 }
 
-function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwitch, canManage, lockedReason, busy, onToggle }: {
+function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwitch, canManage, lockedReason, busy, onToggle, favorite, showFavorite, onFavoriteToggle }: {
   item: FeatureItem
   features: Record<string, boolean>
   usage?: UsageCategory
@@ -102,6 +102,9 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
   lockedReason?: string
   busy?: boolean
   onToggle: (item: FeatureItem, next: boolean) => void
+  favorite?: boolean
+  showFavorite?: boolean
+  onFavoriteToggle?: (itemId: string) => void
 }) {
   const enabled = itemIsEnabled(item, features)
   return (
@@ -116,6 +119,11 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
         </p>
         <p className={styles.rowNote}>{item.note}</p>
       </div>
+      {showFavorite && <button type="button" className={`${styles.favoriteButton} ${favorite ? styles.favoriteActive : ''}`}
+        aria-label={`${item.label}をお気に入り${favorite ? 'から外す' : 'に入れる'}`}
+        aria-pressed={favorite} disabled={busy || !canManage} onClick={() => onFavoriteToggle?.(item.id)}>
+        <Star aria-hidden="true" />
+      </button>}
       {item.required ? (
         <span className={styles.required} title={`${item.label}は必須機能のため、オフにできません`}>
           <Lock className={styles.requiredIcon} aria-hidden="true" />
@@ -143,7 +151,7 @@ function settingsGroupLast<T extends { id: string }>(groups: T[]): T[] {
   return [...groups.filter((group) => !LAST_GROUP_IDS.includes(group.id)), ...groups.filter((group) => LAST_GROUP_IDS.includes(group.id))]
 }
 
-function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, usageRetry, open, canManage, lockedReason, busy, onOpenChange, onItemToggle, onGroupToggle }: {
+function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, usageRetry, open, canManage, lockedReason, busy, onOpenChange, onItemToggle, onGroupToggle, favorites, showFavorites, onFavoriteToggle }: {
   group: FeatureGroup
   features: Record<string, boolean>
   usageByItemId: Map<string, UsageCategory>
@@ -156,6 +164,9 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
   onOpenChange: (open: boolean) => void
   onItemToggle: (item: FeatureItem, next: boolean) => void
   onGroupToggle: (group: FeatureGroup, next: boolean) => void
+  favorites?: string[]
+  showFavorites?: boolean
+  onFavoriteToggle?: (itemId: string) => void
 }) {
   const total = groupFeatureCount(group)
   const enabled = groupEnabledCount(group, features)
@@ -202,6 +213,9 @@ function FeatureGroupCard({ group, features, usageByItemId, usageByFeatureId, us
               lockedReason={lockedReason}
               busy={busy}
               onToggle={onItemToggle}
+              favorite={favorites?.includes(item.id)}
+              showFavorite={showFavorites}
+              onFavoriteToggle={onFavoriteToggle}
             />
           ))}
         </ul>
@@ -254,6 +268,10 @@ export default function FeatureSettingsScreen() {
     cancelLeave,
     setSavedFeatures,
     setSavedItemOrder,
+    favorites,
+    savedFavorites,
+    toggleFavorite,
+    setSavedFavorites,
     currentOrder,
   } = settings
   const accountStyle = useAccountStyle(selectedAccountId)
@@ -361,7 +379,7 @@ export default function FeatureSettingsScreen() {
       notice={conflictBand || (staffRole !== null && !canManage) ? <>{conflictBand}{!canManage && <ReadOnlyNotice role="status" need="manager" />}</> : undefined}
       title={TITLE}
       help={DESCRIPTION}
-      explanation="公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。"
+      explanation={`公開中のページや動いている配信・予約は、それぞれの画面で止めてからオフにしてください。並び順は「並びを変える」から入れ替えます。${accountStyle.data?.style === 'restaurant' ? '星を選ぶと左メニューのお気に入りに表示します。' : ''}`}
       saveActions={ready && (dirty || saving) ? (
         <>
           <Button
@@ -464,6 +482,9 @@ export default function FeatureSettingsScreen() {
                   onOpenChange={(next) => toggleOpen(group.id, next)}
                   onItemToggle={toggleItem}
                   onGroupToggle={toggleGroup}
+                  favorites={favorites}
+                  showFavorites={accountStyle.data?.style === 'restaurant'}
+                  onFavoriteToggle={toggleFavorite}
                 />
               ))}
             </div>
@@ -500,6 +521,7 @@ export default function FeatureSettingsScreen() {
           {Object.keys(features).filter((key) => features[key] !== savedFeatures[key]).map((key) => (
             <li key={key}>{featureLabelByKey.get(key) ?? '追加機能'}：保存済み {savedFeatures[key] ? 'オン' : 'オフ'} → 編集中 {features[key] ? 'オン' : 'オフ'}</li>
           ))}
+          {JSON.stringify(savedFavorites) !== JSON.stringify(favorites) && <li>お気に入り：保存済み {savedFavorites.length}件 → 編集中 {favorites.length}件</li>}
         </ul>
         <p className={styles.compareNote}>並び順も、いま編集中の順番で保存します。</p>
       </ConfirmDialog>
@@ -532,7 +554,7 @@ export default function FeatureSettingsScreen() {
         title="初期値に戻しますか？"
         headerIcon={<RotateCcw aria-hidden="true" />}
         confirmIcon={<RotateCcw aria-hidden="true" />}
-        description="機能の表示と並び順を初期値の下書きに置き換えます。保存するまで、他の利用者やサイドメニューには反映されません。"
+        description="機能の表示・並び順・お気に入りを初期値の下書きに置き換えます。保存するまで、他の利用者やサイドメニューには反映されません。"
         confirmLabel="初期値を下書きに入れる"
         cancelLabel="キャンセル"
         onCancel={() => { if (!saving) setResetToDefaultsOpen(false) }}
@@ -540,16 +562,18 @@ export default function FeatureSettingsScreen() {
       >
         <DialogContentRow>機能ごとの表示（オン・オフ）</DialogContentRow>
         <DialogContentRow>メニューの並び順</DialogContentRow>
+        <DialogContentRow>お気に入り</DialogContentRow>
       </ConfirmDialog>
 
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        subject="この画面で変更した機能の表示・並び順"
+        subject="この画面で変更した機能の表示・並び順・お気に入り"
         busy={saving}
         onCancel={() => { if (!saving) cancelLeave() }}
         onConfirm={() => {
           setSavedFeatures({ ...features })
           setSavedItemOrder(currentOrder)
+          setSavedFavorites([...favorites])
           confirmLeave()
         }}
       />
