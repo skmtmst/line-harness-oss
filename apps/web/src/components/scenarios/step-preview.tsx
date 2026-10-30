@@ -13,6 +13,7 @@
 
 import { Clock } from 'lucide-react'
 import LinePreview from '@/components/shared/line-preview'
+import StickerPreview from '@/components/shared/sticker-preview'
 import Notice from '@/components/shared/notice'
 import styles from './step-preview.module.css'
 import type { DeliveryMode } from '@line-crm/shared'
@@ -354,13 +355,7 @@ export default function StepPreview({
         ) : kind === 'sticker' ? (
           kindState?.sticker.stickerId ? (
             <Bubble>
-              {/* 目印なので次の最適化には載せない。 */}
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img width={80} height={80}
-                src={`https://stickershop.line-scdn.net/stickershop/v1/sticker/${kindState.sticker.stickerId}/android/sticker.png`}
-                alt="スタンプ"
-                className="h-20 w-20"
-              />
+              <StickerPreview stickerId={kindState.sticker.stickerId} size={80} />
             </Bubble>
           ) : (
             <Placeholder>スタンプを選ぶと、ここに出ます</Placeholder>
