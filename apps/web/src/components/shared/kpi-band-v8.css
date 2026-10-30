@@ -144,7 +144,8 @@ html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='ba
   html:root [data-kpi-strip][data-kpi-layout='link-row'][data-kpi-presentation='band'] [data-kpi-detail] > :is(a, button) { margin-inline-start: auto; }
 }
 
-/* Wrapped metric selections keep one shared separator between existing bands. */
+/* 複数段の数の帯は、共通の欄間隔で面と影を離す。 */
+:root [data-shared-part='kpi-band-rows'] { display: grid; gap: var(--polish-space-field); }
 :root [data-shared-part='kpi-band-rows'] > [data-kpi-strip] + [data-kpi-strip] { border-block-start: 0; }
 @media (min-width: 640px) {
   /* 複数段だけは、各帯の既定の自動列より優先して最後の段も同じ列幅にする。 */
