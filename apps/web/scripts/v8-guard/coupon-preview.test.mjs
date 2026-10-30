@@ -53,7 +53,8 @@ test('coupon action entry uses the shared border and starts at the heading edge'
  const browser=await connectGuardBrowser()
  try{
   const page=await browser.newPage()
-  await page.setContent('<section data-design-part="card" style="padding:24px"><h2 id="coupon-use-actions">使用時の処理</h2><button data-shared-button data-variant="secondary">行うことを足す</button></section>')
+  for (const label of ['行うことを足す','タグ・スコアを足す']) {
+  await page.setContent(`<section data-design-part="card" style="padding:24px"><h2 id="coupon-use-actions">使用時の処理</h2><button data-shared-button data-variant="secondary">${label}</button></section>`)
   assert.deepEqual(await page.evaluate(scan),[])
   await page.locator('button').evaluate(e=>{e.style.marginLeft='19px'})
   assert.ok((await page.evaluate(scan)).some(f=>f.kind==='coupon-action-start'))
@@ -61,5 +62,6 @@ test('coupon action entry uses the shared border and starts at the heading edge'
   assert.ok((await page.evaluate(scan)).some(f=>f.kind==='coupon-action-start'))
   await page.locator('button').evaluate(e=>{e.setAttribute('data-variant','secondary')})
   assert.deepEqual(await page.evaluate(scan),[])
+  }
  }finally{await browser.close()}
 })

@@ -18,3 +18,14 @@ it('カードの枠付き入口でも開く・値を変える・外すを保つ'
  fireEvent.click(screen.getByRole('button',{name:'案内の追加処理を外す'}));expect(onChange).toHaveBeenLastCalledWith({tagIds:[],scoreChange:null})
  expect(screen.getByRole('button',{name:'押されたときにあわせて行うことを足す'})).toBeTruthy()
 })
+
+it('入口の文言を指定しても開く・外すを保ち、未指定の入口には影響しない',()=>{
+ render(<TapExtrasField name="クーポン" accountId={null} onChange={()=>{}} actionLabel="タグ・スコア"/>)
+ fireEvent.click(screen.getByRole('button',{name:'タグ・スコアを足す'}))
+ expect(screen.getByLabelText('クーポンの足すスコア')).toBeTruthy()
+ expect(screen.getByRole('group',{name:'クーポンのタグ・スコア'})).toBeTruthy()
+ expect(screen.queryByText('押されたときに、あわせて行うこと')).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:'クーポンの追加処理を外す'}))
+ expect(screen.getByRole('button',{name:'タグ・スコアを足す'})).toBeTruthy()
+ expect(screen.queryByRole('button',{name:'押されたときにあわせて行うことを足す'})).toBeNull()
+})

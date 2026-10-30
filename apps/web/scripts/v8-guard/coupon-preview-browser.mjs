@@ -46,7 +46,7 @@ export default function couponPreviewClipping() {
   const actions = document.querySelector('#coupon-use-actions')
   const card = actions?.closest('[data-design-part="card"]')
   if (card) for (const button of card.querySelectorAll('button[data-shared-button]')) {
-    if (!button.textContent.includes('行うことを足す')) continue
+    if (!button.textContent.includes('行うことを足す') && !button.textContent.includes('タグ・スコアを足す')) continue
     const rect=button.getBoundingClientRect(), title=actions.getBoundingClientRect()
     if (rect.width && (Math.abs(rect.left-title.left)>1 || button.getAttribute('data-variant')!=='secondary')) findings.push({kind:'coupon-action-start',gap:rect.left-title.left})
   }

@@ -663,7 +663,7 @@ describe('クーポンの同じ編集画面と公開の失敗', () => {
     expect(screen.getByText('友だちだけ')).toBeTruthy()
     expect(screen.queryByRole('button',{name:'友だちだけ'})).toBeNull()
     expect(screen.queryByText('当選した数')).toBeNull()
-    expect(screen.getByRole('button',{name:'押されたときにあわせて行うことを足す'}).closest('[data-design-part="card"]')).toBeTruthy()
+    expect(screen.getByRole('button',{name:'タグ・スコアを足す'}).closest('[data-design-part="card"]')).toBeTruthy()
   })
   it('金額2欄の誤りは行の下の1つにまとめ、両方の入力へ説明を結ぶ', async () => {
     assetsList.mockResolvedValue({success:true,data:[{...asset,payload:{...payload,couponType:'discount',discount:{mode:'price',beforeYen:1000,afterYen:500}}}]})
@@ -680,7 +680,7 @@ describe('クーポンの同じ編集画面と公開の失敗', () => {
   it('使用記録時の2種類の処理を同じカードに置き、追加入口は枠付きでそろえる', async()=>{
     await mount('kind=coupon&visual=1')
     const card=screen.getByRole('heading',{name:'クーポンを使ったときに行うこと'}).closest('[data-design-part="card"]')!
-    const add=within(card as HTMLElement).getByRole('button',{name:'押されたときにあわせて行うことを足す'})
+    const add=within(card as HTMLElement).getByRole('button',{name:'タグ・スコアを足す'})
     expect(add.getAttribute('data-variant')).toBe('secondary')
     expect(within(card as HTMLElement).getByRole('button',{name:'行うことを足す'}).getAttribute('data-variant')).toBe('secondary')
     expect(screen.queryByRole('heading',{name:'ボタンを押されたときに行うこと'})).toBeNull()

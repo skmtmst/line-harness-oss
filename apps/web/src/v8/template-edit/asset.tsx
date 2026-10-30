@@ -574,7 +574,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
 
             <Card variant="form" gap="normal">
               <CardHeader size="stacked" titleId="coupon-use-actions" title="クーポンを使ったときに行うこと" />
-              <Field label="タグ・スコア"><div {...fields.bind("tapExtras")}><TapExtrasField addButtonVariant="secondary" error={fields.error("tapExtras")} name="クーポンのボタン" value={tapExtras} onChange={extra => { fields.clear("tapExtras"); setTapExtras(extra) }} accountId={host ? null : selectedAccountId} /></div></Field>
+              <Field label="タグ・スコア"><div {...fields.bind("tapExtras")}><TapExtrasField actionLabel="タグ・スコア" addButtonVariant="secondary" error={fields.error("tapExtras")} name="クーポンのボタン" value={tapExtras} onChange={extra => { fields.clear("tapExtras"); setTapExtras(extra) }} accountId={host ? null : selectedAccountId} /></div></Field>
               {host ? null : <Field label="そのほかの処理"><InlineActionRowsV8 actions={couponUseActions} onChange={setCouponUseActions} {...actionOptions} /></Field>}
             </Card></fieldset>
           </>
