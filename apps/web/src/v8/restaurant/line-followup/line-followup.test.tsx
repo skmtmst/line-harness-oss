@@ -3,6 +3,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BroadcastBubble, RestaurantFollowupTrigger } from '@line-crm/shared'
+import { ApiError } from '@/lib/api/transport/errors'
 
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), role: 'owner' as string | null,
@@ -24,6 +25,7 @@ vi.mock('@/components/scenarios/scenario-reference-data', () => ({
   },
 }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { snapshot: fixture.snapshot } }))
+vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string | null) => role === 'owner' || role === 'admin' }))
 vi.mock('@/lib/api/helpers/restaurant-followup', () => ({
   fetchRestaurantFollowup: fixture.fetchLive,
@@ -34,14 +36,14 @@ vi.mock('@/lib/api/helpers/restaurant-followup', () => ({
   fetchFollowupReviewHistory: fixture.reviewHistory,
 }))
 import LineFollowupV8 from './line-followup'
-import { RESTAURANT_TRIGGER_ROWS, timingError, timingLabel } from './config'
+import { RESTAURANT_TRIGGER_ROWS, exactTiming, timingError, timingLabel } from './config'
 
-const bubble = (text: string): BroadcastBubble => ({ id: 'b1', type: 'text', content: { text } })
-const stepOf = (trigger: RestaurantFollowupTrigger, offset: number, enabled: 0 | 1, text: string | null) => ({
+const bubble = (text: string, id = 'b1'): BroadcastBubble => ({ id, type: 'text', content: { text } })
+const stepOf = (trigger: RestaurantFollowupTrigger, offset: number, enabled: 0 | 1, texts: string[] | null) => ({
   trigger,
   binding: { store_id: 'store', trigger, step_id: `step-${trigger}`, offset_minutes: offset, enabled, version: 1 },
   step: { id: `step-${trigger}`, scenarioId: 'scn-1' },
-  bubbles: text === null ? [] : [bubble(text)],
+  bubbles: texts === null ? [] : texts.map((text, index) => bubble(text, `b${index + 1}`)),
   offsetMinutes: offset,
   state: 'stopped' as const,
 })
@@ -49,19 +51,20 @@ const liveOf = (overrides: Record<string, unknown> = {}) => ({
   storeId: 'store', storeName: '試験店', scenarioId: 'scn-1', templateVersion: 3,
   sendingStatus: 'stopped', approvalId: null, reviewInvitations: null,
   steps: [
-    stepOf('reservation_created', 0, 1, '予約完了の文'),
-    stepOf('reservation_24h', -1440, 1, '前日の文'),
-    stepOf('reservation_2h', -120, 0, '2時間前の文'),
-    stepOf('post_visit', 180, 0, '来店後の文'),
-    stepOf('review_request', 1440, 0, '口コミの文'),
-    stepOf('waitlist_invited', 0, 0, '順番の文'),
-    stepOf('anniversary_before', -10080, 0, '記念日の文'),
+    stepOf('reservation_created', 0, 1, ['予約完了の文']),
+    stepOf('reservation_24h', -1440, 1, ['前日の文']),
+    stepOf('reservation_2h', -120, 0, ['2時間前の文']),
+    stepOf('post_visit', 180, 0, ['来店後の文']),
+    stepOf('review_request', 1440, 0, ['口コミの文']),
+    stepOf('waitlist_invited', 0, 0, ['順番の文']),
+    stepOf('anniversary_before', -10080, 0, ['記念日の文']),
   ],
   ...overrides,
 })
+const storeOf = (id: string, name: string) => ({ id, name, code: 'S', status: 'active', line_account_id: 'account-1', line_account_name: `${name} 公式` })
 const data = {
   organization: { id: 'org', name: '試験組織' },
-  stores: [{ id: 'store', name: '試験店', code: 'S', status: 'active', line_account_id: 'account-1', line_account_name: '試験店 公式' }],
+  stores: [storeOf('store', '試験店')],
   lineFlows: [],
   memberships: [], reservations: [], tables: [], inventory: [], menuItems: [], connectors: [], reviews: [], posts: [], approvals: [],
 }
@@ -110,6 +113,12 @@ describe('時期の言い方と検査', () => {
       'review_request', 'waitlist_invited', 'anniversary_before',
     ])
   })
+  it('既存の時期は割り切れる一番大きい単位で正確に分ける', () => {
+    expect(exactTiming(1440, ['minutes', 'hours', 'days'])).toEqual({ amount: '1', unit: 'days' })
+    expect(exactTiming(180, ['minutes', 'hours', 'days'])).toEqual({ amount: '3', unit: 'hours' })
+    expect(exactTiming(181, ['minutes', 'hours', 'days'])).toEqual({ amount: '181', unit: 'minutes' })
+    expect(exactTiming(90, ['minutes', 'hours'])).toEqual({ amount: '90', unit: 'minutes' })
+  })
 })
 
 describe('7つの行と状態', () => {
@@ -122,13 +131,14 @@ describe('7つの行と状態', () => {
     expect(screen.getByRole('button', { name: '予約完了時' }).getAttribute('aria-expanded')).toBe('true')
     expect(screen.getByText('予約完了時 の中身')).toBeTruthy()
     expect(screen.getByText('本送信は止めています（中身の版: 3）')).toBeTruthy()
+    expect(fixture.fetchLive).toHaveBeenCalledWith('account-1', 'store', '試験店')
   })
   it('オン/オフで結びを版付きで保存する', async () => {
     render(<LineFollowupV8 />)
     await screen.findByRole('button', { name: '予約完了時' })
     // 予約完了時はオンなので「止める」を押す。
     fireEvent.click(screen.getByRole('button', { name: '止める' }))
-    await waitFor(() => expect(fixture.saveBinding).toHaveBeenCalledWith('store', 'step-reservation_created', 'PATCH', {
+    await waitFor(() => expect(fixture.saveBinding).toHaveBeenCalledWith('account-1', 'store', 'step-reservation_created', 'PATCH', {
       expectedVersion: 3, trigger: 'reservation_created', offsetMinutes: 0, enabled: false,
     }))
   })
@@ -137,11 +147,25 @@ describe('7つの行と状態', () => {
     await screen.findByRole('button', { name: '予約の前日' })
     fireEvent.click(screen.getByRole('button', { name: '予約の前日' }))
     const amount = screen.getByRole('textbox', { name: '時期の数値' }) as HTMLInputElement
+    expect(amount.value).toBe('1')
     fireEvent.change(amount, { target: { value: '2' } })
-    // 単位は既定の「時間」のまま。2時間前 = -120分。
+    // 単位は既存値からの「日」のまま。2日前 = -2880分。
     fireEvent.click(screen.getByRole('button', { name: '時期を保存する' }))
-    await waitFor(() => expect(fixture.saveBinding).toHaveBeenCalledWith('store', 'step-reservation_24h', 'PATCH', {
-      expectedVersion: 3, trigger: 'reservation_24h', offsetMinutes: -120, enabled: true,
+    await waitFor(() => expect(fixture.saveBinding).toHaveBeenCalledWith('account-1', 'store', 'step-reservation_24h', 'PATCH', {
+      expectedVersion: 3, trigger: 'reservation_24h', offsetMinutes: -2880, enabled: true,
+    }))
+  })
+  it('割り切れない既存の時期は分で正確に出し、そのまま保存できる', async () => {
+    const live = liveOf()
+    live.steps = live.steps.map(step => step.trigger === 'review_request' ? { ...step, offsetMinutes: 181, binding: { ...step.binding, offset_minutes: 181 } } : step)
+    fixture.fetchLive.mockResolvedValue(live)
+    render(<LineFollowupV8 />)
+    await screen.findByRole('button', { name: '口コミ依頼' })
+    fireEvent.click(screen.getByRole('button', { name: '口コミ依頼' }))
+    expect((screen.getByRole('textbox', { name: '時期の数値' }) as HTMLInputElement).value).toBe('181')
+    fireEvent.click(screen.getByRole('button', { name: '時期を保存する' }))
+    await waitFor(() => expect(fixture.saveBinding).toHaveBeenCalledWith('account-1', 'store', 'step-review_request', 'PATCH', {
+      expectedVersion: 3, trigger: 'review_request', offsetMinutes: 181, enabled: false,
     }))
   })
   it('本文を版付きで保存する', async () => {
@@ -149,9 +173,23 @@ describe('7つの行と状態', () => {
     await screen.findByRole('button', { name: '予約完了時' })
     await typeBody('新しい本文')
     fireEvent.click(screen.getByRole('button', { name: '本文を保存する' }))
-    await waitFor(() => expect(fixture.saveMessages).toHaveBeenCalledWith('store', 'step-reservation_created', {
+    await waitFor(() => expect(fixture.saveMessages).toHaveBeenCalledWith('account-1', 'store', 'step-reservation_created', {
       expectedVersion: 3, messageBubbles: [bubble('新しい本文')],
     }))
+  })
+  it('2通以上の本文は消さないよう保存を止め、本体へ案内する', async () => {
+    const live = liveOf()
+    live.steps = live.steps.map(step => step.trigger === 'post_visit' ? { ...step, bubbles: [bubble('1通目', 'b1'), bubble('2通目', 'b2')] } : step)
+    fixture.fetchLive.mockResolvedValue(live)
+    render(<LineFollowupV8 />)
+    await screen.findByRole('button', { name: '来店後' })
+    fireEvent.click(screen.getByRole('button', { name: '来店後' }))
+    expect(screen.getByText('本文が2通以上あるため、この画面では直せません。本体のシナリオ画面で直してください')).toBeTruthy()
+    expect((screen.getByRole('button', { name: '本文を保存する' }) as HTMLButtonElement).disabled).toBe(true)
+    const read = screen.getByRole('textbox', { name: '本文' }) as HTMLTextAreaElement
+    expect(read.readOnly).toBe(true)
+    expect(read.value).toContain('1通目')
+    expect(read.value).toContain('2通目')
   })
   it('くわしく設定する → は本体のシナリオへ飛ぶ', async () => {
     render(<LineFollowupV8 />)
@@ -162,9 +200,10 @@ describe('7つの行と状態', () => {
     render(<LineFollowupV8 />)
     await screen.findByRole('button', { name: '予約完了時' })
     fireEvent.click(screen.getByRole('button', { name: '承認を申請する' }))
-    await waitFor(() => expect(fixture.requestStart).toHaveBeenCalledWith('store', 3))
-    fireEvent.click(screen.getByRole('button', { name: '本送信を止める' }))
-    await waitFor(() => expect(fixture.stop).toHaveBeenCalledWith('store'))
+    await waitFor(() => expect(fixture.requestStart).toHaveBeenCalledWith('account-1', 'store', 3))
+    // 申請後は読み直すので、終わってから止めるを押す。
+    fireEvent.click(await screen.findByRole('button', { name: '本送信を止める' }))
+    await waitFor(() => expect(fixture.stop).toHaveBeenCalledWith('account-1', 'store'))
   })
   it('承認の申請中は状態の行から承認画面へ飛べる', async () => {
     fixture.fetchLive.mockResolvedValue(liveOf({ sendingStatus: 'pending', approvalId: 'ap-1' }))
@@ -182,15 +221,24 @@ describe('7つの行と状態', () => {
 })
 
 describe('変えられない理由の表示', () => {
-  it('閲覧のみは操作を置かず理由を出す', async () => {
+  it('閲覧のみは操作を隠さず灰色＋理由にする', async () => {
     fixture.role = 'staff'
     render(<LineFollowupV8 />)
     await screen.findByRole('button', { name: '予約完了時' })
-    expect(screen.queryByRole('button', { name: '承認を申請する' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '本送信を止める' })).toBeNull()
-    expect((screen.getByRole('button', { name: '止める' }) as HTMLButtonElement).disabled).toBe(true)
+    // 隠さず置き、押せなくする。鍵付きは理由を読めるよう aria-disabled 運用。
+    expect(screen.getByRole('button', { name: '承認を申請する' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: '本送信を止める' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: '止める' }).getAttribute('aria-disabled')).toBe('true')
     expect(screen.getAllByText('閲覧のみのため変えられません').length).toBeGreaterThan(0)
     expect((screen.getByRole('textbox', { name: '本文' }) as HTMLTextAreaElement).readOnly).toBe(true)
+  })
+  it('役割が読めない時は閲覧のみと断定せず理由なしで止める', async () => {
+    fixture.role = null
+    render(<LineFollowupV8 />)
+    await screen.findByRole('button', { name: '予約完了時' })
+    expect((screen.getByRole('button', { name: '止める' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: '承認を申請する' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.queryByText('閲覧のみのため変えられません')).toBeNull()
   })
   it('まだ無い店舗は見本を出し、保存系は置かない', async () => {
     fixture.fetchLive.mockResolvedValue(null)
@@ -227,6 +275,26 @@ describe('変えられない理由の表示', () => {
   })
 })
 
+describe('失敗と競合', () => {
+  it('409は読み直しても知らせを保つ', async () => {
+    fixture.saveBinding.mockRejectedValueOnce(new ApiError(409))
+    render(<LineFollowupV8 />)
+    await screen.findByRole('button', { name: '予約完了時' })
+    fireEvent.click(screen.getByRole('button', { name: '止める' }))
+    expect(await screen.findByText('ほかの担当者が先に保存しました。読み直しました。')).toBeTruthy()
+    // 読み直しが終わっても知らせは残る。
+    await waitFor(() => expect(fixture.fetchLive).toHaveBeenCalledTimes(2))
+    expect(screen.getByText('ほかの担当者が先に保存しました。読み直しました。')).toBeTruthy()
+  })
+  it('申請の409は版か未公開の両方を言う', async () => {
+    fixture.requestStart.mockRejectedValueOnce(new ApiError(409))
+    render(<LineFollowupV8 />)
+    await screen.findByRole('button', { name: '予約完了時' })
+    fireEvent.click(screen.getByRole('button', { name: '承認を申請する' }))
+    expect(await screen.findByText('承認を申請できませんでした。ほかの担当者の保存か、本体のシナリオの未公開が原因です。読み直しました。')).toBeTruthy()
+  })
+})
+
 it('行を切り替えても未保存の入力を保つ', async () => {
   render(<LineFollowupV8 />)
   await screen.findByRole('button', { name: '予約完了時' })
@@ -235,6 +303,23 @@ it('行を切り替えても未保存の入力を保つ', async () => {
   expect(screen.getByRole('textbox', { name: '本文' }).textContent).toContain('来店後の文')
   fireEvent.click(screen.getByRole('button', { name: '予約完了時' }))
   expect(screen.getByRole('textbox', { name: '本文' }).textContent).toContain('編集中の本文')
+})
+
+it('店を切り替えると別の店の下書きは持ち込まない', async () => {
+  fixture.snapshot.mockResolvedValue({ data: { ...data, stores: [storeOf('store', '試験店'), storeOf('store-2', '二号店')] } })
+  fixture.fetchLive.mockImplementation(async (_accountId: string, storeId: string) => liveOf({
+    storeId, storeName: storeId === 'store-2' ? '二号店' : '試験店',
+    steps: liveOf().steps.map(step => step.trigger === 'reservation_created'
+      ? { ...step, bubbles: [bubble(storeId === 'store-2' ? '二号店の文' : '予約完了の文')] }
+      : step),
+  }))
+  render(<LineFollowupV8 />)
+  await screen.findByRole('button', { name: '予約完了時' })
+  expect(screen.getByRole('textbox', { name: '本文' }).textContent).toContain('予約完了の文')
+  await typeBody('試験店で編集中')
+  fireEvent.change(screen.getByRole('combobox', { name: '店舗' }), { target: { value: 'store-2' } })
+  await waitFor(() => expect(screen.getByRole('textbox', { name: '本文' }).textContent).toContain('二号店の文'))
+  expect(screen.getByRole('textbox', { name: '本文' }).textContent).not.toContain('試験店で編集中')
 })
 
 // 118: 開いた行は押している途中の灰にせず、白のまま開いている印（左の緑の線・右端の ⌃）で示す。

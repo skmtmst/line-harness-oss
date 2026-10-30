@@ -45,6 +45,7 @@ export interface FollowupLive {
 }
 
 const base = (storeId: string) => `/api/restaurant-test/followups/${encodeURIComponent(storeId)}`
+const withAccount = (path: string, accountId: string) => `${path}?account_id=${encodeURIComponent(accountId)}`
 
 function unwrap<T>(response: ApiResponse<T>, fallback: string): T {
   if (!response.success) throw new Error(response.error || fallback)
@@ -52,13 +53,25 @@ function unwrap<T>(response: ApiResponse<T>, fallback: string): T {
 }
 
 /*
+ * 一歩の送る中身。吹き出しがあればそれを、無ければ旧来のテキスト1通を1通の吹き出しに読み替える。
+ * 旧来のテキスト以外（画像など）はこの画面では扱わない。
+ */
+export function stepBubbles(step: ScenarioStep): BroadcastBubble[] {
+  if (step.messageBubbles?.length) return step.messageBubbles
+  if (step.messageType === 'text' && step.messageContent.trim()) {
+    return [{ id: `${step.id}-text`, type: 'text', content: { text: step.messageContent } }]
+  }
+  return []
+}
+
+/*
  * 1店舗分を読む。まだ無い店舗（404）は null を返し、画面は7行の見本を出す。
  * 読めない数は 0 や作り話で埋めない（共通の決まり）。
  */
-export async function fetchRestaurantFollowup(storeId: string, storeName = ''): Promise<FollowupLive | null> {
+export async function fetchRestaurantFollowup(accountId: string, storeId: string, storeName = ''): Promise<FollowupLive | null> {
   let page: RestaurantFollowupPage
   try {
-    page = unwrap(await fetchApi<ApiResponse<RestaurantFollowupPage>>(base(storeId)), 'フォローの設定を読み込めませんでした')
+    page = unwrap(await fetchApi<ApiResponse<RestaurantFollowupPage>>(withAccount(base(storeId), accountId)), 'フォローの設定を読み込めませんでした')
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null
     throw error
@@ -76,7 +89,7 @@ export async function fetchRestaurantFollowup(storeId: string, storeName = ''): 
   const steps: FollowupStepLive[] = triggers.map(trigger => {
     const binding = page.bindings.find(item => item.trigger === trigger) ?? null
     const step = binding ? byId.get(binding.step_id) ?? null : null
-    const bubbles = step?.messageBubbles ?? []
+    const bubbles = step ? stepBubbles(step) : []
     const enabled = binding?.enabled === 1
     return {
       trigger,
@@ -100,9 +113,9 @@ export async function fetchRestaurantFollowup(storeId: string, storeName = ''): 
 }
 
 /** 行の本文（吹き出し1〜5個）を版付きで保存する。 */
-export function saveFollowupMessages(storeId: string, stepId: string, input: { expectedVersion: number; messageBubbles: BroadcastBubble[] }) {
+export function saveFollowupMessages(accountId: string, storeId: string, stepId: string, input: { expectedVersion: number; messageBubbles: BroadcastBubble[] }) {
   return fetchApi<ApiResponse<{ stepId: string; messageBubbles: BroadcastBubble[]; version: number; sendingStatus: string }>>(
-    `${base(storeId)}/steps/${encodeURIComponent(stepId)}/messages`,
+    withAccount(`${base(storeId)}/steps/${encodeURIComponent(stepId)}/messages`, accountId),
     { method: 'PUT', body: JSON.stringify(input) },
   )
 }
@@ -112,26 +125,26 @@ export function saveFollowupMessages(storeId: string, stepId: string, input: { e
  * 結びがある行は PATCH、無い行は POST。POST は本体の一歩が無いと 409 になる
  * （本体の自動作成の口が無い。口の一覧の2件目）。
  */
-export function saveFollowupBinding(storeId: string, stepId: string, method: 'POST' | 'PATCH', input: {
+export function saveFollowupBinding(accountId: string, storeId: string, stepId: string, method: 'POST' | 'PATCH', input: {
   expectedVersion: number; trigger: RestaurantFollowupTrigger; offsetMinutes: number; enabled: boolean
 }) {
   return fetchApi<ApiResponse<{ stopped: boolean }>>(
-    `${base(storeId)}/bindings/${encodeURIComponent(stepId)}`,
+    withAccount(`${base(storeId)}/bindings/${encodeURIComponent(stepId)}`, accountId),
     { method, body: JSON.stringify(input) },
   )
 }
 
 /** 本送信の承認を申請する。有効な結びが1つ以上要る。 */
-export function requestFollowupStart(storeId: string, expectedVersion: number) {
+export function requestFollowupStart(accountId: string, storeId: string, expectedVersion: number) {
   return fetchApi<ApiResponse<{ approvalId: string; sendingStatus: string }>>(
-    `${base(storeId)}/request-start`,
+    withAccount(`${base(storeId)}/request-start`, accountId),
     { method: 'POST', body: JSON.stringify({ expectedVersion }) },
   )
 }
 
 /** 本送信を止める。 */
-export function stopFollowup(storeId: string) {
-  return fetchApi<ApiResponse<{ sendingStatus: string }>>(`${base(storeId)}/stop`, { method: 'POST' })
+export function stopFollowup(accountId: string, storeId: string) {
+  return fetchApi<ApiResponse<{ sendingStatus: string }>>(withAccount(`${base(storeId)}/stop`, accountId), { method: 'POST' })
 }
 
 /** 口コミ依頼の送信履歴の1行。 */
@@ -146,9 +159,9 @@ export interface FollowupInvitation {
 }
 
 /** 口コミ依頼の送信履歴を読む。 */
-export async function fetchFollowupReviewHistory(storeId: string): Promise<FollowupInvitation[]> {
+export async function fetchFollowupReviewHistory(accountId: string, storeId: string): Promise<FollowupInvitation[]> {
   const data = unwrap(
-    await fetchApi<ApiResponse<{ invitations: FollowupInvitation[] }>>(`${base(storeId)}/review-history`),
+    await fetchApi<ApiResponse<{ invitations: FollowupInvitation[] }>>(withAccount(`${base(storeId)}/review-history`, accountId)),
     '送信履歴を読み込めませんでした',
   )
   return data.invitations

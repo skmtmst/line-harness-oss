@@ -1,6 +1,5 @@
 'use client'
 
-import { Utensils } from 'lucide-react'
 import type { BroadcastBubble } from '@line-crm/shared'
 import Card from '@/components/shared/card'
 import { Field } from '@/components/shared/form-controls'
@@ -26,6 +25,11 @@ export function bubbleText(bubble: BroadcastBubble | null | undefined): string {
   return typeof text === 'string' ? text : ''
 }
 
+/** 読むだけの欄に出す全文。2通以上あっても先頭だけにしない。 */
+export function allBubbleText(bubbles: BroadcastBubble[]): string {
+  return bubbles.map(bubbleText).filter(text => text !== '').join('\n\n')
+}
+
 export function StepEditor({ name, bubbles, readOnly, busy, onChange }: {
   name: string; bubbles: BroadcastBubble[]; readOnly: boolean; busy: boolean
   onChange: (bubbles: BroadcastBubble[]) => void
@@ -39,7 +43,7 @@ export function StepEditor({ name, bubbles, readOnly, busy, onChange }: {
     </div>
     <SaveErrorField names={['messageBubbles', 'body']}>
       {readOnly
-        ? <Field label="本文" fill><TextArea value={bubbleText(current)} readOnly /></Field>
+        ? <Field label="本文" fill><TextArea value={allBubbleText(bubbles)} readOnly /></Field>
         : <MessageComposer bubblesOnly bubbles={[current]} accountId={null} busy={busy} unavailable={UNAVAILABLE}
             onChange={(_index, next) => onChange([{ ...next, id: current.id }])}
             onMove={noop} onDelete={noop} onAdd={noop} onPickTemplate={noop} onSaveTemplate={noop} onCompose={noop} />}
@@ -47,15 +51,10 @@ export function StepEditor({ name, bubbles, readOnly, busy, onChange }: {
   </Card>
 }
 
-export function StepPreview({ bubbles, accountName, photo }: { bubbles: BroadcastBubble[]; accountName: string; photo: 'A' | 'B' | 'C' | 'D' }) {
-  const text = bubbleText(bubbles[0])
+/* 送る中身そのままの見え方。送らない画像やボタンは付けない。 */
+export function StepPreview({ bubbles, accountName }: { bubbles: BroadcastBubble[]; accountName: string }) {
+  const texts = bubbles.map(bubbleText).filter(text => text !== '')
   return <LinePreview title={null} accountName={accountName} fit>
-    <div className={styles.rich}>
-      <div className={`${styles.photo} ${photo === 'B' ? styles.photoB : photo === 'C' ? styles.photoC : photo === 'D' ? styles.photoD : styles.photoA}`}><Utensils aria-hidden className={styles.photoIcon} /></div>
-      <div className={styles.richText}>
-        <p className={styles.richBody}>{text || '本文'}</p>
-      </div>
-      <p className={styles.richAction}>予約内容を確認</p>
-    </div>
+    {texts.length ? texts.map((text, index) => <p key={index} className={styles.talkBubble}>{text}</p>) : <p className={styles.talkBubble}>本文</p>}
   </LinePreview>
 }

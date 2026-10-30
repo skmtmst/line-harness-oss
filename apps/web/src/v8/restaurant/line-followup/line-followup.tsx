@@ -1,7 +1,7 @@
 'use client'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useRef, useState, type ComponentType } from 'react'
 import { Bell, CalendarClock, CalendarHeart, Check, ChevronDown, Clock, HeartHandshake, MessageSquare, MessageSquareText, Star } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -13,7 +13,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { RestaurantFrame } from '@/v8/restaurant/common-a/public/frame/index'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import type { ApiResponse, BroadcastBubble, RestaurantFollowupTrigger } from '@line-crm/shared'
-import { ApiError } from '@/lib/api/transport/errors'
+import { ApiError, describeSaveFailure } from '@/lib/api/transport/errors'
 import {
   fetchFollowupReviewHistory,
   fetchRestaurantFollowup,
@@ -25,7 +25,7 @@ import {
   type FollowupStepLive,
 } from '@/lib/api/helpers/restaurant-followup'
 import { StepEditor, StepPreview, bubbleText } from './flow-editor'
-import { RESTAURANT_TRIGGER_ROWS, UNIT_LABEL, UNIT_MINUTES, timingError, timingLabel, type FollowupTriggerRow, type OffsetUnit } from './config'
+import { RESTAURANT_TRIGGER_ROWS, UNIT_LABEL, UNIT_MINUTES, exactTiming, timingError, timingLabel, type FollowupTriggerRow, type OffsetUnit } from './config'
 import styles from './line-followup.module.css'
 
 /*
@@ -69,12 +69,14 @@ function SendingLine({ live }: { live: FollowupLive }) {
 }
 
 /* 開いた行の操作（オン/オフ・時期・本文）。行が変わるたび作り直す。本文の下書きは Board が持ち、行を切り替えても保つ。 */
-function OpenRow({ row, step, live, storeId, readOnly, reviewCount, busy, setBusy, failed, reload, bubbles, onBubbles }: {
+function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, reviewCount, busy, setBusy, failed, reload, bubbles, onBubbles }: {
   row: FollowupTriggerRow
   step: FollowupStepLive | null
   live: FollowupLive
+  accountId: string
   storeId: string
   readOnly: boolean
+  unknownRole: boolean
   reviewCount: number | null
   busy: string | null
   setBusy: (action: string | null) => void
@@ -86,23 +88,21 @@ function OpenRow({ row, step, live, storeId, readOnly, reviewCount, busy, setBus
   const binding = step?.binding ?? null
   const enabled = binding?.enabled === 1
   const currentOffset = binding?.offset_minutes ?? row.defaultOffsetMinutes
-  const [amount, setAmount] = useState(() => {
-    const abs = Math.abs(currentOffset)
-    if (row.defaultUnit === 'days') return String(Math.round(abs / 1440))
-    if (row.defaultUnit === 'hours') return String(Math.round(abs / 60))
-    return String(abs)
-  })
-  const [unit, setUnit] = useState<OffsetUnit>(row.defaultUnit)
+  const initial = exactTiming(Math.abs(currentOffset), row.units)
+  const [amount, setAmount] = useState(initial.amount)
+  const [unit, setUnit] = useState<OffsetUnit>(initial.unit)
   const anniversaryLocked = row.trigger === 'anniversary_before'
   const noStep = !binding || !step?.step
-  const locked = readOnly || busy !== null
-  const toggleReason = readOnly ? '閲覧のみのため変えられません'
-    : noStep ? '本体の一歩がまだないため、この行は変えられません'
-    : anniversaryLocked ? '記念日前の始まりはサーバーの口がまだないため、オンと時期は変えられません'
-    : null
-  const bodyReason = readOnly ? '閲覧のみのため変えられません'
-    : noStep ? '本体の一歩がまだないため、本文は変えられません'
-    : null
+  const multiBubble = (step?.bubbles.length ?? 0) > 1
+  const locked = unknownRole || busy !== null
+  /* 権限の理由は lockedReason、状態の理由は目の前の文。役割不明は理由なし。 */
+  const permReason = readOnly ? '閲覧のみのため変えられません' : null
+  const toggleStateReason = noStep ? '本体の一歩がまだないため、この行は変えられません'
+    : anniversaryLocked ? '記念日前の始まりはサーバーの口がまだないため、オンと時期は変えられません' : null
+  const bodyStateReason = noStep ? '本体の一歩がまだないため、本文は変えられません'
+    : multiBubble ? '本文が2通以上あるため、この画面では直せません。本体のシナリオ画面で直してください' : null
+  const toggleLocked = locked || permReason !== null || toggleStateReason !== null
+  const bodyLocked = locked || permReason !== null || bodyStateReason !== null
 
   const run = async (action: string, work: () => Promise<unknown>) => {
     setBusy(action)
@@ -111,10 +111,10 @@ function OpenRow({ row, step, live, storeId, readOnly, reviewCount, busy, setBus
       reload()
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        failed('ほかの担当者が先に保存しました。読み直しました。')
         reload()
+        failed('ほかの担当者が先に保存しました。読み直しました。')
       } else {
-        failed(error instanceof Error ? error.message : '保存できませんでした')
+        failed(describeSaveFailure(error))
       }
     } finally {
       setBusy(null)
@@ -128,13 +128,13 @@ function OpenRow({ row, step, live, storeId, readOnly, reviewCount, busy, setBus
   }
   return <div>
     <div>
-      <Button variant="secondary" disabled={locked || toggleReason !== null} busy={busy === 'toggle'}
-        title={toggleReason ?? undefined}
+      <Button variant="secondary" disabled={toggleLocked} busy={busy === 'toggle'}
+        lockedReason={permReason}
         onClick={() => {
           if (!binding || !step) return
           const next = !enabled
           void run('toggle', async () => {
-            unwrap(await saveFollowupBinding(storeId, binding.step_id, 'PATCH', {
+            unwrap(await saveFollowupBinding(accountId, storeId, binding.step_id, 'PATCH', {
               expectedVersion: live.templateVersion, trigger: row.trigger,
               offsetMinutes: binding.offset_minutes, enabled: next,
             }), 'オン/オフを変えられませんでした')
@@ -142,15 +142,18 @@ function OpenRow({ row, step, live, storeId, readOnly, reviewCount, busy, setBus
         }}>
         {enabled ? '止める' : '送る'}
       </Button>
-      {toggleReason ? <p role="note">{toggleReason}</p> : null}
+      {permReason && !unknownRole ? <p role="note">{permReason}</p> : null}
+      {toggleStateReason ? <p role="note">{toggleStateReason}</p> : null}
     </div>
-    <Field label="時期" note={row.direction === 'before' ? '前の日時を入れます' : row.direction === 'after' ? '起点からの後を入れます' : '起点からの後を入れます（0はすぐ）'}>
-      <TextInput value={amount} inputMode="numeric" disabled={locked || toggleReason !== null}
+    <Field label="時期" note={row.direction === 'before' ? '前の日時を入れます' : '起点からの後を入れます（0はすぐ）'}>
+      <TextInput value={amount} inputMode="numeric" disabled={toggleLocked}
         aria-label="時期の数値" onChange={event => setAmount(event.target.value)} />
-      <Select value={unit} disabled={locked || toggleReason !== null} aria-label="時期の単位"
+      <Select value={unit} disabled={toggleLocked} aria-label="時期の単位"
+        lockedReason={permReason ?? undefined}
         options={row.units.map(item => ({ value: item, label: UNIT_LABEL[item] }))}
         onChange={value => setUnit(value as OffsetUnit)} />
-      <Button variant="secondary" disabled={locked || toggleReason !== null} busy={busy === 'timing'}
+      <Button variant="secondary" disabled={toggleLocked} busy={busy === 'timing'}
+        lockedReason={permReason}
         onClick={() => {
           const offset = offsetOf()
           if (offset === null) { failed('時期は0以上の整数で入れてください'); return }
@@ -158,7 +161,7 @@ function OpenRow({ row, step, live, storeId, readOnly, reviewCount, busy, setBus
           if (invalid) { failed(invalid); return }
           if (!binding) return
           void run('timing', async () => {
-            unwrap(await saveFollowupBinding(storeId, binding.step_id, 'PATCH', {
+            unwrap(await saveFollowupBinding(accountId, storeId, binding.step_id, 'PATCH', {
               expectedVersion: live.templateVersion, trigger: row.trigger,
               offsetMinutes: offset, enabled,
             }), '時期を変えられませんでした')
@@ -167,17 +170,17 @@ function OpenRow({ row, step, live, storeId, readOnly, reviewCount, busy, setBus
         時期を保存する
       </Button>
     </Field>
-    <StepEditor name={row.name} bubbles={bubbles} readOnly={readOnly || bodyReason !== null} busy={busy === 'body'} onChange={onBubbles} />
-    {bodyReason && !readOnly ? <p role="note">{bodyReason}</p> : null}
+    <StepEditor name={row.name} bubbles={bubbles} readOnly={bodyLocked} busy={busy === 'body'} onChange={onBubbles} />
+    {bodyStateReason ? <p role="note">{bodyStateReason}</p> : null}
     <div>
-      <Button variant="primary" disabled={locked || bodyReason !== null} busy={busy === 'body'}
-        title={bodyReason ?? undefined}
+      <Button variant="primary" disabled={bodyLocked} busy={busy === 'body'}
+        lockedReason={permReason}
         onClick={() => {
-          if (!binding || !step?.step) return
+          if (!binding || !step?.step || multiBubble) return
           if (!bubbleText(bubbles[0]).trim()) { failed('本文を入れてください'); return }
           const next = bubbles.length ? bubbles : [{ id: 'draft', type: 'text' as const, content: { text: '' } }]
           void run('body', async () => {
-            unwrap(await saveFollowupMessages(storeId, binding.step_id, {
+            unwrap(await saveFollowupMessages(accountId, storeId, binding.step_id, {
               expectedVersion: live.templateVersion, messageBubbles: next,
             }), '本文を保存できませんでした')
           })
@@ -192,12 +195,14 @@ function OpenRow({ row, step, live, storeId, readOnly, reviewCount, busy, setBus
   </div>
 }
 
-function Board({ storeId, storeName, selectedTrigger, onSelect, readOnly }: {
+function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readOnly, unknownRole }: {
+  accountId: string | null
   storeId: string | null
   storeName: string
   selectedTrigger: RestaurantFollowupTrigger
   onSelect: (trigger: RestaurantFollowupTrigger) => void
   readOnly: boolean
+  unknownRole: boolean
 }) {
   const [previewExpanded, setPreviewExpanded] = useState(false)
   const [state, setState] = useState<ScreenState>({ kind: 'loading' })
@@ -205,18 +210,24 @@ function Board({ storeId, storeName, selectedTrigger, onSelect, readOnly }: {
   const [busy, setBusy] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
-  /* 行ごとの本文の下書き。行を切り替えても保ち、読み直すと捨てる。 */
+  /* 行ごとの本文の下書き。行を切り替えても保ち、読み直すと捨てる。店が変わると Board ごと作り直す。 */
   const [edits, setEdits] = useState<Record<string, BroadcastBubble[]>>({})
+  /* 失敗の知らせは店が変わったときだけ消す。保存後の読み直しでは保つ。 */
+  const storeKey = `${accountId ?? ''} ${storeId ?? ''}`
+  const prevStoreKey = useRef(storeKey)
   useEffect(() => {
-    if (!storeId) return
+    if (!accountId || !storeId) return
     let cancelled = false
+    if (prevStoreKey.current !== storeKey) {
+      prevStoreKey.current = storeKey
+      setActionError(null)
+    }
     setState({ kind: 'loading' })
-    setActionError(null)
-    fetchRestaurantFollowup(storeId, storeName).then(live => {
+    fetchRestaurantFollowup(accountId, storeId, storeName).then(live => {
       if (cancelled) return
       setState(live ? { kind: 'ready', live } : { kind: 'empty' })
       if (live) {
-        fetchFollowupReviewHistory(storeId).then(
+        fetchFollowupReviewHistory(accountId, storeId).then(
           invitations => { if (!cancelled) setReviewCount(invitations.length) },
           () => { if (!cancelled) setReviewCount(null) },
         )
@@ -226,7 +237,8 @@ function Board({ storeId, storeName, selectedTrigger, onSelect, readOnly }: {
       setState({ kind: 'error', message: error instanceof Error ? error.message : '読み込めませんでした' })
     })
     return () => { cancelled = true }
-  }, [storeId, storeName, reloadKey])
+  }, [accountId, storeId, storeName, reloadKey, storeKey])
+  if (!accountId) return <p role="alert">アカウントを選んでください</p>
   if (state.kind === 'loading') return <p role="status">読み込んでいます…</p>
   if (state.kind === 'error') return <p role="alert">{state.message}</p>
   const rows = RESTAURANT_TRIGGER_ROWS
@@ -238,11 +250,13 @@ function Board({ storeId, storeName, selectedTrigger, onSelect, readOnly }: {
   const draft = edits[current.trigger]
     ?? (step && step.bubbles.length ? step.bubbles : sample ? blank('sample', current.sampleText) : blank('draft', ''))
   const reload = () => { setEdits({}); setReloadKey(key => key + 1) }
+  const permReason = readOnly ? '閲覧のみのため変えられません' : null
+  const startStopLocked = busy !== null || unknownRole || readOnly
   return <>
     {readOnly ? <ReadOnlyNotice role="note" /> : null}
     {actionError ? <p role="alert">{actionError}</p> : null}
     <DetailColumns presentation="notification" asideLabel="LINEでの見え方" expanded={previewExpanded} onExpandedChange={setPreviewExpanded}
-      aside={<StepPreview bubbles={draft} accountName={storeName || 'LINE公式アカウント'} photo="A" />}>
+      aside={<StepPreview bubbles={draft} accountName={storeName || 'LINE公式アカウント'} />}>
       {live ? <SendingLine live={live} /> : null}
       <div className={styles.flowList}>
         {rows.map(row => {
@@ -264,8 +278,9 @@ function Board({ storeId, storeName, selectedTrigger, onSelect, readOnly }: {
               </button>
             </Card>
             {isSelected && live && storeId ? (
-              <OpenRow key={`${row.trigger}:${live.templateVersion}`} row={row} step={rowStep} live={live} storeId={storeId}
-                readOnly={readOnly} reviewCount={reviewCount} busy={busy} setBusy={setBusy}
+              <OpenRow key={`${row.trigger}:${live.templateVersion}`} row={row} step={rowStep} live={live}
+                accountId={accountId} storeId={storeId}
+                readOnly={readOnly} unknownRole={unknownRole} reviewCount={reviewCount} busy={busy} setBusy={setBusy}
                 failed={setActionError} reload={reload}
                 bubbles={edits[row.trigger] ?? rowStep?.bubbles ?? blank('draft', '')}
                 onBubbles={next => setEdits(current => ({ ...current, [row.trigger]: next }))} />
@@ -275,16 +290,18 @@ function Board({ storeId, storeName, selectedTrigger, onSelect, readOnly }: {
         })}
       </div>
       {sample ? <p role="note">この店のフォローの設定はまだありません。表の文は見本です。</p> : null}
-      {live && storeId && !readOnly ? (
+      {live && storeId ? (
         <div>
-          <Button variant="secondary" disabled={busy !== null} busy={busy === 'start'}
+          <Button variant="secondary" disabled={startStopLocked} busy={busy === 'start'}
+            lockedReason={permReason}
             onClick={() => {
               setBusy('start')
-              setActionError(null)
-              requestFollowupStart(storeId, live.templateVersion).then(
+              requestFollowupStart(accountId, storeId, live.templateVersion).then(
                 response => {
                   setBusy(null)
-                  try { unwrap(response, '承認を申請できませんでした') } catch (error) {
+                  try {
+                    unwrap(response, '承認を申請できませんでした')
+                  } catch (error) {
                     setActionError(error instanceof Error ? error.message : '承認を申請できませんでした')
                     return
                   }
@@ -293,25 +310,25 @@ function Board({ storeId, storeName, selectedTrigger, onSelect, readOnly }: {
                 (error: unknown) => {
                   setBusy(null)
                   if (error instanceof ApiError && error.status === 409) {
-                    setActionError('ほかの担当者が先に保存しました。読み直しました。')
                     reload()
+                    setActionError('承認を申請できませんでした。ほかの担当者の保存か、本体のシナリオの未公開が原因です。読み直しました。')
                   } else {
-                    setActionError(error instanceof Error ? error.message : '承認を申請できませんでした')
+                    setActionError(describeSaveFailure(error))
                   }
                 },
               )
             }}>
             承認を申請する
           </Button>
-          <Button variant="secondary" disabled={busy !== null} busy={busy === 'stop'}
+          <Button variant="secondary" disabled={startStopLocked} busy={busy === 'stop'}
+            lockedReason={permReason}
             onClick={() => {
               setBusy('stop')
-              setActionError(null)
-              stopFollowup(storeId).then(
+              stopFollowup(accountId, storeId).then(
                 () => { setBusy(null); reload() },
                 (error: unknown) => {
                   setBusy(null)
-                  setActionError(error instanceof Error ? error.message : '止められませんでした')
+                  setActionError(describeSaveFailure(error))
                 },
               )
             }}>
@@ -332,7 +349,9 @@ export default function LineFollowupV8() {
     setSelectedTrigger('reservation_created')
   }
   const role = useStaffRole()
-  const readOnly = !canManageRole(role)
+  /* 役割が読めるまで null。そのあいだは閲覧のみと断定せず、理由なしで止める。 */
+  const unknownRole = role === null
+  const readOnly = !unknownRole && !canManageRole(role)
   return (
     <RestaurantFrame
       boardId="n9vvGx"
@@ -343,7 +362,7 @@ export default function LineFollowupV8() {
       subtitle={(store) => store ? store.name : ''}
       actions={() => null}
     >
-      {(ctx) => <Board storeId={ctx.store?.id ?? null} storeName={ctx.store?.name ?? ''} selectedTrigger={selectedTrigger} onSelect={setSelectedTrigger} readOnly={readOnly} />}
+      {(ctx) => <Board key={ctx.store?.id ?? 'none'} accountId={selectedAccountId} storeId={ctx.store?.id ?? null} storeName={ctx.store?.name ?? ''} selectedTrigger={selectedTrigger} onSelect={setSelectedTrigger} readOnly={readOnly} unknownRole={unknownRole} />}
     </RestaurantFrame>
   )
 }

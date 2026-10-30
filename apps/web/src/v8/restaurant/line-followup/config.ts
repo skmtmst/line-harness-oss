@@ -34,7 +34,7 @@ export const RESTAURANT_TRIGGER_ROWS: FollowupTriggerRow[] = [
   },
   {
     trigger: 'reservation_24h', name: '予約の前日', note: '予約の前の日に送る',
-    direction: 'before', defaultOffsetMinutes: -1440, units: ['hours', 'days'], defaultUnit: 'hours',
+    direction: 'before', defaultOffsetMinutes: -1440, units: ['minutes', 'hours', 'days'], defaultUnit: 'hours',
     sampleText: '明日はご予約の日です。お気をつけてお越しください。',
   },
   {
@@ -49,7 +49,7 @@ export const RESTAURANT_TRIGGER_ROWS: FollowupTriggerRow[] = [
   },
   {
     trigger: 'review_request', name: '口コミ依頼', note: '来店後に口コミをお願いする',
-    direction: 'after', defaultOffsetMinutes: 1440, units: ['hours', 'days'], defaultUnit: 'days',
+    direction: 'after', defaultOffsetMinutes: 1440, units: ['minutes', 'hours', 'days'], defaultUnit: 'days',
     sampleText: 'よろしければ口コミの投稿をお願いします。',
   },
   {
@@ -59,7 +59,7 @@ export const RESTAURANT_TRIGGER_ROWS: FollowupTriggerRow[] = [
   },
   {
     trigger: 'anniversary_before', name: '記念日前', note: '記念日の前にお祝いを送る',
-    direction: 'before', defaultOffsetMinutes: -10080, units: ['days'], defaultUnit: 'days',
+    direction: 'before', defaultOffsetMinutes: -10080, units: ['minutes', 'hours', 'days'], defaultUnit: 'days',
     sampleText: 'もうすぐ記念日ですね。お祝いのご用意はいかがですか。',
   },
 ]
@@ -67,6 +67,16 @@ export const RESTAURANT_TRIGGER_ROWS: FollowupTriggerRow[] = [
 export const UNIT_MINUTES: Record<OffsetUnit, number> = { minutes: 1, hours: 60, days: 1440 }
 
 export const UNIT_LABEL: Record<OffsetUnit, string> = { minutes: '分', hours: '時間', days: '日' }
+
+/*
+ * 既存の時期を数値＋単位に分ける。開いただけで丸めないよう、
+ * 割り切れる一番大きい単位を選び、値は正確に復元できるものにする。
+ */
+export function exactTiming(absMinutes: number, units: OffsetUnit[]): { amount: string; unit: OffsetUnit } {
+  if (units.includes('days') && absMinutes % 1440 === 0) return { amount: String(absMinutes / 1440), unit: 'days' }
+  if (units.includes('hours') && absMinutes % 60 === 0) return { amount: String(absMinutes / 60), unit: 'hours' }
+  return { amount: String(absMinutes), unit: 'minutes' }
+}
 
 /*
  * 鯖と同じ時期の規則（Worker restaurant-test-definition.ts）。
