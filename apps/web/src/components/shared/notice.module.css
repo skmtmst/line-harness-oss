@@ -35,6 +35,8 @@
 .warn .dot { background: var(--color-status-warn); }
 .danger .dot { background: var(--color-status-danger); }
 .message { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+/* 全体の自動句切りで文の途中に空きを残さず、本文・リンク・強調も同じ改行規則で幅を使う。 */
+.message, .message :where(:not([data-notice-heading], [data-notice-heading] *, [data-notice-status-word])) { word-break: normal; }
 .notice[data-has-action] .content { flex-basis: 24em; }
 .headingRow { display: flex; align-items: center; gap: var(--space-6); }
 .heading { color: var(--color-ink); font-size: var(--text-body); font-weight: 600; }
