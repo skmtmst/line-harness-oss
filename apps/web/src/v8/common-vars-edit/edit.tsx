@@ -29,6 +29,7 @@ import Dialog from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import LinePreview from '@/components/shared/line-preview'
+import MusuboMark from '@/components/shared/musubo-mark'
 import ListState from '@/components/shared/list-state'
 import { NOT_AVAILABLE,STATE_TEXT } from '@/components/shared/not-connected'
 import Notice from '@/components/shared/notice'
@@ -544,13 +545,13 @@ function EditCommonVarV8Inner() {
   const previewTalk = (
     <LinePreview
       caption={schedules.length > 0 && schedules[0] ? `${scheduleStamp(schedules[0].effectiveFrom)} から` : undefined}
-      accountName="然 - NEN -"
+      accountName="musubo"
       note="差し込んだときの見え方です。新しい中身を入れると、ここが変わります。"
     >
       <div className={styles.talkRow}>
-        <span className={styles.talkIcon} aria-hidden="true">然</span>
+        <span className={styles.talkIcon} aria-hidden="true"><MusuboMark /></span>
         <div className={styles.talkCol}>
-          <span className={styles.talkName}>然 - NEN -</span>
+          <span className={styles.talkName}>musubo</span>
           <div className={styles.talkBubbleRow}>
             <p className={styles.talkBubble}>
               {`いつもありがとうございます。\n${item?.name ?? '共通情報'}は ${value || emptyValue('unconfigured')} です。`}

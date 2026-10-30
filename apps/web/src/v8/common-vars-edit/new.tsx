@@ -20,6 +20,7 @@ import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import DateTimeField from '@/components/shared/date-time-field'
 import LinePreview, { LinePreviewMessage } from '@/components/shared/line-preview'
+import MusuboMark from '@/components/shared/musubo-mark'
 import { AffixedTextField, TextArea, TextField } from '@/components/shared/text-field'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
@@ -403,8 +404,8 @@ export default function NewCommonVarV8() {
       <Notice tone="warn" heading="秘密の値は入れないでください">
         パスワード・APIキー・トークンなどは保存できません（入れると止めます）。配信文に誤って差し込まれるおそれがあります。外部連携の設定に登録してください。
       </Notice>
-      <LinePreview caption="差し込んだ例" accountName="然 - NEN -" note="差し込んだときの見え方です。名前と中身を入れると、ここが変わります。">
-        <LinePreviewMessage accountName="然 - NEN -" avatar="然" time="10:00">
+      <LinePreview caption="差し込んだ例" accountName="musubo" note="差し込んだときの見え方です。名前と中身を入れると、ここが変わります。">
+        <LinePreviewMessage accountName="musubo" avatar={<MusuboMark />} time="10:00">
           {`いつもありがとうございます。\n${previewName}は ${value || emptyValue('unconfigured')} です。`}
         </LinePreviewMessage>
       </LinePreview>

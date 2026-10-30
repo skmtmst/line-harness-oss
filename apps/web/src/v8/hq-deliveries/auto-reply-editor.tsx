@@ -22,6 +22,7 @@ import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
 import SegmentedControl from '@/components/shared/segmented'
 import LinePreview, { LinePreviewFlex, LinePreviewMessage } from '@/components/shared/line-preview'
+import MusuboMark from '@/components/shared/musubo-mark'
 import { TextField } from '@/components/shared/text-field'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -37,7 +38,7 @@ const ORDER: StepKey[] = ['basic', 'trigger', 'reply', 'priority', 'confirm']
 const NEXT: Partial<Record<StepKey, StepKey>> = { basic: 'trigger', trigger: 'reply', reply: 'confirm' }
 
 const DELAYS = [{ value: '0', label: 'すぐ返す' }, { value: '30', label: '30秒あける' }, { value: '60', label: '1分あける' }, { value: '300', label: '5分あける' }]
-const SAMPLE_TOKENS: Record<string, string> = { '{{name}}': 'Kenta', '{{account.name}}': '然 -NEN-', '{{var.store_phone}}': '03-1234-5678', '{{var.reservation_url}}': 'https://nen.example/booking' }
+const SAMPLE_TOKENS: Record<string, string> = { '{{name}}': 'Kenta', '{{account.name}}': 'musubo', '{{var.store_phone}}': '03-1234-5678', '{{var.reservation_url}}': 'https://example.com/booking' }
 const sample = (text: string) => text.replace(/\{\{[^}]+\}\}/g, (token) => SAMPLE_TOKENS[token] ?? '（友だち情報）')
 
 export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, name, description, settings, references, onName, onDescription, onSetting, onActions, onCancel, onSave }: {
@@ -81,10 +82,10 @@ export default function HqAutoReplyEditor({ title, help, notice, canEdit, busy, 
       { key: 'after', label: '後の処理', value: afterLabel },
       ...(inserts.length && textReply ? [{ key: 'inserts', label: '差し込み', value: inserts.join('・') }] : []),
     ]} />
-    <LinePreview accountName="然 -NEN-">
+    <LinePreview accountName="musubo">
       <div className={styles.talk}>
-        <LinePreviewMessage direction="outgoing" accountName="然 -NEN-" avatar={null} time="10:12">{keyword ? `${keyword}したいです` : '（キーワードを含むメッセージ）'}</LinePreviewMessage>
-        {silent ? null : <LinePreviewMessage density="compact" accountName="然 -NEN-" avatar="然" time="10:12" bare={preservedReply && !templateId}>
+        <LinePreviewMessage direction="outgoing" accountName="musubo" avatar={null} time="10:12">{keyword ? `${keyword}したいです` : '（キーワードを含むメッセージ）'}</LinePreviewMessage>
+        {silent ? null : <LinePreviewMessage density="compact" accountName="musubo" avatar={<MusuboMark />} time="10:12" bare={preservedReply && !templateId}>
           {templateId ? `${replyLabel}を使います。内容は配布先の同じ名前のテンプレートで確認してください。`
             : responseType === 'flex' ? <LinePreviewFlex content={text} />
             : responseType === 'image' && image ? <ImageFrame title="保存済みの返信画像" value={image.previewImageUrl} previewAlt="返信画像のプレビュー" readOnly />
