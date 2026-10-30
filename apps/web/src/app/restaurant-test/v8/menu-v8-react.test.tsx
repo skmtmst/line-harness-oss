@@ -48,9 +48,10 @@ describe('MJoJR メニュー管理のV8', () => {
     render(<MenuV8 />)
     await screen.findByText('メニュー一覧')
     const board = document.querySelector('[data-design-node="MJoJR"]')!
-    for (const label of ['全メニュー', 'コース', '単品', '要承認', 'アレルギー登録']) {
+    for (const label of ['全メニュー', 'コース', '単品', '開始待ち', 'アレルギー登録']) {
       expect(board.textContent).toContain(label)
     }
+    expect(board.textContent).not.toContain('要承認')
     expect(board.textContent).toContain('「…」の中身')
     expect(board.textContent).toContain('秋の鹿肉コース')
     expect(board.textContent).toContain('ランチ・ディナー')
@@ -89,11 +90,12 @@ describe('MJoJR メニュー管理のV8', () => {
 it('申請中と承認済み開始待ちの新価格を現行価格と併記する',async()=>{
  fixture.snapshot.mockResolvedValue({data:{...data,menuItems:data.menuItems.map((m,i)=>i===0?{...m,pendingPrice:9900,priceChangeStatus:'approved',pendingEffectiveAt:'2099-10-10T00:00:00Z'}:m)}})
  render(<MenuV8 />)
- expect(await screen.findByText('開始待ち')).not.toBeNull()
+ const row = (await screen.findByText('秋の鹿肉コース')).closest('tr')!
+ expect(within(row).getByText('開始待ち')).not.toBeNull()
  expect(screen.getByText('¥8,800')).not.toBeNull()
  expect(screen.getByTitle(/^新価格 ¥9,900/)).not.toBeNull()
 })
-it.each(['2026-10-11T15:09:00Z','2026-10-11T23:59:00Z'])('日本時間00:09・08:59でも価格変更の開始日時を添えて承認へ送る（%s）',async(now)=>{
+it.each(['2026-10-11T15:09:00Z','2026-10-11T23:59:00Z'])('日本時間00:09・08:59でも価格変更の開始日時を添えて確認後に保存する（%s）',async(now)=>{
  vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(now))
  render(<MenuEditV8 />)
  fireEvent.change(await screen.findByLabelText('価格（税込）'),{target:{value:'9900'}})
@@ -105,6 +107,10 @@ it.each(['2026-10-11T15:09:00Z','2026-10-11T23:59:00Z'])('日本時間00:09・08
  fireEvent.click(screen.getAllByRole('button').find(b=>(b.getAttribute('aria-label')??'').startsWith(`${next.getFullYear()}年${next.getMonth()+1}月10日`))!)
  fireEvent.click(within(screen.getByRole('dialog',{name:'日時を選ぶ'})).getByRole('button',{name:'閉じる'}))
  const ymd=`${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-10`
- fireEvent.click(screen.getByRole('button',{name:'保存して申請する'}))
+ expect(screen.queryByRole('button',{name:'保存して申請する'})).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:'保存する'}))
+ const confirm=screen.getByRole('dialog',{name:'価格変更を確定しますか？'})
+ expect(fixture.updateMenu).not.toHaveBeenCalled()
+ fireEvent.click(within(confirm).getByRole('button',{name:'確定して保存する'}))
  await waitFor(()=>expect(fixture.updateMenu).toHaveBeenCalledWith('account-1','m1',expect.objectContaining({price:9900,effectiveAt:new Date(`${ymd}T10:00:00+09:00`).toISOString()})))
 })

@@ -47,7 +47,8 @@ describe('画面→メニュー所属の正本（#984 LAY-15）', () => {
 
   it('メニューと別の URL の画面も、属する項目が選ばれ組が開く（Eo56k・YMVFD）', () => {
     expect(menuOwnerForScreen('/affiliates', '?tab=report')).toEqual(['affiliates'])
-    expect(menuOwnerForScreen('/restaurant-test/close-tasks', '')).toEqual(['restaurant-dashboard'])
+    expect(menuOwnerForScreen('/restaurant-test/close-tasks', '')).toEqual(['restaurant-inventory'])
+    expect(MENU_SECTIONS.flatMap((section) => section.items).some((item) => ['restaurant-dashboard', 'restaurant-organization', 'restaurant-approvals'].includes(item.id))).toBe(false)
     expect(menuOwnerForScreen('/booking/staff', '')).toEqual(['booking-menus'])
   })
 
