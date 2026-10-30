@@ -83,7 +83,7 @@ export default function SelfPasskeys({ enabled }: { enabled: boolean | null }) {
         <Button variant="text" textTone="danger" size="compact" disabled={busy} onClick={() => setKeyToRemove(key)}>削除</Button>
       </div>)}</div> : null}
       <Button variant="primary" fullWidth disabled={busy || !enabled || !loaded || keys.length >= 10} onClick={() => void register()} busy={busy} busyLabel="確認しています…">パスキーを追加</Button>
-      {enabled === false ? <p className={styles.securityHint}>追加するには認証アプリの登録が必要です。</p> : <p className={styles.securityHint}>追加・削除には認証アプリで本人確認します。</p>}
+      {enabled === false ? <p className={styles.securityHint}>追加するには認証アプリの登録が必要です。</p> : null}
     </section>
     <ConfirmDialog open={keyToRemove !== null} title="パスキーを削除しますか？" deleteName={keyToRemove ? 'パスキー' : undefined} description="この端末のパスキーは次回から使えなくなります。認証アプリは引き続き使えます。" destructive busy={busy} error={error} onConfirm={() => void remove()} onCancel={() => setKeyToRemove(null)} />
     {stepUp.prompt}

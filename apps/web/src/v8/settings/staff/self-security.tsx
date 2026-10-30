@@ -10,7 +10,6 @@ export default function SelfSecurity() {
   const [authenticatorEnabled, setAuthenticatorEnabled] = useState<boolean | null>(null)
   return <section className={`${styles.asideCard} ${styles.selfSecurityCard}`} aria-label="自分の設定">
     <h2 className={styles.selfSecurityTitle}>2段階認証</h2>
-    <p className={styles.securityHint}>ログイン中の自分だけが変更できます</p>
     <SelfPasskeys enabled={authenticatorEnabled} />
     <div className={styles.securityDivider} aria-hidden="true" />
     <SelfMfa compact onEnabledChange={setAuthenticatorEnabled} />

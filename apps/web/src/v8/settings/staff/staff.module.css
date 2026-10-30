@@ -154,11 +154,11 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: var(--tpl-sa-staff-card-gap);
+  gap: 0;
   min-width: 0;
   padding: var(--tpl-sa-staff-card-pad);
   border-radius: var(--radius-card);
-  border: 1px solid var(--card-edge);
+  border: 0;
   box-shadow: var(--card-shadow);
   background: var(--color-canvas);
 }
@@ -168,6 +168,8 @@
   align-items: flex-start;
   gap: var(--tpl-sa-staff-col-gap);
   min-width: 0;
+  padding-bottom: var(--polish-space-section);
+  border-bottom: 1px solid var(--tpl-sa-staff-divider);
 }
 
 .cardHeadText {
@@ -181,7 +183,7 @@
 .cardTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: var(--tpl-sa-pool-name-size);
+  font-size: var(--tpl-sa-staff-card-title-size);
   font-weight: 700;
   line-height: var(--tpl-sa-pool-name-lh);
 }
@@ -201,6 +203,7 @@
 }
 
 .cardWarn {
+  margin: 0;
   min-width: 0;
   color: var(--color-status-warn-deep);
   font-size: var(--text-micro);
@@ -263,7 +266,7 @@
   border: 0;
   background: none;
   color: var(--color-ink);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
   font-weight: 600;
   line-height: var(--tpl-sa-staff-name-lh);
   text-align: left;
@@ -589,4 +592,30 @@
 @media (max-width: 1279px) { .table { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-menu-w); } }
 @media (max-width: 1279px) {
   .readOnlyTable { --sett-staff-columns: minmax(0, 1fr) var(--tpl-sa-staff-role-w) var(--tpl-sa-staff-last-w-narrow) var(--tpl-sa-staff-menu-w); }
+}
+
+/* ユーザー一覧はカードの余白を起点に列をそろえ、見本の区切りを最後まで通す。 */
+html:root .table.table :global([data-shared-part='list-head']),
+html:root .table.table :global([data-shared-part='list-row']) {
+  padding-inline: 0;
+  border-bottom: 1px solid var(--tpl-sa-staff-divider);
+  box-shadow: none;
+}
+
+html:root .table.table :global([data-shared-part='list-head']) {
+  height: var(--tpl-sa-staff-head-h);
+  min-height: var(--tpl-sa-staff-head-h);
+  color: var(--color-ink-faint);
+  font-size: var(--text-caption);
+}
+
+html:root .table.table :global([data-shared-part='list-row']) {
+  height: var(--tpl-sa-staff-row-h);
+  min-height: var(--tpl-sa-staff-row-h);
+}
+
+.colRole :global([data-role]) {
+  min-width: var(--tpl-sa-staff-role-chip-w);
+  height: var(--tpl-sa-staff-role-chip-h);
+  justify-content: center;
 }

@@ -1049,11 +1049,10 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
           <h2 className={styles.cardTitle}>{sectionTitle}</h2>
           <div className={styles.cardSubRow}>
             <span className={styles.cardSub}>{summaryReady ? `${formatNumber(filteredUsers.length)}人` : emptyValue('unknown')}</span>
-            {tab === 'members' && missing > 0 ? <span className={styles.cardWarn}>{`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}</span> : null}
           </div>
         </div>
       </div>
-      <GridTable className={`${styles.table} ${viewer ? styles.readOnlyTable : ''}`} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: 'var(--tpl-sa-staff-card-gap)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>
+      <GridTable className={`${styles.table} ${viewer ? styles.readOnlyTable : ''}`} framed={false} label={`${sectionTitle}の一覧`} design={{ columns: 'var(--sett-staff-columns)', gap: 'var(--tpl-sa-staff-col-gap)', rowPadding: 'var(--tpl-sa-staff-row-pad)', rowGap: '0', rowHeight: 'var(--tpl-sa-staff-row-h)', headHeight: 'var(--tpl-sa-staff-head-h)', fontSize: 'var(--text-caption)', lineHeight: 'var(--tpl-sa-staff-sub-lh)' }}>
         <GridHeadRow>
           <GridCell className={styles.colPerson} role="columnheader">ユーザー情報</GridCell>
           <GridCell className={styles.colRole} role="columnheader">権限</GridCell>
@@ -1069,7 +1068,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             return (
               <GridRow key={user.id}>
                 {/* 絵 nku0f：顔・名前・メール。担当のLINEアカウントは列にせず、名前に重ねた説明と「見える画面」で見る。 */}
-                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}</button>{member?.isAccountCreator ? <span className={styles.personSub}>管理者・アカウント作成者</span> : null}{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
+                <GridNameCell className={styles.colPerson} folder={false} name={<><span className={styles.avatar} aria-hidden="true">{[...avatarInitials(user.name)][0] ?? ''}</span><span className={styles.personText}><button type="button" aria-label={`${user.name}の中身を見る`} data-qa-open="EOTS4" onClick={() => openPermissions(user)} className={styles.personName} title={member ? `${user.name}（担当：${accessScopeLabel(user, accountNames)}）` : `${user.name}（要確認：ログイン情報との結び付けが未確認です）`}>{user.name}{me?.id === user.id ? '（自分）' : ''}</button>{user.email ? <span className={styles.personSub} title={user.email}>{user.email}</span> : null}</span></>} />
                 <GridCell className={styles.colRole} role="cell" title={tab === 'invited' && member && member.inviteStatus !== 'active' ? `招待の期限：${formatInviteExpiry((member as StaffMemberWithInvite).inviteExpiresAt)}` : twoFactorState(user).label}>{user.status === 'suspended' ? <StatusBadge tone="neutral" dot={false}>止めた</StatusBadge> : <RoleChip role={roleOf(user)} />}</GridCell>
                 <GridCell className={styles.colLast} role="cell" title={user.lastLoginAt ? formatStaffDate(user.lastLoginAt) : undefined}>{lastLoginDay(user.lastLoginAt)}</GridCell>
                 <GridCell className={`${styles.colMenu} ${styles.menuBox}`} role="cell">
@@ -1144,6 +1143,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                 </div>
               ) : null}
               {listCard}
+              {tab === 'members' && missing > 0 ? <p className={styles.cardWarn}>{`二段階認証が未設定の人が ${missing}人 います。高い権限の人から設定してください。`}</p> : null}
               {!loading && !error ? (
                 <div className={styles.listFoot}>
                   <p>{`ユーザー ${formatNumber(filteredUsers.length)} 人中 ${formatNumber(shown.length)} 人を表示${usersTotal > accessUsers.length ? `（全${formatNumber(usersTotal)} 人中${formatNumber(accessUsers.length)} 人まで読み込み）` : ''}`}</p>
