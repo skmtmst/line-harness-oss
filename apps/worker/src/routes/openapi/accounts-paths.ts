@@ -151,6 +151,9 @@ export const accountsPaths = {
     },
   },
   // ── LINE Accounts ───────────────────────────────────────────────────────
+  '/api/line-accounts/profile-pictures': {
+    get: { tags: ['LINE Accounts'], summary: 'LINEアカウントのプロフィール画像一覧', responses: { '200': { description: 'Profile pictures' } } },
+  },
   '/api/line-accounts': {
     get: { tags: ['LINE Accounts'], summary: 'LINEアカウント一覧', responses: { '200': { description: 'All LINE accounts' } } },
     post: {
