@@ -1019,3 +1019,5 @@
 - [右の詳細欄の文字と操作の統一](release-log/unreleased/0000-kenta-drawer-unify.md) — 反映履歴、確認 2026-10-30。
 
 - [受信箱でテンプレートの中身を見て選ぶ](release-log/unreleased/0000-kenta-inbox-template-preview.md) — 反映履歴。
+
+- [画像欄・受信箱・飲食店と見本の本文](release-log/unreleased/0000-kenta-train-1029s.md) — 反映履歴。
