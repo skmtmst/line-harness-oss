@@ -46,7 +46,7 @@ export default function SelfPasskeys({ enabled }: { enabled: boolean | null }) {
         method: 'POST', headers: { 'X-Step-Up-Token': grant }, body: JSON.stringify({ challengeToken: begin.data.challengeToken, response }),
       })
       if (!finish.success) throw new Error(finish.error)
-      setMessage('パスキーを登録しました。次回のログインでは、メールとパスワードまたはLINEの後にパスキーで本人確認できます。')
+      setMessage('パスキーを登録しました。')
       await load()
     } catch (caught) {
       if (caught instanceof Error && caught.name === 'NotAllowedError') return
