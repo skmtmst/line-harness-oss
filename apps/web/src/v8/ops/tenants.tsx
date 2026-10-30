@@ -1,15 +1,15 @@
 'use client'
+import SegmentedControl from '@/components/shared/segmented'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { createPageReturnHref } from '@/components/shared/create-page'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
-import { BadgeCheck, CircleDot, CreditCard, Hourglass, Pause, Plus } from 'lucide-react'
+import { BadgeCheck, CreditCard, Hourglass, Pause, Plus } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { api, type OpsTenantRow, type OpsTenantSummary } from '@/lib/api'
 import { formatDate, formatDateTime, PLAN_STATUS_LABEL, planLabel, tenantDetailHref, opsCall } from '@/components/ops/ops-ui'
 import { describeApiFailure, isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import FilterChip from '@/components/shared/filter-chip'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import ListState from '@/components/shared/list-state'
@@ -154,13 +154,10 @@ export default function OpsTenantsV8() {
         </KpiBand>}
         toolbar={<OpsListToolbar
           search={{ value: q, onChange: setQ, placeholder: '統括名・メール・店舗名で探す', label: '契約先を探す' }}
-          filters={<>
-            <FilterChip icon={<CircleDot size={16} aria-hidden="true" />} selected={filter === ''} onChange={() => setFilter('')}>
-              {loading || listLoadError ? 'すべて' : `すべて ${rows.length}`}
-            </FilterChip>
-            {/* 状態の札は文字だけ（星はお気に入りの印に見える・絵 XWtYC）。 */}
-            {STATUS_FILTERS.map((f) => <FilterChip key={f.key} selected={filter === f.key} onChange={(selected) => setFilter(selected ? f.key : '')}>{f.label}</FilterChip>)}
-          </>}
+          filters={<SegmentedControl aria-label="契約の状態" fit="content" value={filter} onClear={() => setFilter('')} onChange={setFilter} options={[
+            { value: '', label: 'すべて', count: loading || listLoadError ? undefined : rows.length },
+            ...STATUS_FILTERS.map((f) => ({ value: f.key, label: f.label })),
+          ]} />}
         />}
       >
         {loading && rows.length === 0 ? <ListState permissionScope="hq" kind="loading" title="契約先を読み込んでいます" />

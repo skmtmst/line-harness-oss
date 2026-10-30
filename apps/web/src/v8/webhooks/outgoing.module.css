@@ -15,20 +15,6 @@
 }
 
 /* よく使う絞り込み（左に印）。 */
-.savedBox { position: relative; width: var(--tpl-wh-saved-w); }
-.savedBox :global(*) { max-width: 100%; }
-.savedBox :global(button) { width: 100%; padding-left: calc(var(--tpl-chip-row-gap) * 9); }
-.savedBox :global(button) > svg:last-child { display: none; }
-.savedIcon {
-  position: absolute;
-  top: 50%;
-  left: var(--tpl-rule-row-gap);
-  z-index: 1;
-  color: var(--color-ink-secondary);
-  transform: translateY(-50%);
-  pointer-events: none;
-}
-
 /* 表：絵の列の並び（見出し 13/20・行 9/20・欄の間16）。共通の表の「列の並び」に、この板の寸法だけ当てる。 */
 .tableWrap {
   min-width: 0;

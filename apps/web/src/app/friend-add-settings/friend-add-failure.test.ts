@@ -47,3 +47,10 @@ describe('友だち追加まわりの失敗文', () => {
     }
   })
 })
+
+
+it.each([400, 409, 500, 503])('構造で渡された失敗%sにもSQLや秘密の原文を出さない', status => {
+  const result = describeFriendAddFailure({status, message:'確認の失敗 D1_ERROR SELECT secret FROM tenant'}, '設定', 'create')
+  expect(result.status).toBe(status)
+  expect(result.message).not.toMatch(/D1_ERROR|SELECT|secret/)
+})

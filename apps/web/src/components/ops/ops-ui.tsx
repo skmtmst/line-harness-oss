@@ -1,4 +1,5 @@
 'use client'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import type { ReactNode } from 'react'
@@ -102,7 +103,7 @@ export function tenantDetailHref(id: string): string {
  */
 /** 5xx は本文の文言が画面へ渡らない（`extractApiErrorMessage`）ので、状態コードから言い換える。 */
 export function opsErrorMessage(error: ApiError): string {
-  if (error.message && !error.message.startsWith('API error:')) return error.message
+  if (japaneseDetailOf(error)) return japaneseDetailOf(error)
   if (error.status === 503) return 'この機能はいまの環境では使えません（設定が未完了です）'
   if (error.status === 504) return '処理が時間内に終わりませんでした。手で進めるか、少し待ってからもう一度お試しください'
   if (error.status === 502) return '外部の処理に失敗しました。少し待ってからもう一度お試しください'

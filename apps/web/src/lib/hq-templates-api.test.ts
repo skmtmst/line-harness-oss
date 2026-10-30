@@ -8,7 +8,7 @@ const transport = vi.hoisted(() => {
   }
   return { request: vi.fn(), ApiError }
 })
-vi.mock('./api', () => ({ fetchApi: transport.request, ApiError: transport.ApiError }))
+vi.mock('./api', async (importOriginal) => ({ ...await importOriginal<typeof import('./api')>(), fetchApi: transport.request, ApiError: transport.ApiError }))
 import { hqTemplatesApi, HqTemplatesApiError, type HqTemplateListItem } from './hq-templates-api'
 const request = transport.request
 beforeEach(() => { request.mockReset(); request.mockResolvedValue({ success: true, data: { value: 'ok' } }) })
@@ -151,3 +151,12 @@ it('フォルダ交換は双方の版をまとめて送り、IDをescapeする',
  await hqTemplatesApi.folders.swapOrder('f/1','f/2',3,4);
  expect(request).toHaveBeenLastCalledWith('/api/hq/templates/folders/f%2F1/swap-order',{method:'POST',body:JSON.stringify({withId:'f/2',expectedRevision:3,withExpectedRevision:4})});
 });
+
+
+it.each([400, 409, 422, 428])('HTTP %s の内部原文をひな形の失敗へ残さない', async status => {
+  request.mockRejectedValue(new transport.ApiError(status, '入力を確認してください D1_ERROR: SELECT secret FROM tenant'))
+  const error = await hqTemplatesApi.get('t1').catch(cause => cause)
+  expect(error).toMatchObject({ status, responseReceived: true, requestNotApplied: true })
+  expect(error.message).toMatch(/[ぁ-んァ-ヶ一-龠]/u)
+  expect(error.message).not.toMatch(/D1_ERROR|SELECT|secret|API error/)
+})

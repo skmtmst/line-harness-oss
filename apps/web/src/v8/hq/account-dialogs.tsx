@@ -12,6 +12,7 @@ import Select from '@/components/shared/select'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import { api } from '@/lib/api'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import type { Folder } from '@line-crm/shared'
 import type { AccountWithStats } from '@/contexts/account-context'
 import head from './dialog-head.module.css'
@@ -223,7 +224,7 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
       }
       onDone()
     } catch (caught) {
-      setError(caught instanceof Error ? otpFailureMessage(caught.message) : 'アーカイブできませんでした。時間をおいて、もう一度お試しください。')
+      setError(otpFailureMessage(describeApiFailure(caught, 'アーカイブ')))
     } finally {
       setBusy(false)
     }
@@ -293,7 +294,7 @@ export function AccountRestoreDialogV8({ account, onClose, onDone }: {
       }
       onDone()
     } catch (caught) {
-      setError(caught instanceof Error ? otpFailureMessage(caught.message) : '戻せませんでした。')
+      setError(otpFailureMessage(describeApiFailure(caught, '復元')))
     } finally {
       setBusy(false)
     }

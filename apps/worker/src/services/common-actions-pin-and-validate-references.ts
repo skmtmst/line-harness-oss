@@ -1,4 +1,5 @@
 import { COMMON_ACTION_MAX_BRANCH_DEPTH, COMMON_ACTION_MAX_DEPTH, COMMON_ACTION_MAX_STEPS, type ActionDefinition } from '../features/automations/automation-engine/index.js';
+import { parseAutomationWait } from '@line-crm/shared';
 import { requireResource, requiredString, isRecord, CommonActionValidationError, resolveLatestPublishedReference, assertNoCycle, parseStoredActions, type CommonActionSummary, type CommonActionResources } from './common-actions-is-record.js';
 
 export async function pinAndValidateReferences(
@@ -69,12 +70,13 @@ export async function pinAndValidateReferences(
       params.richMenuPageId = page.id;
       delete params.richMenuId;
     } else if (action.type === 'wait') {
-      const minutes = Number(params.durationMinutes ?? params.minutes);
-      if (!Number.isInteger(minutes) || minutes <= 0 || minutes % 5 !== 0 || minutes > 365 * 24 * 60) {
-        throw new CommonActionValidationError('wait_minutes_invalid', '待つ時間は5分単位で1年以上にならないよう指定してください', `${field}.minutes`);
+      const wait = parseAutomationWait(params.mode === 'next_day' ? params : { ...params, durationMinutes: Number(params.durationMinutes ?? params.minutes) });
+      if (!wait) {
+        throw new CommonActionValidationError('wait_minutes_invalid', params.mode === 'next_day'
+          ? '翌日の時刻を時と分で指定してください' : '待つ時間は5分単位で1年以上にならないよう指定してください', `${field}.${params.mode === 'next_day' ? 'sendAtTime' : 'minutes'}`);
       }
-      params.durationMinutes = minutes;
-      delete params.minutes;
+      for (const key of Object.keys(params)) delete params[key];
+      Object.assign(params,wait);
     } else if (action.type === 'common_action') {
       const commonActionId = requiredString(params.commonActionId, `${field}.commonActionId`, '呼び出す共通アクション');
       if (commonActionId === ownerId) {

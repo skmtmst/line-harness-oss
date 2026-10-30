@@ -156,3 +156,28 @@ describe('配るアカウントの欄の補足', () => {
     expect(summarizeByFolder([{ id: '1', name: '本店' }, { id: '2', name: '渋谷店' }], f)).toBe('本店・渋谷店')
   })
 })
+
+it('カテゴリは件数付きの単一選択で、矢印キーで絞っても候補を確定せず、読込中は数を作らない', async () => {
+  const confirm = vi.fn()
+  const props = {
+    title: 'テンプレートから選ぶ',
+    items: [{ id: 'text', name: '返信の文', category: 'text' }, { id: 'coupon', name: '来店特典', category: 'coupon' }],
+    categories: [{ id: 'text', label: 'テキスト' }, { id: 'coupon', label: 'クーポン' }],
+    onCancel: () => {}, onConfirm: confirm,
+  }
+  const view = render(<EntityPickerDialog {...props} />)
+  const trigger = screen.getByRole('button', { name: '候補の絞り込み' })
+  expect(trigger.textContent).toContain('すべて 2')
+  fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+  await screen.findByRole('listbox')
+  expect(screen.getAllByRole('option').map(item => item.textContent)).toEqual(['すべて 2', 'テキスト 1', 'クーポン 1'])
+  fireEvent.keyDown(trigger, { key: 'ArrowDown' })
+  fireEvent.keyDown(trigger, { key: 'Enter' })
+  await waitFor(() => expect(screen.getAllByRole('radio').map(item => item.getAttribute('aria-label'))).toEqual(['返信の文']))
+  expect(trigger.textContent).toContain('テキスト 1')
+  expect(confirm).not.toHaveBeenCalled()
+  view.rerender(<EntityPickerDialog {...props} state={<p>読み込み中</p>} />)
+  expect((trigger as HTMLButtonElement).disabled).toBe(true)
+  expect(trigger.textContent).toBe('テキスト')
+  expect(confirm).not.toHaveBeenCalled()
+})

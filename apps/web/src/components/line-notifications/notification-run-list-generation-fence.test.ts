@@ -335,3 +335,13 @@ describe('LINE通知一覧の世代フェンス（純粋関数レベル）', () 
     expect(noAccount.visible(0)).toMatchObject({ state: 'ready', items: [] })
   })
 })
+
+
+it.each(['retry_unavailable', 'invalid_template'])('再試行の%sにも内部の原文を出さず、日本語の直し方を残す', code => {
+  for (const status of [400, 409, 500]) {
+    const result = retryNotificationErrorMessage(new ApiError(status, undefined, code))
+    expect(result).toBe(code === 'retry_unavailable' ? 'この送信は再試行できません。記録を読み直して確認してください。' : '送る内容を確認できないため、再試行できません。テンプレートを確認してください。')
+    expect(result).not.toContain('入力を直してください')
+  }
+  expect(retryNotificationErrorMessage(new ApiError(400, '設定を見直してください。', code))).toBe('設定を見直してください。')
+})

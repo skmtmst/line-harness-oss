@@ -171,10 +171,8 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
     : isAdmin && !recovery && !missingChallenge ? { tone: 'muted', text: 'コードは約 30 秒ごとに変わります' }
     : null
 
-  /* 押せない間だけ、ボタンの下に理由の灰の 1 行。6 桁は入れ終わると自動で確かめる。 */
+  /* 6 桁は入れ終わると自動で確かめる。入力不足の間は主ボタンを押せない形にする。 */
   const incomplete = recovery ? typedCode.length !== 8 : isAdmin && typedCode.length !== 6
-  const submitReason = loading || succeeded || missingChallenge || !incomplete ? null
-    : recovery ? '回復コードを 8 文字入れると押せます' : '6 桁を入れると自動でログインします'
 
   if (passkeyMode === 'available') return (
     <SaveErrorScope errors={saveErrors}><AuthPage layout={scope} title={isAdmin ? '二段階認証' : 'パスキーで確認'} titleId="ops-two-factor-title"
@@ -220,14 +218,13 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
           {status ? <p id={status.tone === 'danger' ? 'ops-two-factor-error' : undefined} role={status.tone === 'danger' ? 'alert' : undefined} className={styles.status} data-tone={status.tone}>{status.text}</p> : null}
         </div>
         {recovery && scope === 'ops' ? <><AuthHelp>控えた8個のうち、まだ使っていない1つを入れます。貼り付けもできます。</AuthHelp><AuthHelp>回復コードも無い時は、オーナー（運営）に連絡して、登録をやり直します。</AuthHelp></> : null}
-        <AuthSubmit reasonId="ops-two-factor-submit-reason" reason={submitReason}><Button
+        <AuthSubmit><Button
           variant="primary" fullWidth
           className={styles.submit}
           onClick={() => void submit()}
           disabled={loading || missingChallenge || succeeded || incomplete}
           busy={loading || succeeded}
           busyLabel={succeeded ? '開いています' : '確かめています…'}
-          aria-describedby={submitReason ? 'ops-two-factor-submit-reason' : undefined}
         >
           {scope === 'ops' && !recovery ? <LogIn aria-hidden="true" className={styles.icon} /> : null}{scope === 'ops' && !recovery ? 'ログイン' : '確認してログイン'}
         </Button></AuthSubmit>

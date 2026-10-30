@@ -1,11 +1,12 @@
 'use client'
 
-import { tokenExpiryNotice, tokenExpirySummary } from '@/lib/line-account-state'
+import { tokenExpiryBadge, tokenExpirySummary } from '@/lib/line-account-state'
 
 import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
+import Link from 'next/link';
 import { Folder as FolderIcon, Inbox, LayoutGrid, List, LogIn, Pencil, Plus, RotateCcw, Settings, MessageCircle } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
@@ -41,7 +42,7 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { readSessionSnapshot } from '@/lib/session-snapshot';
 import { useAccount, type AccountWithStats } from '@/contexts/account-context';
 import { AccountArchiveDialogV8, AccountRestoreDialogV8, AccountSettingsDialogV8 } from './account-dialogs';
-import { connectionReasonLine } from './connection-reasons';
+import { connectionNoticeLine } from './connection-reasons';
 import styles from './home.module.css';
 import { DEFAULT_TAG_FOLDER_COLOR } from '@/v8/tags/public/folder-colors/index'
 import StatusBadge from '@/components/shared/status-badge';
@@ -467,7 +468,7 @@ export default function HqHomeV8() {
         <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
         <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
         <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
-        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
+        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} actionPlacement="value-row" action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
       {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">
@@ -506,7 +507,7 @@ export default function HqHomeV8() {
           /></SaveErrorField>
           </ListToolbarEnd>
         </ListToolbarRow>
-        {tokenExpirySummary(currentAccounts) ? <ListToolbarRow><TruncatedText className="text-body text-ink-secondary" value={tokenExpirySummary(currentAccounts)!} /></ListToolbarRow> : null}
+        {tokenExpirySummary(currentAccounts) ? <ListToolbarRow><Notice tone="warn" compact message={tokenExpirySummary(currentAccounts)!} /></ListToolbarRow> : null}
       </ListToolbarFrame> : null}
   </>
 
@@ -585,13 +586,12 @@ export default function HqHomeV8() {
                     <dd>{typeof account.stats?.messagesThisMonth === 'number' ? `${formatNumber(account.stats.messagesThisMonth)} 通` : emptyValue('unknown')}</dd>
                   </div>
                 </dl>
-                {tokenExpiryNotice(account) ? <TruncatedText value={tokenExpiryNotice(account)!} /> : null}
-                {warned ? (() => {
-                  const reason = connectionReasonLine(account)
-                  return <Notice tone="warn" compact title={reason.title} message={reason.text}
+                {(() => {
+                  const notice = connectionNoticeLine(account, warned)
+                  return notice ? <Notice tone="warn" compact title={notice.title || undefined} message={notice.text}
                     action={canManage ? <button type="button" onClick={() => void refreshConnectionInfo(account)} disabled={checkingConnections} className={styles.linkButton}>更新する</button> : undefined}
-                  />
-                })() : null}
+                  /> : null
+                })()}
               </Card>
             )
           })}
@@ -621,7 +621,10 @@ export default function HqHomeV8() {
                   </span>
                 } />
                 <Td><StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>
-                  {tokenExpiryNotice(account) ? <TruncatedText value={tokenExpiryNotice(account)!} /> : null}
+                  {(() => {
+                    const badge = tokenExpiryBadge(account)
+                    return badge ? <StatusBadge tone={account.tokenExpiry?.status === 'expired' ? 'danger' : 'caution'} title={badge.title}>{badge.text}</StatusBadge> : null
+                  })()}
                 </Td>
                 <Td>{(() => {
                   const pay = payState[account.id]

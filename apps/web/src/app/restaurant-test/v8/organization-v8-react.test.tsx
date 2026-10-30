@@ -39,6 +39,6 @@ it('本人確認を中止した場合は権限変更を再送しない',async()=
  fixture.updateMembership.mockRejectedValueOnce({code:'STEP_UP_REQUIRED'});fixture.gate.mockResolvedValue(null)
  render(<OrganizationV8 />);const row=(await screen.findByText('試験担当')).closest('[role="row"]')!
  fireEvent.click(within(row).getByRole('button',{name:'試験担当のその他操作'}));fireEvent.click(screen.getByRole('menuitem',{name:'停止'}));fireEvent.click(screen.getByRole('button',{name:'停止する'}))
- await screen.findByText('保存できませんでした。')
+ await screen.findByText('本人確認を中止しました。変更は保存されていません。')
  expect(fixture.updateMembership).toHaveBeenCalledTimes(1)
 })

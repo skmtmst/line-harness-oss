@@ -1,11 +1,12 @@
 'use client'
+import SegmentedControl from '@/components/shared/segmented'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { daysUntilClose } from './payment-dates'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Banknote, Calendar, CalendarCheck, FileText, Landmark, Lock, TriangleAlert, Users, Wallet } from 'lucide-react'
+import { Banknote, Calendar, CalendarCheck, FileText, Landmark, Lock, TriangleAlert, Wallet } from 'lucide-react'
 import {
   api,
   type AffiliateAccountSettlementPreview,
@@ -16,7 +17,6 @@ import {
 } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
-import FilterChip from '@/components/shared/filter-chip'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
@@ -65,8 +65,6 @@ export default function PaymentTab() {
   const [query, setQuery] = useListUrlValue('q', '')
   const [filter, setFilter] = useListUrlValue<PaymentFilter>('filter', 'all')
   const [saved, setSaved] = useState('')
-  /* 「今回払う人」の札を押したか（絞りは全員のまま。押した形だけ残す）。 */
-  const [allPicked, setAllPicked] = useState(false)
   const [pageSize, setPageSize] = useListUrlValue('pageSize', 20)
   const [page, setPage] = useListUrlValue('page', 1)
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null)
@@ -335,14 +333,10 @@ export default function PaymentTab() {
   )
 
   const chips = (
-    <div role="group" aria-label="振込先で絞り込む" className={styles.chipGroup}>
-      <FilterChip selected={filter === 'bank_missing'} icon={<TriangleAlert size={16} aria-hidden="true" />} onChange={(on) => { setSaved(''); setAllPicked(false); setFilter(on ? 'bank_missing' : 'all'); setPage(1) }}>
-        {ready ? `振込先が足りない ${formatNumber(missingBanks.length)}` : '振込先が足りない'}
-      </FilterChip>
-      <FilterChip selected={filter === 'all' && allPicked} icon={<Users size={16} aria-hidden="true" />} onChange={(on) => { setSaved(''); setFilter('all'); setAllPicked(on); setPage(1) }}>
-        {ready ? `今回払う人 ${formatNumber(rows.length)}` : '今回払う人'}
-      </FilterChip>
-    </div>
+    <SegmentedControl<PaymentFilter> aria-label="振込先で絞り込む" fit="content" value={filter} onClear={() => { setSaved(''); setFilter('all'); setPage(1) }} onChange={(value) => { setSaved(''); setFilter(value); setPage(1) }} options={[
+      { value: 'all', label: '今回払う人', count: ready ? rows.length : undefined },
+      { value: 'bank_missing', label: '振込先が足りない', count: ready ? missingBanks.length : undefined },
+    ]} />
   )
 
   const trailing = (

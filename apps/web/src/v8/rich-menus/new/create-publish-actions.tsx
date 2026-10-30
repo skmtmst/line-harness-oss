@@ -65,12 +65,12 @@ export async function publishMenuNow({ audience, group, loadChecks, persistDraft
     } catch (e) {
       const fieldFailure = saveErrors.capture(e);
 
-      const raw = e instanceof Error && !/^API error: /.test(e.message) ? e.message : ''
-      const isValidationMessage = /[ぁ-んァ-ヶ一-龠]/u.test(raw) && raw !== 'publish failed'
+      const targetingPriorityInvalid = e instanceof Error && /targetingPriority/.test(e.message)
+      const isValidationMessage = e instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(e.message) && e.message !== 'publish failed'
       { if (!fieldFailure)
 
       setError(
-        /targetingPriority/.test(raw)
+        targetingPriorityInvalid
           ? '出す順番は1以上の整数で入力してください。小数は使えません。'
           : isValidationMessage
             ? describeApiFailure(e, '公開')

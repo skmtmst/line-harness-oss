@@ -2,7 +2,7 @@
 
 @layer components {
 .body { min-width: 0; border: 1px solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-canvas); box-shadow: var(--control-shadow); overflow: visible; container-type: inline-size; }
-.body:focus-within { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+
 :root .body :is(textarea, [data-insert-field]) { border: 0; box-shadow: none; outline: 1px solid transparent; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-field); padding: var(--tpl-insert-footer-pad); min-width: 0; }
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); min-width: 0; }
@@ -10,7 +10,7 @@
 .button { display: inline-flex; align-items: center; gap: 4px; border: 0; border-radius: var(--radius-control); background: transparent; box-shadow: none; padding: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); cursor: pointer; white-space: nowrap; }
 .button svg { width: var(--tpl-insert-icon); height: var(--tpl-insert-icon); stroke-width: 1.75; flex-shrink: 0; }
 @media (hover: hover) and (pointer: fine) { .button:hover { background: var(--color-hover); } }
-.button:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+.button:focus-visible { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 .button:is(:disabled, [data-permission-locked]) { opacity: var(--polish-disabled-opacity); cursor: not-allowed; }
 .count { margin-left: auto; font-size: var(--text-micro); color: var(--color-ink-faint); white-space: nowrap; }
 /* 狭い枠でも、差し込みと同じ行に入るなら文字数はその行の右端に置く。入らない時だけ折り返し、次の行の右端へ寄る（margin-left: auto）。 */
@@ -20,3 +20,6 @@
 }
 
 :root .button { padding-block-start: var(--polish-text-center-inset); }
+
+/* 文字の欄は外枠に輪を出す。差し込みボタンの焦点はボタン自身に残す。 */
+html:root .body :is(textarea, [data-insert-field]):focus-visible { outline: var(--polish-focus-width) solid transparent; }/* 中の欄に誤りがある時は外枠を赤1本。 */

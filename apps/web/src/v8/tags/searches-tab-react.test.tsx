@@ -39,6 +39,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
 
 import { flushListUrlState } from '@/components/shared/list-url-state'
 import SearchesTab from './searches-tab'
+import { ApiError } from '@/lib/api'
 
 function search(overrides: Partial<SavedSearch> = {}): SavedSearch {
   return {
@@ -198,5 +199,39 @@ describe('絞り込み', () => {
     fireEvent.click(screen.getByRole('button', { name: '該当人数で絞り込む' }))
     await chooseOption('1人以上')
     await waitFor(() => expect(rows().map((row) => row.getAttribute('data-row-id'))).toEqual(['s1']))
+  })
+})
+
+
+describe('失敗時の日本語と一覧の保持', () => {
+  it.each([
+    [401, undefined, 'ログイン'],
+    [403, undefined, '権限'],
+    [409, '先に変更されています。一覧を読み直してください。', '先に変更されています'],
+    [429, undefined, '混み合っています'],
+    [500, 'D1_ERROR: SELECT secret FROM tenant', '削除に失敗しました'],
+  ] as const)('削除のHTTP %sを言い分け、行と再試行を残す', async (status, message, expected) => {
+    net.remove.mockRejectedValueOnce(new ApiError(status, message))
+    render(<SearchesTab accountId="acc" canEdit />)
+    await screen.findByText('VIPかつ未契約')
+    await openMenu('VIPかつ未契約')
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する' }))
+    const dialog = await screen.findByRole('alertdialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: '削除する' }))
+    await waitFor(() => expect(document.body.textContent).toContain(expected))
+    expect(document.body.textContent).not.toMatch(/API error|D1_ERROR|SELECT secret/)
+    expect(rowOf('s1')).toBeTruthy()
+    expect(net.remove).toHaveBeenCalledTimes(1)
+  })
+
+  it('読み込みの503に内部文を出さず、再読み込みを残す', async () => {
+    net.list.mockRejectedValueOnce(new ApiError(503, 'D1_ERROR: SELECT secret FROM tenant'))
+    render(<SearchesTab accountId="acc" canEdit />)
+    await waitFor(() => expect(document.body.textContent).toContain('保存した検索の読み込みに失敗しました'))
+    expect(document.body.textContent).not.toMatch(/API error|D1_ERROR|SELECT secret/)
+    expect(net.list).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    await screen.findByText('VIPかつ未契約')
+    expect(net.list).toHaveBeenCalledTimes(2)
   })
 })

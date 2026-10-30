@@ -1,5 +1,7 @@
 'use client'
 
+import { automationWaitLabel } from '@line-crm/shared'
+
 import type { CommonActionResources, CommonActionStep } from '@/lib/api'
 import { newCommonActionStep, newStepId } from '@/components/automations/common-action-editor'
 import Button from '@/components/shared/button'
@@ -145,8 +147,7 @@ const RULE_TYPE_LABEL: Record<string, string> = {
 function readonlyStepSummary(step: CommonActionStep): string {
   const label = ACTION_LABELS[step.type] ?? step.type
   if (step.type === 'wait') {
-    const minutes = step.params.durationMinutes ?? step.params.minutes
-    return typeof minutes === 'number' ? `「待つ」${minutes}分` : '「待つ」'
+    return automationWaitLabel(step.params)
   }
   return `「${label}」`
 }

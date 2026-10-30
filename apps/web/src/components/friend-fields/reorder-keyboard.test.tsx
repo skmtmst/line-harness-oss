@@ -309,7 +309,7 @@ describe('N-049 キーボードだけで並び替えられる', () => {
     const table = host.querySelector('table')!
     const names = Array.from(table.querySelectorAll('a[href*="/tags/fields/edit?id="]')).map((el) => el.textContent)
     expect(names).toEqual(['項目A', '項目B', '項目C'])
-    expect(host.textContent).toContain('並び順を保存できませんでした')
+    expect(host.textContent).toContain('並び順の保存に失敗しました')
   })
 
   it('つまみは説明付きのボタンとして出る（マウス専用の印ではない）', async () => {

@@ -1,4 +1,5 @@
 'use client'
+import SegmentedControl from '@/components/shared/segmented'
 
 import { openCommonVarDelete,prepareCommonVarRemoval,removeCommonVars } from './list-delete-actions'
 import { renderCommonVarDialogs } from './list-dialogs'
@@ -12,7 +13,7 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { Archive,Braces,CalendarClock,CalendarX,CircleDashed,Link2,Pause,Plus,TriangleAlert } from 'lucide-react'
+import { Braces,CalendarClock,Link2,Pause,Plus,TriangleAlert } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense,useCallback,useEffect,useMemo,useRef,useState } from 'react'
 
@@ -22,7 +23,6 @@ import Button from '@/components/shared/button'
 import { type ContextMenuItem } from '@/components/shared/context-menu'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import { emptyValue } from '@/components/shared/empty-value'
-import FilterChip from '@/components/shared/filter-chip'
 import { type FolderDotFolder } from '@/components/shared/folder-dot'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -244,10 +244,7 @@ function CommonVarsListInner() {
     setPage(1)
   }
 
-  const toggleChip = (next: VarsChip) => {
-    setChip((currentChip) => (currentChip === next ? 'all' : next))
-    setPage(1)
-  }
+
 
   /*
    * 止める窓（板 ）。止めているあいだ、この共通情報を差し込んだ
@@ -689,25 +686,14 @@ function CommonVarsListInner() {
   }
   const showExpiredChip = chip === 'expired' || stats.expiredCount > 0
   const filterChips = (
-    <div role="group" aria-label="状態で絞り込む" className={styles.chipGroup}>
-      <FilterChip selected={chip === 'empty'} onChange={() => toggleChip('empty')} title="中身が空のもの" icon={<CircleDashed size={16} aria-hidden="true" />}>
-        空のまま
-      </FilterChip>
-      <FilterChip selected={chip === 'scheduled'} onChange={() => toggleChip('scheduled')} title="有効期間か、決めた日の切り替えがあるもの" icon={<CalendarClock size={16} aria-hidden="true" />}>
-        期限つき
-      </FilterChip>
-      <FilterChip selected={chip === 'unused'} onChange={() => toggleChip('unused')} title="どこにも差し込まれていないもの" icon={<Archive size={16} aria-hidden="true" />}>
-        使われていない
-      </FilterChip>
-      <FilterChip selected={chip === 'draftStopped'} onChange={() => toggleChip('draftStopped')} title="下書きと、止めているもの" icon={<Pause size={16} aria-hidden="true" />}>
-        下書き・止めた
-      </FilterChip>
-      {showExpiredChip ? (
-        <FilterChip selected={chip === 'expired'} onChange={() => toggleChip('expired')} title="期限が切れたもの" icon={<CalendarX size={16} aria-hidden="true" />}>
-          期限切れ
-        </FilterChip>
-      ) : null}
-    </div>
+    <SegmentedControl<VarsChip> aria-label="状態で絞り込む" fit="content" value={chip} onClear={() => { setChip('all'); setPage(1) }} onChange={(value) => { setChip(value); setPage(1) }} options={[
+      { value: 'all', label: 'すべて' },
+      { value: 'empty', label: '空のまま', title: '中身が空のもの' },
+      { value: 'scheduled', label: '期限つき', title: '有効期間か、決めた日の切り替えがあるもの' },
+      { value: 'unused', label: '使われていない', title: 'どこにも差し込まれていないもの' },
+      { value: 'draftStopped', label: '下書き・止めた', title: '下書きと、止めているもの' },
+      ...(showExpiredChip ? [{ value: 'expired' as const, label: '期限切れ', title: '期限が切れたもの' }] : []),
+    ]} />
   )
   /* 並び替え：絵に無いが今の機能。場所を取らないよう印だけのボタン＋メニュー。 */
   const orderLabel = ORDER_OPTIONS.find((option) => option.value === order)?.label ?? ''

@@ -1,3 +1,4 @@
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 import { ApiError } from '@/lib/api'
 import { SIZE_LABEL } from './create-options'
 
@@ -20,5 +21,5 @@ export function imageUploadErrorText(err: unknown): string {
   if (message.includes('dimensions ')) {
     return `画像の大きさが合いません。${SIZE_LABEL.large}（大）か${SIZE_LABEL.compact}（小）の画像を選んでください。`
   }
-  return message
+  return japaneseDetailOf(err) || fallback
 }
