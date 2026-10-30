@@ -40,6 +40,12 @@ describe('describeVersionChanges（監査 R468）', () => {
     const v2 = { versionNumber: 2, actions: [wait('w', 60)] }
     expect(versionChangeSummary(v2, [v1, v2])).toBe('「待つ」を1分から60分にした')
     const v3 = { versionNumber: 3, actions: [wait('w', 60), tag('a')] }
-    expect(versionChangeSummary(v3, [v1, v2, v3])).toBe('処理を1個から2個にした')
+    expect(versionChangeSummary(v3, [v1, v2, v3])).toBe('処理を1 個から2 個にした')
   })
+})
+
+test('翌日の時刻と待ち方の変更も、変更前後を履歴に残す', () => {
+  const next = (time: string): CommonActionStep => ({ id: 'w', type: 'wait', params: { mode: 'next_day', sendAtTime: time }, onFailure: 'stop' })
+  expect(describeVersionChanges([next('10:00')], [next('11:30')])).toEqual(['「きっかけの翌日 10:00 まで待つ」から「きっかけの翌日 11:30 まで待つ」にした'])
+  expect(describeVersionChanges([wait('w', 30)], [next('10:00')])).toEqual(['「30 分待つ」から「きっかけの翌日 10:00 まで待つ」にした'])
 })

@@ -22,8 +22,8 @@ import {
  * - S1: 共有のきっかけ10種 = 下書きunionの10種(過不足なし)
  * - S2: 共有の処理4種 = 下書きunionの4種(過不足なし)
  * - S3: 共有のきっかけ10種 ⊆ 実行門(出来事門+定期門)
- * - S4: 共有の処理 ⊆ 実行器の鍵(共通アクションは実行計画で展開)
- * - S5: 共有の10種×5処理を下書き保存が受け付ける(実DB)
+ * - S4: 共有の処理 ⊆ 実行器の鍵(共通アクションは展開・待機はエンジンで処理)
+ * - S5: 共有の全きっかけと全処理を下書き保存が受け付ける(実DB)
  * - S6: union外のきっかけ・処理は保存しない
  */
 
@@ -101,9 +101,10 @@ describe('下書きの選択可能一覧(#734)', () => {
     expect(new Set(AUTOMATION_DRAFT_TRIGGER_OPTIONS.map((option) => option.value))).toEqual(new Set(union));
   });
 
-  it('S2: 共有の処理 = 下書きunion(過不足なし)', () => {
+  it('S2: 選択肢と保持専用の待機を合わせて下書きの保存型と一致する', () => {
     const union = unionMembers(draftSource(), 'AutomationDraftActionType');
-    expect(new Set(AUTOMATION_DRAFT_ACTION_OPTIONS.map((option) => option.value))).toEqual(new Set(union));
+    expect(new Set([...AUTOMATION_DRAFT_ACTION_OPTIONS.map((option) => option.value), 'wait'])).toEqual(new Set(union));
+    expect(AUTOMATION_DRAFT_ACTION_OPTIONS.some(option => option.value === 'wait')).toBe(false);
   });
 
   it('S3: 共有のきっかけ ⊆ 実行門(出来事門+定期門)', () => {
@@ -122,17 +123,17 @@ describe('下書きの選択可能一覧(#734)', () => {
    * `common_action_marker` と中身の処理へ展開する。だから直接の実行器鍵は
    * 持たず、計画側で `type === 'common_action'` を特別扱いする。
    */
-  it('S4: 共有の処理 ⊆ 実行器の鍵（共通アクションは実行計画で展開）', () => {
+  it('S4: 共有の処理 ⊆ 実行器の鍵（共通アクションは展開・待機はエンジンで処理）', () => {
     const keys = new Set(Object.keys(createAutomationActionExecutors({})));
     const engine = readFileSync(join(import.meta.dirname, "automation-engine.ts"), 'utf8');
     expect(engine).toContain("action.type === 'common_action'");
     for (const option of AUTOMATION_DRAFT_ACTION_OPTIONS) {
-      if (option.value === 'common_action') continue;
+      if (option.value === 'common_action' || option.value === 'wait') continue;
       expect(keys.has(option.value), `実行器に無い処理: ${option.value}`).toBe(true);
     }
   });
 
-  it('S5: 共有の10種×5処理を下書き保存が受け付ける', async () => {
+  it('S5: 共有の全きっかけと全処理を下書き保存が受け付ける', async () => {
     for (const trigger of AUTOMATION_DRAFT_TRIGGER_OPTIONS) {
       for (const action of AUTOMATION_DRAFT_ACTION_OPTIONS) {
         const created = await createAutomationDraftFromTemplate(testDb.db, {
@@ -151,7 +152,9 @@ describe('下書きの選択可能一覧(#734)', () => {
           actions: [{
             id: 'step-1',
             type: action.value,
-            params: action.value === 'add_tag'
+            params: action.value === 'wait'
+              ? { durationMinutes: 5 }
+              : action.value === 'add_tag'
               ? { tagId: 'tag-1' }
               : action.value === 'start_scenario'
                 ? { scenarioId: 'scenario-1' }

@@ -61,3 +61,13 @@ it('曜日と対象を正規化して保存し、表示用の友だち名を本�
   expect(input.friendNames).toEqual({ 'friend-a': '表示用の名前' })
   expect(input.weekdays).toBe('1,3,')
 })
+
+it('翌日の待機を読み直しても時刻と手順IDを保ち、不正な時刻は保存前に止める', async () => {
+  const { validateAutomationInput } = await import('./draft-validation')
+  const waitAction = { id: 'wait-next', type: 'wait' as const, params: { mode: 'next_day', sendAtTime: '10:15' }, onFailure: 'stop' as const }
+  const form = draftDetailToForm({ ...detail, actions: [waitAction] })
+  expect(form.actions.map(actionDraftToPayload)).toEqual([waitAction])
+  const check = (actions: typeof form.actions) => validateAutomationInput({ name: '待機', eventType: 'friend_add', triggerConfig: {}, conditionUnreadable: false, actions })
+  expect(check(form.actions)).toBeNull()
+  expect(check([{ ...form.actions[0], kept: { mode: 'next_day', sendAtTime: '24:00' } }])).toMatchObject({ actionKey: form.actions[0].key })
+})

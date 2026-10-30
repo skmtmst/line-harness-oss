@@ -1,3 +1,4 @@
+import { automationWaitLabel } from '@line-crm/shared'
 import type { CommonActionStep, CommonActionResources } from '@/lib/api'
 
 /** 処理の行の2行目（どれを・どれだけ）。選んでいないときは「〇〇を選ぶ」。 */
@@ -25,13 +26,7 @@ export function stepSummary(step: CommonActionStep, resources: CommonActionResou
       const content = String(step.params.content ?? '').trim()
       return content ? content.slice(0, 40) : '送る文を入れる'
     }
-    case 'wait': {
-      const minutes = Number(step.params.durationMinutes ?? step.params.minutes ?? 0)
-      if (!minutes) return '待つ時間を決める'
-      if (minutes % 1440 === 0) return `${minutes / 1440} 日`
-      if (minutes % 60 === 0) return `${minutes / 60} 時間`
-      return `${minutes} 分`
-    }
+    case 'wait': return automationWaitLabel(step.params)
     case 'set_metadata': {
       const keys = Object.keys((step.params.values as Record<string, unknown> | undefined) ?? {}).filter(Boolean)
       return keys.length ? `友だち情報「${keys.join('・')}」` : '友だち情報を選ぶ'

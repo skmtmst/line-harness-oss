@@ -1029,3 +1029,6 @@
 - [失敗した時の案内](release-log/unreleased/0000-kenta-japanese-error-details.md) — 保存・削除などの失敗理由の日本語表示。
 
 - [フォルダを作れない理由の表示](release-log/unreleased/0000-kenta-folder-create-errors.md)
+- [来店フォローとリマインダの接続](release-log/unreleased/0000-kenta-line-followup-engines.md)
+
+- [自動送信の翌日時刻の待機と期限切れの記録](release-log/unreleased/0000-kenta-automation-next-day-wait.md) — 反映履歴、確認 2026-10-31。

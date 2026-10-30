@@ -1,6 +1,7 @@
 import type { ActionDraft } from './action-draft'
 import { b244Requirements } from './draft-model'
 import { normalizeFriendIds, normalizeWeekdays } from './trigger-helpers'
+import { parseAutomationWait } from '@line-crm/shared'
 
 export interface AutomationInputProblem {
   target: string
@@ -37,6 +38,7 @@ export function validateAutomationInput({ name, eventType, triggerConfig, condit
       && normalizeFriendIds(triggerConfig.friendIds).length === 0) return invalid('au-friend-search', '対象の友だちを選んでください')
     if (actions.length === 0) return invalid('v8-add-action', 'することを1つ以上決めてください')
     for (const row of actions) {
+      if (row.type === 'wait' && !parseAutomationWait(row.kept ?? { durationMinutes: 5 })) return invalid(`v8-wait-${row.key}`, '待つ時間は5分単位、翌日の時刻は時と分で指定してください', row.key)
       if (row.type === 'add_tag' && !row.tagId) return invalid(`v8-tag-${row.key}`, '付けるタグを選んでください', row.key)
       if (row.type === 'start_scenario' && !row.scenarioId) return invalid(`v8-scenario-${row.key}`, '始めるシナリオを選んでください', row.key)
       if (row.type === 'common_action' && !row.commonActionId) return invalid(`v8-common-action-${row.key}`, '使う共通アクションを選んでください', row.key)

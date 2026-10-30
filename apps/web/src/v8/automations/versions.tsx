@@ -1,5 +1,7 @@
 'use client'
 
+import { automationWaitLabel } from '@line-crm/shared'
+
 import { CONSUMER_LABELS } from './version-consumer-labels'
 
 /*
@@ -47,19 +49,11 @@ const STEP_SHORT: Record<string, string> = {
   notify_staff: '担当へ知らせる', add_mileage: 'マイル',
 }
 
-function waitText(params: Record<string, unknown>): string {
-  const minutes = params.durationMinutes ?? params.minutes
-  if (typeof minutes !== 'number' || !Number.isFinite(minutes)) return '待つ'
-  if (minutes % 1440 === 0) return `待つ ${minutes / 1440}日`
-  if (minutes % 60 === 0) return `待つ ${minutes / 60}時間`
-  return `待つ ${minutes}分`
-}
-
 /** 版の処理の並びを1行にする。 */
 export function stepChain(actions: CommonActionStep[]): string {
   if (actions.length === 0) return '処理はありません'
   return actions.map((step) => {
-    if (step.type === 'wait') return waitText(step.params)
+    if (step.type === 'wait') return automationWaitLabel(step.params)
     const base = STEP_SHORT[step.type] ?? '処理'
     const name = typeof step.params.templateName === 'string' ? step.params.templateName : ''
     return step.type === 'send_message' && name ? `${base}「${name}」` : base

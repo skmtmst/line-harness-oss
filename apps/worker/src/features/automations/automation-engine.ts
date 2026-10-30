@@ -11,6 +11,8 @@ import { sqlIdSet } from '@line-crm/db/id-queries';
 
 import { matchesCondition } from '../../services/segment-query.js';
 import { type SegmentCondition } from '@line-crm/shared';
+import { AutomationActionError } from './automation-action-error.js';
+import { addMinutes, expireNextDayWait, scheduleAutomationWait } from './automation-wait.js';
 import { featureJobCanRun } from '../../services/feature-enforcement.js';
 import { isOperationCapabilityStopped, listLineAccountsWithTenantStatus } from '@line-crm/db';
 
@@ -89,16 +91,7 @@ export interface AutomationEngineOptions {
   tenantStatusByAccount?: ReadonlyMap<string, 'active' | 'suspended' | 'archived'>;
 }
 
-export class AutomationActionError extends Error {
-  constructor(
-    public readonly code: string,
-    message: string,
-    public readonly retryable: boolean,
-  ) {
-    super(message);
-    this.name = 'AutomationActionError';
-  }
-}
+export { AutomationActionError } from './automation-action-error.js';
 
 /** 再試行は配送 outbox が管理するため、ポーリングでアクションの再試行予算を使わない。 */
 export class AutomationActionDeferred extends Error {}
@@ -123,11 +116,6 @@ export class AutomationRunCancelError extends Error {
   }
 }
 
-function addMinutes(value: string, minutes: number): string {
-  const date = new Date(value);
-  date.setMinutes(date.getMinutes() + minutes);
-  return date.toISOString();
-}
 
 function nowIso(value?: string): string {
   return value ?? new Date().toISOString();
@@ -632,34 +620,6 @@ async function finishRun(db: D1Database, runId: string, now: string): Promise<Ru
   return status;
 }
 
-async function scheduleWait(
-  db: D1Database,
-  run: RunRow,
-  step: StepRow,
-  action: ActionDefinition,
-  now: string,
-): Promise<void> {
-  const durationMinutes = action.params.durationMinutes;
-  if (
-    typeof durationMinutes !== 'number'
-    || !Number.isInteger(durationMinutes)
-    || durationMinutes <= 0
-    || durationMinutes % 5 !== 0
-  ) {
-    throw new AutomationActionError('invalid_wait_duration', '待機時間は5分単位で指定してください', false);
-  }
-  const resumeAt = addMinutes(now, durationMinutes);
-  await db.prepare(
-    `UPDATE automation_run_steps
-        SET status = 'waiting', output_json = ?, retry_at = NULL, lease_expires_at = NULL
-      WHERE id = ? AND status = 'running'`,
-  ).bind(JSON.stringify({ resumeAt }), step.id).run();
-  await db.prepare(
-    `UPDATE automation_runs
-        SET status = 'waiting', resume_at = ?, lease_expires_at = NULL
-      WHERE id = ? AND status = 'running'`,
-  ).bind(resumeAt, run.id).run();
-}
 
 export async function processAutomationRun(
   db: D1Database,
@@ -717,6 +677,7 @@ export async function processAutomationRun(
     return 'failed';
   }
 
+  const hasNextDayWait = actions.some(action => action.type === 'wait' && action.params.mode === 'next_day');
   for (let index = run.current_step; index < actions.length; index += 1) {
     const action = actions[index];
     /*
@@ -728,6 +689,7 @@ export async function processAutomationRun(
       .bind(run.id).first<{ status: RunStatus }>();
     if (!latest) return 'not_found';
     if (latest.status === 'cancelled') return 'cancelled';
+    if (hasNextDayWait && await expireNextDayWait(db, run.id, now)) return 'cancelled';
     /*
      * 緊急停止  も step の境目で効かせる。claim 後に止まった分は
      * run を queued へ戻し、現在の step から再開できるようにする。
@@ -813,7 +775,8 @@ export async function processAutomationRun(
 
     try {
       if (action.type === 'wait') {
-        await scheduleWait(db, run, step, action, now);
+        await scheduleAutomationWait(db, run, step, action.params, now, inputEvent);
+        if (hasNextDayWait && await expireNextDayWait(db, run.id, now)) return 'cancelled';
         return 'waiting';
       }
       if (action.type === 'common_action_marker') {
