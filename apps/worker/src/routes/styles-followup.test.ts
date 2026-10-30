@@ -382,7 +382,7 @@ describe('HQ distribution and provenance', () => {
       sql.raw
         .prepare('SELECT message_content FROM templates WHERE id=?')
         .get(rows.find((r) => r.item_key === 'hq-second')!.target_id),
-    ).toEqual({ message_content: JSON.stringify({ text: '二つ目新版' }) });
+    ).toEqual({ message_content: '二つ目新版' });
     expect(
       (
         await request(
@@ -400,7 +400,7 @@ describe('HQ distribution and provenance', () => {
       sql.raw
         .prepare('SELECT message_content FROM templates WHERE id=?')
         .get(edited.target_id),
-    ).toEqual({ message_content: JSON.stringify({ text: '新版' }) });
+    ).toEqual({ message_content: '新版' });
     const metadata = await withStyleSampleMetadata(
       sql.db,
       [{ id: edited.target_id }],
@@ -717,7 +717,7 @@ test('store acceptance retains template history and creates a new reminder draft
   expect(drafts[0]).toMatchObject({ id: oldVersion, status: 'superseded' });
   expect(JSON.parse(drafts[1].settings_snapshot).steps[0]).toMatchObject({
     sendAtTime: '17:00',
-    messageContent: JSON.stringify({ text: '新しい案内' }),
+    messageContent: '新しい案内',
   });
   expect(
     sql.raw
@@ -740,8 +740,8 @@ test('store acceptance retains template history and creates a new reminder draft
       )
       .all(tpl),
   ).toEqual([
-    { message_content: JSON.stringify({ text: '最初の文' }) },
-    { message_content: JSON.stringify({ text: '新版' }) },
+    { message_content: '最初の文' },
+    { message_content: '新版' },
   ]);
 });
 
