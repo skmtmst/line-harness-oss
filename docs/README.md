@@ -464,6 +464,7 @@
 - [予約台帳の数の帯の幅そろえ](release-log/unreleased/0000-kenta-muse-ledger-band.md)
 - [数の帯の増減の札の直し](release-log/unreleased/1970-kenta-muse-kpi-delta-row.md)
 - [シナリオ作成の権限確認](release-log/unreleased/1971-kenta-train-1029q.md)
+- [シナリオ作成・受信箱・友だち情報・テンプレートの改善](release-log/unreleased/0000-kenta-train-1029r.md)
 - [定期便のページ送り](release-log/unreleased/1971-kenta-swbm-pagination.md)
 - [プール作成の保存帯](release-log/unreleased/1971-kenta-swbm-pool-footer.md)
 - [飲食店向け設定の表示条件](release-log/unreleased/1965-masato-restaurant-only-settings.md)

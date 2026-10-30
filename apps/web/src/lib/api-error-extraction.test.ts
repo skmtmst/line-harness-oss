@@ -100,4 +100,3 @@ describe('extractApiErrorCode', () => {
     expect(extractApiErrorCode(JSON.stringify({ code: 'FORBIDDEN' }))).toBe('FORBIDDEN')
   })
 })
-
