@@ -15,7 +15,8 @@
  * 開く・閉じる・キーボードは呼び出し側（shared/select）が持つ。ここは見た目と並びだけ。
  */
 import { Check, Plus } from 'lucide-react'
-import type { CSSProperties, FocusEvent, MouseEvent, ReactNode, Ref } from 'react'
+import { useRef, type CSSProperties, type FocusEvent, type MouseEvent, type ReactNode, type Ref } from 'react'
+import { usePermissionLockTip } from './permission-lock-tip'
 import MenuPortal from './menu-portal'
 import styles from './select-menu.module.css'
 
@@ -234,6 +235,8 @@ export function SelectMenuOption({
 }
 
 export interface SelectMenuActionProps {
+  disabled?: boolean
+  lockedReason?: string
   label: string
   active?: boolean
   onSelect: () => void
@@ -241,19 +244,28 @@ export interface SelectMenuActionProps {
 }
 
 /** 一覧の下の「＋ 〇〇」（dLffh「新しく作る」）。緑・600。選択肢ではないので listbox の外に置く。 */
-export function SelectMenuAction({ label, active = false, onSelect, onHover }: SelectMenuActionProps) {
+export function SelectMenuAction({ label, active = false, disabled = false, lockedReason, onSelect, onHover }: SelectMenuActionProps) {
+  const lock = usePermissionLockTip<HTMLButtonElement>(lockedReason)
+  const currentPermission = useRef({ disabled, reason: lockedReason })
+  currentPermission.current = { disabled, reason: lockedReason }
   return (
-    <button
+    <><button
+      ref={lock.ref}
       type="button"
       className={`${styles.item} ${styles.action}`}
       data-active={active || undefined}
       data-select-menu-action=""
+      disabled={disabled}
       onMouseEnter={onHover}
-      onClick={onSelect}
+      {...lock.handlers}
+      onClick={(event) => {
+        if (currentPermission.current.disabled || currentPermission.current.reason) { lock.handlers?.onClick(event); return }
+        onSelect()
+      }}
     >
       <span className={styles.leading} aria-hidden="true"><Plus className={styles.actionIcon} /></span>
       <span className={styles.label}>{label}</span>
-    </button>
+    </button>{lock.node}</>
   )
 }
 
