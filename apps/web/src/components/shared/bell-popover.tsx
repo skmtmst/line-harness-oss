@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { Sparkles, TriangleAlert } from 'lucide-react'
+import Button from './button'
 import MenuPortal, { type MenuPortalRect } from './menu-portal'
 import SegmentedControl from './segmented'
 import styles from './bell-popover.module.css'
@@ -36,7 +37,9 @@ export type BellPopoverProps<F extends string = BellFilter> = {
   state: BellPopoverState
   /** 見せる行（呼ぶ側で未読が先・新しい順にし、5件までに切る）。 */
   items: BellItem[]
-  unreadCount: number
+  unreadCount: number | null
+  /** 一部の対象だけ読み込めたときの単一案内。 */
+  partialNotice?: ReactNode
   filter: F
   onFilterChange: (filter: F) => void
   /** 種類のタブ。省くと「すべて・エラー・アップデート」。 */
@@ -49,6 +52,9 @@ export type BellPopoverProps<F extends string = BellFilter> = {
   onRetry?: () => void
   onSelect: (id: string) => void
   onMarkAllRead?: () => void
+  markAllReadDisabled?: boolean
+  markAllReadDisabledReason?: string
+  markAllReadLockedReason?: string
   onViewAll: () => void
 }
 
@@ -81,6 +87,7 @@ export default function BellPopover<F extends string = BellFilter>({
   state,
   items,
   unreadCount,
+  partialNotice,
   filter,
   onFilterChange,
   filters,
@@ -90,6 +97,9 @@ export default function BellPopover<F extends string = BellFilter>({
   onRetry,
   onSelect,
   onMarkAllRead,
+  markAllReadDisabled,
+  markAllReadDisabledReason,
+  markAllReadLockedReason,
   onViewAll,
 }: BellPopoverProps<F>) {
   const panelRef = useRef<HTMLElement>(null)
@@ -128,11 +138,17 @@ export default function BellPopover<F extends string = BellFilter>({
       >
         <header className={styles.head}>
           <h2 className={styles.title}>{title}</h2>
-          {state === 'ready' ? <span className={styles.unread}>{`未読 ${unreadCount}`}</span> : null}
-          {state === 'ready' && onMarkAllRead ? (
-            <button type="button" className={styles.markAll} onClick={onMarkAllRead} disabled={unreadCount === 0}>
+          {state === 'ready' ? (
+            <span className={styles.unread} aria-label={unreadCount === null ? '未読数を確認できません' : `未読 ${unreadCount}`}>
+              {unreadCount === null ? '未読 —' : `未読 ${unreadCount}`}
+            </span>
+          ) : null}
+          {onMarkAllRead ? (
+            <Button type="button" variant="text" size="inline" className={styles.markAll} onClick={onMarkAllRead}
+              disabled={markAllReadDisabled ?? (state !== 'ready' || unreadCount === null || unreadCount === 0)}
+              lockedReason={markAllReadLockedReason ?? markAllReadDisabledReason}>
               すべて既読にする
-            </button>
+            </Button>
           ) : null}
         </header>
 
@@ -148,13 +164,14 @@ export default function BellPopover<F extends string = BellFilter>({
           </div>
         ) : null}
 
+        {state === 'ready' ? partialNotice : null}
         {state === 'loading' ? (
           <p className={styles.state} role="status">読み込み中…</p>
         ) : state === 'no-account' ? (
           <p className={styles.state}>{`LINEアカウントを選ぶと、そのアカウントの${title}が出ます。`}</p>
         ) : state === 'error' ? (
           <div className={styles.state} role="alert">
-            <span>{errorMessage || `${title}を読み込めませんでした。`}</span>
+            <span>{`${errorMessage || `${title}を読み込めませんでした。`}${markAllReadDisabledReason ? ` ${markAllReadDisabledReason}` : ''}`}</span>
             {onRetry ? <button type="button" className={styles.retry} onClick={onRetry}>もう一度</button> : null}
           </div>
         ) : items.length === 0 ? (
