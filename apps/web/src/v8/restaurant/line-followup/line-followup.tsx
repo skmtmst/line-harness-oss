@@ -63,10 +63,11 @@ function RowStatus({ step }: { step: FollowupStepLive }) {
 /*
  * 申請の対象の見分け。公開と申請の間にほかの担当者が変えたら、公開した中身と
  * 画面の中身がずれる。再取得した中身が公開時と同じか比べ、違えば申請を止める。
- * 版と送りの状態は公開自体で変わるため比べない。
+ * 版と送りの状態は公開自体で変わるため比べない。一歩は丸ごと比べる
+ * （旧形式の Flex 等は吹き出しが空でも中身が変わりうる）。
  */
 export function liveFingerprint(live: FollowupLive): string {
-  return JSON.stringify(live.steps.map(step => [step.trigger, step.binding, step.bubbles]))
+  return JSON.stringify(live.steps.map(step => [step.trigger, step.binding, step.step]))
 }
 
 function SendingLine({ live }: { live: FollowupLive }) {

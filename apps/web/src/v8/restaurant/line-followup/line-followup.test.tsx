@@ -252,9 +252,29 @@ describe('7つの行と状態', () => {
   it('公開と申請の間にほかの担当者が変えたら申請を止める', async () => {
     const changed = liveOf({ templateVersion: 4 })
     changed.steps = changed.steps.map(step => step.trigger === 'reservation_created'
-      ? { ...step, bubbles: [bubble('ほかの担当者の文')] }
+      ? {
+        ...step,
+        bubbles: [bubble('ほかの担当者の文')],
+        step: { ...step.step, messageBubbles: [bubble('ほかの担当者の文')] },
+      }
       : step)
     fixture.fetchLive.mockResolvedValueOnce(liveOf()).mockResolvedValue(changed)
+    render(<LineFollowupV8 />)
+    await screen.findByRole('button', { name: '予約完了時' })
+    fireEvent.click(screen.getByRole('button', { name: '承認を申請する' }))
+    expect(await screen.findByText('ほかの担当者が先に保存しました。公開した中身と変わったため申請を止めました。読み直しました。')).toBeTruthy()
+    expect(fixture.requestStart).not.toHaveBeenCalled()
+  })
+  it('旧形式のFlexが変わっても申請を止める（吹き出しは空のまま）', async () => {
+    const base = liveOf({ templateVersion: 4 })
+    base.steps = base.steps.map(step => step.trigger === 'reservation_24h'
+      ? { ...step, bubbles: [], step: { ...step.step, messageType: 'flex', messageContent: '{"a":1}', messageBubbles: null } }
+      : step)
+    const changed = liveOf({ templateVersion: 5 })
+    changed.steps = changed.steps.map(step => step.trigger === 'reservation_24h'
+      ? { ...step, bubbles: [], step: { ...step.step, messageType: 'flex', messageContent: '{"a":2}', messageBubbles: null } }
+      : step)
+    fixture.fetchLive.mockResolvedValueOnce(base).mockResolvedValue(changed)
     render(<LineFollowupV8 />)
     await screen.findByRole('button', { name: '予約完了時' })
     fireEvent.click(screen.getByRole('button', { name: '承認を申請する' }))
