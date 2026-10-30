@@ -177,7 +177,7 @@ describe('まとめての操作', () => {
     const dialog = await screen.findByRole('dialog')
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '移動する' })) })
     await waitFor(() => expect(state.update).toHaveBeenCalledWith('s-1', { folderId: null }))
-    await waitFor(() => expect(state.toast).toHaveBeenCalledWith('フォルダを移動できませんでした。'))
+    await waitFor(() => expect(state.toast).toHaveBeenCalledWith(expect.stringMatching(/全 1 件中 0 件の保存を確認しました。1 件目で止めました。未送信は 0 件です。理由：/)))
   })
 
   it('まとめて「止める」は確かめてから止め、止めたら一覧を読み直す', async () => {

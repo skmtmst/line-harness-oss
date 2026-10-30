@@ -3,7 +3,7 @@ import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
 import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
-import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
+import { deferImpersonationSnapshot, forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import { canWriteScenarioNow, captureScenarioWriteAccess, useScenarioWriteAccess } from './write-access'
 
 const identity = (role: string, extra: object = {}) => ({ id: 'person', role, permissionKeys: [], ...extra }) as unknown as StaffMember
@@ -65,4 +65,17 @@ it('表示も未知・閲覧・編集staff・read代理への切替を購読し�
   expect(result.current.reason).toContain('代理')
   act(() => forgetStaffIdentity())
   expect(result.current).toEqual({ allowed: false, known: false, reason: undefined })
+})
+
+it('代理切替の認証読直し中もreadへ倒し、役割ownerを理由に許可せず代理の共通理由を出す', () => {
+  rememberStaffIdentity(identity('owner'))
+  const held = captureScenarioWriteAccess()
+  const { result } = renderHook(() => useScenarioWriteAccess())
+  expect(held()).toBe(true)
+  act(() => { deferImpersonationSnapshot({ mode: 'write', id: 'pending-proxy', tenantId: 'tenant' } as never) })
+  expect(result.current.allowed).toBe(false)
+  expect(result.current.known).toBe(true)
+  expect(result.current.reason).toContain('代理ログイン（閲覧）')
+  expect(held()).toBe(false)
+  for (const operation of ['edit', 'publish', 'manageFolders'] as const) expect(canWriteScenarioNow(operation)).toBe(false)
 })
