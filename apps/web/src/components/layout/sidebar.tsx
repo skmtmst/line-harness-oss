@@ -363,7 +363,7 @@ export default function Sidebar({
 
         if (isHq) return true
         const savedSettings = explicitSettings?.accountId === selectedAccountId ? explicitSettings.value : canManageRole(staffRole) ? false : null
-        if (!styleMenuItemVisible(item, accountStyle.data?.style ?? null, savedSettings)) return false
+        if (!styleMenuItemVisible(item, accountStyle.data?.style ?? null, savedSettings, accountStyle.data?.styleSelected === true)) return false
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
 
