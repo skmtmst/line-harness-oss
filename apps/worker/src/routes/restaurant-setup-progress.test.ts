@@ -69,6 +69,7 @@ it('店に絞られたアカウントから同じ統括の別店舗を読ませ�
 });
 
 it('未確認・使わない保存・送り方オンの根拠を同じ店舗の初期設定へ返す', async () => {
+  database.raw.exec('UPDATE rt_store_followup_step_bindings SET enabled=0; UPDATE rt_store_followup_targets SET enabled=0');
   expect(await progress()).toMatchObject({ followupSetup: { notUsing: false, decidedAt: null, version: 0, anyEnabled: false } });
   database.raw.exec(`INSERT INTO rt_store_followup_preferences(store_id,not_using,decided_at,decided_by)
     VALUES('store-ginza',1,'2026-10-31T00:00:00Z','owner')`);
