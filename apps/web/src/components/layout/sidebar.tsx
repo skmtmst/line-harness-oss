@@ -836,7 +836,7 @@ export default function Sidebar({
                     なって一覧の中でそこだけ浮き、目が先にそこへ行く。
                     印は「いまここ」を示せれば足りる。
                   */
-                  className={`${styles.item} ${''} ${
+                  className={`${styles.item} ${item.id === 'restaurant-delivery' ? styles.deliveryItem : ''} ${
                     active
                       ? isDanger
                         ? `${styles.active} ${styles.danger}`
