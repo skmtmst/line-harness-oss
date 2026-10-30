@@ -22,3 +22,4 @@ html:root .olderMessages { padding: var(--space-4) var(--polish-space-field); ba
 
 .name { --tpl-inbox-unread-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--polish-weight-body); }
 .name[data-unread] { font-weight: var(--tpl-inbox-unread-weight); }
+.attention { flex: none; color: var(--color-star-on-edge); fill: var(--color-star-on); stroke: var(--color-star-on-edge); }
