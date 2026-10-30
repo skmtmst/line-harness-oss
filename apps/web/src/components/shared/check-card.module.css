@@ -110,6 +110,8 @@
 html:root .boxWrap { display: block; width: var(--choice-size); height: var(--choice-size); line-height: 0; }
 html:root .card:has(input:focus-visible) { outline: var(--focus-ring); outline-offset: var(--focus-ring-offset); }
 html:root .invalid { outline-color: var(--color-danger); }
+/* 誤り＋焦点は赤1本（青を重ねない）。 */
+html:root .card.invalid:has(input:focus-visible) { outline: var(--polish-focus-width) solid var(--color-danger); outline-offset: var(--polish-focus-offset); }
 
 /* 単独の確認行（・ の担当の札）：上の共通の内側16（--tpl-card-pad）に負けないよう、高さ36・内側 8/10・印は真ん中。 */
 html:root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 8px; }

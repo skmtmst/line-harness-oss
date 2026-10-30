@@ -115,3 +115,9 @@
 @layer components {
 :root .field { box-shadow: var(--control-shadow); }
 }
+
+/* 誤り＋焦点は赤1本（青を重ねない）。層の外に置く（全体の青輪より勝つため）。 */
+:root .field[aria-invalid='true']:focus-visible {
+  outline: 2px solid var(--color-danger);
+  outline-offset: -1px;
+}

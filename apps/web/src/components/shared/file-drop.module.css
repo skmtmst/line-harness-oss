@@ -224,6 +224,10 @@
 .zone[data-variant='composer'] .zoneTitle { font-size: var(--text-label); line-height: var(--tpl-msg-composer-text-lh); }
 .zone[data-variant='composer'] .zoneHint { font-size: var(--text-micro); line-height: var(--tpl-msg-composer-tab-lh); }
 .zone[data-variant='composer']:focus-visible { outline: 2px solid var(--color-focus-ring); }
+/* 誤り＋焦点は赤1本（青を重ねない）。寄せは誤りなしの輪と同じ。 */
+.zone[data-invalid]:focus-visible { outline: 2px solid var(--color-danger); outline-offset: 2px; }
+.zone[data-variant='composer'][data-invalid]:focus-visible,
+.zone[data-variant='upload'][data-invalid]:focus-visible { outline: 2px solid var(--color-danger); outline-offset: 0; }
 
 @layer components {
 .zone[data-variant='upload'] .zoneTitle { font-size: var(--text-heading); }

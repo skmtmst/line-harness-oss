@@ -169,5 +169,7 @@ html:root .disabled .input:disabled { opacity: 1; }
 :root .search { outline: 1px solid transparent; background: var(--gradient-raised-control) var(--color-canvas); box-shadow: var(--shadow-raised-control); }
 :root .search:has(.input[aria-invalid='true']) { outline-color: transparent; box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger); }
 html:root .search:has(.input:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+/* 誤り＋焦点は赤1本（青を重ねない）。 */
+html:root .search:has(.input[aria-invalid='true']:focus-visible) { outline: var(--polish-focus-width) solid var(--color-danger); outline-offset: var(--polish-focus-offset); }
 :root .input { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
 :root .searchIcon { flex-basis: var(--polish-icon-control); }
