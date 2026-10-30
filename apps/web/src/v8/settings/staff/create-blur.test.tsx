@@ -95,4 +95,14 @@ describe('ログインユーザーを追加する：欄を離れたときの検�
       canAccessDescendantAccounts: false,
     }))
   })
+
+  it('新しい店舗のスタッフには共通の機能権限だけを表示する', async () => {
+    await act(async () => { render(<NewStaffPage />) })
+    fireEvent.click(screen.getByRole('radio', { name: /スタッフ/ }))
+    expect(screen.getByText('基本')).toBeTruthy()
+    expect(screen.getByText('受信箱')).toBeTruthy()
+    expect(screen.queryByText('専用機能')).toBeNull()
+    expect(screen.queryByText('ECデータ連携')).toBeNull()
+    expect(screen.queryByText('投稿写真審査')).toBeNull()
+  })
 })

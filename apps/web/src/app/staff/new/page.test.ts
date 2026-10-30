@@ -15,7 +15,7 @@ describe('店舗側のユーザー追加', () => {
   it('メール形式と担当範囲を保存前に確かめる', () => {
     expect(source).toContain('正しいメールアドレスを入力してください')
     expect(source).toContain('/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/')
-    expect(source).toContain('のみを閲覧・操作できる担当者として追加されます')
+    expect(source).toContain('担当範囲は${selectedAccount.name}のみです。')
   })
   it('メールアドレスは254文字までで保存前に止める（M959）', () => {
     expect(source).toContain('254')
