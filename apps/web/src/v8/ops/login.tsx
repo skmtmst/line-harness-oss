@@ -13,6 +13,7 @@ import { TextField } from '@/components/shared/text-field'
 import { storeAdminSession, adminSessionHeaders } from '@/lib/admin-session'
 import { authRequest, emailError, internalAuthFailureCopy, TURNSTILE_SITE_KEY } from '@/lib/auth-email'
 import { resetAuthSelectionCleared } from '@/lib/hq-navigation'
+import MusuboLogo from '@/components/shared/musubo-logo'
 import styles from './auth.module.css'
 import { Field } from '@/components/shared/form-controls'
 import Card from '@/components/shared/card'
@@ -146,11 +147,8 @@ export default function OpsLoginV8() {
   return (
     <SaveErrorScope errors={saveErrors}><main className={styles.page} data-design-node="D9JALJ">
       <div className={styles.brand}>
-        <span className={styles.mark} aria-hidden="true">m</span>
-        <span className={styles.brandText}>
-          <span className={styles.brandName}>musubo</span>
-          <span className={styles.brandSub}>運営コンソール</span>
-        </span>
+        <MusuboLogo size="ops" />
+        <span className={styles.brandSub}>運営コンソール</span>
       </div>
       <Card variant="form" className={styles.card} aria-labelledby="ops-login-title">
         <PageHeading inset="none" title="ログイン" titleId="ops-login-title" titleAs="h1" />
