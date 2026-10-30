@@ -1,3 +1,4 @@
+import { starterCatalogRuntime } from './style-starter-runtime.js';
 import { styleEcSummary } from './style-ec-summary.js';
 import { styleMenuButtons } from '../services/style-menu-buttons.js';
 import {styleTemplateSamples} from './style-template-samples-api.js';
@@ -92,7 +93,7 @@ styles.put(base, async (c) => {
       c.get('staff').tenantId ?? null,
       c.get('staff').id,
       await json(c),
-      { catalogRuntime: { bucket: c.env.IMAGES, publicBaseUrl: c.env.WORKER_URL } },
+      { catalogRuntime: starterCatalogRuntime(c) },
     ),
   });
 });

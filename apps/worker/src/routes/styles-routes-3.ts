@@ -1,3 +1,5 @@
+import { catalogDetails } from '../services/style-starter-catalog-details.js';
+import type { StarterCatalogKind } from '@line-crm/shared';
 import { listStarterCatalog, saveCatalogStarter } from '../services/style-starter-catalog-save.js';
 import { readAccountAttention } from '../services/hq-account-attention.js';
 import { requireRole } from '../middleware/role-guard.js';
@@ -171,6 +173,8 @@ styles.get(base + '/analytics-settings', async (c) => {
     },
   });
 });
+
+styles.get('/api/hq/style-starter-sets/catalog/:templateId/versions/:versionId', async(c)=>c.json({success:true,data:await catalogDetails(c.env.DB,await hq(c),{kind:c.req.query('kind') as StarterCatalogKind,templateId:c.req.param('templateId'),versionId:c.req.param('versionId')})}));
 
 styles.get('/api/hq/style-starter-sets/catalog', async (c) => c.json({ success: true, data: await listStarterCatalog(c.env.DB, await hq(c)) }));
 

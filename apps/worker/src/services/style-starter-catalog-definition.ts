@@ -5,6 +5,7 @@ export function readCatalogDefinition(value: unknown): StarterCatalogDefinition 
   const d = value as StarterCatalogDefinition;
   if (!d || d.mode !== 'catalog' || !Array.isArray(d.items) || d.items.length || !Array.isArray(d.selections) || d.selections.length > 100
     || Object.keys(d).some(key => !['mode', 'items', 'selections'].includes(key))) throw new StyleError('invalid_starter_set');
+  if(d.selections.some(item=>!item||typeof item!=='object'||Array.isArray(item)))throw new StyleError('invalid_starter_set');
   const seen = new Set<string>();
   for (const selection of d.selections) {
     const spec = STARTER_CATALOG_KINDS.find(row => row.kind === selection?.kind);

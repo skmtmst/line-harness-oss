@@ -1,3 +1,4 @@
+import { starterCatalogRuntime } from './style-starter-runtime.js';
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { readLineAccountListMetadata } from '../services/line-account-list-metadata.js';
 import { jstDateOffset as japanDateOffset } from '@line-crm/shared';
@@ -1234,7 +1235,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
     await applyRegistrationOptions(c.env.DB,account.id,c.get('staff').id,registration);
     const started = followerState.capability === 'available' ? await startFollowerImport(c.env.DB,account.id) : followerState;
     savingStyle = true;
-    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style,{bucket:c.env.IMAGES,publicBaseUrl:c.env.WORKER_URL});
+    await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,parsed.value.style,starterCatalogRuntime(c));
     savingStyle = false; try { scheduleInitialFollowerImport(c.executionCtx, c.env.DB, new LineClient(prepared.channelAccessToken) as unknown as FollowerImportClient, account.id, started, () => logger.error('line_accounts.initial_follower_import_failed')); } catch { /* 単体試験は executionCtx を持たない */ }
     const steps = [...prepared.steps.slice(0, 4), lineConnectStep(5, 'passed')];
     return c.json({
@@ -1455,7 +1456,7 @@ lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadO
     }
 
     try {
-      await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,body.style,{bucket:c.env.IMAGES,publicBaseUrl:c.env.WORKER_URL});
+      await initializeAccountStyle(c.env.DB,account.id,account.tenant_id??DEFAULT_TENANT_ID,c.get('staff').id,body.style,starterCatalogRuntime(c));
     } catch {
       return c.json({ success: false, error: 'style_save_failed', data: { accountId: account.id, style: body.style ?? null, styleSaved: false, retryAt: `/api/dashboard/style?account_id=${encodeURIComponent(account.id)}`, starterRetryAt: `/api/dashboard/style/starter-items/ensure?account_id=${encodeURIComponent(account.id)}` } }, 502);
     }

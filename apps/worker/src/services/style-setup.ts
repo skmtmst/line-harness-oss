@@ -10,6 +10,8 @@ import { StyleError, checkStyle, readAnswers } from './style-setup-core.js';
 import { readDefinition, standardStarter } from './style-starter-definition.js';
 import { restaurantFollowupSeedStatement } from './restaurant-followup-rows.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
+import { logger } from '@line-crm/shared/server';
+import { HqTemplateError } from './hq-templates/tag.js';
 import { applyCatalogStarter, type StarterCatalogRuntime } from './style-starter-catalog-apply.js';
 export {profile,profileAnswers,type StyleProfile} from './style-profile.js';
 import {profile,profileAnswers,hasPendingStyleSelection} from './style-profile.js';
@@ -187,9 +189,18 @@ export async function saveProfile(
       throw new StyleError('version_conflict', 409);
     throw e;
   }
-  const catalogApplication = set.definition.mode === 'catalog' && tenant && selected
-    ? await applyCatalogStarter(db, tenant, account, actor, style, options.catalogRuntime)
-    : undefined;
+  let catalogApplication: import('@line-crm/shared').StarterCatalogApplyResult | undefined;
+  if(set.definition.mode==='catalog' && tenant && selected) {
+    try { catalogApplication=await applyCatalogStarter(db,tenant,account,actor,style,options.catalogRuntime); }
+    catch(error) {
+      const expected=error instanceof StyleError || (error instanceof HqTemplateError && error.status<500);
+      if(!expected) {
+        logger.error('style_starter_catalog_failed');
+        try{await options.catalogRuntime?.reportError?.(error instanceof Error?error:new Error('catalog_application_failed'))}catch{logger.error('style_starter_catalog_report_failed')}
+      }
+      catalogApplication={mode:'catalog',items:(set.definition.selections??[]).map(item=>({...item,state:expected?'blocked':'failed',reason:expected?error.code:'catalog_application_failed'}))};
+    }
+  }
   return {
     catalogApplication,
     style,

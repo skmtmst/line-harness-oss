@@ -1,3 +1,4 @@
+import { starterCatalogRuntime } from './style-starter-runtime.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { base, hq, json, account, edit, version } from './styles-common.js';
@@ -92,7 +93,7 @@ styleStarterDistribution.post(path + '/distribute', async (c) =>
       c.get('staff').id,
       checkStyle(c.req.param('style')),
       await json(c),
-      {bucket:c.env.IMAGES,publicBaseUrl:c.env.WORKER_URL},
+      starterCatalogRuntime(c),
     ),
   }),
 );

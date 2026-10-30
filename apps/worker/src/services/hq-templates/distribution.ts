@@ -186,7 +186,7 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
   const statements: HqTemplateStatement[] = [], stores = [];
   for (const account of accounts) {
     const snapshot = catalogDefinition ? await catalogSnapshot(db,account.id,template.template_type as import('@line-crm/shared').HqCatalogTemplateType) : tagDefinition ? await tagSnapshot(db, account.id) : scenarioDefinition ? await scenarioSnapshot(db,account.id) : deliveryDefinition ? await deliverySnapshot(db,account.id,template.template_type as import('@line-crm/shared').HqDeliveryTemplateType) : null;
-    if(deliveryDefinition) await validateDeliveryReferences(db,account.id,template.template_type as import('@line-crm/shared').HqDeliveryTemplateType,deliveryDefinition);
+    if(deliveryDefinition) await validateDeliveryReferences(db,account.id,template.template_type as import('@line-crm/shared').HqDeliveryTemplateType,deliveryDefinition,Boolean(initial));
     let form: Awaited<ReturnType<typeof inspectFormTemplate>> | null = null;
     let formReferences: Awaited<ReturnType<typeof inspectFormTemplateReferences>> = [];
     if (template.template_type === 'form') {
@@ -204,10 +204,10 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
     let r2: Awaited<ReturnType<typeof inspectR2RuntimeStore>> | null = null;
     if (template.template_type === 'template' || template.template_type === 'rich_menu') {
       if (!bucket) throw new HqTemplateError('UNSUPPORTED', 422);
-      try { r2 = await inspectR2RuntimeStore({ db, bucket, authority, templateId: id, templateVersionId: template.current_version_id!, textOverride: overrides.get(account.id) }, account.id); }
+      try { r2 = await inspectR2RuntimeStore({ db, bucket, authority, templateId: id, templateVersionId: template.current_version_id!, initialDraft: Boolean(initial), textOverride: overrides.get(account.id) }, account.id); }
       catch (error) { rethrowR2(error); }
     }
-    const items = catalogDefinition ? inspectCatalog(catalogDefinition,snapshot!,template.template_type as import('@line-crm/shared').HqCatalogTemplateType) : deliveryDefinition ? [...inspectDelivery(deliveryDefinition,snapshot!,template.template_type as import('@line-crm/shared').HqDeliveryTemplateType),...await deliveryReferenceItems(db,account.id,deliveryDefinition)] : scenarioDefinition ? inspectScenario(scenarioDefinition,snapshot!) : tagDefinition ? inspectTags(tagDefinition, snapshot!) : form
+    const items = catalogDefinition ? inspectCatalog(catalogDefinition,snapshot!,template.template_type as import('@line-crm/shared').HqCatalogTemplateType) : deliveryDefinition ? [...inspectDelivery(deliveryDefinition,snapshot!,template.template_type as import('@line-crm/shared').HqDeliveryTemplateType),...await deliveryReferenceItems(db,account.id,deliveryDefinition,Boolean(initial))] : scenarioDefinition ? inspectScenario(scenarioDefinition,snapshot!) : tagDefinition ? inspectTags(tagDefinition, snapshot!) : form
       ? [{ sourceId: form.sourceId, itemKind: form.itemKind, name: form.name, targetId: form.targetId, expectedRevision: form.expectedRevision, duplicate: form.duplicate, allowedModes: [...form.allowedModes] }, ...formReferences.map(item => ({ ...item, allowedModes: [...item.allowedModes] }))]
       : r2!.items;
     const storeId = crypto.randomUUID(), token = tagDefinition || scenarioDefinition || deliveryDefinition || catalogDefinition ? `hqts1.${await digest(snapshot!)}` : form?.snapshotToken ?? r2!.snapshotToken;
@@ -260,7 +260,7 @@ export async function distributionResult(db: D1Database, authority: HqTemplateAu
   return { runId, status: run.status, stores };
 }
 
-export async function distributeTemplate(db: D1Database, authority: HqTemplateAuthority, templateId: string, runId: string, selections: DistributionSelection[], bucket?: R2Bucket, publicBaseUrl?: string) {
+export async function distributeTemplate(db: D1Database, authority: HqTemplateAuthority, templateId: string, runId: string, selections: DistributionSelection[], bucket?: R2Bucket, publicBaseUrl?: string, initialResourceCommit?: import('./contract.js').HqInitialResourceCommit) {
   const preflights = (await db.prepare(`SELECT * FROM hq_template_preflights WHERE tenant_id=? AND template_id=? AND idempotency_fingerprint=? ORDER BY target_account_id`).bind(authority.tenantId, templateId, runId).all<HqTemplatePreflight>()).results;
   if (!preflights.length || preflights.some(p => p.created_by !== authority.actorId)) throw new HqTemplateError('NOT_FOUND', 404);
   if (preflights.some(p => p.status === 'expired')) throw new HqTemplateError('VERSION_CONFLICT', 409);
@@ -301,8 +301,8 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
           mode: root.mode,
           resolutions: selected,
         } as const;
-        if (template.template_type === 'form') await executeFormStore({ db, authority, templateId, runId, context });
-        else await executeR2RuntimeStore({ db, bucket: bucket!, authority, templateId, runId, context, publicBaseUrl });
+        if (template.template_type === 'form') await executeFormStore({ db, authority, templateId, runId, context,initialResourceCommit });
+        else await executeR2RuntimeStore({ db, bucket: bucket!, authority, templateId, runId, context, publicBaseUrl,initialResourceCommit });
       } catch (error) {
         if (!(error instanceof HqRuntimeError) && !(error instanceof HqR2RuntimeError)) throw error;
         if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);
@@ -345,7 +345,7 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
           plan={statements:[...commit.value.dbCommit],resolutions:[...commit.value.resolutions],counts:{created:1,overwritten:0,aliased:0}};
         }
         else if(isCatalogType(template.template_type)) plan = planCatalog(p.target_account_id,parseCatalogDefinition(template.template_type,definition),snapshot,template.template_type,selected,{templateId,versionId:p.template_version_id});
-        else if(isDeliveryType(template.template_type)) plan = await planDelivery(db,p.target_account_id,await parseDeliveryDefinition(db,template.template_type,definition),snapshot,template.template_type,selected);
+        else if(isDeliveryType(template.template_type)) plan = await planDelivery(db,p.target_account_id,await parseDeliveryDefinition(db,template.template_type,definition),snapshot,template.template_type,selected,p.initial_insert===1);
         else if (template.template_type === 'scenario') plan = planScenario(p.target_account_id,parseScenarioDefinition(definition),snapshot,selected);
         else {
         const adapter = getHqTemplateAdapter('tag', { db, authority });
@@ -362,13 +362,14 @@ export async function distributeTemplate(db: D1Database, authority: HqTemplateAu
       }
       catch (error) { status = error instanceof HqTemplateError && error.code === 'VERSION_CONFLICT' ? 'version_conflict' : 'failed'; }
     }
-    const persist = (finalStatus: string, commit: HqTemplateStatement[], resolutions: readonly HqTemplateResolution[]) => {
+    const persist = async (finalStatus: string, commit: HqTemplateStatement[], resolutions: readonly HqTemplateResolution[]) => {
       const statements = [guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND tenant_id=? AND status='ready') AND NOT EXISTS(SELECT 1 FROM hq_template_distribution_results WHERE run_id=? AND tenant_id=? AND target_account_id=?)`, [p.id, authority.tenantId, runId, authority.tenantId, p.target_account_id])];
       if (finalStatus === 'succeeded') statements.push(guard(`EXISTS(SELECT 1 FROM hq_template_preflights WHERE id=? AND expires_at>strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, [p.id]));
       // 各店舗の原子的トランザクション内でも統括の所有権を確認する。
       statements.push(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [p.target_account_id, authority.tenantId]));
       for (const r of resolutions) statements.push({ sql: `UPDATE hq_template_preflight_resolutions SET resolution_mode=?,target_id=COALESCE(?,target_id),alias_name=?,expected_revision=COALESCE(?,expected_revision) WHERE preflight_id=? AND tenant_id=? AND source_id=?`, bindings: [r.mode, r.targetId ?? null, r.mode === 'alias' ? r.aliasName ?? 'pending' : null, r.expectedRevision ?? null, p.id, authority.tenantId, r.sourceId] });
       statements.push({ sql: `INSERT INTO hq_template_distribution_results(run_id,tenant_id,template_id,template_version_id,target_account_id,preflight_id,idempotency_fingerprint,snapshot_token,status,finished_at) VALUES (?,?,?,?,?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`, bindings: [runId, authority.tenantId, templateId, p.template_version_id, p.target_account_id, p.id, runId, p.snapshot_token, finalStatus] }, ...commit, audit(authority, 'distributed', templateId, p.target_account_id, finalStatus === 'succeeded' ? 'success' : 'failed', runId));
+      if (finalStatus === 'succeeded' && initialResourceCommit) statements.push(...await initialResourceCommit(p.target_account_id,resolutions));
       if (finalStatus === 'succeeded') statements.push(captureDistributionName(runId, authority.tenantId, p.target_account_id));
       return batch(db, statements);
     };

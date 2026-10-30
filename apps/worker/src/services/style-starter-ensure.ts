@@ -38,7 +38,7 @@ export async function starterApplication(db: D1Database, account: string, tenant
     const rows = (await db.prepare("SELECT template_id,template_version_id,state FROM style_starter_catalog_items WHERE line_account_id=? AND tenant_id=?")
       .bind(account, tenant).all<{template_id:string;template_version_id:string;state:string}>()).results;
     const count = selections.filter(selection => rows.some(row => row.template_id === selection.templateId && row.template_version_id === selection.versionId && row.state === 'succeeded')).length;
-    return { applied: selections.length === 0 || count > 0, count, missing: set.autoInsert ? selections.length - count : 0 };
+    return { applied: count === selections.length, count, missing: set.autoInsert && p.selection_mode==='configured' ? selections.length - count : 0 };
   }
   const count = (await db
     .prepare('SELECT COUNT(*) AS n FROM style_starter_items WHERE line_account_id=?')
@@ -73,10 +73,12 @@ export async function ensureStyleStarterItems(
   if (!Number.isInteger(input.expectedVersion) || input.expectedVersion !== p.version)
     throw new StyleError('version_conflict', 409);
   const selectedSet = await starter(db, tenant, p.style);
-  if (selectedSet.definition.mode === 'catalog' && tenant) return {
-    inserted: [], skipped: [], existing: 0, starterSet: {id:selectedSet.id,version:selectedSet.version},
-    catalogApplication: await applyCatalogStarter(db, tenant, account, actor, p.style, runtime),
-  };
+  if (selectedSet.definition.mode === 'catalog' && tenant) {
+    const before=(await db.prepare("SELECT template_id,template_version_id FROM style_starter_catalog_items WHERE line_account_id=? AND tenant_id=? AND state='succeeded'").bind(account,tenant).all<{template_id:string;template_version_id:string}>()).results;
+    const catalogApplication=await applyCatalogStarter(db,tenant,account,actor,p.style,runtime);
+    return {inserted:catalogApplication.items.filter(row=>row.state==='succeeded'&&!before.some(old=>old.template_id===row.templateId&&old.template_version_id===row.versionId)).map(row=>({key:row.templateId,kind:row.kind})),
+      skipped:[],existing:before.length,starterSet:{id:selectedSet.id,version:selectedSet.version},catalogApplication};
+  }
   const now = new Date().toISOString();
   const { set, inserted, skipped, existing, statements } = await planMissingStarterItems(db, account, tenant, actor, p, now);
   const keys = new Set(set.definition.items.map((item) => item.key));
