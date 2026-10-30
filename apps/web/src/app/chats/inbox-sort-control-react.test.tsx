@@ -134,8 +134,10 @@ const order = (list: HTMLElement) => {
 
 test('既定は未読が先・新しい順で、LINEとメールを統合する。口へは並びを送らない', async () => {
   const list = await renderList()
-  const control = list.querySelector<HTMLButtonElement>('[data-inbox-sort="choice"] button[aria-label="並び順"]')
-  expect(control?.textContent).toContain('未読が先・新しい順')
+  // 並びの1段は無い。選んだ並びは題の横の印の吹き出しで分かる。
+  expect(list.querySelector('[data-inbox-sort="choice"]')).toBeNull()
+  const control = document.querySelector<HTMLButtonElement>('button[aria-label="並び順"]')
+  expect(control?.getAttribute('title')).toBe('並び順：未読が先・新しい順')
   // 古いが未読の行が、新しい既読より先に来る。既読同士は新しい順。
   expect(order(list)).toEqual(['LINE未読古', 'メール未読古', 'LINE新', 'メール中', 'LINE古'])
   expect(fixture.chatQueries.every((query) => !query.has('sort'))).toBe(true)
@@ -145,9 +147,9 @@ test('「新しい順」を選ぶと URL の ?sort=latest に残す（ほかの�
   fixture.params = new URLSearchParams('from=dashboard')
   const replace = vi.spyOn(window.history, 'replaceState')
   const list = await renderList()
-  const control = list.querySelector<HTMLButtonElement>('[data-inbox-sort="choice"] button[aria-label="並び順"]')!
+  const control = document.querySelector<HTMLButtonElement>('button[aria-label="並び順"]')!
   await act(async () => { control.click() })
-  const option = [...document.querySelectorAll<HTMLElement>('[role="option"] button')].find((button) => button.textContent?.trim() === '新しい順')
+  const option = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent?.trim() === '新しい順')
   expect(option).toBeTruthy()
   await act(async () => { option!.click() })
   const url = String(replace.mock.calls.at(-1)?.[2] ?? '')
@@ -158,8 +160,17 @@ test('「新しい順」を選ぶと URL の ?sort=latest に残す（ほかの�
 test('?sort=latest では未読を先にせず、LINEとメールを時刻だけで混ぜる。口へ sort=latest を送る', async () => {
   fixture.params = new URLSearchParams('sort=latest')
   const list = await renderList()
-  expect(list.querySelector('[data-inbox-sort="choice"] button[aria-label="並び順"]')?.textContent).toContain('新しい順')
+  expect(document.querySelector('button[aria-label="並び順"]')?.getAttribute('title')).toBe('並び順：新しい順')
   expect(order(list)).toEqual(['LINE新', 'メール中', 'LINE古', 'LINE未読古', 'メール未読古'])
   expect(fixture.chatQueries.length).toBeGreaterThan(0)
   expect(fixture.chatQueries.every((query) => query.get('sort') === 'latest' && !query.has('beforeUnread'))).toBe(true)
+})
+
+test('メニューの選んだ並びに ✓ と選択中の印が付く', async () => {
+  await renderList()
+  const control = document.querySelector<HTMLButtonElement>('button[aria-label="並び順"]')!
+  await act(async () => { control.click() })
+  const current = document.querySelector<HTMLElement>('[role="menuitem"][aria-label="未読が先・新しい順（選択中）"]')
+  expect(current?.textContent).toContain('✓')
+  expect(document.querySelector('[role="menuitem"][aria-label="新しい順"]')).not.toBeNull()
 })

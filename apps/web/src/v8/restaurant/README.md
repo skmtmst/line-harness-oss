@@ -56,7 +56,6 @@
 - [reservations/public/format/index.ts](reservations/public/format/index.ts)：`INACTIVE_STATUSES`・`hm`・`maskPhone`・`mdWeek`・`sourceName`
 - [store-new/index.ts](store-new/index.ts)：`StoreNewV8`・`TermsBody`・`termsSectionId`
 - [store-new/public/terms-body/index.ts](store-new/public/terms-body/index.ts)：`TermsBody`・`termsSectionId`
-- [store-tabs/index.ts](store-tabs/index.ts)：`StoreTabs`・`StoreTabKey`
 - [tables/index.ts](tables/index.ts)：`TablesPage`
 - [terms/index.ts](terms/index.ts)：`TermsV8`
 

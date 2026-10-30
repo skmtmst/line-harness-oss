@@ -13,7 +13,7 @@ const SRC = join(dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (path: string) => readUiSource(join(SRC, path), 'utf8')
 
 /** 画面 → onCreate を決める権限の値（その値が偽なら作らせない）。 */
-const SCREENS: Array<[string, RegExp]> = [
+const SOURCE_GUARD_SCREENS: Array<[string, RegExp]> = [
   ['v8/tags/create.tsx', /onCreate=\{canEditFolders && selectedAccountId \?/],
   ['v8/tag-edit/edit.tsx', /onCreateGroup=\{canEdit && selectedAccountId \?/],
   ['v8/template-edit/message.tsx', /: canMutate && editorAccountId\s*\?/],
@@ -31,7 +31,6 @@ const SCREENS: Array<[string, RegExp]> = [
   ['v8/tags/field-editor.tsx', /onCreate=\{locked \? undefined : onCreateFolder\}/],
   ['v8/tags/field-new.tsx', /onCreateFolder=\{canCreateFolder\s*\?/],
   ['v8/tags/field-edit.tsx', /onCreateFolder=\{canCreateFolder\s*\?/],
-  ['v8/scenarios/create.tsx', /onCreate=\{canEdit && !locked\s*\?/],
   ['v8/scenario-detail/detail.tsx', /onCreate=\{canEdit\s*\?/],
   ['v8/common-vars-edit/edit.tsx', /onCreate=\{canWrite && selectedAccountId\s*\?/],
   ['v8/common-vars-edit/new.tsx', /onCreate=\{canWrite && selectedAccountId\s*\?/],
@@ -42,9 +41,16 @@ const SCREENS: Array<[string, RegExp]> = [
   ['components/broadcasts/broadcast-form.tsx', /onCreate=\{canCreateFolder \? createFolder : undefined\}/],
 ]
 
+// 実描画へ移した画面も、共通部品・素Select禁止・自作パネル禁止の棚卸しには残す。
+const SCREENS: Array<[string, RegExp]> = [
+  ...SOURCE_GUARD_SCREENS,
+  ['v8/scenarios/create.tsx', /onCreate=\{canEdit && !locked\s*\?/],
+]
+
 describe('物のフォルダを選ぶ欄は FolderSelect（dLffh）', () => {
-  // 自動応答の権限と読込状態は wizard-folder.test.tsx で実際の作成操作を確認する。
-  it.each(SCREENS)('%s は権限があるときだけ作る口を渡す', (path, gate) => {
+  // 自動応答はwizard-folder、シナリオ作成はcreate-permission-screenで実操作とAPI0を確認する。
+  // シナリオは既存選択を残し、＋行だけmanager理由で止める。残る25画面の旧呼出し確認は維持する。
+  it.each(SOURCE_GUARD_SCREENS)('%s は権限があるときだけ作る口を渡す', (path, gate) => {
     expect(read(path)).toMatch(gate)
   })
 

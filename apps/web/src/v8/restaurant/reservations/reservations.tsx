@@ -365,7 +365,6 @@ export default function ReservationsPage() {
       description={ctx=>`${ctx?.store?.name??''}・${view==='today'?dayTitle(toYmd(day)):'今後の予約'}`}
       query={query}
       layout={view === 'today' ? 'ledgerTight' : 'ledger'}
-      storeTab="reservations"
       headAfter={(ctx, storePicker) => (
         <HeadControls
           storePicker={storePicker}

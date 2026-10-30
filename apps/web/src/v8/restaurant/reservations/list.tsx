@@ -1,8 +1,9 @@
 'use client'
-import type {RestaurantFloor,ReservationAxis} from '@line-crm/shared'
-import {reservationBoardApi} from '@/lib/api/helpers/reservation-board'
+import { useLedgerFloor } from './use-ledger-floor'
+import LedgerEmpty from './ledger-empty'
+import type {ReservationAxis} from '@line-crm/shared'
 import ReservationBoard from '@/components/shared/reservation-board'
-import {useEffect,useState,type ReactNode} from 'react'
+import {useState,type ReactNode} from 'react'
 import {DetailColumns} from '@/components/templates/detail-columns'
 import {useAccount} from '@/contexts/account-context'
 import {allBoardPages} from '@/lib/api/helpers/reservation-board'
@@ -84,8 +85,8 @@ export default function ListView({ view, rows, total, tables, page, period, stat
 }) {
   const [detailExpanded,setDetailExpanded]=useState(false)
   const {selectedAccountId}=useAccount()
-  const [axis,setAxis]=useState<ReservationAxis>(view==='month'?'month':'list'),[floor,setFloor]=useState<RestaurantFloor>()
-  useEffect(()=>{let current=true;setFloor(undefined);if(selectedAccountId&&storeId)void reservationBoardApi.floors(selectedAccountId,storeId).then(r=>{if(current)setFloor(r.data[0])}).catch(()=>{});return()=>{current=false}},[selectedAccountId,storeId])
+  const [axis,setAxis]=useState<ReservationAxis>(view==='month'?'month':'list')
+  const {floor,error:floorError,reload:reloadFloor}=useLedgerFloor(selectedAccountId,storeId)
   const range=view==='week'?weekRange(day):view==='month'?monthRange(day):{from:period==='past'?'1970-01-01T00:00:00Z':period==='upcoming'?dayRange(new Date()).from:'1970-01-01T00:00:00Z',to:period==='past'?dayRange(new Date()).from:'2100-01-01T00:00:00Z'}
   const printEntries=selectedAccountId?()=>allBoardPages('seats',selectedAccountId,range.from,range.to,storeId).then(es=>es.filter(e=>status==='all'||status.split(',').includes(e.status))):undefined
   const live = rows.filter((item) => !INACTIVE_STATUSES.includes(item.status) && !isHold(item))
@@ -107,7 +108,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
       </StatRow>
       {/* R11: 5つ目は帯の下の短い1行に残す。配席は今日の盤で付ける。 */}
       <p className={styles.fifthLine}>未配席 {formatNumber(unseated)} 件 <Button variant="text" size="inline" onClick={() => onView('today')}>今日の配席へ →</Button></p>
-      <ReservationBoard selectedId={selectedId} printContext={`${storeName??storeId} ／ ${view==='week'?'今週':view==='month'?'今月':period==='past'?'過去の予約':period==='upcoming'?'今後の予約':'すべての予約'} ／ ${LEDGER_STATUS_OPTIONS.find(o=>o.value===status)?.label??status}`} title="予約台帳" loadPrintEntries={printEntries} axis={axis} floor={floor} dates={[toYmd(day)]} onAxis={v=>{setAxis(v);if(v==='resource')onView('today');else if(v==='month')onView('month');else if(v==='list')onView('list')}} columns="dining" diningContentColumns monthNamePresentation="readable" entries={rows.map(r=>seatBoardEntry(r as unknown as Record<string,unknown>))} resources={tables.map(t=>({id:t.id,label:t.code,active:!!t.is_active,capacity:t.max_capacity}))} onOpen={onOpen} actions={e=><RowActions subjectName={e.customerName} edit={{label:'変更',disabled:busy,onClick:()=>onEdit(e.id)}} menuItems={[{id:'detail',label:'詳細を見る',onSelect:()=>onOpen(e.id)},...(INACTIVE_STATUSES.includes(e.status)?[{id:'restore',label:'予約を有効に戻す',onSelect:()=>onRestore(e.id)}]:[{id:'cancel',label:'取消',tone:'danger' as const,onSelect:()=>onCancel(e.id)}])]} />} canWrite={canWrite} busy={busy}
+      <ReservationBoard notice={floorError ? <ListState kind="error" title="座席表を読み込めませんでした" error={floorError} onRetry={reloadFloor}/> : undefined} selectedId={selectedId} printContext={`${storeName??storeId} ／ ${view==='week'?'今週':view==='month'?'今月':period==='past'?'過去の予約':period==='upcoming'?'今後の予約':'すべての予約'} ／ ${LEDGER_STATUS_OPTIONS.find(o=>o.value===status)?.label??status}`} title="予約台帳" loadPrintEntries={printEntries} axis={axis} floor={floor} dates={[toYmd(day)]} onAxis={v=>{setAxis(v);if(v==='resource')onView('today');else if(v==='month')onView('month');else if(v==='list')onView('list')}} columns="dining" diningContentColumns monthNamePresentation="readable" entries={rows.map(r=>seatBoardEntry(r as unknown as Record<string,unknown>))} resources={tables.map(t=>({id:t.id,label:t.code,active:!!t.is_active,capacity:t.max_capacity}))} onOpen={onOpen} actions={e=><RowActions subjectName={e.customerName} edit={{label:'変更',disabled:busy,onClick:()=>onEdit(e.id)}} menuItems={[{id:'detail',label:'詳細を見る',onSelect:()=>onOpen(e.id)},...(INACTIVE_STATUSES.includes(e.status)?[{id:'restore',label:'予約を有効に戻す',onSelect:()=>onRestore(e.id)}]:[{id:'cancel',label:'取消',tone:'danger' as const,onSelect:()=>onCancel(e.id)}])]} />} canWrite={canWrite} busy={busy}
         toolbar={      <>
         {view === 'list' ? (
           <>
@@ -132,7 +133,8 @@ export default function ListView({ view, rows, total, tables, page, period, stat
         {canImport ? <Button presentation="restaurant" disabled={busy} onClick={onImport}><Inbox size={16} aria-hidden="true" />受信データを試す</Button> : null}
         {canWrite ? <Button presentation="restaurant" disabled={busy} onClick={onCreate}><Plus size={16} aria-hidden="true" />手動で予約を作る</Button> : null}
       </>} renderBody={body=><DetailColumns variant="restaurant-ledger" asideLabel="予約の詳細を見る" expanded={detailExpanded} onExpandedChange={setDetailExpanded} aside={detail}>
-        {rows.length===0?<ListState kind="empty" title="条件に合う予約はありません。"/>:body}
+        {tables.length===0 ? <LedgerEmpty noTables canWrite={canWrite} busy={busy} onCreate={onCreate}/> : rows.length===0 ? <LedgerEmpty noTables={false} filtered={status!=='all'||view==='list'&&period!=='all'} canWrite={canWrite} busy={busy} onCreate={onCreate}/> : null}
+        {rows.length===0 || axis==='floor' && floorError ? null : body}
         {view === 'list' && pageCount > 1 ? (
           <Pagination spacing="restaurant" page={page} pageCount={pageCount} onPageChange={onPage} ariaLabel="予約台帳のページ送り" disabled={busy} summary={`${total} 件中 ${(page - 1) * pageSize + 1}〜${Math.min((page - 1) * pageSize + rows.length, total)} 件`} />
         ) : null}

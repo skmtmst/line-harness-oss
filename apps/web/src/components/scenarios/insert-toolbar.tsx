@@ -14,7 +14,8 @@
  * 共通情報 / 配信日 / その他）。回答フォームはこちらに受け口が無いので出さない。
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type ButtonHTMLAttributes } from 'react'
+import { usePermissionLockTip } from '@/components/shared/permission-lock-tip'
 import { useAccount } from '@/contexts/account-context'
 import { useFeatureVisibility } from '@/lib/use-feature-visibility'
 import { scenarioReferenceData } from './scenario-reference-data'
@@ -43,6 +44,11 @@ interface Option {
   hint?: string
 }
 
+function InsertOption({ lockedReason, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { lockedReason?: string }) {
+  const lock = usePermissionLockTip<HTMLButtonElement>(lockedReason, props['aria-describedby'])
+  return <><button {...props} ref={lock.ref} {...lock.handlers} />{lock.node}</>
+}
+
 export interface InsertToolbarProps {
   compact?: boolean
   count?: React.ReactNode
@@ -52,9 +58,20 @@ export interface InsertToolbarProps {
   onChange: (next: string) => void
   /** 一斉配信の本文編集で、設計上の回答フォーム差し込み口を表示する。 */
   includeAnswerForm?: boolean
+  /** 本人未確定など、権限の理由を出さずに入力を止める。 */
+  disabled?: boolean
+  /** 差し込む口を隠さず、共通の理由付きの灰色で残す。 */
+  lockedReason?: string
+  /** 差し込み直前に確かめる。失効した処理ではfalseを返すleaseを渡す。未指定は今までどおり。 */
+  canChangeNow?: () => boolean
 }
 
-export default function InsertToolbar({ targetRef, value, onChange, includeAnswerForm = false, count }: InsertToolbarProps) {
+export default function InsertToolbar({ targetRef, value, onChange, includeAnswerForm = false, count, disabled, lockedReason, canChangeNow }: InsertToolbarProps) {
+  const permission = useRef({ disabled, lockedReason, canChangeNow })
+  permission.current = { disabled, lockedReason, canChangeNow }
+  const canInsertNow = () => !disabled && !lockedReason && canChangeNow?.() !== false
+    && !permission.current.disabled && !permission.current.lockedReason && permission.current.canChangeNow?.() !== false
+  const blocked = Boolean(disabled || canChangeNow?.() === false)
   const { selectedAccountId } = useAccount()
   // 友だち情報・共通情報は任意機能。オフのaccountでは差し込み口ごと出さない。
   const featureVisibility = useFeatureVisibility(selectedAccountId)
@@ -101,6 +118,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
    * 書こうとしたときに文頭へ打ち込むことになる。
    */
   const insert = (token: string) => {
+    if (!canInsertNow()) return
     const el = targetRef.current
     if (!el) {
       onChange(value + token)
@@ -113,6 +131,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     onChange(next)
     setOpen(null)
     requestAnimationFrame(() => {
+      if (!canInsertNow()) return
       el.focus()
       const pos = start + token.length
       el.setSelectionRange(pos, pos)
@@ -123,7 +142,8 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
     <MessageInsertButton kind={key === 'field' || key === 'var' || key === 'date' ? key : 'other'}
       ref={(element) => { buttonRefs.current[key] = element }} label={label}
       expanded={token ? undefined : open === key}
-      onClick={() => token ? insert(token) : setOpen(open === key ? null : key)} />
+      disabled={blocked} lockedReason={lockedReason}
+      onClick={() => { if (canInsertNow()) token ? insert(token) : setOpen(open === key ? null : key) }} />
   )
 
   const list = (menuKey: string, items: Option[], empty: string) => (
@@ -142,7 +162,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
           <p className="text-ink-faint px-3 py-4 text-center text-xs">{empty}</p>
         ) : (
           items.map((o) => (
-            <button
+            <InsertOption disabled={blocked} lockedReason={lockedReason}
               key={o.token}
               type="button"
               onClick={() => insert(o.token)}
@@ -150,7 +170,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
             >
               <span className="text-ink block">{o.label}</span>
               {o.hint && <span className="text-ink-faint block">{o.hint}</span>}
-            </button>
+            </InsertOption>
           ))
         )}
       </div>
@@ -197,11 +217,12 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
             <div className="flex flex-wrap items-center gap-2">
               <SaveErrorField names={["targetDate","target_date"]}><DateField
                 value={targetDate}
-                onChange={setTargetDate}
+                disabled={blocked || Boolean(lockedReason)}
+                onChange={(next) => { if (canInsertNow()) setTargetDate(next) }}
                 aria-label="目標日"
                 className="min-w-0 flex-1"
               /></SaveErrorField>
-              <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 text-xs whitespace-normal" type="button" disabled={!targetDate} onClick={() => insert(`{{days_until:${targetDate}}}`)}>
+              <Button variant="secondary" className="text-ink-secondary shrink-0 px-3 text-xs whitespace-normal" type="button" disabled={blocked || !targetDate} lockedReason={lockedReason} onClick={() => insert(`{{days_until:${targetDate}}}`)}>
                 入れる
               </Button>
             </div>
@@ -209,7 +230,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
             <p className="text-ink text-xs font-medium mt-3">配信日から何日後かの日付</p>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {[1, 3, 7, 14, 30].map((n) => (
-                <Button variant="secondary" className="text-ink-secondary px-2.5 text-xs whitespace-normal" key={n} type="button" onClick={() => insert(`{{date+${n}}}`)}>
+                <Button variant="secondary" className="text-ink-secondary px-2.5 text-xs whitespace-normal" key={n} type="button" disabled={blocked} lockedReason={lockedReason} onClick={() => insert(`{{date+${n}}}`)}>
                   {n}日後
                 </Button>
               ))}
@@ -218,7 +239,7 @@ export default function InsertToolbar({ targetRef, value, onChange, includeAnswe
         </MenuPortal>
       </div>
     </>}>
-      <MessageInsertButton kind="name" label="名前" onClick={() => insert('{{name}}')} />
+      <MessageInsertButton kind="name" label="名前" disabled={blocked} lockedReason={lockedReason} onClick={() => insert('{{name}}')} />
 
       {fieldsEnabled && (
         <div className="relative">

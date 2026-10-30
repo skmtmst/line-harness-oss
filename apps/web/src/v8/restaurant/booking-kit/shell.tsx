@@ -18,7 +18,6 @@ import Notice from '@/components/shared/notice'
 import { PageContent, PageFrame, PageHeading } from '@/components/templates/page-frame'
 import ListState from '@/components/shared/list-state'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
-import { StoreTabs, type StoreTabKey } from '@/v8/restaurant/store-tabs/index'
 import styles from './shell.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect from '@/components/shared/entity-select'
@@ -114,7 +113,7 @@ function EmptySetup() {
   )
 }
 
-export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', storeTab, boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, readOnly, readOnlyNeed, children, renderPage }: {
+export default function RestaurantShell({ boardId, title, description, explanation, query, headAfter, bare = false, layout = 'standard', boundary = true, headSize, templateHeading = false, headingInset, hideSubtitle = false, readOnly, readOnlyNeed, children, renderPage }: {
   /** Pencil の板 ID。外枠へ付ける。 */
   boardId: string
   title: string
@@ -134,8 +133,6 @@ export default function RestaurantShell({ boardId, title, description, explanati
    * ledgerTight＝予約台帳の今日（さらに段の間が 14）。
    */
   layout?: 'standard' | 'ledger' | 'ledgerTight'
-  /** 板の頭の下に店のタブ（提案 E-1：ダッシュボード・予約・座席・卓・予約枠・在庫）を出す。今の画面の印。 */
-  storeTab?: StoreTabKey
   /**
    * 検証環境の帯を出すか（既定 true）。false のときは中身を段の間なしで置く（中身が自分で余白を持つ。
    * 予約枠・在庫の「休業日・貸切」タブ  は帯が無く、タブ・知らせ・本文が板の幅で続く）。
@@ -268,14 +265,13 @@ export default function RestaurantShell({ boardId, title, description, explanati
         {headAfter ? headAfter(ctx, storePicker) : storePicker}
       </div>
       )}
-      {storeTab ? <div className={styles.storeTabs}><StoreTabs current={storeTab} flush /></div> : null}
     </>
   )
   if (ctx && renderPage) return renderPage(ctx, <div className={styles.page} data-restaurant-fusion={templateHeading || undefined}>{heading}</div>, noticeBand)
   const page = (
     <div data-design-node={boardId} data-restaurant-fusion={templateHeading||undefined} data-list-skeleton={layout === 'ledger' && !templateHeading ? 'templates' : undefined} className={styles.page}>
       {heading}
-      <div className={`${styles.body} ${layout === 'ledgerTight' ? styles.bodyTight : ''} ${storeTab ? styles.bodyAfterTabs : ''} ${boundary ? '' : styles.bodyFlush}`}>
+      <div className={`${styles.body} ${layout === 'ledgerTight' ? styles.bodyTight : ''} ${boundary ? '' : styles.bodyFlush}`}>
         {boundary ? <BoundaryBanner /> : null}
         {noticeBand}
         {content}

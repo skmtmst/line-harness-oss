@@ -1,10 +1,16 @@
 /* 提供された横長ロゴの透明余白だけを表示領域で切る。 */
+/*
+ * 塊の高さは中身通り（上2・絵24・下1＝27）にし、54 の箱の下にあった
+ * 28 の空きを取る。絵の上端（上の余白16＋2＝18）は動かさないので、
+ * 絵は今までどおり上の帯（高さ60）の縦の中心にそろう。下の 1px は
+ * 組の見出しの文字の上端を右の板の上端（60）に合わせる分。
+ */
 .logoRoot {
   display: flex;
   min-width: 0;
-  height: 54px;
+  height: auto;
   align-items: flex-start;
-  padding: 2px 20px 0;
+  padding: var(--space-2) var(--space-20) 1px;
 }
 
 .logoViewport {
