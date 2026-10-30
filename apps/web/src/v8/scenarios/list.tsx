@@ -31,7 +31,7 @@ import { completeReorder } from '@/lib/complete-reorder';
 import { useAccount } from '@/contexts/account-context';
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { ROLE_LABELS } from '@/lib/hq-members';
-import { describeApiFailure, isForbidden, permissionDeniedMessage } from '@/components/shared/api-error-message';
+import { describeApiFailure, isForbidden } from '@/components/shared/api-error-message';
 import { NoPermissionBoard } from '@/v8/no-permission/index'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { formatNumber } from '@/lib/format';
@@ -46,7 +46,7 @@ import EmptyList from '@/components/shared/empty-list'
 import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import Notice from '@/components/shared/notice'
-import Checkbox, { UnavailableSelection } from '@/components/shared/checkbox'
+import Checkbox from '@/components/shared/checkbox'
 import Select from '@/components/shared/select'
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
@@ -155,6 +155,7 @@ export default function ScenariosListV8() {
   const staffRole = useStaffRole()
   const editAccess = useScenarioWriteAccess()
   const folderAccess = useScenarioWriteAccess('manageFolders')
+  const publishAccess = useScenarioWriteAccess('publish')
   const canEdit = editAccess.allowed
 
   /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
@@ -381,6 +382,7 @@ export default function ScenariosListV8() {
   /* 戻ってきたら前のスクロール位置へ（中身が描けてから）。 */
   useListScrollMemory(scenarioList.loaded)
   const loadScenarios = scenarioList.retry
+  const editDisabled = !canEdit || !scenarioList.loaded || accountLoading
 
   /*
    * 選択状態はIDで持ち、一覧が読み直されたときに居なくなった行はそのまま
@@ -485,6 +487,7 @@ export default function ScenariosListV8() {
   const resumableIds = selectedRows.filter((s) => !s.isActive).map((s) => s.id)
 
   const toggleAllOnPage = () => {
+    if (!canWriteHere()) return
     setSelectedIds((current) => {
       const next = new Set(current)
       if (allOnPageSelected) scenarios.forEach((s) => next.delete(s.id))
@@ -493,6 +496,7 @@ export default function ScenariosListV8() {
     })
   }
   const toggleOne = (id: string) => {
+    if (!canWriteHere()) return
     setSelectedIds((current) => {
       const next = new Set(current)
       if (next.has(id)) next.delete(id)
@@ -511,6 +515,7 @@ export default function ScenariosListV8() {
     if (ids.length === 0 || toggleBusyRef.current) return
     toggleBusyRef.current = true
     const ticket = {}; toggleRun.current = ticket
+    let toggleFailure = next ? '配信を始められませんでした。' : '停止できませんでした。'
     const key = listContextKey
     setOptimisticRows({
       key,
@@ -522,14 +527,20 @@ export default function ScenariosListV8() {
         let saved = 0
         for (const id of ids) {
           if (!currentScope()) return
-          if (!requireWrite('publish', saved, ids.length)) throw new Error(stoppedMessage(saved, ids.length))
-          const res = await api.scenarios.update(id, { isActive: next })
-          if (!res.success) throw new Error(res.error)
-          saved++
+          if (!canWriteHere('publish')) { toggleFailure = stoppedMessage(saved, ids.length); throw new Error(toggleFailure) }
+          try {
+            const res = await api.scenarios.update(id, { isActive: next })
+            if (!res.success) throw new Error(res.error)
+            saved++
+          } catch (failure) {
+            saveErrors.capture(failure)
+            toggleFailure = `全 ${formatNumber(ids.length)} 件中 ${formatNumber(saved)} 件の保存を確認しました。${formatNumber(saved + 1)} 件目で止めました。未送信は ${formatNumber(ids.length - saved - 1)} 件です。理由：${describeApiFailure(failure, next ? '開始' : '停止')}`
+            throw failure
+          }
         }
       },
       revert: () => { toggleBusyRef.current = false; setOptimisticRows(null); void loadScenarios() },
-      failureMessage: next ? '配信を始められませんでした。' : '停止できませんでした。',
+      get failureMessage() { return toggleFailure },
       onSuccess: () => {
         toggleBusyRef.current = false
         setOptimisticRows(null)
@@ -561,6 +572,7 @@ export default function ScenariosListV8() {
     if (!moveIds || moveIds.length === 0) return
     const ids = moveIds
     const folderId = moveDraft || null
+    let moveFailure = 'フォルダを移動できませんでした。'
     const key = listContextKey
     setOptimisticRows({
       key,
@@ -573,14 +585,20 @@ export default function ScenariosListV8() {
         let saved = 0
         for (const id of ids) {
           if (!currentScope()) return
-          if (!requireWrite('edit', saved, ids.length)) throw new Error(stoppedMessage(saved, ids.length))
-          const res = await api.scenarios.update(id, { folderId })
-          if (!res.success) throw new Error(res.error)
-          saved++
+          if (!canWriteHere()) { moveFailure = stoppedMessage(saved, ids.length); throw new Error(moveFailure) }
+          try {
+            const res = await api.scenarios.update(id, { folderId })
+            if (!res.success) throw new Error(res.error)
+            saved++
+          } catch (failure) {
+            saveErrors.capture(failure)
+            moveFailure = `全 ${formatNumber(ids.length)} 件中 ${formatNumber(saved)} 件の保存を確認しました。${formatNumber(saved + 1)} 件目で止めました。未送信は ${formatNumber(ids.length - saved - 1)} 件です。理由：${describeApiFailure(failure, 'フォルダ移動')}`
+            throw failure
+          }
         }
       },
       undo: () => { if (currentScope()) setOptimisticRows(null) },
-      failureMessage: 'フォルダを移動できませんでした。',
+      get failureMessage() { return moveFailure },
       onCommitted: () => {
         if (!currentScope()) return
         setOptimisticRows(null)
@@ -611,8 +629,9 @@ export default function ScenariosListV8() {
     setDeleteError('')
     try {
       await handleDelete(deleteTarget.id)
-      if (!canWriteHere() || deleteRun.current !== ticket) return
+      if (!currentScope() || deleteRun.current !== ticket) return
       setDeleteTarget(null)
+      if (!canWriteHere()) notifyToast('削除しました。変更後の権限で一覧を確認してください。', { tone: 'success' })
     } catch {
       if (!currentScope() || deleteRun.current !== ticket) return
       setDeleteError('このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
@@ -664,12 +683,9 @@ export default function ScenariosListV8() {
    * 動かせるのは絞り込みが無く、全件が1ページに出ているときだけ（リマインダ・リッチメニューと同じ決まり）。
    * 保存は渡した行に 0 から番号を振り直すため、一部の行だけで保存すると隠れた行と番号がぶつかる。
    */
-  const reorderDisabledReason = !canEdit
-    ? '閲覧のみのため並び替えできません'
-    : serverQuery || activeParam !== undefined || createdThisMonthOnly || folderFilter
-      ? '絞り込みを外すと動かせます'
-      : null
-  const canReorder = reorderDisabledReason === null
+  const reorderDisabledReason = serverQuery || activeParam !== undefined || createdThisMonthOnly || folderFilter
+    ? '絞り込みを外すと動かせます' : null
+  const canReorder = !editDisabled && reorderDisabledReason === null
 
   /* 動かしている間、置き場所を入れ替えて見せ、ほかの行は滑らかに場所を空ける（フルード ②）。 */
   const liveOrder = useLiveReorder(scenarios, (row) => row.id, dragId)
@@ -722,13 +738,14 @@ export default function ScenariosListV8() {
     { value: UNFILED, label: 'フォルダ：未分類' },
   ]
 
-  // 閲覧のみには押せない作るボタンを置かない（2026-10-06 オーナー決定）。
-  const createButton = (full: boolean) => !canEdit ? null : (
+  const createButton = (full: boolean) => (
     <Button
       type="button"
       variant="primary"
       className={full ? 'v8-folder-create w-full' : undefined}
       onClick={handleCreate}
+      disabled={editDisabled}
+      lockedReason={editAccess.reason}
     >
       <Plus size={16} aria-hidden="true" />
       シナリオを作る
@@ -799,11 +816,14 @@ export default function ScenariosListV8() {
 
   /* ===== 行の「…」の中身（★V8：複製・配信結果・削除） ===== */
 
-  // 閲覧のみには押せない項目を置かない（2026-10-06 オーナー決定）。見る項目（配信結果）だけ残す。
+  // 結果を見る操作は残し、書込の項目だけ理由付きで拒否する。
   const rowMenuItems = (s: ScenarioRow): ActionMenuItem[] => ([
     {
       id: 'duplicate',
       label: '複製する',
+      disabled: editDisabled || duplicating,
+      lockedReason: editAccess.reason,
+      disabledReason: duplicating ? '複製しています…' : undefined,
       onSelect: () => openDuplicate(s),
     },
     {
@@ -817,11 +837,13 @@ export default function ScenariosListV8() {
     {
       id: 'delete',
       label: '削除する',
+      disabled: editDisabled,
+      lockedReason: editAccess.reason,
       tone: 'danger',
       dividerBefore: true,
       onSelect: () => { void requestDelete(s) },
     },
-  ] as ActionMenuItem[]).filter((item) => canEdit || item.id === 'results')
+  ] as ActionMenuItem[])
 
   /** 一覧の行→詳細はつながる移り変わりで開く。 */
   const goDetail = (id: string) => {
@@ -837,6 +859,8 @@ export default function ScenariosListV8() {
       label: item.label,
       danger: item.tone === 'danger',
       disabled: item.disabled,
+      lockedReason: item.lockedReason,
+      disabledReason: item.disabledReason,
       onSelect: () => item.onSelect?.(),
     }))
 
@@ -932,7 +956,8 @@ export default function ScenariosListV8() {
         title="まだシナリオがありません"
         description="友だち追加や購入をきっかけに、決めた順番でメッセージを届けます。"
         create={{ label: '最初のシナリオを作る', onClick: handleCreate }}
-        canCreate={canEdit}
+        canCreate={!editDisabled}
+        lockedReason={editAccess.reason ?? null}
         filtered={scenarioFilterActive}
         onClearFilters={clearScenarioFilters}
         filteredDescription="「停止中のみ」「今月作った」や検索を外すと、すべて出ます"
@@ -949,12 +974,14 @@ export default function ScenariosListV8() {
             <thead>
               <TableHeadRow>
                 <Th className={styles.selectCell} aria-label="選択">
-                  {canEdit ? <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
+                  <SaveErrorField names={["allOnPageSelected","all_on_page_selected"]}><Checkbox
                     checked={allOnPageSelected}
                     indeterminate={!allOnPageSelected && selectedCount > 0}
                     onCheckedChange={() => toggleAllOnPage()}
                     aria-label="このページのシナリオをすべて選択"
-                  /></SaveErrorField> : <UnavailableSelection label="このページのシナリオをすべて選択" />}
+                    disabled={editDisabled}
+                    lockedReason={editAccess.reason}
+                  /></SaveErrorField>
                 </Th>
                 {tableHeadCells}
               </TableHeadRow>
@@ -990,26 +1017,29 @@ export default function ScenariosListV8() {
                      data-row-id={s.id}
                   >
                     <Td className={styles.selectCell}>
-                      {canEdit ? <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","s.id"]}><Checkbox
+                      <SaveErrorField names={[`shown.${saveFieldIndex}.id`,"id","s.id"]}><Checkbox
                         checked={selectedIds.has(s.id)}
                         onCheckedChange={() => toggleOne(s.id)}
                         aria-label={`${s.name}を選択`}
-                      /></SaveErrorField> : <UnavailableSelection label={`${s.name}を選択`} />}
+                        disabled={editDisabled}
+                        lockedReason={editAccess.reason}
+                      /></SaveErrorField>
                     </Td>
                     <Td
                       className={styles.gripCell}
                       onClick={(event) => event.stopPropagation()}
                       draggable={canReorder}
-                      onDragStart={() => setDragId(s.id)}
+                      onDragStart={() => { if (canWriteHere() && canReorder) setDragId(s.id) }}
                       onDragEnd={() => setDragId(null)}
                       title={canReorder ? '上下に動かして並び替え' : undefined}
                     >
-                      {/* 閲覧のみ：つまみは置かない（列の幅は残る）。絞り込み中などはつまみを出さず理由を言う。 */}
-                      {canEdit && <ReorderHandle
+                      <ReorderHandle
                         label={s.name}
                         disabledReason={reorderDisabledReason}
+                        disabled={editDisabled}
+                        lockedReason={editAccess.reason}
                         onMove={(direction) => keyboardMove(s.id, direction)}
-                      />}
+                      />
                     </Td>
                     <NameCell name={
                         <div className={styles.nameRow}>
@@ -1077,21 +1107,23 @@ export default function ScenariosListV8() {
         </div>
 
         {/* まとめての帯（選ぶと表の下に出る）：止める・再開・フォルダへ移す。 */}
-        {canEdit && selectedCount > 0 ? (
+        {selectedCount > 0 ? (
           <BulkBar count={selectedCount} total={scenarioList.total} onSelectAll={selectAllScenarios} onClear={clearSelection}><Button
               type="button"
               variant="secondary"
-              disabled={stoppableIds.length === 0}
-              title={stoppableIds.length === 0 ? '有効のシナリオが選ばれていません' : undefined}
-              onClick={() => setPendingStop(stoppableIds)}
+              disabled={!publishAccess.allowed || !scenarioList.loaded || stoppableIds.length === 0}
+              lockedReason={publishAccess.reason}
+              disabledReason={publishAccess.allowed && stoppableIds.length === 0 ? '有効のシナリオが選ばれていません' : undefined}
+              onClick={() => { if (requireWrite('publish')) setPendingStop(stoppableIds) }}
             >
               <Square size={16} aria-hidden="true" />
               止める
             </Button><Button
               type="button"
               variant="secondary"
-              disabled={resumableIds.length === 0}
-              title={resumableIds.length === 0 ? '停止中のシナリオが選ばれていません' : undefined}
+              disabled={!publishAccess.allowed || !scenarioList.loaded || resumableIds.length === 0}
+              lockedReason={publishAccess.reason}
+              disabledReason={publishAccess.allowed && resumableIds.length === 0 ? '停止中のシナリオが選ばれていません' : undefined}
               onClick={() => runBulkToggle(true, resumableIds)}
             >
               <Play size={16} aria-hidden="true" />
@@ -1099,6 +1131,8 @@ export default function ScenariosListV8() {
             </Button><Button
               type="button"
               variant="secondary"
+              disabled={editDisabled}
+              lockedReason={editAccess.reason}
               onClick={() => openMove([...selectedIds])}
             >
               <FolderIcon size={16} aria-hidden="true" />
@@ -1229,9 +1263,9 @@ export default function ScenariosListV8() {
       help={<>{"きっかけ（友だち追加・タグ・予約など）から、決めた順と日時でメッセージを送り続けます。"}{"左の □ で選ぶと、下に「まとめて止める・再開・フォルダへ移す」の帯が出ます。行を押すと編集、「…」に複製・配信結果・削除。"}</>}
       stats={<>
         {/* 板 `X0QrW0`：閲覧のみの帯。数の帯の上。 */}
-        {!canEdit && (
-          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。{permissionDeniedMessage('store')}</ReadOnlyNotice></div>
-        )}
+        {editAccess.reason ? (
+          <div className={styles.viewerBand}><ReadOnlyNotice need="feature" /></div>
+        ) : null}
         <KpiBand data-design="KPIs">
           {kpis.map((kpi) => (
             <KpiCard
@@ -1279,13 +1313,7 @@ export default function ScenariosListV8() {
                  busyLabel="移動中…">
                   配信結果
                 </Button>
-                {canEdit ? <RowMenu label={`「${panelRow.name}」のその他操作`} items={[
-                  { id: 'duplicate', label: '複製する', onSelect: () => openDuplicate(panelRow) },
-                  { id: 'delete', label: '削除する', tone: 'danger', onSelect: () => {
-                    setPanelId(null)
-                    void requestDelete(panelRow)
-                  } },
-                ]} /> : null}
+                <RowMenu label={`「${panelRow.name}」のその他操作`} items={rowMenuItems(panelRow).filter(item => item.id !== 'results').map(item => item.id === 'delete' ? { ...item, onSelect: () => { if (!requireWrite()) return; setPanelId(null); requestDelete(panelRow) } } : item)} />
               </DialogActions>
             }
           >
@@ -1299,7 +1327,7 @@ export default function ScenariosListV8() {
               <CardHeader size="stacked" title="説明" headingLevel={3} />
               <p>{panelRow.description}</p>
             </Card> : null}
-            {canEdit ? <Card variant="panel" layout="vertical" gap="tight" aria-label="シナリオ名の変更">
+            <Card variant="panel" layout="vertical" gap="tight" aria-label="シナリオ名の変更">
               <CardHeader size="stacked" title="名前を変更" headingLevel={3}
                 help={<HelpTip label="名前の変更方法">下の名前を押すと編集できます。Enterで保存し、Escで取り消します。</HelpTip>} />
               <InlineEdit
@@ -1307,8 +1335,11 @@ export default function ScenariosListV8() {
                 label="シナリオ名"
                 onSave={(next) => renameScenario(panelRow.id, next)}
                 maxLength={80}
+                disabled={editDisabled}
+                lockedReason={editAccess.reason}
+                canSaveNow={canWriteHere}
               />
-            </Card> : null}
+            </Card>
           </DetailPanel>
         )}
 
@@ -1322,6 +1353,9 @@ export default function ScenariosListV8() {
           }
           description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
           confirmLabel="移動する"
+          confirmDisabled={editDisabled || moveWindowScope.current !== renderedScope}
+          confirmLockedReason={moveWindowScope.current === renderedScope ? editAccess.reason : undefined}
+          confirmDisabledReason={moveWindowScope.current !== renderedScope ? 'LINEアカウントが変わりました。閉じて選び直してください。' : undefined}
           onConfirm={() => runMove()}
           onCancel={() => setMoveIds(null)}
         >
@@ -1331,7 +1365,9 @@ export default function ScenariosListV8() {
               aria-label="移動先のフォルダ"
               size="full"
               value={moveDraft}
-              onChange={(value) => setMoveDraft(value)}
+              disabled={editDisabled || moveWindowScope.current !== renderedScope}
+              lockedReason={moveWindowScope.current === renderedScope ? editAccess.reason : undefined}
+              onChange={(value) => { if (canWriteHere() && moveWindowScope.current === renderedScope) setMoveDraft(value) }}
               folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
             /></SaveErrorField>
           </div>
@@ -1346,7 +1382,10 @@ export default function ScenariosListV8() {
           destructive
           busy={deleting}
           error={deleteError}
-          onConfirm={targetStillListed ? () => runDelete() : undefined}
+          onConfirm={() => { void runDelete() }}
+          confirmDisabled={editDisabled || !targetStillListed || deleteWindowScope.current !== renderedScope}
+          confirmLockedReason={targetStillListed && deleteWindowScope.current === renderedScope ? editAccess.reason : undefined}
+          confirmDisabledReason={!targetStillListed || deleteWindowScope.current !== renderedScope ? '一覧が変わりました。閉じて選び直してください。' : undefined}
           onCancel={() => {
             if (deleting) return
             setDeleteTarget(null)
@@ -1379,7 +1418,7 @@ export default function ScenariosListV8() {
         <></>
       </>}
       folders={<>
-        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" onCancel={() => setPendingStop(null)} onConfirm={() => { const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
+        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" confirmDisabled={!publishAccess.allowed || !scenarioList.loaded} confirmLockedReason={publishAccess.reason} onCancel={() => setPendingStop(null)} onConfirm={() => { if (!requireWrite('publish')) return; const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
         {folderPanel}
       </>}
       collapsedFolders={<>{createButton(false)}{folderSelect}</>}

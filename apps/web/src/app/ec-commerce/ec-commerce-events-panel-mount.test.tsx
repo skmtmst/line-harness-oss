@@ -147,6 +147,7 @@ beforeEach(() => {
   overviewDeferreds = new Map()
 
   mockFetchApi.mockImplementation((path: string) => {
+    if (new URL(path, 'http://localhost').pathname === '/api/dashboard/style') return Promise.resolve(ok({ style: 'ec', styleSelected: true, version: 1 }))
     eventsCalls.push(path)
     const d = deferred<unknown>()
     eventsDeferreds.push(d)
