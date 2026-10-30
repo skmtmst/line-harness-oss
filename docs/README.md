@@ -460,6 +460,7 @@
 ## 反映履歴
 
 - [飲食店向け設定の表示条件](release-log/unreleased/1965-masato-restaurant-only-settings.md)
+- [EC連携の表示条件](release-log/unreleased/1966-masato-ec-usecase-visibility.md)
 - [配信・シナリオ・自動応答の日時・題・下見の修正](release-log/unreleased/1954-kenta-muse-delivery.md)
 - [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
 - [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
