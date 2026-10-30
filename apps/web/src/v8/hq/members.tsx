@@ -151,7 +151,7 @@ function MembersInner() {
            */
           ...(value.role !== (dialog.member.role === 'owner' ? 'admin' : dialog.member.role) ? { role: value.role } : {}),
           isActive: value.isActive,
-          assignedLineAccountId: value.assignedLineAccountId,
+          assignedLineAccountId: value.accountScope === 'all' ? null : dialog.member.assignedLineAccountId,
           accountScope: value.accountScope,
           scopedLineAccountIds: value.scopedLineAccountIds,
           managementContext: 'hq',
@@ -163,7 +163,7 @@ function MembersInner() {
           name: value.name,
           email: value.email,
           role: value.role,
-          assignedLineAccountId: value.assignedLineAccountId,
+          assignedLineAccountId: null,
           accountScope: value.accountScope,
           scopedLineAccountIds: value.scopedLineAccountIds,
           managementContext: 'hq',
@@ -291,7 +291,6 @@ function MembersInner() {
         open={dialog.open && !confirmChange}
         session={dialogSession}
         member={dialog.member}
-        accounts={accounts}
         isSelf={dialog.member?.id === me?.id}
         busy={dialogBusy}
         error={dialogError}

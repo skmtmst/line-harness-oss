@@ -9,12 +9,12 @@ export const staffMethods = {
     get: (id: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}`),
     me: () => fetchPrefetchedRead<ApiResponse<StaffMember>>('/api/staff/me'),
-    create: (data: { name: string; email: string; role: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId: string; canAccessDescendantAccounts?: boolean; accountScope: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq' }) =>
+    create: (data: { name: string; email: string; role: 'admin' | 'staff' | 'viewer'; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId: string | null; canAccessDescendantAccounts?: boolean; accountScope: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq' }) =>
       fetchApi<ApiResponse<StaffMember>>('/api/staff', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId?: string; canAccessDescendantAccounts?: boolean; accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq'; roleBundle?: 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'; permissionScope?: Record<string, 'edit' | 'view' | 'none'>; permissionViewKeys?: string[]; emailMask?: 'full' | 'masked' | 'none'; idempotencyKey?: string; expectedPolicyVersion?: number }, stepUpToken?: string) =>
+    update: (id: string, data: { name?: string; email?: string | null; role?: string; isActive?: boolean; lineLinked?: false; permissionKeys?: string[]; notificationPreferences?: Record<string, { email: boolean; line: boolean }>; assignedLineAccountId?: string | null; canAccessDescendantAccounts?: boolean; accountScope?: 'all' | 'accounts'; scopedLineAccountIds?: string[]; managementContext?: 'hq'; roleBundle?: 'administrator' | 'operations' | 'reception' | 'view_only' | 'custom'; permissionScope?: Record<string, 'edit' | 'view' | 'none'>; permissionViewKeys?: string[]; emailMask?: 'full' | 'masked' | 'none'; idempotencyKey?: string; expectedPolicyVersion?: number }, stepUpToken?: string) =>
       /*
        * 本人が自分のメールを変えたとき、emailChangePending=true と pendingEmail
        * が返る（N-433）。その場合メールはまだ切り替わっていない。

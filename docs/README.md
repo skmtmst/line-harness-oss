@@ -982,3 +982,5 @@
 - [アカウントごとの二段階認証の件数](release-log/unreleased/1959-masato-account-mfa-count.md) — 反映履歴。
 - [musuboの表記と案内](release-log/unreleased/1960-masato-musubo-branding.md) — 反映履歴。
 - [アカウントごとの監査履歴](release-log/unreleased/1962-masato-audit-account-isolation.md) — 反映履歴。
+- [担当者のアカウント範囲](release-log/unreleased/1961-masato-single-account-staff-scope.md) — 反映履歴。
+- [統括からのLINEアカウント管理](release-log/unreleased/1963-masato-line-account-hq-scope.md) — 反映履歴。
