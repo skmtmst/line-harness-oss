@@ -22,7 +22,7 @@ html:root .frame[data-choice-field] {
   border-radius: var(--polish-radius-control);
   outline: var(--choice-ring) solid transparent;
   outline-offset: calc(-1 * var(--choice-ring));
-  background: var(--gradient-raised-control) var(--color-canvas);
+  background: var(--color-canvas);
   box-shadow: var(--shadow-raised-control);
   color: var(--color-ink);
   font-family: var(--font-sans);
