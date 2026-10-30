@@ -13,6 +13,9 @@
 
 `apps/web/scripts/v8-guard/store-heading.test.mjs` は、飲食店と予約媒体の題・店舗欄を1152/1440、複数店舗・長い店舗名・単一店舗で実測します。題の幅0・店舗欄との重なり・横のはみ出しを失敗にし、メニュー管理の幅制約を外す故障を検出して読み直し後の復元まで確認します。`V8_GUARD_BASE` に本番形式の出力を指定し、`V8_GUARD_ARTIFACT_DIR` で写真と実測値を保存できます。
 
+`apps/web/scripts/v8-guard/dashboard-content.test.mjs` は、6スタイルの初回表示で案内を600ms遅らせ、見えている数の帯が後挿入で8pxを超えて動かないことを1152/1440で確認します。標準も選択済みの有効な模擬設定を使います。`DASHBOARD_DELAYS=0,600` で通常との比較、`V8_GUARD_ARTIFACT_DIR` で写真とフレーム、`V8_GUARD_VIDEO=1` で動画を保存できます。
+`V8_GUARD_DASHBOARD_FAULT=1` は待機中の本文を表示して、後挿入の揺れを検出する故障対照です。600msの標準で赤、旗を外した同じ出力で緑へ戻ることまで確認します。
+
 ### ページ切り替えの待機表示
 
 `apps/web/scripts/v8-guard/permission-flash.test.mjs` は共通の画面ゲートで本人未取得・Suspense・故障・復元を確認します。`permission-navigation.test.mjs` は本番形式の出力を使い、メニュー正本の全URL・画面内のタブ・6スタイルと実際の設定リンクを1152/1440、通常/API600ms遅延で確認します。書き込み操作は行いません。
