@@ -3,6 +3,7 @@
 import { UNASSIGNED, unreadLookup } from '@/components/chats/assignee-unread'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import type { ChatStatus } from './inbox-dropdown'
+import type { InboxStats } from '@/lib/api'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
 import Checkbox from '@/components/shared/checkbox'
 
@@ -70,7 +71,7 @@ export default function InboxFilterPanel({
   /** 未取得・取得失敗は null。取得済みの0件とは区別する。 */
   unassignedUnreadCount?: number | null
   /** 担当者ごとの未読数。未取得・失敗時は名前の後ろを「—」にする。 */
-  assigneeUnread?: { operatorId: string | null; unread: number }[] | null
+  assigneeUnread?: InboxStats['assigneeUnread'] | null
   assigneeUnreadStatus?: 'error' | 'ready' | 'loading'
   /** 実際の対応期限を使う場合は「期限超過」、それ以外は「1時間以上待ち」。 */
   slaEnabled?: boolean
