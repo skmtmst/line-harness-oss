@@ -88,7 +88,7 @@
 }
 
 .forgot {
-  align-self: center;
+  align-self: flex-end;
   color: var(--color-accent-deep);
   font-size: var(--text-caption);
   font-weight: 600;
