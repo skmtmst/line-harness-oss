@@ -430,23 +430,37 @@ export const updateRestaurantMenu = async (c: Context<Env>) => {
   const db = dbFor(c.env, current.store_id);
   const approvalId = price !== current.price ? crypto.randomUUID() : null;
   const requestId = approvalId ? crypto.randomUUID() : null;
+  const scheduledChange = approvalId ? await db.prepare(`SELECT id, approval_id FROM rt_menu_change_requests
+    WHERE menu_id = ? AND store_id = ? AND status = 'approved' LIMIT 1`)
+    .bind(c.req.param('id'), current.store_id).first<{ id: string; approval_id: string }>() : null;
   const writes = [db.prepare(`UPDATE rt_menu_items SET kind = ?, name = ?, allergens_json = ?, service_periods_json = ?, status = ?, updated_at = datetime('now') WHERE id = ?`)
     .bind(kind, name.trim(), body.allergens === undefined ? current.allergens_json : JSON.stringify(body.allergens), body.servicePeriods === undefined ? current.service_periods_json : JSON.stringify(body.servicePeriods), status, c.req.param('id'))];
   if (approvalId) {
     const requester = c.get('staff')?.id || '管理者';
+    if (scheduledChange) {
+      writes.push(db.prepare(`UPDATE rt_menu_change_requests SET status = 'returned', return_reason = '新しい価格変更で置き換え', updated_at = datetime('now')
+        WHERE id = ? AND status = 'approved'`).bind(scheduledChange.id));
+      writes.push(db.prepare(`UPDATE rt_approval_requests SET status = 'returned', review_comment = '新しい価格変更で置き換え', reviewed_by = ?, updated_at = datetime('now')
+        WHERE id = ? AND status = 'approved'`).bind(requester, scheduledChange.approval_id));
+    }
     writes.push(db.prepare(`INSERT INTO rt_approval_requests (id, organization_id, store_id, kind, title, status, payload_json, requested_by)
       VALUES (?, ?, ?, 'menu_change', ?, 'pending', ?, ?)`).bind(approvalId, organization.id, current.store_id,
       `${name.trim()}の価格変更`, JSON.stringify({ menuId: c.req.param('id'), beforePrice: current.price, afterPrice: price, effectiveAt }), requester));
     writes.push(db.prepare(`INSERT INTO rt_menu_change_requests (id, approval_id, menu_id, store_id, before_price, after_price, requested_by, effective_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).bind(requestId, approvalId, c.req.param('id'), current.store_id, current.price, price, requester, effectiveAt));
+    // 価格変更は保存した権限者自身が確定する。既存のトリガーで即時反映または開始待ちにする。
+    writes.push(db.prepare(`UPDATE rt_approval_requests SET status = 'approved', reviewed_by = ?, updated_at = datetime('now')
+      WHERE id = ? AND status = 'pending'`).bind(requester, approvalId));
   }
   try {
     await db.batch(writes);
   } catch (error) {
-    if (/unique constraint/i.test(String(error))) return c.json({ success: false, error: 'このメニューの価格は申請中です。承認または差し戻しを待ってください' }, 409);
+    if (/unique constraint/i.test(String(error))) return c.json({ success: false, error: 'このメニューには以前の価格変更申請が残っています。メニュー一覧の申請中から確認してください' }, 409);
     throw error;
   }
-  return c.json({ success: true, data: { id: c.req.param('id'), approvalId, requestId, pendingPrice: approvalId ? price : null } });
+  const priceChange = requestId ? await db.prepare('SELECT status FROM rt_menu_change_requests WHERE id = ?').bind(requestId).first<{ status: string }>() : null;
+  if (priceChange?.status === 'failed') return c.json({ success: false, error: '価格が先に変更されたため反映できませんでした。画面を読み直してください' }, 409);
+  return c.json({ success: true, data: { id: c.req.param('id'), approvalId, requestId, pendingPrice: priceChange?.status === 'approved' ? price : null } });
 };
 
 export const updateRestaurantFollowupBinding=async(c:Context<Env>)=>{

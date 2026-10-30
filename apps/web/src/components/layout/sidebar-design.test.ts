@@ -64,7 +64,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
   {
     section: '飲食店向け（テスト）',
     items: [
-      '店舗ダッシュボード', '組織・権限', '承認の流れ', '予約台帳', '座席・卓管理',
+      '予約台帳', '座席・卓管理',
       '予約枠・在庫', 'メニュー管理', 'デリバリー受注', 'Googleビジネス', 'LINE来店フォロー',
     ],
   },
@@ -135,9 +135,6 @@ const ROUTES: Record<string, string> = {
   ログインユーザー: '/staff',
   機能設定: '/settings',
   運用状態: '/emergency',
-  店舗ダッシュボード: '/restaurant-test/dashboard',
-  '組織・権限': '/restaurant-test/organization',
-  承認の流れ: '/restaurant-test/approvals',
   予約台帳: '/restaurant-test/reservations',
   '座席・卓管理': '/restaurant-test/tables',
   '予約枠・在庫': '/restaurant-test/inventory',
@@ -174,7 +171,8 @@ describe('サイドバーが V8の共通メニューの契約と一致する', (
     // 2026-10-07 提案 E-7: 「予約」の組に「来店スタンプ」を足して 49。
     // 2026-10-09 承認（デリバリー受注_v02.pen）: 「飲食店向け（テスト）」に
     // 「デリバリー受注」を足して 50。その後 LINE通知を共通設定から隠して 49。
-    expect(total).toBe(49);
+    // 重複する店舗ダッシュボード・組織と権限・承認の流れを外して 46。
+    expect(total).toBe(46);
   });
 
   it('項目の行き先が仕様どおり', () => {
