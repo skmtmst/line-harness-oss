@@ -85,7 +85,11 @@ describe('UVnvR 休業日・貸切', () => {
     fireEvent.click(screen.getByRole('button', { name: '予約枠・在庫の説明' }))
     expect(screen.getByText('渋谷店・1つの時間帯の総数 20席（有効の卓 5）')).toBeTruthy()
     expect(board.textContent).not.toContain('検証環境専用')
-    expect(screen.getByRole('tab', { name: '休業日・貸切' }).getAttribute('aria-selected')).toBe('true')
+    const toggle = within(screen.getByRole('group', { name: '予約枠・在庫の切り替え' })).getByRole('button', { name: '休業日・貸切' })
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+    expect(document.querySelector('[data-closure-card="cl-1"]')).toBe(card)
     expect(card.textContent).toContain('終日・全卓')
     expect(card.textContent).toContain('他サイト 未対応 2')
     /* 連絡済みは contact-status の数（休業を作った後に担当者が LINE で送った予約）。 */
