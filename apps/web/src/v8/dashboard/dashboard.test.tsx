@@ -34,15 +34,15 @@ describe('V8 ダッシュボードの言葉', () => {
     expect(summary.steps.some((step) => step.key === 'invite')).toBe(false)
   })
 
-  it('はじめにやることはオーナー・管理者だけ、全部済んだら出さない（畳んでいても出す）', () => {
+  it('はじめにやることは状態を読む人へ表示し、全完了でも済みの頭を残す', () => {
     const some = summarizeFirstSteps(buildStepsFromApi([]))
     const all = summarizeFirstSteps(buildStepsFromApi([]).map((step) => ({ ...step, state: 'done' })))
     expect(shouldShowFirstSteps('owner', some)).toBe(true)
     expect(shouldShowFirstSteps('admin', some)).toBe(true)
-    expect(shouldShowFirstSteps('staff', some)).toBe(false)
-    expect(shouldShowFirstSteps('viewer', some)).toBe(false)
+    expect(shouldShowFirstSteps('staff', some)).toBe(true)
+    expect(shouldShowFirstSteps('viewer', some)).toBe(true)
     expect(shouldShowFirstSteps(null, some)).toBe(false)
-    expect(shouldShowFirstSteps('owner', all)).toBe(false)
+    expect(shouldShowFirstSteps('owner', all)).toBe(true)
     expect(shouldShowFirstSteps('owner', null)).toBe(false)
   })
 

@@ -146,6 +146,7 @@ export const restaurantTestApi = {
   connectStore: (accountId: string | null, body: { name: string; alias: string; channelId: string; channelSecret: string }) => fetchApi<{ success: true; data: { store: { id: string; name: string }; lineAccountName: string } }>(withOptionalAccount('/api/restaurant-test/stores/connect', accountId), { method: 'POST', body: JSON.stringify(body) }),
   termsAgreement: (accountId: string | null) => fetchApi<{ success: true; data: RestaurantTermsAgreement }>(withOptionalAccount('/api/restaurant-test/terms-agreement', accountId)),
   agreeToTerms: (accountId: string | null, documentKey: string, version: string) => fetchApi<{ success: true; data: RestaurantTermsAgreement }>(withOptionalAccount('/api/restaurant-test/terms-agreement', accountId), { method: 'POST', body: JSON.stringify({ documentKey, version }) }),
+  setupProgress: (accountId: string, storeId: string) => fetchApi<{ success: true; data: import('@line-crm/shared').RestaurantSetupProgress }>(withAccount(`/api/restaurant-test/setup-progress?storeId=${encodeURIComponent(storeId)}`, accountId)),
   snapshot: (accountId: string, query?: ReservationQuery) => {
     const params = new URLSearchParams();
     if (query?.from) params.set('reservationFrom', query.from);

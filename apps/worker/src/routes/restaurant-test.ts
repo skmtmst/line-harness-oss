@@ -1,3 +1,4 @@
+import { registerRestaurantSetupProgressRoutes } from './restaurant-setup-progress.js';
 import { getRestaurantFollowupEngines,initializeRestaurantFollowupEngines,saveRestaurantFollowupEngine,testRestaurantFollowupEngineHandler,startRestaurantFollowupEngineHandler } from './restaurant-followup-engine.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateClosure, publicClosure, closurePreview, type ClosureRow } from '../services/restaurant-closures.js';
@@ -45,6 +46,8 @@ restaurantTest.use('/api/restaurant-test/*', use__api_restaurant_test__4);
 restaurantTest.get('/api/restaurant-test/assignment-settings', requireRole('owner', 'admin', 'staff'), get__api_restaurant_test_assignment_settings_5);
 
 restaurantTest.put('/api/restaurant-test/assignment-settings', requireRole('owner', 'admin', 'staff'), requirePermission(BOOKING_SETTINGS_KEY), inputJsonBoundary(), put__api_restaurant_test_assignment_settings_6);
+
+registerRestaurantSetupProgressRoutes(restaurantTest);
 
 restaurantTest.get('/api/restaurant-test/stores', requireRole('owner', 'admin', 'staff'), get__api_restaurant_test_stores_7);
 
