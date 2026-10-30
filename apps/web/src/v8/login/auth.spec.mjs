@@ -79,9 +79,10 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
     return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
   await page.goto('/login'); await centered(page.getByRole('button', { name: 'ログイン', exact: true }))
-  // ログインの 1 段目も、二段階認証と同じカードの頭（会社の印・「1 / 2」）。
+  // ログインの 1 段目も、二段階認証と同じ公式ロゴと手順を出す。
   await expect(page.locator('[data-auth-head]')).toContainText('1 / 2')
-  const brandStyle = await page.locator('[data-auth-brand-mark]').evaluate(el => { const style = getComputedStyle(el); return { background: style.backgroundColor, color: style.color } })
+  const brandSrc = await page.locator('[data-auth-head] img[alt="musubo"]').getAttribute('src')
+  expect(brandSrc).toBe('/brand/musubo-color.png')
   await page.goto('/password/reset?token=fixture-reset')
   await centered(page.getByRole('button', { name: 'パスワードを設定してログインへ' }))
   await openPrimaryAuthenticatedChallenge(page, '/login/two-factor', 'fixture-challenge', 'password')
@@ -117,8 +118,8 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   const method = page.getByRole('button', { name: '6桁のコードで入る', exact: true })
   const textStyle = el => { const style = getComputedStyle(el); return { size: style.fontSize, weight: style.fontWeight, color: style.color, background: style.backgroundColor } }
   expect(await toggle.evaluate(textStyle)).toEqual(await method.evaluate(textStyle))
-  const mark = page.locator('main[data-auth-layout="admin"] [data-auth-brand-mark]')
-  expect(await mark.evaluate(el => { const style = getComputedStyle(el); return { background: style.backgroundColor, color: style.color } })).toEqual(brandStyle)
+  const logo = page.locator('main[data-auth-layout="admin"] [data-auth-head] img[alt="musubo"]')
+  await expect(logo).toHaveAttribute('src', brandSrc)
   expect(await page.getByRole('group', { name: '回復コード（8文字）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await page.getByRole('textbox', { name: '1文字目' }).evaluate(el => {
     const event = new Event('paste', { bubbles: true }); Object.defineProperty(event, 'clipboardData', { value: { getData: () => '7k2q-9fxm' } }); el.dispatchEvent(event)

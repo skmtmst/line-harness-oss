@@ -97,6 +97,12 @@ function alertText(): string | null {
 }
 
 describe('R613: 空パスワードの古い案内を消す', () => {
+  it('認証前には会社名を出さず公式ロゴを表示する', async () => {
+    await render()
+    expect(host.querySelector('[data-auth-head] img')?.getAttribute('src')).toBe('/brand/musubo-color.png')
+    expect(host.querySelector('[data-auth-head]')?.textContent).not.toContain('テスト統括')
+  })
+
   it('空パスワードで送信した案内は、パスワード入力が始まったら消える', async () => {
     await render()
     await type('#login-email', 'owner@example.com')
