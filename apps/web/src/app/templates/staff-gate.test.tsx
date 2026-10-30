@@ -51,6 +51,7 @@ vi.mock('@/lib/api', () => ({
     },
     broadcastMessageAssets: {
       list: assetList,
+      folders: { list: async () => ({ success: true, data: [] }), create: vi.fn() },
       counts: () => Promise.resolve({ success: true, data: { card_message: 0, rich_message: 0, coupon: 0, research: 0 } }),
     },
     folders: {
@@ -182,8 +183,8 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
     stubRole('owner')
     await renderListAndWait()
 
-    expect(screen.getAllByRole('button', { name: 'テンプレートを作る' }).length).toBeGreaterThan(0)
-    fireEvent.click(screen.getAllByRole('button', { name: 'テンプレートを作る' })[0])
+    expect(screen.getAllByRole('link', { name: 'メッセージを作る' })[0].getAttribute('href')).toBe('/templates/edit')
+    fireEvent.click(screen.getByRole('button', { name: '見本から作る' }))
     const picker = await screen.findByRole('dialog', { name: 'どの種類を作りますか' })
     expect(within(picker).getByRole('link', { name: '質問' }).getAttribute('href')).toBe('/templates/questions/new')
     fireEvent.click(within(picker).getByRole('button', { name: 'キャンセル' }))
@@ -210,8 +211,34 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
   test('adminにも変更系の入口が出る', async () => {
     stubRole('admin')
     await renderListAndWait()
-    expect(screen.getAllByRole('button', { name: 'テンプレートを作る' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('link', { name: 'メッセージを作る' })[0].getAttribute('href')).toBe('/templates/edit')
     expect(screen.getByRole('button', { name: 'フォルダを追加' })).toBeTruthy()
+  })
+})
+
+describe('種類ごとの作成入口', () => {
+  test.each([
+    ['メッセージ', '/templates/edit'],
+    ['カルーセル', '/templates/carousel'],
+    ['リッチメッセージ', '/templates/edit?kind=rich_message'],
+    ['リッチビデオ', '/templates/edit?kind=rich_video'],
+    ['質問', '/templates/questions/new'],
+    ['クーポン', '/templates/edit?kind=coupon'],
+    ['リサーチ', '/templates/edit?kind=research'],
+  ])('%sはフォルダ上から当該V8の作成画面へ直接進む', async (label, href) => {
+    stubRole('owner')
+    await renderListAndWait()
+    fireEvent.click(screen.getByText(label))
+    await act(async () => { await Promise.resolve() })
+    const column = document.querySelector('[data-template-region="folders"]')!
+    const create = within(column as HTMLElement).getByRole('link', { name: `${label}を作る` })
+    expect(create.getAttribute('href')).toBe(href)
+    const folderHeading = within(column as HTMLElement).getByText('フォルダ', { selector: 'p' })
+    expect(create.compareDocumentPosition(folderHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByRole('dialog', { name: 'どの種類を作りますか' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'テンプレートを作る' })).toBeNull()
+    const empty = screen.queryByRole('link', { name: `最初の${label}を作る` })
+    if (empty) expect(empty.getAttribute('href')).toBe(href)
   })
 })
 
@@ -224,11 +251,12 @@ describe('資産タブのstaffゲート (N-144)', () => {
     // 閲覧は残る（一覧が出る）
     expect(await screen.findByText('秋キャンペーン')).toBeTruthy()
     // 案内文が出る
-    expect(screen.getByText(/オーナーと管理者だけができます。一覧の閲覧はこのまま使えます/)).toBeTruthy()
+    expect(screen.getByText('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')).toBeTruthy()
     // 変更系の操作は画面上に存在しない
-    expect(screen.queryByText('カルーセルを作る')).toBeNull()
-    expect(screen.queryByText('編集')).toBeNull()
-    expect(screen.queryByText('削除する')).toBeNull()
+    expect(screen.getAllByRole('button', { name: 'カルーセルを作る' })[0].getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(screen.getByRole('button', { name: '秋キャンペーンの操作' }))
+    expect(screen.getByRole('menuitem', { name: '編集する' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('menuitem', { name: '削除する' }).getAttribute('aria-disabled')).toBe('true')
     // 閲覧系の遷移（一斉配信で使う）は残る
     expect(screen.getByText('一斉配信で使う')).toBeTruthy()
   })
@@ -239,11 +267,12 @@ describe('資産タブのstaffゲート (N-144)', () => {
 
     fireEvent.click(screen.getByText('カルーセル'))
     // owner には作成ボタンと各カードの編集・削除が出る
-    expect(await screen.findByText('カルーセルを作る')).toBeTruthy()
+    expect((await screen.findAllByRole('link', { name: 'カルーセルを作る' }))[0].getAttribute('href')).toBe('/templates/carousel')
     // 資産カードは別フェッチで遅れて届く。作成ボタンだけ先に出るため、
     // カード名を待ってから編集・削除を同期確認する（staff側と同じ待ち方）。
     expect(await screen.findByText('秋キャンペーン')).toBeTruthy()
-    expect(screen.getByText('編集')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '秋キャンペーンの操作' }))
+    expect(screen.getByText('編集する')).toBeTruthy()
     expect(screen.getByText('削除する')).toBeTruthy()
     expect(screen.queryByText(/オーナーと管理者だけができます。一覧の閲覧はこのまま使えます/)).toBeNull()
   })

@@ -46,7 +46,7 @@ export interface ListPageBodyProps {
   /** 左の列の左の余白を 24 にする（統括の画面。絵の ほか）。ふつうの一覧は 12。 */
   folderInset?: boolean
   /** 指定した板だけ、余白を含めた外寸にする。既定の列幅は変えない。 */
-  folderWidth?: number
+  folderWidth?: CSSProperties['width']
   /** 表以外の配布内容も一覧の道具列と同じ左右余白へ収める。 */
   contentInset?: boolean
   /** 表とページ送りを道具の段と同じ左右24の内側に置く板（絵が表を白い板の端まで伸ばさない：）。既定は  の領域いっぱい。 */

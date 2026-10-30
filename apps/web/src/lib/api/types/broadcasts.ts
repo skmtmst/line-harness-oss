@@ -171,7 +171,18 @@ export type BroadcastSavedView = {
 
 export type BroadcastAssetKind = 'rich_message' | 'card_message' | 'coupon' | 'research';
 
+export type BroadcastAssetFolder = {
+  id: string;
+  lineAccountId: string | null;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type BroadcastMessageAsset = {
+  folderId?: string | null;
+  status?: 'draft' | 'published';
+  hasDraft?: boolean;
   publishedPayload?: Record<string, unknown>;
   publishedVersion?: number;
   id: string;
