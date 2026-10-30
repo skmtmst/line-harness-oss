@@ -5,7 +5,7 @@ import { useWizard } from './use-wizard'
 import type { StyleState } from './model'
 
 const calls = vi.hoisted(() => ({ save: vi.fn(), close: vi.fn() }))
-vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { save: calls.save } }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { save: calls.save,starterSet:vi.fn().mockResolvedValue({success:true,data:{definition:{items:[]}}}) } }))
 vi.mock('@/components/shared/list-navigation', () => ({ useListNavigationRouter: () => ({ push: vi.fn() }) }))
 vi.mock('@/components/shared/preparing-dialog', async original => ({ ...await original<typeof import('@/components/shared/preparing-dialog')>(), usePreparingDialog: () => ({ open: vi.fn() }) }))
 vi.mock('@/hooks/use-account-style', () => ({ accountStyleUpdated: vi.fn() }))
@@ -21,7 +21,7 @@ it('スタイルを選ばず別の質問だけ保存しても、標準を選択�
   await act(async () => { await result.current.onNext() })
   await act(async () => { await result.current.saveAndClose() })
   expect(calls.save).toHaveBeenCalledTimes(1)
-  expect(calls.save.mock.calls[0][1]).toMatchObject({ expectedVersion: 1, answers: { image: { mode: 'configured', value: 'keep' } } })
+  expect(calls.save.mock.calls[0][1]).toMatchObject({ expectedVersion: 1, answers: { image: { mode: 'configured', value: 'simple' } } })
   expect(calls.save.mock.calls[0][1]).not.toHaveProperty('style')
 })
 

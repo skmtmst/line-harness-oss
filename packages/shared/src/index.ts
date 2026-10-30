@@ -128,3 +128,5 @@ export { parseAutomationWait, nextDayWaitAt, automationWaitLabel } from './autom
 export type { AutomationWait } from './automation-wait.js';
 
 export type { RestaurantSetupProgress } from './restaurant-setup-progress.js';
+export * from './initial-rich-menu.js';
+export { initialMenuImageDataUri, initialMenuPng } from './initial-rich-menu-images.js';

@@ -1,6 +1,8 @@
+import { initialMenuItems } from './style-starter-initial-menu.js';
+import { INITIAL_MENUS, initialMenuFormTargets, initialFormKey } from '@line-crm/shared';
 import { templateSamples } from './style-template-samples.js';
 
-import { type AccountStyle, type StyleCard } from '@line-crm/shared';
+import { type AccountStyle } from '@line-crm/shared';
 
 import {
   StyleError,
@@ -8,38 +10,10 @@ import {
   defaultCards,
   readCards,
 } from './style-setup-core.js';
-export type StarterItem = {
-  key: string;
-  kind:
-    | 'template'
-    | 'rich_menu'
-    | 'automation'
-    | 'reminder'
-    | 'booking_menu'
-    | 'dashboard'
-    | 'friend_add_rule'
-    | 'tag_set'
-    | 'scenario';
-  name: string;
-  /** friend_add_rule が送るごあいさつ。同じ組の template の key を指す。 */
-  templateKey?: string;
-  feature?: string;
-  text?: string;
-  durationMinutes?: number;
-  price?: number;
-  buttons?: Array<{ label: string; feature: string; actionType?: 'uri' | 'message'; actionData?: string }>;
-  cards?: StyleCard[];
-  sourceId?: string;
-  offsetMinutes?: number;
-  offsetDays?: number;
-  sendAtTime?: string;
-  triggerType?: 'calendar_booked' | 'restaurant.departed';
-  /** tag_set の見本のタグの名前。入れた時点では本物のタグを作らない。 */
-  tags?: Array<{ name: string }>;
-  /** scenario の通数。delayMinutes は前の通（1 通目はシナリオの始まり）からの分。 */
-  steps?: Array<{ delayMinutes: number; text: string }>;
-};
+import type { StarterItem, StarterDefinition } from './style-starter-types.js';
+export type { StarterItem, StarterDefinition } from './style-starter-types.js';
 export const STARTER_ITEM_KINDS = [
+  'form',
   'template',
   'rich_menu',
   'automation',
@@ -72,7 +46,6 @@ export function isCustomerUri(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   try { const url = new URL(value); return url.protocol === 'https:' && !url.username && !url.password; } catch { return false; }
 }
-export type StarterDefinition = { items: StarterItem[] };
 export function standardStarter(style: AccountStyle): StarterDefinition {
   const names: Record<AccountStyle, string> = {
     standard: 'ご案内',
@@ -99,42 +72,7 @@ export function standardStarter(style: AccountStyle): StarterDefinition {
         templateKey: 'welcome',
         text: welcome,
       },
-      {
-        key: 'menu',
-        kind: 'rich_menu',
-        name: `${names[style]}のメニュー`,
-        buttons: style === 'restaurant' ? [
-          { label: '予約する', feature: 'booking' },
-          { label: '予約の確認', feature: 'booking', actionData: 'history' },
-          { label: 'クーポン', feature: 'coupons' },
-          { label: 'メニュー', feature: 'content' },
-          { label: 'スタンプ', feature: 'stamps' },
-          { label: 'お問い合わせ', feature: 'contact' },
-        ] : style === 'ec' ? [
-          { label: '商品を見る', feature: 'content' },
-          { label: 'お買い物を続ける', feature: 'content' },
-          { label: 'マイページ', feature: 'tickets' },
-          { label: 'クーポン', feature: 'coupons' },
-          { label: 'ご利用ガイド', feature: 'content' },
-          { label: 'お問い合わせ', feature: 'contact' },
-        ] : style === 'standard' ? [
-          { label: 'お知らせ', feature: 'content' },
-          { label: 'お申し込み', feature: 'content' },
-          { label: 'よくある質問', feature: 'content' },
-          { label: 'ご利用ガイド', feature: 'content' },
-          { label: 'マイページ', feature: 'tickets' },
-          { label: 'お問い合わせ', feature: 'contact' },
-        ] : [
-          { label: style === 'lesson' ? 'クラスを予約する' : style === 'consult' ? '面談を予約する' : '予約する', feature: 'booking' },
-          { label: '予約の確認', feature: 'booking', actionData: 'history' },
-          ...(style === 'consult' ? [{ label: '資料', feature: 'content' }, { label: 'よくある質問', feature: 'content' }, { label: '会社のこと', feature: 'content' }] : [
-            { label: '回数券', feature: 'tickets' },
-            { label: style === 'lesson' ? 'スケジュール' : 'スタイル写真', feature: style === 'lesson' ? 'classCapacity' : 'content' },
-            { label: style === 'lesson' ? '振替' : 'スタンプ', feature: style === 'lesson' ? 'classCapacity' : 'stamps', ...(style === 'lesson' ? { actionData: 'history' } : {}) },
-          ]),
-          { label: 'お問い合わせ', feature: 'contact' },
-        ],
-      },
+      ...initialMenuItems(style),
       ...(['salon', 'consult'].includes(style)
         ? [
             {
@@ -214,7 +152,7 @@ export function standardStarter(style: AccountStyle): StarterDefinition {
         name: 'ダッシュボードの型',
         cards: defaultCards(style),
       },
-      ...templateSamples(style).filter(sample => !['standard', 'ec'].includes(style) || (style === 'ec' ? ['new-item', 'purchase-thanks', 'restock', 'inquiry-received'] : ['new-item', 'inquiry-received', 'hours-change', 'birthday']).includes(sample.key)).map((sample) => sample.starterItem),
+      ...templateSamples(style).filter(sample => style !== 'consult' || sample.key !== 'day-before').filter(sample => !['standard', 'ec'].includes(style) || (style === 'ec' ? ['new-item', 'purchase-thanks', 'restock', 'inquiry-received'] : ['new-item', 'inquiry-received', 'hours-change', 'birthday']).includes(sample.key)).map((sample) => sample.starterItem),
     ],
   };
 }
@@ -276,6 +214,13 @@ export function readDefinition(
         ))
     )
       throw new StyleError('invalid_buttons');
+    if (item.initialMenu !== undefined && (item.kind !== 'rich_menu' || item.initialMenu !== style
+      || item.buttons?.length !== 4 || item.buttons.some((button,index) => { const expected=INITIAL_MENUS[style].buttons[index]!; return button.label!==expected.label || button.feature!==expected.feature || button.target!==expected.target || button.actionType!==undefined || button.actionData!==undefined; })))
+      throw new StyleError('invalid_initial_menu');
+    if (item.kind === 'form' && (!item.formTarget || !initialMenuFormTargets(style).includes(item.formTarget)
+      || item.key !== initialFormKey(style,item.formTarget) || item.sourceId))
+      throw new StyleError('invalid_initial_form');
+    if (item.kind !== 'form' && item.formTarget !== undefined) throw new StyleError('invalid_initial_form');
     if (item.cards) readCards(item.cards, style);
     if (
       item.kind === 'friend_add_rule' &&
@@ -321,6 +266,10 @@ export function readDefinition(
       throw new StyleError('invalid_starter_set');
     seen.add(item.key);
   }
+  const initial=input.items.find(item=>item.initialMenu);
+  if(initial && initialMenuFormTargets(style).some(target=>!input.items.some(item=>item.kind==='form'&&item.key===initialFormKey(style,target))))
+    throw new StyleError('initial_menu_forms_required');
+  if(!initial&&input.items.some(item=>item.kind==='form'))throw new StyleError('initial_menu_required');
   // 受け皿は 1 アカウントに 1 つだけなので、ごあいさつの決まりも 1 つまで。
   if (input.items.filter((i) => i.kind === 'friend_add_rule').length > 1)
     throw new StyleError('invalid_starter_set');

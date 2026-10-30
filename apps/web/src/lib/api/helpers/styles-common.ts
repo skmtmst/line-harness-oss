@@ -1,5 +1,6 @@
 import type {
   AccountStyle,
+  InitialMenuTarget,
   IndustryStyle,
   SetupAnswer,
   StyleCard,
@@ -44,6 +45,7 @@ export type StyleQuery = {
 };
 
 export type StyleSelection = {
+  confirmInitialMenu?: boolean;
   expectedVersion: number;
   style?: AccountStyle;
   styleMode?: SetupAnswer['mode'];
@@ -57,7 +59,10 @@ export type StyleSelection = {
 
 export type StarterSetItem = {
   key: string;
+  initialMenu?: AccountStyle;
+  formTarget?: InitialMenuTarget;
   kind:
+    | 'form'
     | 'template'
     | 'rich_menu'
     | 'automation'
@@ -74,7 +79,7 @@ export type StarterSetItem = {
   text?: string;
   durationMinutes?: number;
   price?: number;
-  buttons?: Array<{ label: string; feature: string; actionType?: 'uri' | 'message'; actionData?: string }>;
+  buttons?: Array<{ target?: InitialMenuTarget; label: string; feature: string; actionType?: 'uri' | 'message'; actionData?: string }>;
   cards?: StyleCard[];
   offsetMinutes?: number;
   offsetDays?: number;
@@ -91,6 +96,7 @@ export type StarterSkipReason = 'answer_later' | 'not_for_style' | 'auto_insert_
 
 /** 初期セットの入れ直しの結果。2 回目からは inserted が空。 */
 export type StarterEnsureResult = {
+  updated?: Array<{key:string;kind:StarterSetItem['kind']}>;
   inserted: Array<{ key: string; kind: StarterSetItem['kind'] }>;
   skipped: Array<{ key: string; reason: StarterSkipReason }>;
   existing: number;

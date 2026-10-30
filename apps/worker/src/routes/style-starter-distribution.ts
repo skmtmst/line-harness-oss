@@ -1,3 +1,6 @@
+import { profile } from '../services/style-profile.js';
+import type { SetupAnswer } from '@line-crm/shared';
+import { materializeInitialMenuAssets } from '../services/style-initial-assets.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { base, hq, json, account, edit, version } from './styles-common.js';
@@ -92,6 +95,7 @@ styleStarterDistribution.post(path + '/distribute', async (c) =>
       c.get('staff').id,
       checkStyle(c.req.param('style')),
       await json(c),
+      c.env.IMAGES,
     ),
   }),
 );
@@ -129,7 +133,18 @@ styleStarterDistribution.post(
     );
     if (b.expectedSnapshot !== snapshot)
       throw new StyleError('version_conflict', 409);
+    const p=await profile(c.env.DB,a);
+    const answers=JSON.parse(p?.answers_json??'{}') as Record<string,SetupAnswer>;
+    const style=checkStyle(binding.style);
+    if(pending.item.initialMenu)await materializeInitialMenuAssets(c.env.DB,c.env.IMAGES,a,style,{items:[pending.item]});
+    const plannedForms=new Map<string,string>();
+    const variant=pending.item.initialMenu?'simple':'existing';
+    const profileChanges=p&&pending.item.kind==='rich_menu'?[
+      c.env.DB.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM account_styles WHERE line_account_id=? AND version=?) THEN '{}' ELSE 'STYLE_VERSION_CONFLICT' END)`).bind(a,p.version),
+      c.env.DB.prepare("UPDATE account_styles SET answers_json=json_set(answers_json,'$.image',json(?)),version=version+1 WHERE line_account_id=? AND version=?").bind(JSON.stringify({mode:'configured',value:variant,...(!pending.item.initialMenu?{resourceId:binding.target_id}:{})}),a,p.version),
+    ]:[];
     await c.env.DB.batch([
+      ...profileChanges,
       snapshotGuard(c.env.DB, a, binding.kind, binding.target_id, snapshot),
       c.env.DB.prepare(
         `SELECT json(CASE WHEN EXISTS(SELECT 1 FROM style_starter_items WHERE line_account_id=? AND item_key=? AND pending_update=?) THEN '{}' ELSE 'STYLE_VERSION_CONFLICT' END)`,
@@ -140,6 +155,9 @@ styleStarterDistribution.post(
         binding.target_id,
         pending.item,
         new Date().toISOString(),
+        style,
+        {...answers,image:{mode:'configured',value:variant}},
+        plannedForms,
       )),
       c.env.DB.prepare(
         'UPDATE style_starter_items SET set_id=?,set_version=?,pending_update=NULL WHERE line_account_id=? AND item_key=?',

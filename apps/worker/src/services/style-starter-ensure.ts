@@ -1,3 +1,5 @@
+import { starter } from './style-starter-set.js';
+import { materializeInitialMenuAssets } from './style-initial-assets.js';
 import type { SetupAnswer } from '@line-crm/shared';
 import { hasPendingStyleSelection, profile, type StyleProfile } from './style-profile.js';
 import { StyleError } from './style-setup-core.js';
@@ -36,7 +38,8 @@ export async function starterApplication(db: D1Database, account: string, tenant
     .first<{ n: number }>())?.n ?? 0;
   let missing: number | null;
   try {
-    missing = (await planMissingStarterItems(db, account, tenant, 'getting-started', p, new Date().toISOString())).inserted.length;
+    const plan = await planMissingStarterItems(db,account,tenant,'getting-started',p,new Date().toISOString());
+    missing = plan.inserted.length + plan.updated.length;
   } catch (error) {
     // 統括の組が入れ直しで使えない形の時も、手順の一覧そのものは返す。数えられない物を 0 と言わない。
     if (!(error instanceof StyleError)) throw error;
@@ -56,21 +59,26 @@ export async function ensureStyleStarterItems(
   tenant: string | null,
   actor: string,
   input: Record<string, unknown>,
+  images?: R2Bucket,
 ) {
   const p = await profile(db, account);
   if (!p) throw new StyleError('select_style_first', 409);
   if (!Number.isInteger(input.expectedVersion) || input.expectedVersion !== p.version)
     throw new StyleError('version_conflict', 409);
   const now = new Date().toISOString();
-  const { set, inserted, skipped, existing, statements } = await planMissingStarterItems(db, account, tenant, actor, p, now);
+  const answers = JSON.parse(p.answers_json) as Record<string,SetupAnswer>;
+  if(answers.image?.mode==='configured' && answers.image.value==='simple')
+    await materializeInitialMenuAssets(db,images,account,p.style,(await starter(db,tenant,p.style,true)).definition);
+  const { set, inserted, updated, skipped, existing, statements } = await planMissingStarterItems(db,account,tenant,actor,p,now);
   const keys = new Set(set.definition.items.map((item) => item.key));
   const result = {
     inserted: (inserted as Array<{ key: string; kind: string }>).map(({ key, kind }) => ({ key, kind })),
+    updated,
     skipped,
     existing: existing.filter((row) => keys.has(row.item_key)).length,
     starterSet: { id: set.id, version: set.version },
   };
-  if (!inserted.length) return result;
+  if (!inserted.length && !updated.length) return result;
   try {
     await db.batch([
       db.prepare(

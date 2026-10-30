@@ -1,6 +1,6 @@
 import type { FormSnapshot, BookingResource } from './form-snapshot-types.js';
 import { normalizeScopedTagName } from '@line-crm/db';
-import { collectInputs, layoutToFields, normalizeLayout, validateFormDefinition, type FormLayout } from '@line-crm/shared';
+import { DEFAULT_TENANT_ID, collectInputs, layoutToFields, normalizeLayout, validateFormDefinition, type FormLayout } from '@line-crm/shared';
 
 import { unsupportedHqTemplateAdapter, requireHqTemplateAuthority, type HqTemplateAdapter, type HqTemplateAdapterContext, type HqTemplateAdapterInput, type HqTemplateAuthority, type HqTemplateReference, type HqTemplateSnapshotToken, type HqTemplateStoreAtomicCommitPlan } from './contract.js';
 import { type HqTemplateStatement } from '@line-crm/db';
@@ -193,6 +193,8 @@ const SNAPSHOT_SQL = `SELECT json_object(
  'scenarios',json((SELECT json_group_array(json_object('id',id,'name',name,'updated_at',updated_at,'active',is_active,'published',current_published_version_id)) FROM (SELECT * FROM scenarios WHERE line_account_id=? ORDER BY id))),
  'bookingMenus',json((SELECT json_group_array(json_object('id',id,'name',name,'accountId',line_account_id,'active',is_active,'deleted',deleted_at,'version',version)) FROM menus WHERE line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=(SELECT tenant_id FROM line_accounts WHERE id=?)) ORDER BY id)),
  'bookingStaff',json((SELECT json_group_array(json_object('id',id,'name',name,'accountId',line_account_id,'active',is_active,'deleted',deleted_at)) FROM staff WHERE line_account_id IN (SELECT id FROM line_accounts WHERE tenant_id=(SELECT tenant_id FROM line_accounts WHERE id=?)) ORDER BY id)),
+ 'seatStores',json((SELECT json_group_array(json_object('id',s.id,'accountId',s.line_account_id,'status',s.status,'updated',s.updated_at)) FROM rt_stores s JOIN line_accounts a ON a.id=s.line_account_id JOIN rt_organizations o ON o.id=s.organization_id WHERE COALESCE(o.tenant_id,'${DEFAULT_TENANT_ID}')=COALESCE(a.tenant_id,'${DEFAULT_TENANT_ID}') AND o.status!='archived' AND a.tenant_id=(SELECT tenant_id FROM line_accounts WHERE id=?) AND a.is_active=1 AND a.archived_at IS NULL ORDER BY s.id)),
+ 'seatCourses',json((SELECT json_group_array(json_object('id',m.id,'storeId',m.store_id,'name',m.name,'status',m.status,'updated',m.updated_at)) FROM rt_menu_items m JOIN rt_stores s ON s.id=m.store_id JOIN line_accounts a ON a.id=s.line_account_id JOIN rt_organizations o ON o.id=s.organization_id WHERE COALESCE(o.tenant_id,'${DEFAULT_TENANT_ID}')=COALESCE(a.tenant_id,'${DEFAULT_TENANT_ID}') AND o.status!='archived' AND m.kind='course' AND a.tenant_id=(SELECT tenant_id FROM line_accounts WHERE id=?) AND a.is_active=1 AND a.archived_at IS NULL ORDER BY m.id)),
  'templates',json((SELECT json_group_array(json_object('id',id,'name',name,'updated_at',updated_at,'draft_revision',draft_revision,'published_version',published_version)) FROM (SELECT * FROM templates WHERE line_account_id=? ORDER BY id)))
 ) AS snapshot`;
 function mapBookingLayout(value:FormLayout|null,state:FormSnapshot,accountId:string):FormLayout|null {
@@ -206,14 +208,29 @@ function mapBookingLayout(value:FormLayout|null,state:FormSnapshot,accountId:str
       return matches[0].id;
     };
     for(const block of collectInputs(layout)) if(block.type==='booking'&&block.booking) {
-      if(block.booking.kind==='seats')throw new FormTemplateError('UNSUPPORTED_REFERENCE');
+      if(block.booking.kind==='seats') {
+        const stores=state.seatStores??[],courses=state.seatCourses??[];
+        const source=stores.find(store=>store.id===block.booking!.storeId&&store.status==='active');
+        const targets=stores.filter(store=>store.accountId===accountId&&store.status==='active');
+        if(!source||targets.length!==1)throw new FormTemplateError('REFERENCE_UNAVAILABLE');
+        const target=targets[0]!;
+        if(block.booking.courseId) {
+          const course=courses.find(course=>course.id===block.booking!.courseId&&course.storeId===source.id&&course.status==='active');
+          if(!course)throw new FormTemplateError('REFERENCE_UNAVAILABLE');
+          const matches=courses.filter(row=>row.storeId===target.id&&row.status==='active'&&normalizeScopedTagName(row.name)===normalizeScopedTagName(course.name));
+          if(matches.length!==1)throw new FormTemplateError('REFERENCE_UNAVAILABLE');
+          block.booking.courseId=matches[0]!.id;
+        }
+        block.booking.storeId=target.id;
+        continue;
+      }
       block.booking.menuId=resolve(block.booking.menuId,state.bookingMenus??[]);
       if(block.booking.staffId)block.booking.staffId=resolve(block.booking.staffId,state.bookingStaff??[]);
     }
     return layout;
 }
 export async function formTemplateSnapshot(db: D1Database, accountId: string): Promise<string> {
-    const result = await db.prepare(SNAPSHOT_SQL).bind(accountId, accountId, accountId, accountId, accountId, accountId, accountId).first<{
+    const result = await db.prepare(SNAPSHOT_SQL).bind(accountId, accountId, accountId, accountId, accountId, accountId, accountId, accountId, accountId).first<{
         snapshot: string;
     }>();
     if (!result)
@@ -387,7 +404,7 @@ export function createFormHqTemplateAdapter(deps: FormTemplateDependencies): HqT
             const fields = layout ? layoutToFields(layout) : def!.form.fields;
             const tagId = def!.form.on_submit_tag_id ? map('tag', def!.form.on_submit_tag_id) : null;
             const scenarioId = def!.form.on_submit_scenario_id ? map('scenario', def!.form.on_submit_scenario_id) : null;
-            const statements: HqTemplateStatement[] = [guard(`(${SNAPSHOT_SQL})=?`, [context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, snapshot!])];
+            const statements: HqTemplateStatement[] = [guard(`(${SNAPSHOT_SQL})=?`, [context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, context.targetAccountId, snapshot!])];
             statements.push(guard(`EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND is_active=1 AND archived_at IS NULL)`, [context.targetAccountId, deps.authority.tenantId]));
             for (const value of resolved.values())
                 statements.push(...value.dbCommit ?? []);
