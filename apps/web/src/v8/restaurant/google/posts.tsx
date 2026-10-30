@@ -1,4 +1,6 @@
 'use client'
+import { lockMenuItems } from '@/components/shared/permission-lock'
+import { useGooglePermission } from './use-google-permission'
 
 import { statusBadge } from './post-status'
 
@@ -12,8 +14,10 @@ const FIELD_REQUIREMENTS = {
 
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
-import ListToolbar from '@/components/shared/list-toolbar'
+import { ListToolbarEnd, ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolbar'
 import PageSizeSelect from '@/components/shared/page-size-select'
+import LastChecked from '@/components/shared/last-checked'
+import { usePostStatusCheck } from './use-post-status-check'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Plus, RefreshCw, Send } from 'lucide-react'
 import type { InstagramConnectionStatus, MediaItem } from '@line-crm/shared'
@@ -82,8 +86,9 @@ const FILTER_OPTIONS: Array<{ value: GooglePostFilter; label: string }> = [
 const CTA_LABELS: Record<GooglePostCtaType, string> = { book: '予約', order: '注文', shop: '購入', learn_more: '詳細', sign_up: '申し込み', call: '電話' }
 
 
+/** 種類の札は全部同じ chip（種類＝灰）。 */
 function KindChip({ kind }: { kind: GooglePostKind }) {
-  return <Chip tone={kind === 'event' ? 'warn' : 'neutral'}>{KIND_LABELS[kind]}</Chip>
+  return <Chip>{KIND_LABELS[kind]}</Chip>
 }
 
 function postWhen(post: GooglePost): string {
@@ -122,12 +127,13 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
   const [data, setData] = useState<GooglePostListData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [syncing, setSyncing] = useState(false)
-  const [syncError, setSyncError] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
   const [confirmRemove, setConfirmRemove] = useState<GooglePost | null>(null)
   const [actionError, setActionError] = useState('')
   const [menuFor, setMenuFor] = useState<string | null>(null)
+  const { allowed: canPublish, lockedReason: publishReason, canView } = useGooglePermission('manager', data?.permissions?.canPublish ?? false)
+
+  useEffect(() => { if (!canView) setMenuFor(null) }, [canView])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -144,20 +150,10 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
 
   useEffect(() => { void load() }, [load])
 
-  const sync = async () => {
-    setSyncing(true)
-    setSyncError('')
-    try {
-      await restaurantGoogleApi.syncPosts(accountId)
-      await load()
-    } catch (err) {
-      setSyncError(errorMessage(err, 'Googleから投稿の状態を確認できませんでした。'))
-    } finally {
-      setSyncing(false)
-    }
-  }
+  const { sync, syncing, syncError, lastChecked, canSync, lockedReason } = usePostStatusCheck(accountId, load)
 
   const cancelDraft = async (post: GooglePost) => {
+    if (!canSync || busyId) return
     setBusyId(post.id)
     setActionError('')
     try {
@@ -171,7 +167,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
   }
 
   const removePost = async () => {
-    if (!confirmRemove) return
+    if (!canPublish || busyId || !confirmRemove) return
     setBusyId(confirmRemove.id)
     setActionError('')
     try {
@@ -187,6 +183,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
 
   /** Instagram だけをもう一度送る。Google の公開はそのまま残る（★V8-B `HEEN9`）。 */
   const retryInstagram = async (post: GooglePost) => {
+    if (!canPublish || busyId) return
     setBusyId(post.id)
     setActionError('')
     try {
@@ -202,30 +199,33 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
   const menuItems = (post: GooglePost): ActionMenuItem[] => {
     const actionable = post.status === 'draft' || post.status === 'rejected' || post.status === 'failed'
     const items: ActionMenuItem[] = [
-      { id: 'open', label: actionable ? '編集' : '中身を見る', onSelect: () => go({ tab: 'posts', view: 'edit', id: post.id }) },
+      { id: 'open', label: '中身を見る', onSelect: () => { if (canView) go({ tab: 'posts', view: 'edit', id: post.id }) } },
     ]
-    if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', external: true, href: post.searchUrl ?? '' })
+    if (actionable) items.push({ id: 'edit', label: '編集', disabled: !canSync, onSelect: () => { if (canSync) go({ tab: 'posts', view: 'edit', id: post.id }) } })
+    if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', group: 'view', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
-    if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', disabled: busyId === post.id, onSelect: () => void retryInstagram(post) })
-    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, disabled: busyId === post.id, onSelect: () => setConfirmRemove(post) })
-    return items
+    if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
+    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublish) setConfirmRemove(post) } })
+    if (!canView) return items.map(item => ({ ...item, disabled: true, lockedReason: undefined }))
+    return lockMenuItems(canSync, items, 'feature', item => item.id === 'open' || item.id === 'google')
   }
 
   const pageCount = data ? Math.max(1, Math.ceil(data.total / data.perPage)) : 1
 
   return (
     <>
-      <ListToolbar
-        filters={<>
+      <ListToolbarFrame>
+        <ListToolbarRow>
           <Select label="状態" aria-label="状態で絞り込み" value={filter} onChange={(value) => { setFilter(value as GooglePostFilter); setPage(1) }} options={FILTER_OPTIONS.map((option) => ({ ...option, disabled: option.value === 'scheduled' && (data?.counts.scheduled ?? 0) === 0 }))} />
           <Select label="種類" aria-label="種類で絞り込み" value={kind} onChange={(value) => { setKind(value as typeof kind); setPage(1) }} options={[{ value: 'all', label: 'すべて' }, ...(['standard', 'event', 'offer'] as GooglePostKind[]).map((k) => ({ value: k, label: KIND_LABELS[k] }))]} />
-        </>}
-        trailing={<>
-          <PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); setPage(1) }} />
-          <Button onClick={() => void sync()} disabled={syncing} busy={syncing} busyLabel="確認中…"><RefreshCw aria-hidden className={styles.icon16} />Googleの状態を確認する</Button>
-          <Button variant="primary" onClick={() => go({ tab: 'posts', view: 'new', kind: 'standard' })}><Plus aria-hidden className={styles.icon16} />投稿を作る</Button>
-        </>}
-      />
+          <ListToolbarEnd>
+            <Button key={accountId} onClick={() => void sync()} disabled={!canSync || syncing} lockedReason={lockedReason} busy={syncing} busyLabel="確認中…"><RefreshCw aria-hidden className={styles.icon16} />Googleの状態を確認する</Button>
+            <Button variant="primary" disabled={!canSync} lockedReason={lockedReason} onClick={() => { if (canSync) go({ tab: 'posts', view: 'new', kind: 'standard' }) }}><Plus aria-hidden className={styles.icon16} />投稿を作る</Button>
+            <PageSizeSelect value={perPage} onChange={(next) => { setPerPage(next); setPage(1) }} />
+          </ListToolbarEnd>
+        </ListToolbarRow>
+      </ListToolbarFrame>
+      <LastChecked at={lastChecked} inSession busy={syncing} />
       {syncError ? <Notice tone="warn">{syncError}</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       {loading && !data ? <div className={styles.stateBox}><ListState kind="loading" title="投稿を読み込んでいます" /></div> : null}
@@ -250,7 +250,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
                     <Chip tone={badge.tone === 'success' ? 'ok' : badge.tone === 'warning' ? 'warn' : badge.tone === 'danger' ? 'danger' : badge.tone === 'info' ? 'info' : 'neutral'}>{badge.label}</Chip>
                     {igBadge ? <span title={igBadge.title}><Chip tone={igBadge.tone === 'success' ? 'ok' : igBadge.tone === 'danger' ? 'danger' : 'neutral'}>{igBadge.label}</Chip></span> : null}
                     <span className={styles.menuBox}>
-                      <RowMenu label={`投稿「${name}」の操作`} items={menuItems(post)} open={menuFor === post.id} onOpenChange={(next) => setMenuFor(next ? post.id : null)} />
+                      <RowMenu label={`投稿「${name}」の操作`} items={menuItems(post)} triggerProps={{ disabled: !canView }} open={canView && menuFor === post.id} onOpenChange={(next) => { if (canView || !next) setMenuFor(next ? post.id : null) }} />
                     </span>
                   </div>
                 )
@@ -263,6 +263,8 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
         </Card>
       ) : null}
       <ConfirmDialog
+        confirmDisabled={!canPublish}
+        confirmLockedReason={publishReason}
         open={confirmRemove !== null}
         title="この投稿をGoogleから削除しますか？"
         deleteName={confirmRemove?.title || confirmRemove?.summary || 'この投稿'}
@@ -352,12 +354,13 @@ function draftInputFrom(form: PostForm, igAvailable: boolean): GooglePostDraftIn
   }
 }
 
-function PostImagePanel({ target, filename, url, editable, busy, onFile, onMediaPick, onAdjust, onUseGoogle }: {
+function PostImagePanel({ target, filename, url, editable, busy, lockedReason, onFile, onMediaPick, onAdjust, onUseGoogle }: {
   target: CropTarget
   filename: string | null
   url: string | null
   editable: boolean
   busy: boolean
+  lockedReason?: string
   onFile: (file: File) => void
   onMediaPick: () => void
   onAdjust: () => void
@@ -368,9 +371,9 @@ function PostImagePanel({ target, filename, url, editable, busy, onFile, onMedia
   return <div className={styles.platformImagePanel}>
     <div className={styles.platformImageHead}><strong>{isGoogle ? 'Google ビジネス用の画像' : 'Instagram 用の画像'}</strong><span className={isGoogle ? styles.optionalLabel : styles.requiredLabel}>{isGoogle ? '任意' : '必須'}</span><span className={styles.platformImageRatio}>{isGoogle ? '4:3' : '4:5'} の投稿画像</span></div>
     <div className={styles.platformImageContent}>
-      {url ? <><div className={`${styles.platformThumb} ${isGoogle ? styles.platformThumbGoogle : styles.platformThumbInstagram}`}><img src={url} alt={`${isGoogle ? 'Google' : 'Instagram'}用の投稿画像`} /></div><div className={styles.platformImageInfo}><strong>{filename}</strong><span>{isGoogle ? 'Google 表示範囲 4:3' : 'Instagram 表示範囲 4:5'}</span><b>切り取り位置を確認済み</b></div></> : <div className={styles.platformImageEmpty}><p>画像を選んで、投稿前に切り取り位置を確認</p>{editable ? <div className={styles.platformImageActions}><Button onClick={() => fileInput.current?.click()} disabled={busy}>画像を選ぶ</Button><Button onClick={onMediaPick} disabled={busy}>登録メディアから選ぶ</Button>{onUseGoogle ? <Button variant="text" onClick={onUseGoogle} disabled={busy}>Google画像を使う</Button> : null}</div> : null}</div>}
+      {url ? <><div className={`${styles.platformThumb} ${isGoogle ? styles.platformThumbGoogle : styles.platformThumbInstagram}`}><img src={url} alt={`${isGoogle ? 'Google' : 'Instagram'}用の投稿画像`} /></div><div className={styles.platformImageInfo}><strong>{filename}</strong><span>{isGoogle ? 'Google 表示範囲 4:3' : 'Instagram 表示範囲 4:5'}</span><b>切り取り位置を確認済み</b></div></> : <div className={styles.platformImageEmpty}><p>画像を選んで、投稿前に切り取り位置を確認</p>{editable ? <div className={styles.platformImageActions}><Button lockedReason={lockedReason} onClick={() => fileInput.current?.click()} disabled={busy}>画像を選ぶ</Button><Button lockedReason={lockedReason} onClick={onMediaPick} disabled={busy}>登録メディアから選ぶ</Button>{onUseGoogle ? <Button lockedReason={lockedReason} variant="text" onClick={onUseGoogle} disabled={busy}>Google画像を使う</Button> : null}</div> : null}</div>}
     </div>
-    {url && editable ? <div className={styles.platformImageLinks}><button type="button" onClick={() => fileInput.current?.click()} disabled={busy}>画像を変更</button><button type="button" onClick={onAdjust} disabled={busy}>切り取りを調整</button>{onUseGoogle ? <button type="button" onClick={onUseGoogle} disabled={busy}>Google画像を使う</button> : null}</div> : null}
+    {url && editable ? <div className={styles.platformImageLinks}><Button variant="text" lockedReason={lockedReason} onClick={() => fileInput.current?.click()} disabled={busy}>画像を変更</Button><Button variant="text" lockedReason={lockedReason} onClick={onAdjust} disabled={busy}>切り取りを調整</Button>{onUseGoogle ? <Button variant="text" lockedReason={lockedReason} onClick={onUseGoogle} disabled={busy}>Google画像を使う</Button> : null}</div> : null}
     <input ref={fileInput} type="file" accept="image/png,image/jpeg,image/webp,image/gif" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) onFile(file); event.target.value = '' }} />
     {!url ? <p className={styles.platformImageHelp}>{isGoogle ? '画像がなくてもGoogleへの投稿は作成できます。' : 'Google画像を使うことも、別の画像を選ぶこともできます。'}</p> : null}
   </div>
@@ -379,13 +382,15 @@ function PostImagePanel({ target, filename, url, editable, busy, onFile, onMedia
 /** 投稿を作る・直す。 */
 export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUpload, adjustTarget }: { accountId: string; kind: GooglePostKind; postId: string | null; go: GoogleNav; mediaUpload?: MediaUploadHelpers; adjustTarget?: CropTarget }) {
   const saveErrors = useSaveFormErrors()
+  const { allowed: canEdit, lockedReason } = useGooglePermission()
   const openedAdjust = useRef(false)
 
   const [form, setForm] = useState<PostForm>(emptyForm(kindFromUrl))
   const [initial, setInitial] = useState<PostForm>(emptyForm(kindFromUrl))
   const [loading, setLoading] = useState(Boolean(postId))
   const [loadError, setLoadError] = useState('')
-  const [editable, setEditable] = useState(true)
+  const [draftEditable, setEditable] = useState(true)
+  const editable = draftEditable && canEdit
   const [picker, setPicker] = useState<CropTarget | null>(null)
   const [crop, setCrop] = useState<{ target: CropTarget; source: CropSource; preserveOriginal: boolean } | null>(null)
   const [cropSources, setCropSources] = useState<Partial<Record<CropTarget, CropSource>>>({})
@@ -435,17 +440,18 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
     return () => { alive = false }
   }, [accountId, postId, kindFromUrl])
 
-  const dirty = JSON.stringify(form) !== JSON.stringify(initial)
+  const dirty = canEdit && JSON.stringify(form) !== JSON.stringify(initial)
   const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: busy !== null })
 
   const selectRegisteredMedia = async (item: MediaItem) => {
-    if (!picker) return
+    if (!editable || !picker) return
     const blob = await api.media.readContent(item.id, accountId)
     setCrop({ target: picker, source: { file: new File([blob], item.filename, { type: blob.type || item.mimeType || 'image/jpeg' }), name: item.filename, mediaId: item.id }, preserveOriginal: false })
     setPicker(null)
   }
 
   const uploadMedia = async (file: File): Promise<MediaItem> => {
+    if (!canEdit) throw new Error(lockedReason ?? '画像を変更できません。')
     if (!mediaUpload) throw new Error('画像のアップロードを利用できません。')
     const problem = mediaUpload.validate(file)
     if (problem) throw new Error(problem)
@@ -463,6 +469,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   }
 
   const chooseFile = (target: CropTarget, file: File) => {
+    if (!editable) return
     if (!mediaUpload) { setUpload({ busy: false, progress: 0, error: '画像のアップロードを利用できません。' }); return }
     const problem = mediaUpload.validate(file)
     if (problem) { setUpload({ busy: false, progress: 0, error: problem }); return }
@@ -470,6 +477,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   }
 
   const openCropFromMedia = useCallback(async (target: CropTarget, mediaId: string, name: string) => {
+    if (!editable) return
     setUpload({ busy: true, progress: 0, error: '' })
     try {
       const blob = await api.media.readContent(mediaId, accountId)
@@ -479,18 +487,19 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
       return
     }
     setUpload({ busy: false, progress: 0, error: '' })
-  }, [accountId])
+  }, [accountId, editable])
 
   useEffect(() => {
-    if (!loading && postId && adjustTarget && !openedAdjust.current) {
+    if (editable && !loading && postId && adjustTarget && !openedAdjust.current) {
       openedAdjust.current = true
       const mediaId = adjustTarget === 'google' ? (form.mediaOriginalId ?? form.mediaId) : (form.igOriginalId ?? form.igMediaId)
       const name = adjustTarget === 'google' ? form.mediaFilename : form.igMediaFilename
       if (mediaId) void openCropFromMedia(adjustTarget, mediaId, name ?? '画像.jpg')
     }
-  }, [loading, postId, adjustTarget, form.mediaOriginalId, form.mediaId, form.igOriginalId, form.igMediaId, form.mediaFilename, form.igMediaFilename, openCropFromMedia])
+  }, [loading, postId, adjustTarget, form.mediaOriginalId, form.mediaId, form.igOriginalId, form.igMediaId, form.mediaFilename, form.igMediaFilename, openCropFromMedia, editable])
 
   const adjustCrop = (target: CropTarget) => {
+    if (!editable) return
     const source = cropSources[target]
     if (source) { setCrop({ target, source, preserveOriginal: false }); return }
     const mediaId = target === 'google' ? (form.mediaOriginalId ?? form.mediaId) : (form.igOriginalId ?? form.igMediaId)
@@ -499,12 +508,14 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   }
 
   const useGoogleImage = () => {
+    if (!editable) return
     const source = cropSources.google
     if (source) { setCrop({ target: 'instagram', source, preserveOriginal: false }); return }
     if (form.mediaId) void openCropFromMedia('instagram', form.mediaOriginalId ?? form.mediaId, form.mediaFilename ?? 'Google画像.jpg')
   }
 
   const confirmCrop = async (file: File) => {
+    if (!editable) return
     if (!crop) return
     setUpload({ busy: true, progress: 0, error: '' })
     try {
@@ -564,6 +575,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   }
 
   const save = async (): Promise<string | null> => {
+    if (!editable || busy !== null) return null
     setActionError('')
     if (upload.busy || !validate()) return null
     setBusy('save')
@@ -590,7 +602,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
   }
 
   const openConfirm = async () => {
-    setBusy('confirm')
+    if (!editable || busy !== null) return
     const id = await save()
     setBusy(null)
     if (id) go({ tab: 'posts', view: 'confirm', id })
@@ -607,7 +619,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      {!editable ? <Notice tone="warn">この投稿はもう編集できません（送信済み、または送信手続き中です）。</Notice> : null}
+      {!draftEditable ? <Notice tone="warn">この投稿はもう編集できません（送信済み、または送信手続き中です）。</Notice> : null}
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
         <SectionHeader size="small" title={<>{postId ? '投稿を直す' : '投稿を作る'}</>} />
         <Field density="compact" label="種類">
@@ -639,7 +651,7 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
           <SaveErrorField names={["summary","form.summary"]}><TextArea density="compact" height="post" id="gb-post-summary" value={form.summary} onChange={(e) => set({ summary: e.target.value })} disabled={!editable} maxLength={1500} aria-describedby="gb-post-summary-count" /></SaveErrorField>
           <span id="gb-post-summary-count" className="sr-only">{`${form.summary.length} / 1,500 文字`}</span>
         </Field>
-        <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><PostImagePanel target="google" filename={form.mediaFilename} url={form.mediaSourceUrl} editable={editable} busy={busy !== null || upload.busy} onFile={(file) => chooseFile('google', file)} onMediaPick={() => setPicker('google')} onAdjust={() => adjustCrop('google')} /></SaveErrorField>
+        <SaveErrorField names={["mediaSourceUrl","form.mediaSourceUrl","media_source_url","form.media_source_url"]}><PostImagePanel target="google" filename={form.mediaFilename} url={form.mediaSourceUrl} editable={draftEditable} lockedReason={lockedReason} busy={!canEdit || busy !== null || upload.busy} onFile={(file) => chooseFile('google', file)} onMediaPick={() => { if (editable) setPicker('google') }} onAdjust={() => adjustCrop('google')} /></SaveErrorField>
         <div className={styles.postDetails} data-post-details>
           <SectionHeader size="small" title="投稿の詳細" />
           <div className={styles.fieldPair}>
@@ -686,14 +698,12 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
         {igAvailable ? (
           <div className={styles.igBand} data-design-node="hsiwQ">
             <div className={styles.igToggleRow}>
-              {editable ? (
-                <>
-                  <SaveErrorField names={["igEnabled","form.igEnabled","ig_enabled","enabled","form.ig_enabled"]}><Toggle checked={form.igEnabled} label="Instagram にも投稿する" onChange={(next) => set({ igEnabled: next })} /></SaveErrorField>
-                  <span className={styles.igToggleLabel}>Instagram にも投稿する</span>
-                </>
-              ) : (
-                <span className={styles.igToggleLabel}>{`Instagram にも投稿する：${form.igEnabled ? 'はい' : 'いいえ'}`}</span>
-              )}
+              {draftEditable ? <>
+              <SaveErrorField names={["igEnabled","form.igEnabled","ig_enabled","enabled","form.ig_enabled"]}>
+                <Toggle checked={form.igEnabled} label="Instagram にも投稿する" lockedReason={lockedReason} disabled={!editable} onChange={(next) => { if (editable) set({ igEnabled: next }) }} />
+              </SaveErrorField>
+              <span className={styles.igToggleLabel}>Instagram にも投稿する</span>
+              </> : <span className={styles.igToggleLabel}>{`Instagram にも投稿する：${form.igEnabled ? 'はい' : 'いいえ'}`}</span>}
             </div>
             {form.igEnabled ? (
               <>
@@ -706,18 +716,18 @@ export function PostEditor({ accountId, kind: kindFromUrl, postId, go, mediaUplo
           </div>
         ) : null}
         {igAvailable && form.igEnabled ? <>
-          <PostImagePanel target="instagram" filename={form.igMediaFilename} url={form.igMediaSourceUrl} editable={editable} busy={busy !== null || upload.busy} onFile={(file) => chooseFile('instagram', file)} onMediaPick={() => setPicker('instagram')} onAdjust={() => adjustCrop('instagram')} onUseGoogle={form.mediaId ? useGoogleImage : undefined} />
+          <PostImagePanel target="instagram" filename={form.igMediaFilename} url={form.igMediaSourceUrl} editable={draftEditable} lockedReason={lockedReason} busy={!canEdit || busy !== null || upload.busy} onFile={(file) => chooseFile('instagram', file)} onMediaPick={() => { if (editable) setPicker('instagram') }} onAdjust={() => adjustCrop('instagram')} onUseGoogle={form.mediaId ? useGoogleImage : undefined} />
         </> : null}
         {upload.error ? <Notice tone="danger">{upload.error}</Notice> : null}
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
-        {editable ? (
+        {draftEditable ? (
           <>
-            <Notice tone="info" density="compact" icon={null} action={<Button onClick={() => void saveDraft()} disabled={busy !== null || upload.busy} busy={busy === 'save'}>下書きを保存する</Button>}>
+            <Notice tone="info" density="compact" icon={null} action={<Button onClick={() => void saveDraft()} lockedReason={lockedReason} disabled={!canEdit || busy !== null || upload.busy} busy={busy === 'save'}>下書きを保存する</Button>}>
               「公開内容を確認する」で、両方の画像を見比べてから公開します。
             </Notice>
             <div className={styles.formActions}>
               <Button onClick={() => go({ tab: 'posts' })} disabled={busy !== null || upload.busy}>キャンセル</Button>
-              <Button variant="primary" onClick={() => void openConfirm()} disabled={busy !== null || upload.busy} busy={busy === 'confirm'} busyLabel="確認中…"><Send aria-hidden className={styles.icon16} />公開内容を確認する</Button>
+              <Button variant="primary" onClick={() => void openConfirm()} lockedReason={lockedReason} disabled={!canEdit || busy !== null || upload.busy} busy={busy === 'confirm'} busyLabel="確認中…"><Send aria-hidden className={styles.icon16} />公開内容を確認する</Button>
             </div>
           </>
         ) : (
@@ -740,6 +750,8 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
   const [storeName, setStoreName] = useState('')
   const [writeEnabled, setWriteEnabled] = useState(true)
   const [canPublish, setCanPublish] = useState(false)
+  const { allowed: canSend, lockedReason } = useGooglePermission('manager', canPublish)
+  const { allowed: canEdit, lockedReason: editReason } = useGooglePermission()
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [checked, setChecked] = useState(false)
@@ -776,6 +788,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
   useEffect(() => { void load() }, [load])
 
   const publish = async () => {
+    if (!canSend || !writeEnabled || !checked || busy || !post || ['published', 'accepted', 'rejected', 'cancelled'].includes(post.status)) return
     setBusy(true)
     setActionError('')
     try {
@@ -802,7 +815,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
   if (loadError || !post) return <SaveErrorScope errors={saveErrors}><ListState kind="error" title="投稿を表示できませんでした" description={loadError} onRetry={() => void load()} /></SaveErrorScope>
 
   const done = post.status === 'published' || post.status === 'accepted' || post.status === 'rejected'
-  const canPress = canPublish && writeEnabled && checked && !busy && !done && post.status !== 'cancelled'
+  const canPress = canSend && writeEnabled && checked && !busy && !done && post.status !== 'cancelled'
 
   return (
     <SaveErrorScope errors={saveErrors}><Card appearance="outlined" layout="vertical" padding="default" gap="normal" data-design-node="jqSak">
@@ -820,10 +833,10 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
         <div className={styles.factRow}><dt className={styles.factKey}>種類</dt><dd className={styles.factValue}>{KIND_LABELS[post.kind]}</dd></div>
         <div className={styles.factRow}><dt className={styles.factKey}>公開予定</dt><dd className={styles.factValue}>今すぐ（日本時間）</dd></div>
         {post.cta ? <div className={styles.factRow}><dt className={styles.factKey}>ボタン</dt><dd className={styles.factValue}>{`${CTA_LABELS[post.cta.type]}${post.cta.url ? ` → ${post.cta.url}` : ''}`}</dd></div> : null}
-        {post.media[0] ? <div className={styles.factRow}><dt className={styles.factKey}>Google画像</dt><dd className={styles.factValue}><div className={styles.confirmImage}><div className={`${styles.confirmThumb} ${styles.confirmThumbGoogle}`}><img src={post.media[0].sourceUrl} alt="Google用画像" /></div><div><strong>Google ビジネス ・4:3</strong><span>{post.media[0].filename}</span>{post.status === 'draft' ? <div className={styles.confirmImageLinks}><button type="button" onClick={() => go({ tab: 'posts', view: 'edit', id })}>画像を変更</button><button type="button" onClick={() => go({ tab: 'posts', view: 'edit', id, adjust: 'google' })}>切り取りを調整</button></div> : null}</div></div></dd></div> : null}
+        {post.media[0] ? <div className={styles.factRow}><dt className={styles.factKey}>Google画像</dt><dd className={styles.factValue}><div className={styles.confirmImage}><div className={`${styles.confirmThumb} ${styles.confirmThumbGoogle}`}><img src={post.media[0].sourceUrl} alt="Google用画像" /></div><div><strong>Google ビジネス ・4:3</strong><span>{post.media[0].filename}</span>{post.status === 'draft' ? <div className={styles.confirmImageLinks}><Button variant="text" lockedReason={editReason} disabled={!canEdit || busy} onClick={() => { if (canEdit && !busy) go({ tab: 'posts', view: 'edit', id }) }}>画像を変更</Button><Button variant="text" lockedReason={editReason} disabled={!canEdit || busy} onClick={() => { if (canEdit && !busy) go({ tab: 'posts', view: 'edit', id, adjust: 'google' }) }}>切り取りを調整</Button></div> : null}</div></div></dd></div> : null}
         {post.instagram ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram</dt><dd className={styles.factValue}>{instagramFact(post.instagram)}</dd></div> : null}
         {post.instagram?.enabled ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram本文</dt><dd className={styles.factValue}>{post.instagram.caption || post.summary}</dd></div> : null}
-        {post.instagram?.enabled && igPreview ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram画像</dt><dd className={styles.factValue}><div className={styles.confirmImage}><div className={`${styles.confirmThumb} ${styles.confirmThumbInstagram}`}><img src={igPreview.url} alt="Instagram用画像" /></div><div><strong>Instagram ・4:5</strong><span>{igPreview.filename}</span>{post.status === 'draft' ? <div className={styles.confirmImageLinks}><button type="button" onClick={() => go({ tab: 'posts', view: 'edit', id })}>画像を変更</button><button type="button" onClick={() => go({ tab: 'posts', view: 'edit', id, adjust: 'instagram' })}>切り取りを調整</button></div> : null}</div></div></dd></div> : null}
+        {post.instagram?.enabled && igPreview ? <div className={styles.factRow}><dt className={styles.factKey}>Instagram画像</dt><dd className={styles.factValue}><div className={styles.confirmImage}><div className={`${styles.confirmThumb} ${styles.confirmThumbInstagram}`}><img src={igPreview.url} alt="Instagram用画像" /></div><div><strong>Instagram ・4:5</strong><span>{igPreview.filename}</span>{post.status === 'draft' ? <div className={styles.confirmImageLinks}><Button variant="text" lockedReason={editReason} disabled={!canEdit || busy} onClick={() => { if (canEdit && !busy) go({ tab: 'posts', view: 'edit', id }) }}>画像を変更</Button><Button variant="text" lockedReason={editReason} disabled={!canEdit || busy} onClick={() => { if (canEdit && !busy) go({ tab: 'posts', view: 'edit', id, adjust: 'instagram' }) }}>切り取りを調整</Button></div> : null}</div></div></dd></div> : null}
       </dl>
       {post.title ? <SectionHeader size="small" title={post.title} /> : null}
       <p className={styles.preText}>{post.summary}</p>
@@ -832,8 +845,8 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
           <SaveErrorField names={["checked"]}><Checkbox checked={checked} onCheckedChange={setChecked}>公開先・本文・画像・切り取り位置・日時を確認しました</Checkbox></SaveErrorField>
           <p className={styles.grayNote}>予約後も編集・取消できます。送信後はGoogleとInstagramの状態を確認できます。</p>
           <div className={styles.formActions}>
-            <Button onClick={() => go({ tab: 'posts', view: 'edit', id })} disabled={busy}>修正する</Button>
-            <Button variant="primary" onClick={() => void publish()} disabled={!canPress} busy={busy} busyLabel="送信中…">この内容で予約する</Button>
+            <Button lockedReason={editReason} onClick={() => { if (canEdit && !busy) go({ tab: 'posts', view: 'edit', id }) }} disabled={!canEdit || busy}>修正する</Button>
+            <Button variant="primary" onClick={() => void publish()} lockedReason={lockedReason} disabled={!canPress} busy={busy} busyLabel="送信中…">この内容で予約する</Button>
           </div>
         </>
       ) : (

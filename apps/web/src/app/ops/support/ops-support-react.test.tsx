@@ -7,6 +7,7 @@ import OpsSupportPage from './page'
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 import { compareLabel, durationLabel, elapsedLabel } from '../../../v8/ops/support/format'
 import type { OpsKnowledgeReference, OpsSupportDetail } from '@/lib/api'
+import { OPS_READONLY_LOCK_REASON } from '../../../v8/ops/use-ops-read-only'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -31,6 +32,7 @@ let calls: Array<{ url: string; method: string; body: Record<string, unknown> | 
 let draft: { body: string; aiGenerated: boolean; generatedAt: string | null; updatedAt: string; references?: OpsKnowledgeReference[] } | null
 let availableReferences: OpsKnowledgeReference[] = []
 let aiFails = false
+let viewerMe = false
 let knowledge: OpsSupportDetail['knowledge']
 
 function respond(url: string, init?: RequestInit) {
@@ -38,7 +40,7 @@ function respond(url: string, init?: RequestInit) {
   const body = init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : null
   calls.push({ url, method, body })
   const json = (payload: unknown, status = 200) => new Response(JSON.stringify(payload), { status, headers: { 'Content-Type': 'application/json' } })
-  if (url.endsWith('/api/ops/me')) return json({ success: true, data: { id: 'ops-1', readOnly: false } })
+  if (url.endsWith('/api/ops/me')) return json({ success: true, data: { id: 'ops-1', readOnly: viewerMe } })
   if (url.endsWith('/api/ops/support/summary')) {
     return json({ success: true, data: { byStage: { all: 86, new: 3, in_progress: 2, waiting: 1, resolved: 12, closed: 68 }, kpis: { untouched: 3, untouchedFromLine: 3, avgFirstReplyMinutes: 84, prevAvgFirstReplyMinutes: 117, resolutionRate: 96.7, prevResolutionRate: 90.7, avgResolutionMinutes: 312, prevAvgResolutionMinutes: 310 } } })
   }
@@ -66,6 +68,7 @@ beforeEach(() => {
   calls = []
   draft = null
   aiFails = false
+  viewerMe = false
   knowledge = undefined
   availableReferences = []
   process.env.NEXT_PUBLIC_API_URL = 'https://api.example.test'
@@ -273,5 +276,26 @@ describe('画面', () => {
     expect(reply?.body).toMatchObject({ aiAssisted: true })
     expect(String(reply?.body?.body)).toContain('山田さま')
     expect(host.textContent).toContain('登録メールにも送りました')
+  })
+})
+
+describe('閲覧のみ', () => {
+  it('起票も返信も優先度も押せない形＋理由で出し、押しても口を呼ばない', async () => {
+    viewerMe = true
+    await act(async () => root.render(<OpsSupportPage />)); await flush()
+    expect(host.textContent).toContain(OPS_READONLY_LOCK_REASON)
+    const buttons = Array.from(host.querySelectorAll('button'))
+    for (const label of ['代わりに起票する', '返信する', '解決済みにする', '代理ログイン']) {
+      const button = buttons.find((b) => b.textContent === label) as HTMLButtonElement
+      expect(button, `「${label}」がない`).toBeTruthy()
+    }
+    expect(host.querySelector('button[aria-label="優先度を変える"]'), '優先度の選びがない').toBeTruthy()
+    const textarea = host.querySelector('textarea[aria-label="返信"]') as HTMLTextAreaElement
+    expect(textarea.disabled).toBe(true)
+    const reply = buttons.find((b) => b.textContent === '返信する') as HTMLButtonElement
+    await act(async () => { reply.click() }); await flush()
+    expect(document.body.querySelector('[data-design-node="GgP2d"]')).toBeNull()
+    expect(calls.some((c) => c.url.endsWith('/reply'))).toBe(false)
+    expect(calls.filter((c) => c.method !== 'GET')).toHaveLength(0)
   })
 })

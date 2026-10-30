@@ -10,7 +10,6 @@ import { api, type BroadcastApprovalCandidate } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
-import Select from '@/components/shared/select'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateTimeField from '@/components/shared/date-time-field'
 import { formatNumber } from '@/lib/format'
@@ -23,6 +22,9 @@ import MessageInsertRow, { MessageBody, MessageInsertButton } from '@/components
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockTip } from '@/components/shared/permission-lock-tip'
+import { canUseQuickSendNow, captureQuickSendAccess, useQuickSendAccess, type QuickSendOperation } from './quick-send-access'
 
 /*
  * ★V8 一斉配信 かんたんに送る（板 ・小窓 640）。
@@ -48,6 +50,16 @@ export function estimateText(estimate: Estimate): string {
   return estimate.remaining === null ? base : `${base}・今月あと ${formatNumber(estimate.remaining)} 通 送れます`
 }
 
+/** 元の札の形を保ち、拒否理由だけを共通の吹き出しへつなぐ。 */
+function QuickSendChoice({ lockedReason, ...props }: React.ComponentProps<'button'> & { lockedReason?: string }) {
+  const lock = usePermissionLockTip<HTMLButtonElement>(lockedReason)
+  return <><button {...props} ref={lock.ref} {...lock.handlers} />{lock.node}</>
+}
+class QuickSendPermissionChanged extends Error {
+  constructor() { super('権限が変わったため、続きの処理を中止しました。配信の状態は一覧で確認してください。') }
+}
+class QuickSendContextChanged extends Error {}
+
 export default function QuickSendV8({
   open,
   accountId,
@@ -61,6 +73,11 @@ export default function QuickSendV8({
   onSent: () => void
 }) {
   const saveErrors = useSaveFormErrors()
+  const access = useQuickSendAccess()
+  const context = useRef({ open, accountId, active: true })
+  if (context.current.open !== open || context.current.accountId !== accountId) context.current = { open, accountId, active: true }
+  const renderedContext = context.current
+  useEffect(() => { const current = context.current; current.active = true; return () => { current.active = false } }, [open, accountId])
   const [text, setText] = useState('')
   const [target, setTarget] = useState<'all' | 'tag'>('all')
   const [tags, setTags] = useState<Tag[]>([])
@@ -77,7 +94,7 @@ export default function QuickSendV8({
   const [error, setError] = useState<string | null>(null)
   const estimateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pendingRef = useRef<{ id: string; scheduledAt: string | null; needsApproval: boolean } | null>(null)
-  const sendingRef = useRef(false)
+  const sendingRef = useRef<object | null>(null)
   const [pending, setPending] = useState(false)
   const guard = useUnsavedGuard({ dirty: open && (text !== '' || scheduledValue !== ''), busy, onDiscard: onClose })
   const textRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement | null>(null)
@@ -91,7 +108,7 @@ export default function QuickSendV8({
     setTags([])
     setCandidates([])
     pendingRef.current = null
-    sendingRef.current = false
+    sendingRef.current = null
     setPending(false)
     setText('')
     setTarget('all')
@@ -116,10 +133,13 @@ export default function QuickSendV8({
   // 本文・相手が変わったら人数を見積もる（少し待ってから1回だけ）。
   useEffect(() => {
     let cancelled = false
+    setEstimating(false)
+    if (!open || !accountId || !access.preflight) return
     setEstimate(null)
     setCountInput('')
-    setEstimating(false)
-    if (!open || !accountId) return
+    const current = context.current
+    const permitted = captureQuickSendAccess()
+    const available = () => !cancelled && current === context.current && current.active && permitted('preflight')
     if (estimateTimer.current) clearTimeout(estimateTimer.current)
     if (!text.trim() || (target === 'tag' && !tagId)) {
       setEstimate(null)
@@ -127,6 +147,7 @@ export default function QuickSendV8({
     }
     estimateTimer.current = setTimeout(() => {
       void (async () => {
+        if (!available()) return
         setEstimating(true)
         try {
           const res = await api.broadcasts.preflight({
@@ -136,14 +157,14 @@ export default function QuickSendV8({
             messageContent: text,
             messageCount: 1,
           })
-          if (!cancelled && res.success) {
+          if (available() && res.success) {
             setEstimate({ count: res.data.audienceCount, blocked: res.data.hiddenExcluded, remaining: res.data.quota?.remaining ?? null })
           }
         } catch (saveFailure) {
-          saveErrors.capture(saveFailure)
+          if (available()) saveErrors.capture(saveFailure)
           // 見積もれなくても入力は続けられる。送る前に止めない。
         } finally {
-          if (!cancelled) setEstimating(false)
+          if (available()) setEstimating(false)
         }
       })()
     }, 500);
@@ -152,13 +173,20 @@ export default function QuickSendV8({
       cancelled = true
       if (estimateTimer.current) clearTimeout(estimateTimer.current)
     }
-  }, [open, accountId, text, target, tagId, saveErrors])
+  }, [open, accountId, text, target, tagId, saveErrors, access.identity, access.session, access.preflight])
 
   const needsCountConfirmation = estimate !== null && approvalConfig !== null && estimate.count >= approvalConfig.threshold && approvalConfig.singleOperator
   const needsApproval = estimate !== null && approvalConfig !== null && estimate.count >= approvalConfig.threshold && !approvalConfig.singleOperator
   const countMatched = countInput.trim() !== '' && Number(countInput) === estimate?.count
   const scheduledAt = when === 'scheduled' && scheduledValue ? datetimeLocalJstToUtcIso(scheduledValue) : null
-  const canSend = text.trim().length > 0
+  const currentAttempt = pendingRef.current
+  const operation: QuickSendOperation = currentAttempt?.needsApproval || (!currentAttempt && needsApproval) ? 'approval'
+    : (currentAttempt ? currentAttempt.scheduledAt : when === 'scheduled') ? 'schedule' : 'send'
+  const operationAllowed = canUseQuickSendNow(operation) && (currentAttempt !== null || access.create)
+  const operationReason = access.reason(operationAllowed ? undefined : operation === 'send' && access.session?.impersonation ? 'send' : !currentAttempt && !access.create ? 'create' : operation)
+  const editReason = access.reason('create')
+  const changeInput = <T,>(change: (value: T) => void) => (value: T) => { if (canUseQuickSendNow('create')) change(value) }
+  const canSend = operationAllowed && text.trim().length > 0
     && text.length <= TEXT_LIMIT
     && (target === 'all' || tagId !== '')
     && (when === 'now' || scheduledValue !== '')
@@ -179,6 +207,7 @@ export default function QuickSendV8({
 
   /** 差し込む：今のカーソルの位置に {{name}} を入れる（送るときに名前へ置き換わる形。{名前} は置き換わらずに届いていた）。 */
   const insertName = () => {
+    if (!canUseQuickSendNow('create')) return
     const el = textRef.current
     const token = QUICK_SEND_NAME_TOKEN
     if (!el) return setText((prev) => `${prev}${token}`)
@@ -189,18 +218,30 @@ export default function QuickSendV8({
 
   async function handleSend() {
     if (!canSend || !accountId || sendingRef.current) return
-    sendingRef.current = true
+    const current = renderedContext
+    const token = {}
+    const permitted = captureQuickSendAccess()
+    const isCurrent = () => current === context.current && current.active && current.open
+    if (!isCurrent()) return
+    const requireAccess = (action: QuickSendOperation) => {
+      if (!isCurrent()) throw new QuickSendContextChanged()
+      if (!permitted(action)) throw new QuickSendPermissionChanged()
+    }
+    sendingRef.current = token
     setBusy(true)
     setError(null)
     try {
+      requireAccess(operation)
       let attempt = pendingRef.current
+      if (!attempt) requireAccess('create')
       if (attempt) {
         // 応答だけを失った場合は実物を読み、既に始まった送信・承認依頼を繰り返さない。
-        const current = await api.broadcasts.get(attempt.id)
-        if (!current.success) throw new Error(current.error ?? '配信の状態を確認できませんでした。時間をおいて、もう一度お試しください。')
-        if (current.data.status === 'sent' || current.data.status === 'sending'
-          || (attempt.needsApproval && current.data.approvalStatus === 'pending')) {
-          notifyToast(current.data.approvalStatus === 'pending' ? '配信の承認を頼みました' : current.data.status === 'sent' ? '配信を送りました' : '配信の送信を受け付けました')
+        const existing = await api.broadcasts.get(attempt.id)
+        requireAccess(operation)
+        if (!existing.success) throw new Error(existing.error ?? '配信の状態を確認できませんでした。時間をおいて、もう一度お試しください。')
+        if (existing.data.status === 'sent' || existing.data.status === 'sending'
+          || (attempt.needsApproval && existing.data.approvalStatus === 'pending')) {
+          notifyToast(existing.data.approvalStatus === 'pending' ? '配信の承認を頼みました' : existing.data.status === 'sent' ? '配信を送りました' : '配信の送信を受け付けました')
           guard.disarm()
           onSent()
           onClose()
@@ -208,6 +249,7 @@ export default function QuickSendV8({
         }
       }
       if (needsCountConfirmation) {
+        requireAccess('preflight')
         const current = await api.broadcasts.preflight({
           targetType: target === 'tag' ? 'tag' : 'all',
           targetTagId: target === 'tag' ? tagId : null,
@@ -215,6 +257,7 @@ export default function QuickSendV8({
           messageContent: text,
           messageCount: 1,
         })
+        requireAccess('preflight')
         if (!current.success) throw new Error(current.error || '現在の人数を確認できませんでした。時間をおいて、もう一度お試しください。')
         if (current.data.audienceCount !== Number(countInput)) {
           setEstimate({ count: current.data.audienceCount, blocked: current.data.hiddenExcluded, remaining: current.data.quota?.remaining ?? null })
@@ -224,6 +267,8 @@ export default function QuickSendV8({
         }
       }
       if (!attempt) {
+        requireAccess('create')
+        requireAccess(operation)
         const created = await api.broadcasts.create({
           title: text.trim().slice(0, 20) || 'かんたん送信',
           messageType: 'text',
@@ -235,6 +280,7 @@ export default function QuickSendV8({
           lineAccountId: accountId,
           ...(needsCountConfirmation ? { confirmedRecipientCount: Number(countInput) } : {}),
         })
+        if (!isCurrent()) throw new QuickSendContextChanged()
         if (!created.success) throw new Error(created.error ?? '作れませんでした')
         attempt = { id: created.data.id, scheduledAt, needsApproval }
         pendingRef.current = attempt
@@ -242,33 +288,35 @@ export default function QuickSendV8({
       }
       const id = attempt.id
       if (attempt.needsApproval) {
+        requireAccess('approval')
         const requested = await api.broadcasts.approval.request(id, { approverStaffId: approverId })
+        requireAccess('approval')
         if (!requested.success) throw new Error(requested.error)
         notifyToast('配信の承認を頼みました')
       } else if (!attempt.scheduledAt) {
+        requireAccess('send')
         const sent = await api.broadcasts.send(id, needsCountConfirmation ? { confirmedRecipientCount: Number(countInput) } : undefined)
+        requireAccess('send')
         if (!sent.success) throw new Error(sent.error)
         notifyToast(sent.data?.status === 'sent' ? '配信を送りました' : '配信の送信を受け付けました')
       } else {
+        requireAccess('schedule')
         notifyToast('配信を予約しました')
       }
       guard.disarm()
       onSent()
       onClose()
     } catch (e) {
-      const fieldFailure = saveErrors.capture(e)
-
-      { if (!fieldFailure)
-
-
-      setError(describeApiFailure(e, '保存')) }
+      if (!isCurrent()) return
+      if (e instanceof QuickSendPermissionChanged) setError(e.message)
+      else if (!saveErrors.capture(e)) setError(describeApiFailure(e, '保存'))
     } finally {
-      sendingRef.current = false
-      setBusy(false)
+      if (sendingRef.current === token) sendingRef.current = null
+      if (isCurrent()) setBusy(false)
     }
   }
 
-  const sendLabel = needsApproval ? '承認を頼む' : scheduledAt ? '予約する' : '送る'
+  const sendLabel = operation === 'approval' ? '承認を頼む' : operation === 'schedule' ? '予約する' : '送る'
 
   return (
     <SaveErrorScope errors={saveErrors}><>
@@ -283,13 +331,14 @@ export default function QuickSendV8({
       onCancel={() => { if (!busy) onClose() }}
       footer={(
         <div className={styles.footer}>
-          <Link href="/broadcasts/new" className={styles.detailLink}>
-            <ListOrdered size={16} aria-hidden="true" />
-            詳しく作るへ
-          </Link>
+          {access.create ? <Link href="/broadcasts/new" className={styles.detailLink}>
+            <ListOrdered size={16} aria-hidden="true" />詳しく作るへ
+          </Link> : <Button type="button" variant="secondary" className={styles.detailLink} disabled lockedReason={editReason}>
+            <ListOrdered size={16} aria-hidden="true" />詳しく作るへ
+          </Button>}
           <span className={styles.spacer} aria-hidden="true" />
           <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button type="button" variant="primary" onClick={() => void handleSend()} disabled={!canSend} title={!canSend ? sendDisabledReason : undefined} busy={busy} busyLabel="送っています…">
+          <Button type="button" variant="primary" onClick={() => void handleSend()} disabled={!canSend} lockedReason={operationReason} disabledReason={!operationReason && access.known ? sendDisabledReason : undefined} busy={busy} busyLabel="送っています…">
             <Send size={16} aria-hidden="true" />{sendLabel}
           </Button>
           <span className={styles.spacer} aria-hidden="true" />
@@ -298,43 +347,43 @@ export default function QuickSendV8({
         </div>
       )}
     >
-      <div className={styles.body}><Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField
+      <div className={styles.body}>{access.known && (!access.create || !access.preflight) ? <ReadOnlyNotice need="feature" /> : null}<Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}
           value={text}
           maxLength={TEXT_LIMIT}
-          disabled={busy || pending}
-          onValueChange={(next) => setText(next)}
+          disabled={busy || pending || !access.create}
+          onValueChange={changeInput(setText)}
         />
           <MessageInsertRow count={`${formatNumber(text.length)} / ${formatNumber(TEXT_LIMIT)}`}>
-            <MessageInsertButton kind="name" label="名前" disabled={busy || pending} onClick={insertName} />
+            <MessageInsertButton kind="name" label="名前" lockedReason={editReason} disabled={busy || pending || !access.create} onClick={insertName} />
           </MessageInsertRow>
         </MessageBody></SaveErrorField></Field>
 
 <p className={styles.label} id="quick-send-v8-target">送る相手</p>
 <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-target">
           {([['all', '友だち全員'], ['tag', 'タグで絞る']] as const).map(([value, label]) => (
-            <button key={value} type="button" role="radio" disabled={busy || pending} aria-checked={target === value} className={styles.chip} onClick={() => setTarget(value)}>
+            <QuickSendChoice key={value} lockedReason={editReason} type="button" role="radio" disabled={busy || pending || !access.create} aria-checked={target === value} className={styles.chip} onClick={() => { if (canUseQuickSendNow('create')) setTarget(value) }}>
               {label}
-            </button>
+            </QuickSendChoice>
           ))}
           {target === 'tag' ? (
             <div className={styles.tagPick}>
-              <SaveErrorField names={["tagId"]}><EntityKindField kind="tag" label="タグ" disabled={busy || pending} value={tagId} onChange={setTagId} options={tags} /></SaveErrorField>
+              <SaveErrorField names={["tagId"]}><EntityKindField kind="tag" label="タグ" disabled={busy || pending || !access.create} value={tagId} onChange={changeInput(setTagId)} options={tags} /></SaveErrorField>
             </div>
           ) : null}
         </div>
 <p className={styles.label} id="quick-send-v8-when">いつ</p>
 <div className={styles.chips} role="radiogroup" aria-labelledby="quick-send-v8-when">
           {([['now', '今すぐ'], ['scheduled', '日時を決める']] as const).map(([value, label]) => (
-            <button key={value} type="button" role="radio" disabled={busy || pending} aria-checked={when === value} className={styles.chip} onClick={() => setWhen(value)}>
+            <QuickSendChoice key={value} lockedReason={editReason} type="button" role="radio" disabled={busy || pending || !access.create} aria-checked={when === value} className={styles.chip} onClick={() => { if (canUseQuickSendNow('create')) setWhen(value) }}>
               {label}
-            </button>
+            </QuickSendChoice>
           ))}
           {when === 'scheduled' ? (
             <div className={styles.whenPick}>
-              <SaveErrorField names={["scheduledValue","scheduled_value"]}><DateTimeField disabled={busy || pending} value={scheduledValue} onChange={setScheduledValue} aria-label="送る日時" /></SaveErrorField>
+              <SaveErrorField names={["scheduledValue","scheduled_value"]}><DateTimeField disabled={busy || pending || !access.create} value={scheduledValue} onChange={changeInput(setScheduledValue)} aria-label="送る日時" /></SaveErrorField>
             </div>
           ) : null}
         </div>
@@ -345,7 +394,7 @@ export default function QuickSendV8({
               {estimating ? '人数を数えています…' : estimate ? estimateText(estimate) : '本文を書くと、届く人数の見込みが出ます'}
             </span>
           </div>
-          {needsCountConfirmation && estimate ? <SingleOperatorFields recipientCount={estimate.count} value={countInput} onChange={setCountInput} /> : null}
+          {needsCountConfirmation && estimate ? <fieldset className={styles.countFields} disabled={!access.preflight || busy}><SingleOperatorFields recipientCount={estimate.count} value={countInput} onChange={value => { if (canUseQuickSendNow('preflight')) setCountInput(value) }} /></fieldset> : null}
           {needsApproval ? (
             <div className={styles.approval}>
               <p className={styles.approvalTitle}>{`${formatNumber(approvalConfig?.threshold ?? APPROVAL_THRESHOLD)} 人以上に送るときは承認が要ります。承認する人を選んで頼んでください。`}</p>
@@ -353,7 +402,9 @@ export default function QuickSendV8({
                 aria-label="承認する人"
                 size="full"
                 value={approverId}
-                onChange={setApproverId}
+                onChange={value => { if (canUseQuickSendNow('approval')) setApproverId(value) }}
+                disabled={!access.preflight || busy}
+                lockedReason={access.reason('approval')}
                 options={[{ value: '', label: '承認する人を選ぶ' }, ...candidates.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: item.name, hint: ROLE_LABELS[item.role] }))]}
               /></SaveErrorField>
               <p className={styles.approvalNote}>1人で運用しているときは、人数を確かめるチェックだけで送れます。</p>

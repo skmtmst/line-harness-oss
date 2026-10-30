@@ -21,7 +21,7 @@ describe('V8 再撮9板の印（友だち情報の欄・友だち）', () => {
     const list = read('../../v8/broadcasts/list.tsx')
     expect(list, '一覧の板が無い').toContain("const boardId = narrow ? 'jjFNi' : canEdit ? 'l5V9a' : 'NtCE3'")
     expect(list).toContain('boardId={boardId}')
-    expect(list).toContain("閲覧のみで見ています。{permissionDeniedMessage('store')}")
+    // 権限の帯は broadcasts/list.test.tsx の実描画で、文・1本だけ・未知時0本を確かめる。
   })
 
   it('予約した後の外枠に CRtK8 を付ける', () => {

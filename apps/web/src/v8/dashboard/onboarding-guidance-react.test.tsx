@@ -10,6 +10,7 @@ const net = vi.hoisted(() => ({
 }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(net.search), usePathname: () => '/' }))
 vi.mock('@/components/shared/list-navigation', async original => ({ ...await original<typeof import('@/components/shared/list-navigation')>(), useListNavigationRouter: () => ({ replace: net.replace, push: net.push }) }))
+vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_account: string | null, style: import('@line-crm/shared').AccountStyle | null) => ({ progress: style ? { style, steps: {} } : undefined, reload: vi.fn() }) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ refreshAccounts: vi.fn(), selectedAccountId: 'A', selectedAccount: null, loading: false }) }))
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => net.role, useStaffIdentity: () => null }))
 vi.mock('@/lib/api', async original => {
@@ -213,4 +214,19 @@ it('既知の質問入口から実wizardを開き、戻ると閉じるで保存�
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   expect(await pendingSetup()).toBeTruthy()
   expect(net.save).not.toHaveBeenCalled(); expect(net.activate).not.toHaveBeenCalled()
+})
+
+
+it('既知の業種を設定取得の失敗で標準へ戻さず、実物が未知の段は済みにしない', async () => {
+  net.style.mockRejectedValue(new Error('setup unavailable'))
+  render(<DashboardV8 accountStyle="ec" />)
+  const progress = await screen.findByRole('progressbar', { name: 'はじめにやることの進み' })
+  expect(progress.getAttribute('aria-valuenow')).toBe('2')
+  const card = guide()
+  expect(within(card).getByText('ストアをつなぐ')).toBeTruthy()
+  expect(within(card).getByText('ストアの商品を確認する')).toBeTruthy()
+  expect(within(card).getAllByText('（未確認）')).toHaveLength(3)
+  expect(within(card).getAllByRole('button', { name: /の未確認の理由$/ })).toHaveLength(3)
+  expect(within(card).queryByText('友だちの分け方を決める')).toBeNull()
+  expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
 })

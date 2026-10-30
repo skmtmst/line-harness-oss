@@ -36,7 +36,7 @@ export default function VisitStampQr() {
  useEffect(()=>{if(!adding)return;const reload=()=>{if(document.visibilityState==='visible')void load()};window.addEventListener('focus',reload);document.addEventListener('visibilitychange',reload);return()=>{window.removeEventListener('focus',reload);document.removeEventListener('visibilitychange',reload)}},[adding,load]);
  const close=()=>{if(liff.isInClient())liff.closeWindow();else {const back=new URLSearchParams(params);back.delete('token');if(result?.status==='success'||result?.status==='limited')back.set('card',result.card.id);navigate(`/visit-stamps?${back}`)}};
  const add=()=>{if(!shop?.botBasicId)return;setAdding(true);liff.openWindow({url:`https://line.me/R/ti/p/${encodeURIComponent(shop.botBasicId)}`,external:true})};
- if(!result&&!error)return <LoadingView/>;
+ if(!result&&!error)return <LiffLookScope className={styles.screen}><LiffHeader title="来店スタンプ"/><main className={styles.content}><LoadingView/></main></LiffLookScope>;
  if(error)return <LiffLookScope className={styles.screen} designNode="zz9R3"><LiffHeader title="来店スタンプ"/><LoadErrorView message={error} onRetry={()=>{if(!busy)void load()}}/><Button variant="primary" onClick={close}>LINE に戻る</Button></LiffLookScope>;
  const board=result?.status==='success'?'eSJ8v':result?.status==='limited'?'e9lZv':result?.status==='friend_required'?'ZhddO':'xLyNh';
  const next=result?.status==='success'?result.nextReward:null;

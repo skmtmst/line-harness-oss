@@ -75,8 +75,28 @@ describe('b8xBtZ お問い合わせの並び', () => {
   it('統括の設定メニューで今の画面が分かる', async () => {
     await act(async () => { root.render(<HqSupportPage />) })
     await settle()
-    const current = host.querySelector('[aria-current="page"]')
+    const current = host.querySelector('a[aria-current="page"]')
     expect(current?.textContent).toContain('お問い合わせ')
+  })
+
+  it('［書き方のひな形を入れる］で見出しを本文へ入れ、書いた文章は残す', async () => {
+    await act(async () => { root.render(<HqSupportPage />) })
+    await settle()
+    const body = host.querySelector('textarea')!
+    const template = Array.from(host.querySelectorAll('button')).find((b) => b.textContent === '書き方のひな形を入れる')!
+    await act(async () => { template.click() })
+    expect(body.value).toContain('【起きたこと】')
+    expect(body.value).toContain('【期待したこと】')
+    expect(body.value).toContain('【起きた日時】')
+    // 書いた文章を残して足す。
+    const proto = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!
+    await act(async () => {
+      proto.call(body, 'まず再起動しました')
+      body.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => { template.click() })
+    expect(body.value.startsWith('まず再起動しました')).toBe(true)
+    expect(body.value).toContain('【起きたこと】')
   })
 })
 

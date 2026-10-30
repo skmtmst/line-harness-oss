@@ -131,7 +131,8 @@ export default function BroadcastStatusRail({
           </li>
         ) : null}
       </ol>
-      <Notice tone="info">
+      {/* 一部失敗・失敗は注意以上の組（青にしない）。 */}
+      <Notice tone={displayStatus === 'failed' ? 'danger' : displayStatus === 'partial_failed' ? 'warn' : 'info'}>
         {bandText(displayStatus, ledger, total, scheduledAt, formatDateTime)}
       </Notice>
       {displayStatus === 'partial_failed' || displayStatus === 'failed' ? (

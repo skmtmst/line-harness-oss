@@ -519,7 +519,8 @@ function OverviewTab({
 // Tab 2: Slots
 // ----------------------------------------------------------------
 
-function SlotsTab({
+/** 予約枠の一覧（試験から直接描けるよう名前付きで出す）。 */
+export function SlotsTab({
   accountId,
   eventId,
   slots,
@@ -719,14 +720,17 @@ function SlotsTab({
                     </Button>
                   </Td>
                   <ActionCell>
-                      <RowActions edit={{ onClick: () => setEditSlotTarget(s), disabled: busy }} />
-                      <Button variant="danger"
-                        onClick={() => { setDeleteSlotError(''); setDeleteSlotTarget(s) }}
-                        disabled={busy || (s.active_count ?? 0) > 0}
-                        title={(s.active_count ?? 0) > 0 ? '既存予約があるため削除できません' : '削除'}
-                      >
-                        削除する
-                      </Button>
+                      {/* 行の右は「…」に1つ。削除は区切りの下・赤で最後（持ち主 RowActions が決める）。 */}
+                      <RowActions
+                        edit={{ onClick: () => setEditSlotTarget(s), disabled: busy }}
+                        destructiveItem={{
+                          id: 'delete-slot', label: '削除する',
+                          disabled: busy || (s.active_count ?? 0) > 0,
+                          disabledReason: (s.active_count ?? 0) > 0 ? '既存予約があるため削除できません' : busy ? '処理を反映しています' : undefined,
+                          onSelect: () => { setDeleteSlotError(''); setDeleteSlotTarget(s) },
+                        }}
+                        subjectName={formatJpSlotRange(s.starts_at, s.ends_at)}
+                      />
                   </ActionCell>
                 </Tr>
               ))}

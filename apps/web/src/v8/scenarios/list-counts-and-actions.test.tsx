@@ -1,7 +1,10 @@
 // @vitest-environment happy-dom
+import type { StaffMember } from '@line-crm/shared'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 /*
  * V8 シナリオ一覧の件数と操作の動きの試験。
- * - 読了率の母数は「いま途中＋読み終えた人」。登録0なら0%ではなく「—」
+ * - 読了率の母数は「いま途中＋読み終えた人」。登録0でも数は読めているので「登録した 0 人」（棒・割合なし）
  * - 「すべて」と数の帯のシナリオ数は、絞り込み無しの全体件数（共通のシナリオを含む）
  * - フォルダ・数の帯は一覧と同じアカウントで数え、「未分類」はサーバーの数を出す
  * - 共通のシナリオがフォルダの内訳に入らないことを、差がある時だけ説明する
@@ -37,7 +40,7 @@ const scenario = (id: string, name: string, folderId: string | null, isActive = 
 })
 
 const state = vi.hoisted(() => ({
-  role: 'owner' as 'owner' | 'viewer' | null,
+  role: 'owner' as 'owner' | 'admin' | 'staff' | 'viewer' | null,
   account: 'account-a' as string | null,
   /** 絞り込み無しの全体件数（全アカウント共通のシナリオを含む）。 */
   overall: 7,
@@ -50,6 +53,8 @@ const statsGet = vi.hoisted(() => vi.fn())
 const update = vi.hoisted(() => vi.fn())
 const create = vi.hoisted(() => vi.fn())
 const remove = vi.hoisted(() => vi.fn())
+const reorder = vi.hoisted(() => vi.fn())
+const undo = vi.hoisted(() => ({ hold: false, queue: [] as Array<{ commit: () => unknown }> }))
 const duplicate = vi.hoisted(() => vi.fn())
 
 vi.mock('@/components/scenarios/duplicate-scenario', async (importOriginal) => ({
@@ -64,6 +69,7 @@ vi.mock('@/lib/undoable', async (importOriginal: () => Promise<typeof import('@/
   return {
     ...actual,
     runUndoable: (options: Parameters<typeof actual.runUndoable>[0]) => {
+      if (undo.hold) { undo.queue.push(options); return }
       void Promise.resolve()
         .then(() => options.commit())
         .then((res) => {
@@ -106,7 +112,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     ...actual,
     api: {
       ...api,
-      scenarios: { ...api.scenarios, listPage, update, create, delete: remove, moveReferrers: vi.fn(async () => ({ success: true, data: { items: [] } })), reorder: vi.fn(async () => ({ success: true })) },
+      scenarios: { ...api.scenarios, listPage, update, create, delete: remove, moveReferrers: vi.fn(async () => ({ success: true, data: { items: [] } })), reorder },
       folders: { ...api.folders, list: folderList },
       listStats: { get: statsGet },
     },
@@ -141,8 +147,13 @@ async function mount() {
 }
 
 beforeEach(() => {
+  forgetStaffIdentity(); forgetSessionSnapshot()
+  rememberStaffIdentity({ id: 'scenario-owner', role: 'owner', permissionKeys: [] } as unknown as StaffMember)
   // 絞り込みは URL に残るので、前の試験の絞り込みを持ち越さない。
   window.history.replaceState(null, '', '/scenarios')
+  undo.hold = false; undo.queue = []
+  reorder.mockResolvedValue({ success: true })
+  remove.mockResolvedValue({ success: true })
   state.account = 'account-a'
   state.role = 'owner'
   state.overall = 7
@@ -164,6 +175,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  forgetStaffIdentity(); forgetSessionSnapshot()
   cleanup()
   clearToastsForTest()
   vi.clearAllMocks()
@@ -177,11 +189,25 @@ describe('読了率の母数', () => {
     expect(screen.getAllByTitle('配信中 10 人・最後まで配信 2 人')).toHaveLength(2)
   })
 
-  test('登録した人が0なら0%と言わず「—」にする', async () => {
+  test('登録した人が0でも数は読めているので薄い灰の「登録した 0 人」と出す（割合は決まらないので出さない）', async () => {
     state.stats = { scenarios: { total: 0, active: 0, subscribers: 0, completed: 0, sentThisWeek: 0 } }
     await mount()
-    await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('—'))
+    await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('登録した 0 人'))
     expect(kpi('最後まで配信した人').textContent).not.toContain('%')
+  })
+
+  test('登録0の行は棒と割合を出さず「登録した 0 人」だけ出す', async () => {
+    listPage.mockImplementation(async () => ({
+      success: true,
+      data: { items: [{ ...scenario('s-zero', '誰もいない', null), subscriberCount: 0, completedCount: 0 }], total: 1, limit: 20, sort: [] },
+    }))
+    const view = render(<><ScenariosListV8 /><ToastHost /></>)
+    await view.findByText('誰もいない')
+    const row = screen.getByText('誰もいない').closest('tr') as HTMLElement
+    expect(row.textContent).toContain('配信中 0 人・最後まで配信 0 人')
+    expect(row.textContent).toContain('登録した 0 人')
+    expect(row.textContent).not.toContain('%')
+    expect(within(row).queryByRole('progressbar')).toBeNull()
   })
 })
 
@@ -360,7 +386,8 @@ describe('右詳細の情報と操作', () => {
     const detail = await panel()
     expect(detail.textContent).toContain('配信方法は未確認・通数は未確認')
     const facts = within(detail).getByRole('region', { name: '配信状況' })
-    expect(facts.textContent).toContain('配信中 — 人・最後まで配信 — 人')
+    expect(facts.textContent).toContain('配信中 —・最後まで配信 —')
+    expect(facts.textContent).not.toContain('— 人')
     expect(facts.textContent).not.toContain('0 人')
   })
 
@@ -390,6 +417,8 @@ describe('右詳細の情報と操作', () => {
 
   test.each(['viewer', null] as const)('役割%sでは既存の編集操作を起動しない', async (role) => {
     state.role = role
+    forgetStaffIdentity()
+    if (role) rememberStaffIdentity({ id: 'scenario-viewer', role, permissionKeys: [] } as unknown as StaffMember)
     const detail = await panel()
     expect(within(detail).queryByRole('button', { name: 'シナリオ名を変更する' })).toBeNull()
     expect(within(detail).queryByRole('button', { name: /その他操作/ })).toBeNull()
@@ -397,5 +426,176 @@ describe('右詳細の情報と操作', () => {
     expect(update).not.toHaveBeenCalled()
     expect(remove).not.toHaveBeenCalled()
     expect(duplicate).not.toHaveBeenCalled()
+  })
+})
+
+
+describe('保持した書込操作の実行直前の判定', () => {
+  function selectRow(name: string) { const row = screen.getByText(name).closest('tr')!; fireEvent.click(within(row).getByRole('checkbox')) }
+  const person = (role: 'owner' | 'admin' | 'staff' | 'viewer', extra: object = {}) => { state.role = role; return { id: 'scenario-person', role, permissionKeys: [], ...extra } as unknown as StaffMember }
+  const proxyRead = () => rememberSessionSnapshot({ stepUpMethod: 'totp', unfamiliarAt: null, impersonation: { mode: 'read' } as never })
+  function heldClick(button: HTMLElement) {
+    const key = Object.keys(button).find(key => key.startsWith('__reactProps$'))!
+    const handler = (button as unknown as Record<string, { onClick: (event: unknown) => unknown }>)[key].onClick
+    expect(handler).toBeTypeOf('function')
+    return () => handler({ defaultPrevented: false, preventDefault() {}, stopPropagation() {}, currentTarget: button, target: button })
+  }
+  const pending = <T,>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(done => { resolve = done }); return { promise, resolve } }
+  async function deleteConfirmation() {
+    fireEvent.click(screen.getByRole('button', { name: 'シナリオ「新規登録7日間フォロー」の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '削除する', exact: true }))
+    return screen.findByRole('alertdialog', { name: '「新規登録7日間フォロー」を削除しますか？', exact: true })
+  }
+  test.each(['viewer', 'unknown', 'read-proxy'] as const)('%sへ変わると、保持した削除確定もAPI0で窓と読取を残す', async change => {
+    await mount()
+    const dialog = await deleteConfirmation()
+    const saved = heldClick(within(dialog).getByRole('button', { name: '削除する', exact: true }))
+    act(() => { if (change === 'viewer') rememberStaffIdentity(person('viewer')); else if (change === 'unknown') { state.role = null; forgetStaffIdentity() } else proxyRead() })
+    await act(async () => { await saved() })
+    expect(remove).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog', { name: '「新規登録7日間フォロー」を削除しますか？', exact: true })).toBeTruthy()
+    expect(await screen.findByText('本人・権限・LINEアカウントを確認できないため、変更を中止しました。')).toBeTruthy()
+    expect(listPage).toHaveBeenCalled(); expect(folderList).toHaveBeenCalled(); expect(statsGet).toHaveBeenCalled()
+  })
+  test('編集キーstaffも配信の開始停止は拒む。管理者の明示操作は保存する', async () => {
+    rememberStaffIdentity(person('staff', { permissionKeys: ['/scenarios', 'scenario.definition.edit', 'scenario.definition.publish'] }))
+    await mount(); selectRow('新規登録7日間フォロー')
+    fireEvent.click(await screen.findByRole('button', { name: '止める', exact: true }))
+    let dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '停止する', exact: true }))
+    expect(update).not.toHaveBeenCalled()
+    expect(await screen.findByText('本人・権限・LINEアカウントを確認できないため、変更を中止しました。')).toBeTruthy()
+    act(() => rememberStaffIdentity(person('admin')))
+    fireEvent.click(await screen.findByRole('button', { name: '止める', exact: true }))
+    dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '停止する', exact: true }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    expect(update).toHaveBeenCalledWith('s-filed', { isActive: false })
+  })
+  test('取り消し待ちの並べ替えは本人切替後にGETも書込も始めない', async () => {
+    undo.hold = true; await mount()
+    fireEvent.keyDown(document.querySelector('button[data-reorder-handle]')!, { key: 'ArrowDown' })
+    expect(undo.queue).toHaveLength(1)
+    const reads = listPage.mock.calls.length
+    act(() => rememberStaffIdentity(person('viewer')))
+    await expect(undo.queue[0].commit()).rejects.toThrow('本人・権限')
+    expect(listPage).toHaveBeenCalledTimes(reads); expect(reorder).not.toHaveBeenCalled()
+    expect(await screen.findByText('本人・権限・LINEアカウントを確認できないため、変更を中止しました。')).toBeTruthy()
+  })
+  test('並べ替えの全件GET中にread代理へ変わると順位を保存しない', async () => {
+    undo.hold = true; await mount()
+    const response = pending<{ success: boolean; data: { items: typeof rows; total: number; limit: number; sort: never[] } }>()
+    listPage.mockImplementation(input => input.limit === 100 ? response.promise : Promise.resolve({ success: true, data: { items: rows, total: rows.length, limit: input.limit, sort: [] } }))
+    fireEvent.keyDown(document.querySelector('button[data-reorder-handle]')!, { key: 'ArrowDown' })
+    expect(undo.queue).toHaveLength(1)
+    const commit = Promise.resolve(undo.queue[0].commit())
+    await waitFor(() => expect(listPage).toHaveBeenCalledWith(expect.objectContaining({ limit: 100 }), expect.anything()))
+    act(proxyRead)
+    response.resolve({ success: true, data: { items: rows, total: rows.length, limit: 100, sort: [] } })
+    await expect(commit).rejects.toThrow('本人・権限')
+    expect(reorder).not.toHaveBeenCalled()
+  })
+  test('一括停止は1件目の応答中の権限切替で未送信の2件目を止め、実数を出す', async () => {
+    const activeRows = rows.map(row => ({ ...row, isActive: true }))
+    listPage.mockResolvedValue({ success: true, data: { items: activeRows, total: 2, limit: 20, sort: [] } })
+    const first = pending<{ success: boolean; data: object }>()
+    update.mockReturnValueOnce(first.promise)
+    await mount(); selectRow('新規登録7日間フォロー'); selectRow('会員更新リマインド')
+    fireEvent.click(await screen.findByRole('button', { name: '止める', exact: true }))
+    const dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '停止する', exact: true }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(1))
+    act(() => rememberStaffIdentity(person('viewer')))
+    await act(async () => first.resolve({ success: true, data: {} }))
+    expect(await screen.findByText('2 件中 1 件を保存しました。残りは本人・権限・LINEアカウントが変わったため送っていません。')).toBeTruthy()
+    expect(update).toHaveBeenCalledTimes(1)
+  })
+  test('フォルダ移動の取り消し待ちはread代理への切替で送らず、窓の確定を持ち越さない', async () => {
+    undo.hold = true; await mount(); selectRow('新規登録7日間フォロー')
+    fireEvent.click(await screen.findByRole('button', { name: 'フォルダへ移す', exact: true }))
+    const dialog = await screen.findByRole('dialog', { name: '「新規登録7日間フォロー」のフォルダを移動' })
+    fireEvent.click(within(dialog).getByRole('button', { name: '移動する', exact: true }))
+    expect(undo.queue).toHaveLength(1)
+    act(proxyRead)
+    await expect(undo.queue[0].commit()).rejects.toThrow('本人・権限')
+    expect(update).not.toHaveBeenCalled()
+    expect(await screen.findByText('1 件中 0 件を保存しました。残りは本人・権限・LINEアカウントが変わったため送っていません。')).toBeTruthy()
+  })
+  test('AからBへ移りAへ戻っても、古い並べ替えは復活せず新しい明示操作だけ通る', async () => {
+    undo.hold = true; const view = await mount()
+    fireEvent.keyDown(document.querySelector('button[data-reorder-handle]')!, { key: 'ArrowDown' })
+    expect(undo.queue).toHaveLength(1)
+    state.account = 'account-b'; view.rerender(<><ScenariosListV8 /><ToastHost /></>)
+    await waitFor(() => expect(folderList).toHaveBeenCalledWith('scenario', 'account-b'))
+    state.account = 'account-a'; view.rerender(<><ScenariosListV8 /><ToastHost /></>)
+    await waitFor(() => expect(document.querySelector('button[data-reorder-handle]')).toBeTruthy())
+    await undo.queue[0].commit()
+    expect(reorder).not.toHaveBeenCalled()
+    fireEvent.keyDown(document.querySelector('button[data-reorder-handle]')!, { key: 'ArrowDown' })
+    expect(undo.queue).toHaveLength(2)
+    await undo.queue[1].commit()
+    expect(reorder).toHaveBeenCalledTimes(1)
+  })
+  test('複製の共通手順へ最新判定を渡し、切替後にコピーを勝手に再開しない', async () => {
+    const response = pending<string>(); duplicate.mockReturnValueOnce(response.promise)
+    await mount()
+    fireEvent.click(screen.getByRole('button', { name: 'シナリオ「新規登録7日間フォロー」の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '複製する', exact: true }))
+    await waitFor(() => expect(duplicate).toHaveBeenCalledTimes(1))
+    const allowed = duplicate.mock.calls[0][2] as () => boolean
+    expect(allowed).toBeTypeOf('function'); expect(allowed()).toBe(true)
+    act(proxyRead); expect(allowed()).toBe(false)
+    act(() => forgetSessionSnapshot()); expect(allowed()).toBe(false)
+    await act(async () => response.resolve('saved-copy'))
+    expect(await screen.findByText('本人・権限が変わったため処理を止めました。作成済みのコピーを一覧で確認してください。')).toBeTruthy()
+    expect(duplicate).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText('複製しました')).toBeNull()
+  })
+  test('名前の編集中にread代理へ替わると保持したEnterでも更新0、GETは残る', async () => {
+    window.history.replaceState(null, '', '/scenarios?scenario=s-filed')
+    render(<><ScenariosListV8 /><ToastHost /></>)
+    const panel = await screen.findByRole('dialog', { name: '新規登録7日間フォロー', exact: true })
+    fireEvent.click(within(panel).getByRole('button', { name: 'シナリオ名を変更する' }))
+    const field = within(panel).getByRole('textbox', { name: 'シナリオ名', exact: true })
+    fireEvent.change(field, { target: { value: '書きかけ' } })
+    const key = Object.keys(field).find(key => key.startsWith('__reactProps$'))!
+    const enter = (field as unknown as Record<string, { onKeyDown: (event: unknown) => unknown }>)[key].onKeyDown
+    expect(enter).toBeTypeOf('function')
+    act(proxyRead)
+    await act(async () => enter({ key: 'Enter', defaultPrevented: false, preventDefault() {}, nativeEvent: { isComposing: false }, keyCode: 13 }))
+    expect(update).not.toHaveBeenCalled(); expect(listPage).toHaveBeenCalled()
+    expect(await screen.findByText('本人・権限・LINEアカウントを確認できないため、変更を中止しました。')).toBeTruthy()
+  })
+
+  test('本人未知へ替わると保持した作成入口からも遷移しない', async () => {
+    await mount()
+    const start = heldClick(screen.getAllByRole('button', { name: 'シナリオを作る', exact: true })[0])
+    act(() => { state.role = null; forgetStaffIdentity() })
+    await act(async () => { await start() })
+    expect(push).not.toHaveBeenCalled()
+    expect(create).not.toHaveBeenCalled()
+    expect(await screen.findByText('本人・権限・LINEアカウントを確認できないため、変更を中止しました。')).toBeTruthy()
+  })
+  test('削除窓を閉じて開き直しても、古い確定では保存せず、新しい確定だけ通る', async () => {
+    await mount(); let dialog = await deleteConfirmation()
+    const saved = heldClick(within(dialog).getByRole('button', { name: '削除する', exact: true }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル', exact: true }))
+    dialog = await deleteConfirmation()
+    await act(async () => { await saved() })
+    expect(remove).not.toHaveBeenCalled()
+    expect(screen.getByRole('alertdialog', { name: '「新規登録7日間フォロー」を削除しますか？', exact: true })).toBeTruthy()
+    fireEvent.click(within(dialog).getByRole('button', { name: '削除する', exact: true }))
+    await waitFor(() => expect(remove).toHaveBeenCalledTimes(1))
+  })
+  test('複製の待機中に画面を離れたら保持した許可も失効する', async () => {
+    const response = pending<string>(); duplicate.mockReturnValueOnce(response.promise)
+    const view = await mount()
+    fireEvent.click(screen.getByRole('button', { name: 'シナリオ「新規登録7日間フォロー」の操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '複製する', exact: true }))
+    await waitFor(() => expect(duplicate).toHaveBeenCalledTimes(1))
+    const allowed = duplicate.mock.calls[0][2] as () => boolean
+    expect(allowed()).toBe(true); view.unmount(); expect(allowed()).toBe(false)
+    await act(async () => response.resolve('saved-copy'))
+    expect(screen.queryByText('複製しました')).toBeNull()
   })
 })

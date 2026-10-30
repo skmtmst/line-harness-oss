@@ -49,7 +49,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
   const canMutate = host ? !host.readOnly : featureAccess
   usePageTitle(host?.composer ? null : id ? 'リッチビデオを編集' : 'リッチビデオを作る', !host?.composer)
   usePageCrumbs([{label:'ホーム',href:'/'},{label:'テンプレート',href:'/templates'}], !host)
-  const [draft,setDraft] = useState<RichVideoDraft>(() => visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://nen-petfood.jp/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft)
+  const [draft,setDraft] = useState<RichVideoDraft>(() => visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://example.com/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft)
   const [folders,setFolders] = useState<Folder[]>([])
   const [error,setError] = useState('')
   const [issue,setIssue] = useState<RichVideoIssue | null>(null)
@@ -80,7 +80,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
     return ()=>{cancelled=true}
   },[scopeAccountId,Boolean(host)])
   // アカウントを替えた後の動画・画像のアップロード結果を受け取らない。
-  useEffect(()=>{generation.current++;if(!id){setDraft(visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://nen-petfood.jp/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft);setSavedId(null);setFileName('');setNeedsImage(false);setBusy(false);setClean(snapshotOf(visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://nen-petfood.jp/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft));setIssue(null);setError('')}},[scopeAccountId,id,visual])
+  useEffect(()=>{generation.current++;if(!id){setDraft(visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://example.com/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft);setSavedId(null);setFileName('');setNeedsImage(false);setBusy(false);setClean(snapshotOf(visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://example.com/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft));setIssue(null);setError('')}},[scopeAccountId,id,visual])
   useEffect(()=> {
     const current = ++generation.current
     if (!id) {
@@ -92,7 +92,7 @@ export default function TemplateRichVideoEditor({ id = null, visual = false, hos
 
  setError('動画の中身を読み込めませんでした。') } }
       }
-      setDraft(visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://nen-petfood.jp/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft)
+      setDraft(visual ? {...emptyDraft,name:'新メニュー紹介の動画',actionUrl:'https://example.com/new-menu',altText:'新メニューの動画が届きました'} : emptyDraft)
       media.current = []; baseUrl.current = ''; setBinding(null); setSavedId(null); setLoading(false)
       return ()=>{generation.current++}
     }

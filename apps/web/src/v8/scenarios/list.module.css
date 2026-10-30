@@ -135,6 +135,7 @@
 
 .countRow {
   display: flex;
+  justify-content: flex-end;
   align-items: center;
   gap: var(--space-8);
   min-width: 0;

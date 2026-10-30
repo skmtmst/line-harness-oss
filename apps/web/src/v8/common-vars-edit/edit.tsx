@@ -29,6 +29,7 @@ import Dialog from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import LinePreview from '@/components/shared/line-preview'
+import MusuboMark from '@/components/shared/musubo-mark'
 import ListState from '@/components/shared/list-state'
 import { NOT_AVAILABLE,STATE_TEXT } from '@/components/shared/not-connected'
 import Notice from '@/components/shared/notice'
@@ -36,6 +37,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { SaveErrorField,SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
 import Select from '@/components/shared/select'
 import { StickyBarAction } from '@/components/shared/sticky-bar'
+import ChooseCommonVarTarget from './choose-target'
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageCrumbs,usePageTitle } from '@/components/shell/page-chrome'
 import { CreatePage } from '@/components/templates'
@@ -494,13 +496,8 @@ function EditCommonVarV8Inner() {
 
   if (!id) {
     return (
-      <SaveErrorScope errors={saveErrors}><TargetMissing
-        kind="unspecified"
-        title="編集する共通情報が指定されていません"
-        description="一覧から編集する共通情報を選び直してください。"
-        backHref="/contents/vars"
-        backLabel="共通情報一覧へ戻る"
-      /></SaveErrorScope>
+      <SaveErrorScope errors={saveErrors}><ChooseCommonVarTarget accountId={selectedAccountId}
+        onSelect={targetId => router.push(`/contents/vars/edit?id=${encodeURIComponent(targetId)}`)} /></SaveErrorScope>
     )
   }
   if (!accountLoading && !selectedAccountId) {
@@ -548,13 +545,13 @@ function EditCommonVarV8Inner() {
   const previewTalk = (
     <LinePreview
       caption={schedules.length > 0 && schedules[0] ? `${scheduleStamp(schedules[0].effectiveFrom)} から` : undefined}
-      accountName="然 - NEN -"
+      accountName="musubo"
       note="差し込んだときの見え方です。新しい中身を入れると、ここが変わります。"
     >
       <div className={styles.talkRow}>
-        <span className={styles.talkIcon} aria-hidden="true">然</span>
+        <span className={styles.talkIcon} aria-hidden="true"><MusuboMark /></span>
         <div className={styles.talkCol}>
-          <span className={styles.talkName}>然 - NEN -</span>
+          <span className={styles.talkName}>musubo</span>
           <div className={styles.talkBubbleRow}>
             <p className={styles.talkBubble}>
               {`いつもありがとうございます。\n${item?.name ?? '共通情報'}は ${value || emptyValue('unconfigured')} です。`}

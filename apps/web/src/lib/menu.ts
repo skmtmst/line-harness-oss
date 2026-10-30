@@ -193,9 +193,8 @@ export const MENU_SECTIONS: MenuSection[] = [
       { href: '/staff', label: 'ログインユーザー', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' , id: 'staff', note: '管理画面に入る人と、その権限', required: true },
       { href: '/settings', label: '機能設定', icon: 'M4 6h16M4 12h16M4 18h7' , id: 'settings', note: 'この画面。項目の表示と並びを決めます', required: true },
       { href: '/emergency', label: '運用状態', icon: 'M13 10V3L4 14h7v7l9-11h-7z', badge: 'operations' , id: 'emergency', note: '配信の停止・再開と、異常の記録', required: true },
-      // EC連携・LINE通知は「ECとLINEをつなぐ配管の点検口」。専用機能から設定へ移した（2026-09-16）。
+      // EC連携は「ECとLINEをつなぐ配管の点検口」。専用機能から設定へ移した（2026-09-16）。
       { href: '/ec-commerce', label: 'EC連携', icon: 'M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z', badge: 'unmatched' , id: 'ec-commerce', note: 'ECの会員・注文・定期便データを取り込みます', featureKey: 'ec_commerce' },
-      { href: '/line-notifications', label: 'LINE通知', icon: 'M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9', id: 'line-notifications', note: '注文・入金・発送・返金・定期便の重要なお知らせ', featureKey: 'line_notifications' },
     ],
   },
   {
@@ -205,9 +204,6 @@ export const MENU_SECTIONS: MenuSection[] = [
     label: '飲食店向け（テスト）',
     title: '飲食店向け（テスト）',
     items: [
-      { href: '/restaurant-test/dashboard', label: '店舗ダッシュボード', icon: 'M3 3v18h18M7 16v2m4-6v6m4-10v10m4-14v14', id: 'restaurant-dashboard', note: '全店の予約・空席・売上予測・連携状態', featureKey: 'restaurant_test' },
-      { href: '/restaurant-test/organization', label: '組織・権限', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M15 7a3 3 0 11-6 0 3 3 0 016 0z', id: 'restaurant-organization', note: '本部・店舗・スタッフの権限と連携アカウント', featureKey: 'restaurant_test' },
-      { href: '/restaurant-test/approvals', label: '承認の流れ', icon: 'M9 11l3 3L22 4M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11', id: 'restaurant-approvals', note: 'GBP投稿・LINE配信・メニュー改定の承認', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/reservations', label: '予約台帳', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', id: 'restaurant-reservations', note: '媒体別の予約、配席、顧客カルテを一元表示', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/tables', label: '座席・卓管理', icon: 'M4 6h16M6 6v12m12-12v12M4 18h16M9 10h6v4H9z', id: 'restaurant-tables', note: 'フロア、席種、収容人数、結合ルール', featureKey: 'restaurant_test' },
       { href: '/restaurant-test/inventory', label: '予約枠・在庫', icon: 'M3 5h18v14H3zM3 10h18M8 5v14M13 5v14M18 5v14', id: 'restaurant-inventory', note: '時間帯と媒体別の受入枠を管理', featureKey: 'restaurant_test' },
@@ -292,7 +288,7 @@ export const SCREEN_MENU_OWNER: Record<string, string | readonly string[]> = {
   '/booking/staff': 'booking-menus',
   '/booking/staff/new': 'booking-menus',
   '/duplicates': 'friends',
-  '/restaurant-test/close-tasks': 'restaurant-dashboard',
+  '/restaurant-test/close-tasks': 'restaurant-inventory',
 }
 
 /**

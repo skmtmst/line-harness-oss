@@ -37,7 +37,7 @@ export interface FolderSelectFolder {
 
 export type FolderSelectCreate = (name: string, color: string | null) => Promise<FolderSelectFolder>
 
-export interface FolderSelectProps extends Pick<SelectProps, 'aria-label' | 'label' | 'className' | 'disabled' | 'error' | 'id' | 'name' | 'size' | 'width' | 'defaultOpen'> {
+export interface FolderSelectProps extends Pick<SelectProps, 'aria-label' | 'label' | 'className' | 'disabled' | 'error' | 'id' | 'name' | 'size' | 'width' | 'defaultOpen' | 'lockedReason'> {
   folders: ReadonlyArray<FolderSelectFolder>
   value: string
   onChange: (value: string) => void

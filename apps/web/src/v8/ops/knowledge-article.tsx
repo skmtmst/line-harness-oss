@@ -4,7 +4,6 @@ import { Check } from 'lucide-react'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api, type OpsKnowledgeArticle, type OpsKnowledgeInput } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import { KNOWLEDGE_KINDS, knowledgeTime, knowledgeArticleKind } from '@/components/ops/knowledge-format'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
@@ -15,6 +14,7 @@ import { TextArea, TextField } from '@/components/shared/text-field'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { OpsHead } from './shell'
+import { OPS_READONLY_LOCK_REASON, useOpsReadOnlyState } from './use-ops-read-only'
 import { usePageTitle } from '@/components/shell/page-chrome'
 import parts from './parts.module.css'
 import styles from './ops-knowledge-v8.module.css'
@@ -47,6 +47,9 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
   const [readChecked, setReadChecked] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
+  const access = useOpsReadOnlyState()
+  const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
+  const unknown = access === 'unknown'
   const [closing, setClosing] = useState(false)
   const [loadedTicket, setLoadedTicket] = useState<typeof ticket>(null)
   const [ticketError, setTicketError] = useState('')
@@ -87,7 +90,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
   fields.define('answer', '答え', () => (eligible && !form.answer.trim() ? '答えを入力してください' : null), { required: eligible })
 
   const save = async (approve = false) => {
-    if (busy || (approve && (!readChecked || !eligible || ticketBlocked))) return
+    if (busy || access !== 'writer' || (approve && (!readChecked || !eligible || ticketBlocked))) return
     const value = input()
     if (fields.submit().length > 0) { setError(''); return }
     setBusy(true); setError('')
@@ -105,6 +108,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
   }
 
   const review = async (action: 'dismiss' | 'disable') => {
+    if (access !== 'writer') return
     setBusy(true); setError('')
     const res = await opsCall(api.ops.knowledge.review(article.id, { version: article.version, action }))
     setBusy(false)
@@ -128,9 +132,9 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
         {/* 全画面の戻り道はパンくずと左のメニュー（R5ckwJ は頭に主ボタンだけ）。窓のときは閉じる口として残す。 */}
         {!fullPage ? <Button onClick={close} disabled={busy}>キャンセル</Button> : null}
         {editing ? (
-          <Button variant="primary" onClick={() => save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">承認待ちで保存する</Button>
+          <Button variant="primary" lockedReason={lock} onClick={() => save()} disabled={busy || unknown} busy={Boolean(busy)} busyLabel="処理中…">承認待ちで保存する</Button>
         ) : (
-          <Button variant="primary" disabled={busy || !canApprove} onClick={() => { setError(''); setApproving(true) }}><Check aria-hidden="true" />保存して承認</Button>
+          <Button variant="primary" lockedReason={lock} disabled={busy || unknown || !canApprove} onClick={() => { setError(''); setApproving(true) }}><Check aria-hidden="true" />保存して承認</Button>
         )}
       </>
     )} title={form.title || 'ナレッジの記事'} description={`${editing ? '承認済み' : '承認待ち'}・${ticketLabel} の解決から自動で下書き`}>
@@ -170,30 +174,30 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
             {editing ? (
               <>
                 <Button onClick={close} disabled={busy}>保存せず閉じる</Button>
-                <Button variant="danger" onClick={() => review('disable')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">無効にする</Button>
+                <Button variant="danger" lockedReason={lock} onClick={() => review('disable')} disabled={busy || unknown} busy={Boolean(busy)} busyLabel="処理中…">無効にする</Button>
               </>
             ) : (
               <>
-                {article.reviewState !== 'dismissed' ? <Button onClick={() => review('dismiss')} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">見送る</Button> : null}
-                <Button onClick={() => save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存</Button>
+                {article.reviewState !== 'dismissed' ? <Button lockedReason={lock} onClick={() => review('dismiss')} disabled={busy || unknown} busy={Boolean(busy)} busyLabel="処理中…">見送る</Button> : null}
+                <Button lockedReason={lock} onClick={() => save()} disabled={busy || unknown} busy={Boolean(busy)} busyLabel="処理中…">下書きを保存</Button>
               </>
             )}
           </div>
         </aside>
       )}>
         <section className={styles.fields} aria-label="記事の中身">
-          <div className={styles.field}><Field label="題名" htmlFor="ka-title" requirement={fields.requirement('title')}><SaveErrorField names={["title","form.title"]}><TextField {...fields.bind('title')} id="ka-title" invalid={fields.invalid('title')} aria-describedby={fields.invalid('title') ? 'ka-title-error' : undefined} value={form.title} maxLength={120} disabled={busy} onChange={(e) => change('title', e.target.value)} /></SaveErrorField>
+          <div className={styles.field}><Field label="題名" htmlFor="ka-title" requirement={fields.requirement('title')}><SaveErrorField names={["title","form.title"]}><TextField {...fields.bind('title')} id="ka-title" invalid={fields.invalid('title')} aria-describedby={fields.invalid('title') ? 'ka-title-error' : undefined} value={form.title} maxLength={120} disabled={busy || access !== 'writer'} onChange={(e) => change('title', e.target.value)} /></SaveErrorField>
 <FieldError id="ka-title-error">{fields.error('title')}</FieldError></Field></div>
           <div className={styles.field}>
             <span className={styles.smallLabel} id="ops-article-kind">種類</span>
-              <SaveErrorField names={["kind","form.kind"]}><Select size="full" aria-label="種類" options={KNOWLEDGE_KINDS} value={form.kind} disabled={busy} onChange={(value) => change('kind', value as OpsKnowledgeInput['kind'])} /></SaveErrorField>
+              <SaveErrorField names={["kind","form.kind"]}><Select size="full" aria-label="種類" options={KNOWLEDGE_KINDS} value={form.kind} disabled={busy || access !== 'writer'} onChange={(value) => change('kind', value as OpsKnowledgeInput['kind'])} /></SaveErrorField>
           </div>
-          <div className={styles.field}><Field label="質問" htmlFor="ka-question" requirement={fields.requirement('question')}><SaveErrorField names={["question","form.question"]}><TextArea {...fields.bind('question')} id="ka-question" invalid={fields.invalid('question')} aria-describedby={fields.invalid('question') ? 'ka-question-error' : undefined} className={styles.question} value={form.question} maxLength={1000} disabled={busy} onChange={(e) => change('question', e.target.value)} /></SaveErrorField>
+          <div className={styles.field}><Field label="質問" htmlFor="ka-question" requirement={fields.requirement('question')}><SaveErrorField names={["question","form.question"]}><TextArea {...fields.bind('question')} id="ka-question" invalid={fields.invalid('question')} aria-describedby={fields.invalid('question') ? 'ka-question-error' : undefined} className={styles.question} value={form.question} maxLength={1000} disabled={busy || access !== 'writer'} onChange={(e) => change('question', e.target.value)} /></SaveErrorField>
 <FieldError id="ka-question-error">{fields.error('question')}</FieldError></Field></div>
-          <div className={styles.field}><Field label="答え" htmlFor="ka-answer" requirement={fields.requirement('answer')}><SaveErrorField names={["answer","form.answer"]}><TextArea {...fields.bind('answer')} id="ka-answer" invalid={fields.invalid('answer')} aria-describedby={fields.invalid('answer') ? 'ka-answer-error' : undefined} className={styles.answer} value={form.answer} maxLength={12000} disabled={busy} onChange={(e) => change('answer', e.target.value)} /></SaveErrorField>
+          <div className={styles.field}><Field label="答え" htmlFor="ka-answer" requirement={fields.requirement('answer')}><SaveErrorField names={["answer","form.answer"]}><TextArea {...fields.bind('answer')} id="ka-answer" invalid={fields.invalid('answer')} aria-describedby={fields.invalid('answer') ? 'ka-answer-error' : undefined} className={styles.answer} value={form.answer} maxLength={12000} disabled={busy || access !== 'writer'} onChange={(e) => change('answer', e.target.value)} /></SaveErrorField>
 <FieldError id="ka-answer-error">{fields.error('answer')}</FieldError></Field></div>
           {!form.answer.trim() && article.articleKind === 'answer_example' ? <p className={parts.note}>運営の回答がありません。答えを書いて承認できます</p> : null}
-          <Field label="キーワード"><SaveErrorField names={["keywords"]}><TextField value={keywords} maxLength={480} disabled={busy} onChange={(e) => { setKeywords(e.target.value); setReadChecked(false) }} /></SaveErrorField></Field>
+          <Field label="キーワード"><SaveErrorField names={["keywords"]}><TextField value={keywords} maxLength={480} disabled={busy || access !== 'writer'} onChange={(e) => { setKeywords(e.target.value); setReadChecked(false) }} /></SaveErrorField></Field>
         </section>
       </KnowledgeBody>
 
@@ -207,14 +211,14 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
           onCancel={() => { if (!busy) setApproving(false) }}
           footer={(
             <DialogActions>
-              <Button onClick={() => save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
-              <Button variant="primary" disabled={busy || !canApprove || !readChecked || ticketBlocked} title={ticketBlocked ? ticketError || (sourceTicket ? '元の問い合わせを解決にしてから承認してください' : '元の問い合わせの状態を確認しています') : !readChecked ? '本文と手順の確認にチェックを入れてください' : !canApprove ? '承認できる状態ではありません' : undefined} busy={busy} busyLabel="処理中…" onClick={() => save(true)}><Check aria-hidden="true" />保存して承認</Button>
+              <Button lockedReason={lock} onClick={() => save()} disabled={busy || unknown} busy={Boolean(busy)} busyLabel="処理中…">下書きで保存</Button>
+              <Button variant="primary" lockedReason={lock} disabled={busy || unknown || !canApprove || !readChecked || ticketBlocked} title={ticketBlocked ? ticketError || (sourceTicket ? '元の問い合わせを解決にしてから承認してください' : '元の問い合わせの状態を確認しています') : !readChecked ? '本文と手順の確認にチェックを入れてください' : !canApprove ? '承認できる状態ではありません' : undefined} busy={busy} busyLabel="処理中…" onClick={() => save(true)}><Check aria-hidden="true" />保存して承認</Button>
             </DialogActions>
           )}
         >
           <div className={parts.dialogBody}>
             <p className={parts.line}>{form.title.trim() || '題名未入力'}</p>
-            <SaveErrorField names={["readChecked","read_checked"]}><Checkbox checked={readChecked} disabled={busy || !eligible} onCheckedChange={setReadChecked}>
+            <SaveErrorField names={["readChecked","read_checked"]}><Checkbox checked={readChecked} disabled={busy || unknown || !eligible || access !== 'writer'} onCheckedChange={setReadChecked}>
               本文と手順を読み、いまの作りと合っていることを確かめました
             </Checkbox></SaveErrorField>
             {sourceTicket ? <Checkbox checked={sourceTicket.resolved} disabled title="元の問い合わせの状態は問い合わせ側で変更します。" onCheckedChange={() => {}}>元の問い合わせ {sourceTicket.label} が「解決」になっている</Checkbox> : null}
@@ -233,7 +237,7 @@ function KnowledgeSurface({ fullPage, editing, busy, onCancel, actions, title, d
   fullPage: boolean; editing: boolean; busy: boolean; onCancel: () => void; actions: ReactNode; title: string; description: string; children: ReactNode
 }) {
   if (!fullPage) return <Dialog open title={editing ? '記事を直す' : '下書きの内容を確認'} designNode={editing ? 'ZAOc7' : 'DHdsw'} busy={busy} onCancel={onCancel} footer={actions}>{children}</Dialog>
-  return <div data-design-node="R5ckwJ"><OpsHead title={title} description={description} environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)} actions={actions} />{children}</div>
+  return <div data-design-node="R5ckwJ"><OpsHead title={title} description={description} actions={actions} />{children}</div>
 }
 
 function KnowledgeBody({ fullPage, preview, children }: { fullPage: boolean; preview: ReactNode; children: ReactNode }) {

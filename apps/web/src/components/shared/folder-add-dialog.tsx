@@ -64,6 +64,11 @@ export interface FolderAddDialogProps {
    * 消されていたときは読み直したあと窓を閉じる（onClose）。
    */
   onReload?: () => void | Promise<void>
+  /** 保持した保存操作でも、送信直前の現在の権限を確かめる。未指定は従来どおり。 */
+  canSaveNow?: () => boolean
+  confirmLockedReason?: string
+  /** 本人の確認中など、権限の理由を出さない普通の無効状態。 */
+  confirmDisabled?: boolean
 }
 
 export default function FolderAddDialog({
@@ -75,6 +80,9 @@ export default function FolderAddDialog({
   onClose,
   onAdded,
   onReload,
+  canSaveNow,
+  confirmLockedReason,
+  confirmDisabled,
 }: FolderAddDialogProps) {
 
   const selectedAccount = useOptionalAccount()
@@ -86,6 +94,8 @@ export default function FolderAddDialog({
   const [nameError, setNameError] = useState('')
 
   const add = async () => {
+    if (confirmDisabled || confirmLockedReason) return
+    if (canSaveNow && !canSaveNow()) { setError('権限が変わったため、フォルダの保存を中止しました。'); return }
     const trimmed = name.trim()
     if (!trimmed || saving) return
     setSaving(true)
@@ -127,6 +137,7 @@ export default function FolderAddDialog({
     nameError={nameError || undefined}
     allowClear
     placeholder={placeholder} busy={saving} error={error || undefined}
+    confirmLockedReason={confirmLockedReason} confirmDisabled={confirmDisabled}
     onCancel={onClose} onConfirm={() => void add()} confirmLabel={folder ? '保存する' : '追加する'}
   />
 

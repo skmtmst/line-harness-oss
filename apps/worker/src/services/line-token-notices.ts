@@ -1,3 +1,4 @@
+import { lineTokenExpiry, LINE_TOKEN_REFRESH_DAYS } from '@line-crm/shared';
 import type {
   LineTokenNoticeEventType,
   LineTokenNoticeMetadata,
@@ -5,9 +6,8 @@ import type {
 } from '@line-crm/shared';
 
 /** 取り替えの処理と同じ窓。残りがこれ未満になると cron ごとに取り替える。 */
-export const LINE_TOKEN_REFRESH_WINDOW_MS = 7 * 24 * 60 * 60_000;
+export const LINE_TOKEN_REFRESH_WINDOW_MS = LINE_TOKEN_REFRESH_DAYS * 24 * 60 * 60_000;
 
-const DAY_MS = 24 * 60 * 60_000;
 const REENTER_HINT = 'LINE Developers でチャネルシークレットを確かめて、アカウントの設定で入れ直してください。';
 
 type Notice = { eventType: LineTokenNoticeEventType; title: string; body: string };
@@ -21,28 +21,28 @@ export function lineTokenNoticeFor(input: {
   reason: LineTokenRefreshFailureReason;
   now: number;
 }): Notice | null {
-  const expiresAt = input.expiresAt ? Date.parse(input.expiresAt) : Number.NaN;
-  const known = Number.isFinite(expiresAt);
-  if (known && expiresAt <= input.now) {
+  const expiry = lineTokenExpiry(input.expiresAt, input.now);
+  const known = expiry.daysLeft !== null;
+  if (expiry.status === 'expired') {
     return {
       eventType: 'line_token_expired',
-      title: 'LINEの鍵の期限が切れています',
-      body: `配信と返信が止まっています。${input.reason === 'credentials' ? REENTER_HINT : 'LINEの接続の設定で鍵を更新してください。'}`,
+      title: 'トークンの期限が切れています',
+      body: `配信と返信が止まっています。${input.reason === 'credentials' ? REENTER_HINT : 'LINEの接続の設定でトークンを更新してください。'}`,
     };
   }
   if (input.reason === 'credentials') {
     return {
       eventType: 'line_token_refresh_failed',
-      title: 'LINEの鍵を自動で取り替えられませんでした',
+      title: 'トークンを自動で取り替えられませんでした',
       body: REENTER_HINT,
     };
   }
-  if (known && expiresAt - input.now < LINE_TOKEN_REFRESH_WINDOW_MS) {
-    const daysLeft = Math.floor((expiresAt - input.now) / DAY_MS);
+  if (known && expiry.daysLeft! < LINE_TOKEN_REFRESH_WINDOW_MS / (24 * 60 * 60_000)) {
+    const daysLeft = expiry.daysLeft!;
     return {
       eventType: 'line_token_expiring',
-      title: daysLeft === 0 ? 'LINEの鍵が今日切れます' : `LINEの鍵があと${daysLeft}日で切れます`,
-      body: '自動の取り替えがうまくいっていません。LINEの接続の設定で鍵を更新してください。',
+      title: daysLeft === 0 ? 'トークンが今日切れます' : `トークンがあと${daysLeft}日で切れます`,
+      body: '自動の取り替えがうまくいっていません。LINEの接続の設定でトークンを更新してください。',
     };
   }
   return null;
@@ -62,10 +62,10 @@ export async function recordLineTokenRefreshFailure(
   const notice = lineTokenNoticeFor({ expiresAt: account.token_expires_at, reason, now });
   if (!notice) return false;
   const expiresAt = account.token_expires_at ?? null;
-  const parsed = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  const expiry = lineTokenExpiry(expiresAt, now);
   const metadata: LineTokenNoticeMetadata = {
     expiresAt,
-    daysLeft: Number.isFinite(parsed) ? Math.floor((parsed - now) / DAY_MS) : null,
+    daysLeft: expiry.daysLeft,
     reason,
     failedAt: new Date(now).toISOString(),
   };

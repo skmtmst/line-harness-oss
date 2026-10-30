@@ -135,7 +135,9 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     await render()
     await makeDirty()
     await act(async () => { button('並びを変える').click() })
-    const link = [...host.querySelectorAll('a')].find((item) => item.getAttribute('href') === '/accounts')
+    expect(host.querySelector('a[href="/accounts"]')).toBeNull()
+    expect(host.querySelector('a[href="/line-notifications"]')).toBeNull()
+    const link = [...host.querySelectorAll('a')].find((item) => item.getAttribute('href') === '/emergency')
     if (!link) throw new Error('画面内遷移のLinkがありません')
     await act(async () => { link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })) })
     expect(document.body.textContent).toContain('保存していない変更があります')
@@ -146,7 +148,7 @@ describe('N-445 機能設定の未保存離脱確認', () => {
     await act(async () => { link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 })) })
     await act(async () => { button('保存せずに移る').click() })
     expect(navigation.push).toHaveBeenCalledTimes(1)
-    expect(navigation.push).toHaveBeenCalledWith('/accounts')
+    expect(navigation.push).toHaveBeenCalledWith('/emergency')
   })
 
   it('dirtyの戻る操作は復元側popstateを一度だけ通し、次の戻るで確認を出す', async () => {

@@ -44,15 +44,21 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
         boardId={tab === 'menus' && !canEditMenus ? 'C9fv7A' : tabNode}
         dirty={false}
         readOnly={Boolean(accountId && tabReadOnly)} title={<>予約設定</>}
-        help={<>お客さまの予約画面に出るメニュー・時間・ルールを決めます</>}
-        tabs={<>{tab === 'channels' && accountId ? <ChannelsSummaryBand summary={currentSummary} /> : null}<Tabs
+        help={<>
+          お客さまの予約画面に出るメニュー・時間・ルールを決めます
+          {tab === 'channels' ? <>。いちばん確かなのは「スタッフの Google カレンダー」です。
+            ほかの予約サービスがスタッフの Google カレンダーへ予約を書き出せれば、
+            その時間は自動で LINE の予約受付から外れます（いまの作りでできます）。
+            Google カレンダーに書き出せない入り口は、予約通知メールを取り込みアドレスへ転送して読み取ります（見本のメールがそろった媒体から順に）。</> : null}
+        </>}
+        tabs={<Tabs
               label="予約設定のタブ"
               items={V8_TABS.map((item) => ({
                 label: item.label,
                 current: item.key === tab,
                 onClick: () => requestTab(item.key),
               }))}
-            /></>}
+            />}
 
 
         actions={tab === 'passes' && canEditSettings ? <Button variant="primary" href="/booking/passes/new">回数券・月謝を作る</Button> : undefined}
@@ -67,7 +73,7 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
             {previewUrl ? <Button href={previewUrl} external><Smartphone size={16} aria-hidden="true" />お客さまに見える画面を確かめる</Button> : null}
           </div>
         )}
-        contentSpacing={accountId && tab === 'menus' && menusStatus === 'ready' ? 'notice-after-preview' : undefined}
+        contentSpacing={accountId && (tab === 'channels' || (tab === 'menus' && menusStatus === 'ready')) ? 'notice-after-preview' : undefined}
         footerActions={tabEdit && tabEdit.showBar !== false && !tabEdit.saveDisabled ? (
                 <>
                   <Button onClick={() => tabEdit.onReset()} disabled={tabEdit.saving}>キャンセル</Button>
@@ -170,7 +176,8 @@ export default function BookingSettingsView({ accountId, tab, previewUrl, tabNod
             ) : tab === 'payments' ? (
               <PaymentsTabV8 accountId={accountId} canEdit={canEditSettings} onConnectedChange={setPaymentsConnected} />
             ) : (
-              <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} staff={staff} onSummaryChange={setChannelsSummary} />
+              <><ChannelsSummaryBand summary={currentSummary} />
+              <ChannelsTabV8 accountId={accountId} canEdit={canEditSettings} staff={staff} onSummaryChange={setChannelsSummary} /></>
             )}
       </CreatePage>
 

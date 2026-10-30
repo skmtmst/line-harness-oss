@@ -521,11 +521,11 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return inputError(c, { success: false, error: '正しいメールアドレスを入力してください' }, 400, ["email"]);
     if (emailTooLong(email)) return inputError(c, { success: false, error: 'メールアドレスは254文字以内で入力してください' }, 400, ["email"]);
     if (!body.role || !['admin', 'staff', 'viewer'].includes(body.role)) return inputError(c, { success: false, error: '役割を選択してください' }, 400, ["role"]);
-    if (!body.assignedLineAccountId) {
+    if (!body.assignedLineAccountId && !(body.managementContext === 'hq' && accountScope.accountScope === 'all')) {
       return inputError(c, { success: false, error: '担当するLINEアカウントを選択してください' }, 400, ["assignedLineAccountId"]);
     }
     const visibleAccounts = (await getVisibleLineAccountScope(c.env.DB, c.get('staff'))).accounts;
-    if (!visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
+    if (body.assignedLineAccountId && !visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは割り当てできません' }, 403);
     }
     const current = c.get('staff');
@@ -542,6 +542,14 @@ staff.post('/api/staff', requireRole('owner', 'admin'), inputJsonBoundary({"name
     }
     if (accountScope.accountScope !== undefined && !await mayAssignAccountScopes(c.env.DB, current, accountScope.accountScope, accountScope.scopedLineAccountIds)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは指定できません' }, 403);
+    }
+    if (body.managementContext !== 'hq' && (
+      accountScope.accountScope !== 'accounts' ||
+      accountScope.scopedLineAccountIds.length !== 1 ||
+      accountScope.scopedLineAccountIds[0] !== body.assignedLineAccountId ||
+      body.canAccessDescendantAccounts
+    )) {
+      return c.json({ success: false, error: '店舗から追加する権限者は、このLINEアカウントだけを担当できます' }, 400);
     }
     // 同じメールの行があるときの扱い。要件 -30 §9-2(既存メールは管理者へ安全な案内)。
     // 招待中・期限切れの行は作り直す（上書き・掃除）。送信されなかった
@@ -794,11 +802,11 @@ export async function updateStaffPolicy(c: Context<Env>, id: string, body: Staff
   if (guard) return inputError(c, { success: false, error: guard }, 400, ["isActive","roleBundle","role"]);
 
   if (administrator && body.assignedLineAccountId !== undefined) {
-    if (!body.assignedLineAccountId) {
+    if (!body.assignedLineAccountId && !(body.managementContext === 'hq' && (accountScope.accountScope ?? target.account_scope) === 'all')) {
       return inputError(c, { success: false, error: '担当するLINEアカウントを選択してください' }, 400, ["assignedLineAccountId"]);
     }
     const visibleAccounts = (await getVisibleLineAccountScope(c.env.DB, current)).accounts;
-    if (!visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
+    if (body.assignedLineAccountId && !visibleAccounts.some((account) => account.id === body.assignedLineAccountId)) {
       return c.json({ success: false, error: '権限のないLINEアカウントは割り当てできません' }, 403);
     }
   }

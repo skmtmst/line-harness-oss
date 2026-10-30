@@ -4,25 +4,6 @@
   margin-bottom: var(--tpl-op-section-gap);
 }
 
-.columns {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--tpl-op-section-gap);
-}
-
-.form {
-  display: flex;
-  width: var(--tpl-op-ann-form-w);
-  flex-shrink: 0;
-  flex-direction: column;
-  gap: var(--tpl-op-row-gap);
-  border-radius: var(--radius-card);
-  outline: 1px solid var(--card-edge);
-  outline-offset: -1px;
-  padding: var(--tpl-op-ann-form-pad);
-  box-shadow: var(--card-shadow);
-}
-
 .field {
   display: flex;
   min-width: 0;
@@ -90,16 +71,11 @@
   overflow-y: auto;
 }
 
-.actions {
+.listWrap {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--tpl-op-me-gap);
-}
-
-.actions svg {
-  width: var(--tpl-op-auth-icon);
-  height: var(--tpl-op-auth-icon);
+  flex-direction: column;
+  gap: var(--tpl-op-section-gap);
+  padding-inline: var(--space-24);
 }
 
 .list {
@@ -108,6 +84,19 @@
   flex: 1;
   flex-direction: column;
   gap: var(--tpl-op-me-gap);
+}
+
+/* 作る画面の入力の縦の並び（型 CreatePage の本文の中）。 */
+.formPage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-op-row-gap);
+}
+
+/* 作った行の光らせ（?highlight= で戻ってきたとき。表の共通部品と同じ洗い出し）。 */
+.row[data-highlight='true'] {
+  background: var(--polish-selection-bg);
+  border-radius: var(--radius-mini);
 }
 
 .listHead {
@@ -232,18 +221,4 @@
   color: var(--color-ink-secondary);
   font-size: var(--text-micro);
   line-height: var(--tpl-op-note-lh);
-}
-
-@media (max-width: 1279.98px) {
-  .columns {
-    flex-direction: column;
-  }
-
-  .form {
-    width: 100%;
-  }
-
-  .list {
-    width: 100%;
-  }
 }

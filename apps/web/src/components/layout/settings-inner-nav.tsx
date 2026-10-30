@@ -1,14 +1,16 @@
 'use client'
 
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { effectiveStaffRole, useStaffIdentity, canManageRole } from '@/lib/staff-role'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
+import { useAccountStyle } from '@/hooks/use-account-style'
 import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
+import { styleMenuItemVisible } from './style-menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
-import { Activity, BellRing, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
+import { Activity, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
 
@@ -39,7 +41,6 @@ const SETTINGS_ORDER = [
   '/settings', // 機能設定
   '/emergency', // 運用状態
   '/ec-commerce', // EC連携
-  '/line-notifications', // LINE通知
   '/settings/sns', // SNS 連携（提案 E-6）。今ある絵の並びを動かさないよう末尾に足す
   '/settings/booking-media', // 予約サイト・グルメ媒体（提案 E-4）。飲食店向け（テスト）が使える環境だけ出す
   '/settings/delivery', // デリバリー連携（承認案 DL-1 `dF4Ov`）。飲食店向け（テスト）が使える環境だけ出す
@@ -55,7 +56,6 @@ const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
   '/settings': SlidersHorizontal,
   '/emergency': Activity,
   '/ec-commerce': ShoppingCart,
-  '/line-notifications': BellRing,
   '/settings/sns': Share2,
   '/settings/booking-media': Store,
   '/settings/delivery': Truck,
@@ -69,14 +69,9 @@ const SETTINGS_ONLY_ITEMS: MenuItem[] = [
   { id: 'settings-delivery', href: '/settings/delivery', label: 'デリバリー連携', icon: '', note: 'Uber Eats・出前館・ロケットナウの注文をまとめて受け取ります', required: true },
 ]
 
-/** 機能設定の下に付く2つの画面（絵の「下にマニュアルの対応表・ファイルの安全確認」）。 */
-const SETTINGS_CHILDREN = [
-  { href: '/settings/manual-links', label: 'マニュアルの対応表' },
-  { href: '/settings/file-scan', label: 'ファイルの安全確認' },
-] as const
-
 /** この中のメニューを出す画面（左のメニューの「設定」が光る画面と同じ範囲）。 */
 const SETTINGS_AREA_PATHS = [...SETTINGS_ORDER]
+const RESTAURANT_ONLY_SETTINGS = new Set<string>(['/settings/booking-media', '/settings/delivery'])
 
 /** いまのパスが設定の中のメニューを出す画面か。 */
 export function isSettingsAreaPath(pathname: string): boolean {
@@ -102,7 +97,10 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   useSettingsNavInline(inline)
   const pathname = usePathname() ?? ''
   const { selectedAccountId } = useAccount()
-  const staffRole = useStaffRole()
+  const accountStyle = useAccountStyle(selectedAccountId)
+  const restaurantSettingsVisible = accountStyle.status === 'ready' && !accountStyle.stale && accountStyle.data?.style === 'restaurant'
+  const staffIdentity = useStaffIdentity()
+  const staffRole = effectiveStaffRole(staffIdentity)
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
   const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Record<string, boolean> | null>(null)
@@ -154,8 +152,9 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
    * 設定の中のメニュー）。出し分けの決まりは左のメニューと同じ。
    */
   const itemVisible = (item: MenuItem): boolean => {
+    if (item.href === '/ec-commerce' && !styleMenuItemVisible(item, accountStyle.data?.style ?? null, null, accountStyle.data?.styleSelected === true)) return false
     if ((item.href === '/staff' || item.href === '/settings/customer-look') && !canManageRole(staffRole)) return false
-    if (item.href === '/accounts' && staffRole === 'staff') return false
+    if (item.href === '/accounts' && (staffRole === 'staff' || staffIdentity?.accountScope !== 'all')) return false
     const permissionKey = item.permissionKey ?? item.href
     if (staffRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
     const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
@@ -172,20 +171,22 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   const items = SETTINGS_ORDER
     .map((href) => byHref.get(href))
     .filter((item): item is MenuItem => Boolean(item))
-    .filter((item) => itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item))
+    .filter((item) => {
+      if (RESTAURANT_ONLY_SETTINGS.has(item.href) && !restaurantSettingsVisible) return false
+      if (item.href === '/accounts' && staffIdentity?.accountScope !== 'all') return false
+      if (item.featureKey === 'ec_commerce' && !itemVisible(item)) return false
+      return itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item)
+    })
 
   const entries: SettingsMenuEntry[] = items.map((item) => {
     const active = item.href === '/settings'
       ? pathname === '/settings'
       : itemActive(item.href)
-    // 機能設定の下の2つは絵に無いが、ここからしか行けないので消さない。機能設定とその2つを開いているときだけ出す。
-    const children = item.href === '/settings' && (pathname === '/settings' || SETTINGS_CHILDREN.some((child) => itemActive(child.href))) ? SETTINGS_CHILDREN : []
     return {
       href: item.href,
       label: item.label,
       Icon: SETTINGS_ICONS[item.href as (typeof SETTINGS_ORDER)[number]],
       active,
-      children: children.map((child) => ({ href: child.href, label: child.label, active: itemActive(child.href) })),
     }
   })
 

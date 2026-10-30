@@ -56,17 +56,25 @@ export function formActionChoices(refs: FormRefs): ActionChoice<FormAction>[] {
     items: targets(kind.id, refs), multiple: kind.id === 'tag', apply: applyTarget,
   } }))
 }
+/*
+ * 行の題は、種類（ kindOf ）と並んで出る。種類の言葉を繰り返さず、
+ * 行を見分ける中身（送る文・選んだ先）だけを出す。
+ * 選んでいない（未選択）と、選んだ先が消えた・ここでは読めない（見つかりません）は分ける。
+ */
 export function formActionTitle(action: FormAction, refs: FormRefs): string {
   if (action.kind === 'research_action') return 'リサーチで設定した動作'
-  if (action.kind === 'send_text') return action.text ? `テキストを送る「${action.text}」` : 'テキストを送る'
+  if (action.kind === 'send_text') return action.text ? `「${action.text}」` : '（本文が未設定）'
   const ids = action.kind === 'tag' ? action.tagIds : [action.kind === 'send_template' ? action.templateId : action.kind === 'friend_field' ? action.fieldId : action.kind === 'scenario' ? action.scenarioId : action.reminderId]
-  const names = ids.map(id => targets(action.kind, refs).find(item => item.id === id)?.name ?? '未設定').join('・') || '未設定'
+  if (ids.length === 0 || ids.every((id) => !id)) return '（未選択）'
+  const names = ids.map((id) => targets(action.kind, refs).find((item) => item.id === id)?.name)
+  if (names.some((name) => name === undefined)) return '（見つかりません）'
+  const joined = (names as string[]).join('・')
   switch (action.kind) {
-    case 'tag': return `タグ「${names}」を${action.op === 'remove' ? '外す' : '付ける'}`
-    case 'send_template': return `テンプレート「${names}」を送る`
-    case 'friend_field': return `友だち情報「${names}」に書く`
-    case 'scenario': return `シナリオ「${names}」を${action.op === 'stop' ? '停止' : '開始'}`
-    case 'reminder': return `リマインダ「${names}」を開始`
+    case 'tag': return `「${joined}」`
+    case 'send_template': return `「${joined}」`
+    case 'friend_field': return `「${joined}」に書く`
+    case 'scenario': return `「${joined}」を${action.op === 'stop' ? '停止' : '開始'}`
+    case 'reminder': return `「${joined}」`
   }
 }
 function formActionKind(action: FormAction): string {

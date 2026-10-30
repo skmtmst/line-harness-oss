@@ -125,7 +125,6 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
       { id: 'settings', required: true },
       { id: 'emergency', required: true },
       { id: 'ec-commerce', featureKey: 'ec_commerce' },
-      { id: 'line-notifications', featureKey: 'line_notifications' },
     ],
   },
   {

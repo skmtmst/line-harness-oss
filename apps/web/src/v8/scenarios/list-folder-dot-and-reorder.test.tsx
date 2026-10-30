@@ -4,8 +4,11 @@
  * つまみを出さず理由を言う（一部の行だけで番号を振り直さない）。
  */
 import React from 'react'
+import type { StaffMember } from '@line-crm/shared'
+import { rememberStaffIdentity, forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 import { cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
-import { afterEach, describe, expect, test, vi } from 'vitest'
+import { beforeEach, afterEach, describe, expect, test, vi } from 'vitest'
 
 const scenario = (id: string, name: string, folderId: string | null) => ({
   id,
@@ -19,8 +22,8 @@ const scenario = (id: string, name: string, folderId: string | null) => ({
   displayOrder: 0,
   folderId,
   lineAccountId: 'account-a',
-  subscriberCount: 10,
-  completedCount: 2,
+  subscriberCount: 10 as number | null | undefined,
+  completedCount: 2 as number | null | undefined,
   stepCount: 3,
   createdAt: '2026-08-01T00:00:00.000Z',
   updatedAt: '2026-08-01T00:00:00.000Z',
@@ -124,8 +127,15 @@ test('シナリオの説明本文を型へつなぎ、開閉と同じ人の保�
   }
 })
 
+beforeEach(() => {
+  forgetStaffIdentity(); forgetSessionSnapshot()
+  rememberStaffIdentity({ id: 'scenario-owner', role: 'owner', permissionKeys: [] } as unknown as StaffMember)
+})
+
 afterEach(() => {
+  forgetStaffIdentity(); forgetSessionSnapshot()
   cleanup()
+  window.history.replaceState(null, '', '/scenarios')
 })
 
 describe('V8 シナリオ一覧の並び替えのつまみ', () => {
@@ -175,5 +185,52 @@ describe('V8 シナリオ一覧の最後まで配信した割合', () => {
     expect(row.textContent).toContain('登録した 12 人の 17%')
     expect(row.textContent).not.toContain('2 / 10 人')
     expect(view.getByRole('columnheader', { name: '配信中・最後まで配信' })).not.toBeNull()
+  })
+
+  test.each([
+    [null, null, '—', '—', null],
+    [undefined, undefined, '—', '—', null],
+    [null, 2, '—', '2', null],
+    [10, null, '10', '—', null],
+    [undefined, 0, '—', '0', null],
+    [0, undefined, '0', '—', null],
+    [NaN, 2, '—', '2', null],
+    [10, Infinity, '10', '—', null],
+    [-1, 2, '—', '2', null],
+    [0, 0, '0', '0', null],
+    [0, 2, '0', '2', 2],
+    [10, 0, '10', '0', 10],
+  ] as const)('人数%s/%sでも行と既知の片側を残し、一覧と詳細の表示をそろえる', async (active, completed, activeLabel, completedLabel, denominator) => {
+    const previous = { subscriberCount: items[0].subscriberCount, completedCount: items[0].completedCount }
+    Object.assign(items[0], { subscriberCount: active, completedCount: completed })
+    try {
+      const view = render(<ScenariosListV8 />)
+      const row = (await view.findByText('新規登録7日間フォロー')).closest('tr') as HTMLElement
+      const label = (value: string) => value === '—' ? value : `${value} 人`
+      const expected = `配信中 ${label(activeLabel)}・最後まで配信 ${label(completedLabel)}`
+      expect(view.container.querySelectorAll('tbody tr')).toHaveLength(items.length)
+      expect(row.textContent).toContain(expected)
+      expect(within(row).getByTitle(expected)).not.toBeNull()
+      expect(within(row).queryByText('—', { exact: true })).toBeNull()
+      expect(within(row).queryByText('登録した 0 人', { exact: true }) !== null).toBe(active === 0 && completed === 0)
+      const bar = within(row).queryByRole('progressbar')
+      if (denominator === null) {
+        expect(bar).toBeNull()
+        if (active === 0 && completed === 0) expect(row.textContent).toContain('登録した 0 人')
+        else expect(row.textContent).not.toContain('登録した')
+      } else {
+        expect(bar?.getAttribute('aria-valuenow')).toBe(String(completed))
+        expect(bar?.getAttribute('aria-valuemax')).toBe(String(denominator))
+        expect(row.textContent).toContain(`登録した ${denominator} 人の ${Math.round(Number(completed) / denominator * 100)}%`)
+      }
+      expect(row.textContent).not.toMatch(/NaN|Infinity|0\s*\/\s*0/)
+      expect(row.textContent).not.toContain('— 人')
+      fireEvent.click(row)
+      const detail = await view.findByRole('dialog', { name: '新規登録7日間フォロー', exact: true })
+      expect(within(detail).getByRole('region', { name: '配信状況' }).textContent).toContain(expected)
+    } finally {
+      cleanup()
+      Object.assign(items[0], previous)
+    }
   })
 })

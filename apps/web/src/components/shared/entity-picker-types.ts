@@ -59,12 +59,15 @@ export type SingleProps = {
   error?: string
   busy?: boolean
   confirmDisabled?: boolean
+  /** 確定だけを権限で止める。開いた候補とプレビューは残す。 */
+  confirmLockedReason?: string
   readOnly?: boolean
   createHref?: string
   createLabel?: string
   searchPlaceholder?: string
   designNode?: string
   createAction?: { label: (query: string) => string; onCreate: (query: string) => void }
+  /** プレビュー専用。候補の表示を切り替えるだけで、保存しない。 */
   onSelect?: (id: string) => void
   onConfirm: (id: string) => void
   onCancel: () => void
@@ -172,6 +175,7 @@ export type FieldBase = {
   actionHidden?: boolean | 'label'
   disabled?: boolean
   disabledReason?: string
+  lockedReason?: string
   readOnly?: boolean
   invalid?: boolean
   createHref?: string
@@ -202,6 +206,7 @@ export type SingleField = FieldBase & {
   preview?: SingleProps['preview']
   confirmLabel?: string
   createAction?: SingleProps['createAction']
+  /** プレビュー専用。候補の表示を切り替えるだけで、保存しない。 */
   onSelect?: (id: string) => void
   confirmDisabled?: boolean
 }

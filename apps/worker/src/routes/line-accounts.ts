@@ -13,7 +13,7 @@ import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateRegistrationOptions, applyRegistrationOptions, RegistrationOptionsError } from '../services/connect-registration.js';
 import { Hono, type Context } from 'hono';
 import { LineClient } from '@line-crm/line-sdk';
-import { getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
+import { getLineAccountListStats, getLineAccountTag, getLineAccountsByIds, getLineAccountScopeEntries, getLineAccountById, getLineAccountCredentialHealth, createLineAccount, listLineAccountTags, updateLineAccount, updateLineAccountFields, updateLineAccountOrder, deleteUncommittedLineAccount, getLineAccountArchiveBlockers, setDefaultLineAccount, archiveLineAccount, restoreLineAccount, deactivateLineAccount, activateLineAccount, listSkippedDeliveries, getLineAccountConnectionChecksByIdempotencyKey, saveLineAccountConnectionChecks, LineAccountRevisionConflictError, jstNow, LineAccountLifecycleError } from '@line-crm/db';
 import type { LineAccount as DbLineAccount, LineAccountConnectionCheck } from '@line-crm/db';
 import { CredentialEncryptionKeyError } from '@line-crm/db';
 import { denyReadOnly, requireRole } from '../middleware/role-guard.js';
@@ -39,7 +39,7 @@ import { serializeLineAccount, serializeLineAccountFull } from './line-accounts-
 
 const lineAccounts = new Hono<Env>();
 
-async function mayRegisterLineAccount(c: Context<Env>): Promise<boolean> {
+async function hasTenantWideLineAccountScope(c: Context<Env>): Promise<boolean> {
   const actor = c.get('staff');
   if (actor.id === 'env-owner') return true;
   const member = await getStaffById(c.env.DB, actor.id);
@@ -520,6 +520,7 @@ lineAccounts.post(
 
 // 組織の既定アカウントを切り替える。
 lineAccounts.put('/api/line-accounts/default', requireRole('owner'), inputJsonBoundary({"accountId":["string"]}), async (c) => {
+  if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   try {
     const body = await c.req.json<{ accountId?: string }>();
     if (!body.accountId) {
@@ -593,6 +594,7 @@ async function archiveAccountResponse(
 }
 
 lineAccounts.post('/api/line-accounts/:id/archive', requireRole('owner'), inputJsonBoundary(), async (c) => {
+  if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   try {
     return await archiveAccountResponse(c, '運用者によるアーカイブ');
   } catch (err) {
@@ -603,6 +605,7 @@ lineAccounts.post('/api/line-accounts/:id/archive', requireRole('owner'), inputJ
 });
 
 lineAccounts.post('/api/line-accounts/:id/restore', requireRole('owner'), inputJsonBoundary(), async (c) => {
+  if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   try {
     // 止めたアカウントの再有効化は接続の変更（V）。停止・削除と同じ確認を求める。
     if (!await sensitiveStepUpSatisfied(c, 'line_account.credentials')) {
@@ -783,7 +786,7 @@ lineAccounts.get('/api/line-accounts/:id', async (c) => {
     if (!account) {
       return fail(c, 404, 'LINE_ACCOUNT_NOT_FOUND');
     }
-    return c.json({ success: true, data: serializeLineAccount(account) });
+    return c.json({ success: true, data: { ...serializeLineAccount(account), connection: (await getLineAccountListStats(c.env.DB, [account.id]))[account.id]?.connection ?? { status: 'unknown', checkedAt: null, tokenExpired: false, issues: [] } } });
   } catch (err) {
     throw err;
   }
@@ -1105,7 +1108,7 @@ function publicConnectData(
 
 // UI用の自動接続確認。LINE側のWebhook・LIFFは設定するが、musuboのDBには書き込まない。
 lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
-  if (!await mayRegisterLineAccount(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
+  if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   const parsed = await readConnectRequest(c);
   if (!parsed.ok) return inputError(c, { success: false, error: parsed.error }, 'status' in parsed ? parsed.status : 422, ["name","channelId","channelSecret"]);
   let registration;
@@ -1141,7 +1144,7 @@ lineAccounts.post('/api/line-accounts/connect/check', requireRole('owner', 'admi
 
 // UI用の自動接続・保存。5段目が完了しなければ作成途中の行を必ず巻き戻す。
 lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
-  if (!await mayRegisterLineAccount(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
+  if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   // LINE の接続（新しいアカウントの接続）は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
@@ -1267,7 +1270,7 @@ lineAccounts.post('/api/line-accounts/connect', requireRole('owner', 'admin'), d
 
 // POST /api/line-accounts - create
 lineAccounts.post('/api/line-accounts', requireRole('owner', 'admin'), denyReadOnly(), inputJsonBoundary(), async (c) => {
-  if (!await mayRegisterLineAccount(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
+  if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
   // LINE の接続の追加は大事な操作（V）。
   if (!await sensitiveStepUpSatisfied(c, 'line_account.connect')) {
     return stepUpRequiredResponse(c, 'LINEの接続には本人確認が必要です');
@@ -1481,6 +1484,7 @@ lineAccounts.patch(
   '/api/line-accounts/hierarchy',
   requireRole('owner', 'admin'),
   inputJsonBoundary({"relationships":["array"]}), async (c) => {
+    if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
     try {
       const body = await c.req.json<{
         relationships?: Array<{ id?: unknown; parentLineAccountId?: unknown }>;
@@ -1548,6 +1552,7 @@ lineAccounts.patch(
   '/api/line-accounts/order',
   requireRole('owner', 'admin'),
   inputJsonBoundary({"ordered":["array"]}), async (c) => {
+    if (!await hasTenantWideLineAccountScope(c)) return c.json({ success: false, error: '統括の権限が必要です' }, 403);
     try {
       const body = await c.req.json<{
         ordered: Array<{ id: string; displayOrder: number }>;

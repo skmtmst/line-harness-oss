@@ -1,5 +1,7 @@
 'use client'
 
+import { tokenExpiryNotice, tokenExpirySummary } from '@/lib/line-account-state'
+
 import { KpiValueMotionProvider } from '@/components/shared/kpi-value-motion'
 import { jstDate } from '@/lib/jst-datetime'
 import { DataTable, Tr, Th, Td, PersonCell, TableHeadRow } from '@/components/shared/table';
@@ -18,7 +20,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import { FolderDot, FolderDotName, folderDisplayColor } from '@/components/shared/folder-dot';
 import EmptyList from '@/components/shared/empty-list';
 import ConfirmDialog from '@/components/shared/confirm-dialog';
-import FolderPanel, { FolderPanelNote, type FolderPanelRow } from '@/components/shared/folder-panel';
+import FolderPanel, { type FolderPanelRow } from '@/components/shared/folder-panel';
 import ListState from '@/components/shared/list-state';
 import Notice from '@/components/shared/notice';
 import Pagination from '@/components/shared/pagination';
@@ -97,12 +99,11 @@ export default function HqHomeV8() {
   const [size, setSize] = useState(20)
   const [page, setPage] = useListUrlValue('page', 1)
   const [folders, setFolders] = useState<(Folder & { itemCount?: number })[]>([])
-  const [unfiledCount, setUnfiledCount] = useState<number | null>(null)
   /* フォルダの追加・名前と色を変える窓（同じ窓。editing があれば変える）。 */
   const [folderDialog, setFolderDialog] = useState<{ editing: Folder | null } | null>(null)
   const [folderName, setFolderName] = useState('')
   const [folderColor, setFolderColor] = useState<string | null>(null)
-  const [deleteFolder, setDeleteFolder] = useState<Folder | null>(null)
+  const [deleteFolder, setDeleteFolder] = useState<(Folder & { itemCount?: number }) | null>(null)
   const [folderError, setFolderError] = useState('')
   const [folderSaving, setFolderSaving] = useState(false)
 
@@ -118,7 +119,6 @@ export default function HqHomeV8() {
       const res = await api.lineAccountFolders.list()
       if (res.success && Array.isArray(res.data?.folders)) {
         setFolders([...res.data.folders].sort((a, b) => a.displayOrder - b.displayOrder))
-        setUnfiledCount(typeof res.data.unclassifiedCount === 'number' ? res.data.unclassifiedCount : null)
       }
     } catch (saveFailure) {
       saveErrors.capture(saveFailure)
@@ -245,13 +245,15 @@ export default function HqHomeV8() {
     router.push(back ?? '/')
   }
 
-  const totals = useMemo(() => currentAccounts.reduce((sum, account) => ({
-    friends: sum.friends + (account.stats?.friendCount ?? 0),
-    messages: sum.messages + (account.stats?.messagesThisMonth ?? 0),
-    warnings: sum.warnings + (account.connection?.status === 'warn' ? 1 : 0),
-  }), { friends: 0, messages: 0, warnings: 0 }), [currentAccounts])
+  const accountsReadable = !loading && !loadError
+  const totals = useMemo(() => currentAccounts.reduce<{ friends: number | null; messages: number | null; warnings: number; unconfirmed: number }>((sum, account) => ({
+    friends: sum.friends !== null && typeof account.stats?.friendCount === 'number' ? sum.friends + account.stats.friendCount : null,
+    messages: sum.messages !== null && typeof account.stats?.messagesThisMonth === 'number' ? sum.messages + account.stats.messagesThisMonth : null,
+    warnings: sum.warnings + (statusOf(account).tone === 'warn' ? 1 : 0),
+    unconfirmed: sum.unconfirmed + (statusOf(account).label === '未確認' ? 1 : 0),
+  }), { friends: 0, messages: 0, warnings: 0, unconfirmed: 0 }), [currentAccounts])
 
-  /* 所属は1つ（API-17 の folderId）。サーバーの数が無いときは手元で数える。 */
+  /* 所属は1つ。アーカイブを除く同じ一覧で、すべて・フォルダ・未分類を数える。 */
   const folderOf = useCallback((account: AccountWithStats) => (account as { folderId?: string | null }).folderId ?? null, [])
   const folderCounts = useMemo(() => {
     const counts = new Map<string, number>()
@@ -383,12 +385,12 @@ export default function HqHomeV8() {
   }
 
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: ALL, label: 'すべて', count: currentAccounts.length, icon: <Inbox size={16} aria-hidden="true" /> },
+    { kind: 'all' as const, id: ALL, label: 'すべて', count: accountsReadable ? currentAccounts.length : null, icon: <Inbox size={16} aria-hidden="true" /> },
     ...folders.map((f, index) => ({
       kind: 'folder' as const,
       id: f.id,
       label: f.name,
-      count: typeof f.itemCount === 'number' ? f.itemCount : (folderCounts.get(f.id) ?? 0),
+      count: accountsReadable ? (folderCounts.get(f.id) ?? 0) : null,
       color: f.color,
       icon: <FolderDot folder={{ name: f.name, color: f.color }} />,
       onEdit: canManage ? () => openFolderDialog(f) : undefined,
@@ -396,7 +398,7 @@ export default function HqHomeV8() {
       onMoveDown: canManage && index < folders.length - 1 ? () => void moveFolder(index, 1) : undefined,
       onDelete: canManage ? () => { setFolderError(''); setDeleteFolder(f) } : undefined,
     })),
-    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: unfiledCount ?? localUnfiled },
+    { kind: 'unfiled' as const, id: UNFILED, label: '未分類', count: accountsReadable ? localUnfiled : null },
   ]
 
   const createAccount = canManage ? (
@@ -417,7 +419,6 @@ export default function HqHomeV8() {
         onAddFolder={canManage ? () => openFolderDialog(null) : undefined}
         addFolderLabel="フォルダを追加"
       >
-        <FolderPanelNote>フォルダを消しても、アカウントは消えません</FolderPanelNote>
       </FolderPanel>
     </div>
   )
@@ -460,16 +461,16 @@ export default function HqHomeV8() {
   }
 
 
-  const toolbar = loadError || loading || accounts.length === 0 ? null : <>
+  const toolbar = <>
       <PlatformNotices />
       <KpiBand className={styles.full} data-design="KPIs">
-        <KpiCard title="アカウント" value={currentAccounts.length} unit="件" detail={null} />
-        <KpiCard title="友だち合計" value={totals.friends} unit="人" detail={null} help="アーカイブを除くアカウントの合計" />
-        <KpiCard title="今月の配信" value={totals.messages} unit="通" detail={null} />
-        <KpiCard title="接続に問題" value={totals.warnings} unit="件" detail={null} valueTone={totals.warnings > 0 ? 'warning' : 'default'} />
+        <KpiCard title="アカウント" value={accountsReadable ? currentAccounts.length : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : null} />
+        <KpiCard title="友だち合計" value={accountsReadable ? totals.friends : null} loading={loading} unit="人" detail={loadError ? '読み込めませんでした' : totals.friends === null ? '件数は分かりません' : null} help="アーカイブを除くアカウントの合計" />
+        <KpiCard title="今月の配信" value={accountsReadable ? totals.messages : null} loading={loading} unit="通" detail={loadError ? '読み込めませんでした' : totals.messages === null ? '件数は分かりません' : null} />
+        <KpiCard title="接続に問題" value={accountsReadable && (totals.warnings > 0 || totals.unconfirmed === 0) ? totals.warnings : null} loading={loading} unit="件" detail={loadError ? '読み込めませんでした' : totals.unconfirmed > 0 ? `${totals.warnings > 0 ? 'ほかに未確認' : '未確認'} ${formatNumber(totals.unconfirmed)} 件` : null} valueTone={accountsReadable && totals.warnings > 0 ? 'warning' : 'default'} action={{ label: '対応が要るものへ', href: '/hq/attention?kind=connections' }} />
       </KpiBand>
 
-      <ListToolbarFrame layout="stacked">
+      {accountsReadable && accounts.length > 0 ? <ListToolbarFrame layout="stacked">
         <ListToolbarRow><div className={styles.searchBox}>
           <SearchField
             aria-label="名前・LINE ID・フォルダで探す"
@@ -505,7 +506,8 @@ export default function HqHomeV8() {
           /></SaveErrorField>
           </ListToolbarEnd>
         </ListToolbarRow>
-      </ListToolbarFrame>
+        {tokenExpirySummary(currentAccounts) ? <ListToolbarRow><TruncatedText className="text-body text-ink-secondary" value={tokenExpirySummary(currentAccounts)!} /></ListToolbarRow> : null}
+      </ListToolbarFrame> : null}
   </>
 
   const body = loadError ? (
@@ -576,13 +578,14 @@ export default function HqHomeV8() {
                 <dl className={styles.stats}>
                   <div className={styles.stat}>
                     <dt>友だち</dt>
-                    <dd>{isArchived(account) && !account.stats?.friendCount ? emptyValue('unknown') : formatNumber(account.stats?.friendCount ?? 0)}</dd>
+                    <dd>{typeof account.stats?.friendCount !== 'number' || (isArchived(account) && !account.stats.friendCount) ? emptyValue('unknown') : formatNumber(account.stats.friendCount)}</dd>
                   </div>
                   <div className={styles.stat}>
                     <dt>今月の配信</dt>
-                    <dd>{`${formatNumber(account.stats?.messagesThisMonth ?? 0)} 通`}</dd>
+                    <dd>{typeof account.stats?.messagesThisMonth === 'number' ? `${formatNumber(account.stats.messagesThisMonth)} 通` : emptyValue('unknown')}</dd>
                   </div>
                 </dl>
+                {tokenExpiryNotice(account) ? <TruncatedText value={tokenExpiryNotice(account)!} /> : null}
                 {warned ? (() => {
                   const reason = connectionReasonLine(account)
                   return <Notice tone="warn" compact title={reason.title} message={reason.text}
@@ -594,10 +597,11 @@ export default function HqHomeV8() {
           })}
         </ListPageCards>
       ) : (
-        <DataTable aria-label="アカウントの一覧" columnWeights={[3, 1.5, 1, 1, 1.25, 0.5]}>
+        <DataTable aria-label="アカウントの一覧" columnWeights={[3, 1.25, 1.5, 1, 1, 1.25, 0.5]}>
           <thead><TableHeadRow>
             <Th>アカウント</Th>
-            <Th>接続</Th>
+            <Th>LINE接続</Th>
+            <Th>お支払い</Th>
             <Th>対応が要る</Th>
             <Th>友だち</Th>
             <Th>今月の配信</Th>
@@ -610,20 +614,23 @@ export default function HqHomeV8() {
               <Tr key={account.id}>
                 <PersonCell avatarName={name} avatarSrc={accountIconUrl(account)} avatarShape="rounded" avatarAlt={name} avatarSize={32} nameTitle={[name, state.label, accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))].filter(Boolean).join(' / ')} name={
                   <span className={styles.cardName}>
-                    <FolderDotName folder={folderDotOf(account)} annotation={<StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>}>
+                    <FolderDotName folder={folderDotOf(account)}>
                       <TruncatedText className={styles.name} value={String(name ?? '')} />
                     </FolderDotName>
                     <TruncatedText className={styles.meta} value={accountMeta(account, nameOf((account as { parentLineAccountId?: string | null }).parentLineAccountId))} />
                   </span>
                 } />
+                <Td><StatusBadge tone={state.tone === 'ok' ? 'success' : state.tone === 'warn' ? 'caution' : 'neutral'}>{state.label}</StatusBadge>
+                  {tokenExpiryNotice(account) ? <TruncatedText value={tokenExpiryNotice(account)!} /> : null}
+                </Td>
                 <Td>{(() => {
                   const pay = payState[account.id]
                   if (!pay || pay === 'unknown') return emptyValue('unknown')
                   return <StatusBadge tone={pay === 'live' ? 'success' : pay === 'test' ? 'warning' : 'neutral'}>{pay === 'live' ? 'つながっている' : pay === 'test' ? '試験モード' : 'つなぐ前'}</StatusBadge>
                 })()}</Td>
                 <Td>{state.tone === 'warn' ? `${Math.max(1, account.connection?.issues?.length ?? 0)} 件` : <span>—</span>}</Td>
-                <Td>{formatNumber(account.stats?.friendCount ?? 0)}</Td>
-                <Td>{formatNumber(account.stats?.messagesThisMonth ?? 0)}</Td>
+                <Td>{typeof account.stats?.friendCount === 'number' ? formatNumber(account.stats.friendCount) : emptyValue('unknown')}</Td>
+                <Td>{typeof account.stats?.messagesThisMonth === 'number' ? formatNumber(account.stats.messagesThisMonth) : emptyValue('unknown')}</Td>
                 <Td>{tableMenu(account)}</Td>
               </Tr>
             )
@@ -646,7 +653,7 @@ export default function HqHomeV8() {
     <SaveErrorScope errors={saveErrors}><ListPage
       boardId="JKjsE"
       title="統括のアカウント"
-      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{`${view === 'cards' ? 'カードの「設定」' : '行の「…」'}から、フォルダの移動・名前を変えられます。アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです（戻すのはオーナー・本人確認のあと「停止中」に戻ります）。`}</>}
+      help={<>{`${tenantName || 'この統括'}に属する LINE 公式アカウントです。ここから各アカウントへ入れます。`}{`${view === 'cards' ? 'カードの「設定」' : '行の「…」'}から、フォルダの移動・名前を変えられます。アーカイブしたアカウントは「登録内容を編集」と「戻す」だけです（「戻す」を使えるのはオーナーだけです。本人確認のあと、アカウントは「停止中」になります）。`}</>}
 
       folders={folderColumn}
       folderInset toolbar={toolbar} toolbarSpacing="stats" toolbarRowGap="card"
@@ -654,7 +661,6 @@ export default function HqHomeV8() {
       folderNav={{ rows: folderRows, activeId: folder, onSelect: selectFolder, createAction: createAccount, label: 'フォルダ' }}
     >
       <div className={styles.body}>
-        {toolbar ? null : <PlatformNotices />}
         {body}
       </div>
 
@@ -714,7 +720,7 @@ export default function HqHomeV8() {
         <ConfirmDialog
           open
           title={`フォルダ「${deleteFolder.name}」を消しますか？`}
-          description={`中のアカウント ${formatNumber(folderCounts.get(deleteFolder.id) ?? 0)} 件は消えずに「未分類」へ移ります。消したフォルダは元に戻せません。`}
+          description={`中のアカウント${typeof deleteFolder.itemCount === 'number' ? ` ${formatNumber(deleteFolder.itemCount)} 件` : ''}は消えずに「未分類」へ移ります。消したフォルダは元に戻せません。`}
           confirmLabel="フォルダを消す"
           cancelLabel="キャンセル"
           destructive

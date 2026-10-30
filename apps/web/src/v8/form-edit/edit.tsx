@@ -769,8 +769,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   })()
   const publishChanges = describePublishChanges(publishedSide ?? savedSide, { name, description, layout })
 
+  /* 「答え終わったあと」のタブでは、質問の画面ではなくお礼の画面を映す。 */
   const phone = (
-    <FormPhone accountLook={customerLook.look} layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} fixedNext focusBlockId={selectedBlockId} />
+    <FormPhone accountLook={customerLook.look} layout={layout} pageIndex={page} accountName={host ? host.accountName : selectedAccount?.name ?? '公式アカウント'} bookingMenus={refs.bookingMenus ?? []} fixedNext={editTab !== 'after'} focusBlockId={editTab === 'after' ? null : selectedBlockId} thanks={editTab === 'after' ? { text: layout.options.thanksText ?? '', url: layout.options.thanksUrl ?? null } : undefined} />
   )
 
   const preview = (

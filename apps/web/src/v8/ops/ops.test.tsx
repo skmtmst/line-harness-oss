@@ -2,7 +2,7 @@ import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-a
 // @vitest-environment happy-dom
 /*
  * ★V8 運営コンソール（src/v8/ops）の動きの試験。BEHAVIOR.md の主な動きを守る。
- * V8 のテーマで表示し、閲覧のみの人に押せないボタンを置かないこと・送る前に必ず確かめること・
+ * V8 のテーマで表示し、閲覧のみの人に押せない形＋理由で出すこと・送る前に必ず確かめること・
  * 停止の窓が名前と理由を確かめるまで口を呼ばないことを見る。
  */
 import React, { act } from 'react'
@@ -26,8 +26,10 @@ import OpsShellV8 from './shell'
 import OpsMembersV8 from './members'
 import OpsTenantsV8 from './tenants'
 import OpsAnnouncementsV8 from './announcements'
+import OpsAnnouncementEditV8 from './announcement-edit'
 import OpsTenantDetailV8 from './tenant-detail'
 import KnowledgeArticleV8 from './knowledge-article'
+import { OPS_READONLY_LOCK_REASON } from './use-ops-read-only'
 import { api, type OpsKnowledgeArticle } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -48,11 +50,16 @@ let readOnly = false
 let calls: Array<{ method: string; url: string }> = []
 let root: Root
 let host: HTMLDivElement
+/** 役割の応答を止めて「分からない」状態を作る（null のときはすぐ返す）。 */
+let meGate: Promise<void> | null = null
+let releaseMe: (() => void) | null = null
 
 beforeEach(() => {
   readOnly = false
   search = ''
   calls = []
+  meGate = null
+  releaseMe = null
   document.documentElement.dataset.theme = 'v8'
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -61,7 +68,10 @@ beforeEach(() => {
     const url = String(input)
     const method = init?.method ?? 'GET'
     calls.push({ method, url })
-    if (url.endsWith('/api/ops/me')) return json({ success: true, data: { ...ME, readOnly } })
+    if (url.endsWith('/api/ops/me')) {
+      if (meGate) await meGate
+      return json({ success: true, data: { ...ME, readOnly } })
+    }
     if (url.endsWith('/api/ops/members')) return json({ success: true, data: MEMBERS, summary: { members: 2, invited: 0, awaitingTotp: 0, totpEnabled: 2, impersonationsThisMonth: 0, writeImpersonationsThisMonth: 0, piiRevealsThisMonth: 0 } })
     if (url.includes('/api/ops/tenants/t1')) return json({ success: true, data: { tenant: TENANT, accounts: [], members: [], audit: [] } })
     if (url.includes('/api/ops/tenants')) return json({ success: true, data: [TENANT], summary: { active: 1, trialing: 0, suspended: 0, pastDue: 0 } })
@@ -100,8 +110,22 @@ describe('運営コンソールの V8 外枠', () => {
   })
 })
 
-describe('閲覧のみには押せないボタンを置かない', () => {
-  it('メンバー管理：書ける人には招待と停止、閲覧のみには出さない', async () => {
+describe('閲覧のみには隠さず押せない形＋理由で出す', () => {
+  it('自分の運営アカウントは停止できず、理由を示して送信しない', async () => {
+    await act(async () => { root.render(<OpsMembersV8 />) })
+    await settle()
+    const selfMenu = document.querySelector<HTMLButtonElement>('button[aria-label="検証 太郎のその他操作"]')!
+    expect(selfMenu).not.toBeNull()
+    expect(selfMenu.disabled).toBe(true)
+    expect(selfMenu.getAttribute('title')).toBe('自分の運営アカウントは停止・取り消しできません')
+    act(() => selfMenu.click())
+    await settle()
+    expect(document.querySelector('[role="menu"]')).toBeNull()
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(calls.filter(call => call.method !== 'GET')).toHaveLength(0)
+  })
+
+  it('メンバー管理：書ける人には招待と停止、閲覧のみは押せない形＋理由で押しても口を呼ばない', async () => {
     await act(async () => { root.render(<OpsMembersV8 />) })
     await settle()
     expect(buttons('招待メールを送る')).toHaveLength(1)
@@ -118,26 +142,91 @@ describe('閲覧のみには押せないボタンを置かない', () => {
 
     act(() => root.unmount())
     readOnly = true
+    calls = []
     root = createRoot(host)
     await act(async () => { root.render(<OpsMembersV8 />) })
     await settle()
     expect(text()).toContain('見本 次郎')
-    expect(buttons('招待メールを送る')).toHaveLength(0)
-    expect(document.querySelector('button[aria-label="見本 次郎のその他操作"]')).toBeNull()
+    // 招待は押せない形＋理由で出し、押しても口を呼ばない。
+    expect(buttons('招待メールを送る')).toHaveLength(1)
+    expect(text()).toContain(OPS_READONLY_LOCK_REASON)
+    act(() => buttons('招待メールを送る')[0].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await settle()
+    expect(calls.filter(call => call.method !== 'GET')).toHaveLength(0)
+    // 行の「…」も押せない形＋理由で出し、選んでも口を呼ばない。
+    const lockedMenu = document.querySelector<HTMLButtonElement>('button[aria-label="見本 次郎のその他操作"]')!
+    expect(lockedMenu).not.toBeNull()
+    act(() => lockedMenu.click())
+    const lockedStop = document.querySelector<HTMLElement>('[role="menuitem"]')!
+    expect(lockedStop.textContent).toContain('停止する')
+    expect(lockedStop.textContent).toContain(OPS_READONLY_LOCK_REASON)
+    act(() => lockedStop.click())
+    await settle()
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(calls.filter(call => call.method !== 'GET')).toHaveLength(0)
   })
 
-  it('契約先アカウント：閲覧のみには「契約先を作る」を出さない', async () => {
+  it('契約先アカウント：閲覧のみは「契約先を作る」を押せない形＋理由で出し、押しても窓を開かない', async () => {
     readOnly = true
     await act(async () => { root.render(<OpsTenantsV8 />) })
     await settle()
     expect(text()).toContain('契約先A')
-    expect(buttons('契約先を作る')).toHaveLength(0)
+    expect(buttons('契約先を作る')).toHaveLength(1)
+    expect(text()).toContain(OPS_READONLY_LOCK_REASON)
+    act(() => buttons('契約先を作る')[0].dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await settle()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(calls.filter(call => call.method !== 'GET')).toHaveLength(0)
+  })
+
+  it('役割が分かるまでは理由なしの押せない形で出し、分かったら切り替える', async () => {
+    meGate = new Promise<void>((resolve) => { releaseMe = resolve })
+    await act(async () => { root.render(<OpsTenantsV8 />) })
+    await settle()
+    expect(buttons('契約先を作る')).toHaveLength(1)
+    expect(text()).not.toContain(OPS_READONLY_LOCK_REASON)
+    expect((buttons('契約先を作る')[0] as HTMLButtonElement).disabled).toBe(true)
+    await act(async () => { releaseMe!() })
+    await settle()
+    expect((buttons('契約先を作る')[0] as HTMLButtonElement).disabled).toBe(false)
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+  })
+
+  it('契約先の詳細：閲覧のみは停止も押せない形＋理由で出し、押しても窓を開かない', async () => {
+    readOnly = true
+    search = 'id=t1'
+    await act(async () => { root.render(<OpsTenantDetailV8 />) })
+    await settle()
+    expect(getPageAction({ name: '停止' })).toBeTruthy()
+    expect(getPageAction({ name: 'アーカイブ' })).toBeTruthy()
+    expect(document.body.textContent).toContain(OPS_READONLY_LOCK_REASON)
+    await act(async () => { getPageAction({ name: '停止' }).click() })
+    await settle()
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
+    expect(calls.filter((c) => c.method !== 'GET')).toHaveLength(0)
+  })
+
+  it('ナレッジの記事：閲覧のみは保存も承認も押せない形＋理由で出し、欄も止めて口を呼ばない', async () => {
+    readOnly = true
+    const article = {
+      id: 'k1', version: 1, sourceRequestId: 'r1', ticketNo: 12, sourceCurrent: true, articleKind: 'verified', reviewState: 'approved', status: 'active',
+      reviewReason: '', evidence: [], usedCount: 0, helpfulCount: 0, unhelpfulCount: 0, updatedAt: '2026-10-01T00:00:00Z',
+      title: '配信の止め方', question: '止めたい', answer: '一時停止を押す', kind: 'usage', keywords: [],
+    } as unknown as OpsKnowledgeArticle
+    await act(async () => { root.render(<KnowledgeArticleV8 article={article} onClose={() => {}} onSaved={() => {}} />) })
+    await settle()
+    expect(buttons('承認待ちで保存する')).toHaveLength(1)
+    expect(text()).toContain(OPS_READONLY_LOCK_REASON)
+    expect((document.querySelector('#ka-title') as HTMLInputElement).disabled).toBe(true)
+    await act(async () => { (buttons('承認待ちで保存する')[0] as HTMLButtonElement).click() })
+    await settle()
+    expect(calls.filter((c) => c.method !== 'GET')).toHaveLength(0)
   })
 })
 
 describe('送る・止める前に確かめる', () => {
   it('お知らせ：今すぐ送るを押すと確認の窓が開き、まだ送らない', async () => {
-    await act(async () => { root.render(<OpsAnnouncementsV8 />) })
+    await act(async () => { root.render(<OpsAnnouncementEditV8 />) })
     await settle()
     // 件名と本文を入れてから押す（足りない欄があるうちは確認の窓を開かない。）。
     fireEvent.change(document.querySelector('#ann-subject')!, { target: { value: 'メンテナンスのお知らせ' } })
@@ -151,7 +240,7 @@ describe('送る・止める前に確かめる', () => {
   })
 
   it('お知らせ：件名と本文が空なら確認の窓を開かず、欄が赤くなり理由が出て、件名の欄へ移る', async () => {
-    await act(async () => { root.render(<OpsAnnouncementsV8 />) })
+    await act(async () => { root.render(<OpsAnnouncementEditV8 />) })
     await settle()
     await act(async () => { (buttons('今すぐ送る')[0] as HTMLButtonElement).click() })
     for (let i = 0; i < 2; i += 1) await act(async () => { await new Promise((r) => requestAnimationFrame(r)) })

@@ -22,7 +22,7 @@ import { canManageRole,useStaffRole } from '@/lib/staff-role'
 import { SetupTasks, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import ListState from '@/components/shared/list-state'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
-import type { DashboardCardId } from '@line-crm/shared'
+import type { AccountStyle, DashboardCardId } from '@line-crm/shared'
 import { Calendar,Image as ImageIcon,Inbox,Package,Plus,SlidersHorizontal } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
@@ -71,7 +71,7 @@ const ROW_VARIANT: Partial<Record<DashboardCardId, 'trend' | 'inbox' | 'link'>> 
   'friend-add': 'link',
 }
 
-export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 'ec' } = {}) {
+export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? 'standard' }: { usageStyle?: 'standard' | 'ec'; accountStyle?: AccountStyle | null } = {}) {
   const router = useRouter()
   const d = useDashboard(usageStyle)
   const role = useStaffRole()
@@ -83,9 +83,9 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
   const setupParam = params.get('setup')
   const qrRequested = params.has('qr')
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。QR の窓の間は最初の1通を待って読み直す。 */
-  const start = useFirstSteps(d.selectedAccountId, role, { qrOpen: qrRequested })
   /* 〜：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
   const setup = useStyleSetup(d.selectedAccountId, role)
+  const start = useFirstSteps(d.selectedAccountId, role, { qrOpen: qrRequested, style: setup.data?.state.style ?? accountStyle })
   const starterResult = useStarterRetryResult(d.selectedAccountId)
   const setupRest = setupSummary(setup.data)
   const closedWizardAccount = useRef<string | null>(null)
@@ -467,7 +467,7 @@ export default function DashboardV8({ usageStyle }: { usageStyle?: 'standard' | 
       </div>
       {/* はじめの質問の窓（B-313）。`?setup=0〜|summary` かスタイル未選択の最初の訪問で開く。 */}
       {/* 最初の1通が、この画面で見ている間に届いた時だけ（SPEC-11 ③）。 */}
-      {start.arrived && setup.data && d.selectedAccountId && canManage ? <FirstRunDoneDialog accountId={d.selectedAccountId} style={setup.data.state.style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} onClose={start.dismissArrived} /> : null}
+      {start.arrived && setup.data && d.selectedAccountId && canManage ? <FirstRunDoneDialog accountId={d.selectedAccountId} style={setup.data.state.style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
       {wizardStep !== null && setup.data && d.selectedAccountId && canManage ? <StyleSetupWizard accountId={d.selectedAccountId} state={setup.data.state} initialStep={wizardStep} onClose={closeWizard} /> : null}
     </DashboardPage>
     </KpiValueMotionProvider>

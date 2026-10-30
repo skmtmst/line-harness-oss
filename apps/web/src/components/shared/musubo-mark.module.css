@@ -1,0 +1,12 @@
+@layer properties, theme, base, components, utilities;
+
+@layer components {
+  .mark {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--color-canvas);
+    object-fit: contain;
+  }
+}

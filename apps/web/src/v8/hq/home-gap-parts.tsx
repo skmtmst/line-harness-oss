@@ -1,7 +1,10 @@
 'use client'
 
+import { lineAccountConnectionState } from '@/lib/line-account-state'
+
 import { accountHandle } from './account-dialogs'
 import { formatNumber } from '@/lib/format'
+import { emptyValue } from '@/components/shared/empty-value'
 
 import { type AccountWithStats } from '@/contexts/account-context';
 import { PAGE_SIZES as STANDARD_PAGE_SIZES } from '@/components/shared/page-size-select';
@@ -43,20 +46,17 @@ function matchesStatus(account: AccountWithStats, filter: StatusFilter) {
   if (filter === 'all') return !isArchived(account)
   if (filter === 'archived') return isArchived(account)
   if (isArchived(account)) return false
-  if (filter === 'ok') return account.isActive && account.connection?.status === 'ok'
-  return account.isActive && account.connection?.status !== 'ok'
+  const state = lineAccountConnectionState(account)
+  if (filter === 'ok') return state.tone === 'ok'
+  return state.label === '要確認' || state.label === '未確認'
 }
 
 
 function statusOf(account: AccountWithStats): { label: string; tone: 'ok' | 'warn' | 'idle' } {
-  if (isArchived(account)) return { label: 'アーカイブ', tone: 'idle' }
-  if (!account.isActive) return { label: '停止中', tone: 'idle' }
-  if (account.connection?.status === 'ok') return { label: '正常', tone: 'ok' }
-  if (account.connection?.status === 'warn') return { label: '要確認', tone: 'warn' }
-  return { label: '未確認', tone: 'idle' }
+  return lineAccountConnectionState(account)
 }
 export { type StatusFilter, type View, UNFILED, ALL, STATUS_FILTERS, SORT_OPTIONS, PAGE_SIZES, isArchived, matchesStatus, statusOf }
 
 export function accountMeta(account: AccountWithStats, parent: string | null) {
-  return [accountHandle(account), parent ? `親：${parent}` : null, `権限者 ${formatNumber(account.stats?.staffCount ?? 0)} 人`].filter(Boolean).join('・')
+  return [accountHandle(account), parent ? `親：${parent}` : null, typeof account.stats?.staffCount === 'number' ? `権限者 ${formatNumber(account.stats.staffCount)} 人` : `権限者 ${emptyValue('unknown')}`].filter(Boolean).join('・')
 }

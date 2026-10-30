@@ -166,7 +166,7 @@ export default function HqStarterSetsV8() {
       <div className={styles.body}>
         {error ? <Notice tone="danger" action={<Button onClick={() => void load()}>もう一度試す</Button>}>{error}</Notice> : null}
         <div className={styles.head}>
-          <h3 className={styles.title}>{`${label}の初期セット`}</h3>
+          <h3 className={styles.title}>{`${label}の初期セット${sets !== null && groups.length === 0 ? '（中身は未登録）' : ''}`}</h3>
           {set ? <StatusBadge tone="info" dot>{`${set.accountCount} アカウントで使用中`}</StatusBadge> : <StatusBadge tone="neutral" dot>musubo の標準</StatusBadge>}
           <span className={styles.spacer} />
           {canEdit ? <>
@@ -174,7 +174,7 @@ export default function HqStarterSetsV8() {
             {set ? <Button variant="primary" onClick={() => setDistribute({ target: 'style', accounts: [], editedAction: 'notify' })}><Send aria-hidden="true" className={styles.buttonIcon} />{`使っている ${set.accountCount} アカウントへ配る`}</Button> : null}
           </> : null}
         </div>
-        <div className={styles.auto}>
+        {sets !== null && groups.length > 0 ? <div className={styles.auto}>
           <span className={styles.autoText}>
             <span className={styles.autoTitle}>新しいアカウントで、このスタイルを選んだときに自動で入れる</span>
             <span className={styles.autoNote}>入った物には「見本」の印が付き、店で直せます</span>
@@ -183,13 +183,13 @@ export default function HqStarterSetsV8() {
           {set && canEdit
             ? <SaveErrorField names={['autoInsert', 'auto_insert']}><Toggle label="新しいアカウントで自動で入れる" checked={set.autoInsert} disabled={saving} onChange={(next) => void saveAutoInsert(next)} /></SaveErrorField>
             : <StatusBadge tone={set?.autoInsert === false ? 'neutral' : 'success'} dot>{set?.autoInsert === false ? '入れない' : '自動で入れる'}</StatusBadge>}
-        </div>
+        </div> : null}
         <div className={styles.sectionHead}>
           <h3 className={styles.sectionTitle}>入る物</h3>
           <HelpTip label="入る物の説明">新しいアカウントでこのスタイルを選んだときに入る物です。自動で送る物は止めた状態で入ります。</HelpTip>
         </div>
         {sets === null ? (error ? null : <ListState kind="loading" title="読み込んでいます…" />) : groups.length === 0 ? (
-          <ListState kind="empty" title={`${label}の初期セットはまだありません`} description="［初期セットを作る］から作れます。" emptyPreset="readonly" />
+          <ListState kind="empty" title="自動で入れる中身はまだありません" description="［初期セットを作る］から作れます。" emptyPreset="readonly" />
         ) : (
           <div className={styles.table}>
             <GridTable label="入る物" design={{ columns: 'var(--hss-col-kind) minmax(0, 1fr) var(--hss-col-how) var(--hss-col-date) var(--hss-col-menu)', gap: 'var(--polish-space-card)', rowPadding: '0 var(--polish-space-section)', rowHeight: 'var(--hss-row-h)', fontSize: 'var(--text-body)' }}>

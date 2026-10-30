@@ -141,7 +141,7 @@ export default function QaListV8() {
       </div>}
       toolbar={<ListToolbarFrame singleRow><ListToolbarRow>
         <ListToolbarSearchSlot search={{ placeholder: '質問・答えで探す', value: url.q, onChange: (q) => setUrl({ q, page: '1' }), width: 280 }} />
-        <Select size="content" aria-label="状態" value={url.status} options={STATUS_OPTIONS} onChange={(status) => setUrl({ status, page: '1' })} />
+        <Select size="content" aria-label="状態" label="状態" value={url.status} options={STATUS_OPTIONS} onChange={(status) => setUrl({ status, page: '1' })} />
         <ListToolbarEnd>
           <Select size="page-size" aria-label="表示件数" value={String(size)} options={pageSizeOptions(PAGE_SIZES)} onChange={(next) => setUrl({ size: next, page: '1' })} />
         </ListToolbarEnd>

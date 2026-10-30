@@ -5,8 +5,8 @@ import type { StaffMember } from '@line-crm/shared'
  * ★V8（夕41）：設定の画面の、白い板の中の左の「設定の中のメニュー」。
  *
  *   - 絵の並び（会社とロゴは API ができるまで出さない）
- *   - 機能設定の下にマニュアルの対応表・ファイルの安全確認
- *   - 「専用」の小見出しの下に EC連携・LINE通知
+ *   - いま使わないマニュアルの対応表・ファイルの安全確認はメニューに出さない
+ *   - EC連携は出し、専用のLINE通知は共通メニューに出さない
  *   - いまの画面が選ばれた形になる
  *   - 見るだけの人には、見られる画面だけ出す（左のメニューと同じ決まり）
  */
@@ -17,6 +17,9 @@ const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
   pathname: '/settings',
   accountId: 'account-1',
+  style: 'ec' as string | null,
+  styleSelected: true,
+  stale: false,
 }))
 
 const localStorageValues = new Map<string, string>()
@@ -35,6 +38,7 @@ vi.mock('next/link', async () => {
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement('a', { href, ...props }, children) }
 })
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
+vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ status: fixture.style ? 'ready' : 'loading', stale: fixture.stale, data: fixture.style ? { style: fixture.style, styleSelected: fixture.styleSelected } : null }) }))
 vi.mock('@/lib/api', () => ({
   api: {
     featureSettings: { visibility: fixture.visibility },
@@ -54,13 +58,16 @@ describe('★V8 設定の中のメニュー', () => {
     fixture.visibility.mockReset()
     fixture.pathname = '/settings'
     fixture.accountId = 'account-1'
+    fixture.style = 'ec'
+    fixture.styleSelected = true
+    fixture.stale = false
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { ec_commerce: true, line_notifications: true } },
     })
     window.localStorage.clear()
     window.localStorage.setItem('lh_staff_role', 'owner')
-    rememberStaffIdentity({ role: 'owner' } as StaffMember)
+    rememberStaffIdentity({ role: 'owner', accountScope: 'all' } as StaffMember)
   })
 
   afterEach(() => { cleanup(); vi.unstubAllEnvs() })
@@ -79,8 +86,28 @@ describe('★V8 設定の中のメニュー', () => {
     await waitFor(() => expect(view.queryByText('EC連携')).toBeTruthy())
   })
 
+  it('EC用途だけにEC連携を表示し、アカウント切替と直URLでも非ECには出さない', async () => {
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(view.queryByRole('link', { name: 'EC連携' })).toBeTruthy())
+
+    fixture.accountId = 'account-2'
+    fixture.style = 'restaurant'
+    fixture.pathname = '/ec-commerce'
+    view.rerender(<SettingsInnerNav />)
+    expect(view.queryByRole('link', { name: 'EC連携' })).toBeNull()
+
+    fixture.style = 'standard'
+    view.rerender(<SettingsInnerNav />)
+    expect(view.queryByRole('link', { name: 'EC連携' })).toBeNull()
+
+    fixture.style = 'ec'
+    fixture.styleSelected = false
+    view.rerender(<SettingsInnerNav />)
+    expect(view.queryByRole('link', { name: 'EC連携' })).toBeNull()
+  })
+
   // 2026-10-06：設定の板（ ほか 8 枚）の並びへ。見出し「設定」・印つき・プール管理あり・「専用」の小見出しなし。
-  it('絵の並びで出す：はじめの設定・LINEアカウント・プール管理・ログインユーザー・機能設定・運用状態・EC連携・LINE通知（SNS 連携は末尾）', async () => {
+  it('EC用途の設定の並びにEC連携を出し、飲食店専用項目は出さない', async () => {
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { ec_commerce: true, line_notifications: true, multi_store_hierarchy: true } },
@@ -96,14 +123,10 @@ describe('★V8 設定の中のメニュー', () => {
       'プール管理',
       'ログインユーザー',
       '機能設定',
-      // 機能設定を開いているときだけ下の2つを出す（絵には無いが、ここからしか行けない）
-      'マニュアルの対応表',
-      'ファイルの安全確認',
       '運用状態',
       'EC連携',
-      'LINE通知',
       // 提案 E-6：今ある絵の並びを動かさないよう末尾に足した
-      'SNS 連携', '予約サイト・グルメ媒体', 'デリバリー連携',
+      'SNS 連携',
     ])
     expect(view.getByText('設定')).toBeTruthy()
     expect(view.queryByText('専用')).toBeNull()
@@ -111,8 +134,17 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.queryByText('会社とロゴ')).toBeNull()
   })
 
+  it('店舗に所属する管理者の設定メニューにLINEアカウント管理を出さない', async () => {
+    rememberStaffIdentity({ role: 'admin', accountScope: 'accounts' } as StaffMember)
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: 'LINEアカウント' })).toBeNull()
+    expect(view.getByRole('link', { name: '機能設定' })).toBeTruthy()
+  })
+
   // 2026-10-12：デリバリー連携（承認案 DL-1 `dF4Ov`）を予約サイト・グルメ媒体の下に足した
   it('検証環境でも予約サイト・グルメ媒体とデリバリー連携へ進める', async () => {
+    fixture.style = 'restaurant'
     vi.stubEnv('NEXT_PUBLIC_RESTAURANT_TEST_ENABLED', 'true')
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
@@ -124,46 +156,74 @@ describe('★V8 設定の中のメニュー', () => {
   })
 
   it('本番でも飲食店の設定の入口を残す', async () => {
+    fixture.style = 'restaurant'
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
     expect(view.getByRole('link', { name: 'デリバリー連携' }).getAttribute('href')).toBe('/settings/delivery')
   })
 
-  it('SNS 連携の画面では SNS 連携が今の画面になり、機能設定の下の2つは出さない', async () => {
+  it('飲食店以外とスタイル未取得では予約サイト・グルメ媒体とデリバリー連携を表示しない', async () => {
+    for (const style of ['standard', 'salon', 'consult', 'lesson', 'ec', null]) {
+      fixture.style = style
+      const view = render(<SettingsInnerNav />)
+      await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+      expect(view.queryByRole('link', { name: '予約サイト・グルメ媒体' })).toBeNull()
+      expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
+      cleanup()
+    }
+  })
+
+  it('別スタイルで直接開いた画面も飲食店専用の入口を表示しない', async () => {
+    fixture.style = 'ec'
+    fixture.pathname = '/settings/delivery'
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
+  })
+
+  it('古い記憶の飲食店スタイルだけでは専用の入口を表示しない', async () => {
+    fixture.style = 'restaurant'
+    fixture.stale = true
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: '予約サイト・グルメ媒体' })).toBeNull()
+    expect(view.queryByRole('link', { name: 'デリバリー連携' })).toBeNull()
+  })
+
+  it('SNS 連携の画面でも現在地だけを示す', async () => {
     fixture.pathname = '/settings/sns'
     fixture.visibility.mockResolvedValue({ success: true, data: { features: {} } })
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(view.queryByRole('link', { name: 'SNS 連携' })).toBeTruthy())
     expect(view.getByRole('link', { name: 'SNS 連携' }).getAttribute('aria-current')).toBe('page')
     expect(view.getByRole('link', { name: '機能設定' }).getAttribute('aria-current')).toBeNull()
+    expect(view.queryByRole('link', { name: 'マニュアルの対応表' })).toBeNull()
     expect(view.queryByRole('link', { name: 'ファイルの安全確認' })).toBeNull()
   })
 
-  it('LINE通知の画面では機能設定を同時に選択しない', async () => {
+  it('LINE通知は直接開いた画面でも共通の設定メニューに出さない', async () => {
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: 'LINE通知' })).toBeNull()
     fixture.pathname = '/line-notifications'
-    const view = render(<SettingsInnerNav />)
-    await waitFor(() => expect(view.getByRole('link', { name: 'LINE通知' })).toBeTruthy())
-    expect(view.getByRole('link', { name: 'LINE通知' }).getAttribute('aria-current')).toBe('page')
+    view.rerender(<SettingsInnerNav />)
+    expect(view.queryByRole('link', { name: 'LINE通知' })).toBeNull()
     expect(view.getByRole('link', { name: '機能設定' }).getAttribute('aria-current')).toBeNull()
-    expect(view.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page')).toHaveLength(1)
+    expect(view.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page')).toHaveLength(0)
   })
 
-  it('機能設定の下の2つは、ほかの設定の画面では出さない', async () => {
-    fixture.pathname = '/accounts'
-    const view = render(<SettingsInnerNav />)
+  it.each(['/settings', '/settings/manual-links', '/settings/file-scan', '/settings/sns'])('設定 %s でも使わない2項目を表示しない', async (pathname) => {
+    fixture.pathname = pathname
+    const view = render(<SettingsInnerNav inline />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
-    expect(view.queryByRole('link', { name: 'マニュアルの対応表' })).toBeNull()
-    expect(view.getByRole('link', { name: 'LINEアカウント' }).className).toContain('itemActive')
-  })
-
-  it('いまの画面は選ばれた形（aria ではなく className の薄い地）になる', async () => {
-    fixture.pathname = '/settings/manual-links'
-    const view = render(<SettingsInnerNav />)
-    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
-    const child = view.getByRole('link', { name: 'マニュアルの対応表' })
-    expect(child.className).toContain('itemActive')
+    const nav = view.getByRole('navigation', { name: '設定の中のメニュー' })
     const parent = view.getByRole('link', { name: '機能設定' })
-    expect(parent.className).not.toContain('itemActive')
+    expect(view.queryByRole('link', { name: 'マニュアルの対応表' })).toBeNull()
+    expect(view.queryByRole('link', { name: 'ファイルの安全確認' })).toBeNull()
+    expect(nav.querySelector('ul ul')).toBeNull()
+    const active = view.getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page').map((link) => link.getAttribute('href'))
+    expect(active).toEqual(pathname === '/settings' || pathname === '/settings/sns' ? [pathname] : [])
+    expect(parent.getAttribute('aria-current')).toBe(pathname === '/settings' ? 'page' : null)
   })
 
   it('見るだけの人には見られる画面だけ出す（スタッフにはログインユーザーを出さない）', async () => {

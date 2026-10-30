@@ -57,7 +57,7 @@ export default function CloseTasksPage() {
   const saveErrors = useSaveFormErrors()
   const router = useRouter()
   usePageTitle('枠を閉じる知らせ')
-  usePageCrumbs([{ label: '店舗ダッシュボード', href: '/restaurant-test/dashboard' }])
+  usePageCrumbs([{ label: 'ダッシュボード', href: '/' }])
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   const canWrite = canWriteRole(role)

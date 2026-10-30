@@ -172,28 +172,28 @@ export const SAMPLE_MENUS: Partial<Record<AccountStyle, SampleMenu>> = {
     tiles: [{ label: '商品を見る', icon: 'bag', feature: 'shop' }, { label: 'お買い物を続ける', icon: 'bag', feature: 'shop' }, { label: 'マイページ', icon: 'user', feature: 'mypage' }, { label: 'クーポン', icon: 'ticket', feature: 'coupons' }, { label: 'ご利用ガイド', icon: 'file', feature: 'docs' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' }],
   },
   restaurant: {
-    account: '然 - 和食 -', greeting: '友だち追加ありがとうございます。ご予約・クーポンは下のメニューからどうぞ。', tone: { bg: 'var(--sample-restaurant-bg)', ink: 'var(--sample-restaurant-ink)' },
+    account: 'musubo - 和食 -', greeting: '友だち追加ありがとうございます。ご予約・クーポンは下のメニューからどうぞ。', tone: { bg: 'var(--sample-restaurant-bg)', ink: 'var(--sample-restaurant-ink)' },
     tiles: [
       { label: '予約する', icon: 'calendarCheck', feature: 'booking' }, { label: '予約の確認', icon: 'list', feature: 'history' }, { label: 'クーポン', icon: 'ticket', feature: 'coupons' },
       { label: 'メニュー', icon: 'book', feature: 'menu' }, { label: 'スタンプ', icon: 'stamp', feature: 'stamps' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' },
     ],
   },
   salon: {
-    account: 'Hair Salon 然', greeting: '友だち追加ありがとうございます。ご予約・回数券の残りは下のメニューから見られます。', tone: { bg: 'var(--sample-salon-bg)', ink: 'var(--sample-salon-ink)' },
+    account: 'Hair Salon musubo', greeting: '友だち追加ありがとうございます。ご予約・回数券の残りは下のメニューから見られます。', tone: { bg: 'var(--sample-salon-bg)', ink: 'var(--sample-salon-ink)' },
     tiles: [
       { label: '予約', icon: 'calendarCheck', feature: 'booking' }, { label: '予約の確認', icon: 'list', feature: 'history' }, { label: '回数券', icon: 'ticket', feature: 'tickets' },
       { label: 'スタイル写真', icon: 'image', feature: 'photos' }, { label: 'スタンプ', icon: 'stamp', feature: 'stamps' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' },
     ],
   },
   consult: {
-    account: '然 相談窓口', greeting: '友だち追加ありがとうございます。面談のご予約・資料は下のメニューからどうぞ。', tone: { bg: 'var(--sample-consult-bg)', ink: 'var(--sample-consult-ink)' },
+    account: 'musubo 相談窓口', greeting: '友だち追加ありがとうございます。面談のご予約・資料は下のメニューからどうぞ。', tone: { bg: 'var(--sample-consult-bg)', ink: 'var(--sample-consult-ink)' },
     tiles: [
       { label: '面談を予約', icon: 'calendarCheck', feature: 'booking' }, { label: '予約の確認', icon: 'list', feature: 'history' }, { label: '資料', icon: 'file', feature: 'docs' },
       { label: 'よくある質問', icon: 'bulb', feature: 'faq' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' }, { label: '会社のこと', icon: 'building', feature: 'about' },
     ],
   },
   lesson: {
-    account: '然 ヨガスタジオ', greeting: '友だち追加ありがとうございます。クラスの予約・振替は下のメニューからどうぞ。', tone: { bg: 'var(--sample-lesson-bg)', ink: 'var(--sample-lesson-ink)' },
+    account: 'musubo ヨガスタジオ', greeting: '友だち追加ありがとうございます。クラスの予約・振替は下のメニューからどうぞ。', tone: { bg: 'var(--sample-lesson-bg)', ink: 'var(--sample-lesson-ink)' },
     tiles: [
       { label: 'クラスを予約', icon: 'calendarCheck', feature: 'booking' }, { label: '予約の確認', icon: 'list', feature: 'history' }, { label: '回数券と月謝', icon: 'ticket', feature: 'tickets' },
       { label: '振替', icon: 'repeat', feature: 'transfer' }, { label: 'スケジュール', icon: 'calendarDays', feature: 'schedule' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' },
@@ -239,6 +239,11 @@ export function needsActivation(state: StarterItemState): boolean {
 export type StyleState = StyleSelectionStatus & { style: AccountStyle; version: number; answers: Record<string, SetupAnswer> }
 export type StyleWarning = { feature: string; areaId: string; groupId: string; href?: string; customerState: 'preparing' }
 
+/** 業種に合う警告を、上の帯と設定の一覧でそろえる。 */
+export function setupWarningsForStyle(style: AccountStyle, warnings: ReadonlyArray<StyleWarning>): StyleWarning[] {
+  return warnings.filter(warning => style !== 'ec' || warning.feature !== 'stamps')
+}
+
 export type TodoRow = {
   key: string
   title: string
@@ -265,7 +270,7 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
   const doneKeys = steps.filter((step) => step.key === 'style' ? state.styleSelected : answers[step.key]?.mode === 'configured').map((step) => step.key)
   const rows: TodoRow[] = []
   const warned = new Set<string>()
-  for (const warning of warnings) {
+  for (const warning of setupWarningsForStyle(state.style, warnings)) {
     if (warned.has(warning.feature)) continue
     warned.add(warning.feature)
     const preparing = FEATURES[warning.feature]?.preparing
@@ -280,6 +285,7 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
   }
   if (!state.styleSelected && state.styleMode !== 'manual') rows.push({ key: 'style', title: '使い方のスタイルを選ぶ', note: '答えに合わせて、メニュー・見本・設定をまとめて入れます', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '選ぶ', step: 'style' } })
   for (const question of questions) {
+    if (state.style === 'ec' && question.key === 'stamps') continue
     const answer = answers[question.key]
     if (!answer || answer.mode === 'configured') continue
     if (warned.has(question.key)) continue

@@ -31,10 +31,10 @@ describe('m22c 札・ボタンの折り返し', () => {
 })
 
 describe('m22c 行き先リンクの見た目', () => {
-  it('分類案内の行き先リンクは共通の見た目（13px/600青文字）', () => {
+  it('分類案内の行き先リンクは共通の緑の文字リンク（TextLink）', () => {
     const source = read('components/friend-fields/attribute-kind-guide.tsx')
-    expect(source).toContain('text-status-info mt-0.5 inline-block text-label font-semibold hover:underline')
-    expect(source).not.toContain('font-semibold text-action')
+    expect(source).toContain('<TextLink')
+    expect(source).not.toContain('text-status-info')
   })
 
   // 管理画面の本文の戻るリンクは廃止。V8の経路はbreadcrumb-r177で守る。

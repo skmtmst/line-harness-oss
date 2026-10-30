@@ -1,6 +1,7 @@
-import { jstCalendar as japanCalendar } from '@line-crm/shared';
+import { lineAccountConnectionState, LINE_TOKEN_REFRESH_DAYS, lineTokenExpiry, lineConnectionRisk, jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import {
+  getLineAccountListStats,
   completeOperationHealthRun,
   enqueuePendingOperationAlertNotifications,
   failOperationHealthRun,
@@ -36,12 +37,10 @@ export type OperationInfraDeps = {
 };
 
 /**
- * 鍵は残り7日未満で自動で取り替える（token-refresh）。その前に注意を出すと、
- * 取り替えが動いていても30日ごとに注意が開くので、取り替えの失敗が残っている時と、
- * 取り替えの時期を1日過ぎても新しくならない時（残り5日以下）だけ注意にする。
+ * 鍵は残り7日未満で自動で取り替える（token-refresh）。取り替える窓とは別に、
+ * 画面の14日前の予告と分けて、期限切れ・交換失敗・交換の時期を過ぎた時だけ注意にする。
  */
-const CREDENTIAL_REFRESH_DAYS = 7;
-const CREDENTIAL_STALE_DAYS = 5;
+
 const INFRA_SLOW_MS = 3_000;
 const INFRA_ALERT_AFTER = 3;
 /** 解消も3回連続の成功で確定する。1回の成功で閉じると「解消→再発」が繰り返される。 */
@@ -164,19 +163,13 @@ async function collectChecks(
 ): Promise<OperationHealthResultInput[]> {
   return Promise.all([
     isolate('line_connection', observedAt, async () => {
-      const row = await db.prepare(
-        `SELECT risk_level, error_code, error_count, created_at
-           FROM account_health_logs WHERE line_account_id = ?
-          ORDER BY created_at DESC LIMIT 1`,
-      ).bind(account.id).first<{
-        risk_level: 'normal' | 'warning' | 'danger'; error_code: number | null;
-        error_count: number; created_at: string;
-      }>();
-      if (!row) return result('line_connection', 'unknown', 'LINE接続の確認記録がありません', 'account_health_logs', observedAt);
-      return result('line_connection', row.risk_level,
-        row.risk_level === 'normal' ? 'LINE接続は正常です' : 'LINE接続に問題があります',
-        'account_health_logs', row.created_at,
-        { errorCode: row.error_code, consecutiveErrors: row.error_count });
+      const connection = (await getLineAccountListStats(db, [account.id]))[account.id]?.connection;
+      const risk = lineConnectionRisk(connection);
+      const state = lineAccountConnectionState({ connection });
+      return result('line_connection', risk ?? 'unknown',
+        risk === 'normal' ? 'LINE接続は正常です' : risk ? 'LINE接続に問題があります' : `LINE接続は${state.label}です`,
+        'LINE接続の確認記録', connection?.checkedAt ?? observedAt,
+        { issues: (connection?.issues ?? []).map(({ kind, result, httpStatus, webhookActive }) => ({ kind, result, httpStatus, webhookActive })) });
     }),
     isolate('message_quota', observedAt, async () => {
       // LINE公式側とHarness契約側の両方を見る。送れる数は小さい方で、
@@ -359,25 +352,18 @@ async function collectChecks(
         });
     }),
     isolate('credential_expiry', observedAt, async () => {
-      if (!account.token_expires_at) {
-        return result('credential_expiry', 'unknown', 'LINEの鍵の期限がまだ記録されていません', 'line_accounts', observedAt);
-      }
-      const expiresAt = Date.parse(account.token_expires_at);
-      const daysLeft = Math.floor((expiresAt - Date.parse(observedAt)) / (24 * 60 * 60 * 1000));
-      const refreshFailed = daysLeft >= 0
+      const expiry = lineTokenExpiry(account.token_expires_at, Date.parse(observedAt));
+      const daysLeft = expiry.daysLeft;
+      const refreshFailed = expiry.status !== 'expired'
         && await hasLineTokenRefreshFailure(db, account.id, account.token_expires_at);
-      const status: OperationHealthStatus =
-        daysLeft < 0 ? 'danger'
-          : refreshFailed || daysLeft <= CREDENTIAL_STALE_DAYS ? 'warning'
-          : 'normal';
+      if (daysLeft === null && !refreshFailed) return result('credential_expiry', 'unknown', expiry.label, 'line_accounts', observedAt);
+      const status: OperationHealthStatus = expiry.status === 'expired' ? 'danger'
+        : refreshFailed || (daysLeft !== null && daysLeft < LINE_TOKEN_REFRESH_DAYS) ? 'warning' : 'normal';
       return result('credential_expiry', status,
-        status === 'normal' ? 'LINEの鍵の期限に余裕があります'
-          : daysLeft < 0 ? 'LINEの鍵の期限が切れています'
-          : refreshFailed ? `LINEの鍵を自動で取り替えられていません（${daysLeft}日後に期限）`
-          : `LINEの鍵の期限が${daysLeft}日後に迫っています`,
+        refreshFailed ? 'トークンを自動で取り替えられていません' : status === 'normal' && expiry.status === 'expiring' ? '自動で取り替える時期の前です' : expiry.label,
         'line_accounts', observedAt,
         { expiresAt: account.token_expires_at, daysLeft, refreshFailed },
-        { refreshDays: CREDENTIAL_REFRESH_DAYS, staleDays: CREDENTIAL_STALE_DAYS });
+        { refreshWindowDays: LINE_TOKEN_REFRESH_DAYS });
     }),
     isolate('infra_canary', observedAt, async () => {
       // 実際に読み書きして試す。1回の失敗では知らせず、遅い・失敗が

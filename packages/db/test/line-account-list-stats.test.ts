@@ -70,12 +70,12 @@ describe('LINEアカウント一覧の一括集計', () => {
     await expect(
       getLineAccountListStats(countingDb, ['account-a', 'account-b', 'account-c', 'account-d']),
     ).resolves.toEqual({
-      'account-a': { friendCount: 2, activeScenarios: 1, messagesThisMonth: 1, staffCount: 2, connection: { status: 'ok', checkedAt: '2026-09-15T10:01:00.000Z', tokenExpired: false, issues: [] } },
-      'account-b': { friendCount: 1, activeScenarios: 1, messagesThisMonth: 1, staffCount: 1, connection: { status: 'warn', checkedAt: '2026-09-15T10:02:30.000Z', tokenExpired: false, issues: [
+      'account-a': { friendCount: 2, activeScenarios: 1, messagesThisMonth: 1, staffCount: 2, connection: { isActive: true, archivedAt: null, status: 'ok', checkedAt: '2026-09-15T10:01:00.000Z', tokenExpired: false, issues: [] } },
+      'account-b': { friendCount: 1, activeScenarios: 1, messagesThisMonth: 1, staffCount: 1, connection: { isActive: true, archivedAt: null, status: 'warn', checkedAt: '2026-09-15T10:02:30.000Z', tokenExpired: false, issues: [
         { kind: 'webhook_endpoint', result: 'mismatched', expectedUrl: null, registeredUrl: null, webhookActive: null, httpStatus: null },
       ] } },
-      'account-c': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 1, connection: { status: 'unknown', checkedAt: null, tokenExpired: false, issues: [] } },
-      'account-d': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 1, connection: { status: 'warn', checkedAt: '2026-09-15T10:03:00.000Z', tokenExpired: true, issues: [] } },
+      'account-c': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 1, connection: { isActive: true, archivedAt: null, status: 'unknown', checkedAt: null, tokenExpired: false, issues: [] } },
+      'account-d': { friendCount: 0, activeScenarios: 0, messagesThisMonth: 0, staffCount: 1, connection: { isActive: true, archivedAt: null, status: 'unknown', checkedAt: '2026-09-15T10:03:00.000Z', tokenExpired: true, issues: [] } },
     });
     expect(prepareCalls).toHaveLength(1);
   });
@@ -97,7 +97,7 @@ describe('LINEアカウント一覧の一括集計', () => {
     `);
     const stats = await getLineAccountListStats(db, ['account-c']);
     expect(stats['account-c'].connection).toEqual({
-      status: 'warn',
+      isActive: true, archivedAt: null, status: 'warn',
       checkedAt: '2026-09-15T10:00:01.000Z',
       tokenExpired: false,
       issues: [{
@@ -138,3 +138,66 @@ describe('LINEアカウント一覧の一括集計', () => {
     expect(bindCalls[0]).toHaveLength(1);
   });
 });
+
+ test('手動確認と定期のbot確認を同じ時刻で比較し、復旧とWebhookの問題を別々に残す', async () => {
+   sqlite.exec(`INSERT INTO account_health_logs (id,line_account_id,error_code,error_count,check_period,risk_level,created_at)
+     VALUES ('cron-a','account-a',401,1,'5m','normal','2026-09-15T19:05:00'),
+            ('cron-b','account-b',NULL,0,'5m','warning','2026-09-15T19:05:00+09:00');`);
+   let stats = await getLineAccountListStats(db, ['account-a', 'account-b']);
+   expect(stats['account-a'].connection).toMatchObject({ status: 'warn', checkedAt: '2026-09-15T10:05:00.000Z', issues: [{ kind: 'bot_info', httpStatus: 401 }] });
+   expect(stats['account-b'].connection).toMatchObject({ status: 'warn', issues: [{ kind: 'webhook_endpoint' }] });
+   sqlite.exec(`INSERT INTO line_account_connection_checks
+     (id,line_account_id,check_kind,result,checked_by,checked_at,correlation_id,idempotency_key,account_revision)
+     VALUES ('recovered-a','account-a','bot_info','ok','staff-all','2026-09-15T10:06:00Z','recover','recover',1);`);
+   stats = await getLineAccountListStats(db, ['account-a']);
+   expect(stats['account-a'].connection).toMatchObject({ status: 'ok', issues: [] });
+ });
+
+ test('定期の送信量のwarningとトークン更新失敗だけを接続の故障にしない', async () => {
+   sqlite.exec(`INSERT INTO account_health_logs (id,line_account_id,error_code,error_count,check_period,risk_level,created_at)
+     VALUES ('traffic','account-c',NULL,0,'5m','warning','2026-09-15T10:05:00Z');
+     INSERT INTO line_account_connection_checks
+     (id,line_account_id,check_kind,result,checked_by,checked_at,correlation_id,idempotency_key,account_revision)
+     VALUES ('refresh','account-c','token_refresh','failed','staff-all','2026-09-15T10:06:00Z','refresh','refresh',1);`);
+   expect((await getLineAccountListStats(db, ['account-c']))['account-c'].connection).toMatchObject({ status: 'unknown', issues: [] });
+   sqlite.exec("UPDATE line_accounts SET is_active=0 WHERE id='account-c'");
+   expect((await getLineAccountListStats(db, ['account-c']))['account-c'].connection.isActive).toBe(false);
+ });
+
+ test('botとWebhookの両方の確認がない限り正常にせず、無受信と除外を一覧へ反映する', async () => {
+   sqlite.exec(`INSERT INTO account_health_logs(id,line_account_id,error_count,check_period,risk_level,created_at)
+     VALUES('bot-only','account-c',0,'5m','normal','2026-09-15T10:05:00Z');`);
+   expect((await getLineAccountListStats(db,['account-c']))['account-c'].connection.status).toBe('unknown');
+   sqlite.exec("UPDATE line_accounts SET last_webhook_received_at='2020-01-01T09:00:00' WHERE id='account-a'");
+   expect((await getLineAccountListStats(db,['account-a']))['account-a'].connection).toMatchObject({status:'warn',issues:[{kind:'webhook_silence'}]});
+   sqlite.exec("UPDATE line_accounts SET webhook_silence_exempt=1 WHERE id='account-a'");
+   expect((await getLineAccountListStats(db,['account-a']))['account-a'].connection.status).toBe('ok');
+ });
+
+ test('定期ログの最新をUTC/JSTの文字順で取り違えず、期限の時差なしもJSTとして読む', async () => {
+   sqlite.exec(`INSERT INTO account_health_logs(id,line_account_id,error_code,error_count,check_period,risk_level,created_at)
+     VALUES('jst-old','account-a',401,1,'5m','normal','2026-09-15T19:05:00'),
+           ('utc-new','account-a',NULL,0,'5m','normal','2026-09-15T10:06:00Z');`);
+   const deadline = new Date(Date.now()+8*60*60_000).toISOString().replace(/Z$/,'');
+   sqlite.prepare('UPDATE line_accounts SET token_expires_at=? WHERE id=?').run(deadline,'account-a');
+   expect((await getLineAccountListStats(db,['account-a']))['account-a'].connection).toMatchObject({status:'ok',tokenExpired:true,checkedAt:'2026-09-15T10:06:00.000Z'});
+ });
+
+ test('5万件の定期記録でもアカウントごとの相関で最新1件を取得する', async () => {
+   const insert = sqlite.prepare("INSERT INTO account_health_logs(id,line_account_id,error_code,error_count,check_period,risk_level,created_at) VALUES(?,'account-a',?,?,'5m','normal',?)")
+   sqlite.transaction(() => {
+     for(let i=0;i<50_000;i++)insert.run('bulk-'+i,401,1,new Date(Date.parse('2026-09-14T00:00:00Z')+i*1000).toISOString())
+     insert.run('newest',null,0,'2026-09-15T12:00:00Z')
+   })()
+   let query = ''
+   const observedDb = { ...db, prepare(sql:string) { query=sql; return db.prepare(sql) } } as D1Database
+   const ids=['account-a','account-b','account-c','account-d']
+   const stats=await getLineAccountListStats(observedDb,ids)
+   expect(Object.keys(stats)).toHaveLength(4)
+   expect(stats['account-a'].connection).toMatchObject({status:'ok',checkedAt:'2026-09-15T12:00:00.000Z'})
+   const plan=sqlite.prepare('EXPLAIN QUERY PLAN '+query).all(JSON.stringify(ids)) as Array<{id:number;parent:number;detail:string}>
+   const correlated=plan.filter(row=>row.detail.includes('CORRELATED SCALAR SUBQUERY'))
+   expect(correlated.some(node=>plan.some(row=>row.parent===node.id && /SEARCH recent USING INDEX.*\(line_account_id=\?\)/.test(row.detail)))).toBe(true)
+   expect(plan.some(row=>/SEARCH health USING INDEX.*\(id=\?\)/.test(row.detail))).toBe(true)
+
+ })

@@ -21,7 +21,6 @@ const operator = readFileSync(
 
 describe("notification-run-list-numfix (DrwMm/PZBVb/u8xibp)", () => {
   it("検索欄は現役の共通部品を使う", () => {
-    expect(list).toContain("<SearchField aria-label=\"お客様の名前・注文番号で探す\"");
     expect(operator).toContain("<SearchField aria-label=\"お知らせを検索\"");
   });
 

@@ -24,7 +24,8 @@ import LinePreview from '@/components/shared/line-preview'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { FieldError } from '@/components/shared/form-controls'
-import { ErrorCountBadge } from '@/components/shared/error-count-badge'
+import CarouselOrderChip from './carousel-order-chip'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { useTapActionSources } from '@/components/shared/use-tap-action-sources'
 import { TAP_ACTION_KINDS, tapActionDef, type TapActionKind } from '@/lib/tap-actions'
@@ -193,6 +194,8 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const [publishCheck, setPublishCheck] = useState<{ id: string; usageCount: number } | null>(null)
   const [publishError, setPublishError] = useState('')
   const canMutate = useFeatureAccess('templates')
+  const readOnly = host ? Boolean(host.readOnly) : !canMutate
+  const readOnlyReason = usePermissionLockReason(!readOnly)
   const actionOptions = useActionOptions()
 
   const folderAccountId = host?.composer?.accountId ?? (id ? templateAccountId : selectedAccountId)
@@ -374,11 +377,16 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   const panel = panels[selected] ?? panels[0]
   const selectedIndex = panels[selected] ? selected : 0
 
-  if (host ? host.readOnly : !canMutate) {
+  if (readOnly) {
     return (
       <SaveErrorScope errors={saveErrors}><CreatePage boardId="J60utH" title="カルーセル" help="カルーセルの作成・変更はオーナーと管理者だけができます" readOnly footerActions={null}>
         <p className={styles.note}>一覧で中身を確認できます。</p>
-        <></>
+        <div className={own.chipRow} aria-label="カードの順番">
+          {panels.map((item, index) => <CarouselOrderChip key={index} index={index}
+            label={`${index + 1} ${chipName(item.title) || `カード ${index + 1}`}`} src={item.thumbnailImageUrl}
+            errorCount={fields.countIn(`card-${index}`)} aria-pressed={index === selectedIndex}
+            lockedReason={readOnlyReason} disabled={!readOnlyReason} draggable={false} />)}
+        </div>
 
       </CreatePage></SaveErrorScope>
     )
@@ -386,11 +394,13 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
 
   const busy = saving || publishing || uploading || Boolean(host?.busy)
   const onChipKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (busy) return
     if (event.key === 'ArrowLeft' && event.altKey) { event.preventDefault(); moveTo(index, index - 1) }
     if (event.key === 'ArrowRight' && event.altKey) { event.preventDefault(); moveTo(index, index + 1) }
   }
   const onDrop = (event: DragEvent, index: number) => {
     event.preventDefault()
+    if (busy) return
     if (dragIndex !== null) moveTo(dragIndex, index)
     setDragIndex(null)
   }
@@ -480,10 +490,14 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
               <CardHeader title="カード" titleId="cr-cards" size="stacked" meta="左から順に出ます。つまんで並べ替えられます。" />
               <div className={own.chipRow}>
                 {panels.map((item, index) => (
-                  <button
+                  <CarouselOrderChip
+                    index={index}
+                    label={`${index + 1} ${chipName(item.title) || `カード ${index + 1}`}`}
+                    src={item.thumbnailImageUrl}
+                    errorCount={fields.countIn(`card-${index}`)}
                     key={index}
                     type="button"
-                    className={own.chip} data-composer={inline || undefined}
+                    data-composer={inline || undefined}
                     aria-pressed={index === selectedIndex}
                     draggable={!busy}
                     disabled={busy}
@@ -493,10 +507,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
                     onDragStart={() => setDragIndex(index)}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={(event) => onDrop(event, index)}
-                  >
-                    {`${index + 1} ${chipName(item.title) || `カード ${index + 1}`}`}
-                    <ErrorCountBadge count={fields.countIn(`card-${index}`)} label={`カード${index + 1}`} />
-                  </button>
+                  />
                 ))}
                 <Button type="button" variant="text" disabled={busy || panels.length >= MAX_COLUMNS} onClick={() => { setPanels((prev) => [...prev, emptyPanel()]); setSelected(panels.length) }}>
                   <Plus size={16} aria-hidden="true" />カードを足す

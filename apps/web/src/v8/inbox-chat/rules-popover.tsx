@@ -17,6 +17,7 @@ import { api, type SupportMarkListItem } from '@/lib/api'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import RoutingDrawer from './routing-drawer'
 import styles from './inbox-chat.module.css'
+import listStyles from './list-parts.module.css'
 
 type Status = 'idle' | 'loading' | 'ready' | 'error'
 
@@ -58,7 +59,7 @@ export default function InboxRulesPopover({ accountId, onRoutingSaved }: { accou
       <Button
         type="button"
         size="compact"
-        className={styles.popTrigger}
+        className={`${listStyles.tool} ${listStyles.toolCaption}`}
         aria-label="対応ルール"
         title="対応ルール"
         aria-haspopup="dialog"
@@ -66,6 +67,7 @@ export default function InboxRulesPopover({ accountId, onRoutingSaved }: { accou
         onClick={() => setOpen((now) => !now)}
       >
         <Settings2 aria-hidden size={16} />
+        <span aria-hidden="true" className={listStyles.toolCaptionLabel}>対応ルール</span>
       </Button>
       <MenuPortal open={open} align="end" getAnchor={() => wrapRef.current} onClose={() => setOpen(false)}>
         <section role="dialog" aria-label="対応ルール" className={styles.pop}>

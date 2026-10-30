@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import SearchField from '@/components/shared/search-field'
@@ -116,7 +116,7 @@ function locationLabel(row: AuditEventItem): string {
 }
 
 export default function LoginAudit({ userId }: { userId?: string }) {
-  const { selectedAccountId } = useAccount()
+  const { selectedAccountId, loading: accountsLoading } = useAccount()
   const [rows, setRows] = useState<AuditEventItem[]>([])
   const [summary, setSummary] = useState<AuditEventSummary>(EMPTY_SUMMARY)
   const [total, setTotal] = useState(0)
@@ -142,12 +142,21 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     const requestId = ++requestSeq.current
     setLoading(true)
     setError('')
+    if (!selectedAccountId) {
+      setRows([])
+      setSummary(EMPTY_SUMMARY)
+      setTotal(0)
+      setLoadedPeriod(null)
+      setLoading(accountsLoading)
+      setError(accountsLoading ? '' : 'LINEアカウントを選択してください。')
+      return
+    }
     try {
       const from = periodFilter === 'all'
         ? undefined
         : new Date(Date.now() - Number(periodFilter) * 24 * 60 * 60 * 1000).toISOString()
       const auditResult = await api.audit.events({
-        lineAccountId: selectedAccountId ?? undefined,
+        lineAccountId: selectedAccountId,
         actorId: userId,
         query: query.trim() || undefined,
         from,
@@ -180,8 +189,17 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     } finally {
       if (requestId === requestSeq.current) setLoading(false)
     }
-  }, [actionFilter, page, pageSize, periodFilter, query, selectedAccountId, sort, userId])
+  }, [accountsLoading, actionFilter, page, pageSize, periodFilter, query, selectedAccountId, sort, userId])
 
+  useLayoutEffect(() => {
+    requestSeq.current += 1
+    setRows([])
+    setSummary(EMPTY_SUMMARY)
+    setTotal(0)
+    setLoadedPeriod(null)
+    setDetail(null)
+    setError('')
+  }, [selectedAccountId])
   useEffect(() => { void load() }, [load])
 
   const counts = {
@@ -228,7 +246,7 @@ export default function LoginAudit({ userId }: { userId?: string }) {
     <Notice tone="info" className="mb-4">だれが、いつ、何をしたかの記録です。いつもと違う場所からのログインは赤く出します。消した・配信した・設定を変えたで絞れます。</Notice>
     <div className="mb-3 flex flex-wrap items-center gap-3">
       <SearchField aria-label="人の名前・操作の内容で検索" value={query} onChange={setQuery} placeholder="人の名前・操作の内容で検索" className="min-w-64 flex-1" />
-      <SaveErrorField names={["periodFilter","period_filter"]}><Select aria-label="期間で絞り込む" value={periodFilter} onChange={setPeriodFilter} options={PERIOD_OPTIONS} /></SaveErrorField>
+      <SaveErrorField names={["periodFilter","period_filter"]}><Select aria-label="期間で絞り込む" label="期間" value={periodFilter} onChange={setPeriodFilter} options={PERIOD_OPTIONS} /></SaveErrorField>
       <SaveErrorField names={["pageSize","limit","page_size"]}><Select aria-label="表示件数" value={String(pageSize)} onChange={(value) => setPageSize(Number(value))} options={PAGE_SIZE_OPTIONS} /></SaveErrorField>
     </div>
     <div className="mb-3 flex flex-wrap items-center gap-3">

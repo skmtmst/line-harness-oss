@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { flushListUrlState } from '@/components/shared/list-url-state'
 /*
  * V8 統括のアカウント（src/v8/hq/home.tsx）の動きの試験。
  * LINE ID の @ を二重にしない、要確認のカードに引っかかった確認の言葉を出す（全文は title）、
@@ -85,6 +86,7 @@ beforeEach(() => {
 
 afterEach(() => {
   act(() => root.unmount())
+  flushListUrlState()
   container.remove()
 })
 
@@ -220,6 +222,12 @@ describe('統括のアカウント', () => {
 
 
 
+  it('接続に問題の数は対応が要るものの接続の絞り込みへ進める', async () => {
+    await render()
+    const link = [...container.querySelectorAll('a')].find((anchor) => anchor.textContent?.includes('対応が要るものへ'))!
+    expect(link.getAttribute('href')).toBe('/hq/attention?kind=connections')
+  })
+
   it('閲覧のみでも所属とタグを読め、権限者を含む補足の全文へ届く', async () => {
     role.value = 'viewer'
     accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, folderId: 'area', folder: { name: '渋谷エリア', color: '#0088ff' }, tags: [{ id: 'main', name: '本店', color: '#0088ff' }], stats: { ...warnedAccount.stats, staffCount: 4 } }] })
@@ -245,4 +253,23 @@ it('フォルダがタグにも返っても札は一つで、アーカイブの�
   expect(edit.querySelectorAll('svg')).toHaveLength(1)
   expect([...card.querySelectorAll('button')].some(el => el.textContent === '詳細')).toBe(false)
   expect([...card.querySelectorAll('button')].find(el => el.textContent === '戻す')?.querySelector('svg')).not.toBeNull()
+})
+
+
+it.each([
+  { staffCount: undefined, label: '権限者 —' },
+  { staffCount: 0, label: '権限者 0 人' },
+])('権限者数の未取得と本当の0人をカードと表で分ける：$label', async ({ staffCount, label }) => {
+  window.history.replaceState(null, '', '/hq')
+  accounts.mockResolvedValue({ success: true, data: [{ ...warnedAccount, stats: { ...warnedAccount.stats, staffCount } }] })
+  await render()
+  const card = container.querySelector('article')!
+  expect(card.textContent).toContain(label)
+  expect(card.querySelector('[title*="権限者"]')?.getAttribute('title')).toContain(label)
+  if (staffCount === undefined) expect(card.textContent).not.toContain('権限者 0 人')
+  const table = container.querySelector<HTMLButtonElement>('button[aria-label="表"]')!
+  await act(async () => { table.click() })
+  const row = container.querySelector('tbody tr')!
+  expect(row.textContent).toContain(label)
+  expect(row.querySelector('[title*="権限者"]')?.getAttribute('title')).toContain(label)
 })

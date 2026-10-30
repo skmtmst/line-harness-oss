@@ -2,6 +2,7 @@
 
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
+import { readStaffIdentity } from '@/lib/staff-identity-state'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import ListState from '@/components/shared/list-state'
 import CopyTextButton from '@/components/shared/copy-text-button'
@@ -21,6 +22,7 @@ import Card from '@/components/shared/card'
 import StickyBar from '@/components/shared/sticky-bar'
 import Checkbox from '@/components/shared/checkbox'
 import Notice from '@/components/shared/notice'
+import TextLink from '@/components/shared/text-link'
 import NoticeLineRegisterDialog from '@/components/hq/notice-line-register-dialog'
 import {
   DRAFT_KEY, LOGIN_ACKS, WEBHOOK_ACKS, allAcked, allV06RowsOk, channelErrors, checkActionLabel, checkErrorText,
@@ -35,7 +37,8 @@ import Step2Connect from './step2-connect'
 import Step4Template from './step4-template'
 import RegistrationStyleDialog from './registration-style-dialog'
 import Step5Completion from './step5-completion'
-import ResumeRegistrationStyle from './resume-style'
+import RegistrationSession from './registration-session'
+import { registrationStorageKey } from './registration-storage'
 import { REGISTRATION_STYLE_KEY, useRegistrationStyle } from './use-registration-style'
 import styles from './register.module.css'
 import { qrToDataURL } from '@/lib/qr-image'
@@ -71,11 +74,9 @@ const emptyForm: FormState = {
 
 export default function AccountRegisterV8() {
   const role = useStaffRole()
-  const [resumeId, setResumeId] = useState('')
-  useEffect(() => {
-    if (!canManageRole(role)) return
-    try { setResumeId(sessionStorage.getItem(REGISTRATION_STYLE_KEY) ?? '') } catch { /* 接続を新規作成する前に通常の重複検査も行う。 */ }
-  }, [role])
+  const identity = readStaffIdentity()
+  const draftKey = registrationStorageKey(DRAFT_KEY, identity)
+  const resumeKey = registrationStorageKey(REGISTRATION_STYLE_KEY, identity)
   usePageTitle('LINEアカウントを登録')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'アカウント', href: '/hq' }])
 
@@ -85,11 +86,12 @@ export default function AccountRegisterV8() {
     <PageContent layout="stats">{role === null ? <ListState kind="loading" title="権限を確認しています" /> : <ReadOnlyNotice>LINEアカウントの登録はオーナーか管理者ができます。オーナーか管理者に頼んでください。</ReadOnlyNotice>}</PageContent>
     <StickyBar actions={<Button variant="secondary" href="/accounts">LINEアカウントの一覧へ戻る</Button>} />
   </PageFrame>
-  if (resumeId) return <ResumeRegistrationStyle accountId={resumeId} />
-  return <AccountRegistrationForm />
+  return <RegistrationSession key={draftKey ?? 'unverified'} resumeKey={resumeKey}>
+    <AccountRegistrationForm draftKey={draftKey} resumeKey={resumeKey} />
+  </RegistrationSession>
 }
 
-function AccountRegistrationForm() {
+function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | null; resumeKey: string | null }) {
   const saveErrors = useSaveFormErrors()
 
   // ①事前確認（v07 p6zMkA）。答えと、いま出している面。
@@ -117,6 +119,7 @@ function AccountRegistrationForm() {
   const [importRequestError, setImportRequestError] = useState(false)
   const [importRefreshing, setImportRefreshing] = useState(false)
   const [draftRestored, setDraftRestored] = useState(false)
+  const [draftReady, setDraftReady] = useState(false)
   const [noticeDialog, setNoticeDialog] = useState<'idle' | 'open' | 'done'>('idle')
   const [styleDialogOpen, setStyleDialogOpen] = useState(true)
   const busyLock = useRef(false)
@@ -127,7 +130,7 @@ function AccountRegistrationForm() {
   const rowsOk = allV06RowsOk(checkRows)
   const checkNotice = checkErrorText(checkStage(connection, checkRunning), checkRows)
   const badge = currentStep === 1 ? precheckStateLabel(precheckAt) : stepLabel(currentStep, sub)
-  // 「公式アカウントをこれから作る人」は Q1=いいえ の人。下書きの持ち方は v05 までと同じにしておく。
+  // 「公式アカウントをこれから作る人」は Q1=いいえ の人。
   const accountMethod: 'existing' | 'new' = precheck.q1 === 'no' ? 'new' : 'existing'
   const precheckRows = precheckSummary(precheckAt, precheck)
   const precheckGuide = precheckAt === 'done' && precheck.q4 === 'yes' && precheck.q5
@@ -165,28 +168,25 @@ function AccountRegistrationForm() {
     invalid?.scrollIntoView?.({ block: 'center', behavior: scrollMotion() })
   }, [fieldErrors, currentStep, sub])
 
-  // 端末の下書きがあれば一度だけ戻す（秘密値は書いていないので入れ直す）。
+  // 本人の入力だけを戻す。表示位置は必ず①の最初から（秘密値は入れ直す）。
   useEffect(() => {
-    const draft = (() => { try { return readDraft(window.localStorage) } catch (saveFailure) {
+    const draft = (() => { try { return draftKey ? readDraft(window.localStorage, draftKey) : null } catch (saveFailure) {
       saveErrors.capture(saveFailure)
       return null } })()
-
+    setDraftReady(true)
     if (!draft) return
-    setPrecheck(draft.precheck)
-    setPrecheckAt(draft.precheckAt)
-    setCurrentStep(draft.step)
-    setSub(draft.sub)
     setForm((current) => ({
       ...current, name: draft.name, channelId: draft.channelId, providerId: draft.providerId, loginChannelId: draft.loginChannelId, lineId: draft.lineId,
       tagIds: draft.tagIds, parentId: draft.parentId, staffIds: draft.staffIds, liffId: draft.liffId, importFriends: draft.importFriends,
     }))
     setDraftRestored(true)
-  }, [saveErrors])
+  }, [draftKey, saveErrors])
 
   // 変わるたびに端末の下書きを残す（秘密値は除く）。登録が終わったら消す。
   useEffect(() => {
+    if (!draftReady || !draftKey) return
     if (createdId) {
-      try { window.localStorage.removeItem(DRAFT_KEY) } catch (saveFailure) {
+      try { window.localStorage.removeItem(draftKey) } catch (saveFailure) {
         saveErrors.capture(saveFailure) /* 消せなくても登録は続ける。 */ }
       return
     }
@@ -196,9 +196,9 @@ function AccountRegistrationForm() {
       lineId: form.lineId, tagIds: form.tagIds, parentId: form.parentId, staffIds: form.staffIds, liffId: form.liffId,
       importFriends: form.importFriends,
     }
-    try { window.localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)) } catch (saveFailure) {
+    try { window.localStorage.setItem(draftKey, JSON.stringify(draft)) } catch (saveFailure) {
       saveErrors.capture(saveFailure) /* 書けなくても入力は続ける。 */ }
-  }, [createdId, currentStep, sub, accountMethod, precheck, precheckAt, form.name, form.channelId, form.providerId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, saveErrors])
+  }, [draftReady, draftKey, createdId, currentStep, sub, accountMethod, precheck, precheckAt, form.name, form.channelId, form.providerId, form.loginChannelId, form.lineId, form.tagIds, form.parentId, form.staffIds, form.liffId, form.importFriends, saveErrors])
 
   /* ③-1：応答が返ったあと、5行を1行ずつ送る。止まった行（error）が出たらそこで終わる。 */
   useEffect(() => {
@@ -440,7 +440,7 @@ function AccountRegistrationForm() {
       }
       setConnection(response.data)
       setForm((current) => ({ ...current, channelSecret: '', loginChannelSecret: '' }))
-      try { if (response.data.id) sessionStorage.setItem(REGISTRATION_STYLE_KEY, response.data.id) } catch (failure) { saveErrors.capture(failure) }
+      try { if (response.data.id && resumeKey) sessionStorage.setItem(resumeKey, response.data.id) } catch (failure) { saveErrors.capture(failure) }
       // v07：登録できたら③の2つめ（友だち追加のためし）へ進む。
       setCurrentStep(3)
       setSub(2)
@@ -728,7 +728,7 @@ function AccountRegistrationForm() {
                       <p>このアカウントの LINE トークから「接続テスト」と送ってください。QR を開き直すだけでは確認できません。</p>
                     </div>
                     <p className={styles.receiptHelp}>変わらない場合は LINE Developers で Webhook の利用がオンか確認してください。</p>
-                    <p className={styles.receiptHelp}><a href="/hq/support">変わらない場合はサポートに問い合わせ</a></p>
+                    <p className={styles.receiptHelp}><TextLink href="/hq/support" inline>変わらない場合はサポートに問い合わせ</TextLink></p>
                   </div>
                 </div>
               </Card>

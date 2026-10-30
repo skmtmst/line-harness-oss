@@ -76,7 +76,7 @@ export default function UrlClicksV8({ accountId }: { accountId: string }) {
 
   const toolbar = <ListToolbarFrame><ListToolbarRow>
     <ListToolbarSearchSlot><SearchField id="url-click-search" aria-label="URL・配信名・リンク名で探す" value={query} onChange={(value) => { setQuery(value); setPage(0) }} onClear={() => { setQuery(''); setPage(0) }} placeholder="URL・配信名・リンク名で探す" loading={state.loading} /></ListToolbarSearchSlot>
-    <SaveErrorField names={["status"]}><Select id="url-state" aria-label="URLの状態" value={status} options={[{ value: 'all', label: 'すべての状態' }, { value: 'active', label: '計測中' }, { value: 'stopped', label: '停止中' }]} onChange={(value) => { setStatus(value); setPage(0) }} /></SaveErrorField>
+    <SaveErrorField names={["status"]}><Select id="url-state" aria-label="URLの状態" label="状態" value={status} options={[{ value: 'all', label: 'すべての状態' }, { value: 'active', label: '計測中' }, { value: 'stopped', label: '停止中' }]} onChange={(value) => { setStatus(value); setPage(0) }} /></SaveErrorField>
     <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
     <ListToolbarEnd>
     <Button variant="secondary" onClick={exportRows} disabled={exportDisabled}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>

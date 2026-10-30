@@ -12,13 +12,13 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({
-  query: 'id=synthetic-rule&step=priority',
+  title: vi.fn(), query: 'id=synthetic-rule&step=priority',
   getDraft: vi.fn(), validateDraft: vi.fn(), list: vi.fn(), conflicts: vi.fn(), saveDraft: vi.fn(),
   testDraft: vi.fn(), publishDraft: vi.fn(), friends: vi.fn(), liveStatus: 'draft', wide: false,
 }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ replace: (url: string) => { net.query = url.split('?')[1] }, push: vi.fn() }), useSearchParams: () => new URLSearchParams(net.query) }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'synthetic-account', accounts: [{ id: 'synthetic-account' }] }) }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {} }))
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: net.title }))
 vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ enabled: () => false, status: 'ready' }) }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => !net.wide }))
 vi.mock('@/components/auto-replies/inline-action-list', () => ({ default: () => null, useActionOptions: () => ({ tags: [], fields: [], marks: [], scenarios: [], vars: [] }) }))
@@ -180,9 +180,16 @@ it('下書きを読めなかったら、同じ下書きをその場で読み直�
   net.query = 'id=synthetic-rule&step=basic'
   net.getDraft.mockRejectedValueOnce(new ApiError(500, 'failed')).mockResolvedValue(draft())
   render(<Page />); await act(async () => {})
-  expect(document.body.textContent).toContain('再読み込みしても直らない場合はエラー報告へ。')
+  expect(document.body.textContent).toContain('管理者にお問い合わせください。')
   await act(async () => fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' })))
   expect(net.getDraft).toHaveBeenCalledTimes(2)
   expect(net.getDraft.mock.calls.every(([id]) => id === 'synthetic-rule')).toBe(true)
   expect((screen.getByLabelText(/ルール名/) as HTMLInputElement).value).toBe('予約の受付')
+})
+
+it('新規の題とブラウザ・パンくず用の題には自動応答と分かる名前を付ける',async()=>{
+ net.query='step=basic'
+ render(<Page/>)
+ await waitFor(()=>expect(screen.getByRole('heading',{name:'自動応答を作る'})).toBeTruthy())
+ expect(net.title).toHaveBeenCalledWith('自動応答を作る・基本設定')
 })

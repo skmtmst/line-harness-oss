@@ -194,6 +194,7 @@
 
 .footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--tpl-ms-key-row-gap);
   margin: var(--tpl-ms-qc-foot-margin);
@@ -222,3 +223,24 @@
 .balance {
   flex: 0 0 var(--tpl-ms-qc-balance-w);
 }
+
+/* 権限で押せない札も、選択は保ったまま共通の灰色と理由で伝える。 */
+:root .chip[data-permission-locked] {
+  outline-color: var(--color-control-border);
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-faint);
+  opacity: var(--polish-disabled-opacity);
+  cursor: not-allowed;
+}
+
+:root .chip[data-permission-locked]:focus-visible { outline-color: var(--color-focus-ring); }
+
+.countFields {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* 入力不足の1行は操作の並びと分け、横に押し込まない。 */
+.footer > :global([role='status']) { order: 1; }

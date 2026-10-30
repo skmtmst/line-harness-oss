@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import OpsAuditPage from './page'
 import type { OpsAuditRow } from '@/lib/api'
+import styles from '@/v8/ops/audit.module.css'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -101,6 +102,18 @@ describe('日付範囲の折返し（R158）', () => {
     expect(from.closest('[role="group"]')?.textContent).toContain('開始日')
     expect(to.closest('[role="group"]')?.textContent).toContain('終了日')
     expect(from.closest('[role="group"]')).not.toBe(to.closest('[role="group"]'))
+  })
+})
+
+describe('日時は1行（B23）', () => {
+  it('日時のセルは1つの文で、折らない印を持つ', async () => {
+    totalRows = 1
+    await act(async () => { root.render(<OpsAuditPage />) })
+    await flush()
+    const cell = host.querySelector('tbody tr td')
+    expect(cell?.textContent).toBe('09/27 12:00')
+    // 折返し自体は実ブラウザの写真で見る。ここでは印の結びを守る。
+    expect(cell?.className.split(' ')).toContain(styles.atCell)
   })
 })
 

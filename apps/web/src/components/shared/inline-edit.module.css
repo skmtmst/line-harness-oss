@@ -84,4 +84,17 @@
   color: var(--color-status-danger);
   font-size: 12px;
 }
+
+:is(.view, .input)[data-permission-locked],
+.input[aria-disabled="true"] {
+  color: var(--color-ink-secondary);
+  background: var(--color-canvas-sunken);
+  border-color: var(--color-field-border);
+  cursor: not-allowed;
+  opacity: var(--polish-disabled-opacity);
+}
+
+.view[data-permission-locked]:hover .viewValue {
+  text-decoration: none;
+}
 }

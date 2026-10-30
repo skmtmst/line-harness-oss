@@ -51,7 +51,7 @@ describe('MJoJR メニュー管理', () => {
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
     const board = document.querySelector('[data-design-node="MJoJR"]')!
-    for (const label of ['全メニュー', 'コース', '単品', '要承認', 'アレルギー登録', '「…」の中身']) expect(board.textContent).toContain(label)
+    for (const label of ['全メニュー', 'コース', '単品', '開始待ち', 'アレルギー登録', '「…」の中身']) expect(board.textContent).toContain(label)
     expect(screen.getAllByRole('button', { name: '再開' })).toHaveLength(1)
   })
 
@@ -94,6 +94,16 @@ describe('MJoJR メニュー管理', () => {
     await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/restaurant-test/menu/edit?store=store-1'))
   })
 
+  it('以前の価格申請が残る品目には確認口を残す', async () => {
+    const data = snapshotOf()
+    data.menuItems[0].pendingPrice = 9900
+    data.menuItems[0].priceChangeStatus = 'pending'
+    fixture.snapshot.mockResolvedValueOnce({ data })
+    render(<MenuPage />)
+    fireEvent.click(await screen.findByRole('button', { name: '以前の申請を確認する' }))
+    expect(nav.push).toHaveBeenCalledWith('/restaurant-test/approvals')
+  })
+
   it('閲覧のみ（staff）には追加・「…」・再開を置かない', async () => {
     role.value = verifiedStaffRole('staff')
     render(<MenuPage />)
@@ -116,7 +126,7 @@ describe('mauOC コースの編集ページ', () => {
     await waitFor(() => expect(nav.push).toHaveBeenCalledWith('/restaurant-test/menu'))
   })
 
-  it('価格を変えると「保存して申請する」になり、開始日時を添えて送る', async () => {
+  it('価格を変えると確認を経て、開始日時を添えて確定する', async () => {
     nav.params = new URLSearchParams('id=m1')
     render(<MenuEditPage />)
     fireEvent.change(await screen.findByLabelText('価格（税込）'), { target: { value: '9900' } })
@@ -130,7 +140,10 @@ describe('mauOC コースの編集ページ', () => {
     fireEvent.click(screen.getByRole('button', { name: '次の月' }))
     fireEvent.click(screen.getAllByRole('button').find((b) => (b.getAttribute('aria-label') ?? '').startsWith(`${next.getFullYear()}年${next.getMonth() + 1}月10日`))!)
     fireEvent.click(within(screen.getByRole('dialog', { name: '日時を選ぶ' })).getByRole('button', { name: '閉じる' }))
-    fireEvent.click(screen.getByRole('button', { name: /保存して申請する/ }))
+    fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
+    expect(fixture.updateMenu).not.toHaveBeenCalled()
+    expect(screen.getByText('価格変更を確定しますか？')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '確定して保存する' }))
     await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', expect.objectContaining({ price: 9900, effectiveAt: new Date(`${ymd}T10:00:00+09:00`).toISOString() })))
   })
 

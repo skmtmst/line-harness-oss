@@ -1,5 +1,6 @@
 'use client'
 
+import { useRememberedSidebar } from './use-remembered-sidebar'
 import { revealInScroller } from './sidebar-current-item'
 import { V8_NAV_ICONS, V8_SETTINGS_ICON } from './sidebar-icons'
 export { revealInScroller } from './sidebar-current-item'
@@ -194,7 +195,8 @@ export default function Sidebar({
 
   const [staffName, setStaffName] = useState<string | null>(null)
   const staffRole = useStaffRole()
-  const staffReadRole = readStaffIdentity()?.role ?? staffRole
+  const staffIdentity = readStaffIdentity()
+  const staffReadRole = staffIdentity?.role ?? staffRole
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
   const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
 
@@ -345,9 +347,9 @@ export default function Sidebar({
         ...storeSections.filter((s) => !normalizedSectionOrder.includes(s.label ?? '')),
       ]
     : storeSections
-  const sections = isHq ? HQ_MENU_SECTIONS : orderedStoreSections
+  const sections = isHq ? HQ_MENU_SECTIONS : orderedStoreSections.map(section => ({ ...section, items: section.items.filter(item => item.id !== 'conversions') }))
 
-  const visibleSections = sections
+  const freshSections = sections
     .map((section) => ({
       ...section,
       items: section.items.filter((item) => {
@@ -361,12 +363,12 @@ export default function Sidebar({
 
         if (isHq) return true
         const savedSettings = explicitSettings?.accountId === selectedAccountId ? explicitSettings.value : canManageRole(staffRole) ? false : null
-        if (!styleMenuItemVisible(item, accountStyle.data?.style ?? null, savedSettings)) return false
+        if (!styleMenuItemVisible(item, accountStyle.data?.style ?? null, savedSettings, accountStyle.data?.styleSelected === true)) return false
         // 移行中のV2画面では、承認画像どおり「タグ」を1行だけ出す。
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
 
         if (item.href === '/staff' && !canManageRole(staffReadRole)) return false
-        if (item.href === '/accounts' && staffReadRole === 'staff') return false
+        if (item.href === '/accounts' && (staffReadRole === 'staff' || staffIdentity?.accountScope !== 'all')) return false
         // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
         if (item.staffOnly && staffReadRole !== 'staff') return false
         // 失敗時にも必須ナビは残す。任意機能だけを権限・可視性で絞る。
@@ -390,6 +392,10 @@ export default function Sidebar({
      * 後ろに足すだけにすれば、出ている物は動かない。
      */
     .filter((_section, index) => isHq || currentVisibility !== null || visibilityStatus !== 'loading' || (!selectedAccountId && !accountLoading) || index === 0)
+
+  const menuLoading = !isHq && (visibilityStatus === 'loading' || accountStyle.status === 'loading')
+  const visibleSections = useRememberedSidebar(freshSections, sections, selectedAccountId, menuLoading,
+    !isHq && visibilityStatus === 'ready' && accountStyle.status === 'ready')
 
   /*
    * PERF-08: バッジ用の件数は「出す項目があるもの」だけを購読する。
@@ -618,6 +624,7 @@ export default function Sidebar({
 
   const isActive = (item: MenuItem) => {
     const href = item.href
+    if (item.id === 'affiliates' && (activePathname === '/conversions' || activePathname.startsWith('/conversions/'))) return true
     if (hasOwnerItem) return item.id === ownerItemId
     if (href === '/') return activePathname === '/'
     const [path, query = ''] = href.split('?')
@@ -714,7 +721,7 @@ export default function Sidebar({
       <div className={styles.identityRule} />
 
       {/* ナビゲーション */}
-      <nav ref={watchNavOverflow} className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
+      <nav aria-busy={menuLoading || undefined} ref={watchNavOverflow} className={`${styles.nav} ${preview ? 'overflow-hidden' : ''}`} data-design-node="J33xq" data-sidebar-scroll="">
         {/*
           ★V7 `x63W5x`：補助のデータ（表示可否）の失敗は、その場所の
           小さい1行で伝える。全文の「もう一度読み込む」は一覧本体の

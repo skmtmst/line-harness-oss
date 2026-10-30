@@ -7,7 +7,6 @@ import { Eye, LogIn, Send, Users } from 'lucide-react'
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, type OpsMember, type OpsMemberSummary } from '@/lib/api'
 import { opsCall } from '@/components/ops/ops-ui'
-import { opsEnvironmentLabel } from '@/components/ops/ops-env-bar'
 import NoticeLineAccountCard from '@/components/ops/notice-line-account-card'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
@@ -19,6 +18,8 @@ import { Tabs } from '@/components/shared/tabs'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
 import { OpsHead } from './shell'
+import { OPS_READONLY_LOCK_REASON } from './use-ops-read-only'
+import type { ActionMenuItem } from '@/components/shared/action-menu'
 import { PageFrame } from '@/components/templates/page-frame'
 import parts from './parts.module.css'
 import styles from './members.module.css'
@@ -35,10 +36,22 @@ import { RowActions } from '@/components/shared/row-actions'
  *
  * 動きは 管理画面（app/ops/members）と同じ口：一覧（/api/ops/members）・招待・再送・
  * 停止／再開。自分自身の行には操作を置かない。閲覧のみの運営メンバー
- * （/api/ops/me の readOnly）には、招待・停止などの押せないボタンを置かない。
+ * （/api/ops/me の readOnly）には、招待も行の「…」も押せない形＋理由で出す
+ * （決まり：隠さず灰色＋理由）。役割が分かるまでは理由なしの押せない形。
  */
 
 type PendingAction = { member: OpsMember; kind: 'stop' | 'resume' | 'cancel' }
+
+/** 行の「…」の中身。閲覧のみは押せない形＋理由、役割が分かるまでは理由なしの押せない形。 */
+function memberRowItems(m: OpsMember, access: 'unknown' | 'readonly' | 'writer', invited: boolean, onResend: () => void, onPending: (kind: 'stop' | 'resume' | 'cancel') => void): ActionMenuItem[] {
+  const items: ActionMenuItem[] = invited ? [
+    { id: 'resend', label: '招待を再送する', onSelect: onResend },
+    { id: 'cancel', label: '取り消す', tone: 'danger', onSelect: () => onPending('cancel') },
+  ] : [{ id: 'state', label: m.isActive ? '停止する' : '再開する', tone: m.isActive ? 'danger' : undefined, onSelect: () => onPending(m.isActive ? 'stop' : 'resume') }]
+  if (access === 'readonly') return items.map(({ onSelect: _onSelect, ...item }) => ({ ...item, disabled: false, lockedReason: OPS_READONLY_LOCK_REASON }))
+  if (access === 'unknown') return items.map((item) => ({ ...item, disabled: true }))
+  return items
+}
 
 export default function OpsMembersV8() {
   const [members, setMembers] = useState<OpsMember[]>([])
@@ -50,7 +63,9 @@ export default function OpsMembersV8() {
   const [listFailed, setListFailed] = useState(false)
   const [busy, setBusy] = useState(false)
   const [me, setMe] = useState<string | null>(null)
-  const [readOnly, setReadOnly] = useState(true)
+  const [access, setAccess] = useState<'unknown' | 'readonly' | 'writer'>('unknown')
+  const lock = access === 'readonly' ? OPS_READONLY_LOCK_REASON : undefined
+  const unknown = access === 'unknown'
   const [pending, setPending] = useState<PendingAction | null>(null)
   const [notice, setNotice] = useState('')
   const [resendingId, setResendingId] = useState<string | null>(null)
@@ -60,7 +75,7 @@ export default function OpsMembersV8() {
     setListFailed(false)
     const [res, meRes] = await Promise.all([opsCall(api.ops.members()), opsCall(api.ops.me())])
     setLoaded(true)
-    if (meRes.success) { setMe(meRes.data.id); setReadOnly(meRes.data.readOnly) }
+    if (meRes.success) { setMe(meRes.data.id); setAccess(meRes.data.readOnly ? 'readonly' : 'writer') }
     if (!res.success) { setError(res.error || '読み込めませんでした'); setListFailed(true); return }
     setMembers(res.data)
     setSummary(res.summary)
@@ -71,6 +86,7 @@ export default function OpsMembersV8() {
   const [inviteError, setInviteError] = useState<string | null>(null)
   const invite = async (event: FormEvent) => {
     event.preventDefault()
+    if (access !== 'writer') return
     const problem = inviteEmailRequirement.check(email)
     setInviteError(problem)
     if (problem) return
@@ -87,6 +103,7 @@ export default function OpsMembersV8() {
   }
 
   const resend = async (member: OpsMember) => {
+    if (access !== 'writer') return
     setResendingId(member.staffId)
     setError('')
     const res = await opsCall(api.ops.resendInvite(member.staffId))
@@ -97,7 +114,7 @@ export default function OpsMembersV8() {
   }
 
   const applyPending = async () => {
-    if (!pending) return
+    if (!pending || access !== 'writer') return
     setBusy(true)
     setError('')
     const res = await opsCall(api.ops.setMemberActive(pending.member.staffId, pending.kind === 'resume'))
@@ -114,7 +131,6 @@ export default function OpsMembersV8() {
       <OpsHead
         title="メンバー管理"
         description="運営メンバーはメールで招待します。招待された人はパスワードを設定し、二段階認証の登録が終わるまで運営コンソールに入れません。自分自身は変えられません。"
-        environment={opsEnvironmentLabel(process.env.NEXT_PUBLIC_API_URL)}
       />
       <div className={parts.stack}>
         <div className={parts.tabs}>
@@ -135,23 +151,22 @@ export default function OpsMembersV8() {
               <KpiCard presentation="cell" icon={<Eye size={16} aria-hidden="true" />} title="今月の個人情報の表示" value={summary ? summary.piiRevealsThisMonth : null} unit="回" detail="監査ログに記録" loading={!loaded} />
             </KpiBand>
 
-            {readOnly ? null : (
-              <form onSubmit={(event) => void invite(event)} className={styles.invite}>
-                <div className={styles.inviteField}>
-                  <Field label="招待する人のメールアドレス" requirement={inviteEmailRequirement} error={inviteError}><SaveErrorField names={["email"]}><TextField
-                    type="email"
-                    value={email}
-                    onChange={(event) => { setEmail(event.target.value); setInviteError(null) }}
-                    placeholder="招待する人のメールアドレス"
-                    aria-label="招待する人のメールアドレス"
-                    autoComplete="off"
-                  /></SaveErrorField></Field>
-                </div>
-                <Button type="submit" variant="primary" disabled={busy}>
-                  <Send aria-hidden="true" />招待メールを送る
-                </Button>
-              </form>
-            )}
+            <form onSubmit={(event) => void invite(event)} className={styles.invite}>
+              <div className={styles.inviteField}>
+                <Field label="招待する人のメールアドレス" requirement={inviteEmailRequirement} error={inviteError}><SaveErrorField names={["email"]}><TextField
+                  type="email"
+                  value={email}
+                  onChange={(event) => { setEmail(event.target.value); setInviteError(null) }}
+                  placeholder="招待する人のメールアドレス"
+                  aria-label="招待する人のメールアドレス"
+                  autoComplete="off"
+                  disabled={busy || access !== 'writer'}
+                /></SaveErrorField></Field>
+              </div>
+              <Button type="submit" variant="primary" lockedReason={lock} disabled={busy || unknown}>
+                <Send aria-hidden="true" />招待メールを送る
+              </Button>
+            </form>
 
             {notice ? <p role="status" className={parts.status}>{notice}</p> : null}
             {error && !listFailed ? <Notice tone="danger" className={parts.alertNoticePlacement} >{error}</Notice> : null}
@@ -187,10 +202,11 @@ export default function OpsMembersV8() {
                       <GridCell>{stateChip(m)}</GridCell>
                       <GridCell><span className={styles.shortText} title={m.lastLoginAt ? formatDateTime(m.lastLoginAt) : undefined}>{shortDateTime(m.lastLoginAt)}</span></GridCell>
                       <GridCell align="right">
-                        {readOnly ? null : self ? <RowActions subjectName={m.name} menuButtonProps={{ disabled: true, title: '自分の運営アカウントは停止・取り消しできません' }} menuNote="自分の運営アカウントは停止・取り消しできません" /> : <RowActions subjectName={m.name} menuButtonProps={{ disabled: busy || resendingId !== null }} menuItems={invited ? [
-                          { id: 'resend', label: '招待を再送する', onSelect: () => { void resend(m) } },
-                          { id: 'cancel', label: '取り消す', tone: 'danger', onSelect: () => setPending({ member: m, kind: 'cancel' }) },
-                        ] : [{ id: 'state', label: m.isActive ? '停止する' : '再開する', tone: m.isActive ? 'danger' : undefined, onSelect: () => setPending({ member: m, kind: m.isActive ? 'stop' : 'resume' }) }]} />}
+                        {access === 'writer' && self ? (
+                          <RowActions subjectName={m.name} menuButtonProps={{ disabled: true, title: '自分の運営アカウントは停止・取り消しできません' }} menuNote="自分の運営アカウントは停止・取り消しできません" />
+                        ) : (
+                          <RowActions subjectName={m.name} menuButtonProps={{ disabled: busy || resendingId !== null }} menuItems={memberRowItems(m, access, invited, () => { void resend(m) }, (kind) => setPending({ member: m, kind }))} />
+                        )}
                       </GridCell>
                     </GridRow>
                   )

@@ -13,32 +13,9 @@
 
 .brand {
   display: flex;
-  align-items: center;
-  gap: var(--tpl-op-brand-gap);
-}
-
-.mark {
-  display: flex;
-  width: var(--tpl-op-brand-mark);
-  height: var(--tpl-op-brand-mark);
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-control);
-  background: var(--color-accent-deep);
-  color: var(--color-on-accent);
-  font-size: var(--text-base);
-  font-weight: var(--font-weight-semibold);
-}
-
-.brandText {
-  display: flex;
   flex-direction: column;
-}
-
-.brandName {
-  color: var(--color-ink);
-  font-size: var(--text-base);
-  font-weight: 700;
+  align-items: center;
+  gap: var(--tpl-op-brand-logo-gap);
 }
 
 .brandSub {
@@ -111,7 +88,7 @@
 }
 
 .forgot {
-  align-self: flex-start;
+  align-self: flex-end;
   color: var(--color-accent-deep);
   font-size: var(--text-caption);
   font-weight: 600;

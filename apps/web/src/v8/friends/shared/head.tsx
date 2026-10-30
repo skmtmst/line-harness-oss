@@ -12,7 +12,7 @@ import { PageExplanationBody, PageExplanationProvider, PageExplanationToggle } f
  */
 import Link from '@/components/shared/list-navigation'
 import type { ReactNode } from 'react'
-import { FRIENDS_TABS, FRIENDS_TAB_NOTES, type FriendsTabKey } from './nav'
+import { FRIENDS_CSV_TAB_LABEL, FRIENDS_TABS, FRIENDS_TAB_NOTES, type FriendsTabKey } from './nav'
 import styles from './head.module.css'
 
 export function FriendsTabs({ current, line = true, action }: { current: FriendsTabKey; line?: boolean; action?: ReactNode }) {
@@ -29,6 +29,8 @@ export function FriendsTabs({ current, line = true, action }: { current: Friends
             {tab.label}
           </Link>
         ))}
+        {/* CSV はタブから行けないが、今いる所は示す（B9）。行き先ではないので押せない。 */}
+        {current === 'csv' ? <span className={`${styles.tab} ${styles.tabCurrent}`} aria-current="page">{FRIENDS_CSV_TAB_LABEL}</span> : null}
       </nav>
       {action ? <div className={styles.tabAction}>{action}</div> : null}
     </div>

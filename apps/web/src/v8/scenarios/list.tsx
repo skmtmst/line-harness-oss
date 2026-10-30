@@ -14,7 +14,7 @@ import SharedStatusPill from '@/components/shared/status-pill'
 import { collectListRows } from '@/components/shared/collect-list-rows';
 import BulkBar, { useEscapeToClearSelection } from '@/components/shared/bulk-bar';
 import { useListUrlValue, readListUrlParam, useListScrollMemory, useListUrlFlag, useListUrlParam } from '@/components/shared/list-url-state';
-import { useFeatureAccess } from '@/lib/use-feature-access';
+import { captureScenarioWriteAccess, useScenarioWriteAccess, type ScenarioWriteOperation } from './write-access'
 import { RovingTbody } from '@/components/shared/row-roving';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Bookmark, CalendarPlus, CheckCheck, Folder as FolderIcon, ListVideo, Pause, Play, Plus, Send, Square, Users, Workflow } from 'lucide-react';
@@ -103,8 +103,16 @@ const SAVED_FILTER_OPTIONS = [
 
 type ScenarioRow = Scenario & {
   stepCount?: number
-  subscriberCount?: number
-  completedCount?: number
+  subscriberCount?: number | null
+  completedCount?: number | null
+}
+
+function isKnownScenarioCount(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0
+}
+
+function scenarioCountLabel(value: number | null | undefined): string {
+  return isKnownScenarioCount(value) ? `${formatNumber(value)} 人` : emptyValue('unknown')
 }
 
 /** 実際の配信時刻の起点を、利用者向けの言葉で示す。 */
@@ -114,10 +122,10 @@ const deliveryModeLabels: Record<DeliveryMode, string> = {
   absolute_time: '時刻で指定',
 }
 
-/** 読み終えた人の補足行（板 ：「登録した 1,756 人の 41%」）。 */
+/** 読み終えた人の補足行（板 ：「登録した 1,756 人の 41%」）。0 人は割合が決まらないので人数だけ薄い灰で出す。 */
 function scenarioCompletionDetail(active: number, completed: number): string {
   const enrolled = active + completed
-  if (enrolled === 0) return '—'
+  if (enrolled === 0) return '登録した 0 人'
   const rate = Math.round((completed / enrolled) * 100)
   return `登録した ${formatNumber(enrolled)} 人の ${rate}%`
 }
@@ -143,14 +151,11 @@ export default function ScenariosListV8() {
   // 1152 の板（）。板IDと道具の段の並びだけを切り替える。
   const narrow = useNarrowViewport()
 
-  /*
-   * 閲覧のみ（staff）：作る・複製・削除・止める/再開・並べ替え・フォルダ追加は
-   * 押せない形で出す。役割が取れるまで null なので、そのあいだは今までどおり
-   * 押せる見た目にしておく（最後の守りはサーバの 403）。
-   */
+  // 表示と実行直前の判定は、本人APIの控えと代理モードにそろえる。
   const staffRole = useStaffRole()
-  const featureAccess = useFeatureAccess('scenarios')
-  const canEdit = featureAccess
+  const editAccess = useScenarioWriteAccess()
+  const folderAccess = useScenarioWriteAccess('manageFolders')
+  const canEdit = editAccess.allowed
 
   /* 絞り込み・検索語・ページは URL に置く（戻ると同じ一覧に戻る。動きの点検 5 番）。 */
   const [nameQuery, setNameQuery] = useListUrlParam('q')
@@ -205,6 +210,36 @@ export default function ScenariosListV8() {
    */
   const activeAccountRef = useRef<string | null>(selectedAccountId)
 
+  const scope = useRef({ accountId: selectedAccountId, loading: accountLoading })
+  const mounted = useRef(true)
+  if (scope.current.accountId !== selectedAccountId || scope.current.loading !== accountLoading) scope.current = { accountId: selectedAccountId, loading: accountLoading }
+  const renderedScope = scope.current
+  const currentScope = () => mounted.current && scope.current === renderedScope
+  const leases = {
+    edit: captureScenarioWriteAccess(),
+    publish: captureScenarioWriteAccess('publish'),
+    manageFolders: captureScenarioWriteAccess('manageFolders'),
+  }
+  const canWriteHere = (operation: ScenarioWriteOperation = 'edit') => currentScope() && !accountLoading && scenarioList.loaded && leases[operation]()
+  const stoppedMessage = (completed = 0, total?: number) => total === undefined
+    ? '本人・権限・LINEアカウントを確認できないため、変更を中止しました。'
+    : `${formatNumber(total)} 件中 ${formatNumber(completed)} 件を保存しました。残りは本人・権限・LINEアカウントが変わったため送っていません。`
+  const requireWrite = (operation: ScenarioWriteOperation = 'edit', completed = 0, total?: number) => {
+    if (canWriteHere(operation)) return true
+    if (currentScope()) setActionError(stoppedMessage(completed, total))
+    return false
+  }
+  const deleteRun = useRef<object | null>(null)
+  const duplicateRun = useRef<object | null>(null)
+  const toggleRun = useRef<object | null>(null)
+  const deleteWindow = useRef<object | null>(null)
+  const moveWindow = useRef<object | null>(null)
+  const renderedDeleteWindow = deleteWindow.current
+  const renderedMoveWindow = moveWindow.current
+  const deleteWindowScope = useRef(scope.current)
+  const moveWindowScope = useRef(scope.current)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
+
   /* アカウントを切り替えたときだけフォルダの絞り込みを外す（最初の描画では URL の値を残す）。 */
   const previousAccountRef = useRef(selectedAccountId)
   useEffect(() => {
@@ -219,6 +254,12 @@ export default function ScenariosListV8() {
     setSelectedIds(new Set())
     setPendingStop(null)
     toggleBusyRef.current = false
+    toggleRun.current = null
+    deleteRun.current = null
+    duplicateRun.current = null
+    duplicateLock.current = false
+    setDuplicating(false)
+    setDeleting(false)
   }, [selectedAccountId])
 
   const loadFolders = useCallback(async () => {
@@ -356,6 +397,7 @@ export default function ScenariosListV8() {
 
   /** 配信方式の選択へ送るだけ。ここでは作らない。作るのは方式を選んで確定したとき。 */
   const handleCreate = () => {
+    if (!requireWrite()) return
     router.push('/scenarios/mode')
   }
 
@@ -375,6 +417,7 @@ export default function ScenariosListV8() {
    * 5秒のあいだは知らせの「元に戻す」で送らずに戻せる。
    */
   const handleReorder = (ids: string[]) => {
+    if (!requireWrite()) return
     setActionError('')
     const key = listContextKey
     const byId = new Map(scenarios.map((s) => [s.id, s]))
@@ -387,13 +430,18 @@ export default function ScenariosListV8() {
     runUndoable({
       message: '並び順を変えました',
       commit: async () => {
+        if (!currentScope()) return
+        if (!requireWrite()) throw new Error(stoppedMessage())
         const fullOrder = await completeReorder(ids, loadScenarioPage)
+        if (!currentScope()) return
+        if (!requireWrite()) throw new Error(stoppedMessage())
         const res = await api.scenarios.reorder(fullOrder)
         if (!res.success) throw new Error(res.error)
       },
-      undo: () => setOptimisticRows(null),
+      undo: () => { if (currentScope()) setOptimisticRows(null) },
       failureMessage: '並び順を保存できませんでした。',
       onCommitted: () => {
+        if (!currentScope()) return
         setOptimisticRows(null)
         void loadScenarios()
       },
@@ -401,9 +449,11 @@ export default function ScenariosListV8() {
   }
 
   const handleDelete = async (id: string) => {
+    if (!requireWrite()) throw new Error(stoppedMessage())
     try {
       const res = await api.scenarios.delete(id)
       if (!res.success) throw new Error(res.error)
+      if (!currentScope()) return
       void loadScenarios()
       void loadFolders()
       void loadOverallTotal()
@@ -414,7 +464,7 @@ export default function ScenariosListV8() {
   }
 
   /* 削除は、利用状況にかかわらず確認してから実行する。 */
-  const requestDelete = (s: ScenarioRow) => { setDeleteError(''); setDeleteTarget(s) }
+  const requestDelete = (s: ScenarioRow) => { if (!requireWrite()) return; deleteWindow.current = {}; deleteWindowScope.current = renderedScope; setDeleteError(''); setDeleteTarget(s) }
 
   /* ===== まとめて「止める／再開」 ===== */
 
@@ -457,23 +507,26 @@ export default function ScenariosListV8() {
    * 「元に戻す」で送らずに戻せる。1本ずつの開始前チェックは詳細画面で行う。
    */
   const runBulkToggle = (next: boolean, ids: string[]) => {
-    if (ids.length === 0 || !canEdit || toggleBusyRef.current) return
+    if (!requireWrite('publish')) return
+    if (ids.length === 0 || toggleBusyRef.current) return
     toggleBusyRef.current = true
-    const account = selectedAccountId
+    const ticket = {}; toggleRun.current = ticket
     const key = listContextKey
     setOptimisticRows({
       key,
       rows: scenarios.map((s) => (ids.includes(s.id) ? { ...s, isActive: next } : s)),
     })
     runOptimistic({
-      isCurrent: () => activeAccountRef.current === account,
+      isCurrent: () => currentScope() && toggleRun.current === ticket,
       request: async () => {
-        const results = await Promise.all(
-          ids.map((id) => api.scenarios.update(id, { isActive: next }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
-        );
-
-        const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${formatNumber(failed)} 件の保存に失敗しました`)
+        let saved = 0
+        for (const id of ids) {
+          if (!currentScope()) return
+          if (!requireWrite('publish', saved, ids.length)) throw new Error(stoppedMessage(saved, ids.length))
+          const res = await api.scenarios.update(id, { isActive: next })
+          if (!res.success) throw new Error(res.error)
+          saved++
+        }
       },
       revert: () => { toggleBusyRef.current = false; setOptimisticRows(null); void loadScenarios() },
       failureMessage: next ? '配信を始められませんでした。' : '停止できませんでした。',
@@ -490,7 +543,9 @@ export default function ScenariosListV8() {
   /* ===== フォルダ移動の窓 ===== */
 
   const openMove = (ids: string[]) => {
+    if (!requireWrite()) return
     if (ids.length === 0) return
+    moveWindow.current = {}; moveWindowScope.current = renderedScope
     setMoveDraft('')
     setMoveIds(ids)
   }
@@ -500,6 +555,9 @@ export default function ScenariosListV8() {
    * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で送らずに戻せる。
    */
   const runMove = () => {
+    if (moveWindow.current !== renderedMoveWindow) return
+    if (moveWindowScope.current !== renderedScope) { if (currentScope()) setActionError('LINEアカウントが変わったため、この窓では保存できません。閉じて選び直してください。'); return }
+    if (!requireWrite()) return
     if (!moveIds || moveIds.length === 0) return
     const ids = moveIds
     const folderId = moveDraft || null
@@ -512,16 +570,19 @@ export default function ScenariosListV8() {
     runUndoable({
       message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
       commit: async () => {
-        const results = await Promise.all(
-          ids.map((id) => api.scenarios.update(id, { folderId }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
-        );
-
-        const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${formatNumber(failed)} 件のフォルダ移動に失敗しました`)
+        let saved = 0
+        for (const id of ids) {
+          if (!currentScope()) return
+          if (!requireWrite('edit', saved, ids.length)) throw new Error(stoppedMessage(saved, ids.length))
+          const res = await api.scenarios.update(id, { folderId })
+          if (!res.success) throw new Error(res.error)
+          saved++
+        }
       },
-      undo: () => setOptimisticRows(null),
+      undo: () => { if (currentScope()) setOptimisticRows(null) },
       failureMessage: 'フォルダを移動できませんでした。',
       onCommitted: () => {
+        if (!currentScope()) return
         setOptimisticRows(null)
         const moved = new Set(ids)
         setSelectedIds((current) => new Set([...current].filter((id) => !moved.has(id))))
@@ -541,16 +602,22 @@ export default function ScenariosListV8() {
     deleteTarget !== null && scenarios.some((s) => s.id === deleteTarget.id)
 
   const runDelete = async () => {
+    if (deleteWindow.current !== renderedDeleteWindow) return
+    if (deleteWindowScope.current !== renderedScope) { if (currentScope()) setActionError('LINEアカウントが変わったため、この窓では保存できません。閉じて選び直してください。'); return }
+    if (!requireWrite()) return
     if (!deleteTarget || deleting || !targetStillListed) return
+    const ticket = {}; deleteRun.current = ticket
     setDeleting(true)
     setDeleteError('')
     try {
       await handleDelete(deleteTarget.id)
+      if (!canWriteHere() || deleteRun.current !== ticket) return
       setDeleteTarget(null)
     } catch {
+      if (!currentScope() || deleteRun.current !== ticket) return
       setDeleteError('このシナリオを削除できませんでした。状態を読み直してから、もう一度お試しください。')
     } finally {
-      setDeleting(false)
+      if (currentScope() && deleteRun.current === ticket) setDeleting(false)
     }
   }
 
@@ -560,14 +627,18 @@ export default function ScenariosListV8() {
   }
 
   const runDuplicate = async (duplicateTarget: ScenarioRow) => {
+    if (!requireWrite()) return
     if (duplicateLock.current) return
     if (!duplicateTarget || duplicating) return
     duplicateLock.current = true
+    const ticket = {}; duplicateRun.current = ticket
     const name = `${duplicateTarget.name}のコピー`
     setDuplicating(true)
     setDuplicateError('')
     try {
-      const copyId = await duplicateScenario(duplicateTarget.id, name)
+      const copyId = await duplicateScenario(duplicateTarget.id, name, canWriteHere)
+      if (!currentScope() || duplicateRun.current !== ticket) return
+      if (!canWriteHere()) { setDuplicateError('本人・権限が変わったため処理を止めました。作成済みのコピーを一覧で確認してください。'); void loadScenarios(); return }
 
       notifyToast('複製しました', { tone: 'success' })
       void loadScenarios()
@@ -575,15 +646,15 @@ export default function ScenariosListV8() {
       void loadStats()
       duplicateFeedback.mark(duplicateTarget.id, copyId)
     } catch (e) {
+      if (!currentScope() || duplicateRun.current !== ticket) return
       if (e instanceof DuplicateAborted) {
-        setDuplicateError(`複製が「${e.stage}」で止まりました。途中まで作成されたコピーが一覧に残っています。`)
+        setDuplicateError(`複製が「${e.stage}」で止まりました。作成済みのコピーを一覧で確認してください。`)
       } else {
         setDuplicateError(describeApiFailure(e, '複製'))
       }
       void loadScenarios()
     } finally {
-      duplicateLock.current = false
-      setDuplicating(false)
+      if (currentScope() && duplicateRun.current === ticket) { duplicateLock.current = false; setDuplicating(false) }
     }
   }
 
@@ -671,7 +742,9 @@ export default function ScenariosListV8() {
       accountId={selectedAccountId ?? null}
       folders={folders}
       onChanged={loadFolders}
-      canManage={canEdit}
+      canManage={folderAccess.allowed}
+      canWriteNow={() => canWriteHere('manageFolders')}
+      lockedReason={folderAccess.reason ?? null}
       itemLabel="シナリオ"
       activeId={folderFilter}
       onSelect={setFolderFilter}
@@ -772,9 +845,10 @@ export default function ScenariosListV8() {
 
   /** パネル内の名前のその場の書き換え。失敗したら InlineEdit が戻す。 */
   const renameScenario = async (id: string, next: string): Promise<unknown> => {
+    if (!requireWrite()) throw new Error(stoppedMessage())
     const res = await api.scenarios.update(id, { name: next })
     if (!res.success) throw new Error(res.error)
-    await loadScenarios()
+    if (currentScope()) await loadScenarios()
     return res
   }
 
@@ -899,7 +973,8 @@ export default function ScenariosListV8() {
                 ].join('・')
                 /* 絵：送り方・通数・フォルダのあとに全角の間を空けて説明。1つの文字列で書く。 */
                 const sub = s.description ? `${meta}　${s.description}` : meta
-                const subscribers = s.subscriberCount === undefined ? emptyValue('unknown') : formatNumber(s.subscriberCount)
+                const subscribers = scenarioCountLabel(s.subscriberCount)
+                const completedLabel = scenarioCountLabel(s.completedCount)
                 return (
                   <Tr selected={selectedIds.has(s.id)}
                     interactive
@@ -961,17 +1036,18 @@ export default function ScenariosListV8() {
                     />
                     <Td
                       className={styles.countCell}
-                      title={`配信中 ${subscribers} 人・最後まで配信 ${formatNumber(s.completedCount ?? 0)} 人`}
+                      title={`配信中 ${subscribers}・最後まで配信 ${completedLabel}`}
                     >
                       {/* 配信中と最後まで配信は別の人。割らずに並べ、棒は「最後まで ÷ 登録した人（＝足した数）」で分母を言葉で書く。 */}
-                      <div className={styles.countMain}>{`配信中 ${subscribers} 人・最後まで配信 ${formatNumber(s.completedCount ?? 0)} 人`}</div>
-                      {s.subscriberCount === undefined ? null : (() => {
-                        const completed = s.completedCount ?? 0
-                        const enrolled = (s.subscriberCount ?? 0) + completed
-                        return enrolled === 0 ? <div className={styles.countSub}>{emptyValue('unknown')}</div> : (
+                      <div className={styles.countMain}>{`配信中 ${subscribers}・最後まで配信 ${completedLabel}`}</div>
+                      {(() => {
+                        if (!isKnownScenarioCount(s.subscriberCount) || !isKnownScenarioCount(s.completedCount)) return null
+                        const completed = s.completedCount
+                        const enrolled = s.subscriberCount + completed
+                        return enrolled === 0 ? <div className={styles.countRow}><span className={styles.countSub}>登録した 0 人</span></div> : (
                           <div className={styles.countRow}>
                             <ProgressBar value={completed} max={enrolled} label={`${s.name ?? 'シナリオ'}を最後まで配信した割合`} className={styles.countBar} />
-                            <span className={styles.countSub}>{scenarioCompletionDetail(s.subscriberCount ?? 0, completed)}</span>
+                            <span className={styles.countSub}>{scenarioCompletionDetail(s.subscriberCount, completed)}</span>
                           </div>
                         )
                       })()}
@@ -1217,7 +1293,7 @@ export default function ScenariosListV8() {
               <CardHeader size="stacked" title="配信状況" headingLevel={3}
                 action={<StatusBadge status={panelRow.isActive ? 'active' : 'stopped'} tone={panelRow.isActive ? 'success' : 'neutral'} />}
                 help={<HelpTip label="配信状況の説明">配信中は、このシナリオに登録されていて最後までの配信が終わっていない人です。シナリオが停止中の間は送信されません。最後まで配信は、最終ステップまで処理が終わった人です。既読人数ではありません。</HelpTip>} />
-              <p>配信中 {panelRow.subscriberCount == null ? emptyValue('unknown') : formatNumber(panelRow.subscriberCount)} 人・最後まで配信 {panelRow.completedCount == null ? emptyValue('unknown') : formatNumber(panelRow.completedCount)} 人</p>
+              <p>配信中 {scenarioCountLabel(panelRow.subscriberCount)}・最後まで配信 {scenarioCountLabel(panelRow.completedCount)}</p>
             </Card>
             {panelRow.description ? <Card variant="panel" layout="vertical" gap="tight" aria-label="シナリオの説明">
               <CardHeader size="stacked" title="説明" headingLevel={3} />
@@ -1281,7 +1357,7 @@ export default function ScenariosListV8() {
             <div className={styles.deleteBody}>
               <MoveReferrersNotice scenarioId={deleteTarget.id} />
               <p>
-                購読中 {formatNumber(deleteTarget.subscriberCount ?? 0)} 人 ／ 通数{' '}
+                配信中 {scenarioCountLabel(deleteTarget.subscriberCount)} ／ 通数{' '}
                 {deleteTarget.stepCount === undefined ? '— 読み込めませんでした' : `${deleteTarget.stepCount} 通`}
               </p>
               {deleteTarget.lineAccountId === null && (

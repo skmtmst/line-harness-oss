@@ -166,6 +166,7 @@ function MergedUsersList({ onOpen }: { onOpen: (personId: string) => void }) {
           /></SaveErrorField>
           <SaveErrorField names={["MULTI_ACCOUNTS","account","u.account","_m_u_l_t_i__a_c_c_o_u_n_t_s"]}><EntitySelect
             aria-label="所属アカウントで絞り込む"
+            valuePrefix="所属アカウント"
             width={200}
             value={u.onlyDups ? MULTI_ACCOUNTS : u.account}
             onChange={(value) => {

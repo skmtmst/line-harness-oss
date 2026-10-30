@@ -46,6 +46,8 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { SaveErrorField, useSaveFormErrors, SaveErrorScope } from '@/components/shared/save-form-errors'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
+import { PERMISSION_LOCK_REASON, PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 /*
  * ★V8 LINE通知（Pencil 。運用者へのお知らせ ・送れなかったもの ・記録 ）。
  *
@@ -546,8 +548,8 @@ const TABS = [
 ] as const
 
 /* 出す・止める（共通のつまみ）。押すとすぐは変えず、確認の窓を開く（#734）。送っている間は押せない。 */
-function NotificationToggle({ setting, busy, onToggle }: { setting: EcNotificationSetting; busy: boolean; onToggle: () => void }) {
-  return <SaveErrorField names={["isEnabled","setting.isEnabled","is_enabled","enabled","setting.is_enabled"]}><Toggle checked={setting.isEnabled} label={`${setting.label}のお知らせを出す・止める`} onChange={busy ? undefined : () => onToggle()} /></SaveErrorField>
+function NotificationToggle({ setting, busy, allowed, lockedReason, onToggle }: { setting: EcNotificationSetting; busy: boolean; allowed: boolean; lockedReason?: string; onToggle: () => void }) {
+  return <SaveErrorField names={["isEnabled","setting.isEnabled","is_enabled","enabled","setting.is_enabled"]}><Toggle checked={setting.isEnabled} label={`${setting.label}のお知らせを出す・止める`} disabled={busy || !allowed} lockedReason={lockedReason} onChange={() => { if (allowed && !busy) onToggle() }} /></SaveErrorField>
 }
 
 function CardPreview({ setting }: { setting: EcNotificationSetting }) {
@@ -555,8 +557,7 @@ function CardPreview({ setting }: { setting: EcNotificationSetting }) {
     {setting.imageUrl && <img width={400} height={180} src={setting.imageUrl} alt="" className={styles.previewImage} />}
     <div className="p-5">
       <div className="border-nen-gold-soft flex items-center gap-2 border-b pb-3">
-        <span className="text-nen-gold font-serif text-xl font-bold">然</span>
-        <span className={`text-nen-green text-nano font-bold ${styles.previewBrand}`}>NEN</span>
+        <span className={`text-nen-green text-xl font-bold ${styles.previewBrand}`}>musubo</span>
         <span className="text-nen-label ml-auto text-nano font-semibold">LINE NOTIFICATION</span>
       </div>
       <h3 className="text-nen-green mt-4 text-xl font-bold leading-7">{setting.title}</h3>
@@ -564,7 +565,7 @@ function CardPreview({ setting }: { setting: EcNotificationSetting }) {
       <div className="border-nen-gold-soft mt-4 space-y-3 border-t pt-4">
         {setting.fixedFields.slice(0, 5).map((field, index) => <div key={field}>
           <p className="text-nen-label text-nano font-bold">{field}</p>
-          <p className="text-nen-ink mt-0.5 text-sm">{index === 0 ? 'NEN-TEST-001' : index === 1 ? '鹿肉ミンチ × 2' : '注文情報から自動表示'}</p>
+          <p className="text-nen-ink mt-0.5 text-sm">{index === 0 ? 'ORDER-TEST-001' : index === 1 ? '商品 × 2' : '注文情報から自動表示'}</p>
         </div>)}
       </div>
       {setting.outroText && <p className="text-nen-muted mt-4 whitespace-pre-wrap text-xs leading-5">{setting.outroText}</p>}
@@ -710,9 +711,11 @@ function LineNotificationsPage() {
   const saveErrors = useSaveFormErrors()
 
   const { selectedAccountId, selectedAccount } = useAccount()
-  /* 変える操作（出す・止める・文面を直す）はオーナー・管理者だけ。閲覧のみには押せないボタンを置かない。役割が分かるまでは今までどおり出す。 */
+  /* 変える操作はオーナー・管理者だけ。許可が無い時も共通の理由を付けて残す。 */
   const staffRole = useStaffRole()
   const canManage = canManageRole(staffRole)
+  const manageLockReason = usePermissionLockReason(canManage, 'manager')
+  const canChange = canManage && !manageLockReason
   /* 運用者へのお知らせ：板の頭の「CSVで書き出す」で開く理由の窓。 */
   const [operatorExportOpen, setOperatorExportOpen] = useState(false)
   /*
@@ -754,6 +757,11 @@ function LineNotificationsPage() {
     items: Array<{ id: string; displayName: string; pictureUrl: string | null }>
   }>({ state: 'loading', items: [] })
   const testRecipientGeneration = useRef(0)
+  useEffect(() => {
+    if (canChange) return
+    setExpanded(null); setPendingToggle(null); setTestSendDraft(null)
+    testRecipientGeneration.current += 1
+  }, [canChange])
   // N-341: 運用者タブの件数は実データで出す。子部品とは別に親で取る。
   const [operatorCount, setOperatorCount] = useState<number | null>(null)
   const [operatorState, setOperatorState] = useState<OperatorTabState>('loading')
@@ -1021,6 +1029,7 @@ function LineNotificationsPage() {
       unit={kpi.label === '送れなかった' ? '件' : (kpi.unit ?? '')}
       valueTextWithUnit
       detail={kpi.note || null}
+      detailLayout={kpi.label === '今日 送った' ? 'single' : undefined}
       valueTone={kpi.label === '送れなかった' && typeof kpi.value === 'number' && kpi.value > 0 ? 'warning' : 'default'}
       loading={loadState === 'loading'}
       action={canOpenCustomerNotificationKpi(kpi) && kpi.href ? { label: '見る', href: kpi.href } : undefined}
@@ -1028,6 +1037,7 @@ function LineNotificationsPage() {
   )
   // N-340: 入力のたびに端末へ下書きを置き、未保存の印を付ける。
   const edit = (eventType: string, patch: Partial<EcNotificationSetting>) => {
+    if (!canChange) return
     const current = settings.find((setting) => setting.eventType === eventType)
     if (current) {
       const draft = pickCustomerDraft({ ...current, ...patch })
@@ -1123,6 +1133,7 @@ function LineNotificationsPage() {
   }
 
   const save = async (setting: EcNotificationSetting, enabled = setting.isEnabled) => {
+    if (!canChange) return
     if (enabled === setting.isEnabled && !dirtyEvents.includes(setting.eventType)) return
     if (notificationTitleRequirement.check(setting.title ?? '')) { setNotice({ tone: 'error', text: '通知の見出しを入力してください。' }); return }
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
@@ -1146,6 +1157,7 @@ function LineNotificationsPage() {
   }
 
   const publish = async (setting: EcNotificationSetting) => {
+    if (!canChange) return
     const definition = definitionByEvent.get(setting.eventType)
     if (!definition) return
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
@@ -1163,6 +1175,7 @@ function LineNotificationsPage() {
    * 「送信」を押して初めて testSend が走る。
    */
   const openTestSendConfirm = (setting: EcNotificationSetting) => {
+    if (!canChange) return
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
     const accountId = selectedAccountId
     const generation = ++testRecipientGeneration.current
@@ -1189,6 +1202,7 @@ function LineNotificationsPage() {
   }
 
   const testSend = async (setting: EcNotificationSetting) => {
+    if (!canChange) return
     if (!selectedAccountId) { setNotice({ tone: 'error', text: 'LINEアカウントを選択してください。' }); return }
     const accountId = selectedAccountId
     // 保存・公開とまったく同じ見張りを渡す。テスト送信の結果も「返った時点で
@@ -1216,15 +1230,14 @@ function LineNotificationsPage() {
 
   return <SaveErrorScope errors={saveErrors}><SbSettingsScreen
     boardId={expandedSetting === null ? ({ customer: 'g3iDs', operator: 'u8xibp', failures: 'DrwMm', history: 'PZBVb' } as Record<string, string>)[tab] : undefined}
-    layout="narrow-nav"
     contentLayout={tab === 'customer' ? 'wide' : undefined}
-    actions={tab === 'operator' && expandedSetting === null && canManage ? <>
-      <Button onClick={() => setOperatorExportOpen(true)} disabled={!selectedAccountId}><Download aria-hidden="true" size={16} />CSVで書き出す</Button>
-      <Button href="/line-notifications/operator/new" variant="primary"><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
+    actions={tab === 'operator' && expandedSetting === null ? <>
+      <Button onClick={() => { if (canChange) setOperatorExportOpen(true) }} disabled={!selectedAccountId || !canChange} lockedReason={manageLockReason}><Download aria-hidden="true" size={16} />CSVで書き出す</Button>
+      <Button {...(canChange ? { href: "/line-notifications/operator/new" } : { disabled: true })} variant="primary" lockedReason={manageLockReason}><Plus aria-hidden="true" size={16} />運用者へのお知らせを作る</Button>
     </> : undefined}
     title="LINE通知" help={tab === 'customer' ? '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。' : tab === 'failures' ? '送れなかった理由や再試行の予定を確かめます。ブロックなどの対象外と、再試行が必要な失敗を分けて確認してください。' : undefined}
     explanationKey={`line-notifications:${tab}`}
-    explanation={tab === 'customer' ? undefined : tab === 'operator' ? 'この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。' : '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。'}
+    explanation={tab === 'customer' ? 'これは「お知らせ」であって「売り込みの配信」ではありません。お客さまが配信を止めていても、取引に必要な連絡は届きます。' : tab === 'operator' ? 'この画面の宛先はお店の人だけです。お客様へ送るものは「顧客へのお知らせ」で設定します。' : '注文・入金・発送・返金・定期便など、取引に必要なお知らせを LINE で送ります。'}
   >
     {expandedSetting === null ? <Tabs label="LINE通知の中の切り替え" size="notification" items={tabsWithCounts.map(item => ({ label: item.label, href: tabHref[item.key], current: tab === item.key }))} /> : null}
     {/*
@@ -1236,10 +1249,16 @@ function LineNotificationsPage() {
           : '運用者へのお知らせの件数を読み込めませんでした。'}
         <button type="button" className={styles.inlineLink} onClick={() => void load()}>もう一度読み込む</button></Notice>
     ) : null}
-    {!canManage && expandedSetting === null ? <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。お知らせを出す・止める・文面を直すのは、オーナーか管理者に頼んでください。</ReadOnlyNotice></div> : null}
+    {staffRole !== null && !canChange && expandedSetting === null ? <section className={styles.viewerBand} aria-label="操作権限の案内">
+      {staffRole === 'viewer' && manageLockReason !== PERMISSION_LOCK_REASON.impersonation
+        ? <ReadOnlyNotice />
+        : <Notice tone="info" role="status">{manageLockReason === PERMISSION_LOCK_REASON.impersonation
+          ? PERMISSION_LOCK_SUMMARY.impersonation
+          : PERMISSION_LOCK_SUMMARY.manager}</Notice>}
+    </section> : null}
     {tab === 'failures' ? <RunsTab lineAccountId={selectedAccountId} mode="failures" /> : null}
     {tab === 'history' ? <RunsTab lineAccountId={selectedAccountId} mode="history" /> : null}
-    {tab === 'operator' ? <OperatorTab lineAccountId={selectedAccountId} canManage={canManage} exportOpen={operatorExportOpen} onExportClose={() => setOperatorExportOpen(false)} /> : null}
+    {tab === 'operator' ? <OperatorTab lineAccountId={selectedAccountId} canManage={canChange} exportOpen={operatorExportOpen} onExportClose={() => setOperatorExportOpen(false)} /> : null}
     {tab === 'customer' && expandedSetting ? <>
       <CustomerNotificationEditor
         setting={expandedSetting}
@@ -1319,7 +1338,6 @@ function LineNotificationsPage() {
     </KpiBand>
     {/* R611: 一覧の取得に失敗したときは、上部の件数も取れていないことを添える（赤は使わない）。 */}
     {loadState === 'error' ? <p className={styles.minor}>お知らせの件数は取得失敗です。下の一覧の「もう一度読み込む」から読み直してください。</p> : null}
-    <Notice tone="info">これは「お知らせ」であって「売り込みの配信」ではありません。お客さまが配信を止めていても、取引に必要な連絡は届きます。</Notice>
     {sendCountsFailed && loadState === 'ready' ? <div className={styles.inlineRow}>
       <p className={styles.minor}>送信件数を読み込めませんでした。時間をおいて、もう一度お試しください。</p>
       <Button variant="secondary" size="compact" onClick={() => load()} busyLabel="処理中…">もう一度読み込む</Button>
@@ -1382,13 +1400,13 @@ function LineNotificationsPage() {
               const sent = sendCountsFailed ? null : sent30dOf(setting.eventType)
               const name = setting.title?.trim() || setting.label
               return <Tr key={setting.eventType}>
-                <Td>{canManage ? <RowNameButton title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</RowNameButton> : <TruncatedText value={deliveryWords(setting).trigger || name} />}</Td>
+                <Td>{canChange ? <RowNameButton title={name} aria-label={`${name}の内容を編集`} onClick={() => setExpanded(setting.eventType)}>{deliveryWords(setting).trigger || name}</RowNameButton> : <TruncatedText value={deliveryWords(setting).trigger || name} />}</Td>
                 <Td><TruncatedText value={timingLabel(setting)} /></Td>
                 <Td><TruncatedText value={audienceLabel(setting)} /></Td>
                 <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : emptyValue('unknown')}</span></Td>
                 <StatusCell primary={<><StatusBadge tone={status.tone === 'good' ? 'success' : 'neutral'} title={status.warning ?? undefined} aria-description={status.warning ?? undefined}>{status.label}</StatusBadge>{status.warning ? <StatusDot tone="caution" /> : null}</>} />
-                <Td>{canManage ? <NotificationToggle setting={setting} busy={busy === setting.eventType} onToggle={() => setPendingToggle(setting)} /> : <span className={styles.minor}>{setting.isEnabled ? 'オン' : 'オフ'}</span>}</Td>
-                <ActionCell>{canManage ? <RowActions edit={{ onClick: () => setExpanded(setting.eventType) }} /> : null}</ActionCell>
+                <Td><NotificationToggle setting={setting} busy={busy === setting.eventType} allowed={canChange} lockedReason={manageLockReason} onToggle={() => setPendingToggle(setting)} /></Td>
+                <ActionCell><RowActions edit={{ onClick: () => { if (canChange) setExpanded(setting.eventType) }, disabled: !canChange, lockedReason: manageLockReason }} /></ActionCell>
               </Tr>
             })}
           </tbody>

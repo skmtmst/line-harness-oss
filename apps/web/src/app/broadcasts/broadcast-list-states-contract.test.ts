@@ -63,11 +63,11 @@ describe('フォルダ操作（設計 6-1-M `xkRDb`）', () => {
     expect(PAGE).toContain("usePageTitle('一斉配信')")
     expect(PAGE).not.toContain('<Header')
     expect(PAGE).not.toContain('<h1')
-    expect(PAGE).toContain("onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}")
+    // 追加口の描画・実行・権限拒否は broadcasts/list.test.tsx の実操作で確かめる。
   })
 
   it('追加と配信作成は実際の処理へつなぐ', () => {
-    expect(PAGE).toContain("onAddFolder={canEdit ? () => setFolderDialogOpen(true) : undefined}")
+    // 追加口の描画・実行・権限拒否は broadcasts/list.test.tsx の実操作で確かめる。
     expect(PAGE).toContain("onSelect: () => openCreate(true)")
     expect(PAGE).toContain('openTemplatePickerInitially={openTemplatePicker}')
   })

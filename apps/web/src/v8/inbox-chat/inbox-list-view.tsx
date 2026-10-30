@@ -19,7 +19,7 @@ import SearchField from '@/components/shared/search-field';
 import { DelayedSkeleton, SkeletonRow } from '@/components/shared/skeleton';
 import { InboxListPane } from '@/components/templates/inbox-page';
 import { PageTitle } from '@/components/templates/page-frame';
-import { api, fetchApi, type ChatListItem } from '@/lib/api';
+import { api, type ChatListItem } from '@/lib/api';
 import { SEARCH_QUERY_MAX_LENGTH, clampSearchQuery } from '@/lib/search-query';
 import { formatListRecent, formatListRecentTitle } from '@/lib/format';
 import InboxRulesPopover from '@/v8/inbox-chat/rules-popover';
@@ -86,15 +86,9 @@ type Props = {
   chatListFailed: boolean
   loadChats: () => Promise<void>
   emailItems: EmailInboxItem[]
-  deepLinkRequestIdRef: RefObject<number>
-  deepLinkIdRef: RefObject<string | null>
-  setDeepLinkNotice: Dispatch<SetStateAction<string>>
-  setSelectedChatId: Dispatch<SetStateAction<string | null>>
-  setSelectedThreadId: Dispatch<SetStateAction<string | null>>
-  savedViewParam: string
-  setEmailItems: Dispatch<SetStateAction<EmailInboxItem[]>>
   chats: ChatListItem[]
   handleSelectChat: (chatId: string) => void
+  handleSelectEmail: (threadId: string) => void
   inboxListLoading: boolean
   inboxListRefreshing: boolean
   hasMoreChats: boolean
@@ -109,7 +103,9 @@ type Props = {
   setSortOrder: (next: InboxSort) => void
 }
 
-export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, deepLinkRequestIdRef, deepLinkIdRef, setDeepLinkNotice, setSelectedChatId, setSelectedThreadId, savedViewParam, setEmailItems, chats, handleSelectChat, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
+export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId, setFilterOpen, filterOpen, setSavedViewsOpen, setSavedViewError, savedViewsOpen, savedViews, applySavedView, operatorNames, setSavedViewMenuId, savedViewMenuId, selectedAccountId, loadSavedViews, setSavedViewSuccess, setSaveDialogOpen, savedViewError, setSlaReload, slaEnabled, overdueTotal, quickFilter, setQuickFilter, dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators, savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter, setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus, assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef, emailError, loadEmails, chatListFailed, loadChats, emailItems, chats, handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters, clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder }: Props) {
+  // 緑の点は目で見る印。読み上げには名前で絞り込み中を伝える。
+  const savedSearchLabel = hasInboxFilters ? '保存した検索（絞り込み中）' : '保存した検索'
   return (<InboxListPane selected={Boolean(selectedChatId || selectedThreadId)}>
     {/* タブ (すべて / 未読 / 対応中 / 対応済み) は意図的に削除。直近メッセージが見やすい LINE 風一覧を優先。 */}
 
@@ -127,8 +123,9 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           設計は 対応状況・担当者・受信経路・期限・メッセージ種別・未読だけ の
           6項目。**箱が小さいと、置ける条件の数が先に決まってしまう。**
         */}
-        <Button type="button" size="compact" className={`h-8 w-8 p-0 ${styles.tool}`} aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
+        <Button type="button" size="compact" className={`${styles.tool} ${styles.toolCaption}`} aria-label="絞り込み" title="絞り込み" onClick={() => setFilterOpen(true)} aria-expanded={filterOpen}>
           <ListFilter aria-hidden size={16} />
+          <span aria-hidden="true" className={styles.toolCaptionLabel}>絞り込み</span>
         </Button>
         {/*
           INBOX-11: メニューは「保存した検索」ボタンではなく、画面幅いっぱいの
@@ -141,7 +138,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
           <Button
             type="button"
             size="compact"
-            className={`h-8 w-8 p-0 ${styles.tool}`} aria-label="保存した検索" title="保存した検索"
+            className={`${styles.tool} ${styles.toolCaption} ${styles.toolDotWrap}`} aria-label={savedSearchLabel} title={savedSearchLabel}
             onClick={() => {
               setSavedViewsOpen((open) => !open)
               setSavedViewError('')
@@ -149,6 +146,8 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
             aria-expanded={savedViewsOpen}
           >
             <Bookmark aria-hidden size={16} />
+            <span aria-hidden="true" className={styles.toolCaptionLabel}>保存した検索</span>
+            {hasInboxFilters ? <span aria-hidden="true" className={styles.toolDot} /> : null}
           </Button>
           <InboxFloatingPanel open={savedViewsOpen} placement="below">
               <p className="text-ink text-sm font-bold">保存した検索</p>
@@ -221,7 +220,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                   setSavedViewSuccess(false)
                   setSaveDialogOpen(true)
                 }}>
-                  現在の条件を保存する
+                  今の条件を保存する
                 </Button>
                 {savedViewError && <p className="mt-1.5 text-xs text-danger">{savedViewError}</p>}
               </div>
@@ -484,23 +483,7 @@ export default function InboxList({ unreadOnly, selectedChatId, selectedThreadId
                 // 直書きボタンの借金に数えられる (design-debt)。
                 <div key={item.id} className="border-b border-hairline">
                   <InboxListRow selected={selectedThreadId === item.threadId}
-                    onClick={() => {
-                      // LINEの選択を外す。両方開いていると中央に何を
-                      // 出すのか決まらない。URL指定の案内とURL状態も外す。
-                      // friend を残すと、再読込で古いLINE会話へ戻る(#673)。
-                      deepLinkRequestIdRef.current += 1
-                      deepLinkIdRef.current = null
-                      setDeepLinkNotice('')
-                      setSelectedChatId(null)
-                      setSelectedThreadId(item.threadId)
-                      router.replace(buildInboxUrl(channel, savedViewParam || null))
-                      setEmailItems((prev) => prev.map((email) => (
-                        email.threadId === item.threadId ? { ...email, isUnread: false } : email
-                      )))
-                      void fetchApi(`/api/support/email/threads/${encodeURIComponent(item.threadId)}/read`, {
-                        method: 'POST',
-                      }).catch(() => undefined)
-                    }}
+                    onClick={() => handleSelectEmail(item.threadId)}
                   >
                     <div className={`flex items-start gap-3 ${styles.rowInner}`}>
                       <div className="relative shrink-0">

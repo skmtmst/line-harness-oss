@@ -24,7 +24,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 /*
  * ★V8 メニュー管理（板 ・停止の確認 ・追加と変更 ）。
  *
- * 数5（全メニュー・コース・単品・要承認・アレルギー登録）→ メニュー一覧の枠
+ * 数5（全メニュー・コース・単品・開始待ち・アレルギー登録）→ メニュー一覧の枠
  * （頭に追加ボタン・「…」の決まりの帯・表）。行末は「…」、アーカイブだけ「再開」。
  * 追加・変更は同じ窓、停止は確認の窓。データの口・送る形は今の画面
  * （app/restaurant-test/v8/menu.tsx）と同じ。動きは BEHAVIOR.md。
@@ -50,7 +50,8 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   /* 閲覧のみの人には、追加・変更・停止・再開のボタンを置かない（2026-10-06 オーナー）。 */
   const canEdit = canManageRole(role)
   const rows = store ? data.menuItems.filter((row) => row.store_id === store.id) : data.menuItems
-  const pendingApprovals = data.approvals.filter((item) => item.kind === 'menu_change' && item.status === 'pending')
+  const legacyPending = rows.some((item) => item.priceChangeStatus === 'pending')
+  const scheduledPrices = rows.filter((item) => item.priceChangeStatus === 'approved')
   const [stopId, setStopId] = useState('')
   const [deleteId, setDeleteId] = useState('')
   const stopping = rows.find((row) => row.id === stopId)
@@ -92,17 +93,18 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
         <KpiCard title="全メニュー" value={rows.length} unit="件" detail="公開・下書き・アーカイブ" detailLayout="single" presentation="band" />
         <KpiCard title="コース" value={rows.filter((item) => item.kind === 'course').length} unit="件" detail="予約時に選択" detailLayout="single" presentation="band" />
         <KpiCard title="単品" value={rows.filter((item) => item.kind !== 'course').length} unit="件" detail="アラカルト" detailLayout="single" presentation="band" />
-        <KpiCard title="要承認" value={pendingApprovals.length} unit="件" detail="価格・内容改定" detailLayout="single" valueTone={pendingApprovals.length > 0 ? 'warning' : 'default'} presentation="band" />
+        <KpiCard title="開始待ち" value={scheduledPrices.length} unit="件" detail="確定済みの新価格" detailLayout="single" presentation="band" />
         <KpiCard title="アレルギー登録" value={rows.filter((item) => safeArray(item.allergens_json).length > 0).length} unit="件" detail="注意品目あり" detailLayout="single" presentation="band" />
       </StatRow>
       <Panel
         title="メニュー一覧"
-        description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。価格の改定は承認の流れを通り、決めた開始日時から新しい価格になります。"
+        description="予約台帳・Google投稿・LINEカードで同じマスターを参照します。価格変更は保存時に確定し、指定した開始日時から新価格になります。"
         aside={canEdit ? (
           <Button variant="primary" onClick={openNew}><Plus size={16} aria-hidden="true" />メニューを作る</Button>
         ) : null}
         flush
       >
+        {legacyPending ? <Notice tone="warn">以前の価格変更申請が残っています。{canEdit ? <Button onClick={() => router.push('/restaurant-test/approvals')}>以前の申請を確認する</Button> : '管理者に確認を依頼してください。'}</Notice> : null}
         <Notice tone="info">「…」の中身：有効＝変更・停止／アーカイブ＝変更・再開／一度も公開していない下書き＝変更・削除</Notice>
         <DataTable columnLayout={{ headHeight: 'var(--tpl-thead-h)', rowHeight: 'var(--tpl-list-row-h)', gap: 'var(--space-16)', padding: '0 var(--tpl-list-inset)', bodyTextSize: 'var(--text-caption)' }}>
           <thead>

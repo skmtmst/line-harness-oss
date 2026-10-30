@@ -1,4 +1,5 @@
 'use client'
+import { useGooglePermission } from './use-google-permission'
 import { useEffect, useRef, useState } from 'react'
 import type { MediaItem } from '@line-crm/shared'
 import Button from '@/components/shared/button'
@@ -7,13 +8,11 @@ import ImageFrame from '@/components/shared/image-frame'
 import { Field } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
-import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import SectionHeader from '@/components/shared/section-header'
 import StatusBadge from '@/components/shared/status-badge'
 import StickyBar from '@/components/shared/sticky-bar'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import { api, ApiError } from '@/lib/api'
-import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import { restaurantGoogleApi, type GooglePhoto, type GoogleProfileData, type GoogleProfileProposal } from '@/lib/restaurant-google-api'
@@ -42,8 +41,7 @@ function formFrom(data: GoogleProfileData): ProfileForm {
 
 export function ProfileEditScreen({ accountId, go }: { accountId: string; go: GoogleNav }) {
   const saveErrors = useSaveFormErrors()
-  const role = useStaffRole()
-  const canEdit = canManageRole(role)
+  const { allowed: canEdit, lockedReason } = useGooglePermission('manager')
   const submitLock = useRef(false)
   const pickerRequest = useRef(0)
   const [data, setData] = useState<GoogleProfileData | null>(null)
@@ -77,6 +75,7 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
   const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy })
 
   const openPicker = async () => {
+    if (!canEdit || busy || data?.closed) return
     const request = ++pickerRequest.current
     setPicker({ open: true, items: [], loading: true, error: '' })
     try {
@@ -135,7 +134,6 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
     <SaveErrorScope errors={saveErrors}><>
       <SectionHeader title="プロフィールを編集" note={<StatusBadge tone="warning">まだ反映していません</StatusBadge>} />
       <p className={styles.muted}>対象店舗：{storeName} / 変更した項目だけをGoogleへ送ります。送信前に確認画面を表示します。</p>
-      {!canEdit ? <ReadOnlyNotice>閲覧のみです。店舗情報を確認できます。</ReadOnlyNotice> : null}
       {data.closed ? <Notice tone="danger">Google側で「臨時休業」または「閉業」になっているため、いまは変更できません。</Notice> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal">
@@ -154,12 +152,12 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
         </Field>
       </Card>
       <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label="写真">
-        <SectionHeader size="small" title={`写真（${photos === null ? '—' : `${formatNumber(photoTotal)}枚`}）`} actions={canEdit ? <Button onClick={() => void openPicker()} disabled={picker.loading || !editable}>登録メディアから追加する</Button> : null} />
+        <SectionHeader size="small" title={`写真（${photos === null ? '—' : `${formatNumber(photoTotal)}枚`}）`} actions={<Button lockedReason={lockedReason} onClick={() => void openPicker()} disabled={!canEdit || picker.loading || !editable}>登録メディアから追加する</Button>} />
         {photosError ? <Notice tone="warn">{photosError}</Notice> : null}
         <div className={styles.pickerGrid}>
           {visiblePhotos.map((p, index) => <div key={p.name} className={styles.imageSlot} role="group" aria-label={`既存の写真${index + 1}`}>
             <ImageFrame title="店舗写真" value={p.thumbnailUrl ?? p.googleUrl ?? null} previewAlt={`既存の写真${index + 1}`} readOnly />
-            {canEdit ? <Button variant="text" onClick={() => setDeletes((values) => [...values, p.name])} disabled={!editable} aria-label={`写真${index + 1}を削除`}>削除する</Button> : null}
+            <Button lockedReason={lockedReason} variant="text" onClick={() => { if (editable) setDeletes((values) => [...values, p.name]) }} disabled={!editable} aria-label={`写真${index + 1}を削除`}>削除する</Button>
           </div>)}
           {adds.map((m) => <div key={m.id} className={styles.imageSlot}>
             <ImageFrame title="追加する写真" value={m.url} previewAlt={m.filename} readOnly />
@@ -177,10 +175,10 @@ export function ProfileEditScreen({ accountId, go }: { accountId: string; go: Go
         </Card> : null}
         <p className={styles.muted}>追加・削除した写真はGoogleの審査後に反映されます。人物の顔や個人情報が写った写真は追加しないでください。</p>
       </Card>
-      {canEdit ? <StickyBar actions={<>
-        <Button onClick={() => { setForm(formFrom(data)); setAdds([]); setDeletes([]); setActionError('') }} disabled={busy || !dirty}>入力をクリア</Button>
-        <Button variant="primary" onClick={() => void submit()} disabled={busy || !dirty || data.closed || form.description.length > 750} busy={busy} busyLabel="確認中…">変更内容を確認する</Button>
-      </>} /> : null}
+      <StickyBar actions={<>
+        <Button lockedReason={lockedReason} onClick={() => { setForm(formFrom(data)); setAdds([]); setDeletes([]); setActionError('') }} disabled={!canEdit || busy || !dirty}>入力をクリア</Button>
+        <Button lockedReason={lockedReason} variant="primary" onClick={() => void submit()} disabled={!canEdit || busy || !dirty || data.closed || form.description.length > 750} busy={busy} busyLabel="確認中…">変更内容を確認する</Button>
+      </>} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="プロフィールの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
     </></SaveErrorScope>
   )

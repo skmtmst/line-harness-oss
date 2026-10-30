@@ -25,6 +25,8 @@ export const PERMISSION_LOCK_REASON = {
   ops: '閲覧の権限のため変えられません。運営の管理者に頼んでください。',
   /** 運営が閲覧で代理ログインしている間。 */
   impersonation: '代理ログイン（閲覧）中のため変更できません。書き込みに切り替えてから操作してください。',
+  /** 直接送信は、書込の代理ログイン中もサーバが拒否する。予約と承認依頼には使わない。 */
+  impersonationSend: '代理ログイン中は配信をすぐには送れません。代理ログインを終了してから送ってください。',
 } as const
 
 export type PermissionLockKind = keyof typeof PERMISSION_LOCK_REASON
@@ -40,6 +42,7 @@ export const PERMISSION_LOCK_SUMMARY: Record<Exclude<PermissionLockKind, 'viewer
   tenantWide: 'この画面の変える操作は、統括の管理者だけができます。',
   outgoingWebhook: '送り先は統括の担当者だけが作れます。',
   impersonation: PERMISSION_LOCK_REASON.impersonation,
+  impersonationSend: PERMISSION_LOCK_REASON.impersonationSend,
   ops: PERMISSION_LOCK_REASON.ops,
 }
 
