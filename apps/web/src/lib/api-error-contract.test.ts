@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchApi, downloadApiFile, ApiError } from './api'
+import { fetchApi, downloadApiFile, ApiError, describeSaveFailure } from './api'
 
 const id = 'ab9daa00-9761-40a9-a9ee-a2c21bbe62c0'
 const payload = (code: string) => ({ success: false, data: { currentVersion: 4 }, error: {
@@ -29,4 +29,28 @@ describe('管理画面の共通失敗契約', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(payload('INVALID_INPUT')), { status: 422 })))
     await expect(downloadApiFile('/api/test', 'same.csv')).rejects.toMatchObject({ status: 422, code: 'INVALID_INPUT', trackingId: id, fields: { name: '名前を入力してください。' } })
   })
+})
+
+
+it.each(['保存できません D1_ERROR: SELECT secret FROM tenant', '入力を確認 Bearer sample-secret', '<script>表示</script>'])('通常の例外も内部原文を表示しない: %s', message => {
+  const text = describeSaveFailure(new Error(message))
+  expect(text).toMatch(/[ぁ-んァ-ヶ一-龠]/u)
+  expect(text).not.toMatch(/D1_ERROR|SELECT secret|Bearer|sample-secret|<script>/)
+})
+
+it('具体的で安全な直し方は残す', () => {
+  expect(describeSaveFailure(new Error('名前を入力してください。'))).toBe('名前を入力してください。')
+})
+
+
+it.each([400, 403, 409, 422, 500, 503])('ApiError HTTP %sにも英語・SQL・秘密値を表示しない', status => {
+  for (const message of ['D1_ERROR: SELECT secret FROM tenant', '入力を確認 D1_ERROR: SELECT secret FROM tenant', '入力を確認 Bearer sample-secret', 'Internal server error']) {
+    const text = describeSaveFailure(new ApiError(status, message))
+    expect(text).toMatch(/[ぁ-んァ-ヶ一-龠]/u)
+    expect(text).not.toMatch(/D1_ERROR|SELECT secret|Bearer|sample-secret|Internal server error|API error/)
+  }
+})
+
+it.each([400, 409, 422])('HTTP %sの安全な直し方は共通化しても変えない', status => {
+  expect(describeSaveFailure(new ApiError(status, '最新の内容を読み直してください。'))).toBe('最新の内容を読み直してください。')
 })
