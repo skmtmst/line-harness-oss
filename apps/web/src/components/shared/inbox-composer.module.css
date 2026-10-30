@@ -13,3 +13,8 @@
 :global([data-drop-over]) .input { outline-color: var(--color-accent-deep); background: var(--color-accent-soft); }
 
 }
+
+/* 箱の輪1本：中の入力の輪は消し、外枠を正本に（層の外＝全体の青輪より勝つ）。 */
+html:root .input textarea:focus-visible { outline: none; }
+/* 中の欄に誤りがある時は外枠を赤1本。 */
+html:root .input:has(textarea[aria-invalid='true']):is(:focus-within, :has(:focus-visible)) { outline-color: var(--color-danger); }

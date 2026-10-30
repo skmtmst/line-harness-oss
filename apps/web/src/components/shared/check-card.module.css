@@ -118,3 +118,8 @@ html:root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 
 
 /* 箱と説明のかたまりを、カードの高さの中央にそろえる。 */
 html:root .card { align-items: center; }
+
+/* 箱の輪1本：中の四角と入力の輪は消し、カードを正本に（四角の青・赤指定より勝つ詳細度。card を重ねるのはそのため）。 */
+html:root .card.card input:focus-visible + span { outline: 2px solid transparent; }
+html:root .card.card input[aria-invalid='true']:focus-visible + span { outline: 2px solid transparent; }
+html:root .card input:focus-visible { outline: 2px solid transparent; }

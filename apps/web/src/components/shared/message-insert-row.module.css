@@ -20,3 +20,8 @@
 }
 
 :root .button { padding-block-start: var(--polish-text-center-inset); }
+
+/* 箱の輪1本：中の入力・差し込み・ボタンの輪は消し、外枠を正本に（層の外＝全体の青輪より勝つ）。窓（body直下）の中は別扱い。 */
+html:root .body :is(textarea, button, [data-insert-field]):focus-visible { outline: none; }
+/* 中の欄に誤りがある時は外枠を赤1本。 */
+html:root .body:has(:is(textarea, [data-insert-field])[aria-invalid='true']):focus-within { outline-color: var(--color-danger); }

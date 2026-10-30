@@ -166,3 +166,6 @@ html:root .field:is(.single, .multi):not(.affixedControl):not([data-look='derive
 html:root .field:is(.single, .multi):not(.affixedControl)[aria-invalid='true']:is(:focus-visible, :focus-within) {
   box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
 }
+
+/* 飾り欄の誤り＋焦点は外枠の赤1本：中の入力の赤輪・赤影は消す（誤りの赤指定より勝つ詳細度）。 */
+html:root .affixed .field:is(.single, .multi)[aria-invalid='true']:focus-visible { outline: none; box-shadow: none; }
