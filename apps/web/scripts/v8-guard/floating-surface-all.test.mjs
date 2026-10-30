@@ -92,6 +92,17 @@ const MEASURE = (sel) => {
   for (let p = el; p; p = p.parentElement) opacity *= Number(css(p).opacity)
   return { alpha, opacity, backdrop: c.backdropFilter, shadow: c.boxShadow }
 }
+/** MEASURE と同じ面を選ぶ（故障対照の壊し用。測りが透けを見れば選びが合っている証拠になる）。 */
+const PICK = (sel) => {
+  const root = sel === ':tip' ? document.querySelector('[role="tooltip"]')
+    : sel === ':color' ? document.querySelector('[aria-label^="色を選ぶ"]')?.parentElement?.querySelector(':scope > div')
+    : document.querySelector(sel)
+  if (!root) return null
+  const css = (el) => getComputedStyle(el)
+  const seen = (el) => { const r = el.getBoundingClientRect(); const c = css(el); return r.width > 0 && r.height > 0 && c.display !== 'none' && c.visibility !== 'hidden' }
+  return css(root).backgroundColor !== 'rgba(0, 0, 0, 0)' ? root
+    : [...root.children].find((c) => seen(c) && css(c).backgroundColor !== 'rgba(0, 0, 0, 0)') ?? root
+}
 test('全部の開く面は不透明な地と影で読み取れる（F2）', async () => {
   const browser = await connectGuardBrowser()
   try {
@@ -138,24 +149,22 @@ test('全部の開く面は不透明な地と影で読み取れる（F2）', asy
         assert.notEqual(look.shadow, 'none', `${name}: 浮きの影あり`)
         assert.deepEqual((await page.evaluate(scan)).filter((item) => item.kind === 'floating-surface-transparency'), [], name)
         if (process.env.MUSE_SHOTS) { mkdirSync(process.env.MUSE_SHOTS, { recursive: true }); await page.screenshot({ path: `${process.env.MUSE_SHOTS}/floating-all-${width}-${name}.png` }) }
-        const turned = await page.evaluate((sel) => {
-          const root = sel === ':color' ? document.querySelector('[aria-label^="色を選ぶ"]')?.parentElement?.querySelector(':scope > div') : document.querySelector(sel)
-          const css = (el) => getComputedStyle(el)
-          const el = css(root).backgroundColor !== 'rgba(0, 0, 0, 0)' ? root
-            : [...root.children].find((c) => css(c).backgroundColor !== 'rgba(0, 0, 0, 0)') ?? root
+        // 故障対照：同じ取っ手を壊して戻す（選び直さないので選び違いがない）。
+        // 走査の対象面は、走査が赤になることまで見る。
+        const scanned = selector !== '[role="dialog"]' && selector !== ':color'
+        const handle = await page.evaluateHandle(PICK, selector)
+        assert.ok(await handle.evaluate((el) => el !== null), `${name}: 故障対照の面が見つかる`)
+        const turned = await handle.evaluate((el) => {
           const original = el.style.cssText
           el.style.setProperty('transition', 'none', 'important')
           el.style.setProperty('background', 'rgba(255,255,255,.6)', 'important')
           return original
-        }, selector)
+        })
         const broken = await page.evaluate(MEASURE, selector)
         assert.ok(broken.alpha < 1, `${name}: 故障対照は透けとして測れる`)
-        await page.evaluate(([sel, original]) => {
-          const root = sel === ':color' ? document.querySelector('[aria-label^="色を選ぶ"]')?.parentElement?.querySelector(':scope > div') : document.querySelector(sel)
-          const css = (el) => getComputedStyle(el)
-          const el = [...root.children].find((c) => css(c).backgroundColor !== 'rgba(0, 0, 0, 0)') ?? root
-          el.style.cssText = original
-        }, [selector, turned])
+        if (scanned) assert.ok((await page.evaluate(scan)).some((item) => item.kind === 'floating-surface-transparency'), `${name}: 故障対照は走査で赤になる`)
+        await handle.evaluate((el, original) => { el.style.cssText = original }, turned)
+        await handle.dispose()
         if (extra === ':palette') await page.keyboard.press('Meta+k')
         else if (name === '色を開く') await page.getByRole('button', { name: '色を選ぶ' }).first().click()
         else await page.keyboard.press('Escape')
@@ -166,6 +175,16 @@ test('全部の開く面は不透明な地と影で読み取れる（F2）', asy
       assert.equal(tip.alpha, 1, '吹き出し: 地は不透明')
       assert.notEqual(tip.shadow, 'none', '吹き出し: 浮きの影あり')
       assert.deepEqual((await page.evaluate(scan)).filter((item) => item.kind === 'floating-surface-transparency'), [], '吹き出し')
+      const tipHandle = await page.evaluateHandle(PICK, ':tip')
+      const tipOriginal = await tipHandle.evaluate((el) => {
+        const original = el.style.cssText
+        el.style.setProperty('transition', 'none', 'important')
+        el.style.setProperty('background', 'rgba(255,255,255,.6)', 'important')
+        return original
+      })
+      assert.ok((await page.evaluate(scan)).some((item) => item.kind === 'floating-surface-transparency'), '吹き出し: 故障対照は走査で赤になる')
+      await tipHandle.evaluate((el, original) => { el.style.cssText = original }, tipOriginal)
+      await tipHandle.dispose()
     }
   } finally { await browser.close() }
 })

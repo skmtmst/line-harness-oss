@@ -1,5 +1,6 @@
 import './floating-surface.test.mjs'
 import './floating-surface-components.test.mjs'
+import './floating-surface-all.test.mjs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { connectGuardBrowser } from './browser-session.mjs'
