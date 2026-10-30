@@ -124,6 +124,14 @@ export async function fetchRestaurantFollowup(accountId: string, storeId: string
   }
 }
 
+/** 初回オンの本体作成も、行の版を照合して一括で保存する。保存だけでは送信しない。 */
+export function saveFollowupRow(accountId: string, storeId: string, trigger: RestaurantFollowupTrigger, input: { expectedRowVersion: number; enabled: boolean }) {
+  return fetchApi<ApiResponse<{ version: number; step_id: string | null; sendingStatus: string }>>(
+    withAccount(`${base(storeId)}/rows/${encodeURIComponent(trigger)}`, accountId),
+    { method: 'PUT', body: JSON.stringify(input) },
+  )
+}
+
 /** 行の本文（吹き出し1〜5個）を版付きで保存する。 */
 export function saveFollowupMessages(accountId: string, storeId: string, stepId: string, input: { expectedVersion: number; messageBubbles: BroadcastBubble[] }) {
   return fetchApi<ApiResponse<{ stepId: string; messageBubbles: BroadcastBubble[]; version: number; sendingStatus: string }>>(
@@ -138,7 +146,7 @@ export function saveFollowupMessages(accountId: string, storeId: string, stepId:
  * （本体の自動作成の口が無い。口の一覧の2件目）。
  */
 export function saveFollowupBinding(accountId: string, storeId: string, stepId: string, method: 'POST' | 'PATCH', input: {
-  expectedVersion: number; trigger: RestaurantFollowupTrigger; offsetMinutes: number; enabled: boolean
+  expectedVersion: number; trigger: RestaurantFollowupTrigger; offsetMinutes: number; enabled: boolean; anniversaryDaysBefore?: number; anniversaryTime?: string
 }) {
   return fetchApi<ApiResponse<{ stopped: boolean }>>(
     withAccount(`${base(storeId)}/bindings/${encodeURIComponent(stepId)}`, accountId),

@@ -7,7 +7,7 @@ import { ApiError } from '@/lib/api/transport/errors'
 
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), role: 'owner' as string | null,
-  fetchLive: vi.fn(), saveMessages: vi.fn(), saveBinding: vi.fn(),
+  fetchLive: vi.fn(), saveMessages: vi.fn(), saveBinding: vi.fn(), saveRow: vi.fn(),
   publishScenario: vi.fn(), requestStart: vi.fn(), stop: vi.fn(), reviewHistory: vi.fn(),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
@@ -34,6 +34,7 @@ vi.mock('@/lib/api/helpers/restaurant-followup', async (importOriginal) => {
     fetchRestaurantFollowup: fixture.fetchLive,
     saveFollowupMessages: fixture.saveMessages,
     saveFollowupBinding: fixture.saveBinding,
+    saveFollowupRow: fixture.saveRow,
     publishFollowupScenario: fixture.publishScenario,
     requestFollowupStart: fixture.requestStart,
     stopFollowup: fixture.stop,
@@ -83,6 +84,7 @@ beforeEach(() => {
   fixture.fetchLive.mockResolvedValue(liveOf())
   fixture.reviewHistory.mockResolvedValue([])
   fixture.saveMessages.mockResolvedValue({ success: true, data: {} })
+  fixture.saveRow.mockResolvedValue({ success: true, data: { version: 2, sendingStatus: 'stopped' } })
   fixture.saveBinding.mockResolvedValue({ success: true, data: { stopped: true } })
   fixture.publishScenario.mockResolvedValue({ success: true, data: { scenarioId: 'scn-1', versionId: 'v-1', versionNumber: 2, publishedAt: '2026-10-30T00:00:00.000Z' } })
   fixture.requestStart.mockResolvedValue({ success: true, data: { approvalId: 'ap-1', sendingStatus: 'pending' } })
@@ -112,8 +114,8 @@ describe('時期の言い方と検査', () => {
     expect(timingError('reservation_24h', -1440)).toBeNull()
     expect(timingError('post_visit', 180)).toBeNull()
     expect(timingError('reservation_created', 0)).toBeNull()
-    // 記念日の行はいまの鯖ではどの値も通らない。
-    expect(timingError('anniversary_before', -10080)).not.toBeNull()
+    // 記念日前も、ほかの「前」と同じく負の時期を受け付ける。
+    expect(timingError('anniversary_before', -10080)).toBeNull()
     expect(timingError('anniversary_before', 10080)).not.toBeNull()
   })
   it('行の定義は7つで飲食の順に並ぶ', () => {
@@ -427,4 +429,65 @@ it('ひな形の説明は帯に出さず題の「？」に入れる', async () =
   expect(screen.queryByText(/シナリオのひな形/)).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'LINE来店フォローの説明' }))
   expect(await screen.findByText(/シナリオのひな形/)).toBeTruthy()
+})
+
+
+describe('行の準備がある店の操作', () => {
+  const prepared = (trigger: RestaurantFollowupTrigger, stepId: string | null) => ({
+    store_id: 'store', trigger, initial_key: trigger, step_id: stepId, version: 8,
+    default_offset_minutes: -10080, initial_message: '初期の文',
+  })
+  it('本体の無い停止行をオンにすると行の口へ保存し、公開と開始を飛ばさない', async () => {
+    const live = liveOf({ scenarioId: null, templateVersion: null })
+    live.steps = live.steps.map(step => ({ ...step, binding: null, step: null,
+      row: prepared(step.trigger, null), bubbles: [bubble('初期の文')] }))
+    fixture.fetchLive.mockResolvedValue(live)
+    render(<LineFollowupV8 />)
+    const send = await screen.findByRole('button', { name: '送る' })
+    expect((send as HTMLButtonElement).disabled).toBe(false)
+    expect(screen.getAllByText('止めています')).toHaveLength(7)
+    fireEvent.click(send)
+    await waitFor(() => expect(fixture.saveRow).toHaveBeenCalledWith('account-1', 'store', 'reservation_created', { expectedRowVersion: 8, enabled: true }))
+    expect(fixture.publishScenario).not.toHaveBeenCalled()
+    expect(fixture.requestStart).not.toHaveBeenCalled()
+  })
+  it('記念日前のオンと時期を解放し、現地の時刻を保存する', async () => {
+    const live = liveOf()
+    live.steps = live.steps.map(step => ({ ...step, row: prepared(step.trigger, step.binding.step_id) }))
+    fixture.fetchLive.mockResolvedValue(live)
+    render(<LineFollowupV8 />)
+    fireEvent.click(await screen.findByRole('button', { name: '記念日前' }))
+    expect((screen.getByRole('button', { name: '送る' }) as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.change(screen.getByRole('textbox', { name: '時期の数値' }), { target: { value: '3' } })
+    fireEvent.change(screen.getByLabelText('送る時刻（店の現地時刻）'), { target: { value: '09:25' } })
+    fireEvent.click(screen.getByRole('button', { name: '時期を保存する' }))
+    await waitFor(() => expect(fixture.saveBinding).toHaveBeenCalledWith('account-1', 'store', 'step-anniversary_before', 'PATCH', {
+      expectedVersion: 3, trigger: 'anniversary_before', offsetMinutes: -4320, anniversaryTime: '09:25', enabled: false,
+    }))
+  })
+  it('準備された未作成の行も閲覧のみではオンにできない', async () => {
+    fixture.role = 'staff'
+    const live = liveOf({ scenarioId: null, templateVersion: null })
+    live.steps = live.steps.map(step => ({ ...step, binding: null, step: null, row: prepared(step.trigger, null) }))
+    fixture.fetchLive.mockResolvedValue(live)
+    render(<LineFollowupV8 />)
+    const send = await screen.findByRole('button', { name: '送る' })
+    expect(send.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(send)
+    expect(fixture.saveRow).not.toHaveBeenCalled()
+  })
+})
+
+it('LINE未接続の409は接続を案内し、版競合として読み直さない', async () => {
+  const live = liveOf({ scenarioId: null, templateVersion: null })
+  live.steps = live.steps.map(step => ({ ...step, binding: null, step: null, row: {
+    store_id: 'store', trigger: step.trigger, initial_key: step.trigger, step_id: null, version: 1,
+    default_offset_minutes: 0, initial_message: '初期の文',
+  } }))
+  fixture.fetchLive.mockResolvedValue(live)
+  fixture.saveRow.mockRejectedValueOnce(new ApiError(409, '接続してください', 'line_account_required'))
+  render(<LineFollowupV8 />)
+  fireEvent.click(await screen.findByRole('button', { name: '送る' }))
+  expect(await screen.findByText('LINE公式アカウントを接続してから、もう一度お試しください')).toBeTruthy()
+  expect(fixture.fetchLive).toHaveBeenCalledTimes(1)
 })

@@ -12,6 +12,7 @@ import {
   publishFollowupScenario,
   requestFollowupStart,
   saveFollowupBinding,
+  saveFollowupRow,
   saveFollowupMessages,
   stepBubbles,
   stopFollowup,
@@ -122,4 +123,11 @@ it('本体がまだない店は行の初期文を読み、架空のシナリオ�
   expect(live.steps).toHaveLength(7)
   expect(live.steps[1]).toMatchObject({ binding: null, step: null, row: { version: 1 }, offsetMinutes: -1440, state: 'stopped' })
   expect(live.steps[1]!.bubbles[0]!.content).toEqual({ text: '明日のご予約です' })
+})
+
+it('初回オンの口にもアカウントと行の版を渡す', async () => {
+  await saveFollowupRow('account-1', 'store-sby', 'anniversary_before', { expectedRowVersion: 7, enabled: true })
+  expect(fixture.fetchApi).toHaveBeenCalledWith('/api/restaurant-test/followups/store-sby/rows/anniversary_before?account_id=account-1', {
+    method: 'PUT', body: JSON.stringify({ expectedRowVersion: 7, enabled: true }),
+  })
 })

@@ -21,6 +21,7 @@ import {
   publishFollowupScenario,
   requestFollowupStart,
   saveFollowupBinding,
+  saveFollowupRow,
   saveFollowupMessages,
   stopFollowup,
   type FollowupLive,
@@ -71,13 +72,14 @@ export function liveFingerprint(live: FollowupLive): string {
 }
 
 function SendingLine({ live }: { live: FollowupLive }) {
+  const versionLabel = live.templateVersion === null ? '' : `（中身の版: ${live.templateVersion}）`
   const text = live.sendingStatus === 'active' ? '本送信しています'
     : live.sendingStatus === 'pending' ? '承認を待っています' : '本送信は止めています'
   /* 承認の行き先は状態の札から開く（左メニューは変えない）。 */
   if (live.approvalId) {
-    return <p role="status"><Button variant="text" href="/restaurant-test/approvals">{`${text}（中身の版: ${live.templateVersion}）→`}</Button></p>
+    return <p role="status"><Button variant="text" href="/restaurant-test/approvals">{`${text}${versionLabel}→`}</Button></p>
   }
-  return <p role="status">{`${text}（中身の版: ${live.templateVersion}）`}</p>
+  return <p role="status">{`${text}${versionLabel}`}</p>
 }
 
 /* 開いた行の操作（オン/オフ・時期・本文）。行が変わるたび作り直す。本文の下書きは Board が持ち、行を切り替えても保つ。 */
@@ -104,17 +106,20 @@ function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, r
   const initial = exactTiming(Math.abs(currentOffset), row.units)
   const [amount, setAmount] = useState(initial.amount)
   const [unit, setUnit] = useState<OffsetUnit>(initial.unit)
-  const anniversaryLocked = row.trigger === 'anniversary_before'
+  const rowSetting = step?.row
+  const anniversaryLocked = row.trigger === 'anniversary_before' && !rowSetting
+  const [sendTime, setSendTime] = useState(binding?.anniversary_time ?? '10:00')
   const noStep = !binding || !step?.step
   const unsupportedBody = isUnsupportedBody(step?.step ?? null)
   const locked = unknownRole || busy !== null
   /* 権限の理由は lockedReason、状態の理由は目の前の文。役割不明は理由なし。 */
   const permReason = readOnly ? '閲覧のみのため変えられません' : null
-  const toggleStateReason = noStep ? '本体の一歩がまだないため、この行は変えられません'
+  const toggleStateReason = noStep && !rowSetting ? '本体の一歩がまだないため、この行は変えられません'
     : anniversaryLocked ? '記念日前の始まりはサーバーの口がまだないため、オンと時期は変えられません' : null
   const bodyStateReason = noStep ? '本体の一歩がまだないため、本文は変えられません'
     : unsupportedBody ? 'この本文はテキスト以外の形のため、この画面では直せません。本体のシナリオ画面で直してください' : null
   const toggleLocked = locked || permReason !== null || toggleStateReason !== null
+  const timingLocked = toggleLocked || noStep
   const bodyLocked = locked || permReason !== null || bodyStateReason !== null
 
   const run = async (action: string, work: () => Promise<unknown>) => {
@@ -123,7 +128,9 @@ function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, r
       await work()
       reload()
     } catch (error) {
-      if (error instanceof ApiError && error.status === 409) {
+      if (error instanceof ApiError && error.code === 'line_account_required') {
+        failed('LINE公式アカウントを接続してから、もう一度お試しください')
+      } else if (error instanceof ApiError && error.status === 409) {
         reload()
         failed('ほかの担当者が先に保存しました。読み直しました。')
       } else {
@@ -144,13 +151,17 @@ function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, r
       <Button variant="secondary" disabled={toggleLocked} busy={busy === 'toggle'}
         lockedReason={permReason}
         onClick={() => {
-          if (!binding || !step || templateVersion === null) return
+          if (!step || (!rowSetting && (!binding || templateVersion === null))) return
           const next = !enabled
           void run('toggle', async () => {
-            unwrap(await saveFollowupBinding(accountId, storeId, binding.step_id, 'PATCH', {
-              expectedVersion: templateVersion, trigger: row.trigger,
-              offsetMinutes: binding.offset_minutes, enabled: next,
-            }), 'オン/オフを変えられませんでした')
+            if (rowSetting) {
+              unwrap(await saveFollowupRow(accountId, storeId, row.trigger, { expectedRowVersion: rowSetting.version, enabled: next }), 'オン/オフを変えられませんでした')
+            } else if (binding && templateVersion !== null) {
+              unwrap(await saveFollowupBinding(accountId, storeId, binding.step_id, 'PATCH', {
+                expectedVersion: templateVersion, trigger: row.trigger,
+                offsetMinutes: binding.offset_minutes, enabled: next,
+              }), 'オン/オフを変えられませんでした')
+            }
           })
         }}>
         {enabled ? '止める' : '送る'}
@@ -158,25 +169,29 @@ function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, r
       {permReason && !unknownRole ? <p role="note">{permReason}</p> : null}
       {toggleStateReason ? <p role="note">{toggleStateReason}</p> : null}
     </div>
+    {noStep && rowSetting ? <p role="note">先に「送る」を押すと、時期と本文を変えられます。本送信は承認まで始まりません。</p> : null}
     <Field label="時期" note={row.direction === 'before' ? '前の日時を入れます' : '起点からの後を入れます（0はすぐ）'}>
-      <TextInput value={amount} inputMode="numeric" disabled={toggleLocked}
+      <TextInput value={amount} inputMode="numeric" disabled={timingLocked}
         aria-label="時期の数値" onChange={event => setAmount(event.target.value)} />
-      <Select value={unit} disabled={toggleLocked} aria-label="時期の単位"
+      <Select value={unit} disabled={timingLocked} aria-label="時期の単位"
         lockedReason={permReason ?? undefined}
         options={row.units.map(item => ({ value: item, label: UNIT_LABEL[item] }))}
         onChange={value => setUnit(value as OffsetUnit)} />
-      <Button variant="secondary" disabled={toggleLocked} busy={busy === 'timing'}
+      {row.trigger === 'anniversary_before' && rowSetting ? <TextInput type="time" value={sendTime} disabled={timingLocked} aria-label="送る時刻（店の現地時刻）" onChange={event => setSendTime(event.target.value)} /> : null}
+      <Button variant="secondary" disabled={timingLocked} busy={busy === 'timing'}
         lockedReason={permReason}
         onClick={() => {
           const offset = offsetOf()
           if (offset === null) { failed('時期は0以上の整数で入れてください'); return }
           const invalid = timingError(row.trigger, offset)
           if (invalid) { failed(invalid); return }
+          if (row.trigger === 'anniversary_before' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(sendTime)) { failed('送る時刻を入れてください'); return }
           if (!binding || templateVersion === null) return
           void run('timing', async () => {
             unwrap(await saveFollowupBinding(accountId, storeId, binding.step_id, 'PATCH', {
               expectedVersion: templateVersion, trigger: row.trigger,
               offsetMinutes: offset, enabled,
+              ...(row.trigger === 'anniversary_before' ? { anniversaryTime: sendTime } : {}),
             }), '時期を変えられませんでした')
           })
         }}>
@@ -268,7 +283,7 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
     : draft
   const reload = () => { setEdits({}); setReloadKey(key => key + 1) }
   const permReason = readOnly ? '閲覧のみのため変えられません' : null
-  const startStopLocked = busy !== null || unknownRole || readOnly
+  const startStopLocked = busy !== null || unknownRole || readOnly || !live?.scenarioId
   return <>
     {readOnly ? <ReadOnlyNotice role="note" /> : null}
     {actionError ? <p role="alert">{actionError}</p> : null}
@@ -290,7 +305,7 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
                   <span className={styles.flowNote} title={row.note}>{row.note}</span>
                 </span>
                 <span className={styles.flowTiming}>{timingLabel(row.trigger, offset)}</span>
-                <span className={styles.flowStatus}>{rowStep?.binding ? <RowStatus step={rowStep} /> : <StatusBadge tone="neutral">まだありません</StatusBadge>}</span>
+                <span className={styles.flowStatus}>{rowStep && (rowStep.binding || rowStep.row) ? <RowStatus step={rowStep} /> : <StatusBadge tone="neutral">まだありません</StatusBadge>}</span>
                 <ChevronDown size={18} aria-hidden="true" data-flow-chevron className={styles.flowChevron} data-open={isSelected || undefined} />
               </button>
             </Card>
@@ -409,7 +424,7 @@ export default function LineFollowupV8() {
     <RestaurantFrame
       boardId="n9vvGx"
       title="LINE来店フォロー"
-      description="予約前・来店後・口コミ依頼・会員証を、来店・退店のきっかけで送るひな形として作ります。LINE来店フォローは、来店・退店のきっかけを使う「シナリオのひな形」としてまとめる。行を押すと、その中身をシナリオの一歩と同じ形で直せる。"
+      description="設定を変えると、この店の本送信は止まります。送り始めるには承認を申請してください。予約前・来店後・口コミ依頼・会員証を、来店・退店のきっかけで送るひな形として作ります。LINE来店フォローは、来店・退店のきっかけを使う「シナリオのひな形」としてまとめる。行を押すと、その中身をシナリオの一歩と同じ形で直せる。"
       pickerAs="select"
       banner={false}
       subtitle={(store) => store ? store.name : ''}

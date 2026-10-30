@@ -32,4 +32,3 @@ export const get__api_restaurant_test_followups_storeId_15 = async (c: Context<E
  const jobs=(await db.prepare(`SELECT j.* FROM scenario_source_jobs j LEFT JOIN rt_reservation_events e ON e.id=j.source_event_id WHERE e.store_id=? OR (j.source_kind='restaurant_anniversary' AND j.source_id=?) ORDER BY j.scheduled_at DESC LIMIT 100`).bind(storeId,storeId).all()).results;
  return c.json({success:true,data:{template,bindings,rows,jobs,editor:'common_scenario'}});
 };
-
