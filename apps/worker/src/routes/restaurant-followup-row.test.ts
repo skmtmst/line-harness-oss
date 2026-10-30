@@ -9,6 +9,7 @@ type MockStaff = {
   role: 'owner' | 'admin' | 'staff';
   access_level: 'full' | 'read_only';
   permission_keys: string;
+  view_permission_keys?: string;
   assigned_line_account_id: string | null;
   can_access_descendant_accounts: number;
   tenant_id?: string | null;
@@ -272,4 +273,24 @@ for(const [reason,code,message] of [
   const response=await request(path+'/engines/reservation_created/test-send'+scope,{expectedTargetVersion:1});
   expect(response.status).toBe(409);expect(await response.json()).toMatchObject({success:false,code,error:expect.stringContaining(message)});
  }finally{send.mockRestore();}
+});
+
+it('来店フォローの閲覧権限だけで状態を読め、操作権限があってもスタッフは送り始められない',async()=>{
+ newStore();
+ const staff={id:'staff',name:'担当',role:'staff' as const,access_level:'full' as const,permission_keys:'[]',view_permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1};
+ authMocks.getStaffByApiKey.mockResolvedValue(staff);
+ expect((await requestAs(path+'/engines'+scope,'staff')).status).toBe(403);
+ for(const suffix of ['', '/review-history'])expect((await requestAs(path+suffix+scope,'staff')).status).toBe(200);
+ for(const access_level of ['full','read_only'] as const){
+  authMocks.getStaffByApiKey.mockResolvedValue({...staff,access_level,view_permission_keys:'["/restaurant-test/line-followup"]'});
+  expect((await requestAs(path+'/engines'+scope,'staff')).status).toBe(200);
+  for(const suffix of ['', '/review-history'])expect((await requestAs(path+suffix+scope,'staff')).status).toBe(200);
+  for(const action of ['initialize','reservation_created/draft','reservation_created/test-send','reservation_created/start'])
+   expect((await requestAs(path+'/engines/'+action+scope,'staff',{})).status).toBe(403);
+ }
+ authMocks.getStaffByApiKey.mockResolvedValue({...staff,permission_keys:'["/restaurant-test/line-followup"]'});
+ expect((await requestWithMethod(path+'/rows/reservation_created'+scope,'PUT',{expectedRowVersion:1,enabled:true},'staff')).status).toBe(403);
+ for(const action of ['initialize','reservation_created/draft','reservation_created/test-send','reservation_created/start'])
+  expect((await requestAs(path+'/engines/'+action+scope,'staff',{})).status).toBe(403);
+ expect(testDb.raw.prepare('SELECT count(*) n FROM rt_store_followup_targets').get()).toEqual({n:0});
 });

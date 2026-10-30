@@ -58,6 +58,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
 
 /** URL 互換性で /api/friends 配下にある別機能を先に解決し、friends 権限だけでチャットや属性へアクセスできないようにする。 */
 const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  [/^\/api\/restaurant-test\/followups\/[^/]+\/(?:engines|rows)(?:\/|$)/, '/restaurant-test/line-followup'],
   [/^\/api\/dashboard\/style\/template-samples$/, '/templates'],
   // 予約の細かい権限。広い '/api/booking' → '/booking/bookings' より先に評価する。
   // 本人勤務は route 側で「自分に紐づく予約スタッフか」を確認する。
