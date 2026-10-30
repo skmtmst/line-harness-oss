@@ -37,6 +37,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import { DetailLoading } from '@/components/templates/detail-page'
 import Notice from '@/components/shared/notice'
 import { useAccount } from '@/contexts/account-context'
+import { useAccountStyle } from '@/hooks/use-account-style'
 import { memberRanksApi } from '@/lib/api/helpers/gap3'
 import DeliveryConsentDrawer, { DeliveryConsentSummary, useDeliveryConsents } from './delivery-consent'
 import { api } from '@/lib/api'
@@ -97,6 +98,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
   onEditSupport: () => void
 }) {
   const { selectedAccountId } = useAccount()
+  const accountStyle = useAccountStyle(selectedAccountId)
   const saveErrors = useSaveFormErrors()
   const starred = fields.filter((f) => f.isStarred)
   const { mileage, mileageStatus, richMenu, richMenuStatus } = data
@@ -196,6 +198,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
     <CustomerInfoPanel
       friendId={friendId}
       fields={fields}
+      includeDiningFields={accountStyle.status === 'ready' && accountStyle.data?.style === 'restaurant'}
       state={data.fieldsStatus === 'error' ? 'error' : data.fieldsStatus === 'ready' ? 'ready' : 'loading'}
       onRetry={() => void data.loadFields()}
       canEdit={perms.saveFields}
