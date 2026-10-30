@@ -459,6 +459,7 @@
 
 ## 反映履歴
 
+- [リッチメニューを作る画像欄の箱の大きさ](release-log/unreleased/0000-kenta-muse-media-drop.md)
 - [飲食店3画面の共通タブ整理](release-log/unreleased/1972-kenta-muse-ledger-tabs.md)
 - [予約台帳の卓・予約なしの案内](release-log/unreleased/1972-kenta-muse-ledger-empty.md)
 - [予約台帳の数の帯の幅そろえ](release-log/unreleased/1972-kenta-muse-ledger-band.md)

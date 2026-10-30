@@ -3131,7 +3131,7 @@ html:root [role='table'] [role='row']:not(:has([role='columnheader'])):hover { b
   --tpl-row-pad-side: var(--tpl-list-inset);
   --tpl-thead-pad-side: var(--tpl-list-inset);
   --tpl-list-cell-pad: var(--tpl-list-inset);
-  --tpl-slot-h-compact: 140px;
+  --tpl-slot-h-compact: 180px;
   --tpl-slot-pad-compact: 16px;
 }
 /* コードの面を部品と同じ値で描く。動画・写真には適用しない。 */
