@@ -31,6 +31,20 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('統括の配信設定を共通の一覧と配布画面で扱う', () => {
+  it.each([['auto_reply', '自動応答'], ['friend_add_rule', '友だち追加時の配信'], ['reminder', 'リマインダ']] as const)('%s の一覧の題はパンくずと同じ「%sを配る」', async (type, label) => {
+    render(<HqDeliveryConsole type={type} />)
+    await screen.findByRole('searchbox', { name: 'ひな形を検索' })
+    expect(screen.getByRole('heading', { name: `${label}を配る` })).toBeTruthy()
+  })
+
+  it('自動応答の一覧の参照先は内容だけを出し、「—」を付けない', async () => {
+    render(<HqDeliveryConsole type="auto_reply" />)
+    const row = await screen.findByRole('row', { name: /追加のお礼/ })
+    const references = within(row).getAllByRole('cell')[1]
+    expect(references.textContent).toBe('本文')
+    expect(references.textContent).not.toContain('—')
+  })
+
   it('名前が空の作成は保存の理由を出し、入力すると解除する', async () => {
     render(<HqDeliveryConsole type="auto_reply" />)
     const search = await screen.findByRole('searchbox', { name: 'ひな形を検索' })
