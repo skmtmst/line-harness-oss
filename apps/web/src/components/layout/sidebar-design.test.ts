@@ -60,7 +60,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
     LINEアカウントはその段1の飛び先。LINEアカウントは要件 管理画面-33 §5-3。
     **統括の店舗管理（/hq）とは別**で、送受信に使う LINE公式アカウントそのものの設定。
   */
-  { section: '設定', items: ['はじめの設定', 'LINEアカウント', 'プール管理', 'ログインユーザー', '機能設定', '運用状態', 'EC連携'] },
+  { section: '設定', items: ['はじめの設定', 'LINEアカウント', 'プール管理', 'ユーザー管理', '機能設定', '運用状態', 'EC連携'] },
   {
     section: '飲食店向け（テスト）',
     items: [
@@ -132,7 +132,7 @@ const ROUTES: Record<string, string> = {
   はじめの設定: '/getting-started',
   LINEアカウント: '/accounts',
   プール管理: '/pools',
-  ログインユーザー: '/staff',
+  ユーザー管理: '/staff',
   機能設定: '/settings',
   運用状態: '/emergency',
   予約台帳: '/restaurant-test/reservations',
