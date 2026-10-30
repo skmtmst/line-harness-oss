@@ -10,7 +10,7 @@ import { ApiError, api } from '@/lib/api';
 import { CreatePage } from '@/components/templates';
 import { Steps } from '@/components/templates/steps';
 import { notifyToast } from '@/components/shared/toast';
-import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
+import FolderSelect, { FolderCreateError, folderById, folderCreator } from '@/components/shared/folder-select';
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
@@ -56,6 +56,7 @@ export default function ScenarioCreateV8() {
   const { selectedAccountId, loading: accountLoading } = useAccount()
   const access = useScenarioWriteAccess()
   const canEdit = access.allowed
+  const folderAccess = useScenarioWriteAccess('manageFolders')
   const [scenario, setScenario] = useState<Scenario | null>(null)
   // id なしは「これから作る」。読み込む行が無いので最初から入力できる。
   const [scenarioState, setScenarioState] = useState<'loading' | 'ready' | 'error'>(
@@ -91,7 +92,7 @@ export default function ScenarioCreateV8() {
   liveAccess.current = access
   const requireWrite = () => {
     if (canSaveNow()) return true
-    if (currentScope() && (!liveAccess.current.known || liveAccess.current.allowed)) {
+    if (currentScope() && (liveAccess.current.known && liveAccess.current.allowed)) {
       setError('本人や権限の確認状態が変わったため、操作を中止しました。内容を確認してから、もう一度操作してください。')
     }
     return false
@@ -425,7 +426,7 @@ export default function ScenarioCreateV8() {
   const selectedFolderMissing = Boolean(folderId && !folders.some((folder) => folder.id === folderId))
 
   const locked = (Boolean(id) && !scenario) || detailsSaving || saving !== null
-  const fieldsDisabled = locked || !canEdit
+  const fieldsDisabled = locked || !canEdit || accountLoading
   const scenarioFailure = scenarioError ? loadFailureCopy(scenarioError, 'シナリオ') : null
   const useCommonReason = scenarioError ? isForbiddenOrRateLimited(scenarioError) : false
 
@@ -451,29 +452,32 @@ export default function ScenarioCreateV8() {
       footerActions={(
         <>
           <Button type="button" onClick={cancel}>キャンセル</Button>
-          {canEdit ? (
-            <>
-              <Button disabled={locked} onClick={() => continueAsDraft()} busy={Boolean(detailsSaving)} busyLabel="処理中…">
-                あとで決める（下書きとして保存）
-              </Button>
-              <Button
-                variant="primary"
-                disabled={locked}
-                onClick={() => choose(selectedMode)}
-                busy={saving !== null}
-                busyLabel="作成中…"
-              >
-                <Check size={16} aria-hidden="true" />この方式で保存する
-              </Button>
-            </>
-          ) : null}
+          <Button
+            disabled={locked || !canEdit || accountLoading || !name.trim() || Boolean(createdId)}
+            lockedReason={access.reason}
+            disabledReason={canEdit && !accountLoading && !name.trim() ? 'シナリオ名を入力してください' : undefined}
+            onClick={() => continueAsDraft()}
+            busy={Boolean(detailsSaving)}
+            busyLabel="処理中…"
+          >
+            あとで決める（下書きとして保存）
+          </Button>
+          <Button
+            variant="primary"
+            disabled={locked || !canEdit || accountLoading || !name.trim() || Boolean(createdId)}
+            lockedReason={access.reason}
+            disabledReason={canEdit && !accountLoading && !name.trim() ? 'シナリオ名を入力してください' : undefined}
+            onClick={() => choose(selectedMode)}
+            busy={saving !== null}
+            busyLabel="作成中…"
+          >
+            <Check size={16} aria-hidden="true" />この方式で保存する
+          </Button>
         </>
       )}
     >
       <div className={styles.notices} data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
-        {!canEdit ? (
-          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。シナリオを作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
-        ) : null}
+        {access.reason ? <ReadOnlyNotice need="feature" /> : null}
         {scenarioState === 'loading' ? <Notice tone="info">シナリオを読み込んでいます。</Notice> : null}
         {scenarioState === 'ready' && scenario ? (
           <Notice tone="info">「{scenario.name}」の下書きを作りました。続けて配信方式を選んでください。</Notice>
@@ -526,6 +530,9 @@ export default function ScenarioCreateV8() {
               <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                 value={folderId}
                 disabled={fieldsDisabled || folderState !== 'ready'}
+                lockedReason={access.reason}
+                createDisabled={!folderAccess.allowed || accountLoading || locked}
+                createLockedReason={folderAccess.reason}
                 onChange={(value) => {
                   if (!requireWrite()) return
                   setFolderId(value)
@@ -538,14 +545,12 @@ export default function ScenarioCreateV8() {
                   ...folders.map(folderById),
                 ]}
                 // 一覧の左の列の「フォルダを追加」と同じ口（シナリオのフォルダは共有）。
-                onCreate={canEdit && !locked
-                  ? folderCreator(async (name, color) => {
-                    if (!currentScope() || accountLoading || !folderLease()) throw new Error('本人や権限の確認状態が変わったため、フォルダの作成を中止しました。')
+                onCreate={folderCreator(async (name, color) => {
+                    if (!currentScope() || accountLoading || !folderLease()) throw new FolderCreateError('本人や権限の確認状態が変わったため、フォルダの作成を中止しました。')
                     const result = await api.folders.create({ kind: 'scenario', name, color, accountId: folderAccountId })
-                    if (!currentScope() || accountLoading || !folderLease()) throw new Error('確認状態が変わりました。作成済みのフォルダは一覧で確認してください。')
+                    if (!currentScope() || accountLoading || !folderLease()) throw new FolderCreateError('確認状態が変わりました。作成済みのフォルダは一覧で確認してください。')
                     return result
-                  }, folderById, (created) => setFolders((current) => [...current, created]))
-                  : undefined}
+                  }, folderById, (created) => setFolders((current) => [...current, created]))}
               /></SaveErrorField>
             </span>
             {/* 保存済みのフォルダがこのアカウントの候補に無いときは理由を出す（黙って未分類に見せない）。 */}
