@@ -102,6 +102,8 @@ export interface ScenarioDraftOptions<T> {
   baseline: T
   /** 閲覧のみは false。 */
   active?: boolean
+  /** 保存の直前に本人・代理モードを確かめる。未指定は既存の動き。拒否時は下書きを残す。 */
+  canSaveNow?: () => boolean
 }
 
 export function useScenarioDraft<T>({
@@ -113,12 +115,29 @@ export function useScenarioDraft<T>({
   value,
   baseline,
   active = true,
+  canSaveNow,
 }: ScenarioDraftOptions<T>) {
   const valueJson = JSON.stringify(value)
   const baselineJson = JSON.stringify(baseline)
   const dirty = valueJson !== baselineJson
   const account = accountId || null
   const token = active && account && draftKey ? `${account}\n${draftKey}` : null
+
+  // 未指定の既存画面は変えない。指定した画面では、古い処理を許可の復帰で再開しない。
+  const writeScope = JSON.stringify([account, draftKey, active])
+  const allowedNow = canSaveNow?.() !== false
+  const permission = useRef({ check: canSaveNow, scope: writeScope, allowed: allowedNow, epoch: 0, optedIn: canSaveNow !== undefined, active })
+  const previousPermission = permission.current
+  const permissionEpoch = previousPermission.epoch + Number(previousPermission.scope !== writeScope
+    || previousPermission.allowed !== allowedNow || Boolean(previousPermission.check) !== Boolean(canSaveNow))
+  permission.current = { check: canSaveNow, scope: writeScope, allowed: allowedNow, epoch: permissionEpoch,
+    optedIn: previousPermission.optedIn || canSaveNow !== undefined, active }
+  const capturedPermissionEpoch = permission.current.optedIn ? permissionEpoch : 0
+  const captureWritePermission = useCallback(() => {
+    const startedAllowed = canSaveNow?.() !== false
+    return () => !permission.current.optedIn || (startedAllowed && permission.current.active
+      && permission.current.epoch === capturedPermissionEpoch && canSaveNow?.() !== false && permission.current.check?.() !== false)
+  }, [canSaveNow, capturedPermissionEpoch])
 
   /** いまサーバーにある下書きの版（無ければ 0）。 */
   const versionRef = useRef<string | 0>(0)
@@ -160,6 +179,7 @@ export function useScenarioDraft<T>({
     setReadyToken(null)
     if (!token || !account || !draftKey) return
     let cancelled = false
+    const canContinue = captureWritePermission()
     void (async () => {
       let remote: Remote<T> | null = null
       try {
@@ -181,18 +201,20 @@ export function useScenarioDraft<T>({
       if (legacy && legacyKey) {
         if (remote && remote.savedAt >= legacy.savedAt) {
           // サーバーのほうが新しい。ブラウザの古い書きかけは消すだけ。
-          removeBrowserDraft(legacyKey)
+          if (canContinue()) removeBrowserDraft(legacyKey)
         } else if (JSON.stringify(legacy.value) === baselineRef.current) {
-          removeBrowserDraft(legacyKey)
+          if (canContinue()) removeBrowserDraft(legacyKey)
         } else {
           // 一度だけサーバーへ移す。移せなければ残し、次に開いたときにもう一度。
           try {
+            if (!canContinue()) { setPending({ value: legacy.value, savedAt: legacy.savedAt }); setReadyToken(token); return }
             const res = await api.scenarioDrafts.save(account, draftKey, {
               expectedVersion: versionRef.current,
               content: { value: legacy.value as unknown },
               ...link(),
             })
             if (cancelled) return
+            if (!canContinue()) { setPending({ value: legacy.value, savedAt: legacy.savedAt }); setReadyToken(token); return }
             if (res.success) {
               versionRef.current = res.data.version
               setSavedJson(JSON.stringify(legacy.value))
@@ -206,7 +228,7 @@ export function useScenarioDraft<T>({
         }
       }
 
-      if (chosen && JSON.stringify(chosen.value) === baselineRef.current) {
+      if (chosen && JSON.stringify(chosen.value) === baselineRef.current && canContinue()) {
         // 保存済みと同じなら戻すものは無い。下書きは消す。
         const version = versionRef.current
         versionRef.current = 0
@@ -218,7 +240,7 @@ export function useScenarioDraft<T>({
       setReadyToken(token)
     })()
     return () => { cancelled = true }
-    // link と legacyKey はキーと一緒に決まる。
+    // link と legacyKey はキーと一緒に決まる。権限だけの切替ではGETを増やさず、古い処理の書込は参照と世代で止める。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token])
 
@@ -227,6 +249,8 @@ export function useScenarioDraft<T>({
   const draftDirty = ready && (dirty ? savedJson !== valueJson : savedJson !== null)
 
   const save = useCallback(async (): Promise<boolean> => {
+    const canContinue = captureWritePermission()
+    if (!canContinue()) return false
     const target = targetRef.current
     if (!target) return false
     const targetGen = targetGenRef.current
@@ -246,17 +270,20 @@ export function useScenarioDraft<T>({
       } catch (caught) {
         if (!isStatus(caught, 404) && !isStatus(caught, 409)) return false
       }
-      if (stale()) return false
+      if (stale() || !canContinue()) return false
       versionRef.current = 0
       setSavedJson(null)
       setSavedAt(null)
       return true
     }
-    const put = (expectedVersion: string | 0) => api.scenarioDrafts.save(target.account, target.key, {
-      expectedVersion,
-      content: { value: JSON.parse(sendingJson) as unknown },
-      ...link(),
-    })
+    const put = (expectedVersion: string | 0) => {
+      if (!canContinue()) return Promise.resolve(null)
+      return api.scenarioDrafts.save(target.account, target.key, {
+        expectedVersion,
+        content: { value: JSON.parse(sendingJson) as unknown },
+        ...link(),
+      })
+    }
     const accept = (draft: ScenarioDraft) => {
       versionRef.current = draft.version
       setSavedJson(sendingJson)
@@ -269,14 +296,16 @@ export function useScenarioDraft<T>({
      * 相手（アカウント・キー）が変わっただけなら、前の相手の下書きは消さず、今の画面にも入れない。
      */
     const settleStale = (draft: ScenarioDraft | null) => {
-      if (draft && targetGenRef.current === targetGen && clearGenRef.current !== clearGen) {
+      if (draft && canContinue() && targetGenRef.current === targetGen && clearGenRef.current !== clearGen) {
         void api.scenarioDrafts.delete(target.account, target.key, draft.version).catch(() => {})
       }
       return false
     }
     try {
       const res = await put(versionRef.current)
+      if (!res) return false
       if (stale()) return settleStale(res.success ? res.data : null)
+      if (!canContinue()) return false
       if (!res.success) return false
       accept(res.data)
       return true
@@ -301,14 +330,16 @@ export function useScenarioDraft<T>({
     try {
       versionRef.current = 0
       const res = await put(0)
+      if (!res) return false
       if (stale()) return settleStale(res.success ? res.data : null)
+      if (!canContinue()) return false
       if (!res.success) return false
       accept(res.data)
       return true
     } catch {
       return false
     }
-  }, [valueJson])
+  }, [valueJson, captureWritePermission])
 
   const autosave = useDraftAutosave({
     fingerprint: valueJson,
@@ -337,6 +368,7 @@ export function useScenarioDraft<T>({
 
   /** 「捨てる」・本物を保存できた・キャンセル。下書きを消す。 */
   const clear = useCallback(() => {
+    if (!captureWritePermission()()) return
     clearGenRef.current += 1
     setPending(null)
     setConflict(null)
@@ -349,7 +381,7 @@ export function useScenarioDraft<T>({
       void api.scenarioDrafts.delete(target.account, target.key, version).catch(() => {})
     }
     if (legacyKey) removeBrowserDraft(legacyKey)
-  }, [active, legacyKey])
+  }, [active, legacyKey, captureWritePermission])
 
   /** 競合の帯「最新の下書きを読み込む」。最新の値を返す（画面が自分の state へ入れる）。 */
   const loadLatest = useCallback((): T | null => {
@@ -364,11 +396,11 @@ export function useScenarioDraft<T>({
 
   /** 競合の帯「自分の入力で上書きする」。最新の版を受け取ったうえで、いまの入力を送り直す。 */
   const overwrite = useCallback(() => {
-    if (!conflict) return
+    if (!conflict || !captureWritePermission()()) return
     versionRef.current = conflict.version
     setConflict(null)
     autosave.retry()
-  }, [conflict, autosave])
+  }, [conflict, autosave, captureWritePermission])
 
   let label: string | null = null
   if (active && !account && dirty) label = AUTOSAVE_WORDS.unsaved
