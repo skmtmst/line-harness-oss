@@ -1008,4 +1008,9 @@
 - [シナリオ一覧の操作と途中の失敗の案内](release-log/unreleased/1968-kenta-train-1029o.md) — 反映履歴。
 
 - [友だちの履歴の日付区切り](release-log/unreleased/1972-kenta-swb-date-group.md) — 反映履歴。
+- [ユーザー管理と二段階認証の配置](release-log/unreleased/1976-masato-staff-security-placement.md) — 反映履歴。
+- [ログイン時のパスキー確認](release-log/unreleased/1978-masato-passkey-login.md) — 反映履歴。
+- [店舗ごとの権限者数](release-log/unreleased/1979-masato-shed-account-members.md) — 反映履歴。
+- [ユーザー一覧の最終ログイン日](release-log/unreleased/1980-masato-staff-login-date.md) — 反映履歴。
+- [ユーザー管理画面の見た目](release-log/unreleased/1981-masato-staff-visual-cleanup.md) — 反映履歴。
 - [LINEチャネル情報の入力確認](release-log/unreleased/1982-masato-line-channel-input-validation.md) — 反映履歴、確認 2026-10-30。
