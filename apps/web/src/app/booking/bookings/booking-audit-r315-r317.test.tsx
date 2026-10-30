@@ -10,7 +10,7 @@
  */
 import React from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import BookingCalendar, { slotAriaLabel, startOfWeek, type CalendarSlot } from './booking-calendar'
 import type { BookingRequest } from '@/lib/api'
 
@@ -142,16 +142,18 @@ describe('監査 R315: 選択状態を意味で伝える', () => {
     expect(await screen.findByPlaceholderText('お客さま名で検索')).toBeTruthy()
   })
 
-  it('状態は共通の札で一つを選び、期間の札は選択と解除ができる', async () => {
+  it('状態と期間は共通の切り替えで一つを選び、期間を解除できる', async () => {
     nav.search = 'view=list'
     render(<BookingsPage />)
     const done = await screen.findByRole('button', { name: '完了' })
     const confirmed = screen.getByRole('button', { name: '確定' })
     const today = screen.getByRole('button', { name: '今日' })
     const week = screen.getByRole('button', { name: '今週' })
-    for (const control of [done, confirmed, today, week]) {
-      expect(control.getAttribute('data-part')).toBe('filter-chip')
-    }
+    const statusGroup = screen.getByRole('group', { name: '予約の状態' })
+    const periodGroup = screen.getByRole('group', { name: '予約の期間' })
+    for (const control of [done, confirmed]) expect(control.closest('[data-segmented-control]')).toBe(statusGroup)
+    for (const control of [today, week]) expect(control.closest('[data-segmented-control]')).toBe(periodGroup)
+    for (const control of [done, confirmed, today, week]) expect(control.getAttribute('data-part')).not.toBe('filter-chip')
     fireEvent.click(done)
     expect(done.getAttribute('aria-pressed')).toBe('true')
     fireEvent.click(confirmed)
@@ -160,12 +162,13 @@ describe('監査 R315: 選択状態を意味で伝える', () => {
     expect(confirmed.querySelector('svg')).toBeNull()
     fireEvent.click(today)
     expect(today.getAttribute('aria-pressed')).toBe('true')
-    expect(today.querySelector('svg')).not.toBeNull()
+    expect(today.querySelector('svg')).toBeNull()
     fireEvent.click(week)
     expect(week.getAttribute('aria-pressed')).toBe('true')
     expect(today.getAttribute('aria-pressed')).toBe('false')
     fireEvent.click(week)
     expect(week.getAttribute('aria-pressed')).toBe('false')
+    expect(within(periodGroup).getByRole('button', { name: 'すべて' }).getAttribute('aria-pressed')).toBe('true')
     expect(confirmed.getAttribute('aria-pressed')).toBe('true')
   })
 
