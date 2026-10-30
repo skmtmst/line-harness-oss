@@ -1,4 +1,5 @@
 import type { TemplateQuestion } from '@/lib/api'
+import { readTemplateText } from '@/lib/template-message-text'
 
 /*
  * 一覧の行に出す小さな吹き出しの中身。
@@ -46,13 +47,7 @@ export function bubbleThumbOf(input: { messageType: string; content: string; que
   const content = typeof input.content === 'string' ? input.content.trim() : ''
   if (input.messageType === 'text') {
     if (!content) return { kind: 'empty' }
-    let message = content
-    if (content.startsWith('{')) {
-      try {
-        const payload = record(JSON.parse(content))
-        if (typeof payload?.text === 'string') message = payload.text
-      } catch { /* 通常の文章にある括弧は、そのまま表示する。 */ }
-    }
+    const message = readTemplateText(content)
     const oneLine = message.replace(/\s+/g, ' ').trim()
     if (!oneLine) return { kind: 'empty' }
     return { kind: 'text', text: oneLine.length > TEXT_KEEP ? oneLine.slice(0, TEXT_KEEP).replace(/\{\{[^}]*\}?$/, '') : oneLine }

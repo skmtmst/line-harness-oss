@@ -15,6 +15,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { cleanup, fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ChatsPage from '@/app/chats/page'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 
 const fixture = vi.hoisted(() => ({ params: new URLSearchParams() }))
 vi.mock('next/link', () => ({ default: () => null }))
@@ -115,11 +116,12 @@ beforeEach(() => {
     return await respond(method, url, body)
   })
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+  verifiedStaffRole('owner')
   host = document.createElement('div'); document.body.appendChild(host); root = createRoot(host)
 })
 afterEach(async () => {
   await act(async () => root.unmount())
-  host.remove(); cleanup()
+  host.remove(); cleanup(); verifiedStaffRole(null)
   delete document.documentElement.dataset.theme
   vi.restoreAllMocks(); vi.unstubAllGlobals()
 })
@@ -223,8 +225,8 @@ describe('受信箱V4で既存機能を失わない', () => {
       box().dispatchEvent(new Event('input', { bubbles: true }))
     })
     await act(async () => { [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('テンプレートを選択'))!.click() })
-    await eventually(() => expect(screen.getByRole('button', { name: /発送のご案内/ })).toBeTruthy())
-    fireEvent.click(screen.getByRole('button', { name: /発送のご案内/ }))
+    await eventually(() => expect(screen.getByText('発送のご案内').closest('button')).toBeTruthy())
+    fireEvent.click(screen.getByText('発送のご案内').closest('button')!)
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: '入力欄に入れる' })) })
     expect(box().value).toBe('お待たせしました。\n本日発送しました。')
     expect(calls.some((call) => call.method === 'POST' && /\/api\/chats\/chat-1\/(send|messages)/.test(call.path))).toBe(false)

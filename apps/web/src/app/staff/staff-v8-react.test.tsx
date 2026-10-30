@@ -68,12 +68,14 @@ async function render() {
 }
 
 describe('ログインユーザーV8（nku0f・A35Gh）', () => {
-  it('管理者はnku0f・役割でできることを出す', async () => {
+  it('管理者はnku0f・本人の二段階認証を出す', async () => {
     await render()
     expect(host.querySelector('[data-design-node~="nku0f"]')).not.toBeNull()
     await act(async () => { host.querySelector<HTMLButtonElement>('[data-template-region=heading] button[aria-expanded]')!.click() })
     expect(host.textContent).toContain('管理画面に入る人と、その人ができることを決めます')
-    expect(host.textContent).toContain('役割でできること')
+    expect(host.textContent).not.toContain('役割でできること')
+    expect(host.querySelector('[aria-label="自分の設定"]')).not.toBeNull()
+    expect(host.textContent).toContain('二段階認証')
     expect(host.textContent).not.toContain('閲覧のみで見ています')
   })
 
@@ -87,19 +89,19 @@ describe('ログインユーザーV8（nku0f・A35Gh）', () => {
   it('閲覧の表でも役割ごとの色札を出し、役割と日時の意味順を保つ', async () => {
     net.role = 'viewer'; net.populated = true
     await render()
-    const table = host.querySelector('[role="table"][aria-label="いまいる人の一覧"]')!
+    const table = host.querySelector('[role="table"][aria-label="ユーザーの一覧"]')!
     expect(table).not.toBeNull()
     for (const [role, tone] of [['administrator', 'success'], ['operations', 'info'], ['reception', 'warning'], ['view_only', 'neutral']]) {
       expect(table.querySelector(`[data-role="${role}"]`)?.getAttribute('data-tone')).toBe(tone)
     }
     const heads = [...table.querySelectorAll('[role="columnheader"]')].map(cell => cell.textContent)
-    expect(heads.indexOf('役割')).toBeLessThan(heads.indexOf('最後に入った'))
+    expect(heads.indexOf('権限')).toBeLessThan(heads.indexOf('最終ログイン'))
   })
 
-  it('一覧は絵 nku0f の列（人・役割・最後に入った）。行に顔とメール、表の頭に絞り込みを置かない', async () => {
+  it('一覧はユーザー情報・権限・最終ログインの列。行に顔とメール、表の頭に絞り込みを置かない', async () => {
     net.populated = true
     await render()
-    const table = host.querySelector('[role="table"][aria-label="いまいる人の一覧"]')!
+    const table = host.querySelector('[role="table"][aria-label="ユーザーの一覧"]')!
     expect(table.closest('[data-page-template="settings"]')).toBeTruthy()
     const heads = [...table.querySelectorAll('[role="columnheader"]')].map(cell => cell.textContent)
     expect(heads).not.toContain('担当のLINEアカウント')

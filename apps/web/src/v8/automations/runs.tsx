@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailFields, DetailField } from '@/components/shared/detail-content'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useSamePageUrl } from '@/lib/use-same-page-url'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -614,41 +615,29 @@ export default function AutomationRunsV8() {
           title={run ? run.automationName : ''}
           description={run ? `${shortDateTime(run.occurredAt)}・${run.subject ?? '友だち名なし'}` : undefined}
           onClose={() => setSelectedRun(null)}
-          footer={run ? (
-            <div className={styles.panelActions}>
-              {run.canRetry ? (
-                <Button onClick={() => void retryRun(run)} lockedReason={operateReason} disabled={!canOperate || retryingId !== null} busy={retryingId === run.id} busyLabel="実行中">失敗した処理をもう一度やる</Button>
-              ) : null}
-              {run.canCancel ? (
-                confirmCancel && canOperate && !operateReason ? (
-                  <>
-                    <Button onClick={() => void cancelRun(run)} lockedReason={operateReason} disabled={!canOperate || cancellingId !== null} busy={cancellingId === run.id} busyLabel="取りやめ中">取りやめる</Button>
-                    <Button variant="secondary" onClick={() => setConfirmCancel(false)} disabled={cancellingId !== null}>キャンセル</Button>
-                  </>
-                ) : (
-                  <Button variant="secondary" onClick={() => { if (canUseRunActionNow('operate')) setConfirmCancel(true) }} lockedReason={operateReason} disabled={!canOperate || cancellingId !== null}>この実行を取りやめる</Button>
-                )
-              ) : null}
-            </div>
-          ) : undefined}
-        >
+          actions={run ? {
+primary: confirmCancel && run.canCancel && canOperate && !operateReason ? <Button variant="danger" onClick={() => void cancelRun(run)} lockedReason={operateReason} disabled={!canOperate || cancellingId !== null} busy={cancellingId === run.id} busyLabel="取りやめ中">取りやめる</Button> : run.canRetry ? <Button variant="primary" onClick={() => void retryRun(run)} lockedReason={operateReason} disabled={!canOperate || retryingId !== null} busy={retryingId === run.id} busyLabel="実行中">失敗した処理をもう一度やる</Button> : null,
+menuItems: confirmCancel && run.canRetry ? [{ id: 'retry-run', label: '失敗した処理をもう一度やる', allowed: canOperate, disabled: retryingId !== null, lockedReason: operateReason, onSelect: () => void retryRun(run) }] : [],
+secondary: run.canCancel ? confirmCancel && canOperate && !operateReason ? <Button variant="secondary" onClick={() => setConfirmCancel(false)} disabled={cancellingId !== null}>キャンセル</Button> : <Button variant="secondary" onClick={() => { if (canUseRunActionNow('operate')) setConfirmCancel(true) }} lockedReason={operateReason} disabled={!canOperate || cancellingId !== null}>この実行を取りやめる</Button> : null,
+} : undefined}
+         status={run ? <StatusBadge tone={statusTone(run.status)}>{STATUS_LABEL[run.status]}</StatusBadge> : null}>
+<DetailContent>
           {run ? (
             <div className={styles.panel}>
               <LogEntryCopy canCopy={permissions?.canExport === true} entry={{ occurredAt: run.occurredAt, target: run.subject ?? '友だち名なし', status: STATUS_LABEL[run.status], reason: resultReason(run) ?? STATUS_LABEL[run.status] }} />
-              <p className={styles.panelText}>
+              <DetailField label="版">
                 {`第${(runDetail ?? run).versionNumber}版`}
                 {(runDetail ?? run).isTest ? '・テスト実行' : ''}
                 {runDetail ? (runDetail.isCurrentVersion ? '・いまの公開版です' : runDetail.currentVersionNumber !== null ? `・いまの公開版は 第${runDetail.currentVersionNumber}版 です` : '') : ''}
-              </p>
-              <dl className={styles.panelGrid}>
-                <dt>きっかけ</dt><dd>{run.triggerLabel}</dd>
-                <dt>結果</dt><dd>{STATUS_LABEL[run.status]}</dd>
-                <dt>したこと・失敗理由</dt><dd>{run.detail ?? '何もしていません'}</dd>
-                <dt>かかった時間</dt><dd>{durationText(run.durationMs)}</dd>
-                {runDetail?.holdReason ? <><dt>止まっている理由</dt><dd>{runDetail.holdReason}</dd></> : null}
-              </dl>
-              <p className={styles.panelLabel}>処理ごとの結果</p>
-              {detailLoading ? (
+              </DetailField>
+              <DetailFields>
+                <div><dt>きっかけ</dt><dd>{run.triggerLabel}</dd></div>
+                <div><dt>結果</dt><dd>{STATUS_LABEL[run.status]}</dd></div>
+                <div><dt>したこと・失敗理由</dt><dd>{run.detail ?? '何もしていません'}</dd></div>
+                <div><dt>かかった時間</dt><dd>{durationText(run.durationMs)}</dd></div>
+                {runDetail?.holdReason ? <><div><dt>止まっている理由</dt><dd>{runDetail.holdReason}</dd></div></> : null}
+              </DetailFields>
+              <DetailField label="処理ごとの結果"> {detailLoading ? (
                 <p className={styles.panelText}>読み込んでいます</p>
               ) : detailError === 'forbidden' ? (
                 <p className={styles.panelText}>この実行を見る権限がありません。</p>
@@ -669,7 +658,7 @@ export default function AutomationRunsV8() {
                 </ul>
               ) : (
                 <p className={styles.panelText}>処理の記録はありません</p>
-              )}
+              )} </DetailField>
               <p className={styles.panelText}>
                 {run.canRetry
                   ? '失敗した処理だけを、成功済みの処理と重ならないようにもう一度実行できます。'
@@ -682,7 +671,9 @@ export default function AutomationRunsV8() {
               ) : null}
             </div>
           ) : null}
-        </DetailPanel>
+
+</DetailContent>
+</DetailPanel>
       </>}
     >
       {listBody}

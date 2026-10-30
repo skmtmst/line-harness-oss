@@ -5,6 +5,8 @@ import { createPortal } from 'react-dom'
 import { PanelsTopLeft, X } from 'lucide-react'
 import { OVERLAY_MODAL_OPEN_EVENT, OverlayDepthContext, useOverlayFocus, useOverlayLayer, useV8Leave } from './overlay-utils'
 import styles from './drawer.module.css'
+import detailStyles from './detail-content.module.css'
+import DetailActions, { hasDetailActions, type DetailActionsProps } from './detail-actions'
 import Dialog from './dialog'
 import IconButton from './icon-button'
 import { useFormInputDirty } from './form-input-dirty'
@@ -32,6 +34,9 @@ export type DrawerProps = {
   children?: ReactNode
   details?: DrawerDetail[]
   footer?: ReactNode
+  footerLayout?: 'actions'
+  actions?: DetailActionsProps
+  status?: ReactNode
   /** falseは参照画像と同じ面だけをページ内に描画する。 */
   modal?: boolean
   /**
@@ -78,6 +83,9 @@ export default function Drawer({
   children,
   details,
   footer,
+  footerLayout,
+  actions,
+  status,
   modal = true,
   width,
   designWidth,
@@ -110,8 +118,8 @@ export default function Drawer({
   const titleBlock = (
     <div className={styles.heading}>
       <div className={styles.headingText}>
-        <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} className={`${styles.title} ${modal ? '' : styles.inlineTitle}`}>{headerIcon ? <span className={styles.headerIcon} aria-hidden="true">{headerIcon}</span> : null}<span>{heading ?? title}{isDirty && showDirtyIndicator ? ' *' : ''}</span></h2>{titleAccessory}</div>
-        {description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
+        <div className={titleAccessory ? styles.titleRow : undefined}><h2 id={titleId} title={title} className={`${styles.title} ${detailStyles.title} ${modal ? '' : styles.inlineTitle}`}>{headerIcon ? <span className={styles.headerIcon} aria-hidden="true">{headerIcon}</span> : null}<span className={styles.titleText} data-detail-title-text>{heading ?? title}</span>{isDirty && showDirtyIndicator ? <span aria-label="未保存"> *</span> : null}</h2>{titleAccessory}</div>
+        {actions !== undefined || status !== undefined || footerLayout === 'actions' ? (status || description ? <div className={detailStyles.summary}>{status}{description ? typeof description === 'string' ? <span id={descriptionId} className={detailStyles.summaryText} title={description}>{description}</span> : <div id={descriptionId}>{description}</div> : null}</div> : null) : description ? <p id={descriptionId} className={styles.description}>{description}</p> : null}
       </div>
     </div>
   )
@@ -123,7 +131,7 @@ export default function Drawer({
       onChangeCapture={formInput.onChangeCapture}
       onInputCapture={formInput.onChangeCapture} onInput={formInput.onChange} onChange={formInput.onChange}
       onClickCapture={(event) => { formInput.onClickCapture(event); captureOverlayClose(event, isDirty || busy, discard.requestClose) }}
-      className={`${styles.panel} ${modal ? '' : styles.inline}`}
+      className={`${styles.panel} ${detailStyles.surface} ${modal ? '' : styles.inline}`}
       role="dialog"
       aria-modal={modal || undefined}
       aria-labelledby={titleId}
@@ -163,7 +171,7 @@ export default function Drawer({
         {error}
       </Notice> : null}
       {band ? <div className={styles.band}>{band}</div> : null}
-      {footer ? <footer className={styles.footer} data-window-actions>{footer}</footer> : null}
+      {hasDetailActions(actions) ? <footer className={styles.actionFooter} data-window-actions><DetailActions {...actions} /></footer> : actions ? null : footer ? <footer className={footerLayout === 'actions' ? styles.actionFooter : styles.footer} data-window-actions>{footer}</footer> : null}
     </aside>
   )
   const discardDialog = discard.confirming ? <Dialog open title="入力を破棄しますか？" description="保存していない入力が消えます。" primaryAction="cancel" cancelLabel="編集を続ける" confirmLabel="破棄する" onCancel={discard.continueEditing} onConfirm={discard.discard} busy={busy} confirmation compact /> : null

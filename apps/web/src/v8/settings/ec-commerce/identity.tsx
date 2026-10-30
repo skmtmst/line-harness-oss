@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent } from '@/components/shared/detail-content'
 import { formatYen } from '@line-crm/shared';
 import { ListToolbarSort } from '@/components/shared/list-toolbar'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -276,7 +277,10 @@ export default function EcIdentityCandidatesScreen() {
 
         {detail ? (
           <>
-          <Drawer heightMode="viewport" contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} footer={<DialogActions padding="none"><Button onClick={() => setCandidateId(null)}>閉じる</Button>{canEdit ? <Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button> : null}</DialogActions>}>
+          <Drawer heightMode="viewport" contentSpacing="sections" open={Boolean(candidateId) && !review.dialogOpen} title="候補を見る" onClose={() => setCandidateId(null)} actions={{ primary: (<Button variant="primary" onClick={() => review.openDialog(detail.id)}>決める</Button>),
+    secondary: <Button variant="secondary" onClick={() => setCandidateId(null)}>閉じる</Button>,
+    menuItems: [], primaryAllowed: canEdit }}>
+<DetailContent>
             <div className={styles.detailPair}>
               <IdentitySubjectCard side="ECの会員" subject={detail.left} />
               <IdentitySubjectCard side="LINE の友だち" subject={detail.right} />
@@ -286,7 +290,9 @@ export default function EcIdentityCandidatesScreen() {
               <IdentityImpactList impact={detail.impact} />
             </div>
             <IdentityHistoryList history={detail.history} />
-          </Drawer>
+
+</DetailContent>
+</Drawer>
             <IdentityDecisionDialog
               open={canEdit && review.dialogOpen}
               candidate={detail}

@@ -44,6 +44,9 @@ function installFetch() {
     const url = new URL(raw, 'https://example.com')
     const path = `${url.pathname}${url.search}`
     net.calls.push(`${(init?.method ?? 'GET').toUpperCase()} ${path}`)
+    if (url.pathname === '/api/staff/me') {
+      return new Response(JSON.stringify({ success: true, data: { id: 'owner', role: 'owner', name: '試験の担当者' } }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    }
     if (path.includes('/api/friends/') && path.includes('/mileage')) {
       return new Response(JSON.stringify({ success: true, data: {
         summary: { programId: 'p', programName: '試験マイル', available: 0, pending: 0, lifetimeEarned: 0, spent: 0 },

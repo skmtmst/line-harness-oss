@@ -173,3 +173,6 @@ html:root .search:has(.input:focus-visible) { outline: var(--polish-focus-width)
 html:root .search:has(.input[aria-invalid='true']:focus-visible) { outline: var(--polish-focus-width) solid var(--color-danger); outline-offset: var(--polish-focus-offset); }
 :root .input { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
 :root .searchIcon { flex-basis: var(--polish-icon-control); }
+
+/* 複合欄の地は外枠が持ち、入力部分だけに操作時の色を重ねない。 */
+html:root .search .input { background-image: none; }

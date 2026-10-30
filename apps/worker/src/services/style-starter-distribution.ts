@@ -1,3 +1,4 @@
+import { sameStarterSnapshot } from './style-starter-snapshot.js';
 import type { AccountStyle, SetupAnswer } from '@line-crm/shared';
 import { checkStyle, StyleError, profile, starter } from './style-setup.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
@@ -92,7 +93,7 @@ export async function starterDistributionPlan(
         !!binding &&
         (!binding.is_sample ||
           binding.source_snapshot === null ||
-          snapshot !== binding.source_snapshot);
+          !sameStarterSnapshot(binding.kind, snapshot, binding.source_snapshot));
       items.push({
         key: item.key,
         name: item.name,

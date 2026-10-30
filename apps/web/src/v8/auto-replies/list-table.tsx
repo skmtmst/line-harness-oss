@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailField } from '@/components/shared/detail-content'
 
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { isForbiddenOrRateLimited } from '@/components/shared/api-error-message'
@@ -295,12 +296,10 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lo
               }
               hasPrev={panelIndex > 0}
               hasNext={panelIndex < items.length - 1}
-              footer={
-                <>
-                  <Button variant="primary" onClick={() => goEdit(panelRow.id)}>
+              actions={{primary: <Button variant="primary" onClick={() => goEdit(panelRow.id)}>
                     開く
-                  </Button>
-                  <Button
+                  </Button>,
+secondary: <Button
                     variant="secondary"
                     onClick={() =>
                       withViewTransition(() => {
@@ -309,52 +308,22 @@ export function renderAutoReplyList({ allOnPageSelected, canEdit, canRunList, lo
                     }
                    busyLabel="移動中…">
                     実行結果を見る
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    disabled={!canEdit}
-                    lockedReason={lockedReason}
-                    onClick={() => {
+                  </Button>,
+menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedReason": lockedReason, onSelect: () => {
                       if (!canRunList()) return
                       setDuplicateError('')
                       void runDuplicate(panelRow)
                       setPanelId(null)
-                    }}
-                  >
-                    複製する
-                  </Button>
-                  {canToggle && (
-                    <Button
-                      variant="secondary"
-                      disabled={!canEdit}
-                      lockedReason={lockedReason}
-                      onClick={() => toggleFromPanel(panelRow)}
-                    >
-                      {panelRow.isActive ? '止める' : '再開する'}
-                    </Button>
-                  )}
-                  <Button
-                    variant="secondary"
-                    disabled={!canEdit}
-                    lockedReason={lockedReason}
-                    onClick={() => {
+                    }},
+...((canToggle) ? [{id: 'detail-1', label: (panelRow.isActive ? '止める' : '再開する'), disabled: !canEdit, "lockedReason": lockedReason, onSelect: () => toggleFromPanel(panelRow)}] : []),
+{id: 'detail-2', label: "削除する", disabled: !canEdit, "lockedReason": lockedReason, onSelect: () => {
                       if (!canRunList()) return
                       setPanelId(null)
                       requestDelete(panelRow)
-                    }}
-                  >
-                    削除する
-                  </Button>
-                </>
-              }
-            >
-              <p title={trigger.title}>{trigger.text}</p>
-              <TagOverflow label="すべての応答条件">{conditionChips(panelRow).map((label) => <span key={label} className={styles.condChip} title={label}>{label}</span>)}</TagOverflow>
-              <p>
-                {panelRow.isActive ? '有効' : '停止中'} ／ 今月 {panelRow.hits?.period ?? emptyValue('unknown')}回 ／
-                累計 {panelRow.hits?.total ?? emptyValue('unknown')}回
-              </p>
-            </DetailPanel>
+                    }}]}}
+             status={<SharedStatusPill tone={panelRow.isActive ? 'success' : 'neutral'} title={stopNote(panelRow) ?? undefined}>{panelRow.isActive ? '有効' : '停止中'}</SharedStatusPill>}>
+<DetailContent><DetailField label="きっかけ"><p title={trigger.title}>{trigger.text}</p><TagOverflow label="すべての応答条件">{conditionChips(panelRow).map((label) => <span key={label} className={styles.condChip} title={label}>{label}</span>)}</TagOverflow></DetailField><DetailField label="応答した回数">今月 {panelRow.hits?.period ?? emptyValue('unknown')}回・累計 {panelRow.hits?.total ?? emptyValue('unknown')}回</DetailField></DetailContent>
+</DetailPanel>
           )
         })()}
 

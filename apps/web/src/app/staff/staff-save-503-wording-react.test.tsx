@@ -63,7 +63,8 @@ const state = {
   users: [] as ReturnType<typeof accessUser>[],
 }
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   // 製品の fallback と同じ既定文（message 省略時は API error:<status>）。
   class ApiError extends Error {
     status: number
@@ -75,8 +76,9 @@ vi.mock('@/lib/api', () => {
     }
   }
   return {
+    ...actual,
     ApiError,
-    fetchApi: vi.fn(),
+    fetchApi: vi.fn().mockResolvedValue({ success: true, data: [] }),
     // 配線の証明用：固定の目印を返し、呼ばれた入力を残す。
     // 503→日本語の変換自体は contract 側が本物で守る。
     describeSaveFailure: vi.fn((err: unknown) => {

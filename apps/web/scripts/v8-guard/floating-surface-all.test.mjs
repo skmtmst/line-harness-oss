@@ -51,7 +51,7 @@ function Fixture(){const [open,setOpen]=useState(''),actionAnchor=useRef(null),n
 {open==='message' ? <div data-message-body style={{width:'400px'}}><MessageInsertRow more={<button type="button">差1</button>}><button type="button">名</button></MessageInsertRow></div> : null}
 </main>}
 createRoot(document.getElementById('root')).render(<Fixture/>);`},
- bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',tsconfig: webRoot+'/tsconfig.json',define:{'process.env.NODE_ENV':'"production"'},
+ bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',tsconfig: webRoot+'/tsconfig.json',define:{'process.env.NODE_ENV':'"production"','process.env.NEXT_PUBLIC_API_URL':'"http://127.0.0.1:8788"'},
   plugins: [{ name: 'fixture', setup(b) {
     b.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: 'navigation', namespace: 'fixture' }))
     b.onResolve({ filter: /^next\/link$/ }, () => ({ path: 'link', namespace: 'fixture' }))

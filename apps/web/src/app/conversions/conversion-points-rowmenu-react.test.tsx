@@ -229,7 +229,9 @@ describe('V8 閲覧だけの担当者と権限確認中', () => {
       await mount()
       expect(container.querySelector('a[href="/conversions/new"]')).toBeNull()
       await click(moreButtons()[0])
-      expect(byText('編集する')).toBeUndefined()
+      const edit = byText('編集する')!
+      expect(edit).toBeTruthy()
+      expect(edit.getAttribute('aria-disabled') === 'true' || edit.hasAttribute('disabled')).toBe(true)
       expect(byText('止める')).toBeUndefined()
       expect(byText('使う場所を足す')).toBeUndefined()
       await click(byText('成果地点の詳細を見る'))

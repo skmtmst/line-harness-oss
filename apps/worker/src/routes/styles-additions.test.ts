@@ -15,6 +15,7 @@ import {
   initializeAccountStyle,
   standardStarter,
 } from '../services/style-setup.js';
+import { buildMessage } from '../services/line-message.js';
 import { templateSamples } from '../services/style-template-samples.js';
 import {
   openSeatTables,
@@ -115,7 +116,7 @@ describe('template samples', () => {
         );
         if (!['standard', 'ec'].includes(style)) expect(standardStarter(style).items).toContainEqual(item.starterItem);
         expect(item.hqDefinition.template.messageContent).toBe(
-          JSON.stringify({ text: item.text }),
+          item.text,
         );
       }
       for (const item of standardStarter(style).items.filter(i => i.key.startsWith('sample-'))) expect(result.body.data.items.map((s: {starterItem: unknown}) => s.starterItem)).toContainEqual(item);
@@ -249,15 +250,14 @@ describe('template samples', () => {
     await distribute();
     let row = sql.raw
       .prepare(
-        "SELECT id,message_content FROM templates WHERE line_account_id='b'",
+        "SELECT id,message_type,message_content FROM templates WHERE line_account_id='b'",
       )
       .get() as any;
-    expect(JSON.parse(row.message_content)).toEqual({ text: sample.text });
+    expect(row.message_content).toBe(sample.text);
+    expect(buildMessage(row.message_type, row.message_content)).toEqual({ type: 'text', text: sample.text });
     const originalId = row.id;
     const definition = structuredClone(sample.hqDefinition);
-    definition.template.messageContent = JSON.stringify({
-      text: sample.text + '\nお待ちしています。',
-    });
+    definition.template.messageContent = sample.text + '\nお待ちしています。';
     expect(
       (
         await request(`/api/hq/templates/${id}`, 'PATCH', {
@@ -271,13 +271,14 @@ describe('template samples', () => {
     await distribute('overwrite');
     row = sql.raw
       .prepare(
-        "SELECT id,message_content FROM templates WHERE line_account_id='b'",
+        "SELECT id,message_type,message_content FROM templates WHERE line_account_id='b'",
       )
       .get();
     expect(row.id).toBe(originalId);
-    expect(JSON.parse(row.message_content).text).toContain(
-      'お待ちしています。',
-    );
+    expect(row.message_content).toContain('お待ちしています。');
+    expect(buildMessage(row.message_type, row.message_content)).toEqual({
+      type: 'text', text: definition.template.messageContent,
+    });
     expect(
       sql.raw.prepare('SELECT count(*) n FROM messages_log').get(),
     ).toEqual({ n: 0 });

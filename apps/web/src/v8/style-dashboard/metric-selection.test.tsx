@@ -4,8 +4,8 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { STYLE_METRIC_IDS, type StyleSchedule, type StyleSnapshot } from '@line-crm/shared'
-const state = vi.hoisted(() => ({ account: 'a', role: 'admin', get: vi.fn(), save: vi.fn(), reset: vi.fn(), summary: vi.fn(), version: 2, customized: false as boolean | undefined, ids: ['bookings', 'attention', 'nextBookingRate', 'paidAmount', 'newBookings'], error: null as unknown }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/', useSearchParams: () => new URLSearchParams() }))
+const state = vi.hoisted(() => ({ account: 'a', role: 'admin', params: '', get: vi.fn(), save: vi.fn(), reset: vi.fn(), summary: vi.fn(), version: 2, customized: false as boolean | undefined, ids: ['bookings', 'attention', 'nextBookingRate', 'paidAmount', 'newBookings'], error: null as unknown }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/', useSearchParams: () => new URLSearchParams(state.params) }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account }) }))
 vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => state.role }))
@@ -24,7 +24,7 @@ const schedule: StyleSchedule = { style: 'salon', from: snapshot.from, to: snaps
 function labels() { return Array.from(document.querySelectorAll('[data-style-dashboard] [data-kpi-label]')).map(node => node.getAttribute('title')) }
 async function open() { await waitFor(() => expect(state.summary).toHaveBeenCalled()); fireEvent.click(getPageAction({ name: '表示を変える' })); const drawer = await screen.findByRole('dialog', { name: /表示を変える/ }); await within(drawer).findByRole('switch', { name: '分析', exact: true }); return drawer }
 beforeEach(() => {
-  vi.clearAllMocks(); state.account = 'a'; state.role = 'admin'; state.version = 2; state.customized = false; state.ids = ['bookings', 'attention', 'nextBookingRate', 'paidAmount', 'newBookings']; state.error = null
+  vi.clearAllMocks(); state.params = ''; state.account = 'a'; state.role = 'admin'; state.version = 2; state.customized = false; state.ids = ['bookings', 'attention', 'nextBookingRate', 'paidAmount', 'newBookings']; state.error = null
   state.get.mockImplementation(async () => profile()); state.summary.mockResolvedValue({ data: snapshot }); vi.mocked(styleApi.schedule).mockResolvedValue({ success: true, data: schedule })
   state.save.mockImplementation(async (_account, version, _cards, ids) => {
     if (state.error) throw state.error
@@ -235,4 +235,16 @@ it('旧応答の非保存fallbackから明示した再読込で真のcustomへ�
   await waitFor(() => expect(labels()).toEqual(['来店数', '今日の予約']))
   expect(screen.queryByText(/保存した表示設定を確認できないため/)).toBeNull()
   expect(state.save).not.toHaveBeenCalled()
+})
+
+it('分析には期間と比較を残し、未接続の書き出し・定期メールを置かない', async () => {
+  state.params = 'tab=analytics'
+  render(<StyleDashboard style="salon" />)
+  await waitFor(() => expect(state.summary).toHaveBeenCalled())
+  expect(screen.getByRole('group', { name: '期間' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: '比べる', exact: true })).toBeTruthy()
+  expect(screen.queryByRole('button', { name: 'CSVで書き出す' })).toBeNull()
+  expect(screen.queryByRole('button', { name: '毎朝メールで送る' })).toBeNull()
+  expect(screen.queryByText('書き出しの口をつなぐと使えます。')).toBeNull()
+  expect(screen.queryByText('定期の送信の口をつなぐと使えます。')).toBeNull()
 })

@@ -287,9 +287,9 @@ describe('ログインユーザー操作の表示と実処理 (#834)', () => {
     try {
       await mount()
 
-      expect(screen.getByRole('tab', { name: /いまいる人/ })).toBeTruthy()
+      expect(screen.getByRole('tab', { name: 'ユーザー' })).toBeTruthy()
       expect(screen.queryByText('利用停止中の人')).toBeNull()
-      expect(screen.getByText('ログインユーザー 3 人中 3 人を表示')).toBeTruthy()
+      expect(screen.getByText('ユーザー 3 人中 3 人を表示')).toBeTruthy()
     } finally {
       state.members.pop()
       state.users.pop()

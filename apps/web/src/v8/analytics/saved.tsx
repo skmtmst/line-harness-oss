@@ -1,4 +1,5 @@
 'use client'
+import { DetailPreview } from '@/components/shared/detail-content'
 import { ListPageStats } from '@/components/templates/list-page'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -263,9 +264,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       {loading ? <ListState kind="loading" title="保存した分析を読み込んでいます" />
         : error && items.length === 0 ? <ListState kind="error" title="保存した分析を読み込めませんでした" description="通信が切れたか、サーバが応えませんでした。登録した内容は消えていません。" onRetry={() => setSavedReload((n) => n + 1)} />
         : items.length === 0 ? <ListState kind="empty" title="保存した分析はまだありません" description="クロス分析かファネルを集計し、その結果を保存してください。" />
-        : <DetailColumns presentation="analysis" variant="analysis-history" asideLabel="選んだ分析の履歴を開く" expanded={historyExpanded} onExpandedChange={setHistoryExpanded} aside={
-          <Card variant="records" aria-labelledby="saved-history-title">
-            <CardHeader size="content" titleId="saved-history-title" meta={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${formatNumber(schedules.filter(schedule => schedule.savedAnalysisIds.includes(selected.id)).length)}件`}` : undefined} title={<TruncatedText value={selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'} />} />
+        : <DetailColumns presentation="analysis" variant="analysis-history" asideLabel="選んだ分析の履歴を開く" expanded={historyExpanded} onExpandedChange={setHistoryExpanded} aside={<DetailPreview titleId="saved-history-title" title={selected ? `選んだ分析の履歴：${selected.name}` : '選んだ分析の履歴'} description={selected ? `定期レポート ${schedulesLoading ? '確認中' : schedulesError ? emptyValue('unknown') : `${formatNumber(schedules.filter(schedule => schedule.savedAnalysisIds.includes(selected.id)).length)}件`}` : undefined} actions={{ primary: (selected ? <Button variant="primary" href={`/analytics?tab=${selected.kind}`} title="条件を変えるときは、元の分析で集計し直してから保存します"><FilePen size={16} aria-hidden="true"/>内容を変える</Button> : null), secondary: (selected ? <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={16} aria-hidden="true"/>CSVで書き出す</Button> : null), primaryAllowed: canManage }}>
             {/* 履歴だけ取れないときは、その場所に小さく1行。一覧の失敗とは分ける。 */}
             {snapshotError ? <Notice tone="danger" className={styles.captionNoticePlacement} >結果の履歴を読み込めませんでした。<button type="button" className={styles.linkButton} onClick={() => setSnapshotReload((n) => n + 1)}>もう一度</button></Notice> : null}
             {snapshotLoading ? <p data-card-footer className={styles.caption}>結果を読み込んでいます</p>
@@ -285,13 +284,9 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
                   <ActionCell><Button variant="secondary" onClick={() => setOpenSnapshot(snapshot)}>結果を見る</Button></ActionCell>
                 </Tr>)}</tbody>
               </DataTable>}
-            {selected ? <div data-card-footer className={styles.rowActions} data-gap="wide">
-              <Button variant="secondary" disabled={snapshots.length === 0} onClick={exportSnapshots}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
-              {canManage ? <Button variant="secondary" href={`/analytics?tab=${selected.kind}`} title="条件を変えるときは、元の分析で集計し直してから保存します"><FilePen size={16} aria-hidden="true" />内容を変える</Button> : null}
-            </div> : null}
+
             <p data-card-footer className={styles.caption}>保存時点の固定結果です。いま集計し直しても変わりません。</p>
-          </Card>
-        }>
+          </DetailPreview>} asideLayout="detail">
           <Card variant="records" contentPadding="0" aria-label="保存した分析の一覧"><DataTable aria-label="保存した分析" columnSizing="content" grid={{ columns: 'minmax(0, 1fr) var(--tpl-an-col-90) var(--tpl-an-col-80) var(--tpl-an-col-100) var(--tpl-an-col-100)', padding: '0 var(--tpl-list-inset)', headPadding: '0 var(--tpl-list-inset)', gap: 'var(--polish-space-row)', rowHeight: 'var(--tpl-list-row-h)', bodyTextSize: 'var(--polish-text-body)' }}>
             <thead><TableHeadRow><Th grow truncate>分析名</Th><Th truncate>種類</Th><Th truncate>作った人</Th><Th truncate>更新日時</Th><Th truncate>集計状態</Th></TableHeadRow></thead>
             <tbody>

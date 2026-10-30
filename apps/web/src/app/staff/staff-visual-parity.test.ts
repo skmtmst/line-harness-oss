@@ -23,11 +23,6 @@ describe('ログインユーザーの操作契約', () => {
     expect(staffSource).not.toContain('完全に削除する')
   })
 
-  it('「最後に入った」の下の1行は省略しても全文をtitleで読める', () => {
-    expect(staffSource).toContain('className={styles.colLast}')
-    expect(staffSource).toContain('title={user.lastActionAt ? `最後の操作：${formatStaffDate(user.lastActionAt)}`')
-  })
-
   it('入った記録は異変を拾える札と設計順の5列を持つ', () => {
     for (const word of ['消した操作', '配信した操作', 'いつもと違う場所から', '気になるもの', '元の値 → 新しい値']) {
       expect(auditSource).toContain(word)

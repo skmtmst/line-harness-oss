@@ -28,7 +28,7 @@ import { DashboardPage } from '@/components/templates/dashboard-page'
 import { styleApi } from '@/lib/api/helpers/styles'
 import { formatDate, formatNumber } from '@/lib/format'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
-import { Armchair,BellRing,CalendarCheck,CalendarDays,CalendarX2,Check,CircleUserRound,ClipboardList,Clock3,Copy,CreditCard,Download,ExternalLink,Link2,Mail,MessageCircle,Plus,RefreshCw,Repeat2,SlidersHorizontal,Sparkles,UserPlus,UserRoundX,Users,Video } from 'lucide-react'
+import { Armchair,BellRing,CalendarCheck,CalendarDays,CalendarX2,Check,CircleUserRound,ClipboardList,Clock3,Copy,CreditCard,ExternalLink,Link2,MessageCircle,Plus,RefreshCw,Repeat2,SlidersHorizontal,Sparkles,UserPlus,UserRoundX,Users,Video } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { useMemo,useState } from 'react'
 import { PhoneReservationDrawer } from '@/v8/restaurant/front-desk/public/phone-drawer/index'
@@ -119,8 +119,6 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <EntitySelect compact width={152} aria-label={cfg.staffNoun} valuePrefix={`${cfg.staffNoun}：`} value={staff} onChange={setStaff} options={staffOptions} />
       <span className={styles.grow} />
       <EntitySelect compact width={176} aria-label="比べる" valuePrefix="比べる：" value={compare} onChange={setCompare} options={COMPARE} />
-      <Button disabled disabledReason="書き出しの口をつなぐと使えます。"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
-      <Button disabled disabledReason="定期の送信の口をつなぐと使えます。"><Mail size={16} aria-hidden="true" />毎朝メールで送る</Button>
       {loadedAt ? <span className={styles.updated}>更新 {formatDate(loadedAt, { style: 'time' })}</span> : null}
     </div>
   ) : (

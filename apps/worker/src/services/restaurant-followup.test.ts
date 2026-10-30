@@ -1,3 +1,4 @@
+import { seedExistingRestaurantFollowup } from '../test-utils/restaurant-followup-fixture.js';
 import { reservationInstant } from '@line-crm/shared';
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest';
 import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -34,6 +35,7 @@ beforeEach(()=>{
  INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('f','a','UID','友だち');
  INSERT INTO rt_organizations(id,account_id,name) VALUES('o','a','組織');
  INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('s','o','店舗','S','a');`);
+ seedExistingRestaurantFollowup(t,'s');
  env={DB:t.db,DEPLOY_ENV:'test',RESTAURANT_TEST_ENABLED:'true',WORKER_PUBLIC_URL:'https://worker.invalid'} as Env['Bindings'];
 });
 afterEach(()=>{vi.useRealTimers();t.raw.close();});
@@ -58,7 +60,7 @@ describe('飲食3・承認した共通版と予約ごとの送り方',()=>{
   expect((t.raw.prepare('SELECT steps_snapshot FROM scenario_versions WHERE id=?').get(first) as {steps_snapshot:string}).steps_snapshot).toBe(snapshot);
   await activate();expect((t.raw.prepare('SELECT approved_version_id id FROM rt_store_followup_templates').get() as {id:string}).id).not.toBe(first);
  });
- it('店の追加は下書き・停止、再接続でひな形を二重作成しない',()=>{
+ it('既存の本体は停止のまま再接続しても二重作成しない',()=>{
   expect(t.raw.prepare('SELECT sending_status,approved_version_id FROM rt_store_followup_templates').get()).toEqual({sending_status:'stopped',approved_version_id:null});
   t.raw.exec("UPDATE rt_stores SET line_account_id='a' WHERE id='s'");
   expect(t.raw.prepare('SELECT COUNT(*) n FROM scenarios').get()).toEqual({n:1});

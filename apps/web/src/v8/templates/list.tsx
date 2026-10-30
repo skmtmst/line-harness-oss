@@ -18,6 +18,7 @@ import Button from '@/components/shared/button'
 import { type ContextMenuItem } from '@/components/shared/context-menu'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import { emptyValue } from '@/components/shared/empty-value'
+import SegmentedControl from '@/components/shared/segmented'
 import FilterChip from '@/components/shared/filter-chip'
 import { type FolderDotFolder } from '@/components/shared/folder-dot'
 import FolderPanel,{ FOLDER_RAIL_WIDTH,FolderPanelNote,type FolderPanelRow } from '@/components/shared/folder-panel'
@@ -45,7 +46,7 @@ import { runOptimistic } from '@/lib/undoable'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import type { Folder } from '@line-crm/shared'
-import { Bookmark,Braces,Copy,FileText,Folder as FolderIcon,Layers,Link2,Mail,MessageSquare,Plus,Send,Unlink } from 'lucide-react'
+import { Bookmark,Braces,Copy,FileText,Folder as FolderIcon,Link2,Mail,Plus,Send,Unlink } from 'lucide-react'
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react'
 import { loadTemplateExamples,type TemplateExample } from './examples'
 import styles from './list.module.css'
@@ -812,12 +813,9 @@ export default function TemplatesListV8() {
   }
   const filterChips = (
     <div role="group" aria-label="中身で絞り込む" className={styles.chipGroup}>
-      <FilterChip selected={chips.single} onChange={() => toggleChip('single')} title="1つのメッセージだけのテンプレート" icon={<MessageSquare size={16} aria-hidden="true" />}>
-        1通のみ
-      </FilterChip>
-      <FilterChip selected={chips.multiple} onChange={() => toggleChip('multiple')} title="複数のメッセージに分かれるテンプレート" icon={<Layers size={16} aria-hidden="true" />}>
-        複数通
-      </FilterChip>
+      <SegmentedControl aria-label="メッセージの数" value={chips.single ? 'single' : chips.multiple ? 'multiple' : 'all'}
+        onChange={value => setChips(current => ({ ...current, single: value === 'single', multiple: value === 'multiple' }))}
+        options={[{ value: 'all', label: 'すべて' }, { value: 'single', label: '1通のみ' }, { value: 'multiple', label: '複数通' }]} />
       <FilterChip selected={chips.variables} onChange={() => toggleChip('variables')} title="名前や情報を差し込むテンプレート" icon={<Braces size={16} aria-hidden="true" />}>
         差し込みあり
       </FilterChip>

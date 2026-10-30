@@ -65,11 +65,13 @@ const state = {
   ],
 }
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   class ApiError extends Error {}
   return {
+    ...actual,
     ApiError,
-    fetchApi: vi.fn(),
+    fetchApi: vi.fn().mockResolvedValue({ success: true, data: [] }),
     api: {
       staff: {
         list: async () => ({ success: true, data: state.members }),
@@ -106,7 +108,7 @@ async function mount() {
   await waitFor(() => expect(list().getByText('山田 太郎')).toBeTruthy())
 }
 
-const list = () => within(screen.getByRole('table', { name: 'いまいる人の一覧' }))
+const list = () => within(screen.getByRole('table', { name: 'ユーザーの一覧' }))
 
 function searchBox(): HTMLElement {
   return screen.getByRole('searchbox', { name: '名前・メールで探す' })
@@ -123,7 +125,7 @@ describe('ログインユーザー検索 (#620)', () => {
     await mount()
     typeQuery('存在しない語zzz')
     await waitFor(() => expect(screen.getByText(EMPTY_MESSAGE)).toBeTruthy())
-    expect(screen.getByText('ログインユーザー 0 人中 0 人を表示')).toBeTruthy()
+    expect(screen.getByText('ユーザー 0 人中 0 人を表示')).toBeTruthy()
     expect(list().queryByText('山田 太郎')).toBeNull()
     expect(list().queryByText('佐藤 花子')).toBeNull()
   })
@@ -131,7 +133,7 @@ describe('ログインユーザー検索 (#620)', () => {
   it('名前・メールの部分一致は従来どおり効く', async () => {
     await mount()
     typeQuery('山田')
-    await waitFor(() => expect(screen.getByText('ログインユーザー 1 人中 1 人を表示')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('ユーザー 1 人中 1 人を表示')).toBeTruthy())
     expect(list().getByText('山田 太郎')).toBeTruthy()
     expect(list().queryByText('佐藤 花子')).toBeNull()
 
@@ -146,13 +148,13 @@ describe('ログインユーザー検索 (#620)', () => {
     // 「花子 x-sato」のような跨ぎ語でも行を返していた。
     typeQuery('花子 x-sato')
     await waitFor(() => expect(screen.getByText(EMPTY_MESSAGE)).toBeTruthy())
-    expect(screen.getByText('ログインユーザー 0 人中 0 人を表示')).toBeTruthy()
+    expect(screen.getByText('ユーザー 0 人中 0 人を表示')).toBeTruthy()
   })
 
   it('空白だけの検索語は絞り込みなしとして全件を返す', async () => {
     await mount()
     typeQuery('  　 ')
-    await waitFor(() => expect(screen.getByText('ログインユーザー 3 人中 3 人を表示')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('ユーザー 3 人中 3 人を表示')).toBeTruthy())
     expect(screen.queryByText(EMPTY_MESSAGE)).toBeNull()
   })
 
@@ -160,7 +162,7 @@ describe('ログインユーザー検索 (#620)', () => {
     await mount()
     typeQuery('な'.repeat(2000))
     await waitFor(() => expect(screen.getByText(EMPTY_MESSAGE)).toBeTruthy())
-    expect(screen.getByText('ログインユーザー 0 人中 0 人を表示')).toBeTruthy()
+    expect(screen.getByText('ユーザー 0 人中 0 人を表示')).toBeTruthy()
   })
 
   it('検索語を消すと全件へ戻る', async () => {
@@ -168,7 +170,7 @@ describe('ログインユーザー検索 (#620)', () => {
     typeQuery('存在しない語zzz')
     await waitFor(() => expect(screen.getByText(EMPTY_MESSAGE)).toBeTruthy())
     typeQuery('')
-    await waitFor(() => expect(screen.getByText('ログインユーザー 3 人中 3 人を表示')).toBeTruthy())
+    await waitFor(() => expect(screen.getByText('ユーザー 3 人中 3 人を表示')).toBeTruthy())
     expect(list().getByText('山田 太郎')).toBeTruthy()
     expect(list().getByText('佐藤 花子')).toBeTruthy()
   })

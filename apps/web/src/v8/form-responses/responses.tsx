@@ -1,4 +1,5 @@
 'use client'
+import { DetailPreview, DetailSection, DetailFields } from '@/components/shared/detail-content'
 import { classifyApiFailure } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
@@ -387,29 +388,38 @@ function Responses() {
   const longKey = fieldKeys.find((key) => blockByKey(key)?.type === 'textarea'
     && items.some((item) => String((item.data as Record<string, unknown>)[key] ?? '').trim() !== ''))
 
+  const responseSelection = view === 'rows' ? selected : null
   const rail = (
-    <div className={styles.rail}>
+    <DetailPreview title={view === 'rows' && selected ? `回答の詳細：${selected.friendName ?? '不明'}` : '回答の絞り込み'}
+      actions={{
+        menuLabel: '回答の詳細の操作',
+        primary: responseSelection && incompleteOf(responseSelection) === true ? <Button variant="primary" onClick={() => { if (canRetry) void retryPostActions(responseSelection) }} disabled={retrying} busy={retrying} busyLabel="再実行中…"><RotateCw size={16} aria-hidden="true" />後処理をやり直す</Button> : responseSelection?.friendId ? <Button variant="primary" href={`/chats?friend=${encodeURIComponent(responseSelection.friendId)}`}><User size={16} aria-hidden="true" />友だちを開く</Button> : null,
+        primaryAllowed: responseSelection && incompleteOf(responseSelection) === true ? canRetry : undefined,
+        secondary: <Button variant="secondary" onClick={() => void exportAll()} disabled={exporting || total === 0} busy={exporting} busyLabel="書き出し中…" title={exportProgress || undefined} widthReserve="idle"><Download size={16} aria-hidden="true" />CSVで書き出す</Button>,
+        menuItems: [
+          {id: 'edit-form', label: 'フォームを編集', href: `/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`, allowed: canEditForm},
+          ...(responseSelection?.friendId && incompleteOf(responseSelection) === true ? [{id: 'friend', label: '友だちを開く', href: `/chats?friend=${encodeURIComponent(responseSelection.friendId)}`}] : []),
+          ...(responseSelection ? [{id: 'delete-response', label: '回答を削除する', tone: 'danger' as const, allowed: canDeleteResponse, onSelect: () => { if (canDeleteResponse) openDeletion(responseSelection) }}] : []),
+        ],
+      }}>
       {view === 'rows' && selected ? (
-        <Card variant="aside" gap="var(--polish-space-row)" aria-label={`回答の詳細：${selected.friendName ?? '不明'}`}>
-          <div className={styles.railHead}>
-            <h2 className={styles.railTitle}>{`回答の詳細：${selected.friendName ?? '不明'}`}</h2>
-            {canDeleteResponse ? <RowMenu label="回答の詳細の操作" items={[{ id: 'delete-response', label: '回答を削除する', tone: 'danger', onSelect: () => openDeletion(selected) }]} /> : null}
-          </div>
-          <dl className={styles.detailList}>
-            <div className={styles.detailRow}>
+        <DetailSection label={`回答の詳細：${selected.friendName ?? '不明'}`}>
+
+          <DetailFields>
+            <div>
               <dt>答えた日時</dt>
               <dd>{shortWhen(selected.createdAt)}</dd>
             </div>
             {fieldKeys.map((key) => {
               const value = valueText((selected.data as Record<string, unknown>)[key], blockByKey(key))
               return (
-                <div key={key} className={styles.detailRow}>
+                <div key={key}>
                   <dt title={labels[key] ?? key}>{labels[key] ?? key}</dt>
                   <dd title={value}>{blockByKey(key)?.type === 'rating' && value !== '—' ? `★${value}` : <FormFileAttachments value={(selected.data as Record<string, unknown>)[key]} block={blockByKey(key)} />}</dd>
                 </div>
               )
             })}
-          </dl>
+          </DetailFields>
           <p className={styles.railLabel}>後処理</p>
           {selected.postActions == null || selected.postActions.state === 'untracked' ? (
             <p className={styles.railNote}>この回答には後処理の記録がありません</p>
@@ -426,28 +436,14 @@ function Responses() {
             </ul>
           )}
           {retryError ? <p className={styles.error}>{retryError}</p> : null}
-          <div className={styles.railButtons}>
-            {canRetry && incompleteOf(selected) === true ? (
-              <Button variant="primary" onClick={() => void retryPostActions(selected)} disabled={retrying} busy={retrying} busyLabel="再実行しています">
-                <RotateCw size={16} aria-hidden="true" />後処理をやり直す
-              </Button>
-            ) : null}
-            {selected.friendId ? (
-              <Button href={`/chats?friend=${encodeURIComponent(selected.friendId)}`}><User size={16} aria-hidden="true" />友だちを開く</Button>
-            ) : null}
-          </div>
-        </Card>
+
+        </DetailSection>
       ) : null}
-      <div className={styles.railButtonsWide}>
-        {canEditForm ? <Button href={`/form-submissions/edit?id=${encodeURIComponent(form.id)}&tab=basic`}><Pencil size={16} aria-hidden="true" />フォームを編集</Button> : null}
-        <Button onClick={() => void exportAll()} disabled={exporting || total === 0} busy={exporting} busyLabel={exportProgress || 'CSVを準備しています'} widthReserve="idle">
-          <Download size={16} aria-hidden="true" />CSVで書き出す
-        </Button>
-      </div>
+
       {exportError ? <p className={styles.error}>{exportError}</p> : null}
       {exporting && exportProgress ? <p className={styles.railNote} role="status">{exportProgress}</p> : null}
-      <Card variant="aside" aria-labelledby="fr-filter">
-        <CardHeader size="stacked" title="絞り込み" titleId="fr-filter" meta={total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`} />
+      <DetailSection title="絞り込み">
+        <p className={styles.railNote}>{total === null ? emptyValue('unknown') : `全 ${formatNumber(total)}件から、名前と答えで探します`}</p>
         <SegmentedControl
           aria-label="集計する期間"
           value={period}
@@ -455,8 +451,8 @@ function Responses() {
           options={([['this_month', '今月'], ['last_month', '先月'], ['all', 'すべて']] as const).map(([value, label]) => ({ value, label }))}
         />
         <ListToolbar searchSlot={<SaveErrorField names={["query"]}><SearchField updateMode="immediate" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・答えで探す（全件から）" aria-label="名前・答えで探す（全件から）" /></SaveErrorField>} />
-      </Card>
-    </div>
+      </DetailSection>
+    </DetailPreview>
   )
 
   return (
@@ -478,7 +474,7 @@ function Responses() {
       )}
     >
       {!canEditForm && !canRetry ? <ReadOnlyNotice >閲覧のみで見ています。フォームの編集や後処理の再実行には変更権限が必要です。</ReadOnlyNotice> : null}
-      <DetailColumns aside={rail} asideLabel="回答の詳細・絞り込み" expanded={asideExpanded} onExpandedChange={setAsideExpanded}>
+      <DetailColumns asideLayout="detail" aside={rail} asideLabel="回答の詳細・絞り込み" expanded={asideExpanded} onExpandedChange={setAsideExpanded}>
           {total === 0 && !query.trim() ? (
             <ListState kind="empty" title="まだ回答がありません" description="フォームが回答されると、ここに1件ずつ並びます。" />
           ) : view === 'summary' ? (

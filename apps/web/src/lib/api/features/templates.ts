@@ -53,6 +53,7 @@ export const templatesMethods = {
       folderId?: string;
       quick?: 'frequent' | 'reservation' | 'ec';
       messageType?: string;
+      textOnly?: boolean;
       page?: number;
       limit?: number;
       folderCounts?: boolean;
@@ -63,6 +64,7 @@ export const templatesMethods = {
       if (params.folderId) query.set('folder_id', params.folderId)
       if (params.quick) query.set('quick', params.quick)
       if (params.messageType) query.set('message_type', params.messageType)
+      if (params.textOnly) query.set('text_only', '1')
       query.set('page', String(params.page ?? 1))
       query.set('limit', String(params.limit ?? 100))
       if (params.folderCounts) query.set('folder_counts', '1')

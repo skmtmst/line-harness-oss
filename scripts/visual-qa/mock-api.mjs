@@ -1,3 +1,4 @@
+import { RESTAURANT_LINE_FLOWS, restaurantFollowupRead } from './mock-restaurant-followup.mjs'
 import { templateFolderList } from './mock-template-folders.mjs'
 import {seatBoardEntry} from '../../packages/shared/dist/reservation-board.js'
 import {DEFAULT_CUSTOMER_LOOK} from '../../packages/shared/dist/customer-look.js'
@@ -1447,16 +1448,7 @@ const RESTAURANT_SNAPSHOT = {
     { id: 'post-1', store_id: 'store-sby', post_type: 'standard', title: '週末ランチ始めました', body: '土日限定のランチコースをご用意しています。', status: 'draft', scheduled_at: null },
     { id: 'post-2', store_id: 'store-sby', post_type: 'event', title: '臨時休業のお知らせ', body: '設備点検のため休業します。', status: 'pending', scheduled_at: null },
   ],
-  lineFlows: [
-    /* 種別は本物（rt_line_flows の flow_type）と同じ。文は ★V8 LINE来店フォロー（xLpnS）の絵どおり。 */
-    { id: 'flow-1', store_id: null, flow_type: 'reservation_24h', title: '明日 19:00 にお待ちしております', body: 'ご予約内容の確認・変更はこちらから。アレルギーがあればお知らせください。', timing_minutes: -1440, is_enabled: 1, delivery_mode: 'preview_only' },
-    { id: 'flow-2', store_id: null, flow_type: 'reservation_2h', title: '本日のご来店をお待ちしております', body: 'お店までの道順と、駐車場のご案内です。', timing_minutes: -120, is_enabled: 1, delivery_mode: 'preview_only' },
-    { id: 'flow-3', store_id: null, flow_type: 'post_visit', title: '本日はありがとうございました', body: '次回使えるデザートのサービス券をお送りします。', timing_minutes: 180, is_enabled: 0, delivery_mode: 'preview_only' },
-    { id: 'flow-4', store_id: null, flow_type: 'review_request', title: 'よろしければご感想をお聞かせください', body: 'Google の口コミに書いていただけるとうれしいです。', timing_minutes: 1440, is_enabled: 0, delivery_mode: 'preview_only' },
-    /* 融合の板 n9vvGx の「会員証」「ワンタップ予約」（常設）。 */
-    { id: 'flow-5', store_id: null, flow_type: 'member_card', title: 'デジタル会員証', body: 'スタンプカードと来店履歴を見られます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
-    { id: 'flow-6', store_id: null, flow_type: 'one_tap_booking', title: '前回と同じ内容で予約', body: '店舗・人数・コースを前回と同じにして予約できます。', timing_minutes: null, is_enabled: 0, delivery_mode: 'preview_only' },
-  ],
+  lineFlows: RESTAURANT_LINE_FLOWS,
 }
 /*
  * 飲食店向け Googleビジネス（`restaurantGoogleApi`・`/api/restaurant-test/google/*`）。
@@ -3030,6 +3022,7 @@ function gapuiCWrite(method, pathname, query) {
 }
 
 function bodyFor(method, pathname, query = new URLSearchParams()) {
+  { const followup = restaurantFollowupRead(method, pathname); if (followup) return followup }
   { const gapuiC = gapuiCRead(method, pathname, query); if (gapuiC) return gapuiC }
   { const ab = broadcastAbRead(method, pathname); if (ab) return ab }
   { const style = styleSetupRead(method, pathname, query); if (style) return style }

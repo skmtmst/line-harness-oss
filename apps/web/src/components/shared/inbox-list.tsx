@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import Button from './button'
 import type { HTMLAttributes } from 'react'
 import styles from './inbox-list.module.css'
+import { Star } from 'lucide-react'
 
 type PartProps = HTMLAttributes<HTMLDivElement>
 /** 絞り込みの動きは画面が渡し、受信箱の列の並びはここが持つ。 */
@@ -17,6 +18,11 @@ export function InboxSortSlot({ changed, ...props }: PartProps & { changed: bool
 /** LINEとメールで同じ名前の表示。未読は名前だけを強くし、全文はtitleに残す。 */
 export function InboxListName({ name, unread, id }: { name: string; unread: boolean; id?: string }) {
   return <p id={id} data-inbox-name data-unread={unread || undefined} className={`text-ink text-sm ${styles.name}`} title={name}>{name}</p>
+}
+
+/** 友だちと共通の注目印。行を開く操作の内側なので、ここは表示だけにする。 */
+export function InboxListAttention({ on, id }: { on?: boolean; id?: string }) {
+  return on ? <Star id={id} size={16} role="img" aria-label="注目" className={styles.attention}><title>注目</title></Star> : null
 }
 
 /** 会話・メール・古い本文の取得は画面が持ち、続きを読む操作の形は共通で持つ。 */

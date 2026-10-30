@@ -56,7 +56,12 @@ beforeEach(() => {
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
 const next = () => fireEvent.click(screen.getByRole('button', { name: '次へ' }))
 /** ②の中だけ進むボタンの名前が違う（v07 Fqy29）。 */
-const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
+const nextStep = () => {
+  fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
+  if (screen.queryAllByText(/正しければ「次のステップへ」をもう一度押して進めます。/).length) {
+    fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))
+  }
+}
 const ack = (name: string) => fireEvent.click(screen.getByRole('checkbox', { name }))
 const pick = (name: string) => fireEvent.click(screen.getByRole('radio', { name }))
 

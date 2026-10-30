@@ -1,3 +1,4 @@
+import { seedExistingRestaurantFollowup } from '../test-utils/restaurant-followup-fixture.js';
 import { Hono } from 'hono';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
@@ -125,7 +126,9 @@ describe('private data deletion', () => {
   it('deletes restaurant confirmations and source jobs only for the target friend',async()=>{
     sqlite.raw.exec(`INSERT INTO rt_organizations(id,account_id,name,tenant_id) VALUES('org','a','Restaurant','t');
       INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','Store','S','a');
-      INSERT INTO scenario_versions(id,scenario_id,version_number,published_at,created_at,updated_at) VALUES('version','restaurant-followup:store',1,'now','now','now');`);
+      `);
+    seedExistingRestaurantFollowup(sqlite,'store');
+    sqlite.raw.exec("INSERT INTO scenario_versions(id,scenario_id,version_number,published_at,created_at,updated_at) VALUES('version','restaurant-followup:store',1,'now','now','now');");
     for(const friend of ['u','v']){
       sqlite.raw.prepare("INSERT INTO rt_reservations(id,store_id,source,customer_name,guest_count,starts_at,ends_at,status) VALUES(?,'store','phone','人',2,'2027-01-01T00:00:00Z','2027-01-01T01:00:00Z','pending')").run('r-'+friend);
       sqlite.raw.prepare("INSERT INTO rt_reservation_confirmations(request_id,reservation_id,reservation_version,friend_id,requested_at,expires_at) VALUES(?,?,1,?,'now','later')").run('c-'+friend,'r-'+friend,friend);
