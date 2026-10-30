@@ -1,4 +1,5 @@
 'use client'
+import { DetailFields, DetailSection } from './detail-content'
 
 import { jstCalendar as japanCalendar } from '@/lib/jst-datetime'
 import { jstDate as japanDate } from '@/lib/jst-datetime'
@@ -37,9 +38,15 @@ const axisName={resource:'時間',floor:'座席表',list:'一覧',month:'月'}
 export function ReservationDetailsActions({children}:{children:ReactNode}){return <div className={styles.detailActions}>{children}</div>}
 /** 既存の凡例の入口も状態だけを表す。 */
 export function ReservationLegend({items,label='予約の状態'}:{items:Array<{label:string;tone:'info'|'warning'|'success'|'neutral'|'danger'}>;label?:string}){return <span className={styles.legendInline} role="list" aria-label={label}>{items.map(item=><span key={item.label} role="listitem"><BookingLegendItem state={item.tone==='success'?'active':item.tone==='warning'?'pending':item.tone==='danger'?'attention':item.tone==='neutral'?'completed':'confirmed'}>{item.label}</BookingLegendItem></span>)}</span>}
-export function ReservationFacts({items}:{items:Array<{label:string;value:ReactNode}>}){return <dl className={styles.facts}>{items.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>}
-export function ReservationDining({entry,dense=false}:{entry:ReservationBoardEntry;dense?:boolean}) {
- if(dense)return <div className={styles.denseDining}><strong>飲食（顧客情報と同じ段）</strong><ReservationFacts items={[{label:'アレルギー',value:entry.dining?.allergy||entry.currentAllergy?<StatusBadge size="dining" tone="info" surface="white">{entry.dining?.allergy||entry.currentAllergy}</StatusBadge>:'—'},{label:'記念日',value:entry.dining?.anniversary||'—'},...(entry.dining?.seatPreference?[{label:'席の好み',value:entry.dining.seatPreference}]:[]),...(entry.dining?.courseAllergens?.length?[{label:'コースの注意',value:entry.dining.courseAllergens.join('・')}]:[]),...(entry.currentAllergy&&entry.dining?.allergy&&entry.currentAllergy!==entry.dining.allergy?[{label:'今回の注意',value:entry.currentAllergy}]:[])]}/></div>
+export function ReservationFacts({items,presentation}:{items:Array<{label:string;value:ReactNode}>;presentation?:'detail'}){
+ if(presentation==='detail')return <DetailFields>{items.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</DetailFields>
+ return <dl className={styles.facts}>{items.map(item=><div key={item.label}><dt>{item.label}</dt><dd>{item.value}</dd></div>)}</dl>
+}
+export function ReservationDining({entry,dense=false,presentation}:{entry:ReservationBoardEntry;dense?:boolean;presentation?:'detail'}) {
+ if(dense){
+ const facts=<ReservationFacts presentation={presentation} items={[{label:'アレルギー',value:entry.dining?.allergy||entry.currentAllergy?<StatusBadge size="dining" tone="info" surface="white">{entry.dining?.allergy||entry.currentAllergy}</StatusBadge>:'—'},{label:'記念日',value:entry.dining?.anniversary||'—'},...(entry.dining?.seatPreference?[{label:'席の好み',value:entry.dining.seatPreference}]:[]),...(entry.dining?.courseAllergens?.length?[{label:'コースの注意',value:entry.dining.courseAllergens.join('・')}]:[]),...(entry.currentAllergy&&entry.dining?.allergy&&entry.currentAllergy!==entry.dining.allergy?[{label:'今回の注意',value:entry.currentAllergy}]:[])]}/>
+ return presentation==='detail'?<DetailSection title="飲食">{facts}</DetailSection>:<div className={styles.denseDining}><strong>飲食（顧客情報と同じ段）</strong>{facts}</div>
+ }
  return <div className={styles.dining}><strong>飲食</strong><dl>
  <div><dt>今回の注意</dt><dd>{entry.currentAllergy??'—'}</dd></div>
  <div><dt>アレルギー</dt><dd>{entry.dining?.allergy??'—'}</dd></div>
