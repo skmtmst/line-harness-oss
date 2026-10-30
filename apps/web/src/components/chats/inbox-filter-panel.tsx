@@ -1,5 +1,6 @@
 'use client'
 
+import { UNASSIGNED, unreadLookup } from '@/components/chats/assignee-unread'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import type { ChatStatus } from './inbox-dropdown'
 import { useOverlayFocus } from '@/components/shared/overlay-utils'
@@ -54,6 +55,8 @@ export default function InboxFilterPanel({
   value,
   operators,
   unassignedUnreadCount = null,
+  assigneeUnread = null,
+  assigneeUnreadStatus = 'loading',
   slaEnabled = false,
   emailInboxEnabled = true,
   auxiliaryActions,
@@ -66,6 +69,9 @@ export default function InboxFilterPanel({
   operators: { id: string; name: string }[]
   /** 未取得・取得失敗は null。取得済みの0件とは区別する。 */
   unassignedUnreadCount?: number | null
+  /** 担当者ごとの未読数。未取得・失敗時は名前の後ろを「—」にする。 */
+  assigneeUnread?: { operatorId: string | null; unread: number }[] | null
+  assigneeUnreadStatus?: 'error' | 'ready' | 'loading'
   /** 実際の対応期限を使う場合は「期限超過」、それ以外は「1時間以上待ち」。 */
   slaEnabled?: boolean
   emailInboxEnabled?: boolean
@@ -84,6 +90,8 @@ export default function InboxFilterPanel({
 
   if (!open) return null
   const set = (patch: Partial<InboxFilterValue>) => onChange({ ...value, ...patch })
+  const unassignedCount = unassignedUnreadCount ?? (assigneeUnreadStatus === 'error' ? null : unreadLookup(assigneeUnread)(UNASSIGNED))
+  const unassignedDescription = unassignedCount === null ? '未読 —' : `未読 ${unassignedCount}件`
 
   return (
     <div className="fixed inset-0 z-50" role="presentation">
@@ -133,13 +141,17 @@ export default function InboxFilterPanel({
             <span className={labelClass}>担当</span>
             <div className="mt-1.5">
               <EntitySelect clearable size="full"
-                aria-label="担当者で絞り込む（パネル）"
+                aria-label="担当者で絞り込む"
                 placeholder="すべて"
                 value={value.assignee === 'all' ? '' : value.assignee}
                 onChange={(next) => set({ assignee: next || 'all' })}
                 options={[
-                  { value: 'unassigned', label: '未割り当て', description: unassignedUnreadCount === null ? '未読 —' : `未読 ${unassignedUnreadCount}件` },
-                  ...operators.map((operator) => ({ ...entityOptionMetadata(operator), value: operator.id, label: operator.name })),
+                  { value: 'unassigned', label: '未割り当て', description: unassignedDescription },
+                  ...operators.map((operator) => {
+                    // 未読数は集計の口から渡す。画面の行から数えない（ページ送りで落ちる）。
+                    const unread = assigneeUnreadStatus === 'error' ? null : unreadLookup(assigneeUnread)(operator.id)
+                    return { ...entityOptionMetadata(operator), value: operator.id, label: `${operator.name}（${unread === null ? '—' : unread}）` }
+                  }),
                 ]}
                 className="w-full"
               />
