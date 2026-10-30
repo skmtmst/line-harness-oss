@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
@@ -10,7 +11,7 @@ import { compileUiStyles } from './compile-ui-styles.mjs'
 const require = createRequire(import.meta.url)
 const fromVitest = createRequire(require.resolve('vitest/package.json'))
 const { build } = createRequire(fromVitest.resolve('vite'))('esbuild')
-const webRoot = new URL('../..', import.meta.url).pathname
+const webRoot = fileURLToPath(new URL('../..', import.meta.url))
 const bundle = await build({
   stdin: { resolveDir: webRoot, loader: 'tsx', contents: `
     import React from 'react';

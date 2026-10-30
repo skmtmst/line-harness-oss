@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, mkdirSync } from 'node:fs'
@@ -13,7 +14,7 @@ const require = createRequire(import.meta.url)
 const fromVitest = createRequire(require.resolve('vitest/package.json'))
 const { build } = createRequire(fromVitest.resolve('vite'))('esbuild')
 
-const webRoot = new URL('../..', import.meta.url).pathname
+const webRoot = fileURLToPath(new URL('../..', import.meta.url))
 const sheets = new Set()
 const compiled = await build({
   stdin: { resolveDir: webRoot, loader: 'tsx', contents: `
@@ -192,7 +193,7 @@ function Fixture(){
     b.onLoad({ filter: /\.css$/ }, args => { sheets.add(readFileSync(args.path, 'utf8')); return { contents: '', loader: 'js' } })
   } }],
 })
-const globals = await compileUiStyles(new URL('../../src/app/globals.css', import.meta.url).pathname, ['fixed', 'min-w-0'])
+const globals = await compileUiStyles(fileURLToPath(new URL('../../src/app/globals.css', import.meta.url)), ['fixed', 'min-w-0'])
 const css = [globals, ...sheets].join('\n').replace(/:global\(([^()]*)\)/g, '$1')
 
 async function mount(page, width, inputReasonFault = false) {

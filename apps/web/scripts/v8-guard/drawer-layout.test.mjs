@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -5,7 +6,7 @@ import { connectGuardBrowser } from './browser-session.mjs'
 import { compileUiStyles } from './compile-ui-styles.mjs'
 import { scanDrawerLayout } from './drawer-layout-browser.mjs'
 
-const globals = await compileUiStyles(new URL('../../src/app/globals.css', import.meta.url).pathname)
+const globals = await compileUiStyles(fileURLToPath(new URL('../../src/app/globals.css', import.meta.url)))
 const drawer = readFileSync(new URL('../../src/components/shared/drawer.module.css', import.meta.url), 'utf8')
 for (const width of [1152, 1440, 1920]) {
   test(`full-height drawer keeps footer visible for short and long content at ${width}`, async () => {
