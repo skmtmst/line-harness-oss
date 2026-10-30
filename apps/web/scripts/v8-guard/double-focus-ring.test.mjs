@@ -17,17 +17,22 @@ import {AffixedTextField} from './src/components/shared/text-field';
 import Combobox from './src/components/shared/combobox';
 import SearchField from './src/components/shared/search-field';
 import CheckCard from './src/components/shared/check-card';
+import RadioCard from './src/components/shared/radio-card';
 import Checkbox from './src/components/shared/checkbox';
 import TimeFieldV8 from './src/components/shared/time-field-v8';
 import {InboxInputBox,InboxDraftArea} from './src/components/shared/inbox-composer';
-import {MessageBody} from './src/components/shared/message-insert-row';
+import InsertTextField from './src/components/shared/insert-text-field';
+import {MessageBody,MessageInsertButton} from './src/components/shared/message-insert-row';
 function Case({id,expect,color,children}){return <div data-case={id} data-expect={expect} data-color={color} style={{margin:'8px 0'}}>{children}</div>}
 function Fixture(){return <main>
 <Case id="inbox-ok" expect="1" color="blue"><InboxInputBox><InboxDraftArea aria-label="返信" value="" onChange={()=>{}} /></InboxInputBox></Case>
 <Case id="inbox-bad" expect="1" color="red"><InboxInputBox><InboxDraftArea aria-label="返信誤" value="" onChange={()=>{}} aria-invalid="true" /></InboxInputBox></Case>
 <Case id="msgbody-ok" expect="1" color="blue"><MessageBody><textarea aria-label="本文" value="" onChange={()=>{}} /></MessageBody></Case>
 <Case id="msgbody-bad" expect="1" color="red"><MessageBody><textarea aria-label="本文誤" value="" onChange={()=>{}} aria-invalid="true" /></MessageBody></Case>
-<Case id="msgbody-btn-ok" expect="1" color="blue"><MessageBody><button type="button">差し込む</button></MessageBody></Case>
+<Case id="msgbody-insert-ok" expect="1" color="blue"><MessageBody><InsertTextField aria-label="差し込み本文" value="" onValueChange={()=>{}} /></MessageBody></Case>
+<Case id="msgbody-insert-bad" expect="1" color="red"><MessageBody><InsertTextField aria-label="差し込み本文誤" value="" onValueChange={()=>{}} aria-invalid="true" /></MessageBody></Case>
+<Case id="msgbody-btn-ok" expect="1" color="blue"><MessageBody><MessageInsertButton kind="name" label="名前" onClick={()=>{}} /></MessageBody></Case>
+<Case id="msgbody-btn-locked" expect="1" color="blue"><MessageBody><MessageInsertButton kind="name" label="名前を差し込む" onClick={()=>{}} lockedReason="閲覧のみです" /></MessageBody></Case>
 <Case id="affix-ok" expect="1" color="blue"><AffixedTextField aria-label="金額" startAdornment="¥" value="" onChange={()=>{}} /></Case>
 <Case id="affix-bad" expect="1" color="red"><AffixedTextField aria-label="金額誤" startAdornment="¥" value="" onChange={()=>{}} invalid /></Case>
 <Case id="time-ok" expect="1" color="blue"><TimeFieldV8 value="" onChange={()=>{}} aria-label="時刻" /></Case>
@@ -37,6 +42,8 @@ function Fixture(){return <main>
 <Case id="card-bad" expect="1" color="red"><CheckCard checked={false} onChange={()=>{}} title="止める" invalid /></Case>
 <Case id="combo-ok" expect="1" color="blue"><Combobox aria-label="品目" options={[{value:'a',label:'あ'}]} value="" onChange={()=>{}} /></Case>
 <Case id="search-ok" expect="1" color="blue"><SearchField aria-label="探す" value="" onChange={()=>{}} /></Case>
+<Case id="radio-card-ok" color="blue"><RadioCard name="radio-ok" value="x" checked={false} title="前日" onChange={()=>{}} /></Case>
+<Case id="radio-card-bad" color="red"><RadioCard name="radio-bad" value="x" checked={false} title="当日" onChange={()=>{}} invalid /></Case>
 </main>}
 createRoot(document.getElementById('root')).render(<Fixture/>);`},
  bundle:true,write:false,platform:'browser',format:'iife',jsx:'automatic',tsconfig: webRoot+'/tsconfig.json',define:{'process.env.NODE_ENV':'"production"'},banner:{js:'var process=typeof process!=="undefined"?process:{env:{NODE_ENV:"production",NEXT_PUBLIC_API_URL:"http://127.0.0.1:8788"}};'},
@@ -81,14 +88,19 @@ const RINGS = () => {
       rings.push(`${el.tagName.toLowerCase()}.${(el.className.baseVal !== undefined ? '' : String(el.className)).split(' ')[0]}:${c.outlineColor}`)
     }
   }
-  return { id: host.getAttribute('data-case'), color: host.getAttribute('data-color'), rings }
+  const body = host.querySelector('[data-message-body]')
+  const outer = body && getComputedStyle(body)
+  const focus = getComputedStyle(active)
+  return { id: host.getAttribute('data-case'), color: host.getAttribute('data-color'), rings,
+    buttonFocused: active.matches('button'), outerWidth: outer?.outlineWidth, outerStyle: outer?.outlineStyle,
+    activeWidth: focus.outlineWidth, activeStyle: focus.outlineStyle }
 }
-test('箱で囲んだ入力は焦点の輪1本だけ（二重輪なし）', async () => {
+for (const width of [1152, 1440]) test(`箱で囲んだ入力は焦点の輪1本だけ（二重輪なし） ${width}`, async () => {
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     page.on('pageerror', (e) => console.log('PAGEERROR:', String(e && e.stack || e).slice(0, 800)))
-    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.setViewportSize({ width, height: 900 })
     await page.setContent(`<html data-theme="v8"><style>${css}main{padding:32px}body{background:#f2f3f5}</style><div id="root"></div></html>`)
     await page.addScriptTag({ content: compiled.outputFiles[0].text })
     await page.locator('[data-case]').first().waitFor()
@@ -121,6 +133,12 @@ test('箱で囲んだ入力は焦点の輪1本だけ（二重輪なし）', asyn
       const want = r.color === 'red' ? RED : r.color === 'green' ? GREEN : BLUE
       if (r.rings.length !== 1) bad.push(`${r.id}: 輪は1本だけ（${r.rings.join(' / ') || 'なし'}）`)
       else if (!r.rings[0].endsWith(want)) bad.push(`${r.id}: 輪は${r.color}（${r.rings[0]}）`)
+    }
+    for (const r of results.filter(r => r.id.startsWith('msgbody-btn-'))) {
+      assert.equal(r.buttonFocused, true, `${r.id}: 差し込みボタンに焦点がある`)
+      assert.equal(r.outerStyle, 'none', `${r.id}: 外枠には輪を出さない`)
+      assert.equal(r.activeStyle, 'solid', `${r.id}: ボタン自身の輪を残す`)
+      assert.equal(r.activeWidth, '2px', `${r.id}: ボタン自身の輪は共通の太さ`)
     }
     assert.equal(bad.length, 0, `二重輪あり:\n${bad.join('\n')}`)
   } finally { await browser.close() }

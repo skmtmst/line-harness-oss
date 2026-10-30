@@ -1,7 +1,7 @@
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { compileUiStyles } from './compile-ui-styles.mjs'
@@ -18,12 +18,14 @@ import Select from './src/components/shared/select';
 import DateField from './src/components/shared/date-field';
 import SearchField from './src/components/shared/search-field';
 import Checkbox from './src/components/shared/checkbox';
+import OtpInput from './src/components/shared/otp-input';
+import InsertTextField from './src/components/shared/insert-text-field';
 import Combobox from './src/components/shared/combobox';
 import TagPickerField from './src/components/shared/tag-picker-field';
 import CheckCard from './src/components/shared/check-card';
 import FileDropzone from './src/components/shared/file-drop';
 import fsStyles from './src/components/shared/folder-select.module.css';
-function Case({id,expect,ring,children}){return <div data-case={id} data-expect={expect} data-ring={ring} style={{margin:'8px 0'}}>{children}</div>}
+function Case({id,expect,ring,children}){return <div data-case={id} data-expect={expect} data-ring={ring} style={{margin:'8px 0',padding:'8px'}}>{children}</div>}
 function Fixture(){return <main>
 <Case id="tf-ok" expect="blue" ring="self"><TextField aria-label="姓" value="" onChange={()=>{}} /></Case>
 <Case id="tf-bad" expect="red" ring="self"><TextField aria-label="名" value="" onChange={()=>{}} invalid /></Case>
@@ -43,8 +45,18 @@ function Fixture(){return <main>
 <Case id="tag-bad" expect="red" ring="self"><TagPickerField label="札直し" value={[]} onChange={()=>{}} options={[{id:'t',name:'検'}]} accountId={null} invalid /></Case>
 <Case id="card-ok" expect="blue" ring="card"><CheckCard checked={false} onChange={()=>{}} title="送る" /></Case>
 <Case id="card-bad" expect="red" ring="card"><CheckCard checked={false} onChange={()=>{}} title="止める" invalid /></Case>
+<Case id="cardwindow-ok" expect="blue" ring="card"><div data-window-body><CheckCard checked={false} onChange={()=>{}} title="窓で送る" /></div></Case>
+<Case id="cardwindow-bad" expect="red" ring="card"><div data-window-body><CheckCard checked={false} onChange={()=>{}} title="窓で止める" invalid /></div></Case>
 <Case id="drop-ok" expect="blue" ring="self"><FileDropzone variant="upload" aria-label="置く" onFiles={()=>{}} /></Case>
 <Case id="drop-bad" expect="red" ring="self"><FileDropzone variant="upload" aria-label="足す" onFiles={()=>{}} invalid /></Case>
+<Case id="composer-ok" expect="blue" ring="self"><FileDropzone variant="composer" title="ファイルを追加" aria-label="添付" onFiles={()=>{}} /></Case>
+<Case id="composer-bad" expect="red" ring="self"><FileDropzone variant="composer" title="ファイルを追加" aria-label="添付誤" onFiles={()=>{}} invalid /></Case>
+<Case id="otp-ok" expect="blue" ring="self"><OtpInput label="確認コード" value="123456" onChange={()=>{}} /></Case>
+<Case id="otp-bad" expect="red" ring="self"><OtpInput label="確認コード誤" value="123456" onChange={()=>{}} invalid /></Case>
+<Case id="insert-ok" expect="blue" ring="self"><InsertTextField aria-label="差し込み本文" value="" onValueChange={()=>{}} /></Case>
+<Case id="insert-bad" expect="red" ring="self"><InsertTextField aria-label="差し込み本文誤" value="" onValueChange={()=>{}} aria-invalid="true" /></Case>
+<Case id="insertcompact-ok" expect="blue" ring="self"><InsertTextField compact aria-label="短い本文" value="" onValueChange={()=>{}} /></Case>
+<Case id="insertcompact-bad" expect="red" ring="self"><InsertTextField compact aria-label="短い本文誤" value="" onValueChange={()=>{}} aria-invalid="true" /></Case>
 <Case id="fs-ok" expect="blue" ring="self"><input type="text" aria-label="箱名" className={fsStyles.field} defaultValue="" onChange={()=>{}} /></Case>
 <Case id="fs-bad" expect="red" ring="self"><input type="text" aria-label="箱名誤" className={fsStyles.field} aria-invalid="true" defaultValue="" onChange={()=>{}} /></Case>
 </main>}
@@ -89,19 +101,20 @@ const RING = () => {
     : active
   if (!el) return null
   const c = getComputedStyle(el)
-  return { id: host.getAttribute('data-case'), expect: host.getAttribute('data-expect'), color: c.outlineColor, style: c.outlineStyle, width: c.outlineWidth, shadow: c.boxShadow }
+  return { id: host.getAttribute('data-case'), expect: host.getAttribute('data-expect'), color: c.outlineColor, style: c.outlineStyle, width: c.outlineWidth, offset: c.outlineOffset, shadow: c.boxShadow, boxColor: kind === 'card' ? getComputedStyle(active.nextElementSibling).outlineColor : null }
 }
-test('誤りの欄の焦点は赤1本、誤りなしは青（invalid-focus）', async () => {
+for (const width of [1152, 1440]) test(`誤りの欄の焦点は赤1本、誤りなしは青（invalid-focus） ${width}`, async () => {
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
     page.on('pageerror', (e) => console.log('PAGEERROR:', String(e && e.stack || e).slice(0, 800)))
-    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.setViewportSize({ width, height: 900 })
     await page.setContent(`<html data-theme="v8"><style>${css}main{padding:32px}body{background:#f2f3f5}</style><div id="root"></div></html>`)
     await page.addScriptTag({ content: compiled.outputFiles[0].text })
     await page.locator('[data-case]').first().waitFor()
     const total = await page.locator('[data-case]').count()
     const seen = []
+    const offsets = new Map()
     for (let i = 0; i < total; i++) {
       // 同じ欄の2つ目以降の留まり（連想の開く印など）は飛ばし、未見の欄まで進む。
       let ring = null
@@ -122,12 +135,23 @@ test('誤りの欄の焦点は赤1本、誤りなしは青（invalid-focus）', 
       }
       assert.ok(ring, `Tab ${i + 1}: 欄に焦点が当たる`)
       seen.push(ring.id)
+      offsets.set(ring.id, ring.offset)
+      if (process.env.MUSE_SHOTS && ['fs-ok', 'fs-bad', 'composer-bad', 'insert-ok', 'insert-bad', 'insertcompact-ok', 'insertcompact-bad'].includes(ring.id)) {
+        mkdirSync(process.env.MUSE_SHOTS, { recursive: true })
+        await page.locator(`[data-case="${ring.id}"]`).screenshot({ path: `${process.env.MUSE_SHOTS}/${ring.id}-${width}.png` })
+      }
+      if (ring.id.startsWith('card-') || ring.id.startsWith('cardwindow-')) assert.ok(ring.boxColor && ring.boxColor !== 'rgba(0, 0, 0, 0)', `${ring.id}: チェックの四角の枠を消さない`)
       const want = ring.expect === 'red' ? RED : BLUE
       assert.equal(ring.color, want, `${ring.id}: 輪は${ring.expect === 'red' ? '赤' : '青'}`)
       assert.equal(ring.style, 'solid', `${ring.id}: 輪は実線`)
       assert.equal(ring.width, '2px', `${ring.id}: 輪は2px`)
+      if (ring.id.startsWith('card-')) assert.equal(ring.offset, '2px', 'カードの輪は共通の位置を使う')
+      if (ring.id.startsWith('cardwindow-')) assert.equal(ring.offset, '-2px', '窓の中のカードは内側に輪を出す')
+      if (ring.id.startsWith('insertcompact-')) assert.equal(ring.offset, '-1px', '小さい本文欄は内側の輪を保つ')
+      if (ring.id.startsWith('fs-')) assert.equal(ring.offset, '-1px', `${ring.id}: メニュー内の名前の欄は内側の輪を保つ`)
       if (ring.expect === 'red') assert.ok(!ring.shadow.includes('37, 99, 235'), `${ring.id}: 青を重ねない`)
     }
+    for (const id of seen.filter(id => id.endsWith('-bad'))) assert.equal(offsets.get(id), offsets.get(id.replace(/-bad$/, '-ok')), `${id}: 青と赤で輪の位置を変えない`)
     assert.equal(new Set(seen).size, total, '全部の欄を1回ずつ回った')
   } finally { await browser.close() }
 })

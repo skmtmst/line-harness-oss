@@ -64,8 +64,8 @@
 }
 
 .field:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
 }
 
 .icon {
@@ -282,8 +282,8 @@
 .clear:focus-visible,
 .today:focus-visible,
 .reset:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
 }
 
 .footer {
@@ -366,6 +366,6 @@
 
 /* 誤り＋焦点は赤1本（青を重ねない）。層の外に置く（全体の青輪より勝つため）。 */
 :root .field[data-invalid]:focus-visible {
-  outline: 2px solid var(--color-danger);
-  outline-offset: 2px;
+  outline: var(--polish-focus-width) solid var(--color-danger);
+  outline-offset: var(--polish-focus-offset);
 }

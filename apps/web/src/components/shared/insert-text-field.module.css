@@ -15,7 +15,7 @@
   text-align: left;
 }
 .editor[aria-invalid='true'] { outline: 1px solid var(--color-danger); outline-offset: -1px; }
-.editor[aria-invalid='true']:focus-visible { outline: 2px solid var(--color-danger); }
+.editor[aria-invalid='true']:focus-visible { outline: var(--polish-focus-width) solid var(--color-danger); }
 
 .editor[aria-disabled='true'] { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 
@@ -106,7 +106,7 @@
 .insertButton svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--color-ink-secondary); }
 .insertButton:hover:not(:disabled) { background: var(--color-canvas-sunken); }
 .insertButton:disabled { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
-.insertButton:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 1px; }
+.insertButton:focus-visible { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: 1px; }
 .insertButton[aria-expanded='true'] { outline-color: var(--color-accent); background: var(--color-accent-soft); }
 }
 
@@ -120,3 +120,8 @@
 .editorMessage { box-sizing: border-box; width: 100%; height: var(--tpl-te-body-h); min-height: var(--tpl-te-body-h); padding: var(--tpl-nc-body-pad); border: 0; outline: revert; background: transparent; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-body-lh); resize: vertical; }
 .editorCode { height: var(--tpl-te-flex-h); font-family: var(--font-mono, monospace); font-size: var(--text-caption); }
 }
+
+/* 単独の本文欄は青と赤で同じ輪を使う。MessageBody内は外枠が輪を持つ。 */
+:root .editor:focus-visible:not(:global([data-message-body]) *) { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
+:root .editor[aria-invalid='true']:focus-visible:not(:global([data-message-body]) *) { outline-color: var(--color-danger); }
+:root .editorCompact:focus-visible:not(:global([data-message-body]) *) { outline-offset: var(--polish-focus-offset-inset); }

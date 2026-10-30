@@ -119,7 +119,8 @@ html:root .row { align-items: center; min-height: 36px; padding: 8px 10px; gap: 
 /* 箱と説明のかたまりを、カードの高さの中央にそろえる。 */
 html:root .card { align-items: center; }
 
-/* 箱の輪1本：中の四角と入力の輪は消し、カードを正本に（四角の青・赤指定より勝つ詳細度。card を重ねるのはそのため）。 */
-html:root .card.card input:focus-visible + span { outline: 2px solid transparent; }
-html:root .card.card input[aria-invalid='true']:focus-visible + span { outline: 2px solid transparent; }
-html:root .card input:focus-visible { outline: 2px solid transparent; }
+/* カード内の四角は輪を持たず、カードを焦点の持ち主にする。層の外で共通チェックの輪だけを抑える。 */
+html:root .card input:focus-visible + span { outline: var(--polish-choice-ring) solid var(--polish-choice-border); outline-offset: calc(-1 * var(--polish-choice-ring)); }
+html:root .card input:is(:checked, :indeterminate):focus-visible + span { outline-color: transparent; }
+html:root .card input[aria-invalid="true"]:focus-visible + span { outline-color: var(--color-status-danger); }
+html:root .card input:focus-visible { outline: var(--polish-focus-width) solid transparent; }

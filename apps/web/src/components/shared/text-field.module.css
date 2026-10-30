@@ -34,8 +34,8 @@
 }
 
 .field:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
 }
 
 /* ytG7l 共通 入力欄 */
@@ -90,7 +90,7 @@
 /* V8の1行欄。高さ・左右の余白・行間は共通値。 */
 :root .single { height: var(--tpl-field-h); border: 0; padding: 0 var(--tpl-field-pad-x); outline: 1px solid var(--color-control-border); outline-offset: -1px; box-shadow: var(--control-shadow); line-height: var(--tpl-field-lh); font-family: var(--font-sans); }
 :root .single[aria-invalid='true'] { outline-color: var(--color-danger); }
-:root .single:focus-visible { outline: 2px solid var(--color-focus-ring); outline-offset: 2px; }
+:root .single:focus-visible { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 /* 誤りのある欄へ移したとき、青い枠で赤を消さない（2026-10-08 オーナー：入力が要る欄は周りが赤くなってそこへ移る）。 */
 :root .single[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); }
 :root .multi[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); border-color: var(--color-danger); }
@@ -124,7 +124,7 @@
 :root .multiCompact { min-height: var(--tpl-textarea-compact-h); padding: var(--tpl-e78-pair-gap); line-height: var(--tpl-e78-name-lh); }
 :root .multi[data-density="compact"] { padding: var(--tpl-rt-gray-note-pad); border: 0; border-radius: var(--tpl-rt-inner-radius); outline: 1px solid var(--color-control-border); outline-offset: -1px; font-size: var(--text-caption); line-height: var(--tpl-rt-draft-lh); }
 :root .multi[data-density="compact"][aria-invalid="true"] { outline-color: var(--color-danger); }
-:root .multi[data-density="compact"]:focus-visible { outline-width: 2px; outline-offset: 2px; }
+:root .multi[data-density="compact"]:focus-visible { outline-width: var(--polish-focus-width); outline-offset: var(--polish-focus-offset); }
 :root .multi[data-height='post'] { min-height: var(--tpl-rt-summary-h); height: var(--tpl-rt-summary-h); }
 :root .multi[data-height='reply'] { min-height: var(--tpl-rt-draft-h); height: var(--tpl-rt-draft-h); }
 
@@ -145,7 +145,7 @@ html:root .affixed[data-affixed-layout="field"] { flex: none; }
 html:root .affixed[data-monospace] { font-family: var(--font-mono); }
 html:root .affixed .affixedControl { width: auto; min-width: 0; max-width: 100%; height: 100%; flex: 0 1 auto; padding: 0; border: 0; outline: 1px solid transparent; box-shadow: none; background: transparent; font: inherit; field-sizing: content; }
 html:root .adornment { flex-shrink: 0; color: var(--color-ink-faint); }
-html:root .affixed:focus-within { outline: 2px solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
+html:root .affixed:focus-within { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 html:root .affixed[aria-invalid='true']:focus-within { outline-color: var(--color-danger); box-shadow: var(--polish-error-ring); }
 html:root .affixed[data-disabled] { opacity: var(--polish-disabled-opacity); }
 html:root .affixed .affixedControl:disabled { opacity: 1; }

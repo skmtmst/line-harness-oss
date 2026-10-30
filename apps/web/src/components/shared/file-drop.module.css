@@ -118,8 +118,8 @@
 
 /* キーボードで場所へ来たときの輪郭。緑は「正常」の意味なので輪郭に使わない。 */
 .zone:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  outline: var(--polish-focus-width) solid var(--color-focus-ring);
+  outline-offset: var(--polish-focus-offset);
 }
 
 .row {
@@ -223,15 +223,15 @@
 .zone[data-variant='composer'] { height: var(--tpl-msg-composer-media-h); min-height: var(--tpl-msg-composer-media-h); padding: 0; gap: var(--tpl-msg-composer-gap-s); }
 .zone[data-variant='composer'] .zoneTitle { font-size: var(--text-label); line-height: var(--tpl-msg-composer-text-lh); }
 .zone[data-variant='composer'] .zoneHint { font-size: var(--text-micro); line-height: var(--tpl-msg-composer-tab-lh); }
-.zone[data-variant='composer']:focus-visible { outline: 2px solid var(--color-focus-ring); }
+.zone[data-variant='composer']:focus-visible { outline: var(--polish-focus-width) solid var(--color-focus-ring); }
 /* 誤り＋焦点は赤1本（青を重ねない）。寄せは誤りなしの輪と同じ。 */
-.zone[data-invalid]:focus-visible { outline: 2px solid var(--color-danger); outline-offset: 2px; }
+.zone[data-invalid]:focus-visible { outline: var(--polish-focus-width) solid var(--color-danger); outline-offset: var(--polish-focus-offset); }
 .zone[data-variant='composer'][data-invalid]:focus-visible,
-.zone[data-variant='upload'][data-invalid]:focus-visible { outline: 2px solid var(--color-danger); outline-offset: 0; }
+.zone[data-variant='upload'][data-invalid]:focus-visible { outline: var(--polish-focus-width) solid var(--color-danger); outline-offset: var(--polish-focus-offset); }
 
 @layer components {
 .zone[data-variant='upload'] .zoneTitle { font-size: var(--text-heading); }
-.zone[data-variant='upload']:focus-visible { outline: 2px solid var(--color-focus-ring); }
+.zone[data-variant='upload']:focus-visible { outline: var(--polish-focus-width) solid var(--color-focus-ring); }
 }
 
 /* 欄の中の別の入れ方（「ライブラリから選ぶ」）。 */

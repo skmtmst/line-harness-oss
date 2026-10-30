@@ -496,7 +496,7 @@
   --radius-button-primary: 8px;
   --color-hover: #1d1d1f0a;
   --color-press: #1d1d1f14;
-  --focus-ring: var(--polish-focus-width) solid var(--polish-focus);
+  --focus-ring: var(--polish-focus-width) solid var(--polish-focus); --focus-ring-offset: var(--polish-focus-offset);
   --shadow-toggle-knob: 0 1px 2px #1d1d1f29;
 
   --polish-tooltip-width: 288px;
@@ -520,7 +520,7 @@
   --polish-active: rgb(29 29 31 / 0.08);
   --polish-focus: #2563eb;
   --polish-focus-width: 2px;
-  --polish-focus-offset: 2px;
+  --polish-focus-offset: 2px; --polish-focus-offset-inset: -1px;
   /* 押せない時は元の見た目のまま薄くする。本文の墨色が白地で 3:1 を保つ所（0.45 前後で 0.48）。 */
   --polish-disabled-opacity: 0.48;
   --polish-interaction-duration: var(--motion-fast);

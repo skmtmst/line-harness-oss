@@ -1,5 +1,5 @@
 /* 窓の本文では輪を欄の内側へ描き、送り端でも切れず欄同士の幅をそろえる。 */
-[data-window-body] { --polish-focus-offset: calc(-1 * var(--polish-focus-width)); }
+[data-window-body] { --polish-focus-offset: calc(-1 * var(--polish-focus-width)); --focus-ring-offset: var(--polish-focus-offset); }
 
 /* キーボードの輪は、画面から渡されたクラスにも共通で効く。 */
 html:root :is(button, a, input, textarea, select, [tabindex], [role='button'], [role='tab'], [role='menuitem'], [role='option']):focus-visible:not(:where([data-dialog-choice-cards] a)) {

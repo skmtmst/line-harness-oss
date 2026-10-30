@@ -6,7 +6,8 @@ import { describe, expect, it } from 'vitest'
 const DIR = __dirname
 const files = fs.readdirSync(DIR)
 const read = (name: string) => fs.readFileSync(path.join(DIR, name), 'utf8')
-const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '')
+// 共通の太さの値も同じ2pxとして検査する。実際の幅・色・重なりは実ブラウザでも確かめる。
+const withoutComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/var\(--polish-focus-width\)/g, '2px')
 
 /**
  * **押せる部品には、キーボードのフォーカスが見えること。**
