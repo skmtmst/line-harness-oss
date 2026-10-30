@@ -31,3 +31,21 @@ it('本人の役割が読めるまでは理由なしの無効な設定操作を�
   expect(screen.getByRole('button',{name:'座席・卓を設定する'}).hasAttribute('disabled')).toBe(true)
   expect(screen.queryByRole('tooltip')).toBeNull()
 })
+
+
+it.each([true, false])('予約がない時は条件によって空の案内と作成操作を分ける（絞り込み：%s）', filtered => {
+  const onCreate = vi.fn()
+  render(<LedgerEmpty noTables={false} filtered={filtered} canWrite busy={false} onCreate={onCreate} />)
+  expect(screen.getByText(filtered ? '条件に合う予約はありません' : '予約はまだありません')).toBeTruthy()
+  expect(screen.queryByText(filtered ? '予約はまだありません' : '条件に合う予約はありません')).toBeNull()
+  const create = screen.queryByRole('button', { name: '電話の予約を入れる' })
+  if (filtered) {
+    expect(create).toBeNull()
+    expect(screen.getByText('期間や状態、予約元の条件を変えて確認してください。')).toBeTruthy()
+    expect(onCreate).not.toHaveBeenCalled()
+  } else {
+    expect(create).toBeTruthy()
+    fireEvent.click(create!)
+    expect(onCreate).toHaveBeenCalledTimes(1)
+  }
+})
