@@ -47,7 +47,8 @@ export function FolderNameColorFields({ name, nameError, nameRef, onNameChange, 
     </div>
     <div className={styles.color}>
       <span className={styles.label}>色</span>
-      <FolderColorButton value={color} onChange={onColorChange} colors={colors} allowClear={allowClear} disabled={disabled} />
+      {/* E21：色の板は上へ開く（下へ開くと窓の下帯［やめる／追加する］に被る）。 */}
+      <FolderColorButton value={color} onChange={onColorChange} colors={colors} allowClear={allowClear} disabled={disabled} dropUp />
     </div>
   </div>
 }

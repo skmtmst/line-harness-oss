@@ -46,3 +46,12 @@ it('その場の丸は24pxと選択の輪。開くメニューの見本点は既
   expect(css).toMatch(/\.paletteFlat \.swatch\[data-selected\]\s*\{[^}]*outline-color:\s*var\(--color-ink\);[^}]*outline-offset:\s*2px;/)
   expect(css).toMatch(/\.swatch\s*\{[^}]*width:\s*var\(--select-menu-swatch\);/)
 })
+it('E21：指定が無ければ自動（下）、dropUp で上へ開く', () => {
+  render(<FolderColorButton colors={colors} value={null} onChange={() => {}} />)
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：色なし' }))
+  expect(document.querySelector('[data-menu-portal]')?.getAttribute('data-placement')).toBe('down')
+  cleanup()
+  render(<FolderColorButton colors={colors} value={null} onChange={() => {}} dropUp />)
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：色なし' }))
+  expect(document.querySelector('[data-menu-portal]')?.getAttribute('data-placement')).toBe('up')
+})

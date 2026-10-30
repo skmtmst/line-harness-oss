@@ -45,6 +45,11 @@ export type MenuPortalProps = {
   getAnchor: () => HTMLElement | null
   /** 横の寄せ。既定は `end`（今までの `right-0` と同じく右寄せ）。 */
   align?: MenuPortalAlign
+  /**
+   * 開く向きの固定（E21：窓の下帯に被せない色の板）。渡さなければ今までどおり
+   * 下に入るか・下の余地が広いときに下へ開く（自動判定は変えない）。
+   */
+  placement?: MenuPortalPlacement
   /** ボタンとのすき間。★管理画面 メニューは4px。既定は 4。 */
   gap?: number
   /**
@@ -77,6 +82,16 @@ export type MenuPortalProps = {
 }
 
 export type MenuPortalRect = Pick<DOMRect, 'top' | 'bottom' | 'left' | 'right' | 'width'>
+
+/**
+ * 開く向き。上・下の指定があればそれに従い、無ければ下に中身が入るか・
+ * 下の余地が広いときに下へ開く（今までの自動判定そのまま）。
+ */
+export function resolveMenuPlacement(forced: MenuPortalPlacement | undefined, contentHeight: number, spaceBelow: number, spaceAbove: number): MenuPortalPlacement {
+  if (forced) return forced
+  if (contentHeight <= spaceBelow || spaceBelow >= spaceAbove) return 'down'
+  return 'up'
+}
 
 type Geometry = {
   origin: 'left' | 'right'
@@ -136,6 +151,7 @@ export default function MenuPortal({
   children,
   exitDuration,
   focusPanel = false,
+  placement: forcedPlacement,
 }: MenuPortalProps) {
   const leaving = useV8Leave(open, exitDuration)
   const [mounted, setMounted] = useState(false)
@@ -214,12 +230,7 @@ export default function MenuPortal({
       const lowerBoundary = fitsContent ? contentBottom : viewportHeight - margin
       const spaceBelow = lowerBoundary - anchorRect.bottom - gap
       const spaceAbove = anchorRect.top - gap - upperBoundary
-      let placement: MenuPortalPlacement
-      if (contentHeight <= spaceBelow || spaceBelow >= spaceAbove) {
-        placement = 'down'
-      } else {
-        placement = 'up'
-      }
+      const placement = resolveMenuPlacement(forcedPlacement, contentHeight, spaceBelow, spaceAbove)
       // 開く方向に使える高さまで使う。入るなら全部、足りなければここで切る。
       const maxHeight = Math.max(0, placement === 'down' ? spaceBelow : spaceAbove)
       const shownHeight = Math.min(contentHeight || maxHeight, maxHeight)
