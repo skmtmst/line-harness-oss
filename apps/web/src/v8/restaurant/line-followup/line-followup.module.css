@@ -146,16 +146,6 @@
   text-overflow: ellipsis;
 }
 
-.talkBubble {
-  max-width: var(--tpl-sd-talk-max);
-  padding: var(--tpl-sd-talk-pad);
-  border-radius: var(--tpl-sd-card-radius);
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-size: var(--tpl-sd-talk-size);
-  line-height: var(--tpl-sd-talk-lh);
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
-}
+/* 送りの見え方の吹き出しは共通の LinePreviewMessage を使う（専用の形は作らない）。 */
 
 /* LINE ミニアプリ連携：中身は2列・間16・余白20。カードは余白18・間6。 */

@@ -8,7 +8,7 @@ import { ApiError } from '@/lib/api/transport/errors'
 const fixture = vi.hoisted(() => ({
   snapshot: vi.fn(), role: 'owner' as string | null,
   fetchLive: vi.fn(), saveMessages: vi.fn(), saveBinding: vi.fn(),
-  requestStart: vi.fn(), stop: vi.fn(), reviewHistory: vi.fn(),
+  publishScenario: vi.fn(), requestStart: vi.fn(), stop: vi.fn(), reviewHistory: vi.fn(),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
 vi.mock('@/lib/use-feature-visibility', () => ({
@@ -27,14 +27,19 @@ vi.mock('@/components/scenarios/scenario-reference-data', () => ({
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: { snapshot: fixture.snapshot } }))
 vi.mock('@/components/shared/entity-select', () => import('@/test-utils/entity-select-mock'))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => fixture.role, canManageRole: (role: string | null) => role === 'owner' || role === 'admin' }))
-vi.mock('@/lib/api/helpers/restaurant-followup', () => ({
-  fetchRestaurantFollowup: fixture.fetchLive,
-  saveFollowupMessages: fixture.saveMessages,
-  saveFollowupBinding: fixture.saveBinding,
-  requestFollowupStart: fixture.requestStart,
-  stopFollowup: fixture.stop,
-  fetchFollowupReviewHistory: fixture.reviewHistory,
-}))
+vi.mock('@/lib/api/helpers/restaurant-followup', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@/lib/api/helpers/restaurant-followup')>()
+  return {
+    ...original,
+    fetchRestaurantFollowup: fixture.fetchLive,
+    saveFollowupMessages: fixture.saveMessages,
+    saveFollowupBinding: fixture.saveBinding,
+    publishFollowupScenario: fixture.publishScenario,
+    requestFollowupStart: fixture.requestStart,
+    stopFollowup: fixture.stop,
+    fetchFollowupReviewHistory: fixture.reviewHistory,
+  }
+})
 import LineFollowupV8 from './line-followup'
 import { RESTAURANT_TRIGGER_ROWS, exactTiming, timingError, timingLabel } from './config'
 
@@ -42,7 +47,10 @@ const bubble = (text: string, id = 'b1'): BroadcastBubble => ({ id, type: 'text'
 const stepOf = (trigger: RestaurantFollowupTrigger, offset: number, enabled: 0 | 1, texts: string[] | null) => ({
   trigger,
   binding: { store_id: 'store', trigger, step_id: `step-${trigger}`, offset_minutes: offset, enabled, version: 1 },
-  step: { id: `step-${trigger}`, scenarioId: 'scn-1' },
+  step: {
+    id: `step-${trigger}`, scenarioId: 'scn-1', messageType: 'text', messageContent: '',
+    messageBubbles: texts === null ? [] : texts.map((text, index) => bubble(text, `b${index + 1}`)),
+  },
   bubbles: texts === null ? [] : texts.map((text, index) => bubble(text, `b${index + 1}`)),
   offsetMinutes: offset,
   state: 'stopped' as const,
@@ -76,6 +84,7 @@ beforeEach(() => {
   fixture.reviewHistory.mockResolvedValue([])
   fixture.saveMessages.mockResolvedValue({ success: true, data: {} })
   fixture.saveBinding.mockResolvedValue({ success: true, data: { stopped: true } })
+  fixture.publishScenario.mockResolvedValue({ success: true, data: { scenarioId: 'scn-1', versionId: 'v-1', versionNumber: 2, publishedAt: '2026-10-30T00:00:00.000Z' } })
   fixture.requestStart.mockResolvedValue({ success: true, data: { approvalId: 'ap-1', sendingStatus: 'pending' } })
   fixture.stop.mockResolvedValue({ success: true, data: { sendingStatus: 'stopped' } })
 })
@@ -177,19 +186,33 @@ describe('7つの行と状態', () => {
       expectedVersion: 3, messageBubbles: [bubble('新しい本文')],
     }))
   })
-  it('2通以上の本文は消さないよう保存を止め、本体へ案内する', async () => {
+  it('2通以上の本文は後続を保ったまま直して保存する', async () => {
     const live = liveOf()
-    live.steps = live.steps.map(step => step.trigger === 'post_visit' ? { ...step, bubbles: [bubble('1通目', 'b1'), bubble('2通目', 'b2')] } : step)
+    live.steps = live.steps.map(step => step.trigger === 'post_visit'
+      ? { ...step, bubbles: [bubble('1通目', 'b1'), bubble('2通目', 'b2')] }
+      : step)
     fixture.fetchLive.mockResolvedValue(live)
     render(<LineFollowupV8 />)
     await screen.findByRole('button', { name: '来店後' })
     fireEvent.click(screen.getByRole('button', { name: '来店後' }))
-    expect(screen.getByText('本文が2通以上あるため、この画面では直せません。本体のシナリオ画面で直してください')).toBeTruthy()
+    const second = screen.getByRole('textbox', { name: '2通目の本文' })
+    await act(async () => { second.textContent = '直した2通目'; fireEvent.input(second) })
+    fireEvent.click(screen.getByRole('button', { name: '本文を保存する' }))
+    await waitFor(() => expect(fixture.saveMessages).toHaveBeenCalledWith('account-1', 'store', 'step-post_visit', {
+      expectedVersion: 3, messageBubbles: [bubble('1通目', 'b1'), bubble('直した2通目', 'b2')],
+    }))
+  })
+  it('テキスト以外の古い本文は空欄に見せず編集を止める', async () => {
+    const live = liveOf()
+    live.steps = live.steps.map(step => step.trigger === 'reservation_24h'
+      ? { ...step, bubbles: [], step: { ...step.step, messageType: 'flex', messageContent: '{"type":"bubble"}', messageBubbles: null } }
+      : step)
+    fixture.fetchLive.mockResolvedValue(live)
+    render(<LineFollowupV8 />)
+    await screen.findByRole('button', { name: '予約の前日' })
+    fireEvent.click(screen.getByRole('button', { name: '予約の前日' }))
+    expect(screen.getByText('この本文はテキスト以外の形のため、この画面では直せません。本体のシナリオ画面で直してください')).toBeTruthy()
     expect((screen.getByRole('button', { name: '本文を保存する' }) as HTMLButtonElement).disabled).toBe(true)
-    const read = screen.getByRole('textbox', { name: '本文' }) as HTMLTextAreaElement
-    expect(read.readOnly).toBe(true)
-    expect(read.value).toContain('1通目')
-    expect(read.value).toContain('2通目')
   })
   it('くわしく設定する → は本体のシナリオへ飛ぶ', async () => {
     render(<LineFollowupV8 />)
@@ -200,10 +223,20 @@ describe('7つの行と状態', () => {
     render(<LineFollowupV8 />)
     await screen.findByRole('button', { name: '予約完了時' })
     fireEvent.click(screen.getByRole('button', { name: '承認を申請する' }))
+    // 申請の前に本体を公開して、画面の本文と承認対象の一致を保つ。
+    await waitFor(() => expect(fixture.publishScenario).toHaveBeenCalledWith('scn-1'))
     await waitFor(() => expect(fixture.requestStart).toHaveBeenCalledWith('account-1', 'store', 3))
     // 申請後は読み直すので、終わってから止めるを押す。
     fireEvent.click(await screen.findByRole('button', { name: '本送信を止める' }))
     await waitFor(() => expect(fixture.stop).toHaveBeenCalledWith('account-1', 'store'))
+  })
+  it('公開に失敗したら申請を出さない', async () => {
+    fixture.publishScenario.mockResolvedValueOnce({ success: false, error: '公開できません' })
+    render(<LineFollowupV8 />)
+    await screen.findByRole('button', { name: '予約完了時' })
+    fireEvent.click(screen.getByRole('button', { name: '承認を申請する' }))
+    expect(await screen.findByText('公開できません')).toBeTruthy()
+    expect(fixture.requestStart).not.toHaveBeenCalled()
   })
   it('承認の申請中は状態の行から承認画面へ飛べる', async () => {
     fixture.fetchLive.mockResolvedValue(liveOf({ sendingStatus: 'pending', approvalId: 'ap-1' }))
@@ -286,12 +319,12 @@ describe('失敗と競合', () => {
     await waitFor(() => expect(fixture.fetchLive).toHaveBeenCalledTimes(2))
     expect(screen.getByText('ほかの担当者が先に保存しました。読み直しました。')).toBeTruthy()
   })
-  it('申請の409は版か未公開の両方を言う', async () => {
+  it('申請の409は版のずれを言う（未公開は直前の公開で解消済み）', async () => {
     fixture.requestStart.mockRejectedValueOnce(new ApiError(409))
     render(<LineFollowupV8 />)
     await screen.findByRole('button', { name: '予約完了時' })
     fireEvent.click(screen.getByRole('button', { name: '承認を申請する' }))
-    expect(await screen.findByText('承認を申請できませんでした。ほかの担当者の保存か、本体のシナリオの未公開が原因です。読み直しました。')).toBeTruthy()
+    expect(await screen.findByText('承認を申請できませんでした。ほかの担当者が先に保存しました。読み直しました。')).toBeTruthy()
   })
 })
 

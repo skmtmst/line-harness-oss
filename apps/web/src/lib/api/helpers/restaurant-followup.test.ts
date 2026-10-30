@@ -8,6 +8,8 @@ vi.mock('../features/scenarios', () => ({ scenariosMethods: { scenarios: { get: 
 import {
   fetchFollowupReviewHistory,
   fetchRestaurantFollowup,
+  isUnsupportedBody,
+  publishFollowupScenario,
   requestFollowupStart,
   saveFollowupBinding,
   saveFollowupMessages,
@@ -66,6 +68,15 @@ describe('口の呼び方', () => {
     fixture.fetchApi.mockRejectedValueOnce(new ApiError(404))
     await expect(fetchRestaurantFollowup('account-1', 'store-new')).resolves.toBeNull()
   })
+  it('公開は確認キーを付けて POST する', async () => {
+    fixture.fetchApi.mockResolvedValue({ success: true, data: {} })
+    await publishFollowupScenario('scn-1')
+    expect(fixture.fetchApi).toHaveBeenCalledWith('/api/scenarios/scn-1/publish', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': expect.any(String) },
+      body: JSON.stringify({}),
+    })
+  })
 })
 
 describe('中身の読み替え', () => {
@@ -81,6 +92,12 @@ describe('中身の読み替え', () => {
   it('旧来のテキスト以外は空', () => {
     expect(stepBubbles({ id: 'step-img', messageType: 'image', messageContent: '{"a":1}', messageBubbles: null } as never)).toEqual([])
     expect(stepBubbles({ id: 'step-empty', messageType: 'text', messageContent: '  ', messageBubbles: [] } as never)).toEqual([])
+  })
+  it('直せない本文の見分け', () => {
+    expect(isUnsupportedBody({ id: 's', messageType: 'flex', messageContent: '{}', messageBubbles: null } as never)).toBe(true)
+    expect(isUnsupportedBody({ id: 's', messageType: 'text', messageContent: '', messageBubbles: null } as never)).toBe(false)
+    expect(isUnsupportedBody({ id: 's', messageType: 'flex', messageContent: '', messageBubbles: [{ id: 'b', type: 'text', content: { text: 'a' } }] } as never)).toBe(false)
+    expect(isUnsupportedBody(null)).toBe(false)
   })
   it('7行を組み立てる', async () => {
     const live = (await fetchRestaurantFollowup('account-1', 'store-sby'))!

@@ -17,6 +17,8 @@ import { ApiError, describeSaveFailure } from '@/lib/api/transport/errors'
 import {
   fetchFollowupReviewHistory,
   fetchRestaurantFollowup,
+  isUnsupportedBody,
+  publishFollowupScenario,
   requestFollowupStart,
   saveFollowupBinding,
   saveFollowupMessages,
@@ -93,14 +95,14 @@ function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, r
   const [unit, setUnit] = useState<OffsetUnit>(initial.unit)
   const anniversaryLocked = row.trigger === 'anniversary_before'
   const noStep = !binding || !step?.step
-  const multiBubble = (step?.bubbles.length ?? 0) > 1
+  const unsupportedBody = isUnsupportedBody(step?.step ?? null)
   const locked = unknownRole || busy !== null
   /* 権限の理由は lockedReason、状態の理由は目の前の文。役割不明は理由なし。 */
   const permReason = readOnly ? '閲覧のみのため変えられません' : null
   const toggleStateReason = noStep ? '本体の一歩がまだないため、この行は変えられません'
     : anniversaryLocked ? '記念日前の始まりはサーバーの口がまだないため、オンと時期は変えられません' : null
   const bodyStateReason = noStep ? '本体の一歩がまだないため、本文は変えられません'
-    : multiBubble ? '本文が2通以上あるため、この画面では直せません。本体のシナリオ画面で直してください' : null
+    : unsupportedBody ? 'この本文はテキスト以外の形のため、この画面では直せません。本体のシナリオ画面で直してください' : null
   const toggleLocked = locked || permReason !== null || toggleStateReason !== null
   const bodyLocked = locked || permReason !== null || bodyStateReason !== null
 
@@ -176,9 +178,9 @@ function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, r
       <Button variant="primary" disabled={bodyLocked} busy={busy === 'body'}
         lockedReason={permReason}
         onClick={() => {
-          if (!binding || !step?.step || multiBubble) return
-          if (!bubbleText(bubbles[0]).trim()) { failed('本文を入れてください'); return }
+          if (!binding || !step?.step || unsupportedBody) return
           const next = bubbles.length ? bubbles : [{ id: 'draft', type: 'text' as const, content: { text: '' } }]
+          if (!next.some(item => item.type !== 'text' || bubbleText(item).trim())) { failed('本文を入れてください'); return }
           void run('body', async () => {
             unwrap(await saveFollowupMessages(accountId, storeId, binding.step_id, {
               expectedVersion: live.templateVersion, messageBubbles: next,
@@ -249,6 +251,10 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
   const blank = (id: string, text: string): BroadcastBubble[] => [{ id, type: 'text', content: { text } }]
   const draft = edits[current.trigger]
     ?? (step && step.bubbles.length ? step.bubbles : sample ? blank('sample', current.sampleText) : blank('draft', ''))
+  /* 直せない形の本文は、空の見え方にせず正直に出す。 */
+  const previewBubbles = !sample && isUnsupportedBody(step?.step ?? null) && !edits[current.trigger]
+    ? blank('unsupported', '（この画面では見られない形の本文です）')
+    : draft
   const reload = () => { setEdits({}); setReloadKey(key => key + 1) }
   const permReason = readOnly ? '閲覧のみのため変えられません' : null
   const startStopLocked = busy !== null || unknownRole || readOnly
@@ -256,7 +262,7 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
     {readOnly ? <ReadOnlyNotice role="note" /> : null}
     {actionError ? <p role="alert">{actionError}</p> : null}
     <DetailColumns presentation="notification" asideLabel="LINEでの見え方" expanded={previewExpanded} onExpandedChange={setPreviewExpanded}
-      aside={<StepPreview bubbles={draft} accountName={storeName || 'LINE公式アカウント'} />}>
+      aside={<StepPreview bubbles={previewBubbles} accountName={storeName || 'LINE公式アカウント'} />}>
       {live ? <SendingLine live={live} /> : null}
       <div className={styles.flowList}>
         {rows.map(row => {
@@ -296,25 +302,41 @@ function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readO
             lockedReason={permReason}
             onClick={() => {
               setBusy('start')
-              requestFollowupStart(accountId, storeId, live.templateVersion).then(
-                response => {
-                  setBusy(null)
+              /* 申請は公開版を対象にする。直前に公開して画面の本文との一致を保つ。 */
+              publishFollowupScenario(live.scenarioId).then(
+                publishResponse => {
                   try {
-                    unwrap(response, '承認を申請できませんでした')
+                    unwrap(publishResponse, '本体のシナリオを公開できませんでした')
                   } catch (error) {
-                    setActionError(error instanceof Error ? error.message : '承認を申請できませんでした')
+                    setBusy(null)
+                    setActionError(error instanceof Error ? error.message : '本体のシナリオを公開できませんでした')
                     return
                   }
-                  reload()
+                  requestFollowupStart(accountId, storeId, live.templateVersion).then(
+                    response => {
+                      setBusy(null)
+                      try {
+                        unwrap(response, '承認を申請できませんでした')
+                      } catch (error) {
+                        setActionError(error instanceof Error ? error.message : '承認を申請できませんでした')
+                        return
+                      }
+                      reload()
+                    },
+                    (error: unknown) => {
+                      setBusy(null)
+                      if (error instanceof ApiError && error.status === 409) {
+                        reload()
+                        setActionError('承認を申請できませんでした。ほかの担当者が先に保存しました。読み直しました。')
+                      } else {
+                        setActionError(describeSaveFailure(error))
+                      }
+                    },
+                  )
                 },
                 (error: unknown) => {
                   setBusy(null)
-                  if (error instanceof ApiError && error.status === 409) {
-                    reload()
-                    setActionError('承認を申請できませんでした。ほかの担当者の保存か、本体のシナリオの未公開が原因です。読み直しました。')
-                  } else {
-                    setActionError(describeSaveFailure(error))
-                  }
+                  setActionError(describeSaveFailure(error))
                 },
               )
             }}>

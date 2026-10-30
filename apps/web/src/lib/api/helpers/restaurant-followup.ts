@@ -65,6 +65,14 @@ export function stepBubbles(step: ScenarioStep): BroadcastBubble[] {
 }
 
 /*
+ * この画面で直せない本文。吹き出しが無く、旧来の形もテキスト以外（画像など）。
+ * 空欄に見せて上書きしないよう、編集を止める。本体では直せる（吹き出しが無いため本体の guard に掛からない）。
+ */
+export function isUnsupportedBody(step: ScenarioStep | null): boolean {
+  return step !== null && !(step.messageBubbles?.length) && step.messageType !== 'text'
+}
+
+/*
  * 1店舗分を読む。まだ無い店舗（404）は null を返し、画面は7行の見本を出す。
  * 読めない数は 0 や作り話で埋めない（共通の決まり）。
  */
@@ -131,6 +139,17 @@ export function saveFollowupBinding(accountId: string, storeId: string, stepId: 
   return fetchApi<ApiResponse<{ stopped: boolean }>>(
     withAccount(`${base(storeId)}/bindings/${encodeURIComponent(stepId)}`, accountId),
     { method, body: JSON.stringify(input) },
+  )
+}
+
+/*
+ * 本体のシナリオの下書きを公開版として固定する。申請は公開版を対象にするため、
+ * 申請の直前に呼んで画面の本文と承認対象の一致を保つ。キーは押すたびに新しくする。
+ */
+export function publishFollowupScenario(scenarioId: string) {
+  return fetchApi<ApiResponse<{ scenarioId: string; versionId: string; versionNumber: number; publishedAt: string }>>(
+    `/api/scenarios/${encodeURIComponent(scenarioId)}/publish`,
+    { method: 'POST', headers: { 'Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify({}) },
   )
 }
 
