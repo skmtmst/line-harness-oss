@@ -1,5 +1,4 @@
 import { currentRequestId } from '@line-crm/shared/server';
-import { sqlIdSet } from './id-queries.js';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
 import { jstNow } from './utils.js';
 
@@ -440,7 +439,6 @@ export const AUDIT_GROUP_CONDITIONS: Record<AuditEventGroup, string> = {
 export type ListAuditEventsInput = {
   tenantId?: string | null;
   allowedLineAccountIds: string[];
-  includeTenantWide?: boolean;
   lineAccountId?: string;
   category?: AuditCategory;
   result?: AuditResult;
@@ -480,41 +478,11 @@ function auditRegionLabel(ipPrefix: string | null): string | null {
 function auditScopeSql(input: ListAuditEventsInput): { conditions: string[]; values: unknown[] } {
   const conditions = ['ae.tenant_id = ?'];
   const values: unknown[] = [input.tenantId ?? DEFAULT_TENANT_ID];
-  if (input.lineAccountId) {
-    /*
-     * 認証イベント（ログイン・失敗）はLINEアカウント未所属で保存される。
-     * アカウントで絞ると業務記録だけになり、認証の記録が一覧と集計から消えていた。
-     * アカウントの業務記録に、組織全体の認証記録を添える。権限がアカウント限定の
-     * 人には、そのアカウントを担当する人の認証記録だけを添える。
-     */
-    if (input.includeTenantWide) {
-      conditions.push(`(ae.line_account_id = ? OR (ae.line_account_id IS NULL AND ae.category = 'auth'))`);
-      values.push(input.lineAccountId);
-    } else {
-      conditions.push(`(ae.line_account_id = ? OR (
-        ae.line_account_id IS NULL AND ae.category = 'auth' AND ae.actor_principal_id IS NOT NULL AND EXISTS (
-          SELECT 1 FROM staff_account_scopes audit_scope
-           WHERE audit_scope.staff_id = ae.actor_principal_id
-             AND audit_scope.line_account_id = ?
-        )
-      ))`);
-      values.push(input.lineAccountId, input.lineAccountId);
-    }
-  } else if (input.includeTenantWide && input.allowedLineAccountIds.length > 0) {
-    conditions.push(`(ae.line_account_id IS NULL OR ae.line_account_id IN (${sqlIdSet(input.allowedLineAccountIds).sql}))`);
-    values.push(...(input.allowedLineAccountIds.length ? sqlIdSet(input.allowedLineAccountIds).binds : []));
-  } else if (input.includeTenantWide) {
-    conditions.push('ae.line_account_id IS NULL');
-  } else if (input.allowedLineAccountIds.length > 0) {
-    const placeholders = sqlIdSet(input.allowedLineAccountIds).sql;
-    conditions.push(`(ae.line_account_id IN (${placeholders}) OR (
-      ae.line_account_id IS NULL AND ae.actor_principal_id IS NOT NULL AND EXISTS (
-        SELECT 1 FROM staff_account_scopes audit_scope
-         WHERE audit_scope.staff_id = ae.actor_principal_id
-           AND audit_scope.line_account_id IN (${placeholders})
-      )
-    ))`);
-    values.push(...(input.allowedLineAccountIds.length ? sqlIdSet(input.allowedLineAccountIds).binds : []), ...(input.allowedLineAccountIds.length ? sqlIdSet(input.allowedLineAccountIds).binds : []));
+  // 所属先が記録されていない認証履歴を、現在の担当範囲から推測して表示しない。
+  // 担当範囲は後から変わり得るため、過去の操作先を証明できない。
+  if (input.lineAccountId && input.allowedLineAccountIds.includes(input.lineAccountId)) {
+    conditions.push('ae.line_account_id = ?');
+    values.push(input.lineAccountId);
   } else {
     conditions.push('1 = 0');
   }

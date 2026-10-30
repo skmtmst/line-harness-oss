@@ -40,6 +40,7 @@ export async function recordLoginAudit(
   db: D1Database,
   input: {
     adminUserId?: string | null;
+    lineAccountId?: string | null;
     action: LoginAuditAction;
     screen?: string | null;
     ip?: string | null;
@@ -89,6 +90,7 @@ export async function recordLoginAudit(
       sourceKind: 'login_audit',
       sourceId: id,
       tenantId: actor?.tenant_id,
+      lineAccountId: input.lineAccountId,
       category: 'auth',
       actorPrincipalId: input.adminUserId,
       actorRole: actor?.access_level === 'read_only'
@@ -111,22 +113,25 @@ export async function recordLoginAudit(
 
 export async function getLoginAudit(
   db: D1Database,
-  opts: { adminUserId?: string; action?: LoginAuditAction; limit?: number } = {},
+  opts: { tenantId: string; lineAccountId: string; adminUserId?: string; action?: LoginAuditAction; limit?: number },
 ): Promise<LoginAuditRow[]> {
   const conditions: string[] = [];
-  const values: unknown[] = [];
+  const values: unknown[] = [opts.tenantId, opts.lineAccountId];
   if (opts.adminUserId) {
-    conditions.push('admin_user_id = ?');
+    conditions.push('la.admin_user_id = ?');
     values.push(opts.adminUserId);
   }
   if (opts.action) {
-    conditions.push('action = ?');
+    conditions.push('la.action = ?');
     values.push(opts.action);
   }
-  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+  const where = conditions.length > 0 ? `AND ${conditions.join(' AND ')}` : '';
   values.push(Math.min(opts.limit ?? 100, 500));
   const result = await db
-    .prepare(`SELECT * FROM login_audit ${where} ORDER BY created_at DESC LIMIT ?`)
+    .prepare(`SELECT la.* FROM login_audit la
+      JOIN audit_events ae ON ae.source_kind = 'login_audit' AND ae.source_id = la.id
+      WHERE ae.tenant_id = ? AND ae.line_account_id = ? ${where}
+      ORDER BY la.created_at DESC LIMIT ?`)
     .bind(...values)
     .all<LoginAuditRow>();
   return result.results;

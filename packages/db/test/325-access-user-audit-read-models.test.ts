@@ -123,7 +123,7 @@ describe('common audit read model', () => {
     });
 
     const result = await listAuditEvents(db, {
-      tenantId: TENANT, allowedLineAccountIds: ['account-a'], now: '2026-09-07T00:00:00.000Z',
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], lineAccountId: 'account-a', now: '2026-09-07T00:00:00.000Z',
     });
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
@@ -159,21 +159,21 @@ describe('common audit read model', () => {
 
     // 30日窓（from 指定）: 直近の1件だけを数え、日数を返す。
     const thirty = await listAuditEvents(db, {
-      tenantId: TENANT, allowedLineAccountIds: ['account-a'], includeTenantWide: true,
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], lineAccountId: 'account-a',
       from: '2026-08-08T00:00:00.000Z', now,
     });
     expect(thirty.summary).toMatchObject({ periodDays: 30, total: 1, sent: 1 });
 
     // 90日窓: 古い方も数える。
     const ninety = await listAuditEvents(db, {
-      tenantId: TENANT, allowedLineAccountIds: ['account-a'], includeTenantWide: true,
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], lineAccountId: 'account-a',
       from: '2026-06-09T00:00:00.000Z', now,
     });
     expect(ninety.summary).toMatchObject({ periodDays: 90, total: 2, sent: 2 });
 
     // from 未指定は全期間。日数は null で返す（30日と偽らない）。
     const all = await listAuditEvents(db, {
-      tenantId: TENANT, allowedLineAccountIds: ['account-a'], includeTenantWide: true, now,
+      tenantId: TENANT, allowedLineAccountIds: ['account-a'], lineAccountId: 'account-a', now,
     });
     expect(all.summary).toMatchObject({ periodDays: null, total: 2, sent: 2 });
   });
