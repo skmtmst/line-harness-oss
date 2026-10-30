@@ -1,4 +1,4 @@
-> 文書：scenario-first-step のコード案内｜区分：今の説明｜最終確認：2026-10-20（日本時間）
+> 文書：scenario-first-step のコード案内｜区分：今の説明｜最終確認：2026-10-30（日本時間）
 
 # シナリオを作る②：1通目を設定（V8）の動き：コードの入口
 
@@ -25,6 +25,6 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 ## 動きと試験
 
 - [BEHAVIOR.md](BEHAVIOR.md)
-- このフォルダ内の試験はありません。入口と利用側の試験を確認してください。試験済みの宣言ではありません。
+- [write-permission.test.tsx](write-permission.test.tsx)：stepと下書きの権限切替・保持callback・応答後の中断・通常編集者を守る。入口と利用側の回帰試験も確認してください。
 
 実行：`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web test -- src/v8/scenario-first-step`。関連する入口の試験も実行してください。保存・入力保持・権限・別店舗・失敗からの回復を守り、文書の整合だけを動作の合格に数えません。

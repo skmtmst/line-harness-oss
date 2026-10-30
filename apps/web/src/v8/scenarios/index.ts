@@ -2,3 +2,4 @@
 export { default as ScenarioCreateV8 } from './create'
 export { default as ScenariosListV8 } from './list'
 export { default as ScenarioResultsV8 } from './results'
+export { captureScenarioWriteAccess, useScenarioWriteAccess } from './write-access'
