@@ -75,6 +75,7 @@ export function readDraft(storage: Pick<Storage, 'getItem'>, key = DRAFT_KEY): D
 }
 
 export interface ChannelFields { channelId: string; channelSecret: string; providerId: string; loginChannelId: string; loginChannelSecret: string }
+export type ChannelField = keyof ChannelFields
 export function channelErrors(form: ChannelFields): Record<string, string> {
   return { ...messagingApiErrors(form), ...providerIdErrors(form), ...loginChannelErrors(form) }
 }
@@ -85,25 +86,38 @@ export function channelErrors(form: ChannelFields): Record<string, string> {
 export function messagingApiErrors(form: Pick<ChannelFields, 'channelId' | 'channelSecret'>): Record<string, string> {
   const errors: Record<string, string> = {}
   if (!form.channelId.trim()) errors.channelId = 'チャネルIDを入力してください。'
-  else if (!/^\d+$/.test(form.channelId.trim())) errors.channelId = 'チャネルIDは半角数字で入力してください。'
+  else if (!/^\d+$/.test(form.channelId)) errors.channelId = 'チャネルIDは余分な空白を除き、半角数字で入力してください。'
   if (!form.channelSecret) errors.channelSecret = 'チャネルシークレットを入力してください。'
+  else if (/\s/.test(form.channelSecret)) errors.channelSecret = 'チャネルシークレットに空白や改行があります。LINEのコピーから貼り直してください。'
   return errors
 }
 
 /** ②の Step2 で入れるプロバイダーIDを調べる。 */
 export function providerIdErrors(form: Pick<ChannelFields, 'providerId'>): Record<string, string> {
   if (!form.providerId.trim()) return { providerId: 'プロバイダーIDを入力してください。' }
-  if (!/^\d+$/.test(form.providerId.trim())) return { providerId: 'プロバイダーIDは半角数字で入力してください。' }
+  if (!/^\d+$/.test(form.providerId)) return { providerId: 'プロバイダーIDは余分な空白を除き、半角数字で入力してください。' }
   return {}
 }
 
 /** ②の Step4 で入れる LINEログインの2項目だけを調べる。 */
-export function loginChannelErrors(form: Pick<ChannelFields, 'loginChannelId' | 'loginChannelSecret'>): Record<string, string> {
+export function loginChannelErrors(form: Pick<ChannelFields, 'loginChannelId' | 'loginChannelSecret'> & Partial<Pick<ChannelFields, 'channelId'>>): Record<string, string> {
   const errors: Record<string, string> = {}
   if (!form.loginChannelId.trim()) errors.loginChannelId = 'LoginチャネルIDを入力してください。'
-  else if (!/^\d+$/.test(form.loginChannelId.trim())) errors.loginChannelId = 'LoginチャネルIDは半角数字で入力してください。'
+  else if (!/^\d+$/.test(form.loginChannelId)) errors.loginChannelId = 'LoginチャネルIDは余分な空白を除き、半角数字で入力してください。'
+  else if (form.channelId && form.loginChannelId === form.channelId) errors.loginChannelId = 'Messaging APIと同じIDです。LINEログインチャネルのIDをコピーしてください。'
   if (!form.loginChannelSecret) errors.loginChannelSecret = 'Loginチャネルシークレットを入力してください。'
+  else if (/\s/.test(form.loginChannelSecret)) errors.loginChannelSecret = 'Loginチャネルシークレットに空白や改行があります。LINEのコピーから貼り直してください。'
   return errors
+}
+
+/** LINEの仕様に固定桁数は置かず、明らかな桁違いだけ確認を促す。正しい値なら先へ進める。 */
+export function channelLengthWarning(field: ChannelField, value: string): string | null {
+  if (!value) return null
+  const isSecret = field === 'channelSecret' || field === 'loginChannelSecret'
+  if (isSecret ? value.length >= 24 && value.length <= 64 : value.length >= 8 && value.length <= 16) return null
+  const source = field === 'channelId' || field === 'channelSecret' ? '公式アカウントマネージャー'
+    : 'LINE Developers'
+  return `桁数が通常と異なる可能性があります（現在${value.length}${isSecret ? '文字' : '桁'}）。${source}のコピー元を確認してください。正しければ「次のステップへ」をもう一度押して進めます。`
 }
 
 /** ②は4つ、③は2つの小さな段に分かれる。ほかの画面に小さな段は無い。 */

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { LineAccountConnectData } from '@/lib/api'
 import {
   DRAFT_KEY, LOGIN_ACKS, PRECHECK_RESULT, PRECHECK_VERIFIED_ACK, WEBHOOK_ACKS, allAcked, allV06RowsOk,
-  allV8RowsPassed, checkActionLabel, checkErrorText, checkRowText, checkStage, developerChannelUrl, developerProviderUrl,
+  allV8RowsPassed, channelLengthWarning, checkActionLabel, checkErrorText, checkRowText, checkStage, developerChannelUrl, developerProviderUrl,
   formatJaDuration, handoverProgress, latestFollowerImportState, loginChannelErrors, messagingApiErrors, nextCursor, precheckAsked, providerIdErrors,
   precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
   readDraft, readPrecheckAnswers, readPrecheckAt, stepLabel, subTotal, templateOptions, toV06CheckRows, toV8CheckRows,
@@ -168,10 +168,25 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     expect(Object.keys(messagingApiErrors(empty)).sort()).toEqual(['channelId', 'channelSecret'])
     expect(Object.keys(providerIdErrors(empty))).toEqual(['providerId'])
     expect(Object.keys(loginChannelErrors(empty)).sort()).toEqual(['loginChannelId', 'loginChannelSecret'])
-    expect(messagingApiErrors({ channelId: 'abc', channelSecret: 'x', providerId: '2002' }).channelId).toBe('チャネルIDは半角数字で入力してください。')
-    expect(providerIdErrors({ providerId: 'abc' }).providerId).toBe('プロバイダーIDは半角数字で入力してください。')
+    expect(messagingApiErrors({ channelId: 'abc', channelSecret: 'x', providerId: '2002' }).channelId).toBe('チャネルIDは余分な空白を除き、半角数字で入力してください。')
+    expect(providerIdErrors({ providerId: 'abc' }).providerId).toBe('プロバイダーIDは余分な空白を除き、半角数字で入力してください。')
     expect(messagingApiErrors({ channelId: '2001', channelSecret: 'x', providerId: '2002' })).toEqual({})
     expect(loginChannelErrors({ loginChannelId: '2002', loginChannelSecret: 'x' })).toEqual({})
+  })
+
+  it('コピー時の空白・全角数字・別チャネルの取り違えを欄ごとに止める', () => {
+    expect(messagingApiErrors({ channelId: ' 2012071773', channelSecret: 'abc' }).channelId).toContain('空白')
+    expect(providerIdErrors({ providerId: '２００５６４８７５８' }).providerId).toContain('半角数字')
+    expect(messagingApiErrors({ channelId: '2012071773', channelSecret: 'abc\ndef' }).channelSecret).toContain('改行')
+    expect(loginChannelErrors({ channelId: '2012071773', loginChannelId: '2012071773', loginChannelSecret: 'abc' }).loginChannelId).toContain('Messaging APIと同じID')
+    expect(loginChannelErrors({ channelId: '2012071773', loginChannelId: '2012071821', loginChannelSecret: 'abc' })).toEqual({})
+  })
+
+  it('極端な桁違いは警告だけにし、固定桁数の正解を仮定しない', () => {
+    expect(channelLengthWarning('channelId', '1234')).toContain('現在4桁')
+    expect(channelLengthWarning('channelSecret', 'short')).toContain('現在5文字')
+    expect(channelLengthWarning('providerId', '1234567890')).toBeNull()
+    expect(channelLengthWarning('loginChannelSecret', 'a'.repeat(32))).toBeNull()
   })
 
   it('②Step3の4つ・Step4の2つは、すべて入れないと次の段へ進めない', () => {
