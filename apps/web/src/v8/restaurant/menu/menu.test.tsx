@@ -214,7 +214,7 @@ describe('mauOC コースの編集ページ', () => {
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
     const strip = document.querySelector('[data-kpi-strip]')!
-    expect(Array.from(strip.querySelectorAll('[data-kpi-label]')).map((n) => n.getAttribute('title'))).toEqual(['全メニュー', 'コース', '単品', '要承認'])
+    expect(Array.from(strip.querySelectorAll('[data-kpi-label]')).map((n) => n.getAttribute('title'))).toEqual(['全メニュー', 'コース', '単品', '開始待ち'])
     // 5つ目は帯の外の1行に項目名と値を残す。
     const line = strip.nextElementSibling!
     expect(line.tagName).toBe('P')
