@@ -115,6 +115,15 @@ describe('URLから来る絞り込みの0件', () => {
     render(<List />)
     expect(await screen.findByText('まだ友だちがいません')).toBeTruthy()
   })
+
+  it('本当に空の時だけ、友だち追加のURLを作る口を出す（58）', async () => {
+    fx.list.mockResolvedValue(answer([]))
+    render(<List />)
+    expect(await screen.findByText('まだ友だちがいません')).toBeTruthy()
+    const action = screen.getByRole('link', { name: '友だち追加の URL を作る' })
+    expect(action.getAttribute('href')).toBe('/inflow-links')
+    expect(screen.queryByRole('button', { name: '条件を外す' })).toBeNull()
+  })
 })
 
 describe('友だち一覧の読込状態', () => {

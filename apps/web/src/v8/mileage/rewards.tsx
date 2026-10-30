@@ -39,7 +39,7 @@ import Pagination from '@/components/shared/pagination'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { ListPagePagination } from '@/components/templates'
 import { formatMileageDate, formatMileageNumber } from './display'
-import { MILEAGE_TABLE_LAYOUT, CreateButton, MileageFrame, useMileageShell } from './frame'
+import { MILEAGE_TABLE_LAYOUT, MileageFrame, useMileageShell } from './frame'
 import { MileageToolbar, PerPageSelect, RetryButton, SavedSelect, StateCard, ToolbarNotices } from './parts'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
@@ -579,10 +579,13 @@ export default function RewardsTab() {
     </KpiBand>
   )
 
+  /* 主ボタンは素の Button で渡し、題の右の自動整列（副→主）に載せる。 */
   const createButton = (full: boolean) => (
-    <CreateButton href="/mileage/rewards/edit" readonly={readonly} full={full}>
-      <Plus size={16} aria-hidden="true" /> 使い道を作る
-    </CreateButton>
+    readonly ? null : (
+      <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href="/mileage/rewards/edit">
+        <Plus size={16} aria-hidden="true" /> 使い道を作る
+      </Button>
+    )
   )
 
   const chooseFolder = (id: string) => { setPage(1); setFolderId(id) }
