@@ -459,6 +459,7 @@
 
 ## 反映履歴
 
+- [数の帯の増減の札の直し](release-log/unreleased/0000-kenta-muse-kpi-delta-row.md)
 - [飲食店向け設定の表示条件](release-log/unreleased/1965-masato-restaurant-only-settings.md)
 - [EC連携の表示条件](release-log/unreleased/1966-masato-ec-usecase-visibility.md)
 - [飲食店の入口とメニュー価格の保存](release-log/unreleased/1967-masato-restaurant-simplify.md)
