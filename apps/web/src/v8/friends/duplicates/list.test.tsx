@@ -28,8 +28,8 @@ afterEach(() => { cleanup(); vi.clearAllMocks() })
 it('題から安全説明を開閉し、用語説明と候補の操作を保つ', () => {
   render(<DuplicatesList />)
   const toggle = screen.getByRole('button', { name: 'この画面の説明' })
-  const safety = screen.getByText(/自動では結び付けません/).closest('[role="note"]')!
-  expect(safety.textContent).toContain('元の友だちと履歴は残ります')
+  // 決まり2: 安全説明は帯に出さず題の「？」へ。
+  expect(screen.queryByText(/自動では結び付けません/)).toBeNull()
   expect(toggle.closest('header')).not.toBeNull()
   expect(screen.queryByRole('button', { name: '友だちの説明' })).toBeNull()
   expect(toggle.getAttribute('aria-expanded')).toBe('false')
@@ -37,10 +37,11 @@ it('題から安全説明を開閉し、用語説明と候補の操作を保つ'
   const tip = () => document.getElementById(toggle.getAttribute('aria-describedby') ?? '')
   expect(tip()?.textContent).toContain('同じ人が2人に分かれていないか')
   expect(tip()?.textContent).toContain('結び付けるか決めます')
+  expect(tip()?.textContent).toContain('自動では結び付けません')
+  expect(tip()?.textContent).toContain('元の友だちと履歴は残ります')
   expect(tip()?.textContent).toMatch(/同じ人が別のアカウント/)
   fireEvent.click(toggle)
   expect(toggle.getAttribute('aria-expanded')).toBe('false')
-  expect(safety.isConnected).toBe(true)
   expect(screen.getByRole('button', { name: 'もう一度見直す' })).toBeTruthy()
 })
 

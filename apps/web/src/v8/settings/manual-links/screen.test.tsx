@@ -217,3 +217,21 @@ it('編集中に保持された保存handler自身も現在の代理snapshotを�
   expect(mocks.update).toHaveBeenCalledTimes(1)
   expect(mocks.update).toHaveBeenCalledWith('2-1', { url: 'https://example.test/retained', expectedVersion: 2 })
 })
+
+// 114: 開けない行は白のまま（行の赤地なし）。赤は札だけ。件数の札は表の上、表の下に赤い文は出さない。
+it('開けない行は白のまま札だけ赤で、件数の札は表の上', async () => {
+  mocks.list.mockResolvedValue({ success: true, data: { items: [link, { ...link, key: '2-2', name: '壊れた画面', status: 'broken' }], total: 2 } })
+  const view = render(<ManualLinksScreen />)
+  await screen.findByText('壊れた画面')
+  // 行に壊れ印（赤地）は付けない。
+  expect(view.container.querySelectorAll('[data-broken]').length).toBe(0)
+  // 行の状態の札は赤のまま。
+  expect(screen.getByText('開けません')).toBeTruthy()
+  // 件数の札は表より前（上）にある。
+  const summary = screen.getByText('開けないリンクが 1 件')
+  const table = view.container.querySelector('[role="table"], table, [role="grid"]')
+  expect(table).not.toBeNull()
+  expect(Boolean(summary.compareDocumentPosition(table!) & Node.DOCUMENT_POSITION_FOLLOWING)).toBe(true)
+  // 表の下に赤い文は出さない（添え文は札の横の1か所だけ）。
+  expect(view.container.textContent?.match(/押しても何も出ません/g)?.length).toBe(1)
+})

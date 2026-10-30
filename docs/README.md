@@ -459,6 +459,7 @@
 
 ## 反映履歴
 
+- [数の帯の増減の札の直し](release-log/unreleased/1970-kenta-muse-kpi-delta-row.md)
 - [飲食店向け設定の表示条件](release-log/unreleased/1965-masato-restaurant-only-settings.md)
 - [EC連携の表示条件](release-log/unreleased/1966-masato-ec-usecase-visibility.md)
 - [飲食店の入口とメニュー価格の保存](release-log/unreleased/1967-masato-restaurant-simplify.md)
@@ -469,6 +470,7 @@
 - [共通UIの状態表示・操作の修正](release-log/unreleased/1952-kenta-muse-ui-state.md)
 - [招待・ログインユーザー・予約枠の表示修正](release-log/unreleased/1952-kenta-muse-auth.md)
 - [受信箱の空き・題横の印・保存の入口・カードの縦崩れ](release-log/unreleased/1953-kenta-muse-inbox.md)
+- [フォルダ追加の色の板の重なり修正](release-log/unreleased/1970-kenta-muse-check-b.md)
 - [運営・監査・分析・問い合わせ・リッチメニューの修正](release-log/unreleased/1953-kenta-muse-ops-misc.md)
 - [統括の一覧の名前押下・友だちCSVのタブ・統括アカウント説明の修正](release-log/unreleased/1953-kenta-muse-list-settings.md)
 - [絞り込みの見出し・0の灰色・日付の年・経過の日数](release-log/unreleased/1955-kenta-muse-ui-color.md)
@@ -884,6 +886,7 @@
 - [スマートフォン専用の画面（トークと対応）](release-log/unreleased/1845-kenta-phone-shell-talk.md)
 - [予約のしかたと指名料](release-log/unreleased/1845-kenta-booking-options.md)
 - [一覧の帯・フォルダの丸と共通操作の整理](release-log/unreleased/0000-kenta-tags-band-dot.md)
+- [共通UIの並び・形の統一（パンくず・ボタン・選択・空表示など）](release-log/unreleased/1970-kenta-muse-ui-layout.md)
 - [共通部品と言葉・受信箱の絞り込みの修正](release-log/unreleased/0000-kenta-int.md)
 - [飲食店の閲覧のみの案内](release-log/unreleased/1953-kenta-int.md)
 - [チェックの印・スイッチ・選ぶ欄の見た目の統一](release-log/unreleased/0000-kenta-check-green.md)

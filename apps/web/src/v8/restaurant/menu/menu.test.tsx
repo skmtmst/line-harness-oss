@@ -47,11 +47,15 @@ const openMenu = (name: string) => fireEvent.click(screen.getByRole('button', { 
 
 /* ★V8 メニュー管理（板 ・停止 ・追加と変更 ）の動き。 */
 describe('MJoJR メニュー管理', () => {
-  it('数5・「…」の決まりの帯・一覧が出て、アーカイブだけ再開が出る', async () => {
+  it('数5・一覧が出て、アーカイブだけ再開が出る（「…」の決まりは題の？へ）', async () => {
     render(<MenuPage />)
     await screen.findByText('メニュー一覧')
     const board = document.querySelector('[data-design-node="MJoJR"]')!
-    for (const label of ['全メニュー', 'コース', '単品', '開始待ち', 'アレルギー登録', '「…」の中身']) expect(board.textContent).toContain(label)
+    for (const label of ['全メニュー', 'コース', '単品', '開始待ち', 'アレルギー登録']) expect(board.textContent).toContain(label)
+    expect(board.textContent).not.toContain('要承認')
+    expect(board.textContent).not.toContain('「…」の中身')
+    fireEvent.click(screen.getByRole('button', { name: 'メニュー一覧の説明' }))
+    expect(await screen.findByText(/「…」の中身/)).toBeTruthy()
     expect(screen.getAllByRole('button', { name: '再開' })).toHaveLength(1)
   })
 
@@ -204,6 +208,18 @@ describe('mauOC コースの編集ページ', () => {
     expect(await screen.findByText('¥1,200')).toBeTruthy()
     expect(screen.getByText('変更予定の価格')).toBeTruthy()
     expect(screen.getByText('¥2,500')).toBeTruthy()
+  })
+
+  it('R11: 帯は4枚まで、5つ目のアレルギー登録は帯の下の1行', async () => {
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    const strip = document.querySelector('[data-kpi-strip]')!
+    expect(Array.from(strip.querySelectorAll('[data-kpi-label]')).map((n) => n.getAttribute('title'))).toEqual(['全メニュー', 'コース', '単品', '開始待ち'])
+    // 5つ目は帯の外の1行に項目名と値を残す。
+    const line = strip.nextElementSibling!
+    expect(line.tagName).toBe('P')
+    expect(line.textContent).toContain('アレルギー登録')
+    expect(line.textContent).toContain('2 件')
   })
 })
 

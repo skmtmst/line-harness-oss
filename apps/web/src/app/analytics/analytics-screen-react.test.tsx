@@ -776,3 +776,27 @@ describe('ファネルの集計状態', () => {
     expect(host.textContent).toContain('作成はできましたが、成果地点への利用先記録に失敗しました：購入完了。成果地点側の利用先一覧には出ていません。')
   })
 })
+
+describe('88 二段の切り替え', () => {
+  it('下の段（見かた）は灰の箱の切り替えで、押すと履歴を積まずに置き換える', async () => {
+    const { useRouter } = await import('next/navigation')
+    const replace = useRouter().replace as ReturnType<typeof vi.fn>
+    replace.mockClear()
+    net.handler = async (path) => {
+      if (path.startsWith('/api/analytics/friends')) return friendsOverview()
+      if (path.startsWith('/api/analytics/routes')) return routesOverview([])
+      if (path.startsWith('/api/analytics/saved')) return { success: true, data: [] }
+      throw new Error(`未設定: ${path}`)
+    }
+    await render('friends')
+
+    // 上の段（組）だけが下線のタブ。下の段は箱の切り替え。
+    expect(host.querySelectorAll('[role="tablist"]')).toHaveLength(1)
+    const views = host.querySelector('[role="group"][aria-label="分析の見かた"]')
+    expect(views).not.toBeNull()
+    const reactions = Array.from(views!.querySelectorAll('button')).find((item) => item.textContent?.includes('配信の反応'))
+    await click(reactions as HTMLElement)
+    expect(replace).toHaveBeenCalledWith('/analytics?tab=reactions')
+    expect(useRouter().push as ReturnType<typeof vi.fn>).not.toHaveBeenCalled()
+  })
+})

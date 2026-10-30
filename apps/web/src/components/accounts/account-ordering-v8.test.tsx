@@ -34,6 +34,18 @@ it('ドラッグを使わなくても未設定から子へ移し、変更した�
   expect(updateHierarchy).toHaveBeenCalledWith([{ id: 'free', parentLineAccountId: 'parent' }])
 })
 
+// 決まり2: 並び替え方・階層の説明は帯にせず、題の横の「？」へ入れる。
+it('並び替え方と階層の説明は帯に出さず題の「？」に入れる', async () => {
+  render(<AccountOrdering />)
+  await waitFor(() => expect(screen.getByRole('heading', { name: /LINEアカウントの並び替え/ })).toBeTruthy())
+  expect(screen.queryByText(/3階層まで紐付けます/)).toBeNull()
+  expect(screen.queryByText(/すべてLINE公式アカウントです/)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'LINEアカウントの並び替えの説明' }))
+  expect(await screen.findByText(/3階層まで紐付けます/)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'LINEアカウント階層の説明' }))
+  expect(await screen.findByText(/すべてLINE公式アカウントです/)).toBeTruthy()
+})
+
 it('親を自身の子の下へ移す循環はメニューからも実行できない', async () => {
   render(<AccountOrdering onClose={vi.fn()} />)
   await waitFor(() => expect(screen.getByRole('button', { name: '本店の移動先を選ぶ' })).toBeTruthy())

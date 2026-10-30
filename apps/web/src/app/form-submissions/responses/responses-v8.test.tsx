@@ -259,3 +259,22 @@ it('二重押下は1要求。失敗は窓を残してやり直し、成功後は
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+describe('19 空の値の言い方', () => {
+  it('名前の無い回答は薄い灰の「—」で出し、「不明」と書かない', async () => {
+    fetchApi.mockImplementation((async (url: string) => {
+      if (url.startsWith('/api/forms/form-1/submissions')) {
+        return { success: true, data: { ...submissionsPage, items: [{ ...submissionsPage.items[0], friendName: null }] } }
+      }
+      return { success: true, data: formDetail }
+    }) as typeof fetchApi)
+    await act(async () => { root.render(<FormResponsesPage />) })
+    await settle()
+    await act(async () => { tabButton('1件ずつ見る')?.click() })
+    await settle()
+    const name = host.querySelector('tbody button[title="不明"]')
+    expect(name).not.toBeNull()
+    expect(name!.textContent).toBe('—')
+    expect(name!.querySelector('[data-empty-value]')).not.toBeNull()
+  })
+})

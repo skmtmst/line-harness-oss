@@ -130,7 +130,7 @@ export default function RestaurantFrame({
   bannerNote,
   bodyPadTop,
   bodyGap,
-  pickerAs = 'tabs',
+  pickerAs = 'select',
   banner = true,
   subtitle,
   actions,
@@ -151,7 +151,7 @@ export default function RestaurantFrame({
   bodyPadTop?: number
   /** 中身の段の間を絵の値にする。渡さないときは共通の 16 のまま。 */
   bodyGap?: number
-  /** 店舗を選ぶ形。既定はタブ。`'select'` は絵の「店舗：〇〇 ▾」の選ぶ欄（幅210・融合の板 ）。 */
+  /** 店舗を選ぶ形。86: 既定は絵の「店舗：〇〇 ▾」の選ぶ欄（幅210・融合の板 ）。 */
   pickerAs?: 'tabs' | 'select'
   /** 検証環境の帯を出すか。融合の板は帯を描かないので false。 */
   banner?: boolean
@@ -211,7 +211,8 @@ export default function RestaurantFrame({
     [snapshot, selectedStoreId],
   )
 
-  const picker = snapshot && snapshot.stores.length > 0 ? pickerAs === 'select' ? (
+  /* 86: 店が1つしか無い時は選ぶ欄を出さない（「すべての店舗」を足す画面は選ぶ意味があるので出す）。 */
+  const picker = snapshot && (snapshot.stores.length > 1 || (allStores && snapshot.stores.length > 0)) ? pickerAs === 'select' ? (
     <SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect
       aria-label="店舗"
       noun="店舗"

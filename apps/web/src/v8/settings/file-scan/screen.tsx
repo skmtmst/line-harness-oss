@@ -35,7 +35,8 @@ import { FILE_SCAN_PAGE_SIZE,useFileScan } from './use-file-scan'
 
 const TITLE = 'ファイルの安全確認'
 const DESCRIPTION = '上げたファイルに危ないものがないかを確かめます'
-const SAFETY_NOTICE = <Notice tone="info">確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。</Notice>
+/* 決まり2: いつも同じ説明は帯にせず、題の横の「？」へ入れる。 */
+const EXPLANATION = '確かめ終わるまで、上げたファイルは配信・公開・審査に出せません。'
 
 /* 板の札。`使えません`・`使えます` の絞り込みは 管理画面 の画面に残す。 */
 const STATUS_CHIPS = [
@@ -193,8 +194,7 @@ export default function FileScanScreen() {
 
   if (phase === 'loading' || phase === 'error' || phase === 'forbidden' || !selectedAccountId) {
     return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={DESCRIPTION}>
-        {SAFETY_NOTICE}
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={EXPLANATION}>
         {phase === 'loading' ? (
           <ListState kind="loading" />
         ) : phase === 'error' ? (
@@ -226,9 +226,8 @@ export default function FileScanScreen() {
   const legacySecret = Boolean(config?.externalSecretRef && !/^FILE_SCAN_SECRET_[A-Z0-9_]+$/.test(config.externalSecretRef))
 
   return (
-      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={DESCRIPTION}
+      <SbSettingsScreen boardId="PfA4o" title={TITLE} help={DESCRIPTION} explanation={EXPLANATION}
         saveActions={canEdit && configOpen && (configDirty || configBusy) ? <><Button disabled={configBusy} onClick={() => { setProvider(config?.externalProvider ?? ''); setEndpoint(config?.externalEndpointUrl ?? ''); setSecretRef(config?.externalSecretRef ?? ''); setActionError(''); configFields.reset() }}>キャンセル</Button><Button variant="primary" disabled={configBusy} onClick={() => void saveConfig()} busy={configBusy} busyLabel="保存しています…">外の検査の設定を保存する</Button></> : undefined}>
-        {SAFETY_NOTICE}
       {actionError ? <Notice tone="danger" message={actionError} /> : null}
       {actionDone ? <Notice tone="success" role="status">{actionDone}</Notice> : null}
 

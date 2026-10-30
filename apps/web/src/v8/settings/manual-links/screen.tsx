@@ -48,7 +48,6 @@ export default function ManualLinksScreen() {
     filter,
     setFilter,
     actionError,
-    notice,
     canEdit,
     canView,
     staff,
@@ -133,6 +132,14 @@ export default function ManualLinksScreen() {
           ) : undefined}
         />
       ) : (
+        <>
+        {/* 114: 件数の札は表の上へ。表の下の赤い文は出さない。 */}
+        {brokenCount > 0 ? (
+          <p className={styles.brokenSummary}>
+            <StatusBadge tone="danger">{`開けないリンクが ${formatNumber(brokenCount)} 件`}</StatusBadge>
+            <span className={styles.brokenNote}>直すまで、その画面の「マニュアル」は押しても何も出ません。</span>
+          </p>
+        ) : null}
         <GridTable className={styles.table} label={`画面とマニュアルの対応 ${formatNumber(total)} 件`} design={{ columns: 'var(--sett-manual-columns)', gap: 'var(--tpl-sb-tbl-gap)', padding: 'var(--tpl-sb-tbl-pad)', rowPadding: 'var(--tpl-sb-tbl-row-pad)', fontSize: 'var(--tpl-sb-tbl-head)', color: 'var(--color-ink)' }}>
           <div role="rowgroup">
             <GridHeadRow>
@@ -149,8 +156,9 @@ export default function ManualLinksScreen() {
               const key = row.taskId ?? row.screenId
               const editing = canEdit && editingKey === key
               const checked = row.checkedAt ? formatDate(row.checkedAt, { style: 'list', fallback: checkedLabel(row.checkedAt) }) : emptyValue('unknown')
+              // 114: 開けない行も白のまま。赤は状態の札だけ。
               return (
-                <GridRow key={key} data-broken={row.status !== 'ok' || undefined}>
+                <GridRow key={key}>
                   <GridCell role="cell" className={styles.cell}>{row.screenId}</GridCell>
                   <GridCell role="cell" className={`${styles.cell} ${styles.name}`} title={row.name}>{row.name}</GridCell>
                   <GridCell role="cell" className={styles.cell} title={urlLabel(row.url)}>
@@ -176,9 +184,9 @@ export default function ManualLinksScreen() {
             })}
           </div>
         </GridTable>
+        </>
       )}
 
-      {notice ? <p className={styles.footDanger}>{notice}</p> : null}
       {total > rows.length ? <p className={styles.foot}>{`ほか ${total - rows.length} 件。`}</p> : null}
     </>,
   )

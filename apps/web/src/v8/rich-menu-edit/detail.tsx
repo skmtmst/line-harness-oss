@@ -29,6 +29,7 @@ import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import { ListPageSection } from '@/components/templates/list-page'
 import Notice from '@/components/shared/notice'
+import StatusBadge from '@/components/shared/status-badge'
 import { notifySaved } from '@/components/shared/toast'
 
 type Group = {
@@ -344,7 +345,7 @@ export default function RichMenuDetailV8({ groupId }: { groupId: string }) {
             <section className={styles.aboutBox} aria-label="いまの状態">
               <h2 className={styles.aboutTitle}>いまの状態</h2>
               <dl className={styles.aboutList}>
-                <div className={styles.aboutRow}><dt>状態</dt><dd className={styles.stateOk}>公開中</dd></div>
+                <div className={styles.aboutRow}><dt>状態</dt><dd><StatusBadge tone="success">公開中</StatusBadge></dd></div>
                 <div className={styles.aboutRow}><dt>出す相手</dt><dd>{audience === 'all' ? 'すべての友だち（既定）' : audience === 'targeted' ? '条件に当てはまる友だち' : '登録だけ（出す相手なし）'}</dd></div>
                 <div className={styles.aboutRow}><dt>出る人</dt><dd>{preview?.effective.value == null ? '—' : `${polishFormatNumber(preview.effective.value)} 人`}</dd></div>
                 <div className={styles.aboutRow}><dt>今月押された</dt><dd>{taps === undefined ? '読み込み中…' : taps === null ? '—' : `${polishFormatNumber(taps)} 回`}</dd></div>

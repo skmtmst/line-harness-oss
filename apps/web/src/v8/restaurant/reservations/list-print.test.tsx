@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import ListView from './list'
+import { reservation } from '../booking-kit/test-data'
 
 const fixture = vi.hoisted(() => ({
   allPages: vi.fn(),
@@ -36,4 +37,24 @@ it.each([
   expect(await fixture.board!.loadPrintEntries()).toEqual([{ status: 'confirmed' }])
   expect(fixture.allPages).toHaveBeenCalledWith('seats', 'account', from, to, 'store')
   expect(fixture.board!.printContext).toContain(label)
+})
+
+// R11: 帯は大事な4つまで。5つ目の未配席は帯の下の短い1行に残す。
+it('R11: 帯は4枚で未配席は下の1行、行き先は今日の配席', () => {
+  const onView = vi.fn()
+  const rows = [
+    reservation('r1', { status: 'confirmed', table_id: null, guest_count: 2 }),
+    reservation('r2', { status: 'confirmed', table_id: 't1', guest_count: 3 }),
+  ]
+  const view = render(<ListView view="list" rows={rows as never} total={2} tables={[]} page={1} period="all" status="all"
+    busy={false} canWrite={false} canImport={false} day={new Date()} storeId="store" storeName="試験店"
+    onView={onView} onPeriod={vi.fn()} onStatus={vi.fn()} onPage={vi.fn()} onImport={vi.fn()}
+    onCreate={vi.fn()} onEdit={vi.fn()} onOpen={vi.fn()} onCancel={vi.fn()} onRestore={vi.fn()} />)
+  // 帯の中は4枚だけ。
+  expect(view.container.querySelectorAll('[data-kpi-strip] [data-kpi-presentation]').length).toBe(4)
+  // 5つ目は帯の下の短い1行。
+  const line = screen.getByText(/未配席 1 件/)
+  expect(line.closest('[data-kpi-strip]')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '今日の配席へ →' }))
+  expect(onView).toHaveBeenCalledWith('today')
 })

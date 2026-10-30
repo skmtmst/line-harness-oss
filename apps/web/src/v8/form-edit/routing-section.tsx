@@ -7,7 +7,7 @@ import { DataTable, TableHeadRow, Tr, Td, Th, HandleCell, ActionCell } from '@/c
 import Notice from '@/components/shared/notice'
 
 import { useMemo, useState } from 'react'
-import { Play, Info, Plus } from 'lucide-react'
+import { Play, Plus } from 'lucide-react'
 import type { FormBlock } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
@@ -68,7 +68,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
       <div className={styles.head}>
         <span className={styles.title}>
           <h2 id="fe-routing-title" className={styles.h2}>答えで予約の行き先を分ける</h2>
-          <HelpTip label="答えで予約の行き先を分けるの説明">質問への答えに合わせて、予約のメニューと担当を自動で決めます。上の行から順に当てはめ、どれにも当たらないときは最後の行へ進みます。</HelpTip>
+          <HelpTip label="答えで予約の行き先を分けるの説明">質問への答えに合わせて、予約のメニューと担当を自動で決めます。行き先はこの表で決まるので、お客さまにはメニューと担当を選ばせず日時から始めます（下の「メニューを選んでもらう」は使いません）。上の行から順に当てはめ、どれにも当たらないときは最後の行へ進みます。</HelpTip>
         </span>
         <span className={styles.actions}>
           {value.enabled ? <Button variant="secondary" icon={<Play size={16} aria-hidden="true" />} onClick={() => { setTrying((v) => !v); setTrial('') }} aria-expanded={trying} aria-controls="routing-trial">試しに答える</Button> : null}
@@ -82,9 +82,7 @@ export default function RoutingSection({ blocks, refs, routing, readOnly, onChan
             onChange={(id) => { setPickedQuestion(id); set({ rules: [] }) }} />}
           <span className={styles.hint}>使える質問：1 つ選ぶ・いくつでも選ぶ・プルダウン</span>
         </div>
-        <Notice tone="info" icon={<Info aria-hidden="true" size={16} />}>
-          行き先はこの表で決まるので、お客さまにはメニューと担当を選ばせず日時から始めます（下の「メニューを選んでもらう」は使いません）。上の行から順に当てはめます。
-        </Notice>
+        {/* 決まり2: 行き先の決まりは帯にせず、題の横の「？」へ入れる。 */}
         {trying && question ? <div id="routing-trial" className={styles.trial} role="group" aria-label="試しに答える">
           <span>もしお客さまが「{question.label}」に</span>
           <Select aria-label="試しの答え" value={trial} options={[{ value: '', label: '答えを選ぶ' }, ...(question.choices ?? []).map((c) => ({ value: c.label, label: c.label }))]} onChange={setTrial} />

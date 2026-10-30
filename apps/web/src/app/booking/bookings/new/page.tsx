@@ -9,6 +9,7 @@ import { PageHeading } from '@/components/templates/page-frame';
 import DateField from '@/components/shared/date-field';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAccount } from '@/contexts/account-context';
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import Button from '@/components/shared/button';
 import MenuPortal from '@/components/shared/menu-portal';
 import Notice from '@/components/shared/notice';
@@ -131,6 +132,9 @@ function operationStatusLabel(status: string): string {
 
 export default function NewProxyBookingPage() {
   const { selectedAccountId } = useAccount()
+  /* パンくずは上の帯だけ（板の中の2つ目のパンくずは置かない）。 */
+  usePageTitle('電話の予約を入れる')
+  usePageCrumbs([{ label: '予約管理', href: '/booking/bookings' }])
   const [step, setStep] = useState<Step>('input')
   const [menus, setMenus] = useState<BookingMenu[]>([])
   const [staff, setStaff] = useState<BookingMenuStaff[]>([])

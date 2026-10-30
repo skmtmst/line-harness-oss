@@ -9,7 +9,7 @@ import CopyTextButton from '@/components/shared/copy-text-button'
 import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { Suspense, useEffect, useMemo, useState } from 'react'
-import { Info, Pause, Pencil, QrCode, UserPlus, Gift, Check, CalendarDays, Users, Ban, Target, MousePointerClick, FileText, ShoppingBag, RotateCcw } from 'lucide-react'
+import { Info, Pause, Pencil, QrCode, UserPlus, Gift, Check, CalendarDays, Users, Ban, Target, MousePointerClick, FileText, ShoppingBag } from 'lucide-react'
 import type { ApiResponse, EntryRoute, EntryRouteFunnel, Scenario, Tag, TrafficPool } from '@line-crm/shared'
 import { ApiError, api, fetchApi } from '@/lib/api'
 import { isPoolsFeatureAvailable } from '@/lib/pools-availability'
@@ -511,13 +511,16 @@ function InflowDetailContent() {
                 : '右上の「…」から：受付を止める・別リンクへ送る・削除する'}
             </p>
             {funnel ? (
+              <>
               <KpiBand aria-label="流入後の成果">
                 <KpiCard presentation="band" icon={<MousePointerClick size={16} aria-hidden="true" />} title="クリック" value={funnel.click_count} unit="回" detail={null} />
                 <KpiCard presentation="band" icon={<UserPlus size={16} aria-hidden="true" />} title="友だち追加" value={funnel.friend_add_count} unit="人" detail={addRate == null ? '追加率は集計できません' : `追加率 ${addRate}%`} />
                 <KpiCard presentation="band" icon={<FileText size={16} aria-hidden="true" />} title="フォーム" value={funnel.form_submission_count} unit="件" detail={null} />
                 <KpiCard presentation="band" icon={<ShoppingBag size={16} aria-hidden="true" />} title="購入" value={ordersSummary?.total ?? null} unit="件" detailLayout="single" detail={ordersSummary ? yen(ordersSummary.totalAmount) : '集計を取得できていません'} />
-                <KpiCard presentation="band" icon={<RotateCcw size={16} aria-hidden="true" />} title="返金・取消" value={ordersSummary ? ordersSummary.refunded + ordersSummary.cancelled : null} unit="件" detailLayout="single" detail={ordersSummary ? (ordersSummary.refundedAmount == null ? emptyValue('unknown') : `−${yen(ordersSummary.refundedAmount)}`) : '集計を取得できていません'} />
               </KpiBand>
+              {/* R11: 5つ目は帯の下の短い1行に残す。 */}
+              <p className={styles.fifthLine}>返金・取消 {ordersSummary ? formatNumber(ordersSummary.refunded + ordersSummary.cancelled) : emptyValue('unknown')} 件{ordersSummary && ordersSummary.refundedAmount != null ? `（−${yen(ordersSummary.refundedAmount)}）` : ''} <Button variant="text" size="inline" onClick={() => setShowOrders(true)}>注文明細へ →</Button></p>
+              </>
             ) : funnelError ? (
               <div className={styles.funnelError}>
                 <p className={styles.note}>段階を読み込めませんでした。集計データは消えていません。</p>

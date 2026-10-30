@@ -20,7 +20,6 @@ import ListState from '@/components/shared/list-state'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import { StoreTabs, type StoreTabKey } from '@/v8/restaurant/store-tabs/index'
 import styles from './shell.module.css'
-import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect from '@/components/shared/entity-select'
 
@@ -86,18 +85,20 @@ export function StatRow({ children, compact = false, fusion = false }: { childre
 }
 
 /** 白い枠。題・説明・右端の操作を持つ。 */
-export function Panel({ title, description, aside, flush = false, children,fusion=false }: {
+export function Panel({ title, description, aside, flush = false, children,fusion=false, help }: {
   fusion?:boolean
   title: ReactNode
   description?: ReactNode
   aside?: ReactNode
+  /** 題の横の「？」に入れる説明（決まり2: いつも同じ帯はここへ）。 */
+  help?: ReactNode
   /** 表など枠いっぱいの中身のとき true（内側の余白を付けない）。 */
   flush?: boolean
   children: ReactNode
 }) {
   return (
     <Card layout="vertical" surface="inset" overflow="hidden">
-      <CardHeader size={fusion?'restaurant':'panel'} title={title} meta={description} action={aside} />
+      <CardHeader size={fusion?'restaurant':'panel'} title={title} meta={description} action={aside} help={help} />
       {flush ? children : <div className={fusion?styles.panelBodyFusion:styles.panelBody}>{children}</div>}
     </Card>
   )
@@ -229,7 +230,8 @@ export default function RestaurantShell({ boardId, title, description, explanati
   ) : (
     children?.(ctx)
   )
-  const storePicker = snapshot && snapshot.stores.length > 0 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect compact size="full" aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/></SaveErrorField></span> : <StoreFilterTabs value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/> : null
+  /* 86: 店の切り替えは［店舗：…］の選ぶ欄1つに統一。店が1つしか無い時は出さない。 */
+  const storePicker = snapshot && snapshot.stores.length > 1 ? templateHeading ? <span className={styles.fusionStore}><SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect compact size="full" aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/></SaveErrorField></span> : <SaveErrorField names={["selectedStoreId","selected_store_id"]}><EntitySelect compact size="full" aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={selectedStoreId} onChange={setSelectedStoreId} options={snapshot.stores.map(item=>({value:item.id,label:item.name}))}/></SaveErrorField> : null
   const noticeBand = loadError !== null && snapshot?.organization ? <ListState kind="error" title={savedButUnread ? "保存しましたが、最新の表示を読み込めませんでした" : "最新の表示を読み込めませんでした"} error={loadError} onRetry={()=>void load()}/> : notice ? (
     <Notice role="status" tone={notice.tone === 'success' ? 'success' : 'danger'} message={notice.text} />
   ) : null

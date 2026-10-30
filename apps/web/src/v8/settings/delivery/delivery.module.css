@@ -27,8 +27,8 @@
   font-size: var(--tpl-e1-dl-note-size); line-height: var(--tpl-e1-dl-note-lh);
 }
 
-/* 主な操作はカードの中央に並べる。 */
-.actions { display: flex; justify-content: center; flex-wrap: wrap; align-items: center; gap: var(--tpl-e1-dl-row-gap); }
+/* 追加決まり1: 操作は左に1行で並べる。1つだけ中央に浮かせない。 */
+.actions { display: flex; justify-content: flex-start; flex-wrap: wrap; align-items: center; gap: var(--tpl-e1-dl-row-gap); }
 
 /* つなぐお店を選ぶ窓（DL-4 `X5d8UF`）：行の並びだけを持つ。
    1つだけ選ぶ箱の形と選んだときの色は共通の RadioCard（variant="form"）に任せる。 */

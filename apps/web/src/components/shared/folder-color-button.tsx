@@ -10,7 +10,7 @@ import styles from './folder-color-button.module.css'
 export type FolderColorOption = { value: string; name: string }
 
 /** ・iBuZH 共通：今の色の丸＋矢印。色なしは薄い灰の丸。 */
-export default function FolderColorButton({ value, onChange, colors = FOLDER_SELECT_COLORS, disabled = false, compact = false, allowClear = false, appearance = 'button', label = 'フォルダの色' }: {
+export default function FolderColorButton({ value, onChange, colors = FOLDER_SELECT_COLORS, disabled = false, compact = false, allowClear = false, appearance = 'button', label = 'フォルダの色', dropUp = false }: {
   value: string | null
   onChange: (color: string | null) => void
   colors?: ReadonlyArray<FolderColorOption>
@@ -19,6 +19,8 @@ export default function FolderColorButton({ value, onChange, colors = FOLDER_SEL
   allowClear?: boolean
   appearance?: 'button' | 'palette'
   label?: string
+  /** 上へ開く（E21：フォルダの窓の下帯に被せない）。既定は今までどおり自動。 */
+  dropUp?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const buttonRef = useRef<HTMLButtonElement>(null)
@@ -92,7 +94,7 @@ export default function FolderColorButton({ value, onChange, colors = FOLDER_SEL
         <ChevronDown size={16} aria-hidden="true" />
       </button>
       {compact ? (open ? <span className={styles.inlinePalette}>{palette}</span> : null) : (
-        <MenuPortal open={open} getAnchor={() => buttonRef.current} onClose={() => setOpen(false)} onEscape={close}>{palette}</MenuPortal>
+        <MenuPortal open={open} getAnchor={() => buttonRef.current} onClose={() => setOpen(false)} onEscape={close} placement={dropUp ? 'up' : undefined}>{palette}</MenuPortal>
       )}
     </span>
   )

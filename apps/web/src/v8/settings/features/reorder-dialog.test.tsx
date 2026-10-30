@@ -20,3 +20,9 @@ test('区分を変えても並べ替えた下書きを保ち、確定した時�
   fireEvent.click(screen.getByRole('button', { name: 'この並びにする' }))
   expect(apply).toHaveBeenCalledWith({ delivery: ['b', 'a'] })
 })
+test('81: 取り消しが左、実行が右（［キャンセル］［この並びにする］）', () => {
+  render(<ReorderDialog groups={groups} initialOrder={{}} onApply={vi.fn()} onCancel={() => {}} moveItemInOrder={vi.fn()} />)
+  const pair = screen.getByRole('dialog').querySelector('[data-dialog-action-pair]')
+  const labels = within(pair as HTMLElement).getAllByRole('button').map((button) => (button.textContent ?? '').replace(/\s+/g, ''))
+  expect(labels).toEqual(['元の並びに', 'キャンセル', 'この並びにする'])
+})

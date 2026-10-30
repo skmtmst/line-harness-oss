@@ -95,3 +95,10 @@ it('N-147: 同じ窓で名前と色を更新し、フォルダの所属をAPIへ
   expect(onAdded).toHaveBeenCalledWith(updated)
   expect(onClose).toHaveBeenCalledTimes(1)
 })
+
+it('E21：フォルダの窓の色の板は上へ開く（下帯に被せない）', async () => {
+  await act(async () => { render(<Host />) })
+  fireEvent.click(screen.getByRole('button', { name: 'フォルダの色：色なし' }))
+  expect(screen.getByRole('radiogroup')).toBeTruthy()
+  expect(document.querySelector('[data-menu-portal]')?.getAttribute('data-placement')).toBe('up')
+})

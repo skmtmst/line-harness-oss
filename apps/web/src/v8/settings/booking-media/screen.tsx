@@ -36,7 +36,6 @@ import TruncatedText from '@/components/shared/truncated-text'
 import { withPermissionFailure } from '@/components/shared/api-error-message'
 import TextLink from '@/components/shared/text-link'
 import { EmptyCell } from '@/components/shared/empty-value'
-import StoreFilterTabs from '@/components/shared/store-filter-tabs'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { formatNumber } from '@/lib/format'
@@ -464,7 +463,7 @@ export default function BookingMediaPage() {
             <span className={styles.headActions}>
               {stores.length > 1 ? (
                 <span>
-                  <SaveErrorField names={["storeId","pendingStoreId","store_id","pending_store_id"]}><StoreFilterTabs  value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name }))} /></SaveErrorField>
+                  <SaveErrorField names={["storeId","pendingStoreId","store_id","pending_store_id"]}><EntitySelect aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name }))} /></SaveErrorField>
                 </span>
               ) : null}
               {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={16} aria-hidden="true" />媒体を足す</Button> : null}

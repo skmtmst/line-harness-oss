@@ -1,7 +1,7 @@
 /*
  * ★V8 LINE来店フォロー（融合 ・絵 ）。値は globals.css の共通の値。
- * 行：高さ約60・左右12・間12・印の箱32・名前13/600・説明12・タイミング12/600・札。
- * 選んだ行：緑の枠＋薄い緑の地（ の選んだ形と同じ色）。
+ * 行：高さ約60・左右12・間12・印の箱32・名前13/600・説明12・タイミング12/600・札・右端の開閉印。
+ * 118: 開いた行は白のまま、左の緑の線と右端の ⌃ で開いている印を示す（灰の地にしない）。
  */
 
 .flowList {
@@ -20,9 +20,24 @@
 
 
 
+.flowCardOpen {
+  position: relative;
+}
+
+.flowCardOpen::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: var(--tpl-rt-flow-open-w);
+  border-radius: var(--radius-card) 0 0 var(--radius-card);
+  background: var(--color-accent-deep);
+}
+
 .flowButton {
   display: grid;
-  grid-template-columns: var(--space-32) minmax(0, 1fr) var(--tpl-rt-flow-timing-w) auto;
+  grid-template-columns: var(--space-32) minmax(0, 1fr) var(--tpl-rt-flow-timing-w) auto auto;
   align-items: center;
   gap: var(--space-12);
   width: 100%;
@@ -90,6 +105,21 @@
 .flowStatus {
   display: inline-flex;
   justify-content: flex-end;
+}
+
+.flowChevron {
+  color: var(--color-ink-faint);
+  transition: transform var(--motion-base) var(--motion-ease-out);
+}
+
+.flowChevron[data-open] {
+  transform: rotate(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flowChevron {
+    transition: none;
+  }
 }
 
 .contentHead {

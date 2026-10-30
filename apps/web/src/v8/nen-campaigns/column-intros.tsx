@@ -156,12 +156,13 @@ export default function ColumnIntros() {
   }
 
 
-  return <SaveErrorScope errors={saveErrors}><DetailPage title="コラムの紹介文" readOnly={!canEdit} subtitle="コラムの本文はEC側にあります。ここで直せるのは、LINEで配るときに前に付ける一言だけです。">
+  {/* 119: いつも同じ説明は帯・題下に出さず、題の横の「？」へ。 */}
+  return <SaveErrorScope errors={saveErrors}><DetailPage title="コラムの紹介文" readOnly={!canEdit} help="コラムの本文はEC側にあります。ここで直せるのは、LINEで配るときに前に付ける一言だけです。">
     {error ? <Notice tone="danger" message={error} action={<Button onClick={() => void load()}>読み直す</Button>} /> : null}
     {loading ? <ListState kind="loading" /> : columns.length === 0 ? error ? null : <ListState kind="empty" title="コラムがまだありません。EC側で公開されると、ここに出ます。" /> : columns.map((column) => <FormSection
       key={column.id} id={`column-intro-${column.id}`} title={column.title}
       description={column.publishedAt ? formatDay(column.publishedAt) : '未公開'}
-      action={canEdit ? <Button onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')} busy={savingId === column.id} done={savedId === column.id}>保存する</Button> : undefined}>
+      action={canEdit ? <Button onClick={() => save(column)} disabled={savingId === column.id || (drafts[column.id] ?? '') === (column.introText ?? '')} disabledReason={(drafts[column.id] ?? '') === (column.introText ?? '') ? '変えたところはありません' : null} busy={savingId === column.id} done={savedId === column.id}>保存する</Button> : undefined}>
       <Field label={`${column.title}の紹介文`}>
         <SaveErrorField names={[`${column.id}.introText`]}><TextArea rows={3} value={drafts[column.id] ?? ''} maxLength={1500} readOnly={!canEdit} onChange={(event) => {
           setDrafts((previous) => ({ ...previous, [column.id]: event.target.value }))

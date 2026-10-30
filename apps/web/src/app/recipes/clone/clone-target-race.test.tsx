@@ -8,12 +8,14 @@ import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ id: 'recipe-a', pending: new Map<string, (v: unknown) => void>() }))
+const titleFn = vi.hoisted(() => vi.fn())
 
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(`id=${net.id}`) }))
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: null, loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: vi.fn() }))
+/* 73: レシピ名は板の中のパンくずではなく上の帯の題へ出す。世代の判定は題で見る。 */
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: (...args: unknown[]) => titleFn(...args), usePageCrumbs: vi.fn() }))
 vi.mock('@/lib/api', () => ({
   api: {
     recipes: {
@@ -41,8 +43,9 @@ describe('recipes/clone の対象の世代（WEB321）', () => {
     net.id = 'recipe-b'
     view.rerender(<Page />)
     await act(async () => { net.pending.get('recipe-b')?.({ success: true, data: recipe('recipe-b', 'Bのレシピ') }) })
-    await waitFor(() => expect(screen.getAllByText('Bのレシピ').length).toBeGreaterThan(0))
+    await waitFor(() => expect(titleFn).toHaveBeenCalledWith('Bのレシピを作る'))
     await act(async () => { net.pending.get('recipe-a')?.({ success: true, data: recipe('recipe-a', 'Aのレシピ') }) })
-    expect(screen.queryByText('Aのレシピ')).toBeNull()
+    expect(titleFn).not.toHaveBeenCalledWith('Aのレシピを作る')
+    expect(titleFn).toHaveBeenLastCalledWith('Bのレシピを作る')
   })
 })
