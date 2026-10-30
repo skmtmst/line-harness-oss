@@ -1,3 +1,5 @@
+import './detail-surface-pages.test.mjs'
+import './detail-surface.test.mjs'
 import './kpi-delta-row.test.mjs'
 import './floating-surface.test.mjs'
 import './floating-surface-components.test.mjs'

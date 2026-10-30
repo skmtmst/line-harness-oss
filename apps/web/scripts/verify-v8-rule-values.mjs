@@ -74,8 +74,6 @@ export const RULE_BINDINGS = [
   ['dialog', ".title", 'font-size', '--tpl-dialog-title-size'],
   ['dialog', ".title", 'font-weight', '--tpl-dialog-title-weight'],
   ['dialog', ".panel", 'box-shadow', '--polish-window-shadow'],
-  ['drawer', ".panel.panel .title", 'font-size', '--tpl-dialog-title-size'],
-  ['drawer', ".panel.panel .title", 'font-weight', '--tpl-dialog-title-weight'],
   ['folder-editor-dialog', ".label", 'font-size', '--tpl-field-label-size'],
   ['folder-editor-dialog', ".label", 'font-weight', '--tpl-field-label-weight'],
   ['form-controls', ".label", 'font-size', '--tpl-field-label-size'],
