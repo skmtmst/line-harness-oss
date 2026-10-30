@@ -228,6 +228,7 @@ function FolderCreatePanel({
         <input
           ref={inputRef}
           type="text"
+          data-input-field
           className={styles.field}
           value={name}
           maxLength={100}

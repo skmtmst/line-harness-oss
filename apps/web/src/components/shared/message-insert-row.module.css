@@ -2,7 +2,7 @@
 
 @layer components {
 .body { min-width: 0; border: 1px solid var(--color-control-border); border-radius: var(--radius-control); background: var(--color-canvas); box-shadow: var(--control-shadow); overflow: visible; container-type: inline-size; }
-.body:has(:is(textarea, [data-insert-field]):focus-visible) { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
+
 :root .body :is(textarea, [data-insert-field]) { border: 0; box-shadow: none; outline: 1px solid transparent; }
 .row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--polish-space-field); padding: var(--tpl-insert-footer-pad); min-width: 0; }
 .controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); min-width: 0; }
@@ -22,6 +22,4 @@
 :root .button { padding-block-start: var(--polish-text-center-inset); }
 
 /* 文字の欄は外枠に輪を出す。差し込みボタンの焦点はボタン自身に残す。 */
-html:root .body :is(textarea, [data-insert-field]):focus-visible { outline: var(--polish-focus-width) solid transparent; }
-/* 中の欄に誤りがある時は外枠を赤1本。 */
-html:root .body:has(:is(textarea, [data-insert-field])[aria-invalid='true']):has(:is(textarea, [data-insert-field]):focus-visible) { outline-color: var(--color-danger); }
+html:root .body :is(textarea, [data-insert-field]):focus-visible { outline: var(--polish-focus-width) solid transparent; }/* 中の欄に誤りがある時は外枠を赤1本。 */

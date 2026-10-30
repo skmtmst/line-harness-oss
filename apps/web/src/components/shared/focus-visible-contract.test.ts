@@ -49,7 +49,8 @@ describe('押せる部品のフォーカスが見える', () => {
   it('自前の CSS を持つ部品は :focus-visible を持つ', () => {
     const missing = PARTS.filter((p) => {
       const css = cssOf(p.base)
-      return css !== undefined && !/:focus-visible/.test(withoutComments(read(css)))
+      const commonInput = p.src.includes('data-input-field') && /:focus-visible/.test(withoutComments(read('input-field-ring.css')))
+      return css !== undefined && !commonInput && !/:focus-visible/.test(withoutComments(read(css)))
     }).map((p) => p.base)
     expect(missing, '押せる部品にフォーカスの輪郭が無い').toEqual([])
   })
@@ -72,21 +73,14 @@ describe('押せる部品のフォーカスが見える', () => {
     }
   })
 
-  it('入力欄の輪郭は青い色で2px・外側に余白', () => {
-    // TextField・Select・DateField ほか、入力欄のフォーカスは
-    // `2px・action 色・outline-offset: 2px` にそろえる。
-    // 緑（accent 系）は「正常」の意味なので輪郭に使わない。
-    // 白地で 3:1 未満の緑枠だけの変化はやめる。
-    const targets = [
-      'text-field.module.css',
-      'select.module.css',
-      'date-field.module.css',
-    ]
-    for (const name of targets) {
-      const css = withoutComments(read(name))
-      expect(css, `${name} の輪郭が action 色ではない`).toMatch(/:focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--color-focus-ring\)/)
-      expect(css, `${name} に緑の輪郭が残っている`).not.toMatch(/:focus-visible[^{]*\{[^}]*var\(--color-accent/)
-    }
+  it('入力欄の線は共通の太さ・青と赤・枠の上で決める', () => {
+    const css = withoutComments(read('input-field-ring.css'))
+    const colors = [...css.matchAll(/--polish-input-ring-color:\s*([^;]+);/g)].map(match => match[1])
+    expect({
+      colors,
+      outline: /outline:\s*([^;]+);/.exec(css)?.[1],
+      offset: /outline-offset:\s*([^;]+);/.exec(css)?.[1],
+    }).toEqual({ colors: ['var(--polish-focus)', 'var(--color-danger)'], outline: '2px solid var(--polish-input-ring-color)', offset: 'var(--polish-focus-input-offset)' })
   })
 
   it('Tailwind でもフォーカスの輪郭を消さない', () => {

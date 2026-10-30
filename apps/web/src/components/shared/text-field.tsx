@@ -1,7 +1,7 @@
 'use client'
 
 import { inputPlaceholder } from './input-placeholder'
-import { forwardRef, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
+import { forwardRef, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from 'react'
 import { guardCompositionEnter } from './composition-enter'
 import { joinDescribedBy, useFieldContext } from './field-context'
 import styles from './text-field.module.css'
@@ -53,6 +53,7 @@ export const TextField = forwardRef<
       ref={ref}
       type="text"
       data-design-node="Ume2U"
+      data-input-field
       {...rest}
       readOnly={derived || rest.readOnly}
       data-look={derived ? 'derived' : (rest as Record<string, unknown>)['data-look'] as string | undefined}
@@ -76,7 +77,7 @@ export const AffixedTextField = forwardRef<
 >(function AffixedTextField({ startAdornment, endAdornment, monospace, layout = 'inline', className, style, ...props }, ref) {
   const a11y = useControlA11y(props)
   return <span className={[styles.field, styles.single, styles.affixed, className].filter(Boolean).join(' ')}
-    style={style} aria-invalid={a11y['aria-invalid']} data-look={props.derived ? 'derived' : undefined} data-disabled={props.disabled || undefined} data-monospace={monospace || undefined} data-affixed-layout={layout}>
+    data-input-field style={style} aria-invalid={a11y['aria-invalid']} data-look={props.derived ? 'derived' : undefined} data-disabled={props.disabled || undefined} data-monospace={monospace || undefined} data-affixed-layout={layout}>
     {startAdornment !== undefined && <span className={styles.adornment} aria-hidden="true">{startAdornment}</span>}
     <TextField {...props} ref={ref} className={styles.affixedControl} />
     {endAdornment !== undefined && <span className={styles.adornment} aria-hidden="true">{endAdornment}</span>}
@@ -98,6 +99,7 @@ export const TextArea = forwardRef<
     <textarea
       ref={ref}
       data-design-node="i5BW8b"
+      data-input-field
       data-density={density}
       data-height={height}
       {...rest}
@@ -114,3 +116,8 @@ export const TextArea = forwardRef<
     />
   )
 })
+
+/** 札や補助ボタンを含む入力の外枠。文字欄の線は、この箱の1本にまとめる。 */
+export function InputFieldFrame(props: HTMLAttributes<HTMLDivElement>) {
+  return <div {...props} data-input-field />
+}

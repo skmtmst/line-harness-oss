@@ -34,9 +34,8 @@ html:root .frame[data-choice-field] {
 html:root .frame[data-choice-field][data-choice-active]:not([data-choice-invalid]) { box-shadow: var(--shadow-raised-control), inset 0 0 0 var(--choice-ring) var(--color-selection-border); }
 html:root .frame[data-choice-field][data-choice-invalid] { box-shadow: var(--shadow-raised-control), inset 0 0 0 var(--choice-ring) var(--color-danger); }
 html:root .frame[data-choice-field][data-choice-disabled] { box-shadow: none; cursor: not-allowed; }
-html:root .frame[data-choice-field]:is(:focus-visible, :has(> [data-choice-trigger]:focus-visible)) { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
 /* 誤り＋焦点は赤1本（青を重ねない）。連想・複数・選ぶ・取り出しの枠つき欄はここで赤にする。 */
-html:root .frame[data-choice-field][data-choice-invalid]:is(:focus-visible, :has(> [data-choice-trigger]:focus-visible)) { outline: var(--polish-focus-width) solid var(--color-danger); outline-offset: var(--polish-focus-offset); }
+
 html:root .frame[data-choice-field] > [data-choice-trigger]:focus-visible { outline-color: transparent; }
 html:root .frame [data-choice-chevron] {
   position: absolute;
@@ -75,3 +74,7 @@ html:root .frame[data-choice-field] [data-choice-chip] { min-width: 0; flex: 0 1
 }
 
 html:root .frame[data-choice-field] > [data-choice-trigger]:disabled { cursor: not-allowed; }
+
+/* 状態の札は入力欄とは分け、従来のボタンの輪を保つ。 */
+html:root .frame[data-choice-field][data-tone]:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
+html:root .frame[data-choice-field][data-tone][data-choice-invalid]:focus-visible { outline-color: var(--color-danger); }

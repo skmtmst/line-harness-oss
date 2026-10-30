@@ -116,13 +116,8 @@
   padding: 0 12px;
   border-color: var(--color-control-border);
   box-shadow: var(--control-shadow);
-}
+}/* 複合欄の焦点は外枠へ。内側の入力の輪郭を重ねない。 */
 
-/* 複合欄の焦点は外枠へ。内側の入力の輪郭を重ねない。 */
-:root .search:has(:focus-visible) {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
 :root .input:focus-visible { outline: 1px solid transparent; }
 
 :root .input {
@@ -151,11 +146,9 @@
 :root .search:has(.input[aria-invalid='true']) { outline-color: var(--color-danger); }
 }
 /* ・仕上げ5 */
-:root .searchIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); color: var(--color-ink-secondary); }
+:root .searchIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); stroke-width: var(--polish-icon-stroke); color: var(--color-ink-secondary); }/* ・仕上げ7：輪は検索欄の外側だけに出す。 */
 
-/* ・仕上げ7：輪は検索欄の外側だけに出す。 */
-html:root .search:has(.input:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
-html:root .search .input:focus-visible { outline: 1px solid transparent; }
+
 html:root .disabled { opacity: var(--polish-disabled-opacity); }
 html:root .disabled .input:disabled { opacity: 1; }
 
@@ -168,9 +161,8 @@ html:root .disabled .input:disabled { opacity: 1; }
  */
 :root .search { outline: 1px solid transparent; background: var(--color-canvas); box-shadow: var(--shadow-raised-control); }
 :root .search:has(.input[aria-invalid='true']) { outline-color: transparent; box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger); }
-html:root .search:has(.input:focus-visible) { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
 /* 誤り＋焦点は赤1本（青を重ねない）。 */
-html:root .search:has(.input[aria-invalid='true']:focus-visible) { outline: var(--polish-focus-width) solid var(--color-danger); outline-offset: var(--polish-focus-offset); }
+
 :root .input { font-size: var(--polish-control-text); font-weight: var(--polish-control-weight); }
 :root .searchIcon { flex-basis: var(--polish-icon-control); }
 

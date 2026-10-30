@@ -24,7 +24,6 @@
 }
 
 .field {
-  --polish-focus-offset: var(--polish-focus-offset-inset);
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
@@ -110,7 +109,4 @@
 
 @layer components {
 :root .field { box-shadow: var(--control-shadow); }
-}
-
-/* 青の輪は共通の焦点指定を使い、誤りの時だけ色を変える。 */
-:root .field[aria-invalid='true']:focus-visible { outline-color: var(--color-danger); }
+}/* 青の輪は共通の焦点指定を使い、誤りの時だけ色を変える。 */

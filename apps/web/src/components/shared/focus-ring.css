@@ -1,3 +1,5 @@
+@import "./input-field-ring.css";
+
 /* 窓の本文では輪を欄の内側へ描き、送り端でも切れず欄同士の幅をそろえる。 */
 [data-window-body] { --polish-focus-offset: calc(-1 * var(--polish-focus-width)); --focus-ring-offset: var(--polish-focus-offset); }
 

@@ -7,6 +7,7 @@ import { connectGuardBrowser } from './browser-session.mjs'
 import { compileUiStyles } from './compile-ui-styles.mjs'
 const require = createRequire(import.meta.url)
 const fromVitest = createRequire(require.resolve('vitest/package.json'))
+const { PNG } = require('pngjs')
 const { build } = createRequire(fromVitest.resolve('vite'))('esbuild')
 const webRoot = fileURLToPath(new URL('../..', import.meta.url))
 const sheets = []
@@ -21,6 +22,9 @@ import Checkbox from './src/components/shared/checkbox';
 import OtpInput from './src/components/shared/otp-input';
 import InsertTextField from './src/components/shared/insert-text-field';
 import Combobox from './src/components/shared/combobox';
+import MultiSelect from './src/components/shared/multi-select';
+import {EntityPickerSummary} from './src/components/shared/entity-picker';
+import {TimeField} from './src/components/shared/date-time-field';
 import TagPickerField from './src/components/shared/tag-picker-field';
 import CheckCard from './src/components/shared/check-card';
 import FileDropzone from './src/components/shared/file-drop';
@@ -41,6 +45,14 @@ function Fixture(){return <main>
 <Case id="check-bad" expect="red" ring="check"><Checkbox checked={false} onCheckedChange={()=>{}} invalid>確認した</Checkbox></Case>
 <Case id="combo-ok" expect="blue" ring="combo"><Combobox aria-label="品目" options={[{value:'a',label:'あ'}]} value="" onChange={()=>{}} /></Case>
 <Case id="combo-bad" expect="red" ring="combo"><Combobox aria-label="数量" options={[{value:'a',label:'あ'}]} value="" onChange={()=>{}} error="選んでください" /></Case>
+<Case id="multi-ok" expect="blue" ring="combo"><MultiSelect aria-label="候補を複数選ぶ" options={[{value:'a',label:'あ'}]} values={[]} onChange={()=>{}} /></Case>
+<Case id="multi-bad" expect="red" ring="combo"><MultiSelect aria-label="候補を選び直す" options={[{value:'a',label:'あ'}]} values={[]} onChange={()=>{}} error="選んでください" /></Case>
+<Case id="entity-ok" expect="blue" ring="combo"><EntityPickerSummary label="送り先" noun="送り先" onOpen={()=>{}} /></Case>
+<Case id="entity-bad" expect="red" ring="combo"><EntityPickerSummary label="送り先誤" noun="送り先" onOpen={()=>{}} invalid /></Case>
+<Case id="time-ok" expect="blue" ring="combo"><TimeField aria-label="送る時刻" value="10:00" onChange={()=>{}} /></Case>
+<Case id="time-bad" expect="red" ring="combo"><TimeField aria-label="送る時刻誤" value="10:00" onChange={()=>{}} invalid /></Case>
+<Case id="raw-ok" expect="blue" ring="self"><input type="password" aria-label="パスワード" /></Case>
+<Case id="raw-bad" expect="red" ring="self"><input type="password" aria-label="パスワード誤" aria-invalid="true" /></Case>
 <Case id="tag-ok" expect="blue" ring="self"><TagPickerField label="札付け" value={[]} onChange={()=>{}} options={[{id:'t',name:'検'}]} accountId={null} /></Case>
 <Case id="tag-bad" expect="red" ring="self"><TagPickerField label="札直し" value={[]} onChange={()=>{}} options={[{id:'t',name:'検'}]} accountId={null} invalid /></Case>
 <Case id="card-ok" expect="blue" ring="card"><CheckCard checked={false} onChange={()=>{}} title="送る" /></Case>
@@ -53,8 +65,8 @@ function Fixture(){return <main>
 <Case id="composer-bad" expect="red" ring="self"><FileDropzone variant="composer" title="ファイルを追加" aria-label="添付誤" onFiles={()=>{}} invalid /></Case>
 <Case id="otp-ok" expect="blue" ring="self"><OtpInput label="確認コード" value="123456" onChange={()=>{}} /></Case>
 <Case id="otp-bad" expect="red" ring="self"><OtpInput label="確認コード誤" value="123456" onChange={()=>{}} invalid /></Case>
-<Case id="insert-ok" expect="blue" ring="self"><InsertTextField aria-label="差し込み本文" value="" onValueChange={()=>{}} /></Case>
-<Case id="insert-bad" expect="red" ring="self"><InsertTextField aria-label="差し込み本文誤" value="" onValueChange={()=>{}} aria-invalid="true" /></Case>
+<Case id="insert-ok" expect="blue" ring="self"><InsertTextField aria-label="差し込み本文" value="本文" onValueChange={()=>{}} /></Case>
+<Case id="insert-bad" expect="red" ring="self"><InsertTextField aria-label="差し込み本文誤" value="本文" onValueChange={()=>{}} aria-invalid="true" /></Case>
 <Case id="insertcompact-ok" expect="blue" ring="self"><InsertTextField compact aria-label="短い本文" value="" onValueChange={()=>{}} /></Case>
 <Case id="insertcompact-bad" expect="red" ring="self"><InsertTextField compact aria-label="短い本文誤" value="" onValueChange={()=>{}} aria-invalid="true" /></Case>
 <Case id="fs-ok" expect="blue" ring="self"><input type="text" aria-label="箱名" className={fsStyles.field} defaultValue="" onChange={()=>{}} /></Case>
@@ -100,8 +112,30 @@ const RING = () => {
     : kind === 'card' ? active.closest('label')
     : active
   if (!el) return null
+  document.querySelectorAll('[data-ring-probe]').forEach(item=>item.removeAttribute('data-ring-probe'))
+  el.setAttribute('data-ring-probe','')
   const c = getComputedStyle(el)
   return { id: host.getAttribute('data-case'), expect: host.getAttribute('data-expect'), color: c.outlineColor, style: c.outlineStyle, width: c.outlineWidth, offset: c.outlineOffset, shadow: c.boxShadow, boxColor: kind === 'card' ? getComputedStyle(active.nextElementSibling).outlineColor : null }
+}
+/** 直線の辺を画像で読む。色の線が枠から離れて2本になっていないかを確かめる。 */
+async function paintedStroke(page, color) {
+  const rect = await page.locator('[data-ring-probe]').boundingBox()
+  assert.ok(rect)
+  const left = Math.floor(rect.x) - 6
+  const top = Math.floor(rect.y + rect.height / 2) - 1
+  const png = PNG.sync.read(await page.screenshot({ clip: { x: left, y: top, width: 16, height: 3 } }))
+  const rgb = color === RED ? [185,28,28] : [37,99,235]
+  const pixels = []
+  for(let x=0;x<png.width;x++) {
+    const at=(png.width+x)*4
+    if(rgb.every((value,index)=>Math.abs(png.data[at+index]-value)<35)) pixels.push(left+x+0.5-rect.x)
+  }
+  return pixels
+}
+function assertSingleStroke(pixels, label) {
+  assert.ok(pixels.length >= 1 && pixels.length <= 3, `${label}: 2pxの色の線が1本だけ見える: ${pixels}`)
+  assert.ok(pixels.every(x=>x>=-0.6 && x<=2.6), `${label}: 線を枠の位置へ重ね、すき間を空けない: ${pixels}`)
+  for(let i=1;i<pixels.length;i++) assert.ok(pixels[i]-pixels[i-1]<=1.1, `${label}: 線が分離しない`)
 }
 for (const width of [1152, 1440]) test(`誤りの欄の焦点は赤1本、誤りなしは青（invalid-focus） ${width}`, async () => {
   const browser = await connectGuardBrowser()
@@ -147,9 +181,24 @@ for (const width of [1152, 1440]) test(`誤りの欄の焦点は赤1本、誤り
       assert.equal(ring.width, '2px', `${ring.id}: 輪は2px`)
       if (ring.id.startsWith('card-')) assert.equal(ring.offset, '2px', 'カードの輪は共通の位置を使う')
       if (ring.id.startsWith('cardwindow-')) assert.equal(ring.offset, '-2px', '窓の中のカードは内側に輪を出す')
-      if (ring.id.startsWith('insertcompact-')) assert.equal(ring.offset, '-1px', '小さい本文欄は内側の輪を保つ')
-      if (ring.id.startsWith('fs-')) assert.equal(ring.offset, '-1px', `${ring.id}: メニュー内の名前の欄は内側の輪を保つ`)
+      if (!/^(check|card|drop|composer)/.test(ring.id)) assert.equal(ring.offset, '-2px', `${ring.id}: 入力欄は枠の上に重ねる`)
       if (ring.expect === 'red') assert.ok(!ring.shadow.includes('37, 99, 235'), `${ring.id}: 青を重ねない`)
+      if (!/^(check|card|drop|composer)/.test(ring.id)) {
+        assertSingleStroke(await paintedStroke(page,want), `${ring.id} focus`)
+        if (ring.id === 'tf-ok') {
+          await page.evaluate(()=>document.documentElement.style.setProperty('--polish-focus-input-offset','2px'))
+          const brokenStroke = await paintedStroke(page,want)
+          assert.throws(()=>assertSingleStroke(brokenStroke, '故障対照'))
+          await page.evaluate(()=>document.documentElement.style.removeProperty('--polish-focus-input-offset'))
+          assertSingleStroke(await paintedStroke(page,want), '復元後')
+        }
+        await page.evaluate(()=>document.activeElement.blur())
+        await page.waitForTimeout(150)
+        if (ring.expect === 'red') assertSingleStroke(await paintedStroke(page,RED), `${ring.id} error without focus`)
+        else assert.equal((await paintedStroke(page,BLUE)).length,0, `${ring.id}: 普段は青い線を出さない`)
+        await page.locator('[data-ring-probe]').evaluate(el=>el.focus())
+      }
+
     }
     for (const id of seen.filter(id => id.endsWith('-bad'))) assert.equal(offsets.get(id), offsets.get(id.replace(/-bad$/, '-ok')), `${id}: 青と赤で輪の位置を変えない`)
     assert.equal(new Set(seen).size, total, '全部の欄を1回ずつ回った')

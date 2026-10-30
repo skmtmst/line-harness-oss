@@ -15,7 +15,7 @@
   text-align: left;
 }
 .editor[aria-invalid='true'] { outline: 1px solid var(--color-danger); outline-offset: -1px; }
-.editor[aria-invalid='true']:focus-visible { outline: var(--polish-focus-width) solid var(--color-danger); }
+
 
 .editor[aria-disabled='true'] { cursor: not-allowed; opacity: var(--polish-disabled-opacity); }
 
@@ -37,16 +37,8 @@
   line-height: var(--tpl-nc-body-lh);
   resize: vertical;
 }
-.editorCompact:focus-visible {
-  outline: var(--tpl-nc-focus-ring) solid var(--color-focus-ring);
-}
-
 /* 本文の検証も TextField と同じく、入力中のフォーカスで赤い枠を消さない。 */
-.editor[aria-invalid='true'],
-.editor[aria-invalid='true']:focus-visible {
-  outline: 1px solid var(--color-danger);
-  outline-offset: -1px;
-}
+
 
 /* 空のときの例文（textarea の placeholder と同じ色）。高さ0の段で、カーソルは行の頭に残す。 */
 .editor[data-empty]::before {
@@ -119,9 +111,4 @@
 @layer components {
 .editorMessage { box-sizing: border-box; width: 100%; height: var(--tpl-te-body-h); min-height: var(--tpl-te-body-h); padding: var(--tpl-nc-body-pad); border: 0; outline: revert; background: transparent; color: var(--color-ink); font-size: var(--text-label); line-height: var(--tpl-body-lh); resize: vertical; }
 .editorCode { height: var(--tpl-te-flex-h); font-family: var(--font-mono, monospace); font-size: var(--text-caption); }
-}
-
-/* 単独の本文欄は青と赤で同じ輪を使う。MessageBody内は外枠が輪を持つ。 */
-:root .editor:focus-visible:not(:global([data-message-body]) *) { outline: var(--polish-focus-width) solid var(--color-focus-ring); outline-offset: var(--polish-focus-offset); }
-:root .editor[aria-invalid='true']:focus-visible:not(:global([data-message-body]) *) { outline-color: var(--color-danger); }
-:root .editorCompact:focus-visible:not(:global([data-message-body]) *) { outline-offset: var(--polish-focus-offset-inset); }
+}/* 単独の本文欄は青と赤で同じ輪を使う。MessageBody内は外枠が輪を持つ。 */

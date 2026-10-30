@@ -1,7 +1,7 @@
 import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, mkdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { compileUiStyles } from './compile-ui-styles.mjs'
@@ -13,12 +13,16 @@ const sheets = []
 const compiled = await build({
  stdin: {resolveDir:webRoot,loader:'tsx',contents:`
 import React from 'react';import {createRoot} from 'react-dom/client';
-import {AffixedTextField} from './src/components/shared/text-field';
+import {AffixedTextField,TextArea,TextField,InputFieldFrame} from './src/components/shared/text-field';
 import Combobox from './src/components/shared/combobox';
 import SearchField from './src/components/shared/search-field';
 import CheckCard from './src/components/shared/check-card';
 import RadioCard from './src/components/shared/radio-card';
 import Checkbox from './src/components/shared/checkbox';
+import Button from './src/components/shared/button';
+import Select from './src/components/shared/select';
+import quickStyle from './src/v8/auto-replies/quick-create.module.css';
+import templateStyle from './src/v8/template-edit/edit.module.css';
 import TimeFieldV8 from './src/components/shared/time-field-v8';
 import {InboxInputBox,InboxDraftArea} from './src/components/shared/inbox-composer';
 import InsertTextField from './src/components/shared/insert-text-field';
@@ -29,6 +33,8 @@ function Fixture(){return <main>
 <Case id="inbox-bad" expect="1" color="red"><InboxInputBox><InboxDraftArea aria-label="返信誤" value="" onChange={()=>{}} aria-invalid="true" /></InboxInputBox></Case>
 <Case id="msgbody-ok" expect="1" color="blue"><MessageBody><textarea aria-label="本文" value="" onChange={()=>{}} /></MessageBody></Case>
 <Case id="msgbody-bad" expect="1" color="red"><MessageBody><textarea aria-label="本文誤" value="" onChange={()=>{}} aria-invalid="true" /></MessageBody></Case>
+<Case id="msgbody-textarea-ok" color="blue"><MessageBody><TextArea aria-label="共通本文" value="" onChange={()=>{}} /></MessageBody></Case>
+<Case id="msgbody-textarea-bad" color="red"><MessageBody><TextArea aria-label="共通本文誤" invalid value="" onChange={()=>{}} /></MessageBody></Case>
 <Case id="msgbody-insert-ok" expect="1" color="blue"><MessageBody><InsertTextField aria-label="差し込み本文" value="" onValueChange={()=>{}} /></MessageBody></Case>
 <Case id="msgbody-insert-bad" expect="1" color="red"><MessageBody><InsertTextField aria-label="差し込み本文誤" value="" onValueChange={()=>{}} aria-invalid="true" /></MessageBody></Case>
 <Case id="msgbody-btn-ok" expect="1" color="blue"><MessageBody><MessageInsertButton kind="name" label="名前" onClick={()=>{}} /></MessageBody></Case>
@@ -42,6 +48,10 @@ function Fixture(){return <main>
 <Case id="card-bad" expect="1" color="red"><CheckCard checked={false} onChange={()=>{}} title="止める" invalid /></Case>
 <Case id="combo-ok" expect="1" color="blue"><Combobox aria-label="品目" options={[{value:'a',label:'あ'}]} value="" onChange={()=>{}} /></Case>
 <Case id="search-ok" expect="1" color="blue"><SearchField aria-label="探す" value="" onChange={()=>{}} /></Case>
+<Case id="keyword-frame-ok" color="blue"><InputFieldFrame className={quickStyle.chipBox}><TextField className={quickStyle.chipInput} aria-label="言葉" value="予約" onChange={()=>{}} /></InputFieldFrame></Case>
+<Case id="template-choice-bad" color="red"><InputFieldFrame className={templateStyle.choice}><TextField invalid className={templateStyle.choiceInput} aria-label="選択肢誤" value="予約" onChange={()=>{}} /></InputFieldFrame></Case>
+<Case id="plain-button-ok" color="blue"><Button>保存する</Button></Case>
+<Case id="pill-ok" color="blue"><Select aria-label="対応状況" treatment="pill" value="a" options={[{value:"a",label:"対応中",tone:"neutral"}]} onChange={()=>{}} /></Case>
 <Case id="radio-card-ok" color="blue"><RadioCard name="radio-ok" value="x" checked={false} title="前日" onChange={()=>{}} /></Case>
 <Case id="radio-card-bad" color="red"><RadioCard name="radio-bad" value="x" checked={false} title="当日" onChange={()=>{}} invalid /></Case>
 </main>}
@@ -93,7 +103,8 @@ const RINGS = () => {
   const focus = getComputedStyle(active)
   return { id: host.getAttribute('data-case'), color: host.getAttribute('data-color'), rings,
     buttonFocused: active.matches('button'), outerWidth: outer?.outlineWidth, outerStyle: outer?.outlineStyle,
-    activeWidth: focus.outlineWidth, activeStyle: focus.outlineStyle }
+    inner: active.matches('[data-input-field] [data-input-field]') ? { shadow: focus.boxShadow, border: focus.borderLeftWidth, borderColor: focus.borderLeftColor } : null,
+    activeWidth: focus.outlineWidth, activeOffset: focus.outlineOffset, activeStyle: focus.outlineStyle }
 }
 for (const width of [1152, 1440]) test(`箱で囲んだ入力は焦点の輪1本だけ（二重輪なし） ${width}`, async () => {
   const browser = await connectGuardBrowser()
@@ -126,14 +137,23 @@ for (const width of [1152, 1440]) test(`箱で囲んだ入力は焦点の輪1本
       }
       seen.push(found.id)
       results.push(found)
+      if (process.env.MUSE_SHOTS && ['keyword-frame-ok','template-choice-bad'].includes(found.id)) {
+        mkdirSync(process.env.MUSE_SHOTS,{recursive:true})
+        await page.locator(`[data-case="${found.id}"]`).screenshot({path:`${process.env.MUSE_SHOTS}/${found.id}-${width}.png`})
+      }
     }
     assert.equal(new Set(seen).size, total, '全部の箱を1回ずつ回った')
     const bad = []
     for (const r of results) {
+      if (r.inner) {
+        assert.equal(r.inner.shadow,'none',`${r.id}: 中の文字欄に灰色の縁を描く影を残さない`)
+        assert.ok(r.inner.border === '0px' || r.inner.borderColor === 'rgba(0, 0, 0, 0)',`${r.id}: 中の文字欄の枠を重ねない`)
+      }
       const want = r.color === 'red' ? RED : r.color === 'green' ? GREEN : BLUE
       if (r.rings.length !== 1) bad.push(`${r.id}: 輪は1本だけ（${r.rings.join(' / ') || 'なし'}）`)
       else if (!r.rings[0].endsWith(want)) bad.push(`${r.id}: 輪は${r.color}（${r.rings[0]}）`)
     }
+    for (const r of results.filter(r => ['plain-button-ok','pill-ok','msgbody-btn-ok','msgbody-btn-locked'].includes(r.id))) assert.equal(r.activeOffset,'2px',`${r.id}: 入力以外の輪は従来どおり外側`)
     for (const r of results.filter(r => r.id.startsWith('msgbody-btn-'))) {
       assert.equal(r.buttonFocused, true, `${r.id}: 差し込みボタンに焦点がある`)
       assert.equal(r.outerStyle, 'none', `${r.id}: 外枠には輪を出さない`)
