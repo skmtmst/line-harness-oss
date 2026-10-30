@@ -144,17 +144,7 @@ export default function LoginPage() {
       cardNode="m3tWJ"
       title="ログイン"
       step={{ current: 1, total: 2 }}
-      description={mobileReturn ? (
-        <>
-          メールアドレスとパスワードでログインします。<br />
-          LINE でログインする人は PC の画面から入ってください。
-        </>
-      ) : (
-        <>
-          メールアドレスとパスワードでログインします。<br />
-          LINE で登録した人は「LINE でログイン」を使ってください。
-        </>
-      )}
+      description={null}
     >
       <form onSubmit={(event) => void submit(event)} noValidate className="flex w-full flex-col gap-4">
         {error ? (
