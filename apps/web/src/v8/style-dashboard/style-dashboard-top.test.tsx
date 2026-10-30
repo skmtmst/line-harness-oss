@@ -5,6 +5,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { StyleSchedule, StyleSnapshot } from '@line-crm/shared'
 
 const state = vi.hoisted(() => ({ account: 'a', role: 'admin', get: vi.fn(), save: vi.fn(), reset: vi.fn(), summary: vi.fn(), schedule: vi.fn() }))
+const firstRun = vi.hoisted(() => ({ steps: [] as unknown[] }))
+vi.mock('@/v8/onboarding/public/use-first-run/index', () => ({ useFirstRun: () => ({ status: 'ready', steps: firstRun.steps, firstRun: null, starter: null, error: null, reload: vi.fn(), watchExpired: false, rewatch: vi.fn() }) }))
+vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_id: string, style: string) => ({ progress: { style, steps: {} }, reload: vi.fn() }) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/', useSearchParams: () => new URLSearchParams() }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account }) }))
@@ -16,6 +19,7 @@ vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { summary: state.summary,
 vi.mock('@/lib/api', async importOriginal => { const actual = await importOriginal<typeof import('@/lib/api')>(); return { ...actual, bookingApi: { ...actual.bookingApi, getPaymentConfig: vi.fn().mockResolvedValue({ data: {} }) } } })
 
 import StyleDashboard from './style-dashboard'
+import { buildStepsFromApi } from '@/v8/settings/getting-started/steps'
 
 const metric = (value: number, unit = '件') => ({ value, status: 'available' as const, unit, formula: '選択した期間の実集計' })
 const snapshot: StyleSnapshot = { style: 'restaurant', from: '2026-10-29T15:00:00Z', to: '2026-10-30T15:00:00Z', timeZone: 'Asia/Tokyo', asOf: '2026-10-30T05:00:00Z', dateBasis: 'visit', range: 'today', metrics: { bookings: metric(4), guests: metric(23, '人'), firstTime: metric(2), regular: metric(3), unseated: metric(1), mediaCloseTasks: metric(2), attention: metric(3), freeTables: metric(5, '卓'), noShowRate: metric(0.05, '%') }, previous: {}, items: [], newBookings: [], resultId: 'real' }
@@ -23,6 +27,8 @@ const schedule: StyleSchedule = { style: 'restaurant', from: snapshot.from, to: 
 
 beforeEach(() => {
   vi.clearAllMocks()
+  state.role = 'admin'
+  firstRun.steps = buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map(key => ({ key, state: 'todo', href: '/getting-started', reason: null })) as Parameters<typeof buildStepsFromApi>[0])
   state.get.mockResolvedValue({ data: { cards: [], version: 2, metricIds: ['bookings', 'attention', 'freeTables', 'noShowRate', 'newBookings'] } })
   state.summary.mockResolvedValue({ data: snapshot })
   state.schedule.mockResolvedValue({ success: true, data: schedule })
@@ -51,4 +57,20 @@ it('数の帯の対応待ちの補足は1行に収まる短さにする', async 
 it('サロンの対応待ちの補足も1行に収まる短さにする', async () => {
   render(<StyleDashboard style="salon" />)
   expect(await screen.findByText('承認待ち・来店未記録')).toBeTruthy()
+})
+
+it.each(['restaurant', 'salon', 'consult', 'lesson'] as const)('%sの専用画面も共通の手順を数の帯より先に出す', async style => {
+  const view = render(<StyleDashboard style={style} />)
+  const title = await screen.findByRole('heading', { name: 'はじめにやること' })
+  const card = title.closest('section')!
+  expect(card.querySelectorAll('li')).toHaveLength(style === 'restaurant' ? 8 : 6)
+  const band = view.container.querySelector('[data-style-dashboard]')!
+  expect(card.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+it('専用画面の閲覧のみでもカードを隠さず、設定の操作を灰色で残す', async () => {
+  state.role = 'viewer'
+  render(<StyleDashboard style="restaurant" />)
+  const card = (await screen.findByRole('heading', { name: 'はじめにやること' })).closest('section')!
+  expect(card.querySelectorAll('a')).toHaveLength(0)
+  expect(card.querySelectorAll('button[aria-disabled="true"]').length).toBeGreaterThan(0)
 })

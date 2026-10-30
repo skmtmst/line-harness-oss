@@ -47,7 +47,7 @@ export const STEP_STATE_LABEL: Record<StepState, string> = {
   unknown: '確かめられません',
 }
 
-export type StepKey = GettingStartedStep['key']
+export type StepKey = GettingStartedStep['key'] | 'hours' | 'followup'
 
 export interface StepResult {
   key: StepKey
@@ -88,13 +88,13 @@ export interface GettingStartedInput {
 /** 業種の設定画面で実物を読んだ結果。未取得・失敗はnull、対象外の段は省略できる。 */
 export type StyleSetupProgress = {
   style: AccountStyle
-  steps: Partial<Record<'attributes' | 'friendAdd' | 'scenario', { complete: boolean | null; reason?: string }>>
+  steps: Partial<Record<'attributes' | 'friendAdd' | 'scenario' | 'hours' | 'followup', { complete: boolean | null; reason?: string }>>
 }
 
 /** 業種の3〜5段は、その設定の実測だけで済みを決める。標準の配信判定は流用しない。 */
 export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountStyle | null, progress?: StyleSetupProgress): StepResult[] {
   if (!style || style === 'standard') return [...steps]
-  const copy = steps.map((step): StepResult => ['attributes', 'friendAdd', 'scenario'].includes(step.key) && step.state !== 'forbidden'
+  const copy = steps.filter(step => style !== 'restaurant' || !['hours', 'followup'].includes(step.key)).map((step): StepResult => ['attributes', 'friendAdd', 'scenario'].includes(step.key) && step.state !== 'forbidden'
     ? { ...step, state: 'unknown', blockedReason: null, next: '業種の設定状況を確認できませんでした。' }
     : { ...step })
   const replace = (key: keyof StyleSetupProgress['steps'], title: string, sub: string, label: string, href: string, condition: string, instruction: string) => {
@@ -118,6 +118,20 @@ export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountSt
       replace('attributes', '卓と席を登録する', '座席・卓を用意する', '座席・卓を開く', '/restaurant-test/tables', '座席・卓が登録されている', '座席と卓を登録し、予約で使う席を用意します。')
       replace('friendAdd', 'コースとメニューを登録する', '予約で受け付ける内容を決める', 'メニュー管理を開く', '/restaurant-test/menu', '予約で受け付けるコースとメニューが登録されている', '予約で受け付けるコースとメニューを登録します。')
       replace('scenario', '予約の受付を開ける', '予約枠と在庫を用意する', '予約枠を開く', '/restaurant-test/inventory', '予約枠と在庫が用意され、受付を確認している', '予約枠と在庫を用意し、予約の受付を確認します。')
+      if (copy.length > 0) {
+        const add = (key: 'hours' | 'followup', title: string, href: string, condition: string) => {
+          const result = progress?.style === style ? progress.steps[key] : undefined
+          const forbidden = copy.find(step => step.key === 'attributes')?.state === 'forbidden'
+          const state: StepState = forbidden ? 'forbidden' : result?.complete === true ? 'done' : result?.complete === false ? 'todo' : 'unknown'
+          const step: StepResult = { key, ordinal: '', title, sub: condition, condition, state,
+            next: state === 'done' ? '終わっています。設定を見直せます。' : result?.reason?.trim() || `${title}ための設定状況を確認できませんでした。`,
+            action: forbidden ? null : { label: '設定を開く', href }, blockedReason: forbidden ? '管理者に頼んでください' : null }
+          const before = key === 'hours' ? copy.findIndex(item => item.key === 'friendAdd') : copy.findIndex(item => item.key === 'firstMessage')
+          copy.splice(before < 0 ? copy.length : before, 0, step)
+        }
+        add('hours', '営業時間を設定する', '/restaurant-test/inventory#rs-hours-title', '予約を受け付ける曜日と営業時間が設定されている')
+        add('followup', 'LINE来店フォローを確認する', '/restaurant-test/line-followup', '選んだ来店フォローの設定を確認している')
+      }
       break
     case 'lesson':
       replace('attributes', 'クラスを作る', 'クラスの時間と定員を決める', 'イベント予約を開く', '/events', 'クラスの時間と定員が設定されている', 'クラスを作り、開催する時間と定員を設定します。')
@@ -142,7 +156,7 @@ export function stepsForStyle(steps: ReadonlyArray<StepResult>, style: AccountSt
     default:
       style satisfies never
   }
-  return copy
+  return copy.map((step, index) => ({ ...step, ordinal: String(index + 1) }))
 }
 
 /**
@@ -344,7 +358,7 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
     if (!server) return { ...base, state: 'unknown', action: null, blockedReason: '状態を読み込めませんでした' }
 
     const state = server.state
-    const nextByState: Record<StepKey, Partial<Record<StepState, string>>> = {
+    const nextByState: Record<GettingStartedStep['key'], Partial<Record<StepState, string>>> = {
       featureSet: { done: '終わっています。機能設定で見直せます。', todo: '業種に合わせて使う機能を選び、保存してください。' },
       accounts: {
         done: '終わっています。つなぎ先を見直したいときはこちらから。',
@@ -373,7 +387,7 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
       },
     }
     // 行き先の言葉は板が正本。
-    const labels: Record<StepKey, string> = {
+    const labels: Record<GettingStartedStep['key'], string> = {
       accounts: state === 'done' ? '接続の確認を見る' : 'LINEアカウントを開く',
       featureSet: '使う機能を選ぶ',
       attributes: '友だちの分け方へ',
@@ -386,12 +400,12 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
     if (base.key === 'scenario' && state === 'todo') href = '/recipes'
     // 送信ボタンではなく、既存のQR・シナリオのテスト送信までの道順を開く。
     if (base.key === 'firstMessage' && href) href = '/getting-started#first-message'
-    const action = href && state !== 'forbidden' ? { label: labels[base.key], href } : null
+    const action = href && state !== 'forbidden' ? { label: labels[server.key], href } : null
 
     return {
       ...base,
       state,
-      next: nextByState[base.key][state] ?? server.reason ?? '状態を確認してください。',
+      next: nextByState[server.key][state] ?? server.reason ?? '状態を確認してください。',
       action,
       blockedReason: action ? null : server.reason,
     }
