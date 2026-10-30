@@ -18,7 +18,7 @@ import { useSamePageUrl } from '@/lib/use-same-page-url';
 import { useInboxAi } from '@/v8/ai-reply/public/inbox-ai/index'
 import { useRouter,useSearchParams } from 'next/navigation';
 import { Suspense,useEffect,useRef,useState } from 'react';
-import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,inboxSortFromParam,resolveInboxChannel,statusFilters,statusFiltersV8,type OldestAttentionTarget } from './inbox-model';
+import { InboxSort,jstDatetimeLocalToIso,MESSAGE_MAX_LENGTH,SAVED_VIEW_URL_KEY,StatusFilter,buildInboxUrl,inboxSortFromParam,resolveInboxChannel,statusFilters,type OldestAttentionTarget } from './inbox-model';
 
 import InboxConversation from './inbox-conversation-view';
 import InboxCustomerPanel from './inbox-customer-panel';
@@ -172,7 +172,6 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
 
   // 状態の切り替えの5つの押し場所。選んでいる所だけ Tab で止まる
   // （ラジオの決まり）。左右・先頭・末尾のキーで選ぶ。
-  const statusFilterButtonRefs = useRef<(HTMLButtonElement | null)[]>([])
 
   const hasInboxFilters = Boolean(
     nameQuery.trim()
@@ -435,22 +434,6 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
     } finally {
       setSavingView(false)
     }
-  }
-
-  const handleStatusFilterKeyDown = (event: React.KeyboardEvent) => {
-    const list = statusFiltersV8
-    const current = Math.max(0, list.findIndex((f) => f.key === statusFilter))
-    let next: number | null = null
-    if (event.key === 'ArrowRight') next = (current + 1) % list.length
-    else if (event.key === 'ArrowLeft') next = (current - 1 + list.length) % list.length
-    else if (event.key === 'Home') next = 0
-    else if (event.key === 'End') next = list.length - 1
-    if (next == null) return
-    event.preventDefault()
-    const filter = list[next]
-    setStatusFilter(filter.key)
-    dropSavedViewParam()
-    statusFilterButtonRefs.current[next]?.focus()
   }
 
   const clearInboxFilters = () => {
@@ -798,7 +781,7 @@ function ChatsPageInner({ channel, emailInboxEnabled }: { channel: 'all' | 'line
           dropSavedViewParam, quickCountsNow, saveDialogOpen, statusFilter, assigneeFilter, operators,
           savingView, setSavedViewName, createSavedView, showTemplatePicker, setStatusFilter,
           setAssigneeFilter, setUnreadOnly, channel, emailInboxEnabled, router, nameQuery, setNameQuery, assigneeUnreadStatus,
-          assigneeUnread, handleStatusFilterKeyDown, statusCountsNow, statusFilterButtonRefs, listScrollRef,
+          assigneeUnread, listScrollRef,
           emailError, loadEmails, chatListFailed, loadChats, emailItems, chats,
           handleSelectChat, handleSelectEmail, inboxListLoading, inboxListRefreshing, hasMoreChats, hasMoreEmails, inboxListFailed, hasInboxFilters,
           clearInboxFilters, loadingMore, loadMoreChats, loadingMoreEmails, sortOrder, setSortOrder,

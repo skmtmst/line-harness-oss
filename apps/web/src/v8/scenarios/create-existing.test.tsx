@@ -1,3 +1,5 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
@@ -78,6 +80,7 @@ const draftButton = () => getPageAction({ name: /あとで決める/ }) as HTMLB
 const nameField = () => screen.getByRole('textbox', { name: 'シナリオ名' }) as HTMLInputElement
 
 beforeEach(() => {
+  verifiedStaffRole('owner')
   nav.search = 'id=sc-1'
   push.mockReset()
   readScenario.mockReset()
@@ -89,7 +92,7 @@ beforeEach(() => {
   folderList.mockResolvedValue({ success: true, data: folders })
   document.documentElement.dataset.theme = 'v8'
 })
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); forgetStaffIdentity() })
 
 describe('読み込み中と読み込み失敗', () => {
   test('読み込み中は「作りました」と言わず、方式の確定も下書きも押せない', async () => {

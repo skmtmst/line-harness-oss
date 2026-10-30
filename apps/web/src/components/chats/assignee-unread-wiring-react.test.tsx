@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 /*
- * 受信箱の「担当者で絞り込む」に添える担当者ごとの未読数（設計 `YZaDK`）を、本物の画面で見る。
+ * 受信箱の絞り込みパネルの「担当者で絞り込む」に添える担当者ごとの未読数（設計 `YZaDK`）を、本物の画面で見る。
  * 数の規則そのものは assignee-unread.test.ts、ここは画面の配線：
  * - 数は集計の口（/api/chats/stats）から引く。画面に見えている行からは数えない
  * - 集計に失敗したら数だけ「—」。0件にせず、担当者の候補は残す
@@ -67,14 +67,16 @@ async function settle() {
   for (let i = 0; i < 5; i += 1) await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
 }
 
-/** 一覧の上の「担当者で絞り込む」を開き、候補の読み上げ名を返して閉じる。 */
-async function assigneeChoices(): Promise<string[]> {
-  fireEvent.click(await screen.findByRole('button', { name: /^担当者で絞り込む(?::|：)?(選ぶ|変える)?$/ }))
+/** パネルの「担当者で絞り込む」を開き、候補の読み上げ名と窓の文を返して閉じる。 */
+async function assigneeChoices(): Promise<{ names: string[]; pickerText: string }> {
+  fireEvent.click(await screen.findByRole('button', { name: '絞り込み' }))
+  fireEvent.click(await screen.findByRole('button', { name: /^担当者で絞り込む$/ }))
   const dialog = await findPickerDialog()
   const names = within(dialog).getAllByRole('radio').map((radio) => radio.getAttribute('aria-label') ?? '')
+  const pickerText = dialog.textContent ?? ''
   fireEvent.keyDown(dialog, { key: 'Escape' })
   await settle()
-  return names
+  return { names, pickerText }
 }
 
 describe('担当者ごとの未読数の配線（YZaDK）', () => {
@@ -82,14 +84,16 @@ describe('担当者ごとの未読数の配線（YZaDK）', () => {
     await act(async () => root.render(<ChatsPage />))
     await settle()
     expect(statsCalls.length).toBeGreaterThan(0)
-    expect(await assigneeChoices()).toEqual(expect.arrayContaining(['河野（3）', '佐々木（0）', '未割り当て（2）']))
+    const { names, pickerText } = await assigneeChoices()
+    expect(names).toEqual(expect.arrayContaining(['河野（3）', '佐々木（0）']))
+    expect(pickerText).toContain('未読 2件')
   })
 
   it('集計が届くまでは0件ではなく「—」（初めの値は未取得）', async () => {
     stats = () => new Promise<Response>(() => {})
     await act(async () => root.render(<ChatsPage />))
     await settle()
-    const names = await assigneeChoices()
+    const { names } = await assigneeChoices()
     expect(names).toEqual(expect.arrayContaining(['河野（—）', '佐々木（—）']))
     expect(names.some((name) => /（0）/.test(name))).toBe(false)
   })
@@ -98,15 +102,16 @@ describe('担当者ごとの未読数の配線（YZaDK）', () => {
     stats = () => json({ success: false, error: 'down' }, 500)
     await act(async () => root.render(<ChatsPage />))
     await settle()
-    const names = await assigneeChoices()
-    expect(names).toEqual(expect.arrayContaining(['河野（—）', '佐々木（—）', '未割り当て（—）']))
+    const { names, pickerText } = await assigneeChoices()
+    expect(names).toEqual(expect.arrayContaining(['河野（—）', '佐々木（—）']))
+    expect(pickerText).toContain('未読 —')
     expect(names.some((name) => /（0）/.test(name))).toBe(false)
   })
 
   it('アカウントを切り替えたら、新しい集計が届くまで前のアカウントの数を出さない', async () => {
     await act(async () => root.render(<ChatsPage />))
     await settle()
-    expect(await assigneeChoices()).toContain('河野（3）')
+    expect((await assigneeChoices()).names).toContain('河野（3）')
 
     let release!: () => void
     stats = () => new Promise<Response>((done) => { release = () => done(statsBody([{ operatorId: 'op-k', unread: 7 }])) })
@@ -115,10 +120,10 @@ describe('担当者ごとの未読数の配線（YZaDK）', () => {
     await act(async () => root.render(<ChatsPage />))
     await settle()
     expect(statsCalls.length).toBeGreaterThan(before)
-    expect(await assigneeChoices()).toContain('河野（—）')
+    expect((await assigneeChoices()).names).toContain('河野（—）')
 
     await act(async () => { release(); await Promise.resolve() })
     await settle()
-    expect(await assigneeChoices()).toContain('河野（7）')
+    expect((await assigneeChoices()).names).toContain('河野（7）')
   })
 })

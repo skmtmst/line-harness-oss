@@ -168,7 +168,7 @@ export default function HqDeliveryConsole({ type }: { type: HqDeliveryTemplateTy
   ]
   if (view === 'list') {
     const shown = rows.filter(row => (folderFilter === 'all' || (row.folder_id ?? 'none') === folderFilter) && `${row.name} ${row.content_summary ?? ''}`.includes(query.trim()))
-    return <SaveErrorScope errors={saveErrors}><ListPage boardId="LRc93" title={titleOf(type)} help="設定のひな形を保存して各アカウントへ下書きとして配ります。" stats={stats}
+    return <SaveErrorScope errors={saveErrors}><ListPage boardId="LRc93" title={`${titleOf(type)}を配る`} help="設定のひな形を保存して各アカウントへ下書きとして配ります。" stats={stats}
       tabs={<Tabs label="配る設定の種類" items={[{id:'template',label:'メッセージなど',onClick:()=>router.push('/hq/templates')},...TYPES.map(item=>({id:item.id,label:item.label,current:item.id===type,onClick:()=>router.push(`/hq/templates?type=${item.id}`)}))]} />}
       folders={<>{canEdit && <Button variant="primary" className="v8-folder-create w-full" disabled={busy} onClick={create}><Plus size={16} />ひな形を作る</Button>}<FolderPanel rows={folderRows} activeId={folderFilter} onSelect={setFolderFilter} /></>}
       folderNav={{rows:folderRows,activeId:folderFilter,onSelect:setFolderFilter,createAction:canEdit ? <Button variant="primary" onClick={create}>ひな形を作る</Button> : undefined}}

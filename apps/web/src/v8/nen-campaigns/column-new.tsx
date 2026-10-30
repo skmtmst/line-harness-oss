@@ -3,7 +3,7 @@
 import { createPageReturnHref } from '@/components/shared/create-page';
 import { useEffect, useState } from 'react';
 import { Image as ImageIcon, Save, Type } from 'lucide-react';
-import Link from '@/components/shared/list-navigation'
+import TextLink from '@/components/shared/text-link'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
 import { Eye } from 'lucide-react';
 import type { Tag } from '@line-crm/shared';
@@ -203,7 +203,7 @@ export default function ColumnNew() {
 <FieldError id="nen-col-category-error">{errorFor('category')}</FieldError></Field>
           <div className={styles.field}>
             <span className={styles.labelSmall}>前のコラムを下敷きにする</span>
-            <Link href="/nen-campaigns?tab=columns" className={styles.linkAction}>一覧で元のコラムを選びます →</Link>
+            <TextLink href="/nen-campaigns?tab=columns">一覧で元のコラムを選びます</TextLink>
           </div>
         </SettingsFormRow>
         <Field label="概要（LINE のカードに出る短い紹介文）"><SaveErrorField names={["excerpt","draft.excerpt"]}><TextField id="nen-col-excerpt" aria-describedby={errorFor('excerpt') ? 'nen-col-excerpt-error' : undefined} aria-label="概要" value={draft.excerpt} invalid={Boolean(errorFor('excerpt'))} maxLength={EXCERPT_MAX} onChange={(event) => set({ excerpt: event.target.value })} /></SaveErrorField>
