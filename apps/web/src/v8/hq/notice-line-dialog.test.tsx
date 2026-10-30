@@ -7,14 +7,19 @@ import React from 'react'
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 
-const net = vi.hoisted(() => ({ lineRegistration: vi.fn() }))
+const net = vi.hoisted(() => ({ lineRegistration: vi.fn(), lineRegistrationStatus: vi.fn() }))
 vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
-  return { ...actual, api: { ...actual.api, hqNotices: { ...actual.api.hqNotices, lineRegistration: (...args: unknown[]) => net.lineRegistration(...args) } } }
+  return { ...actual, api: { ...actual.api, hqNotices: {
+    ...actual.api.hqNotices,
+    lineRegistration: (...args: unknown[]) => net.lineRegistration(...args),
+    lineRegistrationStatus: (...args: unknown[]) => net.lineRegistrationStatus(...args),
+  } } }
 })
+vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 
 import NoticeLineDialogV8 from './notice-line-dialog'
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks() })
 
 test('読めなかったら「まだ設定されていません」と言わない', async () => {
   net.lineRegistration.mockRejectedValue(new Error('down'))
@@ -24,7 +29,7 @@ test('読めなかったら「まだ設定されていません」と言わな�
 })
 
 test('開き直したとき、前の確認コードを出したままにしない', async () => {
-  net.lineRegistration.mockResolvedValueOnce({ success: true, data: { available: true, addFriendUrl: 'https://line.me/x', accountName: '運営', linked: false, code: '123456' } })
+  net.lineRegistration.mockResolvedValueOnce({ success: true, data: { available: true, addFriendUrl: 'https://line.me/x', accountName: '運営', linked: false, code: '123456', codeExpiresAt: new Date(Date.now() + 60_000).toISOString() } })
   const view = render(<NoticeLineDialogV8 open onClose={() => undefined} />)
   await waitFor(() => expect(screen.getByLabelText('確認コード 123456')).toBeTruthy())
   net.lineRegistration.mockImplementation(() => new Promise(() => undefined))
@@ -32,3 +37,36 @@ test('開き直したとき、前の確認コードを出したままにしな�
   await act(async () => { view.rerender(<NoticeLineDialogV8 open onClose={() => undefined} />) })
   expect(screen.queryByLabelText('確認コード 123456')).toBeNull()
 })
+
+test('PenどおりPCのQRと紐づけ理由を示し、友だち追加リンクは置かない', async () => {
+  net.lineRegistration.mockResolvedValue({ success: true, data: { available: true, accountName: 'musubo契約者様 通知専用', basicId: '@540qlkhn', addFriendUrl: 'https://line.me/R/ti/p/@540qlkhn', linked: false, code: '123456', codeExpiresAt: new Date(Date.now() + 60_000).toISOString() } })
+  render(<NoticeLineDialogV8 open onClose={() => undefined} />)
+  await waitFor(() => expect(screen.getByAltText('musubo契約者様 通知専用 の友だち追加QRコード')).toBeTruthy())
+  expect(screen.getByText('PC画面のQRをスマートフォンのLINEで読み取ります。')).toBeTruthy()
+  expect(screen.getByText(/運営が契約先に必要なお知らせだけを/)).toBeTruthy()
+  expect(screen.queryByRole('link', { name: /友だち追加/ })).toBeNull()
+  expect(screen.getByLabelText('確認コード 123456')).toBeTruthy()
+})
+
+test('24時間の期限が切れたコードは表示せず、更新して新しいコードを出す', async () => {
+  const base = { available: true, accountName: '通知専用', basicId: '@540qlkhn', addFriendUrl: 'https://line.me/R/ti/p/@540qlkhn', linked: false }
+  net.lineRegistration
+    .mockResolvedValueOnce({ success: true, data: { ...base, code: '111111', codeExpiresAt: new Date(Date.now() - 1000).toISOString() } })
+    .mockResolvedValueOnce({ success: true, data: { ...base, code: '222222', codeExpiresAt: new Date(Date.now() + 60_000).toISOString() } })
+  render(<NoticeLineDialogV8 open onClose={() => undefined} />)
+  await waitFor(() => expect(screen.getByRole('button', { name: '新しいコードを表示' })).toBeTruthy())
+  expect(screen.queryByLabelText('確認コード 111111')).toBeNull()
+  await act(async () => { screen.getByRole('button', { name: '新しいコードを表示' }).click() })
+  await waitFor(() => expect(screen.getByLabelText('確認コード 222222')).toBeTruthy())
+})
+
+test('画面を開いたまま紐づけ完了を検知し、確認コードを消す', async () => {
+  net.lineRegistration.mockResolvedValue({ success: true, data: { available: true, accountName: '通知専用', basicId: '@540qlkhn', addFriendUrl: 'https://line.me/R/ti/p/@540qlkhn', linked: false, code: '123456', codeExpiresAt: new Date(Date.now() + 60_000).toISOString() } })
+  net.lineRegistrationStatus.mockResolvedValue({ success: true, data: { linked: true } })
+  render(<NoticeLineDialogV8 open onClose={() => undefined} />)
+  await waitFor(() => expect(screen.getByLabelText('確認コード 123456')).toBeTruthy())
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 5100)) })
+  await waitFor(() => expect(screen.getByText('LINEとの連携が完了しています')).toBeTruthy())
+  expect(screen.queryByLabelText('確認コード 123456')).toBeNull()
+  expect(net.lineRegistrationStatus).toHaveBeenCalledTimes(1)
+}, 10000)

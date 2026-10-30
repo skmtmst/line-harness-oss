@@ -1,97 +1,33 @@
-/*
- * ★V8 運営の LINE を登録する窓（Pencil ：幅560・余白24・間14）。
- * 窓の枠・頭は共通の Dialog。頭の寸法は dialog-head.module.css。
- * 値は globals.css の `[data-theme="v8"]` の `--tpl-hq-*`。
- */
-
-.faint { margin: 0; color: var(--color-ink-faint); font-size: var(--text-caption); }
-.icon { width: var(--tpl-hq-check); height: var(--tpl-hq-check); }
-
-.qrRow {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-hq-plans-gap);
-}
-
-.qrBox {
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  width: var(--tpl-hq-qr-box);
-  height: var(--tpl-hq-qr-box);
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-table-head);
-}
-
-.qr {
-  width: var(--tpl-hq-qr);
-  height: var(--tpl-hq-qr);
-}
-
-.qrText {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--tpl-hq-plan-head-gap);
-  min-width: 0;
-  flex: 1;
-}
-
-.lead {
-  margin: 0;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-hq-lead-lh);
-}
-
-.codePanel {
-  display: flex;
-  flex-direction: column;
-  gap: var(--tpl-hq-plan-head-gap);
-  padding: var(--tpl-hq-code-pad);
-  border-radius: var(--radius-control);
-  background: var(--color-table-head);
-}
-
-.codeLead {
-  margin: 0;
-  word-break: normal;
-  color: var(--color-ink);
-  font-size: var(--text-caption);
-  line-height: var(--tpl-hq-cell-lh);
-}
-
-.digits {
-  display: flex;
-  justify-content: center;
-  gap: var(--tpl-hq-feature-gap);
-  margin: 0;
-}
-
-.digit {
-  display: grid;
-  place-items: center;
-  width: var(--tpl-hq-digit-w);
-  height: var(--tpl-hq-digit-h);
-  border-radius: var(--radius-control);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-  background: var(--color-canvas);
-  color: var(--color-ink);
-  font-family: var(--font-inter), Inter, system-ui, sans-serif;
-  font-size: var(--text-metric);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.linked { margin: 0; color: var(--color-accent-deep); font-size: var(--text-caption); }
-
-.note {
-  margin: 0;
-  word-break: normal;
-  color: var(--color-ink-faint);
-  font-size: var(--text-micro);
-  line-height: var(--tpl-hq-small-lh);
+/* Pen「musubo-notice-line-design-v01.pen」：PCのQR案内、連携済み、状態別表示。 */
+.body { display: grid; gap: 16px; width: 100%; }
+.state { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-height: 72px; margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+.state p { margin: 0; }
+.statusPending, .statusLinked { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--radius-control); font-size: var(--text-caption); font-weight: 600; line-height: 20px; }
+.statusPending { background: var(--color-table-head); color: var(--color-ink-secondary); }
+.statusLinked { background: var(--color-accent-soft); color: var(--color-accent-deep); }
+.statusPending svg, .statusLinked svg { flex: none; width: 16px; height: 16px; }
+.spinner { animation: noticeSpin 1s linear infinite; }
+@keyframes noticeSpin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+.registration { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 20px; align-items: start; }
+.qrBox { display: grid; place-items: center; width: 170px; height: 170px; padding: 7px; border: 1px solid var(--color-hairline); border-radius: var(--radius-control); background: var(--color-canvas); }
+.qr { display: block; width: 156px; height: 156px; object-fit: contain; }
+.qrFallback { display: grid; justify-items: center; gap: 8px; padding: 8px; text-align: center; color: var(--color-ink-faint); font-size: var(--text-micro); }
+.instructions { display: grid; gap: 12px; min-width: 0; }
+.accountName { margin: 0; color: var(--color-ink); font-size: var(--text-caption); font-weight: 700; line-height: 21px; overflow-wrap: anywhere; }
+.step { display: flex; align-items: flex-start; gap: 9px; color: var(--color-ink); font-size: var(--text-caption); line-height: 20px; }
+.stepNumber { display: grid; place-items: center; flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--color-accent-soft); color: var(--color-accent-deep); font-weight: 700; }
+.step strong { font-weight: 700; }
+.step p { margin: 3px 0 0; color: var(--color-ink-secondary); }
+.codeWrap { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px; padding: 10px 12px; border-radius: var(--radius-control); background: var(--color-table-head); }
+.codeLabel, .expiry { color: var(--color-ink-secondary); font-size: var(--text-micro); }
+.code { margin: 0; color: var(--color-ink); font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: var(--text-metric); font-weight: 700; letter-spacing: .18em; font-variant-numeric: tabular-nums; }
+.codeExpired { display: grid; justify-items: start; gap: 6px; color: var(--color-warning); font-size: var(--text-caption); }
+.reason { padding: 12px 14px; border-radius: var(--radius-control); background: var(--color-accent-soft); color: var(--color-accent-deep); font-size: var(--text-caption); font-weight: 600; line-height: 20px; }
+.statusError { color: var(--color-warning); font-size: var(--text-caption); }
+.caveat { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-micro); line-height: 19px; }
+.footer { display: flex; justify-content: flex-end; width: 100%; padding-top: 14px; border-top: 1px solid var(--color-hairline); }
+@media (max-width: 530px) {
+  .registration { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .qrBox { margin-inline: auto; }
 }

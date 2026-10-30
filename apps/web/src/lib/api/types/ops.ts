@@ -321,6 +321,8 @@ export type HqLineRegistration =
   | { available: false }
   | { available: true; accountName: string; basicId: string | null; addFriendUrl: string | null; linked: boolean; code: string | null; codeExpiresAt: string | null }
 
+export type HqLineRegistrationStatus = { linked: boolean }
+
 export type OpsSupportDetail = {
   knowledge?: { canProcess?: boolean; article: OpsKnowledgeArticle | null; job: { id?: string; status: 'queued' | 'running' | 'done' | 'failed' | 'stale'; source_current: number } | null }
   ticket: OpsSupportTicket
