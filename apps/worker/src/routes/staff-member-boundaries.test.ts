@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import { DEFAULT_TENANT_ID } from '@line-crm/shared';
+import { getLineAccountListStats } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { staff } from './staff.js';
@@ -35,6 +36,7 @@ beforeEach(() => {
   member.run('other-admin', 'B担当', 'b@example.com', 'key-b', 'accounts', DEFAULT_TENANT_ID, null);
   account.run('account-a', 'channel-a', 'A', DEFAULT_TENANT_ID, 'hq-owner');
   account.run('account-b', 'channel-b', 'B', DEFAULT_TENANT_ID, 'hq-owner');
+  account.run('account-c', 'channel-c', 'C', DEFAULT_TENANT_ID, 'hq-owner');
   testDb.raw.prepare(`UPDATE staff_members SET assigned_line_account_id='account-a' WHERE id='account-admin'`).run();
   testDb.raw.prepare(`UPDATE staff_members SET assigned_line_account_id='account-b' WHERE id='other-admin'`).run();
   testDb.raw.prepare(`INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES (?,?,datetime('now'))`).run('account-admin', 'account-a');
@@ -60,6 +62,17 @@ describe('HQ and account member boundaries', () => {
     expect(body.data.map((member) => member.id).sort()).toEqual(['account-admin', 'hq-admin', 'hq-owner']);
     expect(body.data.find((member) => member.id === 'hq-owner')?.isAccountCreator).toBe(true);
     expect(body.data.find((member) => member.id === 'hq-admin')).toMatchObject({ role: 'admin', canManageInAccount: false });
+  });
+
+  it('counts only the creator and explicitly assigned account members', async () => {
+    const stats = await getLineAccountListStats(testDb.db, ['account-a', 'account-b', 'account-c']);
+    expect(stats['account-a']?.staffCount).toBe(3);
+    expect(stats['account-b']?.staffCount).toBe(2);
+    expect(stats['account-c']?.staffCount).toBe(1);
+    const response = await request('hq-owner', '/api/staff?lineAccountId=account-c');
+    expect(response.status).toBe(200);
+    const body = await response.json() as { data: Array<{ id: string }> };
+    expect(body.data.map((member) => member.id)).toEqual(['hq-owner']);
   });
 
   it('does not expose other account or HQ members by list or ID', async () => {

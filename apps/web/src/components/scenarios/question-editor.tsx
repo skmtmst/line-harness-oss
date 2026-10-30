@@ -561,13 +561,13 @@ export default function QuestionEditor({
                         <p className="text-xs font-medium">
                           いま設定されている {dead.join('・')} は実行されません。
                         </p>
-                        <button
-                          type="button"
+                        <Button
+                          variant="text"
+                          size="inline"
                           onClick={() => setChoice(index, clearDeadAnswerSettings(choice))}
-                          className="text-xs font-medium hover:underline"
                         >
                           実行されない設定を消す
-                        </button>
+                        </Button>
                       </>
                     ) : null}
                   </Notice>

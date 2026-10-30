@@ -175,6 +175,10 @@ describe('IDEA-27: 確認が必要なことのまとめ', () => {
 
     expect(screen.getByText('確認が必要なこと')).toBeTruthy()
     expect(screen.getByText('まだ承認・お断りの判断をしていません')).toBeTruthy()
+    /* ID69: 注意の文は押せる形（TextLink inline）。直す前の素のaだと data-inline が無い。 */
+    const attention = screen.getByRole('link', { name: 'まだ承認・お断りの判断をしていません' })
+    expect(attention.getAttribute('href')).toContain('#sec-actions')
+    expect(attention.getAttribute('data-inline')).toBe('true')
     expect(screen.getByText(/お客様からの要望があります/)).toBeTruthy()
     expect(screen.getByText('前回の来店時の申し送りがあります')).toBeTruthy()
     expect(screen.getByText('Googleカレンダーに反映できていません')).toBeTruthy()

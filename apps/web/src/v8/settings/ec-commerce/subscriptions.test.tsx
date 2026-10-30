@@ -10,6 +10,8 @@
  *   - タブは `subscriptions?limit=1` を別に叩いていた(同じ数を2回取っていた)。
  */
 import React from 'react'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
@@ -69,6 +71,7 @@ function page(offset: number, limit: number, total = 900) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  verifiedStaffRole('owner')
   /* 完全切り替え：V8 だけ。1ページ10件が既定。 */
   fixture.subscriptions.mockImplementation(async (params: { offset?: number; limit?: number }) =>
     page(params.offset ?? 0, params.limit ?? 10))
@@ -76,7 +79,7 @@ beforeEach(() => {
   fixture.identities.mockResolvedValue({ success: true, data: { summary: { unmatched: 3 } } })
 })
 
-afterEach(() => { cleanup() })
+afterEach(() => { cleanup(); verifiedStaffRole(null) })
 
 describe('#731 定期便のページ送りとタブの件数', () => {
   test('総数はサーバが数えた数を出し、2ページ目は offset を送って取りに行く', async () => {
@@ -167,8 +170,41 @@ test('ROOT32: 表示条件で0件なら「条件に合う」の空と切り替�
   cleanup()
 })
 
-test('閲覧のみでは定期便を読めるが、対象を選んで送る操作は隠す', async () => {
+test('ページ送りを表の直後へ置き、配信作成の入口は表の前へ置く', async () => {
+  const view = render(<SubscriptionsPanel accountId="account-a" />)
+  const table = await screen.findByRole('table', { name: '定期便' })
+  const pager = screen.getByRole('navigation', { name: '定期便のページ送り' })
+  let block: Element = table
+  while (block.parentElement && block.parentElement !== view.container) block = block.parentElement
+  expect(block.nextElementSibling?.contains(pager)).toBe(true)
+  const action = screen.getByRole('link', { name: '対象を選んで送る' })
+  expect(action.getAttribute('href')).toBe('/broadcasts/new')
+  expect(action.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+})
+
+test('閲覧のみでも配信作成の入口を灰色と理由付きで残し、遷移も読み直しもしない', async () => {
+  verifiedStaffRole('viewer')
   render(<SubscriptionsPanel accountId="account-a" canEdit={false} />)
   await screen.findByText(/900件中/)
-  expect(screen.queryByRole('link', { name: '対象を選んで送る' })).toBeNull()
+  const action = screen.getByRole('button', { name: '対象を選んで送る' }) as HTMLButtonElement
+  expect(action.getAttribute('aria-disabled')).toBe('true')
+  expect(action.disabled).toBe(false)
+  expect(action.getAttribute('href')).toBeNull()
+  const reasonIds = action.getAttribute('aria-describedby')?.split(' ') ?? []
+  expect(reasonIds.map(id => document.getElementById(id)?.textContent).join(' ')).toContain(PERMISSION_LOCK_REASON.viewer)
+  const calls = fixture.subscriptions.mock.calls.length
+  const click = new MouseEvent('click', { bubbles: true, cancelable: true })
+  fireEvent(action, click)
+  expect(click.defaultPrevented).toBe(true)
+  expect(fixture.subscriptions).toHaveBeenCalledTimes(calls)
+})
+
+test('本人が分からない間は入口を押せなくし、権限の理由を決めつけない', async () => {
+  verifiedStaffRole(null)
+  render(<SubscriptionsPanel accountId="account-a" canEdit={false} />)
+  await screen.findByText(/900件中/)
+  const action = screen.getByRole('button', { name: '対象を選んで送る' }) as HTMLButtonElement
+  expect(action.disabled).toBe(true)
+  expect(action.hasAttribute('data-permission-locked')).toBe(false)
+  expect(action.getAttribute('href')).toBeNull()
 })

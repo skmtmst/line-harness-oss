@@ -78,3 +78,11 @@ it('選択肢を並べて見る形では、どの選択肢にも「タグ・記�
   await renderEditor({ choiceOnly: undefined, choiceColumns: true })
   expect(screen.getAllByText('タグ・記録などの詳しい設定')).toHaveLength(2)
 })
+
+it('ID69: 実行されない設定の消す操作は押せる形（text）', async () => {
+  const value = question()
+  value.choices = [{ key: 'a', label: 'サイトを開く', behavior: 'url', url: 'https://example.com/x', removeTagIds: ['tag-vip'] }] as ScenarioQuestion['choices']
+  await renderEditor({ value })
+  /* 直す前の素のbuttonだと data-variant が無く落ちる。 */
+  expect(screen.getByRole('button', { name: '実行されない設定を消す' }).getAttribute('data-variant')).toBe('text')
+})

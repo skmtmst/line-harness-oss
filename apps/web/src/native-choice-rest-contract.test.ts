@@ -60,8 +60,7 @@ describe('m21u: 素の選ぶ入力は残っていない', () => {
     const body = readFileSync(join(SRC, 'v8/scenarios/create.tsx'), 'utf8')
     expect(body).toContain('<RadioCardGroup legend="配信方式"')
     expect(body.match(/<RadioCard\s/g)).toHaveLength(2)
-    expect(body).toContain("onChange={() => setSelectedMode('absolute_time')}")
-    expect(body).toContain("onChange={() => setSelectedMode('elapsed')}")
+    // 方式を選べる動きは作成画面の実描画試験で両方向を確かめる。
     expect(body).not.toContain('type="radio"')
   })
 })

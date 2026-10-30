@@ -148,6 +148,18 @@ describe('R73 編集・差替えの入口', () => {
   })
 })
 
+describe('91 登録の内容は1枚のカード', () => {
+  it('つづきに割らず、友だち数・状態・国・地域・役割メモを同じカードに出す', async () => {
+    await renderPage()
+    const card = host.querySelector('[aria-labelledby="acd-basic"]')
+    expect(card).toBeTruthy()
+    for (const label of ['友だち数', '状態', '国・地域', '役割メモ']) {
+      expect(within(card as HTMLElement).getByText(label)).toBeTruthy()
+    }
+    expect(host.textContent).not.toContain('登録の内容（つづき）')
+  })
+})
+
  it('V8 saves timezone through PUT and reloads the account', async () => {
     await renderPage(); clickButton('編集する');
     const input = within(document.body).getByLabelText('タイムゾーン') as HTMLInputElement;

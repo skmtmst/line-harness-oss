@@ -59,6 +59,8 @@ export type SingleProps = {
   error?: string
   busy?: boolean
   confirmDisabled?: boolean
+  /** 書き換え直前と非同期の応答後に確かめる、失効を記憶するlease。 */
+  canChangeNow?: () => boolean
   /** 確定だけを権限で止める。開いた候補とプレビューは残す。 */
   confirmLockedReason?: string
   readOnly?: boolean
@@ -66,7 +68,7 @@ export type SingleProps = {
   createLabel?: string
   searchPlaceholder?: string
   designNode?: string
-  createAction?: { label: (query: string) => string; onCreate: (query: string) => void }
+  createAction?: { label: (query: string) => string; onCreate: (query: string) => void | Promise<void> }
   /** プレビュー専用。候補の表示を切り替えるだけで、保存しない。 */
   onSelect?: (id: string) => void
   onConfirm: (id: string) => void
@@ -101,6 +103,9 @@ export type MultiBodyProps = {
   onlySelected?: boolean
   readOnly?: boolean
   busy?: boolean
+  disabled?: boolean
+  lockedReason?: string
+  canChangeNow?: () => boolean
   listFooter?: ReactNode
   state?: ReactNode
   /** 行の右の状態（接続の状態など）。 */
@@ -137,6 +142,9 @@ export type MultiProps = {
   state?: ReactNode
   error?: string
   busy?: boolean
+  confirmDisabled?: boolean
+  confirmLockedReason?: string
+  canChangeNow?: () => boolean
   readOnly?: boolean
   createHref?: string
   createLabel?: string
@@ -176,6 +184,8 @@ export type FieldBase = {
   disabled?: boolean
   disabledReason?: string
   lockedReason?: string
+  /** 指定した時だけ、開いた窓を残して変更前後に新鮮な権限を確かめる。 */
+  canChangeNow?: () => boolean
   readOnly?: boolean
   invalid?: boolean
   createHref?: string

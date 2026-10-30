@@ -12,6 +12,7 @@ import Link from 'next/link'
 import { type BookingNotificationPolicy } from '@/lib/api'
 
 import Button from '@/components/shared/button'
+import TextLink from '@/components/shared/text-link'
 
 import TagPill from '@/components/shared/tag-pill'
 
@@ -485,9 +486,9 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
                   {attentionItems.map((item) => (
                     <li key={item.key} className="text-ink-secondary text-xs">
                       {item.href ? (
-                        <a href={item.href} className="hover:text-action hover:underline">
+                        <TextLink href={item.href} inline>
                           {item.text}
-                        </a>
+                        </TextLink>
                       ) : (
                         item.text
                       )}

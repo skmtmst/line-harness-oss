@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Repeat2, Play, Pause, CreditCard } from 'lucide-react'
 import Link from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import Disclosure from '@/components/shared/disclosure'
 import SegmentedControl from '@/components/shared/segmented'
 import KpiBand from '@/components/shared/kpi-band'
@@ -44,6 +45,7 @@ type Filter = typeof FILTERS[number]['key']
 const STATUS_TONE: Record<EcSubscription['status'], StatusBadgeTone> = { active: 'success', paused: 'neutral', at_risk: 'info', cancelled: 'neutral' }
 
 export default function EcSubscriptions({ accountId, canEdit = true }: { accountId: string | null; canEdit?: boolean }) {
+  const lockedReason = usePermissionLockReason(canEdit, 'manager')
   const [v8PageSize, setV8PageSize] = useState(10)
   const pageSize = v8PageSize
   const loadGeneration = useRef(0)
@@ -128,6 +130,7 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
         onChange={setFilter}
         options={FILTERS.map((item) => ({ value: item.key, label: item.label }))}
       />
+      {canEdit ? <Button href="/broadcasts/new" variant="text">対象を選んで送る</Button> : <Button variant="text" disabled lockedReason={lockedReason}>対象を選んで送る</Button>}
     </div>
     {shown.length === 0 ? <ListState kind="empty" title="条件に合う定期便はありません" description="検索する言葉か表示条件を変えてください。" action={filter !== 'all' || search ? <Button onClick={() => { setFilter('all'); setSearch('') }}>条件を外す</Button> : undefined} /> : <DataTable label="定期便" density="compact" columns="var(--tpl-ecc-sub-columns)">
       <thead><TableHeadRow><Th>お客様と中身</Th><Th align="right">1回の金額</Th><Th>次の発送</Th><Th align="right">続いた回数</Th><Th>ようす</Th><Th aria-label="操作" /></TableHeadRow></thead>
@@ -141,13 +144,12 @@ export default function EcSubscriptions({ accountId, canEdit = true }: { account
         <ActionCell><RowMenu label={`${item.ownerName ?? 'お客様'}のその他操作`} menuLabel="定期便の操作" open={openMenuId === item.id} onOpenChange={(open) => setOpenMenuId(open ? item.id : null)} items={[{ id: 'detail', label: '中身を見る', href: `/friends/detail?id=${encodeURIComponent(item.friendId)}` }, ...(item.manageUrl ? [{ id: 'manage', label: 'ECで変更', href: item.manageUrl, external: true }] : [])]} /></ActionCell>
       </Tr>)}</tbody>
     </DataTable>}
-    <Notice tone="info" presentation="account-note" icon={null}>「支払いを確認」は EC から届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」は EC に登録された確定の予定日です。購入後の案内は <Link href="/nen-campaigns">NEN配信</Link> で管理します。</Notice>
-    {canEdit ? <Button href="/broadcasts/new" variant="text">対象を選んで送る</Button> : null}
     <div className={shared.pager}>
       <p className={shared.minorText}>{search.trim() ? `このページの ${formatNumber(shown.length)} 件を表示（検索はページの中だけに効きます）` : <ListRange label={filter === 'all' ? '定期便' : '表示条件に合う定期便'} total={total} first={total === 0 ? 0 : (page - 1) * pageSize + 1} last={(page - 1) * pageSize + shown.length} />}{data && data.skipped.malformedSnapshots > 0 ? `／形が読めなかったお客様のぶん ${formatNumber(data.skipped.malformedSnapshots)} 件は数えていません` : ''}</p>
       <PageSizeSelect value={v8PageSize} options={[10, 20, 50]} onChange={(value) => { setV8PageSize(value); setPage(1) }} />
       <Pagination page={page} pageCount={Math.max(1, Math.ceil(total / pageSize))} onPageChange={setPage} ariaLabel="定期便のページ送り" />
     </div>
+    <Notice tone="info" presentation="account-note" icon={null}>「支払いを確認」は EC から届いた決済状態です。将来止めるかどうかを予測した数字ではありません。「次の発送」は EC に登録された確定の予定日です。購入後の案内は <Link href="/nen-campaigns">NEN配信</Link> で管理します。</Notice>
     {(summary?.monthlyStats ?? []).length > 0 ? <Disclosure title="月別の定期便" size="compact" hint={summary?.monthlyAmount == null ? '今月の金額は未取得' : `今月 ${formatYen(summary.monthlyAmount)}`}><DataTable><thead><TableHeadRow><Th>月</Th><Th>契約数</Th><Th align="right">金額</Th></TableHeadRow></thead><tbody>{summary?.monthlyStats.slice(-6).map((item) => <Tr key={item.month}><Td>{item.month}</Td><Td>{formatNumber(item.count)} 件</Td><Td align="right">{formatYen(item.amount)}</Td></Tr>)}</tbody></DataTable></Disclosure> : null}
   </>
 }

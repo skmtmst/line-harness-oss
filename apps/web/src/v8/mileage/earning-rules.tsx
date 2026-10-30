@@ -35,7 +35,7 @@ import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { ListPagePagination } from '@/components/templates'
 import { describeMileageCsvExportFailure, formatMileageDate, formatMileageMonthDay, formatMileageNumber, isMileageFriendsV6Overview, ruleEventLabel } from './display'
-import { MILEAGE_TABLE_LAYOUT, CreateButton, MileageFrame, useMileageShell } from './frame'
+import { MILEAGE_TABLE_LAYOUT, MileageFrame, useMileageShell } from './frame'
 import { notifyToast } from '@/components/shared/toast'
 import styles from './mileage.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -578,10 +578,13 @@ export default function EarningRulesTab() {
     </KpiBand>
   )
 
+  /* 主ボタンは素の Button で渡し、題の右の自動整列（副→主）に載せる。 */
   const createButton = (full: boolean) => (
-    <CreateButton href="/mileage/earning-rules/new" readonly={readonly} full={full}>
-      <Plus size={16} aria-hidden="true" /> 決めごとを作る
-    </CreateButton>
+    readonly ? null : (
+      <Button variant="primary" className={full ? 'v8-folder-create w-full' : undefined} href="/mileage/earning-rules/new">
+        <Plus size={16} aria-hidden="true" /> 決めごとを作る
+      </Button>
+    )
   )
 
   /*

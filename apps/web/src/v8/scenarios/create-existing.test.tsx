@@ -1,3 +1,5 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
@@ -78,6 +80,7 @@ const draftButton = () => getPageAction({ name: /あとで決める/ }) as HTMLB
 const nameField = () => screen.getByRole('textbox', { name: 'シナリオ名' }) as HTMLInputElement
 
 beforeEach(() => {
+  verifiedStaffRole('owner')
   nav.search = 'id=sc-1'
   push.mockReset()
   readScenario.mockReset()
@@ -89,7 +92,7 @@ beforeEach(() => {
   folderList.mockResolvedValue({ success: true, data: folders })
   document.documentElement.dataset.theme = 'v8'
 })
-afterEach(() => cleanup())
+afterEach(() => { cleanup(); forgetStaffIdentity() })
 
 describe('読み込み中と読み込み失敗', () => {
   test('読み込み中は「作りました」と言わず、方式の確定も下書きも押せない', async () => {
@@ -221,13 +224,16 @@ describe('下書きで続ける', () => {
     expect(document.body.textContent).not.toContain('D1_ERROR')
   })
 
-  test('名前を空にしたら進まず、欄の下に理由を出して欄へ戻す', async () => {
+  test('名前を空にしたら入力不足のdisabledと理由で止まり、書かずにその場に残る', async () => {
     render(<ScenarioCreateV8 />)
     await screen.findByText(/の下書きを作りました/)
     fireEvent.change(nameField(), { target: { value: '' } })
     fireEvent.click(draftButton())
-    await waitFor(() => expect(document.getElementById('scenario-name-error')?.textContent).toBe('シナリオ名を入力してください'))
-    expect(document.activeElement).toBe(nameField())
+    const save = saveButton() as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    expect(save.hasAttribute('data-permission-locked')).toBe(false)
+    expect(save.getAttribute('aria-description')).toBe('シナリオ名を入力してください')
+    expect(document.querySelector('[data-template-region="footer"] [role="status"]')?.textContent).toBe('シナリオ名を入力してください')
     expect(push).not.toHaveBeenCalled()
     expect(update).not.toHaveBeenCalled()
   })

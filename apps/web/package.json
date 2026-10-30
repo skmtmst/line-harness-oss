@@ -24,6 +24,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@line-crm/shared": "workspace:*",
     "@line-harness/update-engine": "workspace:*",
+    "@simplewebauthn/browser": "14.0.0",
     "lucide-react": "^1.34.0",
     "next": "15.5.28",
     "qrcode": "^1.5.4",

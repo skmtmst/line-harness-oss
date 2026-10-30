@@ -169,10 +169,11 @@ describe('フィルターバー統一（監査6 #668）', () => {
     expect(source).not.toMatch(/rounded-full[^`]*rank\.rankName/)
   })
 
-  it('チャットの担当者ラベルはドロップダウン内の1つだけ', () => {
-    const source = read('../../app/chats/page.tsx')
-    expect(source).toContain('aria-label="担当者で絞り込む"')
-    expect(source).toContain('options={buildOperatorRows(operators, true).map')
-    expect(source).not.toContain('>担当者</span>')
+  it('チャットの担当者ラベルは絞り込みパネル内の1つだけ', () => {
+    const list = read('../../v8/inbox-chat/inbox-list-view.tsx')
+    expect(list).not.toContain('aria-label="担当者で絞り込む"')
+    const panel = read('../chats/inbox-filter-panel.tsx')
+    expect(panel).toContain('aria-label="担当者で絞り込む"')
+    expect(panel).not.toContain('>担当者</span>')
   })
 })

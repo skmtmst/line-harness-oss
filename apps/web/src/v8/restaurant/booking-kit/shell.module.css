@@ -76,18 +76,8 @@
   min-width: 0;
 }
 
-/* 店のタブ（E-1 と同じ段）：板の頭の下 12、タブの下 16 で中身 */
-.storeTabs {
-  margin-top: var(--tpl-rs-tabs-top);
-}
-
-.bodyAfterTabs {
-  margin-top: var(--tpl-rs-tabs-body-top);
-}
-
 /* 検証環境の帯を出さない中身（休業日・貸切）：段の間も上の余白も中身が持つ */
-.bodyFlush,
-.bodyAfterTabs.bodyFlush {
+.bodyFlush {
   gap: 0;
   margin-top: 0;
 }
@@ -192,8 +182,6 @@
 }
 
 .page[data-restaurant-fusion] .bodyFlush { gap: var(--tpl-board-section-gap); margin-top: var(--tpl-board-body-top); }
-
-.page[data-restaurant-fusion] .storeTabs { margin-top: var(--tpl-board-tabs-top); }
 
 .fusionStore{width: var(--tpl-rest1-restaurant-booking-kit-shell-width-1);flex: var(--tpl-rest1-restaurant-booking-kit-shell-flex-1);}
 

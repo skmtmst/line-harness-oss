@@ -140,6 +140,17 @@ describe('V8 マイペット（src/v8/nen-pets）', () => {
     expect(host.textContent).toContain('06/12')
   })
 
+  it('110: 体重が古い行は日付の下に黄の札「90日以上前」を出す', async () => {
+    await render('pets')
+    await settle(80)
+    const name = screen.getByText('ハナ')
+    const row = name.closest('tr')!
+    /* 日付は残し、意味は札の文字で出す。札の中身が日付だけだと意味が伝わらない。 */
+    expect(row.textContent).toContain('06/12')
+    const badge = row.querySelector('[data-tone="warning"]')!
+    expect(badge.textContent).toContain('90日以上前')
+  })
+
   it('名前が空なら保存せず、欄を赤くしてそこへ移動し、直すと理由が消える', async () => {
     await render('pets')
     await click(byLabel('「こむぎ」の操作'))

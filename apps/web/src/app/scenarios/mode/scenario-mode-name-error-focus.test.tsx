@@ -1,13 +1,11 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
-/*
- * R172: シナリオ新規作成の必須エラーがスマホの画面外に出る。
- *
- * 名前空欄で画面下の下書き保存を押すと、エラーは画面上方の帯だけに
- * 出て、操作位置（画面下）のままになる。最初の不正入力欄の下にも
- * 短い案内を出し、入力欄へフォーカスとスクロールを移す。
- */
+/* 名前の不足は普通のdisabledと操作の理由1行で伝える。
+ * 保持された保存callbackの必須エラー・欄への焦点は実画面guard試験で守る。 */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -38,6 +36,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 import ScenarioModePage from './page'
+import { api } from '@/lib/api'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
@@ -46,6 +45,9 @@ let root: Root
 let scrolled: string[]
 
 beforeEach(() => {
+  vi.clearAllMocks()
+  forgetSessionSnapshot()
+  verifiedStaffRole('owner')
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -59,6 +61,8 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  forgetStaffIdentity()
+  forgetSessionSnapshot()
 })
 
 async function mount() {
@@ -73,28 +77,20 @@ function nameInput(): HTMLInputElement {
   return input
 }
 
-describe('R172 名前空欄の下書き保存する', () => {
-  it('入力欄の下に案内を出し、欄へフォーカスとスクロールを移す', async () => {
+describe('名前空欄の下書き保存', () => {
+  it('不足は普通のdisabledと理由で伝え、押してもAPIを呼ばない', async () => {
     await mount()
     expect(nameInput().closest('[data-template-region="content"]')?.closest('[data-page-template="create"]')).toBeTruthy()
-    const draft = ([...host.querySelectorAll('button')].find((el) =>
-      el.textContent?.includes('あとで決める'),
-    ) ?? querySupplementaryPageAction('あとで決める')) as HTMLButtonElement
-    expect(draft, '下書き保存ボタンが見つかりません').toBeTruthy()
-    await act(async () => {
-      draft.click()
-    })
-    // 該当欄の下に短い案内が出る。
-    expect(host.textContent).toContain('シナリオ名を入力してください')
-    // 該当欄へフォーカスとスクロールが移る（スマホで原因が画面内に見える）。
-    expect(document.activeElement).toBe(nameInput())
-    expect(scrolled).toContain('INPUT')
-    // 読み上げ用に欄と案内を結ぶ。
-    expect(nameInput().getAttribute('aria-describedby')).toBe('scenario-name-error')
-    expect(nameInput().getAttribute('aria-invalid')).toBe('true')
+    const draft = ([...host.querySelectorAll('button')].find(el => el.textContent?.includes('あとで決める')) ?? querySupplementaryPageAction('あとで決める')) as HTMLButtonElement
+    expect(draft).toBeTruthy()
+    expect(draft.getAttribute('aria-disabled') === 'true' || draft.disabled).toBe(true)
+    expect(draft.hasAttribute('data-permission-locked')).toBe(false)
+    await act(async () => { draft.click() })
+    expect(document.body.textContent).toContain('シナリオ名を入力してください')
+    expect(api.scenarios.create).not.toHaveBeenCalled()
   })
 
-  it('名前を入れ直すと欄下の案内が消える', async () => {
+  it('名前を入れると主ボタンの不足理由が消えて保存できる', async () => {
     await mount()
     const draft = ([...host.querySelectorAll('button')].find((el) =>
       el.textContent?.includes('あとで決める'),
@@ -102,7 +98,9 @@ describe('R172 名前空欄の下書き保存する', () => {
     await act(async () => {
       draft.click()
     })
-    expect(host.querySelector('#scenario-name-error')).toBeTruthy()
+    const save = [...host.querySelectorAll('button')].find(el => el.textContent?.includes('この方式で保存する'))!
+    expect(save.disabled).toBe(true)
+    expect(save.getAttribute('aria-description')).toBe('シナリオ名を入力してください')
     const input = nameInput()
     await act(async () => {
       // React の onChange を通すためネイティブ setter を使う。
@@ -111,5 +109,9 @@ describe('R172 名前空欄の下書き保存する', () => {
       input.dispatchEvent(new window.Event('input', { bubbles: true }))
     })
     expect(host.querySelector('#scenario-name-error')).toBeNull()
+    expect(save.disabled).toBe(false)
+    expect(save.getAttribute('aria-description')).toBeNull()
+    await act(async () => { save.click() })
+    expect(api.scenarios.create).toHaveBeenCalledTimes(1)
   })
 })

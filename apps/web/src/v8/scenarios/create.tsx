@@ -1,5 +1,4 @@
 'use client'
-import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from '@/components/shared/list-navigation'
@@ -11,7 +10,7 @@ import { ApiError, api } from '@/lib/api';
 import { CreatePage } from '@/components/templates';
 import { Steps } from '@/components/templates/steps';
 import { notifyToast } from '@/components/shared/toast';
-import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select';
+import FolderSelect, { FolderCreateError, folderById, folderCreator } from '@/components/shared/folder-select';
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import HelpTip from '@/components/shared/help-tip'
@@ -27,7 +26,7 @@ import { isForbiddenOrRateLimited, loadFailureCopy, permissionDeniedMessage } fr
 import TargetMissing from '@/components/shared/target-missing'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome';
 import { useAccount } from '@/contexts/account-context';
-import { useStaffRole } from '@/lib/staff-role';
+import { captureScenarioWriteAccess, useScenarioWriteAccess } from './write-access'
 import { scenarioReferenceData } from '@/components/scenarios/scenario-reference-data';
 import styles from './create.module.css'
 import DeliveryModeDiagram from './delivery-mode-diagram'
@@ -54,11 +53,10 @@ export default function ScenarioCreateV8() {
   const router = useRouter()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
-  const { selectedAccountId } = useAccount()
-  const role = useStaffRole()
-  // 役割が読めるまでは出す（最後の守りはサーバー）。閲覧のみと分かったら作る操作を隠す。
-  const featureAccess = useFeatureAccess('scenarios')
-  const canEdit = featureAccess
+  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const access = useScenarioWriteAccess()
+  const canEdit = access.allowed
+  const folderAccess = useScenarioWriteAccess('manageFolders')
   const [scenario, setScenario] = useState<Scenario | null>(null)
   // id なしは「これから作る」。読み込む行が無いので最初から入力できる。
   const [scenarioState, setScenarioState] = useState<'loading' | 'ready' | 'error'>(
@@ -78,12 +76,49 @@ export default function ScenarioCreateV8() {
   const [folderState, setFolderState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [detailsSaving, setDetailsSaving] = useState(false)
   const detailsSavePromise = useRef<Promise<boolean> | null>(null)
+  const scope = useRef({ id, accountId: selectedAccountId, loading: accountLoading })
+  const mounted = useRef(true)
+  if (scope.current.id !== id || scope.current.accountId !== selectedAccountId || scope.current.loading !== accountLoading) {
+    scope.current = { id, accountId: selectedAccountId, loading: accountLoading }
+  }
+  const renderedScope = scope.current
+  const detailsScope = useRef(renderedScope)
+  if (detailsScope.current !== renderedScope) { detailsScope.current = renderedScope; detailsSavePromise.current = null }
+  const currentScope = () => mounted.current && scope.current === renderedScope
+  const editLease = captureScenarioWriteAccess()
+  const folderLease = captureScenarioWriteAccess('manageFolders')
+  const canSaveNow = () => currentScope() && !accountLoading && editLease()
+  const liveAccess = useRef(access)
+  liveAccess.current = access
+  const requireWrite = () => {
+    if (canSaveNow()) return true
+    if (currentScope() && (liveAccess.current.known && liveAccess.current.allowed)) {
+      setError('本人や権限の確認状態が変わったため、操作を中止しました。内容を確認してから、もう一度操作してください。')
+    }
+    return false
+  }
+  const created = useRef<{ scope: typeof renderedScope; id: string } | null>(null)
+  const saveOperation = useRef<{ scope: typeof renderedScope } | null>(null)
+  const runSave = (task: () => Promise<void>): Promise<void> => {
+    if (!requireWrite() || saveOperation.current?.scope === renderedScope) return Promise.resolve()
+    const ticket = { scope: renderedScope }
+    saveOperation.current = ticket
+    return task().finally(() => { if (saveOperation.current === ticket) saveOperation.current = null })
+  }
+  const [createdId, setCreatedId] = useState<string | null>(null)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  useEffect(() => { setSaving(null); setDetailsSaving(false); setCreatedId(null); setError('') }, [renderedScope])
 
   /**
    * 名前とフォルダを先に保存する。方式を選ぶ前に閉じても、分類は残る。
    * id なし（これから作る）のときは保存先が無いので、画面の中に持つだけ。
    */
-  const saveDetails = (nextFolderId = folderId): Promise<boolean> => {
+  const saveDetails = (nextFolderId = folderId, fromExplicitSave = false): Promise<boolean> => {
+    if (!requireWrite()) return Promise.resolve(false)
+    if (!fromExplicitSave && saveOperation.current?.scope === renderedScope) return Promise.resolve(false)
     if (!id) return Promise.resolve(true)
     if (detailsSavePromise.current) return detailsSavePromise.current
     const trimmed = name.trim()
@@ -98,6 +133,7 @@ export default function ScenarioCreateV8() {
       setError('')
       try {
         const res = await api.scenarios.update(id, { name: trimmed, folderId: nextFolder })
+        if (!requireWrite()) return false
         if (!res.success) {
           setError('シナリオ情報を保存できませんでした。時間をおいてもう一度お試しください。')
           setFolderId(scenario.folderId ?? '')
@@ -109,6 +145,7 @@ export default function ScenarioCreateV8() {
         setFolderId(res.data.folderId ?? '')
         return true
       } catch (cause) {
+        if (!requireWrite()) return false
         const fieldFailure = saveErrors.capture(cause)
 
         { if (!fieldFailure)
@@ -118,7 +155,7 @@ export default function ScenarioCreateV8() {
 
         return false
       } finally {
-        setDetailsSaving(false)
+        if (currentScope()) setDetailsSaving(false)
       }
     })()
     detailsSavePromise.current = operation
@@ -199,6 +236,11 @@ export default function ScenarioCreateV8() {
 
   /** 行をまだ作っていない（id なし）ときの作成。方式を確定したこの瞬間に初めて作る（N-055）。 */
   const createNew = async (mode: DeliveryMode): Promise<string | null> => {
+    if (!requireWrite()) return null
+    if (created.current?.scope === renderedScope) {
+      setError('作成済みのシナリオがあります。下の案内から開いてください。')
+      return null
+    }
     const trimmed = name.trim()
     if (!trimmed) {
       rejectEmptyName()
@@ -210,10 +252,15 @@ export default function ScenarioCreateV8() {
       triggerType: 'friend_add',
       triggerTagId: null,
       lineAccountId: selectedAccountId,
-      isActive: true,
+      isActive: captureScenarioWriteAccess('publish')(),
       deliveryMode: mode,
       folderId: folderId || null,
     })
+    if (res.success && currentScope()) {
+      created.current = { scope: renderedScope, id: res.data.id }
+      setCreatedId(res.data.id)
+    }
+    if (!requireWrite()) return null
     if (!res.success) {
       // API の内部の文はそのまま出さない（画面は決まった言葉で断る）。
       setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。')
@@ -223,11 +270,12 @@ export default function ScenarioCreateV8() {
     return res.data.id
   }
 
-  const choose = async (mode: DeliveryMode) => {
-
+  const choose = (mode: DeliveryMode) => runSave(async () => {
+    if (!requireWrite()) return
     if (id && !scenario) return
     if (detailsSavePromise.current) {
       const saved = await detailsSavePromise.current
+      if (!requireWrite()) return
       if (!saved) return
     }
     setSaving(mode)
@@ -243,6 +291,7 @@ export default function ScenarioCreateV8() {
       if (!id) {
         // 新規。名前・フォルダ・方式をまとめて1回で作る。
         const createdId = await createNew(mode)
+        if (!requireWrite()) { if (currentScope()) setSaving(null); return }
         if (!createdId) {
           setSaving(null)
           return
@@ -257,6 +306,7 @@ export default function ScenarioCreateV8() {
         folderId: folderId || null,
         deliveryMode: mode,
       })
+      if (!requireWrite()) { if (currentScope()) setSaving(null); return }
       if (!res.success) {
         setError('配信方式を保存できませんでした。時間をおいてもう一度お試しください。')
         setSaving(null)
@@ -267,6 +317,7 @@ export default function ScenarioCreateV8() {
       // 3段目へ。手順の帯が3段なので、2段で編集画面へ放り出さない。
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } catch (cause) {
+      if (!requireWrite()) { if (currentScope()) setSaving(null); return }
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
@@ -274,9 +325,10 @@ export default function ScenarioCreateV8() {
       setError(id ? scenarioModeError(cause) : 'シナリオを作成できませんでした。時間をおいてもう一度お試しください。') }
       setSaving(null)
     }
-  }
+  })
 
-  const continueAsDraft = async () => {
+  const continueAsDraft = () => runSave(async () => {
+    if (!requireWrite()) return
     if (detailsSaving) return
     if (id && !scenario) return
     if (!id) {
@@ -286,29 +338,32 @@ export default function ScenarioCreateV8() {
       setNameError('')
       try {
         const createdId = await createNew('absolute_time')
+        if (!requireWrite()) return
         if (createdId) {
           finishDraft()
           router.push(`/scenarios/first-step?id=${encodeURIComponent(createdId)}`)
         }
       } catch (saveFailure) {
+        if (!requireWrite()) return
         const fieldFailure = saveErrors.capture(saveFailure)
         // WEB226：通信の失敗（例外）も、方式を選んだときと同じ言葉で出す（黙って何も起きない、にしない）。
         { if (!fieldFailure)
 
         setError('シナリオを作成できませんでした。時間をおいてもう一度お試しください。') }
       } finally {
-        setDetailsSaving(false)
+        if (currentScope()) setDetailsSaving(false)
       }
       return
     }
-    const saved = await saveDetails()
+    const saved = await saveDetails(folderId, true)
+    if (!requireWrite()) return
     if (saved) {
       finishDraft()
       router.push(`/scenarios/first-step?id=${encodeURIComponent(id)}`)
     } else if (!name.trim()) {
       rejectEmptyName()
     }
-  }
+  })
 
   /*
    * 書きかけはシナリオの下書きの口（本物とは別の行・配信に使わない・30日で消える）へ残す。
@@ -335,10 +390,12 @@ export default function ScenarioCreateV8() {
           mode: scenario.deliveryMode === 'elapsed' ? 'elapsed' : 'absolute_time',
         }
       : { name: '', folderId: '', mode: 'absolute_time' },
-    active: canEdit,
+    active: canEdit && !accountLoading,
+    canSaveNow,
   })
   /** 本物を保存した・キャンセルした。下書きを消し、次の新規は新しいキーで始める。 */
   const finishDraft = () => {
+    if (!canSaveNow()) return
     browserDraft.clear()
     if (!id) forgetNewScenarioDraftKey(selectedAccountId)
   }
@@ -369,7 +426,7 @@ export default function ScenarioCreateV8() {
   const selectedFolderMissing = Boolean(folderId && !folders.some((folder) => folder.id === folderId))
 
   const locked = (Boolean(id) && !scenario) || detailsSaving || saving !== null
-  const fieldsDisabled = locked || !canEdit
+  const fieldsDisabled = locked || !canEdit || accountLoading
   const scenarioFailure = scenarioError ? loadFailureCopy(scenarioError, 'シナリオ') : null
   const useCommonReason = scenarioError ? isForbiddenOrRateLimited(scenarioError) : false
 
@@ -395,29 +452,32 @@ export default function ScenarioCreateV8() {
       footerActions={(
         <>
           <Button type="button" onClick={cancel}>キャンセル</Button>
-          {canEdit ? (
-            <>
-              <Button disabled={locked} onClick={() => continueAsDraft()} busy={Boolean(detailsSaving)} busyLabel="処理中…">
-                あとで決める（下書きとして保存）
-              </Button>
-              <Button
-                variant="primary"
-                disabled={locked}
-                onClick={() => choose(selectedMode)}
-                busy={saving !== null}
-                busyLabel="作成中…"
-              >
-                <Check size={16} aria-hidden="true" />この方式で保存する
-              </Button>
-            </>
-          ) : null}
+          <Button
+            disabled={locked || !canEdit || accountLoading || !name.trim() || Boolean(createdId)}
+            lockedReason={access.reason}
+            disabledReason={canEdit && !accountLoading && !name.trim() ? 'シナリオ名を入力してください' : undefined}
+            onClick={() => continueAsDraft()}
+            busy={Boolean(detailsSaving)}
+            busyLabel="処理中…"
+          >
+            あとで決める（下書きとして保存）
+          </Button>
+          <Button
+            variant="primary"
+            disabled={locked || !canEdit || accountLoading || !name.trim() || Boolean(createdId)}
+            lockedReason={access.reason}
+            disabledReason={canEdit && !accountLoading && !name.trim() ? 'シナリオ名を入力してください' : undefined}
+            onClick={() => choose(selectedMode)}
+            busy={saving !== null}
+            busyLabel="作成中…"
+          >
+            <Check size={16} aria-hidden="true" />この方式で保存する
+          </Button>
         </>
       )}
     >
       <div className={styles.notices} data-list-state={scenarioState} aria-busy={scenarioState === 'loading'}>
-        {!canEdit ? (
-          <div className={styles.viewerBand}><ReadOnlyNotice role="status">閲覧のみで見ています。シナリオを作る操作はオーナーか管理者に頼んでください。</ReadOnlyNotice></div>
-        ) : null}
+        {access.reason ? <ReadOnlyNotice need="feature" /> : null}
         {scenarioState === 'loading' ? <Notice tone="info">シナリオを読み込んでいます。</Notice> : null}
         {scenarioState === 'ready' && scenario ? (
           <Notice tone="info">「{scenario.name}」の下書きを作りました。続けて配信方式を選んでください。</Notice>
@@ -441,6 +501,7 @@ export default function ScenarioCreateV8() {
           />
         ) : null}
         {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
+        {createdId ? <Notice tone="info">作成したシナリオは保存されています。<Link href={`/scenarios/detail?id=${encodeURIComponent(createdId)}`}>作成済みのシナリオを見る</Link></Notice> : null}
         <BrowserDraftNotice ago={browserDraft.pendingAgo} onRestore={restoreBrowserDraft} onDiscard={browserDraft.clear} />
         <ScenarioDraftConflictNotice ago={browserDraft.conflictAgo} onLoadLatest={loadLatestDraft} onOverwrite={browserDraft.overwrite} />
       </div>
@@ -453,7 +514,7 @@ export default function ScenarioCreateV8() {
             <SaveErrorField names={["name"]}><TextField
               value={name}
               disabled={fieldsDisabled}
-              onChange={(e) => { setName(e.target.value); if (nameError) setNameError('') }}
+              onChange={(e) => { if (!canSaveNow()) return; setName(e.target.value); if (nameError) setNameError('') }}
               onBlur={() => void saveDetails()}
               placeholder="例：友だち追加ウェルカム"
               invalid={Boolean(nameError)}
@@ -469,7 +530,11 @@ export default function ScenarioCreateV8() {
               <SaveErrorField names={["folderId","folder_id"]}><FolderSelect
                 value={folderId}
                 disabled={fieldsDisabled || folderState !== 'ready'}
+                lockedReason={access.reason}
+                createDisabled={!folderAccess.allowed || accountLoading || locked}
+                createLockedReason={folderAccess.reason}
                 onChange={(value) => {
+                  if (!requireWrite()) return
                   setFolderId(value)
                   void saveDetails(value)
                 }}
@@ -480,9 +545,12 @@ export default function ScenarioCreateV8() {
                   ...folders.map(folderById),
                 ]}
                 // 一覧の左の列の「フォルダを追加」と同じ口（シナリオのフォルダは共有）。
-                onCreate={canEdit && !locked
-                  ? folderCreator((name, color) => api.folders.create({ kind: 'scenario', name, color, accountId: folderAccountId }), folderById, (created) => setFolders((current) => [...current, created]))
-                  : undefined}
+                onCreate={folderCreator(async (name, color) => {
+                    if (!currentScope() || accountLoading || !folderLease()) throw new FolderCreateError('本人や権限の確認状態が変わったため、フォルダの作成を中止しました。')
+                    const result = await api.folders.create({ kind: 'scenario', name, color, accountId: folderAccountId })
+                    if (!currentScope() || accountLoading || !folderLease()) throw new FolderCreateError('確認状態が変わりました。作成済みのフォルダは一覧で確認してください。')
+                    return result
+                  }, folderById, (created) => setFolders((current) => [...current, created]))}
               /></SaveErrorField>
             </span>
             {/* 保存済みのフォルダがこのアカウントの候補に無いときは理由を出す（黙って未分類に見せない）。 */}
@@ -500,7 +568,7 @@ export default function ScenarioCreateV8() {
             name="delivery-mode"
             value="absolute_time"
             checked={selectedMode === 'absolute_time'}
-            onChange={() => setSelectedMode('absolute_time')}
+            onChange={() => { if (canSaveNow()) setSelectedMode('absolute_time') }}
             disabled={fieldsDisabled}
             icon={<CalendarClock size={16} aria-hidden="true" />}
             title="時刻で指定"
@@ -513,7 +581,7 @@ export default function ScenarioCreateV8() {
             name="delivery-mode"
             value="elapsed"
             checked={selectedMode === 'elapsed'}
-            onChange={() => setSelectedMode('elapsed')}
+            onChange={() => { if (canSaveNow()) setSelectedMode('elapsed') }}
             disabled={fieldsDisabled}
             icon={<Timer size={16} aria-hidden="true" />}
             title="経過時間で指定"

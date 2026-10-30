@@ -5,6 +5,7 @@ import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes/index'
 import OpsShell from '@/components/ops/ops-shell'
 import { OpsHead } from '@/v8/ops/shell'
 import { SelfMfa } from '@/v8/settings/public/staff-self-mfa/index'
+import SelfPasskeys from '@/v8/settings/staff/self-passkeys'
 import { MfaPolicy } from '@/v8/settings/public/staff-mfa-policy/index'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
@@ -131,7 +132,7 @@ export default function OpsTwoFactorV8() {
     setState('done')
   }
 
-  if (state === 'security') return <OpsShell><OpsHead title="二段階認証" description="管理画面へ入る時の確かめ方を決めます" /><MfaPolicy loginPath="/ops/login" /><SelfMfa loginPath="/ops/login" /></OpsShell>
+  if (state === 'security') return <OpsShell><OpsHead title="二段階認証" description="管理画面へ入る時の確かめ方を決めます" /><MfaPolicy loginPath="/ops/login" /><SelfPasskeys enabled /><SelfMfa loginPath="/ops/login" /></OpsShell>
 
   return (
     <SaveErrorScope errors={saveErrors}><main className={styles.page} data-design-node="qod6X">

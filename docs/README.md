@@ -460,11 +460,20 @@
 ## 反映履歴
 
 - [リッチメニューを作る画像欄の箱の大きさ](release-log/unreleased/0000-kenta-muse-media-drop.md)
+- [飲食店3画面の共通タブ整理](release-log/unreleased/1972-kenta-muse-ledger-tabs.md)
+- [予約台帳の卓・予約なしの案内](release-log/unreleased/1972-kenta-muse-ledger-empty.md)
+- [予約台帳の数の帯の幅そろえ](release-log/unreleased/1972-kenta-muse-ledger-band.md)
 - [数の帯の増減の札の直し](release-log/unreleased/1970-kenta-muse-kpi-delta-row.md)
+- [シナリオ作成の権限確認](release-log/unreleased/1971-kenta-train-1029q.md)
+- [本人のパスキー管理](release-log/unreleased/1973-masato-passkey-self.md)
+- [シナリオ作成・受信箱・友だち情報・テンプレートの改善](release-log/unreleased/1972-kenta-train-1029r.md)
+- [定期便のページ送り](release-log/unreleased/1971-kenta-swbm-pagination.md)
+- [プール作成の保存帯](release-log/unreleased/1971-kenta-swbm-pool-footer.md)
 - [飲食店向け設定の表示条件](release-log/unreleased/1965-masato-restaurant-only-settings.md)
 - [EC連携の表示条件](release-log/unreleased/1966-masato-ec-usecase-visibility.md)
 - [飲食店の入口とメニュー価格の保存](release-log/unreleased/1967-masato-restaurant-simplify.md)
 - [設定メニューの表示項目](release-log/unreleased/1969-masato-hide-settings-menu.md)
+- [友だちの空の案内・保管の札・つづきの統合](release-log/unreleased/1971-kenta-muse-check-a.md)
 - [配信・シナリオ・自動応答の日時・題・下見の修正](release-log/unreleased/1954-kenta-muse-delivery.md)
 - [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
 - [緊急停止とアカウント読込失敗の表示](release-log/unreleased/1950-kenta-train-1029g.md)
@@ -473,8 +482,10 @@
 - [受信箱の空き・題横の印・保存の入口・カードの縦崩れ](release-log/unreleased/1953-kenta-muse-inbox.md)
 - [フォルダ追加の色の板の重なり修正](release-log/unreleased/1970-kenta-muse-check-b.md)
 - [運営・監査・分析・問い合わせ・リッチメニューの修正](release-log/unreleased/1953-kenta-muse-ops-misc.md)
+- [受信箱の絞り込み・自動応答の題・バナー生成・機能設定の住所・マイル履歴の操作](release-log/unreleased/1971-kenta-muse-fix-d.md)
 - [統括の一覧の名前押下・友だちCSVのタブ・統括アカウント説明の修正](release-log/unreleased/1953-kenta-muse-list-settings.md)
 - [絞り込みの見出し・0の灰色・日付の年・経過の日数](release-log/unreleased/1955-kenta-muse-ui-color.md)
+- [行の「…」の枠なし・押せる文字の形](release-log/unreleased/1971-kenta-muse-fix-c.md)
 - [自動応答・配達連携・イベント申込者の閲覧のみの表示](release-log/unreleased/1948-kenta-train-1029f.md)
 - [予約・取り込み・同じ人の比較の操作追加](release-log/unreleased/1948-kenta-swa.md)
 - [予約枠・在庫の操作サイズの更新](release-log/unreleased/1948-kenta-swbm.md)
@@ -483,6 +494,7 @@
 - [在庫の保存帯と本文の重なり修正](release-log/unreleased/1950-kenta-swbm-b19.md)
 - [新規店舗の専用機能を非表示](release-log/unreleased/1925-masato-new-store-specialized-hidden.md)
 - [一斉配信・シナリオ一覧の自動点検の更新](release-log/unreleased/1930-kenta-muse-broadcast-scenario-reds.md)
+- [道具の段の日付と選ぶ欄の地を白にそろえ](release-log/unreleased/1972-kenta-muse-pick-field-surface.md)
 - [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
 - [一斉配信の一覧の受け付け数の表示修正](release-log/unreleased/1916-kenta-muse-broadcast-received-wording.md)
 - [アカウント設定の親アカウント欄を非表示](release-log/unreleased/1900-masato-hide-parent-account.md) — 未使用の欄を隠し、既存の親子関係を保つ変更の反映履歴。
@@ -546,6 +558,7 @@
 - [統括のカードの札・要対応の数・表の幅](release-log/unreleased/0000-kenta-hq-card-fixes.md)
 - [運営の閲覧のみの操作を隠さず押せない形と理由で表示](release-log/unreleased/1956-kenta-muse-opsviewer.md)
 - [統括トップ・店の比較・お店画面の直し](release-log/unreleased/1953-kenta-muse-dash-store.md)
+- [左下の常設「統括へ」撤去・左メニューの上端と左端そろえ](release-log/unreleased/1972-kenta-muse-sidebar-top.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [二段階認証の画面を見やすく](release-log/unreleased/1843-kenta-two-factor-card.md)
 - [回復コードのお知らせに「要確認：」](release-log/unreleased/1846-kenta-recovery-notice-prefix.md)
@@ -994,3 +1007,11 @@
 - [統括からのLINEアカウント管理](release-log/unreleased/1963-masato-line-account-hq-scope.md) — 反映履歴。
 - [シナリオ一覧の権限とお知らせのベル](release-log/unreleased/1964-kenta-train-1029n.md) — 反映履歴。
 - [シナリオ一覧の操作と途中の失敗の案内](release-log/unreleased/1968-kenta-train-1029o.md) — 反映履歴。
+
+- [友だちの履歴の日付区切り](release-log/unreleased/1972-kenta-swb-date-group.md) — 反映履歴。
+- [ユーザー管理と二段階認証の配置](release-log/unreleased/1976-masato-staff-security-placement.md) — 反映履歴。
+- [ログイン時のパスキー確認](release-log/unreleased/1978-masato-passkey-login.md) — 反映履歴。
+- [店舗ごとの権限者数](release-log/unreleased/1979-masato-shed-account-members.md) — 反映履歴。
+- [ユーザー一覧の最終ログイン日](release-log/unreleased/1980-masato-staff-login-date.md) — 反映履歴。
+- [ユーザー管理画面の見た目](release-log/unreleased/1981-masato-staff-visual-cleanup.md) — 反映履歴。
+- [LINEチャネル情報の入力確認](release-log/unreleased/1982-masato-line-channel-input-validation.md) — 反映履歴、確認 2026-10-30。

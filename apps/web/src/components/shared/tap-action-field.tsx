@@ -122,7 +122,7 @@ export default function TapActionField({
   const kindControl = readOnly ? (
     <span className={styles.readKind} aria-label={`${kindLabel ?? `${name}を押したら`}：${current?.label ?? ''}`}>
       {CurrentIcon ? <CurrentIcon className={styles.icon} aria-hidden="true" /> : null}
-      <span className={styles.readText}>{current?.label ?? '—'}</span>
+      <span className={styles.readText}>{current?.label?.trim() ? current.label : '—'}</span>
     </span>
   ) : kindPresentation === 'grid' ? (
     <fieldset className={styles.choices} data-shared-part="tap-action-choices">

@@ -242,7 +242,7 @@ html:root .content .trigger:not([data-choice-field]) { width: var(--list-select-
 :root .trigger:not([data-choice-field]):not(.textTrigger:not([data-choice-field])):not([data-tone]) {
   border: 0;
   outline: 1px solid transparent;
-  background: var(--gradient-raised-control) var(--color-canvas);
+  background: var(--color-canvas);
   box-shadow: var(--shadow-raised-control);
 }
 

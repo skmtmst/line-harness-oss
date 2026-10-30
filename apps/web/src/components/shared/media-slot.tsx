@@ -6,6 +6,7 @@ useCallback,
 useEffect,
 useRef,
 useState,
+type ButtonHTMLAttributes,
 type ClipboardEvent,
 type DragEvent,
 type KeyboardEvent,
@@ -15,6 +16,7 @@ type RefObject,
 } from 'react'
 import { joinDescribedBy,useFieldContext } from './field-context'
 import HelpTip from './help-tip'
+import { usePermissionLockTip } from './permission-lock-tip'
 import styles from './media-slot.module.css'
 import { TextField } from './text-field'
 export { MediaLimitNote } from './media-slot-limit'
@@ -106,6 +108,15 @@ function reasonOf(caught: unknown): string {
   return describeApiFailure(caught, '画像の登録')
 }
 
+/** 未指定なら元の素のボタンをそのまま描く。権限の理由だけ共通の吹き出しにつなぐ。 */
+function MediaSlotButton({ lockedReason, canPressNow, onClick, onKeyDown, ...props }: ButtonHTMLAttributes<HTMLButtonElement> & { lockedReason?: string; canPressNow: () => boolean }) {
+  const lock = usePermissionLockTip<HTMLButtonElement>(lockedReason, props['aria-describedby'])
+  return <><button {...props} ref={lock.ref} {...lock.handlers} onClick={(event) => {
+    if (!canPressNow()) { event.preventDefault(); event.stopPropagation(); return }
+    onClick?.(event)
+  }} onKeyDown={(event) => { lock.handlers?.onKeyDown(event); if (!event.defaultPrevented) onKeyDown?.(event) }} />{lock.node}</>
+}
+
 export interface MediaSlotProps {
   id?: string
   invalid?: boolean
@@ -167,6 +178,10 @@ export interface MediaSlotProps {
   /** 読み取りのみ。押せる口を出さない。 */
   readOnly?: boolean
   disabled?: boolean
+  /** 隠さず灰色にし、選択・消去・URL・登録メディアの操作を理由付きで拒む。children/renderTrigger の表示は呼ぶ側が持つ。 */
+  lockedReason?: string
+  /** 値を変える直前と非同期処理の前後で確認する。以前の処理を失効させる時は、その処理が握る callback も false を返すこと。未指定は従来どおり。 */
+  canChangeNow?: () => boolean
   /** 小さい所（カルーセルのカードなど）。文字を減らす。 */
   size?: 'regular' | 'compact'
   /** 決まった縦横（「1 / 1」「20 / 13」など）。 */
@@ -212,6 +227,8 @@ export default function MediaSlot({
   scope,
   readOnly = false,
   disabled = false,
+  lockedReason,
+  canChangeNow,
   size = 'regular',
   aspectRatio,
   controlsBelow = false,
@@ -224,6 +241,19 @@ export default function MediaSlot({
   id = id ?? field?.controlId
   invalid = invalid || field?.invalid
   saveDescription = joinDescribedBy(saveDescription, field?.describedBy)
+  const permissionBlocked = Boolean(readOnly || disabled || lockedReason || canChangeNow?.() === false)
+  const permissionRef = useRef({ blocked: permissionBlocked, epoch: 0, canChangeNow, lockedReason, readOnly, disabled })
+  if (permissionRef.current.blocked !== permissionBlocked) permissionRef.current.epoch += 1
+  Object.assign(permissionRef.current, { blocked: permissionBlocked, canChangeNow, lockedReason, readOnly, disabled })
+  const permissionEpoch = permissionRef.current.epoch
+  const hasPermissionGate = lockedReason !== undefined || canChangeNow !== undefined
+  const canChange = useCallback(() => {
+    // 任意の口が無ければ既存の処理を変えない。口がある処理は古い世代へ戻って再開しない。
+    const latest = permissionRef.current
+    if (!hasPermissionGate && latest.canChangeNow === undefined && latest.lockedReason === undefined) return true
+    return permissionEpoch === latest.epoch && !readOnly && !disabled && !lockedReason && canChangeNow?.() !== false
+      && !latest.readOnly && !latest.disabled && !latest.lockedReason && latest.canChangeNow?.() !== false
+  }, [hasPermissionGate, permissionEpoch, readOnly, disabled, lockedReason, canChangeNow])
   const inputRef = useRef<HTMLInputElement>(null)
   const dragCount = useRef(0)
   const gen = useRef(0)
@@ -273,7 +303,7 @@ export default function MediaSlot({
   const busy = Boolean(busyProp) || ownBusy
   const progress = progressProp ?? ownProgress
   const error = errorProp || ownError
-  const interactive = !readOnly && !disabled && !busy && canFile
+  const interactive = !readOnly && !disabled && !busy && canFile && !permissionBlocked
   const compact = size === 'compact'
   const dropHint = compact ? 'またはクリック' : 'またはクリックしてファイルをアップロード'
   const noun = NOUN[kind]
@@ -288,6 +318,15 @@ export default function MediaSlot({
     busyChange.current?.(next)
   }, [])
 
+  useEffect(() => {
+    if (!hasPermissionGate || !permissionBlocked) return
+    gen.current += 1
+    dragCount.current = 0
+    setDrag('idle')
+    setBusy(false)
+    setOwnProgress(null)
+  }, [hasPermissionGate, permissionBlocked, setBusy])
+
   const send = useCallback(
     async (file: File, ticket: number, sendFile: NonNullable<MediaSlotProps['upload']>) => {
       const requestedScope = scopeRef.current
@@ -295,16 +334,16 @@ export default function MediaSlot({
       setBusy(true)
       try {
         const url = await sendFile(file, (percent) => {
-          if (ticket === gen.current && alive.current) setOwnProgress(Math.min(100, Math.max(0, Math.round(percent))))
+          if (ticket === gen.current && alive.current && canChange()) setOwnProgress(Math.min(100, Math.max(0, Math.round(percent))))
         })
-        if (ticket !== gen.current || !alive.current) return
+        if (ticket !== gen.current || !alive.current || !canChange()) return
         if (scopeRef.current !== requestedScope) {
           setOwnError(`編集中の場所が変わったため、${NOUN[kind]}を反映しませんでした。選び直してください。`)
           return
         }
         onChange?.(url)
       } catch (caught) {
-        if (ticket !== gen.current || !alive.current) return
+        if (ticket !== gen.current || !alive.current || !canChange()) return
         setOwnError(reasonOf(caught) || `${NOUN[kind]}を取り込めませんでした。もう一度選んでください。`)
       } finally {
         if (ticket === gen.current && alive.current) {
@@ -313,12 +352,12 @@ export default function MediaSlot({
         }
       }
     },
-    [kind, onChange, setBusy],
+    [kind, onChange, setBusy, canChange],
   )
 
   const take = useCallback(
     (file: File) => {
-      if (readOnly || disabled) return
+      if (readOnly || disabled || !canChange()) return
       setOwnError('')
       if (!fileMatchesAccept(file, accept)) {
         setOwnError(formats ? `${formats} の${noun}を選んでください` : `この${noun}は入れられません`)
@@ -330,7 +369,7 @@ export default function MediaSlot({
       }
       const ticket = ++gen.current
       const start = (reason: string) => {
-        if (ticket !== gen.current || !alive.current) return
+        if (ticket !== gen.current || !alive.current || !canChange()) return
         if (reason) {
           setOwnError(reason)
           return
@@ -346,14 +385,15 @@ export default function MediaSlot({
       if (typeof checked === 'string') start(checked)
       else void checked.then(start, () => start(`この${noun}は入れられません`))
     },
-    [accept, disabled, formats, maxBytes, noun, onFile, readOnly, upload, validate, send],
+    [accept, disabled, formats, maxBytes, noun, onFile, readOnly, upload, validate, send, canChange],
   )
 
   const openPicker = () => {
-    if (interactive) inputRef.current?.click()
+    if (interactive && canChange()) inputRef.current?.click()
   }
 
   const clear = () => {
+    if (!canChange()) return
     gen.current += 1
     if (ownBusy) setBusy(false)
     setOwnProgress(null)
@@ -364,7 +404,7 @@ export default function MediaSlot({
 
   const checkDrag = (event: DragEvent) => {
     event.preventDefault()
-    if (!interactive) return
+    if (!interactive || !canChange()) return
     if (event.type === 'dragenter') dragCount.current += 1
     const items = [...(event.dataTransfer?.items ?? [])].filter((item) => item.kind === 'file')
     const ok = items.every((item) => {
@@ -382,13 +422,13 @@ export default function MediaSlot({
     event.preventDefault()
     dragCount.current = 0
     setDrag('idle')
-    if (!interactive) return
+    if (!interactive || !canChange()) return
     const files = Array.from(event.dataTransfer?.files ?? [])
     if (onFiles) onFiles(files)
     else if (files[0]) void take(files[0])
   }
   const paste = (event: ClipboardEvent) => {
-    if (!acceptPaste || readOnly || disabled) return
+    if (!acceptPaste || readOnly || disabled || !canChange()) return
     const item = [...(event.clipboardData?.items ?? [])].find((entry) => entry.kind === 'file' || entry.type.startsWith(`${kind}/`))
     const file = item?.getAsFile()
     if (file) {
@@ -417,20 +457,20 @@ export default function MediaSlot({
     !readOnly && !busy && (onUrl || urlEntry || onMediaPick) ? (
       <span className={styles.links}>
         {onUrl || urlEntry ? (
-          <button
+          <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange}
             type="button"
             className={styles.link}
-            disabled={disabled}
+            disabled={disabled || permissionBlocked}
             aria-expanded={urlEntry ? urlOpen : undefined}
-            onClick={(event) => { stop(event); if (onUrl) onUrl(); else setUrlOpen((open) => !open) }}
+            onClick={(event) => { stop(event); if (!canChange()) return; if (onUrl) onUrl(); else setUrlOpen((open) => !open) }}
           >
             URL で入れる
-          </button>
+          </MediaSlotButton>
         ) : null}
         {onMediaPick ? (
-          <button type="button" className={styles.link} disabled={disabled} onClick={(event) => { stop(event); onMediaPick() }}>
+          <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange} type="button" className={styles.link} disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); if (canChange()) onMediaPick() }}>
             登録メディアから選ぶ
-          </button>
+          </MediaSlotButton>
         ) : null}
       </span>
     ) : null
@@ -461,14 +501,14 @@ export default function MediaSlot({
         {readOnly ? null : (
           <span className={styles.actions}>
             {canFile ? (
-              <button type="button" className={styles.pill} disabled={disabled} onClick={(event) => { stop(event); openPicker() }}>
+              <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange} type="button" className={styles.pill} disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); openPicker() }}>
                 差し替える
-              </button>
+              </MediaSlotButton>
             ) : null}
             {removable ? (
-              <button type="button" className={styles.pill} disabled={disabled} onClick={(event) => { stop(event); clear() }}>
+              <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange} type="button" className={styles.pill} disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); clear() }}>
                 消す
-              </button>
+              </MediaSlotButton>
             ) : null}
           </span>
         )}
@@ -507,9 +547,9 @@ export default function MediaSlot({
         {readOnly || !canFile ? (
           inner
         ) : (
-          <button type="button" className={styles.hit} disabled={!interactive} onClick={(event) => { stop(event); openPicker() }} onKeyDown={onKey}>
+          <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange} type="button" className={styles.hit} disabled={!interactive} onClick={(event) => { stop(event); openPicker() }} onKeyDown={onKey}>
             {inner}
-          </button>
+          </MediaSlotButton>
         )}
         {drag === 'idle' && !controlsBelow ? links : null}
       </span>
@@ -532,6 +572,7 @@ export default function MediaSlot({
             const files = Array.from(event.target.files ?? [])
             // 同じファイルを選び直せるよう、毎回空に戻す。
             event.target.value = ''
+            if (!canChange()) return
             if (onFiles) onFiles(files)
             else if (files[0]) void take(files[0])
           }}
@@ -554,7 +595,7 @@ export default function MediaSlot({
         data-size={size}
         data-kind={kind}
         data-readonly={readOnly || undefined}
-        data-disabled={disabled || undefined}
+        data-disabled={disabled || (hasPermissionGate && permissionBlocked) || undefined}
         className={styles.frame}
         style={aspectRatio ? { aspectRatio } : undefined}
         tabIndex={acceptPaste && interactive ? -1 : undefined}
@@ -581,9 +622,9 @@ export default function MediaSlot({
           type="url"
           aria-label={urlEntry.label}
           value={urlEntry.value}
-          disabled={disabled}
+          disabled={disabled || permissionBlocked}
           placeholder={urlEntry.placeholder ?? 'https://…'}
-          onChange={(event) => urlEntry.onChange(event.target.value)}
+          onChange={(event) => { if (canChange()) urlEntry.onChange(event.target.value) }}
         />
       ) : null}
       {children}
