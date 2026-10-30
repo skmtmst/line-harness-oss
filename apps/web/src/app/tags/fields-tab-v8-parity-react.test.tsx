@@ -33,7 +33,8 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffIdentity: () => null }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   ApiError: class ApiError extends Error {
     status = 500
   },

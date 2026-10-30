@@ -52,7 +52,7 @@ describe('Google営業時間の3方式を現在の共通部品で使う', () => 
     act(() => { button.click(); button.click() })
     expect(mocks.proposeHours).toHaveBeenCalledTimes(1)
     await act(async () => { fail(new ApiError(500, '変更案の作成に失敗しました')) })
-    await screen.findByText('変更案の作成に失敗しました')
+    await screen.findByText('変更案を作れませんでした。')
     expect(screen.getByRole('textbox', { name: '文章で入力' })).toHaveProperty('value', '今日を休みにして')
     expect(screen.getByRole('button', { name: '変更案を確認する' })).toHaveProperty('disabled', false)
   })

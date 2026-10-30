@@ -2,6 +2,9 @@ import { readUiSource as readFileSync } from '../../../../scripts/test-ui-source
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { ApiError } from '@/lib/api'
+import { scoreRuleErrorMessage } from '@/v8/mileage/score-rules'
+import { mileageAdjustmentErrorMessage } from '@/v8/mileage/adjust-dialog'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PAGE = readFileSync(join(HERE, 'page.tsx'), 'utf8')
@@ -15,20 +18,9 @@ const ADJUSTMENT = readFileSync(
  * `mileage-管理画面-contract.test.ts` が見ている。
  */
 describe('スコアのルール：失敗の文言', () => {
-  it('`ApiError` の中身をそのまま出さない', () => {
-    /*
-      `ApiError.message` は 400 以外だと `API error: <番号>` に落ちる
-      （`lib/api.ts`）。素通しすると `API error: 405` が利用者に見える。
-    */
-    expect(PAGE).not.toMatch(/if \(error instanceof ApiError\) return error\.message/)
-  })
-
-  it('400 と 422 は本文を通し、ほかは番号ごとに日本語へ置き換える', () => {
-    // R130: 422の本文はWorkerが付けた日本語の検証文だけ。400と同じく通す。
-    expect(PAGE).toMatch(/if \(error\.status === 400 \|\| error\.status === 422\) return error\.message/)
-    for (const status of [403, 404, 405, 409]) {
-      expect(PAGE).toMatch(new RegExp(`if \\(error\\.status === ${status}\\) return '[^']+'`))
-    }
+  it.each([400, 422])('入力理由%sは実関数で安全な日本語だけを残す', status => {
+    expect(scoreRuleErrorMessage(new ApiError(status, '名前を直してください'))).toBe('名前を直してください')
+    expect(scoreRuleErrorMessage(new ApiError(status, '名前の確認: D1_ERROR SELECT secret FROM tenant'))).not.toMatch(/D1_ERROR|SELECT|secret/)
   })
 
   it('置き換えた文言に番号や英語を混ぜない', () => {
@@ -45,11 +37,13 @@ describe('スコアのルール：失敗の文言', () => {
     expect(PAGE).toContain('通信に失敗しました。接続を確認してもう一度お試しください。')
   })
 
-  it('同じ機能の手動マイル調整と同じ形にそろえる', () => {
-    /* 隣の画面が先にこの形にしている。どちらかだけ直すと、また食い違う。 */
-    expect(ADJUSTMENT).toContain('if (error.status === 400) return error.message')
-    expect(ADJUSTMENT).toContain('if (error.status === 405)')
+  it('手動マイル調整でも安全な入力理由と環境の拒否を残す', () => {
+    expect(mileageAdjustmentErrorMessage(new ApiError(400, '理由を入力してください'))).toBe('理由を入力してください')
+    expect(mileageAdjustmentErrorMessage(new ApiError(400, 'D1_ERROR SELECT secret FROM tenant'))).not.toMatch(/D1_ERROR|SELECT|secret/)
+    expect(mileageAdjustmentErrorMessage(new ApiError(405))).toBe('この環境ではマイル変更を実行できません。')
+    for (const status of [403, 404, 405, 409]) expect(scoreRuleErrorMessage(new ApiError(status))).not.toMatch(/API error|status|\d/)
   })
+
 })
 
 describe("スコアのルール：管理画面の配置", () => {

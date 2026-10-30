@@ -1,3 +1,4 @@
+import { extractApiErrorMessage } from './api/transport/errors'
 import { tapExtrasError } from '@line-crm/shared'
 /*
  * 「押したら」の共通の決まり（オーナー採用 ・Pen YPzmo・2026-10-09）。
@@ -123,5 +124,7 @@ export function tapActionProblem(value: TapActionValue, opts: { where: string; h
 
 /** 追加処理の保存で落ちた理由を、その欄へ戻すための符号。 */
 export function tapExtraSaveError(error: unknown): string | null {
-  return error instanceof Error && (error as Error & { code?: string }).code === 'TAP_EXTRA_INVALID' ? error.message : null
+  if (!(error instanceof Error) || (error as Error & { code?: string }).code !== 'TAP_EXTRA_INVALID') return null
+  const detail = extractApiErrorMessage(JSON.stringify({ error: error.message }), 400)
+  return /[ぁ-んァ-ヶ一-龠]/u.test(detail) ? detail : '追加の動作を確認してください。'
 }

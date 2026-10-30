@@ -41,7 +41,8 @@ vi.mock('next/link', () => ({
   ),
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageCrumbs: () => {}, usePageTitle: () => {} }))
-vi.mock('@/lib/api', () => ({
+vi.mock('@/lib/api', async importOriginal => ({
+  ...await importOriginal<typeof import('@/lib/api')>(),
   ApiError: class ApiError extends Error {
     status: number
     constructor(status: number, message?: string) {
@@ -311,7 +312,7 @@ describe('SCENARIO-05：保存失敗で「保存中」のままにしない', ()
     ) as HTMLTextAreaElement
     fireEvent.change(body, { target: { value: '書きかけの本文' } })
     await click('作って編集へ')
-    expect(screen.getByText(/保存できませんでした/)).toBeTruthy()
+    expect(screen.getByText('保存できませんでした。入力内容は残っています。通信状態を確認して、もう一度お試しください。')).toBeTruthy()
     const again = screen.getByRole('button', { name: '作って編集へ' }) as HTMLButtonElement
     expect(again.disabled).toBe(false)
     expect(body.value).toBe('書きかけの本文')

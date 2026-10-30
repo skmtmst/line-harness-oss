@@ -371,7 +371,7 @@ function OperatorEditInner() {
         setError('お知らせが見つかりません。一覧へ戻って開き直してください。') }
       } else if (caught instanceof ApiError && (caught.status === 409 || caught.status === 400)) {
         { if (!fieldFailure)
-        setError(caught.message)
+        setError(describeApiFailure(caught, '下書きの保存'))
       }
       } else {
         { if (!fieldFailure)

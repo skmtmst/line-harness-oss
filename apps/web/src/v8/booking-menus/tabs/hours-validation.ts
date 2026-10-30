@@ -1,5 +1,5 @@
 import { ApiError, type BookingSettings } from '@/lib/api'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
+import { permissionDeniedMessage, describeApiFailure, japaneseDetailOf } from '@/components/shared/api-error-message'
 import { DAYS, type BusinessHoursDay } from './shared'
 export function initialBusinessHours(settings: BookingSettings): BusinessHoursDay[] {
   return DAYS.map(({ weekday }) => ({
@@ -41,7 +41,7 @@ export function businessHoursSaveError(error: unknown): string {
   if (error instanceof ApiError && error.status === 409) {
     return 'ほかの担当者が先に保存しました。最新の内容を読み直してから、もう一度変更してください。'
   }
-  if (error instanceof ApiError && error.status === 400) return error.message
+  if (error instanceof ApiError && error.status === 400) return japaneseDetailOf(error) || describeApiFailure(error, '入力内容の確認')
   return '営業時間を保存できませんでした。入力内容を確かめて、もう一度お試しください。'
 }
 

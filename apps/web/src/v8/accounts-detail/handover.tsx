@@ -1,4 +1,5 @@
 'use client'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
 
 import CopyTextButton from '@/components/shared/copy-text-button'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
@@ -61,7 +62,7 @@ const NO_MANAGE_NOTE = '閲覧のみで見ています。引き継ぎの変更�
 
 /** サーバの言葉があればそれを、無ければ決まった文を出す。 */
 function apiMessage(caught: unknown, fallback: string): string {
-  return caught instanceof ApiError && caught.message && !/^API error: /.test(caught.message) ? caught.message : fallback
+  return japaneseDetailOf(caught) || fallback
 }
 
 export default function AccountHandoverV8() {

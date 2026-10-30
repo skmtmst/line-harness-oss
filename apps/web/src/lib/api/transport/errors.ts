@@ -91,7 +91,10 @@ export function parseRetryAfterSeconds(value: string | null): number | undefined
  */
 export function describeSaveFailure(err: unknown): string {
   if (err instanceof ApiError) {
-    if (err.message && !/^API error: /.test(err.message)) return err.message
+    if (err.status < 500) {
+      const detail = safeOperatorMessage(err.message)
+      if (/[ぁ-んァ-ヶ一-龠]/u.test(detail)) return detail
+    }
     switch (err.status) {
       case 401:
         return 'ログインの状態が切れています。ログインし直してから、もう一度お試しください。'
@@ -110,7 +113,10 @@ export function describeSaveFailure(err: unknown): string {
           : '保存できませんでした。もう一度お試しください。'
     }
   }
-  if (err instanceof Error && /[ぁ-んァ-ヶ一-龠]/u.test(err.message)) return err.message
+  if (err instanceof Error) {
+    const detail = extractApiErrorMessage(JSON.stringify({ error: err.message }), 400)
+    if (/[ぁ-んァ-ヶ一-龠]/u.test(detail)) return detail
+  }
   return '保存できませんでした。通信が切れている可能性があります。'
     + '接続を確かめて、もう一度お試しください。'
 }
@@ -138,6 +144,7 @@ export function describeSaveFailure(err: unknown): string {
 const BODY_MESSAGE_STATUSES = new Set([400, 404, 409, 410, 422, 428, 429])
 
 const INTERNAL_ERROR_MARKERS = [
+  /\bBearer\s+[A-Za-z0-9._~+\/-]+=*/i,
   /D1_ERROR/i,
   /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER)\b.+\b(?:FROM|INTO|TABLE|SET)\b/is,
   /(?:stack trace|node_modules|\.tsx?:\d+|\.mjs:\d+)/i,

@@ -308,7 +308,7 @@ export default function QuickSendV8({
       onClose()
     } catch (e) {
       if (!isCurrent()) return
-      if (e instanceof QuickSendPermissionChanged) setError(e.message)
+      if (e instanceof QuickSendPermissionChanged) setError(describeApiFailure(e, '配信の変更'))
       else if (!saveErrors.capture(e)) setError(describeApiFailure(e, '保存'))
     } finally {
       if (sendingRef.current === token) sendingRef.current = null
