@@ -108,7 +108,7 @@ async function mount() {
   await waitFor(() => expect(list().getByText('山田 太郎')).toBeTruthy())
 }
 
-const list = () => within(screen.getByRole('table', { name: 'いまいる人の一覧' }))
+const list = () => within(screen.getByRole('table', { name: 'ユーザーの一覧' }))
 
 function searchBox(): HTMLElement {
   return screen.getByRole('searchbox', { name: '名前・メールで探す' })
