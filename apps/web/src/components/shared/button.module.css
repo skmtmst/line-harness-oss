@@ -423,6 +423,7 @@ html:root .button[data-permission-locked], html:root .button[data-permission-loc
   transform: none;
   scale: none;
 }
+html:root .button.inline.text[data-permission-locked], html:root .button.inline.text[data-permission-locked]:is(:hover, :active), html:root .button.text[data-presentation][data-permission-locked], html:root .button.text[data-presentation][data-permission-locked]:is(:hover, :active), html:root .button.secondary[data-presentation='row-action'][data-permission-locked], html:root .button.secondary[data-presentation='row-action'][data-permission-locked]:is(:hover, :active) { color: var(--color-ink-secondary); }
 html:root .button.primary[data-permission-locked]:not(:focus-visible) {
   outline-color: var(--color-field-border);
 }
