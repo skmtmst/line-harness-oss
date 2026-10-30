@@ -1,3 +1,6 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
+import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 import { querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
@@ -46,6 +49,8 @@ let root: Root
 let scrolled: string[]
 
 beforeEach(() => {
+  forgetSessionSnapshot()
+  verifiedStaffRole('owner')
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -59,6 +64,8 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount())
   host.remove()
+  forgetStaffIdentity()
+  forgetSessionSnapshot()
 })
 
 async function mount() {
