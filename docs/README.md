@@ -1037,3 +1037,5 @@
 - [来店フォローの送信直前の承認と予約の確認](release-log/unreleased/0000-kenta-followup-delivery-approval.md) — 反映履歴、確認 2026-10-31。
 
 - [LINE来店フォローを使わない判断](release-log/unreleased/0000-kenta-followup-not-using.md)
+
+- [来店フォローの下書き・テスト・同じ版の公開と承認](release-log/unreleased/0000-kenta-followup-engines.md) — 反映履歴、確認 2026-10-31。
