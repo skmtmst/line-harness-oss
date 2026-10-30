@@ -1,6 +1,9 @@
 'use client'
 
 import { useEffect, useState, type ReactNode } from 'react'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { FolderCreateError } from '@/components/shared/folder-select'
 import { FileText, Plus } from 'lucide-react'
 import BroadcastAssetManager, { type BroadcastAssetListLayout } from '@/components/broadcasts/broadcast-asset-manager'
 import Button from '@/components/shared/button'
@@ -40,6 +43,7 @@ export default function AssetTemplatesList(props: Props) {
 
 function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, items, loadState,
   reload, onEdit, onDelete, editor, deleteDialog }: Props & BroadcastAssetListLayout) {
+  const saveErrors = useSaveFormErrors()
   const [folders, setFolders] = useState<AssetFolder[]>([])
   const [folderError, setFolderError] = useState('')
   const [folderRetry, setFolderRetry] = useState(0)
@@ -81,18 +85,24 @@ function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, items
   const addFolder = async () => {
     if (!canMutate || folderBusy || !folderName.trim()) return
     setFolderBusy(true)
+    saveErrors.reset()
     setCreateError('')
     try {
       const result = await api.broadcastMessageAssets.folders.create(accountId, folderName.trim())
-      if (!result.success || !result.data) throw new Error('folder creation failed')
+      if (!result.success) throw new FolderCreateError(result.error)
+      if (!result.data) throw new Error('folder creation failed')
       setFolders(current => [...current, result.data!])
       setFolderOpen(false)
       setFolderName('')
-    } catch { setCreateError('フォルダを追加できませんでした。もう一度お試しください。') }
+    } catch (reason) {
+      const fieldFailure = saveErrors.capture(reason)
+      if (!fieldFailure) setCreateError((reason instanceof FolderCreateError ? reason.reason : japaneseDetailOf(reason))
+        || 'フォルダを追加できませんでした。もう一度お試しください。')
+    }
     finally { setFolderBusy(false) }
   }
   const clear = () => { setQuery(''); setStatus('all'); setFolderId('all'); setPage(1) }
-  return <ListPage title="テンプレート" heightMode="content" skeleton tableInset folderWidth={FOLDER_RAIL_WIDTH}
+  return <SaveErrorScope errors={saveErrors}><ListPage title="テンプレート" heightMode="content" skeleton tableInset folderWidth={FOLDER_RAIL_WIDTH}
     help="配信などで使う、メッセージのひな形です。" tabs={tabs}
     folderNav={{ rows, activeId: folderId, onSelect: selectFolder, createAction: create }}
     folders={<FolderPanel rows={rows} activeId={folderId} onSelect={selectFolder} createAction={create}
@@ -116,8 +126,8 @@ function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, items
       onCancel={() => { if (!folderBusy) setFolderOpen(false) }} onConfirm={() => void addFolder()}
       confirmLabel="追加する" confirmDisabled={!folderName.trim() || !canMutate}
       busy={folderBusy} error={createError}>
-      <Field label="フォルダ名"><TextField value={folderName}
-        onChange={event => setFolderName(event.target.value)} /></Field>
+      <Field label="フォルダ名"><SaveErrorField names={['name', 'folderName']}><TextField value={folderName}
+        onChange={event => setFolderName(event.target.value)} /></SaveErrorField></Field>
     </Dialog></>}>
     {editor}
     {loadState !== 'ready' ? <ListState kind={loadState === 'error' ? 'error' : 'loading'}
@@ -129,7 +139,7 @@ function AssetListLayout({ kind, accountId, tabs, canMutate, lockedReason, items
         create={{ label: `最初の${meta.title}を作る`, href: meta.href }} />
         : <AssetTable items={filtered.slice((page - 1) * 20, page * 20)} label={meta.title}
           canMutate={canMutate} lockedReason={lockedReason} onEdit={onEdit} onDelete={onDelete} />}
-  </ListPage>
+  </ListPage></SaveErrorScope>
 }
 
 function assetDescription(item: BroadcastMessageAsset): string {
