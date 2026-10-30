@@ -102,6 +102,9 @@ export const opsSupportPaths = {
   '/api/hq/notices/line-registration': {
     get: { tags: ['HQ Support'], summary: '契約者専用LINEの登録案内（友だち追加 URL と本人の確認コード）', responses: { '200': { description: 'Registration info' } } },
   },
+  '/api/hq/notices/line-registration/status': {
+    get: { tags: ['HQ Support'], summary: '本人の通知専用LINE紐づけ状態', responses: { '200': { description: 'Linked status' } } },
+  },
   '/api/ops/notice-line-account': {
     get: { tags: ['Ops Console'], summary: '契約者専用LINEに使うアカウントと候補', responses: { '200': { description: 'Current and candidates' } } },
     put: { tags: ['Ops Console'], summary: '契約者専用LINEに使うアカウントを指定する', requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', properties: { lineAccountId: { type: 'string', nullable: true } } } } } }, responses: { '200': { description: 'Saved' }, '400': { description: 'Not an ops account' } } },

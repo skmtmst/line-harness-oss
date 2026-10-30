@@ -1,111 +1,139 @@
 'use client'
 
-/*
- * ★V8 運営（契約者専用）の LINE を登録する窓（Pencil ）。
- * 読む口・閉じ方は `components/hq/notice-line-register-dialog.tsx` と同じ。
- * 見た目だけを絵どおりに組んだ：QR の箱と説明・6 桁を1字ずつの箱・下の真ん中に「あとで確認する」。
- */
 import { useEffect, useState } from 'react'
-import { Smartphone } from 'lucide-react'
+import { Check, LoaderCircle, PanelsTopLeft } from 'lucide-react'
 import { api, type HqLineRegistration } from '@/lib/api'
 import { qrToDataURL } from '@/lib/qr-image'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import styles from './notice-line-dialog.module.css'
-import head from './dialog-head.module.css'
 
-/** 絵の窓の幅と上からの位置（px）。 */
-const DESIGN_WIDTH = 560
-const DESIGN_TOP = 150
+const STATUS_INTERVAL_MS = 5000
 
-export default function NoticeLineDialogV8({ open, onClose }: { open: boolean; onClose: () => void }) {
+/** 通知専用LINEの案内。Pen「musubo-notice-line-design-v01.pen」の未連携・連携済み・状態別UI。 */
+export default function NoticeLineDialogV8({ open, onClose, quietWhenUnavailable = false }: {
+  open: boolean
+  onClose: () => void
+  /** 登録完了直後の自動表示では、運営側が未設定なら案内を出さずに閉じる。 */
+  quietWhenUnavailable?: boolean
+}) {
   const [info, setInfo] = useState<HqLineRegistration | null>(null)
   const [qr, setQr] = useState('')
-  /* WEB213：読めなかったことを「まだ設定されていません」と言わない。読み直せる。 */
+  const [qrFailed, setQrFailed] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [statusFailed, setStatusFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
 
   useEffect(() => {
     if (!open) return
     let cancelled = false
-    // WEB213：開き直すたびに、前に出した QR・確認コード（24時間）を消してから読み直す。
     setInfo(null)
     setQr('')
+    setQrFailed(false)
     setFailed(false)
+    setStatusFailed(false)
+    setNow(Date.now())
     void api.hqNotices.lineRegistration().then(async (res) => {
       if (cancelled) return
-      if (!res.success) {
-        setFailed(true)
-        return
-      }
+      if (!res.success) { setFailed(true); return }
       setInfo(res.data)
-      if (res.data.available && res.data.addFriendUrl) {
+      if (res.data.available && !res.data.linked && !res.data.addFriendUrl) setQrFailed(true)
+      if (res.data.available && !res.data.linked && res.data.addFriendUrl) {
         try {
-          const dataUrl = await qrToDataURL(res.data.addFriendUrl, { width: 220, margin: 1 })
-          if (!cancelled) setQr(dataUrl)
-        } catch {
-          if (!cancelled) setQr('')
-        }
+          const image = await qrToDataURL(res.data.addFriendUrl, { width: 220, margin: 1 })
+          if (!cancelled) setQr(image)
+        } catch { if (!cancelled) setQrFailed(true) }
       }
     }).catch(() => { if (!cancelled) setFailed(true) })
     return () => { cancelled = true }
   }, [open, attempt])
 
-  if (!open) return null
+  useEffect(() => {
+    if (open && info && !info.available && quietWhenUnavailable) onClose()
+  }, [open, info, quietWhenUnavailable, onClose])
+
+  // 初回のプロフィール取得は繰り返さず、本人の紐づけ状態だけを照会する。
+  useEffect(() => {
+    if (!open || !info?.available || info.linked) return
+    let cancelled = false
+    let checking = false
+    const timer = window.setInterval(() => {
+      setNow(Date.now())
+      if (checking) return
+      checking = true
+      void api.hqNotices.lineRegistrationStatus().then((res) => {
+        if (cancelled) return
+        if (!res.success) { setStatusFailed(true); return }
+        setStatusFailed(false)
+        if (res.data.linked) setInfo((current) => current?.available ? { ...current, linked: true, code: null, codeExpiresAt: null } : current)
+      }).catch(() => { if (!cancelled) setStatusFailed(true) }).finally(() => { checking = false })
+    }, STATUS_INTERVAL_MS)
+    return () => { cancelled = true; window.clearInterval(timer) }
+  }, [open, info?.available, info?.available && info.linked])
+
+  if (!open || (quietWhenUnavailable && info && !info.available)) return null
+
+  const linked = info?.available && info.linked
+  const expired = Boolean(info?.available && !linked && info.codeExpiresAt && now >= Date.parse(info.codeExpiresAt))
+  const accountName = info?.available ? `${info.accountName}${info.basicId ? `（${info.basicId}）` : ''}` : ''
 
   return (
     <Dialog
       open={open}
-      title="運営からの通知を LINE で受け取る"
-      description="メンテナンスや料金など、大事なお知らせを受け取る通知専用LINEです。お問い合わせへの返信は登録メールアドレスと管理画面に届きます。"
-      designWidth={DESIGN_WIDTH}
-      designTop={DESIGN_TOP}
+      title={linked ? 'LINEとの連携が完了しています' : '運営からの通知をLINEで受け取る'}
+      description={linked
+        ? '契約先に関する大事なお知らせを、このLINEへお届けします。'
+        : '契約先に関する料金・メンテナンスなどの重要なお知らせを、あなたのLINEへ届けます。'}
+      headerIcon={<PanelsTopLeft />}
+      designLayout="stacked"
+      designWidth={560}
+      designTop={120}
       onCancel={onClose}
-      footer={<div className={`${head.footer} ${head.footerCenter}`}><Button onClick={onClose}>あとで確認する</Button></div>}
-      designNode="D6fh3"
+      footer={<div className={styles.footer}><Button variant="primary" onClick={onClose}>{linked ? '閉じる' : 'あとで確認する'}</Button></div>}
     >
-      <div className={head.head}>
-        {failed ? (
-          <p className={styles.faint}>
-            案内を読み込めませんでした。{' '}
-            <button type="button" className="font-semibold underline" onClick={() => setAttempt((n) => n + 1)}>もう一度読み込む</button>
-          </p>
-        ) : !info ? (
-          <p className={styles.faint}>読み込んでいます…</p>
-        ) : info.available ? (
-          <>
-            <div className={styles.qrRow}>
-              <div className={styles.qrBox}>
-                {qr ? (
-                  // eslint-disable-next-line @next/next/no-img-element -- 手元で描いた data: URL の QR。最適化の対象ではない
-                  <img width={120} height={120} src={qr} alt={`${info.accountName} の友だち追加 QR コード`} className={styles.qr} />
-                ) : null}
-              </div>
-              <div className={styles.qrText}>
-                <p className={styles.lead}>スマートフォンの LINE でこの QR を読み取るか、下のボタンから友だち追加します。</p>
-                {info.addFriendUrl ? (
-                  <Button external href={info.addFriendUrl}  >
-                    <Smartphone aria-hidden="true" className={styles.icon} />スマートフォンで開く（友だち追加）
-                  </Button>
-                ) : null}
-              </div>
+      {failed ? (
+        <div className={styles.state} role="alert">
+          <p>案内を読み込めませんでした。</p>
+          <Button onClick={() => setAttempt((n) => n + 1)}>もう一度読み込む</Button>
+        </div>
+      ) : !info ? (
+        <p className={styles.state}><LoaderCircle className={styles.spinner} aria-hidden="true" />案内を読み込んでいます…</p>
+      ) : !info.available ? (
+        <p className={styles.state}>通知専用LINEはまだ運営側で設定されていません。設定できしだい、この画面からご案内します。</p>
+      ) : linked ? (
+        <div className={styles.body}>
+          <div className={styles.statusLinked}><Check aria-hidden="true" />連携済み</div>
+          <p className={styles.accountName}>{accountName}</p>
+          <p className={styles.caveat}>このLINEは通知専用です。お問い合わせは各店舗アカウントの管理画面にある「お問い合わせ」からお送りください。</p>
+        </div>
+      ) : (
+        <div className={styles.body}>
+          <div className={styles.statusPending}><LoaderCircle className={styles.spinner} aria-hidden="true" />まだ連携していません ・ 2つの手順で登録できます</div>
+          <div className={styles.registration}>
+            <div className={styles.qrBox}>
+              {qr ? (
+                // eslint-disable-next-line @next/next/no-img-element -- 画面上で生成したQRのdata URL
+                <img src={qr} alt={`${info.accountName} の友だち追加QRコード`} className={styles.qr} width={156} height={156} />
+              ) : qrFailed ? <span className={styles.qrFallback}>QRを表示できません。<Button onClick={() => setAttempt((n) => n + 1)}>再読み込み</Button></span>
+                : <LoaderCircle className={styles.spinner} aria-label="QRを準備しています" />}
             </div>
-            <div className={styles.codePanel}>
-              <p className={styles.codeLead}>追加できたら、LINE のトーク画面で次の 6 桁を送ってください（あなたの管理画面と紐づきます）。</p>
-              {info.linked ? (
-                <p className={styles.linked}>この管理画面はすでに登録済みです。</p>
+            <div className={styles.instructions}>
+              <p className={styles.accountName}>{accountName}</p>
+              <div className={styles.step}><span className={styles.stepNumber}>1</span><div><strong>LINEで友だち追加</strong><p>PC画面のQRをスマートフォンのLINEで読み取ります。</p></div></div>
+              <div className={styles.step}><span className={styles.stepNumber}>2</span><div><strong>6桁コードをLINEのトークに送信</strong><p>あなたの管理画面とLINEを確認して紐づけます。</p></div></div>
+              {expired ? (
+                <div className={styles.codeExpired} role="status">確認コードの有効期限が切れました。<Button onClick={() => setAttempt((n) => n + 1)}>新しいコードを表示</Button></div>
               ) : info.code ? (
-                <p className={styles.digits} aria-label={`確認コード ${info.code}`}>
-                  {info.code.split('').map((digit, index) => <span key={index} className={styles.digit} aria-hidden="true">{digit}</span>)}
-                </p>
+                <div className={styles.codeWrap}><span className={styles.codeLabel}>確認コード</span><p className={styles.code} aria-label={`確認コード ${info.code}`}>{info.code}</p><span className={styles.expiry}>24時間有効</span></div>
               ) : null}
-              <p className={styles.note}>確認コードは 24 時間有効です。このLINEは問い合わせを受け付けません。お問い合わせは管理画面の「お問い合わせ」から送れます。</p>
             </div>
-          </>
-        ) : (
-          <p className={styles.faint}>契約者専用LINEはまだ運営側で設定されていません。設定できしだい、この画面からご案内します。</p>
-        )}
-      </div>
+          </div>
+          <div className={styles.reason}>紐づけると、運営が契約先に必要なお知らせだけを、登録した本人のLINEへ送れます。</div>
+          {statusFailed ? <div className={styles.statusError} role="status">連携状況を確認できません。自動で再確認します。</div> : null}
+          <p className={styles.caveat}>このLINEは問い合わせを受け付けません。お問い合わせは各店舗アカウントの管理画面にある「お問い合わせ」からお送りください。</p>
+        </div>
+      )}
     </Dialog>
   )
 }

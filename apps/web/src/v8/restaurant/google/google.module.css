@@ -105,6 +105,15 @@
   line-height: var(--tpl-rt-rich-body-lh);
 }
 
+.connectionPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--tpl-rt-section-gap);
+  min-width: 0;
+  padding-top: var(--tpl-rt-section-gap);
+  border-top: 1px solid var(--card-edge);
+}
+
 /* 口コミの一覧の下の注：上下10・左右14。 */
 .footNote {
   margin: 0;

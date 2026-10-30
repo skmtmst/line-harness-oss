@@ -300,6 +300,7 @@ const STAFF_EXPLICIT_ALLOW: Array<[method: string, path: string]> = [
   // 運営からのお知らせ（★37-7）は本人宛て。担当者でも読んで既読にできる。
   ['GET', '/api/hq/notices'],
   ['GET', '/api/hq/notices/line-registration'],
+  ['GET', '/api/hq/notices/line-registration/status'],
 ];
 
 const STAFF_EXPLICIT_ALLOW_PATTERNS: Array<[method: string, pattern: RegExp]> = [

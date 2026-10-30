@@ -47,7 +47,7 @@ export const restaurantGoogle = new Hono<Env>();
 const OAUTH_STATE_COOKIE = 'lh_gb_state';
 const OAUTH_STATE_MAX_AGE_SEC = 600;
 const CALLBACK_PATH = '/api/restaurant-test/google/oauth/callback';
-const ADMIN_RETURN_PATH = '/restaurant-test/google';
+const ADMIN_RETURN_PATH = '/settings/sns';
 /** 画面を開いたとき、最終同期からこの時間を過ぎていれば同期を勧める。 */
 export const SYNC_STALE_AFTER_MS = 10 * 60 * 1000;
 export const DEFAULT_AI_MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
