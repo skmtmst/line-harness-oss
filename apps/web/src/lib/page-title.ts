@@ -1,3 +1,4 @@
+import { canonicalScreenPath } from './canonical-route'
 import { HQ_MENU_SECTIONS, MENU_SECTIONS } from './menu'
 
 /** ルート → メニューのラベル。長いほうから当てるので、`/tags/new` は「タグ」になる。 */
@@ -7,9 +8,11 @@ const MENU_LABELS: Array<[string, string]> = MENU_SECTIONS
 
 /** ルートから既定の画面名を引く。当たらなければ空。 */
 export function defaultTitleForPath(pathname: string): string {
+  const path = canonicalScreenPath(pathname)
   for (const [href, label] of MENU_LABELS) {
-    if (pathname === href) return label
-    if (href !== '/' && pathname.startsWith(`${href}/`)) return label
+    const route = href.split('?')[0]
+    if (path === route) return label
+    if (route !== '/' && path.startsWith(`${route}/`)) return label
   }
   return ''
 }
@@ -19,6 +22,7 @@ export function defaultTitleForPath(pathname: string): string {
  * 左メニューに無い画面。上の帯の名前が無いときだけ使う。
  */
 const DOCUMENT_ONLY_LABELS = [
+  ['/conversions', 'コンバージョン'],
   ['/ops/dashboard', 'ダッシュボード（運営）'],
   ['/ops/applications', '申込アカウント（運営）'],
   ['/ops/tenants', '契約先アカウント（運営）'],
@@ -41,8 +45,9 @@ DOCUMENT_ONLY_LABELS.sort((a, b) => b[0].length - a[0].length)
 /** タブの題に使う画面名。上の帯の名前を先に、無ければ上の表から引く。 */
 export function documentTitleForPath(pathname: string, shownTitle: string): string {
   if (shownTitle) return shownTitle
+  const path = canonicalScreenPath(pathname)
   for (const [href, label] of DOCUMENT_ONLY_LABELS) {
-    if (pathname === href || pathname.startsWith(`${href}/`)) return label
+    if (path === href || path.startsWith(`${href}/`)) return label
   }
   return ''
 }
