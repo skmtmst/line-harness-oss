@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailFields, DetailInlineEdit } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import { useListSnapshot } from '@/lib/use-list-snapshot'
 
@@ -558,18 +559,16 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
         hasNext={activeMarkIndex >= 0 && activeMarkIndex < pageItems.length - 1}
         onPrev={activeMarkIndex > 0 ? () => setActiveMarkId(pageItems[activeMarkIndex - 1].id) : undefined}
         onNext={activeMarkIndex >= 0 && activeMarkIndex < pageItems.length - 1 ? () => setActiveMarkId(pageItems[activeMarkIndex + 1].id) : undefined}
-        footer={activeMark && canEdit ? (
-          <Button href={`/tags/marks/edit?id=${encodeURIComponent(activeMark.id)}`}>編集する</Button>
-        ) : undefined}
+        actions={{ primary: (activeMark ? <Button variant="primary" href={`/tags/marks/edit?id=${encodeURIComponent(activeMark.id)}`}>編集する</Button> : null),
+    menuItems: [], primaryAllowed: canEdit }}
       >
+<DetailContent>
         {activeMark ? (
-          <dl className={styles.detailList}>
+          <DetailFields>
             <div>
               <dt>マーク名</dt>
               <dd>
-                {/* 閲覧のみ：鉛筆は置かず、名前だけを見せる（2026-10-06 オーナー決定）。 */}
-                {canEdit ? (
-                  <InlineEdit
+                <DetailInlineEdit allowed={canEdit}
                     label="マーク名"
                     value={activeMark.name}
                     maxLength={30}
@@ -585,16 +584,17 @@ export default function MarksTab({ accountId, canEdit, host, explanation = false
                       void load()
                     }}
                   />
-                ) : activeMark.name}
               </dd>
             </div>
             <div><dt>付いている人</dt><dd>{`${formatNumber(activeMark.friendCount)}人`}</dd></div>
             <div><dt>はじめの値</dt><dd>{activeMark.isDefault ? '新規の初期値' : emptyValue('unknown')}</dd></div>
             <div><dt>自動で変わる</dt><dd>{autoRuleLabel(activeMark)}</dd></div>
             <div><dt>出す場所</dt><dd>{usageLabel(activeMark)}</dd></div>
-          </dl>
+          </DetailFields>
         ) : null}
-      </DetailPanel>
+
+</DetailContent>
+</DetailPanel>
 
       {pendingDelete ? (
         <ArchiveMarkDialog

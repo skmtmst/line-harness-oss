@@ -788,6 +788,7 @@ export default function EmailThread({
 
       {/* 選ぶと本文が入力欄に入る。送る前に直せる（LINE 側と同じ部品）。 */}
       <TemplatePicker
+        channel="email"
         open={showTemplatePicker}
         onClose={() => setShowTemplatePicker(false)}
         onPick={(content) => {

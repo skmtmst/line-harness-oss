@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailSection } from '@/components/shared/detail-content'
 import { withHonorific } from '@line-crm/shared'
 
 import { FormLeaveGuard } from '@/components/shared/form-leave-guard'
@@ -97,7 +98,7 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
   }
 
   async function saveUrl() {
-    if (load.state !== 'ready' || !load.url || !staffId) return
+    if (!canEdit || busy || urlInvalid || load.state !== 'ready' || !load.url || !staffId) return
     setBusy(true); setError(null)
     try {
       const response = await bookingCalendarApi.saveStaffUrl(accountId, staffId, load.url.value.trim() || null, load.url.version)
@@ -122,14 +123,14 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
     <FormLeaveGuard dirty={person !== null && urlDirty} busy={busy} />
     {/* 共通の引き出し（幅は決まりの 540・後ろに暗い幕）。幅は画面で上書きしない。 */}
     <Drawer open={person !== null} title={person?.name ?? ''} description={person ? `${person.role ? `${person.role}・` : ''}担当メニュー ${menuCount} つ` : undefined}
-      width="editor" heightMode="viewport" contentSpacing="sections" onClose={onClose} busy={busy} dirty={urlDirty} footer={<div className={styles.footer}><Button onClick={onClose}>閉じる</Button></div>}>
+      width="editor" heightMode="viewport" contentSpacing="sections" onClose={onClose} busy={busy} dirty={urlDirty} actions={urlDirty ? { primary: <Button variant="primary" busy={busy} disabled={urlInvalid} disabledReason="https:// で始まる URL を入れてください" onClick={() => void saveUrl()}>保存する</Button>, primaryAllowed: canEdit } : {}}>
+<DetailContent>
       {load.state === 'loading' ? <p className={styles.minor}>読み込んでいます…</p> : null}
       {load.state === 'error' ? <div className={styles.card}><p className={styles.minor}>カレンダーの設定を読み込めませんでした。</p><Button size="compact" onClick={() => void reload()}>もう一度読み込む</Button></div> : null}
       {ready && mine ? (
         <>
           {error ? <Notice tone="danger">{error}</Notice> : null}
-          <section className={styles.card} aria-labelledby="staff-calendar-heading">
-            <h3 id="staff-calendar-heading" className={styles.title}>カレンダー</h3>
+          <DetailSection title="カレンダー">
             {ready.store ? <p className={styles.minor}>{`店全体の同期：読み込み ${onOff(ready.store.readEnabled)}・書き込み ${onOff(ready.store.writeEnabled)}（予約設定 › 担当スタッフの上で変えます）`}</p> : null}
             <DataTable aria-label="つなぐカレンダー">
               <thead><TableHeadRow><Th>カレンダー</Th><Th>状態</Th><Th>読み込み</Th><Th>書き込み</Th></TableHeadRow></thead><tbody>
@@ -147,10 +148,9 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
               </Tr>
             </tbody></DataTable>
             <p className={styles.minor}>初めはどちらもオフです。オフにしても予約はそのまま残ります。</p>
-          </section>
+          </DetailSection>
 
-          <section className={styles.card} aria-labelledby="staff-meeting-heading">
-            <div className={styles.headRow}><h3 id="staff-meeting-heading" className={styles.title}>会議の URL</h3><HelpTip label="会議の URL の説明">オンラインのメニューで、予約が決まったらお客さまに LINE で送る URL です。担当の固定の URL を先に使い、無いときはメニューの URL を使います。</HelpTip></div>
+          <DetailSection title="会議の URL" help={<HelpTip label="会議の URL の説明">オンラインのメニューで、予約が決まったらお客さまに LINE で送る URL です。担当の固定の URL を先に使い、無いときはメニューの URL を使います。</HelpTip>}>
             {canEdit ? (
               <>
                 <RadioCardGroup legend="会議の URL の出し方" columns={2}>
@@ -170,13 +170,13 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
                   <div className={styles.urlLine}>
                     <SaveErrorField names={["url","fixedMeetingUrl"]}><TextField aria-label="固定の会議の URL" value={ready.url?.value ?? ''} placeholder="https://meet.google.com/…" disabled={ready.url === null}
                       onChange={(event) => ready.url && setLoad({ ...ready, url: { ...ready.url, value: event.target.value } })} /></SaveErrorField>
-                    {urlDirty ? <Button variant="primary" busy={busy} disabled={urlInvalid} disabledReason="https:// で始まる URL を入れてください" onClick={() => void saveUrl()}>保存する</Button> : null}
+
                   </div>
                 </Field>
                 <p className={styles.minor}>自動で作れないときにも、この URL を使います。</p>
               </>
             ) : <p className={styles.readValue}>{ready.url?.saved || '固定の URL はありません'}</p>}
-          </section>
+          </DetailSection>
 
           {!connected ? (
               <Notice tone="danger" role="status" icon={<Unplug size={20} aria-hidden="true" />} action={<>
@@ -199,7 +199,9 @@ export function StaffCalendarPanel({ accountId, person, menuCount, canEdit, onCl
         </>
       ) : null}
       {preparing.dialog}
-    </Drawer>
+
+</DetailContent>
+</Drawer>
     </SaveErrorScope>
   )
 }

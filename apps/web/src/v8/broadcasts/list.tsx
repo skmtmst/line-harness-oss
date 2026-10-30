@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailField } from '@/components/shared/detail-content'
 import ListDateTime from '@/components/shared/list-date-time'
 import { canChangeBroadcastNow, canEditBroadcastNow, canManageBroadcastListNow, captureBroadcastWriteAccess, isFromHeadquarters, useBroadcastEditAccess, useBroadcastManagementAccess } from './write-access'
 import DetailPanel, { useDetailPanelUrl } from '@/components/shared/detail-panel';
@@ -1279,48 +1280,23 @@ export default function BroadcastListV8() {
               onNext={panelIndex < visibleBroadcasts.length - 1 ? () => setPanelId(visibleBroadcasts[panelIndex + 1].id) : undefined}
               hasPrev={panelIndex > 0}
               hasNext={panelIndex < visibleBroadcasts.length - 1}
-              footer={<>
-                <Button variant="primary" onClick={() => goDetail(panelRow.id)}>開く</Button>
-                {canResume ? (
-                  <Button
+              actions={{primary: <Button variant="primary" onClick={() => goDetail(panelRow.id)}>開く</Button>,
+secondary: ((canResume) ? <Button
                     variant="secondary"
                     lockedReason={editAccess.reason}
                     disabled={!canEdit}
                     onClick={withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?draft=${encodeURIComponent(panelRow.id)}`) }))}
                    busyLabel="移動中…">
                     編集を続ける
-                  </Button>
-                ) : null}
-                {/* 同じ操作を残し、実行直前の現在の許可でも守る。 */}
-                {<>
-                  <Button
-                    variant="secondary"
-                    lockedReason={editAccess.reason}
-                    disabled={!canEdit}
-                    onClick={withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) }))}
-                   busyLabel="移動中…">
-                    複製する
-                  </Button>
-                  {fromHq ? null : (
-                    <Button
-                      variant="secondary"
-                      lockedReason={editAccess.reason}
-                      disabled={!canEdit}
-                      onClick={withCurrentEdit(() => { setPanelId(null); requestDelete(panelRow) })}
-                    >
-                      削除する
-                    </Button>
-                  )}
-                </>}
-              </>}
-            >
-              <p>
-                {panelRow.status === 'sent'
-                  ? (panelRow.sentAt ? `送信済み：${formatDateTime(panelRow.sentAt)}` : '送信済み')
-                  : (panelRow.scheduledAt ? `予約：${formatDateTime(panelRow.scheduledAt)}` : '下書き')}
-                {panelRow.status === 'sent' ? (insight?.delivered != null ? ` ／ ${formatNumber(insight.delivered)} 人に届いた` : ` ／ ${acceptedCountText(panelRow.successCount)}`) : ''}
-              </p>
-            </DetailPanel>
+                  </Button> : null),
+menuItems: [{id: 'detail-0', label: "複製する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => withViewTransition(() => { router.push(`/broadcasts/new?duplicateFrom=${encodeURIComponent(panelRow.id)}`) }))},
+...((!(fromHq)) ? [{id: 'detail-1', label: "削除する", disabled: !canEdit, "lockedReason": editAccess.reason, onSelect: withCurrentEdit(() => { setPanelId(null); requestDelete(panelRow) })}] : [])]}}
+             status={<StatusBadge broadcast={panelRow} />}>
+<DetailContent>
+<DetailField label={panelRow.status === 'sent' ? '送信日時' : '送る日時'}>{panelRow.status === 'sent' ? (panelRow.sentAt ? formatDateTime(panelRow.sentAt) : '送信済み') : (panelRow.scheduledAt ? formatDateTime(panelRow.scheduledAt) : '下書き')}</DetailField>
+{panelRow.status === 'sent' ? <DetailField label="届いた人数">{insight?.delivered != null ? formatNumber(insight.delivered) + ' 人に届いた' : acceptedCountText(panelRow.successCount)}</DetailField> : null}
+</DetailContent>
+</DetailPanel>
           )
         })() : null}
         <ConfirmDialog

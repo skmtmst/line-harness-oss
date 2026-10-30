@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailFields, DetailInlineEdit } from '@/components/shared/detail-content'
 
 import { notifySaved, notifyToast } from '@/components/shared/toast';
 import { useListUrlValue } from '@/components/shared/list-url-state';
@@ -507,21 +508,17 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
         hasNext={activeSearchIndex >= 0 && activeSearchIndex < visible.length - 1}
         onPrev={activeSearchIndex > 0 ? () => setActiveSearchId(visible[activeSearchIndex - 1].id) : undefined}
         onNext={activeSearchIndex >= 0 && activeSearchIndex < visible.length - 1 ? () => setActiveSearchId(visible[activeSearchIndex + 1].id) : undefined}
-        footer={activeSearch?.lineAccountId ? (
-          <>
-            <Button href={`/friends?savedSearch=${activeSearch.id}`}>友だち一覧へ</Button>
-            {canEdit ? <Button href={`/tags/searches/edit?id=${encodeURIComponent(activeSearch.id)}`}>編集する</Button> : null}
-          </>
-        ) : undefined}
+        actions={{ primary: (activeSearch?.lineAccountId ? <Button variant="primary" href={`/friends?savedSearch=${activeSearch.id}`}>友だち一覧へ</Button> : null),
+    secondary: (activeSearch?.lineAccountId ? <Button variant="secondary" href={`/tags/searches/edit?id=${encodeURIComponent(activeSearch.id)}`}>編集する</Button> : null),
+    menuItems: [], secondaryAllowed: canEdit }}
       >
+<DetailContent>
         {activeSearch ? (
-          <dl className={styles.detailList}>
+          <DetailFields>
             <div>
               <dt>検索名</dt>
               <dd>
-                {/* 閲覧のみ：鉛筆は置かず、名前だけを見せる（2026-10-06 オーナー決定）。 */}
-                {canEdit ? (
-                  <InlineEdit
+                <DetailInlineEdit allowed={canEdit}
                     label="検索名"
                     value={activeSearch.name}
                     maxLength={60}
@@ -533,7 +530,6 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
                       void load()
                     }}
                   />
-                ) : activeSearch.name}
               </dd>
             </div>
             <div><dt>条件</dt><dd>{conditionSummary(splitConditions(activeSearch.conditions, tags, conditionLabels))}</dd></div>
@@ -547,9 +543,11 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
             </div>
             <div><dt>使っている所</dt><dd>{usageSummary(activeSearch.usedIn)}</dd></div>
             <div><dt>更新</dt><dd>{updatedText(activeSearch)}</dd></div>
-          </dl>
+          </DetailFields>
         ) : null}
-      </DetailPanel>
+
+</DetailContent>
+</DetailPanel>
 
       <ConfirmDialog
         open={pendingDelete !== null}

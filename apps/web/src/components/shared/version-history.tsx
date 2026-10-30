@@ -46,6 +46,7 @@ export default function VersionHistory({
   canRevert = true,
   revertDisabledReason,
   busy = false,
+  showActions = true,
 }: {
   versions: HistoryVersion[]
   selectedVersionNumber: number | null
@@ -57,6 +58,7 @@ export default function VersionHistory({
   canRevert?: boolean
   revertDisabledReason?: string
   busy?: boolean
+  showActions?: boolean
 }) {
   if (versions.length === 0) {
     return <p className="text-ink-faint text-xs">版はまだありません。</p>
@@ -105,7 +107,7 @@ export default function VersionHistory({
           )
         })}
       </ul>
-      <div className="mt-1 flex flex-wrap gap-2">
+      {showActions ? <div className="mt-1 flex flex-wrap gap-2">
         <Button
           variant="secondary"
           disabled={!selected || busy}
@@ -121,7 +123,7 @@ export default function VersionHistory({
         >
           {revertLabel}
         </Button>
-      </div>
+      </div> : null}
     </div>
   )
 }

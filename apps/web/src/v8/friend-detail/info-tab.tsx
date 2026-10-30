@@ -44,7 +44,7 @@ function FieldInput({ field, value, onChange, disabled, computed = false, id }: 
 }) {
   // 変えられないとき（権限が無い・ECが正本の項目）は、押せない部品を置かずに読み取りだけの欄で見せる（2026-10-06 オーナー決定）。
   const readOnly = disabled || !!field.ecIsMaster
-  if (field.fixedKey === 'allergy') return <AllergyField value={value} options={field.options ?? undefined} readOnly={readOnly} onChange={onChange} />
+  if (field.fixedKey === 'allergy') return <AllergyField showEmptyValue={readOnly} value={value} options={field.options ?? undefined} readOnly={readOnly} onChange={onChange} />
   if (field.type === 'textarea') {
     return <SaveErrorField names={["value"]}><TextArea id={id} rows={3} value={value} readOnly={readOnly} aria-readonly={readOnly || undefined} onChange={(e) => onChange(e.target.value)} /></SaveErrorField>
   }
@@ -63,7 +63,7 @@ function FieldInput({ field, value, onChange, disabled, computed = false, id }: 
     // 日付はほかの日付の欄と同じ「2026年9月15日（火）」の書き方で見せる。
     const shown = field.type === 'checkbox' ? (value === '1' ? 'はい' : 'いいえ') : ymd ? formatDateLabel(new Date(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3]))) : (value || emptyValue('unconfigured'))
     // EC が正本の値は、年齢と同じ灰色の読むだけの欄にする。
-    return <SaveErrorField names={["shown"]}><TextField id={id} value={shown} readOnly disabled={!!field.ecIsMaster} aria-readonly="true" aria-label={`${field.name}の値`} title={shown} /></SaveErrorField>
+    return <SaveErrorField names={["shown"]}><TextField id={id} value={field.type === 'checkbox' || value ? shown : ''} placeholder="未設定" readOnly disabled={!!field.ecIsMaster} aria-readonly="true" aria-label={`${field.name}の値`} title={shown} /></SaveErrorField>
   }
   if (field.type === 'select') {
     return (

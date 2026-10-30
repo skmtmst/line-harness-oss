@@ -59,11 +59,13 @@ const state = {
   ],
 }
 
-vi.mock('@/lib/api', () => {
+vi.mock('@/lib/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/api')>()
   class ApiError extends Error {}
   return {
+    ...actual,
     ApiError,
-    fetchApi: vi.fn(),
+    fetchApi: vi.fn().mockResolvedValue({ success: true, data: [] }),
     api: {
       staff: {
         list: async () => ({ success: true, data: state.members }),
@@ -166,7 +168,9 @@ describe('ログインユーザーの右欄に作る人のメモを出さない 
     await waitFor(() => expect(screen.getByRole('button', { name: '対象者の中身を見る' })).toBeTruthy())
     expect(screen.queryByText('直したあとの列')).toBeNull()
     expect(screen.queryByText(/表に足す列/)).toBeNull()
-    expect(screen.getByText('役割でできること')).toBeTruthy()
+    expect(screen.queryByText('役割でできること')).toBeNull()
+    expect(screen.getByRole('region', { name: '自分の設定' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: '役割と権限' })).toBeTruthy()
   })
 })
 

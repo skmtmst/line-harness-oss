@@ -112,6 +112,15 @@
 .tpCardText { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: var(--tpl-inbox-row-line-gap); }
 .tpCardName { overflow: hidden; color: var(--color-ink); font-size: var(--text-label); font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .tpCardBody { overflow: hidden; color: var(--color-ink-faint); font-size: var(--text-micro); text-overflow: ellipsis; white-space: nowrap; }
+.tpCardBody[data-lines='2'] { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tpCardRow { display: flex; align-items: center; gap: var(--space-8); min-width: 0; }
+.tpCardRow > .tpCard { flex: 1; min-width: 0; }
+.withPreview { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-width: 0; }
+.preview { --picker-preview-title-size: 16px; --picker-preview-action-height: 64px; display: flex; flex-direction: column; min-width: 0; height: var(--tpl-source-picker-body-h); max-height: var(--tpl-inbox-tp-body-max); border-left: 1px solid var(--color-hairline); }
+.previewHeader { display: flex; flex: none; align-items: center; gap: var(--space-8); padding: var(--space-12) var(--space-16); border-bottom: 1px solid var(--color-hairline); }
+.previewTitle { flex: 1; min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--picker-preview-title-size); font-weight: 600; }
+.previewBody { flex: 1; min-height: 0; padding: var(--space-16); overflow-y: auto; }
+.previewActions { display: flex; flex: none; align-items: center; justify-content: flex-end; gap: var(--space-8); height: var(--picker-preview-action-height); padding-inline: var(--space-16); border-top: 1px solid var(--color-hairline); }
 .tpNum {
   display: inline-flex;
   flex: none;
@@ -255,3 +264,5 @@ html:root :is([data-toolbar-row], [data-control-row]) .field { height: var(--con
 :root .field [data-permission-locked] { cursor: not-allowed; }
 /* 欄全体が薄いので、中の外す印は二重に薄くしない。 */
 :root .field[data-disabled] :global([data-permission-locked]) { opacity: var(--polish-enabled-opacity); }
+
+.navigation { padding-inline: var(--space-20); }

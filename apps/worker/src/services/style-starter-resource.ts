@@ -134,7 +134,7 @@ export async function overwriteResource(
         )
         .bind(
           name,
-          JSON.stringify({ text: item.text ?? item.name }),
+          item.text ?? item.name,
           now,
           now,
           id,

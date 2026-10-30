@@ -132,7 +132,7 @@ export default function ListView({ view, rows, total, tables, page, period, stat
         {view === 'list' && onPageSize ? <Select aria-label="1ページに出す件数" size="page-size" value={String(pageSize)} onChange={(value) => onPageSize(Number(value))} options={PAGE_SIZE_SELECT_OPTIONS} /> : null}
         {canImport ? <Button presentation="restaurant" disabled={busy} onClick={onImport}><Inbox size={16} aria-hidden="true" />受信データを試す</Button> : null}
         {canWrite ? <Button presentation="restaurant" disabled={busy} onClick={onCreate}><Plus size={16} aria-hidden="true" />手動で予約を作る</Button> : null}
-      </>} renderBody={body=><DetailColumns variant="restaurant-ledger" asideLabel="予約の詳細を見る" expanded={detailExpanded} onExpandedChange={setDetailExpanded} aside={detail}>
+      </>} renderBody={body=><DetailColumns asideLayout="detail" variant="restaurant-ledger" asideLabel="予約の詳細を見る" expanded={detailExpanded} onExpandedChange={setDetailExpanded} aside={detail}>
         {tables.length===0 ? <LedgerEmpty noTables canWrite={canWrite} busy={busy} onCreate={onCreate}/> : rows.length===0 ? <LedgerEmpty noTables={false} filtered={status!=='all'||view==='list'&&period!=='all'} canWrite={canWrite} busy={busy} onCreate={onCreate}/> : null}
         {rows.length===0 || axis==='floor' && floorError ? null : body}
         {view === 'list' && pageCount > 1 ? (

@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailField, DetailSection, DetailInlineEdit, DetailNumber, DetailSectionTitle } from '@/components/shared/detail-content'
 
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { DRAWER_TABS } from './drawer-tabs'
@@ -6,7 +7,7 @@ import { Tabs } from '@/components/shared/tabs'
 import { useUrlTab } from '@/lib/use-url-tab'
 import { notifySaved } from '@/components/shared/toast'
 import CopyTextButton from '@/components/shared/copy-text-button'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Check, Copy, PauseCircle, Pencil } from 'lucide-react'
 import { api, type AffiliateAccountSettlementPreview, type ConversionApprovalItem } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
@@ -16,8 +17,6 @@ import Select from '@/components/shared/select'
 import { TextField } from '@/components/shared/text-field'
 import Checkbox from '@/components/shared/checkbox'
 import { Field } from '@/components/shared/form-controls'
-import KpiBand from '@/components/shared/kpi-band'
-import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Drawer from '@/components/shared/drawer'
@@ -104,6 +103,8 @@ export default function AffiliateDrawer({
   const [settlement, setSettlement] = useState<SettlementLine | null>(null)
   const [settlementState, setSettlementState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [copiedLinkId, setCopiedLinkId] = useState<string | null>(null)
+  const settlementFormId = useId()
+  const [savingSettlement, setSavingSettlement] = useState(false)
   const [editing, setEditing] = useState(startInEdit)
   const [paymentOpen, setPaymentOpen] = useState(false)
   const journeyCursor = useRef<{ beforeAt: string; beforeId: string } | null>(null)
@@ -260,16 +261,16 @@ export default function AffiliateDrawer({
 
   const summary = (
     <div className={styles.stack}>
-      <KpiBand density="compact">
-        <KpiCard icon={null} title="今月の成果" value={report?.conversions} unit="件" detail={report ? `認めた ${formatNumber(report.conversionsApproved)}・待ち ${formatNumber(report.conversionsPending)}` : '読み込めませんでした'} />
-        <KpiCard icon={null} title="今月の報酬" value={null} valueText={monthReward == null ? '—' : formatYen(monthReward)} unit="" detail={rewardDetail} />
+      <DetailSection>
+        <DetailField label="今月の成果" note={report ? `認めた ${formatNumber(report.conversionsApproved)}・待ち ${formatNumber(report.conversionsPending)}` : '読み込めませんでした'}><DetailNumber value={report?.conversions} unit="件" /></DetailField>
+        <DetailField label="今月の報酬" note={rewardDetail}><DetailNumber value={null} text={monthReward == null ? '—' : formatYen(monthReward)} unit="" /></DetailField>
         {/* 引き出しの幅（3つ並び）では「支払いを確定していない報酬」が切れるので短く言う（tnTn9）。 */}
-        <KpiCard icon={null} title="支払い前の報酬" value={null} valueText={settlementState === 'ready' ? formatYen(settlement?.amount ?? 0) : '—'} unit="" detail={settlementState === 'ready' ? `認めた ${formatNumber(settlement?.conversionCount ?? 0)} 件分` : settlementState === 'loading' ? '読み込んでいます' : '読み込めませんでした'} />
-      </KpiBand>
+        <DetailField label="支払い前の報酬" note={settlementState === 'ready' ? `認めた ${formatNumber(settlement?.conversionCount ?? 0)} 件分` : settlementState === 'loading' ? '読み込んでいます' : '読み込めませんでした'}><DetailNumber value={null} text={settlementState === 'ready' ? formatYen(settlement?.amount ?? 0) : '—'} unit="" /></DetailField>
+      </DetailSection>
 
       <section className={styles.section} aria-label="発行ずみの紹介リンク">
         <div className={styles.sectionHead}>
-          <h3 className={styles.sectionTitle}>発行ずみの紹介リンク</h3>
+          <DetailSectionTitle>発行ずみの紹介リンク</DetailSectionTitle>
         </div>
         {links.length === 0 ? (
           <p className={styles.empty}>{error ? '紹介リンクを読み込めませんでした。' : 'まだ紹介リンクはありません。'}</p>
@@ -295,7 +296,7 @@ export default function AffiliateDrawer({
 
       <section className={styles.section} aria-label="認めるのを待っている成果">
         <div className={styles.sectionHead}>
-          <h3 className={styles.sectionTitle}>認めるのを待っている成果</h3>
+          <DetailSectionTitle>認めるのを待っている成果</DetailSectionTitle>
         </div>
         {pendingTruncated && !pendingError ? (
           <p className={styles.empty}>件数が多いため、一部だけを出しています。</p>
@@ -328,12 +329,11 @@ export default function AffiliateDrawer({
         )}
       </section>
 
-      <section className={styles.card} aria-label="成果の付け方">
-        <h3 className={styles.cardTitle}>成果の付け方</h3>
+      <DetailSection title="成果の付け方">
         <p className={styles.cardText}>
           付けた：最後に開いたリンク・数える期間は案件ごとの決まり。リンクを開いた記録が期間内に無い成果は、誰にも付けません。
         </p>
-      </section>
+      </DetailSection>
     </div>
   )
 
@@ -347,7 +347,7 @@ export default function AffiliateDrawer({
   ) : (
     <>
       <section className={styles.section} aria-label="案件ごとの内訳">
-        <h3 className={styles.sectionTitle}>案件ごとの内訳</h3>
+        <DetailSectionTitle>案件ごとの内訳</DetailSectionTitle>
         {report.byOffer.length === 0 ? <p className={styles.empty}>今月は案件ごとの成果がありません。</p> : (
           <div className={styles.list}>
             {report.byOffer.map((offer) => (
@@ -363,7 +363,7 @@ export default function AffiliateDrawer({
         )}
       </section>
       <section className={styles.section} aria-label="成果地点ごとの内訳">
-        <h3 className={styles.sectionTitle}>成果地点ごとの内訳</h3>
+        <DetailSectionTitle>成果地点ごとの内訳</DetailSectionTitle>
         {report.conversionsByPoint.length === 0 ? <p className={styles.empty}>今月は成果がありません。</p> : (
           <div className={styles.list}>
             {report.conversionsByPoint.map((point) => (
@@ -398,7 +398,7 @@ export default function AffiliateDrawer({
     <p className={styles.empty}>この人の紹介で増えた友だちはまだいません。</p>
   ) : (
     <section className={styles.section} aria-label="紹介で増えた友だち">
-      <h3 className={styles.sectionTitle}>{`紹介で増えた友だち（${formatNumber(journeys.length)} 人${journeyMore ? 'ほか' : ''}）`}</h3>
+      <DetailSectionTitle>{`紹介で増えた友だち（${formatNumber(journeys.length)} 人${journeyMore ? 'ほか' : ''}）`}</DetailSectionTitle>
       <div className={styles.list}>
         {journeys.map((journey) => {
           const duplicate = report?.duplicateFlags.some((flag) => flag.friendId === journey.friendId)
@@ -425,23 +425,25 @@ export default function AffiliateDrawer({
   const payment = (
     <>
       <section className={styles.section} aria-label="今回の締め">
-        <h3 className={styles.sectionTitle}>今回の締め</h3>
+        <DetailSectionTitle>今回の締め</DetailSectionTitle>
         {settlementState === 'loading' ? (
           <p className={styles.empty}>読み込んでいます。</p>
         ) : settlementState === 'error' ? (
           <p className={styles.empty}>今回の締めを読み込めませんでした。</p>
         ) : settlement ? (
-          <KpiBand density="compact">
-            <KpiCard icon={null} title="今回の金額" value={null} valueText={formatYen(settlement.amount)} unit="" detail={null} />
-            <KpiCard icon={null} title="成果" value={settlement.conversionCount} unit="件" detail={null} />
-            <KpiCard icon={null} title="振込先" value={null} valueText={settlement.bankProfileRegistered ? '登録済み' : emptyValue('unconfigured')} unit="" detail={null} />
-          </KpiBand>
+          <DetailSection>
+            <DetailField label="今回の金額" note={null}><DetailNumber value={null} text={formatYen(settlement.amount)} unit="" /></DetailField>
+            <DetailField label="成果" note={null}><DetailNumber value={settlement.conversionCount} unit="件" /></DetailField>
+            <DetailField label="振込先" note={null}><DetailNumber value={null} text={settlement.bankProfileRegistered ? '登録済み' : emptyValue('unconfigured')} unit="" /></DetailField>
+          </DetailSection>
         ) : (
           <p className={styles.empty}>この人には、今回締められる報酬がありません。</p>
         )}
       </section>
       {editing && !readonly ? (
         <SettlementEditor
+          formId={settlementFormId}
+          onBusyChange={setSavingSettlement}
           affiliate={affiliate}
           onSaved={() => {
             setEditing(false)
@@ -449,55 +451,42 @@ export default function AffiliateDrawer({
           }}
         />
       ) : (
-        <section className={styles.card} aria-label="支払いの取り決め">
-          <h3 className={styles.cardTitle}>支払いの取り決め</h3>
+        <DetailSection title="支払いの取り決め">
           <p className={styles.cardText}>
             {`連絡先 ${affiliate.email ?? emptyValue('none')}・確定までの保留 ${affiliate.holdDays == null ? emptyValue('none') : `${affiliate.holdDays}日`}・支払いサイクル ${affiliate.payoutCycle ?? emptyValue('none')}・成果が出たら本人へ${affiliate.notifyOnConversion ? '知らせる' : '知らせない'}`}
           </p>
-        </section>
+        </DetailSection>
       )}
     </>
   )
 
   return (
     <SaveErrorScope errors={saveErrors}><>
-      <Drawer open title={`${affiliate.name}の詳細`} description={subLine} width="editor" heightMode="viewport" layout="inset" initialFocus="panel" busy={paymentOpen} onClose={onClose}
-        heading={<span className={styles.titleRow}>{readonly ? <span>{affiliate.name}</span> : <InlineEdit value={affiliate.name} label="紹介者の名前を直す" maxLength={100} onSave={async (next) => {
+      <Drawer open title={affiliate.name} description={subLine} width="editor" heightMode="viewport" layout="inset" initialFocus="panel" busy={paymentOpen || savingSettlement} onClose={onClose}
+        status={<StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill>}
+        toolbar={<Tabs label="詳細の中身" items={DRAWER_TABS.map(item => ({ label: item.label, current: tab === item.key, onClick: () => setTab(item.key) }))} />}
+        actions={{ primary: (editing && tab === 'payment' && !readonly ? <Button variant="primary" type="submit" form={settlementFormId} busy={savingSettlement} busyLabel="保存しています">取り決めを保存する</Button> : <Button type="button" variant="primary" disabled={!accountId || settlementState !== 'ready' || !settlement} title={settlement ? undefined : '今回締められる報酬がありません'} onClick={() => setPaymentOpen(true)}>
+                <Check size={16} aria-hidden="true"/>
+                支払いを確定する
+              </Button>),
+    secondary: (<Button variant="secondary" type="button" disabled={savingSettlement} onClick={() => { setTab('payment'); setEditing((current) => !current); }}>
+                <Pencil size={16} aria-hidden/>{editing ? '編集をやめる' : '編集する'}
+              </Button>),
+    menuItems: [...([{ allowed: !readonly, id: 'stop-referral', label: '紹介を止める', tone: 'danger' as const, disabled: !affiliate.isActive, onSelect: () => { onClose(); onStopRequest(affiliate.id, affiliate.name); } }])], primaryAllowed: !readonly, secondaryAllowed: !readonly }}
+      >
+<DetailContent>
+<DetailField label="紹介者の名前"><DetailInlineEdit allowed={!(readonly)} value={affiliate.name} label="紹介者の名前を直す" maxLength={100} onSave={async (next) => {
           if (!next.trim()) throw new Error('名前を入力してください')
           const response = await api.affiliates.update(affiliate.id, { name: next.trim() })
           if (!response.success) throw new Error('名前を保存できませんでした。もう一度お試しください。')
           notifyToast('名前を保存しました'); onChanged()
-        }} />}<StatusPill tone={affiliate.isActive ? 'active' : 'neutral'}>{affiliate.isActive ? '計測中' : '停止中'}</StatusPill></span>}
-        toolbar={<Tabs label="詳細の中身" items={DRAWER_TABS.map(item => ({ label: item.label, current: tab === item.key, onClick: () => setTab(item.key) }))} />}
-        footer={(<div className={styles.footerRow}>{readonly ? <span /> : (
-            <button type="button" className={styles.stop} onClick={() => { onClose(); onStopRequest(affiliate.id, affiliate.name) }} disabled={!affiliate.isActive}>
-              <PauseCircle size={16} aria-hidden="true" />
-              紹介を止める
-            </button>
-          )}
-          <span className={styles.spacer} aria-hidden="true" />
-          {readonly ? <Button type="button" onClick={onClose}>閉じる</Button> : (
-            <>
-              <Button type="button" onClick={() => { setTab('payment'); setEditing((current) => !current) }}>
-                <Pencil size={16} aria-hidden />{editing ? '編集をやめる' : '編集する'}
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                disabled={!accountId || settlementState !== 'ready' || !settlement}
-                title={settlement ? undefined : '今回締められる報酬がありません'}
-                onClick={() => setPaymentOpen(true)}
-              >
-                <Check size={16} aria-hidden="true" />
-                支払いを確定する
-              </Button>
-            </>
-          )}</div>)}
-      >
+        }} /></DetailField>
         {loading ? (
             <ListState kind="loading" title="詳細を読み込んでいます" />
           ) : tab === 'summary' ? summary : tab === 'breakdown' ? breakdown : tab === 'friends' ? friends : payment}
-      </Drawer>
+
+</DetailContent>
+</Drawer>
       {accountId ? (
         <AffiliatePaymentConfirmDialog
           target={paymentOpen ? { id: affiliate.id, name: affiliate.name } : null}
@@ -514,9 +503,13 @@ export default function AffiliateDrawer({
 
 /** 報酬の約束（連絡先・保留日数・支払いサイクル・知らせる）。写し元：tabs.tsx の SettlementEditor。 */
 function SettlementEditor({
+  formId,
+  onBusyChange,
   affiliate,
   onSaved,
 }: {
+  formId: string
+  onBusyChange: (busy: boolean) => void
   affiliate: { id: string; rewardMode?: 'none' | 'fixed' | 'rate'; commissionRate: number; email?: string | null; holdDays?: number | null; payoutCycle?: string | null; notifyOnConversion?: boolean }
   onSaved: () => void
 }) {
@@ -554,6 +547,7 @@ function SettlementEditor({
       return
     }
     setSaving(true)
+    onBusyChange(true)
     setError(null)
     try {
       const res = await api.affiliates.update(affiliate.id, {
@@ -578,12 +572,12 @@ function SettlementEditor({
       setError(describeApiFailure(e, '保存')) }
     } finally {
       setSaving(false)
+      onBusyChange(false)
     }
   }
 
   return (
-    <SaveErrorScope errors={saveErrors}><section className={styles.card} aria-label="支払いの取り決め">
-      <h3 className={styles.cardTitle}>支払いの取り決め</h3>
+    <SaveErrorScope errors={saveErrors}><DetailSection title="支払いの取り決め"><form id={formId} noValidate onSubmit={event => { event.preventDefault(); void save() }}>
       <div className={styles.fields}>
         <SaveErrorField names={["rewardMode","reward_mode"]}><Select aria-label="報酬の方式" value={rewardMode} onChange={(value) => setRewardMode(value as typeof rewardMode)} options={[
           { value: 'none', label: '報酬なし（計測のみ）' },
@@ -604,9 +598,6 @@ function SettlementEditor({
       <SaveErrorField names={["notify","notifyOnConversion"]}><Checkbox checked={notify} onCheckedChange={setNotify}>成果が出たときに本人へ知らせる</Checkbox></SaveErrorField>
       <p className={styles.note}>保留日数と支払いサイクルは取り決めの記録です。報酬の計算そのものには使いません。</p>
       {error ? <Notice tone="danger" message={error} /> : null}
-      <div>
-        <Button type="button" onClick={() => { void save() }} disabled={saving} busy={saving} busyLabel="保存しています">取り決めを保存する</Button>
-      </div>
-    </section></SaveErrorScope>
+    </form></DetailSection></SaveErrorScope>
   )
 }

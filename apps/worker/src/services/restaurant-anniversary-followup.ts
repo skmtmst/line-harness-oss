@@ -3,9 +3,9 @@ import { activeTenantLineAccountSql, parseScenarioVersionSteps, type ScenarioVer
 
 import type { ScenarioSourceJob } from '../features/scenarios/source-job-types/index.js';
 
-type Candidate=ScenarioVersion & {store_id:string;line_account_id:string;friend_id:string;line_uid:string;timezone:string;store_name:string;value:string;template_version:number;approved_version_id:string;live_step_id:string;offset_minutes:number};
+type Candidate=ScenarioVersion & {store_id:string;line_account_id:string;friend_id:string;line_uid:string;timezone:string;store_name:string;value:string;template_version:number;approved_version_id:string;live_step_id:string;offset_minutes:number;anniversary_time:string};
 const anniversarySql=()=>`SELECT v.*,s.id store_id,s.line_account_id,s.name store_name,s.timezone,f.id friend_id,f.line_user_id line_uid,
- ff.value,t.template_version,t.approved_version_id,b.step_id live_step_id,b.offset_minutes
+ ff.value,t.template_version,t.approved_version_id,b.step_id live_step_id,b.offset_minutes,b.anniversary_time
  FROM rt_store_followup_templates t JOIN rt_stores s ON s.id=t.store_id AND s.status='active'
  JOIN scenarios sc ON sc.id=t.scenario_id AND sc.line_account_id=s.line_account_id AND sc.current_published_version_id=t.approved_version_id
  JOIN scenario_versions v ON v.id=t.approved_version_id AND v.scenario_id=t.scenario_id AND v.status='published'
@@ -18,15 +18,21 @@ const anniversarySql=()=>`SELECT v.*,s.id store_id,s.line_account_id,s.name stor
  WHERE ${activeTenantLineAccountSql('la.id')} AND t.sending_status='active' AND json_extract(a.payload_json,'$.templateVersion')=t.template_version
  AND json_extract(a.payload_json,'$.scenarioVersionId')=t.approved_version_id AND json_extract(a.payload_json,'$.lineAccountId')=s.line_account_id`;
 
-function localInstant(date:string,timeZone:string) {
-  const wall=Date.parse(date+'T10:00:00Z'); let guess=wall;
-  for(let i=0;i<3;i++) {
-    const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'}).formatToParts(new Date(guess)).map(x=>[x.type,x.value]));
-    const viewed=Date.parse(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}Z`);
-    guess-=viewed-wall;
-  }
-  return guess;
+function localInstant(date:string,timeZone:string,time:string,offset:number) {
+  // 現地の暦で何日前かを引いてからUTCへ変換する。DSTで送る時刻をずらさない。
+  const wall=Date.parse(date+'T'+time+':00Z')+offset*60000;
+  const formatter=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'});
+  const civilAt=(at:number)=>{
+    const p=Object.fromEntries(formatter.formatToParts(new Date(at)).map(x=>[x.type,x.value]));
+    return Date.parse(`${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}:${p.second}Z`);
+  };
+  const offsets=new Set([-86400000,86400000].map(delta=>civilAt(wall+delta)-(wall+delta)));
+  const candidates=[...offsets].map(zoneOffset=>({at:wall-zoneOffset,civil:civilAt(wall-zoneOffset)}));
+  // 時計が戻る日は先の1回、存在しない時刻は時計を進めた側へ寄せる。
+  const exact=candidates.filter(item=>item.civil===wall).sort((a,b)=>a.at-b.at);
+  return exact[0]?.at??candidates.filter(item=>item.civil>wall).sort((a,b)=>a.civil-b.civil)[0]!.at;
 }
+
 async function key(row:Candidate,date:string) {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([row.store_id,row.friend_id,date])))),x=>x.toString(16).padStart(2,'0')).join('');
 }
@@ -37,7 +43,7 @@ function dates(row:Candidate,now:Date) {
   const year=Number(new Intl.DateTimeFormat('en',{timeZone:row.timezone,year:'numeric'}).format(now));
   return [year,year+1].flatMap(y=>{
     const day=effectiveAnniversaryMonthDay(md.month,md.day,y,'feb28'); if(!day)return [];
-    const date=`${y}-${day}`,at=localInstant(date,row.timezone)+row.offset_minutes*60000;
+    const date=`${y}-${day}`,at=localInstant(date,row.timezone,row.anniversary_time,row.offset_minutes);
     return [{date,at}];
   });
 }
@@ -62,7 +68,7 @@ export async function restaurantAnniversaryState(db:D1Database,job:ScenarioSourc
     const step=parseScenarioVersionSteps(row).find(s=>s.id===job.step_id&&s.live_step_id===row.live_step_id&&!s.is_draft);
     if(!step||await key(row,date)!==job.source_event_id||at!==Date.parse(job.scheduled_at))continue;
     return {store_id:row.store_id,trigger:'anniversary_before',template_version:row.template_version,timezone:row.timezone,approved_version_id:row.approved_version_id,
-      store_name:row.store_name,line_uid:row.line_uid,event_payload:'{}',starts_at:new Date(localInstant(date,row.timezone)).toISOString(),ends_at:new Date(localInstant(date,row.timezone)).toISOString(),status:'confirmed',departed_at:null,customer_version:0,guest_count:0,course_name:null};
+      store_name:row.store_name,line_uid:row.line_uid,event_payload:'{}',starts_at:new Date(localInstant(date,row.timezone,row.anniversary_time,0)).toISOString(),ends_at:new Date(localInstant(date,row.timezone,row.anniversary_time,0)).toISOString(),status:'confirmed',departed_at:null,customer_version:0,guest_count:0,course_name:null};
   }
   return null;
 }

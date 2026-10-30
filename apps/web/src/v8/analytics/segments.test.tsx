@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { findDetailMenuItem } from '@/test-utils/detail-menu'
 /*
  * 分析「お客さまの分け方」（G5-1）：5×5 の表・全員の数・マスの引き出し・LINE を送る・閲覧のみの扱い。
  */
@@ -55,19 +56,23 @@ describe('お客さまの分け方', () => {
     expect(JSON.parse(decodeURIComponent(url.split('=')[1]))).toEqual({ operator: 'AND', rules: [{ type: 'customer_segment', value: { r: 3, f: 3, basis: 'both', measure: 'count' } }] })
   })
 
-  it('［保存した検索にする］は保存の口を呼ぶ。閲覧のみの人には、保存も LINE も置かない', async () => {
+  it('保存は同じ口を呼び、閲覧のみの人には保存と LINE を灰色で残す', async () => {
     const { unmount } = render(<SegmentsV8 accountId="a" canManage />)
     await screen.findByText('全員 1,284 人')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'マス13 88 人' })) })
-    await act(async () => { fireEvent.click(await screen.findByRole('button', { name: '保存した検索にする' })) })
+    await act(async () => { fireEvent.click(await findDetailMenuItem('保存した検索にする')) })
     await waitFor(() => expect(api.saveSearch).toHaveBeenCalledWith('a', 3, 3, expect.objectContaining({ basis: 'both', measure: 'count' })))
     unmount()
     render(<SegmentsV8 accountId="a" canManage={false} />)
     await screen.findByText('全員 1,284 人')
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'マス13 88 人' })) })
     await screen.findByText('佐藤 健')
-    expect(screen.queryByRole('button', { name: '保存した検索にする' })).toBeNull()
-    expect(screen.queryByRole('button', { name: /LINE を送る/ })).toBeNull()
+    const save = await findDetailMenuItem('保存した検索にする')
+    expect(save.getAttribute('aria-disabled') === 'true' || save.hasAttribute('disabled')).toBe(true)
+    const send = screen.getByRole('button', { name: /LINE を送る/ })
+    expect(send.getAttribute('aria-disabled') === 'true' || send.hasAttribute('disabled')).toBe(true)
+    fireEvent.click(save); fireEvent.click(send)
+    expect(api.saveSearch).toHaveBeenCalledTimes(1)
   })
 
   it('集計がまだのときは案内を出し、マスは押せない', async () => {

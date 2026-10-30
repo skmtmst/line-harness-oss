@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailFields, DetailInlineEdit } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 
 import type { FriendFieldType } from '@line-crm/shared';
@@ -109,23 +110,17 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
         hasNext={activeFieldIndex >= 0 && activeFieldIndex < pageItems.length - 1}
         onPrev={activeFieldIndex > 0 ? () => setActiveFieldId(pageItems[activeFieldIndex - 1].id) : undefined}
         onNext={activeFieldIndex >= 0 && activeFieldIndex < pageItems.length - 1 ? () => setActiveFieldId(pageItems[activeFieldIndex + 1].id) : undefined}
-        footer={activeField && canEdit ? (
-          <>
-            <Button href={`/tags/fields/edit?id=${encodeURIComponent(activeField.id)}`}>編集する</Button>
-            {(knownUsageCount(activeField) ?? 0) > 0 ? (
-              <Button href={`/tags/fields/migrate?id=${encodeURIComponent(activeField.id)}`}>移行する</Button>
-            ) : null}
-          </>
-        ) : undefined}
+        actions={{ primary: (activeField ? <Button variant="primary" href={`/tags/fields/edit?id=${encodeURIComponent(activeField.id)}`}>編集する</Button> : null),
+    secondary: (activeField && (knownUsageCount(activeField) ?? 0) > 0 ? <Button variant="secondary" href={`/tags/fields/migrate?id=${encodeURIComponent(activeField.id)}`}>移行する</Button> : null),
+    menuItems: [], primaryAllowed: canEdit, secondaryAllowed: canEdit }}
       >
+<DetailContent>
         {activeField ? (
-          <dl className={styles.detailList}>
+          <DetailFields>
             <div>
               <dt>項目名</dt>
               <dd>
-                {/* 閲覧のみ：鉛筆は置かず、名前だけを見せる。 */}
-                {canEdit ? (
-                  <InlineEdit
+                <DetailInlineEdit allowed={canEdit}
                     label="項目名"
                     value={activeField.name}
                     maxLength={40}
@@ -137,7 +132,6 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
                       void load()
                     }}
                   />
-                ) : activeField.name}
               </dd>
             </div>
             <div><dt>差し込み名</dt><dd>{`{{field.${activeField.fieldKey}}}`}</dd></div>
@@ -145,9 +139,11 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
             <div><dt>入っている人</dt><dd>{knownUsageCount(activeField) === null ? emptyValue('unknown') : `${knownUsageCount(activeField)}人`}</dd></div>
             <div><dt>回答フォーム</dt><dd>{activeField.formUsageCount === undefined ? emptyValue('unknown') : `${activeField.formUsageCount}つ`}</dd></div>
             <div><dt>出す場所</dt><dd>{destinationLabel(activeField)}</dd></div>
-          </dl>
+          </DetailFields>
         ) : null}
-      </DetailPanel>
+
+</DetailContent>
+</DetailPanel>
 
       {folderDialog ? (
         <FolderAddDialog

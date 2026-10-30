@@ -1,5 +1,6 @@
 'use client'
 import SegmentedControl from '@/components/shared/segmented'
+import { DetailContent, DetailField } from '@/components/shared/detail-content'
 import { formatYen } from '@line-crm/shared';
 
 import { definitionRange } from './list-export'
@@ -884,57 +885,45 @@ function ConversionList({ accountId, editId, embedded }: { accountId: string | n
   /* ===== 右の詳細パネルと停止の確認 ===== */
   const detailCard = panelPoint ? (
     <DetailPanel open contentSpacing="sections" title={panelPoint.name} onClose={() => setPanelId(null)}
-      footer={canEdit && panelPoint.status !== 'stopped' ? <Button variant="danger-outline" onClick={() => openStop(panelPoint, 'delete')} busyLabel="処理中…">削除する</Button> : undefined}>
-      <div className={styles.panelLine}>
-        <StatePill point={panelPoint} />
-        <RowMenu className={styles.panelMore} label={`詳細「${panelPoint.name}」のその他の操作`} size="row" items={[
-          ...(canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.ingest.configured && panelPoint.status !== 'stopped' ? [{
-            id: 'toggle-ingest', label: panelPoint.ingest.disabledAt ? '受け口を再開する' : '受け口を止める',
-            disabled: ingestBusy !== '', onSelect: () => void toggleIngest(panelPoint),
-          }] : []),
-          { id: 'events', label: "成果地点の詳細を見る", onSelect: () => setDetailTarget(panelPoint) },
-          { id: 'close', label: '閉じる', onSelect: () => setPanelId(null) },
-        ]} />
+      actions={{menuLabel: `詳細「${panelPoint.name}」のその他の操作`, menuItems: [...(panelPoint.measureMethod === 'webhook' && panelPoint.status !== 'stopped' ? [{ allowed: canEdit, id: 'body-0', label: ingestBusy ? "発行しています…" : "鍵を発行する", disabled: ingestBusy !== '', onSelect: () => issueIngest(panelPoint) }] : []),
+        ...(panelPoint.state === 'draft' ? [{ allowed: canEdit, id: 'body-2', label: publishing ? "公開しています…" : "公開する", disabled: publishing, onSelect: () => publishDraft(panelPoint) }] : []),
+        ...(panelPoint.status !== 'stopped' && panelPoint.state !== 'draft' ? [{ allowed: canEdit, id: 'body-3', label: "止める", onSelect: () => openStop(panelPoint, 'stop') }] : []),
+        ...([
+            ...(panelPoint.measureMethod === 'webhook' && panelPoint.ingest.configured && panelPoint.status !== 'stopped' ? [{
+                    allowed: canEdit,
+                    id: 'toggle-ingest', label: panelPoint.ingest.disabledAt ? '受け口を再開する' : '受け口を止める',
+                    disabled: ingestBusy !== '', onSelect: () => void toggleIngest(panelPoint)
+                }] : []),
+            { id: 'events', label: "成果地点の詳細を見る", onSelect: () => setDetailTarget(panelPoint) },
+            { id: 'close', label: '閉じる', onSelect: () => setPanelId(null) },
+        ]), ...(panelPoint.status !== 'stopped' ? [{ allowed: canEdit, id: 'detail-0', label: "削除する", onSelect: () => openStop(panelPoint, 'delete'), tone: 'danger' as const }] : [])], primary: (panelPoint.status !== 'stopped' ? <Button variant="primary" onClick={() => openEdit(panelPoint)}>編集する</Button> : null), primaryAllowed: canEdit }} status={<StatePill point={panelPoint} />}>
+<DetailContent>
+
+      <div className={styles.panelFact}>
+        <DetailField label="何が起きたら数えるか"><span title={sourceTriggerLabel(panelPoint)}>{`${shortTrigger(panelPoint)}・${rowSub(panelPoint)}`}</span></DetailField>
       </div>
       <div className={styles.panelFact}>
-        <p className={styles.panelLabel}>何が起きたら数えるか</p>
-        <p className={styles.panelText} title={sourceTriggerLabel(panelPoint)}>{`${shortTrigger(panelPoint)}・${rowSub(panelPoint)}`}</p>
+        <DetailField label="今月の成果"> {`${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・${formatYen(panelPoint.metrics.netValue)}`}`} </DetailField>
       </div>
       <div className={styles.panelFact}>
-        <p className={styles.panelLabel}>今月の成果</p>
-        <p className={styles.panelText}>{`${formatNumber(panelPoint.metrics.netCount)} 件${panelPoint.metrics.netValue == null ? '' : `・${formatYen(panelPoint.metrics.netValue)}`}`}</p>
-      </div>
-      <div className={styles.panelFact}>
-        <p className={styles.panelLabel}>使われている場所</p>
-        <p className={styles.panelText}>{usageLabel(panelPoint)}</p>
+        <DetailField label="使われている場所"> {usageLabel(panelPoint)} </DetailField>
       </div>
       {panelPoint.measureMethod === 'webhook' ? (
         <div className={styles.panelFact}>
-          <p className={styles.panelLabel}>受け口</p>
-          <p className={styles.panelText}>
+          <DetailField label="受け口">
             {`POST /api/conversions/ingest/${panelPoint.id}${panelPoint.ingest.disabledAt ? '（止まっています）' : panelPoint.ingest.configured ? '（動いています）' : '（まだ鍵を発行していません）'}`}
-          </p>
+           </DetailField>
         </div>
       ) : null}
       {issuedSecret && panelPoint.measureMethod === 'webhook' ? (
         <p className={styles.secretBox} role="status">{`発行した鍵（この表示でだけ見られます。連携先へ渡してください）：${issuedSecret}`}</p>
       ) : null}
       {ingestError ? <Notice tone="danger" >{ingestError}</Notice> : null}
-      <div className={styles.panelButtons}>
-        {canEdit && panelPoint.measureMethod === 'webhook' && panelPoint.status !== 'stopped' ? (
-          <Button onClick={() => issueIngest(panelPoint)} disabled={ingestBusy !== ''} busy={ingestBusy === 'issue'} busyLabel="発行しています"><KeyRound size={16} aria-hidden="true" />鍵を発行する</Button>
-        ) : null}
-        {canEdit && panelPoint.status !== 'stopped' ? <Button onClick={() => openEdit(panelPoint)}>編集する</Button> : null}
-        {canEdit && panelPoint.state === 'draft' ? (
-          <Button onClick={() => publishDraft(panelPoint)} disabled={publishing} busy={publishing} busyLabel="公開しています">公開する</Button>
-        ) : null}
-      </div>
-      {canEdit && panelPoint.status !== 'stopped' && panelPoint.state !== 'draft' ? (
-        <div className={styles.panelButtons}>
-          <Button onClick={() => openStop(panelPoint, 'stop')} busyLabel="処理中…"><Pause size={16} aria-hidden="true" />止める</Button>
-        </div>
-      ) : null}
-    </DetailPanel>
+
+
+
+</DetailContent>
+</DetailPanel>
   ) : null
 
   const stopCard = stopTarget ? (

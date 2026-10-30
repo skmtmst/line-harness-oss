@@ -1,135 +1,438 @@
 'use client'
 
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { DetailPreview } from '@/components/shared/detail-content'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
-import { useState, type ComponentType } from 'react'
-import { Bell, CalendarPlus, Check, ChevronDown, IdCard, LogOut, MessageSquare, Star } from 'lucide-react'
+import { useEffect, useRef, useState, type ComponentType } from 'react'
+import { Bell, CalendarClock, CalendarHeart, Check, ChevronDown, Clock, HeartHandshake, MessageSquare, MessageSquareText, Star } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import StatusBadge from '@/components/shared/status-badge'
+import Select from '@/components/shared/select'
+import { Field, TextInput } from '@/components/shared/form-controls'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
-import { restaurantTestApi, type RestaurantLineFlow } from '@/lib/restaurant-test-api'
-import { RestaurantFrame, type RestaurantContext } from '@/v8/restaurant/common-a/public/frame/index'
-import styles from './line-followup.module.css'
+import { RestaurantFrame } from '@/v8/restaurant/common-a/public/frame/index'
 import { DetailColumns } from '@/components/templates/detail-columns'
-import { FlowEditor, FlowPreview, type FlowDraft } from './flow-editor'
+import type { ApiResponse, BroadcastBubble, RestaurantFollowupTrigger } from '@line-crm/shared'
+import { ApiError, describeSaveFailure } from '@/lib/api/transport/errors'
+import {
+  fetchFollowupReviewHistory,
+  fetchRestaurantFollowup,
+  isUnsupportedBody,
+  publishFollowupScenario,
+  requestFollowupStart,
+  saveFollowupBinding,
+  saveFollowupRow,
+  saveFollowupMessages,
+  stopFollowup,
+  type FollowupLive,
+  type FollowupStepLive,
+} from '@/lib/api/helpers/restaurant-followup'
+import { StepEditor, StepPreview, bubbleText } from './flow-editor'
+import { RESTAURANT_TRIGGER_ROWS, UNIT_LABEL, UNIT_MINUTES, exactTiming, timingError, timingLabel, type FollowupTriggerRow, type OffsetUnit } from './config'
+import styles from './line-followup.module.css'
 
 /*
- * ★V8 LINE来店フォロー（融合 ・絵 ）。
- * フローを行で並べ、押した行の下に中身（題と吹き出し）を開く。右は LINE での見え方。
- * 吹き出しの枠はシナリオ・一斉配信と同じ共通の MessageComposer。
+ * LINE来店フォロー（飲食・本番接続）。7つの行は店のフォローの設定で、
+ * 送る中身はシナリオ（本体）の一歩と同じ吹き出し。行を押すと、
+ * その中身をシナリオの一歩と同じ形で直せる。
+ * くわしい直しは本体のシナリオ画面（くわしく設定する →）でする。
  */
 
-type FlowKind = { name: string; note: string; icon: ComponentType<{ size?: number; 'aria-hidden'?: boolean }> }
-
-/** 本物の flow_type ごとの名前・説明・印（行）。 */
-const FLOW_KINDS: Record<string, FlowKind> = {
-  reservation_24h: { name: '予約 24時間前', note: '前日の確かめ・変更と取り消しの案内', icon: Bell },
-  reservation_2h: { name: '予約 2時間前', note: '当日のご案内', icon: Bell },
-  post_visit: { name: '来店後（退店のきっかけ）', note: 'ご来店のお礼', icon: LogOut },
-  review_request: { name: '口コミ依頼', note: '全員に Google の口コミの案内を出す', icon: Star },
-  member_card: { name: '会員証', note: '', icon: IdCard },
-  one_tap_booking: { name: 'ワンタップ予約', note: '', icon: CalendarPlus },
+type KindIcon = ComponentType<{ size?: number; 'aria-hidden'?: boolean }>
+const KIND_ICONS: Record<RestaurantFollowupTrigger, KindIcon> = {
+  reservation_created: Bell, reservation_24h: CalendarClock, reservation_2h: Clock,
+  post_visit: HeartHandshake, review_request: Star, waitlist_invited: MessageSquareText, anniversary_before: CalendarHeart,
 }
 
-export function timingLabel(flow: RestaurantLineFlow): string {
-  if (flow.timing_minutes === null) return '常設'
-  const hours = Math.abs(flow.timing_minutes) / 60
-  const amount = Number.isInteger(hours) ? `${hours}時間` : `${Math.abs(flow.timing_minutes)}分`
-  if (flow.timing_minutes < 0) return `${amount}前`
-  return flow.flow_type === 'post_visit' ? `退店から ${amount}後` : `${amount}後`
+type ScreenState =
+  | { kind: 'loading' }
+  | { kind: 'error'; message: string }
+  | { kind: 'empty' }
+  | { kind: 'ready'; live: FollowupLive }
+
+function unwrap<T>(response: ApiResponse<T>, fallback: string): T {
+  if (!response.success) throw new Error(response.error || fallback)
+  return response.data
 }
 
-const kindOf = (flow: RestaurantLineFlow): FlowKind => FLOW_KINDS[flow.flow_type] ?? { name: flow.flow_type, note: '', icon: MessageSquare }
-
-function flowsOf(ctx: RestaurantContext) {
-  return ctx.data.lineFlows.filter((flow) => !ctx.store || !flow.store_id || flow.store_id === ctx.store.id)
+function RowStatus({ step }: { step: FollowupStepLive }) {
+  if (!step.binding || !step.binding.enabled) return <StatusBadge tone="neutral">止めています</StatusBadge>
+  if (step.state === 'sending') return <StatusBadge tone="success">送ります</StatusBadge>
+  return <StatusBadge tone="neutral">準備ができました</StatusBadge>
 }
 
-type Drafts = Record<string, FlowDraft>
+/*
+ * 申請の対象の見分け。公開と申請の間にほかの担当者が変えたら、公開した中身と
+ * 画面の中身がずれる。再取得した中身が公開時と同じか比べ、違えば申請を止める。
+ * 版と送りの状態は公開自体で変わるため比べない。一歩は丸ごと比べる
+ * （旧形式の Flex 等は吹き出しが空でも中身が変わりうる）。
+ */
+export function liveFingerprint(live: FollowupLive): string {
+  return JSON.stringify(live.steps.map(step => [step.trigger, step.binding, step.step]))
+}
 
-function LineFollowupBoard({ ctx, selectedId, setSelectedId, drafts, setDrafts, readOnly }: {
-  ctx: RestaurantContext
-  selectedId: string
-  setSelectedId: (id: string) => void
-  drafts: Drafts
-  setDrafts: (update: (current: Drafts) => Drafts) => void
+function SendingLine({ live }: { live: FollowupLive }) {
+  const versionLabel = live.templateVersion === null ? '' : `（中身の版: ${live.templateVersion}）`
+  const text = live.sendingStatus === 'active' ? '本送信しています'
+    : live.sendingStatus === 'pending' ? '承認を待っています' : '本送信は止めています'
+  /* 承認の行き先は状態の札から開く（左メニューは変えない）。 */
+  if (live.approvalId) {
+    return <p role="status"><Button variant="text" href="/restaurant-test/approvals">{`${text}${versionLabel}→`}</Button></p>
+  }
+  return <p role="status">{`${text}${versionLabel}`}</p>
+}
+
+/* 開いた行の操作（オン/オフ・時期・本文）。行が変わるたび作り直す。本文の下書きは Board が持ち、行を切り替えても保つ。 */
+function OpenRow({ row, step, live, accountId, storeId, readOnly, unknownRole, reviewCount, busy, setBusy, failed, reload, bubbles, onBubbles }: {
+  row: FollowupTriggerRow
+  step: FollowupStepLive | null
+  live: FollowupLive
+  accountId: string
+  storeId: string
   readOnly: boolean
+  unknownRole: boolean
+  reviewCount: number | null
+  busy: string | null
+  setBusy: (action: string | null) => void
+  failed: (message: string) => void
+  reload: () => void
+  bubbles: BroadcastBubble[]
+  onBubbles: (next: BroadcastBubble[]) => void
 }) {
-  const { store, busy } = ctx
+  const templateVersion = live.templateVersion
+  const binding = step?.binding ?? null
+  const enabled = binding?.enabled === 1
+  const currentOffset = binding?.offset_minutes ?? row.defaultOffsetMinutes
+  const initial = exactTiming(Math.abs(currentOffset), row.units)
+  const [amount, setAmount] = useState(initial.amount)
+  const [unit, setUnit] = useState<OffsetUnit>(initial.unit)
+  const rowSetting = step?.row
+  const anniversaryLocked = row.trigger === 'anniversary_before' && !rowSetting
+  const [sendTime, setSendTime] = useState(binding?.anniversary_time ?? '10:00')
+  const noStep = !binding || !step?.step
+  const unsupportedBody = isUnsupportedBody(step?.step ?? null)
+  const locked = unknownRole || busy !== null
+  /* 権限の理由は lockedReason、状態の理由は目の前の文。役割不明は理由なし。 */
+  const permReason = readOnly ? '閲覧のみのため変えられません' : null
+  const toggleStateReason = noStep && !rowSetting ? '本体の一歩がまだないため、この行は変えられません'
+    : anniversaryLocked ? '記念日前の始まりはサーバーの口がまだないため、オンと時期は変えられません' : null
+  const bodyStateReason = noStep ? '本体の一歩がまだないため、本文は変えられません'
+    : unsupportedBody ? 'この本文はテキスト以外の形のため、この画面では直せません。本体のシナリオ画面で直してください' : null
+  const toggleLocked = locked || permReason !== null || toggleStateReason !== null
+  const timingLocked = toggleLocked || noStep
+  const bodyLocked = locked || permReason !== null || bodyStateReason !== null
+
+  const run = async (action: string, work: () => Promise<unknown>) => {
+    setBusy(action)
+    try {
+      await work()
+      reload()
+    } catch (error) {
+      if (error instanceof ApiError && error.code === 'line_account_required') {
+        failed('LINE公式アカウントを接続してから、もう一度お試しください')
+      } else if (error instanceof ApiError && error.status === 409) {
+        reload()
+        failed('ほかの担当者が先に保存しました。読み直しました。')
+      } else {
+        failed(describeSaveFailure(error))
+      }
+    } finally {
+      setBusy(null)
+    }
+  }
+  const offsetOf = (): number | null => {
+    const value = Number(amount)
+    if (!Number.isSafeInteger(value) || value < 0) return null
+    const minutes = value * UNIT_MINUTES[unit]
+    return row.direction === 'before' ? -minutes : minutes
+  }
+  return <div>
+    <div>
+      <Button variant="secondary" disabled={toggleLocked} busy={busy === 'toggle'}
+        lockedReason={permReason}
+        onClick={() => {
+          if (!step || (!rowSetting && (!binding || templateVersion === null))) return
+          const next = !enabled
+          void run('toggle', async () => {
+            if (rowSetting) {
+              unwrap(await saveFollowupRow(accountId, storeId, row.trigger, { expectedRowVersion: rowSetting.version, enabled: next }), 'オン/オフを変えられませんでした')
+            } else if (binding && templateVersion !== null) {
+              unwrap(await saveFollowupBinding(accountId, storeId, binding.step_id, 'PATCH', {
+                expectedVersion: templateVersion, trigger: row.trigger,
+                offsetMinutes: binding.offset_minutes, enabled: next,
+              }), 'オン/オフを変えられませんでした')
+            }
+          })
+        }}>
+        {enabled ? '止める' : '送る'}
+      </Button>
+      {permReason && !unknownRole ? <p role="note">{permReason}</p> : null}
+      {toggleStateReason ? <p role="note">{toggleStateReason}</p> : null}
+    </div>
+    {noStep && rowSetting ? <p role="note">先に「送る」を押すと、時期と本文を変えられます。本送信は承認まで始まりません。</p> : null}
+    <Field label="時期" note={row.direction === 'before' ? '前の日時を入れます' : '起点からの後を入れます（0はすぐ）'}>
+      <TextInput value={amount} inputMode="numeric" disabled={timingLocked}
+        aria-label="時期の数値" onChange={event => setAmount(event.target.value)} />
+      <Select value={unit} disabled={timingLocked} aria-label="時期の単位"
+        lockedReason={permReason ?? undefined}
+        options={row.units.map(item => ({ value: item, label: UNIT_LABEL[item] }))}
+        onChange={value => setUnit(value as OffsetUnit)} />
+      {row.trigger === 'anniversary_before' && rowSetting ? <TextInput type="time" value={sendTime} disabled={timingLocked} aria-label="送る時刻（店の現地時刻）" onChange={event => setSendTime(event.target.value)} /> : null}
+      <Button variant="secondary" disabled={timingLocked} busy={busy === 'timing'}
+        lockedReason={permReason}
+        onClick={() => {
+          const offset = offsetOf()
+          if (offset === null) { failed('時期は0以上の整数で入れてください'); return }
+          const invalid = timingError(row.trigger, offset)
+          if (invalid) { failed(invalid); return }
+          if (row.trigger === 'anniversary_before' && !/^([01]\d|2[0-3]):[0-5]\d$/.test(sendTime)) { failed('送る時刻を入れてください'); return }
+          if (!binding || templateVersion === null) return
+          void run('timing', async () => {
+            unwrap(await saveFollowupBinding(accountId, storeId, binding.step_id, 'PATCH', {
+              expectedVersion: templateVersion, trigger: row.trigger,
+              offsetMinutes: offset, enabled,
+              ...(row.trigger === 'anniversary_before' ? { anniversaryTime: sendTime } : {}),
+            }), '時期を変えられませんでした')
+          })
+        }}>
+        時期を保存する
+      </Button>
+    </Field>
+    <StepEditor name={row.name} bubbles={bubbles} readOnly={bodyLocked} busy={busy === 'body'} onChange={onBubbles} />
+    {bodyStateReason ? <p role="note">{bodyStateReason}</p> : null}
+    <div>
+      <Button variant="primary" disabled={bodyLocked} busy={busy === 'body'}
+        lockedReason={permReason}
+        onClick={() => {
+          if (!binding || !step?.step || unsupportedBody || templateVersion === null) return
+          const next = bubbles.length ? bubbles : [{ id: 'draft', type: 'text' as const, content: { text: '' } }]
+          if (!next.some(item => item.type !== 'text' || bubbleText(item).trim())) { failed('本文を入れてください'); return }
+          void run('body', async () => {
+            unwrap(await saveFollowupMessages(accountId, storeId, binding.step_id, {
+              expectedVersion: templateVersion, messageBubbles: next,
+            }), '本文を保存できませんでした')
+          })
+        }}>
+        <Check size={16} aria-hidden />本文を保存する
+      </Button>
+      {live.scenarioId ? <Button variant="text" href={`/scenarios/detail?id=${encodeURIComponent(live.scenarioId)}`}>くわしく設定する →</Button> : <Button variant="text" disabled>くわしく設定する →</Button>}
+    </div>
+    {row.trigger === 'review_request' ? (
+      <p role="status">{reviewCount === null ? '送信履歴は読めませんでした' : `送信履歴 ${reviewCount}件`}</p>
+    ) : null}
+  </div>
+}
+
+function Board({ accountId, storeId, storeName, selectedTrigger, onSelect, readOnly, unknownRole }: {
+  accountId: string | null
+  storeId: string | null
+  storeName: string
+  selectedTrigger: RestaurantFollowupTrigger
+  onSelect: (trigger: RestaurantFollowupTrigger) => void
+  readOnly: boolean
+  unknownRole: boolean
+}) {
   const [previewExpanded, setPreviewExpanded] = useState(false)
-  const flows = flowsOf(ctx)
-  const selected = flows.find(flow => flow.id === selectedId) ?? flows[0]
-  const draft = selected ? drafts[selected.id] ?? { title: selected.title, body: selected.body } : null
-  return (
-    <>
-      {/* 決まり2: いつも同じ説明は帯にせず、題の横の「？」（description）へ入れる。 */}
-      {readOnly ? <ReadOnlyNotice role="note" /> : null}
-      <DetailColumns presentation="notification" asideLabel="LINEでの見え方" expanded={previewExpanded} onExpandedChange={setPreviewExpanded}
-        aside={selected && draft ? <FlowPreview flow={selected} draft={draft} accountName={store?.line_account_name || store?.name || 'LINE公式アカウント'} /> : null}>
-        <div className={styles.flowList}>
-          {flows.map(flow => {
-            const kind = kindOf(flow)
-            const Icon = kind.icon
-            const isSelected = selected?.id === flow.id
-            return <div key={flow.id} className={styles.flowItem}>
-              {/* 118: 開いた行は白のまま。開いている印は左の緑の線と右端の ⌃ で示す（押している途中の灰にしない）。 */}
-              <Card padding="none" contentPadding="0px 0px" data-open={isSelected || undefined} className={isSelected ? styles.flowCardOpen : undefined}>
-                <button type="button" className={styles.flowButton} aria-expanded={isSelected} aria-label={kind.name} onClick={() => setSelectedId(flow.id)}>
-                  <span className={styles.flowIcon}><Icon size={16} aria-hidden /></span>
-                  <span className={styles.flowText}>
-                    <span className={styles.flowName} title={kind.name}>{kind.name}</span>
-                    {kind.note ? <span className={styles.flowNote} title={kind.note}>{kind.note}</span> : null}
-                  </span>
-                  <span className={styles.flowTiming}>{timingLabel(flow)}</span>
-                  <span className={styles.flowStatus}><StatusBadge tone="neutral">{flow.delivery_mode === 'disabled' ? '送信しない' : '確認用'}</StatusBadge></span>
-                  <ChevronDown size={18} aria-hidden="true" data-flow-chevron className={styles.flowChevron} data-open={isSelected || undefined} />
-                </button>
-              </Card>
-              {isSelected && draft ? <FlowEditor key={flow.id} flow={flow} name={kind.name} draft={draft} readOnly={readOnly} busy={busy}
-                onChange={next => setDrafts(current => ({ ...current, [flow.id]: next }))} /> : null}
-            </div>
-          })}
+  const [state, setState] = useState<ScreenState>({ kind: 'loading' })
+  const [reviewCount, setReviewCount] = useState<number | null>(null)
+  const [busy, setBusy] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  /* 行ごとの本文の下書き。行を切り替えても保ち、読み直すと捨てる。店が変わると Board ごと作り直す。 */
+  const [edits, setEdits] = useState<Record<string, BroadcastBubble[]>>({})
+  /* 失敗の知らせは店が変わったときだけ消す。保存後の読み直しでは保つ。 */
+  const storeKey = `${accountId ?? ''} ${storeId ?? ''}`
+  const prevStoreKey = useRef(storeKey)
+  useEffect(() => {
+    if (!accountId || !storeId) return
+    let cancelled = false
+    if (prevStoreKey.current !== storeKey) {
+      prevStoreKey.current = storeKey
+      setActionError(null)
+    }
+    setState({ kind: 'loading' })
+    fetchRestaurantFollowup(accountId, storeId, storeName).then(live => {
+      if (cancelled) return
+      setState(live ? { kind: 'ready', live } : { kind: 'empty' })
+      if (live) {
+        fetchFollowupReviewHistory(accountId, storeId).then(
+          invitations => { if (!cancelled) setReviewCount(invitations.length) },
+          () => { if (!cancelled) setReviewCount(null) },
+        )
+      }
+    }).catch((error: unknown) => {
+      if (cancelled) return
+      setState({ kind: 'error', message: describeApiFailure(error, '読み込み') })
+    })
+    return () => { cancelled = true }
+  }, [accountId, storeId, storeName, reloadKey, storeKey])
+  if (!accountId) return <p role="alert">アカウントを選んでください</p>
+  if (state.kind === 'loading') return <p role="status">読み込んでいます…</p>
+  if (state.kind === 'error') return <p role="alert">{state.message}</p>
+  const rows = RESTAURANT_TRIGGER_ROWS
+  const current: FollowupTriggerRow = rows.find(row => row.trigger === selectedTrigger) ?? rows[0]!
+  const live = state.kind === 'ready' ? state.live : null
+  const step: FollowupStepLive | null = live?.steps.find(item => item.trigger === current.trigger) ?? null
+  const sample = live === null
+  const blank = (id: string, text: string): BroadcastBubble[] => [{ id, type: 'text', content: { text } }]
+  const draft = edits[current.trigger]
+    ?? (step && step.bubbles.length ? step.bubbles : sample ? blank('sample', current.sampleText) : blank('draft', ''))
+  /* 直せない形の本文は、空の見え方にせず正直に出す。 */
+  const previewBubbles = !sample && isUnsupportedBody(step?.step ?? null) && !edits[current.trigger]
+    ? blank('unsupported', '（この画面では見られない形の本文です）')
+    : draft
+  const reload = () => { setEdits({}); setReloadKey(key => key + 1) }
+  const permReason = readOnly ? '閲覧のみのため変えられません' : null
+  const startStopLocked = busy !== null || unknownRole || readOnly || !live?.scenarioId
+  return <>
+    {readOnly ? <ReadOnlyNotice role="note" /> : null}
+    {actionError ? <p role="alert">{actionError}</p> : null}
+    <DetailColumns asideLayout="detail" presentation="notification" asideLabel="LINEでの見え方" expanded={previewExpanded} onExpandedChange={setPreviewExpanded}
+      aside={<DetailPreview title="LINEでの見え方"><StepPreview bubbles={previewBubbles} accountName={storeName || 'LINE公式アカウント'} /></DetailPreview>}>
+      {live ? <SendingLine live={live} /> : null}
+      <div className={styles.flowList}>
+        {rows.map(row => {
+          const Icon = KIND_ICONS[row.trigger] ?? MessageSquare
+          const isSelected = row.trigger === current.trigger
+          const rowStep = live?.steps.find(item => item.trigger === row.trigger) ?? null
+          const offset = rowStep?.offsetMinutes ?? row.defaultOffsetMinutes
+          return <div key={row.trigger} className={styles.flowItem}>
+            <Card padding="none" contentPadding="0px 0px" data-open={isSelected || undefined} className={isSelected ? styles.flowCardOpen : undefined}>
+              <button type="button" className={styles.flowButton} aria-expanded={isSelected} aria-label={row.name} onClick={() => onSelect(row.trigger)}>
+                <span className={styles.flowIcon}><Icon size={16} aria-hidden /></span>
+                <span className={styles.flowText}>
+                  <span className={styles.flowName} title={row.name}>{row.name}</span>
+                  <span className={styles.flowNote} title={row.note}>{row.note}</span>
+                </span>
+                <span className={styles.flowTiming}>{timingLabel(row.trigger, offset)}</span>
+                <span className={styles.flowStatus}>{rowStep && (rowStep.binding || rowStep.row) ? <RowStatus step={rowStep} /> : <StatusBadge tone="neutral">まだありません</StatusBadge>}</span>
+                <ChevronDown size={18} aria-hidden="true" data-flow-chevron className={styles.flowChevron} data-open={isSelected || undefined} />
+              </button>
+            </Card>
+            {isSelected && live && storeId ? (
+              <OpenRow key={`${row.trigger}:${live.templateVersion}`} row={row} step={rowStep} live={live}
+                accountId={accountId} storeId={storeId}
+                readOnly={readOnly} unknownRole={unknownRole} reviewCount={reviewCount} busy={busy} setBusy={setBusy}
+                failed={setActionError} reload={reload}
+                bubbles={edits[row.trigger] ?? rowStep?.bubbles ?? blank('draft', '')}
+                onBubbles={next => setEdits(current => ({ ...current, [row.trigger]: next }))} />
+            ) : null}
+            {isSelected && sample ? <StepEditor name={row.name} bubbles={draft} readOnly busy={false} onChange={() => {}} /> : null}
+          </div>
+        })}
+      </div>
+      {sample ? <p role="note">この店のフォローの設定はまだありません。表の文は見本です。</p> : null}
+      {live && storeId ? (
+        <div>
+          <Button variant="secondary" disabled={startStopLocked} busy={busy === 'start'}
+            lockedReason={permReason}
+            onClick={() => {
+              if (!live.scenarioId) return
+              setBusy('start')
+              /* 申請は公開版を対象にする。直前に公開し、公開で増えた版を取り直してから申請する。 */
+              publishFollowupScenario(live.scenarioId).then(
+                publishResponse => {
+                  try {
+                    unwrap(publishResponse, '本体のシナリオを公開できませんでした')
+                  } catch (error) {
+                    setBusy(null)
+                    setActionError(describeSaveFailure(error))
+                    return
+                  }
+                  fetchRestaurantFollowup(accountId, storeId, storeName).then(
+                    fresh => {
+                      if (!fresh || fresh.templateVersion === null) {
+                        setBusy(null)
+                        setActionError('フォローの設定を読み直せませんでした')
+                        return
+                      }
+                      if (liveFingerprint(fresh) !== liveFingerprint(live)) {
+                        setBusy(null)
+                        reload()
+                        setActionError('ほかの担当者が先に保存しました。公開した中身と変わったため申請を止めました。読み直しました。')
+                        return
+                      }
+                      requestFollowupStart(accountId, storeId, fresh.templateVersion).then(
+                        response => {
+                          setBusy(null)
+                          try {
+                            unwrap(response, '承認を申請できませんでした')
+                          } catch (error) {
+                            setActionError(describeSaveFailure(error))
+                            return
+                          }
+                          reload()
+                        },
+                        (error: unknown) => {
+                          setBusy(null)
+                          if (error instanceof ApiError && error.status === 409) {
+                            reload()
+                            setActionError('承認を申請できませんでした。ほかの担当者が先に保存しました。読み直しました。')
+                          } else {
+                            setActionError(describeSaveFailure(error))
+                          }
+                        },
+                      )
+                    },
+                    (error: unknown) => {
+                      setBusy(null)
+                      setActionError(describeSaveFailure(error))
+                    },
+                  )
+                },
+                (error: unknown) => {
+                  setBusy(null)
+                  setActionError(describeSaveFailure(error))
+                },
+              )
+            }}>
+            承認を申請する
+          </Button>
+          <Button variant="secondary" disabled={startStopLocked} busy={busy === 'stop'}
+            lockedReason={permReason}
+            onClick={() => {
+              setBusy('stop')
+              stopFollowup(accountId, storeId).then(
+                () => { setBusy(null); reload() },
+                (error: unknown) => {
+                  setBusy(null)
+                  setActionError(describeSaveFailure(error))
+                },
+              )
+            }}>
+            本送信を止める
+          </Button>
         </div>
-      </DetailColumns>
-    </>
-  )
+      ) : null}
+    </DetailColumns>
+  </>
 }
 
 export default function LineFollowupV8() {
   const { selectedAccountId } = useAccount()
-  const [selectedId, setSelectedId] = useState('')
-  const [drafts, setDrafts] = useState<Drafts>({})
-  const [draftAccount, setDraftAccount] = useState(selectedAccountId)
-  if (draftAccount !== selectedAccountId) {
-    setDraftAccount(selectedAccountId)
-    setDrafts({})
-    setSelectedId('')
+  const [selectedTrigger, setSelectedTrigger] = useState<RestaurantFollowupTrigger>('reservation_created')
+  const [account, setAccount] = useState(selectedAccountId)
+  if (account !== selectedAccountId) {
+    setAccount(selectedAccountId)
+    setSelectedTrigger('reservation_created')
   }
   const role = useStaffRole()
-  const readOnly = !canManageRole(role)
-  const save = (ctx: RestaurantContext) => {
-    const flows = flowsOf(ctx)
-    const selected = flows.find(flow => flow.id === selectedId) ?? flows[0]
-    if (!selected || !selectedAccountId) return
-    const draft = drafts[selected.id] ?? { title: selected.title, body: selected.body }
-    void ctx.mutate(() => restaurantTestApi.updateLineFlow(selectedAccountId, selected.id, draft), '下書きを保存しました。送信はまだ行いません。')
-  }
+  /* 役割が読めるまで null。そのあいだは閲覧のみと断定せず、理由なしで止める。 */
+  const unknownRole = role === null
+  const readOnly = !unknownRole && !canManageRole(role)
   return (
     <RestaurantFrame
       boardId="n9vvGx"
       title="LINE来店フォロー"
-      description="予約前・来店後・口コミ依頼・会員証を、来店・退店のきっかけで送るひな形として作ります。LINE来店フォローは、来店・退店のきっかけを使う「シナリオのひな形」としてまとめる。行を押すと、その中身をシナリオの一歩と同じ形で直せる。"
+      description="設定を変えると、この店の本送信は止まります。送り始めるには承認を申請してください。予約前・来店後・口コミ依頼・会員証を、来店・退店のきっかけで送るひな形として作ります。LINE来店フォローは、来店・退店のきっかけを使う「シナリオのひな形」としてまとめる。行を押すと、その中身をシナリオの一歩と同じ形で直せる。"
       pickerAs="select"
       banner={false}
-      subtitle={(store) => `${store ? `${store.name}・` : ''}本送信は停止中（プレビューのみ）`}
-      actions={(ctx) => readOnly ? null : (
-        <Button variant="primary" disabled={!ctx || ctx.busy || flowsOf(ctx).length === 0} busy={ctx?.busy} onClick={() => { if (ctx) save(ctx) }}>
-          <Check size={16} aria-hidden />下書きを保存する
-        </Button>
-      )}
+      subtitle={(store) => store ? store.name : ''}
+      actions={() => null}
     >
-      {(ctx) => <LineFollowupBoard ctx={ctx} selectedId={selectedId} setSelectedId={setSelectedId} drafts={drafts} setDrafts={setDrafts} readOnly={readOnly} />}
+      {(ctx) => <Board key={ctx.store?.id ?? 'none'} accountId={selectedAccountId} storeId={ctx.store?.id ?? null} storeName={ctx.store?.name ?? ''} selectedTrigger={selectedTrigger} onSelect={setSelectedTrigger} readOnly={readOnly} unknownRole={unknownRole} />}
     </RestaurantFrame>
   )
 }

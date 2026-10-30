@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
+import { findDetailMenuItem } from '@/test-utils/detail-menu'
 import React, { act } from 'react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 
@@ -79,8 +81,8 @@ beforeEach(() => {
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  vi.stubGlobal('fetch', (input: URL | RequestInfo) =>
-    Promise.resolve(handler(new URL(String(input)))))
+  vi.stubGlobal('fetch', vi.fn((input: URL | RequestInfo) =>
+    Promise.resolve(handler(new URL(String(input))))))
 })
 afterEach(() => {
   act(() => { root.unmount() })
@@ -126,24 +128,27 @@ test('パネルの「詳細を見る」は詳細へ進む', async () => {
   expect(pushes).toEqual(['/reminders/detail?id=r1'])
 })
 
-// 監査 WEB-015：閲覧のみの人には、パネルにも押せない編集・複製・削除を置かない（行の「…」と同じ）。
-test.each(['viewer', 'staff'])('WEB-015: %s の閲覧のみではパネルに編集・複製・削除を出さない', async (readonlyRole) => {
-  const panelButtons = () => [...(document.body.querySelector('[data-design-part="detail-panel"]')?.querySelectorAll('button') ?? [])]
-    .map((b) => b.textContent?.trim())
+// 変更操作は灰色＋理由で残し、本文と詳細への移動は使える。
+test.each(['viewer', 'staff'])('%s は詳細を読めるが、編集・複製・削除は実行できない', async (readonlyRole) => {
   role = readonlyRole
   await openFirstRow()
-  await eventually(() => {
-    if (!panelButtons().includes('詳細を見る')) throw new Error('panel not open')
-  })
-  expect(panelButtons()).not.toContain('編集する')
-  expect(panelButtons()).not.toContain('複製する')
-  expect(panelButtons()).not.toContain('削除する')
+  const panel = await screen.findByRole('dialog')
+  const edit = within(panel).getByRole('button', { name: '編集する', exact: true })
+  expect(edit.getAttribute('aria-disabled')).toBe('true')
+  for (const label of ['複製する', '削除する']) {
+    const item = await findDetailMenuItem(label, panel)
+    expect(item.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(item)
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
+    expect(document.querySelector('[data-design-part="dialog"]')).toBeNull()
+  }
+  expect(vi.mocked(fetch).mock.calls.every(([, init]) => !init?.method || init.method === 'GET')).toBe(true)
+  expect(within(panel).getByRole('button', { name: '詳細を見る' })).toBeTruthy()
 })
 
-test('管理者のパネルには編集・複製・削除を出す', async () => {
+test('管理者は主・副とメニューから編集・複製・削除を使える', async () => {
   await openFirstRow()
-  await eventually(() => {
-    const labels = [...(document.body.querySelector('[data-design-part="detail-panel"]')?.querySelectorAll('button') ?? [])].map((b) => b.textContent?.trim())
-    expect(labels).toEqual(expect.arrayContaining(['詳細を見る', '編集する', '複製する', '削除する']))
-  })
+  const panel = await screen.findByRole('dialog')
+  expect(within(panel).getByRole('button', { name: '編集する' })).toBeTruthy()
+  for (const label of ['複製する', '削除する']) expect((await findDetailMenuItem(label, panel)).getAttribute('aria-disabled')).not.toBe('true')
 })

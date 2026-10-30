@@ -11,8 +11,8 @@ import { TextField } from './text-field'
 import styles from './customer-info-panel.module.css'
 
 /** 旧文字値も外せる。窓の取消では確定した値を変えない。 */
-export default function AllergyField({ value, options = [...DEFAULT_ALLERGY_OPTIONS], readOnly = false, onChange }: {
-  value: string | null; options?: string[]; readOnly?: boolean; onChange: (value: string) => void
+export default function AllergyField({ value, options = [...DEFAULT_ALLERGY_OPTIONS], readOnly = false, showEmptyValue = true, onChange }: {
+  value: string | null; options?: string[]; readOnly?: boolean; showEmptyValue?: boolean; onChange: (value: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [other, setOther] = useState('')
@@ -23,7 +23,7 @@ export default function AllergyField({ value, options = [...DEFAULT_ALLERGY_OPTI
     {selected.length ? readOnly
       ? <TagOverflow maxVisible={2} label="すべてのアレルギー">{selected.map(name => <Chip key={name}>{name}</Chip>)}</TagOverflow>
       : selected.map(name => <TagPill key={name} name={name} onRemove={() => onChange(JSON.stringify(selected.filter(item => item !== name)))} />)
-      : <span className={styles.note}>未設定</span>}
+      : showEmptyValue ? <span className={styles.note}>未設定</span> : null}
     {/* 絵 e5uuD0：札の下に全幅の「選んで足す」（押すと選ぶ窓）。 */}
     {!readOnly ? <Button className={styles.allergyAdd} onClick={() => { setAdded([]); setOther(''); setOpen(true) }}><span>選んで足す</span><ChevronDown size={16} aria-hidden="true" /></Button> : null}
     {open ? <EntityMultiPickerDialog title="アレルギーを選ぶ" items={choices.map(name => ({ id: name, name }))} initialIds={selected} maxSelected={32}

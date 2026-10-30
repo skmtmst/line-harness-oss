@@ -1,3 +1,4 @@
+import { seedExistingRestaurantFollowup } from './restaurant-followup-fixture.js';
 import type { SqliteD1 } from './d1-sqlite.js';
 
 /** HTTPで公開しない、ルート試験専用の最小データ。 */
@@ -56,4 +57,6 @@ export function seedRestaurantFixture(testDb: SqliteD1, {
       'INSERT INTO rt_line_flows (id, organization_id, store_id, flow_type, title, body) VALUES (?, ?, ?, ?, ?, ?)',
     ).run(`flow-${index}`, 'org-fixture', 'store-ginza', flowType, `テスト${index}`, 'テスト本文');
   }
+  seedExistingRestaurantFollowup(testDb,'store-ginza');
+  seedExistingRestaurantFollowup(testDb,'store-yokohama');
 }

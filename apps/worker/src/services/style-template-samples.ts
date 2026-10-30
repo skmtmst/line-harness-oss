@@ -215,7 +215,7 @@ export function templateSamples(style: AccountStyle): StyleTemplateSample[] {
         name,
         category: 'general',
         messageType: 'text' as const,
-        messageContent: JSON.stringify({ text }),
+        messageContent: text,
         carouselActionsJson: null,
         carouselTapLimitMode: 'none' as const,
         carouselTapLimitText: null,

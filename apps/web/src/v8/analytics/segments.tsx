@@ -1,4 +1,6 @@
 'use client'
+import { DetailContent } from '@/components/shared/detail-content'
+import DetailActions from '@/components/shared/detail-actions'
 
 import HeatmapTable from '@/components/shared/heatmap-table'
 import { ListToolbarRow } from '@/components/shared/list-toolbar'
@@ -69,8 +71,10 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
   const [measure, setMeasure] = useState<Measure>('count')
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [error, setError] = useState<unknown>(null)
+  const [actionError, setActionError] = useState('')
   const [data, setData] = useState<CustomerSegments | null>(null)
   const [pick, setPick] = useState<Pick | null>(null)
+  useEffect(() => setActionError(''), [pick])
 
   const load = useCallback(async () => {
     setStatus('loading')
@@ -132,10 +136,15 @@ export default function SegmentsV8({ accountId, canManage }: { accountId: string
         closeAppearance="box"
         heightMode="viewport"
         onClose={() => setPick(null)}
-        footer={pick ? <PickFooterHost accountId={accountId} pick={pick} basis={basis} measure={measure} data={data} cellAt={cellAt} canManage={canManage} onPrepare={preparing.open} onOpenBroadcast={(condition) => router.push(`/broadcasts/new?condition=${encodeURIComponent(JSON.stringify(condition))}`)} /> : undefined}
+        band={actionError ? <Notice tone="danger" message={actionError} /> : undefined}
+        footerLayout="actions"
+        footer={pick ? <PickFooterHost onFailure={setActionError} accountId={accountId} pick={pick} basis={basis} measure={measure} data={data} cellAt={cellAt} canManage={canManage} onPrepare={preparing.open} onOpenBroadcast={(condition) => router.push(`/broadcasts/new?condition=${encodeURIComponent(JSON.stringify(condition))}`)} /> : undefined}
       >
+<DetailContent>
         {pick ? <PickBody accountId={accountId} pick={pick} basis={basis} measure={measure} /> : null}
-      </Drawer>
+
+</DetailContent>
+</Drawer>
       {preparing.dialog}
     </section></ListPageSection>
   )
@@ -218,7 +227,8 @@ function PickBody({ accountId, pick, basis, measure }: { accountId: string; pick
 }
 
 /** 下の操作。人数は一覧と同じ控えから読む。 */
-function PickFooterHost({ accountId, pick, basis, measure, data, cellAt, canManage, onPrepare, onOpenBroadcast }: {
+function PickFooterHost({ onFailure, accountId, pick, basis, measure, data, cellAt, canManage, onPrepare, onOpenBroadcast }: {
+  onFailure: (message: string) => void
   accountId: string
   pick: Pick
   basis: Basis
@@ -230,7 +240,7 @@ function PickFooterHost({ accountId, pick, basis, measure, data, cellAt, canMana
   onOpenBroadcast: (condition: unknown) => void
 }) {
   const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState('')
+  const setMessage = onFailure
   const errors = useSaveFormErrors()
   const total = pick.r === 0 ? data.total : cellAt(pick.r, pick.f)?.count ?? null
   const whole = pick.r === 0
@@ -257,17 +267,12 @@ function PickFooterHost({ accountId, pick, basis, measure, data, cellAt, canMana
   }
 
   return (
-    <SaveErrorScope errors={errors}><div className={styles.drawerBody}>
-      {message ? <Notice tone="danger" message={message} /> : null}
-      <div className={styles.footer}>
-        <Button variant="secondary" onClick={() => onPrepare('CSVの書き出し')}>CSVで書き出す</Button>
-        {canManage && !whole ? <Button variant="secondary" onClick={() => void saveSearch()} busy={busy}>保存した検索にする</Button> : null}
-        {canManage && !whole ? (
-          <Button variant="primary" disabled={total === null || total === 0} onClick={() => condition && onOpenBroadcast(condition)}>
-            {`この ${total === null ? '' : formatNumber(total)} 人に LINE を送る`}
-          </Button>
-        ) : null}
-      </div>
-    </div></SaveErrorScope>
+    <SaveErrorScope errors={errors}><>
+      <DetailActions
+        secondary={<Button variant="secondary" onClick={() => onPrepare('CSVの書き出し')}>CSVで書き出す</Button>}
+        primaryAllowed={canManage} primary={!whole ? <Button variant="primary" disabled={total === null || total === 0} disabledReason={total === null ? '人数を確認できません' : total === 0 ? '送る相手がいません' : undefined} onClick={() => condition && onOpenBroadcast(condition)}>{`この ${total === null ? '' : formatNumber(total)} 人に LINE を送る`}</Button> : null}
+        menuItems={!whole ? [{ allowed: canManage, id: 'save-search', label: '保存した検索にする', disabled: busy, onSelect: () => void saveSearch() }] : []}
+      />
+    </></SaveErrorScope>
   )
 }

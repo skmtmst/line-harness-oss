@@ -348,18 +348,6 @@ export const put__api_restaurant_test_gbp_reviews_id_draft_14 = async (c: Contex
   return c.json({ success: true, data: { id: c.req.param('id'), sent: false } });
 };
 
-export const get__api_restaurant_test_followups_storeId_15 = async (c: Context<Env, "/api/restaurant-test/followups/:storeId">) => {
- if(!hasOrganizationSelector(c))return requiredAccount(c);
- const org=await organizationFor(c),storeId=c.req.param('storeId');
- if(!org||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'not_found'},404);
- const db=dbFor(c.env,storeId);
- const template=await db.prepare('SELECT * FROM rt_store_followup_templates WHERE store_id=?').bind(storeId).first();
- if(!template)return c.json({success:false,error:'not_found'},404);
- const bindings=(await db.prepare('SELECT * FROM rt_store_followup_step_bindings WHERE store_id=? ORDER BY trigger,step_id').bind(storeId).all()).results;
- const jobs=(await db.prepare(`SELECT j.* FROM scenario_source_jobs j LEFT JOIN rt_reservation_events e ON e.id=j.source_event_id WHERE e.store_id=? OR (j.source_kind='restaurant_anniversary' AND j.source_id=?) ORDER BY j.scheduled_at DESC LIMIT 100`).bind(storeId,storeId).all()).results;
- return c.json({success:true,data:{template,bindings,jobs,editor:'common_scenario'}});
-};
-
 export const put__api_restaurant_test_followups_storeId_steps_stepId_messages_16 = async (c: Context<Env, "/api/restaurant-test/followups/:storeId/steps/:stepId/messages">) => {
  if(!hasOrganizationSelector(c))return requiredAccount(c);
  const org=await organizationFor(c),storeId=c.req.param('storeId');
@@ -450,7 +438,7 @@ export const put__api_restaurant_test_line_flows_id_22 = async (c: Context<Env, 
   if (!hasOrganizationSelector(c)) return requiredAccount(c);
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
-  const managed=await dbFor(c.env).prepare(`SELECT t.scenario_id FROM rt_store_followup_templates t JOIN rt_line_flows f ON f.store_id=t.store_id WHERE f.id=? AND f.organization_id=? AND (? IS NULL OR f.store_id=?)`).bind(c.req.param('id'),organization.id,organization.scopedStoreId,organization.scopedStoreId).first<{scenario_id:string}>();
+  const managed=await dbFor(c.env).prepare(`SELECT t.scenario_id FROM rt_line_flows f LEFT JOIN rt_store_followup_templates t ON t.store_id=f.store_id WHERE (t.store_id IS NOT NULL OR EXISTS(SELECT 1 FROM rt_store_followup_rows WHERE store_id=f.store_id)) AND f.id=? AND f.organization_id=? AND (? IS NULL OR f.store_id=?)`).bind(c.req.param('id'),organization.id,organization.scopedStoreId,organization.scopedStoreId).first<{scenario_id:string}>();
   if(managed)return c.json({success:false,error:'common_scenario_editor_required',data:{scenarioId:managed.scenario_id}},409);
   const body = await c.req.json<{ title?: string; body?: string; timingMinutes?: number | null; isEnabled?: boolean }>();
   if (!body.title?.trim() || !body.body?.trim()) return inputError(c, { success: false, error: 'タイトルと本文が必要です' }, 400, ["title","body"]);

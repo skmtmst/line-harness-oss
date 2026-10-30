@@ -582,6 +582,7 @@ export default function MediaSlot({
 
   return (
     <div id={id} className={styles.root} data-controls-below={controlsBelow || undefined} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription} style={invalid ? { outline: '1px solid var(--color-danger)' } : undefined}>
+      {extraHelp ? <HelpTip className={styles.help} label={`${title}の補足`}>{extraHelp}</HelpTip> : null}
       <div
         role="group"
         aria-label={title}
@@ -610,7 +611,6 @@ export default function MediaSlot({
         onPaste={paste}
       >
         {body}
-        {extraHelp ? <HelpTip label={`${title}の補足`}>{extraHelp}</HelpTip> : null}
         {picker}
       </div>
       {controlsBelow && !readOnly && (error || drag === 'reject') ? <span className={styles.reason} role="alert">{error ?? (formats ? `${formats} の${noun}を選んでください` : `この${noun}は入れられません`)}</span> : null}

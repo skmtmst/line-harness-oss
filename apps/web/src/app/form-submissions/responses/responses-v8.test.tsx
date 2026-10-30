@@ -170,8 +170,9 @@ it('WEB-148: 閲覧のみでは編集・後処理を隠し、回答とCSVを残�
   await act(async () => answer!.click()); await settle()
   expect(host.textContent).toContain('待ち時間が短くて助かりました')
   expect(host.textContent).toContain('閲覧のみで見ています')
-  expect([...host.querySelectorAll('a,button')].some((el) => el.textContent?.includes('フォームを編集'))).toBe(false)
-  expect([...host.querySelectorAll('button')].some((el) => el.textContent?.includes('後処理をやり直す'))).toBe(false)
+  expect([...host.querySelectorAll('a')].some((el) => el.textContent?.includes('フォームを編集'))).toBe(false)
+  const retry = [...host.querySelectorAll('button')].find(el => el.textContent?.includes('後処理をやり直す'))!
+  expect(retry.getAttribute('aria-disabled') === 'true' || retry.hasAttribute('disabled')).toBe(true)
   expect(host.textContent).toContain('CSVで書き出す')
  })
 
@@ -215,11 +216,17 @@ async function openResponseDelete(fromDetail = false) {
   const remove = allButtons().find(b => b.textContent === '回答を削除する')!
   await act(async () => remove.click()); await settle()
 }
-it.each(['staff', 'viewer', null])('%sは回答一覧・詳細に削除の口が無い', async value => {
+it.each(['staff', 'viewer', null])('%sは一覧の削除を使えず、詳細の削除は理由付きで無効', async value => {
   role.current = value
   await rowView()
   expect(document.querySelector('[aria-label="回答 sub-1 の操作"]')).toBeNull()
-  expect(document.querySelector('[aria-label="回答の詳細の操作"]')).toBeNull()
+  const detailMenu = document.querySelector<HTMLButtonElement>('[aria-label="回答の詳細の操作"]')!
+  expect(detailMenu).toBeTruthy()
+  await act(async () => detailMenu.click()); await settle()
+  const remove = document.querySelector<HTMLButtonElement>('[role="menuitem"][aria-label="回答を削除する"]')!
+  expect(remove).toBeTruthy()
+  expect(remove.getAttribute('aria-disabled') === 'true' || remove.disabled).toBe(true)
+  if (value === null) { expect(remove.disabled).toBe(true); expect(remove.getAttribute('aria-describedby')).toBeNull() }
 })
 it.each([false, true])('回答の%sから確認し、取消は送らない', async detail => {
   if (!detail) fetchApi.mockImplementation(async (url: string) => ({ success: true, data: url.includes('/submissions') ? {
@@ -277,4 +284,17 @@ describe('19 空の値の言い方', () => {
     expect(name!.textContent).toBe('—')
     expect(name!.querySelector('[data-empty-value]')).not.toBeNull()
   })
+})
+
+it('1件を選んだ後も、まとめ表示にはその回答への操作を残さない', async () => {
+  await rowView()
+  expect(document.querySelector('[data-detail-actions]')).toBeTruthy()
+  await act(async () => tabButton('まとめて見る')!.click()); await settle()
+  const footer = document.querySelector('[data-detail-actions]')!
+  expect(footer.textContent).not.toContain('後処理をやり直す')
+  expect(footer.textContent).not.toContain('友だちを開く')
+  const menu = footer.querySelector<HTMLButtonElement>('[aria-label="回答の詳細の操作"]')!
+  await act(async () => menu.click()); await settle()
+  expect(document.querySelector('[role="menuitem"][aria-label="回答を削除する"]')).toBeNull()
+  expect(document.querySelector('[role="menuitem"][aria-label="友だちを開く"]')).toBeNull()
 })

@@ -8,6 +8,7 @@ export * from './style-starter-definition.js';
 export { featureReadiness, styleWarnings } from './style-readiness.js';
 import { StyleError, checkStyle, readAnswers } from './style-setup-core.js';
 import { readDefinition, standardStarter } from './style-starter-definition.js';
+import { restaurantFollowupSeedStatement } from './restaurant-followup-rows.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
 export {profile,profileAnswers,type StyleProfile} from './style-profile.js';
 import {profile,profileAnswers,hasPendingStyleSelection} from './style-profile.js';
@@ -124,6 +125,7 @@ export async function saveProfile(
         styleMode,
       ),
   );
+  if (selected && style === 'restaurant') statements.push(restaurantFollowupSeedStatement(db,{accountId:account}));
   const previousAnswers = JSON.parse(current?.answers_json ?? '{}') as Record<
     string,
     SetupAnswer

@@ -1,4 +1,5 @@
 'use client'
+import { DetailContent, DetailFields, DetailSectionTitle } from '@/components/shared/detail-content'
 import { formatYen, withHonorific } from '@line-crm/shared';
 
 /*
@@ -208,11 +209,11 @@ export default function OrderDrawer({
         {`${order.customerName ? '・' : ''}${friendId ? 'LINE の友だちと結びついています' : 'LINE の友だちと結びついていません'}${ORDER_STATUS_TEXT[order.status] ? `・${ORDER_STATUS_TEXT[order.status]}` : ''}`}
       </> : undefined}
       onClose={onClose}
-      footer={order ? <>
-        <Button href="/ec-commerce/identity-candidates"><LinkIcon size={16} aria-hidden="true" />会員のつき合わせへ</Button>
-        {order.detailUrl ? <Button external href={order.detailUrl}  >ECの管理画面で開く</Button> : null}
-      </> : undefined}
+      actions={{primary: ((order) && (order.detailUrl) ? <Button variant="primary" external href={order.detailUrl}  >ECの管理画面で開く</Button> : null),
+secondary: ((order) ? <Button variant="secondary" href="/ec-commerce/identity-candidates"><LinkIcon size={16} aria-hidden="true" />会員のつき合わせへ</Button> : null),
+menuItems: []}}
     >
+<DetailContent>
           {state === 'loading' ? (
             <ListState kind="loading" title="注文の状況を読み込んでいます" />
           ) : state === 'forbidden' ? (
@@ -222,20 +223,20 @@ export default function OrderDrawer({
           ) : (
             <>
               <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>注文の内容</h3>
-                <dl className={styles.facts}>
-                  <div className={styles.fact}>
+                <DetailSectionTitle>注文の内容</DetailSectionTitle>
+                <DetailFields>
+                  <div>
                     <dt>中身</dt>
                     <dd>{order.orderLines.length ? order.orderLines.map((line) => `${line.productName} ×${line.quantity}`).join('・') : '商品明細は未取得'}</dd>
                   </div>
-                  <div className={styles.fact}><dt>金額</dt><dd>{amount ?? emptyValue('unknown')}</dd></div>
-                  <div className={styles.fact}>
+                  <div><dt>金額</dt><dd>{amount ?? emptyValue('unknown')}</dd></div>
+                  <div>
                     <dt>EC側の注文</dt>
                     <dd>
                       {`${shortTime(order.orderedAt)} 注文`}
                     </dd>
                   </div>
-                </dl>
+                </DetailFields>
               </section>
 
               <section className={styles.section}>
@@ -248,7 +249,7 @@ export default function OrderDrawer({
               </section>
 
               <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>成果・マイル・スコア</h3>
+                <DetailSectionTitle>成果・マイル・スコア</DetailSectionTitle>
                 {outcomesEmpty ? <p className={styles.empty}>この注文に結びついた成果・マイル・スコアはありません。</p> : (
                   <ul className={styles.timeline}>
                     {detail.outcomes.conversions.map((conversion) => {
@@ -288,7 +289,7 @@ export default function OrderDrawer({
               </section>
 
               <section className={styles.section}>
-                <h3 className={styles.sectionTitle}>発送後に届く案内</h3>
+                <DetailSectionTitle>発送後に届く案内</DetailSectionTitle>
                 {detail.followUps.length === 0 ? <p className={styles.empty}>予約されている案内はありません。</p> : (
                   <ul className={styles.timeline}>
                     {detail.followUps.map((job) => {
@@ -316,6 +317,8 @@ export default function OrderDrawer({
               </section>
             </>
           )}
-    </Drawer>
+
+</DetailContent>
+</Drawer>
   )
 }

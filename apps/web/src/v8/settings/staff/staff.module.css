@@ -399,7 +399,7 @@
 
 .selfSecurityCard {
   width: 100%;
-  max-width: 288px;
+  max-width: var(--tpl-sa-self-security-max-width);
   margin-inline-start: auto;
   gap: var(--polish-space-row);
 }
@@ -407,9 +407,9 @@
 .selfSecurityTitle {
   margin: 0;
   color: var(--color-ink);
-  font-size: 17px;
+  font-size: var(--tpl-sa-self-security-title-size);
   font-weight: 700;
-  line-height: 24px;
+  line-height: var(--tpl-sa-self-security-title-line-height);
 }
 
 .securityState {
@@ -440,7 +440,7 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--polish-space-row);
-  min-height: 59px;
+  min-height: var(--tpl-sa-passkey-row-min-height);
   padding: var(--polish-space-row);
   border: 1px solid var(--card-edge);
   border-radius: var(--radius-control);
@@ -451,7 +451,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  gap: 2px;
+  gap: var(--tpl-sa-passkey-meta-gap);
   font-size: var(--text-micro);
 }
 
