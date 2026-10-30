@@ -1,6 +1,6 @@
 'use client'
 
-import { useStaffRole, canManageRole } from '@/lib/staff-role'
+import { effectiveStaffRole, useStaffIdentity, canManageRole } from '@/lib/staff-role'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -102,7 +102,8 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   useSettingsNavInline(inline)
   const pathname = usePathname() ?? ''
   const { selectedAccountId } = useAccount()
-  const staffRole = useStaffRole()
+  const staffIdentity = useStaffIdentity()
+  const staffRole = effectiveStaffRole(staffIdentity)
   const [staffPermissions, setStaffPermissions] = useState<string[]>([])
   const [staffViewPermissions, setStaffViewPermissions] = useState<string[]>([])
   const [visibility, setVisibility] = useState<Record<string, boolean> | null>(null)
@@ -155,7 +156,7 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
    */
   const itemVisible = (item: MenuItem): boolean => {
     if ((item.href === '/staff' || item.href === '/settings/customer-look') && !canManageRole(staffRole)) return false
-    if (item.href === '/accounts' && staffRole === 'staff') return false
+    if (item.href === '/accounts' && (staffRole === 'staff' || staffIdentity?.accountScope !== 'all')) return false
     const permissionKey = item.permissionKey ?? item.href
     if (staffRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
     const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
@@ -172,7 +173,10 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   const items = SETTINGS_ORDER
     .map((href) => byHref.get(href))
     .filter((item): item is MenuItem => Boolean(item))
-    .filter((item) => itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item))
+    .filter((item) => {
+      if (item.href === '/accounts' && staffIdentity?.accountScope !== 'all') return false
+      return itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item)
+    })
 
   const entries: SettingsMenuEntry[] = items.flatMap((item) => {
     const active = item.href === '/settings'

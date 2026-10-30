@@ -60,7 +60,7 @@ describe('★V8 設定の中のメニュー', () => {
     })
     window.localStorage.clear()
     window.localStorage.setItem('lh_staff_role', 'owner')
-    rememberStaffIdentity({ role: 'owner' } as StaffMember)
+    rememberStaffIdentity({ role: 'owner', accountScope: 'all' } as StaffMember)
   })
 
   afterEach(() => { cleanup(); vi.unstubAllEnvs() })
@@ -81,6 +81,7 @@ describe('★V8 設定の中のメニュー', () => {
 
   // 2026-10-06：設定の板（ ほか 8 枚）の並びへ。見出し「設定」・印つき・プール管理あり・「専用」の小見出しなし。
   it('絵の並びで出す：はじめの設定・LINEアカウント・プール管理・ログインユーザー・機能設定・運用状態・EC連携・LINE通知（SNS 連携は末尾）', async () => {
+    rememberStaffIdentity({ role: 'owner', accountScope: 'all' } as StaffMember)
     fixture.visibility.mockResolvedValue({
       success: true,
       data: { features: { ec_commerce: true, line_notifications: true, multi_store_hierarchy: true } },
@@ -109,6 +110,14 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.queryByText('専用')).toBeNull()
     // 「会社とロゴ」は API ができるまで出さない
     expect(view.queryByText('会社とロゴ')).toBeNull()
+  })
+
+  it('店舗に所属する管理者の設定メニューにLINEアカウント管理を出さない', async () => {
+    rememberStaffIdentity({ role: 'admin', accountScope: 'accounts' } as StaffMember)
+    const view = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(view.queryByRole('link', { name: 'LINEアカウント' })).toBeNull()
+    expect(view.getByRole('link', { name: '機能設定' })).toBeTruthy()
   })
 
   // 2026-10-12：デリバリー連携（承認案 DL-1 `dF4Ov`）を予約サイト・グルメ媒体の下に足した

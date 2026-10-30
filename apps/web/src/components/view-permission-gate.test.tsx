@@ -82,7 +82,7 @@ it.each([
 
 it('別名のクエリは所属先の鍵で判断し、必須メニューの迂回を許さない', () => {
   nav.path = '/accounts'; nav.search = 'tab=migration&from=sidebar'
-  signIn({ role: 'staff', permissionKeys: [], permissionViewKeys: ['/friends'] })
+  signIn({ role: 'staff', accountScope: 'all', permissionKeys: [], permissionViewKeys: ['/friends'] })
   gate()
   expect(screen.getByText('一覧の中身')).toBeTruthy()
   cleanup()
@@ -175,7 +175,7 @@ it('別画面のクエリを付けても担当者用でないアカウント詳�
 
 it('UID移行からURLのタブを外すとアカウント一覧はマウントせず、移行へ戻れば再び読める', () => {
   nav.path = '/accounts'; nav.search = 'tab=migration'
-  signIn({ role: 'staff', permissionKeys: [], permissionViewKeys: ['/friends'] })
+  signIn({ role: 'staff', accountScope: 'all', permissionKeys: [], permissionViewKeys: ['/friends'] })
   const view = render(<ViewPermissionGate><AccountsPage /></ViewPermissionGate>)
   expect(screen.getByText('UID移行')).toBeTruthy()
   nav.search = ''
@@ -185,6 +185,25 @@ it('UID移行からURLのタブを外すとアカウント一覧はマウント�
   nav.search = 'tab=migration'
   view.rerender(<ViewPermissionGate><AccountsPage /></ViewPermissionGate>)
   expect(screen.getByText('UID移行')).toBeTruthy()
+})
+
+it.each(['/accounts', '/accounts/detail', '/accounts/new', '/accounts/handover'])('店舗内で作成された管理者は %s を直接開いても中身を開始しない', path => {
+  nav.path = path
+  nav.search = path === '/accounts' ? 'tab=migration' : ''
+  signIn({ role: 'admin', accountScope: 'accounts', permissionKeys: ['/accounts'], permissionViewKeys: ['/accounts'] })
+  const mounted = vi.fn()
+  function Directory() { React.useEffect(mounted, []); return <p>アカウント管理</p> }
+  render(<ViewPermissionGate><Directory /></ViewPermissionGate>)
+  expect(screen.getByText('LINEアカウントの管理は統括のメンバーが行います。')).toBeTruthy()
+  expect(screen.queryByText('アカウント管理')).toBeNull()
+  expect(mounted).not.toHaveBeenCalled()
+})
+
+it('統括に所属する管理者はLINEアカウント一覧を開ける', () => {
+  nav.path = '/accounts'
+  signIn({ role: 'admin', accountScope: 'all' })
+  gate()
+  expect(screen.getByText('一覧の中身')).toBeTruthy()
 })
 
 it('自動で改訂下書きを作る入口だけは事前に止め、保存済み下書きの閲覧は維持する', () => {

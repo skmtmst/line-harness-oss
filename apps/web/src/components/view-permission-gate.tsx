@@ -3,8 +3,7 @@
 import { Suspense, useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { HQ_MENU_SECTIONS, MENU_SECTIONS, isHqShellPath, menuOwnerForScreen, type MenuItem } from '@/lib/menu'
-import { canManageRole, loadStaffIdentity, useStaffRole } from '@/lib/staff-role'
-import { readStaffIdentity } from '@/lib/staff-identity-state'
+import { canManageRole, effectiveStaffRole, loadStaffIdentity, useStaffIdentity } from '@/lib/staff-role'
 import { canEditFeature, canViewFeature } from '@/lib/staff-capability'
 import { readPermissionSessionSnapshot as readSessionSnapshot, SESSION_SNAPSHOT_CHANGED } from '@/lib/session-snapshot'
 import TargetMissing from '@/components/shared/target-missing'
@@ -47,7 +46,8 @@ function CheckingPermission({ failed = false, onRetry }: { failed?: boolean; onR
 function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '/'
   const search = useSearchParams()?.toString() ?? ''
-  const role = useStaffRole()
+  const staffIdentity = useStaffIdentity()
+  const role = effectiveStaffRole(staffIdentity)
   const session = useSyncExternalStore(subscribeSession, readSessionSnapshot, serverSession)
   const [failed, setFailed] = useState(false)
   const [attempt, setAttempt] = useState(0)
@@ -64,8 +64,14 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
   // 本人の権限が分かるまで子をマウントせず、自動下書きや読込を始めさせない。
   if (role === null) return <CheckingPermission failed={failed} onRetry={() => setAttempt(value => value + 1)} />
 
+  // LINEアカウントの管理画面は統括の所属だけ。店舗の管理者でもURLから開けない。
+  if ((pathname === '/accounts' || pathname.startsWith('/accounts/')) && staffIdentity?.accountScope !== 'all') return <PageFrame kind="detail">
+    <PageHeading title="LINEアカウント" />
+    <TargetMissing kind="forbidden" title="この画面を見る権限がありません" description="LINEアカウントの管理は統括のメンバーが行います。" backHref="/" backLabel="ダッシュボードへ" />
+  </PageFrame>
+
   const items = menuItemsForPath(pathname, search)
-  const signedInRole = readStaffIdentity()?.role ?? role
+  const signedInRole = staffIdentity?.role ?? role
   const canRead = (item: MenuItem) => {
     if (item.href === '/staff' && !canManageRole(signedInRole)) return false
     if (item.href === '/accounts' && signedInRole === 'staff') return false
