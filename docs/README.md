@@ -1027,3 +1027,5 @@
 - [SNS接続の表記](release-log/unreleased/1986-masato-sns-connection-labels.md) — 反映履歴。
 
 - [失敗した時の案内](release-log/unreleased/0000-kenta-japanese-error-details.md) — 保存・削除などの失敗理由の日本語表示。
+
+- [フォルダを作れない理由の表示](release-log/unreleased/0000-kenta-folder-create-errors.md)
