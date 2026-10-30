@@ -1,6 +1,6 @@
-import { api, bookingApi, eventsApi } from '@/lib/api'
 import { styleApi } from '@/lib/api/helpers/styles'
-import { restaurantTestApi } from '@/lib/restaurant-test-api'
+import { api, bookingApi, eventsApi } from '@/lib/api'
+import { loadRestaurantSetupProgress, unknownRestaurantSetup } from './restaurant-setup-progress'
 import type { AccountStyle } from '@line-crm/shared'
 import type { StyleSetupProgress } from '@/v8/settings/public/getting-started-steps/index'
 
@@ -12,32 +12,16 @@ const either = (values: Array<boolean | null>): boolean | null => values.include
 const read = async <T,>(load: () => Promise<T>): Promise<T | null> => { try { return await load() } catch { return null } }
 
 export function unknownStyleSetupProgress(style: AccountStyle, reason = '設定を確かめています'): StyleSetupProgress {
+  if (style === 'restaurant') return unknownRestaurantSetup(reason)
   return { style, steps: Object.fromEntries(['attributes', 'friendAdd', 'scenario'].map(key => [key, { complete: null, reason }])) }
 }
 
 /** 実設定のGETだけを読む。タグ・配信の済みや友だち総数を業種の設定へ代用しない。 */
-export async function loadStyleSetupProgress(accountId: string, style: AccountStyle): Promise<StyleSetupProgress> {
+export async function loadStyleSetupProgress(accountId: string, style: AccountStyle, storeId?: string | null): Promise<StyleSetupProgress> {
   if (style === 'standard') return { style, steps: {} }
   if (style === 'restaurant') {
-    const response = await read(() => restaurantTestApi.snapshot(accountId, { limit: 1 }))
-    if (!response?.success || !Array.isArray(response.data.stores) || !Array.isArray(response.data.tables) || !Array.isArray(response.data.menuItems) || !Array.isArray(response.data.inventory)) {
-      return unknownStyleSetupProgress(style, 'お店の設定を読み込めていません')
-    }
-    const data = response.data
-    const stores = data.stores.filter(store => store.line_account_id === accountId && store.status === 'active')
-    const hasTables = (storeId: string) => data.tables.some(table => table.store_id === storeId && table.is_active === 1 && table.max_capacity > 0)
-    const hasMenu = data.menuItems.some(menu => stores.some(store => store.id === menu.store_id) && menu.status === 'active')
-    const reception = await Promise.all(stores.map(async store => {
-      if (!hasTables(store.id) || store.line_status !== 'connected' || !data.inventory.some(slot => slot.store_id === store.id && slot.line_capacity > 0 && slot.total_capacity > 0)) return false
-      const hours = await read(() => restaurantTestApi.openingHours(accountId, store.id))
-      if (!hours?.success || (hours.data.hours !== null && !Array.isArray(hours.data.hours))) return null
-      return Boolean(hours.data.hours?.some(day => Array.isArray(day.periods) && day.periods.some(period => /^\d{2}:\d{2}$/.test(period.opensAt) && /^\d{2}:\d{2}$/.test(period.closesAt) && period.opensAt !== period.closesAt)))
-    }))
-    return { style, steps: {
-      attributes: evidence(stores.some(store => hasTables(store.id)), '有効な卓と席を登録してください'),
-      friendAdd: evidence(hasMenu, 'コースとメニューを登録してください'),
-      scenario: evidence(either(reception), reception.includes(null) ? '予約受付の営業時間を読み込めていません' : 'LINEの受付枠と営業時間を用意してください'),
-    } }
+    try { return await loadRestaurantSetupProgress(accountId, storeId) }
+    catch { return unknownRestaurantSetup('店舗の設定を読み込めませんでした。もう一度読み直してください') }
   }
   if (style === 'salon' || style === 'consult') {
     const [menusResponse, staffResponse, settingsResponse, accountResponse] = await Promise.all([

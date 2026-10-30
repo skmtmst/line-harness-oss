@@ -128,3 +128,5 @@ export type { StarterCatalogKind, StarterCatalogSelection, StarterCatalogDefinit
 export { zonedWallTime } from './zoned-time.js';
 export { parseAutomationWait, nextDayWaitAt, automationWaitLabel } from './automation-wait.js';
 export type { AutomationWait } from './automation-wait.js';
+
+export type { RestaurantSetupProgress } from './restaurant-setup-progress.js';

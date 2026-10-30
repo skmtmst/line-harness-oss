@@ -1,4 +1,5 @@
-import { cancelV6RemindersForSource, enrollFriendInReminder, rescheduleV6RemindersForSource } from '@line-crm/db';
+import { readFollowupEngineGate } from './restaurant-followup-engine-approval.js';
+import { cancelV6RemindersForSource, enrollFriendInReminder, rescheduleV6RemindersForSource, type V6WriteGuard } from '@line-crm/db';
 import { reservationInstant } from '@line-crm/shared';
 import type { RestaurantEvent } from './restaurant-event-types.js';
 
@@ -7,6 +8,7 @@ interface ReminderTarget {
   reminder_id: string;
   version: number;
   approved_version_id: string;
+  approved_content_hash: string;
   timezone: string;
 }
 
@@ -23,11 +25,11 @@ export const restaurantReminderTargetGate = `EXISTS (
  AND json_extract(CASE WHEN json_valid(fa.payload_json) THEN fa.payload_json ELSE '{}' END,'$.operation')='start_restaurant_followup_engines'
  AND json_extract(CASE WHEN json_valid(fa.payload_json) THEN fa.payload_json ELSE '{}' END,'$.lineAccountId')=fs.line_account_id
  AND EXISTS(SELECT 1 FROM json_each(CASE WHEN json_valid(fa.payload_json) THEN fa.payload_json ELSE '{}' END,'$.targets') approved
-  WHERE json_extract(approved.value,'$.trigger')=ft.trigger
-  AND json_extract(approved.value,'$.engine')=ft.engine
-  AND json_extract(approved.value,'$.targetId')=ft.reminder_id
-  AND json_extract(approved.value,'$.versionId')=ft.approved_version_id
-  AND json_extract(approved.value,'$.contentHash')=ft.approved_content_hash)
+  WHERE json_extract(CASE WHEN json_valid(approved.value) THEN approved.value ELSE '{}' END,'$.trigger')=ft.trigger
+  AND json_extract(CASE WHEN json_valid(approved.value) THEN approved.value ELSE '{}' END,'$.engine')=ft.engine
+  AND json_extract(CASE WHEN json_valid(approved.value) THEN approved.value ELSE '{}' END,'$.targetId')=ft.reminder_id
+  AND json_extract(CASE WHEN json_valid(approved.value) THEN approved.value ELSE '{}' END,'$.versionId')=ft.approved_version_id
+  AND json_extract(CASE WHEN json_valid(approved.value) THEN approved.value ELSE '{}' END,'$.contentHash')=ft.approved_content_hash)
 )`;
 
 /** 予約IDを保った登録・変更・取消。日数と時刻の解釈は既存リマインダに任せる。 */
@@ -48,14 +50,14 @@ export async function syncRestaurantReminderTargets(db: D1Database, event: Resta
   const friend = await db.prepare('SELECT id FROM friends WHERE id=? AND line_account_id=? AND line_user_id=? AND is_following=1 AND is_hidden=0')
     .bind(event.friend_id,event.line_account_id,reservation.line_uid).first();
   if (!friend) return;
-  const targets = await db.prepare(`SELECT ft.trigger,ft.reminder_id,ft.version,ft.approved_version_id,s.timezone
+  const targets = await db.prepare(`SELECT ft.trigger,ft.reminder_id,ft.version,ft.approved_version_id,ft.approved_content_hash,s.timezone
     FROM rt_store_followup_targets ft JOIN rt_stores s ON s.id=ft.store_id
     WHERE ft.store_id=? AND ft.engine='reminder' AND ft.trigger IN ('reservation_24h','reservation_2h')`)
     .bind(event.store_id).all<ReminderTarget>();
   const targetDate = new Date(reservationInstant(reservation.starts_at)).toISOString();
   for (const target of targets.results) {
     const binds = [event.store_id,target.trigger,target.version,event.line_account_id,target.approved_version_id];
-    const writeGuard = {sql:`${restaurantReminderTargetGate} AND ${reservationGuard.sql}`,binds:[...binds,...reservationGuard.binds]};
+    let writeGuard:V6WriteGuard = {sql:`${restaurantReminderTargetGate} AND ${reservationGuard.sql}`,binds:[...binds,...reservationGuard.binds]};
     // 同じ人の同時刻の別予約と、同じ予約の別の送り方を別々に保つ。
     const sourceEventId = `restaurant:${event.store_id}:${target.trigger}:${event.reservation_id}`;
     const existing = await db.prepare(`SELECT id,target_date,status FROM friend_reminders
@@ -69,10 +71,14 @@ export async function syncRestaurantReminderTargets(db: D1Database, event: Resta
       continue;
     }
     if (!await db.prepare(`SELECT 1 WHERE ${restaurantReminderTargetGate}`).bind(...binds).first()) continue;
+    const approval=await readFollowupEngineGate(db,{engine:'reminder',targetId:target.reminder_id,lineAccountId:event.line_account_id,versionId:target.approved_version_id});
+    if(!approval.managed||!approval.allowed)continue;
+    writeGuard={sql:`(${writeGuard.sql}) AND (${approval.guard.sql})`,binds:[...writeGuard.binds,...approval.guard.binds]};
     try {
       await enrollFriendInReminder(db,{
         friendId:event.friend_id,reminderId:target.reminder_id,targetDate,
         sourceKind:source.sourceKind,sourceId:event.reservation_id,sourceEventId,timezone:target.timezone,
+        sourceFingerprint:target.approved_content_hash,
         writeGuard,
       });
     } catch (error) {

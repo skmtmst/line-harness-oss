@@ -1,3 +1,8 @@
+import { readRestaurantAutomationDeliveryGate } from '../../services/restaurant-automation-delivery-gate.js';
+import { restaurantBookingVariables, substituteRestaurantBooking } from '../../services/restaurant-booking-context.js';
+import { expandVariables } from '../../services/message-interpolation.js';
+import { resolveMetadata } from '../../services/step-metadata.js';
+import { resolveSendInterpolationExtra } from '../../services/interpolation-context.js';
 import type { EventDispatcher } from '../../services/event-payload.js';
 import { tracedFetch as fetch } from '@line-crm/shared/server';
 import { classifyLinePushError } from './automation-line-errors.js';
@@ -6,6 +11,7 @@ import { patchFriendMetadata } from '../friends/friend-metadata/index.js';
 import {
   addTagToFriend,
   getLineAccountById,
+  getFriendById,
   getSupportMarkById,
   jstNow,
   removeTagFromFriend,
@@ -204,6 +210,7 @@ function strictMessage(type: string, content: string, altText?: string): Message
 
 async function resolveMessage(
   context: AutomationActionContext,
+  approvedTemplates?: ReadonlyMap<string,{message_type:string;message_content:string;message_bubbles_json:string|null}>,
 ): Promise<{ type: string; content: string; altText?: string }> {
   const templateId = context.action.params.templateId ?? context.action.params.template_id;
   if (templateId !== undefined) {
@@ -211,11 +218,11 @@ async function resolveMessage(
     await requireScopedResource(context, {
       table: 'templates', id, code: 'template_not_found', label: 'テンプレート',
     });
-    const template = await context.db.prepare(
+    const template = approvedTemplates ? approvedTemplates.get(id) : await context.db.prepare(
       `SELECT message_type, message_content FROM templates
         WHERE id = ? AND line_account_id = ? AND message_bubbles_json IS NULL`,
     ).bind(id, context.lineAccountId).first<{ message_type: string; message_content: string }>();
-    if (!template) throw invalid('template_not_found', 'テンプレートが見つかりません');
+    if (!template || ('message_bubbles_json' in template && template.message_bubbles_json)) throw invalid('template_not_found', 'テンプレートが見つかりません');
     return {
       type: template.message_type,
       content: template.message_content,
@@ -370,20 +377,33 @@ async function sendMessageExecutor(
   context: AutomationActionContext,
   dependencies: AutomationActionExecutorDependencies,
 ): Promise<{ output: Record<string, unknown> }> {
+  const initialGate=await readRestaurantAutomationDeliveryGate(context.db,context.runId,dependencies.now?.()??jstNow(),context);
+  if(!initialGate.allowed)throw invalid(initialGate.reason,'予約または承認の内容が変わったため送信できません');
   const friend = await requireFriend(context);
   if(await isFriendDeliverySuppressed(context.db,friend.id)) throw invalid('delivery_consent_suppressed','配信停止・同意の状態により送信できません');
-  const resolved = await resolveMessage(context);
+  const resolved = await resolveMessage(context,initialGate.approval.managed?initialGate.approval.snapshot.templates:undefined);
   // テンプレート/直接本文に {{var.*}} が書かれていても、この経路は従来
   // 差し込みを展開せず生のまま送っていた。消えた共通情報は fail-closed で
   // 止め、解決できるものは送信時点の値へ置き換える。
   let content: string;
   try {
     const { expandSendCommonVars } = await import('../../services/interpolation-context.js');
-    content = await expandSendCommonVars(
-      context.db, resolved.content,
-      { kind: 'automation', id: context.action.id },
-      { lineAccountId: context.lineAccountId, messageType: resolved.type },
-    );
+    if(initialGate.source.restaurant){
+      const body=substituteRestaurantBooking(resolved.content,initialGate.source.context);
+      const vars=restaurantBookingVariables(initialGate.source.context);
+      const scanned=body.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g,(match,key:string)=>key in vars?'':match);
+      const fullFriend=await getFriendById(context.db,friend.id);
+      if(!fullFriend)throw invalid('friend_not_found','対象の友だちが見つかりません');
+      const extra=await resolveSendInterpolationExtra(context.db,friend.id,scanned,{kind:'automation',id:context.action.id});
+      content=expandVariables(body,{...fullFriend,metadata:await resolveMetadata(context.db,fullFriend)},undefined,resolved.type,
+        {...extra,vars:{...extra.vars,...vars},deliveredAt:new Date(dependencies.now?.()??jstNow())});
+    }else{
+      content = await expandSendCommonVars(
+        context.db, resolved.content,
+        { kind: 'automation', id: context.action.id },
+        { lineAccountId: context.lineAccountId, messageType: resolved.type },
+      );
+    }
   } catch (error) {
     const { CommonVarResolutionFailedError } = await import('../../services/interpolation-context.js');
     if (error instanceof CommonVarResolutionFailedError) {
@@ -405,6 +425,16 @@ async function sendMessageExecutor(
   // 呼び出し前の失敗（resolve・検証・予約）は未送信の失敗、
   // 呼び出し後の失敗（受理不明・記録失敗）は照合待ちにする。
   // まとめて分類すると、受理済みの送信を未送信として返却・再送する。
+  const finalGate=await readRestaurantAutomationDeliveryGate(context.db,context.runId,dependencies.now?.()??jstNow(),context);
+  if(!finalGate.allowed)throw invalid(finalGate.reason,'予約または承認の内容が変わったため送信できません');
+  if(finalGate.approval.managed||finalGate.source.restaurant){
+    const right=await context.db.prepare(`UPDATE automation_run_steps SET lease_expires_at=lease_expires_at
+      WHERE id=? AND status='running' AND automation_run_id=?
+        AND EXISTS(SELECT 1 FROM automation_runs WHERE id=? AND status='running' AND automation_version_id=?)
+        AND (${initialGate.guard.sql}) AND (${finalGate.guard.sql})`)
+      .bind(context.stepExecutionId,context.runId,context.runId,context.automationVersionId,...initialGate.guard.binds,...finalGate.guard.binds).run();
+    if(right.meta.changes!==1)throw invalid('restaurant_source_changed','予約または承認の内容が変わったため送信できません');
+  }
   let response: unknown;
   try {
     response = await client.pushMessage(friend.line_user_id, [message], context.idempotencyKey);

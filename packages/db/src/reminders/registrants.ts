@@ -16,6 +16,8 @@ export async function enrollFriendInReminder(
     sourceId?: string | null;
     sourceEventId?: string | null;
     timezone?: string;
+    /** 起点で承認した内容の指紋。登録後に承認が替わっても既存の通へ引き継がない。 */
+    sourceFingerprint?: string;
     /** 指定時は親の版が動いていたら書かず V6_WRITE_GUARDED を投げる。 */
     writeGuard?: V6WriteGuard;
   },
@@ -81,7 +83,9 @@ export async function enrollFriendInReminder(
     input.friendId,
     input.reminderId,
     versionId,
-    templateSnapshot,
+    input.sourceFingerprint
+      ? JSON.stringify({ ...JSON.parse(templateSnapshot ?? '{}'), __source: { fingerprint: input.sourceFingerprint } })
+      : templateSnapshot,
     input.targetDate,
     input.sourceKind ?? 'manual',
     input.sourceId ?? null,
