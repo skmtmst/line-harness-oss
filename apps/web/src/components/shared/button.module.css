@@ -296,7 +296,7 @@ html:root :is([data-toolbar-row], [data-control-row]) .button { height: var(--co
 :root .button[data-presentation='restaurant']{font-size:13px;line-height:20px;font-weight:var(--tpl-button-weight);padding-inline:16px;}
 }
 /* ：共通ボタンを選ぶ札として使う画面も同じ形。 */
-html:root .button:not([data-part='row-name']):not([data-part='attention-star']):not([data-part='folder-row']):not([data-part='joined-segment']):not([data-part='funnel-row'])[aria-pressed='true'] { background: var(--polish-selection-bg); color: var(--polish-selection-ink); border-color: var(--polish-selection-ink); box-shadow: var(--polish-selection-shadow); }
+html:root .button:not([data-permission-locked]):not([data-part='row-name']):not([data-part='attention-star']):not([data-part='folder-row']):not([data-part='joined-segment']):not([data-part='funnel-row'])[aria-pressed='true'] { background: var(--polish-selection-bg); color: var(--polish-selection-ink); border-color: var(--polish-selection-ink); box-shadow: var(--polish-selection-shadow); }
 
 :root .button[data-full-width] { width: 100%; justify-content: center; text-align: center; }
 
@@ -317,7 +317,7 @@ html:root .button.filterActive { outline: 1px solid var(--color-focus-ring); col
 :root .button.text:hover:not(:disabled) { text-decoration: underline; }
 html:root .button.filterActive { outline-color: var(--color-control-border); color: var(--color-ink); }
 
-:root .button.secondary[aria-pressed='true']:not([data-presentation]) { background: var(--polish-selection-bg); color: var(--polish-selection-ink); }
+:root .button.secondary:not([data-permission-locked])[aria-pressed='true']:not([data-presentation]) { background: var(--polish-selection-bg); color: var(--polish-selection-ink); }
 
 /* 明示された危険・成功の文字色は、文字だけの操作でも保持する。 */
 :root .button.inline.text.textDanger { color: var(--color-danger); }
@@ -426,6 +426,7 @@ html:root .button[data-permission-locked], html:root .button[data-permission-loc
 html:root .button.primary[data-permission-locked]:not(:focus-visible) {
   outline-color: var(--color-field-border);
 }
+html:root .button[data-permission-locked][aria-pressed='true']:not(:focus-visible) { outline: var(--choice-card-ring) solid var(--color-ink-secondary); }
 .conditionCount {
   display: inline-flex;
   align-items: center;
