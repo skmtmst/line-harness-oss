@@ -20,7 +20,7 @@ import { ActionCell,DataTable,TableHeadRow,Td,Th,Tr } from '@/components/shared/
 import { TextField } from '@/components/shared/text-field'
 import StepUpPrompt from '@/components/step-up-prompt'
 import { ListPage } from '@/components/templates'
-import { Check,Coins,Gift,Wallet,KeyRound,LayoutTemplate,Plus } from 'lucide-react'
+import { Coins,Gift,Wallet,KeyRound,LayoutTemplate,Plus } from 'lucide-react'
 import { SCOPES } from './api-token-words'
 import { formatDate as polishFormatDate } from '@/lib/format'
 import styles from './api-tokens.module.css'
@@ -139,13 +139,7 @@ export default function WebhooksApiTokensV8() {
           designTop={220}
           designNode="UkZLi"
           onCancel={() => setIssued(null)}
-          footer={(
-            <div className={styles.issuedFooter}>
-              <Button variant="primary" onClick={() => setIssued(null)}>
-                <Check size={16} aria-hidden="true" />写したので閉じる
-              </Button>
-            </div>
-          )}
+
         >
           {issued ? (
             <div className={styles.issuedBody}>
