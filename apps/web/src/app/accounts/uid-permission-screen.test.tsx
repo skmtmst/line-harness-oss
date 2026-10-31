@@ -5,6 +5,7 @@ import type { StaffMember } from '@line-crm/shared'
 import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
 import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import { deferred } from '@/test-utils/race'
+import { pickEntity } from '@/components/shared/entity-picker-test-helpers'
 
 const fixture = vi.hoisted(() => ({ runs: [] as object[], me: vi.fn(), write: vi.fn(), get: vi.fn(), download: vi.fn() }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams(), usePathname: () => '/friends/migrations' }))
@@ -38,6 +39,11 @@ afterEach(async () => { cleanup(); pendingMe.resolve({ success: false, error: '�
 
 for (const [entry, Page] of [['旧入口', Legacy], ['友だち入口', () => <Current initialRunId={null} />]] as const) {
   describe(entry, () => {
+    async function prepareValidRegistration() {
+      await pickEntity('移行先アカウント', '移行先')
+      await act(async () => fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [csvFile()] } }))
+      await screen.findByRole('button', { name: '「対応表.csv」を外す' })
+    }
     it.each(['viewer', 'staff', 'read-proxy'] as const)('%sも同じ入力と灰色の登録を保ち、書込0・帯1', async role => {
       rememberStaffIdentity(identity(role === 'read-proxy' ? 'owner' : role))
       if (role === 'read-proxy') rememberSessionSnapshot({ stepUpMethod: 'totp', unfamiliarAt: null, impersonation: { mode: 'read' } as never })
@@ -89,6 +95,8 @@ for (const [entry, Page] of [['旧入口', Legacy], ['友だち入口', () => <C
       fireEvent.click(create)
       expect(fixture.write).not.toHaveBeenCalled()
       act(() => rememberStaffIdentity(identity('owner')))
+      await waitFor(() => expect((screen.getByRole('button', { name: '移行先アカウント' }) as HTMLButtonElement).disabled).toBe(false))
+      await prepareValidRegistration()
       await waitFor(() => expect(create.disabled).toBe(false))
       expect(container.querySelectorAll('[data-read-only-notice]')).toHaveLength(0)
     })
@@ -127,6 +135,7 @@ for (const [entry, Page] of [['旧入口', Legacy], ['友だち入口', () => <C
         expect(create.hasAttribute('data-permission-locked')).toBe(false)
         fireEvent.click(create)
       }
+      await prepareValidRegistration()
       for (const name of ['移行元アカウント', '移行先アカウント', 'CSVをアップロード', 'テスト移行を実行', 'OLD の引き継ぎ方']) {
         const control = screen.getByRole('button', { name }) as HTMLButtonElement
         expect(control.disabled).toBe(false)

@@ -314,7 +314,7 @@ export function useStyleDashboard(style: IndustryStyle) {
       try { await eventsApi.updateBooking(accountId, m.eventId!, m.bookingId!, { status }) } catch { failedCount += 1 }
     }
     setBusy('')
-    const word = status === 'attended' ? '出席' : '欠席'
+    const word = status === 'attended' ? '出席' : '無断欠席'
     notifyToast(failedCount ? `${formatNumber(failedCount)}人を${word}にできませんでした。` : `${word}にしました。`, failedCount ? { tone: 'error' } : undefined)
     setRosterId(r.rowId)
     setRosterRevision(value => value + 1)
@@ -363,7 +363,7 @@ export function useStyleDashboard(style: IndustryStyle) {
   }
 
 
- return { cfg, router, pathname, params, tab, view, range, subTab, days, selectedAccountId, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, data, setData, failed, setFailed, analytics, setAnalytics, analyticsFailed, setAnalyticsFailed, layout, setLayout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics: data?.kpis ?? fallback?.kpis ?? [], viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, setFloor, loadedAt, setLoadedAt, store, tables, setParam, staffId, compareParam, load, loadAnalytics, cardDefaults, setCardDefaults, roster, setRoster, rosterRow, fallback, restaurantBand, today, preparing, openPayment, reload, asOf, hours, subtitle, openRow, version, run, bookingId, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, setTestMode, alertAction, attend, KIND, saveClosure, addNew }
+ return { cfg, router, pathname, params, tab, view, range, subTab, days, selectedAccountId, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, data, setData, failed, setFailed, analytics, setAnalytics, analyticsFailed, setAnalyticsFailed, layout, setLayout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics: data?.kpis ?? fallback?.kpis ?? [], viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, setFloor, loadedAt, setLoadedAt, store, tables, setParam, staffId, compareParam, load, loadAnalytics, cardDefaults, setCardDefaults, roster, setRoster, rosterRow, fallback, restaurantBand, today, preparing, openPayment, reload, asOf, hours, subtitle, openRow, version, run, bookingId, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, setTestMode, alertAction, attend, reloadRoster: () => { setRosterRevision(value => value + 1); void load() }, KIND, saveClosure, addNew }
 }
 
 import { COMPARE } from './dashboard-options'
