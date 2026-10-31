@@ -319,10 +319,10 @@ export default function Confirm({
         </p>
       </div>
       )}
-      {(policy && policy.cardRequired !== false) || onlinePayment ? <PaymentPreparingNote /> : null}
       <PrivacyNote />
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
+        {(policy && (policy.cardRequired !== false || (policy.deposit?.amount ?? 0) > 0)) || onlinePayment ? <PaymentPreparingNote /> : null}
         <Button variant="primary" onClick={handleSubmit} disabled={submitting || !policyReady || missingMeetingMode || missingPaymentChoice || (policy !== null && !accepted)}>
           {submitting ? '送信中…'
             : policy?.deposit ? `${yen(policy.deposit.amount)}の試験で予約する`
