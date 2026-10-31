@@ -62,6 +62,12 @@ describe('フォームと権限',()=>{
 describe('テストと公開・承認',()=>{
  async function open(){await ready();fireEvent.click(within(card('reservation_created')).getByRole('button',{name:'試す・送り始める'}));await screen.findByRole('dialog')}
  it('本人のテスト成功後だけ、同じ指紋で公開と承認を呼ぶ',async()=>{await open();fireEvent.click(screen.getByRole('button',{name:'自分の LINE で試す'}));await screen.findByRole('button',{name:'この内容で送り始める'});expect(f.start).not.toHaveBeenCalled();fireEvent.click(screen.getByRole('button',{name:'この内容で送り始める'}));await waitFor(()=>expect(f.start).toHaveBeenCalledWith('a','s','reservation_created',1,'tested-hash'))})
+ it.each(['山田','山田さん','山田さま','山田様'])('テスト成功の宛先%sの敬称を重ねない',async recipientName=>{
+  f.test.mockResolvedValue({recipientName,recipientKind:'self',contentHash:'tested-hash',versionId:'tested-version',sent:1,replayed:false})
+  await open();fireEvent.click(screen.getByRole('button',{name:'自分の LINE で試す'}))
+  const name=recipientName==='山田'?'山田さん':recipientName
+  expect(await screen.findByText(`${name}へテスト送信できました。同じ版を公開し、承認してからお客さまへ送り始めます。`)).toBeTruthy()
+ })
  it('登録済みの別宛先を自分のLINEとは呼ばず、名前を見せる',async()=>{snapshot.board.testRecipient.recipientKind='registered';snapshot.board.testRecipient.recipient.displayName='登録した宛先';await open();expect(screen.queryByRole('button',{name:'自分の LINE で試す'})).toBeNull();expect(screen.getByRole('button',{name:'登録済みのテスト宛先で試す'})).toBeTruthy();expect(screen.getByText(/登録した宛先/)).toBeTruthy()})
  it('テスト失敗と結果不明の時は開始せず、不明な送信は繰り返さない',async()=>{f.test.mockRejectedValue(new ApiError(409,'送信結果を確認できません','delivery_unconfirmed'));await open();fireEvent.click(screen.getByRole('button',{name:'自分の LINE で試す'}));await screen.findByText(/送信結果が分からないため/);fireEvent.click(screen.getByRole('button',{name:'自分の LINE で試す'}));expect(f.test).toHaveBeenCalledTimes(1);expect(f.start).not.toHaveBeenCalled()})
  it('開始が競合した時に成功とは表示せず、理由を残す',async()=>{f.start.mockRejectedValue(new Error('公開する内容が変わりました。読み直してください'));await open();fireEvent.click(screen.getByRole('button',{name:'自分の LINE で試す'}));await screen.findByRole('button',{name:'この内容で送り始める'});fireEvent.click(screen.getByRole('button',{name:'この内容で送り始める'}));await screen.findByText('公開する内容が変わりました。読み直してください');expect(screen.queryByText('公開と承認が完了しました。この内容で送り始めます。')).toBeNull()})
