@@ -283,7 +283,7 @@ styles.get(base + '/starter-items', async (c) => {
         ) && !blockedConfirmation,
       // ごあいさつの公開・タグにする・シナリオを動かすは［まとめて動かす］に混ぜない。
       activationAllowed: !blockedConfirmation && !['form','friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind)),
-      href: item.kind==='form' ? `/forms/${encodeURIComponent(String(item.target_id))}` : item.kind === 'reminder' ? '/reminders' : item.kind === 'friend_add_rule' ? '/friend-add-settings' : item.kind === 'scenario' ? '/scenarios' : item.kind === 'tag_set' ? '/tags' : undefined,
+      href: item.kind==='form' ? `/form-submissions/edit?id=${encodeURIComponent(String(item.target_id))}&tab=basic` : item.kind === 'reminder' ? '/reminders' : item.kind === 'friend_add_rule' ? '/friend-add-settings' : item.kind === 'scenario' ? '/scenarios' : item.kind === 'tag_set' ? '/tags' : undefined,
       currentSnapshot: await resourceSnapshot(
         c.env.DB,
         a,
