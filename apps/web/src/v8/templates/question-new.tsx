@@ -317,7 +317,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
               <div key={choice.key ?? index} className={styles.choice}>
                 <div className={styles.choiceHead}>
                   <span className={styles.choiceNo}>{`選択肢 ${index + 1}`}</span>
-                  <Button type="button" variant="text" disabled={question.choices.length <= 1} title={question.choices.length <= 1 ? '選択肢は1つ以上必要です。' : undefined} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を削除する`}><Trash2 size={16} aria-hidden="true" />削除する</Button>
+                  <Button type="button" variant="text" textTone="danger" disabled={question.choices.length <= 1} title={question.choices.length <= 1 ? '選択肢は1つ以上必要です。' : undefined} onClick={() => removeChoice(index)} aria-label={`選択肢 ${index + 1} を削除する`}><Trash2 size={16} aria-hidden="true" />削除する</Button>
                 </div>
                 <Field label="ボタンの文字（20文字まで）" requirement={fields.requirement(`choice-${index}`)}><SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><TextField {...fields.bind(`choice-${index}`)} value={choice.label} maxLength={20} aria-invalid={fields.invalid(`choice-${index}`) || undefined} aria-describedby={fields.invalid(`choice-${index}`) ? `q-choice-${index}-error` : undefined} onChange={(event) => setChoice(index, { label: event.target.value })} /></SaveErrorField></Field>
                 <FieldError id={`q-choice-${index}-error`}>{fields.error(`choice-${index}`)}</FieldError>

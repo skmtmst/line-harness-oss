@@ -61,3 +61,20 @@ it('共通の選択肢のボタン名も20文字の入力上限を持ち、読�
   expect(label.maxLength).toBe(20)
   expect(label.value).toBe(long)
 })
+
+it('閉じた選択肢でも超過値の欄を開いて理由を出し、訂正すると消す', async () => {
+  for (const fn of [scope.tags, scope.fields, scope.scenarios]) fn.mockResolvedValue({ success: true, data: [] })
+  const long = { ...question, choices: [question.choices[0], { ...question.choices[1], label: 'あ'.repeat(25) }] }
+  const view = render(<QuestionEditor value={long} onChange={() => {}} />)
+  await act(async () => {})
+  const input = view.container.querySelector('input[id$="-choice-1-label"]') as HTMLInputElement
+  expect(input).toBeTruthy()
+  expect(input.getAttribute('aria-invalid')).toBe('true')
+  expect(document.getElementById(input.getAttribute('aria-describedby')!)?.textContent).toBe('ボタンの文字は20文字以内で入力してください。')
+  expect(input.value).toBe('あ'.repeat(25))
+  fireEvent.change(input, { target: { value: 'あ'.repeat(20) } })
+  view.rerender(<QuestionEditor value={{ ...long, choices: [long.choices[0], { ...long.choices[1], label: 'あ'.repeat(20) }] }} onChange={() => {}} />)
+  await act(async () => {})
+  expect(screen.queryByText('ボタンの文字は20文字以内で入力してください。')).toBeNull()
+  expect((view.container.querySelector('input[id$="-choice-1-label"]') as HTMLInputElement)?.value).toBe('あ'.repeat(20))
+})
