@@ -1092,5 +1092,3 @@
 - [検証環境の自動配備手順の反映履歴](release-log/unreleased/2017-masato-cf-staging-deploy-doc.md) — 反映履歴、確認 2026-10-31。
 - [反映履歴：フォームを離れる時の下書きの扱い](release-log/unreleased/0000-kenta-form-draft-leave.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [反映履歴：統括の回答フォームの保存と移動](release-log/unreleased/0000-kenta-form-hq-save-leave.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
-- [反映履歴：設定の入口を上段へ](release-log/unreleased/2014-masato-settings-entry-customer-look.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
-- [反映履歴：選択したアカウントの受信箱の件数](release-log/unreleased/2016-masato-inbox-account-badge.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。

@@ -8,7 +8,6 @@ import Button from '@/components/shared/button'
 import { emptyValue } from '@/components/shared/empty-value'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { STATE_TEXT } from '@/components/shared/not-connected'
 import Notice from '@/components/shared/notice'
 import PeriodPicker from '@/components/shared/period-picker'
@@ -22,11 +21,11 @@ import { canManageRole,useStaffRole } from '@/lib/staff-role'
 import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import ListState from '@/components/shared/list-state'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
+import { useSetupWizard } from '@/v8/onboarding/public/setup-wizard/index'
 import type { AccountStyle, DashboardCardId } from '@line-crm/shared'
 import { Calendar,Image as ImageIcon,Inbox,Package,Plus,SlidersHorizontal } from 'lucide-react'
 import dynamic from 'next/dynamic'
-import { useSearchParams } from 'next/navigation'
-import { Fragment,useEffect,useRef,useState,type ReactNode } from 'react'
+import { Fragment,useState,type ReactNode } from 'react'
 import { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 import styles from './dashboard.module.css'
 import { FirstStepsCard,FirstStepsFeedback,summarizeFirstSteps,useFirstSteps } from './first-steps'
@@ -49,8 +48,6 @@ export { canEditDashboardLayout,greeting,headline } from './dashboard-heading'
 /* はじめの質問の窓（xxpM9 ほか）も開くまで読まない。 */
 const EcSummary = dynamic(() => import('./ec-summary'))
 
-const StyleSetupWizard = dynamic(() => import('../onboarding/wizard/index').then((module) => module.default))
-
 const DashboardEditor = dynamic(() => import('./dashboard-editor').then((module) => module.default), {
   loading: () => <p className={styles.note}>編集パネルを読み込んでいます</p>,
 })
@@ -72,53 +69,20 @@ const ROW_VARIANT: Partial<Record<DashboardCardId, 'trend' | 'inbox' | 'link'>> 
 }
 
 export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? 'standard' }: { usageStyle?: 'standard' | 'ec'; accountStyle?: AccountStyle | null } = {}) {
-  const router = useRouter()
   const d = useDashboard(usageStyle)
   const role = useStaffRole()
   const { refreshAccounts } = useAccount()
   /* 役割が読めるまでは出し、閲覧のみと分かったら隠す（サーバの 403 が最後の守り）。 */
   const canManage = canManageRole(role)
   const canEditLayout = canEditDashboardLayout(role)
-  const params = useSearchParams()
-  const setupParam = params.get('setup')
-  const qrRequested = params.has('qr')
   /* 修正案 D-3：はじめにやること（今の「はじめの設定」の帯の場所に置き換える）。QR の窓の間は最初の1通を待って読み直す。 */
   /* 〜：はじめの質問の答え・警告の帯・はじめにやること（スタイルの口が読めたときだけ）。 */
   const setup = useStyleSetup(d.selectedAccountId, role)
+  const wizard = useSetupWizard(d.selectedAccountId, setup.data?.state, role, setup.reload)
+  const { openStep: openSetupStep, qrRequested } = wizard
   const start = useFirstSteps(d.selectedAccountId, role, { qrOpen: qrRequested, style: setup.data?.state.style ?? accountStyle })
   const starterResult = useStarterRetryResult(d.selectedAccountId)
   const setupRest = setupSummary(setup.data, !canManage)
-  const closedWizardAccount = useRef<string | null>(null)
-  const [wizardStep, setWizardStep] = useState<number | 'summary' | null>(null)
-  useEffect(() => {
-    setWizardStep(null)
-    closedWizardAccount.current = null
-  }, [d.selectedAccountId])
-  useEffect(() => {
-    if (setupParam === 'summary') setWizardStep('summary')
-    else if (setupParam !== null && /^\d+$/.test(setupParam)) setWizardStep(Number(setupParam))
-  }, [setupParam, d.selectedAccountId])
-  /* まだスタイルを選んでいない（あとでも選んでいない）アカウントは、最初に入ったとき 1 問目を開く。 */
-  useEffect(() => {
-    const state = setup.data?.state
-    /* 新規の印だけで案内する。過去の曖昧な「あとで」には表示しない。 */
-    if (!state || !canManage || state.styleSelected || !d.selectedAccountId || qrRequested || closedWizardAccount.current === d.selectedAccountId) return
-    if (state.shouldPromptStyleSelection !== true) return
-    setWizardStep((current) => current ?? 0)
-  }, [setup.data, canManage, d.selectedAccountId, qrRequested])
-  const openSetupStep = (step: string | number) => {
-    if (!canManage) return
-    if (typeof step === 'number') { setWizardStep(step); return }
-    const names = setup.data ? ['style', 'image'] : []
-    setWizardStep(step === 'summary' ? 'summary' : Math.max(0, names.indexOf(step)))
-  }
-  const closeWizard = (changed: boolean) => {
-    // 読み直しても未選択の状態は変えず、この画面で閉じた窓を自動では開き直さない。
-    closedWizardAccount.current = d.selectedAccountId
-    setWizardStep(null)
-    if (setupParam !== null) router.replace('/')
-    if (changed) setup.reload()
-  }
   const [openDetail, setOpenDetail] = useState<DashboardCardId | null>(null)
   const data = d.data
   const reference = d.reference
@@ -470,7 +434,8 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       {/* はじめの質問の窓（B-313）。`?setup=0〜|summary` かスタイル未選択の最初の訪問で開く。 */}
       {/* 最初の1通が、この画面で見ている間に届いた時だけ（SPEC-11 ③）。 */}
       {start.arrived && setup.data && d.selectedAccountId && canManage ? <FirstRunDoneDialog accountId={d.selectedAccountId} style={setup.data.state.style} minutes={start.firstRun?.minutes ?? null} steps={start.steps} progress={start.progress} onClose={start.dismissArrived} /> : null}
-      {wizardStep !== null && setup.data && d.selectedAccountId && canManage ? <StyleSetupWizard accountId={d.selectedAccountId} state={setup.data.state} initialStep={wizardStep} onClose={closeWizard} /> : null}
+      {wizard.dialog}
+      {qrRequested && !d.preferences.main.some(item => item.id === 'friend-add' && item.visible) ? <FriendAddLink dialogOnly officialProfileUrl={data?.metrics?.officialProfileUrl.value} visualQa={data?.visualQa} canManage={canManage} /> : null}
     </DashboardPage>
     </KpiValueMotionProvider>
   )
