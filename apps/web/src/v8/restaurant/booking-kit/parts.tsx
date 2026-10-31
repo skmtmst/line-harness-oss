@@ -8,7 +8,7 @@
 import { Field as SharedField } from '@/components/shared/form-controls'
 import { type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { RowMenu } from '@/components/shared/row-actions'
 import styles from './parts.module.css'
 import { useDialogScrollHint } from './use-dialog-scroll-hint'
@@ -95,11 +95,15 @@ export function RsDialog({ open, title, titleNote, width, top, tone, busy, desig
     </div>
   )
   const body = <>{children}{actionsPlacement === 'body' ? actionRow : null}</>
+  const footerTop = footerGap === undefined
+    ? footerPlain ? 'var(--tpl-rs-dlg-actions-pad-plain)' : 'var(--tpl-rs-dlg-gap)'
+    : `${footerGap}px`
   const footer = actionsPlacement === 'footer' ? (
-    <div className={styles.dialogFooter}>
-      {footerNote}
-      {actionRow}
-    </div>
+    <DialogActions padding={footerPlain ? 'none' : undefined}>
+      {footerNote ? <div className={styles.footerNote} style={{ '--rs-dlg-actions-pad-top': footerTop } as CSSProperties}>{footerNote}</div> : null}
+      <p data-scroll-hint className={styles.scrollHint} style={{ visibility: scrollHint.hasMore ? 'visible' : 'hidden' }} aria-hidden={!scrollHint.hasMore} title="スクロールして続きを確認"><span aria-hidden="true">↓ </span>スクロールして続きを確認</p>
+      {actions}
+    </DialogActions>
   ) : undefined
   return (
     <Dialog
@@ -115,6 +119,8 @@ export function RsDialog({ open, title, titleNote, width, top, tone, busy, desig
       designTop={top}
       designHeaderHeight={headerHeight}
       designContentPadding={actionsPlacement === 'footer' ? 'var(--space-16) var(--space-24) 0' : contentPadding}
+      designFooterPadding={actionsPlacement === 'footer' ? `${footerNote ? '0' : footerTop} var(--space-24) var(--space-20)` : undefined}
+      footerDivider={actionsPlacement === 'footer' ? !footerPlain : undefined}
       footer={footer}
       designNode={designNode}
       onCancel={onCancel}

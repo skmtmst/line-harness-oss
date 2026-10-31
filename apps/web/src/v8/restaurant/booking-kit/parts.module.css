@@ -55,9 +55,11 @@
   padding-top: var(--rs-dlg-actions-pad-top, var(--tpl-rs-dlg-actions-pad-plain));
 }
 
-/* 操作を固定する窓だけ、本文と別の共通footerに置く。 */
-.dialogFooter {
-  padding: 0 var(--space-24) var(--space-20);
+/* 共通操作帯の説明だけが1行を取り、操作を内包しない。 */
+.footerNote {
+  flex: 0 0 100%;
+  min-width: 0;
+  margin-bottom: calc(var(--rs-dlg-actions-pad-top, var(--tpl-rs-dlg-gap)) - var(--space-8));
 }
 
 .scrollHint {

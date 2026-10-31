@@ -69,3 +69,45 @@ describe('飲食店の窓の操作位置', () => {
     expect(within(footer).getByText(hint).style.visibility).toBe('hidden')
   })
 })
+
+
+it('固定footerは共通操作帯の直接の子に操作を置き、理由を操作と別の行にする', () => {
+  const close = vi.fn(), stop = vi.fn()
+  render(<RsDialog open title="受付の確認" width={480} top={200} onCancel={close} actionsPlacement="footer" footerNote={<p>停止するサービスを選んでください</p>} actions={<><button onClick={close}>閉じる</button><button onClick={stop}>止める</button></>}><p>本文</p></RsDialog>)
+  const dialog = screen.getByRole('dialog', { name: '受付の確認' })
+  const footer = dialog.querySelector('[data-window-actions]')!
+  const actions = footer.querySelector('[data-dialog-actions]')
+  expect(actions).not.toBeNull()
+  expect(within(footer as HTMLElement).getByRole('button', { name: '閉じる', exact: true }).parentElement).toBe(actions)
+  expect(within(dialog).getByRole('button', { name: '止める', exact: true }).parentElement).toBe(actions)
+  const note = within(footer as HTMLElement).getByText('停止するサービスを選んでください')
+  expect(note.parentElement?.querySelector('button,a')).toBeNull()
+  expect(actions?.querySelector('[data-scroll-hint]')?.parentElement).toBe(actions)
+})
+
+it('線なしの固定footerだけ余白を窓へ任せ、線ありの既定を保つ', () => {
+  const props = { open: true, title: '受付の確認', onCancel: () => {}, actionsPlacement: 'footer' as const, actions: <><button>閉じる</button><button>止める</button></> }
+  const first = render(<RsDialog {...props} footerPlain><p>本文</p></RsDialog>)
+  expect(screen.getByRole('dialog', { name: '受付の確認' }).querySelector('[data-dialog-actions]')?.getAttribute('data-padding')).toBe('none')
+  first.unmount()
+  render(<RsDialog {...props}><p>本文</p></RsDialog>)
+  expect(screen.getByRole('dialog', { name: '受付の確認' }).querySelector('[data-dialog-actions]')?.getAttribute('data-padding')).toBeNull()
+})
+
+
+it.each([
+  ['短い理由', false],
+  ['対象の店舗の情報を確認できません。店舗の設定を確かめてから、停止するサービスを選んでください。', false],
+  [null, false],
+  ['対象を選んでください', true],
+] as const)('理由%sとbusy=%sでも説明に操作を混ぜず、固定操作を共通帯に保つ', (reason, busy) => {
+  render(<RsDialog open title="固定した確認" width={480} top={200} busy={busy} onCancel={() => {}} actionsPlacement="footer" footerNote={reason ? <p>{reason}</p> : null} actions={<><button disabled={busy}>閉じる</button><button disabled={busy}>{busy ? '停止中…' : '止める'}</button></>}><p>本文</p></RsDialog>)
+  const dialog = screen.getByRole('dialog', { name: '固定した確認' })
+  const footer = dialog.querySelector('[data-window-actions]')!
+  const actions = footer.querySelector('[data-dialog-actions]')!
+  expect(actions).not.toBeNull()
+  expect(actions.querySelectorAll(':scope > button')).toHaveLength(2)
+  if (reason) expect(within(footer as HTMLElement).getByText(reason).parentElement?.querySelector('button,a')).toBeNull()
+  else expect(footer.querySelectorAll('p')).toHaveLength(1)
+  for (const button of actions.querySelectorAll('button')) expect(button.disabled).toBe(busy)
+})
