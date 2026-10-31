@@ -28,7 +28,9 @@ import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { usePageTitle } from '@/components/shell/page-chrome';
 import PageResourceScope, { usePageResourceTask } from '@/components/shell/page-resource-scope';
 import { resolveResourceTitle } from '@/lib/resource-title';
-import { useStaffRole } from '@/lib/staff-role';
+import { canManageRole, useStaffRole } from '@/lib/staff-role';
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason';
+import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock';
 import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
 import { requestUnsavedAction } from '@/lib/unsaved-action';
 import { hqFormPortableReferenceError } from '@/components/forms/hq-form-definition-adapter';
@@ -42,6 +44,7 @@ import { focusFieldById } from '@/lib/use-form-errors';
 import { useCustomerLook } from '@/components/shared/use-customer-look';
 import { FormPhone } from './phone';
 import styles from './edit.module.css';
+import { useCreatedDraft } from './use-created-draft'
 import { routingError, routingOf, withRouting, type FormRouting } from './routing-model';
 import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TextLink from '@/components/shared/text-link';
@@ -60,6 +63,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const customerLook = useCustomerLook(host ? null : selectedAccountId)
   const narrow = useNarrowViewport()
   const role = useStaffRole()
+  const draftDeleteLock = usePermissionLockReason(canManageRole(role), 'manager')
+    ?? (!canManageRole(role) ? PERMISSION_LOCK_REASON.manager : undefined)
   const featureAccess = useFeatureAccess('forms')
   const canEdit = host ? !host.readOnly : featureAccess
   const readOnly = host ? Boolean(host.readOnly) : !canEdit
@@ -473,7 +478,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     setSelectedBlockId(null)
   }, [])
 
-  const { leaveTarget, confirmLeave, cancelLeave } = useUnsavedGuard({ dirty, busy: saving, onDiscard: discardChanges })
+  const createdDraft = useCreatedDraft({ accountId: host ? null : selectedAccountId, id, revision: contentRevision,
+    loaded: formLoaded && !loading, published: Boolean(publishedVersionId), canEdit, canDelete: canManageRole(role) && !draftDeleteLock, captureResource, waitForSave: () => saveInFlight.current })
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty: dirty || createdDraft.owned, busy: saving || createdDraft.busy || Boolean(host?.busy), onDiscard: discardChanges })
+  const finishLeave = () => { if (captureResource()()) { disarm(); confirmLeave() } }
+  const cancelDraftLeave = () => { createdDraft.clearError(); cancelLeave() }
 
   /** タブを替える。URL の ?tab= も合わせる（画面の中の移動なので離脱の確認は出さない）。 */
   const changeTab = (next: EditTab) => {
@@ -544,13 +553,14 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
    * 送っている途中の保存を待ち、最新の版で送る。
    */
   const saveInFlight = useRef<Promise<unknown> | null>(null)
+  const hostSaving = useRef(false)
 
   /**
    * 保存する。silent は自動保存：保存中の印・赤い帯・トーストを出さない（失敗は保存の帯に出る）。
    * 競合（409）だけは自動でも帯を出す（このまま書くと相手の変更が消えるため）。
    */
   const save = async (publishAfter = false, { silent = false }: { silent?: boolean } = {}): Promise<boolean> => {
-    if (!canEdit) return false
+    if (!canEdit || createdDraft.deleting.current) return false
     const isCurrent = captureResource()
     if (!isCurrent()) return false
     const problem = saveProblem(publishAfter)
@@ -571,9 +581,22 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     if (!silent) setNameError(null)
     if (host) {
       /* 統括：保存（と配る）は呼ぶ側。publishAfter は［保存して配る］。 */
+      if (host.busy || hostSaving.current) return false
+      hostSaving.current = true
+      setSaving(true)
       setError('')
-      host.onSave({ name: name.trim(), description: description.trim(), layout, onSubmitTagId }, publishAfter)
-      return true
+      try {
+        const saved = await host.onSave({ name: name.trim(), description: description.trim(), layout, onSubmitTagId }, publishAfter)
+        if (!isCurrent() || !saved) return false
+        savedSnapshot.current = currentSnapshot
+        return true
+      } catch (cause) {
+        if (isCurrent() && !saveErrors.capture(cause)) setError(describeApiFailure(cause, '保存'))
+        return false
+      } finally {
+        hostSaving.current = false
+        if (isCurrent()) setSaving(false)
+      }
     }
     if (!selectedAccountId) return false
     while (saveInFlight.current) await saveInFlight.current.catch(() => undefined)
@@ -640,6 +663,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       }
       contentRevisionRef.current = res.data.contentRevision
       if (isCurrent()) {
+        createdDraft.saved(res.data.contentRevision, silent && !reconciledOwnSave)
         setContentRevision(res.data.contentRevision)
         clearConflict()
       }
@@ -709,7 +733,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     dirty,
     active: !host && canEdit,
     enabled: formLoaded && !loading && !conflict && saveProblem(false) === null,
-    paused: leaveTarget !== null || saving || showPublish,
+    paused: leaveTarget !== null || saving || createdDraft.busy || showPublish,
     save: () => save(false, { silent: true }),
   })
 
@@ -831,7 +855,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     </div>
   )
 
-  const hostBusy = Boolean(host?.busy)
+  const hostBusy = saving || Boolean(host?.busy)
   const footerActions = host ? (
     <>
       <Button onClick={() => requestUnsavedAction(host.onCancel)} disabled={hostBusy}>キャンセル</Button>
@@ -966,7 +990,12 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       </div>
       </FormEditAttemptContext.Provider>
 
-      <UnsavedLeaveDialog open={leaveTarget !== null} subject="フォームへの変更" onConfirm={confirmLeave} onCancel={cancelLeave} />
+      <UnsavedLeaveDialog open={leaveTarget !== null} subject="フォームへの変更" busy={saving || createdDraft.busy}
+        description={createdDraft.owned ? '自動で作られた下書きがあります。残すか、消して移るか選んでください。' : undefined}
+        saveLabel={createdDraft.owned ? '下書きを残して移る' : '下書きに保存して移る'} discardLabel={createdDraft.owned ? '下書きを消して移る' : undefined}
+        discardDisabled={createdDraft.owned && !canManageRole(role)} discardLockedReason={createdDraft.owned ? draftDeleteLock : undefined}
+        error={createdDraft.error} saveDisabled={!canEdit || loading || Boolean(host?.busy)} onSave={() => save(false)} onSavedLeave={finishLeave}
+        onConfirm={createdDraft.owned ? () => void createdDraft.discard(finishLeave) : confirmLeave} onCancel={cancelDraftLeave} />
 
       <Dialog
         open={canEdit && showPublish}

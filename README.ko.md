@@ -112,7 +112,7 @@ CLI 가 다음을 모두 처리합니다:
 ### AI 통합
 - **MCP Server 내장** (`@line-harness/mcp-server`) — Claude Code 에서 자연어로 모든 조작
   - `list_conversations` / `get_conversation` — AI 가 미응답 대화 모니터링
-  - `create_scenario` / `update_step` — AI 가 시나리오 설계
+  - `create_scenario` / `update_step` — AI 가 시나리오 설계 — 비활성 상태로 생성됩니다. 내용을 확인한 뒤 `manage_scenarios`의 update로 활성화합니다 (게시 권한 필요)
   - `broadcast` / `send_message` — 발송 류는 사용자 확인 필수
 - **공식 SDK** (`@line-harness/sdk`) — TypeScript 타입드 SDK, ESM + CJS, 의존성 제로
 

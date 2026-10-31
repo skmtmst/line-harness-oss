@@ -15,30 +15,18 @@ beforeEach(() => { window.localStorage.clear(); fixture.accountId = 'account-1';
 afterEach(cleanup)
 
 describe('ホームから初期案内のQRを開く', () => {
-  it.each(['standard', 'ec', 'restaurant', 'salon', 'consult', 'lesson'].flatMap((style) => ['0', 'summary'].map((step) => [style, step])))('%sからsetup=%sを開くと既存の質問画面へ進み、閉じると業種へ戻る', async (style, step) => {
+  it.each(['standard', 'ec', 'restaurant', 'salon', 'consult', 'lesson'].flatMap(style => ['setup=0', 'setup=summary', 'qr=base'].map(query => [style, query])))('%sで%sを開いても選択中のホームを保つ', async (style, query) => {
     fixture.get.mockResolvedValue({ success: true, data: { style } })
-    fixture.search = `setup=${step}`
+    fixture.search = query
     const view = render(<HomeDashboard />)
-    expect(await screen.findByRole('region', { name: 'QRを開けるホーム' })).toBeTruthy()
-    expect(screen.queryByRole('region', { name: `${style}のホーム` })).toBeNull()
-    fixture.search = ''
-    view.rerender(<HomeDashboard />)
     if (style === 'standard' || style === 'ec') {
       await waitFor(() => expect(screen.getByRole('region', { name: 'QRを開けるホーム' }).getAttribute('data-usage-style')).toBe(style))
-    } else expect(await screen.findByRole('region', { name: `${style}のホーム` })).toBeTruthy()
-  })
-
-  it.each(['restaurant', 'salon', 'consult', 'lesson'])('%sを選んだ店でもQRの行き先を優先し、閉じた後は業種の画面へ戻る', async (style) => {
-    window.localStorage.setItem('lh_usage_style:account-1', style)
-    fixture.get.mockResolvedValue({ success: true, data: { style } })
-    fixture.search = 'qr=base'
-    const view = render(<HomeDashboard />)
-    expect(screen.getByRole('region', { name: 'QRを開けるホーム' })).toBeTruthy()
-    await waitFor(() => expect(fixture.get).toHaveBeenCalledWith('account-1'))
-    expect(screen.getByRole('region', { name: 'QRを開けるホーム' })).toBeTruthy()
-    fixture.search = ''
-    view.rerender(<HomeDashboard />)
-    expect(await screen.findByRole('region', { name: `${style}のホーム` })).toBeTruthy()
+    } else {
+      expect(await screen.findByRole('region', { name: `${style}のホーム` })).toBeTruthy()
+      expect(screen.queryByRole('region', { name: 'QRを開けるホーム' })).toBeNull()
+    }
+    fixture.search = ''; view.rerender(<HomeDashboard />)
+    expect(screen.getByRole('region')).toBeTruthy()
   })
 
   it.each(['standard', 'ec', 'restaurant', 'salon', 'consult', 'lesson'])('QR指定がなければ%sのホームを出す', async (style) => {
@@ -50,7 +38,8 @@ describe('ホームから初期案内のQRを開く', () => {
     } else expect(await screen.findByRole('region', { name: `${style}のホーム` })).toBeTruthy()
   })
 
-  it('別アカウントを未取得の間は前の盤も標準の盤も出さず、失敗は読み直せる', async () => {
+  it.each(['', 'setup=0', 'qr=base'])('指定%sで別アカウントを未取得の間は前の盤も標準の盤も出さず、失敗は読み直せる', async query => {
+    fixture.search = query
     fixture.get.mockResolvedValueOnce({ success: true, data: { style: 'restaurant' } }).mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ success: true, data: { style: 'consult' } })
     const view = render(<HomeDashboard />)
     await screen.findByRole('region', { name: 'restaurantのホーム' })

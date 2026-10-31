@@ -6,7 +6,7 @@ import { getClient } from "../client.js";
 export function registerCreateScenario(server: McpServer): void {
   server.tool(
     "create_scenario",
-    "Create a step delivery scenario with multiple message steps. Each step has a delay and message content. Scenarios auto-trigger on friend_add, tag_added, or manual enrollment.",
+    "Create a step delivery scenario with multiple message steps. Each step has a delay and message content. Created scenarios are inactive and do not start delivery. After reviewing the steps, use manage_scenarios with action='update' and isActive=true to activate (publish permission required). Only then do scenarios trigger on friend_add, tag_added, or manual enrollment.",
     {
       name: z.string().describe("Scenario name"),
       triggerType: z
@@ -125,7 +125,11 @@ export function registerCreateScenario(server: McpServer): void {
             {
               type: "text" as const,
               text: JSON.stringify(
-                { success: true, scenario: scenarioWithSteps },
+                {
+                  success: true,
+                  scenario: scenarioWithSteps,
+                  nextAction: "Created inactive. Review the steps, then use manage_scenarios with action='update', scenarioId, and isActive=true to start delivery (publish permission required).",
+                },
                 null,
                 2,
               ),

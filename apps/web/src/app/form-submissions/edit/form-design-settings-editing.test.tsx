@@ -16,7 +16,7 @@ import FormDesignSettings from '@/test-utils/form-appearance-harness'
  */
 
 const router = vi.hoisted(() => ({ replace: vi.fn() }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useRouter: () => router }))
 
 let host: HTMLDivElement
