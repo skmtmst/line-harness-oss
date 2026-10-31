@@ -36,6 +36,7 @@ const fixture = vi.hoisted(() => ({
   menuItems: vi.fn(),
   bulkSoldOut: vi.fn(),
   stopIntake: vi.fn(),
+  stopSubmit: null as (() => void) | null,
   resumeIntake: vi.fn(),
   snapshot: vi.fn(),
   ubereatsConnection: vi.fn(),
@@ -94,6 +95,7 @@ vi.mock('./orders', async (importOriginal) => {
 vi.mock('./bulk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./bulk')>()
   return { ...actual, IntakeStopDialog: (props: import('./bulk').IntakeStopDialogProps) => {
+    fixture.stopSubmit = props.onSubmit
     fixture.stopDialog = props
     return <actual.IntakeStopDialog {...props} />
   } }
@@ -244,6 +246,8 @@ function at(url: string) {
 }
 
 beforeEach(() => {
+  fixture.stopSubmit = null
+  fixture.stopDialog = null
   fixture.role.value = verifiedStaffRole('owner')
   fixture.accountId.value = 'account-1'
   fixture.accountLoading.value = false
@@ -550,12 +554,12 @@ describe('一覧と確認の操作を保つ', () => {
     const times = within(dialog).getByRole('group', { name: '停止する時間' })
     expect(times.getAttribute('data-appearance')).toBe('intake-stop')
     // 選択の面だけが滑り、4つの時間の操作と選択状態を保つ。
-    expect(times.querySelector('[aria-hidden="true"]')).not.toBeNull()
+    expect(times.querySelector('[aria-hidden="true"]')).toBeNull()
     const cards = times.querySelectorAll('button')
     expect(cards.length).toBe(4)
     expect(Array.from(cards).map((card) => card.getAttribute('aria-pressed'))).toEqual([
       'false',
-      'true',
+      'false',
       'false',
       'false',
     ])
@@ -759,6 +763,8 @@ describe('Uberの接続と未完成の操作を分ける', () => {
     expect(uber.disabled).toBe(true)
     expect(uber.checked).toBe(false)
     fireEvent.click(uber)
+    fireEvent.click(dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }))
+    fireEvent.click(dialog.getByRole('button', { name: '60分', exact: true }))
     fireEvent.click(dialog.getByRole('button', { name: '止める' }))
     await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['demaecan'], '60m'))
   })
@@ -795,6 +801,15 @@ describe('Uberの接続と未完成の操作を分ける', () => {
 
 afterEach(() => { verifiedStaffRole(null) })
 
+function chooseAvailableStopServices() {
+  const dialog = within(screen.getByRole('alertdialog'))
+  for (const element of dialog.getAllByRole('checkbox')) {
+    const checkbox = element as HTMLInputElement
+    if (!checkbox.disabled && !checkbox.checked) fireEvent.click(checkbox)
+  }
+  fireEvent.click(dialog.getByRole('button', { name: '60分', exact: true }))
+}
+
 describe('受付操作は現在の接続状態と店を確かめる', () => {
   it.each([
     ['demaecan', '出前館', 'disconnected', 'open'],
@@ -829,6 +844,7 @@ describe('受付操作は現在の接続状態と店を確かめる', () => {
     render(<DeliveryPage />)
     await screen.findByRole('region', { name: '出前館' })
     fireEvent.click(screen.getByRole('button', { name: '受付をまとめて止める' }))
+    chooseAvailableStopServices()
     const dialog = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
     const disconnected = dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }) as HTMLInputElement
     expect(disconnected.disabled).toBe(true)
@@ -862,6 +878,7 @@ describe('受付操作は現在の接続状態と店を確かめる', () => {
     render(<DeliveryPage />)
     await screen.findByRole('region', { name: '出前館' })
     fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
     await screen.findByRole('alertdialog')
     const heldConfirm = fixture.stopDialog!.onSubmit
     const next = { ...data, services: data.services.map((state) => state.service === 'demaecan' ? { ...state, connectionStatus: 'disconnected' as const } : state) }
@@ -899,6 +916,7 @@ describe('受付操作は現在の接続状態と店を確かめる', () => {
     await waitFor(() => expect(fixture.resumeIntake).toHaveBeenCalledWith('account-1', ['rocketnow']))
     await waitFor(() => expect((screen.getByRole('button', { name: 'ロケットナウの受付を再開' }) as HTMLButtonElement).disabled).toBe(false))
     fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
     const dialog = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
     fireEvent.click(dialog.getByRole('button', { name: '止める' }))
     await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['demaecan'], '60m'))
@@ -912,12 +930,16 @@ it.each(['staff', null] as const)('停止の窓を開いた後に役割が%sな�
   render(<DeliveryPage />)
   await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
   const confirm = fixture.stopDialog!.onSubmit
   fixture.role.value = verifiedStaffRole(role)
   await act(async () => at('/restaurant-test/delivery?tab=all'))
   await act(async () => confirm())
   expect(fixture.stopIntake).not.toHaveBeenCalled()
-  expect(screen.getByRole('alertdialog')).toBeTruthy()
+  expect(screen.queryByRole('alertdialog')).not.toBeNull()
+  const dialog = within(screen.getByRole('alertdialog'))
+  expect(within(screen.getByRole('alertdialog').querySelector('[data-window-actions]') as HTMLElement).getByText(role === null ? '担当者の確認が終わるまでお待ちください。' : '店舗や権限が変わったため、受付の操作を中止しました。窓を開き直してください。')).toBeTruthy()
+  expect((dialog.getByRole('button', { name: '止める', exact: true }) as HTMLButtonElement).disabled).toBe(true)
 })
 
 it('未取得の別の店では、前の店のサービスを使って停止を開かない', async () => {
@@ -939,6 +961,7 @@ it('停止中に同じ確定や再開を連続して呼んでも、次の書込�
   render(<DeliveryPage />)
   await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
   const confirm = fixture.stopDialog!.onSubmit
   act(() => { confirm(); confirm(); fixture.board!.onResumeService('rocketnow') })
   expect(fixture.stopIntake).toHaveBeenCalledTimes(1)
@@ -951,6 +974,7 @@ it('StrictModeの2回描画でも正当な受付停止を変化扱いにしな�
   render(<React.StrictMode><DeliveryPage /></React.StrictMode>)
   await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
   fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '止める', exact: true }))
   await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledWith('account-1', ['demaecan'], '60m'))
   expect(screen.queryByText(/店舗や権限が変わった/)).toBeNull()
@@ -965,6 +989,7 @@ it.each(['stop', 'resume'] as const)('送信済み%sの応答が店の切替後�
   await screen.findByRole('region', { name: '出前館' })
   if (action === 'stop') {
     fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
     fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '止める', exact: true }))
   } else fireEvent.click(screen.getByRole('button', { name: 'ロケットナウの受付を再開' }))
   expect(action === 'stop' ? fixture.stopIntake : fixture.resumeIntake).toHaveBeenCalledTimes(1)
@@ -985,6 +1010,7 @@ it.each(['resolve', 'reject'] as const)('自動更新が%sする途中も確認�
     render(<DeliveryPage />)
     await screen.findByRole('region', { name: '出前館' })
     fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+    fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
     const pending = new Promise<DeliveryOrdersData>((done, fail) => { resolve = done; reject = fail })
     fixture.orders.mockReturnValue(pending)
     await act(async () => { vi.advanceTimersByTime(30_000) })
@@ -1013,6 +1039,7 @@ it('接続が切れた選択だけを外し、窓を開き直さず他のサー�
   render(<DeliveryPage />)
   await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByRole('button', { name: '受付をまとめて止める' }))
+  chooseAvailableStopServices()
   fixture.orders.mockResolvedValue({ ...first, services: first.services.map(state => state.service === 'demaecan' ? { ...state, connectionStatus: 'disconnected' } : state) })
   await act(async () => at('/restaurant-test/delivery?tab=all'))
   await waitFor(() => expect((within(screen.getByRole('alertdialog')).getByRole('checkbox', { name: /出前館の受付を止める/ }) as HTMLInputElement).disabled).toBe(true))
@@ -1040,6 +1067,7 @@ it('提供前の営業状態を直接呼んでも選択・停止・再開を書�
   act(() => { fixture.board!.onStopService('ubereats'); fixture.board!.onResumeService('ubereats') })
   expect(screen.queryByRole('alertdialog')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
   act(() => fixture.stopDialog!.onToggleService('ubereats', true))
   expect(fixture.stopDialog!.selected).toEqual(['demaecan'])
   expect(fixture.stopIntake).not.toHaveBeenCalled()
@@ -1050,6 +1078,7 @@ it('店の切替後や画面を閉じた後の古い確定からは書き込ま�
   const view = render(<DeliveryPage />)
   await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
   const confirm = fixture.stopDialog!.onSubmit
   fixture.accountId.value = 'account-2'
   view.rerender(<DeliveryPage />)
@@ -1066,6 +1095,7 @@ it('店の選択を読み込んでいる間は保持された停止と再開を�
   const view = render(<DeliveryPage />)
   await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
   const confirm = fixture.stopDialog!.onSubmit
   const resume = fixture.board!.onResumeService
   fixture.accountLoading.value = true
@@ -1080,6 +1110,7 @@ it('同じ店で画面を閉じた後も保持された確定と再開を書き�
   const view = render(<DeliveryPage />)
   await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
   const confirm = fixture.stopDialog!.onSubmit
   const resume = fixture.board!.onResumeService
   view.unmount()
@@ -1096,6 +1127,7 @@ it('停止の選択を全部外しても接続済みの行を選び直して送�
   render(<DeliveryPage />)
   await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByRole('button', { name: '受付をまとめて止める' }))
+  chooseAvailableStopServices()
   const dialog = within(screen.getByRole('alertdialog'))
   fireEvent.click(dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }))
   fireEvent.click(dialog.getByRole('checkbox', { name: /ロケットナウの受付を止める/ }))
@@ -1103,8 +1135,8 @@ it('停止の選択を全部外しても接続済みの行を選び直して送�
   const choose = dialog.getByRole('checkbox', { name: /ロケットナウの受付を止める/ }) as HTMLInputElement
   expect(choose.disabled).toBe(false)
   expect((dialog.getByRole('button', { name: '止める', exact: true }) as HTMLButtonElement).disabled).toBe(true)
-  const reason = dialog.getByText('接続済みで受付中のサービスを選んでください。')
-  expect(reason.closest('[data-window-body]')).not.toBeNull()
+  const reason = dialog.getByText('停止するサービスを選んでください')
+  expect(reason.closest('[data-window-actions]')).not.toBeNull()
   expect(reason.closest('[class*="dialogActions"]')).toBeNull()
   fireEvent.click(choose)
   fireEvent.click(dialog.getByRole('button', { name: '止める', exact: true }))
@@ -1120,6 +1152,7 @@ it('1件だけの選択が切れたら、その選択を外して他の接続済
   render(<DeliveryPage />)
   await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: '60分', exact: true }))
   const changed = { ...data, services: data.services.map(state => state.service === 'demaecan' ? { ...state, connectionStatus: 'disconnected' as const } : state) }
   fixture.orders.mockResolvedValue(changed)
   await act(async () => at('/restaurant-test/delivery?tab=all'))
@@ -1145,6 +1178,7 @@ it('接続が切れた選択の理由を他の接続済みの行へ流用しな�
   render(<DeliveryPage />)
   await screen.findByRole('region', { name: '出前館' })
   fireEvent.click(screen.getByRole('button', { name: '受付をまとめて止める' }))
+  chooseAvailableStopServices()
   fixture.orders.mockResolvedValue({ ...data, services: data.services.map(state => state.service === 'demaecan' ? { ...state, connectionStatus: 'disconnected' as const } : state) })
   await act(async () => at('/restaurant-test/delivery?tab=all'))
   await waitFor(() => expect((within(screen.getByRole('alertdialog')).getByRole('checkbox', { name: /出前館の受付を止める/ }) as HTMLInputElement).disabled).toBe(true))
@@ -1168,27 +1202,206 @@ it('一括停止は切替後の対象を表示し、切替前の確認では送�
   fireEvent.click(screen.getByRole('button', { name: '受付をまとめて止める', exact: true }))
   const first = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
   await first.findByText('対象LINE-1')
+  fireEvent.click(first.getByRole('checkbox', { name: /出前館の受付を止める/ }))
+  fireEvent.click(first.getByRole('button', { name: '60分', exact: true }))
+  const held = fixture.stopSubmit
+  expect(held).toBeTypeOf('function')
   fixture.accountId.value = 'account-2'
   const next = ordersData([])
   next.store = { id: 'store-2', name: '切替先の店' }
   fixture.orders.mockResolvedValue(next)
   view.rerender(<DeliveryPage />)
+  await waitFor(() => expect(screen.queryByRole('alertdialog', { name: '受付を一括停止しますか？' })).toBeNull())
+  act(() => { held!() })
+  expect(fixture.stopIntake).not.toHaveBeenCalled()
+  await waitFor(() => expect(fixture.orders).toHaveBeenCalledWith('account-2', {tab:'new'}))
+  await waitFor(() => expect((screen.getByRole('button', {name:'受付をまとめて止める',exact:true}) as HTMLButtonElement).disabled).toBe(false))
+  fireEvent.click(screen.getByRole('button', { name: '受付をまとめて止める', exact: true }))
+  const reopened = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+  expect(reopened.getByRole('group', { name: '停止する時間' }).querySelectorAll('[aria-pressed="true"]')).toHaveLength(0)
+  expect((reopened.getByRole('checkbox', { name: /出前館の受付を止める/ }) as HTMLInputElement).checked).toBe(false)
+  expect((reopened.getByRole('button', { name: '止める', exact:true }) as HTMLButtonElement).disabled).toBe(true)
   const target = within(await screen.findByRole('region', { name: '操作の対象' }))
   await target.findByText('対象LINE-2')
   await target.findByText('切替先の店')
   expect(target.queryByText('対象LINE-1')).toBeNull()
   expect(fixture.stopIntake).not.toHaveBeenCalled()
-  fireEvent.click(first.getByRole('button', { name: '止める', exact: true }))
-  expect(fixture.stopIntake).not.toHaveBeenCalled()
-  fireEvent.click(first.getByTitle('閉じる', { exact: true }))
-  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
-  fireEvent.click(screen.getByRole('button', { name: '受付をまとめて止める', exact: true }))
-  const reopened = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
-  await reopened.findByText('対象LINE-2')
-  await reopened.findByText('切替先の店')
-  expect(reopened.queryByText('対象LINE-1')).toBeNull()
+  fireEvent.click(reopened.getByRole('checkbox', { name: /出前館の受付を止める/ }))
+  fireEvent.click(reopened.getByRole('button', { name: '30分', exact: true }))
+  act(() => { held!() })
   expect(fixture.stopIntake).not.toHaveBeenCalled()
   fireEvent.click(reopened.getByRole('button', { name: '止める', exact: true }))
   await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledTimes(1))
-  expect(fixture.stopIntake.mock.calls).toEqual([['account-2', ['demaecan'], '60m']])
+  expect(fixture.stopIntake.mock.calls).toEqual([['account-2', ['demaecan'], '30m']])
+})
+
+
+describe('受付を止める前の明示選択', () => {
+  it('一括の初期状態はサービスも時間も未選択で、片方だけ選んでも停止しない', async () => {
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    fireEvent.click(screen.getByText('受付をまとめて止める'))
+    expect(screen.queryByRole('alertdialog', { name: '受付を一括停止しますか？' })).not.toBeNull()
+    const dialog = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+    const service = dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }) as HTMLInputElement
+    const submit = dialog.getByRole('button', { name: '止める' }) as HTMLButtonElement
+    expect(service.checked).toBe(false)
+    expect(dialog.getByRole('group', { name: '停止する時間' }).querySelectorAll('[aria-pressed="true"]')).toHaveLength(0)
+    expect(submit.disabled).toBe(true)
+    expect(dialog.getByText('停止するサービスを選んでください')).toBeTruthy()
+    fireEvent.click(submit)
+    expect(fixture.stopIntake).not.toHaveBeenCalled()
+    fireEvent.click(service)
+    expect(submit.disabled).toBe(true)
+    expect(dialog.getByText('停止する時間を選んでください')).toBeTruthy()
+    fireEvent.click(dialog.getByRole('button', { name: '90分', exact: true }))
+    expect(submit.disabled).toBe(false)
+    expect(dialog.getByRole('group', { name: '停止する時間' }).querySelector('[aria-hidden="true"]')).not.toBeNull()
+    fireEvent.click(service)
+    expect(submit.disabled).toBe(true)
+    expect(fixture.stopIntake).not.toHaveBeenCalled()
+  })
+
+  it('明示したサービスと時間だけを送り、失敗では選択を保ち、開き直すと選択を消す', async () => {
+    fixture.stopIntake.mockRejectedValueOnce(new Error('停止を確認できませんでした'))
+    render(<DeliveryPage />)
+    await screen.findByText('#UE-1001')
+    fireEvent.click(screen.getByText('受付をまとめて止める'))
+    const element = await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' })
+    const dialog = within(element)
+    fireEvent.click(dialog.getByRole('button', { name: '30分', exact: true }))
+    expect((dialog.getByRole('button', { name: '止める' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }))
+    fireEvent.click(dialog.getByRole('button', { name: '止める' }))
+    await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m'))
+    await dialog.findByText('受付を停止できませんでした。')
+    expect((dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }) as HTMLInputElement).checked).toBe(true)
+    expect(dialog.getByRole('button', { name: '30分', exact: true }).getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(dialog.getByText('閉じる', { exact: true }))
+    await waitFor(() => expect(screen.queryByRole('alertdialog', { name: '受付を一括停止しますか？' })).toBeNull())
+    fireEvent.click(screen.getByText('受付をまとめて止める'))
+    const reopened = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+    expect((reopened.getByRole('checkbox', { name: /出前館の受付を止める/ }) as HTMLInputElement).checked).toBe(false)
+    expect(reopened.getByRole('group', { name: '停止する時間' }).querySelectorAll('[aria-pressed="true"]')).toHaveLength(0)
+    expect((reopened.getByRole('button', { name: '止める' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+})
+
+
+it('個別の停止入口は押したサービスだけを選び、時間は明示するまで送らない', async () => {
+  render(<DeliveryPage />)
+  await screen.findByText('#UE-1001')
+  fireEvent.click(screen.getByRole('button', { name: '出前館の受付を止める' }))
+  const dialog = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+  expect((dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }) as HTMLInputElement).checked).toBe(true)
+  expect((dialog.getByRole('checkbox', { name: /ロケットナウの受付を止める/ }) as HTMLInputElement).checked).toBe(false)
+  expect(dialog.getByRole('group', { name: '停止する時間' }).querySelectorAll('[aria-pressed="true"]')).toHaveLength(0)
+  expect((dialog.getByRole('button', { name: '止める' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(dialog.getByText('停止する時間を選んでください')).toBeTruthy()
+  expect(fixture.stopIntake).not.toHaveBeenCalled()
+})
+
+
+it('古い停止の押し口も最新の未選択で止まり、二度呼んでも一回だけ送る', async () => {
+  let finish!: (value: { stopped: DeliveryService[]; failed: [] }) => void
+  fixture.stopIntake.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  render(<DeliveryPage />)
+  await screen.findByText('#UE-1001')
+  fireEvent.click(screen.getByText('受付をまとめて止める'))
+  const dialog = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+  const service = dialog.getByRole('checkbox', { name: /出前館の受付を止める/ })
+  fireEvent.click(service)
+  fireEvent.click(dialog.getByRole('button', { name: '90分', exact: true }))
+  const held = fixture.stopSubmit
+  expect(held).toBeTypeOf('function')
+  fireEvent.click(service)
+  act(() => { held!() })
+  expect(fixture.stopIntake).not.toHaveBeenCalled()
+  fireEvent.click(service)
+  act(() => { held!(); held!() })
+  expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '90m')
+  finish({ stopped: ['demaecan'], failed: [] })
+  await waitFor(() => expect(screen.queryByRole('alertdialog', { name: '受付を一括停止しますか？' })).toBeNull())
+})
+
+
+it('切替先の一覧待ちでは前の店のサービスを表示せず停止しない', async () => {
+  const view = render(<DeliveryPage />)
+  await screen.findByText('#UE-1001')
+  let finish!: (value: DeliveryOrdersData) => void
+  fixture.orders.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+  fixture.accountId.value = 'account-2'
+  view.rerender(<DeliveryPage />)
+  expect(fixture.stopDialog!.services).toEqual([])
+  const button = screen.getByRole('button', { name: '受付をまとめて止める', exact: true }) as HTMLButtonElement
+  expect(button.disabled).toBe(true)
+  fireEvent.click(button)
+  expect(screen.queryByRole('alertdialog')).toBeNull()
+  expect(fixture.stopSubmit).toBeTypeOf('function')
+  act(() => { fixture.stopSubmit!() })
+  expect(fixture.stopIntake).not.toHaveBeenCalled()
+  const next = ordersData([]);next.store = { id: 'store-2', name: '切替先の店' }
+  await act(async () => { finish(next) })
+  await waitFor(() => expect(button.disabled).toBe(false))
+  fireEvent.click(button)
+  const dialog = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+  expect((dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }) as HTMLInputElement).checked).toBe(false)
+})
+
+
+it.each(['success', 'failure'] as const)('停止の%s応答前に切り替えた時は新しい店と知らせに混ぜない', async (outcome) => {
+  let finish!: (value: { stopped: DeliveryService[]; failed: [] }) => void
+  let fail!: (error: Error) => void
+  fixture.stopIntake.mockImplementationOnce(() => new Promise((resolve, reject) => { finish = resolve; fail = reject }))
+  const view = render(<DeliveryPage />)
+  await screen.findByText('#UE-1001')
+  fireEvent.click(screen.getByText('受付をまとめて止める'))
+  const first = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+  fireEvent.click(first.getByRole('checkbox', { name: /出前館の受付を止める/ }))
+  fireEvent.click(first.getByRole('button', { name: '30分', exact: true }))
+  expect(fixture.stopSubmit).toBeTypeOf('function')
+  let completion: void = undefined
+  act(() => { completion = fixture.stopSubmit!() })
+  expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m')
+  fixture.accountId.value = 'account-2'
+  view.rerender(<DeliveryPage />)
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  await waitFor(() => expect(fixture.orders).toHaveBeenCalledWith('account-2', { tab: 'new' }))
+  expect((screen.getByRole('button', { name: '受付をまとめて止める' }) as HTMLButtonElement).disabled).toBe(true)
+  const callsBeforeResponse = fixture.orders.mock.calls.length
+  await act(async () => {
+    if (outcome === 'success') finish({ stopped: ['demaecan'], failed: [] })
+    else fail(new Error('前の店の停止失敗'))
+    await completion
+  })
+  expect(fixture.orders).toHaveBeenCalledTimes(callsBeforeResponse)
+  expect(screen.queryByText('1件のサービスの受付を停止しました。')).toBeNull()
+  expect(fixture.stopDialog!.error).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '受付をまとめて止める' }))
+  const reopened = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+  expect((reopened.getByRole('checkbox', { name: /出前館の受付を止める/ }) as HTMLInputElement).checked).toBe(false)
+  expect(reopened.queryByText('受付を停止できませんでした。')).toBeNull()
+  expect(fixture.stopIntake).toHaveBeenCalledTimes(1)
+})
+
+it('停止後の一覧読み直し中に切り替えた時も前の店の成功を知らせない', async () => {
+  let finishReload!: (value: DeliveryOrdersData) => void
+  fixture.stopIntake.mockResolvedValue({ stopped: ['demaecan'], failed: [] })
+  const view = render(<DeliveryPage />)
+  await screen.findByText('#UE-1001')
+  fireEvent.click(screen.getByText('受付をまとめて止める'))
+  const dialog = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+  fireEvent.click(dialog.getByRole('checkbox', { name: /出前館の受付を止める/ }))
+  fireEvent.click(dialog.getByRole('button', { name: '30分', exact: true }))
+  fixture.orders.mockImplementationOnce(() => new Promise(resolve => { finishReload = resolve }))
+  expect(fixture.stopSubmit).toBeTypeOf('function')
+  let completion: void = undefined
+  act(() => { completion = fixture.stopSubmit!() })
+  await waitFor(() => expect(fixture.orders).toHaveBeenCalledTimes(2))
+  fixture.accountId.value = 'account-2'
+  view.rerender(<DeliveryPage />)
+  await waitFor(() => expect(fixture.orders).toHaveBeenCalledWith('account-2', { tab: 'new' }))
+  await act(async () => { finishReload(ordersData([])); await completion })
+  expect(screen.queryByText('1件のサービスの受付を停止しました。')).toBeNull()
+  expect(fixture.stopIntake).toHaveBeenCalledExactlyOnceWith('account-1', ['demaecan'], '30m')
 })

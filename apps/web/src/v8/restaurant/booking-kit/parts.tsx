@@ -8,9 +8,10 @@
 import { Field as SharedField } from '@/components/shared/form-controls'
 import { type CSSProperties, type FormEvent, type ReactNode } from 'react'
 import type { ActionMenuItem } from '@/components/shared/action-menu'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { RowMenu } from '@/components/shared/row-actions'
 import styles from './parts.module.css'
+import { useDialogScrollHint } from './use-dialog-scroll-hint'
 
 /** 行の「…」。読み上げ名は「{subject}の操作」。 */
 export function RowMore({ subject, items }: { subject: string; items: ActionMenuItem[] }) {
@@ -27,7 +28,7 @@ export function RowMore({ subject, items }: { subject: string; items: ActionMenu
  * （題の段のあと 14 の間・各段 14・下の線の上 14）で置く。
  * onSubmit を渡すと中身を form にする（Enter で保存できる）。
  */
-export function RsDialog({ open, title, titleNote, width, top, tone, busy, designNode, titleIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, footerPlain = false, footerGap, onCancel, onSubmit, noValidate = false, actions, children }: {
+export function RsDialog({ open, title, titleNote, width, top, tone, busy, designNode, titleIcon, titleRow, plainTitle = false, headerHeight, contentPadding, bodyGap, footerPlain = false, footerGap, actionsPlacement = 'body', footerNote, onCancel, onSubmit, noValidate = false, actions, children }: {
   open: boolean
   title: string
   /** 題の下の小さな補足（絵の窓の頭が題＋1行のとき）。渡さないときは出ない。 */
@@ -48,8 +49,6 @@ export function RsDialog({ open, title, titleNote, width, top, tone, busy, desig
   plainTitle?: boolean
   /** 題の段の高さを絵の値にする（例 77）。渡さないときは共通の高さのまま。 */
   headerHeight?: number
-  /** 中身の余白を絵の値にする（例 `18px 24px 20px`）。 */
-  contentPadding?: string
   /** 中身の段どうしの間を絵の値にする。既定は 14。 */
   bodyGap?: number
   /** 下のボタンの段に上の線を引かない（絵に線が無いとき）。 */
@@ -57,11 +56,26 @@ export function RsDialog({ open, title, titleNote, width, top, tone, busy, desig
   /** 下のボタンの段の上の間を絵の値にする。既定は線ありで 14・線なしで 8。 */
   footerGap?: number
   onCancel: () => void
-  onSubmit?: () => void
   noValidate?: boolean
   actions: ReactNode
   children: ReactNode
-}) {
+} & (
+  {
+    actionsPlacement?: 'body'
+    footerNote?: never
+    onSubmit?: () => void
+    /** 本文内に操作を置く窓だけ、絵の余白を受け取る。 */
+    contentPadding?: string
+  }
+  | {
+    /** onClickで動く操作を本文から分け、共通の余白で下に固定する。 */
+    actionsPlacement: 'footer'
+    footerNote?: ReactNode
+    onSubmit?: never
+    contentPadding?: never
+  }
+)) {
+  const scrollHint = useDialogScrollHint()
   /*
    * 絵の値を渡された分だけ変数で下へ流す。渡さない窓はいままでの間のまま。
    * 欄の題と中身の間は窓からまとめて渡さない。`DialogField` は共通の欄
@@ -71,17 +85,26 @@ export function RsDialog({ open, title, titleNote, width, top, tone, busy, desig
   const bodyStyle = bodyGap === undefined
     ? undefined
     : ({ '--rs-dlg-body-gap': `${bodyGap}px` } as CSSProperties)
-  const body = (
-    <>
-      {children}
-      <div
-        className={footerPlain ? styles.dialogActionsPlain : styles.dialogActions}
-        style={footerGap === undefined ? undefined : ({ '--rs-dlg-actions-pad-top': `${footerGap}px` } as CSSProperties)}
-      >
-        {actions}
-      </div>
-    </>
+  const actionRow = (
+    <div
+      className={footerPlain ? styles.dialogActionsPlain : styles.dialogActions}
+      style={footerGap === undefined ? undefined : ({ '--rs-dlg-actions-pad-top': `${footerGap}px` } as CSSProperties)}
+    >
+      {actionsPlacement === 'footer' ? <p data-scroll-hint className={styles.scrollHint} style={{ visibility: scrollHint.hasMore ? 'visible' : 'hidden' }} aria-hidden={!scrollHint.hasMore} title="スクロールして続きを確認"><span aria-hidden="true">↓ </span>スクロールして続きを確認</p> : null}
+      {actions}
+    </div>
   )
+  const body = <>{children}{actionsPlacement === 'body' ? actionRow : null}</>
+  const footerTop = footerGap === undefined
+    ? footerPlain ? 'var(--tpl-rs-dlg-actions-pad-plain)' : 'var(--tpl-rs-dlg-gap)'
+    : `${footerGap}px`
+  const footer = actionsPlacement === 'footer' ? (
+    <DialogActions padding={footerPlain ? 'none' : undefined}>
+      {footerNote ? <div className={styles.footerNote} style={{ '--rs-dlg-actions-pad-top': footerTop } as CSSProperties}>{footerNote}</div> : null}
+      <p data-scroll-hint className={styles.scrollHint} style={{ visibility: scrollHint.hasMore ? 'visible' : 'hidden' }} aria-hidden={!scrollHint.hasMore} title="スクロールして続きを確認"><span aria-hidden="true">↓ </span>スクロールして続きを確認</p>
+      {actions}
+    </DialogActions>
+  ) : undefined
   return (
     <Dialog
       open={open}
@@ -95,7 +118,10 @@ export function RsDialog({ open, title, titleNote, width, top, tone, busy, desig
       designWidth={width}
       designTop={top}
       designHeaderHeight={headerHeight}
-      designContentPadding={contentPadding}
+      designContentPadding={actionsPlacement === 'footer' ? 'var(--space-16) var(--space-24) 0' : contentPadding}
+      designFooterPadding={actionsPlacement === 'footer' ? `${footerNote ? '0' : footerTop} var(--space-24) var(--space-20)` : undefined}
+      footerDivider={actionsPlacement === 'footer' ? !footerPlain : undefined}
+      footer={footer}
       designNode={designNode}
       onCancel={onCancel}
     >
@@ -109,7 +135,7 @@ export function RsDialog({ open, title, titleNote, width, top, tone, busy, desig
           {body}
         </form>
       ) : (
-        <div className={styles.dialogBody} style={bodyStyle}>{body}</div>
+        <div ref={actionsPlacement === 'footer' ? scrollHint.contentRef : undefined} className={styles.dialogBody} style={bodyStyle}>{body}</div>
       )}
     </Dialog>
   )

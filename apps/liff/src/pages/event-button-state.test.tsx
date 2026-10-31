@@ -188,3 +188,41 @@ it('イベント画像は名前を読み上げ、枠を選ぶだけでは移動�
   fireEvent.click(screen.getByRole('button', { name: 'この時間で申し込む' }));
   expect(await screen.findByText('申込の確認先')).toBeTruthy();
 });
+
+
+describe('開催枠の取得状態を席の状態と区別する', () => {
+  it.each([0, 1])('開催枠0件は満席や定員なしと表示しない（待ち=%s）', async waitlist_enabled => {
+    setup(eventDetail({ waitlist_enabled }), [], []);
+    const button = await screen.findByRole('button', { name: '予約可能な枠がありません' });
+    expect(button.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByText('現在予約可能な枠はありません。')).toBeTruthy();
+    expect(screen.queryByText('定員なし')).toBeNull();
+    expect(screen.queryByRole('button', { name: '満席です' })).toBeNull();
+    fireEvent.click(button);
+    expect(screen.queryByText('申込の確認先')).toBeNull();
+  });
+
+  it('定員なしの開催枠がある場合は表示し、従来どおり選べる', async () => {
+    setup(eventDetail(), [slot({ capacity: null, remaining: null })], []);
+    await screen.findByRole('button', { name: '時間を選んでください' });
+    expect(screen.getAllByText('定員なし')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '10:00〜11:00 定員なし' }));
+    expect(screen.getByRole('button', { name: 'この時間で申し込む' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('取得中と取得失敗では空枠や満席の表示を出さず、再試行で空枠を示す', async () => {
+    let fail!: (reason: Error) => void;
+    getEvent.mockResolvedValue(eventDetail());
+    getEventSlots.mockImplementationOnce(() => new Promise((_, reject) => { fail = reject; })).mockResolvedValue({ items: [] });
+    myEventBookings.mockResolvedValue({ items: [] });
+    render(<MemoryRouter initialEntries={['/events/e1?liffId=test']}><Routes><Route path="/events/:id" element={<Event />} /></Routes></MemoryRouter>);
+    expect(screen.queryByText('現在予約可能な枠はありません。')).toBeNull();
+    expect(screen.queryByRole('button', { name: '満席です' })).toBeNull();
+    fail(new Error('offline'));
+    const retry = await screen.findByRole('button', { name: 'もう一度読み込む' });
+    expect(screen.queryByText('現在予約可能な枠はありません。')).toBeNull();
+    expect(screen.queryByText('定員なし')).toBeNull();
+    fireEvent.click(retry);
+    expect(await screen.findByRole('button', { name: '予約可能な枠がありません' })).toBeTruthy();
+  });
+});

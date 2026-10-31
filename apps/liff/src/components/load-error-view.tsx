@@ -13,15 +13,28 @@ import Button from './ui/button/index.js';
  */
 export default function LoadErrorView({
   compact = false,
+  inline = false,
+  busy = false,
   message,
   note,
   onRetry,
 }: {
   compact?: boolean;
+  /** 取得済みの内容の続きで、messageと再試行だけを表示する。compactとnoteは使わない。 */
+  inline?: boolean;
+  busy?: boolean;
   message?: string;
   note?: string;
   onRetry: () => void;
 }) {
+  if (inline) return (
+    <div role="alert" className="space-y-2 text-sm text-liff-sub">
+      <p>{message ?? LOAD_FAILED_MESSAGE}</p>
+      <Button variant="secondary" disabled={busy} onClick={onRetry}>
+        {RETRY_LABEL}
+      </Button>
+    </div>
+  );
   return (
     // ★V8 ：上の帯の下の残りの真ん中に、印・題・本文・ボタンを 12 ずつ空けて置く。
     // 本文の上下の余白 (pt-3・pb-3) を引いた高さにして、ちょうど画面に収める。

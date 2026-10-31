@@ -45,6 +45,13 @@ const EXPORT_JOBS_LIST_LIMIT = 20;
  */
 const CSV_HEADER = '共通情報,差し込みキー,中身,使われている場所,更新,次の変更日時,次の中身';
 
+async function exportFolderAvailable(db: D1Database, accountId: string, folderId?: string): Promise<boolean> {
+  if (!folderId) return true;
+  const folder = await getFolderById(db, folderId);
+  return Boolean(folder && folder.kind === 'common_var'
+    && (folder.account_id === null || folder.account_id === accountId));
+}
+
 function exportJobJson(job: CommonVarExportJobMeta, nowIso = new Date().toISOString()) {
   const filter = parseCommonVarExportFilter(job.filter_json);
   const effectiveStatus = job.status === 'completed' && job.expires_at <= nowIso ? 'expired' : job.status;
@@ -188,12 +195,8 @@ commonVarExports.post('/api/common-vars/exports', requireDeliveryAccess('commonV
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId])) {
       return c.json({ success: false, error: 'Not found' }, 404);
     }
-    if (folderId) {
-      const folder = await getFolderById(c.env.DB, folderId);
-      if (!folder || folder.kind !== 'common_var'
-        || (folder.account_id !== null && folder.account_id !== accountId)) {
-        return inputError(c, { success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400, ["folderId","accountId"]);
-      }
+    if (!await exportFolderAvailable(c.env.DB, accountId, folderId)) {
+      return inputError(c, { success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400, ["folderId","accountId"]);
     }
     const staff = c.get('staff');
     const now = new Date();
@@ -274,6 +277,15 @@ commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireDelivery
     const job = await accessibleExportJob(c.env.DB, c.get('staff'), c.req.param('id'));
     if (!job) return c.json({ success: false, error: 'Not found' }, 404);
     const filter = parseCommonVarExportFilter(job.filter_json);
+    if (filter.accountId !== job.line_account_id) {
+      return inputError(c, { success: false, error: '前の書き出し条件を読み取れません。一覧の絞り込みから書き出してください' }, 400);
+    }
+    if (filter.folderId && filter.ungrouped) {
+      return inputError(c, { success: false, error: 'フォルダと未分類は同時に選べません' }, 400, ["folderId","ungrouped"]);
+    }
+    if (!await exportFolderAvailable(c.env.DB, job.line_account_id, filter.folderId)) {
+      return inputError(c, { success: false, error: '指定のフォルダが見つかりません。フォルダを選び直してください' }, 400, ["folderId","accountId"]);
+    }
     const staff = c.get('staff');
     const now = new Date();
     const next = await createCommonVarExportJob(c.env.DB, {
@@ -292,6 +304,7 @@ commonVarExports.post('/api/common-vars/exports/:id/regenerate', requireDelivery
       await task;
     }
     const fresh = await getCommonVarExportJob(c.env.DB, next.id);
+    c.set('outputAudit', { count: (fresh ?? next).row_count, accountId: job.line_account_id, targetId: next.id, phase: 'requested' });
     return c.json({ success: true, data: exportJobJson(fresh ?? next) }, 201);
   } catch (error) {
     throw error;
