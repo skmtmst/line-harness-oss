@@ -106,29 +106,28 @@ describe('段は6つで、順番と題が板どおり', () => {
 })
 
 describe('段1 LINEアカウント', () => {
-  it('稼働・一致・シークレット確認の3つが揃って初めて終わり', () => {
+  it('アカウントを登録すれば終わり', () => {
     expect(buildSteps({ ...EMPTY, accounts: [account()] })[0].state).toBe('done')
   })
 
-  it('まだ確かめていない Webhook を「合っている」と読まない', () => {
+  it('Webhook が未確認でも登録済みなら終わり', () => {
     const steps = buildSteps({ ...EMPTY, accounts: [account({ webhook: { status: 'unknown' } })] })
-    expect(steps[0].state).toBe('stalled')
-  })
-
-  it('R74: URL一致でも利用オフなら終わりにしない', () => {
-    const steps = buildSteps({ ...EMPTY, accounts: [account({ webhook: { status: 'matched', active: false } })] })
-    expect(steps[0].state).toBe('stalled')
-    expect(steps[0].next).toContain('利用設定')
-  })
-
-  it('R74: URL一致かつ利用オンなら終わり', () => {
-    const steps = buildSteps({ ...EMPTY, accounts: [account({ webhook: { status: 'matched', active: true } })] })
     expect(steps[0].state).toBe('done')
   })
 
-  it('シークレットが未確認なら終わりにしない', () => {
+  it('Webhook の利用がオフでも登録済みなら終わり', () => {
+    const steps = buildSteps({ ...EMPTY, accounts: [account({ webhook: { status: 'matched', active: false } })] })
+    expect(steps[0].state).toBe('done')
+  })
+
+  it('停止中でも登録済みなら終わり', () => {
+    const steps = buildSteps({ ...EMPTY, accounts: [account({ isActive: false })] })
+    expect(steps[0].state).toBe('done')
+  })
+
+  it('シークレットが未確認でも登録済みなら終わり', () => {
     const steps = buildSteps({ ...EMPTY, accounts: [account({ channelSecretConfigured: false })] })
-    expect(steps[0].state).toBe('stalled')
+    expect(steps[0].state).toBe('done')
   })
 
   it('1件も無ければ「まだです」', () => {
