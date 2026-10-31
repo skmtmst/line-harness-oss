@@ -112,17 +112,18 @@ export const methods1 = {
           key: string;
           name: string | null;
           isSample: boolean;
-          setId: string | null;
-          setVersion: number;
-          pendingUpdate: {
+          /** 本文と配布情報は、編集できるオーナー・管理者にだけ返る。 */
+          setId?: string | null;
+          setVersion?: number;
+          pendingUpdate?: {
             setId: string;
             setVersion: number;
             item: StarterSetItem;
           } | null;
-          currentSnapshot: string | null;
+          currentSnapshot?: string | null;
           activationAllowed: boolean;
           requiresActivation: boolean;
-          definition: {
+          definition?: {
             buttons?: Array<{
               label: string;
               actionType: string;

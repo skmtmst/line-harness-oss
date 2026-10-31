@@ -35,3 +35,5 @@ V8_GUARD_BASE=http://127.0.0.1:4310 V8_GUARD_ARTIFACT_DIR=/tmp/permission-naviga
 `apps/web/scripts/v8-guard/document-title.test.mjs` は、メニュー正本の全URLと認証・スマホ・運営の入口を1152/1440、API0/600msで開き、描画ごとの文書の題が1つ、取得後に既定名へ戻らないことを確認します。実際の左メニューも押します。`V8_GUARD_TITLE_FAULT=1` で競合する題を足して赤、旗を外した同じ出力で緑になることを確認します。写真・各フレームは `V8_GUARD_ARTIFACT_DIR`、動画は `V8_GUARD_VIDEO=1` で保存します。
 
 `apps/web/scripts/v8-guard/canonical-route.test.mjs` は、旧URLの成果6タブ・無効/未指定のタブ・案件・設定・自動応答・サーバーの固定転送を1152/1440、API0/600msで確認します。query/hashと到着先を保ち、成果の別の題が挟まらず、実メニューは正規URLへ直行することを見ます。各入口はテンプレートから開き、戻る操作で互換入口を挟まずテンプレートに戻れることも確認します。`V8_GUARD_CANONICAL_FAULT=1 CANONICAL_PROBE=1 CANONICAL_DELAYS=600` で題を壊す対照、旗なしで復元を確認します。写真/動画の指定は文書の題の見張りと共通です。
+
+`setup-step-layout.mjs` は、ダッシュボードの基本手順と選んだ機能の共通行を測り、幅0・高さ60px未満・行間8px未満・短い手順名の切れ・未確認の理由と名前の距離・横のはみ出しを検出します。`capture.spec.mjs` と撮影で同じ判定を使い、故障対照は `pnpm test:scripts scripts/visual-qa/setup-step-layout.test.ts` で確認します。

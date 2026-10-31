@@ -47,5 +47,5 @@ export async function passBillingEvent(db:D1Database,b:PassBillingEvent,now=new 
  const saved=await db.prepare('SELECT result FROM booking_pass_billing_events WHERE event_id=?').bind(b.id).first<{result:string}>();return {replayed:false,result:saved!.result,testMode:true};
 }
 export async function expirePassGrace(db:D1Database,now=new Date()){
- return db.prepare("UPDATE booking_entitlements SET billing_status='stopped',version=version+1,updated_at=? WHERE source='online' AND billing_status='grace' AND julianday(grace_until)<=julianday(?)").bind(now.toISOString(),now.toISOString()).run();
+ return db.prepare("UPDATE booking_entitlements SET billing_status='stopped',version=version+1,updated_at=? WHERE source='online' AND billing_status='grace' AND julianday(grace_until)<=julianday(?) AND NOT EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=booking_entitlements.id)").bind(now.toISOString(),now.toISOString()).run();
 }

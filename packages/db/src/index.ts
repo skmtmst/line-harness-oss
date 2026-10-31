@@ -1311,3 +1311,6 @@ export {
 export {
   consumePublicIngressReceipt,
 } from './public-ingress.js';
+
+export { prepareMonthlyContract, getMonthlyContractRow, findMonthlyContractReplay, setMonthlyServiceState, listMonthlyContracts, monthlyEntitlementAccess, prepareMonthlyEventApplication, recordMonthlyEventApplication, MonthlyLedgerError } from './booking-monthly/index.js';
+export type { MonthlyScope, MonthlyContractSnapshot, MonthlyContractRow, MonthlyEventApplication } from './booking-monthly/index.js';

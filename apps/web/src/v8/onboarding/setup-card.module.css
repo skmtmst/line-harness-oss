@@ -30,27 +30,8 @@
 .count {
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  line-height: var(--sc-caption-lh);
+  line-height: var(--text-caption--line-height);
   white-space: nowrap;
-}
-
-/* 進み具合は共通の段に区切った緑（ProgressBar）。この板では幅いっぱいに伸ばす。 */
-.track {
-  --progress-steps-w: 100%;
-}
-
-.rows {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sc-gap);
-  list-style: none;
-}
-
-.row {
-  display: flex;
-  min-height: var(--sc-row-h);
-  align-items: center;
-  gap: var(--polish-space-field);
 }
 
 .rowIcon {
@@ -60,35 +41,7 @@
   color: var(--color-ink-faint);
 }
 
-.row[data-alert] .rowIcon {
-  color: var(--color-status-warn-deep);
-}
-
-.rowText {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-}
-
-.rowTitle {
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--text-body);
-  font-weight: 600;
-  line-height: var(--sc-body-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rowNote {
-  overflow: hidden;
-  color: var(--color-ink-secondary);
-  font-size: var(--text-caption);
-  line-height: var(--sc-caption-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.alertIcon { color: var(--color-status-warn-deep); }
 
 .done {
   display: flex;
@@ -97,8 +50,8 @@
 }
 
 .doneIcon {
-  width: var(--sc-small-icon);
-  height: var(--sc-small-icon);
+  width: var(--polish-icon-control);
+  height: var(--polish-icon-control);
   flex: none;
   color: var(--color-accent-deep);
 }
@@ -108,20 +61,7 @@
   overflow: hidden;
   color: var(--color-ink-secondary);
   font-size: var(--text-caption);
-  line-height: var(--sc-caption-lh);
+  line-height: var(--text-caption--line-height);
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.link {
-  flex: none;
-  border: 0;
-  background: transparent;
-  color: var(--color-link);
-  font: inherit;
-  font-size: var(--text-body);
-  font-weight: 600;
-  line-height: var(--sc-body-lh);
-  cursor: pointer;
   white-space: nowrap;
 }

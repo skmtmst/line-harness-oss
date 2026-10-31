@@ -142,6 +142,7 @@ export default function Button(props: ButtonProps) {
 
   if ('href' in props && props.href !== undefined) {
     const { children, icon, count, lockedReason: _lockedReason, actionWording: _actionWording, className: _className, href, external, size: _size, variant: _variant, align, fullWidth, textTone: _textTone, presentation, filterActive: _filterActive, ...linkProps } = props
+    for (const key of ['busy', 'busyLabel', 'done', 'doneLabel', 'widthReserve', 'disabledReason']) delete (linkProps as Record<string, unknown>)[key]
     const newTab = external || linkProps.target === '_blank'
     return (
       <Link href={href} className={classes} data-shared-button="" data-variant={variant} data-align={fullWidth ? undefined : align} data-full-width={fullWidth || undefined} data-presentation={presentation} {...linkProps} data-text-content={hasButtonText(children) || undefined} target={newTab ? '_blank' : linkProps.target} rel={newTab ? 'noopener noreferrer' : linkProps.rel} aria-label={iconButtonLabel(props)}>
@@ -152,7 +153,9 @@ export default function Button(props: ButtonProps) {
     )
   }
 
-  return <NativeButton {...props} classes={classes} />
+  const nativeProps = { ...props } as NativeButtonProps & Pick<LinkButtonProps, 'external'>
+  delete nativeProps.external
+  return <NativeButton {...nativeProps} classes={classes} />
 }
 
 function NativeButton(props: NativeButtonProps & { classes: string }) {

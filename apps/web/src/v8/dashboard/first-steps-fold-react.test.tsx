@@ -158,3 +158,13 @@ it('権限のない段の入口も灰色のボタンで残す', () => {
   expect(button.hasAttribute('href')).toBe(false)
   fireEvent.click(button)
 })
+
+it('設定の許可が渡されても閲覧のみでは質問の入口を押せず理由を残す', () => {
+  const configure = vi.fn()
+  render(<FirstStepsCard summary={summary} folded={false} onToggle={() => {}} readOnly configureAllowed onConfigure={configure} />)
+  const button = screen.getByRole('button', { name: '使い方の設定を開く' })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.click(button)
+  expect(configure).not.toHaveBeenCalled()
+  expect(document.getElementById(button.getAttribute('aria-describedby')!)?.textContent).toContain('管理者')
+})
