@@ -134,7 +134,7 @@ function Fixture(){
   </ListToolbarRow></section>
   <section id="row-controls"><RowMenu label="行の操作" items={[{label:'初期値に戻す…',tone:'danger',onSelect:()=>{}}]} /><RowMenu label="小さい行の操作" appearance="box" items={[{label:'編集',onSelect:()=>{}}]} /><Pagination page={1} pageCount={2} onPageChange={()=>{}} /><Pagination page={1} pageCount={1} summary="1件中1件" ariaLabel="1ページの送り" onPageChange={()=>{}} /></section>
   <section id="notices" style={{maxWidth:720}}>
-   <Notice tone="info" heading="回復コードが残っていません" message="認証アプリが使えない時に入れなくなる前に、作り直してください。" action={<Button>作り直す</Button>} onClose={()=>{}}/>
+   <Notice tone="info" heading="いつもと違う端末からのログイン" message="心当たりがない場合はログイン中の端末を確認してください。" action={<Button>確認する</Button>} onClose={()=>{}}/>
    <Notice tone="warn" heading="いつもと違う端末・場所からのログインです。心当たりがなければ、ほかの端末のログインを終えてパスワードを変えてください" message="大事な操作の前に毎回、本人確認をします。" action={<Button>ログイン中の端末を見る</Button>} onClose={()=>{}}/>
    <Notice tone="warn" heading="ほかの人がこの内容を保存しました" message="読み直すと、ほかの人の変更を見てから続けられます。" states={[{label:'済み',state:'done'},{label:'未保存',state:'pending'}]} footer={<button type="button">入力を破棄する</button>} action={<><Button>読み直す</Button><Button variant="primary">上書きする</Button></>} onClose={()=>{}}/>
    <Notice tone="info" action={<Button>開く</Button>} onClose={()=>{}}>題のない1行の知らせです。</Notice>

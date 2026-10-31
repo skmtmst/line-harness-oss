@@ -1,7 +1,6 @@
 'use client'
 import { Check, RefreshCw } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes/index'
 import OpsShell from '@/components/ops/ops-shell'
 import { OpsHead } from '@/v8/ops/shell'
 import { SelfMfa } from '@/v8/settings/public/staff-self-mfa/index'
@@ -37,7 +36,6 @@ type Session = { id: string; name: string; platformAdmin?: boolean; platformAdmi
  */
 export default function OpsTwoFactorV8() {
   const saveErrors = useSaveFormErrors()
-  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
   const [session, setSession] = useState<Session | null>(null)
   const [state, setState] = useState<'loading' | 'ready' | 'done' | 'denied' | 'security'>('loading')
   const [uri, setUri] = useState('')
@@ -128,7 +126,6 @@ export default function OpsTwoFactorV8() {
     const res = await opsCall(api.staff.confirmTwoFactorSetup(session.id, digits))
     setBusy(false)
     if (!res.success) { setError(otpFailureMessage(res.error || '認証コードが正しくありません')); return }
-    setRecoveryCodes(res.data?.recoveryCodes ?? [])
     setState('done')
   }
 
@@ -151,7 +148,7 @@ export default function OpsTwoFactorV8() {
             <ListState permissionScope="hq" kind="forbidden" title="この画面は運営メンバーだけが開けます" description="招待メールのリンクから進んでください。" />
             <Button fullWidth href="/ops/login" className={styles.wide}>運営のログインへ</Button>
           </>
-        ) : state === 'done' && recoveryCodes.length ? <RecoveryCodePanel codes={recoveryCodes} onContinue={() => void logoutAndGoToLogin('/ops/login')} /> : state === 'done' ? (
+        ) : state === 'done' ? (
           <>
             <NoteBar tone="info">二段階認証を登録しました。安全のため一度ログアウトしています。メールとパスワード、次に6桁の数字でログインし直してください。</NoteBar>
             <Button fullWidth variant="primary" onClick={() => logoutAndGoToLogin('/ops/login')} className={styles.wide}>運営のログインへ</Button>

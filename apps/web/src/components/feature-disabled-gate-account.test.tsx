@@ -68,6 +68,34 @@ it('同じアカウントのまま描き直しても案内は残す', async () =
   expect(host.textContent).toContain('この機能は設定でオフになっています')
 })
 
+it('機能設定は補助APIが機能オフでも閉じない', async () => {
+  state.pathname = '/settings'
+  await render()
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent(FEATURE_DISABLED_EVENT, {
+      detail: { featureId: 'analytics', accountId: 'account-a' },
+    }))
+  })
+  expect(host.textContent).toContain('ウェビナーの中身')
+  expect(host.textContent).not.toContain('この機能は設定でオフになっています')
+})
+
+it('機能設定の補助取得は機能オフを画面全体へ通知しない', async () => {
+  state.pathname = '/settings'
+  await render()
+  const onDisabled = vi.fn()
+  window.addEventListener(FEATURE_DISABLED_EVENT, onDisabled)
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ code: 'FEATURE_DISABLED', featureId: 'analytics' }), { status: 403 })))
+  try {
+    await act(async () => {
+      await fetchApi('/api/analytics/usage?account_id=account-a', { suppressFeatureDisabledEvent: true }).catch(() => undefined)
+    })
+    expect(onDisabled).not.toHaveBeenCalled()
+  } finally {
+    window.removeEventListener(FEATURE_DISABLED_EVENT, onDisabled)
+  }
+})
+
 it('WEB-007：Aの遅い機能オフの返事はBへ切り替えた画面を隠さない', async () => {
   await render()
   state.accountId = 'account-b'

@@ -24,7 +24,7 @@ import {
   sendStaffInviteEmail, sendStaffLineLinkEmail,
   sendStaffEmailChangeConfirmEmail, sendStaffEmailChangeNoticeEmail, sendStaffEmailChangeCompletedEmail,
 } from '../services/staff-invite.js';
-import { createTotpEnrollment, buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
+import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import type { Env } from '../worker-env.js';
 import { getLineAccounts } from '@line-crm/db';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
@@ -1164,14 +1164,14 @@ staff.post('/api/staff/:id/two-factor/confirm', inputJsonBoundary({"code":["stri
   if (!result.valid) {
     return inputError(c, { success: false, error: attempt.attempts >= attempt.maxAttempts ? TWO_FACTOR_ATTEMPT_LIMIT_ERROR : '認証コードが正しくありません' }, attempt.attempts >= attempt.maxAttempts ? 429 : 400, []);
   }
-  const enrollment = await createTotpEnrollment(await decryptTotpSecret(encrypted, key), key);
+  const encryptedSecret = await encryptTotpSecret(await decryptTotpSecret(encrypted, key), key);
   const promotion = c.env.DB.prepare(`UPDATE staff_members SET totp_secret_enc=?,totp_pending_secret_enc=NULL,
     totp_enabled_at=?,totp_last_used_step=? WHERE id=? AND is_active=1 AND totp_secret_enc IS ? AND totp_pending_secret_enc=?
     ${proof ? `AND EXISTS(SELECT 1 FROM platform_settings WHERE key=? AND value=?)
       AND EXISTS(SELECT 1 FROM auth_step_up_grants g WHERE g.token_hash=? AND g.staff_id=staff_members.id
         AND g.purpose='auth.mfa.reenroll' AND g.consumed_at IS NOT NULL AND g.session_token_hash=?
         AND julianday(g.expires_at)>julianday('now') AND (g.issued_policy_version IS NULL OR g.issued_policy_version=staff_members.policy_version))` : ''}`)
-    .bind(enrollment.encrypted, new Date().toISOString(), result.step, id, member.totp_secret_enc, encrypted,
+    .bind(encryptedSecret, new Date().toISOString(), result.step, id, member.totp_secret_enc, encrypted,
       ...(proof ? [proofKey, proofValue, proof.grantHash, proof.sessionHash] : []));
   const promoted = proof ? (await c.env.DB.batch([
     promotion,
@@ -1187,7 +1187,7 @@ staff.post('/api/staff/:id/two-factor/confirm', inputJsonBoundary({"code":["stri
     await activatePlatformAdminIfAwaitingTotp(c.env.DB, id);
     await revokeStaffAuthentication(c.env.DB, id);
   }
-  return c.json({ success: true, data: { ...await serializeStaff(c.env.DB, updated!, staffEmailVisibility(c, updated!.id)), recoveryCodes: enrollment.recoveryCodes } });
+  return c.json({ success: true, data: { ...await serializeStaff(c.env.DB, updated!, staffEmailVisibility(c, updated!.id)) } });
 });
 
 staff.delete('/api/staff/:id/two-factor', async (c) => {
