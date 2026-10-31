@@ -779,7 +779,7 @@ describe('POST /api/line-accounts/connect', () => {
     });
     expect(res.status).toBe(201);
     expect(dbMocks.createLineAccount).toHaveBeenCalledOnce();
-    expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account',expect.anything(),expect.anything(),undefined);
+    expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account',expect.anything(),expect.anything(),undefined,{bucket:undefined,publicBaseUrl:undefined,reportError:expect.any(Function)});
     expect(dbMocks.createLineAccount.mock.calls[0][1]).toMatchObject({
       tenantId: 'tenant-current',
       name: 'LINE公式名',
