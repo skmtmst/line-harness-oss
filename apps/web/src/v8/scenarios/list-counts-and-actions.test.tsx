@@ -195,7 +195,9 @@ afterEach(() => {
 describe('読了率の母数', () => {
   test('いま途中と読み終えた人の合計を母数にし、購読中は重複を含むと書く', async () => {
     await mount()
-    await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('登録した 40 人の 25%'))
+    await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('全7件の合計'))
+    fireEvent.click(screen.getByRole('button', { name: '最後まで配信した人の説明', exact: true }))
+    expect(screen.getByText('登録した 40 人の 25%')).toBeTruthy()
     expect(kpi('配信中').textContent?.replace(/\n/g, '')).toContain('いま途中にいる人（重複を含む）')
     expect(screen.getAllByTitle('配信中 10 人・最後まで配信 2 人')).toHaveLength(2)
   })
@@ -203,7 +205,9 @@ describe('読了率の母数', () => {
   test('登録した人が0でも数は読めているので薄い灰の「登録した 0 人」と出す（割合は決まらないので出さない）', async () => {
     state.stats = { scenarios: { total: 0, active: 0, subscribers: 0, completed: 0, sentThisWeek: 0 } }
     await mount()
-    await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('登録した 0 人'))
+    await waitFor(() => expect(kpi('最後まで配信した人').textContent).toContain('全7件の合計'))
+    fireEvent.click(screen.getByRole('button', { name: '最後まで配信した人の説明', exact: true }))
+    expect(screen.getAllByText('登録した 0 人').length).toBeGreaterThan(0)
     expect(kpi('最後まで配信した人').textContent).not.toContain('%')
   })
 
@@ -232,6 +236,7 @@ describe('件数の定義', () => {
     expect(folderRow('未分類').textContent).toBe('未分類2')
     // 数の帯は list-stats の total（共通を含まない 5）ではなく、全体件数 7。
     await waitFor(() => expect(kpi('シナリオ').textContent).toContain('7'))
+    expect(kpi('最後まで配信した人').textContent).toContain('全7件の合計')
     expect(kpi('シナリオ').textContent).not.toContain('5件')
   })
 

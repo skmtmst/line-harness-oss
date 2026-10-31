@@ -127,3 +127,14 @@ it('読み込み中は件数と「書き出しを止める」を出し、止め�
   expect(downloads).toHaveLength(0)
   expect(screen.queryByRole('button', { name: '書き出しを止める' })).toBeNull()
 })
+
+
+it('実行の日時は日付と日本時間を同じ欄に出し、機械用の日時も保つ', async () => {
+  serve(1)
+  render(<AutoReplyRunsPage />)
+  await waitFor(() => {
+    const timestamp = document.querySelector('time[datetime="2026-09-15T01:00:00.000Z"] [data-list-date-time]')
+    expect(timestamp?.textContent).toContain('09/15')
+    expect(timestamp?.textContent).toContain('10:00')
+  })
+})

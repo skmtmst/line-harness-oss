@@ -566,8 +566,8 @@ function FriendAddList() {
   const kpis = [
     {
       key: 'rules', icon: MessageSquareMore, title: '初回案内', value: error ? null : summary?.rules ?? null, unit: '件',
-      detail: summary ? `有効 ${formatNumber(summary.active)}件` : emptyValue('unknown'),
-      help: 'いまある初回案内の設定数です。右の3つ（直近7日）とは期間がちがいます。',
+      detail: summary ? `有効 ${countText(summary.active, '件')}（共通は別）` : error ? '読み込めませんでした' : loading ? '読み込んでいます' : emptyValue('unknown'),
+      help: '設定数には共通の案内を含みます。有効の内訳は共通の案内を除きます。右の3つ（直近7日）とは期間がちがいます。',
     },
     {
       key: 'adds', icon: UserPlus, title: '直近7日の友だち追加', value: error ? null : summary?.recentAdds ?? null, unit: '人',
@@ -845,6 +845,7 @@ function FriendAddList() {
               value={kpi.value}
               unit={kpi.value === null ? '' : kpi.unit}
               detail={kpi.detail}
+              help={kpi.help}
               action={kpi.action}
             />
           ))}

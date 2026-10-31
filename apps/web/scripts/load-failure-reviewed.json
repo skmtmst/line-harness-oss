@@ -190,7 +190,7 @@
   },
   {
     "filename": "src/v8/friends/merged/use-merged-users.ts",
-    "fingerprint": "d1edbd84da78d3bf",
+    "fingerprint": "b127ba48c4479e04",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"

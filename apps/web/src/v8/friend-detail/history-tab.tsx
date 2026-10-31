@@ -67,7 +67,7 @@ export default function HistoryTab({ friend, friendId, data }: { friend: FriendD
       <div className={styles.tools}>
         <SegmentedControl aria-label="履歴の種類" value={filter} onChange={setFilter} options={FILTERS} />
         {historyStatus === 'ready' ? (
-          <span className={styles.count}>{complete ? `${formatNumber(filteredRows.length)} 件` : `${formatNumber(filteredRows.length)} 件を表示中`}</span>
+          <span className={styles.count}>{complete ? `${formatNumber(rows.length)} 件` : `${formatNumber(rows.length)} 件を表示中`}</span>
         ) : null}
       </div>
 
