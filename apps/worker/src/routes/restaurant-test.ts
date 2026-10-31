@@ -293,7 +293,7 @@ restaurantTest.get('/api/restaurant-test/availability',requireRole('owner','admi
 for(const method of ['GET','PUT'] as const)restaurantTest.on(method,'/api/restaurant-test/close-notification-settings',requireRole('owner','admin','staff'),async c=>{
  if(!hasOrganizationSelector(c))return requiredAccount(c);
  const org=await organizationFor(c),b=method==='PUT'?await c.req.json().catch(()=>null):null,storeId=method==='PUT'?b?.storeId:c.req.query('storeId');
- if(!org||typeof storeId!=='string'||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'店舗が正しくありません'},404);
+ if(!org||typeof storeId!=='string'||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,code:'restaurant_store_mismatch',error:'店舗が正しくありません'},404);
  try{return c.json({success:true,data:method==='GET'?await readCloseNotificationSettings(dbFor(c.env,storeId),storeId):await saveCloseNotificationSettings(dbFor(c.env,storeId),storeId,b)});}
  catch(e){if(e instanceof StampError)return inputError(c, {success:false,error:e.message}, e.status, []);throw e;}
 });
