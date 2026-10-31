@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import { ProgressBar } from '@/components/shared/progress'
-import { StyleChoiceStep, StyleChoiceSwitcher, STYLE_CHOICE_START_ID, StyleChoiceStatus } from '@/v8/onboarding/public/style-choice'
+import { StyleChoiceStep, StyleChoiceSwitcher, STYLE_CHOICE_START_ID, StyleChoiceStatus, StyleChooseAction } from '@/v8/onboarding/public/style-choice'
 import { InitialMenuChoice, type InitialMenuSelection } from '@/v8/onboarding'
 import styles from '@/v8/onboarding/wizard.module.css'
 
@@ -51,7 +51,7 @@ export default function RegistrationStyleDialog({ open, accountId, menu, onMenuC
     designFooterPadding="16px 24px"
     designContentPadding="16px 24px 24px"
     footer={demoOpen ? <DialogActions leadingAction={<Button onClick={() => { if (demoPage > 0) setDemoPage(demoPage - 1) }} aria-disabled={demoPage === 0} disabled={busy}>前のページ</Button>}>
-      <Button variant="primary" onClick={() => { if (choice !== viewing) onChoose(viewing) }} aria-disabled={choice === viewing} disabled={busy}>{choice === viewing ? '選んでいます' : 'このスタイルにする'}</Button>
+      <StyleChooseAction primary viewing={viewing} chosen={choice || null} onChoose={onChoose} disabled={busy} />
       <Button onClick={() => { if (demoPage < 4) setDemoPage(demoPage + 1) }} aria-disabled={demoPage === 4} disabled={busy}>次のページ</Button>
     </DialogActions> : <DialogActions leadingAction={menuStep ? <Button onClick={()=>setMenuStep(false)} disabled={busy}>スタイルを選び直す</Button> : <Button type="button" variant="text" onClick={onSkip} disabled={busy || !ready}>あとで設定する</Button>}>
       <Button type="button" variant="primary" onClick={()=>{if(menuStep)onSave();else setMenuStep(true)}} disabled={busy || !ready || !choice || (menuStep&&menu.value==='existing'&&!menu.resourceId)} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? 'スタイルを選んでください' : null}>{menuStep?'このメニューで進む':'次へ'}<ArrowRight size={16} aria-hidden="true" /></Button>

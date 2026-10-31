@@ -9,13 +9,20 @@ import StyleChoiceStep, { StyleChoiceStatus } from './style-choice-step'
 import { STYLE_EXPERIENCE_SCRIPT } from './style-experience-player'
 import { STYLE_CHOICES, styleLabel, type StyleState } from './model'
 
-const calls = vi.hoisted(() => ({ save: vi.fn(), closed: vi.fn() }))
+const calls = vi.hoisted(() => ({ save: vi.fn(), closed: vi.fn(), choose: vi.fn() }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: {
   save: calls.save, activate: vi.fn(),
   starterSet: vi.fn(async () => ({ success: true, data: { definition: { items: [] }, preview: [] } })),
   starterItems: vi.fn(async () => ({ success: true, data: { items: [] } })),
 } }))
 vi.mock('@/hooks/use-account-style', () => ({ accountStyleUpdated: vi.fn() }))
+vi.mock('./use-wizard', async (original) => {
+  const actual = await original<typeof import('./use-wizard')>()
+  return { ...actual, useWizard: (...args: Parameters<typeof actual.useWizard>) => {
+    const wizard = actual.useWizard(...args)
+    return { ...wizard, chooseStyle: (style: AccountStyle) => { calls.choose(style); wizard.chooseStyle(style) } }
+  } }
+})
 vi.mock('@/components/shared/list-navigation', async (original) => ({
   ...(await original<object>()),
   default: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a>,
@@ -151,4 +158,18 @@ it('窓の唯一の閉じるボタンはデモから選択画面へ戻し、選�
   fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
   expect(screen.getByRole('button', { name: '詳しく見る' })).toBeTruthy()
   expect(calls.closed).not.toHaveBeenCalled()
+})
+
+
+it('はじめの質問のデモで選ぶと、選択を渡し選択済みボタンへ焦点を移す', async () => {
+  render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  const dialog = screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  const action = within(dialog).getByRole('button', { name: 'このスタイルにする' })
+  expect(action.closest('[data-dialog-actions]')).toBeTruthy()
+  fireEvent.click(action)
+  expect(calls.choose).toHaveBeenCalledExactlyOnceWith('restaurant')
+  const selected = within(dialog).getByRole('button', { name: '選んでいます' })
+  await waitFor(() => expect(document.activeElement).toBe(selected))
+  expect(within(dialog).getByText('選んでいるスタイル：飲食店')).toBeTruthy()
 })

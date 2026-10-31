@@ -26,6 +26,7 @@ import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
 import { InitialMenuChoice } from './initial-menu-choice'
 import SetupLinks from './setup-links'
+import StyleChooseAction from './style-choose-action'
 import StyleChoiceStep, { StyleChoiceSwitcher, STYLE_CHOICE_ORDER, STYLE_CHOICE_START_ID, StyleChoiceStatus, initialViewingStyle } from './style-choice-step'
 import { useState } from 'react'
 import { formatNumber } from '@/lib/format'
@@ -57,7 +58,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
 
   const onCount = Object.values(enabled).filter(Boolean).length
   const footer = demoOpen && step === 0 ? <DialogActions leadingAction={<Button onClick={() => { if (demoPage > 0) setDemoPage(demoPage - 1) }} aria-disabled={demoPage === 0} disabled={busy}>前のページ</Button>}>
-      <Button variant="primary" onClick={() => { if (chosenStyle !== viewing) chooseStyle(viewing) }} aria-disabled={chosenStyle === viewing} disabled={busy}>{chosenStyle === viewing ? '選んでいます' : 'このスタイルにする'}</Button>
+      <StyleChooseAction primary viewing={viewing} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} />
       <Button onClick={() => { if (demoPage < 4) setDemoPage(demoPage + 1) }} aria-disabled={demoPage === 4} disabled={busy}>次のページ</Button>
     </DialogActions> : (
     <DialogActions leadingAction={step === 0 ? <>
