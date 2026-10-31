@@ -1111,3 +1111,5 @@
 - [列車1031Jの修正](release-log/unreleased/2026-kenta-train-1031j.md) — 反映履歴、確認 2026-11-01。
 
 - [列車1031K：フォーム・タグ・率と登録結果](release-log/unreleased/2027-kenta-train-1031k.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [リッチメニューの入力案内](release-log/unreleased/0000-kenta-rich-menu-validation-copy.md)：必須入力の案内文末の整形。確認日：2026-11-01。

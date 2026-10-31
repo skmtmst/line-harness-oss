@@ -497,8 +497,8 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   saveErrors.define('name', 'メニュー名', () => null, { required: true, reveal: () => setStep('shape') })
   saveErrors.define('chatBarText', 'トーク画面の下の文言', () => null, { required: true, reveal: () => setStep('shape') })
   const fields = useFormErrors()
-  fields.define('name', 'メニュー名', () => (name.trim() ? null : '名前を入力してください'), { required: true, reveal: () => setStep('shape') })
-  fields.define('chatbar', 'トーク画面の下の文言', () => (chatBarText.trim() ? null : 'トーク画面の下の文言を入力してください'), { required: true, reveal: () => setStep('shape') })
+  fields.define('name', 'メニュー名', () => (name.trim() ? null : '名前を入力してください。'), { required: true, reveal: () => setStep('shape') })
+  fields.define('chatbar', 'トーク画面の下の文言', () => (chatBarText.trim() ? null : 'トーク画面の下の文言を入力してください。'), { required: true, reveal: () => setStep('shape') })
   if (group) {
     pages.forEach((page, pageIndex) => {
       page.areas.forEach((area, areaIndex) => {
