@@ -2,7 +2,7 @@
 import { DetailPreview, DetailSection } from '@/components/shared/detail-content'
 import type { Alloc, Hours, SlotInfo, Conflict } from './stock-types'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Armchair, Check, X } from 'lucide-react'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -114,11 +114,26 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
     return () => { current = false }
   }, [selectedAccountId, storeId, date, refresh])
 
+  // 説明だけに取得元を保持する。既存の時間・版の反映や生成可否は変えない。
+  const hoursScope = useRef({ accountId: selectedAccountId, storeId })
+  const latestHoursRequest = useRef<object | null>(null)
+  const [hoursReceipt, setHoursReceipt] = useState<{ scope: typeof hoursScope.current; request: object; hours: Hours; version: number } | null>(null)
+  useLayoutEffect(() => {
+    if (hoursScope.current.accountId !== selectedAccountId || hoursScope.current.storeId !== storeId) {
+      hoursScope.current = { accountId: selectedAccountId, storeId }
+    }
+  }, [selectedAccountId, storeId])
   const loadHours = () => {
+    const request = {}; latestHoursRequest.current = request
+    const scope = hoursScope.current
+    setHoursReceipt(null)
     if (!selectedAccountId || !storeId) return Promise.resolve()
     return restaurantTestApi.openingHours(selectedAccountId, storeId).then((res) => {
       const week = res.data.hours || emptyWeek()
       setHours(week); setHoursDraft(week); setHoursVersion(res.data.version); setHoursError('')
+      if (scope === hoursScope.current && request === latestHoursRequest.current && scope.accountId === selectedAccountId && scope.storeId === storeId && res.data.storeId === storeId) {
+        setHoursReceipt({ scope, request, hours: week, version: res.data.version })
+      }
       return res.data
     }).catch(() => { setHoursError('開ける時間を読み込めませんでした。再読込してください。') })
   }
@@ -147,6 +162,15 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
   const activeTables = useMemo(() => tables.filter((item) => item.is_active), [tables])
   const stoppedTables = useMemo(() => tables.filter((item) => !item.is_active), [tables])
   const totalSeats = useMemo(() => activeTables.reduce((sum, item) => sum + item.max_capacity, 0), [activeTables])
+  const missingHoursReason = canEdit && !busy && !hoursError && hoursReceipt && hoursReceipt.scope === hoursScope.current
+    && hoursReceipt.scope.accountId === selectedAccountId && hoursReceipt.scope.storeId === storeId
+    && hoursReceipt.request === latestHoursRequest.current && hoursReceipt.hours === hours && hoursReceipt.version === hoursVersion && hoursVersion === 0
+    ? '開ける時間を設定して保存してください。' : undefined
+  const confirmedTables = ctx.tableDefinition && ctx.tableDefinition.accountId === selectedAccountId && ctx.tableDefinition.snapshot === data
+    && data.organization && storeId && data.stores.some(item => item.id === storeId)
+  const noActiveTablesReason = canEdit && !busy && confirmedTables && activeTables.length === 0
+    ? '有効な卓がありません。座席・卓で卓を有効にしてください。' : undefined
+
 
   /* 埋まっている卓：サーバが出した卓（occupiedTableIds）を優先し、無ければ予約台帳の予約から出す。 */
   const occupiedOf = (row: RestaurantInventory): Set<string> => {
@@ -394,6 +418,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
               </div>
               <Button variant="text" size="inline" href="/restaurant-test/tables">座席・卓管理で変える →</Button>
             </div>
+            {noActiveTablesReason ? <DialogNote>{noActiveTablesReason}</DialogNote> : null}
             <div className={styles.allocGrid}>
               <Field label={<><span className={styles.allocLabel}>予約サイト</span></>}><SaveErrorField names={["ota","alloc.ota"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="予約サイト" value={alloc.ota} onChange={(ota) => updateAlloc({ ...alloc, ota })} /></SaveErrorField></Field>
               <Field label={<><span className={styles.allocLabel}>LINE 専用</span></>}><SaveErrorField names={["line","alloc.line"]}><NumberField canEdit={canEdit} invalid={allocInvalid} label="LINE 専用" value={alloc.line} onChange={(line) => updateAlloc({ ...alloc, line })} /></SaveErrorField></Field>
@@ -406,8 +431,9 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
           </Card>
           <Card layout="vertical" padding="spacious" gap="tight" surface="standard" aria-labelledby="rs-stock-title">
             <StockListHeading date={date} busy={busy} onChange={changeDate}>
-              {slots.length > 0 ? <RowActions subjectName="時間帯ごとの在庫" menuButtonProps={{ disabled: busy || !hoursVersion || allocInvalid }} menuItems={[{ id: 'generate', label: 'この日の枠を作る', lockedReason, disabled: !canEdit, onSelect: generateSlots }]} /> : null}
+              {slots.length > 0 ? <RowActions subjectName="時間帯ごとの在庫" menuButtonProps={{ disabled: busy || !hoursVersion || allocInvalid, 'aria-description': missingHoursReason }} menuItems={[{ id: 'generate', label: 'この日の枠を作る', lockedReason, disabled: !canEdit, onSelect: generateSlots }]} /> : null}
             </StockListHeading>
+            {missingHoursReason ? <DialogNote>{missingHoursReason}{' '}<Button variant="text" size="inline" href="#rs-hours-title">開ける時間を設定する</Button></DialogNote> : null}
             {dayRows === null ? (
               <div className={styles.stateBox}><ListState kind="loading" /></div>
             ) : slots.length === 0 ? (
@@ -421,6 +447,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
                       variant="primary"
                       lockedReason={lockedReason}
                       disabled={!canEdit || busy || !hoursVersion || allocInvalid}
+                      aria-description={missingHoursReason}
                       onClick={generateSlots}
                     >この日の枠を作る</Button>
                   )}
