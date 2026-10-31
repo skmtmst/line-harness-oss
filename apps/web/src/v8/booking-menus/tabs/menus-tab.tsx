@@ -10,6 +10,7 @@ import { useMemo, useRef, useState } from 'react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import { Plus } from 'lucide-react'
 import { type ActionMenuItem } from '@/components/shared/action-menu'
+import { RowNameButton, DataTable, TableHeadRow, Tr, Th, Td } from '@/components/shared/table'
 import Card from '@/components/shared/card'
 import Button from '@/components/shared/button'
 import EmptyList from '@/components/shared/empty-list'
@@ -279,16 +280,22 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
               {menuCount ?? menus.length} 件・出しているもの {activeCount}
             </span>
           </div>
-          <div className={styles.tableHead} role="row" aria-hidden="true">
-            <span className={styles.colOrder} />
-            <span className={styles.colName}>メニュー</span>
-            <span className={styles.colTime}>時間</span>
-            <span className={styles.colPrice}>金額</span>
-            <span className={styles.colStaff}>担当</span>
-            <span className={styles.colCount}>30日</span>
-            <span className={styles.colStatus}>状態</span>
-            <span className={styles.colMenu} />
-          </div>
+          <DataTable label="予約メニュー" columnSizing="content" columnLayout={{
+            headHeight: 'var(--polish-table-head)',
+            rowHeight: 'auto', gap: 'var(--tpl-bm-12)', padding: 'var(--tpl-bm-8)',
+            headPadding: 'var(--tpl-bm-8)', bodyTextSize: 'var(--text-label)', collapseScope: 'page',
+          }}>
+          <thead><TableHeadRow className={styles.tableHead} data-table-layout="columns">
+            <Th className={styles.colOrder} />
+            <Th className={styles.colName} grow>メニュー</Th>
+            <Th className={styles.colTime}>時間</Th>
+            <Th className={styles.colPrice}>金額</Th>
+            <Th className={styles.colStaff} collapseAt="narrow">担当</Th>
+            <Th className={styles.colCount} collapseAt="narrow">30日</Th>
+            <Th className={styles.colStatus}>状態</Th>
+            <Th className={styles.colMenu} />
+          </TableHeadRow></thead>
+          <tbody>
           {visible.map((menu) => {
             const orderIndex = shown.findIndex((item) => item.id === menu.id)
             const staffNames = (menu.assigned_staff ?? []).map((person) => person.display_name)
@@ -307,8 +314,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
               ] satisfies ActionMenuItem[] : []),
             ]
             return (
-              <div key={menu.id} className={styles.menuRow} {...reorder.rowProps(menu.id)}>
-                <span className={styles.colOrder}>
+              <Tr key={menu.id} className={styles.menuRow} {...reorder.rowProps(menu.id)} data-table-layout="columns">
+                <Td className={styles.colOrder}>
                   {/* 動かせない時（閲覧のみ・検索中・保存中）はつまみを出さず、理由を title と読み上げで言う。 */}
                   <ReorderHandle
                     look="icon"
@@ -319,38 +326,32 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                     {...reorder.handleProps(menu.id)}
                   />
                   <span className={styles.orderNum}>{orderIndex + 1}</span>
-                </span>
-                <span className={styles.colName}>
+                </Td>
+                <Td className={styles.colName} grow>
                   <span className={styles.nameLine}>
-                    <button
-                      type="button"
-                      className={styles.menuName}
-                      onClick={() => openMenuForm(menu)}
-                    >
-                      {menu.name}
-                    </button>
+                    <RowNameButton title={menu.name} onClick={() => openMenuForm(menu)}>{menu.name}</RowNameButton>
                     {/* 分類には色の項目が無い。絵 owaS3・P6EdLW どおり、色の一覧の先頭（青）の丸で出す。 */}
                     {menu.category_label ? <TagPill name={menu.category_label} color={FOLDER_SELECT_COLORS[0].value} size="sm" aria-label={`分類「${menu.category_label}」`} /> : null}
                   </span>
-                  {menu.description ? <span className={styles.menuDesc}>{menu.description}</span> : null}
-                </span>
-                <span className={styles.colTime}>
+                  {menu.description ? <span className={styles.menuDesc} title={menu.description}>{menu.description}</span> : null}
+                </Td>
+                <Td data-list-number className={styles.colTime}>
                   <span className={styles.cellNum}>{menu.duration_minutes}分</span>
-                </span>
-                <span className={styles.colPrice}>
+                </Td>
+                <Td data-list-number className={styles.colPrice}>
                   <span className={styles.cellNum}>{menuPriceLabel(menu)}</span>
-                </span>
-                <span className={styles.colStaff}>
+                </Td>
+                <Td className={styles.colStaff} collapseAt="narrow">
                   {staffNames.length === 0 ? (
                     <EmptyCell />
                   ) : (
-                    <span className={styles.cellText}>{staffNames.join('・')}</span>
+                    <span className={styles.cellText} title={staffNames.join('・')}>{staffNames.join('・')}</span>
                   )}
-                </span>
-                <span className={styles.colCount}>
+                </Td>
+                <Td data-list-number className={styles.colCount} collapseAt="narrow">
                   <span className={styles.cellNum}>{menu.booking_count_30_days ?? 0} 件</span>
-                </span>
-                <span className={styles.colStatus}>
+                </Td>
+                <Td className={styles.colStatus}>
                   {/* 公開していても担当が 0 人だと予約を受けられない。理由を札で言い、押すと担当スタッフのタブへ。 */}
                   {(visOverride[menu.id] ?? menu.is_active) && staffNames.length === 0 ? (
                     <StatusAction onClick={onOpenStaff} title="担当スタッフのタブで担当を決める">
@@ -359,8 +360,8 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                   ) : (
                     <SharedStatusPill tone={(visOverride[menu.id] ?? menu.is_active) ? 'success' : 'neutral'}>{(visOverride[menu.id] ?? menu.is_active) ? '公開中' : '停止中'}</SharedStatusPill>
                   )}
-                </span>
-                <span className={styles.colMenu}>
+                </Td>
+                <Td className={styles.colMenu}>
                   <RowMenu
                     appearance="box"
                     size="row"
@@ -373,10 +374,12 @@ export function MenusTabV8({ accountId, menus, status, error, menuCount, canEdit
                       ...menuItems,
                     ]}
                   />
-                </span>
-              </div>
+                </Td>
+              </Tr>
             )
           })}
+          </tbody>
+          </DataTable>
           <div className="mt-3 flex items-center justify-between gap-3">
             <ListRange
               label="メニュー"

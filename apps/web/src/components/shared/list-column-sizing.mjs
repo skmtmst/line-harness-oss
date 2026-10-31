@@ -29,12 +29,17 @@ export function fitListColumns(frame) {
       if (!node.textContent.trim()) return 0
       const css = getComputedStyle(node.parentElement)
       context.font = `${css.fontWeight} ${css.fontSize} ${css.fontFamily}`
-      return context.measureText(node.textContent.trim()).width
+      if (css.whiteSpace === 'nowrap' || css.whiteSpace === 'pre') {
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        return range.getBoundingClientRect().width
+      }
+      return context.measureText(node.textContent.trim()).width + number(css.letterSpacing) * node.textContent.trim().length
     }
     if (node.nodeType !== 1) return 0
     const css = getComputedStyle(node)
     if (css.display === 'none' || css.visibility === 'hidden' || node.matches('.sr-only, [hidden], [role="menu"], [role="tooltip"]')) return 0
-    if (node.matches('button, input, svg, img, video, [role="button"]')) return node.getBoundingClientRect().width
+    if (node.matches('button, input, svg, img, video, [role="button"]') && !node.matches('[data-part="row-name"]')) return node.getBoundingClientRect().width
     const pseudo = position => {
       const style = getComputedStyle(node, position)
       return style.content === 'none' || style.content === 'normal' || style.display === 'none' ? 0 : number(style.width)
@@ -61,7 +66,6 @@ export function fitListColumns(frame) {
   if (flexibleContent && !controlsOnly && ![...body.children].some(cell => cell.hasAttribute('data-cell-weight'))) {
     const header = rows.find(row => row.parentElement.tagName === 'THEAD')
     const minimum = widths.map((width, index) => width === null ? 0 : Math.min(width, Math.max(header?.children[index] ? intrinsic(header.children[index]) : 0, number(getComputedStyle(body.children[index]).fontSize))))
-    const nameBudget = Math.max(number(getComputedStyle(body.children[nameIndex]).minWidth), header?.children[nameIndex] ? intrinsic(header.children[nameIndex]) : 0)
     const fixed = widths.map((_, index) => rows.some(row => {
       const cell = row.children[index]
       return cell && (cell.matches('[data-list-number], [data-list-date-time]') || cell.querySelector('button,input,a,[role="button"],[data-list-date-time]'))
@@ -69,10 +73,13 @@ export function fitListColumns(frame) {
     const controls = widths.reduce((sum, width, index) => sum + (fixed[index] ? width ?? 0 : 0), 0)
     const rowStyle = getComputedStyle(body)
     const contentBudget = table.getBoundingClientRect().width - number(rowStyle.paddingLeft) - number(rowStyle.paddingRight) - number(rowStyle.columnGap) * (body.children.length - 1)
+    const nameContent = Math.max(...rows.map(row => intrinsic(row.children[nameIndex])))
+    const nameMinimum = Math.max(number(getComputedStyle(body.children[nameIndex]).minWidth), header?.children[nameIndex] ? intrinsic(header.children[nameIndex]) : 0)
+    const minimumTotal = minimum.reduce((sum, width, index) => sum + (fixed[index] ? 0 : width), 0)
+    const nameBudget = Math.max(nameMinimum, Math.min(nameContent, contentBudget - controls - minimumTotal))
     const available = Math.max(0, contentBudget - nameBudget - controls)
     const total = widths.reduce((sum, width, index) => sum + (fixed[index] ? 0 : width ?? 0), 0)
-    const minimumTotal = minimum.reduce((sum, width, index) => sum + (fixed[index] ? 0 : width), 0)
-    const mustStack = minimumTotal + controls + nameBudget > contentBudget
+    const mustStack = minimumTotal + controls + nameMinimum > contentBudget
     frame.toggleAttribute('data-content-stacked', mustStack)
     if (mustStack) {
       widths.forEach((width, index) => { if (width !== null && !fixed[index]) widths[index] = minimum[index] })

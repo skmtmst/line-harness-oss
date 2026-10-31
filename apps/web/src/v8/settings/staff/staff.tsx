@@ -6,6 +6,7 @@ import { logoutAndGoToLogin } from '@/lib/logout'
 import TotpQr from '@/components/shared/totp-qr'
 
 import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';
+import ListToolbar from '@/components/shared/list-toolbar'
 import SegmentedControl from '@/components/shared/segmented'
 import { useListUrlValue } from '@/components/shared/list-url-state';
 import { avatarInitials } from '@/components/shared/avatar';
@@ -21,7 +22,6 @@ import { GridTable, GridHeadRow, GridRow, GridCell, GridNameCell } from '@/compo
 import { Field } from '@/components/shared/form-controls';
 import { TextField } from '@/components/shared/text-field';
 
-import SearchField from '@/components/shared/search-field'
 import { Tabs } from '@/components/shared/tabs';
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -1104,11 +1104,12 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
             </>
           ) : (
             <>
-              <div className={styles.toolbar}>
-                <SearchField aria-label="名前・メールで探す" value={query} onChange={setQuery} onClear={() => setQuery('')} placeholder="名前・メールで探す" className={styles.search} />
-                {tab === 'members' ? (
+              <ListToolbar
+                search={{ width: 220, label: '名前・メールで探す', placeholder: '名前・メールで探す', value: query, onChange: setQuery }}
+                filters={tab === 'members' ? (
                   <SegmentedControl<'active' | 'suspended' | 'all'>
                     aria-label="利用状態で絞り込む"
+                    fit="content"
                     value={statusFilter}
                     onChange={setStatusFilter}
                     options={[
@@ -1118,14 +1119,13 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
                     ]}
                   />
                 ) : null}
-                <span className={styles.spacer} />
-                {administrator ? (
+                trailing={administrator ? (
                   <Button href="/staff/new" variant="primary"><UserPlus size={16} aria-hidden="true" />招待する</Button>
                 ) : (
                   /* 閲覧のみには押せないボタンを置かない。場所だけ空ける（下の物を詰めない）。 */
                   <span className={styles.inviteSpace} aria-hidden="true" />
                 )}
-              </div>
+              />
               {resendError ? <Notice tone="danger" message={resendError} /> : null}
               {tab === 'roles' ? (
                 <div className={styles.roleCards}>

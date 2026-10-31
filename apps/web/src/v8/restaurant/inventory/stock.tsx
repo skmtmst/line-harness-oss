@@ -3,7 +3,7 @@ import { DetailPreview, DetailSection } from '@/components/shared/detail-content
 import type { Alloc, Hours, SlotInfo, Conflict } from './stock-types'
 import { SaveConflictBand } from '@/components/shared/save-conflict'
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Armchair, BookOpen, Check, X } from 'lucide-react'
+import { Armchair, Check, X } from 'lucide-react'
 import type { RestaurantOpeningDay } from '@line-crm/shared'
 import Card, { CardHeader } from '@/components/shared/card'
 import Notice from '@/components/shared/notice'
@@ -356,7 +356,7 @@ export default function StockBoard({ ctx, canEdit: allowedByRole, heading, notic
           description={`このまま保存すると、${conflict.who}の変更（${conflict.scope}）が消えます`}
           onCompare={() => setDiffOpen(true)} onReload={reloadLatest} />
       ) : null}
-      <DetailColumns variant="restaurant-inventory" asideLabel="この時間帯の卓を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title={selected ? `${selected.time} の卓` : '卓の埋まりぐあい'} description={'赤＝埋まっている・白＝空き・灰＝停止中'} actions={{primary: ((selected) ? <Button variant="primary" href={`/restaurant-test/reservations?date=${encodeURIComponent(date)}`}><BookOpen size={16} aria-hidden="true" />{`予約台帳で ${selected.time} を見る`}</Button> : null),secondary: ((selected) && (canCloseNote) ? <Button variant="secondary" lockedReason={lockedReason} disabled={!canEdit} onClick={() => { if (!canEdit) return; setClosedChannels([]); setCloseNoteOpen(true) }}>媒体の受付を閉じる</Button> : null)}}>
+      <DetailColumns variant="restaurant-inventory" asideLabel="この時間帯の卓を見る" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<DetailPreview title={selected ? `${selected.time} の卓` : '卓の埋まりぐあい'} description={'赤＝埋まっている・白＝空き・灰＝停止中'} actions={{primary: ((selected) ? <Button variant="primary" title={`予約台帳で ${selected.time} を見る`} aria-label={`予約台帳を見る（${selected.time}）`} href={`/restaurant-test/reservations?date=${encodeURIComponent(date)}`}>予約台帳を見る</Button> : null),secondary: ((selected) && (canCloseNote) ? <Button variant="secondary" lockedReason={lockedReason} disabled={!canEdit} onClick={() => { if (!canEdit) return; setClosedChannels([]); setCloseNoteOpen(true) }}>媒体の受付を閉じる</Button> : null)}}>
           <DetailSection>
 
             <ul className={styles.tablesGrid}>

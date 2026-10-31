@@ -1,3 +1,4 @@
+import './short-text.test.mjs'
 import './saved-search-label.test.mjs'
 import './single-choice-filters.test.mjs'
 import './notice-line-break.test.mjs'
