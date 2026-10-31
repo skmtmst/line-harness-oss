@@ -6,7 +6,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react';
-import { emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
+import { liffActionUrl, emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button';
 import Dialog from '@/components/shared/dialog';
@@ -77,9 +77,12 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const canEdit = host ? !host.readOnly : featureAccess
   const readOnly = host ? Boolean(host.readOnly) : !canEdit
 
-  /* 友だちに配るURL。LIFF のURLにパスを足すと、LIFFアプリの同じパスへ転送される。 */
+  /* 一覧・動作指定と同じ共通関数で、友だちに配るURLを作る。 */
   const liffId = selectedAccount?.liffId ?? null
-  const answerUrl = liffId && id ? `https://liff.line.me/${liffId}/forms/${id}` : null
+  const answerUrl = (() => {
+    if (!liffId || !id) return null
+    try { return liffActionUrl({ liffId, kind: 'form', formId: id }) } catch { return null }
+  })()
 
   const [editTab, setEditTab] = useState<EditTab>(() => readTab(params.get('tab')))
   /* 統括から使うときは、最初の描画から読み込んだ中身で出す（空の一瞬に保存を押させない）。 */
@@ -870,11 +873,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         {answerUrl ? (
           <>
             <div className={styles.urlRow}>
-              {/* 見せるのは短い形（絵どおり）。全文は title とコピーで渡す。 */}
-              <span className={styles.urlValue} title={answerUrl}>{`https://liff.line.me/…/forms/${id}`}</span>
+              {/* 長いURLも末尾まで読めるよう折り返す。表示・title・コピーは同じ全文。 */}
+              <span className={styles.urlValue} title={answerUrl}>{answerUrl}</span>
               <CopyTextButton variant="secondary" icon={<Copy size={16} aria-hidden="true" />} value={answerUrl} label="コピーする" aria-label="回答用URLをコピー" />
             </div>
-            <p className={styles.urlNote}>友だちに配るURLです。LINEの中で開きます。</p>
+            <p className={styles.urlNote}>{publishedVersionId ? '友だちに配るURLです。LINEの中で開きます。' : '公開すると開けます。公開前は回答を受け付けません。'}</p>
             {canEdit ? (
               <div className={styles.urlTest}>
                 <Button onClick={() => void startTest()} disabled={testBusy} busy={testBusy} busyLabel="用意しています…" title="保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入りません">

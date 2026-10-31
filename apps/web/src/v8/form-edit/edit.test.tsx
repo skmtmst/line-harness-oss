@@ -128,6 +128,44 @@ afterEach(() => {
 })
 
 describe('回答フォームの編集（V8）', () => {
+  it('壊れたIDのリンクでも画面を落とさず、見つからない案内を出す', async () => {
+    formsGet.mockRejectedValue(new ApiError(404, 'missing'))
+    await render('id=bad.id')
+    expect(await screen.findByText('このフォームは見つかりません')).toBeTruthy()
+    expect(screen.queryByRole('region', { name: '回答用URL' })).toBeNull()
+  })
+
+  it('回答用URLの表示とコピーは、一覧と削除の案内で使うLIFFの入口にそろう', async () => {
+    const previous = Object.getOwnPropertyDescriptor(navigator, 'clipboard')
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } })
+    try {
+      await render('id=form-1')
+      const region = within(screen.getByRole('region', { name: '回答用URL' }))
+      const expected = 'https://liff.line.me/liff-1/?page=form&id=form-1'
+      expect(region.getByText(expected).getAttribute('title')).toBe(expected)
+      fireEvent.click(region.getByRole('button', { name: '回答用URLをコピー' }))
+      await waitFor(() => expect(writeText).toHaveBeenCalledWith(expected))
+    } finally {
+      if (previous) Object.defineProperty(navigator, 'clipboard', previous)
+      else Reflect.deleteProperty(navigator, 'clipboard')
+    }
+  })
+
+  it('未公開の下書きは、回答用URLのそばで公開すると開けることを知らせる', async () => {
+    formsGet.mockResolvedValue({ success: true, data: { ...structuredClone(formData), isActive: false, publishedVersionId: null, publishedContentRevision: null } })
+    await render('id=form-1')
+    expect(within(screen.getByRole('region', { name: '回答用URL' })).getByText('公開すると開けます。公開前は回答を受け付けません。')).toBeTruthy()
+  })
+
+  it('公開した版がある受付停止中のフォームを、未公開の下書きとは案内しない', async () => {
+    formsGet.mockResolvedValue({ success: true, data: { ...structuredClone(formData), isActive: false } })
+    await render('id=form-1')
+    const region = within(screen.getByRole('region', { name: '回答用URL' }))
+    expect(region.queryByText('公開すると開けます。公開前は回答を受け付けません。')).toBeNull()
+    expect(region.getByRole('button', { name: '回答用URLをコピー' })).toBeTruthy()
+  })
+
   it('フォーム名の読み込み中は編集の題を出し、読めた名前を帯と本文へ渡す', async () => {
     let resolveForm!: (value: unknown) => void
     formsGet.mockImplementation(() => new Promise(resolve => { resolveForm = resolve }))

@@ -1103,3 +1103,4 @@
 - [反映履歴：配信の人数と時期・来店フォロー・予約の一覧](release-log/unreleased/2023-kenta-train-1031g.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
 
 - [反映履歴：通知・受付・回答フォーム・受信と教室の一覧](release-log/unreleased/2024-kenta-train-1031h.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+- [反映履歴：回答フォームのURLと公開前の案内](release-log/unreleased/0000-kenta-form-answer-url.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
