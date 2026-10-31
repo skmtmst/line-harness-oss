@@ -18,6 +18,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import ListState from '@/components/shared/list-state'
 import { lockUnless } from '@/components/shared/permission-lock'
 import Notice from '@/components/shared/notice'
+import { useEventAbsence } from '@/v8/events'
 import { RadioCardGroup } from '@/components/shared/radio-card'
 import Radio from '@/components/shared/radio'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -99,8 +100,9 @@ function Kpi({ kpi, onPreparing }: { kpi: StyleKpi; onPreparing: () => void }) {
 }
 
 export default function StyleDashboard({ style }: { style: IndustryStyle }) {
-  const { cfg, router, tab, subTab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, setCardDefaults, roster, rosterRow, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, KIND, saveClosure, addNew } = useStyleDashboard(style)
+  const { cfg, router, tab, subTab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, setCardDefaults, roster, rosterRow, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, reloadRoster, KIND, saveClosure, addNew } = useStyleDashboard(style)
 
+  const absence = useEventAbsence({ accountId, scope: JSON.stringify([style, date, rosterId]), onSaved: reloadRoster })
   const start = useFirstSteps(accountId || null, role, { style })
   const setup = useStyleSetup(accountId || null, role)
   const setupRest = setupSummary(setup.data, !canManageRole(role))
@@ -210,7 +212,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         </>
       )
     }
-    if (shownRoster) aside = <LessonRoster roster={shownRoster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={openPayment} onAttend={(name) => void attend(shownRoster, name)} onAbsent={(name) => void attend(shownRoster, name, 'no_show')} onLine={() => router.push('/broadcasts')} onCancelClass={() => { if (canWrite && rosterRow?.id === shownRoster.rowId) setClassRow(rosterRow) }} />
+    if (shownRoster) aside = <LessonRoster roster={shownRoster} canWrite={canWrite} onClose={() => setRosterId(null)} onPay={openPayment} onAttend={(name) => void attend(shownRoster, name)} onAbsent={(name) => void attend(shownRoster, name, 'no_show')} absenceAllowed={absence.allowed} absenceLockedReason={absence.lockedReason} onReportAbsence={member => { if (member.bookingId && member.eventId && member.startsAt) absence.open({ bookingId: member.bookingId, eventId: member.eventId, startsAt: member.startsAt, name: member.name }) }} onLine={() => router.push('/broadcasts')} onCancelClass={() => { if (canWrite && rosterRow?.id === shownRoster.rowId) setClassRow(rosterRow) }} />
     body = (
       <DetailColumns variant={shownRoster ? 'style-roster' : 'style-dashboard'} aside={aside} asideLabel="今日の動き" expanded={asideOpen} onExpandedChange={setAsideOpen}
         showToggle={false}>{main}</DetailColumns>
@@ -236,6 +238,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
     <DashboardPage boardId={`style-${style}`} initialContent={{ scope: JSON.stringify([accountId, style]), pending: start.status === 'loading' || setup.status === 'loading' || (!today && !failed) }} title={cfg.title} help={cfg.help} subtitle={subtitle} actions={headActions}>
       <div className={styles.head}>{filters}</div>
       <div className={styles.inset}>
+        {absence.notice}
+        {absence.dialog}
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
         {setup.data ? <SetupWarningBands data={setup.data} configureAllowed={canManageRole(role)} role={role} /> : null}
         {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'}

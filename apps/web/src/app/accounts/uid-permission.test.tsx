@@ -38,9 +38,40 @@ afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot(); vi.
 
 for (const [entry, useMigration] of [['旧入口', useLegacy], ['友だち入口', useCurrent]] as const) {
   describe(entry, () => {
+    it('移行先の初期値は未選択で、読み直しても勝手に決めない', async () => {
+      const { result } = renderHook(() => useMigration())
+      await waitFor(() => expect(result.current.status).toBe('ready'))
+      expect(result.current.toAccountId).toBe('')
+      expect(result.current.dryRunBlockedReason).toMatch(/移行先/)
+      await act(async () => { await result.current.load() })
+      expect(result.current.toAccountId).toBe('')
+      act(() => result.current.setToAccountId('to'))
+      await act(async () => { await result.current.load() })
+      expect(result.current.toAccountId).toBe('to')
+    })
+
+    it('CSVの選択と解析が済むまで直接呼ばれたテスト移行も送らない', async () => {
+      const { result } = await mount()
+      expect(result.current.dryRunBlockedReason).toMatch(/CSV/)
+      await act(async () => { await result.current.createDryRun() })
+      expect(fixture.dryRun).not.toHaveBeenCalled()
+      const text = deferred<string>()
+      let pending!: Promise<void>
+      await act(async () => { pending = result.current.onUidFile([file(() => text.promise)]) })
+      expect(result.current.dryRunBlockedReason).toMatch(/読み込んでいます/)
+      await act(async () => { await result.current.createDryRun() })
+      expect(fixture.dryRun).not.toHaveBeenCalled()
+      await act(async () => { text.resolve(csv); await pending })
+      expect(result.current.dryRunBlockedReason).toBeNull()
+      await act(async () => { await result.current.createDryRun() })
+      expect(fixture.dryRun).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ fromAccountId: 'from', toAccountId: 'to', mappings: [{ oldUid: 'OLD', newUid: 'NEW', evidenceType: 'operator_csv' }] }))
+    })
+
     async function mount() {
       const hook = renderHook(() => useMigration())
       await waitFor(() => expect(hook.result.current.status).toBe('ready'))
+      // 対象選択の安全とは分け、権限と競合を試す操作は行き先を明示する。
+      act(() => hook.result.current.setToAccountId('to'))
       return hook
     }
     it.each([
