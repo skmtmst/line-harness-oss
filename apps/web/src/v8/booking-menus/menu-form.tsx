@@ -529,10 +529,21 @@ export default function MenuFormV8() {
     setResourceIds(new Set(ids))
   }
 
+  function audienceChanged(): boolean {
+    if (!canEditAudience) return false
+    if (!editTarget) return true
+    const saved = editTarget as BookingMenu & { audience_mode?: AudienceMode; audience_tag_ids_json?: string | null }
+    if (audienceMode !== (saved.audience_mode ?? 'all')) return true
+    if (audienceMode === 'all') return false
+    const signature = (ids: string[]) => JSON.stringify([...new Set(ids)].sort())
+    return signature(audienceTagIds) !== signature(storedStringList(saved.audience_tag_ids_json))
+  }
+
   function validate(): string | null {
     if (!selectedAccountId) return '先に上部でLINEアカウントを選んでください'
     if (staffStatus === 'loading') return '担当スタッフを読み込んでいます。読み込みが終わってから保存してください'
     if (staffStatus === 'error') return '担当スタッフを読み込めませんでした。読み直してから保存してください'
+    if (audienceChanged() && audienceMode !== 'all' && audienceTagIds.length === 0) return '見せる相手のタグを1つ以上選んでください。'
     if (customerBooking.error) return customerBooking.error
     if ([...resourceIds].some((id) => !Number.isInteger(Number(resourceQuantities[id] ?? '1')) || Number(resourceQuantities[id] ?? '1') < 1 || Number(resourceQuantities[id] ?? '1') > 1000)) return '必要数は1〜1000の整数で入力してください。'
     return bookingMenuError({
@@ -697,7 +708,7 @@ export default function MenuFormV8() {
       intake_question: askQuestion ? intakeQuestion.trim() || null : null,
       auto_tag_id: autoTagId,
       is_active: publish ? 1 : 0,
-      ...(canEditAudience ? { audienceMode, audienceTagIds: audienceMode === 'all' ? [] : audienceTagIds } : {}),
+      ...(audienceChanged() ? { audienceMode, audienceTagIds: audienceMode === 'all' ? [] : audienceTagIds } : {}),
       ...(customerBooking.body() as Partial<BookingMenu>),
     }
   }
@@ -851,9 +862,9 @@ export default function MenuFormV8() {
     } catch (e) {
       const fieldFailure = saveErrors.capture(e);
 
-      if (e instanceof ApiError && e.code === 'tag_not_found') {
+      if (e instanceof ApiError && (e.code === 'tag_not_found' || e.code === 'invalid_audience_tags')) {
         { if (!fieldFailure)
-        setSaveError('選んだタグは削除されたため保存できませんでした。タグを選び直してください。') }
+        setSaveError('選んだタグは利用できないため保存できませんでした。タグを選び直してください。') }
       } else if (e instanceof ApiError && e.status === 409) {
         if (editTarget ?? createdMenuNeedingFollowUp) {
           await openConflict(editTarget?.id ?? createdMenuNeedingFollowUp!.menuId)

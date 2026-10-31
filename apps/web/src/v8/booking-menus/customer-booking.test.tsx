@@ -10,7 +10,7 @@ import { pickEntities } from '@/components/shared/entity-picker-test-helpers'
 import { act, cleanup, fireEvent, render, renderHook, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addonCandidates, readCustomerBooking, recurringError, useMenuCustomerBooking } from './customer-booking'
-import type { BookingMenu } from '@/lib/api'
+import { ApiError, type BookingMenu } from '@/lib/api'
 
 const nav = vi.hoisted(() => ({ menu: null as string | null, push: vi.fn() }))
 const who = vi.hoisted(() => ({ role: 'admin' as string | null }))
@@ -87,6 +87,7 @@ async function choosePartySize(label: string) {
 }
 
 beforeEach(() => {
+  vi.mocked(notifySaved).mockClear()
   nav.menu = null
   who.role = 'admin'
   net.menus = [spa, ask]
@@ -249,10 +250,6 @@ describe('見せる相手の保存と読み直し', () => {
   it.each(['include_tags', 'exclude_tags'] as const)('作成した%sの条件を保存先の項目で送り、開き直しても保つ', async (mode) => {
     net.tags = [{ id: 'member', name: '会員' }]
     net.createMenu.mockImplementation(async (_account, body) => {
-      expect(body.audienceMode).toBe(mode)
-      expect(body.audienceTagIds).toEqual(['member'])
-      expect(body).not.toHaveProperty('audience_mode')
-      expect(body).not.toHaveProperty('audience_tag_ids')
       net.menus = [menu({ audience_mode: body.audienceMode, audience_tag_ids_json: JSON.stringify(body.audienceTagIds) })]
       return { id: 'm1' }
     })
@@ -264,6 +261,10 @@ describe('見せる相手の保存と読み直し', () => {
     await pickEntities('見せる相手のタグ', ['会員'])
     fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
     await vi.waitFor(() => expect(nav.push).toHaveBeenCalledWith('/booking/menus?highlight=m1'))
+    const body = sentBody(net.createMenu, 1)
+    expect(body).toMatchObject({ audienceMode: mode, audienceTagIds: ['member'] })
+    expect(body).not.toHaveProperty('audience_mode')
+    expect(body).not.toHaveProperty('audience_tag_ids')
     view.unmount()
     nav.menu = 'm1'
     render(<MenuFormV8 />)
@@ -278,8 +279,6 @@ describe('見せる相手の保存と読み直し', () => {
     net.tags = [{ id: 'member', name: '会員' }]
     net.menus = [menu({ audience_mode: 'include_tags', audience_tag_ids_json: '["member"]' })]
     net.updateMenu.mockImplementation(async (_account, _id, _version, body) => {
-      expect(body.audienceMode).toBe('all')
-      expect(body.audienceTagIds).toEqual([])
       net.menus = [menu({ version: 4, audience_mode: body.audienceMode, audience_tag_ids_json: JSON.stringify(body.audienceTagIds) })]
       return { ok: true, version: 4 }
     })
@@ -289,6 +288,7 @@ describe('見せる相手の保存と読み直し', () => {
     fireEvent.click(screen.getByRole('button', { name: '変更を保存する' }))
     await settle()
     await vi.waitFor(() => expect(notifySaved).toHaveBeenCalledWith('メニューを保存しました'))
+    expect(sentBody(net.updateMenu, 3)).toMatchObject({ audienceMode: 'all', audienceTagIds: [] })
     view.unmount()
     render(<MenuFormV8 />)
     await settle()
@@ -310,5 +310,50 @@ describe('見せる相手の保存と読み直し', () => {
     await vi.waitFor(() => expect(net.updateMenu).toHaveBeenCalled())
     const body = net.updateMenu.mock.calls[0][3]
     for (const key of ['audienceMode', 'audienceTagIds', 'audience_mode', 'audience_tag_ids']) expect(body).not.toHaveProperty(key)
+  })
+})
+
+
+describe('タグ条件の保存前確認と変更しない設定の保護', () => {
+  it.each(['タグが付いた人だけに見せる', 'タグが付いた人には見せない'])('%sでタグが空なら送らず直し方を出す', async (label) => {
+    render(<MenuFormV8 />)
+    await settle()
+    fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), { target: { value: 'カット' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: '高田', exact: true }))
+    fireEvent.click(screen.getByRole('radio', { name: label }))
+    fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
+    await settle()
+    expect(net.createMenu).not.toHaveBeenCalled()
+    expect(screen.getAllByText('見せる相手のタグを1つ以上選んでください。').length).toBeGreaterThan(0)
+  })
+
+  it.each(['admin', 'owner'])('%sが名前だけ変えた場合は、削除済みタグを再検証する項目を送らない', async (role) => {
+    who.role = role
+    nav.menu = 'm1'
+    net.menus = [menu({ audience_mode: 'include_tags', audience_tag_ids_json: '["deleted"]' })]
+    net.matrix = [{ menu_id: 'm1', name: 'カット', is_offered: 1, override_duration_minutes: null, override_price: null }]
+    net.updateMenu.mockResolvedValue({ version: 4 })
+    render(<MenuFormV8 />)
+    await settle()
+    fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), { target: { value: 'カットを変更' } })
+    fireEvent.click(screen.getByRole('button', { name: '変更を保存する' }))
+    await vi.waitFor(() => expect(net.updateMenu).toHaveBeenCalledTimes(1))
+    const body = sentBody(net.updateMenu, 3)
+    expect(body).not.toHaveProperty('audienceMode')
+    expect(body).not.toHaveProperty('audienceTagIds')
+  })
+
+  it('選択後にタグが使えなくなった場合は選び直す案内を出す', async () => {
+    net.tags = [{ id: 'member', name: '会員' }]
+    net.createMenu.mockRejectedValue(new ApiError(400, undefined, 'invalid_audience_tags'))
+    render(<MenuFormV8 />)
+    await settle()
+    fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), { target: { value: 'カット' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: '高田', exact: true }))
+    fireEvent.click(screen.getByRole('radio', { name: 'タグが付いた人だけに見せる' }))
+    await pickEntities('見せる相手のタグ', ['会員'])
+    fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
+    await vi.waitFor(() => expect(screen.getAllByText('選んだタグは利用できないため保存できませんでした。タグを選び直してください。').length).toBeGreaterThan(0))
+    expect(net.createMenu).toHaveBeenCalledTimes(1)
   })
 })
