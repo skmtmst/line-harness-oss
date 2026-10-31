@@ -6,6 +6,7 @@ import type { StaffMember } from '@line-crm/shared'
 import { forgetStaffIdentity, rememberStaffIdentity, readStaffIdentity } from '@/lib/staff-identity-state'
 import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-snapshot'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { getPageAction } from '@/test-utils/page-action'
 
 const fixture = vi.hoisted(() => ({ search: 'id=sc-1', account: 'account-a', loading: false }))
 const calls = vi.hoisted(() => ({ push: vi.fn(), update: vi.fn(), create: vi.fn(), folderCreate: vi.fn(), read: vi.fn(), draftGet: vi.fn(), draftSave: vi.fn(), draftDelete: vi.fn() }))
@@ -86,15 +87,33 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot(); vi.useRealTimers(); localStorage.clear(); sessionStorage.clear() })
 
-it.each(['owner', 'admin', 'staff'] as const)('%sの新規作成は1回。編集staffは非公開で作成する', async role => {
+const createRoles = ['owner', 'admin', 'staff'] as const
+it.each(createRoles.flatMap(role => (['save', 'later'] as const).map(action => ({ role, action }))))('$roleの新規$actionは下書きを1回だけ作り、配信を始めない', async ({ role, action }) => {
   person(role, role === 'staff' ? { permissionKeys: ['/scenarios', 'scenario.definition.edit'] } : {})
   fixture.search = ''
   render(<ScenarioCreateV8 />)
+  expect(calls.create).not.toHaveBeenCalled()
   fireEvent.change(name(), { target: { value: '新しい案内' } })
-  fireEvent.click(save())
+  fireEvent.click(screen.getByRole('radio', { name: /経過時間で指定/ }))
+  expect(calls.create).not.toHaveBeenCalled()
+  fireEvent.click(getPageAction({ name: action === 'save' ? /この方式で保存する/ : /あとで決める/ }))
   await waitFor(() => expect(calls.push).toHaveBeenCalledWith('/scenarios/first-step?id=created-1'))
   expect(calls.create).toHaveBeenCalledTimes(1)
-  expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({ name: '新しい案内', isActive: role !== 'staff' }))
+  expect(calls.create).toHaveBeenCalledWith(expect.objectContaining({
+    name: '新しい案内', lineAccountId: 'account-a', isActive: false,
+    deliveryMode: action === 'save' ? 'elapsed' : 'absolute_time',
+  }))
+  expect(calls.update).not.toHaveBeenCalled()
+})
+
+it.each([false, true])('既存シナリオの有効状態%sは、名前と方式を保存しても変えない', async isActive => {
+  calls.read.mockResolvedValue({ success: true, data: { ...base, isActive } })
+  await ready()
+  fireEvent.click(screen.getByRole('radio', { name: /時刻で指定/ }))
+  fireEvent.click(save())
+  await waitFor(() => expect(calls.push).toHaveBeenCalledWith('/scenarios/first-step?id=sc-1'))
+  expect(calls.update).toHaveBeenCalledWith('sc-1', { name: base.name, folderId: null, deliveryMode: 'absolute_time' })
+  expect(calls.create).not.toHaveBeenCalled()
 })
 
 it.each(['viewer', 'staff', 'readOnly', 'view_only', 'proxy', 'unknown'] as const)('保持した保存/下書き/blurは%sへの切替後に書かない。読むGETと入力は残す', async kind => {

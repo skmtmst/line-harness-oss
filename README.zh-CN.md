@@ -112,7 +112,7 @@ CLI 自动完成以下全部步骤：
 ### AI 集成
 - **内置 MCP Server** (`@line-harness/mcp-server`) — Claude Code 自然语言完整操作
   - `list_conversations` / `get_conversation` — AI 监控未答会话
-  - `create_scenario` / `update_step` — 让 AI 设计场景
+  - `create_scenario` / `update_step` — 让 AI 设计场景 — 创建后处于停用状态；检查内容后通过 `manage_scenarios` 的 update 启用（需要发布权限）
   - `broadcast` / `send_message` — 发送类操作需要用户确认
 - **官方 SDK** (`@line-harness/sdk`) — TypeScript 强类型 SDK，ESM + CJS，零依赖
 
