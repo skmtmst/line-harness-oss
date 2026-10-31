@@ -42,6 +42,7 @@ import {
 import { DialogField, DialogNote, RsDialog } from '@/v8/restaurant/booking-kit/public/parts/index'
 import { DASH, INTAKE_STOP_PRESET_OPTIONS, SERVICE_TONES, formatYen } from './format'
 import styles from './delivery.module.css'
+import { intakeStopSelection } from './intake-stop-selection'
 import { intakeActionReason } from './intake-access'
 import { formatNumber } from '@/lib/format'
 
@@ -281,7 +282,7 @@ export interface IntakeStopDialogProps {
   disabledReason?: string
   /** 止める相手として選んでいるもの。 */
   selected: DeliveryService[]
-  preset: DeliveryIntakeStopPreset
+  preset: DeliveryIntakeStopPreset | ''
   busy: boolean
   /** 日本語の案内だけを入れる。 */
   error: string | null
@@ -306,8 +307,10 @@ export function IntakeStopDialog({
   onSubmit,
 }: IntakeStopDialogProps) {
   const selectedSet = new Set(selected)
-  const selectionReason = disabledReason ?? (selected.length === 0 ? '接続済みで受付中のサービスを選んでください。'
-    : selected.map(service => intakeActionReason(services.find(state => state.service === service), 'stop')).find(Boolean))
+  const selection = intakeStopSelection(services, selected, preset)
+  const selectionReason = disabledReason
+    ?? selection.services.map(service => intakeActionReason(services.find(state => state.service === service), 'stop')).find(Boolean)
+    ?? selection.problem
   const canSubmit = !busy && !selectionReason
 
   return (
@@ -327,10 +330,11 @@ export function IntakeStopDialog({
       )}
       titleRow="mark"
       plainTitle
-      contentPadding="18px 24px 20px"
       bodyGap={STOP_BODY_GAP}
       footerPlain
       footerGap={STOP_FOOT_GAP}
+      actionsPlacement="footer"
+      footerNote={selectionReason || error ? <DialogNote>{selectionReason ?? error}</DialogNote> : null}
       onCancel={onClose}
       actions={(
         <>
@@ -340,7 +344,7 @@ export function IntakeStopDialog({
             busy={busy}
             busyLabel="停止中…"
             disabled={!canSubmit}
-            aria-description={selectionReason}
+            aria-description={selectionReason ?? undefined}
             onClick={onSubmit}
           >
             <Pause size={16} aria-hidden="true" />止める
@@ -361,7 +365,7 @@ export function IntakeStopDialog({
             services.map((state) => {
               const label = state.label || DELIVERY_SERVICE_LABELS[state.service]
               const reason = disabledReason ?? intakeActionReason(state, 'stop')
-              const picked = selectedSet.has(state.service)
+              const picked = state.intakeStatus !== 'stopped' && selectedSet.has(state.service)
               return (
                 <CheckCard
                   key={state.service}
@@ -403,12 +407,11 @@ export function IntakeStopDialog({
             label: option.label,
           }))}
           value={preset}
-          onChange={onPresetChange}
+          onChange={(value) => { if (value) onPresetChange(value) }}
           disabled={busy}
         />
       </DialogField>
 
-      {selectionReason || error ? <DialogNote>{selectionReason ?? error}</DialogNote> : null}
     </RsDialog>
   )
 }

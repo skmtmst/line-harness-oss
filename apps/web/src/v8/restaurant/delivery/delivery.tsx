@@ -49,6 +49,7 @@ import OrdersBoard from './orders'
 import { CancelOrderDialog, OrderDetailDialog } from './order-detail'
 import HistoryBoard from './history'
 import SoldOutBoard, { IntakeStopDialog } from './bulk'
+import { intakeStopSelection } from './intake-stop-selection'
 import { DASH, errorMessage, formatClock, storeToday } from './format'
 import { useUberConnection } from './use-uber-connection'
 import styles from './delivery.module.css'
@@ -176,8 +177,7 @@ function DeliveryInner() {
   /* ── 受付の一括停止（XCVGd） ─────────────────────────────── */
   const [stopOpen, setStopOpen] = useState(false)
   const [stopSelected, setStopSelected] = useState<DeliveryService[]>([])
-  /* 絵（XCVGd）で選ばれている札は「60分」なので、窓を開いた最初もそこに合わせる。 */
-  const [stopPreset, setStopPreset] = useState<DeliveryIntakeStopPreset>('60m')
+  const [stopPreset, setStopPreset] = useState<DeliveryIntakeStopPreset | ''>('')
   const [stopBusy, setStopBusy] = useState(false)
   const [stopError, setStopError] = useState<string | null>(null)
 
@@ -190,6 +190,16 @@ function DeliveryInner() {
     return () => { currentIntake.current = { ...currentIntake.current, ready: false } }
   })
   const [stopScope, setStopScope] = useState<object | null>(null)
+  const openedStopScope = useRef<typeof intakeScope | null>(null)
+  useEffect(() => {
+    if (!openedStopScope.current || openedStopScope.current.selectedAccountId === selectedAccountId) return
+    openedStopScope.current = null
+    setStopScope(null)
+    setStopOpen(false)
+    setStopSelected([])
+    setStopPreset('')
+    setStopError(null)
+  }, [selectedAccountId])
   const intakeBusy = useRef(false)
   const intakeDisabledReason = intakeReady ? undefined : '注文の状態を読み直してから操作してください。'
   const stoppable = (data?.services ?? []).filter(state => !intakeActionReason(state, 'stop'))
@@ -502,29 +512,43 @@ function DeliveryInner() {
   /* ── 受付の停止・再開 ───────────────────────────────────── */
   const openStop = useCallback((service?: DeliveryService) => {
     const current = currentIntake.current
-    const selected = service ? [service] : current.services.filter(state => !intakeActionReason(state, 'stop')).map(state => state.service)
-    const reason = intakeOperationReason(current, intakeScope, selected, 'stop')
+    const reason = service
+      ? intakeOperationReason(current, intakeScope, [service], 'stop')
+      : intakeContextReason(current, intakeScope)
     if (reason || intakeBusy.current) { setNotice({ tone: 'warn', text: reason ?? '受付の変更が終わるまでお待ちください。' }); return }
+    openedStopScope.current = intakeScope
     setStopScope(intakeScope)
-    setStopSelected(selected)
-    setStopPreset('60m')
+    setStopSelected(service ? [service] : [])
+    setStopPreset('')
     setStopError(null)
     setStopOpen(true)
   }, [intakeScope])
 
+  const stopServices = intakeReady ? data?.services ?? [] : []
+  const stopInput = useRef({ open: stopOpen, openedScope: openedStopScope.current, selection: intakeStopSelection(stopServices, stopSelected, stopPreset), reload: loadOrders })
+  stopInput.current = { open: stopOpen, openedScope: openedStopScope.current, selection: intakeStopSelection(stopServices, stopSelected, stopPreset), reload: loadOrders }
   const submitStop = useCallback(async () => {
     const current = currentIntake.current
-    const reason = intakeOperationReason(current, stopScope ?? intakeScope, stopSelected, 'stop')
-      ?? (current.scope !== intakeScope ? '店舗や権限が変わったため、受付の操作を中止しました。' : undefined)
-    if (reason || intakeBusy.current) { setStopError(reason ?? '受付の変更が終わるまでお待ちください。'); return }
+    const { open, openedScope, selection, reload } = stopInput.current
+    if (current.scope !== intakeScope) return
+    if (!openedScope || openedScope.selectedAccountId !== current.accountId) {
+      setStopOpen(false)
+      setStopSelected([])
+      setStopPreset('')
+      return
+    }
+    if (!open || selection.problem || !selection.preset || intakeBusy.current) return
+    const reason = intakeOperationReason(current, openedScope, selection.services, 'stop')
+    if (reason) { setStopError(reason); return }
+    const accountId = current.accountId!
     intakeBusy.current = true
     setStopBusy(true)
     setStopError(null)
     try {
-      const result = await restaurantDeliveryApi.stopIntake(current.accountId!, stopSelected, stopPreset)
+      const result = await restaurantDeliveryApi.stopIntake(accountId, selection.services, selection.preset)
       if (currentIntake.current.scope !== intakeScope) return
       setStopOpen(false)
-      await loadOrders(true)
+      await reload(true)
       if (currentIntake.current.scope !== intakeScope) return
       if (result.failed.length === 0) {
         setNotice({ tone: 'success', text: `${formatNumber(result.stopped.length)}件のサービスの受付を停止しました。` })
@@ -537,7 +561,7 @@ function DeliveryInner() {
       intakeBusy.current = false
       setStopBusy(false)
     }
-  }, [intakeScope, stopScope, stopSelected, stopPreset, loadOrders])
+  }, [intakeScope])
 
   const resumeService = useCallback(async (service: DeliveryService) => {
     const current = currentIntake.current
@@ -880,7 +904,7 @@ function DeliveryInner() {
         store={dataAccountId === selectedAccountId ? data?.store : undefined}
         open={stopOpen}
         disabledReason={stopReason}
-        services={data?.services ?? []}
+        services={stopServices}
         selected={stopSelected}
         preset={stopPreset}
         busy={stopBusy}
