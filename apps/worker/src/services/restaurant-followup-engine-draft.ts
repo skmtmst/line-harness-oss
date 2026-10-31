@@ -1,3 +1,4 @@
+import { reminderFollowupEditorContent,automationFollowupEditorContent } from './restaurant-followup-editor-content.js';
 import { protectRestaurantFollowupMessageParts } from './restaurant-followup-message-parts.js';
 import {
  getReminderPublishedVersion,getReminderDraftVersion,prepareReminderDraftCreation,prepareReminderDraftSave,parseReminderVersionSettings,
@@ -88,6 +89,7 @@ async function saveEngineDraft(db:D1Database,storeId:string,trigger:RestaurantFo
    const timing=input.timing as Exclude<Timing,{mode:'next_day'}>;
    const field=trigger==='anniversary_before'?await db.prepare("SELECT field_id FROM friend_fixed_fields WHERE fixed_key='anniversary'").first<{field_id:string}>():null;
    if(trigger==='anniversary_before'&&!field)throw invalid();
+   if(current&&!reminderFollowupEditorContent(current,trigger,field?.field_id))throw new FollowupDraftError('invalid_followup','この内容は詳しい設定で変更してください');
    const settings:ReminderDraftSettings={name,lineAccountId:account,triggerType:field?'friend_field':'manual',triggerFieldId:field?.field_id??null,repeatYearly:!!field,leapYearPolicy:'feb28',deliveryMode:timing.mode,
     stopConditions:{bookingCancelled:true,friendBlocked:true,supportMarkCompleted:false,daysAfterTarget:0},
     steps:[{stableStepId:current?parseReminderVersionSettings(current).steps[0]?.stableStepId??crypto.randomUUID():crypto.randomUUID(),offsetMinutes:timing.mode==='countdown'?timing.offsetMinutes:0,offsetDays:timing.mode==='time'?timing.offsetDays:null,sendAtTime:timing.mode==='time'?timing.sendAtTime:null,messageType:parts[0].messageType,messageContent:parts[0].messageContent,messageParts:parts.map(part=>({messageType:part.messageType,messageContent:part.messageContent}))}]};
@@ -100,6 +102,7 @@ async function saveEngineDraft(db:D1Database,storeId:string,trigger:RestaurantFo
    if(target?.automation_id){
     const current=await db.prepare(`SELECT d.current_draft_version_id,d.current_published_version_id,v.* FROM automation_definitions d JOIN automation_versions v ON v.id=COALESCE(d.current_draft_version_id,d.current_published_version_id) WHERE d.id=? AND d.line_account_id=?`).bind(target.automation_id,account).first<{id:string;current_published_version_id:string|null;trigger_type:string;trigger_config:string;condition_config:string;action_config:string}>();
     if(!current||await automationRevisionToken(current.id,current)!==input.expectedContentRevision)throw conflict();
+    if(!automationFollowupEditorContent(current,storeId,trigger))throw new FollowupDraftError('invalid_followup','この内容は詳しい設定で変更してください');
     before.push(db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM automation_definitions WHERE id=? AND current_published_version_id IS ?) THEN '{}' ELSE 'FOLLOWUP_VERSION_CONFLICT' END)`).bind(target.automation_id,current.current_published_version_id));
     const draft=await createAutomationDraftFromDefinition(db,{id:target.automation_id,lineAccountId:account,createdBy:staffId});
     await updateAutomationDraft(db,{id:target.automation_id,lineAccountId:account,expectedDraftVersionId:draft.draftVersionId,name,eventType:content.trigger_type,triggerConfig:{storeId},conditions:{},actions,transaction:{before,after:()=>after(target.automation_id)}});

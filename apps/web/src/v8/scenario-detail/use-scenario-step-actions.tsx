@@ -242,6 +242,10 @@ export function useScenarioStepActions({
     if (!checkWrite()) return
     const problem = validateScenarioStep(stepForm, kindState, deliveryMode)
     if (problem) {
+      if (problem.field === 'question' && stepFields.submit().length > 0) {
+        setStepError('')
+        return
+      }
       if (problem.cause !== undefined) saveErrors.capture(problem.cause)
       if (problem.field) failStep(problem.field, problem.message)
       else setStepError(problem.message)

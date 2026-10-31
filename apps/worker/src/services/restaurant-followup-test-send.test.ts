@@ -1,3 +1,5 @@
+import { createAutomationDraftFromDefinition,updateAutomationDraft } from '../features/automations/automation-drafts/index.js';
+import { readRestaurantFollowupResourceManagement } from './restaurant-followup-resource-management.js';
 import { afterEach,beforeEach,expect,it,vi } from 'vitest';
 import { createTestD1,type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { saveFollowupDraftFixture } from '../test-utils/restaurant-followup-draft.js';
@@ -79,4 +81,26 @@ for(const trigger of ['reservation_created','reservation_24h'] as const)it(`${tr
  expect(t.raw.prepare('SELECT status,failure_code FROM outbound_send_requests').get()).toEqual({status:'failed',failure_code:'NOTIFICATION_PRECONDITION_CHANGED'});
  await restoreOperationIncident(t.db,{incidentId:stopped.incident.id,expectedVersion:stopped.control.version,actorId:'owner'});
  await expect(send()).resolves.toMatchObject({replayed:false});expect(push).toHaveBeenCalledTimes(1);
+});
+
+it('詳細編集後の管理対象は理由を表示して止まり、同じ実物を再テストと承認で再開する',async()=>{
+ const input=await draft(),push=vi.fn(async()=>({data:null,requestId:'request'}));
+ const send=()=>testRestaurantFollowupEngine(t.db,input,{createClient:()=>({pushMessageWithRequestId:push})});
+ const first=await send();
+ await startRestaurantFollowupEngine(t.db,{...input,expectedContentHash:first.contentHash,canApprove:true});
+ const id=(await readRestaurantFollowupEngineStates(t.db,'store')).find(row=>row.trigger==='reservation_created')!.targetId!;
+ const resources=[{id,lineAccountId:'a'}];
+ const management=async()=>(await readRestaurantFollowupResourceManagement(t.db,'automation',resources)).get(id)!;
+ expect(await management()).toMatchObject({effectiveSendingStatus:'active',reason:null});
+ const editable=await createAutomationDraftFromDefinition(t.db,{id,lineAccountId:'a',createdBy:'owner'});
+ await updateAutomationDraft(t.db,{id,lineAccountId:'a',expectedDraftVersionId:editable.draftVersionId,name:'詳細で直した予約の案内',eventType:'restaurant.reservation.created',triggerConfig:{storeId:'store'},conditions:{},actions:[{id:'message1',type:'send_message',params:{messageType:'text',content:'詳細で直した本文'},onFailure:'stop'}]});
+ expect(await management()).toMatchObject({effectiveSendingStatus:'stopped',reason:expect.stringContaining('テスト送信と承認')});
+ input.expectedTargetVersion=(await readRestaurantFollowupEngineStates(t.db,'store')).find(row=>row.trigger==='reservation_created')!.targetVersion;
+ const retest=await send();
+ expect(retest.contentHash).not.toBe(first.contentHash);
+ expect(push).toHaveBeenCalledTimes(2);
+ expect(await management()).toMatchObject({effectiveSendingStatus:'stopped'});
+ await startRestaurantFollowupEngine(t.db,{...input,expectedContentHash:retest.contentHash,canApprove:true});
+ expect(await management()).toMatchObject({effectiveSendingStatus:'active',reason:null});
+ expect((await readRestaurantFollowupEngineStates(t.db,'store')).find(row=>row.trigger==='reservation_created')!.targetId).toBe(id);
 });

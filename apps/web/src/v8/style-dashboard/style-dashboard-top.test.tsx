@@ -5,9 +5,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { StyleSchedule, StyleSnapshot } from '@line-crm/shared'
 
 const state = vi.hoisted(() => ({ account: 'a', role: 'admin', search: '', replace: vi.fn(), push: vi.fn(), get: vi.fn(), save: vi.fn(), reset: vi.fn(), summary: vi.fn(), schedule: vi.fn(), warnings: vi.fn(), items: vi.fn() }))
-const firstRun = vi.hoisted(() => ({ steps: [] as unknown[], watch: vi.fn() }))
+const firstRun = vi.hoisted(() => ({ steps: [] as unknown[], watch: vi.fn(), notices: undefined as {message:string;href:string}[]|undefined }))
 vi.mock('@/v8/onboarding/public/use-first-run/index', () => ({ useFirstRun: (_account: string, _enabled: boolean, watch: boolean) => { firstRun.watch(watch); return { status: 'ready', steps: firstRun.steps, firstRun: null, starter: null, error: null, reload: vi.fn(), watchExpired: false, rewatch: vi.fn() } } }))
-vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_id: string, style: string) => ({ progress: { style, steps: {} }, reload: vi.fn() }) }))
+vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_id: string, style: string) => ({ progress: { style, steps: {}, notices: firstRun.notices }, reload: vi.fn() }) }))
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: state.push, replace: state.replace }), usePathname: () => '/', useSearchParams: () => new URLSearchParams(state.search) }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, selectedAccount: { channelId: state.account, basicId: '@same-store', displayName: '同じ店' } }) }))
@@ -31,6 +31,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   state.role = 'admin'
   state.search = ''
+  firstRun.notices = undefined
   firstRun.steps = buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map(key => ({ key, state: 'todo', href: '/getting-started', reason: null })) as Parameters<typeof buildStepsFromApi>[0])
   state.account = 'a'
   state.get.mockResolvedValue({ success: true, data: { style: 'restaurant', styleSelected: true, answers: { image: { mode: 'configured', value: 'simple' } }, cards: [], version: 2, metricIds: ['bookings', 'attention', 'freeTables', 'noShowRate', 'newBookings'] } })
@@ -178,4 +179,20 @@ it.each(['viewer', 'staff'])('役割%sでは専用画面のURLでも質問を開
   view.rerender(<StyleDashboard style="restaurant" />)
   await screen.findByRole('heading', { name: '選んだ機能の設定' })
   expect(screen.queryByRole('dialog')).toBeNull()
+})
+
+it.each(['admin','staff','viewer'])('飲食のホームでも復旧案内を出し、%sの入口の権限を保つ',async role=>{
+  state.role=role
+  firstRun.notices=[{message:'予約フォームの設定が読めないため、最小の項目で受け付けています。直してください',href:'/restaurant-test/line-followup?store_id=store-a&repair_form=1'}]
+  render(<StyleDashboard style="restaurant"/>)
+  expect(await screen.findByText(/予約フォームの設定が読めないため/)).toBeTruthy()
+  if(role==='admin')expect(screen.getByRole('link',{name:'予約フォームを直す →'}).getAttribute('href')).toBe('/restaurant-test/line-followup?store_id=store-a&repair_form=1')
+  else {
+    expect(screen.queryByRole('link',{name:'予約フォームを直す →'})).toBeNull()
+    const button=screen.getByRole('button',{name:'予約フォームを直す →'})
+    expect(button.getAttribute('aria-disabled')).toBe('true')
+    const reasonId=button.getAttribute('aria-describedby')
+    expect(reasonId).toBeTruthy()
+    expect(document.getElementById(reasonId!)?.textContent).toBe(role==='viewer'?'閲覧のみのため変更できません。オーナーか管理者に頼んでください。':'この操作はオーナーか管理者だけができます。')
+  }
 })

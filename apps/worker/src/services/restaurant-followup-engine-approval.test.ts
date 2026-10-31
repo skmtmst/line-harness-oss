@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, expect, it } from 'vitest';
+import { readRestaurantFollowupResourceManagement } from './restaurant-followup-resource-management.js';
+import { afterEach, beforeEach, expect, it,vi } from 'vitest';
 import { createReminderWithDraftVersion, publishReminderDraftVersion, recordReminderDraftTest } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 import { readFollowupEngineGate, readFollowupEngineSnapshot, type FollowupEngine } from './restaurant-followup-engine-approval.js';
@@ -95,4 +96,21 @@ it('管理しない一般の実物や対応表が未作成の環境では承認�
 it('実行計画のオブジェクトのキーの並びだけでは承認を失わない',async()=>{
  const input=await configured('automation');const plan=input.snapshot!.plan!.map(action=>Object.fromEntries(Object.entries(action).reverse()));
  expect((await readFollowupEngineGate(t.db,{...input,executionPlanJson:JSON.stringify(plan)})).allowed).toBe(true);
+});
+
+it.each(['reminder','automation'] as const)('一覧の管理状態は実際の送信ゲートを読み、管理解除や停止も反映する: %s',async(engine)=>{
+ const input=await configured(engine),resources=[{id:input.targetId,lineAccountId:'a'}];
+ const read=()=>readRestaurantFollowupResourceManagement(t.db,engine,resources);
+ expect((await read()).get(input.targetId)).toMatchObject({storeId:'store',storeName:'食堂',effectiveSendingStatus:'active',reason:null,path:'/restaurant-test/line-followup?store_id=store'});
+ expect((await readRestaurantFollowupResourceManagement(t.db,engine,[{id:input.targetId,lineAccountId:'b'}])).size).toBe(0);
+ t.raw.exec("UPDATE rt_store_followup_targets SET engine='scenario'");
+ expect((await read()).get(input.targetId)).toMatchObject({effectiveSendingStatus:'stopped',reason:'送り方を切り替えたため、来店フォローで止めています'});
+ t.raw.prepare("UPDATE rt_store_followup_targets SET engine=?,enabled=0").run(engine);
+ expect((await read()).get(input.targetId)).toMatchObject({effectiveSendingStatus:'stopped',reason:'来店フォローで止めています'});
+});
+it('普通の一覧は件数にかかわらず索引付きの検索1本で管理の有無を調べる',async()=>{
+ await readRestaurantFollowupResourceManagement(t.db,'reminder',[{id:'warm',lineAccountId:'a'}]);
+ const prepare=vi.spyOn(t.db,'prepare');
+ expect((await readRestaurantFollowupResourceManagement(t.db,'reminder',Array.from({length:100},(_,i)=>({id:`ordinary-${i}`,lineAccountId:'a'})))).size).toBe(0);
+ expect(prepare).toHaveBeenCalledTimes(1);expect(prepare.mock.calls[0][0]).toContain('ft.reminder_id IN');
 });
