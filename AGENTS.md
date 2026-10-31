@@ -139,6 +139,7 @@
 - 書き方の詳細は [docs/release-log/README.md](docs/release-log/README.md)、設計の背景は [docs/change-log-design.md](docs/change-log-design.md) にあります。
 - 版を切るときは `unreleased.md` と `unreleased/` の各 PR ファイルの行をまとめ、1つの `<version>.md` に移します（人がやる）。組み立て（`apps/web/scripts/build-release-log.mjs`）は両方から拾います。
 - CI は文書・ワークフローだけの変更や `[skip release-log]` では確認を飛ばしますが、運用ルールとしては毎回書きます。例外はありません。
+- PR の反映履歴ファイルを追加したら、同じ PR で `docs/README.md` の反映履歴の目次にも、そのファイルへのリンクを1行追加してください。
 
 ## 13. コードの書き方と見張り
 
@@ -148,6 +149,7 @@
 - 保存・送信・権限・失敗時の扱い・読み直しを守る動きの試験は消さないでください。書き換えが必要なら同じ動きを守る形に書き換え、消したときは PR に「何を・なぜ」を書きます。
 
 - 品質の検査は `pnpm quality:check --base <比較元SHA>`、解析器の型と故障対照は `pnpm quality:typecheck`・`pnpm quality:test` で実行します。違反を減らしたときだけ `pnpm quality:update --base <同じSHA>` で一覧も減らします（増やす更新は拒まれます）。詳しくは [docs/code-structure.md §7](docs/code-structure.md#7-品質を後戻りさせない) を読んでください。
+- `codex/development` へ統合する前に、最新の比較元SHAを取り込み、`pnpm --filter web test` と `pnpm quality:check --base <比較元SHA>` を手元で実行してください。Web試験には必要な公開環境変数を設定し、失敗や未実行があれば統合せず結果を共有してください。
 - 新しい画面の入口は `pnpm new:screen <機能名> --title <題名> --board <板ID> --dry-run` で確認してから作ります（[雛形の手順](docs/code-structure.md#8-新しい入口の雛形)）。
 - 新しい route の入口は `pnpm new:route <機能名> --method get --dry-run` で確認してから作ります（同じ雛形の手順）。
 
