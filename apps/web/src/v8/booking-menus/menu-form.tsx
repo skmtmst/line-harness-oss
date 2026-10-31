@@ -28,7 +28,7 @@ import { usePermissionAccess } from '@/lib/use-feature-access'
 import { useBookingEdit } from './lib/edit-permission'
 import { classifyApiFailure, describeApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { formatNumber } from '@/lib/format'
-import { api, ApiError, bookingApi, type BookingMenu, type BookingResource, type BookingSettings, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
+import { api, ApiError, bookingApi, type BookingMenu, type BookingMenuWrite, type BookingResource, type BookingSettings, type BookingStaff, type StaffMenuMatrix } from '@/lib/api'
 import type { Tag } from '@line-crm/shared'
 import { bookingMenuBufferError, bookingMenuDurationError, bookingMenuError, bookingMenuNameError } from './lib/menu-validation'
 import MenuVersionHistory from './menu-version-history'
@@ -194,7 +194,7 @@ export default function MenuFormV8() {
   const [askQuestion, setAskQuestion] = useState(false)
   const [intakeQuestion, setIntakeQuestion] = useState('')
   const [autoTagId, setAutoTagId] = useState<string | null>(null)
-  /* 見せる相手（B9）。保存の口はメニューの audienceMode・audienceTagIds（Codex の次の段）。 */
+  /* タグ条件は管理者だけが変更し、読み取りの列名と保存時の項目名を区別する。 */
   const [audienceMode, setAudienceMode] = useState<AudienceMode>('all')
   const [audienceTagIds, setAudienceTagIds] = useState<string[]>([])
   const [previewFriendId, setPreviewFriendId] = useState('')
@@ -681,7 +681,7 @@ export default function MenuFormV8() {
     }
   }
 
-  function menuBody(publish: boolean): Partial<BookingMenu> {
+  function menuBody(publish: boolean): BookingMenuWrite {
     return {
       name: name.trim(),
       category_label: effectiveCategory || null,
@@ -697,7 +697,7 @@ export default function MenuFormV8() {
       intake_question: askQuestion ? intakeQuestion.trim() || null : null,
       auto_tag_id: autoTagId,
       is_active: publish ? 1 : 0,
-      ...({ audience_mode: audienceMode, audience_tag_ids: audienceMode === 'all' ? [] : audienceTagIds } as Partial<BookingMenu>),
+      ...(canEditAudience ? { audienceMode, audienceTagIds: audienceMode === 'all' ? [] : audienceTagIds } : {}),
       ...(customerBooking.body() as Partial<BookingMenu>),
     }
   }

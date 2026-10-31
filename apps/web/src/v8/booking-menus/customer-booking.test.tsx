@@ -18,6 +18,7 @@ const net = vi.hoisted(() => ({
   createMenu: vi.fn(), updateMenu: vi.fn(), putStaffMenus: vi.fn(),
   menus: [] as unknown[],
   matrix: [] as unknown[],
+  tags: [] as Array<{ id: string; name: string }>,
 }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: nav.push, replace: vi.fn() }),
@@ -35,7 +36,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
   return {
     ...actual,
-    api: { ...actual.api, tags: { ...actual.api.tags, list: async () => ({ success: true, data: [] }) }, friends: { ...actual.api.friends, list: async () => ({ success: true, data: { items: [] } }) } },
+    api: { ...actual.api, tags: { ...actual.api.tags, list: async () => ({ success: true, data: net.tags }) }, friends: { ...actual.api.friends, list: async () => ({ success: true, data: { items: [] } }) } },
     bookingApi: {
       ...actual.bookingApi,
       listMenus: async () => ({ menus: net.menus }),
@@ -44,6 +45,7 @@ vi.mock('@/lib/api', async (importOriginal) => {
       listResources: async () => ({ success: true, data: { resources: [] } }),
       listStaffMenusBulk: async () => ({ staff: [{ staff_id: 's1', matrix: net.matrix }] }),
       getStaffMenus: async () => ({ matrix: [] }),
+      saveMenuResources: async () => ({ success: true, data: { version: 1 } }),
       createMenu: (...args: unknown[]) => net.createMenu(...args),
       updateMenu: (...args: unknown[]) => net.updateMenu(...args),
       putStaffMenus: (...args: unknown[]) => net.putStaffMenus(...args),
@@ -64,6 +66,7 @@ vi.mock('@/lib/api/helpers/booking-payment-admin', async (importOriginal) => {
 })
 
 const { default: MenuFormV8 } = await import('./menu-form')
+const { notifySaved } = await import('@/components/shared/toast')
 
 const menu = (over: Record<string, unknown> = {}) => ({
   id: 'm1', name: 'カット', category_label: null, description: null, duration_minutes: 60, base_price: 3000,
@@ -88,6 +91,7 @@ beforeEach(() => {
   who.role = 'admin'
   net.menus = [spa, ask]
   net.matrix = []
+  net.tags = []
   for (const fn of [net.createMenu, net.updateMenu, net.putStaffMenus, nav.push]) fn.mockReset()
   net.putStaffMenus.mockResolvedValue({ ok: true })
 })
@@ -237,5 +241,74 @@ describe('お客さまの予約のしかたの判定', () => {
     act(() => { admin.result.current.setMaxPartySize(3) })
     expect(admin.result.current.body()).toEqual({ maxPartySize: 3 })
     expect(admin.result.current.dirty).toBe(true)
+  })
+})
+
+
+describe('見せる相手の保存と読み直し', () => {
+  it.each(['include_tags', 'exclude_tags'] as const)('作成した%sの条件を保存先の項目で送り、開き直しても保つ', async (mode) => {
+    net.tags = [{ id: 'member', name: '会員' }]
+    net.createMenu.mockImplementation(async (_account, body) => {
+      expect(body.audienceMode).toBe(mode)
+      expect(body.audienceTagIds).toEqual(['member'])
+      expect(body).not.toHaveProperty('audience_mode')
+      expect(body).not.toHaveProperty('audience_tag_ids')
+      net.menus = [menu({ audience_mode: body.audienceMode, audience_tag_ids_json: JSON.stringify(body.audienceTagIds) })]
+      return { id: 'm1' }
+    })
+    const view = render(<MenuFormV8 />)
+    await settle()
+    fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), { target: { value: 'カット' } })
+    fireEvent.click(screen.getByRole('checkbox', { name: '高田', exact: true }))
+    fireEvent.click(screen.getByRole('radio', { name: mode === 'include_tags' ? 'タグが付いた人だけに見せる' : 'タグが付いた人には見せない' }))
+    await pickEntities('見せる相手のタグ', ['会員'])
+    fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
+    await vi.waitFor(() => expect(nav.push).toHaveBeenCalledWith('/booking/menus?highlight=m1'))
+    view.unmount()
+    nav.menu = 'm1'
+    render(<MenuFormV8 />)
+    await settle()
+    expect((screen.getByRole('radio', { name: mode === 'include_tags' ? 'タグが付いた人だけに見せる' : 'タグが付いた人には見せない' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.getByRole('button', { name: '見せる相手のタグ：変える' }).textContent).toContain('会員')
+  })
+
+  it('編集で全員へ戻すと保存先へ空のタグを送り、読み直しても全員のまま', async () => {
+    nav.menu = 'm1'
+    net.matrix = [{ menu_id: 'm1', name: 'カット', is_offered: 1, override_duration_minutes: null, override_price: null }]
+    net.tags = [{ id: 'member', name: '会員' }]
+    net.menus = [menu({ audience_mode: 'include_tags', audience_tag_ids_json: '["member"]' })]
+    net.updateMenu.mockImplementation(async (_account, _id, _version, body) => {
+      expect(body.audienceMode).toBe('all')
+      expect(body.audienceTagIds).toEqual([])
+      net.menus = [menu({ version: 4, audience_mode: body.audienceMode, audience_tag_ids_json: JSON.stringify(body.audienceTagIds) })]
+      return { ok: true, version: 4 }
+    })
+    const view = render(<MenuFormV8 />)
+    await settle()
+    fireEvent.click(screen.getByRole('radio', { name: '全員に見せる' }))
+    fireEvent.click(screen.getByRole('button', { name: '変更を保存する' }))
+    await settle()
+    await vi.waitFor(() => expect(notifySaved).toHaveBeenCalledWith('メニューを保存しました'))
+    view.unmount()
+    render(<MenuFormV8 />)
+    await settle()
+    expect((screen.getByRole('radio', { name: '全員に見せる' }) as HTMLInputElement).checked).toBe(true)
+    expect(screen.queryByRole('button', { name: /見せる相手のタグ/ })).toBeNull()
+  })
+
+  it.each(['staff', 'viewer', null])('変更権限がない役割%sの保存にはタグ条件を混ぜない', async (role) => {
+    who.role = role
+    net.matrix = [{ menu_id: 'm1', name: 'カット', is_offered: 1, override_duration_minutes: null, override_price: null }]
+    nav.menu = 'm1'
+    net.menus = [menu({ audience_mode: 'include_tags', audience_tag_ids_json: '["member"]' })]
+    net.updateMenu.mockResolvedValue({ ok: true, version: 4 })
+    render(<MenuFormV8 />)
+    await settle()
+    expect(screen.queryByRole('radio', { name: '全員に見せる' })).toBeNull()
+    fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), { target: { value: 'カットを変更' } })
+    fireEvent.click(screen.getByRole('button', { name: '変更を保存する' }))
+    await vi.waitFor(() => expect(net.updateMenu).toHaveBeenCalled())
+    const body = net.updateMenu.mock.calls[0][3]
+    for (const key of ['audienceMode', 'audienceTagIds', 'audience_mode', 'audience_tag_ids']) expect(body).not.toHaveProperty(key)
   })
 })

@@ -636,6 +636,7 @@ export type {
 } from './types/ops'
 export type {
   BookingMenu,
+  BookingMenuWrite,
   BookingMenuResourceAssignment,
   BookingMenuVersion,
   BookingMenuSnapshot,
