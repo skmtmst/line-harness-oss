@@ -119,7 +119,6 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
     title: '設定',
     items: [
       { id: 'getting-started', required: true },
-      { id: 'line-accounts', required: true },
       { id: 'pools', featureKey: 'multi_store_hierarchy' },
       { id: 'staff', required: true },
       { id: 'settings', required: true },
