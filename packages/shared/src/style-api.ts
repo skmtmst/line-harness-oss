@@ -42,6 +42,7 @@ export type StyleMetric = {
   value: number | null;
   numerator?: number;
   denominator?: number;
+  totalTables?: number;
   status: 'available' | 'insufficient_sample' | 'unconfigured';
   formula: string;
   unit: string;
