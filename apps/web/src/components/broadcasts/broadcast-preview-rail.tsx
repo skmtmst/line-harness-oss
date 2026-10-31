@@ -18,8 +18,10 @@ import TextLink from '@/components/shared/text-link'
 import { type BroadcastBubble,type BroadcastMessageButton,type BroadcastPreflight } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { useBroadcastAb } from '@/v8/broadcast-ab/public/use-ab/index'
-import { Eye,Send } from 'lucide-react'
-import type { Dispatch,RefObject,SetStateAction } from 'react'
+import { Send } from 'lucide-react'
+import { useCallback, useEffect, useRef, type Dispatch, type RefObject, type SetStateAction } from 'react'
+import PreviewLauncher from '@/components/templates/preview-launcher'
+import { usePreviewReview } from './use-preview-review'
 import { bubblesError } from './broadcast-form-model'
 import styles from './broadcast-form-v8.module.css'
 
@@ -36,6 +38,7 @@ type BroadcastPreviewRailContext = {
   preflight: BroadcastPreflight | null
   preflightStatus: 'error' | 'idle' | 'loading' | 'ready'
   previewCloseRef: RefObject<HTMLButtonElement | null>
+  reviewKey: string
   previewConfirmed: boolean
   previewDevice: "phone" | "pc"
   previewOpen: boolean
@@ -52,7 +55,14 @@ type BroadcastPreviewRailContext = {
   testBlockReason: string
 }
 
-export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }: BroadcastPreviewRailContext) {
+export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, reviewKey, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }: BroadcastPreviewRailContext) {
+  const review = usePreviewReview(reviewKey, ab.hasB, previewConfirmed, setPreviewConfirmed)
+  const previewOpened = useCallback(() => review.markVariant(ab.hasB ? ab.tab : 'A'), [review.markVariant, ab.hasB, ab.tab])
+  const previousKey = useRef(reviewKey)
+  useEffect(() => {
+    if (previousKey.current !== reviewKey) { previousKey.current = reviewKey; setPreviewOpen(false); return }
+    if (previewOpen && currentStep !== 'basic' && currentStep !== 'audience') previewOpened()
+  }, [reviewKey, previewOpen, currentStep, previewOpened, setPreviewOpen])
   const previewBubbles = ab.tab === 'B' && ab.b ? ab.b : bubbles
   const emptyMessage = previewBubbles.every((bubble) => bubble.type === 'text' && !String(bubble.content.text ?? '').trim())
   const deliveryCaption = scheduledLabel ? `${scheduledLabel} に届きます` : currentStep === 'schedule' || currentStep === 'confirm' ? sendWhenLabel ?? '左で配信日時を設定してください' : '配信日時は手順 4 で設定します'
@@ -66,6 +76,11 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
   const blocked = preflight?.exclusions?.blocked
   const matched = preflight?.audience?.matched
   const people = (value: number | null | undefined) => (value === null || value === undefined ? null : `${formatNumber(value)} 人`)
+  const messagePreview = <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
+          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={deliveryCaption} empty={emptyMessage ? '左でメッセージを入れると、ここに出ます' : false}>
+            <div className="flex flex-col gap-3 text-ink">{ previewBubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
+          </LinePreview>
+        </div>
   return (<aside id="broadcast-line-preview" className={styles.preview} data-open={previewOpen || undefined} aria-label={reach ? '届く人' : 'LINEの見え方'}>
         {reach ? <>
           <div className={styles.previewHead}><h3 className="sr-only">届く人</h3>{closeButton}</div>
@@ -81,11 +96,7 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
         </> : <>
         <div className={styles.previewHead}><h3>LINE の見え方</h3><SegmentedControl aria-label="プレビューの端末" size="small" fit="content" value={previewDevice} options={[{ value: 'phone', label: 'スマホ' }, { value: 'pc', label: 'PC' }]} onChange={setPreviewDevice} />{closeButton}</div>
         {ab.hasB ? <SegmentedControl aria-label="見本の案" size="compact" value={ab.tab} options={[{ value: 'A', label: 'A 案の見本' }, { value: 'B', label: 'B 案の見本' }]} onChange={ab.setTab} /> : null}
-        <div className={previewDevice === 'pc' ? styles.pcPreview : styles.phonePreview}>
-          <LinePreview accountName={selectedAccount?.name} note="実際のLINE表示に近い確認用プレビューです。" caption={deliveryCaption} empty={emptyMessage ? '左でメッセージを入れると、ここに出ます' : false}>
-            <div className="flex flex-col gap-3 text-ink">{ previewBubbles.map((bubble, index) => <BubblePreview key={bubble.id} bubble={bubble} accountName={selectedAccount?.name} composer={currentStep === 'message'} buttons={index === 0 ? messageButtons : []} />)}</div>
-          </LinePreview>
-        </div>
+        {messagePreview}
         <p className={styles.previewCaption}>「名前」は相手の名前で置き換えます</p>
         <div className={styles.previewSummary}><h3>設定内容</h3><dl>{[
           ['送る相手', `${confirmAudienceLabel}${audienceDisplayCount === null ? '' : `（${formatNumber(audienceDisplayCount)}人）`}`],
@@ -93,9 +104,9 @@ export function BroadcastPreviewRail({ ab, afterActionVersionId, audienceDisplay
           ['送る日時', sendWhenLabel ?? '未設定'],
           ['配信後のアクション', publishedActions.find((action) => action.versionId === afterActionVersionId)?.name ?? 'なし'],
         ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
-        <div className={styles.previewActions}><Button type="button" disabled={Boolean(testBlockReason) || saving} title={testBlockReason || (saving ? '保存が終わるまでお待ちください' : undefined)} onClick={() => void openTestDialog()}><Send size={16} aria-hidden /> テストを送る</Button><Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={16} aria-hidden /> 配信イメージを見る</Button></div>
+        <div className={styles.previewActions}><Button type="button" disabled={Boolean(testBlockReason) || saving} title={testBlockReason || (saving ? '保存が終わるまでお待ちください' : undefined)} onClick={() => void openTestDialog()}><Send size={16} aria-hidden /> テストを送る</Button><PreviewLauncher key={reviewKey} label="配信イメージを見る" onOpened={previewOpened}>{messagePreview}{ab.hasB ? <SegmentedControl aria-label="見本の案" size="compact" value={ab.tab} options={[{ value: 'A', label: 'A 案の見本' }, { value: 'B', label: 'B 案の見本' }]} onChange={ab.setTab} /> : null}</PreviewLauncher></div>
         {bubblesError(bubbles) ? <p className="text-xs text-ink-faint">本文を入れるとテストを送れます</p> : null}
-        <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
+        <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed} disabled={!review.ready} disabledReason={ab.hasB ? 'A・B 両案の配信イメージを開いてください' : '配信イメージを開いて確認してください'}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
         </>}
       </aside>)
 }

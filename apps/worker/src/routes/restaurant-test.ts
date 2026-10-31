@@ -1,3 +1,4 @@
+import { getRestaurantReservationForm,putRestaurantReservationForm } from './restaurant-reservation-form.js';
 import { registerRestaurantSetupProgressRoutes } from './restaurant-setup-progress.js';
 import { getRestaurantFollowupEngines,initializeRestaurantFollowupEngines,saveRestaurantFollowupEngine,testRestaurantFollowupEngineHandler,startRestaurantFollowupEngineHandler } from './restaurant-followup-engine.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -177,6 +178,8 @@ restaurantTest.put('/api/restaurant-test/gbp/reviews/:id/draft', requireRole('ow
 
 restaurantTest.get('/api/restaurant-test/followups/:storeId',requireRole('owner','admin','staff'),get__api_restaurant_test_followups_storeId_15);
 
+restaurantTest.get('/api/restaurant-test/followups/:storeId/reservation-form',requireRole('owner','admin','staff'),getRestaurantReservationForm);
+restaurantTest.put('/api/restaurant-test/followups/:storeId/reservation-form',requireRole('owner','admin'),inputJsonBoundary(),putRestaurantReservationForm);
 restaurantTest.get('/api/restaurant-test/followups/:storeId/engines',requireRole('owner','admin','staff'),getRestaurantFollowupEngines);
 restaurantTest.post('/api/restaurant-test/followups/:storeId/engines/initialize',requireRole('owner','admin'),inputJsonBoundary(),initializeRestaurantFollowupEngines);
 restaurantTest.post('/api/restaurant-test/followups/:storeId/engines/:trigger/draft',requireRole('owner','admin'),inputJsonBoundary(),saveRestaurantFollowupEngine);

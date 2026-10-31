@@ -1,6 +1,8 @@
 'use client'
 
 /* LINEの見え方は書き出しもブラウザも現在のスマホ枠だけ。中身と操作は画面が渡す。 */
+import { usePhonePreviewScale } from './use-phone-preview-scale'
+import { PhonePreviewScale } from './phone-preview-scale'
 import { Fragment, type ReactNode } from 'react'
 import { BatteryFull, ChevronDown, ChevronLeft, Menu, Phone, Search, Signal, Wifi } from 'lucide-react'
 import HelpTip from './help-tip'
@@ -11,6 +13,8 @@ import styles from './line-preview.module.css'
 export interface LinePreviewProps {
   /** 狭い選択窓ではスマホを列の内側に収める。省略時は正本の幅のまま。 */
   fit?: boolean
+  scaleToFit?:boolean
+  compact?:boolean
   /** 枠の中身。各画面の吹き出し・カードをそのまま渡す。 */
   children?: ReactNode
   /** V8で画面が指定する題。nullなら外側の題だけを使う。 */
@@ -43,6 +47,8 @@ export interface LinePreviewProps {
 
 export default function LinePreview({
   fit = false,
+  scaleToFit=false,
+  compact=false,
   children,
   title = 'LINEでの見え方',
   caption,
@@ -60,14 +66,15 @@ export default function LinePreview({
    * 縦に送れる。見た目は line-preview.module.css の v8 節に集める。
    */
 
+    const scaled=usePhonePreviewScale(scaleToFit)
     return (
-      <section aria-label="LINEでの見え方" className={styles.phoneRoot} data-line-preview-part="phone" data-fit={fit || undefined}>
+      <section ref={scaled.ref} aria-label="LINEでの見え方" className={styles.phoneRoot} data-line-preview-part="phone" data-fit={fit || undefined}>
         {/* 題は列の左、スマホはその下の真ん中。テンプレートでは「届き方」や外側の題を使う。 */}
         {title !== null ? <p className={styles.phoneTitle}>
           <span>{title}</span>
           {note ? <HelpTip label="LINEでの見え方の説明">{note}</HelpTip> : null}
         </p> : null}
-        <div className={styles.phone} data-line-preview-part="device-frame">
+        <PhonePreviewScale enabled={scaleToFit} scale={scaled.scale}><div className={styles.phone} data-compact={compact||undefined} data-line-preview-part="device-frame">
           <div className={styles.screen}>
             <div className={styles.statusBar}>
               <span className={styles.clock}>9:41</span>
@@ -104,7 +111,7 @@ export default function LinePreview({
             <div className={styles.homeBar}><span className={styles.homeLine} aria-hidden="true" /></div>
           </div>
         </div>
-      </section>
+      </PhonePreviewScale></section>
     )
 
 

@@ -216,3 +216,11 @@ html:root .box { border-radius: var(--choice-checkbox-radius); }
 :root .root .input[data-permission-locked]:focus-visible + .box {
   outline-color: var(--polish-focus);
 }
+
+/* 入力がそろわない場合は薄い緑と理由を使い、権限の灰色とは分ける。 */
+:root .root[data-incomplete] { opacity: 1; }
+:root .root[data-incomplete] .line { opacity: var(--polish-disabled-opacity); }
+:root .root[data-incomplete] .box { background: var(--color-accent-soft); color: var(--color-choice-on); outline-color: var(--color-choice-on); }
+
+:root .root[data-incomplete] .line:hover .input:not(:checked, :indeterminate) + .box { background: var(--color-accent-soft); }
+:root .root[data-incomplete] .line:active .box { scale: 1; }

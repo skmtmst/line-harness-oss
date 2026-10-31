@@ -1,3 +1,4 @@
+import type { RestaurantFollowupManagement } from '@line-crm/shared'
 
 
 /**
@@ -22,6 +23,7 @@
 export const DRAFT_STORAGE_KEY = 'lh-automation-new-draft-v1'
 
 export interface StoredDraft {
+  followupManagement?:RestaurantFollowupManagement
   id: string
   draftVersionId: string
 }

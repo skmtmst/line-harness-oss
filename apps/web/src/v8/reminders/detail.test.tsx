@@ -18,6 +18,7 @@ const state = vi.hoisted(() => ({
   plannedTotal: 2,
   onlyPlanned: false,
   omitId: false,
+  management:false,
 }))
 
 vi.mock('next/link', () => ({
@@ -78,7 +79,7 @@ vi.mock('@/lib/api', () => {
             pagination: { total: params?.status === 'planned' ? state.plannedTotal : state.onlyPlanned ? 40 : 2, limit: 100, offset: 0 },
           },
         })),
-        get: vi.fn(async () => ({ success: true, data: { id: 'reminder-1', name: '予約前日のご案内', isActive: true, triggerType: 'booking', deliveryMode: 'time', createdAt: '', updatedAt: '2026-09-28T01:00:00Z', steps: [{ id: 'st1', reminderId: 'reminder-1', offsetMinutes: 0, offsetDays: -1, sendAtTime: '18:00', messageType: 'text', messageContent: '', createdAt: '' }] } })),
+        get: vi.fn(async () => ({ success: true, data: { id: 'reminder-1', name: '予約前日のご案内', isActive: true, triggerType: 'booking', deliveryMode: 'time', ...(state.management?{followupManagement:{storeId:'store',storeName:'食堂',effectiveSendingStatus:'stopped',reason:'内容が変わったため、止まっています',path:'/restaurant-test/line-followup?store_id=store'}}:{}), createdAt: '', updatedAt: '2026-09-28T01:00:00Z', steps: [{ id: 'st1', reminderId: 'reminder-1', offsetMinutes: 0, offsetDays: -1, sendAtTime: '18:00', messageType: 'text', messageContent: '', createdAt: '' }] } })),
         update: vi.fn(async (_id: string, body: Record<string, unknown>) => {
           state.updates.push(body)
           return { success: true, data: null }
@@ -112,6 +113,7 @@ beforeEach(() => {
   state.plannedTotal = 2
   state.onlyPlanned = false
   state.omitId = false
+  state.management=false
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -203,13 +205,14 @@ describe('V8 リマインダの詳細', () => {
   it('状態欄を開閉しても登録者の日時入力を作り直さず、保存や名前の入口を保つ', async () => {
     state.tab = 'registrants'
     await render()
-    const toggle = buttonByText('いまの状態と操作')!
+    const toggle = buttonByText('いまの状態と操作を開く')!
     const date = host.querySelector('button[aria-label="山田 太郎の基準日"]')!
     const friend = host.querySelector('a[href="/friends/f1"]')!
     expect(friend.textContent).toBe('山田 太郎')
     expect(friend.querySelector('[title="山田 太郎"]')).toBeTruthy()
     await act(async () => toggle.click())
     expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(toggle.textContent).toBe('いまの状態と操作を閉じる')
     expect(document.getElementById(toggle.getAttribute('aria-controls')!)?.getAttribute('data-expanded')).toBe('true')
     await act(async () => toggle.click())
     expect(toggle.getAttribute('aria-expanded')).toBe('false')
@@ -235,3 +238,10 @@ describe('V8 リマインダの詳細', () => {
     expect(section?.textContent).not.toContain('まだ実行した通知はありません')
   })
 })
+
+it('定義が有効でも承認と内容が合わなければ、管理元と停止の理由を出す',async()=>{
+ state.management=true;await render();
+ expect(host.textContent).toContain('来店フォロー（食堂）で管理しています。内容が変わったため、止まっています');
+ expect(host.querySelector('a[href="/restaurant-test/line-followup?store_id=store"]')?.textContent).toContain('来店フォローを見る');
+ expect(host.querySelector('[data-tone="ok"]')?.textContent).not.toBe('有効');
+});
