@@ -1027,7 +1027,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
       distributedLine: formDistributedLine(listRow),
       busy,
       notice: notices,
-      onSave: (content, distribute) => {
+      onSave: async (content, distribute) => {
         let next: FormDefinition
         try {
           next = hqFormEditorToDefinition({ ...value, ...content })
@@ -1037,10 +1037,12 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           { if (!fieldFailure)
 
           setError(errorText(cause)) }
-          return
+          return false
         }
         setDefinition(next); setName(next.form.name); setDescription(next.form.description ?? '')
-        void save(distribute, next, next.form.name, next.form.description ?? '')
+        let saved = false
+        await save(distribute, next, next.form.name, next.form.description ?? '', false, { onSaved: () => { saved = true } })
+        return saved
       },
       onCancel: toList,
       readOnly: !canEdit,
