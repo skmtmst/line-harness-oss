@@ -15,9 +15,9 @@ export const GETTING_STARTED_STEPS = [
 export type GettingStartedStep = (typeof GETTING_STARTED_STEPS)[number];
 
 export interface StepFacts {
-  /** 段1。稼働中で Webhook が合っていてシークレットが確かめ済みのアカウント数。 */
+  /** 接続状態の診断用。段1の完了判定には使わない。 */
   usableAccounts: number;
-  /** 段1。アカウントが 1 件でもあるか（「まだ」と「止まっている」を分ける）。 */
+  /** 段1。アーカイブされていないアカウントが 1 件でもあるか。 */
   totalAccounts: number;
   /** 段2。 */
   tagCount: number;
@@ -78,7 +78,7 @@ export async function firstDeliveredMessageAt(
   return row?.at ?? null;
 }
 
-/** 段1。3つとも揃って初めて数える。**`unknown` の Webhook を「合っている」と読まない。** */
+/** 接続状態の診断用。はじめの設定の完了判定には使わない。 */
 export async function countUsableAccounts(db: D1Database): Promise<{ usable: number; total: number }> {
   const total = await db
     .prepare(`SELECT COUNT(*) AS c FROM line_accounts WHERE archived_at IS NULL`)
