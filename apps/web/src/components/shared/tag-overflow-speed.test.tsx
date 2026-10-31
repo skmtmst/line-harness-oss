@@ -54,7 +54,7 @@ it('最初の札が縮む境界幅でも、通常の8px間隔で収まる1件と
   }
 })
 
-it('1札も入らない列は+3だけを描き、同じ実測値で再コミットしない', async () => {
+it('1札も自然幅で入らない列は先頭と+2を描き、同じ実測値で再コミットしない', async () => {
   vi.stubGlobal('ResizeObserver', undefined)
   vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100)
   vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
@@ -63,8 +63,8 @@ it('1札も入らない列は+3だけを描き、同じ実測値で再コミッ�
   const committed = vi.fn()
   const { container } = render(<Profiler id="tags" onRender={committed}><TagOverflow><span>VIP</span><span>会員</span><span>常連</span></TagOverflow></Profiler>)
   await act(async () => { await Promise.resolve() })
-  expect(container.querySelectorAll('[data-tag-overflow] > span:not([aria-hidden])')).toHaveLength(0)
-  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか3件）' })).toBeTruthy()
+  expect(container.querySelectorAll('[data-tag-overflow] > span:not([aria-hidden])')).toHaveLength(1)
+  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか2件）' })).toBeTruthy()
   const count = committed.mock.calls.length
   await act(async () => { window.dispatchEvent(new Event('resize')); await Promise.resolve() })
   expect(committed).toHaveBeenCalledTimes(count)
@@ -89,7 +89,7 @@ it('サイズ通知を使えない環境でも、列幅の変更後は全件と+
   expect(screen.queryByRole('button', { name: /すべてのタグ/ })).toBeNull()
   available = 100
   await act(async () => { window.dispatchEvent(new Event('resize')); await Promise.resolve() })
-  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか2件）' })).toBeTruthy()
+  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか1件）' })).toBeTruthy()
 })
 it('列幅の通知では自然幅を再利用し、タグ変更後の全件と+Nを保つ', async () => {
   let available = 220
@@ -115,9 +115,9 @@ it('列幅の通知では自然幅を再利用し、タグ変更後の全件と+
     await Promise.resolve()
   })
   expect(measured).not.toHaveBeenCalled()
-  // 1つも入らない幅では名前を切らず +N から全件を読む。
-  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか2件）' }).textContent).toBe('+2')
-  expect(container.querySelectorAll('[data-tag-overflow] > span:not([aria-hidden])')).toHaveLength(0)
+  // 1つも自然幅で入らなくても先頭は省略で残し、ほかの件数と全件への入口を保つ。
+  expect(screen.getByRole('button', { name: 'すべてのタグ（ほか1件）' }).textContent).toBe('+1')
+  expect(container.querySelectorAll('[data-tag-overflow] > span:not([aria-hidden])')).toHaveLength(1)
   available = 300
   rerender(<TagOverflow><TagPill name="VIP" /><TagPill name="会員" /><TagPill name="常連" /></TagOverflow>)
   await act(async () => { await Promise.resolve() })
