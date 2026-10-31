@@ -133,7 +133,7 @@ async function typeTitle(value: string) {
   await flush()
 }
 
-async function click(target: HTMLButtonElement) {
+async function click(target: HTMLElement) {
   await act(async () => {
     target.dispatchEvent(new MouseEvent('click', { bubbles: true }))
   })
@@ -264,9 +264,74 @@ describe('段ごとの確かめで［次へ］を止める', () => {
     }
   })
 
-  it('全部そろっていれば送信設定の段から最終確認へ進める', async () => {
+  it('新規の送信設定は未選択で始まり、選ぶまで次へ進まず理由を表示する', async () => {
     await renderForm('schedule', { visualQaAugustCampaign: true })
     try {
+      const schedule = container.querySelector('#broadcast-step-schedule')!
+      expect(schedule.querySelectorAll('[role="radio"][aria-checked="true"], input[type="radio"]:checked').length).toBe(0)
+      expect(button('配信前チェックへ').disabled).toBe(true)
+      expect(footerReason()).toBe('送る時間を選んでください')
+      await click(button('配信前チェックへ'))
+      expect(onStepChange).not.toHaveBeenCalled()
+      expect(createApi).not.toHaveBeenCalled()
+      expect(updateApi).not.toHaveBeenCalled()
+    } finally { unmount() }
+  })
+
+  it('分散を選ぶと開始日時と分数を1か所で決められ、開始を決めるまで進めない', async () => {
+    await renderForm('schedule', { visualQaAugustCampaign: true })
+    try {
+      const schedule = container.querySelector('#broadcast-step-schedule')!
+      const spread = schedule.querySelector<HTMLInputElement>('input[type="radio"][value="spread"]')
+        ?? schedule.querySelector<HTMLButtonElement>('[role="radio"][value="spread"]')
+      expect(spread).toBeTruthy()
+      await click(spread!)
+      expect(schedule.querySelector('[aria-label="配信日（日本時間）"]')).toBeTruthy()
+      expect(schedule.querySelector('[aria-label="時刻（日本時間）"]')).toBeTruthy()
+      expect(schedule.querySelectorAll('#bc-spread').length).toBe(1)
+      expect(button('配信前チェックへ').disabled).toBe(true)
+      expect(footerReason()).toBe('予約する日付と時刻を入力してください')
+      expect(createApi).not.toHaveBeenCalled()
+    } finally { unmount() }
+  })
+
+  it('分散の分数を空にしても選択が消えず、下書き保存はできる', async () => {
+    createApi.mockResolvedValue({ success: true, data: { id: 'draft-1', version: 1 } })
+    await renderForm('schedule', { visualQaAugustCampaign: true })
+    try {
+      await click(container.querySelector<HTMLInputElement>('#broadcast-step-schedule input[value=spread]')!)
+      const input = container.querySelector<HTMLInputElement>('#bc-spread')!
+      await act(async () => {
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '')
+        input.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      await flush()
+      expect(container.querySelector<HTMLInputElement>('#broadcast-step-schedule input[value=spread]')!.checked).toBe(true)
+      expect(container.querySelector('#bc-spread')).toBe(input)
+      expect(button('配信前チェックへ').disabled).toBe(true)
+      expect(footerReason()).toBe('分散する時間を1〜720の整数で入力してください')
+      await click(button('下書きを保存する'))
+      expect(createApi.mock.calls[0][0]).toMatchObject({ saveAsDraft: true, draftSendChoice: 'spread', draftSpreadMinutes: '', draftSpreadStart: 'scheduled', stealthSpreadMinutes: 0 })
+    } finally { unmount() }
+  })
+
+  it('未選択でも書きかけを自動保存し、送信の値は付けない', async () => {
+    createApi.mockResolvedValue({ success: true, data: { id: 'draft-1', version: 1 } })
+    vi.useFakeTimers()
+    await renderForm('schedule', { visualQaAugustCampaign: true })
+    try {
+      await typeTitle('新しい配信名')
+      await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
+      expect(createApi).toHaveBeenCalled()
+      expect(createApi.mock.calls[0][0]).toMatchObject({ saveAsDraft: true, draftSendChoice: 'unselected', stealthSpreadMinutes: 0, scheduledAt: null })
+      expect(button('配信前チェックへ').disabled).toBe(true)
+    } finally { unmount(); vi.useRealTimers() }
+  })
+
+  it('全部そろい今すぐを明示して選べば送信設定の段から最終確認へ進める', async () => {
+    await renderForm('schedule', { visualQaAugustCampaign: true })
+    try {
+      await click(container.querySelector<HTMLInputElement>('#broadcast-step-schedule input[value=now]')!)
       expect(button('配信前チェックへ').disabled).toBe(false)
       await click(button('配信前チェックへ'))
       expect(onStepChange).toHaveBeenCalledWith('confirm')

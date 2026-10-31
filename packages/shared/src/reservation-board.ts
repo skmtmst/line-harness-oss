@@ -10,7 +10,7 @@ export interface ReservationBoardEntry {
  contactLabel?:string|null; currentAllergy?:string|null; source: string; courseName: string | null; note: string | null; dining: DiningSnapshot | null;
  holdExpiresAt: string | null; arrivedAt?: string | null; departedAt?: string | null;
 }
-export interface ReservationBoardResource { id: string; label: string; active: boolean; capacity: number; }
+export interface ReservationBoardResource { id: string; label: string; active: boolean; capacity: number; groupLabel?: string; }
 export interface ReservationBoardPage { entries: ReservationBoardEntry[]; total: number; limit: number; offset: number; }
 export type ReservationBoardMove =
  | {kind:'people';expectedVersion:number;startsAt:string;staffId?:string}

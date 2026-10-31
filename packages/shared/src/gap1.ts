@@ -7,6 +7,7 @@ export interface LineSender {
 export interface SendConfirmationPreview {
  recipients:number;excluded:{blocked:number;optedOut:number;duplicate:number;hidden?:number;missingDestination?:number};
  purpose:'marketing';scheduledAt:string|null;quietHoursShiftTo:string|null;needsApproval:boolean;firstText:string;sender:LineSenderSnapshot|null;
+ deliveryLimit?:{candidateCount:number;recipientCount:number;random:boolean};
  expectedVersion:string|number;stoppable?:boolean;perAccount?:Array<{accountId:string;recipients:number;excluded:SendConfirmationPreview['excluded']}>;
 }
 export interface InboxFirstResponseSettings {strategy:'none'|'even'|'priority'|'random_weighted';targets?:Array<{staffId:string;priority:number;cap:number}>;enabled:boolean;firstResponseMinutes:number;businessHoursOnly:boolean;version:number;escalateTeamId:string|null}
