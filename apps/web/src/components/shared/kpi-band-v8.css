@@ -281,6 +281,36 @@ html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-sparkline] {
   html:root [data-kpi-strip][data-kpi-appearance='cards'] [data-kpi-detail] > button { margin-inline-start: auto; }
 }
 
+/* 流れの帯は、指標のマスと矢印・割合を交互に並べる。ほかの帯の列数・寸法は変えない。 */
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-layout='flow'] {
+  display: flex; gap: 0; align-items: stretch;
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'][data-kpi-layout='flow'] > [data-design-version] {
+  flex: 1 1 0; min-width: 0;
+}
+/* 上の2マス分と下の1マスの両端をそろえるため、欄間は同じ幅を使う。 */
+html:root [data-kpi-strip][data-kpi-layout='flow'],
+html:root [data-kpi-strip][data-kpi-layout='flow-summary'] {
+  --kpi-flow-connection-width: calc(var(--space-24) + var(--space-16));
+}
+html:root [data-kpi-strip][data-kpi-layout='flow'] > [data-kpi-connection] {
+  flex: 0 0 var(--kpi-flow-connection-width); min-width: 0; border: 0; padding: 0;
+}
+html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'][data-kpi-layout='flow-summary'] {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--kpi-flow-connection-width);
+}
+/* 長い割合は省略せず、隣のカードを避けた下の行へ移す。 */
+html:root [data-kpi-strip][data-kpi-layout='flow'][data-kpi-flow-rates='below'] { padding-block-end: var(--space-24); }
+html:root [data-kpi-strip][data-kpi-layout='flow'][data-kpi-flow-rates='below'] > [data-kpi-connection] { position: relative; }
+html:root [data-kpi-strip][data-kpi-layout='flow'][data-kpi-flow-rates='below'] > [data-kpi-connection] > span {
+  position: absolute; top: calc(100% + var(--space-8)); left: 50%; transform: translateX(-50%); width: max-content; line-height: var(--space-16);
+}
+@container kpi-card (min-width: 1px) {
+  html:root [data-kpi-strip][data-kpi-presentation='band'][data-kpi-appearance='cards'][data-kpi-layout='flow'] > [data-design-version] [data-kpi-fit] :is([data-kpi-value], [data-kpi-number]) {
+    font-size: min(var(--tpl-band-number-size), calc((100cqi - var(--kpi-flow-fit-unit, 0px)) / (var(--kpi-flow-fit-chars, 1) * 0.62)));
+  }
+}
+
 /* どの数の帯でも、値が 0 の時は数字と単位を薄い灰にする（帯の形・数字の太さは変えない）。 */
 html:root [data-kpi-strip] [data-kpi-zero] [data-kpi-value],
 html:root [data-kpi-strip] [data-kpi-zero] [data-kpi-unit] { color: var(--color-kpi-zero); }
