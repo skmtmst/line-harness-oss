@@ -861,7 +861,7 @@ export default function ScenariosListV8() {
       icon: CheckCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
-      detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : emptyValue('unknown'),
+      detail: stats && overallTotal !== null ? `全${formatNumber(overallTotal)}件の合計` : emptyValue('unknown'),
     },
     {
       title: '今週送った数',
@@ -1334,6 +1334,7 @@ export default function ScenariosListV8() {
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}
+              help={kpi.title === '最後まで配信した人' && stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : undefined}
               detailLayout={narrow ? 'qualifier' : undefined}
             />
           ))}

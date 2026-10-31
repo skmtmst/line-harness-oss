@@ -117,7 +117,15 @@ export async function getFriendStats(
   const friendScope = accountScopeSql(scope, 'line_account_id');
   const breakdownScope = accountScopeSql(scope, 'line_account_id');
   const breakdown = await friendBreakdown(db, null, breakdownScope);
-  const inbox = await inboxState(db, scope);
+  const statusScope = accountScopeSql(scope, 'f.line_account_id');
+  const statuses = await db.prepare(`SELECT
+      SUM(CASE WHEN status = 'unread' THEN 1 ELSE 0 END) AS unanswered,
+      SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved
+    FROM (
+      SELECT COALESCE((SELECT c.status FROM chats c WHERE c.friend_id = f.id
+        ORDER BY c.created_at DESC, c.id DESC LIMIT 1), 'resolved') AS status
+      FROM friends f WHERE ${statusScope.sql}
+    )`).bind(...statusScope.binds).first<{ unanswered: number | null; resolved: number | null }>();
 
   // JST の月の頭。月をまたぐ集計は UTC のままだと9時間ずれる。
   const now = japanCalendar();
@@ -140,8 +148,8 @@ export async function getFriendStats(
     blockedByThem: breakdown.blockedByThem + breakdown.blockedBoth,
     hiddenByUs: breakdown.hiddenByUs,
     // 友だち画面は LINE の友だちの数。MAIL のスレッドは混ぜない。
-    unanswered: inbox.line.unanswered,
-    resolved: inbox.line.resolved,
+    unanswered: Number(statuses?.unanswered ?? 0),
+    resolved: Number(statuses?.resolved ?? 0),
     addedThisMonth,
     addedLastMonth,
   };

@@ -25,6 +25,7 @@ vi.mock('@/lib/api', async original => {
 afterEach(() => { cleanup(); sessionStorage.clear() })
 test('シナリオの状態は地の色の札、値の無い所は薄い灰の — を1つだけ出す', async () => {
   render(<List />)
+  expect(await screen.findByRole('columnheader', { name: '最新の受信' })).toBeTruthy()
   const paused = (await screen.findByText('止めた人')).closest('tr')!
   const running = screen.getByText('動いている人').closest('tr')!
   const none = screen.getByText('シナリオの無い人').closest('tr')!

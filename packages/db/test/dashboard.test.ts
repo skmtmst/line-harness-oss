@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   getBroadcastStats,
+  getFriendStats,
   getDashboardOverview,
   dashboardFreshness,
   recordFriendSnapshot,
@@ -670,5 +671,30 @@ describe('今月の配信(#666 N-003)', () => {
     expect(stats.thisMonth).toBe(countedBroadcasts.length);
     expect(countedBroadcasts).toEqual(['b-today', 'b-edge', 'b-made-last-month', 'b-legacy']);
     expect(stats.scheduled).toBe(1);
+  });
+});
+
+describe('友だち一覧と同じ母集団の対応状態', () => {
+  test('会話なしも対応済みに含め、別アカウントと未所属を混ぜない', async () => {
+    insertAccount('a'); insertAccount('b');
+    for (const id of ['no-chat', 'resolved', 'unread', 'progress', 'hold']) insertFriend(id, { lineAccountId: 'a' });
+    insertFriend('other', { lineAccountId: 'b' });
+    insertFriend('unassigned');
+    for (const [id, status] of [['resolved', 'resolved'], ['unread', 'unread'], ['progress', 'in_progress'], ['hold', 'on_hold'], ['other', 'unread']]) {
+      sqlite.prepare('INSERT INTO chats (id,friend_id,status,created_at,updated_at,last_message_at) VALUES (?,?,?,?,?,?)').run('chat-'+id, id, status, jstDate(0), jstDate(0), jstDate(0));
+    }
+    const stats = await getFriendStats(db, { allowedAccountIds: ['a'], includeUnassigned: false });
+    expect(stats).toMatchObject({ total: 5, unanswered: 1, resolved: 2 });
+    // 一覧の行が使う現在状態の既定値も同じ。
+    const rows = sqlite.prepare("SELECT COALESCE(c.status, 'resolved') AS status FROM friends f LEFT JOIN chats c ON c.friend_id=f.id WHERE f.line_account_id='a'").all() as {status:string}[];
+    expect(stats.unanswered).toBe(rows.filter(row => row.status === 'unread').length);
+    expect(stats.resolved).toBe(rows.filter(row => row.status === 'resolved').length);
+    const withUnassigned = await getFriendStats(db, { allowedAccountIds: ['a'], includeUnassigned: true });
+    expect(withUnassigned).toMatchObject({ total: 6, unanswered: 1, resolved: 3 });
+  });
+  test('閲覧範囲が空なら未対応も対応済みも0', async () => {
+    insertFriend('unassigned');
+    const stats = await getFriendStats(db, { allowedAccountIds: [], includeUnassigned: false });
+    expect(stats).toMatchObject({ total: 0, unanswered: 0, resolved: 0 });
   });
 });

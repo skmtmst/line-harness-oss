@@ -128,4 +128,18 @@ describe('件数とページ送り・並び替え', () => {
     for (const item of ITEMS) expect(screen.getAllByRole('button', { name: `${item.name}を並び替え。上下キーで移動` }).length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: '並び替えを終了' })).toBeNull()
   })
+
+  it.each([false, true])('保管表示=%sのフォルダ件数を行と同じ状態で数える', onlyArchived => {
+    if (onlyArchived) { window.history.replaceState(null, '', '/tags?archived=1'); flushListUrlState() }
+    const items = [
+      { ...ITEMS[0], groupId: 'g' }, ...ITEMS.slice(1),
+      tag({ id: 'stored-g', status: 'archived', groupId: 'g' }),
+      tag({ id: 'stored-none', status: 'archived', groupId: null }),
+    ]
+    const groups = [{ id: 'g', name: '店頭' }] as TagGroup[]
+    render(<TagsList accountId="account-a" fixture={{ items, groups }} />)
+    const labels = [...document.querySelectorAll('[data-folder-select]')].map(el => el.textContent?.replace(/\s/g, ''))
+    expect(labels).toEqual(expect.arrayContaining(onlyArchived ? ['すべて2', '店頭1', '未分類1'] : ['すべて4', '店頭1', '未分類3']))
+    expect(rowIds()).toHaveLength(onlyArchived ? 2 : 4)
+  })
 })

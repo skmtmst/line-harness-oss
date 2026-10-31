@@ -152,6 +152,9 @@ describe('実行結果の画面（REIxB）', () => {
     expect(host.textContent).toContain('山田 太郎')
     expect(host.textContent).toContain('経路ごとの内訳')
     expect(host.textContent).toContain('二重送信を防ぐ・知らせ')
+    const timestamp = host.querySelector('time[datetime="2026-09-07T01:32:00.000Z"] [data-list-date-time]')
+    expect(timestamp?.textContent).toContain('09/07')
+    expect(timestamp?.textContent).toContain('10:32')
   })
 
   it('「失敗だけ見る」で URL の status を failed にする', async () => {

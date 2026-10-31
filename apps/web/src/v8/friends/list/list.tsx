@@ -121,7 +121,7 @@ type Column = string
 const COLUMNS: Array<{ key: Column; label: string }> = [
   { key: 'support', label: '対応・担当' },
   { key: 'scenario', label: 'シナリオ' },
-  { key: 'latest', label: '最新のメッセージ' },
+  { key: 'latest', label: '最新の受信' },
   { key: 'tags', label: 'タグ' },
   { key: 'source', label: '流入元' },
   { key: 'last', label: '最終接触' },
@@ -548,7 +548,7 @@ export default function FriendsListV8() {
   }, [friends, setFriends])
 
   const exportCurrentPage = useCallback(() => {
-    const header = ['友だち名', '対応', 'シナリオ', '最新メッセージ', '流入元', '登録日']
+    const header = ['友だち名', '対応', 'シナリオ', '最新の受信メッセージ', '流入元', '登録日']
     const rows = friends.map((friend) => [
       friend.displayName,
       statusOf(friend.chatStatus).label,

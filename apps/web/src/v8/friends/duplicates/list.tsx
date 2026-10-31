@@ -250,7 +250,7 @@ export default function DuplicatesListV8() {
           <Card variant="records" padding="roomy" aria-labelledby="dup-accounts-title">
             <div className={styles.panelHead}>
               <h3 id="dup-accounts-title" className={styles.panelTitle}>アカウントごとの重なり</h3>
-              <p className={styles.panelSub}>どのアカウントに重複が偏っているか</p>
+              <p className={styles.panelSub}>同じIDの登録を数えたものです。上の確認対象の候補の組数とは別の集計です。</p>
             </div>
             {d.data.perAccount.length === 0 ? (
               <p className={styles.panelSub}>アカウントが登録されていません。</p>
