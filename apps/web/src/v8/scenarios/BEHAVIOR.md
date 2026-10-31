@@ -69,6 +69,7 @@
 ## 呼ぶ口（今と同じ）
 - 読む：`scenarioReferenceData.scenario(id)`・`api.folders.list('scenario', シナリオのアカウント)`
 - 名前・フォルダ（id あり）：欄を離れたとき・フォルダを選んだときに `api.scenarios.update(id, { name, folderId })`
+- 新規は「この方式で保存する」「あとで決める」のどちらも、権限にかかわらず停止状態の下書きとして作る。配信開始は詳細の確認を通す別操作。既存の名前・方式の保存では有効状態を変えない。
 - この方式で保存する：id なし → `api.scenarios.create(…deliveryMode)`、id あり → `api.scenarios.update(id, { name, folderId, deliveryMode })`。どちらも `/scenarios/first-step?id=…` へ
 - あとで決める（下書きとして保存）：id なし → 「時刻で指定」で作って first-step へ、id あり → 名前・フォルダを保存して first-step へ
 - 名前が空：保存は入力不足の普通のdisabled、操作の下に理由を1行。保持された保存操作もAPIを呼ばず、必須理由を欄へ結び焦点を移す。

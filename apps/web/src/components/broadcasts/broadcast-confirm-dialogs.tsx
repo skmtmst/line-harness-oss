@@ -17,10 +17,14 @@ import type { SegmentCondition } from '@/lib/segment-condition'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
 import type { SendConfirmationPreview } from '@line-crm/shared'
 import { AlertTriangle,CheckCircle2 } from 'lucide-react'
-import type { Dispatch,SetStateAction } from 'react'
+import type { Dispatch,SetStateAction, ReactNode } from 'react'
 import { BROADCAST_ONLY_CONDITION_AXES,STANDARD_CONDITION_AXES,TYPE_LABELS } from './broadcast-form-model'
 
 type RenderBroadcastConfirmDialogsContext = {
+  canConfirm: boolean
+  confirmationBlocked: boolean
+  confirmationFields: ReactNode
+  preflightChecks: { key: string; label: string; value: string; done: boolean }[]
   approvalCandidates: BroadcastApprovalCandidate[]
   approvalCandidatesState: "loading" | "error" | "ready"
   approvalConfig: { threshold: number; singleOperator: boolean; } | null
@@ -47,7 +51,6 @@ type RenderBroadcastConfirmDialogsContext = {
   needsApproval: boolean
   needsApprovalSingle: boolean
   preflightDialogOpen: boolean
-  previewConfirmed: boolean
   quota: { monthlyUsed: number | null; monthlyLimit: number | null; remaining: number | null; planned: number; state: "available" | "insufficient" | "unavailable"; reason: string | null; } | null
   quotaInsufficient: boolean
   quotaNote: string | null
@@ -72,7 +75,7 @@ type RenderBroadcastConfirmDialogsContext = {
   title: string
 }
 
-export function renderBroadcastConfirmDialogs({ approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, previewConfirmed, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
+export function renderBroadcastConfirmDialogs({ canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
   return (<><UnsavedLeaveDialog
       open={leaveTarget !== null}
       subject="配信の変更"
@@ -128,7 +131,7 @@ export function renderBroadcastConfirmDialogs({ approvalCandidates, approvalCand
       title={quotaInsufficient ? '配信枠が不足しています' : '配信前チェック'}
       description={quotaInsufficient
         ? `現在の送信枠では${formatNumber(quota?.planned)}通を送信できません。対象を絞るか、配信設定を確認してください。`
-        : '対象・メッセージ・日時・送信枠を確認しました。'}
+        : '対象・メッセージ・日時・送信枠の確認結果です。'}
       confirmLabel="対象を見直す"
       cancelLabel="キャンセル"
       designNode="vW4Es"
@@ -140,9 +143,7 @@ export function renderBroadcastConfirmDialogs({ approvalCandidates, approvalCand
       }}
     >
       <ul className="space-y-2 rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
-        <li className={audienceCount === null ? "text-warning" : "text-success"}>{audienceCount === null ? "対象人数をまだ取得できていません" : `対象人数 ${formatNumber(audienceCount)}人を確認してください`}</li>
-        <li className={previewConfirmed ? 'text-success' : 'text-warning'}>{previewConfirmed ? '✓' : '!'} メッセージ表示を確認しました</li>
-        <li className={scheduledLabel ? 'text-success' : 'text-ink-faint'}>{scheduledLabel ? '✓' : '○'} 配信日時を確認しました</li>
+        {preflightChecks.map(check => <li key={check.key} className={check.done ? 'text-success' : 'text-warning'}>{check.done ? '✓' : '⚠'} {check.label}：{check.key === 'audience' ? audienceCount === null ? '対象人数をまだ取得できていません' : `対象人数 ${formatNumber(audienceCount)}人を確認してください` : check.value}</li>)}
       </ul>
     </ConfirmDialog>
 
@@ -173,6 +174,7 @@ export function renderBroadcastConfirmDialogs({ approvalCandidates, approvalCand
       allRecipients={targetMode === 'all'}
       extraCaution={quotaInsufficient ? (quotaNote ?? undefined) : undefined}
       approval={needsApproval && approvalConfig ? { note: `${formatNumber(approvalConfig.threshold)} 人以上は承認が要る店です。承認されたら${sendMode === 'scheduled' && scheduledDate ? ` ${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime} に` : ''}送ります` } : null}
+      confirmationFields={confirmationFields}
       approvalFields={needsApproval && approvalConfig && audienceCount !== null ? (
         <ApprovalRequestFields
           bare
@@ -186,7 +188,7 @@ export function renderBroadcastConfirmDialogs({ approvalCandidates, approvalCand
           onNoteChange={setApprovalNote}
         />
       ) : undefined}
-      primaryDisabled={needsApproval && approverId === ''}
+      primaryDisabled={!canConfirm || confirmationBlocked || (needsApproval && approverId === '')}
       primaryLabel={needsApproval ? '承認を依頼する' : (() => {
         const n = currentStep ? sendPreview.data?.recipients ?? null : audienceCount
         const shifted = currentStep ? sendPreview.data?.quietHoursShiftTo : null

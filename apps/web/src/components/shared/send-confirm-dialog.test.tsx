@@ -29,6 +29,14 @@ describe('共通の「送る前の確かめ」窓（U1）', () => {
     expect(screen.getByText('閉じても送りません')).toBeTruthy()
     expect(document.body.textContent).not.toContain('元に戻す')
   })
+  it('承認が不要な時も追加の確認欄を出し、未指定なら追加の欄を出さない', () => {
+    const { rerender } = render(<SendConfirmDialog {...base} confirmationFields={<p>追加の確認事項</p>} />)
+    expect(screen.getByText('追加の確認事項')).toBeTruthy()
+    expect(screen.queryByText('承認する人')).toBeNull()
+    rerender(<SendConfirmDialog {...base} />)
+    expect(screen.queryByText('追加の確認事項')).toBeNull()
+    expect((screen.getByRole('button', { name: '1,272 人に送る' }) as HTMLButtonElement).disabled).toBe(false)
+  })
   it('数えられなかったとき・0 人のときは主ボタンを押せない', () => {
     const { rerender } = render(<SendConfirmDialog {...base} state="error" recipients={null} />)
     expect(screen.getByText('人数を数えられませんでした')).toBeTruthy()

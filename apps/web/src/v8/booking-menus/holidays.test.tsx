@@ -6,7 +6,7 @@
  */
 import React from 'react'
 import { act, cleanup, render, screen, waitFor,fireEvent,within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookingException, BookingSettings } from '@/lib/api'
 import { closedOn, closedRanges, closedSpan } from './lib/closed-ranges'
 import type { StaffMember } from '@line-crm/shared'
@@ -24,7 +24,8 @@ vi.mock('next/navigation', () => ({
 
 const { HolidaysTabV8 } = await import('./tabs/holidays-tab')
 
-afterEach(() => { cleanup(); forgetStaffIdentity(); vi.clearAllMocks() })
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-15T03:00:00.000Z')) })
+afterEach(() => { cleanup(); forgetStaffIdentity(); vi.clearAllMocks(); vi.useRealTimers() })
 
 const exception = (id: string, dateFrom: string, dateTo: string): BookingException => ({
   id, lineAccountId: 'a', scopeKind: 'store', scopeId: null, date: null, dateFrom, dateTo, kind: 'closed',
