@@ -264,35 +264,6 @@
   font-size: var(--text-body);
 }
 
-/* 下の段：左に戻る・真ん中に主の操作（buttons-centered）。 */
-.footer {
-  display: grid;
-  width: 100%;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--polish-space-row);
-}
-
-.footerSide {
-  display: flex;
-  align-items: center;
-  gap: var(--polish-space-row);
-}
-
-.footerEnd {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--polish-space-row);
-}
-
-.footerCenter {
-  display: flex;
-  align-items: center;
-  gap: var(--polish-space-row);
-}
-
 .buttonIcon {
   width: var(--polish-icon-control);
   height: var(--polish-icon-control);

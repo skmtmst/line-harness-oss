@@ -40,11 +40,9 @@ export default function RegistrationStyleDialog({ open, choice, busy, ready, err
     footerDivider={false}
     designFooterPadding="16px 24px"
     designContentPadding="16px 24px 24px"
-    footer={<DialogActions><div className={styles.footer}>
-      <div className={styles.footerSide}><Button type="button" variant="text" onClick={onSkip} disabled={busy || !ready}>あとで設定する</Button></div>
-      <div className={styles.footerCenter}><Button type="button" variant="primary" onClick={onSave} disabled={busy || !ready || !choice} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? 'スタイルを選んでください' : null}>次へ<ArrowRight size={16} aria-hidden="true" /></Button></div>
-      <div className={styles.footerEnd}><StyleChoiceStatus chosen={choice || null} /></div>
-    </div></DialogActions>}
+    footer={<DialogActions leadingAction={<Button type="button" variant="text" onClick={onSkip} disabled={busy || !ready}>あとで設定する</Button>}>
+      <Button type="button" variant="primary" onClick={onSave} disabled={busy || !ready || !choice} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? 'スタイルを選んでください' : null}>次へ<ArrowRight size={16} aria-hidden="true" /></Button>
+    </DialogActions>}
   >
     <div className={styles.body}>
       <div className={styles.progress}>
@@ -52,6 +50,7 @@ export default function RegistrationStyleDialog({ open, choice, busy, ready, err
         <ProgressBar appearance="quota" className={styles.track} value={4} max={5} label="登録の進み" />
         <span className={styles.progressName}>使い方のスタイル</span>
       </div>
+      <StyleChoiceStatus chosen={choice || null} />
       <StyleChoiceStep viewing={viewing} onView={setViewing} chosen={choice || null} onChoose={onChoose} disabled={busy} />
       <p className={styles.where}><Info aria-hidden="true" className={styles.whereIcon} />あとから変えられます（設定 › アカウント）。</p>
     </div>

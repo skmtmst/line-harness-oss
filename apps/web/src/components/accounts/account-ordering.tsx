@@ -12,7 +12,7 @@ import { MoreAction } from '@/components/shared/row-actions'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import { GripHorizontal, Save } from 'lucide-react'
 import compact from './account-ordering-v8.module.css'
@@ -302,10 +302,10 @@ export default function AccountOrdering({ closeGuardRef, onBusyChange, onClose, 
     return <SaveErrorScope errors={saveErrors}><>
       <Dialog open title="LINEアカウント階層を編集" designNode="a7lUk" designWidth={600} designTop={140}
         designHeaderPadding="24px 24px 0" designContentPadding="15px 24px 0" busy={saving} onCancel={() => { if (changed.length) setClosing(true); else onClose() }}
-        footer={<div className={compact.footer}>
+        footer={<DialogActions>
           <Button onClick={() => { cancelChanges(); onClose() }} disabled={saving}>キャンセル</Button>
           <Button variant="primary" onClick={() => save()} disabled={changed.length === 0 || saving} busy={saving} busyLabel="保存中…"><Save size={16} aria-hidden="true" />構成を保存する</Button>
-        </div>}>
+        </DialogActions>}>
         <div className={compact.body}>
           <p className={compact.description}>カードの「…」から「最上位（親）にする」「○○の子にする」を選ぶか、親にしたいカードの上へドラッグします。親・子・孫の3階層まで設定できます。</p>
           {error ? <Notice tone="danger" message={error} /> : null}
