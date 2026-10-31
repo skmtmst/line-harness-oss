@@ -50,6 +50,12 @@ describe('一覧の状態とページ送り', () => {
     expect(html).not.toContain('データがありません')
   })
 
+  it('指定された説明を権限不足の定型文で上書きしない', () => {
+    const html = renderToStaticMarkup(<ListState kind="forbidden" description="設定で有効にすると使えます。" />)
+    expect(html).toContain('設定で有効にすると使えます。')
+    expect(html).not.toContain('この操作の権限がありません')
+  })
+
   it('画面から作れない記録一覧では作成を促さない', () => {
     const html = renderToStaticMarkup(<ListState kind="empty" emptyPreset="readonly" />)
     expect(html).toContain('記録が増えると')

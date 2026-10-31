@@ -1063,3 +1063,4 @@
 
 - [初期設定の案内と閲覧権限](release-log/unreleased/2004-kenta-setup-guidance.md) — 反映履歴、確認 2026-10-31。
 - [月謝の台帳と閲覧API](release-log/unreleased/2004-kenta-monthly-ledger.md) — 反映履歴、確認 2026-10-31。
+- [受信箱の会話と機能設定の案内](release-log/unreleased/2006-masato-inbox-feature-gate.md) — 反映履歴、確認 2026-10-31。
