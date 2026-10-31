@@ -122,8 +122,17 @@ function buildCondition(table: string, scope: RetentionScope, seen: Set<string>)
     SELECT 'conversion_nonce', id FROM conversion_points WHERE tenant_id=(SELECT tenant_id FROM target)
     UNION ALL SELECT 'site_event', id FROM measurement_sites WHERE line_account_id IN
       (SELECT id FROM line_accounts WHERE tenant_id=(SELECT tenant_id FROM target)))`;
-  if (scope.by === 'workflow') return `${table}.${scope.column} IN (WITH target(id) AS (SELECT ?)
-    SELECT 'tenant:' || id FROM target UNION ALL SELECT 'line:' || id FROM line_accounts WHERE tenant_id=(SELECT id FROM target))`;
+  if (scope.by === 'workflow' && table !== 'workflow_steps') throw new Error(`共有工程の削除条件は未定義です: ${table}`);
+  if (scope.by === 'workflow') return `${table}.rowid IN (
+    WITH target(id) AS (SELECT ?)
+    SELECT w.rowid FROM workflow_steps w WHERE w.scope_id IN (
+      SELECT 'tenant:' || id FROM target UNION ALL SELECT 'line:' || id FROM line_accounts WHERE tenant_id=(SELECT id FROM target))
+    UNION ALL
+    SELECT w.rowid FROM workflow_steps w
+    WHERE w.scope_id>='stripe-test:' AND w.scope_id<'stripe-test;' AND w.process_kind IN ('booking_stripe_webhook','booking_stripe_object')
+      AND (COALESCE(json_extract(w.input_json,'$.retentionTenantId'),json_extract(w.input_json,'$.tenantId'))=(SELECT id FROM target)
+       OR COALESCE(json_extract(w.input_json,'$.retentionAccountId'),json_extract(w.input_json,'$.accountId')) IN
+         (SELECT id FROM line_accounts WHERE tenant_id=(SELECT id FROM target))))`;
   if (scope.by === 'tenant') return `${table}.${scope.column} = ?`;
   if (scope.by === 'lineAccount') {
     return `${table}.${scope.column} IN (SELECT id FROM line_accounts WHERE tenant_id = ?)`;

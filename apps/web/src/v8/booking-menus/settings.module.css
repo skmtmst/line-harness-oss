@@ -15,6 +15,7 @@
   flex-direction: column;
   /* 板の幅で折り畳みを決める（画面幅ではない）。 */
   container-type: inline-size;
+  container-name: v8-booking-settings;
   /* 頭の下線・右欄の区切り・下の帯を板の端まで届かせるため、
      .content の余白（20px 24px 28px）を打ち消して中で持ち直す。 */
   margin: calc(var(--tpl-bm-20) * -1) calc(var(--tpl-bm-24) * -1) calc(var(--tpl-bm-28) * -1);
@@ -178,13 +179,6 @@
   .side {
     width: var(--tpl-bm-280);
     padding: var(--tpl-bm-16);
-  }
-
-  /* 板 （1152）：メニューの表は「担当」「30日」を畳み、
-     メニュー・時間・金額・状態だけにする。 */
-  .colStaff,
-  .colCount {
-    display: none;
   }
 
   .sidePhone {
@@ -381,25 +375,6 @@
   align-items: flex-start;
   gap: var(--tpl-bm-2);
   min-width: 0;
-}
-
-.menuName {
-  min-height: 0;
-  max-width: 100%;
-  padding: 0;
-  line-height: var(--tpl-bm-19);
-  overflow: hidden;
-  /* 一覧の名前は黒の太字（§6.5 の 2・絵 ）。押せることは下線で示す。 */
-  color: var(--color-ink);
-  font-size: var(--tpl-bm-13);
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-decoration: none;
-}
-
-.menuName:hover {
-  text-decoration: underline;
 }
 
 .menuDesc {
@@ -1779,6 +1754,13 @@ span.calDay { cursor: default; color: var(--color-ink); }
 @container v8-staff-table (max-width: 1000px) {
   .staffColNoAssign,
   .staffColWork {
+    display: none;
+  }
+}
+
+@container v8-booking-settings (max-width: 1080px) {
+  .colStaff,
+  .colCount {
     display: none;
   }
 }
