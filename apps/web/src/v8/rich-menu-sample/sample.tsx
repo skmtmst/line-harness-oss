@@ -140,7 +140,7 @@ export default function RichMenuSampleV8() {
                   <GridCell>
                     {canEdit && (editHref || open) ? <RowMenu appearance="box" size="row" label={`${tile.label}の操作`} items={[
                       ...(editHref ? [{ id: 'change', label: '押したときを変える', href: editHref }] : []),
-                      ...(open ? [FEATURES[tile.feature]?.preparing ? { id: 'configure', label: '決まりを入れる', onSelect: () => preparing.open(FEATURES[tile.feature]!.preparing!) } : { id: 'configure', label: '決まりを入れる', href:tile.formId?`/forms/${encodeURIComponent(tile.formId)}`:tile.target==='history'?'/getting-started/rich-menu':hrefOf(tile.feature) }] : []),
+                      ...(open ? [FEATURES[tile.feature]?.preparing ? { id: 'configure', label: '決まりを入れる', onSelect: () => preparing.open(FEATURES[tile.feature]!.preparing!) } : { id: 'configure', label: '決まりを入れる', href:tile.formId?`/form-submissions/edit?id=${encodeURIComponent(tile.formId)}&tab=basic`:tile.target==='history'?'/getting-started/rich-menu':hrefOf(tile.feature) }] : []),
                     ]} /> : null}
                   </GridCell>
                 </GridRow>
