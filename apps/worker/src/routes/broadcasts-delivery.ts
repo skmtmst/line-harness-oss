@@ -1,3 +1,4 @@
+import { assertLimitedAudienceNames, LimitedBroadcastError, storedDeliveryLimit, limitedDeliveryPlan, optionsWithDeliveryConfirmation } from '../features/broadcasts/broadcast-delivery-limit/index.js';
 import { scopeSegmentQuery, scopedFriendIds } from '../services/segment-query-scope.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { BROADCAST_DEFINITION_GUARD_SQL, broadcastDefinitionGuardArgs } from '../features/broadcasts/index.js';
@@ -71,6 +72,11 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       : fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
 
+  const limitedDelivery = storedDeliveryLimit(existing);
+  let approvedLimitCount: number | undefined;
+  let confirmedOptions: string | undefined;
+  if (limitedDelivery && await simulationContext(c.env.DB, id)) return c.json({success:false,error:'人数に上限を付ける配信は、シミュレーションと併用できません。'},409);
+  if (limitedDelivery && await c.env.DB.prepare('SELECT broadcast_id FROM broadcast_ab_tests WHERE broadcast_id=?').bind(id).first()) return c.json({success:false,error:'人数に上限を付ける配信は、A/Bと併用できません。'},409);
   /*
    * 二者承認のゲート（m12a / -06 §6）。送信時点の宛先数で判定する。
    * 承認が要る人数なのに承認済みでなければ送らない。1人運用の組織では
@@ -85,6 +91,18 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       const current=await broadcastSendPreview(c.env.DB,existing);
       if(sendBody.expectedVersion!==current.expectedVersion||sendBody.confirmedRecipientCount!==current.recipients||current.recipients===0)
         return c.json({success:false,code:'SEND_PREVIEW_CHANGED',error:'送る相手が変わりました。もう一度確かめてください',data:current},409);
+    }
+
+    if (limitedDelivery) {
+      const plan = await limitedDeliveryPlan(c.env.DB, existing, {requireConfirmation:false});
+      if (sendBody?.expectedVersion !== (existing.lock_version ?? 1) || sendBody.confirmedRecipientCount !== plan!.recipientCount) return c.json({success:false,code:'SEND_PREVIEW_CHANGED',error:'上限人数と送る相手をもう一度確かめてください。'},409);
+      approvedLimitCount = plan!.recipientCount;
+      const parts = parseBroadcastMessageParts({messageType:existing.message_type,messageContent:existing.message_content,messageBubblesJson:existing.message_bubbles_json,messageOptionsJson:existing.message_options_json,altText:existing.alt_text});
+      if (parts.some(part => hasRecipientVariables(part.messageContent))) {
+        try { await assertLimitedAudienceNames(c.env.DB, plan!.query); }
+        catch (error) { if (error instanceof LimitedBroadcastError) return inputError(c,{success:false,error:error.message},400,['name']); throw error; }
+      }
+      confirmedOptions = optionsWithDeliveryConfirmation(existing, approvedLimitCount, existing.lock_version ?? 1);
     }
 
     const approvalGate = await enforceBroadcastSendApproval(c.env.DB, existing, {
@@ -105,13 +123,15 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       const at=typeof sendBody.scheduledAt==='string'?sendBody.scheduledAt:new Date().toISOString();
       const shifted=await broadcastQuietHoursShift(c.env.DB,existing.line_account_id,at),scheduled=shifted??(sendBody.scheduledAt as string|undefined);
       if(scheduled){
-        const result=await c.env.DB.prepare("UPDATE broadcasts SET status='scheduled',scheduled_at=?,lock_version=lock_version+1 WHERE id=? AND status='draft' AND lock_version=? AND COALESCE(approval_status,'none')=?").bind(scheduled,id,sendBody.expectedVersion,broadcastDefinitionGuardArgs(existing)[1]).run();
+        const scheduledOptions=approvedLimitCount===undefined?existing.message_options_json:optionsWithDeliveryConfirmation(existing,approvedLimitCount,(existing.lock_version??1)+1);
+        const result=await c.env.DB.prepare("UPDATE broadcasts SET status='scheduled',scheduled_at=?,message_options_json=?,lock_version=lock_version+1 WHERE id=? AND status='draft' AND lock_version=? AND COALESCE(approval_status,'none')=?").bind(scheduled,scheduledOptions,id,sendBody.expectedVersion,broadcastDefinitionGuardArgs(existing)[1]).run();
         if(!result.meta.changes)return c.json({success:false,error:'version_conflict'},409);
         return c.json({success:true,data:{scheduled:true,scheduledAt:scheduled,quietHoursShiftTo:shifted}});
       }
     }
 
   } catch (gateError) {
+    if (gateError instanceof LimitedBroadcastError) return inputError(c,{success:false,error:gateError.message},409,["deliveryLimit"]);
     if(gateError instanceof GapError)return c.json({success:false,error:gateError.code},gateError.status);
     // 数えられない（DB到達不能など）ときは送らない。誤送信より停止を選ぶ。
     logger.error("broadcasts.broadcasts_id_send_post_failed");
@@ -152,7 +172,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
    * 送信自体は必ずキューに載せる。条件に当たる人数は事前に読めないので、
    * その場で送ると Worker の30秒制限を超えうる。
    */
-  if (existing.target_type === 'segment') {
+  if (existing.target_type === 'segment' && !limitedDelivery) {
     const rawConditions = (existing as unknown as Record<string, unknown>).segment_conditions as string | null;
     let conditions: SegmentCondition | null = null;
     try {
@@ -232,7 +252,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
 
   // broadcast/multicast は本文を共有するため、受信者別の変数があれば少人数でも個別 push のキューへ進め、Worker の制限内で送る。
   if (hasRecipientVariables(existing.message_content)
-    && existing.target_type !== 'multi-account-dedup') {
+    && existing.target_type !== 'multi-account-dedup' && !limitedDelivery) {
     const rawExisting = existing as unknown as Record<string, unknown>;
     const accountId = rawExisting.line_account_id as string | null;
     const where: string[] = ['f.is_following = 1', 'COALESCE(f.is_hidden,0)=0', DELIVERY_CONSENT_ALLOWED_SQL];
@@ -370,7 +390,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
   }
 
   // target_type='tag' で対象が多い場合はキュー方式
-  if (existing.target_type === 'tag' && existing.target_tag_id) {
+  if (existing.target_type === 'tag' && existing.target_tag_id && !limitedDelivery) {
     const { getFriendsByTag } = await import('@line-crm/db');
     const friends = await getFriendsByTag(
       c.env.DB,
@@ -433,7 +453,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
   if (!afterActionCheck.ok) {
     return c.json({ success: false, error: afterActionCheck.error }, 409);
   }
-  const quotaCheck = await guardScheduledBroadcastQuota(c.env.DB, existing, sendAccountId, { reserveBroadcastId: id });
+  const quotaCheck = await guardScheduledBroadcastQuota(c.env.DB, existing, sendAccountId, { reserveBroadcastId: id, confirmedRecipientCount: approvedLimitCount });
   if (quotaCheck.blocked) {
     return c.json({ success: false, error: quotaCheck.message ?? '送信枠が足りないため送れません' }, 409);
   }
@@ -448,14 +468,14 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
   // 一意に確定する (rollback 時の status 復元に使用)。
   let claimedStatus: 'draft' | 'scheduled' | null = null;
   const draftClaim = await c.env.DB.prepare(
-    `UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'draft' ${BROADCAST_DEFINITION_GUARD_SQL}`
-  ).bind(id, ...broadcastDefinitionGuardArgs(existing)).run();
+    `UPDATE broadcasts SET status = 'sending', message_options_json = ? WHERE id = ? AND status = 'draft' ${BROADCAST_DEFINITION_GUARD_SQL}`
+  ).bind(confirmedOptions ?? existing.message_options_json ?? null, id, ...broadcastDefinitionGuardArgs(existing)).run();
   if (draftClaim.meta.changes) {
     claimedStatus = 'draft';
   } else {
     const schedClaim = await c.env.DB.prepare(
-      `UPDATE broadcasts SET status = 'sending' WHERE id = ? AND status = 'scheduled' ${BROADCAST_DEFINITION_GUARD_SQL}`
-    ).bind(id, ...broadcastDefinitionGuardArgs(existing)).run();
+      `UPDATE broadcasts SET status = 'sending', message_options_json = ? WHERE id = ? AND status = 'scheduled' ${BROADCAST_DEFINITION_GUARD_SQL}`
+    ).bind(confirmedOptions ?? existing.message_options_json ?? null, id, ...broadcastDefinitionGuardArgs(existing)).run();
     if (schedClaim.meta.changes) {
       claimedStatus = 'scheduled';
     }
@@ -469,7 +489,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
   // 冒頭 (updateBroadcastStatus / getBroadcastById / autoTrackContent / buildMessage) で
   // 失敗した場合は内部 catch の対象外。lock を外側で必ず rollback する。
   try {
-    await processBroadcastSend(c.env.DB, lineClient, id, c.env.WORKER_URL);
+    await processBroadcastSend(c.env.DB, lineClient, id, c.env.WORKER_URL, quotaCheck.recipientLimitCount === undefined ? undefined : {recipientLimitCount:quotaCheck.recipientLimitCount});
   } catch (err) {
     await c.env.DB.prepare(
       `UPDATE broadcasts SET status = ? WHERE id = ? AND status = 'sending'`
@@ -478,7 +498,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
   }
 
   const result = await getBroadcastById(c.env.DB, id);
-  if (result?.status === 'sending' && result.segment_conditions) kickQueueProcessing(c, 'consent-filtered');
+  if (result?.status === 'sending' && (result.segment_conditions || limitedDelivery)) kickQueueProcessing(c, 'consent-filtered');
   if (result?.status === 'sent' && result.line_account_id) {
     try {
       await dispatchOperatorEvent(c.env.DB, c.env, {
@@ -495,7 +515,8 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
   }
   return c.json({ success: true, data: result ? serializeBroadcast(result) : null });
   } finally {
-    if (sendAccountId) await releaseQuotaSlot(c.env.DB, sendAccountId, id);
+    const retained = limitedDelivery ? await getBroadcastById(c.env.DB, id) : null;
+    if (sendAccountId && !(limitedDelivery && retained?.status === 'sending')) await releaseQuotaSlot(c.env.DB, sendAccountId, id);
   }
 };
 
@@ -509,6 +530,7 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
   if (!await canAccessBroadcast(c.env.DB, c.get('staff'), existing)) {
     return fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
+  if (storedDeliveryLimit(existing)) return c.json({success:false,error:'上限付きの配信は、送信前の確認から送ってください。'},409);
   if (existing?.hq_run_id) return c.json({ success: false, error: '統括からの配信は、統括の配信画面で操作してください' }, 403);
 
   const body = await c.req.json<{ conditions: SegmentCondition }>();

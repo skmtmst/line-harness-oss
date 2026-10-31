@@ -128,6 +128,15 @@ export function bookingStatus(b: StyleBooking, style: IndustryStyle = 'restauran
 const MEET: Record<string, StyleBadge> = { online: { label: 'オンライン', tone: 'info' }, in_person: { label: '対面', tone: 'neutral' }, customer_choice: { label: 'お客さまが選ぶ', tone: 'neutral' } }
 const SOURCE: Record<string, string> = { line: 'LINE', liff: 'LINE', phone: '電話', manual: '電話', walk_in: 'ウォークイン', web: 'Web', hotpepper: 'ホットペッパー', tabelog: '食べログ', restaurant_board: 'レストランボード' }
 
+/** 古い応答でも、顧客名や担当名をメニュー・卓の代わりにしない。 */
+function entryMenuTitle(entry: StyleScheduleEntry): string {
+  const booking = entry.booking
+  if (!booking) return entry.title
+  if (booking.menuName != null) return booking.menuName
+  if (entry.title && entry.title !== booking.name) return entry.title
+  return booking.kind === 'restaurant' && !booking.menuId ? '席のみ' : '—'
+}
+
 function rowOf(style: IndustryStyle, e: StyleScheduleEntry, sch: StyleSchedule, now: Date): StyleRow {
   const b = e.booking
   const tz = sch.timeZone
@@ -142,9 +151,9 @@ function rowOf(style: IndustryStyle, e: StyleScheduleEntry, sch: StyleSchedule, 
   const live = !['cancelled', 'rejected', 'expired', 'no_show'].includes(b.status)
   const past = Date.parse(b.startsAt) <= now.getTime()
   const extra = { past, live, booking: { id: b.id, friendId: b.friendId, kind: b.kind, version: b.version, updatedAt: b.updatedAt, price: b.price, partySize: b.partySize, startsAt: b.startsAt, meetingUrl: b.meetingUrl } }
-  if (style === 'restaurant') return { ...base, ...extra, reservationId: b.id, people: b.partySize, seat: columnNames || '—', course: e.title || '席のみ', courseNote: b.price ? `1人 ${yen(b.price)}` : '—', state, action: !live ? null : b.visited ? 'undo' : 'visit' }
-  if (style === 'consult') return { ...base, ...extra, sub: e.title, meet: b.meetingMode ? MEET[b.meetingMode] : undefined, staff: columnNames || '—', state: b.visited && !b.outcome ? { label: '結果待ち', tone: 'warning' } : state, action: b.visited ? (b.outcome ? 'done' : 'result') : !live ? null : b.meetingUrl ? 'meet' : b.location ? 'place' : null, actionHref: b.meetingUrl ?? (b.location ? `https://maps.google.com/?q=${encodeURIComponent(b.location)}` : undefined) }
-  return { ...base, ...extra, course: e.title, courseNote: b.price ? yen(b.price) : undefined, staff: columnNames || '—', state, action: b.visited ? 'done' : !live ? null : ['requested', 'pending'].includes(b.status) ? 'approve' : 'visit' }
+  if (style === 'restaurant') return { ...base, ...extra, reservationId: b.id, people: b.partySize, seat: (e.tableNames ?? e.columnIds.map(id => sch.columns.find(column => column.id === id && column.kind === 'table')?.name).filter(Boolean)).join('・') || '—', course: entryMenuTitle(e), courseNote: b.price ? `1人 ${yen(b.price)}` : '—', state, action: !live ? null : b.visited ? 'undo' : 'visit' }
+  if (style === 'consult') return { ...base, ...extra, sub: entryMenuTitle(e), meet: b.meetingMode ? MEET[b.meetingMode] : undefined, staff: columnNames || '—', state: b.visited && !b.outcome ? { label: '結果待ち', tone: 'warning' } : state, action: b.visited ? (b.outcome ? 'done' : 'result') : !live ? null : b.meetingUrl ? 'meet' : b.location ? 'place' : null, actionHref: b.meetingUrl ?? (b.location ? `https://maps.google.com/?q=${encodeURIComponent(b.location)}` : undefined) }
+  return { ...base, ...extra, course: entryMenuTitle(e), courseNote: b.price ? yen(b.price) : undefined, staff: columnNames || '—', state, action: b.visited ? 'done' : !live ? null : ['requested', 'pending'].includes(b.status) ? 'approve' : 'visit' }
 }
 
 const toMin = (t: string) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5))
@@ -180,7 +189,7 @@ function boardOf(style: IndustryStyle, sch: StyleSchedule, now: Date): StyleBoar
     const b = e.booking
     const st = b ? bookingStatus(b, style) : { label: '', tone: 'info' as const }
     const state: StyleBoard['entries'][number]['state'] = !b ? 'booked' : b.status === 'no_show' ? 'no_show' : b.visited || ['completed', 'cancelled', 'rejected', 'expired'].includes(b.status) ? 'done' : b.status === 'seated' || b.attendance === 'visited' ? 'active' : ['requested', 'pending'].includes(b.status) ? 'pending' : 'booked'
-    return { id: e.id, columnId: e.columnIds[0], start: hm(e.startsAt, tz), end: hm(e.endsAt, tz), name: b?.name ?? e.title, menu: b ? e.title : '', source: b?.source, state, stateLabel: st.label, nominated: b?.designation === 'designated' }
+    return { id: e.id, columnId: e.columnIds[0], start: hm(e.startsAt, tz), end: hm(e.endsAt, tz), name: b?.name ?? e.title, menu: b ? entryMenuTitle(e) : '', source: b?.source, state, stateLabel: st.label, nominated: b?.designation === 'designated' }
   })
   // 担当・卓の休み（closures）も盤に出す。人の custom_hours は残した営業時間なので休みの箱にしない。
   for (const c of sch.closures) {
@@ -211,7 +220,7 @@ function weekOf(sch: StyleSchedule, now: Date): StyleWeek {
       return start < end ? [{ day: day.date, start, end }] : []
     })
   }
-  const entries = sch.entries.flatMap(e => segments(e.startsAt, e.endsAt).map(slot => ({ id: e.id, ...slot, title: e.title, name: e.booking?.name ?? '', ...(e.booking ? { source: e.booking.source, state: e.booking.status === 'no_show' ? 'no_show' as const : e.booking.visited ? 'completed' as const : reservationBookingState({ status: e.booking.attendance === 'visited' ? 'visited' : e.booking.status, holdExpiresAt: null }) } : {}) })))
+  const entries = sch.entries.flatMap(e => segments(e.startsAt, e.endsAt).map(slot => ({ id: e.id, ...slot, title: entryMenuTitle(e), name: e.booking?.name ?? '', ...(e.booking ? { source: e.booking.source, state: e.booking.status === 'no_show' ? 'no_show' as const : e.booking.visited ? 'completed' as const : reservationBookingState({ status: e.booking.attendance === 'visited' ? 'visited' : e.booking.status, holdExpiresAt: null }) } : {}) })))
   const free = bookableScheduleSlots(sch).flatMap(s => {
     const original = parts(s.startsAt, tz)
     // A clipped continuation is not a new bookable start. Keep the API candidate's original action.

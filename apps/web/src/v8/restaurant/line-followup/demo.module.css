@@ -1,5 +1,19 @@
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--polish-space-card); align-items: start; }
-.rows { display: flex; flex-direction: column; gap: var(--polish-space-row); }
-.layout h4 { margin: 0; font-size: var(--text-body); color: var(--color-ink); }
-.row { display: flex; justify-content: space-between; align-items: center; gap: var(--polish-space-row); font-size: var(--text-caption); }
-@media (max-width: 600px) { .layout { grid-template-columns: 1fr; } }
+.layout { display: flex; flex-direction: column; gap: var(--polish-space-row); }
+.screen { position: relative; min-height: var(--tpl-style-demo-screen-min-height); padding: var(--polish-space-card); background: var(--color-canvas); }
+.screen p { margin: 0; }
+.screen article { min-width: 0; font-size: var(--text-caption); }
+.head { display: flex; justify-content: space-between; align-items: center; gap: var(--polish-space-row); min-width: 0; }
+.head span { min-width: 0; }
+.sample { padding: var(--polish-space-field); background: var(--color-canvas-sunken); border-radius: var(--radius-card); }
+.actions { display: flex; justify-content: flex-end; margin-top: var(--polish-space-field); }
+.overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: var(--polish-space-card); background: var(--color-scrim); }
+.overlay > * { width: min(100%, var(--tpl-style-demo-form-width)); }
+.columns { display: grid; grid-template-columns: 2fr 1fr; gap: var(--polish-space-card); }
+.fields { display: flex; flex-direction: column; gap: var(--polish-space-row); }
+.phone { padding: var(--polish-space-field); background: var(--color-canvas-sunken); border-radius: var(--radius-card); }
+.note { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
+
+.target { position: relative; display: inline-flex; outline: var(--tpl-style-demo-focus-width) solid var(--color-accent-deep); border-radius: var(--tpl-style-demo-focus-radius); }
+.hand { position: absolute; right: 0; bottom: 0; color: var(--color-ink); }
+
+.results { display: flex; flex-direction: column; gap: var(--polish-space-row); margin: 0; padding: 0; list-style: none; font-size: var(--text-caption); }

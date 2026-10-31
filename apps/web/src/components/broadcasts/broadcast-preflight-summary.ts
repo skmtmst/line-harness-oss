@@ -1,3 +1,4 @@
+import { broadcastSpreadMinutes, type BroadcastSendMode } from './broadcast-schedule'
 import type { BroadcastPreflight } from '@/lib/api'
 import { TARGET_MODES, type TargetMode } from '@/lib/broadcast-audience'
 import { audienceSummary } from '@/lib/broadcast-summary'
@@ -14,7 +15,7 @@ type BroadcastPreflightSummaryInput = {
   scenariosStatus: 'idle' | 'loading' | 'ready' | 'error'
   audience: SegmentCondition | null
   excludeTagId: string
-  sendMode: 'now' | 'scheduled' | 'optimal'
+  sendMode: BroadcastSendMode
   scheduledDate: string
   scheduledTime: string
   spreadMinutes: string
@@ -82,8 +83,9 @@ export function broadcastPreflightSummary({ preflight, targetMode, tags, tagId, 
    */
   const quotaNote = quota === null
     ? null
+    : quota.unlimited ? '送信枠の上限は設定されていません'
     : quota.state === 'unavailable'
-      ? '確認できませんでした'
+      ? quota.reason ?? '確認できませんでした'
       : quota.state === 'insufficient'
         ? `不足しています（残り ${formatNumber(quota.remaining)} / ${formatNumber(quota.monthlyLimit)}通）`
         : `残り ${formatNumber(quota.remaining)} / ${formatNumber(quota.monthlyLimit)}通（この配信で ${formatNumber(quota.planned)}通を使用）`
@@ -94,10 +96,10 @@ export function broadcastPreflightSummary({ preflight, targetMode, tags, tagId, 
   /** 把握できる重複配信。同じ時刻の前後1時間に入っている別の予約。 */
   const concurrentBroadcasts = preflight?.concurrentBroadcasts ?? []
   const scheduledLabel = sendMode === 'scheduled' && scheduledDate
-    ? `${scheduledDate.replace(/-/g, '/')} ${scheduledTime}${Number(spreadMinutes) > 0 ? `（${spreadMinutes}分かけて配信）` : ''}`
+    ? `${scheduledDate.replace(/-/g, '/')} ${scheduledTime}${broadcastSpreadMinutes(spreadMinutes) > 0 ? `（${broadcastSpreadMinutes(spreadMinutes)}分かけて配信）` : ''}`
     : null
   // 今すぐ送ると予約を分け、確定前に小窓で対象と本文を読み合わせる。
-  const sendWhenLabel = scheduledLabel ?? (sendMode === 'now' ? '今すぐ（確認してから送信）' : null)
+  const sendWhenLabel = scheduledLabel ?? (sendMode === 'now' ? `今すぐ（確認してから送信${broadcastSpreadMinutes(spreadMinutes) > 0 ? `・${broadcastSpreadMinutes(spreadMinutes)}分かけて配信` : ''}）` : null)
 
 
   return { audienceCount, audienceDisplayCount, confirmAudienceLabel, exclusionNote, quota, quotaInsufficient, quotaNote, evaluatedAtLabel, concurrentBroadcasts, scheduledLabel, sendWhenLabel }
