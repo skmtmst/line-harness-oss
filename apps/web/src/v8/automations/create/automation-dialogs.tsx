@@ -15,7 +15,7 @@ import styles from './create.module.css'
 
 export function AutomationDialogs({
   conditionOpen, setConditionOpen, condition, setCondition,
-  activateConfirmOpen, saving, setActivateConfirmOpen, save,
+  activateConfirmOpen, saving, setActivateConfirmOpen, save, error,
   name, selectedEvent, triggerConfigSummary, targetSummary,
   previewCount, actionSummary, eventType, compareOpen,
   conflict, setCompareOpen, leaveTarget, leaveBusy,
@@ -28,7 +28,8 @@ export function AutomationDialogs({
   activateConfirmOpen: boolean
   saving: boolean
   setActivateConfirmOpen: Dispatch<SetStateAction<boolean>>
-  save: (activate: boolean, force?: boolean) => Promise<void>
+  save: (activate: boolean, force?: boolean) => Promise<boolean | void>
+  error?: string
   name: string
   selectedEvent: { value: Automation["eventType"]; label: string; note: string; }
   triggerConfigSummary: string
@@ -69,10 +70,11 @@ export function AutomationDialogs({
         confirmLabel="保存して動かし始める"
         cancelLabel="戻って直す"
         busy={saving}
-        onConfirm={() => {
-          setActivateConfirmOpen(false)
-          return save(true)
-        }}
+        error={error || undefined}
+        confirmDisabled={Boolean(conflict)}
+        confirmDisabledReason="閉じて最新の内容と比べてください。"
+        onSuccess={() => setActivateConfirmOpen(false)}
+        onConfirm={() => save(true)}
         onCancel={() => setActivateConfirmOpen(false)}
       >
         <dl className={styles.kvList}>

@@ -242,16 +242,17 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
     }
   }
   const acceptLatest = async () => {
-    setReplaceConfirm(false)
     const next = latest ?? await webinarApi.editor(webinarId).then((res) => ({ editor: res.data, ctas: null })).catch(() => null)
-    if (!next) { setRegistrationError('最新版を読み込めませんでした。もう一度お試しください。'); return }
+    if (!next) { setRegistrationError('最新版を読み込めませんでした。もう一度お試しください。'); return false }
     ctx.onEditorChange(next.editor)
     setRegistrationFormId(next.editor.registrationFormId ?? '')
     setSavedForm(next.editor.registrationFormId ?? '')
     setConflict(false)
     setLatest(null)
     setCompareOpen(false)
+    setReplaceConfirm(false)
     if (conflictScope === 'cards') await loadCtas()
+    return true
   }
 
   const currentIndex = ctas === null ? 0 : Math.min(selected, Math.max(ctas.length - 1, 0))
@@ -388,7 +389,7 @@ export default function CtaPane({ ctx, chrome, onDirtyChange, registerSave }: { 
         {registrationError ? <p className={form.fieldError} role="alert">{registrationError}</p> : null}
       </Card>
 
-      <ConfirmDialog open={replaceConfirm} title="最新を読み込んで続けますか？" description={conflictScope === 'form' ? '申込フォームを保存されている最新版に置き換えます。案内ボタンのカードの入力は残します。' : '保存されている最新の 案内ボタンのカードと申込フォームに置き換えます。この画面で直したところは消えます。'} confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} onConfirm={() => acceptLatest()} />
+      <ConfirmDialog open={replaceConfirm} title="最新を読み込んで続けますか？" description={conflictScope === 'form' ? '申込フォームを保存されている最新版に置き換えます。案内ボタンのカードの入力は残します。' : '保存されている最新の 案内ボタンのカードと申込フォームに置き換えます。この画面で直したところは消えます。'} confirmLabel="最新を読み込んで続ける" onCancel={() => setReplaceConfirm(false)} error={registrationError || undefined} onSuccess={() => setReplaceConfirm(false)} onConfirm={() => acceptLatest()} />
       {compareOpen && latest ? (
         <Dialog open title="違いを比べる" description="左がこの画面の入力、右が保存されている最新です。" confirmLabel="最新を読み込んで続ける" onConfirm={() => { setCompareOpen(false); setReplaceConfirm(true) }} onCancel={() => setCompareOpen(false)}>
           <DataTable className={styles.compare}>

@@ -410,7 +410,7 @@ menuItems: []}}
             {hidden.length > 0 ? (
               <div className={styles.hiddenNote} data-diff-hidden>
                 <p className={styles.mute}>{`全店の平均と同じ ${hidden.length} 項目（${hidden.map((def) => def.label).join('・')}）を隠しています。`}</p>
-                <Button variant="text" onClick={() => onDiffOnly(false)}>すべて表示</Button>
+                <Button variant="text" textTone="ink" onClick={() => onDiffOnly(false)}>すべて表示</Button>
               </div>
             ) : null}
           </DetailSection>

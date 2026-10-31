@@ -123,7 +123,7 @@ export default function ApprovalsTab() {
   }, [])
 
   /* 承認・却下の後は fresh：操作より前に始まった読み込み（件数用など）を使い回さない（WEB003）。 */
-  const loadItems = useCallback(async (options: { fresh?: boolean } = {}) => {
+  const loadItems = useCallback(async (options: { fresh?: boolean; preserveSelection?: boolean } = {}) => {
     setLoadState('loading')
     try {
       const statuses = ['pending', 'approved', 'rejected'] as const
@@ -131,7 +131,7 @@ export default function ApprovalsTab() {
       if (!mounted.current) return
       setItems(results.flatMap((result) => result.items))
       setTruncatedStatuses(statuses.filter((_, index) => results[index].truncated))
-      setSelected(new Set())
+      if (!options.preserveSelection) setSelected(new Set())
       setLoadState('ready')
     } catch {
       if (mounted.current) setLoadState('error')
@@ -201,28 +201,38 @@ export default function ApprovalsTab() {
     return item ? personName(item.friendName) : eventId
   }, [items])
 
+  const bulkAcknowledged = useRef<{ targets: ConversionApprovalItem[] | null; action: BulkOutcome | null; ids: Set<string> }>({ targets: null, action: null, ids: new Set() })
+  const [bulkReviewRequired, setBulkReviewRequired] = useState(false)
+  useEffect(() => { if (bulkConfirm) setActionError(null); setBulkReviewRequired(false) }, [bulkConfirm])
   const runBulkDecide = useCallback(async (action: BulkOutcome, targets: ConversionApprovalItem[]) => {
-    setActioning(action === 'approved' ? 'bulk' : 'bulk-reject')
-    setActionError(null)
+    if (bulkAcknowledged.current.targets !== targets || bulkAcknowledged.current.action !== action) bulkAcknowledged.current = { targets, action, ids: new Set() }
+    const acknowledged = bulkAcknowledged.current.ids
+    setActioning(action === 'approved' ? 'bulk' : 'bulk-reject'); setActionError(null)
     try {
-      const res = await api.conversionApprovals.bulkDecide(targets.map((item) => ({ id: item.eventId, status: action, expectedStatus: item.approvalStatus })))
-      await loadItems({ fresh: true })
-      if (res.success && res.data) {
-        const data = res.data
-        setBulkResult({ action, ...data })
-        const leftovers = data.conflicted.length + data.denied.length + data.failed.length
-        if (leftovers === 0) setSelected(new Set())
-        else setSelected((current) => new Set([...current].filter((eventId) => !data.succeeded.includes(eventId))))
-      } else {
-        setActionError(res.error ?? 'まとめて処理できませんでした。時間をおいて、もう一度お試しください。')
+      const pending = targets.filter(item => !acknowledged.has(item.eventId))
+      const res = await api.conversionApprovals.bulkDecide(pending.map(item => ({ id: item.eventId, status: action, expectedStatus: item.approvalStatus })))
+      if (!mounted.current) return
+      if (!res.success || !res.data) throw new Error(res.success ? 'まとめて処理できませんでした。' : res.error)
+      const data = res.data
+      data.succeeded.forEach(id => acknowledged.add(id))
+      setSelected(current => new Set([...current].filter(id => !acknowledged.has(id))))
+      setBulkResult({ action, ...data, succeeded: [...acknowledged] })
+      const leftovers = data.conflicted.length + data.denied.length + data.failed.length
+      if (leftovers) {
+        setBulkReviewRequired(data.conflicted.length > 0 || data.denied.length > 0)
+        setActionError(`${acknowledged.size} 件を保存しました。${leftovers} 件は保存できませんでした。${data.conflicted.length || data.denied.length ? '閉じて最新の判断と権限を確認してください。' : 'もう一度押すと未完了だけやり直します。'}`)
+        return false
       }
-    } catch (e) {
-      await loadItems({ fresh: true })
-      setActionError(describeApiFailure(e, '保存'))
-    } finally {
-      setBulkConfirm(null)
-      setActioning(null)
-    }
+      setSelected(new Set()); setBulkConfirm(null)
+      void loadItems({ fresh: true })
+      return true
+    } catch (error) {
+      if (!mounted.current) return
+      // Do not repeat an unknown bulk outcome until its authoritative status has been checked.
+      setBulkReviewRequired(true)
+      setActionError(describeApiFailure(error, '保存'))
+      return false
+    } finally { if (mounted.current) setActioning(null) }
   }, [loadItems])
 
   const scoped = useMemo(() => items
@@ -552,7 +562,7 @@ export default function ApprovalsTab() {
           <div><Button type="button" onClick={() => { void loadMoreItems() }} disabled={loadingMore} busy={loadingMore} busyLabel="読み込んでいます">さらに読み込む</Button></div>
         </div>
       ) : null}
-      {bulkResult ? (
+      {bulkResult && !bulkConfirm ? (
         <div className={styles.subSection} role="status" aria-label="まとめて処理の結果">
           <Notice tone={bulkResult.conflicted.length + bulkResult.denied.length + bulkResult.failed.length > 0 ? 'warn' : 'success'}>
             {`まとめて処理の結果：成功 ${formatNumber(bulkResult.succeeded.length)} 件／ほかの人が先に判断 ${formatNumber(bulkResult.conflicted.length)} 件／権限なし ${formatNumber(bulkResult.denied.length)} 件／失敗 ${formatNumber(bulkResult.failed.length)} 件`}
@@ -633,8 +643,8 @@ export default function ApprovalsTab() {
             confirmLabel={bulkConfirm.action === 'approved' ? '認める' : '認めない（却下）'}
             destructive={bulkConfirm.action === 'rejected'}
             busy={actioning !== null}
-            onConfirm={() => { return runBulkDecide(bulkConfirm.action, bulkConfirm.items) }}
-            onCancel={() => setBulkConfirm(null)}
+            error={actionError || undefined} confirmDisabled={bulkReviewRequired} confirmDisabledReason="閉じて最新の判断と権限を確認してください。" onSuccess={() => setBulkConfirm(null)} onConfirm={() => runBulkDecide(bulkConfirm.action, bulkConfirm.items)}
+            onCancel={() => { setBulkConfirm(null); void loadItems({ fresh: true, preserveSelection: true }) }}
           >
             <ul className={styles.resultList}>
               {bulkConfirm.items.map((item) => (

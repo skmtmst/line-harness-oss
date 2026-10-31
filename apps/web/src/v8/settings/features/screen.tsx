@@ -515,7 +515,7 @@ export default function FeatureSettingsScreen() {
         confirmLabel="比べてから保存"
         busy={saving}
         onCancel={() => setCompareOpen(false)}
-        onConfirm={() => { if (!canManage) return; if (!validateReason()) { setCompareOpen(false); return }; setCompareOpen(false); return save() }}
+        error={error || undefined} onSuccess={() => setCompareOpen(false)} onConfirm={() => { if (!canManage || !validateReason()) return; return save() }}
       >
         <ul className={styles.compareList}>
           {Object.keys(features).filter((key) => features[key] !== savedFeatures[key]).map((key) => (

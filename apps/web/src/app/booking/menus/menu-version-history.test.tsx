@@ -6,7 +6,7 @@
 import React from 'react'
 import { afterEach, describe, expect, test, vi } from 'vitest'
 import { act } from 'react'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 
 const fixture = vi.hoisted(() => ({
   listMenuVersions: null as null | (() => Promise<unknown>),
@@ -147,5 +147,6 @@ test('版を戻す409の理由は一覧の取得成功で消えない', async ()
   fireEvent.click(screen.getByText('この版に戻す'))
   fireEvent.click(screen.getByText('新しい版を作る'))
   await waitFor(() => expect(list).toHaveBeenCalledTimes(2))
-  await waitFor(() => expect(screen.getByText('ほかの人が先に保存しました。最新の版を読み直しました。内容を確かめてから、もう一度お試しください。')).toBeTruthy())
+  const dialog = screen.getByRole('dialog', { name: '第1版に戻しますか？' })
+  expect(within(dialog).getByRole('alert').textContent).toContain('ほかの人が先に保存しました。最新の版を読み直しました。内容を確かめてから、もう一度お試しください。')
 })

@@ -222,11 +222,13 @@ export default function SupportMarkRulesPanel({
       )
       if (!res.success) throw new Error('failed')
       setPendingArchive(null)
-      await load()
+      void load()
+      return true
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure) setFailure(failureOf({ status: err instanceof ApiError ? err.status : undefined })) }
+      return false
     } finally {
       setSaving(false)
     }
@@ -418,7 +420,7 @@ export default function SupportMarkRulesPanel({
         confirmLabel="このルールを停止"
         destructive
         busy={saving}
-        onConfirm={() => void archive()}
+        error={failure?.message} onSuccess={() => setPendingArchive(null)} onConfirm={() => archive()}
         onCancel={() => { if (!saving) setPendingArchive(null) }}
       />
     </section></SaveErrorScope>

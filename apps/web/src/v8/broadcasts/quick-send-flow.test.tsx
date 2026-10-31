@@ -21,7 +21,7 @@ vi.mock('@/lib/api', async importOriginal => {
   return { ...actual, ...mocked }
 })
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }))
-vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
+vi.mock('next/link', () => ({ default: ({ href, children, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a> }))
 vi.mock('@/components/shared/select', () => ({ default: ({ value, onChange, options, ...props }: { value: string; onChange: (v: string) => void; options: { value: string; label: string }[]; 'aria-label': string }) => <select aria-label={props['aria-label']} value={value} onChange={e => onChange(e.target.value)}>{options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select> }))
 vi.mock('@/components/shared/date-time-field', () => ({ default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => <input aria-label="送る日時" value={value} onChange={e => onChange(e.target.value)} /> }))
 import QuickSend from './quick-send'
@@ -386,4 +386,23 @@ it('前の窓のcallbackを拒否しても、新しい窓の承認設定エラ�
   expect(screen.getByText('承認の設定を読み込めませんでした。開き直してください。')).toBeTruthy()
   expect(screen.getByRole<HTMLButtonElement>('button', { name: 'キャンセル', exact: true }).disabled).toBe(false)
   expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.send).not.toHaveBeenCalled()
+})
+
+
+it('詳しく作る導線は共通の文字操作を使い、閲覧のみでも灰色と理由を保つ', async () => {
+  render(<QuickSend open accountId="account-a" onClose={onClose} onSent={onSent} />)
+  await act(async () => {})
+  const link = screen.getByRole('link', { name: '詳しく作るへ' })
+  expect(link.getAttribute('href')).toBe('/broadcasts/new')
+  expect(link.getAttribute('data-variant')).toBe('text')
+  cleanup()
+  rememberStaffIdentity(identity('viewer'))
+  render(<QuickSend open accountId="account-a" onClose={onClose} onSent={onSent} />)
+  await act(async () => {})
+  const locked = screen.getByRole('button', { name: '詳しく作るへ' })
+  expect(locked.getAttribute('data-variant')).toBe('text')
+  expect(locked.getAttribute('aria-disabled')).toBe('true')
+  act(() => { locked.focus(); fireEvent.keyDown(locked, { key: 'Enter' }) })
+  expect(screen.getByRole('tooltip').textContent).toContain('閲覧のみ')
+  posts()
 })
