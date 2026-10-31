@@ -37,10 +37,11 @@ async function acknowledge(scope: Element) {
   if (!checkbox) throw new Error('確認しましたの欄がありません')
   await act(async () => { fireEvent.click(checkbox) }); await flush()
 }
-async function render(step: 'confirm' | 'audience' = 'confirm', scheduled = false) {
+async function render(step: 'confirm' | 'audience' = 'confirm', scheduled = false, chosen = true) {
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign initialScheduledDate={scheduled ? '2099-10-05' : undefined} initialScheduledTime={scheduled ? '10:00' : undefined} currentStep={step} tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }, { type: 'tag_exists', value: 'member' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
   await flush()
+  if (!scheduled && chosen) await act(async () => { fireEvent.click(container.querySelector('input[name=broadcast-send-mode][value=now]')!) })
   await act(async () => { await vi.advanceTimersByTimeAsync(650) }); await flush()
 }
 async function confirm() { await click('今すぐ送る', container); await act(async () => { await vi.advanceTimersByTimeAsync(200) }); await flush(); return document.querySelector('[role="dialog"]')! }
@@ -60,6 +61,14 @@ beforeEach(() => {
 afterEach(() => { if (root) act(() => root.unmount()); container?.remove(); vi.useRealTimers() })
 
 describe('V8の5手順で送信を確定する', () => {
+  it('最終確認へ直接来ても未選択のままなら理由1行で止まり保存・送信しない', async () => {
+    await render('confirm', false, false)
+    expect(button('送信設定を確認する', container).disabled).toBe(true)
+    expect(container.querySelector('#broadcast-footer-reason')?.textContent).toBe('送る時間を選んでください')
+    await click('送信設定を確認する', container)
+    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled()
+    expect(mocks.confirm).not.toHaveBeenCalled(); expect(mocks.send).not.toHaveBeenCalled()
+  })
   it('最終確認の窓を開くと下書きを保存して数え直し、確定は見た人数・版を添えて1回だけ送る', async () => {
     await render(); const dialog = await confirm(); await flush()
     expect(mocks.create).toHaveBeenCalledTimes(1); expect(mocks.preview).toHaveBeenCalledWith('draft'); expect(mocks.confirm).not.toHaveBeenCalled()

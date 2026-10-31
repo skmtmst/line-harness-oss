@@ -1,4 +1,6 @@
 'use client'
+import type { BroadcastSendMode } from './broadcast-schedule'
+import { SEND_TIME_MISSING_MESSAGE } from './broadcast-step-gate'
 
 import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 
@@ -29,7 +31,8 @@ type SaveBroadcastContext = {
   saving: boolean
   scheduledAtIso: () => string | null
   selectedAccountIdRef: RefObject<string | null>
-  sendMode: "scheduled" | "now" | "optimal"
+  sendProblem?: () => string | null
+  sendMode: BroadcastSendMode
   setConfirmOpen: Dispatch<SetStateAction<boolean>>
   setError: Dispatch<SetStateAction<string>>
   setSaving: Dispatch<SetStateAction<boolean>>
@@ -37,8 +40,11 @@ type SaveBroadcastContext = {
   validate: () => string
 }
 
-export async function saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, setConfirmOpen, setError, setSaving, submittingRef, validate }: SaveBroadcastContext) {
+export async function saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, sendProblem, setConfirmOpen, setError, setSaving, submittingRef, validate }: SaveBroadcastContext) {
     if (saving || submittingRef.current) return
+    const scheduleProblem = sendProblem?.()
+    if (scheduleProblem) { rejectValidation(scheduleProblem); return }
+    if (sendMode === 'unselected' || sendMode === 'optimal') { rejectValidation(SEND_TIME_MISSING_MESSAGE); return }
     if (currentStep && approvalConfigState !== 'ready') { setError('承認の設定を確認できません。確認画面を開き直してください'); return }
     const validationError = validate(); if (validationError) { rejectValidation(validationError); return }
     if (needsApproval && !needsApprovalSingle && approverId === '') {

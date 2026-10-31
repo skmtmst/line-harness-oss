@@ -300,6 +300,7 @@ export function serializeBroadcast(row: DbBroadcast) {
     internalMemo: (r.internal_memo as string | null | undefined) ?? null,
     draftStep: (r.draft_step as string | null | undefined) ?? null,
     draftPayload: parseJsonObject(r.draft_payload_json),
+    stealthSpreadMinutes: Number(r.stealth_spread_minutes ?? 0),
     messageOptions: parseJsonObject(r.message_options_json),
     afterActionVersionId: (r.after_action_version_id as string | null | undefined) ?? null,
     version: Number(r.lock_version ?? 1),

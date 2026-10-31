@@ -1,4 +1,5 @@
 'use client'
+import type { BroadcastSendMode } from './broadcast-schedule'
 
 import type { UnsavedLeaveTarget } from '@/lib/use-unsaved-guard'
 
@@ -61,7 +62,8 @@ type RenderBroadcastConfirmDialogsContext = {
   scheduledDate: string
   scheduledLabel: string | null
   scheduledTime: string
-  sendMode: "now" | "scheduled" | "optimal"
+  sendWhenLabel: string | null
+  sendMode: BroadcastSendMode
   sendPreview: { state: "loading" | "error" | "ready"; data: SendConfirmationPreview | null; broadcast: ApiBroadcast | null; }
   setApprovalNote: Dispatch<SetStateAction<string>>
   setApproverId: Dispatch<SetStateAction<string>>
@@ -75,7 +77,7 @@ type RenderBroadcastConfirmDialogsContext = {
   title: string
 }
 
-export function renderBroadcastConfirmDialogs({ canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
+export function renderBroadcastConfirmDialogs({ canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
   return (<><UnsavedLeaveDialog
       open={leaveTarget !== null}
       subject="配信の変更"
@@ -162,7 +164,7 @@ export function renderBroadcastConfirmDialogs({ canConfirm, confirmationBlocked,
       purpose="marketing"
       whenLabel={currentStep && sendPreview.data?.quietHoursShiftTo
         ? `${shiftedWhen(sendPreview.data.quietHoursShiftTo)} に送る`
-        : sendMode === 'scheduled' && scheduledLabel ? `${scheduledLabel} に送る（予約）` : '今すぐ送る'}
+        : sendWhenLabel ?? '送る時間は未設定'}
       whenNote={currentStep && sendPreview.data?.quietHoursShiftTo
         ? '夜の静かな時間（21〜8 時）のため、次の 8:00 に送ります'
         : concurrentBroadcasts.length > 0

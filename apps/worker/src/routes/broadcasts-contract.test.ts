@@ -286,6 +286,7 @@ describe('broadcast data contracts', () => {
     const created = await app(testDb.db).request('/api/broadcasts', json('POST', {
       saveAsDraft: true,
       draftStep: 'basic',
+      draftSendChoice: 'unselected',
       lineAccountId: 'account-1',
       internalMemo: '社内だけのメモ',
       scheduledAt: '2026-09-08T10:00:00.000Z',
@@ -299,19 +300,20 @@ describe('broadcast data contracts', () => {
     expect(createdBody.data).toMatchObject({
       version: 1,
       status: 'draft',
-      draftPayload: { saveAsDraft: true, draftStep: 'basic' },
+      draftPayload: { saveAsDraft: true, draftStep: 'basic', draftSendChoice: 'unselected' },
     });
 
     const updated = await app(testDb.db).request(`/api/broadcasts/${createdBody.data.id}`, json('PUT', {
       saveAsDraft: true,
       scheduledAt: '2026-09-09T10:00:00.000Z',
       draftStep: 'audience',
+      draftSendChoice: 'now',
       internalMemo: '更新後',
       expectedVersion: 1,
     }));
     expect(updated.status).toBe(200);
     await expect(updated.json()).resolves.toMatchObject({
-      data: { version: 2, status: 'draft', draftStep: 'audience', internalMemo: '更新後' },
+      data: { version: 2, status: 'draft', draftStep: 'audience', internalMemo: '更新後', draftPayload: { draftSendChoice: 'now' } },
     });
 
     const conflict = await app(testDb.db).request(`/api/broadcasts/${createdBody.data.id}`, json('PUT', {
@@ -319,6 +321,26 @@ describe('broadcast data contracts', () => {
     }));
     expect(conflict.status).toBe(409);
     await expect(conflict.json()).resolves.toMatchObject({ code: 'VERSION_CONFLICT' });
+  });
+
+  it('通常の確定で下書きの印が古くなっても、現在の予約日時と分散45分を返す', async () => {
+    seedBroadcast(testDb, 'draft-choice', { status: 'draft', sent_at: null });
+    const first = await app(testDb.db).request('/api/broadcasts/draft-choice', json('PUT', {
+      saveAsDraft: true, scheduledAt: null, stealthSpreadMinutes: 0,
+      draftSendChoice: 'now', draftScheduledDate: '2020-01-01', expectedVersion: 1,
+    }));
+    expect(first.status).toBe(200);
+    const final = await app(testDb.db).request('/api/broadcasts/draft-choice', json('PUT', {
+      scheduledAt: '2026-09-09T10:00:00.000Z', stealthSpreadMinutes: 45, expectedVersion: 2,
+    }));
+    expect(final.status).toBe(200);
+    const read = await app(testDb.db).request('/api/broadcasts/draft-choice');
+    expect(read.status).toBe(200);
+    await expect(read.json()).resolves.toMatchObject({ data: {
+      scheduledAt: '2026-09-09T10:00:00.000Z', stealthSpreadMinutes: 45,
+      draftPayload: { draftSendChoice: 'now', stealthSpreadMinutes: 0, draftScheduledDate: '2020-01-01' },
+    } });
+    expect(testDb.raw.prepare("SELECT stealth_spread_minutes FROM broadcasts WHERE id = 'draft-choice'").get()).toEqual({ stealth_spread_minutes: 45 });
   });
 
   it('保存した検索はアカウント内だけに保存し、同名を409にする', async () => {

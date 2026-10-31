@@ -1,4 +1,5 @@
 'use client'
+import { broadcastSendLabel, type BroadcastSendMode } from './broadcast-schedule'
 
 import dynamic from 'next/dynamic'
 
@@ -53,7 +54,7 @@ type RenderBroadcastEditorDialogsContext = {
   saving: boolean
   scheduledAtIso: () => string | null
   selectedAccountId: string | null
-  sendMode: "now" | "scheduled" | "optimal"
+  sendMode: BroadcastSendMode
   sendWhenLabel: string | null
   setApprovalCountInput: Dispatch<SetStateAction<string>>
   setConfirmOpen: Dispatch<SetStateAction<boolean>>
@@ -86,7 +87,7 @@ export function renderBroadcastEditorDialogs({ confirmationBlocked, confirmation
             ? '送る相手・日時・内容を確認し、承認をお願いする人を選んでください。承認されるまで送られません。'
             : sendMode === 'scheduled' ? '送信対象・日時・内容を確認して予約します。予約後も配信開始前までは編集・取消できます。' : '送ると友だちに届きます。送信は取り消せません。対象と内容を確認してください。'
         }
-        confirmLabel={needsApproval && !needsApprovalSingle ? '承認を依頼する' : sendMode === 'scheduled' ? 'この内容で予約する' : '今すぐ送る'}
+        confirmLabel={needsApproval && !needsApprovalSingle ? '承認を依頼する' : broadcastSendLabel(sendMode)}
         cancelLabel="戻って修正"
         confirmDisabled={confirmationBlocked}
         busy={saving}
