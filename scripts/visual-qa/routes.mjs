@@ -32,6 +32,7 @@ export const ROUTES = [
   // 残りの一覧
   { name: 'broadcasts', path: '/broadcasts', type: 'L' },
   { name: 'rich-menus', path: '/rich-menus', type: 'L' },
+  { name: 'initial-rich-menu', path: '/getting-started/rich-menu', type: 'C', widths: [1152, 1440, 1920] },
   { name: 'automations', path: '/automations', type: 'L' },
 ]
 
