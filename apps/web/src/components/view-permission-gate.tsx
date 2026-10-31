@@ -12,6 +12,21 @@ import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import PagePending from '@/components/templates/page-pending'
 
 const MENU_ITEMS = [...MENU_SECTIONS, ...HQ_MENU_SECTIONS].flatMap(section => section.items)
+// メニューに置かない既知の入口だけを列挙する。未登録の子の道筋まで許可しない。
+const SELF_SERVICE_PATHS = new Set(['/notifications', '/updates', '/support'])
+const REDIRECT_PATHS = new Set(['/restaurant-test', '/restaurant-test/stores', '/scoring', '/scoring/new'])
+const MANAGER_PATHS = new Set([
+  '/accounts', '/accounts/detail', '/accounts/handover', '/users', '/search-console',
+  '/line-notifications', '/line-notifications/operator/new', '/recipes', '/recipes/clone',
+])
+const UNLISTED_VIEW_KEYS: Readonly<Record<string, string>> = {
+  '/health': '/health',
+  '/booking/passes/new': '/booking/bookings',
+  '/booking/sales': '/booking/bookings',
+  '/restaurant-test/approvals': '/restaurant-test/menu',
+  '/restaurant-test/dashboard': '/',
+  '/restaurant-test/organization': '/hq',
+}
 const subscribeSession = (listener: () => void) => {
   window.addEventListener(SESSION_SNAPSHOT_CHANGED, listener)
   return () => window.removeEventListener(SESSION_SNAPSHOT_CHANGED, listener)
@@ -66,8 +81,12 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
   const restricted = role === 'staff' || role === 'viewer'
   const allowed = restricted ? items.find(canRead) : items[0]
   const item = allowed ?? items[0]
-  if (restricted && item && !allowed) return <PageFrame kind="detail">
-    <PageHeading title={item.label} />
+  const unlistedKey = UNLISTED_VIEW_KEYS[pathname]
+  const unlistedAllowed = items.length === 0 && (SELF_SERVICE_PATHS.has(pathname) || REDIRECT_PATHS.has(pathname)
+    || (MANAGER_PATHS.has(pathname) && canManageRole(signedInRole))
+    || (unlistedKey !== undefined && canViewFeature(unlistedKey, role)))
+  if (restricted && !allowed && !unlistedAllowed) return <PageFrame kind="detail">
+    <PageHeading title={item?.label ?? '画面'} />
     <TargetMissing kind="forbidden" title="この画面を見る権限がありません" description="見たい時はオーナーか管理者に頼んでください。" backHref="/" backLabel="ダッシュボードへ" />
   </PageFrame>
 
@@ -82,7 +101,8 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
     <PageHeading title={title} />
     <TargetMissing kind="forbidden" title={`代理ログイン（閲覧）中のため、ここでは${creating ? '作れません' : '変えられません'}`} description="書き込みに切り替えてから操作してください。" backHref={backHref} backLabel={backLabel} />
   </PageFrame>
-  if (writingEntry && role === 'staff' && item && !canEditFeature(item.permissionKey ?? item.href, role)) return <PageFrame kind="create">
+  const writeKey = item?.permissionKey ?? item?.href ?? unlistedKey
+  if (writingEntry && role === 'staff' && writeKey && !canEditFeature(writeKey, role)) return <PageFrame kind="create">
     <PageHeading title={title} />
     <TargetMissing kind="forbidden" title="この画面を変える権限がありません" description="作りたい時はオーナーか管理者に頼んでください。" backHref={backHref} backLabel={backLabel} />
   </PageFrame>
