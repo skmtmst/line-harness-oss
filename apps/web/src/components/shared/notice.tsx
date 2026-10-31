@@ -7,6 +7,11 @@ import styles from './notice.module.css'
 import { humanizeErrorText } from './human-error-text'
 import { jstDate } from '@/lib/jst-datetime'
 
+/** 複数の帯の間隔をまとめて持ち、各帯の外側の余白を二重にしない。 */
+export function NoticeStack({children}:{children:ReactNode}){
+  return <div className={styles.stack} data-notice-stack>{children}</div>
+}
+
 /** 知らせは案内・成功・注意・危険の4種類。呼び名と見た目はここが持つ。 */
 export type NoticeTone = 'info' | 'success' | 'warn' | 'danger'
 type CanonicalTone = NoticeTone

@@ -31,6 +31,12 @@ export function setupSummary(data: StyleSetupData | null, includeComplete = fals
   return summary.rows.length > 0 || includeComplete ? summary : null
 }
 
+/** 標準と業種のホームで、同じ復旧理由と権限に応じた入口を出す。 */
+export function ReservationFormRepairNotices({notices,role}:{notices?:readonly {message:string;href:string}[];role:string|null}){
+  const canRepair=role==='owner'||role==='admin'
+  return <>{notices?.map(item=><Notice key={item.href} tone="warn" action={<Button {...(canRepair?{href:item.href}:{disabled:true})} lockedReason={permissionLockReason(role,canRepair,'manager')}>予約フォームを直す →</Button>}>{item.message}</Notice>)}</>
+}
+
 /** 上の警告の帯（Bdfxm の「帯/注意（行き先つき）」）。機能ごとに 1 本。 */
 export function SetupWarningBands({ data, configureAllowed = true, role }: { data: StyleSetupData; configureAllowed?: boolean; role?: string | null }) {
   const preparing = usePreparingDialog()

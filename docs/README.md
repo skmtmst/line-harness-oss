@@ -1089,3 +1089,7 @@
 - [受信箱の選択アカウント別バッジ](release-log/unreleased/2016-masato-inbox-account-badge.md) — 反映履歴。確認 2026-10-31。
 
 - [検証環境の自動配備手順の反映履歴](release-log/unreleased/2017-masato-cf-staging-deploy-doc.md) — 反映履歴、確認 2026-10-31。
+- [LINE来店フォローのカードと予約フォーム](release-log/unreleased/0000-kenta-followup-board.md) — 反映履歴、確認 2026-10-31。
+- [検証配備の未適用データベース変更の確認](release-log/unreleased/2018-masato-cf-staging-deploy-pending.md) — 反映履歴、確認 2026-11-01。
+- [検証管理画面のGit連携手順の反映履歴](release-log/unreleased/2020-masato-cf-pages-doc.md) — 反映履歴、確認 2026-11-01。
+- [検証配備の混雑時の再試行](release-log/unreleased/2021-masato-cf-staging-deploy-retry.md) — 反映履歴、確認 2026-11-01。

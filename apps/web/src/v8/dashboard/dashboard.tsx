@@ -19,7 +19,7 @@ import { useAccount } from '@/contexts/account-context'
 import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
-import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import ListState from '@/components/shared/list-state'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import type { AccountStyle, DashboardCardId } from '@line-crm/shared'
@@ -391,7 +391,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
   ) : null
   const onboardingSummary = start.summary ?? (canManage && setupRest && start.steps.length > 0 ? summarizeFirstSteps(start.steps) : null)
   const showOnboarding = role !== null && Boolean(onboardingSummary || setupRest || start.error || setup.error || !canManage)
-  const notice = start.error || setup.error || start.summary || starterRetry || setupRest || setup.data?.warnings.length || viewer || d.error || d.periodNotice || looseFailures.length ? (
+  const notice = start.error || setup.error || start.progress?.notices?.length || start.summary || starterRetry || setupRest || setup.data?.warnings.length || viewer || d.error || d.periodNotice || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
         <ReadOnlyNotice />
@@ -408,6 +408,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
           {setup.error && canManage ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}
         </>}
       /> : null}
+      <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
       {d.periodNotice ? <Notice tone="info" role="status">{d.periodNotice}</Notice> : null}
       {d.error ? (
         <Notice tone="danger" role="alert" action={<Button type="button" onClick={() => d.load()} busyLabel="処理中…"><RetryLabel /></Button>}>{d.error}</Notice>

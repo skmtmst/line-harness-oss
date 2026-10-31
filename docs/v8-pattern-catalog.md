@@ -700,6 +700,7 @@
 ## notice 知らせ（トースト・Notice）
 
 - **役目**：保存できた＝トースト1つ。失敗は欄の赤か帯。種類は info・success・warn・danger
+- **帯をまとめる配置**：`NoticeStack`（`notice.tsx`）が複数のNoticeと閲覧のみの帯を12px間隔に並べる。帯自身の外側の余白と段間を二重に足さない。通常のNotice単体は変えない。
 - **持ち主（コード）**：`apps/web/src/components/shared/toast.tsx`・`apps/web/src/components/shared/toast.module.css`・`apps/web/src/components/shared/notice.tsx`・`apps/web/src/components/shared/notice.module.css`（部品 `Notice`・`notifyToast`・`Toast`）
 - **持ち主（Pen）**：`Q6cQB`「知らせ/うまくいった」・`tnWX9`「知らせ/できなかった」・`ThDed`「帯/案内」
 - **見つけ方（コード）**：

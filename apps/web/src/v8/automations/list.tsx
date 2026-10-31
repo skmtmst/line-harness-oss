@@ -1,6 +1,6 @@
 'use client'
 
-import ListDateTime from '@/components/shared/list-date-time'
+import { formatListTimestamp } from '@/lib/format'
 import StatusBadge from '@/components/shared/status-badge'
 
 import { useActionError } from '@/lib/use-action-error'
@@ -544,12 +544,12 @@ export default function AutomationListV8() {
                     <Td className={styles.colRuns}>
                       <span className={styles.numMain}>{`${formatNumber(item.executionCount30d)} 回`}</span>
                       <span className={styles.numSub}>
-                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)} 回` : <>更新 <ListDateTime value={item.updatedAt} /></>}
+                        {item.isActive ? `失敗 ${formatNumber(item.failureCount30d)} 回` : <TruncatedText value={`更新 ${formatListTimestamp(item.updatedAt)}`} />}
                       </span>
                     </Td>
                     <Td className={styles.colState}>
-                      <StatusBadge tone={item.isActive ? 'success' : 'neutral'}>
-                        {item.status === 'archived' ? '保管' : item.isActive ? '動いています' : '止めています'}
+                      <StatusBadge tone={(item.followupManagement?item.followupManagement.effectiveSendingStatus==='active':item.isActive)?'success':'neutral'} help={item.followupManagement?`来店フォロー（${item.followupManagement.storeName}）で管理しています。${item.followupManagement.reason??'承認された内容で送っています'}`:undefined} helpHref={item.followupManagement?.path}>
+                        {item.status === 'archived' ? '保管' : (item.followupManagement?item.followupManagement.effectiveSendingStatus==='active':item.isActive) ? '動いています' : '止めています'}
                       </StatusBadge>
                     </Td>
                     <ActionCell className={styles.colOps}>
