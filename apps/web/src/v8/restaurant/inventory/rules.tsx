@@ -143,7 +143,7 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
             {canEdit ? <SaveErrorField names={[key]}><Toggle label={label} checked={draft[key]} disabled={saving} onChange={(next) => setDraft({ ...draft, [key]: next })} /></SaveErrorField> : saved[key] ? '有効' : '停止中'}
           </Field>)}
         </SettingsFormRow>
-        <Field label="担当にLINEで知らせる" optional={false} help="媒体の受付を閉じる・再開する作業を店長や当日の責任者へ知らせます。媒体への自動書き戻しは行いません。">
+        <Field label="担当にLINEで知らせる" optional={false} note="お客さまには届きません。" help="媒体の受付を閉じる・再開する作業を店長や当日の責任者へ知らせます。媒体への自動書き戻しは行いません。">
           {canEdit ? <SaveErrorField names={['notify']}><Toggle label="担当にLINEで知らせる" checked={draft.notify} disabled={saving} onChange={(next) => setDraft({ ...draft, notify: next })} /></SaveErrorField> : saved.notify ? '有効' : '停止中'}
         </Field>
       </SettingsFormCard>
