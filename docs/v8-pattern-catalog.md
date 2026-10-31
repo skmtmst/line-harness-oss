@@ -1191,7 +1191,9 @@
 - 役目：使い方のスタイルを「見る」切り替えと「選ぶ」ボタンを分け、見本の枠で中身を見せて選ばせる（SPEC-11・SPEC-12 の共通節 S）。
 - 持ち主：`apps/web/src/v8/onboarding/style-choice-step.tsx` の `StyleChoiceStep`（下の帯の 1 行は `StyleChoiceStatus`）。切り替えは共通 `SegmentedControl`、枠は共通 `Card`、選んだ印は `StatusBadge`。
 - 見本の枠の中は style-experience スタイル体験プレビュー（`StyleExperiencePlayer`・口は S-4）。枠の大きさはプレイヤーが持ち、並べた時は最小版と全部版で同じ高さ、白い板が 1100 未満では縦に積む。
-- 使用先：はじめの質問の 1 問目（ダッシュボードの窓）。登録の画面の④はまだ今の選ぶカードのまま。
+- 使用先：はじめの質問の 1 問目（ダッシュボードの窓）と登録④・登録再開。
+- 最初のメニュー選択は `onboarding/initial-menu-choice.tsx` の `InitialMenuChoice` が画像・行き先・できることを持つ。登録・再開・はじめの質問・選び直しで共通。画像内の文字は12px以上、欄が800px以上なら見本と説明を左右に並べる。狭い欄は縦に積む。
+- 初期メニューの読みやすさと配置は `scripts/visual-qa/initial-menu-layout.mjs` で実際の表示寸法を見張る。
 
 <a id="style-experience"></a>
 ## style-experience スタイル体験プレビュー
