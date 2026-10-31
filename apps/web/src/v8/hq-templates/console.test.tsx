@@ -197,7 +197,8 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
     fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '定期便のご案内' } })
     const save = screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement
     expect(save.disabled).toBe(true)
-    expect(save.getAttribute('aria-describedby')?.split(' ').map(id => document.getElementById(id)?.textContent).join(' ')).toContain('カード 1 の本文を入力してください。')
+    expect(save.getAttribute('aria-description')).toBe('カード 1 の本文を入力してください。')
+    expect(screen.getAllByRole('status').some(status => status.textContent === 'カード 1 の本文を入力してください。')).toBe(true)
     fireEvent.click(save)
     expect(calls.create).not.toHaveBeenCalled()
     /* （オーナーの写真の指摘）：帯だけにせず、本文の欄を赤くして真下に理由を出し、そこへ移る。 */
