@@ -7,6 +7,20 @@ import { join } from 'node:path'
 import { connectGuardBrowser } from './browser-session.mjs'
 import { compileUiStyles } from './compile-ui-styles.mjs'
 import { observePermissionFrames, assertNoPermissionFlash } from './permission-flash-browser.mjs'
+import { injectPermissionPendingFault } from './permission-pending-fault.mjs'
+
+for (const opening of ['<PageContent>', '<PageContent data-page-pending={stage}>', '<PageContent data-page-pending={stage} title={count > 0 ? "待機" : "本文"}>']) test(`属性や式があっても待機本文に故障を入れる: ${opening}`, () => {
+  const source = `const Pending = () => ${opening}<ListState /></PageContent>`
+  const broken = injectPermissionPendingFault(source)
+  assert.notEqual(broken, source)
+  assert.ok(broken.includes(opening + '<h1 data-permission-pending-fault>'))
+  assert.equal(broken.match(/data-permission-pending-fault/g).length, 1)
+})
+
+test('注入先が消えたり増えたりしたら、故障と正常が同じまま進まず赤になる', () => {
+  assert.throws(() => injectPermissionPendingFault('const Pending = () => <div />'), /故障を入れる共通の待機本文は1つ/)
+  assert.throws(() => injectPermissionPendingFault('const Pending = () => <><PageContent /><PageContent>本文</PageContent><PageContent>待機</PageContent></>'), /故障を入れる共通の待機本文は1つ/)
+})
 
 const require = createRequire(import.meta.url)
 const { build } = createRequire(createRequire(require.resolve('vitest/package.json')).resolve('vite'))('esbuild')
@@ -40,7 +54,7 @@ async function fixture(fault) {
       builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({ resolveDir: webRoot, contents: 'export const usePathname=()=>"/hq";export const useSearchParams=()=>new URLSearchParams();export const useRouter=()=>({push(){},replace(){},prefetch(){}});' }))
       if (fault) builder.onLoad({ filter: /page-pending\.tsx$/ }, ({ path }) => ({
         loader: 'tsx', resolveDir: join(webRoot, 'src/components/templates'),
-        contents: readFileSync(path, 'utf8').replace('<PageContent>', '<PageContent><h1>権限を確認しています</h1>'),
+        contents: injectPermissionPendingFault(readFileSync(path, 'utf8')),
       }))
     } }],
   })
@@ -60,6 +74,7 @@ for (const width of [1152, 1440]) test(`共通ゲートの待機・Suspenseと�
         await page.evaluate(observePermissionFrames)
         await page.addScriptTag({ content: bundle.outputFiles.find(file => file.path.endsWith('.js')).text })
         await page.locator('[aria-busy=true]').waitFor({ timeout: 5000 })
+        assert.equal(await page.locator('[data-permission-pending-fault]').count(), fault ? 1 : 0, '故障は実際の待機本文に届き、正常・復元には残らない')
         await page.waitForTimeout(450)
         assert.equal(await page.getByRole('heading', { name: '切り替え先の画面' }).count(), 0)
         await page.getByRole('button', { name: '本人を読み終える' }).click()
