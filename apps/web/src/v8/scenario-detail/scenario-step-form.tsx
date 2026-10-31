@@ -151,7 +151,7 @@ export function ScenarioStepForm({
                 ふつうの通に戻す
               </Button>
             </div>
-            <div {...stepFields.bind('question')} aria-invalid={stepFields.invalid('question') || undefined}>
+            <div {...stepFields.bind('question')} ref={node => stepFields.bind('question').ref(node?.querySelector<HTMLElement>('input[aria-invalid="true"]') ?? node)} aria-invalid={stepFields.invalid('question') || undefined}>
             <FieldError id="step-question-error">{stepFields.error('question')}</FieldError>
             <QuestionEditor
               accountId={scenario?.lineAccountId ?? null}

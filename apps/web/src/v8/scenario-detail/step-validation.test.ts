@@ -78,3 +78,10 @@ describe('R214: 行き先の形が正しくない選択肢は保存しない', (
     ] }) })).toBeNull()
   })
 })
+
+it('既存の20文字超の選択肢は消さず保存を止め、20文字に直せば保存できる', () => {
+  const original = question({ choices: [{ label: 'あ'.repeat(25), behavior: 'none' }] })
+  expect(check({ question: original })).toEqual({ field: 'question', message: '選択肢 1 のボタンの文字は20文字以内で入力してください。' })
+  expect(original.choices[0].label).toBe('あ'.repeat(25))
+  expect(check({ question: question({ choices: [{ label: 'あ'.repeat(20), behavior: 'none' }] }) })).toBeNull()
+})

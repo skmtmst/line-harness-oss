@@ -1,6 +1,8 @@
 'use client'
 
 import Notice from '@/components/shared/notice'
+import { questionChoiceLabelProblem } from './question-choice-label-validation'
+import { FieldError } from '@/components/shared/form-controls'
 import { useEffect, useId, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import Checkbox from '@/components/shared/checkbox'
@@ -368,6 +370,8 @@ export default function QuestionEditor({
            * 思って保存する人が出る。未設定なら欄を出さず、残っている設定は
            * 警告で名指しして、本人の操作でだけ消す。
            */
+          const labelError = questionChoiceLabelProblem(choice.label)
+          const labelErrorId = `${fieldBase}-choice-${index}-label-error`
           const uriOnly = isUriOnlyBehavior(choice.behavior)
           const dead = uriOnly ? deadAnswerSettings(choice) : []
           return (
@@ -379,7 +383,7 @@ export default function QuestionEditor({
                 onClick={() => {
                   if (!choiceColumns) setOpenChoice(openChoice === index ? null : index)
                 }}
-                aria-expanded={choiceColumns || openChoice === index}
+                aria-expanded={choiceColumns || openChoice === index || Boolean(labelError)}
                 className="text-ink min-w-0 text-left text-sm font-bold"
               >
                 選択肢{index + 1}
@@ -411,7 +415,7 @@ export default function QuestionEditor({
               </div>
             </div> : null}
 
-            {(choiceOnly !== undefined || choiceColumns || openChoice === index) && (
+            {(choiceOnly !== undefined || choiceColumns || openChoice === index || labelError) && (
               <div className="space-y-4 px-4 py-4">
                 {choiceOnly === undefined ? <>
                 <div>
@@ -424,10 +428,13 @@ export default function QuestionEditor({
                   <SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><TextField
                     id={`${fieldBase}-choice-${index}-label`}
                     maxLength={20}
+                    aria-invalid={Boolean(labelError) || undefined}
+                    aria-describedby={labelError ? labelErrorId : undefined}
                     value={choice.label}
-                    onChange={(e) => setChoice(index, { label: e.target.value })}
+                    onChange={(e) => { setOpenChoice(index); setChoice(index, { label: e.target.value }) }}
                     className="mt-1.5"
                   /></SaveErrorField>
+                  <FieldError id={labelErrorId}>{labelError}</FieldError>
                   <p className="text-ink-faint mt-1 text-xs leading-relaxed">
                     10文字を超えると、機種によっては途中で切れて表示されます。
                   </p>
