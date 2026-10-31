@@ -70,7 +70,8 @@ export default function Toggle({
 }
 
 /** 説明のある設定行。文字とスイッチの配置を全画面で共通にする。 */
-export function ToggleField({ children, description, 'aria-label': label, title, className, ...props }: {
+export function ToggleField({ id: controlId, children, description, 'aria-label': label, title, className, ...props }: {
+  id?: string
   children: ReactNode
   description?: ReactNode
   'aria-label'?: string
@@ -85,7 +86,7 @@ export function ToggleField({ children, description, 'aria-label': label, title,
 }) {
   const id = useId()
   const field = useFieldContext()
-  const switchId = field?.controlId ?? `${id}-switch`
+  const switchId = controlId ?? field?.controlId ?? `${id}-switch`
   const descriptionId = `${id}-description`
   return <span className={[styles.field, className].filter(Boolean).join(' ')} title={title}>
     <span className={styles.fieldBody}><label id={id} htmlFor={switchId}>{children}</label>{description ? <span id={descriptionId} className={styles.description}>{description}</span> : null}</span>
