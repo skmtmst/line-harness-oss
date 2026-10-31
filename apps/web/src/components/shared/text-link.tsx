@@ -22,6 +22,8 @@ export default function TextLink({
   tone,
   iconTone,
   inline = false,
+  truncate = false,
+  title,
   ...rest
 }: Omit<AnchorHTMLAttributes<HTMLAnchorElement>, 'href'> & {
   tone?:'action'
@@ -29,12 +31,14 @@ export default function TextLink({
   external?: boolean
   /** 本文の中のリンク。矢印なし・周りの文字の大きさのまま。 */
   inline?: boolean
+  /** 短い操作名を1行で省略する。文字の全文は title に残す。 */
+  truncate?: boolean
   href: string
   children: React.ReactNode
   className?: string
 }) {
   return (
-    <Link href={href} data-tone={tone} data-icon-tone={iconTone} data-inline={inline || undefined} className={[styles.root, className].filter(Boolean).join(' ')} {...rest} target={external ? '_blank' : rest.target} rel={external || rest.target === '_blank' ? 'noopener noreferrer' : rest.rel}>
+    <Link href={href} data-tone={tone} data-icon-tone={iconTone} data-inline={inline || undefined} data-truncate={truncate || undefined} title={title ?? (truncate && typeof children === 'string' ? children : undefined)} className={[styles.root, className].filter(Boolean).join(' ')} {...rest} target={external ? '_blank' : rest.target} rel={external || rest.target === '_blank' ? 'noopener noreferrer' : rest.rel}>
       <span className={styles.label}>{children}</span>
       {inline ? null : external || rest.target === '_blank' ? <ArrowUpRight size={16} aria-hidden="true" data-external-icon className={styles.arrow} /> : <ArrowRight size={16} aria-hidden="true" className={styles.arrow} />}
     </Link>

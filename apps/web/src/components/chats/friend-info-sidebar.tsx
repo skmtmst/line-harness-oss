@@ -400,11 +400,10 @@ export default function FriendInfoSidebar({ friendId, chatStatus, operatorName, 
         title={`『${tagToRemove?.name ?? ''}』を外しますか？`}
         description="この友だちからタグを外します。タグそのものは消えません。"
         confirmLabel="外す"
-        onCancel={() => setTagToRemove(null)}
+        onSuccess={() => setTagToRemove(null)} onCancel={() => setTagToRemove(null)}
         onConfirm={() => {
           if (!tagToRemove || tagToRemove.friendId !== friendId) return
-          removeTagById(tagToRemove.id)
-          setTagToRemove(null)
+          return removeTagById(tagToRemove.id)
         }}
       />
       <CustomerInfoViewport>

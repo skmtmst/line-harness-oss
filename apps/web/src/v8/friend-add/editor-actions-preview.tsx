@@ -7,7 +7,7 @@ import Dialog from '@/components/shared/dialog';
 import { emptyValue } from '@/components/shared/empty-value';
 import { EntityKindField } from '@/components/shared/entity-picker-sources';
 import { Field } from '@/components/shared/form-controls';
-import Link from '@/components/shared/list-navigation';
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason';
 import Notice from '@/components/shared/notice';
 import { SaveErrorField } from '@/components/shared/save-form-errors';
 import { api,type FriendAddRuleAction,type FriendAddRuleDefinition,type FriendAddRuleOptions } from '@/lib/api';
@@ -70,6 +70,7 @@ export function PreviewStep({ rule, definition, routeNames, runTest, onTestCondi
   ruleId?: string
   scenarios: FriendAddRuleOptions['scenarios']
 }) {
+  const editLockReason = usePermissionLockReason(canEdit)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [matchedLast28Days, setMatchedLast28Days] = useState<number | null>(null)
   const [metricsError, setMetricsError] = useState(false)
@@ -121,7 +122,7 @@ export function PreviewStep({ rule, definition, routeNames, runTest, onTestCondi
             <div key={row.label} className={styles.confirmRow}>
               <dt>{row.label}</dt>
               <dd title={row.value}>{row.value}</dd>
-              <dd>{canEdit ? <Link className={styles.textLink} href={row.href}>変える</Link> : null}</dd>
+              <dd>{canEdit ? <Button variant="text" size="inline" href={row.href}>変える</Button> : <Button variant="text" size="inline" disabled lockedReason={editLockReason}>変える</Button>}</dd>
             </div>
           ))}
         </dl>
@@ -159,11 +160,9 @@ export function PreviewStep({ rule, definition, routeNames, runTest, onTestCondi
                 <strong>{check.title}</strong>
                 <small>{check.desc}</small>
               </span>
-              {canEdit ? (
-                check.href
-                  ? <Link className={styles.textLink} href={check.href}>見直す</Link>
-                  : <Button type="button" variant="text" disabled={testing} onClick={runTest} busy={testing} busyLabel="処理中…">直す</Button>
-              ) : null}
+              {check.href
+                ? canEdit ? <Button variant="text" size="inline" href={check.href}>見直す</Button> : <Button variant="text" size="inline" disabled lockedReason={editLockReason}>見直す</Button>
+                : <Button type="button" variant="text" disabled={!canEdit || testing} lockedReason={editLockReason} onClick={runTest} busy={testing} busyLabel="処理中…">直す</Button>}
             </li>
           ))}
         </ul>

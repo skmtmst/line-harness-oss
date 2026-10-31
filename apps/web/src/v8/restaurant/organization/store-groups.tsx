@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
+import { describeSaveFailure } from '@/lib/api/transport/errors'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Dialog from '@/components/shared/dialog'
 import { SaveErrorScope, SaveErrorField, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -12,7 +13,7 @@ import Notice from '@/components/shared/notice'
 import { RowActions } from '@/components/shared/row-actions'
 import { TextField } from '@/components/shared/text-field'
 import TruncatedText from '@/components/shared/truncated-text'
-import { notifySaved } from '@/components/shared/toast'
+import { notifySaved, notifyToast } from '@/components/shared/toast'
 import { restaurantTestApi, type RestaurantStore, type RestaurantStoreGroup } from '@/lib/restaurant-test-api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -25,11 +26,13 @@ type Target = { group: RestaurantStoreGroup; member: Member; store: RestaurantSt
 type Settings = { referralEnabled: boolean; maxDistance: number }
 
 function MemberEditor({ target, onClose, onSave }: {
-  target: Target; onClose: () => void; onSave: (settings: Settings) => Promise<void>
+  target: Target; onClose: () => void; onSave: (settings: Settings) => Promise<boolean | void>
 }) {
   const [enabled, setEnabled] = useState(target.member.referral_enabled === 1)
   const [distance, setDistance] = useState(String(target.member.max_distance))
   const [confirming, setConfirming] = useState(false)
+  const [validationBlocked, setValidationBlocked] = useState(false)
+  const [fieldReasons, setFieldReasons] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const fields = useSaveFormErrors()
@@ -41,28 +44,34 @@ function MemberEditor({ target, onClose, onSave }: {
     if (saving.current || !validDistance) return
     saving.current = true; setBusy(true); setError('')
     try {
-      await onSave({ referralEnabled: enabled, maxDistance: Number(distance) })
+      const accepted = await onSave({ referralEnabled: enabled, maxDistance: Number(distance) })
+      if (accepted !== true) return
       guard.disarm(); onClose()
+      return true
     } catch (error) {
-      // 確認の窓を閉じ、入力欄を登録し直してから欄の理由を渡す。
-      flushSync(() => setConfirming(false))
-      if (!fields.capture(error)) setError('保存できませんでした。入力は残っています。もう一度保存してください。')
+      fields.capture(error)
+      const reasonsByField = readSaveFieldErrors(error)
+      setFieldReasons(reasonsByField)
+      const reasons = Object.values(reasonsByField)
+      setValidationBlocked(reasons.length > 0)
+      setError(reasons.length ? `${reasons.join(' ')} 戻って入力を直してください。` : `${describeSaveFailure(error)} 入力は残っています。`)
+      return false
     } finally { saving.current = false; setBusy(false) }
   }
   return <SaveErrorScope errors={fields}>
     <Dialog open={!confirming} title={`${target.store.name}の案内設定`} description={`店の組：${target.group.name}`} dirty={dirty} busy={busy}
-      onCancel={onClose} onConfirm={() => setConfirming(true)} confirmLabel="保存する" confirmDisabled={!dirty || !validDistance}>
+      onCancel={onClose} onConfirm={() => { setError(''); setConfirming(true) }} confirmLabel="保存する" confirmDisabled={validationBlocked || !dirty || !validDistance}>
       <div className={styles.form}>
         {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
-        <SaveErrorField names={["referralEnabled", "input.referralEnabled"]}><ToggleField checked={enabled} onChange={setEnabled} description="満席のとき、同じ組の参加店へ案内します。閲覧権限は変わりません。">満席のとき案内に参加する</ToggleField></SaveErrorField>
-        <Field label="案内する距離（km）" required error={validDistance ? undefined : '0〜1000の距離を入力してください。'}>
-          <SaveErrorField names={["maxDistance", "input.maxDistance"]}><TextField type="number" min={0} max={1000} step="any" value={distance} onChange={e => setDistance(e.target.value)} /></SaveErrorField>
+        <SaveErrorField names={["referralEnabled", "input.referralEnabled"]}><ToggleField checked={enabled} onChange={value => { setEnabled(value); setValidationBlocked(false); setFieldReasons({}); setError('') }} description="満席のとき、同じ組の参加店へ案内します。閲覧権限は変わりません。">満席のとき案内に参加する</ToggleField></SaveErrorField>
+        <Field label="案内する距離（km）" required error={validDistance ? fieldReasons.maxDistance ?? fieldReasons['input.maxDistance'] : '0〜1000の距離を入力してください。'}>
+          <SaveErrorField names={["maxDistance", "input.maxDistance"]}><TextField type="number" min={0} max={1000} step="any" value={distance} onChange={e => { setDistance(e.target.value); setValidationBlocked(false); setFieldReasons({}); setError('') }} /></SaveErrorField>
         </Field>
       </div>
     </Dialog>
     <ConfirmDialog open={confirming} busy={busy} title={`${target.store.name}の案内設定を変えますか？`}
       description={`${target.group.name}での、この店舗の参加を${enabled ? '有効' : '停止中'}にし、案内する距離を${distance}kmにします。ほかの店舗の設定は変わりません。`}
-      confirmLabel="保存する" onCancel={() => setConfirming(false)} onConfirm={() => { void save() }} />
+      confirmLabel="保存する" cancelLabel={validationBlocked ? "戻って直す" : "キャンセル"} confirmDisabled={validationBlocked} confirmDisabledReason="戻って入力を直してください。" error={error || undefined} onSuccess={() => setConfirming(false)} onCancel={() => setConfirming(false)} onConfirm={() => save()} />
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} busy={busy} onCancel={guard.cancelLeave} onConfirm={guard.confirmLeave} />
   </SaveErrorScope>
 }
@@ -77,6 +86,7 @@ export default function StoreGroups({ accountId, stores, readOnly }: {
   const [retry, setRetry] = useState(0)
   const [target, setTarget] = useState<Target | null>(null)
   const generation = useRef(0)
+  useEffect(() => { if (target) notifyToast('アカウントが変わったため、前の確認を閉じました。'); setTarget(null) }, [accountId])
   useEffect(() => {
     const request = ++generation.current
     setLoading(true); setLoadError(null)
@@ -99,6 +109,7 @@ export default function StoreGroups({ accountId, stores, readOnly }: {
     }))
     notifySaved(`${target.store.name}の案内設定を保存しました。`)
     setRetry(current => current + 1)
+    return true
   }
   return <Panel title="店の組（満席のとき案内してよい店）" description="同じ組の店舗ごとに、案内への参加と距離を設定します。" flush>
     {loading ? <ListState kind="loading" /> : loadError ? <ListState kind="error" error={loadError} onRetry={() => setRetry(current => current + 1)} /> : groups.length === 0 ? <ListEmptyMessage>店の組：なし</ListEmptyMessage> :
@@ -116,6 +127,6 @@ export default function StoreGroups({ accountId, stores, readOnly }: {
           </GridRow>
         }))}
       </GridTable>}
-    {target && !readOnly ? <MemberEditor key={`${target.group.id}:${target.member.store_id}`} target={target} onClose={() => setTarget(null)} onSave={save} /> : null}
+    {target && !readOnly ? <MemberEditor key={`${accountId}:${target.group.id}:${target.member.store_id}`} target={target} onClose={() => setTarget(null)} onSave={save} /> : null}
   </Panel>
 }

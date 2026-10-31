@@ -1,4 +1,5 @@
 'use client'
+import TextLink from '@/components/shared/text-link'
 import FilterLink from '@/components/shared/filter-link'
 import Link from '@/components/shared/list-navigation'
 import { ArrowUpRight, Lock } from 'lucide-react'
@@ -163,7 +164,7 @@ export default function InfoTab({ friendId, group, data, perms }: {
       {!groupKnown ? (
         <p className={styles.paneNote}>
           この分類は削除されたか、見つかりません。
-          <Link className={styles.srcLink} href={base}>基本の項目を見る</Link>
+          <TextLink inline href={base}>基本の項目を見る</TextLink>
         </p>
       ) : ordered.length === 0 ? (
         <div className={styles.centered}>

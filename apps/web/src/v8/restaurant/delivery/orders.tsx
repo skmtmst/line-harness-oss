@@ -295,7 +295,7 @@ function OrderRow({
       ) : null}
       <Td>
         <Button
-          variant="text"
+          variant="text" textTone="ink"
           size="inline"
           className={styles.orderNumberButton}
           aria-label={`注文${order.orderNumber}の詳細`}

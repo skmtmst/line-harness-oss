@@ -544,6 +544,7 @@
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
 - [知らせの札・本文の整列と文字の操作](release-log/unreleased/1997-kenta-notice-status-actions.md)
 - [画面の表示確認の試験準備](release-log/unreleased/1997-kenta-browser-fixture-paths.md)
+- [確認の窓の失敗表示と再試行](release-log/unreleased/0000-kenta-confirm-dialog-errors.md)
 - [運営コンソールの端の詰まり修正](release-log/unreleased/1948-kenta-muse-fqa-edge.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
 - [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
@@ -1055,6 +1056,7 @@
 
 - [予約の案内と比較の並び](release-log/unreleased/2001-kenta-rival-small-fixes.md) — 反映履歴、確認 2026-10-31。
 - [保存先の固定とフォームの公開参照](release-log/unreleased/2001-kenta-train-1029x.md) — 反映履歴、確認 2026-10-31。
+- [文字の操作を見分ける表示](release-log/unreleased/0000-kenta-text-button-actions.md) — 反映履歴、確認 2026-10-31。
 
 - [繰り返し設定の読み戻し](release-log/unreleased/2003-kenta-recurring-menu-readback.md) — 反映履歴、確認 2026-10-31
 - [一括予約の処理設計](release-log/unreleased/2003-kenta-bulk-booking-design.md) — 反映履歴、確認 2026-10-31

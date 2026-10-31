@@ -61,7 +61,7 @@ test('最新100件より多いとき、今月の数は「数えられません�
 test('未公開のランクを最高到達にせず、未取得の接続先と付与回数を0にしない', async () => {
   rankLoaded = true
   render(<FriendDetailV8 />)
-  expect((await screen.findByText('使い道・ランクを作る')).getAttribute('href')).toBe('/mileage?tab=rewards')
+  expect((await screen.findByRole('link', { name: '使い道・ランクを作る', exact: true })).getAttribute('href')).toBe('/mileage?tab=rewards')
   expect(screen.getByTitle('ランクは未公開です')).toBeTruthy()
   expect(screen.queryByTitle(/いちばん上のランクです/)).toBeNull()
   expect(screen.getByTitle('接続先を確認できませんでした')).toBeTruthy()

@@ -161,13 +161,14 @@ function TagFolderPage() {
       if (!result.success) throw new Error('delete_failed')
       if (!sameRequest(activeRef.current, request)) return
       router.push('/tags')
+      return true
     } catch (reason) {
       if (!sameRequest(activeRef.current, request)) return
       const fieldFailure = saveErrors.capture(reason)
-      setDeleteOpen(false)
       { if (!fieldFailure)
 
       setError(folderDeleteError(reason instanceof ApiError ? reason.status : undefined)) }
+      return false
     } finally {
       if (sameRequest(activeRef.current, request)) setSaving(false)
     }
@@ -200,7 +201,7 @@ function TagFolderPage() {
         footer={(
           <>
             {editId ? (
-              <Button type="button" variant="danger" disabled={saving} onClick={() => setDeleteOpen(true)}>
+              <Button type="button" variant="danger" disabled={saving} onClick={() => { setError(''); setDeleteOpen(true) }}>
                 <Trash2 size={16} aria-hidden="true" />削除する
               </Button>
             ) : null}
@@ -233,7 +234,7 @@ function TagFolderPage() {
         destructive
         busy={saving}
         onCancel={() => { if (!saving) setDeleteOpen(false) }}
-        onConfirm={() => remove()}
+        error={error || undefined} onSuccess={() => setDeleteOpen(false)} onConfirm={() => remove()}
       />
     </></SaveErrorScope>
   )
