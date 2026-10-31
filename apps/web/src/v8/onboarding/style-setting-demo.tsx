@@ -41,10 +41,11 @@ export default function StyleSettingDemo({ style }: { style: AccountStyle }) {
     <p className={styles.note}>画面と操作の見本です。実際の入力や保存は行いません。{style === 'lesson' ? '保存にはほかの項目も入力します。' : ''}</p>
     <div className={styles.toolbar}><strong>{example.steps[step]}</strong>{!reduced && <Button onClick={() => setPaused(value => !value)}>{paused ? '再生する' : '止める'}</Button>}</div>
     <progress className={styles.progress} aria-label="操作の進み" value={step + 1} max={example.steps.length} />
+    <Card layout="vertical" padding="compact">
     <Card surface="muted" layout="vertical" padding="default" gap="normal">
       <div className={styles.canvas} aria-hidden="true" inert>
         <aside className={styles.sidebar}><strong>musubo</strong><div><LayoutDashboard size={15} /> ダッシュボード</div><div><CalendarDays size={15} /> 予約</div><div><Users size={15} /> 友だち</div><div className={`${styles.menuItem} ${step === 0 ? styles.active : ''}`}>{example.area}{step === 0 && <Hand className={styles.hand} size={22} />}</div></aside>
-        <main className={styles.screen}><header className={styles.screenHead}><div><small>設定</small><h4>{example.area}</h4></div><div className={step === 1 ? styles.active : ''}><Button variant="primary">{example.open}</Button>{step === 1 && <Hand className={styles.hand} size={22} />}</div></header>
+        <div className={styles.screen}><header className={styles.screenHead}><div><small>設定</small><h4>{example.area}</h4></div><div className={step === 1 ? styles.active : ''}><Button variant="primary">{example.open}</Button>{step === 1 && <Hand className={styles.hand} size={22} />}</div></header>
           <div className={styles.board}><strong>{example.area}</strong><p>設定した内容をここで確認できます。</p>
           {editing && <div className={styles.form}><strong>{style === 'restaurant' ? '新しい卓' : style === 'lesson' ? 'イベントを作る' : style === 'ec' ? 'タグを作る' : '予約メニューを直す'}</strong>
             {style === 'restaurant' && <div className={step === 2 ? styles.active : ''}><Field label="卓番" required><TextInput value="1" readOnly /></Field>{step === 2 && <Hand className={styles.hand} size={22} />}</div>}
@@ -52,8 +53,9 @@ export default function StyleSettingDemo({ style }: { style: AccountStyle }) {
             <div className={`${styles.buttonTarget} ${saving ? styles.active : ''}`}><Button variant="primary">{example.save}</Button>{saving && <Hand className={styles.hand} size={22} />}</div>
           </div>}
           </div>
-        </main>
+        </div>
       </div>
+    </Card>
     </Card>
   </section>
 }

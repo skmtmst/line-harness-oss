@@ -1,15 +1,12 @@
 'use client'
 
 import type { AccountStyle } from '@line-crm/shared'
-import Button from '@/components/shared/button'
-import { DialogActions } from '@/components/shared/dialog'
 import Card from '@/components/shared/card'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import { Steps } from '@/components/templates/steps'
 import { Check } from 'lucide-react'
 import { RestaurantFollowupDemo } from '@/v8/restaurant/line-followup/public/demo'
 import { STYLE_EXPERIENCE_SCRIPT, StyleExperiencePlayer } from './style-experience-player'
-import StyleChooseAction from './style-choose-action'
 import StyleSettingDemo from './style-setting-demo'
 import styles from './style-demo-pages.module.css'
 
@@ -52,9 +49,9 @@ export default function StyleDemoPages({ viewing, page, onPage, chosen, onChoose
     </> : <>
       {page === 1 ? <StyleSettingDemo key={viewing} style={viewing} /> : page === 2 && viewing === 'restaurant'
         ? <RestaurantFollowupDemo />
-        : page === 2 && viewing === 'standard' ? <Card surface="muted" layout="vertical" padding="default" gap="normal" aria-label="お知らせの見本">
+        : page === 2 && viewing === 'standard' ? <Card layout="vertical" padding="default" gap="normal" aria-label="お知らせの見本">
           <strong>一斉配信</strong><Field label="本文"><TextInput value="営業時間のお知らせ" readOnly /></Field><p className={styles.note}>お知らせの文の見本です。</p>
-        </Card> : <Card surface="muted" layout="vertical" padding="default" gap="normal" aria-label="使い方の見本">
+        </Card> : <Card layout="vertical" padding="default" gap="normal" aria-label="使い方の見本">
           <strong>{page === 2 ? '操作の見本' : page === 3 ? '利用の流れ' : '基本の機能'}</strong>
           <p className={styles.description}>{page === 4 ? '配信・タグ・自動応答などの基本も使えます。' : message}</p>
         </Card>}
@@ -62,8 +59,4 @@ export default function StyleDemoPages({ viewing, page, onPage, chosen, onChoose
     </>}
 
   </section>
-}
-
-export function StyleDemoFooter({ viewing, page, onPage, chosen, onChoose, disabled }: { viewing: AccountStyle; page: number; onPage: (page: number) => void; chosen: AccountStyle | null; onChoose: (style: AccountStyle) => void; disabled: boolean }) {
-  return <DialogActions><div className={styles.navigation}><Button onClick={() => { if (page > 0) onPage(page - 1) }} aria-disabled={page === 0}>前のページ</Button><StyleChooseAction viewing={viewing} chosen={chosen} onChoose={onChoose} disabled={disabled} primary /><Button onClick={() => { if (page < 4) onPage(page + 1) }} aria-disabled={page === 4}>次のページ</Button></div></DialogActions>
 }

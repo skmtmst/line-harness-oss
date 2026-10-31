@@ -26,7 +26,6 @@ import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
 import { InitialMenuChoice } from './initial-menu-choice'
 import SetupLinks from './setup-links'
-import { StyleDemoFooter } from './style-demo-pages'
 import StyleChoiceStep, { StyleChoiceSwitcher, STYLE_CHOICE_ORDER, STYLE_CHOICE_START_ID, StyleChoiceStatus, initialViewingStyle } from './style-choice-step'
 import { useState } from 'react'
 import { formatNumber } from '@/lib/format'
@@ -57,7 +56,10 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         : { title: question?.title ?? '', description: question?.description ?? '' }
 
   const onCount = Object.values(enabled).filter(Boolean).length
-  const footer = demoOpen && step === 0 ? <StyleDemoFooter viewing={viewing} page={demoPage} onPage={setDemoPage} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} /> : (
+  const footer = demoOpen && step === 0 ? <DialogActions leadingAction={<Button onClick={() => { if (demoPage > 0) setDemoPage(demoPage - 1) }} aria-disabled={demoPage === 0} disabled={busy}>前のページ</Button>}>
+      <Button variant="primary" onClick={() => { if (chosenStyle !== viewing) chooseStyle(viewing) }} aria-disabled={chosenStyle === viewing} disabled={busy}>{chosenStyle === viewing ? '選んでいます' : 'このスタイルにする'}</Button>
+      <Button onClick={() => { if (demoPage < 4) setDemoPage(demoPage + 1) }} aria-disabled={demoPage === 4} disabled={busy}>次のページ</Button>
+    </DialogActions> : (
     <DialogActions leadingAction={step === 0 ? <>
           <Button variant="text" onClick={() => void saveStyleMode('later')} disabled={busy}>あとで設定する</Button>
           <Button variant="text" onClick={() => void saveStyleMode('manual')} disabled={busy}>手動で設定する</Button>
