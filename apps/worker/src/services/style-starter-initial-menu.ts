@@ -10,6 +10,7 @@ export function initialMenuItems(style: AccountStyle, menuKey = 'menu'): Starter
  return [...forms,{key:menuKey,kind:'rich_menu',name:'シンプルなメニュー',initialMenu:style,buttons:INITIAL_MENUS[style].buttons.map(button=>({...button}))}];
 }
 export function withInitialMenu(definition: StarterDefinition, style: AccountStyle): StarterDefinition {
+ if(definition.mode==='catalog')return definition;
  const key=definition.items.find(item=>item.kind==='rich_menu')?.key ?? 'menu';
  const generated=initialMenuItems(style,key), keys=new Set(generated.map(item=>item.key));
  return {items:[...definition.items.filter(item=>item.kind!=='rich_menu'&&!keys.has(item.key)),...generated]};

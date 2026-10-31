@@ -9,6 +9,8 @@ import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import PageResourceScope from '@/components/shell/page-resource-scope'
+import { resolveResourceTitle } from '@/lib/resource-title'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -101,7 +103,8 @@ function MenuEditBody() {
   const priceStartsAt = draft.effectiveAt ? new Date(datetimeLocalJstToUtcIso(draft.effectiveAt)) : null
   const priceStartsLater = Boolean(priceStartsAt && priceStartsAt.getTime() > Date.now())
   const dirty = state === 'ready' && (JSON.stringify(draft) !== JSON.stringify(saved) || payment.dirty)
-  const title = editing ? editing.name : course ? 'コースを追加する' : 'メニューを追加する'
+  const pendingTitle = id ? 'メニューを編集' : course ? 'コースを追加する' : 'メニューを追加する'
+  const title = resolveResourceTitle({ name: editing?.name, loaded: state === 'ready', pendingTitle })
   usePageTitle(title)
   usePageCrumbs([{ label: 'メニュー管理', href: LIST_HREF }])
   const valid = draft.name.trim() !== '' && draft.price !== '' && Number(draft.price) >= 0
@@ -248,5 +251,5 @@ function MenuEditBody() {
 }
 
 export default function RestaurantMenuEditPage() {
-  return <Suspense fallback={<ListState kind="loading" />}><MenuEditBody /></Suspense>
+  return <Suspense fallback={<ListState kind="loading" />}><PageResourceScope queryKeys={['id', 'store']}><MenuEditBody /></PageResourceScope></Suspense>
 }

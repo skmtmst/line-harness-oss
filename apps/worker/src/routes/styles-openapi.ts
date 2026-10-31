@@ -23,6 +23,8 @@ const definitions: Array<[string,string,string]> = [
   ["put", "/api/dashboard/style/holidays/{date}", "休みの日"],
   ["put", "/api/dashboard/style/targets", "目標"],
   ["get", "/api/dashboard/style/analytics-settings", "集計設定"],
+  ["get", "/api/hq/style-starter-sets/catalog", "初期セットで選べるカタログの版"],
+  ["get", "/api/hq/style-starter-sets/catalog/{templateId}/versions/{versionId}", "選んだカタログの版の中身"],
   ["get", "/api/hq/style-starter-sets", "統括の見本セット"],
   ["put", "/api/hq/style-starter-sets/{style}", "統括の見本セット"],
   ["post", "/api/hq/style-starter-sets/{style}/preflight", "初期セットを配る前の確認"],

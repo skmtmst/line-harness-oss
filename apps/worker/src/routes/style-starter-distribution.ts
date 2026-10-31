@@ -1,6 +1,7 @@
 import { profile } from '../services/style-profile.js';
 import type { SetupAnswer } from '@line-crm/shared';
 import { materializeInitialMenuAssets } from '../services/style-initial-assets.js';
+import { starterCatalogRuntime } from './style-starter-runtime.js';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { base, hq, json, account, edit, version } from './styles-common.js';
@@ -96,6 +97,7 @@ styleStarterDistribution.post(path + '/distribute', async (c) =>
       checkStyle(c.req.param('style')),
       await json(c),
       c.env.IMAGES,
+      starterCatalogRuntime(c),
     ),
   }),
 );

@@ -1,6 +1,7 @@
 import { initialMenuItems } from './style-starter-initial-menu.js';
 import { INITIAL_MENUS, initialMenuFormTargets, initialFormKey } from '@line-crm/shared';
 import { templateSamples } from './style-template-samples.js';
+import { readCatalogDefinition } from './style-starter-catalog-definition.js';
 
 import { type AccountStyle } from '@line-crm/shared';
 
@@ -160,6 +161,7 @@ export function readDefinition(
   value: unknown,
   style: AccountStyle,
 ): StarterDefinition {
+  if ((value as { mode?: unknown })?.mode === 'catalog') return readCatalogDefinition(value);
   const input = value as StarterDefinition;
   if (!input || !Array.isArray(input.items) || input.items.length > 30)
     throw new StyleError('invalid_starter_set');

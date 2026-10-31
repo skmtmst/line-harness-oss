@@ -54,6 +54,7 @@ export function StarterRetryNotice({ accountId, starter, version, inserted, onIn
     try {
       const res = await styleApi.ensureStarterItems(accountId, version)
       if (!res.success) throw new Error('starter_ensure_failed')
+      if(res.data.catalogApplication?.items.some(item=>item.state!=='succeeded')){setError('一部の物を入れられませんでした。統括の初期セットや参照先を確認して、もう一度お試しください。');onChanged();return}
       onInserted(res.data.inserted.length+(res.data.updated?.length??0))
       onChanged()
     } catch (caught) {

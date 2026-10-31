@@ -372,7 +372,7 @@ export default function EventsListV8() {
     >
       {foldersError ? (
         <Notice tone="danger" className={styles.folderNoteNoticePlacement} >フォルダを読み込めませんでした。
-          <button type="button" onClick={() => void loadFolders()} className={styles.textButton}>もう一度</button></Notice>
+          <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void loadFolders()}>もう一度</Button></Notice>
       ) : null}
     </ManagedFolderPanel>
   )

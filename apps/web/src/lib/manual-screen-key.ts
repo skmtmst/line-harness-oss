@@ -1,3 +1,5 @@
+import { canonicalScreenPath } from './canonical-route'
+
 /**
  * 画面ID（管理画面 の採番、例: 受信箱は「2-1」）とルートの対応。
  *
@@ -103,7 +105,7 @@ const ROUTE_TO_SCREEN_SORTED = [...ROUTE_TO_SCREEN].sort((a, b) => b[0].length -
 export function manualScreenKeyForPath(pathname: string): string | null {
   // ダッシュボードは '/' そのもの。下のループは1文字より短くならないので先に見る。
   if (pathname === '/') return '1-1'
-  let path = pathname
+  let path = canonicalScreenPath(pathname)
   while (path.length > 1) {
     for (const [route, screenId] of ROUTE_TO_SCREEN_SORTED) {
       if (path === route || path.startsWith(`${route}/`)) return screenId

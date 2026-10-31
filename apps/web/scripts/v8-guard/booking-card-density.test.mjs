@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -8,7 +9,7 @@ import scanPolishRules from './polish-rules-browser.mjs'
 
 const require = createRequire(import.meta.url), fromVitest = createRequire(require.resolve('vitest/package.json'))
 const { build } = createRequire(fromVitest.resolve('vite'))('esbuild')
-const webRoot = new URL('../..', import.meta.url).pathname, sheets = []
+const webRoot = fileURLToPath(new URL('../..', import.meta.url)), sheets = []
 const compiled = await build({
   stdin: { resolveDir: webRoot, loader: 'tsx', contents: `
 import React,{useState} from 'react';import {createRoot} from 'react-dom/client';
@@ -40,7 +41,7 @@ createRoot(document.getElementById('root')).render(<Fixture/>);` },
     })
   } }],
 })
-const css=[await compileUiStyles(new URL('../../src/app/globals.css',import.meta.url).pathname,['sr-only']),...sheets].join('\n')
+const css=[await compileUiStyles(fileURLToPath(new URL('../../src/app/globals.css',import.meta.url)),['sr-only']),...sheets].join('\n')
 const paint=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))))
 async function mount(page,width,mode){
   await page.setViewportSize({width,height:1600});await page.clock.setFixedTime(new Date('2026-09-03T09:24:00Z'))

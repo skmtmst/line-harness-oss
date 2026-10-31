@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 import scanLayoutDefects from './layout-defects-browser.mjs'
 import scanControlOverlap from './control-overlap-browser.mjs'
 import { scanLayoutOverflow } from './layout-overflow.mjs'
@@ -11,7 +12,7 @@ const require = createRequire(import.meta.url)
 const fromVitest = createRequire(require.resolve('vitest/package.json'))
 const { build } = createRequire(fromVitest.resolve('vite'))('esbuild')
 
-const webRoot = new URL('../..', import.meta.url).pathname
+const webRoot = fileURLToPath(new URL('../..', import.meta.url))
 const sheets = new Set()
 const compiled = await build({
   stdin: { resolveDir: webRoot, loader: 'tsx', contents: `

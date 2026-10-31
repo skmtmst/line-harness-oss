@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
-import { setDocumentTitle } from '@/lib/document-title'
+import type { ReactNode } from 'react'
+import { useDocumentTitle } from '@/components/shell/document-title'
 import { PageHeading } from '@/components/templates/page-frame'
 import authStyles from '@/components/templates/auth-page.module.css'
 import { CONTACT_URL, LEGAL_LINKS } from '@/lib/auth-email'
@@ -47,7 +47,7 @@ export default function AuthCard({
   applicationFlow?: 'form' | 'sent' | 'setup' | 'pending'
 }) {
   // ログイン前の画面もタブの題を「<見出し> | musubo」にする。
-  useEffect(() => { setDocumentTitle(title) }, [title])
+  useDocumentTitle(title)
   // V8 login confirmation/enrollment inherits its existing card tokens.
   if (variant === 'totp') return <main className={authStyles.page} data-auth-layout={authLayout}>
     <section className={authStyles.card} aria-label={title} data-auth-layout={authLayout} data-auth-width={wide ? 'wide' : undefined} data-design-node={cardNode}>

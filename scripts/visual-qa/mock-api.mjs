@@ -5197,7 +5197,7 @@ function bodyFor(method, pathname, query = new URLSearchParams()) {
   */
   if (pathname === '/api/staff/me') {
     // tenantId は統括のテンプレート（LRc93）の所属先の確認に要る（無いと「所属先を確認できません」で止まる）。
-    return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null, tenantId: 'visual-tenant-1', ...(gapuiState().role === 'viewer' ? { role: 'staff', readOnly: true, roleBundle: 'view_only' } : {}) } }
+    return { success: true, data: { id: STAFF.id, name: STAFF.name, role: STAFF.role, email: null, tenantId: 'visual-tenant-1', accountScope: 'all', ...(gapuiState().role === 'viewer' ? { role: 'staff', readOnly: true, roleBundle: 'view_only' } : {}) } }
   }
   if (pathname === '/api/webhooks/outgoing') return { success: true, data: OUTGOING_WEBHOOKS }
   if (method === 'GET' && pathname === '/api/webhooks/outgoing/owh-slack-order') {

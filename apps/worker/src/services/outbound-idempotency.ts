@@ -6,7 +6,7 @@ export type OutboundFailureStatus = 'failed' | 'unknown';
 
 export type OutboundReservation =
   | { kind: 'acquired'; leaseToken: string }
-  | { kind: 'retry'; leaseToken: string }
+  | { kind: 'retry'; leaseToken: string; previousFailureCode?: string | null }
   | { kind: 'replay'; responseId: string }
   | { kind: 'in_progress' }
   | { kind: 'failed'; code: string; retryable: boolean; nextRetryAt: string | null }
@@ -152,6 +152,7 @@ export async function reserveOutboundSend(
               attempt_count = attempt_count + 1, updated_at = ?
         WHERE idempotency_key = ?
           AND status = 'failed' AND retryable = 1
+          AND failure_code IS ?
           AND (next_retry_at IS NULL OR next_retry_at <= ?)
           AND (? IS NULL OR line_account_id = ?)`,
     ).bind(
@@ -159,12 +160,13 @@ export async function reserveOutboundSend(
       leaseExpiry(args.now),
       args.now,
       args.key,
+      row.failure_code,
       args.now,
       args.lineAccountId ?? null,
       args.lineAccountId ?? null,
     ).run();
     if ((claimed.meta?.changes ?? 0) === 1) {
-      return { kind: 'retry', leaseToken: retryLeaseToken };
+      return { kind: 'retry', leaseToken: retryLeaseToken, previousFailureCode: row.failure_code };
     }
     return { kind: 'in_progress' };
   }

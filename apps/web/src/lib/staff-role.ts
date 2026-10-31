@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { rememberStaffIdentity, forgetStaffIdentity, readStaffIdentity, subscribeStaffIdentity, staffIdentityGeneration } from './staff-identity-state'
 import type { StaffMember } from '@line-crm/shared'
 import { SESSION_LOST_EVENT } from './session-events'
@@ -90,6 +90,25 @@ export function useStaffIdentity(): StaffMember | null {
 export function useStaffRole(): string | null {
   const identity = useStaffIdentity()
   return effectiveStaffRole(identity)
+}
+
+/** 入口の本人確認。未取得・失敗を許可へ変えず、両方のゲートで同じ読み直しを使う。 */
+export function useStaffIdentityLoad() {
+  const identity = useStaffIdentity()
+  const role = effectiveStaffRole(identity)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  const retry = useCallback(() => { setFailed(false); setAttempt(value => value + 1) }, [])
+  useEffect(() => {
+    if (role !== null) { setFailed(false); return }
+    let active = true
+    setFailed(false)
+    void loadStaffIdentity().then(result => {
+      if (active && !result.success) setFailed(true)
+    }).catch(() => { if (active) setFailed(true) })
+    return () => { active = false }
+  }, [role, attempt])
+  return { identity, failed: role === null && failed, retry }
 }
 
 /** 統括のひな形・配信は全社の管理者だけ（APIのaccount_scope判定と同じ）。 */
