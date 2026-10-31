@@ -1,13 +1,12 @@
 'use client'
 
 import type { AccountStyle } from '@line-crm/shared'
-import { Check, X } from 'lucide-react'
+import { Check } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
-import IconButton from '@/components/shared/icon-button'
 import StyleDemoPages from './style-demo-pages'
 import StyleChooseAction from './style-choose-action'
 import { STYLE_EXPERIENCE_SCRIPT, StyleExperiencePlayer } from './style-experience-player'
@@ -37,6 +36,10 @@ export type StyleChoiceStepProps = {
   disabled?: boolean
   variant?: 'minimal' | 'full'
   switcher?: 'inline' | 'external'
+  detail?: boolean
+  onDetailChange?: (detail: boolean) => void
+  demoPage?: number
+  onDemoPage?: (page: number) => void
 }
 
 /** 窓の固定された帯でも、本文と同じ「見る」切り替えを使う。 */
@@ -64,50 +67,34 @@ export function StyleChoiceSwitcher({ viewing, onView, chosen, disabled = false 
   </div>
 }
 
-export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, disabled = false, variant = 'minimal', switcher = 'inline' }: StyleChoiceStepProps) {
+export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, disabled = false, variant = 'minimal', switcher = 'inline', detail: controlledDetail, onDetailChange, demoPage, onDemoPage }: StyleChoiceStepProps) {
   const script = STYLE_EXPERIENCE_SCRIPT
   const viewed = script.styles[viewing]
-  const [detail, setDetail] = useState(false)
-  const [page, setPage] = useState(0)
-  const [seenStyle, setSeenStyle] = useState(viewing)
-  if (seenStyle !== viewing) { setSeenStyle(viewing); setPage(0) }
+  const [localDetail, setLocalDetail] = useState(false)
+  const [localPage, setLocalPage] = useState(0)
+  const detail = controlledDetail ?? localDetail
+  const page = demoPage ?? localPage
+  const setDetail = (value: boolean) => { setLocalDetail(value); onDetailChange?.(value) }
+  const setPage = (value: number) => { setLocalPage(value); onDemoPage?.(value) }
+  useEffect(() => { setLocalPage(0); onDemoPage?.(0) }, [viewing])
   const openRef = useRef<HTMLButtonElement>(null)
-  const closeRef = useRef<HTMLButtonElement>(null)
   const restoreFocus = useRef(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const previousDetail = useRef(detail)
   useEffect(() => {
     if (previousDetail.current === detail) return
     previousDetail.current = detail
-    if (detail) closeRef.current?.focus()
+    if (detail) { restoreFocus.current = true; rootRef.current?.querySelector<HTMLElement>('[data-demo-heading]')?.focus() }
     else if (restoreFocus.current) {
       if (disabled) document.getElementById(STYLE_CHOICE_START_ID)?.focus()
       else openRef.current?.focus()
       restoreFocus.current = false
     }
   }, [detail, disabled])
-  const close = () => { restoreFocus.current = true; setDetail(false) }
-  useEffect(() => {
-    if (!detail) return
-    const keydown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.isComposing) return
-      const dialog = rootRef.current?.closest('[role=dialog]')
-      const target = event.target instanceof Element ? event.target : document.activeElement
-      if (dialog && target?.closest('[role=dialog]') !== dialog) return
-      event.preventDefault()
-      event.stopPropagation()
-      restoreFocus.current = true
-      setDetail(false)
-    }
-    document.addEventListener('keydown', keydown, true)
-    return () => document.removeEventListener('keydown', keydown, true)
-  }, [detail])
+
   return (
     <div ref={rootRef} className={styles.root}>
-      {switcher === 'inline' || detail ? <div className={styles.demoSwitcher}>
-        {switcher === 'inline' ? <StyleChoiceSwitcher viewing={viewing} onView={onView} chosen={chosen} disabled={disabled} /> : null}
-        {detail ? <IconButton ref={closeRef} aria-label="デモを閉じる" onClick={close}><X aria-hidden="true" /></IconButton> : null}
-      </div> : null}
+      {switcher === 'inline' ? <div className={styles.demoSwitcher}><StyleChoiceSwitcher viewing={viewing} onView={onView} chosen={chosen} disabled={disabled} /></div> : null}
       {detail ? <StyleDemoPages viewing={viewing} page={page} onPage={setPage} chosen={chosen} onChoose={onChoose} disabled={disabled} /> : <>
       <section className={styles.can} aria-labelledby={STYLE_CHOICE_START_ID}>
         <h3 id={STYLE_CHOICE_START_ID} tabIndex={-1} className={styles.canTitle}>{`${viewed.label}でできること`}</h3>

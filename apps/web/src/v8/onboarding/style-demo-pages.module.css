@@ -1,8 +1,10 @@
 .root { display: flex; flex-direction: column; gap: var(--polish-space-card); min-width: 0; }
 .counter { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
-.heading { margin: 0; color: var(--color-ink); font-size: var(--text-heading); }
-.can { margin: 0; padding-inline-start: var(--polish-space-card); color: var(--color-ink-secondary); }
+.heading { margin: 0; color: var(--color-ink); font-size: 24px; line-height: 1.35; font-weight: 700; }
+.can { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; color: var(--color-ink-secondary); }
+.can li { display: flex; align-items: flex-start; gap: 8px; }
+.check { width: 16px; height: 16px; flex: none; color: var(--color-accent-deep); margin-top: 3px; }
 .description { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-body); }
 .note { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .choose { display: flex; justify-content: center; }
-.navigation { display: flex; justify-content: space-between; gap: var(--polish-space-row); }
+.navigation { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: var(--polish-space-row); }
