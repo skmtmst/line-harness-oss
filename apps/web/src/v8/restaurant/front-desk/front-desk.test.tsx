@@ -110,6 +110,7 @@ describe('電話予約（E-2）', () => {
     fireEvent.click(await screen.findByRole('button', { name: '19:00' }))
     expect((screen.getByRole('button', { name: '変える' }) as HTMLButtonElement).disabled).toBe(false)
     expect(screen.getByRole('switch', { name: 'LINE で確認を送る' })).not.toBeNull()
+    fireEvent.click(screen.getByRole('switch', { name: 'LINE で確認を送る' }))
     fireEvent.click(screen.getByRole('button', { name: /予約を入れる/ }))
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ lineFailed: false }))
     expect(api.createReservation).toHaveBeenCalledWith('acc', expect.objectContaining({
@@ -156,4 +157,38 @@ it('UTCの端末でも日付と受け付ける時刻を日本時間で選ぶ', (
     if(previous === undefined) delete process.env.TZ
     else process.env.TZ = previous
   }
+})
+
+it('顧客へのLINEは引き出しでも既定オフで、選び直しや再開で同意を引き継がない', async () => {
+ const props={open:true,accountId:'acc',storeId:'store-1',tables:T,onClose:vi.fn(),onSaved:vi.fn()}
+ const view=render(<PhoneReservationDrawer {...props}/>)
+ fireEvent.change(screen.getByRole('textbox',{name:'電話番号'}),{target:{value:'09012345678'}})
+ fireEvent.click(await screen.findByRole('button',{name:/鈴木 美咲/}))
+ const toggle=()=>screen.getByRole('switch',{name:'LINE で確認を送る'})
+ expect(toggle().getAttribute('aria-checked')).toBe('false')
+ fireEvent.click(toggle());expect(toggle().getAttribute('aria-checked')).toBe('true')
+ fireEvent.click(screen.getByRole('button',{name:/鈴木 美咲/}))
+ expect(screen.queryByRole('switch',{name:'LINE で確認を送る'})).toBeNull()
+ fireEvent.click(screen.getByRole('button',{name:/鈴木 美咲/}))
+ expect(toggle().getAttribute('aria-checked')).toBe('false')
+ fireEvent.click(toggle())
+ view.rerender(<PhoneReservationDrawer {...props} open={false}/>);view.rerender(<PhoneReservationDrawer {...props}/>)
+ fireEvent.change(screen.getByRole('textbox',{name:'電話番号'}),{target:{value:'09012345678'}})
+ fireEvent.click(await screen.findByRole('button',{name:/鈴木 美咲/}))
+ expect(toggle().getAttribute('aria-checked')).toBe('false')
+ fireEvent.click(screen.getByText(/明日/));fireEvent.click(await screen.findByRole('button',{name:'19:00'}))
+ fireEvent.click(screen.getByRole('button',{name:/予約を入れる/}))
+ await waitFor(()=>expect(api.createReservation).toHaveBeenCalledWith('acc',expect.objectContaining({notifyLine:false,lineUid:'U-1'})))
+})
+
+it.each([{accountId:'other',storeId:'store-1'},{accountId:'acc',storeId:'other'}])('引き出しの顧客へのLINE同意を別の文脈へ引き継がず、戻しても復活させない %o',async(next)=>{
+ const props={open:true,accountId:'acc',storeId:'store-1',tables:T,onClose:vi.fn(),onSaved:vi.fn()}
+ const view=render(<PhoneReservationDrawer {...props}/>)
+ fireEvent.change(screen.getByRole('textbox',{name:'電話番号'}),{target:{value:'09012345678'}})
+ fireEvent.click(await screen.findByRole('button',{name:/鈴木 美咲/}))
+ const toggle=()=>screen.getByRole('switch',{name:'LINE で確認を送る'})
+ fireEvent.click(toggle());expect(toggle().getAttribute('aria-checked')).toBe('true')
+ view.rerender(<PhoneReservationDrawer {...props} {...next}/>);expect(toggle().getAttribute('aria-checked')).toBe('false')
+ view.rerender(<PhoneReservationDrawer {...props}/>);expect(toggle().getAttribute('aria-checked')).toBe('false')
+ expect(api.createReservation).not.toHaveBeenCalled()
 })
