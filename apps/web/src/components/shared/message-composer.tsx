@@ -1,5 +1,6 @@
 'use client'
 
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 import { useRef, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, Plus, Save, Trash2, MessageSquare, Image, Video, Music, Smile, GalleryHorizontal, MapPin, FileText, Pencil, Bookmark } from 'lucide-react'
 import type { BroadcastBubble, BroadcastBubbleType } from '@line-crm/shared'
@@ -71,12 +72,12 @@ export interface MessageComposerProps {
   bubblesOnly?: boolean
 }
 
-function ComposerText({ bubble, index, onChange, inserts, extraTokens }: Pick<MessageComposerProps, 'inserts' | 'extraTokens'> & { bubble: BroadcastBubble; index: number; onChange: (next: BroadcastBubble) => void }) {
+function ComposerText({ bubble, index, onChange, inserts, extraTokens, tokenNames }: Pick<MessageComposerProps, 'inserts' | 'extraTokens'> & { tokenNames: InsertTextFieldProps['tokenNames'] } & { bubble: BroadcastBubble; index: number; onChange: (next: BroadcastBubble) => void }) {
   const ref = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const value = String(bubble.content.text ?? '')
   const change = (text: string) => onChange({ ...bubble, content: { ...bubble.content, text } })
   return <MessageBody>
-    <InsertTextField ref={ref} aria-label={index ? `${index + 1}通目の本文` : '本文'} placeholder="テキストを入力" maxLength={MAX_TEXT_LENGTH} value={value} onValueChange={change} extraTokens={extraTokens} className={styles.text} />
+    <InsertTextField tokenNames={tokenNames} ref={ref} aria-label={index ? `${index + 1}通目の本文` : '本文'} placeholder="テキストを入力" maxLength={MAX_TEXT_LENGTH} value={value} onValueChange={change} extraTokens={extraTokens} className={styles.text} />
     {inserts ? inserts(ref, value, change) : <InsertToolbar compact targetRef={ref} value={value} onChange={change} count={messageLengthLabel(value.length)} />}
   </MessageBody>
 
@@ -85,6 +86,7 @@ function ComposerText({ bubble, index, onChange, inserts, extraTokens }: Pick<Me
 /** G-9。吹き出しの枠・タブ・本文・素材・作成の入口は統括と店で同じ部品。 */
 export default function MessageComposer(props: MessageComposerProps) {
   const { bubbles, accountId, onChange, onMove, onDelete, onAdd, onPickTemplate, onSaveTemplate, onCompose, unavailable = {}, busy = false } = props
+  const tokenNames = useInsertTokenNames(accountId)
   const busyReason = busy ? '処理中です。完了してから操作してください。' : undefined
   return <section className={styles.root} data-message-composer data-bubbles-only={props.bubblesOnly || undefined}>
     {props.bubblesOnly ? null : <div className={styles.heading}>
@@ -99,7 +101,7 @@ export default function MessageComposer(props: MessageComposerProps) {
       const KindIcon = KIND_ICONS[bubble.type] ?? MessageSquare
       return <Card key={bubble.id} className={styles.bubble} padding="rows" overflow="hidden" aria-label={`${index + 1}通目の吹き出し`}>
         <div className={styles.header}>
-          <span className={styles.number}>{index + 1}</span><span className={styles.kind}><KindIcon size={16} aria-hidden />{composerLabel(bubble.type)}</span><span className={styles.summary} title={composerSummary(bubble)}>{/* 本文は途中で切らずに渡し、欄の幅で「…」にする。差し込みは札で見せる（k0TPPS）。 */}{bubble.type === 'text' && String(bubble.content.text ?? '').trim() ? <InsertText value={String(bubble.content.text ?? '').trim().replace(/\s+/g, ' ')} extraTokens={props.extraTokens} /> : composerSummary(bubble)}</span><ErrorCountBadge count={props.bubbleErrors?.[index] ? 1 : 0} label={`${index + 1}通目`} />
+          <span className={styles.number}>{index + 1}</span><span className={styles.kind}><KindIcon size={16} aria-hidden />{composerLabel(bubble.type)}</span><span className={styles.summary} title={composerSummary(bubble)}>{/* 本文は途中で切らずに渡し、欄の幅で「…」にする。差し込みは札で見せる（k0TPPS）。 */}{bubble.type === 'text' && String(bubble.content.text ?? '').trim() ? <InsertText tokenNames={tokenNames} value={String(bubble.content.text ?? '').trim().replace(/\s+/g, ' ')} extraTokens={props.extraTokens} /> : composerSummary(bubble)}</span><ErrorCountBadge count={props.bubbleErrors?.[index] ? 1 : 0} label={`${index + 1}通目`} />
           <div className={styles.controls}><IconButton size="row" aria-label={`${index + 1}通目を上へ移動`} disabled={busy || index === 0} title={busyReason ?? (index === 0 ? '最初のメッセージです。' : undefined)} onClick={() => onMove(index, -1)}><ArrowUp size={16} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を下へ移動`} disabled={busy || index === bubbles.length - 1} title={busyReason ?? (index === bubbles.length - 1 ? '最後のメッセージです。' : undefined)} onClick={() => onMove(index, 1)}><ArrowDown size={16} aria-hidden /></IconButton><IconButton size="row" aria-label={`${index + 1}通目を削除する`} disabled={busy || bubbles.length === 1} title={busyReason ?? (bubbles.length === 1 ? 'メッセージは1通以上必要です。' : undefined)} onClick={() => onDelete(index)}><Trash2 size={16} aria-hidden /></IconButton></div>
         </div>
         <div className={styles.tabs} role="tablist" aria-label={`${index + 1}通目のメッセージ形式`} onKeyDown={(event) => {
@@ -114,7 +116,7 @@ export default function MessageComposer(props: MessageComposerProps) {
           {COMPOSER_TYPES.map(([type, label]) => <button key={type} type="button" role="tab" tabIndex={activeType === type ? 0 : -1} aria-selected={activeType === type} aria-disabled={Boolean(unavailable[type]) || busy} title={unavailable[type]}  onClick={() => { if (type !== bubble.type && !busy && !unavailable[type] && type !== 'intro') onChange(index, { id: bubble.id, type: type as BroadcastBubbleType, content: ['audio', 'sticker', 'location'].includes(type) ? { state: emptyMessageKindState() } : {} }) }}>{label}</button>)}
         </div>
         <div className={styles.content} {...props.bubbleFieldProps?.(index)} data-invalid={props.bubbleErrors?.[index] ? '' : undefined} aria-describedby={props.bubbleErrors?.[index] ? `composer-bubble-${bubble.id}-error` : undefined}>
-          {reason ? <p role="note">{reason}</p> : bubble.type === 'text' ? <ComposerText bubble={bubble} index={index} onChange={(next) => onChange(index, next)} inserts={props.inserts} extraTokens={props.extraTokens} />
+          {reason ? <p role="note">{reason}</p> : bubble.type === 'text' ? <ComposerText tokenNames={tokenNames} bubble={bubble} index={index} onChange={(next) => onChange(index, next)} inserts={props.inserts} extraTokens={props.extraTokens} />
             : ['image', 'video', 'audio'].includes(bubble.type) ? <ComposerMedia key={`${bubble.id}-${bubble.type}-${accountId}`} bubble={bubble} accountId={accountId} disabled={busy} onBusyChange={props.onBusyChange} onChange={(content) => onChange(index, { ...bubble, content })} />
             : bubble.type === 'sticker' || bubble.type === 'location' ? <MessageKindFields kind={bubble.type as MessageKind} value={(bubble.content.state as MessageKindState) ?? emptyMessageKindState()} onChange={(state) => onChange(index, { ...bubble, content: { ...bubble.content, state } })} composer />
             : composed ? name ? <div className={styles.made}>

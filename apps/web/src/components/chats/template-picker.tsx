@@ -386,6 +386,7 @@ export default function TemplatePicker({
   const colorOf = new Map(scopedFolders.map((folder) => [folder.id, folder.color]))
   return (
     <TemplatePickerView
+      accountId={selectedAccountId}
       onClose={onClose}
       channel={channel}
       canPick={canPickNow}
