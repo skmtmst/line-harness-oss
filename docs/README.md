@@ -1111,5 +1111,5 @@
 - [列車1031Jの修正](release-log/unreleased/2026-kenta-train-1031j.md) — 反映履歴、確認 2026-11-01。
 
 - [列車1031K：フォーム・タグ・率と登録結果](release-log/unreleased/2027-kenta-train-1031k.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
-- [反映履歴：共通情報のCSV書き出し](release-log/unreleased/0000-kenta-common-vars-export.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
-- [反映履歴：回答フォームの絞り込みで0件の案内](release-log/unreleased/0000-kenta-form-empty-filter-guide.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [列車1031L：CSV・受付停止とお客さまの予約画面](release-log/unreleased/0000-kenta-train-1031l.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
