@@ -87,8 +87,8 @@ export function TodayList({ style, rows, note, canWrite, busyId, selectedId, men
       case 'time2': return <><span className={styles.cellStrong}>{row.time}</span>{row.endTime ? <span className={styles.cellSub}>{row.endTime}</span> : null}</>
       case 'name': return <>{onSelect ? <button type="button" className={styles.nameButton} onClick={() => onSelect(row)}><TruncatedText value={row.name} /></button> : <span className={styles.cellStrong}><TruncatedText value={row.name} /></span>}{row.sub ? <span className={styles.cellSub}><TruncatedText value={row.sub} /></span> : null}</>
       case 'people': return <span className={styles.cellText}>{row.people ?? '—'}</span>
-      case 'seat': return <span className={styles.cellText}>{row.seat ?? '—'}</span>
-      case 'staff': return <span className={styles.cellText}>{row.staff ?? '—'}</span>
+      case 'seat': return <TruncatedText className={styles.cellText} value={row.seat ?? '—'} />
+      case 'staff': return <TruncatedText className={styles.cellText} value={row.staff ?? '—'} />
       case 'course': return <><span className={styles.cellStrong}><TruncatedText value={row.course ?? '—'} /></span>{row.courseNote ? <span className={styles.cellSub}>{row.courseNote}</span> : null}</>
       case 'meet': return <StatusOrDash badge={row.meet} />
       case 'pay': return <StatusOrDash badge={row.pay} />

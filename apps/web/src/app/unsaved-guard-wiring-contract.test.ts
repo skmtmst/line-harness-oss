@@ -242,6 +242,7 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'v8/restaurant/line-followup/demo.tsx': 'phaseだけで描く静的な見本。編集状態・保存・API呼出はなく、全操作はaria-hiddenとinertの内側、文字入力はreadOnly。未保存は見本の札であり利用者の下書きではない。',
   'v8/restaurant/common-a/frame.tsx': '取得と店の選択だけを持つ共通の器。未保存の入力を持たず、店の切り替えはrequestUnsavedActionで子の実際の番兵へ委ねる。',
   'v8/restaurant/line-followup/followup-editor.tsx': '入力は共通Dialogの中だけ。dirtyをDialogへ渡して閉じる前の破棄確認を守り、確定した下書きはFollowupBoardの番兵が守る。',
   'v8/restaurant/line-followup/reservation-form-editor.tsx': '予約フォームの編集は共通Dialogの中だけ。dirtyを渡して破棄を確認し、確定後はFollowupBoardが未保存の定義を保持して画面離脱を守る。',

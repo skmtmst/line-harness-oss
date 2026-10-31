@@ -29,17 +29,13 @@ import Select from '@/components/shared/select'
 
 import type { RestaurantReservation, RestaurantTable } from '@/lib/restaurant-test-api'
 import KpiBand from '@/components/shared/kpi-band'
-import { INACTIVE_STATUSES, SOURCE_LABEL, dayShort, dayTitle, floorOrder, hm, isHold, mdWeek, minutesOf, addDays, sameDay, shortCourse, slotLabel, sourceName, dayRange, toYmd } from './format'
+import { INACTIVE_STATUSES, SOURCE_LABEL, dayShort, dayTitle, hm, isHold, mdWeek, minutesOf, addDays, sameDay, shortCourse, slotLabel, sourceName, dayRange, toYmd } from './format'
 import styles from './reservations.module.css'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Notice from '@/components/shared/notice'
 import { formatNumber } from '@/lib/format'
 
 export type PhonePreset = { date?: Date; time?: string; tableId?: string; hold?: boolean }
-
-const SLOT = 30
-const ROW_START = 17 * 60
-const ROW_END = 22 * 60
 
 export default function TodayView({ rows, later, tables, day, isToday, busy, canWrite, source, onSource, onDay, onAdd, onOpen, onDetail, onReload, storeId,storeName,onView }: {
   onView:(view:import('./format').LedgerView)=>void
@@ -72,11 +68,14 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
   const bookings = useMemo(() => shown.filter((item) => !isHold(item)), [shown])
   const holds = useMemo(() => shown.filter(isHold), [shown])
 
-  /* 停止中の卓は、その日に予約が入っていなければ出さない。 */
+  const entries = useMemo(() => shown.map(row => seatBoardEntry(row as unknown as Record<string,unknown>)), [shown])
+
+  /* 結合予約の全卓を残し、時間の盤では卓番で並べる。 */
   const columns = useMemo(() => {
-    const used = new Set(shown.map((item) => item.table_id).filter(Boolean) as string[])
-    return tables.filter((table) => table.is_active || used.has(table.id)).sort(floorOrder)
-  }, [tables, shown])
+    const used = new Set(entries.flatMap(item => item.resourceIds))
+    return tables.filter((table) => table.is_active || used.has(table.id)).sort((a,b) => a.code.localeCompare(b.code,'ja',{numeric:true}) || a.id.localeCompare(b.id))
+  }, [tables, entries])
+  const visibleFloor = floor ? {...floor,tables:floor.tables.filter(table => columns.some(column => column.id===table.id))} : undefined
   const hidden = tables.filter((table) => !table.is_active && !columns.includes(table))
 
   /* 次の予約：その日の残りから。無ければ（営業の後など）次の日以降の予約から出し、日付も書く。 */
@@ -122,7 +121,7 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
       </KpiBand>
       <div className={styles.todayColumns}>
         <div className={styles.calendarWrap} role="region" aria-label={`${dayTitle(day)}の時間×卓`}>
-        <ReservationBoard renderBody={columns.length===0 || axis==='floor' && (shown.length===0 || floorError) ? body=><>{columns.length===0 ? <LedgerEmpty noTables={tables.length===0} inactiveTables={tables.length>0} canWrite={canWrite} busy={busy} onCreate={()=>onAdd({date:day})} onViewList={shown.length>0 ? ()=>onView('list') : undefined}/> : axis==='floor' && shown.length===0 ? <LedgerEmpty noTables={false} filtered={source!=='all'} canWrite={canWrite} busy={busy} onCreate={()=>onAdd({date:day})}/> : null}{columns.length===0 ? null : axis==='floor' && floorError ? null : body}</> : undefined} axis={axis} onAxis={v=>{setAxis(v);if(v==='list')onView('list');else if(v==='month')onView('month')}} toolbar={<>
+        <ReservationBoard renderBody={columns.length===0 || axis==='floor' && shown.length===0 ? body=><>{shown.length===0 ? <LedgerEmpty noTables={tables.length===0} inactiveTables={tables.length>0&&columns.length===0} filtered={source!=='all'} canWrite={canWrite} busy={busy} onCreate={()=>onAdd({date:day})}/> : null}{columns.length===0&&shown.length===0 ? null : body}{columns.length===0&&shown.length>0 ? <Button presentation="restaurant" onClick={()=>onView('list')}>一覧で予約を見る</Button> : null}</> : undefined} axis={axis} onAxis={v=>{setAxis(v);if(v==='list')onView('list');else if(v==='month')onView('month')}} toolbar={<>
         <IconButton aria-label="前の日" onClick={() => onDay(addDays(day, -1))}><ChevronLeft size={16} aria-hidden="true" /></IconButton>
         <h2 className={styles.dateTitle}>{dayTitle(day)}</h2>
         <IconButton aria-label="次の日" onClick={() => onDay(addDays(day, 1))}><ChevronRight size={16} aria-hidden="true" /></IconButton>
@@ -138,9 +137,9 @@ export default function TodayView({ rows, later, tables, day, isToday, busy, can
           /></SaveErrorField>
             </span>} notice={floorError ? <ListState kind="error" title="座席表を読み込めませんでした" error={floorError} onRetry={reloadFloor}/> : hidden.length > 0 ? <Notice tone="warn">
               {`${hidden.map((table) => table.code).join('・')} は停止中のため出していません`}
-            </Notice> : null} floor={floor} dates={[toYmd(day)]}
-          onSlot={(tableId,startsAt)=>onAdd({date:day,time:hm(startsAt),tableId})} entries={shown.map(r=>seatBoardEntry(r as unknown as Record<string,unknown>))}
-          resources={columns.map(t=>({id:t.id,label:`${t.code} ${t.max_capacity}名`,capacity:t.max_capacity,active:!!t.is_active}))}
+            </Notice> : null} floor={visibleFloor} dates={[toYmd(day)]}
+          onSlot={(tableId,startsAt)=>onAdd({date:day,time:hm(startsAt),tableId})} entries={entries}
+          resources={columns.map(t=>({id:t.id,label:`${t.code} ${t.max_capacity}名`,groupLabel:t.join_group ? `結合 ${t.join_group}` : undefined,capacity:t.max_capacity,active:!!t.is_active}))}
           canWrite={canWrite} busy={busy} onOpen={onDetail}
           onMove={async(id,move)=>{if(!selectedAccountId)throw new Error('アカウント未取得');await reservationBoardApi.move(selectedAccountId,id,move);onReload()}}
           printContext={`${storeName??storeId} ／ ${source==='all'?'予約元：すべて':SOURCE_LABEL[source]??source} ／ 有効な予約・押さえ`} title={`${dayTitle(day)}の予約`}
