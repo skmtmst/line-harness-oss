@@ -1056,5 +1056,7 @@
 - [予約の案内と比較の並び](release-log/unreleased/2001-kenta-rival-small-fixes.md) — 反映履歴、確認 2026-10-31。
 - [保存先の固定とフォームの公開参照](release-log/unreleased/2001-kenta-train-1029x.md) — 反映履歴、確認 2026-10-31。
 
-- [繰り返し設定の読み戻し](release-log/unreleased/0000-kenta-recurring-menu-readback.md) — 反映履歴、確認 2026-10-31
-- [一括予約の処理設計](release-log/unreleased/0000-kenta-bulk-booking-design.md) — 反映履歴、確認 2026-10-31
+- [繰り返し設定の読み戻し](release-log/unreleased/2003-kenta-recurring-menu-readback.md) — 反映履歴、確認 2026-10-31
+- [一括予約の処理設計](release-log/unreleased/2003-kenta-bulk-booking-design.md) — 反映履歴、確認 2026-10-31
+
+- [今月の成果の流れの窓](release-log/unreleased/2003-kenta-monthly-flow.md) — 反映履歴、確認 2026-10-31。
