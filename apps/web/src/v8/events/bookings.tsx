@@ -30,6 +30,7 @@ import { useBookingRequests } from './booking-requests'
 import BookingRecords from './booking-records'
 import { RowMenu } from '@/components/shared/row-actions'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
+import { useEventAbsence } from './use-event-absence'
 
 /*
  * ★V8 イベント予約の「申込者」（Pencil ）。
@@ -250,6 +251,8 @@ function Bookings({ eventId }: { eventId: string }) {
     } finally { request.finish() }
   }, [selectedAccountId, selectedOccurrenceId, saveErrors, operations])
 
+  const absence = useEventAbsence({ accountId: selectedAccountId ?? '', scope: operationScope, onSaved: () => { void refreshApplicants() } })
+
   useEffect(() => {
     void refreshEvent()
     setApplicants(null)
@@ -285,6 +288,10 @@ function Bookings({ eventId }: { eventId: string }) {
   }
 
   const occurrence = applicants?.occurrence ?? null
+  const absenceAction = (bookingId: string, name: string, startsAt: string | undefined) => startsAt && Date.parse(startsAt) > Date.now() ? <Button
+    data-booking-id={bookingId} data-booking-action="absence"
+    size="compact" lockedReason={absence.lockedReason} disabled={!absence.allowed || busy || marking.has(bookingId)}
+    onClick={() => absence.open({ bookingId, eventId, name, startsAt })}>欠席</Button> : null
   const rows = applicants?.applicants ?? []
   const bookingRows = rows.filter((row) => row.source === 'booking')
   const waitingRows = rows.filter((row) => row.source === 'waitlist' && row.status === 'waiting')
@@ -574,6 +581,7 @@ function Bookings({ eventId }: { eventId: string }) {
       )}
     >
       <div className={styles.body}>
+      {absence.notice}
       {eventStatus === 'error' ? (
         <ListState
           kind="error"
@@ -618,6 +626,7 @@ function Bookings({ eventId }: { eventId: string }) {
                 <EventRosterActions deadline={<span title={row.offerExpiresAt ? jstShort(row.offerExpiresAt) : undefined}>
                   {row.offerExpiresAt ? jstShort(row.offerExpiresAt) : row.status === 'waiting' ? '案内前' : emptyValue('unknown')}
                 </span>}>
+                  {row.source === 'booking' && ['requested', 'confirmed'].includes(row.status) ? absenceAction(row.id, row.displayName ?? '申込者', occurrence?.startsAt) : null}
                   {row.source === 'booking' && row.status === 'requested' ? (
                     <>
                       <Button variant="primary" onClick={() => void decide(row, 'confirm')} lockedReason={bookingLockReason} disabled={!canChangeBookings || busy} busy={Boolean(busy)} busyLabel="処理中…">承認する</Button>
@@ -763,7 +772,7 @@ function Bookings({ eventId }: { eventId: string }) {
           firstParticipation: { isFirst: booking.is_first_time == null ? null : booking.is_first_time === 1, attendedCount: null, checkedAt: null },
           offeredAt: null, offerExpiresAt: null,
         }
-        return booking.status === 'confirmed' ? <span className={styles.recordsActions}>
+        return <>{['requested', 'confirmed'].includes(booking.status) ? absenceAction(booking.id, booking.friend_display_name ?? booking.friend_name ?? '申込者', booking.slot_starts_at) : null}{booking.status === 'confirmed' ? <span className={styles.recordsActions}>
           <Button data-booking-id={booking.id} data-booking-action="attended" variant="primary" onClick={() => void markStatus(row, 'attended')} lockedReason={bookingLockReason} disabled={!canChangeBookings || marking.has(booking.id)}><Check size={16} aria-hidden="true" />参加済にする</Button>
           <RowMenu label={`${withHonorific(booking.friend_display_name ?? booking.friend_name ?? '申込者')}の操作`} triggerProps={{ 'data-booking-id': booking.id, 'data-booking-action': 'menu' }} items={[
             { id: 'no-show', lockedReason: bookingLockReason, label: '無断', onSelect: () => void markStatus(row, 'no_show'), disabled: !canChangeBookings || marking.has(booking.id), disabledReason: marking.has(booking.id) ? '処理を反映しています' : undefined },
@@ -772,7 +781,7 @@ function Bookings({ eventId }: { eventId: string }) {
         </span> : booking.status === 'requested' ? <span className={styles.recordsActions}>
           <Button variant="primary" onClick={() => void decide(row, 'confirm')} lockedReason={bookingLockReason} disabled={!canChangeBookings || busy}>承認する</Button>
           <RowMenu label={`${withHonorific(booking.friend_display_name ?? booking.friend_name ?? '申込者')}の操作`} triggerProps={{ 'data-booking-id': booking.id, 'data-booking-action': 'menu' }} items={[{ id: 'reject', lockedReason: bookingLockReason, label: '断る', onSelect: () => { setRejectReason(''); setRejectError(''); setRejectApplicant(row) }, disabled: !canChangeBookings || busy, disabledReason: busy ? '処理を反映しています' : undefined }]} />
-        </span> : null
+        </span> : null}</>
       }}>
         {ready ? <>
           <p>{`申込 ${confirmedSeats + requestedSeats}人（確定 ${confirmedSeats}人・承認待ち ${requestedSeats}人）・キャンセル待ち ${waitingSeats}人・案内中 ${offeredSeats}人 / ${capacity === null ? '定員の上限なし' : occurrence && occurrence.activeSeats >= capacity ? `満席（定員 ${capacity}人）` : `残席 ${Math.max(0, capacity - (occurrence?.activeSeats ?? 0))}席（定員 ${capacity}人）`}`}</p>
@@ -794,6 +803,7 @@ function Bookings({ eventId }: { eventId: string }) {
       </BookingRecords> : null}
       </div>
 
+      {absence.dialog}
       <ConfirmDialog
         key={`cancel:${operationScope}`}
         open={cancelApplicant !== null}

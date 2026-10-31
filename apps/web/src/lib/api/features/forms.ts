@@ -64,7 +64,7 @@ export const formsMethods = {
         body: JSON.stringify({ ...data, accountId }),
       }),
     createDraft: (accountId: string, name?: string) =>
-      fetchApi<ApiResponse<{ id: string; isActive: boolean }>>('/api/forms/drafts', {
+      fetchApi<ApiResponse<{ id: string; isActive: boolean; contentRevision?: number }>>('/api/forms/drafts', {
         method: 'POST',
         body: JSON.stringify({ name, accountId }),
       }),

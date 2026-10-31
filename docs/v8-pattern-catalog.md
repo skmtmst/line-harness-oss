@@ -378,6 +378,8 @@
   - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
   - 確認の実行を左、取消を中央に分ける場合は `confirmPlacement="start"`。通常の文字幅は `actionWidthReserve="idle"` で指定し、既定の結果文の幅予約は保つ。
   - 独自の処理を持つ窓でも操作は `DialogActions` に渡す。`footerAlign` だけを指定して本文にボタンを直置きしない。
+  - 未保存の確認は `UnsavedLeaveDialog` を使う。保存・破棄の意味が異なる場合のみ `saveLabel` / `discardLabel` / `error` / `onSavedLeave` を渡し、保存成功後の移動と破棄の処理を分ける。破棄だけの権限は `discardDisabled` / `discardLockedReason` で保存から分け、保持した操作も現在の権限を守る。省略時の表示と動きは変えない。
+  - 補助操作がある帯は、共通部品が左の最大ボタン幅を左右とも確保し、主操作を中央で折り返す。理由の行が増えても左は最初のボタン行へそろえる。実幅が左右同幅の配置に足りない場合は、共通部品で補助操作を上・中央の組を下へ積み、間を8px以上にする。画面側で幅や上下位置を補正しない。
   - 参照だけの窓は右上の×で閉じ、下の帯に閉じるボタンを置かない。操作の帯は取消と主操作を中央、脇の操作を `leadingAction` へ。理由などの入力は本文に置く。全画面の検査は `scripts/visual-qa/dialog-footer-contract.test.ts`。
   - 読む変数：`--polish-radius-dialog`・`--polish-window-*`・`--card-edge`
 - **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」

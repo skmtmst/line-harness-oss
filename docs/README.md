@@ -1077,3 +1077,9 @@
 - [反映履歴：予約の支払通知の受け取り](release-log/unreleased/2011-kenta-stripe-receipts.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [反映履歴：スタイル選択時の使い方の見本](release-log/unreleased/2011-kenta-style-demo.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [反映履歴：文字欄とシナリオの段の権限](release-log/unreleased/2011-kenta-text-step-permission.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+
+- [名簿の欠席受付](release-log/unreleased/2012-kenta-roster-absence.md) — 反映履歴、確認 2026-10-31
+- [反映履歴：窓の下の操作帯](release-log/unreleased/2012-kenta-dialog-leading.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [反映履歴：UID移行の行き先確認](release-log/unreleased/2012-kenta-uid-safety.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [配信メニューの表示名](release-log/unreleased/2013-masato-friend-add-label.md) — 反映履歴、確認 2026-10-31。
+- [反映履歴：フォームを離れる時の下書きの扱い](release-log/unreleased/0000-kenta-form-draft-leave.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。

@@ -663,8 +663,10 @@ export default function Sidebar({
    * どこかの画面を開いているとき選ばれた形にする。
    */
   const hqSettingsActive = HQ_SETTINGS_PATHS.some((path) => activePathname === path || activePathname.startsWith(`${path}/`))
-  const settingsActive = Boolean(
-    sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)),
+  const settingsActive = (
+    activePathname === '/settings/customer-look'
+    || activePathname.startsWith('/settings/customer-look/')
+    || Boolean(sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)))
   )
 
   /*
@@ -889,7 +891,7 @@ export default function Sidebar({
       {!isHq && !preview && (canManageRole(staffReadRole)) && (
         <div className={styles.settingsEntry}>
           <Link
-            href="/settings"
+            href="/settings/customer-look"
             prefetch={false}
             title={collapsed ? undefined : "設定"}
             aria-label={collapsed ? "設定" : undefined}
