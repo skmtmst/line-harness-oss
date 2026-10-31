@@ -1085,3 +1085,4 @@
 - [配信メニューの表示名](release-log/unreleased/2013-masato-friend-add-label.md) — 反映履歴、確認 2026-10-31。
 - [店舗の設定入口](release-log/unreleased/2014-masato-settings-entry-customer-look.md) — 反映履歴、確認 2026-11-01。
 - [選択中アカウントの受信箱件数](release-log/unreleased/2016-masato-inbox-account-badge.md) — 反映履歴、確認 2026-11-01。
+- [検証環境の自動配備の手順](release-log/unreleased/2017-masato-cf-staging-deploy-doc.md) — 反映履歴、確認 2026-11-01。
