@@ -28,9 +28,14 @@ import PlatformNotices from './hq/platform-notices'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { useEffect, useState } from 'react'
 import ViewPermissionGate from './view-permission-gate'
+import { PagePendingLayout } from './templates/page-pending'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  return <PagePendingLayout variant={pathname === '/' ? 'dashboard' : 'detail'}><AppShellContent pathname={pathname}>{children}</AppShellContent></PagePendingLayout>
+}
+
+function AppShellContent({ children, pathname }: { children: React.ReactNode; pathname: string }) {
   /*
    * LINEアカウントを登録（/accounts/new）。互換経路は外枠の無い専用の全画面。
    * ★V8 は絵（〜）どおり、ほかの画面と同じ外枠（左メニュー・上の帯）で出す（2026-10-07 司令塔）。

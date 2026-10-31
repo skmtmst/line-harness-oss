@@ -27,3 +27,5 @@
 構成の決まりは [コードの構成と名前](../docs/code-structure.md)。`pnpm exec tsx scripts/structure/check.ts` が名前・公開入口・循環を検査し、`pnpm test:scripts` がその故障対照を実行します。
 
 品質の後戻りは `pnpm quality:check --base <PRのbase SHA>`、違反を減らした後の実測更新は `pnpm quality:update --base <同じSHA>`、故障対照は `pnpm quality:test`。新しい入口は `pnpm new:screen <name> --title <title> --board <ID>`・`pnpm new:route <name> --method get` で生成します。先に `--dry-run` で保存先を確かめます。詳細は構成の正本を参照してください。
+
+ホームの初回待機は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/home-pending-heading.test.mjs` で、認証前から到着までの見出しを毎フレーム確かめます。`V8_GUARD_BASE` に本番形式の出力の配信先、`V8_GUARD_ARTIFACT_DIR` に保存先、`V8_GUARD_VIDEO=1` で動画を指定します。既定は6スタイル・1152/1440・API遅延0/600msです。`V8_GUARD_HOME_HEADING_FAULT=1 HOME_STYLES=standard HOME_DELAYS=600` は待機の見出しをCSSで隠す故障の対照で、赤になることを確認してから旗を外して再実行します。
