@@ -1,4 +1,5 @@
 'use client'
+import { requiredInputReason } from '@/lib/required-input-reason'
 
 import { displayText, isEditableQuestion, choiceActionText, choiceActionIcon } from './question-choice-summary'
 export { choiceActionText } from './question-choice-summary'
@@ -234,6 +235,11 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
     )
   }
 
+  const inputReason = requiredInputReason([
+    { label: 'テンプレート名', value: name },
+    { label: '質問文', value: question.text },
+    ...question.choices.map((choice, index) => ({ label: `選択肢 ${index + 1} のボタンの文字`, value: choice.label })),
+  ])
   const busy = saving || publishing || Boolean(host?.busy)
   const phone = (
     <LinePreview title={null} note="質問の見え方（山田 太郎さんの場合）" caption="配信日 10:00">
@@ -250,6 +256,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   return (
     <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
+        inputReason={inputReason}
         boardId="l87p1J"
         title={id ? '質問を編集' : '質問を作る'}
         description="ボタンで答えてもらい、答えでタグなどを付ける"
@@ -266,7 +273,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
           <>
             <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(inputReason)} disabledReason={inputReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
         )}
       >
