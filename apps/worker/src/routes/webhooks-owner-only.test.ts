@@ -4,13 +4,11 @@ import type { Env } from '../worker-env.js';
 import { webhooks } from './webhooks.js';
 
 /*
- * R32: 受け取り口・送り先の作成・変更・削除は統括だけ。
- * 口側の守り（`requireRole('owner')`）がそのままであることを、
- * 管理者・スタッフの 403 行列で守る。画面側の直しを戻しても、
- * この試験は口側が守りのままであることを示す。
- *
- * 権限の門番より先に DB・step-up へ触れないため、DB の代役は要らない。
- * 403 の応答が内部の詳細を漏らさないことも見る。
+ * R32 / D43: 担当者は全操作を拒否し、管理者は定義の通常操作のみ許可する。
+ * 削除・API鍵と既存secret差替えは引き続きオーナー限定。
+ * 管理者のPOST/通常PUT/PATCHの成功と範囲外副作用0は、
+ * webhooks-management-permissions.test.ts の実D1行列で照合する。
+ * 拒否はDB・step-upより前で、内部SQLも返さない。
  */
 function setupApp(role: 'owner' | 'admin' | 'staff') {
   const app = new Hono<Env>();
@@ -38,11 +36,18 @@ const OWNER_ONLY_CALLS: Array<{ method: string; path: string; body?: unknown }> 
   { method: 'POST', path: '/api/webhooks/api-tokens/tok-1/reactivate?lineAccountId=a' },
 ];
 
-describe('webhooks の統括限定操作は管理者・スタッフを通さない（R32）', () => {
+describe('webhooks の役割ごとの操作境界（R32/D43）', () => {
   for (const role of ['admin', 'staff'] as const) {
-    test(`${role} は作成・変更・削除で 403 になる`, async () => {
+    test(`${role} の許可外の操作は 403 になる`, async () => {
       const app = setupApp(role);
-      for (const call of OWNER_ONLY_CALLS) {
+      const calls = role === 'staff' ? OWNER_ONLY_CALLS : [
+        ...OWNER_ONLY_CALLS.filter(call => call.method === 'DELETE' || call.path.includes('/api-tokens')),
+        ...(['incoming/iwh-1', 'outgoing/owh-1'] as const).map(path => ({
+          method: 'PUT', path: `/api/webhooks/${path}?lineAccountId=a`,
+          body: { name: '一部だけも保存不可', secret: 's'.repeat(32) },
+        })),
+      ];
+      for (const call of calls) {
         const res = await app.request(call.path, {
           method: call.method,
           headers: { 'Content-Type': 'application/json' },
