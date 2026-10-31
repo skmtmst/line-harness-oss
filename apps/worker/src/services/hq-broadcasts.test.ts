@@ -121,3 +121,15 @@ it('LIFFの差し込みが必要な店舗にLIFFが無ければ予約前に止�
  await expect(dispatchHqBroadcast(f.db,run,'owner',1)).rejects.toMatchObject({status:409});
  expect(f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get()).toEqual({n:0});
 });
+
+it.each([{deliveryLimit:{upToRemainingQuota:true}}, {deliveryLimitConfirmation:{broadcastId:'copied',recipientCount:1,version:1}}])('統括の入口で店舗だけの上限と確認印を混ぜない %j',async options=>{
+ await expect(prepareHqBroadcast(f.db,tenant,'owner',{...input,messageOptions:options} as unknown as HqBroadcastInput)).rejects.toMatchObject({status:400});
+ expect(f.raw.prepare('SELECT COUNT(*) n FROM hq_broadcast_runs').get()).toEqual({n:0});
+});
+it('保存済みの統括の入力に印が混ざっても、子配信を作る前に拒否する',async()=>{
+ const run=await prepareHqBroadcast(f.db,tenant,'owner',{...input,accountIds:['shop1']});
+ const forged={...JSON.parse(run.input_json),messageOptions:{deliveryLimit:{upToRemainingQuota:true},deliveryLimitConfirmation:{broadcastId:'copied',recipientCount:1,version:1}}};
+ f.raw.prepare('UPDATE hq_broadcast_runs SET input_json=? WHERE id=?').run(JSON.stringify(forged),run.id);
+ await expect(dispatchHqBroadcast(f.db,await getHqBroadcastRun(f.db,tenant,run.id),'owner',1)).rejects.toMatchObject({status:400});
+ expect(f.raw.prepare('SELECT COUNT(*) n FROM broadcasts').get()).toEqual({n:0});
+});

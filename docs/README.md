@@ -1102,3 +1102,6 @@
 
 
 - [来店フォローの入力と内容確認](release-log/unreleased/0000-kenta-followup-inputs.md) — 反映履歴、確認 2026-11-01。
+
+
+- [反映履歴：送る人数の上限と送信枠の確認](release-log/unreleased/0000-kenta-broadcast-recipient-limit.md) — 運用者向けの説明、確認 2026-11-01。
