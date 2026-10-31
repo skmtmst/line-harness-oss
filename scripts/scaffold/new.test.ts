@@ -40,9 +40,7 @@ describe('new feature scaffolds', () => {
   it('route executes its injected handler only after role and read-only guards; errors propagate', async () => {
     const workerRequire = createRequire(join(process.cwd(), 'apps/worker/package.json'));
     const { Hono } = workerRequire('hono');
-    const { requireRole, denyReadOnly } = compile(readFileSync(join(process.cwd(), 'apps/worker/src/middleware/role-guard.ts'), 'utf8'), 'role-guard.ts', {
-      '@line-crm/shared': {},
-    });
+    const { requireRole, denyReadOnly } = await import('../../apps/worker/src/middleware/role-guard.js');
     for (const method of ['get', 'post', 'patch', 'delete'] as const) {
       const source = scaffoldFiles({kind: 'route', name: 'sample', method}).get('apps/worker/src/routes/sample.ts')!;
       const { createSampleRoutes } = compile(source, 'sample.ts', {hono: {Hono}, '../middleware/role-guard.js': {requireRole, denyReadOnly}});

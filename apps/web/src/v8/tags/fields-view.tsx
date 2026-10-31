@@ -65,7 +65,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
             <FolderPanelNote>フォルダを消しても、中の項目は未分類に残ります</FolderPanelNote>
             {folderError ? (
               <Notice tone="danger" className={styles.folderNoteNoticePlacement} >{folderError}
-                <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button></Notice>
+                <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void loadFolders()}>もう一度</Button></Notice>
             ) : null}
           </FolderPanel>
         </>}
@@ -92,9 +92,9 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
       >
         {actionError ? (
           <Notice tone="danger" >{actionError}{retryOrder ? (
-              <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
+              <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</Button>
             ) : (
-              <button type="button" onClick={() => { setActionError(''); void load() }}>もう一度読み込む</button>
+              <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => { setActionError(''); void load() }}>状態を確認する</Button>
             )}</Notice>
         ) : null}
         <RefreshCover refreshing={model.status === 'loading' && model.loaded}>{table}</RefreshCover>

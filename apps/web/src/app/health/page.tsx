@@ -464,13 +464,12 @@ export default function HealthPage() {
                 tone="danger"
                 message="移行履歴を取得できませんでした。"
                 action={
-                  <button
+                  <Button variant="text" size="inline" data-notice-inline-action
                     type="button"
                     onClick={() => void loadMigrations()}
-                    className="text-sm font-medium underline underline-offset-2"
                   >
                     再読み込み
-                  </button>
+                  </Button>
                 }
               />
             ) : migrations.length === 0 ? (

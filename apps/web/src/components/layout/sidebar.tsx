@@ -1,5 +1,6 @@
 'use client'
 
+import SharedButton from '@/components/shared/button'
 import { useRememberedSidebar } from './use-remembered-sidebar'
 import { revealInScroller } from './sidebar-current-item'
 import { V8_NAV_ICONS, V8_SETTINGS_ICON } from './sidebar-icons'
@@ -753,13 +754,12 @@ export default function Sidebar({
             tone="warn"
             className="mx-3 mb-2"
             action={(
-              <button
+              <SharedButton variant="text" size="inline" data-notice-inline-action
                 type="button"
                 onClick={() => { setVisibilityRetry((current) => current + 1); accountStyle.reload() }}
-                className="cursor-pointer font-bold text-action underline"
               >
                 もう一度
-              </button>
+              </SharedButton>
             )}
           >
             {accountStyle.error ? '使い方のスタイルを読み込めませんでした。' : '機能設定を読み込めませんでした。'}

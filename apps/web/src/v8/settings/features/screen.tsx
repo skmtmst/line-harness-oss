@@ -450,7 +450,7 @@ export default function FeatureSettingsScreen() {
 
           {usageFailed && (
                   <Notice tone="warn" action={<>
-                    <button type="button" onClick={() => void loadUsage()} className={styles.inlineLink}>利用状況を読み直す</button>
+                    <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void loadUsage()}>利用状況を読み直す</Button>
                   </>}>
                     機能の利用状況を読めませんでした。設定の切替はそのまま使えます。
                     {' '}

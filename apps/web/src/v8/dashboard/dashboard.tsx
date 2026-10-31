@@ -426,6 +426,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
     <KpiValueMotionProvider scope={d.selectedAccountId ? JSON.stringify([d.selectedAccountId, d.period, d.today]) : null}>
     <DashboardPage
       boardId="WQmep"
+      initialContent={{ scope: JSON.stringify([d.selectedAccountId, accountStyle]), pending: start.status === 'loading' || setup.status === 'loading' }}
       grouping="cards"
       headingSize="compact"
       title={usageStyle ? 'ダッシュボード' : greeting(d.staffName)}

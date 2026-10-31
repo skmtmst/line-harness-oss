@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { canonicalNavigationHref } from './canonical-route'
 import { UNSAVED_ACTION_EVENT } from './unsaved-action'
+
+function canonicalLocalUrl(url: URL): URL {
+  return new URL(canonicalNavigationHref(`${url.pathname}${url.search}${url.hash}`), url.origin)
+}
 
 export type UnsavedLeaveTarget =
   | { kind: 'link'; href: string }
@@ -81,9 +86,12 @@ export function useUnsavedGuard(options: {
       const target = event.target as { closest?: (selector: string) => Element | null } | null
       const anchor = target?.closest?.('a[href]') as HTMLAnchorElement | null
       if (!anchor || anchor.target || anchor.hasAttribute('download')) return
-      const destination = new URL(anchor.href, window.location.href)
-      const current = new URL(window.location.href)
-      if (destination.origin !== current.origin || destination.href === current.href) return
+      const rawDestination = new URL(anchor.href, window.location.href)
+      const rawCurrent = new URL(window.location.href)
+      if (rawDestination.origin !== rawCurrent.origin) return
+      const destination = canonicalLocalUrl(rawDestination)
+      const current = canonicalLocalUrl(rawCurrent)
+      if (destination.href === current.href) return
       // 選び直しの確認を持つ画面は、名前 Link の同一タブ操作をその確認へ渡す。
       if (destination.pathname === current.pathname && anchor.hasAttribute('data-row-local-open') && handlesLocalLinkRef.current?.(destination)) return
       // パスとクエリが同じで hash だけが変わる移動は画面内の見出しジャンプ。
@@ -121,7 +129,7 @@ export function useUnsavedGuard(options: {
        * paneの切替だけが変わる、同じ画面の中の戻る・進むは離脱ではない。
        * ここで止めると「同じ画面に居たまま」なのに離脱確認が出る。
        */
-      if (samePageRef.current?.(new URL(window.location.href))) return
+      if (samePageRef.current?.(canonicalLocalUrl(new URL(window.location.href)))) return
       skipRestoredPopRef.current = true
       window.history.go(1)
       if (!busy) setLeaveTarget({ kind: 'history-back' })

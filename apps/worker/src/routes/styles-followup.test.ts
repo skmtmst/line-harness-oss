@@ -310,12 +310,13 @@ describe('safety regressions', () => {
       expect(ids.sort()).toEqual(['eb', 'old', 'r']);
     }
   });
-  test('canonical starter buttons are exactly the buttons inserted after filtering', async () => {
+  test('canonical starter buttons match the saved four areas', async () => {
     await setup({
       expectedVersion: 1,
       style: 'consult',
       answers: {
         content: { mode: 'configured', value: true },
+        image: { mode: 'configured', value: 'simple' },
         booking: { mode: 'configured', value: true },
       },
     });
@@ -327,7 +328,7 @@ describe('safety regressions', () => {
       )
       .all();
     // 元の下書き ID を維持し、未編集の業種内容だけを更新する。
-    expect(declared.map((b: any) => b.label)).toContain('お問い合わせ');
+    expect(declared.map((b: any) => b.label)).toEqual(['面談を予約する','予約の確認と変更','ご相談内容を送る','会社のこと']);
     expect(actual).toEqual(declared.map((b: any) => ({ label: b.label })));
   });
 });
