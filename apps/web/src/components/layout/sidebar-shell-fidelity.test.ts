@@ -39,7 +39,7 @@ describe('サイドバーの共通ロゴ・設定・版', () => {
   })
 
   it.each([
-    ['店舗', '/', '設定', '/settings', '統括の設定'],
+    ['店舗', '/', '設定', '/settings/customer-look', '統括の設定'],
     ['統括', '/hq', '統括の設定', '/hq/settings', '設定'],
   ])('%sで同じ公式ロゴと版を出し、対応する設定へ進める', async (_shell, pathname, label, href, otherLabel) => {
     fixture.pathname = pathname

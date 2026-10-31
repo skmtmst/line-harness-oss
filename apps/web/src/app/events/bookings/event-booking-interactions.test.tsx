@@ -8,6 +8,7 @@ import { readStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-s
 
 const apiMocks = vi.hoisted(() => ({
   listBookings: vi.fn(),
+  absence: vi.fn(),
   getBookingSummary: vi.fn(),
   getEvent: vi.fn(),
   updateBooking: vi.fn(),
@@ -25,6 +26,7 @@ const apiMocks = vi.hoisted(() => ({
 }))
 
 const accountMock = vi.hoisted(() => ({ selectedAccountId: 'account-a', role: 'owner' as string | null }))
+vi.mock('@/lib/api/helpers/gap2', () => ({ bookingMakeupApi: { absenceByStore: apiMocks.absence } }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
   const actual = await importOriginal()
@@ -220,6 +222,26 @@ async function click(button: HTMLElement): Promise<void> {
   await act(async () => { button.click() })
   await flush()
 }
+
+it.each([0, 1])('名簿の入口%sから欠席し、正規の読取で人数と予約の記録を更新する', async index => {
+  apiMocks.getEvent.mockResolvedValue({ id: 'event-1', line_account_id: 'account-a', name: '相談会', makeup_rule_json: JSON.stringify({ enabled: true, cutoffHours: 3, validDays: 30, monthlyCap: 2, target: 'same_kind', targetIds: [] }) })
+  apiMocks.listBookings.mockResolvedValue({ items: [{ id: 'booking-1', event_id: 'event-1', slot_id: 'slot-1', friend_id: 'friend-booking', status: 'confirmed', slot_starts_at: '2099-06-01T01:00:00Z', friend_display_name: '申込 太郎' }], total: 1 })
+  apiMocks.absence.mockImplementation(async () => {
+    const previous = await apiMocks.getOccurrenceApplicants()
+    apiMocks.getOccurrenceApplicants.mockResolvedValue({ ...previous, occurrence: { ...previous.occurrence, activeSeats: 0 }, applicants: [] })
+    apiMocks.listBookings.mockResolvedValue({ items: [], total: 0 })
+    return { data: { eventBooking: { id: 'booking-1', status: 'absent' }, makeupCredit: null, reasonIfNone: 'monthly_cap' } }
+  })
+  const view = await mount(<EventBookingsPage />)
+  const buttons = elements(view.container).filter(el => el.getAttribute('data-booking-action') === 'absence')
+  expect(buttons).toHaveLength(2)
+  await click(buttons[index])
+  await click(buttonByText(view.container, '欠席にする'))
+  expect(apiMocks.absence).toHaveBeenCalledWith('account-a', 'booking-1', { grantMakeup: true })
+  expect(view.container.textContent).toContain('今月の振替の上限に達しているため')
+  expect(apiMocks.listBookings.mock.calls.length).toBeGreaterThan(1)
+  expect(elements(view.container).filter(el => el.getAttribute('data-booking-action') === 'absence')).toHaveLength(0)
+})
 
 /** U: 待ち操作の確認窓に理由を書いて確認する。 */
 async function confirmWaitlistDialog(container: HTMLElement, reason: string): Promise<void> {
