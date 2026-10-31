@@ -11,4 +11,3 @@ it.each([
   const source = "import { requireReadOperationPermission, requireReadOperationPermission as readGate } from '../middleware/role-guard.js';\n" + route;
   expect(registrations(source).filter(row => row.method === 'POST').map(row => row.guarded)).toEqual([guarded]);
 });
-
