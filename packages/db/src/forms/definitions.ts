@@ -3,6 +3,7 @@ import { jstNow } from '../utils.js';
 import { type FormDeleteImpact, type FormImpactRow, type FormImpactReferenceRow, type FormDeleteReference, type Form, type CreateFormInput, type FormLatestEdit, type UpdateFormInput, type UpdateFormResult } from './types.js';
 import { getFormById, attachFormAccounts } from './reads.js';
 import { publishFormVersion } from './versions.js';
+import { formMediaUsageStatements } from './media-references.js';
 
 
 /**
@@ -140,7 +141,7 @@ export async function deleteFormAtRevision(
   id: string,
   expectedRevision: number,
 ): Promise<boolean> {
-  const result = await db.prepare(
+  const remove = db.prepare(
     `DELETE FROM forms
       WHERE id = ?
         AND status = 'active'
@@ -151,7 +152,8 @@ export async function deleteFormAtRevision(
         AND NOT EXISTS (SELECT 1 FROM form_opens WHERE form_id = forms.id)
         AND NOT EXISTS (SELECT 1 FROM webinar_ctas WHERE form_id = forms.id)
         AND NOT EXISTS (SELECT 1 FROM rich_menu_areas WHERE form_id = forms.id)`,
-  ).bind(id, expectedRevision).run();
+  ).bind(id, expectedRevision);
+  const [result] = await db.batch([remove, ...formMediaUsageStatements(db, id)]);
   // D1 counts cascaded rows too; the primary-key predicate limits the parent to one.
   return (result.meta?.changes ?? 0) > 0;
 }
@@ -161,7 +163,7 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
   const now = jstNow();
 
   try {
-    await db
+    const insert = db
       .prepare(
         `INSERT INTO forms
          (id, name, description, fields, layout, on_submit_tag_id, on_submit_scenario_id,
@@ -191,8 +193,8 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
         input.ogImageUrl ?? null,
         now,
         now,
-      )
-      .run();
+      );
+    await insert.run();
 
     await attachFormAccounts(db, id, input.lineAccountIds ?? []);
     if (input.isActive !== false) {
@@ -201,7 +203,7 @@ export async function createForm(db: D1Database, input: CreateFormInput): Promis
     }
   } catch (error) {
     // 所属だけ保存に失敗したフォームを残さない。管理画面から見えない孤立行になるため。
-    await db.prepare(`DELETE FROM forms WHERE id = ?`).bind(id).run().catch(() => undefined);
+    await db.batch([db.prepare(`DELETE FROM forms WHERE id = ?`).bind(id), ...formMediaUsageStatements(db, id)]).catch(() => undefined);
     throw error;
   }
 
@@ -291,7 +293,7 @@ export async function updateForm(
 
   const result=actorId?(await db.batch([update,db.prepare(`INSERT INTO audit_events(id,source_kind,source_id,tenant_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json,created_at)
     SELECT ?,'form_draft_save',?,COALESCE(s.tenant_id,'${DEFAULT_TENANT_ID}'),'business',s.id,s.role,'form.draft_saved','form',?,'success',json_object('contentRevision',?,'staffName',s.name),? FROM staff_members s WHERE s.id=? AND s.is_active=1 AND changes()=1`)
-    .bind(crypto.randomUUID(),JSON.stringify([id,expectedContentRevision+1]),id,expectedContentRevision+1,now,actorId)]))[0]:await update.run();
+    .bind(crypto.randomUUID(),JSON.stringify([id,expectedContentRevision+1]),id,expectedContentRevision+1,now,actorId), ...formMediaUsageStatements(db, id)]))[0]:(await db.batch([update, ...formMediaUsageStatements(db, id)]))[0];
 
   if ((result.meta?.changes ?? 0) !== 1) {
     const latest = await getFormById(db, id);

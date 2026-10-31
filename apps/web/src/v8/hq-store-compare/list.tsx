@@ -170,7 +170,7 @@ export default function StoreComparisonList() {
   const changeSort = (key: MetricDef['key']) => {
     setPage(1)
     if (sort === key) setOrder(order === 'asc' ? 'desc' : 'asc')
-    else { setSort(key); setOrder('asc') }
+    else { setSort(key); setOrder(METRICS.find((metric) => metric.key === key)?.good === 'low' ? 'desc' : 'asc') }
   }
 
   const toolbar = (

@@ -353,6 +353,7 @@
 
 ## API
 
+- [一括予約の券・支払い・承認・通知（後続実装の契約設計）](booking-bulk-processing-contract.md)
 - [External call executor (A06 / B-365①)](../apps/worker/src/lib/external-call/README.md)
 - [LINE API 互換プロキシ (/line-api)](LINE-API-PROXY.md)
 - [下書き・会話検索・InstagramのAPI](api/drafts-and-instagram.md)
@@ -498,6 +499,8 @@
 - [一斉配信・シナリオ一覧の自動点検の更新](release-log/unreleased/1930-kenta-muse-broadcast-scenario-reds.md)
 - [道具の段の日付と選ぶ欄の地を白にそろえ](release-log/unreleased/1972-kenta-muse-pick-field-surface.md)
 - [配信の下見・対象がない表示・操作と言葉の統一](release-log/unreleased/0000-kenta-swc1.md)
+- [予約の取消料の表示と同意を修正](release-log/unreleased/1998-kenta-cancel-fee-contract.md)
+- [1998-kenta-train-1029w.md](release-log/unreleased/1998-kenta-train-1029w.md) — 配信の宛先の範囲と画面切り替え・窓の操作の修正。
 - [一斉配信の一覧の受け付け数の表示修正](release-log/unreleased/1916-kenta-muse-broadcast-received-wording.md)
 - [アカウント設定の親アカウント欄を非表示](release-log/unreleased/1900-masato-hide-parent-account.md) — 未使用の欄を隠し、既存の親子関係を保つ変更の反映履歴。
 - [LINEアカウント登録の使い方選択ポップアップ](release-log/unreleased/1898-masato-register-style-dialog.md) — 登録時に使い方の見本を見て選ぶか、後で設定する変更の反映履歴。
@@ -1049,3 +1052,11 @@
 - [お気に入りのショートカットと予告表示](release-log/unreleased/1995-masato-sidebar-favorite-shortcuts.md) — 反映履歴、確認 2026-10-31。
 - [店舗の担当者メニュー](release-log/unreleased/1999-masato-store-member-menu.md) — 反映履歴、確認 2026-10-31。
 - [LINEアカウント登録後の初期設定完了](release-log/unreleased/2000-masato-onboarding-account-complete.md) — 反映履歴、確認 2026-10-31。
+
+- [予約の案内と比較の並び](release-log/unreleased/2001-kenta-rival-small-fixes.md) — 反映履歴、確認 2026-10-31。
+- [保存先の固定とフォームの公開参照](release-log/unreleased/2001-kenta-train-1029x.md) — 反映履歴、確認 2026-10-31。
+
+- [繰り返し設定の読み戻し](release-log/unreleased/2003-kenta-recurring-menu-readback.md) — 反映履歴、確認 2026-10-31
+- [一括予約の処理設計](release-log/unreleased/2003-kenta-bulk-booking-design.md) — 反映履歴、確認 2026-10-31
+
+- [今月の成果の流れの窓](release-log/unreleased/2003-kenta-monthly-flow.md) — 反映履歴、確認 2026-10-31。

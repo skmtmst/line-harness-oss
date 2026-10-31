@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Tag, TagGroup } from '@line-crm/shared'
 import { api, ApiError, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import { formatDay, formatNumber } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
@@ -346,11 +346,10 @@ export function DeleteTagDialog({ tag, accountId, onCancel, onArchived }: { tag:
   return <Dialog open size="large" tone="destructive" confirmation dirty={false}
     busy={saving} onCancel={onCancel} title={`「${tag.name}」を保管しますか？`}
     titleIcon={<Trash2 aria-hidden="true" />} error={saveError || undefined}
-    footerLead={blockedReason}
-    footer={<>
+    footer={<DialogActions leadingAction={blockedReason || undefined}>
       <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
       <Button variant="danger" disabled={blocked || text !== tag.name} busy={saving} onClick={() => void archive()}>このタグを保管する</Button>
-    </>}
+    </DialogActions>}
   >
     <div data-qa-dialog="tag-delete" data-impact={impactStatus}>
       <p className="mt-1 text-sm text-ink-secondary">このタグを使っている場所と、外れる友だちを確認してください。保管すると友だちから外れ、一覧には「保管済み」として残ります。元に戻せません。</p>

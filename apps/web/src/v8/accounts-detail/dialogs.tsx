@@ -8,7 +8,7 @@ import { api, ApiError, describeSaveFailure } from '@/lib/api'
 import { formatNumber } from '@/lib/format'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import OtpInput from '@/components/shared/otp-input'
 import { TextField } from '@/components/shared/text-field'
@@ -32,7 +32,7 @@ import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/
  * （app/accounts/detail・components/accounts/account-edit-modal）と同じ。
  */
 
-/** 窓の枠。題・右上の×・中身・下の操作（右寄せ）。 */
+/** 窓の枠。題・右上の×・中身・共通の下の操作。 */
 function Frame({ open, node, width, top, title, busy, onCancel, actions, children }: {
   open: boolean
   node?: string
@@ -54,7 +54,7 @@ function Frame({ open, node, width, top, title, busy, onCancel, actions, childre
       busy={busy}
       onCancel={onCancel}
       layout="account-inset"
-      footer={actions}
+      footer={actions ? <DialogActions padding="none">{actions}</DialogActions> : undefined}
     >
       <div className={styles.body}>{children}</div>
     </Dialog>

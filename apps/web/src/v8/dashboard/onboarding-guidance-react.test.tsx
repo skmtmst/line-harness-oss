@@ -199,7 +199,7 @@ it('基本が全完了で後回しの設定行が無ければ済みの1行へ畳
   expect(screen.getByRole('progressbar', {name:'はじめにやることの進み'})).toBeTruthy()
 })
 
-it.each(['viewer', 'staff', null])('役割%sは許可された状態だけ読み、使い方の変更を出さない', async role => {
+it.each(['viewer', 'staff', null])('役割%sは許可された状態だけ読み、使い方の変更を許可しない', async role => {
   net.role = role
   render(<DashboardV8 />)
   await act(async () => { await Promise.resolve() })
@@ -210,10 +210,25 @@ it.each(['viewer', 'staff', null])('役割%sは許可された状態だけ読み
     expect(await screen.findByRole('heading', { name: 'はじめにやること', exact: true })).toBeTruthy()
     expect(net.progress).toHaveBeenCalledTimes(1)
     if (role === 'viewer') expect(within(guide()).queryAllByRole('link')).toHaveLength(0)
+    const configure = screen.getByRole('button', { name: '使い方の設定を開く', exact: true })
+    expect(configure.getAttribute('aria-disabled')).toBe('true')
+    expect(document.getElementById(configure.getAttribute('aria-describedby')!)?.textContent).toContain('管理者')
+    fireEvent.click(configure)
+    expect(screen.queryByRole('dialog')).toBeNull()
   }
-  expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
-  expect(net.style).not.toHaveBeenCalled()
-  expect(net.warnings).not.toHaveBeenCalled(); expect(net.items).not.toHaveBeenCalled()
+  if (role === null) expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
+  if (role === null) {
+    expect(net.style).not.toHaveBeenCalled()
+    expect(net.warnings).not.toHaveBeenCalled(); expect(net.items).not.toHaveBeenCalled()
+  } else {
+    expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
+    expect(net.style).toHaveBeenCalledWith('A')
+    expect(net.warnings).toHaveBeenCalledWith('A'); expect(net.items).toHaveBeenCalledWith('A')
+    const change = within(guide()).getByRole('button', { name: '決める' })
+    expect(change.getAttribute('aria-disabled')).toBe('true')
+    fireEvent.click(change)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  }
   expect(net.save).not.toHaveBeenCalled()
 })
 

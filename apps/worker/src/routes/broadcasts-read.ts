@@ -1,4 +1,4 @@
-import { scopeSegmentQuery } from '../services/segment-query-scope.js';
+import { scopeSegmentQuery, scopedFriendIds } from '../services/segment-query-scope.js';
 import { buildOffsetListResponse, buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { simulationContext } from '../features/broadcasts/broadcast-simulation/index.js';
@@ -239,32 +239,41 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
   const limit = Math.min(100, Math.max(1, listQueryNumber(c.req.query('limit'), 50, { format: 'integer-prefix' }) || 50));
   const filter = recipientResultFilter(result);
 
+  const readerScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+  const visible = scopedFriendIds(readerScope);
+  const visibleAccounts = sqlIdSet(readerScope.allowedAccountIds);
   const totalRow = await c.env.DB.prepare(
-    `SELECT COUNT(*) AS cnt FROM broadcast_send_claims c WHERE c.broadcast_id = ?${filter}`,
-  ).bind(id).first<{ cnt: number }>();
-  const total = Number(totalRow?.cnt ?? 0);
+    `SELECT COUNT(*) AS ledger_count,
+       SUM(CASE WHEN c.friend_id IN (${visible.sql}) THEN 1 ELSE 0 END) AS visible_count
+       FROM broadcast_send_claims c WHERE c.broadcast_id = ?${filter}`,
+  ).bind(...visible.bindings,id).first<{ ledger_count: number; visible_count: number | null }>();
+  const total = Number(totalRow?.visible_count ?? 0);
+  const unavailableRecipientCount = Number(totalRow?.ledger_count ?? 0) - total;
 
   // 全員配信は宛先の一覧を持たない。旧配信（送り終えているのに行が無い）は
   // 集約だけを返し、宛先の行を作らない。
   const isAll = broadcast.target_type === 'all';
-  const aggregateOnly = isAll || (broadcast.status === 'sent' && total === 0);
+  const aggregateOnly = isAll || (broadcast.status === 'sent' && Number(totalRow?.ledger_count ?? 0) === 0);
   interface RecipientRow {
     friend_id: string; line_account_id: string | null; state: string;
-    error_code: string | null; line_request_id: string | null;
+    error_code: string | null; line_request_id: string | null; line_account_hidden: number;
     dispatched_at: string | null; settled_at: string | null; display_name: string | null;
   }
   const queryResult = aggregateOnly
     ? { results: [] as RecipientRow[] }
     : await c.env.DB.prepare(
-      `SELECT c.friend_id, c.line_account_id, c.state, c.error_code,
-                c.line_request_id, c.dispatched_at, c.settled_at,
+      `SELECT c.friend_id,
+                CASE WHEN c.line_account_id IN (${visibleAccounts.sql}) THEN c.line_account_id ELSE NULL END AS line_account_id,
+                CASE WHEN c.line_account_id IS NOT NULL AND c.line_account_id NOT IN (${visibleAccounts.sql}) THEN 1 ELSE 0 END AS line_account_hidden,
+                CASE WHEN c.line_account_id IS NULL OR c.line_account_id IN (${visibleAccounts.sql}) THEN c.line_request_id ELSE NULL END AS line_request_id,
+                c.state, c.error_code, c.dispatched_at, c.settled_at,
                 f.display_name
            FROM broadcast_send_claims c
            LEFT JOIN friends f ON f.id = c.friend_id
-          WHERE c.broadcast_id = ?${filter}
+          WHERE c.broadcast_id = ?${filter} AND c.friend_id IN (${visible.sql})
           ORDER BY COALESCE(f.display_name, ''), c.friend_id
           LIMIT ? OFFSET ?`,
-    ).bind(id, limit + 1, cursor).all<RecipientRow>();
+    ).bind(...visibleAccounts.binds,...visibleAccounts.binds,...visibleAccounts.binds,id,...visible.bindings,limit + 1,cursor).all<RecipientRow>();
   const allRows = queryResult.results ?? [];
   const page = allRows.slice(0, limit);
   const [counts, breakdown] = await Promise.all([
@@ -289,6 +298,7 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
           friendId: row.friend_id,
           displayName: row.display_name || '名前がありません',
           lineAccountId: row.line_account_id,
+          lineAccountHidden: Boolean(row.line_account_hidden),
           group: view.group,
           label: view.label,
           detail: view.detail,
@@ -304,6 +314,8 @@ export const get__api_broadcasts_id_recipients_9 = async (c: Context<Env, "/api/
     data: buildOffsetListResponse({ rows: responseItems,
       summary,
       aggregateOnly,
+      unavailableRecipientCount,
+      unavailableRecipientLabel: `見られない宛先 ${unavailableRecipientCount}件`,
       aggregateReason: aggregateOnly ? (isAll ? 'all' : 'legacy') : null,
       // 旧配信は集約（成功数）だけ分かっているので返す。捏造はしない。
       legacySuccessCount: aggregateOnly && !isAll
@@ -342,6 +354,7 @@ export const get__api_broadcasts_id_send_preview_11 = async (c: Context<Env, "/a
 
 export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/api/broadcasts/:id/preview-count">) => {
   const id = c.req.param('id');
+  try {
   const broadcast = await getBroadcastById(c.env.DB, id);
   if (!broadcast) {
     return fail(c, 404, 'BROADCAST_NOT_FOUND');
@@ -355,8 +368,11 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
   let perAccount: Array<{ accountId: string; sendCount: number }> | undefined;
 
   if (broadcast.target_type === 'multi-account-dedup') {
-    const accountIds = parseJsonArray(raw.account_ids) ?? [];
-    const dedupPriority = parseJsonArray(raw.dedup_priority) ?? [];
+    const accountIds = parseJsonArray(raw.account_ids);
+    const dedupPriority = raw.dedup_priority == null ? [] : parseJsonArray(raw.dedup_priority);
+    if (!accountIds || !dedupPriority || [...accountIds,...dedupPriority].some(id => typeof id !== 'string' || !id.trim())) {
+      throw new Error('Stored account selection is unreadable');
+    }
     const preview = await computeDedupBroadcastPreview(
       c.env.DB,
       accountIds,
@@ -377,21 +393,23 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
     }
     count = active;
     perAccount = breakdown;
-  } else if (broadcast.target_type === 'tag' && broadcast.target_tag_id) {
+  } else if (broadcast.target_type === 'tag') {
+    if (!broadcast.target_tag_id) throw new Error('Stored tag selection is unreadable');
     // 実送信は getFriendsByTag(db, tagId, line_account_id) で要求アカウントに
     // 絞る (services/broadcast.ts)。プレビューも同じ境界で数え、他アカウント
     // の人数・存在を応答へ漏らさない。
     const tagAccountId = (raw.line_account_id as string | null) || null;
+    const ids = tagAccountId ? null : scopedFriendIds(await getVisibleLineAccountScope(c.env.DB, c.get('staff')));
     const tagSql = tagAccountId
       ? `SELECT COUNT(*) AS cnt FROM friends f
            INNER JOIN friend_tags ft ON ft.friend_id = f.id
            WHERE ft.tag_id = ? AND f.is_following = 1 AND f.line_account_id = ?`
       : `SELECT COUNT(*) AS cnt FROM friends f
            INNER JOIN friend_tags ft ON ft.friend_id = f.id
-           WHERE ft.tag_id = ? AND f.is_following = 1`;
+           WHERE ft.tag_id = ? AND f.is_following = 1 AND f.id IN (${ids!.sql})`;
     const tagBinds: unknown[] = tagAccountId
       ? [broadcast.target_tag_id, tagAccountId]
-      : [broadcast.target_tag_id];
+      : [broadcast.target_tag_id, ...ids!.bindings];
     const row = await c.env.DB.prepare(tagSql).bind(...tagBinds).first<{ cnt: number }>();
     count = row?.cnt ?? 0;
   } else if (broadcast.target_type === 'segment') {
@@ -400,7 +418,8 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
     const rawConditions = raw.segment_conditions as string | null;
     try {
       const conditions = rawConditions ? JSON.parse(rawConditions) : null;
-      if (conditions && Array.isArray(conditions.rules)) {
+      if (!conditions || !Array.isArray(conditions.rules)) throw new Error('Stored segment conditions are unreadable');
+      {
         const { buildSegmentQuery } = await import('../services/segment-query.js');
         const { sql, bindings } = buildSegmentQuery(conditions);
         const accountId = (raw.line_account_id as string | null) || null;
@@ -413,21 +432,28 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
         count = row?.cnt ?? 0;
       }
     } catch (segmentError) {
-      // 条件が壊れているときは 0 を返す。ここで500にすると、下書きの一覧
-      // そのものが開かなくなる。送信を押した時点で理由付きで止まる。
+      // 集計の失敗を0人に読み替えず、送信前に確認をやり直せるエラーとして返す。
       logger.error("broadcasts.broadcasts_id_preview_count_get_failed");
+      return c.json({ success: false, error: '人数を確認できませんでした。時間をおいて、もう一度お試しください。' }, 503);
     }
   } else if (broadcast.target_type === 'all') {
     const accountId = (raw.line_account_id as string | null) || null;
+    const ids = accountId ? null : scopedFriendIds(await getVisibleLineAccountScope(c.env.DB, c.get('staff')));
     const sql = accountId
       ? `SELECT COUNT(*) AS cnt FROM friends WHERE is_following = 1 AND line_account_id = ?`
-      : `SELECT COUNT(*) AS cnt FROM friends WHERE is_following = 1`;
-    const binds: unknown[] = accountId ? [accountId] : [];
+      : `SELECT COUNT(*) AS cnt FROM friends WHERE is_following = 1 AND id IN (${ids!.sql})`;
+    const binds: unknown[] = accountId ? [accountId] : ids!.bindings;
     const row = await c.env.DB.prepare(sql).bind(...binds).first<{ cnt: number }>();
     count = row?.cnt ?? 0;
+  } else {
+    throw new Error('Stored audience type is unreadable');
   }
 
   return c.json({ success: true, data: { count, perAccount } });
+  } catch {
+    logger.error("broadcasts.broadcasts_id_preview_count_get_failed");
+    return c.json({ success: false, error: '人数を確認できませんでした。時間をおいて、もう一度お試しください。' }, 503);
+  }
 };
 
 export const get__api_broadcasts_id_per_account_stats_13 = async (c: Context<Env, "/api/broadcasts/:id/per-account-stats">) => {

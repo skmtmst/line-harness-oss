@@ -4,7 +4,7 @@ import { isOwnerRole } from '@/lib/staff-role'
 import type { UidMigrationItem } from '@/lib/api'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { type StatusBadgeTone } from '@/components/shared/status-badge'
 
 import { formatNumber } from '@/lib/format'
@@ -97,11 +97,8 @@ export function MigrationItemDialog({
       busy={busy}
       error={detailError ?? undefined}
       onCancel={() => { if (!busy) onClose() }}
-      footer={detailItem ? (
-        <div className="mt-4 flex flex-wrap items-center justify-end gap-3">
-          {active && !['review', 'ready', 'failed'].includes(active.status) ? (
-            <span className="text-ink-faint text-xs">この移行の状態では判断を変更できません。</span>
-          ) : (<>
+      footer={detailItem ? (<DialogActions>
+          {active && !['review', 'ready', 'failed'].includes(active.status) ? (<span className="text-ink-faint text-xs">この移行の状態では判断を変更できません。</span>) : (<>
             {detailItem.decision !== 'exclude' && (
               <Button type="button" disabled={!canDecide || busy} lockedReason={lockedReason} onClick={() => decide(detailItem, 'exclude')}>除外する</Button>
             )}
@@ -109,8 +106,7 @@ export function MigrationItemDialog({
               <Button type="button" variant="primary" disabled={!canDecide || busy} lockedReason={lockedReason} onClick={() => decide(detailItem, 'link')}>この組合せを承認</Button>
             )}
           </>)}
-        </div>
-      ) : undefined}
+        </DialogActions>) : undefined}
     >
       {detailItem && (
         <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import ListState from '@/components/shared/list-state'
+import { SetupStepList, SetupStepRow, SetupStepLabel } from '@/components/shared/setup-step-row'
 import Notice from '@/components/shared/notice'
 import { classifyApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { lockUnless } from '@/components/shared/permission-lock'
@@ -113,11 +114,11 @@ export function nextFirstStepKey(summary: FirstStepsSummary): string | null {
   return summary.steps.find((step) => !step.done && step.href)?.key ?? null
 }
 
-export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigure, onRetry, setupTasks, feedback, readOnly = false }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onConfigure?: () => void; onRetry?: () => void; setupTasks?: ReactNode; feedback?: ReactNode; readOnly?: boolean }) {
+export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigure, onRetry, setupTasks, feedback, readOnly = false, configureAllowed = !readOnly }: { summary: FirstStepsSummary | null; folded: boolean; onToggle: () => void; onRecheck?: () => void; onConfigure?: () => void; onRetry?: () => void; setupTasks?: ReactNode; feedback?: ReactNode; readOnly?: boolean; configureAllowed?: boolean }) {
   const complete = Boolean(summary && summary.total > 0 && summary.done === summary.total && !setupTasks)
   const nextKey = summary ? nextFirstStepKey(summary) : null
   return (
-    <Card as="section" layout="vertical" contentPadding="var(--space-16) var(--space-20)" gap="var(--tpl-d23-ob-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34" actions={onConfigure ? <Button variant="primary" onClick={onConfigure} lockedReason={lockUnless(!readOnly, 'manager')}>使い方の設定を開く</Button> : undefined}>
+    <Card as="section" layout="vertical" contentPadding="var(--space-16) var(--space-20)" gap="var(--tpl-d23-ob-gap)" aria-labelledby="first-steps-title" data-design-node="r3X34" actions={onConfigure ? <Button variant="primary" onClick={onConfigure} lockedReason={lockUnless(!readOnly && configureAllowed, 'manager')}>使い方の設定を開く</Button> : undefined}>
       <div className={styles.head}>
         <h2 id="first-steps-title" className={styles.title}>はじめにやること</h2>
         {summary ? <>
@@ -134,24 +135,22 @@ export function FirstStepsCard({ summary, folded, onToggle, onRecheck, onConfigu
       </div>
       {feedback}
       {setupTasks}
-      {summary && !complete ? <ul id="first-steps-list" className={styles.grid} hidden={folded}>
+      {summary && !complete ? <SetupStepList id="first-steps-list" columns={3} hidden={folded}>
         {summary.steps.map((step, index) => (
-          <li key={step.key} className={styles.step} data-done={step.done ? '' : undefined} data-next={step.key === nextKey ? '' : undefined}>
+          <SetupStepRow key={step.key} done={step.done} next={step.key === nextKey}>
             <StepMark done={step.done} />
-            <span className={styles.label} title={step.label}>
+            <SetupStepLabel title={step.label} help={step.state === 'unknown' && step.reason ? <HelpTip label={`${step.label}の未確認の理由`}>{step.reason}</HelpTip> : undefined}>
               <span aria-hidden="true">{step.ordinal ?? index + 1}. </span><span>{step.label}</span>
               <span className="sr-only">{step.done ? '（済み）' : step.state === 'unknown' ? '（未確認）' : step.state === 'forbidden' ? '（権限がありません）' : '（まだ）'}</span>
-            </span>
-            {step.state === 'unknown' && step.reason ? <HelpTip label={`${step.label}の未確認の理由`}>{step.reason}</HelpTip> : null}
-            {!step.done && (readOnly || step.state === 'forbidden') ? <><span className={styles.spacer} /><Button size="compact" lockedReason={lockUnless(false, 'manager')}>開く</Button></> : !step.done && !step.href ? <span className={styles.count}>未確認</span> : step.done ? null : (
+            </SetupStepLabel>
+            {!step.done && (readOnly || step.state === 'forbidden') ? <><Button size="compact" lockedReason={lockUnless(false, 'manager')}>開く</Button></> : !step.done && !step.href ? <span className={styles.count}>未確認</span> : step.done ? null : (
               <>
-                <span className={styles.spacer} />
                 <TextLink tone="action" href={step.href!} className={styles.link} aria-label={`${step.label}（${step.link.replace(' →', '')}）`}>{step.link.replace(' →', '')}</TextLink>
               </>
             )}
-          </li>
+          </SetupStepRow>
         ))}
-      </ul> : null}
+      </SetupStepList> : null}
     </Card>
   )
 }

@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import { ProgressBar } from '@/components/shared/progress'
-import { StyleChoiceStep, STYLE_CHOICE_START_ID, StyleChoiceStatus } from '@/v8/onboarding/public/style-choice'
+import { StyleChoiceStep, StyleChoiceSwitcher, STYLE_CHOICE_START_ID, StyleChoiceStatus } from '@/v8/onboarding/public/style-choice'
 import { InitialMenuChoice, type InitialMenuSelection } from '@/v8/onboarding'
 import styles from '@/v8/onboarding/wizard.module.css'
 
@@ -38,6 +38,8 @@ export default function RegistrationStyleDialog({ open, accountId, menu, onMenuC
     size="wide"
     designTop={60}
     fitViewport
+    contentLayout={!menuStep ? 'form' : undefined}
+    steps={!menuStep ? <StyleChoiceSwitcher viewing={viewing} onView={setViewing} chosen={choice || null} disabled={busy} /> : undefined}
     designNode="xxpM9"
     onCancel={onClose}
     busy={busy}
@@ -45,11 +47,9 @@ export default function RegistrationStyleDialog({ open, accountId, menu, onMenuC
     footerDivider={false}
     designFooterPadding="16px 24px"
     designContentPadding="16px 24px 24px"
-    footer={<DialogActions><div className={styles.footer}>
-      <div className={styles.footerSide}>{menuStep?<Button onClick={()=>setMenuStep(false)} disabled={busy}>スタイルを選び直す</Button>:<Button type="button" variant="text" onClick={onSkip} disabled={busy || !ready}>あとで設定する</Button>}</div>
-      <div className={styles.footerCenter}><Button type="button" variant="primary" onClick={()=>{if(menuStep)onSave();else setMenuStep(true)}} disabled={busy || !ready || !choice || (menuStep&&menu.value==='existing'&&!menu.resourceId)} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? 'スタイルを選んでください' : null}>{menuStep?'このメニューで進む':'次へ'}<ArrowRight size={16} aria-hidden="true" /></Button></div>
-      <div className={styles.footerEnd}><StyleChoiceStatus chosen={choice || null} /></div>
-    </div></DialogActions>}
+    footer={<DialogActions leadingAction={menuStep ? <Button onClick={()=>setMenuStep(false)} disabled={busy}>スタイルを選び直す</Button> : <Button type="button" variant="text" onClick={onSkip} disabled={busy || !ready}>あとで設定する</Button>}>
+      <Button type="button" variant="primary" onClick={()=>{if(menuStep)onSave();else setMenuStep(true)}} disabled={busy || !ready || !choice || (menuStep&&menu.value==='existing'&&!menu.resourceId)} busy={busy} busyLabel="保存しています…" disabledReason={!choice ? 'スタイルを選んでください' : null}>{menuStep?'このメニューで進む':'次へ'}<ArrowRight size={16} aria-hidden="true" /></Button>
+    </DialogActions>}
   >
     <div className={styles.body}>
       <div className={styles.progress}>
@@ -57,7 +57,8 @@ export default function RegistrationStyleDialog({ open, accountId, menu, onMenuC
         <ProgressBar appearance="quota" className={styles.track} value={4} max={5} label="登録の進み" />
         <span className={styles.progressName}>使い方のスタイル</span>
       </div>
-      {menuStep&&choice?<InitialMenuChoice accountId={accountId} style={choice} value={menu} onChange={onMenuChange} disabled={busy}/>:<StyleChoiceStep viewing={viewing} onView={setViewing} chosen={choice || null} onChoose={onChoose} disabled={busy} />}
+      <StyleChoiceStatus chosen={choice || null} />
+      {menuStep&&choice?<InitialMenuChoice accountId={accountId} style={choice} value={menu} onChange={onMenuChange} disabled={busy}/>:<StyleChoiceStep viewing={viewing} onView={setViewing} chosen={choice || null} onChoose={onChoose} disabled={busy} switcher="external" />}
       <p className={styles.where}><Info aria-hidden="true" className={styles.whereIcon} />あとから変えられます（設定 › アカウント）。</p>
     </div>
   </Dialog>

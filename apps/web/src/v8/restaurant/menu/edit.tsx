@@ -9,7 +9,7 @@ import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import PageResourceScope from '@/components/shell/page-resource-scope'
+import PageResourceScope, { usePageResourceTask } from '@/components/shell/page-resource-scope'
 import { resolveResourceTitle } from '@/lib/resource-title'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -63,6 +63,7 @@ function draftOf(item: RestaurantMenuItem | null): Draft {
 }
 
 function MenuEditBody() {
+  const captureResource = usePageResourceTask()
   const params = useSearchParams()
   const id = params.get('id')
   const storeParam = params.get('store')
@@ -111,6 +112,8 @@ function MenuEditBody() {
 
   async function save() {
     if (!canEdit || !selectedAccountId || !valid) return
+    const isCurrent = captureResource()
+    if (!isCurrent()) return
     setBusy(true); setError(null)
     const body = {
       kind: draft.kind, name: draft.name, price: Number(draft.price),
@@ -122,37 +125,44 @@ function MenuEditBody() {
       if (editing) {
         await restaurantTestApi.updateMenu(selectedAccountId, editing.id, body)
         if (editing.kind === 'course') await payment.save(editing.id)
+        if (!isCurrent()) return
         notifySaved(priceChanged ? (priceStartsLater ? '価格変更を確定しました。指定した開始日時に反映します。' : '価格を変更しました。') : 'メニューを更新しました。')
       } else {
         if (!storeId) throw new Error('store_missing')
         await restaurantTestApi.createMenu(selectedAccountId, { storeId, ...body })
+        if (!isCurrent()) return
         notifySaved('メニューを追加しました。')
       }
       setSaved(draft)
       router.push(LIST_HREF)
     } catch (cause) {
+      if (!isCurrent()) return
       /* お支払いの版が古い（409）ときは共通の帯と比べる窓で選んでもらう。ページの中身は保存済み。 */
       if (cause instanceof PaymentConflictError) { setSaved(draft); return }
       saveErrors.capture(cause)
       setError('保存できませんでした。入力を確かめて、もう一度お試しください。')
     } finally {
-      setBusy(false)
+      if (isCurrent()) setBusy(false)
     }
   }
 
   async function remove() {
     if (!editing || !selectedAccountId) return
+    const isCurrent = captureResource()
+    if (!isCurrent()) return
     setBusy(true); setError(null)
     try {
       await fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(editing.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE' })
+      if (!isCurrent()) return
       notifySaved('下書きのメニューを削除しました。')
       setSaved(draft)
       router.push(LIST_HREF)
     } catch {
+      if (!isCurrent()) return
       setError('削除できませんでした。公開したことがあるメニュー・申請中・予約で使っているメニューは削除できません。')
       setDeleting(false)
     } finally {
-      setBusy(false)
+      if (isCurrent()) setBusy(false)
     }
   }
 

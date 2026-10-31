@@ -1,5 +1,17 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const formsPaths = {
+  '/api/forms/{id}/images/{blockId}': {
+    get: {
+      tags: ['Forms'], summary: '公開中のフォームが採用した固定版の画像を表示', security: [],
+      description: '現在の公開版・同店所属・画像所有・公開用途・検査・停止・期限・実体の版を毎回照合する。共有フォームは同店のLINE本人確認が必要。任意の画像IDや試し合言葉は権限にしない。応答はno-store。',
+      parameters: [
+        { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'blockId', in: 'path', required: true, schema: { type: 'string' } },
+        { name: 'formVersionId', in: 'query', required: true, schema: { type: 'string' } },
+      ],
+      responses: { '200': { description: '採用した画像版の実体' }, '404': { description: '未採用・版違い・停止・隔離・所属不明を区別せず返す' }, '503': { description: '利用停止または一時的な取得障害' } },
+    },
+  },
   // ── Forms ────────────────────────────────────────────────────────────
   '/api/forms/unassigned': {
     get: {

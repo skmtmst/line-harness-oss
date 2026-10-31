@@ -150,6 +150,8 @@
 <a id="kpi-band"></a>
 ## kpi-band 数の帯
 
+- 指標を順に追う帯は `KpiBand connections` へ前段との矢印と割合を渡す。数と単位は同じ `KpiCard` が描き、最長の数に合わせて全マスを同じ大きさで縮める。共通カードの内側余白は削らない。欠測・分母0の割合は出さず、画面側でカードの箱や間隔を作らない。
+
 - 数字は共通値の34px・500・行40、上下16。どの帯も横一列（全部のマスの上端が同じ）。入りきらない数だけ共通KpiBandが字を小さくし、数字・単位は省略しない（2026-10-26 オーナー：数の帯は横一列にそろえる）。
 
 - **役目**：数（KPI）を線で区切った1本の帯で並べる
@@ -376,6 +378,7 @@
   - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
   - 確認の実行を左、取消を中央に分ける場合は `confirmPlacement="start"`。通常の文字幅は `actionWidthReserve="idle"` で指定し、既定の結果文の幅予約は保つ。
   - 独自の処理を持つ窓でも操作は `DialogActions` に渡す。`footerAlign` だけを指定して本文にボタンを直置きしない。
+  - 参照だけの窓は右上の×で閉じ、下の帯に閉じるボタンを置かない。操作の帯は取消と主操作を中央、脇の操作を `leadingAction` へ。理由などの入力は本文に置く。全画面の検査は `scripts/visual-qa/dialog-footer-contract.test.ts`。
   - 読む変数：`--polish-radius-dialog`・`--polish-window-*`・`--card-edge`
 - **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
 - **見つけ方（コード）**：
@@ -654,6 +657,7 @@
 ## list-state 空・読めない・読み込み中
 
 - **役目**：空・絞り込みで0件・読めなかった（もう一度読み込む）・骨組みを1つの形で出す
+- ホームの待機は `AppShell` の `PagePendingLayout` が認証前からダッシュボードの型を渡す。役割・店舗・スタイルを待つ間も同じ見出しを保ち、判定が済むまで子画面は始めない。 既知の入口の題は `lib/route-pending.ts` を外枠と入口で共有し、任意の `title` を待機へ渡す。取得前の名前は言い切らない。
 - **持ち主（コード）**：`apps/web/src/components/templates/page-pending.tsx`・`apps/web/src/components/shared/list-state.tsx`・`apps/web/src/components/shared/list-state.module.css`・`apps/web/src/components/shared/skeleton.tsx`・`apps/web/src/components/shared/skeleton.module.css`・`apps/web/src/components/shared/empty-list.tsx`・`apps/web/src/components/shared/retry-label.tsx`（部品 `PagePending`・`ListState`・`TableSkeleton`・`CardsSkeleton`・`Skeleton`・`DelayedSkeleton`・`EmptyList`）
   - 読む変数：`--radius-mini`
 - **持ち主（Pen）**：`hNXm7`「空の表示」・`jr5Nl`「骨格の行」・`Dr8Wr`「状態/検索結果0件」・`deztM`「状態/取得失敗」・`q0z77i`「状態/読み込み中」
@@ -931,6 +935,7 @@
 ## steps 手順
 
 - 完了した入力の要約は `Steps.summaries`。変える口は既存の `onSelect` へ渡す。現在・未完の段には要約を出さない。方向の動きは同じ持ち主の `StepContent` と `CreatePage.step` / `CreateStepColumns.step`。入力を作り直さず transform だけを150ms動かし、動きを減らす設定では即時に替える。
+  - 手順を進めたら `StepContent.elementRef` の内側にある現在の段の題（h2/h3、`tabIndex={-1}`）へ焦点を移す。題は文字の幅に収め、共通の焦点枠を出す。本文全体へは焦点を当てず、輪を消す指定も足さない。
 
 - **役目**：題のすぐ下・左寄せ・1行。済みの段だけ押して戻れる
 - **持ち主（コード）**：`apps/web/src/components/templates/steps.tsx`・`apps/web/src/components/templates/steps.module.css`（部品 `Steps`）
@@ -1225,3 +1230,16 @@
 - **持ち主（コード）**：段②（今日）で `components/templates/mobile-booking-card.tsx` に作る（まだ無い）。状態の札は `StatusBadge`、予約の状態の色と言葉は `shared/booking-state.ts`・`booking-presentation.tsx` を使う。
 - **決まり**：[§6.48](v8-design-rules.md)。版（`expectedVersion`）と `requestId` は PC と同じ口へ渡す。閲覧のみには操作を出さない。
 - **見つけ方（コード）**：own-booking-card（`MobileBookingCard`・`PhoneBookingCard`・`ReservationCard` を自作）。
+
+
+### 初期設定の共通カードと選んだ機能の設定
+
+- 持ち主：`v8/dashboard/first-steps.tsx`の`FirstStepsCard`。選んだ機能の行は`v8/onboarding/setup-card.tsx`の`SetupTasks`、取得は`useStyleSetup`を使う。
+- 使用先：標準・ECの共通ダッシュボードと、飲食・サロン・面談・教室の専用ダッシュボード。基本の手順と質問の進みは分け、同じカードに差し込む。
+- 操作：既存の質問・まとめへ開く。権限のない設定入口は共通の灰色と理由で残し、質問の書き込みを許可しない。
+
+### 初期設定の共通の行
+
+- 持ち主：`components/shared/setup-step-row.tsx` と同名のCSS。`SetupStepList` / `SetupStepRow` / `SetupStepLabel` を基本の手順と選んだ機能の設定で共用する。
+- 高さ・間隔・左右の余白・済みと次の状態はこの部品に集める。説明がある行もない行も同じ高さを保つ。
+- 閲覧だけでも欄は出し、既存のGETで取得できた内容だけ表示する。変更操作は共通の灰色と理由、内容の参照は保存や有効化を伴わない窓で行う。

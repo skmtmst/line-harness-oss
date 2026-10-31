@@ -75,3 +75,8 @@ it('信頼できる条件に置換の特殊文字があっても文字列とし�
   expect(await ids(restrictSegmentInput(buildPublicSegmentQuery(all), "f.display_name <> '$&'")))
     .toEqual(['other-friend', 'own-friend', 'unassigned']);
 });
+
+it('後ろに別の入力集合を足すUNIONも拒否する', () => {
+  const sql = 'SELECT f.id, f.line_user_id, f.display_name FROM friends f WHERE 1=1 UNION SELECT f.id, f.line_user_id, f.display_name FROM friends f';
+  expect(() => scopeSegmentQuery({ sql, bindings: [] }, { allowedAccountIds: ['own'], canSeeUnassigned: false })).toThrow();
+});

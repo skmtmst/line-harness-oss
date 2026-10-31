@@ -4,15 +4,23 @@ import { useEffect, useState } from 'react'
 import { api } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
-import { Field } from '@/components/shared/form-controls'
+import KpiBand from '@/components/shared/kpi-band'
+import KpiCard from '@/components/shared/kpi-card'
+import SectionHeader from '@/components/shared/section-header'
 import Notice from '@/components/shared/notice'
-import { formatNumber } from '@/lib/format'
-import { currentSettlementPeriod, formatYen, listAllConversionApprovals } from './display'
+import { formatPercent } from '@/lib/format'
+import { currentSettlementPeriod, listAllConversionApprovals } from './display'
 
 type Counts = { clicks: number | null; friends: number | null; conversions: number | null; approved: number | null; reward: number | null; held: number | null }
 const UNKNOWN: Counts = { clicks: null, friends: null, conversions: null, approved: null, reward: null, held: null }
 
-/** 旧画面だけにあった月別の流れ。現役の一覧を組み替えず、共通窓から読める。 */
+function stageRate(previous: number | null, next: number | null): string | undefined {
+  if (previous === null || next === null || previous <= 0) return undefined
+  const percent = next / previous * 100
+  return Number.isFinite(percent) ? formatPercent(percent) : undefined
+}
+
+/** 今月の流れと報酬を、同じ期間の数として分けて読む。 */
 export default function MonthlyFlow({ open, accountId, onClose }: { open: boolean; accountId: string | null; onClose: () => void }) {
   const [counts, setCounts] = useState<Counts>(UNKNOWN)
   const [failed, setFailed] = useState(false)
@@ -59,15 +67,24 @@ export default function MonthlyFlow({ open, accountId, onClose }: { open: boolea
     ]).then((results) => { if (!cancelled) { setFailed(results.some((result) => result.status === 'rejected')); setLoading(false) } })
     return () => { cancelled = true }
   }, [open, accountId, attempt])
-  const rows: Array<{ label: string; value: number | null; money?: boolean }> = [
+  const stages = [
     { label: 'クリック', value: counts.clicks }, { label: '友だち追加', value: counts.friends },
     { label: '成果', value: counts.conversions }, { label: '認めた・承認', value: counts.approved },
-    { label: '確定した報酬', value: counts.reward, money: true }, { label: '保留している報酬', value: counts.held, money: true },
   ]
-  return <Dialog open={open} title="今月の成果の流れ" onCancel={onClose} footer={<Button type="button" onClick={onClose}>閉じる</Button>}>
-    <section aria-label="今月の成果の流れ" aria-busy={loading}>
-      {rows.map((row) => <Field key={row.label} label={row.label} optional={false}><span>{row.value === null ? '—' : row.money ? formatYen(row.value) : `${formatNumber(row.value)}件`}</span></Field>)}
+  const connections = stages.slice(1).map((stage, index) => ({
+    label: `${stages[index].label}から${stage.label}`,
+    value: stageRate(stages[index].value, stage.value),
+  }))
+  return <Dialog open={open} title="今月の成果の流れ" size="large" contentLayout="form" onCancel={onClose} >
+      <SectionHeader title="成果までの流れ" helpLabel="流れの割合の説明" help="同じ期間の件数を比べた割合です。同じ人が順に進んだ割合ではなく、100%を超えることがあります。" />
+      <KpiBand appearance="cards" connections={connections} role="group" aria-label="成果までの流れ" aria-busy={loading}>
+        {stages.map((stage) => <KpiCard key={stage.label} title={stage.label} aria-label={stage.label} value={stage.value} unit="件" detail={null} presentation="band" />)}
+      </KpiBand>
+      <SectionHeader title="報酬" separation="section" />
+      <KpiBand appearance="cards" layout="flow-summary" role="group" aria-label="報酬" aria-busy={loading}>
+        <KpiCard title="確定した報酬" aria-label="確定した報酬" value={counts.reward} unit="円" detail={null} presentation="band" />
+        <KpiCard title="保留している報酬" aria-label="保留している報酬" value={counts.held} unit="円" detail={null} presentation="band" />
+      </KpiBand>
       {failed ? <Notice tone="danger" message="一部の集計を読み込めませんでした。取得できない数は「—」で表示しています。" action={<Button type="button" disabled={loading} onClick={() => setAttempt((current) => current + 1)}>もう一度読み込む</Button>} /> : null}
-    </section>
   </Dialog>
 }

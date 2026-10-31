@@ -1,5 +1,7 @@
 'use client'
 
+import PagePending from '@/components/templates/page-pending'
+import { routePendingForPath } from '@/lib/route-pending'
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
@@ -39,7 +41,7 @@ function AutomationDraftPageInner() {
 
 export default function AutomationDraftPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PagePending stage="route" {...routePendingForPath("/automations/drafts")} />}>
       <AutomationDraftPageInner />
     </Suspense>
   )

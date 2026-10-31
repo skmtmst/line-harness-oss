@@ -6,7 +6,7 @@
  * 再試行の成功で数値を戻す。真の0件は0と出す。
  */
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import React from 'react'
 
 const fixture = vi.hoisted(() => ({
@@ -61,18 +61,19 @@ const { AffiliatorsTab } = await import('@/test-utils/affiliate-tabs')
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 function funnelSection() {
-  return screen.getByRole('region', { name: '今月の成果の流れ' })
+  return screen.getByRole('dialog', { name: '今月の成果の流れ' })
 }
 
 function funnelText() {
   return funnelSection().textContent ?? ''
 }
 
-/** 流れの段の箱（見出し＋値）の全文。見出しの親の箱を読む。 */
+/** 共通KPIの札に対応する値と単位を読む。 */
 function monthlyCell(label: string) {
-  const heads = Array.from(funnelSection().querySelectorAll('label'))
-  const head = heads.find((p) => p.textContent === label)
-  return head?.parentElement?.parentElement?.textContent ?? ''
+  return within(funnelSection()).getByLabelText(label)
+}
+function monthlyNumber(label: string) {
+  return monthlyCell(label).querySelector('[data-kpi-number]')?.textContent
 }
 
 beforeEach(() => {
@@ -145,10 +146,11 @@ describe('R293 失敗しても0件と出さない', () => {
       screen.getAllByRole('button', { name: 'もう一度読み込む' }).length,
     ).toBeGreaterThanOrEqual(1))
     // 取れていない3段は—。承認は本当に0件（空の応答）なので0のまま。
-    expect(monthlyCell('クリック')).toBe('クリック—')
-    expect(monthlyCell('友だち追加')).toBe('友だち追加—')
-    expect(monthlyCell('成果')).toBe('成果—')
-    expect(monthlyCell('認めた・承認')).toContain('0件')
+    expect(monthlyNumber('クリック')).toBe('—')
+    expect(monthlyNumber('友だち追加')).toBe('—')
+    expect(monthlyNumber('成果')).toBe('—')
+    expect(monthlyNumber('認めた・承認')).toBe('0')
+    expect(monthlyCell('認めた・承認').querySelector('[data-kpi-unit]')?.textContent).toBe('件')
 
     // 直して読み直すと数値が戻る。
     fixture.listImpl = async () => ({

@@ -1,5 +1,7 @@
 'use client'
 
+import PagePending from '@/components/templates/page-pending'
+import { routePendingForPath } from '@/lib/route-pending'
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import StaffShiftsV8 from '@/v8/booking-staff/shifts'
@@ -10,5 +12,5 @@ function StaffShiftsEntry() {
 }
 
 export default function StaffShiftsPage() {
-  return <Suspense fallback={null}><StaffShiftsEntry /></Suspense>
+  return <Suspense fallback={<PagePending stage="route" {...routePendingForPath("/booking/staff/shifts")} />}><StaffShiftsEntry /></Suspense>
 }

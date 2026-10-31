@@ -29,6 +29,7 @@ export default function ConfirmDialog({
   cancelLabel = '閉じる',
   destructive = false,
   busy = false,
+  confirmDisabled = false,
   error,
   children,
   designNode,
@@ -46,6 +47,7 @@ export default function ConfirmDialog({
   cancelLabel?: string;
   destructive?: boolean;
   busy?: boolean;
+  confirmDisabled?: boolean;
   error?: string;
   children?: ReactNode;
   /** V8 の板の印。渡したときだけ枠に data-design-node を付ける。 */
@@ -157,7 +159,7 @@ export default function ConfirmDialog({
             {cancelLabel}
           </Button>
           {onConfirm ? (
-            <Button variant={destructive ? 'danger' : 'primary'} onClick={onConfirm} disabled={busy}>
+            <Button variant={destructive ? 'danger' : 'primary'} onClick={onConfirm} disabled={busy || confirmDisabled}>
               {busy ? '処理中…' : confirmLabel}
             </Button>
           ) : null}

@@ -262,7 +262,7 @@ describe('遅れて返った結果の照合', () => {
     impacts.set('m-b', { usageCount: 0, canDelete: true })
     await render()
     await openDeleteFor('A.png')
-    await click(buttonIn(dialog(), '閉じる'))
+    await click(dialog()?.querySelector('button[aria-label="閉じる"]'))
     await openDeleteFor('B.png')
     expect(dialog()?.textContent).toContain('「B.png」を削除しますか？')
 
@@ -279,7 +279,7 @@ describe('遅れて返った結果の照合', () => {
     impacts.set('m-1', () => { round += 1; return round === 1 ? first.promise : { usageCount: 0, canDelete: true } })
     await render()
     await openDeleteFor('秋の新商品.png')
-    await click(buttonIn(dialog(), '閉じる'))
+    await click(dialog()?.querySelector('button[aria-label="閉じる"]'))
     await openDeleteFor('秋の新商品.png')
     expect(buttonIn(dialog(), '削除する')).toBeDefined()
 
@@ -301,7 +301,7 @@ describe('遅れて返った結果の照合', () => {
     await render()
     await openDeleteFor('秋の新商品.png')
     await click(buttonIn(dialog(), '削除する'))
-    expect(buttonIn(dialog(), '閉じる')?.disabled).toBe(true)
+    expect(dialog()?.querySelector<HTMLButtonElement>('button[aria-label="閉じる"]')?.disabled).toBe(true)
     await act(async () => { root.render(null) })
     await settle()
     await render()

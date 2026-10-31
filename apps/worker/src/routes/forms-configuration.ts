@@ -1,4 +1,6 @@
 import { logger } from '@line-crm/shared/server';
+import { unhandledWorkerError } from '../lib/unhandled-error.js';
+import { FormReferenceAccessError, formReferenceAccount, resolveFormReferences, publicReferenceLayout, validateFormReferences } from '../features/forms/index.js';
 import { formWebhookTarget } from '../services/public-https-request.js';
 import { webhookUrlBlockReason } from '../services/outgoing-webhook-delivery.js';
 import { validateLayoutRouting } from '../features/forms/form-routing/index.js';
@@ -161,7 +163,10 @@ export const get__api_forms_id_3 = async (c: Context<Env, "/api/forms/:id">) => 
     if (testAccountId) testLayout = await applyAccountAllergyOptions(c.env.DB, testAccountId, testLayout);
     const testLook = testAccountId ? (await accountCustomerLook(c.env.DB, testAccountId)).look : undefined;
     testLayout = {...testLayout, options: {...testLayout.options, theme: resolveCustomerFormTheme(testLayout.options, testLook)}};
-    return c.json({ success: true, data: { ...serializePublicForm(draft, testLayout), isTest: true, availability: await formAvailability({ db: c.env.DB, formId: id, layout: testLayout, active: !!draft.is_active, submitCount: draft.submit_count ?? 0, friendId: null, isTest: true }) } });
+    const references = await resolveFormReferences({ env: c.env, formId: id, formVersionId: null, layout: testLayout,
+      accountId: testAccountId, origin: new URL(c.req.url).origin, reportError: error => unhandledWorkerError(error instanceof Error ? error : new Error('form_reference_failed'), c) });
+    c.header('Cache-Control', 'private, no-store');
+    return c.json({ success: true, data: { ...serializePublicForm(draft, publicReferenceLayout(testLayout)), formVersionId: null, references, isTest: true, availability: await formAvailability({ db: c.env.DB, formId: id, layout: testLayout, active: !!draft.is_active, submitCount: draft.submit_count ?? 0, friendId: null, isTest: true }) } });
   }
   // ログイン中の運用者が公開URLを開いても、account_id を明示した管理画面取得で
   // ない限り下書きを漏らさない。
@@ -194,9 +199,21 @@ export const get__api_forms_id_3 = async (c: Context<Env, "/api/forms/:id">) => 
     const look = publicAccountId ? (await accountCustomerLook(c.env.DB, publicAccountId)).look : undefined;
     layout = {...layout, options: {...layout.options, theme: resolveCustomerFormTheme(layout.options, look)}};
   }
+  let references;
+  if (!adminView) {
+    c.header('Cache-Control', 'private, no-store');
+    if (layout.references?.length) {
+      try { publicAccountId = await formReferenceAccount(c.env, id, staff ? undefined : c.req.header('Authorization'), publicAccountId); }
+      catch (error) { if (error instanceof FormReferenceAccessError) return fail(c, 404, 'FORM_NOT_FOUND'); throw error; }
+    }
+    references = form.is_active ? await resolveFormReferences({ env: c.env, formId: id,
+      formVersionId: form.current_published_version_id, layout, accountId: publicAccountId,
+      origin: new URL(c.req.url).origin, reportError: error => unhandledWorkerError(error instanceof Error ? error : new Error('form_reference_failed'), c) })
+      : (layout.references ?? []).map(reference => ({ blockId: reference.blockId, kind: reference.kind, state: 'unavailable' as const }));
+  }
   const data = adminView
     ? {...serializeForm(form, undefined, { redactSecrets: staff.role === 'staff' }),latestEdit:await getFormLatestEdit(c.env.DB,id,form.content_revision)}
-    : { ...serializePublicForm(form, layout), availability: await formAvailability({
+    : { ...serializePublicForm(form, publicReferenceLayout(layout)), formVersionId: form.current_published_version_id, references, availability: await formAvailability({
       db: c.env.DB, formId: id, layout, active: !!form.is_active,
       submitCount: form.submit_count ?? 0, friendId,
     }) };
@@ -229,6 +246,9 @@ export const post__api_forms_id_publish_4 = async (c: Context<Env, "/api/forms/:
     const publishError = validateFormForPublish(parseLayout(draft.layout, draft.fields));
     if (publishError) {
       return inputError(c, { success: false, error: publishError }, 400, ["layout"]);
+    }
+    if (!await validateFormReferences(c.env, await getFormAccountIds(c.env.DB, id), parseLayout(draft.layout, draft.fields), true)) {
+      return inputError(c, { success: false, error: '公開できる同じ店の参照を選び直してください' }, 422, ['layout.references']);
     }
   }
   const result = await publishFormVersion(c.env.DB, id, expected);
@@ -339,6 +359,10 @@ export const post__api_forms_6 = async (c: Context<Env, "/api/forms">) => {
   if (normalized && !('error' in normalized) && normalized.layout) {
     try { await validateLayoutRouting(c.env.DB, body.accountId, JSON.parse(normalized.layout)); }
     catch(e) { if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
+  }
+
+  if (normalized && !await validateFormReferences(c.env, [body.accountId], JSON.parse(normalized.layout), hasDeliveryAccess(c.get('staff'), 'forms', 'publish'))) {
+    return inputError(c, { success: false, error: '公開できる同じ店の参照を選び直してください' }, 422, ['layout.references']);
   }
 
   const form = await createForm(c.env.DB, {
@@ -534,6 +558,9 @@ export const put__api_forms_id_9 = async (c: Context<Env, "/api/forms/:id">) => 
     }
     try { for(const account of await getFormAccountIds(c.env.DB,id)) await validateLayoutRouting(c.env.DB,account,JSON.parse(normalized.layout)); }
     catch(e) { if(e instanceof GapError)return c.json({success:false,error:e.code},e.status);throw e; }
+    if (!await validateFormReferences(c.env, await getFormAccountIds(c.env.DB, id), JSON.parse(normalized.layout), false)) {
+      return inputError(c, { success: false, error: '同じ店の参照を選び直してください' }, 422, ['layout.references']);
+    }
     updates.layout = normalized.layout;
     updates.fields = normalized.fields;
   }

@@ -2,12 +2,26 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Steps } from './steps'
+import { StepContent, Steps } from './steps'
 import type { StepperStep } from '@/components/shared/stepper'
 
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 const back = vi.fn()
+it('手順を替えても同じ本文と入力を保ち、読み上げの焦点を本文へ渡せる', () => {
+  const ref = React.createRef<HTMLElement>()
+  const view = render(<StepContent step={1} elementRef={ref} tabIndex={-1}><input aria-label="入力" defaultValue="途中" /></StepContent>)
+  const panel = ref.current!
+  expect(panel.hasAttribute('data-step-content')).toBe(true)
+  panel.focus()
+  expect(document.activeElement).toBe(panel)
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: '入力を保持' } })
+  view.rerender(<StepContent step={2} elementRef={ref} tabIndex={-1}><input aria-label="入力" defaultValue="途中" /></StepContent>)
+  expect(ref.current).toBe(panel)
+  expect((screen.getByRole('textbox') as HTMLInputElement).value).toBe('入力を保持')
+  view.unmount()
+  expect(ref.current).toBeNull()
+})
 const STEPS: StepperStep[] = [
   { key: 'basic', label: '基本設定', state: 'done', onSelect: back },
   { key: 'audience', label: '配信対象', state: 'done', onSelect: vi.fn() },

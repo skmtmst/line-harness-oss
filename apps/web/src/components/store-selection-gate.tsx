@@ -43,7 +43,7 @@ export default function StoreSelectionGate({ children }: { children: React.React
   if (decision === 'show') {
     if (!needsHandoverCheck) return <>{children}</>
     if (handoverGate?.id === selectedAccountId && handoverGate.status === 'ready') return <>{children}</>
-    if (handoverGate?.id === selectedAccountId && handoverGate.status === 'error') return <ListState kind="error" title="友だちの引き継ぎ状態を確認できません" onRetry={() => setHandoverRetry((value) => value + 1)} />
+    if (handoverGate?.id === selectedAccountId && handoverGate.status === 'error') return <PagePending stage="handover" failed errorTitle="友だちの引き継ぎ状態を確認できません" onRetry={() => setHandoverRetry((value) => value + 1)} />
     return <PagePending stage="handover" />
   }
 

@@ -12,7 +12,7 @@ import Card, { CardHeader } from '@/components/shared/card'
 import { CreatePage } from '@/components/templates'
 import Checkbox from '@/components/shared/checkbox'
 import { TimeField } from '@/components/shared/date-time-field'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
@@ -1236,7 +1236,7 @@ function AnalyticsReportFormPage() {
             </ul>
           </Card>
       </CreatePage>
-      <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy && !latestBusy) setCompareOpen(false) }} footer={<><Button variant="secondary" disabled={compareBusy || latestBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy || latestBusy || !canManage} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></>} error={compareError || undefined} busy={compareBusy || latestBusy}>
+      <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy && !latestBusy) setCompareOpen(false) }} footer={<DialogActions><Button variant="secondary" disabled={compareBusy || latestBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy || latestBusy || !canManage} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></DialogActions>} error={compareError || undefined} busy={compareBusy || latestBusy}>
         <VersionCompare before={latestSummary} after={draftSummary} />
       </Dialog>
       <ConfirmDialog open={sendOnceOpen && canManage} title="レポートを今すぐ1回だけ送りますか？" description="次の宛先と通知方法で送る依頼を作ります。" confirmLabel="この宛先へ1回だけ送る" busy={saving} onCancel={() => { if (!saving) setSendOnceOpen(false) }} onConfirm={() => void submit(true)}>

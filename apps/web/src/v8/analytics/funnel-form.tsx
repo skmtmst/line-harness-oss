@@ -14,7 +14,7 @@ import { ApiError, api } from '@/lib/api'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import { Field } from '@/components/shared/form-controls'
@@ -322,14 +322,12 @@ export default function FunnelFormV8({ accountId, onCancel, onCreated, edit, pre
       busy={saving}
       error={error || undefined}
       onCancel={onCancel}
-      footer={(
-        <div className={styles.footer}>
+      footer={(<DialogActions>
           <Button onClick={onCancel} disabled={saving}>キャンセル</Button>
           <Button variant="primary" onClick={() => void save()} busy={saving} busyLabel="保存しています…">
             {edit ? null : <Plus size={16} aria-hidden="true" />}{edit ? '新版として保存する' : '作る'}
           </Button>
-        </div>
-      )}
+        </DialogActions>)}
     >
       <div className={styles.form} ref={formRef}>
         {conflict.conflict ? <SaveConflictBand title="ほかの人が先にこのファネルを保存しました" compareBusy={conflict.compareBusy} onCompare={conflict.compare} onReload={conflict.reloadLatest} /> : null}

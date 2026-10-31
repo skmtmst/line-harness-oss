@@ -129,18 +129,18 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
   },
   {
     kind: 'form',
-    sql: `WITH target(token, account_id) AS (SELECT ?, ?)
+    sql: `WITH target(token, account_id, var_key) AS (SELECT ?, ?, ?)
           SELECT f.id AS source_id, NULL AS source_parent_id, f.name AS source_name,
                  CASE WHEN v.id IS NOT NULL AND (
                             instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
                          OR instr(coalesce(v.fields, ''), target.token) > 0
-                         OR instr(coalesce(v.layout, ''), target.token) > 0)
+                         OR instr(coalesce(v.layout, ''), target.token) > 0 OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(v.layout) THEN v.layout ELSE 'null' END,'$.references') j WHERE j.key='varKey' AND CAST(j.value AS TEXT)=target.var_key))
                       THEN 'published'
                       WHEN f.is_active = 1 THEN 'active' ELSE 'stopped' END AS source_status,
                  CASE WHEN instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
                       THEN v.on_submit_message_content
                       WHEN instr(coalesce(v.fields, ''), target.token) > 0 THEN v.fields
-                      WHEN instr(coalesce(v.layout, ''), target.token) > 0 THEN v.layout
+                      WHEN instr(coalesce(v.layout, ''), target.token) > 0 OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(v.layout) THEN v.layout ELSE 'null' END,'$.references') j WHERE j.key='varKey' AND CAST(j.value AS TEXT)=target.var_key) THEN v.layout
                       WHEN instr(coalesce(f.on_submit_message_content, ''), target.token) > 0
                       THEN f.on_submit_message_content
                       WHEN instr(coalesce(f.fields, ''), target.token) > 0 THEN f.fields
@@ -155,8 +155,8 @@ export const COMMON_VAR_USAGE_QUERIES: Array<{
                OR instr(coalesce(f.layout, ''), target.token) > 0
                OR instr(coalesce(v.on_submit_message_content, ''), target.token) > 0
                OR instr(coalesce(v.fields, ''), target.token) > 0
-               OR instr(coalesce(v.layout, ''), target.token) > 0)`,
-    values: (_varKey, token, account) => [token, account],
+               OR instr(coalesce(v.layout, ''), target.token) > 0 OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(f.layout) THEN f.layout ELSE 'null' END,'$.references') j WHERE j.key='varKey' AND CAST(j.value AS TEXT)=target.var_key) OR EXISTS (SELECT 1 FROM json_tree(CASE WHEN json_valid(v.layout) THEN v.layout ELSE 'null' END,'$.references') j WHERE j.key='varKey' AND CAST(j.value AS TEXT)=target.var_key))`,
+    values: (varKey, token, account) => [token, account, varKey],
   },
   {
     kind: 'automation',

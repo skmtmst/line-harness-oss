@@ -22,9 +22,17 @@ import styles from './complete.module.css'
  */
 export default function RegisterCompletePage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<CompletePending />}>
       <CompleteInner />
     </Suspense>
+  )
+}
+
+function CompletePending() {
+  return (
+    <AuthCard node="jk88n" cardNode="oVX3x" title="本登録" description="URL を確かめています">
+      <ListState kind="loading" title="URL を確かめています" />
+    </AuthCard>
   )
 }
 
@@ -94,13 +102,7 @@ function CompleteInner() {
     window.location.assign('/hq')
   }
 
-  if (check.state === 'checking') {
-    return (
-      <AuthCard node="jk88n" cardNode="oVX3x" title="本登録" description="URL を確かめています">
-        <ListState kind="loading" title="URL を確かめています" />
-      </AuthCard>
-    )
-  }
+  if (check.state === 'checking') return <CompletePending />
   if (check.state === 'bad') {
     return (
       <AuthCard node="jk88n" cardNode="oVX3x" title="本登録" description={check.message}>

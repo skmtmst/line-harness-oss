@@ -59,7 +59,7 @@ export default function ApplicationPreview({ accountId, draft, date, startTime, 
   return (
     <div className={styles.linkRow}>
       <Button variant="text" onClick={() => void load()}>プレビューを開く →</Button>
-      <Dialog open={open} title="お客さまの申込ページの見本" onCancel={close} footer={<Button onClick={close}>閉じる</Button>}>
+      <Dialog open={open} title="お客さまの申込ページの見本" onCancel={close} >
         {busy ? <ListState kind="loading" /> : error ? (
           <ListState kind="error" description={error} onRetry={() => void load()} />
         ) : data ? (

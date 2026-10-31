@@ -7,7 +7,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame'
 import { DetailColumns } from '@/components/templates/detail-columns'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Toggle from '@/components/shared/toggle'
 import { TextArea } from '@/components/shared/text-field'
@@ -221,12 +221,10 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
         error={m.saveError || undefined}
         onCancel={() => m.setUnlinkTarget(null)}
         designNode="Hn9eE"
-        footer={(
-          <div className={styles.dialogActions}>
+        footer={(<DialogActions>
             <Button type="button" onClick={() => m.setUnlinkTarget(null)} disabled={m.unlinking}>キャンセル</Button>
             <Button type="button" variant="danger" onClick={m.unlink} disabled={m.unlinking || !m.unlinkReason.trim()} busy={m.unlinking} busyLabel="解除中…">結び付けを解除</Button>
-          </div>
-        )}
+          </DialogActions>)}
       >
         <p className={styles.small}>{`解除する友だち：${m.unlinkTarget?.displayName ?? ''}`}</p>
         <Field label="解除する理由" required><SaveErrorField names={["unlinkReason","m.unlinkReason","unlink_reason","m.unlink_reason"]}><TextArea value={m.unlinkReason} onChange={(event) => m.setUnlinkReason(event.target.value)} placeholder="確認した根拠を書いてください" /></SaveErrorField></Field>
