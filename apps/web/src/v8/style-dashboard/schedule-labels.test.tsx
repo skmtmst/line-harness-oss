@@ -37,11 +37,42 @@ it('実際の一覧で、名前・人数・卓・コースを各見出しの下�
   expect(cells[4].textContent).not.toContain('花子')
 })
 
-it.each(['restaurant', 'salon', 'consult', 'lesson'] as const)('%sの一覧・盤・カレンダーで顧客名をメニュー名に代用しない', style => {
+it.each(['restaurant', 'salon', 'consult'] as const)('%sの一覧・盤・カレンダーで顧客名をメニュー名に代用しない', style => {
   const data = today(schedule, style)
   expect(style === 'consult' ? data.rows[0].sub : data.rows[0].course).toBe('季節のコース')
   expect(data.board?.entries[0]).toMatchObject({ name: '顧客 花子', menu: '季節のコース' })
   expect(today({ ...schedule, display: 'calendar' }, style).week?.entries[0]).toMatchObject({ name: '顧客 花子', title: '季節のコース' })
+})
+
+it('lessonの一覧・盤・日週は開催回の題だけを表示し、受講者行を混ぜない', () => {
+  const classEntry: StyleSchedule['entries'][number] = {
+    id: 'class:course', kind: 'class', classId: 'course', columnIds: ['unassigned'],
+    startsAt: booking.startsAt, endsAt: booking.endsAt, title: '季節のコース', booking: null,
+  }
+  const mixed: StyleSchedule = {
+    ...schedule, style: 'lesson',
+    entries: [
+      { ...schedule.entries[0], id: 'event:r', kind: 'event', booking: { ...booking, kind: 'event' } },
+      classEntry,
+    ],
+    days: [{ ...schedule.days[0], entryIds: ['event:r', 'class:course'] }],
+  }
+  const data = today(mixed, 'lesson')
+  expect(data.rows.map(({ id, name, reservationId }) => ({ id, name, reservationId }))).toEqual([
+    { id: 'class:course', name: '季節のコース', reservationId: 'course' },
+  ])
+  expect(data.board!.entries.map(({ id, name, menu }) => ({ id, name, menu }))).toEqual([
+    { id: 'class:course', name: '季節のコース', menu: '' },
+  ])
+  for (const calendarView of ['day', 'week'] as const) {
+    const calendar = today({ ...mixed, display: 'calendar', calendarView }, 'lesson')
+    expect(calendar.week!.entries.map(({ id, name, title }) => ({ id, name, title }))).toEqual([
+      { id: 'class:course', name: '', title: '季節のコース' },
+    ])
+    expect(calendar.week!.entries.some(entry => entry.id === 'event:r' || entry.name.includes('花子') || entry.title.includes('花子'))).toBe(false)
+  }
+  expect(data.rows.some(row => row.id === 'event:r' || row.name.includes('花子'))).toBe(false)
+  expect(data.board!.entries.some(entry => entry.id === 'event:r' || entry.name.includes('花子') || entry.menu.includes('花子'))).toBe(false)
 })
 
 it('古い応答でも担当名を卓にせず、顧客名と同じ題をコースにしない', () => {
