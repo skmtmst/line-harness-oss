@@ -65,17 +65,17 @@ export function PhonePane({ phone, style, look, base }: { phone: PhoneScene; sty
       return <LiffPhoneFrame title={phone.title} accountName={look.account} step={phone.step} steps={phone.steps}>
         <div className={styles.liffBody}>
           <div className={styles.liffDone}>{data.done ? <CircleCheck aria-hidden="true" className={styles.liffDoneIcon} /> : null}<strong>{data.heading}</strong>{data.body ? <span className={styles.liffSub}>{data.body}</span> : null}</div>
-          <dl className={styles.liffFacts}>{data.facts.map(fact => <div key={fact.label}><dt>{fact.label}</dt><dd>{'at' in fact ? relativeLabel(fact.at, base) : fact.value}</dd></div>)}</dl>
+          <dl className={styles.liffFacts}>{data.facts.map(fact => <div key={fact.label}><dt>{fact.label}</dt><dd>{'at' in fact ? relativeLabel(fact.at, base) : fact.label === 'お店' ? look.account : fact.value}</dd></div>)}</dl>
         </div>
       </LiffPhoneFrame>
     }
-    case 'booking-menu': return <LiffPhoneMenuStep {...phone.data} />
-    case 'booking-staff': return <LiffPhoneStaffStep {...phone.data} />
-    case 'booking-datetime': return <LiffPhoneDatetimeStep {...phone.data} slots={phone.data.slots.map(({ day, ...slot }) => {
+    case 'booking-menu': return <LiffPhoneMenuStep {...phone.data} accountName={look.account} />
+    case 'booking-staff': return <LiffPhoneStaffStep {...phone.data} accountName={look.account} />
+    case 'booking-datetime': return <LiffPhoneDatetimeStep {...phone.data} accountName={look.account} slots={phone.data.slots.map(({ day, ...slot }) => {
       const date = jstDateOffset(day, base)
       return { ...slot, date, startUtc: `${date}T${slot.start}:00+09:00`, endUtc: `${date}T${slot.end}:00+09:00` }
     })} />
-    case 'form': return <FormPhone {...phone.data} />
+    case 'form': return <FormPhone {...phone.data} accountName={look.account} />
     case 'line-talk': {
       const data = phone.data
       const avatar = <span className={sampleStyles.avatar}><MusuboMark /></span>

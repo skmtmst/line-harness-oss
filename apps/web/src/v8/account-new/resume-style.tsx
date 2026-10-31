@@ -8,8 +8,11 @@ import Step4Template from './step4-template'
 import RegistrationStyleDialog from './registration-style-dialog'
 import { useRegistrationStyle } from './use-registration-style'
 import { useState } from 'react'
+import { useAccount } from '@/contexts/account-context'
 
 export default function ResumeRegistrationStyle({ accountId }: { accountId: string }) {
+  const { accounts } = useAccount()
+  const accountName = accounts.find(account => account.id === accountId)?.name
   const state = useRegistrationStyle(accountId, true)
   const [done, setDone] = useState<'saved' | 'skipped' | null>(null)
   const [dialogOpen, setDialogOpen] = useState(true)
@@ -24,7 +27,7 @@ export default function ResumeRegistrationStyle({ accountId }: { accountId: stri
       {done ? <Button href={done === 'saved' && state.choice === 'restaurant' ? '/restaurant-test/stores/new' : '/hq'}>次へ</Button> : <>
         <Step4Template templateKey={state.choice} onOpen={() => setDialogOpen(true)} />
         <RegistrationStyleDialog
-                accountId={state.accountId} menu={state.menu} onMenuChange={state.setMenu}
+          accountId={state.accountId} accountName={accountName} menu={state.menu} onMenuChange={state.setMenu}
           open={dialogOpen}
           choice={state.choice}
           busy={state.busy}

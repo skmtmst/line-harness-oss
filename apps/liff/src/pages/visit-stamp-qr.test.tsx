@@ -34,3 +34,16 @@ it('読み込み失敗は共通の失敗表示から同じ依頼で再試行し�
   fireEvent.click(screen.getByRole('button', { name: 'LINE に戻る' }));
   expect(fx.closeWindow).toHaveBeenCalledOnce();
 });
+
+
+it('失敗時も再読込とLINEに戻るを共通のコンテンツ枠に収める', async () => {
+  fx.redeemQr.mockRejectedValueOnce(new Error('network'));
+  render(<MemoryRouter initialEntries={['/visit-stamps/qr?token=qr-1&accountId=acc-1']}><VisitStampQr /></MemoryRouter>);
+  const retry = await screen.findByRole('button', { name: 'もう一度読み込む' });
+  const back = screen.getByRole('button', { name: 'LINE に戻る' });
+  expect(retry.closest('main')).not.toBeNull();
+  expect(back.closest('main')).toBe(retry.closest('main'));
+  fireEvent.click(back);
+  expect(fx.closeWindow).toHaveBeenCalledOnce();
+  expect(fx.redeemQr).toHaveBeenCalledTimes(1);
+});

@@ -1252,3 +1252,5 @@
 ## 操作する対象の要約
 
 持ち主は `components/shared/operation-target-summary.tsx`。呼び出し側が実際の操作先のIDと名前を渡し、既存の詳細項目の型でLINEアカウント・店舗（店舗の操作のみ）・動いている環境を表示する。名前と環境を推測しない。正本は [操作する対象の確認](v8-requirements/confirmation-targets.md)。
+
+- スタンプのマスの数と描画用データは visit-stamps/public/preview が公開し、既存displayのslotCount/previewSlotsを再利用する。別のマス数の計算を作らない。

@@ -9,7 +9,7 @@ import {ApiError} from '@/lib/api'
 import {DEFAULT_CUSTOMER_LOOK} from '@line-crm/shared'
 const mock=vi.hoisted(()=>({role:'owner' as string|null,get:vi.fn(),save:vi.fn(),retainedSave:undefined as undefined|(()=>Promise<boolean>)}))
 vi.mock('@/lib/api',async original=>({...await original<typeof import('@/lib/api')>(),api:{accountSettings:{getCustomerLook:mock.get,saveCustomerLook:mock.save}}}))
-vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'a',selectedAccount:{name:'店A'}})}))
+vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'a',selectedAccount:{id:'a',name:'店A'},accounts:[{id:'a',name:'店A'}]})}))
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=>mock.role,canManageRole:(role:string)=>['owner','admin'].includes(role)}))
 vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{},useHideSettingsNav:()=>{}}))
 vi.mock('@/components/layout/settings-inner-nav',()=>({default:()=>null}))

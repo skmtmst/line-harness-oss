@@ -226,3 +226,53 @@ describe('開催枠の取得状態を席の状態と区別する', () => {
     expect(await screen.findByRole('button', { name: '予約可能な枠がありません' })).toBeTruthy();
   });
 });
+
+describe('定員のある時間と定員なしの時間が混在する時', () => {
+  it('上部の残席は定員のある時間だけの合計と明記し、各時間の表示と確認先を保つ', async () => {
+    setup(eventDetail(), [slot({ capacity: 5, remaining: 2 }), slot({ id: 'unlimited', capacity: null, remaining: null, starts_at: '2026-10-20T03:00:00.000Z', ends_at: '2026-10-20T04:00:00.000Z' })], []);
+    expect(await screen.findByText('定員のある時間：残り 2 席（定員 5）・定員なしの時間もあります')).toBeTruthy();
+    expect(screen.getByText('定員のある時間：残り 2 席（定員 5）・定員なしの時間もあります').classList.contains('font-bold')).toBe(true);
+    expect(screen.queryByText('残り 2 席（定員 5）', { exact: true })).toBeNull();
+    expect(screen.getByRole('button', { name: '10:00〜11:00 残り 2' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '12:00〜13:00 定員なし' }));
+    const next = screen.getByRole('button', { name: 'この時間で申し込む' });
+    expect(next.hasAttribute('disabled')).toBe(false); fireEvent.click(next);
+    expect(await screen.findByText('申込の確認先')).toBeTruthy();
+  });
+
+  it('定員のある時間が満席でも、定員なしの時間があることを隠さず選べる', async () => {
+    setup(eventDetail(), [slot({ capacity: 5, remaining: 0 }), slot({ id: 'unlimited', capacity: null, remaining: null, starts_at: '2026-10-20T03:00:00.000Z', ends_at: '2026-10-20T04:00:00.000Z' })], []);
+    expect(await screen.findByText('定員のある時間：残り 0 席（定員 5）・定員なしの時間もあります')).toBeTruthy();
+    expect(screen.getByText('定員のある時間：残り 0 席（定員 5）・定員なしの時間もあります').classList.contains('font-bold')).toBe(false);
+    expect(screen.getByRole('button', { name: '10/20(火) 10:00〜11:00 満席' }).hasAttribute('disabled')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: '12:00〜13:00 定員なし' }));
+    expect(screen.getByRole('button', { name: 'この時間で申し込む' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('一部の残席が未取得なら、残りを0や一部の合計で埋めない', async () => {
+    setup(eventDetail(), [slot({ capacity: 5, remaining: 2 }), slot({ id: 'unknown', capacity: 7, remaining: null }), slot({ id: 'unlimited', capacity: null, remaining: null })], []);
+    expect(await screen.findByText('定員のある時間：定員 12 席・残席は各時間で確認してください・定員なしの時間もあります')).toBeTruthy();
+    expect(screen.getByText('定員のある時間：定員 12 席・残席は各時間で確認してください・定員なしの時間もあります').classList.contains('font-bold')).toBe(false);
+    expect(screen.queryByText(/残り 2 席（定員 12）/)).toBeNull();
+  });
+
+  it('全て定員のある時間なら従来の合計を保つ', async () => {
+    setup(eventDetail(), [slot({ capacity: 5, remaining: 2 }), slot({ id: 'other', capacity: 10, remaining: 5 })], []);
+    expect(await screen.findByText('残り 7 席（定員 15）')).toBeTruthy();
+    expect(screen.queryByText(/定員なしの時間もあります/)).toBeNull();
+  });
+
+  it('全て定員なしなら数を作らず定員なしのまま表示する', async () => {
+    setup(eventDetail(), [slot({ capacity: null, remaining: null })], []);
+    await screen.findByRole('button', { name: '時間を選んでください' });
+    expect(screen.getAllByText('定員なし')).toHaveLength(2);
+    expect(screen.queryByText(/定員のある時間/)).toBeNull();
+  });
+});
+
+it('定員のある時間だけでも一部の残席未取得を合計としない', async () => {
+  setup(eventDetail(), [slot({ capacity: 5, remaining: 2 }), slot({ id: 'unknown', capacity: 7, remaining: null })], []);
+  expect(await screen.findByText('定員 12 席・残席は各時間で確認してください')).toBeTruthy();
+    expect(screen.getByText('定員 12 席・残席は各時間で確認してください').classList.contains('font-bold')).toBe(false);
+  expect(screen.queryByText(/残り 2 席（定員 12）/)).toBeNull();
+});

@@ -70,8 +70,8 @@ function PhoneListSkeleton() {
   )
 }
 
-function PhoneChrome({ step, children }: { step: number; children: React.ReactNode }) {
-  return <LiffPhoneFrame step={step}>{children}</LiffPhoneFrame>
+function PhoneChrome({ step, accountName, children }: { step: number; accountName?: string; children: React.ReactNode }) {
+  return <LiffPhoneFrame accountName={accountName} step={step}>{children}</LiffPhoneFrame>
 }
 
 /** 写しのメニューカード。作りかけ（Pick だけ）でも描けるよう、使う欄だけを要求する。 */
@@ -101,6 +101,7 @@ function MenuCard({ menu, picked, check }: { menu: PhoneMenuCard; picked?: boole
 
 /** ① メニューを選ぶ。draft は作りかけのメニュー（作る・直す画面から）。 */
 export function LiffPhoneMenuStep({
+  accountName,
   menus,
   draft,
   status = 'ready',
@@ -109,6 +110,7 @@ export function LiffPhoneMenuStep({
   menus: BookingMenu[]
   /** 作りかけ・直しかけのメニュー。先頭に選ばれた状態で出す（ の写し）。 */
   draft?: Pick<BookingMenu, 'id' | 'name' | 'category_label' | 'description' | 'duration_minutes' | 'base_price' | 'price_mode' | 'sort_order' | 'is_active' | 'auto_tag_id'> | null
+  accountName?: string
   status?: 'loading' | 'ready' | 'error'
   categoryTone?: 'customer'
 }) {
@@ -116,7 +118,7 @@ export function LiffPhoneMenuStep({
   const list = draft ? [draft, ...shown.filter((m) => m.id !== draft.id)] : shown
   const categories = [...new Set(list.map((m) => m.category_label).filter((c): c is string => Boolean(c)))]
   return (
-    <PhoneChrome step={1}>
+    <PhoneChrome accountName={accountName} step={1}>
       <div className={styles.phoneBody}>
         <h3 className={styles.phoneTitle}>メニューを選んでください</h3>
         {status === 'loading' ? (
@@ -150,6 +152,7 @@ export function LiffPhoneMenuStep({
 
 /** ② 担当を選ぶ。 */
 export function LiffPhoneStaffStep({
+  accountName,
   menu,
   staff,
   designationFree,
@@ -158,11 +161,12 @@ export function LiffPhoneStaffStep({
   menu: BookingMenu | null
   staff: BookingStaff[]
   designationFree: boolean
+  accountName?: string
   status?: 'loading' | 'ready' | 'error'
 }) {
   const shown = staff.filter((s) => s.is_active).sort((a, b) => a.sort_order - b.sort_order)
   return (
-    <PhoneChrome step={2}>
+    <PhoneChrome accountName={accountName} step={2}>
       <div className={styles.phoneBody}>
         <h3 className={styles.phoneTitle}>担当を選んでください</h3>
         {status === 'loading' ? (
@@ -210,6 +214,7 @@ export function LiffPhoneStaffStep({
 
 /** ③ 日時を選ぶ。週の札＋その日の時刻。 */
 export function LiffPhoneDatetimeStep({
+  accountName,
   menu,
   staffName,
   slots,
@@ -226,6 +231,7 @@ export function LiffPhoneDatetimeStep({
   closedWeekdays: number[]
   /** 設定画面の「最初の形」。 */
   view: 'list' | 'calendar'
+  accountName?: string
   status?: 'loading' | 'ready' | 'error'
 }) {
   const byDate = new Map<string, BookingAvailabilitySlot[]>()
@@ -245,7 +251,7 @@ export function LiffPhoneDatetimeStep({
   const pickedSlot = selectedSlots.find((slot) => slot.remaining > 0) ?? selectedSlots[0] ?? null
 
   return (
-    <PhoneChrome step={3}>
+    <PhoneChrome accountName={accountName} step={3}>
       <div className={styles.phoneBody}>
         <h3 className={styles.phoneTitle}>日時を選んでください</h3>
         {menu && (

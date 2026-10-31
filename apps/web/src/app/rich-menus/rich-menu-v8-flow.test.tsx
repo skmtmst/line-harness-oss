@@ -81,6 +81,7 @@ const createGroup = vi.hoisted(() => vi.fn())
 const updateGroup = vi.hoisted(() => vi.fn())
 const getGroup = vi.hoisted(() => vi.fn())
 const publishGroup = vi.hoisted(() => vi.fn())
+const scheduleGroup = vi.hoisted(() => vi.fn())
 
 const okGroup = () => ({
   id: 'grp-new',
@@ -144,6 +145,7 @@ vi.mock('@/lib/api', () => ({
       update: updateGroup,
       get: getGroup,
       publish: publishGroup,
+      schedule: scheduleGroup,
       uploadImage: vi.fn(async () => ({ success: true, data: null })),
       audienceSummary: vi.fn(async () => ({
         success: true,
@@ -236,7 +238,10 @@ beforeEach(() => {
     data: { items: store.rows, total: store.rows.length, facets: { total: 1, published: 1, targeting: 0, draft: 0, folderCounts: {} } },
   }))
   createGroup.mockImplementation(async () => ({ success: true, data: { id: 'grp-new', pages: [{ id: 'pg-1' }] } }))
-  updateGroup.mockImplementation(async () => ({ success: true, data: store.group }))
+  updateGroup.mockImplementation(async (_id, patch) => {
+    store.group = { ...store.group as Record<string, unknown>, ...patch }
+    return { success: true, data: store.group }
+  })
   getGroup.mockImplementation(async () => ({ success: true, data: store.group }))
   publishGroup.mockImplementation(async () => ({ success: true, data: { pages: [] } }))
   pushMock.mockClear()
@@ -329,17 +334,20 @@ describe('V8 リッチメニューの通し：作る→押す所→保存→既�
     fireEvent.click(await screen.findByRole('radio', { name: 'URLを開く', exact: true }))
     const urlInput = await screen.findByPlaceholderText('例：https://...')
     fireEvent.change(urlInput, { target: { value: 'https://example.com/menu' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'ボタン名 管理用の呼び名。友だちには表示されません。' }), { target: { value: '予約サイト' } })
     // 動きが付いた印に変わる。
     await waitFor(() => expect(screen.queryByText('未設定')).toBeNull())
 
     // 保存する（知らせがもう1件積まれる）。
     fireEvent.click(getPageAction({ name: '下書きを保存' }))
     await waitFor(() => expect(updateGroup).toHaveBeenCalled())
+    expect(updateGroup.mock.calls.at(-1)?.[1].pages[0].areas[0].label).toBe('予約サイト')
     await waitFor(() => expect(screen.getAllByText('下書きを保存しました')).toHaveLength(2))
 
-    // 手順③→④へ進む（誰に出すかは既定のまま全員）。
+    // 全員への公開を確認するため、表示先を明示して④へ進む。
     fireEvent.click(screen.getByRole('button', { name: '次へ：誰に出すか' }))
     await screen.findByText('誰に出すか')
+    fireEvent.click(screen.getByRole('radio', { name: /^すべての友だち/ }))
     fireEvent.click(screen.getByRole('button', { name: '次へ：公開' }))
     await waitFor(() => expect(screen.getAllByText('いつ公開するか').length).toBeGreaterThan(0))
 
@@ -362,4 +370,39 @@ describe('V8 リッチメニューの通し：作る→押す所→保存→既�
     await screen.findByText('LINEへの登録が終わりました')
     await waitFor(() => expect(screen.getAllByText('一覧へ戻る').length).toBeGreaterThan(0))
   })
+})
+
+
+it.each(['公開する', '予約する'] as const)('未命名の面は下書きを保存でき、%sでは該当欄へ移りAPIを呼ばない', async (action) => {
+  renderNode(<NewRichMenuPage />)
+  await flush()
+  await act(async () => { setInputValue(host.querySelector('#rm-name') as HTMLInputElement, '未命名の下書き') })
+  fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き' }))
+  await waitFor(() => expect(createGroup).toHaveBeenCalledTimes(1))
+  await screen.findByText('下書きを保存しました')
+  fireEvent.click(await screen.findByRole('button', { name: /未設定/ }))
+  fireEvent.click(await screen.findByRole('radio', { name: 'URLを開く', exact: true }))
+  fireEvent.change(await screen.findByPlaceholderText('例：https://...'), { target: { value: 'https://example.com/menu' } })
+  expect((screen.getByRole('textbox', { name: 'ボタン名 管理用の呼び名。友だちには表示されません。' }) as HTMLInputElement).value).toBe('')
+  fireEvent.click(getPageAction({ name: '下書きを保存' }))
+  await waitFor(() => expect(updateGroup).toHaveBeenCalled())
+  expect(updateGroup.mock.calls.at(-1)?.[1].pages[0].areas[0].label).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: '次へ：誰に出すか' }))
+  await screen.findByText('誰に出すか')
+  fireEvent.click(screen.getByRole('button', { name: '次へ：公開' }))
+  await waitFor(() => expect(screen.getAllByText('いつ公開するか').length).toBeGreaterThan(0))
+  const line = (await screen.findByText('LINE の検査')).closest('li') as HTMLElement
+  fireEvent.click(within(line).getByRole('button', { name: '見直す' }))
+  await screen.findByText('LINEの受付に通りました。')
+  if (action === '予約する') fireEvent.click(screen.getByRole('radio', { name: '日時を決めて公開する キャンペーンの始まりに合わせる' }))
+  const submit = screen.getByRole('button', { name: action, exact: true }) as HTMLButtonElement
+  await waitFor(() => expect(submit.disabled).toBe(false))
+  fireEvent.click(submit)
+  const name = await screen.findByRole('textbox', { name: 'ボタン名 管理用の呼び名。友だちには表示されません。 ボタン名（読み上げラベル）を入力してください' }) as HTMLInputElement
+  await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'))
+  expect(screen.getByText('ボタン名（読み上げラベル）を入力してください')).toBeTruthy()
+  expect(screen.getByRole('heading', { name: '面 A「1番目のボタン」の動き' })).toBeTruthy()
+  await waitFor(() => expect(document.activeElement).toBe(name))
+  expect(publishGroup).not.toHaveBeenCalled()
+  expect(scheduleGroup).not.toHaveBeenCalled()
 })
