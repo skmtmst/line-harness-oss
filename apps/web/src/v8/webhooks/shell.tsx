@@ -32,7 +32,7 @@ export const SAMPLE_COUNT = 9
 /** 外部連携の説明（全タブ共通の題の下）。 */
 export const WEBHOOKS_DESCRIPTION = 'ほかのシステムと、友だちの動きをやり取りします。送る・受け取る・API・Google Sheets をここで決めます。'
 
-/** 変更は統括だけ（管理画面 と同じ R32）。見るだけの人への一言。 */
+/** 変更の権限がない人への一言。 */
 export const MANAGE_REASON = permissionDeniedMessage('store')
 
 /*
@@ -214,10 +214,10 @@ export function WebhookBand({ cells }: { cells: BandCell[] }) {
 }
 
 /** 閲覧のみの帯（絵 ：タブの下・数の帯の上）。 */
-export function ViewerBand() {
+export function ViewerBand({ need = 'manager' }: { need?: 'manager' | 'owner' }) {
   return (
     <div className={styles.viewerRow}>
-      <ReadOnlyNotice role="status"></ReadOnlyNotice>
+      <ReadOnlyNotice need={need} role="status"></ReadOnlyNotice>
     </div>
   )
 }

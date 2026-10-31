@@ -7,7 +7,7 @@ import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, api, type IntegrationApiTokenInfo } from '@/lib/api'
-import { useStaffRole } from '@/lib/staff-role'
+import { useWebhookWriteAccess, canManageWebhooksNow, captureWebhookWriteAccess } from './write-access'
 import { useActionError } from '@/lib/use-action-error'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
@@ -25,8 +25,8 @@ export function useApiTokens() {
   const saveErrors = useSaveFormErrors()
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
-  const staffRole = useStaffRole()
-  const canManage = staffRole === 'owner'
+  const ownership = useWebhookWriteAccess(true)
+  const canManage = ownership.allowed
   const overview = useWebhookOverview()
   const { selectedAccountId } = useAccount()
   const selectedAccountIdRef = useRef(selectedAccountId)
@@ -59,6 +59,8 @@ export function useApiTokens() {
   // 行の「…」と同じ中身（右クリックでも出す）。止める口しか無いので、名前・できることを変えるは置かない。
   const revokeMenuItemsFor = (token: IntegrationApiTokenInfo): ContextMenuItem[] => [{
     id: 'revoke',
+    disabled: !canManage && !ownership.reason,
+    lockedReason: ownership.reason,
     label: '止める',
     danger: true,
     onSelect: () => {
@@ -126,6 +128,7 @@ export function useApiTokens() {
   }
 
   const openCreate = () => {
+    if (!canManageWebhooksNow(true)) return
     setName('')
     setNameError('')
     setCreateError('')
@@ -135,11 +138,13 @@ export function useApiTokens() {
   }
 
   const handleCreate = async (stepUpToken?: string) => {
+    if (!canManageWebhooksNow(true)) { setCreateError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
+    const canContinue = captureWebhookWriteAccess(true)
     setCreateError('')
     setNameError('')
     setScopesError('')
     const requestAccountId = selectedAccountId
-    if (!requestAccountId) return
+    if (!requestAccountId || selectedAccountIdRef.current !== requestAccountId) return
     const trimmed = name.trim()
     if (!trimmed) {
       setNameError('名前を入力してください')
@@ -168,7 +173,7 @@ export function useApiTokens() {
       const fieldFailure = saveErrors.capture(caught);
 
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.api_token', action: 'API接続の鍵を発行する', retry: (token) => handleCreate(token) });
+        setStepUp({ purpose: 'webhook.api_token', action: 'API接続の鍵を発行する', retry: async (token) => { if (canContinue() && selectedAccountIdRef.current === requestAccountId) return handleCreate(token); setCreateError('権限やLINEアカウントが変わったため中止しました。') } });
 
         return
       }
@@ -183,10 +188,12 @@ export function useApiTokens() {
   }
 
   const handleRotate = async (stepUpToken?: string) => {
+    if (!canManageWebhooksNow(true)) { setDialogError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
+    const canContinue = captureWebhookWriteAccess(true)
     setActionError('')
     setDialogError('')
     const requestAccountId = selectedAccountId
-    if (!requestAccountId || !rotateTarget) return
+    if (!requestAccountId || selectedAccountIdRef.current !== requestAccountId || !rotateTarget) return
     setMutating(true)
     try {
       const res = await api.webhooks.apiTokens.rotate(rotateTarget.id, requestAccountId, stepUpToken)
@@ -207,7 +214,7 @@ export function useApiTokens() {
         setStepUp({
           purpose: 'webhook.api_token',
           action: `「${target?.name ?? ''}」の鍵を入れ替える`,
-          retry: (token) => handleRotate(token),
+          retry: async (token) => { if (canContinue() && selectedAccountIdRef.current === requestAccountId) return handleRotate(token); setDialogError('権限やLINEアカウントが変わったため中止しました。') },
         })
         return
       }
@@ -229,9 +236,11 @@ export function useApiTokens() {
   }
 
   const handleRevoke = async (stepUpToken?: string) => {
+    if (!canManageWebhooksNow(true)) { setDialogError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
+    const canContinue = captureWebhookWriteAccess(true)
     setDialogError('')
     const requestAccountId = selectedAccountId
-    if (!requestAccountId || !revokeTarget) return
+    if (!requestAccountId || selectedAccountIdRef.current !== requestAccountId || !revokeTarget) return
     setMutating(true)
     try {
       const res = await api.webhooks.apiTokens.revoke(revokeTarget.id, requestAccountId, stepUpToken)
@@ -250,7 +259,7 @@ export function useApiTokens() {
         setStepUp({
           purpose: 'webhook.api_token',
           action: `「${target?.name ?? ''}」の鍵を止める`,
-          retry: (token) => handleRevoke(token),
+          retry: async (token) => { if (canContinue() && selectedAccountIdRef.current === requestAccountId) return handleRevoke(token); setDialogError('権限やLINEアカウントが変わったため中止しました。') },
         })
         return
       }
@@ -265,5 +274,5 @@ export function useApiTokens() {
   }
 
 
-  return { saveErrors, canManage, overview, tokens, status, loadError, actionError, createOpen, setCreateOpen, name, setName, nameError, scopesError, scopes, creating, createError, issued, setIssued, rotateTarget, setRotateTarget, revokeTarget, setRevokeTarget, mutating, dialogError, setDialogError, stepUp, setStepUp, menuId, setMenuId, setCtxId, ctxToken, revokeMenuItemsFor, load, toggleScope, openCreate, handleCreate, handleRotate, handleRevoke }
+  return { saveErrors, ownership, canManage, overview, tokens, status, loadError, actionError, createOpen, setCreateOpen, name, setName, nameError, scopesError, scopes, creating, createError, issued, setIssued, rotateTarget, setRotateTarget, revokeTarget, setRevokeTarget, mutating, dialogError, setDialogError, stepUp, setStepUp, menuId, setMenuId, setCtxId, ctxToken, revokeMenuItemsFor, load, toggleScope, openCreate, handleCreate, handleRotate, handleRevoke }
 }

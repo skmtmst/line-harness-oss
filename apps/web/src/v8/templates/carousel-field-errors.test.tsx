@@ -159,3 +159,13 @@ describe('カルーセルの欄ごとの誤り', () => {
     await waitFor(() => expect(calls.create).toHaveBeenCalled())
   })
 })
+
+it('空の名前・本文では主保存を止め、本文まで入れると主保存が使える', () => {
+  staffRole.value = verifiedStaffRole('owner') as typeof staffRole.value
+  render(<Carousel />)
+  const save = screen.getByRole('button', { name: '保存して公開' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  fillFirst()
+  expect(save.disabled).toBe(false)
+  expect(calls.create).not.toHaveBeenCalled()
+})

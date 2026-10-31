@@ -195,11 +195,19 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
     fireEvent.click((await screen.findAllByRole('button', { name: /テンプレートを作る/ }))[0])
     expect(await screen.findByRole('heading', { name: 'カルーセルを作る' })).toBeTruthy()
     fireEvent.change(screen.getByPlaceholderText('例：夏の定番5点'), { target: { value: '定期便のご案内' } })
-    fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+    const save = screen.getByRole('button', { name: '保存する' }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    expect(save.getAttribute('aria-description')).toBe('カード 1 の本文を入力してください。')
+    expect(screen.getAllByRole('status').some(status => status.textContent === 'カード 1 の本文を入力してください。')).toBe(true)
+    fireEvent.click(save)
+    expect(calls.create).not.toHaveBeenCalled()
     /* （オーナーの写真の指摘）：帯だけにせず、本文の欄を赤くして真下に理由を出し、そこへ移る。 */
     const body = document.getElementById('cr-text') as HTMLInputElement
+    fireEvent.change(body, { target: { value: 'あ'.repeat(301) } })
+    expect(save.disabled).toBe(false)
+    fireEvent.click(save)
     await waitFor(() => expect(body.getAttribute('aria-invalid')).toBe('true'))
-    expect(document.getElementById('cr-text-error')?.textContent).toBe('本文を入力してください')
+    expect(document.getElementById('cr-text-error')?.textContent).toBe('本文は120文字までです（いま301文字）')
     expect(screen.queryByText('すべてのカードに本文を入力してください')).toBeNull()
     await waitFor(() => expect(document.activeElement).toBe(body))
     expect(calls.create).not.toHaveBeenCalled()

@@ -1,4 +1,5 @@
 'use client'
+import { requiredInputReason } from '@/lib/required-input-reason'
 
 import Card, { CardHeader } from '@/components/shared/card'
 import { CreatePage } from '@/components/templates/create-page'
@@ -392,6 +393,17 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
     )
   }
 
+  const inputReason = loading || loadFailed ? null : requiredInputReason([
+    { label: 'テンプレート名', value: inline || name },
+    ...panels.flatMap((panel, index) => [
+      { label: `カード ${index + 1} の本文`, value: panel.text },
+      { label: `カード ${index + 1} の画像`, value: !someImage || panel.thumbnailImageUrl, select: true },
+      ...panel.actions.flatMap((action, actionIndex) => !action.label.trim() ? [] : [
+        { label: `カード ${index + 1} のボタン ${actionIndex + 1} の送る文`, value: action.kind !== 'message' || action.text },
+        { label: `カード ${index + 1} のボタン ${actionIndex + 1} の回答フォーム`, value: action.kind !== 'form' || action.formId, select: true },
+      ]),
+    ]),
+  ])
   const busy = saving || publishing || uploading || Boolean(host?.busy)
   const onChipKey = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (busy) return
@@ -438,6 +450,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
   return (
     <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
+        inputReason={inputReason}
         composerHost={host ? { ...host, busy, onCancel: () => guarded(host.onCancel) } : undefined}
         onComposerInsert={(alsoSave) => void hostSave(alsoSave)}
         boardId="J60utH"
@@ -454,7 +467,7 @@ function Carousel({ host }: { host?: TemplateEditHost }) {
           <>
             <Button type="button" onClick={() => (host ? host.onCancel() : guarded(() => router.push('/templates')))} disabled={busy}>キャンセル</Button>
             <Button type="button" onClick={() => onSaveDraft()} disabled={busy || loadFailed} busy={saving && !publishing}>下書きを保存</Button>
-            <Button type="button" variant="primary" onClick={() => onPublish()} disabled={busy || loadFailed} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
+            <Button type="button" variant="primary" onClick={() => onPublish()} disabled={busy || loadFailed || Boolean(inputReason)} disabledReason={inputReason} busy={publishing || Boolean(host?.busy)}>{host ? null : <Send size={16} aria-hidden="true" />}{host ? host.primaryLabel ?? '保存する' : '保存して公開'}</Button>
           </>
         )}
       >

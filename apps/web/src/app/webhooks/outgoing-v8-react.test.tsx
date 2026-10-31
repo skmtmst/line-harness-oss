@@ -198,7 +198,7 @@ test('v8 の閲覧のみ（l5SRfT）は帯が出て、［送り先を作る］�
   await renderPage()
   const board = host.querySelector('[data-design-node="ZSbFY"]')
   expect(board).not.toBeNull()
-  expect(board?.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
+  expect(board?.textContent).toContain('この画面の変える操作は、オーナーか管理者だけができます。')
   const clickable = [...board!.querySelectorAll('a, button')]
   // 作る口は空白にせず、押せない本物のボタン。行き先へのリンクは置かない。
   const creates = clickable.filter((element) => element.textContent?.includes('送り先を作る'))
@@ -208,7 +208,7 @@ test('v8 の閲覧のみ（l5SRfT）は帯が出て、［送り先を作る］�
     expect(create.getAttribute('aria-disabled')).toBe('true')
     expect(create.hasAttribute('href')).toBe(false)
     const reason = document.getElementById(create.getAttribute('aria-describedby') ?? '')
-    expect(reason?.textContent).toBe('送り先は統括の担当者だけが作れます')
+    expect(reason?.textContent).toBe('この操作はオーナーか管理者だけができます。')
   }
   const create = creates[0] as HTMLButtonElement
   const before = window.location.href
@@ -216,7 +216,7 @@ test('v8 の閲覧のみ（l5SRfT）は帯が出て、［送り先を作る］�
   expect(window.location.href).toBe(before)
   // キーボードで焦点を当てると理由の吹き出しが出る（マウスは部品の試験で見る）。
   await act(async () => { create.focus() })
-  expect(document.querySelector('[role="tooltip"]')?.textContent).toBe('送り先は統括の担当者だけが作れます')
+  expect(document.querySelector('[role="tooltip"]')?.textContent).toBe('この操作はオーナーか管理者だけができます。')
   await act(async () => { create.blur() })
   expect(document.querySelector('[role="tooltip"]')).toBeNull()
   expect(clickable.some((element) => element.textContent === '設定')).toBe(false)
