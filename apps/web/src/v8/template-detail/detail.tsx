@@ -1,4 +1,6 @@
 'use client'
+
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -170,6 +172,7 @@ export default function TemplateDetailV8() {
   const inUseVersion = (versions ?? []).find((v) => v.status === 'in_use') ?? null
   const draftContent = template?.messageContent ?? ''
   const senderAccountId = template?.accountId ?? selectedAccountId
+  const tokenNames = useInsertTokenNames(senderAccountId)
   const senderName = accounts.find((account) => account.id === senderAccountId)?.name ?? '公式アカウント'
   const nextVersionNumber = (template?.publishedVersion ?? 0) + 1
 
@@ -413,7 +416,7 @@ export default function TemplateDetailV8() {
 
         <Card variant="form" aria-label="本文">
           <CardHeader size="content" title={template.hasDraft ? '本文（下書き）' : '本文'} meta="緑の印は差し込み。受け取る人ごとに変わります。" action={canMutate ? <Button href={editHref} variant="secondary" icon={<Pencil aria-hidden="true" />}>編集する</Button> : undefined} />
-          <div className={styles.bodyBox}>{template.messageType === 'text' ? <InsertText value={draftContent} /> : draftContent}</div>
+          <div className={styles.bodyBox}>{template.messageType === 'text' ? <InsertText tokenNames={tokenNames} value={draftContent} /> : draftContent}</div>
         </Card>
 
         <div ref={usageRef}><Card variant="form" aria-label="使っている所">

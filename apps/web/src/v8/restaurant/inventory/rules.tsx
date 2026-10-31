@@ -22,6 +22,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { isSaveConflict, SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { restaurantTestApi } from '@/lib/restaurant-test-api'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog'
@@ -49,23 +50,30 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
   const [fieldError, setFieldError] = useState('')
   const saveErrors = useSaveFormErrors()
   const [confirm, setConfirm] = useState(false)
+  const [validationBlocked, setValidationBlocked] = useState(false)
+  useEffect(() => { setValidationBlocked(false) }, [draft])
   const [saving, setSaving] = useState(false)
   const [date, setDate] = useState(today)
   const [state, setState] = useState<RestaurantInventoryRuleState | null>(null)
   const [stateError, setStateError] = useState('')
   const stateRequest = useRef(0)
   const alive = useRef(true)
+  const contextKey = JSON.stringify([accountId, storeId])
+  const currentContext = useRef({ key: contextKey })
+  if (currentContext.current.key !== contextKey) currentContext.current = { key: contextKey }
+  useEffect(() => { setConfirm(false); setSaving(false); setValidationBlocked(false); setSaveError(''); setSaved(null); setDraft(null) }, [contextKey])
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
   useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
   const load = useCallback(async () => {
+    const scope = currentContext.current
     setLoadError('')
     try {
       const response = await restaurantTestApi.inventoryRules(accountId, storeId)
-      if (!alive.current) return false
+      if (!alive.current || currentContext.current !== scope) return false
       setSaved(response.data); setDraft(toDraft(response.data)); saveErrors.reset()
       return true
-    } catch (error) { if (alive.current) setLoadError(describeApiFailure(error, '読み込み', { scope: 'store' })); return false }
+    } catch (error) { if (alive.current && currentContext.current === scope) setLoadError(describeApiFailure(error, '読み込み', { scope: 'store' })); return false }
   }, [accountId, storeId, saveErrors])
   const loadState = useCallback(async () => {
     const request = ++stateRequest.current
@@ -85,20 +93,27 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
   const dirty = Boolean(canEdit && draft && saved && JSON.stringify(draft) !== JSON.stringify(toDraft(saved)))
   const guard = useUnsavedGuard({ dirty, busy: saving })
   async function save() {
-    if (!canEditRef.current || !draft || !saved || saving || conflict.conflict) return
+    if (!canEditRef.current || !draft || !saved || saving || conflict.conflict || validationBlocked) return
+    const scope = currentContext.current
     setSaving(true); setSaveError('')
     try {
       const response = await restaurantTestApi.saveInventoryRules(accountId, { storeId, ...draft, threshold: Number(draft.threshold), expectedVersion: saved.version })
-      if (!alive.current || !canEditRef.current) return
+      if (!alive.current || currentContext.current !== scope || !canEditRef.current) return
       setSaved(response.data); setDraft(toDraft(response.data)); setConfirm(false)
       notifyToast('自動で合わせるルールを保存しました')
       void loadState()
+      return true
     } catch (error) {
-      if (!alive.current) return
-      setConfirm(false)
-      if (isSaveConflict(error)) conflict.mark()
-      else if (!saveErrors.capture(error)) setSaveError(describeApiFailure(error, '保存', { scope: 'store' }))
-    } finally { if (alive.current) setSaving(false) }
+      if (!alive.current || currentContext.current !== scope) return
+      if (isSaveConflict(error)) { conflict.mark(); setSaveError('ほかの人が先に保存しました。閉じて最新の内容と比べてください。') }
+      else {
+        saveErrors.capture(error)
+        const reasons = Object.values(readSaveFieldErrors(error))
+        setValidationBlocked(reasons.length > 0)
+        setSaveError(reasons.length ? `${reasons.join(' ')} 戻って入力を直してください。` : describeApiFailure(error, '保存', { scope: 'store' }))
+      }
+      return false
+    } finally { if (alive.current && currentContext.current === scope) setSaving(false) }
   }
   if (!saved || !draft) return <PageContent><ListState kind={loadError ? 'error' : 'loading'} description={loadError || undefined} onRetry={load} /></PageContent>
   const diff = conflict.latest ? [
@@ -113,7 +128,7 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
       {saveError ? <Notice tone="danger">{saveError}</Notice> : null}
       <SettingsFormCard id="inventory-rules-form" title="自動で合わせるルール" description="残り席が基準以下になると受付枠を0にし、席が戻れば元の配分に戻します。" onSubmit={(event) => {
         event.preventDefault()
-        if (!canEdit || !dirty || saving) return
+        if (!canEdit || !dirty || saving || validationBlocked) return
         const error = thresholdError(draft.threshold)
         if (error) {
           setFieldError(error); return
@@ -140,9 +155,9 @@ export default function RulesBoard({ accountId, storeId, today, timezone, canEdi
     </PageContent>
     <StickyBar actions={<>
       <Button lockedReason={lockedReason} disabled={!canEdit || !dirty || saving} onClick={() => { setDraft(toDraft(saved)); setFieldError(''); saveErrors.reset() }}>キャンセル</Button>
-      <Button lockedReason={lockedReason} type="submit" form="inventory-rules-form" variant="primary" busy={saving} disabled={!canEdit || !dirty || Boolean(conflict.conflict)}>ルールを保存する</Button>
+      <Button lockedReason={lockedReason} type="submit" form="inventory-rules-form" variant="primary" busy={saving} disabled={!canEdit || !dirty || validationBlocked || Boolean(conflict.conflict)}>ルールを保存する</Button>
     </>} />
-    <ConfirmDialog open={confirm && canEdit} title="自動調整のルールを保存しますか？" description="保存すると、すでにある予約を含めて受付枠を数え直します。受付停止を外すと、保持していた配分へ戻ります。担当への通知を有効にすると、自動通知の対象になります。" confirmLabel="保存する" busy={saving} onConfirm={save} onCancel={() => { if (!saving) setConfirm(false) }} />
+    <ConfirmDialog open={confirm && canEdit} title="自動調整のルールを保存しますか？" description="保存すると、すでにある予約を含めて受付枠を数え直します。受付停止を外すと、保持していた配分へ戻ります。担当への通知を有効にすると、自動通知の対象になります。" confirmLabel="保存する" busy={saving} error={saveError || undefined} onSuccess={() => setConfirm(false)} cancelLabel={validationBlocked ? "戻って直す" : "キャンセル"} confirmDisabled={validationBlocked || Boolean(conflict.conflict)} confirmDisabledReason={validationBlocked ? "戻って入力を直してください。" : "閉じて最新の内容と比べてください。"} onConfirm={save} onCancel={() => { if (!saving) setConfirm(false) }} />
     <SaveConflictCompareDialog open={conflict.compareOpen} busy={conflict.compareBusy} error={conflict.compareError} lines={diff} onReload={conflict.reloadLatest} onCancel={conflict.closeCompare} />
     <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="自動調整ルールの変更" busy={saving} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
   </></SaveErrorScope>

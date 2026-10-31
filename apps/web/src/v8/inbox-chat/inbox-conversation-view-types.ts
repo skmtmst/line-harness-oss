@@ -97,7 +97,7 @@ export type Props = {
   showTemplatePicker: boolean
   setPendingPack: Dispatch<SetStateAction<{ texts: string[]; chatId: string; accountId: string | null; revision?: number; } | null>>
   pendingPack: { texts: string[]; chatId: string; accountId: string | null; revision?: number; } | null
-  handleSendPack: (pack: NonNullable<{ texts: string[]; chatId: string; accountId: string | null; revision?: number; } | null>) => Promise<void>
+  handleSendPack: (pack: NonNullable<{ texts: string[]; chatId: string; accountId: string | null; revision?: number; } | null>) => Promise<boolean | void>
   imagePreviewOpen: boolean
   /** 未選択の中央の「次にやること」（ID27）。件数はサーバー集計（読めない時は null）。 */
   quickCountsNow: { all: number; reply: number; overdue: number; } | null

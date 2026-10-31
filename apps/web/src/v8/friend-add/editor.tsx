@@ -2,6 +2,7 @@
 
 import { ActionsStep,PreviewStep } from './editor-actions-preview'
 import { BasicStep,RoutesStep,sharedPrefix } from './editor-basic-routes'
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 import { MessageStep } from './editor-message'
 import { EMPTY_DEFINITION,EMPTY_RULE,EditorRule,RouteUse,STEPS,Step,b244Requirements,editorSnapshot,toEditorRule } from './editor-model'
 
@@ -62,6 +63,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const searchParams = useSearchParams()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const tokenNames = useInsertTokenNames(selectedAccountId)
   const accountName = accounts.find((account) => account.id === selectedAccountId)?.name ?? '公式アカウント'
   const role = useStaffRole()
   const canEdit = canManageRole(role)
@@ -310,9 +312,38 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
 
   /* 競合：最新を読み込んで続ける（いまの直しは捨てる）。 */
   const reloadAfterConflict = async () => {
-    setConflict(false)
-    setCompare(null)
-    await load()
+    if (!selectedAccountId || !ruleId || compareBusy) return
+    const request = { accountId: selectedAccountId, ruleId, generation: loadRequestRef.current.generation + 1 }
+    loadRequestRef.current = request
+    const isCurrent = () => loadRequestRef.current === request
+    setCompareBusy(true); setError('')
+    try {
+      // Read everything before replacing the operator's draft. Failure leaves both the draft and comparison open.
+      const response = await api.friendAddRules.get(request.accountId, ruleId)
+      if (!isCurrent()) return
+      if (!response.success) throw new Error(response.error)
+      const loadedRule = toEditorRule(response.data.rule)
+      const listResponse = await api.friendAddRules.list(request.accountId, loadedRule.friendKind)
+      if (!isCurrent()) return
+      if (!listResponse.success) throw new Error(listResponse.error)
+      const uses = new Map<string, RouteUse>()
+      for (const item of listResponse.data.items) {
+        if (item.id === ruleId || item.isFallback || item.status !== 'published') continue
+        for (const id of item.definition.routeIds) if (!uses.has(id)) uses.set(id, { ruleId: item.id, name: item.name, priority: item.priority })
+      }
+      setRule(loadedRule); setDefinition(response.data.rule.definition)
+      savedSnapshot.current = editorSnapshot(loadedRule, response.data.rule.definition)
+      setOptions({ ...response.data.options, folders: response.data.options.folders ?? [] })
+      setSlackConnected(response.data.staffNotification?.status === 'connected' ? true : response.data.staffNotification?.status == null ? null : false)
+      setRouteUses(uses); setLoadedAccountId(request.accountId)
+      setConflict(false); setCompare(null); setTestResult(null); setValidateChecks(null)
+      return true
+    } catch (caught) {
+      if (!isCurrent()) return
+      saveErrors.capture(caught)
+      setError(describeFriendAddFailure(caught, '設定', 'load').message)
+      return false
+    } finally { if (isCurrent()) setCompareBusy(false) }
   }
 
   /* 競合：違いを比べる（最新の保存とあなたの直しを、項目ごとに並べる）。 */
@@ -662,7 +693,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         />
       ) : null}
       {step === 'message' ? (
-        <MessageStep definition={definition} setDefinition={setDefinition} friendKind={rule.friendKind} scenarios={options.scenarios} canEdit={canEdit} scenarioError={fieldError?.step === 'message' ? fieldError.message : undefined} />
+        <MessageStep tokenNames={tokenNames} definition={definition} setDefinition={setDefinition} friendKind={rule.friendKind} scenarios={options.scenarios} canEdit={canEdit} scenarioError={fieldError?.step === 'message' ? fieldError.message : undefined} />
       ) : null}
       {step === 'actions' ? (
         <ActionsStep definition={definition} setDefinition={setDefinition} options={options} canEdit={canEdit} />
@@ -698,7 +729,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         title="最新の保存とあなたの直しの違い"
         description={compare && compare.length === 0 ? '項目の違いはありません。最新を読み込んで続けてください。' : '左があなたの直し、右が先に保存された内容です。'}
         confirmLabel="最新を読み込んで続ける"
-        onConfirm={() => reloadAfterConflict()}
+        busy={compareBusy} error={error || undefined} onSuccess={() => setCompare(null)} onConfirm={() => reloadAfterConflict()}
         onCancel={() => setCompare(null)}
       >
         {compare && compare.length > 0 ? (

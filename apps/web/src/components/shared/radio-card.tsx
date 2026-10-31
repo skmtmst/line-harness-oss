@@ -2,6 +2,7 @@ import { useId, type CSSProperties, type FormEventHandler, type KeyboardEventHan
 import styles from './radio-card.module.css'
 import { CircleCheck } from 'lucide-react'
 import { joinDescribedBy, useFieldContext } from './field-context'
+import { usePermissionLockTip } from './permission-lock-tip'
 
 /**
  * ラジオカード。「この中から1つだけ選ぶ」選択肢をカードで出す共通部品。
@@ -84,6 +85,8 @@ export interface RadioCardProps {
    * 「選べないのに選択済みの見た目」にはしない（選択中の着色は付けない）。
    */
   disabledReason?: string
+  /** 権限で選べない時の理由。選択の印と焦点は残し、選択や再選択の操作を止める。 */
+  lockedReason?: string
   /** エラー状態。選択が必須なのに未確定、など。 */
   invalid?: boolean
   /**
@@ -133,6 +136,7 @@ export default function RadioCard({
   children,
   disabled = false,
   disabledReason,
+  lockedReason,
   invalid = false,
   onClick,
   className,
@@ -146,9 +150,11 @@ export default function RadioCard({
 }: RadioCardProps) {
   const field = useFieldContext()
   const disabledReasonId = useId()
+  const lock = usePermissionLockTip<HTMLLabelElement>(lockedReason, field?.describedBy)
   invalid = invalid || Boolean(field?.invalid)
   return (
     <label
+      ref={lockedReason ? lock.ref : undefined}
       className={[
         variant === 'row' ? styles.row : styles.card,
         variant === 'compact' ? styles.compact : null,
@@ -157,22 +163,36 @@ export default function RadioCard({
         variant === 'card' && height === 'fit' ? styles.fit : null,
         variant === 'card' && size === 'small' ? styles.small : null,
         checked ? styles.checked : null,
-        disabled ? styles.disabled : null,
+        disabled || lockedReason ? styles.disabled : null,
+        lockedReason ? styles.locked : null,
         invalid ? styles.invalid : null,
         className,
       ].filter(Boolean).join(' ')}
       data-choice-card={variant !== 'row' || undefined}
+      data-permission-locked={lockedReason ? '' : undefined}
+      data-no-name-tip={lockedReason ? '' : undefined}
       data-variant={variant}
       data-content-placement={contentPlacement}
       data-choice-indicator={indicator === 'check' ? indicator : undefined}
       data-compact-typography={variant === 'compact' ? compactTypography : undefined}
-      onClick={disabled ? undefined : onClick}
+      onClick={lockedReason ? lock.handlers?.onClick : disabled ? undefined : onClick}
+      onDoubleClick={lock.handlers?.onDoubleClick}
+      onPointerEnter={lock.handlers?.onPointerEnter}
+      onPointerLeave={lock.handlers?.onPointerLeave}
+      onPointerDown={lock.handlers?.onPointerDown}
+      onFocus={lock.handlers?.onFocus}
+      onBlur={lock.handlers?.onBlur}
     >
       {icon && variant !== 'form' ? <span className={styles.topIcon} aria-hidden="true">{icon}</span> : null}
       <input
         type="radio"
         ref={inputRef}
-        onKeyDown={onKeyDown}
+        onKeyDown={lockedReason ? (event) => {
+          if (['Enter', ' ', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) {
+            event.preventDefault()
+            event.stopPropagation()
+          } else onKeyDown?.(event)
+        } : onKeyDown}
         tabIndex={tabIndex}
         aria-label={ariaLabel}
         id={id}
@@ -180,17 +200,19 @@ export default function RadioCard({
         name={name}
         value={value}
         checked={checked}
-        disabled={disabled}
+        disabled={lockedReason ? false : disabled}
+        aria-disabled={lockedReason ? true : undefined}
         aria-invalid={invalid || undefined}
-        aria-describedby={joinDescribedBy(field?.describedBy, disabled && disabledReason ? disabledReasonId : undefined)}
-        onChange={() => onChange(value)}
+        aria-describedby={lockedReason ? lock.handlers?.['aria-describedby'] : joinDescribedBy(field?.describedBy, disabled && disabledReason ? disabledReasonId : undefined)}
+        onChange={() => { if (!lockedReason) onChange(value) }}
       />
       <span className={styles.body}>
-        <strong className={styles.title} title={title}>{indicator === 'check' && checked && !disabled ? <CircleCheck className={styles.check} data-choice-check aria-hidden="true" /> : null}{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
+        <strong className={styles.title} title={title}>{indicator === 'check' && checked && (!disabled || lockedReason) ? <CircleCheck className={styles.check} data-choice-check aria-hidden="true" /> : null}{icon && variant === 'form' ? <span className={styles.inlineIcon} aria-hidden="true">{icon}</span> : null}{title}</strong>
         {note ? <small className={styles.note} title={typeof note === 'string' ? note : undefined}>{note}</small> : null}
-        {disabled && disabledReason ? <small id={disabledReasonId} className={styles.reason}>{disabledReason}</small> : null}
+        {disabled && disabledReason && !lockedReason ? <small id={disabledReasonId} className={styles.reason}>{disabledReason}</small> : null}
       </span>
       {children}
+      {lock.node}
     </label>
   )
 }

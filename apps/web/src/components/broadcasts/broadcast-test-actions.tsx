@@ -5,6 +5,7 @@ import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { api,type ApiBroadcast } from '@/lib/api'
+import { notifyToast } from '@/components/shared/toast'
 import { formatTime } from '@/lib/format'
 import type { Dispatch,SetStateAction } from 'react'
 import { testSendFailure,testSendResult,type TestSendView } from './test-send-view'
@@ -18,26 +19,32 @@ type TestBroadcastContext = {
   setTestHistory: Dispatch<SetStateAction<TestSendView[]>>
   setTestResult: Dispatch<SetStateAction<TestSendView | null>>
   setTestSending: Dispatch<SetStateAction<boolean>>
+  setTestRetryBlocked: Dispatch<SetStateAction<boolean>>
   validate: () => string
 }
 
-export async function testBroadcast({ onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, validate }: TestBroadcastContext) {
+export async function testBroadcast({ onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, setTestRetryBlocked, validate }: TestBroadcastContext) {
     const validationError = validate()
     if (validationError) {
       rejectValidation(validationError)
       return
     }
     setTestSending(true)
+    setTestRetryBlocked(false)
     setError('')
     setTestResult(null)
     const at = formatTime(new Date())
+    let attempted = false
+    let acknowledged = false
     try {
       const draft = await persistDraft(null, true)
       if (!draft) return
       // BROADCAST-16: テスト送信でも下書きが増えるので、一覧と
       // フォルダ件数を読み直してもらう。
       onDraftSaved?.(draft)
+      attempted = true
       const res = await api.broadcasts.testSend(draft.id)
+      acknowledged = res.success
       /*
        * **HTTPの成功と配信の成功は分ける。** 全員に失敗しても
        * `success: true` で `sent/failed` が返るので、共通の分類
@@ -45,18 +52,21 @@ export async function testBroadcast({ onDraftSaved, persistDraft, rejectValidati
        */
       const view = res.success
         ? testSendResult(res.sent ?? 0, res.failed ?? 0, at)
-        : res.error
-          ? { kind: 'error' as const, message: `${at} ${res.error}` }
-          : testSendFailure(at)
+        : testSendFailure(at)
       setTestResult(view)
       setTestHistory((history) => [view, ...history])
+      if (acknowledged) notifyToast(view.message, { tone: view.kind === 'success' ? 'success' : view.kind === 'error' ? 'error' : 'info' })
+      return acknowledged
     } catch (saveFailure) {
+      if (acknowledged) { notifyToast('送信は受け付けました。表示を読み直してください。'); return true }
       const fieldFailure = saveErrors.capture(saveFailure);
+      setTestRetryBlocked(attempted)
 
-      const view = testSendFailure(at)
+      const view = attempted ? { kind: 'error' as const, message: `${at} 送信の結果を確認できませんでした。届いている可能性があるため、配信の記録を確認してください。` } : testSendFailure(at)
       { if (!fieldFailure)
       setTestResult(view) }
       setTestHistory((history) => [view, ...history])
+      return false
     } finally {
       setTestSending(false)
     }

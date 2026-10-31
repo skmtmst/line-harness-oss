@@ -66,3 +66,7 @@
 .root[data-inline] { display: inline; color: var(--color-link); white-space: nowrap; }
 .root[data-inline] .label { font-size: inherit; line-height: inherit; }
 .root[data-inline]:hover { text-decoration: underline; }
+
+/* 幅が限られる短い操作名だけを省略する。文中・長い名前の既定は変えない。 */
+.root[data-truncate] { min-width: 0; max-width: 100%; white-space: nowrap; }
+.root[data-truncate] .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -57,6 +57,8 @@ import { api,ApiError } from '@/lib/api'
 import { conversationAiUiEnabled } from '@/lib/environment-features'
 import { formatNumber } from '@/lib/format'
 import { clampSearchQuery } from '@/lib/search-query'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import type { ConfirmedUndoHandle } from '@/lib/undoable'
 import { runUndoable } from '@/lib/undoable'
 import { useLiveReorder } from '@/lib/use-live-reorder'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
@@ -146,6 +148,8 @@ export default function AutoRepliesListV8() {
   const [toggleReason, setToggleReason] = useState('')
   const [toggleError, setToggleError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
+  const moveConfirmed = useRef(new Map<string, string | null>())
+  const [pendingMove, setPendingMove] = useState<ConfirmedUndoHandle | null>(null)
   const [moveAccountId, setMoveAccountId] = useState(selectedAccountId)
   const [moveDraft, setMoveDraft] = useState('')
   const duplicateLock = useRef(false)
@@ -407,6 +411,7 @@ export default function AutoRepliesListV8() {
   /** フォルダへ移す（1件でもまとめてでも同じ窓）。 */
   const openMove = (ids: string[]) => {
     if (!canRunList() || ids.length === 0) return
+    moveConfirmed.current = new Map()
     setMoveIds(ids)
     setMoveAccountId(selectedAccountId)
     setMoveDraft('')
@@ -415,50 +420,64 @@ export default function AutoRepliesListV8() {
    * フォルダ移動は窓で行き先だけ選び、押した瞬間に描き換えて裏で保存する
    * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で送らずに戻せる。
    */
-  const runMove = () => {
-    if (!canRunList() || moveAccountId !== selectedAccountId || !moveIds || moveIds.length === 0) return
+  const runMove = async () => {
+    if (!canRunList() || moveAccountId !== selectedAccountId || !moveIds?.length) return
+    const confirmed = moveConfirmed.current
     const ids = moveIds
     const requestAccountId = selectedAccountId
-    const folderId = moveDraft === '' ? null : moveDraft
+    const folderId = moveDraft || null
     const key = listContextKey
-    setOptimisticRows({
-      key,
-      rows: rules.map((r) => (ids.includes(r.id) ? { ...r, folderId } : r)),
-    })
-    setMoveIds(null)
-    runUndoable({
+    const before = rules
+    const restore = () => {
+      if (!(moveConfirmed.current === confirmed && selectedAccountIdRef.current === requestAccountId)) return
+      setOptimisticRows(confirmed.size ? {
+        key,
+        rows: before.map(row => confirmed.has(row.id)
+          ? { ...row, folderId: confirmed.get(row.id) ?? null } : row),
+      } : null)
+    }
+    setOptimisticRows({ key, rows: before.map(row => ids.includes(row.id) ? { ...row, folderId } : row) })
+    let moveFailure = ''
+    const handle = runUndoable({
+      confirmation: true,
       message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
       commit: async () => {
-        let failed = 0
         for (const id of ids) {
-          if (!canEditAutoReplyListNow() || selectedAccountIdRef.current !== requestAccountId) throw new Error('移動中に操作できる状態が変わりました')
+          if (confirmed.has(id) && confirmed.get(id) === folderId) continue
+          if (!(moveConfirmed.current === confirmed && selectedAccountIdRef.current === requestAccountId) || !(canEditAutoReplyListNow())) {
+            const saved = ids.filter(value => confirmed.has(value) && confirmed.get(value) === folderId).length
+            moveFailure = `${formatNumber(ids.length)} 件中 ${formatNumber(saved)} 件を保存しました。残りは本人・権限・LINEアカウントが変わったため送っていません。`
+            throw new Error(moveFailure)
+          }
           try {
             const result = await api.autoReplies.update(id, { folderId })
-            if (!result.success) failed += 1
-          } catch (saveFailure) {
-            saveErrors.capture(saveFailure)
-            failed += 1
+            if (!result.success) throw new Error(result.error)
+            confirmed.set(id, folderId)
+          } catch (reason) {
+            saveErrors.capture(reason)
+            const saved = ids.filter(value => confirmed.has(value) && confirmed.get(value) === folderId).length
+            moveFailure = `全 ${formatNumber(ids.length)} 件中 ${formatNumber(saved)} 件の保存を確認しました。${formatNumber(ids.indexOf(id) + 1)} 件目で止めました。未送信は ${formatNumber(ids.slice(ids.indexOf(id) + 1).filter(value => !confirmed.has(value) || confirmed.get(value) !== folderId).length)} 件です。理由：${describeApiFailure(reason, 'フォルダ移動')}`
+            throw reason
           }
         }
-        if (failed > 0) throw new Error(`${formatNumber(failed)} 件のフォルダ移動に失敗しました`)
       },
-      undo: () => setOptimisticRows(current => current?.key === key ? null : current),
-      onCommitError: () => {
-        setOptimisticRows(current => current?.key === key ? null : current)
-        if (selectedAccountIdRef.current === requestAccountId) { void load(); void loadFolders() }
-      },
-      failureMessage: 'フォルダへ移せませんでした。状態を読み直してからお試しください。',
+      undo: restore,
+      onCommitError: () => { restore(); if (moveConfirmed.current === confirmed && selectedAccountIdRef.current === requestAccountId) { void load(); void loadFolders() } },
+      get failureMessage() { return moveFailure || undefined },
       onCommitted: () => {
-        setOptimisticRows(current => current?.key === key ? null : current)
-        if (selectedAccountIdRef.current !== requestAccountId) return
+        if (!(moveConfirmed.current === confirmed && selectedAccountIdRef.current === requestAccountId)) return
+        setOptimisticRows(null)
         const moved = new Set(ids)
-        setSelectedIds((current) => new Set([...current].filter((id) => !moved.has(id))))
-        if (selectedAccountIdRef.current === requestAccountId) {
-          void load()
-          void loadFolders()
-        }
+        setSelectedIds(values => new Set([...values].filter(id => !moved.has(id))))
+        void load(); void loadFolders()
       },
     })
+    setPendingMove(handle)
+    try {
+      const result = await handle.finished
+      return (moveConfirmed.current === confirmed && selectedAccountIdRef.current === requestAccountId) ? result : undefined
+    }
+    finally { setPendingMove(value => value === handle ? null : value) }
   }
 
   /*
@@ -1027,7 +1046,8 @@ export default function AutoRepliesListV8() {
         confirmDisabled={!canEdit || moveTargetStale}
         confirmDisabledReason={moveTargetStale ? 'アカウントが切り替わりました。いったん閉じて選び直してください。' : undefined}
         confirmLockedReason={lockedReason}
-        onConfirm={() => runMove()}
+        pendingUndo={pendingMove} onSuccess={() => setMoveIds(null)} onUndone={() => setMoveIds(null)}
+        busyLabel="移動中…" onConfirm={() => runMove()}
         onCancel={() => {
           setMoveIds(null)
         }}
@@ -1038,7 +1058,7 @@ export default function AutoRepliesListV8() {
             aria-label="移動先のフォルダ"
             size="full"
             value={moveDraft}
-            disabled={!canEdit || moveTargetStale}
+            disabled={!canEdit || moveTargetStale || Boolean(pendingMove)}
             onChange={(value) => { if (canRunList()) setMoveDraft(value) }}
             folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
           /></SaveErrorField>

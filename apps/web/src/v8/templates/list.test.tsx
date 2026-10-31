@@ -48,6 +48,8 @@ vi.mock('@/lib/api', () => ({
   fetchApi,
   api: {
     templates: { list: listTemplates, usages, delete: removeTemplate },
+    friendFields: { list: () => Promise.resolve({ success: true, data: [{ fieldKey: 'pet_name', name: 'ペットの名前' }] }) },
+    commonVars: { list: () => Promise.resolve({ success: true, data: [{ varKey: 'business_hours', name: '営業時間' }] }) },
     broadcastMessageAssets: { counts: () => Promise.resolve({ success: true, data: { card_message: 4 } }) },
     folders: { list: (...args: unknown[]) => Promise.resolve(folderList.list ? folderList.list(...args) : folderList.value) },
   },
@@ -112,6 +114,14 @@ afterEach(() => {
 })
 
 describe('V8 テンプレートの一覧', () => {
+  it('差し込みのキーを実名へ置き換えて見せ、一覧の本文は保存値のままにする', async () => {
+    listTemplates.mockResolvedValue({ success: true, data: [{ ...used, messageContent: '{{account.name}} {{var.business_hours}} {{field.pet_name}}' }] })
+    await renderList()
+    const thumb = document.querySelector('[data-line-bubble-thumb="text"]')!
+    expect(thumb.textContent).toBe('LINE公式アカウント名 営業時間 ペットの名前')
+    expect(thumb.querySelector('[data-token="{{var.business_hours}}"]')).toBeTruthy()
+  })
+
   it('行と公開の札（未公開の変更・下書きだけ）が出る', async () => {
     await renderList()
     expect(screen.getByText('予約前日のご案内')).toBeTruthy()

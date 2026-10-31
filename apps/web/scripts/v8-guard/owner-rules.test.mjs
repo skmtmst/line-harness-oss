@@ -1,4 +1,6 @@
+import './insert-token-fit.test.mjs'
 import './coupon-preview.test.mjs'
+import './text-button-style.test.mjs'
 import './saved-search-label.test.mjs'
 import './single-choice-filters.test.mjs'
 import './notice-line-break.test.mjs'

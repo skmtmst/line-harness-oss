@@ -382,7 +382,6 @@ export default function Sidebar({
         // 現行 /tags 自体は消さず、通常画面のメニューにはそのまま残す。
 
         if (item.href === '/staff' && !canManageRole(staffReadRole)) return false
-        if (item.href === '/accounts' && (staffReadRole === 'staff' || staffIdentity?.accountScope !== 'all')) return false
         // N-411: staff 専用項目（自分の勤務）は owner/admin には出さない。
         if (item.staffOnly && staffReadRole !== 'staff') return false
         // 失敗時にも必須ナビは残す。任意機能だけを権限・可視性で絞る。

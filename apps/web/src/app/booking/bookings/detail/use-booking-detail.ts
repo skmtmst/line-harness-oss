@@ -332,10 +332,12 @@ export function useBookingDetail() {
           : '来店なしにしました',
       )
       void load()
+      return true
     } catch (e) {
       // R322: 前の予約の失敗で今の画面を汚さない。
       if (!isCurrentTarget(actionTarget)) return
       setError(describeApiFailure(e, '予約の変更'))
+      return false
     } finally {
       setActing(false)
     }

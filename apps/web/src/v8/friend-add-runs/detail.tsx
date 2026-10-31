@@ -152,18 +152,21 @@ function FriendAddRunDetailInner() {
   /* 処理の失敗が無い失敗（案内を送れなかった等）は、相手に新しく届くので確かめてから動かす。 */
   const [resendConfirmOpen, setResendConfirmOpen] = useState(false)
   const requestSequence = useRef(0)
+  const contextKey = JSON.stringify([selectedAccountId, runId])
+  const currentContext = useRef({ key: contextKey })
+  if (currentContext.current.key !== contextKey) currentContext.current = { key: contextKey }
+  const [retryReviewRequired, setRetryReviewRequired] = useState(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ quiet = false }: { quiet?: boolean } = {}) => {
     const requestId = ++requestSequence.current
     // アカウントを切り替えた直後は、前のアカウントの詳細を一瞬でも残さない。
-    setDetail(null)
-    setNotice('')
+    if (!quiet) { setDetail(null); setNotice(''); setRetrying(false); setResendConfirmOpen(false); setRetryReviewRequired(false) }
     if (!selectedAccountId || !runId) {
       setError('')
       setLoading(false)
       return
     }
-    setLoading(true)
+    if (!quiet) setLoading(true)
     setError('')
     setErrorStatus(null)
     setMissing(false)
@@ -171,19 +174,20 @@ function FriendAddRunDetailInner() {
       const response = await api.friendAddRules.runDetail(selectedAccountId, runId)
       if (requestId !== requestSequence.current) return
       if (!response.success) {
-        setError('実行詳細を表示できませんでした。時間をおいて、もう一度お試しください。')
+        if (quiet) setNotice('最新の実行詳細を確認できませんでした。閉じて状態を読み直してください。')
+        else setError('実行詳細を表示できませんでした。時間をおいて、もう一度お試しください。')
         return
       }
       setDetail(response.data)
     } catch (caught) {
       if (requestId !== requestSequence.current) return
       const failure = describeFriendAddFailure(caught, '実行詳細', 'load')
-      if (failure.status === 404) {
+      if (failure.status === 404 && !quiet) {
         setMissing(true)
         return
       }
-      setError(failure.message)
-      setErrorStatus(failure.status)
+      if (quiet) setNotice(failure.message)
+      else { setError(failure.message); setErrorStatus(failure.status) }
     } finally {
       if (requestId === requestSequence.current) setLoading(false)
     }
@@ -195,25 +199,30 @@ function FriendAddRunDetailInner() {
   }, [accountLoading, load])
 
   const retry = async () => {
-    if (!selectedAccountId || !detail || retrying) return
+    if (!selectedAccountId || !detail || retrying || retryReviewRequired) return
+    const scope = currentContext.current
     setRetrying(true)
     setNotice('')
-    setResendConfirmOpen(false)
     try {
       const response = await api.friendAddRules.retryRun(selectedAccountId, detail.id)
+      if (currentContext.current !== scope) return
       if (!response.success) {
         setNotice('失敗した処理を再試行できませんでした。状態を読み直してください。')
-        return
+        return false
       }
+      setResendConfirmOpen(false)
       setNotice(`${response.data.retried} 件の失敗処理を再試行しました。`)
-      await load()
+      await load({ quiet: true })
+      return true
     } catch (caught) {
+      if (currentContext.current !== scope) return
       // M011：409 は応答が消えたあとの再送（実際は通っている）ことがあるので、読み直してから文を出す。
       const failure = describeFriendAddFailure(caught, '失敗した処理', 'retry')
-      if (failure.status === 409) await load()
-      setNotice(failure.message)
+      if (failure.status === 409) { setRetryReviewRequired(true); await load({ quiet: true }) }
+      if (currentContext.current === scope) setNotice(failure.message)
+      return false
     } finally {
-      setRetrying(false)
+      if (currentContext.current === scope) setRetrying(false)
     }
   }
 
@@ -313,14 +322,15 @@ function FriendAddRunDetailInner() {
         <Notice tone="danger" heading={<> {bandTitle} </>} action={<> {canManage && !deliveryUnknown && (failedActions.length > 0 || runFailed) ? (
             <Button
               variant="primary"
-              disabled={retrying}
+              disabled={retrying || retryReviewRequired}
+              disabledReason={retryReviewRequired ? '最新の実行状態を確認してください。' : undefined}
               busy={retrying}
               busyLabel="再試行中…"
-              onClick={() => (failedActions.length > 0 ? void retry() : setResendConfirmOpen(true))}
+              onClick={() => { if (failedActions.length > 0) void retry(); else { setNotice(''); setResendConfirmOpen(true) } }}
             >
               <RotateCcw size={16} aria-hidden="true" />失敗した処理をもう一度
             </Button>
-          ) : null} </>} >{bandNote}</Notice>
+          ) : null}{retryReviewRequired ? <Button variant="text" size="inline" onClick={() => void load()}>最新の実行状態を確認する</Button> : null} </>} >{bandNote}</Notice>
       ) : null}
 
       <LogEntryCopy canCopy={canManage} entry={{ occurredAt: detail.processedAt ?? detail.receivedAt, target: displayName, status: routingAction(detail.status, detail.errorCode), reason: deliveryUnknown ? '届いたか分からないため、自動では送り直しません。' : runFailed ? safeErrorMessage(detail.errorCode) ?? '処理を完了できませんでした。' : '処理の記録を確認してください。' }} />
@@ -371,8 +381,9 @@ function FriendAddRunDetailInner() {
         description="届かなかった処理だけをもう一度行います。相手には新しく届きます。"
         confirmLabel="もう一度行う"
         busy={retrying}
-        onConfirm={() => retry()}
-        onCancel={() => { if (!retrying) setResendConfirmOpen(false) }}
+        confirmDisabled={retryReviewRequired} confirmDisabledReason="閉じて最新の実行状態を確認してください。"
+        error={notice || undefined} onSuccess={() => setResendConfirmOpen(false)} onConfirm={() => retry()}
+        onCancel={() => { if (!retrying) { setResendConfirmOpen(false); if (retryReviewRequired) void load() } }}
       />
     </DetailPage>
   )

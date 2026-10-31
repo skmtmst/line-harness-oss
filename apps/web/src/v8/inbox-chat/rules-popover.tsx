@@ -8,8 +8,8 @@
  * 小窓を開き、対応マークと「いつ自動で変わるか」を見せる。直すのは小窓の下の
  * 「対応マークの設定を開く」から（そこだけがページを移る）。
  */
+import TextLink from '@/components/shared/text-link'
 import { useEffect, useRef, useState } from 'react'
-import Link from '@/components/shared/list-navigation'
 import { Settings2 } from 'lucide-react'
 import MenuPortal from '@/components/shared/menu-portal'
 import IconButton from '@/components/shared/icon-button'
@@ -93,7 +93,7 @@ export default function InboxRulesPopover({ accountId, onRoutingSaved }: { accou
               ))}
             </ul>
           )}
-          <Link href="/tags?tab=marks" className={styles.popLink}>対応マークの設定を開く</Link>
+          <TextLink inline href="/tags?tab=marks">対応マークの設定を開く</TextLink>
           {canManage && accountId ? <button type="button" className={styles.popLink} onClick={() => { setOpen(false); setRoutingOpen(true) }}>割り当てと返事の期限</button> : null}
         </section>
       </MenuPortal>

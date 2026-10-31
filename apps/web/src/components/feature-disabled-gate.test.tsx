@@ -10,6 +10,7 @@ describe('機能オフの共通案内画面', () => {
     expect(html).toContain('data-list-state="forbidden"')
     expect(html).toContain('この機能は設定でオフになっています')
     expect(html).toContain('機能設定で有効にすると使えます。')
+    expect(html).not.toContain('この操作の権限がありません')
     expect(html).toContain('href="/settings"')
     expect(html).toContain('機能設定を開く')
     expect(html).toContain('data-feature-disabled="webinars"')

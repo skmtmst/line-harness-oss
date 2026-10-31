@@ -340,7 +340,9 @@ export default function InflowListV8({
    * 行の受付・停止を切り替える（行の「…」から）。押した瞬間に札を変え、裏で保存する
    * （動きの点検・7）。失敗したら元に戻して知らせる。終わったら取り直す。
    */
-  const toggleRouteActive = async (entryRouteId: string, nextActive: boolean, name: string) => {
+  const [stopError, setStopError] = useState('')
+  const toggleRouteActive = async (entryRouteId: string, nextActive: boolean, name: string, confirmed = false) => {
+    if (confirmed) setStopError('')
     if (toggleLocks.current.has(entryRouteId)) return false
     toggleLocks.current.add(entryRouteId)
     const accountAtRequest = selectedAccountId
@@ -362,7 +364,8 @@ export default function InflowListV8({
 
  return false
       setActive(!nextActive)
-      { if (!fieldFailure)
+      if (confirmed) setStopError(cause instanceof ApiError && cause.status === 403 ? permissionDeniedMessage('store') : '受付を切り替えられませんでした。')
+      { if (!fieldFailure && !confirmed)
       notifyToast(
         cause instanceof ApiError && cause.status === 403 ? permissionDeniedMessage('store') : '受付を切り替えられませんでした。',
         { tone: 'error', actionLabel: 'もう一度', onAction: () => { void toggleRouteActive(entryRouteId, nextActive, name) } },
@@ -483,7 +486,7 @@ export default function InflowListV8({
           id: 'stop',
           label: '受付を止める',
           tone: 'danger' as const,
-          onSelect: () => { setOpenMenuRefCode(null); setStopTarget({ id: row.entryRouteId!, name: row.name }) },
+          onSelect: () => { setOpenMenuRefCode(null); setStopError(''); setStopTarget({ id: row.entryRouteId!, name: row.name }) },
         })
     }
     return items
@@ -900,10 +903,10 @@ export default function InflowListV8({
           description="この経路からの新しい受付が止まります。再開するまで、お客さまはこのリンクから登録できません。"
           confirmLabel="受付を停止する"
           destructive
-          onCancel={() => setStopTarget(null)}
+          error={stopError || undefined} onSuccess={() => setStopTarget(null)} onCancel={() => { setStopTarget(null); setStopError('') }}
           onConfirm={async () => {
             if (!stopTarget) return
-            if (await toggleRouteActive(stopTarget.id, false, stopTarget.name)) setStopTarget(null)
+            return toggleRouteActive(stopTarget.id, false, stopTarget.name, true)
           }}
         />
         {routeEditor}

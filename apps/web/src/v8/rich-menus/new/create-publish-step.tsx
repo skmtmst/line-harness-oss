@@ -112,7 +112,7 @@ export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, 
                   <p className={styles.checkNote}>押しても何も起きません。②で決めます</p>
                 </div>
                 <span className={styles.checkAction}>
-                  <Button type="button" variant="text" size="inline" onClick={() => goToStep('buttons')}>②で決める</Button>
+                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => goToStep('buttons')}>②で決める</Button>
                 </span>
               </li>
             ) : null}
@@ -124,7 +124,7 @@ export function renderHqPublishStep({ areaActionSummary, goToStep, group, host, 
                   <p className={styles.checkNote}>画像が無いと、配った先で公開できません。①で選びます</p>
                 </div>
                 <span className={styles.checkAction}>
-                  <Button type="button" variant="text" size="inline" onClick={() => goToStep('shape')}>①で選ぶ</Button>
+                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => goToStep('shape')}>①で選ぶ</Button>
                 </span>
               </li>
             ) : (
@@ -294,7 +294,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
                   <p className={styles.checkNote}>押しても何も起きません。②で決めます</p>
                 </div>
                 <span className={styles.checkAction}>
-                  <Button type="button" variant="text" size="inline" onClick={() => { setActivePageId(page.id); setSelectedAreaId(unset[0]?.id ?? null); goToStep('buttons') }}>②で決める</Button>
+                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => { setActivePageId(page.id); setSelectedAreaId(unset[0]?.id ?? null); goToStep('buttons') }}>②で決める</Button>
                 </span>
               </li>
             })}
@@ -308,7 +308,7 @@ export function renderPublishStep({ accountId, aggregateOnly, areaActionSummary,
               </div>
               {missingImages.length > 0 ? (
                 <span className={styles.checkAction}>
-                  <Button type="button" variant="text" size="inline" onClick={() => goToStep('shape')}>①で選ぶ</Button>
+                  <Button type="button" variant="text" textTone="ink" size="inline" onClick={() => goToStep('shape')}>①で選ぶ</Button>
                 </span>
               ) : null}
             </li>

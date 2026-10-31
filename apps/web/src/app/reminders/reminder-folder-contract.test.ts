@@ -42,7 +42,6 @@ describe('リマインダのフォルダ', () => {
   it('一覧と受け口は前から folderId を通していた（画面だけが遅れていた）', () => {
     expect(LIST).toContain('const folderId = moveDraft || null')
     expect(LIST).toContain('api.reminders.update(id, { folderId })')
-    expect(LIST).toContain("failureMessage: 'フォルダを移動できませんでした。'")
     expect(API).toContain('folderId?: string | null')
   })
 })

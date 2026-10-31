@@ -42,6 +42,14 @@ function testApp(handler = vi.fn((c) => c.json({ success: true }))) {
   app.get('/api/broadcasts', handler);
   app.post('/api/broadcasts', handler);
   app.get('/api/settings/features', handler);
+  app.get('/api/instagram/connection', handler);
+  app.post('/api/instagram/oauth/start', handler);
+  app.post('/api/instagram/refresh', handler);
+  app.delete('/api/instagram/connection', handler);
+  app.get('/api/instagram/messages', handler);
+  app.get('/api/restaurant-test/google/connection', handler);
+  app.post('/api/restaurant-test/google/connect/start', handler);
+  app.get('/api/restaurant-test/google/reviews', handler);
   app.get('/api/not-in-manifest', handler);
   return { app, handler };
 }
@@ -70,6 +78,34 @@ describe('featureEnforcementMiddleware', () => {
         disabledDependencies: [],
       };
     });
+  });
+
+  test.each([
+    ['GET', '/api/instagram/connection'],
+    ['POST', '/api/instagram/oauth/start'],
+    ['POST', '/api/instagram/refresh'],
+    ['DELETE', '/api/instagram/connection'],
+    ['GET', '/api/restaurant-test/google/connection'],
+    ['POST', '/api/restaurant-test/google/connect/start'],
+  ])('%s %s は機能オフでもSNS接続設定を開ける', async (method, path) => {
+    mocks.getAccountSetting.mockResolvedValue(JSON.stringify({ enabled: false }));
+    const { app, handler } = testApp();
+    const response = await app.request(`${path}?lineAccountId=account-1`, { method }, env);
+    expect(response.status).toBe(200);
+    expect(handler).toHaveBeenCalledOnce();
+    expect(mocks.accountFeatureAvailability).not.toHaveBeenCalled();
+  });
+
+  test.each([
+    ['/api/instagram/messages', 'external_integrations'],
+    ['/api/restaurant-test/google/reviews', 'restaurant_test'],
+  ])('%s の利用は引き続き機能オフで止まる', async (path, featureId) => {
+    mocks.getAccountSetting.mockResolvedValue(JSON.stringify({ enabled: false }));
+    const { app, handler } = testApp();
+    const response = await app.request(`${path}?lineAccountId=account-1`, {}, env);
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: 'FEATURE_DISABLED', featureId });
+    expect(handler).not.toHaveBeenCalled();
   });
 
   test('会社設定がオフなら handler を実行せず 403 + FEATURE_DISABLED を返す', async () => {

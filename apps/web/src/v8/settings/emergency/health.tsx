@@ -1,4 +1,5 @@
 'use client'
+import TextLink from '@/components/shared/text-link'
 import { LINE_TOKEN_REFRESH_DAYS } from '@line-crm/shared'
 import { useRunningVersion } from '@/lib/use-running-version'
 
@@ -513,7 +514,7 @@ export function HealthPanelV8({
     <>
       {loginSecurityNotice ? <Notice tone="warn" message={loginSecurityNotice} /> : null}
       <Notice tone={banner.tone === "good" ? "success" : banner.tone} data-tone={banner.tone} role="status" action={<>
-        {worst ? <Link href={worst.href} className={styles.bannerLink}>{`${worst.sub.split('・')[0]}を開く →`}</Link> : null}
+        {worst ? <TextLink href={worst.href}>{`${worst.sub.split('・')[0]}を開く`}</TextLink> : null}
       </>} heading={<>{banner.title}</>}>
         <p className={styles.bannerBody}>{banner.body}</p>
       </Notice>

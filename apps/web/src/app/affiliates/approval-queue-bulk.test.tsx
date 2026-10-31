@@ -180,6 +180,11 @@ describe('一括承認の確認と結果表示', () => {
     await act(async () => {
       fireEvent.click(within(dialog).getByRole('button', { name: '認める' }))
     })
+    const failure = await within(dialog).findByRole('alert')
+    expect(failure.textContent).toMatch(/1 件を保存しました。1 件は保存できませんでした/)
+    expect(within(dialog).getByRole('button', { name: 'もう一度' }).hasAttribute('disabled')).toBe(true)
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' })) })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     const result = await screen.findByRole('status')
     expect(within(result).getByText(/成功 1\s*件/)).toBeTruthy()
     expect(within(result).getByText(/ほかの人が先に判断 1\s*件/)).toBeTruthy()
@@ -193,6 +198,11 @@ describe('一括承認の確認と結果表示', () => {
     await act(async () => {
       fireEvent.click(within(dialog).getByRole('button', { name: '認める' }))
     })
+    const failure = await within(dialog).findByRole('alert')
+    expect(failure.textContent).toMatch(/1 件を保存しました。1 件は保存できませんでした/)
+    expect(within(dialog).getByRole('button', { name: 'もう一度' }).hasAttribute('disabled')).toBe(true)
+    await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' })) })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     const result = await screen.findByRole('status')
     // 再試行では競合で状態が変わった利用者2だけが選ばれ直す。
     await act(async () => {
