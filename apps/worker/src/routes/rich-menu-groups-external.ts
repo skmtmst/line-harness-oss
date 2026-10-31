@@ -312,10 +312,12 @@ export const get__api_rich_menu_groups_external_3 = async (c: Context<Env, "/api
     fetch('https://api.line.me/v2/bot/user/all/richmenu', { headers: { Authorization: auth } }),
   ]);
   if (!listRes.ok) {
-    return c.json(
-      { success: false, error: `LINE rich menu list failed: ${listRes.status}` },
-      500,
-    );
+    const code = listRes.status === 401 ? 'INVALID_LINE_ACCESS_TOKEN'
+      : listRes.status === 429 ? 'LINE_RATE_LIMITED' : 'LINE_RICH_MENU_LIST_FAILED';
+    const error = listRes.status === 401 ? 'LINE連携の認証情報を確認できません。連携の設定を確認してください。'
+      : listRes.status === 429 ? 'LINEへの問い合わせが集中しています。少し待ってから、もう一度読み込んでください。'
+        : 'LINEのリッチメニューを取得できませんでした。連携の状態を確認してください。';
+    return fail(c, 500, code, { error });
   }
   const listJson = (await listRes.json()) as { richmenus?: LineMenu[] };
   const lineMenus = listJson.richmenus ?? [];
