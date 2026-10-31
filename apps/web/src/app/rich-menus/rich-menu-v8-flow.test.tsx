@@ -386,7 +386,7 @@ it.each(['公開する', '予約する'] as const)('未命名の面は下書き�
   expect((screen.getByRole('textbox', { name: 'ボタン名 管理用の呼び名。友だちには表示されません。' }) as HTMLInputElement).value).toBe('')
   fireEvent.click(getPageAction({ name: '下書きを保存' }))
   await waitFor(() => expect(updateGroup).toHaveBeenCalled())
-  expect(updateGroup.mock.calls.at(-1)?.[1].pages[0].areas[0].label).toBe('')
+  expect(updateGroup.mock.calls.at(-1)?.[1].pages[0].areas[0].label).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: '次へ：誰に出すか' }))
   await screen.findByText('誰に出すか')
   fireEvent.click(screen.getByRole('button', { name: '次へ：公開' }))
