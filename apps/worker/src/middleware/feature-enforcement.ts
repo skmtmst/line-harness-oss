@@ -125,6 +125,7 @@ export const FEATURE_ROUTE_MANIFEST: readonly FeatureRouteMetadata[] = [
   feature('/api/site', 'site_tracking'),
   feature('/api/webinars', 'webinars'),
   feature('/api/events', 'events'),
+  exempt('/api/booking/stripe-test/webhook','public','Connect専用の試験署名を検査して未対応はpendingに保存する受信口'),
   exempt('/api/booking/pass-payments/webhook','public','Stripeの試験署名を確認する券の支払通知'),
   feature('/api/booking', 'booking'),
   feature('/api/meet-consultations', 'booking'),
