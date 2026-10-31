@@ -1084,3 +1084,4 @@
 - [反映履歴：UID移行の行き先確認](release-log/unreleased/2012-kenta-uid-safety.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [配信メニューの表示名](release-log/unreleased/2013-masato-friend-add-label.md) — 反映履歴、確認 2026-10-31。
 - [反映履歴：フォームを離れる時の下書きの扱い](release-log/unreleased/0000-kenta-form-draft-leave.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [反映履歴：統括の回答フォームの保存と移動](release-log/unreleased/0000-kenta-form-hq-save-leave.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。

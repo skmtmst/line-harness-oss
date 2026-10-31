@@ -480,7 +480,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   const createdDraft = useCreatedDraft({ accountId: host ? null : selectedAccountId, id, revision: contentRevision,
     loaded: formLoaded && !loading, published: Boolean(publishedVersionId), canEdit, canDelete: canManageRole(role) && !draftDeleteLock, captureResource, waitForSave: () => saveInFlight.current })
-  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty: dirty || createdDraft.owned, busy: saving || createdDraft.busy, onDiscard: discardChanges })
+  const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty: dirty || createdDraft.owned, busy: saving || createdDraft.busy || Boolean(host?.busy), onDiscard: discardChanges })
   const finishLeave = () => { if (captureResource()()) { disarm(); confirmLeave() } }
   const cancelDraftLeave = () => { createdDraft.clearError(); cancelLeave() }
 
@@ -553,6 +553,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
    * 送っている途中の保存を待ち、最新の版で送る。
    */
   const saveInFlight = useRef<Promise<unknown> | null>(null)
+  const hostSaving = useRef(false)
 
   /**
    * 保存する。silent は自動保存：保存中の印・赤い帯・トーストを出さない（失敗は保存の帯に出る）。
@@ -580,9 +581,22 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     if (!silent) setNameError(null)
     if (host) {
       /* 統括：保存（と配る）は呼ぶ側。publishAfter は［保存して配る］。 */
+      if (host.busy || hostSaving.current) return false
+      hostSaving.current = true
+      setSaving(true)
       setError('')
-      host.onSave({ name: name.trim(), description: description.trim(), layout, onSubmitTagId }, publishAfter)
-      return true
+      try {
+        const saved = await host.onSave({ name: name.trim(), description: description.trim(), layout, onSubmitTagId }, publishAfter)
+        if (!isCurrent() || !saved) return false
+        savedSnapshot.current = currentSnapshot
+        return true
+      } catch (cause) {
+        if (isCurrent() && !saveErrors.capture(cause)) setError(describeApiFailure(cause, '保存'))
+        return false
+      } finally {
+        hostSaving.current = false
+        if (isCurrent()) setSaving(false)
+      }
     }
     if (!selectedAccountId) return false
     while (saveInFlight.current) await saveInFlight.current.catch(() => undefined)
@@ -841,7 +855,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     </div>
   )
 
-  const hostBusy = Boolean(host?.busy)
+  const hostBusy = saving || Boolean(host?.busy)
   const footerActions = host ? (
     <>
       <Button onClick={() => requestUnsavedAction(host.onCancel)} disabled={hostBusy}>キャンセル</Button>
@@ -980,7 +994,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         description={createdDraft.owned ? '自動で作られた下書きがあります。残すか、消して移るか選んでください。' : undefined}
         saveLabel={createdDraft.owned ? '下書きを残して移る' : '下書きに保存して移る'} discardLabel={createdDraft.owned ? '下書きを消して移る' : undefined}
         discardDisabled={createdDraft.owned && !canManageRole(role)} discardLockedReason={createdDraft.owned ? draftDeleteLock : undefined}
-        error={createdDraft.error} saveDisabled={!canEdit || loading} onSave={host ? undefined : () => save(false)} onSavedLeave={finishLeave}
+        error={createdDraft.error} saveDisabled={!canEdit || loading || Boolean(host?.busy)} onSave={() => save(false)} onSavedLeave={finishLeave}
         onConfirm={createdDraft.owned ? () => void createdDraft.discard(finishLeave) : confirmLeave} onCancel={cancelDraftLeave} />
 
       <Dialog
