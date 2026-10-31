@@ -1230,3 +1230,16 @@
 - **持ち主（コード）**：段②（今日）で `components/templates/mobile-booking-card.tsx` に作る（まだ無い）。状態の札は `StatusBadge`、予約の状態の色と言葉は `shared/booking-state.ts`・`booking-presentation.tsx` を使う。
 - **決まり**：[§6.48](v8-design-rules.md)。版（`expectedVersion`）と `requestId` は PC と同じ口へ渡す。閲覧のみには操作を出さない。
 - **見つけ方（コード）**：own-booking-card（`MobileBookingCard`・`PhoneBookingCard`・`ReservationCard` を自作）。
+
+
+### 初期設定の共通カードと選んだ機能の設定
+
+- 持ち主：`v8/dashboard/first-steps.tsx`の`FirstStepsCard`。選んだ機能の行は`v8/onboarding/setup-card.tsx`の`SetupTasks`、取得は`useStyleSetup`を使う。
+- 使用先：標準・ECの共通ダッシュボードと、飲食・サロン・面談・教室の専用ダッシュボード。基本の手順と質問の進みは分け、同じカードに差し込む。
+- 操作：既存の質問・まとめへ開く。権限のない設定入口は共通の灰色と理由で残し、質問の書き込みを許可しない。
+
+### 初期設定の共通の行
+
+- 持ち主：`components/shared/setup-step-row.tsx` と同名のCSS。`SetupStepList` / `SetupStepRow` / `SetupStepLabel` を基本の手順と選んだ機能の設定で共用する。
+- 高さ・間隔・左右の余白・済みと次の状態はこの部品に集める。説明がある行もない行も同じ高さを保つ。
+- 閲覧だけでも欄は出し、既存のGETで取得できた内容だけ表示する。変更操作は共通の灰色と理由、内容の参照は保存や有効化を伴わない窓で行う。
