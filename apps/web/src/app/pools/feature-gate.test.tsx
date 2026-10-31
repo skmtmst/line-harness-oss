@@ -35,7 +35,7 @@ describe('プール管理の直URL(#860)', () => {
     window.history.replaceState(null, '', '/')
   })
 
-  it('機能offでAPIが403 FEATURE_DISABLEDを返すと、共通ゲートが機能設定への案内へ切り替える', async () => {
+  it('機能offでAPIが403 FEATURE_DISABLEDを返すと、設定画面が機能設定への案内へ切り替える', async () => {
     stubFetch((path) => path.startsWith('/api/traffic-pools')
       ? FEATURE_OFF()
       : new Response(JSON.stringify({ success: true, data: [] }), { status: 200 }))
@@ -86,7 +86,7 @@ describe('プール管理の直URL(#860)', () => {
   })
 })
 
-vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null }))
+vi.mock('@/components/layout/settings-inner-nav', () => ({ default: () => null, isSettingsAreaPath: () => true }))
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
