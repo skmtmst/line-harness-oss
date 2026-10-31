@@ -93,9 +93,41 @@ test('B1-12 B1-13: LIFFで金額への同意前は取消せず、期限後も同
  connect();await save();seedGapBooking(d);const {default:booking}=await import('./booking.js');const a=gapApp(d,[booking]);
  const cancel=(extra:Record<string,unknown>)=>a.request('/api/liff/booking/bk/cancel?liffId=liff-a',{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json'},body:JSON.stringify({lock_version:0,...extra})});
  const no=await cancel({});expect(no.status).toBe(409);expect(await no.json()).toMatchObject({error:'cancellation_fee_confirmation_required',data:{feeNow:4200}});
+ const stale=await cancel({feeAccepted:true,expectedFeeAmount:0});expect(stale.status).toBe(409);
+ for(const feeAccepted of [false,'true',undefined])expect((await cancel({feeAccepted,expectedFeeAmount:4200})).status).toBe(409);
+ expect(d.raw.prepare("SELECT COUNT(*) n FROM booking_charges WHERE booking_id='bk'").get()).toEqual({n:0});
  expect((d.raw.prepare("SELECT status FROM bookings WHERE id='bk'").get() as any).status).toBe('confirmed');
  const yes=await cancel({feeAccepted:true,expectedFeeAmount:4200});expect(yes.status).toBe(200);expect(await yes.json()).toMatchObject({status:'cancelled',feeNow:4200});
  expect(d.raw.prepare("SELECT amount,status FROM booking_charges WHERE booking_id='bk'").get()).toEqual({amount:4200,status:'pending'});
+ }finally{vi.useRealTimers();}
+});
+test('取消の見積もりは本人の版と有料の期限を返し、他人の予約を見せない',async()=>{
+ vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-20T04:00:00Z'));
+ try{
+  connect();await save();seedGapBooking(d);const a=app();
+  const read=(id:string)=>a.request(`/api/liff/booking/cancellation-quote?liffId=liff-a&booking_id=${id}`,{headers:{Authorization:'Bearer token'}});
+  const res=await read('bk');expect(res.status).toBe(200);expect(await res.json()).toMatchObject({data:{feeNow:4200,canCancel:true,lockVersion:0,cancelDeadlineAt:'2026-11-20T05:00:00Z'}});
+  d.raw.exec("UPDATE bookings SET friend_id='f2' WHERE id='bk'");expect((await read('bk')).status).toBe(404);
+ }finally{vi.useRealTimers();}
+});
+test('見積もりと取消は開始ちょうどを期限切れとし、同意不足へ誘導しない',async()=>{
+ vi.useFakeTimers();vi.setSystemTime(new Date('2026-11-20T05:00:00Z'));
+ try{
+  connect();await save();seedGapBooking(d);const {default:booking}=await import('./booking.js');const a=gapApp(d,[booking,bookingCancellation]);
+  const read=await a.request('/api/liff/booking/cancellation-quote?liffId=liff-a&booking_id=bk',{headers:{Authorization:'Bearer token'}});
+  expect(await read.json()).toMatchObject({data:{canCancel:false}});
+  const res=await a.request('/api/liff/booking/bk/cancel?liffId=liff-a',{method:'POST',headers:{Authorization:'Bearer token','Content-Type':'application/json'},body:JSON.stringify({lock_version:0})});
+  expect(res.status).toBe(403);expect(await res.json()).toMatchObject({error:'self_deadline_passed'});
+  expect(d.raw.prepare("SELECT status FROM bookings WHERE id='bk'").get()).toEqual({status:'confirmed'});
+ }finally{vi.useRealTimers();}
+});
+test('料金なしの見積もりは店の取消期限を守り、期限ちょうどだけ許す',async()=>{
+ vi.useFakeTimers();
+ try{
+  connect();await save();seedGapBooking(d);d.raw.exec("UPDATE bookings SET policy_snapshot_json=NULL WHERE id='bk'");
+  const read=()=>app().request('/api/liff/booking/cancellation-quote?liffId=liff-a&booking_id=bk',{headers:{Authorization:'Bearer token'}});
+  vi.setSystemTime(new Date('2026-11-19T05:00:00Z'));expect(await (await read()).json()).toMatchObject({data:{feeNow:0,canCancel:true,cancelDeadlineAt:'2026-11-19T05:00:00.000Z'}});
+  vi.setSystemTime(new Date('2026-11-19T05:00:00.001Z'));expect(await (await read()).json()).toMatchObject({data:{feeNow:0,canCancel:false}});
  }finally{vi.useRealTimers();}
 });
 test('B1-13 B1-24: 期限ちょうどは無料、開始後の取消と巻戻し後の再取消も同じ計算',async()=>{

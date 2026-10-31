@@ -89,31 +89,20 @@ function isViewer(role: StaffMember['role'] | null): boolean {
 
 /**
  * 段1 LINEアカウントをつなぐ。
- *
- * 稼働中で、Webhook が合っていて利用設定がオンで、シークレットが確かめられている——
- * 全部そろって初めて終わり（R74）。
- * **`webhook.status` が `unknown`（まだ確かめていない）を「合っている」と読まない。**
- * URLが一致していても利用がオフ（`active: false`）なら受信は届かない。
+ * 登録済みアカウントが1件以上あれば完了。接続状態は運用画面で扱う。
  */
 function accountsStep(input: GettingStartedInput): StepResult {
-  const usable = input.accounts.filter(
-    (a) => a.isActive && a.webhook?.status === 'matched' && a.webhook?.active !== false && a.channelSecretConfigured === true,
-  )
-  const done = usable.length > 0
-  const hasAny = input.accounts.length > 0
+  const done = input.accounts.length > 0
   return {
     key: 'accounts',
     ordinal: '1',
     title: 'LINE アカウントをつなぐ',
     sub: 'チャネルIDとアクセストークン',
-    state: done ? 'done' : hasAny ? 'stalled' : 'todo',
-    condition:
-      '稼働中のアカウントが1つ以上あり、Webhookが合っていて利用設定がオンで、シークレットが確かめられている',
+    state: done ? 'done' : 'todo',
+    condition: 'LINEアカウントが1つ以上登録されている',
     next: done
       ? '終わっています。つなぎ先を見直したいときはこちらから。'
-      : hasAny
-        ? 'アカウントはありますが、Webhookの利用設定かシークレットがまだ確かめられていません。'
-        : 'LINEアカウントを1つ登録して、Webhookをつなぎます。',
+      : 'LINEアカウントを1つ登録します。',
     action: { label: done ? '接続の確認を見る' : 'LINEアカウントを開く', href: '/accounts' },
     blockedReason: null,
   }
@@ -288,8 +277,7 @@ export function buildStepsFromApi(serverSteps: ReadonlyArray<GettingStartedStep>
       featureSet: { done: '終わっています。機能設定で見直せます。', todo: '業種に合わせて使う機能を選び、保存してください。' },
       accounts: {
         done: '終わっています。つなぎ先を見直したいときはこちらから。',
-        stalled: server.reason ?? 'Webhookかシークレットがまだ確かめられていません。',
-        todo: 'LINEアカウントを1つ登録して、Webhookをつなぎます。',
+        todo: 'LINEアカウントを1つ登録します。',
       },
       attributes: {
         done: '終わっています。タグを増やすときはこちらから。',

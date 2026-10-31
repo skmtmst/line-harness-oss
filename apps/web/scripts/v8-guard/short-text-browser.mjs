@@ -22,7 +22,7 @@ export function collectShortText() {
       const room = input.getBoundingClientRect().width - n(css.borderLeftWidth) - n(css.borderRightWidth) - n(css.paddingLeft) - n(css.paddingRight)
       records.push({ text: input.value, selector: input.id ? '#'+input.id : input.tagName, required, room, clipped: required > room, lines: 1 })
     }
-    const targets = scope.querySelectorAll('[data-row-link],[data-list-name],[data-list-name-cell],[data-list-number],[data-cell-grow], [data-segmented-control] button, [data-detail-actions] button,[data-detail-actions] a, h1,h2,h3, strong, [title]')
+    const targets = scope.querySelectorAll('[data-shared-part="list-table"] td,[data-shared-part="list-table"] th,[data-shared-part="list-table"] [role="cell"],[data-shared-part="list-table"] [role="columnheader"],[data-row-link],[data-list-name],[data-list-name-cell],[data-list-number],[data-cell-grow], [data-segmented-control] button, [data-detail-actions] button,[data-detail-actions] a, h1,h2,h3, strong, [title]')
     for (const target of targets) {
       if (!visible(target) || target.closest('[data-choice-field]:not([data-choice-time]),[data-input-field][aria-haspopup]')) continue
       const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT)
@@ -37,7 +37,9 @@ export function collectShortText() {
         const range = document.createRange(); range.selectNodeContents(atomic)
         const rect = range.getBoundingClientRect(), lineRects = [...range.getClientRects()].filter(r=>r.width>0 && r.height>0)
         const tops = [...new Set(lineRects.map(r=>Math.round(r.top)))]
-        let clipped = false, clipper = null
+        const cell = node.parentElement.closest('td,th,[role="cell"],[role="columnheader"]')
+        const cellBox = cell?.closest('[data-shared-part="list-table"]') ? cell.getBoundingClientRect() : null
+        let clipped = !!cellBox && (rect.left < cellBox.left || rect.right > cellBox.right), clipper = clipped ? 'CELL' : null
         for (let parent = node.parentElement; parent && parent !== scope.parentElement; parent = parent.parentElement) {
           const css = getComputedStyle(parent), box = parent.getBoundingClientRect()
           if (/(hidden|clip|auto|scroll)/.test(css.overflowX) && (rect.left < box.left || rect.right > box.right)) { clipped = true; clipper = parent.tagName; break }

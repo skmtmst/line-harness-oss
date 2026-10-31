@@ -1046,7 +1046,7 @@ export default function FriendsListV8() {
             onDone={() => { clearSelection(); void loadFriends() }}
           />
           {rowAction ? (
-            <Dialog open title={`${rowAction.friend.displayName}への操作`} onCancel={() => setRowAction(null)} footer={<Button onClick={() => setRowAction(null)}>閉じる</Button>}>
+            <Dialog open title={`${rowAction.friend.displayName}への操作`} onCancel={() => setRowAction(null)} >
               <SingleFriendActions
                 friendId={rowAction.friend.id}
                 friendName={rowAction.friend.displayName}

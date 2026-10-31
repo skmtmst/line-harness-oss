@@ -5,7 +5,7 @@ import { Check, Landmark, X } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import { TableHeadRow, Th } from '@/components/shared/table'
@@ -105,24 +105,18 @@ export function AffiliateArchiveDialog({
       busy={busy}
       error={error}
       onCancel={onClose}
-      footer={(
-        <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+      footer={(<DialogActions>
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
-          {choice === 'pay_first' ? (
-            <Button type="button" variant="primary" href="/affiliates?tab=payment">
+          {choice === 'pay_first' ? (<Button type="button" variant="primary" href="/affiliates?tab=payment">
               支払いの画面へ
-            </Button>
-          ) : (
-            <Button
+            </Button>) : (<Button
               type="button"
               variant="primary"
               disabled={busy || phase !== 'ready' || archiveDisabled}
               onClick={() => { void apply() }} busy={busy} busyLabel="処理中…">
               {choice === 'pause' ? '紹介を止める' : 'アーカイブする'}
-            </Button>
-          )}
-        </div>
-      )}
+            </Button>)}
+        </DialogActions>)}
     >
       {phase === 'loading' ? (
         <ListState kind="loading" title="使われている場所を確認しています" />
@@ -305,19 +299,15 @@ export function AffiliatePaymentConfirmDialog({
   if (!target) return null
 
   return (
-    <SaveErrorScope errors={saveErrors}><Dialog open title={title} description="確定すると金額が固定され、振込用のデータに入ります。" onCancel={onClose} busy={busy} error={error || undefined} designNode="GqFTV" designWidth={960} footer={(
-        <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-hairline px-6 py-4">
-          <p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>
-          <div className="flex shrink-0 items-center gap-2">
+    <SaveErrorScope errors={saveErrors}><Dialog open title={title} description="確定すると金額が固定され、振込用のデータに入ります。" onCancel={onClose} busy={busy} error={error || undefined} designNode="GqFTV" designWidth={960} footer={(<DialogActions leadingAction={<p className="min-w-0 flex-1 text-xs text-ink-faint">振込そのものはここでは行いません。振込用CSVを書き出して銀行で処理してください。</p>}>
+
+          <>
             <Button type="button" onClick={onClose} disabled={busy} className="gap-1.5"><X size={16} />キャンセル</Button>
-            {phase === 'ready' && preview ? (
-              <Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
+            {phase === 'ready' && preview ? (<Button type="button" variant="primary" disabled={busy} onClick={() => { void confirmPayment() }} className="gap-1.5" busy={busy} busyLabel="処理中…">
                 <Check size={16} />{`${yen(preview.amount)} で確定する`}
-              </Button>
-            ) : null}
-          </div>
-        </footer>
-    )}>
+              </Button>) : null}
+          </>
+        </DialogActions>)}>
         <div className="space-y-3 px-6 py-5">
       {phase === 'loading' ? (
         <ListState kind="loading" title="確定する内容を読み込んでいます" />

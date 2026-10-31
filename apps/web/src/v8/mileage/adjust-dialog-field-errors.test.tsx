@@ -66,3 +66,14 @@ describe('マイルを手で動かす：確定で欄に知らせる', () => {
     expect(document.getElementById('adj-reason-error')).toBeNull()
   })
 })
+
+
+it('入力中に右上から閉じると破棄確認を出し、保存も閉じる処理もまだ呼ばない', async () => {
+  const onCancel = vi.fn()
+  await act(async () => { root.render(<MileageAdjustDialog open accountId="a" friendId="f" friendName="山田" friendRank={null} currentBalance={500} onCancel={onCancel} onCompleted={async () => {}} canConfigurePolicy={false} />) })
+  await act(async () => { fireEvent.change(screen.getByLabelText('詳しい理由'), { target: { value: '手入力の理由' } }) })
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '閉じる', exact: true })) })
+  expect(screen.getByText('入力を破棄しますか？')).not.toBeNull()
+  expect(onCancel).not.toHaveBeenCalled()
+  expect(adjust).not.toHaveBeenCalled()
+})

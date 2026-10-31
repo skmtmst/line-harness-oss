@@ -393,7 +393,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
                 </FolderDotName></Td>
                 <Td className={styles.searchColStatus}>{!search.lineAccountId ? (
                         <StatusBadge tone="warning" size="annotation" dot={false} title="対象アカウント未割り当て">未割り当て</StatusBadge>
-                      ) : null}</Td>
+                      ) : <StatusBadge tone="neutral" size="annotation" dot={false}>割り当て済み</StatusBadge>}</Td>
                 <Td className={styles.searchColCount}>
                   <span className={styles.cellText} title={search.matchCountError ?? undefined}>
                     {search.matchCount !== null && search.matchCount !== undefined ? `${formatNumber(search.matchCount)}人` : emptyValue('unknown')}

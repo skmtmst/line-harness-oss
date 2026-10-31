@@ -12,7 +12,7 @@ import MediaSlot from '@/components/shared/media-slot'
 import Notice from '@/components/shared/notice'
 import Progress from '@/components/shared/progress'
 import FolderSelect, { folderById, type FolderSelectCreate } from '@/components/shared/folder-select'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { MEDIA_ACCEPT, extractMediaMetadata, putMediaFile, validateMediaFile } from './media-direct-upload'
 import { formatMediaSize } from './media-usage-display'
 import { formatNumber } from '@/lib/format'
@@ -193,18 +193,16 @@ export default function MediaUploadDialog({
 
   if (!open) return null
 
-  return <Dialog open={open} title="ファイルを入れる" onCancel={onClose} busy={busy} error={error || undefined} designNode="eXAJP" designWidth={720} footer={(
-        <div className="border-hairline flex flex-wrap items-center justify-between gap-3 border-t px-6 py-4">
-          <p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
+  return <Dialog open={open} title="ファイルを入れる" onCancel={onClose} busy={busy} error={error || undefined} designNode="eXAJP" designWidth={720} footer={(<DialogActions leadingAction={<p className={errorCount > 0 ? 'text-danger text-xs font-semibold' : 'text-ink-faint text-xs'}>
             {errorCount > 0 ? `${formatNumber(errorCount)}件は登録できません` : `${entries.length}件を選択中`}
-          </p>
-          <div className="flex items-center gap-2">
+          </p>}>
+
+          <>
             <Button type="button" variant="primary" onClick={() => void uploadReady()} disabled={busy || readyCount === 0 || !accountId} busy={busy} busyLabel="登録しています…">
               {`${formatNumber(readyCount)}件を登録する`}
             </Button>
-          </div>
-        </div>
-  )}>{}
+          </>
+        </DialogActions>)}>{}
         <div className="space-y-4 p-6">
         <MediaSlot kind="file"
           title="ここにファイルをドラッグ、または押して選ぶ"

@@ -22,21 +22,21 @@ export function fitListColumns(frame) {
   }
   const controlsOnly = frame.dataset.columnSizing === 'controls'
   const number = value => parseFloat(value) || 0
+  const textWidth = node => {
+    const css = getComputedStyle(node.nodeType === 3 ? node.parentElement : node)
+    const range = document.createRange()
+    range.selectNodeContents(node)
+    const rects = [...range.getClientRects()].filter(rect => rect.width > 0)
+    if (rects.length <= 1) return range.getBoundingClientRect().width
+    const probe = document.createElement('span')
+    probe.style.cssText = 'position:fixed;visibility:hidden;white-space:pre;pointer-events:none'
+    for (const key of ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariantNumeric', 'fontVariationSettings', 'fontFeatureSettings', 'letterSpacing', 'wordSpacing']) probe.style[key] = css[key]
+    probe.textContent = node.textContent.trim()
+    document.body.append(probe)
+    try { return probe.getBoundingClientRect().width } finally { probe.remove() }
+  }
   const intrinsic = node => {
-    if (node.nodeType === 3) {
-      if (!node.textContent.trim()) return 0
-      const css = getComputedStyle(node.parentElement)
-      const range = document.createRange()
-      range.selectNodeContents(node)
-      const rects = [...range.getClientRects()].filter(rect => rect.width > 0)
-      if (rects.length <= 1) return range.getBoundingClientRect().width
-      const probe = document.createElement('span')
-      probe.style.cssText = 'position:fixed;visibility:hidden;white-space:pre;pointer-events:none'
-      for (const key of ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariantNumeric', 'fontVariationSettings', 'fontFeatureSettings', 'letterSpacing', 'wordSpacing']) probe.style[key] = css[key]
-      probe.textContent = node.textContent.trim()
-      document.body.append(probe)
-      try { return probe.getBoundingClientRect().width } finally { probe.remove() }
-    }
+    if (node.nodeType === 3) return node.textContent.trim() ? textWidth(node) : 0
     if (node.nodeType !== 1) return 0
     const css = getComputedStyle(node)
     if (css.display === 'none' || css.visibility === 'hidden' || node.matches('.sr-only, [hidden], [role="menu"], [role="tooltip"]')) return 0
@@ -45,7 +45,8 @@ export function fitListColumns(frame) {
       const style = getComputedStyle(node, position)
       return style.content === 'none' || style.content === 'normal' || style.display === 'none' ? 0 : number(style.width)
     }
-    const sizes = [pseudo('::before'), ...[...node.childNodes].map(intrinsic), pseudo('::after')].filter(size => size > 0)
+    const textOnly = node.childElementCount === 0 && node.textContent.trim()
+    const sizes = [pseudo('::before'), ...(textOnly ? [textWidth(node)] : [...node.childNodes].map(intrinsic)), pseudo('::after')].filter(size => size > 0)
     if (!sizes.length && !node.textContent.trim()) return controlsOnly && number(css.flexGrow) > 0 ? 0 : node.getBoundingClientRect().width
     const inline = css.display === 'inline' || css.display === 'inline-flex' || (css.display === 'flex' && css.flexDirection === 'row')
     const gapItems = controlsOnly ? [...node.childNodes].filter(child => child.nodeType === 3 ? child.textContent.trim() : child.nodeType === 1 && getComputedStyle(child).display !== 'none').length + Number(pseudo('::before') > 0) + Number(pseudo('::after') > 0) : sizes.length
@@ -66,7 +67,14 @@ export function fitListColumns(frame) {
   frame.removeAttribute('data-content-stacked')
   if (flexibleContent && !controlsOnly && ![...body.children].some(cell => cell.hasAttribute('data-cell-weight'))) {
     const header = rows.find(row => row.parentElement.tagName === 'THEAD')
-    const minimum = widths.map((width, index) => width === null ? 0 : Math.min(width, Math.max(header?.children[index] ? intrinsic(header.children[index]) : 0, number(getComputedStyle(body.children[index]).fontSize))))
+    const shortContentWidth = cell => {
+      const content = [cell, ...cell.querySelectorAll('*')].filter(node => node.childElementCount === 0 && node.getBoundingClientRect().width && node.textContent.trim() && !node.closest('[hidden], [aria-hidden="true"], .sr-only, [role="note"]'))
+      const leaves = content.filter(node => node.textContent.trim().replace(/\s/g, '').length <= 16)
+      if (content.length && leaves.length === content.length) return intrinsic(cell)
+      const padding = getComputedStyle(cell)
+      return Math.max(0, ...leaves.map(textWidth)) + number(padding.paddingLeft) + number(padding.paddingRight)
+    }
+    const minimum = widths.map((width, index) => width === null ? 0 : Math.min(width, Math.max(header?.children[index] ? intrinsic(header.children[index]) : 0, number(getComputedStyle(body.children[index]).fontSize), ...rows.map(row => row.children[index] ? shortContentWidth(row.children[index]) : 0))))
     const fixed = widths.map((_, index) => rows.some(row => {
       const cell = row.children[index]
       return cell && (cell.matches('[data-list-number], [data-list-date-time]') || cell.querySelector('button,input,a,[role="button"],[data-list-date-time]'))
@@ -75,7 +83,7 @@ export function fitListColumns(frame) {
     const rowStyle = getComputedStyle(body)
     const contentBudget = table.getBoundingClientRect().width - number(rowStyle.paddingLeft) - number(rowStyle.paddingRight) - number(rowStyle.columnGap) * (body.children.length - 1)
     const nameContent = Math.max(...rows.map(row => intrinsic(row.children[nameIndex])))
-    const nameMinimum = Math.max(number(getComputedStyle(body.children[nameIndex]).minWidth), header?.children[nameIndex] ? intrinsic(header.children[nameIndex]) : 0)
+    const nameMinimum = Math.max(number(getComputedStyle(body.children[nameIndex]).minWidth), header?.children[nameIndex] ? intrinsic(header.children[nameIndex]) : 0, ...rows.map(row => row.children[nameIndex] ? shortContentWidth(row.children[nameIndex]) : 0))
     const minimumTotal = minimum.reduce((sum, width, index) => sum + (fixed[index] ? 0 : width), 0)
     const nameBudget = Math.max(nameMinimum, Math.min(nameContent, contentBudget - controls - minimumTotal))
     const available = Math.max(0, contentBudget - nameBudget - controls)

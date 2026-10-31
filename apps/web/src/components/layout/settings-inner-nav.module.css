@@ -6,7 +6,7 @@
  * 置き方は2つ。
  *   - inline（画面が白い板の中、題の下の左に置く）：いつも左の欄。絵の形。
  *   - 外（まだ移っていない画面。app-shell が白い板の外に置く）：
- *       1280px 以上は左の欄、1024〜1279px は上の帯、1024px 未満は畳む（MIGRATION-RISKS §4）。
+ *       PC は左の欄、1024px 未満は畳む。
  */
 .root {
   display: none;
@@ -31,37 +31,7 @@
   box-shadow: var(--tpl-setnav-divider);
 }
 
-@media (min-width: 1024px) and (max-width: 1279.98px) {
-  .root:not(.inline) {
-    display: flex;
-    align-items: center;
-    gap: var(--tpl-setnav-item-gap);
-    overflow-x: auto;
-    border-bottom: 1px solid var(--color-hairline);
-    padding: var(--tpl-setnav-band-pad);
-  }
-
-  .root:not(.inline) .heading {
-    display: none;
-  }
-
-  .root:not(.inline) .list {
-    flex-direction: row;
-    align-items: center;
-  }
-
-  .root:not(.inline) .item,
-  .root:not(.inline) .child {
-    white-space: nowrap;
-  }
-
-  .root:not(.inline) .children {
-    flex-direction: row;
-    margin: 0;
-  }
-}
-
-@media (min-width: 1280px) {
+@media (min-width: 1024px) {
   .root:not(.inline) {
     display: flex;
     flex-direction: column;
@@ -165,7 +135,3 @@
 }
 
 .child.itemActive { font-weight: 600; }
-@media (min-width: 1024px) and (max-width: 1279.98px) {
-  .root:not(.inline) { overflow: visible; height: auto; min-width: 0; }
-  .root:not(.inline) .list { flex-wrap: wrap; min-width: 0; width: 100%; }
-}

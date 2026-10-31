@@ -5,7 +5,7 @@ import { buildSegmentQuery } from '../../services/segment-query.js';
 import { type SegmentCondition } from '@line-crm/shared';
 import { createTestD1, insertFriend } from '../../test-utils/d1-sqlite.js';
 
-/** first だけを返す最小のモック。SQLとバインドも見られるようにする。 */
+/** アカウント一覧と集計を分けて返し、SQLとバインドも記録する。 */
 function makeDb(row: { total: number | null; hidden: number | null } | null) {
   const calls: Array<{ sql: string; binds: unknown[] }> = [];
   const db = {
@@ -17,6 +17,7 @@ function makeDb(row: { total: number | null; hidden: number | null } | null) {
             async first() {
               return row;
             },
+            async all() { return { results: [] }; },
           };
         },
         async first() {
@@ -48,8 +49,9 @@ describe('届く人数', () => {
   it('タグがあれば絞り込みに入る', async () => {
     const { db, calls } = makeDb({ total: 30, hidden: 0 });
     await countAudience(db, { targetType: 'tag', targetTagId: 't-1' });
-    expect(calls[0].sql).toContain('friend_tags');
-    expect(calls[0].binds).toContain('t-1');
+    const aggregate = calls.find(call => call.sql.includes('friend_tags'));
+    expect(aggregate).toBeDefined();
+    expect(aggregate?.binds).toContain('t-1');
   });
 
   it('複数アカウントで対象が空なら0人', async () => {

@@ -1,9 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import type { AccountStyle } from '@line-crm/shared'
+import type { AccountStyle, LineAccount } from '@line-crm/shared'
 import { buildSteps, stepsForStyle, stoppedReasons, type StepResult, type StyleSetupProgress } from './steps'
 
 const keys = ['attributes', 'friendAdd', 'scenario'] as const
 const styles: AccountStyle[] = ['restaurant', 'lesson', 'salon', 'consult', 'ec']
+
+it('LINEアカウントを登録済みなら接続状態に関係なく段1を完了にする', () => {
+  const input = {
+    accounts: [{ id: 'account-1', isActive: false, channelSecretConfigured: false, webhook: { status: 'unknown' } } as LineAccount],
+    featureSet: null, tagCount: 0, friendFieldCount: 0, friendAdd: null,
+    friendAddDraft: null, scenarios: [], role: 'owner' as const,
+  }
+  expect(buildSteps(input)[0].state).toBe('done')
+  expect(buildSteps({ ...input, accounts: [] })[0].state).toBe('todo')
+})
 const oldDone = (): StepResult[] => keys.map((key, index) => ({
   key, ordinal: String(index + 3), title: '旧配信の設定', sub: 'タグと配信', state: 'done',
   condition: '旧配信の到達条件', next: 'タグを増やす', action: { label: '旧配信へ', href: '/tags' }, blockedReason: null,

@@ -443,7 +443,7 @@ export default function OpsSupportV8() {
               {(
                 <>
                   <div className={styles.draft}>
-                    <div className={styles.draftHead}>
+                    <div className={styles.draftHead}><ListToolbarRow>
                       <Sparkles aria-hidden="true" />
                       <span className={styles.draftTitle} title={replyFromAi ? `${formatDateTime(replyFromAi.generatedAt)} に作成` : undefined}>{aiBusy ? 'AI の下書きを作成中…' : replyFromAi ? 'AI の下書き' : '返信'}</span>
                       <span className={styles.spacer} />
@@ -459,7 +459,7 @@ export default function OpsSupportV8() {
                           <Sparkles aria-hidden="true" />AIで下書きを作る
                         </Button>
                       )}
-                    </div>
+                    </ListToolbarRow></div>
                     {aiBusy ? (
                       <p className={styles.draftNote} role="status">AIが下書きを作っています。5〜15秒ほどかかります。</p>
                     ) : (

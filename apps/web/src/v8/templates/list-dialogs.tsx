@@ -8,7 +8,7 @@ import type { UsageRow } from './words'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DetailPanel from '@/components/shared/detail-panel'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import DialogChoiceCards from '@/components/shared/dialog-choice-cards'
 import { emptyValue } from '@/components/shared/empty-value'
 import FolderAddDialog from '@/components/shared/folder-add-dialog'
@@ -198,8 +198,8 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
           setBlockedDelete(null)
           setBlockedUsage(null)
         }}
-        footer={
-          <div className={styles.centerFooter}>
+        footer={blockedDelete ? (
+          <DialogActions>
             <Button
               type="button"
               variant="secondary"
@@ -210,8 +210,7 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
             >
               閉じる
             </Button>
-            {blockedDelete ? (
-              <Button
+            <Button
                 type="button"
                 variant="secondary"
                 onClick={() => {
@@ -224,9 +223,8 @@ export function renderTemplateDialogs({ activeFolderName, activeIndex, activeTem
                 <List size={16} aria-hidden="true" />
                 使っている所をすべて見る
               </Button>
-            ) : null}
-          </div>
-        }
+          </DialogActions>
+        ) : undefined}
       >
         {blockedLoading ? (
           <p className={styles.faintText}>使用先を読み込んでいます…</p>

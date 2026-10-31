@@ -4,14 +4,14 @@ export const gap1Paths:Record<string,Record<string,ReturnType<typeof operation>>
 (gap1Paths["/api/line-accounts/{id}/senders/{senderId}"]??={}).delete=operation("DELETE","/api/line-accounts/{id}/senders/{senderId}","送信者名・画像の登録、編集、保管。実送信なし。");
 (gap1Paths["/api/booking/admin/bookings/{id}/charges"]??={}).get=operation("GET","/api/booking/admin/bookings/{id}/charges","取消料の見積り・模擬請求・免除・模擬返金。実決済なし。");
 (gap1Paths["/api/booking/admin/calendar-sync"]??={}).get=operation("GET","/api/booking/admin/calendar-sync","店と担当のGoogle予定の読取/書込スイッチ・既存同期の再試行。");
-(gap1Paths["/api/booking/admin/cancellation-policy"]??={}).get=operation("GET","/api/booking/admin/cancellation-policy","取消規則と取消料の見積り。");
+(gap1Paths["/api/booking/admin/cancellation-policy"]??={}).get=operation("GET","/api/booking/admin/cancellation-policy","本人の予約の取消規則と取消料の見積り。booking_idを指定し、feeNow・freeUntil・cancelDeadlineAt・canCancel・lockVersionを返す。");
 (gap1Paths["/api/booking/admin/menus/{id}/meeting-url"]??={}).get=operation("GET","/api/booking/admin/menus/{id}/meeting-url","会議URLの手入力・固定URLの反映。外部の会議は作成しない。");
 (gap1Paths["/api/booking/admin/staff/{id}/calendar-sync"]??={}).get=operation("GET","/api/booking/admin/staff/{id}/calendar-sync","店と担当のGoogle予定の読取/書込スイッチ・既存同期の再試行。");
 (gap1Paths["/api/booking/admin/staff/{id}/meeting-url"]??={}).get=operation("GET","/api/booking/admin/staff/{id}/meeting-url","会議URLの手入力・固定URLの反映。外部の会議は作成しない。");
 (gap1Paths["/api/broadcasts/{id}/send-preview"]??={}).get=operation("GET","/api/broadcasts/{id}/send-preview","送信前の対象人数・同意・時間帯の見本。送信しない。");
 (gap1Paths["/api/hq/broadcasts/{id}/send-preview"]??={}).get=operation("GET","/api/hq/broadcasts/{id}/send-preview","送信前の対象人数・同意・時間帯の見本。送信しない。");
 (gap1Paths["/api/inbox/routing-settings"]??={}).get=operation("GET","/api/inbox/routing-settings","受信箱の自動担当割当の設定。");
-(gap1Paths["/api/liff/booking/cancellation-quote"]??={}).get=operation("GET","/api/liff/booking/cancellation-quote","取消規則と取消料の見積り。");
+(gap1Paths["/api/liff/booking/cancellation-quote"]??={}).get=operation("GET","/api/liff/booking/cancellation-quote","本人の予約の取消規則と取消料の見積り。booking_idを指定し、feeNow・freeUntil・cancelDeadlineAt・canCancel・lockVersionを返す。");
 (gap1Paths["/api/line-accounts/{id}/senders"]??={}).get=operation("GET","/api/line-accounts/{id}/senders","送信者名・画像の登録、編集、保管。実送信なし。");
 (gap1Paths["/api/booking/admin/bookings/{id}/calendar/rewrite"]??={}).post=operation("POST","/api/booking/admin/bookings/{id}/calendar/rewrite","店と担当のGoogle予定の読取/書込スイッチ・既存同期の再試行。");
 (gap1Paths["/api/booking/admin/bookings/{id}/charges"]??={}).post=operation("POST","/api/booking/admin/bookings/{id}/charges","取消料の見積り・模擬請求・免除・模擬返金。実決済なし。");
@@ -23,7 +23,7 @@ export const gap1Paths:Record<string,Record<string,ReturnType<typeof operation>>
 (gap1Paths["/api/liff/booking/setup-webhook"]??={}).post=operation("POST","/api/liff/booking/setup-webhook","試験用の支払方法登録。実決済なし。");
 (gap1Paths["/api/line-accounts/{id}/senders"]??={}).post=operation("POST","/api/line-accounts/{id}/senders","送信者名・画像の登録、編集、保管。実送信なし。");
 (gap1Paths["/api/booking/admin/calendar-sync"]??={}).put=operation("PUT","/api/booking/admin/calendar-sync","店と担当のGoogle予定の読取/書込スイッチ・既存同期の再試行。");
-(gap1Paths["/api/booking/admin/cancellation-policy"]??={}).put=operation("PUT","/api/booking/admin/cancellation-policy","取消規則と取消料の見積り。");
+(gap1Paths["/api/booking/admin/cancellation-policy"]??={}).put=operation("PUT","/api/booking/admin/cancellation-policy","本人の予約の取消規則と取消料の見積り。booking_idを指定し、feeNow・freeUntil・cancelDeadlineAt・canCancel・lockVersionを返す。");
 (gap1Paths["/api/booking/admin/menus/{id}/meeting-url"]??={}).put=operation("PUT","/api/booking/admin/menus/{id}/meeting-url","会議URLの手入力・固定URLの反映。外部の会議は作成しない。");
 (gap1Paths["/api/booking/admin/staff/{id}/calendar-sync"]??={}).put=operation("PUT","/api/booking/admin/staff/{id}/calendar-sync","店と担当のGoogle予定の読取/書込スイッチ・既存同期の再試行。");
 (gap1Paths["/api/booking/admin/staff/{id}/meeting-url"]??={}).put=operation("PUT","/api/booking/admin/staff/{id}/meeting-url","会議URLの手入力・固定URLの反映。外部の会議は作成しない。");

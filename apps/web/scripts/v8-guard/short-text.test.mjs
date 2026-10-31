@@ -208,3 +208,37 @@ test('an entity selector cannot extend into the adjacent checkbox hit area', asy
     assert.deepEqual(shortTextFindings(await page.evaluate(collectShortText)), [])
   } finally { await browser.close() }
 })
+
+test('content sizing combines split block labels and preserves short auxiliary text beside long names', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { connectGuardBrowser } = await import('./browser-session.mjs')
+  const { collectShortText } = await import('./short-text-browser.mjs')
+  const { fitListColumns } = await import('../../src/components/shared/list-column-sizing.mjs')
+  const css = readFileSync(new URL('../../src/components/shared/data-table.module.css', import.meta.url), 'utf8').replace(/:global\(([^)]+)\)/g, '$1')
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    for (const width of [640, 920]) {
+      await page.setContent(`<style>${css}*{box-sizing:border-box}.frame{width:${width}px;--table-column-gap:12px;--table-column-padding:0;--table-head-padding:0;--table-head-height:40px;--table-row-height:auto;--table-head-text-size:13px;--table-body-text-size:13px;font:13px sans-serif}.table{width:100%}th,td{font:inherit}.sub{display:block}.long{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;max-width:100%}</style><main><div class="frame" data-shared-part="list-table" data-column-layout data-column-sizing="content"><table class="table"><thead><tr data-table-layout="columns"><th data-cell-grow>名前</th><th>担当</th><th>接続</th><th>件数</th><th>操作</th></tr></thead><tbody><tr data-table-layout="columns"><td data-cell-grow><a href="#" data-row-link class="long" title="長い名前を省略しても短い補助の項目を押しつぶさないことを確かめる">長い名前を省略しても短い補助の項目を押しつぶさないことを確かめる</a><span class="long">長い説明が何段分もあっても短い文字の幅を先に確保するための見本です</span></td><td><span class="sub">佐々木・高田</span></td><td><span class="sub">ログイン：<!-- -->ひも付けなし</span></td><td data-list-number>12<!-- -->件</td><td><button>…</button></td></tr></tbody></table></div></main>`)
+      await page.locator('td:nth-child(3)').evaluate(cell => { cell.setAttribute('data-content-support-column', ''); cell.style.setProperty('--list-content-column-width', '72px') })
+      assert.ok(shortTextFindings(await page.evaluate(collectShortText)).some(row => row.text === 'ログイン：ひも付けなし' && row.lines > 1))
+      await page.locator('.frame').evaluate(fitListColumns)
+      assert.deepEqual(shortTextFindings(await page.evaluate(collectShortText)), [])
+      const measurements = await page.locator('tbody td:not(:first-child)').evaluateAll(cells => cells.map(cell => ({width:cell.getBoundingClientRect().width, text:cell.textContent})))
+      assert.ok(measurements.every(cell => cell.width > 0))
+    }
+  } finally { await browser.close() }
+})
+
+test('short table cell labels cannot overflow into their neighbours even when overflow is visible', async () => {
+  const { connectGuardBrowser } = await import('./browser-session.mjs')
+  const { collectShortText } = await import('./short-text-browser.mjs')
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><div data-shared-part="list-table" role="table"><div role="row"><span role="cell" style="display:block;width:20px;white-space:nowrap">Connected account</span></div></div></main>')
+    assert.ok(shortTextFindings(await page.evaluate(collectShortText)).some(row => row.clipped && row.clipper === 'CELL'))
+    await page.locator('[role="cell"]').evaluate(cell => { cell.style.width = '240px' })
+    assert.deepEqual(shortTextFindings(await page.evaluate(collectShortText)), [])
+  } finally { await browser.close() }
+})

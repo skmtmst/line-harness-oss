@@ -305,7 +305,7 @@ export function McpIssuedDialog({ issued, onClose }: { issued: McpIssued | null;
         designNode="Ge1vp"
         designWidth={620}
         onCancel={() => setConfirmClose(true)}
-        footer={<div className={styles.issuedFooter}><Button variant="primary" onClick={onClose}>コピーしたので閉じる</Button></div>}
+
       >
         {issued ? (
           <div className={styles.issued}>
