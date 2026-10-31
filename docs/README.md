@@ -1046,3 +1046,4 @@
 - [機能設定の利用条件](release-log/unreleased/1992-masato-feature-settings-self-gate.md) — 反映履歴、確認 2026-10-31。
 - [検証環境への配備手順](release-log/unreleased/1994-masato-cf-staging-deploy.md) — 反映履歴、確認 2026-10-31。
 - [統括の比較と分析](release-log/unreleased/1996-masato-hq-comparison-analysis.md) — 反映履歴、確認 2026-10-31。
+- [お気に入りのショートカットと予告表示](release-log/unreleased/1995-masato-sidebar-favorite-shortcuts.md) — 反映履歴、確認 2026-10-31。
