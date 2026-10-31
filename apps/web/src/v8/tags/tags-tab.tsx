@@ -552,14 +552,16 @@ export default function TagsTab({
     return list
   }
 
-  /* フォルダの列。数は一覧と同じものを数える。 */
+  const folderItems = items.filter(tag => (tag.status === 'archived') === onlyArchived)
+
+  /* フォルダの列。数は一覧と同じ保管状態を数える。 */
   const folderRows: FolderPanelRow[] = [
-    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? items.length : null, color: 'var(--color-accent)', icon: <Inbox size={16} aria-hidden="true" /> },
+    { kind: 'all' as const, id: '', label: 'すべて', count: ready ? folderItems.length : null, color: 'var(--color-accent)', icon: <Inbox size={16} aria-hidden="true" /> },
     ...groups.map((group, index) => ({
       kind: 'folder' as const,
       id: group.id,
       label: group.name,
-      count: ready ? items.filter((tag) => tag.groupId === group.id).length : null,
+      count: ready ? folderItems.filter((tag) => tag.groupId === group.id).length : null,
       color: group.color,
       onEdit: canEdit ? () => { setManageFoldersOpen(false); setFolderDialog(group) } : undefined,
       onMoveUp: canEdit && index > 0 ? () => void moveGroupOrder(group, -1) : undefined,
@@ -567,7 +569,7 @@ export default function TagsTab({
       onDelete: canEdit ? () => { setManageFoldersOpen(false); setDeletingGroup(group) } : undefined,
       deleteNote: '削除しても、中のタグは未分類に残ります。',
     })),
-    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? items.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={16} aria-hidden="true" /> },
+    { kind: 'unfiled' as const, id: UNGROUPED, label: '未分類', count: ready ? folderItems.filter((tag) => !tag.groupId).length : null, color: 'var(--color-ink-disabled)', icon: <FolderOpen size={16} aria-hidden="true" /> },
   ]
 
   const folderSelectOptions = [

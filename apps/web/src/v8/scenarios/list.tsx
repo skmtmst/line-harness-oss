@@ -1,4 +1,7 @@
 'use client'
+
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
 import { DetailContent, DetailField, DetailSection } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import FolderSelect from '@/components/shared/folder-select'
@@ -858,7 +861,7 @@ export default function ScenariosListV8() {
       icon: CheckCheck,
       value: statsFailed ? null : stats?.scenarios.completed ?? null,
       unit: '人',
-      detail: stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : emptyValue('unknown'),
+      detail: stats && overallTotal !== null ? `全${formatNumber(overallTotal)}件の合計` : emptyValue('unknown'),
     },
     {
       title: '今週送った数',
@@ -1331,6 +1334,7 @@ export default function ScenariosListV8() {
               value={kpi.value}
               unit={kpi.value == null ? '' : kpi.unit}
               detail={kpi.detail}
+              help={kpi.title === '最後まで配信した人' && stats ? scenarioCompletionDetail(stats.scenarios.subscribers, stats.scenarios.completed) : undefined}
               detailLayout={narrow ? 'qualifier' : undefined}
             />
           ))}
@@ -1468,7 +1472,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
         <></>
       </>}
       folders={<>
-        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" confirmDisabled={!publishAccess.allowed || !scenarioList.loaded} confirmLockedReason={publishAccess.reason} onCancel={() => setPendingStop(null)} busy={stopBusy} error={stopError || undefined} onSuccess={() => setPendingStop(null)} onConfirm={() => runConfirmedStop()} />
+        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" confirmDisabled={!publishAccess.allowed || !scenarioList.loaded} confirmLockedReason={publishAccess.reason} onCancel={() => setPendingStop(null)} busy={stopBusy} error={stopError || undefined} onSuccess={() => setPendingStop(null)} onConfirm={() => runConfirmedStop()} ><OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} /></ConfirmDialog>
         {folderPanel}
       </>}
       collapsedFolders={<>{createButton(false)}{folderSelect}</>}

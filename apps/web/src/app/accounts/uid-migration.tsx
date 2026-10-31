@@ -322,6 +322,7 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
       />
       <RollbackConfirmDialog
         active={active}
+        accounts={accounts}
         me={me}
         busy={busy || detailBusy}
         lockedReason={ownerLockReason}

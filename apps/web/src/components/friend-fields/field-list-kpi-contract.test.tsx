@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 it('取得していない使用数をundefinedと出さない', async () => {
   stats.load.mockResolvedValue({ success: true, data: { total: 1, registeredFriends: 2, formLinks: 0, updatedThisMonth: 0 } })
   const view = drawFields()
-  await view.waitFor(() => expect(view.details()[0]).toContain('使っている数は未集計'))
+  await view.waitFor(() => expect(view.details()[0]).toContain('値の登録がある項目数は未集計'))
   expect(view.container.textContent).not.toContain('undefined')
   expect(view.numbers()[0]).toBe('1')
 })

@@ -101,6 +101,13 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
       ? c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403)
       : c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
   }
+  const resultingTagId = body.targetTagId !== undefined ? body.targetTagId : existing.target_tag_id;
+  const reservesBroadcast = body.saveAsDraft !== true
+    && (body.scheduledAt !== undefined ? Boolean(body.scheduledAt) : existing.status === 'scheduled');
+  // 書きかけの保存は許可し、予約として確定するときだけ宛先を必須にする。
+  if (reservesBroadcast && resultingTargetType === 'tag' && !resultingTagId) {
+    return inputError(c, { success: false, error: '送る相手を選んでください' }, 400, ["targetTagId"]);
+  }
   const resultingAccountId = resultingTargetType === 'multi-account-dedup'
     ? null
     : (body.lineAccountId !== undefined

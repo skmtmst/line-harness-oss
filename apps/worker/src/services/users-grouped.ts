@@ -89,6 +89,8 @@ export interface UsersGroupedOptions {
   q?: string;
   onlyDups?: boolean;
   account?: string;
+  /** 選択中の店舗への所属。任意の絞り込みと両立させる固定条件。 */
+  memberAccountId?: string;
   /**
    * UID連携の絞り込みはサーバー側の全件にかける。
    * 画面側で表示中ページだけを絞ると「1人中 51〜1人」のような
@@ -239,7 +241,9 @@ async function computeAllRows(db: D1Database, allowedAccountIds?: readonly strin
 }
 
 function applyFilters(rows: UnifiedUserRow[], opts: UsersGroupedOptions): UnifiedUserRow[] {
-  let filtered = rows;
+  let filtered = opts.memberAccountId
+    ? rows.filter(row => row.accounts.some(account => account.accountId === opts.memberAccountId))
+    : rows;
   if (opts.onlyDups) {
     filtered = filtered.filter((r) => r.isDuplicate);
   }

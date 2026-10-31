@@ -373,7 +373,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
 
       <MigrationItemDialog detailItem={m.detailItem} active={active} canDecide={canDecideItems} lockedReason={m.managerLockReason} busy={m.busy || m.detailBusy} detailError={m.detailError} onClose={() => { m.setDetailItem(null); m.setDetailError(null) }} decide={(item, decision) => void m.decide(item, decision)} />
       <ExecuteConfirmDialog active={active} accounts={m.accounts} me={m.me} busy={m.busy || m.detailBusy} lockedReason={m.ownerLockReason} open={m.confirmExecute} error={m.executeError} canRun={m.canRunExecute} onConfirm={() => m.execute()} onCancel={() => { if (!m.busy) m.setConfirmExecute(false) }} />
-      <RollbackConfirmDialog active={active} me={m.me} busy={m.busy || m.detailBusy} lockedReason={m.ownerLockReason} open={m.confirmRollback} error={m.rollbackError} conflicts={m.rollbackConflicts} canRun={m.canRunRollback} onConfirm={() => m.rollback()} onCancel={() => { if (!m.busy) { m.setConfirmRollback(false); m.setRollbackConflicts([]) } }} />
+      <RollbackConfirmDialog active={active} accounts={m.accounts} me={m.me} busy={m.busy || m.detailBusy} lockedReason={m.ownerLockReason} open={m.confirmRollback} error={m.rollbackError} conflicts={m.rollbackConflicts} canRun={m.canRunRollback} onConfirm={() => m.rollback()} onCancel={() => { if (!m.busy) { m.setConfirmRollback(false); m.setRollbackConflicts([]) } }} />
       <ConfirmDialog
         open={bulkOpen && bulkConfirmation.current.runId === active?.id}
         title="要確認をまとめて結び付けます"

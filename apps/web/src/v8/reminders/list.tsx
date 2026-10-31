@@ -1,4 +1,7 @@
 'use client'
+
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
 import StatusBadge from '@/components/shared/status-badge'
 import { DetailContent, DetailField } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
@@ -202,6 +205,8 @@ export default function RemindersListV8() {
 
   /* 窓・まとめての帯の状態。 */
   const [bulkPauseIds, setBulkPauseIds] = useState<string[] | null>(null)
+  const [bulkPauseAccountId, setBulkPauseAccountId] = useState(selectedAccountId)
+  useEffect(() => { setBulkPauseIds(null) }, [selectedAccountId])
   const [pauseTarget, setPauseTarget] = useState<ReminderRow | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ReminderRow | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -1084,7 +1089,7 @@ export default function RemindersListV8() {
               variant="secondary"
               disabled={stoppableIds.length === 0}
               title={stoppableIds.length === 0 ? '有効なリマインダが選ばれていません' : undefined}
-              onClick={() => setBulkPauseIds(stoppableIds)}
+              onClick={() => { setBulkPauseAccountId(selectedAccountId); setBulkPauseIds(stoppableIds) }}
             >
               <Square size={16} aria-hidden="true" style={{ marginRight: 4, verticalAlign: -1 }} />
               止める
@@ -1160,8 +1165,8 @@ export default function RemindersListV8() {
         busy={stopBusy} error={stopError || undefined}
         confirmDisabled={!canEdit} confirmLockedReason={moveLockedReason}
         onSuccess={() => setBulkPauseIds(null)}
-        onConfirm={() => bulkPauseIds ? stopConfirmed(bulkPauseIds, bulkPauseIds) : undefined}
-      />
+        onConfirm={() => bulkPauseIds && bulkPauseAccountId === selectedAccountId ? stopConfirmed(bulkPauseIds, bulkPauseIds) : undefined}
+      ><OperationTargetSummary accounts={[{ id: bulkPauseAccountId ?? '' }]} /></ConfirmDialog>
       {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog
         open={pauseTarget !== null}

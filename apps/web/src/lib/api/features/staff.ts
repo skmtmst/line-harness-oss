@@ -63,6 +63,7 @@ export const staffMethods = {
       q?: string;
       onlyDups?: boolean;
       account?: string;
+      memberAccountId?: string;
       /** FRIEND-09: UID連携の絞り込みは全件へかけるサーバー条件。 */
       uid?: 'linked' | 'unlinked';
       page?: number;
@@ -73,12 +74,14 @@ export const staffMethods = {
       if (opts?.q) p.set('q', opts.q);
       if (opts?.onlyDups) p.set('onlyDups', '1');
       if (opts?.account) p.set('account', opts.account);
+      if (opts?.memberAccountId) p.set('memberAccountId', opts.memberAccountId);
       if (opts?.uid) p.set('uid', opts.uid);
       if (opts?.page) p.set('page', String(opts.page));
       if (opts?.pageSize) p.set('pageSize', String(opts.pageSize));
       if (opts?.forceRefresh) p.set('refresh', '1');
       const qs = p.toString();
       return fetchApi<ApiResponse<{
+        memberAccountId?: string;
         total: number;
         page: number;
         pageSize: number;

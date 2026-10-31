@@ -1,4 +1,7 @@
 'use client'
+
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
 import { lockMenuItems } from '@/components/shared/permission-lock'
 import { useGooglePermission } from './use-google-permission'
 
@@ -750,6 +753,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
   const [post, setPost] = useState<GooglePost | null>(null)
   const [igPreview, setIgPreview] = useState<{ filename: string; url: string } | null>(null)
   const [storeName, setStoreName] = useState('')
+  const [storeId, setStoreId] = useState('')
   const [writeEnabled, setWriteEnabled] = useState(true)
   const [canPublish, setCanPublish] = useState(false)
   const { allowed: canSend, lockedReason } = useGooglePermission('manager', canPublish)
@@ -775,6 +779,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
         setIgPreview(media.success ? media.data.item : null)
       } else setIgPreview(null)
       setStoreName(response.store.name)
+      setStoreId(response.store.id)
       setWriteEnabled(response.writeEnabled)
       setCanPublish(response.canPublish)
     } catch (err) {
@@ -823,6 +828,7 @@ export function PostConfirm({ accountId, id, go }: { accountId: string; id: stri
     <SaveErrorScope errors={saveErrors}><Card appearance="outlined" layout="vertical" padding="default" gap="normal" data-design-node="jqSak">
       <SectionHeader size="small" title={<>{done ? 'この投稿をGoogleに送信しました' : 'この投稿を予約しますか？'}</>} />
       <p className={styles.muted}>Googleに公開される内容と日時を確認してください。</p>
+      <OperationTargetSummary accounts={[{ id: accountId }]} store={{ id: storeId, name: storeName }} />
       {sent ? <Notice tone="success">{sent.alreadyPublished ? 'この内容はすでにGoogleに届いていました。送信はしていません。' : post.status === 'published' ? 'Googleに投稿を送信し、公開を確認しました。' : 'Googleに投稿を送信しました。反映を確認できるまで「審査中」と表示します。'}</Notice> : null}
       {post.status === 'rejected' ? <Notice tone="danger">Googleの審査で公開されませんでした。内容を見直して作り直してください。</Notice> : null}
       {post.status === 'pending_confirm' && !sent ? <Notice tone="warn">前回の送信結果を確認できていません。「この内容で予約する」を押すと、先にGoogle側の状態を照合してから送信します。</Notice> : null}

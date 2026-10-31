@@ -120,6 +120,7 @@ export function audienceSummary(
     targetType: string
     targetTagId?: string | null
     segmentConditions?: SegmentCondition | null
+    draftPayload?: Record<string, unknown> | null
   },
   tagName: (id: string) => string | null,
   /**
@@ -132,6 +133,7 @@ export function audienceSummary(
   if (broadcast.targetType === 'multi-account-dedup') return '複数アカウント（重複除外）'
   if (broadcast.targetType === 'all') return '友だち全員'
   if (broadcast.targetType === 'tag') {
+    if (!broadcast.targetTagId && broadcast.draftPayload?.draftTargetMode === 'unselected') return '送る相手は未選択'
     const name = broadcast.targetTagId ? tagName(broadcast.targetTagId) : null
     return name ? `タグ：${name}` : 'タグ（削除済み）'
   }

@@ -3,7 +3,7 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
-const actions = vi.hoisted(() => ({ setStatus: vi.fn(), clearFilters: vi.fn(), loadCandidates: vi.fn(), filtering: false, failure: '' }))
+const actions = vi.hoisted(() => ({ setStatus: vi.fn(), clearFilters: vi.fn(), loadCandidates: vi.fn(), filtering: false, failure: '', stats: null as import('./use-duplicates-data').DuplicatesStatsData | null }))
 
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/lib/staff-role', () => ({ useStaffIdentity: () => ({ id: 'staff-test' }) }))
@@ -13,7 +13,7 @@ vi.mock('./use-duplicates-data', () => ({
   useDuplicatesData: () => ({
     candidateTotal: 0, unfilteredCandidates: !actions.filtering, statusCounts: null,
     duplicateTotalText: '—', duplicateDetail: '読み込めませんでした', lowConfidenceCount: null,
-    candidates: [], data: null, query: '', status: '', page: 1,
+    candidates: [], data: actions.stats, query: '', status: '', page: 1,
     statsFailure: null, error: '', candidateError: actions.failure, candidatesLoading: false,
     setQuery: vi.fn(), setStatus: actions.setStatus, setPage: vi.fn(), clearFilters: actions.clearFilters, loadCandidates: actions.loadCandidates, load: vi.fn(), detect: vi.fn(),
   }),
@@ -21,7 +21,7 @@ vi.mock('./use-duplicates-data', () => ({
 
 import DuplicatesList from './list'
 
-beforeEach(() => { actions.filtering = false; actions.failure = '' })
+beforeEach(() => { actions.filtering = false; actions.failure = ''; actions.stats = null })
 
 afterEach(() => { cleanup(); vi.clearAllMocks() })
 
@@ -67,4 +67,14 @@ it('候補の取得失敗を0件にせず、候補だけ読み直す', () => {
   expect(screen.queryByText('重複の候補はありません')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
   expect(actions.loadCandidates).toHaveBeenCalledOnce()
+})
+
+
+it('確認候補0と同じIDの重なりを区別し、登録の重なりの実数を保つ', () => {
+  actions.stats = { totalFollowing: 4, uniquePeople: 2, friendDups: 2, duplicateGroups: 2, wastedPerBroadcastYen: 0, msgUnitYen: 0, perAccount: [{ accountId: 'a', accountName: '本店', friends: 4, dups: 2, dupRate: .5 }] }
+  render(<DuplicatesList />)
+  expect(screen.getByText('重複の候補はありません')).toBeTruthy()
+  expect(screen.getByText('同じIDの登録を数えたものです。上の確認対象の候補の組数とは別の集計です。')).toBeTruthy()
+  const cells = [...screen.getByText('本店').closest('tr')!.querySelectorAll('td')].map(cell => cell.textContent)
+  expect(cells).toEqual(['本店', '4', '2', '50%'])
 })

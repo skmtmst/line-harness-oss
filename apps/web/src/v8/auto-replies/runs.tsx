@@ -9,6 +9,7 @@ import { ListToolbarFrame, ListToolbarRow } from '@/components/shared/list-toolb
 import { jstMonthStart, jstDateOffset } from '@/lib/jst-datetime'
 
 
+import ListDateTime from '@/components/shared/list-date-time'
 import SegmentedControl from '@/components/shared/segmented'
 import { RowNameLink } from '@/components/shared/table';
 import { useListUrlValue } from '@/components/shared/list-url-state';
@@ -40,7 +41,7 @@ import { canManageRole, useStaffRole } from '@/lib/staff-role';
 import { effectiveStaffRole, readStaffIdentity } from '@/lib/staff-identity-state'
 import { lockReason } from '@/components/shared/permission-lock'
 import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
-import { formatDateTime, formatNumber, formatTime, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
+import { formatDateTime, formatNumber, formatListDateTime as polishFormatListDateTime } from '@/lib/format';
 import styles from './runs.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message';
@@ -462,7 +463,7 @@ export default function AutoReplyRunsV8() {
           detail={failedCount > 0 ? '理由と送信記録を確認してください' : '記録を開始してからの合計です'} />
         <KpiCard presentation="band" icon={<Timer size={16} aria-hidden="true" />} title="平均で返すまで"
           value={data?.summary.averageResponseMs == null ? null : Number((data.summary.averageResponseMs / 1000).toFixed(1))} unit="秒"
-          detail={`最後に動いた ${data ? formatTime(data.summary.lastRunAt) : emptyValue('unknown')}`} />
+          detail={`最後に動いた ${data ? polishFormatListDateTime(data.summary.lastRunAt) : emptyValue('unknown')}`} />
       </KpiBand>
       </div>
 
@@ -523,7 +524,7 @@ export default function AutoReplyRunsV8() {
         ) : visibleItems.length === 0 ? (
           <ListState kind="empty" emptyPreset="filtered" title="条件に合う記録はありません" action={<Button onClick={clearEmptyFilters}>条件を外す</Button>} />
         ) : (
-          <DataTable columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
+          <DataTable columnSizing="content" columnLayout={{ headHeight: 'var(--polish-table-head)', rowHeight: 'var(--polish-table-row)', gap: 'var(--polish-space-card)', padding: '0 var(--tpl-list-inset)', collapseScope: 'page' }}>
             <thead>
               <TableHeadRow data-table-layout="columns">
                 <Th className={styles.colWhen}>日時</Th>
@@ -545,7 +546,7 @@ export default function AutoReplyRunsV8() {
                 return (
                   <Tr key={item.id} data-table-layout="columns" href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}>
                     <Td className={styles.colWhen}>
-                      <time dateTime={item.occurredAt} title={polishFormatListDateTime(item.occurredAt)} className={styles.when}>{formatTime(item.occurredAt)}</time>
+                      <time dateTime={item.occurredAt}><ListDateTime value={item.occurredAt} /></time>
                     </Td>
                     <PersonCell className={styles.colFriend} avatarName={item.friendName} name={item.friendId ? (
                       <RowNameLink href={`/friends/detail?id=${encodeURIComponent(item.friendId)}`}><TruncatedText value={name} /></RowNameLink>

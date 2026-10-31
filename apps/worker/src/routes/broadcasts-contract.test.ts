@@ -323,6 +323,60 @@ describe('broadcast data contracts', () => {
     await expect(conflict.json()).resolves.toMatchObject({ code: 'VERSION_CONFLICT' });
   });
 
+  it.each([
+    { label: '普通の本文', text: '書きかけ', sendBody: {} },
+    { label: '名前を差し込む本文', text: '{{name}}へのお知らせ', sendBody: {} },
+    { label: '送信の口から予約', text: '予約する本文', sendBody: { expectedVersion: 2, confirmedRecipientCount: 0, scheduledAt: '2026-09-09T10:00:00.000Z' } },
+  ])('$label: 宛先未選択の下書きは繰り返し保存して読み直せ、送信は拒否する', async ({ text, sendBody }) => {
+    const payload = { saveAsDraft: true, targetType: 'tag', targetTagId: '', draftTargetMode: 'unselected', lineAccountId: 'account-1', messageContent: text, title: '未選択の下書き' };
+    const created = await app(testDb.db).request('/api/broadcasts', json('POST', payload));
+    expect(created.status).toBe(201);
+    const { data } = await created.json() as { data: { id: string } };
+    const updated = await app(testDb.db).request(`/api/broadcasts/${data.id}`, json('PUT', { ...payload, messageContent: text + ' 続きを保存', expectedVersion: 1 }));
+    expect(updated.status).toBe(200);
+    const read = await app(testDb.db).request(`/api/broadcasts/${data.id}`);
+    await expect(read.json()).resolves.toMatchObject({ data: { targetType: 'tag', targetTagId: '', version: 2, status: 'draft', messageContent: text + ' 続きを保存', draftPayload: { draftTargetMode: 'unselected' } } });
+    const confirmation = json('POST', sendBody);
+    const sent = await app(testDb.db).request(`/api/broadcasts/${data.id}/send`, { ...confirmation, headers: { ...confirmation.headers, 'X-Confirm-Irreversible': 'broadcast-send' } });
+    expect(sent.status).toBe(400);
+    await expect(sent.json()).resolves.toMatchObject({ success: false, error: '送る相手を選んでください' });
+    expect(vi.mocked(fetch).mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(0);
+    expect(testDb.raw.prepare('SELECT status FROM broadcasts WHERE id = ?').get(data.id)).toEqual({ status: 'draft' });
+  });
+
+  it('日時を保持した未選択の下書きでも、名前だけの更新は下書きのまま保存する', async () => {
+    seedBroadcast(testDb, 'draft-retained-date', { status: 'draft', sent_at: null, target_type: 'tag', target_tag_id: null, scheduled_at: '2026-09-09T10:00:00.000Z' });
+    const res = await app(testDb.db).request('/api/broadcasts/draft-retained-date', json('PUT', { expectedVersion: 1, title: '名前を更新' }));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ data: { title: '名前を更新', status: 'draft', targetType: 'tag', targetTagId: null, scheduledAt: '2026-09-09T10:00:00.000Z', version: 2 } });
+  });
+
+  it.each(['stored', 'changed', 'cleared'])('%sの空タグの予約確定は入力も版も変えずに拒否する', async kind => {
+    seedBroadcast(testDb, 'draft-empty-target', { status: 'draft', sent_at: null, target_type: kind === 'changed' ? 'all' : 'tag', target_tag_id: kind === 'cleared' ? 'old-tag' : null });
+    const before = testDb.raw.prepare('SELECT * FROM broadcasts WHERE id = ?').get('draft-empty-target');
+    const res = await app(testDb.db).request('/api/broadcasts/draft-empty-target', json('PUT', { expectedVersion: 1, scheduledAt: '2026-09-09T10:00:00.000Z', ...(kind === 'stored' ? {} : { targetType: 'tag', targetTagId: '' }), messageContent: '送らない新しい入力' }));
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ success: false, error: '送る相手を選んでください' });
+    expect(testDb.raw.prepare('SELECT * FROM broadcasts WHERE id = ?').get('draft-empty-target')).toEqual(before);
+  });
+
+  it.each(['all', 'tag', 'segment'] as const)('明示した%sの有効な宛先なら予約として保存する', async targetType => {
+    testDb.raw.prepare("INSERT INTO tags (id, name, line_account_id) VALUES ('valid-tag', '購入者', 'account-1')").run();
+    seedBroadcast(testDb, 'draft-valid-target', { status: 'draft', sent_at: null });
+    const payload = { expectedVersion: 1, targetType, targetTagId: targetType === 'tag' ? 'valid-tag' : null, ...(targetType === 'segment' ? { segmentConditions: { operator: 'AND', rules: [{ type: 'is_following', value: true }] } } : {}), scheduledAt: '2026-09-09T10:00:00.000Z' };
+    const res = await app(testDb.db).request('/api/broadcasts/draft-valid-target', json('PUT', payload));
+    expect(res.status).toBe(200);
+    await expect(res.json()).resolves.toMatchObject({ data: { targetType, status: 'scheduled', scheduledAt: payload.scheduledAt, version: 2, messageContent: 'https://example.com/campaign' } });
+  });
+
+  it.each(['send', 'schedule'])('空タグでも%sの権限不足を先に返す', async operation => {
+    seedBroadcast(testDb, 'draft-locked-target', { status: 'draft', sent_at: null, target_type: 'tag', target_tag_id: null });
+    const req = operation === 'send' ? { ...json('POST', {}), headers: { 'Content-Type': 'application/json', 'X-Confirm-Irreversible': 'broadcast-send' } } : json('PUT', { expectedVersion: 1, scheduledAt: '2026-09-09T10:00:00.000Z' });
+    const res = await app(testDb.db, staff).request('/api/broadcasts/draft-locked-target' + (operation === 'send' ? '/send' : ''), req);
+    expect(res.status).toBe(403);
+    expect(testDb.raw.prepare('SELECT status, lock_version FROM broadcasts WHERE id = ?').get('draft-locked-target')).toEqual({ status: 'draft', lock_version: 1 });
+  });
+
   it('通常の確定で下書きの印が古くなっても、現在の予約日時と分散45分を返す', async () => {
     seedBroadcast(testDb, 'draft-choice', { status: 'draft', sent_at: null });
     const first = await app(testDb.db).request('/api/broadcasts/draft-choice', json('PUT', {

@@ -57,8 +57,10 @@ function AffiliatesInner() {
 
   useEffect(() => {
     let cancelled = false
+    setCounts({})
+    if (!selectedAccountId) return
     void Promise.allSettled([
-      api.affiliates.list(),
+      api.affiliates.list(selectedAccountId),
       api.affiliateOffers.list(),
       listAllConversionApprovals('pending', 0, { accountId: selectedAccountId }),
     ]).then(([affiliates, offers, pending]) => {
@@ -78,6 +80,8 @@ function AffiliatesInner() {
     () => ({ tab, readonly, narrow, accountId: selectedAccountId, counts, setCount, focusAffiliateId }),
     [tab, readonly, narrow, selectedAccountId, counts, setCount, focusAffiliateId],
   )
+
+  if (!selectedAccountId) return <ListState kind="empty" title="LINE公式アカウントを選んでください" description="画面上部で選ぶと、このアカウントの成果を確認できます。" />
 
   return (
     <AffiliateShell.Provider value={shell}>
