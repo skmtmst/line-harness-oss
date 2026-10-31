@@ -243,15 +243,10 @@ export function AppearanceTab(props: Props) {
         <div className={styles.cardHeadText}>
           <h2 className={styles.cardTitle}>ボタンの言葉</h2>
         </div>
-        <div className={styles.wordsHead} aria-hidden="true">
-          <span>前へ</span>
-          <span>次へ</span>
-          <span>送る</span>
-        </div>
         <SettingsFormRow layout="columns" columns={3}>
-          <SaveErrorField names={["prevLabel","options.prevLabel","prev_label","options.prev_label"]}><TextField aria-label="前へボタンの文字" value={options.prevLabel ?? ''} placeholder="前へ" onChange={(e) => onChangeOptions({ prevLabel: e.target.value })} /></SaveErrorField>
-          <SaveErrorField names={["nextLabel","options.nextLabel","next_label","options.next_label"]}><TextField aria-label="次へボタンの文字" value={options.nextLabel ?? ''} placeholder="次へ" onChange={(e) => onChangeOptions({ nextLabel: e.target.value })} /></SaveErrorField>
-          <SaveErrorField names={["submitLabel","options.submitLabel","submit_label","options.submit_label"]}><TextField aria-label="送るボタンの文字" value={options.submitLabel ?? ''} placeholder="送信する" onChange={(e) => onChangeOptions({ submitLabel: e.target.value })} /></SaveErrorField>
+          <Field label="前へ" htmlFor="fe-prev-label"><SaveErrorField names={["prevLabel","options.prevLabel","prev_label","options.prev_label"]}><TextField id="fe-prev-label" aria-label="前へボタンの文字" value={options.prevLabel ?? ''} placeholder="前へ" onChange={(e) => onChangeOptions({ prevLabel: e.target.value })} /></SaveErrorField></Field>
+          <Field label="次へ" htmlFor="fe-next-label"><SaveErrorField names={["nextLabel","options.nextLabel","next_label","options.next_label"]}><TextField id="fe-next-label" aria-label="次へボタンの文字" value={options.nextLabel ?? ''} placeholder="次へ" onChange={(e) => onChangeOptions({ nextLabel: e.target.value })} /></SaveErrorField></Field>
+          <Field label="送る" htmlFor="fe-submit-label"><SaveErrorField names={["submitLabel","options.submitLabel","submit_label","options.submit_label"]}><TextField id="fe-submit-label" aria-label="送るボタンの文字" value={options.submitLabel ?? ''} placeholder="送信する" onChange={(e) => onChangeOptions({ submitLabel: e.target.value })} /></SaveErrorField></Field>
         </SettingsFormRow>
       </Card>
 

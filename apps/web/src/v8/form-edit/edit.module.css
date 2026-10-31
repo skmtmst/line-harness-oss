@@ -155,8 +155,6 @@
   padding: var(--tpl-fe-select-pad); border: 0; border-radius: var(--radius-control); background: var(--color-canvas);
   box-shadow: var(--tpl-fe-ring-control); cursor: pointer; font-size: var(--tpl-fe-body-size); font-weight: 500; color: var(--color-ink); text-align: left;
 }
-.wordsHead, .wordsRow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tpl-fe-words-gap); }
-.wordsHead { font-size: var(--tpl-fe-note-size); font-weight: 600; line-height: var(--tpl-fe-note-lh); color: var(--color-ink-secondary); }
 .dialogFields { display: flex; flex-direction: column; gap: var(--tpl-fe-open-gap); }
 
 /* ---------- 右の列 ---------- */
