@@ -22,6 +22,7 @@ export const MEDIA_REF_KINDS = [
   'booking_menu',
   'booking_staff',
   'booking_settings',
+  'form',
 ] as const;
 export type MediaRefKind = (typeof MEDIA_REF_KINDS)[number];
 

@@ -52,10 +52,13 @@ const SOURCES: Array<{ refKind: MediaRefKind; table: string; idColumn: string; c
   { refKind: 'booking_menu', table: 'menus', idColumn: 'id', columns: ['photo_media_id'], mediaIdMatch: true, activeOnly: true },
   { refKind: 'booking_staff', table: 'staff', idColumn: 'id', columns: ['photo_media_id'], mediaIdMatch: true, activeOnly: true },
   { refKind: 'booking_settings', table: 'booking_settings', idColumn: 'id', columns: ['store_photo_media_id', 'store_photo_interior_media_id', 'store_photo_waiting_media_id'], mediaIdMatch: true },
+  { refKind: 'form', table: 'forms', idColumn: 'id', columns: ['layout', 'published_layout'] },
 ];
 
 /** 店の6種類は同じテンプレート参照として点検する。 */
 function sourceTable(source: typeof SOURCES[number]): string {
+  if (source.refKind === 'form') return `(SELECT f.id,f.layout,v.layout AS published_layout FROM forms f
+    LEFT JOIN form_versions v ON v.id=f.current_published_version_id AND v.form_id=f.id)`;
   if (source.activeOnly) return `(SELECT id,${source.columns.join(',')} FROM ${source.table} WHERE deleted_at IS NULL)`;
   if (source.refKind !== 'template') return source.table;
   return `(SELECT id, message_content, draft_message_content FROM templates
@@ -112,7 +115,7 @@ async function findMatches(
   const seen = new Set<string>();
   for (const source of SOURCES) {
     try {
-      const sourceTokens = source.mediaIdMatch ? [mediaId] : tokens;
+      const sourceTokens = source.mediaIdMatch ? [mediaId] : source.refKind === 'form' ? [...tokens, mediaId] : tokens;
       for (let index = 0; index < sourceTokens.length; index += MATCH_TOKEN_CHUNK) {
         const chunk = sourceTokens.slice(index, index + MATCH_TOKEN_CHUNK);
         // LIKE '%...%' だと、R2キーやライブURLのような長いトークンでD1が
@@ -297,7 +300,7 @@ export async function scanMediaUsage(
       .join('\n');
     const rowUsages: typeof usages = [];
     for (const item of media.results) {
-      const tokens = usageMatchTokens(item, tokenMap.get(item.id) ?? []);
+      const tokens = [...usageMatchTokens(item, tokenMap.get(item.id) ?? []), ...(source.refKind === 'form' ? [item.id] : [])];
       const matches = source.mediaIdMatch
         ? source.columns.some(column => row[column] === item.id)
         : tokens.some((token) => searchable.includes(token));

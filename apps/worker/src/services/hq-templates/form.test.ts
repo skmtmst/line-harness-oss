@@ -38,6 +38,31 @@ beforeEach(() => {
 });
 afterEach(() => fixture.raw.close());
 describe('HQ form atomic plans', () => {
+    test('店情報は配布先の同名キーだけを検査し、値を持ち出さず下書きへ結ぶ', async () => {
+        for (const account of ['a1', 'a2']) fixture.raw.prepare(`INSERT INTO common_vars(id,line_account_id,name,var_key,value)
+          VALUES(?,?,'お店の名前','public_name',?)`).run(`var-${account}`, account, `${account}のお店`);
+        const layout = emptyLayout();
+        layout.header = [{ id: 'store', kind: 'text', text: '' }];
+        layout.references = [{ blockId: 'store', kind: 'store_information', fields: { displayName: { varKey: 'public_name' } } }];
+        const source = { ...input, definitionJson: JSON.stringify({ ...definition, form: { ...definition.form, layout } }) };
+        const { context } = await preflight('a1', 'create', source);
+        const id = await commit(await plan(context, source));
+        const stored = fixture.raw.prepare('SELECT layout,is_active FROM forms WHERE id=?').get(id) as { layout: string; is_active: number };
+        expect(JSON.parse(stored.layout).references).toEqual(layout.references);
+        expect(stored.is_active).toBe(0);
+        expect(stored.layout).not.toContain('a1のお店');
+        await expect(preflight('a3', 'create', source)).rejects.toMatchObject({ code: 'FORM_STORE_REFERENCE_UNAVAILABLE' });
+        fixture.raw.prepare("UPDATE common_vars SET value='変わった値',version=version+1 WHERE line_account_id='a1'").run();
+        await expect(plan(context, source)).rejects.toMatchObject({ code: 'VERSION_CONFLICT' });
+    });
+    test('登録画像があるフォームは事前確認で理由つきに止め、元IDを配らない', async () => {
+        const layout = emptyLayout();
+        layout.header = [{ id: 'photo', kind: 'image', mediaUrl: '' }];
+        layout.references = [{ blockId: 'photo', kind: 'image', mediaId: 'source-only', versionNo: 1, alt: '写真' }];
+        const source = { ...input, definitionJson: JSON.stringify({ ...definition, form: { ...definition.form, layout } }) };
+        await expect(preflight('a1', 'create', source)).rejects.toMatchObject({ code: 'PUBLIC_IMAGE_REFERENCE_UNSUPPORTED' });
+        expect(rows()).toEqual([]);
+    });
     test('three destination drafts have new stable URLs and local tag/scenario references', async () => {
         const urls = [];
         for (const account of ['a1', 'a2', 'a3']) {

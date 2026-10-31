@@ -141,6 +141,7 @@ const ALLOWLIST_MAX = 769;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/forms/{id}/images/{blockId}',
   'GET /api/liff/events',
   'POST /api/liff/tracked-link-identity',
   'GET /api/booking/admin/menus/photos',
