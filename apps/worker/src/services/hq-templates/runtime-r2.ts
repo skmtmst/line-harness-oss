@@ -80,7 +80,7 @@ function formValueHasDependency(value:unknown):boolean {
   if(Array.isArray(value))return value.some(formValueHasDependency);
   if(!value||typeof value!=='object')return false;
   return Object.entries(value).some(([key,item])=>
-    (['tagId','tagIds','scenarioId','templateId','friendFieldId','friendFieldIds','choiceFriendFieldId','fieldId','reminderId','mediaUrl','backgroundImageUrl'].includes(key)&&item!=null&&item!==''&&!(Array.isArray(item)&&!item.length))
+    (['tagId','tagIds','scenarioId','templateId','friendFieldId','friendFieldIds','choiceFriendFieldId','fieldId','reminderId','mediaId','varKey','mediaUrl','backgroundImageUrl'].includes(key)&&item!=null&&item!==''&&!(Array.isArray(item)&&!item.length))
     ||(['url','linkUrl','thanksUrl'].includes(key)&&!portableText(item))
     ||formValueHasDependency(item));
 }

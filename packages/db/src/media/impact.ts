@@ -85,6 +85,11 @@ export async function describeMediaUsageInner(
   let href: string | null = null;
 
   switch (usage.ref_kind as MediaDeleteImpactReferenceKind) {
+    case 'form':
+      row = await db.prepare(`SELECT f.name,? AS account_id FROM forms f JOIN form_accounts fa ON fa.form_id=f.id
+        WHERE f.id=? AND fa.line_account_id=?`).bind(lineAccountId, usage.ref_id, lineAccountId).first<NamedReference>();
+      href = `/form-submissions/edit?id=${encodeURIComponent(usage.ref_id)}`;
+      break;
     case 'template':
       row = await db.prepare(
         `SELECT name, line_account_id AS account_id, NULL AS asset_kind FROM templates WHERE id = ?
@@ -264,6 +269,9 @@ export async function describeMediaReplacementUsage(
       blocker: 'unsupported_reference',
       reason: 'この種類のテンプレートは編集画面で画像を変更してください。',
     };
+  }
+  if (usage.ref_kind === 'form') {
+    return { ...described, replaceable: false, blocker: 'unsupported_reference', reason: 'フォームの画像はフォームを編集して再公開してください。公開中の版は書き換えません。' };
   }
   if (usage.ref_kind === 'booking_menu' || usage.ref_kind === 'booking_staff' || usage.ref_kind === 'booking_settings') {
     return { ...described, replaceable: false, blocker: 'unsupported_reference', reason: '予約の写真は予約設定の「写真」から替えてください。' };

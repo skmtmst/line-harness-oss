@@ -4875,7 +4875,7 @@ CREATE TABLE "media_usages" (
   media_id TEXT NOT NULL REFERENCES media(id) ON DELETE CASCADE,
   ref_kind TEXT NOT NULL CHECK (ref_kind IN (
     'template','broadcast','rich_menu','scenario_step','nen_column','event','webinar',
-    'booking_menu','booking_staff','booking_settings')),
+    'booking_menu','booking_staff','booking_settings','form')),
   ref_id TEXT NOT NULL,
   scanned_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%f','now','+9 hours')),
   PRIMARY KEY (media_id, ref_kind, ref_id)
@@ -10656,7 +10656,7 @@ CREATE INDEX idx_media_upload_sessions_account_status
 CREATE INDEX idx_media_upload_sessions_target
   ON media_upload_sessions(target_media_id, status, created_at DESC);
 
-CREATE INDEX idx_media_usages_media_scanned ON media_usages(media_id, scanned_at);
+CREATE INDEX idx_media_usages_media_scanned ON media_usages(media_id,scanned_at);
 
 CREATE INDEX idx_media_versions_media_created
   ON media_versions(media_id, version_no DESC, created_at DESC);

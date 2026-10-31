@@ -1,4 +1,5 @@
 import { inputJsonBoundary } from '../lib/input-errors.js';
+import { getFormPublicImage } from './form-public-image.js';
 
 import { Hono } from 'hono';
 
@@ -36,6 +37,7 @@ forms.get('/api/forms/unassigned', requireRole('owner', 'admin'), get__api_forms
 
 // GET /api/forms/:id — get form
 forms.get('/api/forms/:id', get__api_forms_id_3);
+forms.get('/api/forms/:id/images/:blockId', getFormPublicImage);
 
 // POST /api/forms/:id/publish — 保存済みの編集内容を不変版にして公開する。
 forms.post('/api/forms/:id/publish', requireDeliveryAccess('forms', 'publish'), inputJsonBoundary(), post__api_forms_id_publish_4);

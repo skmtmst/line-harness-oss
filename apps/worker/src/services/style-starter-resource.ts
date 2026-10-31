@@ -1,3 +1,4 @@
+import { formMediaUsageStatements } from '@line-crm/db';
 import { styleMenuActionData } from './style-menu-action-data.js';
 import { initialMenuImageKey } from '@line-crm/shared';
 import { initialFormLayout,initialFormScopeGuards } from './style-initial-form.js';
@@ -159,7 +160,7 @@ export async function overwriteResource(
     if(!current)return [];
     const definition=await initialFormLayout(db,account,style,item.formTarget),layout=JSON.stringify(definition);
     if(layout===current.layout)return [];
-    return [...initialFormScopeGuards(db,account,definition),db.prepare('UPDATE forms SET layout=?,content_revision=content_revision+1,updated_at=? WHERE id=? AND is_active=0').bind(layout,now,id)];
+    return [...initialFormScopeGuards(db,account,definition),db.prepare('UPDATE forms SET layout=?,content_revision=content_revision+1,updated_at=? WHERE id=? AND is_active=0').bind(layout,now,id), ...formMediaUsageStatements(db, id)];
   }
   if (item.kind === 'booking_menu')
     return [

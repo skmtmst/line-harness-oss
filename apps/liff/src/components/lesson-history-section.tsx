@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, type EventBookingMine, type MakeupCredit } from '../lib/api.js';
 import { utcToJstHm } from '../lib/datetime.js';
+import AbsenceNotice from './absence-notice.js';
 import AbsenceSheet, { mdHm } from './absence-sheet.js';
 import MakeupPicker from './makeup-picker.js';
 import Button from './ui/button/index.js';
@@ -18,7 +19,7 @@ export default function LessonHistorySection({ onPicking, onLater, onBookingChan
   const [justAbsent, setJustAbsent] = useState<{ startsAt: string; name: string | null } | null>(null);
   /** 欠席した回を探すための、今・これまでの予約（振替が返す欠席元の予約 ID から日時と教室名を引く）。 */
   const [known, setKnown] = useState<EventBookingMine[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const load = useCallback(() => {
     setLoadFailed(false);
@@ -29,12 +30,12 @@ export default function LessonHistorySection({ onPicking, onLater, onBookingChan
   useEffect(() => { load(); }, [load]);
   useEffect(() => { onPicking?.(credits.length > 0); return () => onPicking?.(false); }, [credits.length, onPicking]);
   const sourceOf = (c: MakeupCredit) => { if (justAbsent) return justAbsent; const b = known.find((k) => k.id === c.source_event_booking_id); return b ? { startsAt: b.slot_starts_at, name: b.event_name } : null; };
-  if (loadFailed) return <LoadErrorView compact note="教室の予約・振替の履歴はなくなっていません。" onRetry={load} />;
-  if ((creditsOnly || items.length === 0) && credits.length === 0 && !target) return null;
+  if (loadFailed) return <><AbsenceNotice message={notice} /><LoadErrorView compact note="教室の予約・振替の履歴はなくなっていません。" onRetry={load} /></>;
+  if ((creditsOnly || items.length === 0) && credits.length === 0 && !target && !notice) return null;
   return (
     <section className="space-y-3.5" aria-label="教室の予約">
       {credits[0] ? <MakeupPicker key={credits[0].id} credit={credits[0]} source={sourceOf(credits[0])} onUsed={() => { setJustAbsent(null); load(); onBookingChanged?.(); }} onLater={() => { setJustAbsent(null); onLater?.(); }} /> : null}
-      {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
+      <AbsenceNotice message={notice} />
       <ul className="space-y-3.5">
         {(creditsOnly ? [] : items).map((b) => (
           <li key={b.id}>
@@ -42,14 +43,14 @@ export default function LessonHistorySection({ onPicking, onLater, onBookingChan
               <h3 className="text-[15px] font-bold text-ink">{mdHm(b.slot_starts_at)}</h3>
               <p className="text-[13px] text-ink">{[b.event_name, b.venue_name].filter(Boolean).join('・')}</p>
               <p className="text-xs text-liff-sub">{[b.makeup?.plan_label, b.makeup?.cutoff_at ? `欠席の連絡は ${utcToJstHm(b.makeup.cutoff_at)} まで` : null].filter(Boolean).join('・')}</p>
-              <Button variant="secondary" onClick={() => { setError(null); setTarget(b); }}>欠席する</Button>
+              <Button variant="secondary" onClick={() => { setNotice(null); setTarget(b); }}>欠席する</Button>
             </Card>
           </li>
         ))}
       </ul>
       {target ? <AbsenceSheet booking={target} onClose={() => setTarget(null)} onDone={({ credit, reason }) => {
         const t = target; setTarget(null);
-        if (credit) setJustAbsent({ startsAt: t.slot_starts_at, name: t.event_name }); else if (reason) setError(reason);
+        if (credit) setJustAbsent({ startsAt: t.slot_starts_at, name: t.event_name }); else if (reason) setNotice(reason);
         load();
       }} /> : null}
     </section>

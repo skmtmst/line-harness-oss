@@ -103,3 +103,5 @@ export {
   deleteExpiredFormTestTokens,
   countChoiceUsage,
 } from './test-tokens.js';
+
+export { formMediaUsageQueries, formMediaUsageStatements } from './media-references.js';
