@@ -5,6 +5,7 @@ import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 
 import { requireRole } from '../middleware/role-guard.js';
+import { requireWebhookSecretOwner } from './webhook-secret-permission.js';
 
 import { get__api_webhooks_incoming_1, get__api_webhooks_incoming_id_2, patch__api_webhooks_incoming_id_config_3, post__api_webhooks_incoming_4, put__api_webhooks_incoming_id_5, delete__api_webhooks_incoming_id_6, post__api_webhooks_incoming_id_restore_7, get__api_webhooks_incoming_id_unmatched_8, post__api_webhooks_incoming_id_test_9, post__api_webhooks_unmatched_id_resolve_10, get__api_webhooks_outgoing_11 } from './webhooks-incoming-admin-handlers.js';
 import { generateWebhookSecret } from './webhooks-definition.js';
@@ -22,11 +23,11 @@ webhooks.get('/api/webhooks/incoming', requireRole('owner', 'admin', 'staff'), g
 
 webhooks.get('/api/webhooks/incoming/:id', requireRole('owner', 'admin', 'staff'), get__api_webhooks_incoming_id_2);
 
-webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner'), inputJsonBoundary(), patch__api_webhooks_incoming_id_config_3);
+webhooks.patch('/api/webhooks/incoming/:id/config', requireRole('owner', 'admin'), inputJsonBoundary(), patch__api_webhooks_incoming_id_config_3);
 
-webhooks.post('/api/webhooks/incoming', requireRole('owner'), inputJsonBoundary({"name":["string"],"sourceType":["string"],"secret":["string"],"lineAccountId":["string"],"isActive":["boolean"]}), post__api_webhooks_incoming_4);
+webhooks.post('/api/webhooks/incoming', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"sourceType":["string"],"secret":["string"],"lineAccountId":["string"],"isActive":["boolean"]}), post__api_webhooks_incoming_4);
 
-webhooks.put('/api/webhooks/incoming/:id', requireRole('owner'), inputJsonBoundary({"name":["string"],"sourceType":["string"],"secret":["string"],"isActive":["boolean"]}), put__api_webhooks_incoming_id_5);
+webhooks.put('/api/webhooks/incoming/:id', requireRole('owner', 'admin'), requireWebhookSecretOwner, inputJsonBoundary({"name":["string"],"sourceType":["string"],"secret":["string"],"isActive":["boolean"]}), put__api_webhooks_incoming_id_5);
 
 webhooks.delete('/api/webhooks/incoming/:id', requireRole('owner'), delete__api_webhooks_incoming_id_6);
 
@@ -64,9 +65,9 @@ webhooks.get('/api/webhooks/outgoing', requireRole('owner', 'admin', 'staff'), g
 //  編集画面が現在値を読むための詳細口。secret は出さない。
 webhooks.get('/api/webhooks/outgoing/:id', requireRole('owner', 'admin', 'staff'), get__api_webhooks_outgoing_id_1);
 
-webhooks.post('/api/webhooks/outgoing', requireRole('owner'), inputJsonBoundary({"name":["string"],"url":["string"],"eventTypes":["array"],"secret":["string"],"isActive":["boolean"],"lineAccountId":["string"]}), post__api_webhooks_outgoing_2);
+webhooks.post('/api/webhooks/outgoing', requireRole('owner', 'admin'), inputJsonBoundary({"name":["string"],"url":["string"],"eventTypes":["array"],"secret":["string"],"isActive":["boolean"],"lineAccountId":["string"]}), post__api_webhooks_outgoing_2);
 
-webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner'), inputJsonBoundary({"name":["string"],"url":["string"],"eventTypes":["array"],"secret":["string"],"isActive":["boolean"],"expectedVersion":["number"]}), put__api_webhooks_outgoing_id_3);
+webhooks.put('/api/webhooks/outgoing/:id', requireRole('owner', 'admin'), requireWebhookSecretOwner, inputJsonBoundary({"name":["string"],"url":["string"],"eventTypes":["array"],"secret":["string"],"isActive":["boolean"],"expectedVersion":["number"]}), put__api_webhooks_outgoing_id_3);
 
 webhooks.post('/api/webhooks/outgoing/:id/test', requireRole('owner', 'admin'), inputJsonBoundary(), post__api_webhooks_outgoing_id_test_4);
 

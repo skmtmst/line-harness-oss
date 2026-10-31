@@ -11,7 +11,7 @@ import WebhooksCreate from './create'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { PERMISSION_LOCK_SUMMARY } from '@/components/shared/permission-lock'
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); verifiedStaffRole(null) })
-it.each(['staff', 'admin'] as const)('非オーナー%sは両通知と戻る操作を残し、書込を起動しない', role => {
+it.each(['staff'] as const)('作成できない%sは通知を1つと戻る操作を残し、書込を起動しない', role => {
   identity.role = verifiedStaffRole(role)
   const fetcher = vi.fn()
   vi.stubGlobal('fetch', fetcher)
@@ -19,15 +19,14 @@ it.each(['staff', 'admin'] as const)('非オーナー%sは両通知と戻る操�
   expect(container.querySelector('[data-read-only-notice]')?.getAttribute('role')).toBe('status')
   expect(container.querySelector('[data-read-only-notice]')?.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
   const content = container.querySelector('[data-template-region="content"]')!
-  expect(content.getAttribute('data-content-spacing')).toBe('notice-after-read-only')
-  expect(content.querySelector('[data-design-part="notice"]')?.textContent).toBeTruthy()
-  expect(container.querySelectorAll('[data-design-part="notice"]')).toHaveLength(2)
+  expect(content.hasAttribute('data-content-spacing')).toBe(false)
+  expect(container.querySelectorAll('[data-design-part="notice"]')).toHaveLength(1)
   expect(screen.getByRole('link', { name: '一覧へ戻る' }).getAttribute('href')).toBe('/webhooks')
   expect(screen.queryByRole('button', { name: 'つくって動かす' })).toBeNull()
   expect(fetcher).not.toHaveBeenCalled()
 })
-it('オーナーの入力と既定の余白は維持する', () => {
-  identity.role = verifiedStaffRole('owner')
+it.each(['owner', 'admin'] as const)('%s は入力でき、権限の帯を重ねない', role => {
+  identity.role = verifiedStaffRole(role)
   const { container } = render(<WebhooksCreate />)
   expect(container.querySelector('[data-read-only-notice]')).toBeNull()
   expect(container.querySelector('[data-template-region="content"]')!.hasAttribute('data-content-spacing')).toBe(false)

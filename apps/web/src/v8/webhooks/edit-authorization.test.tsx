@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const fixture = vi.hoisted(() => ({ me: vi.fn(), update: vi.fn() }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(), useSearchParams: () => new URLSearchParams('id=wh-1') }))
@@ -36,7 +36,17 @@ it('本人確認の失敗は保存を隠し、共通の読取を再試行でき�
 it('閲覧のみのオーナーには保存と編集欄を出さない', async () => {
   fixture.me.mockResolvedValue({ success: true, data: { role: 'owner', roleBundle: 'view_only' } })
   render(<Edit />)
-  await screen.findByText(/送り先の変更は統括だけ/)
+  await screen.findByText(/送り先の変更はオーナーか管理者だけ/)
   expect(screen.queryByRole('button', { name: /保存する/ })).toBeNull()
   expect(screen.queryByRole('textbox', { name: '名前' })).toBeNull()
+})
+
+it('管理者は既存の送り先の名前を保存できる', async () => {
+  fixture.me.mockResolvedValue({ success: true, data: { id: 'admin', role: 'admin' } })
+  fixture.update.mockResolvedValue({ success: true })
+  render(<Edit />)
+  const name = await screen.findByRole('textbox', { name: /名前/ })
+  fireEvent.change(name, { target: { value: '管理者が変更' } })
+  fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
+  await waitFor(() => expect(fixture.update).toHaveBeenCalledWith('wh-1', 'account-a', expect.objectContaining({ name: '管理者が変更' })))
 })

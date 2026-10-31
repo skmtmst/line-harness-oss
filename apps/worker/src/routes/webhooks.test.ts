@@ -1027,8 +1027,8 @@ describe('受け取り口の詳細と設定', () => {
     expect(updateIncomingWebhookConfig).not.toHaveBeenCalled();
   });
 
-  test('オーナー以外は設定を更新できない', async () => {
-    const res = await setupApp(undefined, 'admin').request(
+  test('担当者は設定を更新できない', async () => {
+    const res = await setupApp(undefined, 'staff').request(
       `/api/webhooks/incoming/iwh-1/config?lineAccountId=${ACCOUNT_ID}`,
       {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },

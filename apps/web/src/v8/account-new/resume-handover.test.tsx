@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ResumeFollowerHandover from './resume-handover'
 
 const mocks = vi.hoisted(() => ({
@@ -53,5 +53,16 @@ describe('統括から友だち引き継ぎへ戻る画面', () => {
     enter.click()
     expect(mocks.select).toHaveBeenCalledWith('the-shed')
     expect(mocks.push).toHaveBeenCalledWith('/')
+  })
+
+  it('未開始の再開画面は、状態だけ再確認して勝手に処理や入店を始めない', async () => {
+    mocks.state.mockResolvedValue({ success: true, data: importState({ phase: 'not_started' }) })
+    render(<ResumeFollowerHandover />)
+    await screen.findByText('引き継ぎが開始されていません')
+    fireEvent.click(screen.getByRole('button', { name: /もう一度|再読み込み|再確認/ }))
+    await waitFor(() => expect(mocks.state).toHaveBeenCalledTimes(2))
+    expect(mocks.step).not.toHaveBeenCalled()
+    expect(mocks.select).not.toHaveBeenCalled(); expect(mocks.push).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'アカウントに入る' })).toBeNull()
   })
 })

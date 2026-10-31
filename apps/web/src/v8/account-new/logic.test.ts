@@ -244,8 +244,8 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     expect(allV06RowsOk(waiting)).toBe(false)
   })
 
-  it('③Step1の5行の文は、承認済みの v07（Lwxyh）の5状態をそのまま出す', () => {
-    const titles = ['LINEとつながるかの確認', '同じプロバイダーかの確認', 'Webhook URL の登録', 'アカウント名・@ID・アイコンの取り込み', '友だち追加の窓口（LIFF）の用意']
+  it('接続確認の5行は、認証の事実とWebhook等の状態を表示する', () => {
+    const titles = ['LINEとつながるかの確認', '2つのチャネルの認証', 'Webhook URL の登録', 'アカウント名・@ID・アイコンの取り込み', '友だち追加の窓口（LIFF）の用意']
     // 押す前（EKLKb）：5行とも「これから何をするか」の文。
     const idle = toV06CheckRows(null, { running: false, cursor: 0 })
     expect(idle.map((row) => row.title)).toEqual(titles)
@@ -260,7 +260,7 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     const ok = toV06CheckRows(connection('passed'), { running: false, cursor: 5 })
     expect(ok.map((row) => row.detail)).toEqual([
       '2つのチャネルに接続できました。',
-      '同じプロバイダーの中にありました。',
+      '両方のチャネルで認証できました。',
       'Webhook URL を登録しました。',
       'アカウント名・@ID・アイコンを取り込みました。',
       '友だち追加の窓口（LIFF）を作りました。',
@@ -300,12 +300,12 @@ describe('v07（LINE新規追加_v07.pen・2026-10-18承認）の小さな計算
     expect(off?.title).toBe('「Webhookの利用」をONにしてください')
     expect(off?.body).toContain('Webhook設定 で「Webhookの利用」をONにし')
     expect(off?.body).toContain('URLの入力は不要です')
-    // プロバイダーが別（Tn6tJ）は赤い箱。
+    // 両チャネルの認証の行が止まったときは、所属不一致と断定せず赤い箱。
     const providerRows: V06CheckRow[] = rows.map((row, i) => (i === 1 ? { ...row, phase: 'error' } : i === 2 ? { ...row, phase: 'waiting' } : row))
     const bad = checkErrorText('error', providerRows)
     expect(bad?.tone).toBe('danger')
-    expect(bad?.title).toBe('LINEログインのチャネルを同じプロバイダーに作り直してください')
-    expect(bad?.body).toContain('Messaging API とは別のプロバイダーにありました')
+    expect(bad?.title).toBe('2つのチャネルの認証情報を確認してください')
+    expect(bad?.body).toContain('所属が違うかどうかは、この結果だけでは分かりません')
     expect(bad?.body).toContain('入力済みの内容はそのまま残っています')
     // ほかの行で止まったときは、その行の文を添えた赤い箱。
     const other = checkErrorText('error', rows)

@@ -9,6 +9,7 @@
  * - 発行：一度だけ平文が出て、写せる。一覧には平文が出ない
  * - 入れ替え・停止：確認を挟み、口を叩く
  */
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -68,6 +69,7 @@ async function render() {
 }
 
 beforeEach(() => {
+  verifiedStaffRole('owner')
   calls.length = 0
   vi.stubGlobal('fetch', vi.fn(async (input: unknown, init?: RequestInit) => {
     const raw = typeof input === 'string' ? input : (input as Request).url
@@ -91,6 +93,7 @@ afterEach(() => {
   act(() => { root.unmount() })
   host.remove()
   vi.unstubAllGlobals()
+  verifiedStaffRole(null)
 })
 
 describe('R434 API接続パネル', () => {

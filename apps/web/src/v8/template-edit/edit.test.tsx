@@ -738,3 +738,12 @@ describe('クーポンの同じ編集画面と公開の失敗', () => {
     expect(assetFoldersList).not.toHaveBeenCalled(); expect(assetsCreate).not.toHaveBeenCalled(); expect(assetsUpdate).not.toHaveBeenCalled()
   })
 })
+
+it.each(['', 'kind=coupon', 'kind=research'])('必須が空の主保存は押せず、下書きの欄検証の入口は保つ: %s', async query => {
+  await mount(query);
+  const save = screen.getByRole('button', { name: '保存して公開' }) as HTMLButtonElement;
+  expect(save.disabled).toBe(true);
+  expect(screen.getByRole('button', { name: '下書きを保存' }).hasAttribute('disabled')).toBe(false);
+  expect(screen.getByText('テンプレート名を入力してください。')).toBeTruthy();
+  fireEvent.click(save);await flush();expect(templatesApi.create).not.toHaveBeenCalled();expect(assetsCreate).not.toHaveBeenCalled();
+})

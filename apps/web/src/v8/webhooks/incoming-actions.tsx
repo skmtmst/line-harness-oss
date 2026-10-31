@@ -7,6 +7,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import ActionList from '@/components/shared/action-list'
 import { EntityPickerField } from '@/components/shared/entity-picker'
+import { useWebhookWriteAccess, canManageWebhooksNow } from './write-access'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import { notifyToast } from '@/components/shared/toast'
@@ -27,6 +28,10 @@ const KIND_ICONS: Record<string, LucideIcon> = { tag: Tag, support_mark: Bookmar
 /** 既存の版付き config の口につなぐ。照合設定・未対応の既存参照は保持する。 */
 export default function IncomingActions({ detail, accountId, readOnly, onSaved, onGuardReady }: { detail: IncomingWebhookDetail; accountId: string; readOnly: boolean; onSaved: () => void; onGuardReady: (guard: ((action: () => void) => void) | null) => void }) {
   const saveErrors = useSaveFormErrors()
+  const access = useWebhookWriteAccess()
+  const readOnlyRef = useRef(readOnly)
+  readOnlyRef.current = readOnly
+  const canChangeNow = () => !readOnlyRef.current && canManageWebhooksNow()
   const [draft, setDraft] = useState(detail.actions)
   const [resources, setResources] = useState<CommonActionResources | null>(null)
   const [loadError, setLoadError] = useState(false)
@@ -54,6 +59,7 @@ export default function IncomingActions({ detail, accountId, readOnly, onSaved, 
   const guard = useUnsavedGuard({ dirty, busy, onDiscard: () => setDraft(detail.actions) })
   useEffect(() => { onGuardReady(guard.guarded); return () => onGuardReady(null) }, [onGuardReady, guard.guarded])
   const save = async () => {
+    if (!canChangeNow()) { setError(access.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     if (lock.current || readOnly) return
     lock.current = true; setBusy(true); setError('')
     try {
@@ -67,13 +73,13 @@ export default function IncomingActions({ detail, accountId, readOnly, onSaved, 
   return <SaveErrorScope errors={saveErrors}>
     <ConfirmDialog open={guard.leaveTarget !== null} title="入力を破棄しますか？" description="保存していない行うことの変更があります。" confirmLabel="破棄して移動する" busy={busy} onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} />
     {loadError ? <Notice tone="danger" message="動きの対象を読み込めませんでした。" action={<Button onClick={() => setAttempt(n => n + 1)}>もう一度読み込む</Button>} /> : null}
-    <ActionList<Ref> value={draft} onChange={setDraft} readOnly={readOnly || busy} idOf={(_, index) => String(index)} titleOf={action => action.displayName} iconOf={action => KIND_ICONS[action.refKind]} kindOf={action => KINDS.find(kind => kind.id === action.refKind)?.label ?? ({ automation: 'オートメーションを動かす', conversion: '成果を記録する' }[action.refKind] ?? '登録済みの操作')}
+    <ActionList<Ref> value={draft} onChange={setDraft} disabled={busy || (!access.allowed && !access.reason)} lockedReason={access.reason} canChangeNow={canChangeNow} idOf={(_, index) => String(index)} titleOf={action => action.displayName} iconOf={action => KIND_ICONS[action.refKind]} kindOf={action => KINDS.find(kind => kind.id === action.refKind)?.label ?? ({ automation: 'オートメーションを動かす', conversion: '成果を記録する' }[action.refKind] ?? '登録済みの操作')}
       choices={draft.length >= 20 ? [] : KINDS.map(kind => ({ id: kind.id, label: kind.label, disabled: !resources, disabledReason: loadError ? '候補を読み直してください' : '候補を読み込んでいます', make: () => ({ refKind: kind.id, refId: '', refVersionId: null, displayName: kind.label }),
         picker: { title: `${kind.label}対象を選ぶ`, items: items(kind.id), apply: targetFromIds } }))}
-      renderEditor={(action, update, index) => <SaveErrorField names={[`actions.${index}.refId`, "refId", "actions"]}><EntityPickerField label="操作の対象" noun="対象" items={items(action.refKind)} value={action.refId} onChange={id => update(target(action, id))} /></SaveErrorField>} />
+      renderEditor={(action, update, index) => <SaveErrorField names={[`actions.${index}.refId`, "refId", "actions"]}><EntityPickerField label="操作の対象" noun="対象" disabled={!access.allowed && !access.reason} lockedReason={access.reason} canChangeNow={canChangeNow} items={items(action.refKind)} value={action.refId} onChange={id => update(target(action, id))} /></SaveErrorField>} />
     {error ? <Notice tone="danger" action={<Button onClick={() => guard.guarded(onSaved)}>最新の内容を読み込む</Button>}>{error}</Notice> : null}
     {/* 保存は変えたときだけ出す（変えていない間は絵どおり、行と［行うことを足す］だけ）。 */}
-    {readOnly || !dirty ? null : <Button disabled={busy} busy={busy} onClick={() => void save()}>行うことを保存する</Button>}
+    {!dirty ? null : <Button disabled={busy || !access.allowed} lockedReason={access.reason} busy={busy} onClick={() => void save()}>行うことを保存する</Button>}
   </SaveErrorScope>
   function targetFromIds(action: Ref, ids: string[]) { return target(action, ids[0]) }
 }

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({
   routes: vi.fn(), progress: vi.fn(), style: vi.fn(), warnings: vi.fn(), items: vi.fn(), features: vi.fn(),
@@ -56,6 +56,8 @@ const style = (deferred = true) => ok({ style: 'standard', styleSelected: true, 
 const guide = () => screen.getByRole('region', { name: 'はじめにやること' })
 const retry = (title: string) => within(screen.getByText(title).closest('[data-list-state="error"]') as HTMLElement).getByRole('button', { name: 'もう一度読み込む', exact: true })
 const pendingSetup = () => screen.findByRole('button', { name: '使い方の設定を開く', exact: true })
+
+beforeAll(async () => { await import('@/v8/onboarding/wizard') })
 
 beforeEach(() => {
   vi.clearAllMocks()

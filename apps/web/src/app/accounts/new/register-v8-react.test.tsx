@@ -181,7 +181,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(calls.registrationReceipt.mock.calls.length).toBeGreaterThanOrEqual(2)
     await chooseStyle('飲食店')
     await waitFor(() => expect(shownNode()).toBe('Plmq1'))
-    expect(await screen.findByText('準備ができました')).toBeTruthy()
+    expect(await screen.findByText('LINEアカウントの登録が完了しました')).toBeTruthy()
   })
 
   /** v07はアカウントを③で作るので、作ったあとも段の表示は⑤へ飛ばさない。 */
@@ -212,7 +212,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     const skip = screen.getByRole('button', { name: 'あとで設定する' }) as HTMLButtonElement
     await waitFor(() => expect(skip.disabled).toBe(false))
     fireEvent.click(skip)
-    expect(await screen.findByText('準備ができました')).toBeTruthy()
+    expect(await screen.findByText('LINEアカウントの登録が完了しました')).toBeTruthy()
     expect(calls.styleSave).toHaveBeenCalledExactlyOnceWith('new-account', { expectedVersion: 0, styleMode: 'later' })
     expect(sessionStorage.getItem('musubo-registration-style')).toBeNull()
   })
@@ -396,7 +396,7 @@ describe('V8 登録ウィザードの gated 進行', () => {
     expect(calls.followerImportState).not.toHaveBeenCalled()
     // 取り込み完了後は引き継ぎ結果の板を出し、汎用の完了文は出さない。
     await screen.findByText('友だちの引き継ぎが完了しました', { selector: 'h2' })
-    expect(screen.queryByText('準備ができました')).toBeNull()
+    expect(screen.queryByText('LINEアカウントの登録が完了しました')).toBeNull()
     expect(screen.getByText('10人の友だちを引き継ぎました')).toBeTruthy()
   })
 
