@@ -17,6 +17,7 @@ import StatusView from '../components/ui/status-view.js';
 
 import { statusMeta, canLeaveWaitlist } from './event-bookings-policy.js';
 import LessonHistorySection from '../components/lesson-history-section.js';
+import AbsenceNotice from '../components/absence-notice.js';
 import AbsenceSheet from '../components/absence-sheet.js';
 
 function canCancel(b: EventBookingMine): boolean {
@@ -48,6 +49,7 @@ const DECIDED_CHANGE_ERRORS = new Set([
 export default function EventBookings() {
   const words = useCustomerWords();
   const style = useCustomerStyle();
+  const [absenceNotice, setAbsenceNotice] = useState<string | null>(null);
   const [absence, setAbsence] = useState<EventBookingMine | null>(null);
   const [lessonRevision, setLessonRevision] = useState(0);
   const [pickingMakeup, setPickingMakeup] = useState(false);
@@ -221,6 +223,7 @@ export default function EventBookings() {
       <LiffHeader title={words.myEvents} />
       <div className={`mx-auto flex w-full max-w-md flex-col gap-3.5 p-4 ${pickingMakeup ? 'pb-40' : 'pb-10'}`}>
         <h1 className="text-xl font-bold text-ink">{words.myEvents}</h1>
+        <AbsenceNotice message={absenceNotice} />
         {loading ? (
           <LoadingView />
         ) : loadFailed ? (
@@ -334,7 +337,7 @@ export default function EventBookings() {
                             )}
                             {style === 'lesson' && tab === 'upcoming' && b.makeup?.enabled
                               && (b.status === 'requested' || b.status === 'confirmed') && Date.parse(b.slot_starts_at) > Date.now()
-                              ? <Button variant="inline-action" disabled={busy} onClick={() => setAbsence(b)}>欠席する</Button> : null}
+                              ? <Button variant="inline-action" disabled={busy} onClick={() => { setAbsenceNotice(null); setAbsence(b); }}>欠席する</Button> : null}
                           </div>
                           <Button variant="arrow"
                             type="button"
@@ -356,7 +359,7 @@ export default function EventBookings() {
         )}
       </div>
       {absence ? <AbsenceSheet booking={absence} onClose={() => setAbsence(null)} onDone={({ reason }) => {
-        setAbsence(null); setLessonRevision((n) => n + 1); void refresh().then(() => { if (reason) setActionError(reason); });
+        setAbsence(null); setLessonRevision((n) => n + 1); setAbsenceNotice(reason ?? null); void refresh();
       }} /> : null}
       <ConfirmDialog
         open={pendingCancel !== null}

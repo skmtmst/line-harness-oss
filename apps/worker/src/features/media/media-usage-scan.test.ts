@@ -158,7 +158,7 @@ describe('定期走査', () => {
 
   it('整理を1,000件ずつ続け、残りが無い回だけ1周を完了する', async () => {
     dbMocks.getMediaUsageScanState.mockResolvedValue({
-      sourceIndex: 10,
+      sourceIndex: 11,
       lastRefId: '',
       cycleStartedAt: '2026-08-15T00:00:00.000',
     });
