@@ -4,15 +4,15 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { FriendAddLink } from './friend-add'
 
 const fixture = vi.hoisted(() => ({
-  replace: vi.fn(),
+  replace: vi.fn(), account: 'account-a', search: '', renderedRoutes: [] as string[],
   routes: vi.fn(async () => ({ success: true, data: [{ id: 'route-a', name: '広告の経路', refCode: 'ad-a', isActive: true }] })),
 }))
 vi.mock('@/lib/api', () => ({ api: { entryRoutes: { list: fixture.routes } } }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', selectedAccount: { channelId: 'channel-a' } }) }))
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams() }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.account, selectedAccount: { channelId: fixture.account === 'account-a' ? 'channel-a' : 'channel-b' } }) }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(fixture.search) }))
 vi.mock('@/lib/use-same-page-url', () => ({ useSamePageUrl: () => ({ replace: fixture.replace }) }))
-vi.mock('@/components/dashboard/qr-dialog', () => ({ default: ({ open, initialRouteId }: { open: boolean; initialRouteId: string }) => open ? <div role="dialog" aria-label="QRの見本" data-route-id={initialRouteId} /> : null }))
-afterEach(() => { cleanup(); vi.clearAllMocks() })
+vi.mock('@/components/dashboard/qr-dialog', () => ({ default: ({ open, initialRouteId, routes, routesPending, baseLink }: { open: boolean; initialRouteId: string; routes: { id: string }[]; routesPending: boolean; baseLink: string }) => { fixture.renderedRoutes.push(routes.map(r => r.id).join(',')); return open ? <div role="dialog" aria-label="QRの見本" data-route-id={initialRouteId} data-routes={routes.map(r => r.id).join(',')} data-pending={String(routesPending)} data-base={baseLink} /> : null } }))
+afterEach(() => { cleanup(); vi.clearAllMocks(); fixture.account = 'account-a'; fixture.search = ''; fixture.renderedRoutes = [] })
 
 it('経路は確定してからURLへ反映し、基本URLへ戻すとQRも基本のまま開く', async () => {
   render(<FriendAddLink officialProfileUrl={null} visualQa={{ friendAddUrl: 'https://example.test/auth/line?account=channel-a' }} canManage />)
@@ -45,4 +45,21 @@ it('経路は確定してからURLへ反映し、基本URLへ戻すとQRも基�
   fireEvent.click(screen.getByRole('button', { name: 'QRを表示' }))
   expect(fixture.replace).toHaveBeenCalledWith('/?qr=base')
   expect(screen.getByRole('dialog', { name: 'QRの見本' }).getAttribute('data-route-id')).toBe('')
+})
+
+it('カードが無いホームでも同じQRを表示し、別アカウントの経路を残さない', async () => {
+  fixture.search = 'qr=base'
+  const view = render(<FriendAddLink dialogOnly officialProfileUrl={undefined} canManage={false} />)
+  expect(screen.queryByRole('textbox')).toBeNull()
+  await waitFor(() => expect(screen.getByRole('dialog').getAttribute('data-routes')).toBe('route-a'))
+  fixture.routes.mockImplementationOnce(() => new Promise(() => {}))
+  fixture.renderedRoutes = []
+  fixture.account = 'account-b'
+  view.rerender(<FriendAddLink dialogOnly officialProfileUrl={undefined} canManage={false} />)
+  const dialog = screen.getByRole('dialog')
+  expect(dialog.getAttribute('data-routes')).toBe('')
+  expect(dialog.getAttribute('data-pending')).toBe('true')
+  expect(dialog.getAttribute('data-base')).toContain('account=channel-b')
+  expect(fixture.routes).toHaveBeenLastCalledWith('account-b')
+  expect(fixture.renderedRoutes).not.toContain('route-a')
 })

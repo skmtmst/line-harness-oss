@@ -11,6 +11,7 @@ export class Workflows {
     private readonly broadcasts: BroadcastsResource,
   ) {}
 
+  /** Creates an inactive scenario. After reviewing the steps, activate with scenarios.update(id, { isActive: true }) using publish permission. */
   async createStepScenario(
     name: string,
     triggerType: ScenarioTriggerType,
