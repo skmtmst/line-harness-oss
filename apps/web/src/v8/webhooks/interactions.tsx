@@ -548,6 +548,7 @@ function InteractionDialog({ item, techOpen, setTechOpen, canRetry, retrying, bu
     <Dialog
       open
       title="やり取りの中身"
+      titleHelp={<StatusBadge tone={state.tone}>{state.label}</StatusBadge>}
       description={`${shortDateTime(item.startedAt)}・${item.direction === 'outgoing' ? '送った' : '受け取った'}・${item.webhookName}`}
       designNode="DA0Ag"
       designWidth={680}
@@ -570,9 +571,6 @@ function InteractionDialog({ item, techOpen, setTechOpen, canRetry, retrying, bu
     >
       <div className={styles.dialogBody}>
         <LogEntryCopy canCopy={canRetry} entry={{ occurredAt: item.startedAt, target: item.webhookName, status: state.label, reason: item.failureReason ?? item.responseLabel }} />
-        <span className={styles.dialogState}>
-          <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
-        </span>
         <dl className={styles.dialogList}>
           <div className={styles.dialogRow}><dt>きっかけ</dt><dd>{dialogTrigger(item)}</dd></div>
           <div className={styles.dialogRow}><dt>出来事の種類</dt><dd>{item.eventType}</dd></div>
