@@ -402,16 +402,11 @@ export default function QuestionEditor({
                     アクション
                   </Button>
                 )}
-                <button
-                  type="button"
-                  onClick={() =>
-                    onChange({ ...value, choices: value.choices.filter((_, i) => i !== index) })
-                  }
-                  disabled={value.choices.length <= 1}
-                  className="text-ink-faint hover:text-danger text-xs"
-                >
+                <Button variant="text" textTone="danger" size="inline" type="button"
+                  onClick={() => onChange({ ...value, choices: value.choices.filter((_, i) => i !== index) })}
+                  disabled={value.choices.length <= 1}>
                   削除する
-                </button>
+                </Button>
               </div>
             </div> : null}
 
