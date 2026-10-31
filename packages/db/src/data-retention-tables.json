@@ -5129,10 +5129,10 @@
   "event_booking_transition_runs": {"category": "purge", "scope": {"by": "lineAccount", "column": "line_account_id"}},
   "event_booking_entitlement_uses": {"category": "retain", "scope": {"by": "parent", "column": "entitlement_id", "parent": "booking_entitlements", "parentColumn": "id"}},
   "booking_monthly_contracts": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
-  "booking_monthly_active_slots": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "booking_monthly_active_slots": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_monthly_cycles": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_monthly_attempts": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_monthly_rights": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
-  "booking_monthly_event_applications": {"category":"purge","scope":{"by":"lineAccount","column":"account_id"}},
+  "booking_monthly_event_applications": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}},
   "booking_monthly_operations": {"category":"retain","scope":{"by":"lineAccount","column":"account_id"}}
 }
