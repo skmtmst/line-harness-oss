@@ -18,7 +18,7 @@ it('ページを飛ばしてもスタイルは自動で選ばれない', () => {
   fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
   fireEvent.click(screen.getByRole('button', { name: 'LINE来店フォローに進む' }))
   expect(screen.getByRole('heading', { name: 'LINE来店フォローで、かんたんに作る' })).toBeTruthy()
-  expect(screen.getByText('予約の前日')).toBeTruthy()
+  expect(screen.getByText('保存の結果を確認します。まだ送信されていません。 見本のため実際の設定は変わりません。')).toBeTruthy()
   expect(choose).not.toHaveBeenCalled()
 })
 it('スタイルを変えると最初のページに戻り、標準ではお知らせを見せる', () => {

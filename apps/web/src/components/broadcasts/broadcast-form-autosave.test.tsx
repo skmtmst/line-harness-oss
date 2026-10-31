@@ -521,13 +521,14 @@ describe('自動保存の競合（R625/R626/R627）', () => {
     await enter(messageInput(), 'reachable body')
     await click('送信設定へ')
     expect(step).toBe('schedule')
+    await act(async () => { container.querySelector<HTMLInputElement>('input[name=broadcast-send-mode][value=now]')!.click() })
     await click('配信前チェックへ')
     expect(step).toBe('confirm')
 
     await tick(2000)
     expect(createApi).toHaveBeenCalledTimes(1)
-    // 入力時の段のまま送られる（指紋は段を含まないので移動で変わらない）。
-    expect(createApi.mock.calls[0][0].draftStep).toBe('message')
+    // 最後に入力した送信設定の段で送られる（移動だけでは指紋は変わらない）。
+    expect(createApi.mock.calls[0][0].draftStep).toBe('schedule')
 
     await click('下書きを保存する')
     expect(createApi).toHaveBeenCalledTimes(1)

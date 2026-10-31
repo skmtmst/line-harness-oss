@@ -198,3 +198,14 @@ it('WEB258: 明示的な分散0分を開き直しても30分へ変えない', as
     expect(updateApi.mock.calls[0][1].stealthSpreadMinutes).toBe(0)
   } finally { unmount() }
 })
+
+it.each(['now', 'scheduled'])('古い%sの印より予約の現在日時と分散を使って開く', async (draftSendChoice) => {
+  getApi.mockResolvedValue({ success: true, data: draftRow({ status: 'scheduled', scheduledAt: '2099-01-02T01:00:00.000Z', stealthSpreadMinutes: 45, draftPayload: { draftSendChoice, stealthSpreadMinutes: 0, draftScheduledDate: '2020-01-01', draftScheduledTime: '01:00' } }) })
+  await renderForm()
+  try {
+    expect(container.querySelector<HTMLInputElement>('input[name="broadcast-send-mode"][value="spread"]')!.checked).toBe(true)
+    expect(container.querySelector<HTMLInputElement>('#bc-spread')!.value).toBe('45')
+    expect(container.querySelector<HTMLButtonElement>('#bc-date')!.title).toMatch(/^2099年1月2日/)
+    expect(container.querySelector<HTMLInputElement>('#bc-time')!.value).toBe('10 : 00')
+  } finally { unmount() }
+})
