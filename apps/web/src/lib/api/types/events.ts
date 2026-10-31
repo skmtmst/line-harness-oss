@@ -26,6 +26,8 @@ export interface EventListItem {
   updated_at: string;
   version: number;
   next_slot_starts_at: string | null;
+  /** 表示専用の直近の過去回。旧応答には無いため optional。 */
+  latest_past_slot_starts_at?: string | null;
   total_capacity: number | null;
   total_active: number;
   pending_count: number;
