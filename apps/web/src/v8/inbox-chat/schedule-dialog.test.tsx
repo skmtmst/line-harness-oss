@@ -13,14 +13,15 @@ import ScheduleSendDialog, { type ScheduledRowView } from './schedule-dialog'
 
 const NOW = new Date('2026-10-01T06:30:00Z') // 木曜 15:30 JST
 
-function Harness({ onConfirm, onCancelRow, rows = [], initial = '' }: { onConfirm: () => void; onCancelRow?: (id: string) => void; rows?: ScheduledRowView[]; initial?: string }) {
+function Harness({ onConfirm, onCancelRow, rows = [], initial = '', content = 'ソラさん、明日の 10:30 でお待ちしております。\n2行目', hasImage = false, attachmentLabel }: { onConfirm: () => void; onCancelRow?: (id: string) => void; rows?: ScheduledRowView[]; initial?: string; content?: string; hasImage?: boolean; attachmentLabel?: string }) {
   const [value, setValue] = useState(initial)
   return (
     <ScheduleSendDialog
       open
       onClose={() => undefined}
-      content={'ソラさん、明日の 10:30 でお待ちしております。\n2行目'}
-      hasImage={false}
+      content={content}
+      hasImage={hasImage}
+      attachmentLabel={attachmentLabel}
       value={value}
       onChange={setValue}
       onConfirm={onConfirm}
@@ -39,6 +40,28 @@ beforeEach(() => { vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true) })
 afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe('予約して送るの窓', () => {
+  test('空の本文・日時では予約できず、理由が1つだけ出る。両方そろうと予約できる', () => {
+    const confirm = vi.fn()
+    const view = render(<Harness onConfirm={confirm} content="   " />)
+    const button = screen.getByRole('button', { name: 'この日時で予約する' }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    expect(screen.getAllByText('送るものを入力してください')).toHaveLength(1)
+    fireEvent.click(button); expect(confirm).not.toHaveBeenCalled()
+    view.rerender(<Harness onConfirm={confirm} content="お知らせ" />)
+    expect(button.disabled).toBe(true)
+    expect(screen.getAllByText('送る日時を選んでください')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: '明日 9:00', exact: true }))
+    expect(button.disabled).toBe(false)
+    expect(screen.queryByText('送る日時を選んでください')).toBeNull()
+    fireEvent.click(button); expect(confirm).toHaveBeenCalledOnce()
+  })
+  test.each([{ hasImage: true }, { attachmentLabel: '動画「案内.mp4」' }])('本文が空でも準備済みの添付と日時があれば予約できる: %j', props => {
+    const confirm = vi.fn()
+    render(<Harness onConfirm={confirm} content="" initial="2026-10-02T09:00" {...props} />)
+    const button = screen.getByRole('button', { name: '10/2 9:00 に予約' }) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    fireEvent.click(button); expect(confirm).toHaveBeenCalledOnce()
+  })
   test('送るものに本文の1行目を出し、すぐ選ぶで日時が入って予約できる', () => {
     const onConfirm = vi.fn()
     render(<Harness onConfirm={onConfirm} />)

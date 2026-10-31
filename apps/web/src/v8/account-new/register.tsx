@@ -650,7 +650,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
         )}
       />
       <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
-        <div ref={stepPanelRef} tabIndex={-1}><StepContent step={currentStep * 10 + sub} className={styles.stepBody}>
+        <StepContent elementRef={stepPanelRef} tabIndex={-1} step={currentStep * 10 + sub} className={styles.stepBody}>
           {currentStep === 1 && (
             <Step1Precheck
               badge={badge}
@@ -805,7 +805,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
           ) : error ? (
             <Notice tone="danger" message={error} onClose={() => setError('')} />
           ) : null}
-        </StepContent></div>
+        </StepContent>
         <StickyBar presentation="account-registration" actions={currentStep === 5 ? <>
             {importAttention ? <Button type="button" variant="primary" busy={importRefreshing} busyLabel="確認中…" onClick={() => void refreshImport()}>状態を再確認</Button> : null}
             <Button href="/hq" variant={importAttention ? 'secondary' : 'primary'}><ArrowLeft size={16} aria-hidden="true" />統括コンソールへ戻る</Button>

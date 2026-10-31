@@ -1,4 +1,6 @@
 'use client'
+import PagePending from '@/components/templates/page-pending'
+import { routePendingForPath } from '@/lib/route-pending'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useAccount } from '@/contexts/account-context'
@@ -25,7 +27,7 @@ export type LoadStatus = 'loading' | 'ready' | 'error' | 'forbidden'
  */
 export default function NenMembersPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PagePending stage="route" {...routePendingForPath("/nen/members")} />}>
       <MembersInner />
     </Suspense>
   )

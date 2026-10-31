@@ -5,7 +5,7 @@ import EntitySelect from '@/components/shared/entity-select'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
 import { ApiError, fetchApi } from '@/lib/api'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { InboxInputBox } from '@/components/shared/inbox-composer'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
 import { createPollGeneration, startVisiblePoll, type VisiblePollHandle } from '@/lib/visible-polling'
@@ -714,10 +714,10 @@ export default function EmailThread({
         <Dialog open={showMemoEditor} title="内部メモ" busy={memoSaving}
           description="担当者だけに表示され、相手には送信されません。"
           onCancel={closeMemoEditor}
-          footer={<>
+          footer={<DialogActions>
             <Button type="button" disabled={memoSaving} onClick={closeMemoEditor}>キャンセル</Button>
             <Button variant="primary" type="button" busy={memoSaving} busyLabel="保存中…" onClick={() => saveMemo()} disabled={memoSaving || memoDraft === (detail.thread.notes ?? '')}>保存する</Button>
-          </>}>
+          </DialogActions>}>
           <label htmlFor="email-internal-memo" className="text-xs font-semibold text-ink-faint">メモ内容</label>
           <SharedTextArea id="email-internal-memo" value={memoDraft} disabled={memoSaving}
             onChange={(event) => setMemoDraft(event.target.value)} rows={7} autoFocus placeholder="メモを追加"

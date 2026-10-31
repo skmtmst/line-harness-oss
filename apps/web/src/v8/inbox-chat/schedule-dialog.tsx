@@ -7,6 +7,7 @@ import { isNightJst, schedulePresets, shortJst } from './schedule-presets'
 import styles from './inbox-chat.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { scheduledMessageInputReason } from '@/lib/scheduled-message-input'
 
 
 /*
@@ -74,6 +75,7 @@ export default function ScheduleSendDialog({
   const firstLine = content.trim().split('\n')[0] ?? ''
   const summary = [firstLine ? `「${firstLine}」` : '', hasImage ? '画像 1枚' : '', attachmentLabel ?? ''].filter(Boolean).join(' ＋ ')
   const night = value ? isNightJst(value) : false
+  const disabledReason = scheduledMessageInputReason(content, hasImage || Boolean(attachmentLabel), value)
 
   return (
     <Dialog
@@ -86,6 +88,8 @@ export default function ScheduleSendDialog({
       confirmLabel={value ? `${shortJst(value)} に予約` : 'この日時で予約する'}
       confirmIcon={<Clock3 aria-hidden="true" />}
       onConfirm={onConfirm}
+      confirmDisabled={Boolean(disabledReason)}
+      confirmDisabledReason={disabledReason}
     >
       <div className={styles.schBox}>
         <p className={styles.schBoxLabel}>送るもの</p>

@@ -103,13 +103,6 @@
   align-self: stretch;
   margin-block: var(--tpl-wb-ix-body-pull);
 }
-/* 状態の札は題の右（題の文字は固定なので、窓の左上から絵の位置へ置く）。札そのものは共通の StatusBadge。 */
-.dialogState {
-  position: absolute;
-  top: var(--tpl-wb-ix-state-top);
-  left: var(--tpl-wb-ix-state-left);
-  display: inline-flex;
-}
 /* 技術的な記録の下に、伏せた後の記録の JSON を開く。 */
 .dialogJson {
   min-width: 0;

@@ -61,10 +61,19 @@ describe('予約して送る（MyJP7）', () => {
     await click(host.querySelector('button[aria-label="ソラのその他操作"]'))
     await click(byText('予約して送る'))
     expect(document.body.querySelector('[role="dialog"] h2')?.textContent).toBe('ソラさんに予約して送る')
+    const emptyReserve = Array.from(document.body.querySelectorAll('button')).find((button) => /に予約$/.test(button.textContent ?? ''))!
+    expect(emptyReserve.disabled).toBe(true)
+    expect([...document.body.querySelectorAll('[role="status"]')].filter(node => node.textContent === '送るものを入力してください')).toHaveLength(1)
+    await click(emptyReserve)
+    expect(calls).toHaveLength(0)
     await click(byText('テンプレートを選択'))
     // 共通の選ぶ窓（dJZ7Q）で選び、［この文を入れる］で本文へ入れる。
     await click(document.body.querySelector('input[type="radio"][aria-label="前日のご案内"]'))
     await click(byText('この文を入れる'))
+    await click(byText('日時を決める'))
+    const missingDate = byText('日時を選んで予約')!
+    expect(missingDate.disabled).toBe(true)
+    expect(document.body.textContent).toContain('送る日時を選んでください')
     await click(byText('月曜 10:00'))
     expect(byText('月曜 10:00')?.getAttribute('aria-pressed')).toBe('true')
     const reserve = Array.from(document.body.querySelectorAll('button')).find((b) => /に予約$/.test(b.textContent ?? ''))

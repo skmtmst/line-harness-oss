@@ -4,7 +4,7 @@ import { describeApiFailure } from '@/components/shared/api-error-message'
 import { Upload } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import { api } from '@/lib/api'
 import { readFileAsBase64, type BannerProject } from '@/lib/hq-banners'
@@ -119,7 +119,7 @@ export default function UploadTargetDialog({
       error={error || undefined}
       designNode="AnwtH"
       footer={
-        <div className="flex w-full flex-wrap items-center justify-end gap-2">
+        <DialogActions>
           <Button onClick={onClose} disabled={uploading}>キャンセル</Button>
           <Button
             variant="primary"
@@ -131,7 +131,7 @@ export default function UploadTargetDialog({
             <Upload aria-hidden="true" className="h-4 w-4" />
             取り込む
           </Button>
-        </div>
+        </DialogActions>
       }
     >
       {projects.length === 0 && !loading ? (

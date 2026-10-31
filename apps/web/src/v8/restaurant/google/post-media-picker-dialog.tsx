@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { MediaItem } from '@line-crm/shared'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import Pagination from '@/components/shared/pagination'
@@ -96,11 +96,11 @@ export function PostMediaPickerDialog({ target, accountId, onClose, onSelect }: 
     designContentPadding="22px 24px 24px"
     busy={confirming} busyLabel="画像を読み込み中…"
     onCancel={onClose}
-    footer={<div className={styles.footer}>
-      <span>選択後、切り取り位置を確認します。</span>
-      <Button className={styles.cancel} onClick={onClose} disabled={confirming}>キャンセル</Button>
-      <Button className={styles.confirm} variant="primary" onClick={() => void applySelection()} disabled={!selected || loading || confirming} busy={confirming} busyLabel="画像を読み込み中…">切り取り位置を確認</Button>
-    </div>}
+    footer={<DialogActions leadingAction={<span>選択後、切り取り位置を確認します。</span>}>
+
+      <Button onClick={onClose} disabled={confirming}>キャンセル</Button>
+      <Button variant="primary" onClick={() => void applySelection()} disabled={!selected || loading || confirming} busy={confirming} busyLabel="画像を読み込み中…">切り取り位置を確認</Button>
+    </DialogActions>}
   >
     <div className={styles.body}>
       <form className={styles.search} onSubmit={(event) => { event.preventDefault(); search() }}>

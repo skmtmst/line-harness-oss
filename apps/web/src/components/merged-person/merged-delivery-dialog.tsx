@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import type { MergedPersonDeliveryPriority } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import {
   canSaveDeliveryPriorities,
   groupByPurpose,
@@ -90,13 +90,13 @@ export default function MergedDeliveryDialog({
       onCancel={onCancel}
       designNode="Hn9eE"
       footer={
-        <div className={styles.actions}>
+        <DialogActions>
           <Button type="button" onClick={onCancel} disabled={busy}>
             キャンセル
           </Button>
           <Button type="button" variant="primary" onClick={() => onSave(rows)} disabled={!ready} busy={busy} busyLabel="処理中…">保存する
           </Button>
-        </div>
+        </DialogActions>
       }
     >
       <div className={styles.dialogBody}>
