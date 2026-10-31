@@ -4,7 +4,7 @@ import CopyTextButton from '@/components/shared/copy-text-button';
 import { notifySaved } from '@/components/shared/toast';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react';
 import { emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
 import { CreatePage } from '@/components/templates';
@@ -45,6 +45,7 @@ import { useCustomerLook } from '@/components/shared/use-customer-look';
 import { FormPhone } from './phone';
 import styles from './edit.module.css';
 import { useCreatedDraft } from './use-created-draft'
+import { readFormDraftCreation, rememberFormDraftCreation } from '@/lib/form-draft-session'
 import { routingError, routingOf, withRouting, type FormRouting } from './routing-model';
 import { formatNumber as polishFormatNumber } from '@/lib/format';
 import TextLink from '@/components/shared/text-link';
@@ -55,11 +56,17 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const captureResource = usePageResourceTask()
   const saveErrors = useSaveFormErrors()
   const params = useSearchParams()
-  const id = params.get('id') ?? ''
+  const router = useRouter()
+  const requestedId = params.get('id') ?? ''
+  const rawDraftToken = params.get('new') ?? ''
+  const draftToken = !host && !requestedId && /^[A-Za-z0-9_-]{16,128}$/.test(rawDraftToken) ? rawDraftToken : null
   /* 統括のひな形から使うとき（host.ts）。読み込み・保存は呼ぶ側。 */
   const hostRef = useRef(host)
   hostRef.current = host
   const { selectedAccount, selectedAccountId } = useAccount()
+  const [createdId, setCreatedId] = useState(() => selectedAccountId && draftToken ? readFormDraftCreation(selectedAccountId, draftToken) ?? '' : '')
+  const locallyCreatedId = useRef<string | null>(null)
+  const id = requestedId || createdId
   const customerLook = useCustomerLook(host ? null : selectedAccountId)
   const narrow = useNarrowViewport()
   const role = useStaffRole()
@@ -71,14 +78,14 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   /* 友だちに配るURL。LIFF のURLにパスを足すと、LIFFアプリの同じパスへ転送される。 */
   const liffId = selectedAccount?.liffId ?? null
-  const answerUrl = liffId ? `https://liff.line.me/${liffId}/forms/${id}` : null
+  const answerUrl = liffId && id ? `https://liff.line.me/${liffId}/forms/${id}` : null
 
   const [editTab, setEditTab] = useState<EditTab>(() => readTab(params.get('tab')))
   /* 統括から使うときは、最初の描画から読み込んだ中身で出す（空の一瞬に保存を押させない）。 */
   const [name, setName] = useState(() => host?.initial.name ?? '')
   const [nameError, setNameError] = useState<string | null>(null)
   const [description, setDescription] = useState(() => host?.initial.description ?? '')
-  const [isActive, setIsActive] = useState(!host)
+  const [isActive, setIsActive] = useState(!host && !draftToken)
   const [submitCount, setSubmitCount] = useState(0)
   const [onSubmitTagId, setOnSubmitTagId] = useState(() => host?.initial.onSubmitTagId ?? '')
   const [ogTitle, setOgTitle] = useState('')
@@ -259,6 +266,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       setLoading(false)
       return
     }
+    // 自分の初回保存で得たIDへの切替では、保存中に追記された入力を読み込みで消さない。
+    if (id && locallyCreatedId.current === id) return
     void (async () => {
       try {
         // 参照一覧は選んでいる公式アカウントに絞る（別アカウントのタグ等を混ぜない）。
@@ -293,8 +302,14 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             })
             .catch(() => {})
         }
-        const ok = await loadForm()
-        if (!ok && id && selectedAccountId) setFormLoadFailed('missing')
+        if (draftToken && !id) {
+          const initial: Snapshot = { name: '', description: '', isActive: false, onSubmitTagId: '', ogTitle: '', ogDescription: '', ogImageUrl: '', layout }
+          savedSnapshot.current = JSON.stringify(initial)
+          setFormLoaded(true)
+        } else {
+          const ok = await loadForm()
+          if (!ok && id && selectedAccountId) setFormLoadFailed('missing')
+        }
       } catch (caught) {
         const fieldFailure = saveErrors.capture(caught);
 
@@ -459,6 +474,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   const current: Snapshot = { name, description, isActive, onSubmitTagId, ogTitle, ogDescription, ogImageUrl, layout }
   const currentSnapshot = JSON.stringify(current)
+  const currentSnapshotRef = useRef(currentSnapshot)
+  currentSnapshotRef.current = currentSnapshot
   const dirty = savedSnapshot.current !== null && currentSnapshot !== savedSnapshot.current
 
   const discardChanges = useCallback(() => {
@@ -544,7 +561,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       const portableError = hqFormPortableReferenceError({ name, description, layout, onSubmitTagId, onSubmitScenarioId: '', saveToMetadata: true })
       return portableError ? { message: portableError } : null
     }
-    if (contentRevisionRef.current === null) return { message: '読み込みが終わっていません。少し待ってから、もう一度お試しください' }
+    if (contentRevisionRef.current === null && !(draftToken && !id)) return { message: '読み込みが終わっていません。少し待ってから、もう一度お試しください' }
     return null
   }
 
@@ -559,7 +576,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
    * 保存する。silent は自動保存：保存中の印・赤い帯・トーストを出さない（失敗は保存の帯に出る）。
    * 競合（409）だけは自動でも帯を出す（このまま書くと相手の変更が消えるため）。
    */
-  const save = async (publishAfter = false, { silent = false }: { silent?: boolean } = {}): Promise<boolean> => {
+  const save = async (publishAfter = false, { silent = false, leaving = false }: { silent?: boolean; leaving?: boolean } = {}): Promise<boolean> => {
     if (!canEdit || createdDraft.deleting.current) return false
     const isCurrent = captureResource()
     if (!isCurrent()) return false
@@ -600,8 +617,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     }
     if (!selectedAccountId) return false
     while (saveInFlight.current) await saveInFlight.current.catch(() => undefined)
-    const expectedRevision = contentRevisionRef.current
-    if (expectedRevision === null) return false
+    if (!isCurrent()) return false
+    let targetId = id || locallyCreatedId.current || ''
+    let expectedRevision = contentRevisionRef.current
+    if (expectedRevision === null && (targetId || !draftToken)) return false
     if (!silent && isCurrent()) {
       setSaving(true)
       setError('')
@@ -621,7 +640,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     }
     const confirmOwnSave = async (): Promise<number | null> => {
       try {
-        const latest = await api.forms.get(id, selectedAccountId)
+        const latest = await api.forms.get(targetId, selectedAccountId)
         if (!latest.success) return null
         const actual: FormSavedContent = {
           name: latest.data.name,
@@ -644,9 +663,25 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     let settle: () => void = () => {}
     saveInFlight.current = new Promise<void>((resolve) => { settle = resolve })
     try {
+      if (!targetId && draftToken) {
+        const created = await api.forms.createDraft(selectedAccountId, undefined, draftToken)
+        if (!created.success) throw new Error(created.error)
+        if (!isCurrent()) return false
+        const revision = created.data.contentRevision
+        if (!Number.isSafeInteger(revision) || !revision || revision < 1) throw new Error('作成した下書きの版を確認できませんでした')
+        targetId = created.data.id
+        expectedRevision = revision
+        locallyCreatedId.current = targetId
+        rememberFormDraftCreation(selectedAccountId, draftToken, targetId)
+        createdDraft.created(targetId, revision)
+        contentRevisionRef.current = revision
+        setContentRevision(revision)
+        setCreatedId(targetId)
+      }
+      if (expectedRevision === null) return false
       let res: Awaited<ReturnType<typeof api.forms.update>>
       try {
-        res = await api.forms.update(id, selectedAccountId, { ...sentContent, expectedContentRevision: expectedRevision })
+        res = await api.forms.update(targetId, selectedAccountId, { ...sentContent, expectedContentRevision: expectedRevision })
       } catch (updateError) {
         if (isCurrent()) saveErrors.capture(updateError);
 
@@ -655,7 +690,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
         if (ownRevision === null) throw updateError
         reconciledOwnSave = true
-        res = { success: true, data: { id, contentRevision: ownRevision, updatedAt: '' } }
+        res = { success: true, data: { id: targetId, contentRevision: ownRevision, updatedAt: '' } }
       }
       if (!res.success) {
         if (!silent && isCurrent()) setError(res.error)
@@ -663,12 +698,12 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       }
       contentRevisionRef.current = res.data.contentRevision
       if (isCurrent()) {
-        createdDraft.saved(res.data.contentRevision, silent && !reconciledOwnSave)
+        createdDraft.saved(res.data.contentRevision, silent && !reconciledOwnSave, targetId)
         setContentRevision(res.data.contentRevision)
         clearConflict()
       }
       if (publishAfter) {
-        const published = await api.forms.publish(id, selectedAccountId, res.data.contentRevision)
+        const published = await api.forms.publish(targetId, selectedAccountId, res.data.contentRevision)
         if (!published.success) {
           if (isCurrent()) setError(published.error)
           return false
@@ -697,6 +732,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
               layout: sentContent.layout,
             })
           : currentSnapshot
+      }
+      if (draftToken && !leaving && currentSnapshotRef.current === currentSnapshot) {
+        const tab = readTab(new URLSearchParams(window.location.search).get('tab'))
+        disarm()
+        router.replace(`/form-submissions/edit?id=${encodeURIComponent(targetId)}&tab=${tab}`, { scroll: false })
       }
       return true
     } catch (e) {
@@ -739,7 +779,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   /* 公開前の試し：試し合言葉を取って試しURLを作る。試しは保存済みの下書きに出る。 */
   const startTest = async () => {
-    if (!canEdit || !selectedAccountId || testBusy) return
+    if (!canEdit || !selectedAccountId || !id || testBusy) return
     setTestBusy(true)
     setTestError('')
     try {
@@ -760,7 +800,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 
   /* ---------------- 対象が無いとき ---------------- */
 
-  if (!host && !id) {
+  if (!host && !id && !draftToken) {
     return <SaveErrorScope errors={saveErrors}><TargetMissing kind="unspecified" title="編集する回答フォームが指定されていません" description="一覧から編集するフォームを選び直してください。" backHref="/form-submissions" backLabel="回答フォーム一覧へ戻る" /></SaveErrorScope>
   }
   if (!host && !loading && !selectedAccountId) {
@@ -847,7 +887,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             ) : null}
           </>
         ) : (
-          <p className={styles.urlNote}>回答用URLを発行する設定がまだありません。LINEアカウント設定を確認してください。</p>
+          <p className={styles.urlNote}>{draftToken && !id ? '最初に下書きを保存すると、回答用URLが表示されます。' : '回答用URLを発行する設定がまだありません。LINEアカウント設定を確認してください。'}</p>
         )}
       </section>
       )}
@@ -994,7 +1034,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         description={createdDraft.owned ? '自動で作られた下書きがあります。残すか、消して移るか選んでください。' : undefined}
         saveLabel={createdDraft.owned ? '下書きを残して移る' : '下書きに保存して移る'} discardLabel={createdDraft.owned ? '下書きを消して移る' : undefined}
         discardDisabled={createdDraft.owned && !canManageRole(role)} discardLockedReason={createdDraft.owned ? draftDeleteLock : undefined}
-        error={createdDraft.error} saveDisabled={!canEdit || loading || Boolean(host?.busy)} onSave={() => save(false)} onSavedLeave={finishLeave}
+        error={createdDraft.error} saveDisabled={!canEdit || loading || Boolean(host?.busy)} onSave={() => save(false, { leaving: true })} onSavedLeave={finishLeave}
         onConfirm={createdDraft.owned ? () => void createdDraft.discard(finishLeave) : confirmLeave} onCancel={cancelDraftLeave} />
 
       <Dialog
@@ -1077,7 +1117,7 @@ export default function FormEditV8({ host }: { host?: FormEditHost } = {}) {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
     <Suspense fallback={<ListState kind="loading" />}>
-      <PageResourceScope enabled={!host}><FormEditInner host={host} /></PageResourceScope>
+      <PageResourceScope enabled={!host} queryKeys={['id', 'new']}><FormEditInner host={host} /></PageResourceScope>
     </Suspense>
   )
 }

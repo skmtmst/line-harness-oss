@@ -39,6 +39,7 @@ vi.mock('@/lib/staff-role', async original => {
 const staffMe = vi.hoisted(() => vi.fn())
 const formsGet = vi.hoisted(() => vi.fn())
 const formsUpdate = vi.hoisted(() => vi.fn())
+const formsCreateDraft = vi.hoisted(() => vi.fn())
 const formsPublish = vi.hoisted(() => vi.fn())
 const menuStaff = vi.hoisted(()=>vi.fn(async()=>({staff:[]})))
 const emptyList = vi.hoisted(() => async () => ({ success: true, data: [] as never[] }))
@@ -55,7 +56,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
     },
     api: {
       ...actual.api,
-      forms: { ...actual.api.forms, get: formsGet, update: formsUpdate, publish: formsPublish },
+      forms: { ...actual.api.forms, get: formsGet, update: formsUpdate, publish: formsPublish, createDraft: formsCreateDraft },
       // 下書きの自動保存は閲覧のみの人には動かさないため、役割を読む（通信させない）。
       staff: { ...actual.api.staff, me: staffMe },
       friendFields: { ...actual.api.friendFields, list: emptyList },
@@ -70,6 +71,7 @@ import FormEditPage from '@/app/form-submissions/edit/page'
 import FormEditV8 from './edit'
 import { EMPTY_REFS } from '@/components/forms/form-refs'
 import type { FormEditHost, FormHostContent } from './host'
+import { readCreatedFormDraft } from '@/lib/form-draft-session'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { ApiError,api } from '@/lib/api'
 
@@ -110,6 +112,7 @@ beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
   formsGet.mockImplementation(async () => ({ success: true, data: structuredClone(formData) }))
   formsUpdate.mockImplementation(async () => ({ success: true, data: { id: 'form-1', contentRevision: 8, updatedAt: '' } }))
+  formsCreateDraft.mockReset().mockResolvedValue({ success: true, data: { id: 'form-created', isActive: false, contentRevision: 1 } })
   formsPublish.mockImplementation(async () => ({ success: true, data: { id: 'v4', versionNumber: 4, contentRevision: 8, publishedAt: '', replayed: false } }))
   host = document.createElement('div')
   document.body.appendChild(host)
@@ -404,6 +407,7 @@ describe('回答フォームの編集（V8）', () => {
     expect(within(dialog).getByText(/すでに集まった回答（1,284 件）は消えません/)).toBeTruthy()
     fireEvent.click(within(dialog).getByRole('button', { name: 'この版を公開' }))
     await waitFor(() => expect(formsPublish).toHaveBeenCalledWith('form-1', 'acc-1', 8))
+    expect(formsUpdate).toHaveBeenCalledWith('form-1', 'acc-1', expect.objectContaining({ expectedContentRevision: 7 }))
     expect(formsUpdate.mock.invocationCallOrder[0]).toBeLessThan(formsPublish.mock.invocationCallOrder[0])
   })
 
@@ -621,4 +625,111 @@ it('参照候補success:falseは空の候補で編集を進めない',async()=>{
  await waitFor(()=>expect(spy).toHaveBeenCalled())
  expect(await screen.findByText(/^(フォーム|候補)を読み込めませんでした$/)).toBeTruthy()
  spy.mockRestore()
+})
+
+describe('新しいフォームは最初の保存で作成する', () => {
+  const token = '79c678bb-236b-42db-b5db-034b6d577e69'
+  const query = `new=${token}&tab=appearance`
+  beforeEach(() => { window.sessionStorage.clear() })
+  const nameField = () => screen.getByLabelText('フォーム名') as HTMLInputElement
+
+  it('未入力で開いてキャンセルしても書き込みはなく、回答用URLもまだ出さない', async () => {
+    await render(query)
+    expect(nameField().value).toBe('')
+    expect(screen.getByText('最初に下書きを保存すると、回答用URLが表示されます。')).toBeTruthy()
+    fireEvent.click(screen.getByRole('link', { name: 'キャンセル' }))
+    expect(formsCreateDraft).not.toHaveBeenCalled()
+    expect(formsGet).not.toHaveBeenCalled()
+    expect(formsUpdate).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+  })
+
+  it('名前が空のまま保存しても作成せず、欄の理由を表示する', async () => {
+    await render(query)
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    expect(await screen.findByText('フォーム名を入力してください')).toBeTruthy()
+    expect(formsCreateDraft).not.toHaveBeenCalled()
+    expect(formsUpdate).not.toHaveBeenCalled()
+  })
+
+  it('最初の保存で一度だけ作り、内容の保存に失敗しても同じIDで再試行する', async () => {
+    formsUpdate.mockRejectedValueOnce(new ApiError(503, 'offline'))
+    await render(query)
+    fireEvent.change(nameField(), { target: { value: '新しいフォーム' } })
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledOnce())
+    await waitFor(() => expect((getPageAction({ name: '下書きを保存' }) as HTMLButtonElement).disabled).toBe(false))
+    expect(nameField().value).toBe('新しいフォーム')
+    expect(formsCreateDraft).toHaveBeenCalledWith('acc-1', undefined, token)
+    expect(formsUpdate).toHaveBeenCalledWith('form-created', 'acc-1', expect.objectContaining({ name: '新しいフォーム', expectedContentRevision: 1, isActive: false }))
+    expect(navigation.replace).not.toHaveBeenCalled()
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledTimes(2))
+    expect(formsCreateDraft).toHaveBeenCalledOnce()
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith(expect.stringMatching(/^\/form-submissions\/edit\?id=form-created&tab=/), { scroll: false }))
+    expect(formsPublish).not.toHaveBeenCalled()
+  })
+
+  it('作成の応答が途切れた後も同じ操作番号で再送し、入力を残す', async () => {
+    formsCreateDraft.mockRejectedValueOnce(new ApiError(503, 'offline'))
+    await render(query)
+    fireEvent.change(nameField(), { target: { value: '残す名前' } })
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(formsCreateDraft).toHaveBeenCalledOnce())
+    await waitFor(() => expect((getPageAction({ name: '下書きを保存' }) as HTMLButtonElement).disabled).toBe(false))
+    expect(nameField().value).toBe('残す名前')
+    expect(formsUpdate).not.toHaveBeenCalled()
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledOnce())
+    expect(formsCreateDraft.mock.calls.map(call => call[2])).toEqual([token, token])
+  })
+
+  it('入力が止まると自動保存で作り、作成元の店と成功した版を記録する', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: false })
+    try {
+      await render(query)
+      fireEvent.change(nameField(), { target: { value: '自動保存のフォーム' } })
+      await act(async () => { await vi.advanceTimersByTimeAsync(2100) })
+      for (let i = 0; i < 8; i++) await act(async () => { await Promise.resolve() })
+      expect(formsCreateDraft).toHaveBeenCalledOnce()
+      expect(formsUpdate).toHaveBeenCalledOnce()
+      expect(readCreatedFormDraft('acc-1', 'form-created')).toBe(8)
+      expect(readCreatedFormDraft('other-account', 'form-created')).toBeNull()
+      expect(formsPublish).not.toHaveBeenCalled()
+    } finally { vi.useRealTimers() }
+  })
+
+  it('保存中に追記された入力を読み込みやURL切替で消さず、次の保存も同じIDを使う', async () => {
+    let finish!: (value: unknown) => void
+    formsUpdate.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    await render(query)
+    fireEvent.change(nameField(), { target: { value: '初めの入力' } })
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledOnce())
+    fireEvent.change(nameField(), { target: { value: '保存中の追記' } })
+    await act(async () => finish({ success: true, data: { id: 'form-created', contentRevision: 2, updatedAt: '' } }))
+    expect(nameField().value).toBe('保存中の追記')
+    expect(formsGet).not.toHaveBeenCalled()
+    expect(navigation.replace).not.toHaveBeenCalled()
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledTimes(2))
+    expect(formsCreateDraft).toHaveBeenCalledOnce()
+    expect(formsUpdate.mock.calls[1]).toEqual(['form-created', 'acc-1', expect.objectContaining({ name: '保存中の追記', expectedContentRevision: 2 })])
+  })
+
+  it('店を切り替えた後に前の作成結果が届いても、現在の店の入力や画面を変えない', async () => {
+    let finish!: (value: unknown) => void
+    formsCreateDraft.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    await render(query)
+    fireEvent.change(nameField(), { target: { value: '前の店の入力' } })
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(formsCreateDraft).toHaveBeenCalledOnce())
+    account.id = 'acc-2'
+    await render(query)
+    await act(async () => finish({ success: true, data: { id: 'old-store-draft', contentRevision: 1 } }))
+    expect(nameField().value).toBe('')
+    expect(formsUpdate).not.toHaveBeenCalled()
+    expect(navigation.replace).not.toHaveBeenCalled()
+    expect(readCreatedFormDraft('acc-2', 'old-store-draft')).toBeNull()
+  })
 })

@@ -1097,3 +1097,4 @@
 - [検証管理画面のPages Git連携の手順](release-log/unreleased/2020-masato-cf-pages-doc.md) — 反映履歴、確認 2026-11-01。
 
 - [検証配備でCloudflare混雑時に待って再試行する](release-log/unreleased/2021-masato-cf-staging-deploy-retry.md) — 反映履歴、確認 2026-11-01。
+- [反映履歴：回答フォームの最初の保存](release-log/unreleased/0000-kenta-form-create-on-save.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
