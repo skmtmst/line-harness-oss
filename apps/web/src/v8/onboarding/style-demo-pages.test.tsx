@@ -5,23 +5,21 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { AccountStyle } from '@line-crm/shared'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 import StyleChoiceStep from './style-choice-step'
-import { StyleDemoFooter } from './style-demo-pages'
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push() {}, replace() {}, prefetch() {} }), usePathname: () => '/', useSearchParams: () => new URLSearchParams() }))
 beforeEach(() => { setTestReducedMotion(true) })
 afterEach(cleanup)
-it('ページを飛ばして選び、下の帯からスタイルを選ぶ', () => {
+it('ページを飛ばしてもスタイルは自動で選ばれない', () => {
   const choose = vi.fn()
   function Subject() {
     const [page, setPage] = useState(0)
-    return <><StyleChoiceStep viewing="restaurant" onView={vi.fn()} chosen={null} onChoose={choose} demoPage={page} onDemoPage={setPage} /><StyleDemoFooter viewing="restaurant" page={page} onPage={setPage} chosen={null} onChoose={choose} disabled={false} /></>
+    return <StyleChoiceStep viewing="restaurant" onView={vi.fn()} chosen={null} onChoose={choose} demoPage={page} onDemoPage={setPage} />
   }
   render(<Subject />)
   fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
   fireEvent.click(screen.getByRole('button', { name: 'LINE来店フォローに進む' }))
   expect(screen.getByRole('heading', { name: 'LINE来店フォローで、かんたんに作る' })).toBeTruthy()
   expect(screen.getByText('予約の前日')).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'このスタイルにする' }))
-  expect(choose).toHaveBeenCalledWith('restaurant')
+  expect(choose).not.toHaveBeenCalled()
 })
 it('スタイルを変えると最初のページに戻り、標準ではお知らせを見せる', () => {
   function Subject() {
