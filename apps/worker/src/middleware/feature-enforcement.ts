@@ -432,6 +432,7 @@ const RESOURCE_ACCOUNT_LOOKUPS: ReadonlyArray<{
   { pattern: /^\/api\/form-files\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM form_submission_files WHERE id = ?' },
   { pattern: /^\/api\/forms\/document-settings\/([^/]+)$/, sql: 'SELECT id AS account_id FROM line_accounts WHERE id = ?' },
   { pattern: /^\/api\/media\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM media WHERE id = ?' },
+  { pattern: /^\/api\/common-vars\/exports\/([^/]+)(?:\/|$)/, sql: 'SELECT line_account_id AS account_id FROM common_var_export_jobs WHERE id = ?' },
   { pattern: /^\/api\/common-vars\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_vars WHERE id = ?' },
   { pattern: /^\/api\/common-actions\/([^/]+)/, sql: 'SELECT line_account_id AS account_id FROM common_actions WHERE id = ?' },
   // 一覧が返すidは の automation_definitions。旧 automations 表だけを
