@@ -1,5 +1,8 @@
 'use client'
 
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
+
 /*
  * ★V8 デリバリー受注・品切れ一括設定（板 `h7OeT`）と受付の一括停止（窓 `XCVGd`）。
  *
@@ -268,6 +271,9 @@ export default function SoldOutBoard({
 /* ── D-6 `XCVGd` 受付の一括停止 ───────────────────────────────── */
 
 export interface IntakeStopDialogProps {
+  accountId?: string | null
+  store?: { id: string; name?: string | null }
+
   open: boolean
   /** サービスの今の状態。すでに停止中のものは「対象外」にする。 */
   services: DeliveryServiceState[]
@@ -285,7 +291,7 @@ export interface IntakeStopDialogProps {
 
 /** D-6 `XCVGd`。受付を止めると新しい注文が来なくなるので、対象と時間を見せてから送る。 */
 export function IntakeStopDialog({
-  open,
+  accountId, store, open,
   services,
   selected,
   preset,
@@ -337,6 +343,7 @@ export function IntakeStopDialog({
         </>
       )}
     >
+      <OperationTargetSummary accounts={[{ id: accountId ?? '' }]} store={store ?? { id: '' }} />
       <p className={styles.dialogLead}>
         選んだサービスで新しい注文の受け付けを止めます。すでに受け付けた注文の調理・受け渡しはそのまま続きます。
       </p>

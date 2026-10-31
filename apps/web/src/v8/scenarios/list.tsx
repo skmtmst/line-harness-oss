@@ -1,4 +1,7 @@
 'use client'
+
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
 import { DetailContent, DetailField, DetailSection } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 import FolderSelect from '@/components/shared/folder-select'
@@ -1468,7 +1471,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
         <></>
       </>}
       folders={<>
-        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" confirmDisabled={!publishAccess.allowed || !scenarioList.loaded} confirmLockedReason={publishAccess.reason} onCancel={() => setPendingStop(null)} busy={stopBusy} error={stopError || undefined} onSuccess={() => setPendingStop(null)} onConfirm={() => runConfirmedStop()} />
+        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" confirmDisabled={!publishAccess.allowed || !scenarioList.loaded} confirmLockedReason={publishAccess.reason} onCancel={() => setPendingStop(null)} busy={stopBusy} error={stopError || undefined} onSuccess={() => setPendingStop(null)} onConfirm={() => runConfirmedStop()} ><OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} /></ConfirmDialog>
         {folderPanel}
       </>}
       collapsedFolders={<>{createButton(false)}{folderSelect}</>}

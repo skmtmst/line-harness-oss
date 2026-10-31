@@ -846,6 +846,8 @@ function DeliveryInner() {
       />
 
       <IntakeStopDialog
+        accountId={selectedAccountId}
+        store={dataAccountId === selectedAccountId ? data?.store : undefined}
         open={stopOpen}
         services={data?.services ?? []}
         selected={stopSelected}

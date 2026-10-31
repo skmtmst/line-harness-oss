@@ -12,6 +12,7 @@ vi.hoisted(() => {
 
 const folderList = vi.hoisted(() => vi.fn())
 const role = vi.hoisted(() => ({ manage: true }))
+const accountState = vi.hoisted(() => ({ id: 'account-a' }))
 const archiveAffiliate = vi.hoisted(() => vi.fn())
 const updateAffiliate = vi.hoisted(() => vi.fn())
 const affiliatesList = vi.hoisted(() => vi.fn())
@@ -45,7 +46,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'account-a', accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
+  useAccount: () => ({ selectedAccountId: accountState.id, accounts: [{ id: 'account-a', name: '本店' }], loading: false }),
 }))
 
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
@@ -78,6 +79,7 @@ async function render() {
 }
 
 beforeEach(() => {
+  accountState.id = 'account-a'
   flushListUrlState()
   window.history.replaceState(null,'','/affiliates')
   updateAffiliate.mockReset().mockResolvedValue({ success: true })
@@ -134,4 +136,23 @@ it('まとめ停止の再試行は受け付け済みを飛ばし、未完了だ�
  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
  expect(screen.getByRole('checkbox', { name: '多い人を選ぶ' })).toHaveProperty('checked', false)
  expect(screen.getByRole('checkbox', { name: '少ない人を選ぶ' })).toHaveProperty('checked', false)
+})
+
+vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: async () => ({ version: '2.7.0', deploy_env: 'staging' }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '二号店' }] }) }))
+
+it('一括停止の窓は操作先を示し、アカウント切替で閉じて古い紹介者を送らない', async () => {
+  archiveAffiliate.mockReset().mockResolvedValue({ success: true })
+  await render()
+  fireEvent.click(screen.getByRole('checkbox', { name: '多い人を選ぶ' }))
+  fireEvent.click(screen.getByRole('checkbox', { name: '少ない人を選ぶ' }))
+  fireEvent.click(screen.getByRole('button', { name: 'まとめて紹介を止める' }))
+  const dialog = await screen.findByRole('alertdialog', { name: '2 人の紹介をまとめて止めますか？' })
+  await within(within(dialog).getByRole('region', { name: '操作の対象' })).findByText('本店')
+  expect(archiveAffiliate).not.toHaveBeenCalled()
+  accountState.id = 'account-b'
+  await render()
+  await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull())
+  expect(archiveAffiliate).not.toHaveBeenCalled()
+  expect(screen.queryAllByRole('checkbox', { checked: true })).toHaveLength(0)
 })
