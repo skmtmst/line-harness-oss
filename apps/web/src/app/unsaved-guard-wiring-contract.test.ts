@@ -22,6 +22,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/events/use-event-absence.tsx',
   'v8/hq-starter-sets/catalog-editor.tsx',
   // 会社・連絡先とプール名の下書きは、共通の FormLeaveGuard が画面離脱を守る。
   'v8/hq/company-contact.tsx',
