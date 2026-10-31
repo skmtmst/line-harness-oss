@@ -436,7 +436,7 @@ export const READ_GATE_SOURCE = `(() => {
     .find((el) => el.getBoundingClientRect().height > 1
       && getComputedStyle(el).visibility !== 'hidden');
   if (off) return 'feature-off';
-  const checking = Array.from(root.querySelectorAll('[role="status"][aria-label="店舗を確認中"]'))
+  const checking = Array.from(root.querySelectorAll('[data-page-pending="store"]'))
     .find((el) => el.getBoundingClientRect().height > 1
       && getComputedStyle(el).visibility !== 'hidden');
   if (checking) return 'store-checking';

@@ -1,10 +1,36 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, render } from '@testing-library/react'
+import { cleanup, render, screen, fireEvent } from '@testing-library/react'
+import { useEffect, useState } from 'react'
 import { DashboardAsideSection, DashboardColumns, DashboardPage, DashboardRow } from './dashboard-page'
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/', useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
 afterEach(cleanup)
+
+it('初回は案内を出して本文を待ち、表示済みの本文は読み直しで作り直さず、別の店舗では待ち直す', () => {
+  const read = vi.fn()
+  function Content() {
+    useEffect(() => { read() }, [])
+    const [count, setCount] = useState(0)
+    return <button onClick={() => setCount(count + 1)}>本文 {count}</button>
+  }
+  const page = (scope: string, pending: boolean) => <DashboardPage title="ダッシュボード" notice={<p>取得済みの設定への入口</p>} initialContent={{ scope, pending }}><Content /></DashboardPage>
+  const view = render(page('A', true))
+  expect(screen.getByText('取得済みの設定への入口')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '本文 0' })).toBeNull()
+  expect(read).toHaveBeenCalledTimes(1)
+  expect(view.container.querySelector('[aria-busy="true"]')).toBeTruthy()
+  view.rerender(page('A', false))
+  fireEvent.click(screen.getByRole('button', { name: '本文 0' }))
+  view.rerender(page('A', true))
+  expect(screen.getByRole('button', { name: '本文 1' })).toBeTruthy()
+  expect(read).toHaveBeenCalledTimes(1)
+  view.rerender(page('B', true))
+  expect(screen.queryByRole('button', { name: '本文 1' })).toBeNull()
+  expect(read).toHaveBeenCalledTimes(2)
+  view.rerender(page('B', false))
+  expect(screen.getByRole('button', { name: '本文 0' })).toBeTruthy()
+})
 
 function page(grouping?: 'cards') {
   return render(<DashboardPage title="ダッシュボード" grouping={grouping}>

@@ -9,9 +9,11 @@ import type { StyleSnapshot } from '@line-crm/shared'
 const noop = { open: () => {}, visit: () => {}, line: () => {}, pay: () => {}, copy: () => {}, roster: () => {} }
 
 describe('業種ダッシュボード（XBkC2）', () => {
-  it('題は業種の名前、1枚目のタブは業種ごとの名前', () => {
-    expect(STYLE_CONFIG.restaurant.title).toBe('お店')
-    expect(STYLE_CONFIG.salon.title).toBe('サロン')
+  it('題はどの業種でもダッシュボード、1枚目のタブは業種ごとの名前', () => {
+    expect(STYLE_CONFIG.restaurant.title).toBe('ダッシュボード')
+    expect(STYLE_CONFIG.salon.title).toBe('ダッシュボード')
+    expect(STYLE_CONFIG.consult.title).toBe('ダッシュボード')
+    expect(STYLE_CONFIG.lesson.title).toBe('ダッシュボード')
     expect(Object.values(STYLE_CONFIG.restaurant.tabs)).toEqual(['席', '予約', 'お客さま', '分析'])
     expect(Object.values(STYLE_CONFIG.salon.tabs)).toEqual(['台帳', '予約', 'お客さま', '分析'])
     expect(Object.values(STYLE_CONFIG.consult.tabs)).toEqual(['面談', '結果待ち', '相談者', '分析'])
