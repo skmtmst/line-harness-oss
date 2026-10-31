@@ -1,5 +1,7 @@
 'use client'
 
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
+
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react'
@@ -74,6 +76,7 @@ export default function QuickSendV8({
   const saveErrors = useSaveFormErrors()
   const access = useQuickSendAccess()
   const context = useRef({ open, accountId, active: true })
+  const tokenNames = useInsertTokenNames(open ? accountId : null)
   if (context.current.open !== open || context.current.accountId !== accountId) context.current = { open, accountId, active: true }
   const renderedContext = context.current
   useEffect(() => { const current = context.current; current.active = true; return () => { current.active = false } }, [open, accountId])
@@ -344,7 +347,7 @@ export default function QuickSendV8({
 
         </DialogActions>)}
     >
-      <div className={styles.body}>{access.known && (!access.create || !access.preflight) ? <ReadOnlyNotice need="feature" /> : null}<Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField
+      <div className={styles.body}>{access.known && (!access.create || !access.preflight) ? <ReadOnlyNotice need="feature" /> : null}<Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField tokenNames={tokenNames}
           id="quick-send-v8-text"
           ref={textRef}
           className={styles.textarea}

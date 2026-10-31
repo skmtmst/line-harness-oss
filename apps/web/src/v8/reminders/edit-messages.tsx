@@ -7,6 +7,7 @@ import ActionMenu,{ type ActionMenuItem } from '@/components/shared/action-menu'
 import Button from '@/components/shared/button'
 import { TimeField } from '@/components/shared/date-time-field'
 import DetailPanel from '@/components/shared/detail-panel'
+import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import InsertTextField,{ type InsertTextFieldHandle } from '@/components/shared/insert-text-field'
 import MessageInsertRow,{ MessageBody,MessageInsertButton } from '@/components/shared/message-insert-row'
 import NumberInput from '@/components/shared/number-field'
@@ -66,7 +67,9 @@ export function MessagesStageV8({
 }) {
   const { selectedAccount, selectedAccountId } = useAccount()
   const [selectedStepId, setSelectedStepId] = useState<string | null>(settings.steps[0]?.stableStepId ?? null)
-  const [fields, setFields] = useState<FriendField[]>([])
+  const [loadedFields, setLoadedFields] = useState<{ accountId: string; items: FriendField[] } | null>(null)
+  const fields = loadedFields?.accountId === selectedAccountId ? loadedFields.items : []
+  const tokenNames = referenceTokenNames({ friendFields: fields, commonVars: [] })
   const [phoneOpen, setPhoneOpen] = useState(false)
   const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const sampleBase = useRef<Date>(sampleBaseDate())
@@ -74,9 +77,11 @@ export function MessagesStageV8({
   useEffect(() => {
     if (!selectedAccountId) return
     const accountId = selectedAccountId
+    let active = true
     void api.friendFields.list(accountId).then((res) => {
-      if (res.success) setFields(res.data)
+      if (active && res.success) setLoadedFields({ accountId, items: res.data })
     }).catch(() => undefined)
+    return () => { active = false }
   }, [selectedAccountId])
 
   const selectedIndex = settings.steps.findIndex((step) => step.stableStepId === selectedStepId)
@@ -249,7 +254,7 @@ export function MessagesStageV8({
                       onChange={(patch) => updateStep(step.stableStepId, patch)}
                     />
                     <MessageBody>
-                      <SaveErrorField names={[`shown.${index}.messageContent`,`shown.${index}.message_content`,"messageContent","step.messageContent","message_content","step.message_content"]}><InsertTextField
+                      <SaveErrorField names={[`shown.${index}.messageContent`,`shown.${index}.message_content`,"messageContent","step.messageContent","message_content","step.message_content"]}><InsertTextField tokenNames={tokenNames}
                         ref={bodyRef}
                         className={styles.bodyArea}
                         value={step.messageContent}
