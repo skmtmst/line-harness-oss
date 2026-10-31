@@ -69,7 +69,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
 import FormEditPage from '@/app/form-submissions/edit/page'
 import FormEditV8 from './edit'
 import { EMPTY_REFS } from '@/components/forms/form-refs'
-import type { FormHostContent } from './host'
+import type { FormEditHost, FormHostContent } from './host'
 import ToastHost, { clearToastsForTest } from '@/components/shared/toast'
 import { ApiError,api } from '@/lib/api'
 
@@ -519,7 +519,7 @@ describe('参考の文字の保存と読み直し', () => {
 
   it('統括も同じ欄で設定し、ひな形を保存→読み直すと残る。店の保存APIは呼ばない', async () => {
     let stored: FormHostContent = { name: '回答のひな形', description: '', layout: sample(), onSubmitTagId: '' }
-    const onSave = vi.fn((content: FormHostContent) => { stored = JSON.parse(JSON.stringify(content)) })
+    const onSave = vi.fn(async (content: FormHostContent) => { stored = JSON.parse(JSON.stringify(content)); return true })
     const open = async () => {
       act(() => root.render(<FormEditV8 host={{ initial: stored, refs: EMPTY_REFS, accountName: 'ひな形', backHref: '/hq/form-submissions', statusLine: '下書き', distributedLine: 'まだ配っていません', busy: false, onSave, onCancel: vi.fn() }} />))
       await screen.findByLabelText(hintLabel)
@@ -534,6 +534,73 @@ describe('参考の文字の保存と読み直し', () => {
     expect(within(screen.getByLabelText('お客さまに見える形')).getByPlaceholderText('例：統括の見本')).toBeTruthy()
     expect(formsUpdate).not.toHaveBeenCalled()
     expect(formsGet).not.toHaveBeenCalled()
+  })
+})
+
+describe('統括の保存結果と離脱', () => {
+  const onCancel = vi.fn()
+  async function openHost(onSave: FormEditHost['onSave']) {
+    navigation.query = 'tab=appearance'
+    const initial = { name: '回答のひな形', description: '', layout: emptyLayout(), onSubmitTagId: '' }
+    act(() => root.render(<FormEditV8 host={{ initial, refs: EMPTY_REFS, accountName: 'ひな形', backHref: '/hq/form-submissions', statusLine: '下書き', distributedLine: 'まだ配っていません', busy: false, onSave, onCancel }} />))
+    const input = await screen.findByLabelText('フォーム名')
+    fireEvent.change(input, { target: { value: '保存したい名前' } })
+    return input as HTMLInputElement
+  }
+  async function leaveBySaving() {
+    fireEvent.click(getPageAction({ name: 'キャンセル' }))
+    const dialog = within(await screen.findByRole('dialog', { name: '保存していない変更があります' }))
+    fireEvent.click(dialog.getByRole('button', { name: '下書きに保存して移る' }))
+  }
+
+  it('離れる窓からの保存は確定を待ち、成功してから予定した操作を一度だけ行う', async () => {
+    let finish!: (ok: boolean) => void
+    const onSave = vi.fn(() => new Promise<boolean>(resolve => { finish = resolve }))
+    await openHost(onSave)
+    await leaveBySaving()
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce())
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(navigation.push).not.toHaveBeenCalled()
+    await act(async () => finish(true))
+    await waitFor(() => expect(onCancel).toHaveBeenCalledOnce())
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: '保存したい名前' }), false)
+    expect(formsUpdate).not.toHaveBeenCalled()
+    expect(formsGet).not.toHaveBeenCalled()
+  })
+
+  it.each(['refused', 'rejected'])('保存が通らないときは移らず入力を残し、次の離脱でも確認する（%s）', async result => {
+    const onSave = result === 'refused' ? vi.fn(async () => false) : vi.fn(async () => { throw new Error('offline') })
+    const input = await openHost(onSave)
+    await leaveBySaving()
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull())
+    expect(input.value).toBe('保存したい名前')
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(navigation.push).not.toHaveBeenCalled()
+    fireEvent.click(getPageAction({ name: 'キャンセル' }))
+    expect(await screen.findByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+    expect(formsUpdate).not.toHaveBeenCalled()
+  })
+
+  it('通常の保存が確定した内容は未保存扱いにせず、キャンセルでそのまま移れる', async () => {
+    const onSave = vi.fn(async () => true)
+    await openHost(onSave)
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect((getPageAction({ name: 'キャンセル' }) as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(getPageAction({ name: 'キャンセル' }))
+    await waitFor(() => expect(onCancel).toHaveBeenCalledOnce())
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: '保存したい名前' }), false)
+    expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull()
+  })
+
+  it('保存して配るが成功しても、子から追加の移動を行わない', async () => {
+    const onSave = vi.fn(async () => true)
+    await openHost(onSave)
+    fireEvent.click(getPageAction({ name: '保存して配る' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: '保存したい名前' }), true))
+    expect(onCancel).not.toHaveBeenCalled()
+    expect(navigation.push).not.toHaveBeenCalled()
+    expect(navigation.replace).not.toHaveBeenCalled()
+    expect(formsPublish).not.toHaveBeenCalled()
   })
 })
 

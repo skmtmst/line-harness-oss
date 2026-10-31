@@ -485,7 +485,10 @@ describe('scenarios (シナリオ)', () => {
       messageContent: 'again',
     })
     expect(client.scenarios.get).toHaveBeenCalledWith('s1')
-    expect(JSON.parse(textOf(result)).success).toBe(true)
+    expect(JSON.parse(textOf(result))).toMatchObject({
+      success: true,
+      nextAction: expect.stringMatching(/Created inactive.*manage_scenarios.*isActive=true.*publish permission/),
+    })
   })
 
   it('create_scenario requires triggerTagId for tag_added without SDK calls', async () => {

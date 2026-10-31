@@ -32,6 +32,7 @@ export class LineHarness {
   private readonly defaultAccountId: string | undefined
   private readonly workflows: Workflows
 
+  /** Creates an inactive scenario. After reviewing the steps, activate with scenarios.update(id, { isActive: true }) using publish permission. */
   readonly createStepScenario: (name: string, triggerType: ScenarioTriggerType, steps: StepDefinition[]) => Promise<ScenarioWithSteps>
   readonly broadcastText: (text: string, options?: BroadcastSendOptions) => Promise<Broadcast>
   readonly broadcastToTag: (tagId: string, messageType: MessageType, content: string, options?: BroadcastSendOptions) => Promise<Broadcast>
