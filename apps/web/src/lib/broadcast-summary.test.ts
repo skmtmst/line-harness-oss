@@ -83,6 +83,13 @@ describe('宛先の要約', () => {
     expect(audienceSummary({ targetType: 'tag', targetTagId: 'gone' }, tagName)).toBe('タグ（削除済み）')
   })
 
+  it('未選択の印がある空タグだけ未選択と表示し、実物や削除済みのタグを変えない', () => {
+    expect(audienceSummary({ targetType: 'tag', targetTagId: '', draftPayload: { draftTargetMode: 'unselected' } }, tagName)).toBe('送る相手は未選択')
+    expect(audienceSummary({ targetType: 'tag', targetTagId: 't1', draftPayload: { draftTargetMode: 'unselected' } }, tagName)).toBe('タグ：VIP')
+    expect(audienceSummary({ targetType: 'tag', targetTagId: 'gone', draftPayload: { draftTargetMode: 'unselected' } }, tagName)).toBe('タグ（削除済み）')
+    expect(audienceSummary({ targetType: 'tag', targetTagId: null }, tagName)).toBe('タグ（削除済み）')
+  })
+
   it('詳細条件を「タグ指定」と言い張らない', () => {
     // 前は targetType が all 以外なら全部「タグ指定」と出ていた。
     const out = audienceSummary({

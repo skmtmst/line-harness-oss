@@ -72,6 +72,10 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       : fail(c, 404, 'BROADCAST_NOT_FOUND');
   }
 
+  // 宛先をまだ選んでいない下書きを、承認・送信開始へ進めない。
+  if (existing.target_type === 'tag' && !existing.target_tag_id) {
+    return inputError(c, { success: false, error: '送る相手を選んでください' }, 400, ["targetTagId"]);
+  }
   const limitedDelivery = storedDeliveryLimit(existing);
   let approvedLimitCount: number | undefined;
   let confirmedOptions: string | undefined;

@@ -126,3 +126,10 @@ describe('一斉配信の段ごとの確かめ', () => {
     expect(broadcastNextBlockReason(broadcastStepProblems(input({ title: '' })), 'confirm')).toBeNull()
   })
 })
+
+it('相手をまだ選んでいない書きかけは下書きを守り、次へだけ止める', () => {
+  const problems = broadcastStepProblems(input({ audienceUnselected: true, audienceProblem: '送る相手を選んでください' }))
+  expect(broadcastSaveProblem(problems)).toBe('')
+  expect(broadcastNextBlockReason(problems, 'audience')).toBe('送る相手を選んでください')
+  expect(broadcastStepPassed(problems, 'audience')).toBe(false)
+})

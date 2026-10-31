@@ -194,7 +194,7 @@ export default function BroadcastForm({
     .sort((a, b) => (b.usageCount ?? 0) - (a.usageCount ?? 0))
     .slice(0, 5).map((template) => template.id)), [messageTemplates])
   const [showTemplatePicker, setShowTemplatePicker] = useState(openTemplatePickerInitially)
-  const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'scenario')
+  const [targetMode, setTargetMode] = useState<TargetMode>(initialCondition ? 'advanced' : 'unselected')
   /** シナリオ購読で絞るときの相手。空なら「どれか1つでも購読している人」。 */
   const [scenarioId, setScenarioId] = useState('')
   const [scenarios, setScenarios] = useState<Array<{ id: string; name: string }>>([])
@@ -461,16 +461,21 @@ export default function BroadcastForm({
       const userCondition: SegmentCondition | null = stored
         ? { ...stored, rules: (stored.rules ?? []).filter((rule) => rule.type !== 'is_following') }
         : null
-      if (draft.targetType === 'tag' && draft.targetTagId) {
+      if (draft.targetType === 'tag' && !draft.targetTagId && draft.draftPayload?.draftTargetMode === 'unselected') {
+        // 相手をまだ選んでいない下書き。全員へ置き換えない。
+        setTargetMode('unselected')
+      } else if (draft.targetType === 'tag') {
         setTargetMode('tag')
-        setTagId(draft.targetTagId)
+        setTagId(draft.targetTagId ?? '')
       } else if (draft.targetType === 'all') {
-        setTargetMode('all')
+        setTargetMode(draft.status === 'draft' && draft.draftPayload?.draftTargetMode !== 'all' ? 'unselected' : 'all')
       } else {
         const rules = userCondition?.rules ?? []
         const groups = userCondition?.groups ?? []
         // 「シナリオ購読中の全員」で保存された条件は、その選び方へ戻す。
-        if (rules.length === 1 && rules[0]?.type === 'scenario_subscribed' && groups.length === 0) {
+        if (stored && rules.length === 0 && groups.length === 0) {
+          setTargetMode(draft.status === 'draft' && draft.draftPayload?.draftTargetMode !== 'all' ? 'unselected' : 'all')
+        } else if (rules.length === 1 && rules[0]?.type === 'scenario_subscribed' && groups.length === 0) {
           setTargetMode('scenario')
           setScenarioId(String(rules[0].value ?? ''))
         } else {
@@ -693,6 +698,7 @@ export default function BroadcastForm({
    */
   const audience = useMemo(
     () => {
+      if (targetMode === 'unselected') return null
       const next = buildAudienceCondition(targetMode, { scenarioId, tagId, condition })
       if (excludeTagId) return { operator: 'AND' as const, rules: [{ type: 'tag_not_exists', value: excludeTagId }], groups: [next] }
       return next
@@ -707,6 +713,7 @@ export default function BroadcastForm({
    * 送信の経路が別（キューに載せずにその場で送る）で、少人数のときに速い。
    */
   const targetPayload = useCallback(() => {
+    if (!audience) return { targetType: 'tag' as const, targetTagId: '', segmentConditions: undefined }
     if (targetMode === 'tag' && tagId && !excludeTagId) {
       return { targetType: 'tag' as const, targetTagId: tagId, segmentConditions: undefined }
     }
@@ -832,6 +839,7 @@ export default function BroadcastForm({
     title,
     titleMax: TITLE_MAX,
     audienceProblem: audienceError(targetMode, { scenarioId, tagId, condition }),
+    audienceUnselected: targetMode === 'unselected',
     bubbleProblem: bubblesError(bubbles),
     // 監査 R206: ボタンの不備は「保存できませんでした」で済ませない。
     buttonProblem: messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) }),
@@ -887,7 +895,11 @@ export default function BroadcastForm({
    * @param silent 自動で走るとき。確認中の表示もエラーも出さない。打っている
    *   最中に「確認中…」が点いたり、書きかけを直せと言われたりすると邪魔になる。
    */
-  const runPreflight = (silent = false) => runBroadcastPreflight({ preflightRequestBody, preflightSeq, saveErrors, setError, setPreflightKey, setPreflightResult, setPreflightStatus }, silent)
+  const runPreflight = async (silent = false) => {
+    const problem = audienceError(targetMode, { scenarioId, tagId, condition })
+    if (problem) { if (!silent) setError(problem); return }
+    await runBroadcastPreflight({ preflightRequestBody, preflightSeq, saveErrors, setError, setPreflightKey, setPreflightResult, setPreflightStatus }, silent)
+  }
 
   /*
    * 文字数は**いちばん長い通**と**合計**の両方を見る。
@@ -944,10 +956,10 @@ export default function BroadcastForm({
     quotaInsufficient,
   })
   const liveStepProblems = stepProblems()
-  const sendScheduleProblem = useRef<string | null>(null)
-  sendScheduleProblem.current = liveStepProblems.schedule?.message ?? null
+  const sendInputProblem = useRef<string | null>(null)
+  sendInputProblem.current = liveStepProblems.audience?.message ?? liveStepProblems.schedule?.message ?? null
 
-  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, deliveryLimit, selectedAccountId, sendChoice, spreadStartMode, spreadMinutes: effectiveSpreadMinutes, scheduledDate, scheduledTime, targetPayload, title, trackLinks }, scheduledAt, saveAsDraft, confirmedCount)
+  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, deliveryLimit, selectedAccountId, sendChoice, spreadStartMode, spreadMinutes: effectiveSpreadMinutes, scheduledDate, scheduledTime, targetMode, targetPayload, title, trackLinks }, scheduledAt, saveAsDraft, confirmedCount)
 
   /**
    * テスト後の修正も同じ下書きへ上書きし、予約時に別レコードを作らない。
@@ -1026,7 +1038,7 @@ export default function BroadcastForm({
    * 形になる。`validate` は保存のときと同じものを使う。
    */
   const openConfirm = () => {
-    const validationError = validate() || sendScheduleProblem.current
+    const validationError = validate() || sendInputProblem.current
     if (validationError) { rejectValidation(validationError); return }
     setError('')
     setAcknowledgementKey(null)
@@ -1187,13 +1199,13 @@ export default function BroadcastForm({
     section?.querySelector<HTMLElement>('input:not([type="hidden"]), textarea')?.focus()
   }, [currentStep])
 
-  const canConfirm = audienceCount !== null && audienceCount > 0
+  const canConfirm = !liveStepProblems.audience && audienceCount !== null && audienceCount > 0
   /*
    * ［次へ］は、今の段の確かめが通るまで押せない。押せない理由は下の帯の左に1行で出す
    * （title だけだと指を乗せないと見えない）。最終確認の段の止め方（人数・文字数）は今のまま。
    */
   const nextBlockReason = currentStep ? broadcastNextBlockReason(liveStepProblems, currentStep) : null
-  const confirmBlockReason = liveStepProblems.schedule?.message ?? (!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : null)
+  const confirmBlockReason = liveStepProblems.audience?.message ?? liveStepProblems.schedule?.message ?? (!canConfirm ? '対象人数を確認できるまで実行できません' : lengthNotice.tone === 'error' ? lengthNotice.description : null)
   const footerReason = currentStep === 'confirm' ? confirmBlockReason : nextBlockReason
 
   /*
@@ -1254,7 +1266,7 @@ export default function BroadcastForm({
   const confirmedDeliveryLimit = currentStep && !needsApprovalSingle ? sendPreview.data?.deliveryLimit : preflight?.deliveryLimit
   const confirmationFields = <>{confirmedDeliveryLimit && <Notice tone="info">配信できる候補{formatNumber(confirmedDeliveryLimit.candidateCount)}人から、無作為に最大{formatNumber(confirmedDeliveryLimit.recipientCount)}人へ送ります。確認後に人数を増やしません。</Notice>}<BroadcastCheckAcknowledgement issues={pendingChecks.map(check => `${check.label}：${check.value}`)} checked={acknowledgementKey === confirmationKey} onCheckedChange={checked => setAcknowledgementKey(checked ? confirmationKey : null)} disabled={saving} /></>
   const confirmMessage = async () => {
-    const problem = sendScheduleProblem.current
+    const problem = sendInputProblem.current
     if (problem) { rejectValidation(problem); return Promise.resolve() }
     if (!canConfirm || confirmationBlocked) return
     return confirmBroadcastMessage({ onSuccess, scheduledAtIso, sendPreview, setConfirmOpen, setError, setPreviewSeq })
@@ -1262,7 +1274,7 @@ export default function BroadcastForm({
 
   const save = async () => {
     if (confirmOpen && (!canConfirm || confirmationBlocked)) return
-    return saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, deliveryLimited:!!deliveryLimit, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, sendProblem: () => sendScheduleProblem.current, setConfirmOpen, setError, setSaving, submittingRef, validate })
+    return saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, deliveryLimited:!!deliveryLimit, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, sendProblem: () => sendInputProblem.current, setConfirmOpen, setError, setSaving, submittingRef, validate })
   }
 
   /*
