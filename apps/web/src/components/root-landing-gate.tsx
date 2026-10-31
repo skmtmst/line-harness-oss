@@ -3,7 +3,6 @@
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAccount } from '@/contexts/account-context'
-import ListState from '@/components/shared/list-state'
 import PagePending from '@/components/templates/page-pending'
 import { decideRootLanding } from '@/lib/hq-navigation'
 
@@ -29,9 +28,10 @@ export default function RootLandingGate({ children }: { children: React.ReactNod
 
   if (loadFailed) {
     return (
-      <ListState
-        kind="error"
-        title="アカウント一覧を読み込めませんでした"
+      <PagePending
+        stage="root"
+        failed
+        errorTitle="アカウント一覧を読み込めませんでした"
         description="通信状況を確認して、もう一度お試しください。"
         onRetry={() => { void refreshAccounts() }}
         retrying={refreshing}

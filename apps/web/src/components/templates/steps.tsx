@@ -5,7 +5,7 @@ import Button from '@/components/shared/button'
 
 import { Check, Circle, CircleCheck, CircleDot } from 'lucide-react'
 import type { StepperStep } from '@/components/shared/stepper'
-import { useLayoutEffect, useRef, type HTMLAttributes } from 'react'
+import { useImperativeHandle, useLayoutEffect, useRef, type HTMLAttributes, type Ref } from 'react'
 import { motionEasing, motionMs, prefersReducedMotion, shouldAnimateLeave } from '@/components/shared/overlay-utils'
 import styles from './steps.module.css'
 
@@ -172,8 +172,9 @@ export function Steps({
 }
 
 /** 入力を作り直さず、進む・戻る方向だけを示す。次の操作で前の動きを取り消す。 */
-export function StepContent({ step, children, as: Element = 'div', disabled, ...props }: HTMLAttributes<HTMLElement> & { step: number | null; as?: 'div' | 'fieldset'; disabled?: boolean }) {
+export function StepContent({ step, children, as: Element = 'div', disabled, elementRef, ...props }: HTMLAttributes<HTMLElement> & { step: number | null; as?: 'div' | 'fieldset'; disabled?: boolean; elementRef?: Ref<HTMLElement> }) {
   const ref = useRef<HTMLDivElement & HTMLFieldSetElement>(null)
+  useImperativeHandle(elementRef, () => ref.current!)
   const previous = useRef(step)
   useLayoutEffect(() => {
     const from = previous.current
@@ -188,7 +189,7 @@ export function StepContent({ step, children, as: Element = 'div', disabled, ...
     void animation.finished?.catch(() => {})
     return () => animation.cancel()
   }, [step])
-  return <Element {...props} disabled={Element === 'fieldset' ? disabled : undefined} ref={ref}>{children}</Element>
+  return <Element {...props} data-step-content disabled={Element === 'fieldset' ? disabled : undefined} ref={ref}>{children}</Element>
 }
 
 /** 段を開いて入力し、閉じた段には要約と変更口を残す作成画面。 */

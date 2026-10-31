@@ -66,7 +66,7 @@ describe('運営からのお知らせ', () => {
 })
 
 describe('契約者専用LINEの登録案内', () => {
-  it('QR・確認コード・紐づけ理由を出し、「あとで確認する」で閉じる', async () => {
+  it('QR・確認コード・紐づけ理由を出し、右上の閉じる操作で閉じる', async () => {
     const onClose = vi.fn()
     await act(async () => { root.render(<NoticeLineRegisterDialog open onClose={onClose} />) })
     await flush()
@@ -78,7 +78,7 @@ describe('契約者専用LINEの登録案内', () => {
     expect(document.querySelector('img[src^="data:image/png"]')).not.toBeNull()
     expect(text).toContain('契約先に必要なお知らせだけを')
     expect(document.querySelector('a[href="https://line.me/R/ti/p/@musubo"]')).toBeNull()
-    await act(async () => { button('あとで確認する')!.click() })
+    await act(async () => { document.querySelector<HTMLButtonElement>('[role="dialog"] button[aria-label="閉じる"]')!.click() })
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 

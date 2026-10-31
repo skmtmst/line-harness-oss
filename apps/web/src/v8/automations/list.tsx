@@ -54,7 +54,7 @@ import { ActionCell, RowNameLink, DataTable, TableHeadRow, Th, Tr, Td } from '@/
 import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { RowMenu } from '@/components/shared/row-actions'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
 
 import ListState from '@/components/shared/list-state'
@@ -644,17 +644,14 @@ export default function AutomationListV8() {
         />
         <Dialog
           open={testing !== null}
+          dirty={testDone ? false : undefined}
           onCancel={closeTestDialog}
           title={testing ? `「${testing.name}」を1人で試す` : ''}
           description="選んだ友だち1人に、保存されている内容のまま動かします。取り消せません。"
-          footer={testing && !testDone ? (
-            <>
+          footer={testing && !testDone ? (<DialogActions>
               <Button variant="secondary" onClick={closeTestDialog}>やめる</Button>
               <Button onClick={() => runSingleTest()} disabled={testBusy || !testFriendId.trim()} busy={testBusy} busyLabel="動かしています…">試しに動かす</Button>
-            </>
-          ) : (
-            <Button onClick={closeTestDialog}>閉じる</Button>
-          )}
+            </DialogActions>) : undefined}
         >
           {testing ? (
             <div className={styles.testBody}>

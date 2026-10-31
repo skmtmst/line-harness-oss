@@ -16,7 +16,7 @@ import { RowMenu } from '@/components/shared/row-actions';
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import { TemplateDeleteDialog } from '@/v8/templates/public/delete-dialog/index'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import DialogUsageTable from '@/components/shared/dialog-usage-table'
 import LinePreview, { LinePreviewFlex as FlexPreviewComponent, LinePreviewMessage } from '@/components/shared/line-preview';
 import { InsertText } from '@/components/shared/insert-text-field';
@@ -499,15 +499,13 @@ export default function TemplateDetailV8() {
           setPublishOpen(false)
           setPublishError('')
         }}
-        footer={(
-          <div className={styles.dialogFooter}>
+        footer={(<DialogActions>
             <Button variant="secondary" onClick={() => { setPublishOpen(false); setPublishError('') }} disabled={publishing}>キャンセル</Button>
             <Button variant="primary" onClick={() => void doPublish()} busy={publishing} busyLabel="公開しています…">
               <Upload size={16} aria-hidden="true" />
               {latestCount > 0 ? `公開する（${latestCount} か所に反映）` : '公開する'}
             </Button>
-          </div>
-        )}
+          </DialogActions>)}
       >
         <div className={styles.dialogBody}>
           {usageCount > 0 ? (
@@ -537,12 +535,10 @@ export default function TemplateDetailV8() {
         title={`「${template.name}」はまだ消せません`}
         description={`${usageCount} か所で使われています。消すと、その配信や自動応答が送れなくなるためです。先に別のテンプレートへ差し替えてください。`}
         onCancel={() => setBlockedOpen(false)}
-        footer={(
-          <div className={styles.dialogFooter}>
+        footer={(<DialogActions>
             <Button variant="secondary" onClick={() => setBlockedOpen(false)}>閉じる</Button>
             <Button variant="secondary" onClick={showAllAndScroll}><List size={16} aria-hidden="true" />使っている所をすべて見る</Button>
-          </div>
-        )}
+          </DialogActions>)}
       >
         <div className={styles.dialogList}>
           <DialogUsageTable rows={usageRows.slice(0, BLOCKED_VISIBLE)} />

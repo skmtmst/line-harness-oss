@@ -12,7 +12,7 @@ import { EC_EVENT_LABELS, EC_EVENT_TYPES } from '@line-crm/shared'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import DateTimeField from '@/components/shared/date-time-field'
 import ListState from '@/components/shared/list-state'
@@ -594,7 +594,7 @@ export default function ActionScoreRulesPage() {
         description="友だちの点数や履歴は変えません。"
         error={testError || undefined}
         onCancel={() => { if (!busy) { setTestOpen(false); setTestError(''); setTestScoreError('') } }}
-        footer={<div className="flex justify-end gap-2"><Button variant="primary" onClick={() => void runTest()} disabled={busy}>この条件をテスト</Button></div>}
+        footer={<DialogActions><Button variant="primary" onClick={() => void runTest()} disabled={busy}>この条件をテスト</Button></DialogActions>}
       >
         <div className="grid gap-3">
           <Field label="テスト前の点数" htmlFor="test-score" note={`${bundle?.bands.min ?? 0}〜${bundle?.bands.max ?? 100}の整数で入力`} error={testScoreError || undefined}><SaveErrorField names={["testScore","test_score"]}><TextInput id="test-score" type="number" value={testScore} invalid={Boolean(testScoreError)} onChange={(event) => { setTestScore(event.target.value); setTestScoreError(''); setTestResult(null); testRunRef.current += 1 }} /></SaveErrorField></Field>
@@ -616,7 +616,7 @@ export default function ActionScoreRulesPage() {
             title="できごとの設定を直す"
             description="「設定を反映」を押すまで、一覧の内容は変わりません。閉じただけでは入力は残りません。"
             onCancel={() => closeEditor()}
-            footer={<div className="flex justify-end"><Button variant="primary" onClick={() => applyEditor()}>設定を反映</Button></div>}
+            footer={<DialogActions><Button variant="primary" onClick={() => applyEditor()}>設定を反映</Button></DialogActions>}
           >
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="sm:col-span-2"><Field label="表示名" htmlFor="rule-name" error={editError || undefined}><SaveErrorField names={["name"]}><TextInput id="rule-name" value={rule.name} invalid={Boolean(editError)} onChange={(event) => { updateEditDraft({ name: event.target.value }); setEditError('') }} /></SaveErrorField></Field></div>

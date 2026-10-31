@@ -4,7 +4,7 @@ import { useId, useRef, useState } from 'react'
 import type { Tag } from '@line-crm/shared'
 import { api, describeSaveFailure, type TagDependencies, type TagDeleteImpactReferences } from '@/lib/api'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { CreatePage } from '@/components/templates/create-page'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import { TextArea } from '@/components/shared/text-field'
@@ -65,17 +65,14 @@ export function DeleteDialog({ tag, dependencies, dependenciesStatus, onCancel, 
       description="削除すると、このタグを使っている設定と友だちへの付与状態に影響します。"
       busy={deleting}
       onCancel={onCancel}
-      footer={(
-        <div className="flex items-center justify-end gap-2">
-          {blockedReason && <p className="min-w-0 flex-1 text-xs text-ink-faint">{blockedReason}</p>}
+      footer={(<DialogActions leadingAction={blockedReason || undefined}>
           <Button onClick={onCancel} disabled={deleting}>キャンセル</Button>
           <Button
             variant="danger"
             onClick={onDelete}
             disabled={deleting || blocked || confirmation !== tag.name} busy={deleting} busyLabel="削除中…">タグを削除する
           </Button>
-        </div>
-      )}
+        </DialogActions>)}
     >
       <div className="overflow-hidden rounded-control border border-hairline">
         <dl className="divide-y divide-hairline text-sm">

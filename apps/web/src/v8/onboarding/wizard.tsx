@@ -26,7 +26,7 @@ import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
 import { InitialMenuChoice } from './initial-menu-choice'
 import SetupLinks from './setup-links'
-import StyleChoiceStep, { STYLE_CHOICE_ORDER, STYLE_CHOICE_START_ID, StyleChoiceStatus, initialViewingStyle } from './style-choice-step'
+import StyleChoiceStep, { StyleChoiceSwitcher, STYLE_CHOICE_ORDER, STYLE_CHOICE_START_ID, StyleChoiceStatus, initialViewingStyle } from './style-choice-step'
 import { useState } from 'react'
 import { formatNumber } from '@/lib/format'
 
@@ -55,25 +55,18 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
 
   const onCount = Object.values(enabled).filter(Boolean).length
   const footer = (
-    <DialogActions><div className={styles.footer}>
-      {/* B-338：どの問も同じ骨組み。左に［戻る］（1問目は無し）、真ん中に［次へ］。あとで・手動はカードで選ぶ。 */}
-      <div className={styles.footerSide}>
-        {step === 0 ? <>
+    <DialogActions leadingAction={step === 0 ? <>
           <Button variant="text" onClick={() => void saveStyleMode('later')} disabled={busy}>あとで設定する</Button>
           <Button variant="text" onClick={() => void saveStyleMode('manual')} disabled={busy}>手動で設定する</Button>
-        </> : <Button onClick={() => setStep(step === 'summary' ? total - 1 : Math.max(0, (step as number) - 1))} disabled={busy}>{step===1?'スタイルを選び直す':'戻る'}</Button>}
-      </div>
-      <div className={styles.footerCenter}>
+        </> : <>
+          <Button onClick={() => setStep(step === 'summary' ? total - 1 : Math.max(0, (step as number) - 1))} disabled={busy}>{step===1?'スタイルを選び直す':'戻る'}</Button>
+          {step !== 'summary' ? <Button onClick={() => void saveAndClose()} busy={busy} busyLabel="保存中…">途中保存して閉じる</Button> : null}
+        </>}>
         {step === 'summary' ? <Button onClick={() => onClose(true)} disabled={busy}>動かさずにダッシュボードへ</Button> : null}
         {step === 'summary'
           ? <Button variant="primary" onClick={() => void activate()} busy={busy && summary !== null} busyLabel="動かしています…" disabled={!summary || onCount === 0}><Play aria-hidden="true" className={styles.buttonIcon} />{`まとめて動かす（${formatNumber(onCount)}件）`}</Button>
           : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle" disabled={step === 0 && !chosenStyle} disabledReason={step === 0 && !chosenStyle ? 'スタイルを選んでください' : null}>{step===1?'このメニューで進む':'次へ'}<ArrowRight aria-hidden="true" className={styles.buttonIcon} /></Button>}
-      </div>
-      <div className={step === 0 ? styles.footerEnd : styles.footerSide}>
-        {step === 0 ? <StyleChoiceStatus chosen={chosenStyle} /> : null}
-        {step !== 0 && step !== 'summary' ? <Button onClick={() => void saveAndClose()} busy={busy} busyLabel="保存中…">途中保存して閉じる</Button> : null}
-      </div>
-    </div></DialogActions>
+    </DialogActions>
   )
 
   const progress = (
@@ -92,7 +85,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   if (step === 0) {
     body = (
       <>
-        <StyleChoiceStep viewing={viewing} onView={setViewing} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} />
+        <StyleChoiceStep viewing={viewing} onView={setViewing} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} switcher="external" />
         {where(`あとから変えられます（設定 › アカウント）。友だち・配信は残ります。前の予約は${BOOKING_PLACE[state.style]}から見られます。`)}
       </>
     )
@@ -188,6 +181,8 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         size="wide"
         designTop={step === 'summary' ? 48 : 60}
         fitViewport
+        contentLayout={step === 0 ? 'form' : undefined}
+        steps={step === 0 ? <StyleChoiceSwitcher viewing={viewing} onView={setViewing} chosen={chosenStyle} disabled={busy} /> : undefined}
         onCancel={discard}
         dirty={dirty || undefined}
         busy={busy}
@@ -200,6 +195,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
       >
         <div className={styles.body} data-step={step}>
           {progress}
+          {step === 0 ? <StyleChoiceStatus chosen={chosenStyle} /> : null}
           {body}
         </div>
       </Dialog>

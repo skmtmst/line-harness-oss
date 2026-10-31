@@ -306,6 +306,8 @@ describe('行の削除の窓（xxKtW）', () => {
     expect(replacementImpact).toHaveBeenCalledWith('v-company', 'account-a', 'v-contact')
     const dialog = deleteDialog()
     expect(dialog.textContent).toContain('別の共通情報に差し替えて消す（おすすめ）')
+    expect(dialog.querySelector('[data-window-actions] input')).toBeNull()
+    expect(dialog.querySelectorAll('[data-window-body] input[aria-label="消した理由・止める理由（記録に残ります）"]')).toHaveLength(1)
     expect(dialog.textContent).toContain('消さずに止める')
     expect(dialog.querySelector('[aria-label="差し替え先"]')).toBeTruthy()
     expect(dialog.textContent).toContain('差し替えると、15か所の「株式会社NEN」が問い合わせ先の中身になります。')

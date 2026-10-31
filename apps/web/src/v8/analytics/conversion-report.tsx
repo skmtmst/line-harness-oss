@@ -92,7 +92,7 @@ export default function ConversionReportV8({ accountId }: { accountId: string })
       {noRun ? <ListState kind="empty" title="まだ集計していません" /> : null}
       {exportError ? <Notice tone="danger" className={styles.captionNoticePlacement} >{exportError}</Notice> : null}
       {loading ? <ListState kind="loading" title="成果レポートを読み込んでいます" />
-        : error ? <ListState kind="error" title={error} onRetry={retry} />
+        : error ? null
         : report ? <>
           <section className={styles.reportCard} aria-labelledby="conversion-daily-title">
             <div className={styles.reportHead}>

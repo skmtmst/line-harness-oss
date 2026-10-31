@@ -36,7 +36,7 @@ import { DetailColumns } from '@/components/templates/detail-columns'
 import { ListPageSection } from '@/components/templates/list-page'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Progress from '@/components/shared/progress'
 import Notice from '@/components/shared/notice'
 import { Tabs } from '@/components/shared/tabs'
@@ -455,7 +455,7 @@ export function CancelReservationDialog({
       error={error || undefined}
       onCancel={onClose}
       footer={
-        <div className={`${styles.dialogButtons} ${styles.cancelButtons}`}>
+        <DialogActions>
           <Button type="button" variant="danger" onClick={onConfirm} disabled={busy} busy={busy} busyLabel="取り消しています…">
             予約を取り消す
           </Button>
@@ -466,7 +466,7 @@ export function CancelReservationDialog({
             <ArrowLeft aria-hidden="true" />
             予約のまま残す
           </Button>
-        </div>
+        </DialogActions>
       }
     />
   )

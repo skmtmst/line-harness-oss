@@ -3,7 +3,7 @@ import { formatYen } from '@line-crm/shared';
 import type { Dispatch, SetStateAction } from 'react'
 import Button from '@/components/shared/button'
 import ConditionBuilder from '@/components/shared/condition-builder'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import EditorSurface from '@/components/shared/editor-surface'
 import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
@@ -214,27 +214,19 @@ export function ConversionDetailDialog(props: ConversionDetailDialogProps) {
       title={detailTarget?.name ?? ''}
       description="この成果地点の数え方と利用状況です。"
       onCancel={() => setDetailTarget(null)}
-      footer={detailTarget ? (
-        <div className="flex justify-end gap-2">
-          {canReverse && detailTarget.state === 'draft' ? (
-            <Button
+      footer={detailTarget ? (<DialogActions>
+          {canReverse && detailTarget.state === 'draft' ? (<Button
               variant="primary"
               disabled={publishing}
               onClick={() => void publishDraft(detailTarget)} busy={publishing} busyLabel="公開しています">計測をはじめる（公開）
-            </Button>
-          ) : null}
-          {canReverse && detailTarget.status !== 'stopped' ? (
-            <Button onClick={() => openEdit(detailTarget)}>
+            </Button>) : null}
+          {canReverse && detailTarget.status !== 'stopped' ? (<Button onClick={() => openEdit(detailTarget)}>
               編集
-            </Button>
-          ) : null}
-          {canReverse && detailTarget.status !== 'stopped' ? (
-            <Button onClick={() => void openStop(detailTarget)}>
+            </Button>) : null}
+          {canReverse && detailTarget.status !== 'stopped' ? (<Button onClick={() => void openStop(detailTarget)}>
               停止・削除する
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
+            </Button>) : null}
+        </DialogActions>) : null}
     >
       {detailTarget ? (
         <div className="space-y-4">

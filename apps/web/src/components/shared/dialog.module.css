@@ -356,7 +356,7 @@
 html:root .actions[data-padding='none'] { padding: 0; border: 0; }
 /* 下のボタンを中央に置く口（footerAlign="center"）。既定の右寄せは変えない。 */
 :root .panel[data-footer-align='center'] .actions[data-dialog-action-pair] { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
-:root .footerLead { grid-column: 1; min-width: 0; font-family: var(--font-inter), Inter, system-ui, sans-serif; font-size: 13px; line-height: 20px; color: var(--color-ink-faint); }
+:root .footerLead { grid-column: 1; min-width: 0; font-family: var(--font-sans); font-size: 13px; line-height: 20px; color: var(--color-ink-faint); }
 :root .buttonPair { grid-column: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
 :root .designButton { min-width: 0; font-family: inherit; line-height: 20px; }
 :root .designButton[data-dialog-action='secondary'] { border: 0; outline: 1px solid var(--color-control-border); outline-offset: -1px; }
@@ -435,6 +435,7 @@ html:root .panel[data-layout='inset'] .headerContent { gap: var(--tpl-hb-dialog-
 html:root .panel[data-layout='inset'] .content { align-items: stretch; }
 html:root .panel[data-layout='inset'] .actions { padding: var(--polish-window-divider-space) 0 0; }
 .actionLead { display: flex; flex-wrap: wrap; gap: var(--space-8); min-width: 0; margin-right: auto; }
+.actionStart { grid-column: 1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); min-width: 0; }
 
 html:root .panel[data-confirm-placement='start'] .actions[data-dialog-action-pair] {
   display: grid;

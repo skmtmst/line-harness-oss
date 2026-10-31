@@ -90,7 +90,7 @@ export default function NoticeLineDialogV8({ open, onClose, quietWhenUnavailable
       designWidth={560}
       designTop={120}
       onCancel={onClose}
-      footer={<div className={styles.footer}><Button variant="primary" onClick={onClose}>{linked ? '閉じる' : 'あとで確認する'}</Button></div>}
+
     >
       {failed ? (
         <div className={styles.state} role="alert">
