@@ -385,6 +385,7 @@
 - [飲食5：外部予約の対応 API](../apps/worker/src/routes/restaurant-external-links.md)
 - [.env.example](.env.example) — 説明用データ・付随資料、確認 2026-10-19
 - [デプロイ安全ゲートと排他運用](DEPLOY-GATE.md)
+- [検証環境の自動配備（Cloudflare Git 連携）](staging-deploy-cloudflare-builds.md)
 - [然-NEN- LINE管理システム検証環境](NEN-LINE-STAGING.md)
 - [OSS Sandbox Merge Gate](OSS-SANDBOX-MERGE-GATE.md)
 - [文書の入口](README.md)
