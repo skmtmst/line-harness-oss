@@ -210,31 +210,39 @@ D1 migration、管理画面 Pages、設定変更、配信の実行には使用�
 既存の Actions 専用スクリプトへ偽の `GITHUB_*` 値を渡して実行しません。
 
 本番実行前に、Masato が対象SHAと実施内容を明示承認し、その記録URLを残します。
-検証 Worker が**同じ40桁のSHA**を公開して合格したことを確認します。
+検証 Worker に候補版を一時配備し、Cloudflare の版ID・配備ID・100%稼働・
+`BUILD_GIT_COMMIT` が対象SHAと一致することを確認します。
+旧 `main` の `/api/health` はSHAを返さないため、正常応答とSHAの照合は別々に行います。
 `codex/development` の通常検証と異なる候補を検証環境へ一時配備するときは、
 検証環境への影響について別途承認を得て、検証ロックを取り、元の版を記録して戻します。
-検証環境に別のSHAが公開されている間は、本番スクリプトは止まります。
+検証後は元の版へ戻し、復元した版IDと公開SHAを照合します。
 
-1. `main` を最新にし、親・子の作業ツリーをクリーンにする。配備スクリプト自身も `main` に含める。
+1. `main` を最新にし、親・子の作業ツリーをクリーンにする。配備ゲートはレビュー済みの専用ブランチで実行し、`--target-checkout` で対象のクリーンな `main` 作業ツリーを指定する。これによりゲートの追加で対象SHAが変わらない。
 2. 変更対象の関連テスト、Workerビルド、セキュリティ検査を通し、対象SHAを記録する。
 3. 本番ロックを `pnpm deploy:lock acquire production --note "Worker の配信先分離修正"` で取る。他の配備者がいれば待つ。
 4. 操作を止めたことを確認し、Cloudflare認証情報、本番Worker・D1識別子、非公開の暗号化バックアップ先・鍵を安全な環境変数で渡す。`APPROVED_MIGRATIONS` はスクリプトが空配列へ固定する。
-5. リポジトリ外に権限を絞った記録ディレクトリを作る。まず以下のdry-runを実行し、公開SHA・未適用DB更新0件・設定・ビルド・Wrangler dry-runを確認する。
-6. 配備直前に本番のWorker版を記録し、D1を暗号化して非公開R2へ保存・読み戻し検証する。再度main・検証SHA・ロック・DB・本番Worker版を確認してからWorkerのみ配備する。
-7. 公開SHA、正常応答、実際に100%稼働する新しいWorker版を確認する。記録ディレクトリのreceiptに旧版・新版・バックアップ位置・時刻が残る。
+5. リポジトリ外に権限を絞った記録ディレクトリを作る。まず以下のdry-runを実行し、検証版のSHA・未適用DB更新0件・設定・ビルド・Wrangler dry-runを確認する。
+6. 配備直前に本番のWorker版を記録し、D1を暗号化して非公開R2へ保存・読み戻し検証する。再度main・検証版のSHA・ロック・DB・本番Worker版を確認してからWorkerのみ配備する。
+7. 正常応答、実際に100%稼働する新しいWorker版、Cloudflare版の `BUILD_GIT_COMMIT` が対象SHAであることを確認する。記録ディレクトリのreceiptに旧版・新版・バックアップ位置・時刻が残る。
 8. 結果を共有し、`pnpm deploy:lock release production` でロックを解放する。途中失敗時はロックを保持し、旧版への切り戻し要否を判断する。
 
 ```bash
 pnpm deploy:production:worker:manual -- \
   --approval-ref 'https://github.com/OWNER/REPO/pull/NUMBER#issuecomment-ID' \
   --parent-repo '/absolute/path/to/parent' \
-  --record-dir '/absolute/path/to/private-release-records'
+  --record-dir '/absolute/path/to/private-release-records' \
+  --target-checkout '/absolute/path/to/clean-main-checkout' \
+  --staging-version '<candidate-worker-version-id>' \
+  --staging-deployment '<candidate-100-percent-deployment-id>'
 
 # 本番への適用は、上のdry-runとMasatoの個別承認を確認した後だけ
 pnpm deploy:production:worker:manual -- \
   --approval-ref 'https://github.com/OWNER/REPO/pull/NUMBER#issuecomment-ID' \
   --parent-repo '/absolute/path/to/parent' \
-  --record-dir '/absolute/path/to/private-release-records' --apply
+  --record-dir '/absolute/path/to/private-release-records' \
+  --target-checkout '/absolute/path/to/clean-main-checkout' \
+  --staging-version '<candidate-worker-version-id>' \
+  --staging-deployment '<candidate-100-percent-deployment-id>' --apply
 ```
 
 配備後に異常があればreceiptの `before.versionId` を読み、原因と影響を確認してから
