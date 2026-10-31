@@ -1041,4 +1041,4 @@
 - [お気に入りの星の表示](release-log/unreleased/1991-masato-yellow-favorites.md) — 反映履歴、確認 2026-10-31。
 - [機能設定の表示維持](release-log/unreleased/1992-masato-feature-settings-self-gate.md) — 反映履歴、確認 2026-10-31。
 - [検証環境のCloudflare配備](release-log/unreleased/1994-masato-cf-staging-deploy.md) — 反映履歴、確認 2026-10-31。
-- [お気に入りのショートカットと予告表示](release-log/unreleased/next-masato-sidebar-favorite-shortcuts.md) — 反映履歴、確認 2026-10-31。
+- [お気に入りのショートカットと予告表示](release-log/unreleased/1995-masato-sidebar-favorite-shortcuts.md) — 反映履歴、確認 2026-10-31。
