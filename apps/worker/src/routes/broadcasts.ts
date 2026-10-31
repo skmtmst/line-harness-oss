@@ -1,3 +1,5 @@
+import { scopeSegmentQuery, scopeStoredBroadcastSegmentQuery, scopedFriendIds, storedBroadcastFriendScope } from '../services/segment-query-scope.js';
+import { getBroadcastAudiencePreview } from '../services/broadcast-audience-preview.js';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import {
@@ -876,32 +878,41 @@ broadcasts.get('/api/broadcasts/:id/recipients', async (c) => {
     const limit = Math.min(100, Math.max(1, Number.parseInt(c.req.query('limit') ?? '50', 10) || 50));
     const filter = recipientResultFilter(result);
 
+    const readerScope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const visible = scopedFriendIds(readerScope);
+    const visibleAccounts = { sql: 'SELECT value FROM json_each(?)', binds: [JSON.stringify(readerScope.allowedAccountIds)] };
     const totalRow = await c.env.DB.prepare(
-      `SELECT COUNT(*) AS cnt FROM broadcast_send_claims c WHERE c.broadcast_id = ?${filter}`,
-    ).bind(id).first<{ cnt: number }>();
-    const total = Number(totalRow?.cnt ?? 0);
+      `SELECT COUNT(*) AS ledger_count,
+         SUM(CASE WHEN c.friend_id IN (${visible.sql}) THEN 1 ELSE 0 END) AS visible_count
+         FROM broadcast_send_claims c WHERE c.broadcast_id = ?${filter}`,
+    ).bind(...visible.bindings,id).first<{ ledger_count: number; visible_count: number | null }>();
+    const total = Number(totalRow?.visible_count ?? 0);
+    const unavailableRecipientCount = Number(totalRow?.ledger_count ?? 0) - total;
 
     // 全員配信は宛先の一覧を持たない。旧配信（送り終えているのに行が無い）は
     // 集約だけを返し、宛先の行を作らない。
     const isAll = broadcast.target_type === 'all';
-    const aggregateOnly = isAll || (broadcast.status === 'sent' && total === 0);
+    const aggregateOnly = isAll || (broadcast.status === 'sent' && Number(totalRow?.ledger_count ?? 0) === 0);
     interface RecipientRow {
       friend_id: string; line_account_id: string | null; state: string;
-      error_code: string | null; line_request_id: string | null;
+      error_code: string | null; line_request_id: string | null; line_account_hidden: number;
       dispatched_at: string | null; settled_at: string | null; display_name: string | null;
     }
     const queryResult = aggregateOnly
       ? { results: [] as RecipientRow[] }
       : await c.env.DB.prepare(
-        `SELECT c.friend_id, c.line_account_id, c.state, c.error_code,
-                c.line_request_id, c.dispatched_at, c.settled_at,
-                f.display_name
-           FROM broadcast_send_claims c
-           LEFT JOIN friends f ON f.id = c.friend_id
-          WHERE c.broadcast_id = ?${filter}
-          ORDER BY COALESCE(f.display_name, ''), c.friend_id
-          LIMIT ? OFFSET ?`,
-      ).bind(id, limit + 1, cursor).all<RecipientRow>();
+        `SELECT c.friend_id,
+                  CASE WHEN c.line_account_id IN (${visibleAccounts.sql}) THEN c.line_account_id ELSE NULL END AS line_account_id,
+                  CASE WHEN c.line_account_id IS NOT NULL AND c.line_account_id NOT IN (${visibleAccounts.sql}) THEN 1 ELSE 0 END AS line_account_hidden,
+                  CASE WHEN c.line_account_id IS NULL OR c.line_account_id IN (${visibleAccounts.sql}) THEN c.line_request_id ELSE NULL END AS line_request_id,
+                  c.state, c.error_code, c.dispatched_at, c.settled_at,
+                  f.display_name
+             FROM broadcast_send_claims c
+             LEFT JOIN friends f ON f.id = c.friend_id
+            WHERE c.broadcast_id = ?${filter} AND c.friend_id IN (${visible.sql})
+            ORDER BY COALESCE(f.display_name, ''), c.friend_id
+            LIMIT ? OFFSET ?`,
+      ).bind(...visibleAccounts.binds,...visibleAccounts.binds,...visibleAccounts.binds,id,...visible.bindings,limit + 1,cursor).all<RecipientRow>();
     const allRows = queryResult.results ?? [];
     const page = allRows.slice(0, limit);
     const [counts, breakdown] = await Promise.all([
@@ -929,6 +940,7 @@ broadcasts.get('/api/broadcasts/:id/recipients', async (c) => {
             friendId: row.friend_id,
             displayName: row.display_name || '名前がありません',
             lineAccountId: row.line_account_id,
+            lineAccountHidden: Boolean(row.line_account_hidden),
             group: view.group,
             label: view.label,
             detail: view.detail,
@@ -940,6 +952,8 @@ broadcasts.get('/api/broadcasts/:id/recipients', async (c) => {
           };
         }),
         summary,
+        unavailableRecipientCount,
+        unavailableRecipientLabel: unavailableRecipientCount > 0 ? `見られない宛先 ${unavailableRecipientCount}件` : null,
         aggregateOnly,
         aggregateReason: aggregateOnly ? (isAll ? 'all' : 'legacy') : null,
         // 旧配信は集約（成功数）だけ分かっているので返す。捏造はしない。
@@ -1000,86 +1014,12 @@ broadcasts.get('/api/broadcasts/:id/preview-count', async (c) => {
       return c.json({ success: false, error: 'Broadcast not found' }, 404);
     }
 
-    const raw = broadcast as unknown as Record<string, unknown>;
-    let count = 0;
-    let perAccount: Array<{ accountId: string; sendCount: number }> | undefined;
-
-    if (broadcast.target_type === 'multi-account-dedup') {
-      const accountIds = parseJsonArray(raw.account_ids) ?? [];
-      const dedupPriority = parseJsonArray(raw.dedup_priority) ?? [];
-      const preview = await computeDedupBroadcastPreview(
-        c.env.DB,
-        accountIds,
-        dedupPriority,
-        broadcast.target_tag_id ?? null,
-      );
-      // /send パスと同じく inactive/missing アカウントを除外して、実送信数の見積りを返す。
-      // 同時に per-account breakdown も返して confirm modal に表示できるようにする。
-      const { getLineAccountById } = await import('@line-crm/db');
-      let active = 0;
-      const breakdown: Array<{ accountId: string; sendCount: number }> = [];
-      for (const a of preview.perAccount) {
-        const account = await getLineAccountById(c.env.DB, a.accountId);
-        if (account && account.is_active) {
-          active += a.recipients.length;
-          breakdown.push({ accountId: a.accountId, sendCount: a.recipients.length });
-        }
-      }
-      count = active;
-      perAccount = breakdown;
-    } else if (broadcast.target_type === 'tag' && broadcast.target_tag_id) {
-      // 実送信は getFriendsByTag(db, tagId, line_account_id) で要求アカウントに
-      // 絞る (services/broadcast.ts)。プレビューも同じ境界で数え、他アカウント
-      // の人数・存在を応答へ漏らさない (N-060)。
-      const tagAccountId = (raw.line_account_id as string | null) || null;
-      const tagSql = tagAccountId
-        ? `SELECT COUNT(*) AS cnt FROM friends f
-           INNER JOIN friend_tags ft ON ft.friend_id = f.id
-           WHERE ft.tag_id = ? AND f.is_following = 1 AND f.line_account_id = ?`
-        : `SELECT COUNT(*) AS cnt FROM friends f
-           INNER JOIN friend_tags ft ON ft.friend_id = f.id
-           WHERE ft.tag_id = ? AND f.is_following = 1`;
-      const tagBinds: unknown[] = tagAccountId
-        ? [broadcast.target_tag_id, tagAccountId]
-        : [broadcast.target_tag_id];
-      const row = await c.env.DB.prepare(tagSql).bind(...tagBinds).first<{ cnt: number }>();
-      count = row?.cnt ?? 0;
-    } else if (broadcast.target_type === 'segment') {
-      // 絞り込み配信。条件は下書きに入っている。作った条件と、送る前に出す
-      // 人数がずれないよう、送信と同じ組み立てを使う。
-      const rawConditions = raw.segment_conditions as string | null;
-      try {
-        const conditions = rawConditions ? JSON.parse(rawConditions) : null;
-        if (conditions && Array.isArray(conditions.rules)) {
-          const { buildSegmentQuery } = await import('../services/segment-query.js');
-          const { sql, bindings } = buildSegmentQuery(conditions);
-          const accountId = (raw.line_account_id as string | null) || null;
-          const countSql = accountId
-            ? `SELECT COUNT(*) AS cnt FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
-            : `SELECT COUNT(*) AS cnt FROM (${sql}) q`;
-          const binds = accountId ? [accountId, ...bindings] : bindings;
-          const row = await c.env.DB.prepare(countSql).bind(...binds).first<{ cnt: number }>();
-          count = row?.cnt ?? 0;
-        }
-      } catch (segmentError) {
-        // 条件が壊れているときは 0 を返す。ここで500にすると、下書きの一覧
-        // そのものが開かなくなる。送信を押した時点で理由付きで止まる。
-        console.error('preview-count: invalid segment_conditions', segmentError);
-      }
-    } else if (broadcast.target_type === 'all') {
-      const accountId = (raw.line_account_id as string | null) || null;
-      const sql = accountId
-        ? `SELECT COUNT(*) AS cnt FROM friends WHERE is_following = 1 AND line_account_id = ?`
-        : `SELECT COUNT(*) AS cnt FROM friends WHERE is_following = 1`;
-      const binds: unknown[] = accountId ? [accountId] : [];
-      const row = await c.env.DB.prepare(sql).bind(...binds).first<{ cnt: number }>();
-      count = row?.cnt ?? 0;
-    }
-
+    const { count, perAccount } = await getBroadcastAudiencePreview(c.env.DB, broadcast);
+    if (count === null) return c.json({ success: false, error: '対象の人数を確認できません。もう一度お試しください。' }, 503);
     return c.json({ success: true, data: { count, perAccount } });
   } catch (err) {
     console.error('GET /api/broadcasts/:id/preview-count error:', err);
-    return c.json({ success: false, error: 'Internal server error' }, 500);
+    return c.json({ success: false, error: '対象の人数を確認できません。もう一度お試しください。' }, 503);
   }
 });
 
@@ -2397,16 +2337,11 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
       }
 
       const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
-      let audienceSql = `SELECT COUNT(*) AS total,
+      const scoped = await scopeStoredBroadcastSegmentQuery(c.env.DB, { sql, bindings }, accountId);
+      const audienceSql = `SELECT COUNT(*) AS total,
                                 SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
-                           FROM (${sql}) q`;
-      const audienceBindings = [...bindings];
-      if (accountId) {
-        audienceSql = `SELECT COUNT(*) AS total,
-                              SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
-                         FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
-        audienceBindings.unshift(accountId);
-      }
+                           FROM (${scoped.sql}) q`;
+      const audienceBindings = scoped.bindings;
       const audience = await c.env.DB.prepare(audienceSql)
         .bind(...audienceBindings)
         .first<{ total: number; missing_name: number | null }>();
@@ -2459,10 +2394,9 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
       const accountId = rawExisting.line_account_id as string | null;
       const where: string[] = ['f.is_following = 1'];
       const binds: unknown[] = [];
-      if (accountId) {
-        where.push('f.line_account_id = ?');
-        binds.push(accountId);
-      }
+      const audienceScope = scopedFriendIds(await storedBroadcastFriendScope(c.env.DB, accountId));
+      where.push(`f.id IN (${audienceScope.sql})`);
+      binds.push(...audienceScope.bindings);
       if (existing.target_type === 'tag') {
         if (!existing.target_tag_id) {
           return c.json({ success: false, error: 'targetTagId is required for tag delivery' }, 400);
@@ -2600,6 +2534,7 @@ broadcasts.post('/api/broadcasts/:id/send', requireIrreversibleConfirmation('bro
         c.env.DB,
         existing.target_tag_id,
         existing.line_account_id ?? null,
+        await storedBroadcastFriendScope(c.env.DB, existing.line_account_id),
       );
       const followingCount = friends.filter(f => f.is_following).length;
 
@@ -2812,16 +2747,11 @@ broadcasts.post('/api/broadcasts/:id/send-segment', requirePermission(BROADCAST_
       const { buildPublicSegmentQuery } = await import('../services/segment-query.js');
       const { sql, bindings } = buildPublicSegmentQuery(body.conditions);
       const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
-      let audienceSql = `SELECT COUNT(*) AS total,
+      const scoped = await scopeStoredBroadcastSegmentQuery(c.env.DB, { sql, bindings }, accountId);
+      const audienceSql = `SELECT COUNT(*) AS total,
                                 SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
-                           FROM (${sql}) q`;
-      const audienceBindings = [...bindings];
-      if (accountId) {
-        audienceSql = `SELECT COUNT(*) AS total,
-                              SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
-                         FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
-        audienceBindings.unshift(accountId);
-      }
+                           FROM (${scoped.sql}) q`;
+      const audienceBindings = scoped.bindings;
       const audience = await c.env.DB.prepare(audienceSql)
         .bind(...audienceBindings)
         .first<{ total: number; missing_name: number | null }>();
@@ -3356,20 +3286,28 @@ broadcasts.get('/api/broadcasts/:id/progress', async (c) => {
 
 // POST /api/segments/count — count friends matching segment conditions
 broadcasts.post('/api/segments/count', requirePermission(BROADCAST_DEFINITION_EDIT_KEY), async (c) => {
-  const body = await c.req.json<{ conditions: unknown; accountId?: string }>();
+  const body = await c.req.json<{ conditions: unknown; accountId?: string } & Record<string, unknown>>();
   try {
+    const accountId = body.accountId;
+    const alternateAccounts = [
+      ...['account_id', 'line_account_id', 'lineAccountId'].flatMap(key => Object.hasOwn(body, key) ? [body[key]] : []),
+      ...['accountId', 'account_id', 'line_account_id', 'lineAccountId', 'account'].flatMap(key => c.req.queries(key) ?? []),
+    ];
+    if (['accountIds', 'lineAccountIds'].some(key => Object.hasOwn(body, key))
+      || (Object.hasOwn(body, 'accountId') && (typeof accountId !== 'string' || !accountId.trim()))
+      || alternateAccounts.some(value => accountId === undefined || value !== accountId)) {
+      return c.json({ success: false, error: '集計するLINEアカウントの指定が一致していません' }, 400);
+    }
     if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId ?? null])) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
     const { buildPublicSegmentQuery } = await import('../services/segment-query.js');
     const { sql, bindings } = buildPublicSegmentQuery(body.conditions as SegmentCondition);
 
-    let accountSql = sql;
-    const accountBindings = [...bindings];
-    if (body.accountId) {
-      accountSql = sql.replace('WHERE', 'WHERE f.line_account_id = ? AND');
-      accountBindings.unshift(body.accountId);
-    }
+    const scope = body.accountId
+      ? { allowedAccountIds: [body.accountId], canSeeUnassigned: false }
+      : await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const { sql: accountSql, bindings: accountBindings } = scopeSegmentQuery({ sql, bindings }, scope);
 
     /*
      * 件数は、組み立てた SQL を丸ごと副問い合わせに包んで数える。

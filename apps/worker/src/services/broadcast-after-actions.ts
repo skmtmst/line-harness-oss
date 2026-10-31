@@ -1,3 +1,4 @@
+import { scopedFriendIds, storedBroadcastFriendScope } from './segment-query-scope.js';
 import { jstNow } from '@line-crm/db';
 import {
   createAutomationActionExecutors,
@@ -179,13 +180,14 @@ export async function processBroadcastAfterActions(
   }
   if (plan.length === 0) return result;
   const lineAccountId = broadcast.line_account_id;
+  const scope = scopedFriendIds(await storedBroadcastFriendScope(db, lineAccountId));
 
   // 受理済みで、まだ実行し終えていない宛先だけを拾う。失敗・送達不明は
   // 最初から対象外（送達台帳の state が 'sent' の行だけ見る）。
   const targets = await db.prepare(
     `SELECT c.friend_id AS friend_id
        FROM broadcast_send_claims c
-      WHERE c.broadcast_id = ? AND c.state = 'sent'
+      WHERE c.broadcast_id = ? AND c.state = 'sent' AND c.friend_id IN (${scope.sql})
         AND NOT EXISTS (
           SELECT 1 FROM broadcast_after_action_runs r
            WHERE r.broadcast_id = c.broadcast_id AND r.friend_id = c.friend_id
@@ -193,7 +195,7 @@ export async function processBroadcastAfterActions(
         )
       ORDER BY c.friend_id
       LIMIT ?`,
-  ).bind(input.broadcastId, limit).all<{ friend_id: string }>();
+  ).bind(input.broadcastId, ...scope.bindings, limit).all<{ friend_id: string }>();
 
   const executors = input.executors ?? createAutomationActionExecutors(input.executorDependencies);
   for (const target of targets.results ?? []) {
@@ -209,6 +211,9 @@ export async function processBroadcastAfterActions(
     let stopped = false;
     for (const action of plan) {
       if (stopped) break;
+      const current = await db.prepare('SELECT id FROM friends WHERE id = ? AND line_account_id = ?')
+        .bind(friendId, lineAccountId).first();
+      if (!current) { result.skipped += 1; break; }
       const now = jstNow();
       await db.prepare(
         `INSERT OR IGNORE INTO broadcast_after_action_runs

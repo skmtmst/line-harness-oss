@@ -1,3 +1,4 @@
+import { scopedFriendIds, storedBroadcastFriendScope, scopeStoredBroadcastSegmentQuery } from './segment-query-scope.js';
 import { getLineAccountById, type Broadcast } from '@line-crm/db';
 
 import { computeDedupBroadcastPreview } from './dedup-broadcast.js';
@@ -68,55 +69,42 @@ export async function getBroadcastAudiencePreview(
   }
 
   const accountId = broadcastAccountId(broadcast, requestedAccountId);
+  try {
+    const scope = scopedFriendIds(await storedBroadcastFriendScope(db, accountId));
 
-  if (broadcast.target_type === 'tag') {
-    if (!broadcast.target_tag_id) return { count: null };
-    const sql = accountId
-      ? `SELECT COUNT(*) AS count
-           FROM friends f
-           JOIN friend_tags ft ON ft.friend_id = f.id
-          WHERE ft.tag_id = ? AND f.is_following = 1 AND f.line_account_id = ?`
-      : `SELECT COUNT(*) AS count
-           FROM friends f
-           JOIN friend_tags ft ON ft.friend_id = f.id
-          WHERE ft.tag_id = ? AND f.is_following = 1`;
-    const row = accountId
-      ? await db.prepare(sql).bind(broadcast.target_tag_id, accountId).first<{ count: number }>()
-      : await db.prepare(sql).bind(broadcast.target_tag_id).first<{ count: number }>();
-    return { count: Number(row?.count ?? 0) };
-  }
-
-  if (broadcast.target_type === 'segment') {
-    if (typeof broadcast.segment_conditions !== 'string' || !broadcast.segment_conditions.trim()) {
-      return { count: null };
-    }
-    try {
-      const conditions = JSON.parse(broadcast.segment_conditions) as { rules?: unknown };
-      if (!Array.isArray(conditions.rules)) return { count: null };
-      const { sql, bindings } = buildSegmentQuery(
-        conditions as Parameters<typeof buildSegmentQuery>[0],
-      );
-      const scopedSql = accountId
-        ? sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')
-        : sql;
-      const scopedBindings = accountId ? [accountId, ...bindings] : bindings;
-      const row = await db.prepare(`SELECT COUNT(*) AS count FROM (${scopedSql}) q`)
-        .bind(...scopedBindings).first<{ count: number }>();
+    if (broadcast.target_type === 'tag') {
+      if (!broadcast.target_tag_id) return { count: null };
+      const row = await db.prepare(
+        `SELECT COUNT(*) AS count FROM friends f JOIN friend_tags ft ON ft.friend_id = f.id
+          WHERE ft.tag_id = ? AND f.is_following = 1 AND f.id IN (${scope.sql})`,
+      ).bind(broadcast.target_tag_id, ...scope.bindings).first<{ count: number }>();
       return { count: Number(row?.count ?? 0) };
-    } catch {
-      return { count: null };
     }
-  }
 
-  if (broadcast.target_type === 'all') {
-    const sql = accountId
-      ? 'SELECT COUNT(*) AS count FROM friends WHERE is_following = 1 AND line_account_id = ?'
-      : 'SELECT COUNT(*) AS count FROM friends WHERE is_following = 1';
-    const row = accountId
-      ? await db.prepare(sql).bind(accountId).first<{ count: number }>()
-      : await db.prepare(sql).first<{ count: number }>();
-    return { count: Number(row?.count ?? 0) };
-  }
+    if (broadcast.target_type === 'segment') {
+      if (typeof broadcast.segment_conditions !== 'string' || !broadcast.segment_conditions.trim()) {
+        return { count: null };
+      }
+      try {
+        const conditions = JSON.parse(broadcast.segment_conditions) as { rules?: unknown };
+        if (!Array.isArray(conditions.rules)) return { count: null };
+        const { sql, bindings } = await scopeStoredBroadcastSegmentQuery(db, buildSegmentQuery(
+          conditions as Parameters<typeof buildSegmentQuery>[0],
+        ), accountId);
+        const row = await db.prepare(`SELECT COUNT(*) AS count FROM (${sql}) q`)
+          .bind(...bindings).first<{ count: number }>();
+        return { count: Number(row?.count ?? 0) };
+      } catch {
+        return { count: null };
+      }
+    }
 
-  return { count: null };
+    if (broadcast.target_type === 'all') {
+      const row = await db.prepare(`SELECT COUNT(*) AS count FROM friends f WHERE is_following = 1 AND f.id IN (${scope.sql})`)
+        .bind(...scope.bindings).first<{ count: number }>();
+      return { count: Number(row?.count ?? 0) };
+    }
+
+    return { count: null };
+  } catch { return { count: null }; }
 }
