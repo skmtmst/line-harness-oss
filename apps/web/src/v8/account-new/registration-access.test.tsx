@@ -53,7 +53,7 @@ describe('/accounts/new の登録権限', () => {
     fixture.role.value = verifiedStaffRole(null)
     render(<AccountRegisterV8 />)
     expect(screen.queryByText(MANAGER_ONLY)).toBeNull()
-    expect(screen.getByLabelText('権限を確認しています').getAttribute('aria-busy')).toBe('true')
+    expect(screen.getByLabelText('読み込んでいます').getAttribute('aria-busy')).toBe('true')
     expect(screen.queryByRole('radio')).toBeNull()
     expect(screen.queryByRole('textbox')).toBeNull()
     expect(styleCalls.get).not.toHaveBeenCalled()

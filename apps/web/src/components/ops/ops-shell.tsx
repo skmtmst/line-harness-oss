@@ -3,21 +3,12 @@
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import {
-  BookOpen,
-  Building2,
-  LayoutDashboard,
-  LifeBuoy,
-  Megaphone,
-  ScrollText,
-} from 'lucide-react'
 import { api, type OpsMe } from '@/lib/api'
 import Button from '@/components/shared/button'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import ImpersonationBar from './impersonation-bar'
 import { OpsShellV8 } from '@/v8/ops/public/shell/index'
-import { setDocumentTitle } from '@/lib/document-title'
 
 /**
  * 運営コンソールの外枠。★管理画面 37 系。
@@ -26,15 +17,6 @@ import { setDocumentTitle } from '@/lib/document-title'
  * （`jIZP0`）と環境帯（`OGkIw`）を持つ。メンバー管理はサイドメニューに置かず、
  * 左下のアカウントメニュー（37-9）から開く。
  */
-
-const MENU: Array<{ href: string; label: string; icon: typeof LayoutDashboard }> = [
-  { href: '/ops/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
-  { href: '/ops/tenants', label: '契約先アカウント', icon: Building2 },
-  { href: '/ops/support', label: 'お問い合わせ', icon: LifeBuoy },
-  { href: '/ops/announcements', label: 'お知らせ', icon: Megaphone },
-  { href: '/ops/knowledge', label: 'ナレッジ', icon: BookOpen },
-  { href: '/ops/audit', label: '監査ログ', icon: ScrollText },
-]
 
 export default function OpsShell({ children }: { children: ReactNode }) {
   const router = useRouter()
@@ -51,12 +33,6 @@ export default function OpsShell({ children }: { children: ReactNode }) {
    * 狭い画面のメニューは開閉式。画面を移ったら閉じ、開いている間は
    * Escape と背面のスクロール停止に対応する。
    */
-  // タブの題（「<画面名> | musubo」）。運営の画面は左メニューの名前を使う。
-  useEffect(() => {
-    const item = MENU.find((m) => pathname === m.href || pathname.startsWith(`${m.href}/`))
-    setDocumentTitle(item ? `${item.label}（運営）` : '運営コンソール')
-  }, [pathname])
-
   const load = useCallback(async () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     try {

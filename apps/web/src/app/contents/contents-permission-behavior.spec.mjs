@@ -240,7 +240,7 @@ test.describe('Issue #667 メディア管理権限の実挙動', () => {
     })
 
     await openContents(page, 'domcontentloaded')
-    await expect(permissionNote(page)).toContainText('操作権限を確認しています。')
+    await expect(permissionNote(page)).toHaveCount(0)
     await expectManagementHidden(page)
     expect(management.requests).toEqual([])
     await page.keyboard.press('Escape')

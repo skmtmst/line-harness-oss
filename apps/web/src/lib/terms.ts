@@ -192,7 +192,7 @@ export function term(key: keyof typeof terms): string { return terms[key] }
 
 export const termsStyle = {
   V01: {"standard": "標準", "restaurant": "飲食店", "salon": "サロン", "consult": "面談・相談", "lesson": "教室・レッスン", "ec": "EC"},
-  V02: {"standard": "ダッシュボード", "restaurant": "お店", "salon": "サロン", "consult": "面談", "lesson": "教室", "ec": "ダッシュボード"},
+  V02: {"standard": "ダッシュボード", "restaurant": "ダッシュボード", "salon": "ダッシュボード", "consult": "ダッシュボード", "lesson": "ダッシュボード", "ec": "ダッシュボード"},
   V03: {"standard": "—", "restaurant": "席", "salon": "台帳", "consult": "面談", "lesson": "クラス", "ec": "—"},
   V04: {"standard": "来店日", "restaurant": "来店日", "salon": "来店日", "consult": "面談日", "lesson": "クラスの日", "ec": "—"},
   V05: {"standard": "予約", "restaurant": "予約", "salon": "予約", "consult": "面談", "lesson": "クラス", "ec": "—"},

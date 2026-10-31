@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { StaffMember } from '@line-crm/shared'
 import { forgetStaffIdentity, rememberStaffIdentity } from '@/lib/staff-identity-state'
@@ -61,7 +61,20 @@ it('本人未確定の統括では子も拒否文も出さず、確定後だけ�
   const mounted = vi.fn(); gate(mounted)
   expect(mounted).not.toHaveBeenCalled()
   expect(screen.queryByText('この画面を見る権限がありません')).toBeNull()
+  expect(screen.getByLabelText('読み込んでいます').getAttribute('aria-busy')).toBe('true')
+  expect(screen.queryByLabelText(/権限/)).toBeNull()
   expect(nav.replace).not.toHaveBeenCalled()
   await act(async () => { signIn({ role: 'owner', accountScope: 'all' }) })
   expect(mounted).toHaveBeenCalledTimes(1)
+})
+
+it('統括で本人の取得に失敗したら読み直せ、成功するまで子を始めない', async () => {
+  nav.me.mockResolvedValueOnce({ success: false })
+  const mounted = vi.fn(); gate(mounted)
+  await screen.findByText('読み込めませんでした')
+  expect(mounted).not.toHaveBeenCalled()
+  nav.me.mockResolvedValueOnce({ success: true, data: { role: 'owner', accountScope: 'all' } })
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+  await waitFor(() => expect(mounted).toHaveBeenCalledTimes(1))
+  expect(nav.me).toHaveBeenCalledTimes(2)
 })
