@@ -2,7 +2,7 @@
 import { cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react'
 import { afterEach,expect,it,vi } from 'vitest'
 import { useState } from 'react'
-import { INITIAL_MENUS, initialMenuImageDataUri } from '@line-crm/shared'
+import { INITIAL_MENUS, initialMenuImageDataUri, initialMenuDestination, type AccountStyle } from '@line-crm/shared'
 import { InitialMenuChoice, type InitialMenuSelection } from './initial-menu-choice'
 const net=vi.hoisted(()=>({resources:vi.fn()}))
 vi.mock('@/lib/api/helpers/styles',()=>({styleApi:net}))
@@ -24,4 +24,15 @@ it('閲覧だけならメニューの選び方を変えられない',()=>{
  const onChange=vi.fn();render(<InitialMenuChoice accountId="a" style="ec" value={{value:'simple'}} onChange={onChange} disabled/>);
  fireEvent.click(screen.getByRole('radio',{name:/あとで設定/}));expect(onChange).not.toHaveBeenCalled()
  expect(screen.queryByText('予約用の回答フォーム')).toBeNull()
+})
+it.each(Object.keys(INITIAL_MENUS) as AccountStyle[])('%sの見本と4つの行き先を同じ定義で示す',style=>{
+ render(<InitialMenuChoice accountId="a" style={style} value={{value:'simple'}} onChange={vi.fn()}/>);
+ const menu=INITIAL_MENUS[style];
+ expect(screen.getByRole('img').getAttribute('src')).toBe(initialMenuImageDataUri(style));
+ expect(screen.getByRole('img').getAttribute('alt')).toBe(menu.buttons.map(button=>button.label).join('・'));
+ expect(screen.getAllByRole('row')).toHaveLength(5);
+ for(const button of menu.buttons){
+  expect(screen.getByRole('cell',{name:button.label})).toBeTruthy();
+  expect(screen.getAllByText(initialMenuDestination(style,button.target)).length).toBeGreaterThan(0);
+ }
 })

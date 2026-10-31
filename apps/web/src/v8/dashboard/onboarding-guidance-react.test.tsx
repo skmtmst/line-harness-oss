@@ -4,18 +4,19 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({
-  progress: vi.fn(), style: vi.fn(), warnings: vi.fn(), items: vi.fn(), features: vi.fn(),
+  routes: vi.fn(), progress: vi.fn(), style: vi.fn(), warnings: vi.fn(), items: vi.fn(), features: vi.fn(),
   save: vi.fn(), activate: vi.fn(), starterSet: vi.fn(),
   role: 'owner' as string | null, search: '', replace: vi.fn(), push: vi.fn(),
 }))
-vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(net.search), usePathname: () => '/' }))
+vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(net.search), usePathname: () => '/', useRouter: () => ({ replace: net.replace, push: net.push }) }))
 vi.mock('@/components/shared/list-navigation', async original => ({ ...await original<typeof import('@/components/shared/list-navigation')>(), useListNavigationRouter: () => ({ replace: net.replace, push: net.push }) }))
 vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_account: string | null, style: import('@line-crm/shared').AccountStyle | null) => ({ progress: style ? { style, steps: {} } : undefined, reload: vi.fn() }) }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ refreshAccounts: vi.fn(), selectedAccountId: 'A', selectedAccount: null, loading: false }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ refreshAccounts: vi.fn(), selectedAccountId: 'A', selectedAccount: { channelId: 'channel-A', displayName: 'A' }, loading: false }) }))
 vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => net.role, useStaffIdentity: () => null }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api,
+    entryRoutes: { ...actual.api.entryRoutes, list: net.routes },
     gettingStarted: { ...actual.api.gettingStarted, get: net.progress },
     featureSettings: { ...actual.api.featureSettings, get: net.features },
     dashboard: { ...actual.api.dashboard, comparisons: vi.fn().mockResolvedValue({ success: false, error: 'not requested' }) },
@@ -43,6 +44,8 @@ vi.mock('./use-dashboard', async original => ({
   }),
 }))
 
+vi.mock('@/components/dashboard/qr-dialog', () => ({ default: ({ open }: { open: boolean }) => open ? <div role="dialog" aria-label="友だち追加のQRコード" /> : null }))
+
 import DashboardV8 from './dashboard'
 import { setTestReducedMotion } from '@/test-utils/reduced-motion'
 
@@ -57,6 +60,7 @@ const pendingSetup = () => screen.findByRole('button', { name: '使い方の設�
 beforeEach(() => {
   vi.clearAllMocks()
   net.role = 'owner'; net.search = ''
+  net.routes.mockReset().mockResolvedValue(ok([]))
   window.localStorage.clear(); window.sessionStorage.clear(); window.history.replaceState(null, '', '/')
   setTestReducedMotion(true)
   net.progress.mockReset().mockResolvedValue(basic())
@@ -96,22 +100,22 @@ it.each([
   expect((document.getElementById('first-steps-list') as HTMLElement).hidden).toBe(true)
   const configure = await pendingSetup()
   expect(within(guide()).getByText('リッチメニューなどの見た目を決める').closest('[hidden]')).toBeNull()
-  expect(within(guide()).getByText(/残りの設定 1 件/)).toBeTruthy()
+  expect(within(guide()).getByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
   fireEvent.click(configure)
   expect(await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })).toBeTruthy()
   expect(net.save).not.toHaveBeenCalled(); expect(net.activate).not.toHaveBeenCalled()
 })
 
-it('基本6段の満タンとは別に、使い方の設定1/3と残りの設定を示す', async () => {
+it('カードの進みは基本6段の1つだけにし、選んだ機能の設定と操作を残す', async () => {
   net.progress.mockResolvedValue(basic(true))
   render(<DashboardV8 />)
   await pendingSetup()
   expect(within(guide()).getByText('6 / 6 済み')).toBeTruthy()
-  expect(within(guide()).getByText(/1 \/ 3 済み/)).toBeTruthy()
-  expect(within(guide()).getByText(/残りの設定 1 件/)).toBeTruthy()
-  const progress = within(guide()).getByRole('progressbar', { name: '使い方の設定の進み' })
-  expect(progress.getAttribute('aria-valuenow')).toBe('1')
-  expect(progress.getAttribute('aria-valuemax')).toBe('3')
+  expect(within(guide()).getAllByRole('progressbar')).toHaveLength(1)
+  expect(within(guide()).queryByRole('progressbar', { name: '使い方の設定の進み' })).toBeNull()
+  expect(guide().textContent).not.toMatch(/質問 \d|済み \d+件/)
+  expect(within(guide()).getByText('リッチメニューなどの見た目を決める')).toBeTruthy()
+  expect(within(guide()).getByRole('button', { name: '済んだ物を見る' })).toBeTruthy()
 })
 
 it('基本GETだけ失敗しても取得済みの設定入口と独立した再試行を残す', async () => {
@@ -136,7 +140,8 @@ it('基本GETが保留でstepsが空でも、取得済みの設定を隠さず0/
   expect(await pendingSetup()).toBeTruthy()
   expect(document.querySelector('[data-design="TodayTasks"]')?.closest('[inert][aria-hidden="true"]')).toBeTruthy()
   expect(screen.queryByRole('progressbar', { name: 'はじめにやることの進み' })).toBeNull()
-  expect(screen.getByRole('progressbar', { name: '使い方の設定の進み' }).getAttribute('aria-valuenow')).toBe('1')
+  expect(screen.queryByRole('progressbar', { name: '使い方の設定の進み' })).toBeNull()
+  expect(screen.getByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
   expect(guide().textContent).not.toContain('0 / 0')
   await act(async () => { resolve(basic()) })
   expect(await screen.findByRole('progressbar', { name: 'はじめにやることの進み' })).toBeTruthy()
@@ -174,11 +179,11 @@ it('両GETが失敗したときは各再試行が対応する取得だけをや�
   expect(net.progress).toHaveBeenCalledTimes(2); expect(net.style).toHaveBeenCalledTimes(2)
 })
 
-it('基本6段と使い方の進捗を分け、畳んでも後回しの設定操作を残す', async () => {
+it('基本6段の進みだけを示し、畳んでも後回しの設定操作を残す', async () => {
   net.progress.mockResolvedValue(basic(true))
   render(<DashboardV8 />)
   await pendingSetup()
-  expect(screen.getAllByRole('progressbar')).toHaveLength(2)
+  expect(screen.getAllByRole('progressbar')).toHaveLength(1)
   expect(within(guide()).getByText('6 / 6 済み')).toBeTruthy()
   expect(within(guide()).getByText('リッチメニューなどの見た目を決める')).toBeTruthy()
   fireEvent.click(within(guide()).getByRole('button', { name: '畳む', exact: true }))
@@ -267,4 +272,13 @@ it('既知の業種を設定取得の失敗で標準へ戻さず、実物が未�
   expect(within(card).getAllByRole('button', { name: /の未確認の理由$/ })).toHaveLength(3)
   expect(within(card).queryByText('友だちの分け方を決める')).toBeNull()
   expect(screen.queryByRole('button', { name: '使い方の設定を開く', exact: true })).toBeNull()
+})
+
+it.each(['standard', 'ec'] as const)('%sは友だち追加のカードを隠していても共通のQRを1つだけ開く', async usageStyle => {
+  net.search = 'qr=base'
+  render(<DashboardV8 usageStyle={usageStyle} />)
+  expect(await screen.findAllByRole('dialog', { name: '友だち追加のQRコード' })).toHaveLength(1)
+  expect(net.routes).toHaveBeenCalledWith('A')
+  expect(screen.queryByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeNull()
+  expect(net.save).not.toHaveBeenCalled()
 })

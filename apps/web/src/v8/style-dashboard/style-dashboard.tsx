@@ -1,8 +1,10 @@
 'use client'
 import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog } from '@/v8/dashboard/public/first-steps/index'
 import { canManageRole } from '@/lib/staff-role'
-import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
+import { useSetupWizard } from '@/v8/onboarding/public/setup-wizard/index'
+import { FriendAddLink } from '@/v8/dashboard/public/friend-add/index'
 import CalendarPeriod from '@/components/shared/calendar-period'
 import { formatYen } from '@line-crm/shared';
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
@@ -103,15 +105,11 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const { cfg, router, tab, subTab, view, range, days, accountId, role, canWrite, date, setDate, staff, setStaff, compare, setCompare, search, setSearch, failed, analytics, analyticsFailed, layout, applyPresentation, metricSelectionFallback, reloadPresentation, defaultMetrics, viewOpen, setViewOpen, closureOpen, setClosureOpen, phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen, busy, setBusy, rosterId, setRosterId, asideOpen, setAsideOpen, floor, loadedAt, store, tables, setParam, load, loadAnalytics, setCardDefaults, roster, rosterRow, today, preparing, openPayment, reload, subtitle, openRow, markVisit, markNoShow, approve, undoVisit, cancelRow, setCancelRow, refundRow, setRefundRow, resultRow, setResultRow, classRow, setClassRow, menuFor, confirmCancel, saveResult, testMode, alertAction, attend, reloadRoster, KIND, saveClosure, addNew } = useStyleDashboard(style)
 
   const absence = useEventAbsence({ accountId, scope: JSON.stringify([style, date, rosterId]), onSaved: reloadRoster })
-  const start = useFirstSteps(accountId || null, role, { style })
   const setup = useStyleSetup(accountId || null, role)
   const setupRest = setupSummary(setup.data, !canManageRole(role))
-  const openSetupStep = (step: string | number) => {
-    if (!canManageRole(role)) return
-    const names = setup.data ? ['style', 'image'] : []
-    const target = typeof step === 'number' ? step : step === 'summary' ? 'summary' : Math.max(0, names.indexOf(step))
-    router.push(`/?setup=${target}`)
-  }
+  const wizard = useSetupWizard(accountId || null, setup.data?.state, role, setup.reload)
+  const { openStep: openSetupStep, qrRequested } = wizard
+  const start = useFirstSteps(accountId || null, role, { style, qrOpen: qrRequested })
   const emptyBookingState = today ? bookingEmptyState(style, today) : null
   const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && (emptyBookingState === 'no-bookings' || emptyBookingState === 'no-classes')
   const writeLock = role === null ? undefined : lockUnless(canWrite)
@@ -242,6 +240,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         {absence.dialog}
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
         {setup.data ? <SetupWarningBands data={setup.data} configureAllowed={canManageRole(role)} role={role} /> : null}
+        <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
         {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'}
           onRecheck={start.watchExpired ? start.rewatch : undefined}
           onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : !canManageRole(role) ? () => openSetupStep('style') : undefined} configureAllowed={canManageRole(role)}
@@ -316,6 +315,8 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
           onClose={() => setClassRow(null)} onConfirm={() => { setClassRow(null); preparing.open('休講') }} />
       ) : null}
       {resultRow ? <ResultDialog row={resultRow} busy={busy === 'result'} onClose={() => setResultRow(null)} onSave={(outcome) => void saveResult(resultRow, outcome)} /> : null}
+      {wizard.dialog}
+      {qrRequested ? <FriendAddLink dialogOnly officialProfileUrl={undefined} canManage={canManageRole(role)} /> : null}
     </DashboardPage>
     </KpiValueMotionProvider>
   )

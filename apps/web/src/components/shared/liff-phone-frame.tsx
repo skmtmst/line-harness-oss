@@ -1,13 +1,16 @@
 'use client'
+import { usePhonePreviewScale } from './use-phone-preview-scale'
+import { PhonePreviewScale } from './phone-preview-scale'
 import type { AriaRole, CSSProperties, ReactNode } from 'react'
 import { BatteryFull, Signal, Wifi, X, MoreHorizontal } from 'lucide-react'
 import styles from './liff-phone-frame.module.css'
-export default function LiffPhoneFrame({ children, title = 'ご予約', accountName = 'musubo', caption, role, step, steps = ['メニュー', '担当', '日時', '確認'], footer, accent, label = 'お客さまの予約画面の見本' }: {
-  children: ReactNode; role?: AriaRole; title?: string; accountName?: string; caption?: string; step?: number; steps?: string[]; footer?: ReactNode; accent?: string | null; label?: string
+export default function LiffPhoneFrame({ scaleToFit=false,compact=false,children, title = 'ご予約', accountName = 'musubo', caption, role, step, steps = ['メニュー', '担当', '日時', '確認'], footer, accent, label = 'お客さまの予約画面の見本' }: {
+  scaleToFit?:boolean;compact?:boolean;children: ReactNode; role?: AriaRole; title?: string; accountName?: string; caption?: string; step?: number; steps?: string[]; footer?: ReactNode; accent?: string | null; label?: string
 }) {
-  return <section role={role} className={styles.root} aria-label={label} data-liff-phone-frame>
+  const scaled=usePhonePreviewScale(scaleToFit)
+  return <section ref={scaled.ref} role={role} className={styles.root} aria-label={label} data-liff-phone-frame>
     {caption ? <p className={styles.caption}>{caption}</p> : null}
-    <div className={styles.phone} data-line-preview-part="device-frame" style={accent ? { '--fe-phone-main': accent, '--v8-liff-primary': accent } as CSSProperties : undefined}>
+    <PhonePreviewScale enabled={scaleToFit} scale={scaled.scale}><div className={styles.phone} data-compact={compact||undefined} data-line-preview-part="device-frame" style={accent ? { '--fe-phone-main': accent, '--v8-liff-primary': accent } as CSSProperties : undefined}>
       {/* 本物のスマホの形（LINE の見え方と同じ器：330×690・黒い縁・黒い島。Pen cfVyj・fZrjX）。 */}
       <div className={styles.screen}>
       <div className={styles.status}><span className={styles.time}>9:41</span><span className={styles.island} aria-hidden="true" /><span className={styles.statusIcons} aria-hidden="true"><Signal size={16} strokeWidth={1.8}/><Wifi size={16} strokeWidth={1.8}/><BatteryFull size={20} strokeWidth={1.8}/></span></div>
@@ -18,5 +21,5 @@ export default function LiffPhoneFrame({ children, title = 'ご予約', accountN
       <div className={styles.home} aria-hidden="true"><span/></div>
       </div>
     </div>
-  </section>
+  </PhonePreviewScale></section>
 }

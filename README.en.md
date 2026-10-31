@@ -112,7 +112,7 @@ Takes about 5 minutes. Once done, the dashboard at `https://<your-name>-admin.pa
 ### AI integration
 - **MCP server included** (`@line-harness/mcp-server`) — natural-language operation from Claude Code
   - `list_conversations` / `get_conversation` — AI-monitored unanswered conversations
-  - `create_scenario` / `update_step` — let AI design scenarios
+  - `create_scenario` / `update_step` — let AI design scenarios — created inactive; review, then activate via `manage_scenarios` update (publish permission required)
   - `broadcast` / `send_message` — sending requires user confirmation
 - **Official SDK** (`@line-harness/sdk`) — typed TypeScript SDK, ESM + CJS, zero dependencies
 

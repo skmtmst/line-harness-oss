@@ -4,6 +4,7 @@ import { isRichVideoTemplate } from './list-model'
 
 import { renderTemplateDialogs } from './list-dialogs'
 import { ChipKey,FolderCountSection,PAGE_SIZE_OPTIONS,PendingDelete,SAVED_FILTER_OPTIONS,Section,Template,latestContentOf,normalizeTemplateSearchText } from './list-model'
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 import { renderTemplateList } from './list-table'
 
 
@@ -60,6 +61,7 @@ export default function TemplatesListV8() {
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const router = useRouter()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const tokenNames = useInsertTokenNames(selectedAccountId)
   /*
    * 作成・編集・公開・削除は API が owner/admin で閉じている。
    * それ以外の人には押せない形で出す（閲覧は残す）。
@@ -896,7 +898,7 @@ export default function TemplatesListV8() {
 
   /* ===== 一覧の中身（：読込中・読み込めない・空・0件を分ける） ===== */
   const sectionWord = activeSection === 'rich_video' ? 'リッチビデオのテンプレート' : activeSection === 'question' ? '質問のテンプレート' : 'メッセージのテンプレート'
-  const listBody = renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, createHref: createKind.href, createLabel: createKind.title, lockedReason, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view })
+  const listBody = renderTemplateList({ tokenNames, accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, createHref: createKind.href, createLabel: createKind.title, lockedReason, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view })
 
   /* ページ送りは型の pagination 枠へ。件数は部品の summary に入れる（絵：左に「26件中 1〜20件」、右に頁。帯の内側は部品の 10・20）。 */
   const showPager = view === 'ready' && filteredTemplates.length > 0

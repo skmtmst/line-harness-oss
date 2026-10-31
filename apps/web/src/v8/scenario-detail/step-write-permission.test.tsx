@@ -10,7 +10,8 @@ const calls = vi.hoisted(() => ({ update: vi.fn(), add: vi.fn(), reorder: vi.fn(
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => account }))
 // The hook under test uses the production access lease; screen imports are irrelevant here.
 vi.mock('@/v8/scenarios', async () => await import('@/v8/scenarios/write-access'))
-vi.mock('./step-validation', () => ({ validateScenarioStep: () => null }))
+const validation = vi.hoisted(() => ({ problem: null as null | { field: 'question' | 'content'; message: string } }))
+vi.mock('./step-validation', () => ({ validateScenarioStep: () => validation.problem }))
 vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api, scenarios: { ...actual.api.scenarios,
@@ -42,6 +43,7 @@ function props() {
 const writes = () => Object.entries(calls).filter(([name]) => name !== 'listActions').map(([,fn]) => fn)
 const invoke = async (fn: () => unknown) => { await act(async () => { await fn() }) }
 beforeEach(() => {
+  validation.problem = null
   forgetSessionSnapshot(); person('owner'); account.selectedAccountId = 'account-a'; account.loading = false
   Object.values(calls).forEach(fn => fn.mockReset())
   writes().forEach(fn => fn.mockResolvedValue({ success: true, data: step }))
@@ -166,4 +168,33 @@ it.each(['loading','missing','mismatch'] as const)('%sは権限拒否と混同�
   expect(p.setStepError).toHaveBeenCalledWith('画面の読み込みが終わるまで、この操作はできません。')
   expect(p.setStepError).not.toHaveBeenCalledWith(expect.stringMatching(/権限が変わった/))
   expect(p.stepDraft.clear).not.toHaveBeenCalled()
+})
+
+it('長い選択肢のclient検証が落ちたらserver誤りに変えず、保存せずに欄へ案内する', async () => {
+  validation.problem = { field: 'question', message: 'ボタンの文字は20文字以内で入力してください。' }
+  const p = props()
+  const submit = vi.fn(() => [{ key: 'question', label: '質問' }])
+  p.stepFields.submit = submit
+  const view = renderHook(() => useScenarioStepActions(p))
+  await invoke(() => view.result.current.handleSaveStep())
+  expect(submit).toHaveBeenCalledOnce()
+  expect(p.setStepError).toHaveBeenCalledWith('')
+  expect(p.failStep).not.toHaveBeenCalled()
+  expect(calls.update).not.toHaveBeenCalled()
+  expect(calls.add).not.toHaveBeenCalled()
+  view.unmount()
+})
+
+it.each(['question', 'content'] as const)('既存の%sの問題は従来の欄の失敗経路を保つ', async field => {
+  validation.problem = { field, message: '入力を確認してください。' }
+  const p = props()
+  const submit = vi.fn(() => [])
+  p.stepFields.submit = submit
+  const view = renderHook(() => useScenarioStepActions(p))
+  await invoke(() => view.result.current.handleSaveStep())
+  expect(submit).toHaveBeenCalledTimes(field === 'question' ? 1 : 0)
+  expect(p.failStep).toHaveBeenCalledWith(field, '入力を確認してください。')
+  expect(calls.update).not.toHaveBeenCalled()
+  expect(calls.add).not.toHaveBeenCalled()
+  view.unmount()
 })

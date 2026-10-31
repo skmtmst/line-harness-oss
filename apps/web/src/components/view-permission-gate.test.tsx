@@ -41,7 +41,7 @@ describe('メニューに無い画面を URL で開いた時', () => {
     expect(screen.getByText('一覧の中身')).toBeTruthy()
   })
 
-  it('オーナー・管理者、メニューの必須の項目、メニューに無い道筋は止めない', () => {
+  it('オーナーと必須の項目は通し、担当者にはメニューに無い道筋を拒む', () => {
     signIn({ role: 'owner' } as Partial<StaffMember>)
     gate()
     expect(screen.getByText('一覧の中身')).toBeTruthy()
@@ -49,7 +49,8 @@ describe('メニューに無い画面を URL で開いた時', () => {
     signIn({ role: 'staff', permissionKeys: [], permissionViewKeys: [] } as Partial<StaffMember>)
     nav.path = '/no-such-menu'
     gate()
-    expect(screen.getByText('一覧の中身')).toBeTruthy()
+    expect(screen.getByText('この画面を見る権限がありません')).toBeTruthy()
+    expect(screen.queryByText('一覧の中身')).toBeNull()
   })
 
   it('いちばん長く一致するメニューの項目で決める', () => {
@@ -187,6 +188,89 @@ it('UID移行からURLのタブを外すとアカウント一覧はマウント�
   nav.search = 'tab=migration'
   view.rerender(<ViewPermissionGate><AccountsPage /></ViewPermissionGate>)
   expect(screen.getByText('UID移行')).toBeTruthy()
+})
+
+it.each([
+  { role: 'staff', permissionKeys: ['/removed-feature'], permissionViewKeys: ['/removed-feature'] },
+  { role: 'viewer' },
+  { role: 'owner', readOnly: true },
+  { role: 'admin', roleBundle: 'view_only' },
+] satisfies Partial<StaffMember>[])('メニューから外れた道筋は役割 $role でも鍵の文字だけで許可せず、子を始めない', identity => {
+  signIn(identity)
+  const mounted = vi.fn()
+  function Probe() { React.useEffect(mounted, []); return <p>未登録の中身</p> }
+  nav.path = '/removed-feature'
+  const view = render(<ViewPermissionGate><Probe /></ViewPermissionGate>)
+  for (const path of ['/removed-feature', '/removed-feature/detail', '/removed-feature/new']) {
+    nav.path = path
+    view.rerender(<ViewPermissionGate><Probe /></ViewPermissionGate>)
+    expect(screen.getByText('この画面を見る権限がありません')).toBeTruthy()
+    expect(screen.queryByText('未登録の中身')).toBeNull()
+    expect(mounted).not.toHaveBeenCalled()
+  }
+})
+
+it.each(['owner', 'admin'] as const)('制限のない %s はメニューに無い道筋でも従来どおり中身を読める', role => {
+  nav.path = '/removed-feature'
+  signIn({ role })
+  gate()
+  expect(screen.getByText('一覧の中身')).toBeTruthy()
+  expect(screen.queryByText('この画面を見る権限がありません')).toBeNull()
+})
+
+it('担当者の必須メニューと、見る鍵がある親項目の下の画面は閉じない', () => {
+  signIn({ role: 'staff', permissionKeys: [], permissionViewKeys: ['/broadcasts'] })
+  nav.path = '/friends'
+  const view = gate()
+  expect(screen.getByText('一覧の中身')).toBeTruthy()
+  nav.path = '/broadcasts/detail'
+  view.rerender(<ViewPermissionGate><p>一覧の中身</p></ViewPermissionGate>)
+  expect(screen.getByText('一覧の中身')).toBeTruthy()
+  expect(screen.queryByText('この画面を見る権限がありません')).toBeNull()
+})
+
+it.each(['/notifications', '/updates', '/support', '/restaurant-test', '/restaurant-test/stores', '/scoring', '/scoring/new'])('明示した本人用・転送の入口 %s は鍵なしでも通すが、未登録の子は通さない', path => {
+  nav.path = path
+  signIn({ role: 'staff', accountScope: 'all', permissionKeys: [], permissionViewKeys: [] })
+  const view = gate()
+  expect(screen.getByText('一覧の中身')).toBeTruthy()
+  nav.path = path + '/unknown-child'
+  view.rerender(<ViewPermissionGate><p>一覧の中身</p></ViewPermissionGate>)
+  expect(screen.getByText('この画面を見る権限がありません')).toBeTruthy()
+  expect(screen.queryByText('一覧の中身')).toBeNull()
+})
+
+it.each([
+  ['/health', '/health'],
+  ['/booking/passes/new', '/booking/bookings'],
+  ['/booking/sales', '/booking/bookings'],
+  ['/restaurant-test/approvals', '/restaurant-test/menu'],
+  ['/restaurant-test/dashboard', '/'],
+  ['/restaurant-test/organization', '/hq'],
+])('メニューの外の %s も指定された %s の鍵だけで読み、作成には編集の鍵が要る', (path, key) => {
+  nav.path = path
+  const mounted = vi.fn()
+  function Probe() { React.useEffect(mounted, []); return <p>機能の中身</p> }
+  signIn({ role: 'staff', accountScope: 'all', permissionKeys: [], permissionViewKeys: ['/friends'] })
+  const view = render(<ViewPermissionGate><Probe /></ViewPermissionGate>)
+  expect(screen.getByText('この画面を見る権限がありません')).toBeTruthy()
+  expect(mounted).not.toHaveBeenCalled()
+  act(() => { signIn({ role: 'staff', accountScope: 'all', permissionKeys: [], permissionViewKeys: [key] }) })
+  if (path.endsWith('/new')) {
+    expect(screen.getByText('この画面を変える権限がありません')).toBeTruthy()
+    expect(mounted).not.toHaveBeenCalled()
+  } else expect(mounted).toHaveBeenCalledTimes(1)
+  act(() => { signIn({ role: 'staff', accountScope: 'all', permissionKeys: [key], permissionViewKeys: [] }) })
+  view.rerender(<ViewPermissionGate><Probe /></ViewPermissionGate>)
+  expect(screen.getByText('機能の中身')).toBeTruthy()
+  expect(mounted).toHaveBeenCalledTimes(1)
+})
+
+it.each(['owner', 'admin'] as const)('閲覧のみにした %s でも統括のアカウント一覧の閲覧は保つ', role => {
+  nav.path = '/accounts'
+  signIn({ role, readOnly: true, accountScope: 'all' })
+  gate()
+  expect(screen.getByText('一覧の中身')).toBeTruthy()
 })
 
 it.each(['/accounts', '/accounts/detail', '/accounts/new', '/accounts/handover'])('店舗内で作成された管理者は %s を直接開いても中身を開始しない', path => {

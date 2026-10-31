@@ -253,7 +253,7 @@ export default function ScenarioCreateV8() {
       triggerType: 'friend_add',
       triggerTagId: null,
       lineAccountId: selectedAccountId,
-      isActive: captureScenarioWriteAccess('publish')(),
+      isActive: false,
       deliveryMode: mode,
       folderId: folderId || null,
     })

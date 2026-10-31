@@ -26,7 +26,7 @@ import { notifyToast } from '@/components/shared/toast'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, describeSaveFailure, fetchApi } from '@/lib/api'
-import { restaurantTestApi, type RestaurantMembership, type RestaurantStore } from '@/lib/restaurant-test-api'
+import { restaurantTestApi, type RestaurantMembership } from '@/lib/restaurant-test-api'
 import type { RestaurantCloseNotificationSettings } from '@line-crm/shared'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -39,6 +39,7 @@ import { EmptyCell } from '@/components/shared/empty-value'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
 import { formatNumber } from '@/lib/format'
+import { useBookingMediaStoreSelection } from './use-store-selection'
 
 /*
  * ★V8 予約サイト・グルメ媒体（提案 E-4 `aSmph`。設定の中の1画面）。
@@ -144,7 +145,17 @@ function UrlCell({ url }: { url: string | null }) {
   )
 }
 
+function isStoreMismatch(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 400 || error.status === 404) && error.code === 'restaurant_store_mismatch'
+}
+
 export default function BookingMediaPage() {
+  const { selectedAccountId } = useAccount()
+  const storeSelection = useBookingMediaStoreSelection(selectedAccountId)
+  return <BookingMediaBody key={JSON.stringify([selectedAccountId, storeSelection.id])} storeSelection={storeSelection} />
+}
+
+function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeof useBookingMediaStoreSelection> }) {
   const saveErrors = useSaveFormErrors()
   usePageTitle('予約サイト・グルメ媒体')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
@@ -153,8 +164,12 @@ export default function BookingMediaPage() {
   const role = useStaffRole()
   const canManage = canManageRole(role)
 
-  const [stores, setStores] = useState<RestaurantStore[]>([])
-  const [storeId, setStoreId] = useState('')
+  const { stores, storeId } = storeSelection
+  const setStoreId = storeSelection.choose
+  const mounted = useRef(true)
+  const loadedMedia = useRef(false)
+  const loadedNotice = useRef(false)
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   const [saved, setSaved] = useState<MediaRow[] | null>(null)
   const savedRef = useRef<MediaRow[] | null>(null)
   savedRef.current = saved
@@ -187,23 +202,6 @@ export default function BookingMediaPage() {
   const [picking, setPicking] = useState<Pick<NoticeSettings, 'recipientMode' | 'membershipIds'> | null>(null)
   const [pickError, setPickError] = useState('')
 
-  /* 店舗：選んでいる店舗（store-context）→ 無ければ先頭（今日のお店と同じ）。 */
-  useEffect(() => {
-    let current = true
-    if (!selectedAccountId) return
-    void Promise.all([
-      restaurantTestApi.listStores(selectedAccountId),
-      restaurantTestApi.storeContext(selectedAccountId).catch(() => null),
-    ]).then(([list, context]) => {
-      if (!current) return
-      const selected = context?.data.selectedStore?.id
-      setStores(list.data.stores)
-      setStoreId(list.data.stores.some((s) => s.id === selected) ? selected! : list.data.stores[0]?.id ?? '')
-      if (list.data.stores.length === 0) setSaved([])
-    }).catch((caught) => { if (current) setLoadError(caught) })
-    return () => { current = false }
-  }, [selectedAccountId])
-
   /*
    * WEB005：読み直し（媒体を足したあとなど）は、まだ保存していない行の入力を消さない。
    * 入力中の行は自分の入力と版を残し、ほかの行だけサーバーの値にする。
@@ -216,6 +214,7 @@ export default function BookingMediaPage() {
         fetchApi<{ success: true; data: ChannelState[] }>(`/api/restaurant-test/channels?account_id=${encodeURIComponent(selectedAccountId)}&storeId=${encodeURIComponent(storeId)}`)
           .then((res) => res.data),
       ])
+      if (!mounted.current) return
       const next = links.data.map((row) => ({
         code: row.code,
         name: row.name,
@@ -230,29 +229,37 @@ export default function BookingMediaPage() {
       } else {
         setRows(next)
       }
+      loadedMedia.current = true
       setSaved(next); setChannels(channelRows); setLoadError(null); setConflict(false)
     } catch (caught) {
+      if (!mounted.current) return
+      if (isStoreMismatch(caught)) await storeSelection.recheckContext()
+      if (!mounted.current) return
       const fieldFailure = saveErrors.capture(caught)
 
       { if (!fieldFailure)
       setLoadError(caught) }
     }
-  }, [selectedAccountId, storeId, saveErrors])
-  useEffect(() => { void load() }, [load]);
+  }, [selectedAccountId, storeId, saveErrors, storeSelection.recheckContext])
+  useEffect(() => { if (!loadedMedia.current) void load() }, [load]);
 
 
   const loadNotice = useCallback(async () => {
     if (!selectedAccountId || !storeId) return
     try {
       const res = await restaurantTestApi.closeNotificationSettings(selectedAccountId, storeId)
+      if (!mounted.current) return
+      loadedNotice.current = true
       const next = { notifyReopen: res.data.notifyReopen, recipientMode: res.data.recipientMode, membershipIds: res.data.membershipIds, version: res.data.version }
       setNoticeSaved(next); setNotice(next)
     } catch (saveFailure) {
+      if (!mounted.current) return
+      if (isStoreMismatch(saveFailure)) { await storeSelection.recheckContext(); return }
       const fieldFailure = saveErrors.capture(saveFailure)
       setNoticeSaved(null); { if (!fieldFailure) setNotice(null) }
     }
-  }, [selectedAccountId, storeId, saveErrors])
-  useEffect(() => { void loadNotice() }, [loadNotice])
+  }, [selectedAccountId, storeId, saveErrors, storeSelection.recheckContext])
+  useEffect(() => { if (!loadedNotice.current) void loadNotice() }, [loadNotice])
 
   /* 選べるスタッフ：この店の担当（店を決めていない人を含む）で、有効な人。 */
   useEffect(() => {
@@ -349,6 +356,7 @@ export default function BookingMediaPage() {
         const res = await restaurantTestApi.saveMediaLink(selectedAccountId, row.code, {
           storeId, pageUrl: row.pageUrl, loginUrl: row.loginUrl, closeOnBooking: row.acceptsReservations && row.closeOnBooking, expectedVersion: row.version,
         })
+        if (!mounted.current) return
         /*
          * WEB004：1行ずつ保存できた分は、その場で新しい版と保存済みの値にする。
          * 途中の行で失敗してやり直したとき、保存できた行を古い版で送り直して 409 にしない。
@@ -366,6 +374,7 @@ export default function BookingMediaPage() {
           storeId, notifyReopen: notice.notifyReopen, recipientMode: notice.recipientMode,
           membershipIds: notice.recipientMode === 'selected' ? notice.membershipIds : [], expectedVersion: notice.version,
         })
+        if (!mounted.current) return
         const version = (res as { data?: { version?: number } } | undefined)?.data?.version
         if (typeof version === 'number') {
           const next = { ...notice, version }
@@ -375,6 +384,12 @@ export default function BookingMediaPage() {
       notifySaved('予約サイト・グルメ媒体の設定を保存しました')
       await Promise.all([load(), loadNotice()])
     } catch (caught) {
+      if (!mounted.current) return
+      if (isStoreMismatch(caught)) {
+        await storeSelection.recheckContext()
+        if (mounted.current) setSaveError('別の画面で表示中の店舗が変わった可能性があります。入力は残しています。店舗を確認してから、もう一度保存してください。')
+        return
+      }
       const fieldFailure = saveErrors.capture(caught);
 
       if (caught instanceof ApiError && caught.status === 409) setConflict(true)
@@ -388,6 +403,38 @@ export default function BookingMediaPage() {
   const askLink = () => setLinkAsked(true)
 
 
+  const navigationLeaveDialog = (<UnsavedLeaveDialog
+        open={leaveTarget !== null}
+        subject="予約サイト・グルメ媒体の変更"
+        busy={saving}
+        onCancel={() => { if (!saving) cancelLeave() }}
+        onConfirm={() => { confirmLeave() }}
+      />)
+  const storeLeaveDialog = (<UnsavedLeaveDialog
+        open={pendingStoreId !== null}
+        subject="予約サイト・グルメ媒体の変更"
+        description="店舗を切り替えると、保存していない変更が消えます。"
+        busy={saving}
+        onCancel={() => setPendingStoreId(null)}
+        onConfirm={() => { if (pendingStoreId) setStoreId(pendingStoreId); setPendingStoreId(null) }}
+      />)
+  const storePicker = stores.length > 1 || (!storeSelection.id && stores.length > 0) ? (
+    <EntitySelect aria-label="店舗" noun="店舗" placeholder="店舗を選んでください" valuePrefix="店舗：" value={storeSelection.id} disabled={storeSelection.switching} onChange={(value) => { if (value === storeSelection.id) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={[...stores.map(store => ({ ...entityOptionMetadata(store), value: store.id, label: store.name, hint: `${store.status === 'paused' ? '一時停止' : '現役'} · ID: ${store.id}` }))]} />
+  ) : null
+  if (!storeId) {
+    const desired = stores.find(store => store.id === storeSelection.id)
+    return <><PageFrame kind="settings" boardId="aSmph"><PageHeading headingSize="compact" title="予約サイト・グルメ媒体" actions={storePicker} />
+      {storeSelection.status === 'loading' ? <ListState kind="loading" title="店舗を確認しています" />
+        : storeSelection.status === 'error' ? <ListState kind="error" title="店舗を読み込めませんでした" error={storeSelection.error} onRetry={storeSelection.refresh} />
+        : <>
+          {storeSelection.error ? <ListState kind="error" title="表示店舗を確認できませんでした" error={storeSelection.error} onRetry={() => void storeSelection.recheckContext()} /> : null}
+          {desired && storeSelection.requiresSwitch ? <Notice tone="warn" action={<Button onClick={() => void storeSelection.switchContext()} busy={storeSelection.switching}>この店舗に切り替えて表示する</Button>}>
+            {storeSelection.changedElsewhere ? '別の画面で表示中の店舗が変わりました。' : 'ログイン中の表示店舗と、このアカウントの店舗が違います。'}「{desired.name}」を表示すると、管理画面全体の表示店舗も切り替わります。保存していない入力は残しています。
+          </Notice> : !desired ? <ListState kind="empty" title={stores.length ? '店舗を選んでください' : 'このアカウントに関連する店舗がありません'} description={stores.length ? '保管済みを除いた、このアカウントの店舗から選べます。' : '店舗の設定で、現在のLINE公式アカウントとの関連付けを確認してください。'} /> : null}
+        </>}
+    </PageFrame>{navigationLeaveDialog}{storeLeaveDialog}</>
+  }
+
   let table
   if (loadError && !saved) table = <ListState kind="error" title="媒体を読み込めませんでした" error={loadError} onRetry={() => void load()} />
   else if (!saved) table = <ListState kind="loading" />
@@ -397,10 +444,10 @@ export default function BookingMediaPage() {
       <DataTable density="media" className={styles.table} data-design="booking-media">
         <thead>
           <TableHeadRow>
-            <Th className={styles.colName}>媒体</Th>
-            <Th className={styles.colPage}>店舗ページの URL</Th>
-            <Th className={styles.colLogin}>管理画面（ログイン）の URL</Th>
-            <Th className={styles.colImport}>予約メールの取り込み</Th>
+            <Th truncate>媒体</Th>
+            <Th truncate>店舗ページの URL</Th>
+            <Th truncate>管理画面（ログイン）の URL</Th>
+            <Th truncate>予約メールの取り込み</Th>
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
@@ -410,15 +457,15 @@ export default function BookingMediaPage() {
             const changed = dirty.some((d) => d.code === row.code)
             return (
               <Tr key={row.code} data-dirty={changed || undefined}>
-                <Td className={styles.colName}><FolderDotName>
+                <Td><FolderDotName>
                   <span className={styles.nameCell}>
                     <span className={styles.mark} aria-hidden="true">{row.name.slice(0, 1)}</span>
                     <span className={styles.name} ><TruncatedText value={String(row.name ?? '')} /></span>
                   </span>
                 </FolderDotName></Td>
-                <Td className={styles.colPage}><UrlCell url={row.pageUrl} /></Td>
-                <Td className={styles.colLogin}><UrlCell url={row.loginUrl} /></Td>
-                <Td className={styles.colImport}>
+                <Td><UrlCell url={row.pageUrl} /></Td>
+                <Td><UrlCell url={row.loginUrl} /></Td>
+                <Td>
                   <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
                 </Td>
                 <Td className={styles.colMenu}>
@@ -460,11 +507,7 @@ export default function BookingMediaPage() {
       explanation="他の予約サイトの空き枠は自動で変更しません。LINE や電話で予約が入ったら、他のサイトの同じ時刻の枠を閉じる知らせを出します。"
           actions={(
             <span className={styles.headActions}>
-              {stores.length > 1 ? (
-                <span>
-                  <SaveErrorField names={["storeId","pendingStoreId","store_id","pending_store_id"]}><EntitySelect aria-label="店舗" noun="店舗" valuePrefix="店舗：" value={storeId} onChange={(value) => { if (value === storeId) return; if (changes > 0) setPendingStoreId(value); else setStoreId(value) }} options={stores.map((s) => ({ ...entityOptionMetadata(s), value: s.id, label: s.name }))} /></SaveErrorField>
-                </span>
-              ) : null}
+              {storePicker}
               {canManage ? <Button onClick={() => { setAdding(true); setAddName(''); setAddError(''); setAddNameError('') }}><Plus size={16} aria-hidden="true" />媒体を足す</Button> : null}
             </span>
           )}
@@ -588,22 +631,8 @@ export default function BookingMediaPage() {
         ) : null}
       </PageFrame>
 
-      <UnsavedLeaveDialog
-        open={leaveTarget !== null}
-        subject="予約サイト・グルメ媒体の変更"
-        busy={saving}
-        onCancel={() => { if (!saving) cancelLeave() }}
-        onConfirm={() => { confirmLeave() }}
-      />
-
-      <UnsavedLeaveDialog
-        open={pendingStoreId !== null}
-        subject="予約サイト・グルメ媒体の変更"
-        description="店舗を切り替えると、保存していない変更が消えます。"
-        busy={saving}
-        onCancel={() => setPendingStoreId(null)}
-        onConfirm={() => { if (pendingStoreId) setStoreId(pendingStoreId); setPendingStoreId(null) }}
-      />
+      {navigationLeaveDialog}
+      {storeLeaveDialog}
 
       <Dialog
         open={!!editing}
