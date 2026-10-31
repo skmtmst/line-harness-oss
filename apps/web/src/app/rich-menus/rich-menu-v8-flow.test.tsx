@@ -344,9 +344,10 @@ describe('V8 リッチメニューの通し：作る→押す所→保存→既�
     expect(updateGroup.mock.calls.at(-1)?.[1].pages[0].areas[0].label).toBe('予約サイト')
     await waitFor(() => expect(screen.getAllByText('下書きを保存しました')).toHaveLength(2))
 
-    // 手順③→④へ進む（誰に出すかは既定のまま全員）。
+    // 全員への公開を確認するため、表示先を明示して④へ進む。
     fireEvent.click(screen.getByRole('button', { name: '次へ：誰に出すか' }))
     await screen.findByText('誰に出すか')
+    fireEvent.click(screen.getByRole('radio', { name: /^すべての友だち/ }))
     fireEvent.click(screen.getByRole('button', { name: '次へ：公開' }))
     await waitFor(() => expect(screen.getAllByText('いつ公開するか').length).toBeGreaterThan(0))
 
