@@ -1,3 +1,5 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 import { getPageAction, querySupplementaryPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /*
@@ -223,6 +225,7 @@ async function openDeleteScenario() {
 }
 
 beforeEach(() => {
+  verifiedStaffRole('owner')
   document.documentElement.dataset.theme = 'v8'
   for (const fn of Object.values(calls)) fn.mockReset()
   stubScenario({})
@@ -257,6 +260,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  forgetStaffIdentity()
   act(() => root.unmount())
   host.remove()
   vi.useRealTimers()
