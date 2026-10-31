@@ -39,6 +39,25 @@ it('統括を使える本人は内側の門を通り、統括の中身を読め�
   expect(nav.replace).not.toHaveBeenCalled()
 })
 
+it.each(['/accounts', '/accounts/detail'])(
+  '店舗だけの管理者は %s を直接開いても一覧を読み込めない', (pathname) => {
+    nav.pathname = pathname
+    signIn({ role: 'admin', accountScope: 'accounts' })
+    const mounted = vi.fn(); gate(mounted)
+    expect(mounted).not.toHaveBeenCalled()
+    expect(screen.getByText('この画面を見る権限がありません')).toBeTruthy()
+    expect(nav.replace).not.toHaveBeenCalled()
+  },
+)
+
+it('店舗だけの管理者は登録画面を直接開いても、統括の入口で戻される', () => {
+  nav.pathname = '/accounts/new'
+  signIn({ role: 'admin', accountScope: 'accounts' })
+  const mounted = vi.fn(); gate(mounted)
+  expect(mounted).not.toHaveBeenCalled()
+  expect(nav.replace).toHaveBeenCalledWith('/')
+})
+
 it('店舗の画面では統括の境界を通過しても、機能の鍵なしなら子を始めない', () => {
   nav.pathname = '/broadcasts'
   signIn({ role: 'staff', accountScope: 'accounts', permissionKeys: [], permissionViewKeys: [] })
