@@ -29,10 +29,11 @@ import { logoutAndGoToLogin } from '@/lib/logout'
 import { useEffect, useState } from 'react'
 import ViewPermissionGate from './view-permission-gate'
 import { PagePendingLayout } from './templates/page-pending'
+import { routePendingForPath } from '@/lib/route-pending'
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  return <PagePendingLayout variant={pathname === '/' ? 'dashboard' : 'detail'}><AppShellContent pathname={pathname}>{children}</AppShellContent></PagePendingLayout>
+  return <PagePendingLayout {...routePendingForPath(pathname)}><AppShellContent pathname={pathname}>{children}</AppShellContent></PagePendingLayout>
 }
 
 function AppShellContent({ children, pathname }: { children: React.ReactNode; pathname: string }) {

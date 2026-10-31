@@ -38,3 +38,7 @@
 
 `node scripts/rich-menu/build-initial-images.mjs` は共有の4面定義から、LINEへのアップロードと管理画面の見本で使うPNGを再生成する。WebのNext.jsが依存するSharpとTypeScriptを使う。業種のラベル・順序・色を変えた時だけ実行し、画像寸法と実際の公開用座標の一致を試験・写真で確認する。
 画像のJSONはこの生成器だけで作り、手では編集しません。内容を変える時は `INITIAL_MENU_VERSION` を上げます。同じ版のまま内容を変えると生成器が止まります。`pnpm test:scripts scripts/rich-menu/image-version.test.ts` でこの判定を確認します。
+
+入口の空の待機は `pnpm test:scripts scripts/visual-qa/route-pending-contract.test.ts` が全appを検査します。fallback省略・null・undefined・false・空文字・空fragmentは赤、認証のカードと共通PagePendingは可です。外枠と入口の題と型は `apps/web/src/lib/route-pending.ts` で共有し、固定の題は実画面到着後にも一致を確かめます。
+
+入口の待機と題は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/route-pending.test.mjs` で共有表の全入口を2幅・API遅延600msで開き、認証・ゲート・入口の全待機フレームの題と、固定の題の到着後の一致を確かめます。`V8_GUARD_ROUTE_PENDING_FAULT=1 ROUTE_PENDING_PATHS=/friends` は題をCSSで隠す故障で赤、旗を外すと緑です。

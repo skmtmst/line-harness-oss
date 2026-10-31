@@ -2,7 +2,7 @@
 
 import { Skeleton } from './shared/skeleton'
 import { PageFrame } from './templates/page-frame'
-import PagePending, { usePagePendingVariant } from './templates/page-pending'
+import PagePending, { usePagePendingTitle, usePagePendingVariant } from './templates/page-pending'
 import shell from './app-shell.module.css'
 import sidebar from './layout/sidebar.module.css'
 import styles from './auth-pending-shell.module.css'
@@ -19,6 +19,7 @@ const ROW_WIDTHS = ['40%', '92%', '86%', '90%', '78%', '88%']
  */
 export default function AuthPendingShell() {
   const dashboard = usePagePendingVariant() === 'dashboard'
+  const title = usePagePendingTitle()
   return (
     <div className={shell.shell} data-auth-pending="" role="status" aria-busy="true" aria-label="読み込み中">
       <div className={shell.workspace}>
@@ -35,7 +36,7 @@ export default function AuthPendingShell() {
           <div className={styles.topBar} aria-hidden="true" />
           <div className={shell.main}>
             <div className={shell.content}>
-              {dashboard ? <PagePending stage="auth" /> : <PageFrame kind="pending">
+              {dashboard || title ? <PagePending stage="auth" /> : <PageFrame kind="pending">
                 <div className={styles.rows} aria-hidden="true">
                   {ROW_WIDTHS.map((width, index) => <Skeleton key={index} width={width} height={index === 0 ? 22 : 16} />)}
                 </div>
