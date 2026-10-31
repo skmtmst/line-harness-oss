@@ -394,11 +394,11 @@ it.each(['公開する', '予約する'] as const)('未命名の面は下書き�
   const line = (await screen.findByText('LINE の検査')).closest('li') as HTMLElement
   fireEvent.click(within(line).getByRole('button', { name: '見直す' }))
   await screen.findByText('LINEの受付に通りました。')
-  if (action === '予約する') fireEvent.click(screen.getByRole('radio', { name: '日時を決めて公開する' }))
+  if (action === '予約する') fireEvent.click(screen.getByRole('radio', { name: '日時を決めて公開する キャンペーンの始まりに合わせる' }))
   const submit = screen.getByRole('button', { name: action, exact: true }) as HTMLButtonElement
   await waitFor(() => expect(submit.disabled).toBe(false))
   fireEvent.click(submit)
-  const name = await screen.findByRole('textbox', { name: 'ボタン名 管理用の呼び名。友だちには表示されません。' }) as HTMLInputElement
+  const name = await screen.findByRole('textbox', { name: 'ボタン名 管理用の呼び名。友だちには表示されません。 ボタン名（読み上げラベル）を入力してください' }) as HTMLInputElement
   await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'))
   expect(screen.getByText('ボタン名（読み上げラベル）を入力してください')).toBeTruthy()
   expect(screen.getByRole('heading', { name: '面 A「1番目のボタン」の動き' })).toBeTruthy()
