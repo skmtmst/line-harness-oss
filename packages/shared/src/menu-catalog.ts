@@ -132,9 +132,6 @@ export const MENU_SECTION_CATALOG: readonly MenuSectionCatalogEntry[] = [
     label: '飲食店向け（テスト）',
     title: '飲食店向け（テスト）',
     items: [
-      { id: 'restaurant-dashboard', featureKey: 'restaurant_test' },
-      { id: 'restaurant-organization', featureKey: 'restaurant_test' },
-      { id: 'restaurant-approvals', featureKey: 'restaurant_test' },
       { id: 'restaurant-reservations', featureKey: 'restaurant_test' },
       { id: 'restaurant-tables', featureKey: 'restaurant_test' },
       { id: 'restaurant-inventory', featureKey: 'restaurant_test' },
