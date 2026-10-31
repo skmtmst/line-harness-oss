@@ -128,7 +128,7 @@ describe('登録メディアの厳密走査と実DBスキーマ', () => {
     ).get()).toEqual({ count: 205 });
   });
 
-  it('定期走査は予約写真を含む10回へ分け、1周が終わるまで古い記録を消さない', async () => {
+  it('定期走査は予約写真とフォームを含む11回へ分け、1周が終わるまで古い記録を消さない', async () => {
     sqlite.prepare(
       `INSERT INTO templates (id, name, message_type, message_content, line_account_id)
        VALUES ('template-1', '案内', 'image', 'https://example.com/media/guide.png', 'account-1')`,
@@ -137,6 +137,10 @@ describe('登録メディアの厳密走査と実DBスキーマ', () => {
       `INSERT INTO media_usages (media_id, ref_kind, ref_id, scanned_at)
        VALUES ('media-1', 'event', 'deleted-event', '2026-08-01T00:00:00.000')`,
     ).run();
+
+    sqlite.prepare(`INSERT INTO forms (id,name,layout) VALUES ('form-1','ご案内',?)`)
+      .run(JSON.stringify({ references: [{ kind: 'image', mediaId: 'media-1' }] }));
+    sqlite.prepare(`INSERT INTO form_accounts (form_id,line_account_id) VALUES ('form-1','account-1')`).run();
 
     for (let index = 0; index < 6; index += 1) {
       const result = await scanMediaUsage(db, `2026-09-0${index + 1}T00:00:00.000`);
@@ -157,18 +161,21 @@ describe('登録メディアの厳密走査と実DBスキーマ', () => {
       expect(result).toMatchObject({ source, cycleCompleted: false, pruned: 0 });
       expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM media_usages WHERE ref_id='deleted-event'`).get()).toEqual({ count: 1 });
     }
-    const completed = await scanMediaUsage(db, '2026-09-11T00:00:00.000');
+    const form = await scanMediaUsage(db, '2026-09-11T00:00:00.000');
+    expect(form).toMatchObject({ source: 'form', matched: 1, cycleCompleted: false, pruned: 0 });
+    expect(sqlite.prepare(`SELECT COUNT(*) AS count FROM media_usages WHERE ref_id='deleted-event'`).get()).toEqual({ count: 1 });
+    const completed = await scanMediaUsage(db, '2026-09-12T00:00:00.000');
 
     expect(completed).toMatchObject({ cycleCompleted: true, pruned: 1 });
     expect(sqlite.prepare(
       `SELECT ref_kind, ref_id FROM media_usages ORDER BY ref_kind, ref_id`,
-    ).all()).toEqual([{ ref_kind: 'template', ref_id: 'template-1' }]);
+    ).all()).toEqual([{ ref_kind: 'form', ref_id: 'form-1' }, { ref_kind: 'template', ref_id: 'template-1' }]);
     expect(sqlite.prepare(
       `SELECT source_index, last_ref_id, cycle_started_at FROM media_usage_scan_state WHERE id = 1`,
     ).get()).toEqual({
       source_index: 0,
       last_ref_id: '',
-      cycle_started_at: '2026-09-11T00:00:00.000',
+      cycle_started_at: '2026-09-12T00:00:00.000',
     });
   });
 });
