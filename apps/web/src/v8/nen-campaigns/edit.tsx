@@ -1,5 +1,7 @@
 'use client'
 
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
+
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { notifySaved } from '@/components/shared/toast'
 import { useEffect, useRef, useState } from 'react'
@@ -126,6 +128,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
   const [customMileageError, setCustomMileageError] = useState('')
   const bodyRef = useRef<InsertTextFieldHandle | HTMLTextAreaElement>(null)
   const { selectedAccountId, selectedAccount } = useAccount()
+  const tokenNames = useInsertTokenNames(selectedAccountId)
   const staffRole = useStaffRole()
   const canEdit = canManageRole(staffRole)
 
@@ -525,7 +528,7 @@ export default function CampaignEdit({ campaignKey }: { campaignKey: string }) {
           <SaveErrorField names={["nen-message-kind"]}><Radio name="nen-message-kind" checked={!kindIsRich} readOnly disabled={kindIsRich}>文字だけ</Radio></SaveErrorField>
         </div>
         <div className={styles.field}>
-          <Field required label="配信本文" htmlFor="nen-edit-body"><MessageBody><SaveErrorField names={["bodyText","merged.bodyText","draft","body_text","merged.body_text"]}><InsertTextField
+          <Field required label="配信本文" htmlFor="nen-edit-body"><MessageBody><SaveErrorField names={["bodyText","merged.bodyText","draft","body_text","merged.body_text"]}><InsertTextField tokenNames={tokenNames}
             id="nen-edit-body"
             aria-required="true"
             aria-invalid={Boolean((validationSubmitted || !bodyCheck.fits) && bodyError)}

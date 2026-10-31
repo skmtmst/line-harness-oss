@@ -1083,3 +1083,19 @@
 - [反映履歴：窓の下の操作帯](release-log/unreleased/2012-kenta-dialog-leading.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [反映履歴：UID移行の行き先確認](release-log/unreleased/2012-kenta-uid-safety.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [配信メニューの表示名](release-log/unreleased/2013-masato-friend-add-label.md) — 反映履歴、確認 2026-10-31。
+- [反映履歴：未保存の確認・設定の安全性・表示の改善](release-log/unreleased/2015-kenta-train-1031d.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [設定の入口からお客さまのデザインを開く](release-log/unreleased/2014-masato-settings-entry-customer-look.md) — 反映履歴、確認2026-10-31。
+
+- [受信箱の選択アカウント別バッジ](release-log/unreleased/2016-masato-inbox-account-badge.md) — 反映履歴。確認 2026-10-31。
+
+- [検証環境の自動配備手順の反映履歴](release-log/unreleased/2017-masato-cf-staging-deploy-doc.md) — 反映履歴、確認 2026-10-31。
+
+- [反映履歴：フォームの下書き・配信前確認・設定の表示](release-log/unreleased/2019-kenta-train-1031e.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [検証配備で未適用のDB変更だけを確認する](release-log/unreleased/2018-masato-cf-staging-deploy-pending.md) — 反映履歴、確認 2026-11-01。
+
+- [検証管理画面のPages Git連携の手順](release-log/unreleased/2020-masato-cf-pages-doc.md) — 反映履歴、確認 2026-11-01。
+
+- [検証配備でCloudflare混雑時に待って再試行する](release-log/unreleased/2021-masato-cf-staging-deploy-retry.md) — 反映履歴、確認 2026-11-01。
+
+- [反映履歴：LINE来店フォロー・配信イメージ・閲覧と入力の守り](release-log/unreleased/2022-kenta-train-1031f.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。

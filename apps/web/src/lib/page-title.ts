@@ -1,6 +1,38 @@
 import { canonicalScreenPath } from './canonical-route'
 import { HQ_MENU_SECTIONS, MENU_SECTIONS } from './menu'
 
+/** メニューに置かない入口の画面名。権限の判定には使わず、完全一致だけで表示する。 */
+const ENTRY_TITLES: Readonly<Record<string, string>> = {
+  '/accounts/detail': 'LINEアカウントの詳細',
+  '/accounts/handover': '乗り換え',
+  '/accounts': 'LINEアカウント',
+  '/booking/passes/new': '回数券・月謝を作る',
+  '/booking/sales': '予約からの売上',
+  '/health': 'BAN検知ダッシュボード',
+  '/line-notifications/operator/new': '運用者へのお知らせを作る',
+  '/line-notifications': 'LINE通知',
+  '/notifications': '通知',
+  '/recipes/clone': 'レシピを複製する',
+  '/recipes': 'レシピから作る',
+  '/restaurant-test/approvals': '承認の流れ',
+  '/restaurant-test/dashboard': 'ダッシュボード',
+  '/restaurant-test/organization': '組織・権限',
+  '/restaurant-test': 'アカウント',
+  '/restaurant-test/stores': 'アカウント',
+  '/scoring/new': 'たまる決めごとを作る',
+  '/scoring': 'マイル',
+  '/search-console': 'Search Console',
+  '/support': '問い合わせ',
+  '/updates': 'アップデート履歴',
+  '/users': '統合ユーザー',
+  '/visual-qa/heading-band': '見出しの閲覧帯の確認',
+  '/visual-qa/v8-parts': 'V8の部品の確認',
+}
+
+export function entryTitleForPath(pathname: string): string {
+  return Object.hasOwn(ENTRY_TITLES, pathname) ? ENTRY_TITLES[pathname] : ''
+}
+
 /** ルート → メニューのラベル。長いほうから当てるので、`/tags/new` は「タグ」になる。 */
 const MENU_LABELS: Array<[string, string]> = MENU_SECTIONS
   .flatMap((section) => section.items.map((item): [string, string] => [item.href, item.label]))
@@ -8,6 +40,8 @@ const MENU_LABELS: Array<[string, string]> = MENU_SECTIONS
 
 /** ルートから既定の画面名を引く。当たらなければ空。 */
 export function defaultTitleForPath(pathname: string): string {
+  const entryTitle = entryTitleForPath(pathname)
+  if (entryTitle) return entryTitle
   const path = canonicalScreenPath(pathname)
   for (const [href, label] of MENU_LABELS) {
     const route = href.split('?')[0]

@@ -1,6 +1,5 @@
 'use client'
 import dynamic from 'next/dynamic'
-import { useSearchParams } from 'next/navigation'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import StaleStyleNotice from '@/components/shared/stale-style-notice'
 import PagePending from '@/components/templates/page-pending'
@@ -25,13 +24,7 @@ const INDUSTRY: readonly UsageStyle[] = ['restaurant', 'salon', 'consult', 'less
 
 export default function HomeDashboard() {
   const { selectedAccountId, loading: accountsLoading, error: accountsError, accounts } = useAccount()
-  const params = useSearchParams()
-  const qrRequested = params.has('qr')
-  const setupParam = params.get('setup')
-  const setupRequested = setupParam === 'summary' || (setupParam !== null && /^\d+$/.test(setupParam))
   const profile = useAccountStyle(selectedAccountId)
-  // QR・質問の再開は業種より先に既存の共通画面へ渡す。閉じると業種のホームへ戻る。
-  if (qrRequested || setupRequested) return <StandardDashboard key={selectedAccountId} usageStyle={profile.data?.style === 'ec' ? 'ec' : 'standard'} accountStyle={profile.data?.style ?? null} />
   // 店が1件も無い時だけ共通画面へ。それ以外は業種が分かるまで読み込み中の同じ形。
   const noAccounts = !accountsLoading && !accountsError && accounts.length === 0
   if (!profile.data && !profile.error && !noAccounts) return <HomeLoading />

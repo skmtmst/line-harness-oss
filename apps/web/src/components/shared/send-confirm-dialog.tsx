@@ -96,6 +96,8 @@ export interface SendConfirmDialogProps {
   approval?: { note: string } | null
   /** 承認が要るとき、窓の中に出す欄（承認する人・ひとこと）。 */
   approvalFields?: ReactNode
+  /** 承認と独立した、送信前の確認欄。指定しない用途の表示は変えない。 */
+  confirmationFields?: ReactNode
   /** 承認する人が選ばれるまで主ボタンを押せなくする。 */
   primaryDisabled?: boolean
   block?: SendConfirmBlock
@@ -123,7 +125,7 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 export default function SendConfirmDialog(props: SendConfirmDialogProps) {
   const {
     open, subtitle, scheduled, state, onRetry, recipients, recipientsNote, perAccount, accountCount, purpose, whenLabel, whenNote, sender,
-    bodyHead, bubbleCount, bodyLabel = '本文', allRecipients, extraCaution, approval, approvalFields, primaryDisabled, block, hidePrimary, unavailableNote, primaryLabel, onConfirm, onBack, error,
+    bodyHead, bubbleCount, bodyLabel = '本文', allRecipients, extraCaution, approval, approvalFields, confirmationFields, primaryDisabled, block, hidePrimary, unavailableNote, primaryLabel, onConfirm, onBack, error,
   } = props
   const [busy, setBusy] = useState(false)
   const submitting = useRef(false)
@@ -236,6 +238,7 @@ export default function SendConfirmDialog(props: SendConfirmDialogProps) {
         </Row>
         {approval && approvalFields ? <Row label="承認する人">{approvalFields}</Row> : null}
       </dl>
+      {confirmationFields}
       <Notice tone="warn" heading="送ったあとは取り消せません。">
         <p>間違いに気づいたら、送ったあとに［訂正を送る］で正しい内容を送れます。</p>
         {extraCaution ? <p>{extraCaution}</p> : null}

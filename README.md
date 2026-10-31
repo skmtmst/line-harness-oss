@@ -114,7 +114,7 @@ Google Calendar・Meet の同期と、Google マップ/検索の「Google で予
 ### AI 統合
 - **MCP Server 同梱** (`@line-harness/mcp-server`) — Claude Code から自然言語で全操作
   - `list_conversations` / `get_conversation` — 未返信会話の AI 監視
-  - `create_scenario` / `update_step` — シナリオを AI に作らせる
+  - `create_scenario` / `update_step` — シナリオを AI に作らせる — 停止状態で作成。内容を確認してから `manage_scenarios` の `update` で有効にする（公開権限が必要）
   - `broadcast` / `send_message` — メッセージ送信（要ユーザー確認）
 - **公式 SDK** (`@line-harness/sdk`) — TypeScript の型付き SDK、ESM + CJS、ゼロ依存
 

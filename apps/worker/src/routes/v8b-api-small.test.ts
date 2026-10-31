@@ -27,7 +27,7 @@ afterEach(() => db.raw.close());
 describe('V8-Bの既存契約への追加', () => {
   it('流入の旧4項目を残し、残存・ブロック・成果金額を返す', async () => {
     db.raw.exec(`INSERT INTO entry_routes (id, ref_code, name) VALUES ('route', 'first', '流入');
-      INSERT INTO friends (id, line_user_id, ref_code, is_following) VALUES ('f1', 'u1', 'first', 1), ('f2', 'u2', 'first', 0), ('f3', 'u3', 'other', 1);
+      INSERT INTO friends (id, line_user_id, ref_code, is_following, created_at) VALUES ('f1', 'u1', 'first', 1, '2026-10-15 12:00:00'), ('f2', 'u2', 'first', 0, '2026-10-15 12:00:00'), ('f3', 'u3', 'other', 1, '2026-10-15 12:00:00');
       INSERT INTO conversion_points (id, name, event_type, value) VALUES ('point', '成果', 'purchase', 50);
       INSERT INTO conversion_events (id, friend_id, conversion_point_id, value_snapshot) VALUES ('c1', 'f1', 'point', 100), ('c2', 'f1', 'point', 0), ('c3', 'f2', 'point', NULL), ('c4', 'f3', 'point', 999);`);
     const expected = { click_count: 0, friend_add_count: 2, form_submission_count: 0, cv_count: 3,

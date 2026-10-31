@@ -55,6 +55,9 @@
  * 文の行の高さを変えないよう、上下の余白は1だけ。
  */
 .chip {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: calc(100% - 4px);
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -72,7 +75,7 @@
   cursor: default;
 }
 .chipIcon { width: var(--polish-icon-control); height: var(--polish-icon-control); flex-shrink: 0; }
-.chipLabel { white-space: nowrap; }
+.chipLabel { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /*
  * 下の「差し込む」の丸い枠のボタン（絵 OVCot ①の下の並び）。

@@ -22,6 +22,8 @@ Image as ImageIcon,
 LayoutTemplate,
 PenLine
 } from 'lucide-react';
+import { useInsertReferences } from '@/lib/use-insert-token-names'
+import { referenceTokenNames } from '@/components/shared/insert-tokens'
 import AutoReplyInsertChips from './insert-chips';
 import { REPLY_DELAY_OPTIONS,ResponseMode,WizardForm } from './wizard-model';
 import styles from '../../../app/auto-replies/edit/wizard-v8.module.css';
@@ -39,6 +41,8 @@ type WizardResponseStepContext = {
 }
 
 export function WizardResponseStep({ disabled = false, lockedReason, actionOptions, fieldError, form, imageContent, matchedAccountId, patch, templates }: WizardResponseStepContext) {
+  const { references, state: referenceState } = useInsertReferences(matchedAccountId)
+  const tokenNames = referenceTokenNames(references)
   return (<>
               <Card variant="form" gap="normal" className={styles.cardContent}>
                 <CardHeader size="stacked" title={<>返すもの</>} />
@@ -67,7 +71,7 @@ export function WizardResponseStep({ disabled = false, lockedReason, actionOptio
 
                 {form.mode === 'inline-text' && (
                   <MessageBody>
-                    <SaveErrorField names={["responseContent","form.responseContent","response_content","form.response_content"]}><InsertTextField disabled={disabled}
+                    <SaveErrorField names={["responseContent","form.responseContent","response_content","form.response_content"]}><InsertTextField tokenNames={tokenNames} disabled={disabled}
                       id="wiz-content"
                       aria-invalid={!!fieldError('wiz-content') || undefined}
                       aria-describedby={fieldError('wiz-content') ? 'wiz-content-error' : undefined}
@@ -79,7 +83,7 @@ export function WizardResponseStep({ disabled = false, lockedReason, actionOptio
                       maxLength={5000}
                     /></SaveErrorField>
                     <MessageInsertRow count={`${formatNumber(form.responseContent.length)} / 5,000`}>
-                      <AutoReplyInsertChips disabled={disabled} lockedReason={lockedReason} accountId={matchedAccountId} onInsert={(token) => patch({ responseContent: form.responseContent + token })} />
+                      <AutoReplyInsertChips references={references} referenceState={referenceState} disabled={disabled} lockedReason={lockedReason} accountId={matchedAccountId} onInsert={(token) => patch({ responseContent: form.responseContent + token })} />
                     </MessageInsertRow>
                     {fieldError('wiz-content') ? <FieldError id="wiz-content-error">{fieldError('wiz-content')}</FieldError> : null}
                   </MessageBody>

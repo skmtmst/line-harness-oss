@@ -1,3 +1,4 @@
+import { getRestaurantReservationForm,putRestaurantReservationForm } from './restaurant-reservation-form.js';
 import { registerRestaurantSetupProgressRoutes } from './restaurant-setup-progress.js';
 import { getRestaurantFollowupEngines,initializeRestaurantFollowupEngines,saveRestaurantFollowupEngine,testRestaurantFollowupEngineHandler,startRestaurantFollowupEngineHandler } from './restaurant-followup-engine.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -177,6 +178,8 @@ restaurantTest.put('/api/restaurant-test/gbp/reviews/:id/draft', requireRole('ow
 
 restaurantTest.get('/api/restaurant-test/followups/:storeId',requireRole('owner','admin','staff'),get__api_restaurant_test_followups_storeId_15);
 
+restaurantTest.get('/api/restaurant-test/followups/:storeId/reservation-form',requireRole('owner','admin','staff'),getRestaurantReservationForm);
+restaurantTest.put('/api/restaurant-test/followups/:storeId/reservation-form',requireRole('owner','admin'),inputJsonBoundary(),putRestaurantReservationForm);
 restaurantTest.get('/api/restaurant-test/followups/:storeId/engines',requireRole('owner','admin','staff'),getRestaurantFollowupEngines);
 restaurantTest.post('/api/restaurant-test/followups/:storeId/engines/initialize',requireRole('owner','admin'),inputJsonBoundary(),initializeRestaurantFollowupEngines);
 restaurantTest.post('/api/restaurant-test/followups/:storeId/engines/:trigger/draft',requireRole('owner','admin'),inputJsonBoundary(),saveRestaurantFollowupEngine);
@@ -293,7 +296,7 @@ restaurantTest.get('/api/restaurant-test/availability',requireRole('owner','admi
 for(const method of ['GET','PUT'] as const)restaurantTest.on(method,'/api/restaurant-test/close-notification-settings',requireRole('owner','admin','staff'),async c=>{
  if(!hasOrganizationSelector(c))return requiredAccount(c);
  const org=await organizationFor(c),b=method==='PUT'?await c.req.json().catch(()=>null):null,storeId=method==='PUT'?b?.storeId:c.req.query('storeId');
- if(!org||typeof storeId!=='string'||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,error:'店舗が正しくありません'},404);
+ if(!org||typeof storeId!=='string'||!await storeBelongsTo(c,org.id,storeId))return c.json({success:false,code:'restaurant_store_mismatch',error:'店舗が正しくありません'},404);
  try{return c.json({success:true,data:method==='GET'?await readCloseNotificationSettings(dbFor(c.env,storeId),storeId):await saveCloseNotificationSettings(dbFor(c.env,storeId),storeId,b)});}
  catch(e){if(e instanceof StampError)return inputError(c, {success:false,error:e.message}, e.status, []);throw e;}
 });

@@ -21,7 +21,7 @@ export interface InsertTokenSpec {
   icon: InsertTokenIcon
 }
 
-/** 友だち情報・共通情報の名前（キー → 画面の名前）。分からなければキーのまま見せる。 */
+/** 友だち情報・共通情報の名前（キー → 画面の名前）。分からなければ情報の種類だけを見せる。 */
 export interface InsertTokenNames {
   fields?: ReadonlyMap<string, string> | Record<string, string>
   vars?: ReadonlyMap<string, string> | Record<string, string>
@@ -48,6 +48,7 @@ function lookup(names: InsertTokenNames['fields'], key: string): string | undefi
 export function resolveDefaultToken(token: string, names: InsertTokenNames = {}): InsertTokenSpec | null {
   const inner = /^\{\{\s*([^{}\n]+?)\s*\}\}$/.exec(token)?.[1]
   if (!inner) return null
+  if (inner === 'account.name') return { token, label: 'LINE公式アカウント名', hint: '送信するLINE公式アカウントの名前に置き換わります', icon: 'store' }
   if (inner === 'name') return { token, label: '名前', hint: '受け取る人の名前に置き換わります', icon: 'user' }
   if (inner === 'liff_id') return { token, label: 'LIFF ID', hint: 'LIFF ID に置き換わります', icon: 'phone' }
   const date = /^date(?::([a-z_]+))?$/.exec(inner)
@@ -66,12 +67,12 @@ export function resolveDefaultToken(token: string, names: InsertTokenNames = {})
   const field = /^field\.([a-z][a-z0-9_]*)$/.exec(inner)
   if (field) {
     const name = lookup(names.fields, field[1])
-    return { token, label: name ?? field[1], hint: `友だち情報「${name ?? field[1]}」の値に置き換わります`, icon: 'idcard' }
+    return { token, label: name ?? '友だち情報', hint: name ? `友だち情報「${name}」の値に置き換わります` : '友だち情報の値に置き換わります', icon: 'idcard' }
   }
   const commonVar = /^var\.([a-z][a-z0-9_]*)$/.exec(inner)
   if (commonVar) {
     const name = lookup(names.vars, commonVar[1])
-    return { token, label: name ?? commonVar[1], hint: `共通情報「${name ?? commonVar[1]}」の値に置き換わります`, icon: 'braces' }
+    return { token, label: name ?? '共通情報', hint: name ? `共通情報「${name}」の値に置き換わります` : '共通情報の値に置き換わります', icon: 'braces' }
   }
   return null
 }
@@ -155,7 +156,7 @@ export function splitResolvedInsertTokens(value: string, resolvedValue: string, 
     // 解決できなかった差し込みは、値が入った札に見せない。
     result.push(label.includes('{{')
       ? { kind: 'text', text: label }
-      : { kind: 'chip', spec: { ...piece.spec, token, label, hint: token } })
+      : { kind: 'chip', spec: { ...piece.spec, token, label, hint: group.map(spec => spec.hint).join('・') } })
     cursor = end
   }
   return cursor === resolvedValue.length ? result : fallback()

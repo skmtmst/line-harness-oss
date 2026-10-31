@@ -25,6 +25,7 @@ export default function Checkbox({
   indeterminate = false,
   invalid = false,
   description,
+  disabledReason,
   lockedReason,
   error,
   children,
@@ -39,6 +40,8 @@ export default function Checkbox({
   invalid?: boolean
   /** 文字の下の補足（薄い字）。 */
   description?: ReactNode
+  /** 入力不足で押せない場合の理由。権限のロックとは分けて表示する。 */
+  disabledReason?: ReactNode
   /**
    * 権限で使えない時も同じ欄を残し、焦点で理由を伝える。
    * 止まるのは click・change・Enter・Space だけ。他のイベントで変更を書き込まない。
@@ -54,7 +57,9 @@ export default function Checkbox({
   const autoId = useId()
   const inputId = id ?? autoId
   const noteId = `${inputId}-note`
-  const hasNote = Boolean(error || description)
+  const incomplete = Boolean(rest.disabled && !lockedReason && disabledReason)
+  const note = description ?? (incomplete ? disabledReason : undefined)
+  const hasNote = Boolean(error || note)
   const isInvalid = invalid || Boolean(error)
   const describedBy = hasNote ? noteId : rest['aria-describedby']
   const lock = usePermissionLockTip<HTMLInputElement>(lockedReason, lockedReason ? [rest['aria-describedby'], hasNote ? noteId : undefined].filter(Boolean).join(' ') : describedBy)
@@ -74,7 +79,7 @@ export default function Checkbox({
   }, [indeterminate])
 
   return (
-    <span className={[styles.root, className].filter(Boolean).join(' ')} data-disabled={rest.disabled || lockedReason ? 'true' : undefined}>
+    <span className={[styles.root, className].filter(Boolean).join(' ')} data-disabled={rest.disabled || lockedReason ? 'true' : undefined} data-incomplete={incomplete || undefined}>
       <label className={styles.line} htmlFor={inputId}>
         <span className={styles.control}>
           <input
@@ -95,7 +100,7 @@ export default function Checkbox({
       </label>
       {lock.node}
       {hasNote ? (
-        <span id={noteId} className={error ? styles.error : styles.description}>{error ?? description}</span>
+        <span id={noteId} className={error ? styles.error : styles.description}>{error ?? note}</span>
       ) : null}
     </span>
   )

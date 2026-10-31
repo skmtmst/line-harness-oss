@@ -1,3 +1,4 @@
+import { readCreatedFormDraft, forgetCreatedFormDraft } from '@/lib/form-draft-session'
 import { getPageAction } from '@/test-utils/page-action'
 // @vitest-environment happy-dom
 /**
@@ -198,6 +199,7 @@ beforeEach(() => {
     } as Storage
   }
   window.localStorage.setItem('lh_staff_role', 'owner')
+  forgetCreatedFormDraft('acc-1', 'form-new')
   store.forms = [formRow('form-1', '流れのフォーム')]
   fetchApiMock.mockImplementation(async (url: string) => {
     if (typeof url === 'string' && url.startsWith('/api/forms')) {
@@ -207,7 +209,7 @@ beforeEach(() => {
   })
   foldersList.mockImplementation(async () => ({ success: true, data: [], unfiledCount: 0 }))
   listStatsGet.mockImplementation(async () => ({ success: true, data: {} }))
-  formsCreateDraft.mockImplementation(async () => ({ success: true, data: { id: 'form-new' } }))
+  formsCreateDraft.mockImplementation(async () => ({ success: true, data: { id: 'form-new', contentRevision: 1 } }))
   formsGet.mockImplementation(async () => ({ success: true, data: { ...apiFormData } }))
   formsUpdate.mockImplementation(async () => ({
     success: true,
@@ -243,6 +245,8 @@ describe('V8 回答フォームの通し：作る→保存→公開→一覧', (
     fireEvent.click(creates[0])
     await waitFor(() => expect(formsCreateDraft).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/form-submissions/edit?id=form-new&tab=basic'))
+    expect(readCreatedFormDraft('acc-1', 'form-new')).toBe(1)
+    expect(readCreatedFormDraft('other-account', 'form-new')).toBeNull()
   })
 
   it('下書き保存→知らせ→公開→知らせ・一覧に戻ると増えている', async () => {

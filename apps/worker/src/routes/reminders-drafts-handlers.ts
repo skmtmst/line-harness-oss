@@ -1,3 +1,4 @@
+import { readRestaurantFollowupResourceManagement } from '../services/restaurant-followup-resource-management.js';
 import { logger } from '@line-crm/shared/server';
 import { publicReminder } from './reminder-display.js';
 import type { ReminderListRow } from './reminder-display.js';
@@ -135,12 +136,13 @@ export const get__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =>
         .all<ReminderListRow>();
       // REMINDER-10: 下書き版がある行は版の実値から日時・通数を組み立てる。
       const summaries = await loadReminderListSummaries(c.env.DB, result.results);
+      const management=await readRestaurantFollowupResourceManagement(c.env.DB,'reminder',result.results.map(row=>({id:row.id,lineAccountId:row.line_account_id})));
       return c.json({
         success: true,
         data: buildOffsetListResponse({
           items: result.results.map((row) => {
             const summary = summaries.get(row.id);
-            return publicReminder(row, summary?.stepCount, undefined, summary?.timingSummary ?? null);
+            return {...publicReminder(row, summary?.stepCount, undefined, summary?.timingSummary ?? null),...(management.has(row.id)?{followupManagement:management.get(row.id)}:{})};
           }),
           total: Number(totalRow?.total ?? 0),
           paging,
@@ -203,14 +205,15 @@ export const get__api_reminders_2 = async (c: Context<Env, "/api/reminders">) =>
 
     // REMINDER-10: 旧配列応答も、版を持つ行は版の実値で要約する。
     const summaries = await loadReminderListSummaries(c.env.DB, items);
+    const management=await readRestaurantFollowupResourceManagement(c.env.DB,'reminder',items.map(row=>({id:row.id,lineAccountId:row.line_account_id})));
     const publicItems = items.map((r) => {
       const summary = summaries.get(r.id);
-      return publicReminder(
+      return {...publicReminder(
         r,
         summary?.stepCount ?? stepCounts.get(r.id) ?? 0,
         failedReminderIds.has(r.id),
         summary?.timingSummary ?? null,
-      );
+      ),...(management.has(r.id)?{followupManagement:management.get(r.id)}:{})};
     });
 
     /* 旧配列応答は、移行期限（2026-10-31）まで未移行の呼び出しだけに残す。 */
@@ -252,9 +255,11 @@ export const get__api_reminders_id_4 = async (c: Context<Env, "/api/reminders/:i
       getReminderPublishedVersion(c.env.DB, id),
     ]);
     if (!reminder) return fail(c, 404, 'REMINDER_NOT_FOUND');
+    const management=await readRestaurantFollowupResourceManagement(c.env.DB,'reminder',[{id:reminder.id,lineAccountId:reminder.line_account_id}]);
     return c.json({
       success: true,
       data: {
+        ...(management.has(reminder.id)?{followupManagement:management.get(reminder.id)}:{}),
         id: reminder.id,
         name: reminder.name,
         description: reminder.description,

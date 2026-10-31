@@ -79,7 +79,7 @@ afterEach(() => {
 describe('札に分ける（保存の文字は1文字も変えない）', () => {
   it('分かる差し込みだけ札にし、分からない {{…}} は文字のまま残す', () => {
     const pieces = splitInsertTokens('{{name}}さん、{{date:ymd}} {{unknown}} {{field.pet_name}}')
-    expect(pieces.map((piece) => (piece.kind === 'chip' ? `[${piece.spec.label}]` : piece.text)).join('')).toBe('[名前]さん、[配信日] {{unknown}} [pet_name]')
+    expect(pieces.map((piece) => (piece.kind === 'chip' ? `[${piece.spec.label}]` : piece.text)).join('')).toBe('[名前]さん、[配信日] {{unknown}} [友だち情報]')
     expect(pieces.map((piece) => (piece.kind === 'chip' ? piece.spec.token : piece.text)).join('')).toBe('{{name}}さん、{{date:ymd}} {{unknown}} {{field.pet_name}}')
   })
 
@@ -200,6 +200,26 @@ describe('旧指定でも現在の差し込み表示', () => {
 
 
 describe('閲覧用の差し込み', () => {
+  it('送信対応済みのアカウント名も日本語の札で出し、参照名と保存値を保つ', () => {
+    const value = '{{account.name}} {{var.business_hours}} {{var.reservation_url}} {{field.pet_name}}'
+    act(() => root.render(<InsertText value={value} tokenNames={{ vars: { business_hours: '営業時間', reservation_url: '予約ページ' }, fields: { pet_name: 'ペットの名前' } }} />))
+    expect(host.textContent).toBe('LINE公式アカウント名 営業時間 予約ページ ペットの名前')
+    expect([...host.querySelectorAll('[data-token]')].map(node => node.getAttribute('data-token')).join(' ')).toBe(value)
+  })
+  it('解決済みの値の説明にも内部キーを出さず、表示する値はそのままにする', () => {
+    act(() => root.render(<InsertText value="{{field.pet_name}}" resolvedValue="ポチ" tokenNames={{ fields: { pet_name: 'ペットの名前' } }} />))
+    const chip = host.querySelector('[data-token]')
+    expect(chip?.textContent).toBe('ポチ')
+    expect(chip?.getAttribute('title')).toBe('友だち情報「ペットの名前」の値に置き換わります')
+    expect(chip?.getAttribute('data-token')).toBe('{{field.pet_name}}')
+  })
+  it('名前を読み込めない差し込みも英語のキーを本文へ出さず、未知の形はそのまま読む', () => {
+    act(() => root.render(<InsertText value="{{field.pet_name}} {{var.business_hours}} {{unknown}}" />))
+    expect(host.textContent).toBe('友だち情報 共通情報 {{unknown}}')
+    expect(host.querySelector('[data-token="{{field.pet_name}}"]')?.getAttribute('title')).toBe('友だち情報の値に置き換わります')
+    expect(host.querySelector('[data-token="{{var.business_hours}}"]')?.getAttribute('title')).toBe('共通情報の値に置き換わります')
+  })
+
   it('名前と分かる差し込みは札、未知の差し込みとHTMLに見える文は文字として読む', () => {
     const value = '<script>alert(1)</script>{{name}}さん {{field.plan}} {{unknown}}'
     act(() => root.render(<InsertText value={value} tokenNames={{ fields: { plan: 'プラン' } }} />))
