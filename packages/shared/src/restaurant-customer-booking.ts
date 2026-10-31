@@ -7,6 +7,9 @@ export interface RestaurantLateArrivalPolicy {
 export interface RestaurantCustomerDetails {
   note?: string | null;
   customerPhone?: string | null;
+  customerName?: string | null;
+  allergyNote?: string | null;
+  expectedFormVersion?: number;
 }
 export interface RestaurantCustomerConfirmInput extends RestaurantCustomerDetails {
   referralId?: string;
@@ -55,6 +58,8 @@ export interface RestaurantCustomerBooking {
   holdExpiresAt: string | null;
   note: string | null;
   customerPhone: string | null;
+  customerName?: string;
+  allergyNote?: string | null;
   seatType: string | null;
   courseId?: string | null;
   courseName?: string | null;

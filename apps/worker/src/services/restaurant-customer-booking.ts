@@ -26,6 +26,8 @@ export type CustomerReservationRow = {
   customer_request_id: string | null;
   note: string | null;
   customer_phone: string | null;
+  customer_name: string;
+  allergy_note: string | null;
   seat_type: string | null;
   course_id?: string | null;
   course_name?: string | null;
@@ -33,11 +35,13 @@ export type CustomerReservationRow = {
 export function customerBooking(r: CustomerReservationRow): RestaurantCustomerBooking {
   return { id:r.id, storeId:r.store_id, startsAt:r.starts_at, endsAt:r.ends_at, guestCount:r.guest_count,
     status:r.status, version:r.customer_version, holdExpiresAt:r.hold_expires_at,
-    note:r.note, customerPhone:r.customer_phone ? normalizePhone(r.customer_phone) : null, seatType:r.seat_type, courseId:r.course_id ?? null, courseName:r.course_name ?? null };
+    note:r.note, customerPhone:r.customer_phone ? normalizePhone(r.customer_phone) : null, customerName:r.customer_name,allergyNote:r.allergy_note,seatType:r.seat_type, courseId:r.course_id ?? null, courseName:r.course_name ?? null };
 }
 /** 任意欄はUnicodeの文字数で検査。空欄・nullは保存済みの値を消す。 */
-export function validCustomerDetails(b: {note?: unknown; customerPhone?: unknown}): boolean {
+export function validCustomerDetails(b: {note?: unknown; customerPhone?: unknown;customerName?:unknown;allergyNote?:unknown}): boolean {
   return (b.note == null || (typeof b.note === 'string' && Array.from(b.note).length <= 200))
+    && (b.customerName == null || (typeof b.customerName === 'string' && Array.from(b.customerName).length <= 100 && !!b.customerName.trim()))
+    && (b.allergyNote == null || (typeof b.allergyNote === 'string' && Array.from(b.allergyNote).length <= 200))
     && (b.customerPhone == null || (typeof b.customerPhone === 'string' && !phoneProblem(b.customerPhone)));
 }
 export const customerDetailValue = (v: string | null | undefined) => v?.trim() || null;

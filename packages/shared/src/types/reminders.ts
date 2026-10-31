@@ -1,3 +1,4 @@
+import type { RestaurantFollowupManagement } from '../restaurant-followup-management.js';
 import type { MessageType } from './messages.js';
 import type { ExecutionRunListItem } from './execution-runs.js';
 
@@ -13,6 +14,7 @@ import type { ExecutionRunListItem } from './execution-runs.js';
 export type ReminderTriggerType = "manual" | "booking" | "event" | "friend_field";
 
 export interface Reminder {
+  followupManagement?:RestaurantFollowupManagement;
   id: string;
   name: string;
   description: string | null;
