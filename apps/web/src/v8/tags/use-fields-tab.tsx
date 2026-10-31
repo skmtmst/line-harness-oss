@@ -42,6 +42,10 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
   const [page, setPage] = useListUrlValue('page', 1)
   const [dragId, setDragId] = useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = useState<FriendField | null>(null)
+  const [deleteError, setDeleteError] = useState('')
+  const [deleteNeedsReview, setDeleteNeedsReview] = useState(false)
+  const editAllowed = useRef(canEdit)
+  editAllowed.current = canEdit
   const { leavingId, leave } = useRowLeaving()
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderDialog, setFolderDialog] = useState<'new' | Folder | null>(null)
@@ -61,6 +65,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
   useEffect(() => {
     gateRef.current.invalidate()
     setPendingDelete(null)
+    setDeleteError(''); setDeleteNeedsReview(false)
     setDragId(null)
     setFolderFilter('')
     setPage(1)
@@ -189,18 +194,27 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
   }
 
   const remove = async (field: FriendField) => {
-    if (!accountId) return
+    if (!accountId || accountRef.current !== accountId || !editAllowed.current || deleteNeedsReview) return
     const blockedReason = fieldDeletionBlockedReason(field)
     if (blockedReason) {
-      setActionError(blockedReason)
-      return
+      setActionError(blockedReason); setDeleteError(blockedReason)
+      return false
     }
-    setActionError('')
+    setActionError(''); setDeleteError('')
     try {
-      await api.friendFields.delete(field.id, accountId)
+      const response = await api.friendFields.delete(field.id, accountId)
+      if (!response.success) throw new Error(response.error || '項目を削除できませんでした。')
+      if (accountRef.current !== accountId) return
       leave(field.id, () => load())
+      return true
     } catch (reason) {
-      setActionError(describeApiFailure(reason, '削除'))
+      if (accountRef.current !== accountId) return
+      const message = describeApiFailure(reason, '削除')
+      const conflict = reason instanceof ApiError && reason.status === 409
+      setActionError(message)
+      setDeleteNeedsReview(conflict)
+      setDeleteError(conflict ? `${message} この窓を閉じ、最新の使用状況を確かめてください。` : `${message} この項目の削除を完了できませんでした。`)
+      return false
     }
   }
 
@@ -264,7 +278,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
         dividerBefore: true,
         disabled: blocked !== null,
         disabledReason: blocked ?? undefined,
-        onSelect: () => setPendingDelete(field),
+        onSelect: () => { setActionError(''); setDeleteError(''); setDeleteNeedsReview(false); setPendingDelete(field) },
       })
     }
     return list
@@ -320,5 +334,5 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
     <Button {...(host ? { onClick: host.onCreate, disabled: host.busy } : { href: '/tags/fields/new' })} variant="primary" className={wide ? styles.createWide : undefined}><Plus size={16} aria-hidden="true" />項目を作る</Button>
   )
 
-  return { accountId, canEdit, narrow, host, explanation, items, loaded, status, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, page, setPage, dragId, setDragId, pendingDelete, setPendingDelete, leavingId, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, openMenuId, setOpenMenuId, setActiveFieldId, openFieldDetail, load, loadFolders, visible, pages, currentPage, pageItems, liveOrder, bodyRef, activeField, activeFieldIndex, applyOrder, move, keyboardMove, remove, removeFolder, rowMenuItems, fieldContextItems, kpis, folderRows, folderDotOf, filterActive, createButton }
+  return { accountId, canEdit, narrow, host, explanation, items, loaded, status, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, page, setPage, dragId, setDragId, pendingDelete, setPendingDelete, deleteError, deleteNeedsReview, leavingId, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, openMenuId, setOpenMenuId, setActiveFieldId, openFieldDetail, load, loadFolders, visible, pages, currentPage, pageItems, liveOrder, bodyRef, activeField, activeFieldIndex, applyOrder, move, keyboardMove, remove, removeFolder, rowMenuItems, fieldContextItems, kpis, folderRows, folderDotOf, filterActive, createButton }
 }

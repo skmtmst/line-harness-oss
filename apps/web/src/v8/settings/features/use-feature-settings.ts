@@ -583,21 +583,20 @@ export function useFeatureSettings() {
       (key) => savedFeatures[key] === true && features[key] === false,
     )
     if (offKeys.length === 0) {
-      await persist()
-      return
+      return persist()
     }
     setSaving(true)
     setError('')
     try {
       const data = await checkImpact()
-      if (!data) return
+      if (!data) return false
       if (data.requiresConfirmation) {
         setImpactGroups(data.impacts)
         setImpactError('')
         setImpactOpen(true)
-        return
+        return true
       }
-      await persist()
+      return await persist()
     } finally {
       setSaving(false)
     }

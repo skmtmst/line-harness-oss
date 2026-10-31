@@ -3,6 +3,7 @@
 import { storedStringList } from '@/lib/stored-json'
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
+import { useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Check } from 'lucide-react'
 import { CreatePage } from '@/components/templates/create-page'
@@ -106,8 +107,15 @@ function MenuEditBody() {
   usePageCrumbs([{ label: 'メニュー管理', href: LIST_HREF }])
   const valid = draft.name.trim() !== '' && draft.price !== '' && Number(draft.price) >= 0
 
+  const contextKey = JSON.stringify([selectedAccountId, id, storeParam])
+  const mutationContext = useRef<{ key: string; menuSignature: string | null }>({ key: contextKey, menuSignature: null })
+  if (mutationContext.current.key !== contextKey) mutationContext.current = { key: contextKey, menuSignature: null }
+  useEffect(() => { setBusy(false); setDeleting(false); setConfirmingPrice(false); setError(null) }, [contextKey])
+
   async function save() {
     if (!canEdit || !selectedAccountId || !valid) return
+    const attempt = mutationContext.current
+    const stillHere = () => mutationContext.current === attempt
     setBusy(true); setError(null)
     const body = {
       kind: draft.kind, name: draft.name, price: Number(draft.price),
@@ -117,7 +125,12 @@ function MenuEditBody() {
     }
     try {
       if (editing) {
-        await restaurantTestApi.updateMenu(selectedAccountId, editing.id, body)
+        const signature = JSON.stringify([editing.id, body])
+        if (attempt.menuSignature !== signature) {
+          await restaurantTestApi.updateMenu(selectedAccountId, editing.id, body)
+          attempt.menuSignature = signature
+        }
+        if (!stillHere()) return
         if (editing.kind === 'course') await payment.save(editing.id)
         notifySaved(priceChanged ? (priceStartsLater ? '価格変更を確定しました。指定した開始日時に反映します。' : '価格を変更しました。') : 'メニューを更新しました。')
       } else {
@@ -125,31 +138,40 @@ function MenuEditBody() {
         await restaurantTestApi.createMenu(selectedAccountId, { storeId, ...body })
         notifySaved('メニューを追加しました。')
       }
+      if (!stillHere()) return
       setSaved(draft)
       router.push(LIST_HREF)
+      return true
     } catch (cause) {
+      if (!stillHere()) return
       /* お支払いの版が古い（409）ときは共通の帯と比べる窓で選んでもらう。ページの中身は保存済み。 */
-      if (cause instanceof PaymentConflictError) { setSaved(draft); return }
+      if (cause instanceof PaymentConflictError) { setSaved(draft); setError('メニュー本体は保存しました。お支払いの設定は、閉じて最新の内容と比べてください。'); return false }
       saveErrors.capture(cause)
       setError('保存できませんでした。入力を確かめて、もう一度お試しください。')
+      return false
     } finally {
-      setBusy(false)
+      if (stillHere()) setBusy(false)
     }
   }
 
   async function remove() {
     if (!editing || !selectedAccountId) return
+    const attempt = mutationContext.current
+    const stillHere = () => mutationContext.current === attempt
     setBusy(true); setError(null)
     try {
       await fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(editing.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE' })
+      if (!stillHere()) return
       notifySaved('下書きのメニューを削除しました。')
       setSaved(draft)
       router.push(LIST_HREF)
+      return true
     } catch {
+      if (!stillHere()) return
       setError('削除できませんでした。公開したことがあるメニュー・申請中・予約で使っているメニューは削除できません。')
-      setDeleting(false)
+      return false
     } finally {
-      setBusy(false)
+      if (stillHere()) setBusy(false)
     }
   }
 
@@ -178,10 +200,10 @@ function MenuEditBody() {
         preview={side}
         previewSurface="plain"
         previewToggle={<PreviewLauncher title="お支払いの説明" label="お支払いの説明を見る">{side}</PreviewLauncher>}
-        destructive={canEdit && draftItem ? <Button variant="danger" onClick={() => setDeleting(true)} disabled={busy}>削除する</Button> : undefined}
+        destructive={canEdit && draftItem ? <Button variant="danger" onClick={() => { setError(null); setDeleting(true) }} disabled={busy}>削除する</Button> : undefined}
         footerActions={<>
           <Button onClick={() => router.push(LIST_HREF)} disabled={busy}>キャンセル</Button>
-          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} onClick={() => priceChanged ? setConfirmingPrice(true) : void save()}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
+          {canEdit ? <Button variant="primary" busy={busy} disabled={!valid} onClick={() => { setError(null); if (priceChanged) setConfirmingPrice(true); else void save() }}><Check size={16} aria-hidden="true" />{editing ? '保存する' : '保存して追加する'}</Button> : null}
         </>}
       >
         {error ? <Notice tone="danger" role="alert">{error}</Notice> : null}
@@ -239,10 +261,10 @@ function MenuEditBody() {
         ) : course && canEdit ? <p className={styles.note}>お支払いの方法は、コースを追加したあとにこのページで決められます。</p> : null}
       </CreatePage>
       <ConfirmDialog open={deleting} title="この下書きを削除しますか？" description="一度も公開していない下書きだけ削除できます。元に戻せません。"
-        confirmLabel="削除する" destructive busy={busy} onCancel={() => setDeleting(false)} onConfirm={() => void remove()} />
+        confirmLabel="削除する" destructive busy={busy} onCancel={() => setDeleting(false)} error={error || undefined} onSuccess={() => setDeleting(false)} onConfirm={() => remove()} />
       <ConfirmDialog open={confirmingPrice} title="価格変更を確定しますか？"
         description={`${editing?.name ?? 'メニュー'}の価格を${formatYen(editing?.price ?? 0)}から${formatYen(Number(draft.price))}へ変更します。${priceStartsLater && priceStartsAt ? `${polishFormatDateTime(priceStartsAt)}に新価格を反映します。` : '保存後すぐに新価格を反映します。'}`}
-        confirmLabel="確定して保存する" busy={busy} onCancel={() => setConfirmingPrice(false)} onConfirm={() => { setConfirmingPrice(false); void save() }} />
+        confirmLabel="確定して保存する" busy={busy} onCancel={() => setConfirmingPrice(false)} error={error || undefined} confirmDisabled={Boolean(payment.conflict.conflict)} confirmDisabledReason="閉じてお支払いの最新の内容と比べてください。" onSuccess={() => setConfirmingPrice(false)} onConfirm={() => save()} />
     </SaveErrorScope>
   )
 }

@@ -45,6 +45,7 @@ export default function MenuVersionHistory({
   const [comparing, setComparing] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [reverting, setReverting] = useState(false)
+  const [reviewRequired, setReviewRequired] = useState(false)
   const { error: revertError, setError: setRevertError } = useActionError(`${accountId}:${menuId}`)
 
   /*
@@ -92,18 +93,21 @@ export default function MenuVersionHistory({
   const current = versions.find((v) => v.version_number === expectedVersion)
     ?? versions.find((v) => v.status === 'in_use') ?? null
 
+  const currentKnown = versions.some(version => version.version_number === expectedVersion)
   const doRevert = async () => {
-    if (selected == null) return
-    setConfirming(false)
+    if (selected == null || reviewRequired || !currentKnown) return
     setReverting(true)
     setRevertError('')
     try {
       const response = await bookingApi.revertMenuVersion(accountId, menuId, selected, expectedVersion)
+      setConfirming(false)
       notifyToast(`第${selected}版の中身で新しい版（第${response.version}版）を作りました。`)
       onReverted(response.version)
       await load()
+      return true
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
+        setReviewRequired(true)
         // WEB051：口が返した今の版を、次に送る版にする。
         const latest = Number((error.data as { currentVersion?: unknown } | undefined)?.currentVersion)
         if (Number.isInteger(latest) && latest > 0) setExpectedVersion(latest)
@@ -114,6 +118,7 @@ export default function MenuVersionHistory({
       } else {
         setRevertError('版を戻せませんでした。通信状態を確認して、もう一度お試しください。')
       }
+      return false
     } finally {
       setReverting(false)
     }
@@ -129,7 +134,7 @@ export default function MenuVersionHistory({
       onClose={onClose}
       actions={loadState === 'ready' && versions.length > 0 ? {
         secondary: <Button variant="secondary" disabled={!selectedVersion || reverting} onClick={() => setComparing(true)}>いまと比べる</Button>,
-        primary: <Button variant="primary" disabled={!selectedVersion || !canRevert || reverting} lockedReason={role === null ? undefined : lockReason(canRevert)} onClick={() => { if (canRevert) setConfirming(true) }}>この版に戻す</Button>,
+        primary: <Button variant="primary" disabled={!selectedVersion || !canRevert || reverting || !currentKnown} lockedReason={role === null ? undefined : lockReason(canRevert)} onClick={() => { if (canRevert && currentKnown) { setRevertError(''); setReviewRequired(false); setConfirming(true) } }}>この版に戻す</Button>,
       } : undefined}
     >
 <DetailContent>
@@ -158,8 +163,8 @@ export default function MenuVersionHistory({
             compareLabel="いまと比べる"
             onCompare={() => setComparing(true)}
             revertLabel="この版に戻す"
-            onRevert={() => setConfirming(true)}
-            canRevert={canRevert}
+            onRevert={() => { if (!currentKnown) return; setRevertError(''); setReviewRequired(false); setConfirming(true) }}
+            canRevert={canRevert && currentKnown}
             revertDisabledReason={canRevert ? undefined : '版を戻す権限がありません。'}
             busy={reverting}
           />
@@ -185,8 +190,10 @@ export default function MenuVersionHistory({
         confirmLabel="新しい版を作る"
         cancelLabel="キャンセル"
         busy={reverting}
-        onCancel={() => setConfirming(false)}
-        onConfirm={() => doRevert()}
+        confirmDisabled={reviewRequired}
+        confirmDisabledReason="閉じて最新の版と比べ、戻す内容を確認してください。"
+        onCancel={() => { setConfirming(false); if (reviewRequired) void load() }}
+        error={revertError || undefined} onSuccess={() => setConfirming(false)} onConfirm={() => doRevert()}
       />
 
 </DetailContent>

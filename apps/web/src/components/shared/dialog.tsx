@@ -98,6 +98,8 @@ export type DialogProps = {
   confirmPlacement?: 'start'
   error?: string
   confirmLabel?: string
+  /** 再試行中も元の操作の意味と色を保ち、表示だけを変える。既定は今までどおり。 */
+  confirmRetry?: boolean
   /** 実行中の文字。Buttonのbusyへ渡す。 */
   busyLabel?: string
   cancelLabel?: string
@@ -170,6 +172,7 @@ export default function Dialog({
   initialFocusId,
   error,
   confirmLabel = '保存する',
+  confirmRetry = false,
   busyLabel = '処理中…',
   cancelLabel = 'キャンセル',
   confirmDisabled = false,
@@ -368,8 +371,8 @@ export default function Dialog({
               widthReserve={actionWidthReserve}
               onClick={runConfirm}
               disabled={busy || confirmDisabled} aria-description={confirmDisabled && !confirmLockedReason ? confirmDisabledReason : undefined} lockedReason={confirmLockedReason} busy={busy} busyLabel={busyLabel}>
-              {!busy && confirmIcon && !isDeleteConfirmation(confirmLabel) ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
-              {tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
+              {!busy && !confirmRetry && confirmIcon && !isDeleteConfirmation(confirmLabel) ? <span className={styles.buttonIcon} aria-hidden="true">{confirmIcon}</span> : null}
+              {confirmRetry ? 'もう一度' : tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
             </Button>
           </span>
           {confirmDisabled && !busy && !confirmLockedReason && confirmDisabledReason ? <p className={styles.confirmReason} role="status">{confirmDisabledReason}</p> : null}

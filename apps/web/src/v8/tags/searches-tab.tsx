@@ -193,12 +193,11 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
       setPendingDelete(null)
       notifyToast(`保存した検索「${search.name}」を削除しました`)
       void load()
+      return true
     } catch (reason) {
-      const fieldFailure = saveErrors.capture(reason)
-
-      { if (!fieldFailure)
-
-      setError(describeApiFailure(reason, '削除')) }
+      saveErrors.capture(reason)
+      setError(describeApiFailure(reason, '削除'))
+      return false
     }
   }
 
@@ -314,7 +313,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
         dividerBefore: true,
         disabled: deleteDisabled,
         disabledReason: deleteDisabled ? deleteReason : undefined,
-        onSelect: () => setPendingDelete(search),
+        onSelect: () => { setError(''); setPendingDelete(search) },
       })
     }
     return list
@@ -556,7 +555,7 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
         confirmLabel="削除する"
         destructive
         onCancel={() => setPendingDelete(null)}
-        onConfirm={() => { const target = pendingDelete; if (target) void confirmRemove(target) }}
+        error={error || undefined} onSuccess={() => setPendingDelete(null)} onConfirm={() => pendingDelete ? confirmRemove(pendingDelete) : false}
       />
     </></SaveErrorScope>
   )

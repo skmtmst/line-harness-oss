@@ -170,13 +170,15 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
       if (!response.success) throw new Error('save_failed')
       setForm((current) => ({ ...current, inboundSecret: '', expectedVersion: response.data.version }))
       notifySaved('つなぎ先の設定を保存しました。')
-      await load()
+      void load()
+      return true
     } catch (error) {
       if (accountRef.current !== accountAtSave) return
       const fieldFailure = saveErrors.capture(error);
 
-      if (error instanceof ApiError && error.status === 409) { saveConflict.mark(); return }
+      if (error instanceof ApiError && error.status === 409) { saveConflict.mark(); setNotice({ tone: 'error', text: 'ほかの人が先に保存しました。閉じて最新の内容と比べてください。' }); return false }
       setNotice({ tone: 'error', text: '設定を保存できませんでした。通信の状態を確認して、もう一度お試しください。' })
+      return false
     } finally {
       setSaving(false)
     }
@@ -345,7 +347,7 @@ export default function EcConnector({ accountId, canEdit = true }: { accountId: 
         confirmLabel="止めて保存する"
         destructive
         busy={saving}
-        onConfirm={() => { setEmptyConfirm(null); return save() }}
+        error={notice?.tone === 'error' ? notice.text : undefined} confirmDisabled={Boolean(saveConflict.conflict)} confirmDisabledReason="閉じて最新の内容と比べてください。" onSuccess={() => setEmptyConfirm(null)} onConfirm={() => save()}
         onCancel={() => { if (!saving) setEmptyConfirm(null) }}
       />
       <UnsavedLeaveDialog

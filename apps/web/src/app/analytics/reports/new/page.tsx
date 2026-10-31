@@ -729,7 +729,6 @@ function AnalyticsReportFormPage() {
     const { payload } = built
     const lock = { target }
     submitLock.current = lock
-    setSendOnceOpen(false)
     const submittedSignature = signature
     setSaving(true)
     setError('')
@@ -792,8 +791,8 @@ function AnalyticsReportFormPage() {
           } catch {
             // 取り直しに失敗しても帯は出す。比べる文は出さない。
           }
-          setError('')
-          return
+          setError('ほかの人が先に保存しました。閉じて最新の内容と比べてください。')
+          return false
         }
         if (!isFresh()) return
         if (!response.success) throw new Error(response.error)
@@ -825,8 +824,8 @@ function AnalyticsReportFormPage() {
             const existingId = (caught.data as { existingId?: unknown } | undefined)?.existingId
             if (typeof existingId === 'string' && existingId && isFresh()) {
               setConflictId(existingId)
-              setError('')
-              return
+              setError('この依頼は既にあります。閉じて既にある依頼を確認してください。')
+              return false
             }
           }
           throw caught
@@ -855,9 +854,11 @@ function AnalyticsReportFormPage() {
           router.push(`/analytics/reports/new?id=${response.data.id}`)
         }
       }
+      return true
     } catch (caught) {
       if (!isFresh()) return
       setError(describeSaveFailure(caught))
+      return false
     } finally {
       if (submitLock.current === lock) submitLock.current = null
       if (isFresh()) setSaving(false)
@@ -1136,7 +1137,7 @@ function AnalyticsReportFormPage() {
         footerActions={<>
         <Button href="/analytics">キャンセル</Button>
         {/* 閲覧のみには押せない送る・作るボタンを置かない（オーナー決定 2026-10-06）。 */}
-        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { const built = buildReportPayload(options); if (!built.ok) { showValidation(built); return }; setSendOnceOpen(true) }}>今すぐ1回だけ送る</Button>}
+        {!editing && canManage && <Button variant="secondary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { const built = buildReportPayload(options); if (!built.ok) { showValidation(built); return }; setError(''); setSendOnceOpen(true) }}>今すぐ1回だけ送る</Button>}
         {canManage && <Button variant="primary" disabled={saving || !canManage || !hasRecipient || hasInvalidEmail} title={submitDisabledReason} onClick={() => { if (editing && updateConflict) { setCompareError(''); setCompareOpen(true) } else void submit(false) }} busy={saving} busyLabel={editing ? '保存しています' : '作っています'}><Check size={16} aria-hidden="true" />{editing ? (updateConflict ? '比べてから保存' : '変更を保存する') : 'つくって動かす'}</Button>}
       </>}
       >
@@ -1239,7 +1240,7 @@ function AnalyticsReportFormPage() {
       <Dialog open={compareOpen} title="違いを比べる" description="「－」が相手の最新の内容から消える行、「＋」があなたの入力で増える行です。このまま保存すると、相手の変更のうえに重ねて保存します。" onCancel={() => { if (!compareBusy && !latestBusy) setCompareOpen(false) }} footer={<><Button variant="secondary" disabled={compareBusy || latestBusy} busy={latestBusy} busyLabel="読み込んでいます" onClick={() => void reloadLatest()}>最新を読み込んで続ける</Button><Button variant="primary" disabled={compareBusy || latestBusy || !canManage} onClick={() => void saveOverLatest()} busy={compareBusy} busyLabel="保存しています">この内容で保存する</Button></>} error={compareError || undefined} busy={compareBusy || latestBusy}>
         <VersionCompare before={latestSummary} after={draftSummary} />
       </Dialog>
-      <ConfirmDialog open={sendOnceOpen && canManage} title="レポートを今すぐ1回だけ送りますか？" description="次の宛先と通知方法で送る依頼を作ります。" confirmLabel="この宛先へ1回だけ送る" busy={saving} onCancel={() => { if (!saving) setSendOnceOpen(false) }} onConfirm={() => void submit(true)}>
+      <ConfirmDialog open={sendOnceOpen && canManage} title="レポートを今すぐ1回だけ送りますか？" description="次の宛先と通知方法で送る依頼を作ります。" confirmLabel="この宛先へ1回だけ送る" busy={saving} onCancel={() => { if (!saving) setSendOnceOpen(false) }} error={error || undefined} confirmDisabled={updateConflict || Boolean(conflictId)} confirmDisabledReason="閉じて最新の内容を確認してください。" onSuccess={() => setSendOnceOpen(false)} onConfirm={() => submit(true)}>
         <p className="whitespace-pre-wrap break-words">{oneTimeSummary}</p>
       </ConfirmDialog>
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力した定期レポート" onConfirm={confirmLeave} onCancel={cancelLeave} />

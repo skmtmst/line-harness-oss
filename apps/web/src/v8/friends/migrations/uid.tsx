@@ -1,4 +1,5 @@
 'use client'
+import { useRef } from 'react'
 import SegmentedControl from '@/components/shared/segmented'
 
 import CsvTemplateDownload from '@/components/shared/csv-template-download'
@@ -91,9 +92,11 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
 
   /* 「要確認をまとめて結び付ける」：このページの要確認・未判断・移行先ありの行を1行ずつ結び付ける（まとめての口は無い）。 */
   const bulkTargets: UidMigrationItem[] = (active?.items ?? []).filter((item) => item.classification === 'review' && item.decision === 'pending' && item.newUid)
+  const bulkConfirmation = useRef<{ runId: string | null; items: UidMigrationItem[]; acknowledged: Set<string> }>({ runId: null, items: [], acknowledged: new Set() })
   const runBulkLink = async () => {
-    await m.decideMany(bulkTargets, 'link')
-    setBulkOpen(false)
+    const confirmation = bulkConfirmation.current
+    if (confirmation.runId !== active?.id) return
+    return m.decideMany(confirmation.items, 'link', confirmation.acknowledged)
   }
 
   const register = (
@@ -185,7 +188,7 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
                 </div>
                 <span className={styles.spacer} />
                 {!decisionsLocked && bulkTargets.length > 0 ? (
-                  <Button type="button" variant="text" size="inline" disabled={!canDecideItems || m.busy || m.detailBusy} lockedReason={m.managerLockReason} onClick={() => setBulkOpen(true)}>
+                  <Button type="button" variant="text" size="inline" disabled={!canDecideItems || m.busy || m.detailBusy} lockedReason={m.managerLockReason} onClick={() => { bulkConfirmation.current = { runId: active.id, items: bulkTargets, acknowledged: new Set() }; m.clearDecisionError(); setBulkOpen(true) }}>
                     <CheckCheck size={16} aria-hidden="true" />
                     要確認をまとめて「結び付ける」
                   </Button>
@@ -370,14 +373,14 @@ export default function UidMigrationV8({ initialRunId }: { initialRunId: string 
       <ExecuteConfirmDialog active={active} accounts={m.accounts} me={m.me} busy={m.busy || m.detailBusy} lockedReason={m.ownerLockReason} open={m.confirmExecute} error={m.executeError} canRun={m.canRunExecute} onConfirm={() => m.execute()} onCancel={() => { if (!m.busy) m.setConfirmExecute(false) }} />
       <RollbackConfirmDialog active={active} me={m.me} busy={m.busy || m.detailBusy} lockedReason={m.ownerLockReason} open={m.confirmRollback} error={m.rollbackError} conflicts={m.rollbackConflicts} canRun={m.canRunRollback} onConfirm={() => m.rollback()} onCancel={() => { if (!m.busy) { m.setConfirmRollback(false); m.setRollbackConflicts([]) } }} />
       <ConfirmDialog
-        open={bulkOpen}
+        open={bulkOpen && bulkConfirmation.current.runId === active?.id}
         title="要確認をまとめて結び付けます"
-        description={`このページの要確認・未判断で移行先のある ${formatNumber(bulkTargets.length)} 行を「結び付ける」にします。1行ずつ保存します。本移行まで実データは変わりません。`}
+        description={`このページの要確認・未判断で移行先のある ${formatNumber(bulkConfirmation.current.items.length)} 行を「結び付ける」にします。1行ずつ保存します。本移行まで実データは変わりません。`}
         confirmLabel="結び付ける"
         confirmDisabled={!canDecideItems || decisionsLocked || m.detailBusy}
         confirmLockedReason={m.managerLockReason}
         busy={m.busy}
-        onConfirm={() => runBulkLink()}
+        error={m.detailError || m.message || undefined} onSuccess={() => setBulkOpen(false)} onConfirm={() => runBulkLink()}
         onCancel={() => { if (!m.busy) setBulkOpen(false) }}
       />
     </PageFrame>

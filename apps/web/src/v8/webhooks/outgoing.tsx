@@ -268,24 +268,26 @@ export default function WebhooksOutgoingV8() {
   const runTest = async (item: OutgoingWebhookOverview) => {
     const accountId = selectedAccountId
     if (!accountId || testingId !== null) return
-    setTestTarget(null)
     setTestingId(item.id)
     setTestNotice(null)
     try {
       const response = await api.webhooks.outgoing.test(item.id, accountId)
       if (accountRef.current !== accountId) return
-      if (response.success && response.data.delivered) {
+      if (!response.success) throw new Error(response.error)
+      if (response.data.delivered) {
         const status = response.data.responseStatus
         notifyToast(`「${item.name}」への試し送信が届きました${status === null ? '' : `(相手の応答 ${status})`}。`)
       } else {
         const status = response.success ? response.data.responseStatus : null
         setTestNotice(`「${item.name}」への試し送信は届きませんでした${status === null ? '' : `(相手の応答 ${status})`}。「やり取りの記録」タブで詳しく確認できます。`)
       }
+      return true
     } catch (saveFailure) {
       if (accountRef.current !== accountId) return
       const fieldFailure = saveErrors.capture(saveFailure)
       { if (!fieldFailure)
       setTestNotice(`「${item.name}」への試し送信に失敗しました。「やり取りの記録」タブで詳しく確認できます。`) }
+      return false
     } finally {
       setTestingId(null)
     }
@@ -416,7 +418,7 @@ export default function WebhooksOutgoingV8() {
       label: '試しに送る',
       disabled: !item.isActive,
       disabledReason: !item.isActive ? '止めている送り先には試し送信できません' : undefined,
-      onSelect: () => { setMenuId(null); setTestTarget(item) },
+      onSelect: () => { setMenuId(null); setTestNotice(''); setTestTarget(item) },
     })
     if (canManage) {
       items.push({ id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => { setMenuId(null); askDelete(item) } })
@@ -766,7 +768,7 @@ export default function WebhooksOutgoingV8() {
           confirmLabel="この送り先へ送る"
           cancelLabel="キャンセル"
           busy={testingId !== null}
-          onConfirm={() => { if (testTarget) void runTest(testTarget) }}
+          error={testNotice || undefined} onSuccess={() => setTestTarget(null)} onConfirm={() => testTarget ? runTest(testTarget) : undefined}
           onCancel={() => setTestTarget(null)}
         >
           {testTarget ? (

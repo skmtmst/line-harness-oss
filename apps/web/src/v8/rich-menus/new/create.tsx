@@ -969,7 +969,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
       void scheduleSubmit(input)
       return
     }
-    setPublishConfirmOpen(true)
+    setError(null); setPublishConfirmOpen(true)
   }
 
   /* ---------- 派生値 ---------- */
@@ -1363,7 +1363,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         description={publishConfirmNote}
         confirmLabel="公開する"
         busy={publishing || saving}
-        onConfirm={() => { setPublishConfirmOpen(false); void handlePublish() }}
+        error={error || undefined} onSuccess={() => setPublishConfirmOpen(false)} onConfirm={() => handlePublish()}
         onCancel={() => setPublishConfirmOpen(false)}
       />
 

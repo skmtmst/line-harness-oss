@@ -8,7 +8,7 @@
  *  - ［確かめた］［解決した］は古い版を渡し、解決は確認の小窓をはさむ。409 は読み直して知らせる。
  */
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SecurityMonitorPanel } from './security-monitor'
 
@@ -108,7 +108,8 @@ describe('セキュリティの見張り', () => {
     await chooseAction('解決した')
     const confirms = await screen.findAllByRole('button', { name: '解決した' })
     fireEvent.click(confirms[confirms.length - 1])
-    expect(await screen.findByText(/ほかの人が先に更新しました/)).toBeTruthy()
+    const failed = screen.getByRole('dialog')
+    expect((await within(failed).findByRole('alert')).textContent).toMatch(/ほかの人が先に更新しました/)
     await waitFor(() => expect(fixture.list.mock.calls.length).toBeGreaterThan(1))
   })
 
@@ -185,7 +186,12 @@ describe('監視状態と応答の寿命', () => {
     render(<SecurityMonitorPanel accountId="acc-1" canOperate />)
     await chooseAction('解決した')
     fireEvent.click(screen.getByRole('button', { name: '解決した' }))
-    await screen.findByText(/ほかの人が先に更新しました/)
+    const failed = screen.getByRole('dialog')
+    expect((await within(failed).findByRole('alert')).textContent).toMatch(/ほかの人が先に更新しました/)
+    const retry = within(failed).getByRole('button', { name: 'もう一度' })
+    expect(retry.hasAttribute('disabled')).toBe(true)
+    fireEvent.click(retry); expect(fixture.resolve).toHaveBeenCalledTimes(1)
+    fireEvent.click(within(failed).getByRole('button', { name: 'キャンセル' }))
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     await chooseAction('解決した')
     const confirm = screen.getByRole('button', { name: '解決した' })

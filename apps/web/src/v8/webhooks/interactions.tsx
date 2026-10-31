@@ -207,6 +207,7 @@ export default function WebhooksInteractionsV8() {
     setRetrying(null)
     setBulkRetrying(false)
     setConfirmingRetry(null)
+    setRetryCheckRequired(false)
     if (!accountId) {
       setLoading(false)
       setError(false)
@@ -237,16 +238,16 @@ export default function WebhooksInteractionsV8() {
     }
   }, [selectedAccountId, periodDays, direction, status, search, page, limit])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { setNotice(''); void load() }, [load])
 
   const pageCount = Math.max(1, Math.ceil(data.total / data.limit))
   const rangeFirst = data.total === 0 ? 0 : (data.page - 1) * data.limit + 1
   const rangeLast = data.total === 0 ? 0 : Math.min(data.total, rangeFirst + data.items.length - 1)
 
+  const [retryCheckRequired, setRetryCheckRequired] = useState(false)
   const retry = async (item: WebhookInteraction, confirmed = false) => {
     const accountId = selectedAccountId
     if (!accountId || loadedAccountId !== accountId) return
-    setConfirmingRetry(null)
     setRetrying(item.id)
     setNotice('')
     try {
@@ -255,16 +256,21 @@ export default function WebhooksInteractionsV8() {
       if (!response.success) throw new Error(response.error)
       if (response.data.status === 'succeeded') notifyToast(`「${item.webhookName}」へもう一度送り、届いたことを確認しました。`)
       else setNotice(`「${item.webhookName}」へ送り直しましたが、まだ届きませんでした。`)
-      await load()
+      setConfirmingRetry(null)
+      void load()
+      return true
     } catch (err) {
       if (accountRef.current !== accountId) return
-      if (err instanceof ApiError && err.code === 'result_unknown_needs_check') setConfirmingRetry(item)
+      if (err instanceof ApiError && err.code === 'result_unknown_needs_check') { setConfirmingRetry(item); setNotice('届いたかどうか確認できませんでした。相手先の記録を確認してください。') }
       else if (err instanceof ApiError && err.code === 'webhook_not_found') { setNotice('送り先は削除されています。一覧の表示を最新にしました。'); void load() }
       else if (err instanceof ApiError && err.code === 'auto_retry_scheduled') setNotice('この知らせは自動での送り直しが予定されています。しばらく待っても届かない場合は、連携先の設定を確かめてください。')
       else if (err instanceof ApiError && err.code === 'already_delivered') { setNotice('この知らせは自動の送り直しで届いています。一覧の表示を最新にしました。'); void load() }
       else if (err instanceof ApiError && err.code === 'webhook_inactive') setNotice('送り先が止められています。送る一覧で動かしてからやり直してください。')
       else if (err instanceof ApiError && err.status === 503) setNotice('署名に使う合言葉を確認できないため、まだ送っていません。連携の設定を保存し直してからやり直してください。')
       else setNotice('送り直しを受け付けられませんでした。状態を読み直してからお試しください。')
+      // Never bypass an unknown-result check, a scheduled retry, or a stale target with the retry button.
+      setRetryCheckRequired(confirmed && (!(err instanceof ApiError) || err.status !== 503))
+      return false
     } finally {
       if (accountRef.current === accountId) setRetrying(null)
     }
@@ -487,7 +493,7 @@ export default function WebhooksInteractionsV8() {
             busy={retrying !== null}
             onClose={() => setSelected(null)}
             onRetry={() => {
-              if (selected.failureReasonCode === 'unknown') setConfirmingRetry(selected)
+              if (selected.failureReasonCode === 'unknown') { setNotice(''); setRetryCheckRequired(false); setConfirmingRetry(selected) }
               else void retry(selected)
             }}
           />
@@ -499,8 +505,8 @@ export default function WebhooksInteractionsV8() {
           confirmLabel="確かめたので送り直す"
           cancelLabel="まだ確かめていない"
           busy={retrying === confirmingRetry?.id}
-          onConfirm={() => { if (confirmingRetry) void retry(confirmingRetry, true) }}
-          onCancel={() => setConfirmingRetry(null)}
+          error={notice || undefined} confirmDisabled={retryCheckRequired} confirmDisabledReason="閉じて相手先の記録と最新の状態を確認してください。" onSuccess={() => setConfirmingRetry(null)} onConfirm={() => confirmingRetry ? retry(confirmingRetry, true) : undefined}
+          onCancel={() => { setConfirmingRetry(null); setRetryCheckRequired(false) }}
         />
       </>}
     >

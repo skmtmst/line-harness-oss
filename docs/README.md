@@ -541,6 +541,7 @@
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
 - [知らせの札・本文の整列と文字の操作](release-log/unreleased/0000-kenta-notice-status-actions.md)
 - [画面の表示確認の試験準備](release-log/unreleased/0000-kenta-browser-fixture-paths.md)
+- [確認の窓の失敗表示と再試行](release-log/unreleased/0000-kenta-confirm-dialog-errors.md)
 - [運営コンソールの端の詰まり修正](release-log/unreleased/1948-kenta-muse-fqa-edge.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
 - [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
