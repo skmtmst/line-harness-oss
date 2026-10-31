@@ -146,7 +146,7 @@ function UrlCell({ url }: { url: string | null }) {
 }
 
 function isStoreMismatch(error: unknown): boolean {
-  return error instanceof ApiError && ((error.status === 400 && /店舗を確認してください|店舗が正しくありません/.test(error.message)) || (error.status === 404 && error.message === '店舗が正しくありません'))
+  return error instanceof ApiError && (error.status === 400 || error.status === 404) && error.code === 'restaurant_store_mismatch'
 }
 
 export default function BookingMediaPage() {

@@ -76,7 +76,7 @@ it('保存中に別画面で店舗が変わっても入力と版を残し、明�
   await screen.findByText('人工媒体')
   const label = 'LINE・電話で予約が入ったら、他のサイトの枠を閉じる知らせを出す'
   fireEvent.click(screen.getByRole('switch', { name: label }))
-  net.save.mockImplementationOnce(async () => { net.contextId = 'other'; throw new ApiError(400, '店舗を確認してください') })
+  net.save.mockImplementationOnce(async () => { net.contextId = 'other'; throw new ApiError(400, 'API error: 400', 'restaurant_store_mismatch') })
   fireEvent.click(await screen.findByRole('button', { name: '保存する' }))
   const restore = await screen.findByRole('button', { name: 'この店舗に切り替えて表示する' })
   expect(screen.getByText(/別の画面で表示中の店舗が変わりました/)).toBeTruthy()
@@ -95,7 +95,7 @@ it('お知らせだけの保存の404も店の不一致として回復し、お�
   await screen.findByText('人工媒体')
   const label = 'キャンセルで席が空いたら「もう開けてよい」を知らせる'
   fireEvent.click(await screen.findByRole('switch', { name: label }))
-  net.saveNotice.mockImplementationOnce(async () => { net.contextId = 'other'; throw new ApiError(404, '店舗が正しくありません') })
+  net.saveNotice.mockImplementationOnce(async () => { net.contextId = 'other'; throw new ApiError(404, 'API error: 404', 'restaurant_store_mismatch') })
   fireEvent.click(await screen.findByRole('button', { name: '保存する' }))
   fireEvent.click(await screen.findByRole('button', { name: 'この店舗に切り替えて表示する' }))
   expect((await screen.findByRole('switch', { name: label })).getAttribute('aria-checked')).toBe('true')
@@ -124,4 +124,18 @@ it('現役の候補が複数なら未選択から始め、実在する店舗を�
   await screen.findByText('人工媒体')
   expect(net.media).toHaveBeenCalledExactlyOnceWith('a', 'current')
   expect(net.select).not.toHaveBeenCalled()
+})
+
+it('同じ案内文でも別の種類の404は店舗の不一致として扱わない', async () => {
+  render(<BookingMedia />)
+  await screen.findByText('人工媒体')
+  const label = 'キャンセルで席が空いたら「もう開けてよい」を知らせる'
+  fireEvent.click(await screen.findByRole('switch', { name: label }))
+  net.saveNotice.mockImplementationOnce(async () => { net.contextId = 'other'; throw new ApiError(404, '店舗が正しくありません', 'resource_not_found') })
+  fireEvent.click(await screen.findByRole('button', { name: '保存する' }))
+  await waitFor(() => expect(net.saveNotice).toHaveBeenCalledTimes(1))
+  await screen.findByRole('alert')
+  expect(net.context).toHaveBeenCalledTimes(1)
+  expect(screen.queryByRole('button', { name: 'この店舗に切り替えて表示する' })).toBeNull()
+  expect(screen.getByRole('switch', { name: label }).getAttribute('aria-checked')).toBe('true')
 })
