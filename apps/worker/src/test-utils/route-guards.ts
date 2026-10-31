@@ -4,7 +4,7 @@ export type Registration = {
   method: string; path: string; router: string; position: number; guarded: boolean;
   mountedRouter?: string;
 };
-const GUARDS = new Set(['requireRole', 'requirePermission', 'requireDeliveryAccess', 'requirePlatformAdminWrite', 'authMiddleware']);
+const GUARDS = new Set(['requireRole', 'requirePermission', 'requireDeliveryAccess', 'requireReadOperationPermission', 'requirePlatformAdminWrite', 'authMiddleware']);
 
 /** import 名だけで保護済みとはせず、middleware の引数として登録したものだけを数える。 */
 export function registrations(source: string | ts.SourceFile): Registration[] {

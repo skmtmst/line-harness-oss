@@ -95,10 +95,20 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/scenario-subscriptions(?:\/|$)/, 'scenario.subscription.edit'],
 ];
 
+/** 読取だけを行うPOSTの、経路と閲覧鍵。複数の鍵はどちらか一つでよい。 */
+export const READ_OPERATION_PERMISSIONS: ReadonlyMap<string, readonly string[]> = new Map<string, readonly string[]>([
+  ['POST /api/segments/count', ['/scenarios', '/broadcasts']],
+]);
+
+export function readOperationPermissions(method: string, path: string): readonly string[] | null {
+  return READ_OPERATION_PERMISSIONS.get(`${method.toUpperCase()} ${path}`) ?? null;
+}
+
 /** POST でも業務データを更新しない読取・プレビュー操作。 */
 export function gap2ReadOperation(method: string, path: string): boolean {
   return method === 'POST' && (
-    /^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)
+    readOperationPermissions(method, path) !== null
+    || /^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)
     || /^\/api\/chats\/[^/]+\/ai\/summary$/.test(path)
     || path === '/api/booking/admin/series/preview'
     || path === '/api/member-ranks/preview'

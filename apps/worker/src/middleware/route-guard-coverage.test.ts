@@ -45,7 +45,7 @@ import {
   isStaffSelfRouteTemplate,
   permissionForApiPath,
 } from './auth.js';
-import { gap2SelfPreference } from './auth/permissions/auth.js';
+import { gap2SelfPreference, readOperationPermissions } from './auth/permissions/auth.js';
 
 /** 更新ルートごとのmiddleware引数と、登録済みの親のガードを確認する。 */
 const ROUTES_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'routes');
@@ -360,6 +360,7 @@ function isStaffApiFailClosed(entry: string): boolean {
   if (isStaffSelfRouteTemplate(method, path)) return false;
   if (isStaffExplicitAllow(method, path)) return false;
   if (permissionForApiPath(path) !== null) return false;
+  if (readOperationPermissions(method, path) !== null) return false;
   return true;
 }
 
@@ -770,7 +771,6 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/restaurant-test/stores/connect',
     'POST /api/restaurant-test/tables',
     'POST /api/restaurant-test/terms-agreement',
-    'POST /api/segments/count',
     'POST /api/settings/features/impact',
     'POST /api/site/link',
     'POST /api/staff',
