@@ -1,3 +1,4 @@
+import { monthlyEntitlementAccess } from '@line-crm/db';
 import {GapError} from '../../services/gap-common.js';
 import {EntitlementError} from './entitlement-error.js';
 export type PassPlanWrite={kind:'ticket'|'monthly';name:string;price:number;count:number|null;monthlyLimit:number|null;validDays:number;menuIds:string[];allowWithoutPass:boolean;eventIds?:string[]| null};
@@ -16,10 +17,12 @@ export async function expandPlanGrant(db:D1Database,a:string,b:Record<string,unk
  return {...b,kind:r.kind,name:r.name,remaining:r.kind==='ticket'?r.count:undefined,monthlyLimit:r.kind==='monthly'?r.monthly_limit:undefined,menuId:null,validFrom,expiresAt:new Date(Date.parse(validFrom)+Number(r.valid_days)*86400000).toISOString()};
 }
 export async function passUnusable(db:D1Database,e:{id:string;menu_id:string|null;kind:string;remaining:number|null;monthRemaining:number|null;valid_from:string;expires_at:string},a:string,menu:string|undefined,at:string){
+ const monthly=await monthlyEntitlementAccess(db,a,e.id,'menu',menu,at);
+ if(monthly?.reason)return monthly.reason;
  const extra=await db.prepare('SELECT e.billing_status,e.grace_until,p.target_scope_json FROM booking_entitlements e LEFT JOIN booking_pass_plans p ON p.id=e.plan_id AND p.line_account_id=e.line_account_id WHERE e.id=? AND e.line_account_id=?').bind(e.id,a).first<{billing_status:string;grace_until:string|null;target_scope_json:string|null}>();
- if(extra?.billing_status==='stopped'||extra?.billing_status==='grace'&&extra.grace_until&&Date.parse(extra.grace_until)<=Date.now())return 'billing_stopped';
+ if(!monthly && (extra?.billing_status==='stopped'||extra?.billing_status==='grace'&&extra.grace_until&&Date.parse(extra.grace_until)<=Date.now()))return 'billing_stopped';
  if(Date.parse(at)<Date.parse(e.valid_from)||Date.parse(at)>=Date.parse(e.expires_at))return 'expired';
- if(menu&&(e.menu_id&&e.menu_id!==menu||extra?.target_scope_json&&JSON.parse(extra.target_scope_json).length&&!JSON.parse(extra.target_scope_json).includes(menu)))return 'menu_out_of_scope';
+ if(!monthly&&menu&&(e.menu_id&&e.menu_id!==menu||extra?.target_scope_json&&JSON.parse(extra.target_scope_json).length&&!JSON.parse(extra.target_scope_json).includes(menu)))return 'menu_out_of_scope';
  if(e.kind==='ticket'?Number(e.remaining)<=0:e.monthRemaining!==null&&e.monthRemaining<=0)return 'month_used_up';return null;
 }
 export async function assertPassRequirement(db:D1Database,a:string,menu:string,entitlement:unknown){

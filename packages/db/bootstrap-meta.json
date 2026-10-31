@@ -660,7 +660,8 @@
     "744_restaurant_followup_targets.sql",
     "745_style_starter_catalog.sql",
     "747_restaurant_followup_preferences.sql",
-    "748_form_public_media_usages.sql"
+    "748_form_public_media_usages.sql",
+    "749_booking_monthly_ledger.sql"
   ],
-  "migrationCount": 661
+  "migrationCount": 662
 }
