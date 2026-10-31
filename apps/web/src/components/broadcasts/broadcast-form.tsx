@@ -1,5 +1,6 @@
 'use client'
 
+import type { BroadcastDeliveryLimit } from '@line-crm/shared'
 import { jstCalendar as japanCalendar, jstDate as japanDate } from '@/lib/jst-datetime'
 
 import { copyBroadcastDraft,copyRecentBroadcast } from './broadcast-copy-draft'
@@ -316,6 +317,9 @@ export default function BroadcastForm({
   const [approverId, setApproverId] = useState('')
   const [approvalNote, setApprovalNote] = useState('')
   const [approvalCountInput, setApprovalCountInput] = useState('')
+  const [limitToQuota, setLimitToQuota] = useState(false)
+  const [recipientLimitInput, setRecipientLimitInput] = useState('')
+  const deliveryLimit: BroadcastDeliveryLimit | undefined = limitToQuota || recipientLimitInput.trim() ? { upToRemainingQuota: limitToQuota, ...(recipientLimitInput.trim() ? {maxRecipients:Number(recipientLimitInput)} : {}) } : undefined
 
   /* ★V8 だけ、手順を型の共通部品 Steps で題と説明の下に置く（互換経路はこれまでの帯）。
      ★V8 は板の頭に戻る（← 一斉配信一覧）を置かない（オーナー 2026-10-08）。互換経路は今までどおり。 */
@@ -361,6 +365,8 @@ export default function BroadcastForm({
       }
       const copy = duplicateCopy(res.data)
       setTitle(copy.title)
+      setLimitToQuota(res.data.messageOptions?.deliveryLimit?.upToRemainingQuota ?? false)
+      setRecipientLimitInput(res.data.messageOptions?.deliveryLimit?.maxRecipients === undefined ? '' : String(res.data.messageOptions.deliveryLimit.maxRecipients))
       setBubbles(copy.bubbles)
       setDeliveryMethod('duplicate')
     }).catch(() => {
@@ -421,6 +427,8 @@ export default function BroadcastForm({
       setInternalMemo(draft.internalMemo ?? '')
       setTrackLinks(draft.trackLinks)
       setMessageButtons(draft.messageOptions?.buttons ?? [])
+      setLimitToQuota(draft.messageOptions?.deliveryLimit?.upToRemainingQuota ?? false)
+      setRecipientLimitInput(draft.messageOptions?.deliveryLimit?.maxRecipients === undefined ? '' : String(draft.messageOptions.deliveryLimit.maxRecipients))
       setAfterActionVersionId(draft.afterActionVersionId ?? '')
       setFolderId(draft.folderId ?? '')
       setMeasureOpens(draft.measureOpens ?? true)
@@ -730,7 +738,7 @@ export default function BroadcastForm({
     return () => clearTimeout(timer)
     // runPreflight は毎回作り直されるので依存に入れない。見たいのは中身の変化。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bubbles, tagId, excludeTagId, condition, scenarioId, targetMode, selectedAccountId, scheduledDate, scheduledTime, sendMode])
+  }, [bubbles, tagId, excludeTagId, condition, scenarioId, targetMode, selectedAccountId, scheduledDate, scheduledTime, sendMode, limitToQuota, recipientLimitInput])
 
   /*
    * BC-01: 型を切り替えると `emptyBubble` で中身が空になるが、
@@ -784,7 +792,7 @@ export default function BroadcastForm({
    */
   const duplicateCopy = (broadcast: ApiBroadcast) => copyBroadcastDraft(broadcast)
 
-  const duplicateRecent = (broadcast: ApiBroadcast) => copyRecentBroadcast({ duplicateCopy, setBubbles, setDeliveryMethod, setTitle }, broadcast)
+  const duplicateRecent = (broadcast: ApiBroadcast) => copyRecentBroadcast({ duplicateCopy, setBubbles, setDeliveryMethod, setTitle, setLimitToQuota, setRecipientLimitInput }, broadcast)
 
   const openConditionDialog = () => {
     setTargetMode('advanced')
@@ -831,7 +839,7 @@ export default function BroadcastForm({
     scheduledAt: scheduledAtIso(),
     stepped: Boolean(currentStep),
   })
-  const validate = () => broadcastSaveProblem(stepProblems())
+  const validate = () => recipientLimitInput.trim() && (!Number.isSafeInteger(Number(recipientLimitInput)) || Number(recipientLimitInput)<1) ? '上限人数は1以上の整数を入れてください。' : deliveryLimit && ab.enabled ? '人数の上限とA/Bは併用できません。A/Bをオフにしてください。' : broadcastSaveProblem(stepProblems())
   /**
    * R580: いまの入力に対する検査結果が、どの段の不備か。
    * `validate` と同じ結果から読む。送信設定の段は移動の導線を出さない（今のまま）。
@@ -860,6 +868,7 @@ export default function BroadcastForm({
       messageContent: content,
       scheduledAt: scheduledAtIso(),
       messageCount: bubbles.length,
+      deliveryLimit,
     }
   }
 
@@ -931,7 +940,7 @@ export default function BroadcastForm({
   })
   const liveStepProblems = stepProblems()
 
-  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, selectedAccountId, spreadMinutes, targetPayload, title, trackLinks }, scheduledAt, saveAsDraft, confirmedCount)
+  const draftPayload = (scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) => buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, deliveryLimit, selectedAccountId, spreadMinutes, targetPayload, title, trackLinks }, scheduledAt, saveAsDraft, confirmedCount)
 
   /**
    * テスト後の修正も同じ下書きへ上書きし、予約時に別レコードを作らない。
@@ -1186,7 +1195,7 @@ export default function BroadcastForm({
    */
   const needsApproval = audienceCount !== null
     && approvalConfig !== null
-    && audienceCount >= approvalConfig.threshold
+    && (preflight?.deliveryLimit?.candidateCount ?? audienceCount) >= approvalConfig.threshold
   const needsApprovalSingle = needsApproval && approvalConfig?.singleOperator === true
   const approvalCountMatched = needsApprovalSingle
     && approvalCountInput.trim() !== ''
@@ -1235,7 +1244,8 @@ export default function BroadcastForm({
   // アカウント・保存内容・確認結果が変わったとき、前の了承を使わない。
   const confirmationKey = JSON.stringify([selectedAccountId, formFingerprint, preflightChecks.map(({ key, value, done }) => ({ key, value, done })), sendPreview.data, previewSeq])
   const confirmationBlocked = pendingChecks.length > 0 && acknowledgementKey !== confirmationKey
-  const confirmationFields = <BroadcastCheckAcknowledgement issues={pendingChecks.map(check => `${check.label}：${check.value}`)} checked={acknowledgementKey === confirmationKey} onCheckedChange={checked => setAcknowledgementKey(checked ? confirmationKey : null)} disabled={saving} />
+  const confirmedDeliveryLimit = currentStep && !needsApprovalSingle ? sendPreview.data?.deliveryLimit : preflight?.deliveryLimit
+  const confirmationFields = <>{confirmedDeliveryLimit && <Notice tone="info">配信できる候補{formatNumber(confirmedDeliveryLimit.candidateCount)}人から、無作為に最大{formatNumber(confirmedDeliveryLimit.recipientCount)}人へ送ります。確認後に人数を増やしません。</Notice>}<BroadcastCheckAcknowledgement issues={pendingChecks.map(check => `${check.label}：${check.value}`)} checked={acknowledgementKey === confirmationKey} onCheckedChange={checked => setAcknowledgementKey(checked ? confirmationKey : null)} disabled={saving} /></>
   const confirmMessage = async () => {
     if (!canConfirm || confirmationBlocked) return
     return confirmBroadcastMessage({ onSuccess, scheduledAtIso, sendPreview, setConfirmOpen, setError, setPreviewSeq })
@@ -1243,7 +1253,7 @@ export default function BroadcastForm({
 
   const save = async () => {
     if (confirmOpen && (!canConfirm || confirmationBlocked)) return
-    return saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, setConfirmOpen, setError, setSaving, submittingRef, validate })
+    return saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, deliveryLimited:!!deliveryLimit, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, setConfirmOpen, setError, setSaving, submittingRef, validate })
   }
 
   /*
@@ -1375,7 +1385,7 @@ export default function BroadcastForm({
         {!showTemplatePicker && bubbles.some(bubble => bubble.type === 'text') ? <Disclosure size="compact" title="ほかの設定" hint="クリックを数える・ボタン" detailsRef={(el) => { buttonsRef.current = el; fields.bind('buttons').ref(el) }} onBlur={fields.bind('buttons').onBlur}><SaveErrorField names={["trackLinks","track_links"]}><ToggleField checked={trackLinks} onChange={setTrackLinks}>URLを短縮してクリックを数える</ToggleField></SaveErrorField><MessageButtonsSection buttons={messageButtons} error={messageButtonsError(messageButtons, { hasLiff: Boolean(selectedAccount?.liffId) })} onChange={setMessageButtons} liffId={selectedAccount?.liffId ?? null} accountId={selectedAccountId ?? null} /></Disclosure> : null}
         {!currentStep && error && <Notice tone="danger" message={error} />}
         </>}</div>
-        <BroadcastScheduleStep {...{ ab, approvalConfig, audienceCount, concurrentBroadcasts, goToStep, measureOpens, quota, quotaInsufficient, scheduledAtIso, scheduledDate, scheduledTime, sendMode, setMeasureOpens, setScheduledDate, setScheduledTime, setSendMode, setSpreadMinutes, shows, spreadMinutes, targetMode }} />
+        <BroadcastScheduleStep onRetryQuota={() => void runPreflight()} {...{ selectedAccountId, limitToQuota, setLimitToQuota, recipientLimitInput, setRecipientLimitInput, ab, approvalConfig, audienceCount, concurrentBroadcasts, goToStep, measureOpens, quota, quotaInsufficient, scheduledAtIso, scheduledDate, scheduledTime, sendMode, setMeasureOpens, setScheduledDate, setScheduledTime, setSendMode, setSpreadMinutes, shows, spreadMinutes, targetMode }} />
 
     <div id="broadcast-step-confirm" className={shows('confirm') ? styles.section : 'hidden'}>
       <h3>配信前チェック</h3>

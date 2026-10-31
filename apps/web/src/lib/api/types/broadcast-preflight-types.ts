@@ -1,4 +1,5 @@
 export type BroadcastPreflight = {
+  deliveryLimit?: { candidateCount: number; recipientCount: number; random: boolean }
   audienceCount: number
   hiddenExcluded: number
   consentExcluded?: number
@@ -23,6 +24,7 @@ export type BroadcastPreflight = {
     total: number
   }
   quota?: {
+    unlimited?: boolean
     monthlyUsed: number | null
     monthlyLimit: number | null
     remaining: number | null

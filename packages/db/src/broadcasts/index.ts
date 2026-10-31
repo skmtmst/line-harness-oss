@@ -829,6 +829,14 @@ export async function updateBroadcastFailedAccountIds(
  * （getQueuedBroadcasts / recoverStalledBroadcasts / バッチ取得の CAS）。
  */
 
+// 停止・再開・失敗分の再送は定義を変えない。正しい版の人数の確認印だけを
+// 同じCASの中で次の版へ引き継ぎ、人数と固定した宛先は変えない。
+const ADVANCE_DELIVERY_CONFIRMATION_SQL = `message_options_json = CASE WHEN json_valid(message_options_json)
+  THEN CASE WHEN json_extract(message_options_json, '$.deliveryLimitConfirmation.version') = lock_version
+    AND json_extract(message_options_json, '$.deliveryLimitConfirmation.broadcastId') = id
+    THEN json_set(message_options_json, '$.deliveryLimitConfirmation.version', lock_version + 1)
+    ELSE message_options_json END ELSE message_options_json END`;
+
 export interface BroadcastStopInput {
   id: string;
   expectedVersion: number;
@@ -844,7 +852,7 @@ export async function requestBroadcastStop(
   const result = await db
     .prepare(
       `UPDATE broadcasts
-          SET stopped_at = ?, stopped_by = ?, lock_version = lock_version + 1
+          SET stopped_at = ?, stopped_by = ?, ${ADVANCE_DELIVERY_CONFIRMATION_SQL}, lock_version = lock_version + 1
         WHERE id = ? AND status = 'sending' AND stopped_at IS NULL AND lock_version = ?`,
     )
     .bind(input.at ?? jstNow(), input.actorId ?? null, input.id, input.expectedVersion)
@@ -867,6 +875,7 @@ export async function resumeBroadcastSending(
     'stopped_by = NULL',
     'batch_lock_at = NULL',
     'batch_offset = CASE WHEN batch_offset < 0 THEN 0 ELSE batch_offset END',
+    ADVANCE_DELIVERY_CONFIRMATION_SQL,
     'lock_version = lock_version + 1',
   ];
   const values: unknown[] = [];
@@ -915,6 +924,7 @@ export async function beginBroadcastRetryAttempt(
     'stopped_by = NULL',
     'batch_offset = 0',
     'batch_lock_at = NULL',
+    ADVANCE_DELIVERY_CONFIRMATION_SQL,
     'lock_version = lock_version + 1',
   ];
   const values: unknown[] = [];

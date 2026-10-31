@@ -171,7 +171,7 @@ export function renderBroadcastConfirmDialogs({ canConfirm, confirmationBlocked,
       sender={currentStep ? sendPreview.data?.sender ?? null : null}
       bodyHead={(currentStep && sendPreview.data?.firstText) || String(bubbles.find((b) => b.type === 'text')?.content.text ?? '') || `${TYPE_LABELS[bubbles[0]?.type ?? 'text'] ?? 'メッセージ'}を送ります`}
       bubbleCount={bubbles.length}
-      allRecipients={targetMode === 'all'}
+      allRecipients={targetMode === 'all' && !sendPreview.data?.stoppable}
       extraCaution={quotaInsufficient ? (quotaNote ?? undefined) : undefined}
       approval={needsApproval && approvalConfig ? { note: `${formatNumber(approvalConfig.threshold)} 人以上は承認が要る店です。承認されたら${sendMode === 'scheduled' && scheduledDate ? ` ${Number(scheduledDate.slice(5, 7))}/${Number(scheduledDate.slice(8, 10))} ${scheduledTime} に` : ''}送ります` } : null}
       confirmationFields={confirmationFields}

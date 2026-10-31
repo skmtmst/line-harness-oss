@@ -1,3 +1,4 @@
+import { storedDeliveryLimit, limitedDeliveryPlan, optionsWithDeliveryConfirmation } from '../features/broadcasts/broadcast-delivery-limit/index.js';
 import {staffName} from './broadcast-approval-actor.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
@@ -216,7 +217,7 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-request', inputJsonBoundar
       recipientCount: gate.recipientCount,
     }, 409);
   }
-  const body = await c.req.json<{ approverStaffId?: unknown; note?: unknown }>().catch(() => null);
+  const body = await c.req.json<{ approverStaffId?: unknown; note?: unknown; expectedVersion?: unknown; confirmedRecipientCount?: unknown }>().catch(() => null);
   const approverStaffId = typeof body?.approverStaffId === 'string' ? body.approverStaffId.trim() : '';
   if (!approverStaffId) {
     return inputError(c, { success: false, error: '承認をお願いする人を選んでください' }, 400, ["approverStaffId"]);
@@ -241,6 +242,14 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-request', inputJsonBoundar
     || !canApproveBroadcast(approverStaff)) {
     return inputError(c, { success: false, error: '承認できる人を選んでください' }, 400, ["approverStaffId"]);
   }
+  let confirmationOptions = broadcast.message_options_json ?? null;
+  if (storedDeliveryLimit(broadcast)) {
+    try {
+      const plan = await limitedDeliveryPlan(c.env.DB,broadcast,{requireConfirmation:false});
+      if (body?.expectedVersion !== (broadcast.lock_version ?? 1) || body.confirmedRecipientCount !== plan!.recipientCount) return c.json({success:false,code:'SEND_PREVIEW_CHANGED',error:'上限人数と送る相手をもう一度確かめてください。'},409);
+      confirmationOptions = optionsWithDeliveryConfirmation(broadcast,plan!.recipientCount,broadcast.lock_version ?? 1);
+    } catch(error) { return c.json({success:false,error:error instanceof Error?error.message:'上限人数を確認できませんでした。'},409); }
+  }
   const note = typeof body?.note === 'string' ? body.note.trim().slice(0, 500) : '';
   const now = new Date().toISOString();
   // pending のまま二重に頼めない。差し戻し・取消・期限切れのあとは頼み直せる。
@@ -254,10 +263,10 @@ broadcastApprovals.post('/api/broadcasts/:id/approval-request', inputJsonBoundar
               approval_decided_by_staff_id = NULL,
               approval_decided_at = NULL,
               approval_reject_reason = NULL,
-              approval_confirmed_count = NULL
+              approval_confirmed_count = NULL, message_options_json = ?
         WHERE id = ? AND approval_status IN ('none', 'rejected', 'cancelled', 'expired')
           AND status IN ('draft', 'scheduled') AND lock_version = ?`,
-  ).bind(staff?.id ?? '', now, approverStaffId, note || null, broadcast.id, broadcast.lock_version ?? 1).run();
+  ).bind(staff?.id ?? '', now, approverStaffId, note || null, confirmationOptions, broadcast.id, broadcast.lock_version ?? 1).run();
   if (!claimed.meta.changes) {
     return c.json({ success: false, error: 'すでに承認の依頼中です。状態を読み直してください。', code: 'ALREADY_REQUESTED' }, 409);
   }

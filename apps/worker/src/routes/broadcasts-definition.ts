@@ -6,7 +6,7 @@ import type { BroadcastDisplayStatus } from '@line-crm/db';
 import type { Broadcast as DbBroadcast, BroadcastMessageType, BroadcastTargetType } from '@line-crm/db';
 import { LineClient } from '@line-crm/line-sdk';
 import { processQueuedBroadcasts } from '../features/broadcasts/broadcast/index.js';
-import type { SegmentCondition } from '@line-crm/shared';
+import { parseBroadcastDeliveryLimit, type SegmentCondition } from '@line-crm/shared';
 import { assertAnalyticsAudiencesUsable, BroadcastAudienceError } from '../services/segment-audience-guard.js';
 import type { Env } from '../worker-env.js';
 import { hasStaffPermission } from '../middleware/role-guard.js';
@@ -109,6 +109,7 @@ export type CreateBroadcastBody = {
   draftStep?: 'basic' | 'audience' | 'message' | 'schedule' | 'confirm';
   internalMemo?: string | null;
   messageOptions?: unknown;
+  confirmedRecipientCount?: unknown;
   afterActionVersionId?: string | null;
 };
 
@@ -128,7 +129,9 @@ export const BROADCAST_ONLY_CONDITION_AXES = [
 export function validateMessageOptions(value: unknown): string | null {
   if (value === undefined || value === null) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) return 'ボタンの設定を読み込めませんでした';
-  const options = value as { buttons?: unknown; resources?: unknown };
+  const options = value as { buttons?: unknown; resources?: unknown; deliveryLimit?: unknown; deliveryLimitConfirmation?: unknown };
+  if (options.deliveryLimitConfirmation !== undefined) return '送信前の確認をやり直してください。';
+  try { parseBroadcastDeliveryLimit(options.deliveryLimit); } catch (error) { return error instanceof Error ? error.message : '上限人数を確認してください。'; }
   if (options.buttons !== undefined) {
     // 監査 : 番号と不足項目を日本語で返す。画面の検査と文言をそろえる。
     if (!Array.isArray(options.buttons) || options.buttons.length > 4) return 'ボタンは4つまでです';
@@ -224,6 +227,14 @@ async function checkSendableAfterActionVersion(
   return { ok: true };
 }
 
+function publicMessageOptions(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const options = parseJsonObject(value);
+  if (!options) return null;
+  delete options.deliveryLimitConfirmation;
+  return JSON.stringify(options);
+}
+
 export function sameCreateRequest(existing: DbBroadcast, body: CreateBroadcastBody): boolean {
   const existingAccountIds = parseJsonArray(existing.account_ids) ?? [];
   const existingPriority = parseJsonArray(existing.dedup_priority) ?? [];
@@ -241,7 +252,7 @@ export function sameCreateRequest(existing: DbBroadcast, body: CreateBroadcastBo
     && existing.track_links === (body.trackLinks === false ? 0 : 1)
     && (existing.internal_memo ?? null) === (body.internalMemo ?? null)
     && (existing.draft_step ?? null) === (body.draftStep ?? null)
-    && (existing.message_options_json ?? null) === (body.messageOptions == null ? null : JSON.stringify(body.messageOptions))
+    && publicMessageOptions(existing.message_options_json) === (body.messageOptions == null ? null : JSON.stringify(body.messageOptions))
     && (existing.after_action_version_id ?? null) === (body.afterActionVersionId ?? null);
 }
 
@@ -300,7 +311,7 @@ export function serializeBroadcast(row: DbBroadcast) {
     internalMemo: (r.internal_memo as string | null | undefined) ?? null,
     draftStep: (r.draft_step as string | null | undefined) ?? null,
     draftPayload: parseJsonObject(r.draft_payload_json),
-    messageOptions: parseJsonObject(r.message_options_json),
+    messageOptions: parseJsonObject(publicMessageOptions(r.message_options_json as string | null)),
     afterActionVersionId: (r.after_action_version_id as string | null | undefined) ?? null,
     version: Number(r.lock_version ?? 1),
     /*

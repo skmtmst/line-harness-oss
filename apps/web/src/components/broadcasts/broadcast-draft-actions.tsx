@@ -1,5 +1,7 @@
 'use client'
 
+import type { BroadcastDeliveryLimit } from '@line-crm/shared'
+
 import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 
 
@@ -17,6 +19,7 @@ type BuildBroadcastDraftContext = {
   folderId: string
   internalMemo: string
   measureOpens: boolean
+  deliveryLimit?: BroadcastDeliveryLimit
   messageButtons: BroadcastMessageButton[]
   selectedAccountId: string | null
   spreadMinutes: string
@@ -25,7 +28,7 @@ type BuildBroadcastDraftContext = {
   trackLinks: boolean
 }
 
-export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, selectedAccountId, spreadMinutes, targetPayload, title, trackLinks }: BuildBroadcastDraftContext, scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) {
+export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, deliveryLimit, selectedAccountId, spreadMinutes, targetPayload, title, trackLinks }: BuildBroadcastDraftContext, scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) {
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     return {
@@ -43,7 +46,7 @@ export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep
       measureOpens,
       stealthSpreadMinutes: Number(spreadMinutes) || 0,
       internalMemo: internalMemo.trim() || null,
-      messageOptions: messageButtons.length > 0 ? { buttons: messageButtons } : null,
+      messageOptions: messageButtons.length || deliveryLimit ? { ...(messageButtons.length ? {buttons:messageButtons} : {}), ...(deliveryLimit ? {deliveryLimit} : {}) } : null,
       afterActionVersionId: afterActionVersionId || null,
       ...(saveAsDraft ? {
         saveAsDraft: true,

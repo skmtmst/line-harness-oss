@@ -11,7 +11,7 @@ import { tracedFetch as fetch } from '@line-crm/shared/server';
  * 送った人と送れなかった人が混ざり、運用者は結果を見るまで気づけない。
  * 足りないと分かった時点で送らないほうが、あとから追いかけやすい。
  *
- * **取れないときは止めない。** LINE の口が落ちているだけで予約を潰すと、
+ * **上限を指定しない配信は、取れないときは止めない。** LINE の口が落ちているだけで予約を潰すと、
  * 送れるはずの配信が届かなくなる。分からないものは分からないと記録して
  * 通す（`state: 'unknown'`）。
  */
@@ -32,9 +32,8 @@ type QuotaFetch = {
 /**
  * 残りの枠と、これから送る通数を突き合わせる。
  *
- * **1人1通で数える。** 吹き出しを複数持つ配信でも、LINE の集計は
- * 「送った人数」ではなく「送ったメッセージ数」なので、呼ぶ側が
- * 通数を渡す。
+ * **1人につき1回分で数える。** 1つの送信リクエストに吹き出しが
+ * 複数あっても重ねて数えず、送る宛先の人数を渡す。
  */
 export function evaluateQuota(fetched: QuotaFetch, planned: number): QuotaCheck {
   if (fetched.limit === null) {
@@ -71,29 +70,46 @@ export function shortfallMessage(check: Extract<QuotaCheck, { state: 'short' }>,
   )
 }
 
-/** LINE から上限と使用数を読む。**落ちても投げない**（`null` にして呼ぶ側で判断する）。 */
-export async function fetchQuota(channelAccessToken: string): Promise<QuotaFetch> {
-  const headers = { Authorization: `Bearer ${channelAccessToken}` };
-  const read = async (path: string, pick: (json: Record<string, unknown>) => number | null) => {
+export type QuotaFailure = { endpoint: 'quota' | 'consumption'; code: 'not_connected' | 'authentication' | 'rate_limit' | 'unavailable' | 'invalid_response' };
+export type QuotaDetails = QuotaFetch & { unlimited: boolean; failures: QuotaFailure[]; reason: string | null };
+
+/** 外部の応答本文や秘密値を残さず、接続設定で直せる失敗を区別する。 */
+export async function fetchQuotaDetails(channelAccessToken: string): Promise<QuotaDetails> {
+  const failures: QuotaFailure[] = [];
+  const failed = (endpoint: QuotaFailure['endpoint'], code: QuotaFailure['code']) => { failures.push({ endpoint, code }); return null; };
+  const read = async (endpoint: QuotaFailure['endpoint']): Promise<Record<string, unknown> | null> => {
+    if (!channelAccessToken?.trim()) return failed(endpoint, 'not_connected');
     try {
-      const res = await fetch(`https://api.line.me/v2/bot/message/${path}`, {
-        headers,
-        signal: AbortSignal.timeout(10_000),
+      const response = await fetch(`https://api.line.me/v2/bot/message/${endpoint === 'quota' ? 'quota' : 'quota/consumption'}`, {
+        headers: { Authorization: `Bearer ${channelAccessToken}` }, signal: AbortSignal.timeout(10_000),
       });
-      if (!res.ok) return null;
-      return pick((await res.json()) as Record<string, unknown>);
-    } catch {
-      return null;
-    }
+      if (!response.ok) return failed(endpoint, response.status === 401 || response.status === 403 ? 'authentication'
+        : response.status === 429 ? 'rate_limit' : 'unavailable');
+      const data: unknown = await response.json();
+      if (!data || typeof data !== 'object' || Array.isArray(data)) return failed(endpoint, 'invalid_response');
+      return data as Record<string, unknown>;
+    } catch { return failed(endpoint, 'unavailable'); }
   };
-  const [limit, used] = await Promise.all([
-    read('quota', (json) =>
-      json.type === 'limited' && typeof json.value === 'number' ? json.value : null,
-    ),
-    read('quota/consumption', (json) =>
-      typeof json.totalUsage === 'number' ? json.totalUsage : null,
-    ),
-  ]);
+  const [quota, consumption] = await Promise.all([read('quota'), read('consumption')]);
+  const unlimited = quota?.type === 'none';
+  const validNumber = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+  const limit = quota?.type === 'limited' && validNumber(quota.value) ? quota.value : null;
+  const used = consumption && validNumber(consumption.totalUsage) ? consumption.totalUsage : null;
+  if (quota && !unlimited && limit === null) failed('quota', 'invalid_response');
+  if (consumption && used === null) failed('consumption', 'invalid_response');
+  const reason = failures.some(failure => failure.code === 'not_connected')
+    ? 'LINEの接続に必要な鍵が未設定です。LINEの設定で発行し、接続設定に入れてください。'
+    : failures.some(failure => failure.code === 'authentication')
+      ? 'LINEの接続用の鍵が受け付けられていません。LINEの設定で鍵を発行し直し、接続設定に入れ直してください。'
+    : failures.some(failure => failure.code === 'rate_limit')
+      ? 'LINEへの確認が混み合っています。少し待って、もう一度確かめてください。'
+      : failures.length ? 'LINEから送信枠を確認できませんでした。時間を置いて、もう一度確かめてください。' : null;
+  return { limit, used, unlimited, failures, reason };
+}
+
+/** 従来の呼び出し口は数だけを返し、失敗を例外にしない。 */
+export async function fetchQuota(channelAccessToken: string): Promise<QuotaFetch> {
+  const { limit, used } = await fetchQuotaDetails(channelAccessToken);
   return { limit, used };
 }
 
@@ -138,6 +154,7 @@ export async function tryReserveQuotaSlot(
   planned: number,
   used: number,
   limit: number,
+  options?: { replaceOwn?: boolean },
 ): Promise<boolean> {
   const now = Date.now();
   for (let attempt = 0; attempt < QUOTA_RESERVATION_RETRIES; attempt++) {
@@ -147,7 +164,7 @@ export async function tryReserveQuotaSlot(
     const active = parseQuotaReservations(row?.value).filter(
       (entry) => now - entry.reservedAt < QUOTA_RESERVATION_TTL_MS,
     );
-    const reserved = active.reduce((sum, entry) => sum + entry.planned, 0);
+    const reserved = active.filter(entry => !options?.replaceOwn || entry.broadcastId !== broadcastId).reduce((sum, entry) => sum + entry.planned, 0);
     if (used + reserved + planned > limit) return false;
     const next = [
       ...active.filter((entry) => entry.broadcastId !== broadcastId),

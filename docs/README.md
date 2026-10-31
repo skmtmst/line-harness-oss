@@ -1094,3 +1094,5 @@
 - [反映履歴：検証配備の未適用変更の確認](release-log/unreleased/2018-masato-cf-staging-deploy-pending.md) — 運用者向けの説明、確認2026-10-31。
 - [反映履歴：検証管理画面の配備手順](release-log/unreleased/2020-masato-cf-pages-doc.md) — 運用者向けの説明、確認2026-10-31。
 - [反映履歴：検証配備の再試行](release-log/unreleased/2021-masato-cf-staging-deploy-retry.md) — 運用者向けの説明、確認2026-10-31。
+
+- [反映履歴：送る人数の上限と送信枠の確認](release-log/unreleased/0000-kenta-broadcast-recipient-limit.md) — 運用者向けの説明、確認 2026-11-01。
