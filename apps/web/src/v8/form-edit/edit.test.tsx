@@ -128,6 +128,53 @@ afterEach(() => {
 })
 
 describe('回答フォームの編集（V8）', () => {
+  it('中身から名前を変え、タブを替えても同じ値を保存して読み直せる', async () => {
+    await render('id=form-1')
+    const input = screen.getByLabelText('フォーム名') as HTMLInputElement
+    expect(input.value).toBe(formData.name)
+    fireEvent.change(input, { target: { value: '秋のアンケート' } })
+    expect(screen.getByRole('heading', { name: '秋のアンケート', exact: true })).toBeTruthy()
+    fireEvent.click(screen.getByRole('tab', { name: '受付と見た目' }))
+    expect((screen.getByLabelText('フォーム名') as HTMLInputElement).value).toBe('秋のアンケート')
+    fireEvent.click(screen.getByRole('tab', { name: '中身' }))
+    expect((screen.getByLabelText('フォーム名') as HTMLInputElement).value).toBe('秋のアンケート')
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledWith('form-1', 'acc-1', expect.objectContaining({ name: '秋のアンケート', expectedContentRevision: 7 })))
+    await screen.findByText('下書きを保存しました')
+    formsGet.mockResolvedValue({ success: true, data: { ...structuredClone(formData), name: '秋のアンケート', contentRevision: 8 } })
+    act(() => root.unmount())
+    root = createRoot(host)
+    await render('id=form-1')
+    expect((screen.getByLabelText('フォーム名') as HTMLInputElement).value).toBe('秋のアンケート')
+  })
+
+  it('中身の名前の入力と欄の理由を、保存が失敗しても残す', async () => {
+    formsUpdate.mockRejectedValue(new ApiError(503, 'offline'))
+    await render('id=form-1')
+    const input = screen.getByLabelText('フォーム名') as HTMLInputElement
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.blur(input)
+    expect(screen.getByRole('alert').textContent).toBe('フォーム名を入力してください')
+    fireEvent.change(input, { target: { value: '保存したい名前' } })
+    expect(screen.queryByText('フォーム名を入力してください')).toBeNull()
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledOnce())
+    expect(input.value).toBe('保存したい名前')
+    expect(formsPublish).not.toHaveBeenCalled()
+  })
+
+  it('統括でも中身の名前を同じ保存口へ渡す', async () => {
+    navigation.query = 'tab=basic'
+    const onSave = vi.fn(async () => true)
+    act(() => root.render(<FormEditV8 host={{ initial: { name: '店向けのひな形', description: '', layout: emptyLayout(), onSubmitTagId: '' }, refs: EMPTY_REFS, accountName: 'ひな形', backHref: '/hq/form-submissions', statusLine: '下書き', distributedLine: 'まだ配っていません', busy: false, onSave, onCancel: vi.fn() }} />))
+    const input = await screen.findByLabelText('フォーム名')
+    fireEvent.change(input, { target: { value: '季節のひな形' } })
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ name: '季節のひな形' }), false))
+    expect(formsUpdate).not.toHaveBeenCalled()
+    expect(formsGet).not.toHaveBeenCalled()
+  })
+
   it('フォーム名の読み込み中は編集の題を出し、読めた名前を帯と本文へ渡す', async () => {
     let resolveForm!: (value: unknown) => void
     formsGet.mockImplementation(() => new Promise(resolve => { resolveForm = resolve }))
@@ -366,7 +413,7 @@ describe('回答フォームの編集（V8）', () => {
     expect(screen.queryByText('タイトルが空のブロックがあります')).toBeNull()
   })
 
-  it('フォーム名が空のまま中身のタブで保存すると、受付と見た目のタブを開いて名前の欄へ移る', async () => {
+  it('フォーム名が空のまま中身のタブで保存すると、その名前の欄へ移る', async () => {
     formsGet.mockImplementation(async () => ({ success: true, data: { ...structuredClone(formData), name: '' } }))
     await render('id=form-1')
     await screen.findByText('ページ1 のブロック')
@@ -377,7 +424,7 @@ describe('回答フォームの編集（V8）', () => {
     expect(name).toBeTruthy()
     expect(name.getAttribute('aria-invalid')).toBe('true')
     expect(document.activeElement).toBe(name)
-    const tab = screen.getByRole('tab', { name: /受付と見た目/ })
+    const tab = screen.getByRole('tab', { name: '中身 中身に直す欄が1か所', exact: true })
     expect(tab.getAttribute('aria-selected')).toBe('true')
     expect(tab.querySelector('[data-design-part="error-count-badge"]')?.textContent).toBe('1')
   })

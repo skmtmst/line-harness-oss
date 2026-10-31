@@ -39,7 +39,8 @@ import type { FormEditHost } from './host';
 import { conflictMessage, conflictTitle, describeConflictDiff, describePublishChanges, firstInputBlockId, formSavedContentMatches, ogImageUrlError, readPage, readTab, type ConflictSide, type EditTab, type FormSavedContent } from './model';
 import { ContentTab } from './content-tab';
 import { AfterTab } from './after-tab';
-import { AppearanceTab, formNameRequirement } from './appearance-tab';
+import { AppearanceTab } from './appearance-tab';
+import { FormNameField, formNameRequirement } from './form-name-field';
 import { FormEditAttemptContext } from './field-issues';
 import { focusFieldById } from '@/lib/use-form-errors';
 import { useCustomerLook } from '@/components/shared/use-customer-look';
@@ -85,6 +86,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* 統括から使うときは、最初の描画から読み込んだ中身で出す（空の一瞬に保存を押させない）。 */
   const [name, setName] = useState(() => host?.initial.name ?? '')
   const [nameError, setNameError] = useState<string | null>(null)
+  const changeName = (next: string) => {
+    setName(next)
+    if (next.trim()) setNameError(null)
+  }
+  const blurName = () => setNameError(name.trim() ? null : 'フォーム名を入力してください')
   const [description, setDescription] = useState(() => host?.initial.description ?? '')
   const [isActive, setIsActive] = useState(!host && !draftToken)
   const [submitCount, setSubmitCount] = useState(0)
@@ -363,7 +369,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const blocks = useMemo(() => layout.sections[page]?.blocks ?? [], [layout, page])
   /* タブの札の赤い印。保存を押したあとだけ、そのタブの直す欄の数を出す。 */
   const tabErrors: Record<EditTab, number> = attempted ? {
-    content: layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input' && !b.label.trim()).length, 0),
+    content: (name.trim() ? 0 : 1) + layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input' && !b.label.trim()).length, 0),
     after: 0,
     appearance: (name.trim() ? 0 : 1) + (ogImageUrlError(ogImageUrl) ? 1 : 0) + (formThemeContrastError(resolveCustomerFormTheme(layout.options,customerLook.look ?? undefined)) ? 1 : 0),
   } : { content: 0, after: 0, appearance: 0 }
@@ -526,7 +532,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   type SaveProblem = { message: string; name?: boolean; tab?: EditTab; target?: string; page?: number; blockId?: string; inline?: boolean }
   const saveProblem = (publishAfter: boolean): SaveProblem | null => {
     if (!host && !selectedAccountId) return { message: 'LINE公式アカウントを選んでください' }
-    if (formNameRequirement.check(name)) return { message: 'フォーム名を入力してください', name: true, tab: 'appearance', target: 'fe-name', inline: true }
+    if (formNameRequirement.check(name)) return { message: 'フォーム名を入力してください', name: true, tab: editTab === 'content' ? 'content' : 'appearance', target: 'fe-name', inline: true }
     const allBlocks = layout.header.concat(layout.sections.flatMap((s) => s.blocks))
     const untitledPage = layout.sections.findIndex((s) => s.blocks.some((b) => b.kind === 'input' && !b.label.trim()))
     if (untitledPage >= 0) {
@@ -979,6 +985,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         ) : editTab === 'content' ? (
           <ContentTab
             readOnly={!canEdit}
+            nameField={<FormNameField value={name} error={nameError} readOnly={!canEdit} onChange={changeName} onBlur={blurName} />}
             layout={layout}
             page={page}
             blocks={blocks}
@@ -1019,11 +1026,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             ogDescription={ogDescription}
             ogImageUrl={ogImageUrl}
             onChangeOptions={patchOptions}
-            onChangeName={(next) => {
-              setName(next)
-              if (next.trim()) setNameError(null)
-            }}
-            onBlurName={() => setNameError(name.trim() ? null : 'フォーム名を入力してください')}
+            onChangeName={changeName}
+            onBlurName={blurName}
             onChangeDescription={setDescription}
             onChangeOgTitle={setOgTitle}
             onChangeOgDescription={setOgDescription}
