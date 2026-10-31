@@ -258,7 +258,7 @@ export function useAutomationSave({
        * 重なったら帯で知らせる。自分の入力は残す。
        */
       if (!forcedVersion && saved.data.draftVersionId !== res.data.draftVersionId) {
-        if (await recordConflict(draft.id, accountId)) return
+        if (await recordConflict(draft.id, accountId)) return false
         throw new ApiError(
           409,
           'ほかの人が同じ下書きを保存しました。内容を確かめてから、もう一度お試しください',
@@ -308,7 +308,7 @@ export function useAutomationSave({
         if (selectedAccountRef.current === accountId) {
           notifySaved('下書きに保存しました。見込み人数を確認して、1人で試せます。')
         }
-        return
+        return selectedAccountRef.current === accountId ? true : undefined
       }
       /*
        * R483: 新規作成の下書きは状態が draft のはず。読み取り後の停止・再開を
@@ -340,6 +340,7 @@ export function useAutomationSave({
           }
         }
       }
+      return selectedAccountRef.current === accountId && saveTicketRef.current[accountId] === saveTicket ? true : undefined
     } catch (caught) {
       const fieldFailure = saveErrors.capture(caught)
       /*
@@ -356,9 +357,9 @@ export function useAutomationSave({
           if (selectedAccountRef.current === accountId) {
             setSaveOutcome('failed')
             { if (!fieldFailure)
-            setError('') }
+            setError('ほかの人が先に保存しました。閉じて最新の内容と比べてください。') }
           }
-          return
+          return false
         }
       }
       // 下書き自体が無くなっていたら控えを捨て、次は作り直す（N-357）。
@@ -396,7 +397,7 @@ export function useAutomationSave({
             }
             saveRunningRef.current = false
             setSaving(false)
-            return
+            return selectedAccountRef.current === accountId ? true : undefined
           }
         }
         if (accountId) {
@@ -446,6 +447,7 @@ export function useAutomationSave({
           ) }
         }
       }
+      return selectedAccountRef.current === accountId ? false : undefined
     } finally {
       saveRunningRef.current = false
       setSaving(false)

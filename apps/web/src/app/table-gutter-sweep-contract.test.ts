@@ -106,9 +106,8 @@ describe('表の外側の余白の洗い出し', () => {
   it('/duplicates：外側は見出しの余白にそろえ、操作は右へ寄せる', () => {
     const body = code(read("app/duplicates/list-screen.tsx"))
     expect(body).toContain('<th>操作</th>')
-    expect(body).toContain('className={styles.linkAction}')
     expect(read("app/friends/friends-v8.module.css")).toContain('.table td')
-    expect(read("app/friends/friends-v8.module.css")).toContain('.linkAction')
+    // 操作のリンク・色・折り返しは text-button-style.test.mjs で実ページを描き、故障と復元も確かめる。
     expect(body).toContain('candidate.left.label')
     expect(body).toContain('candidate.right.label')
 

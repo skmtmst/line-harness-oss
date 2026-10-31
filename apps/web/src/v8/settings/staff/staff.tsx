@@ -186,19 +186,23 @@ function SessionsCard() {
       if (isCurrent) {
         // 自分のセッションを消したので、この画面はもう使えない。ログインへ戻す。
         window.location.assign('/login')
-        return
+        return true
       }
       notifyToast('その端末のログインを終了しました')
       await load()
-    } catch (caught) { setError(messageOf(caught)) } finally { setRevokingId(null) }
+      return true
+    } catch (caught) { setError(messageOf(caught)); return false } finally { setRevokingId(null) }
   }
   const revokeOthers = async () => {
     setRevokingId('others'); setError('')
     try {
       const res = await api.sessions.revokeOthers()
+      if (!res.success) throw new Error(res.error)
+      setConfirmOthers(false)
       if (res.success) { notifyToast(res.data.revoked > 0 ? `この端末以外の ${res.data.revoked} 件のログインを終了しました` : '他にログイン中の端末はありませんでした') }
       await load()
-    } catch (caught) { setError(messageOf(caught)) } finally { setRevokingId(null); setConfirmOthers(false) }
+      return true
+    } catch (caught) { setError(messageOf(caught)); return false } finally { setRevokingId(null) }
   }
   const deviceLabel = (userAgent: string | null): string => {
     if (!userAgent) return '端末情報なし'
@@ -208,14 +212,14 @@ function SessionsCard() {
   }
   return <section className="rounded-card border content-card bg-canvas p-4" aria-label="ログイン中の端末">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-sm font-bold text-ink">ログイン中の端末</h2><p className="mt-1 text-xs text-ink-secondary">あなたのアカウントでいまログインしている端末です。見覚えのない端末があれば「ログインを終了」で切り離せます。</p></div>
-      {sessions && sessions.length > 1 && <Button variant="secondary" onClick={() => setConfirmOthers(true)}>この端末以外をすべて終了</Button>}</div>
+      {sessions && sessions.length > 1 && <Button variant="secondary" onClick={() => { setError(''); setConfirmOthers(true) }}>この端末以外をすべて終了</Button>}</div>
     {error && <Notice tone="danger" className="mt-3" message={error} />}
     {sessions === null ? <p className="mt-3 text-xs text-ink-faint">読み込んでいます…</p> : sessions.length === 0 ? <p className="mt-3 text-xs text-ink-faint">ログイン中の端末はありません。</p> : (
       <ul className="mt-3 divide-y divide-hairline">
         {sessions.map((session) => <li key={session.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
           <div className="min-w-0"><p className="truncate text-sm font-medium text-ink" title={session.userAgent ?? undefined}>{deviceLabel(session.userAgent)}{session.current && <span className="ml-2 rounded-pill bg-accent-soft px-2 py-0.5 text-xs font-semibold text-accent-deep">この端末</span>}</p>
             <p className="mt-0.5 text-xs text-ink-faint">ログイン：{formatStaffDate(session.createdAt)}{session.ipPrefix ? `・接続元：${session.ipPrefix}` : ''}</p></div>
-          <Button variant="secondary" disabled={revokingId === session.id} onClick={() => (session.current ? setConfirmCurrent(true) : void revoke(session.id, false))} busy={revokingId === session.id} busyLabel="終了中…">ログインを終了</Button>
+          <Button variant="secondary" disabled={revokingId === session.id} onClick={() => { setError(''); if (session.current) setConfirmCurrent(true); else void revoke(session.id, false) }} busy={revokingId === session.id} busyLabel="終了中…">ログインを終了</Button>
         </li>)}
       </ul>
     )}
@@ -225,7 +229,7 @@ function SessionsCard() {
       description="いま使っているこの端末のログインが終わり、ログイン画面へ戻ります。"
       confirmLabel="この端末を終了する"
       busy={revokingId === sessions?.find((s) => s.current)?.id}
-      onConfirm={() => { const current = sessions?.find((s) => s.current); if (current) { setConfirmCurrent(false); void revoke(current.id, true) } }}
+      error={error || undefined} onSuccess={() => setConfirmCurrent(false)} onConfirm={() => { const current = sessions?.find(s => s.current); return current ? revoke(current.id, true) : undefined }}
       onCancel={() => setConfirmCurrent(false)}
     />
     <ConfirmDialog
@@ -234,7 +238,7 @@ function SessionsCard() {
       description="他の端末はすべてログイン画面へ戻ります。この端末のログインは続きます。"
       confirmLabel="すべて終了する"
       busy={revokingId === 'others'}
-      onConfirm={() => revokeOthers()}
+      error={error || undefined} onSuccess={() => setConfirmOthers(false)} onConfirm={() => revokeOthers()}
       onCancel={() => { if (revokingId === 'others') return; setConfirmOthers(false) }}
     />
   </section>
@@ -536,7 +540,7 @@ function PermissionScopeView({ user, memberId, canSave, copyCandidates, roleCoun
   return <SaveErrorScope errors={saveErrors}><div data-design-node="EOTS4" className="flex flex-col gap-4 pb-28">
     <UnsavedLeaveDialog open={leaveGuard.leaveTarget !== null} onConfirm={leaveGuard.confirmLeave} onCancel={leaveGuard.cancelLeave} busy={saving} />
     {/* カード同士の縦の間隔はこの親の gap-4（16px）だけで作る。子ごとの mb/mt は付けない。 */}
-    <div className="flex items-center justify-between"><nav className="text-xs text-ink-faint"><Button variant="text" size="inline" onClick={() => leaveGuard.guarded(onClose)}>ログインユーザー</Button>　›　<span className="font-semibold text-action">{user.name}</span>　›　見せる範囲</nav>{writable ? <Button variant="secondary" disabled={copyCandidates.length === 0} onClick={() => setCopyOpen((current) => !current)}>ほかの人と同じにする</Button> : null}</div>
+    <div className="flex items-center justify-between"><nav className="text-xs text-ink-faint"><Button variant="text" textTone="ink" size="inline" onClick={() => leaveGuard.guarded(onClose)}>ログインユーザー</Button>　›　<span className="font-semibold text-action">{user.name}</span>　›　見せる範囲</nav>{writable ? <Button variant="secondary" disabled={copyCandidates.length === 0} onClick={() => setCopyOpen((current) => !current)}>ほかの人と同じにする</Button> : null}</div>
     {copyOpen && <section className="rounded-card border border-hairline bg-canvas p-4" aria-label="ほかの人の権限をコピー"><p className="mb-2 text-xs text-ink-secondary">同じ組織の人を選ぶと、その人の権限のかたまりを下書きへ反映します。コピーするとすべての行がコピー元の内容に置き換わり、一部だけ許可の細かい設定は残りません。</p><SaveErrorField names={["copySourceId","copy_source_id"]}><EntitySelect aria-label="コピー元のログインユーザー" value={copySourceId} onChange={copyBundle} size="full" options={[{ value: '', label: 'コピー元を選ぶ', disabled: true }, ...copyCandidates.map((candidate) => ({ ...entityOptionMetadata(candidate), value: candidate.id, label: `${candidate.name}（${ACCESS_ROLE_LABEL[candidate.roleBundle]}）` }))]} /></SaveErrorField>{copyNotice && <p className="mt-2 text-xs font-medium text-success" role="status">{copyNotice}</p>}</section>}
     {/*
       LAY-07: 狭い幅は1列で「いまの権限→変更項目→影響の確認」の順にする。

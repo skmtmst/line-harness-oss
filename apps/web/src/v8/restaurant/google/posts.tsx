@@ -174,8 +174,10 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
       await restaurantGoogleApi.removePost(accountId, confirmRemove.id)
       setConfirmRemove(null)
       await load()
+      return true
     } catch (err) {
       setActionError(errorMessage(err, '削除できませんでした。'))
+      return false
     } finally {
       setBusyId(null)
     }
@@ -205,7 +207,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
     if (post.status === 'published' && post.searchUrl) items.push({ id: 'google', label: 'Googleで表示', group: 'view', external: true, href: post.searchUrl ?? '' })
     if (post.status === 'draft') items.push({ id: 'cancel', label: '取り消す', disabled: busyId === post.id, onSelect: () => void cancelDraft(post) })
     if (post.instagram?.status === 'failed') items.push({ id: 'ig-retry', label: 'Instagram へ再送', lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => void retryInstagram(post) })
-    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublish) setConfirmRemove(post) } })
+    if (post.status === 'published') items.push({ id: 'remove', label: 'Google から削除', tone: 'danger', dividerBefore: true, lockedReason: publishReason, disabled: !canPublish || busyId === post.id, onSelect: () => { if (canPublish) { setActionError(''); setConfirmRemove(post) } } })
     if (!canView) return items.map(item => ({ ...item, disabled: true, lockedReason: undefined }))
     return lockMenuItems(canSync, items, 'feature', item => item.id === 'open' || item.id === 'google')
   }
@@ -272,7 +274,7 @@ export function PostsBoard({ accountId, go }: { accountId: string; go: GoogleNav
         confirmLabel="削除する"
         destructive
         busy={busyId === confirmRemove?.id}
-        onConfirm={() => removePost()}
+        error={actionError || undefined} onSuccess={() => setConfirmRemove(null)} onConfirm={() => removePost()}
         onCancel={() => setConfirmRemove(null)}
       />
     </>

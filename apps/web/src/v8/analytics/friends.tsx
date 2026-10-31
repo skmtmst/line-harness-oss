@@ -1,5 +1,6 @@
 'use client'
 
+import TextLink from '@/components/shared/text-link'
 import { BarChart, BarChartEventMark, BarChartLegend, toBarChartItems } from '@/components/shared/bar-chart'
 
 /*
@@ -9,7 +10,6 @@ import { BarChart, BarChartEventMark, BarChartLegend, toBarChartItems } from '@/
  * 呼ぶ口・数の出し方は今の画面（app/analytics/page.tsx の FriendsOverviewTab）と同じ。
  */
 import { useState } from 'react'
-import Link from '@/components/shared/list-navigation'
 import { ArrowLeftRight, CircleHelp, UserMinus, Users } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
@@ -114,7 +114,7 @@ export default function FriendsV8({ accountId }: { accountId: string }) {
           <Card variant="form" padding="roomy" layout="vertical" gap="normal" aria-labelledby="friends-routes-title">
             <CardHeader size="stacked" titleId="friends-routes-title" title="どこから増えたか" meta={`流入リンクごと・${periodLabel}`} />
             <RouteBreakdown accountId={accountId} from={range.from} to={range.to} />
-            <Link href="/inflow-links" className={styles.more}>流入と計測で詳しく見る →</Link>
+            <TextLink href="/inflow-links">流入と計測で詳しく見る</TextLink>
           </Card>
           <Card variant="form" padding="roomy" layout="vertical" gap="normal" aria-labelledby="friends-removed-title">
             <CardHeader size="stacked" titleId="friends-removed-title" title="減った友だち" help={<HelpTip label="減った友だちの説明">ブロックと友だち解除を合わせた人数です。ブロックだけの内訳は未取得です。</HelpTip>} />
