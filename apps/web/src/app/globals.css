@@ -584,53 +584,13 @@
   --polish-weight-label: 500;
 }
 :root {
-  --polish-space-row: 8px;
-  --polish-control-bg: #f0f0f2; --polish-control-hover: #e8e8eb; --polish-control-text: 13px; --polish-control-weight: 500; --polish-value-weight: 600;
-  --polish-selection-bg: #f0f0f2; --polish-selection-ink: var(--color-ink); --polish-selection-shadow: var(--shadow-nav-active); --polish-selection-outline: 1px solid var(--color-control-border); --polish-band-radius: 16px;
-  --polish-band-shadow: 0 1px 3px rgb(29 29 31 / 0.06); --polish-nav-tracking: 0.06em; --polish-heading-tracking: 0.02em; --polish-icon-small: 16px; --polish-icon-large: 20px; --polish-text-center-inset: 1px; --tpl-tabs-center-inset: 2px; --tpl-funnel-window-min-width: 208px; --tpl-cv-period-preview-width: 320px; --tpl-cv-period-content-width: 288px;
-  --polish-space-field: 12px;
-  --polish-space-card: 16px;
-  --polish-space-section: 24px;
-}
-
-/* スタイルのデモ内に縮小した設定画面の寸法と色。 */
-:root {
-  --tpl-style-demo-heading-size: 24px;
-  --tpl-style-demo-title-icon-offset: 3px;
-  --tpl-style-demo-progress-height: 4px;
-  --tpl-style-demo-header-title-offset: 4px;
-  --tpl-style-demo-pointer-anchor-offset: 4px;
-  --tpl-style-demo-pointer-hand-x: 3px;
-  --tpl-style-demo-pointer-hand-y: 6px;
-  --tpl-style-demo-preview-radius: 8px;
-  --tpl-style-demo-menu-radius: 4px;
-  --tpl-style-demo-sidebar-width: 160px;
-  --tpl-style-demo-sidebar-width-compact: 105px;
-  --tpl-style-demo-screen-min-height: 260px;
-  --tpl-style-demo-sidebar-gap: 14px;
-  --tpl-style-demo-sidebar-item-gap: 6px;
-  --tpl-style-demo-sidebar-brand-size: 16px;
-  --tpl-style-demo-compact-gap: 10px;
-  --tpl-style-demo-screen-padding: 18px;
-  --tpl-style-demo-screen-heading-size: 18px;
-  --tpl-style-demo-form-width: 440px;
-  --tpl-style-demo-focus-width: 3px;
-  --tpl-style-demo-focus-radius: 5px;
-  --tpl-style-demo-pointer-ring-size: 28px;
-  --tpl-style-demo-pointer-right: 15px;
-  --tpl-style-demo-pointer-bottom: 18px;
-  --tpl-style-demo-preview-border: #dce3df;
-  --tpl-style-demo-preview-background: #f4f6f5;
-  --tpl-style-demo-sidebar-border: #e4e9e6;
-  --tpl-style-demo-sidebar-ink: #55645d;
-  --tpl-style-demo-accent: #087a4b;
-  --tpl-style-demo-selection: #ecf8f0;
-  --tpl-style-demo-subtle-ink: #68776e;
-  --tpl-style-demo-board-border: #e2e9e5;
-  --tpl-style-demo-form-border: #d9dedb;
-  --tpl-style-demo-highlight: #24a26a;
-  --tpl-style-demo-note-ink: #5d6862;
-  --tpl-style-demo-pointer-shadow: 0 2px 2px #888;
+  --polish-space-row: 8px; /* スタイルのデモ内に縮小した設定画面の寸法と色。 */ --tpl-style-demo-heading-size: 24px; --tpl-style-demo-title-icon-offset: 3px; --tpl-style-demo-progress-height: 4px; --tpl-style-demo-header-title-offset: 4px; --tpl-style-demo-pointer-anchor-offset: 4px; --tpl-style-demo-pointer-hand-x: 3px;
+  --polish-control-bg: #f0f0f2; --polish-control-hover: #e8e8eb; --polish-control-text: 13px; --polish-control-weight: 500; --polish-value-weight: 600; --tpl-style-demo-pointer-hand-y: 6px; --tpl-style-demo-preview-radius: 8px; --tpl-style-demo-menu-radius: 4px; --tpl-style-demo-sidebar-width: 160px;
+  --polish-selection-bg: #f0f0f2; --polish-selection-ink: var(--color-ink); --polish-selection-shadow: var(--shadow-nav-active); --polish-selection-outline: 1px solid var(--color-control-border); --polish-band-radius: 16px; --tpl-style-demo-sidebar-width-compact: 105px; --tpl-style-demo-screen-min-height: 260px; --tpl-style-demo-sidebar-gap: 14px; --tpl-style-demo-sidebar-item-gap: 6px; --tpl-style-demo-sidebar-brand-size: 16px; --tpl-style-demo-compact-gap: 10px;
+  --polish-band-shadow: 0 1px 3px rgb(29 29 31 / 0.06); --polish-nav-tracking: 0.06em; --polish-heading-tracking: 0.02em; --polish-icon-small: 16px; --polish-icon-large: 20px; --polish-text-center-inset: 1px; --tpl-tabs-center-inset: 2px; --tpl-funnel-window-min-width: 208px; --tpl-cv-period-preview-width: 320px; --tpl-cv-period-content-width: 288px; --tpl-style-demo-screen-padding: 18px; --tpl-style-demo-screen-heading-size: 18px; --tpl-style-demo-form-width: 440px; --tpl-style-demo-focus-width: 3px;
+  --polish-space-field: 12px; --tpl-style-demo-focus-radius: 5px; --tpl-style-demo-pointer-ring-size: 28px; --tpl-style-demo-pointer-right: 15px; --tpl-style-demo-pointer-bottom: 18px;
+  --polish-space-card: 16px; --tpl-style-demo-preview-border: #dce3df; --tpl-style-demo-preview-background: #f4f6f5; --tpl-style-demo-sidebar-border: #e4e9e6; --tpl-style-demo-sidebar-ink: #55645d; --tpl-style-demo-accent: #087a4b; --tpl-style-demo-selection: #ecf8f0;
+  --polish-space-section: 24px; --tpl-style-demo-subtle-ink: #68776e; --tpl-style-demo-board-border: #e2e9e5; --tpl-style-demo-form-border: #d9dedb; --tpl-style-demo-highlight: #24a26a; --tpl-style-demo-note-ink: #5d6862; --tpl-style-demo-pointer-shadow: 0 2px 2px #888;
 }
 
 :root {
