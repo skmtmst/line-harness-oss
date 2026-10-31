@@ -334,7 +334,7 @@ describe('V8 リッチメニューの通し：作る→押す所→保存→既�
     fireEvent.click(await screen.findByRole('radio', { name: 'URLを開く', exact: true }))
     const urlInput = await screen.findByPlaceholderText('例：https://...')
     fireEvent.change(urlInput, { target: { value: 'https://example.com/menu' } })
-    fireEvent.change(screen.getByRole('textbox', { name: 'ボタン名' }), { target: { value: '予約サイト' } })
+    fireEvent.change(screen.getByRole('textbox', { name: 'ボタン名 管理用の呼び名。友だちには表示されません。' }), { target: { value: '予約サイト' } })
     // 動きが付いた印に変わる。
     await waitFor(() => expect(screen.queryByText('未設定')).toBeNull())
 
@@ -383,7 +383,7 @@ it.each(['公開する', '予約する'] as const)('未命名の面は下書き�
   fireEvent.click(await screen.findByRole('button', { name: /未設定/ }))
   fireEvent.click(await screen.findByRole('radio', { name: 'URLを開く', exact: true }))
   fireEvent.change(await screen.findByPlaceholderText('例：https://...'), { target: { value: 'https://example.com/menu' } })
-  expect((screen.getByRole('textbox', { name: 'ボタン名' }) as HTMLInputElement).value).toBe('')
+  expect((screen.getByRole('textbox', { name: 'ボタン名 管理用の呼び名。友だちには表示されません。' }) as HTMLInputElement).value).toBe('')
   fireEvent.click(getPageAction({ name: '下書きを保存' }))
   await waitFor(() => expect(updateGroup).toHaveBeenCalled())
   expect(updateGroup.mock.calls.at(-1)?.[1].pages[0].areas[0].label).toBe('')
@@ -398,7 +398,7 @@ it.each(['公開する', '予約する'] as const)('未命名の面は下書き�
   const submit = screen.getByRole('button', { name: action, exact: true }) as HTMLButtonElement
   await waitFor(() => expect(submit.disabled).toBe(false))
   fireEvent.click(submit)
-  const name = await screen.findByRole('textbox', { name: 'ボタン名' }) as HTMLInputElement
+  const name = await screen.findByRole('textbox', { name: 'ボタン名 管理用の呼び名。友だちには表示されません。' }) as HTMLInputElement
   await waitFor(() => expect(name.getAttribute('aria-invalid')).toBe('true'))
   expect(screen.getByText('ボタン名（読み上げラベル）を入力してください')).toBeTruthy()
   expect(screen.getByRole('heading', { name: '面 A「1番目のボタン」の動き' })).toBeTruthy()
