@@ -51,6 +51,8 @@ export default function FeatureDisabledGate({ children }: { children: React.Reac
 
   useEffect(() => {
     const onDisabled = (event: Event) => {
+      // 機能設定はオフになった機能を戻す入口。補助APIの機能オフで画面を閉じない。
+      if (pathname === '/settings') return
       const detail = (event as CustomEvent<FeatureDisabledEventDetail>).detail
       if (detail?.accountId != null && detail.accountId !== selectedAccountId) return
       if (detail?.featureContext && (detail.featureContext.generation !== context.current?.generation
