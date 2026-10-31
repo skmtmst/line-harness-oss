@@ -452,13 +452,13 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
           help={`デリバリーサービスへの接続を設定します。Uber Eats の注文の取り込みと注文ごとの操作は、連携の利用準備が整った店舗では受注画面に表示されます。営業状態の変更・メニューの同期はまだ利用できません。${
             anyConnected
               ? 'つながっているサービスの状態をここに出します。お店での入力はありません。うまくいっていない時は musubo が原因を確認し、必要な手続きを行います。'
-              : 'お店での入力はありません。Uber Eats は「ログインしてつなぐ」を押して Uber Eats の画面で許可するだけ、出前館とロケットナウは「連携を申し込む」を押すだけです。鍵・接続先アドレス・通知の設定は、すべて musubo 側で行います。'
+              : 'お店での入力はありません。Uber Eats は「ログインしてつなぐ」を押して Uber Eats の画面で許可するだけ、出前館とロケットナウへの申し込みは準備中です。鍵・接続先アドレス・通知の設定は、すべて musubo 側で行います。'
           }`}
         />
         <div className={styles.body}>
           {services.map((service) => {
             const state = STATUS[service.status]
-            const connectable = service.connect !== 'login' || service.ready
+            const connectable = service.ready
             const serviceBusy = busy?.serviceId === service.id
             return (
               /* 角丸・線・影は共通の Card に任せる。中の間と余白だけ承認案 v03 の寸法で足す。 */
@@ -498,9 +498,10 @@ export default function DeliverySettingsPage({ services: initialServices = SERVI
                 <div className={styles.actions}>
                   {service.status === 'disconnected' ? (
                     <Button
-                      variant="primary"
+                      variant={service.connect === 'apply' && !connectable ? 'secondary' : 'primary'}
                       lockedReason={permissionReason}
                       disabled={!canManage || !connectable || busy !== null}
+                      disabledReason={canManage && service.connect === 'apply' && !connectable ? '連携の申し込みは準備中です。' : undefined}
                       title={connectable ? undefined : WAITING}
                       busy={serviceBusy && (busy?.action === 'connect' || busy?.action === 'stores')}
                       busyLabel="開いています…"

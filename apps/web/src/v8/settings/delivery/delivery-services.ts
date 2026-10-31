@@ -90,7 +90,7 @@ export const SERVICES: DeliveryService[] = [
     sub: '出前館に入った注文を、この画面へ取り込みます',
     connect: 'apply',
     guide:
-      '出前館はログインでつなぐ仕組みがありません。ボタンを押すと musubo が出前館へ連携の申し込みを行い、受け取った接続情報を musubo 側で設定します。お店で鍵を調べたり入力したりする必要はありません。',
+      '出前館への連携の申し込みは準備中です。',
     ready: false,
     status: 'disconnected',
   },
