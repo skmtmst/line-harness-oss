@@ -160,5 +160,6 @@
       ]
     }
   ],
-  "event_booking_entitlement_uses": [{"parent":"event_bookings","columns":[{"column":"event_booking_id","parentColumn":"id"}]}]
+  "event_booking_entitlement_uses": [{"parent":"event_bookings","columns":[{"column":"event_booking_id","parentColumn":"id"}]}],
+  "booking_monthly_contracts": [{"parent":"friends","mode":"restrict","columns":[{"column":"friend_id","parentColumn":"id"},{"column":"account_id","parentColumn":"line_account_id"}]}]
 }

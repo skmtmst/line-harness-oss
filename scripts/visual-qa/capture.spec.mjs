@@ -3,6 +3,7 @@ import { test, expect } from '@playwright/test'
 import { captureClockFor, QA_TIMEZONE } from './qa-clock.mjs'
 import { ROUTES, TAG_STATES, WIDTHS } from './routes.mjs'
 import { routeLocalApi } from './local-api.mjs'
+import { measureSetupStepLayout, setupStepLayoutFailures } from './setup-step-layout.mjs'
 
 test.beforeEach(routeLocalApi)
 
@@ -59,6 +60,8 @@ for (const width of WIDTHS) {
       )
       expect(overflow, `${route.path} に横スクロールが出ている（${overflow}px）`).toBeLessThan(2)
       await expect(page.locator('main').first()).toBeVisible()
+      const setupRows = await page.evaluate(measureSetupStepLayout)
+      expect(setupStepLayoutFailures(setupRows), `${route.path} の共通手順行`).toEqual([])
     })
   }
 }

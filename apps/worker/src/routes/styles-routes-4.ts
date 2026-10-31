@@ -139,6 +139,8 @@ styles.route('/',styleMeetUpdates);
 
 styles.get(base + '/starter-items', async (c) => {
   const a = await account(c);
+  const staff = c.get('staff');
+  const includeContents = Boolean(staff && !staff.readOnly && ['owner', 'admin'].includes(staff.role));
   const rows = (
     await c.env.DB.prepare(
       'SELECT * FROM style_starter_items WHERE line_account_id=? ORDER BY applied_at,item_key',
@@ -168,7 +170,7 @@ styles.get(base + '/starter-items', async (c) => {
       status = row?.status ?? 'missing';
       blockedConfirmation =
         blockedConfirmation || row?.trigger_type === 'calendar_booked';
-      if (row?.current_draft_version_id)
+      if (includeContents && row?.current_draft_version_id)
         draftRevision = await automationRevisionToken(
           row.current_draft_version_id,
           row,
@@ -224,6 +226,32 @@ styles.get(base + '/starter-items', async (c) => {
             .bind(item.target_id, a)
             .first<{ status: string }>()
         )?.status ?? 'missing';
+    const requiresActivation = ['automation', 'reminder', 'booking_menu', 'rich_menu', 'friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind)) && !blockedConfirmation;
+    const activationAllowed = !blockedConfirmation && !['form', 'friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind));
+    const table = resourceTables[String(item.kind)];
+    const resource = item.kind==='form' ? await c.env.DB.prepare('SELECT f.name FROM forms f JOIN form_accounts a ON a.form_id=f.id WHERE f.id=? AND a.line_account_id=?').bind(item.target_id,a).first<{name:string}>() : table
+      ? await c.env.DB.prepare(
+          `SELECT name FROM ${table.table} WHERE id=? AND ${table.account}=?`,
+        )
+          .bind(item.target_id, a)
+          .first<{ name: string }>()
+      : null;
+    if (!includeContents) {
+      // 本文の権限を持たない人には、進み具合に必要なメタ情報だけを返す。
+      items.push({
+        target_id: item.target_id,
+        kind: item.kind,
+        key: item.item_key,
+        name: resource?.name ?? (item.kind === 'tag_set' ? (await heldTagSet(c, a, String(item.item_key)))?.name ?? null : null),
+        is_sample: item.is_sample,
+        isSample: !!item.is_sample,
+        status,
+        draftRevision: null,
+        requiresActivation,
+        activationAllowed,
+      });
+      continue;
+    }
     const definition =
       item.kind === 'rich_menu'
         ? {
@@ -258,14 +286,6 @@ styles.get(base + '/starter-items', async (c) => {
             : item.kind === 'tag_set'
               ? { tags: (await heldTagSet(c, a, String(item.item_key)))?.tags ?? [] }
               : null;
-    const table = resourceTables[String(item.kind)];
-    const resource = item.kind==='form' ? await c.env.DB.prepare('SELECT f.name FROM forms f JOIN form_accounts a ON a.form_id=f.id WHERE f.id=? AND a.line_account_id=?').bind(item.target_id,a).first<{name:string}>() : table
-      ? await c.env.DB.prepare(
-          `SELECT name FROM ${table.table} WHERE id=? AND ${table.account}=?`,
-        )
-          .bind(item.target_id, a)
-          .first<{ name: string }>()
-      : null;
     items.push({
       ...item,
       definition,
@@ -277,12 +297,9 @@ styles.get(base + '/starter-items', async (c) => {
       pendingUpdate: item.pending_update
         ? JSON.parse(String(item.pending_update))
         : null,
-      requiresActivation:
-        ['automation', 'reminder', 'booking_menu', 'rich_menu', 'friend_add_rule', 'tag_set', 'scenario'].includes(
-          String(item.kind),
-        ) && !blockedConfirmation,
+      requiresActivation,
       // ごあいさつの公開・タグにする・シナリオを動かすは［まとめて動かす］に混ぜない。
-      activationAllowed: !blockedConfirmation && !['form','friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind)),
+      activationAllowed,
       href: item.kind==='form' ? `/form-submissions/edit?id=${encodeURIComponent(String(item.target_id))}&tab=basic` : item.kind === 'reminder' ? '/reminders' : item.kind === 'friend_add_rule' ? '/friend-add-settings' : item.kind === 'scenario' ? '/scenarios' : item.kind === 'tag_set' ? '/tags' : undefined,
       currentSnapshot: await resourceSnapshot(
         c.env.DB,
