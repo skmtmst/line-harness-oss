@@ -496,11 +496,6 @@ export default function BroadcastForm({
     })
   }, [searchParams, accountLoading, selectedAccountId, draftReloadKey, draftReloadId])
 
-  // 本文や届く時刻を変えたあとは、前の見た目に対する確認を引き継がない。
-  useEffect(() => {
-    if (visualQaAugustCampaign) return
-    setPreviewConfirmed(false)
-  }, [bubbles, scheduledDate, scheduledTime, sendMode, visualQaAugustCampaign])
 
   useEffect(() => {
     api.folders.list('broadcast')
@@ -1419,7 +1414,7 @@ export default function BroadcastForm({
       </Notice>
     )}
       </StepContent>
-      <BroadcastPreviewRail {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
+      <BroadcastPreviewRail reviewKey={visualQaAugustCampaign ? 'visual-example' : JSON.stringify([bubbles, ab.hasB, ab.b, messageButtons, selectedAccountId, scheduledDate, scheduledTime, sendMode])} {...{ ab, afterActionVersionId, audienceDisplayCount, bubbles, confirmAudienceLabel, currentStep, excludeTagId, messageButtons, openTestDialog, preflight, preflightStatus, previewCloseRef, previewConfirmed, previewDevice, previewOpen, previewToggleRef, publishedActions, saving, scheduledLabel, selectedAccount, sendWhenLabel, setPreviewConfirmed, setPreviewDevice, setPreviewOpen, tags, testBlockReason }} />
     </CreateColumns>
 
     <StickyBar className={styles.footer} status={currentStep && footerReason ? <span id="broadcast-footer-reason" role="note">{footerReason}</span> : undefined} actions={(
