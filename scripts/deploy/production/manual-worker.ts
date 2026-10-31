@@ -7,20 +7,16 @@ import { copyFileSync, existsSync, readFileSync, readdirSync, realpathSync, stat
 import { dirname, isAbsolute, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { unstable_readConfig } from 'wrangler';
-import { assertNoPending, planDatabase } from './database.js';
-import { backupDatabase } from './backup.js';
+import { assertNoPending } from './database.js';
 import { assertHeaderRules, prepareWorker, verifyHeaders, workerArtifactPath } from './artifacts.js';
 import { publishWorker } from './publish.js';
-import { assertSha, cloudflare, command, requireValue } from './common.js';
+import { assertSha, command } from './common.js';
 const releaseRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 type Active = { deploymentId: string; versionId: string };
 
 export function activeDeployment(value: unknown): Active {
-  const data = value as { deployments?: Array<{ id?: unknown; created_on?: unknown; versions?: Array<{ version_id?: unknown; percentage?: unknown }> }> };
-  const deployments = data?.deployments;
-  if (!Array.isArray(deployments) || deployments.length === 0 || deployments.some(item => typeof item.created_on !== 'string' || Number.isNaN(Date.parse(item.created_on)))) throw new Error('active_version_unknown');
-  const deployment = deployments.reduce((latest, item) => Date.parse(item.created_on as string) > Date.parse(latest.created_on as string) ? item : latest);
+  const deployment = value as { id?: unknown; versions?: Array<{ version_id?: unknown; percentage?: unknown }> };
   const version = deployment?.versions?.[0];
   if (typeof deployment?.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(deployment.id) ||
       deployment.versions?.length !== 1 || typeof version?.version_id !== 'string' ||
@@ -45,7 +41,7 @@ export function assertManualArgs(args: string[]): { apply: boolean; approvalRef:
   const targetCheckout = flag('--target-checkout') || process.cwd();
   const stagingVersion = flag('--staging-version');
   const stagingDeployment = flag('--staging-deployment');
-  if (!/^https:\/\/github\.com\/[^/]+\/[^/]+\/(?:issues|pull)\/\d+(?:#.*)?$/.test(approvalRef)) throw new Error('approval_record');
+  if (apply && !/^https:\/\/github\.com\/[^/]+\/[^/]+\/(?:issues|pull)\/\d+(?:#.*)?$/.test(approvalRef)) throw new Error('approval_record');
   if (!isAbsolute(parent) || !isAbsolute(recordDir) || !isAbsolute(targetCheckout) || resolve(recordDir).startsWith(`${resolve(targetCheckout)}${sep}`)) throw new Error('paths');
   if (![stagingVersion, stagingDeployment].every(value => /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value))) throw new Error('staging_proof_ids');
   return { apply, approvalRef, parent, recordDir, targetCheckout, stagingVersion, stagingDeployment };
@@ -62,14 +58,27 @@ export function assertRecordDirectory(path: string, checkout = process.cwd(), pa
   return real;
 }
 
-async function currentActive(name: string): Promise<Active> {
-  return activeDeployment(await cloudflare(`workers/scripts/${encodeURIComponent(name)}/deployments`));
+function wranglerJson(args: string[]): any {
+  return JSON.parse(command('pnpm', ['exec', 'wrangler', ...args, '--json']));
 }
 
-function preflight(parent: string, approvalRef: string): string {
+async function currentActive(name: string): Promise<Active> {
+  return activeDeployment(wranglerJson(['deployments', 'status', '--name', name]));
+}
+
+function sourcePreflight(parent: string): string {
   const sha = command('git', ['rev-parse', 'HEAD']).trim();
   assertSha(sha);
   if (command('git', ['rev-parse', '--abbrev-ref', 'HEAD']).trim() !== 'main') throw new Error('main_only');
+  if (command('git', ['status', '--porcelain', '--untracked-files=all']).trim() ||
+      command('git', ['-C', parent, 'status', '--porcelain', '--untracked-files=all']).trim()) throw new Error('dirty_checkout');
+  command('git', ['fetch', 'origin']);
+  if (command('git', ['rev-parse', 'origin/main']).trim() !== sha) throw new Error('main_remote_changed');
+  return sha;
+}
+
+function preflight(parent: string, approvalRef: string): string {
+  const sha = sourcePreflight(parent);
   command('pnpm', ['deploy:preflight', 'production', '--parent-repo', parent, '--approved-by', 'skmtmst', '--approval-ref', approvalRef]);
   return sha;
 }
@@ -89,11 +98,19 @@ export function assertStagingDeployment(value: unknown, versionId: string): void
 
 async function stagingProof(sha: string, versionId: string, deploymentId: string): Promise<void> {
   const name = 'nen-line-stg';
-  const version = await cloudflare(`workers/scripts/${name}/versions/${versionId}`);
+  const version = wranglerJson(['versions', 'view', versionId, '--name', name]);
   if (version?.id !== versionId || versionCommit(version) !== sha) throw new Error('staging_version_sha');
-  const deployment = await cloudflare(`workers/scripts/${name}/deployments/${deploymentId}`);
+  const deployments = wranglerJson(['deployments', 'list', '--name', name]);
+  const deployment = Array.isArray(deployments) ? deployments.find(value => value.id === deploymentId) : null;
   if (deployment?.id !== deploymentId) throw new Error('staging_deployment_id');
   assertStagingDeployment(deployment, versionId);
+}
+
+export function backupBookmark(value: unknown): string {
+  const data = value as { bookmark?: unknown; result?: { bookmark?: unknown } };
+  const bookmark = data?.bookmark ?? data?.result?.bookmark;
+  if (typeof bookmark !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}$/i.test(bookmark)) throw new Error('backup_bookmark');
+  return bookmark;
 }
 
 async function publicHealth(): Promise<void> {
@@ -125,19 +142,24 @@ function ensureWorkerHeaders(): void {
 
 function productionIdentity(): string {
   const source = unstable_readConfig({ config: 'apps/worker/wrangler.toml' });
-  if (source.name !== requireValue(process.env.SECURITY_WORKER_NAME) ||
-      source.account_id !== requireValue(process.env.CLOUDFLARE_ACCOUNT_ID) ||
-      source.d1_databases?.length !== 1 ||
-      source.d1_databases[0].database_name !== requireValue(process.env.D1_DATABASE_NAME) ||
-      source.d1_databases[0].database_id !== requireValue(process.env.D1_DATABASE_ID)) throw new Error('production_identity');
+  const whoami = wranglerJson(['whoami']);
+  const database = wranglerJson(['d1', 'info', 'nen-line']);
+  if (source.name !== 'nen-line' || source.vars?.DEPLOY_ENV !== 'production' ||
+      !source.routes?.some((route: { pattern?: string; custom_domain?: boolean }) => route.pattern === 'api.musubo.jp' && route.custom_domain === true) ||
+      source.d1_databases?.length !== 1 || source.d1_databases[0].database_name !== 'nen-line' ||
+      database?.uuid !== source.d1_databases[0].database_id ||
+      !whoami?.accounts?.some((account: { id?: string }) => account.id === source.account_id)) throw new Error('production_identity');
+  process.env.SECURITY_WORKER_NAME = source.name;
+  process.env.CLOUDFLARE_ACCOUNT_ID = source.account_id;
+  process.env.D1_DATABASE_NAME = source.d1_databases[0].database_name;
+  process.env.D1_DATABASE_ID = source.d1_databases[0].database_id;
   return source.name;
 }
 
 async function run(args: string[]): Promise<void> {
   const options = assertManualArgs(args);
-  if (process.env.OPERATIONS_PAUSED !== 'true') throw new Error('operations_pause_confirmation');
   process.chdir(realpathSync(options.targetCheckout));
-  const sha = preflight(options.parent, options.approvalRef);
+  const sha = options.apply ? preflight(options.parent, options.approvalRef) : sourcePreflight(options.parent);
   const name = productionIdentity();
   await stagingProof(sha, options.stagingVersion, options.stagingDeployment);
   process.env.APPROVED_MIGRATIONS = '[]';
@@ -152,17 +174,11 @@ async function run(args: string[]): Promise<void> {
     return;
   }
 
-  // The caller must choose durable, private storage outside the checkout.
-  if (!process.env.CLOUDFLARE_API_TOKEN || !process.env.PRODUCTION_BACKUP_KEY || !process.env.PRODUCTION_BACKUP_POLICY) throw new Error('release_credentials_or_backup_policy');
+  if (process.env.OPERATIONS_PAUSED !== 'true') throw new Error('operations_pause_confirmation');
   const recordDir = assertRecordDirectory(options.recordDir, process.cwd(), options.parent);
   if (command('git', ['status', '--porcelain', '--untracked-files=all']).trim()) throw new Error('dirty_checkout');
-  process.env.RUNNER_TEMP = recordDir;
-  process.env.MANUAL_BACKUP_RUN_ID = String(Date.now());
-  process.env.MANUAL_BACKUP_RUN_ATTEMPT = '1';
   const before = await currentActive(name);
-  planDatabase(); // The approved migration set is empty; any pending SQL stops here.
-  await backupDatabase(sha);
-  const backup = JSON.parse(readFileSync(`${recordDir}/production-backup-receipt.json`, 'utf8'));
+  const backup = { type: 'd1-time-travel', bookmark: backupBookmark(wranglerJson(['d1', 'time-travel', 'info', 'nen-line'])), capturedAt: new Date().toISOString(), retentionDays: 30 };
   const receipt = `${recordDir}/worker-${sha}.json`;
   writeFileSync(receipt, JSON.stringify({ sha, before, backup, phase: 'backed_up', recordedAt: new Date().toISOString() }, null, 2), { flag: 'wx', mode: 0o600 });
 
@@ -184,7 +200,7 @@ async function run(args: string[]): Promise<void> {
   await verifyHotfixResponses();
   const after = await currentActive(name);
   if (after.versionId === before.versionId) throw new Error('deployment_version_unchanged');
-  const deployed = await cloudflare(`workers/scripts/${encodeURIComponent(name)}/versions/${after.versionId}`);
+  const deployed = wranglerJson(['versions', 'view', after.versionId, '--name', name]);
   if (deployed?.id !== after.versionId || versionCommit(deployed) !== sha) throw new Error('production_version_sha');
   writeFileSync(receipt, JSON.stringify({ sha, before, after, backup, phase: 'verified', recordedAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
   console.log(`manual_worker_release: PASS ${sha} version=${after.versionId} receipt=${receipt}`);
@@ -193,7 +209,7 @@ async function run(args: string[]): Promise<void> {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   run(process.argv.slice(2)).catch(() => {
     // Never print provider response bodies, paths, or credentials.
-    console.error('manual_worker_release: FAIL; keep the production lock and inspect the local receipt');
+    console.error('manual_worker_release: FAIL; inspect the local receipt and keep any acquired production lock');
     process.exitCode = 1;
   });
 }

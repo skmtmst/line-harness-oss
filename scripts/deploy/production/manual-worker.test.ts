@@ -2,27 +2,20 @@ import { mkdtempSync, rmSync, writeFileSync, chmodSync, realpathSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { activeDeployment, assertManualArgs, assertRecordDirectory, assertStagingDeployment, verifyHotfixResponses, versionCommit } from './manual-worker.js';
+import { activeDeployment, assertManualArgs, assertRecordDirectory, assertStagingDeployment, backupBookmark, verifyHotfixResponses, versionCommit } from './manual-worker.js';
 
 const uuidA = '11111111-1111-4111-8111-111111111111';
 const uuidB = '22222222-2222-4222-8222-222222222222';
 
 describe('manual Worker production gate', () => {
   it('accepts only a single fully active version as the rollback target', () => {
-    const timestamp = '2026-10-31T14:31:29Z';
-    expect(activeDeployment({ deployments: [{ id: uuidA, created_on: timestamp, versions: [{ version_id: uuidB, percentage: 100 }] }] }))
+    expect(activeDeployment({ id: uuidA, versions: [{ version_id: uuidB, percentage: 100 }] }))
       .toEqual({ deploymentId: uuidA, versionId: uuidB });
-    expect(activeDeployment({ deployments: [
-      { id: uuidB, created_on: '2026-10-31T13:00:00Z', versions: [{ version_id: uuidA, percentage: 100 }] },
-      { id: uuidA, created_on: timestamp, versions: [{ version_id: uuidB, percentage: 100 }] },
-    ] })).toEqual({ deploymentId: uuidA, versionId: uuidB });
     for (const value of [
       {},
-      { deployments: [] },
-      { deployments: [{ id: uuidA, versions: [{ version_id: uuidB, percentage: 100 }] }] },
-      { deployments: [{ id: uuidA, created_on: timestamp, versions: [] }] },
-      { deployments: [{ id: uuidA, created_on: timestamp, versions: [{ version_id: uuidB, percentage: 50 }] }] },
-      { deployments: [{ id: uuidA, created_on: timestamp, versions: [{ version_id: uuidB, percentage: 50 }, { version_id: uuidA, percentage: 50 }] }] },
+      { id: uuidA, versions: [] },
+      { id: uuidA, versions: [{ version_id: uuidB, percentage: 50 }] },
+      { id: uuidA, versions: [{ version_id: uuidB, percentage: 50 }, { version_id: uuidA, percentage: 50 }] },
     ]) expect(() => activeDeployment(value)).toThrow('active_version_unknown');
   });
 
@@ -30,11 +23,18 @@ describe('manual Worker production gate', () => {
     const args = ['--approval-ref', 'https://github.com/skmtmst/line-harness-oss/pull/2002#issuecomment-123', '--parent-repo', '/tmp/parent-repo', '--record-dir', '/tmp/release-receipts', '--target-checkout', '/tmp/main-checkout', '--staging-version', uuidA, '--staging-deployment', uuidB];
     expect(assertManualArgs(args).apply).toBe(false);
     expect(assertManualArgs([...args, '--apply']).apply).toBe(true);
-    expect(() => assertManualArgs(args.filter(arg => !arg.startsWith('https://')))).toThrow('approval_record');
+    expect(assertManualArgs(args.slice(2)).apply).toBe(false);
+    expect(() => assertManualArgs([...args.slice(2), '--apply'])).toThrow('approval_record');
     expect(() => assertManualArgs([...args, '--dry-run', '--apply'])).toThrow('conflicting_mode');
     expect(() => assertManualArgs([...args, '--bad'])).toThrow('unknown_argument');
     expect(() => assertManualArgs([...args.slice(0, 5), '/tmp/main-checkout/receipt', ...args.slice(6)])).toThrow('paths');
     expect(() => assertManualArgs(args.filter(arg => arg !== uuidA))).toThrow('staging_proof_ids');
+  });
+
+  it('accepts only a D1 Time Travel restore bookmark', () => {
+    const bookmark = '11111111-22222222-33333333-55555555555555555555555555555555';
+    expect(backupBookmark({ bookmark })).toBe(bookmark);
+    expect(() => backupBookmark({ bookmark: 'invalid' })).toThrow('backup_bookmark');
   });
 
   it('requires the staged 100% deployment and its recorded source SHA', () => {

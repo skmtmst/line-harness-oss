@@ -219,24 +219,24 @@ D1 migration、管理画面 Pages、設定変更、配信の実行には使用�
 
 1. `main` を最新にし、親・子の作業ツリーをクリーンにする。配備ゲートはレビュー済みの専用ブランチで実行し、`--target-checkout` で対象のクリーンな `main` 作業ツリーを指定する。これによりゲートの追加で対象SHAが変わらない。
 2. 変更対象の関連テスト、Workerビルド、セキュリティ検査を通し、対象SHAを記録する。
-3. 本番ロックを `pnpm deploy:lock acquire production --note "Worker の配信先分離修正"` で取る。他の配備者がいれば待つ。
-4. 操作を止めたことを確認し、Cloudflare認証情報、本番Worker・D1識別子、非公開の暗号化バックアップ先・鍵を安全な環境変数で渡す。`APPROVED_MIGRATIONS` はスクリプトが空配列へ固定する。
-5. リポジトリ外に権限を絞った記録ディレクトリを作る。まず以下のdry-runを実行し、検証版のSHA・未適用DB更新0件・設定・ビルド・Wrangler dry-runを確認する。
-6. 配備直前に本番のWorker版を記録し、D1を暗号化して非公開R2へ保存・読み戻し検証する。再度main・検証版のSHA・ロック・DB・本番Worker版を確認してからWorkerのみ配備する。
-7. 正常応答、実際に100%稼働する新しいWorker版、Cloudflare版の `BUILD_GIT_COMMIT` が対象SHAであることを確認する。記録ディレクトリのreceiptに旧版・新版・バックアップ位置・時刻が残る。
+3. 本番のWorker・D1・アカウント識別子が設定と一致することを確認する。`APPROVED_MIGRATIONS` はスクリプトが空配列へ固定する。
+4. まず以下のdry-runを実行し、検証版のSHA・未適用DB更新0件・設定・ビルド・Wrangler dry-runを確認する。dry-runでは本番を変更しない。
+5. 本番適用の明示承認を得たら、本番ロックを `pnpm deploy:lock acquire production --note "Worker の配信先分離修正"` で取る。他の配備者がいれば待つ。操作を止めたことを確認し、`OPERATIONS_PAUSED=true` を設定する。
+6. リポジトリ外に権限を絞った空の記録ディレクトリを作る。配備直前の本番Worker版とD1 Time Travel復元地点を記録する。Time Travelは30日間の復元猶予があり、復元操作は別の判断を要する。再度main・検証版のSHA・ロック・DB・本番Worker版を確認してからWorkerのみ配備する。
+7. 正常応答、実際に100%稼働する新しいWorker版、Cloudflare版の `BUILD_GIT_COMMIT` が対象SHAであることを確認する。記録ディレクトリのreceiptに旧版・新版・D1復元地点・時刻が残る。
 8. 結果を共有し、`pnpm deploy:lock release production` でロックを解放する。途中失敗時はロックを保持し、旧版への切り戻し要否を判断する。
 
 ```bash
-pnpm deploy:production:worker:manual -- \
-  --approval-ref 'https://github.com/OWNER/REPO/pull/NUMBER#issuecomment-ID' \
+pnpm deploy:production:worker:manual \
   --parent-repo '/absolute/path/to/parent' \
   --record-dir '/absolute/path/to/private-release-records' \
   --target-checkout '/absolute/path/to/clean-main-checkout' \
   --staging-version '<candidate-worker-version-id>' \
   --staging-deployment '<candidate-100-percent-deployment-id>'
 
-# 本番への適用は、上のdry-runとMasatoの個別承認を確認した後だけ
-pnpm deploy:production:worker:manual -- \
+# 本番への適用は、上のdry-runとMasatoの個別承認を確認し、ロック取得・操作停止後だけ
+OPERATIONS_PAUSED=true \
+pnpm deploy:production:worker:manual \
   --approval-ref 'https://github.com/OWNER/REPO/pull/NUMBER#issuecomment-ID' \
   --parent-repo '/absolute/path/to/parent' \
   --record-dir '/absolute/path/to/private-release-records' \
