@@ -376,6 +376,7 @@
   - 確認の本文を全幅で並べる場合は `ConfirmDialog.contentLayout="form"` を選ぶ。既定の本文配置は維持する。
   - 確認の実行を左、取消を中央に分ける場合は `confirmPlacement="start"`。通常の文字幅は `actionWidthReserve="idle"` で指定し、既定の結果文の幅予約は保つ。
   - 独自の処理を持つ窓でも操作は `DialogActions` に渡す。`footerAlign` だけを指定して本文にボタンを直置きしない。
+  - 参照だけの窓は右上の×で閉じ、下の帯に閉じるボタンを置かない。操作の帯は取消と主操作を中央、脇の操作を `leadingAction` へ。理由などの入力は本文に置く。全画面の検査は `scripts/visual-qa/dialog-footer-contract.test.ts`。
   - 読む変数：`--polish-radius-dialog`・`--polish-window-*`・`--card-edge`
 - **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
 - **見つけ方（コード）**：
@@ -654,6 +655,7 @@
 ## list-state 空・読めない・読み込み中
 
 - **役目**：空・絞り込みで0件・読めなかった（もう一度読み込む）・骨組みを1つの形で出す
+- ホームの待機は `AppShell` の `PagePendingLayout` が認証前からダッシュボードの型を渡す。役割・店舗・スタイルを待つ間も同じ見出しを保ち、判定が済むまで子画面は始めない。 既知の入口の題は `lib/route-pending.ts` を外枠と入口で共有し、任意の `title` を待機へ渡す。取得前の名前は言い切らない。
 - **持ち主（コード）**：`apps/web/src/components/templates/page-pending.tsx`・`apps/web/src/components/shared/list-state.tsx`・`apps/web/src/components/shared/list-state.module.css`・`apps/web/src/components/shared/skeleton.tsx`・`apps/web/src/components/shared/skeleton.module.css`・`apps/web/src/components/shared/empty-list.tsx`・`apps/web/src/components/shared/retry-label.tsx`（部品 `PagePending`・`ListState`・`TableSkeleton`・`CardsSkeleton`・`Skeleton`・`DelayedSkeleton`・`EmptyList`）
   - 読む変数：`--radius-mini`
 - **持ち主（Pen）**：`hNXm7`「空の表示」・`jr5Nl`「骨格の行」・`Dr8Wr`「状態/検索結果0件」・`deztM`「状態/取得失敗」・`q0z77i`「状態/読み込み中」
@@ -931,6 +933,7 @@
 ## steps 手順
 
 - 完了した入力の要約は `Steps.summaries`。変える口は既存の `onSelect` へ渡す。現在・未完の段には要約を出さない。方向の動きは同じ持ち主の `StepContent` と `CreatePage.step` / `CreateStepColumns.step`。入力を作り直さず transform だけを150ms動かし、動きを減らす設定では即時に替える。
+  - 手順を進めたら `StepContent.elementRef` の内側にある現在の段の題（h2/h3、`tabIndex={-1}`）へ焦点を移す。題は文字の幅に収め、共通の焦点枠を出す。本文全体へは焦点を当てず、輪を消す指定も足さない。
 
 - **役目**：題のすぐ下・左寄せ・1行。済みの段だけ押して戻れる
 - **持ち主（コード）**：`apps/web/src/components/templates/steps.tsx`・`apps/web/src/components/templates/steps.module.css`（部品 `Steps`）

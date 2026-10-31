@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from 'react'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { TextArea, TextField } from '@/components/shared/text-field'
 import type { BannerProject } from '@/lib/hq-banners'
 
@@ -68,12 +68,12 @@ export default function ProjectFormDialog({
       onCancel={onCancel}
       designNode="W7Z57"
       footer={
-        <div className="flex w-full flex-wrap items-center justify-end gap-2">
+        <DialogActions>
           <Button onClick={onCancel} disabled={busy}>キャンセル</Button>
           <Button variant="primary" onClick={submit} disabled={!canSubmit} busy={busy} busyLabel="保存しています…">
             {project ? '変更を保存' : '＋ 作って開く'}
           </Button>
-        </div>
+        </DialogActions>
       }
     >
       <form

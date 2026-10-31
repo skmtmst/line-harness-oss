@@ -14,7 +14,7 @@ import ListToolbar from '@/components/shared/list-toolbar'
 import Button from '@/components/shared/button'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Tabs } from '@/components/shared/tabs'
 import { LogEntryCopy } from '@/components/shared/log-entry-details'
 import { LogRecordJson } from '@/v8/log-record'
@@ -554,6 +554,7 @@ function InteractionDialog({ item, techOpen, setTechOpen, canRetry, retrying, bu
     <Dialog
       open
       title="やり取りの中身"
+      titleHelp={<StatusBadge tone={state.tone}>{state.label}</StatusBadge>}
       description={`${shortDateTime(item.startedAt)}・${item.direction === 'outgoing' ? '送った' : '受け取った'}・${item.webhookName}`}
       designNode="DA0Ag"
       designWidth={680}
@@ -562,25 +563,20 @@ function InteractionDialog({ item, techOpen, setTechOpen, canRetry, retrying, bu
       busy={busy}
       onCancel={onClose}
       footer={
-        <div className={styles.dialogFoot}>
-          <Button onClick={() => setTechOpen(!techOpen)}>
+        <DialogActions leadingAction={<Button onClick={() => setTechOpen(!techOpen)}>
             <FileCode size={16} aria-hidden="true" />{techOpen ? '技術的な記録を閉じる' : '技術的な記録を開く'}
-          </Button>
-          <span className={styles.dialogFootSpacer} aria-hidden="true" />
+          </Button>}>
+
+
           <Button onClick={onClose} disabled={busy}>閉じる</Button>
-          {retryable ? (
-            <Button variant="primary" onClick={onRetry} busy={retrying} busyLabel="やり直し中">
+          {retryable ? (<Button variant="primary" onClick={onRetry} busy={retrying} busyLabel="やり直し中">
               <RotateCw size={16} aria-hidden="true" />届いたか確かめてから送り直す
-            </Button>
-          ) : null}
-        </div>
+            </Button>) : null}
+        </DialogActions>
       }
     >
       <div className={styles.dialogBody}>
         <LogEntryCopy canCopy={canRetry} entry={{ occurredAt: item.startedAt, target: item.webhookName, status: state.label, reason: item.failureReason ?? item.responseLabel }} />
-        <span className={styles.dialogState}>
-          <StatusBadge tone={state.tone}>{state.label}</StatusBadge>
-        </span>
         <dl className={styles.dialogList}>
           <div className={styles.dialogRow}><dt>きっかけ</dt><dd>{dialogTrigger(item)}</dd></div>
           <div className={styles.dialogRow}><dt>出来事の種類</dt><dd>{item.eventType}</dd></div>

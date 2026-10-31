@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Tag, Send, UserRound, CircleCheck, Bell, Zap, Play, Square } from 'lucide-react'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Steps } from '@/components/templates/steps'
 import { TableHeadRow, Th, Td } from '@/components/shared/table'
 import Button from '@/components/shared/button'
@@ -343,9 +343,7 @@ export default function BulkRunDialog({
       : input.resourceName
   const phaseIndex = ['operation', 'confirm', 'result'].indexOf(phase)
   const footer = (
-    <div className={styles.footer}>
-      <span className={styles.hint}>手順 {phaseIndex + 1} / 3</span>
-      <div className={styles.actions}>
+    <DialogActions leadingAction={`手順 ${phaseIndex + 1} / 3`}>
         {phase === 'operation' ? <>
           <Button onClick={close}>閉じる</Button>
           <Button variant="primary" disabled={!operation() || previewState === 'loading'} onClick={() => void loadPreview()} busy={previewState === 'loading'}>実行内容を確認 →</Button>
@@ -360,8 +358,7 @@ export default function BulkRunDialog({
           {runId ? <Button onClick={() => void pollRun(runId, resultAction)} disabled={busy || resultState === 'loading'}>読み直す</Button> : null}
           <Button variant="primary" onClick={close} disabled={busy}>← 友だち一覧へ戻る</Button>
         </> : null}
-      </div>
-    </div>
+    </DialogActions>
   )
 
   const phaseSteps = (['operation', 'confirm', 'result'] as const).map((key, index) => ({

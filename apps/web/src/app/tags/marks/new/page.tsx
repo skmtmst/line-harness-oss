@@ -1,10 +1,12 @@
 'use client'
 
+import PagePending from '@/components/templates/page-pending'
+import { routePendingForPath } from '@/lib/route-pending'
 import { Suspense } from 'react'
 import Screen from '@/v8/tags/mark-editor'
 import FeatureGate from '@/components/feature-gate'
 
 /** V8 の入口。URL・読み書き・権限は画面側で保つ。 */
 export default function NewSupportMarkPage() {
-  return <FeatureGate feature="support_marks"><Suspense fallback={null}><Screen /></Suspense></FeatureGate>
+  return <FeatureGate feature="support_marks"><Suspense fallback={<PagePending stage="route" {...routePendingForPath("/tags/marks/new")} />}><Screen /></Suspense></FeatureGate>
 }

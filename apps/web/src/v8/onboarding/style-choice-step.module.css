@@ -12,6 +12,14 @@
   gap: var(--polish-space-card);
 }
 
+.switcher { width: 100%; min-width: 0; }
+.switcherSegments { width: 100%; min-width: 0; }
+.switcherSelect { display: none; }
+@media (max-width: 640px) {
+  .switcherSegments { display: none; }
+  .switcherSelect { display: block; width: 100%; }
+}
+
 .option {
   display: inline-flex;
   align-items: center;

@@ -236,7 +236,7 @@ export default function KnowledgeArticleV8({ article: initial, onClose, onSaved,
 function KnowledgeSurface({ fullPage, editing, busy, onCancel, actions, title, description, children }: {
   fullPage: boolean; editing: boolean; busy: boolean; onCancel: () => void; actions: ReactNode; title: string; description: string; children: ReactNode
 }) {
-  if (!fullPage) return <Dialog open title={editing ? '記事を直す' : '下書きの内容を確認'} designNode={editing ? 'ZAOc7' : 'DHdsw'} busy={busy} onCancel={onCancel} footer={actions}>{children}</Dialog>
+  if (!fullPage) return <Dialog open title={editing ? '記事を直す' : '下書きの内容を確認'} designNode={editing ? 'ZAOc7' : 'DHdsw'} busy={busy} onCancel={onCancel} footer={<DialogActions>{actions}</DialogActions>}>{children}</Dialog>
   return <div data-design-node="R5ckwJ"><OpsHead title={title} description={description} actions={actions} />{children}</div>
 }
 

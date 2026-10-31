@@ -7,7 +7,7 @@ import { useEffect, useId, useState, type ReactNode } from 'react'
 import { Send, ShieldCheck } from 'lucide-react'
 import type { StaffMember } from '@line-crm/shared'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { Field as FormField, FieldError } from '@/components/shared/form-controls'
 import { focusFieldById } from '@/lib/use-form-errors'
 import Radio from '@/components/shared/radio'
@@ -164,13 +164,13 @@ export default function MemberDialogV8({
       error={localError || error || undefined}
       onCancel={onCancel}
       footer={
-        <div className={`${head.footer} ${head.footerCenter}`}>
+        <DialogActions>
           <Button type="button" onClick={onCancel} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={submit} disabled={busy || Boolean(fieldErrors.name || fieldErrors.email)} busy={busy} busyLabel="処理中…">
             {member ? null : <Send aria-hidden="true" className={styles.icon} />}
             {member ? '変更を保存する' : '招待メールを送る'}
           </Button>
-        </div>
+        </DialogActions>
       }
     >
       <form noValidate
@@ -284,13 +284,13 @@ export function MemberChangeConfirmV8({ member, value, accountNames, busy, error
       error={error || undefined}
       onCancel={onCancel}
       footer={
-        <div className={`${head.footer} ${head.footerEnd}`}>
+        <DialogActions>
           <Button type="button" onClick={onCancel} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={onConfirm} disabled={busy} busy={busy} busyLabel="処理中…">
             {needsCode ? <ShieldCheck aria-hidden="true" className={styles.icon} /> : null}
             {needsCode ? '確認コードを入れて変える' : '変える'}
           </Button>
-        </div>
+        </DialogActions>
       }
     >
       <div className={`${head.head} ${styles.form}`}>

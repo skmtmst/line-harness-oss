@@ -25,7 +25,7 @@ import SearchField from '@/components/shared/search-field'
 import { Tabs } from '@/components/shared/tabs';
 import Pagination from '@/components/shared/pagination'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
 import Notice from '@/components/shared/notice'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest as SharedStepUpRequest } from '@/components/step-up-prompt';
@@ -707,7 +707,7 @@ function TwoFactorModal({ member, onClose }: { member: StaffMember; onClose: () 
  { if (!fieldFailure)
 
  setError(otpFailureMessage(messageOf(caught))) } } finally { setSaving(false) } }
-  return <SaveErrorScope errors={saveErrors}><Dialog open title="二段階認証を設定" onCancel={onClose} footer={<Button variant="primary" onClick={() => save()} disabled={saving || !uri} busy={saving}>確認して登録する</Button>}>
+  return <SaveErrorScope errors={saveErrors}><Dialog open title="二段階認証を設定" onCancel={onClose} footer={<DialogActions><Button variant="primary" onClick={() => save()} disabled={saving || !uri} busy={saving}>確認して登録する</Button></DialogActions>}>
     {error ? <Notice tone="danger" message={error} /> : null}
     <TotpQr qr={qr} manualKey={manualKey} />
     <Field label="認証アプリに表示された6桁コード"><SaveErrorField names={["code"]}><OtpInput value={code} onChange={setCode} onComplete={entered => void save(entered)} label="認証アプリに表示された6桁コード" invalid={Boolean(error)} busy={saving} /></SaveErrorField></Field>

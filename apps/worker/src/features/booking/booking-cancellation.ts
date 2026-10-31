@@ -31,3 +31,16 @@ export async function bookingCancellationQuote(db:D1Database,id:string,account:s
  if(!b)throw new GapError('not_found',404);
  return cancellationQuote(b.policy_snapshot_json?JSON.parse(b.policy_snapshot_json):defaultCancellationPolicy,b.starts_at,b.price_at_booking,now,!!b.ticket);
 }
+
+/** 有料の取消も開始時刻まで。無料の取消はメニュー・店の既定の期限を守る。 */
+export function customerCancellationDeadline(startsAt:string,policyAcceptedRequired:boolean,minutes:number) {
+ return policyAcceptedRequired?startsAt:new Date(Date.parse(startsAt)-minutes*60000).toISOString();
+}
+export async function bookingCancellationReview(db:D1Database,id:string,account:string,now=new Date()):Promise<import('@line-crm/shared').BookingCancellationReview> {
+ const b=await db.prepare(`SELECT b.starts_at,b.status,b.lock_version,COALESCE(m.cancel_deadline_hours_before*60,s.cancel_deadline_minutes_before,1440) minutes
+ FROM bookings b JOIN menus m ON m.id=b.menu_id AND m.line_account_id=b.line_account_id LEFT JOIN booking_settings s ON s.line_account_id=b.line_account_id
+ WHERE b.id=? AND b.line_account_id=?`).bind(id,account).first<{starts_at:string;status:string;lock_version:number;minutes:number}>();
+ if(!b)throw new GapError('not_found',404);
+ const quote=await bookingCancellationQuote(db,id,account,now),cancelDeadlineAt=customerCancellationDeadline(b.starts_at,quote.policyAcceptedRequired,b.minutes);
+ return {...quote,cancelDeadlineAt,lockVersion:b.lock_version,canCancel:['requested','confirmed'].includes(b.status)&&now.getTime()<Date.parse(b.starts_at)&&now.getTime()<=Date.parse(cancelDeadlineAt)};
+}

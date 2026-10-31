@@ -4,6 +4,8 @@ import { jstDate } from '@/lib/jst-datetime'
 
 
 import { useRouter, useSearchParams } from 'next/navigation'
+import PagePending from '@/components/templates/page-pending'
+import { routePendingForPath } from '@/lib/route-pending'
 import { Suspense } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -12,7 +14,7 @@ import PetsPageV8 from '@/v8/nen-pets/pets'
 export type PetTab = 'pets' | 'feeding'
 
 export default function NenPetsPage() {
-  return <Suspense fallback={null}><PetsInner /></Suspense>
+  return <Suspense fallback={<PagePending stage="route" {...routePendingForPath("/nen/pets")} />}><PetsInner /></Suspense>
 }
 
 function PetsInner() {

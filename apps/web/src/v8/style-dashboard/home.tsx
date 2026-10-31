@@ -3,8 +3,7 @@ import dynamic from 'next/dynamic'
 import { useSearchParams } from 'next/navigation'
 import { useAccountStyle } from '@/hooks/use-account-style'
 import StaleStyleNotice from '@/components/shared/stale-style-notice'
-import ListState from '@/components/shared/list-state'
-import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame'
+import PagePending from '@/components/templates/page-pending'
 import { useAccount } from '@/contexts/account-context'
 import type { IndustryStyle, UsageStyle } from './model'
 import { DashboardV8 as StandardDashboard } from '@/v8/dashboard/index'
@@ -17,9 +16,7 @@ import { DashboardV8 as StandardDashboard } from '@/v8/dashboard/index'
 
 /* 業種が分かるまでの同じ形。題は最初からダッシュボード、中身は骨組み。別の画面や別の題を出さない。 */
 function HomeLoading({ error, onRetry }: { error?: unknown; onRetry?: () => void }) {
-  return <PageFrame kind="dashboard"><PageHeading title="ダッシュボード" /><PageContent layout="stats">
-    {error ? <ListState kind="error" title="使い方のスタイルを読み込めませんでした" error={error} onRetry={onRetry} /> : <ListState kind="loading" loadingShape="cards" title="使い方のスタイルを確認しています" />}
-  </PageContent></PageFrame>
+  return <PagePending variant="dashboard" stage="style" failed={Boolean(error)} error={error} errorTitle="使い方のスタイルを読み込めませんでした" onRetry={onRetry} />
 }
 
 const StyleDashboard = dynamic(() => import('./style-dashboard'), { ssr: false, loading: () => <HomeLoading /> })

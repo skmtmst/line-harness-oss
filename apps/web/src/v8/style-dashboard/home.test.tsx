@@ -55,7 +55,7 @@ describe('ホームから初期案内のQRを開く', () => {
     const view = render(<HomeDashboard />)
     await screen.findByRole('region', { name: 'restaurantのホーム' })
     fixture.accountId = 'account-2'; view.rerender(<HomeDashboard />)
-    expect(screen.getByLabelText('使い方のスタイルを確認しています')).toBeTruthy()
+    expect(screen.getByLabelText('読み込んでいます')).toBeTruthy()
     expect(screen.queryByRole('region')).toBeNull()
     await screen.findByText('使い方のスタイルを読み込めませんでした')
     fireEvent.click(screen.getByRole('button', { name: /もう一度読み込む/ }))

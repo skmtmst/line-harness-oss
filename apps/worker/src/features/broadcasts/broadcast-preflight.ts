@@ -1,3 +1,4 @@
+import { scopedFriendIds, storedBroadcastFriendScope } from '../../services/segment-query-scope.js';
 import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { INSIGHT_MIN_AUDIENCE } from '@line-crm/db';
@@ -71,6 +72,7 @@ export async function previewAudience(
   db: D1Database,
   input: PreflightInput,
 ): Promise<AudiencePreview> {
+  if (input.targetType === 'tag' && !input.targetTagId) return emptyAudiencePreview();
   const where: string[] = ['1 = 1'];
   const binds: unknown[] = [];
   if (input.targetType === 'multi-account-dedup') {
@@ -81,9 +83,12 @@ export async function previewAudience(
   } else if (input.lineAccountId) {
     where.push('f.line_account_id = ?');
     binds.push(input.lineAccountId);
+  } else {
+    const ids = scopedFriendIds(await storedBroadcastFriendScope(db, null));
+    where.push(`f.id IN (${ids.sql})`);
+    binds.push(...ids.bindings);
   }
   if (input.targetType === 'tag') {
-    if (!input.targetTagId) return emptyAudiencePreview();
     where.push('EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)');
     binds.push(input.targetTagId);
   }
@@ -197,6 +202,7 @@ export async function countAudience(
   db: D1Database,
   input: PreflightInput,
 ): Promise<{ total: number; hiddenExcluded: number }> {
+  if (input.targetType === 'tag' && !input.targetTagId) return { total: 0, hiddenExcluded: 0 };
   const where: string[] = ['f.is_following = 1', DELIVERY_CONSENT_ALLOWED_SQL];
   const binds: unknown[] = [];
 
@@ -208,10 +214,13 @@ export async function countAudience(
   } else if (input.lineAccountId) {
     where.push('f.line_account_id = ?');
     binds.push(input.lineAccountId);
+  } else {
+    const ids = scopedFriendIds(await storedBroadcastFriendScope(db, null));
+    where.push(`f.id IN (${ids.sql})`);
+    binds.push(...ids.bindings);
   }
 
   if (input.targetType === 'tag') {
-    if (!input.targetTagId) return { total: 0, hiddenExcluded: 0 };
     where.push('EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)');
     binds.push(input.targetTagId);
   }

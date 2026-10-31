@@ -101,7 +101,8 @@ describe('予約の詳細のV8（AjZhH）', () => {
     expect(document.body.textContent).toContain('鈴木 真理さん')
     expect(document.body.textContent).toContain('秋の鹿肉コース')
     expect(document.body.textContent).toContain('3回')
-    for (const label of ['閉じる', '取り消す', '変える']) {
+    expect(document.querySelector('[role="dialog"] button[aria-label="閉じる"]')).not.toBeNull()
+    for (const label of ['取り消す', '変える']) {
       expect(document.body.textContent).toContain(label)
     }
   })
