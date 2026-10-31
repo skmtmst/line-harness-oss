@@ -28,6 +28,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
 let root: Root
 let host: HTMLDivElement
 let staffRole = 'owner'
+let writes: string[] = []
 
 const token = {
   id: 'tok-1',
@@ -60,11 +61,14 @@ const json = (data: unknown, status = 200) => new Response(
 
 beforeEach(() => {
   staffRole = 'owner'
+  writes = []
   host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
-  vi.stubGlobal('fetch', async (input: RequestInfo | URL) => {
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
+    const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
+    if (method !== 'GET') writes.push(`${method} ${url}`)
     if (url.includes('/api/staff/me') || url.includes('/staff/me')) {
       return json({ success: true, data: { role: staffRole } })
     }
@@ -110,11 +114,19 @@ test('v8 では ralAc の鍵の表（札・行の右端の「…」）が出る'
   expect(board?.textContent).toContain('外の仕組みに書き写してから閉じてください')
 })
 
-test('閲覧者には発行の案内を出さず、鍵の一覧は読める', async () => {
+test('担当者は鍵の一覧を読み、発行はオーナーの理由付きで止める', async () => {
   staffRole = 'staff'
   await renderPage()
   await waitFor(() => expect(host.textContent).toContain('予約システム連携'))
-  expect(screen.queryByRole('button', { name: /API 接続の鍵を発行する/ })).toBeNull()
+  const issue = screen.getByRole('button', { name: /API 接続の鍵を発行する/ })
+  expect(issue.getAttribute('aria-disabled')).toBe('true')
+  expect(issue.hasAttribute('href')).toBe(false)
+  expect(document.getElementById(issue.getAttribute('aria-describedby') ?? '')?.textContent).toBe('この操作はオーナーだけができます。')
+  await act(async () => { issue.focus() })
+  expect(screen.getByRole('tooltip').textContent).toBe('この操作はオーナーだけができます。')
+  await act(async () => { issue.click() })
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(writes).toEqual([])
   expect(screen.queryByText(/鍵は発行したときに1回だけ表示されます/)).toBeNull()
 })
 

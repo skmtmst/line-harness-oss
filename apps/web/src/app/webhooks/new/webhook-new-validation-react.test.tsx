@@ -150,7 +150,7 @@ describe('webhooks/new の保存失敗文（D005・結合）', () => {
   })
 })
 
-for (const role of [null, 'admin', 'staff', 'viewer']) it(`作成に必要なowner権限${role}の確認なしでは操作と送信を出さない`, async () => {
+for (const role of [null, 'staff', 'viewer']) it(`作成に必要なowner権限${role}の確認なしでは操作と送信を出さない`, async () => {
   if (role === null) fixture.staffMe.mockImplementation(() => new Promise(() => {}))
   else fixture.staffMe.mockResolvedValue({ success: true, data: { role } })
   await render(); await flush()
@@ -158,4 +158,27 @@ for (const role of [null, 'admin', 'staff', 'viewer']) it(`作成に必要なown
   expect(host.querySelector('a[href="/webhooks"]')).toBeTruthy()
   expect(host.textContent).not.toContain('つくって動かす')
   expect(fixture.outgoingCreate).not.toHaveBeenCalled()
+})
+
+it('管理者は通常の送り先を明示操作で1回だけ作る', async () => {
+  fixture.staffMe.mockResolvedValue({ success: true, data: { role: 'admin' } })
+  fixture.outgoingCreate.mockResolvedValue({ success: true, data: { id: 'wh-admin-1' } })
+  await render(); await flush()
+  expect(host.querySelector('#wh-new-name')).toBeTruthy()
+  expect(fixture.outgoingCreate).not.toHaveBeenCalled()
+  const secret = (host.querySelector('#wh-new-secret') as HTMLInputElement).value
+  expect(secret.length).toBeGreaterThan(0)
+  await act(async () => {
+    fireEvent.change(host.querySelector('#wh-new-name')!, { target: { value: '管理者の連携' } })
+    fireEvent.change(host.querySelector('#wh-new-url')!, { target: { value: 'https://example.com/admin-hook' } })
+    ;(host.querySelector('input[value="all"]') as HTMLInputElement).click()
+  })
+  expect(fixture.outgoingCreate).not.toHaveBeenCalled()
+  await act(async () => { saveButton().click() }); await flush()
+  expect(fixture.outgoingCreate.mock.calls).toEqual([[{
+    lineAccountId: 'account-a', name: '管理者の連携', url: 'https://example.com/admin-hook',
+    eventTypes: ['*'], secret, maxRetries: 3,
+  }, undefined]])
+  expect(fixture.push).toHaveBeenCalledTimes(1)
+  expect(fixture.push).toHaveBeenCalledWith('/webhooks?highlight=wh-admin-1')
 })

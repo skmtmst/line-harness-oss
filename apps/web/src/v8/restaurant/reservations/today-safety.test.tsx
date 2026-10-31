@@ -13,7 +13,9 @@ afterEach(()=>{cleanup();vi.clearAllMocks()})
 it.each([{list:[]},{list:tables.map(t=>({...t,is_active:0}))}])('卓が未設定・全卓停止でも未配席予約を開ける',({list})=>{
  const open=vi.fn();render(<TodayView {...props} tables={list} onDetail={open}/>)
  const board=document.querySelector('[data-reservation-board]')! as HTMLElement
- fireEvent.click(within(board).getByRole('button',{name:/未配席のお客さま.*未配席/}))
+ const unassigned=within(board).getByRole('region',{name:'未配席の予約'})
+ expect(unassigned.previousElementSibling?.textContent).toBe('未配席')
+ fireEvent.click(within(unassigned).getByRole('button',{name:'未配席のお客さま・21:00〜23:00・2名'}))
  expect(open).toHaveBeenCalledWith('unassigned')
  expect(screen.queryByText('利用できる卓がありません')).toBeNull()
 })
@@ -27,7 +29,10 @@ it('座席表でも未配席を残し、使っていない停止卓を描かな�
  const {container}=render(<TodayView {...props}/>)
  fireEvent.click(screen.getByRole('button',{name:'座席表'}))
  const board=container.querySelector('[data-reservation-board]')! as HTMLElement
- expect(within(board).getByRole('button',{name:/未配席のお客さま.*未配席/})).toBeTruthy()
+ const unassigned=within(board).getByRole('region',{name:'未配席の予約'})
+ expect(unassigned.previousElementSibling?.textContent).toBe('未配席')
+ fireEvent.click(within(unassigned).getByRole('button',{name:'未配席のお客さま・21:00〜23:00・2名'}))
+ expect(props.onDetail).toHaveBeenCalledWith('unassigned')
  expect(within(board).queryByRole('button',{name:/pb/})).toBeNull()
 })
 

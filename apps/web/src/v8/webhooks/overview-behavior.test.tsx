@@ -5,6 +5,7 @@
  * 試し送信の確認・行の「…」のキーボード操作を、描いた画面と口の呼び出しで確かめる。
  */
 import React, { act } from 'react'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -23,7 +24,7 @@ vi.mock('@/contexts/account-context', () => ({
 }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/lib/use-narrow-viewport', () => ({ useNarrowViewport: () => false }))
-let role = 'owner'
+let role = verifiedStaffRole('owner')
 vi.mock('@/lib/staff-role', async (importOriginal: () => Promise<typeof import('@/lib/staff-role')>) => {
   const actual = await importOriginal()
   return { ...actual, useStaffRole: () => role }
@@ -55,7 +56,7 @@ let incomingByAccount: Record<string, unknown[]> = {}
 
 beforeEach(() => {
   accountId = 'account-a'
-  role = 'owner'
+  role = verifiedStaffRole('owner')
   calls = []
   route = () => undefined
   outgoingByAccount = { 'account-a': [destination('out-1', '顧客台帳')], 'account-b': [destination('out-b', '支店の台帳')] }
@@ -353,13 +354,19 @@ describe('一覧の読み込みは送る・受け取るを別々に扱い、失�
 })
 
 describe('権限と失敗の言葉', () => {
-  it('管理者には受け取り口の変更を出さず、届いたつもりで試すは出す', async () => {
-    role = 'admin'
+  it('管理者は通常編集と試しを使え、合言葉と削除は理由付きで拒む', async () => {
+    role = verifiedStaffRole('admin')
     await render(<WebhooksIncomingV8 />)
     expect(byText('試す')).toBeTruthy()
-    expect(byText('合言葉を更新する')).toBeUndefined()
-    expect(byText('この受け取り口を削除する')).toBeUndefined()
-    expect(host.querySelector('[role="switch"]')).toBeNull()
+    expect(byText('合言葉を更新する')?.getAttribute('aria-disabled')).toBe('true')
+    await act(async () => byText('合言葉を更新する')!.click())
+    expect(byText('この受け取り口を削除する')?.getAttribute('aria-disabled')).toBe('true')
+    await act(async () => byText('この受け取り口を削除する')!.click())
+    expect(calls.filter(call => call.method !== 'GET')).toHaveLength(0)
+    const toggle = host.querySelector('[role="switch"]') as HTMLButtonElement
+    expect(toggle.disabled).toBe(false)
+    await act(async () => toggle.click())
+    expect(calls.filter(call => call.method === 'PUT')).toHaveLength(1)
   })
 
   it('受け取り口を作る口に断られたら、原因どおりの言葉を窓に出す', async () => {
