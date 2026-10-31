@@ -112,3 +112,48 @@ it('予約の日時の差し込みは日本語で見せ、保存するキーを�
  fireEvent.click(screen.getByRole('button',{name:'人数',exact:true}));await accept();await save();
  expect(f.saveRow.mock.calls[0][3].messageBubbles[0].content.text).toContain('{{var.reservation_datetime}}');
 });
+
+describe('保存失敗の欄への接続',()=>{
+ it('本文の保存失敗は入力を残して編集を開き、直すと欄の理由が消える',async()=>{
+  await ready();await edit();await text('残す本文');await accept()
+  f.saveRow.mockRejectedValueOnce(new ApiError(422,'本文を確認してください','invalid_followup',undefined,undefined,undefined,{messageBubbles:'本文が長すぎます'}))
+  fireEvent.click(screen.getByRole('button',{name:'保存して作る'}))
+  await screen.findByRole('dialog',{name:'予約したときを変える'})
+  const body=screen.getByRole('textbox',{name:'本文'})
+  expect(body.textContent).toBe('残す本文');expect(await screen.findByText('本文が長すぎます')).toBeTruthy()
+  expect(body.getAttribute('aria-invalid')).toBe('true')
+  await text('直した本文');expect(screen.queryByText('本文が長すぎます')).toBeNull()
+  await accept();await save();expect(screen.queryByText('本文が長すぎます')).toBeNull()
+  expect(f.saveRow.mock.calls.at(-1)?.[3].messageBubbles[0].content.text).toBe('直した本文')
+ })
+ it('予約フォームの保存失敗は題名を残して開き、直して保存できる',async()=>{
+  await ready();fireEvent.click(within(screen.getByRole('article',{name:'予約の回答フォーム'})).getByRole('button',{name:'変える'}))
+  fireEvent.change(screen.getByRole('textbox',{name:'題名'}),{target:{value:'残す題名'}})
+  fireEvent.click(screen.getByRole('button',{name:'この内容にする'}))
+  f.saveForm.mockRejectedValueOnce(new ApiError(422,'題名を確認してください','invalid_form',undefined,undefined,undefined,{definition:'この題名は使えません'}))
+  fireEvent.click(screen.getByRole('button',{name:'保存して作る'}))
+  await screen.findByRole('dialog',{name:'予約の回答フォームを変える'})
+  const title=screen.getByRole('textbox',{name:'題名'}) as HTMLInputElement
+  expect(title.value).toBe('残す題名');expect(await screen.findByText('この題名は使えません')).toBeTruthy()
+  fireEvent.change(title,{target:{value:'使える題名'}});expect(screen.queryByText('この題名は使えません')).toBeNull()
+  fireEvent.click(screen.getByRole('button',{name:'この内容にする'}));await save()
+  expect(f.saveForm.mock.calls.at(-1)?.[3].title).toBe('使える題名')
+ })
+})
+
+it('行の失敗を閉じて別の行を開いても古い欄の理由を持ち込まない',async()=>{
+ await ready();await edit();await text('Aの本文');await accept()
+ f.saveRow.mockRejectedValueOnce(new ApiError(422,'本文を確認してください','invalid_followup',undefined,undefined,undefined,{messageBubbles:'Aだけの理由'}))
+ fireEvent.click(screen.getByRole('button',{name:'保存して作る'}));await screen.findByText('Aだけの理由')
+ fireEvent.click(screen.getByRole('button',{name:'キャンセル'}))
+ await screen.findByRole('dialog',{name:'保存の結果'});fireEvent.click(screen.getByRole('button',{name:'閉じる',exact:true}))
+ await edit('reservation_24h');expect(screen.queryByText('Aだけの理由')).toBeNull()
+ expect(screen.getByRole('textbox',{name:'本文'}).getAttribute('aria-invalid')).not.toBe('true')
+})
+it('一括初期化の欄の理由に行の特定がなければ先頭の行へ結ばない',async()=>{
+ snapshot.board.engines=[];await ready();await edit();await text('一括の入力');await accept()
+ f.initialize.mockRejectedValueOnce(new ApiError(422,'送り方を確認してください','invalid_followup',undefined,undefined,undefined,{messageBubbles:'どれかの本文を確認してください'}))
+ await save();expect(screen.queryByRole('dialog',{name:'予約したときを変える'})).toBeNull()
+ expect(await screen.findAllByText('送り方を確認してください')).toHaveLength(7)
+ expect(screen.getAllByText('保存できませんでした')).toHaveLength(7)
+})

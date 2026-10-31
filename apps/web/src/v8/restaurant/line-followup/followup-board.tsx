@@ -10,6 +10,8 @@ import Dialog from '@/components/shared/dialog'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import StickyBar from '@/components/shared/sticky-bar'
 import { ListPageCards } from '@/components/templates/list-page'
+import { SaveErrorScope,useSaveFormErrors } from '@/components/shared/save-form-errors'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { describeSaveFailure } from '@/lib/api/transport/errors'
 import { followupBoardApi,type FollowupBoardSnapshot } from '@/lib/api/helpers/restaurant-followup-board'
 import { useUnsavedGuard } from '@/lib/use-unsaved-guard'
@@ -24,6 +26,20 @@ type Progress={key:string;name:string;state:'pending'|'done'|'failed';descriptio
 export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false}:{accountId:string;storeId:string;storeName:string;role:string|null;repairForm?:boolean}){
  const [snapshot,setSnapshot]=useState<FollowupBoardSnapshot|null>(null),[rows,setRows]=useState<FollowupCardModel[]>([]),[form,setForm]=useState<RestaurantReservationForm|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[busy,setBusy]=useState(false)
  const [editor,setEditor]=useState<FollowupCardModel|null>(null),[formEditor,setFormEditor]=useState(false),[test,setTest]=useState<RestaurantFollowupTrigger|null>(null),[progress,setProgress]=useState<Progress[]|null>(null),[notUsing,setNotUsing]=useState(false)
+ const saveErrors=useSaveFormErrors(),fieldFailure=useRef<{error:unknown;row?:FollowupCardModel}|null>(null)
+ const errorFields=['messageBubbles','timing','timing.offsetMinutes','timing.offsetDays','timing.sendAtTime','definition','title','definition.title','completionMessage','definition.completionMessage',...Array.from({length:5},(_,i)=>`messageBubbles.${i}.content.text`),...Array.from({length:6},(_,i)=>`definition.fields.${i}.label`)]
+ useEffect(()=>{
+  if(!(editor||formEditor)||!fieldFailure.current)return
+  const failure=fieldFailure.current;let next=0
+  // Dialogがportalへ移った後の実際の欄へ理由を結ぶ。
+  const frame=requestAnimationFrame(()=>{next=requestAnimationFrame(()=>{saveErrors.capture(failure.error);if(fieldFailure.current===failure)fieldFailure.current=null})})
+  return ()=>{cancelAnimationFrame(frame);cancelAnimationFrame(next)}
+ },[editor,formEditor,saveErrors.capture])
+ function revealFieldFailure(){if(!permission.current)return;const failure=fieldFailure.current;if(failure){if(failure.row)setEditor(failure.row);else setFormEditor(true)}}
+ function rememberFieldFailure(error:unknown,row?:FollowupCardModel){
+  const names=Object.keys(readSaveFieldErrors(error))
+  if(!fieldFailure.current&&names.some(name=>errorFields.includes(name)&&(row?/^(timing|messageBubbles)/.test(name):!/^(timing|messageBubbles)/.test(name))))fieldFailure.current={error,row}
+ }
  const [formRepairAccepted,setFormRepairAccepted]=useState(false)
  const lock=useRef(false),alive=useRef(true),canManage=role==='owner'||role==='admin',permission=useRef(canManage)
  permission.current=canManage
@@ -41,7 +57,7 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
  function assertCurrent(){if(!alive.current||!permission.current)throw new Error('操作する権限を確認してください。読み直してからお試しください')}
  async function save(){
   if(lock.current||!canManage||!snapshot||!form||!dirty)return false
-  lock.current=true;setBusy(true);setError('')
+  lock.current=true;setBusy(true);setError('');saveErrors.reset();fieldFailure.current=null
   const base=snapshot,draftRows=rows.map(row=>structuredClone(row)),draftForm=structuredClone(form),first=base.board.engines.length===0
   const workRows=first&&changed.length?draftRows:changed
   const records:Progress[]=[...(formChanged?[{key:'form',name:'予約の回答フォーム',state:'pending' as const}]:[]),...workRows.map(row=>({key:row.trigger,name:FOLLOWUP_NAMES[row.trigger],state:'pending' as const}))]
@@ -49,7 +65,7 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
   const done=new Set<string>()
   const mark=(keys:string[],state:Progress['state'],description:string)=>{if(alive.current)setProgress(current=>current?.map(item=>keys.includes(item.key)?{...item,state,description}:item)??null)}
   try{
-   if(formChanged){try{assertCurrent();await followupBoardApi.saveForm(accountId,storeId,base.form.version,draftForm,base.form.repairToken);done.add('form');mark(['form'],'done','予約の受付画面の設定を保存しました')}catch(e){mark(['form'],'failed',describeSaveFailure(e))}}
+   if(formChanged){try{assertCurrent();await followupBoardApi.saveForm(accountId,storeId,base.form.version,draftForm,base.form.repairToken);done.add('form');mark(['form'],'done','予約の受付画面の設定を保存しました')}catch(e){saveErrors.capture(e);rememberFieldFailure(e);mark(['form'],'failed',describeSaveFailure(e))}}
    if(workRows.length){
     if(first){
      try{
@@ -58,20 +74,20 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
       if(draftRows.some(row=>row.enabled&&!row.editable))throw new Error('詳しい構成の送り方があります。詳細画面で確認するか、オフにしてから保存してください')
       await followupBoardApi.initialize(accountId,storeId,draftRows.map(row=>({trigger:row.trigger,input:draftInput(row)})))
       draftRows.forEach(row=>{done.add(row.trigger);mark([row.trigger],'done',row.enabled?`${['reservation_24h','reservation_2h','anniversary_before'].includes(row.trigger)?'リマインダ':'オートメーション'}に、止めた下書きを作りました`:'オフのまま保存しました')})
-     }catch(e){mark(workRows.map(row=>row.trigger),'failed',describeSaveFailure(e))}
+     }catch(e){saveErrors.capture(e);mark(workRows.map(row=>row.trigger),'failed',describeSaveFailure(e))}
     }else for(const row of workRows){
      try{assertCurrent();const fresh=boardRows(await followupBoardApi.read(accountId,storeId)).find(item=>item.trigger===row.trigger)!
       if(!fresh||rowVersionKey(row)!==rowVersionKey(fresh))throw new Error('ほかの担当者が設定を変えました。読み直してください')
       await followupBoardApi.saveRow(accountId,storeId,row.trigger,draftInput(row));done.add(row.trigger);mark([row.trigger],'done',row.enabled?'同じ実物の下書きを更新しました。まだ送っていません':'送り方を止めて保存しました')
-     }catch(e){mark([row.trigger],'failed',describeSaveFailure(e))}
+     }catch(e){saveErrors.capture(e);rememberFieldFailure(e,row);mark([row.trigger],'failed',describeSaveFailure(e))}
     }
    }
    const latest=await followupBoardApi.read(accountId,storeId)
    const latestRows=boardRows(latest)
    if(alive.current){setSnapshot(latest);if(done.has('form'))setFormRepairAccepted(false);setRows(latestRows.map(row=>done.has(row.trigger)?row:draftRows.find(item=>item.trigger===row.trigger)??row));setForm(done.has('form')?latest.form.definition:draftForm)}
    return records.every(item=>done.has(item.key))
-  }catch(e){if(alive.current)setError(`保存の結果を読み直せませんでした。もう一度読み直してから操作してください。${describeSaveFailure(e)}`);return false}
-  finally{lock.current=false;if(alive.current)setBusy(false)}
+  }catch(e){saveErrors.capture(e);if(alive.current)setError(`保存の結果を読み直せませんでした。もう一度読み直してから操作してください。${describeSaveFailure(e)}`);return false}
+  finally{lock.current=false;if(alive.current){setBusy(false);revealFieldFailure()}}
  }
  async function decideNotUsing(){
   if(lock.current||!canManage||!snapshot||dirty||rows.some(row=>row.enabled))return
@@ -82,7 +98,7 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
  if(!snapshot||!form)return <Notice tone="danger" action={<Button variant="secondary" onClick={()=>void load().catch(()=>{})}>読み直す</Button>}>{error||'設定を読み込めませんでした'}</Notice>
  const testRow=rows.find(row=>row.trigger===test)
  const selectedOn=rows.filter(row=>row.enabled).length
- return <div className={styles.stack}>
+ return <SaveErrorScope errors={saveErrors}><div className={styles.stack}>
   <NoticeStack>
   {role==='viewer'&&<ReadOnlyNotice/>}
   <Notice tone="info">主要な送り方をかんたんに作れます。<Button variant="text" size="inline" textTone="accent" href="/reminders">リマインダ</Button>・<Button variant="text" size="inline" textTone="accent" href="/automations">オートメーション</Button>でも細かく設定できます。</Notice>
@@ -108,13 +124,13 @@ export function FollowupBoard({accountId,storeId,storeName,role,repairForm=false
    </Card>)}
   </ListPageCards>
   <StickyBar status={`オン ${selectedOn}つ・変更 ${changed.length+(formChanged?1:0)}件`} actions={<><Button variant="secondary" disabled={!canManage||busy||dirty||selectedOn>0} lockedReason={lockedReason} disabledReason={dirty?'先に変更を保存してください':selectedOn>0?'オンの送り方を止めて保存してから選べます':undefined} onClick={()=>setNotUsing(true)}>今は使わない</Button><Button variant="secondary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} onClick={()=>install(snapshot)}>元に戻す</Button><Button variant="primary" disabled={!canManage||busy||!dirty} lockedReason={lockedReason} busy={busy} onClick={()=>void save()}>保存して作る</Button></>}/>
-  {editor&&<FollowupEditor key={editor.trigger} row={editor} accountId={accountId} storeName={storeName} onCancel={()=>setEditor(null)} onConfirm={row=>{if(permission.current){update(row);setEditor(null)}}}/>}
-  {formEditor&&<ReservationFormEditor definition={form} storeName={storeName} onCancel={()=>setFormEditor(false)} onConfirm={next=>{if(permission.current){setForm(next);setFormRepairAccepted(true);setFormEditor(false)}}}/>}
+  {editor&&<FollowupEditor key={editor.trigger} row={editor} accountId={accountId} storeName={storeName} onCancel={()=>{saveErrors.reset();setEditor(null)}} onConfirm={row=>{if(permission.current){update(row);setEditor(null)}}}/>}
+  {formEditor&&<ReservationFormEditor definition={form} storeName={storeName} onCancel={()=>{saveErrors.reset();setFormEditor(false)}} onConfirm={next=>{if(permission.current){setForm(next);setFormRepairAccepted(true);setFormEditor(false)}}}/>}
   {testRow&&<TestStartDialog key={testRow.trigger} row={testRow} accountId={accountId} storeId={storeId} storeName={storeName} recipient={snapshot.board.testRecipient} canManage={canManage} lockedReason={lockedReason} onCancel={()=>{setTest(null);void load().catch(()=>{})}} onStarted={load}/>}
-  {notUsing&&<Dialog open title="今は使わないと設定しますか" description="この店の『LINE来店フォローを確認する』を済みにします。送り方は全てオフのままです。" confirmLabel="今は使わない" onCancel={()=>setNotUsing(false)} onConfirm={()=>void decideNotUsing()} busy={busy}/>}
-  {progress&&<Dialog open title={busy?'保存しています…':'保存の結果'} busy={busy} onCancel={()=>setProgress(null)}>
+  {notUsing&&<Dialog open title="今は使わないと設定しますか" description="この店の『LINE来店フォローを確認する』を済みにします。送り方はすべてオフのままです。" confirmLabel="今は使わない" onCancel={()=>setNotUsing(false)} onConfirm={()=>void decideNotUsing()} busy={busy}/>}
+  {progress&&!editor&&!formEditor&&<Dialog open title={busy?'保存しています…':'保存の結果'} busy={busy} onCancel={()=>setProgress(null)}>
    <div className={styles.stack}><Notice tone="info">作った場所と保存できた内容を確認してください。まだ送っていません。テスト送信と承認のあと送り始めます。</Notice><ul className={styles.list}>{progress.map(item=><li key={item.key}><strong>{item.name}</strong> <StatusBadge tone={item.state==='done'?'success':item.state==='failed'?'danger':'neutral'}>{item.state==='done'?'保存しました':item.state==='failed'?'保存できませんでした':'保存待ち'}</StatusBadge>{item.description&&<p>{item.description}</p>}</li>)}</ul></div>
   </Dialog>}
-  <UnsavedLeaveDialog open={guard.leaveTarget!==null} subject="LINE来店フォローの変更" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy}/>
- </div>
+  <UnsavedLeaveDialog open={guard.leaveTarget !== null} subject="LINE来店フォローの変更" onConfirm={guard.confirmLeave} onCancel={guard.cancelLeave} busy={busy}/>
+ </div></SaveErrorScope>
 }
