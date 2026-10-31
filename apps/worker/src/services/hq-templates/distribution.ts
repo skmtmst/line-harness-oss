@@ -195,6 +195,7 @@ export async function preflightDistribution(db: D1Database, authority: HqTemplat
         formReferences = await inspectFormTemplateReferences(db, authority, account.id, input, form.snapshot);
       } catch (error) {
         if (!(error instanceof FormTemplateError)) throw error;
+        if (error.code === 'PUBLIC_IMAGE_REFERENCE_UNSUPPORTED' || error.code === 'FORM_STORE_REFERENCE_UNAVAILABLE') throw new HqTemplateError(error.code, 422, ['definition']);
         if (error.code === 'FORBIDDEN') throw new HqTemplateError('FORBIDDEN', 403);
         if (error.code === 'SELECTION_REQUIRED' || error.code === 'VERSION_CONFLICT' || error.code === 'REFERENCE_UNAVAILABLE') throw new HqTemplateError(error.code === 'SELECTION_REQUIRED' ? 'SELECTION_REQUIRED' : 'VERSION_CONFLICT', 409);
         if (error.code === 'UNSUPPORTED_REFERENCE') throw new HqTemplateError('UNSUPPORTED', 422);

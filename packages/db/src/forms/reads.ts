@@ -1,3 +1,4 @@
+import { formMediaUsageStatements } from './media-references.js';
 import { sqlIdSet } from '../id-queries.js';
 import { jstDateString, toJstString } from '../utils.js';
 import { type Form, type FormAccountScope, type FormWithStats, type FormUsedByAccount } from './types.js';
@@ -172,9 +173,9 @@ export async function attachFormAccounts(
 ): Promise<void> {
   const uniqueIds = [...new Set(lineAccountIds)].filter(Boolean);
   if (uniqueIds.length === 0) return;
-  await db.batch(uniqueIds.map((accountId) => db
+  await db.batch([...uniqueIds.map((accountId) => db
     .prepare(`INSERT OR IGNORE INTO form_accounts (form_id, line_account_id) VALUES (?, ?)`)
-    .bind(formId, accountId)));
+    .bind(formId, accountId)), ...formMediaUsageStatements(db, formId)]);
 }
 
 export async function getFormById(
