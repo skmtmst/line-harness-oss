@@ -656,6 +656,10 @@ for (const width of [1152,1440,1920]) {
         return {kind:item.dataset.choiceCase,height:b.height,image:s.backgroundImage,shadow:s.boxShadow,radius:s.borderRadius,border:s.borderWidth,dy:a.y+a.height/2-b.y-b.height/2,right:b.right-a.right}
       }))
       const good=await measure()
+      if (process.env.V8_CHOICE_SHOTS_DIR) {
+        mkdirSync(process.env.V8_CHOICE_SHOTS_DIR, { recursive: true })
+        await page.locator('#choice-appearance').screenshot({ path: join(process.env.V8_CHOICE_SHOTS_DIR, `choice-surfaces-${width}.png`) })
+      }
       assert.equal(good.length,7)
       assert.ok(good.every(item=>item.height===36&&Math.abs(item.dy)<=1&&Math.abs(item.right-12)<=1),JSON.stringify(good))
       assert.deepEqual(good.map(({kind,image})=>({kind,image})), ['select','folder','entity','combo','multi','text','time'].map(kind=>({kind,image:['select','folder','entity','multi'].includes(kind)?'linear-gradient(rgb(255, 255, 255), rgb(250, 250, 252))':'none'})))
