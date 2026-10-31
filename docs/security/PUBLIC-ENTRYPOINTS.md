@@ -6,7 +6,7 @@
 
 ## 数え方と限界
 
-WorkerのHono実登録にある管理認証の外の入口は **205経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。10-17の列車42で統合後の実登録と照合し、不足していた19経路を追記した（182＋19）。既存行の全入力組合せを再監査したという意味ではない。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。 10-19 P02で店の写真の公開取得1経路を追記（201＋1）。認証の許可範囲は変更しない。 10-19にチャネル別LINE Webhookを追加（202＋1）。10-21に本人確認済みのクリック遷移資格発行を追加（203＋1）。10-31にF1の公開フォーム画像1経路を追加（204＋1）。
+WorkerのHono実登録にある管理認証の外の入口は **206経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。10-17の列車42で統合後の実登録と照合し、不足していた19経路を追記した（182＋19）。既存行の全入力組合せを再監査したという意味ではない。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。 10-19 P02で店の写真の公開取得1経路を追記（201＋1）。認証の許可範囲は変更しない。 10-19にチャネル別LINE Webhookを追加（202＋1）。10-21に本人確認済みのクリック遷移資格発行を追加（203＋1）。10-31にF1の公開フォーム画像1経路を追加（204＋1）。10-31に本人の月謝契約の閲覧1経路を追加（205＋1）。
 
 「全経路を列挙」と「すべての入力で安全を確認」は別。表の本人確認・期限はコードの方式で、実配備の設定や全資源ID×本人の組合せはS07/S15の未完を維持する。URLの実値・query・顧客情報は記録しない。
 
@@ -82,6 +82,7 @@ WorkerのHono実登録にある管理認証の外の入口は **205経路**（�
 | `GET /api/liff/affiliate/statements/:id/download` | 明細ID＋LINE本人の所属照合 | IP 3,000/分（単一実行環境） | 本人の支払明細PDF。発行/取得とも認証ヘッダー必須。旧署名なしリンクはqueryの認証情報を捨てLIFF入口へ303案内。R03のquery認証を廃止 | 署名は最長15分。本人/店/統括と明細の公開状態/取得期限も照合。期限なしの旧行は拒否 | `apps/worker/src/routes/affiliate-self.ts` |
 | `POST /api/liff/booking/:id/cancel` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
 | `POST /api/liff/booking/:id/reschedule` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
+| `GET /api/liff/booking/monthly-contracts` | LIFF IDでアカウントを解決し、LINE本人確認とそのアカウントへの友だちの所属を照合 | IP 3,000/分（単一実行環境） | 本人の友だちIDに属する月謝契約だけを返す。tenant/accountの範囲を固定 | LINE本人確認・アカウント有効・統括の契約有効を照合。private/no-store | `apps/worker/src/routes/booking-monthly.ts` |
 | `GET /api/liff/booking/availability` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 公開の空き枠/メニュー/表示設定。利用者一覧や秘密を含めないことを個別確認 | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
 | `GET /api/liff/booking/last-booking` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
 | `GET /api/liff/booking/me` | 資源ID/公開slug/LIFF IDは秘密ではない。本人操作はLINEと所属、公開表示は店の状態を確認 | IP 3,000/分（単一実行環境） | 本人の予約/会員/ペット/回答/支払等を返す経路を含む。IDだけで認可しない | LINE検証の有効性＋各予約/資源の状態。全組合せの証拠はS15の残件 | `apps/worker/src/routes/booking.ts` |
