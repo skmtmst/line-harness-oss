@@ -223,3 +223,5 @@ html:root .root[data-equal-width] .item { flex: 1 1 0; width: auto; min-width: 0
 /* 0件は項目全体を薄く示す。読めていない件数と押せない状態にはしない。 */
 html:root .root .item[data-empty],
 html:root .root .item[data-empty] .count { color: var(--color-ink-faint); }
+
+html:root .root[data-equal-width][data-segmented-fit='content'] { grid-auto-columns: minmax(max-content, 1fr); flex-shrink: 0; }
