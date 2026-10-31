@@ -1,0 +1,69 @@
+'use client'
+
+import type { AccountStyle } from '@line-crm/shared'
+import Button from '@/components/shared/button'
+import { DialogActions } from '@/components/shared/dialog'
+import Card from '@/components/shared/card'
+import { Field, TextInput } from '@/components/shared/form-controls'
+import { Steps } from '@/components/templates/steps'
+import { Check } from 'lucide-react'
+import { RestaurantFollowupDemo } from '@/v8/restaurant/line-followup/public/demo'
+import { STYLE_EXPERIENCE_SCRIPT, StyleExperiencePlayer } from './style-experience-player'
+import StyleChooseAction from './style-choose-action'
+import StyleSettingDemo from './style-setting-demo'
+import styles from './style-demo-pages.module.css'
+
+const afterLabel: Record<AccountStyle, string> = { restaurant: '来店のあとも', salon: '来店のあとも', consult: '相談のあとも', lesson: 'レッスンのあとも', standard: '問い合わせのあとも', ec: '注文のあとも' }
+const labelsFor = (style: AccountStyle) => ['できること', '設定のしかた', style === 'restaurant' ? 'LINE来店フォロー' : style === 'standard' ? 'お知らせを作る' : 'よく使う操作', afterLabel[style], '見本から始める']
+const headings: Record<AccountStyle, string[]> = {
+ restaurant: ['席と人数で、予約を受ける', '予約を受ける準備をする', 'LINE来店フォローで、かんたんに作る', '来店のあとも、つながりが続く', 'お店に合う見本から始められる'],
+ salon: ['メニューと担当で、予約を受ける', '予約を受ける準備をする', '担当ごとの予定を確認する', '来店のあとも、つながりが続く', 'サロンに合う見本から始められる'],
+ consult: ['相談の予約を、わかりやすく受ける', '相談を受ける準備をする', '相談の予定を確認する', '相談のあとも、つながりが続く', '相談に合う見本から始められる'],
+ lesson: ['レッスンの予定と予約をまとめる', 'イベントを受け付ける準備をする', 'クラスの予定を確認する', 'レッスンのあとも、つながりが続く', '教室に合う見本から始められる'],
+ standard: ['問い合わせとお知らせを、ひとつに', '予約を使う場合の準備をする', 'お知らせを作る', '問い合わせのあとも、つながりが続く', '使い方に合う見本から始められる'],
+ ec: ['注文とお問い合わせを確認する', 'お客様を分類する準備をする', '商品の案内を用意する', '注文のあとも、つながりが続く', 'お店に合う見本から始められる'],
+}
+const content: Record<AccountStyle, { setting: string; operation: string; after: string; feature: string }> = {
+  restaurant: { setting: '席と卓を登録し、人数に合わせた予約を受けます。', operation: '予約の前日や来店後の案内を用意します。', after: '予約を確認し、来店を記録します。', feature: '席・人数・コースに合わせたお店の見本から始められます。' },
+  salon: { setting: 'メニューと担当者、受付時間を設定します。', operation: '担当ごとの予定を確認します。', after: '来店を記録し、次のご案内に備えます。', feature: '担当とメニューに合わせた見本から始められます。' },
+  consult: { setting: '相談のメニューと受付時間を設定します。', operation: 'オンラインまたは対面の相談予約を確認します。', after: '面談の結果を確認し、次のご案内に備えます。', feature: '相談の使い方に合わせた見本から始められます。' },
+  lesson: { setting: 'イベント予約を使う場合は、受付の予定を設定します。', operation: 'クラスの予定と出席を確認します。', after: 'レッスンの出席を記録します。', feature: 'クラスと出欠に合わせた見本から始められます。' },
+  standard: { setting: '予約機能を有効にした場合は、予約メニューや受付枠を設定できます。', operation: 'お知らせの文とプレビューを確認します。', after: 'お問い合わせを受信箱で確認し、担当者が返事します。', feature: '使い方に合わせた見本と画面から始められます。' },
+  ec: { setting: 'お客様を分類するタグを作れます。', operation: '商品の案内を用意します。', after: '注文の数とお問い合わせを確認します。', feature: 'お店の使い方に合わせた見本から始められます。' },
+}
+
+export default function StyleDemoPages({ viewing, page, onPage, chosen, onChoose, disabled }: {
+  viewing: AccountStyle; page: number; onPage: (index: number) => void; chosen: AccountStyle | null
+  onChoose: (style: AccountStyle) => void; disabled: boolean
+}) {
+  const labels = labelsFor(viewing)
+  const look = STYLE_EXPERIENCE_SCRIPT.styles[viewing]
+  const text = content[viewing]
+  const message = page === 1 ? text.setting : page === 2 ? text.operation : page === 3 ? text.after : text.feature
+  return <section className={styles.root} aria-label={`${look.label}のデモ`}>
+    <Steps label="デモのページ" currentKey={String(page)} steps={labels.map((label, index) => ({
+      key: String(index), label, state: index === page ? 'current' : index < page ? 'done' : 'todo', reachable: true, onSelect: () => onPage(index),
+    }))} />
+    <p className={styles.counter}>{`${page + 1} / ${labels.length}`}</p>
+    <div><h3 data-demo-heading tabIndex={-1} className={styles.heading}>{headings[viewing][page]}</h3><p className={styles.description}>{page === 0 ? 'できることを、見本で紹介します。' : message}</p></div>
+    {page === 0 ? <>
+      <ul className={styles.can}>{look.can.map(item => <li key={item.text}><Check aria-hidden="true" className={styles.check} />{item.text}</li>)}</ul>
+      <StyleExperiencePlayer script={STYLE_EXPERIENCE_SCRIPT} style={viewing} switcher="external" variant="minimal" data="sample" />
+    </> : <>
+      {page === 1 ? <StyleSettingDemo key={viewing} style={viewing} /> : page === 2 && viewing === 'restaurant'
+        ? <RestaurantFollowupDemo />
+        : page === 2 && viewing === 'standard' ? <Card surface="muted" layout="vertical" padding="default" gap="normal" aria-label="お知らせの見本">
+          <strong>一斉配信</strong><Field label="本文"><TextInput value="営業時間のお知らせ" readOnly /></Field><p className={styles.note}>お知らせの文の見本です。</p>
+        </Card> : <Card surface="muted" layout="vertical" padding="default" gap="normal" aria-label="使い方の見本">
+          <strong>{page === 2 ? '操作の見本' : page === 3 ? '利用の流れ' : '基本の機能'}</strong>
+          <p className={styles.description}>{page === 4 ? '配信・タグ・自動応答などの基本も使えます。' : message}</p>
+        </Card>}
+      {page === 2 && viewing === 'restaurant' ? <p className={styles.note}>設定のない状態の見本です。実際の初期セットとは異なります。送り始めるには設定・公開・承認が必要です。</p> : null}
+    </>}
+
+  </section>
+}
+
+export function StyleDemoFooter({ viewing, page, onPage, chosen, onChoose, disabled }: { viewing: AccountStyle; page: number; onPage: (page: number) => void; chosen: AccountStyle | null; onChoose: (style: AccountStyle) => void; disabled: boolean }) {
+  return <DialogActions><div className={styles.navigation}><Button onClick={() => { if (page > 0) onPage(page - 1) }} aria-disabled={page === 0}>前のページ</Button><StyleChooseAction viewing={viewing} chosen={chosen} onChoose={onChoose} disabled={disabled} primary /><Button onClick={() => { if (page < 4) onPage(page + 1) }} aria-disabled={page === 4}>次のページ</Button></div></DialogActions>
+}
