@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import type { LineAccount } from '@line-crm/shared'
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
@@ -20,6 +21,10 @@ import EmergencyControlV8 from '../../v8/emergency/control'
  * 進めないことを実DOMで固定する。
  */
 vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
+
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }) }))
+const accounts = [{ id: 'acc-1', name: '確認用アカウント' }] as LineAccount[]
+const previewTargets: Array<string | null> = []
 
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children?: React.ReactNode }) => (
@@ -66,6 +71,7 @@ let host: HTMLDivElement | null = null
 
 beforeEach(() => {
   verifiedStaffRole('owner')
+  previewTargets.length = 0
   canControl = true
   activeIncidentId = null
   host = document.createElement('div')
@@ -87,10 +93,12 @@ beforeEach(() => {
       return response({ success: true, data: { status: 'changed', control: controlBase, incident: null } })
     }
     if (url.includes('/api/operations/control/preview')) {
+      const target = new URL(url, 'http://worker.test').searchParams.get('account_id')
+      previewTargets.push(target)
       return response({
         success: true,
         data: {
-          control: { ...controlBase, activeIncidentId, stoppedAt: activeIncidentId ? '2026-10-02T06:00:00.000Z' : null },
+          control: { ...controlBase, scopeKey: target ?? 'all', lineAccountId: target, activeIncidentId, stoppedAt: activeIncidentId ? '2026-10-02T06:00:00.000Z' : null },
           counts: {},
           impact,
           permissions: { canControl },
@@ -137,7 +145,7 @@ test('記録の読み込み中は表の形の骨組みが出て「読み込み�
       return response({ success: false, error: 'not mocked' }, 500)
     }))
     await act(async () => {
-      root?.render(<EmergencyControlV8 accounts={[]} />)
+      root?.render(<EmergencyControlV8 accounts={accounts} />)
     })
     await act(async () => {
       vi.advanceTimersByTime(350)
@@ -152,7 +160,7 @@ test('記録の読み込み中は表の形の骨組みが出て「読み込み�
 
 async function renderControl() {
   await act(async () => {
-    root?.render(<EmergencyControlV8 accounts={[]} />)
+    root?.render(<EmergencyControlV8 accounts={accounts} />)
   })
   /* 口（preview・history）の応答が返って描き終わるまで待つ。 */
   for (let i = 0; i < 10; i++) {
@@ -164,6 +172,7 @@ async function renderControl() {
 
 test('新しい制御タブ（OHwbU）が出る', async () => {
   await renderControl()
+  expect(previewTargets[0]).toBeNull()
   expect(host?.querySelector('[data-design-node="OHwbU"]')).not.toBeNull()
   expect(host?.textContent).toContain('何を止めますか')
   expect(host?.textContent).toContain('止めた・戻した記録')
@@ -176,6 +185,7 @@ test('PKG107: 閲覧のみには停止操作を灰色で残し、状態と記録
   canControl = false
   verifiedStaffRole('viewer')
   await renderControl()
+  expect(previewTargets[0]).toBe('acc-1')
   expect(host?.textContent).toContain('閲覧のみで見ています')
   const stopButton = Array.from(host?.querySelectorAll('button') ?? [])
     .find((button) => button.textContent === '選んだものを止める')
@@ -405,6 +415,7 @@ test('PKG107: 停止中の閲覧のみでは復旧操作を灰色で残し、停
   verifiedStaffRole('viewer')
   activeIncidentId = 'incident-1'
   await renderControl()
+  expect(previewTargets[0]).toBe('acc-1')
   expect(host?.textContent).toContain('止めているとき')
   await expectPermissionLocked([...host!.querySelectorAll('button')].find((el) => el.textContent?.trim() === '復旧する'))
   expect(stopCalls).toHaveLength(0)
