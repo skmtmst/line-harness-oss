@@ -26,7 +26,7 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { usePageTitle } from '@/components/shell/page-chrome';
-import PageResourceScope from '@/components/shell/page-resource-scope';
+import PageResourceScope, { usePageResourceTask } from '@/components/shell/page-resource-scope';
 import { resolveResourceTitle } from '@/lib/resource-title';
 import { useStaffRole } from '@/lib/staff-role';
 import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
@@ -49,6 +49,7 @@ import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form
 import ReadOnlyNotice from '@/components/shared/read-only-notice';
 import { TAB_ITEMS, TAB_NODE, type Snapshot } from "./edit-gap-parts"
 function FormEditInner({ host }: { host?: FormEditHost }) {
+  const captureResource = usePageResourceTask()
   const saveErrors = useSaveFormErrors()
   const params = useSearchParams()
   const id = params.get('id') ?? ''
@@ -550,6 +551,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
    */
   const save = async (publishAfter = false, { silent = false }: { silent?: boolean } = {}): Promise<boolean> => {
     if (!canEdit) return false
+    const isCurrent = captureResource()
+    if (!isCurrent()) return false
     const problem = saveProblem(publishAfter)
     if (problem) {
       if (silent) return false
@@ -576,7 +579,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     while (saveInFlight.current) await saveInFlight.current.catch(() => undefined)
     const expectedRevision = contentRevisionRef.current
     if (expectedRevision === null) return false
-    if (!silent) {
+    if (!silent && isCurrent()) {
       setSaving(true)
       setError('')
       setNotice('')
@@ -609,7 +612,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         }
         return formSavedContentMatches(sentContent, actual) ? latest.data.contentRevision : null
       } catch (saveFailure) {
-        saveErrors.capture(saveFailure);
+        if (isCurrent()) saveErrors.capture(saveFailure);
 
         return null
       }
@@ -622,7 +625,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       try {
         res = await api.forms.update(id, selectedAccountId, { ...sentContent, expectedContentRevision: expectedRevision })
       } catch (updateError) {
-        saveErrors.capture(updateError);
+        if (isCurrent()) saveErrors.capture(updateError);
 
         if (!(updateError instanceof ApiError) || updateError.status !== 409) throw updateError
         const ownRevision = await confirmOwnSave();
@@ -632,18 +635,21 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         res = { success: true, data: { id, contentRevision: ownRevision, updatedAt: '' } }
       }
       if (!res.success) {
-        if (!silent) setError(res.error)
+        if (!silent && isCurrent()) setError(res.error)
         return false
       }
       contentRevisionRef.current = res.data.contentRevision
-      setContentRevision(res.data.contentRevision)
-      clearConflict()
+      if (isCurrent()) {
+        setContentRevision(res.data.contentRevision)
+        clearConflict()
+      }
       if (publishAfter) {
         const published = await api.forms.publish(id, selectedAccountId, res.data.contentRevision)
         if (!published.success) {
-          setError(published.error)
+          if (isCurrent()) setError(published.error)
           return false
         }
+        if (!isCurrent()) return false
         setPublishedVersionId(published.data.id)
         setPublishedContentRevision(published.data.contentRevision)
         setIsActive(true)
@@ -651,6 +657,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         notifySaved(message)
         savedSnapshot.current = JSON.stringify({ ...current, isActive: true })
       } else {
+        if (!isCurrent()) return false
         if (!silent) {
           notifySaved('下書きを保存しました')
         }
@@ -669,6 +676,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       }
       return true
     } catch (e) {
+      if (!isCurrent()) return false
       const fieldFailure = saveErrors.capture(e)
       // ほかの人が先に保存していた（409）。入力はそのまま残し、読み直すかは運用者が決める。
       if (e instanceof ApiError && e.status === 409) {
@@ -688,7 +696,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
     } finally {
       saveInFlight.current = null
       settle()
-      if (!silent) setSaving(false)
+      if (!silent && isCurrent()) setSaving(false)
     }
   }
 

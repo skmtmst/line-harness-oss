@@ -51,7 +51,8 @@ export type MediaDeleteImpactReferenceKind =
   | "webinar"
   | "booking_menu"
   | "booking_staff"
-  | "booking_settings";
+  | "booking_settings"
+  | "form";
 
 /** 登録メディアを消す前に、運用者が確認する現在の使用先。 */
 export interface MediaDeleteImpactReference {

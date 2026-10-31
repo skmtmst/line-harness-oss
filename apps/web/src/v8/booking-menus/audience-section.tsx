@@ -8,7 +8,7 @@ import Radio, { RadioGroup } from '@/components/shared/radio'
  * 予約メニューの「見せる相手」（板 L6ifay・B9-1／要件 B9）。
  * 全員（初期）／このタグが付いた人だけ／このタグが付いた人には見せない。タグは「どれか1つ」。
  * 「この人で見る」で友だちを選ぶと、右のお客さまの予約画面の見本から見えないメニューが消え、理由が出る。
- * 保存の口（メニューの audienceMode・audienceTagIds）と見えない理由の口（preview-as）は Codex の次の段。いまは画面の中で判定する。
+ * 保存はメニューのAPIへつなぎ、編集中の見本は画面の中で判定する。
  */
 import { useEffect, useMemo, useState } from 'react'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -30,7 +30,8 @@ const MODES: Array<{ value: AudienceMode; label: string }> = [
 
 /** その人にこのメニューが見えるか。見えないときは理由の文（タグ名つき）を返す。 */
 export function audienceVisibility(mode: AudienceMode, tagIds: readonly string[], friendTagIds: readonly string[], tagName: (id: string) => string): { visible: true } | { visible: false; reason: string } {
-  if (mode === 'all' || tagIds.length === 0) return { visible: true }
+  if (mode === 'all') return { visible: true }
+  if (tagIds.length === 0) return { visible: false, reason: '見せる相手のタグを1つ以上選んでください。' }
   const hit = tagIds.filter((id) => friendTagIds.includes(id))
   if (mode === 'include_tags') {
     return hit.length > 0 ? { visible: true } : { visible: false, reason: `タグ「${tagIds.map(tagName).join('」「')}」がありません` }

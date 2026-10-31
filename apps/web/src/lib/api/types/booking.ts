@@ -1,3 +1,5 @@
+import type { BookingAudienceWrite } from '@line-crm/shared'
+
 // ----------------------------------------------------------------
 // Booking API client (admin endpoints scoped by ?account_id=)
 // ----------------------------------------------------------------
@@ -53,6 +55,9 @@ export interface BookingMenuResourceAssignment {
   isActive: boolean;
   warning: 'resource_inactive' | 'capacity_exceeded' | null;
 }
+
+/** 読み取りの列名と、APIへ送るタグ条件の項目名を区別する。 */
+export type BookingMenuWrite = Partial<BookingMenu> & Partial<Pick<BookingAudienceWrite, 'audienceMode' | 'audienceTagIds'>>
 
 /** T: 予約メニューの版。いちばん新しい版だけ status が in_use。 */
 export interface BookingMenuVersion {

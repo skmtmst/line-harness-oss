@@ -1,7 +1,6 @@
 'use client'
 import { CardHeader } from '@/components/shared/card'
 import TruncatedText from '@/components/shared/truncated-text'
-
 import { PRIORITY_FILTER, SORT_OPTIONS } from './support-list-options'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -16,7 +15,8 @@ import { planLabel, tenantDetailHref, opsCall, formatDateTime, PLAN_STATUS_LABEL
 import { compareLabel, durationLabel, elapsedLabel } from '@/v8/ops/support/format'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
-import { ListToolbarRow } from '@/components/shared/list-toolbar'
+import { ListToolbarEnd, ListToolbarRow } from '@/components/shared/list-toolbar'
+import SectionHeader from '@/components/shared/section-header'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -443,10 +443,10 @@ export default function OpsSupportV8() {
               {(
                 <>
                   <div className={styles.draft}>
-                    <div className={styles.draftHead}><ListToolbarRow>
+                    <SectionHeader wrap title={<span className={styles.draftHead}>
                       <Sparkles aria-hidden="true" />
                       <span className={styles.draftTitle} title={replyFromAi ? `${formatDateTime(replyFromAi.generatedAt)} に作成` : undefined}>{aiBusy ? 'AI の下書きを作成中…' : replyFromAi ? 'AI の下書き' : '返信'}</span>
-                      <span className={styles.spacer} />
+                    </span>} actions={<ListToolbarEnd>
                       {aiBusy ? (
                         <Button onClick={skipAi}>待たずに手で書く</Button>
                       ) : replyFromAi ? (
@@ -459,7 +459,7 @@ export default function OpsSupportV8() {
                           <Sparkles aria-hidden="true" />AIで下書きを作る
                         </Button>
                       )}
-                    </ListToolbarRow></div>
+                    </ListToolbarEnd>} />
                     {aiBusy ? (
                       <p className={styles.draftNote} role="status">AIが下書きを作っています。5〜15秒ほどかかります。</p>
                     ) : (

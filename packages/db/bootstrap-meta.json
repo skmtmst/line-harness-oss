@@ -659,7 +659,8 @@
     "743_restaurant_followup_rows.sql",
     "744_restaurant_followup_targets.sql",
     "745_style_starter_catalog.sql",
-    "747_restaurant_followup_preferences.sql"
+    "747_restaurant_followup_preferences.sql",
+    "748_form_public_media_usages.sql"
   ],
-  "migrationCount": 660
+  "migrationCount": 661
 }

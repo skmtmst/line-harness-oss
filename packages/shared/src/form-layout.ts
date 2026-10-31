@@ -1,4 +1,5 @@
 import { jstCalendar as japanCalendar } from './jst-datetime.js';
+import { parseFormReferences } from './form-public-references.js';
 import type {
   FormInputType, FormInputFormat, FormInputBlock, FormBlock, FormOptions,
   FormTheme, FormLayout, FormFieldCompat, FormAddressValue, FormDecorationBlock,
@@ -377,6 +378,8 @@ function safeJsonArray(raw: string): unknown[] {
 export function normalizeLayout(input: unknown): FormLayout | null {
   if (!input || typeof input !== "object") return null;
   const raw = input as Record<string, unknown>;
+  const references = parseFormReferences(raw.references);
+  if (!references) return null;
   if (formBlockTypeError(input)) return null;
 
   const sections = Array.isArray(raw.sections)
@@ -395,6 +398,7 @@ export function normalizeLayout(input: unknown): FormLayout | null {
 
   return {
     version: 2,
+    ...(raw.references === undefined ? {} : { references }),
     header: normalizeBlocks(raw.header),
     sections: sections.length
       ? sections
@@ -968,6 +972,15 @@ export function formBlockTypeError(input: unknown): string | null {
 }
 
 export function validateFormDefinition(layout: FormLayout): string | null {
+  const references = parseFormReferences(layout.references);
+  if (!references) return '表示する参照の形が正しくありません';
+  const blocks = [...layout.header, ...layout.sections.flatMap(section => section.blocks)];
+  for (const reference of references) {
+    const owners = blocks.filter(block => block.id === reference.blockId);
+    if (owners.length !== 1 || owners[0]?.kind !== (reference.kind === 'image' ? 'image' : 'text')) {
+      return '表示する参照に対応するブロックを選んでください';
+    }
+  }
   const design = layout.options.customerDesign;
   if (design !== undefined && (!design || !['account','fixed'].includes(design.mode) || !CUSTOMER_DESIGN_IDS.includes(design.preset))) return 'デザインの型を選び直してください';
   const typeError = formBlockTypeError(layout);

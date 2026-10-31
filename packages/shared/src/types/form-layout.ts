@@ -227,6 +227,8 @@ export interface FormTheme {
 
 export interface FormLayout {
   version: 2;
+  /** 画像/テキストの表示ブロックと結び、公開用の値はWorkerが別に解決する。 */
+  references?: import('../form-public-references.js').FormReferenceDefinition[];
   /** 全セクションの先頭に出る共通部分 */
   header: FormBlock[];
   sections: FormSection[];
