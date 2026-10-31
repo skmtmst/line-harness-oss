@@ -20,7 +20,7 @@ test('coupon fields keep the shared gap and short numeric width; spacing and wid
   const browser = await connectGuardBrowser()
   try {
     const page = await browser.newPage()
-    await page.setContent('<section data-design-part="card"><h2 id="coupon-basics">基本設定</h2><div data-form-row="media-fields" style="display:grid;grid-template-columns:180px 1fr;gap:12px;width:700px"><div data-media-slot style="height:100px"></div><input id="te-coupon-title"></div></section><section data-design-part="card"><h2 id="coupon-benefit">特典</h2><div data-form-row="compact" style="display:flex;gap:12px;width:700px"><div style="width:176px">種類</div><div style="width:176px">表示</div></div><span data-short style="display:block;width:128px"><input type="number" id="benefit" style="width:100%"></span></section>')
+    await page.setContent('<section data-design-part="card"><h2 id="coupon-basics">基本設定</h2><div data-form-row="media-fields" style="display:grid;grid-template-columns:180px 1fr;gap:12px;width:700px"><div data-media-slot style="width:180px;height:100px"></div><input id="te-coupon-title"></div></section><section data-design-part="card"><h2 id="coupon-benefit">特典</h2><div data-form-row="compact" style="display:flex;gap:12px;width:700px"><div style="width:176px">種類</div><div style="width:176px">表示</div></div><span data-short style="display:block;width:128px"><input type="number" id="benefit" style="width:100%"></span></section>')
     assert.deepEqual(await page.evaluate(scan), [])
     for (const [selector, property, fault, restored, kind] of [
       ['[data-form-row="media-fields"]', 'gridTemplateColumns', '1fr 1fr', '180px 1fr', 'coupon-media-gap'],
