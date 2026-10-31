@@ -855,3 +855,10 @@ describe('staff 権限の deny-by-default の網羅 (N-423 #670)', () => {
     expect(failClosed).not.toEqual(STAFF_FAIL_CLOSED_SNAPSHOT);
   });
 });
+
+it('Connect受信の管理認証例外は共通口のPOSTだけ',()=>{
+  const path='/api/booking/stripe-test/webhook';
+  expect(isPublicApiBoundary('POST',path)).toBe(true);
+  for(const method of ['GET','PUT','PATCH','DELETE'])expect(isPublicApiBoundary(method,path)).toBe(false);
+  expect(isPublicApiBoundary('POST',path+'/unexpected')).toBe(false);
+});

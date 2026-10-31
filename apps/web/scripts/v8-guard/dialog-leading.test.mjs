@@ -29,10 +29,12 @@ const menuStep = async page => {
 
 const recipes = [
   { source: 'components/friends/bulk-run-dialog.tsx', path: '/friends', open: async page => { const checks = page.locator('main tbody input[type="checkbox"]'); await checks.nth(0).check(); await checks.nth(1).check(); await button(page, '操作を選ぶ').click() } },
-  { source: 'v8/onboarding/wizard.tsx', path: '/?setup=0', after: menuStep, open: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).waitFor() } },
+  { source: 'v8/onboarding/wizard.tsx', index: 0, path: '/?setup=0', after: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).getByRole('button', { name: '次のページ', exact: true }).click() }, open: async page => { const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }); await dialog.waitFor(); await dialog.getByRole('button', { name: '詳しく見る', exact: true }).click() } },
+  { source: 'v8/onboarding/wizard.tsx', index: 1, path: '/?setup=0', after: menuStep, open: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).waitFor() } },
   { source: 'components/friend-fields/edit-tag-page-v4.tsx', path: '/tags/edit?id=tag-0', dependencyFailure: true, open: async page => { await button(page, 'タグを削除する').click() } },
   { source: 'components/friend-fields/tags-page-v4.tsx', path: '/tags', dependencyFailure: true, open: async page => { await rowMenu(page, '保管する') } },
-  { source: 'v8/account-new/registration-style-dialog.tsx', path: '/accounts/new', registration: true, after: menuStep, open: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).waitFor() } },
+  { source: 'v8/account-new/registration-style-dialog.tsx', index: 0, path: '/accounts/new', registration: true, after: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).getByRole('button', { name: '次のページ', exact: true }).click() }, open: async page => { const dialog = page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }); await dialog.waitFor(); await dialog.getByRole('button', { name: '詳しく見る', exact: true }).click() } },
+  { source: 'v8/account-new/registration-style-dialog.tsx', index: 1, path: '/accounts/new', registration: true, after: menuStep, open: async page => { await page.getByRole('dialog', { name: '使い方のスタイルを選ぶ', exact: true }).waitFor() } },
   { source: 'v8/hq/account-dialogs.tsx', path: '/hq', open: async page => { await button(page, /の設定$/).click() } },
   { source: 'v8/broadcasts/quick-send.tsx', path: '/broadcasts', dialogTitle: 'かんたんに送る', open: async page => { await menu(page, /^配信を作る/, 'かんたんに送る') }, fault: 'alignment' },
   { source: 'v8/ops/support.tsx', index: 0, path: '/ops/support', open: support, fault: 'overlap' },

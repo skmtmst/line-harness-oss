@@ -1,3 +1,5 @@
+import { readBodyWithinLimit } from '../services/stripe-signature.js';
+import { externalBookingStripeObject } from '../features/booking/booking-stripe-webhooks/index.js';
 import { liffBookingJson, liffBookingInputError } from './liff-booking-response.js';
 import { logger } from '@line-crm/shared/server';
 import { runBookingPaymentStart } from '../features/booking/booking-payment-start/index.js';
@@ -382,10 +384,10 @@ bookingPayments.post('/api/booking/payments/:id/booking',requireRole('owner','ad
 // POST /api/booking/payments/webhook/:provider — 支払い済みの知らせ
 bookingPayments.post(
   '/api/booking/payments/webhook/:provider',
-  inputJsonBoundary(), async (c) => {
+  async (c) => {
     const providerName = c.req.param('provider');
-    const rawBody = await c.req.text();
-    if (new TextEncoder().encode(rawBody).byteLength > 256 * 1024) {
+    const rawBody = await readBodyWithinLimit(c.req.raw);
+    if (rawBody === null) {
       return c.json({ success: false, error: 'Payload too large' }, 413);
     }
     const signature = c.req.header('stripe-signature') ?? c.req.header('x-payment-signature') ?? '';
@@ -393,6 +395,7 @@ bookingPayments.post(
     if (!provider) return c.json({ success: false, error: 'unknown provider' }, 404);
     const outcome = await provider.verifyWebhook(rawBody, signature);
     if (!outcome) return c.json({ success: false, error: 'Invalid signature' }, 401);
+    if (providerName === 'stripe' && await externalBookingStripeObject(c.env.DB,outcome.providerPaymentId)) return c.json({success:false,error:'connect_webhook_required'},409);
     const result = await receivePaymentEvent(c.env.DB, providerName, outcome, rawBody);
     if (['event_conflict','busy_or_missing'].includes(result.status) || result.result==='failed') {
       return c.json({success:false,error:'payment_event_unavailable',code:'payment_event_unavailable'},503);
