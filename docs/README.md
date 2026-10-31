@@ -353,6 +353,7 @@
 
 ## API
 
+- [一括予約の券・支払い・承認・通知（後続実装の契約設計）](booking-bulk-processing-contract.md)
 - [External call executor (A06 / B-365①)](../apps/worker/src/lib/external-call/README.md)
 - [LINE API 互換プロキシ (/line-api)](LINE-API-PROXY.md)
 - [下書き・会話検索・InstagramのAPI](api/drafts-and-instagram.md)
@@ -1054,3 +1055,6 @@
 
 - [予約の案内と比較の並び](release-log/unreleased/2001-kenta-rival-small-fixes.md) — 反映履歴、確認 2026-10-31。
 - [保存先の固定とフォームの公開参照](release-log/unreleased/2001-kenta-train-1029x.md) — 反映履歴、確認 2026-10-31。
+
+- [繰り返し設定の読み戻し](release-log/unreleased/0000-kenta-recurring-menu-readback.md) — 反映履歴、確認 2026-10-31
+- [一括予約の処理設計](release-log/unreleased/0000-kenta-bulk-booking-design.md) — 反映履歴、確認 2026-10-31
