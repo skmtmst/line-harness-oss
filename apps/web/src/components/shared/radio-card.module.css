@@ -378,3 +378,15 @@ html:root .card.compact[data-compact-typography='banner'] > .radio { top: var(--
 /* カードの枠を焦点の持ち主にし、行形式は丸の輪を保つ。 */
 html:root .card:not(.row) .radio:focus-visible { outline: var(--polish-focus-width) solid transparent; }
 html:root .card:not(.row).invalid:has(.radio:focus-visible) { outline-color: var(--color-danger); }
+
+/* 権限の理由がある時だけ灰色へ。選択の印と焦点の輪は別々に残す。 */
+html:root .locked:is(.card, .row), html:root .locked:is(.card, .row):is(:hover, :active) {
+  background: var(--color-canvas-sunken);
+  color: var(--color-ink-secondary);
+  cursor: not-allowed;
+}
+html:root .locked:is(.card, .row) .title, html:root .locked:is(.card, .row) .inlineIcon, html:root .locked:is(.card, .row) .check { color: var(--color-ink-secondary); }
+html:root .locked:is(.card, .row) .radio { cursor: not-allowed; border-color: var(--color-ink-secondary); }
+html:root .locked:is(.card, .row) .radio:checked { background: radial-gradient(circle, var(--color-ink-secondary) calc(var(--choice-dot) / 2), var(--color-canvas) calc(var(--choice-dot) / 2)); }
+html:root .locked.checked:not(.row):not(:has(.radio:focus-visible)) { outline: var(--choice-card-ring) solid var(--color-ink-secondary); }
+html:root .locked.row, html:root .locked.row:is(:hover, :active) { background: transparent; }

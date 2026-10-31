@@ -1,4 +1,5 @@
 'use client'
+import TextLink from '@/components/shared/text-link'
 import type { TapActionSourceItem, TapActionSources } from './tap-action-source-types'
 export type { TapActionSourceItem, TapActionSources } from './tap-action-source-types'
 
@@ -21,7 +22,6 @@ export type { TapActionSourceItem, TapActionSources } from './tap-action-source-
  * 作ってあるものを選ぶ窓は共通の選ぶ窓（EntityPicker・Pen dJZ7Q）。下の `TapTargetPicker` で呼ぶ。
  */
 import { useId, useMemo, useState, type ReactNode } from 'react'
-import Link from 'next/link'
 import { CalendarCheck, ClipboardList, ExternalLink, History, Info, MessageSquare, Stamp, type LucideIcon } from 'lucide-react'
 import { TAP_ACTION_DEFS, TAP_ACTION_KINDS, tapActionDef, type TapActionKind, type TapActionValue } from '@/lib/tap-actions'
 import TapExtrasField from './tap-extras-field'
@@ -161,7 +161,7 @@ export default function TapActionField({
   } else if (liffMissing) {
     body = (
       <Notice tone="info" role="note" icon={<Info aria-hidden="true" />} action={<>
-        {readOnly ? null : <Link href={liffSettingsHref} className={styles.liffLink}>設定を開く</Link>}
+        {readOnly ? null : <TextLink inline href={liffSettingsHref}>設定を開く</TextLink>}
       </>}>
         <span className={styles.liffText}>この動きは LIFF の設定が要ります</span>
 

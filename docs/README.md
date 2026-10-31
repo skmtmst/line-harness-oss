@@ -545,6 +545,7 @@
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
 - [知らせの札・本文の整列と文字の操作](release-log/unreleased/1997-kenta-notice-status-actions.md)
 - [画面の表示確認の試験準備](release-log/unreleased/1997-kenta-browser-fixture-paths.md)
+- [確認の窓の失敗表示と再試行](release-log/unreleased/2005-kenta-confirm-dialog-errors.md)
 - [運営コンソールの端の詰まり修正](release-log/unreleased/1948-kenta-muse-fqa-edge.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
 - [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
@@ -1056,15 +1057,19 @@
 
 - [予約の案内と比較の並び](release-log/unreleased/2001-kenta-rival-small-fixes.md) — 反映履歴、確認 2026-10-31。
 - [保存先の固定とフォームの公開参照](release-log/unreleased/2001-kenta-train-1029x.md) — 反映履歴、確認 2026-10-31。
+- [文字の操作を見分ける表示](release-log/unreleased/2005-kenta-text-button-actions.md) — 反映履歴、確認 2026-10-31。
 
 - [繰り返し設定の読み戻し](release-log/unreleased/2003-kenta-recurring-menu-readback.md) — 反映履歴、確認 2026-10-31
 - [一括予約の処理設計](release-log/unreleased/2003-kenta-bulk-booking-design.md) — 反映履歴、確認 2026-10-31
 
 - [今月の成果の流れの窓](release-log/unreleased/2003-kenta-monthly-flow.md) — 反映履歴、確認 2026-10-31。
-- [クラスの振替の決まり](release-log/unreleased/0000-kenta-class-makeup-rule.md) — 反映履歴、確認 2026-10-31
 
 - [初期設定の案内と閲覧権限](release-log/unreleased/2004-kenta-setup-guidance.md) — 反映履歴、確認 2026-10-31。
 - [月謝の台帳と閲覧API](release-log/unreleased/2004-kenta-monthly-ledger.md) — 反映履歴、確認 2026-10-31。
+- [クラスの振替の決まり](release-log/unreleased/2005-kenta-class-makeup-rule.md) — 反映履歴、確認 2026-10-31
+
+
+- [選択カードの権限表示](release-log/unreleased/2005-kenta-radio-card-permission.md) — 反映履歴、確認 2026-10-31。
 - [受信箱の会話と機能設定の案内](release-log/unreleased/2006-masato-inbox-feature-gate.md) — 反映履歴、確認 2026-10-31。
 - [店舗設定のLINEアカウント管理導線](release-log/unreleased/2007-masato-store-line-account-menu.md) — 反映履歴、確認 2026-10-31。
 - [設定メニューの表示維持](release-log/unreleased/2008-masato-settings-nav.md) — 反映履歴、確認 2026-10-31。

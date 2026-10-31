@@ -312,12 +312,13 @@ export default function AccountHandoverV8() {
       if (!res.success) throw new Error(res.error)
       setCancelOpen(false)
       await load()
+      return true
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setExecuteError('取り消せませんでした。しばらくおいてから、もう一度お試しください。') }
-      setCancelOpen(false)
+      return false
     } finally {
       setCancelling(false)
     }
@@ -471,7 +472,7 @@ export default function AccountHandoverV8() {
           <p className={styles.boxHead}>
             <span className={styles.boxLabel}>事前確認の結果</span>
             {canManage ? (
-              <Button type="button" variant="text" presentation="account-inline" aria-expanded={declaredOpen} onClick={() => setDeclaredOpen((open) => !open)}>
+              <Button type="button" variant="text" textTone="ink" presentation="account-inline" aria-expanded={declaredOpen} onClick={() => setDeclaredOpen((open) => !open)}>
                 {handover.declaredFriendTotal != null ? `申告 ${formatNumber(handover.declaredFriendTotal)} 人` : '申告の数を入れる'}
               </Button>
             ) : handover.declaredFriendTotal != null ? (
@@ -583,7 +584,7 @@ export default function AccountHandoverV8() {
         </p>} actions={<>
         {/* 取り消しは進行中だけ。変更なので見るだけの人には出さない。 */}
         {canManage && handover.status !== 'completed' && handover.status !== 'failed' && handover.status !== 'cancelled' ? (
-          <Button type="button" onClick={() => setCancelOpen(true)}>引き継ぎをやめる</Button>
+          <Button type="button" onClick={() => { setExecuteError(''); setCancelOpen(true) }}>引き継ぎをやめる</Button>
         ) : null}
         {canManage && handover.status !== 'completed' ? (
           <Button type="button" variant="primary" disabled={executeDisabled} title={executeDisabled ? unresolved > 0 ? '全員の判断を決めてください' : executing ? '実行しています' : '事前確認と判断の状態を確かめてください' : undefined} busy={executing} busyLabel="実行中…" onClick={() => { setExecuteError(''); setConfirmOpen(true) }}>
@@ -623,7 +624,7 @@ export default function AccountHandoverV8() {
         confirmLabel="引き継ぎを取り消す" busyLabel="取り消し中…"
         destructive
         busy={cancelling}
-        onConfirm={() => runCancel()}
+        error={executeError || undefined} onSuccess={() => setCancelOpen(false)} onConfirm={() => runCancel()}
         onCancel={() => { if (!cancelling) setCancelOpen(false) }}
       />
       <ConfirmDialog

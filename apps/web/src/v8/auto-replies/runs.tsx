@@ -257,8 +257,10 @@ export default function AutoReplyRunsV8() {
       setStopReason('')
       setActionMessage('自動応答を一時停止しました。')
       await load()
+      return true
     } catch {
       setActionMessage('一時停止できませんでした。状態を読み直してからお試しください。')
+      return false
     } finally {
       setStopping(false)
     }
@@ -430,7 +432,7 @@ export default function AutoReplyRunsV8() {
       help="いつ・誰に・何を返したか、失敗した処理を見ます。"
       identity={<></>}
       actions={<div className={styles.headActions}>
-          <Button lockedReason={manageReason} onClick={() => { if (canManageRunsNow()) setStopOpen(true) }} disabled={!canChange || !isActiveRule || stopping}>
+          <Button lockedReason={manageReason} onClick={() => { if (canManageRunsNow()) { setActionMessage(''); setStopOpen(true) } }} disabled={!canChange || !isActiveRule || stopping}>
             <Pause size={16} aria-hidden="true" />一時停止する
           </Button>
         {data?.rule.id ? (
@@ -609,7 +611,7 @@ export default function AutoReplyRunsV8() {
         destructive
         busy={stopping}
         designNode="i8F12"
-        onConfirm={() => stopRule()}
+        error={actionMessage || undefined} onSuccess={() => setStopOpen(false)} onConfirm={() => stopRule()}
         onCancel={() => { if (!stopping) { setStopOpen(false); setStopReason('') } }}
       >
         <SaveErrorField names={["stopReason","reason","stop_reason"]}><SharedTextField

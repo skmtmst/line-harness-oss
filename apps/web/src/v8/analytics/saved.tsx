@@ -119,6 +119,8 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   const [savedReload, setSavedReload] = useState(0)
   const [snapshotReload, setSnapshotReload] = useState(0)
   const [archiveTarget, setArchiveTarget] = useState<AnalyticsReportSchedule | null>(null)
+  const [archiveError, setArchiveError] = useState('')
+  const [archiveReviewRequired, setArchiveReviewRequired] = useState(false)
   const [historyExpanded, setHistoryExpanded] = useState(false)
   const [openSnapshot, setOpenSnapshot] = useState<SavedAnalyticsSnapshot | null>(null)
 
@@ -168,7 +170,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
     schedulesGen.current += 1
     setSchedulesLoading(true); setSchedules([]); setRecentOneTime([]); setSchedulesError('')
     // アカウントが変わったら前の確認窓は閉じる（別アカウントへ操作を送らない）。
-    setArchiveTarget(null)
+    setArchiveTarget(null); setArchiveError(''); setArchiveReviewRequired(false)
     void api.analytics.reportSchedules.list(accountId).then((response) => {
       if (!active) return
       if (!response.success) throw new Error(response.error)
@@ -180,24 +182,32 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
   }, [accountId])
 
   const changeScheduleStatus = async (schedule: AnalyticsReportSchedule, status: 'active' | 'paused' | 'archived') => {
+    if (status === 'archived' && archiveReviewRequired) return false
     setScheduleBusyId(schedule.id)
-    setSchedulesError('')
+    if (status === 'archived') setArchiveError('')
     try {
       const response = await api.analytics.reportSchedules.setStatus(accountId, schedule.id, { status, expectedUpdatedAt: schedule.updatedAt })
       if (!response.success) {
         // 先に誰かが変えていたら最新を読み直してから知らせる。
-        setSchedulesError(response.error)
+        const message = describeApiFailure(new Error(response.error), '更新')
+        if (status === 'archived') { setArchiveError(message); setArchiveReviewRequired(true) }
+        else setSchedulesError(message)
         reloadSchedules()
-        return
+        return false
       }
       setSchedules((current) => status === 'archived' ? current.filter((item) => item.id !== schedule.id) : current.map((item) => (item.id === schedule.id ? response.data : item)))
       setArchiveTarget(null)
+      return true
     } catch (caught) {
-      const fieldFailure = saveErrors.capture(caught);
-
-
-      if (!fieldFailure) {
-      setSchedulesError(describeApiFailure(caught, '更新')) }
+      saveErrors.capture(caught)
+      const message = describeApiFailure(caught, '更新')
+      if (status !== 'archived') setSchedulesError(message)
+      if (status === 'archived') {
+        setArchiveError(message)
+        const code = caught && typeof caught === 'object' && 'status' in caught ? Number(caught.status) : null
+        setArchiveReviewRequired(code === null || code === 409 || code >= 500)
+      }
+      return false
     } finally {
       setScheduleBusyId('')
     }
@@ -321,7 +331,7 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
             <Td><TruncatedText value={schedule.isOneTime ? '1回だけ' : cadenceLabel(schedule)} /></Td>
             <Td><TruncatedText value={schedule.status === 'paused' ? emptyValue('unknown') : shortDateTime(schedule.nextRunAt).replace(/ 0(\d):/, ' $1:')} /></Td>
             <Td><span><StatePill tone={schedule.status === 'active' ? 'ok' : 'neutral'}>{REPORT_STATUS_LABELS[schedule.status]}</StatePill></span></Td>
-            <ActionCell>{canManage && !schedule.isOneTime ? <ScheduleMenu schedule={schedule} busy={scheduleBusyId === schedule.id} onPause={() => void changeScheduleStatus(schedule, 'paused')} onResume={() => void changeScheduleStatus(schedule, 'active')} onArchive={() => setArchiveTarget(schedule)} /> : null}</ActionCell>
+            <ActionCell>{canManage && !schedule.isOneTime ? <ScheduleMenu schedule={schedule} busy={scheduleBusyId === schedule.id} onPause={() => void changeScheduleStatus(schedule, 'paused')} onResume={() => void changeScheduleStatus(schedule, 'active')} onArchive={() => { setArchiveError(''); setArchiveReviewRequired(false); setArchiveTarget(schedule) }} /> : null}</ActionCell>
           </Tr>)}</tbody>
         </DataTable></Card>}
 
@@ -341,8 +351,8 @@ export default function SavedV8({ accountId, onCountChange, canManage }: { accou
       confirmLabel="しまう"
       destructive
       busy={archiveTarget !== null && scheduleBusyId === archiveTarget.id}
-      onConfirm={() => { if (archiveTarget) void changeScheduleStatus(archiveTarget, 'archived') }}
-      onCancel={() => setArchiveTarget(null)}
+      error={archiveError || undefined} confirmDisabled={archiveReviewRequired} confirmDisabledReason="閉じて最新の定期レポートを確認してください。" onSuccess={() => setArchiveTarget(null)} onConfirm={() => archiveTarget ? changeScheduleStatus(archiveTarget, 'archived') : undefined}
+      onCancel={() => { setArchiveTarget(null); setArchiveError(''); if (archiveReviewRequired) reloadSchedules(); setArchiveReviewRequired(false) }}
     />
     <Dialog open={openSnapshot !== null} title="この時点の結果" description={openSnapshot ? `${formatAnalyticsDate(openSnapshot.periodFrom)}〜${formatAnalyticsDate(openSnapshot.periodTo)}・データ締切 ${formatAnalyticsDateTime(openSnapshot.dataCutoffAt)}・${SAVED_STATE_LABELS[openSnapshot.state]}` : undefined} confirmLabel="閉じる" onConfirm={() => setOpenSnapshot(null)} onCancel={() => setOpenSnapshot(null)}>
       {openSnapshot ? (() => {

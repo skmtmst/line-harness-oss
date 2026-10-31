@@ -200,10 +200,11 @@ function BillingInner() {
       const res = await api.hqBilling.portal()
       if (!res.success) throw new Error(res.error)
       window.location.href = res.data.url
+      return true
     } catch (caught) {
-      setChange(null)
       setError(billingFailureMessage(caught, '支払い方法の管理画面の表示', '支払い方法の管理はオーナーか管理者だけができます。オーナーか管理者の方に操作してもらってください。'))
       setBusy(null)
+      return false
     }
   }
 
@@ -326,7 +327,7 @@ function BillingInner() {
                   </Button>
                 ) : isOwner && changeRoute ? (
                   <Button
-                    onClick={() => setChange({ plan, route: changeRoute })}
+                    onClick={() => { setError(''); setChange({ plan, route: changeRoute }) }}
                     disabled={busy !== null}
                     className={styles.planButton}
                   >
@@ -365,12 +366,14 @@ function BillingInner() {
         onConfirm={() => {
           if (!change) return
           if (change.route === 'portal') {
-            void portal()
-            return
+            return portal()
           }
           setChange(null)
           router.push('/hq/support')
+          return true
         }}
+        error={error || undefined}
+        onSuccess={() => setChange(null)}
       />
 
       <section className={styles.history} data-design="History">

@@ -1,4 +1,5 @@
 'use client'
+import TextLink from '@/components/shared/text-link'
 import { isForbiddenOrRateLimited,permissionDeniedMessage } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
@@ -11,7 +12,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select'
 import { Field } from '@/components/shared/form-controls'
 import IconButton from '@/components/shared/icon-button'
-import Link,{ useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
@@ -301,7 +302,7 @@ function OwnShiftEntry() {
         desc="管理者が予約スタッフとログインユーザーをひも付けると、ここで自分の勤務を決められます。"
         actions={<>
           <Button href="/booking/bookings">予約の一覧へ戻る</Button>
-          {canSeeStore ? <Link href="/booking/menus?tab=hours" className={styles.stateLink}>店の受付枠を見る</Link> : null}
+          {canSeeStore ? <TextLink inline href="/booking/menus?tab=hours">店の受付枠を見る</TextLink> : null}
         </>}
       />
     )
@@ -455,6 +456,9 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
 
   const load = useCallback(async () => {
     const requestId = ++requestRef.current
+    setDisconnecting(false)
+    setSavingRules(false); setSavingBreaks(false); setSavingShift(false)
+    setConfirmDisconnect(false)
     if (!selectedAccountId) {
       setStaffList([])
       setLoadStatus('ready')
@@ -884,16 +888,17 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         if (!res.success) throw new Error('exception_delete_failed')
       } else {
         const target = removeTarget.item.key
-        if (!await saveBreakDates(dateRows.filter((row) => row.key !== target))) return
+        if (!await saveBreakDates(dateRows.filter((row) => row.key !== target))) return false
       }
       setRemoveTarget(null)
-      await refreshAfterSave('days')
-      if (saveGeneration !== requestRef.current) return
+      void refreshAfterSave('days')
+      return true
     } catch (error) {
       if (saveGeneration !== requestRef.current) return
       const fieldFailure = saveErrors.capture(error)
       { if (!fieldFailure)
       setShiftError(staffErrorMessage(error, '削除')) }
+      return false
     } finally {
       if (saveGeneration !== requestRef.current)
 
@@ -978,22 +983,27 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
   }
 
   async function disconnectCalendar() {
+    const saveGeneration = requestRef.current
     if (!selectedAccountId) return
     setDisconnecting(true)
     try {
       await bookingApi.deleteGoogleCalendar(selectedAccountId, staffId)
+      if (saveGeneration !== requestRef.current) return
       setConfirmDisconnect(false)
       setCalendarId(null)
       setCalendarVerifiedAt(null)
       setCalendarError(null)
-      if (menuId) await loadAvailability(selectedAccountId, menuId, timeZone, requestRef.current)
+      if (menuId) void loadAvailability(selectedAccountId, menuId, timeZone, saveGeneration)
+      return true
     } catch (error) {
+      if (saveGeneration !== requestRef.current) return
       const fieldFailure = saveErrors.capture(error)
 
       { if (!fieldFailure)
       setCalendarFormError(staffErrorMessage(error, '削除')) }
+      return false
     } finally {
-      setDisconnecting(false)
+      if (saveGeneration === requestRef.current) setDisconnecting(false)
     }
   }
 
@@ -1275,7 +1285,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
                       )}
                       <span className={styles.exMemo}>{row.kind === 'exception' ? (row.item.reason ?? '') : ''}</span>
                       {canEdit ? (
-                        <IconButton onClick={() => setRemoveTarget(row)} aria-label={`${shortDay(row.date)} の${kindLabel}を削除`}>
+                        <IconButton onClick={() => { setShiftError(null); setRemoveTarget(row) }} aria-label={`${shortDay(row.date)} の${kindLabel}を削除`}>
                           <Trash2 aria-hidden="true" />
                         </IconButton>
                       ) : null}
@@ -1385,7 +1395,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
               ) : null}
               {canEdit ? (
                 <div className={styles.calActions}>
-                  {calendarId ? <Button onClick={() => setConfirmDisconnect(true)} disabled={disconnecting}>外す</Button> : null}
+                  {calendarId ? <Button onClick={() => { setCalendarFormError(''); setConfirmDisconnect(true) }} disabled={disconnecting}>外す</Button> : null}
                   <Button variant={calendarId ? 'secondary' : 'primary'} onClick={() => void connectCalendar()} disabled={savingCalendar || !serviceConfigured} busy={savingCalendar} busyLabel="確認中…" widthReserve="idle">
                     {calendarId ? '保存する' : 'つなげる'}
                   </Button>
@@ -1409,7 +1419,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         destructive
         busy={deleting}
         onCancel={() => setRemoveTarget(null)}
-        onConfirm={() => removeDayEntry()}
+        error={shiftError || undefined} confirmDisabled={removeTarget?.kind === 'break' && Boolean(dateSaveConflict.conflict)} confirmDisabledReason="閉じて最新の内容と比べてください。" onSuccess={() => setRemoveTarget(null)} onConfirm={() => removeDayEntry()}
       />
       <ConfirmDialog
         open={confirmDisconnect}
@@ -1419,7 +1429,7 @@ function StaffShiftsDetail({ staffId, isSelf }: { staffId: string; isSelf: boole
         destructive
         busy={disconnecting}
         onCancel={() => setConfirmDisconnect(false)}
-        onConfirm={() => disconnectCalendar()}
+        error={calendarFormError || undefined} onSuccess={() => setConfirmDisconnect(false)} onConfirm={() => disconnectCalendar()}
       />
     </SaveErrorScope>
   )

@@ -71,18 +71,26 @@ export function useFriendInfoTags({ setMemoSaving, targetKey, friendId, accountI
   const removeTagById = useCallback((tagId: string) => {
     if (!friendId) return
     const tag = (effectiveTags ?? []).find((t) => t.id === tagId)
-    if (!tag) return
+    if (!tag) return Promise.resolve(true)
     const putBack = () => setLocalTags((now) => [...(now ?? effectiveTags ?? []).filter((t) => t.id !== tagId), tag])
     setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId))
+    const isCurrent = beginChange(`tag:${tagId}`)
+    return new Promise<boolean | void>((resolve, reject) => {
     runOptimisticWithUndo({
-      isCurrent: beginChange(`tag:${tagId}`),
-      request: () => api.friends.removeTag(friendId, tagId),
+      isCurrent,
+      request: async () => {
+        try { return await api.friends.removeTag(friendId, tagId) }
+        finally { if (!isCurrent()) resolve(undefined) }
+      },
+      onSuccess: () => resolve(true),
+      onFailure: reject,
       revert: putBack,
       reapply: () => setLocalTags((now) => (now ?? effectiveTags ?? []).filter((t) => t.id !== tagId)),
       successMessage: `タグ「${tag.name}」を外しました`,
       failureMessage: `タグ「${tag.name}」を外せませんでした。`,
       retry: () => removeTagById(tagId),
       undoRequest: () => api.friends.addTag(friendId, tagId),
+    })
     })
   }, [friendId, effectiveTags, setLocalTags, beginChange])
 

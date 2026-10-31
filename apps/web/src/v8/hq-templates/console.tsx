@@ -316,7 +316,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
   const perform = async (action: () => Promise<void>) => {
     if (lock.current || !ready) return
     lock.current = true; setBusy(true); setError(''); setConflict(false); setMessage('')
-    try { await action() } catch (e) {
+    try { await action(); return true } catch (e) {
       const fieldFailure = saveErrors.capture(e);
 
       if (alive.current) {
@@ -329,6 +329,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         if (collided) collision.mark()
         }
       }
+      return false
     } finally { lock.current = false; if (alive.current) setBusy(false) }
   }
   const toList = () => {
@@ -758,7 +759,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         })}
         onDistribute={(row) => open(row.id, 'accounts')}
         onDuplicate={duplicateRow}
-        onRemove={(row) => setRemove(row)}
+        onRemove={(row) => { setError(''); setRemove(row) }}
         notices={notices}
         overlays={(
           <>
@@ -778,7 +779,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
             confirmLabel="削除する"
             busy={busy}
             onCancel={() => { if (!busy) setRemove(null) }}
-            onConfirm={() => perform(async () => {
+            error={error || undefined} onSuccess={() => setRemove(null)} onConfirm={() => perform(async () => {
               if (!remove) return
               await hqTemplatesApi.remove(remove.id, remove.revision)
               setTemplates((current) => current.filter((t) => t.id !== remove.id))
@@ -829,7 +830,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
           setMessage('ひな形を複製しました。')
         })}
         onEnterAccount={(accountId) => { setSelectedAccountId(accountId); router.push('/templates') }}
-        onRemove={canEdit ? () => setRemove(detail.template) : undefined}
+        onRemove={canEdit ? () => { setError(''); setRemove(detail.template) } : undefined}
       />
       <ConfirmDialog
         open={!!remove}
@@ -840,7 +841,7 @@ function HqTemplatesBody({ type, DefinitionEditor, RichMenuCreate }: {
         confirmLabel="削除する"
         busy={busy}
         onCancel={() => { if (!busy) setRemove(null) }}
-        onConfirm={() => perform(async () => {
+        error={error || undefined} onSuccess={() => setRemove(null)} onConfirm={() => perform(async () => {
           if (!remove) return
           await hqTemplatesApi.remove(remove.id, remove.revision)
           setTemplates((current) => current.filter((t) => t.id !== remove.id))

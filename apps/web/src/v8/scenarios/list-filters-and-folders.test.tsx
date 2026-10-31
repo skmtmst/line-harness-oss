@@ -28,15 +28,19 @@ const state = vi.hoisted(() => ({
   toast: vi.fn(),
 }))
 
-vi.mock('@/lib/undoable', () => ({
-  runUndoable: (options: { commit: () => Promise<unknown>; onCommitted?: () => void; undo: () => void; failureMessage?: string }) => {
+vi.mock('@/lib/undoable', async () => {
+  const { scheduledConfirmation } = await import('@/test-utils/confirmed-undo-test-handle')
+  return ({
+  runUndoable: (options: Parameters<typeof import('@/lib/undoable').runUndoable>[0] & { confirmation?: boolean }) => {
+    if (options.confirmation) { const scheduled = scheduledConfirmation(options); void Promise.resolve().then(() => scheduled.execute()).catch(() => {}); return scheduled.handle }
     void options.commit().then(() => options.onCommitted?.()).catch(() => { options.undo(); state.toast(options.failureMessage) })
   },
   runOptimistic: (options: { request: () => Promise<unknown>; onSuccess?: () => void; revert: () => void; failureMessage?: string }) => {
     void options.request().then(() => options.onSuccess?.()).catch(() => { options.revert(); state.toast(options.failureMessage) })
   },
   notifyToast: () => {},
-}))
+})
+})
 
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-a', loading: false }) }))
 vi.mock('next/navigation', () => ({
@@ -177,7 +181,8 @@ describe('まとめての操作', () => {
     const dialog = await screen.findByRole('dialog')
     await act(async () => { fireEvent.click(within(dialog).getByRole('button', { name: '移動する' })) })
     await waitFor(() => expect(state.update).toHaveBeenCalledWith('s-1', { folderId: null }))
-    await waitFor(() => expect(state.toast).toHaveBeenCalledWith(expect.stringMatching(/全 1 件中 0 件の保存を確認しました。1 件目で止めました。未送信は 0 件です。理由：/)))
+    await waitFor(() => expect(within(dialog).getByRole('alert').textContent).toMatch(/全 1 件中 0 件の保存を確認しました。1 件目で止めました。未送信は 0 件です。理由：/))
+    expect(state.toast).not.toHaveBeenCalled()
   })
 
   it('まとめて「止める」は確かめてから止め、止めたら一覧を読み直す', async () => {

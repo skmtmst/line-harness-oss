@@ -12,9 +12,9 @@ vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api, tags: { definition: fx.definition, updateDefinition: fx.update, dependencies: async () => ({ success: true, data: { friendCount: 0 } }) }, tagGroups: { list: async () => ({ success: true, data: [] }) } } }
 })
-vi.mock('./edit-form', () => ({ TagEditForm: ({ tag, saving, onSave }: { tag: { name: string }; saving: boolean; onSave: (values: { name: string; actions: [] }, apply: boolean) => void }) => {
+vi.mock('./edit-form', () => ({ TagEditForm: ({ tag, saving, onSave }: { tag: { name: string }; saving: boolean; onSave: (values: { name: string; actions: []; isStarred: boolean }, apply: boolean) => void }) => {
   const [name, setName] = useState(tag.name)
-  return <><input aria-label="下書き" value={name} disabled={saving} onChange={e => setName(e.target.value)} /><button onClick={() => onSave({ name, actions: [] }, false)}>保存</button></>
+  return <><input aria-label="下書き" value={name} disabled={saving} onChange={e => setName(e.target.value)} /><button onClick={() => onSave({ name, actions: [], isStarred: true }, false)}>保存</button></>
 } }))
 import TagEdit from './edit'
 const detail = (name: string, version = 1) => ({ success: true, data: { tag: { id: fx.id, name, status: 'active', version }, automation: null } })
@@ -37,10 +37,14 @@ it('後から届いた前の対象の取得応答を捨てる（WEB088）', asyn
 })
 it('保存後の読み直し中も編集欄を外さず、入力を残す（WEB087）', async () => {
   const reload=deferred();fx.definition.mockResolvedValueOnce(detail('元の名前')).mockReturnValueOnce(reload.promise)
-  fx.update.mockResolvedValue({ success:true,data:{ queued:0 } })
+  const accepted = deferred()
+  fx.update.mockReturnValue(accepted.promise)
   render(<TagEdit />);const input=await screen.findByLabelText('下書き')
   fireEvent.change(input,{ target:{ value:'保存する名前' } });fireEvent.click(screen.getByText('保存'))
-  await act(async()=>{ await Promise.resolve();await Promise.resolve() })
+  expect(fx.update).toHaveBeenCalledWith('one', 'A', 1, expect.objectContaining({ isStarred: true }), expect.any(String))
+  expect(fx.definition).toHaveBeenCalledTimes(1)
+  await act(async()=>{ accepted.resolve({ success:true,data:{ queued:0 } }); await Promise.resolve();await Promise.resolve() })
+  expect(fx.definition).toHaveBeenCalledTimes(2)
   expect(screen.getByLabelText('下書き')).toBe(input)
   await act(async()=>reload.resolve(detail('保存する名前',2)))
   expect(screen.getByLabelText('下書き')).toBe(input)

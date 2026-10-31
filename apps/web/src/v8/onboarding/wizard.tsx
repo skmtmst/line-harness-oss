@@ -206,7 +206,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         description={`保存すると、予約設定のこれが変わります。${confirm?.lines.join('。') ?? ''}。`}
         confirmLabel="変えて保存する"
         onCancel={() => confirm?.cancel()}
-        onConfirm={() => confirm?.run()}
+        error={error || undefined} onSuccess={() => confirm?.complete()} onConfirm={() => confirm?.run()}
       />
     </>
   )

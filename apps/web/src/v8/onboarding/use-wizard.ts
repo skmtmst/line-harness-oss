@@ -56,7 +56,7 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
 
   /*  (2)：開き直して保存するときは、変えた答えだけを送る（前の答えで予約設定を書き戻さない）。 */
   const [saved, setSaved] = useState<Record<string, SetupAnswer>>(answersForApi(state.answers ?? {}))
-  const [confirm, setConfirm] = useState<{ lines: string[]; run: () => void; cancel: () => void } | null>(null)
+  const [confirm, setConfirm] = useState<{ lines: string[]; run: () => Promise<boolean>; complete: () => void; cancel: () => void } | null>(null)
 
   const save = async (next: Record<string, SetupAnswer>, nextChoices = choices, options: { skipSettings?: boolean } = {}) => {
     let changed = changedAnswers(saved, answersForApi(next))
@@ -73,9 +73,11 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
   const confirmThenSave = (next: Record<string, SetupAnswer>, nextChoices = choices) => new Promise<boolean>((resolve, reject) => {
     const lines = settingsChanges(saved, answersForApi(next))
     if (lines.length === 0) { save(next, nextChoices).then(() => resolve(true), reject); return }
+    setError('')
     setConfirm({
       lines,
-      run: () => { setConfirm(null); save(next, nextChoices).then(() => resolve(true), reject) },
+      run: async () => { await save(next, nextChoices); return true },
+      complete: () => { setConfirm(null); resolve(true) },
       cancel: () => { setConfirm(null); resolve(false) },
     })
   })
