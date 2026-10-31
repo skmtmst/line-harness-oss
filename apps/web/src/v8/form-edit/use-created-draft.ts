@@ -23,14 +23,20 @@ export function useCreatedDraft({ accountId, id, revision, loaded, published, ca
     forgetCreatedFormDraft(accountId, id)
     setExpected(null)
   }, [loaded, expected, valid, accountId, id])
-  const saved = (nextRevision: number, automatic: boolean) => {
+  const created = (resourceId: string, nextRevision: number) => {
+    if (!accountId) return
+    rememberCreatedFormDraft(accountId, resourceId, nextRevision)
+    expectedRef.current = nextRevision
+    setExpected(nextRevision)
+  }
+  const saved = (nextRevision: number, automatic: boolean, resourceId = id) => {
     if (!accountId || expectedRef.current === null) return
     if (automatic) {
-      rememberCreatedFormDraft(accountId, id, nextRevision)
+      rememberCreatedFormDraft(accountId, resourceId, nextRevision)
       expectedRef.current = nextRevision
       setExpected(nextRevision)
     } else {
-      forgetCreatedFormDraft(accountId, id)
+      forgetCreatedFormDraft(accountId, resourceId)
       expectedRef.current = null
       setExpected(null)
     }
@@ -72,5 +78,5 @@ export function useCreatedDraft({ accountId, id, revision, loaded, published, ca
         : describeApiFailure(cause, '下書きの削除'))
     } finally { deleting.current = false; if (isCurrent()) setBusy(false) }
   }
-  return { owned, busy, error, saved, discard, deleting, clearError: () => setError('') }
+  return { owned, busy, error, created, saved, discard, deleting, clearError: () => setError('') }
 }
