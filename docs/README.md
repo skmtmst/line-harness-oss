@@ -460,6 +460,7 @@
 
 ## 反映履歴
 
+- [SNS連携の設定表示と接続](release-log/unreleased/2010-masato-sns-settings-access.md)
 - [リッチメニューを作る画像欄の箱の大きさ](release-log/unreleased/1984-kenta-muse-media-drop.md)
 - [飲食店3画面の共通タブ整理](release-log/unreleased/1972-kenta-muse-ledger-tabs.md)
 - [予約台帳の卓・予約なしの案内](release-log/unreleased/1972-kenta-muse-ledger-empty.md)
@@ -1064,3 +1065,6 @@
 
 - [初期設定の案内と閲覧権限](release-log/unreleased/2004-kenta-setup-guidance.md) — 反映履歴、確認 2026-10-31。
 - [月謝の台帳と閲覧API](release-log/unreleased/2004-kenta-monthly-ledger.md) — 反映履歴、確認 2026-10-31。
+- [受信箱の会話と機能設定の案内](release-log/unreleased/2006-masato-inbox-feature-gate.md) — 反映履歴、確認 2026-10-31。
+- [店舗設定のLINEアカウント管理導線](release-log/unreleased/2007-masato-store-line-account-menu.md) — 反映履歴、確認 2026-10-31。
+- [設定メニューの表示維持](release-log/unreleased/2008-masato-settings-nav.md) — 反映履歴、確認 2026-10-31。
