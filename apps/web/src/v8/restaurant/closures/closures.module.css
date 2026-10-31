@@ -468,7 +468,8 @@
 }
 
 .affectedRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--tpl-e1-gap-m);
   min-width: 0;
@@ -528,3 +529,5 @@
     border-left: 0;
   }
 }
+
+.affectedRow > :last-child { grid-column: 1 / -1; justify-self: start; max-width: 100%; }

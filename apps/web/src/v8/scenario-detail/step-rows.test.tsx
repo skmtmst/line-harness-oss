@@ -1,3 +1,5 @@
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { forgetStaffIdentity } from '@/lib/staff-identity-state'
 // @vitest-environment happy-dom
 /*
  * V8 シナリオ配信の編集：通の行と通の削除の動きの試験。
@@ -160,6 +162,7 @@ async function openDeleteDialog(order: number) {
 }
 
 beforeEach(() => {
+  verifiedStaffRole('owner')
   document.documentElement.dataset.theme = 'v8'
   deleteStep.mockReset()
   readScenario.mockReset()
@@ -175,6 +178,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  forgetStaffIdentity()
   act(() => root.unmount())
   host.remove()
   delete document.documentElement.dataset.theme

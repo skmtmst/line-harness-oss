@@ -11,7 +11,10 @@ import { api, ApiError } from '@/lib/api'
 import { useFormErrors } from '@/lib/use-form-errors'
 import { useScenarioDraft } from '@/v8/autosave/public/use-scenario-draft/index'
 import type { DeliveryMode, MessageType, ScenarioStep } from '@line-crm/shared'
-import type { Dispatch, SetStateAction } from 'react'
+import { useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
+import { useAccount } from '@/contexts/account-context'
+import { readStaffIdentity } from '@/lib/staff-identity-state'
+import { captureScenarioWriteAccess } from '@/v8/scenarios'
 import { emptyStepForm, isStructuredKind, nextStepOrder, ScenarioWithSteps, StepFormState, stepScheduleForClone, TemplateOpt } from './detail-model'
 
 export function useScenarioStepActions({
@@ -56,6 +59,38 @@ export function useScenarioStepActions({
   setDeleteStepTarget: Dispatch<SetStateAction<ScenarioStep | null>>
   setError: Dispatch<SetStateAction<string>>
 }) {
+  const { selectedAccountId, loading: accountLoading } = useAccount()
+  const mounted = useRef(true)
+  const scope = useRef({ id, accountId: selectedAccountId, scenarioAccountId: scenario?.lineAccountId, accountLoading })
+  if (scope.current.id !== id || scope.current.accountId !== selectedAccountId
+    || scope.current.scenarioAccountId !== scenario?.lineAccountId || scope.current.accountLoading !== accountLoading) {
+    scope.current = { id, accountId: selectedAccountId, scenarioAccountId: scenario?.lineAccountId, accountLoading }
+  }
+  const renderedScope = scope.current
+  const currentScope = () => mounted.current && scope.current === renderedScope
+  const access = captureScenarioWriteAccess()
+  const checkWrite = (report: (message: string) => void = setStepError) => {
+    if (!currentScope()) return false
+    if (accountLoading || scenario?.id !== id) {
+      report('画面の読み込みが終わるまで、この操作はできません。')
+      return false
+    }
+    if (access()) return true
+    report(readStaffIdentity()
+      ? '権限が変わったため中止しました。入力内容は残っています。'
+      : '本人の確認が終わるまで、この操作はできません。')
+    return false
+  }
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  useEffect(() => {
+    setStepSaving(false)
+    setDuplicatingStepId(null)
+    setDeletingStepId(null)
+  }, [renderedScope, setStepSaving, setDuplicatingStepId, setDeletingStepId])
+
   const openAddStep = () => {
     const nextOrder = nextStepOrder(scenario?.steps ?? [])
     setStepForm(emptyStepForm(nextOrder))
@@ -182,9 +217,11 @@ export function useScenarioStepActions({
     for (const row of rows) {
       const moveTo = moveById.get(row.id)
       if (moveTo === undefined && !plan.removeIds.includes(row.id)) continue
+      if (!checkWrite()) return '権限が変わったため、選択肢の動作の付け替えを中止しました。画面を開き直して対応を確認してください。'
       const removed = await api.scenarios.actions.remove(id, row.id)
       if (!removed.success) return '選択肢の動作の付け替えに失敗しました。画面を開き直して対応を確認してください。'
       if (moveTo !== undefined) {
+        if (!checkWrite()) return '権限が変わったため、選択肢の動作の付け替えを中止しました。画面を開き直して対応を確認してください。'
         const recreated = await api.scenarios.actions.create(id, {
           hook: row.hook,
           stepId: row.stepId,
@@ -202,6 +239,7 @@ export function useScenarioStepActions({
   }
 
   const handleSaveStep = async () => {
+    if (!checkWrite()) return
     const problem = validateScenarioStep(stepForm, kindState, deliveryMode)
     if (problem) {
       if (problem.cause !== undefined) saveErrors.capture(problem.cause)
@@ -248,7 +286,9 @@ export function useScenarioStepActions({
         isDraft: stepForm.isDraft,
       }
       if (editingStepId) {
+        if (!checkWrite()) return
         const res = await api.scenarios.updateStep(id, editingStepId, payload)
+        if (!checkWrite()) return
         if (!res.success) {
           setStepError(res.error)
           return
@@ -259,6 +299,7 @@ export function useScenarioStepActions({
          * だけを消す。新しい選択肢は行が無い（0件から始める）。
          */
         const remapError = await remapChoiceActions(editingStepId, keyedQuestion)
+        if (!currentScope()) return
         if (remapError) {
           setStepError(remapError)
           await loadScenario(true)
@@ -276,6 +317,7 @@ export function useScenarioStepActions({
             .sort((a, b) => b.stepOrder - a.stepOrder)
           if (moving.length > 0) {
             const orders = moving.map((st) => ({ stepId: st.id, stepOrder: st.stepOrder + 1 }))
+            if (!checkWrite()) return
             const moved = await api.scenarios.reorderSteps(id, orders)
             if (!moved.success) {
               setStepError('あいだに入れるための並べ替えに失敗しました。通信を確かめて、もう一度お試しください。')
@@ -283,17 +325,21 @@ export function useScenarioStepActions({
             }
           }
         }
+        if (!checkWrite()) return
         const res = await api.scenarios.addStep(id, payload)
+        if (!checkWrite()) return
         if (!res.success) {
           setStepError(res.error)
           return
         }
       }
+      if (!checkWrite()) return
       stepDraft.clear()
       closeStepForm()
       loadScenario(true)
       reloadStats()
     } catch (error) {
+      if (!checkWrite()) return
       const fieldFailure = saveErrors.capture(error)
       /*
        * R235: 入力の不備（400番台）と通信・サーバーの失敗を分ける。
@@ -305,7 +351,7 @@ export function useScenarioStepActions({
         ? '入力内容に不備があります。時刻・本文を確かめて、もう一度お試しください。'
         : 'ステップの保存に失敗しました。通信を確かめて、もう一度お試しください。') }
     } finally {
-      setStepSaving(false)
+      if (currentScope()) setStepSaving(false)
     }
   }
 
@@ -316,7 +362,7 @@ export function useScenarioStepActions({
    * 後ろの通は「ここに挿入」と同じ経路で押し出される。
    */
   const handleDuplicateStep = async (step: ScenarioStep) => {
-    if (duplicatingStepId) return
+    if (duplicatingStepId || !checkWrite()) return
     setDuplicatingStepId(step.id)
     setStepError('')
     try {
@@ -330,6 +376,7 @@ export function useScenarioStepActions({
         .filter((st) => st.stepOrder > step.stepOrder)
         .sort((a, b) => b.stepOrder - a.stepOrder)
       if (moving.length > 0) {
+        if (!checkWrite()) return
         const moved = await api.scenarios.reorderSteps(
           id,
           moving.map((st) => ({ stepId: st.id, stepOrder: st.stepOrder + 1 })),
@@ -339,6 +386,7 @@ export function useScenarioStepActions({
           return
         }
       }
+      if (!checkWrite()) return
       const res = await api.scenarios.addStep(id, {
         stepOrder: step.stepOrder + 1,
         messageType: step.messageType,
@@ -352,6 +400,7 @@ export function useScenarioStepActions({
         question: (step.question as ScenarioQuestion | null) ?? null,
         isDraft: step.isDraft === true,
       })
+      if (!checkWrite()) return
       if (!res.success) {
         setStepError(res.error)
         return
@@ -359,39 +408,43 @@ export function useScenarioStepActions({
       loadScenario(true)
       reloadStats()
     } catch (saveFailure) {
+      if (!checkWrite()) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setStepError('この通を複製できませんでした。時間をおいて、もう一度お試しください。') }
     } finally {
-      setDuplicatingStepId(null)
+      if (currentScope()) setDuplicatingStepId(null)
     }
   }
 
   const handleDeleteStep = async () => {
-    if (!deleteStepTarget || deletingStepId) return
+    if (!deleteStepTarget || deletingStepId || !checkWrite(setDeleteStepError)) return
     const stepId = deleteStepTarget.id
     setDeletingStepId(stepId)
     setDeleteStepError('')
     try {
+      if (!checkWrite(setDeleteStepError)) return
       const result = await api.scenarios.deleteStep(id, stepId)
+      if (!checkWrite(setDeleteStepError)) return
       if (!result.success) throw new Error(result.error)
       if (editingStepId === stepId) closeStepForm()
       setDeleteStepTarget(null)
       void loadScenario(true)
       void reloadStats()
     } catch (saveFailure) {
+      if (!checkWrite(setDeleteStepError)) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setDeleteStepError('この通を削除できませんでした。状態を読み直してから、もう一度お試しください。') }
     } finally {
-      setDeletingStepId(null)
+      if (currentScope()) setDeletingStepId(null)
     }
   }
 
   const handleMoveStep = async (stepId: string, direction: 'up' | 'down') => {
-    if (!scenario) return
+    if (!scenario || !checkWrite(setError)) return
     const sorted = [...scenario.steps].sort((a, b) => a.stepOrder - b.stepOrder)
     const idx = sorted.findIndex((s) => s.id === stepId)
     const swap = direction === 'up' ? idx - 1 : idx + 1
@@ -399,14 +452,17 @@ export function useScenarioStepActions({
     const a = sorted[idx]
     const b = sorted[swap]
     try {
+      if (!checkWrite(setError)) return
       await api.scenarios.reorderSteps(id, [
         { stepId: a.id, stepOrder: b.stepOrder },
         { stepId: b.id, stepOrder: a.stepOrder },
       ])
+      if (!checkWrite(setError)) return
       loadScenario(true)
       // 到達率バッジは stepOrder ベースでマッチングするので、並び替え後は stats も再取得
       reloadStats()
     } catch (saveFailure) {
+      if (!checkWrite(setError)) return
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
