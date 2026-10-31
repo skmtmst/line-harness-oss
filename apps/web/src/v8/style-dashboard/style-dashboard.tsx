@@ -1,7 +1,7 @@
 'use client'
 import { FirstStepsCard, FirstStepsFeedback, useFirstSteps, FirstRunDoneDialog } from '@/v8/dashboard/public/first-steps/index'
 import { canManageRole } from '@/lib/staff-role'
-import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, ReservationFormRepairNotices, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import { useSetupWizard } from '@/v8/onboarding/public/setup-wizard/index'
 import { FriendAddLink } from '@/v8/dashboard/public/friend-add/index'
@@ -240,6 +240,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
         {absence.dialog}
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}
         {setup.data ? <SetupWarningBands data={setup.data} configureAllowed={canManageRole(role)} role={role} /> : null}
+        <ReservationFormRepairNotices notices={start.progress?.notices} role={role}/>
         {role !== null && (start.summary || start.error || setupRest || setup.error || !canManageRole(role)) ? <FirstStepsCard onRetry={start.reload} summary={start.summary} folded={start.folded} onToggle={start.toggle} readOnly={role === 'viewer'}
           onRecheck={start.watchExpired ? start.rewatch : undefined}
           onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : !canManageRole(role) ? () => openSetupStep('style') : undefined} configureAllowed={canManageRole(role)}

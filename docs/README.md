@@ -1097,3 +1097,4 @@
 - [検証管理画面のPages Git連携の手順](release-log/unreleased/2020-masato-cf-pages-doc.md) — 反映履歴、確認 2026-11-01。
 
 - [検証配備でCloudflare混雑時に待って再試行する](release-log/unreleased/2021-masato-cf-staging-deploy-retry.md) — 反映履歴、確認 2026-11-01。
+- [LINE来店フォローのカードと予約フォーム](release-log/unreleased/0000-kenta-followup-board.md) — 反映履歴、確認 2026-10-31。

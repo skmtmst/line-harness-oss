@@ -1,3 +1,4 @@
+import { readRestaurantFollowupResourceManagement } from '../services/restaurant-followup-resource-management.js';
 import {defaultWindow} from './automation-execution-window.js';
 import { withStyleSampleMetadata } from '../services/style-sample-metadata.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
@@ -517,10 +518,11 @@ automations.get(
   async (c) => {
     const accountId = await requireDraftAccount(c);
     if (typeof accountId !== 'string') return accountId;
-    return draftEndpoint(c, () => getAutomationDraft(c.env.DB, {
-      id: c.req.param('id'),
-      lineAccountId: accountId,
-    }));
+    return draftEndpoint(c, async () => {
+      const draft=await getAutomationDraft(c.env.DB,{id:c.req.param('id'),lineAccountId:accountId});
+      const management=await readRestaurantFollowupResourceManagement(c.env.DB,'automation',[{id:draft.id,lineAccountId:accountId}]);
+      return {...draft,...(management.has(draft.id)?{followupManagement:management.get(draft.id)}:{})};
+    });
   },
 );
 
@@ -613,7 +615,9 @@ automations.get(
       requestedAccountId ? [requestedAccountId] : scope.allowedAccountIds,
       { limit, offset, includeArchived: c.req.query('includeArchived') === '1' },
     );
-    const responseItems = await withStyleSampleMetadata(c.env.DB,result.items,'automation');
+    const styledItems = await withStyleSampleMetadata(c.env.DB,result.items,'automation');
+    const management=await readRestaurantFollowupResourceManagement(c.env.DB,'automation',result.items.map(row=>({id:row.id,lineAccountId:row.lineAccountId})));
+    const responseItems=styledItems.map(row=>({...row,...(management.has(row.id)?{followupManagement:management.get(row.id)}:{})}));
     return c.json(buildOffsetListResponse({ success: true,
       data: responseItems,
       summary: result.summary,

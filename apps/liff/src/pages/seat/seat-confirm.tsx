@@ -4,8 +4,7 @@ import Button from '../../components/ui/button/index.js';
 import { useEffect, useState } from 'react';
 import PrivacyNote from '../../components/ui/privacy-note.js';
 import { changeRule, longDate, remainingText, stayText, zonedParts } from '../../lib/seat-reserve.js';
-import { LiffInput } from '../../components/forms/controls.js'
-import { withHonorific } from '@line-crm/shared'
+import { withHonorific,defaultRestaurantReservationForm,type RestaurantReservationForm } from '@line-crm/shared'
 
 
 /**
@@ -20,6 +19,7 @@ export default function SeatConfirm({
   storeName,
   courseName,
   customerName,
+  definition=defaultRestaurantReservationForm(),onName,allergy='',onAllergy,
   startsAt,
   endsAt,
   guestCount,
@@ -41,6 +41,7 @@ export default function SeatConfirm({
   storeName: string;
   courseName?: string | null;
   customerName: string;
+  definition?:RestaurantReservationForm;onName?:(value:string)=>void;allergy?:string;onAllergy?:(value:string)=>void;
   startsAt: string;
   endsAt: string;
   guestCount: number;
@@ -81,34 +82,36 @@ export default function SeatConfirm({
     ['人数', `${guestCount}名`],
     ...(courseName ? [['コース',courseName] as [string,string]] : []),
     ['お席', seat],
-    ['お名前', `${withHonorific(customerName, 'さま', { space: true })}`],
+    ...(reschedule?[[definition.fields.find(f=>f.id==='name')!.label,withHonorific(customerName,'さま',{space:true})] as [string,string]]:[]),
   ];
 
+  const field=(id:string)=>definition.fields.find(item=>item.id===id)!;
   return (
     <div className="space-y-3.5" data-design-node="B3oGt3">
       <Card className="space-y-4 p-6">
         <h2 className="text-[15px] leading-[23px] font-bold text-ink">{reschedule ? 'この内容に変更します' : 'ご予約の内容'}</h2>
         <div className="space-y-2.5">
           <p className="text-[13px] leading-5 font-semibold text-ink">{p.date.slice(5).replace('-','/')}（{new Intl.DateTimeFormat('ja-JP',{timeZone,weekday:'short'}).format(new Date(startsAt))}）{p.hm}・{guestCount}名</p>
-          <p className="truncate text-xs leading-[18px] text-liff-sub" title={`コース：${courseName??'席のみ'}（${stayText(startsAt,endsAt)}）`}>コース：{courseName??'席のみ'}（{stayText(startsAt,endsAt)}）</p>
+          <p className="truncate text-xs leading-[18px] text-liff-sub" title={`コース：${courseName??'席のみ'}${stayText(startsAt,endsAt)}`}>コース：{courseName??'席のみ'}{stayText(startsAt,endsAt)}</p>
           <p className="text-xs leading-[18px] text-liff-sub">お席はお店が決めます</p>
         </div>
       </Card>
       <p className="text-[13px] leading-5 text-liff-sub">受け付けたら「受け付けました」と表示します。</p>
-      <details>
+      <details open={definition.fields.some(field=>field.required&&['phone','allergy','note'].includes(field.id))||!reschedule}>
       <summary className="liff-hit cursor-pointer text-xs leading-[18px] text-liff-sub">連絡先・ご要望・予約の決まり</summary>
-      <dl className="flex flex-col gap-2.5 rounded-(--liff-radius-lg) bg-canvas p-3.5 outline outline-1 -outline-offset-1 outline-liff-line">
+      <dl className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-x-3 gap-y-2.5 rounded-(--liff-radius-lg) bg-canvas p-3.5 outline outline-1 -outline-offset-1 outline-liff-line">
         {rows.map(([k, v]) => (
-          <div key={k} className="flex items-start gap-3">
+          <div key={k} className="contents">
             <dt className="shrink-0 text-[13px] leading-5 text-liff-sub">{k}</dt>
             <dd className="min-w-0 flex-1 truncate text-[13px] leading-5 font-semibold text-ink" title={v}>
               {v}
             </dd>
           </div>
         ))}
-        <div className="flex items-start gap-3">
+        {!reschedule&&<div className="contents"><dt className="shrink-0 text-[13px] leading-5 text-liff-sub"><FieldLabel htmlFor="seat-name" required>{field('name').label}</FieldLabel></dt><dd className="min-w-0 flex-1"><TextInput id="seat-name" value={customerName} maxLength={100} required onChange={e=>onName?.(e.target.value)} autoComplete="name" /></dd></div>}
+        {field('phone').enabled&&<div className="contents">
           <dt className="shrink-0 text-[13px] leading-5 text-liff-sub">
-            <FieldLabel htmlFor="seat-phone">電話</FieldLabel>
+            <FieldLabel htmlFor="seat-phone" required={field('phone').required}>{field('phone').label}</FieldLabel>
           </dt>
           <dd className="min-w-0 flex-1">
             {reschedule ? (
@@ -117,6 +120,7 @@ export default function SeatConfirm({
               <TextInput
                 id="seat-phone"
                 type="tel"
+                required={field('phone').required}
                 inputMode="tel"
                 autoComplete="tel"
                 maxLength={50}
@@ -127,10 +131,11 @@ export default function SeatConfirm({
             )}
             {!reschedule && <FieldCount value={phone} max={50} />}
           </dd>
-        </div>
+        </div>}
+        {field('allergy').enabled&&<div className="contents"><dt className="shrink-0 text-[13px] leading-5 text-liff-sub"><FieldLabel htmlFor="seat-allergy" required={field('allergy').required}>{field('allergy').label}</FieldLabel></dt><dd className="min-w-0 flex-1">{reschedule?<span>{allergy||'なし'}</span>:<TextInput id="seat-allergy" value={allergy} maxLength={200} required={field('allergy').required} onChange={e=>onAllergy?.(e.target.value)} placeholder="例：乳製品（ない場合は「なし」）" />}</dd></div>}
       </dl>
-      <div className="flex flex-col gap-1.5">
-        <FieldLabel htmlFor="seat-note">ご要望</FieldLabel>
+      {field('note').enabled&&<div className="flex flex-col gap-1.5">
+        <FieldLabel htmlFor="seat-note" required={field('note').required}>{field('note').label}</FieldLabel>
         {reschedule ? (
           <p className="flex h-9 items-center truncate rounded-(--liff-radius) bg-canvas px-3 text-sm text-ink outline outline-1 -outline-offset-1 outline-liff-line-strong">
             {note || 'なし'}
@@ -138,6 +143,7 @@ export default function SeatConfirm({
         ) : (
           <TextInput
             id="seat-note"
+            required={field('note').required}
             type="text"
             maxLength={200}
             value={note}
@@ -146,7 +152,7 @@ export default function SeatConfirm({
           />
         )}
         {!reschedule && <FieldCount value={note} max={200} />}
-      </div>
+      </div>}
       <ul className="flex flex-col gap-1 rounded-(--liff-radius) bg-liff-off-bg p-3 text-xs leading-[18px] text-liff-sub">
         <li>{`・${changeRule(startsAt, cancelDeadlineMinutesBefore, timeZone, now)}`}</li>
         <li>{`・${late}`}</li>

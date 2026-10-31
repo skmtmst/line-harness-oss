@@ -1,3 +1,6 @@
+import { logger } from '@line-crm/shared/server';
+import { defaultRestaurantReservationForm } from '@line-crm/shared';
+import { saveRestaurantReservationForm } from '../services/restaurant-reservation-form.js';
 import { Hono } from 'hono';
 import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import type { Env } from '../worker-env.js';
@@ -542,4 +545,71 @@ it('全角・区切りを数字だけで保存し、旧行は読み取り時だ�
   expect(history.data[0].customerPhone).toBe('09012345678');
   expect((await request('/api/liff/restaurant/holds',{...input,customerPhone:'090 1234 5678'})).status).toBe(200);
   expect(db.raw.prepare('SELECT customer_phone FROM rt_reservations WHERE id=?').get(held.data.id)).toEqual({customer_phone:'０９０－１２３４－５６７８'});
+});
+
+describe('専用の予約フォームの設定と確定',()=>{
+ const settings=async(requiredPhone=false)=>{
+  const definition=defaultRestaurantReservationForm();
+  definition.title='お席の受付';definition.completionMessage='お席を受け付けました。';
+  definition.fields=definition.fields.map(field=>field.id==='phone'?{...field,required:requiredPhone}:field);
+  await saveRestaurantReservationForm(db.db,{storeId:'store',accountId:'a1',staffId:'owner',expectedVersion:0,definition});
+  return definition;
+ };
+ it('予約リンクは同じ店の設定を読み、別アカウントには見せない',async()=>{
+  db.raw.exec("INSERT INTO rt_reservation_links(store_id,token) VALUES('store','form-link')");
+  const definition=await settings();
+  const link=await request('/api/liff/restaurant/link/form-link');
+  expect(link.status).toBe(200);expect(await link.json()).toMatchObject({data:{id:'store',reservationForm:{version:1,definition}}});
+ });
+ it('入力の検査後にフォームが変わると確定と通知を両方戻す',async()=>{
+  await settings();const {data:h}=await read(await hold());
+  const batch=db.db.batch.bind(db.db);
+  vi.spyOn(db.db,'batch').mockImplementationOnce(async statements=>{
+   db.raw.exec("UPDATE account_settings SET value=json_set(value,'$.version',2) WHERE key='restaurant.reservation_form:store'");
+   return batch(statements);
+  });
+  const response=await request(`/api/liff/restaurant/reservations/${h.id}/confirm`,{expectedVersion:h.version,expectedFormVersion:1});
+  expect(response.status).toBe(409);expect(await response.json()).toMatchObject({error:'reservation_form_changed'});
+  expect(db.raw.prepare('SELECT status FROM rt_reservations WHERE id=?').get(h.id)).toEqual({status:'pending'});
+  expect(db.raw.prepare('SELECT count(*) n FROM rt_customer_notice_outbox WHERE reservation_id=?').get(h.id)).toEqual({n:0});
+ });
+ it('必須の電話はAPIでも検証し、名前とアレルギーを同じ予約の確定と一緒に保存する',async()=>{
+  await settings(true);const {data:h}=await read(await hold());
+  const url=`/api/liff/restaurant/reservations/${h.id}/confirm`;
+  expect((await request(url,{expectedVersion:h.version})).status).toBe(409);
+  expect((await request(url,{expectedVersion:h.version,expectedFormVersion:1})).status).toBe(400);
+  const details={expectedVersion:h.version,expectedFormVersion:1,customerName:'予約した方',customerPhone:'09012345678',allergyNote:'乳製品',note:'窓側希望'};
+  const confirmed=await request(url,details);expect(confirmed.status).toBe(200);
+  expect((await read(confirmed)).data).toMatchObject({customerName:'予約した方',allergyNote:'乳製品'});
+  const saved=db.raw.prepare('SELECT customer_name,allergy_note,dining_snapshot_json FROM rt_reservations WHERE id=?').get(h.id) as {customer_name:string;allergy_note:string;dining_snapshot_json:string};
+  expect(saved.customer_name).toBe('予約した方');expect(saved.allergy_note).toBe('乳製品');expect(JSON.parse(saved.dining_snapshot_json).allergy).toBe('乳製品');
+  expect((await request(url,details)).status).toBe(200);
+  expect((await request(url,{...details,allergyNote:'卵'})).status).toBe(409);
+  expect(db.raw.prepare('SELECT count(*) n FROM rt_customer_notice_outbox WHERE reservation_id=?').get(h.id)).toEqual({n:1});
+ });
+});
+
+for(const broken of ['{broken',JSON.stringify({version:3,data:{fields:[]}})])it('保存済みフォームが壊れても必須3項目で予約を受け、版が変われば通知も確定も残さない',async()=>{
+ const warn=vi.spyOn(logger,'warn').mockImplementation(()=>{});
+ try{
+  await saveRestaurantReservationForm(db.db,{storeId:'store',accountId:'a1',staffId:'owner',expectedVersion:0,definition:defaultRestaurantReservationForm()});
+  db.raw.prepare("UPDATE account_settings SET value=? WHERE key='restaurant.reservation_form:store'").run(broken);
+  db.raw.exec("INSERT INTO rt_reservation_links(store_id,token) VALUES('store','recovery-link')");
+  const link=await request('/api/liff/restaurant/link/recovery-link');expect(link.status).toBe(200);
+  const form=(await link.json() as {data:{reservationForm:{version:number;definition:{fields:{id:string;enabled:boolean}[]}}}}).data.reservationForm;
+  expect(form.version).toBe(-1);expect(form.definition.fields.filter(field=>field.enabled).map(field=>field.id)).toEqual(['name','dateTime','guestCount']);
+  const {data:h}=await read(await hold());const url=`/api/liff/restaurant/reservations/${h.id}/confirm`;
+  expect((await request(url,{expectedVersion:h.version,expectedFormVersion:0})).status).toBe(409);
+  const batch=db.db.batch.bind(db.db);
+  vi.spyOn(db.db,'batch').mockImplementationOnce(async statements=>{
+   db.raw.prepare("UPDATE account_settings SET value=? WHERE key='restaurant.reservation_form:store'").run(JSON.stringify({version:4,data:defaultRestaurantReservationForm()}));return batch(statements);
+  });
+  expect((await request(url,{expectedVersion:h.version,expectedFormVersion:-1})).status).toBe(409);
+  expect(db.raw.prepare('SELECT status FROM rt_reservations WHERE id=?').get(h.id)).toEqual({status:'pending'});
+  expect(db.raw.prepare('SELECT count(*) n FROM rt_customer_notice_outbox').get()).toEqual({n:0});
+  db.raw.prepare("UPDATE account_settings SET value=? WHERE key='restaurant.reservation_form:store'").run(broken);
+  expect((await request(url,{expectedVersion:h.version,expectedFormVersion:-1,customerName:'本人'})).status).toBe(200);
+  expect(db.raw.prepare('SELECT count(*) n FROM rt_customer_notice_outbox').get()).toEqual({n:1});
+  expect(warn).toHaveBeenCalledWith('restaurant_reservation_form_recovery');
+ }finally{warn.mockRestore();}
 });

@@ -12,7 +12,7 @@ export default function SeatDone({
   storeName,
   timeZone,
   cancelDeadlineMinutesBefore,
-  changed,
+  changed,completionMessage,
 }: {
   booking: RestaurantCustomerBooking;
   storeName: string;
@@ -20,6 +20,7 @@ export default function SeatDone({
   cancelDeadlineMinutesBefore: number;
   /** 変更のあと。題を「変更しました」にする。 */
   changed: boolean;
+  completionMessage?:string;
 }) {
   const p = zonedParts(booking.startsAt, timeZone);
   const rows: Array<[string, string]> = [
@@ -36,7 +37,7 @@ export default function SeatDone({
         tone="success"
         large
         title={changed ? 'ご予約を変更しました' : 'ご予約を受け付けました'}
-        body={`確認の LINE をお送りしました。\n${changeRule(booking.startsAt, cancelDeadlineMinutesBefore, timeZone)}。`}
+        body={`${!changed&&completionMessage?completionMessage:'ご予約の内容をご確認ください。'}\n${changeRule(booking.startsAt, cancelDeadlineMinutesBefore, timeZone)}。`}
       />
       <dl className="rounded-(--liff-radius-lg) bg-canvas px-3.5 py-1 outline outline-1 -outline-offset-1 outline-liff-line">
         {rows.map(([k, v]) => (

@@ -26,7 +26,7 @@ export async function loadRestaurantSetupProgress(accountId: string, selectedSto
     || !['tables', 'hours', 'menus', 'reception', 'followup'].every(key => typeof response.data[key as keyof typeof response.data] === 'boolean'))
     return unknownRestaurantSetup('店舗の設定を読み込めませんでした')
   const data = response.data
-  return { style: 'restaurant', steps: {
+  return { style: 'restaurant', ...(data.reservationForm?.available===false?{notices:[{message:data.reservationForm.message,href:data.reservationForm.repairPath}]}:{}), steps: {
     attributes: { complete: data.tables, reason: '有効な卓と席を登録してください' },
     hours: { complete: data.hours, reason: '予約を受け付ける曜日と時間を設定してください' },
     friendAdd: { complete: data.menus, reason: 'コースとメニューを登録してください' },

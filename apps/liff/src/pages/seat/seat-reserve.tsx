@@ -1,3 +1,4 @@
+import { defaultRestaurantReservationForm,restaurantReservationAnswerError } from '@line-crm/shared';
 import { useRequestGeneration } from '../../lib/use-request-generation.js';
 import { FieldError } from '../../components/forms/controls.js';
 import CourseChoice from '../../components/course-choice.js';
@@ -82,6 +83,7 @@ export default function SeatReserve() {
   /* ご要望・電話（任意）。確定の口へ送る。 */
   const [note, setNote] = useState('');
   const [phone, setPhone] = useState('');
+  const [allergy,setAllergy]=useState('');
   const [guestCount, setGuestCount] = useState(defaultGuests);
   const [date, setDate] = useState('');
   const [startsAt, setStartsAt] = useState<string | null>(null);
@@ -281,7 +283,7 @@ export default function SeatReserve() {
 
   async function finish() {
     if (!store || busyRef.current) return;
-    const problem = target ? '' : noteProblem(note) || phoneProblem(phone);
+    const problem = target ? '' : restaurantReservationAnswerError(store.reservationForm?.definition??defaultRestaurantReservationForm(),{customerName,customerPhone:phone,allergyNote:allergy,note}) || noteProblem(note) || phoneProblem(phone);
     if (problem) {
       setError(problem);
       return;
@@ -301,6 +303,7 @@ export default function SeatReserve() {
         : await restaurantBookingApi.confirm(hold!.id, hold!.version, {
             note: note.trim() || null,
             customerPhone: normalizePhone(phone) || null,
+            customerName:customerName.trim(),allergyNote:allergy.trim()||null,expectedFormVersion:store.reservationForm?.version??0,
             ...(params.get('referralId') ? {referralId:params.get('referralId')!} : {}),
           });
       if (!mutation.isCurrent(requestGeneration)) return;
@@ -313,6 +316,9 @@ export default function SeatReserve() {
       if (!mutation.isCurrent(requestGeneration)) return;
       logFailure(target ? 'seat-reschedule' : 'seat-confirm', e);
       setError(seatErrorMessage(e));
+      if((e as {body?:{error?:string}}).body?.error==='reservation_form_changed'){
+        try{const fresh=await restaurantBookingApi.link(token);if(mutation.isCurrent(requestGeneration))setStore(fresh.data);}catch{setError('予約フォームを読み直せませんでした。通信を確認して、もう一度お試しください');}
+      }
       if ((e as { body?: { error?: string } }).body?.error === 'hold_expired') setExpired(true);
     } finally {
       if (!mutation.isCurrent(requestGeneration)) return;
@@ -387,6 +393,7 @@ export default function SeatReserve() {
     setCourseId(null);
     setNote('');
     setPhone('');
+    setAllergy('');
     setTarget(null);
     setResult(null);
     setStartsAt(null);
@@ -396,14 +403,14 @@ export default function SeatReserve() {
 
   if (loadState === 'loading') return (
     <LiffLookScope className="restaurant-fusion min-h-screen bg-canvas">
-      <LiffHeader title="ご予約" />
+      <LiffHeader title={store?.reservationForm?.definition.title??'ご予約'} />
       <div className="mx-auto w-full max-w-md px-4 pt-3"><LoadingView /></div>
     </LiffLookScope>
   );
   if (loadState === 'missing')
     return (
       <LiffLookScope className="restaurant-fusion min-h-screen bg-canvas">
-        <LiffHeader title="ご予約" />
+        <LiffHeader title={store?.reservationForm?.definition.title??'ご予約'} />
         <div className="mx-auto w-full max-w-md px-4 pt-3">
           <StatusView
             icon="calendar-x"
@@ -416,7 +423,7 @@ export default function SeatReserve() {
   if (loadState === 'error' || !store)
     return (
       <LiffLookScope className="restaurant-fusion min-h-screen bg-canvas">
-        <LiffHeader title="ご予約" />
+        <LiffHeader title={store?.reservationForm?.definition.title??'ご予約'} />
         <div className="mx-auto w-full max-w-md px-4 pt-3">
           <LoadErrorView note="ご予約はなくなっていません。" onRetry={() => void load()} />
         </div>
@@ -426,7 +433,7 @@ export default function SeatReserve() {
   const minutes = cancelMinutes ?? 0;
   return (
     <LiffLookScope className={`${view==='pick'||view==='confirm'?'restaurant-fusion ':''}min-h-screen bg-canvas`}>
-      <LiffHeader title={view==='confirm'?'確認':'ご予約'} />
+      <LiffHeader title={view==='confirm'?'確認':store.reservationForm?.definition.title??'ご予約'} />
       <div className={`mx-auto w-full max-w-md ${view==='done'?'px-6 pt-0':`px-4 ${view==='pick'||view==='confirm'?'pt-4':'pt-3'}`}`}>
       {(view === 'pick' || view === 'confirm') && (
         <Stepper appearance="restaurant" steps={STEPS} current={view === 'pick' ? 0 : STEPS.length - 1} />
@@ -435,6 +442,8 @@ export default function SeatReserve() {
           {view === 'pick' && (
             <>
             <SeatPick
+              guestLabel={store.reservationForm?.definition.fields.find(field=>field.id==='guestCount')?.label}
+              dateLabel={store.reservationForm?.definition.fields.find(field=>field.id==='dateTime')?.label}
               timeZone={store.timezone}
               today={today}
               chips={chips}
@@ -483,7 +492,11 @@ export default function SeatReserve() {
                 timeZone={store.timezone}
                 storeName={store.name}
                 courseName={courses.find(c=>c.id===courseId)?.name ?? hold?.courseName ?? null}
-                customerName={customerName}
+                customerName={target?.customerName??customerName}
+                definition={store.reservationForm?.definition}
+                onName={setCustomerName}
+                allergy={target?.allergyNote??allergy}
+                onAllergy={setAllergy}
                 // 確認は仮押さえした中身で出す（確定はこの仮押さえを送る）。
                 startsAt={!target && hold ? hold.startsAt : slot.startsAt}
                 endsAt={!target && hold ? hold.endsAt : slot.endsAt}
@@ -509,6 +522,7 @@ export default function SeatReserve() {
               timeZone={store.timezone}
               cancelDeadlineMinutesBefore={minutes}
               changed={result.changed}
+              completionMessage={store.reservationForm?.definition.completionMessage}
             />
           )}
           {view === 'mine' && (

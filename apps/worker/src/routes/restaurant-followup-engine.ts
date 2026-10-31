@@ -1,3 +1,5 @@
+import { readRestaurantReservationFormHealth } from '../services/restaurant-reservation-form.js';
+import { readLegacyFollowupEditorContents } from '../services/restaurant-followup-editor-content.js';
 import type { Context } from 'hono';
 import type { Env } from '../worker-env.js';
 import { inputError } from '../lib/input-errors.js';
@@ -42,7 +44,7 @@ export async function getRestaurantFollowupEngines(c:Context<Env>){
  const access=await scope(c);if(access.response)return access.response;
  const store=await access.db!.prepare('SELECT line_account_id FROM rt_stores WHERE id=?').bind(access.storeId).first<{line_account_id:string|null}>();
  const recipient=store?.line_account_id?await resolveReminderTestRecipient(access.db!,store.line_account_id,{staffId:c.get('staff')?.id}):null;
- return c.json({success:true,data:{engines:await readRestaurantFollowupEngineStates(access.db!,access.storeId!),testRecipient:recipient}});
+ return c.json({success:true,data:{engines:await readRestaurantFollowupEngineStates(access.db!,access.storeId!),legacyContents:await readLegacyFollowupEditorContents(access.db!,access.storeId!),testRecipient:recipient,...(store?.line_account_id?{reservationForm:await readRestaurantReservationFormHealth(access.db!,access.storeId!,store.line_account_id)}:{})}});
 }
 export async function initializeRestaurantFollowupEngines(c:Context<Env>){
  const access=await scope(c);if(access.response)return access.response;
