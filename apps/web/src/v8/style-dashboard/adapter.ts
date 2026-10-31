@@ -252,9 +252,15 @@ function monthOf(sch: StyleSchedule, selected: string, now: Date, rows: StyleRow
   } while (cursor.getUTCMonth() === month)
   const sel = sch.days.find((d) => d.date === selected)
   const x = new Date(`${selected}T00:00:00Z`)
+  const lesson = sch.style === 'lesson'
   return {
     title: `${start.getUTCFullYear()}年${month + 1}月`, days: cells,
-    selected: { title: `${x.getUTCMonth() + 1}月${x.getUTCDate()}日（${WEEK[x.getUTCDay()]}）の予約`, total: sel ? `${sel.bookings}組・${formatNumber(sel.people)}人` : '0組', moreLabel: `この日の一覧を開く（${sel?.bookings ?? 0}組）`, rows: rows.slice(0, 6).map((r) => ({ time: r.time, name: r.name, sub: r.people ? `${formatNumber(r.people)}名` : r.sub ?? '', state: r.state ?? { label: '予約', tone: 'info' } })) },
+    selected: {
+      title: `${x.getUTCMonth() + 1}月${x.getUTCDate()}日（${WEEK[x.getUTCDay()]}）の${lesson ? 'クラス' : '予約'}`,
+      total: lesson ? `${formatNumber(rows.length)}回・予約${formatNumber(sel?.bookings ?? 0)}件（${formatNumber(sel?.people ?? 0)}人）` : sel ? `${sel.bookings}組・${formatNumber(sel.people)}人` : '0組',
+      moreLabel: `この日の一覧を開く（${lesson ? `${formatNumber(rows.length)}回` : `${sel?.bookings ?? 0}組`}）`,
+      rows: rows.slice(0, 6).map((r) => ({ time: r.time, name: r.name, sub: r.people ? `${formatNumber(r.people)}名` : r.sub ?? '', state: r.state ?? { label: lesson ? 'クラス' : '予約', tone: 'info' } })),
+    },
   }
 }
 
@@ -281,6 +287,8 @@ function sideFor(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedule, hre
 const LINKS: Record<IndustryStyle, string> = { restaurant: '/restaurant-test/reservations', salon: '/booking/bookings', consult: '/booking/bookings', lesson: '/events' }
 
 export function toToday(style: IndustryStyle, s: StyleSnapshot, sch: StyleSchedule, selected: string, range: DashboardRange, now = new Date()): StyleToday {
+  // 教室の管理は開催回を並べ、参加者ごとの予約は回の名簿で確認する。
+  if (style === 'lesson') sch = { ...sch, entries: sch.entries.filter(entry => entry.kind === 'class') }
   const sorted = sch.entries.slice().sort((a, b) => a.startsAt.localeCompare(b.startsAt))
   const rows = sorted.map((e) => rowOf(style, e, sch, now))
   const dayRows = rows.filter((_, i) => parts(sorted[i].startsAt, sch.timeZone).date === selected)

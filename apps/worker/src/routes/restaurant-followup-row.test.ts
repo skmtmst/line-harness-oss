@@ -1,3 +1,5 @@
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { defaultRestaurantReservationForm } from '@line-crm/shared';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
@@ -157,8 +159,43 @@ describe('新しい送り手の保存・承認のHTTP境界',()=>{
   newStore();const rows=await initialRows();
   rows.find(row=>row.trigger==='reservation_created')!.input.messageBubbles=[{id:'broken',type:'text',content:{text:''}}];
   const response=await request(path+'/engines/initialize'+scope,{rows});expect(response.status).toBe(422);
-  expect(await response.json()).toMatchObject({code:'invalid_followup',error:'送り方と送る内容を確認してください'});
+  expect(await response.json()).toMatchObject({code:'invalid_followup',error:'本文を入力するか、テンプレートを選んでください。',fields:{messageBubbles:'本文を入力するか、テンプレートを選んでください。'}});
   expect(testDb.raw.prepare('SELECT count(*) n FROM automation_definitions').get()).toEqual({n:0});
+ });
+ it.each([
+  {trigger:'anniversary_before',timing:{mode:'time',offsetDays:-366,sendAtTime:'10:00'},reason:'記念日の1〜365日前の日数と、00:00〜23:59の時刻を指定してください。'},
+  {trigger:'reservation_24h',timing:{mode:'countdown',offsetMinutes:0},reason:'予約前の時間は1分〜365日で指定してください。'},
+  {trigger:'reservation_2h',timing:{mode:'next_day',sendAtTime:'10:00'},reason:'この送り方は日時か、予約の前の時間で指定してください。'},
+  {trigger:'post_visit',timing:{mode:'countdown',offsetMinutes:-5},reason:'待つ時間は0以上・365日以内の5分単位で指定してください。'},
+ ])('$triggerの時期の保存失敗は該当の欄と修正方法を返し、実物を作らない',async({trigger,timing,reason})=>{
+  newStore();const rows=await initialRows();Object.assign(rows.find(row=>row.trigger===trigger)!.input,{enabled:true,timing});
+  const response=await request(path+'/engines/initialize'+scope,{rows});expect(response.status).toBe(422);
+  expect(await response.json()).toMatchObject({code:'invalid_followup',error:reason,fields:{timing:reason}});
+  expect(testDb.raw.prepare('SELECT count(*) n FROM rt_store_followup_targets').get()).toEqual({n:0});
+  expect(testDb.raw.prepare('SELECT count(*) n FROM automation_definitions').get()).toEqual({n:0});
+ });
+ it('分割後の吹き出しが5通を超えたら、本文を減らす理由を返す',async()=>{
+  newStore();const rows=await initialRows();rows.find(row=>row.trigger==='reservation_created')!.input.messageBubbles=[{id:'long',type:'text',content:{text:'a'.repeat(25001)}}];
+  const response=await request(path+'/engines/initialize'+scope,{rows});expect(response.status).toBe(422);
+  expect(await response.json()).toMatchObject({fields:{messageBubbles:'文章の自動分割とボタンを合わせて5通までです。本文や吹き出しを減らしてください'}});
+  expect(testDb.raw.prepare('SELECT count(*) n FROM automation_definitions').get()).toEqual({n:0});
+ });
+ it('前日の返事を含めて6通になる保存は本文を減らす理由を返し、実物は増やさない',async()=>{
+  newStore();expect((await request(path+'/engines/initialize'+scope,{rows:await initialRows()})).status).toBe(200);
+  const rows=await initialRows(),row=rows.find(item=>item.trigger==='reservation_24h')!;
+  row.input.enabled=true;row.input.timing={mode:'countdown',offsetMinutes:-1440};
+  row.input.messageBubbles=Array.from({length:5},(_,i)=>({id:`text-${i}`,type:'text',content:{text:`確認の本文${i+1}`}}));
+  const response=await request(path+'/engines/reservation_24h/draft'+scope,row.input);expect(response.status).toBe(422);const body=await response.json();
+  expect(body).toMatchObject({code:'invalid_followup',fields:{messageBubbles:'予約の返事の入口を含めて5つ以内になるよう、吹き出しを減らしてください'}});
+  expect(testDb.raw.prepare('SELECT count(*) n FROM reminders').get()).toEqual({n:0});
+  expect(testDb.raw.prepare('SELECT count(*) n FROM rt_store_followup_targets').get()).toEqual({n:1});
+  if(process.env.VISUAL_QA_RESPONSE_DIR)writeFileSync(join(process.env.VISUAL_QA_RESPONSE_DIR,'reply-limit-422.json'),JSON.stringify(body,null,2));
+ });
+ it('読み取れない本文は選び直しを案内し、内部例外や入力値を返さない',async()=>{
+  newStore();const rows=await initialRows();rows.find(row=>row.trigger==='reservation_created')!.input.messageBubbles=[{id:'broken',type:'flex',content:{text:'private-fixture-value'}}];
+  const response=await request(path+'/engines/initialize'+scope,{rows});expect(response.status).toBe(422);const body=await response.json();
+  expect(body).toMatchObject({fields:{messageBubbles:'本文の形式を読み取れません。テンプレートを選び直すか、テキストを入れて保存し直してください。'}});
+  expect(JSON.stringify(body)).not.toContain('private-fixture-value');expect(JSON.stringify(body)).not.toContain('messageBubbles flex');
  });
 });
 describe('7行の補完とオンのHTTP境界',()=>{

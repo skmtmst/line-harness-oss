@@ -1,5 +1,6 @@
 /** このタブで自動作成したフォームだけを、店・ID・最後に確認した版で識別する。 */
 const fallback = new Map<string, number>()
+const creationFallback = new Map<string, string>()
 const keyFor = (accountId: string, id: string) => `musubo:created-form:${encodeURIComponent(accountId)}:${encodeURIComponent(id)}`
 const validRevision = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value > 0
 
@@ -21,4 +22,15 @@ export function forgetCreatedFormDraft(accountId: string, id: string): void {
   const key = keyFor(accountId, id)
   fallback.delete(key)
   try { window.sessionStorage.removeItem(key) } catch { /* このタブの記録も解除済み。 */ }
+}
+
+const creationKey = (accountId: string, token: string) => `musubo:form-creation:${encodeURIComponent(accountId)}:${encodeURIComponent(token)}`
+export function readFormDraftCreation(accountId: string, token: string): string | null {
+  const key = creationKey(accountId, token)
+  try { return window.sessionStorage.getItem(key) || null } catch { return creationFallback.get(key) ?? null }
+}
+export function rememberFormDraftCreation(accountId: string, token: string, id: string): void {
+  const key = creationKey(accountId, token)
+  creationFallback.set(key, id)
+  try { window.sessionStorage.setItem(key, id) } catch { /* このタブの記録を使う。 */ }
 }

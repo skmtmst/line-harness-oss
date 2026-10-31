@@ -138,3 +138,5 @@ export type { FormReferenceDefinition, PublicFormReference, PublicFormImage, Pub
 export * from './restaurant-reservation-form.js';
 
 export type { RestaurantFollowupManagement } from './restaurant-followup-management.js';
+
+export { lineMessagePreview } from './line-message-preview.js';
