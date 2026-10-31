@@ -1112,4 +1112,4 @@
 
 - [列車1031K：フォーム・タグ・率と登録結果](release-log/unreleased/2027-kenta-train-1031k.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
 
-- [列車1031L：CSV・受付停止とお客さまの予約画面](release-log/unreleased/0000-kenta-train-1031l.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+- [列車1031L：CSV・受付停止とお客さまの予約画面](release-log/unreleased/2028-kenta-train-1031l.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
