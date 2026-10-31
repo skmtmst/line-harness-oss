@@ -496,6 +496,14 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
    */
   saveErrors.define('name', 'メニュー名', () => null, { required: true, reveal: () => setStep('shape') })
   saveErrors.define('chatBarText', 'トーク画面の下の文言', () => null, { required: true, reveal: () => setStep('shape') })
+  const unnamedArea = pages.flatMap(page => page.areas.map(area => ({ page, area }))).find(({ area }) => !area.label?.trim())
+  const publishLabelErrors = useSaveFormErrors()
+  publishLabelErrors.define('label', 'ボタン名', () => null, { reveal: () => {
+    if (!unnamedArea) return
+    setStep('buttons')
+    setActivePageId(unnamedArea.page.id)
+    setSelectedAreaId(unnamedArea.area.id)
+  } })
   const fields = useFormErrors()
   fields.define('name', 'メニュー名', () => (name.trim() ? null : '名前を入力してください'), { required: true, reveal: () => setStep('shape') })
   fields.define('chatbar', 'トーク画面の下の文言', () => (chatBarText.trim() ? null : 'トーク画面の下の文言を入力してください'), { required: true, reveal: () => setStep('shape') })
@@ -945,10 +953,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
     },
   })
 
-  function handlePublish() { return publishMenuNow({ audience, group, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing }) }
+  function validatePublishLabels() {
+    if (!unnamedArea) return true
+    publishLabelErrors.fail('label', 'ボタン名（読み上げラベル）を入力してください')
+    return false
+  }
+  function handlePublish() { if (validatePublishLabels()) return publishMenuNow({ audience, group, loadChecks, persistDraft, publishAttempt, publishing, reloadGroup, saveErrors, saving, setDone, setError, setNotice, setPublishing }) }
 
   /** 「公開する」/「予約する」。時刻を決めた公開は予約口へ。 */
   async function handlePublishSubmit() {
+    if (!validatePublishLabels()) return
     const timingIsScheduled = publishPlan.mode !== 'now'
     if (timingIsScheduled) {
       const startsAt = publishPlan.startsAt
@@ -1404,7 +1418,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   function renderTabImageSlot(index: number) { return renderTabSlot({ accountId, busy, clearPendingImage, group, handlePickedFile, host, pages, setImagePickTarget, setMediaPickerOpen, size, slotImage, tabNameAt }, index) }
 
   /* ======== 手順②：ボタンの動き ======== */
-  function renderButtons() { return renderButtonsStep({ activePage, addArea, areaActionSummary, deleteArea, fields, forms, goToStep, group, host, pageImageUrl, pages, selectedArea, selectedAreaId, setActivePageId, setSelectedAreaId, size, tags, templates, trackedLinks, updateArea }) }
+  function renderButtons() { return renderButtonsStep({ activePage, addArea, areaActionSummary, deleteArea, fields, forms, goToStep, group, host, pageImageUrl, pages, publishLabelErrors, selectedArea, selectedAreaId, setActivePageId, setSelectedAreaId, size, tags, templates, trackedLinks, updateArea }) }
 
   /*
    * ======== 統括の手順③：配る先========

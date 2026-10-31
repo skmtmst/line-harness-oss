@@ -7,7 +7,7 @@ export function createAreaDrafts(template: RichMenuTemplate): Area[] {
   return templateToAreas(template).map((area, index) => ({
     ...area,
     id: `${template.key}-${index}`,
-    label: `面 ${String.fromCharCode(65 + index)}`,
+    label: '',
     tagIds: [],
     scoreChange: null,
     templateId: null,

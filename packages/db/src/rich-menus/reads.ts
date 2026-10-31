@@ -319,6 +319,14 @@ export async function getRichMenuGroupWithPages(
   }
   return {
     ...group,
-    pages: pages.map((p) => ({ ...p, areas: areasByPage.get(p.id) ?? [] })),
+    pages: pages.map((p) => {
+      const pageAreas = areasByPage.get(p.id) ?? [];
+      // 重なる既存の面は、前後の優先を変えないよう従来のID順を保つ。
+      const overlapping = pageAreas.some((area, index) => pageAreas.slice(index + 1).some(other =>
+        area.bounds_x < other.bounds_x + other.bounds_width && area.bounds_x + area.bounds_width > other.bounds_x
+        && area.bounds_y < other.bounds_y + other.bounds_height && area.bounds_y + area.bounds_height > other.bounds_y));
+      if (!overlapping) pageAreas.sort((a, b) => a.bounds_y - b.bounds_y || a.bounds_x - b.bounds_x);
+      return { ...p, areas: pageAreas };
+    }),
   };
 }
