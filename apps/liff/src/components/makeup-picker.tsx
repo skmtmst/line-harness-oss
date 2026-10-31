@@ -42,6 +42,8 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
   const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showNearby, setShowNearby] = useState(false);
+  const requireChoice = useRef(false);
   const key = useRef(crypto.randomUUID());
   const generation = useRef(0);
   const request = useRequestGeneration(credit.id);
@@ -63,7 +65,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
       setOptions(options);
       const first = options.find((o) => !o.full && inWeek(o));
       setDay((cur) => (cur && options.some((o) => jstDate(o.starts_at) === cur && inWeek(o)) ? cur : first ? jstDate(first.starts_at) : null));
-      setPicked((cur) => (cur && options.some((o) => o.slot_id === cur && !o.full && inWeek(o)) ? cur : first?.slot_id ?? null));
+      setPicked((cur) => (cur && options.some((o) => o.slot_id === cur && !o.full && inWeek(o)) ? cur : requireChoice.current ? null : first?.slot_id ?? null));
     }).catch((e) => { if (generation.current === version) { logFailure('makeup-options', e); setFailed(true); } });
   }, [credit.id, week, usable, expires]);
   useEffect(() => { load(); return () => { generation.current++; }; }, [load]);
@@ -71,6 +73,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
   const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
   const rows = (options ?? []).filter((o) => !day || jstDate(o.starts_at) === day);
   const chosen = (options ?? []).find((o) => o.slot_id === picked) ?? null;
+  const nearby = showNearby ? (options ?? []).filter((o) => !o.full).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at) || a.slot_id.localeCompare(b.slot_id)).slice(0, 3) : [];
 
   async function use() {
     if (!chosen || chosen.full || busy || credit.status !== 'open' || !Number.isFinite(expires) || Date.now() >= expires || Date.parse(chosen.starts_at) > expires || Date.parse(chosen.starts_at) <= Date.now()) return;
@@ -81,7 +84,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
       if (!request.isCurrent(version)) return;
       logFailure('makeup-use', e);
       const code = (e as { body?: { error?: string } }).body?.error;
-      if (code === 'slot_full' || code === 'slot_conflict') { key.current = crypto.randomUUID(); setError('この回は埋まりました。ほかの回を選んでください。振替は残っています。'); load(); }
+      if (code === 'makeup_slot_unavailable' || code === 'slot_full' || code === 'slot_conflict') { requireChoice.current = true; setPicked(null); setShowNearby(true); key.current = crypto.randomUUID(); setError('この回は埋まりました。ほかの回を選んでください。振替は残っています。'); load(); }
       else setError('振替を予約できませんでした。振替は残っています。もう一度お試しください。');
     } finally { if (request.isCurrent(version)) setBusy(false); }
   }
@@ -107,7 +110,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
           {days.map((d) => {
             const has = (options ?? []).some((o) => jstDate(o.starts_at) === d && !o.full);
             return (
-              <Button key={d} variant="day" selected={day === d} unavailable={!has} disabled={!has} aria-pressed={day === d} onClick={() => { setDay(d); setPicked((options ?? []).find((o) => jstDate(o.starts_at) === d && !o.full)?.slot_id ?? null); }}>
+              <Button key={d} variant="day" selected={day === d} unavailable={!has} disabled={!has} aria-pressed={day === d} onClick={() => { requireChoice.current = false; setShowNearby(false); setDay(d); setPicked((options ?? []).find((o) => jstDate(o.starts_at) === d && !o.full)?.slot_id ?? null); }}>
                 <span className="liff-num text-sm font-bold">{Number(d.slice(8))}</span>
                 <span className="text-[10.5px]">{formatWeekday(d)}</span>
               </Button>
@@ -123,7 +126,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
               const selected = o.slot_id === picked;
               return (
                 <li key={o.slot_id}>
-                  <Button variant="option" selected={selected} unavailable={o.full} disabled={o.full} aria-pressed={selected} onClick={() => { setPicked(o.slot_id); setError(null); }}>
+                  <Button variant="option" selected={selected} unavailable={o.full} disabled={o.full} aria-pressed={selected} onClick={() => { requireChoice.current = false; setShowNearby(false); setPicked(o.slot_id); setError(null); }}>
                     <span className={`liff-num text-sm font-bold whitespace-nowrap ${o.full ? 'text-liff-off-ink' : 'text-ink'}`}>{utcToJstHm(o.starts_at)}</span>
                     <span className={`min-w-0 flex-1 truncate text-left text-[13px] ${o.full ? 'text-liff-off-ink' : 'text-ink'}`}>{o.name}</span>
                     <span className={`shrink-0 text-xs whitespace-nowrap ${o.full ? 'text-danger' : 'text-liff-sub'}`}>{o.full ? '満席（選べません）' : o.remaining != null ? `残り ${o.remaining}` : '空きあり'}</span>
@@ -135,6 +138,12 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
           </ul>
         )}
       </div>
+      {nearby.length > 0 ? <div role="group" aria-label="近い振替先" className="space-y-2">
+        <h3 className="text-sm font-bold text-ink">近い振替先</h3>
+        {nearby.map(option => <Button key={option.slot_id} variant="option" onClick={() => {
+          requireChoice.current = false; setShowNearby(false); setWeek(mondayOf(jstDate(option.starts_at))); setDay(jstDate(option.starts_at)); setPicked(option.slot_id); setError(null);
+        }}>{mdHm(option.starts_at)} {option.name}</Button>)}
+      </div> : null}
       {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>

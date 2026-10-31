@@ -62,3 +62,16 @@ it('メニューの保存中に店を切り替えても次の店で保存でき�
  await act(async () => { fresh({ success: true }) })
  await waitFor(() => expect(nav.push).toHaveBeenCalledTimes(1))
 })
+
+it.each(['success', 'failure'])('画面を離れた後の保存の%sで一覧へ移らない', async outcome => {
+ nav.params = new URLSearchParams('id=m1')
+ let succeed!: (value: unknown) => void, fail!: (error: Error) => void
+ fixture.updateMenu.mockImplementationOnce(() => new Promise((resolve, reject) => { succeed = resolve; fail = reject }))
+ const view = render(<MenuEditPage />)
+ fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '保存途中' } })
+ fireEvent.click(screen.getByRole('button', { name: /保存する/ }))
+ await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledTimes(1))
+ view.unmount()
+ await act(async () => { if (outcome === 'success') succeed({ success: true }); else fail(new Error('old save failed')) })
+ expect(nav.push).not.toHaveBeenCalled()
+})

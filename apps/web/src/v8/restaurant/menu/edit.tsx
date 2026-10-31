@@ -10,7 +10,7 @@ import { CreatePage } from '@/components/templates/create-page'
 import PreviewLauncher from '@/components/templates/preview-launcher'
 import { CreateSummaryCard } from '@/components/templates/create-parts'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import PageResourceScope from '@/components/shell/page-resource-scope'
+import PageResourceScope, { usePageResourceTask } from '@/components/shell/page-resource-scope'
 import { resolveResourceTitle } from '@/lib/resource-title'
 import Button from '@/components/shared/button'
 import Card, { CardHeader } from '@/components/shared/card'
@@ -64,6 +64,7 @@ function draftOf(item: RestaurantMenuItem | null): Draft {
 }
 
 function MenuEditBody() {
+  const captureResource = usePageResourceTask()
   const params = useSearchParams()
   const id = params.get('id')
   const storeParam = params.get('store')
@@ -117,8 +118,10 @@ function MenuEditBody() {
 
   async function save() {
     if (!canEdit || !selectedAccountId || !valid) return
+    const isCurrent = captureResource()
+    if (!isCurrent()) return
     const attempt = mutationContext.current
-    const stillHere = () => mutationContext.current === attempt
+    const stillHere = () => isCurrent() && mutationContext.current === attempt
     setBusy(true); setError(null)
     const body = {
       kind: draft.kind, name: draft.name, price: Number(draft.price),
@@ -133,12 +136,13 @@ function MenuEditBody() {
           await restaurantTestApi.updateMenu(selectedAccountId, editing.id, body)
           attempt.menuSignature = signature
         }
-        if (!stillHere()) return
         if (editing.kind === 'course') await payment.save(editing.id)
+        if (!stillHere()) return
         notifySaved(priceChanged ? (priceStartsLater ? '価格変更を確定しました。指定した開始日時に反映します。' : '価格を変更しました。') : 'メニューを更新しました。')
       } else {
         if (!storeId) throw new Error('store_missing')
         await restaurantTestApi.createMenu(selectedAccountId, { storeId, ...body })
+        if (!stillHere()) return
         notifySaved('メニューを追加しました。')
       }
       if (!stillHere()) return
@@ -159,8 +163,10 @@ function MenuEditBody() {
 
   async function remove() {
     if (!editing || !selectedAccountId) return
+    const isCurrent = captureResource()
+    if (!isCurrent()) return
     const attempt = mutationContext.current
-    const stillHere = () => mutationContext.current === attempt
+    const stillHere = () => isCurrent() && mutationContext.current === attempt
     setBusy(true); setError(null)
     try {
       await fetchApi(`/api/restaurant-test/menus/${encodeURIComponent(editing.id)}?account_id=${encodeURIComponent(selectedAccountId)}`, { method: 'DELETE' })

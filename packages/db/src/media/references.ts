@@ -229,7 +229,7 @@ export async function retargetMediaUsageReference(
     mediaUpdate?: { expectedRevision?: number; filename?: string; folderId?: string | null };
   },
 ): Promise<{ changed: boolean; state: MediaUsageReferenceState }> {
-  if (input.refKind === 'webinar' || input.refKind === 'booking_menu' || input.refKind === 'booking_staff' || input.refKind === 'booking_settings') {
+  if (input.refKind === 'form' || input.refKind === 'webinar' || input.refKind === 'booking_menu' || input.refKind === 'booking_staff' || input.refKind === 'booking_settings') {
     throw new MediaUsageReferenceError('media_reference_unsupported');
   }
   if (input.target.mode === 'live' && input.refKind === 'rich_menu') {

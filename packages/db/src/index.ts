@@ -454,7 +454,7 @@ export {
   FORM_SUBMIT_CLAIM_STALE_MS, appendFormSubmitClaimStep, archiveFormAtRevision, attachFormAccounts, claimFormCapacitySlot, completeFormSubmitClaim,
   countActiveFormTestTokens, countChoiceUsage, countFormSubmissionsByFriend, countFriendFormSubmissions, createForm, createFormSubmission,
   createFormSubmitClaim, deleteExpiredFormTestTokens, deleteFormAtRevision, ensureFormSubmitOutboxEvent, failFormSubmitClaim, findUnfinishedFormSubmitClaimByHash,
-  formBelongsToLineAccount, getFormAccountIds, getFormById, getFormDeleteImpact, getFormLatestEdit, getFormSubmissionAnalytics,
+  formMediaUsageQueries, formMediaUsageStatements, formBelongsToLineAccount, getFormAccountIds, getFormById, getFormDeleteImpact, getFormLatestEdit, getFormSubmissionAnalytics,
   getFormSubmissionById, getFormSubmissions, getFormSubmissionsByFriend, getFormSubmissionsByFriendCursor, getFormSubmissionsPage, getFormSubmitClaim,
   getFormSubmitClaimBySubmissionId, getFormSubmitClaimsBySubmissionIds, getFormSubmitOutbox, getFormVersionContent, getFormVersionContentsByIds, getForms,
   getFormsWithStats, getLatestFormSubmission, getValidFormTestToken, incrementFormSubmitCount, insertFormSubmissionRecord, insertFormTestToken,

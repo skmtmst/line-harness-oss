@@ -27,6 +27,7 @@ import type {
   BookingResource,
   BookingException,
   BookingMenu,
+  BookingMenuWrite,
   BookingMenuStaff,
   BookingAvailabilityResponse,
   BookingAvailabilityBatchResponse,
@@ -352,7 +353,7 @@ export const bookingApi = {
    * 応答だけを失っても、同じキーでの再送は作り直さず作成済みIDを返す。
    * キーが無い呼び出しは従来どおり毎回作成する。
    */
-  createMenu: (accountId: string, body: Partial<BookingMenu>, idempotencyKey?: string) =>
+  createMenu: (accountId: string, body: BookingMenuWrite, idempotencyKey?: string) =>
     fetchApi<{ id: string }>(withAccount('/api/booking/admin/menus', accountId), {
       method: 'POST',
       headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
@@ -362,7 +363,7 @@ export const bookingApi = {
     fetchApi<BookingMenuReorderResponse>(withAccount('/api/booking/admin/menus/order', accountId), {
       method: 'PUT', body: JSON.stringify(body),
     }),
-  updateMenu: (accountId: string, id: string, expectedVersion: number, body: Partial<BookingMenu>) =>
+  updateMenu: (accountId: string, id: string, expectedVersion: number, body: BookingMenuWrite) =>
     fetchApi<{ ok: true; version: number }>(withAccount(`/api/booking/admin/menus/${id}`, accountId), {
       method: 'PUT',
       body: JSON.stringify({ ...body, expectedVersion }),

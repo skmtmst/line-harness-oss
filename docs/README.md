@@ -1052,3 +1052,6 @@
 - [お気に入りのショートカットと予告表示](release-log/unreleased/1995-masato-sidebar-favorite-shortcuts.md) — 反映履歴、確認 2026-10-31。
 - [店舗の担当者メニュー](release-log/unreleased/1999-masato-store-member-menu.md) — 反映履歴、確認 2026-10-31。
 - [LINEアカウント登録後の初期設定完了](release-log/unreleased/2000-masato-onboarding-account-complete.md) — 反映履歴、確認 2026-10-31。
+
+- [予約の案内と比較の並び](release-log/unreleased/2001-kenta-rival-small-fixes.md) — 反映履歴、確認 2026-10-31。
+- [保存先の固定とフォームの公開参照](release-log/unreleased/2001-kenta-train-1029x.md) — 反映履歴、確認 2026-10-31。

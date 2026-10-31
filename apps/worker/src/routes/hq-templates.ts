@@ -41,6 +41,8 @@ async function authority(c: Context<Env>): Promise<HqTemplateAuthority> {
   return auth.authority;
 }
 const reasons: Record<string, string> = {
+  PUBLIC_IMAGE_REFERENCE_UNSUPPORTED: '登録画像を参照するフォームは、画像の各店への複製にまだ対応していないため配れません。画像の参照を外して確認してください',
+  FORM_STORE_REFERENCE_UNAVAILABLE: '配り先のお店に同じキーの公開できる共通情報がありません。お店の情報の参照を確認してください',
   INVALID_MEDIA: '動画はMP4、音声はM4Aで選んでください。ファイルの長さを読み取れるか確認してください',
   MEDIA_SIZE_LIMIT: '動画・音声は200MB以内、プレビュー画像は1MB以内で選んでください',
   DIRECT_UPLOAD_UNAVAILABLE: '直接アップロードが未設定です。統括の管理者に頼んでください',
