@@ -144,16 +144,19 @@ export default function Event() {
 
   /** 枠がすべて同じ日か。同じ日なら枠には時刻だけを出す。 */
   const oneDay = new Set(slots.map((s) => utcToJstMd(s.starts_at))).size <= 1;
-  const caps = slots.map((s) => s.capacity).filter((c): c is number => c != null);
-  const rems = slots.map((s) => s.remaining).filter((r): r is number => r != null);
+  const limitedSlots = slots.filter((s) => s.capacity != null);
+  const caps = limitedSlots.map((s) => s.capacity!);
+  const rems = limitedSlots.map((s) => s.remaining).filter((r): r is number => r != null);
   const seats =
     caps.length === 0
       ? '定員なし'
-      : rems.length === 0
-        ? `定員 ${caps.reduce((a, b) => a + b, 0)} 席`
+      : rems.length !== limitedSlots.length
+        ? `定員 ${caps.reduce((a, b) => a + b, 0)} 席・残席は各時間で確認してください`
         : `残り ${rems.reduce((a, b) => a + b, 0)} 席（定員 ${caps.reduce((a, b) => a + b, 0)}）`;
-  /** 残席があるときだけ、残りの行を黄土色で出す 。 */
-  const hasSeats = rems.reduce((a, b) => a + b, 0) > 0;
+  const seatSummary = limitedSlots.length > 0 && limitedSlots.length < slots.length
+    ? `定員のある時間：${seats}・定員なしの時間もあります` : seats;
+  /** 残席を全て数えられるときだけ、残りの行を強調する。 */
+  const hasSeats = rems.length === limitedSlots.length && rems.reduce((a, b) => a + b, 0) > 0;
 
   function goConfirm() {
     if (!selectedId || overLimit) return;
@@ -199,7 +202,7 @@ export default function Event() {
           )}
           {slots.length > 0 && <p className="flex items-start gap-2 text-[13px]">
             <Icon name="users" className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" />
-            <span className={hasSeats ? 'font-bold text-liff-wait-ink' : 'text-ink'}>{seats}</span>
+            <span className={hasSeats ? 'font-bold text-liff-wait-ink' : 'text-ink'}>{seatSummary}</span>
           </p>}
           {event.venue_address && <p className="text-sm text-ink-secondary break-words">{event.venue_address}</p>}
           {isHttpsUrl(event.venue_url) && (
