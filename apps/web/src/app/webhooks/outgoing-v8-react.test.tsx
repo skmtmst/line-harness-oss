@@ -198,7 +198,7 @@ test('v8 の閲覧のみ（l5SRfT）は帯が出て、［送り先を作る］�
   await renderPage()
   const board = host.querySelector('[data-design-node="ZSbFY"]')
   expect(board).not.toBeNull()
-  expect(board?.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
+  expect(board?.textContent).toContain('この画面の変える操作は、オーナーか管理者だけができます。')
   const clickable = [...board!.querySelectorAll('a, button')]
   // 作る口は空白にせず、押せない本物のボタン。行き先へのリンクは置かない。
   const creates = clickable.filter((element) => element.textContent?.includes('送り先を作る'))
