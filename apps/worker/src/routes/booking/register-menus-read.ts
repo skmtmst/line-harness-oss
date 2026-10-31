@@ -30,6 +30,7 @@ booking.get('/api/booking/admin/menus', async (c) => {
                 m.duration_minutes, m.buffer_after_minutes,
                 m.base_price, m.price_mode, m.version,
                 m.sort_order, m.is_active, m.auto_tag_id,m.audience_mode,m.audience_tag_ids_json,m.addon_menu_ids_json,m.max_party_size,m.addon_only,m.hq_template_id,m.hq_template_version_id,m.hq_customized,m.image_url,
+                m.customer_recurring_enabled, m.recurring_freqs_json, m.recurring_max_count,
                 m.concurrent_capacity, m.booking_window_days, m.cutoff_hours_before,
                 m.cancel_deadline_hours_before, m.intake_question,
                 COALESCE((
@@ -109,6 +110,9 @@ booking.get('/api/booking/admin/menus', async (c) => {
         audience_mode:row.audience_mode,audience_tag_ids_json:row.audience_tag_ids_json,
         addon_menu_ids_json:row.addon_menu_ids_json,max_party_size:row.max_party_size,addon_only:row.addon_only,
         hq_template_id:row.hq_template_id,hq_template_version_id:row.hq_template_version_id,hq_customized:row.hq_customized,image_url:row.image_url,
+        customer_recurring_enabled: row.customer_recurring_enabled,
+        recurring_freqs_json: row.recurring_freqs_json,
+        recurring_max_count: row.recurring_max_count,
         concurrent_capacity: row.concurrent_capacity,
         booking_window_days: row.booking_window_days,
         cutoff_hours_before: row.cutoff_hours_before,
