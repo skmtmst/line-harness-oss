@@ -23,7 +23,7 @@ import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-s
  * 分けると、2つの選択肢の差（片方だけタグを付ける等）が見比べられない。
  *
  * 文字数の上限は LINE 側の都合。超えたぶんは途中で切れて相手に届くので、
- * 保存を止めるのではなく**その場で残り文字数を出す**。
+ * 入力欄の上限と残り文字数で、送れる長さを案内する。
  */
 
 export type ChoiceBehavior = 'none' | 'url' | 'tel' | 'add_friend' | 'mail' | 'form' | 'scenario'
@@ -423,6 +423,7 @@ export default function QuestionEditor({
                   </div>
                   <SaveErrorField names={[`choices.${index}.label`,"label","choice.label"]}><TextField
                     id={`${fieldBase}-choice-${index}-label`}
+                    maxLength={20}
                     value={choice.label}
                     onChange={(e) => setChoice(index, { label: e.target.value })}
                     className="mt-1.5"

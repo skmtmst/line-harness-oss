@@ -50,3 +50,14 @@ it('WEB261/262: 持ち主の候補を使い、切替前の遅い応答を捨て�
   expect(names.some((name) => name.includes('古いタグ'))).toBe(false)
   expect(names.some((name) => name.includes('新しいタグ'))).toBe(true)
 })
+
+
+it('共通の選択肢のボタン名も20文字の入力上限を持ち、読み込んだ長い値は切り捨てない', async () => {
+  for (const fn of [scope.tags, scope.fields, scope.scenarios]) fn.mockResolvedValue({ success: true, data: [] })
+  const long = 'あ'.repeat(25)
+  const view = render(<QuestionEditor value={{ ...question, choices: [{ ...question.choices[0], label: long }] }} onChange={() => {}} choiceColumns />)
+  await act(async () => {})
+  const label = view.container.querySelector('input[id$="-choice-0-label"]') as HTMLInputElement
+  expect(label.maxLength).toBe(20)
+  expect(label.value).toBe(long)
+})

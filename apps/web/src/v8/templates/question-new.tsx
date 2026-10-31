@@ -156,7 +156,7 @@ function QuestionNew({ host }: { host?: TemplateEditHost }) {
   fields.define('text', '質問文', () => (question.text.trim() ? null : '質問文を入力してください。'), { required: true })
   question.choices.forEach((choice, index) => {
     fields.define(`extras-${index}`, `選択肢 ${index + 1} の追加処理`, () => tapExtrasError({ tagIds: choice.addTagIds, scoreChange: choice.scoreChange }))
-    fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (choice.label.trim() ? null : 'ボタンの文字を入力してください。'), { required: true })
+    fields.define(`choice-${index}`, `選択肢 ${index + 1} のボタンの文字`, () => (!choice.label.trim() ? 'ボタンの文字を入力してください。' : choice.label.length > 20 ? 'ボタンの文字は20文字以内で入力してください。' : null), { required: true })
   })
   const { leaveTarget, confirmLeave, cancelLeave, guarded, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
 
