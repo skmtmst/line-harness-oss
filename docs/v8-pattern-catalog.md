@@ -379,6 +379,7 @@
   - 確認の実行を左、取消を中央に分ける場合は `confirmPlacement="start"`。通常の文字幅は `actionWidthReserve="idle"` で指定し、既定の結果文の幅予約は保つ。
   - 独自の処理を持つ窓でも操作は `DialogActions` に渡す。`footerAlign` だけを指定して本文にボタンを直置きしない。
   - 補助操作がある帯は、共通部品が左の最大ボタン幅を左右とも確保し、主操作を中央で折り返す。理由の行が増えても左は最初のボタン行へそろえる。実幅が左右同幅の配置に足りない場合は、共通部品で補助操作を上・中央の組を下へ積み、間を8px以上にする。画面側で幅や上下位置を補正しない。
+  - 未保存の確認は `UnsavedLeaveDialog` を使う。保存・破棄の意味が異なる場合のみ `saveLabel` / `discardLabel` / `error` / `onSavedLeave` を渡し、保存成功後の移動と破棄の処理を分ける。破棄だけの権限は `discardDisabled` / `discardLockedReason` で保存から分け、保持した操作も現在の権限を守る。省略時の表示と動きは変えない。
   - 参照だけの窓は右上の×で閉じ、下の帯に閉じるボタンを置かない。操作の帯は取消と主操作を中央、脇の操作を `leadingAction` へ。理由などの入力は本文に置く。全画面の検査は `scripts/visual-qa/dialog-footer-contract.test.ts`。
   - 読む変数：`--polish-radius-dialog`・`--polish-window-*`・`--card-edge`
 - **持ち主（Pen）**：`q3DPdz`「ダイアログ/中」
@@ -1192,7 +1193,9 @@
 - 役目：使い方のスタイルを「見る」切り替えと「選ぶ」ボタンを分け、見本の枠で中身を見せて選ばせる（SPEC-11・SPEC-12 の共通節 S）。
 - 持ち主：`apps/web/src/v8/onboarding/style-choice-step.tsx` の `StyleChoiceStep`（下の帯の 1 行は `StyleChoiceStatus`）。切り替えは共通 `SegmentedControl`、枠は共通 `Card`、選んだ印は `StatusBadge`。
 - 見本の枠の中は style-experience スタイル体験プレビュー（`StyleExperiencePlayer`・口は S-4）。枠の大きさはプレイヤーが持ち、並べた時は最小版と全部版で同じ高さ、白い板が 1100 未満では縦に積む。
-- 使用先：はじめの質問の 1 問目（ダッシュボードの窓）。登録の画面の④はまだ今の選ぶカードのまま。
+- 使用先：はじめの質問の 1 問目（ダッシュボードの窓）と登録④・登録再開。
+- 最初のメニュー選択は `onboarding/initial-menu-choice.tsx` の `InitialMenuChoice` が画像・行き先・できることを持つ。登録・再開・はじめの質問・選び直しで共通。画像内の文字は12px以上、欄が800px以上なら見本と説明を左右に並べる。狭い欄は縦に積む。
+- 初期メニューの読みやすさと配置は `scripts/visual-qa/initial-menu-layout.mjs` で実際の表示寸法を見張る。
 
 <a id="style-experience"></a>
 ## style-experience スタイル体験プレビュー

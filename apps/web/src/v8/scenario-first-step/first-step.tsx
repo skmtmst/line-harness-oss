@@ -1,6 +1,7 @@
 'use client'
 
 import { firstQuestionChoiceLabelProblem } from '@/components/scenarios/question-choice-label-validation'
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { jstDate } from '@/lib/jst-datetime';
 import { formatNumber } from '@/lib/format';
@@ -105,6 +106,7 @@ export default function ScenarioFirstStepV8() {
   const { accounts, selectedAccountId, loading: accountLoading } = useAccount()
 
   const [scenario, setScenario] = useState<(Scenario & { steps: ScenarioStep[] }) | null>(null)
+  const tokenNames = useInsertTokenNames(scenario?.lineAccountId ?? selectedAccountId)
   const [loadState, setLoadState] = useState<LoadState>('idle')
   /** 失敗したあとの「再読み込み」で effect を回し直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
@@ -788,7 +790,7 @@ export default function ScenarioFirstStepV8() {
 
             {kind === 'text' ? (
               <MessageBody>
-                <SaveErrorField names={["body","messageContent"]}><InsertTextField
+                <SaveErrorField names={["body","messageContent"]}><InsertTextField tokenNames={tokenNames}
                   id="first-step-body"
                   aria-invalid={Boolean(contentError) || bodyOverLimit || undefined}
                   ref={bodyRef}

@@ -17,6 +17,14 @@
    - `wrangler deploy --config apps/worker/wrangler.staging.toml`
    - `/health` の `git_commit` が配備元 SHA と一致するか
 
+## 管理画面（Pages）
+
+管理画面は Cloudflare Pages の Git 連携プロジェクト `nen-line-stg-admin-git` が、同じ `codex/development` の更新で自動ビルドする（2026-11-01 設定）。
+ビルドコマンドは `pnpm install --frozen-lockfile && pnpm --filter @line-harness/update-engine build && pnpm --filter web build`、出力は `apps/web/out`。
+ビルド時の環境変数は GitHub Actions の `Deploy Cloudflare Staging` と同じ `NEXT_PUBLIC_*` 一式（API URL・Turnstile の公開サイトキー・利用規約などの URL）を Pages 側に持つ。
+以前の Direct Upload 方式の `nen-line-stg-admin` は Git 連携へ切り替えられないため残してあり、`stg-admin.musubo.jp` を新プロジェクトへ付け替えた時点で役目を終える。
+他のブランチのプレビュー配備は切ってある（本番ブランチだけ）。
+
 ## モード
 
 Cloudflare の Build variables `CF_STAGING_DEPLOY_MODE` で切り替えます。

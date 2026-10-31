@@ -1,5 +1,7 @@
 'use client'
 
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
+
 import CarouselPicker from '@/components/scenarios/carousel-picker'
 import InsertToolbar from '@/components/scenarios/insert-toolbar'
 import MessageKindFields, { serializeMessageKind, type MessageKind, type MessageKindState } from '@/components/scenarios/message-kind-fields'
@@ -60,6 +62,7 @@ export function ScenarioStepForm({
   closeStepForm: () => void
   stepFormPreview: { offsetDays: number; offsetHours: number; offsetMinutes: number; }
 }) {
+  const tokenNames = useInsertTokenNames(scenario?.lineAccountId ?? null)
   return (    <div className={editingStepId ? '' : 'border-hairline rounded-card bg-canvas-sunken border p-4'}>
       {!editingStepId && (
         <h4 className="text-sm font-semibold text-ink-secondary mb-3">新しいステップを追加</h4>
@@ -258,7 +261,7 @@ export function ScenarioStepForm({
                 }}
               />
             ) : (
-              <div><Field label="メッセージ内容" required><MessageBody><SaveErrorField names={["messageContent","stepForm.messageContent","message_content","step_form.message_content","step_form"]}><InsertTextField
+              <div><Field label="メッセージ内容" required><MessageBody><SaveErrorField names={["messageContent","stepForm.messageContent","message_content","step_form.message_content","step_form"]}><InsertTextField tokenNames={tokenNames}
                   ref={stepBodyRef}
                   className="w-full border-hairline rounded-control bg-canvas text-ink resize-none border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
                   rows={4}
