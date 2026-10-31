@@ -139,7 +139,7 @@ describe('件数とページ送り・並び替え', () => {
     const groups = [{ id: 'g', name: '店頭' }] as TagGroup[]
     render(<TagsList accountId="account-a" fixture={{ items, groups }} />)
     const labels = [...document.querySelectorAll('[data-folder-select]')].map(el => el.textContent?.replace(/\s/g, ''))
-    expect(labels).toEqual(expect.arrayContaining(onlyArchived ? ['すべて2', '店頭1', '未分類1'] : ['すべて4', '店頭1', '未分類3']))
-    expect(rowIds()).toHaveLength(onlyArchived ? 2 : 4)
+    expect(labels).toEqual(onlyArchived ? ['すべて2', '店頭1', '未分類1'] : ['すべて4', '店頭1', '未分類3'])
+    expect(rowIds()).toEqual(onlyArchived ? ['stored-g', 'stored-none'] : ['manual', 'unknown', 'auto', 'unused'])
   })
 })
