@@ -436,6 +436,19 @@ html:root .panel[data-layout='inset'] .content { align-items: stretch; }
 html:root .panel[data-layout='inset'] .actions { padding: var(--polish-window-divider-space) 0 0; }
 .actionLead { display: flex; flex-wrap: wrap; gap: var(--space-8); min-width: 0; margin-right: auto; }
 .actionStart { grid-column: 1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-8); min-width: 0; }
+/* 左の操作1つ分を左右とも確保し、足りない幅は中央の組で折り返す。 */
+html:root .actions[data-dialog-action-pair]:has(> [data-dialog-action-leading]) {
+  grid-template-columns: minmax(var(--dialog-leading-min, 0px), 1fr) minmax(min-content, auto) minmax(var(--dialog-leading-min, 0px), 1fr);
+  align-items: start;
+}
+html:root .actions > [data-dialog-action-leading] { align-self: start; min-height: var(--control-h); }
+html:root .actions[data-dialog-action-pair] > .buttonPair { min-width: 0; }
+html:root .actions[data-dialog-action-pair][data-dialog-actions-stacked]:has(> [data-dialog-action-leading]) { grid-template-columns: minmax(0, 1fr); }
+html:root .actions[data-dialog-actions-stacked] > .buttonPair { grid-column: 1; }
+@media (min-width: 561px) {
+  html:root .actions[data-dialog-action-pair] > .buttonPair { align-items: flex-start; }
+  html:root .actions > .buttonPair > :is(button, a) { align-self: flex-start; }
+}
 
 html:root .panel[data-confirm-placement='start'] .actions[data-dialog-action-pair] {
   display: grid;
@@ -544,6 +557,7 @@ html:root .panel[data-confirmation='compact'][data-design-layout='stacked'] > .f
 }
 
 @media (max-width: 560px) {
+  html:root .actions[data-dialog-action-pair]:has(> [data-dialog-action-leading]) { grid-template-columns: minmax(0, 1fr); }
   :root .actions[data-dialog-action-pair] { grid-template-columns: minmax(0, 1fr); }
   :root .actions[data-dialog-action-pair] .buttonPair { grid-column: 1; width: 100%; flex-direction: column; }
   :root .panel[data-footer-align='start'] .actions[data-dialog-action-pair] { grid-template-columns: minmax(0, 1fr); }

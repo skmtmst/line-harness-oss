@@ -15,6 +15,7 @@ export function toLessonRosterMember(booking: EventBookingItem): StyleRoster['me
     sub: cancelled ? '取消' : STATUS_NOTES[booking.status] ?? (booking.is_first_time ? '初めて' : '会員'),
     pay: { label: '—', tone: 'neutral' },
     attend: cancelled ? 'cancel' : booking.status === 'attended' ? 'done' : booking.status === 'no_show' ? 'absent' : booking.status === 'confirmed' ? 'button' : 'unavailable',
-    bookingId: booking.id, eventId: booking.event_id,
+    bookingId: booking.id, eventId: booking.event_id, startsAt: booking.slot_starts_at,
+    canReportAbsence: !cancelled && ['requested', 'confirmed'].includes(booking.status),
   }
 }

@@ -14,13 +14,16 @@ import { formatNumber } from '@/lib/format'
  * 教室の「名簿のパネル」（k2MBw）。一覧で回を押すと右に開く。
  * 出席の印・この回の人に LINE・支払いのリンク（Stripe をつなぐまで押せない）・休講にする。
  */
-export function LessonRoster({ roster, canWrite, onClose, onPay, onAttend, onAbsent, onLine, onCancelClass }: {
+export function LessonRoster({ roster, canWrite, onClose, onPay, onAttend, onAbsent, onLine, onCancelClass, onReportAbsence, absenceAllowed, absenceLockedReason }: {
   roster: StyleRoster
   canWrite: boolean
   onClose: () => void
   onPay: () => void
   onAttend: (bookingId: string | null) => void
   onAbsent: (bookingId: string) => void
+  onReportAbsence?: (member: StyleRoster['members'][number]) => void
+  absenceAllowed?: boolean
+  absenceLockedReason?: string
   onLine: () => void
   onCancelClass: () => void
 }) {
@@ -51,11 +54,13 @@ export function LessonRoster({ roster, canWrite, onClose, onPay, onAttend, onAbs
             <span className={styles.rosterName}><strong>{m.name}</strong><span className={styles.cellSub}>{m.sub}</span></span>
             <span className={styles.grow} />
             {m.pay.label === '—' ? <span className={styles.cellMuted}>—</span> : <StatusBadge tone={m.pay.tone}>{m.pay.label}</StatusBadge>}
+            {onReportAbsence && m.canReportAbsence && m.bookingId && m.eventId && m.startsAt && Date.parse(m.startsAt) > Date.now() ? <Button size="compact"
+              lockedReason={absenceLockedReason} disabled={!absenceAllowed} onClick={() => onReportAbsence(m)}>欠席</Button> : null}
             <span className={styles.rosterAttend}>
               {m.attend === 'done' ? <span className={styles.attendDone}>✓ 出席</span> : m.attend === 'absent' ? <span className={styles.cellMuted}>欠席</span> : m.attend === 'cancel' ? <span className={styles.cellMuted}>取消</span> : canWrite && m.attend === 'button' && m.bookingId ? (
                 <span className={styles.actionPair}>
                   <Button size="compact" onClick={() => onAttend(m.bookingId!)}>出席</Button>
-                  {roster.started ? <Button size="compact" onClick={() => onAbsent(m.bookingId!)}>欠席</Button> : null}
+                  {(m.startsAt ? Date.parse(m.startsAt) <= Date.now() : roster.started) ? <Button size="compact" onClick={() => onAbsent(m.bookingId!)}>無断欠席</Button> : null}
                 </span>
               ) : <span className={styles.cellMuted}>—</span>}
             </span>
