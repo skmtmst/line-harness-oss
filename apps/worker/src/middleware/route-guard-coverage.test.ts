@@ -545,6 +545,9 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/operations/security-alerts',
     'GET /api/operations/send-paths',
     'GET /api/ops/announcements',
+    // 利用申込は運営管理者専用。staff の権限表に公開しない。
+    'GET /api/ops/applications',
+    'GET /api/ops/applications/:id',
     'GET /api/ops/audit',
     'GET /api/ops/dashboard',
     'GET /api/ops/dashboard/first-run',
@@ -722,6 +725,9 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/operations/security-alerts/:id/resolve',
     'POST /api/ops/announcements',
     'POST /api/ops/announcements/preview',
+    'POST /api/ops/applications/:id/approve',
+    'POST /api/ops/applications/:id/contact',
+    'POST /api/ops/applications/:id/resend-invite',
     'POST /api/ops/billing/sync',
     'POST /api/ops/impersonation/end',
     'POST /api/ops/impersonation/pii-reveal',
@@ -734,6 +740,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'POST /api/ops/knowledge/tickets/:id/retry',
     'POST /api/ops/members',
     'POST /api/ops/members/:staffId/resend-invite',
+    // LINE の資格情報を扱う接続も運営管理者専用。
+    'POST /api/ops/notice-line-account/connect',
     'POST /api/ops/security-alerts/:id/acknowledge',
     'POST /api/ops/security-alerts/:id/resolve',
     'POST /api/ops/security-alerts/run-once',

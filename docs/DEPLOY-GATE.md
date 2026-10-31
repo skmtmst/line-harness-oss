@@ -73,6 +73,8 @@ GitHub Actions の `deploy-cloudflare-staging.yml` を使うときは
 ロックを自分で取らないでください（workflow が自分で取ります）。
 →「[GitHub Actions のロック](#github-actions-のロック2026-10-13-修正)」
 
+管理画面を配備するときは、ビルド前に `NEXT_PUBLIC_TURNSTILE_SITE_KEY` を検証環境の GitHub Environment 変数と同じ値に設定してください。空欄や別環境のキーでビルドした成果物は配備しません。Worker だけを配備する `--skip-admin` には適用しません。
+
 ### 1. ロックを取得する（＝使用宣言）
 
 ```bash

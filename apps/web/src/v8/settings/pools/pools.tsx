@@ -79,10 +79,9 @@ export default function PoolsV8() {
       else setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
       if (accRes.success) setAccounts(accRes.data as AccountWithStats[])
     } catch (err) {
-      // FEATURE_DISABLED は共通ゲートが案内へ切り替える。それ以外だけここで伝える。
-      if (!(err instanceof ApiError && err.code === 'FEATURE_DISABLED')) {
-        setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
-      }
+      // 設定画面は共通ゲートを通過するため、この画面で停止案内に切り替える。
+      if (err instanceof ApiError && err.code === 'FEATURE_DISABLED') setFeatureOff(true)
+      else setError('プール一覧の取得に失敗しました。もう一度読み込んでください。')
     } finally {
       setLoading(false)
     }

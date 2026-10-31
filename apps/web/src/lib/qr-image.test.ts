@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from 'vitest'
 const SRC = path.join(__dirname, '..')
 const QR_PAGES = [
   'components/dashboard/qr-dialog.tsx',
-  'components/hq/notice-line-register-dialog.tsx',
+  'v8/hq/notice-line-dialog.tsx',
   'v8/ops/two-factor.tsx',
   'v8/settings/staff/staff.tsx',
   'app/login/two-factor/setup/page.tsx',

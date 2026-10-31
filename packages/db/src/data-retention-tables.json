@@ -1964,6 +1964,13 @@
       "column": "line_account_id"
     }
   },
+  "line_account_hq_admin_memberships": {
+    "category": "purge",
+    "scope": {
+      "by": "lineAccount",
+      "column": "line_account_id"
+    }
+  },
   "line_account_tag_links": {
     "category": "purge",
     "scope": {
@@ -2797,6 +2804,13 @@
       "column": "line_account_id"
     }
   },
+  "registration_applications": {
+    "category": "retain",
+    "scope": {
+      "by": "tenant",
+      "column": "tenant_id"
+    }
+  },
   "reminder_delivery_runs": {
     "category": "purge",
     "scope": {
@@ -3537,6 +3551,24 @@
       "by": "parent",
       "column": "notification_id",
       "parent": "notifications",
+      "parentColumn": "id"
+    }
+  },
+  "staff_passkey_challenges": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
+      "parentColumn": "id"
+    }
+  },
+  "staff_passkeys": {
+    "category": "purge",
+    "scope": {
+      "by": "parent",
+      "column": "staff_id",
+      "parent": "staff_members",
       "parentColumn": "id"
     }
   },
