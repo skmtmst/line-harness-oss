@@ -58,7 +58,7 @@ beforeEach(() => {
     if (path === '/api/line-accounts') return json([])
     if (path === '/api/staff') return json([])
     if (path === '/api/auth/two-factor/policy') return json({ required: false })
-    if (path === '/api/auth/two-factor/self') return json({ staffId: 'staff-a', enabled: false, recoveryCodesRemaining: 0 })
+    if (path === '/api/auth/two-factor/self') return json({ staffId: 'staff-a', enabled: false })
     if (path === '/api/auth/sessions') return json({ sessions: [] })
     if (path === '/api/access/users') return json({ items: [], pagination: { total: 0 }, summary: { active: 0, suspended: 0, mfaEnabled: 0, invited: 0 } })
     if (path === '/api/access/roles') return json({ items: [] })

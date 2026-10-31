@@ -50,13 +50,13 @@
 
 /* Page templates cancel the content wrapper's padding with negative margins.
    Keep the account-wide notice outside that wrapper so the page cannot cover it. */
-.recoveryNotice {
+.securityNotice {
   /* 下は 0。下の画面が自分の上の余白（見出しの 24px など）を持っているので、足すと 40px 空く。 */
   margin: var(--polish-space-card) var(--polish-space-section) 0;
 }
 
 /* 受信箱は上の余白を持たずに枠から始まるので、お知らせとのあいだを空ける。 */
-.recoveryNotice:has(+ .content [data-page-template='inbox']) {
+.securityNotice:has(+ .content [data-page-template='inbox']) {
   margin-bottom: var(--polish-space-card);
 }
 
@@ -290,7 +290,7 @@
     flex: 1;
   }
 
-  :root .main[id='main-content']:has(> .content[data-design-shell] > :global([data-page-template][data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']))) > .recoveryNotice {
+  :root .main[id='main-content']:has(> .content[data-design-shell] > :global([data-page-template][data-standalone][data-has-footer][data-frame-height='viewport']:not([data-page-template='settings'], [data-page-template='create']))) > .securityNotice {
     flex-shrink: 0;
   }
 

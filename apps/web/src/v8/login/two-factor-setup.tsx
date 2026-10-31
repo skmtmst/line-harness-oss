@@ -14,7 +14,6 @@ import { isTwoFactorChallengeGone, twoFactorFailureMessage } from '@/v8/login/tw
 
 import { AuthPage, AuthForm, AuthHelp } from '@/components/templates/auth-page'
 import TotpQr from '@/components/shared/totp-qr'
-import RecoveryCodes from './recovery-codes'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 
 type SetupData = { provisioningUri: string; manualKey: string }
@@ -50,8 +49,6 @@ export default function TwoFactorSetupPage() {
   const [retrying, setRetrying] = useState(false)
   /** R508: 合言葉が使えなくなった（期限切れ・回数制限）。入力は終わらせる。 */
   const [expired, setExpired] = useState(false)
-  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
-  const [destination, setDestination] = useState('')
 
   // M033: 開始の失敗は合言葉が生きていればその場で再試行する。
   // 再ログインに戻すのは、合言葉が無いときと期限切れ401のときだけ。
@@ -124,7 +121,7 @@ export default function TwoFactorSetupPage() {
         method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ challengeToken: challenge, code: digits }),
       })
-      const body = await response.json() as { success: boolean; error?: string; fields?: Record<string, string>; data?: { sessionToken?: string; recoveryCodes?: string[] }; csrfToken?: string }
+      const body = await response.json() as { success: boolean; error?: string; fields?: Record<string, string>; data?: { sessionToken?: string }; csrfToken?: string }
       if (!response.ok || !body.success) {
         if (isTwoFactorChallengeGone(response.status)) {
           // 合言葉はサーバー側で消えている。再試行は通らないので入力を終わらせる。
@@ -154,8 +151,7 @@ export default function TwoFactorSetupPage() {
       }
       clearTwoFactorChallenge()
       const path = adminSessionHandoffPath(nextPath, body.data?.sessionToken, body.csrfToken)
-      if (body.data?.recoveryCodes?.length) { setDestination(path); setRecoveryCodes(body.data.recoveryCodes) }
-      else window.location.assign(path)
+      window.location.assign(path)
     } catch (caught) {
       // R506のついで: 通信断の技術文言をそのまま出さない。
       if (!saveErrors.capture(caught)) setError(otpFailureMessage(twoFactorFailureMessage(caught, '登録を完了できませんでした')))
@@ -163,7 +159,6 @@ export default function TwoFactorSetupPage() {
     } finally { setBusy(false) }
   }
 
-  if (recoveryCodes.length) return <RecoveryCodes codes={recoveryCodes} onContinue={() => { setRecoveryCodes([]); window.location.assign(destination) }} />
   return <SaveErrorScope errors={saveErrors}><AuthPage wide title="二段階認証を設定">
     {error ? <Notice tone="danger" message={error} /> : null}
     {loading ? <ListState kind="loading" title="QRコードを用意しています…" /> : setup ? (

@@ -48,7 +48,7 @@ it('実際の代理帯で書込から閲覧へ戻すと、同じ画面の保存�
 it('閲覧から理由付き書込へ切り替えると元の編集許可を使え、保存は1回', async () => {
   verifiedStaffRole('owner')
   const reading = { ...initial, mode: 'read' as const }
-  const known = { impersonation: reading, unfamiliarAt: '2026-10-28', stepUpMethod: 'totp' as const, recoveryCodesRemaining: 3 }
+  const known = { impersonation: reading, unfamiliarAt: '2026-10-28', stepUpMethod: 'totp' as const }
   rememberSessionSnapshot(known)
   rememberAuthCheck('fixture-fingerprint', 'active', known)
   mock.write.mockResolvedValue({ success: true, data: initial })
@@ -127,11 +127,10 @@ it.each([true, false])('控えが無い時の再確認中は保存0、認証の�
   expect(lockReason(true, 'manager')).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: '設定を保存する' }))
   expect(write).not.toHaveBeenCalled()
-  finish(new Response(JSON.stringify({ success, data: { impersonation: { ...initial, mode: 'read' }, stepUpMethod: 'password', unfamiliarAt: '2026-10-28T01:00:00Z', recoveryCodesRemaining: 2 } }), { status: success ? 200 : 503, headers: { 'content-type': 'application/json' } }))
+  finish(new Response(JSON.stringify({ success, data: { impersonation: { ...initial, mode: 'read' }, stepUpMethod: 'password', unfamiliarAt: '2026-10-28T01:00:00Z' } }), { status: success ? 200 : 503, headers: { 'content-type': 'application/json' } }))
   if (success) {
     await waitFor(() => expect(readSessionSnapshot()?.stepUpMethod).toBe('password'))
     expect(readSessionSnapshot()?.unfamiliarAt).toBe('2026-10-28T01:00:00Z')
-    expect(readSessionSnapshot()?.recoveryCodesRemaining).toBe(2)
   } else {
     await screen.findByText(/切り替え後のログインを確認できませんでした/)
     expect(readSessionSnapshot()).toBeNull()

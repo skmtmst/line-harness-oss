@@ -87,7 +87,6 @@ export type StepUpPurpose =
   | 'ops.impersonation'
   | 'secrets.reveal'
   | 'auth.mfa.policy'
-  | 'auth.mfa.recovery'
   | 'auth.mfa.reenroll'
   | 'auth.passkey.register'
   | 'auth.passkey.remove'

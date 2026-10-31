@@ -17,7 +17,6 @@ import OpsShell from './ops/ops-shell'
 import MobileShell from './mobile/mobile-shell'
 import { isMobileShellPath } from '@/lib/mobile-shell'
 import ImpersonationNotice from './ops/impersonation-notice'
-import RecoveryCodeNotice from './recovery-code-notice'
 import UnfamiliarLoginNotice from './unfamiliar-login-notice'
 import SuspendedSidebar from './layout/suspended-sidebar'
 import CommandPalette from './shared/command-palette'
@@ -192,9 +191,8 @@ export function Workspace({ children }: { children: React.ReactNode }) {
     <div className={styles.side}>
       <AppTopBar />
       <main id="main-content" tabIndex={-1} className={styles.main}>
-        {/* V-2: いつもと違う端末・場所からのログイン。そのログイン中だけ、回復コードと同じ白いカードで出す。 */}
-        <UnfamiliarLoginNotice className={styles.recoveryNotice} />
-        <RecoveryCodeNotice className={styles.recoveryNotice} />
+        {/* V-2: いつもと違う端末・場所からのログイン。そのログイン中だけ、白いカードで出す。 */}
+        <UnfamiliarLoginNotice className={styles.securityNotice} />
         {/* V6 共通メニュー J33xq と同じ256pxサイドバーを基準にする。 */}
         <div
           data-design-shell="v6-1920"

@@ -459,7 +459,6 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/ops/applications/{id}/contact',
   'POST /api/ops/applications/{id}/resend-invite',
   'POST /api/ops/notice-line-account/connect',
-  'POST /api/auth/two-factor/recovery',
   'PUT /api/auth/two-factor/policy',
   'GET /api/images/{key}',
   'GET /api/account-settings/allergy-options',
