@@ -1111,3 +1111,5 @@
 - [列車1031Jの修正](release-log/unreleased/2026-kenta-train-1031j.md) — 反映履歴、確認 2026-11-01。
 
 - [配信の入力エラーの表示](release-log/unreleased/0000-kenta-broadcast-validation-recovery.md) — 説明。確認日：2026-11-01。
+
+- [配信前チェックの状態と設定へのリンク](release-log/unreleased/0000-kenta-broadcast-preflight-state.md) — 説明。確認日：2026-11-01。
