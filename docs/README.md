@@ -385,6 +385,7 @@
 - [飲食5：外部予約の対応 API](../apps/worker/src/routes/restaurant-external-links.md)
 - [.env.example](.env.example) — 説明用データ・付随資料、確認 2026-10-19
 - [デプロイ安全ゲートと排他運用](DEPLOY-GATE.md)
+- [検証環境の自動配備（Cloudflare Git 連携）](staging-deploy-cloudflare-builds.md)
 - [然-NEN- LINE管理システム検証環境](NEN-LINE-STAGING.md)
 - [OSS Sandbox Merge Gate](OSS-SANDBOX-MERGE-GATE.md)
 - [文書の入口](README.md)
@@ -1083,5 +1084,13 @@
 - [反映履歴：窓の下の操作帯](release-log/unreleased/2012-kenta-dialog-leading.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [反映履歴：UID移行の行き先確認](release-log/unreleased/2012-kenta-uid-safety.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [配信メニューの表示名](release-log/unreleased/2013-masato-friend-add-label.md) — 反映履歴、確認 2026-10-31。
-- [反映履歴：設定の入口を上段へ](release-log/unreleased/2014-masato-settings-entry-customer-look.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
-- [反映履歴：選択したアカウントの受信箱の件数](release-log/unreleased/2016-masato-inbox-account-badge.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [反映履歴：未保存の確認・設定の安全性・表示の改善](release-log/unreleased/2015-kenta-train-1031d.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [設定の入口からお客さまのデザインを開く](release-log/unreleased/2014-masato-settings-entry-customer-look.md) — 反映履歴、確認2026-10-31。
+
+- [受信箱の選択アカウント別バッジ](release-log/unreleased/2016-masato-inbox-account-badge.md) — 反映履歴。確認 2026-10-31。
+
+- [検証環境の自動配備手順の反映履歴](release-log/unreleased/2017-masato-cf-staging-deploy-doc.md) — 反映履歴、確認 2026-10-31。
+
+- [反映履歴：検証配備の未適用変更の確認](release-log/unreleased/2018-masato-cf-staging-deploy-pending.md) — 運用者向けの説明、確認2026-10-31。
+- [反映履歴：検証管理画面の配備手順](release-log/unreleased/2020-masato-cf-pages-doc.md) — 運用者向けの説明、確認2026-10-31。
+- [反映履歴：検証配備の再試行](release-log/unreleased/2021-masato-cf-staging-deploy-retry.md) — 運用者向けの説明、確認2026-10-31。

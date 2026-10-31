@@ -2,6 +2,7 @@
 
 import { ActionsStep,PreviewStep } from './editor-actions-preview'
 import { BasicStep,RoutesStep,sharedPrefix } from './editor-basic-routes'
+import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 import { MessageStep } from './editor-message'
 import { EMPTY_DEFINITION,EMPTY_RULE,EditorRule,RouteUse,STEPS,Step,b244Requirements,editorSnapshot,toEditorRule } from './editor-model'
 
@@ -62,6 +63,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
   const searchParams = useSearchParams()
   const narrow = useNarrowViewport()
   const { selectedAccountId, accounts, loading: accountLoading } = useAccount()
+  const tokenNames = useInsertTokenNames(selectedAccountId)
   const accountName = accounts.find((account) => account.id === selectedAccountId)?.name ?? '公式アカウント'
   const role = useStaffRole()
   const canEdit = canManageRole(role)
@@ -691,7 +693,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         />
       ) : null}
       {step === 'message' ? (
-        <MessageStep definition={definition} setDefinition={setDefinition} friendKind={rule.friendKind} scenarios={options.scenarios} canEdit={canEdit} scenarioError={fieldError?.step === 'message' ? fieldError.message : undefined} />
+        <MessageStep tokenNames={tokenNames} definition={definition} setDefinition={setDefinition} friendKind={rule.friendKind} scenarios={options.scenarios} canEdit={canEdit} scenarioError={fieldError?.step === 'message' ? fieldError.message : undefined} />
       ) : null}
       {step === 'actions' ? (
         <ActionsStep definition={definition} setDefinition={setDefinition} options={options} canEdit={canEdit} />

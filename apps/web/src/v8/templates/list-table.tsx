@@ -1,5 +1,6 @@
 'use client'
 
+import type { InsertTokenNames } from '@/components/shared/insert-tokens'
 import type { AccountWithStats } from '@/contexts/account-context'
 import type { TemplatesListView } from '@/v8/templates/words'
 import { isRichVideoTemplate } from './list-model'
@@ -34,6 +35,7 @@ import styles from './list.module.css'
 import { messageTypeText,type TemplatesFailure } from './words'
 
 type RenderTemplateListContext = {
+  tokenNames?: InsertTokenNames
   accountLoading: boolean
   accounts: AccountWithStats[]
   activeId: string | null
@@ -82,7 +84,7 @@ type RenderTemplateListContext = {
 const KIND_ICONS = { image: ImageIcon, flex: LayoutTemplate, carousel: GalleryHorizontal, question: HelpCircle, video: Video } as const
 const kindIcon = (kind: string) => KIND_ICONS[kind as keyof typeof KIND_ICONS] ?? FileText
 
-export function renderTemplateList({ accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, createHref, createLabel, lockedReason, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view }: RenderTemplateListContext) {
+export function renderTemplateList({ tokenNames, accountLoading, accounts, activeId, allOnPageSelected, bulkDeleting, canMutateTemplates, createHref, createLabel, lockedReason, clearFilters, clearSelection, contextMenuItems, contextTemplate, detailHref, duplicateFeedback, failure, filterActive, filteredTemplates, folderDotOf, load, moving, narrow, openMenuId, openMove, removableSelected, rowMenuItems, sectionWord, selectedAccountId, selectedCount, selectedIds, setActiveId, setBulkDeleteError, setContextId, setOpenMenuId, setPendingBulkDelete, setSelectedIds, shownItems, templates, toggleAllOnPage, toggleOne, usedSelectedCount, view }: RenderTemplateListContext) {
   return (accountLoading || view === 'loading' ? (
     <div className={styles.skeletonRows} aria-label="読み込み中" data-design-node="susGP">
       {[0, 1, 2, 3].map((i) => (
@@ -200,7 +202,7 @@ export function renderTemplateList({ accountLoading, accounts, activeId, allOnPa
                     ) : (
                       <Td weight={1} className={styles.previewCell} title={`種類：${kindText}`}>
                         <span className="sr-only">{`種類：${kindText}`}</span>
-                        <LineBubbleThumb thumb={bubbleThumbOf({ messageType: t.messageType, content: latestContentOf(t), question: t.question })} />
+                        <LineBubbleThumb tokenNames={tokenNames} thumb={bubbleThumbOf({ messageType: t.messageType, content: latestContentOf(t), question: t.question })} />
                       </Td>
                     )}
                     <Td>

@@ -8,7 +8,7 @@
  */
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, screen, within, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.hoisted(() => {
@@ -27,12 +27,17 @@ vi.mock('next/navigation', () => ({
 const ACCOUNT = { id: 'acc-1', name: '店舗A' }
 
 import RichMenuCreateV8 from './create'
+import type { RichMenuCreateHost } from '@/lib/rich-menu-create-host'
+import type { HqRichMenuSeed } from '@/lib/hq-rich-menu-create'
+import { describeMenuSummary } from './create-draft'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
+import { getPageAction } from '@/test-utils/page-action'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const area = (id: string, label: string, x: number) => ({
-  id, boundsX: x, boundsY: 0, boundsWidth: 833, boundsHeight: 843, actionType: 'uri',
-  actionData: { uri: 'https://nen.example/' }, intent: 'url', label, tagIds: [], scoreChange: null,
+  id, boundsX: x, boundsY: 0, boundsWidth: 833, boundsHeight: 843, actionType: 'uri' as const,
+  actionData: { uri: 'https://nen.example/' }, intent: 'url' as const, label, tagIds: [], scoreChange: null,
   templateId: null, formId: null, trackedLinkId: null,
 })
 const GROUP = {
@@ -48,6 +53,7 @@ const GROUP = {
 let host: HTMLDivElement
 let root: Root
 const calls: string[] = []
+const writes: Array<{ method: string; body: Record<string, unknown> }> = []
 /** 道の頭がこれに当たる候補の口は、この回数だけ 500 で断る。 */
 let failing: Record<string, number> = {}
 /** 下書きの取得で返す中身。形の違う返事を試すときに入れ替える。 */
@@ -55,7 +61,8 @@ let groupBody: unknown = GROUP
 
 function stubFetch() {
   calls.length = 0
-  vi.stubGlobal('fetch', vi.fn(async (url: unknown) => {
+  writes.length = 0
+  vi.stubGlobal('fetch', vi.fn(async (url: unknown, init?: RequestInit) => {
     const parsed = new URL(String(url), 'http://localhost')
     calls.push(parsed.pathname + parsed.search)
     const prefix = Object.keys(failing).find((key) => parsed.pathname === key && failing[key] > 0)
@@ -64,6 +71,12 @@ function stubFetch() {
       return { ok: false, status: 500, json: async () => ({ success: false, error: 'internal' }) }
     }
     if (parsed.pathname === '/api/staff/me') return { ok: true, status: 200, json: async () => ({ success: true, data: { id: 'owner-1', role: 'owner' } }) }
+    if ((parsed.pathname === '/api/rich-menu-groups' && init?.method === 'POST') || (parsed.pathname === '/api/rich-menu-groups/rmg-x' && init?.method === 'PATCH')) {
+      const body = JSON.parse(String(init.body)) as Record<string, unknown>
+      writes.push({ method: init.method, body })
+      groupBody = { ...GROUP, ...(groupBody as typeof GROUP), ...body, id: GROUP.id, pages: GROUP.pages }
+      return { ok: true, status: 200, json: async () => ({ success: true, data: groupBody }) }
+    }
     if (parsed.pathname === '/api/rich-menu-groups/rmg-x') return { ok: true, status: 200, json: async () => ({ success: true, data: groupBody }) }
     if (parsed.pathname === '/api/rich-menu-groups') return { ok: true, status: 200, json: async () => ({ success: true, data: { items: [], total: 0, page: 1, limit: 200 } }) }
     return { ok: true, status: 200, json: async () => ({ success: true, data: [] }) }
@@ -74,9 +87,9 @@ async function settle() {
   for (let i = 0; i < 12; i++) await act(async () => { await new Promise((r) => setTimeout(r, 0)) })
 }
 
-async function open(search: string) {
+async function open(search: string, props: React.ComponentProps<typeof RichMenuCreateV8> = {}) {
   window.history.replaceState(null, '', `/rich-menus/new${search}`)
-  await act(async () => { root.render(<RichMenuCreateV8 />) })
+  await act(async () => { root.render(<RichMenuCreateV8 {...props} />) })
   await settle()
 }
 
@@ -205,4 +218,110 @@ describe('リッチメニューを作る：選ぶ札と終わりの欄', () => {
     expect(ends().disabled).toBe(false)
     expect(screen.queryByText('「終わりを決める」をオンにすると設定できます')).toBeNull()
   })
+})
+
+
+function makeHqHost(initial?: HqRichMenuSeed): RichMenuCreateHost {
+  return {
+    backHref: '/hq/rich-menus', onCancel: vi.fn(), canOperate: true, folders: [],
+    references: { tags: [], templates: [], forms: [] }, initial,
+    uploadImage: vi.fn(async () => ({ r2Key: 'test-image' })), imageUrl: () => '',
+    distribute: null, selectedCount: 0, selectedIds: [], friendTotal: null, busy: false, onSave: vi.fn(),
+  }
+}
+
+describe('リッチメニューの出す相手は明示的に決める', () => {
+  it('店舗の新規作成は決めないから始め、全員を選んでいない', async () => {
+    await open('?step=audience')
+    expect((screen.getByRole('radio', { name: /^決めない/ }) as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByRole('radio', { name: /^すべての友だち/ }) as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('統括の新規作成も各アカウントで決める状態から始める', async () => {
+    await open('?step=audience', { host: makeHqHost() })
+    expect((screen.getByRole('radio', { name: /^決めない/ }) as HTMLInputElement).checked).toBe(true)
+    expect((screen.getByRole('radio', { name: /^全員/ }) as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('初めの下書き保存と手順の保存でも全員の既定にしない', async () => {
+    await open('')
+    await act(async () => { fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '作りかけのメニュー' } }) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：ボタンの動き', exact: true })) })
+    await settle()
+    expect(writes).toHaveLength(1)
+    expect(writes[0].body).toMatchObject({ accountId: 'acc-1', isDefaultForAll: false, targetingEnabled: false, targetingCondition: null })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：誰に出すか', exact: true })) })
+    await settle()
+    expect(writes).toHaveLength(2)
+    expect(writes[1]).toMatchObject({ method: 'PATCH', body: { isDefaultForAll: false, targetingEnabled: false } })
+    expect((screen.getByRole('radio', { name: /^決めない/ }) as HTMLInputElement).checked).toBe(true)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：公開', exact: true })) })
+    await settle()
+    expect(host.textContent).toContain('LINEへの登録だけでは、友だちの画面は変わりません。出す相手は一覧の「表示先」で決めてください。')
+    expect(within(screen.getByRole('list', { name: '設定済みの内容' })).getByText('決めない', { exact: true })).toBeTruthy()
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '誰に出すかに戻る', exact: true })) })
+    await act(async () => { fireEvent.click(screen.getByRole('radio', { name: /^すべての友だち/ })) })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: '次へ：公開', exact: true })) })
+    await settle()
+    expect(writes.at(-1)?.body.isDefaultForAll).toBe(true)
+  })
+
+  it.each([
+    ['全員', { isDefaultForAll: true, targetingEnabled: false }, /^すべての友だち/],
+    ['条件付き', { isDefaultForAll: false, targetingEnabled: true, targetingCondition: JSON.stringify({ operator: 'AND', rules: [{ type: 'tag_exists', value: 'tag-1' }] }) }, /^条件に当てはまる友だちだけ/],
+    ['決めない', { isDefaultForAll: false, targetingEnabled: false }, /^決めない/],
+  ] as const)('保存済みの%sは、読み直してもその選択を保つ', async (_name, saved, label) => {
+    groupBody = { ...GROUP, ...saved }
+    await open('?id=rmg-x&step=audience')
+    expect((screen.getByRole('radio', { name: label }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  it.each(['all', 'store', 'tag'] as const)('統括の保存済み%sも選び直させず保持する', async displayAudience => {
+    const initial: HqRichMenuSeed = {
+      name: GROUP.name, chatBarText: GROUP.chatBarText, folderId: null, size: 'large',
+      displayAudience, displayTagName: displayAudience === 'tag' ? '会員' : '', defaultOpen: true,
+      displayOrder: 1, defaultPageId: GROUP.defaultPageId, pages: GROUP.pages,
+    }
+    await open('?step=audience', { host: makeHqHost(initial) })
+    const label = displayAudience === 'all' ? /^全員/ : displayAudience === 'tag' ? /^タグが付いた人/ : /^決めない/
+    expect((screen.getByRole('radio', { name: label }) as HTMLInputElement).checked).toBe(true)
+  })
+})
+
+
+it('統括は初めの保存・決めないを押した保存・開き直しで同じ表示先になり、未保存を作らない', async () => {
+  const hq = makeHqHost()
+  await open('', { host: hq })
+  await act(async () => { fireEvent.change(screen.getByRole('textbox', { name: /^メニュー名/ }), { target: { value: '各店舗で決めるメニュー' } }) })
+  const leave = vi.fn()
+  await act(async () => { requestUnsavedAction(leave) })
+  expect(leave).not.toHaveBeenCalled()
+  expect(screen.getByRole('dialog', { name: '保存していない変更があります' })).toBeTruthy()
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: '編集を続ける', exact: true })) })
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: '保存していない変更があります' })).toBeNull())
+  await act(async () => { fireEvent.click(getPageAction({ name: '下書きを保存', exact: true })) })
+  await settle()
+  const saved = vi.mocked(hq.onSave).mock.calls[0][0]
+  expect(saved.displayAudience).toBe('store')
+  await act(async () => { requestUnsavedAction(leave) })
+  expect(leave).toHaveBeenCalledTimes(1)
+  await act(async () => { root.unmount(); root = createRoot(host) })
+  const resumed = makeHqHost(saved)
+  await open('?step=audience', { host: resumed })
+  expect((screen.getByRole('radio', { name: /^決めない/ }) as HTMLInputElement).checked).toBe(true)
+  await act(async () => { fireEvent.click(screen.getByRole('radio', { name: /^全員/ })) })
+  expect((screen.getByRole('radio', { name: /^全員/ }) as HTMLInputElement).checked).toBe(true)
+  await act(async () => { fireEvent.click(screen.getByRole('radio', { name: /^決めない/ })) })
+  await act(async () => { fireEvent.click(getPageAction({ name: '下書きを保存', exact: true })) })
+  await settle()
+  expect(vi.mocked(resumed.onSave).mock.calls[0][0]).toEqual(saved)
+  await act(async () => { requestUnsavedAction(leave) })
+  expect(leave).toHaveBeenCalledTimes(2)
+})
+
+it.each([
+  ['all', false, 'すべての友だち'], ['targeted', false, '条件に当てはまる友だちだけ'], ['none', false, '決めない'],
+  ['all', true, '全員'], ['tag', true, 'タグが付いた人'], ['targeted', true, '決めない'],
+] as const)('比較する表示先%s（統括=%s）は選択の題と一致する', (audience, forHq, expected) => {
+  expect(describeMenuSummary({ name: 'メニュー', chatBarText: 'メニュー', audience, forHq, pages: [] })).toContain(`出す相手：${expected}`)
 })
