@@ -8,9 +8,9 @@ import { readDraftSettings } from '../routes/reminders-definition-read-draft-set
 let t:SqliteD1;
 const parts=[{messageType:'text',messageContent:'{{name}}さんへ'},{messageType:'text',messageContent:'2つ目の文です'}];
 const settings=():ReminderDraftSettings=>({name:'来店前',lineAccountId:'a',triggerType:'manual',deliveryMode:'countdown',stopConditions:{bookingCancelled:true,friendBlocked:true,supportMarkCompleted:false,daysAfterTarget:null},steps:[{stableStepId:'step',offsetMinutes:0,messageType:parts[0].messageType,messageContent:parts[0].messageContent,messageParts:parts}]});
-beforeEach(()=>{t=createTestD1({foreignKeys:true});t.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','c','店','t','s');
+beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date('2026-10-31T00:00:00Z'));t=createTestD1({foreignKeys:true,now:()=>new Date()});t.raw.exec(`INSERT INTO line_accounts(id,channel_id,name,channel_access_token,channel_secret) VALUES('a','c','店','t','s');
  INSERT INTO friends(id,line_account_id,line_user_id,display_name) VALUES('f','a','UID','さくら');`);});
-afterEach(()=>t.raw.close());
+afterEach(()=>{t.raw.close();vi.useRealTimers()});
 it('同時刻の吹き出しは1つのステップ・1つの要求で送り、すべての履歴を残す',async()=>{
  const draft=await createReminderWithDraftVersion(t.db,settings());await recordReminderDraftTest(t.db,draft.version.id,{succeeded:true,staffId:null});
  await publishReminderDraftVersion(t.db,draft.reminder.id,null);
