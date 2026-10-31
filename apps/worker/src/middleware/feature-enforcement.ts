@@ -354,6 +354,12 @@ export const FEATURE_ROUTE_PATTERN_MANIFEST: readonly FeatureRoutePatternMetadat
     classification: { kind: 'public', reason: '回答前に表示する公開フォーム' },
   },
   {
+    pattern: /^\/api\/forms\/[^/]+\/images\/[^/]+$/,
+    methods: ['GET'],
+    accountResolver: 'none',
+    classification: { kind: 'public', reason: '採用中の公開フォーム版が表示する固定画像' },
+  },
+  {
     pattern: /^\/api\/forms\/[^/]+\/(?:submit|opened|partial|files)$/,
     methods: ['POST'],
     accountResolver: 'none',
