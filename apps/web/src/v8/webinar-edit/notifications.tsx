@@ -282,15 +282,17 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
     setTestResult('')
     try {
       if (dirty && !(await saveRef.current())) return
-      setTestOpen(false)
       const res = await webinarApi.testNotifications(webinarId)
       setTestResult(`テスト送信しました。成功 ${formatNumber(res.data.sent)} 件・失敗 ${formatNumber(res.data.failed)} 件`)
-      await refreshTestResult()
+      setTestOpen(false)
+      void refreshTestResult()
+      return true
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
       setTestResult(webinarErrorText(cause, 'テスト送信できませんでした。時間をおいてもう一度お試しください。')) }
+      return false
     } finally {
       testLock.current = false
       setTesting(false)
@@ -356,7 +358,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
         </ul>
       ) : null}
       {readOnly ? null : (
-        <div><Button onClick={() => setTestOpen(true)} disabled={testRefreshError || testing || saving || testDone} title={testRefreshError ? '送信済みの結果を読み直してください' : testDone ? 'テスト済みです' : undefined}  busy={testing} busyLabel="送信中…"><Send size={16} aria-hidden="true" />{testDone ? 'テスト送信済み（全部）' : 'テストを送る（全部）'}</Button></div>
+        <div><Button onClick={() => { setTestResult(''); setTestOpen(true) }} disabled={testRefreshError || testing || saving || testDone} title={testRefreshError ? '送信済みの結果を読み直してください' : testDone ? 'テスト済みです' : undefined}  busy={testing} busyLabel="送信中…"><Send size={16} aria-hidden="true" />{testDone ? 'テスト送信済み（全部）' : 'テストを送る（全部）'}</Button></div>
       )}
     </>
   }
@@ -379,7 +381,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
             : <p className={styles.previewEmpty}>{`「${previewRow?.label ?? '通知'}」の本文はまだありません。送るときに決まった文面を使います。`}</p>}
         </LinePreview>
         <div className={form.previewActions}>
-          {readOnly ? null : <Button onClick={() => setTestOpen(true)} disabled={testRefreshError || testing || saving || testDone || !settings} title={testRefreshError ? '送信済みの結果を読み直してください' : testDone ? 'テスト済みです' : saving ? '保存しています' : !settings ? '通知の設定を読み込んでください' : undefined} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : 'テストを送る'}</Button>}
+          {readOnly ? null : <Button onClick={() => { setTestResult(''); setTestOpen(true) }} disabled={testRefreshError || testing || saving || testDone || !settings} title={testRefreshError ? '送信済みの結果を読み直してください' : testDone ? 'テスト済みです' : saving ? '保存しています' : !settings ? '通知の設定を読み込んでください' : undefined} busy={testing} busyLabel="送信中…">{testDone ? 'テスト送信済み' : 'テストを送る'}</Button>}
           {ctx.canOpenPublicPage && ctx.publicUrl ? <Button external href={ctx.publicUrl}  >公開ページを見る</Button> : null}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
@@ -435,7 +437,7 @@ export default function NotificationsPane({ ctx, chrome, onDirtyChange, register
       {testRefreshError ? <Notice tone="info" action={readOnly ? undefined : <Button onClick={() => void retryTestResult()} disabled={testing} busy={testing}>送信結果を読み直す</Button>}>テスト送信の結果は受け取りましたが、確認状態を読み込めませんでした。再送せずに結果を読み直してください。</Notice> : null}
       {testResult ? <p role="status" className={form.previewNote}>{testResult}</p> : null}
 
-      <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} onConfirm={() => void runTest()}>
+      <ConfirmDialog open={testOpen} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing} onCancel={() => { if (!testing) setTestOpen(false) }} error={testResult || undefined} onSuccess={() => setTestOpen(false)} onConfirm={() => runTest()}>
         <p className={form.cardNote}>{dirty ? '保存していない設定を保存してから送ります。' : ''}{`対象：「${webinar.title}」の入っている通知。本文は設定済みのものを送ります。`}</p>
       </ConfirmDialog>
     </CreatePage></SaveErrorScope>

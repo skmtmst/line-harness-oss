@@ -2,7 +2,7 @@
 import { canManageRole, useTenantWideAccess, useStaffRole } from '@/lib/staff-role'
 
 import { useSamePageUrl } from '@/lib/use-same-page-url'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Ban, Check, CirclePause, Copy, Download, PencilLine, RotateCcw, Send } from 'lucide-react'
 import Select from '@/components/shared/select'
@@ -425,8 +425,13 @@ function HqBroadcastDetailBody() {
     return () => clearInterval(timer)
   }, [run, load])
 
+  const retryAcknowledged = useRef<{ ask: typeof ask; targets: Set<string> }>({ ask: null, targets: new Set() })
+  const [actConflict, setActConflict] = useState(false)
+  useEffect(() => { if (ask) setError(''); setActConflict(false) }, [ask])
   const act = async () => {
-    if (!run || !ask) return
+    if (!run || !ask || busy || actConflict || loadError) return
+    if (retryAcknowledged.current.ask !== ask) retryAcknowledged.current = { ask, targets: new Set() }
+    const acknowledged = retryAcknowledged.current.targets
     setBusy(true); setError('')
     try {
       if (ask.kind === 'send') {
@@ -444,20 +449,31 @@ function HqBroadcastDetailBody() {
         await hqBroadcastsApi.retry(run.id, ask.target.accountId, ask.target.version)
         notifyToast(`${ask.target.accountName}にやり直しています`)
       } else {
-        const targets = run.targets.filter((t) => canRetry(run, t))
+        const targets = run.targets.filter((t) => canRetry(run, t) && !acknowledged.has(t.accountId))
         const failures: string[] = []
+        let conflicted = false
         for (const t of targets) {
-          try { await hqBroadcastsApi.retry(run.id, t.accountId, t.version) } catch { failures.push(t.accountName) }
+          try { await hqBroadcastsApi.retry(run.id, t.accountId, t.version); acknowledged.add(t.accountId) } catch (cause) {
+            if (cause instanceof ApiError && cause.status === 409) conflicted = true
+            failures.push(t.accountName)
+          }
         }
-        if (failures.length) setError(`やり直せなかった店があります：${failures.join('・')}。読み直してから、店ごとに「…」でやり直してください。`)
+        if (failures.length) {
+          const message = `やり直せなかった店があります：${failures.join('・')}。${conflicted ? '閉じて最新の状態を確認してください。' : 'もう一度押すと、未完了の店だけやり直します。'}`
+          if (conflicted) throw new ApiError(409, message)
+          throw new Error(message)
+        }
         else notifyToast(`${n(targets.length)}店にやり直しています`)
       }
       setAsk(null)
-      await load()
+      void load()
+      return true
     } catch (caught) {
-      setAsk(null)
-      setError(errorText(caught, '操作できませんでした。もう一度お試しください。'))
-      await load()
+      const needsReview = !(caught instanceof ApiError) || caught.status === 409 || caught.status >= 500
+      setActConflict(needsReview)
+      const reason = errorText(caught, '操作できませんでした。')
+      setError(needsReview ? `${reason} 閉じて最新の状態を確認してください。` : reason)
+      return false
     } finally {
       setBusy(false)
     }
@@ -645,7 +661,11 @@ function HqBroadcastDetailBody() {
           warning={ask.kind === 'send'}
           busy={busy}
           onConfirm={ask.kind !== 'send' || gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => act() : undefined}
-          onCancel={() => setAsk(null)}
+          error={error || undefined}
+          confirmDisabled={actConflict || Boolean(loadError)}
+          confirmDisabledReason="閉じて最新の状態を確認してください。"
+          onSuccess={() => setAsk(null)}
+          onCancel={() => { setAsk(null); setError(''); if (actConflict) void load() }}
         >
           {ask.kind === 'send' && gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}
         </ConfirmDialog>

@@ -319,6 +319,16 @@ html:root .button.filterActive { outline-color: var(--color-control-border); col
 
 :root .button.secondary:not([data-permission-locked])[aria-pressed='true']:not([data-presentation]) { background: var(--polish-selection-bg); color: var(--polish-selection-ink); }
 
+/* 文字の操作は緑で区別し、選択状態・明示色・押せない理由の表示は保つ。 */
+:root .button.text[data-text-content]:not(:is(.textInk, .textDanger, .textAccent, .textQuiet)):not(.filterActive):not([aria-pressed='true']):not(:disabled):not([aria-disabled='true']):not([data-permission-locked]) {
+  color: var(--color-accent-deep);
+}
+:root .button.text[data-text-content]:is(:hover, :focus-visible):not(:disabled):not([aria-disabled='true']):not([data-permission-locked]) { text-decoration: underline; }
+html:root .button.text[data-shared-button]:is(:disabled, [aria-disabled='true'], [data-permission-locked]) {
+  color: var(--color-ink-secondary);
+  text-decoration: none;
+}
+
 /* 明示された危険・成功の文字色は、文字だけの操作でも保持する。 */
 :root .button.inline.text.textDanger { color: var(--color-danger); }
 :root .button.inline.text.textAccent { color: var(--color-accent-deep); }

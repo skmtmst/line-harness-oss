@@ -1,10 +1,11 @@
 'use client'
 
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { PASS_LIST_HREF } from './words'
 
 import { StepSection, StepContent } from '@/components/templates/steps'
 
-import { Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Pencil, Plus } from 'lucide-react'
 import type { BookingPassPlan, BookingPassPlanWrite } from '@line-crm/shared'
@@ -89,10 +90,27 @@ function PassCreateInner() {
   const [menus, setMenus] = useState<EntityPickerItem[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [confirmCreate, setConfirmCreate] = useState(false)
+  const [validationBlocked, setValidationBlocked] = useState(false)
+  useEffect(() => { setValidationBlocked(false) }, [form])
   const [dirty, setDirty] = useState(false)
   const errorsScope = useSaveFormErrors()
+  const currentAttempt = useRef<{
+    scope: string; key: string; plan: BookingPassPlan | null; signature: string
+  } | null>(null)
+  const scope = JSON.stringify([accountId, editId])
+  if (!currentAttempt.current || currentAttempt.current.scope !== scope) {
+    currentAttempt.current = { scope, key: crypto.randomUUID(), plan: null, signature: '' }
+  }
+  const attempt = currentAttempt.current
+  useEffect(() => {
+    setConfirmCreate(false); setBusy(null); setNotice(''); setErrors({})
+    setOriginal(null); setForm(EMPTY); setDirty(false)
+    setLoadState(editId ? 'loading' : 'ready')
+    errorsScope.reset()
+  }, [attempt])
 
-  const patch = (next: Partial<Form>) => { setDirty(true); setForm((current) => ({ ...current, ...next })) }
+
+  const patch = (next: Partial<Form>) => { setNotice(''); setDirty(true); setForm((current) => ({ ...current, ...next })) }
 
   useEffect(() => {
     if (!accountId) return
@@ -144,34 +162,46 @@ function PassCreateInner() {
   }
 
   const submit = async (start: boolean) => {
-    if (!accountId) return
+    if (!canEdit || busy || !accountId) return
     const payload = body()
-    if (!payload) { setConfirmCreate(false); return }
+    if (!payload) return
+    const signature = JSON.stringify(payload)
+    const stillHere = () => currentAttempt.current === attempt
     setBusy(start ? 'create' : 'draft')
     setNotice('')
     try {
-      let plan: BookingPassPlan
-      if (original) {
-        const response = await bookingPassPlansApi.save(accountId, original.id, { ...payload, expectedVersion: original.version })
-        if (!response.success) throw new Error('save_failed')
+      let plan = attempt.plan ?? original
+      if (!plan || attempt.signature !== signature) {
+        const response = plan
+          ? await bookingPassPlansApi.save(accountId, plan.id, { ...payload, expectedVersion: plan.version })
+          : await bookingPassPlansApi.create(accountId, payload, attempt.key)
+        if (!response.success) throw new Error('回数券を保存できませんでした。')
         plan = response.data
-      } else {
-        const response = await bookingPassPlansApi.create(accountId, payload, crypto.randomUUID())
-        if (!response.success) throw new Error('create_failed')
-        plan = response.data
+        attempt.plan = plan
+        attempt.signature = signature
       }
       if (start) {
         const started = await bookingPassPlansApi.start(accountId, plan.id, plan.version)
-        if (!started.success) throw new Error('start_failed')
+        if (!started.success) throw new Error('販売を始められませんでした。')
       }
+      if (!stillHere()) return
       setDirty(false)
+      setConfirmCreate(false)
       notifySaved(start ? `「${plan.name}」の販売を始めました。` : `「${plan.name}」を下書きで保存しました。`)
       router.push(PASS_LIST_HREF)
+      return true
     } catch (reason) {
-      setConfirmCreate(false)
-      if (!errorsScope.capture(reason)) setNotice(failureText(reason, start ? '作る' : '保存する'))
+      if (!stillHere()) return
+      errorsScope.capture(reason)
+      const fieldErrors = readSaveFieldErrors(reason)
+      if (Object.keys(fieldErrors).length > 0) {
+        setErrors(current => ({ ...current, name: fieldErrors.name ?? fieldErrors['form.name'], price: fieldErrors.price ?? fieldErrors['form.price'], count: fieldErrors.count ?? fieldErrors.monthlyLimit }))
+        setValidationBlocked(true)
+        setNotice(`${Object.values(fieldErrors).join(' ')} 戻って入力を直してください。`)
+      } else setNotice(failureText(reason, start ? '作る' : '保存する'))
+      return false
     } finally {
-      setBusy(null)
+      if (stillHere()) setBusy(null)
     }
   }
 
@@ -304,7 +334,8 @@ function PassCreateInner() {
         description="始めると、種類・回数・値段・使える予約は変えられません。お客さまに券を付けられるようになります。まだ始めないときは、下書き保存を押してください。"
         confirmLabel="販売を始める"
         busy={busy === 'create'}
-        onConfirm={() => void submit(true)}
+        cancelLabel={validationBlocked ? "戻って直す" : "キャンセル"} confirmDisabled={validationBlocked} confirmDisabledReason="戻って入力を直してください。"
+        error={notice || undefined} onSuccess={() => setConfirmCreate(false)} onConfirm={() => submit(true)}
         onCancel={() => setConfirmCreate(false)}
       />
       {preparing.dialog}

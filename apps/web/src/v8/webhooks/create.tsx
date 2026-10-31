@@ -482,7 +482,7 @@ function WebhooksCreateV8Inner() {
               </Card>
             ))}
             <div>
-              <Button variant="text" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((open) => !open)}>
+              <Button variant="text" textTone="ink" aria-expanded={detailsOpen} onClick={() => setDetailsOpen((open) => !open)}>
                 {detailsOpen ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}詳細条件
               </Button>
             </div>

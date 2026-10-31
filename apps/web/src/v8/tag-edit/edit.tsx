@@ -157,7 +157,8 @@ export default function TagEditV8() {
       saveKeysRef.current.clear(sig)
       notifySaved(update.data.replayed ? '保存済みでした。' : update.data.queued > 0 ? `保存しました。${update.data.queued}人へ遡及反映を開始しました。` : '保存しました。')
       setConflictValues(null)
-      await load(true)
+      void load(true)
+      return true
     } catch (reason) {
       if (!stillHere()) return
       const fieldFailure = saveErrors.capture(reason);
@@ -165,6 +166,7 @@ export default function TagEditV8() {
       if (reason instanceof ApiError && reason.status === 409) setConflictValues(values)
       else { if (!fieldFailure)
  setError(withPermissionFailure(reason, describeSaveFailure(reason), 'store')) }
+      return false
     } finally {
       if (targetRef.current === savingTarget && targetGenerationRef.current === targetGeneration) setSaving(false)
     }

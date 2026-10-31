@@ -2,6 +2,7 @@
 import { DetailContent, DetailFields, DetailInlineEdit } from '@/components/shared/detail-content'
 import { RefreshCover } from '@/components/shared/refresh-cover'
 
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import type { FriendFieldType } from '@line-crm/shared';
 import { api } from '@/lib/api';
 import { ListPageBody } from '@/components/templates';
@@ -29,6 +30,7 @@ import FieldsTable from './fields-table'
 
 export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
   const { accountId, canEdit, host, explanation, error, actionError, setActionError, retryOrder, setRetryOrder, query, setQuery, type, setType, folderFilter, setFolderFilter, pageSize, setPageSize, pendingDelete, setPendingDelete, folders, folderDialog, setFolderDialog, deletingFolder, setDeletingFolder, folderBusy, folderError, setActiveFieldId, load, loadFolders, pageItems, activeField, activeFieldIndex, applyOrder, remove, removeFolder, kpis, folderRows, createButton } = model
+  const deleteLockedReason = usePermissionLockReason(canEdit)
   const table = <FieldsTable {...model} />
   const operationHelp = canEdit ? `行の「…」に：編集・${host ? '配る' : '移行（種類を変える）'}・削除。並べ替えはつまんで上下（キーボードは上下キー）` : '行から中身を見られます。'
   const typeNote = host ? '情報欄のひな形を各アカウントへ配れます。種類と差し込みの名前は作ったあと変えられません。別の種類は新しいひな形を作ってください。' : '項目の種類を変えると、入っている値が変わることがあります。種類を変えるときは「移行」で事前に確かめてから変えます。'
@@ -175,8 +177,9 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
         description="値が入っていない項目だけ削除できます。この操作は元に戻せません。"
         confirmLabel="削除する"
         destructive
-        onCancel={() => setPendingDelete(null)}
-        onConfirm={() => { const target = pendingDelete; setPendingDelete(null); if (target) void remove(target) }}
+        onCancel={() => { setPendingDelete(null); if (model.deleteNeedsReview) void load() }}
+        confirmDisabled={!canEdit || model.deleteNeedsReview} confirmLockedReason={deleteLockedReason} confirmDisabledReason="閉じて最新の使用状況を確かめてください。"
+        error={model.deleteError || undefined} onSuccess={() => setPendingDelete(null)} onConfirm={() => pendingDelete ? remove(pendingDelete) : false}
       />
     </>
   )

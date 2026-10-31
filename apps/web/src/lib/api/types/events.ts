@@ -49,7 +49,18 @@ export interface EventQuestion {
   options?: string[] | null;
 }
 
+export interface EventMakeupRule {
+  enabled: boolean;
+  cutoffHours: number;
+  validDays: number;
+  monthlyCap: number;
+  target: 'same_kind' | 'list';
+  targetIds: string[];
+}
+
 export interface EventDetail {
+  /** 保存済みの振替ルール。未取得時は既定値へ置き換えて送らない。 */
+  makeup_rule_json?: string | null;
   folderId?: string | null;
   venue_address?: string | null;
   id: string;

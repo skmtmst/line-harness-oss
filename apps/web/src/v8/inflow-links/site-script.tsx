@@ -261,12 +261,13 @@ export default function SiteScriptV8() {
       setResumeTarget(null)
       setSiteActionError('')
       await load()
+      return true
     } catch (err) {
       if (moved()) return
       const fieldFailure = saveErrors.capture(err)
-      setResumeTarget(null)
       { if (!fieldFailure)
       setSiteActionError(describeApiFailure(err, '保存')) }
+      return false
     } finally {
       setSiteBusy(false)
     }
@@ -321,7 +322,7 @@ export default function SiteScriptV8() {
                   items={[
                     { id: 'edit', label: '編集', onSelect: () => { setSiteFieldErrors({}); setSiteDialog({ mode: 'edit', site, label: site.label, domainsText: site.domains.join('\n'), error: null }) } },
                     ...(stopped
-                      ? [{ id: 'resume', label: '再開する', icon: <Play size={16} aria-hidden />, onSelect: () => setResumeTarget(site) }]
+                      ? [{ id: 'resume', label: '再開する', icon: <Play size={16} aria-hidden />, onSelect: () => { setSiteActionError(''); setResumeTarget(site) } }]
                       : [{ id: 'stop', label: '止める', icon: <Pause size={16} aria-hidden />, onSelect: () => { setStopReasonError(''); setStopDialog({ site, reason: '', error: null }) } }]),
                   ]}
                 />
@@ -528,7 +529,7 @@ export default function SiteScriptV8() {
         description={resumeTarget ? `「${resumeTarget.label}」から届く分をまた数え始めます。止めていた間の分は数えていません。` : ''}
         confirmLabel="再開する"
         busy={siteBusy}
-        onConfirm={() => resumeSite()}
+        error={siteActionError || undefined} onSuccess={() => setResumeTarget(null)} onConfirm={() => resumeSite()}
         onCancel={() => { if (!siteBusy) setResumeTarget(null) }}
       />
     </DetailPage></SaveErrorScope>

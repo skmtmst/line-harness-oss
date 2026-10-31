@@ -1,4 +1,5 @@
 'use client'
+import TextLink from '@/components/shared/text-link'
 import { ListPageStats } from '@/components/templates/list-page'
 import { formatYen } from '@line-crm/shared';
 
@@ -9,8 +10,7 @@ import { formatYen } from '@line-crm/shared';
  * 呼ぶ口・合計の出し方・CSV は今の画面（RoutesOverviewTab）と同じ。
  */
 import { useMemo, useState, type ReactNode } from 'react'
-import Link from '@/components/shared/list-navigation'
-import { ArrowRight, Download, Target, TrendingUp, UserPlus, Wallet } from 'lucide-react'
+import { Download, Target, TrendingUp, UserPlus, Wallet } from 'lucide-react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
 import Button from '@/components/shared/button'
@@ -103,7 +103,7 @@ export function RoutesFrame({ accountId, children, exportCsv, exportDisabled, da
         <RangePickerV8 customRange={customRange} onRangeChange={setRange} days={days} onChange={setDays} />
         <span className={styles.caption}>{dataRangeCaption(state.data.period.from, state.data.period.to, state.data.dataCutoffAt)}</span>
         <span className={styles.spacer} />
-        <Link href={overview.searchConsoleHref} className={styles.textLink}>Search Console を見る<ArrowRight size={16} aria-hidden="true" /></Link>
+        <TextLink href={overview.searchConsoleHref} truncate>Search Console を見る</TextLink>
         <Button variant="secondary" onClick={onExport} disabled={disabled}><Download size={16} aria-hidden="true" />CSVで書き出す</Button>
       </div>
       {children ? children(overview) : <RoutesTable overview={overview} clicks={clicks} />}

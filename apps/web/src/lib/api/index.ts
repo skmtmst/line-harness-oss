@@ -698,6 +698,7 @@ export type {
   EventListItem,
   EventQuestion,
   EventDetail,
+  EventMakeupRule,
   EventSlot,
   EventSlotInput,
   EventBookingItem,

@@ -1,4 +1,5 @@
 'use client'
+import TextLink from '@/components/shared/text-link'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { canManageRole, useStaffRole, isOwnerRole } from '@/lib/staff-role'
 import { mileageAssignee as assignee } from './display'
@@ -17,7 +18,6 @@ import { jstMonthStart } from '@/lib/jst-datetime'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import Link from '@/components/shared/list-navigation'
 import { useSearchParams } from 'next/navigation'
 import { CircleDot, Clock3, Inbox, MessageCircle, Minus, Plus, Undo2 } from 'lucide-react'
 import { DetailPage } from '@/components/templates'
@@ -549,7 +549,7 @@ function FriendDetailInner() {
             </div>
           ) : null}
           <div className={styles.summaryFoot}>
-            <Link href="/mileage?tab=rewards" className={styles.backLink}>{rankUnpublished ? '使い道・ランクを作る' : '使い道を見る'}</Link>
+            <TextLink inline href="/mileage?tab=rewards">{rankUnpublished ? '使い道・ランクを作る' : '使い道を見る'}</TextLink>
           </div>
         </Card>
       </div>

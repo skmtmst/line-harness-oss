@@ -1,15 +1,15 @@
 'use client'
 
+import TextLink from '@/components/shared/text-link'
 import { BroadcastAbResult, abStatusDefinition, useAbResult } from '@/v8/broadcast-ab/public/result/index'
 import { useFeatureAccess } from '@/lib/use-feature-access'
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict'
 import { useState, type ReactNode, type RefObject } from 'react'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import Link, { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import {
   ArrowLeft,
-  ArrowRight,
   Check,
   CircleAlert,
   Copy,
@@ -716,7 +716,7 @@ function Overview({
           <section className={styles.section}>
             <div className={styles.secHead}>
               <h3 className={styles.secTitle}>反応</h3>
-              <Link href="/inflow-links" className={styles.secLink}>流入経路で見る<ArrowRight aria-hidden="true" /></Link>
+              <TextLink href="/inflow-links">流入経路で見る</TextLink>
             </div>
             {insight?.links?.length ? (
               <ul className={styles.linkList}>
@@ -779,7 +779,7 @@ function Overview({
         <section className={styles.section}>
           <div className={styles.secHead}>
             <h3 className={styles.secTitle}>押されたリンク</h3>
-            <Link href="/inflow-links" className={styles.secLink}>流入経路で見る<ArrowRight aria-hidden="true" /></Link>
+            <TextLink href="/inflow-links">流入経路で見る</TextLink>
           </div>
           <p className={styles.faint}>
             配信ごとのリンク別の押された数はまだ出せません。リンク全体は「分析 → URL クリック」で見られます。

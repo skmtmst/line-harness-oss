@@ -185,16 +185,18 @@ export function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: 
 
   const issue = async () => {
     if (!storeId || error) return
-    setReissueOpen(false)
     setIssuing(true)
     setNotice('')
     setActionError('')
     try {
       await restaurantTestApi.issueIntakeAddress(accountId, storeId)
-      await loadAddresses()
+      setReissueOpen(false)
+      void loadAddresses()
       setNotice(addresses.length > 0 ? '新しいアドレスを発行しました。旧アドレスは90日後に失効します。' : '取り込みアドレスを発行しました。')
+      return true
     } catch (caught) {
       setActionError(intakeAddressError(caught))
+      return false
     } finally {
       setIssuing(false)
     }
@@ -245,7 +247,7 @@ export function IntakeAddressPanel({ accountId, store, readOnly }: { accountId: 
         confirmLabel="発行する"
         busy={issuing}
         onCancel={() => setReissueOpen(false)}
-        onConfirm={() => issue()}
+        error={actionError || undefined} onSuccess={() => setReissueOpen(false)} onConfirm={() => issue()}
       />
       </div>
     </Panel>

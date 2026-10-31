@@ -1,4 +1,5 @@
 'use client'
+import TextLink from '@/components/shared/text-link'
 import Link from '@/components/shared/list-navigation'
 import { CircleAlert, Info, RotateCw, SearchX } from 'lucide-react'
 import Button from '@/components/shared/button'
@@ -218,9 +219,9 @@ export default function DuplicatesV8() {
                 </td>
                 <td>{formatDateTime(candidate.reviewedAt ?? candidate.detectedAt)}</td>
                 <td>
-                  <Link className={styles.linkAction} href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>
+                  <TextLink inline href={`/friends/identity-candidates?id=${encodeURIComponent(candidate.id)}`}>
                     根拠を確認 →
-                  </Link>
+                  </TextLink>
                 </td>
               </tr>
             )) : (
