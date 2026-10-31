@@ -92,9 +92,10 @@ export function prepareWorker(sha: string): void {
   built.vars = { ...built.vars, ADMIN_ORIGIN: 'https://admin.musubo.jp', ADMIN_ALLOW_CROSS_SITE: 'false', WORKER_URL: 'https://api.musubo.jp', BUILD_GIT_COMMIT: sha, BUILD_VERSION: JSON.parse(readFileSync('package.json', 'utf8')).version, BUILD_RELEASED_AT: new Date().toISOString() };
   writeFileSync(path, JSON.stringify(built));
   assertWorkerConfig(source, JSON.parse(readFileSync(path, 'utf8')));
-  requireValue(process.env.GITHUB_ENV);
-  // Only an internally derived relative path, never configuration values.
-  command('node', ['-e', 'require("fs").appendFileSync(process.env.GITHUB_ENV, "WORKER_DEPLOY_CONFIG="+process.argv[1]+"\\n")', path.replace('apps/worker/', '')]);
+  if (process.env.GITHUB_ENV) {
+    // Actions consumes this output; the manual Worker path uses the artifact directly.
+    command('node', ['-e', 'require("fs").appendFileSync(process.env.GITHUB_ENV, "WORKER_DEPLOY_CONFIG="+process.argv[1]+"\\n")', path.replace('apps/worker/', '')]);
+  }
 }
 export async function verifyPages(sha: string): Promise<void> {
   assertSha(sha);

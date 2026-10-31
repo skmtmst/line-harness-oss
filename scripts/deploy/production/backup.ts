@@ -37,7 +37,8 @@ export async function backupDatabase(sha: string): Promise<void> {
   const root = `r2/buckets/${encodeURIComponent(policy.bucket)}`;
   const source = unstable_readConfig({ config: 'apps/worker/wrangler.toml' });
   assertBackupPolicy(policy, await cloudflare(`${root}/domains/managed`), await cloudflare(`${root}/domains/custom`), await cloudflare(`${root}/lifecycle`), source.r2_buckets.map((bucket: { bucket_name: string }) => bucket.bucket_name));
-  const run = requireValue(process.env.GITHUB_RUN_ID), attempt = requireValue(process.env.GITHUB_RUN_ATTEMPT);
+  const run = requireValue(process.env.MANUAL_BACKUP_RUN_ID ?? process.env.GITHUB_RUN_ID);
+  const attempt = requireValue(process.env.MANUAL_BACKUP_RUN_ATTEMPT ?? process.env.GITHUB_RUN_ATTEMPT);
   if (!/^\d+$/.test(run) || !/^\d+$/.test(attempt)) throw new Error('backup_run');
   const object = `${policy.bucket}/${policy.prefix}${sha}-${run}-${attempt}.enc`;
   const dir = mkdtempSync(join(requireValue(process.env.RUNNER_TEMP), 'production-backup-'));
@@ -56,7 +57,7 @@ export async function backupDatabase(sha: string): Promise<void> {
     command('npx', ['wrangler', 'r2', 'object', 'get', object, `--file=${fetchedPath}`, '--remote']);
     const stored = readFileSync(fetchedPath);
     if (digest(stored) !== digest(encrypted) || !decryptBackup(stored, key).equals(plain)) throw new Error('backup_round_trip');
-    writeFileSync(receiptPath(), JSON.stringify({ verified: true, sha, planDigest: digest(JSON.stringify(plan)) }), { mode: 0o600 });
+    writeFileSync(receiptPath(), JSON.stringify({ verified: true, sha, planDigest: digest(JSON.stringify(plan)), object, bookmark, createdAt: new Date().toISOString() }), { mode: 0o600 });
   } finally {
     // Only our own disposable export/encrypted copy, never repository work or provider data.
     rmSync(dir, { recursive: true, force: true });

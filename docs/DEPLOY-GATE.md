@@ -1,4 +1,4 @@
-> 文書：デプロイ安全ゲートと排他運用｜区分：今の正本｜最終確認：2026-10-19（日本時間）
+> 文書：デプロイ安全ゲートと排他運用｜区分：今の正本｜最終確認：2026-10-31（日本時間）
 
 # デプロイ安全ゲートと排他運用
 
@@ -201,6 +201,46 @@ staging のロックが242分残留してその間の配備が全部止まりま
 Cloudflare の本番アクセス権限があること自体は、本番変更の承認ではありません。
 kenta は調査・差分確認・dry-run・手順準備まで進められますが、
 本番への適用は masato の明示的な承認と担当指定がある場合だけ実施します。
+
+### GitHub Actions を使用しない Worker 単独配備
+
+GitHub Actions を使用しない運用では、`main` に入った Worker の修正を
+`pnpm deploy:production:worker:manual` で手動配備します。これは Worker のみの経路です。
+D1 migration、管理画面 Pages、設定変更、配信の実行には使用しません。
+既存の Actions 専用スクリプトへ偽の `GITHUB_*` 値を渡して実行しません。
+
+本番実行前に、Masato が対象SHAと実施内容を明示承認し、その記録URLを残します。
+検証 Worker が**同じ40桁のSHA**を公開して合格したことを確認します。
+`codex/development` の通常検証と異なる候補を検証環境へ一時配備するときは、
+検証環境への影響について別途承認を得て、検証ロックを取り、元の版を記録して戻します。
+検証環境に別のSHAが公開されている間は、本番スクリプトは止まります。
+
+1. `main` を最新にし、親・子の作業ツリーをクリーンにする。配備スクリプト自身も `main` に含める。
+2. 変更対象の関連テスト、Workerビルド、セキュリティ検査を通し、対象SHAを記録する。
+3. 本番ロックを `pnpm deploy:lock acquire production --note "Worker の配信先分離修正"` で取る。他の配備者がいれば待つ。
+4. 操作を止めたことを確認し、Cloudflare認証情報、本番Worker・D1識別子、非公開の暗号化バックアップ先・鍵を安全な環境変数で渡す。`APPROVED_MIGRATIONS` はスクリプトが空配列へ固定する。
+5. リポジトリ外に権限を絞った記録ディレクトリを作る。まず以下のdry-runを実行し、公開SHA・未適用DB更新0件・設定・ビルド・Wrangler dry-runを確認する。
+6. 配備直前に本番のWorker版を記録し、D1を暗号化して非公開R2へ保存・読み戻し検証する。再度main・検証SHA・ロック・DB・本番Worker版を確認してからWorkerのみ配備する。
+7. 公開SHA、正常応答、実際に100%稼働する新しいWorker版を確認する。記録ディレクトリのreceiptに旧版・新版・バックアップ位置・時刻が残る。
+8. 結果を共有し、`pnpm deploy:lock release production` でロックを解放する。途中失敗時はロックを保持し、旧版への切り戻し要否を判断する。
+
+```bash
+pnpm deploy:production:worker:manual -- \
+  --approval-ref 'https://github.com/OWNER/REPO/pull/NUMBER#issuecomment-ID' \
+  --parent-repo '/absolute/path/to/parent' \
+  --record-dir '/absolute/path/to/private-release-records'
+
+# 本番への適用は、上のdry-runとMasatoの個別承認を確認した後だけ
+pnpm deploy:production:worker:manual -- \
+  --approval-ref 'https://github.com/OWNER/REPO/pull/NUMBER#issuecomment-ID' \
+  --parent-repo '/absolute/path/to/parent' \
+  --record-dir '/absolute/path/to/private-release-records' --apply
+```
+
+配備後に異常があればreceiptの `before.versionId` を読み、原因と影響を確認してから
+Cloudflareの公式 `wrangler rollback <VERSION_ID> --name <WORKER_NAME>` を使います。
+切り戻しも本番変更なのでMasatoの判断を得て、同じロックを保持したまま実施し、
+公開応答と稼働版を再確認します。D1の復元はWorkerの切り戻しに含めません。
 
 ### `--approved-by` は承認の証明ではない
 
