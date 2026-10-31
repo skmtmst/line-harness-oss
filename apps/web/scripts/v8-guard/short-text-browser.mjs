@@ -1,11 +1,11 @@
 /** Visible short labels must fit without hiding characters or splitting a word. */
 export function shortTextFindings(records) {
-  return records.filter(record => record.clipped || record.lines > 1).map(record => ({ ...record, kind: record.clipped ? 'short-text-clipped' : 'short-text-wrapped' }))
+  return records.filter(record => record.clipped || record.lines > 1 && !record.allowWrap).map(record => ({ ...record, kind: record.clipped ? 'short-text-clipped' : 'short-text-wrapped' }))
 }
 
 /** DOM geometry from the rendered product; long names keep their existing title/ellipsis contract. */
 export function collectShortText() {
-  const records = [], seen = new Set()
+  const records = [], seen = new Set(), measuredParents = new Set()
   const visible = node => { const r = node.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(node).visibility !== 'hidden' && !node.closest('[hidden],[inert],[aria-hidden="true"],nav,[data-template-region="folders"],[data-line-preview-part]') }
   for (const scope of document.querySelectorAll('main,[role="dialog"]')) {
     for (const input of scope.querySelectorAll('input[inputmode="numeric"]')) {
@@ -28,10 +28,13 @@ export function collectShortText() {
       const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT)
       for (let node; (node = walker.nextNode());) {
         if (seen.has(node)) continue
-        const text = node.textContent.trim()
+        const atomic = node.parentElement.childElementCount === 0 ? node.parentElement : node
+        if (atomic.nodeType === 1 && measuredParents.has(atomic)) continue
+        const text = atomic.textContent.trim()
         if (!text || text.replace(/\s/g,'').length > 16 || /[\r\n]/.test(text) || !visible(node.parentElement) || node.parentElement.closest('.sr-only')) continue
         seen.add(node)
-        const range = document.createRange(); range.selectNodeContents(node)
+        if (atomic.nodeType === 1) measuredParents.add(atomic)
+        const range = document.createRange(); range.selectNodeContents(atomic)
         const rect = range.getBoundingClientRect(), lineRects = [...range.getClientRects()].filter(r=>r.width>0 && r.height>0)
         const tops = [...new Set(lineRects.map(r=>Math.round(r.top)))]
         let clipped = false, clipper = null
@@ -39,7 +42,7 @@ export function collectShortText() {
           const css = getComputedStyle(parent), box = parent.getBoundingClientRect()
           if (/(hidden|clip|auto|scroll)/.test(css.overflowX) && (rect.left < box.left || rect.right > box.right)) { clipped = true; clipper = parent.tagName; break }
         }
-        records.push({ text, selector: target.id ? '#'+target.id : target.tagName, clipped, clipper, lines: tops.length, width: rect.width })
+        records.push({ text, selector: target.id ? '#'+target.id : target.tagName, clipped, clipper, lines: tops.length, allowWrap: !!node.parentElement.closest('[role="note"]'), width: rect.width })
       }
     }
   }

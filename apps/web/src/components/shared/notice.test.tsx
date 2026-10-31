@@ -25,8 +25,39 @@ describe('帯（Notice）の4種類', () => {
     jsx.unmount()
     const body = render(<Notice tone={tone}><p>一覧を読み込めませんでした。</p></Notice>)
     expect(word(body.container)).toBe(expected)
-    // 本文だけの帯では、点のすぐ後ろの本文の頭に置く。
-    if (expected) expect(body.container.querySelector('[data-notice-message]')?.firstElementChild?.hasAttribute('data-notice-status-word')).toBe(true)
+    // 段落で始まる本文でも、最初の段落の同じ行の頭に置く。
+    if (expected) expect(body.container.querySelector('p')?.firstElementChild?.hasAttribute('data-notice-status-word')).toBe(true)
+  })
+
+  it('段落とリンクの形・余白を保ち、札をリンクの押し場所へ入れない', () => {
+    const { container } = render(<Notice tone="danger"><p style={{ marginBlock: 12 }}><a href="/settings">設定を確認してください。</a></p><p>内容は残ります。</p></Notice>)
+    const paragraphs = container.querySelectorAll('p')
+    expect(paragraphs).toHaveLength(2)
+    expect(paragraphs[0].style.marginBlock).toBe('12px')
+    expect(paragraphs[0].textContent).toBe('失敗：設定を確認してください。')
+    expect(screen.getByRole('link').textContent).toBe('設定を確認してください。')
+    expect(paragraphs[1].textContent).toBe('内容は残ります。')
+  })
+
+  it('入力欄の名前・表・画面読み上げ専用の中へ札を差し込まない', () => {
+    const labels = render(<Notice tone="danger"><label htmlFor="field">名前</label><input id="field" /></Notice>)
+    expect(screen.getByRole('textbox', { name: '名前' })).toBeTruthy()
+    expect(labels.container.querySelector('label [data-notice-status-word]')).toBeNull()
+    labels.unmount()
+    function Cell() { return <td>内容</td> }
+    const table = render(<Notice tone="danger"><table><tbody><tr><Cell /></tr></tbody></table></Notice>)
+    expect(table.container.querySelector('table [data-notice-status-word]')).toBeNull()
+    expect(table.container.querySelector('tr')?.children[0].tagName).toBe('TD')
+    table.unmount()
+    const hidden = render(<Notice tone="danger"><span className="sr-only">補足</span><p>理由を表示します。</p></Notice>)
+    expect(hidden.container.querySelector('.sr-only [data-notice-status-word]')).toBeNull()
+    expect(hidden.container.querySelector('p [data-notice-status-word]')).not.toBeNull()
+  })
+
+  it('箇条書きの札は最初のliの中へ置き、ulの直下にspanを作らない', () => {
+    const { container } = render(<Notice tone="danger"><ul><li>名前を入れてください。</li><li>入力は残っています。</li></ul></Notice>)
+    expect(container.querySelector('ul > [data-notice-status-word]')).toBeNull()
+    expect(container.querySelector('li [data-notice-status-word]')).not.toBeNull()
   })
 
   it('呼び出し側が同じ言葉で書き出している時は重ねない', () => {
@@ -46,7 +77,8 @@ describe('帯（Notice）の4種類', () => {
     const dot = notice.querySelector('[data-notice-dot]')
     expect(dot?.tagName).toBe('SPAN')
     expect(dot?.getAttribute('aria-hidden')).toBe('true')
-    expect(notice.querySelector('[data-notice-message]')?.previousElementSibling).toBe(dot)
+    expect(notice.querySelector('[data-notice-message]')?.previousElementSibling).toBe(dot?.parentElement)
+    expect(dot?.parentElement?.getAttribute('aria-hidden')).toBe('true')
     expect(notice.querySelector('svg')).toBeNull()
     expect(notice.className).toContain(tone)
   })

@@ -76,6 +76,15 @@ afterEach(() => {
   sql.raw.close();
 });
 
+test('初期セットのフォームは現役の編集画面を開く', async () => {
+  const saved = await request(base + '?account_id=a', 'PUT', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'configured', value: 'simple' } } });
+  expect(saved.status).toBe(200);
+  const items = (await request(base + '/starter-items?account_id=a')).body.data.items as any[];
+  const forms = items.filter((item) => item.kind === 'form');
+  expect(forms.length).toBeGreaterThan(0);
+  for (const item of forms) expect(item.href).toBe(`/form-submissions/edit?id=${encodeURIComponent(item.target_id)}&tab=basic`);
+});
+
 describe('③分け方のタグ・⑤シナリオの見本', () => {
   test.each(ACCOUNT_STYLES)('%s の初期セットはタグの見本とシナリオの見本を 1 つずつ持つ', (style) => {
     const items = standardStarter(style).items;

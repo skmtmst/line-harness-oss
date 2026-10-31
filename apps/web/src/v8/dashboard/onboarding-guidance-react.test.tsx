@@ -70,6 +70,17 @@ beforeEach(() => {
 })
 afterEach(() => { cleanup(); window.localStorage.clear(); window.sessionStorage.clear() })
 
+it('使い方の確認中も基本の案内は使え、本文は並行して読みながら表示を待つ', async () => {
+  let resolve!: (value: unknown) => void
+  net.style.mockImplementationOnce(() => new Promise(value => { resolve = value }))
+  render(<DashboardV8 />)
+  expect(await screen.findByRole('progressbar', { name: 'はじめにやることの進み' })).toBeTruthy()
+  expect(document.querySelector('[data-design="TodayTasks"]')?.closest('[inert][aria-hidden="true"]')).toBeTruthy()
+  await act(async () => { resolve(style()) })
+  expect(await pendingSetup()).toBeTruthy()
+  expect(document.querySelector('[data-design="TodayTasks"]')?.closest('[inert]')).toBeNull()
+})
+
 it.each([
   ['lh:v8:first-steps-folded:A', true],
   ['lh:v8:first-steps-dismissed:A', true],
@@ -87,7 +98,7 @@ it.each([
   expect(within(guide()).getByText('リッチメニューなどの見た目を決める').closest('[hidden]')).toBeNull()
   expect(within(guide()).getByText(/残りの設定 1 件/)).toBeTruthy()
   fireEvent.click(configure)
-  expect(await screen.findByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })).toBeTruthy()
+  expect(await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })).toBeTruthy()
   expect(net.save).not.toHaveBeenCalled(); expect(net.activate).not.toHaveBeenCalled()
 })
 
@@ -123,11 +134,14 @@ it('基本GETが保留でstepsが空でも、取得済みの設定を隠さず0/
   net.progress.mockImplementationOnce(() => new Promise(value => { resolve = value }))
   render(<DashboardV8 />)
   expect(await pendingSetup()).toBeTruthy()
+  expect(document.querySelector('[data-design="TodayTasks"]')?.closest('[inert][aria-hidden="true"]')).toBeTruthy()
   expect(screen.queryByRole('progressbar', { name: 'はじめにやることの進み' })).toBeNull()
   expect(screen.getByRole('progressbar', { name: '使い方の設定の進み' }).getAttribute('aria-valuenow')).toBe('1')
   expect(guide().textContent).not.toContain('0 / 0')
   await act(async () => { resolve(basic()) })
   expect(await screen.findByRole('progressbar', { name: 'はじめにやることの進み' })).toBeTruthy()
+  expect(document.querySelector('[data-design="TodayTasks"]')).toBeTruthy()
+  expect(document.querySelector('[data-design="TodayTasks"]')?.closest('[inert]')).toBeNull()
   expect(net.progress).toHaveBeenCalledTimes(1)
 })
 
@@ -216,8 +230,8 @@ it('APIの空stepsは正規化された未確認を表示し、全完了や0/0�
 it('既知の質問入口から実wizardを開き、戻ると閉じるで保存を始めない', async () => {
   render(<DashboardV8 />)
   fireEvent.click(await pendingSetup())
-  const dialog = await screen.findByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })
-  fireEvent.click(within(dialog).getByRole('button', { name: '戻る', exact: true }))
+  const dialog = await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'スタイルを選び直す', exact: true }))
   const first = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   fireEvent.click(within(first).getByRole('button', { name: '閉じる', exact: true }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())

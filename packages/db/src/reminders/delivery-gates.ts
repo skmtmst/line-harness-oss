@@ -2,6 +2,8 @@ import { jstNow } from '../utils.js';
 import { getPlatformSetting, setPlatformSetting } from '../platform-announcements.js';
 import { accountFeatureOffExclusionSql } from '../account-settings.js';
 import { type FriendReminderRow, type ReminderStepRow } from './types.js';
+import { reminderVersionMessageParts } from './version-messages.js';
+import { logger } from '@line-crm/shared/server';
 
 
 
@@ -31,8 +33,9 @@ export async function getPendingReminderDeliveries(
   const pageSize = 500;
   const activeReminders = (await db.prepare(`SELECT fr.*,
     COALESCE(fr.reminder_version_id,r.current_published_version_id) AS effective_version_id,
-    COALESCE(json_extract(rv.settings_snapshot,'$.deliveryMode'),r.delivery_mode) AS delivery_mode,
-    COALESCE(json_extract(rv.settings_snapshot,'$.lineAccountId'),r.line_account_id) AS line_account_id,
+    COALESCE(json_extract(CASE WHEN json_valid(rv.settings_snapshot) THEN rv.settings_snapshot ELSE '{}' END,'$.deliveryMode'),r.delivery_mode) AS delivery_mode,
+    COALESCE(json_extract(CASE WHEN json_valid(rv.settings_snapshot) THEN rv.settings_snapshot ELSE '{}' END,'$.lineAccountId'),r.line_account_id) AS line_account_id,
+    CASE WHEN rv.settings_snapshot IS NULL OR json_valid(rv.settings_snapshot) THEN 1 ELSE 0 END settings_valid,
     rv.settings_snapshot AS version_settings_snapshot
     FROM friend_reminders fr JOIN reminders r ON r.id=fr.reminder_id
     LEFT JOIN reminder_versions rv ON rv.id=COALESCE(fr.reminder_version_id,r.current_published_version_id)
@@ -40,7 +43,7 @@ export async function getPendingReminderDeliveries(
       AND NOT ${accountFeatureOffExclusionSql('r.line_account_id', 'reminders')}
     ORDER BY fr.id LIMIT ?`).bind(cursor,pageSize).all<FriendReminderRow & {
       effective_version_id: string | null; delivery_mode: string; line_account_id: string | null;
-      version_settings_snapshot: string | null;
+      version_settings_snapshot: string | null;settings_valid:number;
     }>()).results;
   const results: Array<FriendReminderRow & {
     delivery_mode: string; line_account_id: string | null; version_settings_snapshot: string | null;
@@ -62,9 +65,13 @@ export async function getPendingReminderDeliveries(
     const delivered=(await db.prepare(`SELECT friend_reminder_id,reminder_step_id FROM friend_reminder_deliveries
       WHERE friend_reminder_id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify(activeReminders.map(fr=>fr.id)))
       .all<{friend_reminder_id:string;reminder_step_id:string}>()).results;
+    const partsByVersion=new Map<string,Map<string,string>|null>();
+    for(const enrollment of activeReminders)if(enrollment.effective_version_id&&!partsByVersion.has(enrollment.effective_version_id))
+      partsByVersion.set(enrollment.effective_version_id,reminderVersionMessageParts(enrollment.version_settings_snapshot));
     const byVersion=new Map<string,ReminderStepRow[]>();
     for(const {scan_key,sort_order,...step} of steps) {
-      const group=byVersion.get(scan_key)??[];group.push(step);byVersion.set(scan_key,group);
+      const parts=scan_key.startsWith('version:')?partsByVersion.get(scan_key.slice('version:'.length))?.get(step.id):undefined;
+      const group=byVersion.get(scan_key)??[];group.push({...step,...(parts?{message_parts_json:parts}:{})});byVersion.set(scan_key,group);
     }
     const deliveredByEnrollment=new Map<string,Set<string>>();
     for(const row of delivered) {
@@ -72,6 +79,8 @@ export async function getPendingReminderDeliveries(
       group.add(row.reminder_step_id);deliveredByEnrollment.set(row.friend_reminder_id,group);
     }
     for(const {effective_version_id,...fr} of activeReminders) {
+      // 壊れた版を一部の本文だけで送らず、その登録だけ止めて他の店を続ける。
+      if(fr.settings_valid!==1||effective_version_id&&partsByVersion.get(effective_version_id)===null){logger.warn('reminder_delivery_settings_invalid');continue;}
       const key=effective_version_id?'version:'+effective_version_id:'legacy:'+fr.reminder_id;
       const pending=(byVersion.get(key)??[]).filter(step=>!deliveredByEnrollment.get(fr.id)?.has(step.id));
       if(pending.length)results.push({...fr,steps:pending});

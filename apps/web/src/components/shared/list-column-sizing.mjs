@@ -20,21 +20,22 @@ export function fitListColumns(frame) {
     frame.listColumnScope = scope
     frame.listColumnCeilings = [...body.children].map((cell, index) => flexibleContent ? Math.max(...rows.map(row => row.children[index]?.getBoundingClientRect().width ?? 0)) : cell.getBoundingClientRect().width)
   }
-  const context = document.createElement('canvas').getContext('2d')
-  if (!context) return
   const controlsOnly = frame.dataset.columnSizing === 'controls'
   const number = value => parseFloat(value) || 0
   const intrinsic = node => {
     if (node.nodeType === 3) {
       if (!node.textContent.trim()) return 0
       const css = getComputedStyle(node.parentElement)
-      context.font = `${css.fontWeight} ${css.fontSize} ${css.fontFamily}`
-      if (css.whiteSpace === 'nowrap' || css.whiteSpace === 'pre') {
-        const range = document.createRange()
-        range.selectNodeContents(node)
-        return range.getBoundingClientRect().width
-      }
-      return context.measureText(node.textContent.trim()).width + number(css.letterSpacing) * node.textContent.trim().length
+      const range = document.createRange()
+      range.selectNodeContents(node)
+      const rects = [...range.getClientRects()].filter(rect => rect.width > 0)
+      if (rects.length <= 1) return range.getBoundingClientRect().width
+      const probe = document.createElement('span')
+      probe.style.cssText = 'position:fixed;visibility:hidden;white-space:pre;pointer-events:none'
+      for (const key of ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'fontVariantNumeric', 'fontVariationSettings', 'fontFeatureSettings', 'letterSpacing', 'wordSpacing']) probe.style[key] = css[key]
+      probe.textContent = node.textContent.trim()
+      document.body.append(probe)
+      try { return probe.getBoundingClientRect().width } finally { probe.remove() }
     }
     if (node.nodeType !== 1) return 0
     const css = getComputedStyle(node)

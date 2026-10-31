@@ -105,7 +105,7 @@ describe('#948 N-320: 影響件数の明示とやり直し規定の常時表示'
     expect(links.getAttribute('title')).toContain('タグ 4 件（ECの出来事がきっかけ）')
     expect(links.getAttribute('title')).toContain('分析 0 件（アカウント全体）')
     expect(document.querySelector('a[href="/nen-campaigns"]')?.getAttribute('title')).toContain('ECの出来事がきっかけ 2 件')
-    expect(document.querySelector('a[href="/conversions"]')?.getAttribute('title')).toContain('アカウント全体 3 件')
+    expect(document.querySelector('a[href="/affiliates?tab=points"]')?.getAttribute('title')).toContain('アカウント全体 3 件')
     expect(links.getAttribute('title')).toContain('失敗した処理のやり直しは「取り込みの記録」タブで一件ずつ「もう一度やる」から行います。')
     expect(links.getAttribute('title')).toContain('コンバージョンと分析はアカウント全体の記録数です。')
   })

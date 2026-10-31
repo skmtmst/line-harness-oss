@@ -53,6 +53,18 @@ export interface RestaurantFollowupSetup {
     decidedAt: string | null;
     version: number;
 }
+export type RestaurantFollowupTiming =
+    | {mode:'countdown';offsetMinutes:number}
+    | {mode:'time';offsetDays:number;sendAtTime:string}
+    | {mode:'next_day';sendAtTime:string};
+export interface RestaurantFollowupEngineDraftInput {
+    expectedRowVersion:number;
+    expectedTargetVersion:number;
+    expectedContentRevision:string|null;
+    enabled:boolean;
+    timing:RestaurantFollowupTiming;
+    messageBubbles:unknown[];
+}
 export interface RestaurantFollowupPage {
     setup?: RestaurantFollowupSetup;
     template: RestaurantFollowupTemplate | null;

@@ -74,11 +74,13 @@ test('narrow time fields preserve coarse touch targets and reserve space before 
   const { readFileSync } = await import('node:fs')
   const { connectGuardBrowser } = await import('./browser-session.mjs')
   const css = ['choice-field', 'time-field-v8'].map(name => readFileSync(new URL(`../../src/components/shared/${name}.module.css`, import.meta.url), 'utf8')).join('\n')
+  const { collectShortText } = await import('./short-text-browser.mjs')
   const browser = await connectGuardBrowser()
   try {
-    for (const hasTouch of [false, true]) {
+    const measurements = []
+    for (const fieldWidth of [84, 88]) for (const hasTouch of [false, true]) {
       const page = await browser.newPage({ viewport: { width: 1152, height: 900 }, hasTouch })
-      await page.setContent(`<style>:root{--control-h:36px;--space-4:4px;--space-8:8px;--space-24:24px;--polish-space-field:12px;--polish-icon-control:16px;--tpl-toolbar-gap:8px;--choice-ring:1px;--font-sans:Arial;--polish-control-text:13px;--polish-control-weight:500;--text-body--line-height:20px}${css}</style><main style="width:84px"><div class="root"><div class="field frame" data-choice-field data-choice-time><input class="input" role="combobox" data-choice-trigger value="09 : 00"><button class="open" data-choice-action><svg></svg></button></div></div></main>`)
+      await page.setContent(`<style>:root{--control-h:36px;--space-4:4px;--space-8:8px;--space-24:24px;--polish-space-field:12px;--polish-icon-control:16px;--tpl-toolbar-gap:8px;--choice-ring:1px;--font-sans:Arial;--polish-control-text:13px;--polish-control-weight:500;--text-body--line-height:20px}${css}</style><main style="width:${fieldWidth}px"><div class="root"><div class="field frame" data-choice-field data-choice-time><input inputmode="numeric" class="input" role="combobox" data-choice-trigger value="09 : 00"><button class="open" data-choice-action><svg></svg></button></div></div></main>`)
       const geometry = await page.evaluate(() => {
         const button = document.querySelector('button').getBoundingClientRect()
         return { coarse: matchMedia('(pointer:coarse)').matches, width: button.width, height: button.height, inputRight: document.querySelector('input').getBoundingClientRect().right, iconLeft: document.querySelector('svg').getBoundingClientRect().left }
@@ -87,8 +89,12 @@ test('narrow time fields preserve coarse touch targets and reserve space before 
       assert.equal(geometry.width, hasTouch ? 44 : 24)
       assert.equal(geometry.height, hasTouch ? 44 : 24)
       assert.ok(geometry.inputRight <= geometry.iconLeft)
+      const records = await page.evaluate(collectShortText)
+      measurements.push({fieldWidth,hasTouch,records,findings:shortTextFindings(records)})
       await page.close()
     }
+    console.info('narrow-time-measurements',JSON.stringify(measurements))
+    assert.deepEqual(measurements.filter(row => row.findings.length), [])
   } finally { await browser.close() }
 })
 
@@ -124,5 +130,81 @@ test('content tables reserve readable main names before long supplemental text w
       assert.ok(good.controls.every(button => button.width <= button.room))
       assert.equal(good.overflow, false)
     }
+  } finally { await browser.close() }
+})
+
+test('supplemental note paragraphs may wrap while clipped notes and atomic labels still fail', async () => {
+  const { connectGuardBrowser } = await import('./browser-session.mjs')
+  const { collectShortText } = await import('./short-text-browser.mjs')
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main><span role="note" title="補足は複数行で読みます" style="display:block;width:60px">補足は複数行で読みます</span><span role="note" title="対象外 12 回" style="display:block;width:20px;overflow:hidden;white-space:nowrap">対象外 12 回</span><strong style="display:block;width:20px">10月1日</strong></main>')
+    const records = await page.evaluate(collectShortText), findings = shortTextFindings(records)
+    assert.ok(records.some(row => row.text === '補足は複数行で読みます' && row.lines > 1 && row.allowWrap))
+    assert.equal(findings.some(row => row.text === '補足は複数行で読みます'), false)
+    assert.ok(findings.some(row => row.text === '対象外 12 回' && row.clipped))
+    assert.ok(findings.some(row => row.text === '10月1日' && row.lines > 1))
+  } finally { await browser.close() }
+})
+
+test('split numeric text and units stay on one line after content columns are fitted', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { connectGuardBrowser } = await import('./browser-session.mjs')
+  const { collectShortText } = await import('./short-text-browser.mjs')
+  const { fitListColumns } = await import('../../src/components/shared/list-column-sizing.mjs')
+  const css = readFileSync(new URL('../../src/components/shared/data-table.module.css', import.meta.url), 'utf8').replace(/:global\(([^)]+)\)/g, '$1')
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<style>${css}*{box-sizing:border-box}.frame{width:640px;--table-column-gap:12px;--table-column-padding:0;--table-head-padding:0;--table-head-height:40px;--table-row-height:auto;--table-head-text-size:13px;--table-body-text-size:13px;font:13px sans-serif}.table{width:100%}th,td{font:inherit}.amount{font-variant-numeric:tabular-nums;letter-spacing:1px}</style><main><div class="frame" data-column-layout data-column-sizing="content"><table class="table"><thead><tr data-table-layout="columns"><th data-cell-grow>メニュー</th><th>時間</th><th>操作</th></tr></thead><tbody><tr data-table-layout="columns"><td data-cell-grow>初回相談</td><td data-list-number><span class="amount">105<!-- -->分</span></td><td><button>…</button></td></tr></tbody></table></div><strong style="display:block;width:20px">10<!-- -->月31<!-- -->日</strong></main>`)
+    await page.locator('[data-list-number]').evaluate(cell => { cell.style.setProperty('--list-content-column-width', '20px'); cell.setAttribute('data-content-support-column', '') })
+    assert.ok(shortTextFindings(await page.evaluate(collectShortText)).some(row => row.text === '105分' && row.lines > 1))
+    assert.ok(shortTextFindings(await page.evaluate(collectShortText)).some(row => row.text === '10月31日' && row.lines > 1))
+    await page.locator('strong').evaluate(el => { el.style.width = '160px' })
+    await page.locator('.frame').evaluate(fitListColumns)
+    assert.deepEqual(shortTextFindings(await page.evaluate(collectShortText)), [])
+    const measurement = await page.locator('.amount').evaluate(el => {
+      const range = document.createRange(); range.selectNodeContents(el)
+      return { textWidth: range.getBoundingClientRect().width, cellWidth: el.closest('td').getBoundingClientRect().width }
+    })
+    assert.ok(measurement.textWidth <= measurement.cellWidth, JSON.stringify(measurement))
+  } finally { await browser.close() }
+})
+
+test('reservation toolbar keeps date and controls inside its own column at both widths', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { connectGuardBrowser } = await import('./browser-session.mjs')
+  const css = readFileSync(new URL('../../src/components/shared/reservation-board.module.css', import.meta.url), 'utf8')
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    for (const width of [840, 1140]) {
+      await page.setContent(`<style>:root{--space-6:6px;--tpl-toolbar-gap:8px;--radius-md:12px;--color-border:#ddd;--color-canvas:#fff}${css}*{box-sizing:border-box}.board{width:${width}px}.toolbar{font:14px sans-serif}.toolbar button{flex-shrink:0;white-space:nowrap;padding:8px 12px}.axis{width:320px;flex-shrink:0}.select{width:148px}</style><main><div class="board" data-kind="people"><div class="toolbar" data-control-row><button>前へ</button><strong>10月26日〜11月1日</strong><button>次へ</button><button>今日</button><div class="axis">時間×スタッフ　一覧　月</div><button class="select">担当：すべて</button><button class="select">予約元：すべて</button><button>印刷</button></div></div></main>`)
+      const outside = () => page.locator('[data-control-row]').evaluate(row => {
+        const box = row.getBoundingClientRect()
+        return [...row.children].filter(el => { const child = el.getBoundingClientRect(); return child.left < box.left || child.right > box.right }).map(el => el.textContent)
+      })
+      assert.deepEqual(await outside(), [], `toolbar width ${width}`)
+      if (width === 840) {
+        await page.locator('[data-control-row]').evaluate(row => { row.style.flexWrap = 'nowrap' })
+        assert.ok((await outside()).length > 0, 'the former nowrap rule must reproduce the overflow')
+        await page.locator('[data-control-row]').evaluate(row => { row.style.removeProperty('flex-wrap') })
+        assert.deepEqual(await outside(), [])
+      }
+    }
+  } finally { await browser.close() }
+})
+
+test('an entity selector cannot extend into the adjacent checkbox hit area', async () => {
+  const { connectGuardBrowser } = await import('./browser-session.mjs')
+  const { collectShortText } = await import('./short-text-browser.mjs')
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent('<main style="display:flex;gap:8px"><span id="wrapper" style="width:176px;flex:none"><button data-entity-picker-field style="width:192px;height:36px">Account</button></span><label><input type="checkbox">Multiple accounts</label></main>')
+    assert.ok(shortTextFindings(await page.evaluate(collectShortText)).some(row => row.overlap === 'checkbox'))
+    await page.locator('#wrapper').evaluate(wrapper => { wrapper.style.width = '192px' })
+    assert.deepEqual(shortTextFindings(await page.evaluate(collectShortText)), [])
   } finally { await browser.close() }
 })

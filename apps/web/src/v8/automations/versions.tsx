@@ -77,7 +77,7 @@ function VersionsInner() {
   usePageTitle('版と使われている場所')
   usePageCrumbs([{ label: 'ホーム', href: '/' }, { label: 'オートメーション', href: '/automations' }])
   const canManage = useAutomationManage()
-  const canEdit = canManage !== false
+  const canEdit = canManage === true
   const searchParams = useSearchParams()
   const id = searchParams.get('id') ?? ''
   const { selectedAccountId, loading: accountLoading } = useAccount()

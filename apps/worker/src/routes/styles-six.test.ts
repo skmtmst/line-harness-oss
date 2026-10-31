@@ -6,6 +6,7 @@ import { ACCOUNT_STYLES, DEFAULT_TENANT_ID, type SetupAnswer } from '@line-crm/s
 import type { Env } from '../worker-env.js';
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { initializeAccountStyle, profile, saveProfile, standardStarter, readDefinition } from '../services/style-setup.js';
+import type { StarterItem } from '../services/style-starter-definition.js';
 import { styleMenuButtons } from '../services/style-menu-buttons.js';
 import { restaurantMenuButtons } from '../services/style-restaurant-buttons.js';
 import { templateSamples } from '../services/style-template-samples.js';
@@ -81,8 +82,8 @@ test('standard and EC starter templates have no reservation messages; consult an
   for (const style of ['consult','lesson'] as const) expect(templateSamples(style).map(s=>s.text).join('\n')).not.toContain('お気をつけてお越しください');
 });
 
-test('lesson links use a real selected event and history, tickets use MyPage, missing URLs never become text actions', async () => {
-  const menu=standardStarter('lesson').items.find(i=>i.kind==='rich_menu')!;
+test('custom lesson links resolve selected events and history, tickets use MyPage, missing URLs stay unavailable', async () => {
+  const menu:StarterItem={key:'custom',kind:'rich_menu',name:'店のメニュー',buttons:[{label:'クラスを予約する',feature:'booking'},{label:'予約の確認',feature:'booking',actionData:'history'},{label:'回数券',feature:'tickets'},{label:'振替',feature:'booking',actionData:'history'}]};
   f.raw.exec("INSERT INTO events(id,line_account_id,name,is_published,lifecycle_status) VALUES('class','a','クラス',1,'published'),('foreign','b','別店',1,'published')");
   const buttons=await styleMenuButtons(f.db,'a','lesson',menu,{});
   expect(buttons.find(b=>b.label==='クラスを予約する')?.actionData).toBe('https://liff.line.me/liff-a/events/class');
@@ -94,7 +95,7 @@ test('lesson links use a real selected event and history, tickets use MyPage, mi
   expect((await styleMenuButtons(f.db,'a','lesson',menu,{})).some(b=>b.label==='クラスを予約する')).toBe(false);
   expect((await styleMenuButtons(f.db,'a','lesson',menu,{booking:{mode:'configured',resourceId:'class'}})).find(b=>b.label==='クラスを予約する')?.actionData).toContain('/events/class');
   expect((await styleMenuButtons(f.db,'a','lesson',menu,{booking:{mode:'configured',resourceId:'foreign'}})).some(b=>b.label==='クラスを予約する')).toBe(false);
-  const ec=standardStarter('ec').items.find(i=>i.kind==='rich_menu')!;
+  const ec:StarterItem={key:'custom',kind:'rich_menu',name:'店のメニュー',buttons:[{label:'商品を見る',feature:'content'}]};
   expect((await styleMenuButtons(f.db,'a','ec',ec,{})).some(b=>b.label==='商品を見る')).toBe(false);
   ec.buttons![0]!.actionType='uri'; ec.buttons![0]!.actionData='https://shop.example/products';
   expect((await styleMenuButtons(f.db,'a','ec',ec,{}))[0]).toMatchObject({label:'商品を見る',actionType:'uri',actionData:'https://shop.example/products'});
@@ -104,8 +105,8 @@ test('lesson links use a real selected event and history, tickets use MyPage, mi
   expect((await styleMenuButtons(f.db,'a','ec',ec,{})).some(b=>b.label==='商品を見る')).toBe(false);
 });
 
-test('restaurant buttons preserve the previous resolver and starter limits remain enforced', async () => {
-  const item=standardStarter('restaurant').items.find(i=>i.kind==='rich_menu')!;
+test('custom restaurant buttons share the resolver and starter limits remain enforced', async () => {
+  const item:StarterItem={key:'custom',kind:'rich_menu',name:'店のメニュー',buttons:[{label:'予約する',feature:'booking'},{label:'予約の確認',feature:'booking',actionData:'history'},{label:'お問い合わせ',feature:'contact'}]};
   for(const answers of ([{},{booking:{mode:'configured' as const,value:true}},{stamps:{mode:'later' as const}}] as Record<string,SetupAnswer>[])) {
     expect(await styleMenuButtons(f.db,'a','restaurant',item,answers)).toEqual(await restaurantMenuButtons(f.db,'a','restaurant',item,answers));
   }

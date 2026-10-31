@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
@@ -8,7 +9,7 @@ import { PARITY_INIT } from '../../../../scripts/visual-qa/v8-parity.mjs'
 import { stubApi } from './speed-budget.mjs'
 import { mockFetch } from './mock-local.mjs'
 
-const root = resolve(new URL('../../out/', import.meta.url).pathname)
+const root = resolve(fileURLToPath(new URL('../../out/', import.meta.url)))
 const map = JSON.parse(readFileSync(new URL('../../../../scripts/visual-qa/v8-design-map.json', import.meta.url)))
 const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' }
 

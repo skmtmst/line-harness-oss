@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -8,7 +9,7 @@ import { compileUiStyles } from './compile-ui-styles.mjs'
 const require = createRequire(import.meta.url)
 const fromVitest = createRequire(require.resolve('vitest/package.json'))
 const { build } = createRequire(fromVitest.resolve('vite'))('esbuild')
-const webRoot = new URL('../..', import.meta.url).pathname
+const webRoot = fileURLToPath(new URL('../..', import.meta.url))
 const sheets = []
 const compiled = await build({
   stdin: { resolveDir: webRoot, loader: 'tsx', contents: `
@@ -59,7 +60,7 @@ createRoot(document.getElementById('root')).render(globalThis.slotFixture?<SlotF
   } }],
 })
 const paint = page => page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
-const css = [await compileUiStyles(new URL('../../src/app/globals.css', import.meta.url).pathname), ...sheets].join('\n')
+const css = [await compileUiStyles(fileURLToPath(new URL('../../src/app/globals.css', import.meta.url))), ...sheets].join('\n')
 
 async function mount(page, width, slots = false) {
   await page.setViewportSize({width,height:1000})

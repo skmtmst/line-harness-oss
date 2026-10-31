@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 
 const net = vi.hoisted(() => ({
+  exportAllowed: true as boolean | null,
   getMode: 'ok' as 'internal' | 'ok' | 'no-draft' | 'failing' | 'failing-then-ok',
   resourcesMode: 'ok-empty' as 'ok-empty' | 'ok-with-tags' | 'failing' | 'failing-then-ok',
   getCount: 0,
@@ -99,7 +100,7 @@ vi.mock('@/components/shell/page-chrome', async () => ({ ...(await import('@/tes
   usePageChrome: () => ({ title: null }),
 }))
 
-vi.mock('@/v8/automations/shell', async importOriginal => ({ ...(await importOriginal<typeof import('@/v8/automations/shell')>()), useAutomationManage: () => true, useAutomationRunManage: () => ({ canExport: true }), useAutomationTabCounts: () => ({ rules: 0, commonActions: 1, runs: 0 }) }))
+vi.mock('@/v8/automations/shell', async importOriginal => ({ ...(await importOriginal<typeof import('@/v8/automations/shell')>()), useAutomationManage: () => true, useAutomationRunManage: () => net.exportAllowed === null ? null : ({ canExport: net.exportAllowed }), useAutomationTabCounts: () => ({ rules: 0, commonActions: 1, runs: 0 }) }))
 const { default: ListPage } = await import('@/v8/automations/common-actions')
 const { default: EditPage } = await import('./edit/page')
 const { default: NewPage } = await import('./new/page')
@@ -128,6 +129,7 @@ function buttonNamed(name: string): HTMLButtonElement | undefined {
 
 beforeEach(() => {
   document.documentElement.dataset.theme = 'v8'
+  net.exportAllowed = true
   net.getMode = 'ok'
   net.resourcesMode = 'ok-empty'
   net.getCount = 0
@@ -274,4 +276,14 @@ it('複製が失敗したら内部の本文を出さず、編集画面へ移動�
   expect(net.duplicate).toHaveBeenCalledTimes(1)
   expect(net.duplicate).toHaveBeenCalledWith('ca-1', 'account-1')
   expect(text()).toContain('来店の案内')
+})
+
+it('CSVの可否が未取得の間は書き出す操作を出さず、確認後だけ出す', async () => {
+  net.exportAllowed = null
+  await act(async () => { root.render(<ListPage />) })
+  await flush()
+  expect(screen.queryByText('CSVで書き出す')).toBeNull()
+  net.exportAllowed = true
+  await act(async () => { root.render(<ListPage />) })
+  expect(screen.getByText('CSVで書き出す')).toBeTruthy()
 })

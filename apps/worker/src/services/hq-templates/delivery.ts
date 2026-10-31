@@ -137,12 +137,12 @@ export function inspectDelivery(def:HqDeliveryTemplateDefinition,snapshot:string
   const safe=!!row && row.versions.length<=1 && (r!.status??r!.lifecycle_status)==='draft' && !r!.is_active && !r!.current_published_version_id && !r!.deleted_at && !r!.archived_at && !row.usage && row.versions.every(v=>v.status==='draft') && (type!=='friend_add_rule'||r!.friend_kind===def.settings.friendKind);
   return [{sourceId:type,itemKind:type,name:def.settings.name,targetId:r?.id??null,expectedRevision:row?JSON.stringify(row):null,duplicate:!!row,allowedModes:(row?safe?['overwrite','alias']:['alias']:['create']) as Array<'create'|'overwrite'|'alias'>}];
 }
-export async function deliveryReferenceItems(db:D1Database,accountId:string,def:HqDeliveryTemplateDefinition) {
+export async function deliveryReferenceItems(db:D1Database,accountId:string,def:HqDeliveryTemplateDefinition,initialDraft=false) {
   const items:Array<{sourceId:string;itemKind:string;name:string;targetId:string;expectedRevision:string;duplicate:true;allowedModes:['overwrite'];operation:'reuse'}>=[];
   for(const ref of def.references??[]) {
     const table:Record<string,string>={coupon:'broadcast_message_assets',tag:'tags',template:'templates',scenario:'scenarios',form:'forms',friend_field:'friend_fields',mark:'support_marks',event:'events',reminder:'reminders',entry_route:'entry_routes',common_var:'common_vars',tag_folder:'folders',notification_rule:'notification_rules'};
     let scope='line_account_id=?';const bindings:string[]=[accountId,ref.name];
-    if(ref.kind==='coupon') scope+=" AND kind='coupon' AND published_version>0";
+    if(ref.kind==='coupon') scope+=initialDraft?" AND kind='coupon'":" AND kind='coupon' AND published_version>0";
     if(ref.kind==='tag_folder') scope="account_id=? AND kind='tag'";
     if(ref.kind==='form') scope='EXISTS(SELECT 1 FROM form_accounts fa WHERE fa.form_id=forms.id AND fa.line_account_id=?)';
     if(ref.kind==='friend_field') scope='EXISTS(SELECT 1 FROM friend_field_scopes fs WHERE fs.field_id=friend_fields.id AND fs.line_account_id=?)';
@@ -159,8 +159,8 @@ export async function deliveryReferenceItems(db:D1Database,accountId:string,def:
   }
   return items;
 }
-async function mapSettings(db:D1Database,accountId:string,def:HqDeliveryTemplateDefinition) {
-  const items=await deliveryReferenceItems(db,accountId,def);
+async function mapSettings(db:D1Database,accountId:string,def:HqDeliveryTemplateDefinition,initialDraft=false) {
+  const items=await deliveryReferenceItems(db,accountId,def,initialDraft);
   const mapped=new Map((def.references??[]).map((r,i)=>[r.sourceId,items[i].targetId]));
   const transform=(value:unknown):unknown=> {
     if(Array.isArray(value)) return value.map(transform);
@@ -175,7 +175,7 @@ async function mapSettings(db:D1Database,accountId:string,def:HqDeliveryTemplate
   const settings=transform(def.settings) as Record<string,unknown>;
   if(settings.responseType==='coupon') {
     const payload=JSON.parse(String(settings.responseContent));
-    const asset=await db.prepare("SELECT payload_json,name FROM broadcast_message_assets WHERE id=? AND line_account_id=? AND kind='coupon' AND published_version>0").bind(payload.assetId,accountId).first<{payload_json:string;name:string}>();
+    const asset=await db.prepare(`SELECT payload_json,name FROM broadcast_message_assets WHERE id=? AND line_account_id=? AND kind='coupon' ${initialDraft?'':'AND published_version>0'}`).bind(payload.assetId,accountId).first<{payload_json:string;name:string}>();
     if(!asset)throw new HqTemplateError('REFERENCE_UNAVAILABLE',409);
     settings.responseContent=JSON.stringify({...JSON.parse(asset.payload_json),assetId:payload.assetId,assetName:asset.name});
   }
@@ -201,18 +201,18 @@ async function mapSettings(db:D1Database,accountId:string,def:HqDeliveryTemplate
   refreshNotice(settings);
   return settings;
 }
-export async function validateDeliveryReferences(db:D1Database,accountId:string,type:HqDeliveryTemplateType,def:HqDeliveryTemplateDefinition) {
-  return readSettings(db,type,await mapSettings(db,accountId,def),accountId,true);
+export async function validateDeliveryReferences(db:D1Database,accountId:string,type:HqDeliveryTemplateType,def:HqDeliveryTemplateDefinition,initialDraft=false) {
+  return readSettings(db,type,await mapSettings(db,accountId,def,initialDraft),accountId,!initialDraft);
 }
-export async function planDelivery(db:D1Database,accountId:string,def:HqDeliveryTemplateDefinition,snapshot:string,type:HqDeliveryTemplateType,resolutions:readonly HqTemplateResolution[]) {
+export async function planDelivery(db:D1Database,accountId:string,def:HqDeliveryTemplateDefinition,snapshot:string,type:HqDeliveryTemplateType,resolutions:readonly HqTemplateResolution[],initialDraft=false) {
   const item=inspectDelivery(def,snapshot,type)[0],selected=resolutions.find(r=>r.sourceId===type);
   if(resolutions.length!==1+(def.references?.length??0) || !selected || !item.allowedModes.includes(selected.mode)) throw new HqTemplateError('SELECTION_REQUIRED',409);
-  const references=await deliveryReferenceItems(db,accountId,def);
+  const references=await deliveryReferenceItems(db,accountId,def,initialDraft);
   for(const item of references) if(!resolutions.some(r=>r.sourceId===item.sourceId && r.itemKind===item.itemKind && r.mode==='overwrite')) throw new HqTemplateError('SELECTION_REQUIRED',409);
   const rows=(JSON.parse(snapshot) as {targets:Target[]}).targets;
   const id=selected.mode==='overwrite'?item.targetId!:crypto.randomUUID();
   const name=selected.mode==='alias'?nextAlias(def.settings.name,rows.map(r=>String(r.record.name??r.record.keyword))):def.settings.name;
-  const settings=await validateDeliveryReferences(db,accountId,type,{...def,settings:{...def.settings,name}});
+  const settings=await validateDeliveryReferences(db,accountId,type,{...def,settings:{...def.settings,name}},initialDraft);
   const now=jstNow(),existingDraft=selected.mode==='overwrite'?rows.find(r=>r.record.id===id)?.versions.find(v=>v.status==='draft')?.id:undefined,versionId=existingDraft??crypto.randomUUID();
   const statements:HqTemplateStatement[]=[{sql:`SELECT json(CASE WHEN (${snapshotSql(type)})=? THEN '{}' ELSE 'VERSION_CONFLICT' END)`,bindings:[accountId,snapshot]}];
   const add=(sql:string,bindings:HqTemplateStatement['bindings'])=>statements.push({sql,bindings});

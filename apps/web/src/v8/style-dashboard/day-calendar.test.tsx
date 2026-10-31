@@ -182,7 +182,7 @@ it.each(['salon', 'consult'] as const)('%sの空日の案内と予約導線を�
     state.search = 'view=' + view
     const result = render(<StyleDashboard style={style} />)
     await screen.findByText('今日の予約はありません')
-    expect(screen.getAllByRole('button', { name: '予約を入れる', exact: true })).toHaveLength(1)
+    expect(await screen.findAllByRole('button', { name: '予約を入れる', exact: true })).toHaveLength(1)
     if (view === 'calendar') expect(screen.getByRole('region', { name: '1日のカレンダー' })).toBeTruthy()
     if (view === 'board') expect(screen.getByRole('region', { name: '台帳の盤' })).toBeTruthy()
     state.push.mockClear()
@@ -197,7 +197,7 @@ it.each(['salon', 'consult'] as const)('%sの閲覧のみも空日操作を灰�
     state.search = 'view=' + view
     const result = render(<StyleDashboard style={style} />)
     await screen.findByText('今日の予約はありません')
-    const action = screen.getByRole('button', { name: '予約を入れる', exact: true })
+    const action = await screen.findByRole('button', { name: '予約を入れる', exact: true })
     expect(action.getAttribute('aria-disabled')).toBe('true')
     expect(action.getAttribute('data-permission-locked')).not.toBeNull()
     state.push.mockClear(); fireEvent.click(action)
@@ -304,7 +304,7 @@ it('日送りで今日でない日を開いた時は「この日の予約」と�
   emptySchedule()
   render(<StyleDashboard style="salon" />)
   await screen.findByText('今日の予約はありません')
-  fireEvent.click(within(screen.getByRole('region', { name: '1日のカレンダー' })).getByRole('button', { name: '次へ', exact: true }))
+  fireEvent.click(within(await screen.findByRole('region', { name: '1日のカレンダー' })).getByRole('button', { name: '次へ', exact: true }))
   await screen.findByText('この日の予約はありません')
   expect(screen.queryByText('今日の予約はありません')).toBeNull()
 })
@@ -316,7 +316,7 @@ it('読み込み中は頭の主操作を出さず、空と分かった後に本�
   const data = fixture('salon').schedule
   finish({ data: { ...data, entries: [], days: data.days.map(day => ({ ...day, entryIds: [], bookings: 0, people: 0 })) } })
   await screen.findByText('今日の予約はありません')
-  expect(screen.getAllByRole('button', { name: '予約を入れる', exact: true })).toHaveLength(1)
+  expect(await screen.findAllByRole('button', { name: '予約を入れる', exact: true })).toHaveLength(1)
 })
 it('取消だけの日も記録は消さず、有効な予約がない案内と作成入口を1回残す', async () => {
   state.schedule.mockImplementation((_account, query) => {
@@ -328,7 +328,7 @@ it('取消だけの日も記録は消さず、有効な予約がない案内と�
     const result = render(<StyleDashboard style="salon" />)
     await screen.findByText('今日の予約はありません')
     expect(screen.getByText(/取消などの記録は下で確認できます/)).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: '予約を入れる', exact: true })).toHaveLength(1)
+    expect(await screen.findAllByRole('button', { name: '予約を入れる', exact: true })).toHaveLength(1)
     expect(screen.getAllByText(/予約者/).length).toBeGreaterThan(0)
     result.unmount()
   }
@@ -364,7 +364,7 @@ it.each(['list', 'board', 'calendar'])('教室の%sはクラス無しと会員�
     await screen.findByText(title)
     expect(screen.getAllByText(title)).toHaveLength(1)
     expect(screen.queryByText(noClasses ? '今日の予約はありません' : '今日のクラスはありません')).toBeNull()
-    const button = screen.getByRole('button', { name: noClasses ? 'クラスを作る' : '会員を予約する', exact: true })
+    const button = await screen.findByRole('button', { name: noClasses ? 'クラスを作る' : '会員を予約する', exact: true })
     expect(screen.getAllByRole('button', { name: /^(クラスを作る|会員を予約する)$/ })).toHaveLength(1)
     if (!noClasses) {
       expect(screen.getAllByText(/朝の予約/).length).toBeGreaterThan(0)
@@ -411,7 +411,7 @@ it('教室の取得失敗もクラス無しと誤認せず、翌日はこの日�
   result.unmount(); lessonDay(true, 0)
   render(<StyleDashboard style="lesson" />)
   await screen.findByText('今日のクラスはありません')
-  fireEvent.click(within(screen.getByRole('region', { name: '1日のカレンダー' })).getByRole('button', { name: '次へ', exact: true }))
+  fireEvent.click(within(await screen.findByRole('region', { name: '1日のカレンダー' })).getByRole('button', { name: '次へ', exact: true }))
   await screen.findByText('この日のクラスはありません')
 })
 
@@ -423,7 +423,7 @@ it('教室の日送りは選択日のsummaryを取り直し、今日0件を翌�
   })
   render(<StyleDashboard style="lesson" />)
   await screen.findByText('今日の予約はありません')
-  fireEvent.click(within(screen.getByRole('region', { name: '1日のカレンダー' })).getByRole('button', { name: '次へ', exact: true }))
+  fireEvent.click(within(await screen.findByRole('region', { name: '1日のカレンダー' })).getByRole('button', { name: '次へ', exact: true }))
   await waitFor(() => expect(state.summary).toHaveBeenLastCalledWith('calendar-account', expect.objectContaining({ style: 'lesson', date: '2026-10-22', range: 'today' })))
   await waitFor(() => expect(screen.queryByText('今日の予約はありません')).toBeNull())
   await screen.findByRole('button', { name: '10:00〜11:00 朝の予約', exact: true })

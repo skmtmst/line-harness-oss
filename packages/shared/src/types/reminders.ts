@@ -72,6 +72,7 @@ export interface ReminderStopConditions {
 }
 
 export interface ReminderDraftStep {
+  messageParts?: Array<{messageType:string;messageContent:string}>;
   stableStepId: string;
   offsetMinutes: number;
   messageType: MessageType;

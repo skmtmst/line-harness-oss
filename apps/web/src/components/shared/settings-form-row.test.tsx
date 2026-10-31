@@ -36,3 +36,11 @@ it('同じ並びの3つの画面は共通の行へ、フォルダは行の全幅
     }
   }
 })
+
+it('画像と小さい欄を並べる任意の行は、既存の既定・2列の行と独立する', () => {
+ const {container}=render(<><SettingsFormRow data-testid="default"><span>既定</span></SettingsFormRow><SettingsFormRow layout="columns"><span>列</span></SettingsFormRow><SettingsFormRow layout="media-fields"><span>画像</span><span>入力</span></SettingsFormRow><SettingsFormRow layout="compact"><span>小さい欄</span></SettingsFormRow></>)
+ expect(container.querySelector('[data-testid="default"]')?.getAttribute('data-form-row')).toBeNull()
+ expect(container.querySelector('[data-form-row="columns"]')?.getAttribute('data-form-columns')).toBe('2')
+ expect(container.querySelectorAll('[data-form-row="media-fields"]')).toHaveLength(1)
+ expect(container.querySelectorAll('[data-form-row="compact"]')).toHaveLength(1)
+})

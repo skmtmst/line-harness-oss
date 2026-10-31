@@ -1,3 +1,7 @@
+import { styleMenuActionData } from './style-menu-action-data.js';
+import { initialMenuImageKey } from '@line-crm/shared';
+import { initialFormLayout,initialFormScopeGuards } from './style-initial-form.js';
+import type { PlannedInitialForms } from './style-initial-buttons.js';
 import { publishedVersionStatement } from '@line-crm/db';
 import { reminderReplacement } from './style-starter-reminder.js';
 import { styleMenuButtons } from './style-menu-buttons.js';
@@ -23,9 +27,11 @@ export const resourceTables: Record<
 /** SQL の照合には、子行を含む編集内容と公開状態の両方を含める。 */
 export function snapshotSql(kind: string) {
   const jsonRows = (table: string, where: string) =>
-    `(SELECT json_group_array(json_object(${table === 'rich_menu_pages' ? "'id',id,'name',name,'image',image_r2_key,'order',order_index" : table === 'rich_menu_areas' ? "'id',id,'x',bounds_x,'y',bounds_y,'w',bounds_width,'h',bounds_height,'action',action_type,'data',action_data,'label',label,'template',template_id,'form',form_id" : "'id',id,'status',status,'trigger',trigger_type,'config',trigger_config,'conditions',condition_config,'actions',action_config"})) FROM ${table} WHERE ${where})`;
+    `(SELECT json_group_array(json_object(${table === 'rich_menu_pages' ? "'id',id,'name',name,'image',image_r2_key,'order',order_index" : table === 'rich_menu_areas' ? "'id',id,'x',bounds_x,'y',bounds_y,'w',bounds_width,'h',bounds_height,'action',action_type,'intent',intent,'data',action_data,'label',label,'template',template_id,'form',form_id" : "'id',id,'status',status,'trigger',trigger_type,'config',trigger_config,'conditions',condition_config,'actions',action_config"})) FROM ${table} WHERE ${where})`;
   if (kind === 'dashboard')
     return `(SELECT json_object('cards',cards_json) FROM account_styles WHERE line_account_id=? AND line_account_id=?)`;
+  if (kind === 'form')
+    return `(SELECT json_object('id',id,'name',name,'description',description,'fields',fields,'layout',layout,'active',is_active,'status',status,'revision',content_revision,'published',current_published_version_id) FROM forms r WHERE id=? AND EXISTS(SELECT 1 FROM form_accounts a WHERE a.form_id=r.id AND a.line_account_id=?) AND (SELECT COUNT(*) FROM form_accounts a WHERE a.form_id=r.id)=1)`;
   // タグの見本は行を持たない。店が触れる物が無いので、いつも同じ値（＝手を加えていない）。
   if (kind === 'tag_set')
     return `(SELECT json_object('heldTagSet',?,'account',?))`;
@@ -97,6 +103,7 @@ export async function overwriteResource(
   now: string,
   style?: AccountStyle,
   answersOverride?: Record<string, SetupAnswer>,
+  plannedForms?: PlannedInitialForms,
 ) {
   const name = '【見本】' + item.name;
   if (item.kind === 'template') {
@@ -143,6 +150,16 @@ export async function overwriteResource(
       publishedVersionStatement(db, id, current.published_version + 1, {}, now),
     );
     return statements;
+  }
+  if (item.kind === 'form') {
+    if(!style || !item.formTarget) throw new StyleError('invalid_initial_form');
+    const current=await db.prepare(`SELECT f.layout FROM forms f WHERE f.id=? AND f.is_active=0 AND f.status='active'
+      AND EXISTS(SELECT 1 FROM form_accounts a WHERE a.form_id=f.id AND a.line_account_id=?)
+      AND (SELECT COUNT(*) FROM form_accounts a WHERE a.form_id=f.id)=1`).bind(id,account).first<{layout:string|null}>();
+    if(!current)return [];
+    const definition=await initialFormLayout(db,account,style,item.formTarget),layout=JSON.stringify(definition);
+    if(layout===current.layout)return [];
+    return [...initialFormScopeGuards(db,account,definition),db.prepare('UPDATE forms SET layout=?,content_revision=content_revision+1,updated_at=? WHERE id=? AND is_active=0').bind(layout,now,id)];
   }
   if (item.kind === 'booking_menu')
     return [
@@ -204,32 +221,15 @@ export async function overwriteResource(
         .bind(id, account),
     ];
     const p = await profile(db, account);
-    for (const [i, b] of (
-      await styleMenuButtons(
-        db,
-        account,
-        style ?? p?.style ?? 'standard',
-        item,
-        answersOverride ?? JSON.parse(p?.answers_json ?? '{}'),
-      )
-    ).entries())
-      statements.push(
-        db
-          .prepare(
-            `INSERT INTO rich_menu_areas(id,page_id,bounds_x,bounds_y,bounds_width,bounds_height,action_type,action_data,intent,label) SELECT ?,default_page_id,?,?,833,843,?,?,?,? FROM rich_menu_groups WHERE id=? AND account_id=?`,
-          )
-          .bind(
-            crypto.randomUUID(),
-            (i % 3) * 833,
-            Math.floor(i / 3) * 843,
-            b.actionType,
-            b.actionData,
-            b.intent,
-            b.label,
-            id,
-            account,
-          ),
-      );
+    const buttons = await styleMenuButtons(db, account, style ?? p?.style ?? 'standard', item, answersOverride ?? JSON.parse(p?.answers_json ?? '{}'), plannedForms);
+    for (const [i, button] of buttons.entries()) {
+      const bounds=button.bounds??{x:(i%3)*833,y:Math.floor(i/3)*843,width:833,height:843};
+      statements.push(db.prepare(`INSERT INTO rich_menu_areas(id,page_id,bounds_x,bounds_y,bounds_width,bounds_height,action_type,action_data,intent,label,form_id)
+        SELECT ?,default_page_id,?,?,?,?,?,?,?,?,? FROM rich_menu_groups WHERE id=? AND account_id=?`)
+        .bind(crypto.randomUUID(),bounds.x,bounds.y,bounds.width,bounds.height,button.actionType,styleMenuActionData(button),button.intent,button.label,button.formId??null,id,account));
+    }
+    if(item.initialMenu) statements.push(db.prepare(`UPDATE rich_menu_pages SET image_r2_key=?,image_content_type='image/png' WHERE id=(SELECT default_page_id FROM rich_menu_groups WHERE id=? AND account_id=?)`)
+      .bind(initialMenuImageKey(account,item.initialMenu),id,account));
     return statements;
   }
   if (item.kind === 'tag_set')

@@ -163,3 +163,15 @@ describe('useUnsavedGuard', () => {
     expect(host.querySelector('[role="dialog"]')).toBeNull()
   })
 })
+
+it('同じ正規画面の互換リンクは確認せず、別画面は確認する', async () => {
+  window.history.replaceState(null, '', '/conversions?tab=points')
+  await render(<Harness dirty />)
+  const link = anchor('回答フォーム')
+  link.href = '/affiliates?tab=points#list'
+  await act(async () => { link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })) })
+  expect(host.querySelector('[role="dialog"]')).toBeNull()
+  link.href = '/friends'
+  await act(async () => { link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })) })
+  expect(host.querySelector('[role="dialog"]')).toBeTruthy()
+})

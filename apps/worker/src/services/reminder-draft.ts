@@ -499,23 +499,12 @@ export async function testReminderDraft(
   if (!account) throw new Error('REMINDER_LINE_ACCOUNT_NOT_FOUND');
   const built = await buildReminderStepMessage(db, step, friend, new Date(), 'test_send');
   const response = await new LineClient(account.channel_access_token)
-    .pushMessageWithRequestId(friend.line_user_id, [built.message], requestKey);
+    .pushMessageWithRequestId(friend.line_user_id, built.messages??[built.message], requestKey);
   const logId = crypto.randomUUID();
   await db.batch([
-    db.prepare(
-      `INSERT INTO messages_log
-         (id, friend_id, direction, message_type, content, template_id_at_send,
-          delivery_type, source, line_account_id, created_at)
-       VALUES (?, ?, 'outgoing', ?, ?, ?, 'test', 'reminder_test', ?, ?)`,
-    ).bind(
-      logId,
-      friend.id,
-      built.messageType,
-      built.messageContent,
-      built.templateId,
-      settings.lineAccountId,
-      now,
-    ),
+    ...(built.messageParts??[built]).map((part,index)=>db.prepare(
+      `INSERT INTO messages_log(id,friend_id,direction,message_type,content,template_id_at_send,delivery_type,source,line_account_id,created_at)
+       VALUES(?,?,'outgoing',?,?,?,'test','reminder_test',?,?)`).bind(index===0?logId:crypto.randomUUID(),friend.id,part.messageType,part.messageContent,built.templateId,settings.lineAccountId,now)),
     completeOutboundSendStatement(db, {
       key: requestKey,
       responseId: response.requestId ?? logId,
