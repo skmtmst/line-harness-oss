@@ -193,10 +193,22 @@ describe('スタイル体験の見本の自動再生', () => {
     const frame = document.querySelector('[data-scene]') as HTMLElement
     expect(frame.hasAttribute('inert')).toBe(true)
     expect(frame.getAttribute('aria-hidden')).toBe('true')
-    const live = document.querySelector('[aria-live="polite"]')
+    const live = document.querySelector('[aria-live="off"]')
     expect(live?.textContent).toBe('飲食店：① 予約。お客さまが LINE から人数・日時・コースを選んで予約します')
     advance(3500)
-    expect(live?.textContent).toBe('飲食店：② 受付。空いている卓に割り当てられ、台帳に入ります')
+    expect(live?.textContent).toBe('飲食店：② 受付。予約と卓の割り当てを台帳で確認できます')
+    fireEvent.click(screen.getByRole('button', { name: '止める' }))
+    expect(live?.getAttribute('aria-live')).toBe('polite')
+  })
+
+  it('自動再生中は読み上げを繰り返さず、手動で選んだ段は知らせる', () => {
+    renderPlayer()
+    expect(document.querySelector('[aria-live="off"]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '来店に進む' }))
+    const live = document.querySelector('[aria-live="polite"]')
+    expect(live?.textContent).toContain('来店')
+    advance(3500)
+    expect(live?.getAttribute('aria-live')).toBe('off')
   })
 
   it('最小版はスマホ枠と数の帯だけで、手順と右の画面を出さない', () => {

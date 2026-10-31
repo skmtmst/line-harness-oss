@@ -26,6 +26,7 @@ import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
 import { InitialMenuChoice } from './initial-menu-choice'
 import SetupLinks from './setup-links'
+import StyleChooseAction from './style-choose-action'
 import StyleChoiceStep, { StyleChoiceSwitcher, STYLE_CHOICE_ORDER, STYLE_CHOICE_START_ID, StyleChoiceStatus, initialViewingStyle } from './style-choice-step'
 import { useState } from 'react'
 import { formatNumber } from '@/lib/format'
@@ -44,6 +45,8 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   const label = styleLabel(style)
   /* 1 問目で「見ている」スタイル。選んでいるスタイル（choice）とは別に持つ（共通節 S-3）。 */
   const [viewing, setViewing] = useState<AccountStyle>(() => initialViewingStyle(state))
+  const [demoOpen, setDemoOpen] = useState(false)
+  const [demoPage, setDemoPage] = useState(0)
   const chosenStyle = step === 0 && (STYLE_CHOICE_ORDER as readonly string[]).includes(choice) ? choice as AccountStyle : null
   const head = step === 0
     ? { title: '使い方のスタイルを選ぶ', description: undefined }
@@ -54,7 +57,10 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         : { title: question?.title ?? '', description: question?.description ?? '' }
 
   const onCount = Object.values(enabled).filter(Boolean).length
-  const footer = (
+  const footer = demoOpen && step === 0 ? <DialogActions leadingAction={<Button onClick={() => { if (demoPage > 0) setDemoPage(demoPage - 1) }} aria-disabled={demoPage === 0} disabled={busy}>前のページ</Button>}>
+      <StyleChooseAction primary viewing={viewing} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} />
+      <Button onClick={() => { if (demoPage < 4) setDemoPage(demoPage + 1) }} aria-disabled={demoPage === 4} disabled={busy}>次のページ</Button>
+    </DialogActions> : (
     <DialogActions leadingAction={step === 0 ? <>
           <Button variant="text" onClick={() => void saveStyleMode('later')} disabled={busy}>あとで設定する</Button>
           <Button variant="text" onClick={() => void saveStyleMode('manual')} disabled={busy}>手動で設定する</Button>
@@ -85,7 +91,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   if (step === 0) {
     body = (
       <>
-        <StyleChoiceStep viewing={viewing} onView={setViewing} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} switcher="external" />
+        <StyleChoiceStep viewing={viewing} onView={setViewing} chosen={chosenStyle} onChoose={chooseStyle} disabled={busy} switcher="external" detail={demoOpen} onDetailChange={setDemoOpen} demoPage={demoPage} onDemoPage={setDemoPage} />
         {where(`あとから変えられます（設定 › アカウント）。友だち・配信は残ります。前の予約は${BOOKING_PLACE[state.style]}から見られます。`)}
       </>
     )
@@ -183,8 +189,8 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         fitViewport
         contentLayout={step === 0 ? 'form' : undefined}
         steps={step === 0 ? <StyleChoiceSwitcher viewing={viewing} onView={setViewing} chosen={chosenStyle} disabled={busy} /> : undefined}
-        onCancel={discard}
-        dirty={dirty || undefined}
+        onCancel={demoOpen && step === 0 ? () => setDemoOpen(false) : discard}
+        dirty={demoOpen && step === 0 ? undefined : dirty || undefined}
         busy={busy}
         error={error}
         designNode={step === 0 ? 'xxpM9' : step === 1 ? 'RZW83' : step === 'summary' ? 'oKSsG' : 'lS1Gh'}

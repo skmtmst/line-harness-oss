@@ -221,10 +221,6 @@
   font-weight: 700;
 }
 
-.spacer {
-  flex: 1;
-}
-
 .replyBox.replyBox {
   min-height: var(--tpl-op-sp-reply-h);
   border: 0;
