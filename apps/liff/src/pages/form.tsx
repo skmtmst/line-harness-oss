@@ -1,6 +1,6 @@
 import { jstDate as japanDate } from '@line-crm/shared';
 import { useCustomerWords, useCustomerStyle } from '../components/customer-style-scope.js';
-import { liffErrorMessage } from '../lib/api-error.js';
+import { LiffApiError, liffErrorMessage } from '../lib/api-error.js';
 import { useRequestGeneration } from '../lib/use-request-generation.js';
 import SeatBookingBlock from '../components/seat-booking-block.js';
 import { restaurantBookingApi } from '../lib/api.js';
@@ -304,7 +304,9 @@ export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:bo
       clearFieldError(name);
     } catch (err) {
       logFailure('form-upload', err);
-      setError('ファイルを送れませんでした。形式と容量を確認して、もう一度お試しください。');
+      setError(err instanceof LiffApiError && err.status >= 400 && err.status < 500 && err.status !== 429
+        ? err.message
+        : 'ファイルを送れませんでした。時間をおいて、もう一度ファイルを選んでください。');
     } finally {
       setUploading((prev) => ({ ...prev, [name]: false }));
     }
