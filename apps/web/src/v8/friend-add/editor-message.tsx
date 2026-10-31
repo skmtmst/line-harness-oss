@@ -1,5 +1,6 @@
 'use client'
 
+import type { InsertTokenNames } from '@/components/shared/insert-tokens'
 import Button from '@/components/shared/button';
 import Card,{ CardHeader } from '@/components/shared/card';
 import Toggle from '@/components/shared/toggle';
@@ -35,7 +36,8 @@ export const MESSAGE_TABS: Array<{ key: FriendAddRuleDefinition['messageType'] |
   { key: 'none', label: '送らない', icon: Ban, enabled: false, reason: '送らない設定は「以前からの友だち」のときに選びます' },
 ]
 
-export function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit, scenarioError }: {
+export function MessageStep({ definition, setDefinition, friendKind, scenarios, canEdit, scenarioError, tokenNames }: {
+  tokenNames?: InsertTokenNames
   definition: FriendAddRuleDefinition
   setDefinition: Dispatch<SetStateAction<FriendAddRuleDefinition>>
   friendKind: FriendAddRuleKind
@@ -57,7 +59,7 @@ export function MessageStep({ definition, setDefinition, friendKind, scenarios, 
     })
   }
   if (friendKind === 'returning') {
-    return <ReturningMessage definition={definition} setDefinition={setDefinition} scenarios={scenarios} canEdit={canEdit} scenarioError={scenarioError} />
+    return <ReturningMessage tokenNames={tokenNames} definition={definition} setDefinition={setDefinition} scenarios={scenarios} canEdit={canEdit} scenarioError={scenarioError} />
   }
   const scheduled = definition.timeWindows != null && definition.timeWindows.length > 0
   const suppressOn = (definition.resendSuppressionHours ?? 24) > 0
@@ -90,7 +92,7 @@ export function MessageStep({ definition, setDefinition, friendKind, scenarios, 
         </div>
         )}
         <MessageBody>
-          <SaveErrorField names={["messageText","definition.messageText","message_text","mine","definition.message_text"]}><InsertTextField
+          <SaveErrorField names={["messageText","definition.messageText","message_text","mine","definition.message_text"]}><InsertTextField tokenNames={tokenNames}
             ref={messageRef}
             aria-label="最初に送るメッセージ"
             editorSize="message"
@@ -242,7 +244,8 @@ export function ReadOnlyText({ id, label, value }: { id?: string; label: string;
   return <SaveErrorField names={["value"]}><TextField id={id} aria-label={label} value={value} readOnly aria-readonly="true" title={value} /></SaveErrorField>
 }
 
-export function ReturningMessage({ definition, setDefinition, scenarios, canEdit, scenarioError }: {
+export function ReturningMessage({ definition, setDefinition, scenarios, canEdit, scenarioError, tokenNames }: {
+  tokenNames?: InsertTokenNames
   definition: FriendAddRuleDefinition
   setDefinition: Dispatch<SetStateAction<FriendAddRuleDefinition>>
   scenarios: FriendAddRuleOptions['scenarios']
@@ -309,7 +312,7 @@ export function ReturningMessage({ definition, setDefinition, scenarios, canEdit
         )}
       </Card> : null}
       <Dialog open={messageOpen && mode === 'other' && canEdit} title="初回メッセージ" dirty={false} onCancel={() => setMessageOpen(false)} >
-        <Field label="最初に送るメッセージ"><MessageBody><SaveErrorField names={["messageText","definition.messageText","message_text"]}><InsertTextField editorSize="message" aria-label="最初に送るメッセージ" maxLength={MESSAGE_LIMIT} value={definition.messageText} onValueChange={(messageText) => setDefinition((current) => ({ ...current, messageText }))} /></SaveErrorField></MessageBody></Field>
+        <Field label="最初に送るメッセージ"><MessageBody><SaveErrorField names={["messageText","definition.messageText","message_text"]}><InsertTextField tokenNames={tokenNames} editorSize="message" aria-label="最初に送るメッセージ" maxLength={MESSAGE_LIMIT} value={definition.messageText} onValueChange={(messageText) => setDefinition((current) => ({ ...current, messageText }))} /></SaveErrorField></MessageBody></Field>
       </Dialog>
     </>
   )

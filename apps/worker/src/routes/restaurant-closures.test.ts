@@ -1,3 +1,4 @@
+import { readApiError } from '@line-crm/shared';
 /**
  * 席の空き待ちと席の来店の印（booking-plus 6 の席対応）。
  *
@@ -363,4 +364,21 @@ test('店ごとの再開通知と宛先を版付きで保存し、取消後の�
  const saved=await create();expect(cardSender).toHaveBeenCalledTimes(1);
  await request('DELETE',closurePath+'/'+saved.body.data.closure.id,{expectedVersion:1});expect(cardSender).toHaveBeenCalledTimes(1);
  expect(testDb.raw.prepare('SELECT status FROM rt_closure_close_tasks').get()).toEqual({status:'reopen'});
+});
+
+it('媒体設定の店舗不一致は同じ機械コードを返し、日本語の案内と状態を保つ', async () => {
+  const root = '/api/restaurant-test/';
+  const cases = [
+    ['GET', 'media-links', 400, '店舗を確認してください'],
+    ['PUT', 'media-links/hotpepper', 400, '店舗を確認してください'],
+    ['GET', 'channels', 400, '店舗が正しくありません'],
+    ['GET', 'close-notification-settings', 404, '店舗が正しくありません'],
+    ['PUT', 'close-notification-settings', 404, '店舗が正しくありません'],
+  ] as const;
+  for (const [method, resource, status, message] of cases) {
+    const body = resource.startsWith('media-links') ? { storeId: 'missing-store', pageUrl: null, loginUrl: null, closeOnBooking: false, expectedVersion: 0 } : { storeId: 'missing-store', notifyReopen: false, recipientMode: 'responsible', membershipIds: [], expectedVersion: 1 };
+    const response = await app().request(`${root}${resource}?account_id=account-1&storeId=missing-store`, { method, headers: { Authorization: 'Bearer owner-key', 'Content-Type': 'application/json' }, body: method === 'PUT' ? JSON.stringify(body) : undefined }, env);
+    expect(response.status, resource).toBe(status);
+    expect(readApiError(await response.json()), resource).toMatchObject({ code: 'restaurant_store_mismatch', message });
+  }
 });

@@ -8,7 +8,7 @@
 #
 #   1. 作業ツリーがビルド成果物で汚れていないか
 #   2. 未適用の D1 マイグレーションを一覧（migrate.ts status）
-#   3. 今回追加されたマイグレーションに破壊的な文が無いか（追加のみ許可）
+#   3. これから当たるマイグレーションに破壊的な文が無いか（追加のみ許可）
 #   4. D1 へ適用（migrate.ts apply --apply。復元点の取得は migrate.ts 側が行う）
 #   5. wrangler deploy（配備元を照合できるよう版情報を渡す）
 #   6. /health で配備 SHA が一致するか
@@ -79,29 +79,27 @@ if [ "$SKIP_MIGRATE" = "1" ]; then
   step "2/6〜4/6 D1 — スキップ（CF_STAGING_SKIP_MIGRATE=1）"
 else
   step "2/6 D1 の状態（未適用の一覧）"
-  "$TSX" scripts/deploy/migrate.ts status staging
+  STATUS_OUT="$(mktemp)"
+  "$TSX" scripts/deploy/migrate.ts status staging | tee "$STATUS_OUT"
 
-  step "3/6 追加されたマイグレーションの中身の確認（追加のみ許可）"
-  # 今配備されている版からの差分で「新しく足された .sql」だけを見る。
-  # /health が読めない・履歴が浅くて辿れない時は、手元にある履歴の範囲で見る。
-  DEPLOYED_SHA="$(curl -fsS --max-time 15 "$STAGING_API_URL/health" 2>/dev/null \
-    | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const j=JSON.parse(s);process.stdout.write(String(j.data?.git_commit??""))}catch{}})' \
-    || true)"
-  if [ -n "$DEPLOYED_SHA" ] && git cat-file -e "$DEPLOYED_SHA^{commit}" 2>/dev/null; then
-    echo "配備中の版: $DEPLOYED_SHA から今回までの追加分を見ます。"
-    NEW_SQL="$(git diff --name-only --diff-filter=A "$DEPLOYED_SHA" "$SHA" -- "$MIGRATIONS_DIR" | grep -E '\.sql$' || true)"
-  else
-    echo "配備中の版を辿れないため、手元の履歴で分かる範囲（直近 200 コミット）の追加分を見ます。"
-    NEW_SQL="$(git log -200 --diff-filter=A --name-only --pretty=format: -- "$MIGRATIONS_DIR" | grep -E '\.sql$' | sort -u || true)"
-  fi
-  if [ -z "$NEW_SQL" ]; then
-    echo "新しく足されたマイグレーションはありません。"
+  step "3/6 これから当たるマイグレーションの中身の確認（追加のみ許可）"
+  # migrate.ts status が「これから当たるもの」として挙げた物だけを見る。
+  # （Git の履歴で判断すると、浅い clone では全部が「新規」に見えてしまう。）
+  PENDING_SQL="$(grep -E '^[[:space:]]+[^[:space:]]+\.sql[[:space:]]+\((未適用|データのみ)\)' "$STATUS_OUT" | awk '{print $1}' || true)"
+  rm -f "$STATUS_OUT"
+  if [ -z "$PENDING_SQL" ]; then
+    echo "これから当たるマイグレーションはありません。"
   else
     echo "確認するファイル:"
-    printf '  %s\n' $NEW_SQL
+    printf '  %s\n' $PENDING_SQL
     BAD=0
-    for f in $NEW_SQL; do
-      [ -f "$f" ] || continue
+    for name in $PENDING_SQL; do
+      f="$MIGRATIONS_DIR/$name"
+      if [ ! -f "$f" ]; then
+        echo "[停止] $f が見つかりません。" >&2
+        BAD=1
+        continue
+      fi
       # コメント行を除いてから、破壊的な文（表の削除・列の削除・データの書き換え・削除）を探す。
       if grep -vE '^\s*--' "$f" | grep -qiE '\b(DROP\s+TABLE|DROP\s+COLUMN|ALTER\s+TABLE\s+\S+\s+DROP|RENAME\s+TO|TRUNCATE|DELETE\s+FROM|UPDATE\s+\S+\s+SET)\b'; then
         echo "[停止] $f に追加のみではない文があります。人の承認が要るので自動では当てません。" >&2

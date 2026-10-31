@@ -1,2 +1,8 @@
-.image { width:100%; max-width:var(--tpl-htn-preview-w); height:auto; align-self:flex-start; }
+.preview { --initial-menu-image-width:460px; --initial-menu-card-width:calc(var(--initial-menu-image-width) + var(--polish-space-card) * 2); container-type:inline-size; min-width:0; }
+.layout { display:grid; grid-template-columns:var(--initial-menu-card-width) minmax(0,1fr); gap:var(--space-24); align-items:start; }
+.imageCard { min-width:0; max-width:var(--initial-menu-card-width); }
+.image { display:block; width:var(--initial-menu-image-width); max-width:100%; height:auto; align-self:flex-start; }
+.destinations { display:flex; flex-direction:column; min-width:0; gap:var(--space-16); }
+.capability { color:var(--color-ink-secondary); font-size:var(--text-caption); line-height:1.5; }
 .phoneImage { display:block; width:100%; height:auto; }
+@container (max-width:799px) { .layout { grid-template-columns:minmax(0,1fr); } }
