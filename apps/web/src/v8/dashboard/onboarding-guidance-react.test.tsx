@@ -98,7 +98,7 @@ it.each([
   expect(within(guide()).getByText('リッチメニューなどの見た目を決める').closest('[hidden]')).toBeNull()
   expect(within(guide()).getByText(/残りの設定 1 件/)).toBeTruthy()
   fireEvent.click(configure)
-  expect(await screen.findByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })).toBeTruthy()
+  expect(await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })).toBeTruthy()
   expect(net.save).not.toHaveBeenCalled(); expect(net.activate).not.toHaveBeenCalled()
 })
 
@@ -230,7 +230,7 @@ it('APIの空stepsは正規化された未確認を表示し、全完了や0/0�
 it('既知の質問入口から実wizardを開き、戻ると閉じるで保存を始めない', async () => {
   render(<DashboardV8 />)
   fireEvent.click(await pendingSetup())
-  const dialog = await screen.findByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })
+  const dialog = await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
   fireEvent.click(within(dialog).getByRole('button', { name: '戻る', exact: true }))
   const first = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   fireEvent.click(within(first).getByRole('button', { name: '閉じる', exact: true }))
