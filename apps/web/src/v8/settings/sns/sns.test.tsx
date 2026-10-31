@@ -68,7 +68,7 @@ vi.mock('@/lib/staff-role', () => ({
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
   usePageCrumbs: () => {},
-  useHideSettingsNav: () => {},
+  useHideSettingsNav: () => { throw new Error('SNS連携では設定メニューを隠さない') },
 }))
 
 function googleData(): GoogleConnectionData {

@@ -119,7 +119,6 @@ describe('★V8 設定の中のメニュー', () => {
       // （10-11）で足したお客さまのデザイン。絵  では会社とロゴ（API 待ち）の次。
       'お客さまのデザイン',
       'はじめの設定',
-      'LINEアカウント',
       'プール管理',
       'ユーザー管理',
       '機能設定',
@@ -134,7 +133,11 @@ describe('★V8 設定の中のメニュー', () => {
     expect(view.queryByText('会社とロゴ')).toBeNull()
   })
 
-  it('店舗に所属する管理者の設定メニューにLINEアカウント管理を出さない', async () => {
+  it('統括と店舗の管理者の設定メニューにLINEアカウント管理を出さない', async () => {
+    const hqView = render(<SettingsInnerNav />)
+    await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
+    expect(hqView.queryByRole('link', { name: 'LINEアカウント' })).toBeNull()
+    cleanup()
     rememberStaffIdentity({ role: 'admin', accountScope: 'accounts' } as StaffMember)
     const view = render(<SettingsInnerNav />)
     await waitFor(() => expect(fixture.visibility).toHaveBeenCalled())
