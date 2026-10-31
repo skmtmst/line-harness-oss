@@ -1069,3 +1069,7 @@
 
 
 - [選択カードの権限表示](release-log/unreleased/2005-kenta-radio-card-permission.md) — 反映履歴、確認 2026-10-31。
+- [受信箱の会話と機能設定の案内](release-log/unreleased/2006-masato-inbox-feature-gate.md) — 反映履歴、確認 2026-10-31。
+
+
+- [店舗のLINEアカウント管理の入口](release-log/unreleased/2007-masato-store-line-account-menu.md) — 反映履歴、確認 2026-10-31。
