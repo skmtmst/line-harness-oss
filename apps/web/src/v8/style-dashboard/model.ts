@@ -120,7 +120,7 @@ export interface StyleRoster {
   title: string
   pay: StyleBadge
   meta: string
-  members: { name: string; sub: string; pay: StyleBadge; attend: 'done' | 'absent' | 'button' | 'cancel' | 'unavailable'; bookingId?: string; eventId?: string }[]
+  members: { name: string; sub: string; pay: StyleBadge; attend: 'done' | 'absent' | 'button' | 'cancel' | 'unavailable'; bookingId?: string; eventId?: string; startsAt?: string; canReportAbsence?: boolean }[]
   /** 回が始まったか（［欠席］はこの後だけ）。 */
   started?: boolean
   more: string

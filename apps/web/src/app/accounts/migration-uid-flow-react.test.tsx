@@ -44,6 +44,7 @@ const net = vi.hoisted(() => ({
   failExecute: null as null | 'network' | { status: number; error: string },
   failRollback: null as null | 'network',
   /** 対応表GETの回数（結果不明時の読み直しを見る）。 */
+  accountRows: null as Array<Record<string, unknown>> | null,
   detailGets: 0,
   /** 一覧GETの失敗再現。'network' で fetch が投げる。 */
   failList: null as null | 'network',
@@ -103,7 +104,7 @@ function installFetch() {
     const path = url.pathname
     const method = init?.method ?? 'GET'
     net.calls.push({ path: path + url.search, method })
-    if (path === '/api/line-accounts') return json(ACCOUNTS)
+    if (path === '/api/line-accounts') return json(net.accountRows ?? ACCOUNTS)
     if (path === '/api/staff/me') {
       return net.me ? json(net.me) : new Response(JSON.stringify({ success: false, error: 'x' }), { status: 500 })
     }
@@ -150,6 +151,7 @@ beforeEach(() => {
   fixture.push.mockClear()
   fixture.replace.mockClear()
   net.calls.length = 0
+  net.accountRows = null
   net.runs = [runFixture()]
   net.detailResponders = new Map()
   net.me = { id: 'owner-2', role: 'owner' }
@@ -742,4 +744,37 @@ describe('UID移行の5段階の表示', () => {
     await flush()
     expect(states().at(-1)).not.toBe('done')
   })
+})
+
+
+it.each(['legacy', 'v8'])('移行先を未選択で開き、候補の状態とIDを示し、CSVなしでは送れない: %s', async entry => {
+  net.runs = []
+  net.accountRows = [
+    { id: 'archive-id', name: '同じ名前の店', isActive: false, archivedAt: '2026-10-01' },
+    { id: 'active-id', name: '同じ名前の店', isActive: true, archivedAt: null },
+  ]
+  await act(async () => { root.render(entry === 'v8' ? <UidMigrationV8 initialRunId={null} /> : <AccountMigration />) })
+  await flush()
+  const target = host.querySelector('[aria-label="移行先アカウント"]') as HTMLButtonElement
+  expect(target.closest('[data-choice-field]')?.textContent).toContain('移行先アカウントを選択')
+  expect(buttonByText('テスト移行を実行').disabled).toBe(true)
+  fireEvent.click(target)
+  await flush()
+  const dialog = openDialog()
+  const text = dialog.textContent ?? ''
+  expect(text).toContain('保管済み · ID: archive-id')
+  expect(text).toContain('現役 · ID: active-id')
+  expect(text.indexOf('現役 · ID: active-id')).toBeLessThan(text.indexOf('保管済み · ID: archive-id'))
+  expect(within(dialog).queryByRole('radio', { name: '移行先アカウントを選択' })).toBeNull()
+  const choose = within(dialog).getByRole('button', { name: '選ぶ', exact: true }) as HTMLButtonElement
+  expect(choose.disabled).toBe(true)
+  const candidates = within(dialog).getAllByRole('radio')
+  expect(candidates).toHaveLength(2)
+  fireEvent.click(candidates[0])
+  await flush()
+  expect(choose.disabled).toBe(false)
+  fireEvent.click(choose)
+  await flush()
+  expect(target.closest('[data-choice-field]')?.textContent).toContain('同じ名前の店')
+  expect(writes()).toEqual([])
 })
