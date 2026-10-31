@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 // 日付の見本を作る前に日本時間で固定し、待ち合わせのタイマーは動かす。
@@ -74,4 +74,97 @@ it.each(['success', 'failure'])('画面を離れた後の保存の%sで一覧へ
  view.unmount()
  await act(async () => { if (outcome === 'success') succeed({ success: true }); else fail(new Error('old save failed')) })
  expect(nav.push).not.toHaveBeenCalled()
+})
+
+
+async function fillNewMenu() {
+ fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '試しのコース' } })
+ fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '4200' } })
+}
+async function choosePublication() {
+ fireEvent.click(screen.getByLabelText('保存する状態'))
+ fireEvent.click(within(await screen.findByRole('listbox')).getByRole('button', { name: '公開', exact: true }))
+}
+
+it('新しいメニューは公開を選ばなければ下書きで保存する', async () => {
+ render(<MenuEditPage />)
+ await fillNewMenu()
+ fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+ await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ storeId: 'store-1', name: '試しのコース', price: 4200, status: 'draft' })))
+ expect(screen.queryByRole('dialog', { name: 'このメニューを公開しますか？' })).toBeNull()
+})
+
+it('公開を選んでも確認するまでは送らず、キャンセル後も選択を保つ', async () => {
+ render(<MenuEditPage />)
+ await fillNewMenu(); await choosePublication()
+ fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+ const dialog = await screen.findByRole('dialog', { name: 'このメニューを公開しますか？' })
+ expect(fixture.createMenu).not.toHaveBeenCalled()
+ fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+ expect(screen.getByLabelText('保存する状態').textContent).toContain('公開')
+ fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+ fireEvent.click(within(await screen.findByRole('dialog', { name: 'このメニューを公開しますか？' })).getByRole('button', { name: '公開して追加する' }))
+ await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledWith('account-1', expect.objectContaining({ status: 'active' })))
+ expect(fixture.createMenu).toHaveBeenCalledTimes(1)
+})
+
+it('保存が失敗しても入力と下書きの選択を残す', async () => {
+ fixture.createMenu.mockRejectedValueOnce(new Error('temporary failure'))
+ render(<MenuEditPage />)
+ await fillNewMenu()
+ fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+ await screen.findByText('保存できませんでした。入力を確かめて、もう一度お試しください。')
+ expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('試しのコース')
+ expect((screen.getByLabelText('価格（税込）') as HTMLInputElement).value).toBe('4200')
+ expect(screen.getByLabelText('保存する状態').textContent).toContain('下書き')
+ expect(nav.push).not.toHaveBeenCalled()
+ fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+ await waitFor(() => expect(fixture.createMenu).toHaveBeenCalledTimes(2))
+ expect(fixture.createMenu.mock.calls[1][1]).toMatchObject({ status: 'draft' })
+})
+
+it('既存のメニューの編集では公開状態を送らない', async () => {
+ nav.params = new URLSearchParams('id=m1')
+ render(<MenuEditPage />)
+ fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '名前だけ変更' } })
+ expect(screen.queryByLabelText('保存する状態')).toBeNull()
+ fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+ await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledTimes(1))
+ expect(fixture.updateMenu.mock.calls[0][2]).not.toHaveProperty('status')
+})
+
+
+it('保存済みの下書きは確認して公開でき、確認を閉じただけでは送らない', async () => {
+ nav.params = new URLSearchParams('id=m4')
+ render(<MenuEditPage />)
+ await screen.findByLabelText('メニュー名')
+ await choosePublication()
+ fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+ const dialog = await screen.findByRole('dialog', { name: 'このメニューを公開しますか？' })
+ expect(fixture.updateMenu).not.toHaveBeenCalled()
+ fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
+ expect(fixture.updateMenu).not.toHaveBeenCalled()
+ fireEvent.click(screen.getByRole('button', { name: '保存する' }))
+ fireEvent.click(within(await screen.findByRole('dialog', { name: 'このメニューを公開しますか？' })).getByRole('button', { name: '公開して保存する' }))
+ await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm4', expect.objectContaining({ status: 'active' })))
+ expect(fixture.updateMenu).toHaveBeenCalledTimes(1)
+})
+
+
+it('公開が失敗しても確認と入力を残し、同じ公開をやり直せる', async () => {
+ fixture.createMenu.mockRejectedValueOnce(new Error('拒否'))
+ render(<MenuEditPage />)
+ fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '公開する下書き' } })
+ fireEvent.change(screen.getByLabelText('価格（税込）'), { target: { value: '4200' } })
+ await choosePublication()
+ fireEvent.click(screen.getByRole('button', { name: '保存して追加する' }))
+ const dialog = await screen.findByRole('dialog', { name: 'このメニューを公開しますか？' })
+ fireEvent.click(within(dialog).getByRole('button', { name: '公開して追加する' }))
+ await within(dialog).findByRole('alert')
+ expect(nav.push).not.toHaveBeenCalled()
+ expect((screen.getByLabelText('メニュー名') as HTMLInputElement).value).toBe('公開する下書き')
+ fireEvent.click(within(dialog).getByRole('button', { name: 'もう一度' }))
+ await waitFor(() => expect(nav.push).toHaveBeenCalledTimes(1))
+ expect(fixture.createMenu).toHaveBeenCalledTimes(2)
+ expect(fixture.createMenu.mock.calls.every(call => call[1].status === 'active')).toBe(true)
 })

@@ -1,5 +1,6 @@
 'use client'
 
+import type { InsertTokenNames } from '@/components/shared/insert-tokens'
 import { InsertText } from '@/components/shared/insert-text-field'
 import { GalleryHorizontalEnd, HelpCircle, Image as ImageIcon, LayoutGrid, LayoutTemplate, Video, type LucideIcon } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
@@ -28,10 +29,10 @@ function ImageThumb({ src }: { src: string }) {
   return <img className={styles.image} src={src} alt="" width={IMAGE_W} height={IMAGE_H} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)} />
 }
 
-function bodyOf(thumb: BubbleThumb): ReactNode {
+function bodyOf(thumb: BubbleThumb, tokenNames?: InsertTokenNames): ReactNode {
   switch (thumb.kind) {
     case 'text':
-      return <span className={styles.bubble}><span className={styles.line}><InsertText value={thumb.text} /></span></span>
+      return <span className={styles.bubble}><span className={styles.line}><InsertText value={thumb.text} tokenNames={tokenNames} /></span></span>
     case 'image':
       return <ImageThumb key={thumb.src} src={thumb.src} />
     case 'card':
@@ -55,11 +56,11 @@ function bodyOf(thumb: BubbleThumb): ReactNode {
  * テンプレートの中身を、トークの地に小さな吹き出し1つで見せる（LINE での見え方の目安）。
  * 名前の読み上げを邪魔しない飾りなので、読み上げからは外す。
  */
-export default function LineBubbleThumb({ thumb }: { thumb: BubbleThumb }) {
+export default function LineBubbleThumb({ thumb, tokenNames }: { thumb: BubbleThumb; tokenNames?: InsertTokenNames }) {
   const muted = thumb.kind === 'empty' || thumb.kind === 'unavailable'
   return (
     <div className={styles.talk} data-tone={muted ? 'muted' : undefined} data-line-bubble-thumb={thumb.kind} aria-hidden="true">
-      {bodyOf(thumb)}
+      {bodyOf(thumb, tokenNames)}
     </div>
   )
 }

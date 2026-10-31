@@ -5,6 +5,8 @@ import { ROUTES, TAG_STATES, WIDTHS } from './routes.mjs'
 import { routeLocalApi } from './local-api.mjs'
 import { measureSetupStepLayout, setupStepLayoutFailures } from './setup-step-layout.mjs'
 
+import { measureInitialMenuLayout, initialMenuLayoutFailures } from './initial-menu-layout.mjs'
+
 test.beforeEach(routeLocalApi)
 
 
@@ -44,8 +46,8 @@ async function expectLanded(page, path) {
   }
 }
 
-for (const width of WIDTHS) {
-  for (const route of ROUTES) {
+for (const route of ROUTES) {
+  for (const width of route.widths ?? WIDTHS) {
     test(`${width}px ${route.name}（${route.path}）`, async ({ page }) => {
       await page.setViewportSize({ width, height: DEFAULT_CAPTURE_HEIGHT })
 
@@ -62,6 +64,11 @@ for (const width of WIDTHS) {
       await expect(page.locator('main').first()).toBeVisible()
       const setupRows = await page.evaluate(measureSetupStepLayout)
       expect(setupStepLayoutFailures(setupRows), `${route.path} の共通手順行`).toEqual([])
+
+      const initialMenus = await page.evaluate(measureInitialMenuLayout)
+      if (route.name === 'initial-rich-menu' || initialMenus.length) {
+        expect(initialMenuLayoutFailures(initialMenus)).toEqual([])
+      }
     })
   }
 }

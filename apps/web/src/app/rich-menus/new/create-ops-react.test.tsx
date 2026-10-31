@@ -158,7 +158,7 @@ describe('作成の口へ送る中身', () => {
     expect(created()).toHaveLength(1)
     expect(created()[0].body).toMatchObject({
       accountId: 'acc-1', name: '会員メニュー', folderId: 'f-1',
-      defaultPageIndex: 0, isDefaultForAll: true, targetingEnabled: false, targetingCondition: null, targetingPriority: 0,
+      defaultPageIndex: 0, isDefaultForAll: false, targetingEnabled: false, targetingCondition: null, targetingPriority: 0,
     })
     const refile = requests.filter((r) => r.method === 'PATCH' && r.body && Object.keys(r.body as object).join() === 'folderId')
     expect(refile).toHaveLength(0)
