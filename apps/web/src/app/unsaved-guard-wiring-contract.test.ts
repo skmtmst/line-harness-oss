@@ -150,6 +150,7 @@ const GUARDED = [
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
   'v8/onboarding/initial-menu-page.tsx': 'components/templates/create-page.tsx',
   'v8/friend-add/editor-basic-routes.tsx': 'v8/friend-add/editor.tsx',
+  'v8/friend-add/editor-message.tsx': 'v8/friend-add/editor.tsx',
   // 登録中のスタッフは親の入力を表示するだけ。入力と離脱確認を持つ親を検査する。
   'v8/booking-staff/phone.tsx': 'v8/booking-staff/staff-new.tsx',
   // U05: state/ref と離脱確認は従来の親が保持する。分割先をその親へ結び直す（対象外の追加ではない）。
@@ -235,6 +236,7 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'v8/mileage/adjust-dialog.tsx': '入力中は共通Dialogの自動dirty検出とuseOverlayDiscardが閉じる操作を止める。確認・完了の段だけdirty=false。adjust-dialog-field-errorsの実描画で入力→閉じるの破棄確認とAPI/close未実行を確かめる。',
   'components/shared/table-body.tsx':
     '共有の仮想行表示。structureDirty は列とスクロール領域の寸法キャッシュを再計測する印で、入力の下書きではない。行の表示範囲・実測高さ・フォーカス行を管理するだけで、編集値や保存処理は呼び出し元が持つ。',
   'v8/mileage/ranks.tsx':
