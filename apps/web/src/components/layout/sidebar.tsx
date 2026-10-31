@@ -411,8 +411,7 @@ export default function Sidebar({
   const favoriteItems = freshSections.flatMap((section) => section.items.filter((item) => favoriteIds.has(item.id)))
   const displayedSections = favoriteItems.length === 0 ? freshSections : [
     { id: 'favorites', label: 'お気に入り', title: 'お気に入り', items: favoriteItems },
-    ...freshSections.map((section) => ({ ...section, items: section.items.filter((item) => !favoriteIds.has(item.id)) }))
-      .filter((section) => section.items.length > 0),
+    ...freshSections,
   ]
 
   const menuLoading = !isHq && (visibilityStatus === 'loading' || accountStyle.status === 'loading')
