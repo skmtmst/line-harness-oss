@@ -1,4 +1,4 @@
-import type { AccountStyle, StyleCard, InitialMenuTarget } from '@line-crm/shared';
+import type { AccountStyle, StyleCard, InitialMenuTarget, StarterCatalogSelection } from '@line-crm/shared';
 
 export type StarterItem = {
   key: string;
@@ -34,4 +34,4 @@ export type StarterItem = {
   /** scenario の通数。delayMinutes は前の通（1 通目はシナリオの始まり）からの分。 */
   steps?: Array<{ delayMinutes: number; text: string }>;
 };
-export type StarterDefinition = { items: StarterItem[] };
+export type StarterDefinition = { items: StarterItem[]; mode?: 'catalog'; selections?: StarterCatalogSelection[] };

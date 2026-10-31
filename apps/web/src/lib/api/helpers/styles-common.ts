@@ -5,6 +5,7 @@ import type {
   SetupAnswer,
   StyleCard,
   StyleRange,
+  StarterCatalogSelection,
 } from '@line-crm/shared';
 
 export const root = '/api/dashboard/style';
@@ -97,7 +98,8 @@ export type StarterSkipReason = 'answer_later' | 'not_for_style' | 'auto_insert_
 /** 初期セットの入れ直しの結果。2 回目からは inserted が空。 */
 export type StarterEnsureResult = {
   updated?: Array<{key:string;kind:StarterSetItem['kind']}>;
-  inserted: Array<{ key: string; kind: StarterSetItem['kind'] }>;
+  catalogApplication?: import('@line-crm/shared').StarterCatalogApplyResult;
+  inserted: Array<{ key: string; kind: StarterSetItem['kind'] | import('@line-crm/shared').StarterCatalogKind }>;
   skipped: Array<{ key: string; reason: StarterSkipReason }>;
   existing: number;
   starterSet: { id: string; version: number };
@@ -108,7 +110,7 @@ export type StyleStarterDefault = {
   style: AccountStyle;
   id: string;
   version: number;
-  definition: { items: StarterSetItem[] };
+  definition: { items: StarterSetItem[]; mode?: 'catalog'; selections?: StarterCatalogSelection[] };
 };
 
 /** 統括の組を標準へ戻す口の返事。自分の組が無い時は reset が false で何も変わらない。 */
@@ -164,7 +166,7 @@ export type StyleStarterSet = {
   style: AccountStyle;
   name: string;
   version: number;
-  definition: { items: StarterSetItem[] };
+  definition: { items: StarterSetItem[]; mode?: 'catalog'; selections?: StarterCatalogSelection[] };
   accountCount: number;
   updatedAt: string;
   updatedBy: string | null;

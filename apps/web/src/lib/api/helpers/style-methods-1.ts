@@ -57,6 +57,7 @@ export const methods1 = {
         styleMode: SetupAnswer['mode'];
         styleSelected: boolean;
         version: number;
+        catalogApplication?: import('@line-crm/shared').StarterCatalogApplyResult;
         changedAnswers: Record<string, SetupAnswer>;
         bookingSettingsChanges: Array<{ key: string; answer: SetupAnswer }>;
         inserted: Array<{

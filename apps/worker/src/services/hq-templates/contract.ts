@@ -213,3 +213,5 @@ export function unsupportedHqTemplateAdapter(type: HqTemplateType): HqTemplateAd
     buildCommitPlan: () => unsupported('commit'),
   };
 }
+
+export type HqInitialResourceCommit = (account:string,resolutions:readonly HqTemplateResolution[])=>Promise<HqTemplateStatement[]>;

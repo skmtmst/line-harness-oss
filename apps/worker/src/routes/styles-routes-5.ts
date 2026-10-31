@@ -1,3 +1,4 @@
+import { starterCatalogRuntime } from './style-starter-runtime.js';
 import { restaurantEffectivelyEnabledForTenant } from '../services/tenant-features.js';
 import { Hono } from 'hono';
 
@@ -23,6 +24,7 @@ styles.post(base + '/starter-items/ensure', async (c) => {
       c.get('staff').id,
       await json(c),
       c.env.IMAGES,
+      starterCatalogRuntime(c),
     ),
   });
 });
