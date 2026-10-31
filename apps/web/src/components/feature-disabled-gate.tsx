@@ -4,6 +4,7 @@ import React from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { menuItemForPath } from './view-permission-gate'
+import { isSettingsAreaPath } from './layout/settings-inner-nav'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { useOptionalAccount } from '@/contexts/account-context'
@@ -52,8 +53,8 @@ export default function FeatureDisabledGate({ children }: { children: React.Reac
 
   useEffect(() => {
     const onDisabled = (event: Event) => {
-      // 機能設定はオフになった機能を戻す入口。補助APIの機能オフで画面を閉じない。
-      if (pathname === '/settings') return
+      // 設定内の画面は停止中の機能をつなぎ直す入口。補助APIの停止で閉じない。
+      if (isSettingsAreaPath(pathname)) return
       const detail = (event as CustomEvent<FeatureDisabledEventDetail>).detail
       // 必須画面の補助APIがオフでも画面全体を閉じない。
       // 任意機能の画面では、その画面自身の機能だけを案内する。
