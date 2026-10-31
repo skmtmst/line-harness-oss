@@ -1,4 +1,5 @@
 'use client'
+import { uidAccountCandidates, uidDryRunBlockedReason } from '@/lib/uid-migration-input'
 import { UID_IMPORT_COLUMNS } from '@/lib/csv-import-columns'
 
 import { useStaffIdentity, useStaffRole, isOwnerRole, canManageRole } from '@/lib/staff-role'
@@ -204,10 +205,10 @@ export function useUidMigration() {
     try {
       const [accountResponse, runResponse] = await Promise.all([api.lineAccounts.list(), api.friendMigrations.list()])
       if (!accountResponse.success || !runResponse.success) throw new Error('load failed')
-      setAccounts(accountResponse.data)
+      setAccounts(uidAccountCandidates(accountResponse.data))
       setRuns(runResponse.data)
       setFromAccountId((value) => value || accountResponse.data[0]?.id || '')
-      setToAccountId((value) => value || accountResponse.data[1]?.id || '')
+      setToAccountId((value) => accountResponse.data.some((account) => account.id === value) ? value : '')
       setPage(0)
       setClassification('')
       setPendingOnly(false)
@@ -252,10 +253,12 @@ export function useUidMigration() {
       : null)
   }
 
+  const dryRunBlockedReason = uidDryRunBlockedReason({ fromAccountId, toAccountId, purpose, file, mappingsFile, mappings })
+
   const createDryRun = async () => {
     if (!mounted.current || !canWriteMigrationNow() || busy || writeLock.current) return
-    if (!file || mappingsFile !== file || mappings.length === 0 || !fromAccountId || !toAccountId || !purpose.trim()) {
-      setMessage('移行元・移行先・利用目的と、old_uid / new_uid 列を持つCSVを選んでください。')
+    if (dryRunBlockedReason || !file) {
+      setMessage(dryRunBlockedReason)
       return
     }
     const permissionEpoch = accessEpoch.current, selectionEpoch = inputEpoch.current
@@ -536,6 +539,7 @@ export function useUidMigration() {
     loadDetail,
     onUidFile,
     createDryRun,
+    dryRunBlockedReason,
     decide,
     decideMany,
     unresolved,
