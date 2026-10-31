@@ -357,3 +357,15 @@ describe('タグ条件の保存前確認と変更しない設定の保護', () =
     expect(net.createMenu).toHaveBeenCalledTimes(1)
   })
 })
+
+it('新規作成の初期値はAPIの全員を使い、管理者用のタグ変更項目を送らない', async () => {
+  net.createMenu.mockResolvedValue({ id: 'm1' })
+  render(<MenuFormV8 />)
+  await settle()
+  fireEvent.change(screen.getByPlaceholderText('例：トリミング（小型犬）'), { target: { value: 'カット' } })
+  fireEvent.click(screen.getByRole('checkbox', { name: '高田', exact: true }))
+  fireEvent.click(screen.getByRole('button', { name: '保存して公開' }))
+  await vi.waitFor(() => expect(net.createMenu).toHaveBeenCalledTimes(1))
+  expect(sentBody(net.createMenu, 1)).not.toHaveProperty('audienceMode')
+  expect(sentBody(net.createMenu, 1)).not.toHaveProperty('audienceTagIds')
+})

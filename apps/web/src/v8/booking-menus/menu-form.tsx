@@ -531,7 +531,7 @@ export default function MenuFormV8() {
 
   function audienceChanged(): boolean {
     if (!canEditAudience) return false
-    if (!editTarget) return true
+    if (!editTarget) return audienceMode !== 'all'
     const saved = editTarget as BookingMenu & { audience_mode?: AudienceMode; audience_tag_ids_json?: string | null }
     if (audienceMode !== (saved.audience_mode ?? 'all')) return true
     if (audienceMode === 'all') return false
