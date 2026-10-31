@@ -7,8 +7,7 @@ import { mockFetch } from './mock-local.mjs'
 import { styleDashboardMock } from '../../../../scripts/visual-qa/style-dashboard-mock.mjs'
 
 // 道具の段の日付の欄と選ぶ欄の、計算後の地・枠・影を比べる。
-// 日付は button（全体の上塗りの透明勾配が乗る）、選ぶ欄は div（勾配なし）。
-// 層の書き方は違うので、見える地（白＋影1本）が同じことを見る。
+// 文字を打つ日付は平ら、押して選ぶ欄は共通の白い薄い勾配。枠・影はそろえる。
 function toolbarSurfaces() {
   const date = [...document.querySelectorAll('button')].find((b) => /月\d+日/.test(b.innerText || ''))
   const pick = document.querySelector('[data-entity-picker-field] [data-choice-field]')
@@ -31,6 +30,8 @@ function toolbarSurfaces() {
     return {
       text: (el.innerText || '').slice(0, 16),
       ink: visibleInk(s.backgroundImage),
+      image: s.backgroundImage,
+      surface: el.getAttribute('data-choice-surface'),
       bgColor: s.backgroundColor,
       border: `${s.borderTopWidth} ${s.borderTopStyle}`,
       shadow: s.boxShadow,
@@ -39,7 +40,7 @@ function toolbarSurfaces() {
   return { date: surface(date), pick: surface(pick) }
 }
 
-// 全画面の走査：選ぶ欄・入力欄の地に浮き勾配の筋が残っていないか。
+// 全画面の走査：押して選ぶ欄は指定の白い勾配、文字を打つ欄は平ら。
 // 日付・選ぶ・探す・文字入力・絞り札。押下・hover・誤り・無効は別決まりなので数えない。
 function sweepInk() {
   const els = [...document.querySelectorAll(
@@ -66,12 +67,14 @@ function sweepInk() {
     if (el.getAttribute('aria-pressed') === 'true') continue
     if (el.getAttribute('aria-invalid') === 'true' || el.hasAttribute('data-invalid') || el.disabled) continue
     count += 1
-    const ink = visibleInk(getComputedStyle(el).backgroundImage)
-    if (ink.length) {
+    const image = getComputedStyle(el).backgroundImage
+    const ink = visibleInk(image)
+    const isChoice = el.getAttribute('data-choice-surface') === 'select'
+    if (isChoice ? image !== 'linear-gradient(rgb(255, 255, 255), rgb(250, 250, 252))' : ink.length > 0) {
       bad.push({
         label: ((el.getAttribute('aria-label') || el.innerText || el.getAttribute('placeholder') || '').replace(/\s+/g, ' ')).slice(0, 24),
         cls: String(el.className.baseVal !== undefined ? '' : el.className).split(' ').map((c) => c.split('__')[0]).join(' ').slice(0, 60),
-        ink,
+        ink, image, surface: isChoice ? 'select' : 'input',
       })
     }
   }
@@ -84,7 +87,7 @@ const SWEEP_ROUTES = [
   ['booking', '/booking/bookings'], ['broadcast-new', '/broadcasts/new'], ['staff', '/staff'],
 ]
 
-test('全画面の選ぶ欄・入力欄の普段の地に勾配の筋が無い', async () => {
+test('全画面の選ぶ欄は白い勾配、文字を打つ欄は平ら', async () => {
   const browser = await connectGuardBrowser()
   try {
     const adapter = { newPage: async (options) => { const p = await browser.newPage(options); await stubApi(p, mockFetch); return p } }
@@ -94,7 +97,7 @@ test('全画面の選ぶ欄・入力欄の普段の地に勾配の筋が無い',
       try {
         const found = await page.evaluate(sweepInk)
         total += found.count
-        assert.deepEqual(found.bad, [], `${name}の欄の地に筋が残る`)
+        assert.deepEqual(found.bad, [], `${name}の欄の地が役割と一致する`)
       } finally {
         await page.close().catch(() => {})
       }
@@ -116,7 +119,8 @@ for (const style of ['restaurant', 'salon', 'consult', 'lesson']) {
       const found = await page.evaluate(toolbarSurfaces)
       assert.ok(found.date, '日付の欄がある（消して違反0にしない）')
       assert.ok(found.pick, '選ぶ欄がある（消して違反0にしない）')
-      assert.deepEqual(found.pick.ink, [], `選ぶ欄の地に筋が無い（${found.pick.text}）`)
+      assert.equal(found.pick.surface, 'select', '選ぶ欄の役割が付いている')
+      assert.equal(found.pick.image, 'linear-gradient(rgb(255, 255, 255), rgb(250, 250, 252))', `選ぶ欄は白い薄い勾配（${found.pick.text}）`)
       assert.deepEqual(found.date.ink, [], `日付の欄の地に筋が無い（${found.date.text}）`)
       assert.equal(found.pick.bgColor, found.date.bgColor, '地の色が同じ')
       assert.equal(found.pick.border, found.date.border, '枠が同じ')

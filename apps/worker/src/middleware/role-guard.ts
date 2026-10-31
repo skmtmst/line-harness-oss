@@ -1,8 +1,9 @@
-import { hasDeliveryAccess, type DeliveryFeature, type StaffFeatureOperation } from '@line-crm/shared';
+import { hasStaffAccess, hasDeliveryAccess, type DeliveryFeature, type StaffFeatureOperation } from '@line-crm/shared';
 
 import type { Context, MiddlewareHandler } from 'hono';
 import type { Env } from '../worker-env.js';
 import type { StaffRole } from './auth/principal/auth.js';
+import { readOperationPermissions } from './auth/permissions/auth.js';
 
 /**
  * 役割による門番。
@@ -52,6 +53,17 @@ export function requirePermission(permission: string): MiddlewareHandler<Env> {
         { success: false, error: 'この操作を実行する権限がありません' },
         403,
       );
+    }
+    return next();
+  };
+}
+
+/** 表に明記された読取操作だけを、指定のいずれかの閲覧鍵で通す。 */
+export function requireReadOperationPermission(): MiddlewareHandler<Env> {
+  return async (c, next) => {
+    const permissions = readOperationPermissions(c.req.method, c.req.path);
+    if (!permissions?.some(permission => hasStaffAccess(c.get('staff'), permission, true))) {
+      return c.json({ success: false, error: 'この操作を実行する権限がありません' }, 403);
     }
     return next();
   };

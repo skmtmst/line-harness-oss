@@ -1,4 +1,5 @@
 export { starter } from './style-starter-set.js';
+import { materializeInitialMenuAssets } from './style-initial-assets.js';
 import { starter } from './style-starter-set.js';
 import { restaurantDefaultFeatures, type AccountStyle, type SetupAnswer } from '@line-crm/shared';
 import { storeFeatureInitialization } from '@line-crm/db/src/store-feature-initialization.js';
@@ -10,6 +11,9 @@ import { StyleError, checkStyle, readAnswers } from './style-setup-core.js';
 import { readDefinition, standardStarter } from './style-starter-definition.js';
 import { restaurantFollowupSeedStatement } from './restaurant-followup-rows.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
+import { logger } from '@line-crm/shared/server';
+import { HqTemplateError } from './hq-templates/tag.js';
+import { applyCatalogStarter, type StarterCatalogRuntime } from './style-starter-catalog-apply.js';
 export {profile,profileAnswers,type StyleProfile} from './style-profile.js';
 import {profile,profileAnswers,hasPendingStyleSelection} from './style-profile.js';
 function assertVersion(expected: unknown, actual: number) {
@@ -22,7 +26,7 @@ export async function saveProfile(
   tenant: string | null,
   actor: string,
   input: Record<string, unknown>,
-  options: { initialSelectionPending?: boolean } = {},
+  options: { initialSelectionPending?: boolean; images?: R2Bucket; catalogRuntime?: StarterCatalogRuntime } = {},
 ) {
   const current = await profile(db, account);
   assertVersion(input.expectedVersion, current?.version ?? 0);
@@ -152,7 +156,10 @@ export async function saveProfile(
   const bookingSettingsChanges = Object.entries(changedAnswers).map(
     ([key, answer]) => ({ key, answer }),
   );
-  const { set, inserted, skipped } = await insertStyleStarterItems(
+  const preparedSet = await starter(db,tenant,style,answers.image?.value==='simple');
+  if (selected && answers.image?.mode==='configured' && answers.image.value==='simple')
+    await materializeInitialMenuAssets(db,options.images,account,style,preparedSet.definition);
+  const { set, inserted, updated, skipped } = await insertStyleStarterItems(
     db,
     account,
     tenant,
@@ -163,6 +170,7 @@ export async function saveProfile(
     answers,
     statements,
     now,
+    {set:preparedSet},
   );
   statements.push(
     db
@@ -186,7 +194,20 @@ export async function saveProfile(
       throw new StyleError('version_conflict', 409);
     throw e;
   }
+  let catalogApplication: import('@line-crm/shared').StarterCatalogApplyResult | undefined;
+  if(set.definition.mode==='catalog' && tenant && selected) {
+    try { catalogApplication=await applyCatalogStarter(db,tenant,account,actor,style,options.catalogRuntime); }
+    catch(error) {
+      const expected=error instanceof StyleError || (error instanceof HqTemplateError && error.status<500);
+      if(!expected) {
+        logger.error('style_starter_catalog_failed');
+        try{await options.catalogRuntime?.reportError?.(error instanceof Error?error:new Error('catalog_application_failed'))}catch{logger.error('style_starter_catalog_report_failed')}
+      }
+      catalogApplication={mode:'catalog',items:(set.definition.selections??[]).map(item=>({...item,state:expected?'blocked':'failed',reason:expected?error.code:'catalog_application_failed'}))};
+    }
+  }
   return {
+    catalogApplication,
     style,
     styleMode,
     styleSelected: selected,
@@ -197,6 +218,7 @@ export async function saveProfile(
     bookingSettingsChanges,
     version,
     inserted,
+    updated,
     skipped,
     starterSet: { id: set.id, version: set.version },
   };
@@ -208,12 +230,13 @@ export async function initializeAccountStyle(
   tenant: string | null,
   actor: string,
   selectedStyle?: AccountStyle,
+  catalogRuntime?: StarterCatalogRuntime,
 ) {
   if (selectedStyle !== undefined) {
-    return saveProfile(db, account, tenant, actor, { expectedVersion: 0, style: checkStyle(selectedStyle) });
+    return saveProfile(db, account, tenant, actor, { expectedVersion: 0, style: checkStyle(selectedStyle) }, { catalogRuntime });
   }
   return saveProfile(db, account, tenant, actor, {
     expectedVersion: 0,
     style: 'standard',
-  }, { initialSelectionPending: true });
+  }, { initialSelectionPending: true, catalogRuntime });
 }

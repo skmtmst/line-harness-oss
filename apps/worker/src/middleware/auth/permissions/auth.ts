@@ -58,6 +58,7 @@ const STAFF_API_PERMISSIONS: Array<[string, string]> = [
 
 /** URL 互換性で /api/friends 配下にある別機能を先に解決し、friends 権限だけでチャットや属性へアクセスできないようにする。 */
 const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
+  [/^\/api\/restaurant-test\/followups\/[^/]+\/(?:engines|rows)(?:\/|$)/, '/restaurant-test/line-followup'],
   [/^\/api\/dashboard\/style\/template-samples$/, '/templates'],
   // 予約の細かい権限。広い '/api/booking' → '/booking/bookings' より先に評価する。
   // 本人勤務は route 側で「自分に紐づく予約スタッフか」を確認する。
@@ -95,10 +96,20 @@ const STAFF_API_PERMISSION_OVERRIDES: Array<[RegExp, string]> = [
   [/^\/api\/scenario-subscriptions(?:\/|$)/, 'scenario.subscription.edit'],
 ];
 
+/** 読取だけを行うPOSTの、経路と閲覧鍵。複数の鍵はどちらか一つでよい。 */
+export const READ_OPERATION_PERMISSIONS: ReadonlyMap<string, readonly string[]> = new Map<string, readonly string[]>([
+  ['POST /api/segments/count', ['/scenarios', '/broadcasts']],
+]);
+
+export function readOperationPermissions(method: string, path: string): readonly string[] | null {
+  return READ_OPERATION_PERMISSIONS.get(`${method.toUpperCase()} ${path}`) ?? null;
+}
+
 /** POST でも業務データを更新しない読取・プレビュー操作。 */
 export function gap2ReadOperation(method: string, path: string): boolean {
   return method === 'POST' && (
-    /^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)
+    readOperationPermissions(method, path) !== null
+    || /^\/api\/forms\/[^/]+\/routing\/preview$/.test(path)
     || /^\/api\/chats\/[^/]+\/ai\/summary$/.test(path)
     || path === '/api/booking/admin/series/preview'
     || path === '/api/member-ranks/preview'
@@ -147,7 +158,6 @@ const STAFF_SELF_ENDPOINTS: Array<[method: string, path: string]> = [
   ['PUT', '/api/me/presence'],
   // 外部入力で対象を選ばせず、認証済みの本人だけから解決する。
   ['GET', '/api/auth/two-factor/self'],
-  ['POST', '/api/auth/two-factor/recovery'],
   ['GET', '/api/auth/passkeys/self'],
   ['POST', '/api/auth/passkeys/register/options'],
   ['POST', '/api/auth/passkeys/register/verify'],

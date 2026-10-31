@@ -118,23 +118,9 @@ export const get__api_rich_menu_groups_groupId_prepublish_check_4 = async (c: Co
     const fingerprint = manualPublishFingerprint(group);
     let selfCheck: { ok: boolean; message: string };
     try {
-      validateRichMenuGroupForPublish({
-        id: group.id,
-        size: group.size,
-        chatBarText: group.chat_bar_text,
-        isDefaultForAll: group.is_default_for_all === 1,
-        pages: resolveSwitcherActions(group.pages.map((p) => ({
-          id: p.id, orderIndex: p.order_index, name: p.name,
-          imageR2Key: p.image_r2_key, imageContentType: p.image_content_type, lineRichMenuId: p.line_richmenu_id,
-          areas: p.areas.map((a) => ({
-            id: a.id,
-            bounds: { x: a.bounds_x, y: a.bounds_y, width: a.bounds_width, height: a.bounds_height },
-            actionType: a.action_type, actionData: a.actionData, intent: a.intent, label: a.label,
-            tagIds: a.tagIds, scoreChange: a.score_change, templateId: a.template_id, formId: a.form_id,
-            trackedLinkUrl: null,
-          })),
-        })), group.id),
-      });
+      const account = await getLineAccountById(c.env.DB,group.account_id);
+      const input = await buildPublishGroupInput(c,group,account??{});
+      validateRichMenuGroupForPublish({...input,pages:resolveSwitcherActions(input.pages,input.id)});
       selfCheck = { ok: true, message: '自前の検査を通りました。' };
     } catch (e) {
       selfCheck = { ok: false, message: e instanceof Error ? e.message : String(e) };

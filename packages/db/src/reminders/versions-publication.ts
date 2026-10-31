@@ -1,14 +1,15 @@
 import { jstNow } from '../utils.js';
+import { reminderVersionMessageParts } from './version-messages.js';
 import { type ReminderVersionRow, type ReminderStepRow } from './types.js';
 import { getReminderDraftVersion, parseReminderVersionSettings, getReminderVersionById } from './versions-drafts.js';
 
 
 /** 公開版を固定し、既存登録の reminder_version_id は変更しない。 */
-export async function publishReminderDraftVersion(
+export async function prepareReminderDraftPublication(
   db: D1Database,
   reminderId: string,
   staffId: string | null,
-): Promise<ReminderVersionRow> {
+) {
   const draft = await getReminderDraftVersion(db, reminderId);
   if (!draft) throw new Error('REMINDER_DRAFT_NOT_FOUND');
   if (draft.last_test_status !== 'succeeded') throw new Error('REMINDER_DRAFT_NOT_TESTED');
@@ -91,10 +92,14 @@ export async function publishReminderDraftVersion(
       now,
     ));
   }
-  await db.batch(statements);
-  const published = await getReminderVersionById(db, draft.id);
-  if (!published || published.status !== 'published') throw new Error('REMINDER_DRAFT_NOT_PUBLISHED');
-  return published;
+  return {draft,statements};
+}
+
+export async function publishReminderDraftVersion(db:D1Database,reminderId:string,staffId:string|null):Promise<ReminderVersionRow>{
+ const {draft,statements}=await prepareReminderDraftPublication(db,reminderId,staffId);
+ await db.batch(statements);
+ const published=await getReminderVersionById(db,draft.id);
+ if(!published||published.status!=='published')throw new Error('REMINDER_DRAFT_NOT_PUBLISHED');return published;
 }
 
 export async function getReminderVersionSteps(
@@ -102,13 +107,16 @@ export async function getReminderVersionSteps(
   versionId: string,
 ): Promise<ReminderStepRow[]> {
   const result = await db.prepare(
-    `SELECT rvs.stable_step_id AS id, rv.reminder_id, rvs.offset_minutes,
+    `SELECT rv.settings_snapshot,rvs.stable_step_id AS id, rv.reminder_id, rvs.offset_minutes,
             rvs.message_type, rvs.message_content, rvs.created_at,
             rvs.offset_days, rvs.send_at_time, rvs.template_id
        FROM reminder_version_steps rvs
        JOIN reminder_versions rv ON rv.id = rvs.reminder_version_id
       WHERE rvs.reminder_version_id = ?
       ORDER BY rvs.position, rvs.stable_step_id`,
-  ).bind(versionId).all<ReminderStepRow>();
-  return result.results;
+  ).bind(versionId).all<ReminderStepRow&{settings_snapshot:string}>();
+  const parts=reminderVersionMessageParts(result.results[0]?.settings_snapshot);
+  return result.results.map(({settings_snapshot,...step})=>{
+    return {...step,...(parts?.has(step.id)?{message_parts_json:parts.get(step.id)}:{})};
+  });
 }

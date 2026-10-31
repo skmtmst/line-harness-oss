@@ -1,3 +1,4 @@
+import { scopeStoredBroadcastSegmentQuery } from '../../services/segment-query-scope.js';
 import { getLineAccountById, type Broadcast } from '@line-crm/db';
 
 
@@ -97,12 +98,9 @@ export async function getBroadcastAudiencePreview(
       const { sql, bindings } = buildSegmentQuery(
         conditions as Parameters<typeof buildSegmentQuery>[0],
       );
-      const scopedSql = accountId
-        ? sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')
-        : sql;
-      const scopedBindings = accountId ? [accountId, ...bindings] : bindings;
-      const row = await db.prepare(`SELECT COUNT(*) AS count FROM (${scopedSql}) q`)
-        .bind(...scopedBindings).first<{ count: number }>();
+      const scoped = await scopeStoredBroadcastSegmentQuery(db, { sql, bindings }, accountId);
+      const row = await db.prepare(`SELECT COUNT(*) AS count FROM (${scoped.sql}) q`)
+        .bind(...scoped.bindings).first<{ count: number }>();
       return { count: Number(row?.count ?? 0) };
     } catch {
       return { count: null };

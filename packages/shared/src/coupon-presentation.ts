@@ -7,6 +7,8 @@ export interface CouponPresentationInput {
   instructions?: unknown;
   description?: unknown;
   title?: unknown;
+  oncePerFriend?: unknown;
+  maxUsesPerFriend?: unknown;
 }
 
 export type CouponDiscount =
@@ -78,6 +80,8 @@ export function couponPresentation(payload: CouponPresentationInput, fallbackNam
   return {
     title: text(payload.title) || fallbackName || 'クーポン',
     kindLabel: payload.couponType === 'discount' ? '割引' : '',
+    countLabel: payload.oncePerFriend === false && payload.maxUsesPerFriend == null ? '期間中は何回でも' : `${Number(payload.maxUsesPerFriend ?? 1)}回のみ使用可能`,
+    timezoneNote: '日本時間（UTC+09:00）',
     benefit, beforePrice,
     conditions: text(payload.conditions),
     code: code ? text(code.text) : '',

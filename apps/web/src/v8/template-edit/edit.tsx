@@ -20,6 +20,6 @@ export default function TemplateEditV8() {
   const example = params.get('example')
   if (kind === 'rich_video') return <TemplateRichVideoEditor key={`${id ?? 'new'}`} id={id} visual={visual} />
   if (kind === 'rich_message') return <TemplateRichEditor visual={visual} />
-  if (kind === 'coupon' || kind === 'research') return <TemplateAssetEditor key={kind} kind={kind} visual={visual} />
+  if (kind === 'coupon' || kind === 'research') return <TemplateAssetEditor key={`${kind}:${id ?? 'new'}`} id={id} kind={kind} visual={visual} />
   return <TemplateMessageEditor id={id} visual={visual} example={example} />
 }

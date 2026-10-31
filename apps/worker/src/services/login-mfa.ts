@@ -40,7 +40,7 @@ export async function mfaAudit(c: Context<Env>, staffId: string | null, action: 
   const staff = staffId ? await getStaffById(c.env.DB, staffId) : null;
   await recordAuditEvent(c.env.DB, {
     tenantId: staff?.tenant_id, actorRole: staff?.role, category: 'auth', action, actorPrincipalId: staffId, targetKind: 'staff', targetId: staffId,
-    result, riskLevel: action === 'auth.mfa.policy' || action === 'auth.mfa.recovery' || result !== 'success' ? 'high' : 'normal', retentionClass: 'security',
+    result, riskLevel: action === 'auth.mfa.policy' || result !== 'success' ? 'high' : 'normal', retentionClass: 'security',
   });
 }
 

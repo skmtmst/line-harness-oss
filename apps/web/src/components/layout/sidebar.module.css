@@ -1,6 +1,7 @@
 .nav {
   flex: 1;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
   /* 項目の箱の左端はロゴの箱・下の「設定」と同じ線（--space-20）にそろえる。 */
   padding: 0 var(--space-20) 8px;
@@ -574,4 +575,6 @@
 }
 
 .nav[aria-busy='true'] a { color: var(--color-ink-faint); }
-.comingSoon { flex: none; margin-left: 12px; font-size: 10px; line-height: 18px; color: #64748b; white-space: nowrap; }
+.deliveryItem .itemLabel { flex: 0 1 auto; max-width: calc(100% - 78px); }
+.comingSoon { position: absolute; right: 2px; font-size: 10px; line-height: 18px; color: #64748b; white-space: nowrap; }
+:root .desktop[data-collapsed] .comingSoon { display: none; }

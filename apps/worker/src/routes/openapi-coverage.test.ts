@@ -141,6 +141,7 @@ const ALLOWLIST_MAX = 769;
  * 後続票で記載を増やしたら、同じ PR でここへ追加する。
  */
 const BASELINE_DOCUMENTED = new Set<string>([
+  'GET /api/liff/events',
   'POST /api/liff/tracked-link-identity',
   'GET /api/booking/admin/menus/photos',
   'GET /api/liff/booking/store-photos',
@@ -343,6 +344,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/dashboard/style/warnings',
   'GET /api/hq/style-attention',
   'GET /api/hq/style-starter-sets',
+  'GET /api/hq/style-starter-sets/catalog',
+  'GET /api/hq/style-starter-sets/catalog/{templateId}/versions/{versionId}',
   'GET /api/hq/style-starter-sets/{style}/default',
   'GET /api/hq/style-template-samples',
   'GET /api/liff/booking/style-readiness',
@@ -459,7 +462,6 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/ops/applications/{id}/contact',
   'POST /api/ops/applications/{id}/resend-invite',
   'POST /api/ops/notice-line-account/connect',
-  'POST /api/auth/two-factor/recovery',
   'PUT /api/auth/two-factor/policy',
   'GET /api/images/{key}',
   'GET /api/account-settings/allergy-options',

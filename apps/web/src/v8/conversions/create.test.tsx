@@ -151,7 +151,7 @@ describe('V8 成果地点を作る', () => {
     await mount()
     expect(nameInput().value).toBe('商品を買った')
     expect(screen.getByRole('alert').textContent).toContain('同じ名前の「商品を買った」がすでにあります')
-    expect(screen.getByRole('link', { name: /違いを比べる/ }).getAttribute('href')).toBe('/conversions?tab=points&highlight=cp-1')
+    expect(screen.getByRole('link', { name: /違いを比べる/ }).getAttribute('href')).toBe('/affiliates?tab=points&highlight=cp-1')
     expect(screen.getByRole('link', { name: /比べてから保存/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /保存して数えはじめる/ })).toBeNull()
   })
@@ -181,7 +181,7 @@ describe('V8 成果地点を作る', () => {
       { refKind: 'automation', refId: 'auto-1', refVersionId: 'v1' },
       { refKind: 'automation', refId: 'auto-2', refVersionId: 'v2' },
     ])
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/conversions?tab=points&highlight=cp-new'))
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/affiliates?tab=points&highlight=cp-new'))
   })
 
   it('閲覧のみ：帯を出し、保存のボタン・使う場所を足すは置かない', async () => {
@@ -190,7 +190,7 @@ describe('V8 成果地点を作る', () => {
     expect(screen.getByText('閲覧のみで見ています。作る操作はオーナーか管理者に頼んでください。')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /保存して/ })).toBeNull()
     expect(screen.queryByRole('button', { name: /使う場所を足す/ })).toBeNull()
-    expect(screen.getByRole('link', { name: 'キャンセル' }).getAttribute('href')).toBe('/conversions?tab=points')
+    expect(screen.getByRole('link', { name: 'キャンセル' }).getAttribute('href')).toBe('/affiliates?tab=points')
     // 押せない入力の欄も置かない（作る画面なので帯だけ）
     expect(screen.queryByLabelText('成果地点の名前')).toBeNull()
   })

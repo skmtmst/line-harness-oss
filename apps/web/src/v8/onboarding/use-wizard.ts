@@ -15,6 +15,7 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
   const [styleChosen, setStyleChosen] = useState(state.styleSelected)
   const [answers, setAnswers] = useState<Record<string, SetupAnswer>>(state.answers ?? {})
   const [choices, setChoices] = useState<Record<string, { mode: 'sample' | 'existing' | 'configured'; resourceId?: string }>>({})
+  const [menuConfirmed,setMenuConfirmed]=useState(false)
   const [version, setVersion] = useState(state.version)
   const [step, setStep] = useState<WizardStep>(initialStep)
   const [dirty, setDirty] = useState(false)
@@ -24,7 +25,7 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
   const [summary, setSummary] = useState<SummaryData | null>(null)
   const [enabled, setEnabled] = useState<Record<string, boolean>>({})
   const [resources, setResources] = useState<Array<{ id: string; name: string; kind: string }> | null>(null)
-  const [resource, setResource] = useState('')
+  const [resource, setResource] = useState(state.answers?.image?.value==='existing'?state.answers.image.resourceId??'':'')
   const preparing = usePreparingDialog()
 
   const steps = useMemo(() => stepNames(style), [style])
@@ -39,18 +40,14 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
     if (step === 0) return styleChosen ? style : ''
     /* 「あとで」「手動」にした質問を開き直したときは、答えに来たのでおすすめを選んでおく。 */
     const picked = (key: string) => (answers[key]?.mode === 'configured' ? selectedValue(answers[key], questions.find((q) => q.key === key)) : null)
-    if (step === 1) return picked('image') ?? 'keep'
+    if (step === 1) return picked('image')==='existing'?'existing':'simple'
     if (question) return picked(question.key) ?? recommendedValue(question, style)
     return ''
   })()
-  const [choice, setChoice] = useState<string>(current)
-  useEffect(() => { setChoice(current) }, [step]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  /* 「同じアカウントの中にある物を使う」：同じアカウントのリッチメニュー・画像の候補（styleApi.resources）。 */
-  useEffect(() => {
-    if (choice !== 'existing' || resources) return
-    void styleApi.resources(accountId).then((res) => { if (res.success) setResources(res.data.items.filter((item) => item.kind === 'rich_menu' || item.kind === 'image')) }).catch((caught) => setError(describeApiFailure(caught, '読み込み')))
-  }, [choice, resources, accountId])
+  const [choiceState,setChoiceState]=useState<{step:WizardStep;value:string}>({step,value:current})
+  const choice=choiceState.step===step?choiceState.value:current
+  const setChoiceValue=(value:string)=>setChoiceState({step,value})
+  const setChoice=(value:string)=>{if(step===1)setMenuConfirmed(false);setChoiceValue(value);setDirty(true)}
 
   const answer = (key: string, value: SetupAnswer) => {
     setAnswers((prev) => ({ ...prev, [key]: value }))
@@ -64,7 +61,7 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
   const save = async (next: Record<string, SetupAnswer>, nextChoices = choices, options: { skipSettings?: boolean } = {}) => {
     let changed = changedAnswers(saved, answersForApi(next))
     if (options.skipSettings) changed = Object.fromEntries(Object.entries(changed).filter(([key]) => !SETTINGS_KEYS.includes(key)))
-    const res = await styleApi.save(accountId, { expectedVersion: version, ...(styleChosen ? { style } : {}), answers: changed, choices: Object.keys(nextChoices).length ? nextChoices : undefined })
+    const res = await styleApi.save(accountId, { expectedVersion: version, ...(menuConfirmed?{confirmInitialMenu:true}:{}), ...(styleChosen ? { style } : {}), answers: changed, choices: Object.keys(nextChoices).length ? nextChoices : undefined })
     if (!res.success) throw new Error('save failed')
     accountStyleUpdated(accountId)
     setVersion(res.data.version)
@@ -136,15 +133,19 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
     if (step === 1) {
       if (choice === 'configured') { preparing.open(LOOK_CHOICES.find((c) => c.value === choice)!.label); return null }
       if (choice === 'later' || choice === 'manual') return { key: 'image', value: { mode: choice }, nextChoices: choices }
+      if (choice === 'simple') {
+        const set=await styleApi.starterSet(accountId,style,true)
+        if(!set.success)throw new Error('メニューを確認できませんでした')
+        const key=set.data.definition.items.find(item=>item.kind==='rich_menu')?.key
+        return {key:'image',value:{mode:'configured',value:'simple'},nextChoices:key?{...choices,[key]:{mode:'sample'}}:choices}
+      }
       if (choice === 'existing') {
-        const picked = resources?.find((item) => item.id === resource)
-        if (!picked) { setError('使うリッチメニューか画像を選んでください。'); return null }
-        if (picked.kind === 'image') return { key: 'image', value: { mode: 'configured', resourceId: picked.id }, nextChoices: choices }
+        if (!resource) { setError('使うリッチメニューを選んでください。'); return null }
         /* 今あるリッチメニューをそのまま使う：初期セットのリッチメニューの代わりにする（choices）。 */
         try {
           const set = await styleApi.starterSet(accountId, style)
           const menuKey = set.success ? set.data.definition.items.find((item) => item.kind === 'rich_menu')?.key : undefined
-          return { key: 'image', value: { mode: 'configured', value: 'keep' }, nextChoices: menuKey ? { ...choices, [menuKey]: { mode: 'existing', resourceId: picked.id } } : choices }
+          return { key: 'image', value: { mode: 'configured', value: 'existing',resourceId:resource }, nextChoices: menuKey ? { ...choices, [menuKey]: { mode: 'existing', resourceId: resource } } : choices }
         } catch (caught) { setError(describeApiFailure(caught, '読み込み')); return null }
       }
       return { key: 'image', value: { mode: 'configured', value: choice }, nextChoices: choices }
@@ -159,16 +160,17 @@ export function useWizard({ accountId, state, initialStep = 0, onClose }: Props)
       if (!choice) return
       setStyleChosen(true)
       setDirty(true)
-      if (choice !== style) setStyle(choice as AccountStyle)
+      if (choice !== style) {setMenuConfirmed(false);setStyle(choice as AccountStyle)}
       void go(1)
       return
     }
     const selected = await selectedAnswer()
-    if (selected) commitAndNext(selected.key, selected.value, selected.nextChoices)
+    if (selected) {if(step===1)setMenuConfirmed(selected.value.value==='simple');commitAndNext(selected.key, selected.value, selected.nextChoices)}
   }
 
   /* 1 問目で選ぶ。保存は［次へ］から先の今の流れのまま。選び直しは閉じる時の未保存確認に入れる。 */
   const chooseStyle = (next: AccountStyle) => {
+    if(next!==style)setMenuConfirmed(false)
     setChoice(next)
     if (next !== (styleChosen ? style : '')) setDirty(true)
   }

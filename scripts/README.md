@@ -27,3 +27,9 @@
 構成の決まりは [コードの構成と名前](../docs/code-structure.md)。`pnpm exec tsx scripts/structure/check.ts` が名前・公開入口・循環を検査し、`pnpm test:scripts` がその故障対照を実行します。
 
 品質の後戻りは `pnpm quality:check --base <PRのbase SHA>`、違反を減らした後の実測更新は `pnpm quality:update --base <同じSHA>`、故障対照は `pnpm quality:test`。新しい入口は `pnpm new:screen <name> --title <title> --board <ID>`・`pnpm new:route <name> --method get` で生成します。先に `--dry-run` で保存先を確かめます。詳細は構成の正本を参照してください。
+
+
+### 初期リッチメニュー画像
+
+`node scripts/rich-menu/build-initial-images.mjs` は共有の4面定義から、LINEへのアップロードと管理画面の見本で使うPNGを再生成する。WebのNext.jsが依存するSharpとTypeScriptを使う。業種のラベル・順序・色を変えた時だけ実行し、画像寸法と実際の公開用座標の一致を試験・写真で確認する。
+画像のJSONはこの生成器だけで作り、手では編集しません。内容を変える時は `INITIAL_MENU_VERSION` を上げます。同じ版のまま内容を変えると生成器が止まります。`pnpm test:scripts scripts/rich-menu/image-version.test.ts` でこの判定を確認します。

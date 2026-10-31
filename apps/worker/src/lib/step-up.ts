@@ -28,7 +28,6 @@ export const STEP_UP_PURPOSES = [
   'secrets.reveal',
   'auth.api_key',
   'auth.mfa.policy',
-  'auth.mfa.recovery',
   'auth.mfa.reenroll',
   'auth.passkey.register',
   'auth.passkey.remove',

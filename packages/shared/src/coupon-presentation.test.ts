@@ -20,6 +20,13 @@ describe('クーポンの追加情報', () => {
       'お店で確認してから「使う」を押してください', '1人1回まで',
     ]);
     expect(card.footer.contents[0].action).toEqual({ type: 'postback', label: '使う', data: 'coupon_use:coupon-1' });
+    expect(card).toEqual({ type: 'bubble', body: { type: 'box', layout: 'vertical', spacing: 'md', contents: [
+      { type: 'text', text: '以前の券', weight: 'bold', wrap: true },
+      { type: 'text', text: 'お店で見せてください', wrap: true },
+      { type: 'text', text: '有効期間：2026-10-01T00:00〜2026-11-30T23:59', wrap: true, size: 'sm' },
+      { type: 'text', text: 'お店で確認してから「使う」を押してください', wrap: true, size: 'sm' },
+      { type: 'text', text: '1人1回まで', wrap: true, size: 'sm' },
+    ] }, footer: { type: 'box', layout: 'vertical', contents: [{ type: 'button', style: 'primary', action: { type: 'postback', label: '使う', data: 'coupon_use:coupon-1' } }] } });
     expect(JSON.stringify(legacy)).toBe(snapshot);
     expect(validateAssetPayload('coupon', { ...legacy, title: 'あ'.repeat(61), instructions: 'あ'.repeat(501) })).toBeNull();
   });

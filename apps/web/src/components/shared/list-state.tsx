@@ -28,6 +28,8 @@ import { DelayedSkeleton, ListSkeleton, type LoadingShape } from './skeleton'
  */
 export type ListStateKind = 'loading' | 'empty' | 'error' | 'forbidden'
 
+export const LOADING_MESSAGE = '読み込んでいます'
+
 /** 詳細の節だけが空のときは、一覧全体の絵や操作を増やさず1行で知らせる。 */
 export function ListEmptyMessage({ children, as: Tag = 'p', ...props }: HTMLAttributes<HTMLElement> & { as?: 'p' | 'span'; children: ReactNode }) {
   return <Tag {...props} className={styles.inlineEmpty}>{children}</Tag>
@@ -64,7 +66,7 @@ const ICONS: Record<Exclude<ListStateKind, 'error' | 'loading'>, typeof Inbox> =
 export const UNKNOWN_COUNT_TEXT = '読み込めていないため件数は分かりません。'
 
 export const PRESETS: Record<ListStateKind, { title: string; description: string }> = {
-  loading: { title: '読み込んでいます', description: 'このまま少しお待ちください。' },
+  loading: { title: LOADING_MESSAGE, description: 'このまま少しお待ちください。' },
   empty: { title: 'データがありません', description: '条件を変えるか、新しく作成してください。' },
   error: { title: '表示できませんでした', description: `${UNKNOWN_COUNT_TEXT}再読み込みしても直らない場合はエラー報告へ。` },
   forbidden: { title: '表示する権限がありません', description: permissionDeniedMessage() },

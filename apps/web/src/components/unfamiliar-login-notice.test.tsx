@@ -5,7 +5,7 @@ import { forgetSessionSnapshot, rememberSessionSnapshot } from '@/lib/session-sn
 import UnfamiliarLoginNotice from './unfamiliar-login-notice'
 const route = vi.hoisted(() => ({ pathname: '/friends' }))
 vi.mock('next/navigation', () => ({ usePathname: () => route.pathname }))
-const snapshot = (unfamiliarAt: string | null) => ({ impersonation: null, unfamiliarAt, stepUpMethod: 'totp' as const, recoveryCodesRemaining: 8 })
+const snapshot = (unfamiliarAt: string | null) => ({ impersonation: null, unfamiliarAt, stepUpMethod: 'totp' as const })
 beforeEach(() => { route.pathname = '/friends' })
 afterEach(() => { cleanup(); forgetSessionSnapshot(); localStorage.clear() })
 

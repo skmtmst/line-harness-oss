@@ -146,6 +146,7 @@ function app() {
   a.use('*', authMiddleware);
   a.route('/', adminAuth);
   a.get('/api/restaurant-test/setup-progress', (c) => c.json({ success: true }));
+  a.put('/api/dashboard/style',(c)=>c.json({success:true}));
   a.post('/api/restaurant-test/setup-progress', (c) => c.json({ success: true }));
   a.get('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
   a.post('/api/protected', (c) => c.json({ success: true, data: c.get('staff') }));
@@ -1247,4 +1248,10 @@ test.each(['no-permissions-key', 'viewer-key'])('店舗の設定状況は %s で
  const headers = { Authorization: `Bearer ${token}` };
  expect((await app().request('/api/restaurant-test/setup-progress', { headers }, crossSiteEnv())).status).toBe(200);
  expect((await app().request('/api/restaurant-test/setup-progress', { method: 'POST', headers }, crossSiteEnv())).status).toBe(403);
+});
+
+
+test('閲覧のみは明示保存の印があっても初期メニューの保存へ入れない',async()=>{
+ const response=await app().request('/api/dashboard/style',{method:'PUT',headers:{Authorization:'Bearer viewer-key','Content-Type':'application/json'},body:JSON.stringify({expectedVersion:1,confirmInitialMenu:true,answers:{image:{mode:'configured',value:'simple'}}})},crossSiteEnv());
+ expect(response.status).toBe(403);
 });

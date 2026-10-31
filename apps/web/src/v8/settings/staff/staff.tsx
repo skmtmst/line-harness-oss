@@ -2,7 +2,7 @@
 import { loadStaffIdentity, canManageRole, useStaffRole, useStaffIdentity } from '@/lib/staff-role'
 import SelfSecurity from './self-security'
 import MfaPolicy from './mfa-policy'
-import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes/index'
+import { logoutAndGoToLogin } from '@/lib/logout'
 import TotpQr from '@/components/shared/totp-qr'
 
 import { formatDate as polishFormatDate, formatDateTime } from '@/lib/format';
@@ -693,10 +693,8 @@ function EditModal({ member, administrator, currentUserId, activeAdministratorCo
   </div></EditorSurface></SaveErrorScope>
 }
 
-function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onClose: () => void; onSaved: () => Promise<void> }) {
+function TwoFactorModal({ member, onClose }: { member: StaffMember; onClose: () => void }) {
   const saveErrors = useSaveFormErrors()
-  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([])
-
   const [uri, setUri] = useState(''), [manualKey, setManualKey] = useState(''), [qr, setQr] = useState(''), [code, setCode] = useState(''), [error, setError] = useState(''), [saving, setSaving] = useState(false)
   useEffect(() => { void (async () => { try { const res = await api.staff.beginTwoFactorSetup(member.id); if (res.success) { setUri(res.data.provisioningUri); setManualKey(res.data.manualKey) } } catch (caught) {
     const fieldFailure = saveErrors.capture(caught)
@@ -704,17 +702,15 @@ function TwoFactorModal({ member, onClose, onSaved }: { member: StaffMember; onC
 
  setError(messageOf(caught)) } } })() }, [member.id, saveErrors])
   useEffect(() => { if (uri) void qrToDataURL(uri, { width: 240, margin: 1, color: qrColors() }).then(setQr) }, [uri])
-  const save = async (entered?: string) => { const value = entered ?? code; if (saving) return; if (!/^\d{6}$/.test(value)) return setError('6桁の認証コードを入力してください'); setSaving(true); setError(''); try { const res = await api.staff.confirmTwoFactorSetup(member.id, value); if (!res.success) throw new Error(res.error); if (res.data.recoveryCodes?.length) setRecoveryCodes(res.data.recoveryCodes); else { await onSaved(); onClose() } } catch (caught) {
+  const save = async (entered?: string) => { const value = entered ?? code; if (saving) return; if (!/^\d{6}$/.test(value)) return setError('6桁の認証コードを入力してください'); setSaving(true); setError(''); try { const res = await api.staff.confirmTwoFactorSetup(member.id, value); if (!res.success) throw new Error(res.error); await logoutAndGoToLogin('/login') } catch (caught) {
     const fieldFailure = saveErrors.capture(caught)
  { if (!fieldFailure)
 
  setError(otpFailureMessage(messageOf(caught))) } } finally { setSaving(false) } }
-  return <SaveErrorScope errors={saveErrors}><Dialog open title={recoveryCodes.length ? '回復コードを保存' : '二段階認証を設定'} onCancel={onClose} footer={recoveryCodes.length ? undefined : <Button variant="primary" onClick={() => save()} disabled={saving || !uri} busy={saving}>確認して登録する</Button>}>
-    {recoveryCodes.length ? <RecoveryCodePanel codes={recoveryCodes} onContinue={() => window.location.assign('/login')} /> : <>
-      {error ? <Notice tone="danger" message={error} /> : null}
-      <TotpQr qr={qr} manualKey={manualKey} />
-      <Field label="認証アプリに表示された6桁コード"><SaveErrorField names={["code"]}><OtpInput value={code} onChange={setCode} onComplete={entered => void save(entered)} label="認証アプリに表示された6桁コード" invalid={Boolean(error)} busy={saving} /></SaveErrorField></Field>
-    </>}
+  return <SaveErrorScope errors={saveErrors}><Dialog open title="二段階認証を設定" onCancel={onClose} footer={<Button variant="primary" onClick={() => save()} disabled={saving || !uri} busy={saving}>確認して登録する</Button>}>
+    {error ? <Notice tone="danger" message={error} /> : null}
+    <TotpQr qr={qr} manualKey={manualKey} />
+    <Field label="認証アプリに表示された6桁コード"><SaveErrorField names={["code"]}><OtpInput value={code} onChange={setCode} onComplete={entered => void save(entered)} label="認証アプリに表示された6桁コード" invalid={Boolean(error)} busy={saving} /></SaveErrorField></Field>
   </Dialog></SaveErrorScope>
 }
 
@@ -1170,7 +1166,7 @@ function StaffPageHost({ editId }: { editId?: string | null }) {
         ) : null}
       </div>
       {editing && <EditModal member={editing} administrator={Boolean(administrator)} currentUserId={me?.id ?? null} activeAdministratorCount={activeAdministratorCount} onClose={() => setEditing(null)} onSaved={load} />}
-      {settingTwoFactor && <TwoFactorModal member={settingTwoFactor} onClose={() => setSettingTwoFactor(null)} onSaved={load} />}
+      {settingTwoFactor && <TwoFactorModal member={settingTwoFactor} onClose={() => setSettingTwoFactor(null)} />}
       <Dialog
         open={suspendTarget !== null}
         designWidth={480}

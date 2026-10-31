@@ -1,6 +1,8 @@
 export type BookingResource={id:string;name:string;accountId:string;active:number;deleted:string|null};
 
 export type FormSnapshot = {
+    seatStores?:Array<{id:string;accountId:string;status:string;updated:string|null}>;
+    seatCourses?:Array<{id:string;storeId:string;name:string;status:string;updated:string|null}>;
     bookingMenus: BookingResource[]; bookingStaff: BookingResource[];
     account: {
         id: string;

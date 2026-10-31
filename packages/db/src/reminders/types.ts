@@ -40,6 +40,7 @@ export interface ReminderRow {
 }
 
 export interface ReminderStepRow {
+  message_parts_json?: string | null;
   id: string;
   reminder_id: string;
   offset_minutes: number;
@@ -101,6 +102,7 @@ export interface ReminderRowScope {
 }
 
 export interface ReminderDraftStepInput {
+  messageParts?: Array<{messageType:string;messageContent:string}>;
   stableStepId: string;
   offsetMinutes: number;
   messageType: string;

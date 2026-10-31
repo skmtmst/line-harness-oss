@@ -111,7 +111,7 @@ export async function scheduleRestaurantFollowup(db: D1Database, e: RestaurantEv
         triggers.push('post_visit', 'review_request');
     if (e.event_type === 'restaurant.waitlist.invited')
         triggers.push('waitlist_invited');
-    const bindings = (await db.prepare('SELECT * FROM rt_store_followup_step_bindings WHERE store_id=? AND enabled=1').bind(e.store_id).all<FollowupBinding>()).results;
+    const bindings = (await db.prepare(`SELECT * FROM rt_store_followup_step_bindings b WHERE store_id=? AND enabled=1 AND NOT EXISTS(SELECT 1 FROM rt_store_followup_targets ft WHERE ft.store_id=b.store_id AND ft.trigger=b.trigger AND ft.engine!='scenario')`).bind(e.store_id).all<FollowupBinding>()).results;
     for (const b of bindings.filter(b => triggers.includes(b.trigger))) {
         const step = parseScenarioVersionSteps(t).find(s => s.live_step_id === b.step_id && !s.is_draft);
         if (!step)
@@ -139,8 +139,8 @@ export async function scheduleRestaurantFollowup(db: D1Database, e: RestaurantEv
             .bind(sourceId, e.id, b.step_id).first())
             continue;
         await db.prepare(`INSERT OR IGNORE INTO scenario_source_jobs(id,line_account_id,friend_id,scenario_version_id,step_id,source_kind,source_id,source_event_id,source_version,scheduled_at,idempotency_key)
-   SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_store_followup_templates WHERE store_id=? AND sending_status='active' AND template_version=? AND approved_version_id=?)`)
-            .bind(crypto.randomUUID(), e.line_account_id, e.friend_id, t.approved_version_id, step.id, e.reservation_id ? 'restaurant_reservation' : 'restaurant_waitlist', sourceId, e.id, e.reservation_version, at.toISOString(), e.reservation_id ? crypto.randomUUID() : e.request_id, e.store_id, t.template_version, t.approved_version_id).run();
+   SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_store_followup_templates WHERE store_id=? AND sending_status='active' AND template_version=? AND approved_version_id=?) AND NOT EXISTS(SELECT 1 FROM rt_store_followup_targets ft WHERE ft.store_id=? AND ft.trigger=? AND ft.engine!='scenario')`)
+            .bind(crypto.randomUUID(), e.line_account_id, e.friend_id, t.approved_version_id, step.id, e.reservation_id ? 'restaurant_reservation' : 'restaurant_waitlist', sourceId, e.id, e.reservation_version, at.toISOString(), e.reservation_id ? crypto.randomUUID() : e.request_id, e.store_id, t.template_version, t.approved_version_id,e.store_id,b.trigger).run();
     }
 }
 function instantMs(value: string): number { return Date.parse(reservationInstant(value)); }

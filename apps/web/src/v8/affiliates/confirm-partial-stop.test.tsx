@@ -115,7 +115,7 @@ it('まとめ停止の受け付けた分を行へ反映し、取消後の読み�
  const reads = affiliatesList.mock.calls.length
  fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル' }))
  await waitFor(() => expect(affiliatesList).toHaveBeenCalledTimes(reads + 1))
- expect(screen.getByRole('checkbox', { name: '多い人を選ぶ' })).toHaveProperty('checked', false)
+ expect(await screen.findByRole('checkbox', { name: '多い人を選ぶ' })).toHaveProperty('checked', false)
  expect(screen.getByRole('checkbox', { name: '少ない人を選ぶ' })).toHaveProperty('checked', true)
  expect(archiveAffiliate).toHaveBeenCalledTimes(2)
 })

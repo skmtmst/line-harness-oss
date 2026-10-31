@@ -119,7 +119,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
         </p>
         <p className={styles.rowNote}>{item.note}</p>
       </div>
-      {showFavorite && <button type="button" className={`${styles.favoriteButton} ${favorite ? styles.favoriteActive : ''}`}
+      {showFavorite && <button type="button" data-part="favorite-star" className={`${styles.favoriteButton} ${favorite ? styles.favoriteActive : ''}`}
         aria-label={`${item.label}をお気に入り${favorite ? 'から外す' : 'に入れる'}`}
         aria-pressed={favorite} disabled={busy || !canManage} onClick={() => onFavoriteToggle?.(item.id)}>
         <Star aria-hidden="true" />

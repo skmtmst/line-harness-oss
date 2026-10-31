@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 
 import type { Env } from '../worker-env.js';
 
-import { requireIrreversibleConfirmation, requireRole, requirePermission } from '../middleware/role-guard.js';
+import { requireIrreversibleConfirmation, requireRole, requirePermission, requireReadOperationPermission } from '../middleware/role-guard.js';
 import { BROADCAST_DEFINITION_EDIT_KEY, BROADCAST_DEFINITION_PUBLISH_KEY, BROADCAST_JOB_RETRY_KEY, BROADCAST_JOB_STOP_KEY, BROADCAST_TEST_SEND_KEY } from '@line-crm/shared';
 
 import { use__api_broadcasts_id__1, get__api_broadcasts_2, get__api_broadcasts_stats_3, get__api_broadcasts_notification_settings_4, put__api_broadcasts_notification_settings_5, get__api_broadcasts_saved_views_6, post__api_broadcasts_saved_views_7, get__api_broadcasts_id_8, get__api_broadcasts_id_recipients_9, get__api_broadcasts_id_activity_10, get__api_broadcasts_id_send_preview_11, get__api_broadcasts_id_preview_count_12, get__api_broadcasts_id_per_account_stats_13 } from './broadcasts-read.js';
@@ -130,6 +130,6 @@ broadcasts.post('/api/broadcasts/:id/test-send', requirePermission(BROADCAST_TES
 broadcasts.get('/api/broadcasts/:id/progress', get__api_broadcasts_id_progress_4);
 
 // POST /api/segments/count — count friends matching segment conditions
-broadcasts.post('/api/segments/count', requirePermission(BROADCAST_DEFINITION_EDIT_KEY), inputJsonBoundary({"accountId":["string"]}), post__api_segments_count_5);
+broadcasts.post('/api/segments/count', requireReadOperationPermission(), inputJsonBoundary({"accountId":["string"]}), post__api_segments_count_5);
 
 export { broadcasts };

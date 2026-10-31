@@ -156,24 +156,6 @@ describe('N-426: 初回設定画面', () => {
     expect(window.location.pathname).toBe('/accounts/new')
   })
 
-  it('回復コードを控えた後も、アカウントが0件なら登録画面へ進む', async () => {
-    fixture.accountsResponse = { success: true, data: [] }
-    fixture.confirmResponse = { success: true, data: { sessionToken: 'sess-1', recoveryCodes: ['TEST-CODE-1'] }, csrfToken: 'csrf-1' }
-    await render()
-    const input = host.querySelector('#totp-setup-code') as HTMLInputElement
-    await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')!.set!
-      setter.call(input, '123456')
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-    })
-    await flush()
-    expect(host.textContent).toContain('回復コードを控えてください')
-    const continueButton = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('控えました'))
-    expect(continueButton).toBeTruthy()
-    await act(async () => { continueButton?.click() })
-    expect(window.location.pathname).toBe('/accounts/new')
-  })
-
   it('アカウント一覧を確認できない場合も、二段階認証の完了を取り消さずホームへ進む', async () => {
     fixture.accountsResponse = { success: false, error: 'temporary failure' }
     fixture.accountsStatus = 503

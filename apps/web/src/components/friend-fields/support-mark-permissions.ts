@@ -20,5 +20,5 @@ export function canManageSupportMarkByRole(role: string | null): boolean | null 
 }
 
 export function useCanManageSupportMark(): boolean | null {
-  return canManageSupportMarkByRole(useStaffRole()) ?? false
+  return canManageSupportMarkByRole(useStaffRole())
 }

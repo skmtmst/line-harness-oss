@@ -184,3 +184,16 @@ it.each(['regular', 'compact'] as const)('補足は%sの枠の外に置き、開
   fireEvent.click(frame)
   expect(chooseFile).toHaveBeenCalledTimes(1)
 })
+
+it('URL と登録メディアの口は共通の文字ボタンで、枠のファイル選択へ伝わらない', () => {
+ const onFile=vi.fn(),onMediaPick=vi.fn()
+ render(<MediaSlot title="画像を追加" onFile={onFile} onMediaPick={onMediaPick} urlEntry={{value:'',onChange:()=>{},label:'画像URL'}} />)
+ for(const name of ['URL で入れる','登録メディアから選ぶ']){
+  const button=screen.getByRole('button',{name})
+  expect(button.hasAttribute('data-shared-button')).toBe(true)
+  expect(button.getAttribute('data-variant')).toBe('text')
+  fireEvent.click(button)
+ }
+ expect(screen.getByRole('textbox',{name:'画像URL'})).toBeTruthy()
+ expect(onMediaPick).toHaveBeenCalledTimes(1);expect(onFile).not.toHaveBeenCalled()
+})

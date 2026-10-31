@@ -79,7 +79,7 @@ function Fixture(){
       <TextField aria-label="寸法の名前" defaultValue="名前" />
       <SearchField aria-label="寸法の検索" value="" onChange={()=>{}} placeholder="名前で探す" />
       <Select aria-label="寸法の選択" menuAlign="end" label="状態" value="all" options={[{value:'all',label:'すべて'},{value:'active',label:'とても長い選択肢の名前を最後まで確認する'}]} onChange={()=>{}} />
-      <Button variant="secondary" aria-label="寸法の保存">保存する</Button>
+      <Button variant="primary" aria-label="寸法の保存">保存する</Button>
     </div>
     <TextArea aria-label="寸法の本文" defaultValue="本文" />
   </section>
@@ -135,7 +135,7 @@ function Fixture(){
   </ListToolbarRow></section>
   <section id="row-controls"><RowMenu label="行の操作" items={[{label:'初期値に戻す…',tone:'danger',onSelect:()=>{}}]} /><RowMenu label="小さい行の操作" appearance="box" items={[{label:'編集',onSelect:()=>{}}]} /><Pagination page={1} pageCount={2} onPageChange={()=>{}} /><Pagination page={1} pageCount={1} summary="1件中1件" ariaLabel="1ページの送り" onPageChange={()=>{}} /></section>
   <section id="notices" style={{maxWidth:720}}>
-   <Notice tone="info" heading="回復コードが残っていません" message="認証アプリが使えない時に入れなくなる前に、作り直してください。" action={<Button>作り直す</Button>} onClose={()=>{}}/>
+   <Notice tone="info" heading="いつもと違う端末からのログイン" message="心当たりがない場合はログイン中の端末を確認してください。" action={<Button>確認する</Button>} onClose={()=>{}}/>
    <Notice tone="warn" heading="いつもと違う端末・場所からのログインです。心当たりがなければ、ほかの端末のログインを終えてパスワードを変えてください" message="大事な操作の前に毎回、本人確認をします。" action={<Button>ログイン中の端末を見る</Button>} onClose={()=>{}}/>
    <Notice tone="warn" heading="ほかの人がこの内容を保存しました" message="読み直すと、ほかの人の変更を見てから続けられます。" states={[{label:'済み',state:'done'},{label:'未保存',state:'pending'}]} footer={<button type="button">入力を破棄する</button>} action={<><Button>読み直す</Button><Button variant="primary">上書きする</Button></>} onClose={()=>{}}/>
    <Notice tone="info" action={<Button>開く</Button>} onClose={()=>{}}>題のない1行の知らせです。</Notice>
@@ -490,8 +490,11 @@ for (const width of [1152,1440,1920]) {
       const controls = await read()
       assert.ok(controls.slice(0,4).every(control => control.height === 36), JSON.stringify(controls))
       assert.ok(controls.slice(0,4).every(control => Math.abs(control.center - controls[0].center) <= 0.5), JSON.stringify(controls))
-      assert.ok(controls.every(control => control.image.includes('linear-gradient') && control.shadow !== 'none'), JSON.stringify(controls))
-      assert.equal(controls[0].image, controls[2].image)
+      assert.deepEqual([controls[0], controls[1], controls[4]].map(control => control.image), ['none', 'none', 'none'])
+      assert.equal(controls[2].image, 'linear-gradient(rgb(255, 255, 255), rgb(250, 250, 252))')
+      assert.equal(controls[3].image, 'linear-gradient(rgb(8, 122, 62), rgb(6, 106, 53))')
+      assert.ok(controls.every(control => control.shadow !== 'none'), JSON.stringify(controls))
+      assert.equal(controls[0].image, controls[4].image)
       assert.equal(controls[0].shadow, controls[2].shadow)
       assert.equal(controls[1].shadow, controls[2].shadow)
       assert.equal(controls[4].shadow, controls[2].shadow)
@@ -653,9 +656,14 @@ for (const width of [1152,1440,1920]) {
         return {kind:item.dataset.choiceCase,height:b.height,image:s.backgroundImage,shadow:s.boxShadow,radius:s.borderRadius,border:s.borderWidth,dy:a.y+a.height/2-b.y-b.height/2,right:b.right-a.right}
       }))
       const good=await measure()
+      if (process.env.V8_CHOICE_SHOTS_DIR) {
+        mkdirSync(process.env.V8_CHOICE_SHOTS_DIR, { recursive: true })
+        await page.locator('#choice-appearance').screenshot({ path: join(process.env.V8_CHOICE_SHOTS_DIR, `choice-surfaces-${width}.png`) })
+      }
       assert.equal(good.length,7)
       assert.ok(good.every(item=>item.height===36&&Math.abs(item.dy)<=1&&Math.abs(item.right-12)<=1),JSON.stringify(good))
-      assert.ok(good.every(item=>item.image===good[0].image&&item.shadow===good[0].shadow&&item.radius===good[0].radius&&item.border==='0px'),JSON.stringify(good))
+      assert.deepEqual(good.map(({kind,image})=>({kind,image})), ['select','folder','entity','combo','multi','text','time'].map(kind=>({kind,image:['select','folder','entity','multi'].includes(kind)?'linear-gradient(rgb(255, 255, 255), rgb(250, 250, 252))':'none'})))
+      assert.ok(good.every(item=>item.shadow===good[0].shadow&&item.radius===good[0].radius&&item.border==='0px'),JSON.stringify(good))
       const entity=page.locator('[data-choice-case="entity"] [data-choice-chevron]')
       await entity.evaluate(el=>el.style.transform='translateY(calc(-50% + 2px))')
       await expect.poll(async () => (await measure()).some(item=>Math.abs(item.dy)>1)).toBe(true)

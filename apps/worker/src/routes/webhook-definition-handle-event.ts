@@ -93,6 +93,8 @@ export async function handleEvent(
 
   // Flex ボタンの postback も自動返信条件へ通すが、入力の文をチャットに表示しない。
   if (event.type === 'postback') {
+    // 専用の見本の返事は予約や自動返信の起点にしない。
+    if (/^test:restaurant_(going|change|cancel)$/.test(event.postback.data)) return;
     const userId = event.source.type === 'user' ? event.source.userId : undefined;
     if (!userId) return;
 
