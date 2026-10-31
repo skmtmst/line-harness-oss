@@ -233,7 +233,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     const links = [...desktop.querySelectorAll('a')]
     expect(links.filter(link => link.textContent?.trim() === '成果とアフィリエイト')).toHaveLength(1)
     expect(links.filter(link => link.textContent?.trim() === 'コンバージョン')).toHaveLength(0)
-    expect(links.filter(link => link.getAttribute('href') === '/settings')).toHaveLength(1)
+    expect(links.filter(link => link.getAttribute('href') === '/settings/customer-look')).toHaveLength(1)
     expect(links.filter(link => link.getAttribute('aria-current') === 'page')[0]?.textContent).toBe('成果とアフィリエイト')
   })
 
@@ -241,7 +241,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     const view = await renderSidebar()
     const gear = view.getAllByRole('link', { name: '設定' })
     expect(gear.length).toBeGreaterThan(0)
-    expect(gear[0]!.getAttribute('href')).toBe('/settings')
+    expect(gear[0]!.getAttribute('href')).toBe('/settings/customer-look')
     cleanup()
 
     window.localStorage.setItem('lh_staff_role', 'staff')
@@ -255,14 +255,14 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     rememberStaffIdentity({ role } as StaffMember)
     // 保存していた組の開閉も、重複した入口を復活させない。
     window.localStorage.setItem('lh-sidebar-groups', JSON.stringify({ settings: true }))
-    for (const pathname of ['/settings', '/accounts', '/emergency']) {
+    for (const pathname of ['/settings/customer-look', '/settings', '/emergency']) {
       rememberStaffIdentity({ role } as StaffMember)
       fixture.pathname = pathname
       const view = await renderSidebar()
       expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
       expect(view.queryAllByRole('link', { name: '機能設定', exact: true })).toHaveLength(0)
       const gear = view.getAllByRole('link', { name: '設定', exact: true })[0]!
-      expect(gear.getAttribute('href')).toBe('/settings')
+      expect(gear.getAttribute('href')).toBe('/settings/customer-look')
       expect(gear.className).toMatch(/active/)
       cleanup()
     }
