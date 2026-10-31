@@ -1047,3 +1047,5 @@
 - [検証環境への配備手順](release-log/unreleased/1994-masato-cf-staging-deploy.md) — 反映履歴、確認 2026-10-31。
 - [統括の比較と分析](release-log/unreleased/1996-masato-hq-comparison-analysis.md) — 反映履歴、確認 2026-10-31。
 - [お気に入りのショートカットと予告表示](release-log/unreleased/1995-masato-sidebar-favorite-shortcuts.md) — 反映履歴、確認 2026-10-31。
+- [店舗の担当者メニュー](release-log/unreleased/1999-masato-store-member-menu.md) — 反映履歴、確認 2026-10-31。
+- [LINEアカウント登録後の初期設定完了](release-log/unreleased/2000-masato-onboarding-account-complete.md) — 反映履歴、確認 2026-10-31。
