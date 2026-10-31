@@ -24,6 +24,9 @@ interface UnsavedLeaveDialogProps {
   /** 未指定なら従来の保存・破棄の文言を使う。 */
   saveLabel?: string
   discardLabel?: string
+  /** 破棄だけを止める。保存権限とは別に渡し、権限で止める場合は discardLockedReason も渡す。 */
+  discardDisabled?: boolean
+  discardLockedReason?: string
   /** 呼出側が持つ失敗理由を、開いている窓の中に出す。 */
   error?: string
   busy?: boolean
@@ -36,7 +39,7 @@ interface UnsavedLeaveDialogProps {
   saveDisabled?: boolean
   saveLockedReason?: string
   onSave?: () => Promise<boolean>
-  /** 保存成功後だけ使う。呼出側が離脱の守りを解除し窓を閉じて移動する。省略時は onConfirm。 */
+  /** 保存成功後だけ使う。呼出側が離脱の守りを解除し窓を閉じて移動する。省略時は onConfirm。onConfirm が削除する画面では必ず渡す。 */
   onSavedLeave?: () => void
   onConfirm: () => void
   onCancel: () => void
@@ -65,6 +68,8 @@ export function UnsavedLeaveDialog({
   cancelLabel = '編集を続ける',
   saveLabel = '保存して移る',
   discardLabel = '保存せずに移る',
+  discardDisabled = false,
+  discardLockedReason,
   error,
   busy = false,
   onSave,
@@ -77,6 +82,9 @@ export function UnsavedLeaveDialog({
   const [savingLeave, setSavingLeave] = useState(false)
   const saveBlocked = useRef(false)
   saveBlocked.current = saveDisabled || Boolean(saveLockedReason)
+  const discardBlocked = useRef(false)
+  discardBlocked.current = busy || savingLeave || discardDisabled || Boolean(discardLockedReason)
+  const discardAndLeave = () => { if (!discardBlocked.current) onConfirm() }
   const body = description ?? `このまま移ると、${subject}が消えます。`
 
   // 「保存して移る」があるとき: 移る系の2択だけ出し、残る口は右上の×（UI-25）
@@ -108,7 +116,7 @@ export function UnsavedLeaveDialog({
         compact
         footer={
           <DialogActions>
-            <Button variant="secondary" onClick={onConfirm} disabled={busy || savingLeave}>
+            <Button variant="secondary" onClick={discardAndLeave} disabled={busy || savingLeave || discardDisabled} lockedReason={discardLockedReason}>
               {discardLabel}
             </Button>
             <Button variant="primary" onClick={() => void saveAndLeave()} disabled={busy || saveDisabled} lockedReason={saveLockedReason} busy={savingLeave} busyLabel="保存中…">
@@ -130,7 +138,9 @@ export function UnsavedLeaveDialog({
       confirmLabel={discardLabel}
       cancelLabel={cancelLabel}
       busy={busy}
-      onConfirm={onConfirm}
+      onConfirm={discardAndLeave}
+      confirmDisabled={discardDisabled}
+      confirmLockedReason={discardLockedReason}
       onCancel={onCancel}
     />
   )

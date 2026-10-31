@@ -3,10 +3,15 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const fixture = vi.hoisted(() => ({ save: undefined as undefined | (() => void) }))
+const fixture = vi.hoisted(() => ({ save: undefined as undefined | (() => void), discard: undefined as undefined | (() => void) }))
 vi.mock('@/components/shared/button', async importOriginal => {
   const actual = await importOriginal<typeof import('@/components/shared/button')>()
   return { ...actual, default: (props: React.ComponentProps<typeof actual.default>) => {
+    const text = React.Children.toArray(props.children).filter(child => typeof child === 'string').join('')
+    if (text === '保存せずに移る' && props.onClick) {
+      const handler = props.onClick
+      fixture.discard = () => Reflect.apply(handler, undefined, [new MouseEvent('click')])
+    }
     if (props.children === '保存して移る' && props.onClick) {
       const handler = props.onClick
       fixture.save = () => Reflect.apply(handler, undefined, [new MouseEvent('click')])
@@ -212,4 +217,65 @@ it('削除を待つ間は保存・破棄・×を使えず、終われば閉じ�
   view.rerender(<UnsavedLeaveDialog {...props} busy={false} />)
   fireEvent.click(screen.getByRole('button', { name: '閉じる' }))
   expect(onCancel).toHaveBeenCalledTimes(1)
+})
+
+
+for (const withSave of [false, true]) describe(`破棄の権限を保存と分ける（保存あり=${withSave}）`, () => {
+  it('破棄だけのdisabledを保ち、保存・編集の継続を止めない', async () => {
+    const onConfirm = vi.fn(), onCancel = vi.fn(), onSavedLeave = vi.fn(), onSave = vi.fn(async () => true)
+    render(<UnsavedLeaveDialog open discardDisabled onSave={withSave ? onSave : undefined} onSavedLeave={onSavedLeave} onConfirm={onConfirm} onCancel={onCancel} />)
+    const discard = screen.getByRole('button', { name: '保存せずに移る' }) as HTMLButtonElement
+    expect(discard.disabled).toBe(true)
+    fireEvent.click(discard)
+    expect(onConfirm).not.toHaveBeenCalled()
+    if (withSave) {
+      fireEvent.click(screen.getByRole('button', { name: '保存して移る' }))
+      await waitFor(() => expect(onSavedLeave).toHaveBeenCalledTimes(1))
+      expect(onSave).toHaveBeenCalledTimes(1)
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: '編集を続ける' }))
+      expect(onCancel).toHaveBeenCalledTimes(1)
+    }
+  })
+
+  it('削除できない理由を焦点で伝え、クリックでは破棄しない', async () => {
+    const onConfirm = vi.fn(), onSave = vi.fn(async () => true)
+    render(<UnsavedLeaveDialog open discardLockedReason="下書きを削除する権限がありません。" onSave={withSave ? onSave : undefined} onConfirm={onConfirm} onCancel={vi.fn()} />)
+    const discard = screen.getByRole('button', { name: '保存せずに移る' }) as HTMLButtonElement
+    expect(discard.getAttribute('aria-disabled')).toBe('true')
+    expect(discard.getAttribute('data-permission-locked')).not.toBeNull()
+    expect(discard.disabled).toBe(false)
+    fireEvent.focus(discard)
+    await waitFor(() => expect(screen.getByRole('tooltip').textContent).toContain('下書きを削除する権限がありません。'))
+    fireEvent.click(discard)
+    expect(onConfirm).not.toHaveBeenCalled()
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('保持した古い破棄口も、後から付いた権限とbusyを守り、解除後は実行できる', async () => {
+    fixture.discard = undefined
+    const onConfirm = vi.fn(), onCancel = vi.fn(), onSave = vi.fn(async () => true)
+    const props = { open: true, onSave: withSave ? onSave : undefined, onConfirm, onCancel }
+    const view = render(<UnsavedLeaveDialog {...props} />)
+    const held = fixture.discard
+    expect(held).toBeTypeOf('function')
+    view.rerender(<UnsavedLeaveDialog {...props} discardDisabled discardLockedReason="下書きを削除する権限がありません。" />)
+    await act(async () => { held!() })
+    expect(onConfirm).not.toHaveBeenCalled()
+    view.rerender(<UnsavedLeaveDialog {...props} busy />)
+    await act(async () => { held!() })
+    expect(onConfirm).not.toHaveBeenCalled()
+    view.rerender(<UnsavedLeaveDialog {...props} />)
+    await act(async () => { fixture.discard!() })
+    expect(onConfirm).toHaveBeenCalledTimes(1)
+    expect(onSave).not.toHaveBeenCalled()
+  })
+})
+
+it('破棄が禁止でも保存成功後の従来の移動先は呼べる', async () => {
+  const onConfirm = vi.fn(), onSave = vi.fn(async () => true)
+  render(<UnsavedLeaveDialog open discardDisabled discardLockedReason="削除の権限がありません。" onSave={onSave} onConfirm={onConfirm} onCancel={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: '保存して移る' }))
+  await waitFor(() => expect(onConfirm).toHaveBeenCalledTimes(1))
+  expect(onSave).toHaveBeenCalledTimes(1)
 })
