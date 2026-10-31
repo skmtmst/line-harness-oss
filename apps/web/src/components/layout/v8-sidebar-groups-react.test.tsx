@@ -18,10 +18,13 @@ import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { act } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MENU_SECTIONS, SCREEN_MENU_OWNER } from '@/lib/menu'
+import { UNANSWERED_REFRESH_EVENT } from '@/lib/events'
 
 const fixture = vi.hoisted(() => ({
   visibility: vi.fn(),
   get: vi.fn(),
+  unansweredCount: vi.fn(),
+  accountId: 'account-1',
   pathname: '/',
   style: 'restaurant' as AccountStyle,
 }))
@@ -41,7 +44,7 @@ vi.mock('next/link', async () => {
   const React = await import('react')
   return { default: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => React.createElement('a', { href, ...props }, children) }
 })
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1' }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
 vi.mock('@/lib/use-brand', () => ({ useBrand: () => ({ name: '会社', iconUrl: null }) }))
 vi.mock('@/components/layout/sidebar-identity', () => ({ default: () => <div>identity</div> }))
 vi.mock('@/components/layout/sidebar-version', () => ({ default: () => <div>version</div> }))
@@ -52,14 +55,14 @@ vi.mock('@/lib/api', () => ({
       visibility: fixture.visibility,
       get: fixture.get,
     },
-    inbox: { unanswered: { count: vi.fn(async () => ({ success: true, data: { total: 0 } })) } },
+    inbox: { unanswered: { count: fixture.unansweredCount } },
     nenMembers: { overview: vi.fn(async () => ({ success: true, data: { pendingPhotos: 0 } })) },
     health: { summary: vi.fn(async () => ({ success: true, data: { warningCount: 0, dangerCount: 0 } })) },
   },
 }))
 
 vi.mock('@/hooks/use-account-style', () => ({ useAccountStyle: () => ({ data: { style: fixture.style }, status: 'ready', error: null, reload: vi.fn() }) }))
-import Sidebar, { isHqShellPath } from './sidebar'
+import Sidebar, { clearSidebarCountCache, isHqShellPath } from './sidebar'
 import { clearFeatureVisibilityCache } from '@/lib/feature-visibility-cache'
 
 ;(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -89,6 +92,10 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     clearFeatureVisibilityCache()
     fixture.visibility.mockReset()
     fixture.get.mockReset()
+    fixture.unansweredCount.mockReset()
+    fixture.unansweredCount.mockResolvedValue({ success: true, data: { total: 0, byAccount: [] } })
+    fixture.accountId = 'account-1'
+    clearSidebarCountCache()
     fixture.pathname = '/'
     fixture.style = 'restaurant'
     fixture.visibility.mockResolvedValue({ success: true, data: { features: ALL_FEATURES_ON } })
@@ -121,6 +128,32 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
       expect(view.getAllByRole('button', { name: label }).length, `組「${label}」の見出しが無い`).toBeGreaterThan(0)
     }
     expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
+  })
+
+  it('受信箱の札は全アカウント合計でなく選択中のアカウントの要返信件数を出す', async () => {
+    fixture.unansweredCount.mockResolvedValue({
+      success: true,
+      data: { total: 3, byAccount: [{ accountId: 'other', accountName: '他店', count: 3 }] },
+    })
+    const view = await renderSidebar()
+    const desktop = view.container.querySelector('aside[data-design-node="J33xq"]')!
+    const inbox = () => desktop.querySelector('a[href="/chats"]')!
+    await waitFor(() => expect(fixture.unansweredCount).toHaveBeenCalled())
+    expect(inbox().getAttribute('data-rail-count')).toBeNull()
+
+    fixture.unansweredCount.mockResolvedValue({
+      success: true,
+      data: { total: 5, byAccount: [
+        { accountId: 'account-1', accountName: 'THE SHED', count: 2 },
+        { accountId: 'other', accountName: '他店', count: 3 },
+      ] },
+    })
+    await act(async () => { window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT)) })
+    await waitFor(() => expect(inbox().getAttribute('data-rail-count')).toBe('2'))
+
+    fixture.accountId = 'other'
+    view.rerender(<Sidebar />)
+    await waitFor(() => expect(inbox().getAttribute('data-rail-count')).toBe('3'))
   })
 
   it('新規店舗の空の専用目録では「専用機能」の組を出さない', async () => {
@@ -233,7 +266,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     const links = [...desktop.querySelectorAll('a')]
     expect(links.filter(link => link.textContent?.trim() === '成果とアフィリエイト')).toHaveLength(1)
     expect(links.filter(link => link.textContent?.trim() === 'コンバージョン')).toHaveLength(0)
-    expect(links.filter(link => link.getAttribute('href') === '/settings')).toHaveLength(1)
+    expect(links.filter(link => link.getAttribute('href') === '/settings/customer-look')).toHaveLength(1)
     expect(links.filter(link => link.getAttribute('aria-current') === 'page')[0]?.textContent).toBe('成果とアフィリエイト')
   })
 
@@ -241,7 +274,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     const view = await renderSidebar()
     const gear = view.getAllByRole('link', { name: '設定' })
     expect(gear.length).toBeGreaterThan(0)
-    expect(gear[0]!.getAttribute('href')).toBe('/settings')
+    expect(gear[0]!.getAttribute('href')).toBe('/settings/customer-look')
     cleanup()
 
     window.localStorage.setItem('lh_staff_role', 'staff')
@@ -255,14 +288,14 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     rememberStaffIdentity({ role } as StaffMember)
     // 保存していた組の開閉も、重複した入口を復活させない。
     window.localStorage.setItem('lh-sidebar-groups', JSON.stringify({ settings: true }))
-    for (const pathname of ['/settings', '/accounts', '/emergency']) {
+    for (const pathname of ['/settings/customer-look', '/settings', '/emergency']) {
       rememberStaffIdentity({ role } as StaffMember)
       fixture.pathname = pathname
       const view = await renderSidebar()
       expect(view.queryAllByRole('button', { name: '設定', exact: true })).toHaveLength(0)
       expect(view.queryAllByRole('link', { name: '機能設定', exact: true })).toHaveLength(0)
       const gear = view.getAllByRole('link', { name: '設定', exact: true })[0]!
-      expect(gear.getAttribute('href')).toBe('/settings')
+      expect(gear.getAttribute('href')).toBe('/settings/customer-look')
       expect(gear.className).toMatch(/active/)
       cleanup()
     }

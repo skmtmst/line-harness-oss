@@ -480,8 +480,11 @@ export default function Sidebar({
         if (cancelled || mySeq !== seq) return
         const entry = sidebarCountCache.get(accountId) ?? { unanswered: 0, photos: 0, operations: 0 }
         if (unanswered.status === 'fulfilled' && unanswered.value.success) {
-          setUnansweredCount(unanswered.value.data.total)
-          entry.unanswered = unanswered.value.data.total
+          // count API の total は閲覧可能な全アカウントの合計。
+          // 店舗メニューには、今選んでいるLINEアカウントの件数だけを出す。
+          const accountCount = unanswered.value.data.byAccount.find((item) => item.accountId === accountId)?.count ?? 0
+          setUnansweredCount(accountCount)
+          entry.unanswered = accountCount
         }
         if (summary.status === 'fulfilled' && summary.value.success) {
           const total = summary.value.data.warningCount + summary.value.data.dangerCount
@@ -663,8 +666,10 @@ export default function Sidebar({
    * どこかの画面を開いているとき選ばれた形にする。
    */
   const hqSettingsActive = HQ_SETTINGS_PATHS.some((path) => activePathname === path || activePathname.startsWith(`${path}/`))
-  const settingsActive = Boolean(
-    sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)),
+  const settingsActive = (
+    activePathname === '/settings/customer-look'
+    || activePathname.startsWith('/settings/customer-look/')
+    || Boolean(sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)))
   )
 
   /*
@@ -889,7 +894,7 @@ export default function Sidebar({
       {!isHq && !preview && (canManageRole(staffReadRole)) && (
         <div className={styles.settingsEntry}>
           <Link
-            href="/settings"
+            href="/settings/customer-look"
             prefetch={false}
             title={collapsed ? undefined : "設定"}
             aria-label={collapsed ? "設定" : undefined}
