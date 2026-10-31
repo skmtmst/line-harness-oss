@@ -4,7 +4,7 @@ import { normalizePhone, phoneProblem } from '@line-crm/shared';
 import { datetimeLocalJstToUtcIso, jstDateTimeLocal, jstCalendar } from '@/lib/jst-datetime'
 
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, Download } from 'lucide-react'
 import { Field } from '@/components/shared/form-controls'
 import { useFormErrors } from '@/lib/use-form-errors'
@@ -20,9 +20,12 @@ import { formatNumber as polishFormatNumber } from '@/lib/format'
 import { formatYen as polishFormatYen } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
 import NumberInput from '@/components/shared/number-field'
-import { SaveErrorField } from '@/components/shared/save-form-errors'
+import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
+import Notice from '@/components/shared/notice'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import EntitySelect from '@/components/shared/entity-select'
 import { withHonorific } from '@line-crm/shared'
+import type { ReservationEditSaveResult } from './edit-save-result'
 
 /*
  * ★V8 予約台帳の窓：予約の変更（取消・復活・押さえの解除もここ）・取消の確認・受信データの試し。
@@ -57,7 +60,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   busy: boolean
   canWrite: boolean
   onClose: () => void
-  onSave: (patch: ReservationPatch) => void
+  onSave: (patch: ReservationPatch) => Promise<ReservationEditSaveResult> | void
   onCancelReservation: (id: string) => void
   onRestore: (id: string) => void
 }) {
@@ -75,7 +78,13 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       courseId: reservation.course_id || '',
     })
   }, [reservation])
-  const fields = useFormErrors()
+  const fields = useSaveFormErrors()
+  const [saveError, setSaveError] = useState<unknown>(null)
+  const saving = useRef(false)
+  const attempt = useRef(0)
+  const currentInput = useRef({ draft, canWrite, busy, onSave })
+  currentInput.current = { draft, canWrite, busy, onSave }
+  useEffect(() => () => { attempt.current += 1 }, [])
   fields.define('name', 'お客様名', () => draft.customerName.trim() ? null : 'お客様名を入れてください。', { required: true })
   fields.define('phone', '電話番号', () => phoneProblem(draft.customerPhone) || null)
   fields.define('count', '人数', () => Number.isInteger(Number(draft.guestCount)) && Number(draft.guestCount) >= 1 && Number(draft.guestCount) <= 100 ? null : '人数は1〜100で入れてください。', { required: true })
@@ -84,7 +93,9 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
   if (!reservation) return null
   const hold = isHold(reservation)
   const inactive = INACTIVE_STATUSES.includes(reservation.status)
-  const save = () => {
+  const save = async () => {
+    const { draft: input, canWrite: allowed, busy: working, onSave: commit } = currentInput.current
+    if (saving.current || working || !allowed) return
     if (fields.submit().length > 0) {
       requestAnimationFrame(() => {
         const target = document.querySelector<HTMLElement>('[role="dialog"] [aria-invalid="true"]')
@@ -92,16 +103,24 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
       })
       return
     }
-    onSave({
-    customerName: draft.customerName,
-    customerPhone: normalizePhone(draft.customerPhone) || null,
-    guestCount: Number(draft.guestCount),
-    startsAt: datetimeLocalJstToUtcIso(draft.startsAt),
-    endsAt: datetimeLocalJstToUtcIso(draft.endsAt),
-    tableId: draft.tableId || null,
-    courseId: draft.courseId || null,
-    allergyNote: draft.allergyNote || null,
-    })
+    const ticket = ++attempt.current
+    saving.current = true
+    setSaveError(null)
+    try {
+      const result = await commit({
+        customerName: input.customerName,
+        customerPhone: normalizePhone(input.customerPhone) || null,
+        guestCount: Number(input.guestCount),
+        startsAt: datetimeLocalJstToUtcIso(input.startsAt),
+        endsAt: datetimeLocalJstToUtcIso(input.endsAt),
+        tableId: input.tableId || null,
+        courseId: input.courseId || null,
+        allergyNote: input.allergyNote || null,
+      })
+      if (ticket === attempt.current && result?.inputError !== undefined && !fields.capture(result.inputError)) setSaveError(result.inputError)
+    } finally {
+      if (ticket === attempt.current) saving.current = false
+    }
   }
   const tableOptions = [
     { value: '', label: '未配席' },
@@ -112,7 +131,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
     ...courses.filter((course) => course.status === 'active' || course.id === reservation.course_id).map((course) => ({ value: course.id, label: `${course.name} ${polishFormatYen(course.price)}` })),
   ]
   return (
-    <RsDialog
+    <SaveErrorScope errors={fields}><RsDialog
       noValidate
       open
       title={hold ? `押さえ（${hm(reservation.starts_at)}〜${hm(reservation.ends_at)}）` : `${withHonorific(reservation.customer_name)}の予約${canWrite ? 'を変更' : ''}`}
@@ -137,6 +156,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
         </>
       )}
     >
+      {saveError !== null ? <Notice tone="danger" role="alert" message={describeApiFailure(saveError, '保存')} /> : null}
       {hold ? (
         <DialogNote>{`${reservation.note || '仮押さえ'}・解除の期限 ${reservation.hold_expires_at ? hm(reservation.hold_expires_at) : emptyValue('unknown')}。期限を過ぎると空き卓に戻ります。台帳には履歴が残ります。`}</DialogNote>
       ) : (
@@ -177,7 +197,7 @@ export function EditReservationDialog({ reservation, tables, courses, busy, canW
           </Field>
         </>
       )}
-    </RsDialog>
+    </RsDialog></SaveErrorScope>
   )
 }
 
