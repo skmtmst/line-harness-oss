@@ -191,7 +191,7 @@ export function ConfirmStageV8({
               <span className={styles.confirmVal} title={row.key === '通知' && validation?.audience.matched != null
                 ? `${row.value}（対象者×通知数：${countLabel(validation.audience.matched * settings.steps.length, '通')}）`
                 : row.value}>{row.value}</span>
-              <Button variant="text" href={editHref(reminderId, row.stage)}>変える</Button>
+              <Button variant="text" textTone="ink" href={editHref(reminderId, row.stage)}>変える</Button>
             </div>
           ))}
         </div>
@@ -235,7 +235,7 @@ export function ConfirmStageV8({
               ok={validation.audience.matched != null}
               title="対象者を数えた"
               note={validation.audience.matched != null ? `${formatNumber(validation.audience.matched)} 人に送る予定` : '対象者を数えられませんでした'}
-              action={<Button variant="text" href={editHref(reminderId, 'target')}>見直す</Button>}
+              action={<Button variant="text" textTone="ink" href={editHref(reminderId, 'target')}>見直す</Button>}
             />
             {validation.checks.filter((check) => check.key !== 'test_send').map((check) => (
               <CheckRow
@@ -243,7 +243,7 @@ export function ConfirmStageV8({
                 ok={check.status === 'passed'}
                 title={check.label}
                 note={check.message}
-                action={check.status !== 'passed' ? <Button variant="text" href={editHref(reminderId, checkStageFor(check.key))}>直す</Button> : undefined}
+                action={check.status !== 'passed' ? <Button variant="text" textTone="ink" href={editHref(reminderId, checkStageFor(check.key))}>直す</Button> : undefined}
               />
             ))}
           </div>

@@ -133,7 +133,7 @@ export function WizardConfirmStep({ conflictsReadable = true, permissionPending 
                           <p className={styles.checkTitle}>{gate.label}</p>
                           <p className={styles.checkNote}>{gate.detail}</p>
                         </div>
-                        <Button type="button" variant="text" onClick={() => goToStep(backTo)}>
+                        <Button type="button" variant="text" textTone="ink" onClick={() => goToStep(backTo)}>
                           見直す
                         </Button>
                       </div>

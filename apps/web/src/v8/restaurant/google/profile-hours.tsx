@@ -179,7 +179,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
           <SectionHeader size="small" title="日付を選んで、その日の営業時間を決めます" />
           <Field label="変更する日" htmlFor="gb-hours-day"><SaveErrorField names={["selectedDate","selected_date"]}><DateField id="gb-hours-day" aria-label="変更する日" value={selectedDate} onChange={setSelectedDate} min={today.date} max={addDays(today.date, 366)} /></SaveErrorField></Field>
           {profile.specialHours.length ? <dl className={styles.facts} aria-label="登録済みの特別営業時間">{profile.specialHours.map((day) => <div key={day.date} className={styles.factRow}>
-            <dt className={styles.factKey}><Button variant="text" disabled={day.date < today.date || day.date > addDays(today.date, 366)} onClick={() => setSelectedDate(day.date)}>{formatYmdShort(day.date)}</Button></dt>
+            <dt className={styles.factKey}><Button variant="text" textTone="ink" disabled={day.date < today.date || day.date > addDays(today.date, 366)} onClick={() => setSelectedDate(day.date)}>{formatYmdShort(day.date)}</Button></dt>
             <dd className={styles.factValue}>{day.closed ? '休業' : formatPeriods(day.periods)}</dd>
           </div>)}</dl> : null}
         </Card>
@@ -196,7 +196,7 @@ export function HoursEditor({ accountId, mode, initialDate, go }: { accountId: s
         {editedDates.length ? <Card appearance="outlined" layout="vertical" padding="default" gap="normal" aria-label="変更する日の一覧">
           <SectionHeader size="small" title={`変更する日（${editedDates.length}日）`} />
           {editedDates.map((date) => <div key={date} className={styles.buttonRow}>
-            <Button variant="text" onClick={() => setSelectedDate(date)}>{formatYmdShort(date)}</Button>
+            <Button variant="text" textTone="ink" onClick={() => setSelectedDate(date)}>{formatYmdShort(date)}</Button>
             <span className={styles.muted}>{describeDay(originalFor(date))} → {describeDay(days[date])}</span>
             <Button disabled={busy} onClick={() => undoDay(date)}>この日の変更を取り消す</Button>
           </div>)}

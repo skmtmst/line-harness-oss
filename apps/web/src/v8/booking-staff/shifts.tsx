@@ -1,4 +1,5 @@
 'use client'
+import TextLink from '@/components/shared/text-link'
 import { isForbiddenOrRateLimited,permissionDeniedMessage } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Card,{ CardHeader } from '@/components/shared/card'
@@ -11,7 +12,7 @@ import { emptyValue } from '@/components/shared/empty-value'
 import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select'
 import { Field } from '@/components/shared/form-controls'
 import IconButton from '@/components/shared/icon-button'
-import Link,{ useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import ListState from '@/components/shared/list-state'
 import Notice from '@/components/shared/notice'
 import NumberInput from '@/components/shared/number-field'
@@ -301,7 +302,7 @@ function OwnShiftEntry() {
         desc="管理者が予約スタッフとログインユーザーをひも付けると、ここで自分の勤務を決められます。"
         actions={<>
           <Button href="/booking/bookings">予約の一覧へ戻る</Button>
-          {canSeeStore ? <Link href="/booking/menus?tab=hours" className={styles.stateLink}>店の受付枠を見る</Link> : null}
+          {canSeeStore ? <TextLink inline href="/booking/menus?tab=hours">店の受付枠を見る</TextLink> : null}
         </>}
       />
     )

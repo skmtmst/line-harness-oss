@@ -472,7 +472,7 @@ export default function AccountHandoverV8() {
           <p className={styles.boxHead}>
             <span className={styles.boxLabel}>事前確認の結果</span>
             {canManage ? (
-              <Button type="button" variant="text" presentation="account-inline" aria-expanded={declaredOpen} onClick={() => setDeclaredOpen((open) => !open)}>
+              <Button type="button" variant="text" textTone="ink" presentation="account-inline" aria-expanded={declaredOpen} onClick={() => setDeclaredOpen((open) => !open)}>
                 {handover.declaredFriendTotal != null ? `申告 ${formatNumber(handover.declaredFriendTotal)} 人` : '申告の数を入れる'}
               </Button>
             ) : handover.declaredFriendTotal != null ? (

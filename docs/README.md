@@ -1055,3 +1055,4 @@
 
 - [予約の案内と比較の並び](release-log/unreleased/2001-kenta-rival-small-fixes.md) — 反映履歴、確認 2026-10-31。
 - [保存先の固定とフォームの公開参照](release-log/unreleased/2001-kenta-train-1029x.md) — 反映履歴、確認 2026-10-31。
+- [文字の操作を見分ける表示](release-log/unreleased/0000-kenta-text-button-actions.md) — 反映履歴、確認 2026-10-31。

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react'
 import StatusPill from '@/components/shared/status-pill'
 import Link from '@/components/shared/list-navigation'
 import {
-  ArrowRight,
   Bell,
   CalendarDays,
   Link2,
@@ -216,7 +215,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
           : <span className={`${styles.memo} ${styles.faint}`}>タグはありません</span>}
         {perms.editSupport ? <Button variant="text" size="inline" actionWording onClick={() => void openTagEditor()}>＋ 追加</Button> : null}
       </div></> },
-        { key: 'mileage', label: 'マイル', action: <Link className={styles.groupLink} href={`/mileage/friends/detail?id=${encodeURIComponent(friendId)}`}>詳細を見る</Link>, content: <>{mileageStatus === 'error' ? (
+        { key: 'mileage', label: 'マイル', action: <TextLink inline href={`/mileage/friends/detail?id=${encodeURIComponent(friendId)}`}>詳細を見る</TextLink>, content: <>{mileageStatus === 'error' ? (
         <p className={`${styles.memo} ${styles.faint}`}>
           マイルを読み込めませんでした
           <button type="button" className={styles.retry} onClick={() => void data.loadMileage()}>もう一度読み込む</button>
@@ -246,7 +245,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
       more={<div className={styles.more}>
         {starred.length > 0 ? (
           <section className={styles.group} aria-label="★つき友だち情報">
-            <GroupHead title="★つき友だち情報" action={<Link className={styles.groupLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>すべて見る</Link>} />
+            <GroupHead title="★つき友だち情報" action={<TextLink inline href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>すべて見る</TextLink>} />
             <dl className={styles.kvList}>
               {starred.map((f) => <Kv key={f.id} label={f.name}>{values[f.id] || <span className={styles.faint}>{emptyValue('unconfigured')}</span>}</Kv>)}
             </dl>
@@ -267,7 +266,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
           </dl>
         </section>
         <section className={styles.group} aria-label="フォーム回答">
-          <GroupHead title="フォーム回答" action={<Link className={styles.groupLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=forms`}>すべて見る</Link>} />
+          <GroupHead title="フォーム回答" action={<TextLink inline href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=forms`}>すべて見る</TextLink>} />
           <p className={styles.value}>
             {typeof friend.formSubmissionTotal === 'number'
               ? friend.formSubmissionTotal > 0 ? `${formatNumber(friend.formSubmissionTotal)} 件` : '回答はまだありません'
@@ -362,7 +361,7 @@ export default function OverviewTab({
         <section className={styles.section} aria-labelledby="fdt-running">
           <div className={styles.secHead}>
             <h2 id="fdt-running" className={styles.secTitle}>進行中の配信・自動処理</h2>
-            <Link className={styles.secLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=scenario`}>すべてを見る<ArrowRight size={16} aria-hidden /></Link>
+            <TextLink href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=scenario`}>すべてを見る</TextLink>
           </div>
           {upcomingStatus === 'loading' || upcomingStatus === 'idle' ? (
             <DetailLoading />
@@ -400,7 +399,7 @@ export default function OverviewTab({
         <section className={`${styles.section} ${styles.recent}`} aria-labelledby="fdt-recent">
           <div className={styles.secHead}>
             <h2 id="fdt-recent" className={styles.secTitle}>最近の履歴</h2>
-            <Link className={styles.secLink} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=history`}>すべて見る<ArrowRight size={16} aria-hidden /></Link>
+            <TextLink href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=history`}>すべて見る</TextLink>
           </div>
           {data.historyStatus === 'loading' || data.historyStatus === 'idle' ? (
             <DetailLoading />

@@ -65,7 +65,7 @@ export function renderButtonsStep({ activePage, addArea, areaActionSummary, dele
             setSelectedAreaId(pages.find((p) => p.id === id)?.areas[0]?.id ?? null)
           }}
         /></SaveErrorField>
-        <Button type="button" variant="text" className={styles.tabSwitchLink} onClick={() => goToStep('shape')}>
+        <Button type="button" variant="text" textTone="ink" className={styles.tabSwitchLink} onClick={() => goToStep('shape')}>
           タブの数・名前・画像は ①形と画像 で変えます
         </Button>
       </div>

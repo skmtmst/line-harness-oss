@@ -91,6 +91,6 @@ export default function ReservationPeopleGrid({ entries, resources, date, slots 
         </div>
       })}
     </div>)}
-    {rows.filter(row => !row.resourceIds.some(id => staff.some(resource => resource.id === id))).map(row => <Button key={row.id} variant="text" onClick={() => onOpen(row.id)}>{row.customerName}・担当未設定</Button>)}
+    {rows.filter(row => !row.resourceIds.some(id => staff.some(resource => resource.id === id))).map(row => <Button key={row.id} variant="text" textTone="ink" onClick={() => onOpen(row.id)}>{row.customerName}・担当未設定</Button>)}
   </GridTable>
 }
