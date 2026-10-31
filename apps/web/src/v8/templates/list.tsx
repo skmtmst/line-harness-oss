@@ -959,7 +959,7 @@ export default function TemplatesListV8() {
       headingSize="regular"
       {...heading}
       actions={activeSection === 'message' ? <Button onClick={openPicker}
-        disabled={!canMutateTemplates} lockedReason={lockedReason}>見本から作る</Button> : undefined}
+        disabled={!canMutateTemplates} lockedReason={lockedReason}>種類を選んで作る</Button> : undefined}
       tabs={tabs}
       stats={
         /* 数の帯 4つ。並びと間は共有の帯に任せる。 */
