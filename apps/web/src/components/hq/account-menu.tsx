@@ -175,7 +175,7 @@ export function SidebarAccountMenu({ hq, collapsed = false }: SidebarAccountMenu
                 <div className={styles.rule} role="separator" />
               </>
             ) : null}
-            {rows.includes('members') ? <SidebarMenuLink href="/hq/members" icon={Users} onSelect={close}>メンバー</SidebarMenuLink> : null}
+            {rows.includes('members') ? <SidebarMenuLink href={hq ? '/hq/members' : '/staff'} icon={Users} onSelect={close}>メンバー</SidebarMenuLink> : null}
             {rows.includes('billing') ? <SidebarMenuLink href="/hq/billing" icon={CreditCard} onSelect={close}>請求</SidebarMenuLink> : null}
             <SidebarMenuLink href="/hq/support" icon={LifeBuoy} onSelect={close}>お問い合わせ</SidebarMenuLink>
             <div className={styles.rule} role="separator" />

@@ -138,7 +138,7 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     expect(view.getAllByRole('button', { name: '配信' }).length).toBeGreaterThan(0)
   })
 
-  it('お気に入りが空なら見出しを隠し、登録すると先頭へ移す。個別オフも反映する', async () => {
+  it('お気に入りが空なら見出しを隠し、登録すると元の組にも残す。個別オフも反映する', async () => {
     vi.stubEnv('NEXT_PUBLIC_GOOGLE_BUSINESS_ENABLED', 'true')
     fixture.visibility.mockResolvedValue({ success: true, data: {
       features: ALL_FEATURES_ON,
@@ -150,7 +150,8 @@ describe('★V8 左メニューの組の開閉と「設定」の入口', () => {
     const headings = [...desktop.querySelectorAll('nav button[aria-expanded]')].map((button) => button.textContent?.trim())
     expect(headings[0]).toBe('お気に入り')
     expect(headings[1]).toBe('メイン')
-    expect(desktop.querySelectorAll('a[href="/restaurant-test/reservations"]')).toHaveLength(1)
+    expect(desktop.querySelectorAll('a[href="/restaurant-test/reservations"]')).toHaveLength(2)
+    expect(desktop.querySelectorAll('a[href="/restaurant-test/google"]')).toHaveLength(2)
     expect(desktop.querySelectorAll('a[href="/restaurant-test/tables"]')).toHaveLength(0)
     expect(desktop.textContent).not.toContain('★')
   })

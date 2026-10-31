@@ -137,7 +137,7 @@ describe('★V8 左下の自分とメニュー', () => {
     expect(menu.textContent).toContain('Kenta Kawano')
     await waitFor(() => expect(menu.textContent).toContain('オーナー・無料トライアル 残り14日'))
     const href = (name: string) => view.getByRole('menuitem', { name }).getAttribute('href')
-    expect(href('メンバー')).toBe('/hq/members')
+    expect(href('メンバー')).toBe('/staff')
     expect(href('請求')).toBe('/hq/billing')
     expect(href('お問い合わせ')).toBe('/hq/support')
   })
@@ -162,6 +162,7 @@ describe('★V8 左下の自分とメニュー', () => {
     const view = await renderMenu()
     const menu = await openMenu(view)
     expect(itemNames(menu)).toEqual(['統括に戻る', 'メンバー', '請求', 'お問い合わせ', 'ログアウト'])
+    expect(view.getByRole('menuitem', { name: 'メンバー' }).getAttribute('href')).toBe('/staff')
     await waitFor(() => expect(menu.textContent).toContain('管理者・無料トライアル 残り14日'))
   })
 
@@ -233,6 +234,7 @@ describe('★V8 左下の自分とメニュー', () => {
     const view = await renderMenu({ hq: true })
     const menu = await openMenu(view)
     expect(itemNames(menu)).toEqual(['メンバー', '請求', 'お問い合わせ', 'ログアウト'])
+    expect(view.getByRole('menuitem', { name: 'メンバー' }).getAttribute('href')).toBe('/hq/members')
   })
 
   it('統括の画面・担当者には請求を出さない', async () => {
