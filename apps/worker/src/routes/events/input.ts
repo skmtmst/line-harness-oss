@@ -170,7 +170,7 @@ export async function resolveAccountIdFromLiff(c: Context<Env>): Promise<string 
   const liffId = c.req.query('liffId');
   if (!liffId) return null;
   const acc = await c.env.DB
-    .prepare(`SELECT id FROM line_accounts WHERE liff_id = ? AND is_active = 1`)
+    .prepare(`SELECT id FROM line_accounts WHERE liff_id = ? AND is_active = 1 AND archived_at IS NULL`)
     .bind(liffId)
     .first<{ id: string }>();
   return acc?.id ?? null;

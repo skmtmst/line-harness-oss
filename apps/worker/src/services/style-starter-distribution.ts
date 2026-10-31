@@ -1,3 +1,5 @@
+import { materializeInitialMenuAssets } from './style-initial-assets.js';
+import type { PlannedInitialForms } from './style-initial-buttons.js';
 import { sameStarterSnapshot } from './style-starter-snapshot.js';
 import type { AccountStyle, SetupAnswer } from '@line-crm/shared';
 import { checkStyle, StyleError, profile, starter } from './style-setup.js';
@@ -91,7 +93,7 @@ export async function starterDistributionPlan(
         : null;
       const edited =
         !!binding &&
-        (!binding.is_sample ||
+        ((item.kind==='rich_menu' && !item.initialMenu && JSON.parse(p?.answers_json??'{}').image?.value==='simple') || !binding.is_sample ||
           binding.source_snapshot === null ||
           !sameStarterSnapshot(binding.kind, snapshot, binding.source_snapshot));
       items.push({
@@ -131,6 +133,7 @@ export async function distributeStarter(
   actor: string,
   style: AccountStyle,
   input: Record<string, unknown>,
+  images?: R2Bucket,
 ) {
   const plan = await starterDistributionPlan(db, tenant, style, input);
   if (input.confirmed !== true || input.token !== plan.token)
@@ -152,6 +155,13 @@ export async function distributeStarter(
   for (const a of plan.accounts) {
     statements.push(db.prepare(`SELECT json(CASE WHEN EXISTS(SELECT 1 FROM line_accounts WHERE id=? AND tenant_id=? AND archived_at IS NULL AND is_active=1) THEN '{}' ELSE 'STYLE_VERSION_CONFLICT' END)`).bind(a.accountId,tenant));
     const p = await profile(db, a.accountId);
+    const answers=JSON.parse(p?.answers_json??'{}') as Record<string,SetupAnswer>;
+    const canonical=plan.set.definition.items.some(item=>item.initialMenu===style);
+    const operationAnswers=canonical?{...answers,image:{mode:'configured' as const,value:'simple'}}:answers;
+    const plannedForms:PlannedInitialForms=new Map(a.items.filter(row=>row.kind==='form'&&row.binding).map(row=>[row.key,row.binding!.target_id]));
+    if(canonical){await materializeInitialMenuAssets(db,images,a.accountId,style,plan.set.definition);}
+    let menuApplied=false,menuTarget:string|undefined;
+
     statements.push(
       db
         .prepare(
@@ -159,7 +169,7 @@ export async function distributeStarter(
         )
         .bind(a.accountId, a.profileVersion),
     );
-    for (const row of a.items) {
+    for (const row of [...a.items.filter(row=>row.kind==='form'),...a.items.filter(row=>row.kind!=='form')]) {
       const item = plan.set.definition.items.find((i) => i.key === row.key)!;
       const b = row.binding;
       if (b)
@@ -200,6 +210,8 @@ export async function distributeStarter(
             item,
             now,
             style,
+            operationAnswers,
+            plannedForms,
           )),
         );
         statements.push(
@@ -226,6 +238,7 @@ export async function distributeStarter(
             b.target_id,
           ),
         );
+        if(item.kind==='rich_menu'){menuApplied=true;menuTarget=b.target_id;}
         results.push({
           accountId: a.accountId,
           key: item.key,
@@ -241,10 +254,6 @@ export async function distributeStarter(
             )
             .bind(a.accountId, item.key),
         );
-      const answers = JSON.parse(p?.answers_json ?? '{}') as Record<
-        string,
-        SetupAnswer
-      >;
       const { inserted } = await insertStyleStarterItems(
         db,
         a.accountId,
@@ -253,19 +262,26 @@ export async function distributeStarter(
         { choices: { [item.key]: { mode: 'sample' } } },
         true,
         style,
-        answers,
+        operationAnswers,
         statements,
         now,
         {
           set: { ...plan.set, definition: { items: [item] } },
           skipExisting: false,
+          plannedForms,
         },
       );
+      if(inserted.length&&item.kind==='rich_menu'){menuApplied=true;menuTarget=(inserted[0] as {id:string}).id;}
       results.push({
         accountId: a.accountId,
         key: item.key,
         action: inserted.length ? 'created' : 'unconfigured',
       });
+    }
+    // 先頭の版照合と同じbatch内。カード更新による版の増加も含めて保存する。
+    if(menuApplied&&p) {
+      const value=canonical?'simple':'existing';
+      statements.push(db.prepare("UPDATE account_styles SET answers_json=json_set(answers_json,'$.image',json(?)),version=version+1,updated_at=? WHERE line_account_id=?").bind(JSON.stringify({mode:'configured',value,...(!canonical&&menuTarget?{resourceId:menuTarget}:{})}),now,a.accountId));
     }
     statements.push(
       db

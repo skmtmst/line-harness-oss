@@ -83,3 +83,9 @@ button.tile:focus-visible {
   font-size: var(--text-caption);
   font-weight: 700;
 }
+
+.grid[data-initial] { grid-template-columns:repeat(2,minmax(0,1fr)); aspect-ratio:2500 / 1686; gap:0; background-size:100% 100%; }
+.grid[data-initial] .tile { height:auto; min-height:0; background:transparent; }
+
+.grid[data-image] { position:relative; background-size:100% 100%; }
+.grid[data-image] .tile { background:transparent; }

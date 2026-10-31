@@ -43,6 +43,7 @@ import { formatNumber } from '@/lib/format'
  */
 
 const KIND_ROWS: ReadonlyArray<{ kind: StarterSetItem['kind']; label: string; how: { text: string; tone: 'neutral' | 'warning' } }> = [
+  { kind:'form',label:'回答フォーム・ご案内',how:{text:'公開前の下書きで入る',tone:'neutral'} },
   { kind: 'rich_menu', label: 'リッチメニュー', how: { text: '「見本」の印つきで入る', tone: 'neutral' } },
   { kind: 'template', label: 'テンプレート', how: { text: '「見本」の印つきで入る', tone: 'neutral' } },
   { kind: 'automation', label: 'オートメーション', how: { text: '止めた状態で入る', tone: 'warning' } },
@@ -136,7 +137,7 @@ export default function HqStarterSetsV8() {
     setSaving(true)
     setSaveError('')
     try {
-      const res = await hqStyleApi.saveStarterSet(set.style, { expectedVersion: set.version, name: set.name, definition: { items: set.definition.items.filter((item) => item.kind !== removing) } })
+      const res = await hqStyleApi.saveStarterSet(set.style, { expectedVersion: set.version, name: set.name, definition: { items: set.definition.items.filter(item=>item.kind!==removing && !(removing==='rich_menu'&&item.kind==='form') && !(removing==='form'&&item.initialMenu)) } })
       if (!res.success) throw new Error('save failed')
       notifySaved('初期セットから外しました')
       setRemoving(null)
@@ -323,7 +324,7 @@ export default function HqStarterSetsV8() {
       <ConfirmDialog
         open={removing !== null}
         title="初期セットから外しますか？"
-        description={`これから新しく作るアカウントには「${KIND_ROWS.find((row) => row.kind === removing)?.label ?? ''}」が入らなくなります。今あるアカウントの中身は変わりません。`}
+        description={`${removing==='form'||removing==='rich_menu'?'4面メニューと、それにつながるフォーム・ご案内を一緒に外します。':''}これから新しく作るアカウントには「${KIND_ROWS.find((row) => row.kind === removing)?.label ?? ''}」が入らなくなります。今あるアカウントの中身は変わりません。`}
         confirmLabel="外す"
         destructive
         busy={saving}

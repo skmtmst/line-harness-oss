@@ -88,7 +88,7 @@ export const methods1 = {
       }>
     >(url(root + '/warnings', accountId)),
 
-  starterSet: (accountId: string, style: AccountStyle) =>
+  starterSet: (accountId: string, style: AccountStyle, initialMenu = false) =>
     fetchApi<
       Result<{
         id: string;
@@ -96,7 +96,7 @@ export const methods1 = {
         autoInsert: boolean;
         definition: { items: StarterSetItem[] };
       }>
-    >(url(root + '/starter-set', accountId, { style })),
+    >(url(root + '/starter-set', accountId, { style, ...(initialMenu ? { initialMenu:'true' } : {}) })),
 
   templateSamples: (accountId: string, style: AccountStyle) =>
     fetchApi<Result<{ style: AccountStyle; items: StyleTemplateSample[] }>>(

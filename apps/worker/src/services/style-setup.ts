@@ -1,4 +1,5 @@
 export { starter } from './style-starter-set.js';
+import { materializeInitialMenuAssets } from './style-initial-assets.js';
 import { starter } from './style-starter-set.js';
 import { restaurantDefaultFeatures, type AccountStyle, type SetupAnswer } from '@line-crm/shared';
 import { storeFeatureInitialization } from '@line-crm/db/src/store-feature-initialization.js';
@@ -22,7 +23,7 @@ export async function saveProfile(
   tenant: string | null,
   actor: string,
   input: Record<string, unknown>,
-  options: { initialSelectionPending?: boolean } = {},
+  options: { initialSelectionPending?: boolean; images?: R2Bucket } = {},
 ) {
   const current = await profile(db, account);
   assertVersion(input.expectedVersion, current?.version ?? 0);
@@ -152,7 +153,10 @@ export async function saveProfile(
   const bookingSettingsChanges = Object.entries(changedAnswers).map(
     ([key, answer]) => ({ key, answer }),
   );
-  const { set, inserted, skipped } = await insertStyleStarterItems(
+  const preparedSet = await starter(db,tenant,style,answers.image?.value==='simple');
+  if (selected && answers.image?.mode==='configured' && answers.image.value==='simple')
+    await materializeInitialMenuAssets(db,options.images,account,style,preparedSet.definition);
+  const { set, inserted, updated, skipped } = await insertStyleStarterItems(
     db,
     account,
     tenant,
@@ -163,6 +167,7 @@ export async function saveProfile(
     answers,
     statements,
     now,
+    {set:preparedSet},
   );
   statements.push(
     db
@@ -197,6 +202,7 @@ export async function saveProfile(
     bookingSettingsChanges,
     version,
     inserted,
+    updated,
     skipped,
     starterSet: { id: set.id, version: set.version },
   };

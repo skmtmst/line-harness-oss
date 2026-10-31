@@ -17,7 +17,7 @@ const CONFLICT = 'ほかの人が先にスタイルを変えました。読み�
 
 /** 帯を出すか。入れた後の知らせは、読み直しで starter が変わっても残す。 */
 export function starterRetryVisible(starter: GettingStartedStarter | null, inserted: number | null): boolean {
-  return inserted !== null || (starter?.applied === false && starter.missing !== 0)
+  return inserted !== null || (starter?.missing != null && starter.missing>0) || (starter?.applied===false && starter.missing===null)
 }
 
 /** 入れた数をアカウントごとに覚える。読み直しの間（starter が null）も知らせを消さないため、帯の外に持つ。 */
@@ -54,7 +54,7 @@ export function StarterRetryNotice({ accountId, starter, version, inserted, onIn
     try {
       const res = await styleApi.ensureStarterItems(accountId, version)
       if (!res.success) throw new Error('starter_ensure_failed')
-      onInserted(res.data.inserted.length)
+      onInserted(res.data.inserted.length+(res.data.updated?.length??0))
       onChanged()
     } catch (caught) {
       if (caught instanceof ApiError && caught.code === 'version_conflict') {
@@ -69,12 +69,12 @@ export function StarterRetryNotice({ accountId, starter, version, inserted, onIn
     <Notice
       tone="warn"
       role="status"
-      heading="初期セットが入っていません"
+      heading="初期セットに準備待ちがあります"
       action={starter.missing === null || version === null ? undefined : <Button onClick={retry} busyLabel="入れています…">入れ直す</Button>}
     >
       {error || (starter.missing === null
         ? '統括の初期セットを読めなかったため、ここでは入れ直せません。統括の初期セットの画面で確かめてください。'
-        : `あいさつ・リッチメニューなど ${starter.missing} 件が入っていません。［入れ直す］で足りない物だけを止めた状態で入れます。`)}
+        : `あいさつ・リッチメニューなど ${starter.missing} 件を準備できます。［入れ直す］で未編集の下書きを補います。`)}
     </Notice>
   )
 }

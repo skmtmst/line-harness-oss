@@ -13,7 +13,6 @@ import Link from '@/components/shared/list-navigation'
 import Notice from '@/components/shared/notice'
 import { PREPARING_WORD } from '@/components/shared/preparing-dialog'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
-import EntitySelect from '@/components/shared/entity-select'
 import ListState from '@/components/shared/list-state'
 import StatusBadge from '@/components/shared/status-badge'
 import Toggle from '@/components/shared/toggle'
@@ -21,12 +20,11 @@ import Toggle from '@/components/shared/toggle'
 import type { AccountStyle, SetupAnswer } from '@line-crm/shared'
 import { ArrowRight, Hourglass, Info, Play } from 'lucide-react'
 import { SetupIcon } from './icons'
-import { LOOK_CHOICES, choiceLabel, styleLabel } from './model'
-import { SampleMenuTiles } from './sample-menu'
+import { choiceLabel, styleLabel } from './model'
 import { useWizard } from './use-wizard'
 import { KIND_WORD } from './wizard-item-kinds'
 import styles from './wizard.module.css'
-import { useStarterMenu } from './use-starter-menu'
+import { InitialMenuChoice } from './initial-menu-choice'
 import SetupLinks from './setup-links'
 import StyleChoiceStep, { STYLE_CHOICE_ORDER, STYLE_CHOICE_START_ID, StyleChoiceStatus, initialViewingStyle } from './style-choice-step'
 import { useState } from 'react'
@@ -47,11 +45,10 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
   /* 1 問目で「見ている」スタイル。選んでいるスタイル（choice）とは別に持つ（共通節 S-3）。 */
   const [viewing, setViewing] = useState<AccountStyle>(() => initialViewingStyle(state))
   const chosenStyle = step === 0 && (STYLE_CHOICE_ORDER as readonly string[]).includes(choice) ? choice as AccountStyle : null
-  const menu = useStarterMenu(accountId, style)
   const head = step === 0
     ? { title: '使い方のスタイルを選ぶ', description: undefined }
     : step === 1
-      ? { title: 'リッチメニューなどの見た目をどうしますか', description: `${label}の見本が入っています。画像だけ変えることもできます。` }
+      ? { title: '最初のリッチメニューを選ぶ', description: '画像とボタンの行き先がセットで入ります。あとから変更できます。' }
       : step === 'summary'
         ? { title: '準備ができました', description: '入った物を確かめて、自動で送る物を動かしてください。' }
         : { title: question?.title ?? '', description: question?.description ?? '' }
@@ -64,13 +61,13 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
         {step === 0 ? <>
           <Button variant="text" onClick={() => void saveStyleMode('later')} disabled={busy}>あとで設定する</Button>
           <Button variant="text" onClick={() => void saveStyleMode('manual')} disabled={busy}>手動で設定する</Button>
-        </> : <Button onClick={() => setStep(step === 'summary' ? total - 1 : Math.max(0, (step as number) - 1))} disabled={busy}>戻る</Button>}
+        </> : <Button onClick={() => setStep(step === 'summary' ? total - 1 : Math.max(0, (step as number) - 1))} disabled={busy}>{step===1?'スタイルを選び直す':'戻る'}</Button>}
       </div>
       <div className={styles.footerCenter}>
         {step === 'summary' ? <Button onClick={() => onClose(true)} disabled={busy}>動かさずにダッシュボードへ</Button> : null}
         {step === 'summary'
           ? <Button variant="primary" onClick={() => void activate()} busy={busy && summary !== null} busyLabel="動かしています…" disabled={!summary || onCount === 0}><Play aria-hidden="true" className={styles.buttonIcon} />{`まとめて動かす（${formatNumber(onCount)}件）`}</Button>
-          : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle" disabled={step === 0 && !chosenStyle} disabledReason={step === 0 && !chosenStyle ? 'スタイルを選んでください' : null}>次へ<ArrowRight aria-hidden="true" className={styles.buttonIcon} /></Button>}
+          : <Button variant="primary" onClick={() => void onNext()} busy={busy} busyLabel="保存中…" widthReserve="idle" disabled={step === 0 && !chosenStyle} disabledReason={step === 0 && !chosenStyle ? 'スタイルを選んでください' : null}>{step===1?'このメニューで進む':'次へ'}<ArrowRight aria-hidden="true" className={styles.buttonIcon} /></Button>}
       </div>
       <div className={step === 0 ? styles.footerEnd : styles.footerSide}>
         {step === 0 ? <StyleChoiceStatus chosen={chosenStyle} /> : null}
@@ -100,31 +97,7 @@ export default function StyleSetupWizard({ accountId, state, initialStep = 0, on
       </>
     )
   } else if (step === 1) {
-    body = (
-      <>
-        <div className={styles.lookRow}>
-          <RadioCardGroup legend="見た目" className={styles.stack}>
-            {LOOK_CHOICES.filter((item) => item.value !== 'later').map((item) => (
-              <RadioCard key={item.value} name="setup-look" value={item.value} checked={choice === item.value} onChange={setChoice} title={item.label} note={item.value === 'keep' ? `${label}${item.note}` : item.note} icon={<SetupIcon name={item.icon} />} />
-            ))}
-            <div className={styles.pair}>
-              <RadioCard name="setup-look" value="later" checked={choice === 'later'} onChange={setChoice} title="あとで設定する" note="今は入れません。はじめにやることに残ります" icon={<SetupIcon name="hourglass" />} />
-              <RadioCard name="setup-look" value="manual" checked={choice === 'manual'} onChange={setChoice} title="手動で設定する" note="リッチメニューの画面で 1 から作ります" icon={<SetupIcon name="sliders" />} />
-            </div>
-            {choice === 'existing' ? (
-              <EntitySelect aria-label="使うリッチメニュー・画像" noun="リッチメニュー・画像" size="full" value={resource} onChange={setResource} disabled={resources === null}
-                options={[{ value: '', label: resources === null ? '読み込んでいます…' : resources.length ? '使うリッチメニュー・画像を選ぶ' : '使える物がありません' }, ...(resources ?? []).map((item) => ({ value: item.id, label: `${item.kind === 'image' ? '画像' : 'リッチメニュー'}：${item.name}` }))]} />
-            ) : null}
-          </RadioCardGroup>
-          <Card surface="muted" layout="vertical" contentPadding="var(--polish-space-card)" gap="var(--ob-panel-gap)" role="complementary" aria-label="入る見本">
-            <div className={styles.panelHead}><span className={styles.panelTitle}>入る見本</span><StatusBadge tone="neutral" dot>見本</StatusBadge></div>
-            {menu.error ? <ListState kind="error" title="見本を読み込めませんでした" error={menu.error} onRetry={menu.reload} /> : menu.loading ? <ListState kind="loading" title="見本を確認しています" /> : <SampleMenuTiles style={style} buttons={menu.buttons} />}
-            <p className={styles.panelNote}>{`中身が決まっていないボタンは、お客さまには「${PREPARING_WORD}」と出します。`}</p>
-          </Card>
-        </div>
-        {where('あとから変えられます（リッチメニュー・テンプレートの画面）。')}
-      </>
-    )
+    body = <InitialMenuChoice accountId={accountId} style={style} disabled={busy} value={{value:choice==='existing'?'existing':choice==='later'||choice==='manual'?'later':'simple',resourceId:resource}} onChange={next=>{setChoice(next.value);setResource(next.resourceId??'')}} />
   } else if (question) {
     const mains = question.choices
     body = (
