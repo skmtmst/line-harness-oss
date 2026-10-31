@@ -257,7 +257,7 @@ describe('新規作成画面: 予約後に付けるタグ', () => {
   test('保存が tag_not_found で落ちても入力は残り、選び直せる', async () => {
     fixture.createMenu = vi.fn(async () => { throw new ApiError(400, 'tag not found', 'tag_not_found') })
     await renderNew(); await chooseTag('予約中'); await publish()
-    expect(await screen.findByText('選んだタグは削除されたため保存できませんでした。タグを選び直してください。')).toBeTruthy()
+    expect(await screen.findByText('選んだタグは利用できないため保存できませんでした。タグを選び直してください。')).toBeTruthy()
     expect(nameInput().value).toBe('トリミング')
     await chooseTag('常連さん'); expect(chosenTag()).toContain('常連さん')
   })
