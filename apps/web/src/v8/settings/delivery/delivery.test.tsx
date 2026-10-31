@@ -41,7 +41,7 @@ vi.mock('@/lib/staff-role', () => ({
 vi.mock('@/components/shell/page-chrome', () => ({
   usePageTitle: () => {},
   usePageCrumbs: () => {},
-  useHideSettingsNav: () => {},
+  useHideSettingsNav: () => { throw new Error('デリバリー連携では設定メニューを隠さない') },
 }))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(fixture.search.value),

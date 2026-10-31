@@ -752,7 +752,7 @@ export default function BookingDetailScreen({ model }: { model: BookingDetailMod
         destructive={decideTarget === 'reject' || decideTarget === 'cancel' || decideTarget === 'no_show'}
         busy={acting}
         onCancel={() => setDecideTarget(null)}
-        onConfirm={() => { const a = decideTarget; setDecideTarget(null); if (a) void decide(a) }}
+        error={error || undefined} onSuccess={() => setDecideTarget(null)} onConfirm={() => decideTarget ? decide(decideTarget) : false}
       />
     </div>
   )

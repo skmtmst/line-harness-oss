@@ -328,6 +328,7 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
     setSendError('')
     sendLockRef.current = true
     setSending(true)
+    let acknowledged = false
     try {
       const now = new Date().toISOString()
       const signature = JSON.stringify({ chatId: sendingChatId, combined: true, texts })
@@ -339,8 +340,9 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
         if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
           setSendError(sendResult.error || '送信できませんでした。時間をおいて、もう一度お試しください。')
         }
-        return
+        return false
       }
+      acknowledged = true
       sendKeysRef.current.clear(signature)
       const staffName = sendResult.data.sentByStaffName
       const packMessages = texts.map((content) =>
@@ -368,14 +370,19 @@ export function useInboxSend({ selectedChatId, sending, sendLockRef, pendingAtta
       })
       // 手動返信で未対応が減るので、サイドバーのバッジを即時更新させる
       window.dispatchEvent(new Event(UNANSWERED_REFRESH_EVENT))
+      return true
     } catch (sendError) {
+      if (acknowledged) {
+        if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) setSendError('送信は受け付けました。表示を読み直してください。')
+        return true
+      }
       if (detailAccountRef.current === sendingAccountId && selectedChatIdRef.current === sendingChatId) {
         setSendError(describeSendFailure(sendError))
       }
+      return false
     } finally {
       setSending(false)
       sendLockRef.current = false
-      setPendingPack(null)
     }
   }
 

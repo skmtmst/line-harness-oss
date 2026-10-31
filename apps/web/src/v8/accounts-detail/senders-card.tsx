@@ -83,16 +83,19 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
       setBusy(false)
     }
   }
+  const [stopReviewRequired, setStopReviewRequired] = useState(false)
   const stop = async () => {
-    if (!stopping || busy) return
+    if (!stopping || busy || stopReviewRequired) return
     setBusy(true)
     try {
       await lineSenderApi.deactivate(accountId, stopping.id, stopping.version)
       setStopping(null)
       await load()
+      return true
     } catch {
-      setError('使わない設定にできませんでした。読み直してもう一度お試しください。')
-      await load()
+      setStopReviewRequired(true)
+      setError('使わない設定にできませんでした。閉じて最新の送り手を読み直し、状態を確認してください。')
+      return false
     } finally {
       setBusy(false)
     }
@@ -123,7 +126,7 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
               <span className={styles.name} title={sender.name}>{sender.name}{sender.iconMissing ? '（画像が見つかりません）' : ''}</span>
               <span className={styles.who}>{sender.visibility === 'all' ? '全員' : '本人だけ'}</span>
               {canManage || sender.visibility === 'owner_only' ? (
-                <RowMenu label={`送り手「${sender.name}」の操作`} items={[{ id: 'stop', label: '使わない', tone: 'danger', onSelect: () => setStopping(sender) }]} />
+                <RowMenu label={`送り手「${sender.name}」の操作`} items={[{ id: 'stop', label: '使わない', tone: 'danger', onSelect: () => { setError(''); setStopReviewRequired(false); setStopping(sender) } }]} />
               ) : null}
             </li>
           ))}
@@ -173,8 +176,9 @@ export default function SendersCard({ accountId, accountName }: { accountId: str
         confirmLabel="使わない"
         destructive
         busy={busy}
-        onConfirm={() => stop()}
-        onCancel={() => { if (!busy) setStopping(null) }}
+        confirmDisabled={stopReviewRequired} confirmDisabledReason="閉じて最新の送り手を確認してください。"
+        error={error || undefined} onSuccess={() => setStopping(null)} onConfirm={() => stop()}
+        onCancel={() => { if (busy) return; setStopping(null); setError(''); if (stopReviewRequired) void load(); setStopReviewRequired(false) }}
       />
     </Card>
   )}</SaveErrorScope>)

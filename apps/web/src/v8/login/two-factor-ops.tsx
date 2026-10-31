@@ -196,7 +196,7 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
         {scope === 'ops' && ready && challenge ? <AuthHelp>{`${method === 'password' ? 'パスワード' : 'LINEでのログイン'}を確かめました。認証アプリに出ている6桁を入れてください。認証アプリが使えないときは、運営のオーナーに連絡してください。`}</AuthHelp> : null}
 
         {missingChallenge ? (
-          <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Button variant="text" size="inline" href={backHref} onClick={clearTwoFactorChallenge}>ログインに戻る</Button>} />
+          <Notice tone="info" id="ops-two-factor-missing" message="ログインの情報が見つかりませんでした。ログインからやり直してください。" action={<Button variant="text" textTone="ink" size="inline" href={backHref} onClick={clearTwoFactorChallenge}>ログインに戻る</Button>} />
         ) : null}
         {isAdmin ? <span id="ops-two-factor-code-label" className="sr-only">{codeLabel}</span> : null}
         <div className={styles.code}>
@@ -242,7 +242,7 @@ export default function OpsTwoFactorV8({ scope = 'ops' }: { scope?: 'ops' | 'adm
         ) : (
           <Card surface="muted" padding="compact" layout="vertical" gap="normal">
             <SectionHeader title="コードを入力できない場合" />
-            <AuthActions><Button variant="text" size="inline" href={backHref} onClick={clearTwoFactorChallenge}>ログインに戻る</Button>
+            <AuthActions><Button variant="text" textTone="ink" size="inline" href={backHref} onClick={clearTwoFactorChallenge}>ログインに戻る</Button>
             </AuthActions>
           </Card>
         )}

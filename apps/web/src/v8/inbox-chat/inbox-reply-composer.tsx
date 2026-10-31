@@ -255,14 +255,14 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
             {pendingImageMeta ? '・添付済み' : '添付済み'}
           </span>
         </span>
-        <button
-          type="button"
+        <Button
+          type="button" variant="text" size="inline"
           onClick={() => imageInputRef.current?.click()}
-          disabled={imageUploading}
-          className="text-action shrink-0 whitespace-nowrap text-xs font-semibold"
+          disabled={imageUploading} busy={imageUploading} busyLabel="画像を読み込み中…"
+          className="shrink-0 whitespace-nowrap"
         >
           変更
-        </button>
+        </Button>
         <button
           type="button"
           onClick={clearPendingImage}
@@ -415,7 +415,7 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
           title="テンプレートをまとめて送る"
           description={pendingPack ? `${formatNumber(pendingPack.texts.length)}通をこの順番で一度に送ります。送信すると取り消せません。` : ''}
           confirmLabel={pendingPack ? `まとめて送る（${formatNumber(pendingPack.texts.length)}通）` : 'まとめて送る'}
-          onConfirm={pendingPack ? () => void handleSendPack(pendingPack) : undefined}
+          error={sendError || undefined} onSuccess={() => setPendingPack(null)} onConfirm={pendingPack ? () => handleSendPack(pendingPack) : undefined}
           onCancel={() => setPendingPack(null)}
           busy={sending}
         >

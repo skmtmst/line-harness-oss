@@ -53,6 +53,10 @@ import SheetDialog from '@/v8/reminders/sheet-dialog'
 import { DelayedSkeleton } from '@/components/shared/skeleton';
 import { DataTable, TableHeadRow, Tr, Td, Th, NameCell } from '@/components/shared/table';
 import { type FolderDotFolder } from '@/components/shared/folder-dot';
+import { describeSaveFailure } from '@/lib/api'
+import { describeApiFailure } from '@/components/shared/api-error-message'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
+import type { ConfirmedUndoHandle } from '@/lib/undoable'
 import { runUndoable, runOptimistic } from '@/lib/undoable';
 import PageSizeSelect from '@/components/shared/page-size-select'
 import { completeReorder } from '@/lib/complete-reorder';
@@ -165,6 +169,9 @@ export default function RemindersListV8() {
   const duplicateFeedback = useDuplicateFeedback(selectedAccountId)
   const role = useStaffRole()
   const canEdit = useFeatureAccess('reminders')
+  const moveLockedReason = usePermissionLockReason(canEdit)
+  const moveAllowed = useRef(canEdit)
+  moveAllowed.current = canEdit
   const readonlyReason = 'この操作にはオーナーか管理者の権限が要ります'
   // 1152の板（）。折り畳みはCSSのコンテナ問い合わせが担い、
   // ここでは板IDだけを切り替える。
@@ -198,6 +205,8 @@ export default function RemindersListV8() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
+  const moveConfirmed = useRef(new Map<string, string | null>())
+  const [pendingMove, setPendingMove] = useState<ConfirmedUndoHandle | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
   const duplicateLock = useRef(false)
   const [duplicating, setDuplicating] = useState(false)
@@ -329,12 +338,42 @@ export default function RemindersListV8() {
     })
   }
 
-  const runPause = () => {
-    if (!pauseTarget) return
-    const row = pauseTarget
-    setPauseTarget(null)
-    runToggle(row, false)
+  const confirmedStops = useRef<{ target: object | null; done: Set<string> }>({ target: null, done: new Set() })
+  const stopLock = useRef(false)
+  const [stopBusy, setStopBusy] = useState(false)
+  const [stopError, setStopError] = useState('')
+  useEffect(() => { setStopError('') }, [pauseTarget, bulkPauseIds])
+  const stopConfirmed = async (ids: string[], target: object) => {
+    if (!moveAllowed.current || !ids.length || stopLock.current) return
+    if (confirmedStops.current.target !== target) confirmedStops.current = { target, done: new Set() }
+    const attempt = confirmedStops.current
+    const key = listContextKey
+    const current = () => key === currentListContext.current && confirmedStops.current === attempt
+    stopLock.current = true; setStopBusy(true); setStopError('')
+    try {
+      for (const id of ids) {
+        if (attempt.done.has(id)) continue
+        if (!current()) return
+        if (!moveAllowed.current) { setStopError(`${formatNumber(ids.length)} 件中 ${formatNumber(attempt.done.size)} 件を保存しました。残りは本人・権限・LINEアカウントが変わったため送っていません。`); return false }
+        try {
+          const response = await api.reminders.update(id, { isActive: false })
+          if (!response.success) throw new Error(response.error)
+          attempt.done.add(id)
+        } catch (failure) {
+          if (!current()) return
+          saveErrors.capture(failure)
+          setStopError(`${formatNumber(ids.length)} 件中 ${formatNumber(attempt.done.size)} 件を保存しました。残り ${formatNumber(ids.length - attempt.done.size)} 件は停止できませんでした。${describeSaveFailure(failure)}`)
+          return false
+        }
+      }
+      if (!current()) return
+      setSelectedIds(new Set()); setOptimisticRows(null)
+      reminderList.retry(); void loadStats()
+      return true
+    } finally { stopLock.current = false; if (current()) setStopBusy(false) }
   }
+
+  const runPause = () => pauseTarget ? stopConfirmed([pauseTarget.id], pauseTarget) : undefined
 
   const runResume = (row: ReminderRow) => runToggle(row, true)
 
@@ -413,6 +452,7 @@ export default function RemindersListV8() {
   const openMove = (ids: string[]) => {
     if (ids.length === 0) return
     setMoveDraft('')
+    moveConfirmed.current = new Map()
     setMoveIds(ids)
   }
 
@@ -420,35 +460,63 @@ export default function RemindersListV8() {
    * フォルダ移動は窓で行き先だけ選び、押した瞬間に描き換えて裏で保存する
    * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で送らずに戻せる。
    */
-  const runMove = () => {
-    if (!moveIds || moveIds.length === 0) return
+  const runMove = async () => {
+    if (!moveAllowed.current || !moveIds?.length) return
+    const confirmed = moveConfirmed.current
     const ids = moveIds
     const folderId = moveDraft || null
     const key = listContextKey
-    setOptimisticRows({
-      key,
-      rows: reminders.map((row) => (ids.includes(row.id) ? { ...row, folderId } : row)),
-    })
-    setMoveIds(null)
-    runUndoable({
+    const before = reminders
+    const restore = () => {
+      if (!(moveConfirmed.current === confirmed && currentListContext.current === key)) return
+      setOptimisticRows(confirmed.size ? {
+        key,
+        rows: before.map(row => confirmed.has(row.id)
+          ? { ...row, folderId: confirmed.get(row.id) ?? null } : row),
+      } : null)
+    }
+    setOptimisticRows({ key, rows: before.map(row => ids.includes(row.id) ? { ...row, folderId } : row) })
+    let moveFailure = ''
+    const handle = runUndoable({
+      confirmation: true,
       message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
       commit: async () => {
-        const results = await Promise.all(
-          ids.map((id) => api.reminders.update(id, { folderId }).catch((saveFailure) => { saveErrors.capture(saveFailure); return null })),
-        );
-
-        const failed = results.filter((res) => !res || !res.success).length
-        if (failed > 0) throw new Error(`${formatNumber(failed)}件のフォルダを移動できませんでした`)
+        for (const id of ids) {
+          if (confirmed.has(id) && confirmed.get(id) === folderId) continue
+          if (!(moveConfirmed.current === confirmed && currentListContext.current === key) || !(moveAllowed.current)) {
+            const saved = ids.filter(value => confirmed.has(value) && confirmed.get(value) === folderId).length
+            moveFailure = `${formatNumber(ids.length)} 件中 ${formatNumber(saved)} 件を保存しました。残りは本人・権限・LINEアカウントが変わったため送っていません。`
+            throw new Error(moveFailure)
+          }
+          try {
+            const result = await api.reminders.update(id, { folderId })
+            if (!result.success) throw new Error(result.error)
+            confirmed.set(id, folderId)
+          } catch (reason) {
+            saveErrors.capture(reason)
+            const saved = ids.filter(value => confirmed.has(value) && confirmed.get(value) === folderId).length
+            moveFailure = `全 ${formatNumber(ids.length)} 件中 ${formatNumber(saved)} 件の保存を確認しました。${formatNumber(ids.indexOf(id) + 1)} 件目で止めました。未送信は ${formatNumber(ids.slice(ids.indexOf(id) + 1).filter(value => !confirmed.has(value) || confirmed.get(value) !== folderId).length)} 件です。理由：${describeApiFailure(reason, 'フォルダ移動')}`
+            throw reason
+          }
+        }
       },
-      undo: () => setOptimisticRows(null),
-      failureMessage: 'フォルダを移動できませんでした。',
+      undo: restore,
+      onCommitError: restore,
+      get failureMessage() { return moveFailure || undefined },
       onCommitted: () => {
+        if (!(moveConfirmed.current === confirmed && currentListContext.current === key)) return
         setOptimisticRows(null)
         const moved = new Set(ids)
-        setSelectedIds((current) => new Set([...current].filter((id) => !moved.has(id))))
+        setSelectedIds(values => new Set([...values].filter(id => !moved.has(id))))
         reminderList.retry()
       },
     })
+    setPendingMove(handle)
+    try {
+      const result = await handle.finished
+      return (moveConfirmed.current === confirmed && currentListContext.current === key) ? result : undefined
+    }
+    finally { setPendingMove(value => value === handle ? null : value) }
   }
 
   /* ===== まとめて「止める／再開」 ===== */
@@ -1094,10 +1162,10 @@ export default function RemindersListV8() {
         description="再開するまで、選んだリマインダの通知は送られません。"
         confirmLabel="停止する"
         onCancel={() => setBulkPauseIds(null)}
-        onConfirm={() => {
-          if (bulkPauseIds) runBulkToggle(false, bulkPauseIds)
-          setBulkPauseIds(null)
-        }}
+        busy={stopBusy} error={stopError || undefined}
+        confirmDisabled={!canEdit} confirmLockedReason={moveLockedReason}
+        onSuccess={() => setBulkPauseIds(null)}
+        onConfirm={() => bulkPauseIds ? stopConfirmed(bulkPauseIds, bulkPauseIds) : undefined}
       />
       {/* 一時停止の窓（★V8 `RwVo5`）。確定で即反映し、裏で保存する。 */}
       <ConfirmDialog
@@ -1106,6 +1174,9 @@ export default function RemindersListV8() {
         title={pauseTarget ? `「${pauseTarget.name}」を一時停止する` : ''}
         description="再開するまで、このリマインダの通知は送られません。"
         confirmLabel="一時停止する"
+        busy={stopBusy} error={stopError || undefined}
+        confirmDisabled={!canEdit} confirmLockedReason={moveLockedReason}
+        onSuccess={() => setPauseTarget(null)}
         onConfirm={() => runPause()}
         onCancel={() => {
           setPauseTarget(null)
@@ -1179,7 +1250,9 @@ export default function RemindersListV8() {
         }
         description="移動先のフォルダを選んでください。「未分類」を選ぶとフォルダから外れます。"
         confirmLabel="移動する"
-        onConfirm={() => runMove()}
+        confirmDisabled={!canEdit} confirmLockedReason={moveLockedReason}
+        pendingUndo={pendingMove} onSuccess={() => setMoveIds(null)} onUndone={() => setMoveIds(null)}
+        busyLabel="移動中…" onConfirm={() => runMove()}
         onCancel={() => {
           setMoveIds(null)
         }}
@@ -1188,6 +1261,7 @@ export default function RemindersListV8() {
           <Field label={<><span className={styles.moveLabel}>移動先のフォルダ</span></>}><SaveErrorField names={["moveDraft","move_draft"]}><FolderSelect
               aria-label="移動先のフォルダ"
               size="full"
+              disabled={!canEdit || Boolean(pendingMove)} lockedReason={moveLockedReason}
               value={moveDraft}
               onChange={(value) => setMoveDraft(value)}
               folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}

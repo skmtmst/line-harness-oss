@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { RankProgram, RankTier } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
@@ -68,7 +68,7 @@ function downText(program: RankProgram, tier: RankTier): string {
 
 function failureText(reason: unknown, doing: string): string {
   const code = reason instanceof ApiError ? reason.code : undefined
-  if (code === 'version_conflict') return '別の人が先に変えていました。読み直したので、もう一度お試しください。'
+  if (reason instanceof ApiError && reason.status === 409) return '別の人が先に変えていました。閉じて最新の段を確認してください。'
   if (code === 'invalid_tiers') return '段の入力を直してください。名前・上がる条件（上の段ほど大きく）・特典の倍率（1〜3）を確かめます。'
   if (reason instanceof ApiError && reason.status === 403) return `${doing}権限がありません。オーナーか管理者に頼んでください。`
   return `${doing}ことができませんでした。時間をおいてもう一度お試しください。`
@@ -84,10 +84,12 @@ export default function RanksTab() {
   const [program, setProgram] = useState<RankProgram | null>(null)
   const [preview, setPreview] = useState<Preview | null>(null)
   const [notice, setNotice] = useState('')
-  const [edit, setEdit] = useState<{ index: number | null } | null>(null)
+  const [edit, setEdit] = useState<{ id: string | null; tier: RankTier | null } | null>(null)
   const [confirm, setConfirm] = useState<'activate' | 'stop' | null>(null)
   const [busy, setBusy] = useState(false)
-  const [deleteIndex, setDeleteIndex] = useState<number | null>(null)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const mutation = useRef(false)
+  const [reviewRequired, setReviewRequired] = useState(false)
   const [sample, setSample] = useState<'up' | 'down'>('up')
   const [menuIndex, setMenuIndex] = useState<number | null>(null)
 
@@ -110,24 +112,34 @@ export default function RanksTab() {
   useEffect(() => { void load() }, [load])
 
   const tiers = useMemo(() => program?.tiers ?? [], [program])
+  const editingIndex = edit?.id ? tiers.findIndex(tier => tier.id === edit.id) : -1
   const countOf = (id: string) => preview?.byTier.find((item) => item.tierId === id)?.count
 
   const run = async (doing: string, action: () => Promise<{ success: boolean }>, done: string) => {
+    if (mutation.current || reviewRequired || readonly || status !== 'ready') return false
+    mutation.current = true
     setBusy(true)
     setNotice('')
     try {
       const response = await action()
       if (!response.success) throw new Error('failed')
       notifySaved(done)
-      await load()
+      void load()
       return true
     } catch (reason) {
       setNotice(failureText(reason, doing))
-      await load()
+      const needsReview = !(reason instanceof ApiError) || reason.status === 409 || reason.status >= 500
+      setReviewRequired(needsReview)
       return false
     } finally {
-      setBusy(false)
+      mutation.current = false; setBusy(false)
     }
+  }
+
+  const closeReviewed = () => {
+    setNotice('')
+    if (reviewRequired) void load()
+    setReviewRequired(false)
   }
 
   const saveProgram = (next: Partial<Pick<RankProgram, 'metric' | 'windowMonths' | 'notifyUpgrade' | 'notifyDowngrade'>>) => {
@@ -176,8 +188,8 @@ export default function RanksTab() {
                       open={menuIndex === index}
                       onOpenChange={(next) => setMenuIndex(next ? index : null)}
                       items={[
-                        { id: 'edit', label: '編集する', onSelect: () => setEdit({ index }) },
-                        ...(index === 0 || tiers.length <= 2 ? [] : [{ id: 'delete', label: '削除する', onSelect: () => setDeleteIndex(index) }]),
+                        { id: 'edit', label: '編集する', disabled: busy || reviewRequired, disabledReason: '最新のランクを確認してください。', onSelect: () => { setNotice(''); setEdit({ id: tier.id, tier }) } },
+                        ...(index === 0 || tiers.length <= 2 ? [] : [{ id: 'delete', label: '削除する', disabled: busy || reviewRequired, disabledReason: '最新のランクを確認してください。', onSelect: () => { setNotice(''); setReviewRequired(false); setDeleteId(tier.id) } }]),
                       ]}
                     />
                   </span>
@@ -213,7 +225,7 @@ export default function RanksTab() {
   ) : (
     <ListPageSection><div className={narrow ? `${styles.layout} ${styles.layoutNarrow}` : styles.layout}>
       <div className={styles.main}>
-        {notice ? <Notice tone="danger" message={notice} /> : null}
+        {notice ? <Notice tone="danger" message={notice} action={reviewRequired && !edit && !confirm && !deleteId ? <Button variant="text" size="inline" onClick={closeReviewed}>最新のランクを確認する</Button> : undefined} /> : null}
         <section className={styles.card} aria-label="ランクの段">
           <div className={styles.cardHead}>
             <h3 className={styles.cardTitle}>ランクの段</h3>
@@ -222,21 +234,21 @@ export default function RanksTab() {
               <StatusBadge tone={program?.status === 'active' ? 'success' : 'neutral'}>{activeLabel}</StatusBadge>
               {readonly || !program || tiers.length === 0 ? null : (
                 program.status === 'active'
-                  ? <Button variant="secondary" onClick={() => setConfirm('stop')} disabled={busy}>止める</Button>
-                  : <Button variant="primary" onClick={() => setConfirm('activate')} disabled={busy}>動かす</Button>
+                  ? <Button variant="secondary" onClick={() => { setNotice(''); setConfirm('stop') }} disabled={busy || reviewRequired}>止める</Button>
+                  : <Button variant="primary" onClick={() => { setNotice(''); setConfirm('activate') }} disabled={busy || reviewRequired}>動かす</Button>
               )}
             </span>
           </div>
           {program && !readonly ? (
             <div className={styles.settings}>
               <span className={styles.settingsLabel}>数える物</span>
-              <Select aria-label="数える物" value={program.metric} options={METRIC_OPTIONS} onChange={(value) => saveProgram({ metric: value as RankProgram['metric'] })} disabled={busy} />
+              <Select aria-label="数える物" value={program.metric} options={METRIC_OPTIONS} onChange={(value) => saveProgram({ metric: value as RankProgram['metric'] })} disabled={busy || reviewRequired} />
               <span className={styles.settingsLabel}>期間</span>
-              <Toggle checked={program.notifyUpgrade} label="上がったときに知らせる" onChange={(checked) => saveProgram({ notifyUpgrade: checked })} disabled={busy} />
+              <Toggle checked={program.notifyUpgrade} label="上がったときに知らせる" onChange={(checked) => saveProgram({ notifyUpgrade: checked })} disabled={busy || reviewRequired} />
               <span className={styles.settingsLabel}>上がったときに知らせる</span>
-              <Toggle checked={program.notifyDowngrade} label="下がる前に知らせる" onChange={(checked) => saveProgram({ notifyDowngrade: checked })} disabled={busy} />
+              <Toggle checked={program.notifyDowngrade} label="下がる前に知らせる" onChange={(checked) => saveProgram({ notifyDowngrade: checked })} disabled={busy || reviewRequired} />
               <span className={styles.settingsLabel}>下がる前に知らせる</span>
-              <Select aria-label="数える期間" value={String(program.windowMonths)} options={Array.from(new Set([...WINDOW_OPTIONS, program.windowMonths])).sort((a, b) => a - b).map((value) => ({ value: String(value), label: windowLabel(value) }))} onChange={(value) => saveProgram({ windowMonths: Number(value) })} disabled={busy} />
+              <Select aria-label="数える期間" value={String(program.windowMonths)} options={Array.from(new Set([...WINDOW_OPTIONS, program.windowMonths])).sort((a, b) => a - b).map((value) => ({ value: String(value), label: windowLabel(value) }))} onChange={(value) => saveProgram({ windowMonths: Number(value) })} disabled={busy || reviewRequired} />
             </div>
           ) : null}
           {tiers.length === 0 ? (
@@ -252,7 +264,7 @@ export default function RanksTab() {
   )
 
   const actions = readonly || !program ? null : (
-    <Button variant="primary" onClick={() => setEdit({ index: null })} disabled={tiers.length >= 5} title={tiers.length >= 5 ? '段は 5 つまでです' : undefined}>ランクを足す</Button>
+    <Button variant="primary" onClick={() => { setNotice(''); setEdit({ id: null, tier: null }) }} disabled={tiers.length >= 5 || reviewRequired || status !== 'ready'} title={tiers.length >= 5 ? '段は 5 つまでです' : undefined}>ランクを足す</Button>
   )
 
   return (
@@ -260,34 +272,40 @@ export default function RanksTab() {
       {body}
       {edit && program ? (
         <TierDialog
-          tier={edit.index === null ? null : tiers[edit.index]}
+          key={edit.id ?? 'new'}
+          tier={edit.tier}
           program={program}
-          prev={edit.index === null ? tiers[tiers.length - 1] ?? null : tiers[edit.index - 1] ?? null}
-          next={edit.index === null ? null : tiers[edit.index + 1] ?? null}
-          isFirst={edit.index === 0 || (edit.index === null && tiers.length === 0)}
+          prev={edit.id === null ? tiers[tiers.length - 1] ?? null : tiers[editingIndex - 1] ?? null}
+          next={edit.id === null ? null : tiers[editingIndex + 1] ?? null}
+          isFirst={editingIndex === 0 || (edit.id === null && tiers.length === 0)}
           busy={busy}
-          onCancel={() => setEdit(null)}
+          error={notice || undefined}
+          blocked={reviewRequired || (edit.id !== null && editingIndex < 0)}
+          onCancel={() => { setEdit(null); closeReviewed() }}
           onSave={async (tier) => {
-            const list = edit.index === null ? [...tiers, tier] : tiers.map((item, i) => (i === edit.index ? tier : item))
+            if (reviewRequired || (edit.id !== null && !tiers.some(item => item.id === edit.id))) return
+            const list = edit.id === null ? [...tiers, tier] : tiers.map(item => item.id === edit.id ? { ...tier, id: item.id } : item)
             if (await saveTiers(list)) setEdit(null)
           }}
         />
       ) : null}
       <ConfirmDialog
-        open={deleteIndex !== null}
-        title={deleteIndex !== null ? `「${tiers[deleteIndex]?.name ?? ''}」を削除しますか？` : ''}
+        open={deleteId !== null}
+        title={deleteId !== null ? `「${tiers.find(tier => tier.id === deleteId)?.name ?? ''}」を削除しますか？` : ''}
         description="その段にいた人は、1 つ下の段になります。段を保存するといったん止まります。"
         confirmLabel="削除する"
         destructive
         busy={busy}
-        onConfirm={async () => { if (deleteIndex !== null && await saveTiers(tiers.filter((_, i) => i !== deleteIndex))) setDeleteIndex(null) }}
-        onCancel={() => setDeleteIndex(null)}
+        confirmDisabled={reviewRequired} confirmDisabledReason="閉じて最新の段を読み直し、消す段を選び直してください。"
+        error={notice || undefined} onSuccess={() => setDeleteId(null)} onConfirm={() => deleteId !== null ? saveTiers(tiers.filter(tier => tier.id !== deleteId)) : undefined}
+        onCancel={() => { setDeleteId(null); closeReviewed() }}
       />
       <Dialog
         open={confirm !== null}
         title={confirm === 'activate' ? '会員ランクを動かしますか？' : '会員ランクを止めますか？'}
         confirmLabel={confirm === 'activate' ? '動かす' : '止める'}
         busy={busy}
+        confirmRetry={Boolean(notice)}
         onConfirm={() => {
           if (!accountId || !program) return
           const action = confirm === 'activate'
@@ -295,7 +313,8 @@ export default function RanksTab() {
             : () => memberRanksApi.stop(accountId, program.version)
           void run(confirm === 'activate' ? '動かす' : '止める', action, confirm === 'activate' ? '会員ランクを動かしました。' : '会員ランクを止めました。').then((ok) => { if (ok) setConfirm(null) })
         }}
-        onCancel={() => setConfirm(null)}
+        error={notice || undefined} confirmDisabled={reviewRequired} confirmDisabledReason="閉じて最新のランクを確認してください。"
+        onCancel={() => { setConfirm(null); closeReviewed() }}
       >
         <div className={styles.dialogBody}>
           {confirm === 'activate' ? (
@@ -322,7 +341,7 @@ function useAccountId(): string | null {
   return selectedAccountId
 }
 
-function TierDialog({ tier, program, prev, next, isFirst, busy, onCancel, onSave }: {
+function TierDialog({ tier, program, prev, next, isFirst, busy, error, blocked, onCancel, onSave }: {
   tier: RankTier | null
   program: RankProgram
   prev: RankTier | null
@@ -330,6 +349,8 @@ function TierDialog({ tier, program, prev, next, isFirst, busy, onCancel, onSave
   isFirst: boolean
   busy: boolean
   onCancel: () => void
+  error?: string
+  blocked: boolean
   onSave: (tier: RankTier) => void
 }) {
   const [name, setName] = useState(tier?.name ?? '')
@@ -342,6 +363,7 @@ function TierDialog({ tier, program, prev, next, isFirst, busy, onCancel, onSave
   const [errors, setErrors] = useState<{ name?: string; threshold?: string; multiplier?: string }>({})
 
   const submit = () => {
+    if (busy || blocked) return
     const found: typeof errors = {}
     const th = Number(threshold)
     const mul = Number(multiplier)
@@ -366,7 +388,7 @@ function TierDialog({ tier, program, prev, next, isFirst, busy, onCancel, onSave
   }
 
   return (
-    <Dialog open contentLayout="form" title={tier ? 'ランクを編集する' : 'ランクを足す'} confirmLabel="保存する" busy={busy} onConfirm={submit} onCancel={onCancel}>
+    <Dialog open contentLayout="form" title={tier ? 'ランクを編集する' : 'ランクを足す'} confirmLabel="保存する" busy={busy} error={error} confirmRetry={Boolean(error)} confirmDisabled={blocked} confirmDisabledReason="閉じて最新の段を確認し、編集する段を選び直してください。" onConfirm={submit} onCancel={onCancel}>
       <div className={styles.dialogBody}>
         <Field label="名前" required error={errors.name}><TextField aria-label="名前" value={name} maxLength={30} onChange={(event) => setName(event.target.value)} /></Field>
         <Field label="上がる条件" required error={errors.threshold} note={isFirst ? '最初の段は、友だちになったら入ります。' : `${windowLabel(program.windowMonths)}の ${METRIC_OPTIONS.find((item) => item.value === program.metric)?.label ?? ''}`}>

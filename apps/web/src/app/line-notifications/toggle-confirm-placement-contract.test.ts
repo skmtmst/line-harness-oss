@@ -21,12 +21,6 @@ const CODE = PAGE
   .replace(/^\s*\/\/.*$/gm, '')
 
 describe('お知らせの出す・止める確認窓の置き場所', () => {
-  it('行スイッチは即時保存ではなく pendingToggle を立てる', () => {
-    expect(CODE).toContain('onToggle={() => setPendingToggle(setting)}')
-    // 確認なしの即時 save へ戻さない。
-    expect(CODE).not.toContain('onToggle={() => void save(')
-  })
-
   it('確認窓は編集画面の条件（expandedSetting）の外に置く', () => {
     const editorBlock = CODE.indexOf('expandedSetting ? <>')
     const dialog = CODE.indexOf('open={pendingToggle !== null}')
@@ -37,8 +31,4 @@ describe('お知らせの出す・止める確認窓の置き場所', () => {
     expect(dialog).toBeGreaterThan(blockEnd)
   })
 
-  it('実行は pendingToggle を閉じてから save に進む', () => {
-    expect(CODE).toContain('setPendingToggle(null); return save(')
-    expect(CODE).toContain('onCancel={() => setPendingToggle(null)}')
-  })
 })

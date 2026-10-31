@@ -261,7 +261,8 @@ describe('R490・R491: 公開の再試行と店切替', () => {
     // やり直す。再試行は同じ下書きの更新から入り、404で公開済みを照合する。
     mockUpdate.mockRejectedValueOnce(new ApiError(404, '編集中の下書きが見つかりません'))
     mockList.mockResolvedValue(ok([{ id: 'draft-9', status: 'active' }]))
-    await activateRule(el)
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    await clickButton(el, 'もう一度')
     expect(notice).toHaveBeenCalledWith(expect.stringContaining('すでに公開されています'))
     // 新しい下書きは作らない（稼働ルールを2件にしない）。
     expect(mockCreate).toHaveBeenCalledTimes(1)

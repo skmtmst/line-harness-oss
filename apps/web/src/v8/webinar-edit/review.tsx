@@ -105,13 +105,15 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
       const res = await webinarApi.testNotifications(webinar.id)
       setNotifyConfirm(false)
       setNotice(`通知をテスト送信しました。成功 ${formatNumber(res.data.sent)} 件・失敗 ${formatNumber(res.data.failed)} 件`)
-      const refreshed = await webinarApi.editor(webinar.id)
-      ctx.onEditorChange(refreshed.data)
+      // Delivery was acknowledged. A failed refresh must never resend it.
+      void webinarApi.editor(webinar.id).then(refreshed => ctx.onEditorChange(refreshed.data)).catch(cause => { setNotice(webinarErrorText(cause, '表示を読み直してください。')) })
+      return true
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause)
 
       { if (!fieldFailure)
       setNotice(webinarErrorText(cause, 'テスト送信できませんでした。時間をおいてもう一度お試しください。')) }
+      return false
     } finally {
       lock.current = false
       setTesting(false)
@@ -165,7 +167,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         </div>
         <div className={form.previewActions}>
           {ctx.canOpenPublicPage && ctx.publicUrl ? <Button external href={ctx.publicUrl}  >公開ページを見る</Button> : null}
-          {readOnly ? null : <Button disabled={testing !== false || publishing} onClick={() => setNotifyConfirm(true)}><Send size={16} aria-hidden="true" />テストを送る</Button>}
+          {readOnly ? null : <Button disabled={testing !== false || publishing} onClick={() => { setNotice(''); setNotifyConfirm(true) }}><Send size={16} aria-hidden="true" />テストを送る</Button>}
         </div>
         {!ctx.canOpenPublicPage && ctx.publicPageReason ? <p className={form.previewNote}>{ctx.publicPageReason}</p> : null}
         {ctx.analytics ? <p className={form.previewNote}>{`申込 ${formatNumber(ctx.analytics.summary.reservations)} 人`}</p> : null}
@@ -189,7 +191,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         {readOnly ? null : (
           <div className={form.buttons}>
             <Button variant={failed.some((check) => check.key === 'public_page_test') ? 'primary' : 'secondary'} disabled={testing !== false || publishing} busy={testing === 'page'} busyLabel="確かめています…" onClick={() => void testPage()}><Globe size={16} aria-hidden="true" />ページをテスト</Button>
-            <Button disabled={testing !== false || publishing} onClick={() => setNotifyConfirm(true)}><Send size={16} aria-hidden="true" />通知のテストを送る</Button>
+            <Button disabled={testing !== false || publishing} onClick={() => { setNotice(''); setNotifyConfirm(true) }}><Send size={16} aria-hidden="true" />通知のテストを送る</Button>
           </div>
         )}
         {notice ? <p className={form.cardNote} role="status">{notice}</p> : null}
@@ -208,7 +210,7 @@ export default function ReviewPane({ ctx, chromeFor }: { ctx: EditContext; chrom
         </dl>
       </Card>
 
-      <ConfirmDialog open={notifyConfirm} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing === 'notify'} onCancel={() => { if (testing === false) setNotifyConfirm(false) }} onConfirm={() => testNotify()} />
+      <ConfirmDialog open={notifyConfirm} title="通知をテスト送信しますか？" description="アカウント設定で登録したテスト受信者へ、実際のLINEメッセージを送ります。申込者全員には届きません。" confirmLabel="テストを送る" busy={testing === 'notify'} onCancel={() => { if (testing === false) setNotifyConfirm(false) }} error={notice || undefined} onSuccess={() => setNotifyConfirm(false)} onConfirm={() => testNotify()} />
     </CreatePage></SaveErrorScope>
   )
 }

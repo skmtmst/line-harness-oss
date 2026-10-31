@@ -294,7 +294,7 @@ export function useUidMigration(initialRunId: string | null = null) {
     }
   }
 
-  const decideChecked = async (item: UidMigrationItem, decision: UidMigrationDecision, ticket: number) => {
+  const decideChecked = async (item: UidMigrationItem, decision: UidMigrationDecision, ticket: number, onAcknowledged?: () => void) => {
     if (!canWriteMigrationNow() || !active || !isCurrentRun(active.id, ticket) || writeLock.current || busy || current.current.detailBusy || !['review', 'ready', 'failed'].includes(current.current.active!.status)) return
     writeLock.current = true
     setBusy(true)
@@ -303,6 +303,7 @@ export function useUidMigration(initialRunId: string | null = null) {
     try {
       const response = await api.friendMigrations.decide(active.id, item.id, decision)
       if (!response.success) throw new ApiError(400, response.error)
+      onAcknowledged?.()
       if (detailTicket.current !== ticket || current.current.active?.id !== active.id) return
       let reading = loadDetail(active.id, page, classification, pendingOnly)
       let ownTicket = detailTicket.current
@@ -341,22 +342,30 @@ export function useUidMigration(initialRunId: string | null = null) {
   const decide = (item: UidMigrationItem, decision: UidMigrationDecision) => decideChecked(item, decision, renderedDetailTicket)
 
   /** 一括判断は自分の再読取で進んだ世代だけを引き継ぎ、外部の画面切替では止める。 */
-  const decideMany = async (items: UidMigrationItem[], decision: UidMigrationDecision) => {
+  const decideMany = async (items: UidMigrationItem[], decision: UidMigrationDecision, acknowledged = new Set<string>()) => {
     const permissionEpoch = accessEpoch.current
     let ticket = renderedDetailTicket
     for (const [index, item] of items.entries()) {
       if (!mounted.current) return
+      if (acknowledged.has(item.id)) continue
       if (permissionEpoch !== accessEpoch.current) {
         setMessage(`${index + 1}件目で止めました。理由：権限が変わったため、残りの判断を中止しました。`)
-        return
+        return false
       }
-      const next = await decideChecked(item, decision, ticket)
+      const latest = current.current.active?.items?.find(row => row.id === item.id)
+      if (!latest || latest.decision !== 'pending') {
+        if (latest?.decision === decision) { acknowledged.add(item.id); continue }
+        setMessage('表示内容が変わりました。閉じて対応表を確認してください。')
+        return false
+      }
+      const next = await decideChecked(item, decision, ticket, () => acknowledged.add(item.id))
       if (next === undefined) {
         if (mounted.current) setMessage(reason => `${index + 1}件目で止めました。理由：${reason ?? '表示内容または操作できる状態が変わりました。対応表を確認してください。'}`)
-        return
+        return false
       }
       ticket = next
     }
+    return true
   }
 
   // 口が返す未判断数があればそれを使い、なければ表示中の行で数える。
@@ -537,6 +546,7 @@ export function useUidMigration(initialRunId: string | null = null) {
     createDryRun,
     decide,
     decideMany,
+    clearDecisionError: () => { setMessage(null); setDetailError(null) },
     unresolved,
     canRunExecute,
     canRunRollback,

@@ -280,9 +280,12 @@ export default function BroadcastForm({
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [preflightDialogOpen, setPreflightDialogOpen] = useState(false)
   const [testDialogOpen, setTestDialogOpen] = useState(false)
+  const [testResultOpen, setTestResultOpen] = useState(false)
   const [testRecipients, setTestRecipients] = useState<Array<{ id: string; displayName: string; pictureUrl: string | null }>>([])
   const [testRecipientState, setTestRecipientState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const [testSending, setTestSending] = useState(false)
+  const [testRetryBlocked, setTestRetryBlocked] = useState(false)
+  useEffect(() => { if (!testDialogOpen) setTestRetryBlocked(false) }, [testDialogOpen])
   /*
    * テスト送信の結果と実行履歴。
    *
@@ -984,14 +987,14 @@ export default function BroadcastForm({
    * 最初だけ下書きを作り、2回目以降と本番予約は同じ行を更新する。
    * 確かめた内容と本番で送る内容を同じ実体にし、テスト回数ぶん下書きを増やさない。
    */
-  const handleTestSend = () => testBroadcast({ onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, validate })
+  const handleTestSend = () => testBroadcast({ onDraftSaved, persistDraft, rejectValidation, saveErrors, setError, setTestHistory, setTestResult, setTestSending, setTestRetryBlocked, validate })
 
   /**
    * テスト送信の前に、実際に登録されている送信先を読み合わせる。
    * 送信先を固定名で描くと、別アカウントでもその人へ届くように誤解される。
    */
   const testRecipientsGeneration = useRef(0)
-  useEffect(() => { testRecipientsGeneration.current += 1; setTestDialogOpen(false); setTestRecipients([]) }, [selectedAccountId])
+  useEffect(() => { testRecipientsGeneration.current += 1; setTestDialogOpen(false); setTestResultOpen(false); setTestRecipients([]) }, [selectedAccountId])
   const afterActionChoices = [{ id: 'common_action', label: '共通アクションを実行する', make: () => '', picker: {
     title: '公開済みの共通アクションを選ぶ', items: publishedActions.map(action => ({ id: action.versionId, name: action.name, meta: `第${action.version}版` })), apply: (_: string, ids: string[]) => ids[0],
   } }]
@@ -1434,6 +1437,6 @@ export default function BroadcastForm({
       保存できないときはこの画面へ戻って直す。
     */}
     {renderBroadcastConfirmDialogs({ approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, previewConfirmed, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title })}
-    {renderBroadcastEditorDialogs({ ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, preflight, previewConfirmed, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, title, trackLinks, unconfirmedCount })}
+    {renderBroadcastEditorDialogs({ ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, preflight, previewConfirmed, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks, unconfirmedCount })}
   </div></MessageComposerPage></SaveErrorScope>
 }

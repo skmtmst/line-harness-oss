@@ -1,5 +1,6 @@
 'use client'
 
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import type { TagEditFormProps } from './edit-form-types'
 export type { TagEditHost } from './edit-form-types'
 
@@ -135,6 +136,8 @@ export function TagEditForm({
   })
   const overlapAmounts = [...(reward.trim() && Number(reward) > 0 ? [Number(reward)] : []), ...grantAmounts]
   const [bulkOpen, setBulkOpen] = useState(false)
+  const [bulkTried, setBulkTried] = useState(false)
+  const bulkLockedReason = usePermissionLockReason(!readOnly)
   const bulkOk = useRef(false)
   const bulkPeople = tag.friendCount ?? 0
   const requestSave = () => {
@@ -143,14 +146,14 @@ export function TagEditForm({
     if (problem) { setNameError(problem); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
     setNameError('')
     if (grantAmounts.length > 0 && bulkPeople >= 1000 && !bulkOk.current) {
-      setBulkOpen(true)
+      setBulkTried(false); setBulkOpen(true)
       return
     }
     if (applyToExisting && (tag.friendCount ?? 0) > 0 && (values.rewardMiles > 0 || values.referralRewardMiles > 0)) {
       setRetroactiveOpen(true)
-      return
+      return true
     }
-    void onSave(values, false)
+    return onSave(values, false)
   }
 
   /* 使っている所：削除の影響確認と同じ数え方（dependencies）。取れないときはタグの一覧の数。 */
@@ -364,7 +367,7 @@ export function TagEditForm({
         title={`${bulkPeople.toLocaleString('ja-JP')} 人に付きます。保存しますか？`}
         description={`マイルを付ける動きがあります。このタグが付いている ${bulkPeople.toLocaleString('ja-JP')} 人に関わります。付けたマイルは自動では戻せません。`}
         confirmLabel="保存する"
-        onConfirm={() => { bulkOk.current = true; setBulkOpen(false); requestSave(); bulkOk.current = false }}
+        busy={saving} error={(bulkTried ? error : undefined) || nameError || undefined} confirmDisabled={readOnly || conflict} confirmLockedReason={bulkLockedReason} confirmDisabledReason="閉じて最新の内容と比べてください。" onSuccess={() => setBulkOpen(false)} onConfirm={() => { setBulkTried(true); bulkOk.current = true; try { return requestSave() } finally { bulkOk.current = false } }}
         onCancel={() => setBulkOpen(false)}
       />
       {retroactiveOpen ? (
