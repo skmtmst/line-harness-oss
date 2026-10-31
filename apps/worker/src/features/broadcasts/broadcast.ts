@@ -1,4 +1,4 @@
-import { scopeStoredBroadcastSegmentQuery, restrictSegmentInput } from '../../services/segment-query-scope.js';
+import { scopeStoredBroadcastSegmentQuery, restrictSegmentInput, scopedFriendIds, storedBroadcastFriendScope } from '../../services/segment-query-scope.js';
 import { BROADCAST_DEFINITION_GUARD_SQL, broadcastDefinitionGuardArgs } from './broadcast-definition-guard.js';
 import { logger } from '@line-crm/shared/server';
 import {processBroadcastSimulation} from './broadcast-simulation.js';
@@ -173,6 +173,10 @@ export async function processBroadcastSend(
     if (accountId) {
       where.push('f.line_account_id = ?');
       binds.push(accountId);
+    } else {
+      const ids = scopedFriendIds(await storedBroadcastFriendScope(db, null));
+      where.push(`f.id IN (${ids.sql})`);
+      binds.push(...ids.bindings);
     }
     if (broadcast.target_type === 'tag') {
       if (!broadcast.target_tag_id) throw new Error('target_tag_id is required for personalized tag broadcast');
@@ -359,15 +363,22 @@ export async function processBroadcastSend(
       if (known > 0) {
         await db.prepare(`UPDATE broadcast_send_claims SET state='unknown',error_code='interrupted_dispatch'
           WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NOT NULL`).bind(broadcastId).run();
-        // 現在のタグではなく最初の台帳を読む。ブロック・非表示だけは直前の状態を見る。
+        // 最初の台帳の宛先を保ち、現在の所属・ブロック・非表示だけを確認する。
+        const ids = scopedFriendIds(await storedBroadcastFriendScope(db, broadcastAccountId));
+        await db.prepare(`UPDATE broadcast_send_claims SET state='failed',error_code='recipient_unavailable'
+          WHERE broadcast_id=? AND ((state='claimed' AND dispatched_at IS NULL)
+            OR (state='failed' AND error_code IN ('line_http_429','stopped_before_dispatch') AND attempt_no=?))
+            AND friend_id NOT IN (${ids.sql})`).bind(broadcastId,Number(broadcast.send_attempt_no ?? 1),...ids.bindings).run();
         followingFriends = (await db.prepare(`SELECT f.* FROM friends f JOIN broadcast_send_claims c ON c.friend_id=f.id
-          WHERE c.broadcast_id=? AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0
-            AND (? IS NULL OR f.line_account_id=?) ORDER BY c.friend_id`)
-          .bind(broadcastId,broadcastAccountId,broadcastAccountId).all<import('@line-crm/db').Friend>()).results;
+          WHERE c.broadcast_id=? AND ((c.state='claimed' AND c.dispatched_at IS NULL)
+            OR (c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch') AND c.attempt_no=?))
+            AND f.is_following=1 AND COALESCE(f.is_hidden,0)=0 AND f.id IN (${ids.sql}) ORDER BY c.friend_id`)
+          .bind(broadcastId,Number(broadcast.send_attempt_no ?? 1),...ids.bindings).all<import('@line-crm/db').Friend>()).results;
         totalCount = broadcast.total_count || known;
         successCount = Number(ledger?.sent ?? 0);
       } else {
-        const friends = await getFriendsByTag(db, broadcast.target_tag_id, broadcastAccountId);
+        const friends = await getFriendsByTag(db, broadcast.target_tag_id, broadcastAccountId,
+          broadcastAccountId == null ? await storedBroadcastFriendScope(db, null) : undefined);
         followingFriends = friends.filter((f) => f.is_following && !f.is_hidden);
         totalCount = followingFriends.length;
         // 送信前に全IDを残す。JSON配列を1変数で渡しD1のbind数上限に当てない。

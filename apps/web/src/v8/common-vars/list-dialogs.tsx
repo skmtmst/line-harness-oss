@@ -175,29 +175,11 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
         busy={deleteBusy}
         error={deleteError || undefined}
         onCancel={closeDelete}
-        footer={deleteTarget ? (
-          /* 絵 ：キャンセルは真ん中、実行は右端。 */
-          <div className={`${styles.splitFooter} ${styles.deleteFooter}`}>
-            {/* 絵 xxKtW に理由の欄は無いが、差し替え・止めるには理由が要る（版履歴に残す）。左の空きに小さく置く。 */}
-            {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete ? (
-              /* 必須は欄の中の文（理由（必須…））と aria-required で伝え、下の帯を1行に保つ（帯の高さ）。 */
-              <span><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><SharedTextField
-                aria-required={reasonRequirement.required}
-                value={deleteReason}
-                onChange={(e) => setDeleteReason(e.target.value)}
-                placeholder="理由（必須）"
-                aria-label="消した理由・止める理由（記録に残ります）"
-                title="消した理由・止める理由（記録に残ります）"
-                className={styles.footerReason}
-              /></SaveErrorField></span>
-            ) : <span aria-hidden="true" />}
+        footer={deleteTarget ? (<DialogActions>
             <Button type="button" onClick={closeDelete} disabled={deleteBusy}>
               キャンセル
             </Button>
-            <span aria-hidden="true" />
-            <span className={styles.footerEnd}>
-            {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete && deleteChoice === 'replace' ? (
-              <Button
+            {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete && deleteChoice === 'replace' ? (<Button
                 type="button"
                 variant="danger"
                 onClick={() => void confirmReplacement()}
@@ -207,10 +189,8 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                 busyLabel="差し替え中…"
               >
                 差し替えて消す
-              </Button>
-            ) : null}
-            {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete && deleteChoice === 'stop' ? (
-              <Button
+              </Button>) : null}
+            {deletePhase === 'ready' && deleteImpact && !deleteImpact.canDelete && deleteChoice === 'stop' ? (<Button
                 type="button"
                 variant="primary"
                 onClick={() => void confirmStopInstead()}
@@ -220,11 +200,9 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                 busyLabel="止めています…"
               >
                 止める
-              </Button>
-            ) : null}
+              </Button>) : null}
             {deletePhase === 'ready' && deleteImpact && deleteImpact.canDelete
-              && canDeleteVar({ impact: deleteImpact, typedKey, reason: deleteReason, busy: deleteBusy }) ? (
-                <Button
+              && canDeleteVar({ impact: deleteImpact, typedKey, reason: deleteReason, busy: deleteBusy }) ? (<Button
                   type="button"
                   variant="danger"
                   onClick={() => void confirmDirectDelete()}
@@ -232,11 +210,8 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                   busyLabel="処理中…"
                 >
                   このまま削除
-                </Button>
-              ) : null}
-            </span>
-          </div>
-        ) : undefined}
+                </Button>) : null}
+          </DialogActions>) : undefined}
       >
         {deleteTarget ? (
           <div className={`${styles.dialogBody} ${styles.deleteBody}`}>
@@ -379,6 +354,8 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                 ) : null}
 
                 <Field label={deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'} requirement={reasonRequirement} error={deleteError && reasonRequirement.check(deleteReason)}><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><SharedTextField
+                    aria-label={deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'}
+                    aria-required={reasonRequirement.required}
                     value={deleteReason}
                     onChange={(e) => setDeleteReason(e.target.value)}
                     placeholder="店舗情報の変更のため"

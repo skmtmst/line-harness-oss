@@ -41,6 +41,9 @@ it('E2：404は未集計、500は失敗。再試行の連打で要求を増や�
   expect(screen.queryByRole('button', { name: '集計する' })).toBeNull()
   reject(new ApiError(500, 'fixture'))
   await waitFor(() => expect(container.querySelector('[data-aggregation-state=failed]')?.textContent).toContain('成果レポートを読み込めませんでした'))
+  expect(screen.getAllByText('成果レポートを読み込めませんでした')).toHaveLength(1)
+  expect(container.querySelectorAll('[data-list-state="error"]')).toHaveLength(0)
+  expect(screen.getAllByRole('button', { name: 'もう一度', exact: true })).toHaveLength(1)
 })
 
 it('選んだ期間と異なる応答をグラフとして出さない', async () => {

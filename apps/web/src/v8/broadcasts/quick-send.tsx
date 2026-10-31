@@ -8,7 +8,7 @@ import { ListOrdered, Send, Users } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { api, type BroadcastApprovalCandidate } from '@/lib/api'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { SingleOperatorFields } from '@/components/broadcasts/broadcast-approval'
 import { EntityKindField } from '@/components/shared/entity-picker-sources'
 import DateTimeField from '@/components/shared/date-time-field'
@@ -329,23 +329,21 @@ export default function QuickSendV8({
       error={error ?? undefined}
       busy={busy}
       onCancel={() => { if (!busy) onClose() }}
-      footer={(
-        <div className={styles.footer}>
-          {access.create ? <Link href="/broadcasts/new" className={styles.detailLink}>
+      footer={(<DialogActions align="center" leadingAction={access.create ? <Link href="/broadcasts/new" className={styles.detailLink}>
             <ListOrdered size={16} aria-hidden="true" />詳しく作るへ
           </Link> : <Button type="button" variant="secondary" className={styles.detailLink} disabled lockedReason={editReason}>
             <ListOrdered size={16} aria-hidden="true" />詳しく作るへ
-          </Button>}
-          <span className={styles.spacer} aria-hidden="true" />
+          </Button>}>
+
+
           <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={() => void handleSend()} disabled={!canSend} lockedReason={operationReason} disabledReason={!operationReason && access.known ? sendDisabledReason : undefined} busy={busy} busyLabel="送っています…">
             <Send size={16} aria-hidden="true" />{sendLabel}
           </Button>
-          <span className={styles.spacer} aria-hidden="true" />
+
           {/* 左の「詳しく作るへ」と釣り合いを取り、キャンセル・送るを窓の真ん中に置く。 */}
-          <span className={styles.balance} aria-hidden="true" />
-        </div>
-      )}
+
+        </DialogActions>)}
     >
       <div className={styles.body}>{access.known && (!access.create || !access.preflight) ? <ReadOnlyNotice need="feature" /> : null}<Field label="本文" htmlFor="quick-send-v8-text" required><SaveErrorField names={["text","messageContent"]}><MessageBody><InsertTextField
           id="quick-send-v8-text"

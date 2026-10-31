@@ -1,5 +1,7 @@
 'use client'
 
+import PagePending from '@/components/templates/page-pending'
+import { routePendingForPath } from '@/lib/route-pending'
 import { Suspense } from 'react'
 import AffiliateOfferCreateV8 from '@/v8/affiliate-offer-new/create'
 
@@ -8,5 +10,5 @@ import AffiliateOfferCreateV8 from '@/v8/affiliate-offer-new/create'
  * ../new-offer-v8.tsx から写した。写し元は切り替えの日まで残す）。
  */
 export default function NewAffiliateOfferPage() {
-  return <Suspense fallback={null}><AffiliateOfferCreateV8 /></Suspense>
+  return <Suspense fallback={<PagePending stage="route" {...routePendingForPath("/affiliate-offers/new")} />}><AffiliateOfferCreateV8 /></Suspense>
 }

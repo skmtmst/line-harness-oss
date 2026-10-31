@@ -36,7 +36,6 @@ vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-util
 vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('@/components/shared/condition-builder', () => ({ default: () => null }))
 vi.mock('@/components/shared/confirm-dialog', () => ({ default: () => null }))
-vi.mock('@/components/shared/icon-button', () => ({ default: () => null }))
 vi.mock('@/components/shared/list-state', () => ({ default: ({ title }: any) => <div>{title}</div> }))
 vi.mock('@/components/shared/select', () => ({
   default: ({ value, onChange, options, disabled, ...rest }: any) => (

@@ -14,6 +14,8 @@ export type InboxFirstResponseWrite=Omit<InboxFirstResponseSettings,'version'|'e
 export type InboxSlaState='none'|'ok'|'soon'|'overdue'|'outside_hours';
 export interface BookingCancellationPolicy {enabled:boolean;tiers:Array<{beforeHours:number;percent:number}>;noShowPercent:number;version:number}
 export interface BookingCancellationQuote {freeUntil:string|null;feeNow:number;feeNoShow:number;text:string;policyAcceptedRequired:boolean}
+export interface BookingCancellationReview extends BookingCancellationQuote {cancelDeadlineAt:string;canCancel:boolean;lockVersion:number}
+export interface BookingCancellationConfirmation {feeAccepted:boolean;expectedFeeAmount:number}
 export interface BookingCancellationCharge {
  id:string;booking_id:string;line_account_id:string;kind:'cancellation_fee'|'no_show_fee';amount:number;
  status:'pending'|'processing'|'succeeded'|'failed'|'unknown'|'waived'|'refunded';version:number;

@@ -34,7 +34,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
               {showHandover ? <>
                 <div className={styles.handoverHeading}>
                   <span className={styles.handoverIcon}>{complete ? <CircleCheck size={22} aria-hidden="true" /> : <LoaderCircle className={styles.handoverSpinner} size={22} aria-hidden="true" />}</span>
-                  <h2 className={styles.panelTitle}>{stageLabel}</h2>
+                  <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>{stageLabel}</h2>
                   <StatusBadge dot={false} tone={checking ? 'caution' : 'success'}>{complete ? '完了' : checking ? '要確認' : total === null ? '確認中' : '進行中'}</StatusBadge>
                 </div>
                 <p className={styles.progressNote}>{complete ? '登録が完了しました。引き継ぎ結果を確認できます。' : '画面を閉じても引き継ぎは続きます。ここでは最新の状態を確認できます。'}</p>
@@ -61,7 +61,7 @@ export default function Step5Completion({ connection, accountName, createdId, im
               </> : <>
                 <div className={styles.doneHero}>
                   <CircleCheck size={40} className={styles.doneIcon} aria-hidden="true" />
-                  <p className={styles.doneTitle}>準備ができました</p>
+                  <h2 data-step-heading tabIndex={-1} className={styles.doneTitle}>準備ができました</h2>
                 </div>
                 <Card className={styles.accountBox} layout="vertical" surface="muted" corner="control" contentPadding="var(--tpl-htn-note-pad)" gap="var(--tpl-htn-gap-xs)">
                   <span className={styles.accountName}>{(connection.displayName ?? accountName) || 'LINEアカウント'}</span>

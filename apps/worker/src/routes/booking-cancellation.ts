@@ -2,7 +2,7 @@ import { liffBookingJson } from './liff-booking-response.js';
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {gapAccount,gapBody,gapKey,gapVersion,gapWrite,GapError} from '../services/gap-common.js';
-import {cancellationPolicy,validCancellationPolicy,requireCancellationTestConnection,bookingCancellationQuote,cancellationSetupUrl} from '../features/booking/booking-cancellation/index.js';
+import {cancellationPolicy,validCancellationPolicy,requireCancellationTestConnection,bookingCancellationQuote,bookingCancellationReview,cancellationSetupUrl} from '../features/booking/booking-cancellation/index.js';
 import {resolveAccountIdFromLiff,resolveFriendId,verifyCallerLineUserId} from './booking.js';
 import {verifyStripeSignature} from '../services/stripe-signature.js';
 export const bookingCancellation=new Hono<Env>();
@@ -30,7 +30,7 @@ bookingCancellation.put('/api/booking/admin/cancellation-policy',async (c:Contex
 bookingCancellation.get('/api/liff/booking/cancellation-quote',async (c:Context<Env>):Promise<Response>=>{
  const {account,friend}=await liff(c),id=c.req.query('booking_id');
  if(!id||!await c.env.DB.prepare('SELECT id FROM bookings WHERE id=? AND line_account_id=? AND friend_id=?').bind(id,account,friend).first())throw new GapError('not_found',404);
- return liffBookingJson(c, {success:true,data:await bookingCancellationQuote(c.env.DB,id,account)});
+ return liffBookingJson(c, {success:true,data:await bookingCancellationReview(c.env.DB,id,account)});
 });
 bookingCancellation.post('/api/liff/booking/setup-intent',async (c:Context<Env>):Promise<Response>=>{
  const {account,friend}=await liff(c),key=gapKey(c),b=await gapBody(c);await requireCancellationTestConnection(c.env.DB,account);

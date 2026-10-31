@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
 import { HelpCircle, ListOrdered, Send, X } from 'lucide-react'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import { api } from '@/lib/api'
 import type { AutoReplyConflict, AutoReplyDraftInput } from '@line-crm/shared'
@@ -268,13 +268,12 @@ export default function QuickCreateV8({
       busy={saving}
       error={saveError || undefined}
       onCancel={onClose}
-      footer={(
-        <div className={styles.footer}>
-          <Button {...(!inputsDisabled ? { href: '/auto-replies/edit' } : { type: 'button', disabled: true })} variant="text" lockedReason={lockedReason}>
+      footer={(<DialogActions align="center" leadingAction={<Button {...(!inputsDisabled ? { href: '/auto-replies/edit' } : { type: 'button', disabled: true })} variant="text" lockedReason={lockedReason}>
             <ListOrdered size={16} aria-hidden="true" />
             詳しく作るへ
-          </Button>
-          <span className={styles.footerSpacer} aria-hidden="true" />
+          </Button>}>
+
+
           <Button type="button" variant="secondary" disabled={saving} onClick={onClose}>
             キャンセル
           </Button>
@@ -290,11 +289,10 @@ export default function QuickCreateV8({
             <Send size={16} aria-hidden="true" />
             有効にして保存
           </Button>
-          <span className={styles.footerSpacer} aria-hidden="true" />
+
           {/* 左の「詳しく作るへ」と釣り合いを取り、キャンセル・保存を窓の真ん中に置く。 */}
-          <span className={styles.footerBalance} aria-hidden="true" />
-        </div>
-      )}
+
+        </DialogActions>)}
     >
       <div className={styles.body}>
         {lockedReason ? <ReadOnlyNotice need="feature" /> : null}

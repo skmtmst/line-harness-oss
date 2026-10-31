@@ -1,7 +1,7 @@
 import { formatYen } from '@line-crm/shared';
 import { useEffect, useState } from 'react'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { DelayedSkeleton, Skeleton } from '@/components/shared/skeleton'
 import { bookingApi, type BookingAdminDetail, type BookingRequest } from '@/lib/api'
 import { formatDateTime, formatTime, formatNumber } from '@/lib/format'
@@ -84,23 +84,16 @@ export default function BookingDetailV8({
       designNode="AjZhH"
       title={`${withHonorific(name)}`}
       onCancel={onClose}
-      footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button variant="secondary" onClick={onClose}>
-            閉じる
-          </Button>
-          {canOperate ? (
-            <>
+      footer={canOperate ? (
+        <DialogActions>
               <Button variant="secondary" onClick={onCancel}>
                 取り消す
               </Button>
               <Button variant="primary" href={detailHref}>
                 変える
               </Button>
-            </>
-          ) : null}
-        </div>
-      }
+        </DialogActions>
+      ) : undefined}
     >
       {accountId ? <div className="mb-4 flex flex-col gap-4"><BookingGapSections accountId={accountId} bookingId={b.id} seriesId={(b as { series_id?: string | null }).series_id ?? null} customerName={name} menuName={b.menu_name} startsAt={b.starts_at} canOperate={canOperate} onChanged={() => setHistorySeq((n) => n + 1)} /></div> : null}
       <dl className="space-y-2 text-sm">
