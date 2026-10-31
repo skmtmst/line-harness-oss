@@ -26,7 +26,7 @@
 | G3 | 受信箱の自動割り当てと返事の期限 | [G3-inbox-routing-sla.md](G3-inbox-routing-sla.md) | ①②③ | 小〜中 |
 | G5 | RFM（お客さまの分け方）と会員ランク | [G5-rfm-member-rank.md](G5-rfm-member-rank.md) | ①②③ | 中 |
 | G6 | カゴ落ち・閲覧落ち・再入荷の自動 LINE | [G6-ec-auto-line.md](G6-ec-auto-line.md) | ②③④ | 中〜大 |
-| G7 | 統括（本部）の店の比較 | [G7-hq-store-compare.md](G7-hq-store-compare.md) | ①②④ | 中 |
+| G7 | 統括（本部）の比較・分析 | [G7-hq-store-compare.md](G7-hq-store-compare.md) | ①②④ | 中 |
 | G8 | 送り手（送信者の名前・アイコン）の切り替え | [G8-sender-switch.md](G8-sender-switch.md) | ②③④ | 小 |
 | G9 | AI とつなぐ（MCP）：読むだけ／読む＋下書き／読む＋下書き＋送る依頼 | [G9-mcp-connect.md](G9-mcp-connect.md) | ①②③ | 中 |
 | U1 | 送信の取り消し（送った後は取り消さない・送る前の取り消しと［訂正を送る］）と共通の「送る前の確かめ」（Q-17・板 lKmZK） | [U1-unsend-and-send-confirm.md](U1-unsend-and-send-confirm.md) | ①②④ | 小 |

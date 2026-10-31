@@ -64,7 +64,7 @@ function rangeLabel(from: string, to: string): string {
 }
 
 export default function StoreComparisonList() {
-  usePageTitle('店の比較')
+  usePageTitle('比較・分析')
   usePageCrumbs([{ label: 'ホーム', href: '/hq' }])
   const preparing = usePreparingDialog()
   const router = useRouter()
@@ -192,7 +192,7 @@ export default function StoreComparisonList() {
   )
 
   const body = status === 'loading' && !data ? (
-    <ListState kind="loading" title="店の比較を読み込んでいます" />
+    <ListState kind="loading" title="比較・分析を読み込んでいます" />
   ) : status === 'error' ? (
     <ListState kind="error" error={error} onRetry={() => void load()} />
   ) : !data || data.rows.length === 0 ? (
@@ -257,7 +257,7 @@ export default function StoreComparisonList() {
       <ListPage
         skeleton
         boardId="W4fI7A"
-        title="店の比較"
+        title="比較・分析"
         help={<>店ごとに、友だち・予約・来店・返事の速さを並べて見ます。平均より悪い数は赤の印で知らせます。数は毎朝、前の日の分まで更新します。数の横の印は、「比べる相手」（前の期間か全店の平均）との差で、赤は悪い方・緑は良い方です。期間の途中から集計した店は、集計できた日の分だけで数を出し、件数の横に「12 日分」のように日数を出します（日数が違うので差の印は出しません）。{METRICS.map((def) => <span key={def.key}><br />{`${def.label}：${def.help}`}</span>)}</>}
         toolbar={toolbar}
         pagination={status === 'ready' && total > 0 ? (
