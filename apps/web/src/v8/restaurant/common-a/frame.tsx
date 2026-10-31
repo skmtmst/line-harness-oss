@@ -1,4 +1,5 @@
 'use client'
+import { requestUnsavedAction } from '@/lib/unsaved-action'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 
 import { notifySaved } from '@/components/shared/toast'
@@ -127,6 +128,7 @@ export default function RestaurantFrame({
   description,
   query,
   allStores = false,
+  initialStoreId = '',
   bannerNote,
   bodyPadTop,
   bodyGap,
@@ -146,6 +148,7 @@ export default function RestaurantFrame({
   query?: ReservationQuery
   /** 店舗を選ぶ欄の先頭に「すべての店舗」を足す（全店を見る画面）。 */
   allStores?: boolean
+  initialStoreId?: string
   bannerNote?: string
   /** 中身の上の余白を絵の値にする。渡さないときは共通の 16 のまま。 */
   bodyPadTop?: number
@@ -167,7 +170,7 @@ export default function RestaurantFrame({
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
   const { selectedAccountId } = useAccount()
   const [snapshot, setSnapshot] = useState<RestaurantSnapshot | null>(null)
-  const [selectedStoreId, setSelectedStoreId] = useState('')
+  const [selectedStoreId, setSelectedStoreId] = useState(initialStoreId)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<{ tone: 'success' | 'error'; text: string } | null>(null)
@@ -219,7 +222,7 @@ export default function RestaurantFrame({
       valuePrefix="店舗"
       width={STORE_PICKER_WIDTH}
       value={selectedStoreId}
-      onChange={setSelectedStoreId}
+      onChange={next=>requestUnsavedAction(()=>setSelectedStoreId(next))}
       options={[
         ...(allStores ? [{ value: '', label: '店舗：すべての店舗' }] : []),
         ...snapshot.stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}` })),
@@ -229,7 +232,7 @@ export default function RestaurantFrame({
     <SaveErrorField names={["selectedStoreId","selected_store_id"]}><StoreFilterTabs
 
       value={selectedStoreId}
-      onChange={setSelectedStoreId}
+      onChange={next=>requestUnsavedAction(()=>setSelectedStoreId(next))}
       options={[
         ...(allStores ? [{ value: '', label: '店舗：すべての店舗' }] : []),
         ...snapshot.stores.map((item) => ({ ...entityOptionMetadata(item), value: item.id, label: `店舗：${item.name}` })),

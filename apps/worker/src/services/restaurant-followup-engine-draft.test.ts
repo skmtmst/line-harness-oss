@@ -135,3 +135,18 @@ it('以前の未受理の記録があっても、今実行中の旧送信があ�
  await expect(saveFollowupDraftFixture(t.db,'store','reservation_created',body,'owner')).rejects.toMatchObject({code:'delivery_unconfirmed'});
  expect(t.raw.prepare('SELECT count(*) n FROM rt_store_followup_targets').get()).toEqual({n:0});
 });
+
+it('詳細で足したテンプレートや条件を簡易保存で消さず、停止操作だけは受ける',async()=>{
+ const body={...await input('reservation_24h'),timing:{mode:'time' as const,offsetDays:-1,sendAtTime:'18:00'}};
+ await saveFollowupDraftFixture(t.db,'store','reservation_24h',body,'owner');
+ const {reminder_id:id}=t.raw.prepare('SELECT reminder_id FROM rt_store_followup_targets').get() as {reminder_id:string};
+ const original=(await getReminderDraftVersion(t.db,id))!;
+ const settings=JSON.parse(original.settings_snapshot);settings.steps[0].templateId='external-template';
+ t.raw.prepare('UPDATE reminder_versions SET settings_snapshot=? WHERE id=?').run(JSON.stringify(settings),original.id);
+ const changed=(await getReminderDraftVersion(t.db,id))!;
+ const current={...await input('reservation_24h'),timing:body.timing,expectedTargetVersion:1,expectedContentRevision:`${changed.id}:${changed.updated_at}`};
+ await expect(saveRestaurantFollowupEngineDraft(t.db,'store','reservation_24h',current,'owner')).rejects.toMatchObject({code:'invalid_followup'});
+ expect((await getReminderDraftVersion(t.db,id))!.settings_snapshot).toBe(changed.settings_snapshot);
+ await saveRestaurantFollowupEngineDraft(t.db,'store','reservation_24h',{...current,enabled:false},'owner');
+ expect((await getReminderDraftVersion(t.db,id))!.settings_snapshot).toBe(changed.settings_snapshot);
+});

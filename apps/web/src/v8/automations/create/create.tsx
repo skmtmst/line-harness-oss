@@ -775,7 +775,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
       /* 競合の帯は板の頭の下・左右の列の上に、板いっぱいで出す（型の頭と本文の間の段）。 */
       /* 見本の帯は頭の中、題のすぐ下（絵では頭の線より上）。 */
       subtitle={sourceBand ?? undefined}
-      notice={conflictBand}
+      notice={<>{conflictBand}{savedDraft?.followupManagement?<Notice tone="info" action={<Button href={savedDraft.followupManagement.path}>来店フォローを見る →</Button>}>来店フォロー（{savedDraft.followupManagement.storeName}）で管理しています。{savedDraft.followupManagement.reason??'承認された内容で送っています。'}変更後は来店フォローでテスト送信と承認をやり直してください。</Notice>:null}</>}
       noticeSpacing="band"
       previewLabel="設定内容を見る"
       previewTitle="設定内容"

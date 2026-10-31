@@ -10,6 +10,7 @@ const initialRows: Record<RestaurantFollowupTrigger, { offset: number; message: 
   waitlist_invited: { offset: 0, message: 'お席のご用意ができました。ご案内します。\nこの時間で予約する：{{var.waitlist_book_url}}\n今回は見送る：{{var.waitlist_decline_url}}' },
   anniversary_before: { offset: -10080, message: 'もうすぐ記念日ですね。お祝いのご用意はいかがですか。' },
 };
+export function restaurantFollowupInitialValues(trigger:RestaurantFollowupTrigger){return {...initialRows[trigger]};}
 export function isRestaurantFollowupTrigger(value: unknown): value is RestaurantFollowupTrigger {
   return typeof value === 'string' && Object.hasOwn(initialRows, value);
 }

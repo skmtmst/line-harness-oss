@@ -76,7 +76,9 @@ for (const entry of ['apps', 'worker'] as const) {
     await screen.findByText(/送信できませんでした/);
     failHold = false; fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
     await screen.findByText('ご予約の内容');
-    expect(screen.getByText(`${entry === 'worker' ? 'Workerの本人' : '予約の本人'} さま`)).toBeTruthy();
+    const profileName = entry === 'worker' ? 'Workerの本人' : '予約の本人';
+    expect(screen.getByRole('textbox', { name: /お名前/ })).toHaveProperty('value', profileName);
+    expect(screen.getByRole('textbox', { name: /お名前/ })).toHaveProperty('required', true);
     const calls = writes.filter(w => w.path.endsWith('/holds'));
     expect(calls).toHaveLength(2); expect(calls[0].body).toEqual(calls[1].body);
     expect(calls[0].body).toMatchObject({ courseId: 'c90', guestCount: 2 });
@@ -89,6 +91,7 @@ for (const entry of ['apps', 'worker'] as const) {
     await screen.findByText('ご予約を受け付けました');
     const confirms = writes.filter(w => w.path.endsWith('/confirm'));
     expect(confirms).toHaveLength(2); expect(confirms[0].body).toEqual(confirms[1].body);
+    expect(confirms[0].body).toMatchObject({ customerName: profileName, expectedFormVersion: 0 });
     fireEvent.click(screen.getByRole('button', { name: 'LINEに戻る' }));
     expect((entry === 'worker' ? workerSdk : sdk).closeWindow).toHaveBeenCalledOnce();
   });

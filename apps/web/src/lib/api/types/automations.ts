@@ -1,3 +1,4 @@
+import type { RestaurantFollowupManagement } from '@line-crm/shared'
 import type { Automation } from '@line-crm/shared'
 
 export type CommonActionStep = {
@@ -27,6 +28,7 @@ export type CommonActionSummary = {
 };
 
 export type AutomationListItem = Automation & {
+  followupManagement?:RestaurantFollowupManagement;
   folderId?: string | null
   triggerConfig: Record<string, unknown>;
   status: 'draft' | 'active' | 'stopped' | 'archived';
@@ -123,6 +125,7 @@ export type AutomationDraftAction = {
 }
 
 export type AutomationDraftDetail = {
+  followupManagement?:RestaurantFollowupManagement;
   folderId?: string | null
   id: string
   draftVersionId: string
