@@ -1,4 +1,6 @@
 'use client'
+import { tableCapacityReason, type RestaurantTableDefinition } from '../booking-kit/table-definition'
+import { DialogNote } from '../booking-kit/parts'
 
 /*
  * ★V8 ウォークインの窓（提案 E-3 `nNujj`）。
@@ -40,9 +42,10 @@ export function nextFreeAt(tables: RestaurantTable[], guests: number, rows: Rest
   return best
 }
 
-export default function WalkInDialog({ open, accountId, storeId, tables, onClose, onSaved }: {
+export default function WalkInDialog({ tableDefinition, open, accountId, storeId, tables, onClose, onSaved }: {
   open: boolean
   accountId: string
+  tableDefinition?: RestaurantTableDefinition
   storeId: string
   tables: RestaurantTable[]
   onClose: () => void
@@ -52,6 +55,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
 
   const [now, setNow] = useState(() => new Date())
   const [guests, setGuests] = useState(2)
+  const capacityReason = tableCapacityReason(tableDefinition, accountId, storeId, tables, guests)
   const [tableId, setTableId] = useState('')
   const [rows, setRows] = useState<RestaurantReservation[] | null>(null)
   const [busy, setBusy] = useState(false)
@@ -126,7 +130,7 @@ export default function WalkInDialog({ open, accountId, storeId, tables, onClose
         ) : free.length === 0 ? (
           <div className={styles.full} role="status">
             <p className={styles.fullTitle}>いま座れる卓はありません</p>
-            <p className={styles.hint}>{waitUntil ? `${guests}名が入る卓は ${hm(waitUntil)} ごろに空く予定です（約${Math.max(1, Math.round((waitUntil - now.getTime()) / 60_000))}分）。` : `${guests}名が入る卓がありません。人数を分けるか、予約台帳で卓を確かめてください。`}</p>
+            {capacityReason ? <DialogNote>{capacityReason}</DialogNote> : <p className={styles.hint}>{waitUntil ? `${guests}名が入る卓は ${hm(waitUntil)} ごろに空く予定です（約${Math.max(1, Math.round((waitUntil - now.getTime()) / 60_000))}分）。` : `${guests}名が入る卓がありません。人数を分けるか、予約台帳で卓を確かめてください。`}</p>}
           </div>
         ) : (
           <div className={styles.cardsWrap}>
