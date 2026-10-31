@@ -19,6 +19,8 @@ import { PageContent, PageFrame, PageHeading } from '@/components/templates/page
 import ListState from '@/components/shared/list-state'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
 import styles from './shell.module.css'
+import { useTableDefinition } from './use-table-definition'
+import type { RestaurantTableDefinition } from './table-definition'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect from '@/components/shared/entity-select'
 
@@ -32,6 +34,7 @@ import EntitySelect from '@/components/shared/entity-select'
  */
 
 export interface RestaurantV8Context {
+  tableDefinition?: RestaurantTableDefinition
   data: RestaurantSnapshot
   /** 店舗を選ぶ欄で今選んでいる店舗（先頭が既定）。 */
   store: RestaurantStore | null
@@ -166,14 +169,17 @@ export default function RestaurantShell({ boardId, title, description, explanati
   /* 見方・絞り込みを続けて変えたとき、先に出した古い問い合わせの返事が後から来て新しい結果を上書きしないように、最後の1件だけを使う。 */
   const [savedButUnread, setSavedButUnread] = useState(false)
   const latest = useRef(0)
+  const { begin, accept, tableDefinition } = useTableDefinition(selectedAccountId, snapshot)
   const load = useCallback(async () => {
     const ticket = ++latest.current
+    const definitionRequest = begin(selectedAccountId)
     if (!selectedAccountId) { setSnapshot(null); setLoadError(null); setLoading(false); return false }
     setLoading(true)
     try {
       const res = await restaurantTestApi.snapshot(selectedAccountId, query)
       if (ticket !== latest.current) return false
       setSnapshot(res.data)
+      accept(definitionRequest, res.data)
       setLoadError(null)
       setSavedButUnread(false)
       setSelectedStoreId((current) => (res.data.stores.some((item) => item.id === current)
@@ -187,7 +193,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
     } finally {
       if (ticket === latest.current) setLoading(false)
     }
-  }, [selectedAccountId, query])
+  }, [selectedAccountId, query, begin, accept])
   useEffect(() => { void load() }, [load])
 
   const mutate = useCallback(async (action: () => Promise<unknown>, success: string) => {
@@ -215,7 +221,7 @@ export default function RestaurantShell({ boardId, title, description, explanati
     [snapshot, selectedStoreId],
   )
   const ctx: RestaurantV8Context | null = snapshot?.organization
-    ? { data: snapshot, store, selectedStoreId, busy, mutate, reload: async () => { await load() } }
+    ? { tableDefinition, data: snapshot, store, selectedStoreId, busy, mutate, reload: async () => { await load() } }
     : null
 
   const content = loading && !snapshot ? (
