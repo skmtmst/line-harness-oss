@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 const update = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', accounts: [] }) }))
@@ -30,6 +30,8 @@ vi.mock('@/lib/api', async importOriginal => {
     },
   } }
 })
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+beforeEach(() => verifiedStaffRole('owner'))
 import Incoming from './incoming'
 import Outgoing from './outgoing'
 afterEach(cleanup)

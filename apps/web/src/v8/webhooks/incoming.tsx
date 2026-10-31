@@ -39,6 +39,7 @@ import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components
 import { MANAGE_REASON, ViewerBand, WEBHOOKS_DESCRIPTION, WebhookBand, WebhookTabs, overviewBandCells, useWebhookOverview } from './shell'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { shortDateTime } from './words'
+import { useWebhookWriteAccess, canManageWebhooksNow, captureWebhookWriteAccess } from './write-access'
 import styles from './incoming.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -125,8 +126,9 @@ export default function WebhooksIncomingV8() {
   const accountScopeRef = useRef({ accountId: selectedAccountId })
   if (accountScopeRef.current.accountId !== selectedAccountId) accountScopeRef.current = { accountId: selectedAccountId }
   const staffRole = useStaffRole()
-  /* 受け取り口の変更は統括だけ（R32）。届物の結び付けは管理者も使える。 */
-  const canManage = staffRole === 'owner'
+  const management = useWebhookWriteAccess()
+  const ownership = useWebhookWriteAccess(true)
+  const canManage = management.allowed
   const canResolveUnmatched = canManageRole(staffRole)
   const searchParams = useSearchParams()
 
@@ -204,7 +206,7 @@ export default function WebhooksIncomingV8() {
   })
 
   useEffect(() => {
-    if (staffRole !== null && staffRole !== 'owner') setShowCreate(false)
+    if (staffRole !== null && !canManageRole(staffRole)) setShowCreate(false)
   }, [staffRole])
 
   const displayed = useMemo(() => incoming.map((item) => (
@@ -283,9 +285,10 @@ export default function WebhooksIncomingV8() {
 
   /* 名前のその場の書き換え。失敗したら投げて元に戻す（共通部品の約束）。 */
   const renameInlet = async (next: string) => {
+    if (!canManageWebhooksNow()) throw new Error(management.reason ?? '担当者の確認が終わるまでお待ちください。')
     const accountId = selectedAccountId
     const target = selected
-    if (!accountId || !target) throw new Error('no target')
+    if (!accountId || accountRef.current !== accountId || !target) throw new Error('no target')
     const trimmed = next.trim()
     if (!trimmed) throw new Error('empty name')
     const res = await api.webhooks.incoming.update(target.id, accountId, { name: trimmed })
@@ -296,10 +299,11 @@ export default function WebhooksIncomingV8() {
 
   /* ===== 動かす・止める（押した瞬間に変え、裏で保存する） ===== */
   const handleToggle = async (item: IncomingWebhook, currentActive: boolean) => {
+    if (!canManageWebhooksNow()) { setError(management.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     const accountId = selectedAccountId
     const scope = accountScopeRef.current
     const isCurrent = () => accountScopeRef.current === scope
-    if (!accountId || loadedAccountId !== accountId) {
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId) {
       setError('LINEアカウントの一覧を読み直してください')
       return
     }
@@ -352,9 +356,10 @@ export default function WebhooksIncomingV8() {
 
   /* ===== 削除 ===== */
   const runDelete = async () => {
+    if (!canManageWebhooksNow(true)) { setDeleteError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     if (!deleteTarget || deleting) return
     const accountId = selectedAccountId
-    if (!accountId || loadedAccountId !== accountId) {
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId) {
       setDeleteError('LINEアカウントが切り替わりました。削除する受け取り口を選び直してください。')
       return
     }
@@ -382,11 +387,13 @@ export default function WebhooksIncomingV8() {
 
   /* ===== 合言葉を更新する ===== */
   const runRotate = async (stepUpToken?: string) => {
+    if (!canManageWebhooksNow(true)) { setRotateError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
+    const canContinue = captureWebhookWriteAccess(true)
     if (rotating) return
     setRotateError('')
     const accountId = selectedAccountId
     if (!rotateTarget) return
-    if (!accountId || loadedAccountId !== accountId) {
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId) {
       setRotateError('LINEアカウントの一覧を読み直してください')
       return
     }
@@ -409,7 +416,7 @@ export default function WebhooksIncomingV8() {
       const fieldFailure = saveErrors.capture(caught);
 
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => runRotate(token) });
+        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: async (token) => { if (canContinue() && accountRef.current === accountId) return runRotate(token); setRotateError('権限やLINEアカウントが変わったため中止しました。') } });
 
         return
       }
@@ -425,14 +432,17 @@ export default function WebhooksIncomingV8() {
 
   /* ===== 受け取り口を作る（窓 ） ===== */
   const openCreate = () => {
+    if (!canManageWebhooksNow()) return
     setCreateFieldError({})
     if (!createSecret) setCreateSecret(generateSecret())
     setShowCreate(true)
   }
   const runCreate = async (stepUpToken?: string) => {
+    if (!canManageWebhooksNow()) { setCreateFieldError({ form: management.reason ?? '担当者の確認が終わるまでお待ちください。' }); return }
+    const canContinue = captureWebhookWriteAccess()
     setCreateFieldError({})
     const accountId = selectedAccountId
-    if (!accountId) {
+    if (!accountId || accountRef.current !== accountId) {
       setCreateFieldError({ form: 'LINEアカウントを選択してください' })
       return
     }
@@ -471,7 +481,7 @@ export default function WebhooksIncomingV8() {
       const fieldFailure = saveErrors.capture(caught);
 
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.secret', action: '受け取り口を登録する', retry: (token) => runCreate(token) });
+        setStepUp({ purpose: 'webhook.secret', action: '受け取り口を登録する', retry: async (token) => { if (canContinue() && accountRef.current === accountId) return runCreate(token); setCreateFieldError({ form: '権限やLINEアカウントが変わったため中止しました。' }) } });
 
         return
       }
@@ -586,10 +596,7 @@ export default function WebhooksIncomingV8() {
         moveSelection(event.key === 'ArrowUp' ? -1 : 1)
       }}
     >
-      {/* 変更権限が無い人には作る操作も予約領域も置かない。 */}
-      {canManage
-        ? <Button variant="primary" className={styles.createButton} onClick={openCreate}><Plus size={16} aria-hidden="true" />受け取り口を作る</Button>
-        : null}
+      <Button variant="primary" disabled={!canManage && !management.reason} lockedReason={management.reason} className={styles.createButton} onClick={openCreate}><Plus size={16} aria-hidden="true" />受け取り口を作る</Button>
       <p className={styles.inletListLabel}>受け取り口</p>
       {incomingStatus === 'loading' && selectedAccountId ? (
         <div aria-busy="true" aria-label="受け取り口を読み込んでいます">
@@ -648,6 +655,7 @@ export default function WebhooksIncomingV8() {
         description="相手のサービスから届く知らせを受け取る URL を作ります。"
         create={{ label: '最初の受け取り口を作る', onClick: openCreate }}
         canCreate={canManage}
+        lockedReason={management.reason ?? null}
       />
     )
   } else if (!selected) {
@@ -658,19 +666,14 @@ export default function WebhooksIncomingV8() {
       <>
         <div className={styles.titleRow}>
           <h2 className={styles.title}>
-            {/* 閲覧のみ：名前を変える鉛筆は置かず、名前だけ見せる（2026-10-06 オーナー決定） */}
-            {canManage
-              ? <InlineEdit value={selected.name} label="受け取り口の名前" onSave={renameInlet} />
-              : selected.name}
+            <InlineEdit value={selected.name} label="受け取り口の名前" onSave={renameInlet} canSaveNow={canManageWebhooksNow} lockedReason={management.reason} />
           </h2>
           <StatusBadge tone={toggling ? 'neutral' : selected.isActive ? 'success' : 'neutral'}>{toggling ? '切り替え中' : selected.isActive ? '有効' : '停止中'}</StatusBadge>
           <span className={styles.spacer} aria-hidden="true" />
-          {canManage ? (
-            <>
+          {<>
               <span className={styles.toggleLabel}>動かす</span>
-              <SaveErrorField names={["isActive","selected.isActive","is_active","selected.is_active"]}><Toggle checked={selected.isActive} label={`${selected.name}を動かす`} onChange={() => void handleToggle(selected, selected.isActive)} /></SaveErrorField>
-            </>
-          ) : null}
+              <SaveErrorField names={["isActive","selected.isActive","is_active","selected.is_active"]}><Toggle checked={selected.isActive} label={`${selected.name}を動かす`} disabled={!canManage && !management.reason} lockedReason={management.reason} onChange={() => void handleToggle(selected, selected.isActive)} /></SaveErrorField>
+            </>}
         </div>
 
         <Card spacing="integration" aria-labelledby="wh-in-receive">
@@ -690,11 +693,9 @@ export default function WebhooksIncomingV8() {
               <span className={styles.fieldLabel}>合言葉（署名）</span>
               <span className={styles.valueBox}>{selected.hasSecret ? '設定済み（再表示しません）' : 'まだ設定していません'}</span>
             </div>
-            {canManage ? (
-              <Button onClick={() => { setRotateError(''); setRotateSecret(''); setRotateTarget({ id: selected.id, name: selected.name }) }}>
+            {<Button disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => { if (!canManageWebhooksNow(true)) return; setRotateError(''); setRotateSecret(''); setRotateTarget({ id: selected.id, name: selected.name }) }}>
                 <RefreshCw size={16} aria-hidden="true" />合言葉を更新する
-              </Button>
-            ) : null}
+              </Button>}
           </div>
           <p className={styles.smallNote}>合言葉は人に見せないでください。知られると、第三者がデータを送れるようになります。</p>
           {selected.previousSecretUsableUntil ? (
@@ -733,7 +734,7 @@ export default function WebhooksIncomingV8() {
           ) : detailStatus === 'error' ? (
             <ListState kind="error" title="届いた後の処理を表示できませんでした" onRetry={() => setDetailReloadKey((key) => key + 1)} />
           ) : detail && selectedAccountId ? (
-              <IncomingActions key={`${selectedAccountId}:${detail.id}:${detail.version}`} detail={detail} accountId={selectedAccountId} readOnly={staffRole !== 'owner'} onGuardReady={onActionsGuardReady} onSaved={() => setDetailReloadKey(key => key + 1)}/>
+              <IncomingActions key={`${selectedAccountId}:${detail.id}:${detail.version}`} detail={detail} accountId={selectedAccountId} readOnly={!canManage} onGuardReady={onActionsGuardReady} onSaved={() => setDetailReloadKey(key => key + 1)}/>
             ) :
             <p className={styles.cardNote}>届いた後に動かす処理は、まだ決めていません。</p>}
           {detail?.actionExecution.state === 'needs_attention' && detail.actionExecution.reason ? (
@@ -841,14 +842,11 @@ export default function WebhooksIncomingV8() {
             </Button>
           </div>
         </Card>
-        {/* 削除は絵に無い。消さずに、カードの下へ小さく置く（押すと確かめの窓）。 */}
-        {canManage ? (
-          <div className={styles.dangerRow}>
-            <Button variant="text" onClick={() => { setDeleteError(''); setDeleteTarget({ id: selected.id, name: selected.name }) }}>
+        {<div className={styles.dangerRow}>
+            <Button variant="text" disabled={!ownership.allowed && !ownership.reason} lockedReason={ownership.reason} onClick={() => { if (!canManageWebhooksNow(true)) return; setDeleteError(''); setDeleteTarget({ id: selected.id, name: selected.name }) }}>
               <Trash2 size={16} aria-hidden="true" />この受け取り口を削除する
             </Button>
-          </div>
-        ) : null}
+          </div>}
       </>
     )
   }
@@ -859,10 +857,10 @@ export default function WebhooksIncomingV8() {
       headingSize="regular"
       title="外部連携"
       help={WEBHOOKS_DESCRIPTION}
-      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button> : undefined}
+      actions={<Button lockedReason={management.reason} {...(canManage ? { href: "/webhooks?tab=notify" } : { disabled: true })}><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button>}
       tabs={<WebhookTabs active="incoming" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
-        {!canManage ? <ViewerBand /> : null}
+        {management.known && !canManage ? <ViewerBand /> : null}
         <WebhookBand
           cells={overviewBandCells({
             outgoing: overview.outgoingCount === null ? null : overview.outgoing,
@@ -873,7 +871,9 @@ export default function WebhooksIncomingV8() {
       </>}
       overlays={<>
         <Dialog
-          open={showCreate && canManage}
+          open={showCreate}
+          confirmDisabled={!canManage}
+          confirmLockedReason={management.reason}
           title="受け取る設定を追加"
           designNode="H031gC"
           designWidth={540}
@@ -970,6 +970,8 @@ export default function WebhooksIncomingV8() {
           title={`「${deleteTarget?.name ?? ''}」の受け取り口を削除しますか？`}
           description="このURLへの通知を受け取らなくなります。すでに受け取った記録は残ります。この操作は取り消せません。"
           confirmLabel="削除する"
+          confirmDisabled={!ownership.allowed}
+          confirmLockedReason={ownership.reason}
           destructive
           busy={deleting}
           error={deleteError || undefined}
@@ -986,6 +988,8 @@ export default function WebhooksIncomingV8() {
           onCancel={() => { setRotateTarget(null); setRotateSecret('') }}
           onConfirm={() => runRotate()}
           confirmLabel="保存する"
+          confirmDisabled={!ownership.allowed}
+          confirmLockedReason={ownership.reason}
         >
           <div className={styles.fieldRow}>
             <SaveErrorField names={["rotateSecret","secret","rotate_secret"]}><TextField

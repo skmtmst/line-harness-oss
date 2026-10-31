@@ -100,9 +100,13 @@ it.each(['owner', 'admin'] as const)('%sの専用許可は本人確認後に1回
   identity(role, { permissionKeys: role === 'admin' ? ['operations.control.execute'] : [] })
   render(<EmergencyPage />); await loaded()
   if (role === 'admin') {
-    expect(stopButton().hasAttribute('data-permission-locked')).toBe(true) // 全体操作はownerのみ
-    fireEvent.change(screen.getByRole('combobox', { name: '緊急停止の対象アカウント' }), { target: { value: 'account-a' } })
-  }
+    expect(f.preview.mock.calls.every(([accountId]) => accountId === 'account-a')).toBe(true)
+    const account = screen.getByRole('combobox', { name: '緊急停止の対象アカウント' })
+    expect((within(account).getByRole('option', { name: 'すべてのアカウント' }) as HTMLOptionElement).disabled).toBe(true)
+    fireEvent.change(account, { target: { value: 'all' } })
+    expect((account as HTMLSelectElement).value).toBe('account-a')
+    expect(f.preview.mock.calls.some(([accountId]) => accountId === null)).toBe(false)
+  } else expect(f.preview).toHaveBeenCalledWith(null)
   await waitFor(() => expect(stopButton().disabled).toBe(false))
   expect(stopButton().hasAttribute('data-permission-locked')).toBe(false)
   fireEvent.click(await fillStop())
@@ -113,7 +117,9 @@ it.each(['owner', 'admin'] as const)('%sの専用許可は本人確認後に1回
 })
 
 it('previewが許可でも本人未確認は通常disabled・帯なし、本人の確定で使える', async () => {
-  identity(null); render(<EmergencyPage />); await loaded()
+  identity(null); render(<EmergencyPage />)
+  await act(async () => {})
+  expect(f.preview).not.toHaveBeenCalled()
   expect(stopButton().disabled).toBe(true)
   expect(document.querySelector('[data-permission-locked]')).toBeNull()
   expect(document.querySelector('[data-read-only-notice]')).toBeNull()
@@ -220,4 +226,26 @@ it('対象を変えると古い確認を捨て、新しいpreviewが返るまで
   await act(async () => { pending.resolve(payload('account-b')) })
   await waitFor(() => expect(stopButton().disabled).toBe(false))
   expect(screen.queryByRole('alertdialog')).toBeNull()
+})
+
+it('管理者の初回は全体の403を呼ばず、許可アカウントの停止状態を読む', async () => {
+  identity('admin')
+  f.preview.mockImplementation(async (id: string | null) => {
+    if (id === null) throw new Error('all scope forbidden')
+    return payload(id, false)
+  })
+  render(<EmergencyPage />); await loaded()
+  expect(f.preview).toHaveBeenCalledWith('account-a')
+  expect(f.preview.mock.calls.some(([id]) => id === null)).toBe(false)
+  expect(stopButton().hasAttribute('data-permission-locked')).toBe(true)
+  expect(f.stop).not.toHaveBeenCalled(); expect(f.restore).not.toHaveBeenCalled()
+})
+it('管理者の許可アカウントが未取得なら影響人数を要求しない', async () => {
+  identity('admin')
+  const view = render(<EmergencyControlV8 accounts={[]} />)
+  await act(async () => {})
+  expect(f.preview).not.toHaveBeenCalled()
+  view.rerender(<EmergencyControlV8 accounts={[{ id: 'account-b', name: 'B' }] as never} />)
+  await waitFor(() => expect(f.preview).toHaveBeenCalledWith('account-b'))
+  expect(f.preview.mock.calls.some(([id]) => id === null)).toBe(false)
 })
