@@ -77,7 +77,6 @@ export default function SeatConfirm({
 
   const p = zonedParts(startsAt, timeZone);
   const rows: Array<[string, string]> = [
-    ['お店', storeName],
     ['日時', `${longDate(p.date)}${p.hm}〜${stayText(startsAt, endsAt)}`],
     ['人数', `${guestCount}名`],
     ...(courseName ? [['コース',courseName] as [string,string]] : []),
@@ -91,6 +90,7 @@ export default function SeatConfirm({
       <Card className="space-y-4 p-6">
         <h2 className="text-[15px] leading-[23px] font-bold text-ink">{reschedule ? 'この内容に変更します' : 'ご予約の内容'}</h2>
         <div className="space-y-2.5">
+          {storeName.trim() ? <p className="break-words text-[13px] leading-5 font-semibold text-ink" title={storeName}>お店：{storeName}</p> : null}
           <p className="text-[13px] leading-5 font-semibold text-ink">{p.date.slice(5).replace('-','/')}（{new Intl.DateTimeFormat('ja-JP',{timeZone,weekday:'short'}).format(new Date(startsAt))}）{p.hm}・{guestCount}名</p>
           <p className="truncate text-xs leading-[18px] text-liff-sub" title={`コース：${courseName??'席のみ'}${stayText(startsAt,endsAt)}`}>コース：{courseName??'席のみ'}{stayText(startsAt,endsAt)}</p>
           <p className="text-xs leading-[18px] text-liff-sub">お席はお店が決めます</p>
