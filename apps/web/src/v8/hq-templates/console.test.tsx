@@ -207,7 +207,7 @@ describe('統括のテンプレートを作る（質問・カルーセル）', (
     expect(save.disabled).toBe(false)
     fireEvent.click(save)
     await waitFor(() => expect(body.getAttribute('aria-invalid')).toBe('true'))
-    expect(document.getElementById('cr-text-error')?.textContent).toBe('本文は300文字までです（いま301文字）')
+    expect(document.getElementById('cr-text-error')?.textContent).toBe('本文は120文字までです（いま301文字）')
     expect(screen.queryByText('すべてのカードに本文を入力してください')).toBeNull()
     await waitFor(() => expect(document.activeElement).toBe(body))
     expect(calls.create).not.toHaveBeenCalled()
