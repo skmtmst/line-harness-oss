@@ -8,6 +8,3 @@ html:root :is(button, a, input, textarea, select, [tabindex], [role='button'], [
   outline: var(--polish-focus-width) solid var(--polish-focus);
   outline-offset: var(--polish-focus-offset);
 }
-
-/* 手順の移動先は読み上げ用の焦点。操作する欄やボタンの輪は残す。 */
-html:root [data-step-content][tabindex='-1']:focus-visible { outline: none; }
