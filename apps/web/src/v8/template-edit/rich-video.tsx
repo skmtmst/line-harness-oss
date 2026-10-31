@@ -1,4 +1,5 @@
 'use client'
+import { requiredInputReason } from '@/lib/required-input-reason'
 import { scrollMotion } from '@/components/shared/overlay-utils'
 import { useStaffRole } from '@/lib/staff-role'
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
@@ -159,6 +160,13 @@ if(current===generation.current){ if (!fieldFailure)
 setError(describeApiFailure(cause, '画像の登録')) }}
     finally{if(current===generation.current)setBusy(false)}
   }
+  const inputReason = loading || loadFailed ? null : requiredInputReason([
+    { label: 'テンプレート名', value: draft.name },
+    { label: '動画', value: draft.originalContentUrl, select: true },
+    { label: 'プレビュー画像', value: draft.previewImageUrl, select: true },
+    { label: 'リンク先URL', value: !draft.buttonEnabled || draft.actionUrl },
+    { label: '通知に出る文', value: draft.altText },
+  ])
   const mismatch = Boolean(id && binding !== selectedAccountId)
   const save = async (alsoSave = false, distribute = true) => {
     if(saveLock.current || !canMutate || busy || loading || loadFailed || mismatch || (!hqHost && !selectedAccountId))return
@@ -240,9 +248,9 @@ setError(describeApiFailure(cause, '保存')) }}
   </LinePreview>
   const side=(inDialog:boolean)=><><section className={styles.sideCard}><h2 className={styles.sideTitle}>リッチメッセージとの違い</h2><p className={styles.sideText}>リッチビデオはトークで自動で流れる動画です。画像を面に分けて押した所ごとに動かしたいときは、リッチメッセージを使います。</p></section><h2 className={styles.previewHead}>届き方</h2><div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div></>
   return <SaveErrorScope errors={saveErrors}><>
-    <TemplateEditFrame composerHost={host ? { ...host, busy: busy || loading || Boolean(host.busy), onCancel: () => guarded(host.onCancel) } : undefined} onComposerInsert={(alsoSave)=>void save(alsoSave)} boardId={hqHost?'Ni0V8':'oIFk7'} title={id?'リッチビデオを編集':'リッチビデオを作る'} description={host?.description ?? 'トーク画面で自動で流れる動画。見終わったらボタンで案内'} side={side}
+    <TemplateEditFrame inputReason={inputReason} composerHost={host ? { ...host, busy: busy || loading || Boolean(host.busy), onCancel: () => guarded(host.onCancel) } : undefined} onComposerInsert={(alsoSave)=>void save(alsoSave)} boardId={hqHost?'Ni0V8':'oIFk7'} title={id?'リッチビデオを編集':'リッチビデオを作る'} description={host?.description ?? 'トーク画面で自動で流れる動画。見終わったらボタンで案内'} side={side}
       band={!canMutate && role ? <ReadOnlyNotice />:undefined}
-      footerActions={canMutate?<>{hqHost && host ? <Button disabled={busy} onClick={()=>guarded(host.onCancel)}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}{hqHost?<Button onClick={()=>void save(false,false)} disabled={busy||loading||loadFailed}>下書きを保存</Button>:null}<Button variant="primary" onClick={()=>void save()} disabled={busy||loading||loadFailed||mismatch||(!hqHost&&!selectedAccountId)} busy={busy} busyLabel="保存中…">{hqHost?host?.primaryLabel??'保存して配る':'保存する'}</Button></>:undefined}>
+      footerActions={canMutate?<>{hqHost && host ? <Button disabled={busy} onClick={()=>guarded(host.onCancel)}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}{hqHost?<Button onClick={()=>void save(false,false)} disabled={busy||loading||loadFailed}>下書きを保存</Button>:null}<Button variant="primary" onClick={()=>void save()} disabled={busy||loading||loadFailed||mismatch||(!hqHost&&!selectedAccountId)||Boolean(inputReason)} disabledReason={inputReason} busy={busy} busyLabel="保存中…">{hqHost?host?.primaryLabel??'保存して配る':'保存する'}</Button></>:undefined}>
       {host?.notice}
       {error?<Notice tone="danger" >{error}</Notice>:null}
       {mismatch?<Notice tone="info" role="status">このテンプレートのLINEアカウントに切り替えてから保存してください。</Notice>:null}

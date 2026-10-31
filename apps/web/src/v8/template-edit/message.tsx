@@ -1,4 +1,5 @@
 'use client'
+import { requiredInputReason } from '@/lib/required-input-reason'
 
 import ReadOnlyNotice from '@/components/shared/read-only-notice'
 import { createPageReturnHref } from '@/components/shared/create-page'
@@ -458,6 +459,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   const flexError = messageType === 'flex' ? validateFlexContent('flex', messageContent) : null
   const sendName = accountName(editorAccountId) ?? undefined
   const busy = saving || publishing || Boolean(host?.busy)
+  const inputReason = conflict || loading || loadFailed || saveGuard ? null : requiredInputReason([{ label: 'テンプレート名', value: name }, { label: messageType === 'text' ? '本文' : 'メッセージ内容', value: messageContent }])
   const blocked = loadFailed ? TEMPLATE_LOAD_FAILED_MESSAGE : saveGuard
   const phone = (
     <LinePreview
@@ -488,6 +490,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
   return (
     <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
+        inputReason={inputReason}
         boardId={boardId}
         title={title}
         description={description}
@@ -523,7 +526,7 @@ export default function TemplateMessageEditor({ id, visual, example = null, host
               type="button"
               variant="primary"
               onClick={conflict ? () => void openCompare() : () => void onPublish()}
-              disabled={busy || Boolean(blocked)}
+              disabled={busy || Boolean(blocked) || Boolean(inputReason)} disabledReason={inputReason}
               title={blocked ?? undefined}
               busy={publishing || Boolean(host?.busy)}
               busyLabel={host ? '保存中…' : '公開中…'}

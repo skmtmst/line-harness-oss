@@ -187,3 +187,11 @@ it('20文字を超す既存のボタン名は消さずその欄へ案内し、�
   expect(templatesApi.create).toHaveBeenCalledOnce()
   expect(templatesApi.create.mock.calls[0][0].question.choices[1].label).toBe('あ'.repeat(20))
 })
+
+it('必須不足は主保存を押せない形と理由にし、欄の検証入口を残す', () => {
+  const save = screen.getByRole('button', { name: '保存して公開' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  expect(screen.getByText('テンプレート名を入力してください。')).toBeTruthy()
+  expect(screen.getByRole('button', { name: '下書きを保存' }).hasAttribute('disabled')).toBe(false)
+  fireEvent.click(save);expect(templatesApi.create).not.toHaveBeenCalled()
+})
