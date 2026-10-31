@@ -51,6 +51,22 @@ esac
 
 step() { printf '\n=== %s ===\n' "$1"; }
 
+# Cloudflare API の一時的な混雑（code 971「throttling」など）で wrangler が落ちることがある。
+# D1 の読み書きは同じ内容を打ち直して問題ないので、少し待って最大 4 回まで試す。
+retry() {
+  local attempt=1 max=4 wait_sec="${CF_STAGING_RETRY_WAIT:-20}"
+  while true; do
+    if "$@"; then return 0; fi
+    if [ "$attempt" -ge "$max" ]; then
+      echo "[NG] $max 回試しても通りませんでした: $*" >&2
+      return 1
+    fi
+    echo "  失敗しました（$attempt/$max）。${wait_sec} 秒待って打ち直します。" >&2
+    sleep "$wait_sec"
+    attempt=$((attempt + 1))
+  done
+}
+
 if [ ! -f "$STAGING_CONFIG" ]; then
   echo "[NG] $STAGING_CONFIG がありません。" >&2
   exit 1
@@ -80,7 +96,8 @@ if [ "$SKIP_MIGRATE" = "1" ]; then
 else
   step "2/6 D1 の状態（未適用の一覧）"
   STATUS_OUT="$(mktemp)"
-  "$TSX" scripts/deploy/migrate.ts status staging | tee "$STATUS_OUT"
+  retry bash -c '"$0" scripts/deploy/migrate.ts status staging > "$1"' "$TSX" "$STATUS_OUT"
+  cat "$STATUS_OUT"
 
   step "3/6 これから当たるマイグレーションの中身の確認（追加のみ許可）"
   # migrate.ts status が「これから当たるもの」として挙げた物だけを見る。
@@ -119,9 +136,9 @@ else
 
   step "4/6 D1 へ適用"
   if [ "$MODE" = "apply" ]; then
-    "$TSX" scripts/deploy/migrate.ts apply staging --apply
+    retry "$TSX" scripts/deploy/migrate.ts apply staging --apply
   else
-    "$TSX" scripts/deploy/migrate.ts apply staging
+    retry "$TSX" scripts/deploy/migrate.ts apply staging
     echo "(plan のため D1 は変えていません)"
   fi
 fi
@@ -133,7 +150,7 @@ BUILD_VARS=(
   --var "BUILD_RELEASED_AT:$RELEASED_AT"
 )
 if [ "$MODE" = "apply" ]; then
-  "$WRANGLER" deploy --config "$STAGING_CONFIG" "${BUILD_VARS[@]}"
+  retry "$WRANGLER" deploy --config "$STAGING_CONFIG" "${BUILD_VARS[@]}"
 else
   "$WRANGLER" deploy --config "$STAGING_CONFIG" --dry-run "${BUILD_VARS[@]}"
   echo "(plan のため Cloudflare へは反映していません)"
