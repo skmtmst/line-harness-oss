@@ -27,6 +27,12 @@ function canCancel(b: EventBookingMine): boolean {
   return deadlineMs > Date.now();
 }
 
+/** 取消可否の計算には触れず、応答にある期限だけを案内する。 */
+function cancellationDeadlineLabel(hours: number | null | undefined): string {
+  if (typeof hours !== 'number' || !Number.isFinite(hours) || hours < 0) return 'キャンセル期限';
+  return hours === 0 ? '開始時刻' : `開始${hours}時間前`;
+}
+
 /**
  * 3-b 自分のイベント。「これから／これまで」の切り替え。
  * キャンセルは期限まで。確認の出し方と失敗の文言はそのまま。
@@ -369,7 +375,7 @@ export default function EventBookings() {
             ? `${utcToJstMd(pendingCancel.slot_starts_at)} ${utcToJstHm(pendingCancel.slot_starts_at)} の${pendingCancel.event_name}${canLeaveWaitlist(pendingCancel) ? 'のキャンセル待ちをやめますか' : 'をキャンセルしますか'}`
             : ''
         }
-        description={pendingCancel && canLeaveWaitlist(pendingCancel) ? 'キャンセル待ちをやめると、空きが出てもLINEのお知らせは届かなくなります。' : `キャンセル待ちの方へ順番に案内されます。前日を過ぎるとここからは変えられません（${words.contact}へご連絡ください）。`}
+        description={pendingCancel && canLeaveWaitlist(pendingCancel) ? 'キャンセル待ちをやめると、空きが出てもLINEのお知らせは届かなくなります。' : `キャンセル待ちの方へ順番に案内されます。${cancellationDeadlineLabel(pendingCancel?.cancel_deadline_hours_before)}になると、ここからは変えられません（${words.contact}へご連絡ください）。`}
         confirmLabel={pendingCancel && canLeaveWaitlist(pendingCancel) ? 'キャンセル待ちをやめる' : 'キャンセルする'}
         cancelLabel="閉じる"
         destructive
