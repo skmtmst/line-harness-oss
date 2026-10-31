@@ -1112,3 +1112,4 @@
 
 - [反映履歴：回答フォームの中身から名前を入力](release-log/unreleased/0000-kenta-form-name-content.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
 - [反映履歴：回答フォームのURLと公開前の案内](release-log/unreleased/0000-kenta-form-answer-url.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [反映履歴：未公開の回答フォームの削除案内](release-log/unreleased/0000-kenta-form-archive-dialog.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
