@@ -233,35 +233,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* 状態の札。 */
-.statePill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  border-radius: var(--radius-pill);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.statePillActive {
-  background: var(--color-success-bg);
-  color: var(--color-success);
-}
-
-.statePillStopped {
-  background: var(--color-canvas-sunken);
-  color: var(--color-ink-secondary);
-}
-
-.stateDot {
-  width: 6px;
-  height: 6px;
-  border-radius: var(--radius-pill);
-  background: currentColor;
-}
-
 .menuCell {
   text-align: right;
 }

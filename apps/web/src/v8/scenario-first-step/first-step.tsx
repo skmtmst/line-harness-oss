@@ -1,5 +1,6 @@
 'use client'
 
+import { firstQuestionChoiceLabelProblem } from '@/components/scenarios/question-choice-label-validation'
 import { useInsertTokenNames } from '@/lib/use-insert-token-names'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { jstDate } from '@/lib/jst-datetime';
@@ -405,6 +406,14 @@ export default function ScenarioFirstStepV8() {
         // 書かずに進む道は「1通目はあとで書く」に寄せ、保存は空なら理由を出して止める（点検 #495 中7）。
         setContentError('内容を入力してください。あとで書く場合は「1通目はあとで書く」を押してください。')
         const field = editorRef.current?.querySelector<HTMLElement>('[contenteditable="true"], textarea, input:not([type="file"]):not([disabled])') ?? editorRef.current?.querySelector<HTMLElement>('button:not([disabled])')
+        field?.focus()
+        field?.scrollIntoView?.({ block: 'center' })
+        return
+      }
+      const labelProblem = contentMode === 'compose' && kind === 'question' ? firstQuestionChoiceLabelProblem(question) : null
+      if (labelProblem) {
+        setContentError('')
+        const field = editorRef.current?.querySelector<HTMLElement>('input[aria-invalid="true"]')
         field?.focus()
         field?.scrollIntoView?.({ block: 'center' })
         return

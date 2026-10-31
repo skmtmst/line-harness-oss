@@ -1,0 +1,10 @@
+/* LINE・LIFFの共通のスマホの寸法。カードの見本だけ高さを抑える。 */
+:root {
+  --v8-line-phone-width: 330px;
+  --v8-line-phone-height: 690px;
+  --v8-line-phone-compact-height: 410px;
+  --v8-line-phone-card-width: 240px;
+  --v8-line-shell-radius: 52px;
+  --v8-line-screen-radius: 42px;
+  --v8-line-homebar-radius: 3px;
+}

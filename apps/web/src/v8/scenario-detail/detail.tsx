@@ -1,5 +1,7 @@
 'use client'
 
+import { firstQuestionChoiceLabelProblem } from '@/components/scenarios/question-choice-label-validation'
+
 import { emptyMessageKindState, type MessageKindState } from '@/components/scenarios/message-kind-fields'
 import { describeCondition, ON_COMPLETE_LABEL, type OnCompleteMode } from '@/components/scenarios/scenario-dialogs'
 import { previewOffsets } from '@/components/scenarios/step-preview'
@@ -200,7 +202,7 @@ export default function ScenarioDetailV8({
   const [stepError, setStepError] = useState('')
   /* 通の保存で落ちた欄は、その欄の真下に理由を出して移る。検査は保存の直前に1つずつ見る形なので fail で結び付ける。 */
   const stepFields = useFormErrors()
-  for (const [key, label] of [['question', '質問'], ['content', 'メッセージ内容'], ['template', 'テンプレート'], ['time', '配信する時刻']] as const) stepFields.define(key, label, () => null)
+  for (const [key, label] of [['question', '質問'], ['content', 'メッセージ内容'], ['template', 'テンプレート'], ['time', '配信する時刻']] as const) stepFields.define(key, label, () => key === 'question' && stepForm.question ? firstQuestionChoiceLabelProblem(stepForm.question)?.message ?? null : null)
   const failStep = (key: 'question' | 'content' | 'template' | 'time', message: string) => {
     setStepError('')
     stepFields.fail(key, message)

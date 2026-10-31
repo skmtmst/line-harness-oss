@@ -1,3 +1,5 @@
+import { readRestaurantCustomerReservationForm,RestaurantReservationFormError } from '../services/restaurant-reservation-form.js';
+import { restaurantReservationAnswerError } from '@line-crm/shared';
 import { liffBookingJson, liffBookingInputError } from './liff-booking-response.js';
 import { UnexpectedRouteError } from '../lib/unhandled-error.js';
 import { normalizePhone } from '@line-crm/shared';
@@ -37,6 +39,8 @@ import { processBookingWaitlists } from '../services/waitlist-tick.js';
 import { isAccountFeatureEnabled } from '@line-crm/db';
 export const restaurantCustomerBooking = new Hono<Env>();
 restaurantCustomerBooking.onError((e, c) => {
+  if(String(e).includes('RESTAURANT_FORM_CHANGED'))return liffBookingJson(c,{success:false,error:'reservation_form_changed'},409);
+  if(e instanceof RestaurantReservationFormError)return liffBookingJson(c,{success:false,error:'reservation_form_unavailable'},503);
   if (/customer_table_conflict|customer_duplicate_booking|customer_line_capacity|restaurant_table_conflict|closure_conflict|UNIQUE constraint/.test(String(e))) {
     return liffBookingJson(c, { success: false, error: 'slot_conflict' }, 409);
   }
@@ -81,10 +85,10 @@ restaurantCustomerBooking.get('/api/liff/restaurant/link/:token', async (c) => {
       `SELECT s.id,s.name,s.timezone FROM rt_reservation_links l JOIN rt_stores s ON s.id=l.store_id WHERE l.token=? AND s.line_account_id=? AND s.status='active'`,
     )
     .bind(c.req.param('token'), self.accountId)
-    .first();
-  return store
-    ? liffBookingJson(c, { success: true, data: store })
-    : liffBookingJson(c, { success: false, error: 'not_found' }, 404);
+    .first<{id:string;name:string;timezone:string}>();
+  if(!store)return liffBookingJson(c,{success:false,error:'not_found'},404);
+  const {form:reservationForm}=await readRestaurantCustomerReservationForm(dbFor(c.env,store.id),store.id,self.accountId);
+  return liffBookingJson(c,{success:true,data:{...store,reservationForm}});
 });
 restaurantCustomerBooking.get(
   '/api/liff/restaurant/availability',
@@ -142,6 +146,8 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
   if (old) {
     if (
       old.note !== customerDetailValue(body.note) ||
+      (body.customerName!==undefined&&old.customer_name!==customerDetailValue(body.customerName)) ||
+      (body.allergyNote!==undefined&&old.allergy_note!==customerDetailValue(body.allergyNote)) ||
       (normalizePhone(old.customer_phone ?? '') || null) !== (normalizePhone(body.customerPhone ?? '') || null) ||
       old.starts_at !== startsAt ||
       old.guest_count !== body.guestCount ||
@@ -188,13 +194,13 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
   // 営業時間を読んだ版と同じときだけ作る。席・本人・残枠はDBトリガーでも守る。
   await db
     .prepare(
-      `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id,note,customer_phone,course_id) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`,
+      `INSERT INTO rt_reservations(id,store_id,source,external_id,customer_name,line_uid,guest_count,starts_at,ends_at,table_id,status,hold_expires_at,customer_request_id,note,customer_phone,course_id,allergy_note) SELECT ?,?,'line',?,?,?,?,?,?,?,'pending',?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?) AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`,
     )
     .bind(
       id,
       store.id,
       `customer:${id}`,
-      self.friendName,
+      customerDetailValue(body.customerName)??self.friendName,
       self.uid,
       body.guestCount,
       startsAt,
@@ -205,6 +211,7 @@ restaurantCustomerBooking.post('/api/liff/restaurant/holds', inputJsonBoundary()
       customerDetailValue(body.note),
       (normalizePhone(body.customerPhone ?? '') || null),
       body.courseId || null,
+      customerDetailValue(body.allergyNote),
       store.id,
       result.hoursVersion,
       body.courseId || null, body.courseId || null, store.id, course?.durationMinutes ?? null,
@@ -256,7 +263,7 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         b.expectedVersion < 1
       )
         return liffBookingInputError(c, { success: false, error: 'expected_version_required' }, 400, ["expectedVersion"]);
-      if (action === 'confirm' && !validCustomerDetails(b)) return liffBookingInputError(c, {success:false,error:'invalid_customer_details'}, 400, ["note","customerPhone"]);
+      if (action === 'confirm' && !validCustomerDetails(b)) return liffBookingInputError(c, {success:false,error:'invalid_customer_details'}, 400, ["note","customerPhone","customerName","allergyNote"]);
       const db = dbFor(c.env),
         row = await db
           .prepare(
@@ -270,10 +277,17 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         (action === 'confirm' && row.status === 'confirmed') ||
         (action === 'cancel' && row.status === 'cancelled')
       ) {
-        if (action === 'confirm' && ((b.note !== undefined && customerDetailValue(b.note)!==row.note) || (b.customerPhone !== undefined && (normalizePhone(b.customerPhone ?? '') || null)!==(normalizePhone(row.customer_phone ?? '') || null)))) return liffBookingJson(c, {success:false,error:'request_conflict'},409);
+        if (action === 'confirm' && ((b.note !== undefined && customerDetailValue(b.note)!==row.note) || (b.customerPhone !== undefined && (normalizePhone(b.customerPhone ?? '') || null)!==(normalizePhone(row.customer_phone ?? '') || null)) || (b.customerName!==undefined&&customerDetailValue(b.customerName)!==row.customer_name) || (b.allergyNote!==undefined&&customerDetailValue(b.allergyNote)!==row.allergy_note))) return liffBookingJson(c, {success:false,error:'request_conflict'},409);
         if(action==='confirm' && typeof b.referralId==='string') await acceptReferral(db,b.referralId,store.id,row.id,self.uid,row.customer_version).run();
         await finish(c, store);
         return liffBookingJson(c, { success: true, data: customerBooking(row) });
+      }
+      const formSnapshot=action==='confirm'?await readRestaurantCustomerReservationForm(db,store.id,self.accountId):null;
+      const form=formSnapshot?.form;
+      if(form){
+        if((b.expectedFormVersion??0)!==form.version)return liffBookingJson(c,{success:false,error:'reservation_form_changed'},409);
+        const problem=restaurantReservationAnswerError(form.definition,{customerName:b.customerName===undefined?row.customer_name:b.customerName,customerPhone:b.customerPhone===undefined?row.customer_phone:b.customerPhone,allergyNote:b.allergyNote===undefined?row.allergy_note:b.allergyNote,note:b.note===undefined?row.note:b.note});
+        if(problem)return liffBookingInputError(c,{success:false,error:'invalid_reservation_answers',message:problem},400,['customerName','customerPhone','allergyNote','note']);
       }
       if (row.customer_version !== b.expectedVersion)
         return liffBookingJson(c, { success: false, error: 'version_conflict' }, 409);
@@ -359,6 +373,8 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
       const next = {
         ...row,
         note: action === 'confirm' && b.note !== undefined ? customerDetailValue(b.note) : row.note,
+        customer_name:action==='confirm'&&b.customerName!==undefined?customerDetailValue(b.customerName)!:row.customer_name,
+        allergy_note:action==='confirm'&&b.allergyNote!==undefined?customerDetailValue(b.allergyNote):row.allergy_note,
         customer_phone: action === 'confirm' && b.customerPhone !== undefined ? (normalizePhone(b.customerPhone ?? '') || null) : row.customer_phone,
         status: action === 'cancel' ? 'cancelled' : 'confirmed',
         starts_at: starts,
@@ -371,9 +387,10 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
         hold_expires_at: null,
       };
       const results = await db.batch([
+        ...(formSnapshot?[formSnapshot.guard]:[]),
         db
           .prepare(
-            `UPDATE rt_reservations SET status=?,starts_at=?,ends_at=?,table_id=?,guest_count=?,note=?,customer_phone=?,course_id=?,dining_snapshot_json=CASE WHEN course_id IS NOT ? THEN json_set(dining_snapshot_json,'$.courseId',?,'$.courseAllergens',json(COALESCE((SELECT allergens_json FROM rt_menu_items WHERE id=? AND store_id=?),'[]'))) ELSE dining_snapshot_json END,customer_version=customer_version+1,hold_expires_at=NULL,updated_at=datetime('now') WHERE id=? AND line_uid=? AND customer_version=? AND status=? AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)) AND (?<>'confirm' OR julianday(hold_expires_at)>julianday('now')) AND (?='cancel' OR ? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`,
+            `UPDATE rt_reservations SET status=?,starts_at=?,ends_at=?,table_id=?,guest_count=?,note=?,customer_phone=?,customer_name=?,allergy_note=?,course_id=?,dining_snapshot_json=json_set(CASE WHEN course_id IS NOT ? THEN json_set(COALESCE(dining_snapshot_json,'{}'),'$.courseId',?,'$.courseAllergens',json(COALESCE((SELECT allergens_json FROM rt_menu_items WHERE id=? AND store_id=?),'[]'))) ELSE COALESCE(dining_snapshot_json,'{}') END,'$.allergy',?),customer_version=customer_version+1,hold_expires_at=NULL,updated_at=datetime('now') WHERE id=? AND line_uid=? AND customer_version=? AND status=? AND (? IS NULL OR EXISTS(SELECT 1 FROM rt_opening_hours_settings WHERE store_id=? AND version=?)) AND (?<>'confirm' OR julianday(hold_expires_at)>julianday('now')) AND (?='cancel' OR ? IS NULL OR EXISTS(SELECT 1 FROM rt_menu_items WHERE id=? AND store_id=? AND status='active' AND kind='course' AND duration_minutes=?))`,
           )
           .bind(
             next.status,
@@ -383,7 +400,8 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
             count,
             next.note,
             next.customer_phone,
-            courseId, courseId, courseId, courseId, store.id,
+            next.customer_name,next.allergy_note,
+            courseId, courseId, courseId, courseId, store.id,next.allergy_note,
             row.id,
             self.uid,
             b.expectedVersion,
@@ -411,8 +429,11 @@ for (const action of ['confirm', 'cancel', 'reschedule'] as const) {
             crypto.randomUUID(),
           ),
         ...(action==='confirm' && typeof b.referralId==='string' ? [acceptReferral(db,b.referralId,store.id,row.id,self.uid,next.customer_version)] : []),
-      ]);
-      if (!results[0]!.meta.changes)
+      ]).catch(async error=>{
+        if(formSnapshot&&!await formSnapshot.isCurrent())throw new Error('RESTAURANT_FORM_CHANGED');
+        throw error;
+      });
+      if (!results[form?1:0]!.meta.changes)
         return liffBookingJson(c, { success: false, error: 'version_conflict' }, 409);
       await finish(c, store);
       const saved=await db.prepare('SELECT *,NULL seat_type,(SELECT name FROM rt_menu_items WHERE id=rt_reservations.course_id) course_name FROM rt_reservations WHERE id=?').bind(next.id).first<CustomerReservationRow>();

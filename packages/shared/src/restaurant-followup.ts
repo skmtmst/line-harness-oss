@@ -1,3 +1,5 @@
+import type { RestaurantReservationFormHealth } from './restaurant-reservation-form.js';
+import type { ReminderTestRecipientStatus } from './types/reminders.js';
 export type RestaurantFollowupTrigger = 'reservation_created' | 'reservation_24h' | 'reservation_2h' | 'post_visit' | 'review_request' | 'waitlist_invited' | 'anniversary_before';
 export const RESTAURANT_FOLLOWUP_LABELS:Record<RestaurantFollowupTrigger,string> = {
     reservation_created:'予約したとき',reservation_24h:'前日の確認',reservation_2h:'当日の来店前',
@@ -84,4 +86,23 @@ export interface RestaurantConfirmation {
     responded_at: string | null;
     expires_at: string;
     is_current: 0 | 1;
+}
+
+/** 吹き出しは実物の保存値。見本の文字で保存済み本文を上書きしない。 */
+export interface RestaurantFollowupEditorContent {
+ timing:RestaurantFollowupTiming;
+ messageParts:Array<{messageType:string;messageContent:string}>;
+}
+export interface RestaurantFollowupEngineState {
+ trigger:RestaurantFollowupTrigger;
+ engine:'scenario'|'reminder'|'automation';
+ targetId:string|null;targetVersion:number;contentRevision:string|null;
+ enabled:boolean;effectiveSendingStatus:'active'|'stopped';reason:string|null;detailPath:string|null;
+ editorContent:RestaurantFollowupEditorContent|null;
+}
+export interface RestaurantFollowupEngineBoard {
+ reservationForm?:RestaurantReservationFormHealth;
+ engines:RestaurantFollowupEngineState[];
+ legacyContents:Array<{trigger:RestaurantFollowupTrigger;content:RestaurantFollowupEditorContent|null}>;
+ testRecipient:ReminderTestRecipientStatus|null;
 }

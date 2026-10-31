@@ -14,6 +14,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MAX_TEXT_LENGTH } from './message-limits'
 
+const account = vi.hoisted(() => ({ id: 'acc-1' as string | null, loading: false }))
 const getApi = vi.hoisted(() => vi.fn())
 const query = vi.hoisted(() => ({ current: 'draft=draft-1&step=message' }))
 
@@ -60,7 +61,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, loading: account.loading }),
 }))
 
 import BroadcastForm from './broadcast-form'
@@ -107,6 +108,7 @@ function body(): HTMLElement {
 }
 
 beforeEach(() => {
+  account.id = 'acc-1'; account.loading = false
   query.current = 'draft=draft-1&step=message'
 })
 
@@ -127,9 +129,13 @@ describe('LINEプレビューの確認', () => {
     expect(document.body.textContent).toContain('実際のLINE表示に近い確認用プレビューです。')
     expect(container.textContent).toContain('LINEプレビューが未確認です')
 
-    const checkbox = Array.from(container.querySelectorAll('label')).find((label) => label.textContent?.includes('LINEプレビューが未確認です'))!
+    await act(async () => { Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('配信イメージを見る'))!.click() })
+    await flush()
+    const checkbox = Array.from(container.querySelectorAll('label')).find((label) => label.textContent?.includes('LINEプレビュー確認済み'))!
       .querySelector('input[type="checkbox"]') as HTMLInputElement
-    await act(async () => { checkbox.click() })
+    expect(checkbox.checked).toBe(true)
+    await act(async () => { document.querySelector<HTMLButtonElement>('[role="dialog"] button[aria-label="閉じる"]')!.click() })
+    await flush()
     expect(container.textContent).toContain('LINEプレビュー確認済み')
 
     // 古い見た目への確認を、書き換えたあとの本文へ引き継がない。
@@ -172,4 +178,17 @@ describe('本文の上限', () => {
     expect(button('テストを送る').disabled).toBe(false)
     expect(container.textContent).not.toContain('本文が長すぎます')
   })
+})
+
+it('撮影用の見本はアカウントの読み込み後も確認済みを保つ', async () => {
+  query.current = ''
+  account.id = null; account.loading = true
+  container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container)
+  const draw = () => <BroadcastForm currentStep="message" visualQaAugustCampaign tags={[]} onSuccess={() => {}} onCancel={() => {}} />
+  await act(async () => { root.render(draw()) }); await flush()
+  expect(container.textContent).toContain('LINEプレビュー確認済み')
+  account.id = 'acc-1'; account.loading = false
+  await act(async () => { root.render(draw()) }); await flush()
+  expect(container.textContent).toContain('LINEプレビュー確認済み')
+  expect(container.querySelector<HTMLInputElement>('#broadcast-line-preview input[type="checkbox"]')?.disabled).toBe(false)
 })

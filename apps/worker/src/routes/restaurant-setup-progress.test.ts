@@ -80,3 +80,11 @@ it('未確認・使わない保存・送り方オンの根拠を同じ店舗の�
     VALUES('store-ginza','post_visit','automation','setup-target',1)`);
   expect(await progress()).toMatchObject({ followupSetup: { notUsing: false, decidedAt: null, version: 2, anyEnabled: true } });
 });
+
+it('フォームの破損を他店へ混ぜず、最小項目で受付中の知らせと修復先を読み取りだけで返す',async()=>{
+ database.raw.exec("UPDATE rt_stores SET line_account_id='account-2' WHERE id='store-ginza'");
+ database.raw.exec("INSERT INTO account_settings(id,line_account_id,key,value) VALUES('broken-form','account-2','restaurant.reservation_form:store-ginza','{broken')");
+ const before=database.raw.prepare('SELECT count(*) n FROM account_settings').get();
+ expect((await progress()).reservationForm).toMatchObject({available:false,repairPath:'/restaurant-test/line-followup?store_id=store-ginza&repair_form=1'});
+ expect(database.raw.prepare('SELECT count(*) n FROM account_settings').get()).toEqual(before);
+});

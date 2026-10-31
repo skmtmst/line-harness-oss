@@ -3,11 +3,20 @@
 import React from 'react'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import Notice from './notice'
+import Notice, { NoticeStack } from './notice'
 
 afterEach(() => cleanup())
 
 describe('帯（Notice）の4種類', () => {
+  it('並べた知らせも失敗の読み上げと再試行の操作を保つ', () => {
+    const retry = vi.fn()
+    render(<NoticeStack><Notice tone="info">内容は残っています</Notice><Notice tone="danger" action={<button onClick={retry}>もう一度読み込む</button>}>取得できませんでした</Notice></NoticeStack>)
+    expect(screen.getByRole('alert').textContent).toContain('取得できませんでした')
+    expect(screen.getByText('内容は残っています')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+    expect(retry).toHaveBeenCalledTimes(1)
+  })
+
   const word = (container: HTMLElement) => container.querySelector('[data-notice-status-word]')?.textContent ?? null
   it.each([
     ['warn', '要確認：'],

@@ -16,6 +16,7 @@ import type { Env } from '../worker-env.js';
  */
 
 export type AuditAction =
+  | 'restaurant.reservation_form.repair'
   | 'form.submission.export'
   | 'ad_conversion.retry'
   | 'line_account_folder.create'

@@ -137,6 +137,8 @@ export function useAutomationDraftResume({
    * 画面を別の店の下書きに結び付けることはない（DETAIL-14）。
    */
   const bindAccountDraft = (accountId: string, draft: StoredDraft | null) => {
+    const previous=draftByAccountRef.current[accountId]
+    if(draft&&!draft.followupManagement&&previous?.id===draft.id&&previous.followupManagement)draft={...draft,followupManagement:{...previous.followupManagement,effectiveSendingStatus:'stopped',reason:'内容が変わったため、来店フォローでテスト送信と承認をやり直してください'}}
     if (draft) draftByAccountRef.current[accountId] = draft
     else delete draftByAccountRef.current[accountId]
     /*
@@ -353,7 +355,7 @@ export function useAutomationDraftResume({
           return
         }
         const restored = draftDetailToForm(res.data)
-        const draft = { id: res.data.id, draftVersionId: res.data.draftVersionId }
+        const draft = { id: res.data.id, draftVersionId: res.data.draftVersionId, ...(res.data.followupManagement?{followupManagement:res.data.followupManagement}:{}) }
         if (restored.eventType !== eventType) suppressTriggerResetRef.current = true
         setName(restored.name)
         setSourceName(restored.name)
