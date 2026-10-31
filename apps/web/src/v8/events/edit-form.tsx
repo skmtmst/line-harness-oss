@@ -45,6 +45,7 @@ import { AddSlotDialog, EditSlotDialog } from "./edit-form-gap-parts"
 import { formatJpDateTime, formatJpSlotRange, toEventDraft } from './edit-format'
 import { formatNumber } from '@/lib/format'
 import { ToggleField } from '@/components/shared/toggle'
+import { MakeupRuleSection } from './makeup-rule-section'
 export { formatJpDateTime, formatJpSlotRange, toEventDraft } from './edit-format'
 
 type Tab = 'overview' | 'slots' | 'publish'
@@ -107,8 +108,9 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       setDeleteBusy(false)
     }
   }
-  const dirty = eventPayment.dirty || JSON.stringify(draft) !== JSON.stringify(savedDraft)
-  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving || duplicating })
+  const [makeupEditState, setMakeupEditState] = useState({ dirty: false, busy: false })
+  const dirty = makeupEditState.dirty || eventPayment.dirty || JSON.stringify(draft) !== JSON.stringify(savedDraft)
+  const { leaveTarget, confirmLeave, cancelLeave, guarded } = useUnsavedGuard({ dirty, busy: saving || duplicating || makeupEditState.busy })
 
   const [copiedValue, setCopiedValue] = useState<string | null>(null)
   const [tags, setTags] = useState<Array<{ id: string; name: string }>>([])
@@ -348,7 +350,14 @@ export default function EventForm({ accountId, eventId }: EventFormProps) {
       onClick: () => { if (item.key === 'overview' || eventId) setTab(item.key) },
     }))} />
     {tab === 'overview' ? <OverviewTab draft={draft} update={update} accounts={accounts} currentAccountId={accountId}
-      afterBasics={eventId ? <MenuPaymentCard state={eventPayment} name="event" price={null} priceField unit="名" /> : null} /> : null}
+      afterBasics={eventId ? <><MenuPaymentCard state={eventPayment} name="event" price={null} priceField unit="名" />
+        <MakeupRuleSection onEditState={setMakeupEditState} accountId={accountId} event={draft} busy={saving || duplicating} onSaved={(rule, revision, previousRevision) => {
+          const updateRule = (value: EventDetail) => ({ ...value, makeup_rule_json: JSON.stringify(rule), version: value.version === previousRevision ? revision : value.version })
+          setDraft(updateRule)
+          setSavedDraft(updateRule)
+          if (draft.version !== previousRevision) setError('振替の決まりは保存しました。クラスの概要はほかの人が更新しています。概要の入力を控えて開き直してから保存してください。')
+        }} />
+      </> : null} /> : null}
     {tab === 'slots' ? <SlotsTab accountId={accountId} eventId={eventId} slots={slots} setSlots={setSlots} /> : null}
     {tab === 'publish' ? <PublishTab draft={draft} update={update} tags={tags} /> : null}
     {tab !== 'slots' ? <StickyBar destructive={tab === 'overview' && eventId && canDelete ? <Button variant="danger" onClick={() => { setDeleteError(''); setDeleteOpen(true) }} disabled={saving}>削除する</Button> : undefined} status={tab === 'overview'

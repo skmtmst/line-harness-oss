@@ -1060,3 +1060,4 @@
 - [一括予約の処理設計](release-log/unreleased/2003-kenta-bulk-booking-design.md) — 反映履歴、確認 2026-10-31
 
 - [今月の成果の流れの窓](release-log/unreleased/2003-kenta-monthly-flow.md) — 反映履歴、確認 2026-10-31。
+- [クラスの振替の決まり](release-log/unreleased/0000-kenta-class-makeup-rule.md) — 反映履歴、確認 2026-10-31
