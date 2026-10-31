@@ -13,6 +13,16 @@ const result = (extra: Partial<BroadcastPreflight> = {}): BroadcastPreflight => 
 const exclusions = { blocked: 0, hidden: 0, missingDestination: 0, duplicate: 0, paused: null, total: 0 }
 
 describe('配信の事前確認を表示する値', () => {
+  it('確認後すぐの分散送信では、開始と分散する分数の両方を最終確認に出す', () => {
+    expect(broadcastPreflightSummary({ ...input, sendMode: 'now', spreadMinutes: '45' }).sendWhenLabel)
+      .toBe('今すぐ（確認してから送信・45分かけて配信）')
+  })
+
+  it('不正な小数の分数を配送にもまとめにも使わない', () => {
+    expect(broadcastPreflightSummary({ ...input, spreadMinutes: '45.5' }).sendWhenLabel).toBe('今すぐ（確認してから送信）')
+    expect(broadcastPreflightSummary({ ...input, sendMode: 'unselected' }).sendWhenLabel).toBeNull()
+  })
+
   it('未取得は未取得のまま、確認済みの0人・除外なしと区別する', () => {
     expect(broadcastPreflightSummary(input)).toMatchObject({ audienceCount: null, audienceDisplayCount: null, exclusionNote: null, quotaNote: null, evaluatedAtLabel: null })
     expect(broadcastPreflightSummary({ ...input, preflight: result({ audienceCount: 0, exclusions }) })).toMatchObject({ audienceCount: 0, audienceDisplayCount: 0, exclusionNote: '除外なし' })
