@@ -32,6 +32,11 @@ function button(label: string, scope: ParentNode = document) {
   return element
 }
 async function click(label: string, scope: ParentNode = document) { await act(async () => { fireEvent.click(button(label, scope)) }); await flush() }
+async function acknowledge(scope: Element) {
+  const checkbox = Array.from(scope.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')).find(input => input.labels?.[0]?.textContent?.includes('確認しました'))
+  if (!checkbox) throw new Error('確認しましたの欄がありません')
+  await act(async () => { fireEvent.click(checkbox) }); await flush()
+}
 async function render(step: 'confirm' | 'audience' = 'confirm', scheduled = false) {
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign initialScheduledDate={scheduled ? '2099-10-05' : undefined} initialScheduledTime={scheduled ? '10:00' : undefined} currentStep={step} tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }, { type: 'tag_exists', value: 'member' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
@@ -58,6 +63,7 @@ describe('V8の5手順で送信を確定する', () => {
   it('最終確認の窓を開くと下書きを保存して数え直し、確定は見た人数・版を添えて1回だけ送る', async () => {
     await render(); const dialog = await confirm(); await flush()
     expect(mocks.create).toHaveBeenCalledTimes(1); expect(mocks.preview).toHaveBeenCalledWith('draft'); expect(mocks.confirm).not.toHaveBeenCalled()
+    await acknowledge(dialog)
     await act(async () => { fireEvent.click(button('10 人に送る', dialog)); fireEvent.click(button('10 人に送る', dialog)) }); await flush()
     expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith('draft', { expectedVersion: 2, confirmedRecipientCount: 10 })
     expect(mocks.get).toHaveBeenCalledExactlyOnceWith('draft')
@@ -65,7 +71,7 @@ describe('V8の5手順で送信を確定する', () => {
   })
   it('送信が断られたときは入力と確認窓を残し、成功として移動しない', async () => {
     mocks.confirm.mockRejectedValue(new Error('送信枠が足りません'))
-    await render(); const dialog = await confirm(); await flush(); await click('10 人に送る', dialog)
+    await render(); const dialog = await confirm(); await flush(); await acknowledge(dialog); await click('10 人に送る', dialog)
     expect(document.querySelector('[role="dialog"]')).not.toBeNull()
     expect(container.textContent).toContain('8月キャンペーンのお知らせ'); expect(mocks.success).not.toHaveBeenCalled()
   })
@@ -88,6 +94,7 @@ describe('V8の5手順で送信を確定する', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(200) }); await flush()
     const dialog = document.querySelector('[role="dialog"]')!
     expect(mocks.create.mock.calls[0][0].scheduledAt).toBe('2099-10-05T01:00:00.000Z')
+    await acknowledge(dialog)
     await click('10 人に 10/5 10:00 で予約する', dialog)
     expect(mocks.confirm).toHaveBeenCalledWith('draft', expect.objectContaining({ scheduledAt: '2099-10-05T01:00:00.000Z' }))
     expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.success).toHaveBeenCalledTimes(1)
@@ -98,6 +105,7 @@ describe('V8の5手順で送信を確定する', () => {
     await act(async () => { fireEvent.click(dialog.querySelector('button[aria-label="承認をお願いする人"]')!) }); await flush()
     await act(async () => { fireEvent.click(Array.from(document.querySelectorAll('input[type="radio"]')).find((item) => item.getAttribute('aria-label')?.includes('確認担当'))!) }); await flush()
     await click('選ぶ', [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].at(-1)!)
+    await acknowledge(dialog)
     await click('承認を依頼する', dialog)
     expect(mocks.request).toHaveBeenCalledWith('draft', { approverStaffId: 'reviewer', note: undefined })
     expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.success).toHaveBeenCalledTimes(1)
@@ -113,6 +121,7 @@ describe('V8の5手順で送信を確定する', () => {
   it('1人運用では人数が合うまで保存せず、確認した人数を送信側にも渡す', async () => {
     mocks.config.mockResolvedValue({ success: true, data: { threshold: 5, singleOperator: true } })
     await render(); const dialog = await confirm()
+    await acknowledge(dialog)
     const savedBefore = mocks.create.mock.calls.length + mocks.update.mock.calls.length
     await click('今すぐ送る', dialog)
     expect(mocks.create.mock.calls.length + mocks.update.mock.calls.length).toBe(savedBefore)

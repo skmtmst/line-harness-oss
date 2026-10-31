@@ -22,6 +22,7 @@ import { type ActionMenuItem } from '@/components/shared/action-menu'
 import { loadFailureCopy } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import ContextMenu,{ type ContextMenuItem } from '@/components/shared/context-menu'
+import { rememberCreatedFormDraft } from '@/lib/form-draft-session'
 import EmptyList from '@/components/shared/empty-list'
 import { emptyValue } from '@/components/shared/empty-value'
 import SegmentedControl from '@/components/shared/segmented'
@@ -258,6 +259,7 @@ export default function FormsListV8() {
     try {
       const res = await api.forms.createDraft(selectedAccountId)
       if (!res.success) throw new Error(res.error)
+      rememberCreatedFormDraft(selectedAccountId, res.data.id, res.data.contentRevision)
       router.push(`/form-submissions/edit?id=${encodeURIComponent(res.data.id)}&tab=basic`)
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)

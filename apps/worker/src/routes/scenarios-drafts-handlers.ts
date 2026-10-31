@@ -271,7 +271,7 @@ export const post__api_scenarios_6 = async (c: Context<Env, "/api/scenarios">) =
 
     let scenario = await createScenario(c.env.DB, {
       name: body.name,
-      isActive: body.isActive !== false && hasDeliveryAccess(c.get('staff'), 'scenarios', 'publish'),
+      isActive: body.isActive === true && hasDeliveryAccess(c.get('staff'), 'scenarios', 'publish'),
       description: body.description ?? null,
       triggerType: body.triggerType,
       triggerTagId: body.triggerTagId ?? null,
