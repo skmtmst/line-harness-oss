@@ -1,2 +1,2 @@
-.image { width:100%; max-width:320px; height:auto; align-self:flex-start; }
+.image { width:100%; max-width:var(--tpl-htn-preview-w); height:auto; align-self:flex-start; }
 .phoneImage { display:block; width:100%; height:auto; }
