@@ -47,6 +47,7 @@ import RoutingSection from './routing-section';
 
 type Props = {
   readOnly?: boolean
+  nameField?: ReactNode
   layout: FormLayout
   page: number
   blocks: FormBlock[]
@@ -86,6 +87,7 @@ export function ContentTab(props: Props) {
 
   return (
     <>
+      {props.nameField ? <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)">{props.nameField}</Card> : null}
       <Card layout="vertical" contentPadding="var(--tpl-fe-card-pad)" gap="var(--tpl-fe-card-gap)" aria-labelledby="fe-pages-title">
         <div className={styles.cardHead}>
           <span className={styles.cardHeadText}>

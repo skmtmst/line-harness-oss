@@ -33,7 +33,7 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
   const more = useRef<HTMLButtonElement>(null)
   const measuredContent = useRef('')
   const refreshWidths = useRef<() => void>(() => {})
-  const [fit, setFit] = useState(() => Math.min(items.length, maxVisible ?? items.length, 1))
+  const [fit, setFit] = useState(() => ({ count: Math.min(items.length, maxVisible ?? items.length, 1), firstTruncated: false }))
   const lastFit = useRef(fit)
   const [open, setOpen] = useState(false)
   const tipId = useId()
@@ -68,10 +68,18 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
       // The one-tag layout uses a smaller display gap; fit against the shared natural gap.
       const naturalGap = parseFloat(style.getPropertyValue('--tpl-tag-overflow-gap'))
       const gap = Number.isFinite(naturalGap) ? naturalGap : parseFloat(style.columnGap) || 0
-      const count = fittingTagCount(widths, host.clientWidth, gap, () => more.current?.getBoundingClientRect().width ?? 0)
-      const fitted = Math.min(count, maxVisible ?? items.length)
-      // 名前全部が収まる札だけを出し、1つも入らない場合は +N から全件を読める。
-      return () => { if (active && lastFit.current !== fitted) { lastFit.current = fitted; setFit(fitted) } }
+      const available = host.clientWidth
+      const count = fittingTagCount(widths, available, gap, () => more.current?.getBoundingClientRect().width ?? 0)
+      // 先頭は省略しても残す。全件を隠す明示的な上限と、非表示の器は従来どおり扱う。
+      const fitted = Math.min(available > 0 ? Math.max(count, 1) : count, maxVisible ?? items.length)
+      const firstTruncated = available > 0 && fitted === 1 && widths[0] + (items.length > 1 ? gap + (more.current?.getBoundingClientRect().width ?? 0) : 0) > available
+      return () => {
+        if (active && (lastFit.current.count !== fitted || lastFit.current.firstTruncated !== firstTruncated)) {
+          const next = { count: fitted, firstTruncated }
+          lastFit.current = next
+          setFit(next)
+        }
+      }
     }
     const update = () => { if (active) scheduleMeasurement(key, read) }
     const invalidate = () => { widths = null; update() }
@@ -94,12 +102,12 @@ export default function TagOverflow({ children, label = 'すべてのタグ', ma
     const content = measure.current?.innerHTML ?? ''
     if (content !== measuredContent.current) { measuredContent.current = content; refreshWidths.current() }
   }, [children])
-  const shown = Math.min(fit, maxVisible ?? items.length, items.length)
+  const shown = Math.min(fit.count, maxVisible ?? items.length, items.length)
   const rest = items.length - shown
   if (items.length === 0) return null
   return <>
-    <span ref={root} className={styles.line} data-tag-overflow="" onClick={(event) => event.stopPropagation()}>
-      <TruncatedTextFocus.Provider value={rest === 0}>{items.slice(0, shown).map((item, index) => <span key={index} className={styles.item}>{item}</span>)}</TruncatedTextFocus.Provider>
+    <span ref={root} className={styles.line} data-tag-overflow="" data-tag-overflow-max={maxVisible} data-tag-overflow-first={fit.firstTruncated && shown === 1 || undefined} onClick={(event) => event.stopPropagation()}>
+      <TruncatedTextFocus.Provider value={rest === 0}>{items.slice(0, shown).map((item, index) => <span key={index} className={styles.item} title={index === 0 && fit.firstTruncated ? names(item) || undefined : undefined}>{item}</span>)}</TruncatedTextFocus.Provider>
       {rest > 0 ? <button type="button" className={styles.more} aria-label={`${label}（ほか${rest}件）`} aria-haspopup="dialog" aria-expanded={open} aria-describedby={tip ? tipId : undefined} onMouseEnter={event => showTip(event.currentTarget)} onMouseLeave={() => setTip(null)} onFocus={event => showTip(event.currentTarget)} onBlur={() => setTip(null)} onKeyDown={event => { if (event.key === 'Escape') setTip(null) }} onClick={() => { setTip(null); setOpen(true) }}>+{rest}</button> : null}
       <span ref={measure} className={styles.measure} data-tag-overflow-measure="" aria-hidden="true" inert>{items.map((item, index) => <span key={index} className={styles.item}>{item}</span>)}</span>
       <button ref={more} type="button" className={`${styles.more} ${styles.sampleMore}`} aria-hidden="true" tabIndex={-1} inert>+{items.length}</button>

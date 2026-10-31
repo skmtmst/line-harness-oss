@@ -39,7 +39,10 @@ export default function Step5Completion({ connection, accountName, createdId, im
   const remaining = total === null ? null : Math.max(0, total - processed)
   const percent = total === null ? null : total === 0 ? complete ? 100 : 0 : Math.round(processed / total * 100)
   const stageLabel = complete ? needsReview ? '引き継ぎの処理が終わりました（要確認）' : '友だちの引き継ぎが完了しました' : checking ? '進み具合を確認できません' : total === null ? '友だちを確認しています' : '友だちの情報を引き継いでいます'
-  const progressLabel = total === null ? '対象人数を確認中' : `${polishFormatNumber(processed)} / ${polishFormatNumber(total)}人 · ${percent}% · 残り${polishFormatNumber(remaining ?? 0)}人`
+  const countDetail = complete
+    ? handover.needsReview > 0 ? `未反映${polishFormatNumber(handover.needsReview)}件` : ''
+    : `残り${polishFormatNumber(remaining ?? 0)}人`
+  const progressLabel = total === null ? '対象人数を確認中' : `${polishFormatNumber(processed)} / ${polishFormatNumber(total)}人 · ${percent}%${countDetail ? ` · ${countDetail}` : ''}`
   const referenceTotal = connection.verification?.followerTotal
   const updateLabel = complete
     ? `完了：${new Intl.DateTimeFormat('ja-JP', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Tokyo' }).format(new Date(importState?.completedAt ?? importState?.updatedAt ?? Date.now()))}`

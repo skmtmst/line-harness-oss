@@ -26,6 +26,9 @@ export function scanListRows() {
   for (const tags of document.querySelectorAll('[data-tag-overflow]')) {
     if (!visible(tags)) continue
     if (tags.scrollWidth > tags.clientWidth + 1) failures.push('B-190 タグのはみ出し')
+    const total = tags.querySelector(':scope > [data-tag-overflow-measure]')?.children.length ?? 0
+    const shown = [...tags.children].filter(element => element.tagName === 'SPAN' && visible(element))
+    if (total > 0 && tags.getAttribute('data-tag-overflow-max') !== '0' && shown.length === 0) failures.push('B-190 タグ名なし')
   }
   return { rows: rows.length, failures: [...new Set(failures)] }
 }
