@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import MakeupPicker from './makeup-picker.js';
 import { api, type MakeupCredit } from '../lib/api.js';
@@ -69,3 +69,25 @@ it('画面を離れた後の完了で、古い画面の一覧を読み直さな�
   await act(async () => { finish!(); });
   expect(used).not.toHaveBeenCalled();
 });
+
+
+it('確保の直前に満席になったら、残った振替と近い3回を出して選び直せる', async () => {
+  const alternatives = [22, 23, 24, 25].map(day => ({ ...option, slot_id: `next-${day}`, name: `振替クラス${day}`, starts_at: `2026-10-${day}T01:00:00Z` }))
+  vi.mocked(api.makeupOptions).mockResolvedValueOnce({ options: [option] }).mockResolvedValue({ options: [...alternatives].reverse() })
+  vi.mocked(api.useMakeup).mockRejectedValueOnce({ status: 409, body: { error: 'makeup_slot_unavailable' } }).mockResolvedValue({ id: 'new', status: 'confirmed' })
+  const used = vi.fn()
+  render(<MakeupPicker credit={credit} onUsed={used} />)
+  fireEvent.click(await screen.findByRole('button', { name: /に振り替える/ }))
+  expect(await screen.findByRole('alert')).toHaveProperty('textContent', 'この回は埋まりました。ほかの回を選んでください。振替は残っています。')
+  const nearby = await screen.findByRole('group', { name: '近い振替先' })
+  const choices = within(nearby).getAllByRole('button')
+  expect(choices).toHaveLength(3)
+  expect(choices.map(button => button.textContent)).toEqual(expect.arrayContaining([expect.stringContaining('10/22'), expect.stringContaining('10/23'), expect.stringContaining('10/24')]))
+  expect(choices[0].textContent).toContain('10/22')
+  expect(used).not.toHaveBeenCalled()
+  fireEvent.click(choices[1])
+  fireEvent.click(await screen.findByRole('button', { name: /10\/23.*に振り替える/ }))
+  await vi.waitFor(() => expect(used).toHaveBeenCalledTimes(1))
+  expect(api.useMakeup).toHaveBeenLastCalledWith('mine', 'next-23', expect.any(String))
+  expect(vi.mocked(api.useMakeup).mock.calls[0][2]).not.toBe(vi.mocked(api.useMakeup).mock.calls[1][2])
+})

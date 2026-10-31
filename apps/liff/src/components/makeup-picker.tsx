@@ -42,6 +42,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
   const [picked, setPicked] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showNearby, setShowNearby] = useState(false);
   const key = useRef(crypto.randomUUID());
   const generation = useRef(0);
   const request = useRequestGeneration(credit.id);
@@ -71,6 +72,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
   const days = Array.from({ length: 7 }, (_, i) => addDays(week, i));
   const rows = (options ?? []).filter((o) => !day || jstDate(o.starts_at) === day);
   const chosen = (options ?? []).find((o) => o.slot_id === picked) ?? null;
+  const nearby = showNearby ? (options ?? []).filter((o) => !o.full).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at) || a.slot_id.localeCompare(b.slot_id)).slice(0, 3) : [];
 
   async function use() {
     if (!chosen || chosen.full || busy || credit.status !== 'open' || !Number.isFinite(expires) || Date.now() >= expires || Date.parse(chosen.starts_at) > expires || Date.parse(chosen.starts_at) <= Date.now()) return;
@@ -81,7 +83,7 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
       if (!request.isCurrent(version)) return;
       logFailure('makeup-use', e);
       const code = (e as { body?: { error?: string } }).body?.error;
-      if (code === 'slot_full' || code === 'slot_conflict') { key.current = crypto.randomUUID(); setError('この回は埋まりました。ほかの回を選んでください。振替は残っています。'); load(); }
+      if (code === 'makeup_slot_unavailable' || code === 'slot_full' || code === 'slot_conflict') { setPicked(null); setShowNearby(true); key.current = crypto.randomUUID(); setError('この回は埋まりました。ほかの回を選んでください。振替は残っています。'); load(); }
       else setError('振替を予約できませんでした。振替は残っています。もう一度お試しください。');
     } finally { if (request.isCurrent(version)) setBusy(false); }
   }
@@ -135,6 +137,12 @@ export default function MakeupPicker({ credit, source, onUsed, onLater }: {
           </ul>
         )}
       </div>
+      {nearby.length > 0 ? <div role="group" aria-label="近い振替先" className="space-y-2">
+        <h3 className="text-sm font-bold text-ink">近い振替先</h3>
+        {nearby.map(option => <Button key={option.slot_id} variant="option" onClick={() => {
+          setWeek(mondayOf(jstDate(option.starts_at))); setDay(jstDate(option.starts_at)); setPicked(option.slot_id); setError(null);
+        }}>{mdHm(option.starts_at)} {option.name}</Button>)}
+      </div> : null}
       {error ? <p role="alert" className="text-[13px] leading-5 text-danger">{error}</p> : null}
       <div className="pb-40" aria-hidden="true" />
       <BottomBar>
