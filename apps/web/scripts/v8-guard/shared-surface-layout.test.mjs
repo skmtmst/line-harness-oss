@@ -79,7 +79,7 @@ function Fixture(){
       <TextField aria-label="寸法の名前" defaultValue="名前" />
       <SearchField aria-label="寸法の検索" value="" onChange={()=>{}} placeholder="名前で探す" />
       <Select aria-label="寸法の選択" menuAlign="end" label="状態" value="all" options={[{value:'all',label:'すべて'},{value:'active',label:'とても長い選択肢の名前を最後まで確認する'}]} onChange={()=>{}} />
-      <Button variant="secondary" aria-label="寸法の保存">保存する</Button>
+      <Button variant="primary" aria-label="寸法の保存">保存する</Button>
     </div>
     <TextArea aria-label="寸法の本文" defaultValue="本文" />
   </section>
@@ -490,10 +490,11 @@ for (const width of [1152,1440,1920]) {
       const controls = await read()
       assert.ok(controls.slice(0,4).every(control => control.height === 36), JSON.stringify(controls))
       assert.ok(controls.slice(0,4).every(control => Math.abs(control.center - controls[0].center) <= 0.5), JSON.stringify(controls))
-      assert.deepEqual([controls[0], controls[1], controls[2], controls[4]].map(control => control.image), ['none', 'none', 'none', 'none'])
-      assert.ok(controls[3].image.includes('linear-gradient'), JSON.stringify(controls[3]))
+      assert.deepEqual([controls[0], controls[1], controls[4]].map(control => control.image), ['none', 'none', 'none'])
+      assert.equal(controls[2].image, 'linear-gradient(rgb(255, 255, 255), rgb(250, 250, 252))')
+      assert.equal(controls[3].image, 'linear-gradient(rgb(8, 122, 62), rgb(6, 106, 53))')
       assert.ok(controls.every(control => control.shadow !== 'none'), JSON.stringify(controls))
-      assert.equal(controls[0].image, controls[2].image)
+      assert.equal(controls[0].image, controls[4].image)
       assert.equal(controls[0].shadow, controls[2].shadow)
       assert.equal(controls[1].shadow, controls[2].shadow)
       assert.equal(controls[4].shadow, controls[2].shadow)
