@@ -11,6 +11,8 @@ type Journal = { id: string; action: string; detail_json: string; actor_id: stri
 type Detail = { accountId: string | null; formId?: string; token: string; leaseUntil: number; completedAt?: string; rows?: number };
 type Relation = { friendColumns: string[]; lineUserColumn: boolean; references: Array<{ parent: string; columns: Array<{ column: string; parentColumn: string }> }> };
 const graph: Record<string, Relation> = relations;
+type ProtectedReference = {parent:string;mode?:'restrict';columns:Array<{column:string;parentColumn:string}>};
+const protectedGraph = protectedRelations as Record<string,ProtectedReference[]>;
 export const deletionJournalId = (kind: DeletionKind, id: string) => `customer-delete:${kind}:${id}`;
 const q = (name: string) => `"${name.replace(/"/g, '""')}"`;
 export class DeletionFailure extends Error {
@@ -86,12 +88,17 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
   if (prior?.action === 'deleted') return { deleted: true, replayed: true };
   const conditions = conditionsFor(target);
   const params = target.kind === 'friend_data' ? [target.id, target.lineUserId ?? '', target.accountId] : [target.id];
-  // 未適用・途中の移行では削除意図や R2 を変更する前に止める。SQL 識別子は確認済みの13表・15参照だけを使う。
+  // 未適用・途中の移行では削除意図や R2 を変更する前に止める。SQL 識別子は承認済みの保持参照だけを使う。
   if (target.kind === 'friend_data') {
-    for (const [table, refs] of Object.entries(protectedRelations)) {
+    for (const [table, refs] of Object.entries(protectedGraph)) {
       const columns = (await db.prepare(`PRAGMA table_info(${q(table)})`).all<{ name: string; notnull: number }>()).results;
       const foreignKeys = (await db.prepare(`PRAGMA foreign_key_list(${q(table)})`).all<{ from: string; table: string; on_delete: string }>()).results;
       for (const ref of refs) for (const col of ref.columns) {
+        // 月謝の固定契約は切り離さず、該当本人の削除だけを下の保持検査で止める。
+        if(ref.mode==='restrict') {
+          if(!foreignKeys.some(f=>f.from===col.column && f.table===ref.parent && f.on_delete==='RESTRICT')) throw new DeletionFailure(409,'deletion_schema_approval_required');
+          continue;
+        }
         if (!columns.some(c => c.name === `${col.column}_history`)
           || !columns.some(c => c.name === col.column && c.notnull === 0)
           || !foreignKeys.some(f => f.from === col.column && f.table === ref.parent && f.on_delete === 'SET NULL')) {
@@ -100,9 +107,9 @@ export async function deleteCustomerData(env: { DB: D1Database; IMAGES?: Pick<R2
       }
     }
   }
-  const protectedChecks = Object.entries(protectedRelations).flatMap(([table, refs]) => refs.flatMap(ref => {
-    if (target.kind === 'friend_data') return [];
-    const condition = conditions[ref.parent];
+  const protectedChecks = Object.entries(protectedGraph).flatMap(([table, refs]) => refs.flatMap(ref => {
+    if (target.kind === 'friend_data' && ref.mode !== 'restrict') return [];
+    const condition = target.kind === 'friend_data' ? friendDeletionCondition(ref.parent) : conditions[ref.parent];
     if (!condition) return [];
     return [{ table, condition: `EXISTS (SELECT 1 FROM ${q(ref.parent)} WHERE ${condition} AND ${ref.columns.map(col => `${q(ref.parent)}.${q(col.parentColumn)} = ${q(table)}.${q(col.column)}`).join(' AND ')})` }];
   }));

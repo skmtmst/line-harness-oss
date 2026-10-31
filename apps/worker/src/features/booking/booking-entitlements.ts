@@ -16,11 +16,11 @@ export function entitlementMonth(at: string, timezone: string) {
 }
 export async function entitlementViews(db: D1Database, accountId: string, friendId: string, at: string): Promise<BookingEntitlementView[]> {
   const period=entitlementMonth(at,await getAccountTimeZone(db,accountId));
-  const rows=await db.prepare(`SELECT e.*, COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=?),e.monthly_limit) AS monthAllowance, ((SELECT COUNT(*) FROM booking_entitlement_uses u JOIN bookings b ON b.id=u.booking_id
-    WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(b.starts_at)>=julianday(?) AND julianday(b.starts_at)<julianday(?)) + (SELECT COUNT(*) FROM event_booking_entitlement_uses u WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(u.starts_at)>=julianday(?) AND julianday(u.starts_at)<julianday(?))) AS monthUsed
-    FROM booking_entitlements e WHERE e.line_account_id=? AND e.friend_id=? ORDER BY e.expires_at,e.id`)
-    .bind(period.periodStart,period.periodStart,period.periodEnd,period.periodStart,period.periodEnd,accountId,friendId).all<BookingEntitlement & {monthUsed:number;monthAllowance:number|null}>();
-  return rows.results.map(e=>({...e,...period,monthRemaining:e.kind==='monthly'&&e.monthAllowance!==null?Math.max(0,e.monthAllowance-e.monthUsed):null}));
+  const rows=await db.prepare(`SELECT e.*, COALESCE(y.period_start,?) stored_period_start,COALESCE(y.service_end,?) stored_period_end, COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=COALESCE(y.period_start,?)),e.monthly_limit) AS monthAllowance, ((SELECT COUNT(*) FROM booking_entitlement_uses u JOIN bookings b ON b.id=u.booking_id
+    WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(b.starts_at)>=julianday(COALESCE(y.period_start,?)) AND julianday(b.starts_at)<julianday(COALESCE(y.service_end,?))) + (SELECT COUNT(*) FROM event_booking_entitlement_uses u WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(u.starts_at)>=julianday(COALESCE(y.period_start,?)) AND julianday(u.starts_at)<julianday(COALESCE(y.service_end,?)))) AS monthUsed
+    FROM booking_entitlements e LEFT JOIN booking_monthly_rights r ON r.entitlement_id=e.id LEFT JOIN booking_monthly_cycles y ON y.id=r.cycle_id WHERE e.line_account_id=? AND e.friend_id=? ORDER BY e.expires_at,e.id`)
+    .bind(period.periodStart,period.periodEnd,period.periodStart,period.periodStart,period.periodEnd,period.periodStart,period.periodEnd,accountId,friendId).all<BookingEntitlement & {monthUsed:number;monthAllowance:number|null;stored_period_start:string;stored_period_end:string}>();
+  return rows.results.map(e=>({...e,periodStart:e.stored_period_start,periodEnd:e.stored_period_end,monthRemaining:e.kind==='monthly'&&e.monthAllowance!==null?Math.max(0,e.monthAllowance-e.monthUsed):null}));
 }
 async function replay(db: D1Database, account: string, key: string, request: string) {
   const row=await db.prepare('SELECT entitlement_id,request_json,after_json FROM booking_entitlement_events WHERE line_account_id=? AND request_key=?')
@@ -86,7 +86,7 @@ export async function operateEntitlement(db:D1Database,account:string,id:string,
 export function entitlementUseStatement(db:D1Database,bookingId:string,entitlementId:string,at:string,timezone:string) {
   const p=entitlementMonth(at,timezone);
   return db.prepare(`INSERT INTO booking_entitlement_uses(booking_id,booking_id_history,entitlement_id,period_start,period_end)
-    SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM bookings WHERE id=?)`).bind(bookingId,bookingId,entitlementId,p.periodStart,p.periodEnd,bookingId);
+    SELECT ?,?,?,COALESCE((SELECT period_start FROM booking_monthly_bound_rights WHERE entitlement_id=?),?),COALESCE((SELECT service_end FROM booking_monthly_bound_rights WHERE entitlement_id=?),?) WHERE EXISTS(SELECT 1 FROM bookings WHERE id=?)`).bind(bookingId,bookingId,entitlementId,entitlementId,p.periodStart,entitlementId,p.periodEnd,bookingId);
 }
 export async function validateEntitlementSelection(db:D1Database,accountId:string,friendId:string,menuId:string,id:string,at:string) {
   const rows=await entitlementViews(db,accountId,friendId,at);

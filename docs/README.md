@@ -1061,3 +1061,6 @@
 
 - [今月の成果の流れの窓](release-log/unreleased/2003-kenta-monthly-flow.md) — 反映履歴、確認 2026-10-31。
 - [クラスの振替の決まり](release-log/unreleased/0000-kenta-class-makeup-rule.md) — 反映履歴、確認 2026-10-31
+
+- [初期設定の案内と閲覧権限](release-log/unreleased/2004-kenta-setup-guidance.md) — 反映履歴、確認 2026-10-31。
+- [月謝の台帳と閲覧API](release-log/unreleased/2004-kenta-monthly-ledger.md) — 反映履歴、確認 2026-10-31。
