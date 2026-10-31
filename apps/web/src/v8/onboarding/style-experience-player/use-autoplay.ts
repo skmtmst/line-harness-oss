@@ -16,8 +16,8 @@ function prefersReducedMotion() {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-function useReducedMotion() {
-  const [reduced, setReduced] = useState(prefersReducedMotion)
+export function useReducedMotion() {
+  const [reduced, setReduced] = useState(false)
   useEffect(() => {
     if (typeof window.matchMedia !== 'function') return
     const media = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -30,7 +30,7 @@ function useReducedMotion() {
 }
 
 /** 器が少しでも見えているか。IntersectionObserver が無い所は見えている扱い。 */
-function useInView(ref: RefObject<HTMLElement | null>) {
+export function useInView(ref: RefObject<HTMLElement | null>) {
   const [inView, setInView] = useState(true)
   useEffect(() => {
     const node = ref.current
@@ -45,7 +45,7 @@ function useInView(ref: RefObject<HTMLElement | null>) {
   return inView
 }
 
-function useTabVisible() {
+export function useTabVisible() {
   const [visible, setVisible] = useState(() => typeof document === 'undefined' || document.visibilityState !== 'hidden')
   useEffect(() => {
     const change = () => setVisible(document.visibilityState !== 'hidden')
@@ -73,14 +73,15 @@ export function useStyleExperienceAutoplay({ script, style, onStyleChange, rotat
   const startIndex = (name: AccountStyle) => (reduced ? lastIndex(name) : 0)
   const [position, setPosition] = useState<AutoplayPosition>(() => {
     const first = style ?? rotation[0] ?? script.order[0]
-    return { style: first, index: prefersReducedMotion() ? script.styles[first].scenes.length - 1 : 0 }
+    return { style: first, index: 0 }
   })
   const [userPaused, setUserPaused] = useState(false)
+  const [manual, setManual] = useState(false)
   /** 同じスタイルの札をもう一度押した時に数え直すための印。 */
   const [restart, setRestart] = useState(0)
 
   // 外が持つスタイルが変わったら、そのスタイルの①（動きを減らす設定では最後の段）へ。
-  if (style !== undefined && style !== position.style) setPosition({ style, index: startIndex(style) })
+  if (style !== undefined && style !== position.style) { setPosition({ style, index: startIndex(style) }); setManual(true) }
   // 動きを減らす設定になったら、今のスタイルの最後の段で止める（その後は Steps を押した時だけ移る）。
   const [reducedSeen, setReducedSeen] = useState(reduced)
   if (reduced !== reducedSeen) {
@@ -94,6 +95,7 @@ export function useStyleExperienceAutoplay({ script, style, onStyleChange, rotat
   useEffect(() => {
     if (!running || !scene) return
     const timer = window.setTimeout(() => {
+      setManual(false)
       if (position.index < lastIndex(position.style)) {
         setPosition({ style: position.style, index: position.index + 1 })
         return
@@ -114,14 +116,16 @@ export function useStyleExperienceAutoplay({ script, style, onStyleChange, rotat
 
   // 押せる段は今の段と違うので、段が変わったことでタイマーが数え直す。
   const goToStep = useCallback((index: number) => {
+    setManual(true)
     setPosition((current) => ({ style: current.style, index }))
   }, [])
 
   const selectStyle = useCallback((next: AccountStyle) => {
+    setManual(true)
     setPosition({ style: next, index: prefersReducedMotion() ? script.styles[next].scenes.length - 1 : 0 })
     setRestart((value) => value + 1)
     onStyleChange?.(next)
   }, [onStyleChange, script])
 
-  return { position, scene, running, reduced, userPaused, togglePause: () => setUserPaused((value) => !value), goToStep, selectStyle }
+  return { position, scene, running, reduced, manual, userPaused, togglePause: () => setUserPaused((value) => !value), goToStep, selectStyle }
 }

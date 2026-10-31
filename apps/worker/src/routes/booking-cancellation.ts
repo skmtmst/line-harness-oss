@@ -1,10 +1,11 @@
+import { externalBookingStripeObject } from '../features/booking/booking-stripe-webhooks/index.js';
 import { liffBookingJson } from './liff-booking-response.js';
 import {Hono,type Context} from 'hono';
 import type { Env } from '../worker-env.js';
 import {gapAccount,gapBody,gapKey,gapVersion,gapWrite,GapError} from '../services/gap-common.js';
 import {cancellationPolicy,validCancellationPolicy,requireCancellationTestConnection,bookingCancellationQuote,bookingCancellationReview,cancellationSetupUrl} from '../features/booking/booking-cancellation/index.js';
 import {resolveAccountIdFromLiff,resolveFriendId,verifyCallerLineUserId} from './booking.js';
-import {verifyStripeSignature} from '../services/stripe-signature.js';
+import {readBodyWithinLimit,isStripeTestEvent,verifyStripeSignature} from '../services/stripe-signature.js';
 export const bookingCancellation=new Hono<Env>();
 bookingCancellation.onError((e,c)=>(c.req.path.startsWith('/api/liff/') ? liffBookingJson(c, {success:false,error:e instanceof GapError?e.code:'cancellation_unavailable'}, e instanceof GapError?e.status:503) : c.json({success:false,error:e instanceof GapError?e.code:'cancellation_unavailable'},e instanceof GapError?e.status:503)));
 async function liff(c:import('hono').Context<Env>){
@@ -44,13 +45,16 @@ bookingCancellation.post('/api/liff/booking/setup-intent',async (c:Context<Env>)
 });
 // 署名を検証した試験イベントだけが登録済みに進められる。クライアントの自己申告は受けない。
 bookingCancellation.post('/api/liff/booking/setup-webhook',async (c:Context<Env>):Promise<Response>=>{
- const raw=await c.req.text(),secret=c.env.STRIPE_TEST_WEBHOOK_SECRET;
+ const raw=await readBodyWithinLimit(c.req.raw),secret=c.env.STRIPE_TEST_WEBHOOK_SECRET;
+ if(raw===null)return liffBookingJson(c,{success:false,error:'body_too_large'},413);
  if(!secret||!await verifyStripeSignature(secret,raw,c.req.header('stripe-signature')??''))throw new GapError('invalid_signature',401);
- let b:{livemode?:unknown;type?:string;data?:{object?:{id?:string;customer?:string;payment_method?:string;status?:string}}};
+ let b:{account?:unknown;livemode?:unknown;type?:string;data?:{object?:{id?:string;customer?:string;payment_method?:string;status?:string}}};
  try{b=JSON.parse(raw);}catch{throw new GapError('invalid_event');}
- if(b.livemode!==false)throw new GapError('live_mode_not_approved',409);
+ if(!isStripeTestEvent(b))throw new GapError('live_mode_not_approved',409);
+ if(b.account!==undefined)throw new GapError('connect_webhook_required',409);
  const o=b.data?.object;
  if(b.type!=='setup_intent.succeeded'||o?.status!=='succeeded'||typeof o.id!=='string'||typeof o.customer!=='string'||typeof o.payment_method!=='string')throw new GapError('invalid_event');
+ if(await externalBookingStripeObject(c.env.DB,o.id))throw new GapError('connect_webhook_required',409);
  await c.env.DB.prepare(`UPDATE booking_payment_methods SET status='ready',stripe_customer_id=?,stripe_payment_method_id=? WHERE setup_id=? AND test_mode=1 AND status='pending'`).bind(o.customer,o.payment_method,o.id).run();
  return liffBookingJson(c, {success:true});
 });
