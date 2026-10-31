@@ -1,12 +1,16 @@
 'use client'
 
-import React, { useRef, useState, type ReactNode } from 'react'
+import React, { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { CircleCheck, Trash2, TriangleAlert } from 'lucide-react'
 import Dialog from './dialog'
 import { deleteConfirmationTitle, isDeleteConfirmation, normalizeDeleteTitle } from './delete-confirmation'
 import { CONFIRM_WIDTH } from './destination-policy'
+import { describeSaveFailure } from '@/lib/api'
+import type { ConfirmedUndoHandle, ConfirmedUndoResult } from '@/lib/undoable'
+import Button from './button'
+import { notifyToast } from './toast'
 
-interface ConfirmDialogProps {
+interface ConfirmDialogBaseProps {
   open: boolean
   contentLayout?: 'form'
   title: string
@@ -72,7 +76,8 @@ interface ConfirmDialogProps {
    * `undefined` を渡すと**確認のボタンそのものが出ない**（`Dialog` の作り）。
    * 数えられていない人数のまま送らせない、といった止め方に使う。
    */
-  onConfirm?: () => void
+  /** 取消の結果。未指定なら確認の中身を保つ。 */
+  onUndone?: () => void
   /** 実行ボタンを押せない形で出す（WEB228：確かめのチェックが入るまで）。 */
   confirmDisabled?: boolean
   confirmDisabledReason?: string
@@ -82,6 +87,17 @@ interface ConfirmDialogProps {
   confirmPlacement?: 'start'
   onCancel: () => void
 }
+
+type ConfirmDialogProps = ConfirmDialogBaseProps & (
+  | {
+      /** true / committedだけを完了にする。未指定なら従来どおり呼出側が閉じる。 */
+      onSuccess: () => void
+      onConfirm?: () => boolean | void | ConfirmedUndoResult | Promise<boolean | void | ConfirmedUndoResult>
+      /** 窓内に取消を置き、送信と同じ期限を止める。成功/失敗の受取も必須。 */
+      pendingUndo?: ConfirmedUndoHandle | null
+    }
+  | { onSuccess?: undefined; pendingUndo?: undefined; onConfirm?: () => void }
+)
 
 export { deleteConfirmationTitle, normalizeDeleteTitle } from './delete-confirmation'
 
@@ -117,6 +133,9 @@ export default function ConfirmDialog({
   designTop,
   primaryAction = 'confirm',
   onConfirm,
+  onSuccess,
+  onUndone,
+  pendingUndo,
   confirmDisabled = false,
   confirmDisabledReason,
   confirmLockedReason,
@@ -126,27 +145,98 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   const [executing, setExecuting] = useState(false)
   const [executionError, setExecutionError] = useState('')
+  const [acknowledged, setAcknowledged] = useState(false)
+  const [undoReady, setUndoReady] = useState<ConfirmedUndoHandle | null>(null)
+  const undoButtonRef = useRef<HTMLButtonElement>(null)
+  const focusAfterUndo = useRef<HTMLElement | null>(null)
+  const openRef = useRef(open)
+  openRef.current = open
   const lock = useRef(false)
+  const executionGeneration = useRef(0)
+  const managed = onSuccess !== undefined
+  useEffect(() => {
+    if (open || !managed) return
+    executionGeneration.current += 1
+    if (!lock.current) setExecuting(false)
+    setExecutionError('')
+    setAcknowledged(false)
+  }, [open, managed])
+  useEffect(() => () => { executionGeneration.current += 1 }, [])
+  useEffect(() => {
+    if (!pendingUndo || !open) { setUndoReady(null); return }
+    let current = true
+    setUndoReady(pendingUndo)
+    const settled = () => {
+      if (!current) return
+      const undoButton = undoButtonRef.current
+      if (undoButton && undoButton === document.activeElement) {
+        focusAfterUndo.current = undoButton.closest<HTMLElement>('[role="dialog"], [role="alertdialog"]')
+      }
+      setUndoReady(null)
+    }
+    void pendingUndo.undoWindowClosed.then(settled, settled)
+    return () => {
+      current = false
+      pendingUndo.resume('pointer')
+      pendingUndo.resume('focus')
+    }
+  }, [open, pendingUndo])
+  useLayoutEffect(() => {
+    if (undoReady || executing || busy || !focusAfterUndo.current) return
+    const frame = focusAfterUndo.current
+    focusAfterUndo.current = null
+    const cancelAction = primaryAction === 'cancel' ? 'primary' : 'secondary'
+    if (frame.isConnected) frame.querySelector<HTMLButtonElement>(`[data-dialog-action="${cancelAction}"]:not(:disabled)`)?.focus()
+  }, [undoReady, executing, busy, primaryAction])
   const runConfirm = onConfirm ? () => {
-    if (lock.current || busy || confirmLockedReason) return
+    if (lock.current || busy || confirmLockedReason || confirmDisabled || (managed && acknowledged)) return
     lock.current = true
     setExecutionError('')
+    const generation = executionGeneration.current
+    const current = () => !managed || generation === executionGeneration.current
+    const fallback = '実行できませんでした。もう一度お試しください。'
+    const failed = (reason: unknown) => {
+      if (current()) setExecutionError(managed ? describeSaveFailure(reason) : fallback)
+      else if (managed && openRef.current) notifyToast(describeSaveFailure(reason), { tone: 'error' })
+    }
+    const complete = (result: unknown) => {
+      if (!onSuccess) return
+      const outcome = result && typeof result === 'object' && 'status' in result ? result as ConfirmedUndoResult : null
+      if (!current()) {
+        if (openRef.current && (result === true || outcome?.status === 'committed')) {
+          notifyToast('前の操作を保存しました。表示を読み直してください。')
+        } else if (openRef.current && (result === false || outcome?.status === 'failed')) {
+          notifyToast(outcome?.status === 'failed' ? outcome.message ?? describeSaveFailure(outcome.error) : fallback, { tone: 'error' })
+        }
+        return
+      }
+      if (result === true || outcome?.status === 'committed') {
+        setAcknowledged(true)
+        try { onSuccess() }
+        catch { notifyToast('保存しました。表示を読み直してください。', { tone: 'error' }) }
+      } else if (outcome?.status === 'undone') {
+        setExecutionError('')
+        try { onUndone?.() }
+        catch { notifyToast('取り消しました。表示を読み直してください。', { tone: 'error' }) }
+      } else if (outcome?.status === 'failed') setExecutionError(outcome.message ?? describeSaveFailure(outcome.error))
+      else if (result === false) setExecutionError(fallback)
+    }
     try {
       const pending = onConfirm() as unknown
       if (pending && typeof (pending as PromiseLike<unknown>).then === 'function') {
         setExecuting(true)
-        return Promise.resolve(pending).catch(() => {
-          setExecutionError('実行できませんでした。もう一度お試しください。')
-        }).finally(() => {
+        return Promise.resolve(pending).then(complete).catch(failed).finally(() => {
           lock.current = false
           setExecuting(false)
         })
       }
-    } catch {
-      setExecutionError('実行できませんでした。もう一度お試しください。')
+      complete(pending)
+    } catch (reason) {
+      failed(reason)
     }
     lock.current = false
   } : undefined
+  const undoHandle = undoReady === pendingUndo ? undoReady : null
 
   /*
    * 未保存の離脱確認（主が取消）は印を付けない。緑のチェックは
@@ -160,6 +250,7 @@ export default function ConfirmDialog({
       : <CircleCheck size={20} />)
   const shownConfirmIcon = confirmIcon ?? (destructive ? <Trash2 size={16} /> : undefined)
 
+  const shownError = error || executionError
   return (
     <Dialog
       open={open}
@@ -169,15 +260,16 @@ export default function ConfirmDialog({
       tone={destructive ? 'destructive' : 'default'}
       descriptionBand={dangerBand ? 'danger' : warning ? 'warning' : undefined}
       confirmLabel={deleteName !== undefined || isDeleteConfirmation(confirmLabel) ? '削除する' : confirmLabel}
+      confirmRetry={managed && Boolean(executionError)}
       busyLabel={busyLabel}
       cancelLabel={cancelLabel}
       busy={busy || executing}
-      confirmDisabled={confirmDisabled}
+      confirmDisabled={confirmDisabled || (managed && acknowledged)}
       confirmDisabledReason={confirmDisabledReason}
       confirmLockedReason={confirmLockedReason}
       actionWidthReserve={actionWidthReserve}
       confirmPlacement={confirmPlacement}
-      error={error || executionError}
+      error={shownError}
       primaryAction={primaryAction}
       titleIcon={titleIcon !== undefined ? shownTitleIcon : undefined}
       headerIcon={headerIcon ?? (titleIcon === undefined ? shownTitleIcon ?? false : false)}
@@ -189,7 +281,10 @@ export default function ConfirmDialog({
       designWidth={designWidth ?? (size ? undefined : CONFIRM_WIDTH)}
       designLayout={designLayout}
       footerAlign={footerAlign}
-      footerLead={footerLead}
+      footerLead={undoHandle ? <Button ref={undoButtonRef} variant="text" size="inline" type="button" onClick={() => undoHandle.undo()}
+        onPointerEnter={event => { if (event.pointerType !== 'touch') undoHandle.pause('pointer') }}
+        onPointerLeave={event => { if (event.pointerType !== 'touch') undoHandle.resume('pointer') }}
+        onFocus={() => undoHandle.pause('focus')} onBlur={() => undoHandle.resume('focus')}>元に戻す</Button> : footerLead}
       designFooterGap={designFooterGap}
       confirmFirst={confirmFirst}
       designTop={designTop}

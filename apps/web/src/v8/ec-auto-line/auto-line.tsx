@@ -91,9 +91,10 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
     }
   }
 
+  const [enableReviewRequired, setEnableReviewRequired] = useState(false)
   const turnOn = async (kind: AutoLineKind) => {
     const rule = ruleOf(kind)
-    if (!accountId || !rule) return
+    if (!accountId || !rule || enableReviewRequired) return
     setBusyKind(kind)
     setNotice('')
     try {
@@ -102,10 +103,12 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
       setConfirmKind(null)
       notifySaved(`${KIND_LABEL[kind]}の自動の LINE をオンにしました（試験運転）。`)
       await load()
+      return true
     } catch (reason) {
-      setConfirmKind(null)
-      if (!errors.capture(reason)) setNotice(failureText(reason, 'オンにする'))
-      await load()
+      errors.capture(reason)
+      setEnableReviewRequired(true)
+      setNotice(`${failureText(reason, 'オンにする')} 閉じて、最新の運用状態を確認してください。`)
+      return false
     } finally {
       setBusyKind(null)
     }
@@ -170,7 +173,7 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
                       label={`${KIND_LABEL[kind]}の自動の LINE`}
                       checked={rule.enabled}
                       disabled={busyKind === kind}
-                      onChange={(next) => { if (next) setConfirmKind(kind); else void turnOff(rule) }}
+                      onChange={(next) => { if (next) { setNotice(''); setEnableReviewRequired(false); setConfirmKind(kind) } else void turnOff(rule) }}
                     />
                   ) : (
                     <StatusBadge tone={rule.enabled ? 'success' : 'neutral'}>{rule.enabled ? 'オン' : 'オフ'}</StatusBadge>
@@ -209,8 +212,9 @@ export default function EcAutoLine({ accountId, canEdit }: { accountId: string |
         description={confirmKind ? `これから ${KIND_WHEN[confirmKind]} に自動で送る準備をします。宣伝を止めている人には送りません。今は試験運転で、LINE へは送らず、送る予定だけを記録します。` : ''}
         confirmLabel="オンにする"
         busy={busyKind !== null && busyKind === confirmKind}
-        onConfirm={() => { if (confirmKind) void turnOn(confirmKind) }}
-        onCancel={() => setConfirmKind(null)}
+        confirmDisabled={enableReviewRequired} confirmDisabledReason="閉じて最新の運用状態を確認してください。"
+        error={notice || undefined} onSuccess={() => setConfirmKind(null)} onConfirm={() => confirmKind ? turnOn(confirmKind) : false}
+        onCancel={() => { setConfirmKind(null); setNotice(''); if (enableReviewRequired) void load(); setEnableReviewRequired(false) }}
       />
       <EditDrawer
         accountId={accountId}

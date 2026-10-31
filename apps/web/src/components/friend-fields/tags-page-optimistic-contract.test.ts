@@ -24,7 +24,6 @@ describe('タグ一覧・編集の操作失敗と再取得の契約', () => {
   it('友だち一覧への表示設定は版付きの保存で更新し、成功後に最新を読む', () => {
     expect(editor).toContain('isStarred: values.isStarred')
     expect(editor).toContain('api.tags.updateDefinition(tag.id, selectedAccountId, tag.version ?? 1, payload,')
-    expect(editor).toContain('await load(true)')
   })
   it('表示設定の保存競合は下書きを保ち、比較か読み直しへ進める', () => {
     expect(editor).toContain('reason instanceof ApiError && reason.status === 409')

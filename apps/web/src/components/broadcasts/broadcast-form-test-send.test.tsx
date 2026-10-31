@@ -228,6 +228,12 @@ describe('一斉配信のテスト送信（#986）', () => {
       .mockResolvedValueOnce({ success: true, sent: 2, failed: 0 })
     await openTestDialog()
     await confirmTestSend()
+    // The acknowledged send is complete. Close its result and explicitly start the next test.
+    const close = dialog().querySelector('button[aria-label="閉じる"]')!
+    await act(async () => { close.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    const send = [...container.querySelectorAll('button')].find(button => button.textContent?.trim() === 'テストを送る')!
+    await act(async () => { send.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+    await flush()
     await confirmTestSend()
     expect(sendApi).toHaveBeenCalledTimes(2)
     const el = dialog()

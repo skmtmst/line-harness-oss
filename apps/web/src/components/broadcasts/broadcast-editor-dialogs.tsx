@@ -38,7 +38,7 @@ type RenderBroadcastEditorDialogsContext = {
   error: string
   evaluatedAtLabel: string | null
   exclusionNote: string | null
-  handleTestSend: () => Promise<void>
+  handleTestSend: () => Promise<boolean | void>
   inlineComposer: { index: number; kind: "carousel" | "rich_message" | "rich_video"; } | null
   inlineHost: TemplateEditHost | undefined
   measureOpens: boolean
@@ -69,12 +69,15 @@ type RenderBroadcastEditorDialogsContext = {
   testRecipientState: "loading" | "error" | "ready" | "idle"
   testResult: TestSendView | null
   testSending: boolean
+  testRetryBlocked?: boolean
+  testResultOpen?: boolean
+  setTestResultOpen?: Dispatch<SetStateAction<boolean>>
   title: string
   trackLinks: boolean
   unconfirmedCount: number | null
 }
 
-export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, preflight, previewConfirmed, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, title, trackLinks, unconfirmedCount }: RenderBroadcastEditorDialogsContext) {
+export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approvalCountInput, audienceCount, bubbles, canConfirm, composerBusy, concurrentBroadcasts, confirmAudienceLabel, confirmOpen, currentStep, error, evaluatedAtLabel, exclusionNote, handleTestSend, inlineComposer, inlineHost, measureOpens, needsApproval, needsApprovalSingle, preflight, previewConfirmed, quotaInsufficient, quotaNote, save, saveComposerTemplate, saving, scheduledAtIso, selectedAccountId, sendMode, sendWhenLabel, setApprovalCountInput, setConfirmOpen, setTemplateSaveIndex, setTemplateSaveName, setTestDialogOpen, templateSaveError, templateSaveIndex, templateSaveName, testDialogOpen, testHistory, testRecipients, testRecipientState, testResult, testSending, testRetryBlocked, testResultOpen, setTestResultOpen, title, trackLinks, unconfirmedCount }: RenderBroadcastEditorDialogsContext) {
   return (<><div data-design-node="FpgxH">
       <ConfirmDialog
         open={confirmOpen && needsApprovalSingle}
@@ -222,7 +225,11 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
       titleIcon={<Send size={20} />}
       confirmIcon={<Send size={16} />}
       onCancel={() => { if (!testSending) setTestDialogOpen(false) }}
-      onConfirm={testRecipientState === 'ready' && testRecipients.length > 0 ? () => void handleTestSend() : undefined}
+      error={testResult?.kind === 'error' ? testResult.message : error || undefined}
+      confirmDisabled={testRetryBlocked}
+      confirmDisabledReason="届いたかどうか、配信の記録を確認してください。"
+      onSuccess={() => { setTestDialogOpen(false); setTestResultOpen?.(true) }}
+      onConfirm={testRecipientState === 'ready' && testRecipients.length > 0 ? () => handleTestSend() : undefined}
     >
       <div className="space-y-3">
         {testRecipientState === 'loading' && <p className="text-sm text-ink-faint">読み込んでいます</p>}
@@ -262,7 +269,7 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
             </Notice>
           </>
         )}
-        {testResult && (
+        {testResult && testResult.kind !== 'error' && (
           <Notice tone={testResult.kind === 'success' ? 'success' : testResult.kind === 'partial' ? 'warn' : 'danger'}>{testResult.message}</Notice>
         )}
         {testHistory.length > 1 && (
@@ -277,6 +284,16 @@ export function renderBroadcastEditorDialogs({ ab, approvalConfigState, approval
         )}
       </div>
     </ConfirmDialog>
+
+    <Dialog open={testResultOpen === true} title="テスト送信の結果" onCancel={() => setTestResultOpen?.(false)}>
+      {testResult ? <Notice tone={testResult.kind === 'success' ? 'success' : testResult.kind === 'partial' ? 'warn' : 'danger'}>{testResult.message}</Notice> : null}
+      {testHistory.length > 1 ? <section>
+        <h4 className="text-xs font-bold text-ink-faint">これ以前の実行履歴</h4>
+        <ul className="mt-1 space-y-1">{testHistory.slice(1).map((entry, index) => <li key={index}>
+          <Notice tone={entry.kind === 'success' ? 'success' : entry.kind === 'partial' ? 'warn' : 'danger'}>{entry.message}</Notice>
+        </li>)}</ul>
+      </section> : null}
+    </Dialog>
 
   {inlineComposer && inlineHost ? inlineComposer.kind === 'carousel' ? <CarouselV8 key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : inlineComposer.kind === 'rich_message' ? <TemplateRichEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : <TemplateRichVideoEditor key={`${selectedAccountId}-${inlineComposer.index}`} host={inlineHost} /> : null}
   <Dialog open={templateSaveIndex !== null} title="テンプレートにする" description={`${(templateSaveIndex ?? 0) + 1}通目の吹き出しを保存します。ほかの吹き出しは含みません。`} onCancel={() => setTemplateSaveIndex(null)} confirmLabel="保存する" onConfirm={() => void saveComposerTemplate()} busy={composerBusy} error={templateSaveError || undefined}><label>テンプレートの名前<SaveErrorField names={["templateSaveName","name","template_save_name"]}><SharedTextField aria-label="テンプレートの名前" value={templateSaveName} onChange={(event) => setTemplateSaveName(event.target.value)} className={styles.textInput} /></SaveErrorField></label></Dialog></>)

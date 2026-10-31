@@ -148,6 +148,8 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  // 振替の窓はonEditStateで未保存/保存中を親へ返し、Dialogが窓内の破棄を、親の番兵が画面離脱を守る。
+  'v8/events/makeup-rule-section.tsx': 'v8/events/edit-form.tsx',
   'v8/onboarding/initial-menu-page.tsx': 'components/templates/create-page.tsx',
   'v8/friend-add/editor-basic-routes.tsx': 'v8/friend-add/editor.tsx',
   'v8/friend-add/editor-message.tsx': 'v8/friend-add/editor.tsx',

@@ -30,7 +30,17 @@ type Commit = () => Promise<{ success: boolean; error?: string } | void> | void
  * （`undo` と同じ処理を渡せることが多い）。知らせの文は呼び出し側が
  * 運用者の言葉で渡す（例「3人から『VIP』を外しました」）。
  */
-export function runUndoable(options: {
+export type ConfirmedUndoResult = { status: 'committed' | 'undone' } | { status: 'failed'; error: unknown; message?: string }
+export type ConfirmedUndoHandle = {
+  finished: Promise<ConfirmedUndoResult>
+  /** 取消または送信開始で決着する。送信中の取消操作を残さない。 */
+  undoWindowClosed: Promise<void>
+  undo: () => void
+  pause: (reason: 'pointer' | 'focus') => void
+  resume: (reason: 'pointer' | 'focus') => void
+}
+
+type UndoableOptions = {
   message: string
   commit: Commit
   undo: () => void
@@ -40,7 +50,15 @@ export function runUndoable(options: {
   failureMessage?: string
   /** commit が通ったあとに呼ぶ（一覧の読み直しなど）。 */
   onCommitted?: () => void
-}): void {
+}
+
+export function runUndoable(options: UndoableOptions & { confirmation: true }): ConfirmedUndoHandle
+export function runUndoable(options: UndoableOptions): void
+export function runUndoable(options: UndoableOptions & { confirmation?: boolean }): ConfirmedUndoHandle | void {
+  let finish: ((result: ConfirmedUndoResult) => void) | undefined
+  const finished = options.confirmation ? new Promise<ConfirmedUndoResult>(resolve => { finish = resolve }) : undefined
+  let closeUndoWindow: (() => void) | undefined
+  const undoWindowClosed = options.confirmation ? new Promise<void>(resolve => { closeUndoWindow = resolve }) : undefined
   /*
    * 送信期限は知らせの期限と一つのもの（R623）。知らせの hover/focus で
    * 止まったら送信も止まり、離したら一緒に動く。期限が来る・戻すの
@@ -55,6 +73,7 @@ export function runUndoable(options: {
   const fire = () => {
     if (settled) return
     settled = true
+    closeUndoWindow?.()
     timer = null
     // 期限が来たら知らせを消す。残った取り消し操作は効かない。
     dismiss()
@@ -62,11 +81,23 @@ export function runUndoable(options: {
       .then(() => options.commit())
       .then((res) => {
         if (res && res.success === false) throw new Error(res.error ?? '')
-        options.onCommitted?.()
+        if (options.confirmation) {
+          // 保存の返事と読み直しの失敗を分け、保存済みの操作を再送しない。
+          finish?.({ status: 'committed' })
+          void Promise.resolve().then(() => options.onCommitted?.()).catch(() => {
+            notifyToast('保存しました。表示を読み直してください。', { tone: 'error' })
+          })
+        } else options.onCommitted?.()
       })
-      .catch(() => {
-        ;(options.onCommitError ?? options.undo)()
-        notifyToast(options.failureMessage ?? 'できませんでした。もう一度お試しください。', { tone: 'error' })
+      .catch((error: unknown) => {
+        if (!options.confirmation) {
+          ;(options.onCommitError ?? options.undo)()
+          notifyToast(options.failureMessage ?? 'できませんでした。もう一度お試しください。', { tone: 'error' })
+          return
+        }
+        try { (options.onCommitError ?? options.undo)() }
+        catch { /* 保存の失敗を保ち、表示の復元が失敗しても窓の鍵を外す。 */ }
+        finally { finish?.({ status: 'failed', error, message: options.failureMessage }) }
       })
   }
   const arm = (ms: number) => {
@@ -85,17 +116,32 @@ export function runUndoable(options: {
   }
   arm(remaining)
 
-  const dismiss = notifyToast(options.message, {
+  const undo = () => {
+    if (settled) return
+    settled = true
+    closeUndoWindow?.()
+    if (timer !== null) clearTimeout(timer)
+    timer = null
+    if (!options.confirmation) { options.undo(); return }
+    try { options.undo() }
+    catch (error) {
+      notifyToast('操作は取り消しました。表示を読み直してください。', { tone: 'error' })
+    } finally { finish?.({ status: 'undone' }) }
+  }
+  const dismiss = options.confirmation ? () => {} : notifyToast(options.message, {
     actionLabel: '元に戻す',
-    onAction: () => {
-      if (settled) return
-      settled = true
-      if (timer !== null) clearTimeout(timer)
-      timer = null
-      options.undo()
-    },
+    onAction: undo,
     lifecycle: { onPause: pauseCommit, onResume: resumeCommit },
   })
+  if (finished && undoWindowClosed) {
+    const holds = new Set<'pointer' | 'focus'>()
+    return {
+      finished, undoWindowClosed, undo,
+      pause: reason => { holds.add(reason); pauseCommit() },
+      resume: reason => { holds.delete(reason); if (!holds.size) resumeCommit() },
+    }
+  }
+
 }
 
 /**

@@ -127,11 +127,11 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
       if (!active.current) return
       setPending(null)
       invalidate()
-      await load(true)
+      void load(true)
+      return true
     } catch (caught) {
       if (!active.current) return
-      // A stale confirmation must never retry its old version after refreshing.
-      setPending(null)
+      // Keep the failed confirmation and its input. A conflict blocks its old version until the operator closes it and reviews the latest record.
       setActionConflict(caught instanceof ApiError && isSaveConflict(caught))
       setActionError(caught instanceof ApiError && isSaveConflict(caught)
         ? 'ほかの人が先に更新しました。最新の記録を確認してから、もう一度操作してください。'
@@ -139,7 +139,8 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
           ? 'この操作をする権限がありません。'
           : '更新できませんでした。もう一度お試しください。')
       invalidate()
-      await load(true)
+      void load(true)
+      return false
     } finally { mutation.current = false; if (active.current) setBusyId(null) }
   }
 
@@ -200,8 +201,8 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
                   <GridCell role="cell" className={styles.actions}>
                     {canOperate ? <>
                       <RowActions subjectName={item.summary} menuItems={[
-                        ...(item.status === 'open' ? [{ id: 'acknowledge', label: '確かめた', disabled: busyId !== null, onSelect: () => { setActionError(''); setPending({ alert: item, action: 'acknowledge' }) } }] : []),
-                        { id: 'resolve', label: '解決した', disabled: busyId !== null, onSelect: () => { setActionError(''); setPending({ alert: item, action: 'resolve' }) } },
+                        ...(item.status === 'open' ? [{ id: 'acknowledge', label: '確かめた', disabled: busyId !== null, onSelect: () => { setActionError(''); setActionConflict(false); setPending({ alert: item, action: 'acknowledge' }) } }] : []),
+                        { id: 'resolve', label: '解決した', disabled: busyId !== null, onSelect: () => { setActionError(''); setActionConflict(false); setPending({ alert: item, action: 'resolve' }) } },
                       ]} />
                     </> : null}
                   </GridCell>
@@ -227,7 +228,7 @@ function SecurityMonitorContent({ accountId, canOperate }: { accountId: string; 
           : '確かめた記録を残します。解決したことにはなりません。'}
         confirmLabel={pending?.action === 'resolve' ? '解決した' : '確かめた'}
         busy={busyId !== null}
-        onConfirm={() => void run()}
+        error={actionError || undefined} confirmDisabled={actionConflict} confirmDisabledReason="閉じて最新の記録を確認してください。" onSuccess={() => setPending(null)} onConfirm={() => run()}
         onCancel={() => setPending(null)}
       />
     </div>

@@ -78,7 +78,7 @@ function HistoryRow({
     <Tr data-table-layout="columns">
       <Td>
         <Button
-          variant="text"
+          variant="text" textTone="ink"
           size="inline"
           aria-label={`注文${order.orderNumber}の詳細`}
           onClick={() => onOpenOrder(order.id)}

@@ -403,7 +403,7 @@ export default function MessageKindFields({ kind, value, onChange, composer = fa
         {autoDuration && v.duration ? (
           <p className={hintClass}>
             {`長さ ${v.duration} 秒（ファイルから読みました）`}{' '}
-            <button type="button" className="text-action font-semibold" onClick={() => setAutoDuration(false)}>直す</button>
+            <Button type="button" variant="text" size="inline" onClick={() => setAutoDuration(false)}>直す</Button>
           </p>
         ) : v.originalContentUrl ? (
           <label className="block">

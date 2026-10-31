@@ -16,7 +16,7 @@ import ConfirmDialog from '@/components/shared/confirm-dialog'
 import StatusBadge from '@/components/shared/status-badge'
 import { GOOGLE_CONNECTION_STATUS, INSTAGRAM_CONNECTION_STATUS } from '@/lib/status-labels'
 import { RowActions } from '@/components/shared/row-actions'
-import { usePageTitle, usePageCrumbs, useHideSettingsNav } from '@/components/shell/page-chrome'
+import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { restaurantGoogleApi, type GoogleConnectionData } from '@/lib/restaurant-google-api'
 import GoogleConnectionSettings from '@/v8/restaurant/google/settings'
@@ -61,7 +61,6 @@ export default function SnsSettingsPage() {
   const saveErrors = useSaveFormErrors()
   usePageTitle('SNS 連携')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
-  useHideSettingsNav()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { selectedAccountId, setSelectedAccountId, accounts } = useAccount()
@@ -162,11 +161,13 @@ export default function SnsSettingsPage() {
       await api.instagram.disconnect(accountId, igConnection?.version ?? 0)
       setConfirm(null)
       await load()
+      return true
     } catch (saveFailure) {
       const fieldFailure = saveErrors.capture(saveFailure)
 
       { if (!fieldFailure)
       setActionError('Instagram の接続を解除できませんでした。もう一度お試しください。') }
+      return false
     } finally {
       setBusy(false)
     }
@@ -293,7 +294,7 @@ export default function SnsSettingsPage() {
         description="解除すると、Googleビジネスの投稿を Instagram へ同時に出せなくなります。あとでもう一度つなぎ直せます。"
         confirmLabel="解除する"
         busy={busy}
-        onConfirm={() => runDisconnect()}
+        error={actionError || undefined} onSuccess={() => setConfirm(null)} onConfirm={() => runDisconnect()}
         onCancel={() => setConfirm(null)}
       />
     </PageFrame></SaveErrorScope>

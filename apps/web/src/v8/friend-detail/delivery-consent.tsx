@@ -4,7 +4,7 @@ import { RadioGroup } from '@/components/shared/radio'
 
 import Card from '@/components/shared/card'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Drawer from '@/components/shared/drawer'
@@ -20,6 +20,9 @@ import { friendDeliveryConsentHistoryApi, friendDeliveryConsentsApi, type Friend
 import { SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import styles from './delivery-consent.module.css'
 import { withHonorific } from '@line-crm/shared'
+import { ApiError } from '@/lib/api'
+import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
+import { describeSaveFailure } from '@/lib/api/transport/errors'
 
 /*
  * ★V8 友だち詳細「配信の受け取り」（E9-1 `mAbif`）。目的ごと（予約の連絡・お知らせ・キャンペーン・宣伝・アンケート）に、
@@ -87,6 +90,8 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
   const errors = useSaveFormErrors()
   const [events, setEvents] = useState<FriendDeliveryConsentEvent[] | null>(null)
   const [historyFailed, setHistoryFailed] = useState(false)
+  const [reviewRequired, setReviewRequired] = useState(false)
+  const commitLock = useRef(false)
   const loadHistory = useCallback(async () => {
     try {
       const response = await friendDeliveryConsentHistoryApi.list(friendId, { limit: 20 })
@@ -101,11 +106,12 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
 
   const rowOf = (key: string) => rows.find((row) => row.purpose === key)
   const begin = (key: string) => {
-    setEditing(key); setNext(rowOf(key)?.state ?? 'unknown'); setReason(''); setReasonError(''); setError('')
+    setReviewRequired(false); setEditing(key); setNext(rowOf(key)?.state ?? 'unknown'); setReason(''); setReasonError(''); setError('')
   }
 
   const commit = async () => {
-    if (!editing) return
+    if (!editing || reviewRequired || commitLock.current || busy || !canEdit) return
+    commitLock.current = true
     setBusy(true); setError('')
     try {
       const current = rowOf(editing)
@@ -115,12 +121,18 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
       setWarn(false); setEditing(null)
       await onSaved()
       await loadHistory()
+      return true
     } catch (reason) {
-      setWarn(false)
-      if (!errors.capture(reason)) setError('保存できませんでした。ほかの人が先に変えたかもしれません。読み直したので、もう一度お試しください。')
-      await onSaved()
+      errors.capture(reason)
+      const needsReview = !(reason instanceof ApiError) || reason.status === 409 || reason.status >= 500
+      setReviewRequired(needsReview)
+      const fieldReasons = readSaveFieldErrors(reason)
+      setReasonError(fieldReasons.reason ?? fieldReasons['input.reason'] ?? '')
+      setError(needsReview ? '保存結果を確認できませんでした。閉じて、本人の受け取り設定と理由を確かめてください。' : describeSaveFailure(reason))
+      if (needsReview) { await onSaved(); await loadHistory() }
+      return false
     } finally {
-      setBusy(false)
+      commitLock.current = false; setBusy(false)
     }
   }
 
@@ -145,7 +157,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
       footer={editing && canEdit ? (
         <div className={styles.footer}>
           <Button onClick={() => setEditing(null)} disabled={busy}>キャンセル</Button>
-          <Button variant="primary" onClick={submit} busy={busy} disabled={busy}>保存する</Button>
+          <Button variant="primary" onClick={submit} busy={busy} disabled={busy || reviewRequired} disabledReason={reviewRequired ? '本人の受け取り設定を確認し、理由か選択を見直してください。' : undefined}>保存する</Button>
         </div>
       ) : undefined}
     >
@@ -162,7 +174,7 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
                   <span className={styles.rowNote}>{purpose.note}</span>
                 </div>
                 <StatusBadge tone={STATE_TONE[state]}><span>{STATE_LABEL[state]}</span></StatusBadge>
-                {canEdit ? <Button variant="secondary" onClick={() => begin(purpose.key)}>変える</Button> : null}
+                {canEdit ? <Button variant="secondary" onClick={() => begin(purpose.key)} disabled={busy}>変える</Button> : null}
               </div>
             )
           })}
@@ -173,11 +185,11 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
             <Card padding="compact" layout="vertical" gap="var(--polish-space-field)">
               <RadioGroup className={styles.radios} label="受け取り">
                 {STATES.map((state) => (
-                  <Radio key={state} name="consent-state" value={state} checked={next === state} onChange={() => setNext(state)}>{state === 'unknown' ? '不明（まだ聞いていない）' : STATE_LABEL[state]}</Radio>
+                  <Radio key={state} name="consent-state" value={state} checked={next === state} disabled={busy} onChange={() => { setNext(state); setReviewRequired(false); setError('') }}>{state === 'unknown' ? '不明（まだ聞いていない）' : STATE_LABEL[state]}</Radio>
                 ))}
               </RadioGroup>
               <Field label="理由" required error={reasonError}>
-                <TextField aria-label="理由" value={reason} placeholder="例：お電話で「宣伝はいらない」とご連絡" onChange={(event) => { setReason(event.target.value); setReasonError('') }} />
+                <TextField aria-label="理由" value={reason} placeholder="例：お電話で「宣伝はいらない」とご連絡" disabled={busy} onChange={(event) => { setReason(event.target.value); setReasonError(''); setReviewRequired(false); setError('') }} />
               </Field>
             </Card>
           </section>
@@ -208,8 +220,10 @@ export default function DeliveryConsentDrawer({ open, friendId, friendName, rows
         confirmLabel="受け取るに戻す"
         destructive
         busy={busy}
-        onConfirm={() => void commit()}
-        onCancel={() => setWarn(false)}
+        confirmDisabled={reviewRequired}
+        confirmDisabledReason="閉じて、本人の受け取り設定と理由を確かめてください。"
+        error={error || undefined} onSuccess={() => setWarn(false)} onConfirm={() => commit()}
+        onCancel={() => { setWarn(false); setReviewRequired(false); setError('') }}
       />
     </Drawer></SaveErrorScope>
   )

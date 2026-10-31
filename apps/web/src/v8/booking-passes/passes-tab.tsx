@@ -125,10 +125,10 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
       notifySaved(action === 'start' ? `「${plan.name}」の販売を始めました。` : `「${plan.name}」の販売をやめました。持っている人の券は、そのまま使えます。`)
       setPending(null)
       await load()
+      return true
     } catch (reason) {
-      setPending(null)
       if (!errors.capture(reason)) setNotice(failureText(reason, action === 'start' ? '販売を始める' : '販売をやめる'))
-      await load()
+      return false
     } finally {
       setBusyId(null)
     }
@@ -232,8 +232,8 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
                       { id: 'holders', label: '持っている人を見る', onSelect: () => setHoldersOf(plan) },
                       ...(canEdit ? [
                         ...(plan.status === 'draft' ? [{ id: 'edit', label: '編集する', onSelect: () => router.push(`/booking/passes/new?id=${encodeURIComponent(plan.id)}`) }] : []),
-                        ...(plan.status === 'draft' || plan.status === 'stopped' ? [{ id: 'start', label: '販売を始める', disabled: busyId === plan.id, onSelect: () => setPending({ plan, action: 'start' }) }] : []),
-                        ...(plan.status === 'on_sale' ? [{ id: 'stop', label: '販売をやめる', disabled: busyId === plan.id, onSelect: () => setPending({ plan, action: 'stop' }) }] : []),
+                        ...(plan.status === 'draft' || plan.status === 'stopped' ? [{ id: 'start', label: '販売を始める', disabled: busyId === plan.id, onSelect: () => { setNotice(''); setPending({ plan, action: 'start' }) } }] : []),
+                        ...(plan.status === 'on_sale' ? [{ id: 'stop', label: '販売をやめる', disabled: busyId === plan.id, onSelect: () => { setNotice(''); setPending({ plan, action: 'stop' }) } }] : []),
                         { id: 'notices', label: '残り・期限の知らせ', onSelect: () => setNoticeOf(plan) },
                         { id: 'duplicate', label: '複製', disabled: busyId === plan.id, onSelect: () => void duplicate(plan) },
                       ] : []),
@@ -269,7 +269,7 @@ export default function PassesTabV8({ accountId, canEdit }: { accountId: string;
           : 'やめると、新しく券を付けられなくなります。持っている人の券は、そのまま使えます。'}
         confirmLabel={pending?.action === 'start' ? '販売を始める' : '販売をやめる'}
         busy={pending !== null && busyId === pending.plan.id}
-        onConfirm={() => void runPending()}
+        error={notice || undefined} onSuccess={() => setPending(null)} onConfirm={() => runPending()}
         onCancel={() => setPending(null)}
       />
       {noticeOf ? <NoticeDialog accountId={accountId} plan={noticeOf} onClose={() => setNoticeOf(null)} /> : null}
