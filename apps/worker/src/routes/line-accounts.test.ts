@@ -1915,7 +1915,7 @@ describe('selected registration style', () => {
     lineClientMocks.getFollowerIds.mockResolvedValue({userIds:[]});
     const res=await setupApp('owner').request('/api/line-accounts/connect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...autoConnectBody,style})});
     expect(res.status).toBe(201);
-    expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account','tenant-1','test-staff',style);
+    expect(styleMocks.initializeAccountStyle).toHaveBeenCalledWith(expect.anything(),'created-account','tenant-1','test-staff',style,{bucket:undefined,publicBaseUrl:undefined,reportError:expect.any(Function)});
   });
   test.each(['meeting','',null,{},42])('rejects invalid style %j before external calls and creation',async style=>{
     const external=vi.fn();vi.stubGlobal('fetch',external);
