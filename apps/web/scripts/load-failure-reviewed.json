@@ -85,7 +85,7 @@
   },
   {
     "filename": "src/v8/affiliates/affiliators.tsx",
-    "fingerprint": "bd8be3d7f11baba7",
+    "fingerprint": "bbcc93382a3a0477",
     "disposition": "error-visible",
     "count": 1,
     "reason": "revfix-b-load-failures.tsv で確認済み。失敗表示を伴う既存の枝。"

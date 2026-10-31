@@ -13,9 +13,10 @@ describe('V8タグ一覧の件数の母集団', () => {
     expect(PAGE).toContain('api.listStats.get(accountId)')
   })
   it('フォルダ欄は全体と各フォルダの内訳を同じ取得済みデータから数える', () => {
-    expect(PAGE).toContain("label: 'すべて', count: ready ? items.length : null")
-    expect(PAGE).toContain('count: ready ? items.filter((tag) => tag.groupId === group.id).length : null')
-    expect(PAGE).toContain('count: ready ? items.filter((tag) => !tag.groupId).length : null')
+    expect(PAGE).toContain('const folderItems = items.filter(tag => (tag.status === \'archived\') === onlyArchived)')
+    expect(PAGE).toContain("label: 'すべて', count: ready ? folderItems.length : null")
+    expect(PAGE).toContain('count: ready ? folderItems.filter((tag) => tag.groupId === group.id).length : null')
+    expect(PAGE).toContain('count: ready ? folderItems.filter((tag) => !tag.groupId).length : null')
   })
   it('畳まれたフォルダ選択には件数を重ねない', () => {
     expect(PAGE).toContain("label: 'フォルダ：すべて'")
