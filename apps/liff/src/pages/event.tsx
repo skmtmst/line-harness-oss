@@ -133,7 +133,7 @@ export default function Event() {
   // 予約上限に達している人は、待ちにも入れないので選べない。
   const waitlistOpen = event.waitlist_enabled === 1;
   const isFull = (s: EventSlot): boolean => s.remaining != null && s.remaining <= 0;
-  // 選べる枠が1つも無い (枠自体が無い場合も含む)。
+  // 選べる枠が1つも無い (枠自体が無い場合も含む)。表示では空枠を満席と分ける。
   const allFull = !slots.some((s) => !isFull(s));
   const selectedSlot = slots.find((s) => s.id === selectedId) ?? null;
   const selectedFull = selectedSlot != null && isFull(selectedSlot);
@@ -197,10 +197,10 @@ export default function Event() {
               </span>
             </p>
           )}
-          <p className="flex items-start gap-2 text-[13px]">
+          {slots.length > 0 && <p className="flex items-start gap-2 text-[13px]">
             <Icon name="users" className="mt-0.5 h-4 w-4 shrink-0 text-ink-secondary" />
             <span className={hasSeats ? 'font-bold text-liff-wait-ink' : 'text-ink'}>{seats}</span>
-          </p>
+          </p>}
           {event.venue_address && <p className="text-sm text-ink-secondary break-words">{event.venue_address}</p>}
           {isHttpsUrl(event.venue_url) && (
             <a
@@ -298,9 +298,11 @@ export default function Event() {
               ? selectedFull && waitlistOpen
                 ? 'キャンセル待ちで申し込む'
                 : 'この時間で申し込む'
-              : allFull
-                ? '満席です'
-                : '時間を選んでください'}
+              : slots.length === 0
+                ? '予約可能な枠がありません'
+                : allFull
+                  ? '満席です'
+                  : '時間を選んでください'}
         </Button>
       </BottomBar>
     </LiffLookScope>
