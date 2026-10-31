@@ -39,7 +39,16 @@ export function expandAccountName(content:string,name:string,isJson=false):strin
   return expandHqVariables(content,name,null,isJson);
 }
 
+export function assertHqDeliveryOptions(input: HqBroadcastInput): void {
+  const options = input?.messageOptions;
+  if (options && typeof options === 'object'
+    && ('deliveryLimit' in options || 'deliveryLimitConfirmation' in options)) {
+    throw new StampError('人数に上限を付ける配信は、店舗の一斉配信で人数を確かめてください。統括の配信では指定できません。', 400, ['messageOptions']);
+  }
+}
+
 export function mappedHqContent(input:HqBroadcastInput,name:string,liffId?:string|null) {
+  assertHqDeliveryOptions(input);
   return {messageBubbles:undefined,
     messageContent:expandHqVariables(input.messageContent,name,liffId,!['text','image','audio','video'].includes(input.messageType)),
     messageBubblesJson:input.messageBubbles ? expandHqVariables(JSON.stringify(input.messageBubbles),name,liffId,true)
@@ -50,6 +59,7 @@ export function mappedHqContent(input:HqBroadcastInput,name:string,liffId?:strin
 
 export async function preflightHqBroadcast(db:D1Database,run:RunRow,persist=true,runtime?:HqMediaRuntime):Promise<HqBroadcastPreflight[]> {
   const input=JSON.parse(run.input_json) as HqBroadcastInput,targets=(await db.prepare('SELECT * FROM hq_broadcast_targets WHERE run_id=? ORDER BY line_account_id').bind(run.id).all<Target>()).results;
+  assertHqDeliveryOptions(input);
   const result:HqBroadcastPreflight[]=[];
   for(const t of targets) {
     const reasons:string[]=[];
