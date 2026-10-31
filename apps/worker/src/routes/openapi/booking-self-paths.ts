@@ -40,17 +40,24 @@ export const bookingSelfPaths = {
     post: {
       tags: ['Booking'],
       summary: '本人の予約を取消',
-      description: '本人確認→店→友だちの所有だけに許可。期限・CASを検査し、リマインダ停止・カレンダー削除・Meet取消の結果を返す。取消ずみ再送は副作用をそろえて 200。待ち列は含まない。',
+      description: '本人確認→店→友だちの所有だけに許可。期限・CASを検査し、料金があるときはfeeAccepted=trueと現在の見積もりに一致するexpectedFeeAmountが必要。取消ずみ再送は副作用をそろえて200。実請求はしない。',
       security: [],
       parameters: [
         { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
       ],
+      requestBody: { required: true, content: { 'application/json': { schema: {
+        type: 'object', required: ['lock_version'], properties: {
+          lock_version: { type: 'integer', minimum: 0 },
+          feeAccepted: { type: 'boolean', description: '取消料が発生するときは明示的なtrueが必要' },
+          expectedFeeAmount: { type: 'integer', minimum: 0, description: '同意した表示金額（円）。現在の見積もりと違う場合は409' },
+        },
+      } } } },
       responses: {
         '200': { description: '取消成立（calendar_sync・meet_sync 付き）' },
         '401': { description: '本人確認ができない' },
         '403': { description: '期限切れ' },
         '404': { description: '予約なし' },
-        '409': { description: '版競合・送信中の再試行' },
+        '409': { description: '版競合・送信中の再試行・取消料の同意または金額の再確認が必要' },
       },
     },
   },
