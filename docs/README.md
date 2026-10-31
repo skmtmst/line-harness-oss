@@ -1079,3 +1079,5 @@
 - [反映履歴：文字欄とシナリオの段の権限](release-log/unreleased/2011-kenta-text-step-permission.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 
 - [名簿の欠席受付](release-log/unreleased/0000-kenta-roster-absence.md) — 反映履歴、確認 2026-10-31
+- [反映履歴：窓の下の操作が重ならないようにし、狭い幅では段を分けて表示するようにしました](release-log/unreleased/0000-kenta-dialog-leading.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+- [反映履歴：UID移行の行き先を状態とIDで選び、CSVと入力がそろってから実行できるようにしました](release-log/unreleased/0000-kenta-uid-safety.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
