@@ -240,6 +240,8 @@
   gap: var(--tpl-slot-pill-gap);
 }
 
+.root[data-has-help] .actions { right: calc(var(--tpl-slot-pill-inset) + var(--space-24)); }
+
 .pill {
   display: inline-flex;
   align-items: center;

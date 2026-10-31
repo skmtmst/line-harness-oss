@@ -4,6 +4,17 @@ import { type ResearchFormat, type ResearchQuestion, visualQuestions, assetIniti
 export type { ResearchQuestion } from './asset-initial'
 export { assetInitial } from './asset-initial'
 
+import CouponSettings, { CouponGuide } from './coupon-settings'
+import { couponDraftPayload, couponDraftProblems, initialCouponDraft } from './coupon-draft'
+import StoredAssetEditor from './stored-asset-editor'
+import { useCouponPersistence } from './use-coupon-persistence'
+import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import CouponPreview from '@/components/shared/coupon-preview'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
+import type { BroadcastMessageAsset } from '@/lib/api'
+import type { BroadcastAssetFolder } from '@/lib/api/types/broadcasts'
+import { defaultCouponInstructions } from '@line-crm/shared'
+
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
 import Toggle from '@/components/shared/toggle'
@@ -25,7 +36,7 @@ import { usePageTitle } from '@/components/shell/page-chrome'
 import TapExtrasField from '@/components/shared/tap-extras-field'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
-import Card from '@/components/shared/card'
+import Card, { CardHeader } from '@/components/shared/card'
 import ActionMenu from '@/components/shared/action-menu'
 import ReorderHandle, { useReorder } from '@/components/shared/reorder-handle'
 import Combobox from '@/components/shared/combobox'
@@ -33,7 +44,7 @@ import DateTimeField from '@/components/shared/date-time-field'
 import LinePreview from '@/components/shared/line-preview'
 import SegmentedControl from '@/components/shared/segmented'
 import Select from '@/components/shared/select'
-import FolderSelect, { folderByName, folderCreator, hostFolderCreate } from '@/components/shared/folder-select'
+import FolderSelect, { folderByName, folderCreator, hostFolderCreate, FolderCreateError } from '@/components/shared/folder-select'
 import { TextField } from '@/components/shared/text-field'
 import InlineActionRowsV8 from '@/components/auto-replies/inline-action-rows-v8'
 import { useActionOptions } from '@/components/auto-replies/inline-action-list'
@@ -67,7 +78,7 @@ export type AssetKind = 'coupon' | 'research'
 
 /* 今の画面と同じ値（template-asset-editor.tsx から写した）。 */
 const META: Record<AssetKind, { title: string; heading: string; lead: string; board: string; folder: string }> = {
-  coupon: { title: 'クーポン', heading: 'クーポンを作る', lead: '期間・回数・抽選を決めて配る', board: 'S6FEuB', folder: '03_販促・クーポン' },
+  coupon: { title: 'クーポン', heading: 'クーポンを作る', lead: '特典・使える期間・回数を決めます。公開しても、この操作では友だちへ送信しません。', board: 'S6FEuB', folder: '03_販促・クーポン' },
   research: { title: 'リサーチ', heading: 'リサーチを作る', lead: 'LINEの中で答える短い質問。住所や画像も聞くなら回答フォーム', board: 'EsYo4', folder: '02_健康フォロー' },
 }
 export const MAX_QUESTIONS = 10
@@ -95,21 +106,35 @@ export function couponPeriodLine(startsAt: string, endsAt: string, once: boolean
  * `host` を渡すと、統括のテンプレートの入口から同じ画面を使う（host.ts）。保存は呼ぶ側、主ボタンは［保存して配る］、
  * 店のアカウントに結びつく欄（登録メディア・行うこと・答えてもらう人）は出さない。
  */
-export default function TemplateAssetEditor({ kind, visual = false, host }: { kind: AssetKind; visual?: boolean; host?: TemplateEditHost }) {
+type EditorProps = { kind: AssetKind; visual?: boolean; host?: TemplateEditHost; existing?: BroadcastMessageAsset }
+export default function TemplateAssetEditor({ id, ...props }: EditorProps & { id?: string | null }) {
+  if (id && props.kind === 'coupon' && !props.host) return <StoredAssetEditor id={id}>{asset => <TemplateAssetForm key={`${asset.id}:${asset.lineAccountId}`} {...props} existing={asset} />}</StoredAssetEditor>
+  return <TemplateAssetForm {...props} />
+}
+
+function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps) {
   const saveErrors = useSaveFormErrors()
   const meta = META[kind]
   const router = useRouter()
   const role = useStaffRole()
   const featureAccess = useFeatureAccess('templates')
   const canMutate = host ? !host.readOnly : featureAccess
+  const permissionReason = usePermissionLockReason(canMutate)
   const { selectedAccountId, accounts } = useAccount()
-  usePageTitle(host ? 'テンプレート' : meta.heading)
+  const persistCoupon = useCouponPersistence(selectedAccountId, existing)
+  usePageTitle(host ? 'テンプレート' : existing && kind === 'coupon' ? 'クーポンを編集する' : meta.heading)
   const actionOptions = useActionOptions()
 
   /* 統括の編集：保存してある payload から欄を埋める（同じ形で保存し直す）。 */
-  const init = host?.initialContent && host.initialContent.kind === kind && 'payload' in host.initialContent ? { name: host.initialContent.name, ...assetInitial(host.initialContent.payload) } : null
+  const initialPayload = host?.initialContent && host.initialContent.kind === kind && 'payload' in host.initialContent ? host.initialContent.payload : existing?.payload
+  const init = initialPayload ? { name: host?.initialContent?.name ?? existing?.name ?? '', ...assetInitial(initialPayload) } : null
+  const [couponDraft, setCouponDraft] = useState(() => initialCouponDraft(initialPayload, visual))
   const [name, setName] = useState(init ? init.name : visual ? (kind === 'coupon' ? '夏の20%オフ' : '定期便のご満足度') : '')
-  const [folder, setFolder] = useState(visual ? meta.folder : '')
+  const [folder, setFolder] = useState(kind === 'coupon' ? existing?.folderId ?? '' : visual ? meta.folder : '')
+  const [folderTouched, setFolderTouched] = useState(false)
+  const [assetFolders, setAssetFolders] = useState<BroadcastAssetFolder[]>([])
+  const [folderProblem, setFolderProblem] = useState(false)
+  const [folderAttempt, setFolderAttempt] = useState(0)
   const [folders, setFolders] = useState<Folder[]>([])
   const [description, setDescription] = useState(init ? init.description : visual ? (kind === 'coupon' ? '会計時にこの画面をご提示ください。他の割引との併用はできません。' : 'いつもありがとうございます。3問だけ聞かせてください。') : '')
   // クーポン
@@ -118,14 +143,16 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const [tapExtras, setTapExtras] = useState<TapExtras | undefined>(init?.tapExtras)
   const [pickedMedia, setPickedMedia] = useState<MediaItem | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [couponOnce, setCouponOnce] = useState<'once' | 'unlimited'>(init ? init.couponOnce : 'once')
+  const [couponOnce, setCouponOnce] = useState<'once' | 'unlimited' | 'limited'>(typeof initialPayload?.maxUsesPerFriend === 'number' && initialPayload.maxUsesPerFriend > 1 ? 'limited' : init ? init.couponOnce : 'once')
+  const [countTouched, setCountTouched] = useState(false)
   const [couponVisibility, setCouponVisibility] = useState<'friends' | 'link'>(init ? init.couponVisibility : 'friends')
   const [lottery, setLottery] = useState(init ? init.lottery : false)
   const [lotteryRate, setLotteryRate] = useState(init ? init.lotteryRate : '20')
   const [winnerLimit, setWinnerLimit] = useState(init ? init.winnerLimit : '500')
   const [couponStartsAt, setCouponStartsAt] = useState(init ? init.startsAt : visual ? '2026-08-01T00:00' : '')
   const [couponEndsAt, setCouponEndsAt] = useState(init ? init.endsAt : visual ? '2026-08-31T23:59' : '')
-  const [couponUseActions, setCouponUseActions] = useState<InlineAction[]>([])
+  const [couponUseActions, setCouponUseActions] = useState<InlineAction[]>(() => readInlineActions(initialPayload?.useActions as unknown[] | undefined))
+  const initialUseActions = useRef(couponUseActions)
   // リサーチ
   const [researchStartsAt, setResearchStartsAt] = useState(init ? init.startsAt : visual ? '2026-10-01T10:00' : '')
   const [researchEndsAt, setResearchEndsAt] = useState(init ? init.endsAt : visual ? '2026-10-15T23:59' : '')
@@ -141,28 +168,37 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    if (host) return
+    if (host || existing) return
     setPickedMedia(null)
     setImageUrl('')
     // 統括では上のバーのアカウントに結びつかない（編集で読み込んだ画像を消さない）。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAccountId])
 
-  /* フォルダはアカウントの置き場一覧から選ぶ（保存値はフォルダ名のまま。今と同じ）。 */
   useEffect(() => {
-    setFolders([])
+    setFolders([]); setAssetFolders([]); setFolderProblem(false)
     if (!selectedAccountId || host) return
-    let cancelled = false
-    void api.folders.list('template', selectedAccountId)
-      .then((res) => { if (!cancelled && res.success) setFolders(res.data) })
-      .catch(() => undefined)
-    return () => { cancelled = true }
-  }, [selectedAccountId])
+    let current = true
+    if (kind === 'coupon') {
+      void api.broadcastMessageAssets.folders.list(selectedAccountId).then(response => {
+        if (!current) return
+        if (response.success) setAssetFolders(response.data)
+        else setFolderProblem(true)
+      }).catch(() => { if (current) setFolderProblem(true) })
+    } else {
+      void api.folders.list('template', selectedAccountId).then(response => {
+        if (!current) return
+        if (response.success) setFolders(response.data)
+        else setFolderProblem(true)
+      }).catch(() => { if (current) setFolderProblem(true) })
+    }
+    return () => { current = false }
+  }, [selectedAccountId, host, kind, folderAttempt])
 
   const snapshot = useMemo(() => JSON.stringify({
-    tapExtras, name, folder, description, couponTitle, imageUrl, pickedMedia, couponOnce, couponVisibility, lottery, lotteryRate, winnerLimit,
-    couponStartsAt, couponEndsAt, couponUseActions, researchStartsAt, researchEndsAt, targetTagId, questions, answerActions,
-  }), [tapExtras, name, folder, description, couponTitle, imageUrl, pickedMedia, couponOnce, couponVisibility, lottery, lotteryRate, winnerLimit, couponStartsAt, couponEndsAt, couponUseActions, researchStartsAt, researchEndsAt, targetTagId, questions, answerActions])
+    tapExtras, name, folder, folderTouched, countTouched, description, couponTitle, imageUrl, pickedMedia, couponOnce, couponVisibility, lottery, lotteryRate, winnerLimit,
+    couponDraft, couponStartsAt, couponEndsAt, couponUseActions, researchStartsAt, researchEndsAt, targetTagId, questions, answerActions,
+  }), [tapExtras, name, folder, folderTouched, countTouched, description, couponTitle, imageUrl, pickedMedia, couponOnce, couponVisibility, lottery, lotteryRate, winnerLimit, couponDraft, couponStartsAt, couponEndsAt, couponUseActions, researchStartsAt, researchEndsAt, targetTagId, questions, answerActions])
   const [clean, setClean] = useState(() => snapshot)
   const dirty = snapshot !== clean && !saved
   const { leaveTarget, confirmLeave, cancelLeave, disarm } = useUnsavedGuard({ dirty, busy: saving || publishing })
@@ -199,14 +235,15 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
    */
   const fields = useFormErrors()
   fields.define('name', 'テンプレート名', () => (name.trim() ? null : `${meta.title}名を入力してください`), { required: true })
+  const couponExtras = couponDraftPayload(couponDraft, initialPayload)
+  const couponProblems = couponDraftProblems(couponDraft, initialPayload)
   if (kind === 'coupon') {
+    fields.define('couponTitle', 'クーポン名', () => !couponTitle.trim() && (!initialPayload || Boolean(initialPayload.title)) ? 'クーポン名を入力してください' : couponTitle.length > 60 && (couponTitle !== init?.couponTitle || 'couponType' in couponExtras) ? 'クーポン名は60文字以内で入力してください' : null, { required: !initialPayload || Boolean(initialPayload.title) })
+    for (const [key, label] of [['benefit', '割引の内容'], ['conditions', '利用条件'], ['code', 'クーポンコード'], ['instructions', '利用ガイド']] as const) fields.define(key, label, () => couponProblems[key])
     fields.define('tapExtras', 'ボタンの追加処理', () => tapExtrasError(tapExtras))
     fields.define('start', '使える期間の開始', () => (couponStartsAt ? null : '開始を入力してください'), { required: true })
     fields.define('end', '使える期間の終了', () => (!couponEndsAt ? '終了を入力してください' : couponStartsAt && couponEndsAt <= couponStartsAt ? '終了は開始よりあとにしてください' : null), { required: true })
-    if (lottery) {
-      fields.define('rate', '当たる確率', () => { const rate = Number(lotteryRate); return Number.isInteger(rate) && rate >= 1 && rate <= 100 ? null : '1〜100の整数で入力してください' }, { required: true })
-      fields.define('limit', '当選人数の上限', () => { const limit = Number(winnerLimit); return Number.isInteger(limit) && limit >= 1 ? null : '1以上の整数で入力してください' }, { required: true })
-    }
+    fields.define('lottery', '獲得条件', () => lottery ? '抽選には対応していません。条件なしへ変更してください' : null)
   } else {
     questions.forEach((question, index) => {
       fields.define(`q-${question.key}`, `質問 ${index + 1} の本文`, () => (question.text.trim() ? null : '質問文を入力してください'), { required: true })
@@ -229,19 +266,22 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
       }
       return {
         payload: {
+          ...initialPayload,
+          ...couponExtras,
           ...(couponTitle.trim() ? { title: couponTitle.trim() } : {}),
-          description,
+          description: initialPayload && couponDraft.instructions === initialCouponDraft(initialPayload).instructions ? description : couponDraft.instructions.trim(),
           imageUrl,
-          imageMediaId: pickedMedia?.id ?? null,
-          imageMediaKind: pickedMedia?.kind ?? null,
+          imageMediaId: pickedMedia?.id ?? (imageUrl === init?.imageUrl ? initialPayload?.imageMediaId ?? null : null),
+          imageMediaKind: pickedMedia?.kind ?? (imageUrl === init?.imageUrl ? initialPayload?.imageMediaKind ?? null : null),
           startsAt: couponStartsAt,
           endsAt: couponEndsAt,
-          oncePerFriend: couponOnce === 'once',
+          oncePerFriend: couponOnce === 'limited' ? initialPayload?.oncePerFriend !== false : couponOnce === 'once',
+          ...(countTouched ? { maxUsesPerFriend: couponOnce === 'unlimited' ? null : couponOnce === 'limited' ? initialPayload?.maxUsesPerFriend : 1 } : {}),
           visibility: couponVisibility,
           lottery,
           ...(lottery ? { lotteryRate: Number(lotteryRate), winnerLimit: Number(winnerLimit) } : {}),
           tapExtras,
-          useActions: couponUseActions.map(toActionPayload),
+          useActions: initialPayload?.useActions && JSON.stringify(couponUseActions) === JSON.stringify(initialUseActions.current) ? initialPayload.useActions : couponUseActions.map(toActionPayload),
         },
       }
     }
@@ -271,8 +311,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     }
   }
 
-  const save = async (): Promise<string | false> => {
-    if (host) return false
+  const save = async (publishCoupon = false): Promise<string | false> => {
+    if (host || !canMutate) return false
     if (!selectedAccountId) { setError('上のバーでLINE公式アカウントを選んでください。'); return false }
     if (fields.submit().length > 0) { setError(''); return false }
     const built = buildPayload()
@@ -280,6 +320,14 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     setSaving(true)
     setError('')
     try {
+      if (kind === 'coupon') {
+        const legacyFolder = folderTouched || !initialPayload
+          ? assetFolders.find(item => item.id === folder)?.name ?? ''
+          : typeof initialPayload.folder === 'string' ? initialPayload.folder : ''
+        const id = await persistCoupon(name.trim(), { ...built.payload, folder: legacyFolder }, folder || null, snapshot, publishCoupon)
+        setSaved(true); setClean(snapshot)
+        return id
+      }
       const result = await api.broadcastMessageAssets.create({
         lineAccountId: selectedAccountId,
         kind,
@@ -300,7 +348,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         else fields.setServerErrors(Object.fromEntries(questions.flatMap(q => q.choices.map((_, ci) => [`extra-${q.key}-${ci}`, extraError]))))
         return false
       }
-      setError('保存できませんでした。通信状態を確認して、もう一度お試しください。')
+      const fieldFailure = saveErrors.capture(caught, fields)
+      if (!fieldFailure) setError(japaneseDetailOf(caught) || '保存できませんでした。通信状態を確認して、もう一度お試しください。')
       return false
     } finally {
       setSaving(false)
@@ -308,25 +357,29 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   }
 
   /* 統括の入口：中身を組み立てて呼ぶ側へ渡す（保存・配る・失敗の知らせは呼ぶ側）。 */
-  const hostSave = (distribute: boolean) => {
-    if (!host) return
+  const hostSave = async (distribute: boolean) => {
+    if (!host || !canMutate) return
     if (fields.submit().length > 0) { setError(''); return }
     const built = buildPayload()
     if ('error' in built) { setError(built.error); return }
     setError('')
-    setClean(snapshot)
-    host.onSave({ kind, name: name.trim(), payload: built.payload }, distribute)
+    try {
+      const result = await host.onSave({ kind, name: name.trim(), payload: built.payload }, distribute)
+      if (result !== false) setClean(snapshot)
+    } catch (caught) {
+      if (!saveErrors.capture(caught, fields)) setError(japaneseDetailOf(caught) || '保存できませんでした。もう一度お試しください。')
+    }
   }
   const onSaveDraft = async () => {
-    if (host) { hostSave(false); return }
+    if (host) { await hostSave(false); return }
     const savedId = await save()
     if (savedId) { notifySaved('下書きを保存しました'); disarm(); router.push(createPageReturnHref('/templates', savedId)) }
   }
   const onPublish = async () => {
-    if (host) { hostSave(true); return }
+    if (host) { await hostSave(true); return }
     setPublishing(true)
     try {
-      const savedId = await save()
+      const savedId = await save(kind === 'coupon')
       if (savedId) {
         disarm()
         router.push(createPageReturnHref('/templates', savedId))
@@ -347,7 +400,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
       <dl className={styles.statList}>
         <div className={styles.statRow}><dt>配った数</dt><dd>{emptyValue('unknown')}</dd></div>
         <div className={styles.statRow}><dt>使われた数</dt><dd>{emptyValue('unknown')}</dd></div>
-        <div className={styles.statRow}><dt>当選した数</dt><dd>{lottery ? emptyValue('unknown') : '抽選なし'}</dd></div>
+        {lottery ? <div className={styles.statRow}><dt>当選した数</dt><dd>{emptyValue('unknown')}</dd></div> : null}
       </dl>
     </section>
   ) : (
@@ -379,27 +432,14 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   const phone = kind === 'research' ? (
     <FormPhone layout={researchLayout} pageIndex={0} accountName={sendName} bookingMenus={[]} caption={null} title={name || 'リサーチ'} fixedNext progressHead />
   ) : (
-    <LinePreview title={null} note={`${meta.title}の見え方`} caption="配信日 10:00" accountName={sendName}>
-      <div className={styles.assetRow}>
-        <span className={styles.assetAvatar} aria-hidden="true">{sendName.slice(0, 1)}</span>
-        <div className={styles.assetCard}>
-          <div className={styles.assetImage}>
-            {imageSet ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img width={320} height={240} src={imageUrl.trim()} alt="" />
-            ) : <span>{couponTitle || name || 'クーポン'}</span>}
-          </div>
-          <div className={styles.assetBody}>
-            <p className={styles.assetTitle}>{couponTitle || name || 'クーポン名'}</p>
-            <p className={styles.assetSub}>{couponPeriodLine(couponStartsAt, couponEndsAt, couponOnce === 'once')}</p>
-          </div>
-          <p className={styles.assetAction}>クーポンを使う</p>
-        </div>
-      </div>
-    </LinePreview>
+    <CouponPreview payload={{ ...initialPayload, ...couponExtras, title: couponTitle || name, description, imageUrl,
+      startsAt: couponStartsAt, endsAt: couponEndsAt,
+      oncePerFriend: couponOnce === 'limited' ? initialPayload?.oncePerFriend !== false : couponOnce === 'once',
+      ...(countTouched ? { maxUsesPerFriend: couponOnce === 'unlimited' ? null : couponOnce === 'limited' ? initialPayload?.maxUsesPerFriend : 1 } : {}),
+    }} name={name} accountName={sendName} />
   )
 
-  if (!canMutate) {
+  if (!canMutate && kind !== 'coupon') {
     return (
       <SaveErrorScope errors={saveErrors}><TemplateEditFrame
         boardId={meta.board}
@@ -408,7 +448,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         band={<ReadOnlyNotice>閲覧のみ：テンプレートの作成・変更はオーナーと管理者だけができます。</ReadOnlyNotice>}
         side={sideCard}
       >
-        <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
+        <Card variant="form" gap="normal">
           <p className={styles.cardNote}>中身の確認は一覧の行を開くと読めます。</p>
         </Card>
       </TemplateEditFrame></SaveErrorScope>
@@ -416,24 +456,24 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
   }
 
   const nameCard = (
-    <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
-      <div className={styles.cardHead}>
-        <h2 className={styles.cardTitle}>名前とフォルダ</h2>
-      </div>
+    <Card variant="form" gap="normal">
+      <CardHeader size="stacked" title="名前とフォルダ" />
       <SettingsFormRow layout="name-folder">
         <div className={styles.field}><Field label="テンプレート名" htmlFor={`te-${kind}-name`} requirement={fields.requirement('name')}><SaveErrorField names={["name"]}><TextField {...fieldProps('name', `te-${kind}-name`)} id={`te-${kind}-name`} value={name} onChange={(event) => setName(event.target.value)} placeholder={kind === 'coupon' ? '例：夏の20%オフ' : '例：定期便のご満足度'} aria-required="true" /></SaveErrorField>
 <FieldError id={`te-${kind}-name-error`}>{fields.error('name')}</FieldError></Field></div>
-        <div className={styles.field}><Field label="フォルダ" htmlFor={`te-${kind}-folder`}><SaveErrorField names={["folder","host.folder"]}><FolderSelect size="full"
+        <div className={styles.field}><Field label="フォルダ" htmlFor={`te-${kind}-folder`}><SaveErrorField names={["folder","folderId","host.folder"]}><FolderSelect size="full"
             id={`te-${kind}-folder`}
             aria-label="フォルダ"
             value={host ? host.folder : folder}
-            onChange={host ? host.onFolderChange : setFolder}
-            folders={host ? host.folders : folders.map(folderByName)}
-            colors
+            onChange={host ? host.onFolderChange : value => { setFolder(value); setFolderTouched(true) }}
+            folders={host ? host.folders : kind === 'coupon' ? assetFolders.map(item => ({ value: item.id, label: item.name })) : folders.map(folderByName)}
+            colors={kind !== 'coupon'}
             onCreate={host
               ? hostFolderCreate(host)
               : canMutate && selectedAccountId
-                ? folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
+                ? kind === 'coupon'
+                  ? folderCreator(name => api.broadcastMessageAssets.folders.create(selectedAccountId, name), item => { if (!item) throw new FolderCreateError('作成したフォルダを確認できませんでした。読み直してください'); return { value: item.id, label: item.name } }, created => { if (created) setAssetFolders(current => [...current, created]) })
+                  : folderCreator((name, color) => api.folders.create({ kind: 'template', name, color, accountId: selectedAccountId }), folderByName, (created) => setFolders((current) => [...current, created]))
                 : undefined}
           /></SaveErrorField></Field></div>
       </SettingsFormRow>
@@ -444,12 +484,13 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
     <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
         boardId={meta.board}
-        title={meta.heading}
+        title={existing && kind === 'coupon' ? 'クーポンを編集する' : meta.heading}
         description={meta.lead}
+        band={!canMutate ? <ReadOnlyNotice /> : undefined}
         side={(inDialog) => (
           <>
             {sideCard}
-            <h2 className={styles.previewHead} title="この形式は、いまの画面から自分へのテスト送信ができません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。">届き方</h2>
+            <h2 className={styles.previewHead} title="この形式は、いまの画面から自分へのテスト送信ができません。保存して一斉配信に組み込むと、配信の画面からテスト送信できます。">{kind === 'coupon' ? '受け取った人の画面' : '届き方'}</h2>
             <div className={inDialog ? styles.previewDialog : styles.phone}>{phone}</div>
           </>
         )}
@@ -457,10 +498,10 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         footerActions={(
           <>
             {host ? <Button type="button" onClick={host.onCancel}>キャンセル</Button> : <Button href="/templates">キャンセル</Button>}
-            <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={saving && !publishing} busyLabel="保存中…">
+            <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || Boolean(blocked) || !canMutate && !permissionReason} lockedReason={permissionReason} title={blocked ?? undefined} busy={saving && !publishing} busyLabel="保存中…">
               下書きを保存
             </Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked) || !canMutate && !permissionReason} lockedReason={permissionReason} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
               {host ? null : <Upload size={16} aria-hidden="true" />}
               {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>
@@ -470,22 +511,24 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
         {host?.notice}
         {error ? <Notice tone="danger" >{error}</Notice> : null}
         {null}
-        {nameCard}
+        {folderProblem ? <Notice tone="warn" message="フォルダを読み込めませんでした。保存先を確認してから保存してください。" action={<Button type="button" onClick={() => setFolderAttempt(value => value + 1)}>再読み込み</Button>} /> : null}
+        <fieldset className="contents" disabled={kind !== 'coupon' && (!canMutate || busy)} aria-label="テンプレートの入力">
+        {kind === 'coupon' ? <fieldset className="contents" disabled={!canMutate || busy}>{nameCard}</fieldset> : nameCard}
 
         {kind === 'coupon' ? (
           <>
-            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>中身</h2>
-              </div>
-              <div className={styles.couponRow}>
-                <div className={styles.couponImage}>
+            <CouponSettings disabled={!canMutate || busy} draft={couponDraft} onChange={patch => setCouponDraft(current => ({ ...current, ...patch }))}
+              title={couponTitle} onTitleChange={setCouponTitle} fields={fields} lottery={lottery} onRemoveLottery={() => setLottery(false)} image={<div className={styles.couponFields}>
                   <SaveErrorField names={["imageUrl","image_url"]}><ImageFrame
                     title="画像を追加"
+                    lockedReason={permissionReason}
+                    disabled={busy || !canMutate && !permissionReason}
+                    canChangeNow={() => canMutate && !busy}
                     previewAlt="クーポンの画像"
                     value={imageSet ? imageUrl.trim() : null}
                     accept="image/jpeg,image/png"
-                    help="1029 × 1029px"
+                    help="JPG・JPEG・PNG、10MB以下"
+                    maxBytes={10 * 1024 * 1024}
                     upload={!host && selectedAccountId ? async (file, progress) => {
                       const result = await uploadToMediaLibrary(file, selectedAccountId, 'image', progress)
                       setPickedMedia(result.item)
@@ -496,19 +539,10 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                     urlEntry={{ value: imageUrl, onChange: (url) => { setImageUrl(url); setPickedMedia(null) }, label: 'クーポン画像のURL', placeholder: '画像URL' }}
                   /></SaveErrorField>
                   {pickedMedia ? <p className={styles.hint}>選択中：{pickedMedia.filename}</p> : null}
-                </div>
-                <div className={styles.couponFields}>
-                  <div className={styles.field}><Field label="クーポン名" htmlFor="te-coupon-title"><SaveErrorField names={["couponTitle","coupon_title"]}><TextField id="te-coupon-title" value={couponTitle} onChange={(event) => setCouponTitle(event.target.value)} placeholder={name || '例：夏の20%オフ'} /></SaveErrorField></Field></div>
-                  <div className={styles.field}><Field label="使うときの説明" htmlFor="te-coupon-desc"><SaveErrorField names={["description"]}><TextField id="te-coupon-desc" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：会計時にこの画面をご提示ください。" /></SaveErrorField></Field></div>
-                </div>
-              </div>
-            </Card>
+              </div>} />
 
-            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>使える期間と回数</h2>
-                <p className={styles.cardNote}>この管理画面の時刻（日本時間）で入ります</p>
-              </div>
+            <fieldset className="contents" disabled={!canMutate || busy}><Card variant="form" gap="normal">
+              <CardHeader size="stacked" title="使える期間と回数" meta="日本時間（UTC+09:00）" />
               <SettingsFormRow layout="columns">
                 <div className={styles.field}><Field label="開始" htmlFor="te-coupon-start" requirement={fields.requirement('start')}><span {...fields.bind('start')}><SaveErrorField names={["couponStartsAt","startsAt","coupon_starts_at"]}><DateTimeField className={styles.dateBox} id="te-coupon-start" value={couponStartsAt} onChange={setCouponStartsAt} aria-label="使える期間の開始" required invalid={fields.invalid('start')} aria-describedby={fields.invalid('start') ? 'te-coupon-start-error' : undefined} /></SaveErrorField></span>
 <FieldError id="te-coupon-start-error">{fields.error('start')}</FieldError></Field></div>
@@ -520,59 +554,34 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
                 <span className={styles.labelSmall}>1人が使える回数</span>
                 <SaveErrorField names={["couponOnce"]}><SegmentedControl
                   aria-label="1人が使える回数"
-                  options={[{ value: 'once' as const, label: '1人1回だけ' }, { value: 'unlimited' as const, label: '期間中なら何回でも' }]}
+                  options={[{ value: 'once' as const, label: '1人1回だけ' }, { value: 'unlimited' as const, label: '期間中なら何回でも' }, ...(typeof initialPayload?.maxUsesPerFriend === 'number' && initialPayload.maxUsesPerFriend > 1 ? [{ value: 'limited' as const, label: `1人${initialPayload.maxUsesPerFriend}回` }] : [])]}
                   value={couponOnce}
-                  onChange={setCouponOnce}
+                  onChange={value => { setCountTouched(true); setCouponOnce(value); setCouponDraft(current => current.instructions === defaultCouponInstructions(couponOnce !== 'unlimited') ? { ...current, instructions: defaultCouponInstructions(value !== 'unlimited') } : current) }}
                 /></SaveErrorField>
               </div>
               <div className={styles.typeRow}>
                 <span className={styles.labelSmall}>受け取れる人</span>
-                <SaveErrorField names={["couponVisibility"]}><SegmentedControl
+                <SaveErrorField names={["couponVisibility"]}>{initialPayload?.visibility === 'link' ? <SegmentedControl
                   aria-label="受け取れる人"
-                  options={[{ value: 'friends' as const, label: '友だちだけ' }, { value: 'link' as const, label: 'リンクを知っている人' }]}
+                  options={[{ value: 'friends' as const, label: '友だちだけ' }, ...(initialPayload?.visibility === 'link' ? [{ value: 'link' as const, label: 'リンクを知っている人（保存済み）' }] : [])]}
                   value={couponVisibility}
                   onChange={setCouponVisibility}
-                /></SaveErrorField>
+                /> : <span>友だちだけ</span>}</SaveErrorField>
               </div>
             </Card>
 
-            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>抽選</h2>
-              </div>
-              <div className={styles.toggleRow}>
-                <span className={styles.toggleLabel}>抽選する</span>
-                <span className={styles.spacer} />
-                <SaveErrorField names={["lottery"]}><Toggle checked={lottery} label="抽選する" onChange={setLottery} /></SaveErrorField>
-              </div>
-              {lottery ? (
-                <SettingsFormRow layout="columns">
-                  <div className={styles.field}><Field label="当たる確率（%）" htmlFor="te-lottery-rate" requirement={fields.requirement('rate')}><SaveErrorField names={["lotteryRate","lottery_rate"]}><NumberInput unit="%" {...fieldProps('rate', 'te-lottery-rate')} id="te-lottery-rate" type="number" min={1} max={100} value={lotteryRate} onChange={(event) => setLotteryRate(event.target.value)} /></SaveErrorField>
-<FieldError id="te-lottery-rate-error">{fields.error('rate')}</FieldError></Field></div>
-                  <div className={styles.field}><Field label="当選人数の上限（人）" htmlFor="te-winner-limit" requirement={fields.requirement('limit')}><SaveErrorField names={["winnerLimit","winner_limit"]}><NumberInput unit="人" {...fieldProps('limit', 'te-winner-limit')} id="te-winner-limit" type="number" min={1} value={winnerLimit} onChange={(event) => setWinnerLimit(event.target.value)} /></SaveErrorField>
-<FieldError id="te-winner-limit-error">{fields.error('limit')}</FieldError></Field></div>
-                </SettingsFormRow>
-              ) : (
-                <p className={styles.cardNote}>抽選しないときは、受け取った人全員に配ります。</p>
-              )}
-            </Card>
+            <CouponGuide draft={couponDraft} onChange={patch => setCouponDraft(current => ({ ...current, ...patch }))} fields={fields} />
 
-            <div {...fields.bind("tapExtras")}><TapExtrasField error={fields.error("tapExtras")} name="クーポンのボタン" value={tapExtras} onChange={extra => { fields.clear("tapExtras"); setTapExtras(extra) }} accountId={host ? null : selectedAccountId} /></div>
-            {host ? null : (
-              <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
-                <div className={styles.cardHead}>
-                  <h2 className={styles.cardTitle}>使われたときに行うこと</h2>
-                </div>
-                <InlineActionRowsV8 actions={couponUseActions} onChange={setCouponUseActions} {...actionOptions} />
-              </Card>
-            )}
+            <Card variant="form" gap="normal">
+              <CardHeader size="stacked" titleId="coupon-use-actions" title="クーポンを使ったときに行うこと" />
+              <Field label="タグ・スコア"><div {...fields.bind("tapExtras")}><TapExtrasField actionLabel="タグ・スコア" addButtonVariant="secondary" error={fields.error("tapExtras")} name="クーポンのボタン" value={tapExtras} onChange={extra => { fields.clear("tapExtras"); setTapExtras(extra) }} accountId={host ? null : selectedAccountId} /></div></Field>
+              {host ? null : <Field label="そのほかの処理"><InlineActionRowsV8 actions={couponUseActions} onChange={setCouponUseActions} {...actionOptions} /></Field>}
+            </Card></fieldset>
           </>
         ) : (
           <>
-            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>受付</h2>
-              </div>
+            <Card variant="form" gap="normal">
+              <CardHeader size="stacked" title="受付" />
               <SettingsFormRow layout="columns">
                 <div className={styles.field}><Field label="受付の開始" htmlFor="te-research-start"><SaveErrorField names={["researchStartsAt","startsAt","research_starts_at"]}><DateTimeField className={styles.dateBox} id="te-research-start" value={researchStartsAt} onChange={setResearchStartsAt} aria-label="受付の開始" /></SaveErrorField></Field></div>
 
@@ -581,10 +590,8 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
               <div className={styles.field}><Field label="はじめのあいさつ" htmlFor="te-research-greeting"><SaveErrorField names={["description"]}><TextField id="te-research-greeting" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="例：いつもありがとうございます。3問だけ聞かせてください。" /></SaveErrorField></Field></div>
             </Card>
 
-            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>質問（上から順に出ます）</h2>
-              </div>
+            <Card variant="form" gap="normal">
+              <CardHeader size="stacked" title="質問（上から順に出ます）" />
               {questionOrder.shown.map((question, index) => (
                 <section key={question.key} className={styles.question} aria-label={`問 ${index + 1}`} {...questionOrder.rowProps(question.key)}>
                   <div className={styles.toggleRow}>
@@ -689,14 +696,12 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
 
             {host ? null : (
             <>
-            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
-              <div className={styles.cardHead}>
-                <h2 className={styles.cardTitle}>答え終わったときに行うこと</h2>
-              </div>
+            <Card variant="form" gap="normal">
+              <CardHeader size="stacked" title="答え終わったときに行うこと" />
               <InlineActionRowsV8 actions={answerActions} onChange={setAnswerActions} {...actionOptions} />
             </Card>
 
-            <Card layout="vertical" contentPadding="var(--tpl-section-pad)" gap="var(--polish-space-card)">
+            <Card variant="form" gap="normal">
               <div className={styles.cardHead}>
                 <h2 className={styles.cardTitle}>答えてもらう人</h2>
                 <p className={styles.cardNote}>タグで絞れます。選ばなければ全員が対象です。</p>
@@ -713,6 +718,7 @@ export default function TemplateAssetEditor({ kind, visual = false, host }: { ki
             )}
           </>
         )}
+        </fieldset>
       </TemplateEditFrame>
 
       <ActionMenu

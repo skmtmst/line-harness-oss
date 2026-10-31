@@ -754,6 +754,7 @@
 
 - **役目**：LINE のトークは LinePreview 1つ。LIFF の画面は LIFF のスマホ枠1つ
 - **持ち主（コード）**：`apps/web/src/components/shared/line-preview.tsx`・`apps/web/src/components/shared/line-preview.module.css`（部品 `LinePreview`・`LinePreviewMessage`・`LinePreviewCard`）
+- クーポンの中身と状態の見本は `shared/coupon-preview.tsx`。外枠は LinePreview、値は shared の couponPresentation、使用済み・期限切れでは写真とコードを描かない。
 - **持ち主（Pen）**：`cfVyj`「LINEの見え方/スマホ」
   - 注：LIFF のスマホ枠は未実装（B-158 の 10）
 - **見つけ方（コード）**：
