@@ -227,8 +227,43 @@ export type SetupSummary = {
   nextStep: number
 }
 
+/** 選んだ機能の案内は、ダッシュボードと設定画面で同じ業種の言葉を使う。 */
+const SETUP_WORDS: Record<AccountStyle, { bookingMenu: string; initialMenu: string; images: string }> = {
+  restaurant: {
+    bookingMenu: '予約メニュー',
+    initialMenu: 'メニュー・アクセスの内容と席の予約設定を確かめてから、LINEに出します',
+    images: 'お店の写真とロゴを入れる',
+  },
+  salon: {
+    bookingMenu: '施術メニュー',
+    initialMenu: 'メニュー・料金と予約設定を確かめてから、LINEに出します',
+    images: 'サロンの写真とロゴを入れる',
+  },
+  consult: {
+    bookingMenu: '面談メニュー',
+    initialMenu: 'ご相談内容・会社案内と面談の予約設定を確かめてから、LINEに出します',
+    images: '相談窓口の写真とロゴを入れる',
+  },
+  lesson: {
+    bookingMenu: '予約メニュー',
+    initialMenu: 'クラス・スケジュールと教室案内を確かめてから、LINEに出します',
+    images: '教室の写真とロゴを入れる',
+  },
+  ec: {
+    bookingMenu: 'メニュー',
+    initialMenu: '商品・お問い合わせ・ご利用ガイドの内容を確かめてから、LINEに出します',
+    images: 'ショップの写真とロゴを入れる',
+  },
+  standard: {
+    bookingMenu: 'メニュー',
+    initialMenu: 'お知らせ・お申し込み・お問い合わせの内容を確かめてから、LINEに出します',
+    images: '案内に使う写真とロゴを入れる',
+  },
+}
+
 /** 答え・警告・止めている自動の送信から、はじめにやることの行を組む。 */
 export function summarizeSetup(state: StyleState, warnings: StyleWarning[], items: StarterItemState[]): SetupSummary {
+  const words = SETUP_WORDS[state.style]
   const steps = stepNames(state.style)
   const questions = questionsFor(state.style)
   const answers = state.answers ?? {}
@@ -262,15 +297,17 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
       action: question.preparing ? { label: question.todo.action, preparing: question.preparing } : { label: question.todo.action, href: question.manualHref },
     })
   }
-  if (items.some(needsActivation)) {
-    rows.push({ key: 'activation', title: '入った予約メニュー・お知らせを動かす', note: '止めた状態で入っています', badge: { tone: 'neutral', label: '止めている' }, action: { label: '中身を見る', step: 'summary' } })
+  const inactive = items.filter(needsActivation)
+  if (inactive.length > 0) {
+    const targets = [inactive.some(item => item.kind === 'booking_menu') ? words.bookingMenu : null, inactive.some(item => item.kind === 'automation') ? 'お知らせ' : null].filter(Boolean)
+    rows.push({ key: 'activation', title: `入った${targets.join('・')}を動かす`, note: '止めた状態で入っています', badge: { tone: 'neutral', label: '止めている' }, action: { label: '中身を見る', step: 'summary' } })
   }
   const look = answers.image
   if(look?.mode==='configured' && look.value==='simple' && items.some(item=>item.kind==='rich_menu'&&item.status!=='published')) {
-    rows.push({key:'initial-menu',title:'最初のメニューの内容を確かめる',note:'ページと予約の設定を終えてから、内容を確認してLINEに出します',badge:{tone:'neutral',label:'下書き'},action:{label:'確かめる',href:'/getting-started/rich-menu'}})
+    rows.push({key:'initial-menu',title:'最初のメニューの内容を確かめる',note:words.initialMenu,badge:{tone:'neutral',label:'下書き'},action:{label:'確かめる',href:'/getting-started/rich-menu'}})
   }
   if (look?.mode === 'configured' && (look.value === 'keep' || look.value === 'change')) {
-    rows.push({ key: 'images', title: 'お店の写真とロゴを入れる', note: '見本の画像のままです', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '画像を変える', href: '/rich-menus' } })
+    rows.push({ key: 'images', title: words.images, note: '見本の画像のままです', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '画像を変える', href: '/rich-menus' } })
   } else if (look && look.mode !== 'configured') {
     rows.push({ key: 'image', title: 'リッチメニューなどの見た目を決める', note: '見本を使うか、画像を変えるかを選びます', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '決める', step: 'image' } })
   }

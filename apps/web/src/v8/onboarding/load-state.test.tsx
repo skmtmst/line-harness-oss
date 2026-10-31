@@ -31,9 +31,9 @@ it('別アカウントへ切替後の遅い返事で上書きしない', async (
   expect(result.current.steps.find((step) => step.key === 'featureSet')?.state).toBe('done')
 })
 
-it('管理権限がない時は初期質問APIを読まない', () => {
+it('役割が分からない時は初期質問APIを読まない', () => {
   net.get.mockClear()
-  const { result } = renderHook(() => useStyleSetup('a', 'viewer'))
+  const { result } = renderHook(() => useStyleSetup('a', null))
   expect(result.current.status).toBe('idle')
   expect(net.get).not.toHaveBeenCalled()
 })

@@ -1,5 +1,29 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const bookingSelfPaths = {
+  '/api/booking/admin/monthly-contracts': {
+    get: {
+      tags: ['Booking'], summary: '本人別の月謝契約と直近12か月の請求状態を読む',
+      parameters: [
+        { name: 'account_id', in: 'query', required: true, schema: { type: 'string' } },
+        { name: 'friend_id', in: 'query', required: true, schema: { type: 'string' } },
+        { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 50 } },
+        { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0 } },
+      ],
+      responses: { '200': { description: '契約一覧。カード・接続先・請求URLは含まない' }, '400': { description: '入力不正' }, '403': { description: '権限なし' }, '404': { description: '対象なし' }, '409': { description: 'monthly_tenant_required：会社設定未完了' } },
+    },
+  },
+  '/api/liff/booking/monthly-contracts': {
+    get: {
+      tags: ['Booking'], summary: 'LINE本人の月謝契約と直近12か月の請求状態を読む',
+      description: 'LINEの本人確認と同じ店の所属を検査。friend_id指定による代理参照は不可。private, no-store。',
+      security: [{ liffIdToken: [] }],
+      parameters: [
+        { name: 'limit', in: 'query', schema: { type: 'integer', minimum: 1, maximum: 50 } },
+        { name: 'offset', in: 'query', schema: { type: 'integer', minimum: 0 } },
+      ],
+      responses: { '200': { description: '本人の契約一覧' }, '400': { description: '入力不正' }, '401': { description: 'LINE本人確認なし' }, '404': { description: '対象なし' }, '409': { description: 'monthly_tenant_required：会社設定未完了' } },
+    },
+  },
   // ── LIFF Booking settings（日時を選ぶ段の最初の形） ─────────────────────
   '/api/liff/booking/settings': {
     get: {

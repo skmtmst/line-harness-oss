@@ -1708,6 +1708,121 @@ CREATE TABLE "booking_menu_resources" (
   PRIMARY KEY (menu_id, resource_id)
 );
 
+CREATE TABLE booking_monthly_active_slots (
+ tenant_id TEXT NOT NULL, account_id TEXT NOT NULL, friend_id TEXT NOT NULL,
+ class_kind TEXT NOT NULL, class_id TEXT NOT NULL, contract_id TEXT NOT NULL UNIQUE,
+ PRIMARY KEY(tenant_id,account_id,friend_id,class_kind,class_id),
+ FOREIGN KEY(contract_id,tenant_id,account_id,friend_id,class_kind,class_id)
+ REFERENCES booking_monthly_contracts(id,tenant_id,account_id,friend_id,class_kind,class_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE booking_monthly_attempts (
+ cycle_id TEXT NOT NULL, tenant_id TEXT NOT NULL, account_id TEXT NOT NULL,
+ attempt_no INTEGER NOT NULL CHECK(typeof(attempt_no)='integer' AND attempt_no BETWEEN 0 AND 3),
+ scheduled_at TEXT NOT NULL CHECK(julianday(scheduled_at) IS NOT NULL),
+ payment_method_id TEXT NOT NULL, payment_method_version INTEGER NOT NULL CHECK(payment_method_version>0),
+ request_key TEXT NOT NULL UNIQUE,
+ state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN('pending','running','processing','unknown','succeeded','failed','canceled')),
+ error_code TEXT, started_at TEXT, finished_at TEXT,
+ version INTEGER NOT NULL DEFAULT 1 CHECK(version>0),
+ PRIMARY KEY(cycle_id,attempt_no),
+ FOREIGN KEY(cycle_id,tenant_id,account_id) REFERENCES booking_monthly_cycles(id,tenant_id,account_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE booking_monthly_contracts (
+ id TEXT PRIMARY KEY,
+ tenant_id TEXT NOT NULL, account_id TEXT NOT NULL, friend_id TEXT NOT NULL,
+ class_kind TEXT NOT NULL CHECK(class_kind IN('menu','event')), class_id TEXT NOT NULL,
+ plan_id TEXT NOT NULL, plan_version INTEGER NOT NULL CHECK(plan_version>0), name TEXT NOT NULL,
+ amount INTEGER NOT NULL CHECK(typeof(amount)='integer' AND amount BETWEEN 50 AND 100000000),
+ currency TEXT NOT NULL DEFAULT 'jpy' CHECK(currency='jpy'),
+ monthly_limit INTEGER CHECK(monthly_limit IS NULL OR typeof(monthly_limit)='integer' AND monthly_limit>0),
+ timezone TEXT NOT NULL, consent_version TEXT NOT NULL, consented_at TEXT NOT NULL CHECK(julianday(consented_at) IS NOT NULL),
+ connected_account TEXT NOT NULL CHECK(connected_account GLOB 'acct_*'), connection_identity TEXT NOT NULL,
+ customer_id TEXT, payment_method_id TEXT, payment_method_version INTEGER NOT NULL DEFAULT 0 CHECK(payment_method_version>=0),
+ setup_session_id TEXT, setup_expires_at TEXT CHECK(setup_expires_at IS NULL OR julianday(setup_expires_at) IS NOT NULL),
+ state TEXT NOT NULL DEFAULT 'applying' CHECK(state IN('applying','expired','active','stop_scheduled','stopped')),
+ stop_reason TEXT CHECK(stop_reason IN('member_request','store_request','store_immediate','unpaid')),
+ stop_effective_at TEXT CHECK(stop_effective_at IS NULL OR julianday(stop_effective_at) IS NOT NULL),
+ service_state TEXT NOT NULL DEFAULT 'enabled' CHECK(service_state IN('enabled','review_hold')),
+ service_reason TEXT,
+ attention_episode_id TEXT, attention_started_at TEXT CHECK(attention_started_at IS NULL OR julianday(attention_started_at) IS NOT NULL),
+ request_key TEXT NOT NULL, request_json TEXT NOT NULL CHECK(json_valid(request_json)),
+ test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1), version INTEGER NOT NULL DEFAULT 1 CHECK(version>0),
+ created_at TEXT NOT NULL CHECK(julianday(created_at) IS NOT NULL), updated_at TEXT NOT NULL CHECK(julianday(updated_at) IS NOT NULL),
+ UNIQUE(id,tenant_id,account_id), UNIQUE(id,tenant_id,account_id,friend_id,class_kind,class_id),
+ UNIQUE(id,tenant_id,account_id,connected_account), UNIQUE(account_id,friend_id,request_key),
+ FOREIGN KEY(account_id,tenant_id) REFERENCES line_accounts(id,tenant_id) ON DELETE RESTRICT,
+ FOREIGN KEY(friend_id,account_id) REFERENCES friends(id,line_account_id) ON DELETE RESTRICT,
+ FOREIGN KEY(plan_id,account_id) REFERENCES booking_pass_plans(id,line_account_id) ON DELETE RESTRICT,
+ CHECK((attention_episode_id IS NULL)=(attention_started_at IS NULL)),
+ CHECK(service_state!='review_hold' OR service_reason IS NOT NULL AND length(trim(service_reason))>0),
+ CHECK(state NOT IN('stop_scheduled','stopped') OR stop_reason IS NOT NULL AND stop_effective_at IS NOT NULL)
+);
+
+CREATE TABLE booking_monthly_cycles (
+ id TEXT PRIMARY KEY, contract_id TEXT NOT NULL, tenant_id TEXT NOT NULL, account_id TEXT NOT NULL,
+ connected_account TEXT NOT NULL,
+ month_key TEXT NOT NULL CHECK(month_key GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]' AND substr(month_key,6,2) BETWEEN '01' AND '12'),
+ kind TEXT NOT NULL CHECK(kind IN('initial','renewal')),
+ due_at TEXT NOT NULL CHECK(julianday(due_at) IS NOT NULL),
+ period_start TEXT NOT NULL CHECK(julianday(period_start) IS NOT NULL),
+ service_start TEXT NOT NULL CHECK(julianday(service_start) IS NOT NULL),
+ service_end TEXT NOT NULL CHECK(julianday(service_end) IS NOT NULL AND julianday(service_end)>julianday(service_start)),
+ amount INTEGER NOT NULL CHECK(typeof(amount)='integer' AND amount BETWEEN 50 AND 100000000),
+ currency TEXT NOT NULL DEFAULT 'jpy' CHECK(currency='jpy'),
+ invoice_id TEXT, invoice_status TEXT CHECK(invoice_status IN('draft','open','paid','void','uncollectible')),
+ auto_advance INTEGER CHECK(auto_advance=0),
+ state TEXT NOT NULL DEFAULT 'planned' CHECK(state IN('planned','preparing','open','retry_wait','requires_action','processing','unknown','paid','exhausted','blocked','void')),
+ first_failed_at TEXT CHECK(first_failed_at IS NULL OR julianday(first_failed_at) IS NOT NULL),
+ paid_at TEXT CHECK(paid_at IS NULL OR julianday(paid_at) IS NOT NULL),
+ version INTEGER NOT NULL DEFAULT 1 CHECK(version>0), test_mode INTEGER NOT NULL DEFAULT 1 CHECK(test_mode=1),
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ UNIQUE(contract_id,month_key), UNIQUE(connected_account,invoice_id),
+ UNIQUE(id,contract_id,tenant_id,account_id), UNIQUE(id,tenant_id,account_id),
+ FOREIGN KEY(contract_id,tenant_id,account_id,connected_account)
+ REFERENCES booking_monthly_contracts(id,tenant_id,account_id,connected_account) ON DELETE RESTRICT,
+ CHECK(invoice_id IS NULL OR auto_advance IS 0),
+ CHECK(julianday(period_start)<=julianday(service_start)),
+ CHECK(state!='paid' OR invoice_status IS 'paid' AND invoice_id IS NOT NULL AND paid_at IS NOT NULL),
+ CHECK(state!='void' OR invoice_status IS 'void' AND invoice_id IS NOT NULL)
+);
+
+CREATE TABLE booking_monthly_event_applications (
+ source TEXT NOT NULL, connected_account TEXT NOT NULL, provider_event_id TEXT NOT NULL,
+ receipt_id TEXT NOT NULL UNIQUE, payload_digest TEXT NOT NULL CHECK(length(payload_digest)=64),
+ contract_id TEXT NOT NULL, cycle_id TEXT, tenant_id TEXT NOT NULL, account_id TEXT NOT NULL,
+ outcome TEXT NOT NULL CHECK(outcome IN('setup_ready','paid','failed','processing','void','ignored')),
+ applied_at TEXT NOT NULL,
+ PRIMARY KEY(source,connected_account,provider_event_id),
+ FOREIGN KEY(contract_id,tenant_id,account_id,connected_account)
+ REFERENCES booking_monthly_contracts(id,tenant_id,account_id,connected_account) ON DELETE RESTRICT,
+ FOREIGN KEY(cycle_id,contract_id,tenant_id,account_id)
+ REFERENCES booking_monthly_cycles(id,contract_id,tenant_id,account_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE booking_monthly_operations (
+ id TEXT PRIMARY KEY, contract_id TEXT NOT NULL, tenant_id TEXT NOT NULL, account_id TEXT NOT NULL,
+ request_key TEXT NOT NULL, kind TEXT NOT NULL CHECK(kind IN('stop_next_month','stop_now','waive','payment_method','expire','restore')),
+ actor_type TEXT NOT NULL CHECK(actor_type IN('friend','staff','system')), actor_id TEXT NOT NULL,
+ expected_version INTEGER NOT NULL CHECK(expected_version>0), reason TEXT NOT NULL,
+ request_json TEXT NOT NULL CHECK(json_valid(request_json)), response_json TEXT CHECK(response_json IS NULL OR json_valid(response_json)),
+ state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN('pending','unknown','succeeded','failed')),
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+ UNIQUE(account_id,request_key),
+ FOREIGN KEY(contract_id,tenant_id,account_id) REFERENCES booking_monthly_contracts(id,tenant_id,account_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE booking_monthly_rights (
+ contract_id TEXT NOT NULL, cycle_id TEXT NOT NULL, tenant_id TEXT NOT NULL, account_id TEXT NOT NULL,
+ month_key TEXT NOT NULL, entitlement_id TEXT NOT NULL UNIQUE REFERENCES booking_entitlements(id) ON DELETE RESTRICT,
+ state TEXT NOT NULL CHECK(state IN('paid','provisional','revoked','review_hold')),
+ version INTEGER NOT NULL DEFAULT 1 CHECK(version>0), updated_at TEXT NOT NULL,
+ PRIMARY KEY(contract_id,month_key), UNIQUE(cycle_id),
+ FOREIGN KEY(cycle_id,contract_id,tenant_id,account_id)
+ REFERENCES booking_monthly_cycles(id,contract_id,tenant_id,account_id) ON DELETE RESTRICT
+);
+
 CREATE TABLE booking_noshow_flag_events (
   id TEXT PRIMARY KEY,
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id) ON DELETE CASCADE,
@@ -9432,6 +9547,13 @@ CREATE INDEX ai_answer_logs_account ON ai_answer_logs(account_id,created_at,id);
 
 CREATE INDEX booking_entitlement_notices_due ON booking_entitlement_notices(status,scheduled_at);
 
+CREATE UNIQUE INDEX booking_monthly_attempt_unresolved ON booking_monthly_attempts(cycle_id)
+ WHERE state IN('pending','running','processing','unknown');
+
+CREATE INDEX booking_monthly_cycles_due ON booking_monthly_cycles(state,due_at,id);
+
+CREATE UNIQUE INDEX booking_monthly_initial_cycle ON booking_monthly_cycles(contract_id) WHERE kind='initial';
+
 CREATE INDEX booking_pass_billing_cycle ON booking_pass_billing_events(subscription_id,period_start,occurred_at);
 
 CREATE UNIQUE INDEX booking_pass_subscription ON booking_entitlements(line_account_id,stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;
@@ -11671,6 +11793,12 @@ CREATE INDEX member_rank_history_friend ON member_rank_history(account_id,friend
 
 CREATE INDEX member_rank_notices_due ON member_rank_notices(status,scheduled_at);
 
+CREATE UNIQUE INDEX monthly_account_scope ON line_accounts(id,tenant_id);
+
+CREATE UNIQUE INDEX monthly_friend_scope ON friends(id,line_account_id);
+
+CREATE UNIQUE INDEX monthly_plan_scope ON booking_pass_plans(id,line_account_id);
+
 CREATE INDEX rt_closures_store_dates ON rt_closures(store_id,start_date,end_date) WHERE archived_at IS NULL;
 
 CREATE INDEX rt_confirmation_reservation ON rt_reservation_confirmations(reservation_id,reservation_version);
@@ -11924,18 +12052,68 @@ CREATE TRIGGER booking_menu_photo_usage_insert AFTER INSERT ON menus BEGIN DELET
 
 CREATE TRIGGER booking_menu_photo_usage_update AFTER UPDATE ON menus BEGIN DELETE FROM media_usages WHERE ref_kind = 'booking_menu' AND ref_id = NEW.id; INSERT INTO media_usages(media_id,ref_kind,ref_id) SELECT NEW.photo_media_id, 'booking_menu', NEW.id WHERE NEW.photo_media_id IS NOT NULL AND NEW.deleted_at IS NULL; END;
 
+CREATE TRIGGER booking_monthly_attempt_delete BEFORE DELETE ON booking_monthly_attempts BEGIN SELECT RAISE(ABORT,'monthly_attempt_immutable'); END;
+
+CREATE TRIGGER booking_monthly_attempt_identity BEFORE UPDATE ON booking_monthly_attempts WHEN NEW.cycle_id IS NOT OLD.cycle_id OR NEW.tenant_id IS NOT OLD.tenant_id OR NEW.account_id IS NOT OLD.account_id  OR NEW.attempt_no IS NOT OLD.attempt_no OR NEW.scheduled_at IS NOT OLD.scheduled_at OR NEW.request_key IS NOT OLD.request_key  OR NEW.payment_method_id IS NOT OLD.payment_method_id OR NEW.payment_method_version IS NOT OLD.payment_method_version  OR NEW.version!=OLD.version+1 OR OLD.state IN('succeeded','failed','canceled') AND NEW.state!=OLD.state BEGIN SELECT RAISE(ABORT,'monthly_attempt_conflict'); END;
+
+CREATE TRIGGER booking_monthly_attempt_validate BEFORE INSERT ON booking_monthly_attempts BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM booking_monthly_cycles y JOIN booking_monthly_contracts c ON c.id=y.contract_id  WHERE y.id=NEW.cycle_id AND y.tenant_id=NEW.tenant_id AND y.account_id=NEW.account_id  AND y.invoice_id IS NOT NULL AND y.invoice_status='open' AND y.state IN('open','retry_wait','requires_action')  AND c.state IN('applying','active','stop_scheduled') AND c.service_state='enabled'  AND c.payment_method_id=NEW.payment_method_id AND c.payment_method_version=NEW.payment_method_version  AND (c.stop_effective_at IS NULL OR julianday(c.stop_effective_at)>julianday('now'))  AND ((NEW.attempt_no=0 AND NOT EXISTS(SELECT 1 FROM booking_monthly_attempts a WHERE a.cycle_id=y.id))   OR (NEW.attempt_no>0 AND EXISTS(SELECT 1 FROM booking_monthly_attempts a WHERE a.cycle_id=y.id AND a.attempt_no=NEW.attempt_no-1 AND a.state='failed')    AND y.first_failed_at IS NOT NULL AND julianday(NEW.scheduled_at)=julianday(y.first_failed_at)+CASE NEW.attempt_no WHEN 1 THEN 3 WHEN 2 THEN 5 ELSE 7 END)))  THEN RAISE(ABORT,'monthly_attempt_unavailable') END; END;
+
+CREATE TRIGGER booking_monthly_contract_delete BEFORE DELETE ON booking_monthly_contracts BEGIN SELECT RAISE(ABORT,'monthly_contract_immutable'); END;
+
+CREATE TRIGGER booking_monthly_contract_identity BEFORE UPDATE ON booking_monthly_contracts WHEN NEW.id IS NOT OLD.id OR NEW.tenant_id IS NOT OLD.tenant_id OR NEW.account_id IS NOT OLD.account_id  OR NEW.friend_id IS NOT OLD.friend_id OR NEW.class_kind IS NOT OLD.class_kind OR NEW.class_id IS NOT OLD.class_id  OR NEW.plan_id IS NOT OLD.plan_id OR NEW.plan_version IS NOT OLD.plan_version OR NEW.amount IS NOT OLD.amount  OR NEW.monthly_limit IS NOT OLD.monthly_limit OR NEW.timezone IS NOT OLD.timezone OR NEW.connected_account IS NOT OLD.connected_account  OR NEW.connection_identity IS NOT OLD.connection_identity OR NEW.consent_version IS NOT OLD.consent_version  OR NEW.consented_at IS NOT OLD.consented_at OR NEW.request_key IS NOT OLD.request_key OR NEW.request_json IS NOT OLD.request_json  OR (OLD.customer_id IS NOT NULL AND NEW.customer_id IS NOT OLD.customer_id)  OR NEW.version!=OLD.version+1  OR (OLD.state='expired' AND NEW.state!=OLD.state)  OR (OLD.state='stopped' AND NEW.state!=OLD.state AND NOT(NEW.state='active' AND OLD.stop_reason='unpaid'    AND NEW.stop_reason IS NULL AND NEW.stop_effective_at IS NULL AND EXISTS(SELECT 1 FROM booking_monthly_cycles y      WHERE y.contract_id=NEW.id AND y.state='paid' AND julianday(y.service_start)<=julianday('now') AND julianday(y.service_end)>julianday('now'))))  OR (OLD.state IN('active','stop_scheduled') AND NEW.state IN('applying','expired'))  OR (OLD.stop_reason IN('member_request','store_request','store_immediate') AND    (NEW.stop_reason IS NOT OLD.stop_reason AND NOT(NEW.stop_reason IS 'store_immediate' AND julianday(NEW.stop_effective_at)<=julianday(OLD.stop_effective_at))     OR NEW.stop_effective_at IS NULL OR julianday(NEW.stop_effective_at)>julianday(OLD.stop_effective_at)))  OR (NEW.state IN('active','stop_scheduled') AND NOT EXISTS(SELECT 1 FROM booking_monthly_active_slots s WHERE s.contract_id=NEW.id))  OR (OLD.state='applying' AND NEW.state IN('active','stop_scheduled') AND NOT EXISTS(SELECT 1 FROM booking_monthly_cycles y WHERE y.contract_id=NEW.id AND y.kind='initial' AND y.state='paid'))  OR (NEW.payment_method_id IS NOT OLD.payment_method_id AND NEW.payment_method_version!=OLD.payment_method_version+1)  OR (OLD.attention_started_at IS NOT NULL AND NEW.attention_started_at IS NOT NULL AND julianday(NEW.attention_started_at)>julianday(OLD.attention_started_at)) BEGIN SELECT RAISE(ABORT,'monthly_contract_conflict'); END;
+
+CREATE TRIGGER booking_monthly_contract_slot AFTER INSERT ON booking_monthly_contracts BEGIN INSERT INTO booking_monthly_active_slots VALUES(NEW.tenant_id,NEW.account_id,NEW.friend_id,NEW.class_kind,NEW.class_id,NEW.id); END;
+
+CREATE TRIGGER booking_monthly_contract_validate BEFORE INSERT ON booking_monthly_contracts BEGIN  SELECT CASE WHEN NEW.state!='applying' OR NEW.version!=1 OR NOT EXISTS(   SELECT 1 FROM line_accounts a JOIN tenants t ON t.id=a.tenant_id   JOIN friends f ON f.id=NEW.friend_id AND f.line_account_id=a.id   JOIN booking_pass_plans p ON p.id=NEW.plan_id AND p.line_account_id=a.id   WHERE a.id=NEW.account_id AND a.tenant_id=NEW.tenant_id AND a.is_active=1 AND a.archived_at IS NULL AND t.status='active'   AND p.kind='monthly' AND p.status='on_sale' AND p.version=NEW.plan_version AND p.price=NEW.amount   AND p.monthly_limit IS NEW.monthly_limit   AND ((NEW.class_kind='menu' AND EXISTS(SELECT 1 FROM menus m WHERE m.id=NEW.class_id AND m.line_account_id=a.id AND m.deleted_at IS NULL)     AND (json_array_length(p.target_scope_json)=0 OR EXISTS(SELECT 1 FROM json_each(p.target_scope_json) WHERE value=NEW.class_id)))    OR (NEW.class_kind='event' AND EXISTS(SELECT 1 FROM events ev WHERE ev.id=NEW.class_id AND ev.line_account_id=a.id AND ev.deleted_at IS NULL)     AND p.event_target_scope_json IS NOT NULL AND (json_array_length(p.event_target_scope_json)=0 OR EXISTS(SELECT 1 FROM json_each(p.event_target_scope_json) WHERE value=NEW.class_id)))))  THEN RAISE(ABORT,'monthly_contract_unavailable') END; END;
+
+CREATE TRIGGER booking_monthly_cycle_delete BEFORE DELETE ON booking_monthly_cycles BEGIN SELECT RAISE(ABORT,'monthly_cycle_immutable'); END;
+
+CREATE TRIGGER booking_monthly_cycle_identity BEFORE UPDATE ON booking_monthly_cycles WHEN NEW.id IS NOT OLD.id OR NEW.contract_id IS NOT OLD.contract_id OR NEW.account_id IS NOT OLD.account_id OR NEW.tenant_id IS NOT OLD.tenant_id  OR NEW.connected_account IS NOT OLD.connected_account OR NEW.month_key IS NOT OLD.month_key OR NEW.kind IS NOT OLD.kind  OR NEW.amount IS NOT OLD.amount OR NEW.currency IS NOT OLD.currency OR NEW.due_at IS NOT OLD.due_at OR NEW.period_start IS NOT OLD.period_start OR NEW.service_start IS NOT OLD.service_start OR NEW.service_end IS NOT OLD.service_end  OR (OLD.invoice_id IS NOT NULL AND NEW.invoice_id IS NOT OLD.invoice_id) OR NEW.version!=OLD.version+1  OR (OLD.state='paid' AND NEW.state!='paid')  OR (OLD.first_failed_at IS NOT NULL AND NEW.first_failed_at IS NOT OLD.first_failed_at) BEGIN SELECT RAISE(ABORT,'monthly_cycle_conflict'); END;
+
+CREATE TRIGGER booking_monthly_cycle_validate BEFORE INSERT ON booking_monthly_cycles BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM booking_monthly_contracts c WHERE c.id=NEW.contract_id  AND c.account_id=NEW.account_id AND c.tenant_id=NEW.tenant_id AND c.connected_account=NEW.connected_account  AND c.amount=NEW.amount AND c.currency=NEW.currency AND c.state IN('applying','active','stop_scheduled')  AND (c.stop_effective_at IS NULL OR julianday(NEW.service_start)<julianday(c.stop_effective_at)))  THEN RAISE(ABORT,'monthly_cycle_unavailable') END; END;
+
+CREATE TRIGGER booking_monthly_event_bounds BEFORE UPDATE OF event_booking_id,line_account_id,event_id,slot_id,starts_at,period_start,period_end ON event_booking_entitlement_uses WHEN NEW.event_booking_id IS NOT NULL AND EXISTS(SELECT 1 FROM booking_monthly_rights WHERE entitlement_id=NEW.entitlement_id) BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id  JOIN booking_monthly_bound_rights v ON v.entitlement_id=NEW.entitlement_id  WHERE b.id=NEW.event_booking_id AND b.line_account_id=NEW.line_account_id AND v.account_id=b.line_account_id AND v.friend_id=b.friend_id  AND v.class_kind='event' AND v.class_id=b.event_id AND NEW.event_id=b.event_id AND NEW.slot_id=s.id  AND julianday(NEW.starts_at)=julianday(s.starts_at) AND julianday(NEW.starts_at)>=julianday(v.service_start) AND julianday(NEW.starts_at)<julianday(v.service_end)  AND julianday(NEW.period_start)=julianday(v.period_start) AND julianday(NEW.period_end)=julianday(v.service_end))  THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
+CREATE TRIGGER booking_monthly_event_consume BEFORE UPDATE OF consumed_at ON event_booking_entitlement_uses WHEN EXISTS(SELECT 1 FROM booking_monthly_rights WHERE entitlement_id=NEW.entitlement_id) AND OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id WHERE b.id=NEW.event_booking_id AND EXISTS(  SELECT 1 FROM booking_monthly_available_rights v WHERE v.entitlement_id=NEW.entitlement_id  AND v.account_id=b.line_account_id AND v.friend_id=b.friend_id AND v.class_kind='event' AND v.class_id=b.event_id  AND julianday(s.starts_at)>=julianday(v.service_start) AND julianday(s.starts_at)<julianday(v.service_end)  AND julianday(NEW.period_start)=julianday(v.period_start) AND julianday(NEW.period_end)=julianday(v.service_end)  AND (v.stop_effective_at IS NULL OR julianday(s.starts_at)<julianday(v.stop_effective_at))))  THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
+CREATE TRIGGER booking_monthly_event_delete BEFORE DELETE ON booking_monthly_event_applications BEGIN SELECT RAISE(ABORT,'monthly_event_immutable'); END;
+
+CREATE TRIGGER booking_monthly_event_identity BEFORE UPDATE ON booking_monthly_event_applications BEGIN SELECT RAISE(ABORT,'monthly_event_immutable'); END;
+
+CREATE TRIGGER booking_monthly_event_select BEFORE INSERT ON event_booking_entitlement_uses WHEN EXISTS(SELECT 1 FROM booking_monthly_rights WHERE entitlement_id=NEW.entitlement_id) BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id WHERE b.id=NEW.event_booking_id AND EXISTS(  SELECT 1 FROM booking_monthly_available_rights v WHERE v.entitlement_id=NEW.entitlement_id  AND v.account_id=b.line_account_id AND v.friend_id=b.friend_id AND v.class_kind='event' AND v.class_id=b.event_id  AND julianday(s.starts_at)>=julianday(v.service_start) AND julianday(s.starts_at)<julianday(v.service_end)  AND julianday(NEW.period_start)=julianday(v.period_start) AND julianday(NEW.period_end)=julianday(v.service_end)  AND (v.stop_effective_at IS NULL OR julianday(s.starts_at)<julianday(v.stop_effective_at))))  THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
+CREATE TRIGGER booking_monthly_event_transfer BEFORE UPDATE OF event_booking_id,slot_id,starts_at,period_start,period_end ON event_booking_entitlement_uses WHEN NEW.event_booking_id IS NOT OLD.event_booking_id AND NEW.event_booking_id IS NOT NULL  AND EXISTS(SELECT 1 FROM booking_monthly_rights WHERE entitlement_id=NEW.entitlement_id) BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id WHERE b.id=NEW.event_booking_id AND EXISTS(  SELECT 1 FROM booking_monthly_available_rights v WHERE v.entitlement_id=NEW.entitlement_id  AND v.account_id=b.line_account_id AND v.friend_id=b.friend_id AND v.class_kind='event' AND v.class_id=b.event_id  AND julianday(s.starts_at)>=julianday(v.service_start) AND julianday(s.starts_at)<julianday(v.service_end)  AND julianday(NEW.period_start)=julianday(v.period_start) AND julianday(NEW.period_end)=julianday(v.service_end)  AND (v.stop_effective_at IS NULL OR julianday(s.starts_at)<julianday(v.stop_effective_at))))  THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
+CREATE TRIGGER booking_monthly_event_use_identity BEFORE UPDATE OF entitlement_id ON event_booking_entitlement_uses WHEN NEW.entitlement_id IS NOT OLD.entitlement_id AND EXISTS(SELECT 1 FROM booking_monthly_rights WHERE entitlement_id IN(OLD.entitlement_id,NEW.entitlement_id)) BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
+
+CREATE TRIGGER booking_monthly_right_delete BEFORE DELETE ON booking_monthly_rights BEGIN SELECT RAISE(ABORT,'monthly_right_immutable'); END;
+
+CREATE TRIGGER booking_monthly_right_identity BEFORE UPDATE ON booking_monthly_rights WHEN NEW.contract_id IS NOT OLD.contract_id OR NEW.cycle_id IS NOT OLD.cycle_id OR NEW.tenant_id IS NOT OLD.tenant_id  OR NEW.account_id IS NOT OLD.account_id OR NEW.month_key IS NOT OLD.month_key OR NEW.entitlement_id IS NOT OLD.entitlement_id  OR NEW.version!=OLD.version+1  OR (NEW.state='paid' AND NOT EXISTS(SELECT 1 FROM booking_monthly_cycles WHERE id=NEW.cycle_id AND state='paid')) BEGIN SELECT RAISE(ABORT,'monthly_right_conflict'); END;
+
+CREATE TRIGGER booking_monthly_right_validate BEFORE INSERT ON booking_monthly_rights BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM booking_monthly_cycles y JOIN booking_monthly_contracts c ON c.id=y.contract_id  JOIN booking_entitlements e ON e.id=NEW.entitlement_id AND e.line_account_id=c.account_id AND e.friend_id=c.friend_id  WHERE y.id=NEW.cycle_id AND y.contract_id=NEW.contract_id AND y.tenant_id=NEW.tenant_id AND y.account_id=NEW.account_id  AND y.month_key=NEW.month_key AND e.kind='monthly' AND e.source='online' AND e.plan_id=c.plan_id  AND e.monthly_limit IS c.monthly_limit AND e.stripe_subscription_id IS NULL  AND julianday(e.valid_from)=julianday(y.service_start) AND julianday(e.expires_at)=julianday(y.service_end)  AND ((c.class_kind='menu' AND e.menu_id=c.class_id) OR (c.class_kind='event' AND e.menu_id IS NULL))  AND ((NEW.state='paid' AND y.state='paid') OR (NEW.state='provisional' AND y.kind='renewal'  AND EXISTS(SELECT 1 FROM booking_monthly_cycles past WHERE past.contract_id=c.id AND past.state='paid' AND past.month_key<y.month_key))))  THEN RAISE(ABORT,'monthly_right_unavailable') END; END;
+
+CREATE TRIGGER booking_monthly_slot_delete BEFORE DELETE ON booking_monthly_active_slots WHEN EXISTS(SELECT 1 FROM booking_monthly_contracts c WHERE c.id=OLD.contract_id AND  (c.state NOT IN('expired','stopped') OR julianday(c.stop_effective_at)>julianday('now')  OR EXISTS(SELECT 1 FROM booking_monthly_cycles y WHERE y.contract_id=c.id AND   (y.state IN('preparing','open','retry_wait','requires_action','processing','unknown','exhausted','blocked') OR y.invoice_status IN('draft','open')))  OR EXISTS(SELECT 1 FROM booking_monthly_rights r JOIN booking_monthly_cycles y ON y.id=r.cycle_id   WHERE r.contract_id=c.id AND r.state IN('paid','provisional') AND julianday(y.service_end)>julianday('now'))  OR EXISTS(SELECT 1 FROM workflow_steps w WHERE w.scope_id='line:'||c.account_id AND w.process_kind='booking_monthly'   AND w.status IN('pending','running','unknown') AND (w.subject_id=c.id OR w.subject_id IN(    SELECT id FROM booking_monthly_cycles WHERE contract_id=c.id UNION ALL SELECT id FROM booking_monthly_operations WHERE contract_id=c.id))))) BEGIN SELECT RAISE(ABORT,'monthly_slot_unresolved'); END;
+
+CREATE TRIGGER booking_monthly_slot_identity BEFORE UPDATE ON booking_monthly_active_slots BEGIN SELECT RAISE(ABORT,'monthly_slot_immutable'); END;
+
+CREATE TRIGGER booking_monthly_slot_reschedule BEFORE UPDATE OF starts_at,event_id ON event_slots WHEN EXISTS(SELECT 1 FROM event_booking_entitlement_uses u JOIN booking_monthly_rights r ON r.entitlement_id=u.entitlement_id WHERE u.slot_id=NEW.id AND u.returned_at IS NULL) BEGIN SELECT CASE WHEN EXISTS(SELECT 1 FROM event_booking_entitlement_uses u  WHERE u.slot_id=NEW.id AND u.returned_at IS NULL AND EXISTS(SELECT 1 FROM booking_monthly_rights WHERE entitlement_id=u.entitlement_id)  AND NOT EXISTS(SELECT 1 FROM booking_monthly_bound_rights v WHERE v.entitlement_id=u.entitlement_id  AND v.class_kind='event' AND v.class_id=NEW.event_id AND julianday(NEW.starts_at)>=julianday(v.service_start)  AND julianday(NEW.starts_at)<julianday(v.service_end)))  THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
+CREATE TRIGGER booking_monthly_use_consume BEFORE UPDATE OF consumed_at ON booking_entitlement_uses WHEN EXISTS(SELECT 1 FROM booking_monthly_rights WHERE entitlement_id=NEW.entitlement_id) AND OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM bookings b WHERE b.id=NEW.booking_id AND EXISTS(  SELECT 1 FROM booking_monthly_available_rights v WHERE v.entitlement_id=NEW.entitlement_id  AND v.account_id=b.line_account_id AND v.friend_id=b.friend_id AND v.class_kind='menu' AND v.class_id=b.menu_id  AND julianday(b.starts_at)>=julianday(v.service_start) AND julianday(b.starts_at)<julianday(v.service_end)  AND julianday(NEW.period_start)=julianday(v.period_start) AND julianday(NEW.period_end)=julianday(v.service_end)  AND (v.stop_effective_at IS NULL OR julianday(b.starts_at)<julianday(v.stop_effective_at))))  THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
+CREATE TRIGGER booking_monthly_use_identity BEFORE UPDATE OF entitlement_id ON booking_entitlement_uses WHEN NEW.entitlement_id IS NOT OLD.entitlement_id AND EXISTS(SELECT 1 FROM booking_monthly_rights WHERE entitlement_id IN(OLD.entitlement_id,NEW.entitlement_id)) BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
+
+CREATE TRIGGER booking_monthly_use_reschedule BEFORE UPDATE OF starts_at,menu_id,friend_id,line_account_id ON bookings WHEN EXISTS(SELECT 1 FROM booking_entitlement_uses u JOIN booking_monthly_rights r ON r.entitlement_id=u.entitlement_id WHERE u.booking_id=NEW.id AND u.returned_at IS NULL) BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM booking_entitlement_uses u JOIN booking_monthly_bound_rights v ON v.entitlement_id=u.entitlement_id  WHERE u.booking_id=NEW.id AND v.account_id=NEW.line_account_id AND v.friend_id=NEW.friend_id AND v.class_kind='menu' AND v.class_id=NEW.menu_id  AND julianday(NEW.starts_at)>=julianday(v.service_start) AND julianday(NEW.starts_at)<julianday(v.service_end))  THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
+CREATE TRIGGER booking_monthly_use_select BEFORE INSERT ON booking_entitlement_uses WHEN EXISTS(SELECT 1 FROM booking_monthly_rights WHERE entitlement_id=NEW.entitlement_id) BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM bookings b WHERE b.id=NEW.booking_id AND EXISTS(  SELECT 1 FROM booking_monthly_available_rights v WHERE v.entitlement_id=NEW.entitlement_id  AND v.account_id=b.line_account_id AND v.friend_id=b.friend_id AND v.class_kind='menu' AND v.class_id=b.menu_id  AND julianday(b.starts_at)>=julianday(v.service_start) AND julianday(b.starts_at)<julianday(v.service_end)  AND julianday(NEW.period_start)=julianday(v.period_start) AND julianday(NEW.period_end)=julianday(v.service_end)  AND (v.stop_effective_at IS NULL OR julianday(b.starts_at)<julianday(v.stop_effective_at))))  THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+
 CREATE TRIGGER booking_nomination_reassign AFTER UPDATE OF staff_id ON bookings
 WHEN OLD.staff_id IS NOT NEW.staff_id AND OLD.nominated=1
 BEGIN UPDATE bookings SET nominated=0,nomination_fee_at_booking=0,
  price_at_booking=MAX(0,NEW.price_at_booking-OLD.nomination_fee_at_booking) WHERE id=NEW.id; END;
 
-CREATE TRIGGER booking_pass_grace_consumption BEFORE UPDATE OF consumed_at ON booking_entitlement_uses
-WHEN OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL AND EXISTS(SELECT 1 FROM booking_entitlements e WHERE e.id=NEW.entitlement_id AND e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now'))
-BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
+CREATE TRIGGER booking_pass_grace_consumption BEFORE UPDATE OF consumed_at ON booking_entitlement_uses WHEN OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL AND EXISTS(SELECT 1 FROM booking_entitlements e WHERE e.id=NEW.entitlement_id AND NOT EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=e.id) AND e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now')) BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
 
-CREATE TRIGGER booking_pass_grace_selection BEFORE INSERT ON booking_entitlement_uses
-WHEN EXISTS(SELECT 1 FROM booking_entitlements e WHERE e.id=NEW.entitlement_id AND e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now'))
-BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
+CREATE TRIGGER booking_pass_grace_selection BEFORE INSERT ON booking_entitlement_uses WHEN EXISTS(SELECT 1 FROM booking_entitlements e WHERE e.id=NEW.entitlement_id AND NOT EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=e.id) AND e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now')) BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
 
 CREATE TRIGGER booking_pass_remaining_notice AFTER INSERT ON booking_entitlement_events
 WHEN NEW.action='consume'
@@ -12070,15 +12248,7 @@ CREATE TRIGGER event_entitlement_confirm AFTER UPDATE OF status ON event_booking
 
 CREATE TRIGGER event_entitlement_consume AFTER UPDATE OF consumed_at ON event_booking_entitlement_uses WHEN OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL BEGIN UPDATE booking_entitlements SET remaining=CASE WHEN kind='ticket' THEN remaining-1 ELSE NULL END,version=version+1,updated_at=NEW.consumed_at WHERE id=NEW.entitlement_id; INSERT INTO booking_entitlement_events(id,entitlement_id,line_account_id,action,reason,actor_type,actor_id,request_key,request_json,after_json,created_at) SELECT lower(hex(randomblob(16))),e.id,e.line_account_id,'consume','クラスの確定による1回利用','system',NEW.event_booking_id_history,'event-consume:'||NEW.event_booking_id_history,json_object('eventBookingId',NEW.event_booking_id_history),json_object('remaining',e.remaining,'version',e.version),NEW.consumed_at FROM booking_entitlements e WHERE e.id=NEW.entitlement_id; END;
 
-CREATE TRIGGER event_entitlement_consume_guard BEFORE UPDATE OF consumed_at ON event_booking_entitlement_uses WHEN OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id JOIN events ev ON ev.id=b.event_id AND ev.line_account_id=b.line_account_id
- JOIN booking_entitlements e ON e.id=NEW.entitlement_id JOIN booking_pass_plans p ON p.id=e.plan_id
- WHERE b.id=NEW.event_booking_id AND b.line_account_id=NEW.line_account_id AND e.line_account_id=b.line_account_id AND p.line_account_id=b.line_account_id
- AND e.friend_id=b.friend_id AND e.menu_id IS NULL AND e.status='active' AND e.billing_status<>'stopped'
- AND NOT(e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now'))
- AND b.party_size=1 AND b.event_id=NEW.event_id AND b.slot_id=NEW.slot_id AND julianday(s.starts_at)=julianday(NEW.starts_at)
- AND julianday(s.starts_at)>=julianday(e.valid_from) AND julianday(s.starts_at)<julianday(e.expires_at)
- AND julianday(s.starts_at)>=julianday(NEW.period_start) AND julianday(s.starts_at)<julianday(NEW.period_end)
- AND p.event_target_scope_json IS NOT NULL AND (json_array_length(p.event_target_scope_json)=0 OR EXISTS(SELECT 1 FROM json_each(p.event_target_scope_json) WHERE value=b.event_id)) AND b.status='confirmed' AND (e.kind='ticket' AND e.remaining>0 OR e.kind='monthly' AND (COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=NEW.period_start),e.monthly_limit) IS NULL OR ((SELECT COUNT(*) FROM booking_entitlement_uses u JOIN bookings b ON b.id=u.booking_id WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(b.starts_at)>=julianday(NEW.period_start) AND julianday(b.starts_at)<julianday(NEW.period_end)) + (SELECT COUNT(*) FROM event_booking_entitlement_uses u WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(u.starts_at)>=julianday(NEW.period_start) AND julianday(u.starts_at)<julianday(NEW.period_end)))<COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=NEW.period_start),e.monthly_limit)))) THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+CREATE TRIGGER event_entitlement_consume_guard BEFORE UPDATE OF consumed_at ON event_booking_entitlement_uses WHEN OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id JOIN events ev ON ev.id=b.event_id AND ev.line_account_id=b.line_account_id  JOIN booking_entitlements e ON e.id=NEW.entitlement_id JOIN booking_pass_plans p ON p.id=e.plan_id  WHERE b.id=NEW.event_booking_id AND b.line_account_id=NEW.line_account_id AND e.line_account_id=b.line_account_id AND p.line_account_id=b.line_account_id  AND e.friend_id=b.friend_id AND e.menu_id IS NULL AND e.status='active' AND (EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=e.id) OR (e.billing_status<>'stopped' AND NOT(e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now'))))  AND b.party_size=1 AND b.event_id=NEW.event_id AND b.slot_id=NEW.slot_id AND julianday(s.starts_at)=julianday(NEW.starts_at)  AND julianday(s.starts_at)>=julianday(e.valid_from) AND julianday(s.starts_at)<julianday(e.expires_at)  AND julianday(s.starts_at)>=julianday(NEW.period_start) AND julianday(s.starts_at)<julianday(NEW.period_end)  AND (EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=e.id) OR (p.event_target_scope_json IS NOT NULL AND (json_array_length(p.event_target_scope_json)=0 OR EXISTS(SELECT 1 FROM json_each(p.event_target_scope_json) WHERE value=b.event_id)))) AND b.status='confirmed' AND (e.kind='ticket' AND e.remaining>0 OR e.kind='monthly' AND (COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=NEW.period_start),e.monthly_limit) IS NULL OR ((SELECT COUNT(*) FROM booking_entitlement_uses u JOIN bookings b ON b.id=u.booking_id WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(b.starts_at)>=julianday(NEW.period_start) AND julianday(b.starts_at)<julianday(NEW.period_end)) + (SELECT COUNT(*) FROM event_booking_entitlement_uses u WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(u.starts_at)>=julianday(NEW.period_start) AND julianday(u.starts_at)<julianday(NEW.period_end)))<COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=NEW.period_start),e.monthly_limit)))) THEN RAISE(ABORT,'entitlement_unavailable') END; END;
 
 CREATE TRIGGER event_entitlement_immediate AFTER INSERT ON event_booking_entitlement_uses WHEN (SELECT status FROM event_bookings WHERE id=NEW.event_booking_id)='confirmed' BEGIN UPDATE event_booking_entitlement_uses SET consumed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE event_booking_id=NEW.event_booking_id AND consumed_at IS NULL; END;
 
@@ -12086,19 +12256,11 @@ CREATE TRIGGER event_entitlement_month_change BEFORE UPDATE OF starts_at ON even
 
 CREATE TRIGGER event_entitlement_return AFTER UPDATE OF returned_at ON event_booking_entitlement_uses WHEN OLD.returned_at IS NULL AND NEW.returned_at IS NOT NULL AND NEW.consumed_at IS NOT NULL BEGIN UPDATE booking_entitlements SET remaining=CASE WHEN kind='ticket' THEN remaining+1 ELSE NULL END,version=version+1,updated_at=NEW.returned_at WHERE id=NEW.entitlement_id; INSERT INTO booking_entitlement_events(id,entitlement_id,line_account_id,action,reason,actor_type,actor_id,request_key,request_json,after_json,created_at) SELECT lower(hex(randomblob(16))),e.id,e.line_account_id,'adjust','クラスの取消で戻した','system',NEW.event_booking_id_history,'event-return:'||NEW.event_booking_id_history,json_object('eventBookingId',NEW.event_booking_id_history),json_object('remaining',e.remaining,'version',e.version),NEW.returned_at FROM booking_entitlements e WHERE e.id=NEW.entitlement_id; END;
 
-CREATE TRIGGER event_entitlement_selection BEFORE INSERT ON event_booking_entitlement_uses BEGIN SELECT CASE WHEN NEW.consumed_at IS NOT NULL OR NOT EXISTS(SELECT 1 FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id JOIN events ev ON ev.id=b.event_id AND ev.line_account_id=b.line_account_id
- JOIN booking_entitlements e ON e.id=NEW.entitlement_id JOIN booking_pass_plans p ON p.id=e.plan_id
- WHERE b.id=NEW.event_booking_id AND b.line_account_id=NEW.line_account_id AND e.line_account_id=b.line_account_id AND p.line_account_id=b.line_account_id
- AND e.friend_id=b.friend_id AND e.menu_id IS NULL AND e.status='active' AND e.billing_status<>'stopped'
- AND NOT(e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now'))
- AND b.party_size=1 AND b.event_id=NEW.event_id AND b.slot_id=NEW.slot_id AND julianday(s.starts_at)=julianday(NEW.starts_at)
- AND julianday(s.starts_at)>=julianday(e.valid_from) AND julianday(s.starts_at)<julianday(e.expires_at)
- AND julianday(s.starts_at)>=julianday(NEW.period_start) AND julianday(s.starts_at)<julianday(NEW.period_end)
- AND p.event_target_scope_json IS NOT NULL AND (json_array_length(p.event_target_scope_json)=0 OR EXISTS(SELECT 1 FROM json_each(p.event_target_scope_json) WHERE value=b.event_id)) AND b.status IN('requested','confirmed')) THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+CREATE TRIGGER event_entitlement_selection BEFORE INSERT ON event_booking_entitlement_uses BEGIN SELECT CASE WHEN NEW.consumed_at IS NOT NULL OR NOT EXISTS(SELECT 1 FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id JOIN events ev ON ev.id=b.event_id AND ev.line_account_id=b.line_account_id  JOIN booking_entitlements e ON e.id=NEW.entitlement_id JOIN booking_pass_plans p ON p.id=e.plan_id  WHERE b.id=NEW.event_booking_id AND b.line_account_id=NEW.line_account_id AND e.line_account_id=b.line_account_id AND p.line_account_id=b.line_account_id  AND e.friend_id=b.friend_id AND e.menu_id IS NULL AND e.status='active' AND (EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=e.id) OR (e.billing_status<>'stopped' AND NOT(e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now'))))  AND b.party_size=1 AND b.event_id=NEW.event_id AND b.slot_id=NEW.slot_id AND julianday(s.starts_at)=julianday(NEW.starts_at)  AND julianday(s.starts_at)>=julianday(e.valid_from) AND julianday(s.starts_at)<julianday(e.expires_at)  AND julianday(s.starts_at)>=julianday(NEW.period_start) AND julianday(s.starts_at)<julianday(NEW.period_end)  AND (EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=e.id) OR (p.event_target_scope_json IS NOT NULL AND (json_array_length(p.event_target_scope_json)=0 OR EXISTS(SELECT 1 FROM json_each(p.event_target_scope_json) WHERE value=b.event_id)))) AND b.status IN('requested','confirmed')) THEN RAISE(ABORT,'entitlement_unavailable') END; END;
 
 CREATE TRIGGER event_entitlement_slot_snapshot AFTER UPDATE OF starts_at ON event_slots BEGIN UPDATE event_booking_entitlement_uses SET starts_at=NEW.starts_at,version=version+1,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE slot_id=NEW.id AND returned_at IS NULL; END;
 
-CREATE TRIGGER event_entitlement_transfer BEFORE UPDATE OF event_booking_id,slot_id,starts_at,period_start,period_end ON event_booking_entitlement_uses WHEN NEW.event_booking_id IS NOT NULL AND NEW.event_booking_id IS NOT OLD.event_booking_id BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id JOIN events ev ON ev.id=b.event_id AND ev.line_account_id=b.line_account_id  JOIN booking_entitlements e ON e.id=NEW.entitlement_id JOIN booking_pass_plans p ON p.id=e.plan_id  WHERE b.id=NEW.event_booking_id AND b.line_account_id=NEW.line_account_id AND e.line_account_id=b.line_account_id AND p.line_account_id=b.line_account_id  AND e.friend_id=b.friend_id AND e.menu_id IS NULL AND e.status='active' AND e.billing_status<>'stopped'  AND NOT(e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now'))  AND b.party_size=1 AND b.event_id=NEW.event_id AND b.slot_id=NEW.slot_id AND julianday(s.starts_at)=julianday(NEW.starts_at)  AND julianday(s.starts_at)>=julianday(e.valid_from) AND julianday(s.starts_at)<julianday(e.expires_at)  AND julianday(s.starts_at)>=julianday(NEW.period_start) AND julianday(s.starts_at)<julianday(NEW.period_end)  AND p.event_target_scope_json IS NOT NULL AND (json_array_length(p.event_target_scope_json)=0 OR EXISTS(SELECT 1 FROM json_each(p.event_target_scope_json) WHERE value=b.event_id)) AND b.status IN('requested','confirmed') AND (e.kind='ticket' OR COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=NEW.period_start),e.monthly_limit) IS NULL OR ((SELECT COUNT(*) FROM booking_entitlement_uses u JOIN bookings b ON b.id=u.booking_id WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(b.starts_at)>=julianday(NEW.period_start) AND julianday(b.starts_at)<julianday(NEW.period_end)) + (SELECT COUNT(*) FROM event_booking_entitlement_uses u WHERE u.entitlement_id=e.id AND u.event_booking_id_history<>OLD.event_booking_id_history AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(u.starts_at)>=julianday(NEW.period_start) AND julianday(u.starts_at)<julianday(NEW.period_end)))<COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=NEW.period_start),e.monthly_limit))) THEN RAISE(ABORT,'entitlement_unavailable') END; END;
+CREATE TRIGGER event_entitlement_transfer BEFORE UPDATE OF event_booking_id,slot_id,starts_at,period_start,period_end ON event_booking_entitlement_uses WHEN NEW.event_booking_id IS NOT NULL AND NEW.event_booking_id IS NOT OLD.event_booking_id BEGIN SELECT CASE WHEN NOT EXISTS(SELECT 1 FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id JOIN events ev ON ev.id=b.event_id AND ev.line_account_id=b.line_account_id  JOIN booking_entitlements e ON e.id=NEW.entitlement_id JOIN booking_pass_plans p ON p.id=e.plan_id  WHERE b.id=NEW.event_booking_id AND b.line_account_id=NEW.line_account_id AND e.line_account_id=b.line_account_id AND p.line_account_id=b.line_account_id  AND e.friend_id=b.friend_id AND e.menu_id IS NULL AND e.status='active' AND (EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=e.id) OR (e.billing_status<>'stopped' AND NOT(e.billing_status='grace' AND julianday(e.grace_until)<=julianday('now'))))  AND b.party_size=1 AND b.event_id=NEW.event_id AND b.slot_id=NEW.slot_id AND julianday(s.starts_at)=julianday(NEW.starts_at)  AND julianday(s.starts_at)>=julianday(e.valid_from) AND julianday(s.starts_at)<julianday(e.expires_at)  AND julianday(s.starts_at)>=julianday(NEW.period_start) AND julianday(s.starts_at)<julianday(NEW.period_end)  AND (EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=e.id) OR (p.event_target_scope_json IS NOT NULL AND (json_array_length(p.event_target_scope_json)=0 OR EXISTS(SELECT 1 FROM json_each(p.event_target_scope_json) WHERE value=b.event_id)))) AND b.status IN('requested','confirmed') AND (e.kind='ticket' OR COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=NEW.period_start),e.monthly_limit) IS NULL OR ((SELECT COUNT(*) FROM booking_entitlement_uses u JOIN bookings b ON b.id=u.booking_id WHERE u.entitlement_id=e.id AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(b.starts_at)>=julianday(NEW.period_start) AND julianday(b.starts_at)<julianday(NEW.period_end)) + (SELECT COUNT(*) FROM event_booking_entitlement_uses u WHERE u.entitlement_id=e.id AND u.event_booking_id_history<>OLD.event_booking_id_history AND u.consumed_at IS NOT NULL AND u.returned_at IS NULL AND julianday(u.starts_at)>=julianday(NEW.period_start) AND julianday(u.starts_at)<julianday(NEW.period_end)))<COALESCE((SELECT allowance FROM booking_entitlement_month_limits ml WHERE ml.entitlement_id=e.id AND ml.period_start=NEW.period_start),e.monthly_limit))) THEN RAISE(ABORT,'entitlement_unavailable') END; END;
 
 CREATE TRIGGER event_payment_scope_insert BEFORE INSERT ON event_payment_settings
 WHEN NOT EXISTS(SELECT 1 FROM events e WHERE e.id=NEW.event_id AND e.line_account_id=NEW.line_account_id)
@@ -12477,17 +12639,11 @@ CREATE TRIGGER pass_plan_cancelled_reconfirm BEFORE UPDATE OF status ON bookings
 WHEN NEW.status='confirmed' AND OLD.status='cancelled' AND EXISTS(SELECT 1 FROM booking_entitlement_uses WHERE booking_id=NEW.id AND returned_at IS NOT NULL)
 BEGIN SELECT RAISE(ABORT,'entitlement_cancelled_retry'); END;
 
-CREATE TRIGGER pass_plan_consume BEFORE UPDATE OF consumed_at ON booking_entitlement_uses
-WHEN OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL AND EXISTS(SELECT 1 FROM booking_entitlements e JOIN bookings b ON b.id=NEW.booking_id JOIN booking_pass_plans p ON p.id=e.plan_id WHERE e.id=NEW.entitlement_id AND (e.billing_status='stopped' OR json_array_length(p.target_scope_json)>0 AND NOT EXISTS(SELECT 1 FROM json_each(p.target_scope_json) WHERE value=b.menu_id)))
-BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
+CREATE TRIGGER pass_plan_consume BEFORE UPDATE OF consumed_at ON booking_entitlement_uses WHEN OLD.consumed_at IS NULL AND NEW.consumed_at IS NOT NULL AND EXISTS(SELECT 1 FROM booking_entitlements e JOIN bookings b ON b.id=NEW.booking_id JOIN booking_pass_plans p ON p.id=e.plan_id WHERE e.id=NEW.entitlement_id AND NOT EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=e.id) AND (e.billing_status='stopped' OR json_array_length(p.target_scope_json)>0 AND NOT EXISTS(SELECT 1 FROM json_each(p.target_scope_json) WHERE value=b.menu_id))) BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
 
-CREATE TRIGGER pass_plan_reschedule BEFORE UPDATE OF menu_id ON bookings
-WHEN EXISTS(SELECT 1 FROM booking_entitlement_uses u JOIN booking_entitlements e ON e.id=u.entitlement_id JOIN booking_pass_plans p ON p.id=e.plan_id WHERE u.booking_id=NEW.id AND json_array_length(p.target_scope_json)>0 AND NOT EXISTS(SELECT 1 FROM json_each(p.target_scope_json) WHERE value=NEW.menu_id))
-BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
+CREATE TRIGGER pass_plan_reschedule BEFORE UPDATE OF menu_id ON bookings WHEN EXISTS(SELECT 1 FROM booking_entitlement_uses u JOIN booking_entitlements e ON e.id=u.entitlement_id JOIN booking_pass_plans p ON p.id=e.plan_id WHERE u.booking_id=NEW.id AND NOT EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=e.id) AND json_array_length(p.target_scope_json)>0 AND NOT EXISTS(SELECT 1 FROM json_each(p.target_scope_json) WHERE value=NEW.menu_id)) BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
 
-CREATE TRIGGER pass_plan_selection BEFORE INSERT ON booking_entitlement_uses
-WHEN EXISTS(SELECT 1 FROM booking_entitlements e JOIN bookings b ON b.id=NEW.booking_id JOIN booking_pass_plans p ON p.id=e.plan_id WHERE e.id=NEW.entitlement_id AND (e.billing_status='stopped' OR p.line_account_id<>b.line_account_id OR json_array_length(p.target_scope_json)>0 AND NOT EXISTS(SELECT 1 FROM json_each(p.target_scope_json) WHERE value=b.menu_id)))
-BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
+CREATE TRIGGER pass_plan_selection BEFORE INSERT ON booking_entitlement_uses WHEN EXISTS(SELECT 1 FROM booking_entitlements e JOIN bookings b ON b.id=NEW.booking_id JOIN booking_pass_plans p ON p.id=e.plan_id WHERE e.id=NEW.entitlement_id AND NOT EXISTS(SELECT 1 FROM booking_monthly_rights mr WHERE mr.entitlement_id=e.id) AND (e.billing_status='stopped' OR p.line_account_id<>b.line_account_id OR json_array_length(p.target_scope_json)>0 AND NOT EXISTS(SELECT 1 FROM json_each(p.target_scope_json) WHERE value=b.menu_id))) BEGIN SELECT RAISE(ABORT,'entitlement_unavailable'); END;
 
 CREATE TRIGGER photo_derivative_keys_insert AFTER INSERT ON nen_photo_submissions BEGIN UPDATE nen_photo_submissions SET review_r2_key=CASE WHEN (NEW.review_image_url LIKE 'https://%/images/nen-photo-review/%' OR NEW.review_image_url LIKE 'https://%/images/nen-photo-public/%') AND instr(NEW.review_image_url,'?')=0 AND instr(NEW.review_image_url,'#')=0 AND instr(NEW.review_image_url,'%')=0 AND instr(substr(NEW.review_image_url,instr(NEW.review_image_url,'/images/')+8),'..')=0 AND instr(NEW.review_image_url,char(92))=0 THEN substr(NEW.review_image_url,instr(NEW.review_image_url,'/images/')+8) ELSE NULL END,public_r2_key=CASE WHEN (NEW.public_image_url LIKE 'https://%/images/nen-photo-review/%' OR NEW.public_image_url LIKE 'https://%/images/nen-photo-public/%') AND instr(NEW.public_image_url,'?')=0 AND instr(NEW.public_image_url,'#')=0 AND instr(NEW.public_image_url,'%')=0 AND instr(substr(NEW.public_image_url,instr(NEW.public_image_url,'/images/')+8),'..')=0 AND instr(NEW.public_image_url,char(92))=0 THEN substr(NEW.public_image_url,instr(NEW.public_image_url,'/images/')+8) ELSE NULL END WHERE id=NEW.id; END;
 
@@ -13273,6 +13429,24 @@ CREATE TRIGGER visit_stamp_entry_balance AFTER INSERT ON visit_stamp_entries BEG
 CREATE TRIGGER visit_stamp_rt_insert AFTER INSERT ON rt_reservations WHEN NEW.status IN ('visited','seated') BEGIN INSERT INTO visit_stamp_visit_queue(kind,visit_id) VALUES('restaurant',NEW.id) ON CONFLICT(kind,visit_id) DO UPDATE SET generation=generation+1; END;
 
 CREATE TRIGGER visit_stamp_rt_update AFTER UPDATE OF status ON rt_reservations WHEN NEW.status<>OLD.status AND (NEW.status IN ('visited','seated') OR OLD.status IN ('visited','seated')) BEGIN INSERT INTO visit_stamp_visit_queue(kind,visit_id) VALUES('restaurant',NEW.id) ON CONFLICT(kind,visit_id) DO UPDATE SET generation=generation+1; END;
+
+CREATE VIEW booking_monthly_available_rights AS
+ SELECT r.entitlement_id,c.id contract_id,c.account_id,c.friend_id,c.class_kind,c.class_id,y.period_start,y.service_start,y.service_end,c.stop_effective_at
+ FROM booking_monthly_rights r JOIN booking_monthly_contracts c ON c.id=r.contract_id
+ JOIN booking_monthly_cycles y ON y.id=r.cycle_id
+ JOIN booking_entitlements e ON e.id=r.entitlement_id AND e.line_account_id=c.account_id AND e.friend_id=c.friend_id
+ JOIN line_accounts a ON a.id=c.account_id AND a.tenant_id=c.tenant_id JOIN tenants t ON t.id=c.tenant_id
+ WHERE (r.state='paid' AND y.state='paid' OR r.state='provisional' AND y.state NOT IN('exhausted','void')) AND e.status='active' AND c.state IN('active','stop_scheduled')
+ AND c.service_state='enabled' AND (c.attention_started_at IS NULL OR julianday(c.attention_started_at)+7>julianday('now'))
+ AND (c.stop_effective_at IS NULL OR julianday(c.stop_effective_at)>julianday('now'))
+ AND a.is_active=1 AND a.archived_at IS NULL AND t.status='active'
+ AND ((c.class_kind='menu' AND EXISTS(SELECT 1 FROM menus m WHERE m.id=c.class_id AND m.line_account_id=c.account_id AND m.deleted_at IS NULL))
+ OR (c.class_kind='event' AND EXISTS(SELECT 1 FROM events ev WHERE ev.id=c.class_id AND ev.line_account_id=c.account_id AND ev.deleted_at IS NULL)));
+
+CREATE VIEW booking_monthly_bound_rights AS
+ SELECT r.entitlement_id,c.account_id,c.friend_id,c.class_kind,c.class_id,y.period_start,y.service_start,y.service_end
+ FROM booking_monthly_rights r JOIN booking_monthly_contracts c ON c.id=r.contract_id
+ JOIN booking_monthly_cycles y ON y.id=r.cycle_id;
 
 CREATE VIEW booking_slot_allocations AS SELECT id,line_account_id,staff_id,menu_id,starts_at,block_ends_at,NULL AS waitlist_id FROM bookings WHERE status IN ('requested','confirmed') UNION ALL SELECT 'waitlist:'||id,line_account_id,staff_id,menu_id,starts_at,block_ends_at,id FROM booking_waitlist WHERE status='invited' AND julianday(hold_expires_at)>julianday('now');
 

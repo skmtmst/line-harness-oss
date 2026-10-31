@@ -9,6 +9,10 @@ import HelpTip from '@/components/shared/help-tip'
 import Notice from '@/components/shared/notice'
 import { ProgressBar, StepMark } from '@/components/shared/progress'
 import StatusBadge from '@/components/shared/status-badge'
+import ListState from '@/components/shared/list-state'
+import { SetupStepList, SetupStepRow, SetupStepLabel } from '@/components/shared/setup-step-row'
+import { permissionLockReason } from '@/components/shared/permission-lock'
+import { classifyApiFailure, permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { PREPARING_WORD, usePreparingDialog } from '@/components/shared/preparing-dialog'
 import { FEATURES, featureHref, sampleMenuFor, featureName, summarizeSetup, setupWarningsForStyle, type SetupSummary, type TodoRow } from './model'
 import type { StyleSetupData } from './use-style-setup'
@@ -21,14 +25,14 @@ import styles from './setup-card.module.css'
  *   自動の送信・見本の画像のまま、を 1 行ずつ。最後に済んだ物の 1 行。
  */
 
-export function setupSummary(data: StyleSetupData | null): SetupSummary | null {
+export function setupSummary(data: StyleSetupData | null, includeComplete = false): SetupSummary | null {
   if (!data) return null
   const summary = summarizeSetup(data.state, data.warnings, data.items)
-  return summary.rows.length > 0 ? summary : null
+  return summary.rows.length > 0 || includeComplete ? summary : null
 }
 
 /** 上の警告の帯（Bdfxm の「帯/注意（行き先つき）」）。機能ごとに 1 本。 */
-export function SetupWarningBands({ data }: { data: StyleSetupData }) {
+export function SetupWarningBands({ data, configureAllowed = true, role }: { data: StyleSetupData; configureAllowed?: boolean; role?: string | null }) {
   const preparing = usePreparingDialog()
   const seen = new Set<string>()
   const warnings = setupWarningsForStyle(data.state.style, data.warnings).filter((warning) => (seen.has(warning.feature) ? false : (seen.add(warning.feature), true)))
@@ -39,7 +43,7 @@ export function SetupWarningBands({ data }: { data: StyleSetupData }) {
       {warnings.map((warning) => {
         const button = tiles.find((tile) => tile.feature === warning.feature)?.label ?? featureName(warning.feature)
         return (
-          <Notice key={warning.feature} tone="warn" appearance="soft" action={FEATURES[warning.feature]?.preparing ? <Button onClick={() => preparing.open(FEATURES[warning.feature]!.preparing!)}>決まりを入れる</Button> : <Button href={featureHref(warning.feature, warning.href, data.state.style)}>決まりを入れる</Button>}>
+          <Notice key={warning.feature} tone="warn" appearance="soft" action={FEATURES[warning.feature]?.preparing ? <Button lockedReason={permissionLockReason(role, configureAllowed, 'manager')} onClick={() => { if (configureAllowed) preparing.open(FEATURES[warning.feature]!.preparing!) }}>決まりを入れる</Button> : <Button lockedReason={permissionLockReason(role, configureAllowed, 'manager')} href={featureHref(warning.feature, warning.href, data.state.style)}>決まりを入れる</Button>}>
             {`リッチメニューに「${button}」のボタンがありますが、${featureName(warning.feature)}の決まりがまだです。お客さまには「${PREPARING_WORD}」と出ています。`}
           </Notice>
         )
@@ -65,8 +69,9 @@ export function SetupCard({ summary, onOpenStep }: { summary: SetupSummary; onOp
   )
 }
 /** 同じ手順カードへ差し込み、質問で後回しにした設定への操作を保つ。 */
-export function SetupTasks({ summary, onOpenStep, heading = false }: { summary: SetupSummary; onOpenStep: (step: string | number) => void; heading?: boolean }) {
+export function SetupTasks({ summary, onOpenStep, heading = false, configureAllowed = true, role }: { summary: SetupSummary; onOpenStep: (step: string | number) => void; heading?: boolean; configureAllowed?: boolean; role?: string | null }) {
   const preparing = usePreparingDialog()
+  const openSummary = () => { if (configureAllowed) onOpenStep('summary') }
   const doneText = useMemo(() => {
     const names = summary.doneNames.slice(0, 3).join('・')
     return `済み ${summary.done}件（${names}${summary.doneNames.length > 3 ? ' ほか' : ''}）`
@@ -78,36 +83,43 @@ export function SetupTasks({ summary, onOpenStep, heading = false }: { summary: 
           help={<HelpTip label="選んだ機能の設定の説明">質問で後回しにした設定です。基本の手順とは別に、使い方の質問の進みと残りの設定を表示します。</HelpTip>} />
         <ProgressBar appearance="quota" value={summary.done} max={summary.total} label="使い方の設定の進み" />
       </> : null}
-      <ul className={styles.rows}>
-        {summary.rows.map((row) => <SetupRow key={row.key} row={row} onOpenStep={onOpenStep} onPreparing={preparing.open} />)}
-      </ul>
+      <SetupStepList>
+        {summary.rows.map((row) => <SetupRow key={row.key} row={row} onOpenStep={onOpenStep} onPreparing={preparing.open} configureAllowed={configureAllowed} role={role} onView={openSummary} />)}
+      </SetupStepList>
       {summary.done > 0 ? (
         <p className={styles.done}>
           <CircleCheck aria-hidden="true" className={styles.doneIcon} />
           <span className={styles.doneText}>{doneText}</span>
           <span className={styles.spacer} />
-          <button type="button" className={styles.link} onClick={() => onOpenStep(0)}>済んだ物を見る</button>
+          <Button variant="text" lockedReason={configureAllowed ? undefined : '中身はオーナーか管理者が見られます'} onClick={() => { if (configureAllowed) onOpenStep(0) }}>済んだ物を見る</Button>
         </p>
       ) : null}
       {preparing.dialog}
   </>
 }
 
-function SetupRow({ row, onOpenStep, onPreparing }: { row: TodoRow; onOpenStep: (step: string | number) => void; onPreparing: (feature: string) => void }) {
+export function SetupTasksUnavailable({ error, onRetry }: { error?: unknown; onRetry: () => void }) {
+  const forbidden = error && classifyApiFailure(error) === 'forbidden'
+  return <>
+    <CardHeader title="選んだ機能の設定" headingLevel={3} size="content" />
+    {forbidden ? <Notice tone="info">{permissionDeniedMessage()}</Notice> : <ListState kind={error ? 'error' : 'loading'} title={error ? '選んだ機能の設定を確認できませんでした' : '選んだ機能の設定を確認しています'} error={error} onRetry={error ? onRetry : undefined} />}
+  </>
+}
+
+function SetupRow({ row, onOpenStep, onPreparing, configureAllowed, role, onView }: { row: TodoRow; onOpenStep: (step: string | number) => void; onPreparing: (feature: string) => void; configureAllowed: boolean; role?: string | null; onView: () => void }) {
+  const readAction = row.action.step === 'summary'
+  const reason = readAction ? configureAllowed ? undefined : '中身はオーナーか管理者が見られます' : permissionLockReason(role, configureAllowed, 'manager')
   return (
-    <li className={styles.row} data-alert={row.alert || undefined}>
-      {row.alert ? <TriangleAlert aria-hidden="true" className={styles.rowIcon} /> : <StepMark done={false} />}
-      <span className={styles.rowText}>
-        <span className={styles.rowTitle}>{row.title}</span>
-        <span className={styles.rowNote}>{row.note}</span>
-      </span>
+    <SetupStepRow data-alert={row.alert || undefined}>
+      {row.alert ? <TriangleAlert aria-hidden="true" className={`${styles.rowIcon} ${styles.alertIcon}`} /> : <StepMark done={false} />}
+      <SetupStepLabel title={row.title} note={row.note}>{row.title}</SetupStepLabel>
       <RowStatusActions status={<StatusBadge tone={row.badge.tone} dot>{row.badge.label}</StatusBadge>}>
-      {row.action.preparing
-        ? <Button presentation="row-action" textTone={row.alert ? 'accent' : 'ink'} onClick={() => onPreparing(row.action.preparing!)}>{row.action.label}</Button>
+      {readAction ? <Button presentation="row-action" lockedReason={reason} onClick={onView}>{row.action.label}</Button> : row.action.preparing
+        ? <Button presentation="row-action" lockedReason={reason} textTone={row.alert ? 'accent' : 'ink'} onClick={() => { if (configureAllowed) onPreparing(row.action.preparing!) }}>{row.action.label}</Button>
         : row.action.href
-          ? <Button presentation="row-action" textTone={row.alert ? 'accent' : 'ink'} href={row.action.href}>{row.action.label}</Button>
-          : <Button presentation="row-action" textTone={row.alert ? 'accent' : 'ink'} onClick={() => onOpenStep(row.action.step ?? 0)}>{row.action.label}</Button>}
+          ? <Button presentation="row-action" lockedReason={reason} textTone={row.alert ? 'accent' : 'ink'} href={row.action.href}>{row.action.label}</Button>
+          : <Button presentation="row-action" lockedReason={reason} textTone={row.alert ? 'accent' : 'ink'} onClick={() => { if (configureAllowed) onOpenStep(row.action.step ?? 0) }}>{row.action.label}</Button>}
       </RowStatusActions>
-    </li>
+    </SetupStepRow>
   )
 }
