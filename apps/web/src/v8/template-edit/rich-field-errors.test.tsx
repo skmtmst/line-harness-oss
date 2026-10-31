@@ -38,3 +38,13 @@ it('名前・画像が空、面 B の URL が空なら送らず、それぞれ�
   await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('面 B のURL')))
   expect(create).not.toHaveBeenCalled()
 })
+
+it('空の画像と名前では主保存を止め、名前を入れると画像の理由を出す', () => {
+  render(<TemplateRichEditor />)
+  const save = screen.getByRole('button', { name: '保存して公開' }) as HTMLButtonElement
+  expect(save.disabled).toBe(true)
+  fireEvent.change(screen.getByLabelText('テンプレート名'), { target: { value: '告知' } })
+  expect(save.disabled).toBe(true)
+  expect(screen.getByText('画像を選んでください。')).toBeTruthy()
+  fireEvent.click(save);expect(create).not.toHaveBeenCalled()
+})

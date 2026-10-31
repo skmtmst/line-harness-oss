@@ -88,11 +88,23 @@ describe('リッチビデオ編集',()=>{
   mocks.get.mockRejectedValue(new Error('failed'));const {unmount}=render(<Editor id="r"/>);await screen.findByRole('alert');expect((screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement).disabled).toBe(true);unmount();
   mocks.account='b';mocks.get.mockResolvedValue({success:true,data:{id:'r',accountId:'a',name:'動画',messageType:'imagemap',messageContent:JSON.stringify(stored())}});render(<Editor id="r"/>);await screen.findByDisplayValue('新しい動画です');expect((screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement).disabled).toBe(true);
  });
- it('名前の入力不足はその欄だけに示し、通信せずフォーカスする',async()=>{
-  render(<Editor/>);fireEvent.click(screen.getByRole('button',{name:'保存する'}));
-  await waitFor(()=>expect(document.activeElement).toBe(screen.getByLabelText('テンプレート名')));
-  expect(screen.getByLabelText('テンプレート名').getAttribute('aria-invalid')).toBe('true');
-  expect(screen.getByText('テンプレート名を入力してください。')).toBeTruthy();expect(screen.queryByRole('alert')).toBeNull();expect(mocks.create).not.toHaveBeenCalled();
+ it('必須が空なら主保存を止め、入力に応じて不足理由を切り替える',async()=>{
+  render(<Editor/>);
+  const save=screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement;
+  expect(save.disabled).toBe(true);
+  expect(screen.getByText('テンプレート名を入力してください。')).toBeTruthy();
+  fireEvent.click(save);expect(mocks.create).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText('テンプレート名'),{target:{value:'動画'}});
+  expect(save.disabled).toBe(true);expect(screen.getByText('動画を選んでください。')).toBeTruthy();
+  expect(screen.queryByText('テンプレート名を入力してください。')).toBeNull();
+  expect(screen.queryByRole('alert')).toBeNull();
+ });
+ it('値のあるURLの形式誤りは保存時にその欄へ知らせる',async()=>{
+  render(<Editor id="r"/>);await screen.findByDisplayValue('新しい動画です');
+  const input=screen.getByLabelText('リンク先URL');fireEvent.change(input,{target:{value:'javascript:bad'}});
+  const save=screen.getByRole('button',{name:'保存する'}) as HTMLButtonElement;expect(save.disabled).toBe(false);
+  fireEvent.click(save);await waitFor(()=>expect(document.activeElement).toBe(input));
+  expect(input.getAttribute('aria-invalid')).toBe('true');expect(mocks.update).not.toHaveBeenCalled();
  });
  it('ボタン無しはURL不要、URL不正と通知文超過は拒否する',()=>{
   expect(richVideoDraftError({...draft,buttonEnabled:false,actionUrl:''})).toBeNull();
