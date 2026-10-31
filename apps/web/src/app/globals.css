@@ -1,6 +1,7 @@
 @layer properties, theme, base, components, utilities;
 @import "tailwindcss";
 @import "../components/shared/kpi-band-v8.css";
+@import "../components/shared/phone-preview-tokens.css";
 @import "../components/shared/focus-ring.css"; @import "../components/shared/scrollbars.css"; @import "../components/shared/autofill.css";
 
 [data-design-node="yPkWe"] [data-design-part="dialog"] { width: min(720px, calc(100% - 32px)); }
@@ -2095,9 +2096,6 @@
   --v8-line-empty: #ffffffa6;         /* 空のときの薄い文 */
   --v8-line-menu: #444444;            /* メニュー帯の字 */
   --v8-line-homebar: #111111;         /* ホームの線 */
-  --v8-line-shell-radius: 52px;       /* 器の角丸 */
-  --v8-line-screen-radius: 42px;      /* 画面の角丸 */
-  --v8-line-homebar-radius: 3px;      /* ホームの線の角丸 */
   /* トークの吹き出し。届いた側（左・白）は左上、返す側（右・緑）は右上を小さく。 */
   --v8-line-bubble-in-radius: 4px 14px 14px 14px;
   --v8-line-bubble-out-radius: 14px 4px 14px 14px;

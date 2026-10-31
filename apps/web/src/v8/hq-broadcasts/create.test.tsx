@@ -9,6 +9,12 @@ import React from 'react'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+const previewWindow = vi.hoisted(() => ({ hidden: false }))
+vi.mock('@/components/shared/dialog', async original => {
+  const { default: Dialog } = await original<typeof import('@/components/shared/dialog')>()
+  return { default: (props: React.ComponentProps<typeof Dialog>) => previewWindow.hidden && props.title === 'LINEの見え方' ? null : <Dialog {...props} /> }
+})
+
 const hq = vi.hoisted(() => ({
   list: vi.fn(), create: vi.fn(), update: vi.fn(), get: vi.fn(), preflight: vi.fn(), exclude: vi.fn(), send: vi.fn(), stop: vi.fn(), cancel: vi.fn(), retry: vi.fn(),
   /* API-18：フォルダ・承認・テスト送信。承認が要らない（人数が少ない）ときの返事。 */
@@ -62,6 +68,7 @@ const check = (accountId: string, accountName: string, audienceCount: number, bl
 const folder = (id: string, name: string) => ({ id, kind: 'line_account', name, parentId: null, color: '#2f6fde', displayOrder: 1, createdAt: '', updatedAt: '' })
 
 beforeEach(() => {
+  previewWindow.hidden = false
   role.value = 'owner'
   // 画面の住所（段の切り替えは同じ住所の中で履歴だけを書き換える）。
   window.history.replaceState(null, '', '/hq/broadcasts/new')
@@ -106,6 +113,48 @@ async function fillToConfirm(body = '{店名}より：1月の限定メニュー'
   fireEvent.click(screen.getByRole('button', { name: '送信設定へ' }))
   fireEvent.click(screen.getByRole('button', { name: '配信前チェックへ' }))
 }
+
+describe('配信イメージの確認', () => {
+  it('見本の窓が出ない場合はボタンを押しても確認済みにしない', async () => {
+    previewWindow.hidden = true
+    params.value = new URLSearchParams('step=message')
+    render(<HqBroadcastCreate />)
+    await screen.findByLabelText('本文')
+    const check = screen.getByRole('checkbox', { name: 'LINEプレビューが未確認です' }) as HTMLInputElement
+    fireEvent.click(screen.getByRole('button', { name: '配信イメージを見る' }))
+    expect(screen.queryByRole('dialog', { name: 'LINEの見え方' })).toBeNull()
+    expect(check.checked).toBe(false)
+    expect(hq.send).not.toHaveBeenCalled()
+  })
+
+  it('現在の見本を開いた時だけ確認し、本文の変更で解除する', async () => {
+    params.value = new URLSearchParams('step=message')
+    const view = render(<HqBroadcastCreate />)
+    const body = await screen.findByLabelText('本文')
+    fireEvent.change(body, { target: { value: '目で確かめる本文' } })
+    const check = screen.getByRole('checkbox', { name: 'LINEプレビューが未確認です' }) as HTMLInputElement
+    expect(check.disabled).toBe(true)
+    expect(check.closest('[data-incomplete]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: '配信イメージを見る' }))
+    const dialog = screen.getByRole('dialog', { name: 'LINEの見え方' })
+    expect(within(dialog).getByText('目で確かめる本文')).toBeTruthy()
+    expect(check.checked).toBe(true)
+    fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
+    fireEvent.change(body, { target: { value: '書き直した本文' } })
+    expect(check.checked).toBe(false)
+    expect(check.disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'LINEの見え方を確認' }))
+    const narrow = screen.getByRole('dialog', { name: 'LINEの見え方' })
+    expect(within(narrow).getByText('書き直した本文')).toBeTruthy()
+    expect(within(narrow).getByRole('checkbox', { name: 'LINEプレビュー確認済み' })).toBeTruthy()
+    expect(within(narrow).getByRole('button', { name: /テストを送る/ })).toBeTruthy()
+    expect(within(narrow).getByRole('group', { name: 'プレビューの端末' })).toBeTruthy()
+    expect(within(narrow).queryByRole('button', { name: '配信イメージを見る' })).toBeNull()
+    expect(check.checked).toBe(true)
+    expect(view.container.textContent).toContain('書き直した本文')
+    expect(hq.send).not.toHaveBeenCalled()
+  })
+})
 
 describe('一括配信を作る（BBRDb：店の一斉配信と同じ5段＋送るアカウント）', () => {
   it('日本で日付が変わった直後でも、予約の初期日は日本の明日になる', async () => {

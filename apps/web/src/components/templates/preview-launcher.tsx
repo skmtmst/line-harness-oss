@@ -1,15 +1,20 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Eye } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 
 /** 右欄を畳む画面でも同じ見本を確認できる、作成の型の入口。 */
-export default function PreviewLauncher({ children, title = 'LINEの見え方', label = 'LINEの見え方を確認' }: { children: ReactNode; title?: string; label?: string }) {
+export default function PreviewLauncher({ children, title = 'LINEの見え方', label = 'LINEの見え方を確認', onOpened }: { children: ReactNode; title?: string; label?: string; onOpened?: () => void }) {
   const [open, setOpen] = useState(false)
   return <>
     <Button type="button" onClick={() => setOpen(true)}><Eye size={16} aria-hidden />{label}</Button>
-    <Dialog open={open} title={title} onCancel={() => setOpen(false)}>{children}</Dialog>
+    <Dialog open={open} title={title} onCancel={() => setOpen(false)}>{children ? <OpenedPreview onOpened={onOpened}>{children}</OpenedPreview> : null}</Dialog>
   </>
+}
+
+function OpenedPreview({ children, onOpened }: { children: ReactNode; onOpened?: () => void }) {
+  useEffect(() => { onOpened?.() }, [onOpened])
+  return <>{children}</>
 }
