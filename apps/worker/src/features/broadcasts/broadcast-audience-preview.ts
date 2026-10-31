@@ -1,4 +1,4 @@
-import { scopeStoredBroadcastSegmentQuery } from '../../services/segment-query-scope.js';
+import { scopeStoredBroadcastSegmentQuery, scopedFriendIds, storedBroadcastFriendScope } from '../../services/segment-query-scope.js';
 import { getLineAccountById, type Broadcast } from '@line-crm/db';
 
 
@@ -70,6 +70,11 @@ export async function getBroadcastAudiencePreview(
   }
 
   const accountId = broadcastAccountId(broadcast, requestedAccountId);
+  let ids: ReturnType<typeof scopedFriendIds> | null = null;
+  if (!accountId && (broadcast.target_type === 'tag' || broadcast.target_type === 'all')) {
+    try { ids = scopedFriendIds(await storedBroadcastFriendScope(db, null)); }
+    catch { return { count: null }; }
+  }
 
   if (broadcast.target_type === 'tag') {
     if (!broadcast.target_tag_id) return { count: null };
@@ -81,10 +86,10 @@ export async function getBroadcastAudiencePreview(
       : `SELECT COUNT(*) AS count
            FROM friends f
            JOIN friend_tags ft ON ft.friend_id = f.id
-          WHERE ft.tag_id = ? AND f.is_following = 1`;
+          WHERE ft.tag_id = ? AND f.is_following = 1 AND f.id IN (${ids!.sql})`;
     const row = accountId
       ? await db.prepare(sql).bind(broadcast.target_tag_id, accountId).first<{ count: number }>()
-      : await db.prepare(sql).bind(broadcast.target_tag_id).first<{ count: number }>();
+      : await db.prepare(sql).bind(broadcast.target_tag_id,...ids!.bindings).first<{ count: number }>();
     return { count: Number(row?.count ?? 0) };
   }
 
@@ -110,10 +115,10 @@ export async function getBroadcastAudiencePreview(
   if (broadcast.target_type === 'all') {
     const sql = accountId
       ? 'SELECT COUNT(*) AS count FROM friends WHERE is_following = 1 AND line_account_id = ?'
-      : 'SELECT COUNT(*) AS count FROM friends WHERE is_following = 1';
+      : `SELECT COUNT(*) AS count FROM friends WHERE is_following = 1 AND id IN (${ids!.sql})`;
     const row = accountId
       ? await db.prepare(sql).bind(accountId).first<{ count: number }>()
-      : await db.prepare(sql).first<{ count: number }>();
+      : await db.prepare(sql).bind(...ids!.bindings).first<{ count: number }>();
     return { count: Number(row?.count ?? 0) };
   }
 
