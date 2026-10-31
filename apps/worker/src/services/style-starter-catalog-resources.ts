@@ -14,8 +14,8 @@ const contentColumns:Record<string,string> = {
   tags: 'id,name,color,description,group_id,folder_id,is_starred,display_order,manual_assignment_allowed,reapply_policy,linked_enabled,status,mileage_reward,referral_mileage_reward,mileage_multiplier_bps,mileage_multiplier_priority',
   folders: 'id,kind,name,parent_id,color,display_order',
   templates: 'id,name,category,folder_id,display_order,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json,draft_message_type,draft_message_content,draft_carousel_actions_json,draft_carousel_tap_limit_mode,draft_carousel_tap_limit_text,draft_question_json,draft_question_status,draft_message_bubbles_json,published_version,deleted_at',
-  template_versions: 'id,template_id,version_number,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json',
-  media: 'id,folder_id,kind,filename,mime_type,size_bytes,width,height,duration_ms,r2_key,public_url',
+  template_versions: 'id,template_id,version_number,effective_from,message_type,message_content,carousel_actions_json,carousel_tap_limit_mode,carousel_tap_limit_text,question_json,question_status,message_bubbles_json',
+  media: 'id,folder_id,archived_at,usage_expires_at,usage_consent_note,kind,filename,mime_type,size_bytes,width,height,duration_ms,r2_key,public_url',
   media_versions: 'id,media_id,version_no,r2_key,mime_type,size_bytes,width,height,duration_ms,page_count,codec,content_hash,etag',
   auto_replies: 'id,name,keyword,match_type,response_type,response_content,template_id,is_active,actions_json,response_weekdays_json,response_holiday_rule,once_per_friend,keywords_json,respond_to_all,keyword_match_mode,active_from,active_until,cooldown_minutes,skip_when_operator_active,folder_id,display_order,priority,message_kinds_json,friend_conditions_json,lifecycle_status,current_draft_version_id,current_published_version_id,deleted_at',
   auto_reply_versions: 'id,auto_reply_id,version_number,definition_snapshot,status',
@@ -28,9 +28,103 @@ const contentColumns:Record<string,string> = {
   rich_menu_areas: 'id,page_id,bounds_x,bounds_y,bounds_width,bounds_height,action_type,action_data,intent,label,tag_ids,score_change,template_id,form_id,tracked_link_id',
   broadcast_message_assets: 'id,kind,name,payload_json,folder_id,published_version,draft_payload_json',
   common_action_bindings: 'id,common_action_id,common_action_version_id,consumer_type,consumer_id,consumer_path',
-  common_actions: 'id,name,description,status,current_draft_version_id,current_published_version_id,archived_at',
+  common_actions: 'id,folder_id,name,description,status,current_draft_version_id,current_published_version_id,archived_at',
   common_action_versions: 'id,common_action_id,version_number,status,action_config',
 };
+/** 除外する列も明示する。新しい列は分類の見張りが判断を要求する。 */
+const ignoredColumns:Record<string,Record<string,string>> = {
+  tags: {
+    '所有範囲は取得条件で限定する': 'line_account_id',
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at,created_by,updated_by,updated_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'version,created_from_recipe_id,recipe_clone_run_id',
+    '正規化名は名前から作る派生値': 'normalized_name',
+  },
+  folders: {
+    '所有範囲は取得条件で限定する': 'account_id',
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at,updated_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'revision',
+  },
+  templates: {
+    '所有範囲は取得条件で限定する': 'line_account_id',
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at,updated_at,published_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'created_from_recipe_id,recipe_clone_run_id,publish_idempotency_key,draft_revision',
+  },
+  template_versions: {
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_by_staff_id,created_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'hq_template_version_id',
+  },
+  media: {
+    '所有範囲は取得条件で限定する': 'line_account_id',
+    '更新・作成・公開の日時と担当者は内容ではない': 'uploaded_by,created_at,archived_by,archive_reason',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'revision',
+  },
+  media_versions: {
+    '更新・作成・公開の日時と担当者は内容ではない': 'uploaded_by,created_at,published_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'change_reason',
+    '自動スキャンと試験の実行結果は店の編集ではない': 'scan_status,scan_result,scanned_at',
+  },
+  auto_replies: {
+    '所有範囲は取得条件で限定する': 'line_account_id',
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at,deleted_by_staff_id',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'created_from_recipe_id,recipe_clone_run_id',
+    '停止状態は本体の利用状態で比較し、理由・担当者・要求キーは除く': 'stopped_at,stopped_by_staff_id,stop_reason,stop_idempotency_key',
+  },
+  auto_reply_versions: {
+    '所有範囲は取得条件で限定する': 'line_account_id',
+    '更新・作成・公開の日時と担当者は内容ではない': 'published_at,published_by_staff_id,created_at,updated_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'publish_idempotency_key',
+    '自動スキャンと試験の実行結果は店の編集ではない': 'last_test_status,last_tested_at,last_tested_by_staff_id',
+  },
+  scenarios: {
+    '所有範囲は取得条件で限定する': 'line_account_id',
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at,updated_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'created_from_recipe_id,recipe_clone_run_id',
+    '停止状態は本体の利用状態で比較し、理由・担当者・要求キーは除く': 'stopped_reason,stopped_by,stopped_at',
+  },
+  scenario_steps: {
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at',
+  },
+  forms: {
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at,updated_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'revision,content_revision',
+    '利用により増える回答数は内容ではない': 'submit_count',
+  },
+  form_accounts: {
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at',
+  },
+  rich_menu_groups: {
+    '所有範囲は取得条件で限定する': 'account_id',
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at,updated_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'version',
+    'LINEへの公開処理の一時情報と発行IDは内容ではない': 'publishing_at,publishing_owner,publishing_expires_at,publishing_generation',
+  },
+  rich_menu_pages: {
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at,updated_at',
+    'LINEへの公開処理の一時情報と発行IDは内容ではない': 'alias_id,line_richmenu_id',
+  },
+  rich_menu_areas: {
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at,updated_at',
+  },
+  broadcast_message_assets: {
+    '所有範囲は取得条件で限定する': 'line_account_id',
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_at,updated_at,published_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'draft_revision',
+  },
+  common_action_bindings: {
+    '所有範囲は取得条件で限定する': 'line_account_id',
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_by,created_at,updated_at',
+  },
+  common_actions: {
+    '所有範囲は取得条件で限定する': 'line_account_id',
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_by,created_at,updated_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'client_request_key',
+  },
+  common_action_versions: {
+    '更新・作成・公開の日時と担当者は内容ではない': 'created_by,created_at,published_at',
+    '楽観ロックと作成・配備の実行記録は内容ではない': 'draft_revision',
+  },
+};
+export const catalogResourceColumnPolicy = {content:contentColumns,ignored:ignoredColumns};
 const columns=(table:string)=>contentColumns[table];
 /** 名前だけで同じと見なさず、子行・公開状態も含めて店の編集を検出する。 */
 export async function catalogResourceSnapshot(db: D1Database, account: string, kind: string, id: string): Promise<string | null> {

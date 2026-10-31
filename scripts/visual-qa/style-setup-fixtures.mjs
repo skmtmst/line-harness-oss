@@ -50,14 +50,19 @@ const HQ_STYLE_ATTENTION = {
     { accountId: 'visual-qa-account-5', name: '然 ヨガスタジオ', style: 'lesson', counts: { unhandledChats: 1, pendingBookings: 0, unpaid: 0, connections: 0, stoppedDeliveries: 1 } },
   ].map((item) => ({ ...item, details: { unhandledChats: [{ id: 'c', href: '/chats' }], pendingBookings: [{ id: 'b', href: '/booking/bookings' }], unpaid: [{ id: 'p', href: '/booking/settings?tab=payment' }], connections: [{ id: 'l', href: '/line-accounts' }], stoppedDeliveries: [{ id: 'd', href: '/broadcasts' }] } })),
 }
+const CATALOG_KINDS=[['rich_menu','基本のリッチメニュー'],['template','カタログのテンプレート'],['tag','カタログのタグ'],['auto_reply','カタログの自動応答'],['coupon','カタログのクーポン'],['form','カタログの回答フォーム']]
+const CATALOG_OPTIONS=CATALOG_KINDS.map(([kind,name])=>({kind,name,templateId:`catalog-${kind}`,versionId:`catalog-${kind}-v1`,version:1}))
+const CATALOG_PREVIEW={...CATALOG_OPTIONS[0],lines:[],pages:[{name:'メイン',width:2500,height:1686,areas:[{label:'予約',destination:'予約ページ',x:0,y:0,width:1250,height:843},{label:'回答フォーム',destination:'回答フォーム：カタログの回答フォーム',x:1250,y:0,width:1250,height:843},{label:'ご案内',destination:'テンプレート：カタログのテンプレート',x:0,y:843,width:2500,height:843}]}]}
 export function styleSetupRead(method, pathname, query) {
   if (method !== 'GET') return null
+  if(pathname==='/api/hq/style-starter-sets/catalog')return {success:true,data:CATALOG_OPTIONS}
+  if(/^\/api\/hq\/style-starter-sets\/catalog\/[^/]+\/versions\/[^/]+$/.test(pathname))return {success:true,data:query.get('kind')==='rich_menu'?CATALOG_PREVIEW:{...CATALOG_OPTIONS.find(row=>row.kind===query.get('kind')),lines:[]}}
   if (pathname === '/api/dashboard/style/resources') return { success: true, data: { items: [{ id: 'rm-1', name: '秋のメニュー', kind: 'rich_menu' }, { id: 'page-1', name: '秋のメニューの画像', kind: 'image' }] } }
   if (/^\/api\/dashboard\/style\/menus\/[^/]+$/.test(pathname)) return { success: true, data: { id: pathname.split('/').pop(), name: 'ランチコース', version: 1, meetingMode: 'in_person', location: null } }
   if (pathname === '/api/dashboard/style/warnings') return { success: true, data: STYLE_SETUP_WARNINGS }
   if (pathname === '/api/dashboard/style/starter-set') return { success: true, data: { id: `starter-set-${query.get('style') ?? 'restaurant'}`, version: 2, autoInsert: true, definition: { items: STYLE_SETUP_ITEMS } } }
   if (pathname === '/api/dashboard/style/starter-items') return { success: true, data: { items: STYLE_SETUP_STATES } }
-  if (pathname === '/api/hq/style-starter-sets') return { success: true, data: HQ_STARTER_SETS }
+  if (pathname === '/api/hq/style-starter-sets') return { success: true, data: process.env.VISUAL_QA_STARTER_CATALOG==='selected'?HQ_STARTER_SETS.map(row=>({...row,definition:{mode:'catalog',items:[],selections:row.style==='restaurant'?[CATALOG_OPTIONS[0],CATALOG_OPTIONS[5]].map(({kind,templateId,versionId})=>({kind,templateId,versionId})):[]}})):HQ_STARTER_SETS }
   if (pathname === '/api/hq/style-attention') return { success: true, data: HQ_STYLE_ATTENTION }
   if (pathname === '/api/hq/style-template-samples' || pathname === '/api/dashboard/style/template-samples') return { success: true, data: { style: query.get('style') ?? 'restaurant', items: STYLE_TEMPLATE_SAMPLES } }
   return null

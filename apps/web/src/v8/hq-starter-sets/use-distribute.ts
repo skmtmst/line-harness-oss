@@ -26,12 +26,12 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
   const [preview, setPreview] = useState<{ key: string; data: StarterDistributionPreview } | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [tick,setTick]=useState(0)
   const target = draft && version !== null ? targetOf(style, draft) : null
   const key = target ? JSON.stringify({ style, version, target }) : null
 
   useEffect(() => {
     setPreview(null)
-    setError('')
     if (!key || !target || version === null) return
     let cancelled = false
     void hqStyleApi.preflight(style, { expectedVersion: version, target }).then((res) => {
@@ -39,7 +39,9 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
       if (!cancelled) setPreview({ key, data: res.data })
     }).catch((caught: unknown) => { if (!cancelled) setError(describeApiFailure(caught, '読み込み', { scope: 'hq' })) })
     return () => { cancelled = true }
-  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key,tick]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(()=>{setError('')},[key])
 
   const ready = preview !== null && preview.key === key
   const run = async () => {
@@ -49,8 +51,9 @@ export function useDistribute(style: AccountStyle, version: number | null, onDon
     try {
       const res = await hqStyleApi.distribute(style, { expectedVersion: version, target, token: preview.data.token, confirmed: true, editedAction: draft.editedAction })
       if (!res.success) throw new Error('distribute failed')
+      if(res.data.items.some(item=>item.action==='failed')){setError('一部の物を入れられませんでした。入力を残しています。もう一度、配る先を確認してください。');onDone();setTick(n=>n+1);return}
       const held = res.data.items.filter((item) => item.action === 'pending').length
-      notifySaved(held > 0 ? `${res.data.accountCount} アカウントへ配りました（店が直した ${held} 件は保留にして知らせました）` : `${res.data.accountCount} アカウントへ配りました`)
+      notifySaved(held > 0 ? `${res.data.accountCount} アカウントへ配りました（確認が必要な ${held} 件は保留にして知らせました）` : `${res.data.accountCount} アカウントへ配りました`)
       setDraft(null)
       onDone()
     } catch (caught) {

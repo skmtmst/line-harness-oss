@@ -40,10 +40,12 @@ export async function distributeCatalog(db:D1Database,tenant:string,actor:string
     for(const item of applied.items) {
       const edited=account.items.some(row=>row.key===item.templateId&&row.edited);
       const held=input.editedAction!=='new_copy'&&edited;
-      items.push({accountId:account.accountId,key:item.templateId,action:held||item.state==='blocked'?'pending':item.state==='succeeded'?'created':'failed',message:item.reason});
+      const previous=account.bound.find(row=>row.template_id===item.templateId);
+      const unchanged=previous?.state==='succeeded'&&previous.template_version_id===item.versionId&&!(input.editedAction==='new_copy'&&edited);
+      items.push({accountId:account.accountId,key:item.templateId,action:held||item.state==='blocked'?'pending':item.state==='succeeded'?(unchanged?'existing':'created'):'failed',message:item.reason});
       if(held||item.state==='blocked') {
         const id=await digest(JSON.stringify([tenant,account.accountId,plan.set.id,plan.set.version,item.templateId]));
-        await db.prepare(`INSERT OR IGNORE INTO notifications(id,event_type,title,body,channel,metadata,line_account_id,category,created_at) VALUES (?,'style_starter_update','本部の初期セットに確認する物があります','お店で直した内容は変えていません。本部の担当者と、新しい版を入れるか確かめてください。','dashboard',?,?,'update',?)`)
+        await db.prepare(`INSERT OR IGNORE INTO notifications(id,event_type,title,body,channel,metadata,line_account_id,category,created_at) VALUES (?,'style_starter_update','本部の初期セットに確認する物があります','初期セットの一部は確認待ちです。お店の既存の内容は上書きしていません。本部の担当者と、内容を確かめてください。','dashboard',?,?,'update',?)`)
           .bind(id,JSON.stringify({starterSetId:plan.set.id,starterSetVersion:plan.set.version,templateId:item.templateId}),account.accountId,new Date().toISOString()).run();
       }
     }

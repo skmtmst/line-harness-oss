@@ -92,7 +92,8 @@ export type StarterSkipReason = 'answer_later' | 'not_for_style' | 'auto_insert_
 
 /** 初期セットの入れ直しの結果。2 回目からは inserted が空。 */
 export type StarterEnsureResult = {
-  inserted: Array<{ key: string; kind: StarterSetItem['kind'] }>;
+  catalogApplication?: import('@line-crm/shared').StarterCatalogApplyResult;
+  inserted: Array<{ key: string; kind: StarterSetItem['kind'] | import('@line-crm/shared').StarterCatalogKind }>;
   skipped: Array<{ key: string; reason: StarterSkipReason }>;
   existing: number;
   starterSet: { id: string; version: number };

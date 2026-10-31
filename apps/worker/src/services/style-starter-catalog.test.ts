@@ -4,7 +4,7 @@ import { saveTemplate } from './hq-templates/distribution.js';
 import { saveCatalogStarter, listStarterCatalog } from './style-starter-catalog-save.js';
 import { applyCatalogStarter } from './style-starter-catalog-apply.js';
 import { initializeAccountStyle, saveProfile } from './style-setup.js';
-import { catalogResourceSnapshot } from './style-starter-catalog-resources.js';
+import { catalogResourceColumnPolicy, catalogResourceSnapshot } from './style-starter-catalog-resources.js';
 import type { HqTemplateAuthority } from './hq-templates/contract.js';
 import type { StarterCatalogSelection } from '@line-crm/shared';
 
@@ -57,9 +57,8 @@ test('店限定の担当者のスタイル選択でも、統括の承認済み�
 });
 test('別統括の版・種類違い・未対応の種類を保存できない',async()=>{
   const choice=await catalog('tag',tag());
-  sql.raw.prepare("UPDATE hq_templates SET tenant_id='other' WHERE id=?").run(choice.templateId);
-  await expect(saveCatalogStarter(sql.db,'t','owner','standard',{expectedVersion:0,confirmed:true,definition:{mode:'catalog',items:[],selections:[choice]}})).rejects.toMatchObject({code:'catalog_version_unavailable'});
-  sql.raw.prepare("UPDATE hq_templates SET tenant_id='t' WHERE id=?").run(choice.templateId);
+  const foreign=await saveTemplate(sql.db,{...authority,tenantId:"other"},{type:"tag",name:"別統括の見本",definition:tag(),requestId:crypto.randomUUID()});
+  await expect(saveCatalogStarter(sql.db,'t','owner','standard',{expectedVersion:0,confirmed:true,definition:{mode:'catalog',items:[],selections:[{...choice,templateId:foreign.template.id,versionId:foreign.template.current_version_id!}]}})).rejects.toMatchObject({code:'catalog_version_unavailable'});
   await expect(set([{...choice,kind:'form'}])).rejects.toMatchObject({code:'catalog_version_unavailable'});
   await expect(set([{...choice,kind:'visit_stamp'}])).rejects.toMatchObject({code:'invalid_starter_set'});
 });
@@ -78,7 +77,7 @@ test('違う店の境界と自動投入オフを守る',async()=>{
   await initializeAccountStyle(sql.db,'a','t','admin','standard');
   expect(sql.raw.prepare('SELECT COUNT(*) n FROM tags').get()).toEqual({n:0});
   await set([await catalog('tag',tag('別'))],true,1);
-  await initializeAccountStyle(sql.db,'b','other','owner','standard');
+  sql.raw.exec("INSERT INTO account_styles(line_account_id,style,updated_at) VALUES('b','standard','now')");
   await expect(applyCatalogStarter(sql.db,'t','b','owner','standard')).rejects.toMatchObject({code:'catalog_approval_unavailable'});
 });
 test('店が持つ同名タグを上書きせず、確認待ちにする',async()=>{
@@ -140,6 +139,12 @@ test('テンプレートを参照する自動応答を停止状態で作り、�
  const row=sql.raw.prepare('SELECT is_active,lifecycle_status FROM auto_replies').get();expect(row).toEqual({is_active:0,lifecycle_status:'draft'});
  const snapshot=JSON.parse((sql.raw.prepare('SELECT definition_snapshot FROM auto_reply_versions').get() as {definition_snapshot:string}).definition_snapshot);
  expect(snapshot.templateId).toBe((sql.raw.prepare("SELECT id FROM templates WHERE line_account_id='a'").get() as {id:string}).id);
+ const {getAutoReplyDraftVersion}=await import('@line-crm/db');const {validateDraft}=await import('../routes/auto-replies-definition.js');
+ const reply=sql.raw.prepare('SELECT id FROM auto_replies').get() as {id:string};
+ const draft=await getAutoReplyDraftVersion(sql.db,reply.id);
+ sql.raw.exec("UPDATE templates SET deleted_at='2099-01-01' WHERE line_account_id='a'");
+ const validation=await validateDraft(sql.db,draft!);
+ expect(validation.valid).toBe(false);expect(validation.errors).toContain('選んだテンプレートを確認できません');
 });
 test('手動で新しい版を別名コピーし、店の変更を保ち、起点と承認を監査する',async()=>{
  const {starterDistributionPlan,distributeStarter}=await import('./style-starter-distribution.js');
@@ -203,7 +208,7 @@ test('実体と同時に保存した比較記録は、読み直した実体と�
 });
 test('改行・タブ・絵文字と複数の子行でも比較記録が一致し、一文字の変更を検出する',async()=>{
  const {catalogResourceCommit}=await import('./style-starter-catalog-resources.js');
- await set([await catalog('template',message('表示の確認','1行目\n\t2行目 😀'))]);
+ await set([await catalog('template',message('表示の確認','1行目\n\t2行目 😀\u0001\u0000\"\\'))]);
  await initializeAccountStyle(sql.db,'a','t','admin','standard',{bucket,publicBaseUrl:'https://worker.test'});
  const {id}=sql.raw.prepare("SELECT id FROM templates WHERE line_account_id='a'").get() as {id:string};
  for(const [version,text] of [[1,'本文\n\t😀'],[2,'別の本文\n\t😀']] as const)sql.raw.prepare("INSERT INTO template_versions(id,template_id,version_number,message_type,message_content) VALUES(?,?,?,'text',?)").run(`version-${version}`,id,version,text);
@@ -256,3 +261,51 @@ test('途中でスタイルの版が変わったら書き込まず、競合と�
  expect(result.catalogApplication?.items[0]).toMatchObject({state:'failed',reason:'catalog_conflict'});
  expect(reportError).not.toHaveBeenCalled();expect(sql.raw.prepare('SELECT COUNT(*) n FROM tags').get()).toEqual({n:0});
 });
+
+
+test('比較する19表の列は、内容か理由付きの除外へ漏れなく分類する',()=>{
+ for(const [table,columns] of Object.entries(catalogResourceColumnPolicy.content)){
+  const actual=(sql.raw.prepare(`PRAGMA table_info(${table})`).all() as {name:string}[]).map(row=>row.name).sort()
+  const ignored=catalogResourceColumnPolicy.ignored[table]
+  expect(Object.keys(ignored).every(reason=>reason.length>0)).toBe(true)
+  const classified=[...columns.split(','),...Object.values(ignored).flatMap(value=>value.split(','))]
+  expect(new Set(classified).size).toBe(classified.length)
+  expect(classified.sort()).toEqual(actual)
+ }
+})
+
+
+test('結果のない事前確認が期限切れでも、再試行で作り直して戻れる',async()=>{
+ const choice=await catalog('tag',tag());await set([choice])
+ const distribution=await import('./hq-templates/distribution.js')
+ const original=distribution.preflightDistribution
+ vi.spyOn(distribution,'preflightDistribution').mockImplementationOnce(async(...args)=>{
+  const preview=await original(...args)
+  sql.raw.exec("UPDATE hq_template_preflights SET expires_at='2000-01-01T00:00:00.000Z'")
+  return preview
+ })
+ const first=await initializeAccountStyle(sql.db,'a','t','admin','standard')
+ expect(first.version).toBe(1)
+ expect(first.catalogApplication?.items[0].state).toBe('failed')
+ const resumed=await applyCatalogStarter(sql.db,'t','a','admin','standard')
+ expect(resumed.items[0].state).toBe('succeeded')
+ expect(sql.raw.prepare("SELECT COUNT(*) n FROM tags WHERE line_account_id='a'").get()).toEqual({n:1})
+})
+
+
+test('通知を選ぶと編集した項目だけ保留し、未投入の別項目を入れて実際の結果を返す',async()=>{
+ const {starterDistributionPlan,distributeStarter}=await import('./style-starter-distribution.js')
+ const first=await catalog('tag',tag('編集する分類'));await set([first]);await initializeAccountStyle(sql.db,'a','t','admin','standard')
+ sql.raw.exec("UPDATE tags SET description='店で編集' WHERE line_account_id='a'")
+ const second=await catalog('tag',tag('新しい分類'));await set([first,second],true,1)
+ const input={expectedVersion:2,target:{accountIds:['a']}}
+ const plan=await starterDistributionPlan(sql.db,'t','standard',input)
+ expect(plan.editedCount).toBe(1)
+ const result=await distributeStarter(sql.db,'t','owner','standard',{...input,confirmed:true,token:plan.token,editedAction:'notify'})
+ expect(result.items).toEqual(expect.arrayContaining([expect.objectContaining({key:first.templateId,action:'pending'}),expect.objectContaining({key:second.templateId,action:'created'})]))
+ expect(sql.raw.prepare("SELECT name,description FROM tags WHERE line_account_id='a' ORDER BY name").all()).toEqual([{name:'新しい分類',description:null},{name:'編集する分類',description:'店で編集'}])
+ const again=await starterDistributionPlan(sql.db,'t','standard',input)
+ const repeated=await distributeStarter(sql.db,'t','owner','standard',{...input,confirmed:true,token:again.token,editedAction:'notify'})
+ expect(repeated.items.find(item=>item.key===second.templateId)?.action).toBe('existing')
+ expect(sql.raw.prepare('SELECT COUNT(*) n FROM notifications').get()).toEqual({n:1})
+})

@@ -1,8 +1,8 @@
 -- 統括の承認した組と配布の実行を結び、結果不明の再試行で二重に作らない。
 CREATE TABLE style_starter_catalog_items (
   line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
-  template_id TEXT NOT NULL REFERENCES hq_templates(id),
-  template_version_id TEXT NOT NULL REFERENCES hq_template_versions(id),
+  template_id TEXT NOT NULL,
+  template_version_id TEXT NOT NULL,
   tenant_id TEXT NOT NULL REFERENCES tenants(id),
   set_id TEXT NOT NULL REFERENCES style_starter_sets(id),
   set_version INTEGER NOT NULL CHECK(set_version > 0),
@@ -17,7 +17,9 @@ CREATE TABLE style_starter_catalog_items (
   lease_until TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
-  PRIMARY KEY(line_account_id,template_id)
+  PRIMARY KEY(line_account_id,template_id),
+  FOREIGN KEY(template_id,tenant_id) REFERENCES hq_templates(id,tenant_id),
+  FOREIGN KEY(template_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id)
 );
 CREATE INDEX idx_starter_catalog_tenant_account ON style_starter_catalog_items(tenant_id,line_account_id);
 CREATE TABLE style_starter_catalog_resources (

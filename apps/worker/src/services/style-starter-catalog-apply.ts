@@ -32,6 +32,7 @@ export async function applyCatalogStarter(db: D1Database, tenant: string, accoun
     return (order[a.kind as keyof typeof order] ?? 9) - (order[b.kind as keyof typeof order] ?? 9);
   });
   for (const selection of selections) {
+    try {
     const newCopy = runtime.manual && runtime.copyTemplateIds?.includes(selection.templateId);
     const answers = JSON.parse(selected.answers_json) as Record<string,{mode:string;value?:unknown}>;
     const key = {coupon:'coupons',rich_menu:'image',template:'content'}[selection.kind as 'coupon'|'rich_menu'|'template'];
@@ -86,8 +87,8 @@ export async function applyCatalogStarter(db: D1Database, tenant: string, accoun
         for (const row of preview.stores[0].items) {
           if (!row.targetId || !row.duplicate) continue;
           const root = row.itemKind === selection.kind || (selection.kind==='coupon' && row.itemKind==='template');
-          if(newCopy && root){if(!row.allowedModes.includes('alias'))throw new StyleError('catalog_local_changes',409);continue;}
-          if(!row.allowedModes.includes('overwrite'))throw new StyleError('catalog_local_changes',409);
+          if(newCopy && root){if(!(row.allowedModes as readonly string[]).includes('alias'))throw new StyleError('catalog_local_changes',409);continue;}
+          if(!(row.allowedModes as readonly string[]).includes('overwrite'))throw new StyleError('catalog_local_changes',409);
           const held = await db.prepare('SELECT source_snapshot FROM style_starter_catalog_resources WHERE tenant_id=? AND line_account_id=? AND resource_kind=? AND target_id=?')
             .bind(tenant, account, catalogResourceKind(row.itemKind), row.targetId).first<{ source_snapshot: string }>();
           if (!held || held.source_snapshot !== await catalogResourceSnapshot(db, account, row.itemKind, row.targetId))
@@ -119,7 +120,7 @@ export async function applyCatalogStarter(db: D1Database, tenant: string, accoun
       const state = reason === 'catalog_local_changes' ? 'blocked' : 'failed';
       await db.prepare(`UPDATE style_starter_catalog_items SET state=?,error_code=?,lease_token=NULL,lease_until=NULL,updated_at=?
         WHERE line_account_id=? AND template_id=? AND lease_token=?`).bind(state, reason, new Date().toISOString(), account, selection.templateId, lease).run();
-      if(!(error instanceof StyleError) && !(error instanceof HqTemplateError)) {
+      if(!(error instanceof StyleError) && !(error instanceof HqTemplateError && error.status<500)) {
         logger.error('style_starter_catalog_failed');
         try{await runtime.reportError?.(error instanceof Error?error:new Error('catalog_application_failed'))}catch{logger.error('style_starter_catalog_report_failed')}
       }
@@ -130,6 +131,14 @@ export async function applyCatalogStarter(db: D1Database, tenant: string, accoun
       if ((!failed && error instanceof HqTemplateError && ['SELECTION_REQUIRED','SELECTION_CHANGED','VERSION_CONFLICT','NOT_FOUND'].includes(error.code)) || (failed && !failed.cleanup && ['failed','version_conflict','compensated','unsupported'].includes(failed.status)))
         await db.prepare("UPDATE style_starter_catalog_items SET distribution_run_id=NULL WHERE line_account_id=? AND template_id=? AND tenant_id=? AND state='failed' AND lease_token IS NULL")
           .bind(account,selection.templateId,tenant).run();
+    }
+    } catch(error) {
+      const expected=error instanceof StyleError || (error instanceof HqTemplateError && error.status<500);
+      if(!expected){
+        logger.error('style_starter_catalog_failed');
+        try{await runtime.reportError?.(error instanceof Error?error:new Error('catalog_application_failed'))}catch{logger.error('style_starter_catalog_report_failed')}
+      }
+      if(!result.items.some(row=>row.templateId===selection.templateId))result.items.push({...selection,state:'failed',reason:error instanceof StyleError||error instanceof HqTemplateError?error.code:'catalog_application_failed'});
     }
   }
   return result;

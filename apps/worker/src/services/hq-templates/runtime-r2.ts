@@ -529,7 +529,7 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
     if (renewed.meta.changes !== 1) fail('CLAIM_LOST');
   };
   let plan: HqTemplateStoreAtomicCommitPlan | null = null;
-  const binding: R2RuntimeBinding = {...options,templateVersionId:p!.template_version_id,textOverride:p!.text_override,initialDraft:p.initial_insert===1};
+  const binding: R2RuntimeBinding = {...options,templateVersionId:p!.template_version_id,textOverride:p!.text_override,initialDraft:p!.initial_insert===1};
   try {
     await renewClaim();
     const v = await sourceVersion(binding);
