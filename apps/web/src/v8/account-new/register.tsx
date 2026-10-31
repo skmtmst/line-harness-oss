@@ -32,6 +32,7 @@ import {
   precheckBack, precheckBlocked, precheckNext, precheckNote, precheckStateLabel, precheckSummary,
   type DraftState, type PrecheckAnswers, type PrecheckAt, type PrecheckKey, type StepNumber,
 } from './logic'
+import { PROVIDER_MEMBERSHIP_GUIDANCE } from './check-rows'
 import Step1Precheck from './step1-precheck'
 import Step2Connect, { type Step2Field } from './step2-connect'
 import Step4Template from './step4-template'
@@ -696,6 +697,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続確認">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>接続確認</h2>
+                <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p></Notice>
                 <ul className={styles.checkList}>
                   {checkRows.map((row) => (
                     <li key={row.key} className={styles.checkRow} data-phase={row.phase}>
@@ -734,6 +736,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="ためしに友だち追加">
                 <p className={styles.subBadge}>{badge}</p>
                 <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>友だち追加できるか確かめます</h2>
+                <Notice tone="info"><p>{PROVIDER_MEMBERSHIP_GUIDANCE}</p></Notice>
                 <div className={styles.qrBlock}>
                   <div className={styles.qrFrame}>
                     {qrDataUrl ? (
