@@ -593,6 +593,46 @@
   --polish-space-section: 24px;
 }
 
+/* スタイルのデモ内に縮小した設定画面の寸法と色。 */
+:root {
+  --tpl-style-demo-heading-size: 24px;
+  --tpl-style-demo-title-icon-offset: 3px;
+  --tpl-style-demo-progress-height: 4px;
+  --tpl-style-demo-header-title-offset: 4px;
+  --tpl-style-demo-pointer-anchor-offset: 4px;
+  --tpl-style-demo-pointer-hand-x: 3px;
+  --tpl-style-demo-pointer-hand-y: 6px;
+  --tpl-style-demo-preview-radius: 8px;
+  --tpl-style-demo-menu-radius: 4px;
+  --tpl-style-demo-sidebar-width: 160px;
+  --tpl-style-demo-sidebar-width-compact: 105px;
+  --tpl-style-demo-screen-min-height: 260px;
+  --tpl-style-demo-sidebar-gap: 14px;
+  --tpl-style-demo-sidebar-item-gap: 6px;
+  --tpl-style-demo-sidebar-brand-size: 16px;
+  --tpl-style-demo-compact-gap: 10px;
+  --tpl-style-demo-screen-padding: 18px;
+  --tpl-style-demo-screen-heading-size: 18px;
+  --tpl-style-demo-form-width: 440px;
+  --tpl-style-demo-focus-width: 3px;
+  --tpl-style-demo-focus-radius: 5px;
+  --tpl-style-demo-pointer-ring-size: 28px;
+  --tpl-style-demo-pointer-right: 15px;
+  --tpl-style-demo-pointer-bottom: 18px;
+  --tpl-style-demo-preview-border: #dce3df;
+  --tpl-style-demo-preview-background: #f4f6f5;
+  --tpl-style-demo-sidebar-border: #e4e9e6;
+  --tpl-style-demo-sidebar-ink: #55645d;
+  --tpl-style-demo-accent: #087a4b;
+  --tpl-style-demo-selection: #ecf8f0;
+  --tpl-style-demo-subtle-ink: #68776e;
+  --tpl-style-demo-board-border: #e2e9e5;
+  --tpl-style-demo-form-border: #d9dedb;
+  --tpl-style-demo-highlight: #24a26a;
+  --tpl-style-demo-note-ink: #5d6862;
+  --tpl-style-demo-pointer-shadow: 0 2px 2px #888;
+}
+
 :root {
   --color-slot-bg: #f7f8fa;           /* 薄い灰の地（#f7f8fa） */
   --tpl-slot-h: 260px;                /* ふだんの高さ（絵の 380×260） */        /* 小さい所（カルーセルのカード 180×140） */
