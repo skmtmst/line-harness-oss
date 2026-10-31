@@ -1,6 +1,6 @@
 'use client'
 import { describeApiFailure } from '@/components/shared/api-error-message'
-import { FileAudio,File as FileIcon,FileUp,Loader } from 'lucide-react'
+import { FileAudio,File as FileIcon,FileUp,Loader,Link2,Images } from 'lucide-react'
 import {
 useCallback,
 useEffect,
@@ -16,6 +16,7 @@ type RefObject,
 } from 'react'
 import { joinDescribedBy,useFieldContext } from './field-context'
 import HelpTip from './help-tip'
+import Button from './button'
 import { usePermissionLockTip } from './permission-lock-tip'
 import styles from './media-slot.module.css'
 import { TextField } from './text-field'
@@ -457,20 +458,19 @@ export default function MediaSlot({
     !readOnly && !busy && (onUrl || urlEntry || onMediaPick) ? (
       <span className={styles.links}>
         {onUrl || urlEntry ? (
-          <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange}
+          <Button lockedReason={lockedReason} variant="text" size="inline" textTone="accent"
             type="button"
-            className={styles.link}
             disabled={disabled || permissionBlocked}
             aria-expanded={urlEntry ? urlOpen : undefined}
             onClick={(event) => { stop(event); if (!canChange()) return; if (onUrl) onUrl(); else setUrlOpen((open) => !open) }}
           >
-            URL で入れる
-          </MediaSlotButton>
+            <Link2 size={14} aria-hidden="true" />URL で入れる
+          </Button>
         ) : null}
         {onMediaPick ? (
-          <MediaSlotButton lockedReason={lockedReason} canPressNow={canChange} type="button" className={styles.link} disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); if (canChange()) onMediaPick() }}>
-            登録メディアから選ぶ
-          </MediaSlotButton>
+          <Button lockedReason={lockedReason} variant="text" size="inline" textTone="accent" type="button" disabled={disabled || permissionBlocked} onClick={(event) => { stop(event); if (canChange()) onMediaPick() }}>
+            <Images size={14} aria-hidden="true" />登録メディアから選ぶ
+          </Button>
         ) : null}
       </span>
     ) : null
@@ -581,7 +581,7 @@ export default function MediaSlot({
   if (renderTrigger) return <>{renderTrigger(openPicker)}{picker}{error ? <p role="alert">{error}</p> : null}</>
 
   return (
-    <div id={id} className={styles.root} data-controls-below={controlsBelow || undefined} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription}>
+    <div id={id} className={styles.root} data-has-help={extraHelp ? true : undefined} data-controls-below={controlsBelow || undefined} data-testid={testId} aria-invalid={invalid || undefined} aria-describedby={saveDescription}>
       {extraHelp ? <HelpTip className={styles.help} label={`${title}の補足`}>{extraHelp}</HelpTip> : null}
       <div
         role="group"

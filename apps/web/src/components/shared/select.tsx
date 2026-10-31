@@ -278,6 +278,7 @@ export default function Select({
         type="button"
         className={iconOnly ? undefined : `${choiceStyles.frame} ${styles.trigger} ${open ? styles.openTrigger : styles.closedTrigger} ${treatment === 'text' ? styles.textTrigger : treatment === 'pill' ? `${pillStyles.pill} ${pillStyles.control}` : ''}`}
         data-choice-field={!iconOnly || undefined}
+        data-choice-surface={!iconOnly && treatment !== 'text' && treatment !== 'pill' ? 'select' : undefined}
         data-choice-active={filterState === 'active' || undefined}
         data-choice-invalid={Boolean(error) || invalid || undefined}
         data-choice-disabled={disabled || Boolean(lockedReason) || undefined}

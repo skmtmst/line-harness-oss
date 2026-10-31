@@ -285,7 +285,7 @@ describe('V8 閲覧だけの担当者と権限確認中', () => {
     const loading = container.querySelector('[data-list-state="loading"]')
     expect(loading).not.toBeNull()
     expect(loading?.getAttribute('aria-busy')).toBe('true')
-    expect(loading?.getAttribute('aria-label')).toBe('成果とアフィリエイトへ移動しています')
+    expect(loading?.getAttribute('aria-label')).toBe('読み込んでいます')
     expect(container.querySelector('table')).toBeNull()
   })
 })

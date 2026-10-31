@@ -1,3 +1,8 @@
+import type { AutomationVersionContent } from './automation-version-content.js';
+export type { AutomationVersionContent } from './automation-version-content.js';
+import { validateTemplateMessage } from '../../services/template-message-validation.js';
+import { buildMessage } from '../../services/line-message.js';
+import { automationDraftCreationStatements } from './automation-draft-storage.js';
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { readFolderAssignment, FolderAssignmentError } from '@line-crm/db';
 import { resolveCommonActionVersion } from './automation-engine.js';
@@ -100,18 +105,6 @@ export interface AutomationDraftCommonActionVersionDetail {
   }>;
 }
 
-/**
- * 版の中身を、保存されている生の文字列のまま持ったもの。
- *
- * 指紋も突き合わせも**この生の文字列**で行う。読み直して組み立て直すと
- * 鍵の並びや空白で見た目が変わることがあり、同じ中身なのに違うと言い出す。
- */
-export interface AutomationVersionContent {
-  trigger_type: string;
-  trigger_config: string;
-  condition_config: string;
-  action_config: string;
-}
 
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -618,41 +611,11 @@ export async function createAutomationDraftFromTemplate(
   for (let generation = 0; generation < 32; generation += 1) {
     const id = await templateDraftId(operation, generation);
     const versionId = crypto.randomUUID();
-    await db.batch([
-      db.prepare(
-        `INSERT OR IGNORE INTO automation_definitions
-           (id, line_account_id, name, description, status, created_by, created_at, updated_at, folder_id)
-         VALUES (?, ?, ?, ?, 'draft', ?, ?, ?, ?)`,
-      ).bind(id, input.lineAccountId, source.name, source.description, input.createdBy ?? null, now, now, folderId ?? null),
-      db.prepare(
-        // まだ版が付いていない下書きのときだけ足す。先に作った側の版を
-        // 上書きしないよう、`current_draft_version_id IS NULL` で守る。
-        `INSERT INTO automation_versions
-           (id, automation_id, version_number, status, trigger_type, trigger_config,
-            condition_config, action_config, created_by, created_at)
-         SELECT ?, ?, 1, 'draft', ?, ?, '{}', ?, ?, ?
-          WHERE EXISTS (
-            SELECT 1 FROM automation_definitions
-             WHERE id = ? AND line_account_id = ? AND status = 'draft'
-               AND current_draft_version_id IS NULL
-          )`,
-      ).bind(
-        versionId,
-        id,
-        source.triggerType,
-        JSON.stringify(source.triggerConfig),
-        JSON.stringify(source.actions),
-        input.createdBy ?? null,
-        now,
-        id,
-        input.lineAccountId,
-      ),
-      db.prepare(
-        `UPDATE automation_definitions SET current_draft_version_id = ?
-          WHERE id = ? AND line_account_id = ? AND status = 'draft'
-            AND current_draft_version_id IS NULL`,
-      ).bind(versionId, id, input.lineAccountId),
-    ]);
+    await db.batch(automationDraftCreationStatements(db,{
+      id,versionId,lineAccountId:input.lineAccountId,name:source.name,description:source.description,
+      folderId,createdBy:input.createdBy,now,content:{trigger_type:source.triggerType,
+        trigger_config:JSON.stringify(source.triggerConfig),condition_config:'{}',action_config:JSON.stringify(source.actions)},
+    }));
 
     const row = await db.prepare(
       `SELECT d.current_draft_version_id, v.trigger_type, v.trigger_config,
@@ -839,6 +802,7 @@ export async function updateAutomationDraft(
     triggerConfig: unknown;
     conditions?: unknown;
     actions: unknown;
+    transaction?:{before?:D1PreparedStatement[];after?:(versionId:string)=>D1PreparedStatement[]};
   },
 ): Promise<{ draftVersionId: string }> {
   const folderId = await automationFolder(db, input.lineAccountId, input.folderId);
@@ -949,8 +913,11 @@ export async function updateAutomationDraft(
       params.notificationRuleId = notificationRuleId;
       params.message = requiredString(params.message, `actions.${index}.message`, '通知文');
     } else {
-      params.messageType = 'text';
+      params.messageType = typeof params.messageType==='string'?params.messageType:'text';
       params.content = requiredString(params.content, `actions.${index}.content`, '送る文面');
+      const checked=validateTemplateMessage(params.messageType as string,params.content as string);
+      if(!checked.ok)throw new AutomationDraftError('message_invalid',checked.error,`actions.${index}.content`);
+      try{buildMessage(params.messageType as string,params.content as string);}catch{throw new AutomationDraftError('message_invalid','送る内容を確認してください',`actions.${index}.content`);}
     }
     const id = typeof raw.id === 'string' && raw.id.trim() ? raw.id.trim() : `step-${index + 1}`;
     if (ids.has(id)) throw new AutomationDraftError('action_id_duplicate', '処理の番号が重複しています', `actions.${index}.id`);
@@ -1027,8 +994,9 @@ export async function updateAutomationDraft(
       current.id, binding.path, current.created_by ?? null, now, now,
     )),
   ];
-  const results = await db.batch(statements);
-  if ((results[0].meta?.changes ?? 0) !== 1 || (results[1].meta?.changes ?? 0) !== 1) {
+  const before=input.transaction?.before??[];
+  const results = await db.batch([...before,...statements,...(input.transaction?.after?.(nextVersionId)??[])]);
+  if ((results[before.length].meta?.changes ?? 0) !== 1 || (results[before.length+1].meta?.changes ?? 0) !== 1) {
     throw new AutomationDraftError('version_conflict', '編集中の下書きが変わりました。再読み込みしてください');
   }
   // 版が新しくなったので札も変わる。画面はこれを次の突き合わせに使う。
@@ -1048,6 +1016,7 @@ export async function publishAutomationDraft(
      * 読んだ時点の状態で上書きしない。省略時は従来どおり状態を見ない。
      */
     expectedStatus?: unknown;
+    transaction?:{before?:D1PreparedStatement[];after?:(versionId:string)=>D1PreparedStatement[]};
   },
 ): Promise<{ id: string; versionId: string; versionNumber: number; status: 'active' | 'stopped' }> {
   const current = await readAutomationDraftRow(db, { id: input.id, lineAccountId: input.lineAccountId });
@@ -1117,7 +1086,8 @@ export async function publishAutomationDraft(
   const definitionGuardBinds = expectedStatus === null
     ? [current.id, input.lineAccountId, expectedVersionId]
     : [current.id, input.lineAccountId, expectedStatus, expectedVersionId];
-  const results = await db.batch([
+  const before=input.transaction?.before??[];
+  const results = await db.batch([...before,
     db.prepare(
       `UPDATE automation_versions SET status = 'published', published_at = ?
         WHERE id = ? AND automation_id = ? AND status = 'draft'
@@ -1142,8 +1112,8 @@ export async function publishAutomationDraft(
       ...(expectedStatus === null ? [] : [expectedStatus]),
       expectedVersionId,
     ),
-  ]);
-  if ((results[0].meta?.changes ?? 0) !== 1 || (results[1].meta?.changes ?? 0) !== 1) {
+  ...(input.transaction?.after?.(expectedVersionId)??[])]);
+  if ((results[before.length].meta?.changes ?? 0) !== 1 || (results[before.length+1].meta?.changes ?? 0) !== 1) {
     throw new AutomationDraftError('version_conflict', '公開する前に下書きが変わりました。再読み込みしてください');
   }
   return { id: current.id, versionId: expectedVersionId, versionNumber: Number(version.version_number), status };

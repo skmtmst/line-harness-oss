@@ -140,6 +140,6 @@ describe('conversions/new の未保存ガード', () => {
     fireEvent.click(bodyButton('保存せずに移る'))
     await flush()
 
-    expect(fixture.push).toHaveBeenCalledWith('/conversions?tab=points')
+    expect(fixture.push).toHaveBeenCalledWith('/affiliates?tab=points')
   })
 })

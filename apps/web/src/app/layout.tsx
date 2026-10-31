@@ -3,17 +3,11 @@ import { Inter, Noto_Sans_JP } from 'next/font/google'
 import './globals.css'
 import './polish.css'
 import AppShell from '@/components/app-shell'
+import DocumentTitleRoot from '@/components/shell/document-title'
 import ClientErrorReporter from '@/components/client-error-reporter'
 import ToastHost from '@/components/shared/toast'
 import NameTipHost from '@/components/shared/name-tip'
 
-/**
- * 書き出しの時点で決まる題。
- *
- * 描いたあとは上の帯（app-top-bar）と usePageTitle が「<画面名> | musubo」に
- * 差し替える（lib/document-title.ts）。ここはそれまでの間の名前。
- * 製品の名前を出す場所なので musubo と書く（LINE Harness は出さない）。
- */
 const DEFAULT_TITLE = 'musubo LINE管理システム'
 
 /*
@@ -44,7 +38,6 @@ const notoSansJp = Noto_Sans_JP({
 })
 
 export const metadata: Metadata = {
-  title: DEFAULT_TITLE,
   description: DEFAULT_TITLE,
   icons: {
     icon: '/icon.svg',
@@ -69,9 +62,9 @@ export default function RootLayout({
       {/* 書体は globals.css の --font-sans が正本（#976 U080）。inline style はやめる。 */}
       <body className="bg-canvas-sunken text-ink font-sans">
         <ClientErrorReporter />
-        <AppShell>
-          {children}
-        </AppShell>
+        <DocumentTitleRoot>
+          <AppShell>{children}</AppShell>
+        </DocumentTitleRoot>
         {/* 保存の知らせ（Toast）の置き場所。全画面で1つ。画面側は置かない。 */}
         <ToastHost />
         {/* アイコンだけのボタンの名前の吹き出し。全画面で1つ。画面側は置かない。 */}

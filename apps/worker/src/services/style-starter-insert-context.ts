@@ -3,8 +3,8 @@ import { profile } from './style-profile.js';
 import { starter } from './style-starter-set.js';
 import { StyleError } from './style-setup-core.js';
 
-export async function prepareStarterInsert(db:D1Database,account:string,tenant:string|null,style:AccountStyle,input:Record<string,unknown>,options:{set?:Awaited<ReturnType<typeof starter>>;skipExisting?:boolean}) {
-  const set = options.set ?? (await starter(db, tenant, style));
+export async function prepareStarterInsert(db:D1Database,account:string,tenant:string|null,style:AccountStyle,input:Record<string,unknown>,options:{set?:Awaited<ReturnType<typeof starter>>;skipExisting?:boolean;initialMenu?:boolean}) {
+  const set = options.set ?? (await starter(db, tenant, style, options.initialMenu));
   const existing = (
     await db
       .prepare('SELECT * FROM style_starter_items WHERE line_account_id=?')
@@ -53,12 +53,12 @@ export async function prepareStarterInsert(db:D1Database,account:string,tenant:s
                   : item.kind === 'scenario'
                     ? 'scenarios'
                     : null;
-      if (!table || !chosen.resourceId)
+      if ((!table && item.kind!=='form') || !chosen.resourceId)
         throw new StyleError('invalid_resource');
       const col = item.kind === 'rich_menu' ? 'account_id' : 'line_account_id';
       if (
         !(await db
-          .prepare(`SELECT 1 FROM ${table} WHERE id=? AND ${col}=?`)
+          .prepare(item.kind==='form' ? `SELECT 1 FROM forms f JOIN form_accounts a ON a.form_id=f.id WHERE f.id=? AND a.line_account_id=? AND f.status!='archived' AND (SELECT COUNT(*) FROM form_accounts b WHERE b.form_id=f.id)=1` : `SELECT 1 FROM ${table} WHERE id=? AND ${col}=?`)
           .bind(chosen.resourceId, account)
           .first())
       )

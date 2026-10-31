@@ -289,7 +289,7 @@ export default function StaffNewV8() {
   if (!canManageStaff) {
     return <CreatePage title="予約スタッフを登録" boardId="CcA4k" readOnly dirty={false}
       footerActions={<><Button href="/booking/menus?tab=staff">キャンセル</Button><Button variant="primary" disabled lockedReason={staffLockedReason}>スタッフを登録する</Button></>}>
-      {staffLockedReason ? <ListState kind="forbidden" title="予約設定の変更権限がありません" description={staffLockedReason} /> : <ListState kind="loading" title="予約設定の権限を確認しています" />}
+      {staffLockedReason ? <ListState kind="forbidden" title="予約設定の変更権限がありません" description={staffLockedReason} /> : <ListState kind="loading" />}
     </CreatePage>
   }
 

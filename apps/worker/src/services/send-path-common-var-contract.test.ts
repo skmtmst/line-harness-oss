@@ -21,6 +21,7 @@ function read(rel: string): string {
 
 // LINE送信に繋がる経路と、そこで必須の厳格resolver呼び出し。
 const SEND_PATHS: Array<{ file: string; mustCall: string; label: string }> = [
+  { file: 'services/restaurant-followup-test-send.ts', mustCall: 'buildReminderStepMessage', label: '来店フォローの自分向けテスト送信' },
   {file:'features/hq-broadcasts/hq-broadcast-details.ts',mustCall:'resolveSendCommonVars',label:'統括の一括配信のテスト送信'},
   {file:'features/auto-replies/auto-reply-unmatched.ts',mustCall:'expandSendCommonVars',label:'LINEのキーワード未一致時の返事'},
   { file: 'services/step-delivery.ts', mustCall: 'resolveSendInterpolationExtra', label: 'シナリオ配信' },

@@ -15,11 +15,14 @@ const fixture = vi.hoisted(() => ({ snapshot: vi.fn(), createMenu: vi.fn(), upda
 const role = vi.hoisted(() => ({ value: 'owner' as string | null }))
 const fetchApi = vi.hoisted(() => vi.fn())
 
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1', accounts: [] }) }))
+const account = vi.hoisted(() => ({ id: 'account-1' }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: account.id, accounts: [] }) }))
 vi.mock('@/lib/restaurant-test-api', () => ({ restaurantTestApi: fixture }))
 vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => role.value, canManageRole: (r: string | null) => r === 'owner' || r === 'admin' }))
 vi.mock('@/lib/api', async (load) => ({ ...(await load<typeof import('@/lib/api')>()), fetchApi }))
 const nav = vi.hoisted(() => ({ push: vi.fn(), params: new URLSearchParams() }))
+const chromeTitle = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shell/page-chrome', async load => ({ ...(await load<typeof import('@/components/shell/page-chrome')>()), usePageTitle: chromeTitle }))
 vi.mock('next/navigation', async (load) => ({
   ...(await load<typeof import('next/navigation')>()),
   useRouter: () => ({ push: nav.push, replace: nav.push, back: vi.fn(), prefetch: vi.fn(), refresh: vi.fn(), forward: vi.fn() }),
@@ -32,6 +35,7 @@ import MenuEditPage from './edit'
 import { snapshotOf } from '../booking-kit/test-data'
 
 beforeEach(() => {
+  account.id = 'account-1'
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-10T12:00:00+09:00'))
   role.value = verifiedStaffRole('owner')
@@ -120,6 +124,73 @@ describe('MJoJR メニュー管理', () => {
 })
 
 describe('mauOC コースの編集ページ', () => {
+  it('メニュー編集の読み込み中は追加の題にせず、読めた名前へ替える', async () => {
+    let resolveSnapshot!: (value: unknown) => void
+    fixture.snapshot.mockImplementation(() => new Promise(resolve => { resolveSnapshot = resolve }))
+    nav.params = new URLSearchParams('id=m1')
+    render(<MenuEditPage />)
+    expect(chromeTitle).toHaveBeenLastCalledWith('メニューを編集')
+    expect(chromeTitle).not.toHaveBeenCalledWith('コースを追加する')
+    resolveSnapshot({ data: snapshotOf() })
+    await screen.findByLabelText('メニュー名')
+    expect(chromeTitle).toHaveBeenLastCalledWith('秋の鹿肉コース')
+  })
+
+  it('新規は取得中も取得後も追加の題を保つ', async () => {
+    let resolveSnapshot!: (value: unknown) => void
+    fixture.snapshot.mockImplementation(() => new Promise(resolve => { resolveSnapshot = resolve }))
+    nav.params = new URLSearchParams('store=store-1')
+    render(<MenuEditPage />)
+    expect(chromeTitle).toHaveBeenLastCalledWith('コースを追加する')
+    resolveSnapshot({ data: snapshotOf() })
+    await screen.findByLabelText('メニュー名')
+    expect(chromeTitle).toHaveBeenLastCalledWith('コースを追加する')
+  })
+
+  it('編集IDを替えると、次の取得中に前の名前と入力を残さない', async () => {
+    nav.params = new URLSearchParams('id=m1')
+    const view = render(<MenuEditPage />)
+    await screen.findByDisplayValue('秋の鹿肉コース')
+    let resolveSnapshot!: (value: unknown) => void
+    fixture.snapshot.mockImplementation(() => new Promise(resolve => { resolveSnapshot = resolve }))
+    nav.params = new URLSearchParams('id=m2')
+    view.rerender(<MenuEditPage />)
+    expect(chromeTitle).toHaveBeenLastCalledWith('メニューを編集')
+    expect(screen.queryByDisplayValue('秋の鹿肉コース')).toBeNull()
+    const next = snapshotOf()
+    next.menuItems = [{ ...next.menuItems[0], id: 'm2', name: '冬のコース' }]
+    resolveSnapshot({ data: next })
+    await screen.findByDisplayValue('冬のコース')
+    expect(chromeTitle).toHaveBeenLastCalledWith('冬のコース')
+  })
+
+  it('店舗を替えたら同じIDでも前の名前を残さない', async () => {
+    nav.params = new URLSearchParams('id=m1')
+    const view = render(<MenuEditPage />)
+    await screen.findByDisplayValue('秋の鹿肉コース')
+    let resolveSnapshot!: (value: unknown) => void
+    fixture.snapshot.mockImplementation(() => new Promise(resolve => { resolveSnapshot = resolve }))
+    account.id = 'account-2'
+    view.rerender(<MenuEditPage />)
+    expect(chromeTitle).toHaveBeenLastCalledWith('メニューを編集')
+    expect(screen.queryByDisplayValue('秋の鹿肉コース')).toBeNull()
+    const next = snapshotOf()
+    next.menuItems = [{ ...next.menuItems[0], name: '二号店のコース' }]
+    resolveSnapshot({ data: next })
+    await screen.findByDisplayValue('二号店のコース')
+    expect(fixture.snapshot).toHaveBeenLastCalledWith('account-2')
+  })
+
+  it('対象IDが同じ内部の指定では入力を作り直さない', async () => {
+    nav.params = new URLSearchParams('id=m1')
+    const view = render(<MenuEditPage />)
+    fireEvent.change(await screen.findByLabelText('メニュー名'), { target: { value: '編集中のコース' } })
+    nav.params = new URLSearchParams('id=m1&tab=payment')
+    view.rerender(<MenuEditPage />)
+    expect(screen.getByDisplayValue('編集中のコース')).toBeTruthy()
+    expect(fixture.snapshot).toHaveBeenCalledTimes(1)
+  })
+
   it('変更して保存すると、今の口（updateMenu）へ届き一覧へ戻る', async () => {
     nav.params = new URLSearchParams('id=m1')
     render(<MenuEditPage />)

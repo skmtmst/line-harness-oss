@@ -270,17 +270,15 @@ function convertCoupon(name: string, payload: AssetPayloadInput): AssetConversio
   const title = text(payload.title) || name || 'クーポン';
   let body: Record<string, unknown>[] = [
     { type: 'text', text: title, weight: 'bold', wrap: true },
-    ...(text(payload.description) ? [{ type: 'text', text: text(payload.description), wrap: true }] : []),
+    { type: 'text', text: text(payload.description), wrap: true },
     { type: 'text', text: `有効期間：${text(payload.startsAt)}〜${text(payload.endsAt)}`, wrap: true, size: 'sm' },
     { type: 'text', text: text(payload.instructions) || 'お店で確認してから「使う」を押してください', wrap: true, size: 'sm' },
     { type: 'text', text: payload.oncePerFriend === false && payload.maxUsesPerFriend == null ? '期間中は何回でも使えます' : `1人${Number(payload.maxUsesPerFriend ?? 1)}回まで`, wrap: true, size: 'sm' },
   ];
   if (hasCouponPresentation(payload)) {
     const view = couponPresentation(payload, name);
-    const count = payload.oncePerFriend === false && payload.maxUsesPerFriend == null
-      ? '期間中は何回でも' : `${Number(payload.maxUsesPerFriend ?? 1)}回のみ使用可能`;
     body = [
-      { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [view.kindLabel, count].filter(Boolean).map(value => ({ type: 'text', text: value, size: 'xs', wrap: true })) },
+      { type: 'box', layout: 'horizontal', spacing: 'sm', contents: [view.kindLabel, view.countLabel].filter(Boolean).map(value => ({ type: 'text', text: value, size: 'xs', wrap: true })) },
       { type: 'text', text: view.title, weight: 'bold', wrap: true },
       ...(view.beforePrice ? [{ type: 'text', text: view.beforePrice, decoration: 'line-through', size: 'sm' }] : []),
       ...(view.benefit ? [{ type: 'text', text: view.benefit, weight: 'bold', size: 'xxl', wrap: true }] : []),
@@ -288,7 +286,7 @@ function convertCoupon(name: string, payload: AssetPayloadInput): AssetConversio
       ...(view.code ? [{ type: 'text', text: `クーポンコード：${view.code}`, size: 'sm', wrap: true }] : []),
       { type: 'text', text: `有効期間：${text(payload.startsAt)}〜${text(payload.endsAt)}`, size: 'sm', wrap: true },
       ...(view.instructions ? [{ type: 'text', text: view.instructions, size: 'sm', wrap: true }] : []),
-      { type: 'text', text: '日本時間（UTC+09:00）', size: 'xs' },
+      { type: 'text', text: view.timezoneNote, size: 'xs' },
     ];
   }
   const bubble = { type: 'bubble',

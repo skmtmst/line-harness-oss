@@ -99,6 +99,7 @@ function FlexText({ node }: { node: FlexNode }) {
     fontSize: getSize(node.size) || '14px',
     fontWeight: node.weight === 'bold' ? 700 : 400,
     color: node.color || '#111',
+    textDecoration: node.decoration === 'line-through' || node.decoration === 'underline' ? node.decoration : undefined,
     margin: 0,
     lineHeight: 1.4,
     ...(node.wrap === false ? { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } : { wordBreak: 'break-word' }),

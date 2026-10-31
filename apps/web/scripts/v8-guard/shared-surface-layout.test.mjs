@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync, mkdirSync } from 'node:fs'
@@ -13,7 +14,7 @@ const require = createRequire(import.meta.url)
 const fromVitest = createRequire(require.resolve('vitest/package.json'))
 const { build } = createRequire(fromVitest.resolve('vite'))('esbuild')
 
-const webRoot = new URL('../..', import.meta.url).pathname
+const webRoot = fileURLToPath(new URL('../..', import.meta.url))
 const sheets = new Set()
 const compiled = await build({
   stdin: { resolveDir: webRoot, loader: 'tsx', contents: `
@@ -78,7 +79,7 @@ function Fixture(){
       <TextField aria-label="寸法の名前" defaultValue="名前" />
       <SearchField aria-label="寸法の検索" value="" onChange={()=>{}} placeholder="名前で探す" />
       <Select aria-label="寸法の選択" menuAlign="end" label="状態" value="all" options={[{value:'all',label:'すべて'},{value:'active',label:'とても長い選択肢の名前を最後まで確認する'}]} onChange={()=>{}} />
-      <Button variant="secondary" aria-label="寸法の保存">保存する</Button>
+      <Button variant="primary" aria-label="寸法の保存">保存する</Button>
     </div>
     <TextArea aria-label="寸法の本文" defaultValue="本文" />
   </section>
@@ -192,7 +193,7 @@ function Fixture(){
     b.onLoad({ filter: /\.css$/ }, args => { sheets.add(readFileSync(args.path, 'utf8')); return { contents: '', loader: 'js' } })
   } }],
 })
-const globals = await compileUiStyles(new URL('../../src/app/globals.css', import.meta.url).pathname, ['fixed', 'min-w-0'])
+const globals = await compileUiStyles(fileURLToPath(new URL('../../src/app/globals.css', import.meta.url)), ['fixed', 'min-w-0'])
 const css = [globals, ...sheets].join('\n').replace(/:global\(([^()]*)\)/g, '$1')
 
 async function mount(page, width, inputReasonFault = false) {
@@ -489,8 +490,11 @@ for (const width of [1152,1440,1920]) {
       const controls = await read()
       assert.ok(controls.slice(0,4).every(control => control.height === 36), JSON.stringify(controls))
       assert.ok(controls.slice(0,4).every(control => Math.abs(control.center - controls[0].center) <= 0.5), JSON.stringify(controls))
-      assert.ok(controls.every(control => control.image.includes('linear-gradient') && control.shadow !== 'none'), JSON.stringify(controls))
-      assert.equal(controls[0].image, controls[2].image)
+      assert.deepEqual([controls[0], controls[1], controls[4]].map(control => control.image), ['none', 'none', 'none'])
+      assert.equal(controls[2].image, 'linear-gradient(rgb(255, 255, 255), rgb(250, 250, 252))')
+      assert.equal(controls[3].image, 'linear-gradient(rgb(8, 122, 62), rgb(6, 106, 53))')
+      assert.ok(controls.every(control => control.shadow !== 'none'), JSON.stringify(controls))
+      assert.equal(controls[0].image, controls[4].image)
       assert.equal(controls[0].shadow, controls[2].shadow)
       assert.equal(controls[1].shadow, controls[2].shadow)
       assert.equal(controls[4].shadow, controls[2].shadow)
@@ -652,9 +656,14 @@ for (const width of [1152,1440,1920]) {
         return {kind:item.dataset.choiceCase,height:b.height,image:s.backgroundImage,shadow:s.boxShadow,radius:s.borderRadius,border:s.borderWidth,dy:a.y+a.height/2-b.y-b.height/2,right:b.right-a.right}
       }))
       const good=await measure()
+      if (process.env.V8_CHOICE_SHOTS_DIR) {
+        mkdirSync(process.env.V8_CHOICE_SHOTS_DIR, { recursive: true })
+        await page.locator('#choice-appearance').screenshot({ path: join(process.env.V8_CHOICE_SHOTS_DIR, `choice-surfaces-${width}.png`) })
+      }
       assert.equal(good.length,7)
       assert.ok(good.every(item=>item.height===36&&Math.abs(item.dy)<=1&&Math.abs(item.right-12)<=1),JSON.stringify(good))
-      assert.ok(good.every(item=>item.image===good[0].image&&item.shadow===good[0].shadow&&item.radius===good[0].radius&&item.border==='0px'),JSON.stringify(good))
+      assert.deepEqual(good.map(({kind,image})=>({kind,image})), ['select','folder','entity','combo','multi','text','time'].map(kind=>({kind,image:['select','folder','entity','multi'].includes(kind)?'linear-gradient(rgb(255, 255, 255), rgb(250, 250, 252))':'none'})))
+      assert.ok(good.every(item=>item.shadow===good[0].shadow&&item.radius===good[0].radius&&item.border==='0px'),JSON.stringify(good))
       const entity=page.locator('[data-choice-case="entity"] [data-choice-chevron]')
       await entity.evaluate(el=>el.style.transform='translateY(calc(-50% + 2px))')
       await expect.poll(async () => (await measure()).some(item=>Math.abs(item.dy)>1)).toBe(true)
