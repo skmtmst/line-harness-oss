@@ -1111,3 +1111,5 @@
 - [列車1031Jの修正](release-log/unreleased/2026-kenta-train-1031j.md) — 反映履歴、確認 2026-11-01。
 
 - [列車1031K：フォーム・タグ・率と登録結果](release-log/unreleased/2027-kenta-train-1031k.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [Google口コミの離脱確認文](release-log/unreleased/0000-kenta-google-review-leave-copy.md)：返信文の変更を残す・破棄する操作と説明を合わせた修正。確認日：2026-11-01。
