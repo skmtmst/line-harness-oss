@@ -123,3 +123,14 @@ describe('スタイルを選ぶ画面（共通節 S）', () => {
     expect(screen.getByRole('status').textContent).toBe(`選んでいるスタイル：${styleLabel('consult')}`)
   })
 })
+
+it('窓上部のスタイル切り替えから Escape を押すとデモだけ閉じる', async () => {
+  render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
+  fireEvent.click(screen.getByRole('button', { name: '詳しく見る' }))
+  const styleButton = within(group()).getByRole('button', { name: 'サロン' })
+  styleButton.focus()
+  fireEvent.keyDown(styleButton, { key: 'Escape' })
+  expect(screen.queryByRole('button', { name: 'デモを閉じる' })).toBeNull()
+  expect(screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })).toBeTruthy()
+  expect(calls.closed).not.toHaveBeenCalled()
+})
