@@ -5,7 +5,7 @@ import { ApiError, api } from '@/lib/api'
 import type { EntryRoute } from '@line-crm/shared'
 import { formatNumber } from '@/lib/format'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -100,18 +100,14 @@ export default function BulkRoutesDialog({
       description="選んだ経路に同じ操作をまとめて行います。実行前に、実際に変わる件数を確認できます。"
       busy={busy}
       onCancel={close}
-      footer={result ? undefined : (
-        <div className="border-hairline flex flex-wrap items-center justify-end gap-2 border-t pt-4">
+      footer={result ? undefined : (<DialogActions>
           <Button type="button" onClick={close} disabled={busy}>
             キャンセル
           </Button>
-          {action && affected.length > 0 ? (
-            <Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }} busy={busy} busyLabel="実行中…">
+          {action && affected.length > 0 ? (<Button type="button" variant="primary" disabled={busy} onClick={() => { void run() }} busy={busy} busyLabel="実行中…">
               {`${formatNumber(affected.length)} 件に実行する`}
-            </Button>
-          ) : null}
-        </div>
-      )}
+            </Button>) : null}
+        </DialogActions>)}
     >
       {result ? (
         <div className="space-y-3">

@@ -25,7 +25,7 @@ import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateField from '@/components/shared/date-field'
 import DateTimeField,{ TimeField } from '@/components/shared/date-time-field'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import LinePreview from '@/components/shared/line-preview'
@@ -817,7 +817,7 @@ function EditCommonVarV8Inner() {
         error={statusError || undefined}
         onCancel={closeStatusDialog}
         footer={
-          <div className={styles.dialogActions}>
+          <DialogActions>
             <Button type="button" onClick={closeStatusDialog} disabled={statusBusy}>
               キャンセル
             </Button>
@@ -831,7 +831,7 @@ function EditCommonVarV8Inner() {
             >
               {statusAction === 'stop' ? '止める' : statusAction === 'resume' ? '再開する' : '公開する'}
             </Button>
-          </div>
+          </DialogActions>
         }
       >
         <Field label={<><span className={styles.fieldLabelStrong}>
@@ -903,14 +903,14 @@ function EditCommonVarV8Inner() {
         description="決めた日時から、ここに入れた値へ変わります。"
         onCancel={() => setDraft(null)}
         footer={
-          <div className={styles.dialogActions}>
+          <DialogActions>
             <Button type="button" disabled={addingSchedule} onClick={() => setDraft(null)}>
               キャンセル
             </Button>
             <Button type="button" variant="primary" disabled={addingSchedule} busy={addingSchedule} onClick={() => void addSchedule()}>
               登録する
             </Button>
-          </div>
+          </DialogActions>
         }
       >
         {draft ? (
@@ -973,15 +973,14 @@ function EditCommonVarV8Inner() {
         error={error || undefined}
         onCancel={() => { if (!saving) setCompareOpen(false) }}
         footer={
-          <div className={styles.dialogActions}>
+          <DialogActions>
             <Button type="button" onClick={() => { if (!saving) setCompareOpen(false) }} disabled={saving}>
               閉じる
             </Button>
             <Button type="button" onClick={adoptLatest} disabled={saving}>
               最新の値で続け直す
             </Button>
-            {canWrite ? (
-              <Button
+            {canWrite ? (<Button
                 type="button"
                 variant="danger"
                 onClick={() => void save()}
@@ -990,9 +989,8 @@ function EditCommonVarV8Inner() {
                 busyLabel="保存中…"
               >
                 このまま保存して上書きする
-              </Button>
-            ) : null}
-          </div>
+              </Button>) : null}
+          </DialogActions>
         }
       >
         {item ? (
@@ -1014,13 +1012,7 @@ function EditCommonVarV8Inner() {
         designNode="C67dE-preview"
         title="LINEでの見え方"
         onCancel={() => setPreviewOpen(false)}
-        footer={
-          <div className={styles.dialogActions}>
-            <Button type="button" onClick={() => setPreviewOpen(false)}>
-              閉じる
-            </Button>
-          </div>
-        }
+
       >
         {previewTalk}
       </Dialog>

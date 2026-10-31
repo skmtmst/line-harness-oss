@@ -8,7 +8,7 @@ import type { Tag } from '@line-crm/shared'
 import { api, type CommonActionResources, type TagDefinitionAction, type TagRetroactivePreview } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { formatNumber } from '@/lib/format'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 
@@ -148,11 +148,11 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
   return <Dialog open size="large" tone="destructive" confirmation dirty={false}
     onCancel={onCancel} title={`${selfTargets + referralTargets}人にさかのぼってマイルを積みますか？`}
     titleIcon={<Coins aria-hidden="true" />}
-    footer={<>
+    footer={<DialogActions>
 
           <Button variant="secondary" type="button" onClick={onSaveWithoutApplying}>反映しないで保存する</Button>
           <Button variant="primary" type="button" disabled={!accepted || loading || Boolean(previewError)} onClick={() => onSave(preview?.previewToken ?? '')}>{loading ? '対象を計算中…' : 'さかのぼって反映して保存する'}</Button>
-            </>}
+            </DialogActions>}
   >
         <p className="mt-2 text-sm leading-6 text-ink-secondary">「{values.name || 'このタグ'}」の変更を、いまこのタグが付いている人にも適用します。人数はサーバーで再計算した値です。</p>
         <div className="mt-4 overflow-hidden rounded-control border border-hairline">

@@ -1169,15 +1169,12 @@ export default function RichMenusListV8() {
       busy={deleteBusy}
       error={deleteError}
       onClose={closeDelete}
-      footer={<>
-        <Button type="button" variant="secondary" onClick={closeDelete} disabled={deleteBusy}>閉じる</Button>
-        {managedDelete.status === 'published' && canEdit ? (
+      footer={managedDelete.status === 'published' && canEdit ? (
           <Button type="button" variant="secondary" onClick={() => void confirmDelete()} disabled={deleteBusy} busy={Boolean(deleteBusy)} busyLabel="処理中…">
             <CloudOff size={16} aria-hidden="true" />
             LINEから取り下げる
           </Button>
-        ) : null}
-      </>}
+        ) : undefined}
     />
   ) : null
 

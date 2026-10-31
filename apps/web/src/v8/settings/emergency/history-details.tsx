@@ -7,7 +7,7 @@ import { collectRecentUpdates, RECENT_UPDATES_LIMIT, type UpdateRelease } from '
 import { formatOperationDate } from '@/lib/operation-status'
 import { formatMinutesRough } from '@/lib/format-duration'
 import releaseLog from '@/generated/release-log-summary.json'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import { downloadCsv as saveCsvFile } from '@/components/shared/csv-download'
 import Select from '@/components/shared/select'
@@ -79,7 +79,7 @@ export default function HistoryDetails({ panel, onClose }: { panel: HistoryDetai
   return <Dialog open={panel !== null} title={panel === 'incidents' ? '止めた・戻した記録' : '管理画面の更新内容'}
     description={panel === 'incidents' ? '選んだ期間の一覧・回数・最長停止を確認します。' : `新しい${RECENT_UPDATES_LIMIT}件を表示します。まだ画面に入っていない変更は行に混ぜません。`}
     onCancel={onClose} cancelLabel="閉じる" size="wide"
-    footer={panel === 'incidents' ? <Button variant="secondary" disabled={!ready} onClick={downloadCsv}>CSVで書き出す</Button> : undefined}>
+    footer={panel === 'incidents' ? <DialogActions><Button variant="secondary" disabled={!ready} onClick={downloadCsv}>CSVで書き出す</Button></DialogActions> : undefined}>
     {state === 'error' ? <ListState kind="error" title="運用履歴を読み込めませんでした" description="履歴なしとは扱いません。もう一度読み直してください。" action={<Button variant="secondary" onClick={() => setRevision((value) => value + 1)}>もう一度読み込む</Button>} /> : null}
     {panel === 'incidents' ? <>
       <Field label="表示期間"><Select aria-label="表示期間" size="full" value={period} onChange={(value) => setPeriod(value as 'year' | '30days')} options={[{ value: 'year', label: 'この1年' }, { value: '30days', label: '過去30日' }]} /></Field>

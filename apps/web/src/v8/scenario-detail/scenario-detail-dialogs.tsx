@@ -171,7 +171,7 @@ export function ScenarioDetailDialogs({
           setRenameOpen(false)
         }}
         footer={
-          <>
+          <DialogActions>
             <Button
               disabled={saving}
               onClick={() => {
@@ -193,7 +193,7 @@ export function ScenarioDetailDialogs({
             <Button variant="primary" onClick={() => void handleSaveScenario()} disabled={!editForm.name.trim() || saving} busy={saving}>
               この内容で保存する
             </Button>
-          </>
+          </DialogActions>
         }
       >
         <div className="flex flex-col gap-4">

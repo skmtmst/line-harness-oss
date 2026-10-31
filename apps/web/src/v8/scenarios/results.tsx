@@ -13,7 +13,7 @@ import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import type { ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import ListState from '@/components/shared/list-state'
 import TargetMissing from '@/components/shared/target-missing'
 import NoteBar from '@/components/shared/note-bar'
@@ -641,8 +641,7 @@ export default function ScenarioResultsV8() {
         busy={opBusy !== null}
         error={moveTarget ? opError : ''}
         onCancel={closeMove}
-        footer={(
-          <div className={styles.dialogButtons}>
+        footer={(<DialogActions>
             <Button type="button" onClick={closeMove} disabled={opBusy !== null}>キャンセル</Button>
             <Button
               type="button"
@@ -654,8 +653,7 @@ export default function ScenarioResultsV8() {
             >
               このシナリオへ移す
             </Button>
-          </div>
-        )}
+          </DialogActions>)}
       >
         {/* 候補の取得失敗は「移せるシナリオがありません」と分ける（SCENARIO-10 と同じ分け方）。 */}
         {moveOptionsError ? (
