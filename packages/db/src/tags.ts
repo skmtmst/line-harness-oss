@@ -1471,9 +1471,14 @@ export async function getFriendsByTag(
   db: D1Database,
   tagId: string,
   lineAccountId?: string | null,
+  scope?: { allowedAccountIds: readonly string[]; canSeeUnassigned: boolean },
 ): Promise<Friend[]> {
-  const accountClause = lineAccountId ? ' AND f.line_account_id = ?' : '';
+  let accountClause = lineAccountId ? ' AND f.line_account_id = ?' : '';
   const bindings = lineAccountId ? [tagId, lineAccountId] : [tagId];
+  if (scope) {
+    accountClause += ` AND (f.line_account_id IN (SELECT value FROM json_each(?))${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`;
+    bindings.push(JSON.stringify(scope.allowedAccountIds));
+  }
   const result = await db
     .prepare(
       `SELECT f.*

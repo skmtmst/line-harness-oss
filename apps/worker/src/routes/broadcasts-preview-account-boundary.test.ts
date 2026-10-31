@@ -40,6 +40,7 @@ vi.mock('@line-crm/db', () => ({
   updateBroadcast: vi.fn(),
   deleteBroadcast: vi.fn(),
   getLineAccountById: vi.fn(),
+  getLineAccountScopeEntries: vi.fn(async () => [{ id: 'accA' }]),
 }));
 vi.mock('../services/account-access.js', () => ({
   getVisibleLineAccountScope: vi.fn(),
@@ -84,7 +85,8 @@ function countFor(query: string, bindings: unknown[]): number {
     const accountId = hasAccount ? (bindings[1] as string) : null;
     return FRIENDS.filter((f) => f.tags.includes(tagId)
       && f.is_following === 1
-      && (!hasAccount || f.line_account_id === accountId)).length;
+      && (!hasAccount || f.line_account_id === accountId)
+      && (!query.includes('json_each') || JSON.parse(bindings[1] as string).includes(f.line_account_id))).length;
   }
   const hasAccount = query.includes('line_account_id = ?');
   const accountId = hasAccount ? (bindings[0] as string) : null;
@@ -103,7 +105,7 @@ function app() {
           sql.push(entry);
           const statement = {
             bind: (...bindings: unknown[]) => { entry.bindings = bindings; return statement; },
-            first: async () => ({ cnt: countFor(query, entry.bindings) }),
+            first: async () => ({ count: countFor(query, entry.bindings) }),
             all: async () => ({ results: [] }),
             run: async () => ({}),
           };
@@ -176,12 +178,12 @@ describe('preview-count tag account boundary (N-060)', () => {
     expect(await response.json()).toMatchObject({ success: true, data: { count: 0 } });
   });
 
-  test('line_account_id が無い配信は絞らず全件 (送信と同じ)', async () => {
+  test('line_account_id が無い配信は既定統括の範囲で数える', async () => {
     const { instance, sql } = app();
     const response = await instance.request('/api/broadcasts/b-null/preview-count');
-    expect(await response.json()).toMatchObject({ success: true, data: { count: 8 } });
+    expect(await response.json()).toMatchObject({ success: true, data: { count: 3 } });
     expect(sql[0].query).not.toContain('f.line_account_id = ?');
-    expect(sql[0].bindings).toEqual(['tag-1']);
+    expect(sql[0].bindings).toEqual(['tag-1', '["accA"]']);
   });
 
   test('二重実行でも同じ人数', async () => {

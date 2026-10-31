@@ -1,3 +1,4 @@
+import { scopedFriendIds, storedBroadcastFriendScope } from './segment-query-scope.js';
 import { INSIGHT_MIN_AUDIENCE } from '@line-crm/db';
 import { buildSegmentWhere, type SegmentCondition } from './segment-query.js';
 
@@ -68,6 +69,7 @@ export async function previewAudience(
   db: D1Database,
   input: PreflightInput,
 ): Promise<AudiencePreview> {
+  if (input.targetType === 'tag' && !input.targetTagId) return emptyAudiencePreview();
   const where: string[] = ['1 = 1'];
   const binds: unknown[] = [];
   if (input.targetType === 'multi-account-dedup') {
@@ -78,6 +80,10 @@ export async function previewAudience(
   } else if (input.lineAccountId) {
     where.push('f.line_account_id = ?');
     binds.push(input.lineAccountId);
+  } else {
+    const scope = scopedFriendIds(await storedBroadcastFriendScope(db, null));
+    where.push(`f.id IN (${scope.sql})`);
+    binds.push(...scope.bindings);
   }
   if (input.targetType === 'tag') {
     if (!input.targetTagId) return emptyAudiencePreview();
@@ -187,6 +193,7 @@ export async function countAudience(
   db: D1Database,
   input: PreflightInput,
 ): Promise<{ total: number; hiddenExcluded: number }> {
+  if (input.targetType === 'tag' && !input.targetTagId) return { total: 0, hiddenExcluded: 0 };
   const where: string[] = ['f.is_following = 1'];
   const binds: unknown[] = [];
 
@@ -198,6 +205,10 @@ export async function countAudience(
   } else if (input.lineAccountId) {
     where.push('f.line_account_id = ?');
     binds.push(input.lineAccountId);
+  } else {
+    const scope = scopedFriendIds(await storedBroadcastFriendScope(db, null));
+    where.push(`f.id IN (${scope.sql})`);
+    binds.push(...scope.bindings);
   }
 
   if (input.targetType === 'tag') {

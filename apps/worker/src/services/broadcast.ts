@@ -1,3 +1,4 @@
+import { scopeStoredBroadcastSegmentQuery, scopedFriendIds, storedBroadcastFriendScope, storedBroadcastFriendIds } from './segment-query-scope.js';
 import { buildMessage } from './line-message.js';
 import {
   getBroadcastById,
@@ -74,11 +75,12 @@ const PERSONALIZED_PUSH_BATCH_SIZE = 10;
  * 何日も残る。
  *
  * 上限を置く理由は Workers の subrequest（1回の実行で出せる問い合わせの数、
- * 1,000）。1人あたり最大4つ使う。
+ * 1,000）。後続の動作を指定していない場合、1人あたり最大6つ使う。
  *
- *   照合1（送信済みか） + 友だち情報1 + LINEへの送信1 + 記録1 = 4
+ *   送信済み・現在の所属の照合1 + 友だち情報1 + LINEへの送信1
+ *   + 台帳1 + 記録と決着1 + 後続動作の入口1 = 6
  *
- * 150人で600。10人ごとに `batch_offset` を書いているので、上限に当たって
+ * 150人で900。10人ごとに `batch_offset` を書いているので、上限に当たって
  * 実行が切れても**次のcronで続きから再開する**。送信済みの照合があるので
  * 二重送信にもならない。
  */
@@ -184,18 +186,12 @@ export async function processBroadcastSend(
       // 分析の一時対象者は送信直前にも所属・期限を確かめ直す。
       await assertAnalyticsAudiencesUsable(db, storedConditions, accountId);
       const { buildSegmentQuery } = await import('./segment-query.js');
-      const { sql, bindings } = buildSegmentQuery(storedConditions);
-      const segmentAudienceSql = accountId
-        ? `SELECT COUNT(*) AS total,
-                  SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
-             FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
-        : `SELECT COUNT(*) AS total,
-                  SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
-             FROM (${sql}) q`;
-      const segmentAudience = await db
-        .prepare(segmentAudienceSql)
-        .bind(...(accountId ? [accountId, ...bindings] : bindings))
-        .first<{ total: number; missing_name: number | null }>();
+      const { sql, bindings } = await scopeStoredBroadcastSegmentQuery(db, buildSegmentQuery(storedConditions), accountId);
+      const segmentAudience = await db.prepare(
+        `SELECT COUNT(*) AS total,
+                SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+           FROM (${sql}) q`,
+      ).bind(...bindings).first<{ total: number; missing_name: number | null }>();
       if (Number(segmentAudience?.missing_name ?? 0) > 0) {
         throw new Error(`Cannot personalize broadcast: ${segmentAudience!.missing_name} recipient(s) have no display name`);
       }
@@ -209,10 +205,9 @@ export async function processBroadcastSend(
 
     const where: string[] = ['f.is_following = 1'];
     const binds: unknown[] = [];
-    if (accountId) {
-      where.push('f.line_account_id = ?');
-      binds.push(accountId);
-    }
+    const audienceScope = scopedFriendIds(await storedBroadcastFriendScope(db, accountId));
+    where.push(`f.id IN (${audienceScope.sql})`);
+    binds.push(...audienceScope.bindings);
     if (broadcast.target_type === 'tag') {
       if (!broadcast.target_tag_id) throw new Error('target_tag_id is required for personalized tag broadcast');
       where.push('EXISTS (SELECT 1 FROM friend_tags ft WHERE ft.friend_id = f.id AND ft.tag_id = ?)');
@@ -265,21 +260,16 @@ export async function processBroadcastSend(
     await assertAnalyticsAudiencesUsable(
       db, conditions as Parameters<typeof buildSegmentQuery>[0], accountId,
     );
-    const { sql, bindings } = buildSegmentQuery(conditions as Parameters<typeof buildSegmentQuery>[0]);
-    const countSql = accountId
-      ? `SELECT COUNT(*) AS cnt FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
-      : `SELECT COUNT(*) AS cnt FROM (${sql}) q`;
-    const binds = accountId ? [accountId, ...bindings] : bindings;
-    const row = await db.prepare(countSql).bind(...binds).first<{ cnt: number }>();
+    const { sql, bindings } = await scopeStoredBroadcastSegmentQuery(db, buildSegmentQuery(conditions as Parameters<typeof buildSegmentQuery>[0]), accountId);
+    const row = await db.prepare(`SELECT COUNT(*) AS cnt FROM (${sql}) q`)
+      .bind(...bindings).first<{ cnt: number }>();
 
     // 名前を差し込む本文は、名前の無い人がいると差し込めない。送る前に止める。
     if (hasRecipientVariablesInParts(storedParts)) {
-      const nameSql = accountId
-        ? `SELECT SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
-             FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
-        : `SELECT SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
-             FROM (${sql}) q`;
-      const missing = await db.prepare(nameSql).bind(...binds).first<{ missing_name: number | null }>();
+      const missing = await db.prepare(
+        `SELECT SUM(CASE WHEN q.display_name IS NULL OR trim(q.display_name) = '' THEN 1 ELSE 0 END) AS missing_name
+           FROM (${sql}) q`,
+      ).bind(...bindings).first<{ missing_name: number | null }>();
       if (Number(missing?.missing_name ?? 0) > 0) {
         throw new Error(`Cannot personalize broadcast: ${missing!.missing_name} recipient(s) have no display name`);
       }
@@ -390,7 +380,7 @@ export async function processBroadcastSend(
         throw new Error('target_tag_id is required for tag-targeted broadcasts');
       }
 
-      const friends = await getFriendsByTag(db, broadcast.target_tag_id, broadcastAccountId);
+      const friends = await getFriendsByTag(db, broadcast.target_tag_id, broadcastAccountId, await storedBroadcastFriendScope(db, broadcastAccountId));
       const followingFriends = friends.filter((f) => f.is_following);
       totalCount = followingFriends.length;
 
@@ -415,16 +405,11 @@ export async function processBroadcastSend(
             await isOperationCapabilityStopped(db, broadcastAccountId, 'broadcast_dispatch')) break;
         const batchIndex = Math.floor(i / MULTICAST_BATCH_SIZE);
         const batch = followingFriends.slice(i, i + MULTICAST_BATCH_SIZE);
-        const sendable = batch.filter((f) => !blocked.has(f.id));
+        if (batchIndex > 0) await sleep(calculateStaggerDelay(followingFriends.length, batchIndex, MULTICAST_BATCH_SIZE));
+        const sendable = await currentBroadcastRecipients(db, broadcastAccountId, batch.filter((f) => !blocked.has(f.id)));
         if (sendable.length === 0) continue;
         const sendableIds = sendable.map((f) => f.id);
         const lineUserIds = sendable.map((f) => f.line_user_id);
-
-        // Stealth: add staggered delay between batches
-        if (batchIndex > 0) {
-          const delay = calculateStaggerDelay(followingFriends.length, batchIndex, MULTICAST_BATCH_SIZE);
-          await sleep(delay);
-        }
 
         // Stealth: add slight variation to text messages
         const batchMessages = varyTextMessages(messages, batchIndex, totalBatches);
@@ -1003,14 +988,9 @@ async function processQueuedBroadcastBatches(
   if (segmentConditionsStr) {
     const { buildSegmentQuery } = await import('./segment-query.js');
     const condition = JSON.parse(segmentConditionsStr);
-    const { sql, bindings } = buildSegmentQuery(condition);
-    // アカウントフィルタを追加（line_account_idで絞り込み）
-    let accountSql = sql;
-    const accountBindings = [...bindings];
-    if (accountId) {
-      accountSql = sql.replace('WHERE', 'WHERE f.line_account_id = ? AND');
-      accountBindings.unshift(accountId);
-    }
+    const { sql: accountSql, bindings: accountBindings } = await scopeStoredBroadcastSegmentQuery(
+      db, buildSegmentQuery(condition), accountId,
+    );
     const result = await db.prepare(accountSql).bind(...accountBindings).all<{
       id: string;
       line_user_id: string;
@@ -1019,7 +999,7 @@ async function processQueuedBroadcastBatches(
     friends = result.results ?? [];
   } else if (broadcast.target_tag_id) {
     const { getFriendsByTag } = await import('@line-crm/db');
-    const tagFriends = await getFriendsByTag(db, broadcast.target_tag_id, accountId);
+    const tagFriends = await getFriendsByTag(db, broadcast.target_tag_id, accountId, await storedBroadcastFriendScope(db, accountId));
     friends = tagFriends.filter(f => f.is_following).map(f => ({
       id: f.id,
       line_user_id: f.line_user_id,
@@ -1117,16 +1097,6 @@ async function processQueuedBroadcastBatches(
           currentOffset++;
           continue;
         }
-        const alreadyLogged = await db.prepare(
-          `SELECT 1 FROM messages_log
-            WHERE broadcast_id = ? AND friend_id = ? AND direction = 'outgoing'
-              AND COALESCE(delivery_type, '') != 'test'
-            LIMIT 1`,
-        ).bind(broadcast.id, friend.id).first();
-        if (alreadyLogged) {
-          currentOffset++;
-          continue;
-        }
 
         try {
           // 友だち情報欄は人ごとに違うので、ここで引く。本文で使っていなければ引かない。
@@ -1150,13 +1120,15 @@ async function processQueuedBroadcastBatches(
           // 外へ出す**直前**に台帳へ「出す」と書く。書いてから送ると、
           // 送信と記録のあいだで Worker が消えても送達不明として残る。
           // 逆にすると「届いたのに台帳は空」になり、次の試行が再送する。
+          const [currentFriend] = await currentBroadcastRecipients(db, accountId, [friend], broadcast.id);
+          if (!currentFriend) { currentOffset++; continue; }
           await markBroadcastRecipientsDispatched(db, {
             broadcastId: broadcast.id,
             attemptNo,
             lineAccountId: accountId,
             friendIds: [friend.id],
           });
-          const { requestId: pushRequestId } = await lineClient.pushMessageWithRequestId(friend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
+          const { requestId: pushRequestId } = await lineClient.pushMessageWithRequestId(currentFriend.line_user_id, personalizedMessages, retryKey, aggregationUnits(unit));
 
           await db.batch([
             ...renderedParts.map((part) => db.prepare(
@@ -1241,18 +1213,13 @@ async function processQueuedBroadcastBatches(
      * 失敗分の再送は先頭から歩き直すので、ここで叩いてしまうと送り終えた
      * 相手へ2通目が出る。
      */
-    const sendable = batch.filter((friend) => !blocked.has(friend.id));
+    if (batchIndex > 0) await sleep(calculateStaggerDelay(friends.length, batchIndex, deliveryBatchSize));
+    const sendable = await currentBroadcastRecipients(db, accountId, batch.filter((friend) => !blocked.has(friend.id)));
     if (sendable.length === 0) {
       currentOffset += batch.length;
       continue;
     }
     const lineUserIds = sendable.map(f => f.line_user_id);
-
-    // ステルス遅延（最初のバッチ以外）
-    if (batchIndex > 0) {
-      const delay = calculateStaggerDelay(friends.length, batchIndex, deliveryBatchSize);
-      await sleep(delay);
-    }
 
     // テキストメッセージのバリエーションは先頭のテキスト1通だけに付ける。
     const batchMessages = varyTextMessages(messages, batchIndex, totalBatches);
@@ -1362,3 +1329,20 @@ async function processQueuedBroadcastBatches(
  * 呼び出し側が多いので、ここからも取れるようにしておく。
  */
 export { buildMessage };
+
+/** Recheck current ownership immediately before dispatch without reopening settled claims. */
+async function currentBroadcastRecipients<T extends { id: string; line_user_id: string }>(
+  db: D1Database, accountId: string | null, candidates: T[], alreadyLoggedBroadcastId?: string,
+): Promise<T[]> {
+  if (candidates.length === 0) return [];
+  const scope = storedBroadcastFriendIds(accountId);
+  const excludeLogged = alreadyLoggedBroadcastId
+    ? " AND NOT EXISTS (SELECT 1 FROM messages_log m WHERE m.broadcast_id = ? AND m.friend_id = f.id AND m.direction = 'outgoing' AND COALESCE(m.delivery_type, '') != 'test')"
+    : '';
+  const rows = await db.prepare(
+    `SELECT f.id, f.line_user_id FROM friends f
+      WHERE f.id IN (SELECT value FROM json_each(?)) AND f.id IN (${scope.sql})${excludeLogged}`,
+  ).bind(JSON.stringify(candidates.map(friend => friend.id)), ...scope.bindings, ...(alreadyLoggedBroadcastId ? [alreadyLoggedBroadcastId] : [])).all<{ id: string; line_user_id: string }>();
+  const current = new Map(rows.results.map(friend => [friend.id, friend.line_user_id]));
+  return candidates.filter(friend => current.has(friend.id)).map(friend => ({ ...friend, line_user_id: current.get(friend.id)! }));
+}

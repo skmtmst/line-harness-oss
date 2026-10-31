@@ -3,13 +3,14 @@ import { buildWarnings, countAudience } from './broadcast-preflight.js';
 import { buildSegmentQuery, type SegmentCondition } from './segment-query.js';
 import { createTestD1, insertFriend } from '../test-utils/d1-sqlite.js';
 
-/** first だけを返す最小のモック。SQLとバインドも見られるようにする。 */
+/** 人数とアカウントの読込を分けたモック。集計のSQLとバインドを記録する。 */
 function makeDb(row: { total: number | null; hidden: number | null } | null) {
   const calls: Array<{ sql: string; binds: unknown[] }> = [];
   const db = {
     prepare(sql: string) {
       return {
         bind(...binds: unknown[]) {
+          if (sql.includes('FROM line_accounts')) return { async all() { return { results: [] }; } };
           calls.push({ sql, binds });
           return {
             async first() {
