@@ -70,7 +70,11 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   const [tableId, setTableId] = useState('auto')
   const [changingTable, setChangingTable] = useState(false)
   const [memo, setMemo] = useState('')
-  const [notify, setNotify] = useState(true)
+  const [notifyTarget, setNotifyTarget] = useState<string | null>(null)
+  const notifyKey = JSON.stringify([accountId, storeId, friend?.lineUid])
+  const notify = Boolean(friend?.lineUid) && notifyTarget === notifyKey
+  const setNotify = (next: boolean) => setNotifyTarget(next ? notifyKey : null)
+  useEffect(() => { setNotifyTarget(null) }, [accountId, storeId])
   const [hours, setHours] = useState<RestaurantOpeningDay[] | null>(null)
   const [dayRows, setDayRows] = useState<RestaurantReservation[]>([])
   const [busy, setBusy] = useState(false)
@@ -81,7 +85,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
     if (!open) return
     fields.reset()
     setPhone(''); setFriends([]); setFriend(null); setName(''); setGuests(2); setDayChoice('today'); setPicked('')
-    setTime(''); setTableId('auto'); setChangingTable(false); setMemo(''); setNotify(true); setError('')
+    setTime(''); setTableId('auto'); setChangingTable(false); setMemo(''); setNotify(false); setError('')
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps -- 欄の印の片付けは開いたときだけ
 
   const date = dayChoice === 'today' ? toYmd(now) : dayChoice === 'tomorrow' ? toYmd(addDays(now, 1)) : picked
@@ -136,6 +140,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   const dirty = phone !== '' || name !== '' || memo !== '' || time !== '' || guests !== 2
 
   const choose = (item: Friend | null) => {
+    setNotifyTarget(null)
     setFriend(item)
     if (item) setName(item.name)
   }
@@ -275,7 +280,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
           /></SaveErrorField>
         ) : null}
         <Field label="メモ"><SaveErrorField names={["memo","note"]}><TextField value={memo} onChange={(event) => setMemo(event.target.value)} placeholder="アレルギー・記念日など" /></SaveErrorField></Field>
-        {friend ? (
+        {friend?.lineUid ? (
           <div className={styles.notifyRow}>
             <SaveErrorField names={["notify"]}><Toggle checked={notify} onChange={setNotify} label="LINE で確認を送る" /></SaveErrorField>
             <span className={styles.notifyText}>
