@@ -227,8 +227,9 @@ export const api = {
       'PUT',
     ).then((r) => unwrapSuccessData<NotificationPreferences>(r, '/api/liff/notification-preferences')),
   /** 本人の取消。版（lock_version）が合わないと 409。期限を過ぎると 403 self_deadline_passed。 */
-  cancelMyBooking: (id: string, lockVersion: number) =>
-    post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/cancel`, { lock_version: lockVersion }),
+  cancellationQuote: (id:string) => getData<import('@line-crm/shared').BookingCancellationReview>(`/api/liff/booking/cancellation-quote?booking_id=${encodeURIComponent(id)}`),
+  cancelMyBooking: (id: string, lockVersion: number, confirmation?:import('@line-crm/shared').BookingCancellationConfirmation) =>
+    post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/cancel`, { lock_version: lockVersion, ...confirmation }),
   /** 本人の日時変更。starts_at は UTC の ISO。埋まっていると 409 slot_not_available。 */
   rescheduleMyBooking: (id: string, body: { lock_version: number; starts_at: string; reason?: string }) =>
     post<LiffBookingChangeResponse>(`/api/liff/booking/${encodeURIComponent(id)}/reschedule`, body),

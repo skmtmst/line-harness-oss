@@ -107,7 +107,7 @@ export * from './support-mark-display.js';
 export * from './payment-status.js';
 export * from './yen.js';
 export * from './phone.js';
-export type {LineSenderSnapshot,LineSender,SendConfirmationPreview,InboxFirstResponseSettings,InboxFirstResponseWrite,InboxSlaState,BookingCancellationPolicy,BookingCancellationQuote,BookingCancellationCharge,BookingCalendarSwitch,BookingCalendarSwitchWrite} from './gap1.js';
+export type {LineSenderSnapshot,LineSender,SendConfirmationPreview,InboxFirstResponseSettings,InboxFirstResponseWrite,InboxSlaState,BookingCancellationPolicy,BookingCancellationQuote,BookingCancellationReview,BookingCancellationConfirmation,BookingCancellationCharge,BookingCalendarSwitch,BookingCalendarSwitchWrite} from './gap1.js';
 export * from './gap2.js';
 
 export * from './gap3-booking.js';
