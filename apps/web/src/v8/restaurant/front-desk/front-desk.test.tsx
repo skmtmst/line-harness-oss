@@ -118,18 +118,21 @@ describe('電話予約（E-2）', () => {
     }))
   })
 
-  it('お名前も時刻も無いまま入れると、口を呼ばず2つの欄に理由が出て、お名前の欄へ移る', async () => {
+  it('お名前も時刻も無い間は保存を止め、欄を離れた時の2つの理由も保つ', async () => {
     render(<PhoneReservationDrawer open accountId="acc" storeId="store-1" tables={T} onClose={() => {}} onSaved={vi.fn()} />)
     fireEvent.click(screen.getByText(/明日/))
-    await screen.findByRole('button', { name: '19:00' })
-    fireEvent.click(screen.getByRole('button', { name: /予約を入れる/ }))
-    await new Promise((r) => requestAnimationFrame(r))
+    const time = await screen.findByRole('button', { name: '19:00' })
+    const submit = screen.getByRole('button', { name: /予約を入れる/ }) as HTMLButtonElement
+    expect(submit.disabled).toBe(true)
+    expect(submit.getAttribute('aria-description')).toBe('お名前・時刻を入れてください。')
+    fireEvent.click(submit)
     expect(api.createReservation).not.toHaveBeenCalled()
     const name = screen.getByRole('textbox', { name: 'お名前' })
+    fireEvent.blur(name)
+    fireEvent.blur(time)
     expect(name.getAttribute('aria-invalid')).toBe('true')
     expect(document.getElementById('e2-name-error')?.textContent).toBe('お名前を入れてください。')
     expect(document.getElementById('e2-time-error')?.textContent).toBe('時刻を選んでください。')
-    await waitFor(() => expect(document.activeElement).toBe(name))
   })
 
   it('友だちでないときは「LINE で確認を送る」を出さず、送らない', async () => {
