@@ -6,7 +6,7 @@ import { authMiddleware, sha256Hex } from '../middleware/auth.js';
 import { adminAuth } from './admin-auth.js';
 import { authEmail } from './auth-email.js';
 import { hashPassword } from '../services/password-hash.js';
-import { encryptTotpSecret, decryptTotpEnrollment, totpAtStep } from '../lib/totp.js';
+import { encryptTotpSecret, decryptTotpSecret, totpAtStep } from '../lib/totp.js';
 import { staff } from './staff.js';
 import { createStepUpGrant } from '@line-crm/db';
 import { mfaPolicyKey } from '../services/login-mfa.js';
@@ -25,7 +25,7 @@ vi.mock('../services/turnstile.js', async importOriginal => {
 const key = 'test-encryption-key-at-least-thirty-two-characters';
 const secret = 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
 let db: SqliteD1;
-type MfaJson = { data: { challengeToken: string; provisioningUri: string; recoveryCodes: string[]; twoFactor: boolean; twoFactorSetup: boolean; token: string } };
+type MfaJson = { data: { challengeToken: string; provisioningUri: string; twoFactor: boolean; twoFactorSetup: boolean; token: string } };
 async function json(response: Response): Promise<MfaJson> { return response.json() as Promise<MfaJson>; }
 function app() {
   const a = new Hono<Env>(); a.use('*', authMiddleware); a.route('/', adminAuth); a.route('/', authEmail); a.route('/', staff);
@@ -57,11 +57,11 @@ async function enroll() {
   const setupData = (await json(setup)).data;
   const enrolledSecret = new URL(setupData.provisioningUri).searchParams.get('secret')!;
   const confirm = await request('/api/auth/two-factor/setup/confirm', { challengeToken: data.challengeToken, code: await totpAtStep(enrolledSecret, Math.floor(Date.now() / 30000)) });
-  expect(confirm.status).toBe(200); return (await json(confirm)).data.recoveryCodes as string[];
+  expect(confirm.status).toBe(200); expect((await json(confirm)).data).not.toHaveProperty('recoveryCodes');
 }
 beforeEach(() => { db = createTestD1(); }); afterEach(() => db.raw.close());
 
-describe('MFA policy and recovery', () => {
+describe('MFA policy and authenticator', () => {
   it.each(['owner', 'admin', 'staff'])('default-On with %s issues only a challenge and no usable session', async role => {
     await seed('owner', role); const primary = await login();
     expect((await json(primary)).data.twoFactorSetup).toBe(true);
@@ -77,24 +77,23 @@ describe('MFA policy and recovery', () => {
     const enrolled = await login(); expect((await json(enrolled)).data.twoFactor).toBe(true);
     expect(enrolled.headers.get('set-cookie')).toBeNull();
   });
-  it('first enrollment issues recovery codes only once; a recovery code has one concurrent winner', async () => {
-    await seed(); const codes = await enroll(); expect(codes).toHaveLength(8);
+  it('first enrollment stores only the authenticator secret and rejects legacy codes', async () => {
+    await seed(); await enroll();
     const row = db.raw.prepare('SELECT totp_secret_enc FROM staff_members WHERE id=?').get('owner') as { totp_secret_enc: string };
-    const stored = await decryptTotpEnrollment(row.totp_secret_enc, key);
-    expect(stored.recoveryHashes).toHaveLength(8); expect(stored.recoveryHashes).not.toContain(codes[0]);
+    expect(await decryptTotpSecret(row.totp_secret_enc, key)).toMatch(/^[A-Z2-7]+$/);
+    const legacy = await encryptTotpSecret(JSON.stringify({ secret, recoveryHashes: ['f'.repeat(64)] }), key);
+    db.raw.prepare('UPDATE staff_members SET totp_secret_enc=?,totp_last_used_step=NULL WHERE id=?').run(legacy, 'owner');
     const { data } = await json(await login());
-    const attempts = await Promise.all([0, 1].map(() => request('/api/auth/two-factor/verify', { challengeToken: data.challengeToken, code: codes[0] })));
-    expect(attempts.filter(r => r.status === 200)).toHaveLength(1);
+    expect((await request('/api/auth/two-factor/verify', { challengeToken: data.challengeToken, code: 'ABCD-EFGH' })).status).toBe(400);
     const next = (await json(await login())).data;
-    expect((await request('/api/auth/two-factor/verify', { challengeToken: next.challengeToken, code: codes[0] })).status).toBe(400);
-    expect(db.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='auth.mfa.recovery' AND result='success'").get()).toEqual({ n: 1 });
+    expect((await request('/api/auth/two-factor/verify', { challengeToken: next.challengeToken, code: await totpAtStep(secret, Math.floor(Date.now() / 30000)) })).status).toBe(200);
   });
   it('TOTP step cannot be replayed even in a fresh challenge', async () => {
     await seed(); await enroll();
     const row = db.raw.prepare('SELECT totp_secret_enc,totp_last_used_step FROM staff_members WHERE id=?').get('owner') as { totp_secret_enc: string; totp_last_used_step: number };
-    const enrolled = await decryptTotpEnrollment(row.totp_secret_enc, key);
+    const enrolled = await decryptTotpSecret(row.totp_secret_enc, key);
     const { data } = await json(await login());
-    const replay = await request('/api/auth/two-factor/verify', { challengeToken: data.challengeToken, code: await totpAtStep(enrolled.secret, row.totp_last_used_step) });
+    const replay = await request('/api/auth/two-factor/verify', { challengeToken: data.challengeToken, code: await totpAtStep(enrolled, row.totp_last_used_step) });
     expect(replay.status).toBe(400);
   });
   it('failure limit persists across fresh challenges and different primary logins', async () => {
@@ -194,25 +193,12 @@ describe('MFA policy and recovery', () => {
     const res = await request('/api/auth/password/login', { email: 'owner@example.com', password: 'Fixture-pass123', turnstileToken: 'fixture-login-robot' }, undefined, 'POST', { TOTP_ENCRYPTION_KEY: undefined });
     expect(res.status).toBe(500); expect(res.headers.get('set-cookie')).toBeNull();
   });
-  it('regeneration needs a one-use self confirmation, invalidates all old codes and returns only counts afterwards', async () => {
-    await seed(); const old = await enroll(); expect(old.every(code => /^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(code))).toBe(true);
-    const token = await session();
-    expect((await request('/api/auth/two-factor/recovery', {}, token)).status).toBe(401);
-    const grant = 'fixture-recovery-grant';
-    await createStepUpGrant(db.db, { tokenHash: await sha256Hex(grant), staffId: 'owner', purpose: 'auth.mfa.recovery', expiresAt: new Date(Date.now()+60000).toISOString(), sessionTokenHash: await sha256Hex(token) });
-    const regenerate = () => app().request('https://api.example.com/api/auth/two-factor/recovery', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer lh_session:${token}`, 'X-Step-Up-Token': grant }, body: '{}' }, { DB: db.db, TOTP_ENCRYPTION_KEY: key } as Env['Bindings']);
-    const refreshed = await regenerate(); expect(refreshed.status).toBe(200); expect(refreshed.headers.get('cache-control')).toBe('private, no-store');
-    const codes = (await json(refreshed)).data.recoveryCodes; expect(codes).toHaveLength(8);
-    expect((await regenerate()).status).toBe(401);
-    const self = await request('/api/auth/two-factor/self', undefined, token); expect((await json(self)).data).toMatchObject({ remaining: 8, total: 8 });
-    const start = (await json(await login())).data;
-    expect((await request('/api/auth/two-factor/verify', { challengeToken: start.challengeToken, code: old[0] })).status).toBe(400);
-    for (const code of codes.slice(0, 6)) {
-      const start = (await json(await login())).data;
-      const res = await request('/api/auth/two-factor/verify', { challengeToken: start.challengeToken, code }); expect(res.status).toBe(200);
-    }
-    expect((await json(await request('/api/auth/session', undefined, token))).data).toMatchObject({ recoveryCodesRemaining: 2 });
-    expect(db.raw.prepare("SELECT COUNT(*) n FROM audit_events WHERE action='auth.mfa.recovery.regenerate'").get()).toEqual({ n: 1 });
+  it('removed code endpoint is unavailable and self status has no code count', async () => {
+    await seed(); await enroll(); const token = await session();
+    expect((await request('/api/auth/two-factor/recovery', {}, token)).status).toBe(404);
+    const self = await request('/api/auth/two-factor/self', undefined, token);
+    expect((await json(self)).data).toMatchObject({ staffId: 'owner', enabledAt: expect.any(String) });
+    expect((await json(await request('/api/auth/session', undefined, token))).data).not.toHaveProperty('recoveryCodesRemaining');
   });
 });
 
@@ -227,23 +213,12 @@ describe('MFA policy and recovery', () => {
     expect(db.raw.prepare("SELECT totp_secret_enc FROM staff_members WHERE id='owner'").get()).toEqual(previous);
     const replacement = new URL((await json(start)).data.provisioningUri).searchParams.get('secret')!;
     const confirmed = await request('/api/staff/owner/two-factor/confirm', { code: await totpAtStep(replacement, Math.floor(Date.now()/30000)) }, token);
-    expect(confirmed.status).toBe(200); expect((await json(confirmed)).data.recoveryCodes).toHaveLength(8);
+    expect(confirmed.status).toBe(200); expect((await json(confirmed)).data).not.toHaveProperty('recoveryCodes');
     expect(db.raw.prepare('SELECT COUNT(*) n FROM admin_sessions').get()).toEqual({ n: 0 });
-    expect((await decryptTotpEnrollment((db.raw.prepare("SELECT totp_secret_enc FROM staff_members WHERE id='owner'").get() as { totp_secret_enc: string }).totp_secret_enc, key)).secret).toBe(replacement);
+    expect(await decryptTotpSecret((db.raw.prepare("SELECT totp_secret_enc FROM staff_members WHERE id='owner'").get() as { totp_secret_enc: string }).totp_secret_enc, key)).toBe(replacement);
   });
 
-it('staff can inspect and regenerate only their own codes without an organization-management permission', async () => {
-  await seed('owner', 'staff'); const codes = await enroll(); const token = await session();
-  expect((await json(await request('/api/auth/two-factor/self?staffId=other', undefined, token))).data).toMatchObject({ staffId: 'owner', remaining: 8 });
-  expect((await request('/api/auth/two-factor/recovery', { staffId: 'other' }, token)).status).toBe(401);
-  const grant = 'fixture-staff-grant';
-  await createStepUpGrant(db.db, { tokenHash: await sha256Hex(grant), staffId: 'owner', purpose: 'auth.mfa.recovery', expiresAt: new Date(Date.now()+60000).toISOString(), sessionTokenHash: await sha256Hex(token) });
-  const res = await app().request('https://api.example.com/api/auth/two-factor/recovery', { method: 'POST', headers: { Authorization: `Bearer lh_session:${token}`, 'Content-Type': 'application/json', 'X-Step-Up-Token': grant }, body: JSON.stringify({ staffId: 'other' }) }, { DB: db.db, TOTP_ENCRYPTION_KEY: key } as Env['Bindings']);
-  expect(res.status).toBe(200); expect((await json(res)).data.recoveryCodes).toHaveLength(8);
-  expect(codes).toHaveLength(8);
-});
-
-it.each(['expired', 'different-session'])('re-enrollment %s proof leaves the old app and recovery codes intact', async scenario => {
+it.each(['expired', 'different-session'])('re-enrollment %s proof leaves the old authenticator intact', async scenario => {
   await seed(); await enroll(); const token = await session();
   const old = db.raw.prepare("SELECT totp_secret_enc FROM staff_members WHERE id='owner'").get() as { totp_secret_enc: string };
   const grant = `reenroll-${scenario}`;

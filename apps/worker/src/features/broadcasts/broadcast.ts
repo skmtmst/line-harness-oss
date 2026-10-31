@@ -1,3 +1,4 @@
+import { scopeStoredBroadcastSegmentQuery, restrictSegmentInput } from '../../services/segment-query-scope.js';
 import { BROADCAST_DEFINITION_GUARD_SQL, broadcastDefinitionGuardArgs } from './broadcast-definition-guard.js';
 import { logger } from '@line-crm/shared/server';
 import {processBroadcastSimulation} from './broadcast-simulation.js';
@@ -150,16 +151,11 @@ export async function processBroadcastSend(
       // 分析の一時対象者は送信直前にも所属・期限を確かめ直す。
       await assertAnalyticsAudiencesUsable(db, storedConditions, accountId);
       const { sql, bindings } = buildSegmentQuery(storedConditions);
-      const segmentAudienceSql = accountId
-        ? `SELECT COUNT(*) AS total,
-                  SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-             FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
-        : `SELECT COUNT(*) AS total,
-                  SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-             FROM (${sql}) q`;
-      const segmentAudience = await db
-        .prepare(segmentAudienceSql)
-        .bind(...(accountId ? [accountId, ...bindings] : bindings))
+      const scoped = await scopeStoredBroadcastSegmentQuery(db, { sql, bindings }, accountId);
+      const segmentAudience = await db.prepare(`SELECT COUNT(*) AS total,
+        SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
+        FROM (${scoped.sql}) q`)
+        .bind(...scoped.bindings)
         .first<{ total: number; missing_name: number | null }>();
       if (Number(segmentAudience?.missing_name ?? 0) > 0) {
         throw new Error(`Cannot personalize broadcast: ${segmentAudience!.missing_name} recipient(s) have no display name`);
@@ -230,20 +226,14 @@ export async function processBroadcastSend(
       db, conditions as Parameters<typeof buildSegmentQuery>[0], accountId,
     );
     const { sql, bindings } = buildSegmentQuery(conditions as Parameters<typeof buildSegmentQuery>[0]);
-    const countSql = accountId
-      ? `SELECT COUNT(*) AS cnt FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
-      : `SELECT COUNT(*) AS cnt FROM (${sql}) q`;
-    const binds = accountId ? [accountId, ...bindings] : bindings;
-    const row = await db.prepare(countSql).bind(...binds).first<{ cnt: number }>();
+    const scoped = await scopeStoredBroadcastSegmentQuery(db, { sql, bindings }, accountId);
+    const row = await db.prepare(`SELECT COUNT(*) AS cnt FROM (${scoped.sql}) q`)
+      .bind(...scoped.bindings).first<{ cnt: number }>();
 
     // 名前を差し込む本文は、名前の無い人がいると差し込めない。送る前に止める。
     if (hasRecipientVariablesInParts(storedParts)) {
-      const nameSql = accountId
-        ? `SELECT SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-             FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
-        : `SELECT SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-             FROM (${sql}) q`;
-      const missing = await db.prepare(nameSql).bind(...binds).first<{ missing_name: number | null }>();
+      const missing = await db.prepare(`SELECT SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
+        FROM (${scoped.sql}) q`).bind(...scoped.bindings).first<{ missing_name: number | null }>();
       if (Number(missing?.missing_name ?? 0) > 0) {
         throw new Error(`Cannot personalize broadcast: ${missing!.missing_name} recipient(s) have no display name`);
       }
@@ -576,10 +566,10 @@ async function countScheduledRecipients(
       const conditions = parseStoredConditions(stored);
       if (!conditions) return null;
       const query = buildSegmentQuery(conditions);
-      const sql = query.sql.replace('WHERE',
-        `WHERE f.line_account_id = ? AND ${DELIVERY_CONSENT_ALLOWED_SQL} AND`);
-      const row = await db.prepare(`SELECT COUNT(*) AS total FROM (${sql})`)
-        .bind(accountId, ...query.bindings).first<{ total: number }>();
+      const scoped = await scopeStoredBroadcastSegmentQuery(db, query, accountId);
+      const consented = restrictSegmentInput(scoped, DELIVERY_CONSENT_ALLOWED_SQL);
+      const row = await db.prepare(`SELECT COUNT(*) AS total FROM (${consented.sql})`)
+        .bind(...consented.bindings).first<{ total: number }>();
       const total = Number(row?.total ?? 0);
       return Number.isFinite(total) ? total : null;
     }
@@ -1014,8 +1004,7 @@ async function processQueuedBroadcastBatches(
           ? [{ type: 'tag_exists', value: broadcast.target_tag_id }]
           : [{ type: 'is_following', value: true }] };
     const query = buildSegmentQuery(conditions);
-    const sql = accountId ? query.sql.replace('WHERE', 'WHERE f.line_account_id = ? AND') : query.sql;
-    const bindings = accountId ? [accountId, ...query.bindings] : query.bindings;
+    const { sql, bindings } = await scopeStoredBroadcastSegmentQuery(db, query, accountId);
     await db.batch([
       db.prepare(`INSERT INTO broadcast_send_claims
         (broadcast_id,friend_id,line_account_id,attempt_no,state)
@@ -1046,18 +1035,23 @@ async function processQueuedBroadcastBatches(
   // 前の実行が外部呼出しの途中で失われた行は、送達不明として残す。
   await db.prepare(`UPDATE broadcast_send_claims SET state='unknown',error_code='interrupted_dispatch'
     WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NOT NULL`).bind(broadcast.id).run();
-  // ブロック・非表示・アカウント変更は宛先の変更と別。送らずに結果を残す。
+  // 固定済みの宛先も、現在の所属・表示状態だけは送信直前に確認する。元の条件は再評価しない。
+  const currentRecipients = await scopeStoredBroadcastSegmentQuery(db, {
+    sql: 'SELECT f.id, f.line_user_id, f.display_name FROM friends f WHERE f.is_following = 1 AND COALESCE(f.is_hidden,0)=0',
+    bindings: [],
+  }, accountId);
   await db.prepare(`UPDATE broadcast_send_claims SET state='failed',error_code='recipient_unavailable'
-    WHERE broadcast_id=? AND state='claimed' AND dispatched_at IS NULL
-      AND NOT EXISTS (SELECT 1 FROM friends f WHERE f.id=friend_id AND f.is_following=1
-        AND COALESCE(f.is_hidden,0)=0 AND (? IS NULL OR f.line_account_id=?))`)
-    .bind(broadcast.id,accountId,accountId).run();
+    WHERE broadcast_id=? AND (
+      (state='claimed' AND dispatched_at IS NULL)
+      OR (state='failed' AND error_code IN ('line_http_429','stopped_before_dispatch') AND attempt_no=?))
+      AND NOT EXISTS (SELECT 1 FROM (${currentRecipients.sql}) f WHERE f.id=friend_id)`)
+    .bind(broadcast.id,Number(raw.send_attempt_no ?? 1),...currentRecipients.bindings).run();
   const pending = await db.prepare(`SELECT f.id,f.line_user_id,f.display_name
-    FROM broadcast_send_claims c JOIN friends f ON f.id=c.friend_id
+    FROM broadcast_send_claims c JOIN (${currentRecipients.sql}) f ON f.id=c.friend_id
     WHERE c.broadcast_id=? AND (
       (c.state='claimed' AND c.dispatched_at IS NULL)
       OR (c.state='failed' AND c.error_code IN ('line_http_429','stopped_before_dispatch') AND c.attempt_no=?))
-    ORDER BY c.friend_id`).bind(broadcast.id,Number(raw.send_attempt_no ?? 1)).all<{
+    ORDER BY c.friend_id`).bind(...currentRecipients.bindings,broadcast.id,Number(raw.send_attempt_no ?? 1)).all<{
       id:string; line_user_id:string; display_name:string|null;
     }>();
   const friends = pending.results;

@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import AccountRequiredState from '@/components/shared/account-required-state'
 import ListState from '@/components/shared/list-state'
 import { MobileFrame, type MobileFrameBack } from '@/components/templates'
-import { setDocumentTitle } from '@/lib/document-title'
+import { useDocumentTitle } from '@/components/shell/document-title'
 import { useMobileShell } from './mobile-shell'
 
 /*
@@ -22,7 +22,7 @@ export default function MobileScreen({ title, back, permission, hideTabs, footer
   children: ReactNode
 }) {
   const shell = useMobileShell()
-  useEffect(() => { setDocumentTitle(title) }, [title])
+  useDocumentTitle(title)
   const allowed = shell.ready && (!permission || shell.canView(permission))
   const body = !shell.ready
     ? <ListState kind="loading" title="読み込んでいます" />

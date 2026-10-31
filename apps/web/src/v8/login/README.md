@@ -13,8 +13,7 @@
 
 ## 外に見せる名前（index.ts）
 
-- [index.ts](index.ts)：`AdminTwoFactorV8`・`OpsTwoFactorV8`・`RecoveryCodePanel`
-- [public/recovery-codes/index.ts](public/recovery-codes/index.ts)：`RecoveryCodePanel`
+- [index.ts](index.ts)：`AdminTwoFactorV8`・`OpsTwoFactorV8`
 
 機能の内部は宣言元を直接読み、外部は明示された公開入口を使います。Nextのpage・layoutとWorkerのroute登録は直接接続します。決まりは [コードの構成と名前](../../../../../docs/code-structure.md)。
 
@@ -28,7 +27,6 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 
 - [BEHAVIOR.md](BEHAVIOR.md)
 - [auth.spec.mjs](auth.spec.mjs)
-- [recovery-codes.test.tsx](recovery-codes.test.tsx)
 - [two-factor-ops.test.tsx](two-factor-ops.test.tsx)
 
 実行：`NEXT_PUBLIC_API_URL=http://127.0.0.1:8788 pnpm --filter web test -- src/v8/login`。関連する入口の試験も実行してください。保存・入力保持・権限・別店舗・失敗からの回復を守り、文書の整合だけを動作の合格に数えません。

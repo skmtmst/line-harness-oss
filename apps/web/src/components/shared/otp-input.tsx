@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useLayoutEffect, useRef, type ClipboardEvent, type KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, type ClipboardEvent, type KeyboardEvent } from 'react'
 import { Check } from 'lucide-react'
 import { joinDescribedBy, useFieldContext } from './field-context'
 import styles from './otp-input.module.css'
@@ -64,12 +64,10 @@ export default function OtpInput({
   success = false,
   busy = false,
   visualLabel,
-  format = 'digits',
   inlineStatus = true,
 }: {
   /** マスのそばに確かめ中の輪と通った ✓ を出すか。ボタンが状態を言う画面では false。 */
   inlineStatus?: boolean
-  format?: 'digits' | 'recovery'
   visualLabel?: string
   value: string
   onChange: (value: string) => void
@@ -102,7 +100,7 @@ export default function OtpInput({
    * 古い値を見て「空いたマスが先にある」と判断し、1マス目へ戻してしまう。
    */
   const pendingFocus = useRef<number | null>(null)
-  const normalize = (raw: string) => format === 'recovery' ? raw.normalize('NFKC').toUpperCase().replace(/[^A-Z2-9]/g, '') : otpDigits(raw)
+  const normalize = otpDigits
   const digits = normalize(value).slice(0, length)
   const locked = disabled || busy
   const groupRef = useRef<HTMLDivElement | null>(null)
@@ -181,7 +179,7 @@ export default function OtpInput({
 
   const onKeyDown = (index: number, event: KeyboardEvent<HTMLInputElement>) => {
     if (event.nativeEvent.isComposing || event.ctrlKey || event.metaKey || event.altKey) return
-    if ((format === 'recovery' ? /^[A-Za-z2-9Ａ-Ｚａ-ｚ２-９]$/ : /^[0-9０-９]$/).test(event.key)) {
+    if (/^[0-9０-９]$/.test(event.key)) {
       event.preventDefault()
       writeFrom(index, event.key)
       return
@@ -229,10 +227,10 @@ export default function OtpInput({
       ref={(node) => { refs.current[index] = node }}
       id={index === 0 ? id : undefined}
       type="text"
-      inputMode={format === 'recovery' ? 'text' : 'numeric'}
-      pattern={format === 'recovery' ? '[A-Za-z2-9]*' : '[0-9]*'}
-      autoComplete={format === 'digits' && index === 0 ? 'one-time-code' : 'off'}
-      aria-label={`${index + 1}${format === 'recovery' ? '文字目' : '桁目'}`} autoCapitalize={format === 'recovery' ? 'characters' : undefined}
+      inputMode="numeric"
+      pattern="[0-9]*"
+      autoComplete={index === 0 ? 'one-time-code' : 'off'}
+      aria-label={`${index + 1}桁目`}
       aria-invalid={invalid || undefined}
       disabled={locked}
       value={digits[index] ?? ''}
@@ -273,23 +271,12 @@ export default function OtpInput({
       aria-describedby={describedBy}
       ref={groupRef}
       className={styles.group}
-      data-format={format}
+      data-format="digits"
       data-state={invalid ? 'error' : success ? 'success' : undefined}
       aria-busy={busy || undefined}
     >
-      {format === 'digits' ? (
-        <>
-          <span className={styles.cluster}>{[0, 1, 2].map(renderSlot)}</span>
-          <span className={styles.cluster}>{[3, 4, 5].map(renderSlot)}</span>
-        </>
-      ) : (
-        Array.from({ length }, (_, index) => (
-          <Fragment key={index}>
-            {index === 4 ? <span className={styles.separator} aria-hidden="true">−</span> : null}
-            {renderSlot(index)}
-          </Fragment>
-        ))
-      )}
+      <span className={styles.cluster}>{[0, 1, 2].map(renderSlot)}</span>
+      <span className={styles.cluster}>{[3, 4, 5].map(renderSlot)}</span>
       {inlineStatus && busy ? <span className={styles.spinner} aria-hidden="true" /> : null}
       {inlineStatus && success && !busy ? <Check className={styles.check} size={20} aria-hidden="true" /> : null}
     </div>

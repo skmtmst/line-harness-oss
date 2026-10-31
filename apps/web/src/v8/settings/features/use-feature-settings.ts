@@ -221,7 +221,8 @@ export function useFeatureSettings() {
     const ticket = accountGuard.issue(selectedAccountId)
     setUsageFailed(false)
     try {
-      const usageResponse = await api.analytics.usageOverview(selectedAccountId)
+      // 利用数は任意の補助情報。分析がオフでも機能設定本体を閉じない。
+      const usageResponse = await api.analytics.usageOverview(selectedAccountId, undefined, { suppressFeatureDisabledEvent: true })
       if (!accountGuard.isCurrent(ticket, selectedAccountId)) return
       if (usageResponse?.success) {
         setUsageCategories(usageResponse.data.data.categories)

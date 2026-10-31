@@ -6,11 +6,11 @@ import { adminSessionHeaders } from '@/lib/admin-session'
 import { readSessionSnapshot } from '@/lib/session-snapshot'
 import Notice, { useNoticeClosedToday } from '@/components/shared/notice'
 import Button from '@/components/shared/button'
-import { isSecurityNoticePinned } from '@/components/recovery-code-notice'
+import { isSecurityNoticePinned } from '@/components/security-notice-paths'
 
 /**
  * V-2: いつもと違う端末・場所からのログインの知らせ（管理画面-30 §14）。
- * 回復コードの知らせと同じく、白い板の中の白いカード1枚で出す（§6.32 案A）。
+ * 白い板の中の白いカード1枚で出す（§6.32 案A）。
  *
  * /api/auth/session が unfamiliarAt を返すときだけ描く。帯は AuthGuard の
  * 内側に載るので、答えは AuthGuard が取ったものを読む（readSessionSnapshot）。

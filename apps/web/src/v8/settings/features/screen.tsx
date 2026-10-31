@@ -119,7 +119,7 @@ function FeatureRow({ item, features, usage, featureUsage, usageRetry, sharedSwi
         </p>
         <p className={styles.rowNote}>{item.note}</p>
       </div>
-      {showFavorite && <button type="button" className={`${styles.favoriteButton} ${favorite ? styles.favoriteActive : ''}`}
+      {showFavorite && <button type="button" data-part="favorite-star" className={`${styles.favoriteButton} ${favorite ? styles.favoriteActive : ''}`}
         aria-label={`${item.label}をお気に入り${favorite ? 'から外す' : 'に入れる'}`}
         aria-pressed={favorite} disabled={busy || !canManage} onClick={() => onFavoriteToggle?.(item.id)}>
         <Star aria-hidden="true" />
@@ -450,7 +450,7 @@ export default function FeatureSettingsScreen() {
 
           {usageFailed && (
                   <Notice tone="warn" action={<>
-                    <button type="button" onClick={() => void loadUsage()} className={styles.inlineLink}>利用状況を読み直す</button>
+                    <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void loadUsage()}>利用状況を読み直す</Button>
                   </>}>
                     機能の利用状況を読めませんでした。設定の切替はそのまま使えます。
                     {' '}

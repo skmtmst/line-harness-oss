@@ -364,5 +364,5 @@
 .favoriteButton svg { width: 19px; height: 19px; }
 .favoriteButton:hover { color: #ca8a04; }
 .favoriteButton:disabled { opacity: .45; cursor: not-allowed; }
-.favoriteActive { color: #eab308; }
-.favoriteActive svg { fill: currentColor; }
+.favoriteActive { color: var(--color-star-on-edge); }
+.favoriteActive svg { fill: var(--color-star-on); stroke: var(--color-star-on-edge); }

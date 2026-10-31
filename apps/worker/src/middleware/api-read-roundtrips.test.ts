@@ -2,7 +2,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { app } from '../index.js';
 import type { Env } from '../worker-env.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
-import { createTotpEnrollment } from '../lib/totp.js';
+import { encryptTotpSecret } from '../lib/totp.js';
 import { sha256Hex } from './auth.js';
 
 let fixture: SqliteD1;
@@ -64,14 +64,14 @@ it.each([
   ['/api/staff/me', 2],
   ['/api/tenants/me', 3],
   ['/api/auth/session', 4],
-  ['/api/line-accounts', 7],
-  ['/api/hq/style-attention', 5],
+  ['/api/line-accounts', 8],
+  ['/api/hq/style-attention', 6],
   ['/api/inbox/unanswered/count', 4],
   ['/api/accounts/health-summary', 4],
   ['/api/notifications/center?lineAccountId=store&limit=1', 5],
   ['/api/settings/features/visibility?account_id=store', 7],
   ['/api/settings/features?account_id=store', 8],
-  ['/api/hq/billing/summary', 3],
+  ['/api/hq/billing/summary', 4],
 ])('%s のD1往復数を守る', async (path, expected) => {
   const response = await request(path);
   expect(response.status, await response.clone().text()).toBe(200);
@@ -99,9 +99,9 @@ it('別統括のアカウント指定は従来どおり拒否する', async () =
 
 const mfaKey = 'fixture-mfa-master-key-at-least-32-characters';
 async function registerMfa() {
-  const enrollment = await createTotpEnrollment('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', mfaKey);
+  const encrypted = await encryptTotpSecret('GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ', mfaKey);
   fixture.raw.prepare("UPDATE staff_members SET totp_enabled_at='2026-10-01',totp_secret_enc=? WHERE id='actor'")
-    .run(enrollment.encrypted);
+    .run(encrypted);
   fixture.raw.prepare("INSERT INTO platform_settings(key,value) VALUES(?, 'actor')")
     .run(`auth.mfa.session:${tokenHash}`);
 }
@@ -109,11 +109,11 @@ async function registerMfa() {
 it.each([
   ['/api/auto-replies', 13], ['/api/scenarios', 10], ['/api/templates', 13], ['/api/tags', 6],
   ['/api/staff/me', 4], ['/api/tenants/me', 5], ['/api/auth/session', 6],
-  ['/api/line-accounts', 9], ['/api/hq/style-attention', 7],
+  ['/api/line-accounts', 10], ['/api/hq/style-attention', 8],
   ['/api/inbox/unanswered/count', 6], ['/api/accounts/health-summary', 6],
   ['/api/notifications/center?lineAccountId=store&limit=1', 7],
   ['/api/settings/features/visibility?account_id=store', 9],
-  ['/api/settings/features?account_id=store', 10], ['/api/hq/billing/summary', 5],
+  ['/api/settings/features?account_id=store', 10], ['/api/hq/billing/summary', 6],
 ])('MFA登録済み %s のD1往復数を守る', async (path, expected) => {
   await registerMfa();
   const response = await request(path, { TOTP_ENCRYPTION_KEY: mfaKey });

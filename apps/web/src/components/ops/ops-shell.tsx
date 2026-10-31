@@ -3,22 +3,12 @@
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
-import {
-  BookOpen,
-  Building2,
-  LayoutDashboard,
-  LifeBuoy,
-  Megaphone,
-  ScrollText,
-} from 'lucide-react'
 import { api, type OpsMe } from '@/lib/api'
 import Button from '@/components/shared/button'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import ImpersonationBar from './impersonation-bar'
-import RecoveryCodeNotice from '@/components/recovery-code-notice'
 import { OpsShellV8 } from '@/v8/ops/public/shell/index'
-import { setDocumentTitle } from '@/lib/document-title'
 
 /**
  * 運営コンソールの外枠。★管理画面 37 系。
@@ -28,20 +18,10 @@ import { setDocumentTitle } from '@/lib/document-title'
  * 左下のアカウントメニュー（37-9）から開く。
  */
 
-const MENU: Array<{ href: string; label: string; icon: typeof LayoutDashboard }> = [
-  { href: '/ops/dashboard', label: 'ダッシュボード', icon: LayoutDashboard },
-  { href: '/ops/tenants', label: '契約先アカウント', icon: Building2 },
-  { href: '/ops/support', label: 'お問い合わせ', icon: LifeBuoy },
-  { href: '/ops/announcements', label: 'お知らせ', icon: Megaphone },
-  { href: '/ops/knowledge', label: 'ナレッジ', icon: BookOpen },
-  { href: '/ops/audit', label: '監査ログ', icon: ScrollText },
-]
-
 export default function OpsShell({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [me, setMe] = useState<OpsMe | null>(null)
-  const [remaining, setRemaining] = useState<number | null>(null)
   const [checked, setChecked] = useState(false)
   const [loadError, setLoadError] = useState('')
   // ★管理画面：担当者の取得だけ落ちても外枠は落とさない。本文は普通に出す。
@@ -53,12 +33,6 @@ export default function OpsShell({ children }: { children: ReactNode }) {
    * 狭い画面のメニューは開閉式。画面を移ったら閉じ、開いている間は
    * Escape と背面のスクロール停止に対応する。
    */
-  // タブの題（「<画面名> | musubo」）。運営の画面は左メニューの名前を使う。
-  useEffect(() => {
-    const item = MENU.find((m) => pathname === m.href || pathname.startsWith(`${m.href}/`))
-    setDocumentTitle(item ? `${item.label}（運営）` : '運営コンソール')
-  }, [pathname])
-
   const load = useCallback(async () => {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL
     try {
@@ -69,7 +43,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
         if (res.status === 401) { router.replace('/ops/login'); return }
         throw new Error('運営コンソールのログイン状態を確認できませんでした。時間をおいて、もう一度お試しください。')
       }
-      const body = await res.json() as { success?: boolean; data?: { platformAdmin?: boolean; platformAdminState?: string | null; recoveryCodesRemaining?: number | null }; csrfToken?: string }
+      const body = await res.json() as { success?: boolean; data?: { platformAdmin?: boolean; platformAdminState?: string | null }; csrfToken?: string }
       if (!body.success || !body.data) throw new Error('運営コンソールのログイン状態を確認できませんでした。時間をおいて、もう一度お試しください。')
       if (body.csrfToken) {
         try { localStorage.setItem('lh_csrf', body.csrfToken) } catch { /* Bearer session remains usable */ }
@@ -79,7 +53,6 @@ export default function OpsShell({ children }: { children: ReactNode }) {
         router.replace(body.data.platformAdminState === 'awaiting_totp' ? '/ops/two-factor' : '/ops/login?error=not_platform_admin')
         return
       }
-      setRemaining(typeof body.data.recoveryCodesRemaining === 'number' ? body.data.recoveryCodesRemaining : null)
       setLoadError('')
     } catch (caught) {
       // 認証済みなのに後続APIが失敗した場合までログインへ戻すと、原因を隠したまま
@@ -144,7 +117,6 @@ export default function OpsShell({ children }: { children: ReactNode }) {
         pathname={pathname}
         banner={me?.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
       >
-        <RecoveryCodeNotice remaining={remaining} />
         {children}
       </OpsShellV8>
     )

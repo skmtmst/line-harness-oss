@@ -281,5 +281,50 @@ export default function scanOwnerRules() {
       if (!correct) add('create-action-placement', el, { folders: Number(folders), rail: Number(Boolean(rail)) })
     }
   }
+  // 札と本文は最初の文字の基準線を合わせる。文字ごとの書体の下降分も差し引く。
+  const metricsContext = document.createElement('canvas').getContext('2d')
+  const firstBaseline = (element, excluded) => {
+    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+    let text
+    while ((text = walker.nextNode())) {
+      if (excluded?.contains(text) || !visible(text.parentElement)) continue
+      const index = text.textContent.search(/\S/u)
+      if (index < 0) continue
+      const character = String.fromCodePoint(text.textContent.codePointAt(index))
+      const range = document.createRange(); range.setStart(text, index); range.setEnd(text, index + character.length)
+      const rect = range.getBoundingClientRect()
+      if (!rect.width || !rect.height) continue
+      const c = css(text.parentElement)
+      metricsContext.font = `${c.fontStyle} ${c.fontWeight} ${c.fontSize} ${c.fontFamily}`
+      const descent = metricsContext.measureText(character).fontBoundingBoxDescent
+      return rect.bottom - descent
+    }
+    return null
+  }
+  for (const word of [...document.querySelectorAll('[data-notice-status-word]')].filter(visible)) {
+    const notice = word.closest('[data-design-part="notice"]')
+    if (!notice) continue
+    const message = word.closest('[data-notice-heading]') || notice.querySelector('[data-notice-message]')
+    const label = firstBaseline(word), body = message ? firstBaseline(message, word) : null
+    if (label === null || body === null) { add('notice-status-line', word, { missing: 1 }, notice.textContent); continue }
+    const delta = Math.abs(label - body)
+    if (delta > 0.5) add('notice-status-line', word, { delta }, notice.textContent)
+  }
+  // 色点は、余白を持つ段落でも最初の文字の行の中央へ追従する。
+  for (const notice of [...document.querySelectorAll('[data-design-part="notice"]')].filter(visible)) {
+    const dot = notice.querySelector('[data-notice-dot]'), message = notice.querySelector('[data-notice-message]')
+    if (dot && message && visible(dot)) {
+      const baseline = firstBaseline(message), box = dot.getBoundingClientRect(), c = css(dot.parentElement)
+      metricsContext.font = `${c.fontStyle} ${c.fontWeight} ${c.fontSize} ${c.fontFamily}`
+      const strut = metricsContext.measureText('\u200b')
+      const lineCenter = baseline === null ? null : baseline + (strut.fontBoundingBoxDescent - strut.fontBoundingBoxAscent) / 2
+      if (lineCenter === null) add('notice-dot-line', dot, { missing: 1 }, notice.textContent)
+      else if (Math.abs(box.top + box.height / 2 - lineCenter) > 1) add('notice-dot-line', dot, { delta: Math.abs(box.top + box.height / 2 - lineCenter) }, notice.textContent)
+    }
+    for (const button of [...notice.querySelectorAll('button')].filter(visible)) {
+      if (button.hasAttribute('data-shared-button') || button.hasAttribute('data-notice-close') || button.hasAttribute('data-help-trigger') || button.querySelector('[data-help-mark]')) continue
+      add('notice-native-button', button, { count: 1 }, button.textContent)
+    }
+  }
   return findings
 }

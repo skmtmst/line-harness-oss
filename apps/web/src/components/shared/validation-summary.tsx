@@ -1,5 +1,6 @@
 'use client'
 
+import SharedButton from '@/components/shared/button'
 import { AlertCircle } from 'lucide-react'
 import type { FormFieldProblem } from '@/lib/use-form-errors'
 import Notice from './notice'
@@ -44,13 +45,12 @@ export default function ValidationSummary({
             </span>
           ))}
         </>} action={onFocusFirst ? (
-          <button
+          <SharedButton variant="text" size="inline" data-notice-inline-action textTone="danger"
             type="button"
             onClick={onFocusFirst}
-            className="text-danger shrink-0 text-sm font-semibold underline underline-offset-2 hover:opacity-80"
           >
             1つ目へ→
-          </button>
+          </SharedButton>
         ) : null} />
     </div>
   )

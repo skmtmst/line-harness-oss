@@ -458,7 +458,7 @@ export function RulesTabV8({ accountId, settings, status, error, staff, staffRea
         {saveError && feedback.state.kind === 'idle' ? (
           <Notice tone="danger" >{saveError}
             {saveError.includes('先に保存') ? (
-              <button type="button" className="text-action ml-2 font-semibold underline" onClick={onReload}>最新の内容を読み直す</button>
+              <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={onReload}>最新の内容を読み直す</Button>
             ) : null}</Notice>
         ) : null}
       </div>

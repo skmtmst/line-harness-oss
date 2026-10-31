@@ -188,7 +188,7 @@ export default function MultiSelect({
         : null}
       <div
         ref={fieldRef}
-        data-choice-field data-choice-invalid={invalid || undefined} data-choice-disabled={disabled || undefined}
+        data-choice-field data-choice-surface="select" data-choice-invalid={invalid || undefined} data-choice-disabled={disabled || undefined}
         className={[choiceStyles.frame, styles.field, open ? styles.open : null, invalid ? styles.invalid : null, disabled ? styles.disabled : null]
           .filter(Boolean)
           .join(' ')}

@@ -1,9 +1,11 @@
+import { withInitialMenu } from './style-starter-initial-menu.js';
 import type { AccountStyle } from '@line-crm/shared';
 import { readDefinition, standardStarter } from './style-starter-definition.js';
 export async function starter(
   db: D1Database,
   tenant: string | null,
   style: AccountStyle,
+  initialMenu = false,
 ) {
   const saved = await db
     .prepare(
@@ -16,13 +18,14 @@ export async function starter(
       definition_json: string;
       auto_insert: number;
     }>();
-  return saved
+  const set = saved
     ? {
         id: saved.id,
         version: saved.version,
         autoInsert: !!saved.auto_insert,
         definition: readDefinition(
           {
+            ...JSON.parse(saved.definition_json),
             items: (
               JSON.parse(saved.definition_json)
                 .items as import('./style-starter-definition.js').StarterItem[]
@@ -45,6 +48,7 @@ export async function starter(
         autoInsert: true,
         definition: standardStarter(style),
       };
+  return initialMenu ? {...set,definition:withInitialMenu(set.definition,style)} : set;
 }
 
 /** musubo の標準の組。統括の組を見ずに、標準の保存（tenant_id が無い組）かコードの標準を返す。 */

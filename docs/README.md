@@ -539,6 +539,8 @@
 - [投稿メディアの内容選択](release-log/unreleased/1890-masato-post-media-content.md)
 - [開発者向け案内の更新](release-log/unreleased/kenta-quality2.md)
 - [Macで作る更新用ファイルの検査不一致を修正](release-log/unreleased/0000-kenta-bundle-metadata.md)
+- [知らせの札・本文の整列と文字の操作](release-log/unreleased/1997-kenta-notice-status-actions.md)
+- [画面の表示確認の試験準備](release-log/unreleased/1997-kenta-browser-fixture-paths.md)
 - [運営コンソールの端の詰まり修正](release-log/unreleased/1948-kenta-muse-fqa-edge.md)
 - [予約写真の登録・参照保護の更新](release-log/unreleased/1781-kenta-cleanup-p02.md)
 - [予約写真の公開選択の更新](release-log/unreleased/1781-kenta-cleanup-p03.md)
@@ -563,6 +565,7 @@
 - [左下の常設「統括へ」撤去・左メニューの上端と左端そろえ](release-log/unreleased/1972-kenta-muse-sidebar-top.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [二段階認証の画面を見やすく](release-log/unreleased/1843-kenta-two-factor-card.md)
+- [回復コード機能の撤去](release-log/unreleased/1993-masato-remove-recovery-codes.md)
 - [回復コードのお知らせに「要確認：」](release-log/unreleased/1846-kenta-recovery-notice-prefix.md)
 - [api-17-kenta-hq-folders-template-kinds.md](release-log/drafts/api-17-kenta-hq-folders-template-kinds.md)
 - [fielderr2.md](release-log/drafts/fielderr2.md)
@@ -1036,5 +1039,10 @@
 - [来店フォローの送信直前の承認と予約の確認](release-log/unreleased/1989-kenta-followup-delivery-approval.md) — 反映履歴、確認 2026-10-31。
 - [LINE来店フォローを使わない判断](release-log/unreleased/1989-kenta-followup-not-using.md) — 反映履歴、確認 2026-10-31。
 - [シナリオ配信と初期設定の案内](release-log/unreleased/1989-kenta-train-1029u.md) — 反映履歴、確認 2026-10-31。
-
-- [来店フォローの下書き・テスト・同じ版の公開と承認](release-log/unreleased/0000-kenta-followup-engines.md) — 反映履歴、確認 2026-10-31。
+- [デリバリー受注の予告表示](release-log/unreleased/1990-masato-delivery-sidebar-overflow.md) — 反映履歴、確認 2026-10-31。
+- [お気に入りの星の表示](release-log/unreleased/1991-masato-yellow-favorites.md) — 反映履歴、確認 2026-10-31。
+- [来店フォローの下書き・テスト・同じ版の公開と承認](release-log/unreleased/1997-kenta-followup-engines.md) — 反映履歴、確認 2026-10-31。
+- [初期セット・画面切替とクーポン](release-log/unreleased/1997-kenta-train-1029v.md) — 反映履歴、確認 2026-10-31。
+- [機能設定の利用条件](release-log/unreleased/1992-masato-feature-settings-self-gate.md) — 反映履歴、確認 2026-10-31。
+- [検証環境への配備手順](release-log/unreleased/1994-masato-cf-staging-deploy.md) — 反映履歴、確認 2026-10-31。
+- [統括の比較と分析](release-log/unreleased/1996-masato-hq-comparison-analysis.md) — 反映履歴、確認 2026-10-31。

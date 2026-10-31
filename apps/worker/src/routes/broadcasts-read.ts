@@ -1,3 +1,4 @@
+import { scopeSegmentQuery } from '../services/segment-query-scope.js';
 import { buildOffsetListResponse, buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
 import { simulationContext } from '../features/broadcasts/broadcast-simulation/index.js';
@@ -403,11 +404,12 @@ export const get__api_broadcasts_id_preview_count_12 = async (c: Context<Env, "/
         const { buildSegmentQuery } = await import('../services/segment-query.js');
         const { sql, bindings } = buildSegmentQuery(conditions);
         const accountId = (raw.line_account_id as string | null) || null;
-        const countSql = accountId
-          ? `SELECT COUNT(*) AS cnt FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`
-          : `SELECT COUNT(*) AS cnt FROM (${sql}) q`;
-        const binds = accountId ? [accountId, ...bindings] : bindings;
-        const row = await c.env.DB.prepare(countSql).bind(...binds).first<{ cnt: number }>();
+        const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+        const scoped = scopeSegmentQuery({ sql, bindings }, accountId
+          ? { allowedAccountIds: [accountId], canSeeUnassigned: false }
+          : scope);
+        const row = await c.env.DB.prepare(`SELECT COUNT(*) AS cnt FROM (${scoped.sql}) q`)
+          .bind(...scoped.bindings).first<{ cnt: number }>();
         count = row?.cnt ?? 0;
       }
     } catch (segmentError) {

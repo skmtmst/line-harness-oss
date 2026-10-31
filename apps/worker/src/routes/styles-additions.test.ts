@@ -114,7 +114,8 @@ describe('template samples', () => {
             },
           ]),
         );
-        if (!['standard', 'ec'].includes(style)) expect(standardStarter(style).items).toContainEqual(item.starterItem);
+        if (style==='consult'&&item.key==='day-before') expect(standardStarter(style).items).not.toContainEqual(item.starterItem);
+        else if (!['standard', 'ec'].includes(style)) expect(standardStarter(style).items).toContainEqual(item.starterItem);
         expect(item.hqDefinition.template.messageContent).toBe(
           item.text,
         );

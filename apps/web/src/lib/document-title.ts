@@ -11,10 +11,3 @@ export function formatDocumentTitle(screenName?: string | null): string {
   const name = screenName?.trim()
   return name ? `${name} | ${PRODUCT_NAME}` : PRODUCT_NAME
 }
-
-/** 描いたあとに題を合わせる（書き出しの時点の題は layout.tsx の既定）。 */
-export function setDocumentTitle(screenName?: string | null): void {
-  if (typeof document === 'undefined') return
-  const next = formatDocumentTitle(screenName)
-  if (document.title !== next) document.title = next
-}

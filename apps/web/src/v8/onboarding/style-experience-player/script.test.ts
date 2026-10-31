@@ -4,7 +4,6 @@ import { styleTerm } from '@/lib/terms'
 import { STYLE_CONFIG } from '@/v8/style-dashboard/public/sample-parts/index'
 import { defaultCards } from '../../../../../worker/src/services/style-setup-core'
 import { standardStarter } from '../../../../../worker/src/services/style-starter-definition'
-import { SAMPLE_MENUS } from '../model'
 import { STYLE_EXPERIENCE_SCRIPT as script } from './script'
 import { FORBIDDEN_DEMO_TEXT, collectStrings } from './demo-guard.fixture'
 
@@ -58,15 +57,13 @@ describe('スタイル体験の見本の台本', () => {
     for (const style of INDUSTRY) expect(text).not.toContain(`"${STYLE_CONFIG[style].primary}"`)
   })
 
-  it('リッチメニューは初期セットのボタン。飲食は画面の見本の 6 つ（初期セットを 6 つに増やす決定）', () => {
-    expect(script.styles.restaurant.richMenu?.map(button => button.label)).toEqual(SAMPLE_MENUS.restaurant?.tiles.map(tile => tile.label))
-    expect(script.styles.restaurant.richMenu).toHaveLength(6)
-    for (const style of ['salon', 'consult', 'standard', 'ec'] as const) {
-      const menu = standardStarter(style).items.find(item => item.kind === 'rich_menu')
-      expect(script.styles[style].richMenu?.map(button => button.label)).toEqual(menu?.buttons?.map(button => button.label))
+  it('体験のメニューも全6スタイルの初期セットと同じ4面で、教室に購入を混ぜない', () => {
+    for(const style of ACCOUNT_STYLES){
+      const menu=standardStarter(style).items.find(item=>item.kind==='rich_menu');
+      expect(script.styles[style].richMenu?.map(button=>button.label)).toEqual(menu?.buttons?.map(button=>button.label));
+      expect(script.styles[style].richMenu).toHaveLength(4);
     }
-    // 教室のメニューには準備中の購入の言葉が入るので、トークの下に出さない。
-    expect(script.styles.lesson.richMenu).toBeUndefined()
+    expect(JSON.stringify(script.styles.lesson.richMenu)).not.toMatch(/回数券|月謝|購入/);
   })
 
   it('初期セットから届く文（あいさつ・前日の案内・お礼）は初期セットの文と同じ', () => {

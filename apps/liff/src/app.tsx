@@ -16,6 +16,7 @@ const EventBookings = lazy(() => import('./pages/event-bookings.js'));
 const Affiliate = lazy(() => import('./pages/affiliate.js'));
 const Webinar = lazy(() => import('./pages/webinar.js'));
 const Research = lazy(() => import('./pages/research.js'));
+const EventCatalog = lazy(() => import('./pages/event-catalog.js'));
 const Form = lazy(() => import('./pages/form.js'));
 const EventWaitlistOffer = lazy(() => import('./pages/event-waitlist-offer.js'));
 const VisitStampQr = lazy(() => import('./pages/visit-stamp-qr.js'));
@@ -81,6 +82,7 @@ export default function App() {
         <Route path="/booking" element={<CustomerBookingEntry><Booking /></CustomerBookingEntry>} />
         <Route path="/booking/history" element={<BookingHistory />} />
         <Route path="/mypage" element={<MyPage />} />
+        <Route path="/events" element={<EventCatalog />} />
         <Route path="/events/me" element={<EventBookings />} />
         <Route path="/events/:id/confirm" element={<EventConfirm />} />
         <Route path="/events/:id/done" element={<EventDone />} />
@@ -95,6 +97,7 @@ export default function App() {
         <Route path="/statements/:id" element={<StatementOpen />} />
         <Route path="/statements" element={<StatementOpen />} />
         <Route path="/forms/:id" element={<Form />} />
+        <Route path="/information/:id" element={<Form readOnlyDocument />} />
         <Route path="/restaurant/reserve/:token" element={<SeatReserve />} />
         <Route path="/" element={<Navigate to={{ pathname: style === 'ec' ? '/mypage' : style === 'lesson' ? '/events/me' : '/booking', search: location.search }} replace />} />
         {/* どの住所にも当たらないとき（板 aLU3r）。 */}

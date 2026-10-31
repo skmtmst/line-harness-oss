@@ -603,7 +603,7 @@ describe('staging delivery verification safety', () => {
           + '<h2>この機能はご契約に含まれていません</h2></div></main>');
         expect(await page.evaluate<string | null>(READ_GATE_SOURCE)).toBe('feature-off');
 
-        await page.setContent('<main><div role="status" aria-label="店舗を確認中"'
+        await page.setContent('<main><div data-page-pending="store"'
           + ' style="height:64px"><div style="height:32px"></div></div></main>');
         expect(await page.evaluate<string | null>(READ_GATE_SOURCE)).toBe('store-checking');
 

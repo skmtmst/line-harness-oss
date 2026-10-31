@@ -51,11 +51,11 @@ function readPermissionKeys(): string[] {
 /*
  * ルールを変えられるか。役割はサーバ（/api/staff/me）から読む（手元の保存値は書き換えられる）。
  * staff は権限キー `/automations` を持つときだけ変えられる（サーバの requireAutomationPermission と同じ条件）。
- * 役割が読めるまでは false（操作を隠す。最後の守りはサーバの 403）。
+ * 役割が読めるまでは null。呼び側は操作を許可せず待つ（最後の守りはサーバの 403）。
  */
 export function useAutomationManage(): boolean | null {
   const role = useStaffRole()
-  if (role === null) return false
+  if (role === null) return null
   return canManageAutomationRole(role, typeof window === 'undefined' ? [] : readPermissionKeys())
 }
 
@@ -65,7 +65,7 @@ export function useAutomationManage(): boolean | null {
  */
 export function useAutomationRunManage(): { canOperate: boolean; canExport: boolean } | null {
   const role = useStaffRole()
-  if (role === null) return { canOperate: false, canExport: false }
+  if (role === null) return null
   const keys = typeof window === 'undefined' ? [] : readPermissionKeys()
   return { canOperate: canOperateAutomationRun(role, keys), canExport: canExportAutomationRuns(role, keys) }
 }

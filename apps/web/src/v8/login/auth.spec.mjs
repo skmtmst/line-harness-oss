@@ -12,7 +12,6 @@ async function openPrimaryAuthenticatedChallenge(page, path, token, method) {
   const fragment = new URLSearchParams({ lh_2fa: token, lh_method: method, lh_nonce: nonce })
   await page.goto(`${path}#${fragment}`)
 }
-const codes = ['7K2Q-9FXM','B4TN-6WJP','H8RD-3CVY','M5ZL-2QKA','P9XE-7NHU','T3GW-8BSC','Y6JA-4DRV','C2FN-5MXT']
 for (const width of [1152,1440,1920]) test(`shared list tools and support actions stay usable at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })
   await page.addInitScript(() => {
@@ -63,7 +62,7 @@ async function detailTypography(page, label) {
   expect(valueStyle).toEqual({ size: 13, weight: 600 })
   expect(headingStyle.weight).toBeLessThan(valueStyle.weight)
 }
-for (const width of [1152,1440,1920]) test(`MFA input, one-time display and centered auth buttons at ${width}`, async ({ page }) => {
+for (const width of [1152,1440,1920]) test(`MFA input and centered auth buttons at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })
   const errors = []; page.on('pageerror', error => errors.push(error.message))
   let submitted = null
@@ -72,7 +71,7 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
     let data
     if (path === '/api/auth/password/reset/check') data = { email: 'fixture@example.com' }
     if (path === '/api/auth/two-factor/setup') data = { provisioningUri: 'otpauth://totp/musubo:fixture?secret=JBSWY3DPEHPK3PXP&issuer=musubo', manualKey: 'JBSW Y3DP EHPK 3PXP' }
-    if (path === '/api/auth/two-factor/setup/confirm') data = { recoveryCodes: codes }
+    if (path === '/api/auth/two-factor/setup/confirm') data = { sessionToken: 'session-1' }
     if (path === '/api/auth/two-factor/verify') { submitted = route.request().postDataJSON(); return route.fulfill({ status: 400, json: { success: false, error: 'コードが違います' } }) }
     if (data) return route.fulfill({ status: 200, json: { success: true, data } })
     // Every remaining API request is redirected to the local fixture server.
@@ -110,97 +109,18 @@ for (const width of [1152,1440,1920]) test(`MFA input, one-time display and cent
   expect(await page.getByRole('group', { name: '認証コード（6桁）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
   await centered(page.getByRole('button', { name: '確認してログイン', exact: true }))
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`verify-${width}.png`) })
-  // 画面の案内は「コードが使えない場合」から開く小さな文字の道に変わった（動きは同じ）。
   await page.getByRole('button', { name: 'コードが使えない場合' }).click()
-  await page.getByRole('button', { name: '回復コードを使う' }).click()
-  await expect(page.getByRole('textbox')).toHaveCount(8)
-  const toggle = page.getByRole('button', { name: 'コードが使えない場合' })
-  const method = page.getByRole('button', { name: '6桁のコードで入る', exact: true })
-  const textStyle = el => { const style = getComputedStyle(el); return { size: style.fontSize, weight: style.fontWeight, color: style.color, background: style.backgroundColor } }
-  expect(await toggle.evaluate(textStyle)).toEqual(await method.evaluate(textStyle))
-  const logo = page.locator('main[data-auth-layout="admin"] [data-auth-head] img[alt="musubo"]')
-  await expect(logo).toHaveAttribute('src', brandSrc)
-  expect(await page.getByRole('group', { name: '回復コード（8文字）' }).evaluate(el => getComputedStyle(el.closest('[data-field-content-gap]')).gap)).toBe('12px')
-  await page.getByRole('textbox', { name: '1文字目' }).evaluate(el => {
-    const event = new Event('paste', { bubbles: true }); Object.defineProperty(event, 'clipboardData', { value: { getData: () => '7k2q-9fxm' } }); el.dispatchEvent(event)
-  })
-  await expect(page.getByRole('textbox', { name: '8文字目' })).toHaveValue('M')
-  await centered(page.getByRole('button', { name: '確認してログイン', exact: true }))
-  await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`recovery-input-${width}.png`) })
-  await page.getByRole('button', { name: '確認してログイン', exact: true }).click()
-  await expect.poll(() => submitted?.code).toBe('7K2Q-9FXM')
+  await expect(page.getByRole('button', { name: '回復コードを使う' })).toHaveCount(0)
   await openPrimaryAuthenticatedChallenge(page, '/login/two-factor/setup', 'fixture-setup', 'line')
   await expect(page.getByAltText('認証アプリ登録用のQRコード')).toBeVisible()
   await centered(page.getByRole('button', { name: '登録してログイン' }))
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`setup-${width}.png`) })
-  await page.getByRole('textbox', { name: '1桁目' }).fill('123456')
-  await expect(page.getByRole('list', { name: '8個の回復コード' }).getByRole('listitem')).toHaveCount(8)
-  expect(await page.getByRole('button', { name: '回復コードをコピー' }).evaluate(textStyle)).toEqual(await page.getByRole('button', { name: 'ファイルに保存する' }).evaluate(textStyle))
-  await centered(page.getByRole('button', { name: '控えました。ログインする' }))
-  const download = page.waitForEvent('download'); await page.getByRole('button', { name: 'ファイルに保存する' }).click(); expect((await download).suggestedFilename()).toBe('musubo-recovery-codes.txt')
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0)
-  expect(await page.evaluate(() => [...Object.values(localStorage), ...Object.values(sessionStorage)].some(value => value.includes('7K2Q-9FXM')))).toBe(false)
-  await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`recovery-${width}.png`) })
   expect(errors).toEqual([])
 })
-for (const width of [1152,1440,1920]) test(`low recovery-code banner is not covered by page content at ${width}`, async ({ page }) => {
+for (const width of [1152,1440,1920]) test(`policy confirmation and authenticator settings at ${width}`, async ({ page }) => {
   await page.setViewportSize({ width, height: 1000 })
-  await page.addInitScript(() => {
-    localStorage.setItem('lh_selected_account', 'visual-qa-account')
-    sessionStorage.setItem('lh_auth_selection_cleared', '1')
-  })
-  let remaining = 0
-  // Prepare fixture responses before navigation. A navigation can cancel an
-  // in-flight prefetch; fulfilling it after route.fetch() races that cancellation.
-  const session = await (await page.request.get(`http://127.0.0.1:${mockPort}/api/auth/session`)).json()
-  const style = await (await page.request.get(`http://127.0.0.1:${mockPort}/api/dashboard/style`)).json()
-  await page.route('**/api/**', async route => {
-    const url = new URL(route.request().url())
-    if (url.pathname === '/api/auth/session') {
-      return route.fulfill({ json: { ...session, data: { ...session.data, recoveryCodesRemaining: remaining } } })
-    }
-    if (url.pathname === '/api/dashboard/style') {
-      return route.fulfill({ json: { ...style, data: { ...style.data, styleSelected: true } } })
-    }
-    return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
-  })
-  for (const path of ['/', '/friends', '/broadcasts', '/form-submissions', '/templates/edit', '/templates/detail?id=template-1', '/chats', '/hq', '/settings']) {
-    await page.goto(path)
-    const notice = page.getByRole('note').filter({ hasText: '回復コードが残っていません' })
-    await expect(notice).toBeVisible()
-    const frame = page.locator('[data-design-shell] [data-page-template]').first()
-    await expect(frame).toBeVisible()
-    // Account/style loading can replace the first frame. Resolve both nodes in
-    // the same DOM read, so a detached loading frame cannot produce a zero box.
-    await expect.poll(() => page.evaluate(() => {
-      const el = [...document.querySelectorAll('#main-content > [data-design-part="notice"]')].find(node => node.textContent.includes('回復コードが残っていません'))
-      if (!el) throw new Error('The low-code notice is missing from the main board')
-      const next = [...document.querySelectorAll('#main-content [data-page-template]')].find(node => node.getBoundingClientRect().width > 0)
-      if (!next) return null
-      const rect = el.getBoundingClientRect()
-      const text = [...el.querySelectorAll('div, span, p')].filter(node => node.textContent.includes('入れなくなります')).pop().getBoundingClientRect()
-      const painted = document.elementFromPoint(rect.x + rect.width / 2, rect.bottom - 2)
-      return { separated: next.getBoundingClientRect().top >= rect.bottom, textInside: text.bottom < rect.bottom, uncovered: el.contains(painted), overflow: document.documentElement.scrollWidth - innerWidth }
-    })).toEqual({ separated: true, textInside: true, uncovered: true, overflow: 0 })
-    await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`notice-${path.replace(/\W/g, '-') || 'home'}-${width}.png`) })
-    if (path === '/form-submissions') {
-      const create = page.getByRole('button', { name: 'フォームを作る', exact: true })
-      await expect(create).toBeVisible()
-      await expect.poll(() => create.evaluate(el => {
-        const text = document.createRange()
-        text.selectNodeContents(el)
-        const label = text.getBoundingClientRect(), button = el.getBoundingClientRect()
-        return label.left >= button.left && label.right <= button.right
-      })).toBe(true)
-    }
-  }
-  remaining = 8
-  await page.reload()
-  await expect(page.getByRole('note').filter({ hasText: '回復コードが残っていません' })).toHaveCount(0)
-})
-for (const width of [1152,1440,1920]) test(`policy confirmation and personal recovery counts at ${width}`, async ({ page }) => {
-  await page.setViewportSize({ width, height: 1000 })
-  let required = true, remaining = 2, writes = 0
+  let required = true, writes = 0
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url()), path = url.pathname, method = route.request().method()
     let data
@@ -208,18 +128,15 @@ for (const width of [1152,1440,1920]) test(`policy confirmation and personal rec
       if (method === 'PUT') { required = route.request().postDataJSON().required; writes++ }
       data = { required, canEdit: true, configured: true, notice: null, registered: 4, total: 6, relogin: false }
     }
-    if (path === '/api/auth/two-factor/self') data = { staffId: 'visual-qa-owner', enabledAt: '2026-10-12T03:00:00Z', remaining, total: 8, canEdit: true, configured: true, notice: null }
+    if (path === '/api/auth/two-factor/self') data = { staffId: 'visual-qa-owner', enabledAt: '2026-10-12T03:00:00Z', canEdit: true, configured: true, notice: null }
     if (path === '/api/auth/step-up') data = { token: 'fixture-step-up-grant' }
-    if (path === '/api/auth/two-factor/recovery') { remaining = 8; data = { recoveryCodes: codes } }
     if (data) return route.fulfill({ status: 200, json: { success: true, data } })
     return route.fulfill({ response: await route.fetch({ url: `http://127.0.0.1:${mockPort}${url.pathname}${url.search}` }) })
   })
   await page.goto('/staff')
   await expect(page.getByRole('heading', { name: '自分の二段階認証' })).toBeVisible()
   await detailTypography(page, '認証アプリ')
-  await detailTypography(page, '回復コード')
   await detailTypography(page, '登録済み')
-  await expect(page.getByText(/回復コードの残りが2個です/)).toBeVisible()
   await page.getByRole('heading', { name: '自分の二段階認証' }).scrollIntoViewIfNeeded()
   await page.screenshot({ animations: 'disabled', path: test.info().outputPath(`personal-${width}.png`), fullPage: true })
   await page.getByRole('switch', { name: 'ログインで二段階認証を必須にする' }).click()
@@ -233,14 +150,6 @@ for (const width of [1152,1440,1920]) test(`policy confirmation and personal rec
   await dialog.getByRole('button', { name: 'オフにする', exact: true }).click()
   await expect.poll(() => writes).toBe(1)
   await expect(page.getByRole('switch', { name: 'ログインで二段階認証を必須にする' })).toHaveAttribute('aria-checked', 'false')
-  await page.getByRole('button', { name: '回復コードを作り直す' }).click()
-  const recoveryDialog = page.getByRole('dialog')
-  await waitForOverlayLayout(recoveryDialog)
-  await recoveryDialog.getByRole('textbox', { name: '1桁目' }).fill('234567')
-  await expect(page.getByRole('list', { name: '8個の回復コード' }).getByRole('listitem')).toHaveCount(8)
-  await page.getByRole('button', { name: '控えました', exact: true }).click()
-  await expect(page.getByText('残り 8 / 8 個', { exact: true })).toBeVisible()
-  await expect(page.getByText(/回復コードの残りが2個です/)).toHaveCount(0)
   expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBe(0)
 })
 

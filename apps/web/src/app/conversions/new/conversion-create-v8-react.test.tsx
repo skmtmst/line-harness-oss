@@ -169,7 +169,7 @@ describe('★V8-B 成果地点を作る（j8p3yj・競合cXqlS）', () => {
     await eventually(() => {
       expect(st.created).toHaveLength(1)
     })
-    expect(st.pushed).toEqual(['/conversions?tab=points&highlight=cv-new'])
+    expect(st.pushed).toEqual(['/affiliates?tab=points&highlight=cv-new'])
   })
 
   it('v8 の閲覧のみでは帯が出て、保存のボタンは置かない（押せない形でも置かない・2026-10-06 オーナー）', async () => {

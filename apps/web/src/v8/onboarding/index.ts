@@ -9,3 +9,7 @@ export { SampleMenuTiles } from './sample-menu'
 export { default as StyleEntry } from './style-entry'
 export { StyleExperiencePlayer, STYLE_EXPERIENCE_SCRIPT } from './style-experience-player'
 export type { StyleExperiencePlayerProps, StyleExperienceScript } from './style-experience-player'
+
+export { InitialMenuChoice, InitialMenuPhone } from './initial-menu-choice'
+export type { InitialMenuSelection } from './initial-menu-choice'
+export { default as InitialMenuPage } from './initial-menu-page'

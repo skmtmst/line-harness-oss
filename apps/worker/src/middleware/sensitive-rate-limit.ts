@@ -12,7 +12,7 @@ async function digest(value: string): Promise<string> {
 }
 function authAttempt(c: Context<Env>): boolean {
   if (c.req.path === '/api/auth/api-key' && ['POST','DELETE'].includes(c.req.method)) return true;
-  return c.req.method === 'POST' && /^\/api\/auth\/(?:login|password\/(?:login|forgot|reset)|two-factor\/(?:verify|setup(?:\/confirm)?|recovery)|step-up)$/.test(c.req.path);
+  return c.req.method === 'POST' && /^\/api\/auth\/(?:login|password\/(?:login|forgot|reset)|two-factor\/(?:verify|setup(?:\/confirm)?)|step-up)$/.test(c.req.path);
 }
 export function isUploadRequest(c: Context<Env>): boolean {
   if (!['POST', 'PUT'].includes(c.req.method)) return false;

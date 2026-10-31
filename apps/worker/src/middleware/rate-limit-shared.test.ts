@@ -34,8 +34,8 @@ describe('S13 shared sensitive request budgets', () => {
     for (let n = 0; n < 10; n++) expect((await request(app(), '/api/auth/password/login', `192.0.2.${30+n}`, { email: 'Synthetic@invalid.test', password: 'synthetic' })).status).toBe(200);
     expect((await request(app(), '/api/auth/password/login', '192.0.2.50', { email: ' synthetic@invalid.test ', password: 'synthetic' })).status).toBe(429);
   });
-  it.each(['/api/auth/two-factor/verify', '/api/auth/two-factor/setup/confirm'])('shares MFA and recovery request attempts for %s', async path => {
-    for (let n=0;n<30;n++) expect((await request(app(), path, '192.0.2.61', { challengeToken: `synthetic-${n}`, recoveryCode: 'synthetic' })).status).toBe(200);
+  it.each(['/api/auth/two-factor/verify', '/api/auth/two-factor/setup/confirm'])('shares MFA request attempts for %s', async path => {
+    for (let n=0;n<30;n++) expect((await request(app(), path, '192.0.2.61', { challengeToken: `synthetic-${n}` })).status).toBe(200);
     expect((await request(app(), path, '192.0.2.61', { challengeToken: 'synthetic-next' })).status).toBe(429);
   });
   it.each(['/api/friends/export', '/api/images'])('shares the verified principal budget for %s across IPs', async path => {

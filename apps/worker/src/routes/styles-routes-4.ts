@@ -173,6 +173,8 @@ styles.get(base + '/starter-items', async (c) => {
           row.current_draft_version_id,
           row,
         );
+    } else if(item.kind==='form') {
+      status=(await c.env.DB.prepare(`SELECT CASE WHEN is_active=1 AND current_published_version_id IS NOT NULL THEN 'active' ELSE 'draft' END status FROM forms f WHERE id=? AND EXISTS(SELECT 1 FROM form_accounts a WHERE a.form_id=f.id AND a.line_account_id=?) AND f.status!='archived'`).bind(item.target_id,a).first<{status:string}>())?.status??'missing';
     } else if (item.kind === 'reminder') {
       const row = await c.env.DB.prepare(
         'SELECT lifecycle_status status,current_draft_version_id FROM reminders WHERE id=? AND line_account_id=?',
@@ -257,7 +259,7 @@ styles.get(base + '/starter-items', async (c) => {
               ? { tags: (await heldTagSet(c, a, String(item.item_key)))?.tags ?? [] }
               : null;
     const table = resourceTables[String(item.kind)];
-    const resource = table
+    const resource = item.kind==='form' ? await c.env.DB.prepare('SELECT f.name FROM forms f JOIN form_accounts a ON a.form_id=f.id WHERE f.id=? AND a.line_account_id=?').bind(item.target_id,a).first<{name:string}>() : table
       ? await c.env.DB.prepare(
           `SELECT name FROM ${table.table} WHERE id=? AND ${table.account}=?`,
         )
@@ -280,8 +282,8 @@ styles.get(base + '/starter-items', async (c) => {
           String(item.kind),
         ) && !blockedConfirmation,
       // ごあいさつの公開・タグにする・シナリオを動かすは［まとめて動かす］に混ぜない。
-      activationAllowed: !blockedConfirmation && !['friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind)),
-      href: item.kind === 'reminder' ? '/reminders' : item.kind === 'friend_add_rule' ? '/friend-add-settings' : item.kind === 'scenario' ? '/scenarios' : item.kind === 'tag_set' ? '/tags' : undefined,
+      activationAllowed: !blockedConfirmation && !['form','friend_add_rule', 'tag_set', 'scenario'].includes(String(item.kind)),
+      href: item.kind==='form' ? `/form-submissions/edit?id=${encodeURIComponent(String(item.target_id))}&tab=basic` : item.kind === 'reminder' ? '/reminders' : item.kind === 'friend_add_rule' ? '/friend-add-settings' : item.kind === 'scenario' ? '/scenarios' : item.kind === 'tag_set' ? '/tags' : undefined,
       currentSnapshot: await resourceSnapshot(
         c.env.DB,
         a,

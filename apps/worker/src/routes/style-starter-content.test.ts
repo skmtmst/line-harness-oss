@@ -4,7 +4,7 @@ import { publishFriendAddRule } from '@line-crm/db';
 
 import { createTestD1 } from '../test-utils/d1-sqlite.js';
 import { initializeAccountStyle, profile, readDefinition, saveProfile, standardStarter } from '../services/style-setup.js';
-import { restaurantMenuButtons } from '../services/style-restaurant-buttons.js';
+import { styleMenuButtons } from '../services/style-menu-buttons.js';
 import { selectPublishedFriendAddRule } from '../features/friends/friend-add-routing-select-published-friend-add-rule.js';
 
 let f: ReturnType<typeof createTestD1>;
@@ -33,7 +33,8 @@ const EXPECTED_KEYS: Record<string, string[]> = {
 
 test.each(ACCOUNT_STYLES)('%s の初期セットは、ごあいさつにつないだ友だち追加の決まりを 1 つだけ持つ', (style) => {
   const items = standardStarter(style).items;
-  expect(items.slice(0, EXPECTED_KEYS[style]!.length).map((i) => i.key)).toEqual(EXPECTED_KEYS[style]);
+  const existingKinds=items.filter(item=>item.kind!=='form');
+  expect(existingKinds.slice(0, EXPECTED_KEYS[style]!.length).map((i) => i.key)).toEqual(EXPECTED_KEYS[style]);
   expect(items.length).toBeLessThanOrEqual(30);
   const rules = items.filter((i) => i.kind === 'friend_add_rule');
   expect(rules).toHaveLength(1);
@@ -107,19 +108,23 @@ test('受け皿が作られた時のまま（移行で作られた ID）なら�
   expect(starterRows()).toMatchObject([{ target_id: 'mine' }]);
 });
 
-test('飲食のリッチメニューは画面の見本と同じ 6 つで、行き先は本当にある LIFF の画面だけ', async () => {
+test('飲食の4面は、フォームと同じ店の予約履歴へつなぎ、未設定でも並びを保つ', async () => {
   const item = standardStarter('restaurant').items.find((i) => i.kind === 'rich_menu')!;
-  expect(item.buttons!.map((b) => b.label)).toEqual(['予約する', '予約の確認', 'クーポン', 'メニュー', 'スタンプ', 'お問い合わせ']);
-  f.raw.exec(`INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','店','s','a');
+  expect(item.buttons!.map((b) => b.label)).toEqual(['予約する','予約の確認と変更','メニュー','アクセス']);
+  f.raw.exec(`INSERT INTO rt_organizations(id,account_id,name) VALUES('org','a','統括');
+    INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('store','org','店','s','a');
     INSERT INTO rt_reservation_links(store_id,token) VALUES('store','tok');`);
-  const answers: Record<string, SetupAnswer> = { booking: { mode: 'configured', value: true } };
-  const buttons = await restaurantMenuButtons(f.db, 'a', 'restaurant', item, answers);
-  expect(buttons.map((b) => [b.label, b.actionType, b.actionData])).toEqual([
-    ['予約する', 'uri', 'https://liff.line.me/liff-a?page=restaurant&token=tok'],
-    ['予約の確認', 'uri', 'https://liff.line.me/liff-a?page=restaurant&token=tok&view=mine'],
-    ['お問い合わせ', 'message', 'お問い合わせ'],
-  ]);
-  // 予約の口が無い店では、予約のボタンを架空の行き先で置かない。
+  const answers:Record<string,SetupAnswer>={image:{mode:'configured',value:'simple'}};
+  await saveProfile(f.db,'a',DEFAULT_TENANT_ID,'owner',{expectedVersion:0,style:'restaurant',answers});
+  const buttons=await styleMenuButtons(f.db,'a','restaurant',item,answers);
+  expect(buttons).toHaveLength(4);
+  expect(buttons[0]).toMatchObject({intent:'form',actionType:'uri'});
+  expect(new URL(buttons[0]!.actionData).searchParams.get('page')).toBe('form');
+  expect(new URL(buttons[0]!.actionData).searchParams.get('id')).toBe(buttons[0]!.formId);
+  expect(buttons[1]!.actionData).toBe('https://liff.line.me/liff-a/?page=restaurant&token=tok&view=mine');
+  expect(buttons.slice(2).every(button=>button.actionData.includes('/information/'))).toBe(true);
   f.raw.exec('DELETE FROM rt_reservation_links');
-  expect((await restaurantMenuButtons(f.db, 'a', 'restaurant', item, answers)).map((b) => b.label)).toEqual(['お問い合わせ']);
+  const pending=await styleMenuButtons(f.db,'a','restaurant',item,answers);
+  expect(pending.map(button=>button.label)).toEqual(buttons.map(button=>button.label));
+  expect(pending[1]).toMatchObject({actionData:'',ready:false});
 });
