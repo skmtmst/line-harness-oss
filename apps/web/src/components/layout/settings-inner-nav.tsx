@@ -10,7 +10,7 @@ import { MENU_SECTION_BY_ID, type MenuItem } from '@/lib/menu'
 import { styleMenuItemVisible } from './style-menu'
 import { SIDEBAR_FEATURE_BY_HREF } from '@/lib/feature-settings'
 import { FEATURE_SETTINGS_UPDATED_EVENT } from '@/lib/feature-settings-event'
-import { Activity, Layers, MessageCircle, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
+import { Activity, Layers, Palette, Rocket, Share2, ShoppingCart, SlidersHorizontal, Store, Truck, Users, type LucideIcon } from 'lucide-react'
 import { useSettingsNavInline } from '@/components/shell/page-chrome'
 import styles from './settings-inner-nav.module.css'
 
@@ -35,7 +35,6 @@ import styles from './settings-inner-nav.module.css'
 const SETTINGS_ORDER = [
   '/settings/customer-look', // お客さまのデザイン（・絵  では会社とロゴの次＝今は先頭）
   '/getting-started', // はじめの設定
-  '/accounts', // LINEアカウント
   '/pools', // プール管理
   '/staff', // ログインユーザー
   '/settings', // 機能設定
@@ -50,7 +49,6 @@ const SETTINGS_ORDER = [
 const SETTINGS_ICONS: Record<(typeof SETTINGS_ORDER)[number], LucideIcon> = {
   '/settings/customer-look': Palette,
   '/getting-started': Rocket,
-  '/accounts': MessageCircle,
   '/pools': Layers,
   '/staff': Users,
   '/settings': SlidersHorizontal,
@@ -70,7 +68,8 @@ const SETTINGS_ONLY_ITEMS: MenuItem[] = [
 ]
 
 /** この中のメニューを出す画面（左のメニューの「設定」が光る画面と同じ範囲）。 */
-const SETTINGS_AREA_PATHS = [...SETTINGS_ORDER]
+// 統括から開いた旧一覧でも設定の板を保つが、項目には出さない。
+const SETTINGS_AREA_PATHS = [...SETTINGS_ORDER, '/accounts']
 const RESTAURANT_ONLY_SETTINGS = new Set<string>(['/settings/booking-media', '/settings/delivery'])
 
 /** いまのパスが設定の中のメニューを出す画面か。 */
@@ -154,7 +153,6 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
   const itemVisible = (item: MenuItem): boolean => {
     if (item.href === '/ec-commerce' && !styleMenuItemVisible(item, accountStyle.data?.style ?? null, null, accountStyle.data?.styleSelected === true)) return false
     if ((item.href === '/staff' || item.href === '/settings/customer-look') && !canManageRole(staffRole)) return false
-    if (item.href === '/accounts' && (staffRole === 'staff' || staffIdentity?.accountScope !== 'all')) return false
     const permissionKey = item.permissionKey ?? item.href
     if (staffRole === 'staff' && !item.required && !staffPermissions.includes(permissionKey) && !staffViewPermissions.includes(permissionKey)) return false
     const featureKey = SIDEBAR_FEATURE_BY_HREF[item.href]
@@ -173,7 +171,6 @@ export default function SettingsInnerNav({ inline = false }: { inline?: boolean 
     .filter((item): item is MenuItem => Boolean(item))
     .filter((item) => {
       if (RESTAURANT_ONLY_SETTINGS.has(item.href) && !restaurantSettingsVisible) return false
-      if (item.href === '/accounts' && staffIdentity?.accountScope !== 'all') return false
       if (item.featureKey === 'ec_commerce' && !itemVisible(item)) return false
       return itemActive(item.href) && item.href !== '/settings' ? true : itemVisible(item)
     })
