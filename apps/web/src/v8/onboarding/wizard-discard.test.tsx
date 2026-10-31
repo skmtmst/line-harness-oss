@@ -14,6 +14,7 @@ vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: {
   starterSet: vi.fn(async () => ({ success: true, data: { definition: { items: [] }, preview: [] } })),
   starterItems: vi.fn(async () => ({ success: true, data: { items: [] } })),
 } }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'test-store', accounts: [{id:'test-store',name:'Test store'}], selectedAccount: {id:'test-store',name:'Test store'} }) }))
 vi.mock('@/hooks/use-account-style', () => ({ accountStyleUpdated: calls.updated }))
 vi.mock('@/components/shared/list-navigation', () => ({
   default: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => <a href={href} {...props}>{children}</a>,

@@ -49,8 +49,8 @@ function FollowupDemoPlayer() {
   </section>
 }
 
-export default function StyleDemoPages({ viewing, page, onPage, chosen, onChoose, disabled }: {
-  viewing: AccountStyle; page: number; onPage: (index: number) => void; chosen: AccountStyle | null
+export default function StyleDemoPages({ accountName, viewing, page, onPage, chosen, onChoose, disabled }: {
+  accountName?: string; viewing: AccountStyle; page: number; onPage: (index: number) => void; chosen: AccountStyle | null
   onChoose: (style: AccountStyle) => void; disabled: boolean
 }) {
   const labels = labelsFor(viewing)
@@ -65,7 +65,7 @@ export default function StyleDemoPages({ viewing, page, onPage, chosen, onChoose
     <div><h3 data-demo-heading tabIndex={-1} className={styles.heading}>{headings[viewing][page]}</h3><p className={styles.description}>{page === 0 ? 'できることを、見本で紹介します。' : message}</p></div>
     {page === 0 ? <>
       <ul className={styles.can}>{look.can.map(item => <li key={item.text}><Check aria-hidden="true" className={styles.check} />{item.text}</li>)}</ul>
-      <StyleExperiencePlayer script={STYLE_EXPERIENCE_SCRIPT} style={viewing} switcher="external" variant="minimal" data="sample" />
+      <StyleExperiencePlayer accountName={accountName?.trim() || "店名未取得"} script={STYLE_EXPERIENCE_SCRIPT} style={viewing} switcher="external" variant="minimal" data="sample" />
     </> : <>
       {page === 1 ? <StyleSettingDemo key={viewing} style={viewing} /> : page === 2 && viewing === 'restaurant'
         ? <FollowupDemoPlayer />

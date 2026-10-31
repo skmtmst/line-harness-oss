@@ -13,7 +13,8 @@ test('予約の見本の選択日・時刻と確認文は一致し、タブを�
   const weekday=selected?.firstChild?.textContent
   const time=container.querySelector(`.${styles.times} [data-selected]`)?.textContent
   expect(date).toBeTruthy();expect(weekday).toBeTruthy();expect(time).toBeTruthy()
-  const expected=`10月${date}日（${weekday}）${time}`
+  const month=Number(selected?.getAttribute('data-date')?.slice(5,7))
+  const expected=`${month}月${date}日（${weekday}）${time}`
   expect(container.querySelector(`.${styles.footer} p`)?.textContent).toBe(expected)
   return expected
  }

@@ -99,3 +99,5 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+html:root .canTitle[tabindex='-1']:focus { outline: none; }

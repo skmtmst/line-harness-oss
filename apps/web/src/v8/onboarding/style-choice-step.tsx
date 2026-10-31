@@ -29,6 +29,7 @@ export function initialViewingStyle(saved: { style: AccountStyle; styleSelected:
 }
 
 export type StyleChoiceStepProps = {
+  accountName?: string
   viewing: AccountStyle
   onView: (style: AccountStyle) => void
   chosen: AccountStyle | null
@@ -67,7 +68,7 @@ export function StyleChoiceSwitcher({ viewing, onView, chosen, disabled = false 
   </div>
 }
 
-export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, disabled = false, variant = 'minimal', switcher = 'inline', detail: controlledDetail, onDetailChange, demoPage, onDemoPage }: StyleChoiceStepProps) {
+export default function StyleChoiceStep({ accountName, viewing, onView, chosen, onChoose, disabled = false, variant = 'minimal', switcher = 'inline', detail: controlledDetail, onDetailChange, demoPage, onDemoPage }: StyleChoiceStepProps) {
   const script = STYLE_EXPERIENCE_SCRIPT
   const viewed = script.styles[viewing]
   const [localDetail, setLocalDetail] = useState(false)
@@ -95,7 +96,7 @@ export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, dis
   return (
     <div ref={rootRef} className={styles.root}>
       {switcher === 'inline' ? <div className={styles.demoSwitcher}><StyleChoiceSwitcher viewing={viewing} onView={onView} chosen={chosen} disabled={disabled} /></div> : null}
-      {detail ? <StyleDemoPages viewing={viewing} page={page} onPage={setPage} chosen={chosen} onChoose={onChoose} disabled={disabled} /> : <>
+      {detail ? <StyleDemoPages accountName={accountName} viewing={viewing} page={page} onPage={setPage} chosen={chosen} onChoose={onChoose} disabled={disabled} /> : <>
       <section className={styles.can} aria-labelledby={STYLE_CHOICE_START_ID}>
         <h3 id={STYLE_CHOICE_START_ID} tabIndex={-1} className={styles.canTitle}>{`${viewed.label}でできること`}</h3>
         <ul className={styles.canList}>
@@ -103,7 +104,7 @@ export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, dis
         </ul>
       </section>
       <Card surface="muted" layout="block" contentPadding="var(--polish-space-card)" className={styles.frame} aria-label="見本">
-        <StyleExperiencePlayer script={script} style={viewing} switcher="external" variant={variant} data="sample" />
+        <StyleExperiencePlayer accountName={accountName?.trim() || "店名未取得"} script={script} style={viewing} switcher="external" variant={variant} data="sample" />
       </Card>
       <div className={styles.choose}><StyleChooseAction viewing={viewing} chosen={chosen} onChoose={onChoose} disabled={disabled} /></div>
       <div className={styles.choose}><Button ref={openRef} onClick={() => { setPage(0); setDetail(true) }} disabled={disabled}>詳しく見る</Button></div>
