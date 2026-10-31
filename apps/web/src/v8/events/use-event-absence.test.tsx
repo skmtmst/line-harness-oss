@@ -52,11 +52,25 @@ it('締め後は振替を外し、選ぶと理由が必須になり空白のま�
   fireEvent.click(dialog.getByRole('switch'))
   fireEvent.change(dialog.getByLabelText('振替を渡す理由'), { target: { value: '   ' } })
   fireEvent.click(dialog.getByRole('button', { name: '欠席にする' }))
-  expect(await dialog.findByText('締め切り後に振替を渡す理由を入れてください。')).toBeTruthy()
+  expect((dialog.getByRole('button', { name: '欠席にする' }) as HTMLButtonElement).disabled).toBe(true)
+  expect(dialog.getByRole('status').textContent).toBe('振替を渡す理由を入れると欠席にできます')
   expect(mock.save).not.toHaveBeenCalled()
   fireEvent.change(dialog.getByLabelText('振替を渡す理由'), { target: { value: '  店の都合  ' } })
+  expect((dialog.getByRole('button', { name: '欠席にする' }) as HTMLButtonElement).disabled).toBe(false)
+  expect(dialog.queryByText('振替を渡す理由を入れると欠席にできます')).toBeNull()
   fireEvent.click(dialog.getByRole('button', { name: '欠席にする' }))
   await waitFor(() => expect(mock.save).toHaveBeenCalledWith('a', 'booking-a', { grantMakeup: true, reason: '店の都合' }))
+})
+
+it('締め後でも振替を渡さない選択に戻すと、理由が空のまま欠席を受け付けられる', async () => {
+  render(<Harness startsAt={new Date(now + 3600000).toISOString()} />); const dialog = await open()
+  fireEvent.click(dialog.getByRole('switch'))
+  expect((dialog.getByRole('button', { name: '欠席にする' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(dialog.getByRole('switch'))
+  expect((dialog.getByRole('button', { name: '欠席にする' }) as HTMLButtonElement).disabled).toBe(false)
+  expect(dialog.queryByText('振替を渡す理由を入れると欠席にできます')).toBeNull()
+  fireEvent.click(dialog.getByRole('button', { name: '欠席にする' }))
+  await waitFor(() => expect(mock.save).toHaveBeenCalledWith('a', 'booking-a', { grantMakeup: false }))
 })
 
 it('窓を開いた後に締めを越えた場合も、送る瞬間に理由を確かめる', async () => {

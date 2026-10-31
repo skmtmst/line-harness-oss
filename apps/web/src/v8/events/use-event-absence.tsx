@@ -82,6 +82,7 @@ function AbsenceDialog({ accountId, target, allowed, lockedReason, onCancel, onS
   const saveErrors = useSaveFormErrors()
   const starts = Date.parse(target.startsAt)
   const late = Boolean(rule && starts - Date.now() < rule.cutoffHours * 3600000)
+  const missingReason = grant && late && !reason.trim()
   const dirty = grant !== initialGrant || reason !== ''
   const guard = useUnsavedGuard({ dirty, busy, onDiscard: onCancel })
   useEffect(() => { active.current = true; return () => { active.current = false } }, [])
@@ -114,7 +115,8 @@ function AbsenceDialog({ accountId, target, allowed, lockedReason, onCancel, onS
   return <SaveErrorScope errors={saveErrors}>
     <Dialog open contentLayout="form" title="欠席を受け付ける" description={`${target.name}の欠席を受け付けます。空いた席はキャンセル待ちの方へ回ります。`}
       confirmLabel="欠席にする" busyLabel="受け付けています…" onCancel={onCancel} onConfirm={() => void save()}
-      dirty={dirty} busy={busy} confirmDisabled={!allowed || loadState !== 'ready'} confirmLockedReason={lockedReason} error={error}>
+      dirty={dirty} busy={busy} confirmDisabled={!allowed || loadState !== 'ready' || missingReason}
+      confirmDisabledReason={missingReason ? '振替を渡す理由を入れると欠席にできます' : undefined} confirmLockedReason={lockedReason} error={error}>
       {loadState === 'loading' ? <p role="status">振替の決まりを確認しています…</p> : loadState === 'error' ? <Notice tone="warn" message="振替の決まりを読み込めませんでした。欠席はまだ受け付けていません。"
         action={<Button onClick={() => setAttempt(value => value + 1)}>もう一度読み込む</Button>} /> : rule ? <>
         <SaveErrorField names={['grantMakeup', 'grant_makeup']}><ToggleField checked={grant} disabled={!allowed || busy || !rule.enabled} onChange={setGrant}>振替を1回渡す</ToggleField></SaveErrorField>
