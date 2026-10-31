@@ -92,7 +92,7 @@ const ROUTES: Record<string, string> = {
   ウェビナー: '/webinars',
   共通情報: '/contents/vars',
   登録メディア一覧: '/contents',
-  成果とアフィリエイト: '/conversions?tab=affiliates',
+  成果とアフィリエイト: '/affiliates?tab=affiliates',
   回答フォーム: '/form-submissions',
   マイル: '/mileage',
   流入と計測: '/inflow-links',
