@@ -6,7 +6,7 @@ export function shortTextFindings(records) {
 /** DOM geometry from the rendered product; long names keep their existing title/ellipsis contract. */
 export function collectShortText() {
   const records = [], seen = new Set(), measuredParents = new Set()
-  const visible = node => { const r = node.getBoundingClientRect(); return r.width > 0 && r.height > 0 && getComputedStyle(node).visibility !== 'hidden' && !node.closest('[hidden],[inert],[aria-hidden="true"],nav,[data-template-region="folders"],[data-line-preview-part]') }
+  const visible = (node, textOnly = false) => { const r = node.getBoundingClientRect(), cell = textOnly === true && node.closest('td,th,[role=cell],[role=columnheader]'); return (r.width > 0 || cell && cell.closest('[data-shared-part="list-table"]') && cell.getBoundingClientRect().width > 0) && r.height > 0 && getComputedStyle(node).visibility !== 'hidden' && !node.closest('[hidden],[inert],[aria-hidden="true"],nav,[data-template-region="folders"],[data-line-preview-part]') }
   for (const scope of document.querySelectorAll('main,[role="dialog"]')) {
     for (const input of scope.querySelectorAll('input[inputmode="numeric"]')) {
       if (!visible(input) || !/^\d{2}\s?:\s?\d{2}$/.test(input.value)) continue
@@ -31,7 +31,7 @@ export function collectShortText() {
         const atomic = node.parentElement.childElementCount === 0 ? node.parentElement : node
         if (atomic.nodeType === 1 && measuredParents.has(atomic)) continue
         const text = atomic.textContent.trim()
-        if (!text || text.replace(/\s/g,'').length > 16 || /[\r\n]/.test(text) || !visible(node.parentElement) || node.parentElement.closest('.sr-only')) continue
+        if (!text || text.replace(/\s/g,'').length > 16 || /[\r\n]/.test(text) || !visible(node.parentElement, true) || node.parentElement.closest('.sr-only')) continue
         seen.add(node)
         if (atomic.nodeType === 1) measuredParents.add(atomic)
         const range = document.createRange(); range.selectNodeContents(atomic)

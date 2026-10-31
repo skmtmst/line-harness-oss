@@ -242,3 +242,22 @@ test('short table cell labels cannot overflow into their neighbours even when ov
     assert.deepEqual(shortTextFindings(await page.evaluate(collectShortText)), [])
   } finally { await browser.close() }
 })
+
+test('short labels remain measurable when a badge shrinks its inner text to zero width', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { connectGuardBrowser } = await import('./browser-session.mjs')
+  const { collectShortText } = await import('./short-text-browser.mjs')
+  const { fitListColumns } = await import('../../src/components/shared/list-column-sizing.mjs')
+  const css = readFileSync(new URL('../../src/components/shared/data-table.module.css', import.meta.url), 'utf8').replace(/:global\(([^)]+)\)/g, '$1')
+  const browser = await connectGuardBrowser()
+  try {
+    const page = await browser.newPage()
+    await page.setContent(`<style>${css}*{box-sizing:border-box}.frame{width:640px;--table-column-gap:12px;--table-column-padding:0;--table-head-padding:0;--table-head-height:40px;--table-row-height:auto;--table-head-text-size:13px;--table-body-text-size:13px;font:13px sans-serif}.table{width:100%}th,td{font:inherit}.name{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.badge{display:inline-flex;align-items:center;gap:8px;padding:4px 8px;max-width:100%}.badge:before{content:'';width:6px;height:6px;flex:none;background:green}.label{display:block;min-width:0;overflow:hidden;white-space:nowrap}</style><main><div class="frame" data-shared-part="list-table" data-column-layout data-column-sizing="content"><table class="table"><thead><tr class="row" data-table-layout="columns"><th class="headCell" data-cell-grow>名前</th><th class="headCell">状態</th><th class="headCell">操作</th></tr></thead><tbody><tr class="row" data-table-layout="columns"><td class="bodyCell" data-cell-grow><a data-row-link class="name" href="#" title="長い名前でも状態を色の点だけにしないことを確かめます">長い名前でも状態を色の点だけにしないことを確かめます</a></td><td class="bodyCell"><span class="badge"><span class="label">計測済</span></span></td><td class="bodyCell"><button>…</button></td></tr></tbody></table></div></main>`)
+    await page.locator('tbody td:nth-child(2)').evaluate(cell => { cell.setAttribute('data-content-support-column', ''); cell.style.setProperty('--list-content-column-width', '24px') })
+    assert.equal(await page.locator('.label').evaluate(el => el.getBoundingClientRect().width), 0)
+    assert.ok(shortTextFindings(await page.evaluate(collectShortText)).some(row => row.text === '計測済' && row.clipped))
+    await page.locator('.frame').evaluate(fitListColumns)
+    assert.deepEqual(shortTextFindings(await page.evaluate(collectShortText)), [])
+    assert.ok(await page.locator('.label').evaluate(el => el.clientWidth >= el.scrollWidth && el.clientWidth > 0))
+  } finally { await browser.close() }
+})

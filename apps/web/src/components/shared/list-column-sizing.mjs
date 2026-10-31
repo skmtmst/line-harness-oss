@@ -68,7 +68,7 @@ export function fitListColumns(frame) {
   if (flexibleContent && !controlsOnly && ![...body.children].some(cell => cell.hasAttribute('data-cell-weight'))) {
     const header = rows.find(row => row.parentElement.tagName === 'THEAD')
     const shortContentWidth = cell => {
-      const content = [cell, ...cell.querySelectorAll('*')].filter(node => node.childElementCount === 0 && node.getBoundingClientRect().width && node.textContent.trim() && !node.closest('[hidden], [aria-hidden="true"], .sr-only, [role="note"]'))
+      const content = [cell, ...cell.querySelectorAll('*')].filter(node => node.childElementCount === 0 && node.getBoundingClientRect().height && node.textContent.trim() && !node.closest('[hidden], [aria-hidden="true"], .sr-only, [role="note"]'))
       const leaves = content.filter(node => node.textContent.trim().replace(/\s/g, '').length <= 16)
       if (content.length && leaves.length === content.length) return intrinsic(cell)
       const padding = getComputedStyle(cell)
