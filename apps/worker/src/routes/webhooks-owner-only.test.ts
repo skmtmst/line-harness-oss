@@ -56,7 +56,11 @@ describe('webhooks の役割ごとの操作境界（R32/D43）', () => {
         expect(res.status, `${role} ${call.method} ${call.path}`).toBe(403);
         const payload = await res.json() as { success: boolean; error: string };
         expect(payload.success).toBe(false);
-        expect(payload.error).toContain('権限');
+        if (role === 'admin' && call.method === 'PUT') {
+          expect(payload.error).toBe('合言葉の変更はオーナーだけができます');
+        } else {
+          expect(payload.error).toContain('権限');
+        }
         expect(JSON.stringify(payload)).not.toContain('SELECT');
       }
     });
