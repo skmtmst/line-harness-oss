@@ -444,10 +444,10 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
       <DataTable density="media" className={styles.table} data-design="booking-media">
         <thead>
           <TableHeadRow>
-            <Th className={styles.colName}>媒体</Th>
-            <Th className={styles.colPage}>店舗ページの URL</Th>
-            <Th className={styles.colLogin}>管理画面（ログイン）の URL</Th>
-            <Th className={styles.colImport}>予約メールの取り込み</Th>
+            <Th truncate>媒体</Th>
+            <Th truncate>店舗ページの URL</Th>
+            <Th truncate>管理画面（ログイン）の URL</Th>
+            <Th truncate>予約メールの取り込み</Th>
             <Th className={styles.colMenu}><span className="sr-only">操作</span></Th>
           </TableHeadRow>
         </thead>
@@ -457,15 +457,15 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
             const changed = dirty.some((d) => d.code === row.code)
             return (
               <Tr key={row.code} data-dirty={changed || undefined}>
-                <Td className={styles.colName}><FolderDotName>
+                <Td><FolderDotName>
                   <span className={styles.nameCell}>
                     <span className={styles.mark} aria-hidden="true">{row.name.slice(0, 1)}</span>
                     <span className={styles.name} ><TruncatedText value={String(row.name ?? '')} /></span>
                   </span>
                 </FolderDotName></Td>
-                <Td className={styles.colPage}><UrlCell url={row.pageUrl} /></Td>
-                <Td className={styles.colLogin}><UrlCell url={row.loginUrl} /></Td>
-                <Td className={styles.colImport}>
+                <Td><UrlCell url={row.pageUrl} /></Td>
+                <Td><UrlCell url={row.loginUrl} /></Td>
+                <Td>
                   <StatusBadge tone={badge.tone}>{badge.label}</StatusBadge>
                 </Td>
                 <Td className={styles.colMenu}>

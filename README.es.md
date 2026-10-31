@@ -112,7 +112,7 @@ Tarda unos 5 minutos. Al finalizar, el panel en `https://<your-name>-admin.pages
 ### Integración con IA
 - **MCP server incluido** (`@line-harness/mcp-server`) — operación en lenguaje natural desde Claude Code
   - `list_conversations` / `get_conversation` — la IA monitorea conversaciones sin responder
-  - `create_scenario` / `update_step` — deja que la IA diseñe escenarios
+  - `create_scenario` / `update_step` — deja que la IA diseñe escenarios — se crean inactivos; revisa y activa con update de `manage_scenarios` (requiere permiso de publicación)
   - `broadcast` / `send_message` — los envíos requieren confirmación del usuario
 - **SDK oficial** (`@line-harness/sdk`) — SDK TypeScript tipado, ESM + CJS, sin dependencias
 

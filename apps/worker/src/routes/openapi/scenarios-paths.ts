@@ -15,8 +15,8 @@ export const scenariosPaths = {
     post: {
       tags: ['Scenarios'],
       summary: 'シナリオ作成',
-      requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, triggerType: { type: 'string' }, description: { type: 'string' }, triggerTagId: { type: 'string' }, isActive: { type: 'boolean' } }, required: ['name', 'triggerType'] } } } },
-      responses: { '201': { description: 'Scenario created' } },
+      requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: { type: 'string' }, triggerType: { type: 'string' }, description: { type: 'string' }, triggerTagId: { type: 'string' }, isActive: { type: 'boolean', default: false, description: '省略時は停止状態。明示的なtrueには公開権限が必要' } }, required: ['name', 'triggerType'] } } } },
+      responses: { '201': { description: 'Scenario created (inactive unless explicitly activated)' }, '403': { description: 'Scenario edit permission required; isActive:true also requires publish permission' } },
     },
   },
   '/api/scenarios/{id}': {
