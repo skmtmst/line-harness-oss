@@ -480,8 +480,11 @@ export default function Sidebar({
         if (cancelled || mySeq !== seq) return
         const entry = sidebarCountCache.get(accountId) ?? { unanswered: 0, photos: 0, operations: 0 }
         if (unanswered.status === 'fulfilled' && unanswered.value.success) {
-          setUnansweredCount(unanswered.value.data.total)
-          entry.unanswered = unanswered.value.data.total
+          // count API の total は閲覧可能な全アカウントの合計。
+          // 店舗メニューには、今選んでいるLINEアカウントの件数だけを出す。
+          const accountCount = unanswered.value.data.byAccount.find((item) => item.accountId === accountId)?.count ?? 0
+          setUnansweredCount(accountCount)
+          entry.unanswered = accountCount
         }
         if (summary.status === 'fulfilled' && summary.value.success) {
           const total = summary.value.data.warningCount + summary.value.data.dangerCount
