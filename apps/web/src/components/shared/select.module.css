@@ -273,4 +273,3 @@ html:root :is([data-toolbar-row], [data-control-row]) .trigger:not([data-choice-
 
 /* 短い既定値は欄の内容幅を下限にして省略しない。長い選択値だけを省略する。 */
 .root[data-entity-default] { min-width: max-content; }
-
