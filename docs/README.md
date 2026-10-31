@@ -474,6 +474,7 @@
 - [EC連携の表示条件](release-log/unreleased/1966-masato-ec-usecase-visibility.md)
 - [飲食店の入口とメニュー価格の保存](release-log/unreleased/1967-masato-restaurant-simplify.md)
 - [設定メニューの表示項目](release-log/unreleased/1969-masato-hide-settings-menu.md)
+- [飲食店の機能設定の保存エラー修正](release-log/unreleased/2009-masato-settings-save-quality.md)
 - [友だちの空の案内・保管の札・つづきの統合](release-log/unreleased/1971-kenta-muse-check-a.md)
 - [配信・シナリオ・自動応答の日時・題・下見の修正](release-log/unreleased/1954-kenta-muse-delivery.md)
 - [ダッシュボードのカードの行き先表示](release-log/unreleased/1950-kenta-side-card-links.md)
