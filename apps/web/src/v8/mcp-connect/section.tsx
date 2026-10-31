@@ -33,10 +33,10 @@ import { notifyToast } from '@/components/shared/toast'
 import StepUpPrompt, { isStepUpRequired, type StepUpRequest } from '@/components/step-up-prompt'
 import { useAccount } from '@/contexts/account-context'
 import { formatDate } from '@/lib/format'
-import { readSessionSnapshot } from '@/lib/session-snapshot'
-import { useStaffRole } from '@/lib/staff-role'
 import { MCP_STEP_UP, mcpApi, type McpConnection, type McpIssued, type McpLevel } from './api'
-import { EXPIRY_OPTIONS, LEVEL_LABEL, LEVEL_NOTE, connectionState, mcpPermissions } from './words'
+import { EXPIRY_OPTIONS, LEVEL_LABEL, LEVEL_NOTE, connectionState } from './words'
+import { useMcpPermissions, currentMcpPermissions, captureMcpCreation } from './write-access'
+export { useMcpPermissions } from './write-access'
 import styles from './section.module.css'
 
 type Load = { kind: 'loading' } | { kind: 'ready'; items: McpConnection[] } | { kind: 'error'; error: unknown }
@@ -44,11 +44,6 @@ type Load = { kind: 'loading' } | { kind: 'ready'; items: McpConnection[] } | { 
 const LEVELS: McpLevel[] = ['read', 'draft', 'send_request']
 const day = (value: string | null) => formatDate(value, { style: 'list-day', fallback: '—' })
 const used = (value: string | null) => formatDate(value, { style: 'list', fallback: value ? '—' : 'まだ使っていません' })
-
-export function useMcpPermissions() {
-  const role = useStaffRole()
-  return mcpPermissions(role, Boolean(readSessionSnapshot()?.impersonation))
-}
 
 export default function McpConnectionsSection() {
   const { selectedAccountId, selectedAccount, accounts } = useAccount()
@@ -78,7 +73,7 @@ export default function McpConnectionsSection() {
   if (!permissions.see) return null
 
   const stop = async () => {
-    if (!stopTarget) return
+    if (!stopTarget || !currentMcpPermissions().stop) return
     setBusy(true)
     setDialogError('')
     try {
@@ -94,7 +89,8 @@ export default function McpConnectionsSection() {
   }
 
   const rotate = async (stepUpToken?: string) => {
-    if (!rotateTarget) return
+    if (!rotateTarget || !currentMcpPermissions().create) return
+    const canContinue = captureMcpCreation()
     setBusy(true)
     setDialogError('')
     try {
@@ -103,7 +99,7 @@ export default function McpConnectionsSection() {
       setIssued(res.data)
       void fetchList()
     } catch (caught) {
-      if (!stepUpToken && isStepUpRequired(caught)) setStepUp({ purpose: MCP_STEP_UP, action: 'AI との接続の鍵を作り直す', retry: (token) => rotate(token) })
+      if (!stepUpToken && isStepUpRequired(caught)) setStepUp({ purpose: MCP_STEP_UP, action: 'AI との接続の鍵を作り直す', retry: async (token) => { if (canContinue()) return rotate(token); setDialogError('権限が変わったため中止しました。') } })
       else setDialogError(describeApiFailure(caught, '鍵の作り直し'))
     } finally {
       setBusy(false)
@@ -111,14 +107,14 @@ export default function McpConnectionsSection() {
   }
 
   const failure = load.kind === 'error' ? loadFailureCopy(load.error, 'AI との接続') : null
-  const create = permissions.create ? <Button onClick={() => setCreateOpen(true)}><Plus size={16} aria-hidden="true" />接続を作る</Button> : null
+  const create = <Button disabled={!permissions.create} lockedReason={permissions.reason} onClick={() => { if (currentMcpPermissions().create) setCreateOpen(true) }}><Plus size={16} aria-hidden="true" />接続を作る</Button>
 
   return (
     <Card padding="default" className={styles.card} data-design-node="Xb0yc">
       <CardHeader
         title="AI とつなぐ（MCP）"
         help={<HelpTip label="AI とつなぐの説明">MCP（AI のアプリとつなぐ決まり）で、Claude などの AI からこのアカウントの数を読んだり、下書きを作ったりできます。何をしたかは全部「AI の操作の記録」に残ります。</HelpTip>}
-        action={create ?? (permissions.stop ? <span className={styles.ownerOnly}>オーナーだけが作れます</span> : undefined)}
+        action={create}
       />
       <p className={styles.purpose}>Claude などの AI から、このアカウントの情報を読む・下書きを作ることができます。送るのは人の承認が要ります。</p>
       {load.kind === 'loading' ? <ListState kind="loading" /> : null}
@@ -128,8 +124,9 @@ export default function McpConnectionsSection() {
           icon={<Bot aria-hidden="true" />}
           title="まだ AI との接続がありません"
           description="AI とつなぐと、Claude などから数を読んだり下書きを作ったりできます。"
-          create={{ label: '接続を作る', onClick: () => setCreateOpen(true) }}
+          create={{ label: '接続を作る', onClick: () => { if (currentMcpPermissions().create) setCreateOpen(true) } }}
           canCreate={permissions.create}
+          lockedReason={permissions.reason ?? null}
         />
       ) : null}
       {load.kind === 'ready' && load.items.length > 0 ? (
@@ -168,8 +165,8 @@ export default function McpConnectionsSection() {
                       onOpenChange={(next) => setMenuId(next ? connection.id : null)}
                       items={[
                         { id: 'log', label: '記録を見る', href: `/webhooks/ai-log?connection=${encodeURIComponent(connection.id)}`, onSelect: () => setMenuId(null) },
-                        ...(permissions.create && live ? [{ id: 'rotate', label: '鍵を作り直す', onSelect: () => { setMenuId(null); setDialogError(''); setRotateTarget(connection) } }] : []),
-                        ...(permissions.stop && live ? [{ id: 'stop', label: '止める', tone: 'danger' as const, onSelect: () => { setMenuId(null); setDialogError(''); setStopTarget(connection) } }] : []),
+                        ...(live ? [{ id: 'rotate', label: '鍵を作り直す', disabled: !permissions.create && !permissions.reason, lockedReason: permissions.reason, onSelect: () => { setMenuId(null); setDialogError(''); setRotateTarget(connection) } }] : []),
+                        ...(live ? [{ id: 'stop', label: '止める', disabled: !permissions.stop && !permissions.reason, lockedReason: permissions.stop ? undefined : permissions.reason, tone: 'danger' as const, onSelect: () => { setMenuId(null); setDialogError(''); setStopTarget(connection) } }] : []),
                       ]}
                     />
                   </ActionCell>
@@ -193,6 +190,8 @@ export default function McpConnectionsSection() {
         title={`「${stopTarget?.name ?? ''}」を止めますか？`}
         description="すぐ使えなくなり、次の呼び出しから断ります。止めた人は記録に残ります。もう一度使うときは、接続を作り直します。"
         confirmLabel="止める"
+        confirmDisabled={!permissions.stop}
+        confirmLockedReason={permissions.stop ? undefined : permissions.reason}
         destructive
         busy={busy}
         error={dialogError || undefined}
@@ -204,6 +203,8 @@ export default function McpConnectionsSection() {
         title={`「${rotateTarget?.name ?? ''}」の鍵を作り直しますか？`}
         description="新しい鍵を 1 回だけ表示します。古い鍵は 24 時間だけ使えます。そのあいだに AI のアプリの鍵を書き換えてください。"
         confirmLabel="作り直す"
+        confirmDisabled={!permissions.create}
+        confirmLockedReason={permissions.reason}
         busy={busy}
         error={dialogError || undefined}
         onConfirm={() => void rotate()}
@@ -222,6 +223,7 @@ function McpCreateDialog({ open, defaultAccountId, accountOptions, onClose, onCr
   onClose: () => void
   onCreated: (issued: McpIssued) => void
 }) {
+  const permissions = useMcpPermissions()
   const [name, setName] = useState('')
   const [level, setLevel] = useState<McpLevel>('read')
   const [accountId, setAccountId] = useState(defaultAccountId ?? '')
@@ -237,6 +239,8 @@ function McpCreateDialog({ open, defaultAccountId, accountOptions, onClose, onCr
   }, [open, defaultAccountId])
 
   const submit = async (stepUpToken?: string) => {
+    if (!currentMcpPermissions().create) { setError(permissions.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
+    const canContinue = captureMcpCreation()
     const trimmed = name.trim()
     if (!trimmed) { setNameError('名前を入れてください（例：Claude（Kenta））'); return }
     setNameError('')
@@ -247,7 +251,7 @@ function McpCreateDialog({ open, defaultAccountId, accountOptions, onClose, onCr
       notifyToast('接続を作りました')
       onCreated(res.data)
     } catch (caught) {
-      if (!stepUpToken && isStepUpRequired(caught)) setStepUp({ purpose: MCP_STEP_UP, action: 'AI との接続を作る', retry: (token) => submit(token) })
+      if (!stepUpToken && isStepUpRequired(caught)) setStepUp({ purpose: MCP_STEP_UP, action: 'AI との接続を作る', retry: async (token) => { if (canContinue()) return submit(token); setError('権限が変わったため中止しました。') } })
       else if (!saveErrors.capture(caught)) setError(describeApiFailure(caught, '接続の作成'))
     } finally {
       setBusy(false)
@@ -266,6 +270,8 @@ function McpCreateDialog({ open, defaultAccountId, accountOptions, onClose, onCr
         busy={busy}
         error={error || undefined}
         confirmLabel="作る"
+        confirmDisabled={!permissions.create}
+        confirmLockedReason={permissions.reason}
         footerAlign="center"
         onConfirm={() => void submit()}
         onCancel={() => { if (!busy) onClose() }}

@@ -263,7 +263,7 @@ describe('外部連携 V8', () => {
   })
 
   it.each(['admin', 'staff'])('狭い幅でも %s の権限に合わせて試し送信を出す', async (staffRole) => {
-    role = staffRole
+    role = verifiedStaffRole(staffRole)
     narrow = true
     const base = globalThis.fetch
     vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => String(input).includes('/api/webhooks/outgoing')
@@ -278,19 +278,28 @@ describe('外部連携 V8', () => {
     const items = [...document.querySelectorAll('[role="menuitem"]')].map((item) => item.textContent)
     expect(items).toContain('送信の記録を見る')
     expect(items.includes('試しに送る')).toBe(staffRole === 'admin')
-    for (const action of ['止める', '動かす', '直す', '鍵を作り直す', '削除する']) expect(items).not.toContain(action)
+    for (const action of ['鍵を作り直す', '削除する']) {
+      const locked = within(document.body).getByRole('menuitem', { name: action })
+      expect(locked.getAttribute('aria-disabled')).toBe('true')
+      fireEvent.click(locked)
+    }
+    expect(within(document.body).getByRole('menuitem', { name: '止める' }).getAttribute('aria-disabled')).toBe(staffRole === 'admin' ? null : 'true')
     expect(posted).toHaveLength(0)
   })
 
-  it('閲覧のみ：受け取り口を作る・見本で作る・まとめてやり直すを置かず、閲覧のみの帯を出す', async () => {
+  it('閲覧のみ：受け取り口と見本の入口は理由付きで拒み、閲覧のみの帯を出す', async () => {
     role = verifiedStaffRole('staff')
     await render(<WebhooksIncomingV8 />)
-    expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.feature)
-    expect(buttons().some((element) => element.textContent?.includes('受け取り口を作る'))).toBe(false)
+    expect(host.textContent).toContain(PERMISSION_LOCK_SUMMARY.manager)
+    expect(within(host).getByRole('button', { name: '受け取り口を作る' }).getAttribute('aria-disabled')).toBe('true')
     act(() => { root.unmount() })
     root = createRoot(host)
     await render(<WebhooksSamplesV8 />)
-    expect(buttons().some((element) => element.textContent?.includes('この見本で作る'))).toBe(false)
+    expect(within(host).getAllByRole('button', { name: 'この見本で作る' })).toHaveLength(9)
+    for (const button of within(host).getAllByRole('button', { name: 'この見本で作る' })) {
+      expect(button.getAttribute('aria-disabled')).toBe('true'); fireEvent.click(button)
+    }
+    expect(posted).toHaveLength(0)
     act(() => { root.unmount() })
     root = createRoot(host)
     await render(<WebhooksInteractionsV8 />)
@@ -503,3 +512,38 @@ describe('外部連携 V8', () => {
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it('管理者が見本の受信元で開いても、作成の窓と入力を保つ', async () => {
+  role = verifiedStaffRole('admin')
+  search = 'source=booking'
+  await render(<WebhooksIncomingV8 />)
+  const dialog = within(document.body).getByRole('dialog', { name: '受け取る設定を追加' })
+  expect(dialog.textContent).toContain('予約サービス')
+  fireEvent.change(within(dialog).getByRole('textbox', { name: '名前' }), { target: { value: '管理者の予約受信' } })
+  await render(<WebhooksIncomingV8 />)
+  expect(within(dialog).getByRole('textbox', { name: '名前' }).getAttribute('value')).toBe('管理者の予約受信')
+  expect((within(dialog).getByRole('button', { name: '作る', exact: true }) as HTMLButtonElement).disabled).toBe(false)
+  expect(posted).toHaveLength(0)
+})
+
+it('管理者は実際の受け取り口の中で、受信後の行動を追加し保存できる', async () => {
+  role = verifiedStaffRole('admin')
+  const base = globalThis.fetch
+  vi.stubGlobal('fetch', (input: RequestInfo | URL, init?: RequestInit) => {
+    if (String(input).includes('/api/common-actions/resources')) return Promise.resolve(json({ success: true, data: {
+      tags: [{ id: 'tag-new', name: '申し込み済み' }], supportMarks: [], templates: [], scenarios: [], webhooks: [], commonActions: [], richMenus: [],
+    } }))
+    return base(input, init)
+  })
+  await render(<WebhooksIncomingV8 />)
+  await act(async () => fireEvent.click(within(host).getByRole('button', { name: '行うことを足す' })))
+  await act(async () => fireEvent.click(within(document.body).getByRole('menuitem', { name: /タグを付ける/ })))
+  const picker = within(document.body).getByRole('dialog', { name: 'タグを付ける対象を選ぶ' })
+  await act(async () => fireEvent.click(within(picker).getByRole('radio', { name: '申し込み済み' })))
+  await act(async () => fireEvent.click(within(picker).getByRole('button', { name: '選ぶ', exact: true })))
+  await act(async () => fireEvent.click(within(host).getByRole('button', { name: '行うことを保存する' })))
+  await waitFor(() => expect(posted.filter(call => call.url.includes('/config'))).toHaveLength(1))
+  expect(posted.find(call => call.url.includes('/config'))?.body).toMatchObject({ expectedVersion: 1,
+    actions: [{ refKind: 'tag', refId: 'tag-new', refVersionId: null }],
+  })
+})

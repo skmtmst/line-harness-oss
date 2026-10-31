@@ -1,12 +1,13 @@
 'use client'
 
-import { useStaffRole, isOwnerRole, loadStaffIdentity } from '@/lib/staff-role'
+import { useStaffRole, canManageRole, loadStaffIdentity } from '@/lib/staff-role'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { api, ApiError } from '@/lib/api'
 import Button from '@/components/shared/button'
 import Notice from '@/components/shared/notice'
 import CreatePage, { Field, inputClass } from '@/components/shared/create-page'
+import { canManageWebhooksNow } from './write-access'
 import TargetMissing from '@/components/shared/target-missing'
 import { useAccount } from '@/contexts/account-context'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -41,10 +42,6 @@ function EditWebhookPageInner() {
   const currentKey = `${selectedAccountId ?? ''}|${id}`
   /** 失敗したあとの「もう一度読み込む」で取り直すための番号。 */
   const [reloadKey, setReloadKey] = useState(0)
-  /*
-   * 送り先の変更は統括だけ（R32）。口側が `requireRole('owner')` で守っている。
-   * 直接URLで開いた管理者には作らず、統括への依頼を案内する。
-   */
   const staffRole = useStaffRole()
 
 
@@ -110,11 +107,11 @@ function EditWebhookPageInner() {
     )
   }
 
-  if (!isOwnerRole(staffRole)) {
+  if (!canManageRole(staffRole)) {
     return (
       <div className="flex flex-col gap-4">
         <Notice tone="info">
-          {staffRole === null ? '権限の確認が終わるまで編集できません。確認できないときは、もう一度読み込んでください。' : '送り先の変更は統括だけができます。必要なときは統括に頼んでください。'}
+          {staffRole === null ? '権限の確認が終わるまで編集できません。確認できないときは、もう一度読み込んでください。' : '送り先の変更はオーナーか管理者だけができます。必要なときは依頼してください。'}
         </Notice>
         <div>
           {staffRole === null ? <Button variant="secondary" onClick={() => { void loadStaffIdentity().catch(() => {}) }}>もう一度読み込む</Button> : null}
@@ -145,8 +142,9 @@ function EditWebhookPageInner() {
         return null
       }}
       onSave={async () => {
+        if (!canManageWebhooksNow()) throw new Error('この操作はオーナーか管理者だけができます。')
         const requestAccountId = selectedAccountId
-        if (!requestAccountId) throw new Error('LINEアカウントを選択してください')
+        if (!requestAccountId || selectedAccountIdRef.current !== requestAccountId) throw new Error('LINEアカウントを選択してください')
         try {
           const res = await api.webhooks.outgoing.update(id, requestAccountId, {
             name: name.trim(),
@@ -160,9 +158,9 @@ function EditWebhookPageInner() {
           if (!res.success) throw new Error(res.error)
         } catch (caught) {
       saveErrors.capture(caught)
-          // 変更は統括だけ。権限不足は生の `API error: 403` ではなく依頼の案内にする（R32）。
+          // 保存できない時は、担当者へ依頼する案内を出す。
           if (caught instanceof ApiError && caught.status === 403) {
-            throw new Error('送り先の変更は統括だけができます。必要なときは統括に頼んでください。')
+            throw new Error('送り先の変更はオーナーか管理者だけができます。必要なときは依頼してください。')
           }
           throw caught
         }

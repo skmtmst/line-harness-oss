@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { expectPermissionLocked } from '@/test-utils/permission-locked-control'
 /*
  * R32: 受け取り口・送り先の作成は統括だけに出す。
@@ -11,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 let query = ''
 let staffRole = 'owner'
+const writes: Array<{ path: string; method: string }> = []
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: null, loading: false }),
@@ -63,9 +65,12 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
   beforeEach(() => {
     query = ''
     staffRole = 'owner'
-    vi.stubGlobal('fetch', vi.fn(async (input: unknown) => {
+    verifiedStaffRole(null)
+    writes.length = 0
+    vi.stubGlobal('fetch', vi.fn(async (input: unknown, init?: RequestInit) => {
       const raw = typeof input === 'string' ? input : String(input)
       const path = raw.startsWith('http') ? new URL(raw).pathname + new URL(raw).search : raw
+      if (init?.method && !['GET', 'HEAD', 'OPTIONS'].includes(init.method)) writes.push({ path, method: init.method })
       let body: unknown = { success: true, data: [] }
       if (path.startsWith('/api/staff/me')) {
         body = { success: true, data: { id: 's-1', name: '担当', role: staffRole, email: null } }
@@ -93,6 +98,7 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     })
     host.remove()
     vi.unstubAllGlobals()
+    verifiedStaffRole(null)
   })
 
   it('統括には送り先の作成を出す', async () => {
@@ -105,45 +111,68 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     expect(host.textContent).not.toContain('送り先の作成は統括だけができます')
   })
 
-  it('管理者には送り先の作成を理由付きで残し、実行を拒否する', async () => {
+  it('管理者には送り先の作成を出し、作成画面へ進める', async () => {
     staffRole = 'admin'
-    await act(async () => {
-      root.render(<WebhooksPage />)
-    })
+    await act(async () => { root.render(<WebhooksPage />) })
     await settle()
-    await expectPermissionLocked([...host.querySelectorAll('button')].find(button => button.textContent?.includes('最初の送り先を作る')))
-    expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
+    const create = [...host.querySelectorAll('a')].find(link => link.textContent?.includes('最初の送り先を作る'))
+    expect(create?.getAttribute('href')).toBe('/webhooks/new')
+    expect(create?.getAttribute('aria-disabled')).not.toBe('true')
+    expect(host.textContent).not.toContain('この画面を変える権限がありません。')
+    expect(writes).toEqual([])
   })
 
-  it('手元に統括の保存値が残っていても、本人確認が管理者なら作成を拒否する', async () => {
+  it.each(['staff', 'viewer'])('本人が%sなら手元の統括の保存値にかかわらず作成を拒否する', async role => {
+    staffRole = role
+    window.localStorage.setItem('lh_staff_role', 'owner')
+    try {
+      for (const tabQuery of ['', 'tab=incoming', 'tab=notify']) {
+        query = tabQuery
+        await act(async () => { root.render(<WebhooksPage />) })
+        await settle()
+        const label = !tabQuery ? '最初の送り先を作る' : tabQuery === 'tab=incoming' ? '受け取り口を作る' : 'この見本で作る'
+        const create = [...host.querySelectorAll('button')].find(button => button.textContent?.includes(label))
+        await expectPermissionLocked(create)
+        expect(host.querySelector('a[href="/webhooks/new"]')).toBeNull()
+        expect(host.querySelector('a[href^="/webhooks/new?event="]')).toBeNull()
+        expect(host.querySelector('a[href^="/webhooks?tab=incoming&source="]')).toBeNull()
+        expect(writes).toEqual([])
+      }
+    } finally { window.localStorage.removeItem('lh_staff_role') }
+  })
+
+  it('本人が管理者なら作成できても、手元の統括の値で鍵やMCPを作れない', async () => {
     staffRole = 'admin'
     window.localStorage.setItem('lh_staff_role', 'owner')
     try {
-      for (const tabQuery of ['', 'tab=incoming']) {
-        query = tabQuery
-        await act(async () => {
-          root.render(<WebhooksPage />)
-        })
-        await settle()
-        if (!tabQuery) await expectPermissionLocked([...host.querySelectorAll('button')].find(button => button.textContent?.includes('最初の送り先を作る')))
-        else expect(host.textContent).not.toContain('最初の送り先を作る')
-        expect(host.textContent, tabQuery || 'outgoing').not.toContain('受け取り口を作る')
-        expect(host.textContent, tabQuery || 'outgoing').not.toContain('見本から作る')
-      }
-    } finally {
-      window.localStorage.removeItem('lh_staff_role')
-    }
+      await act(async () => { root.render(<WebhooksPage />) })
+      await settle()
+      expect(host.querySelector('a[href="/webhooks/new"]')).not.toBeNull()
+      query = 'tab=api-tokens'
+      await act(async () => { root.render(<WebhooksPage />) })
+      await settle()
+      await expectPermissionLocked([...host.querySelectorAll('button')].find(button => button.textContent?.trim() === 'API 接続の鍵を発行する'))
+      const mcp = host.querySelector('[data-design-node="Xb0yc"]')
+      expect(mcp).not.toBeNull()
+      await expectPermissionLocked([...mcp!.querySelectorAll('button')].find(button => button.textContent?.trim() === '接続を作る'))
+      expect(document.querySelector('[role="dialog"]')).toBeNull()
+      expect(writes).toEqual([])
+    } finally { window.localStorage.removeItem('lh_staff_role') }
   })
 
-  it('管理者には受け取り口の作成を出さず、統括への依頼を案内する', async () => {
+  it('管理者には受け取り口の作成を出し、書き込み前に入力窓を開く', async () => {
     query = 'tab=incoming'
     staffRole = 'admin'
-    await act(async () => {
-      root.render(<WebhooksPage />)
-    })
+    await act(async () => { root.render(<WebhooksPage />) })
     await settle()
-    expect(host.textContent).not.toContain('受け取り口を作る')
-    expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
+    const create = [...host.querySelectorAll('button')].find(button => button.textContent?.trim() === '受け取り口を作る')
+    expect(create).toBeTruthy()
+    expect(create?.getAttribute('aria-disabled')).not.toBe('true')
+    expect(create?.disabled).toBe(false)
+    await act(async () => { create!.click() })
+    await settle()
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull()
+    expect(writes).toEqual([])
   })
 
   it('受け取り口のURLはAPIの住所で組み立てる', async () => {
@@ -179,22 +208,18 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     }
   })
 
-  it('管理者には見本から作るを出さず、統括への依頼だけ出す', async () => {
-    for (const [tabQuery, guidance] of [
-      ['', 'この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。'],
-      ['tab=incoming', 'この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。'],
-    ] as const) {
+  it('管理者には受け取る・送るの両方で見本の入口を出す', async () => {
+    for (const tabQuery of ['', 'tab=incoming']) {
       query = tabQuery
       staffRole = 'admin'
-      await act(async () => {
-        root.render(<WebhooksPage />)
-      })
+      await act(async () => { root.render(<WebhooksPage />) })
       await settle()
-      expect(host.textContent, `admin ${tabQuery || 'outgoing'}`).not.toContain('見本から作る')
-      expect(host.textContent, `admin ${tabQuery || 'outgoing'}`).toContain(guidance)
-      act(() => {
-        root.unmount()
-      })
+      const sample = [...host.querySelectorAll('a')].find(link => link.textContent?.includes('見本から作る'))
+      expect(sample?.getAttribute('href')).toBe('/webhooks?tab=notify')
+      expect(sample?.getAttribute('aria-disabled')).not.toBe('true')
+      expect(host.textContent).not.toContain('この画面を変える権限がありません。')
+      expect(writes).toEqual([])
+      act(() => { root.unmount() })
       host.remove()
       host = document.createElement('div')
       document.body.appendChild(host)
@@ -213,16 +238,18 @@ describe('R32/C33 外部連携の権限連動と受け取りURL', () => {
     expect(host.querySelector('a[href^="/webhooks/new?event="]')).not.toBeNull()
   })
 
-  it('管理者には見本タブの作成を出さず、統括への依頼だけ出す', async () => {
+  it('管理者には見本から受け取り口と送り先へ進む入口を出す', async () => {
     query = 'tab=notify'
     staffRole = 'admin'
-    await act(async () => {
-      root.render(<WebhooksPage />)
-    })
+    await act(async () => { root.render(<WebhooksPage />) })
     await settle()
-    expect(host.textContent).not.toContain('この見本で作る')
-    expect(host.textContent).not.toContain('送り先を作る')
-    expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
-    expect(host.textContent).toContain('この画面を変える権限がありません。変えたい時はオーナーか管理者に頼んでください。')
+    const creates = [...host.querySelectorAll('a')].filter(link => link.textContent?.trim() === 'この見本で作る')
+    expect(creates.length).toBeGreaterThan(0)
+    expect(creates.every(link => link.getAttribute('aria-disabled') !== 'true')).toBe(true)
+    expect(creates.some(link => link.getAttribute('href')?.startsWith('/webhooks/new?event='))).toBe(true)
+    expect(creates.some(link => link.getAttribute('href')?.startsWith('/webhooks?tab=incoming&source='))).toBe(true)
+    expect(host.textContent).not.toContain('この画面を変える権限がありません。')
+    expect(writes).toEqual([])
   })
+
 })

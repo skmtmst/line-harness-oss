@@ -1,4 +1,5 @@
 'use client'
+import { requiredInputReason } from '@/lib/required-input-reason'
 
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 
@@ -379,6 +380,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   }
 
   const sendName = host ? host.accountName || '公式アカウント' : accounts.find((account) => account.id === selectedAccountId)?.name ?? '公式アカウント'
+  const inputReason = requiredInputReason([{ label: 'テンプレート名', value: name }, { label: '画像', value: hqHost ? Boolean(uploaded) : imageUrl, select: true }])
   const blocked = saved ? '保存しました。一覧へ戻ってください。' : null
   const busy = saving || publishing || uploading || Boolean(host?.busy)
   const imageSet = /^https?:\/\//.test(imageUrl.trim())
@@ -444,6 +446,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
   return (
     <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
+        inputReason={inputReason}
         composerHost={host ? { ...host, busy, onCancel: () => guarded(host.onCancel) } : undefined}
         onComposerInsert={(alsoSave) => void hostSave(alsoSave)}
         boardId={host ? 'g8d6ai' : 'EFV8l'}
@@ -463,7 +466,7 @@ export default function TemplateRichEditor({ visual = false, host }: { visual?: 
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined} busy={saving && !publishing} busyLabel="保存中…">
               下書きを保存
             </Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked)} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked) || Boolean(inputReason)} disabledReason={inputReason} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
               {host ? null : <Upload size={16} aria-hidden="true" />}
               {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>

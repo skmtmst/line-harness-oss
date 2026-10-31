@@ -1,4 +1,5 @@
 'use client'
+import { requiredInputReason } from '@/lib/required-input-reason'
 
 import { type ResearchFormat, type ResearchQuestion, visualQuestions, assetInitial } from './asset-initial'
 export type { ResearchQuestion } from './asset-initial'
@@ -390,6 +391,23 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
   }
 
   const sendName = host ? host.accountName || '公式アカウント' : accounts.find((account) => account.id === selectedAccountId)?.name ?? '公式アカウント'
+  const inputReason = requiredInputReason([
+    { label: 'テンプレート名', value: name },
+    ...(kind === 'coupon' ? [
+      { label: 'クーポン名', value: Boolean(initialPayload && !initialPayload.title) || couponTitle },
+      { label: '使える期間の開始', value: couponStartsAt },
+      { label: '使える期間の終了', value: couponEndsAt },
+      { label: '割引額', value: couponDraft.couponType !== 'discount' || couponDraft.mode !== 'amount' || couponDraft.amount },
+      { label: '割引率', value: couponDraft.couponType !== 'discount' || couponDraft.mode !== 'percent' || couponDraft.percent },
+      { label: '割引前の金額', value: couponDraft.couponType !== 'discount' || couponDraft.mode !== 'price' || couponDraft.before },
+      { label: '割引後の金額', value: couponDraft.couponType !== 'discount' || couponDraft.mode !== 'price' || couponDraft.after },
+      { label: '表示するコード', value: !couponDraft.showCode || couponDraft.code },
+      { label: '使うときの説明', value: couponDraft.instructions },
+    ] : questions.flatMap((question, index) => [
+      { label: `質問 ${index + 1} の本文`, value: question.text },
+      { label: `質問 ${index + 1} の選択肢`, value: question.format === 'free' || question.choices.some(choice => Boolean(choice.trim())) },
+    ])),
+  ])
   const blocked = saved ? '保存しました。一覧へ戻ってください。' : null
   const busy = saving || publishing || Boolean(host?.busy)
   const imageSet = /^https?:\/\//.test(imageUrl.trim())
@@ -483,6 +501,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
   return (
     <SaveErrorScope errors={saveErrors}><>
       <TemplateEditFrame
+        inputReason={inputReason}
         boardId={meta.board}
         title={existing && kind === 'coupon' ? 'クーポンを編集する' : meta.heading}
         description={meta.lead}
@@ -501,7 +520,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
             <Button type="button" onClick={() => void onSaveDraft()} disabled={busy || Boolean(blocked) || !canMutate && !permissionReason} lockedReason={permissionReason} title={blocked ?? undefined} busy={saving && !publishing} busyLabel="保存中…">
               下書きを保存
             </Button>
-            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked) || !canMutate && !permissionReason} lockedReason={permissionReason} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
+            <Button type="button" variant="primary" onClick={() => void onPublish()} disabled={busy || Boolean(blocked) || Boolean(inputReason) || !canMutate && !permissionReason} disabledReason={inputReason} lockedReason={permissionReason} title={blocked ?? undefined}  busy={publishing || Boolean(host?.busy)} busyLabel="保存中…">
               {host ? null : <Upload size={16} aria-hidden="true" />}
               {host ? host.primaryLabel ?? '保存する' : '保存して公開'}
             </Button>

@@ -5,11 +5,10 @@
  *
  * 受け取る見本5つ（どこから来るか）と送る見本4つ（いつ・何を送るか）を
  * カードで並べ、「この見本で作る」で作る画面へ進む。見本データは 管理画面 と同じ。
- * 見本からの作成は統括だけ（R32）。閲覧のみの人には押せないボタンを置かない。
+ * 作成できない人にも同じ入口を残し、灰色と理由で知らせる。
  */
 import { CalendarDays, ClipboardList, CreditCard, LayoutTemplate, MessageCircle, ShoppingCart } from 'lucide-react'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
 import TruncatedText from '@/components/shared/truncated-text'
@@ -21,8 +20,8 @@ import {
   overviewBandCells,
   useWebhookOverview,
 } from './shell'
+import { useWebhookWriteAccess } from './write-access'
 import styles from './samples.module.css'
-import { permissionDeniedMessage } from '@/components/shared/api-error-message'
 
 /* 受け取る側の見本（どこから来るか）。 */
 export const INCOMING_SAMPLES = [
@@ -48,8 +47,8 @@ export const OUTGOING_SAMPLES = [
 export default function WebhooksSamplesV8() {
   usePageTitle('外部連携')
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
-  const staffRole = useStaffRole()
-  const canManage = staffRole === 'owner'
+  const management = useWebhookWriteAccess()
+  const canManage = management.allowed
   const overview = useWebhookOverview()
   return (
     <ListPage help={<>{WEBHOOKS_DESCRIPTION}{"見本に書いたことだけを送ります。「すべての出来事を送る」設定は見本からは作られません。"}</>}
@@ -57,10 +56,10 @@ export default function WebhooksSamplesV8() {
       headingSize="regular"
       title="外部連携"
 
-      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button> : undefined}
+      actions={<Button lockedReason={management.reason} {...(canManage ? { href: "/webhooks?tab=notify" } : { disabled: true })}><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button>}
       tabs={<WebhookTabs active="notify" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
-        {!canManage ? <ViewerBand /> : null}
+        {management.known && !canManage ? <ViewerBand /> : null}
         <WebhookBand
           cells={overviewBandCells({
             outgoing: overview.outgoingCount === null ? null : overview.outgoing,
@@ -87,9 +86,7 @@ export default function WebhooksSamplesV8() {
                 </div>
                 <p className={styles.cardDesc}>{sample.hint}</p>
                 <span className={styles.cardSpacer} aria-hidden="true" />
-                {canManage
-                  ? <Button href={`/webhooks?tab=incoming&source=${sample.value}`} className={styles.cardButton}>この見本で作る</Button>
-                  : <span className={styles.cardButtonSpace} aria-hidden="true" />}
+                <Button lockedReason={management.reason} {...(canManage ? { href: `/webhooks?tab=incoming&source=${sample.value}` } : { disabled: true })} className={styles.cardButton}>この見本で作る</Button>
               </li>
             ))}
           </ul>
@@ -112,14 +109,11 @@ export default function WebhooksSamplesV8() {
                   <dd className={styles.code}><TruncatedText value={sample.event} /></dd>
                 </dl>
                 <span className={styles.cardSpacer} aria-hidden="true" />
-                {canManage
-                  ? <Button href={`/webhooks/new?event=${sample.event}`} className={styles.cardButton}>この見本で作る</Button>
-                  : <span className={styles.cardButtonSpace} aria-hidden="true" />}
+                <Button lockedReason={management.reason} {...(canManage ? { href: `/webhooks/new?event=${sample.event}` } : { disabled: true })} className={styles.cardButton}>この見本で作る</Button>
               </li>
             ))}
           </ul>
         </section>
-        {!canManage ? <p className={styles.askNote}>{permissionDeniedMessage('store')}</p> : null}
       </div>
     </ListPage>
   )
