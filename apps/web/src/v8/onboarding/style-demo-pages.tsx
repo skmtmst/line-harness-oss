@@ -2,6 +2,7 @@
 
 import type { AccountStyle } from '@line-crm/shared'
 import Button from '@/components/shared/button'
+import { DialogActions } from '@/components/shared/dialog'
 import Card from '@/components/shared/card'
 import { Field, TextInput } from '@/components/shared/form-controls'
 import { Steps } from '@/components/templates/steps'
@@ -64,5 +65,5 @@ export default function StyleDemoPages({ viewing, page, onPage, chosen, onChoose
 }
 
 export function StyleDemoFooter({ viewing, page, onPage, chosen, onChoose, disabled }: { viewing: AccountStyle; page: number; onPage: (page: number) => void; chosen: AccountStyle | null; onChoose: (style: AccountStyle) => void; disabled: boolean }) {
-  return <div className={styles.navigation}><Button onClick={() => onPage(page - 1)} disabled={page === 0}>前のページ</Button><StyleChooseAction viewing={viewing} chosen={chosen} onChoose={onChoose} disabled={disabled} primary /><Button onClick={() => onPage(page + 1)} disabled={page === 4}>次のページ</Button></div>
+  return <DialogActions><div className={styles.navigation}><Button onClick={() => { if (page > 0) onPage(page - 1) }} aria-disabled={page === 0}>前のページ</Button><StyleChooseAction viewing={viewing} chosen={chosen} onChoose={onChoose} disabled={disabled} primary /><Button onClick={() => { if (page < 4) onPage(page + 1) }} aria-disabled={page === 4}>次のページ</Button></div></DialogActions>
 }

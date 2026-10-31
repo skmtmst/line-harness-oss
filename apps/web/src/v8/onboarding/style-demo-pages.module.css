@@ -7,4 +7,11 @@
 .description { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-body); }
 .note { margin: 0; color: var(--color-ink-secondary); font-size: var(--text-caption); }
 .choose { display: flex; justify-content: center; }
-.navigation { display: flex; width: 100%; justify-content: space-between; align-items: center; gap: var(--polish-space-row); }
+.navigation { display: grid; width: 100%; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: var(--polish-space-row); }
+.navigation > :first-child { justify-self: start; }
+.navigation > :last-child { justify-self: end; }
+
+@media (max-width: 560px) {
+  .navigation { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .navigation > :nth-child(2) { grid-column: 1 / -1; grid-row: 1; justify-self: center; }
+}

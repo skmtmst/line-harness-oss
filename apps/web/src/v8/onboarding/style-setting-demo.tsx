@@ -49,7 +49,7 @@ export default function StyleSettingDemo({ style }: { style: AccountStyle }) {
           {editing && <div className={styles.form}><strong>{style === 'restaurant' ? '新しい卓' : style === 'lesson' ? 'イベントを作る' : style === 'ec' ? 'タグを作る' : '予約メニューを直す'}</strong>
             {style === 'restaurant' && <div className={step === 2 ? styles.active : ''}><Field label="卓番" required><TextInput value="1" readOnly /></Field>{step === 2 && <Hand className={styles.hand} size={22} />}</div>}
             <div className={!saving && (style !== 'restaurant' || step === 3) ? styles.active : ''}><Field label={example.field} required><TextInput value={step >= (style === 'restaurant' ? 3 : 2) ? example.value : ''} readOnly /></Field>{!saving && (style !== 'restaurant' || step === 3) && <Hand className={styles.hand} size={22} />}</div>
-            <div className={saving ? styles.active : ''}><Button variant="primary">{example.save}</Button>{saving && <Hand className={styles.hand} size={22} />}</div>
+            <div className={`${styles.buttonTarget} ${saving ? styles.active : ''}`}><Button variant="primary">{example.save}</Button>{saving && <Hand className={styles.hand} size={22} />}</div>
           </div>}
           </div>
         </main>
