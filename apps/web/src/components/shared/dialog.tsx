@@ -13,6 +13,7 @@ import { captureOverlayClose, useOverlayDiscard } from './overlay-discard'
 import { useStepMotion } from './use-step-motion'
 import { dialogWidth } from './destination-policy'
 import Notice from '@/components/shared/notice'
+import { useDialogActionWidth } from './use-dialog-action-width'
 
 export type DialogProps = {
   open: boolean
@@ -412,8 +413,9 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
 /** 自前の処理でも、下の操作の余白と配置は窓の共通部品が持つ。 */
 export function DialogActions({ children, leadingAction, align, padding }: { children: ReactNode; leadingAction?: ReactNode; align?: 'center'; padding?: 'none' }) {
   const centered = align === 'center' || leadingAction !== undefined
-  return <div className={styles.actions} data-dialog-actions data-dialog-action-pair={centered || undefined} data-padding={padding}>
-    {leadingAction ? <span className={centered ? styles.actionStart : styles.actionLead}>{typeof leadingAction === 'string' ? <span className={styles.footerLead}>{leadingAction}</span> : leadingAction}</span> : null}
+  const ref = useDialogActionWidth()
+  return <div ref={ref} className={styles.actions} data-dialog-actions data-dialog-action-pair={centered || undefined} data-padding={padding}>
+    {leadingAction ? <span data-dialog-action-leading className={centered ? styles.actionStart : styles.actionLead}>{typeof leadingAction === 'string' ? <span className={styles.footerLead}>{leadingAction}</span> : leadingAction}</span> : null}
     {centered ? <span className={styles.buttonPair}>{children}</span> : children}
   </div>
 }
