@@ -1,6 +1,7 @@
 import { jstNow } from '../utils.js';
 import { type FormVersionContent, type PublishFormVersionResult, type PublishedFormVersion } from './types.js';
 import { getFormById } from './reads.js';
+import { formMediaUsageStatements } from './media-references.js';
 
 
 export async function getFormVersionContent(
@@ -110,6 +111,7 @@ export async function publishFormVersion(
                AND v.source_content_revision = forms.content_revision
           )`,
     ).bind(versionId, now, id, expectedContentRevision, versionId),
+    ...formMediaUsageStatements(db, id),
   ]);
 
   if ((results[1]?.meta?.changes ?? 0) === 1) {
