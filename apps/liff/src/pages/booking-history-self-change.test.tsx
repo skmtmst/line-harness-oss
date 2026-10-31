@@ -138,7 +138,7 @@ describe('予約の履歴：本人の日時変更・キャンセル（F-6）', (
     // 埋まった枠は並べない。
     expect(screen.queryByText(/10\/5/)).toBeNull();
     fireEvent.click(await screen.findByRole('button', { name: /10\/6（火） 14:00/ }));
-    fireEvent.click(screen.getByRole('button', { name: 'この日時に変える' }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '日時を変える' }));
     await vi.waitFor(() =>
       expect(rescheduleMyBooking).toHaveBeenCalledWith('bk-1', { starts_at: '2099-10-06T05:00:00.000Z', lock_version: 4 }),
     );
