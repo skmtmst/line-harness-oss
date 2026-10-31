@@ -93,6 +93,7 @@ export const broadcastsMethods = {
       /** 詳細条件。渡さないと条件を無視した人数（＝全員）が返る。 */
       segmentConditions?: SegmentCondition | null
       scheduledAt?: string | null
+      deliveryLimit?: import('@line-crm/shared').BroadcastDeliveryLimit
       messageCount?: number
     }) =>
       fetchApi<ApiResponse<BroadcastPreflight>>('/api/broadcasts/preflight', {
@@ -135,12 +136,12 @@ export const broadcastsMethods = {
     // 本送信は取り消せないため、サーバー側が確認ヘッダを要求する。
     // 画面の確認ダイアログを経たことをここで示す。
     // 1人運用のときは確認で入れた人数も送る（合わなければ409）。
-    send: (id: string, options?: { confirmedRecipientCount?: number }) =>
+    send: (id: string, options?: { confirmedRecipientCount?: number; expectedVersion?: number }) =>
       fetchApi<ApiResponse<ApiBroadcast>>(`/api/broadcasts/${id}/send`, {
         method: 'POST',
         headers: IRREVERSIBLE_BROADCAST_HEADERS,
         body: options?.confirmedRecipientCount !== undefined
-          ? JSON.stringify({ confirmedRecipientCount: options.confirmedRecipientCount })
+          ? JSON.stringify(options)
           : undefined,
       }),
     /**
@@ -158,7 +159,7 @@ export const broadcastsMethods = {
         ),
       get: (id: string) =>
         fetchApi<ApiResponse<BroadcastApprovalState>>(`/api/broadcasts/${id}/approval`),
-      request: (id: string, data: { approverStaffId: string; note?: string }) =>
+      request: (id: string, data: { approverStaffId: string; note?: string; expectedVersion?: number; confirmedRecipientCount?: number }) =>
         fetchApi<ApiResponse<{ approval: BroadcastApprovalState['approval'] }>>(
           `/api/broadcasts/${id}/approval-request`, { method: 'POST', body: JSON.stringify(data) },
         ),

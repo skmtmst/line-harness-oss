@@ -1,3 +1,4 @@
+import { assertLimitedAudienceNames, storedDeliveryLimit, limitedDeliveryPlan, freezeLimitedAudience, holdLimitedBroadcast, renewLimitedReservation, LimitedBroadcastError } from './broadcast-delivery-limit.js';
 import { scopeStoredBroadcastSegmentQuery, restrictSegmentInput, scopedFriendIds, storedBroadcastFriendScope } from '../../services/segment-query-scope.js';
 import { BROADCAST_DEFINITION_GUARD_SQL, broadcastDefinitionGuardArgs } from './broadcast-definition-guard.js';
 import { logger } from '@line-crm/shared/server';
@@ -84,6 +85,7 @@ export async function processBroadcastSend(
   lineClient: LineClient,
   broadcastId: string,
   workerUrl?: string,
+  delivery?: { recipientLimitCount: number },
 ): Promise<Broadcast> {
   if(await processBroadcastSimulation(db,broadcastId))return (await getBroadcastById(db,broadcastId))!;
 
@@ -112,6 +114,13 @@ export async function processBroadcastSend(
     throw new Error(
       `Unsupported broadcast variables: ${unsupportedVariables.map((v) => `{{${v}}}`).join(', ')}`,
     );
+  }
+
+  if (storedDeliveryLimit(broadcast)) {
+    const plan = await limitedDeliveryPlan(db, broadcast);
+    if (hasRecipientVariablesInParts(storedParts)) await assertLimitedAudienceNames(db, plan!.query);
+    await freezeLimitedAudience(db, broadcast, Math.min(plan!.recipientCount, delivery?.recipientLimitCount ?? plan!.recipientCount));
+    return (await getBroadcastById(db, broadcastId))!;
   }
 
   // LINE broadcast は一部の友だちを除外できないため、同意条件がある場合は all 設定を保ったまま、再開可能な宛先台帳の経路へ切り替える。
@@ -325,6 +334,7 @@ export async function processBroadcastSend(
           .bind(JSON.stringify({operator:'AND',rules:[{type:'is_following',value:true}]}),broadcast.id).run();
         return (await getBroadcastById(db,broadcastId))!;
       }
+      if (storedDeliveryLimit(broadcast)) throw new LimitedBroadcastError('上限付きの配信の宛先を確認できません。全員へは送りません。');
       const { requestId } = await lineClient.broadcast(messages, retryKey);
       await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
       if (broadcastAccountId) {
@@ -515,8 +525,24 @@ export async function guardScheduledBroadcastQuota(
   db: D1Database,
   broadcast: Broadcast,
   accountId: string | null,
-  opts?: { reserveBroadcastId?: string },
-): Promise<{ blocked: boolean; message?: string }> {
+  opts?: { reserveBroadcastId?: string; confirmedRecipientCount?: number },
+): Promise<{ blocked: boolean; message?: string; recipientLimitCount?: number }> {
+  if (storedDeliveryLimit(broadcast)) {
+    try {
+      const plan = await limitedDeliveryPlan(db, broadcast, { requireConfirmation: opts?.confirmedRecipientCount === undefined });
+      const count = Math.min(plan!.recipientCount, opts?.confirmedRecipientCount ?? plan!.recipientCount);
+      if (count <= 0) throw new LimitedBroadcastError('送れる人数が0人です。対象と送信枠を確かめてください。');
+      if (!plan!.quota.unlimited) {
+        const { tryReserveQuotaSlot } = await import('./broadcast-quota-guard.js');
+        if (!await tryReserveQuotaSlot(db, accountId!, opts?.reserveBroadcastId ?? broadcast.id, count, plan!.quota.used!, plan!.quota.limit!, {replaceOwn:true})) {
+          throw new LimitedBroadcastError('ほかの送信が枠を使っています。少し待って確かめ直してください。');
+        }
+      }
+      return { blocked: false, recipientLimitCount: count };
+    } catch (error) {
+      return { blocked: true, message: error instanceof Error ? error.message : '送る人数と送信枠を確かめ直してください。' };
+    }
+  }
   if (!accountId) return { blocked: false };
 
   const { getLineAccountById } = await import('@line-crm/db');
@@ -684,6 +710,7 @@ export async function processScheduledBroadcasts(
         const approvalCheck = await checkScheduledBroadcastApproval(db, broadcast);
         if (!approvalCheck.sendable) continue;
       } catch (approvalError) {
+        if (approvalError instanceof LimitedBroadcastError) { await holdLimitedBroadcast(db,broadcast,approvalError.message); continue; }
         logger.error("services_broadcast_failed");
         continue;
       }
@@ -742,6 +769,7 @@ export async function processScheduledBroadcasts(
 
       const guard = await guardScheduledBroadcastQuota(db, broadcast, accountId);
       if (guard.blocked) {
+        if (storedDeliveryLimit(broadcast)) await holdLimitedBroadcast(db, broadcast, guard.message ?? '送る人数と送信枠を確かめ直してください。');
         // 下書きへ戻す。**内容は消さない**ので、相手を減らして予約し直せる。
         await db.prepare(
           `UPDATE broadcasts SET status = 'draft', scheduled_at = NULL WHERE id = ? AND status = 'sending'`,
@@ -749,10 +777,14 @@ export async function processScheduledBroadcasts(
         continue;
       }
 
-      await processBroadcastSend(db, deliveryClient, broadcast.id, workerUrl);
+      await processBroadcastSend(db, deliveryClient, broadcast.id, workerUrl, guard.recipientLimitCount === undefined ? undefined : { recipientLimitCount: guard.recipientLimitCount });
     } catch (err) {
       // 分析の一時対象者が期限切れ・消滅している予約は毎tick再試行しても
       // 届かない。下書きへ戻して予約を消す（内容は残るので作り直せる）。
+      if (err instanceof LimitedBroadcastError) {
+        await holdLimitedBroadcast(db, broadcast, err.message);
+        continue;
+      }
       if (err instanceof BroadcastAudienceError) {
         logger.warn("services_broadcast_warn");
         try {
@@ -1008,6 +1040,10 @@ async function processQueuedBroadcastBatches(
     .bind(broadcast.id).first<{n:number}>();
   if (await holdMissingBroadcastAudience(db,{id:broadcast.id,expected:Number(raw.total_count ?? 0),
     known:Number(previousAudience?.n ?? 0),started:!!hasAudience || Number(raw.success_count ?? 0)>0 || batchOffset>0 || Number(raw.send_attempt_no ?? 1)>1})) return;
+  if (!hasAudience && storedDeliveryLimit(broadcast)) {
+    await holdLimitedBroadcast(db, broadcast, '固定した宛先を確認できません。選び直さず送信を止めました。');
+    return;
+  }
   const filterAll = broadcast.target_type === 'all' && await hasSuppressedDeliveryRecipients(db,accountId);
   if (!hasAudience && (segmentConditionsStr || broadcast.target_tag_id || filterAll)) {
     const conditions = segmentConditionsStr ? JSON.parse(segmentConditionsStr)
@@ -1037,7 +1073,8 @@ async function processQueuedBroadcastBatches(
       await updateBroadcastBatchProgress(db,broadcast.id,0,0);
       return;
     }
-    const { requestId } = await lineClient.broadcast(messages, retryKey);
+    if (storedDeliveryLimit(broadcast)) throw new LimitedBroadcastError('上限付きの配信の宛先を確認できません。全員へは送りません。');
+      const { requestId } = await lineClient.broadcast(messages, retryKey);
     await updateBroadcastLineRequestId(db, broadcast.id, requestId, null);
     await createBroadcastInsight(db, broadcast.id);
     await updateBroadcastStatus(db, broadcast.id, 'sent', { totalCount: 0, successCount: 0 });
@@ -1128,6 +1165,10 @@ async function processQueuedBroadcastBatches(
         `UPDATE broadcasts SET batch_offset = ?, batch_lock_at = NULL
           WHERE id = ? AND stopped_at IS NOT NULL`,
       ).bind(progressBase + currentOffset, broadcast.id).run();
+      return;
+    }
+    try { await renewLimitedReservation(db,broadcast,friends.length-currentOffset); } catch (error) {
+      await holdLimitedBroadcast(db,broadcast,error instanceof Error?error.message:'送信枠を確認できません。');
       return;
     }
     const batch = friends.slice(currentOffset, currentOffset + deliveryBatchSize);
@@ -1376,6 +1417,10 @@ async function processQueuedBroadcastBatches(
 
   // 全バッチ完了 — ロック解除 + 完了マーク
   await updateBroadcastLineRequestId(db, broadcast.id, null, unit);
+  if (storedDeliveryLimit(broadcast) && broadcast.line_account_id) {
+    const { releaseQuotaSlot } = await import('./broadcast-quota-guard.js');
+    await releaseQuotaSlot(db,broadcast.line_account_id,broadcast.id);
+  }
   await createBroadcastInsight(db, broadcast.id);
   await updateBroadcastStatus(db, broadcast.id, 'sent');
 }

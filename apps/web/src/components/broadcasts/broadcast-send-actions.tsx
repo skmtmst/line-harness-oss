@@ -1,4 +1,6 @@
 'use client'
+import type { BroadcastSendMode } from './broadcast-schedule'
+import { SEND_TIME_MISSING_MESSAGE } from './broadcast-step-gate'
 
 import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 
@@ -17,6 +19,7 @@ type SaveBroadcastContext = {
   approvalCountMatched: boolean
   approvalNote: string
   approverId: string
+  deliveryLimited?: boolean
   audienceCount: number | null
   bubbles: BroadcastBubble[]
   currentStep: BroadcastStepKey | null
@@ -29,7 +32,8 @@ type SaveBroadcastContext = {
   saving: boolean
   scheduledAtIso: () => string | null
   selectedAccountIdRef: RefObject<string | null>
-  sendMode: "scheduled" | "now" | "optimal"
+  sendProblem?: () => string | null
+  sendMode: BroadcastSendMode
   setConfirmOpen: Dispatch<SetStateAction<boolean>>
   setError: Dispatch<SetStateAction<string>>
   setSaving: Dispatch<SetStateAction<boolean>>
@@ -37,8 +41,11 @@ type SaveBroadcastContext = {
   validate: () => string
 }
 
-export async function saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, setConfirmOpen, setError, setSaving, submittingRef, validate }: SaveBroadcastContext) {
+export async function saveBroadcast({ ab, approvalConfigState, approvalCountInput, approvalCountMatched, approvalNote, approverId, audienceCount, deliveryLimited, bubbles, currentStep, needsApproval, needsApprovalSingle, onSuccess, persistDraft, rejectValidation, saveErrors, saving, scheduledAtIso, selectedAccountIdRef, sendMode, sendProblem, setConfirmOpen, setError, setSaving, submittingRef, validate }: SaveBroadcastContext) {
     if (saving || submittingRef.current) return
+    const scheduleProblem = sendProblem?.()
+    if (scheduleProblem) { rejectValidation(scheduleProblem); return }
+    if (sendMode === 'unselected' || sendMode === 'optimal') { rejectValidation(SEND_TIME_MISSING_MESSAGE); return }
     if (currentStep && approvalConfigState !== 'ready') { setError('承認の設定を確認できません。確認画面を開き直してください'); return }
     const validationError = validate(); if (validationError) { rejectValidation(validationError); return }
     if (needsApproval && !needsApprovalSingle && approverId === '') {
@@ -56,7 +63,7 @@ export async function saveBroadcast({ ab, approvalConfigState, approvalCountInpu
       const saved = await persistDraft(
         scheduledAtIso(),
         false,
-        needsApprovalSingle ? Number(approvalCountInput) : undefined,
+        needsApprovalSingle ? Number(approvalCountInput) : deliveryLimited ? audienceCount ?? undefined : undefined,
       )
       // R626: 待っている間にアカウントが変わっていたら今の画面へ混ぜない。
       if ((selectedAccountIdRef.current || null) !== requestAccountId) return
@@ -67,6 +74,7 @@ export async function saveBroadcast({ ab, approvalConfigState, approvalCountInpu
       if (needsApproval && !needsApprovalSingle) {
         const requested = await api.broadcasts.approval.request(saved.id, {
           approverStaffId: approverId,
+          ...(deliveryLimited ? {expectedVersion:abVersion,confirmedRecipientCount:audienceCount!} : {}),
           note: approvalNote.trim() || undefined,
         })
         if (!requested.success) {
@@ -85,7 +93,7 @@ export async function saveBroadcast({ ab, approvalConfigState, approvalCountInpu
           onSuccess(saved)
           return
         }
-        const sent = await api.broadcasts.send(saved.id, needsApprovalSingle ? { confirmedRecipientCount: Number(approvalCountInput) } : undefined)
+        const sent = await api.broadcasts.send(saved.id, deliveryLimited ? { expectedVersion:abVersion, confirmedRecipientCount:audienceCount! } : needsApprovalSingle ? { confirmedRecipientCount: Number(approvalCountInput) } : undefined)
         if ((selectedAccountIdRef.current || null) !== requestAccountId) return
         if (!sent.success) { setError(sent.error); return }
         setConfirmOpen(false)

@@ -73,28 +73,31 @@ export async function styleSchedule(
       ? (
           await db
             .prepare(
-              'SELECT l.reservation_id,l.table_id FROM rt_reservation_table_links l JOIN rt_reservations r ON r.id=l.reservation_id JOIN rt_stores s ON s.id=r.store_id WHERE s.line_account_id=?',
+              'SELECT l.reservation_id,l.table_id FROM rt_reservation_table_links l JOIN rt_reservations r ON r.id=l.reservation_id JOIN rt_stores s ON s.id=r.store_id JOIN rt_tables t ON t.id=l.table_id AND t.store_id=r.store_id WHERE s.line_account_id=? ORDER BY l.reservation_id,l.table_id',
             )
             .bind(account)
             .all<{ reservation_id: string; table_id: string }>()
         ).results
       : [];
+  const tableNames = new Map<string, { name: string; storeId: string }>();
   if (style === 'restaurant') {
     const tables = (
       await db
         .prepare(
-          'SELECT t.id,t.label name,t.store_id storeId FROM rt_tables t JOIN rt_stores s ON s.id=t.store_id WHERE s.line_account_id=? AND (? IS NULL OR s.id=?) AND t.is_active=1 ORDER BY t.id',
+          'SELECT t.id,t.label name,t.store_id storeId,t.is_active isActive FROM rt_tables t JOIN rt_stores s ON s.id=t.store_id WHERE s.line_account_id=? AND (? IS NULL OR s.id=?) ORDER BY t.id',
         )
         .bind(account, query.store_id ?? null, query.store_id ?? null)
-        .all<{ id: string; name: string; storeId: string }>()
+        .all<{ id: string; name: string; storeId: string; isActive: number }>()
     ).results;
-    availability.resources = tables;
+    for (const table of tables) tableNames.set(table.id, { name: table.name, storeId: table.storeId });
+    const activeTables = tables.filter(table => table.isActive === 1).map(table => ({ id: table.id, name: table.name, storeId: table.storeId }));
+    availability.resources = activeTables;
     // ボードの既定軸は時間と担当者とし、席のタブではテーブル軸を使える。
     if (query.axis === 'table')
       columns.splice(
         0,
         columns.length,
-        ...tables.map((t) => ({ ...t, kind: 'table' as const })),
+        ...activeTables.map((t) => ({ ...t, kind: 'table' as const })),
       );
     else if (query.axis && query.axis !== 'staff')
       throw new StyleError('invalid_axis');
@@ -120,7 +123,8 @@ export async function styleSchedule(
         columnIds: ids.length ? ids : ['unassigned'],
         startsAt: booking.startsAt,
         endsAt: booking.endsAt,
-        title: booking.name,
+        title: booking.menuName ?? (booking.kind === 'restaurant' && !booking.menuId ? '席のみ' : '—'),
+        ...(style === 'restaurant' ? { tableNames: (tableIds.length ? tableIds : booking.slotId ? [booking.slotId] : []).map(id => tableNames.get(id)).flatMap(table => table && table.storeId === booking.storeId ? [table.name] : []) } : {}),
         booking,
       });
     }
