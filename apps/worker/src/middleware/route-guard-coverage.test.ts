@@ -477,6 +477,8 @@ const STAFF_FAIL_CLOSED_SNAPSHOT: string[] = [
     'GET /api/hq/store-comparison/exports/:id/download',
     'GET /api/hq/style-attention',
     'GET /api/hq/style-starter-sets',
+    'GET /api/hq/style-starter-sets/catalog',
+    'GET /api/hq/style-starter-sets/catalog/:templateId/versions/:versionId',
     'GET /api/hq/style-template-samples',
     'GET /api/hq/support/context',
     'GET /api/hq/support/kinds',

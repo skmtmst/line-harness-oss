@@ -27,7 +27,8 @@ beforeEach(()=>{
     INSERT INTO line_accounts(id,tenant_id,channel_id,name,channel_access_token,channel_secret) VALUES('a','t','ca','店舗','fixture','fixture'),('source','t','cs','元の店','fixture','fixture'),('b','other','cb','別店舗','fixture','fixture');
     INSERT INTO staff_members(id,name,role,api_key,tenant_id) VALUES('owner','統括','owner','owner-key','t'),('admin','店の担当者','admin','admin-key','t');
     INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES('admin','a','now');
-    UPDATE staff_members SET account_scope='accounts' WHERE id='admin';`);
+    UPDATE staff_members SET account_scope='accounts' WHERE id='admin';
+    UPDATE line_accounts SET liff_id='liff-'||id;`);
 });
 afterEach(()=>{sql.raw.close();vi.restoreAllMocks()});
 test('空の組を明示保存でき、標準文面で埋めず、未選択では投入しない',async()=>{
@@ -169,7 +170,7 @@ test('クーポン素材も未公開の下書きで入れる',async()=>{
  expect(sql.raw.prepare("SELECT kind,published_version,draft_revision FROM broadcast_message_assets WHERE line_account_id='a'").get()).toEqual({kind:'coupon',published_version:0,draft_revision:1});
  expect(sql.raw.prepare('SELECT COUNT(*) n FROM broadcast_asset_versions').get()).toEqual({n:0});
 });
-test('想定外の投入障害も登録済みの事実を保ち、事故の報告口へ渡す',async()=>{
+test('投入の予期しない失敗でも登録を成功として返し、共通のエラー報告を呼ぶ',async()=>{
  await set([await catalog('tag',tag())]);
  const original=sql.db.batch.bind(sql.db),reportError=vi.fn();let batches=0;
  sql.db.batch=async statements=>{batches++;if(batches===2)throw new Error('simulated database outage');return original(statements)};
@@ -199,7 +200,7 @@ test('一度も作れていない古い版は、組を更新した後に新し�
  const result=await applyCatalogStarter(sql.db,'t','a','admin','standard',{bucket,publicBaseUrl:'https://worker.test'});
  expect(result.items[0].state).toBe('succeeded');expect(sql.raw.prepare("SELECT name FROM templates WHERE line_account_id='a'").all()).toEqual([{name:'新版'}]);
 });
-test('実体と同時に保存した比較記録は、読み直した実体と一致する',async()=>{
+test('配布時に記録した中身が実体と一致する',async()=>{
  await set([await catalog('tag',tag()),await catalog('template',message())]);
  await initializeAccountStyle(sql.db,'a','t','admin','standard',{bucket,publicBaseUrl:'https://worker.test'});
  const rows=sql.raw.prepare("SELECT resource_kind,target_id,source_snapshot FROM style_starter_catalog_resources WHERE line_account_id='a'").all() as Array<{resource_kind:string;target_id:string;source_snapshot:string}>;

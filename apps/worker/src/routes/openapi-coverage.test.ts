@@ -343,6 +343,8 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'GET /api/dashboard/style/warnings',
   'GET /api/hq/style-attention',
   'GET /api/hq/style-starter-sets',
+  'GET /api/hq/style-starter-sets/catalog',
+  'GET /api/hq/style-starter-sets/catalog/{templateId}/versions/{versionId}',
   'GET /api/hq/style-starter-sets/{style}/default',
   'GET /api/hq/style-template-samples',
   'GET /api/liff/booking/style-readiness',

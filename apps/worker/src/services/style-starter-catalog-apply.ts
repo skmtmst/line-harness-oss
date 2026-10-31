@@ -98,8 +98,12 @@ export async function applyCatalogStarter(db: D1Database, tenant: string, accoun
         }
         runId = preview.preflightId;
         await scoped.batch([
-          ...preview.stores[0].items.map(row=>scoped.prepare(`UPDATE hq_template_preflight_resolutions SET resolution_mode=? WHERE tenant_id=? AND target_account_id=? AND idempotency_fingerprint=? AND source_id=?`)
-            .bind(row.duplicate ? (newCopy && (row.itemKind===selection.kind || (selection.kind==='coupon' && row.itemKind==='template'))?'alias':'overwrite') : row.allowedModes[0],tenant,account,runId,row.sourceId)),
+          ...preview.stores[0].items.map(row=>{
+            const root=row.itemKind===selection.kind || (selection.kind==='coupon' && row.itemKind==='template');
+            const mode=row.duplicate?(newCopy&&root?'alias':'overwrite'):row.allowedModes[0];
+            return scoped.prepare(`UPDATE hq_template_preflight_resolutions SET resolution_mode=?,alias_name=CASE WHEN ?='alias' THEN 'pending' ELSE NULL END WHERE tenant_id=? AND target_account_id=? AND idempotency_fingerprint=? AND source_id=?`)
+              .bind(mode,mode,tenant,account,runId,row.sourceId);
+          }),
           scoped.prepare('UPDATE style_starter_catalog_items SET distribution_run_id=? WHERE line_account_id=? AND template_id=? AND lease_token=?').bind(runId,account,selection.templateId,lease),
         ]);
       }
