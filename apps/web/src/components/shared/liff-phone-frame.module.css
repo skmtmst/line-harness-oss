@@ -92,6 +92,7 @@
 .barTitle {
   display: flex;
   flex: 1;
+  min-width: 0;
   flex-direction: column;
   align-items: center;
 }

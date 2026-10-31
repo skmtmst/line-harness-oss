@@ -1107,3 +1107,4 @@
 - [反映履歴：通知・受付・回答フォーム・受信と教室の一覧](release-log/unreleased/2024-kenta-train-1031h.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
 
 - [反映履歴：送る相手・操作先・登録案内・一覧の数字と会員の入口](release-log/unreleased/2025-kenta-train-1031i.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+- [反映履歴：回答フォームの見本の題](release-log/unreleased/0000-kenta-form-preview-heading.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。

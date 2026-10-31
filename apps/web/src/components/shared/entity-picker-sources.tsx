@@ -61,21 +61,21 @@ export function TemplatePreviewPhone({ templateId, accountName }: { templateId: 
 
 /** 回答フォームの中身の見本（お客さまのスマホ・LINE で開いた時）。 */
 export function FormPreviewPhone({ formId, accountId, accountName }: { formId: string | null; accountId?: string | null; accountName?: string }) {
-  const [state, setState] = useState<FormLayout | 'loading' | 'error' | null>(null)
+  const [state, setState] = useState<{ name: string; layout: FormLayout } | 'loading' | 'error' | null>(null)
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     if (!formId || !accountId) { setState(null); return }
     let current = true
     setState('loading')
     Promise.resolve().then(() => api.forms.get(formId, accountId))
-      .then((res) => { if (!current) return; if (!res?.success) throw new Error('form'); setState(res.data.layout) })
+      .then((res) => { if (!current) return; if (!res?.success) throw new Error('form'); setState({ name: res.data.name, layout: res.data.layout }) })
       .catch(() => { if (current) setState('error') })
     return () => { current = false }
   }, [formId, accountId, attempt])
   if (!formId) return <p className="text-ink-secondary text-xs">候補を選ぶと、お客さまのスマホでの見え方が出ます。</p>
   if (state === 'loading' || state === null) return <ListState kind="loading" />
   if (state === 'error') return <ListState kind="error" error={new Error('form')} onRetry={() => setAttempt((value) => value + 1)} />
-  return <FormPhone layout={state} pageIndex={0} accountName={accountName || '公式アカウント'} bookingMenus={[]} />
+  return <FormPhone formName={state.name} layout={state.layout} pageIndex={0} accountName={accountName || '公式アカウント'} bookingMenus={[]} />
 }
 
 type KindFieldBase = {

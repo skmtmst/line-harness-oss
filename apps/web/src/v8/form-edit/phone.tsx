@@ -27,7 +27,9 @@ type Props = {
   bookingMenus: { id: string; name: string; durationMinutes: number }[]
   /** 上の小さい見出し。置き場に題があるとき（リサーチの「届き方」）は null。 */
   caption?: string | null
-  /** 上の帯の題。 */
+  /** フォームの名前。ページの題を決めていない時に使う。 */
+  formName?: string
+  /** 呼び出し元で決めた上の帯の題（リサーチなど）。 */
   title?: string
   /** 次へ・送るを画面の下に固定する（中身が長いリサーチ。絵 「下の帯（固定）」）。 */
   fixedNext?: boolean
@@ -39,11 +41,12 @@ type Props = {
   thanks?: { text: string; url: string | null } | null
 }
 
-export function FormPhone({ accountLook, layout, pageIndex, accountName, bookingMenus, caption = 'お客さまに見える形', title = '回答フォーム', fixedNext = false, progressHead = false, focusBlockId = null, thanks = null }: Props) {
+export function FormPhone({ accountLook, layout, pageIndex, accountName, bookingMenus, caption = 'お客さまに見える形', formName, title, fixedNext = false, progressHead = false, focusBlockId = null, thanks = null }: Props) {
   const formRef = useRef<HTMLDivElement>(null)
   const sections = layout.sections
   const section = sections[pageIndex] ?? sections[0]
   const options = { ...FORM_OPTIONS_DEFAULT, ...layout.options }
+  const phoneTitle = title ?? (options.pageTitle || formName || '回答フォーム')
   const blocks = [...(pageIndex === 0 ? layout.header : []), ...(section?.blocks ?? [])]
   const last = pageIndex >= sections.length - 1
   const bar = (
@@ -78,7 +81,7 @@ export function FormPhone({ accountLook, layout, pageIndex, accountName, booking
     : `${options.nextLabel || '次へ'}（${pageIndex + 1} / ${sections.length}）`
 
   return (
-    <LiffPhoneFrame title={title} accountName={accountName} caption={caption ?? undefined} label="お客さまに見える形" accent={main} footer={!thanks && fixedNext ? <div className={styles.phoneFoot} style={{ backgroundColor: theme.sub }}><span className={styles.phoneNext}>{nextLabel}</span></div> : undefined}>
+    <LiffPhoneFrame title={phoneTitle} accountName={accountName} caption={caption ?? undefined} label="お客さまに見える形" accent={main} footer={!thanks && fixedNext ? <div className={styles.phoneFoot} style={{ backgroundColor: theme.sub }}><span className={styles.phoneNext}>{nextLabel}</span></div> : undefined}>
           <div ref={formRef} className={styles.phoneForm} style={{backgroundColor:theme.sub,color:theme.text,fontFamily:theme.fontFamily==='serif'?'serif':'sans-serif'}}>
             {thanks ? (
               <div className={styles.thanksBox}>

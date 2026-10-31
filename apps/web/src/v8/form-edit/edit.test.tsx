@@ -128,6 +128,16 @@ afterEach(() => {
 })
 
 describe('回答フォームの編集（V8）', () => {
+  it('編集中の名前を電話の見本の題へ渡す', async () => {
+    formsGet.mockResolvedValue({ success: true, data: { ...structuredClone(formData), layout: { ...structuredClone(layout), options: { ...layout.options, pageTitle: '' } } } })
+    await render('id=form-1&tab=appearance')
+    const phone = host.querySelector('[data-liff-phone-frame]') as HTMLElement
+    expect(within(phone).getByTitle(formData.name).textContent).toBe(formData.name)
+    fireEvent.change(screen.getByLabelText('フォーム名'), { target: { value: '秋の感想を聞くフォーム' } })
+    expect(within(phone).getByTitle('秋の感想を聞くフォーム').textContent).toBe('秋の感想を聞くフォーム')
+    expect(formsUpdate).not.toHaveBeenCalled()
+  })
+
   it('フォーム名の読み込み中は編集の題を出し、読めた名前を帯と本文へ渡す', async () => {
     let resolveForm!: (value: unknown) => void
     formsGet.mockImplementation(() => new Promise(resolve => { resolveForm = resolve }))
