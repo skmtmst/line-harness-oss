@@ -97,12 +97,12 @@ export default function CatalogStarterSets() {
           {!catalogMode ? <Button onClick={()=>void viewCurrent()}>現在の中身を見る</Button> : null}</div>
         <ToggleField checked={auto} disabled={busy || role===null} lockedReason={lock} onChange={value=>{setAuto(value);setDirty(true)}}
           description="新しいアカウントでこのスタイルを選んだときに入ります。">新しいアカウントへ自動で入れる</ToggleField>
-        <GridTable label="最初に入れる物" design={{columns:'minmax(170px, 1fr) minmax(0, 1.7fr)',gap:'var(--space-16)',rowPadding:'0 var(--space-16)',fontSize:'var(--text-body)'}}>
+        <GridTable label="最初に入れる物" design={{columns:'minmax(170px, 1fr) minmax(0, 1.7fr)',gap:'var(--space-16)',rowPadding:'var(--space-8) var(--space-16)',rowHeight:'auto',fontSize:'var(--text-body)'}}>
           <GridHeadRow><GridCell role="columnheader">種類</GridCell><GridCell role="columnheader">統括のカタログから選ぶ</GridCell></GridHeadRow>
           {STARTER_CATALOG_KINDS.map(spec => {
             const choices = options.filter(option=>option.kind===spec.kind)
             const values = selected.filter(row=>row.kind===spec.kind).map(row=>row.versionId)
-            const items = choices.map(option=>({id:option.versionId,name:option.name,meta:`版${option.version}`}))
+            const items = choices.map(option=>({id:option.versionId,name:spec.multiple?`${option.name}（版${option.version}）`:option.name,meta:spec.multiple?undefined:`版${option.version}`}))
             for (const id of values) if (!items.some(item=>item.id===id)) items.push({id,name:'選択済みの見本を読み込めません',meta:'選び直してください'})
             const update = (ids:string[]) => {
               if(!canEdit || busy)return
@@ -110,11 +110,15 @@ export default function CatalogStarterSets() {
               setSelected(old=>[...old.filter(row=>row.kind!==spec.kind),...Array.from(new Map(next.map(row=>[row.templateId,row])).values()).map(({kind,templateId,versionId})=>({kind,templateId,versionId}))]);setDirty(true)
             }
             return <GridRow key={spec.kind}><GridCell><span className={styles.name} title={spec.label}>{spec.label}</span></GridCell><GridCell>
-              <EntityPickerField label={`${spec.label}を選ぶ`} title={`統括の${spec.label}を選ぶ`} noun={spec.label}
+              <div className={styles.selection}><EntityPickerField label={`${spec.label}を選ぶ`} title={`統括の${spec.label}を選ぶ`} noun={spec.label}
                 placeholder={choices.length ? '未設定' : 'まだありません'} items={items} disabled={busy || role===null} lockedReason={lock} canChangeNow={()=>canEdit&&!busy}
                 state={choices.length ? undefined : <ListState kind="empty" title="まだありません" description="統括のカタログに登録されると、ここから選べます。" emptyPreset="readonly" />}
                 {...(spec.multiple ? {multiple:true as const,value:values,onChange:update,allowEmpty:true} : {value:values[0] ?? null,onChange:(id:string)=>update(id?[id]:[]),clearable:true})} />
-              {selected.filter(row=>row.kind===spec.kind).map(row=><Button key={row.versionId} size="compact" onClick={()=>setViewSelection(row)}>選んだ版の中身を見る</Button>)}
+              {selected.filter(row=>row.kind===spec.kind).map(row=>{
+                const option=choices.find(item=>item.versionId===row.versionId)
+                const label=option?`${option.name}（版${option.version}）`:'選択済みの見本'
+                return <div key={row.versionId} className={styles.preview}><span className={styles.name} title={label}>{label}</span><Button size="compact" aria-label={`${label}の中身を見る`} onClick={()=>setViewSelection(row)}>中身を見る</Button></div>
+              })}</div>
             </GridCell></GridRow>
           })}
         </GridTable>
