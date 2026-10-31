@@ -1,5 +1,8 @@
 'use client'
 
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
+
 import Toggle from '@/components/shared/toggle';
 import { FolderDotName } from '@/components/shared/folder-dot'
 import { notifySaved } from '@/components/shared/toast'
@@ -642,6 +645,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
         onConfirm={applyEdit}
         onCancel={() => setEditing(null)}
       >
+        <OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} store={{ id: storeId, name: stores.find(store => store.id === storeId)?.name }} />
         <div className={styles.dialogFields}>
           <Field label="店舗ページの URL" htmlFor="media-page-url" error={editErrors.page}>
             <SaveErrorField names={["editPage","edit_page"]}><TextField id="media-page-url" value={editPage} onChange={(event) => { setEditPage(event.target.value); setEditErrors((errors) => ({ ...errors, page: undefined })) }} placeholder="https://" inputMode="url" /></SaveErrorField>
@@ -666,6 +670,7 @@ function BookingMediaBody({ storeSelection }: { storeSelection: ReturnType<typeo
         onCancel={() => setPicking(null)}
         error={pickError || undefined}
       >
+        <OperationTargetSummary accounts={[{ id: selectedAccountId ?? '' }]} store={{ id: storeId, name: stores.find(store => store.id === storeId)?.name }} />
         {picking ? (
           <div className={styles.dialogFields} role="radiogroup" aria-label="知らせる相手">
             <SaveErrorField names={["close-notice-recipient","recipientMode","picking.recipientMode","picking"]}><Radio name="close-notice-recipient" checked={picking.recipientMode === 'responsible'} onChange={() => setPicking({ ...picking, recipientMode: 'responsible' })}>当日の責任者（いなければ店長）</Radio></SaveErrorField>

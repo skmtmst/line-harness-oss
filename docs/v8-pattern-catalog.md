@@ -1248,3 +1248,7 @@
 - 持ち主：`components/shared/setup-step-row.tsx` と同名のCSS。`SetupStepList` / `SetupStepRow` / `SetupStepLabel` を基本の手順と選んだ機能の設定で共用する。
 - 高さ・間隔・左右の余白・済みと次の状態はこの部品に集める。説明がある行もない行も同じ高さを保つ。
 - 閲覧だけでも欄は出し、既存のGETで取得できた内容だけ表示する。変更操作は共通の灰色と理由、内容の参照は保存や有効化を伴わない窓で行う。
+
+## 操作する対象の要約
+
+持ち主は `components/shared/operation-target-summary.tsx`。呼び出し側が実際の操作先のIDと名前を渡し、既存の詳細項目の型でLINEアカウント・店舗（店舗の操作のみ）・動いている環境を表示する。名前と環境を推測しない。正本は [操作する対象の確認](v8-requirements/confirmation-targets.md)。

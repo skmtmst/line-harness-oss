@@ -1,5 +1,8 @@
 'use client'
 
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
+
 /*
  * ★V8 UID移行の確認窓（app/accounts/migration.tsx の MigrationItemDialog・ExecuteConfirmDialog・
  * RollbackConfirmDialog と runStatusView の写し。src/v8 は @/app を読めない）。
@@ -132,6 +135,10 @@ export function ExecuteConfirmDialog({
       onConfirm={onConfirm}
       onCancel={onCancel}
     >
+      <OperationTargetSummary accounts={[
+        { id: active.fromAccountId, name: accounts.find(account => account.id === active.fromAccountId)?.name, label: '移行元LINEアカウント' },
+        { id: active.toAccountId, name: accounts.find(account => account.id === active.toAccountId)?.name, label: '移行先LINEアカウント' },
+      ]} />
       <ul className={styles.bullets}>
         <li>{`対象：${name(active.fromAccountId)} → ${name(active.toAccountId)}`}</li>
         <li>{`結び付け ${active.decisionCounts?.link ?? emptyValue('unknown')} 件・除外 ${active.decisionCounts?.exclude ?? emptyValue('unknown')} 件・新規作成の判断 ${active.decisionCounts?.create ?? emptyValue('unknown')} 件（自動反映できない行は失敗として記録されます）`}</li>
@@ -146,9 +153,10 @@ export function ExecuteConfirmDialog({
 
 /** 切り戻しの確認。 */
 export function RollbackConfirmDialog({
-  active, me, busy, open, error, conflicts, canRun, lockedReason, onConfirm, onCancel,
+  active, accounts = [], me, busy, open, error, conflicts, canRun, lockedReason, onConfirm, onCancel,
 }: {
   active: UidMigrationDetail | null
+  accounts?: LineAccount[]
   me: { id: string; role: string } | null
   busy: boolean
   open: boolean
@@ -174,6 +182,10 @@ export function RollbackConfirmDialog({
       onConfirm={onConfirm}
       onCancel={onCancel}
     >
+      <OperationTargetSummary accounts={[
+        { id: active.fromAccountId, name: accounts.find(account => account.id === active.fromAccountId)?.name, label: '移行元LINEアカウント' },
+        { id: active.toAccountId, name: accounts.find(account => account.id === active.toAccountId)?.name, label: '移行先LINEアカウント' },
+      ]} />
       <ul className={styles.bullets}>
         <li>{`対象：この履歴で反映済みの ${formatNumber(active.counts.applied)} 行だけです。失敗・除外の行は変更しません。`}</li>
         <li>制約：移行後に統合ユーザーへ別の変更があった行は切り戻せません。</li>

@@ -1,5 +1,8 @@
 'use client'
 
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
+
 import { duplicateAutoReply } from './list-duplicate-action'
 import { AutoReply,displayName,PAGE_SIZE_OPTIONS,PendingDelete,PendingToggle,SAVED_FILTER_OPTIONS,TemplateLite,UNFILED } from './list-model'
 import { renderAutoReplyList } from './list-table'
@@ -913,10 +916,10 @@ export default function AutoRepliesListV8() {
           pendingToggle === null
             ? ''
             : pendingToggle.kind === 'resume'
-              ? pendingToggle.ids.length === 1
+              ? pendingToggle.ids.length === 1 && pendingToggle.names[0]
                 ? `自動応答「${pendingToggle.names[0]}」を再開しますか？`
                 : `${formatNumber(pendingToggle.ids.length)} 件の自動応答を再開しますか？`
-              : pendingToggle.ids.length === 1
+              : pendingToggle.ids.length === 1 && pendingToggle.names[0]
                 ? `「${pendingToggle.names[0]}」を止める`
                 : `${formatNumber(pendingToggle.ids.length)} 件の自動応答を止めますか？`
         }
@@ -944,6 +947,7 @@ export default function AutoRepliesListV8() {
         confirmLockedReason={lockedReason}
         onConfirm={() => runToggle()}
       >
+        <OperationTargetSummary accounts={[{ id: pendingToggle?.accountId ?? '' }]} />
         {pendingToggle?.kind === 'stop' && (
           <div className={styles.reasonField}>
             <Field label="止める理由" htmlFor="auto-reply-stop-reason" optional>
