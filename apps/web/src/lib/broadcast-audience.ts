@@ -16,9 +16,11 @@ import { pruneCondition, type SegmentCondition } from './segment-condition'
 import { formatNumber } from '@/lib/format'
 
 /** 送る相手の決め方。 */
-export type TargetMode = 'all' | 'scenario' | 'tag' | 'advanced'
+export type TargetMode = 'unselected' | 'all' | 'scenario' | 'tag' | 'advanced'
 
-export const TARGET_MODES: Array<{ value: TargetMode; label: string; description: string }> = [
+export const AUDIENCE_MISSING_MESSAGE = '送る相手を選んでください'
+
+export const TARGET_MODES: Array<{ value: Exclude<TargetMode, 'unselected'>; label: string; description: string }> = [
   {
     value: 'all',
     label: '友だち全員に配信する',
@@ -64,6 +66,7 @@ export function conditionHasAnalyticsAudience(condition: SegmentCondition | null
  * LINE がエラーを返し、その分だけ配信数が減って見える。
  */
 export function buildAudienceCondition(mode: TargetMode, input: AudienceInput): SegmentCondition {
+  if (mode === 'unselected') throw new Error(AUDIENCE_MISSING_MESSAGE)
   const base: SegmentCondition = {
     operator: 'AND',
     rules: [{ type: 'is_following', value: true }],
@@ -104,6 +107,7 @@ export function buildAudienceCondition(mode: TargetMode, input: AudienceInput): 
  * 全員に送りたいときは「友だち全員に配信する」を選ぶ。
  */
 export function audienceError(mode: TargetMode, input: AudienceInput): string {
+  if (mode === 'unselected') return AUDIENCE_MISSING_MESSAGE
   if (mode === 'tag' && !input.tagId) return '送る相手のタグを選んでください'
   if (mode === 'advanced' && !pruneCondition(input.condition)) {
     return '詳細条件を1つ以上入力してください。全員に送るなら「友だち全員に配信する」を選んでください'
@@ -117,6 +121,7 @@ export function describeAudience(
   input: AudienceInput,
   names: { scenarios: Array<{ id: string; name: string }>; tags: Array<{ id: string; name: string }> },
 ): string {
+  if (mode === 'unselected') return '送る相手は未選択'
   if (mode === 'all') return '友だち全員（ブロック中を除く）'
   if (mode === 'scenario') {
     if (!input.scenarioId) return 'シナリオ購読中の全員'

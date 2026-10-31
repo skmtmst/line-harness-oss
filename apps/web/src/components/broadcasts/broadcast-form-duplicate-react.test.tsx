@@ -134,7 +134,8 @@ describe('同じ設定で作り直す', () => {
     const payload = createApi.mock.calls[0][0]
     expect(payload).toMatchObject({ title: '夏の告知（複製）', messageContent: '元の本文', lineAccountId: 'acc-1' })
     // 宛先・予約日時は写さない。
-    expect(payload.targetTagId ?? null).toBeNull()
+    expect(payload).toMatchObject({ targetType: 'tag', targetTagId: '', draftTargetMode: 'unselected' })
+    expect(payload.segmentConditions ?? null).toBeNull()
     expect(payload.scheduledAt).toBeNull()
   })
 

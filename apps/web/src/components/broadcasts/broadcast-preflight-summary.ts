@@ -41,6 +41,7 @@ export function broadcastPreflightSummary({ preflight, targetMode, tags, tagId, 
   const confirmAudienceLabel = (() => {
     const getTagName = (id: string) => tags.find((tag) => tag.id === id)?.name ?? null
     const getScenarioName = (id: string) => scenarios.find((item) => item.id === id)?.name ?? null
+    if (targetMode === 'unselected') return '送る相手は未選択'
     if (targetMode === 'all') return '友だち全員'
     if (targetMode === 'tag') {
       if (!tagId) return targetModeLabel

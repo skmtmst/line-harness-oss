@@ -11,7 +11,7 @@ import type { BroadcastStepKey } from './broadcast-steps'
  * 不備には2つの重さがある。
  * - 保存も止める不備（`blocksSave`）：配信名・宛先・吹き出し・ボタン。
  *   今の保存・自動保存・テスト送信の検査と同じ文・同じ順。
- * - 先へ進むのだけ止める不備：送る時間の未選択・書きかけの日時と分数・文字数の超え・過ぎた予約日時・送信枠の不足。
+ * - 先へ進むのだけ止める不備：送る時間の未選択・書きかけの日時と分数・宛先の未選択・文字数の超え・過ぎた予約日時・送信枠の不足。
  *   書きかけを下書きに残せるよう、保存は止めない。
  */
 export type BroadcastGateStep = Exclude<BroadcastStepKey, 'confirm'>
@@ -28,6 +28,8 @@ export interface BroadcastStepCheckInput {
   titleMax: number
   /** `audienceError` の結果。空文字なら宛先は決まっている。 */
   audienceProblem: string
+  /** 相手をまだ選んでいない書きかけは下書きに残せる。 */
+  audienceUnselected?: boolean
   /** `bubblesError` の結果。 */
   bubbleProblem: string
   /** `messageButtonsError` の結果。 */
@@ -64,7 +66,7 @@ export function broadcastStepProblems(input: BroadcastStepCheckInput): Broadcast
       : null
   // 宛先が空のまま進めると、絞ったつもりで全員に届く。
   const audience: BroadcastStepProblem | null = input.audienceProblem
-    ? { message: input.audienceProblem, blocksSave: true }
+    ? { message: input.audienceProblem, blocksSave: !input.audienceUnselected }
     : null
   const message: BroadcastStepProblem | null = input.bubbleProblem
     ? { message: input.bubbleProblem, blocksSave: true }
