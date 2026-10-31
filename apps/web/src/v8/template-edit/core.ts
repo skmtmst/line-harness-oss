@@ -8,14 +8,10 @@ import { formatDate as polishFormatDate } from '@/lib/format'
 
 import { readSaveFieldErrors } from '@/lib/api/helpers/field-errors'
 import { api, ApiError, describeSaveFailure } from '@/lib/api'
-import { validateFlexContent, type CommonVar, type FriendField } from '@line-crm/shared'
+import { validateFlexContent } from '@line-crm/shared'
 
-export interface TemplateReferences {
-  friendFields: FriendField[]
-  commonVars: CommonVar[]
-}
-export type TemplateReferenceState = 'idle' | 'loading' | 'ready' | 'failed'
-export const EMPTY_REFERENCES: TemplateReferences = { friendFields: [], commonVars: [] }
+export { EMPTY_REFERENCES, loadTemplateReferences, requestTemplateReferences } from '@/lib/template-references'
+export type { TemplateReferences, TemplateReferenceState } from '@/lib/template-references'
 
 /** 詳細口（GET /api/templates/:id）が返す1件分の形。 */
 export type TemplateDetailData = Extract<
@@ -46,38 +42,6 @@ export function isTemplateDetailData(data: unknown): data is TemplateDetailData 
     if (!Array.isArray(lists[key])) return false
   }
   return true
-}
-
-/* 友だち情報・共通情報は任意機能。機能オフの 403 は「候補なし」として扱う。 */
-export async function loadTemplateReferences(accountId: string): Promise<TemplateReferences> {
-  const emptyOnDisabled = (error: unknown) => {
-    if (error instanceof ApiError && error.code === 'FEATURE_DISABLED') return { success: true as const, data: [] }
-    throw error
-  }
-  const [fieldResponse, varResponse] = await Promise.all([
-    api.friendFields.list(accountId, undefined, { suppressFeatureDisabledEvent: true }).catch(emptyOnDisabled),
-    api.commonVars.list(accountId, undefined, { suppressFeatureDisabledEvent: true }).catch(emptyOnDisabled),
-  ])
-  if (!fieldResponse.success || !varResponse.success) throw new Error('差し込み項目を読み込めませんでした')
-  return {
-    friendFields: fieldResponse.data.filter((field) => field.canInsertText !== false),
-    commonVars: varResponse.data,
-  }
-}
-
-/** 遅れて届いた古い応答は捨てる（捨てたら null、読めなければ 'failed'）。 */
-export async function requestTemplateReferences(request: {
-  load: (accountId: string) => Promise<TemplateReferences>
-  accountId: string
-  generation: number
-  currentGeneration: () => number
-}): Promise<TemplateReferences | 'failed' | null> {
-  try {
-    const references = await request.load(request.accountId)
-    return request.generation === request.currentGeneration() ? references : null
-  } catch {
-    return request.generation === request.currentGeneration() ? 'failed' : null
-  }
 }
 
 export type TemplateLoadStatus = 'idle' | 'loading' | 'ready' | 'failed'
