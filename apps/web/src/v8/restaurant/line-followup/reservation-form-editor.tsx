@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { RESTAURANT_RESERVATION_REQUIRED_FIELDS,parseRestaurantReservationForm,type RestaurantReservationForm } from '@line-crm/shared'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 import Dialog from '@/components/shared/dialog'
 import { Field } from '@/components/shared/form-controls'
 import { TextField,TextArea } from '@/components/shared/text-field'
@@ -27,15 +28,15 @@ export function ReservationFormEditor({definition,storeName,onCancel,onConfirm}:
  return <Dialog open size="wide" title="予約の回答フォームを変える" dirty={JSON.stringify(draft)!==JSON.stringify(definition)} onCancel={onCancel} confirmLabel="この内容にする" error={error} onConfirm={()=>{const parsed=parseRestaurantReservationForm(draft);if(!parsed.ok){setError(parsed.error);return}onConfirm(parsed.value)}}>
   <DetailColumns asideLabel="予約フォームの見え方" expanded={expanded} onExpandedChange={setExpanded} aside={<ReservationFormSample definition={draft} storeName={storeName}/>}>
    <div className={styles.stack}>
-    <Field label="題名" required><TextField value={draft.title} maxLength={80} onChange={e=>setDraft({...draft,title:e.target.value})}/></Field>
+    <Field label="題名" required><SaveErrorField names={["definition","title","definition.title"]}><TextField value={draft.title} maxLength={80} onChange={e=>setDraft({...draft,title:e.target.value})}/></SaveErrorField></Field>
     <Field label="聞く項目" note="お名前・日時・人数は予約に必要なため外せません。日時と人数は最初の手順で選びます。">
-     {draft.fields.map(field=>{const fixed=RESTAURANT_RESERVATION_REQUIRED_FIELDS.includes(field.id);return <SettingsFormRow key={field.id} layout="columns" columns={3}>
-      <TextField aria-label={`${field.label}の項目名`} value={field.label} maxLength={50} onChange={e=>change(field.id,{label:e.target.value})}/>
+     {draft.fields.map((field,index)=>{const fixed=RESTAURANT_RESERVATION_REQUIRED_FIELDS.includes(field.id);return <SettingsFormRow key={field.id} layout="columns" columns={3}>
+      <SaveErrorField names={[`definition.fields.${index}.label`]}><TextField aria-label={`${field.label}の項目名`} value={field.label} maxLength={50} onChange={e=>change(field.id,{label:e.target.value})}/></SaveErrorField>
       <ToggleField aria-label={`${field.label}を表示する`} checked={field.enabled} locked={fixed} onChange={enabled=>change(field.id,{enabled,required:enabled&&field.required})}>表示する</ToggleField>
       <ToggleField aria-label={`${field.label}を必須にする`} checked={field.required} locked={fixed} disabled={!field.enabled} onChange={required=>change(field.id,{required})}>必須にする</ToggleField>
      </SettingsFormRow>})}
     </Field>
-    <Field label="完了後の文" required><TextArea value={draft.completionMessage} maxLength={500} onChange={e=>setDraft({...draft,completionMessage:e.target.value})}/></Field>
+    <Field label="完了後の文" required><SaveErrorField names={["completionMessage","definition.completionMessage"]}><TextArea value={draft.completionMessage} maxLength={500} onChange={e=>setDraft({...draft,completionMessage:e.target.value})}/></SaveErrorField></Field>
    </div>
   </DetailColumns>
  </Dialog>

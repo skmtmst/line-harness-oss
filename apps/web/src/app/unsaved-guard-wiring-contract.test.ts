@@ -22,6 +22,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/restaurant/line-followup/followup-board.tsx',
   'v8/events/use-event-absence.tsx',
   'v8/hq-starter-sets/catalog-editor.tsx',
   // 会社・連絡先とプール名の下書きは、共通の FormLeaveGuard が画面離脱を守る。
@@ -149,6 +150,8 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  // 入口は保存状態を持たず、カードの入力と画面離脱は実体の番兵へ委ねる。
+  'v8/restaurant/line-followup/line-followup.tsx': 'v8/restaurant/line-followup/followup-board.tsx',
   // 振替の窓はonEditStateで未保存/保存中を親へ返し、Dialogが窓内の破棄を、親の番兵が画面離脱を守る。
   'v8/events/makeup-rule-section.tsx': 'v8/events/edit-form.tsx',
   'v8/onboarding/initial-menu-page.tsx': 'components/templates/create-page.tsx',
@@ -239,6 +242,9 @@ const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
  * 番兵を付けられるようになったら EXEMPTIONS から GUARDED へ移す。
  */
 const EXEMPTIONS: Record<string, string> = {
+  'v8/restaurant/common-a/frame.tsx': '取得と店の選択だけを持つ共通の器。未保存の入力を持たず、店の切り替えはrequestUnsavedActionで子の実際の番兵へ委ねる。',
+  'v8/restaurant/line-followup/followup-editor.tsx': '入力は共通Dialogの中だけ。dirtyをDialogへ渡して閉じる前の破棄確認を守り、確定した下書きはFollowupBoardの番兵が守る。',
+  'v8/restaurant/line-followup/reservation-form-editor.tsx': '予約フォームの編集は共通Dialogの中だけ。dirtyを渡して破棄を確認し、確定後はFollowupBoardが未保存の定義を保持して画面離脱を守る。',
   'v8/mileage/adjust-dialog.tsx': '入力中は共通Dialogの自動dirty検出とuseOverlayDiscardが閉じる操作を止める。確認・完了の段だけdirty=false。adjust-dialog-field-errorsの実描画で入力→閉じるの破棄確認とAPI/close未実行を確かめる。',
   'components/shared/table-body.tsx':
     '共有の仮想行表示。structureDirty は列とスクロール領域の寸法キャッシュを再計測する印で、入力の下書きではない。行の表示範囲・実測高さ・フォーカス行を管理するだけで、編集値や保存処理は呼び出し元が持つ。',
