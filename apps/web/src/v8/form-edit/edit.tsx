@@ -6,7 +6,7 @@ import { useFeatureAccess } from '@/lib/use-feature-access';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Copy, FlaskConical, Smartphone, Upload } from 'lucide-react';
-import { emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
+import { liffActionUrl, emptyLayout, resolveCustomerFormTheme, formThemeContrastError, newBlockId, validateFormForPublish, type FormBlock, type FormLayout, type FormOptions, type FormSection } from '@line-crm/shared';
 import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button';
 import Dialog from '@/components/shared/dialog';
@@ -39,7 +39,8 @@ import type { FormEditHost } from './host';
 import { conflictMessage, conflictTitle, describeConflictDiff, describePublishChanges, firstInputBlockId, formSavedContentMatches, ogImageUrlError, readPage, readTab, type ConflictSide, type EditTab, type FormSavedContent } from './model';
 import { ContentTab } from './content-tab';
 import { AfterTab } from './after-tab';
-import { AppearanceTab, formNameRequirement } from './appearance-tab';
+import { AppearanceTab } from './appearance-tab';
+import { FormNameField, formNameRequirement } from './form-name-field';
 import { FormEditAttemptContext } from './field-issues';
 import { focusFieldById } from '@/lib/use-form-errors';
 import { useCustomerLook } from '@/components/shared/use-customer-look';
@@ -77,14 +78,22 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const canEdit = host ? !host.readOnly : featureAccess
   const readOnly = host ? Boolean(host.readOnly) : !canEdit
 
-  /* 友だちに配るURL。LIFF のURLにパスを足すと、LIFFアプリの同じパスへ転送される。 */
+  /* 一覧・動作指定と同じ共通関数で、友だちに配るURLを作る。 */
   const liffId = selectedAccount?.liffId ?? null
-  const answerUrl = liffId && id ? `https://liff.line.me/${liffId}/forms/${id}` : null
+  const answerUrl = (() => {
+    if (!liffId || !id) return null
+    try { return liffActionUrl({ liffId, kind: 'form', formId: id }) } catch { return null }
+  })()
 
   const [editTab, setEditTab] = useState<EditTab>(() => readTab(params.get('tab')))
   /* 統括から使うときは、最初の描画から読み込んだ中身で出す（空の一瞬に保存を押させない）。 */
   const [name, setName] = useState(() => host?.initial.name ?? '')
   const [nameError, setNameError] = useState<string | null>(null)
+  const changeName = (next: string) => {
+    setName(next)
+    if (next.trim()) setNameError(null)
+  }
+  const blurName = () => setNameError(name.trim() ? null : 'フォーム名を入力してください')
   const [description, setDescription] = useState(() => host?.initial.description ?? '')
   const [isActive, setIsActive] = useState(!host && !draftToken)
   const [submitCount, setSubmitCount] = useState(0)
@@ -363,7 +372,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const blocks = useMemo(() => layout.sections[page]?.blocks ?? [], [layout, page])
   /* タブの札の赤い印。保存を押したあとだけ、そのタブの直す欄の数を出す。 */
   const tabErrors: Record<EditTab, number> = attempted ? {
-    content: layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input' && !b.label.trim()).length, 0),
+    content: (name.trim() ? 0 : 1) + layout.sections.reduce((n, s) => n + s.blocks.filter((b) => b.kind === 'input' && !b.label.trim()).length, 0),
     after: 0,
     appearance: (name.trim() ? 0 : 1) + (ogImageUrlError(ogImageUrl) ? 1 : 0) + (formThemeContrastError(resolveCustomerFormTheme(layout.options,customerLook.look ?? undefined)) ? 1 : 0),
   } : { content: 0, after: 0, appearance: 0 }
@@ -526,7 +535,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   type SaveProblem = { message: string; name?: boolean; tab?: EditTab; target?: string; page?: number; blockId?: string; inline?: boolean }
   const saveProblem = (publishAfter: boolean): SaveProblem | null => {
     if (!host && !selectedAccountId) return { message: 'LINE公式アカウントを選んでください' }
-    if (formNameRequirement.check(name)) return { message: 'フォーム名を入力してください', name: true, tab: 'appearance', target: 'fe-name', inline: true }
+    if (formNameRequirement.check(name)) return { message: 'フォーム名を入力してください', name: true, tab: editTab === 'content' ? 'content' : 'appearance', target: 'fe-name', inline: true }
     const allBlocks = layout.header.concat(layout.sections.flatMap((s) => s.blocks))
     const untitledPage = layout.sections.findIndex((s) => s.blocks.some((b) => b.kind === 'input' && !b.label.trim()))
     if (untitledPage >= 0) {
@@ -870,11 +879,11 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         {answerUrl ? (
           <>
             <div className={styles.urlRow}>
-              {/* 見せるのは短い形（絵どおり）。全文は title とコピーで渡す。 */}
-              <span className={styles.urlValue} title={answerUrl}>{`https://liff.line.me/…/forms/${id}`}</span>
+              {/* 長いURLも末尾まで読めるよう折り返す。表示・title・コピーは同じ全文。 */}
+              <span className={styles.urlValue} title={answerUrl}>{answerUrl}</span>
               <CopyTextButton variant="secondary" icon={<Copy size={16} aria-hidden="true" />} value={answerUrl} label="コピーする" aria-label="回答用URLをコピー" />
             </div>
-            <p className={styles.urlNote}>友だちに配るURLです。LINEの中で開きます。</p>
+            <p className={styles.urlNote}>{publishedVersionId ? '友だちに配るURLです。LINEの中で開きます。' : '公開すると開けます。公開前は回答を受け付けません。'}</p>
             {canEdit ? (
               <div className={styles.urlTest}>
                 <Button onClick={() => void startTest()} disabled={testBusy} busy={testBusy} busyLabel="用意しています…" title="保存済みの下書きをお客さま画面で開きます。試しの回答は集計に入りません">
@@ -979,6 +988,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         ) : editTab === 'content' ? (
           <ContentTab
             readOnly={!canEdit}
+            nameField={<FormNameField value={name} error={nameError} readOnly={!canEdit} onChange={changeName} onBlur={blurName} />}
             layout={layout}
             page={page}
             blocks={blocks}
@@ -1019,11 +1029,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
             ogDescription={ogDescription}
             ogImageUrl={ogImageUrl}
             onChangeOptions={patchOptions}
-            onChangeName={(next) => {
-              setName(next)
-              if (next.trim()) setNameError(null)
-            }}
-            onBlurName={() => setNameError(name.trim() ? null : 'フォーム名を入力してください')}
+            onChangeName={changeName}
+            onBlurName={blurName}
             onChangeDescription={setDescription}
             onChangeOgTitle={setOgTitle}
             onChangeOgDescription={setOgDescription}

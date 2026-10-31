@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 import { resolve } from 'node:path'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import ts from 'typescript'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { auditListSource, auditListSources } from '../../../scripts/list-row-audit.mjs'
@@ -60,6 +62,37 @@ describe('一覧の行の決まり（/193/194/195/198）', () => {
     expect(fittingTagCount([80, 80, 80], 220, 8, () => 40)).toBe(2)
     expect(fittingTagCount([80, 80, 80], 100, 8, () => 40)).toBe(0)
   })
+  it.each([undefined, 2])('長い先頭を残し、残り13件と全14件の名前を区別して読める（上限%s）', async (maxVisible) => {
+    vi.stubGlobal('ResizeObserver', undefined)
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      return { width: this.tagName === 'BUTTON' ? 40 : 300, height: 24, top: 0, bottom: 24 } as DOMRect
+    })
+    const names = ['とても長い先頭のタグの名前', ...Array.from({ length: 13 }, (_, index) => `分類${index + 2}`)]
+    const { container } = render(<TagOverflow maxVisible={maxVisible}>{names.map(name => <TagPill key={name} name={name} />)}</TagOverflow>)
+    await act(async () => { await Promise.resolve() })
+    const first = container.querySelector('[data-tag-overflow] > span:not([aria-hidden])')
+    expect(first?.textContent).toBe(names[0])
+    expect(first?.getAttribute('title')).toBe(names[0])
+    fireEvent.click(screen.getByRole('button', { name: 'すべてのタグ（ほか13件）' }))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getAllByRole('group')).toHaveLength(14)
+    for (const name of names) expect(within(dialog).getByText(name)).toBeTruthy()
+  })
+  it('幅0の器は従来どおり全件を隠し、1件だけの長いタグは省略して残す', async () => {
+    vi.stubGlobal('ResizeObserver', undefined)
+    let available = 0
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(() => available)
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width: 300, height: 24, top: 0, bottom: 24 } as DOMRect)
+    const { container } = render(<TagOverflow><TagPill name="とても長い先頭のタグの名前" /></TagOverflow>)
+    await act(async () => { await Promise.resolve() })
+    expect(container.querySelectorAll('[data-tag-overflow] > span:not([aria-hidden])')).toHaveLength(0)
+    available = 100
+    await act(async () => { window.dispatchEvent(new Event('resize')); await Promise.resolve() })
+    expect(container.querySelectorAll('[data-tag-overflow] > span:not([aria-hidden])')).toHaveLength(1)
+    expect(container.querySelector('[data-tag-overflow-first]')).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /すべてのタグ/ })).toBeNull()
+  })
   it('+Nを押すと全件が見え、タグを外す操作も残る', () => {
     vi.stubGlobal('ResizeObserver', class { observe() {}; unobserve() {}; disconnect() {} })
     const remove = vi.fn()
@@ -89,6 +122,12 @@ describe('一覧の行の決まり（/193/194/195/198）', () => {
     expect(auditListSource(`<Tr><NameCell name="名前" /><Td><StatusBadge>有効</StatusBadge><StatusBadge>${note}</StatusBadge></Td></Tr>`)).toEqual([])
     const broken = `<Tr><Td className={styles.colName}><FolderDotName>名前</FolderDotName><StatusBadge>有効</StatusBadge><StatusBadge>${note}</StatusBadge></Td></Tr>`
     expect(auditListSource(broken).some(rule => rule.includes('B-194'))).toBe(true)
+  })
+  it('タグ名の見張りを共通ブラウザ検査から外すと止める', () => {
+    const entry = readFileSync(resolve(process.cwd(), 'scripts/v8-guard/owner-rules.test.mjs'), 'utf8')
+    const ast = ts.createSourceFile('owner-rules.test.mjs', entry, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS)
+    const imports = ast.statements.filter(ts.isImportDeclaration).map(node => ts.isStringLiteral(node.moduleSpecifier) ? node.moduleSpecifier.text : '')
+    expect(imports).toContain('./list-row-tag-first.test.mjs')
   })
   it('全画面のソースに違反がない', () => {
     expect(auditListSources(resolve(process.cwd(), 'src'))).toEqual([])

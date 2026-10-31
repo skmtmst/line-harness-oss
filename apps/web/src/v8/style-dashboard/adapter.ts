@@ -29,7 +29,7 @@ export const hm = (iso: string, tz: string) => parts(iso, tz).time
 const md = (iso: string, tz: string) => { const p = parts(iso, tz); return `${p.month}/${String(p.day).padStart(2, '0')}（${p.week}）` }
 const dayLabel = (date: string) => { const d = new Date(`${date}T00:00:00Z`); return `${d.getUTCMonth() + 1}/${d.getUTCDate()}（${WEEK[d.getUTCDay()]}）` }
 
-const isRate = (m?: StyleMetric) => Boolean(m && (m.unit === '' || m.unit === 'ratio' || m.unit === '%' || m.unit === '率') && m.denominator !== undefined)
+const isRate = (m?: StyleMetric) => Boolean(m && (m.unit === '' || m.unit === 'ratio' || m.unit === '%' || m.unit === '率' || m.unit === '割合') && m.denominator !== undefined)
 const isYen = (m?: StyleMetric) => m?.unit === '円'
 
 /** 数のマスの値・単位（率は 0〜1 を %、円は ¥）。 */
