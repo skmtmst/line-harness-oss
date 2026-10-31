@@ -238,7 +238,10 @@ beforeEach(() => {
     data: { items: store.rows, total: store.rows.length, facets: { total: 1, published: 1, targeting: 0, draft: 0, folderCounts: {} } },
   }))
   createGroup.mockImplementation(async () => ({ success: true, data: { id: 'grp-new', pages: [{ id: 'pg-1' }] } }))
-  updateGroup.mockImplementation(async () => ({ success: true, data: store.group }))
+  updateGroup.mockImplementation(async (_id, patch) => {
+    store.group = { ...store.group as Record<string, unknown>, ...patch }
+    return { success: true, data: store.group }
+  })
   getGroup.mockImplementation(async () => ({ success: true, data: store.group }))
   publishGroup.mockImplementation(async () => ({ success: true, data: { pages: [] } }))
   pushMock.mockClear()
