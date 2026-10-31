@@ -114,13 +114,16 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && (emptyBookingState === 'no-bookings' || emptyBookingState === 'no-classes')
   const writeLock = role === null ? undefined : lockUnless(canWrite)
   const viewErrors = useSaveFormErrors()
+  const restaurantStoreReady = Boolean(accountId && !store.loading && !store.error && store.tableDefinition?.accountId === accountId && store.tableDefinition.snapshot === store.snapshot && store.store && store.snapshot?.stores.includes(store.store))
+  const storeLock = restaurantStoreReady ? undefined : !store.loading || store.error ? '店舗情報を確認できません。読み直してからお試しください。' : '店舗情報を読み込んでいます。確認が終わるまでお待ちください。'
+  const reservationLock = cfg.walkIn ? storeLock ?? (!today ? failed ? '予約情報を確認できません。読み直してからお試しください。' : '予約情報を読み込んでいます。確認が終わるまでお待ちください。' : undefined) : undefined
   const headActions = (
     <>
-      {cfg.walkIn && store.store ? <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setWalkInOpen(true) }}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
+      {cfg.walkIn ? <Button disabled={role === null} lockedReason={writeLock || storeLock} onClick={() => { if (canWrite && restaurantStoreReady) setWalkInOpen(true) }}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
       <Button lockedReason={writeLock} {...(canWrite ? { href: '/broadcasts' } : { disabled: role === null })}><MessageCircle size={16} aria-hidden="true" />LINE を送る</Button>
       <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setClosureOpen(true) }}><CalendarX2 size={16} aria-hidden="true" />休みを入れる</Button>
       <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setViewOpen(true) }}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>
-      {today && !hasEmptyBookingAction ? <Button variant="primary" disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) addNew() }}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button> : null}
+      {cfg.walkIn || (today && !hasEmptyBookingAction) ? <Button variant="primary" disabled={role === null} lockedReason={writeLock || reservationLock} onClick={() => { if (canWrite && (!cfg.walkIn || (restaurantStoreReady && today))) addNew() }}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button> : null}
     </>
   )
 

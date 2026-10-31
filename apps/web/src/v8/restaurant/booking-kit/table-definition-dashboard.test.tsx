@@ -19,7 +19,7 @@ vi.mock('@/v8/style-dashboard/use-style-dashboard', async () => {
   return { useStyleDashboard: () => {
     const [phoneOpen, setPhoneOpen] = useState(state.entry === 'phone'); const [walkInOpen, setWalkInOpen] = useState(false)
     return { cfg: STYLE_CONFIG.restaurant, router: { push: vi.fn() }, tab: 'main', range: 'today', view: 'calendar', date: '2026-10-10', staff: 'all', compare: 'previous', role: 'owner', canWrite: true, accountId: 'account-1', search: '', failed: true, busy: '', today: null, preparing: {}, defaultMetrics: [],
-      store: { accountId: 'account-1', store: state.data!.stores[0], tableDefinition: { accountId: 'account-1', snapshot: state.data! } }, tables: state.data!.tables,
+      store: { accountId: 'account-1', snapshot: state.data!, loading: false, error: null, store: state.data!.stores[0], tableDefinition: { accountId: 'account-1', snapshot: state.data! } }, tables: state.data!.tables,
       phoneOpen, setPhoneOpen, walkInOpen, setWalkInOpen }
   } }
 })
