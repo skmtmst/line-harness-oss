@@ -1,4 +1,4 @@
-/* ★V8 予約サイト・グルメ媒体（E-4 aSmph）。寸法は globals.css の --tpl-e49-* だけを使う。板の頭と下の帯は型（CreatePage）が持つ。 */
+/* 予約サイト・グルメ媒体。板の頭と下の帯は型が持つ。 */
 
 /* 板の頭の下（絵の上 4 に、この型の頭が 4 低い分を足して 8・左右 24・下 24）。下の帯は作る型と同じ浮いた帯（画面の下に追従）。 */
 .body {
@@ -44,26 +44,9 @@
   line-height: var(--tpl-e49-lh-20);
 }
 
-/* 表（見出し 46・行 55。左右 20・列の間 16） */
+/* 操作の幅を確保し、残りを4列に等分する。短い文字列は共通部品で省略する。 */
 .table {
   width: 100%;
-  table-layout: fixed;
-}
-
-.colName {
-  width: var(--tpl-e49-col-name);
-}
-
-.colPage {
-  width: auto;
-}
-
-.colLogin {
-  width: var(--tpl-e49-col-login);
-}
-
-.colImport {
-  width: var(--tpl-e49-col-import);
 }
 
 .colMenu {
