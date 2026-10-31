@@ -39,6 +39,7 @@ export default function EventConfirm() {
 
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [slot, setSlot] = useState<EventSlot | null>(null);
+  const [availabilityReadKey, setAvailabilityReadKey] = useState<string | null>(null);
   const [note, setNote] = useState('');
   // カスタム質問への回答。質問id → 文字列、複数選択は文字列配列。
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
@@ -56,6 +57,7 @@ export default function EventConfirm() {
   useEffect(() => {
     if (!id || !slotId) return;
     let cancelled = false;
+    setAvailabilityReadKey(null);
     async function load() {
       setLoadFailed(false);
       setSubmitError(null);
@@ -72,6 +74,7 @@ export default function EventConfirm() {
           return;
         }
         setSlot(found);
+        setAvailabilityReadKey(JSON.stringify([id, slotId, reloadKey]));
       } catch (err) {
         if (!cancelled) {
           logFailure('event-confirm', err);
@@ -187,6 +190,11 @@ export default function EventConfirm() {
     );
   }
 
+  const availabilityChecked = availabilityReadKey === JSON.stringify([id, slotId, reloadKey]);
+  const availability = availabilityChecked ? availabilityText(event, slot) : '確認しています';
+  const availabilityNote = '空きは確保されていません。受付結果は送信時の空き状況で決まります。'
+    + (event.waitlist_enabled === 1 ? 'キャンセル待ちになる場合があります。' : '');
+
   // 期限があれば日時で出す（板 「キャンセルは 10月10日 18:00 まで。」）。無ければ「自分のイベント」へ案内する。
   const cancelText = event.cancel_deadline_hours_before != null
     ? `キャンセルは ${formatJstDeadline(slot.starts_at, event.cancel_deadline_hours_before)} まで。`
@@ -206,6 +214,7 @@ export default function EventConfirm() {
           <Row label="日時" value={formatJstEventSpan(slot.starts_at, slot.ends_at)} />
           {event.venue_name && <Row label="場所" value={event.venue_name} />}
           {event.venue_address && <Row label="住所" value={event.venue_address} />}
+          <Row label="枠全体の空き（確認時点）" value={availability} stacked />
         </dl>
 
 
@@ -297,7 +306,7 @@ export default function EventConfirm() {
         )}
         <div className="flex gap-2 rounded-(--liff-radius) bg-liff-note p-3 text-xs leading-[18px] text-ink">
           <Icon name="info" tone="booking-info" className="h-4 w-4 shrink-0" />
-          <p>{infoText}</p>
+          <p>{availabilityNote}<br />{infoText}</p>
         </div>
         <PrivacyNote />
       </div>
@@ -317,13 +326,24 @@ export default function EventConfirm() {
 }
 
 /** 確認の1行。板  は 1行 40 (線を含む)・鍵と値は上ぞろえ (予約の確認と同じ)。 */
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, stacked = false }: { label: string; value: string; stacked?: boolean }) {
   return (
-    <div className="flex h-10 items-start gap-2 py-2.5">
-      <dt className="w-18 shrink-0 text-xs text-liff-sub">{label}</dt>
-      <dd className="min-w-0 flex-1 truncate text-sm font-semibold text-ink" title={value}>
+    <div className={stacked ? "flex flex-col items-start gap-1 py-2.5" : "flex h-10 items-start gap-2 py-2.5"}>
+      <dt className={stacked ? "text-xs text-liff-sub" : "w-18 shrink-0 text-xs text-liff-sub"}>{label}</dt>
+      <dd className={stacked ? "w-full min-w-0 truncate text-sm font-semibold text-ink" : "min-w-0 flex-1 truncate text-sm font-semibold text-ink"} title={value}>
         {value}
       </dd>
     </div>
   );
+}
+
+
+/** 確認GETで分かる枠全体の値だけを示し、参加方法別の受付結果は保証しない。 */
+function availabilityText(event: EventDetail, slot: EventSlot): string {
+  if (slot.capacity === null) return '枠全体の定員なし';
+  if (!Number.isSafeInteger(slot.capacity) || slot.capacity < 0
+    || slot.remaining === null || !Number.isSafeInteger(slot.remaining)
+    || slot.remaining < 0 || slot.remaining > slot.capacity) return '確認できません';
+  if (slot.remaining === 0) return event.waitlist_enabled === 1 ? '満席・キャンセル待ちの受付あり' : '満席';
+  return `残り ${slot.remaining} 席`;
 }
