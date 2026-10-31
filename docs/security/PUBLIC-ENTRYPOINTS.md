@@ -6,7 +6,7 @@
 
 ## 数え方と限界
 
-WorkerのHono実登録にある管理認証の外の入口は **206経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。10-17の列車42で統合後の実登録と照合し、不足していた19経路を追記した（182＋19）。既存行の全入力組合せを再監査したという意味ではない。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。 10-19 P02で店の写真の公開取得1経路を追記（201＋1）。認証の許可範囲は変更しない。 10-19にチャネル別LINE Webhookを追加（202＋1）。10-21に本人確認済みのクリック遷移資格発行を追加（203＋1）。10-31にF1の公開フォーム画像1経路を追加（204＋1）。10-31に本人の月謝契約の閲覧1経路を追加（205＋1）。
+WorkerのHono実登録にある管理認証の外の入口は **210経路**（メソッド＋パステンプレート、ALLを含む）。下の表に全件を載せた。10-16 19:23の続きで今回の取り直し2経路だけを追記（173＋2）。10-17のAPI列車の取り込みで、追加された7経路だけを追記（175＋7）。10-17の列車42で統合後の実登録と照合し、不足していた19経路を追記した（182＋19）。既存行の全入力組合せを再監査したという意味ではない。`route-guard-coverage.test.ts` が構文の一覧を実登録と照合し、`public-entrypoints.security.test.ts` がこの表との不足/余分を検出する。数は機能数や脆弱性数ではない。一般のstatic assetとSPA fallbackは末尾で別に数える。 10-19 P02で店の写真の公開取得1経路を追記（201＋1）。認証の許可範囲は変更しない。 10-19にチャネル別LINE Webhookを追加（202＋1）。10-21に本人確認済みのクリック遷移資格発行を追加（203＋1）。10-31にF1の公開フォーム画像1経路を追加（204＋1）。10-31に本人の月謝契約の閲覧1経路を追加（205＋1）。10-31にStripeのConnect試験の共通の受け口1経路を追加（206＋1）。同日の実登録との照合で、本線から掲載漏れだったパスキー確認2経路・イベント一覧1経路を追記（207＋3、認証範囲の変更なし）。
 
 「全経路を列挙」と「すべての入力で安全を確認」は別。表の本人確認・期限はコードの方式で、実配備の設定や全資源ID×本人の組合せはS07/S15の未完を維持する。URLの実値・query・顧客情報は記録しない。
 
@@ -23,7 +23,7 @@ WorkerのHono実登録にある管理認証の外の入口は **206経路**（�
 
 共通の回数制限：`middleware/rate-limit.ts`。認証・upload等には `sensitive-rate-limit.ts` の共有D1枠もある。下のIPの上限は単一実行環境の1分窓（特記を除く）。IPを分散した取得を止めるものではなく、本番WAFの確認はS43。
 
-## 全204経路
+## 全210経路
 
 | メソッド・経路 | IDの形・推測への耐性 | 回数の制限 | 返す個人情報/確認する人 | 期限 | 根拠のファイル |
 | --- | --- | --- | --- | --- | --- |
@@ -207,6 +207,10 @@ WorkerのHono実登録にある管理認証の外の入口は **206経路**（�
 | `POST /webhook/:channelId` | 数字のチャネルIDは公開識別子。対象アカウントのLINE署名を検証 | IP 100/分＋受信済み記録 | 署名で確定したアカウント内だけに保存・取消。本文のdestinationは他顧客の識別に使用しない | 受信済みイベントとメッセージの重複を抑止 | `apps/worker/src/routes/webhook.ts` |
 | `POST /webhooks/xserver/support-email` | 入口IDは秘密ではない。サービス別の署名/専用鍵で確認 | IP 3,000/分（単一実行環境） | 署名/専用鍵を検査後に通知処理。GETの登録確認は専用確認値。顧客本文・鍵を応答/Slackへ出さない | サービス別の署名時刻/受信済み記録（全方式の期限の統一はしていない） | `apps/worker/src/routes/support-inbox.ts` |
 | `GET /webinar-assets/:token/:slug/*` | 期限＋HMACを含むtoken、slug/パスも署名照合 | IP 3,000/分（単一実行環境） | 申込者へ配る動画。URLの再配布は防ぎ切れない | 署名時のexpまで。期限と動画公開状態を確認 | `apps/worker/src/routes/webinars.ts` |
+| `POST /api/auth/passkeys/login/options` | 一次ログイン後の短命challenge必須。RP/Originと有効なスタッフを照合 | IP 3,000/分（単一実行環境）、本文1KiB | 本人に登録済みの認証器の公開情報だけ。パスワードなしログインには使わない | 一次challengeの有効期限と試行上限 | `apps/worker/src/routes/admin-passkeys-login.ts` |
+| `POST /api/auth/passkeys/login/verify` | 一次ログインと一度限りのchallenge、WebAuthn署名・RP/Origin・本人確認必須 | IP 3,000/分（単一実行環境）＋MFA試行制限、本文128KiB | 本人の認証器の検証後だけログインを発行 | challengeの期限・一度限りの消費・counterのCAS | `apps/worker/src/routes/admin-passkeys-login.ts` |
+| `GET /api/liff/events` | LIFFから店を解決し、公開状態・店・公開対象のタグを検査 | IP 3,000/分（単一実行環境） | 公開対象のイベント一覧。参加用URLを返さず、タグ限定のものはLINE本人を照合 | 店とイベントの公開状態を都度検査 | `apps/worker/src/routes/events/register-liff-catalog.ts` |
+| `POST /api/booking/stripe-test/webhook` | 専用 `BOOKING_STRIPE_TEST_CONNECT_WEBHOOK_SECRET` によるStripe署名必須（fallbackなし） | IP 3,000/分（単一実行環境）、本文256KiB | Connect試験の共通口。外側・対象ともlivemode:false必須。対応先未登録はpending、対象外typeは保存せず無視、未知API版は要確認で保存。後続の固定した店・本人・用途・接続先・金額を照合して反映 | 署名時刻は前後5分。Connect＋event IDの受信記録と同batchで一度だけ反映 | `apps/worker/src/routes/booking-stripe-webhook.ts` |
 | `POST /api/booking/pass-payments/webhook` | Stripe試験用の専用署名。管理ログインとは別 | IP 3,000/分（単一実行環境） | 署名を検査した試験イベントだけ。livemodeと支払状態を確認し、本番決済や外部Stripe書込は行わない | 署名時刻は前後5分。イベントIDで二重適用を抑止 | `apps/worker/src/routes/booking-pass-billing.ts` |
 | `POST /api/ec/events` | 店ごとの連携鍵による本文と時刻のHMAC。対象店ヘッダーも照合 | 店ごとの直近1分の受信記録600件＋共通IP枠。本文64KB | 有効な店・契約・接続だけ受信。イベントIDの重複を抑止。秘密値を返さない | 署名時刻は前後5分。保存と再送は連携の台帳で管理 | `apps/worker/src/routes/ec-auto-line.ts` |
 | `GET /api/liff/booking/cancellation-quote` | LINE本人＋対象店の友だち照合。資源IDだけでは通さない | IP 3,000/分（単一実行環境） | 本人が持つ対象店の予約だけのキャンセル料見積もり。予約IDの所属も検査 | LINE本人確認と保存済みのキャンセル条件で判定 | `apps/worker/src/routes/booking-cancellation.ts` |

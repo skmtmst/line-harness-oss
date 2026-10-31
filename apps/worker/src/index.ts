@@ -1,3 +1,4 @@
+import { bookingStripeWebhook } from './routes/booking-stripe-webhook.js';
 import { escapeHtml as escapeHtmlAttribute } from './lib/html-escape.js';
 import { failureMessage } from './lib/failure-messages.js';
 import { logger, resumeInvocation, withInvocation } from '@line-crm/shared/server';
@@ -435,6 +436,7 @@ app.route('/', bookingCalendarSettings);
 app.route('/', bookingGap3);
 app.route('/', bookingCancellation);
 app.route('/', bookingPayments);
+app.route('/', bookingStripeWebhook);
 app.route('/', bookingPaymentAdmin);
 app.route('/', bookingEntitlements);
 app.route('/', bookingPlus);

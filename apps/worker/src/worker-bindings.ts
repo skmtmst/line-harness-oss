@@ -136,6 +136,8 @@ export type WorkerBindings = {
     ECCUBE_WEBHOOK_SECRET?: string;
     /** 予約のStripeテストの知らせ署名の検証鍵。値ではなく有無だけ画面に出す。 */
     STRIPE_TEST_WEBHOOK_SECRET?: string;
+    /** Connect試験の共通受信専用。既存の模擬/SaaS署名鍵と共有しない。 */
+    BOOKING_STRIPE_TEST_CONNECT_WEBHOOK_SECRET?: string;
     NEN_EC_BASE_URL?: string;
     /** ECの会員別ランクAPIを配備した後だけ true にする。未設定は送信停止。 */
     NEN_EC_MEMBER_RANK_SYNC_ENABLED?: string;

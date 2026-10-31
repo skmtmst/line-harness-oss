@@ -1,3 +1,4 @@
+import { purgeUnboundBookingStripeReceipts, markOverdueBookingStripeReceipts } from '../features/booking/booking-stripe-webhooks/index.js';
 import { jstCalendar as japanCalendar } from '@line-crm/shared';
 import { logger } from '@line-crm/shared/server';
 import { sweepOperatorPush, retryOperatorPush } from '../services/operator-push.js';
@@ -70,7 +71,7 @@ export async function runFrequentHeavyJobs(
       name: 'form document retention',
       run: async () => { await purgeExpiredFormDocuments(env.DB, env.IMAGES, new Date(event.scheduledTime)); },
     },
-    {name:'API draft and integration retention',run:async()=>{const now=new Date(event.scheduledTime);await purgeExpiredScenarioDrafts(env.DB,now);await purgeInstagramTransientData(env.DB,now);}},
+    {name:'API draft and integration retention',run:async()=>{const now=new Date(event.scheduledTime);await purgeExpiredScenarioDrafts(env.DB,now);await purgeInstagramTransientData(env.DB,now);await purgeUnboundBookingStripeReceipts(env.DB,event.scheduledTime);const pending=await markOverdueBookingStripeReceipts(env.DB,event.scheduledTime);if(pending>0)logger.warn('booking_stripe_binding_overdue');}},
     {name:'booking waitlist expiry and promotion',run:async()=>{const {processBookingWaitlists}=await import('../services/waitlist-tick.js');await processBookingWaitlists(env);}},
     {
       name: 'follower import continuation',
