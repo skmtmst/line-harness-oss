@@ -42,7 +42,7 @@ export default function BannerDialogFrame({
   // 絵 ：取り込む窓も作る窓と同じ囲み（幅 560・説明は題の下の小さい文）。
   const inset = kind === 'create' || kind === 'confirm' || kind === 'detail' || kind === 'upload' || kind === 'reference'
   return <Dialog open={open} title={title} description={inset && typeof description === 'string' ? description : undefined} onCancel={onClose} busy={busy} error={error} designNode={designNode}
-    tone={role === 'alertdialog' ? 'destructive' : 'default'} confirmation contentLayout={contentLayout} layout={inset ? 'inset' : undefined} footer={inset && actions ? <DialogActions>{actions}</DialogActions> : actions} footerAlign={actionsAlign === 'center' ? 'center' : 'start'}
+    tone={role === 'alertdialog' ? 'destructive' : 'default'} confirmation contentLayout={contentLayout} layout={inset ? 'inset' : undefined} footer={actions ? <DialogActions>{actions}</DialogActions> : undefined} footerAlign={actionsAlign === 'center' ? 'center' : 'start'}
     designWidth={kind === 'confirm' ? 480 : kind === 'detail' ? 960 : 560} designTop={kind === 'reference' ? 16 : undefined} fitViewport={kind === 'reference' || undefined}>
     {description && (!inset || typeof description !== 'string') ? <p>{description}</p> : null}{children}
   </Dialog>

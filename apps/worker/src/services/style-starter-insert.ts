@@ -1,3 +1,4 @@
+import { formMediaUsageStatements } from '@line-crm/db';
 import { styleMenuActionData } from './style-menu-action-data.js';
 import { planInitialMenuHistory } from './style-initial-assets.js';
 import { initialMenuImageKey } from '@line-crm/shared';
@@ -233,7 +234,7 @@ export async function insertStyleStarterItems(
       statements.push(...initialFormScopeGuards(db,account,definition));
       statements.push(db.prepare(`INSERT INTO forms(id,name,description,fields,layout,is_active,save_to_metadata) VALUES(?,?,?,'[]',?,0,0)`)
         .bind(id,item.name,null,layout),
-        db.prepare('INSERT INTO form_accounts(form_id,line_account_id) VALUES(?,?)').bind(id,account));
+        db.prepare('INSERT INTO form_accounts(form_id,line_account_id) VALUES(?,?)').bind(id,account), ...formMediaUsageStatements(db, id));
       plannedForms.set(item.key,id);
     } else if (item.kind === 'template')
       statements.push(

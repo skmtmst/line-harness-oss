@@ -17,6 +17,7 @@ vi.mock('../lib/api.js', () => ({
   api: { customerLook: vi.fn().mockResolvedValue({success:true,data:{settings:{liff_theme:"line"}}}),
     me: vi.fn(),
     cancelMyBooking: vi.fn(),
+    cancellationQuote: vi.fn(),
     rescheduleMyBooking: vi.fn(),
     availability: vi.fn(),
     liffConfig: vi.fn().mockResolvedValue({ success: true, data: {} }),
@@ -64,8 +65,31 @@ beforeEach(() => {
   cancelMyBooking.mockReset();
   rescheduleMyBooking.mockReset();
   availability.mockReset();
+  vi.mocked(api.cancellationQuote).mockReset();
 });
 afterEach(() => cleanup());
+
+it.each(['version_conflict','not_editable','booking_not_found'])('取消の%sでは窓を閉じて一覧を読み直し、古い版で送り直さない',async code=>{
+ cancelMyBooking.mockRejectedValueOnce({body:{error:code}});
+ setup([item()]);fireEvent.click(await screen.findByRole('button',{name:'キャンセル'}));
+ me.mockResolvedValue({upcoming:[],past:[]});fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button',{name:'キャンセルする'}));
+ await vi.waitFor(()=>expect(screen.queryByRole('alertdialog')).toBeNull());
+ await vi.waitFor(()=>expect(me).toHaveBeenCalledTimes(2));expect(cancelMyBooking).toHaveBeenCalledTimes(1);expect(api.cancellationQuote).not.toHaveBeenCalled();
+});
+
+it('取消料の変更後も窓と予約を残し、最新金額への同意を取り直して送る',async()=>{
+ const quote={feeNow:4200,feeNoShow:8400,freeUntil:'2099-10-01T04:00:00Z',text:'決まり',policyAcceptedRequired:true,canCancel:true,lockVersion:4,cancelDeadlineAt:'2099-10-02T04:00:00.000Z'};
+ vi.mocked(api.cancellationQuote).mockResolvedValueOnce(quote).mockResolvedValue({...quote,feeNow:8400});
+ cancelMyBooking.mockRejectedValueOnce({body:{error:'cancellation_fee_confirmation_required'}}).mockResolvedValue({status:'cancelled',lock_version:5,calendar_sync:'not_applicable',meet_sync:'not_applicable'});
+ setup([item({cancellationQuote:quote,cancel_deadline_at:quote.cancelDeadlineAt})]);
+ fireEvent.click(await screen.findByRole('button',{name:'キャンセル'}));await screen.findByText('今取り消すとキャンセル料 ¥4,200 が掛かります');
+ fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button',{name:'キャンセルする'}));
+ await screen.findByText('今取り消すとキャンセル料 ¥8,400 が掛かります');expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
+ expect(cancelMyBooking).toHaveBeenLastCalledWith('bk-1',4,{feeAccepted:true,expectedFeeAmount:4200});
+ expect(screen.getByRole('alertdialog').textContent).toContain('最新の金額を確認して、もう一度同意してください');
+ fireEvent.click(screen.getByRole('checkbox'));fireEvent.click(within(screen.getByRole('alertdialog')).getByRole('button',{name:'キャンセルする'}));
+ await vi.waitFor(()=>expect(cancelMyBooking).toHaveBeenLastCalledWith('bk-1',4,{feeAccepted:true,expectedFeeAmount:8400}));
+});
 
 describe('予約の履歴：本人の日時変更・キャンセル（F-6）', () => {
   it('版を返さない予約には「日時を変える」「キャンセル」を出さず、トークでの連絡を案内する', async () => {

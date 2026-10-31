@@ -106,6 +106,8 @@ export const REPLACEMENT_TARGET_KINDS: Record<MediaRefKind, {
   booking_menu: null,
   booking_staff: null,
   booking_settings: null,
+  // 公開フォームの固定版は書き換えず、編集して再公開する。
+  form: null,
 };
 
 /**

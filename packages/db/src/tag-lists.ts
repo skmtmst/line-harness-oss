@@ -6,7 +6,8 @@ export interface TagReadScope {
   canSeeUnassigned: boolean;
 }
 
-export function tagReadPredicate(scope?: TagReadScope, alias: 't' | 'known' = 't'): { sql: string; binds: string[] } {
+// alias f は配信受信者の境界でも使う。範囲を広げる変更は受信者の範囲試験も確認する。
+export function tagReadPredicate(scope?: TagReadScope, alias: 't' | 'known' | 'f' = 't'): { sql: string; binds: string[] } {
   if (!scope) return { sql: '1 = 1', binds: [] };
   const accounts = sqlIdSet(scope.allowedAccountIds);
   return {

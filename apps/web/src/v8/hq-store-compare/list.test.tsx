@@ -93,13 +93,29 @@ describe('店の比較の表', () => {
     expect(wraps[1].textContent).toContain('−25')
   })
 
-  it('列の見出しを押すとその数の順で頼み直す（同じ列をもう一度押すと向きが逆）', async () => {
+  it.each([
+    ['friendChange', 'asc'], ['blockRate', 'desc'], ['clickRate', 'asc'],
+    ['bookings', 'asc'], ['visits', 'asc'], ['noShowRate', 'desc'], ['responseMinutes', 'desc'],
+  ] as const)('%sの初回は悪い順、次は反転し、表示する行と見出しとCSVも一致する', async (key, initial) => {
+    const rows = DATA.rows.map((item, index) => ({ ...item, metrics: Object.fromEntries(Object.entries(item.metrics).map(([name, value]) => [name, { ...value, value: index + 1, available: true }])) }))
+    api.get.mockImplementation(async (params: { sort: typeof key; order: 'asc' | 'desc' }) => ({ success: true, data: { ...DATA, rows: [...rows].sort((a, b) => (a.metrics[params.sort].value - b.metrics[params.sort].value) * (params.order === 'asc' ? 1 : -1)) } }))
+    api.export.mockResolvedValue({ success: true, data: { id: 'sort-export', replayed: false } })
+    api.exportStatus.mockResolvedValue({ success: true, data: { id: 'sort-export', status: 'completed', rowCount: 2, downloadUrl: null, errorCode: null } })
     render(<StoreComparisonList />)
     await screen.findByText('大宮店')
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'ブロック率で並べ替える' })) })
-    await waitFor(() => expect(api.get).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'blockRate', order: 'asc' })))
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'ブロック率で並べ替える' })) })
-    await waitFor(() => expect(api.get).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'blockRate', order: 'desc' })))
+    if (key === 'bookings') {
+      fireEvent.click(screen.getByRole('button', { name: '友だちの増減で並べ替える' }))
+      await waitFor(() => expect(api.get).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'friendChange' })))
+    }
+    const heading = screen.getByRole('button', { name: `${METRICS.find(item => item.key === key)!.label}で並べ替える` })
+    for (const direction of [initial, initial === 'asc' ? 'desc' : 'asc']) {
+      fireEvent.click(heading)
+      await waitFor(() => expect(api.get).toHaveBeenLastCalledWith(expect.objectContaining({ sort: key, order: direction, page: 1 })))
+      await waitFor(() => expect([...document.querySelectorAll('[data-row-id]')].map(item => item.getAttribute('data-row-id'))).toEqual(direction === 'asc' ? ['s1', 's2'] : ['s2', 's1']))
+      expect(heading.closest('th')?.getAttribute('aria-sort')).toBe(direction === 'asc' ? 'ascending' : 'descending')
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'CSVで書き出す' }))
+    await waitFor(() => expect(api.export).toHaveBeenCalledWith(expect.objectContaining({ sort: key, order: initial === 'asc' ? 'desc' : 'asc' }), expect.any(String)))
   })
 
   it('行を押すと右の引き出しに、最近の配信と［この店を開く］を出す', async () => {

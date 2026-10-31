@@ -308,7 +308,7 @@ export function ReturningMessage({ definition, setDefinition, scenarios, canEdit
         </RadioCardGroup></SaveErrorField>
         )}
       </Card> : null}
-      <Dialog open={messageOpen && mode === 'other' && canEdit} title="初回メッセージ" onCancel={() => setMessageOpen(false)} footer={<Button type="button" onClick={() => setMessageOpen(false)}>閉じる</Button>}>
+      <Dialog open={messageOpen && mode === 'other' && canEdit} title="初回メッセージ" dirty={false} onCancel={() => setMessageOpen(false)} >
         <Field label="最初に送るメッセージ"><MessageBody><SaveErrorField names={["messageText","definition.messageText","message_text"]}><InsertTextField editorSize="message" aria-label="最初に送るメッセージ" maxLength={MESSAGE_LIMIT} value={definition.messageText} onValueChange={(messageText) => setDefinition((current) => ({ ...current, messageText }))} /></SaveErrorField></MessageBody></Field>
       </Dialog>
     </>

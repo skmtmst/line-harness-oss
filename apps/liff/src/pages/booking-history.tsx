@@ -40,6 +40,7 @@ export default function BookingHistory() {
   const { search } = useLocation();
   /* 取消の確認・日時変更の窓と、送っている途中・失敗の文。 */
   const [pendingCancel, setPendingCancel] = useState<BookingHistoryItem | null>(null);
+  const [cancelQuoteKey,setCancelQuoteKey]=useState(0);
   const [pendingChange, setPendingChange] = useState<{
     booking: BookingHistoryItem;
     slots: ChangeSlot[] | null;
@@ -129,25 +130,27 @@ export default function BookingHistory() {
 
   const paidCancel = pendingCancel && payments[pendingCancel.id]?.kind === 'paid' ? payments[pendingCancel.id] : null;
 
-  async function runCancel() {
+  async function runCancel(confirmation?:import('@line-crm/shared').BookingCancellationConfirmation,deadline?:string) {
     const target = pendingCancel;
     if (!target || busy || typeof target.lock_version !== 'number') return;
-    if (!withinDeadline(target, Date.now())) {
+    if (!withinDeadline({...target,cancel_deadline_at:deadline??target.cancel_deadline_at}, Date.now())) {
       setActionError('キャンセルの期限を過ぎています。トークでご連絡ください。');
       return;
     }
     setBusy(true);
     setActionError(null);
     try {
-      await api.cancelMyBooking(target.id, target.lock_version);
+      if(confirmation)await api.cancelMyBooking(target.id, target.lock_version,confirmation);
+      else await api.cancelMyBooking(target.id,target.lock_version);
       setPendingCancel(null);
       setReloadKey((k) => k + 1);
     } catch (err) {
       logFailure('booking-history-cancel', err);
       const code = errorCode(err);
-      setPendingCancel(null);
       setActionError(cancelFailureMessage(code));
+      if(target.cancellationQuote?.policyAcceptedRequired||code==='cancellation_fee_confirmation_required')setCancelQuoteKey(key=>key+1);
       if (code === 'version_conflict' || code === 'not_editable' || code === 'booking_not_found') {
+        setPendingCancel(null);
         setReloadKey((k) => k + 1);
       }
     } finally {
@@ -280,7 +283,7 @@ export default function BookingHistory() {
                     onReceipt={pay && !pay.actionRequired && (pay.kind === 'paid' || pay.kind === 'refunded') ? () => openReceipt(pay) : undefined}
                     disabled={busy}
                     onChange={canChange(b) ? () => void openChange(b) : undefined}
-                    onCancel={canCancel(b) ? () => { setActionError(null); setPendingCancel(b); } : undefined}
+                    onCancel={canCancel(b) ? () => { setActionError(null); setCancelQuoteKey(0); setPendingCancel(b); } : undefined}
                   />
                   );
                 })}
@@ -307,8 +310,8 @@ export default function BookingHistory() {
           </Button>
         </BottomBar>
       )}
-      <BookingHistoryCancelDialog booking={pendingCancel} payment={paidCancel || null} busy={busy} error={actionError}
-        onConfirm={() => void runCancel()} onCancel={() => { if (!busy) setPendingCancel(null) }} />
+      <BookingHistoryCancelDialog booking={pendingCancel} payment={paidCancel || null} busy={busy} error={actionError} refreshKey={cancelQuoteKey}
+        onConfirm={(confirmation,deadline) => void runCancel(confirmation,deadline)} onReload={()=>{setPendingCancel(null);setReloadKey(key=>key+1)}} onCancel={() => { if (!busy) setPendingCancel(null) }} />
       <ConfirmDialog
         open={pendingChange !== null}
         title={pendingChange ? `「${pendingChange.booking.menu_name}」の日時を変えますか` : ''}

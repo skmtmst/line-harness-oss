@@ -42,7 +42,7 @@ vi.mock('@line-crm/db', () => ({
   getLineAccountById: vi.fn(),
 }));
 vi.mock('../services/account-access.js', () => ({
-  getVisibleLineAccountScope: vi.fn(),
+  getVisibleLineAccountScope: vi.fn(async () => ({ allowedAccountIds: ['accA', 'accB'], canSeeUnassigned: true })),
   canAccessAllLineAccounts: (
     _db: D1Database,
     _staff: unknown,
@@ -111,7 +111,7 @@ function app() {
         },
       } as unknown as D1Database,
     };
-    c.set('staff' as never, { id: 'owner', role: 'owner', tenantId: 'tenant-a' } as never);
+    c.set('staff' as never, { id: 'owner', role: 'owner', tenantId: 'default' } as never);
     await next();
   });
   instance.route('/', broadcasts);
@@ -176,12 +176,12 @@ describe('preview-count tag account boundary (N-060)', () => {
     expect(await response.json()).toMatchObject({ success: true, data: { count: 0 } });
   });
 
-  test('line_account_id が無い配信は絞らず全件 (送信と同じ)', async () => {
+  test('所属未指定の配信は閲覧可能なアカウントの集合だけを渡す', async () => {
     const { instance, sql } = app();
     const response = await instance.request('/api/broadcasts/b-null/preview-count');
     expect(await response.json()).toMatchObject({ success: true, data: { count: 8 } });
     expect(sql[0].query).not.toContain('f.line_account_id = ?');
-    expect(sql[0].bindings).toEqual(['tag-1']);
+    expect(sql[0].bindings).toEqual(['tag-1', JSON.stringify(['accA', 'accB'])]);
   });
 
   test('二重実行でも同じ人数', async () => {

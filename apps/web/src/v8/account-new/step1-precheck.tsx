@@ -55,7 +55,7 @@ export default function Step1Precheck({
         )}
         {/* カードの頭は 題・？・のび・札 の順（v07 B2SpuV）。 */}
         <div className={styles.precheckHead}>
-          <h2 className={styles.panelTitle}>ご利用環境の確認</h2>
+          <h2 data-step-heading={precheckAt === 'done' ? '' : undefined} tabIndex={-1} className={styles.panelTitle}>ご利用環境の確認</h2>
           <span className={styles.precheckHelpMark} title="答えに合わせて、このあとの手順が変わります。" aria-label="答えに合わせて、このあとの手順が変わります。"><CircleHelp size={16} aria-hidden="true" /></span>
           <p className={styles.subBadge}>{badge}</p>
         </div>
@@ -74,7 +74,7 @@ export default function Step1Precheck({
         )}
         {precheckAt !== 'done' && (
           <div className={styles.precheckQuestion}>
-            <h3 className={styles.precheckQuestionTitle}>{PRECHECK_TITLES[precheckAt]}</h3>
+            <h3 data-step-heading tabIndex={-1} className={styles.precheckQuestionTitle}>{PRECHECK_TITLES[precheckAt]}</h3>
             <p className={styles.help}>{PRECHECK_HELPS[precheckAt]}</p>
             {/* Q5 だけ説明付きの3択なので縦に積む。ほかは2列（v07 aSRi4・s70iLZ）。 */}
             <RadioCardGroup legend={PRECHECK_TITLES[precheckAt]} columns={precheckAt === 'q5' ? undefined : 2}>

@@ -1,6 +1,8 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
+import PagePending from '@/components/templates/page-pending'
+import { routePendingForPath } from '@/lib/route-pending'
 import { Suspense } from 'react'
 import { useAccount } from '@/contexts/account-context'
 import { usePageTitle } from '@/components/shell/page-chrome'
@@ -10,7 +12,7 @@ export type HealthTabKey = 'logs' | 'concern' | 'items'
 export type SummaryStatus = 'loading' | 'ready' | 'error'
 
 export default function NenHealthPage() {
-  return <Suspense fallback={null}><HealthInner /></Suspense>
+  return <Suspense fallback={<PagePending stage="route" {...routePendingForPath("/nen/health")} />}><HealthInner /></Suspense>
 }
 
 function HealthInner() {

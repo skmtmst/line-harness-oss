@@ -19,9 +19,17 @@ import { authRequest, confirmError, passwordError } from '@/lib/auth-email'
  */
 export default function PasswordResetPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<ResetPending />}>
       <ResetInner />
     </Suspense>
+  )
+}
+
+function ResetPending() {
+  return (
+    <AuthCard node="KN3y1" cardNode="fWkBE" title="新しいパスワードを設定" description="URL を確かめています">
+      <ListState kind="loading" title="URL を確かめています" />
+    </AuthCard>
   )
 }
 
@@ -70,13 +78,7 @@ function ResetInner() {
     setCheck({ state: 'done', email: res.data.email })
   }
 
-  if (check.state === 'checking') {
-    return (
-      <AuthCard node="KN3y1" cardNode="fWkBE" title="新しいパスワードを設定" description="URL を確かめています">
-        <ListState kind="loading" title="URL を確かめています" />
-      </AuthCard>
-    )
-  }
+  if (check.state === 'checking') return <ResetPending />
   if (check.state === 'bad') {
     return (
       <AuthCard node="KN3y1" cardNode="fWkBE" title="新しいパスワードを設定" description={check.message}>

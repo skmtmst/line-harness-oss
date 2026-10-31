@@ -70,7 +70,7 @@ export type DialogProps = {
   designTitleRow?: 'mark'
   /** 段の帯を使わず続ける窓、またはアカウントの窓の余白。既定の窓は変えない。 */
   layout?: 'continuous' | 'account-inset' | 'inset'
-  /** 手順の帯。本文のスクロールから独立させる。 */
+  /** 手順や表示の切り替えの帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
   /** 手順の本文を閉じずに切り替える鍵。StepsのcurrentKeyは自動で読む。 */
   stepKey?: string | number
@@ -407,6 +407,10 @@ export function DialogSteps({ steps }: { steps: Array<{ label: string; done?: bo
 }
 
 /** 自前の処理でも、下の操作の余白と配置は窓の共通部品が持つ。 */
-export function DialogActions({ children, leadingAction, padding }: { children: ReactNode; leadingAction?: ReactNode; padding?: 'none' }) {
-  return <div className={styles.actions} data-dialog-actions data-padding={padding}>{leadingAction ? <span className={styles.actionLead}>{leadingAction}</span> : null}{children}</div>
+export function DialogActions({ children, leadingAction, align, padding }: { children: ReactNode; leadingAction?: ReactNode; align?: 'center'; padding?: 'none' }) {
+  const centered = align === 'center' || leadingAction !== undefined
+  return <div className={styles.actions} data-dialog-actions data-dialog-action-pair={centered || undefined} data-padding={padding}>
+    {leadingAction ? <span className={centered ? styles.actionStart : styles.actionLead}>{typeof leadingAction === 'string' ? <span className={styles.footerLead}>{leadingAction}</span> : leadingAction}</span> : null}
+    {centered ? <span className={styles.buttonPair}>{children}</span> : children}
+  </div>
 }

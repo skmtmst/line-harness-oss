@@ -17,6 +17,7 @@ export function isPublicApiBoundary(method: string, path: string): boolean {
   if(normalizedMethod==='POST' && (path==='/api/ec/events'||path==='/api/booking/pass-payments/webhook'||path==='/mcp'))return true;
   // フォーム定義の GET は LIFF が認証なしで読む。PUT/DELETE は管理 API。
   if (isPublicFormDefinition(normalizedMethod, path)) return true;
+  if (normalizedMethod === 'GET' && /^\/api\/forms\/[^/]+\/images\/[^/]+$/.test(path)) return true;
   // 予約 route で本人確認する LIFF 操作なので、この method/path だけを管理ログインの例外にする。
   if (isPublicLiffOperation(normalizedMethod, path)) return true;
   // LIFF の回答・開封・途中保存は route 側で LINE 署名を見る。

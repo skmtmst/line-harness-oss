@@ -12,6 +12,7 @@ import { Clock3, FileText, ImagePlus } from 'lucide-react'
 import { withHonorific, type MediaItem, type Template } from '@line-crm/shared'
 import { api } from '@/lib/api'
 import { IdempotencyKeyStore } from '@/lib/idempotency-key-store'
+import { scheduledMessageInputReason } from '@/lib/scheduled-message-input'
 import { EntityKindDialog } from '@/components/shared/entity-picker-sources'
 import Button from '@/components/shared/button'
 import DateTimeField from '@/components/shared/date-time-field'
@@ -88,6 +89,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
     { key: 'monday10', label: '月曜 10:00', value: toLocalInput(nextMonday10()) },
   ]
   const scheduledAt = choice === 'custom' ? custom : presets.find((p) => p.key === choice)?.value ?? ''
+  const disabledReason = scheduledMessageInputReason(content, Boolean(image), scheduledAt)
 
   useEffect(() => { setImage(null); setImagePickerOpen(false) }, [accountId, friendId])
 
@@ -198,7 +200,7 @@ export default function ScheduleDialog({ friendId, friendName, accountId, onClos
         {/* 絵は注意の下 12 にボタンが並ぶ（窓の下の線・帯なし）。共通の窓の帯は余白が 24 あるので、本文の続きに置く。 */}
         <DialogActions padding="none">
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
-          <Button type="button" variant="primary" icon={<Clock3 aria-hidden="true" />} onClick={() => void reserve()} disabled={busy} busy={busy}>
+          <Button type="button" variant="primary" icon={<Clock3 aria-hidden="true" />} onClick={() => void reserve()} disabled={busy || Boolean(disabledReason)} disabledReason={disabledReason} busy={busy}>
             {scheduledAt ? formatReserveLabel(scheduledAt) : '日時を選んで予約'}
           </Button>
         </DialogActions>

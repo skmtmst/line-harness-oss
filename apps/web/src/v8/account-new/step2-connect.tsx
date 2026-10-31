@@ -106,7 +106,7 @@ export default function Step2Connect({
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Messaging API の情報を入れる">
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
-            <h2 className={styles.panelTitle}>Messaging API の情報を入れる</h2>
+            <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>Messaging API の情報を入れる</h2>
             <span className={styles.precheckHelpMark} title="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。" aria-label="LINE公式アカウントの本体（Messaging API チャネル）とつなぐための情報です。"><CircleHelp size={16} aria-hidden="true" /></span>
           </div>
           <p className={styles.precheckLead}>Messaging API のチャネルIDとチャネルシークレットを入力します。</p>
@@ -140,7 +140,7 @@ export default function Step2Connect({
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="プロバイダーIDを確認する">
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
-            <h2 className={styles.panelTitle}>プロバイダーIDを確認する</h2>
+            <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>プロバイダーIDを確認する</h2>
             <span className={styles.precheckHelpMark} title="Messaging APIとLINEログインを同じプロバイダーにつなぎます。" aria-label="Messaging APIとLINEログインを同じプロバイダーにつなぎます。"><CircleHelp size={16} aria-hidden="true" /></span>
           </div>
           <p className={styles.precheckLead}>Messaging APIとLINEログインを同じプロバイダーにつなぎます。</p>
@@ -175,7 +175,7 @@ export default function Step2Connect({
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="Webhook（受信のつなぎ）を設定する">
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
-            <h2 className={styles.panelTitle}>Webhook（受信のつなぎ）を設定する</h2>
+            <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>Webhook（受信のつなぎ）を設定する</h2>
             <span className={styles.precheckHelpMark} title="LINE からのメッセージを musubo が受け取るための通り道です。" aria-label="LINE からのメッセージを musubo が受け取るための通り道です。"><CircleHelp size={16} aria-hidden="true" /></span>
           </div>
           <div className={`${styles.precheckNote} ${styles.precheckNoteInfo}`}>
@@ -228,7 +228,7 @@ export default function Step2Connect({
         <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="LINEログインの情報を入れる">
           <p className={styles.subBadge}>{badge}</p>
           <div className={styles.precheckHead}>
-            <h2 className={styles.panelTitle}>LINEログインの情報を入れる</h2>
+            <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>LINEログインの情報を入れる</h2>
             <span className={styles.precheckHelpMark} title="友だち追加の窓口（LIFF）を musubo が自動で作るために使います。" aria-label="友だち追加の窓口（LIFF）を musubo が自動で作るために使います。"><CircleHelp size={16} aria-hidden="true" /></span>
           </div>
           <p className={styles.precheckLead}>友だち追加の窓口（LIFF）を musubo が自動で作るために使います。入れていただくのはこの2項目だけです。</p>

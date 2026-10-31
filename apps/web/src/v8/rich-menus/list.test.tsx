@@ -217,9 +217,9 @@ describe('V8 リッチメニュー一覧', () => {
       '2 LINEに登録されているLINEから取り下げる',
       '3 「会員ランク上位」の切替先になっている切替を外す',
     ])
-    // 右上の×と、下の「閉じる」（絵どおり）。
+    // 閉じる操作は右上の×へ統一。
     // 読み込み中に出ていた確認窓は閉じの動き（160ms）のあと外れる。
-    await waitFor(() => expect(view.getAllByRole('button', { name: '閉じる' }).length).toBe(2))
+    await waitFor(() => expect(view.getAllByRole('button', { name: '閉じる' }).length).toBe(1))
   })
 })
 

@@ -107,7 +107,7 @@ export * from './support-mark-display.js';
 export * from './payment-status.js';
 export * from './yen.js';
 export * from './phone.js';
-export type {LineSenderSnapshot,LineSender,SendConfirmationPreview,InboxFirstResponseSettings,InboxFirstResponseWrite,InboxSlaState,BookingCancellationPolicy,BookingCancellationQuote,BookingCancellationCharge,BookingCalendarSwitch,BookingCalendarSwitchWrite} from './gap1.js';
+export type {LineSenderSnapshot,LineSender,SendConfirmationPreview,InboxFirstResponseSettings,InboxFirstResponseWrite,InboxSlaState,BookingCancellationPolicy,BookingCancellationQuote,BookingCancellationReview,BookingCancellationConfirmation,BookingCancellationCharge,BookingCalendarSwitch,BookingCalendarSwitchWrite} from './gap1.js';
 export * from './gap2.js';
 
 export * from './gap3-booking.js';
@@ -132,3 +132,5 @@ export type { AutomationWait } from './automation-wait.js';
 export type { RestaurantSetupProgress } from './restaurant-setup-progress.js';
 export * from './initial-rich-menu.js';
 export { initialMenuImageDataUri, initialMenuPng } from './initial-rich-menu-images.js';
+export { parseFormReferences, STORE_INFORMATION_FIELDS } from './form-public-references.js';
+export type { FormReferenceDefinition, PublicFormReference, PublicFormImage, PublicStoreInformation, StoreInformationField } from './form-public-references.js';

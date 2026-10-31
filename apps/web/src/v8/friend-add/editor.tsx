@@ -19,7 +19,7 @@ import { withPermissionFailure } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import DateTimeField from '@/components/shared/date-time-field'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import EntitySelect,{ entityOptionMetadata } from '@/components/shared/entity-select'
 import { folderByName,folderCreator } from '@/components/shared/folder-select'
@@ -686,7 +686,7 @@ function FriendAddEditor({ ruleId }: { ruleId?: string }) {
         />
       ) : null}
 
-      <Dialog open={testConditionsOpen && canEdit} title="テストの条件" busy={saving} onCancel={() => setTestConditionsOpen(false)} footer={<Button type="button" variant="primary" busy={saving} busyLabel="判定中…" onClick={() => { setTestConditionsOpen(false); void runTest() }}>この条件でテストする</Button>}>
+      <Dialog open={testConditionsOpen && canEdit} title="テストの条件" busy={saving} onCancel={() => setTestConditionsOpen(false)} footer={<DialogActions><Button type="button" variant="primary" busy={saving} busyLabel="判定中…" onClick={() => { setTestConditionsOpen(false); void runTest() }}>この条件でテストする</Button></DialogActions>}>
         <Field label="試す流入リンク"><SaveErrorField names={["routeId"]}><EntitySelect noun="流入リンク" clearable aria-label="試す流入リンク" value={testInput.routeId ?? ''} onChange={(routeId) => changeTestInput({ routeId: routeId || null })} options={[{ value: '', label: 'どの経路でも' }, ...options.routes.map((route) => ({ ...entityOptionMetadata(route), value: route.id, label: route.name }))]} /></SaveErrorField></Field>
         <Field label="想定日時"><SaveErrorField names={["expectedAt"]}><DateTimeField aria-label="想定日時" value={testInput.expectedAt ?? ''} onChange={(expectedAt) => changeTestInput({ expectedAt: expectedAt || null })} /></SaveErrorField></Field>
         <SaveErrorField names={["friendId"]}><FriendPickerField accountId={selectedAccountId} label="試す友だち" value={testInput.friendId ?? ''} onChange={(friendId) => changeTestInput({ friendId: friendId || null })} /></SaveErrorField>
