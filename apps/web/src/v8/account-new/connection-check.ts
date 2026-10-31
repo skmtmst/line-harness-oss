@@ -58,7 +58,7 @@ export function toV8CheckRows(connection: LineAccountConnectData | null): V8Chec
       message: channelFailed ? (steps[0]?.state === 'failed' ? steps[0].message : steps[3]?.message ?? null) : null,
     },
     {
-      key: 'provider', title: '同じプロバイダー', detail: '2つのチャネルが同じプロバイダーにある',
+      key: 'provider', title: '2つのチャネルの認証', detail: 'Messaging API・LINEログインの認証結果',
       state: !connection ? 'todo' : providerPassed ? 'passed' : providerFailed ? 'failed' : 'todo',
       message: providerFailed ? 'チャネルID・シークレットを確認してください。' : null,
     },
