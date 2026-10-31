@@ -471,7 +471,7 @@ describe('回答フォームの下書き自動保存（一斉配信と同じ形�
     expect(formsUpdate.mock.calls[1][2]).toEqual(expect.objectContaining({ expectedContentRevision: 8 }))
   })
 
-  it('保存に失敗したら帯に出し、赤い帯は出さない', async () => {
+  it('自動保存に失敗したら下の帯から保存し直せ、成功したら失敗の表示を消す', async () => {
     formsUpdate.mockImplementation(async () => { throw new Error('network') })
     await render('id=form-1')
     fireEvent.change(screen.getByDisplayValue('今日のご来店の目的は？'), { target: { value: '今日の目的は？' } })
@@ -479,6 +479,30 @@ describe('回答フォームの下書き自動保存（一斉配信と同じ形�
     for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve() })
     expect(status()).toContain('自動保存できませんでした')
     expect(host.querySelector('[role="alert"]')).toBeNull()
+    const footer = host.querySelector('[data-template-region="footer"]') as HTMLElement
+    const retry = within(footer).getByRole('button', { name: '下書きを保存' })
+    expect(retry).toBeTruthy()
+    expect(within(footer).queryByText('下書き・公開中と違います')).toBeNull()
+    formsUpdate.mockResolvedValue({ success: true, data: { id: 'form-1', contentRevision: 8, updatedAt: '' } })
+    await act(async () => { fireEvent.click(retry) })
+    for (let i = 0; i < 6; i++) await act(async () => { await Promise.resolve() })
+    expect(formsUpdate).toHaveBeenCalledTimes(2)
+    expect(formsPublish).not.toHaveBeenCalled()
+    expect(status()).toBe('下書き保存済み・0秒前')
+    expect(within(footer).queryByText('自動保存できませんでした')).toBeNull()
+  })
+
+  it('自動保存がほかの人の保存と競合したときは、比べる操作を優先する', async () => {
+    formsUpdate.mockRejectedValue(new ApiError(409, 'conflict', 'VERSION_CONFLICT', { updatedAt: '' }))
+    await render('id=form-1')
+    fireEvent.change(screen.getByDisplayValue('今日のご来店の目的は？'), { target: { value: '今日の目的は？' } })
+    await wait(2100)
+    for (let i = 0; i < 12; i++) await act(async () => { await Promise.resolve() })
+    const footer = host.querySelector('[data-template-region="footer"]') as HTMLElement
+    expect(within(footer).getByRole('button', { name: '比べてから保存' })).toBeTruthy()
+    expect(within(footer).queryByRole('button', { name: '下書きを保存' })).toBeNull()
+    expect(within(footer).queryByRole('button', { name: 'この版を公開' })).toBeNull()
+    expect(formsPublish).not.toHaveBeenCalled()
   })
 })
 

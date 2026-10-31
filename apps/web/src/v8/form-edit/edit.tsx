@@ -11,6 +11,7 @@ import { CreatePage } from '@/components/templates';
 import Button from '@/components/shared/button';
 import Dialog from '@/components/shared/dialog';
 import Notice from '@/components/shared/notice';
+import HelpTip from '@/components/shared/help-tip';
 import { SaveConflictBand, SaveConflictCompareDialog, useSaveConflict } from '@/components/shared/save-conflict';
 import ListState from '@/components/shared/list-state';
 import TargetMissing from '@/components/shared/target-missing';
@@ -834,8 +835,10 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       ? '下書き・公開中と違います'
       : '公開中の版と同じです'
   const saveStatus = host ? (dirty ? '保存していない変更があります' : undefined) : autosave.label
-    ? <span aria-live="polite" data-autosave-status>{autosave.label}</span>
+    ? <span aria-live="polite" data-autosave-status>{autosave.failed ? '自動保存できませんでした' : autosave.label}</span>
     : dirty ? '保存していない変更があります' : undefined
+  const shortState = statusLine.split('（')[0]
+  const retryAutosave = autosave.failed && !conflict
 
   const savedSide: ConflictSide | null = (() => {
     if (!savedSnapshot.current) return null
@@ -915,7 +918,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       <Button href="/form-submissions">キャンセル</Button>
       {canEdit ? (
         <>
-          <Button onClick={() => void save(false).then((ok) => { if (ok) autosave.markSaved() })} disabled={saving} busy={saving} busyLabel="保存中…" title="フォームを保存（公開中の内容は変わりません）">
+          <Button variant={retryAutosave ? 'primary' : 'secondary'} onClick={() => void save(false).then((ok) => { if (ok) autosave.markSaved() })} disabled={saving} busy={saving} busyLabel="保存中…" title="フォームを保存（公開中の内容は変わりません）">
             下書きを保存
           </Button>
           {conflict ? (
@@ -923,7 +926,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
               比べてから保存
             </Button>
           ) : (
-            <Button variant="primary" onClick={() => setShowPublish(true)} disabled={saving}>
+            <Button variant={retryAutosave ? 'secondary' : 'primary'} onClick={() => setShowPublish(true)} disabled={saving}>
               <Upload size={16} aria-hidden="true" />
               この版を公開
             </Button>
@@ -962,7 +965,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
       preview={preview}
       previewToggle={conflictBand}
       footerActions={footerActions}
-      status={<><span role="note" data-status-line>{statusLine}</span>{saveStatus ? <span data-status-line>{saveStatus}</span> : null}</>} dirty={false}
+      status={<span className={styles.saveSummary} data-status-line><span>{saveStatus ?? shortState}</span><HelpTip label="公開・配布の状態">{statusLine}</HelpTip></span>} dirty={false}
     >
       <FormEditAttemptContext.Provider value={attempted}>
       <div className={styles.root} data-fe-root>
