@@ -1,5 +1,6 @@
 import { parseOffsetPaging, buildOffsetListResponse, buildCursorListResponse, listQueryNumber } from '../lib/list-paging.js';
 import { logger } from '@line-crm/shared/server';
+import { lineMessagePreview } from '@line-crm/shared';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
 import PostalMime from 'postal-mime';
@@ -301,7 +302,7 @@ supportInbox.get('/api/support/inbox', requireRole('owner', 'admin', 'staff'), a
           customerName: row.displayName || '(名前なし)',
           customerIdentifier: row.accountName,
           subject: 'LINEお問い合わせ',
-          preview: row.lastIncomingContent,
+          preview: lineMessagePreview(row.lastIncomingType, row.lastIncomingContent),
           status: 'unread',
           lastMessageAt: row.lastIncomingAt,
           lastIncomingAt: row.lastIncomingAt,

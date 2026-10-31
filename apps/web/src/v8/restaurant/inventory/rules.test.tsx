@@ -215,3 +215,17 @@ it('保存確認中に閲覧のみになったら保存を実行しない', asyn
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+it('担当通知はオンを保ち、お客さまには届かないことを確かめられる',async()=>{
+ render(<RulesBoard {...props}/>);await screen.findByRole('spinbutton')
+ expect(screen.getByRole('switch',{name:'担当にLINEで知らせる'}).getAttribute('aria-checked')).toBe('true')
+ expect(await screen.findByText(/お客さまには届きません/)).toBeTruthy()
+ expect(api.saveInventoryRules).not.toHaveBeenCalled()
+})
+
+it('閲覧のみでも担当通知の届け先の説明を出す',async()=>{
+ role.value=verifiedStaffRole('viewer')
+ render(<RulesBoard {...props} canEdit={false}/>);await screen.findByText('2席')
+ expect(screen.getByText('お客さまには届きません。')).toBeTruthy()
+ expect(api.saveInventoryRules).not.toHaveBeenCalled()
+})
