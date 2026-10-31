@@ -56,3 +56,16 @@
 }
 
 .booking[data-compact] { padding-inline: 0; }
+
+.unassigned { display: flex; flex: 1; flex-wrap: wrap; min-width: 0; align-items: center; gap: var(--polish-space-row); padding: var(--polish-space-row); }
+.unassigned > :global(button) { max-width: 100%; min-width: 0; }
+
+.resourceGroup { display: block; font-size: var(--text-micro); color: var(--color-ink-secondary); overflow: hidden; text-overflow: ellipsis; }
+
+.board[data-kind='seats'] .timeHead { position: relative; }
+.timeEnd { position: absolute; inset-inline-end: 0; transform: translateX(50%); text-align: center; }
+
+/* 端の目盛りの半幅を確保し、格子と現在時刻の線は同じ範囲に揃える。 */
+.board[data-kind='seats'] .timeline { padding-inline-end: var(--space-24); }
+.board[data-kind='seats'] .timeHead > span { min-width: 0; }
+.board[data-kind='seats'] .nowTrack { inset-inline-end: var(--space-24); }

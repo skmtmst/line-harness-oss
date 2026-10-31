@@ -28,11 +28,15 @@ type CopyRecentBroadcastContext = {
   duplicateCopy: (broadcast: ApiBroadcast) => { title: string; bubbles: { id: string; type: BroadcastBubbleType; content: Record<string, unknown>; }[]; }
   setBubbles: Dispatch<SetStateAction<BroadcastBubble[]>>
   setDeliveryMethod: Dispatch<SetStateAction<"new" | "template" | "duplicate">>
+  setLimitToQuota?: Dispatch<SetStateAction<boolean>>
+  setRecipientLimitInput?: Dispatch<SetStateAction<string>>
   setTitle: Dispatch<SetStateAction<string>>
 }
 
-export function copyRecentBroadcast({ duplicateCopy, setBubbles, setDeliveryMethod, setTitle }: CopyRecentBroadcastContext, broadcast: ApiBroadcast) {
+export function copyRecentBroadcast({ duplicateCopy, setBubbles, setDeliveryMethod, setTitle, setLimitToQuota, setRecipientLimitInput }: CopyRecentBroadcastContext, broadcast: ApiBroadcast) {
     const copy = duplicateCopy(broadcast)
+    setLimitToQuota?.(broadcast.messageOptions?.deliveryLimit?.upToRemainingQuota ?? false)
+    setRecipientLimitInput?.(broadcast.messageOptions?.deliveryLimit?.maxRecipients === undefined ? '' : String(broadcast.messageOptions.deliveryLimit.maxRecipients))
     setTitle(copy.title)
     setBubbles(copy.bubbles)
     setDeliveryMethod('duplicate')

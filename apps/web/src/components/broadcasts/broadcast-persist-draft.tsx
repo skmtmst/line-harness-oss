@@ -1,6 +1,5 @@
 'use client'
 
-import type { BroadcastMessageKind } from '@/lib/broadcast-template'
 
 
 import type { SaveConflictState } from '@/components/shared/save-conflict'
@@ -8,15 +7,14 @@ import type { SaveConflictState } from '@/components/shared/save-conflict'
 
 import { type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import { useSaveFormErrors } from '@/components/shared/save-form-errors'
-import { ApiError,api,type ApiBroadcast,type BroadcastBubble,type BroadcastMessageButton } from '@/lib/api'
+import { ApiError,api,type ApiBroadcast } from '@/lib/api'
 import { newBroadcastDraftSession,persistBroadcastDraft,type BroadcastDraftSession } from '@/lib/broadcast-draft'
-import type { SegmentCondition } from '@/lib/segment-condition'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
 type PersistBroadcastFormDraftContext = {
   createKeyByAccount: RefObject<Map<string | null, string>>
   currentStep: BroadcastStepKey | null
-  draftPayload: (scheduledAt: string | null, saveAsDraft?: boolean, confirmedCount?: number) => { saveAsDraft?: boolean | undefined; draftStep?: BroadcastStepKey | undefined; trackLinks: boolean; folderId: string | null; measureOpens: boolean; stealthSpreadMinutes: number; internalMemo: string | null; messageOptions: { buttons: BroadcastMessageButton[]; } | null; afterActionVersionId: string | null; confirmedRecipientCount?: number | undefined; lineAccountId: string | null; scheduledAt: string | null; targetType: "tag"; targetTagId: string; segmentConditions: undefined; title: string; messageType: BroadcastMessageKind; messageContent: string; messageBubbles: BroadcastBubble[] | undefined; } | { saveAsDraft?: boolean | undefined; draftStep?: BroadcastStepKey | undefined; trackLinks: boolean; folderId: string | null; measureOpens: boolean; stealthSpreadMinutes: number; internalMemo: string | null; messageOptions: { buttons: BroadcastMessageButton[]; } | null; afterActionVersionId: string | null; confirmedRecipientCount?: number | undefined; lineAccountId: string | null; scheduledAt: string | null; targetType: "segment"; targetTagId: null; segmentConditions: SegmentCondition; title: string; messageType: BroadcastMessageKind; messageContent: string; messageBubbles: BroadcastBubble[] | undefined; }
+  draftPayload: (scheduledAt: string | null, saveAsDraft?: boolean, confirmedCount?: number) => ReturnType<typeof import('./broadcast-draft-actions').buildBroadcastDraft>
   draftSession: RefObject<BroadcastDraftSession>
   draftSessionsByAccount: RefObject<Map<string | null, BroadcastDraftSession>>
   editingDraft: ApiBroadcast | null

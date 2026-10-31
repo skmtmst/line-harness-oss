@@ -1,6 +1,8 @@
 'use client'
 
 import { type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
+import Button from '@/components/shared/button'
+import TextLink from '@/components/shared/text-link'
 import Checkbox from '@/components/shared/checkbox'
 import DateField from '@/components/shared/date-field'
 import { TimeField } from '@/components/shared/date-time-field'
@@ -19,13 +21,19 @@ import styles from './broadcast-form-v8.module.css'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 type BroadcastScheduleStepContext = {
+  limitToQuota: boolean
+  setLimitToQuota: Dispatch<SetStateAction<boolean>>
+  recipientLimitInput: string
+  setRecipientLimitInput: Dispatch<SetStateAction<string>>
+  selectedAccountId: string | null
+  onRetryQuota: () => void
   ab: ReturnType<typeof useBroadcastAb>
   approvalConfig: { threshold: number; singleOperator: boolean; } | null
   audienceCount: number | null
   concurrentBroadcasts: { id: string; title: string; scheduledAt: string; }[]
   goToStep: (step: BroadcastStepKey) => void | undefined
   measureOpens: boolean
-  quota: { monthlyUsed: number | null; monthlyLimit: number | null; remaining: number | null; planned: number; state: "available" | "insufficient" | "unavailable"; reason: string | null; } | null
+  quota: { unlimited?: boolean; monthlyUsed: number | null; monthlyLimit: number | null; remaining: number | null; planned: number; state: "available" | "insufficient" | "unavailable"; reason: string | null; } | null
   quotaInsufficient: boolean
   scheduledAtIso: () => string | null
   scheduledDate: string
@@ -44,7 +52,7 @@ type BroadcastScheduleStepContext = {
   targetMode: TargetMode
 }
 
-export function BroadcastScheduleStep({ ab, approvalConfig, audienceCount, concurrentBroadcasts, goToStep, measureOpens, quota, quotaInsufficient, scheduledAtIso, scheduledDate, scheduledTime, sendMode, sendChoice, setSendChoice, spreadStartMode, setSpreadStartMode, setMeasureOpens, setScheduledDate, setScheduledTime, setSpreadMinutes, shows, spreadMinutes, targetMode }: BroadcastScheduleStepContext) {
+export function BroadcastScheduleStep({ limitToQuota, setLimitToQuota, recipientLimitInput, setRecipientLimitInput, selectedAccountId, onRetryQuota, ab, approvalConfig, audienceCount, concurrentBroadcasts, goToStep, measureOpens, quota, quotaInsufficient, scheduledAtIso, scheduledDate, scheduledTime, sendMode, sendChoice, setSendChoice, spreadStartMode, setSpreadStartMode, setMeasureOpens, setScheduledDate, setScheduledTime, setSpreadMinutes, shows, spreadMinutes, targetMode }: BroadcastScheduleStepContext) {
   return (<section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
           <h3>配信日</h3>
           <SaveErrorField names={["broadcast-send-mode","sendMode","spreadMinutes"]}><RadioCardGroup legend="配信日" className={styles.methodCards}>
@@ -119,11 +127,20 @@ export function BroadcastScheduleStep({ ab, approvalConfig, audienceCount, concu
       </p>
           </div>}
           <div className={styles.quota}>
-            <div className={styles.quotaHead}><strong>送信枠</strong><HelpTip label="送信枠の説明">LINE公式アカウントの月間送信枠です。テスト送信も枠を使用します</HelpTip><span>今月 残り {quota?.remaining == null ? '—' : formatNumber(quota.remaining)}通</span></div>
+            <div className={styles.quotaHead}><strong>送信枠</strong><HelpTip label="送信枠の説明">LINE公式アカウントの月間送信枠です。テスト送信も枠を使用します</HelpTip><span>今月 残り {quota?.unlimited ? '上限未設定' : `${quota?.remaining == null ? '—' : formatNumber(quota.remaining)}通`}</span></div>
             <div className={styles.quotaTrack}><div style={{ width: quota?.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div>
             <p>{quota?.monthlyUsed == null || quota.monthlyLimit == null ? '送信枠は配信前チェックで確認します' : `使った ${formatNumber(quota.monthlyUsed)} + 今回 ${formatNumber(quota.planned)} / 上限 ${formatNumber(quota.monthlyLimit)}通`}</p>
+            {quota?.state === 'unavailable' && <Notice tone="warn">{quota.reason ?? 'LINEから送信枠を確認できませんでした。'}{' '}<TextLink inline href={selectedAccountId ? `/accounts/detail?id=${encodeURIComponent(selectedAccountId)}` : '/accounts'}>LINEの接続設定を見る</TextLink>{' '}<Button variant="text" onClick={onRetryQuota}>もう一度確認する</Button></Notice>}
             {quotaInsufficient && <p className="text-danger">送信枠が不足しています。配信する人数を減らしてください</p>}
           </div>
+          <SaveErrorField names={["deliveryLimit","messageOptions"]}>
+            <section className="mt-4 space-y-3">
+              <h4 className="text-sm font-semibold text-ink">送る人数の上限</h4>
+              <Checkbox checked={limitToQuota} onCheckedChange={setLimitToQuota}>残りの送信枠まで送る（無作為）</Checkbox>
+              <div><label htmlFor="bc-recipient-limit" className="mb-1 block text-sm text-ink-secondary">上限人数（任意）</label><SharedTextField id="bc-recipient-limit" type="number" min={1} step={1} value={recipientLimitInput} onChange={event=>setRecipientLimitInput(event.target.value)} placeholder="指定しなければ全員" /></div>
+              {(limitToQuota || recipientLimitInput.trim()) && <Notice tone="info">条件に合い、配信を受け取れる人から無作為に選びます。予約後に枠が増えても、最後に確認した人数を超えて送りません。途中で止まっても選び直しません。</Notice>}
+            </section>
+          </SaveErrorField>
           <SaveErrorField names={["measureOpens","measure_opens"]}><Checkbox checked={measureOpens} onCheckedChange={setMeasureOpens}>開封数の集計を取る</Checkbox></SaveErrorField>
           {sendMode === 'scheduled' && (
             <section className="mt-4 rounded-control border border-hairline p-4">

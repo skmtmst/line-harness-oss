@@ -83,8 +83,9 @@ export function broadcastPreflightSummary({ preflight, targetMode, tags, tagId, 
    */
   const quotaNote = quota === null
     ? null
+    : quota.unlimited ? '送信枠の上限は設定されていません'
     : quota.state === 'unavailable'
-      ? '確認できませんでした'
+      ? quota.reason ?? '確認できませんでした'
       : quota.state === 'insufficient'
         ? `不足しています（残り ${formatNumber(quota.remaining)} / ${formatNumber(quota.monthlyLimit)}通）`
         : `残り ${formatNumber(quota.remaining)} / ${formatNumber(quota.monthlyLimit)}通（この配信で ${formatNumber(quota.planned)}通を使用）`

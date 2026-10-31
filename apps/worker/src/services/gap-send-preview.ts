@@ -1,3 +1,4 @@
+import { limitedDeliveryPlan } from '../features/broadcasts/broadcast-delivery-limit/index.js';
 import { DELIVERY_CONSENT_ALLOWED_SQL } from '@line-crm/db/src/friend-delivery-consents.js';
 import { buildSegmentWhere, type Broadcast, type SegmentCondition } from '@line-crm/db';
 
@@ -25,10 +26,12 @@ export async function broadcastSendPreview(db: D1Database, broadcast: Broadcast)
     : broadcast.target_type==='segment' ? JSON.parse(broadcast.segment_conditions!) : undefined;
   if (broadcast.target_type==='segment' && !condition?.rules) throw new Error('invalid_preview_conditions');
   const counts=await sendAudienceCounts(db,broadcast.line_account_id,condition);
-  return {...counts,purpose:'marketing' as const,scheduledAt:broadcast.scheduled_at??null,quietHoursShiftTo:await broadcastQuietHoursShift(db,broadcast.line_account_id,broadcast.scheduled_at??new Date().toISOString()),
-    needsApproval:counts.recipients>=await getBroadcastApprovalThreshold(db,broadcast),
+  const limited=await limitedDeliveryPlan(db,broadcast,{requireConfirmation:false});
+  const recipients=limited?.recipientCount??counts.recipients;
+  return {...counts,recipients,...(limited?{deliveryLimit:{candidateCount:limited.candidateCount,recipientCount:recipients,random:true}}:{}),purpose:'marketing' as const,scheduledAt:broadcast.scheduled_at??null,quietHoursShiftTo:await broadcastQuietHoursShift(db,broadcast.line_account_id,broadcast.scheduled_at??new Date().toISOString()),
+    needsApproval:(limited?.candidateCount??counts.recipients)>=await getBroadcastApprovalThreshold(db,broadcast),
     firstText:broadcast.message_content.slice(0,200),sender:null,expectedVersion:broadcast.lock_version??1,
-    stoppable:broadcast.target_type!=='all'};
+    stoppable:!!limited||broadcast.target_type!=='all'};
 }
 
 /** 最初の版の一斉配信は宣伝。21〜8時は店舗の次の8時へ送る。 */

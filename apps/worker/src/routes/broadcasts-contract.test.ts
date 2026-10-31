@@ -179,7 +179,7 @@ describe('broadcast data contracts', () => {
     expect(body.data.audience.representatives).toHaveLength(1);
     expect(body.data.exclusions).toMatchObject({ blocked: 1, hidden: 1, total: 2, paused: 0 });
     expect(body.data.quota).toEqual({
-      monthlyUsed: 1213, monthlyLimit: 5000, remaining: 3787, planned: 1, state: 'available', reason: null,
+      monthlyUsed: 1213, monthlyLimit: 5000, remaining: 3787, planned: 1, state: 'available', reason: null, unlimited: false, failures: [],
     });
     expect(body.data.concurrentBroadcasts).toHaveLength(1);
     expect(body.data.conditionAxes.standard).toHaveLength(15);

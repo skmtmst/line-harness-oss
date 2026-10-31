@@ -1,3 +1,5 @@
+import { releaseQuotaSlot } from '../features/broadcasts/broadcast-quota-guard/index.js';
+import { storedDeliveryLimit, deliveryLimitFromOptions, limitedDeliveryPlan, optionsWithDeliveryConfirmation } from '../features/broadcasts/broadcast-delivery-limit/index.js';
 import { logger } from '@line-crm/shared/server';
 import { simulationContext } from '../features/broadcasts/broadcast-simulation/index.js';
 import { sensitiveStepUpSatisfied, stepUpRequiredResponse } from '../lib/step-up.js';
@@ -222,22 +224,25 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
           ? segmentConditions
           : (existingRaw.segment_conditions as string | null | undefined) ?? null,
         line_account_id: resultingAccountId,
+        message_options_json: body.messageOptions === undefined ? existing.message_options_json : body.messageOptions === null ? null : JSON.stringify(body.messageOptions),
         account_ids: resultingTargetType === 'multi-account-dedup'
           ? JSON.stringify(body.accountIds ?? [])
           : (existingRaw.account_ids as string | null | undefined) ?? null,
       } as typeof existing;
       const gate = await approval.evaluateApprovalGate(c.env.DB, mergedForGate);
+      const limitedGate = await limitedDeliveryPlan(c.env.DB, mergedForGate, {requireConfirmation:false});
+      const expectedRecipients = limitedGate?.recipientCount ?? gate.recipientCount;
       if (gate.required && gate.singleOperator) {
         const confirmed = typeof body.confirmedRecipientCount === 'string'
           && body.confirmedRecipientCount.trim() !== ''
           ? Number(body.confirmedRecipientCount)
           : body.confirmedRecipientCount;
         if (typeof confirmed !== 'number' || !Number.isInteger(confirmed)
-          || confirmed !== gate.recipientCount) {
+          || confirmed !== expectedRecipients) {
           return c.json(
             {
               success: false,
-              error: `送る相手は${gate.recipientCount.toLocaleString('ja-JP')}人です。人数を入れて一致させてください。`,
+              error: `送る相手は${expectedRecipients.toLocaleString('ja-JP')}人です。人数を入れて一致させてください。`,
               code: 'COUNT_MISMATCH',
               recipientCount: gate.recipientCount,
               threshold: gate.threshold,
@@ -250,6 +255,32 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     } catch (gateError) {
       logger.error("broadcasts.broadcasts_id_put_failed");
       return c.json({ success: false, error: '承認の確認ができませんでした。しばらくしてからもう一度お試しください。' }, 503);
+    }
+  }
+
+  const resultingOptions = body.messageOptions === undefined
+    ? JSON.parse(existing.message_options_json ?? '{}') as Record<string, unknown>
+    : body.messageOptions as Record<string, unknown> | null;
+  const limited = deliveryLimitFromOptions(resultingOptions);
+  let limitedMessageOptions: string | undefined;
+  if (!limited && storedDeliveryLimit(existing) && existing.status === 'scheduled' && statusUpdate !== 'draft') {
+    return inputError(c,{success:false,error:'上限を解除する場合は、下書きに戻して送る人数を確かめ直してください。'},409,['deliveryLimit']);
+  }
+  if (limited) {
+    if (!resultingAccountId || resultingTargetType === 'multi-account-dedup') return inputError(c,{success:false,error:'人数に上限を付ける配信は、1つのLINEアカウントで作ってください。'},400,['messageOptions']);
+    const publicOptions = { ...resultingOptions }; delete publicOptions.deliveryLimitConfirmation;
+    limitedMessageOptions = JSON.stringify(publicOptions);
+    if (statusUpdate === 'scheduled' || (existing.status === 'scheduled' && statusUpdate !== 'draft')) {
+      try {
+        const definition = { ...existing, target_type: resultingTargetType,
+          target_tag_id: body.targetTagId === undefined ? existing.target_tag_id : body.targetTagId,
+          line_account_id: resultingAccountId,
+          segment_conditions: segmentConditions === undefined ? existing.segment_conditions : segmentConditions,
+          message_options_json: limitedMessageOptions };
+        const plan = await limitedDeliveryPlan(c.env.DB, definition, {requireConfirmation:false});
+        if (body.confirmedRecipientCount !== plan!.recipientCount) return inputError(c,{success:false,error:'上限人数と送る相手をもう一度確かめてください。'},409,['deliveryLimit']);
+        limitedMessageOptions = optionsWithDeliveryConfirmation(definition, plan!.recipientCount, body.expectedVersion + 1);
+      } catch(error) { return inputError(c,{success:false,error:error instanceof Error?error.message:'送る人数を確認できませんでした。'},409,['deliveryLimit']); }
     }
   }
 
@@ -280,6 +311,7 @@ export const put__api_broadcasts_id_1 = async (c: Context<Env, "/api/broadcasts/
     ...(body.afterActionVersionId !== undefined
       ? { after_action_version_id: body.afterActionVersionId }
       : {}),
+    ...(limitedMessageOptions === undefined ? {} : {message_options_json:limitedMessageOptions}),
     // 解決失敗の再予約、またはsnapshotの意味を実際に変える編集だけを新しい試行にする。
     // 画面は未変更項目もPUTへ含めるため、presenceだけで判定するとprovider再試行で
     // 固定snapshotを誤って捨ててしまう。
@@ -347,6 +379,7 @@ export const post__api_broadcasts_id_cancel_2 = async (c: Context<Env, "/api/bro
   if (!updated) {
       throw new Error('broadcast_missing_after_cancellation');
   }
+  if (existing.line_account_id && storedDeliveryLimit(existing)) await releaseQuotaSlot(c.env.DB,existing.line_account_id,id);
   await recordLifecycle(c.env.DB, id, c.get('staff')?.id, 'cancelled');
   return c.json({ success: true, data: serializeBroadcast(updated) });
 };

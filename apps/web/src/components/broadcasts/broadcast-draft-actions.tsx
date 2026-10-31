@@ -1,5 +1,7 @@
 'use client'
 
+import type { BroadcastDeliveryLimit } from '@line-crm/shared'
+
 import { broadcastSpreadMinutes, type BroadcastSendChoice, type BroadcastSpreadStart } from './broadcast-schedule'
 import type { BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 
@@ -18,6 +20,7 @@ type BuildBroadcastDraftContext = {
   folderId: string
   internalMemo: string
   measureOpens: boolean
+  deliveryLimit?: BroadcastDeliveryLimit
   messageButtons: BroadcastMessageButton[]
   selectedAccountId: string | null
   sendChoice?: BroadcastSendChoice
@@ -30,7 +33,7 @@ type BuildBroadcastDraftContext = {
   trackLinks: boolean
 }
 
-export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, selectedAccountId, sendChoice, spreadStartMode, spreadMinutes, scheduledDate, scheduledTime, targetPayload, title, trackLinks }: BuildBroadcastDraftContext, scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) {
+export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, deliveryLimit, selectedAccountId, sendChoice, spreadStartMode, spreadMinutes, scheduledDate, scheduledTime, targetPayload, title, trackLinks }: BuildBroadcastDraftContext, scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) {
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     return {
@@ -51,7 +54,7 @@ export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep
       ...(sendChoice === 'spread' ? { draftSpreadMinutes: spreadMinutes } : {}),
       ...(sendChoice === 'spread' && spreadStartMode ? { draftSpreadStart: spreadStartMode } : {}),
       internalMemo: internalMemo.trim() || null,
-      messageOptions: messageButtons.length > 0 ? { buttons: messageButtons } : null,
+      messageOptions: messageButtons.length || deliveryLimit ? { ...(messageButtons.length ? {buttons:messageButtons} : {}), ...(deliveryLimit ? {deliveryLimit} : {}) } : null,
       afterActionVersionId: afterActionVersionId || null,
       ...(saveAsDraft ? {
         saveAsDraft: true,

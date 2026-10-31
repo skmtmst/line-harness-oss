@@ -1,3 +1,4 @@
+import { deliveryLimitFromOptions } from './broadcast-delivery-limit.js';
 import { audience, permitted } from './simulation-preview.js';
 export { simulationContext, simulationPreview } from './simulation-preview.js';
 import { simulationContext, simulationPreview } from './simulation-preview.js';
@@ -18,6 +19,7 @@ export function simulationDraftInput(b:Record<string,unknown>){
  return {title:b.title.trim(),text:b.text,purpose:b.purpose as BroadcastPurpose,targetTagId:typeof b.targetTagId==='string'?b.targetTagId:null};
 }
 export async function saveSimulationDraft(db:D1Database,a:string,actor:string,key:string,b:Record<string,unknown>,id?:string){
+ if(deliveryLimitFromOptions(b.messageOptions))throw new GapError('人数の上限とシミュレーションは併用できません。',409);
  const content=simulationDraftInput(b),request=JSON.stringify(content),fingerprint=await sha256Hex(request);
  if(content.targetTagId&&!await db.prepare('SELECT id FROM tags WHERE id=? AND line_account_id=? AND archived_at IS NULL').bind(content.targetTagId,a).first())throw new GapError('invalid_tag');
  if(!id){

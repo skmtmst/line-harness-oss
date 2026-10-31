@@ -117,7 +117,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     : []), [data.reservations, stopping, now])
 
   const openNew = () => {
-    setDraft({ code: '', label: '', seatType: 'table', minCapacity: '1', maxCapacity: '2', floorX: String(40+(rows.length % 5)*120), floorY: String(40+Math.floor(rows.length / 5)*100), joinGroup: '',floorId:floors[0]?.id??'floor-'+store?.id })
+    setDraft({ code: '', label: '', seatType: 'table', minCapacity: '1', maxCapacity: '2', floorX: '', floorY: '', joinGroup: '',floorId:floors[0]?.id??'floor-'+store?.id })
     setFieldErrors({})
     setShowPlacement(false)
     setEditor('new')
@@ -142,8 +142,10 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
     if (!Number.isInteger(min) || min < 1) errors.minCapacity = '最小人数は1以上の整数にしてください。'
     if (!Number.isInteger(max) || max < min || max < 1) errors.maxCapacity = '最大人数は最小人数以上の整数にしてください。'
     for (const key of ['floorX', 'floorY'] as const) {
+      if (!draft[key].trim()) { if (editing) errors[key] = '位置を入れてください。'; continue }
       if (!Number.isInteger(Number(draft[key])) || Number(draft[key]) < 0 || Number(draft[key]) > 10000) errors[key] = '配置は0〜10000の整数にしてください。'
     }
+    if (!editing && Boolean(draft.floorX.trim()) !== Boolean(draft.floorY.trim())) errors[draft.floorX.trim() ? 'floorY' : 'floorX'] = '横と縦の位置を一緒に指定してください。'
     setFieldErrors(errors)
     if (Object.keys(errors).length) {
       if (errors.floorX || errors.floorY) setShowPlacement(true)
@@ -158,8 +160,8 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       seatType: draft.seatType,
       minCapacity: Number(draft.minCapacity),
       maxCapacity: Number(draft.maxCapacity),
-      floorX: editing||showPlacement?Number(draft.floorX):undefined,
-      floorY: editing||showPlacement?Number(draft.floorY):undefined,
+      floorX: draft.floorX.trim()?Number(draft.floorX):undefined,
+      floorY: draft.floorY.trim()?Number(draft.floorY):undefined,
       joinGroup: draft.joinGroup.trim() || null,
     }
     const ok = editing
@@ -228,12 +230,13 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
       <div className={styles.pair}>
         <Field label="階・エリア"><SaveErrorField names={["floorId","draft.floorId","floor_id","draft.floor_id"]}><EntitySelect size="full" aria-label="階・エリア" noun="階・エリア" value={draft.floorId} onChange={v=>setDraft({...draft,floorId:v})} options={floors.map(f=>({value:f.id,label:f.name}))}/></SaveErrorField></Field>
         <Field label="横の位置" htmlFor="rs-table-x" error={fieldErrors.floorX}>
-          <SaveErrorField names={["floorX","draft.floorX","floor_x","draft.floor_x"]}><NumberInput id="rs-table-x" type="number" min={0} max={10000} value={draft.floorX} onChange={(event) => setDraft({ ...draft, floorX: event.target.value })} /></SaveErrorField>
+          <SaveErrorField names={["floorX","draft.floorX","floor_x","draft.floor_x"]}><NumberInput placeholder={editing?undefined:"自動配置"} id="rs-table-x" type="number" min={0} max={10000} value={draft.floorX} onChange={(event) => setDraft({ ...draft, floorX: event.target.value })} /></SaveErrorField>
         </Field>
         <Field label="縦の位置" htmlFor="rs-table-y" error={fieldErrors.floorY}>
-          <SaveErrorField names={["floorY","draft.floorY","floor_y","draft.floor_y"]}><NumberInput id="rs-table-y" type="number" min={0} max={10000} value={draft.floorY} onChange={(event) => setDraft({ ...draft, floorY: event.target.value })} /></SaveErrorField>
+          <SaveErrorField names={["floorY","draft.floorY","floor_y","draft.floor_y"]}><NumberInput placeholder={editing?undefined:"自動配置"} id="rs-table-y" type="number" min={0} max={10000} value={draft.floorY} onChange={(event) => setDraft({ ...draft, floorY: event.target.value })} /></SaveErrorField>
         </Field>
       </div>
+      {!editing?<DialogNote>位置を空欄にすると、重ならない空き位置へ自動で配置します。追加後は座席図上で移動できます。</DialogNote>:null}
       <DialogField label="結合グループ" htmlFor="rs-table-group">
         <SaveErrorField names={["joinGroup","draft.joinGroup","join_group","draft.join_group"]}><TextField id="rs-table-group" maxLength={100} value={draft.joinGroup} onChange={(event) => setDraft({ ...draft, joinGroup: event.target.value })} /></SaveErrorField>
       </DialogField>
@@ -264,7 +267,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
           </ul>
         </DetailPreview>} asideLayout="detail">
         <div className={styles.floorPanel}>
-          {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} resources={rows.map(t=>({id:t.id,label:t.code,capacity:t.max_capacity,active:!!t.is_active}))} canEdit={canEdit} onSelect={setSelectedId}/>:null}
+          {store&&selectedAccountId?<RestaurantFloorEditor accountId={selectedAccountId} storeId={store.id} refreshKey={JSON.stringify(rows.map(t=>[t.id,t.floor_id,t.floor_version]))} resources={rows.map(t=>({id:t.id,label:t.code,capacity:t.max_capacity,active:!!t.is_active}))} canEdit={canEdit} onSelect={setSelectedId}/>:null}
         </div>
       </DetailColumns>
       <div className={styles.rules}>

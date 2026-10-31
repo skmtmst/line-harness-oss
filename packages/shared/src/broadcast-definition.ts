@@ -23,7 +23,23 @@ export interface SegmentCondition {
 export type BroadcastBubbleType = 'text' | 'sticker' | 'image' | 'flex' | 'location' | 'audio' | 'carousel' | 'rich_message' | 'rich_video' | 'video' | 'card_message' | 'coupon' | 'research';
 export type BroadcastBubble = { id: string; type: BroadcastBubbleType; content: Record<string, unknown> };
 export type BroadcastMessageButton = { label: string; type: 'url' | 'pdf'; value: string };
-export type BroadcastMessageOptions = { buttons?: BroadcastMessageButton[] };
+export type BroadcastDeliveryLimit = { upToRemainingQuota: boolean; maxRecipients?: number };
+export type BroadcastMessageOptions = { buttons?: BroadcastMessageButton[]; deliveryLimit?: BroadcastDeliveryLimit };
+
+/** 未指定は全員へ送る既存の設定。壊れた上限を全員へ戻さない。 */
+export function parseBroadcastDeliveryLimit(value: unknown): BroadcastDeliveryLimit | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('送る人数の上限を確認してください。');
+  const limit = value as Record<string, unknown>;
+  if (typeof limit.upToRemainingQuota !== 'boolean'
+    || Object.keys(limit).some(key => !['upToRemainingQuota', 'maxRecipients'].includes(key))
+    || (limit.maxRecipients !== undefined && (!Number.isSafeInteger(limit.maxRecipients) || Number(limit.maxRecipients) < 1))
+    || (!limit.upToRemainingQuota && limit.maxRecipients === undefined)) {
+    throw new Error('上限人数は1以上の整数を入れるか、残りの枠まで送る設定を選んでください。');
+  }
+  return { upToRemainingQuota: limit.upToRemainingQuota,
+    ...(limit.maxRecipients === undefined ? {} : { maxRecipients: limit.maxRecipients as number }) };
+}
 export type BroadcastDefinitionInput = Pick<Broadcast,'title' | 'messageContent'> & {
   messageType: LineMessageType; messageBubbles?: BroadcastBubble[];
   messageBubblesJson?: string | null; altText?: string | null;
