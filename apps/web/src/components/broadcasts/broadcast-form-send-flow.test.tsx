@@ -37,10 +37,11 @@ async function acknowledge(scope: Element) {
   if (!checkbox) throw new Error('確認しましたの欄がありません')
   await act(async () => { fireEvent.click(checkbox) }); await flush()
 }
-async function render(step: 'confirm' | 'audience' = 'confirm', scheduled = false) {
+async function render(step: 'confirm' | 'audience' | 'schedule' = 'confirm', scheduled = false, chosen = true) {
   container = document.createElement('div'); document.body.append(container); root = createRoot(container)
   await act(async () => { root.render(<BroadcastForm visualQaAugustCampaign initialScheduledDate={scheduled ? '2099-10-05' : undefined} initialScheduledTime={scheduled ? '10:00' : undefined} currentStep={step} tags={[{ id: 'exclude', name: '配信不要' } as never]} initialCondition={{ operator: 'OR', rules: [{ type: 'tag_exists', value: 'vip' }, { type: 'tag_exists', value: 'member' }] }} onSuccess={mocks.success} onCancel={() => {}} />) })
   await flush()
+  if (!scheduled && chosen) await act(async () => { fireEvent.click(container.querySelector('input[name=broadcast-send-mode][value=now]')!) })
   await act(async () => { await vi.advanceTimersByTimeAsync(650) }); await flush()
 }
 async function confirm() { await click('今すぐ送る', container); await act(async () => { await vi.advanceTimersByTimeAsync(200) }); await flush(); return document.querySelector('[role="dialog"]')! }
@@ -60,6 +61,14 @@ beforeEach(() => {
 afterEach(() => { if (root) act(() => root.unmount()); container?.remove(); vi.useRealTimers() })
 
 describe('V8の5手順で送信を確定する', () => {
+  it('最終確認へ直接来ても未選択のままなら理由1行で止まり保存・送信しない', async () => {
+    await render('confirm', false, false)
+    expect(button('送信設定を確認する', container).disabled).toBe(true)
+    expect(container.querySelector('#broadcast-footer-reason')?.textContent).toBe('送る時間を選んでください')
+    await click('送信設定を確認する', container)
+    expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.update).not.toHaveBeenCalled()
+    expect(mocks.confirm).not.toHaveBeenCalled(); expect(mocks.send).not.toHaveBeenCalled()
+  })
   it('最終確認の窓を開くと下書きを保存して数え直し、確定は見た人数・版を添えて1回だけ送る', async () => {
     await render(); const dialog = await confirm(); await flush()
     expect(mocks.create).toHaveBeenCalledTimes(1); expect(mocks.preview).toHaveBeenCalledWith('draft'); expect(mocks.confirm).not.toHaveBeenCalled()
@@ -141,4 +150,40 @@ describe('V8の5手順で送信を確定する', () => {
     await click('下書きを保存する', container)
     expect(mocks.create.mock.calls[0][0].segmentConditions).toEqual(counted)
   })
+  it('上限の選択と人数は再確認と下書きへ渡り、既定の全員へ勝手に戻らない', async () => {
+    mocks.preflight.mockImplementation(async (input) => ({ success: true, data: { audienceCount: input.deliveryLimit ? 2 : 10, ...(input.deliveryLimit ? { deliveryLimit: {candidateCount:10,recipientCount:2,random:true} } : {}) } }))
+    await render('schedule')
+    const input = container.querySelector<HTMLInputElement>('#bc-recipient-limit')!
+    expect(input.value).toBe('')
+    await act(async () => { fireEvent.change(input, {target:{value:'2'}}) }); await flush()
+    await act(async () => { await vi.advanceTimersByTimeAsync(650) }); await flush()
+    expect(mocks.preflight.mock.calls.at(-1)![0].deliveryLimit).toEqual({upToRemainingQuota:false,maxRecipients:2})
+    await click('下書きを保存する',container)
+    expect(mocks.create.mock.calls.at(-1)![0].messageOptions.deliveryLimit).toEqual({upToRemainingQuota:false,maxRecipients:2})
+    expect(mocks.confirm).not.toHaveBeenCalled(); expect(mocks.send).not.toHaveBeenCalled()
+  })
+  it('鍵が拒否された理由と入れ直す先を示し、再確認しても入力した上限を残す', async () => {
+    mocks.preflight.mockResolvedValue({success:true,data:{audienceCount:10,quota:{state:'unavailable',monthlyLimit:null,monthlyUsed:null,remaining:null,planned:10,reason:'LINEの接続用の鍵が受け付けられていません。LINEの設定で鍵を発行し直し、接続設定に入れ直してください。'}}})
+    await render('schedule')
+    expect(container.textContent).toContain('鍵を発行し直し')
+    expect(container.querySelector('a[href="/accounts/detail?id=acc-1"]')?.textContent).toBe('LINEの接続設定を見る')
+    await act(async () => { fireEvent.change(container.querySelector('#bc-recipient-limit')!,{target:{value:'2'}}) }); await flush()
+    await act(async () => { await vi.advanceTimersByTimeAsync(650) }); await flush()
+    await click('もう一度確認する',container)
+    expect(container.querySelector<HTMLInputElement>('#bc-recipient-limit')!.value).toBe('2')
+    expect(mocks.preflight.mock.calls.at(-1)![0].deliveryLimit).toEqual({upToRemainingQuota:false,maxRecipients:2})
+    expect(container.textContent).not.toContain('残り 0通')
+  })
+
+  it('確認窓の上限が減ったら、了承する説明も新しい人数でそろえる', async () => {
+    mocks.preflight.mockResolvedValue({success:true,data:{audienceCount:2,deliveryLimit:{candidateCount:10,recipientCount:2,random:true}}})
+    mocks.preview.mockResolvedValue({success:true,data:{recipients:1,deliveryLimit:{candidateCount:10,recipientCount:1,random:true},excluded:{blocked:0,optedOut:0,duplicate:0},purpose:'marketing',scheduledAt:null,quietHoursShiftTo:null,needsApproval:false,firstText:'本文',sender:null,expectedVersion:2,stoppable:true}})
+    await render();const dialog=await confirm();await flush()
+    expect(dialog.textContent).toContain('無作為に最大1人へ送ります')
+    expect(dialog.textContent).not.toContain('無作為に最大2人へ送ります')
+    expect(button('1 人に送る',dialog).disabled).toBe(true)
+    await acknowledge(dialog);await click('1 人に送る',dialog)
+    expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith('draft',{expectedVersion:2,confirmedRecipientCount:1})
+  })
+
 })

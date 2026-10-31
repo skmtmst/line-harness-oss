@@ -1,5 +1,5 @@
 export { getHqBroadcastRun, expandAccountName, mappedHqContent, preflightHqBroadcast } from '../features/hq-broadcasts/preflight/index.js';
-import { getHqBroadcastRun, expandAccountName, mappedHqContent, preflightHqBroadcast } from '../features/hq-broadcasts/preflight/index.js';
+import { assertHqDeliveryOptions, getHqBroadcastRun, expandAccountName, mappedHqContent, preflightHqBroadcast } from '../features/hq-broadcasts/preflight/index.js';
 import type { RunRow, Target } from '../features/hq-broadcasts/preflight/index.js';
 import { validateHqAfterActionSelection, hqAfterAction } from '../features/hq-broadcasts/hq-broadcast-after-actions/index.js';
 import { hqBroadcastBlocks } from '../features/hq-broadcasts/hq-broadcast-blocks/index.js';
@@ -28,6 +28,7 @@ export async function hqBroadcastAuthority(db:D1Database,staff:AuthenticatedStaf
   if(result.kind!=='AUTHORIZED')throw new StampError('統括全体の編集権限が必要です',403);return result.authority;
 }
 export async function prepareHqBroadcast(db:D1Database,tenantId:string,actorId:string,b:HqBroadcastInput, update?:{run:RunRow;expectedVersion:number}) {
+  assertHqDeliveryOptions(b);
   if(!b||typeof b.title!=='string'||!b.title.trim()||b.title.length>200||typeof b.messageContent!=='string'||(!b.messageContent.trim()&&!b.messageBubbles&&!b.messageBubblesJson)||b.messageContent.length>200000)throw new StampError('配信名と本文を確認してください', 400, ["title","messageContent","messageBubbles","messageBubblesJson"]);
   stampId(b.requestId);
   if(b.followupOfRunId!==undefined)stampId(b.followupOfRunId);

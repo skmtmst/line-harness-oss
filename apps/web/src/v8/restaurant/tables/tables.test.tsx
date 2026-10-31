@@ -183,6 +183,7 @@ describe('BERxg 座席・卓管理', () => {
     await pickEntity('階・エリア', '2階')
     fireEvent.click(screen.getByRole('button', { name: /^追加する$/ }))
     await waitFor(() => expect(fixture.createTable).toHaveBeenCalledWith('account-1', expect.objectContaining({ floorId: 'floor-2', expectedTargetVersion: 7 })))
+    expect(fixture.createTable.mock.calls[0][1]).toMatchObject({floorX:undefined,floorY:undefined})
   })
 
   it('空の卓番で保存すると欄に理由を出して移動し、APIへ送らない', async () => {
@@ -246,4 +247,31 @@ it('共通タブを外し、tablesの画面内操作を保つ', async () => {
   render(<TablesPage />)
   await screen.findByText('卓の詳細')
   expect(screen.queryByRole('tablist', {name:'店の中の画面'})).toBeNull()
+})
+
+it('新しい卓の位置を片方だけ指定したら入力を残して送らない',async()=>{
+ render(<TablesPage />);await screen.findByText('卓の詳細')
+ fireEvent.click(screen.getByRole('button',{name:/卓を作る/}))
+ fireEvent.change(screen.getByLabelText('卓番'),{target:{value:'T9'}})
+ fireEvent.change(screen.getByLabelText('表示名'),{target:{value:'新しい卓'}})
+ fireEvent.click(screen.getByRole('button',{name:'配置・結合グループ'}))
+ fireEvent.change(screen.getByLabelText('横の位置'),{target:{value:'200'}})
+ fireEvent.click(screen.getByRole('button',{name:/^追加する$/}))
+ expect(fixture.createTable).not.toHaveBeenCalled()
+ expect(screen.getByLabelText('縦の位置').getAttribute('aria-invalid')).toBe('true')
+ expect((screen.getByLabelText('横の位置') as HTMLInputElement).value).toBe('200')
+ expect((screen.getByLabelText('表示名') as HTMLInputElement).value).toBe('新しい卓')
+})
+
+it('配置の詳細を閉じても、自分で指定した位置を保存する',async()=>{
+ render(<TablesPage />);await screen.findByText('卓の詳細')
+ fireEvent.click(screen.getByRole('button',{name:/卓を作る/}))
+ fireEvent.change(screen.getByLabelText('卓番'),{target:{value:'T9'}})
+ fireEvent.change(screen.getByLabelText('表示名'),{target:{value:'新しい卓'}})
+ fireEvent.click(screen.getByRole('button',{name:'配置・結合グループ'}))
+ fireEvent.change(screen.getByLabelText('横の位置'),{target:{value:'200'}})
+ fireEvent.change(screen.getByLabelText('縦の位置'),{target:{value:'100'}})
+ fireEvent.click(screen.getByRole('button',{name:'配置・結合グループを閉じる'}))
+ fireEvent.click(screen.getByRole('button',{name:/^追加する$/}))
+ await waitFor(()=>expect(fixture.createTable).toHaveBeenCalledWith('account-1',expect.objectContaining({floorX:200,floorY:100})))
 })

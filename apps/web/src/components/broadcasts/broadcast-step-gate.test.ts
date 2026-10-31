@@ -84,9 +84,14 @@ describe('一斉配信の段ごとの確かめ', () => {
     expect(broadcastSaveProblem(problems)).toBe('')
   })
 
-  it('予約日時の未入力は、段ごとの画面でだけ保存を止める（今の検査のまま）', () => {
+  it('未選択・書きかけの予約日時・分数は先へ進めず、下書きには残せる', () => {
     const missing = { sendMode: 'scheduled' as const, scheduledDate: '' }
-    expect(broadcastSaveProblem(broadcastStepProblems(input({ ...missing, stepped: true })))).toBe('予約する日付と時刻を入力してください')
+    expect(broadcastSaveProblem(broadcastStepProblems(input({ ...missing, stepped: true })))).toBe('')
+    for (const timing of [{ sendMode: 'unselected' as const }, { spreadSelected: true, spreadMinutes: '' }, { spreadSelected: true, spreadMinutes: '721' }]) {
+      const problems = broadcastStepProblems(input(timing))
+      expect(broadcastNextBlockReason(problems, 'schedule')).toBeTruthy()
+      expect(broadcastSaveProblem(problems)).toBe('')
+    }
     expect(broadcastSaveProblem(broadcastStepProblems(input({ ...missing, stepped: false })))).toBe('')
   })
 
@@ -100,7 +105,6 @@ describe('一斉配信の段ごとの確かめ', () => {
       { audienceProblem: '条件を決めてください' },
       { bubbleProblem: '本文を入力してください' },
       { buttonProblem: 'ボタンの行き先を入力してください' },
-      { sendMode: 'scheduled', scheduledDate: '' },
     ]
     for (const overrides of cases) {
       const problems = broadcastStepProblems(input(overrides))

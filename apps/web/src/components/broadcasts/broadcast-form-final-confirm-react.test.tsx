@@ -85,6 +85,7 @@ async function render({ step = 'confirm', scheduled = false, filled = true, unte
     />)
   })
   await flush()
+  if (!scheduled) await act(async () => { fireEvent.click(container.querySelector('input[name=broadcast-send-mode][value=now]')!) })
   await settle()
 }
 

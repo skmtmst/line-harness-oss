@@ -17,6 +17,7 @@ function normalized(r: Row): StyleBooking {
     status: String(r.status),
     staffId: (r.staffId ?? null) as string | null,
     menuId: (r.menuId ?? null) as string | null,
+    menuName: (r.menuName ?? null) as string | null,
     storeId: (r.storeId ?? null) as string | null,
     slotId: (r.slotId ?? null) as string | null,
     partySize: Number(r.partySize ?? 1),
@@ -46,20 +47,20 @@ async function industryRows(
   let sql: string;
   if (style === 'restaurant')
     sql = `SELECT r.id,r.customer_version version,r.updated_at updatedAt,'restaurant' kind,f.id friendId,COALESCE(f.id,'phone:'||r.customer_phone,'reservation:'||r.id) personKey,
-    r.customer_name name,r.starts_at startsAt,r.ends_at endsAt,r.created_at requestedAt,r.status,r.staff_id staffId,r.course_id menuId,r.store_id storeId,r.table_id slotId,
+    r.customer_name name,r.starts_at startsAt,r.ends_at endsAt,r.created_at requestedAt,r.status,r.staff_id staffId,r.course_id menuId,m.name menuName,r.store_id storeId,r.table_id slotId,
     r.guest_count partySize,0 price,r.status IN('visited','seated') visited,r.hold_expires_at IS NOT NULL held,r.source,NULL cancelledAt,
     (SELECT response FROM rt_reservation_confirmations WHERE reservation_id=r.id ORDER BY requested_at DESC LIMIT 1) confirmedResponse
-    FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id LEFT JOIN friends f ON f.line_user_id=r.line_uid AND f.line_account_id=s.line_account_id
+    FROM rt_reservations r JOIN rt_stores s ON s.id=r.store_id LEFT JOIN rt_menu_items m ON m.id=r.course_id AND m.store_id=r.store_id LEFT JOIN friends f ON f.line_user_id=r.line_uid AND f.line_account_id=s.line_account_id
     WHERE s.line_account_id=?`;
   else if (style === 'lesson')
     sql = `SELECT b.id,b.updated_at updatedAt,'event' kind,b.friend_id friendId,b.friend_id personKey,f.display_name name,s.starts_at startsAt,s.ends_at endsAt,
-    b.requested_at requestedAt,b.status,s.instructor_id staffId,b.event_id menuId,b.slot_id slotId,b.party_size partySize,0 price,b.status='attended' visited,
+    b.requested_at requestedAt,b.status,s.instructor_id staffId,b.event_id menuId,e.name menuName,b.slot_id slotId,b.party_size partySize,0 price,b.status='attended' visited,
     0 held,b.status attendance,b.participation_mode participationMode,b.cancelled_at cancelledAt,f.ref_code refCode
     FROM event_bookings b JOIN event_slots s ON s.id=b.slot_id JOIN events e ON e.id=b.event_id
     JOIN friends f ON f.id=b.friend_id AND f.line_account_id=b.line_account_id WHERE b.line_account_id=?`;
   else
     sql = `SELECT b.id,b.lock_version version,b.updated_at updatedAt,'booking' kind,b.friend_id friendId,COALESCE(b.friend_id,'customer:'||b.booking_customer_id) personKey,
-    COALESCE(f.display_name,c.display_name,'') name,b.starts_at startsAt,b.ends_at endsAt,b.requested_at requestedAt,b.status,b.staff_id staffId,b.menu_id menuId,
+    COALESCE(f.display_name,c.display_name,'') name,b.starts_at startsAt,b.ends_at endsAt,b.requested_at requestedAt,b.status,b.staff_id staffId,b.menu_id menuId,m.name menuName,
     1 partySize,COALESCE(b.price_at_booking,0) price,
     (b.status='completed' OR EXISTS(SELECT 1 FROM booking_visit_marks v WHERE v.booking_id=b.id AND v.kind IN('visited','late'))) visited,
     (SELECT kind FROM booking_visit_marks v WHERE v.booking_id=b.id ORDER BY marked_at DESC,id DESC LIMIT 1) attendance,
