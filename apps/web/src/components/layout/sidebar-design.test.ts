@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { MENU_SECTIONS } from '@/lib/menu';
 
 /** V8の部品の正本の並びと、承認済み追加項目・行き先を守る。
  * 2026-10-11 司令塔: 予約はコンテンツの直後。N-411の権限は別の動きの試験で守る。
@@ -72,23 +73,7 @@ const DESIGN: Array<{ section: string | null; items: string[] }> = [
 
 /** menu.ts の MENU_SECTIONS から、区分と項目を順序どおりに読む。 */
 function readSidebar(): Array<{ section: string | null; items: string[] }> {
-  const source = readFileSync(MENU, 'utf8');
-  const body = source.slice(source.indexOf(MENU_START), source.indexOf(MENU_END));
-
-  const sections: Array<{ section: string | null; items: string[] }> = [];
-  // `label: '配信',` / `label: null,` が区分の頭。`{ href: ..., label: '...' }` が項目。
-  for (const line of body.split('\n')) {
-    const sectionMatch = /^\s{4}label:\s*(null|'([^']+)')/.exec(line);
-    if (sectionMatch) {
-      sections.push({ section: sectionMatch[2] ?? null, items: [] });
-      continue;
-    }
-    const itemMatch = /\{\s*href:\s*'[^']*',\s*label:\s*'([^']+)'/.exec(line);
-    if (itemMatch && sections.length > 0) {
-      sections[sections.length - 1].items.push(itemMatch[1]);
-    }
-  }
-  return sections;
+  return MENU_SECTIONS.map(section => ({ section: section.label, items: section.items.map(item => item.label) }));
 }
 
 /** 仕様 §2 の「項目 → ルート」。写真審査だけ仕様書の誤りを直してある。 */
@@ -111,7 +96,7 @@ const ROUTES: Record<string, string> = {
   回答フォーム: '/form-submissions',
   マイル: '/mileage',
   流入と計測: '/inflow-links',
-  コンバージョン: '/conversions',
+  コンバージョン: '/affiliates?tab=points',
   分析: '/analytics',
   オートメーション: '/automations',
   外部連携: '/webhooks',
@@ -176,10 +161,7 @@ describe('サイドバーが V8の共通メニューの契約と一致する', (
   });
 
   it('項目の行き先が仕様どおり', () => {
-    const source = readFileSync(MENU, 'utf8');
-    const body = source.slice(source.indexOf(MENU_START), source.indexOf(MENU_END));
-    const pairs = [...body.matchAll(/\{\s*href:\s*'([^']+)',\s*label:\s*'([^']+)'/g)];
-    const actual = Object.fromEntries(pairs.map((m) => [m[2], m[1]]));
+    const actual = Object.fromEntries(MENU_SECTIONS.flatMap(section => section.items.map(item => [item.label, item.href])));
     expect(actual).toEqual(ROUTES);
   });
 

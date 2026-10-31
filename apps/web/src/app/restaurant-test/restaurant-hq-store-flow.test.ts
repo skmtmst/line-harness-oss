@@ -1,12 +1,14 @@
 import { readFileSync } from 'node:fs'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+const navigation = vi.hoisted(() => ({ redirect: vi.fn() }))
+vi.mock('next/navigation', () => ({ redirect: navigation.redirect }))
+import RestaurantIndex from './page'
+import RestaurantStores from './stores/page'
 
 // 旧一覧の転送の部品（stores/store-list.tsx）はどこからも読まれないので 2026-10-07 に消した。転送は stores/page.tsx の redirect が担う。
 const wizard = readFileSync(new URL('../../v8/restaurant/store-new/store-new.tsx', import.meta.url), 'utf8')
 const terms = readFileSync(new URL('../../v8/restaurant/terms/terms.tsx', import.meta.url), 'utf8')
 const menu = readFileSync(new URL('../../components/hq/account-menu.tsx', import.meta.url), 'utf8')
-const index = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
-const storesPage = readFileSync(new URL('./stores/page.tsx', import.meta.url), 'utf8')
 const accountsPage = readFileSync(new URL('../accounts/page.tsx', import.meta.url), 'utf8')
 const accountsNewPage = readFileSync(new URL('../accounts/new/page.tsx', import.meta.url), 'utf8')
 const consolePage = readFileSync(new URL('../../v8/restaurant/booking-kit/shell.tsx', import.meta.url), 'utf8')
@@ -15,8 +17,12 @@ const api = readFileSync(new URL('../../lib/restaurant-test-api.ts', import.meta
 describe('飲食店向けHQと店舗追加動線', () => {
   it('店舗一覧と追加の重複入口を統括と店舗追加ウィザードへ転送する', () => {
     // D-3: 旧URLを消さず、店舗の一覧と追加の正本だけを1か所にする。
-    expect(index).toContain("redirect('/hq')")
-    expect(storesPage).toContain("redirect('/hq')")
+    navigation.redirect.mockClear()
+    RestaurantIndex()
+    expect(navigation.redirect).toHaveBeenLastCalledWith('/hq')
+    RestaurantStores()
+    expect(navigation.redirect).toHaveBeenLastCalledWith('/hq')
+    expect(navigation.redirect).toHaveBeenCalledTimes(2)
     /*
       2026-09-04: `/accounts` と `/accounts/new` の転送はどちらもやめた。
       **統括の店舗管理と、LINE公式アカウントの設定は別のもの。**
