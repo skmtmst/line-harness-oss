@@ -1,3 +1,4 @@
+import { externalBookingStripeObject } from '../features/booking/booking-stripe-webhooks/index.js';
 import { liffBookingJson } from './liff-booking-response.js';
 import {Hono} from 'hono';
 import type { Env } from '../worker-env.js';
@@ -5,7 +6,7 @@ import {GapError,gapAccount,gapBody,gapKey,gapWrite} from '../services/gap-commo
 import {requirePermission} from '../middleware/role-guard.js';
 import {resolveAccountIdFromLiff,verifyCallerLineUserId,resolveFriendId} from './booking.js';
 import {passCheckout,passBillingEvent,purchaseView,type PassBillingEvent} from '../features/booking/booking-pass-billing/index.js';
-import {readBodyWithinLimit,verifyStripeSignature} from '../services/stripe-signature.js';
+import {readBodyWithinLimit,isStripeTestEvent,verifyStripeSignature} from '../services/stripe-signature.js';
 export const bookingPassBilling=new Hono<Env>();
 bookingPassBilling.onError((e,c)=>(c.req.path.startsWith('/api/liff/') ? liffBookingJson(c, {success:false,error:e instanceof GapError?e.code:'pass_billing_unavailable'}, e instanceof GapError?e.status:503) : c.json({success:false,error:e instanceof GapError?e.code:'pass_billing_unavailable'},e instanceof GapError?e.status:503)));
 bookingPassBilling.post('/api/liff/booking/pass-plans/:id/checkout',async c=>{
@@ -23,16 +24,19 @@ bookingPassBilling.get('/api/booking/admin/pass-purchases',requirePermission('/b
 bookingPassBilling.post('/api/booking/admin/pass-purchases/simulate-event',requirePermission('/booking/bookings'),async c=>{
  gapWrite(c,{admin:true});const a=await gapAccount(c),b=await gapBody(c);
  const event=b as unknown as PassBillingEvent;
+ if(await externalBookingStripeObject(c.env.DB,event.checkoutId??event.subscriptionId??''))throw new GapError('connect_webhook_required',409);
  const row=await c.env.DB.prepare("SELECT id FROM booking_pass_purchases WHERE account_id=? AND (CASE WHEN ?='checkout.session.completed' THEN checkout_id=? ELSE subscription_id=? END)").bind(a,event.kind,event.checkoutId??null,event.subscriptionId??null).first();if(!row)throw new GapError('not_found',404);
  return c.json({success:true,data:await passBillingEvent(c.env.DB,event)});
 });
 /** 本番や Stripe の外部書込へつながない、専用の署名付き試験 Webhook。 */
 bookingPassBilling.post('/api/booking/pass-payments/webhook',async c=>{
- const raw=await readBodyWithinLimit(c.req.raw),secret=c.env.STRIPE_TEST_WEBHOOK_SECRET;if(raw===null)throw new GapError('body_too_large');
+ const raw=await readBodyWithinLimit(c.req.raw),secret=c.env.STRIPE_TEST_WEBHOOK_SECRET;if(raw===null)return c.json({success:false,error:'body_too_large'},413);
  if(!secret||!await verifyStripeSignature(secret,raw,c.req.header('stripe-signature')??''))throw new GapError('invalid_signature',401);
  let event;try{event=JSON.parse(raw);}catch{throw new GapError('invalid_body');}
- if(event.livemode!==false||event.data?.object?.livemode===true)throw new GapError('live_mode_forbidden',409);
+ if(event?.account!==undefined)throw new GapError('connect_webhook_required',409);
+ if(!isStripeTestEvent(event))throw new GapError('live_mode_forbidden',409);
  const o=event.data?.object;if(!o||typeof event.created!=='number')throw new GapError('invalid_test_event');
+ if(await externalBookingStripeObject(c.env.DB,o.id))throw new GapError('connect_webhook_required',409);
  const date=(n:unknown)=>typeof n==='number'&&Number.isFinite(n)?new Date(n*1000).toISOString():'';
  if(event.type==='checkout.session.completed'&&o.payment_status!=='paid')throw new GapError('payment_not_paid',409);
  return c.json({success:true,data:await passBillingEvent(c.env.DB,{id:event.id,kind:event.type,checkoutId:o.id,subscriptionId:o.subscription??(event.type==='customer.subscription.deleted'?o.id:undefined),invoiceId:event.type?.startsWith('invoice.')?o.id:undefined,amount:o.amount_total??o.amount_paid,currency:o.currency,periodStart:date(o.period_start??event.created),periodEnd:date(o.period_end??(event.created+30*86400)),occurredAt:date(event.created),testMode:true})});
