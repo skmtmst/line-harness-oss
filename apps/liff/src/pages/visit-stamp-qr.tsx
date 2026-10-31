@@ -37,7 +37,7 @@ export default function VisitStampQr() {
  const close=()=>{if(liff.isInClient())liff.closeWindow();else {const back=new URLSearchParams(params);back.delete('token');if(result?.status==='success'||result?.status==='limited')back.set('card',result.card.id);navigate(`/visit-stamps?${back}`)}};
  const add=()=>{if(!shop?.botBasicId)return;setAdding(true);liff.openWindow({url:`https://line.me/R/ti/p/${encodeURIComponent(shop.botBasicId)}`,external:true})};
  if(!result&&!error)return <LiffLookScope className={styles.screen}><LiffHeader title="来店スタンプ"/><main className={styles.content}><LoadingView/></main></LiffLookScope>;
- if(error)return <LiffLookScope className={styles.screen} designNode="zz9R3"><LiffHeader title="来店スタンプ"/><LoadErrorView message={error} onRetry={()=>{if(!busy)void load()}}/><Button variant="primary" onClick={close}>LINE に戻る</Button></LiffLookScope>;
+ if(error)return <LiffLookScope className={styles.screen} designNode="zz9R3"><LiffHeader title="来店スタンプ"/><main className={styles.content}><LoadErrorView compact message={error} onRetry={()=>{if(!busy)void load()}}/><div className={styles.spacer}/><Button variant="primary" onClick={close}>LINE に戻る</Button></main></LiffLookScope>;
  const board=result?.status==='success'?'eSJ8v':result?.status==='limited'?'e9lZv':result?.status==='friend_required'?'ZhddO':'xLyNh';
  const next=result?.status==='success'?result.nextReward:null;
  const retry=result?.status==='limited'?new Intl.DateTimeFormat('ja-JP',{timeZone:'Asia/Tokyo',month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).format(new Date(result.retryAt)):'';
