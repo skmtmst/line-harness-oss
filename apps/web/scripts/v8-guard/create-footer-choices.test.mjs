@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -9,7 +10,7 @@ const require = createRequire(import.meta.url)
 const fromVitest = createRequire(require.resolve('vitest/package.json'))
 const { build } = createRequire(fromVitest.resolve('vite'))('esbuild')
 
-const webRoot = new URL('../..', import.meta.url).pathname
+const webRoot = fileURLToPath(new URL('../..', import.meta.url))
 const sheets = new Set()
 const compiled = await build({
   stdin: { resolveDir: webRoot, loader: 'tsx', contents: `
@@ -25,7 +26,7 @@ const compiled = await build({
     }createRoot(document.getElementById('root')).render(<Fixture/>);
   ` },
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
-  tsconfig: `${webRoot}/tsconfig.json`, define: { 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"' },
+  tsconfig: `${webRoot}/tsconfig.json`, define: { 'process.env': '{}', 'process.env.NODE_ENV': '"production"', 'process.env.NEXT_PUBLIC_API_URL': '"http://127.0.0.1:8788"' },
   plugins: [{ name: 'fixture', setup(b) {
     b.onResolve({ filter: /^next\/navigation$/ }, () => ({ path: 'navigation', namespace: 'fixture' }))
     b.onResolve({ filter: /^@\/contexts\/account-context$/ }, () => ({ path: 'account', namespace: 'fixture' }))
@@ -49,7 +50,7 @@ const compiled = await build({
     b.onLoad({ filter: /\.css$/ }, args => { sheets.add(readFileSync(args.path, 'utf8')); return { contents: '', loader: 'js' } })
   } }],
 })
-const globals = await compileUiStyles(new URL('../../src/app/globals.css', import.meta.url).pathname)
+const globals = await compileUiStyles(fileURLToPath(new URL('../../src/app/globals.css', import.meta.url)))
 const css = [globals, ...sheets].join('\n').replace(/:global\(([^()]*)\)/g, '$1')
 
 test('本物の作成型の選択肢は切れず、鍵盤選択と下書きを保つ', async () => {

@@ -1,5 +1,6 @@
 'use client'
 
+import SharedButton from '@/components/shared/button'
 import { useStaffRole, useStaffIdentity } from '@/lib/staff-role'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -306,14 +307,13 @@ export default function AppTopBar() {
       <Notice
         tone="danger"
         action={(
-          <button
+          <SharedButton variant="text" size="inline" data-notice-inline-action
             type="button"
             onClick={() => { void refreshAccounts() }}
             disabled={refreshing}
-            className="font-semibold underline underline-offset-2"
           >
             {refreshing ? '読み込んでいます' : '再読み込み'}
-          </button>
+          </SharedButton>
         )}
       >
         LINEアカウントの一覧を読み込めませんでした。

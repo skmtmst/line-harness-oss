@@ -1,9 +1,11 @@
 import type {
   AccountStyle,
+  InitialMenuTarget,
   IndustryStyle,
   SetupAnswer,
   StyleCard,
   StyleRange,
+  StarterCatalogSelection,
 } from '@line-crm/shared';
 
 export const root = '/api/dashboard/style';
@@ -44,6 +46,7 @@ export type StyleQuery = {
 };
 
 export type StyleSelection = {
+  confirmInitialMenu?: boolean;
   expectedVersion: number;
   style?: AccountStyle;
   styleMode?: SetupAnswer['mode'];
@@ -57,7 +60,10 @@ export type StyleSelection = {
 
 export type StarterSetItem = {
   key: string;
+  initialMenu?: AccountStyle;
+  formTarget?: InitialMenuTarget;
   kind:
+    | 'form'
     | 'template'
     | 'rich_menu'
     | 'automation'
@@ -74,7 +80,7 @@ export type StarterSetItem = {
   text?: string;
   durationMinutes?: number;
   price?: number;
-  buttons?: Array<{ label: string; feature: string; actionType?: 'uri' | 'message'; actionData?: string }>;
+  buttons?: Array<{ target?: InitialMenuTarget; label: string; feature: string; actionType?: 'uri' | 'message'; actionData?: string }>;
   cards?: StyleCard[];
   offsetMinutes?: number;
   offsetDays?: number;
@@ -91,7 +97,9 @@ export type StarterSkipReason = 'answer_later' | 'not_for_style' | 'auto_insert_
 
 /** 初期セットの入れ直しの結果。2 回目からは inserted が空。 */
 export type StarterEnsureResult = {
-  inserted: Array<{ key: string; kind: StarterSetItem['kind'] }>;
+  updated?: Array<{key:string;kind:StarterSetItem['kind']}>;
+  catalogApplication?: import('@line-crm/shared').StarterCatalogApplyResult;
+  inserted: Array<{ key: string; kind: StarterSetItem['kind'] | import('@line-crm/shared').StarterCatalogKind }>;
   skipped: Array<{ key: string; reason: StarterSkipReason }>;
   existing: number;
   starterSet: { id: string; version: number };
@@ -102,7 +110,7 @@ export type StyleStarterDefault = {
   style: AccountStyle;
   id: string;
   version: number;
-  definition: { items: StarterSetItem[] };
+  definition: { items: StarterSetItem[]; mode?: 'catalog'; selections?: StarterCatalogSelection[] };
 };
 
 /** 統括の組を標準へ戻す口の返事。自分の組が無い時は reset が false で何も変わらない。 */
@@ -158,7 +166,7 @@ export type StyleStarterSet = {
   style: AccountStyle;
   name: string;
   version: number;
-  definition: { items: StarterSetItem[] };
+  definition: { items: StarterSetItem[]; mode?: 'catalog'; selections?: StarterCatalogSelection[] };
   accountCount: number;
   updatedAt: string;
   updatedBy: string | null;

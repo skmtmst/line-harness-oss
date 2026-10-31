@@ -169,7 +169,7 @@ export function RetroactiveDialog({ values, count, tagId, accountId, onCancel, o
           <p>さかのぼって積んだマイルは自動では戻せません。取り消すにはマイル画面から手動で調整が必要です。</p>
         </Notice>
         {previewError && (
-          <Notice tone="danger" action={<> <button type="button" onClick={fetchPreview} className="ml-2 font-semibold underline">再計算する</button> </>} role="alert">
+          <Notice tone="danger" action={<> <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={fetchPreview}>再計算する</Button> </>} role="alert">
             {previewError}
 
           </Notice>

@@ -1100,7 +1100,7 @@ export default function AutoRepliesListV8() {
           pagination={listPager}
       >
         {actionError ? (
-          <Notice tone="danger" >{actionError}<button type="button" onClick={() => void load()}>もう一度読み込む</button></Notice>
+          <Notice tone="danger" >{actionError}<Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => { setActionError(''); void load() }}>状態を確認する</Button></Notice>
         ) : null}
         {listBody}
       </ListPage></SaveErrorScope>

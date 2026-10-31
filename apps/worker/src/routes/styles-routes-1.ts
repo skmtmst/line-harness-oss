@@ -1,3 +1,5 @@
+import { savedStyleMenuPreview } from '../services/style-menu-preview.js';
+import { starterCatalogRuntime } from './style-starter-runtime.js';
 import { styleEcSummary } from './style-ec-summary.js';
 import { styleMenuButtons } from '../services/style-menu-buttons.js';
 import {styleTemplateSamples} from './style-template-samples-api.js';
@@ -92,6 +94,7 @@ styles.put(base, async (c) => {
       c.get('staff').tenantId ?? null,
       c.get('staff').id,
       await json(c),
+      { images: c.env.IMAGES, catalogRuntime: starterCatalogRuntime(c) },
     ),
   });
 });
@@ -106,12 +109,14 @@ styles.get(base + '/warnings', async (c) =>
 styles.get(base + '/starter-set', async (c) => {
   const id = await account(c);
   const style = checkStyle(c.req.query('style'));
-  const set = await starter(c.env.DB, c.get('staff').tenantId ?? null, style);
   const p = await profile(c.env.DB, id);
   const answers = profileAnswers(p);
-  const preview = await Promise.all(set.definition.items.filter(item => item.kind === 'rich_menu').map(async item => ({
-    key: item.key, buttons: await styleMenuButtons(c.env.DB, id, style, item, answers),
-  })));
+  const set = await starter(c.env.DB, c.get('staff').tenantId ?? null, style, c.req.query('initialMenu') === 'true' || answers.image?.value === 'simple');
+  let preview = await Promise.all(set.definition.items.filter(item=>item.kind==='rich_menu').map(async item=>{
+    const saved=c.req.query('initialMenu')==='true'?null:await savedStyleMenuPreview(c.env.DB,id,style,item);
+    return saved??{key:item.key,initialMenu:item.initialMenu,buttons:await styleMenuButtons(c.env.DB,id,style,item,answers)};
+  }));
+  if(answers.image?.value==='existing'&&answers.image.resourceId)preview=preview.filter(menu=>'targetId' in menu&&menu.targetId===answers.image.resourceId);
   return c.json({ success: true, data: { ...set, preview } });
 });
 styles.route('/',styleTemplateSamples);

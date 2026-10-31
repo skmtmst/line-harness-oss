@@ -105,7 +105,7 @@ export default function MergedPersonV8({ personId, onClose }: { personId: string
       }>
         <div className={styles.main}>
           {m.saveError ? (
-            <Notice tone="danger" >{m.saveError}<button type="button" className={styles.link} onClick={m.reload}>もう一度読み込む</button></Notice>
+            <Notice tone="danger" >{m.saveError}<Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => { m.setSaveError(''); m.reload() }}>状態を確認する</Button></Notice>
           ) : null}
 
           <section className={styles.card} aria-labelledby="mp-delivery">

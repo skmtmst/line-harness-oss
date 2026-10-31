@@ -35,7 +35,7 @@ const overview = {
   pagination: { total: 1, limit: 20, offset: 0 },
 }
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 beforeEach(() => {
   vi.clearAllMocks()
   calls.account = 'acc-1'
@@ -51,13 +51,13 @@ describe('V8 行動スコアのCSV書き出し', () => {
     calls.rules.mockResolvedValue({ success: true, data: { rules: [] } })
     const created: { name: string; content: string }[] = []
     const anchorClick = vi.fn()
-    vi.stubGlobal('URL', {
+    vi.stubGlobal('URL', Object.assign(class extends URL {}, {
       createObjectURL: vi.fn((blob: Blob) => {
         void (blob as Blob).text().then((text) => created.push({ name: 'csv', content: text }))
         return 'blob:csv'
       }),
       revokeObjectURL: vi.fn(),
-    })
+    }))
     const createElement = document.createElement.bind(document)
     vi.spyOn(document, 'createElement').mockImplementation(((tag: string, options?: ElementCreationOptions) => {
       const element = createElement(tag, options)

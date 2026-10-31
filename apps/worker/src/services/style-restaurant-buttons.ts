@@ -4,7 +4,7 @@ import {
   type SetupAnswer,
 } from '@line-crm/shared';
 
-import type { StarterItem } from './style-starter-definition.js';
+import { isCustomerUri, type StarterItem } from './style-starter-definition.js';
 import { featureReadiness } from './style-readiness.js';
 export async function restaurantMenuButtons(
   db: D1Database,
@@ -19,6 +19,17 @@ export async function restaurantMenuButtons(
     .first<{ liff_id: string | null }>();
   const buttons = [];
   for (const button of item.buttons ?? []) {
+    if(button.actionType==='uri') {
+      if(!isCustomerUri(button.actionData))continue;
+      const url=new URL(button.actionData);
+      if(url.hostname==='liff.line.me'&&url.pathname.split('/')[1]!==line?.liff_id)continue;
+      buttons.push({...button,actionType:'uri',actionData:button.actionData,intent:'url'});
+      continue;
+    }
+    if(button.actionType==='message'&&button.actionData?.trim()) {
+      buttons.push({...button,actionType:'message',actionData:button.actionData,intent:'text'});
+      continue;
+    }
     const answer = answers[button.feature];
     if (
       button.feature !== 'contact' &&

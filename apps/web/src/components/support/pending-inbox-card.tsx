@@ -1,5 +1,6 @@
 'use client'
 
+import SharedButton from '@/components/shared/button'
 import { loadStaffIdentity } from '@/lib/staff-role'
 import Link from 'next/link'
 import TextLink from '@/components/shared/text-link'
@@ -247,7 +248,7 @@ export default function PendingInboxCard({
       {loadFailure && summary ? (
         <Notice
           tone="warn"
-          action={<button type="button" onClick={() => void load()} className="font-medium underline">もう一度読み込む</button>}
+          action={<SharedButton variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void load()}>もう一度読み込む</SharedButton>}
         >
           最新の状態に更新できませんでした。
           {lastSuccessAt ? `最終更新 ${formatTime(lastSuccessAt)} の内容を表示しています。` : ''}

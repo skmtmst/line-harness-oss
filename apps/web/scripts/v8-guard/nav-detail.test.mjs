@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import test, { after, before } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
@@ -18,7 +19,7 @@ import { mockFetch } from './mock-local.mjs'
  * ページ送りの今のページは薄い灰の地＋太字、ほかの番号は枠なし、端の矢印だけ薄い。
  * SIDEBAR_SHOTS にフォルダを渡すと、上・途中・一番下の絵を残す。
  */
-const root = resolve(new URL('../../out/', import.meta.url).pathname)
+const root = resolve(fileURLToPath(new URL('../../out/', import.meta.url)))
 const mime = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.svg': 'image/svg+xml' }
 
 function measure() {

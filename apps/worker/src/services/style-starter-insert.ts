@@ -1,3 +1,9 @@
+import { styleMenuActionData } from './style-menu-action-data.js';
+import { planInitialMenuHistory } from './style-initial-assets.js';
+import { initialMenuImageKey } from '@line-crm/shared';
+import { initialFormLayout,initialFormScopeGuards } from './style-initial-form.js';
+import { initialMenuNeedsRefresh } from './style-initial-refresh.js';
+import type { PlannedInitialForms } from './style-initial-buttons.js';
 import { sameStarterSnapshot } from './style-starter-snapshot.js';
 import {prepareStarterInsert} from './style-starter-insert-context.js';
 import { styleMenuButtons } from './style-menu-buttons.js';
@@ -31,22 +37,54 @@ export async function insertStyleStarterItems(
   options: {
     set?: Awaited<ReturnType<typeof starter>>;
     skipExisting?: boolean;
+    plannedForms?: PlannedInitialForms;
   } = {},
 ) {
-  const {set,existing,oldProfile,choice}=await prepareStarterInsert(db,account,tenant,style,input,options);
+  const {set,existing,oldProfile,choice}=await prepareStarterInsert(db,account,tenant,style,input,{...options,initialMenu:!options.set && answers.image?.value === 'simple'});
   const inserted:unknown[]=[];
+  const updated:Array<{key:string;kind:string}>=[];
+  const plannedForms:PlannedInitialForms=options.plannedForms??new Map(existing.filter(row=>row.kind==='form').map(row=>[row.item_key,row.target_id]));
+  if(input.confirmInitialMenu===true && selected && style==='restaurant' && answers.image?.value==='simple' && set.definition.items.some(item=>item.initialMenu))
+    await planInitialMenuHistory(db,account,statements,plannedForms,actor);
   const skipped:StarterSkip[]=[];
   const skip=(key:string,reason:StarterSkipReason)=>{skipped.push({key,reason});};
   // スタイルを選んでいない（あとで・手動）時は何も入れない。黙って飛ばさず理由を返す。
   if (!selected) for (const item of set.definition.items) skip(item.key,'answer_later');
-  for (const item of selected ? set.definition.items : []) {
+  const ordered=[...set.definition.items.filter(item=>item.kind==='form'),...set.definition.items.filter(item=>item.kind!=='form')];
+  for (const item of selected ? ordered : []) {
+    if ((item.initialMenu && answers.image?.value!=='simple' && !choice?.[item.key])
+      || (item.kind==='rich_menu' && (!answers.image || answers.image.mode!=='configured'))
+      || (item.kind==='form' && answers.image?.value!=='simple')) { skip(item.key,'answer_later');continue; }
     if (item.kind === 'booking_menu' && !['salon', 'consult'].includes(style)) {
       skip(item.key,'not_for_style');
       continue;
     }
-    if (!set.autoInsert && !choice?.[item.key]) {
+    if (!set.autoInsert && !choice?.[item.key] && !(answers.image?.value==='simple' && (item.kind==='form'||item.initialMenu))) {
       skip(item.key,'auto_insert_off');
       continue;
+    }
+    const previous=existing.find(row=>row.item_key===item.key);
+    if(item.kind==='form'&&previous&&((input.answers as Record<string,SetupAnswer>|undefined)?.image?.value==='simple'||input.confirmInitialMenu===true)) {
+      const available=await db.prepare(`SELECT 1 FROM forms f WHERE f.id=? AND f.status='active'
+        AND EXISTS(SELECT 1 FROM form_accounts a WHERE a.form_id=f.id AND a.line_account_id=?) AND (SELECT COUNT(*) FROM form_accounts a WHERE a.form_id=f.id)=1`).bind(previous.target_id,account).first();
+      if(!available) {
+        const snapshot=await resourceSnapshot(db,account,previous.kind,previous.target_id);
+        statements.push(snapshotGuard(db,account,previous.kind,previous.target_id,snapshot),
+          db.prepare("UPDATE style_starter_items SET item_key=item_key||':previous:'||target_id WHERE line_account_id=? AND item_key=?").bind(account,item.key));
+        existing.splice(existing.indexOf(previous),1);
+      }
+    }
+
+    if(item.initialMenu && previous && ((input.answers as Record<string,SetupAnswer>|undefined)?.image?.value==='simple' || (oldProfile?.style!==style && answers.image?.value==='simple'))) {
+      const snapshot=await resourceSnapshot(db,account,previous.kind,previous.target_id);
+      const canonical=await db.prepare(`SELECT 1 FROM rich_menu_groups g JOIN rich_menu_pages p ON p.id=g.default_page_id
+        WHERE g.id=? AND g.account_id=? AND g.status='draft' AND p.image_r2_key=?
+        AND (SELECT COUNT(*) FROM rich_menu_areas a WHERE a.page_id=p.id)=4`).bind(previous.target_id,account,initialMenuImageKey(account,style)).first();
+      if(!canonical || !sameStarterSnapshot(previous.kind,snapshot,previous.source_snapshot)) {
+        statements.push(snapshotGuard(db,account,previous.kind,previous.target_id,snapshot));
+        statements.push(db.prepare("UPDATE style_starter_items SET item_key=item_key||':previous:'||target_id WHERE line_account_id=? AND item_key=?").bind(account,item.key));
+        existing.splice(existing.indexOf(previous),1);
+      }
     }
     if (
       options.skipExisting !== false &&
@@ -54,9 +92,22 @@ export async function insertStyleStarterItems(
     ) {
       if (!choice?.[item.key] || choice[item.key].mode === 'sample') {
         const old = existing.find((e) => e.item_key === item.key)!;
+        if(old.is_sample && old.source_snapshot && (item.kind==='form'||item.initialMenu)) {
+          const snapshot=await resourceSnapshot(db,account,old.kind,old.target_id);
+          if(sameStarterSnapshot(old.kind,snapshot,old.source_snapshot)) {
+            const refresh=item.kind==='form'||await initialMenuNeedsRefresh(db,account,old.target_id,style,plannedForms);
+            const changes=refresh?await overwriteResource(db,account,old.target_id,item,now,style,answers,plannedForms):[];
+            if(changes.length) {
+              statements.push(snapshotGuard(db,account,old.kind,old.target_id,snapshot),...changes,
+                recordSnapshot(db,account,old.style,item.key,old.kind,old.target_id));
+              updated.push({key:item.key,kind:item.kind});
+            }
+          }
+        }
         // スタイルをまたいでも未編集の同じリソースを使い、業種内容だけを更新する。
         if (
           oldProfile?.style !== style &&
+          !item.initialMenu &&
           old.kind === item.kind &&
           old.is_sample &&
           old.source_snapshot &&
@@ -115,7 +166,7 @@ export async function insertStyleStarterItems(
       );
     }
     if (
-      ['template', 'rich_menu'].includes(item.kind) &&
+      ['template', 'rich_menu'].includes(item.kind) && !item.initialMenu &&
       answers.content &&
       (answers.content.mode !== 'configured' || answers.content.value === false)
     ) {
@@ -163,18 +214,27 @@ export async function insertStyleStarterItems(
     const accountColumn =
       item.kind === 'rich_menu' ? 'account_id' : 'line_account_id';
     if (chosen && chosen.mode !== 'sample') {
-      if (!table || !chosen.resourceId)
+      if ((!table && item.kind!=='form') || !chosen.resourceId)
         throw new StyleError('invalid_resource');
-      const source = await db
+      const source = item.kind==='form' ? await db.prepare(`SELECT f.id FROM forms f JOIN form_accounts a ON a.form_id=f.id WHERE f.id=? AND a.line_account_id=? AND f.status!='archived' AND (SELECT COUNT(*) FROM form_accounts b WHERE b.form_id=f.id)=1`).bind(chosen.resourceId,account).first<{id:string}>() : await db
         .prepare(`SELECT id FROM ${table} WHERE id=? AND ${accountColumn}=?`)
         .bind(chosen.resourceId, account)
         .first<{ id: string }>();
       if (!source) throw new StyleError('resource_not_found', 404);
       id = source.id;
       sample = false;
+      if(item.kind==='form')plannedForms.set(item.key,id);
     } else if (item.sourceId) {
       // アカウント間の複製は統括の既存配布へ委ね、生きた ID をそのままコピーしない。
       throw new StyleError('use_hq_distribution_for_source', 422);
+    } else if (item.kind === 'form') {
+      if(!item.formTarget) throw new StyleError('invalid_initial_form');
+      const definition=await initialFormLayout(db,account,style,item.formTarget),layout=JSON.stringify(definition);
+      statements.push(...initialFormScopeGuards(db,account,definition));
+      statements.push(db.prepare(`INSERT INTO forms(id,name,description,fields,layout,is_active,save_to_metadata) VALUES(?,?,?,'[]',?,0,0)`)
+        .bind(id,item.name,null,layout),
+        db.prepare('INSERT INTO form_accounts(form_id,line_account_id) VALUES(?,?)').bind(id,account));
+      plannedForms.set(item.key,id);
     } else if (item.kind === 'template')
       statements.push(
         db
@@ -322,7 +382,9 @@ export async function insertStyleStarterItems(
           )
           .bind(page, id, 'style-' + page),
       );
-      if (answers.image?.mode === 'configured' && answers.image.resourceId) {
+      if(item.initialMenu) {
+        statements.push(db.prepare("UPDATE rich_menu_pages SET image_r2_key=?,image_content_type='image/png' WHERE id=?").bind(initialMenuImageKey(account,style),page));
+      } else if (answers.image?.mode === 'configured' && answers.image.resourceId) {
         const image = await db
           .prepare(
             `SELECT p.image_r2_key,p.image_content_type FROM rich_menu_pages p JOIN rich_menu_groups g ON g.id=p.group_id WHERE p.id=? AND g.account_id=? AND p.image_r2_key IS NOT NULL`,
@@ -338,26 +400,11 @@ export async function insertStyleStarterItems(
             .bind(image.image_r2_key, image.image_content_type, page),
         );
       }
-      for (const [i, button] of (
-        await styleMenuButtons(db, account, style, item, answers)
-      ).entries()) {
-        const { actionType, actionData, intent } = button;
-        statements.push(
-          db
-            .prepare(
-              `INSERT INTO rich_menu_areas(id,page_id,bounds_x,bounds_y,bounds_width,bounds_height,action_type,action_data,intent,label) VALUES(?,?,?,?,833,843,?,?,?,?)`,
-            )
-            .bind(
-              crypto.randomUUID(),
-              page,
-              (i % 3) * 833,
-              Math.floor(i / 3) * 843,
-              actionType,
-              actionData,
-              intent,
-              button.label,
-            ),
-        );
+      const buttons=await styleMenuButtons(db,account,style,item,answers,plannedForms);
+      for (const [i,button] of buttons.entries()) {
+        const bounds=button.bounds??{x:(i%3)*833,y:Math.floor(i/3)*843,width:833,height:843};
+        statements.push(db.prepare(`INSERT INTO rich_menu_areas(id,page_id,bounds_x,bounds_y,bounds_width,bounds_height,action_type,action_data,intent,label,form_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+          .bind(crypto.randomUUID(),page,bounds.x,bounds.y,bounds.width,bounds.height,button.actionType,styleMenuActionData(button),button.intent,button.label,button.formId??null));
       }
       statements.push(
         db
@@ -437,5 +484,5 @@ export async function insertStyleStarterItems(
         item.kind === 'rich_menu',
     });
   }
-  return { set, inserted, skipped, existing };
+  return { set, inserted, updated, skipped, existing };
 }

@@ -4695,6 +4695,14 @@
       "column": "line_account_id"
     }
   },
+  "style_starter_catalog_items": {
+    "category": "purge",
+    "scope": { "by": "lineAccount", "column": "line_account_id" }
+  },
+  "style_starter_catalog_resources": {
+    "category": "purge",
+    "scope": { "by": "lineAccount", "column": "line_account_id" }
+  },
   "style_starter_items": {
     "category": "purge",
     "scope": {

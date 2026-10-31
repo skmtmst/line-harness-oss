@@ -490,9 +490,9 @@ export default function SearchesTab({ accountId, canEdit, explanation = false }:
       >
         {error ? (
           <Notice tone="danger" >{error}{retryOrder ? (
-              <button type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</button>
+              <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => { const next = retryOrder; setRetryOrder(null); if (next) void applyOrder(next) }}>再試行</Button>
             ) : (
-              <button type="button" onClick={() => { setError(''); void load() }}>もう一度読み込む</button>
+              <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => { setError(''); void load() }}>状態を確認する</Button>
             )}</Notice>
         ) : null}
         <RefreshCover refreshing={loading && loaded}>{table}</RefreshCover>

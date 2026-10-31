@@ -996,7 +996,7 @@ export default function BroadcastListV8() {
       ) : null}
       {savedViewError ? (
         <Notice tone="danger" className={styles.noteNoticePlacement} >{savedViewError}
-          <button type="button" onClick={() => setSavedViewsSeq((n) => n + 1)} className={styles.inlineRetry}>もう一度</button></Notice>
+          <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => setSavedViewsSeq((n) => n + 1)}>もう一度</Button></Notice>
       ) : null}
     </ListToolbarFrame>
   )
@@ -1212,7 +1212,7 @@ export default function BroadcastListV8() {
           <FolderPanelNote>フォルダを消しても、入っていたものは未分類に残ります</FolderPanelNote>
           {folderError ? (
             <Notice tone="danger" className={styles.noteNoticePlacement} >{folderError}
-              <button type="button" onClick={() => void loadFolders()} className={styles.inlineRetry}>もう一度</button></Notice>
+              <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void loadFolders()}>もう一度</Button></Notice>
           ) : null}
         </FolderPanel>
       )}

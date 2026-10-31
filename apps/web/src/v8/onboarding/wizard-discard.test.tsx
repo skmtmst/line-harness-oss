@@ -46,10 +46,10 @@ function chosenStyle(style: AccountStyle) {
 async function chooseStyle(style: AccountStyle) {
   pickStyle(style)
   fireEvent.click(screen.getByRole('button', { name: '次へ' }))
-  await screen.findByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })
+  await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
 }
 function requestClose(method: 'close' | 'escape' | 'backdrop') {
-  const dialog = screen.getByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })
+  const dialog = screen.getByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
   if (method === 'close') fireEvent.click(within(dialog).getByRole('button', { name: '閉じる' }))
   else if (method === 'escape') fireEvent.keyDown(document, { key: 'Escape' })
   else fireEvent.mouseDown(dialog.parentElement!)
@@ -107,8 +107,8 @@ describe('はじめの質問の保存と破棄', () => {
     await chooseStyle('ec')
     requestClose('close')
     fireEvent.click(await screen.findByRole('button', { name: '編集を続ける' }))
-    expect(screen.getByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '戻る' }))
+    expect(screen.getByRole('dialog', { name: '最初のリッチメニューを選ぶ' })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'スタイルを選び直す' }))
     expect(chosenStyle('ec')).not.toBeNull()
     expect(calls.save).not.toHaveBeenCalled()
     expect(calls.closed).not.toHaveBeenCalled()
@@ -117,10 +117,10 @@ describe('はじめの質問の保存と破棄', () => {
   it('途中保存して閉じると表示中の版を付けて一度だけ保存する', async () => {
     render(<Subject />)
     await chooseStyle('salon')
-    fireEvent.click(document.querySelector<HTMLInputElement>('input[name="setup-look"][value="change"]')!)
+    fireEvent.click(screen.getByRole('radio',{name:/シンプルなメニュー/}))
     fireEvent.click(screen.getByRole('button', { name: '途中保存して閉じる' }))
     await screen.findByText('閉じました')
-    expect(calls.save).toHaveBeenCalledExactlyOnceWith('test-store', expect.objectContaining({ expectedVersion: 7, style: 'salon', answers: { image: { mode: 'configured', value: 'change' } } }))
+    expect(calls.save).toHaveBeenCalledExactlyOnceWith('test-store', expect.objectContaining({ expectedVersion: 7, style: 'salon', answers: { image: { mode: 'configured', value: 'simple' } } }))
     expect(calls.updated).toHaveBeenCalledExactlyOnceWith('test-store')
     expect(calls.activate).not.toHaveBeenCalled()
     expect(calls.closed).toHaveBeenCalledExactlyOnceWith(true)
@@ -132,10 +132,10 @@ describe('はじめの質問の保存と破棄', () => {
     await chooseStyle('salon')
     fireEvent.click(screen.getByRole('button', { name: '途中保存して閉じる' }))
     await waitFor(() => expect(screen.getByRole('alert').textContent).toBeTruthy())
-    expect(screen.getByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: '最初のリッチメニューを選ぶ' })).toBeTruthy()
     expect(calls.closed).not.toHaveBeenCalled()
     expect(calls.updated).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '戻る' }))
+    fireEvent.click(screen.getByRole('button', { name: 'スタイルを選び直す' }))
     expect(chosenStyle('salon')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: '次へ' }))
     requestClose('close')
@@ -177,13 +177,13 @@ describe('はじめの質問の保存と破棄', () => {
   it('最後の一覧への保存を維持し、一覧を閉じても追加保存・有効化しない', async () => {
     render(<Subject />)
     await chooseStyle('standard')
-    fireEvent.click(screen.getByRole('button', { name: '次へ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'このメニューで進む' }))
     await waitFor(() => expect(document.querySelector('input[name="setup-content"]')).not.toBeNull())
     fireEvent.click(screen.getByRole('button', { name: '次へ' }))
     const summary = await screen.findByRole('dialog', { name: '準備ができました' })
     await waitFor(() => expect(summary.getAttribute('aria-busy')).not.toBe('true'))
     expect(calls.save).toHaveBeenCalledTimes(1)
-    expect(calls.save).toHaveBeenCalledWith('test-store', expect.objectContaining({ expectedVersion: 7, style: 'standard', answers: { content: { mode: 'configured', value: true } } }))
+    expect(calls.save).toHaveBeenCalledWith('test-store', expect.objectContaining({ expectedVersion: 7, style: 'standard', confirmInitialMenu:true,answers: {image:{mode:'configured',value:'simple'}, content: { mode: 'configured', value: true } } }))
     fireEvent.click(within(summary).getByRole('button', { name: '閉じる' }))
     const discard = screen.queryByRole('button', { name: '破棄する' })
     if (discard) fireEvent.click(discard)
@@ -196,7 +196,7 @@ describe('はじめの質問の保存と破棄', () => {
   it('予約設定を変える最終保存は確認前に送らず、確認取消でも入力を保つ', async () => {
     render(<Subject state={{ ...initialState, style: 'salon', answers: { ...initialState.answers, approval: { mode: 'configured', value: 'automatic' } } }} />)
     await chooseStyle('salon')
-    fireEvent.click(screen.getByRole('button', { name: '次へ' }))
+    fireEvent.click(screen.getByRole('button', { name: 'このメニューで進む' }))
     await waitFor(() => expect(document.querySelector('input[name="setup-approval"]')).not.toBeNull())
     fireEvent.click(document.querySelector<HTMLInputElement>('input[name="setup-approval"][value="require_approval"]')!)
     fireEvent.click(screen.getByRole('button', { name: '次へ' }))
@@ -214,3 +214,18 @@ describe('はじめの質問の保存と破棄', () => {
     expect(calls.save).toHaveBeenCalledExactlyOnceWith('test-store', expect.objectContaining({ expectedVersion: 7, answers: expect.objectContaining({ approval: { mode: 'configured', value: 'manual' } }) }))
   })
 })
+
+
+it('別スタイルで確かめたメニューの確認を、飲食店への途中保存で使い回さない',async()=>{
+ render(<Subject/>);
+ await chooseStyle('standard');
+ fireEvent.click(screen.getByRole('button',{name:'このメニューで進む'}));
+ await waitFor(()=>expect(document.querySelector('input[name="setup-content"]')).not.toBeNull());
+ fireEvent.click(within(screen.getByRole('navigation',{name:'はじめの質問の一覧'})).getByRole('button',{name:/使い方のスタイル/}));
+ await chooseStyle('restaurant');
+ requestClose('close');
+ fireEvent.click(await screen.findByRole('button',{name:'途中保存して閉じる'}));
+ await screen.findByText('閉じました');
+ expect(calls.save).toHaveBeenCalledWith('test-store',expect.objectContaining({style:'restaurant'}));
+ expect(calls.save.mock.calls[0][1].confirmInitialMenu).toBeUndefined();
+});

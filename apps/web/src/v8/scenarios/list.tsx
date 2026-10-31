@@ -1421,7 +1421,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
       pagination={listPager}
     >
       {actionError ? (
-        <Notice tone="danger" >{actionError}<button type="button" onClick={() => setActionError('')}>閉じる</button></Notice>
+        <Notice tone="danger" >{actionError}<Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => setActionError('')}>閉じる</Button></Notice>
       ) : null}
       <RefreshCover refreshing={scenarioList.refreshing}>{listBody}</RefreshCover>
     </ListPage></SaveErrorScope>

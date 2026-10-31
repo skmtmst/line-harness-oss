@@ -1,9 +1,10 @@
 // @vitest-environment happy-dom
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { flushListUrlState } from '@/components/shared/list-url-state'
 /*
  * V8 統括のアカウント（src/v8/hq/home.tsx）の動きの試験。
  * LINE ID の @ を二重にしない、要確認のカードに引っかかった確認の言葉を出す（全文は title）、
- * 閲覧のみには「更新する」を置かない。
+ * 閲覧のみには「更新する」を灰色と理由付きで置く。
  * 「入る」は押すと引き継ぎの状態を確かめ、終わっていれば店へ進み、
  * 未完了・確認失敗なら登録時と同じ進捗画面へ戻す。
  */
@@ -88,9 +89,11 @@ afterEach(() => {
   act(() => root.unmount())
   flushListUrlState()
   container.remove()
+  verifiedStaffRole(null)
 })
 
 async function render() {
+  verifiedStaffRole(role.value === 'owner' ? 'owner' : role.value === 'admin' ? 'admin' : 'viewer')
   await act(async () => { root.render(<HqHomeV8 />) })
   await act(async () => { await Promise.resolve() })
 }
@@ -250,11 +253,15 @@ describe('統括のアカウント', () => {
     expect(container.querySelector('article')!.textContent).toContain('正常')
   })
 
-  it('閲覧のみには「更新する」を置かない', async () => {
+  it('閲覧のみにはNoticeの更新を灰色と理由付きで置き、変更しない', async () => {
     role.value = 'viewer'
     await render()
     const card = container.querySelector('article')!
-    expect([...card.querySelectorAll('button')].some((button) => button.textContent === '更新する')).toBe(false)
+    const update = [...card.querySelectorAll('button')].find(button => button.textContent === '更新する')!
+    expect(update.getAttribute('aria-disabled')).toBe('true')
+    await act(async () => { update.click(); update.focus() })
+    expect(checkConnection).not.toHaveBeenCalled()
+    expect(document.body.textContent).toContain('閲覧のみ')
     expect([...container.querySelectorAll('button')].some((button) => button.textContent === '全部を更新')).toBe(false)
   })
   it.each(['owner', 'admin', 'viewer'])('アカウントの用途文から権限を推測せず、現在の人%sで設定の入口を決める', async viewerRole => {

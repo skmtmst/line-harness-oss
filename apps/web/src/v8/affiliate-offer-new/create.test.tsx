@@ -47,7 +47,7 @@ describe('案件を作る（Td4TN）', () => {
     expect(buttons()).toContain('保存して公開')
     expect(host.querySelector('#of-point')).toBeNull()
     expect(host.textContent).toContain('成果地点と案件をつなぐ設定は、まだ保存できません')
-    expect(host.querySelector('a[href="/conversions"]')?.textContent).toContain('成果地点を見る')
+    expect(host.querySelector('a[href="/affiliates?tab=points"]')?.textContent).toContain('成果地点を見る')
     expect(host.textContent).not.toContain('閲覧のみで見ています')
   })
 

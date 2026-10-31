@@ -33,3 +33,8 @@
 窓の下の帯は `pnpm test:scripts scripts/visual-qa/dialog-footer-contract.test.ts` が全画面の自前帯と参照だけの閉じる帯を検査します。実窓は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/dialog-footer.test.mjs`、題と札・失敗の重複・設定ナビ・手順の焦点・状態セルは同じ入口の `patrol-layout.test.mjs` です。上と同じ配信先・保存先・動画の環境変数を使い、各検査は故障を入れて赤になることと復元後の緑も必須で確認します。設定ナビは1024/1152/1440、窓などは1152/1440を測ります。
 
 予約送信の入力不足は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/scheduled-message.test.mjs` で受信箱と友だち一覧を2幅で操作し、押せない主操作・理由1行・通常の緑との差を検査します。日時の過去判定は既存の処理とAPIが担当します。
+
+### 初期リッチメニュー画像
+
+`node scripts/rich-menu/build-initial-images.mjs` は共有の4面定義から、LINEへのアップロードと管理画面の見本で使うPNGを再生成する。WebのNext.jsが依存するSharpとTypeScriptを使う。業種のラベル・順序・色を変えた時だけ実行し、画像寸法と実際の公開用座標の一致を試験・写真で確認する。
+画像のJSONはこの生成器だけで作り、手では編集しません。内容を変える時は `INITIAL_MENU_VERSION` を上げます。同じ版のまま内容を変えると生成器が止まります。`pnpm test:scripts scripts/rich-menu/image-version.test.ts` でこの判定を確認します。

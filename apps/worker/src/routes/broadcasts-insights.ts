@@ -12,7 +12,10 @@ import { getLineAccountById } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
 
-import { canAccessAllLineAccounts } from '../services/account-access.js';
+import { scopeSegmentQuery } from '../services/segment-query-scope.js';
+import { ACCOUNT_KEYS } from '../middleware/feature-body-accounts.js';
+import { ACCOUNT_QUERY_KEYS } from '../middleware/tenant-scope.js';
+import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
 import { canAccessBroadcast, failedBreakdown, ACCOUNT_ACCESS_ERROR } from './broadcasts-definition.js';
 import type { Context } from 'hono';
 
@@ -507,26 +510,34 @@ export const get__api_broadcasts_id_progress_4 = async (c: Context<Env, "/api/br
 };
 
 export const post__api_segments_count_5 = async (c: Context<Env, "/api/segments/count">) => {
-  const body = await c.req.json<{ conditions: unknown; accountId?: string }>();
+  const body = await c.req.json<{ conditions: unknown; accountId?: string } & Record<string, unknown>>();
   try {
-    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [body.accountId ?? null])) {
+    const accountId = body.accountId;
+    const alternateAccounts = [
+      ...ACCOUNT_KEYS.filter(key => key !== 'accountId').flatMap(key => Object.hasOwn(body, key) ? [body[key]] : []),
+      ...ACCOUNT_QUERY_KEYS.flatMap(key => c.req.queries(key) ?? []),
+    ];
+    if (['accountIds', 'lineAccountIds'].some(key => Object.hasOwn(body, key))
+      || (Object.hasOwn(body, 'accountId') && (typeof accountId !== 'string' || !accountId.trim()))
+      || alternateAccounts.some(value => accountId === undefined || value !== accountId)) {
+      return inputError(c, { success: false, error: '集計するLINEアカウントの指定が一致していません' }, 400, ['accountId']);
+    }
+    if (!await canAccessAllLineAccounts(c.env.DB, c.get('staff'), [accountId ?? null])) {
       return c.json({ success: false, error: ACCOUNT_ACCESS_ERROR }, 403);
     }
     const { buildPublicSegmentQuery } = await import('../services/segment-query.js');
     const { sql, bindings } = buildPublicSegmentQuery(body.conditions as SegmentCondition);
 
-    let accountSql = sql;
-    const accountBindings = [...bindings];
-    if (body.accountId) {
-      accountSql = sql.replace('WHERE', 'WHERE f.line_account_id = ? AND');
-      accountBindings.unshift(body.accountId);
-    }
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const scoped = scopeSegmentQuery({ sql, bindings }, accountId
+      ? { allowedAccountIds: [accountId], canSeeUnassigned: false }
+      : scope);
 
     /*
      * 集計 SQL は副問い合わせに包んで数える。SELECT から FROM までを正規表現で置換すると、タグ条件の入れ子の FROM まで消して SQL を壊すため。
      */
-    const countSql = `SELECT COUNT(*) AS count FROM (${accountSql}) q`;
-    const result = await c.env.DB.prepare(countSql).bind(...accountBindings).first<{ count: number }>();
+    const countSql = `SELECT COUNT(*) AS count FROM (${scoped.sql}) q`;
+    const result = await c.env.DB.prepare(countSql).bind(...scoped.bindings).first<{ count: number }>();
 
     return c.json({ success: true, count: result?.count ?? 0 });
   } catch (err) {
