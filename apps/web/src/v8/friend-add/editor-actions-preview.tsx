@@ -127,7 +127,7 @@ export function PreviewStep({ rule, definition, routeNames, runTest, onTestCondi
         </dl>
         <Button type="button" variant="text" onClick={() => setDetailsOpen(true)}>動きの詳細を確認</Button>
       </Card>
-      <Dialog open={detailsOpen} title="追加された人に起きること" onCancel={() => setDetailsOpen(false)} footer={<Button type="button" onClick={() => setDetailsOpen(false)}>閉じる</Button>}>
+      <Dialog open={detailsOpen} title="追加された人に起きること" onCancel={() => setDetailsOpen(false)} >
         <dl>{flowSteps.map((item) => <div key={item.key}><dt>{item.title}</dt><dd>{item.detail}</dd></div>)}</dl>
         <Field label="再追加・ブロック解除のとき"><ul>{readdLines.map((line) => <li key={line}>{line}</li>)}</ul></Field>
         <Field label="過去28日の該当"><span>{matchedLast28Days === null ? '未取得' : `${formatNumber(matchedLast28Days)}人`}</span></Field>

@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -30,6 +30,8 @@ beforeEach(() => {
   db = asD1(sqlite);
 });
 
+afterEach(() => sqlite?.close());
+
 describe('タグの友だち取得', () => {
   it('配信元と別のLINEアカウントの友だちを混ぜない', async () => {
     const friends = await getFriendsByTag(db, 'tag-1', 'account-1');
@@ -39,6 +41,37 @@ describe('タグの友だち取得', () => {
   it('アカウントを指定しない既存の利用方法は保つ', async () => {
     const friends = await getFriendsByTag(db, 'tag-1');
     expect(friends.map((friend) => friend.id).sort()).toEqual(['friend-1', 'friend-2']);
+  });
+
+  it.each([false, true])('指定した範囲だけを入力にし未割当の可否=%sを保つ', async (canSeeUnassigned) => {
+    sqlite.prepare("INSERT INTO friends (id, line_user_id, display_name) VALUES ('unassigned', 'user-null', '未割当')").run();
+    sqlite.prepare("INSERT INTO friend_tags (friend_id, tag_id) VALUES ('unassigned', 'tag-1')").run();
+    const friends = await getFriendsByTag(db, 'tag-1', null, { allowedAccountIds: ['account-1'], canSeeUnassigned });
+    expect(friends.map(friend => friend.id).sort()).toEqual(canSeeUnassigned ? ['friend-1', 'unassigned'] : ['friend-1']);
+  });
+
+  it('空の範囲は他アカウントへ広げず誰も返さない', async () => {
+    expect(await getFriendsByTag(db, 'tag-1', undefined, { allowedAccountIds: [], canSeeUnassigned: false })).toEqual([]);
+  });
+
+  it('明示アカウントと範囲を両方満たさなければ返さない', async () => {
+    expect(await getFriendsByTag(db, 'tag-1', 'account-2', { allowedAccountIds: ['account-1'], canSeeUnassigned: true })).toEqual([]);
+  });
+
+  it('明示アカウントでは未割当の許可があっても未割当を含めない', async () => {
+    sqlite.prepare("INSERT INTO friends(id,line_user_id) VALUES ('unassigned','user-null')").run();
+    sqlite.prepare("INSERT INTO friend_tags(friend_id,tag_id) VALUES ('unassigned','tag-1')").run();
+    expect((await getFriendsByTag(db, 'tag-1', 'account-1', { allowedAccountIds: ['account-1'], canSeeUnassigned: true })).map(friend=>friend.id)).toEqual(['friend-1']);
+  });
+
+  it('多数のアカウントも1バインドの集合で絞り順序を保つ', async () => {
+    const allowedAccountIds = ['account-1', ...Array.from({ length: 200 }, (_, index) => `unused-${index}`)];
+    sqlite.prepare("UPDATE friends SET created_at = '2030-01-01' WHERE id = 'friend-1'").run();
+    sqlite.prepare("INSERT INTO friends(id,line_user_id,line_account_id,created_at) VALUES ('older','older-user','account-1','2020-01-01')").run();
+    sqlite.prepare("INSERT INTO friend_tags(friend_id,tag_id) VALUES ('older','tag-1')").run();
+    const friends = await getFriendsByTag(db, 'tag-1', undefined, { allowedAccountIds, canSeeUnassigned: false });
+    expect(friends.map(friend => friend.id)).toEqual(['friend-1', 'older']);
+    expect(friends).toEqual(await getFriendsByTag(db, 'tag-1', 'account-1'));
   });
 
   it('200人のタグを1問い合わせ・1バインドで取得する', async () => {

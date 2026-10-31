@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { MediaItem, MediaReplacementImpact } from '@line-crm/shared'
 import { ApiError, api } from '@/lib/api'
 import Button from '@/components/shared/button'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Select from '@/components/shared/select'
 import Pagination from '@/components/shared/pagination'
 import ListRange from '@/components/ui/list-range'
@@ -165,18 +165,12 @@ export default function MediaReplacementDialog({
       busy={busy}
       error={error || undefined}
       onCancel={onClose}
-      footer={(
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {impact?.canPartiallyReplace && !impact.canReplace ? (
-            <Button type="button" variant="primary" onClick={() => void replace('partial')} disabled={busy} busy={busy} busyLabel="差し替えています…">
+      footer={(<DialogActions>
+          {impact?.canPartiallyReplace && !impact.canReplace ? (<Button type="button" variant="primary" onClick={() => void replace('partial')} disabled={busy} busy={busy} busyLabel="差し替えています…">
               {`差し替え可能な${impact.replaceableCount}か所だけ差し替える`}
-            </Button>
-          ) : (
-            <Button type="button" variant="primary" onClick={() => void replace('all')} disabled={busy || !impact?.canReplace} busy={busy} busyLabel="差し替えています…">使用先を差し替える
-            </Button>
-          )}
-        </div>
-      )}
+            </Button>) : (<Button type="button" variant="primary" onClick={() => void replace('all')} disabled={busy || !impact?.canReplace} busy={busy} busyLabel="差し替えています…">使用先を差し替える
+            </Button>)}
+        </DialogActions>)}
     >
       <div className="space-y-4">
         <div><Field label="差し替え先"><form

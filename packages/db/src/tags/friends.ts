@@ -1,3 +1,4 @@
+import { tagReadPredicate, type TagReadScope } from '../tag-lists.js';
 import type { Friend } from '../friends/types/index.js';
 import { type Tag } from './types.js';
 
@@ -67,18 +68,21 @@ export async function getFriendsByTag(
   db: D1Database,
   tagId: string,
   lineAccountId?: string | null,
+  scope?: TagReadScope,
 ): Promise<Friend[]> {
+  const predicate = scope ? tagReadPredicate(scope, 'f') : undefined;
+  const friendSource = predicate ? `(SELECT * FROM friends f WHERE ${predicate.sql}) f` : 'friends f';
   const accountClause = lineAccountId ? ' AND f.line_account_id = ?' : '';
   const bindings = lineAccountId ? [tagId, lineAccountId] : [tagId];
   const result = await db
     .prepare(
       `SELECT f.*
-       FROM friends f
+       FROM ${friendSource}
        INNER JOIN friend_tags ft ON ft.friend_id = f.id
        WHERE ft.tag_id = ?${accountClause}
        ORDER BY f.created_at DESC`,
     )
-    .bind(...bindings)
+    .bind(...(predicate?.binds ?? []), ...bindings)
     .all<Friend>();
   return result.results;
 }

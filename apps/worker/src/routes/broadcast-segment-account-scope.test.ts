@@ -88,8 +88,8 @@ it.each(['preview-count', 'send', 'send-segment'] as const)('%s: 入力集合を
     .mockReturnValue({ sql: 'SELECT f.id, f.line_user_id, f.display_name FROM friends AS f WHERE 1=1', bindings: [] });
   const response = await request(kind);
   if (kind === 'preview-count') {
-    expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({ data: { count: 0 } });
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ success: false });
   } else {
     expect(response.status).toBeGreaterThanOrEqual(400);
   }

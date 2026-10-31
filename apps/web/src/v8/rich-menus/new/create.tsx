@@ -49,7 +49,7 @@ isForbiddenOrRateLimited,
 loadFailureNotice } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import { Field } from '@/components/shared/form-controls'
 import Notice from '@/components/shared/notice'
@@ -1375,9 +1375,9 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
         cancelLabel="閉じる"
         onCancel={() => setCompareOpen(false)}
         footer={
-          <Button type="button" variant="primary" onClick={acceptLatestAndContinue}>
+          <DialogActions><Button type="button" variant="primary" onClick={acceptLatestAndContinue}>
             最新を読み込んで続ける
-          </Button>
+          </Button></DialogActions>
         }
       >
         <VersionCompare before={latestSummary} after={currentSummary} />

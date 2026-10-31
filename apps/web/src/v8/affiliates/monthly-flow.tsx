@@ -64,7 +64,7 @@ export default function MonthlyFlow({ open, accountId, onClose }: { open: boolea
     { label: '成果', value: counts.conversions }, { label: '認めた・承認', value: counts.approved },
     { label: '確定した報酬', value: counts.reward, money: true }, { label: '保留している報酬', value: counts.held, money: true },
   ]
-  return <Dialog open={open} title="今月の成果の流れ" onCancel={onClose} footer={<Button type="button" onClick={onClose}>閉じる</Button>}>
+  return <Dialog open={open} title="今月の成果の流れ" onCancel={onClose} >
     <section aria-label="今月の成果の流れ" aria-busy={loading}>
       {rows.map((row) => <Field key={row.label} label={row.label} optional={false}><span>{row.value === null ? '—' : row.money ? formatYen(row.value) : `${formatNumber(row.value)}件`}</span></Field>)}
       {failed ? <Notice tone="danger" message="一部の集計を読み込めませんでした。取得できない数は「—」で表示しています。" action={<Button type="button" disabled={loading} onClick={() => setAttempt((current) => current + 1)}>もう一度読み込む</Button>} /> : null}

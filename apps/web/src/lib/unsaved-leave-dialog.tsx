@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react'
 import Button from '@/components/shared/button'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 
 interface UnsavedLeaveDialogProps {
   open: boolean
@@ -95,14 +95,14 @@ export function UnsavedLeaveDialog({
         confirmation
         compact
         footer={
-          <div className="flex justify-end gap-2">
+          <DialogActions>
             <Button variant="secondary" onClick={onConfirm} disabled={busy || savingLeave}>
               保存せずに移る
             </Button>
             <Button variant="primary" onClick={() => void saveAndLeave()} disabled={busy || saveDisabled} lockedReason={saveLockedReason} busy={savingLeave} busyLabel="保存中…">
               保存して移る
             </Button>
-          </div>
+          </DialogActions>
         }
       />
     )

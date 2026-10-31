@@ -16,7 +16,7 @@ import Button from '@/components/shared/button'
 import TextLink from '@/components/shared/text-link'
 import Checkbox from '@/components/shared/checkbox'
 import { collectListRows } from '@/components/shared/collect-list-rows'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import EmptyList from '@/components/shared/empty-list'
 import { emptyValue } from '@/components/shared/empty-value'
 import FilterChip from '@/components/shared/filter-chip'
@@ -1075,17 +1075,13 @@ export default function MediaLibraryListV8() {
           if (deleteBusy) return
           closeDeleteDialog()
         }}
-        footer={
-          <div>
-            <p>
-              {impact && !impact.canDelete ? '使用先から外すと削除できます' : ''}
-            </p>
-            <div>
+        footer={deleting && impact && (impact.usageCount > 0 || canDeleteMedia({ impact, busy: false })) ? (
+          <DialogActions leadingAction={impact && !impact.canDelete ? '使用先から外すと削除できます' : undefined}>
+            <>
               <Button type="button" onClick={closeDeleteDialog} disabled={deleteBusy}>
-                閉じる
+                キャンセル
               </Button>
-              {deleting && impact && impact.usageCount > 0 ? (
-                <Button
+              {deleting && impact && impact.usageCount > 0 ? (<Button
                   type="button"
                   variant="primary"
                   disabled={deleteBusy}
@@ -1096,16 +1092,13 @@ export default function MediaLibraryListV8() {
                   }}
                 >
                   別のメディアに差し替える
-                </Button>
-              ) : null}
+                </Button>) : null}
               {/* 消せないときは押し口ごと出さない。押せるように見えて何も起きない形にしない。 */}
-              {canDeleteMedia({ impact, busy: deleteBusy }) ? (
-                <Button type="button" variant="primary" onClick={() => void confirmDeleteOne()} busy={deleteBusy} busyLabel="処理中…">削除する
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        }
+              {canDeleteMedia({ impact, busy: deleteBusy }) ? (<Button type="button" variant="primary" onClick={() => void confirmDeleteOne()} busy={deleteBusy} busyLabel="処理中…">削除する
+                </Button>) : null}
+            </>
+          </DialogActions>
+        ) : undefined}
       >
         <div data-design-node="YfTfJ">
         {impactPhase === 'loading' ? (
@@ -1171,7 +1164,7 @@ export default function MediaLibraryListV8() {
           setBulkConfirm(null)
         }}
         footer={
-          <div>
+          <DialogActions>
             <Button type="button" onClick={() => setBulkConfirm(null)} disabled={bulkBusy}>
               キャンセル
             </Button>
@@ -1181,7 +1174,7 @@ export default function MediaLibraryListV8() {
               disabled={bulkBusy}
               onClick={() => void runBulkDelete(bulkConfirm ?? [])} busy={bulkBusy} busyLabel="処理中…">削除する
             </Button>
-          </div>
+          </DialogActions>
         }
       >
         <p>
@@ -1213,7 +1206,7 @@ export default function MediaLibraryListV8() {
           setArchiveTarget(null)
         }}
         footer={
-          <div>
+          <DialogActions>
             <Button type="button" onClick={() => setArchiveTarget(null)} disabled={archiveBusy}>
               キャンセル
             </Button>
@@ -1224,7 +1217,7 @@ export default function MediaLibraryListV8() {
               onClick={() => void confirmArchiveChange()} busy={archiveBusy} busyLabel="処理中…">
               {archiveTarget?.mode === 'archive' ? 'アーカイブする' : '一覧へ戻す'}
             </Button>
-          </div>
+          </DialogActions>
         }
       >
         <Field label="理由（あとから履歴で確認できます）" required><SaveErrorField names={["archiveReason","archive_reason"]}><SharedTextField
@@ -1252,7 +1245,7 @@ export default function MediaLibraryListV8() {
           setMoveTarget(null)
         }}
         footer={
-          <div>
+          <DialogActions>
             <Button type="button" onClick={() => setMoveTarget(null)} disabled={moveBusy}>
               キャンセル
             </Button>
@@ -1263,7 +1256,7 @@ export default function MediaLibraryListV8() {
               onClick={() => void confirmMove()} busy={moveBusy} busyLabel="処理中…">
               移す
             </Button>
-          </div>
+          </DialogActions>
         }
       >
         <div className={styles.moveField}>

@@ -100,7 +100,7 @@ describe('V8の閲覧と実測値の保護', () => {
     await render()
     expect(state.calls).toEqual(['report:account-a'])
     expect(host.querySelector('[data-design-node="AzrZq"]')).not.toBeNull()
-    const retry = [...host.querySelectorAll('button')].find((button) => button.textContent === 'もう一度読み込む')!
+    const retry = [...host.querySelectorAll('button')].find((button) => button.textContent === 'もう一度')!
     await act(async () => retry.click())
     expect(state.calls).toEqual(['report:account-a', 'report:account-a'])
   })

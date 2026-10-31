@@ -108,6 +108,13 @@ describe('数の帯', () => {
 })
 
 describe('行', () => {
+  it('割当済みと未割り当てを、空の状態セルにせず伝える', async () => {
+    net.list.mockResolvedValue({ success: true, items: [search(), search({ id: 'unassigned', name: '割当待ち', lineAccountId: null })], summary })
+    render(<SearchesTab accountId="acc" canEdit />)
+    await screen.findByText('VIPかつ未契約')
+    expect(within(rowOf('s1')).getByText('割り当て済み')).toBeTruthy()
+    expect(within(rowOf('unassigned')).getByText('未割り当て')).toBeTruthy()
+  })
   it('行の名前のリンクは編集へ、ボタンは条件を当てた友だち一覧へ。省略しても全文を持つ', async () => {
     render(<SearchesTab accountId="acc" canEdit />)
     await screen.findByText('VIPかつ未契約')

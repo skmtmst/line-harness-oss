@@ -2,7 +2,7 @@ import { liffBookingInputError, liffBookingJson, liffBookingResponse } from '../
 import { logger } from '@line-crm/shared/server';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
-import { bookingCancellationQuote } from '../../features/booking/booking-cancellation/index.js';
+import { bookingCancellationQuote, customerCancellationDeadline } from '../../features/booking/booking-cancellation/index.js';
 import { syncSelfBookingMeet } from '../booking-self-meet-sync.js';
 import type { SelfBookingChange } from '../booking-self-meet-sync.js';
 import { inputJsonBoundary } from '../../lib/input-errors.js';
@@ -161,11 +161,11 @@ booking.post('/api/liff/booking/:id/cancel', inputJsonBoundary(), async (c) => {
   }
   const cancellationAt=new Date();
   const quote=await bookingCancellationQuote(c.env.DB,bookingId,accountId,cancellationAt);
-  if(quote.feeNow>0 && (body.feeAccepted!==true||body.expectedFeeAmount!==quote.feeNow))return liffBookingJson(c, {error:'cancellation_fee_confirmation_required',data:quote},409);
   const rules = await readSelfBookingRules(c.env.DB, accountId, row.menu_id);
-  if (cancellationAt.getTime() >= new Date(row.starts_at).getTime() || (!quote.policyAcceptedRequired && cancellationAt.getTime() > new Date(row.starts_at).getTime() - rules.cancelDeadlineMinutesBefore * 60_000)) {
+  if (cancellationAt.getTime() >= Date.parse(row.starts_at) || cancellationAt.getTime() > Date.parse(customerCancellationDeadline(row.starts_at,quote.policyAcceptedRequired,rules.cancelDeadlineMinutesBefore))) {
     return liffBookingJson(c, { error: 'self_deadline_passed' }, 403);
   }
+  if(quote.feeNow>0 && (body.feeAccepted!==true||body.expectedFeeAmount!==quote.feeNow))return liffBookingJson(c, {error:'cancellation_fee_confirmation_required',data:quote},409);
   // 条件付き確定: 同時取消の race では片方だけが通る。副作用は通った方だけ走る。
   // 所有権は cancel_claim_id (uuid) を同じ UPDATE で書く単文 CAS。
   // 確定と主張が不可分のため、確定→監査の別 await 窓は存在しない。

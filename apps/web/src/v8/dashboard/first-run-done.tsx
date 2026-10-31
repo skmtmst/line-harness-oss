@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import type { AccountStyle } from '@line-crm/shared'
-import Button from '@/components/shared/button'
 import HelpTip from '@/components/shared/help-tip'
-import Dialog, { DialogActions } from '@/components/shared/dialog'
+import Dialog from '@/components/shared/dialog'
 import TextLink from '@/components/shared/text-link'
 import ListState from '@/components/shared/list-state'
 import StatusBadge, { type StatusBadgeTone } from '@/components/shared/status-badge'
@@ -83,7 +82,7 @@ export function FirstRunDoneDialog({ accountId, style, minutes, steps, progress,
       description={elapsed ?? undefined}
       size="large"
       onCancel={onClose}
-      footer={<DialogActions><Button variant="primary" onClick={onClose}>閉じる</Button></DialogActions>}
+
     >
       <div className={styles.body}>
         <p className={styles.note}>LINE がお客さまへの 1 通を受け取りました。</p>
