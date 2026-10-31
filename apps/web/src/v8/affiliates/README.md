@@ -31,6 +31,7 @@ HTTP契約は [API文書の一覧](../../../../../docs/README.md#api)、失敗�
 
 - [BEHAVIOR.md](BEHAVIOR.md)
 - [affiliators.test.tsx](affiliators.test.tsx)
+- [account-scope.test.tsx](account-scope.test.tsx)
 - [approvals-order.test.tsx](approvals-order.test.tsx)
 - [display-approvals.test.ts](display-approvals.test.ts)
 - [entry-behavior.test.tsx](entry-behavior.test.tsx)

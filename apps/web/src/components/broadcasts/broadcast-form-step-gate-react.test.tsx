@@ -228,6 +228,17 @@ describe('段ごとの確かめで［次へ］を止める', () => {
     }
   })
 
+  it('新規の宛先は未選択で、選ぶまで次へ進めず理由を出す', async () => {
+    await renderForm('audience', { visualQaAugustCampaign: true })
+    try {
+      expect(container.querySelectorAll('input[name="broadcast-target-mode"]:checked')).toHaveLength(0)
+      expect(button('メッセージ設定へ').disabled).toBe(true)
+      expect(footerReason()).toBe('送る相手を選んでください')
+      await click(button('メッセージ設定へ'))
+      expect(onStepChange).not.toHaveBeenCalled()
+    } finally { unmount() }
+  })
+
   it('宛先の条件が空のときは宛先の段の［次へ］を押せない（絞ったつもりで全員に届くのを防ぐ）', async () => {
     await renderForm('audience', { visualQaAugustCampaign: true, initialCondition: { operator: 'AND', rules: [] } })
     try {
@@ -323,7 +334,7 @@ describe('段ごとの確かめで［次へ］を止める', () => {
       await typeTitle('新しい配信名')
       await act(async () => { await vi.advanceTimersByTimeAsync(5000) })
       expect(createApi).toHaveBeenCalled()
-      expect(createApi.mock.calls[0][0]).toMatchObject({ saveAsDraft: true, draftSendChoice: 'unselected', stealthSpreadMinutes: 0, scheduledAt: null })
+      expect(createApi.mock.calls[0][0]).toMatchObject({ saveAsDraft: true, draftSendChoice: 'unselected', draftTargetMode: 'unselected', targetType: 'tag', targetTagId: '', stealthSpreadMinutes: 0, scheduledAt: null })
       expect(button('配信前チェックへ').disabled).toBe(true)
     } finally { unmount(); vi.useRealTimers() }
   })

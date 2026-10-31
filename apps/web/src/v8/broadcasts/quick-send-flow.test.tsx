@@ -45,6 +45,8 @@ const onClose = vi.fn()
 async function fill() {
   render(<QuickSend open accountId="account-a" onClose={onClose} onSent={onSent} />)
   await act(async () => {})
+  fireEvent.click(screen.getByRole('radio', { name: '友だち全員' }))
+  fireEvent.click(screen.getByRole('radio', { name: '今すぐ', exact: true }))
   fireEvent.change(screen.getByLabelText('本文'), { target: { value: 'お知らせ' } })
   await estimate()
 }
@@ -63,6 +65,18 @@ beforeEach(() => {
   mocks.preflight.mockResolvedValue({ success: true, data: { audienceCount: 10, hiddenExcluded: 0 } })
 })
 afterEach(() => { cleanup(); forgetStaffIdentity(); forgetSessionSnapshot(); vi.useRealTimers() })
+it('新規は相手も時間も未選択で、本文だけでは人数確認も送信もしない', async () => {
+  render(<QuickSend open accountId="account-a" onClose={onClose} onSent={onSent} />)
+  await act(async () => {})
+  fireEvent.change(screen.getByLabelText('本文'), { target: { value: 'お知らせ' } })
+  await estimate()
+  expect(screen.getAllByRole('radio').filter(radio => radio.getAttribute('aria-checked') === 'true')).toHaveLength(0)
+  expect(screen.getByText('送る相手を選んでください。')).toBeTruthy()
+  expect(screen.getByRole<HTMLButtonElement>('button', { name: '送る', exact: true }).disabled).toBe(true)
+  expect(heldSend.current).toBeTypeOf('function')
+  await act(async () => heldSend.current!())
+  posts()
+})
 it('日本時間10月5日10時を同じ時刻のISOで予約する', async () => {
   await fill()
   fireEvent.click(screen.getByRole('radio', { name: '日時を決める' }))
@@ -280,6 +294,8 @@ it.each(['account', 'account-roundtrip', 'reopen'])('%sで別の窓になった�
   mocks.create.mockImplementationOnce(() => new Promise(r => { resolve = r }))
   const props = { open: true, accountId: 'account-a', onClose, onSent }
   const view = render(<QuickSend {...props} />); await act(async () => {})
+  fireEvent.click(screen.getByRole('radio', { name: '友だち全員' }))
+  fireEvent.click(screen.getByRole('radio', { name: '今すぐ', exact: true }))
   fireEvent.change(screen.getByLabelText('本文'), { target: { value: '前の窓' } }); await estimate()
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '送る', exact: true })))
   if (change === 'account' || change === 'account-roundtrip') { view.rerender(<QuickSend {...props} accountId="account-b" />); if (change === 'account-roundtrip') view.rerender(<QuickSend {...props} />) }
@@ -322,9 +338,13 @@ it('前の窓のfinallyが新しい送信中の連打防止を解除しない', 
     .mockImplementationOnce(() => new Promise(r => { newResolve = r }))
   const props = { open: true, accountId: 'account-a', onClose, onSent }
   const view = render(<QuickSend {...props} />); await act(async () => {})
+  fireEvent.click(screen.getByRole('radio', { name: '友だち全員' }))
+  fireEvent.click(screen.getByRole('radio', { name: '今すぐ', exact: true }))
   fireEvent.change(screen.getByLabelText('本文'), { target: { value: '前の窓' } }); await estimate()
   await act(async () => fireEvent.click(screen.getByRole('button', { name: '送る', exact: true })))
   view.rerender(<QuickSend {...props} open={false} />); view.rerender(<QuickSend {...props} />); await act(async () => {})
+  fireEvent.click(screen.getByRole('radio', { name: '友だち全員' }))
+  fireEvent.click(screen.getByRole('radio', { name: '今すぐ', exact: true }))
   fireEvent.change(screen.getByLabelText('本文'), { target: { value: '次の窓' } }); await estimate()
   const retained = heldSend.current
   expect(retained).toBeTypeOf('function')
@@ -404,5 +424,35 @@ it('詳しく作る導線は共通の文字操作を使い、閲覧のみでも�
   expect(locked.getAttribute('aria-disabled')).toBe('true')
   act(() => { locked.focus(); fireEvent.keyDown(locked, { key: 'Enter' }) })
   expect(screen.getByRole('tooltip').textContent).toContain('閲覧のみ')
+  posts()
+})
+
+it.each(['友だち全員', '今すぐ'])('%sだけ選んでも送信しない', async choice => {
+  render(<QuickSend open accountId="account-a" onClose={onClose} onSent={onSent} />)
+  await act(async () => {})
+  fireEvent.change(screen.getByLabelText('本文'), { target: { value: 'お知らせ' } })
+  fireEvent.click(screen.getByRole('radio', { name: choice, exact: true }))
+  await estimate()
+  expect(screen.getByRole<HTMLButtonElement>('button', { name: '送る', exact: true }).disabled).toBe(true)
+  expect(screen.getByText(choice === '今すぐ' ? '送る相手を選んでください。' : '送る時間を選んでください。')).toBeTruthy()
+  expect(heldSend.current).toBeTypeOf('function')
+  await act(async () => heldSend.current!())
+  expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.request).not.toHaveBeenCalled()
+})
+it('全員と今すぐを選んだ古い押し口も、タグ未入力へ変えた後は送信しない', async () => {
+  await fill()
+  const previous = heldSend.current!
+  fireEvent.click(screen.getByRole('radio', { name: 'タグで絞る' }))
+  await act(async () => previous())
+  expect(mocks.create).not.toHaveBeenCalled(); expect(mocks.send).not.toHaveBeenCalled()
+})
+it('アカウントを替えると相手と日時を未選択へ戻す', async () => {
+  const props = { open: true, accountId: 'account-a', onClose, onSent }
+  const view = render(<QuickSend {...props} />)
+  await act(async () => {})
+  fireEvent.click(screen.getByRole('radio', { name: '友だち全員' }))
+  fireEvent.click(screen.getByRole('radio', { name: '今すぐ', exact: true }))
+  await act(async () => view.rerender(<QuickSend {...props} accountId="account-b" />))
+  expect(screen.getAllByRole('radio').filter(radio => radio.getAttribute('aria-checked') === 'true')).toHaveLength(0)
   posts()
 })

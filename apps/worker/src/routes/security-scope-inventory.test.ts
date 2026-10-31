@@ -43,6 +43,25 @@ function server(db: ReturnType<typeof createTestD1>, router: Hono<Env>, tenantId
 const post = (data: unknown): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
 
 describe('S07 unqualified resource IDs and aggregate requests stay in the staff account scope', () => {
+  it.each(['owner', 'admin', 'staff'] as const)('memberAccountId narrows the current store without widening %s access', async role => {
+    const db = fixture();
+    db.raw.exec("UPDATE line_accounts SET tenant_id='ta' WHERE id='b'; INSERT INTO friends (id,line_user_id,display_name,line_account_id,is_following,created_at,updated_at) VALUES ('fb-only','U-b-only','B only','b',1,'2026-10-31','2026-10-31')");
+    const app = server(db, usersGrouped, 'ta', role);
+    const broad = await (await app.request('/api/users-grouped')).json() as { data: { total: number } };
+    expect(broad.data.total).toBe(2);
+    const current = await (await app.request('/api/users-grouped?memberAccountId=a')).json() as { data: { total: number; rows: { displayName: string }[] } };
+    expect(current.data.total).toBe(1);
+    expect(JSON.stringify(current)).not.toContain('B only');
+    const intersection = await (await app.request('/api/users-grouped?memberAccountId=a&account=b')).json() as { data: { total: number } };
+    expect(intersection.data.total).toBe(1);
+    const unrelated = await (await app.request('/api/users-grouped?memberAccountId=a&q=B%20only')).json() as { data: { total: number } };
+    expect(unrelated.data.total).toBe(0);
+    db.raw.exec("UPDATE staff_members SET account_scope='accounts' WHERE id='sa'; INSERT INTO staff_account_scopes(staff_id,line_account_id,created_at) VALUES ('sa','a','2026-10-31')");
+    const forbidden = await (await app.request('/api/users-grouped?memberAccountId=b')).json() as { data: { total: number; rows: unknown[] } };
+    expect(forbidden.data).toMatchObject({ total: 0, rows: [] });
+    expect(JSON.stringify(forbidden)).not.toContain('other@example.invalid');
+  });
+
   it.each(['owner','admin','staff'] as const)('grouped users: %s never receives another store member or merged private contact', async role => {
     const db = fixture();
     const response = await server(db, usersGrouped, 'ta', role).request('/api/users-grouped');

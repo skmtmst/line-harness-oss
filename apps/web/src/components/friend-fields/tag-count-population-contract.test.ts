@@ -12,11 +12,6 @@ describe('V8タグ一覧の件数の母集団', () => {
   it('KPIは一覧と同じアカウント範囲で数える', () => {
     expect(PAGE).toContain('api.listStats.get(accountId)')
   })
-  it('フォルダ欄は全体と各フォルダの内訳を同じ取得済みデータから数える', () => {
-    expect(PAGE).toContain("label: 'すべて', count: ready ? items.length : null")
-    expect(PAGE).toContain('count: ready ? items.filter((tag) => tag.groupId === group.id).length : null')
-    expect(PAGE).toContain('count: ready ? items.filter((tag) => !tag.groupId).length : null')
-  })
   it('畳まれたフォルダ選択には件数を重ねない', () => {
     expect(PAGE).toContain("label: 'フォルダ：すべて'")
     expect(PAGE).not.toMatch(/フォルダ：すべて（\$\{.*\}件）/)

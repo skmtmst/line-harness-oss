@@ -516,6 +516,7 @@ describe('自動保存の競合（R625/R626/R627）', () => {
     await enter(titleInput(), 'reachable title')
     await click('対象設定へ')
     expect(step).toBe('audience')
+    await act(async () => { container.querySelector<HTMLInputElement>('input[name=broadcast-target-mode][value=scenario]')!.click() })
     await click('メッセージ設定へ')
     expect(step).toBe('message')
     await enter(messageInput(), 'reachable body')

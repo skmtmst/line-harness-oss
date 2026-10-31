@@ -119,3 +119,9 @@ describe('要約', () => {
     expect(describeAudience('tag', { ...empty, tagId: 'gone' }, names)).toBe('タグ未選択')
   })
 })
+
+it('未選択を全員向けの条件へ変換せず、要約にも未選択を出す', () => {
+  expect(audienceError('unselected', empty)).toBe('送る相手を選んでください')
+  expect(() => buildAudienceCondition('unselected', empty)).toThrow('送る相手を選んでください')
+  expect(describeAudience('unselected', empty, { scenarios: [], tags: [] })).toBe('送る相手は未選択')
+})

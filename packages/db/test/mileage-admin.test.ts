@@ -14,7 +14,7 @@ import {
   reserveMileageAdjustmentNotification,
   saveMileageEarningRuleDraft,
 } from '../src/mileage/admin-operations.js';
-import { getMileageAdminHistory, postMileageAdjustment } from '../src/mileage/index.js';
+import { getMileageAdminHistory, getMileageSummaryForFriend, postMileageAdjustment } from '../src/mileage/index.js';
 import { asD1 } from './d1-test-helper.js';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -96,6 +96,34 @@ describe('mileage admin read models', () => {
     await expect(saveMileageEarningRuleDraft(db, {
       ruleId: 'builtin-link-clicked', lineAccountId: 'account-1', expectedVersion: 0, draft,
     })).rejects.toMatchObject<MileageV6Error>({ code: 'rule_not_found', status: 404 });
+  });
+
+  it('friend detail and the member list read the same one-mile wallet', async () => {
+    await postMileageAdjustment(db, {
+      friendId: 'friend-1', lineAccountId: 'account-1', amount: 1, reason: '一致の確認',
+      reasonCategory: 'campaign', idempotencyKey: 'one-mile-comparison',
+      executedByStaffId: 'staff-1', executedByStaffName: '担当者',
+    });
+    const detail = await getMileageSummaryForFriend(db, 'friend-1');
+    const list = await getMileageFriendsV6(db, { lineAccountId: 'account-1', visibleAccountIds: ['account-1'], search: '', friendId: 'friend-1', limit: 1, offset: 0 });
+    expect(detail.available).toBe(1);
+    expect(list.items[0]?.available).toBe(detail.available);
+    expect(list.summary.available).toBe(detail.available);
+  });
+
+  it('a shared person adjusted in another store has the same balance in detail and the selected-store list', async () => {
+    sqlite.exec("INSERT INTO users(id, display_name) VALUES ('same-person', '同じ人'); UPDATE friends SET user_id='same-person' WHERE id IN ('friend-1','friend-2')");
+    await postMileageAdjustment(db, {
+      friendId: 'friend-2', lineAccountId: 'account-2', amount: 1, reason: '別店舗での調整',
+      reasonCategory: 'campaign', idempotencyKey: 'shared-wallet-comparison',
+      executedByStaffId: 'staff-1', executedByStaffName: '担当者',
+    });
+    const detail = await getMileageSummaryForFriend(db, 'friend-1');
+    const list = await getMileageFriendsV6(db, { lineAccountId: 'account-1', visibleAccountIds: ['account-1'], search: '', friendId: 'friend-1', limit: 1, offset: 0 });
+    expect(detail.available).toBe(1);
+    expect(list.items).toHaveLength(1);
+    expect(list.items[0]?.available).toBe(detail.available);
+    expect(list.summary.available).toBe(detail.available);
   });
 
   it('returns real balances, expiration, period totals, score reasons, and reward reach', async () => {

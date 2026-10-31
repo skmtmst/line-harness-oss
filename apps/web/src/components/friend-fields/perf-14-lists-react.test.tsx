@@ -136,7 +136,7 @@ describe('PERF-14: 一覧は補助取得を待たない', () => {
     // あとから届いた集計はカードへ入る。
     stats.resolve({ success: true, data: { total: 1, inUse: 1, registeredFriends: 5, formLinks: null, updatedThisMonth: 2 } })
     await flush()
-    expect(host.textContent).toContain('使っている 1 件')
+    expect(host.textContent).toContain('値の登録あり 1 件')
   })
 
   it('友だち情報欄: 集計が失敗しても一覧は残り、カードは理由を添える', async () => {

@@ -48,6 +48,7 @@ export default function FieldsView(model: ReturnType<typeof useFieldsTab>) {
             value={kpi.value}
             unit={kpi.value == null ? '' : kpi.unit}
             detail={kpi.detail}
+            help={kpi.help}
           />
         ))}
       </KpiBand>}

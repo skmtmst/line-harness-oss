@@ -1,4 +1,7 @@
 'use client'
+
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
 import { useGooglePermission } from './use-google-permission'
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
@@ -67,7 +70,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
   const [index, setIndex] = useState(0)
   const id = ids[index] ?? ids[0]
   const [change, setChange] = useState<GoogleChange | null>(null)
-  const [store, setStore] = useState<{ name: string; timeZone: string } | null>(null)
+  const [store, setStore] = useState<{ id: string; name: string; timeZone: string } | null>(null)
   const [writeEnabled, setWriteEnabled] = useState(true)
   const [canSend, setCanSend] = useState(false)
   const { allowed: canEdit, lockedReason } = useGooglePermission('manager')
@@ -90,7 +93,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
     try {
       const response = await restaurantGoogleApi.change(accountId, id)
       setChange(response.change)
-      setStore({ name: response.store.name, timeZone: response.store.timeZone })
+      setStore({ id: response.store.id, name: response.store.name, timeZone: response.store.timeZone })
       setWriteEnabled(response.writeEnabled)
       setCanSend(response.canSend)
     } catch (err) {
@@ -182,6 +185,7 @@ export function ChangeConfirmScreen({ accountId, ids, go }: { accountId: string;
         note={<StatusBadge tone={status.tone}>{status.label}</StatusBadge>}
         help={isHours ? '反映直前にGoogleの最新情報を再確認します。他の担当者が変更していた場合は、差分を表示して止めます。' : '反映直前にGoogleの最新情報を再確認します。他の担当者が同じ項目を変更していた場合は、差分を表示して止めます。'}
         helpLabel="変更の確かめ方の説明" />
+      <OperationTargetSummary accounts={[{ id: accountId }]} store={store} />
       <p className={styles.muted}>{`対象店舗：${store.name} / ${isHours ? store.timeZone : `変更する項目：${FIELD_LABEL[field ?? ''] ?? ''}`}`}</p>
       {ids.length > 1 ? <p className={styles.muted}>{index + 1} / {formatNumber(ids.length)}件目</p> : null}
       {sent ? <Notice tone="success">{sent.alreadyApplied ? 'この内容はすでにGoogleに反映されていました。送信はしていません。' : change.status === 'applied' ? 'Googleに変更を送信し、反映を確認しました。' : 'Googleに変更を送信しました。反映を確認できるまで「反映確認中」と表示します。審査・同期に時間がかかることがあります。'}</Notice> : null}

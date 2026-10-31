@@ -299,7 +299,7 @@ export function useFieldsTab({ accountId, canEdit, narrow = false, host, explana
         : null
   const detailOf = (whenAvailable: string): string => kpiReason ?? whenAvailable
   const kpis = [
-    { title: '項目', icon: List, value: summary?.total ?? null, unit: '件', detail: detailOf(typeof summary?.inUse === 'number' ? `使っている ${summary.inUse} 件` : '使っている数は未集計') },
+    { title: '項目', help: '項目へ保存された値が1つ以上ある項目数です。メッセージへの差し込みで使っている数は含みません。', icon: List, value: summary?.total ?? null, unit: '件', detail: detailOf(typeof summary?.inUse === 'number' ? `値の登録あり ${summary.inUse} 件` : '値の登録がある項目数は未集計') },
     { title: '入力済みの友だち', icon: Users, value: summary?.registeredFriends ?? null, unit: '人', detail: detailOf('1つ以上入っている') },
     // 口そのものが無いときは、読込・失敗とは別の言葉にする（管理画面 と同じ）。
     { title: '回答フォームで集める', icon: ClipboardList, value: summary?.formLinks ?? null, unit: '件', detail: kpiReason ?? (summary?.formLinks === null ? notConnectedText('回答フォームの登録先') : '回答で自動で入る') },

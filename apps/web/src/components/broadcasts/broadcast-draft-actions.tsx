@@ -10,6 +10,7 @@ import { useSaveFormErrors } from '@/components/shared/save-form-errors'
 import { notifyToast } from '@/components/shared/toast'
 import { describeSaveFailure,type ApiBroadcast,type BroadcastBubble,type BroadcastMessageButton } from '@/lib/api'
 import { bubbleLegacyMessage,bubblesForSave } from '@/lib/broadcast-template'
+import type { TargetMode } from '@/lib/broadcast-audience'
 import type { SegmentCondition } from '@/lib/segment-condition'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 
@@ -28,12 +29,13 @@ type BuildBroadcastDraftContext = {
   spreadMinutes: string
   scheduledDate?: string
   scheduledTime?: string
+  targetMode?: TargetMode
   targetPayload: () => { targetType: "tag"; targetTagId: string; segmentConditions: undefined; } | { targetType: "segment"; targetTagId: null; segmentConditions: SegmentCondition; }
   title: string
   trackLinks: boolean
 }
 
-export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, deliveryLimit, selectedAccountId, sendChoice, spreadStartMode, spreadMinutes, scheduledDate, scheduledTime, targetPayload, title, trackLinks }: BuildBroadcastDraftContext, scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) {
+export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep, folderId, internalMemo, measureOpens, messageButtons, deliveryLimit, selectedAccountId, sendChoice, spreadStartMode, spreadMinutes, scheduledDate, scheduledTime, targetMode, targetPayload, title, trackLinks }: BuildBroadcastDraftContext, scheduledAt: string | null, saveAsDraft = false, confirmedCount?: number) {
     const first = bubbles[0]
     const legacy = bubbleLegacyMessage(first)
     return {
@@ -42,6 +44,7 @@ export function buildBroadcastDraft({ afterActionVersionId, bubbles, currentStep
       messageContent: legacy.messageContent,
       messageBubbles: bubblesForSave(bubbles),
       ...targetPayload(),
+      ...(targetMode ? { draftTargetMode: targetMode } : {}),
       lineAccountId: selectedAccountId || null,
       scheduledAt,
       // 1人運用のとき、送る人が確認で入れた人数。予約の口が突き合わせる。

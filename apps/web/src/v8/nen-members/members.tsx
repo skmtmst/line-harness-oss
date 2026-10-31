@@ -11,6 +11,7 @@
  */
 
 import { useState, type ReactNode } from 'react'
+import { useAccountStyle } from '@/hooks/use-account-style'
 import { Download, History, CircleHelp, Undo2 } from 'lucide-react'
 import { ListPage } from '@/components/templates'
 import Button from '@/components/shared/button'
@@ -61,6 +62,9 @@ export default function MembersV8({
 }) {
   const role = useStaffRole()
   const readonly = !canManageRole(role)
+  const profile = useAccountStyle(accountId)
+  const ecAvailable = profile.status === 'ready' && !profile.stale
+    && profile.data?.style === 'ec' && profile.data.styleSelected === true
   /* ★V8 の上の帯は「ホーム › 会員」。画面名は枠が付ける。 */
   usePageCrumbs([{ label: 'ホーム', href: '/' }])
 
@@ -76,7 +80,7 @@ export default function MembersV8({
         { label: '会員一覧', count: kpis?.members, current: tab === 'members', onClick: () => onChangeTab('members') },
         { label: 'ランク設定', current: tab === 'ranks', onClick: () => onChangeTab('ranks') },
         { label: 'ライフタイム', current: tab === 'lifetime', onClick: () => onChangeTab('lifetime') },
-        { label: 'ECとの照合', href: '/ec-commerce/identity-candidates' },
+        ...(ecAvailable ? [{ label: 'ECとの照合', href: '/ec-commerce/identity-candidates' }] : []),
       ]}
     />
     {readonly ? (
