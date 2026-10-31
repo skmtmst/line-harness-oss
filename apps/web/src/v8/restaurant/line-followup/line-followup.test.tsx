@@ -43,7 +43,7 @@ describe('8枚のカードと保存',()=>{
  it('割り切れない既存の分数を正確に出し、本文だけ変えても保つ',async()=>{snapshot.board.engines.find(row=>row.trigger==='post_visit')!.editorContent.timing={mode:'countdown',offsetMinutes:185};await ready();await edit('post_visit');expect((screen.getByRole('spinbutton',{name:'きっかけから待つ時間'}) as HTMLInputElement).value).toBe('185');await text('内容の更新');await accept();await save();expect(f.saveRow).toHaveBeenCalledWith('a','s','post_visit',expect.objectContaining({timing:{mode:'countdown',offsetMinutes:185}}))})
  it('2通目以降を落とさず、本文を版付きで保存する',async()=>{snapshot.board.engines[0]!.editorContent.messageParts.push({messageType:'text',messageContent:'続きの本文'});await ready();await edit();await text('先頭の修正');await accept();await save();expect(f.saveRow).toHaveBeenCalledWith('a','s','reservation_created',expect.objectContaining({messageBubbles:expect.arrayContaining([expect.objectContaining({content:expect.objectContaining({text:'先頭の修正'})}),expect.objectContaining({content:expect.objectContaining({text:'続きの本文'})})])}))})
  it('テンプレートを選んだ本文を保存し、ダイアログのキャンセルは値を変えない',async()=>{await ready();await edit();fireEvent.click(screen.getByRole('button',{name:'テンプレートから選ぶ'}));fireEvent.click(screen.getByRole('button',{name:'このテンプレートを選ぶ'}));await accept();await save();expect(f.saveRow).toHaveBeenCalledWith('a','s','reservation_created',expect.objectContaining({messageBubbles:[expect.objectContaining({content:{text:'選んだテンプレートの本文'}})]}))})
- it('詳細で構成を増やした実物を空の本文で上書きしない',async()=>{snapshot.board.engines[0]!.editorContent=null as never;await ready();const change=within(card('reservation_created')).getByRole('button',{name:'変える'});fireEvent.click(change);expect(screen.queryByRole('dialog')).toBeNull();expect(within(card('reservation_created')).getByText('詳しい構成のため、詳細画面で中身をご確認ください。')).toBeTruthy();expect(f.saveRow).not.toHaveBeenCalled()})
+ it('詳細で構成を増やした実物を空の本文で上書きしない',async()=>{snapshot.board.engines[0]!.editorContent=null as never;await ready();const change=within(card('reservation_created')).getByRole('button',{name:'変える'});fireEvent.click(change);expect(screen.queryByRole('dialog')).toBeNull();expect(within(card('reservation_created')).getByText('詳細で中身を確認してから試してください。')).toBeTruthy();expect(f.saveRow).not.toHaveBeenCalled()})
  it('詳しい設定の行き先は保存済みの実物のURLを使う',async()=>{await ready();expect(within(card('reservation_24h')).getByRole('link',{name:'詳しく設定する →'}).getAttribute('href')).toBe('/reminders/detail?id=resource-reservation_24h')})
  it('他のカードを開いても未保存の内容を保つ',async()=>{await ready();await edit();await text('まだ保存していない本文');await accept();await edit('reservation_24h');fireEvent.click(screen.getByRole('button',{name:'キャンセル'}));await edit();expect(screen.getByRole('textbox',{name:'本文'}).textContent).toContain('まだ保存していない本文')})
  it('競合した行は入力と理由を保ち、他の成功した行だけを反映する',async()=>{await ready();fireEvent.click(within(card('reservation_created')).getByRole('switch'));fireEvent.click(within(card('reservation_24h')).getByRole('switch'));f.saveRow.mockImplementationOnce(async()=>{snapshot.page.rows[0]!.enabled=false;return {}}).mockRejectedValueOnce(new Error('ほかの担当者が先に保存しました'));await save();expect(screen.getByText('保存できませんでした')).toBeTruthy();expect(screen.getByText('ほかの担当者が先に保存しました')).toBeTruthy();expect(f.saveRow).toHaveBeenCalledTimes(2)})
@@ -106,3 +106,39 @@ it('予約の日時の差し込みは日本語で見せ、保存するキーを�
  fireEvent.click(screen.getByRole('button',{name:'人数',exact:true}));await accept();await save();
  expect(f.saveRow.mock.calls[0][3].messageBubbles[0].content.text).toContain('{{var.reservation_datetime}}');
 });
+
+
+describe('時期の入力の保全',()=>{
+ it.each([
+  ['reservation_24h','予約の何日前','3',-3],
+  ['reservation_2h','予約までの時間','2',-120],
+  ['post_visit','きっかけから待つ時間','3',180],
+  ['anniversary_before','記念日の何日前','7',-7],
+ ] as const)('%sの負の入力を残して欄に理由を出し、直すまで保存しない',async(trigger,label,valid,_expected)=>{
+  await ready();await edit(trigger)
+  const input=screen.getByRole('spinbutton',{name:label}) as HTMLInputElement
+  fireEvent.change(input,{target:{value:'-3'}})
+  expect(input.value).toBe('-3')
+  expect(input.getAttribute('aria-invalid')).toBe('true')
+  const description=input.getAttribute('aria-describedby')?.split(' ').map(id=>document.getElementById(id)?.textContent).join(' ')
+  expect(description).toMatch(/確認|選んで|以上/)
+  const confirm=screen.getByRole('button',{name:'この内容でオンにする'})
+  expect(confirm.getAttribute('aria-disabled')==='true'||confirm.hasAttribute('disabled')).toBe(true)
+  fireEvent.click(confirm);expect(screen.getByRole('dialog')).toBeTruthy();expect(f.saveRow).not.toHaveBeenCalled()
+  fireEvent.change(input,{target:{value:valid}})
+  expect(input.getAttribute('aria-invalid')).not.toBe('true')
+  expect(within(screen.getByRole('dialog')).queryByRole('alert')).toBeNull()
+  await accept();await save()
+  expect(f.saveRow.mock.calls[0][3].timing).toMatchObject(trigger==='reservation_24h'||trigger==='anniversary_before'?{offsetDays:_expected}:{offsetMinutes:_expected})
+ })
+ it.each(FOLLOWUP_ORDER)('表示できない%sの中身を準備済みと呼ばず、詳細への入口を残す',async trigger=>{
+  snapshot.page.rows.find(row=>row.trigger===trigger)!.enabled=true
+  snapshot.board.engines.find(row=>row.trigger===trigger)!.editorContent=null as never
+  await ready();const row=card(trigger)
+  expect(within(row).queryByText('準備済み・送信停止中')).toBeNull()
+  expect(within(row).getByText('中身を確認してください')).toBeTruthy()
+  expect(within(row).getByText('詳細で中身を確認してから試してください。')).toBeTruthy()
+  expect(within(row).getByRole('button',{name:'試す・送り始める'}).hasAttribute('disabled')).toBe(false)
+  expect(within(row).getByRole('link',{name:'詳しく設定する →'}).getAttribute('href')).toContain('id=')
+ })
+})

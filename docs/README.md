@@ -1099,3 +1099,5 @@
 - [検証配備でCloudflare混雑時に待って再試行する](release-log/unreleased/2021-masato-cf-staging-deploy-retry.md) — 反映履歴、確認 2026-11-01。
 
 - [LINE来店フォローのカードと予約フォーム](release-log/unreleased/0000-kenta-followup-board.md) — 反映履歴、確認 2026-10-31。
+
+- [来店フォローの入力と内容確認](release-log/unreleased/0000-kenta-followup-inputs.md) — 反映履歴、確認 2026-11-01。
