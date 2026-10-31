@@ -54,7 +54,7 @@ async function enterCode(digits: string) {
   })
 }
 
-/** 「コードが使えない場合」を開く（回復コードと、経路に合わせた戻り道が出る）。 */
+/** 「コードが使えない場合」を開く（経路に合わせた戻り道が出る）。 */
 async function openHelpChoices() {
   const toggle = [...host.querySelectorAll('button')].find((button) => button.textContent === 'コードが使えない場合')
   await act(async () => { toggle?.click() })
@@ -163,7 +163,7 @@ describe('R507 ログイン方法の取り違え', () => {
     await render()
     await openHelpChoices()
 
-    expect(host.textContent).toContain('回復コードを使う')
+    expect(host.textContent).toContain('コードが使えない場合')
     expect(host.textContent).not.toContain('別のLINEアカウントでログイン')
   })
 })

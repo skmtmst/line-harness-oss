@@ -10,19 +10,16 @@ import Notice from '@/components/shared/notice'
 import Dialog from '@/components/shared/dialog'
 import OtpInput from '@/components/shared/otp-input'
 import TotpQr from '@/components/shared/totp-qr'
-import { RecoveryCodePanel } from '@/v8/login/public/recovery-codes/index'
 import { qrToDataURL } from '@/lib/qr-image'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import { formatDate } from '@/lib/format'
 import styles from './staff.module.css'
 
-type Self = { staffId: string; enabledAt: string | null; remaining: number | null; canEdit: boolean; notice: string | null }
+type Self = { staffId: string; enabledAt: string | null; canEdit: boolean; notice: string | null }
 export default function SelfMfa({ loginPath = '/login', compact = false, onEnabledChange }: { loginPath?: '/login' | '/ops/login'; compact?: boolean; onEnabledChange?: (enabled: boolean) => void }) {
   const [self, setSelf] = useState<Self | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-  const [relogin, setRelogin] = useState(false)
-  const [codes, setCodes] = useState<string[]>([])
   const [setup, setSetup] = useState<{ manualKey: string; qr: string } | null>(null)
   const [code, setCode] = useState('')
   const stepUp = useStepUpGate()
@@ -47,9 +44,9 @@ export default function SelfMfa({ loginPath = '/login', compact = false, onEnabl
     if (busy || !self || code.length !== 6) return
     setBusy(true); setError('')
     try {
-      const res = await fetchApi<ApiResponse<{ recoveryCodes: string[] }>>(`/api/staff/${encodeURIComponent(self.staffId)}/two-factor/confirm`, { method: 'POST', body: JSON.stringify({ code }) })
+      const res = await fetchApi<ApiResponse<unknown>>(`/api/staff/${encodeURIComponent(self.staffId)}/two-factor/confirm`, { method: 'POST', body: JSON.stringify({ code }) })
       if (!res.success) throw new Error(res.error)
-      setRelogin(true); setCodes(res.data.recoveryCodes); setSetup(null)
+      setSetup(null); await logoutAndGoToLogin(loginPath)
     } catch (caught) { setError(describeSaveFailure(caught)); setCode('') }
     finally { setBusy(false) }
   }
@@ -64,9 +61,6 @@ export default function SelfMfa({ loginPath = '/login', compact = false, onEnabl
       {self?.notice ? <Notice tone="warn" message={self.notice} /> : null}
       <AuthDetailRow label="認証アプリ" value={self ? self.enabledAt ? `登録済み（${formatDate(self.enabledAt, { style: 'day' })}）` : '未登録' : '—'} actions={self?.canEdit ? <Button disabled={busy} onClick={reenroll}>{self.enabledAt ? '登録し直す' : '登録する'}</Button> : undefined} />
     </FormSection>}
-    <Dialog open={codes.length > 0} title="回復コードを控えてください" description="認証アプリが使えない時に、1つにつき1回だけ使えます。" onCancel={() => { setCodes([]); if (relogin) void logoutAndGoToLogin(loginPath); else void load() }} cancelLabel="閉じる">
-      <RecoveryCodePanel codes={codes} continueLabel="控えました" onContinue={() => { setCodes([]); if (relogin) void logoutAndGoToLogin(loginPath); else void load() }} />
-    </Dialog>
     <Dialog open={Boolean(setup)} title="二段階認証を設定" onCancel={() => setSetup(null)} confirmLabel="登録する" onConfirm={() => confirmSetup()} confirmDisabled={code.length !== 6} busy={busy} error={error}>
       {setup ? <><TotpQr {...setup} /><OtpInput visualLabel="認証コード（6桁）" label="認証コード（6桁）" value={code} onChange={setCode} busy={busy} /></> : null}
     </Dialog>

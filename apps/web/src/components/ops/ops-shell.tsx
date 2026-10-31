@@ -16,7 +16,6 @@ import Button from '@/components/shared/button'
 import { adminSessionHeaders, captureAdminSessionHandoff } from '@/lib/admin-session'
 import { logoutAndGoToLogin } from '@/lib/logout'
 import ImpersonationBar from './impersonation-bar'
-import RecoveryCodeNotice from '@/components/recovery-code-notice'
 import { OpsShellV8 } from '@/v8/ops/public/shell/index'
 import { setDocumentTitle } from '@/lib/document-title'
 
@@ -41,7 +40,6 @@ export default function OpsShell({ children }: { children: ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
   const [me, setMe] = useState<OpsMe | null>(null)
-  const [remaining, setRemaining] = useState<number | null>(null)
   const [checked, setChecked] = useState(false)
   const [loadError, setLoadError] = useState('')
   // ★管理画面：担当者の取得だけ落ちても外枠は落とさない。本文は普通に出す。
@@ -69,7 +67,7 @@ export default function OpsShell({ children }: { children: ReactNode }) {
         if (res.status === 401) { router.replace('/ops/login'); return }
         throw new Error('運営コンソールのログイン状態を確認できませんでした。時間をおいて、もう一度お試しください。')
       }
-      const body = await res.json() as { success?: boolean; data?: { platformAdmin?: boolean; platformAdminState?: string | null; recoveryCodesRemaining?: number | null }; csrfToken?: string }
+      const body = await res.json() as { success?: boolean; data?: { platformAdmin?: boolean; platformAdminState?: string | null }; csrfToken?: string }
       if (!body.success || !body.data) throw new Error('運営コンソールのログイン状態を確認できませんでした。時間をおいて、もう一度お試しください。')
       if (body.csrfToken) {
         try { localStorage.setItem('lh_csrf', body.csrfToken) } catch { /* Bearer session remains usable */ }
@@ -79,7 +77,6 @@ export default function OpsShell({ children }: { children: ReactNode }) {
         router.replace(body.data.platformAdminState === 'awaiting_totp' ? '/ops/two-factor' : '/ops/login?error=not_platform_admin')
         return
       }
-      setRemaining(typeof body.data.recoveryCodesRemaining === 'number' ? body.data.recoveryCodesRemaining : null)
       setLoadError('')
     } catch (caught) {
       // 認証済みなのに後続APIが失敗した場合までログインへ戻すと、原因を隠したまま
@@ -144,7 +141,6 @@ export default function OpsShell({ children }: { children: ReactNode }) {
         pathname={pathname}
         banner={me?.impersonation ? <ImpersonationBar initial={me.impersonation} onChange={() => void load()} /> : null}
       >
-        <RecoveryCodeNotice remaining={remaining} />
         {children}
       </OpsShellV8>
     )

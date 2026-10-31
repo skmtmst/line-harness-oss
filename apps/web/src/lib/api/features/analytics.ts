@@ -89,9 +89,10 @@ export const analyticsMethods = {
       fetchApi<ApiResponse<AnalyticsRoutesOverview>>(
         `/api/analytics/routes${rangeQuery({ ...params, accountId })}`,
       ),
-    usageOverview: (accountId: string, params?: { from?: string; to?: string }) =>
+    usageOverview: (accountId: string, params?: { from?: string; to?: string }, options?: { suppressFeatureDisabledEvent?: boolean }) =>
       fetchApi<ApiResponse<AnalyticsUsageOverview>>(
         `/api/analytics/usage${rangeQuery({ ...params, accountId })}`,
+        options,
       ),
     urlClicksOverview: (
       accountId: string,

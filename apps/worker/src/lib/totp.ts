@@ -132,49 +132,12 @@ async function decryptTotpPayload(payload: string, masterKey: string): Promise<s
   return new TextDecoder().decode(decrypted);
 }
 
-/** 保存済みの暗号化 base32 秘密値も読める形式を保つ。 */
-export async function decryptTotpEnrollment(payload: string, masterKey: string): Promise<{ secret: string; recoveryHashes: string[] }> {
-  const plain = await decryptTotpPayload(payload, masterKey);
-  if (!plain.startsWith('{')) return { secret: plain, recoveryHashes: [] };
-  const enrollment = JSON.parse(plain) as { secret: string; recoveryHashes: string[] };
-  if (!/^[A-Z2-7]+$/.test(enrollment.secret) || !Array.isArray(enrollment.recoveryHashes)
-    || !enrollment.recoveryHashes.every(hash => /^[a-f0-9]{64}$/.test(hash))) throw new Error('Invalid TOTP enrollment');
-  return enrollment;
-}
-
+/** 以前の JSON 形式に保存された認証アプリの秘密値も読める。 */
 export async function decryptTotpSecret(payload: string, masterKey: string): Promise<string> {
-  return (await decryptTotpEnrollment(payload, masterKey)).secret;
-}
-
-/** 40ビットのコードを8つ作り、オンライン試行はアカウントごとに制限する。保存するのはハッシュだけ。 */
-export async function createTotpEnrollment(secret: string, masterKey: string) {
-  const uniqueCodes = new Set<string>();
-  while (uniqueCodes.size < 8) {
-    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    const bytes = crypto.getRandomValues(new Uint8Array(8));
-    const code = Array.from(bytes, b => alphabet[b & 31]).join('');
-    uniqueCodes.add(`${code.slice(0, 4)}-${code.slice(4)}`);
-  }
-  const recoveryCodes = [...uniqueCodes];
-  const recoveryHashes = await Promise.all(recoveryCodes.map(hashRecoveryCode));
-  return { encrypted: await encryptTotpSecret(JSON.stringify({ secret, recoveryHashes }), masterKey), recoveryCodes };
-}
-
-async function hashRecoveryCode(code: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code.trim().toLowerCase().replace(/-/g, '')));
-  return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
-}
-
-export async function consumeTotpRecoveryCode(db: D1Database, staffId: string, encrypted: string, masterKey: string, code: string): Promise<boolean> {
-  if (!/^[A-Za-z2-9]{4}-?[A-Za-z2-9]{4}$/.test(code.trim())) return false;
-  const enrollment = await decryptTotpEnrollment(encrypted, masterKey);
-  const hash = await hashRecoveryCode(code);
-  if (!enrollment.recoveryHashes.includes(hash)) return false;
-  enrollment.recoveryHashes = enrollment.recoveryHashes.filter(value => value !== hash);
-  const next = await encryptTotpSecret(JSON.stringify(enrollment), masterKey);
-  const result = await db.prepare('UPDATE staff_members SET totp_secret_enc=? WHERE id=? AND totp_secret_enc=? AND is_active=1')
-    .bind(next, staffId, encrypted).run();
-  return result.meta.changes === 1;
+  const plain = await decryptTotpPayload(payload, masterKey);
+  const secret = plain.startsWith('{') ? (JSON.parse(plain) as { secret?: unknown }).secret : plain;
+  if (typeof secret !== 'string' || !/^[A-Z2-7]+$/.test(secret)) throw new Error('Invalid TOTP secret');
+  return secret;
 }
 
 /*
