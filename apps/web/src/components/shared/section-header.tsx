@@ -21,12 +21,15 @@ export default function SectionHeader({
   linkLabel,
   wrap,
   linkTone,
+  separation,
 }: {
   /** 段の題（例「最近の動き」） */
   title: React.ReactNode
   description?:React.ReactNode
   size?: 'small' | 'customer'
   linkTone?: 'action'
+  /** 本文の段の間。既存の欄間に共通の余白を足し、次のまとまりの題を離す。 */
+  separation?: 'section'
   /** 題の右の小さな補足（例「直近30日」） */
   note?: React.ReactNode
   /** 段の右端の閉じる操作など。補足と分けて右へ寄せる。 */
@@ -46,7 +49,7 @@ export default function SectionHeader({
   wrap?: boolean
 }) {
   return (
-    <div className={styles.root} data-size={size} data-wrap={wrap ? '' : undefined}>
+    <div className={styles.root} data-size={size} data-wrap={wrap ? '' : undefined} data-separation={separation}>
       {description?<div className={styles.labels}><h3 className={styles.title} title={typeof title === 'string' ? title : undefined}>
         {title}
       </h3><p className={styles.description}>{description}</p></div>:(<h3 className={styles.title} title={typeof title === 'string' ? title : undefined}>
