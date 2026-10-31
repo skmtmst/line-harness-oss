@@ -1043,3 +1043,6 @@
 - [お気に入りの星の表示](release-log/unreleased/1991-masato-yellow-favorites.md) — 反映履歴、確認 2026-10-31。
 - [来店フォローの下書き・テスト・同じ版の公開と承認](release-log/unreleased/1997-kenta-followup-engines.md) — 反映履歴、確認 2026-10-31。
 - [初期セット・画面切替とクーポン](release-log/unreleased/1997-kenta-train-1029v.md) — 反映履歴、確認 2026-10-31。
+- [機能設定の利用条件](release-log/unreleased/1992-masato-feature-settings-self-gate.md) — 反映履歴、確認 2026-10-31。
+- [検証環境への配備手順](release-log/unreleased/1994-masato-cf-staging-deploy.md) — 反映履歴、確認 2026-10-31。
+- [統括の比較と分析](release-log/unreleased/1996-masato-hq-comparison-analysis.md) — 反映履歴、確認 2026-10-31。
