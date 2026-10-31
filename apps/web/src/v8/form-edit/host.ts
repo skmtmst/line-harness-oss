@@ -38,8 +38,8 @@ export interface FormEditHost {
   busy: boolean
   /** 頭の下に出す知らせ（保存の失敗・版の衝突など）。 */
   notice?: ReactNode
-  /** 下書きを保存（distribute=false）・保存して配る（distribute=true）。 */
-  onSave: (content: FormHostContent, distribute: boolean) => void
+  /** 保存の確定を待つ。下書きはdistribute=false、保存して配るはtrue。失敗・未確定はfalse。 */
+  onSave: (content: FormHostContent, distribute: boolean) => Promise<boolean>
   onCancel: () => void
   /** 閲覧のみ（押せる操作を出さない）。 */
   readOnly?: boolean

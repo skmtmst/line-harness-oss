@@ -13,7 +13,9 @@
 import React, { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { ApiForm } from '@/lib/api'
+import { ApiError, type ApiForm } from '@/lib/api'
+import { screen, within, waitFor } from '@testing-library/react'
+import { forgetCreatedFormDraft, readCreatedFormDraft, rememberCreatedFormDraft } from '@/lib/form-draft-session'
 import { emptyLayout } from '@line-crm/shared'
 
 const navigation = vi.hoisted(() => ({
@@ -25,7 +27,9 @@ const navigation = vi.hoisted(() => ({
   refresh: vi.fn(),
 }))
 
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+const staffRole = vi.hoisted(() => ({ value: 'owner' }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => staffRole.value }))
+vi.mock('@/lib/use-feature-access', async original => ({ ...await original<typeof import('@/lib/use-feature-access')>(), useFeatureAccess: () => true }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => navigation,
   usePathname: () => navigation.pathname,
@@ -42,7 +46,7 @@ vi.mock('next/link', () => ({
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({
     accounts: [{ id: 'acc-1', name: 'テスト店' }],
-    selectedAccountId: 'acc-1',
+    selectedAccountId: account.id,
     selectedAccount: { id: 'acc-1', name: 'テスト店' },
     loading: false,
     error: '',
@@ -55,6 +59,9 @@ vi.mock('@/contexts/account-context', () => ({
 
 const formsGet = vi.hoisted(() => vi.fn())
 const formsUpdate = vi.hoisted(() => vi.fn())
+const formsImpact = vi.hoisted(() => vi.fn())
+const formsRemove = vi.hoisted(() => vi.fn())
+const account = vi.hoisted(() => ({ id: 'acc-1' }))
 const emptyList = vi.hoisted(() => async () => ({ success: true, data: [] as never[] }))
 
 vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/api')>) => {
@@ -76,7 +83,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
       forms: {
         ...actual.api.forms,
         get: formsGet,
-        update: formsUpdate,
+        update: formsUpdate, deleteImpact: formsImpact, remove: formsRemove,
         publish: vi.fn(async () => ({ success: true, data: { id: 'v1' } })),
         submitCount: vi.fn(async () => ({ success: true, data: { count: 0 } })),
       },
@@ -148,12 +155,21 @@ beforeEach(() => {
   document.body.appendChild(host)
   root = createRoot(host)
   formsGet.mockReset()
-  formsUpdate.mockReset()
+  formsUpdate.mockReset().mockResolvedValue({ success: true, data: { id: 'form-1', contentRevision: 2, updatedAt: '' } })
+  formsImpact.mockReset().mockResolvedValue({ success: true, data: { canDelete: true, revision: 9, contentRevision: 1 } })
+  formsRemove.mockReset().mockResolvedValue({ success: true, data: {} })
+  navigation.push.mockClear()
+  account.id = 'acc-1'
+  staffRole.value = 'owner'
+  forgetCreatedFormDraft('acc-1', 'form-1')
+  forgetCreatedFormDraft('acc-2', 'form-1')
 })
 
 afterEach(async () => {
   await act(async () => { root.unmount() })
   host.remove()
+  forgetCreatedFormDraft('acc-1', 'form-1')
+  forgetCreatedFormDraft('acc-2', 'form-1')
 })
 
 async function show(over: Partial<ApiForm> = {}) {
@@ -262,9 +278,106 @@ describe('フォーム編集の未保存ガード（FORM-19）', () => {
     await show()
     await editName('書きかけの名前')
     await click(anchor('キャンセル'))
-    await click(dialogButton('編集を続ける'))
+    await click(within(screen.getByRole('dialog', { name: '保存していない変更があります' })).getByRole('button', { name: '閉じる' }))
     expect(navigation.push).not.toHaveBeenCalled()
     expect(nameInput().value).toBe('書きかけの名前')
     expect(bodyText()).not.toContain('保存していない変更があります')
   })
+})
+
+
+describe('フォームを離れる時の保存と自動作成した下書き', () => {
+  it('既存フォームは書きかけを保存してから移り、本体を消さない', async () => {
+    await show(); await editName('保存して残す名前'); await click(anchor('キャンセル'))
+    await click(dialogButton('下書きに保存して移る'))
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/form-submissions'))
+    expect(formsUpdate).toHaveBeenCalledWith('form-1', 'acc-1', expect.objectContaining({ name: '保存して残す名前', expectedContentRevision: 1 }))
+    expect(nameInput().value).toBe('保存して残す名前')
+    expect(formsRemove).not.toHaveBeenCalled()
+  })
+  it('保存できない時は移らず、書きかけの名前を残す', async () => {
+    formsUpdate.mockRejectedValue(new Error('offline'))
+    await show(); await editName('消さない名前'); await click(anchor('キャンセル'))
+    await click(dialogButton('下書きに保存して移る'))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalled())
+    expect(navigation.push).not.toHaveBeenCalled()
+    expect(nameInput().value).toBe('消さない名前')
+    expect(formsRemove).not.toHaveBeenCalled()
+  })
+  it('自動作成直後は未変更でも残すか消すか聞き、確認した版で一度だけ消す', async () => {
+    rememberCreatedFormDraft('acc-1', 'form-1', 1)
+    await show(); await click(anchor('キャンセル'))
+    expect(bodyText()).toContain('自動で作られた下書きがあります')
+    const remove = dialogButton('下書きを消して移る')
+    await act(async () => { remove.click(); remove.click() })
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith('/form-submissions'))
+    expect(formsImpact).toHaveBeenCalledWith('form-1', 'acc-1')
+    expect(formsRemove).toHaveBeenCalledTimes(1)
+    expect(formsRemove).toHaveBeenCalledWith('form-1', 'acc-1', 9)
+    expect(formsUpdate).not.toHaveBeenCalled()
+    expect(readCreatedFormDraft('acc-1', 'form-1')).toBeNull()
+  })
+  it('下書きを残して移る時は保存成功を待ち、消す処理へ進まない', async () => {
+    rememberCreatedFormDraft('acc-1', 'form-1', 1)
+    let settle!: (value: unknown) => void
+    formsUpdate.mockImplementationOnce(() => new Promise(done => { settle = done }))
+    await show(); await editName('あとで続ける'); await click(anchor('キャンセル'))
+    await click(dialogButton('下書きを残して移る'))
+    expect(navigation.push).not.toHaveBeenCalled()
+    await act(async () => settle({ success: true, data: { id: 'form-1', contentRevision: 2, updatedAt: '' } }))
+    await waitFor(() => expect(navigation.push).toHaveBeenCalled())
+    expect(formsRemove).not.toHaveBeenCalled()
+    expect(formsImpact).not.toHaveBeenCalled()
+    expect(readCreatedFormDraft('acc-1', 'form-1')).toBeNull()
+  })
+  it.each([{ canDelete: false, contentRevision: 1 }, { canDelete: true, contentRevision: 2 }])('公開状態や版が変わった下書きは消さず、入力と確認を残す（%j）', async result => {
+    rememberCreatedFormDraft('acc-1', 'form-1', 1)
+    formsImpact.mockResolvedValue({ success: true, data: { ...result, revision: 10 } })
+    await show(); await editName('まだ残す'); await click(anchor('キャンセル')); await click(dialogButton('下書きを消して移る'))
+    expect(await screen.findByText(/下書きの状態が変わったため消せません/)).toBeTruthy()
+    expect(formsRemove).not.toHaveBeenCalled()
+    expect(navigation.push).not.toHaveBeenCalled()
+    expect(nameInput().value).toBe('まだ残す')
+  })
+  it('削除の競合は窓内に理由を出し、成功した再試行では古い理由を消す', async () => {
+    rememberCreatedFormDraft('acc-1', 'form-1', 1)
+    formsRemove.mockRejectedValueOnce(new ApiError(409, 'changed'))
+    await show(); await editName('書きかけ'); await click(anchor('キャンセル')); await click(dialogButton('下書きを消して移る'))
+    const dialog = within(screen.getByRole('dialog', { name: '保存していない変更があります' }))
+    expect(await dialog.findByText(/ほかの人が更新したため消せません/)).toBeTruthy()
+    expect(nameInput().value).toBe('書きかけ')
+    expect(navigation.push).not.toHaveBeenCalled()
+    await click(dialogButton('下書きを消して移る'))
+    await waitFor(() => expect(navigation.push).toHaveBeenCalled())
+    expect(screen.queryByText(/ほかの人が更新したため消せません/)).toBeNull()
+  })
+  it('別の店へ切り替えた後に前の店の確認結果が届いても削除も移動もしない', async () => {
+    rememberCreatedFormDraft('acc-1', 'form-1', 1)
+    let settle!: (value: unknown) => void
+    formsImpact.mockImplementationOnce(() => new Promise(done => { settle = done }))
+    await show(); await click(anchor('キャンセル')); await click(dialogButton('下書きを消して移る'))
+    account.id = 'acc-2'
+    await act(async () => root.render(<EditFormPage />))
+    await act(async () => settle({ success: true, data: { canDelete: true, revision: 9, contentRevision: 1 } }))
+    expect(formsRemove).not.toHaveBeenCalled()
+    expect(navigation.push).not.toHaveBeenCalled()
+  })
+})
+
+it('編集できるスタッフにも消す操作は灰色と理由を出し、下書きを残す操作は使える', async () => {
+  staffRole.value = 'staff'
+  rememberCreatedFormDraft('acc-1', 'form-1', 1)
+  await show(); await click(anchor('キャンセル'))
+  const dialog = within(screen.getByRole('dialog', { name: '保存していない変更があります' }))
+  const remove = dialog.getByRole('button', { name: '下書きを消して移る' })
+  expect(remove.getAttribute('data-permission-locked')).not.toBeNull()
+  const reason = remove.getAttribute('aria-describedby')?.split(' ').map(id => document.getElementById(id)?.textContent).join(' ')
+  expect(reason).toContain('オーナーか管理者')
+  await click(remove)
+  expect(formsRemove).not.toHaveBeenCalled()
+  expect(formsImpact).not.toHaveBeenCalled()
+  expect((dialog.getByRole('button', { name: '下書きを残して移る' }) as HTMLButtonElement).disabled).toBe(false)
+  await click(dialogButton('下書きを残して移る'))
+  await waitFor(() => expect(navigation.push).toHaveBeenCalled())
+  expect(formsRemove).not.toHaveBeenCalled()
 })

@@ -20,7 +20,7 @@ const navigation = vi.hoisted(() => ({
   refresh: vi.fn(),
 }))
 
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('@/lib/staff-role', async original => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('next/navigation', async () => ({ ...(await import('@/test-utils/navigation-mock')).navigationMock(),
   useRouter: () => navigation,
   usePathname: () => navigation.pathname,
