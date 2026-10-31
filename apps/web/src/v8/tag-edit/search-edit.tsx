@@ -785,12 +785,14 @@ export default function SavedSearchEditV8() {
     try {
       await api.savedSearches.delete(id, selectedAccountId)
       router.push('/tags?tab=searches')
+      return true
     } catch (deleteError) {
       const fieldFailure = saveErrors.capture(deleteError)
 
       { if (!fieldFailure)
 
       setError(describeApiFailure(deleteError, '削除')) }
+      return false
     }
   }
 
@@ -897,7 +899,7 @@ export default function SavedSearchEditV8() {
         previewTitle="検索結果と使っている所"
         preview={side}
         destructive={(
-          <StickyBarAction destructive label="削除する" icon={Trash2} disabledReason={original.canDelete === true ? undefined : deleteReason} onClick={() => setDeleteOpen(true)} />
+          <StickyBarAction destructive label="削除する" icon={Trash2} disabledReason={original.canDelete === true ? undefined : deleteReason} onClick={() => { setError(''); setDeleteOpen(true) }} />
         )}
         status={dirty ? '変更内容を確かめて保存してください' : undefined}
         footerActions={(
@@ -985,7 +987,7 @@ export default function SavedSearchEditV8() {
         {/* IDEA-04：印ならタグ・値なら情報欄・条件の保存は保存した検索、という違いを編集の場所でも確かめられる。 */}
         <AttributeKindGuide current="search" />
       </CreatePage>
-      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使っている所が無いことをサーバーで確かめてあります。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} onConfirm={() => { setDeleteOpen(false); return remove() }} />
+      <ConfirmDialog open={deleteOpen && original.canDelete === true} title={`「${name}」を削除しますか？`} description="使っている所が無いことをサーバーで確かめてあります。保存した条件だけを削除し、友だちは削除しません。" confirmLabel="削除する" destructive onCancel={() => setDeleteOpen(false)} error={error || undefined} onSuccess={() => setDeleteOpen(false)} onConfirm={() => remove()} />
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="検索条件への変更" busy={saving} onConfirm={confirmLeave} onCancel={cancelLeave} />
     </div></SaveErrorScope>
   )

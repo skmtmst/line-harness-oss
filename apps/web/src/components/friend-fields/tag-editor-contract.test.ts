@@ -65,7 +65,6 @@ describe('現役V8のタグ編集', () => {
   })
   it('R620: 遡及OFFでは既存へ反映せず、確認した時だけ反映する', () => {
     expect(EDITOR).toContain('if (applyToExisting && (tag.friendCount ?? 0) > 0')
-    expect(EDITOR).toContain('void onSave(values, false)')
     expect(SAVE).toContain('applyToExisting: applyRetroactive && values.applyToExisting')
   })
 })

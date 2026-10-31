@@ -571,22 +571,24 @@ export default function HqBroadcastCreate() {
   }, [confirmOpen, run, previewSeq])
 
   const send = async () => {
-    if (!run) return
+    if (!run || stale || sending) return
     setSending(true)
+    setError('')
+    let accepted = false
     try {
       await (gate === 'single' ? hqBroadcastsApi.send(run.id, run.version, Number(confirmCount)) : hqBroadcastsApi.send(run.id, run.version))
+      accepted = true
       setConfirmOpen(false)
       notifyToast(when === 'now' ? '一括配信を送り始めました' : '一括配信を予約しました')
       setLeaving(true)
       router.push(`/hq/broadcasts/detail?id=${encodeURIComponent(run.id)}`)
+      return true
     } catch (caught) {
-      const fieldFailure = saveErrors.capture(caught, fields)
-      setConfirmOpen(false)
-      { if (!fieldFailure)
-
-
-      setError(errorText(caught, '送れませんでした。もう一度確かめてください。')) }
+      if (accepted) { setConfirmOpen(false); setLeaving(true); notifyToast('送る依頼は受け付けました。配信の記録を確認してください。'); return true }
+      saveErrors.capture(caught, fields)
       setRunKey('')
+      setError(`${errorText(caught, '送れませんでした。')} 閉じて、送る前の確かめをやり直してください。`)
+      return false
     } finally {
       setSending(false)
     }
@@ -1164,9 +1166,11 @@ export default function HqBroadcastCreate() {
         sender={sendPreview.data?.sender ?? null}
         bodyHead={sendPreview.data?.firstText ?? ''}
         allRecipients={audience === 'all'}
-        hidePrimary={approval.state === null}
+        hidePrimary={approval.state === null && !stale}
+        primaryDisabled={sending || stale}
+        error={error || undefined}
         primaryLabel={sendPreview.data ? `${totals ? `${formatNumber(totals.sendStores)} アカウント ` : ''}${formatNumber(sendPreview.data.recipients)} 人に${when === 'now' ? '送る' : '予約する'}` : '送る'}
-        onConfirm={() => send()}
+        onConfirm={async () => { await send() }}
         onBack={() => { if (!sending) setConfirmOpen(false) }}
       />
       <ConfirmDialog
@@ -1175,8 +1179,12 @@ export default function HqBroadcastCreate() {
         description={`${formatNumber(totals?.sendPeople ?? 0)} 人に${when === 'now' ? 'すぐ' : `${sendWhenLabel} に`}送ります。送った LINE は取り消せません。${totals && totals.skipStores ? `外した${formatNumber(totals.skipStores)}アカウントには送りません。` : ''}`}
         confirmLabel={when === 'now' ? '送る' : '予約する'}
         busy={sending}
+        confirmDisabled={stale}
+        confirmDisabledReason="閉じて、送る前の確かめをやり直してください。"
         warning
         onConfirm={gate !== 'single' || (approval.state && Number(confirmCount) === approval.state.gate.recipientCount) ? () => send() : undefined}
+        error={error || undefined}
+        onSuccess={() => setConfirmOpen(false)}
         onCancel={() => setConfirmOpen(false)}
       >
         {gate === 'single' && approval.state ? <SingleOperatorFields recipientCount={approval.state.gate.recipientCount} value={confirmCount} onChange={setConfirmCount} /> : null}

@@ -1,8 +1,8 @@
 'use client'
+import TextLink from '@/components/shared/text-link'
 import {japaneseDetailOf} from '@/components/shared/api-error-message'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import Link from 'next/link'
 import { FileText, Settings2 } from 'lucide-react'
 import HelpTip from './help-tip'
 import Avatar from './avatar'
@@ -129,7 +129,7 @@ export default function CustomerInfoPanel({
       {expanded ? '顧客情報を閉じる' : '顧客情報をすべて表示'}
     </Button>
     {expanded ? <div className={styles.more}>
-      <Link className={styles.action} href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>情報欄をすべて見る</Link>
+      <TextLink inline href={`/friends/detail?id=${encodeURIComponent(friendId)}&tab=info`}>情報欄をすべて見る</TextLink>
       {extraSections.filter(section => !hidden.includes(section.key)).map(section => <section className={styles.section} key={section.key} aria-label={section.label}>
         <div className={styles.head}><h3>{section.label}{section.key === 'memo' ? <HelpTip label="メモの説明">この人について担当者同士で共有するメモです。お客さまには送られません。</HelpTip> : null}</h3>{section.action}</div>
         <div className={styles.content}>{section.content}</div>

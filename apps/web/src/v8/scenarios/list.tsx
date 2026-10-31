@@ -37,6 +37,8 @@ import { NoPermissionBoard } from '@/v8/no-permission/index'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { formatNumber } from '@/lib/format';
 import { ProgressBar } from '@/components/shared/progress';
+import { describeSaveFailure } from '@/lib/api'
+import type { ConfirmedUndoHandle } from '@/lib/undoable'
 import { runUndoable, runOptimistic } from '@/lib/undoable';
 import { useLiveReorder } from '@/lib/use-live-reorder';
 import { ListPage, ListPagePagination } from '@/components/templates';
@@ -183,6 +185,8 @@ export default function ScenariosListV8() {
 
   /* まとめて/1件のフォルダ移動の窓。 */
   const [moveIds, setMoveIds] = useState<string[] | null>(null)
+  const moveConfirmed = useRef(new Map<string, string | null>())
+  const [pendingMove, setPendingMove] = useState<ConfirmedUndoHandle | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
 
   /* 削除の確認窓。 */
@@ -554,11 +558,47 @@ export default function ScenariosListV8() {
 
   /* ===== フォルダ移動の窓 ===== */
 
+  const confirmedStops = useRef<{ ids: string[] | null; done: Set<string> }>({ ids: null, done: new Set() })
+  const [stopBusy, setStopBusy] = useState(false)
+  const [stopError, setStopError] = useState('')
+  useEffect(() => { setStopError('') }, [pendingStop])
+  const runConfirmedStop = async () => {
+    const ids = pendingStop
+    if (!ids?.length || !requireWrite('publish') || toggleBusyRef.current) return
+    if (confirmedStops.current.ids !== ids) confirmedStops.current = { ids, done: new Set() }
+    const attempt = confirmedStops.current
+    const current = () => currentScope() && confirmedStops.current === attempt
+    toggleBusyRef.current = true; setStopBusy(true); setStopError('')
+    try {
+      for (const id of ids) {
+        if (attempt.done.has(id)) continue
+        if (!current()) return
+        if (!canWriteHere('publish')) { setStopError(stoppedMessage(attempt.done.size, ids.length)); return false }
+        try {
+          const response = await api.scenarios.update(id, { isActive: false })
+          if (!response.success) throw new Error(response.error)
+          attempt.done.add(id)
+        } catch (failure) {
+          if (!current()) return
+          saveErrors.capture(failure)
+          const saved = attempt.done.size
+          setStopError(`全 ${formatNumber(ids.length)} 件中 ${formatNumber(saved)} 件の保存を確認しました。${formatNumber(saved + 1)} 件目で止めました。未送信は ${formatNumber(ids.length - saved - 1)} 件です。理由：${describeApiFailure(failure, '停止')}`)
+          return false
+        }
+      }
+      if (!current()) return
+      setSelectedIds(new Set()); setOptimisticRows(null)
+      void loadScenarios(); void loadStats()
+      return true
+    } finally { toggleBusyRef.current = false; if (current()) setStopBusy(false) }
+  }
+
   const openMove = (ids: string[]) => {
     if (!requireWrite()) return
     if (ids.length === 0) return
     moveWindow.current = {}; moveWindowScope.current = renderedScope
     setMoveDraft('')
+    moveConfirmed.current = new Map()
     setMoveIds(ids)
   }
 
@@ -566,49 +606,63 @@ export default function ScenariosListV8() {
    * フォルダ移動は窓で行き先だけ選び、押した瞬間に描き換えて裏で保存する
    * （★V8 サクサク感 B）。5秒のあいだ知らせの「元に戻す」で送らずに戻せる。
    */
-  const runMove = () => {
-    if (moveWindow.current !== renderedMoveWindow) return
-    if (moveWindowScope.current !== renderedScope) { if (currentScope()) setActionError('LINEアカウントが変わったため、この窓では保存できません。閉じて選び直してください。'); return }
-    if (!requireWrite()) return
-    if (!moveIds || moveIds.length === 0) return
+  const runMove = async () => {
+    if (moveWindow.current !== renderedMoveWindow || moveWindowScope.current !== renderedScope || !requireWrite() || !moveIds?.length) return
+    const confirmed = moveConfirmed.current
     const ids = moveIds
     const folderId = moveDraft || null
-    let moveFailure = 'フォルダを移動できませんでした。'
     const key = listContextKey
-    setOptimisticRows({
-      key,
-      rows: scenarios.map((s) => (ids.includes(s.id) ? { ...s, folderId } : s)),
-    })
-    setMoveIds(null)
-    runUndoable({
+    const before = scenarios
+    const restore = () => {
+      if (!(moveConfirmed.current === confirmed && currentScope())) return
+      setOptimisticRows(confirmed.size ? {
+        key,
+        rows: before.map(row => confirmed.has(row.id)
+          ? { ...row, folderId: confirmed.get(row.id) ?? null } : row),
+      } : null)
+    }
+    setOptimisticRows({ key, rows: before.map(row => ids.includes(row.id) ? { ...row, folderId } : row) })
+    let moveFailure = ''
+    const handle = runUndoable({
+      confirmation: true,
       message: folderId ? 'フォルダへ移しました' : 'フォルダから外しました',
       commit: async () => {
-        let saved = 0
         for (const id of ids) {
-          if (!currentScope()) return
-          if (!canWriteHere()) { moveFailure = stoppedMessage(saved, ids.length); throw new Error(moveFailure) }
+          if (confirmed.has(id) && confirmed.get(id) === folderId) continue
+          if (!(moveConfirmed.current === confirmed && currentScope()) || !(canWriteHere())) {
+            const saved = ids.filter(value => confirmed.has(value) && confirmed.get(value) === folderId).length
+            moveFailure = stoppedMessage(saved, ids.length)
+            throw new Error(moveFailure)
+          }
           try {
-            const res = await api.scenarios.update(id, { folderId })
-            if (!res.success) throw new Error(res.error)
-            saved++
-          } catch (failure) {
-            saveErrors.capture(failure)
-            moveFailure = `全 ${formatNumber(ids.length)} 件中 ${formatNumber(saved)} 件の保存を確認しました。${formatNumber(saved + 1)} 件目で止めました。未送信は ${formatNumber(ids.length - saved - 1)} 件です。理由：${describeApiFailure(failure, 'フォルダ移動')}`
-            throw failure
+            const result = await api.scenarios.update(id, { folderId })
+            if (!result.success) throw new Error(result.error)
+            confirmed.set(id, folderId)
+          } catch (reason) {
+            saveErrors.capture(reason)
+            const saved = ids.filter(value => confirmed.has(value) && confirmed.get(value) === folderId).length
+            moveFailure = `全 ${formatNumber(ids.length)} 件中 ${formatNumber(saved)} 件の保存を確認しました。${formatNumber(ids.indexOf(id) + 1)} 件目で止めました。未送信は ${formatNumber(ids.slice(ids.indexOf(id) + 1).filter(value => !confirmed.has(value) || confirmed.get(value) !== folderId).length)} 件です。理由：${describeApiFailure(reason, 'フォルダ移動')}`
+            throw reason
           }
         }
       },
-      undo: () => { if (currentScope()) setOptimisticRows(null) },
-      get failureMessage() { return moveFailure },
+      undo: restore,
+      onCommitError: restore,
+      get failureMessage() { return moveFailure || undefined },
       onCommitted: () => {
-        if (!currentScope()) return
+        if (!(moveConfirmed.current === confirmed && currentScope())) return
         setOptimisticRows(null)
         const moved = new Set(ids)
-        setSelectedIds((current) => new Set([...current].filter((id) => !moved.has(id))))
-        void loadScenarios()
-        void loadFolders()
+        setSelectedIds(values => new Set([...values].filter(id => !moved.has(id))))
+        void loadScenarios(); void loadFolders()
       },
     })
+    setPendingMove(handle)
+    try {
+      const result = await handle.finished
+      return (moveConfirmed.current === confirmed && currentScope()) ? result : undefined
+    }
+    finally { setPendingMove(value => value === handle ? null : value) }
   }
 
   /* ===== 削除 ===== */
@@ -1351,7 +1405,8 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
           confirmDisabled={editDisabled || moveWindowScope.current !== renderedScope}
           confirmLockedReason={moveWindowScope.current === renderedScope ? editAccess.reason : undefined}
           confirmDisabledReason={moveWindowScope.current !== renderedScope ? 'LINEアカウントが変わりました。閉じて選び直してください。' : undefined}
-          onConfirm={() => runMove()}
+          pendingUndo={pendingMove} onSuccess={() => setMoveIds(null)} onUndone={() => setMoveIds(null)}
+        busyLabel="移動中…" onConfirm={() => runMove()}
           onCancel={() => setMoveIds(null)}
         >
           <div className={styles.moveBody}>
@@ -1360,7 +1415,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
               aria-label="移動先のフォルダ"
               size="full"
               value={moveDraft}
-              disabled={editDisabled || moveWindowScope.current !== renderedScope}
+              disabled={editDisabled || moveWindowScope.current !== renderedScope || Boolean(pendingMove)}
               lockedReason={moveWindowScope.current === renderedScope ? editAccess.reason : undefined}
               onChange={(value) => { if (canWriteHere() && moveWindowScope.current === renderedScope) setMoveDraft(value) }}
               folders={folders.map((folder) => ({ value: folder.id, label: folder.name }))}
@@ -1413,7 +1468,7 @@ menuItems: [...(rowMenuItems(panelRow).filter(item => item.id !== 'results').map
         <></>
       </>}
       folders={<>
-        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" confirmDisabled={!publishAccess.allowed || !scenarioList.loaded} confirmLockedReason={publishAccess.reason} onCancel={() => setPendingStop(null)} onConfirm={() => { if (!requireWrite('publish')) return; const ids = pendingStop; setPendingStop(null); if (ids) runBulkToggle(false, ids) }} />
+        <ConfirmDialog open={pendingStop !== null} title="選んだシナリオを停止しますか？" description="これから送る予定のシナリオ配信が止まります。" confirmLabel="停止する" confirmDisabled={!publishAccess.allowed || !scenarioList.loaded} confirmLockedReason={publishAccess.reason} onCancel={() => setPendingStop(null)} busy={stopBusy} error={stopError || undefined} onSuccess={() => setPendingStop(null)} onConfirm={() => runConfirmedStop()} />
         {folderPanel}
       </>}
       collapsedFolders={<>{createButton(false)}{folderSelect}</>}

@@ -248,7 +248,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
           return (
             <Button
               key={date}
-              type="button" variant="text" disabled={!canEdit} lockedReason={lockedReason}
+              type="button" variant="text" textTone="ink" disabled={!canEdit} lockedReason={lockedReason}
               onClick={() => { if (!canEdit) return; if (exception) openEdit(exception, date); else openNew(date) }}
               role="gridcell"
               aria-label={dayLabel}
@@ -272,7 +272,7 @@ export function HolidaysTabV8({ accountId, settings, status, error, exceptions, 
             const to = item.dateTo || item.date || ''
             return (
               <div key={item.id} className={styles.exceptionRow}>
-                <Button type="button" variant="text" size="inline" disabled={!canEdit} lockedReason={lockedReason} onClick={() => { if (canEdit) openEdit(item) }}>
+                <Button type="button" variant="text" textTone="ink" size="inline" disabled={!canEdit} lockedReason={lockedReason} onClick={() => { if (canEdit) openEdit(item) }}>
                   {from !== to ? `${jpDate(from)}・${jpDate(to)}` : jpDate(from)}
                 </Button>
                 <span className={styles.exceptionReason} title={item.reason || item.note || '臨時休業'}>{item.reason || item.note || '臨時休業'}</span>

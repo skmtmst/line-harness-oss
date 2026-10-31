@@ -1,5 +1,6 @@
 'use client'
 
+import TextLink from '@/components/shared/text-link'
 import choiceStyles from './choice-field.module.css'
 import { usePermissionLockTip } from './permission-lock-tip'
 import { type EntityPickerItem, type EntityPickerFolder, type EntityPickerCategory, type SingleProps, type EntityPickerWindowProps, type MultiBodyProps, type MultiProps, type FieldBase, type SingleField, type MultiField } from './entity-picker-types'
@@ -9,7 +10,6 @@ import { ChevronDown, ArrowUpRight, Plus, X, type LucideIcon } from 'lucide-reac
 import { folderDisplayColor, FolderDot } from './folder-dot'
 import { useFieldContext, joinDescribedBy } from './field-context'
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
-import Link from 'next/link'
 import Button from './button'
 import IconButton from './icon-button'
 import Checkbox from './checkbox'
@@ -58,7 +58,7 @@ function CreateLink({ href, label, lockedReason, disabled, canChangeNow }: { hre
   if (!href || !label) return null
   if (lockedReason) return <Button variant="text" size="inline" lockedReason={lockedReason}>{`作る画面へ：${label}`}<ArrowUpRight size={16} aria-hidden="true" /></Button>
   if (disabled) return <Button variant="text" size="inline" disabled>{`作る画面へ：${label}`}<ArrowUpRight size={16} aria-hidden="true" /></Button>
-  return <Link className={styles.createLink} href={href} target="_blank" rel="noopener" onClick={canChangeNow ? event => { if (!canChangeNow()) { event.preventDefault(); event.stopPropagation() } } : undefined}>{`作る画面へ：${label}`}<ArrowUpRight size={16} aria-hidden="true" /></Link>
+  return <TextLink href={href} target="_blank" rel="noopener" onClick={canChangeNow ? event => { if (!canChangeNow()) { event.preventDefault(); event.stopPropagation() } } : undefined}>{`作る画面へ：${label}`}</TextLink>
 }
 
 export function EntityPickerWindow(props: EntityPickerWindowProps) {

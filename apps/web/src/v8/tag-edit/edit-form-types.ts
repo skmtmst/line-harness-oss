@@ -48,6 +48,6 @@ export type TagEditFormProps = {
   saving: boolean
   error: string
   onCancel: () => void
-  onSave: (values: TagEditorValues, applyRetroactive: boolean, previewToken?: string) => Promise<void>
+  onSave: (values: TagEditorValues, applyRetroactive: boolean, previewToken?: string) => Promise<boolean | void>
   onDelete: () => void
 }

@@ -61,7 +61,8 @@ export async function publishMenuNow({ audience, group, loadChecks, persistDraft
           : 'LINEへの登録が終わりました',
       )
       clearPublishPlanDraft(group.id)
-      await reloadGroup(group.id)
+      void reloadGroup(group.id).catch(cause => setError(describeApiFailure(cause, '読み込み')))
+      return true
     } catch (e) {
       const fieldFailure = saveErrors.capture(e);
 
@@ -79,6 +80,7 @@ export async function publishMenuNow({ audience, group, loadChecks, persistDraft
               : 'LINEへ登録できませんでした。下書きは保存されていません。しばらくおいてから、もう一度お試しください。',
       ) }
       void loadChecks()
+      return false
     } finally {
       setPublishing(false)
       publishAttempt.current.finish()
