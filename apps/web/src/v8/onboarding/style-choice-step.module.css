@@ -19,6 +19,19 @@
   .switcherSegments { display: none; }
   .switcherSelect { display: block; width: 100%; }
 }
+.demoSwitcher {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--polish-space-row);
+  min-width: 0;
+  background: var(--color-canvas);
+  padding-block: var(--polish-space-row);
+}
+.demoSwitcher > :first-child { min-width: 0; }
 
 .option {
   display: inline-flex;

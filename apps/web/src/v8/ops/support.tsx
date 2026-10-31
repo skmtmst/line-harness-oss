@@ -1,5 +1,6 @@
 'use client'
-
+import { CardHeader } from '@/components/shared/card'
+import TruncatedText from '@/components/shared/truncated-text'
 import { PRIORITY_FILTER, SORT_OPTIONS } from './support-list-options'
 
 import { useListUrlValue } from '@/components/shared/list-url-state'
@@ -14,7 +15,8 @@ import { planLabel, tenantDetailHref, opsCall, formatDateTime, PLAN_STATUS_LABEL
 import { compareLabel, durationLabel, elapsedLabel } from '@/v8/ops/support/format'
 import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
-import { ListToolbarRow } from '@/components/shared/list-toolbar'
+import { ListToolbarEnd, ListToolbarRow } from '@/components/shared/list-toolbar'
+import SectionHeader from '@/components/shared/section-header'
 import ListState from '@/components/shared/list-state'
 import SearchField from '@/components/shared/search-field'
 import Select from '@/components/shared/select'
@@ -409,14 +411,15 @@ export default function OpsSupportV8() {
             ) : <ListState permissionScope="hq" kind="empty" title="チケットを選んでください" description="左の一覧から開きます。" />
           ) : (
             <>
-              <div className={styles.detailHead}>
-                <h2 className={styles.detailTitle} title={`${ticket.ticketLabel} ${ticket.subject}`}>{`${ticket.ticketLabel} ${ticket.subject}`}</h2>
+              <CardHeader size="content" title={<TruncatedText value={`${ticket.ticketLabel} ${ticket.subject}`} />} />
+              <ListToolbarRow>
+
                 <span className={styles.prioritySelect}>
                   <SaveErrorField names={["priority","ticket.priority"]}><Select size="page-size" aria-label="優先度を変える" lockedReason={lock} disabled={unknown} value={ticket.priority} onChange={(value) => void changePriority(value as OpsSupportPriority)} options={PRIORITY_OPTIONS} /></SaveErrorField>
                 </span>
                 <Button href={tenantDetailHref(ticket.tenantId)}><Building2 aria-hidden="true" />契約先を開く</Button>
                 <Button lockedReason={lock} disabled={busy || unknown} onClick={() => { if (access !== 'writer') return; impersonate(ticket.tenantId, setBusy, setError) }} busy={Boolean(busy)} busyLabel="処理中…"><LogIn aria-hidden="true" />代理ログイン</Button>
-              </div>
+              </ListToolbarRow>
               <div className={styles.detailMeta}>
                 <StatusBadge tone={STAGE_TONE[ticket.stage]}>{stageLabel(ticket.stage, ticket.stageLabel)}</StatusBadge>
                 <span title={`起票者 ${ticket.staffName || emptyValue('unknown')}${ticket.staffRole ? `（${ROLE_LABEL[ticket.staffRole] ?? ticket.staffRole}）` : ''}・受付 ${ticket.channel === 'admin' ? '管理画面のお問い合わせ' : ticket.channelLabel}・プラン ${planLabel(ticket.tenantPlanKey)}／${PLAN_STATUS_LABEL[ticket.tenantPlanStatus] ?? ticket.tenantPlanStatus}${detail ? `・店舗 ${detail.tenant.accountCount}・LINE登録 ${formatNumber(detail.tenant.staffCount)}人中${detail.tenant.staffWithLine}人・これまで${detail.tenant.pastTickets}のうち未解決${detail.tenant.pastOpen}件` : ''}`}>{`${ticket.tenantName}・${planLabel(ticket.tenantPlanKey)}・LINE登録${detail && detail.tenant.staffWithLine > 0 ? 'あり' : emptyValue('none')}・${ticket.kindLabel}・優先度 ${ticket.priorityLabel}`}</span>
@@ -440,10 +443,10 @@ export default function OpsSupportV8() {
               {(
                 <>
                   <div className={styles.draft}>
-                    <div className={styles.draftHead}>
+                    <SectionHeader wrap title={<span className={styles.draftHead}>
                       <Sparkles aria-hidden="true" />
                       <span className={styles.draftTitle} title={replyFromAi ? `${formatDateTime(replyFromAi.generatedAt)} に作成` : undefined}>{aiBusy ? 'AI の下書きを作成中…' : replyFromAi ? 'AI の下書き' : '返信'}</span>
-                      <span className={styles.spacer} />
+                    </span>} actions={<ListToolbarEnd>
                       {aiBusy ? (
                         <Button onClick={skipAi}>待たずに手で書く</Button>
                       ) : replyFromAi ? (
@@ -456,7 +459,7 @@ export default function OpsSupportV8() {
                           <Sparkles aria-hidden="true" />AIで下書きを作る
                         </Button>
                       )}
-                    </div>
+                    </ListToolbarEnd>} />
                     {aiBusy ? (
                       <p className={styles.draftNote} role="status">AIが下書きを作っています。5〜15秒ほどかかります。</p>
                     ) : (

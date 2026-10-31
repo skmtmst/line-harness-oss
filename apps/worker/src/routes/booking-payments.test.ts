@@ -71,9 +71,9 @@ async function stripeSignature(rawBody: string): Promise<string> {
 }
 
 const paidEvent = (providerPaymentId: string) => JSON.stringify({
-  id: 'evt-test-1',
+  id: 'evt-test-1', livemode: false,
   type: 'payment_intent.succeeded',
-  data: { object: { id: providerPaymentId } },
+  data: { object: { id: providerPaymentId, livemode: false } },
 });
 
 beforeEach(() => {
@@ -299,8 +299,8 @@ describe('予約の支払いの共通口', () => {
     expect(bad.status).toBe(401);
 
     const failedBody = JSON.stringify({
-      id: 'evt-test-2', type: 'payment_intent.payment_failed',
-      data: { object: { id: providerPaymentId } },
+      id: 'evt-test-2', livemode: false, type: 'payment_intent.payment_failed',
+      data: { object: { id: providerPaymentId, livemode: false } },
     });
     const failed = await instance.request('/api/booking/payments/webhook/stripe', {
       method: 'POST', headers: { 'stripe-signature': await stripeSignature(failedBody) },

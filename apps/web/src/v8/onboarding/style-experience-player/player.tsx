@@ -74,7 +74,7 @@ export function StyleExperiencePlayer({ script, style, onStyleChange, switcher, 
   // 全部版は右の画面がそろったスタイルだけを回す（教室は LIFF の描く部分の切り出しの後）。
   const rotation = useMemo(() => script.order.filter((name) => !full || script.styles[name].scenes.every((scene) => scene.board)), [script, full])
   const tabs = useMemo(() => script.tabs.filter((tab) => tab.styles.some((name) => rotation.includes(name))), [script, rotation])
-  const { position, scene, reduced, userPaused, togglePause, goToStep, selectStyle } = useStyleExperienceAutoplay({
+  const { position, scene, running, reduced, manual, userPaused, togglePause, goToStep, selectStyle } = useStyleExperienceAutoplay({
     script, style, onStyleChange, rotation, repeatStyle: switcher === 'external', rootRef,
   })
   const { scale, stacked } = useStageScale(rootRef)
@@ -107,12 +107,12 @@ export function StyleExperiencePlayer({ script, style, onStyleChange, switcher, 
       </KpiValueMotionProvider>
       <div className={styles.lineRow}>
         <p className={styles.line} aria-hidden="true">{scene.line}</p>
-        <p className={styles.srOnly} aria-live="polite">{announce}</p>
+        <p className={styles.srOnly} aria-live={running && !manual ? 'off' : 'polite'}>{announce}</p>
         {record ? null : <Button variant="secondary" size="compact" onClick={togglePause} disabled={reduced} disabledReason={reduced ? '動きを減らす設定のため、自動では進みません。下の手順を押すと移れます。' : undefined}>
           {userPaused ? <Play size={16} aria-hidden="true" /> : <Pause size={16} aria-hidden="true" />}{userPaused ? '動かす' : '止める'}
         </Button>}
       </div>
-      {full ? <Steps label={`${look.label}の流れ`} currentKey={step.key} steps={look.steps.map((item, index) => ({
+      {full || reduced ? <Steps label={`${look.label}の流れ`} currentKey={step.key} steps={look.steps.map((item, index) => ({
         key: item.key, label: item.label, state: index < position.index ? 'done' : index === position.index ? 'current' : 'todo', reachable: true, onSelect: () => goToStep(index),
       }))} /> : null}
     </section>
