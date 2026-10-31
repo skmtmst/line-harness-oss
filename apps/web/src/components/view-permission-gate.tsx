@@ -54,6 +54,14 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
     <TargetMissing kind="forbidden" title="この画面を見る権限がありません" description="LINEアカウントの管理は統括のメンバーが行います。" backHref="/" backLabel="ダッシュボードへ" />
   </PageFrame>
 
+  // 一覧のメニュー項目が非表示でも、URL から開いた担当者を素通りさせない。
+  // UID移行だけは友だちの権限で別途判定する。
+  const migration = pathname === '/accounts' && new URLSearchParams(search).get('tab') === 'migration'
+  if ((role === 'staff' || role === 'viewer') && (pathname === '/accounts' || pathname.startsWith('/accounts/')) && !migration) return <PageFrame kind="detail">
+    <PageHeading title="LINEアカウント" />
+    <TargetMissing kind="forbidden" title="この画面を見る権限がありません" description="見たい時はオーナーか管理者に頼んでください。" backHref="/" backLabel="ダッシュボードへ" />
+  </PageFrame>
+
   const items = menuItemsForPath(pathname, search)
   const signedInRole = staffIdentity?.role ?? role
   const canRead = (item: MenuItem) => {

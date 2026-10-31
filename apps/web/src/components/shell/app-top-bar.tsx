@@ -84,7 +84,8 @@ const SETTINGS_CRUMB = { label: '設定', href: '/settings' }
  */
 export function finishPageCrumbs<T extends { label: string; href?: string }>(pathname: string, crumbs: T[] | null, title: string, hq = false): Array<T | typeof SETTINGS_CRUMB> | null {
   let next: Array<T | typeof SETTINGS_CRUMB> | null = crumbs ? crumbs.filter((crumb) => crumb.label !== title) : null
-  const inSettings = !hq && pathname !== '/settings' && SETTINGS_SECTION_PATHS.length > 0 && menuSectionIdForPath(pathname) === 'settings'
+  const accountsSettings = pathname === '/accounts' || pathname.startsWith('/accounts/detail')
+  const inSettings = !hq && pathname !== '/settings' && (accountsSettings || (SETTINGS_SECTION_PATHS.length > 0 && menuSectionIdForPath(pathname) === 'settings'))
   if (inSettings) {
     const rest = (next ?? []).filter((crumb) => crumb.label !== 'ホーム' && crumb.label !== SETTINGS_CRUMB.label && crumb.href?.split('?')[0] !== '/settings')
     next = [SETTINGS_CRUMB, ...rest]

@@ -664,7 +664,9 @@ export default function Sidebar({
    */
   const hqSettingsActive = HQ_SETTINGS_PATHS.some((path) => activePathname === path || activePathname.startsWith(`${path}/`))
   const settingsActive = Boolean(
-    sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item)),
+    sections.find((section) => section.id === 'settings')?.items.some((item) => isActive(item))
+    || (activePathname === '/accounts' && new URLSearchParams(currentSearch).get('tab') !== 'migration')
+    || activePathname.startsWith('/accounts/detail'),
   )
 
   /*
