@@ -158,7 +158,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   }
   const importPhase = importState?.phase ?? connection?.followerImport.phase ?? ''
   const importRunning = importPhase === 'importing_ids' || importPhase === 'hydrating_profiles'
-  const importAttention = importRunning && (Boolean(importState?.lastError) || importRequestError || idleSeconds >= 60)
+  const importAttention = (importRunning || importState?.phase === 'completed') && (Boolean(importState?.lastError) || importRequestError || (importRunning && idleSeconds >= 60))
   const basicId = connection?.basicId ?? ''
   const addFriendUrl = basicId ? `https://line.me/R/ti/p/${encodeURIComponent(basicId.startsWith('@') ? basicId : `@${basicId}`)}` : ''
   const shownStep = V8_STEPS[currentStep - 1]
@@ -294,8 +294,10 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
     const poll = async () => {
       try {
         const response = await api.lineAccounts.followerImportState(createdId)
-        if (active && response.success) setImportState((current) => latestFollowerImportState(current, response.data))
-        else if (active) setImportRequestError(true)
+        if (active && response.success) {
+          setImportState((current) => latestFollowerImportState(current, response.data))
+          setImportRequestError(false)
+        } else if (active) setImportRequestError(true)
       } catch {
         if (active) setImportRequestError(true)
       }
@@ -798,7 +800,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
           )}
 
           {currentStep === 5 && connection && (
-            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} restaurant={templateKey === 'restaurant'} />
+            <Step5Completion connection={connection} accountName={form.name.trim()} createdId={createdId} importRunning={importRunning} importFriends={form.importFriends} importState={importState} handover={handover} idleSeconds={idleSeconds} requestError={importRequestError} restaurant={templateKey === 'restaurant'} onRefresh={() => void refreshImport()} refreshing={importRefreshing} />
           )}
 
           {recoveredAccountId ? (
