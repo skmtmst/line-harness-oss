@@ -176,11 +176,11 @@ export default function UidMigrationV8({ m }: { m: UidMigrationState }) {
         <div className={styles.duoCards}>
           <div className={styles.fieldStack}>
             <span className={styles.fieldLabel}>移行元</span>
-            <SaveErrorField names={["fromAccountId","from_account_id"]}><EntitySelect aria-label="移行元アカウント" disabled={!canDecideItems || busy} lockedReason={managerLockReason} value={fromAccountId} onChange={(value) => setFromAccountId(value)} options={[{ value: '', label: '移行元アカウントを選択' }, ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name, hint: uidAccountHint(account) }))]} size="full" /></SaveErrorField>
+            <SaveErrorField names={["fromAccountId","from_account_id"]}><EntitySelect aria-label="移行元アカウント" placeholder="移行元アカウントを選択" disabled={!canDecideItems || busy} lockedReason={managerLockReason} value={fromAccountId} onChange={(value) => setFromAccountId(value)} options={[...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name, hint: uidAccountHint(account) }))]} size="full" /></SaveErrorField>
           </div>
           <div className={styles.fieldStack}>
             <span className={styles.fieldLabel}>移行先</span>
-            <SaveErrorField names={["toAccountId","to_account_id"]}><EntitySelect aria-label="移行先アカウント" disabled={!canDecideItems || busy} lockedReason={managerLockReason} value={toAccountId} onChange={(value) => setToAccountId(value)} options={[{ value: '', label: '移行先アカウントを選択' }, ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name, hint: uidAccountHint(account) }))]} size="full" /></SaveErrorField>
+            <SaveErrorField names={["toAccountId","to_account_id"]}><EntitySelect aria-label="移行先アカウント" placeholder="移行先アカウントを選択" disabled={!canDecideItems || busy} lockedReason={managerLockReason} value={toAccountId} onChange={(value) => setToAccountId(value)} options={[...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: account.name, hint: uidAccountHint(account) }))]} size="full" /></SaveErrorField>
           </div>
         </div>
         <div className={styles.fieldStack} style={{ marginTop: 12 }} ref={purposeLock.ref} {...purposeHandlers} tabIndex={m.managerLockReason ? 0 : undefined} role={m.managerLockReason ? "group" : undefined} aria-label={m.managerLockReason ? "利用目的" : undefined}>
