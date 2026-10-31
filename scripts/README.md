@@ -30,4 +30,6 @@
 
 ホームの初回待機は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/home-pending-heading.test.mjs` で、認証前から到着までの見出しを毎フレーム確かめます。`V8_GUARD_BASE` に本番形式の出力の配信先、`V8_GUARD_ARTIFACT_DIR` に保存先、`V8_GUARD_VIDEO=1` で動画を指定します。既定は6スタイル・1152/1440・API遅延0/600msです。`V8_GUARD_HOME_HEADING_FAULT=1 HOME_STYLES=standard HOME_DELAYS=600` は待機の見出しをCSSで隠す故障の対照で、赤になることを確認してから旗を外して再実行します。
 
-題と状態の札・失敗の重複・設定ナビ・手順の焦点・状態セルは `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/patrol-layout.test.mjs` で見張ります。設定13入口は1024/1152/1440、ほかは1152/1440。予約送信の2窓は同じ入口の `scheduled-message.test.mjs` で、入力不足・理由1行・通常の緑との差を検査します。各検査は故障で赤、復元で緑も必須です。
+窓の下の帯は `pnpm test:scripts scripts/visual-qa/dialog-footer-contract.test.ts` が全画面の自前帯と参照だけの閉じる帯を検査します。実窓は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/dialog-footer.test.mjs`、題と札・失敗の重複・設定ナビ・手順の焦点・状態セルは同じ入口の `patrol-layout.test.mjs` です。上と同じ配信先・保存先・動画の環境変数を使い、各検査は故障を入れて赤になることと復元後の緑も必須で確認します。設定ナビは1024/1152/1440、窓などは1152/1440を測ります。
+
+予約送信の入力不足は `node apps/web/scripts/v8-guard/browser-host.mjs --test --test-concurrency=1 apps/web/scripts/v8-guard/scheduled-message.test.mjs` で受信箱と友だち一覧を2幅で操作し、押せない主操作・理由1行・通常の緑との差を検査します。日時の過去判定は既存の処理とAPIが担当します。
