@@ -3,7 +3,6 @@
 import { notifyToast } from '@/components/shared/toast'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import { useEffect, useRef, useState } from 'react'
-import Link from '@/components/shared/list-navigation'
 import { ListOrdered, Send, Users } from 'lucide-react'
 import type { Tag } from '@line-crm/shared'
 import { api, type BroadcastApprovalCandidate } from '@/lib/api'
@@ -324,14 +323,14 @@ export default function QuickSendV8({
       open={open}
       confirmation
       designNode="P6vbxn"
-      designWidth={640}
+      designWidth={720}
       title="かんたんに送る"
       error={error ?? undefined}
       busy={busy}
       onCancel={() => { if (!busy) onClose() }}
-      footer={(<DialogActions align="center" leadingAction={access.create ? <Link href="/broadcasts/new" className={styles.detailLink}>
+      footer={(<DialogActions align="center" leadingAction={access.create ? <Button variant="text" size="field" href="/broadcasts/new">
             <ListOrdered size={16} aria-hidden="true" />詳しく作るへ
-          </Link> : <Button type="button" variant="secondary" className={styles.detailLink} disabled lockedReason={editReason}>
+          </Button> : <Button type="button" variant="text" size="field" disabled lockedReason={editReason}>
             <ListOrdered size={16} aria-hidden="true" />詳しく作るへ
           </Button>}>
 

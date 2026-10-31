@@ -13,7 +13,14 @@ vi.mock('@/lib/api', async original => {
   const actual = await original<typeof import('@/lib/api')>()
   return { ...actual, api: { ...actual.api, autoReplies: { ...actual.api.autoReplies, list: net.list, summary: net.summary, update: net.update, stop: net.stop, delete: net.remove, create: net.create }, templates: { ...actual.api.templates, list: net.templates }, folders: { ...actual.api.folders, list: net.folders } } }
 })
-vi.mock('@/lib/undoable', async original => ({ ...await original<typeof import('@/lib/undoable')>(), runUndoable: (options: Parameters<typeof import('@/lib/undoable').runUndoable>[0]) => { delayed.push(options) } }))
+vi.mock('@/lib/undoable', async original => {
+  const actual = await original<typeof import('@/lib/undoable')>()
+  const { scheduledConfirmation } = await import('@/test-utils/confirmed-undo-test-handle')
+  return { ...actual, runUndoable: (options: Parameters<typeof actual.runUndoable>[0] & { confirmation?: boolean }) => {
+    if (options.confirmation) { const scheduled = scheduledConfirmation(options); delayed.push({ ...options, get failureMessage() { return options.failureMessage }, commit: scheduled.execute }); return scheduled.handle }
+    delayed.push(options)
+  } }
+})
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: net.push, replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), forward: vi.fn(), prefetch: vi.fn() }), useSearchParams: () => new URLSearchParams('') }))
 vi.mock('next/link', () => ({ default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account, accounts: [], loading: false }) }))

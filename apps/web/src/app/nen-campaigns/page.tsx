@@ -261,6 +261,7 @@ export default function NenCampaignsPage() {
       await api.nenCampaigns.setEnabled(selectedAccountId, setting.campaignKey, nextEnabled)
       updateDraft(setting.campaignKey, { isEnabled: nextEnabled })
       setNotice({ tone: 'success', text: `${setting.label}を${nextEnabled ? '動かしました' : '止めました'}。` })
+      return true
     } catch (caught) {
       /*
        * M501: 混雑（429）の案内は共通部品に任せる。画面で状態を見分けて
@@ -273,6 +274,7 @@ export default function NenCampaignsPage() {
           forbidden: `${setting.label}を切り替える権限がありません。権限を確認してください。`,
         }),
       })
+      return false
     }
     finally { setSaving(null) }
   }
@@ -284,6 +286,7 @@ export default function NenCampaignsPage() {
   }
   const deliverColumn = async (column: NenColumn, scheduledAt?: string) => {
     if (!selectedAccountId) return
+    setNotice(null)
     try {
       const result = await api.nenCampaigns.deliverColumn(column.id, { accountId: selectedAccountId, scheduledAt })
       if (!result.success) throw new Error(result.error)
@@ -291,11 +294,13 @@ export default function NenCampaignsPage() {
       setNotice({ tone: 'success', text: result.data.queued === 0
         ? `「${column.title}」はすでに配信待ちに入っているか、いま送れる相手がいません。`
         : scheduledAt ? `「${column.title}」を${result.data.queued}人分 予約しました。` : `「${column.title}」を${result.data.queued}人分 配信待ちに入れました。` })
-      await loadTab('columns')
+      void loadTab('columns')
+      return true
     } catch (caught) {
       setNotice({ tone: 'error', text: caught instanceof ApiError && caught.code === 'past_datetime'
         ? '予約日時が過去になっています。いまより先の日時を選び直してください。'
         : 'コラムを配信予約できませんでした。コラムの配信が停止中でないか確認してください。' })
+      return false
     }
   }
   const saveColumnMessage = async (column: NenColumn) => {
@@ -504,14 +509,14 @@ export default function NenCampaignsPage() {
         loading={loading} notice={notice}
         saving={saving} testing={testing}
         previewCampaignKey={previewCampaignKey} onPreviewCampaign={setPreviewCampaignKey}
-        onToggleSetting={(setting) => void toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
+        onToggleSetting={(setting) => toggleSetting(setting)} onTestSend={(setting) => void testSend(setting)}
         coupon={coupon} couponOpen={couponOpen} onCouponOpenChange={setCouponOpen} onCouponChange={setCoupon} onSaveCoupon={() => void saveCoupon()} savingCoupon={savingCoupon}
         selectedColumnId={selectedColumnId} onSelectColumn={selectColumn} audienceCount={audienceCount}
         columnsTotal={columnsTotal}
         onLoadMoreColumns={loadMoreColumns}
         plan={plan} onPlanChange={setPlan}
         introDraft={introDraft} onIntroChange={setIntroDraft} onSaveIntro={(column) => void saveColumnMessage(column)} savingColumnId={savingColumnId}
-        onDeliverColumn={(column, scheduledAt) => void deliverColumn(column, scheduledAt)}
+        onDeliverColumn={(column, scheduledAt) => deliverColumn(column, scheduledAt)}
         onDuplicateColumn={(column) => void duplicateColumn(column)} duplicatingColumnId={duplicatingColumnId} onTestColumn={(column) => void testColumn(column)}
         onShowDelivery={(id) => void showDelivery(id)} onRetryDelivery={(id, version, reason) => void retryDelivery(id, version, reason)}
         onChangeDeliveryView={(status, cursor, q) => void changeDeliveryView(status, cursor, q)}

@@ -67,9 +67,16 @@ vi.mock('@/components/scenarios/duplicate-scenario', async (importOriginal) => (
 vi.mock('@/lib/undoable', async (importOriginal: () => Promise<typeof import('@/lib/undoable')>) => {
   const actual = await importOriginal()
   const { notifyToast } = await import('@/components/shared/toast')
+  const { scheduledConfirmation } = await import('@/test-utils/confirmed-undo-test-handle')
   return {
     ...actual,
-    runUndoable: (options: Parameters<typeof actual.runUndoable>[0]) => {
+    runUndoable: (options: Parameters<typeof actual.runUndoable>[0] & { confirmation?: boolean }) => {
+      if (options.confirmation) {
+        const scheduled = scheduledConfirmation(options)
+        if (undo.hold) undo.queue.push({ ...options, get failureMessage() { return options.failureMessage }, commit: scheduled.execute })
+        else void Promise.resolve().then(() => scheduled.execute()).catch(() => {})
+        return scheduled.handle
+      }
       if (undo.hold) { undo.queue.push(options); return }
       void Promise.resolve()
         .then(() => options.commit())

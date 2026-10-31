@@ -191,6 +191,7 @@ for (const [entry, useMigration] of [['旧入口', useLegacy], ['友だち入口
     })
 
     it('一括判断は自分の再読取だけを引き継ぎ、2件を1回ずつ保存する', async () => {
+      fixture.detail.mockResolvedValue({ success: true, data: { ...run, counts: { ...run.counts, total: 2, review: 2 }, items: [item, { ...item, id: 'item-2' }] } })
       const { result } = await mount()
       fixture.decide.mockResolvedValue({ success: true, data: { unresolved: 0 } })
       await act(async () => { await result.current.decideMany([item, { ...item, id: 'item-2' }], 'link') })
@@ -207,6 +208,7 @@ for (const [entry, useMigration] of [['旧入口', useLegacy], ['友だち入口
     })
 
     it.each(['read', 'read-write'] as const)('一括判断の途中の%s切替で残りは保存せず、読取は続ける', async transition => {
+      fixture.detail.mockResolvedValue({ success: true, data: { ...run, counts: { ...run.counts, total: 2, review: 2 }, items: [item, { ...item, id: 'item-2' }] } })
       const { result } = await mount()
       const reads = fixture.detail.mock.calls.length
       fixture.decide.mockImplementationOnce(async () => { mode('read'); if (transition === 'read-write') mode('write'); return { success: true, data: { unresolved: 0 } } })

@@ -41,17 +41,24 @@ it('実画面: 枠失敗は公開済みの本体と残りを分け、変更は�
  expect(screen.getByText('残り：最初の予約枠')).toBeTruthy();
  expect(createEvent.mock.calls[0][1]).toMatchObject({name:'元の名前',is_published:1});
  expect((screen.getByLabelText('イベント名') as HTMLInputElement).value).toBe('元の名前');
+ expect(screen.getByRole('dialog',{name:'イベントを公開する'})).toBe(confirm);
+ expect(within(confirm).getByRole('alert').textContent).toContain('最初の予約枠を作れませんでした');
+ fireEvent.click(within(confirm).getByRole('button',{name:'キャンセル'}));
+ await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());
  fireEvent.change(screen.getByLabelText('イベント名'),{target:{value:'修正した名前'}});
  fireEvent.click(getPageAction({name:'下書きを保存'}));await waitFor(()=>expect(push).toHaveBeenCalled());
  expect(createEvent).toHaveBeenCalledTimes(1);expect(createSlots).toHaveBeenCalledTimes(2);expect(updateEvent).toHaveBeenCalledWith('account-a','fixture-event',expect.objectContaining({name:'修正した名前',is_published:1}),1);
  expect(createSlots.mock.calls[1][2][0].client_key).toBe('first-slot:fixture-event');
 });
-it('保存待ちの連続クリックは本体要求1回、失敗後は入力を保持',async()=>{
+it('保存待ちの連続クリックは本体要求1回、作成結果が不明なら入力を保持して再作成を止める',async()=>{
  let reject!:(e:Error)=>void;createEvent.mockImplementation(()=>new Promise((_,r)=>{reject=r}));
  render(<EventsCreate/>);fill();const btn=getPageAction({name:'下書きを保存'});fireEvent.click(btn);fireEvent.click(btn);
  expect(createEvent).toHaveBeenCalledTimes(1);expect((screen.getByRole('button',{name:'保存しています…'}) as HTMLButtonElement).disabled).toBe(true);
  await act(async()=>reject(new Error('fixture offline')));
- await waitFor(()=>expect((getPageAction({name:'下書きを保存'}) as HTMLButtonElement).disabled).toBe(false));
+ await screen.findByText(/イベントの作成結果を確認できませんでした/);
+ expect((getPageAction({name:'下書きを保存'}) as HTMLButtonElement).disabled).toBe(true);
+ fireEvent.click(getPageAction({name:'下書きを保存'}));fireEvent.click(screen.getByRole('button',{name:'もう一度保存する'}));
+ expect(createEvent).toHaveBeenCalledTimes(1);
  expect((screen.getByLabelText('イベント名') as HTMLInputElement).value).toBe('元の名前');expect(push).not.toHaveBeenCalled();
 });
 it('未保存でリンク離脱を止め、編集継続で入力を保つ',async()=>{
