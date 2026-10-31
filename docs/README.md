@@ -1041,3 +1041,4 @@
 - [シナリオ配信と初期設定の案内](release-log/unreleased/1989-kenta-train-1029u.md) — 反映履歴、確認 2026-10-31。
 - [デリバリー受注の予告表示](release-log/unreleased/1990-masato-delivery-sidebar-overflow.md) — 反映履歴、確認 2026-10-31。
 - [お気に入りの星の表示](release-log/unreleased/1991-masato-yellow-favorites.md) — 反映履歴、確認 2026-10-31。
+- [来店フォローの下書き・テスト・同じ版の公開と承認](release-log/unreleased/0000-kenta-followup-engines.md) — 反映履歴、確認 2026-10-31。

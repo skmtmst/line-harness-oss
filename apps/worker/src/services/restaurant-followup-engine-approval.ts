@@ -10,9 +10,11 @@ interface ApprovedTemplate {
 export interface FollowupEngineSnapshot {
   versionId: string;
   contentHash: string;
+  sourceContentJson:string;
   plan: ActionDefinition[] | null;
   templates: ReadonlyMap<string, ApprovedTemplate>;
   guard: V6WriteGuard;
+  publicationGuard?:V6WriteGuard;
 }
 
 // 状態や検査日時は指紋に含めず、本文・時期・参照する版・下書きの変更を含める。
@@ -42,10 +44,12 @@ const automationSnapshotSql = `SELECT json_object(
 
 /** 承認する実物の指紋と、送信直前に同じ内容を照合するSQLを同時に作る。 */
 export async function readFollowupEngineSnapshot(db: D1Database, input: {
-  engine: FollowupEngine; targetId: string; lineAccountId: string; storeId: string;
+  engine: FollowupEngine; targetId: string; lineAccountId: string; storeId: string; publishingVersionId?:string;
 }): Promise<FollowupEngineSnapshot | null> {
   const sql = input.engine === 'reminder' ? reminderSnapshotSql : automationSnapshotSql;
-  const result = await db.prepare(sql).bind(input.targetId).first<{content_json:string}>();
+  const projection=input.publishingVersionId?publicationSnapshotQuery(input.engine,sql):null;
+  const readSql=projection??sql,readBinds=input.publishingVersionId?[input.targetId,input.publishingVersionId,input.targetId]:[input.targetId];
+  const result = await db.prepare(readSql).bind(...readBinds).first<{content_json:string}>();
   if (!result) return null;
   const row = result.content_json;
   const data = JSON.parse(row) as { accountId: string; versionId: string; actions?: string; steps?: Array<{ templateId: string | null }> };
@@ -76,7 +80,27 @@ export async function readFollowupEngineSnapshot(db: D1Database, input: {
   }
   const digest = await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify([data,plan,[...templates.values()],store])));
   const contentHash = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2,'0')).join('');
-  return {versionId:data.versionId,contentHash,plan,templates,guard:{sql:clauses.join(' AND '),binds}};
+  return {versionId:data.versionId,contentHash,sourceContentJson:row,plan,templates,guard:{sql:clauses.join(' AND '),binds},...(projection?{publicationGuard:{sql:[`(${readSql})=?`,...clauses.slice(1)].join(' AND '),binds:[...readBinds,row,...binds.slice(2)]}}:{})};
+}
+
+/** 公開後と同じ写しを先に作り、公開と承認の1つのbatchに使う。 */
+function publicationSnapshotQuery(engine:FollowupEngine,sql:string){
+ if(engine==='automation')return sql.replace('FROM automation_definitions d JOIN',`FROM (
+   SELECT live.id,live.line_account_id,pv.id current_published_version_id,NULL current_draft_version_id
+   FROM automation_definitions live JOIN automation_versions pv ON pv.id=live.current_draft_version_id AND pv.automation_id=live.id
+   WHERE live.id=? AND pv.id=? AND pv.status='draft' AND live.archived_at IS NULL AND live.status IN('draft','active','stopped')
+ ) d JOIN`).replace("v.status='published'","v.status='draft'");
+ return sql.replace('FROM reminders r JOIN',`FROM (
+   SELECT live.id,json_extract(pv.settings_snapshot,'$.lineAccountId') line_account_id,pv.id current_published_version_id,NULL current_draft_version_id,
+    json_extract(pv.settings_snapshot,'$.triggerType') trigger_type,json_extract(pv.settings_snapshot,'$.deliveryMode') delivery_mode,
+    json_extract(pv.settings_snapshot,'$.triggerFieldId') trigger_field_id,json_extract(pv.settings_snapshot,'$.triggerEventId') trigger_event_id,
+    CASE WHEN json_extract(pv.settings_snapshot,'$.repeatYearly') THEN 1 ELSE 0 END repeat_yearly,
+    COALESCE(json_extract(pv.settings_snapshot,'$.leapYearPolicy'),'mar1') leap_year_policy,
+    json_extract(pv.settings_snapshot,'$.triggerOffsetMinutes') trigger_offset_minutes,
+    json_extract(pv.settings_snapshot,'$.sendAtTime') send_at_time,json_extract(pv.settings_snapshot,'$.targetTagId') target_tag_id
+   FROM reminders live JOIN reminder_versions pv ON pv.id=live.current_draft_version_id AND pv.reminder_id=live.id
+   WHERE live.id=? AND pv.id=? AND pv.status='draft' AND live.deleted_at IS NULL
+ ) r JOIN`).replace("v.status='published'","v.status='draft'");
 }
 
 export type FollowupEngineGate = { managed: false; allowed: true } | {

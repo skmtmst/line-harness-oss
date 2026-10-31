@@ -16,7 +16,7 @@ const anniversarySql=()=>`SELECT v.*,s.id store_id,s.line_account_id,s.name stor
  JOIN friend_field_values ff ON ff.friend_id=f.id AND ff.field_id=(SELECT field_id FROM friend_fixed_fields WHERE fixed_key='anniversary')
  JOIN line_accounts la ON la.id=s.line_account_id AND la.is_active=1 AND la.archived_at IS NULL
 
- WHERE ${activeTenantLineAccountSql('la.id')} AND t.sending_status='active' AND json_extract(a.payload_json,'$.templateVersion')=t.template_version
+ WHERE NOT EXISTS(SELECT 1 FROM rt_store_followup_targets ft WHERE ft.store_id=b.store_id AND ft.trigger=b.trigger AND ft.engine!='scenario') AND ${activeTenantLineAccountSql('la.id')} AND t.sending_status='active' AND json_extract(a.payload_json,'$.templateVersion')=t.template_version
  AND json_extract(a.payload_json,'$.scenarioVersionId')=t.approved_version_id AND json_extract(a.payload_json,'$.lineAccountId')=s.line_account_id`;
 
 function localInstant(date:string,timeZone:string,time:string,offset:number) {

@@ -135,6 +135,27 @@ describe('outbound send idempotency boundary', () => {
     ).get(KEY)).toEqual({ attempt_count: 2 });
   });
 
+  test('失敗の読取後に外部要求の記録が変わったら古い理由で回収しない', async()=>{
+    const args={key:KEY,channel:'line' as const,resourceId:'failure-race',payloadHash:await hashOutboundPayload('same'),retryInProgress:false,now:NOW};
+    const first=await reserveOutboundSend(sqlite.db,args);
+    if(first.kind!=='acquired')throw new Error('reservation failed');
+    await failOutboundSend(sqlite.db,{key:KEY,leaseToken:first.leaseToken,status:'failed',code:'NOTIFICATION_PRECONDITION_CHANGED',retryable:true,nextRetryAt:null,now:NOW});
+    const competingDb={...sqlite.db,prepare:(sql:string)=>{
+      const statement=sqlite.db.prepare(sql);
+      if(!sql.includes("SET status = 'in_progress', failure_code = NULL"))return statement;
+      return {...statement,bind:(...args:unknown[])=>{
+        const bound=statement.bind(...args);
+        return {...bound,run:async()=>{
+          sqlite.raw.prepare("UPDATE outbound_send_requests SET failure_code='LINE_TEMPORARILY_UNAVAILABLE' WHERE idempotency_key=?").run(KEY);
+          return bound.run();
+        }};
+      }};
+    }} as D1Database;
+    expect(await reserveOutboundSend(competingDb,args)).toEqual({kind:'in_progress'});
+    expect(sqlite.raw.prepare('SELECT status,failure_code,attempt_count FROM outbound_send_requests WHERE idempotency_key=?').get(KEY))
+      .toEqual({status:'failed',failure_code:'LINE_TEMPORARILY_UNAVAILABLE',attempt_count:1});
+  });
+
   test('送達不明は同じキーでも再送しない', async () => {
     const args = {
       key: KEY,
