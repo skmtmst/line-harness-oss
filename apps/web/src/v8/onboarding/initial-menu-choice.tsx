@@ -10,6 +10,7 @@ import LinePreview, { LinePreviewMessage } from '@/components/shared/line-previe
 import { GridTable, GridHeadRow, GridRow, GridCell } from '@/components/shared/grid-table'
 import { styleApi } from '@/lib/api/helpers/styles'
 import styles from './initial-menu-choice.module.css'
+import { SaveErrorField } from '@/components/shared/save-form-errors'
 
 function menuActionDescription(style:AccountStyle,target:InitialMenuTarget):string {
  if(target==='booking')return style==='restaurant'?'席の空きから日時・人数を選ぶ':'空いている日時を選ぶ';
@@ -43,12 +44,12 @@ export function InitialMenuChoice({accountId,style,value,onChange,disabled=false
  const items=resources?.accountId===accountId?resources.items:null
  const menu=INITIAL_MENUS[style]
  return <>
-  <RadioCardGroup legend="使うメニュー" columns={3}>
+  <SaveErrorField names={['image','answers.image','confirmInitialMenu']}><RadioCardGroup legend="使うメニュー" columns={3}>
    <RadioCard name="initial-menu" value="simple" checked={value.value==='simple'} onChange={()=>onChange({value:'simple'})} disabled={disabled} disabledReason={disabledReason} height="fit" title="シンプルなメニュー" note={menu.buttons.map(button=>button.label).join('・')}/>
    <RadioCard name="initial-menu" value="existing" checked={value.value==='existing'} onChange={()=>onChange({value:'existing'})} disabled={disabled} disabledReason={disabledReason} height="fit" title="今あるメニューを使う" note="現在の画像とボタンをそのまま使います"/>
    <RadioCard name="initial-menu" value="later" checked={value.value==='later'} onChange={()=>onChange({value:'later'})} disabled={disabled} disabledReason={disabledReason} height="fit" title="あとで設定する" note="はじめにやることから続けられます"/>
-  </RadioCardGroup>
-  {value.value==='existing' ? error ? <ListState kind="error" title="メニューを読み込めませんでした" error={error} onRetry={()=>setTick(n=>n+1)}/> : <EntitySelect aria-label="使うリッチメニュー" noun="リッチメニュー" size="full" value={value.resourceId??''} onChange={resourceId=>onChange({value:'existing',resourceId})} disabled={disabled||items===null} disabledReason={disabled?disabledReason:'メニューを読み込んでいます'} options={[{value:'',label:items===null?'読み込んでいます…':items.length?'使うメニューを選ぶ':'使えるメニューがありません'},...(items??[]).map(item=>({value:item.id,label:item.name}))]}/> : null}
+  </RadioCardGroup></SaveErrorField>
+  {value.value==='existing' ? error ? <ListState kind="error" title="メニューを読み込めませんでした" error={error} onRetry={()=>setTick(n=>n+1)}/> : <SaveErrorField names={['resourceId','answers.image.resourceId']}><EntitySelect aria-label="使うリッチメニュー" noun="リッチメニュー" size="full" value={value.resourceId??''} onChange={resourceId=>onChange({value:'existing',resourceId})} disabled={disabled||items===null} disabledReason={disabled?disabledReason:'メニューを読み込んでいます'} options={[{value:'',label:items===null?'読み込んでいます…':items.length?'使うメニューを選ぶ':'使えるメニューがありません'},...(items??[]).map(item=>({value:item.id,label:item.name}))]}/></SaveErrorField> : null}
   {value.value==='simple' ? <>
    <Card layout="vertical"><CardHeader title="入る画像"/><img className={styles.image} src={initialMenuImageDataUri(style)} alt={menu.buttons.map(button=>button.label).join('・')} width={2500} height={1686}/></Card>
    <CardHeader title="ボタンを押すと開くページ" meta="URLを貼る操作は不要"/>
