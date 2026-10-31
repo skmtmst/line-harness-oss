@@ -1091,3 +1091,5 @@
 - [検証環境の自動配備手順の反映履歴](release-log/unreleased/2017-masato-cf-staging-deploy-doc.md) — 反映履歴、確認 2026-10-31。
 
 - [反映履歴：フォームの下書き・配信前確認・設定の表示](release-log/unreleased/2019-kenta-train-1031e.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [検証配備で未適用のDB変更だけを確認する](release-log/unreleased/2018-masato-cf-staging-deploy-pending.md) — 反映履歴、確認 2026-11-01。
