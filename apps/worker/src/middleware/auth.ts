@@ -13,7 +13,7 @@ import { isOutputRequest } from './output-request.js';
 import { DEFAULT_TENANT_ID } from '../lib/tenant.js';
 import { ADMIN_SESSION_BEARER_PREFIX, CSRF_HEADER, adminSessionTokenFromCookie, csrfTokenFromCookie, sha256Hex } from './auth/credentials/auth.js';
 import { toAuthenticatedStaff, isTenantUnavailable, isTenantSuspensionExemptPath, TENANT_SUSPENDED_CODE, TENANT_SUSPENDED_ERROR, type AuthenticatedStaff } from './auth/principal/auth.js';
-import { gap2ReadOperation, gap2SelfPreference, permissionForApiPath, isStaffSelfEndpoint, isStaffExplicitAllow } from './auth/permissions/auth.js';
+import { gap2ReadOperation, gap2SelfPreference, readOperationPermissions, permissionForApiPath, isStaffSelfEndpoint, isStaffExplicitAllow } from './auth/permissions/auth.js';
 
 export { ADMIN_AUTH_COOKIE, ADMIN_SESSION_BEARER_PREFIX, CSRF_COOKIE, CSRF_HEADER, SESSION_DEFAULT_MAX_AGE, SESSION_REMEMBER_MAX_AGE, SESSION_MAX_AGE, adminSessionTokenHashFromRequest, adminSessionTokenFromCookie, csrfTokenFromCookie, adminSessionCookie, csrfCookie, expiredCookie, sha256Hex } from './auth/credentials/auth.js';
 export { toAuthenticatedStaff, isTenantUnavailable, isTenantSuspensionExemptPath, TENANT_SUSPENDED_CODE, TENANT_SUSPENDED_ERROR, type AuthenticatedStaff, type StaffRole, type TenantStatus } from './auth/principal/auth.js';
@@ -187,11 +187,11 @@ async function authenticateRequest(c: Context<Env>, next: Next): Promise<Respons
       && !isStaffSelfEndpoint(method, path, staff.id)
       && !isStaffExplicitAllow(method, path)) {
     const requiredPermission = permissionForApiPath(path);
-    // 「見えるだけ」の key は GET系だけを許可する。変更系は edit の key が要る。
-    const granted = requiredPermission
-      && (staff.permissionKeys?.includes(requiredPermission)
-        || ((SAFE_METHODS.has(method)||gap2ReadOperation(method,path)) && !outputRequest && staff.viewPermissionKeys?.includes(requiredPermission)));
-    if (!requiredPermission || !granted) {
+    const requiredPermissions = readOperationPermissions(method, path) ?? (requiredPermission ? [requiredPermission] : []);
+    // 閲覧鍵は安全なメソッドか、表に登録された読取操作だけに使う。
+    const granted = requiredPermissions.some(permission => staff.permissionKeys?.includes(permission)
+      || ((SAFE_METHODS.has(method)||gap2ReadOperation(method,path)) && !outputRequest && staff.viewPermissionKeys?.includes(permission)));
+    if (!granted) {
       return c.json({ success: false, error: 'この機能を操作する権限がありません' }, 403);
     }
   }

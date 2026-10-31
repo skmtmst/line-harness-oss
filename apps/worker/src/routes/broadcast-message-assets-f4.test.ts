@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../worker-env.js';
 import { getBroadcastMessageAsset } from '@line-crm/db';
+import { convertBroadcastAsset } from '@line-crm/shared';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 
 vi.mock('../services/account-access.js', () => ({
@@ -297,6 +298,11 @@ it('クーポンの割引・条件・コード・ガイドは保存・公開・�
   expect(JSON.parse(republished!.payload_json)).toEqual(edited);
   expect(republished!.draft_payload_json).toBeNull();
   expect(republished!.published_version).toBe(2);
+  const delivered = convertBroadcastAsset('coupon', '値引き券', { ...JSON.parse(republished!.payload_json), assetId: id });
+  expect(delivered.ok).toBe(true);
+  if (!delivered.ok) throw new Error(delivered.error);
+  expect(delivered.message.messageContent).toContain('20%引き');
+  expect(delivered.message.messageContent).not.toContain('WELCOME500');
   const publishedList = await app().request('/api/broadcast-message-assets?lineAccountId=account-1&kind=coupon', {}, bindings);
   expect(publishedList.status).toBe(200);
   const publishedBody = await publishedList.json() as { data: Array<{ id: string; publishedPayload: Record<string, unknown> }> };

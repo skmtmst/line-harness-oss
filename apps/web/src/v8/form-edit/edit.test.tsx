@@ -24,10 +24,12 @@ vi.mock('next/navigation', () => ({
 vi.mock('next/link', () => ({
   default: ({ children, href, className }: { children: React.ReactNode; href: string; className?: string }) => <a href={href} className={className}>{children}</a>,
 }))
+const account = vi.hoisted(() => ({ id: 'acc-1' }))
 vi.mock('@/contexts/account-context', () => ({
-  useAccount: () => ({ selectedAccountId: 'acc-1', selectedAccount: { id: 'acc-1', name: 'テスト店', liffId: 'liff-1' }, accounts: [], loading: false }),
+  useAccount: () => ({ selectedAccountId: account.id, selectedAccount: { id: account.id, name: 'テスト店', liffId: 'liff-1' }, accounts: [], loading: false }),
 }))
-vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {}, usePageChrome: () => ({ title: '' }) }))
+const chromeTitle = vi.hoisted(() => vi.fn())
+vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: chromeTitle, usePageCrumbs: () => {}, usePageChrome: () => ({ title: '' }) }))
 
 const forcedRole = vi.hoisted(() => ({ value: null as string | null }))
 vi.mock('@/lib/staff-role', async original => {
@@ -102,6 +104,7 @@ const render = async (query: string) => {
 }
 
 beforeEach(() => {
+  account.id = 'acc-1'
   forcedRole.value = null
   staffMe.mockReset().mockResolvedValue({ success: true, data: { role: 'owner' } })
   document.documentElement.dataset.theme = 'v8'
@@ -122,6 +125,52 @@ afterEach(() => {
 })
 
 describe('回答フォームの編集（V8）', () => {
+  it('フォーム名の読み込み中は編集の題を出し、読めた名前を帯と本文へ渡す', async () => {
+    let resolveForm!: (value: unknown) => void
+    formsGet.mockImplementation(() => new Promise(resolve => { resolveForm = resolve }))
+    await render('id=form-1')
+    expect(screen.getByRole('heading', { name: '回答フォーム編集', exact: true })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'フォーム名未設定', exact: true })).toBeNull()
+    expect(chromeTitle).toHaveBeenLastCalledWith('回答フォーム編集')
+    await act(async () => { resolveForm({ success: true, data: structuredClone(formData) }) })
+    expect(await screen.findByRole('heading', { name: formData.name, exact: true })).toBeTruthy()
+    expect(chromeTitle).toHaveBeenLastCalledWith(formData.name)
+  })
+
+  it('取得済みで名前が空なら、帯と本文の両方で未設定と分かる', async () => {
+    formsGet.mockResolvedValue({ success: true, data: { ...structuredClone(formData), name: '' } })
+    await render('id=form-1')
+    expect(await screen.findByRole('heading', { name: 'フォーム名未設定', exact: true })).toBeTruthy()
+    expect(chromeTitle).toHaveBeenLastCalledWith('フォーム名未設定')
+  })
+
+  it('同じ編集画面でIDを替えたら、次の取得中に前の名前を残さない', async () => {
+    await render('id=form-1')
+    await screen.findByRole('heading', { name: formData.name, exact: true })
+    let resolveForm!: (value: unknown) => void
+    formsGet.mockImplementation(() => new Promise(resolve => { resolveForm = resolve }))
+    await render('id=form-2')
+    expect(screen.getByRole('heading', { name: '回答フォーム編集', exact: true })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: formData.name, exact: true })).toBeNull()
+    await act(async () => { resolveForm({ success: true, data: { ...structuredClone(formData), id: 'form-2', name: '次のアンケート' } }) })
+    expect(await screen.findByRole('heading', { name: '次のアンケート', exact: true })).toBeTruthy()
+    expect(chromeTitle).toHaveBeenLastCalledWith('次のアンケート')
+  })
+
+  it('店舗を替えたら、同じIDでも前の店舗の名前を残さない', async () => {
+    await render('id=form-1')
+    await screen.findByRole('heading', { name: formData.name, exact: true })
+    let resolveForm!: (value: unknown) => void
+    formsGet.mockImplementation(() => new Promise(resolve => { resolveForm = resolve }))
+    account.id = 'acc-2'
+    await render('id=form-1')
+    expect(screen.getByRole('heading', { name: '回答フォーム編集', exact: true })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: formData.name, exact: true })).toBeNull()
+    expect(formsGet).toHaveBeenLastCalledWith('form-1', 'acc-2')
+    await act(async () => { resolveForm({ success: true, data: { ...structuredClone(formData), name: '二号店のアンケート' } }) })
+    expect(await screen.findByRole('heading', { name: '二号店のアンケート', exact: true })).toBeTruthy()
+  })
+
   it('V8 では src/v8 の画面が出て、最初のページの最初の質問の設定が開いている', async () => {
     await render('id=form-1')
     expect(await screen.findByRole('tab', { name: '中身' })).toBeTruthy()

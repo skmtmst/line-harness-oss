@@ -296,3 +296,25 @@ test('組5: 予約ブロックを店の同名メニューと担当へ写し、�
  await expect(plan(p.context,source)).rejects.toThrow('VERSION_CONFLICT');
  await expect(preflight('a3','create',source)).rejects.toThrow('REFERENCE_UNAVAILABLE');
 });
+
+
+test('席予約フォームは同じ統括の配布先の店舗とコースに置き換え、曖昧なコース・他統括・並行編集を拒む',async()=>{
+ fixture.raw.exec("INSERT INTO rt_organizations(id,account_id,tenant_id,name) VALUES('org','a1','tenant-a','統括');");
+ for(const account of ['a1','a2','b1']) {
+  fixture.raw.prepare("INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES(?,'org',?,?,?)").run('store-'+account,account,account,account);
+  fixture.raw.prepare("INSERT INTO rt_menu_items(id,store_id,kind,name,price,status) VALUES(?,?,'course','夕食',3000,'active')").run('course-'+account,'store-'+account);
+ }
+ const layout={version:2,header:[],sections:[{id:'main',name:'予約',blocks:[{id:'booking',kind:'input',type:'booking',name:'booking',label:'予約',required:true,booking:{kind:'seats',storeId:'store-a1',courseId:'course-a1',menuId:''}}]}],options:{}};
+ const source={...input,definitionJson:JSON.stringify({...definition,form:{...definition.form,layout}})};
+ const ready=await preflight('a2','create',source);
+ const planned=await plan(ready.context,source);
+ fixture.raw.prepare("UPDATE rt_menu_items SET name='変更' WHERE id='course-a2'").run();
+ await expect(commit(planned)).rejects.toThrow();expect(rows()).toHaveLength(0);
+ fixture.raw.prepare("UPDATE rt_menu_items SET name='夕食' WHERE id='course-a2'").run();
+ await commit(await plan((await preflight('a2','create',source)).context,source));
+ const stored=JSON.parse(rows()[0]!.layout as string);expect(stored.sections[0].blocks[0].booking).toMatchObject({storeId:'store-a2',courseId:'course-a2'});
+ const foreign=JSON.parse(source.definitionJson);foreign.form.layout.sections[0].blocks[0].booking.storeId='store-b1';foreign.form.layout.sections[0].blocks[0].booking.courseId='course-b1';
+ await expect(preflight('a1','create',{...source,definitionJson:JSON.stringify(foreign)})).rejects.toMatchObject({code:'REFERENCE_UNAVAILABLE'});
+ fixture.raw.prepare("INSERT INTO rt_menu_items(id,store_id,kind,name,price,status) VALUES('duplicate','store-a2','course','夕食',3000,'active')").run();
+ await expect(preflight('a2','overwrite',source)).rejects.toMatchObject({code:'REFERENCE_UNAVAILABLE'});
+});

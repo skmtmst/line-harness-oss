@@ -1,4 +1,4 @@
-> 文書：hq-starter-sets のコード案内｜区分：今の説明｜最終確認：2026-10-26（日本時間）
+> 文書：hq-starter-sets のコード案内｜区分：今の説明｜最終確認：2026-10-31（日本時間）
 
 # 統括のスタイルの初期セット：コードの入口
 
@@ -8,7 +8,7 @@
 
 - `/hq/templates/starter-sets` → [app/hq/templates/starter-sets/page.tsx](../../app/hq/templates/starter-sets/page.tsx)
 
-本体：[starter-sets.tsx](starter-sets.tsx)、[use-distribute.ts](use-distribute.ts)
+本体：[starter-sets.tsx](starter-sets.tsx) → [catalog-editor.tsx](catalog-editor.tsx)。版の中身は [catalog-details.tsx](catalog-details.tsx)、配布は [distribution-dialog.tsx](distribution-dialog.tsx)・[use-distribute.ts](use-distribute.ts)、従来の組の確認は [legacy-details.tsx](legacy-details.tsx)。
 
 ## 外に見せる名前（index.ts）
 

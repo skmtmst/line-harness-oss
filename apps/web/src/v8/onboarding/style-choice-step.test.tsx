@@ -64,7 +64,7 @@ describe('スタイルを選ぶ画面（共通節 S）', () => {
     expect(screen.getByRole('button', { name: 'このスタイルにする' })).toBeTruthy()
     expect(calls.save).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '次へ' }))
-    await screen.findByRole('dialog', { name: 'リッチメニューなどの見た目をどうしますか' })
+    await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
     expect(calls.save).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '途中保存して閉じる' }))
     await waitFor(() => expect(calls.save).toHaveBeenCalledTimes(1))

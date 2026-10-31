@@ -14,6 +14,6 @@ afterEach(cleanup)
 /** B21：古い住所 /settings/features は今の /settings へ送る。 */
 it('古い住所を開くと機能設定へ送る', async () => {
   render(<Page />)
-  expect(screen.getByLabelText('機能設定へ移動しています')).toBeTruthy()
+  expect(document.querySelector('[data-page-pending="route"]')).toBeTruthy()
   await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/settings'))
 })

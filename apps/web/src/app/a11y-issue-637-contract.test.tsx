@@ -85,8 +85,8 @@ describe('Issue #637 h1は1画面に1つ', () => {
  */
 describe('Issue #637 画面名とナビ名の一致', () => {
   it('ナビ項目名が監査対象ルートに対して正しい', () => {
-    expect(menuLabel('/conversions?tab=affiliates')).toBe('成果とアフィリエイト')
-    expect(menuLabel('/conversions')).toBe('コンバージョン')
+    expect(menuLabel('/affiliates?tab=affiliates')).toBe('成果とアフィリエイト')
+    expect(menuLabel('/affiliates?tab=points')).toBe('コンバージョン')
     expect(menuLabel('/nen-members')).toBe('投稿')
     expect(menuLabel('/nen-campaigns')).toBe('NEN配信')
     expect(menuLabel('/ec-commerce')).toBe('EC連携')

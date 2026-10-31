@@ -74,15 +74,12 @@ export function reminderVersionStepStatements(
   ));
 }
 
-/** 定義と初版下書きを同じD1 batchで作る。 */
-export async function createReminderWithDraftVersion(
-  db: D1Database,
-  settings: ReminderDraftSettings,
-): Promise<{ reminder: ReminderRow; version: ReminderVersionRow }> {
+/** 定義と初版下書きのSQLを作る。関連する所有情報と同じbatchへ入れられる。 */
+export function prepareReminderDraftCreation(db:D1Database,settings:ReminderDraftSettings){
   const reminderId = crypto.randomUUID();
   const versionId = crypto.randomUUID();
   const now = jstNow();
-  await db.batch([
+  const statements = [
     db.prepare(
       `INSERT INTO reminders
          (id, name, description, is_active, line_account_id, trigger_type,
@@ -115,7 +112,17 @@ export async function createReminderWithDraftVersion(
        VALUES (?, ?, 1, 'draft', ?, ?, ?)`,
     ).bind(versionId, reminderId, JSON.stringify(settings), now, now),
     ...reminderVersionStepStatements(db, versionId, settings.steps, now),
-  ]);
+  ];
+  return {reminderId,versionId,statements};
+}
+
+/** 定義と初版下書きを同じD1 batchで作る。 */
+export async function createReminderWithDraftVersion(
+  db: D1Database,
+  settings: ReminderDraftSettings,
+): Promise<{ reminder: ReminderRow; version: ReminderVersionRow }> {
+  const {reminderId,versionId,statements}=prepareReminderDraftCreation(db,settings);
+  await db.batch(statements);
   const [reminder, version] = await Promise.all([
     getReminderById(db, reminderId),
     getReminderVersionById(db, versionId),
@@ -124,13 +131,13 @@ export async function createReminderWithDraftVersion(
   return { reminder, version };
 }
 
-/** 公開版を触らず、編集用の版だけを作る、または置き換える。 */
-export async function saveReminderDraftVersion(
+/** 編集用の版を照合し、所有情報と一緒に保存できるSQLを作る。 */
+export async function prepareReminderDraftSave(
   db: D1Database,
   reminderId: string,
   settings: ReminderDraftSettings,
   options: { expectedVersionId?: string | null; expectedUpdatedAt?: string | null } = {},
-): Promise<ReminderVersionRow> {
+) {
   const reminder = await getReminderById(db, reminderId);
   if (!reminder) throw new Error('REMINDER_NOT_FOUND');
   const existing = await getReminderDraftVersion(db, reminderId);
@@ -158,9 +165,9 @@ export async function saveReminderDraftVersion(
   ) THEN '{}' ELSE 'REMINDER_DRAFT_CONFLICT' END)`)
     .bind(reminderId, reminder.current_draft_version_id, reminder.updated_at,
       ...(existing ? [existing.updated_at] : []));
-  try {
-    if (existing) {
-      await db.batch([
+  const statements:D1PreparedStatement[]=[];
+  if (existing) {
+      statements.push(
         guard,
         db.prepare(
           `UPDATE reminder_versions
@@ -170,13 +177,13 @@ export async function saveReminderDraftVersion(
         ).bind(JSON.stringify(settings), now, versionId, existing.updated_at),
         db.prepare(`DELETE FROM reminder_version_steps WHERE reminder_version_id = ?`).bind(versionId),
         ...reminderVersionStepStatements(db, versionId, settings.steps, now),
-      ]);
+      );
     } else {
       const next = await db.prepare(
         `SELECT COALESCE(MAX(version_number), 0) + 1 AS version_number
            FROM reminder_versions WHERE reminder_id = ?`,
       ).bind(reminderId).first<{ version_number: number }>();
-      await db.batch([
+      statements.push(
         guard,
         db.prepare(
           `INSERT INTO reminder_versions
@@ -198,15 +205,23 @@ export async function saveReminderDraftVersion(
             WHERE id = ? AND deleted_at IS NULL`,
         ).bind(versionId, now, reminderId),
         ...reminderVersionStepStatements(db, versionId, settings.steps, now),
-      ]);
+      );
     }
-  } catch (error) {
-    if (error instanceof Error && /malformed JSON/i.test(error.message)) throw new Error('REMINDER_DRAFT_CONFLICT');
-    throw error;
-  }
-  const saved = await getReminderVersionById(db, versionId);
-  if (!saved) throw new Error('REMINDER_DRAFT_NOT_SAVED');
-  return saved;
+  return {versionId,statements};
+}
+
+/** 公開版を触らず、CASで編集用の版だけを保存する。 */
+export async function saveReminderDraftVersion(
+ db:D1Database,reminderId:string,settings:ReminderDraftSettings,
+ options:{expectedVersionId?:string|null;expectedUpdatedAt?:string|null}={},
+):Promise<ReminderVersionRow>{
+ const {versionId,statements}=await prepareReminderDraftSave(db,reminderId,settings,options);
+ try{await db.batch(statements);}catch(error){
+  if(error instanceof Error&&/malformed JSON/i.test(error.message))throw new Error('REMINDER_DRAFT_CONFLICT');
+  throw error;
+ }
+ const saved=await getReminderVersionById(db,versionId);
+ if(!saved)throw new Error('REMINDER_DRAFT_NOT_SAVED');return saved;
 }
 
 export async function recordReminderDraftTest(

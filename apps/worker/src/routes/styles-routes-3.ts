@@ -1,3 +1,6 @@
+import { catalogDetails } from '../services/style-starter-catalog-details.js';
+import type { StarterCatalogKind } from '@line-crm/shared';
+import { listStarterCatalog, saveCatalogStarter } from '../services/style-starter-catalog-save.js';
 import { readAccountAttention } from '../services/hq-account-attention.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { Hono } from 'hono';
@@ -171,6 +174,10 @@ styles.get(base + '/analytics-settings', async (c) => {
   });
 });
 
+styles.get('/api/hq/style-starter-sets/catalog/:templateId/versions/:versionId', async(c)=>c.json({success:true,data:await catalogDetails(c.env.DB,await hq(c),{kind:c.req.query('kind') as StarterCatalogKind,templateId:c.req.param('templateId'),versionId:c.req.param('versionId')})}));
+
+styles.get('/api/hq/style-starter-sets/catalog', async (c) => c.json({ success: true, data: await listStarterCatalog(c.env.DB, await hq(c)) }));
+
 styles.get('/api/hq/style-starter-sets', async (c) => {
   const tenant = await hq(c);
   return c.json({
@@ -211,6 +218,7 @@ styles.put(
     const tenant = await hq(c),
       style = checkStyle(c.req.param('style')),
       b = await json(c);
+    if ((b.definition as {mode?:unknown})?.mode === 'catalog') return c.json({ success: true, data: await saveCatalogStarter(c.env.DB, tenant, c.get('staff').id, style, b) });
     const definition = readDefinition(b.definition, style),
       current = await c.env.DB.prepare(
         'SELECT id,version,auto_insert FROM style_starter_sets WHERE tenant_id=? AND style=? AND archived_at IS NULL',

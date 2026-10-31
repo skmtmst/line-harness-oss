@@ -71,9 +71,9 @@
 :global(:root) .toolbar:has(> [data-kpi-strip]) { row-gap: var(--space-16); padding-top: var(--space-8); padding-bottom: var(--space-16); }
 :global(:root) .stats [data-kpi-strip]:last-child { margin-bottom: 0; }
 :global(:root) .stats:has([data-kpi-strip]) + .split > .main > .toolbar:first-child { padding-top: var(--space-16); padding-bottom: var(--space-16); }
-:global(:root) .frame > [data-kpi-strip] + * { margin-top: var(--space-16); }
+:global(:root) :is(.frame, .dashboardContent) > [data-kpi-strip] + * { margin-top: var(--space-16); }
 /* 板の直下・一覧の本文に直に置いた数の帯も、型の stats と同じ左右の内側の余白に収める（題・道具の行と端をそろえる）。帯側の下余白は持たせず、帯→次の段を型の16にそろえる。 */
-:global(:root) .frame > [data-kpi-strip] { margin-inline: var(--tpl-list-inset); margin-bottom: 0; }
+:global(:root) :is(.frame, .dashboardContent) > [data-kpi-strip] { margin-inline: var(--tpl-list-inset); margin-bottom: 0; }
 :global(:root) .listBody:not([data-table-inset]) .content > [data-kpi-strip] { margin-inline: var(--tpl-list-inset); }
 :global(:root) .content { min-width: 0; }
 :global(:root) .listCards { display: grid; grid-template-columns: repeat(var(--tpl-list-card-columns), minmax(0, 1fr)); gap: var(--polish-space-card); padding-inline: var(--tpl-list-inset); align-items: start; }
@@ -109,6 +109,9 @@
 :global(:root) .listBody { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 :global(:root) [data-page-template='dashboard'] .heading { padding-bottom: var(--tpl-head-pad-bottom); }
 :global(:root) .dashboardRow { display: flex; min-width: 0; border-bottom: 1px solid var(--color-hairline); }
+:global(:root) .dashboardContent { display: contents; }
+/* 読み込みは並行して始め、初回の案内が決まるまで本文を表示・操作・読み上げの対象にしない。 */
+:global(:root) .dashboardContent[data-pending] { display: block; height: 0; min-height: 0; overflow: hidden; visibility: hidden; }
 :global(:root) .dashboardCell { min-width: 0; flex: 1; padding: var(--polish-space-card) var(--polish-space-section); }
 :global(:root) .dashboardCell + .dashboardCell { border-left: 1px solid var(--color-hairline); }
 :global(:root) .dashboardAside { width: 297px; flex-shrink: 0; border-left: 1px solid var(--color-hairline); }

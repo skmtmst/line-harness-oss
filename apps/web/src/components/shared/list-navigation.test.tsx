@@ -2,6 +2,7 @@
 import React from 'react'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import TopBar from './top-bar'
 import PageLink, { ListNavigationAccount, ListReturnAccountGuard, listNavigationHref, listReturnUrl } from './list-navigation'
 import { RovingTbody } from './row-roving'
 import { Tr, Td, NameCell, RowNameLink } from './table'
@@ -165,4 +166,24 @@ it('矢印移動付きの表でも行のSpaceはパネルを開き、チェッ�
   fireEvent.keyDown(screen.getByRole('row'), { key: ' ' })
   expect(open).toHaveBeenCalledOnce()
   expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false)
+})
+
+it('共通リンクは成果の互換入口を挟まず条件と新しいタブを保つ', () => {
+  render(<PageLink href="/conversions?tab=offers&q=a#rows" target="_blank">案件へ</PageLink>)
+  const link = screen.getByRole('link', { name: '案件へ' })
+  expect(link.getAttribute('href')).toBe('/affiliates?tab=offers&q=a#rows')
+  expect(link.getAttribute('target')).toBe('_blank')
+  expect(listNavigationHref('/conversions?pointId=cp-1', '/analytics', 'account-a', origin)).toBe('/affiliates?pointId=cp-1&tab=points')
+})
+
+it('上の帯のパンくずと現在の題も正規の成果地点へつなぐ', () => {
+  render(<TopBar title="成果地点を作る" v8Chrome accounts={[]} selectedAccountId="" onAccountChange={() => undefined} roleLabel="オーナー" userName="担当者" onLogout={() => undefined} crumbs={[{ label: '成果地点', href: '/conversions?tab=points' }]} titleHref="/conversions?tab=points" />)
+  expect(screen.getByRole('link', { name: '成果地点', exact: true }).getAttribute('href')).toBe('/affiliates?tab=points')
+  expect(screen.getByRole('link', { name: '成果地点を作る', exact: true }).getAttribute('href')).toBe('/affiliates?tab=points')
+})
+
+it('上の帯から一覧へ戻るときも、同じアカウントの絞り込みを保つ', () => {
+  window.history.replaceState(null, '', edit)
+  render(<ListNavigationAccount.Provider value="account-a"><TopBar title="テンプレート編集" v8Chrome accounts={[]} selectedAccountId="" onAccountChange={() => undefined} roleLabel="オーナー" userName="担当者" onLogout={() => undefined} crumbs={[{ label: 'テンプレート', href: '/templates' }]} /></ListNavigationAccount.Provider>)
+  expect(screen.getByRole('link', { name: 'テンプレート', exact: true }).getAttribute('href')).toBe(new URL(source, origin).pathname + new URL(source, origin).search)
 })

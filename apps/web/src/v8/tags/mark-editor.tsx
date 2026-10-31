@@ -270,7 +270,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   useEffect(() => { void loadRules() }, [loadRules])
 
   const stopRule = async () => {
-    if (!selectedAccountId || !stoppingRule) return
+    if (canManageByRole !== true || !selectedAccountId || !stoppingRule) return
     setRuleBusy(true)
     setRuleError('')
     try {
@@ -294,7 +294,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
     if (markNameRequirement.check(name)) { setNameError('マーク名を入力してください'); setError(''); nameRef.current?.focus(); nameRef.current?.scrollIntoView({ block: 'center' }); return }
     setNameError('')
     if (!selectedAccountId) return setError('LINE公式アカウントを選んでください')
-    if (loadState !== 'ready' || roleBlocked || saveForbidden) return
+    if (loadState !== 'ready' || canManageByRole !== true || saveForbidden) return
     if (loadedAccountRef.current !== selectedAccountId) return
     setSaving(true)
     setError('')
@@ -354,7 +354,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   /* 保管：一覧の保管と同じ影響確認を経る。 */
   const openArchive = async () => {
     const account = selectedAccountId
-    if (!account || !selected) return
+    if (canManageByRole !== true || !account || !selected) return
     setArchiveOpen(true)
     setArchiveImpact(null)
     setReplacementMarkId('')
@@ -377,7 +377,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
 
   const confirmArchive = async (mark: MarkRow) => {
     const replacement = (archiveImpact?.friendCount ?? 0) > 0 ? replacementMarkId : (replacementMarkId || null)
-    if (!selectedAccountId || !archiveImpact || ((archiveImpact.friendCount ?? 0) > 0 && !replacementMarkId) || archiving) return
+    if (canManageByRole !== true || !selectedAccountId || !archiveImpact || ((archiveImpact.friendCount ?? 0) > 0 && !replacementMarkId) || archiving) return
     setArchiveError('')
     setArchiving(true)
     try {
@@ -409,7 +409,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
             : loadState === 'ready' && loadedAccountRef.current !== selectedAccountId ? 'アカウントを切り替えています。一覧を読み込むまでお待ちください'
                 : editing && !selected ? '編集中のマークを読み込めませんでした'
                   : null
-  const saveDisabled = saving || blockedReason !== null
+  const saveDisabled = canManageByRole !== true || saving || blockedReason !== null
   const hideForm = loadState === 'forbidden' || roleBlocked
 
   const applyLatest = () => {
@@ -427,7 +427,7 @@ function MarkEditorBody({ markId }: { markId?: string }) {
   const collision = useSaveConflict<NonNullable<typeof conflict>>({ fetchLatest: async () => conflict, reload: applyLatest })
   const comparison = collision.latest ? [['名前', name, collision.latest.name], ['色', color, collision.latest.color], ['並び順', displayOrder, collision.latest.displayOrder]].flatMap(([label, current, latest]) => current === latest ? [] : [{ text: `${label}：編集中 ${current} → 最新 ${latest}` }]) : null
 
-  if (loadState === 'loading') return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
+  if (loadState === 'loading' || canManageByRole === null) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
 
   const back = null
   const description = editing && selected

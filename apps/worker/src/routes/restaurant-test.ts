@@ -1,4 +1,5 @@
 import { registerRestaurantSetupProgressRoutes } from './restaurant-setup-progress.js';
+import { getRestaurantFollowupEngines,initializeRestaurantFollowupEngines,saveRestaurantFollowupEngine,testRestaurantFollowupEngineHandler,startRestaurantFollowupEngineHandler } from './restaurant-followup-engine.js';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { validateClosure, publicClosure, closurePreview, type ClosureRow } from '../services/restaurant-closures.js';
 
@@ -175,6 +176,12 @@ restaurantTest.post('/api/restaurant-test/gbp/posts', requireRole('owner', 'admi
 restaurantTest.put('/api/restaurant-test/gbp/reviews/:id/draft', requireRole('owner', 'admin'), inputJsonBoundary({"replyDraft":["string"]}), put__api_restaurant_test_gbp_reviews_id_draft_14);
 
 restaurantTest.get('/api/restaurant-test/followups/:storeId',requireRole('owner','admin','staff'),get__api_restaurant_test_followups_storeId_15);
+
+restaurantTest.get('/api/restaurant-test/followups/:storeId/engines',requireRole('owner','admin','staff'),getRestaurantFollowupEngines);
+restaurantTest.post('/api/restaurant-test/followups/:storeId/engines/initialize',requireRole('owner','admin'),inputJsonBoundary(),initializeRestaurantFollowupEngines);
+restaurantTest.post('/api/restaurant-test/followups/:storeId/engines/:trigger/draft',requireRole('owner','admin'),inputJsonBoundary(),saveRestaurantFollowupEngine);
+restaurantTest.post('/api/restaurant-test/followups/:storeId/engines/:trigger/test-send',requireRole('owner','admin'),inputJsonBoundary(),testRestaurantFollowupEngineHandler);
+restaurantTest.post('/api/restaurant-test/followups/:storeId/engines/:trigger/start',requireRole('owner','admin'),inputJsonBoundary(),startRestaurantFollowupEngineHandler);
 
 restaurantTest.put('/api/restaurant-test/followups/:storeId/setup',requireRole('owner','admin'),inputJsonBoundary(),putRestaurantFollowupSetup);
 restaurantTest.put('/api/restaurant-test/followups/:storeId/rows/:trigger',requireRole('owner','admin'),inputJsonBoundary(),putRestaurantFollowupRow);

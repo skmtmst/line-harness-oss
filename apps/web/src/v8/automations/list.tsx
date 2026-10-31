@@ -165,7 +165,7 @@ export default function AutomationListV8() {
    * 置かずに隠す（場所だけ空ける。2026-10-06 オーナー決定）。役割が読めるまで（null）は今までどおり出す。
    */
   const canManage = useAutomationManage()
-  const canEdit = canManage !== false
+  const canEdit = canManage === true
   const viewerOnly = canManage === false
 
   const [items, setItems] = useState<Automation[]>([])

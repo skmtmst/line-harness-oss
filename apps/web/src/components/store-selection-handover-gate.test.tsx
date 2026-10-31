@@ -5,20 +5,27 @@ import { forgetStaffIdentity, rememberStaffIdentity, readStaffIdentity } from '@
 import type { StaffMember } from '@line-crm/shared'
 import StoreSelectionGate from './store-selection-gate'
 
-const mocks = vi.hoisted(() => ({ state: vi.fn(), replace: vi.fn(), pathname: '/chats' }))
+const mocks = vi.hoisted(() => ({ state: vi.fn(), replace: vi.fn(), pathname: '/chats', loading: false }))
 vi.mock('next/navigation', () => ({
   usePathname: () => mocks.pathname, useRouter: () => ({ replace: mocks.replace }),
 }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({
-  loading: false, selectedAccountId: 'the-shed', accounts: [{ id: 'the-shed' }],
+  loading: mocks.loading, selectedAccountId: 'the-shed', accounts: [{ id: 'the-shed' }],
   error: null, refreshing: false, refreshAccounts: vi.fn(),
 }) }))
 vi.mock('@/lib/api', () => ({ api: { lineAccounts: { followerImportState: mocks.state } } }))
 
-beforeEach(() => { vi.clearAllMocks(); mocks.pathname = '/chats' })
+beforeEach(() => { vi.clearAllMocks(); mocks.pathname = '/chats'; mocks.loading = false })
 afterEach(() => { cleanup(); forgetStaffIdentity() })
 
 describe('保存済みの店舗選択からの再訪', () => {
+  it('店舗一覧の待機は共通の骨組みにし、検証台本が識別できる印を保つ', () => {
+    mocks.loading = true
+    render(<StoreSelectionGate><div>店舗画面</div></StoreSelectionGate>)
+    expect(document.querySelector('[data-page-pending="store"] [aria-busy="true"]')).toBeTruthy()
+    expect(screen.queryByText('店舗画面')).toBeNull()
+  })
+
   it('引き継ぎ中なら店舗画面をマウントせずPenの進捗画面へ戻す', async () => {
     mocks.state.mockResolvedValue({ success: true, data: { phase: 'importing_ids' } })
     render(<StoreSelectionGate><div>店舗画面</div></StoreSelectionGate>)

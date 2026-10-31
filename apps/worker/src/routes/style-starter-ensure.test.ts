@@ -55,6 +55,7 @@ const friendAddDrafts = (rule: string) =>
 /** 受け皿の下書きが残っている時、入れ直しで入る物（友だち追加の決まりは既にあるので入らない）。 */
 const withoutFriendAdd = (items: Array<{ key: string; kind: string }>) => items.filter((i) => i.kind !== 'friend_add_rule');
 const allAnswers = {
+  image: { mode: 'configured', value: 'simple' },
   booking: { mode: 'configured', value: true },
   reminders: { mode: 'configured', value: true },
   content: { mode: 'configured', value: true },
