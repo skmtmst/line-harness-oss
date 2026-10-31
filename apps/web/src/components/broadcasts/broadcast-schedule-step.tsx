@@ -15,6 +15,7 @@ import { formatDay,formatNumber } from '@/lib/format'
 import { BroadcastAbSettings } from '@/v8/broadcast-ab/public/settings/index'
 import { useBroadcastAb } from '@/v8/broadcast-ab/public/use-ab/index'
 import type { Dispatch,SetStateAction } from 'react'
+import type { BroadcastSendMode, BroadcastSendChoice, BroadcastSpreadStart } from './broadcast-schedule'
 import { formatScheduleTime } from './broadcast-form-model'
 import styles from './broadcast-form-v8.module.css'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
@@ -37,25 +38,32 @@ type BroadcastScheduleStepContext = {
   scheduledAtIso: () => string | null
   scheduledDate: string
   scheduledTime: string
-  sendMode: "scheduled" | "now" | "optimal"
+  sendMode: BroadcastSendMode
+  sendChoice: BroadcastSendChoice
+  setSendChoice: Dispatch<SetStateAction<BroadcastSendChoice>>
+  spreadStartMode: BroadcastSpreadStart
+  setSpreadStartMode: Dispatch<SetStateAction<BroadcastSpreadStart>>
   setMeasureOpens: Dispatch<SetStateAction<boolean>>
   setScheduledDate: Dispatch<SetStateAction<string>>
   setScheduledTime: Dispatch<SetStateAction<string>>
-  setSendMode: Dispatch<SetStateAction<"scheduled" | "now" | "optimal">>
   setSpreadMinutes: Dispatch<SetStateAction<string>>
   shows: (step: BroadcastStepKey) => boolean
   spreadMinutes: string
   targetMode: TargetMode
 }
 
-export function BroadcastScheduleStep({ limitToQuota, setLimitToQuota, recipientLimitInput, setRecipientLimitInput, selectedAccountId, onRetryQuota, ab, approvalConfig, audienceCount, concurrentBroadcasts, goToStep, measureOpens, quota, quotaInsufficient, scheduledAtIso, scheduledDate, scheduledTime, sendMode, setMeasureOpens, setScheduledDate, setScheduledTime, setSendMode, setSpreadMinutes, shows, spreadMinutes, targetMode }: BroadcastScheduleStepContext) {
+export function BroadcastScheduleStep({ limitToQuota, setLimitToQuota, recipientLimitInput, setRecipientLimitInput, selectedAccountId, onRetryQuota, ab, approvalConfig, audienceCount, concurrentBroadcasts, goToStep, measureOpens, quota, quotaInsufficient, scheduledAtIso, scheduledDate, scheduledTime, sendMode, sendChoice, setSendChoice, spreadStartMode, setSpreadStartMode, setMeasureOpens, setScheduledDate, setScheduledTime, setSpreadMinutes, shows, spreadMinutes, targetMode }: BroadcastScheduleStepContext) {
   return (<section id="broadcast-step-schedule" className={shows('schedule') ? styles.section : 'hidden'}>
           <h3>配信日</h3>
           <SaveErrorField names={["broadcast-send-mode","sendMode","spreadMinutes"]}><RadioCardGroup legend="配信日" className={styles.methodCards}>
-            <RadioCard name="broadcast-send-mode" value="now" checked={sendMode === 'now' && Number(spreadMinutes) === 0} onChange={() => { setSendMode('now'); setSpreadMinutes('0') }} title="今すぐ配信" note="最終確認で送ると、すぐに届きます" />
-            <RadioCard name="broadcast-send-mode" value="scheduled" checked={sendMode === 'scheduled'} onChange={() => setSendMode('scheduled')} title="日時を指定して予約" note="決めた日時に送ります" />
-            <RadioCard name="broadcast-send-mode" value="spread" checked={sendMode === 'now' && Number(spreadMinutes) > 0} onChange={() => { setSendMode('now'); setSpreadMinutes(Number(spreadMinutes) > 0 ? spreadMinutes : '30') }} title="時間を分散して送る" note="少しずつ送り、集中を避けます" />
+            <RadioCard name="broadcast-send-mode" value="now" checked={sendChoice === 'now'} onChange={() => setSendChoice('now')} title="今すぐ配信" note="最終確認で送ると、すぐに届きます" />
+            <RadioCard name="broadcast-send-mode" value="scheduled" checked={sendChoice === 'scheduled'} onChange={() => setSendChoice('scheduled')} title="日時を指定して予約" note="決めた日時に送ります" />
+            <RadioCard name="broadcast-send-mode" value="spread" checked={sendChoice === 'spread'} onChange={() => setSendChoice('spread')} title="時間を分散して送る" note="少しずつ送り、集中を避けます" />
           </RadioCardGroup></SaveErrorField>
+          {sendChoice === 'spread' && <RadioCardGroup legend="分散を始めるタイミング" legendVisible columns={2}>
+            <RadioCard name="broadcast-spread-start" value="scheduled" checked={spreadStartMode === 'scheduled'} onChange={() => setSpreadStartMode('scheduled')} title="開始日時を指定する" variant="row" />
+            <RadioCard name="broadcast-spread-start" value="now" checked={spreadStartMode === 'now'} onChange={() => setSpreadStartMode('now')} title="送信を確定してから始める" variant="row" />
+          </RadioCardGroup>}
           {sendMode === 'scheduled' && (
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <div>
@@ -98,18 +106,15 @@ export function BroadcastScheduleStep({ limitToQuota, setLimitToQuota, recipient
             </div>
           )}
 
-          <div className="border-hairline mt-4 border-t pt-4">
+          {sendChoice === 'spread' && <div className="border-hairline mt-4 border-t pt-4">
       <label htmlFor="bc-spread" className="text-ink-secondary mb-1 block text-sm font-medium">
-        時間を分散して送る
-        <span className="bg-success-bg text-success rounded-pill ml-2 px-2 py-0.5 text-micro font-medium">
-          推奨
-        </span>
+        分散する時間 <HelpTip label="分散して送る時間の説明">一度に大量に送るとLINEの制限を受けることがあります。少しずつ配り、途中で止まっても同じ人には二度届けません。</HelpTip>
       </label>
       <div className="flex items-center gap-1.5">
         <SaveErrorField names={["spreadMinutes","spread_minutes"]}><SharedTextField
           id="bc-spread"
           type="number"
-          min={0}
+          min={1}
           max={720}
           value={spreadMinutes}
           onChange={(e) => setSpreadMinutes(e.target.value)}
@@ -118,10 +123,9 @@ export function BroadcastScheduleStep({ limitToQuota, setLimitToQuota, recipient
         <span className="text-ink-faint text-xs">分かけて</span>
       </div>
       <p className="text-ink-faint mt-1 text-xs leading-relaxed">
-        指定した時刻から、その分数をかけて少しずつ送ります。同時刻に大量送信するとLINE側で制限を受けることがあるため、通常はオンのままにしてください。
-        0 なら一気に送ります。途中で止まっても、続きから送り直します（同じ人に二度は届きません）。
+        {sendMode === 'scheduled' ? '指定した日時から' : '最終確認で送信を確定してから'}、この分数をかけて少しずつ送ります。
       </p>
-          </div>
+          </div>}
           <div className={styles.quota}>
             <div className={styles.quotaHead}><strong>送信枠</strong><HelpTip label="送信枠の説明">LINE公式アカウントの月間送信枠です。テスト送信も枠を使用します</HelpTip><span>今月 残り {quota?.unlimited ? '上限未設定' : `${quota?.remaining == null ? '—' : formatNumber(quota.remaining)}通`}</span></div>
             <div className={styles.quotaTrack}><div style={{ width: quota?.monthlyLimit ? `${Math.min(100, ((quota.monthlyUsed ?? 0) + quota.planned) / quota.monthlyLimit * 100)}%` : '0%' }} /></div>
