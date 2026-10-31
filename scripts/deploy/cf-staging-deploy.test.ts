@@ -24,7 +24,16 @@ function makeSandbox(options: { newSql?: string; sqlBody?: string; healthCommit?
   }
   const logArgs = (name: string) =>
     `#!/bin/sh\nprintf "%s\\n" "$@" >> "$PWD/${name}.args"\n`;
-  writeFileSync(resolve(sandbox, 'node_modules/.bin/tsx'), logArgs('tsx'), { mode: 0o755 });
+  // tsx の身代わりは、status のときだけ migrate.ts と同じ形で「これから当たるもの」を書く。
+  const pendingName = options.newSql ? options.newSql.replace('packages/db/migrations/', '') : '';
+  const pendingReport = pendingName
+    ? `printf "\\nこれから当たるもの 1 件:\\n  ${pendingName}  (未適用)\\n"`
+    : 'printf "対象: nen-line-stg (staging)\\n"';
+  writeFileSync(
+    resolve(sandbox, 'node_modules/.bin/tsx'),
+    `#!/bin/sh\nprintf "%s\\n" "$@" >> "$PWD/tsx.args"\nif [ "$2" = status ]; then ${pendingReport}; fi\n`,
+    { mode: 0o755 },
+  );
   writeFileSync(resolve(sandbox, 'node_modules/.bin/wrangler'), logArgs('wrangler'), { mode: 0o755 });
   writeFileSync(
     resolve(sandbox, 'bin/git'),
@@ -110,7 +119,17 @@ describe('cf-staging-deploy', () => {
     expect(result.stdout).toContain(`/health の git_commit = ${SHA} を確認しました`);
   });
 
-  it('stops before touching D1 when a new migration is not additive', () => {
+  it('applies when the pending migration is additive', () => {
+    const sandbox = makeSandbox({ newSql: 'packages/db/migrations/902_ok.sql', healthCommit: SHA });
+    sandboxes.push(sandbox);
+    const result = run(sandbox, { CF_STAGING_DEPLOY_MODE: 'apply' });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toContain('902_ok.sql');
+    expect(result.stdout).toContain('追加のみの文です');
+    expect(read(sandbox, 'tsx')).toContain('apply\nstaging\n--apply');
+  });
+
+  it('stops before touching D1 when a pending migration is not additive', () => {
     const sandbox = makeSandbox({
       newSql: 'packages/db/migrations/900_bad.sql',
       sqlBody: '-- comment with DROP TABLE is fine\nDROP TABLE friends;\n',
