@@ -735,7 +735,7 @@ function InflowDetailContent() {
         <Dialog
           open={deleteOpen}
           title={`「${route.name}」を削除しますか？`}
-          description={`このURLは ${route.createdAt.slice(5, 10).replace('-', '/')} から使われています。削除すると同じURLは開けなくなります。`}
+          description={`このURLは ${route.createdAt.slice(5, 10).replace('-', '/')} に作られました。削除すると同じURLは開けなくなります。`}
           tone="destructive"
           designNode="UIaM7"
           designWidth={840}
