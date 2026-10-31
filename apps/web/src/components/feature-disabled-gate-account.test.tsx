@@ -80,6 +80,50 @@ it('機能設定は補助APIが機能オフでも閉じない', async () => {
   expect(host.textContent).not.toContain('この機能は設定でオフになっています')
 })
 
+it('受信箱で会話を開いても、補助のAI・EC機能のオフで画面を閉じない', async () => {
+  state.pathname = '/chats'
+  await render()
+  for (const featureId of ['auto_replies', 'ec_commerce']) {
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(FEATURE_DISABLED_EVENT, {
+        detail: { featureId, accountId: 'account-a' },
+      }))
+    })
+  }
+  expect(host.textContent).toContain('ウェビナーの中身')
+  expect(host.textContent).not.toContain('この機能は設定でオフになっています')
+})
+
+it('受信箱の補助APIが実際にFEATURE_DISABLEDを返しても会話を保つ', async () => {
+  state.pathname = '/chats'
+  await render()
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+    code: 'FEATURE_DISABLED', featureId: 'auto_replies',
+  }), { status: 403 })))
+  await act(async () => {
+    await fetchApi('/api/ai-settings?account_id=account-a').catch(() => undefined)
+  })
+  expect(host.textContent).toContain('ウェビナーの中身')
+  expect(host.textContent).not.toContain('この機能は設定でオフになっています')
+})
+
+it('任意機能の画面でも、別の補助機能のオフでは画面を閉じない', async () => {
+  state.pathname = '/broadcasts'
+  await render()
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent(FEATURE_DISABLED_EVENT, {
+      detail: { featureId: 'ec_commerce', accountId: 'account-a' },
+    }))
+  })
+  expect(host.textContent).toContain('ウェビナーの中身')
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent(FEATURE_DISABLED_EVENT, {
+      detail: { featureId: 'broadcasts', accountId: 'account-a' },
+    }))
+  })
+  expect(host.textContent).toContain('この機能は設定でオフになっています')
+})
+
 it('機能設定の補助取得は機能オフを画面全体へ通知しない', async () => {
   state.pathname = '/settings'
   await render()

@@ -3,6 +3,7 @@
 import React from 'react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import { menuItemForPath } from './view-permission-gate'
 import Button from '@/components/shared/button'
 import ListState from '@/components/shared/list-state'
 import { useOptionalAccount } from '@/contexts/account-context'
@@ -22,7 +23,7 @@ export function FeatureDisabledScreen({ featureId }: { featureId?: string }) {
       <ListState
         kind="forbidden"
         title="この機能は設定でオフになっています"
-        permissionReason="機能設定で有効にすると使えます。"
+        description="機能設定で有効にすると使えます。"
         action={<Button href="/settings" variant="secondary">機能設定を開く</Button>}
       />
     </section>
@@ -54,6 +55,10 @@ export default function FeatureDisabledGate({ children }: { children: React.Reac
       // 機能設定はオフになった機能を戻す入口。補助APIの機能オフで画面を閉じない。
       if (pathname === '/settings') return
       const detail = (event as CustomEvent<FeatureDisabledEventDetail>).detail
+      // 必須画面の補助APIがオフでも画面全体を閉じない。
+      // 任意機能の画面では、その画面自身の機能だけを案内する。
+      const pageFeature = menuItemForPath(pathname)?.featureKey
+      if (!pageFeature || detail?.featureId !== pageFeature) return
       if (detail?.accountId != null && detail.accountId !== selectedAccountId) return
       if (detail?.featureContext && (detail.featureContext.generation !== context.current?.generation
         || detail.featureContext.pathname !== pathname)) return

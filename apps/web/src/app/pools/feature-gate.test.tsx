@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import { cleanup, render, waitFor } from '@testing-library/react'
-import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 let PoolsPage: typeof import('./page').default
 let FeatureDisabledGate: typeof import('@/components/feature-disabled-gate').default
@@ -28,9 +28,11 @@ const FEATURE_OFF = () => new Response(JSON.stringify({
 }), { status: 403 })
 
 describe('プール管理の直URL(#860)', () => {
+  beforeEach(() => window.history.replaceState(null, '', '/pools'))
   afterEach(() => {
     cleanup()
     vi.unstubAllGlobals()
+    window.history.replaceState(null, '', '/')
   })
 
   it('機能offでAPIが403 FEATURE_DISABLEDを返すと、共通ゲートが機能設定への案内へ切り替える', async () => {
