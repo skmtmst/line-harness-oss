@@ -11,6 +11,7 @@ import { readStaffIdentity, rememberStaffIdentity, forgetStaffIdentity } from '@
 const REGISTRATION_STYLE_KEY = registrationStorageKey(STYLE_KEY, { id: 'style-owner', tenantId: 'style-tenant' })!
 const net = vi.hoisted(() => ({ get: vi.fn(), save: vi.fn(),starterSet:vi.fn() }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: net }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ accounts: [{ id: 'created-account', name: '登録した教室' }] }) }))
 beforeEach(() => {
   verifiedStaffRole('owner')
   rememberStaffIdentity({ ...readStaffIdentity()!, id: 'style-owner', tenantId: 'style-tenant' })
@@ -20,6 +21,14 @@ beforeEach(() => {
   net.save.mockReset().mockResolvedValue({ success: true, data: { version: 1 } })
 })
 afterEach(() => { cleanup(); forgetStaffIdentity() })
+
+it('登録を再開したアカウントの店名を見本へ渡す', async () => {
+  render(<ResumeRegistrationStyle accountId="created-account" />)
+  const dialog = screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  await waitFor(() => expect(dialog.querySelector('[data-pane="phone"]')?.textContent).toContain('登録した教室'))
+  expect(dialog.querySelector('[data-pane="phone"]')?.textContent).not.toContain('店名未取得')
+  expect(net.save).not.toHaveBeenCalled()
+})
 
 it.each(ACCOUNT_STYLES)('%sをポップアップで選び、同じアカウントへ保存して登録をやり直さない', async style => {
   sessionStorage.setItem(REGISTRATION_STYLE_KEY, 'created-account')

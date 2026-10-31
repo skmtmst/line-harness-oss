@@ -15,6 +15,7 @@ vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: {
   starterSet: vi.fn(async () => ({ success: true, data: { definition: { items: [] }, preview: [] } })),
   starterItems: vi.fn(async () => ({ success: true, data: { items: [] } })),
 } }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'a', accounts: [{id:'a',name:'Test store'}], selectedAccount: {id:'a',name:'Test store'} }) }))
 vi.mock('@/hooks/use-account-style', () => ({ accountStyleUpdated: vi.fn() }))
 vi.mock('./use-wizard', async (original) => {
   const actual = await original<typeof import('./use-wizard')>()

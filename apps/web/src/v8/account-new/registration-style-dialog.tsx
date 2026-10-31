@@ -12,8 +12,9 @@ import { InitialMenuChoice, type InitialMenuSelection } from '@/v8/onboarding'
 import styles from '@/v8/onboarding/wizard.module.css'
 
 /** 登録の④でも、はじめの質問と同じ見本を見てからスタイルを選ぶ。 */
-export default function RegistrationStyleDialog({ open, accountId, menu, onMenuChange, choice, busy, ready, error, onChoose, onSave, onSkip, onClose }: {
+export default function RegistrationStyleDialog({ open, accountId, accountName, menu, onMenuChange, choice, busy, ready, error, onChoose, onSave, onSkip, onClose }: {
   accountId: string
+  accountName?: string
   menu: InitialMenuSelection
   onMenuChange: (next:InitialMenuSelection)=>void
   open: boolean
@@ -64,7 +65,7 @@ export default function RegistrationStyleDialog({ open, accountId, menu, onMenuC
         <span className={styles.progressName}>使い方のスタイル</span>
       </div>
       <StyleChoiceStatus chosen={choice || null} />
-      {menuStep&&choice?<InitialMenuChoice accountId={accountId} style={choice} value={menu} onChange={onMenuChange} disabled={busy}/>:<StyleChoiceStep viewing={viewing} onView={setViewing} chosen={choice || null} onChoose={onChoose} disabled={busy} switcher="external" detail={demoOpen} onDetailChange={setDemoOpen} demoPage={demoPage} onDemoPage={setDemoPage} />}
+      {menuStep&&choice?<InitialMenuChoice accountId={accountId} style={choice} value={menu} onChange={onMenuChange} disabled={busy}/>:<StyleChoiceStep accountName={accountName} viewing={viewing} onView={setViewing} chosen={choice || null} onChoose={onChoose} disabled={busy} switcher="external" detail={demoOpen} onDetailChange={setDemoOpen} demoPage={demoPage} onDemoPage={setDemoPage} />}
       <p className={styles.where}><Info aria-hidden="true" className={styles.whereIcon} />あとから変えられます（設定 › アカウント）。</p>
     </div>
   </Dialog>

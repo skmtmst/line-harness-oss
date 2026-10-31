@@ -28,7 +28,8 @@ import {useSaveConflict} from '@/components/shared/save-conflict'
 import {notifyToast} from '@/components/shared/toast'
 export default function CustomerLookScreen() {
  usePageTitle('お客さまの画面のデザイン');usePageCrumbs([{label:'設定',href:'/settings'}]);useHideSettingsNav()
- const {selectedAccountId,selectedAccount}=useAccount();const role=useStaffRole();const canEditRole=canManageRole(role)
+ const {selectedAccountId,selectedAccount,accounts}=useAccount();const role=useStaffRole();const canEditRole=canManageRole(role)
+ const accountName=(selectedAccount?.id===selectedAccountId?selectedAccount?.name:accounts.find(account=>account.id===selectedAccountId)?.name)?.trim()||'店名未取得'
  const permissionReason=usePermissionLockReason(canEditRole,'manager');const canEdit=canEditRole&&!permissionReason
  const [saved,setSaved]=useState<CustomerLook | null>(null),[draft,setDraft]=useState<CustomerLook>({...DEFAULT_CUSTOMER_LOOK})
  const [version,setVersion]=useState(0),[status,setStatus]=useState<'loading'|'ready'|'error'>('loading'),[error,setError]=useState(''),[saving,setSaving]=useState(false),[retry,setRetry]=useState(0)
@@ -62,7 +63,7 @@ export default function CustomerLookScreen() {
  return <SaveErrorScope errors={saveErrors}><SettingsPage title="お客さまの画面のデザイン" layout="customer-look" navigation={<SettingsInnerNav inline/>}
   help="予約・回答フォーム・履歴・スタンプなど、お客さまに見える画面のデザインを決めます。型を選ぶと右の見本が変わり、保存するとお客さまの画面に反映されます。"
   notice={status==='ready'&&role!==null&&!canEdit?<ReadOnlyNotice need="manager"/>:undefined}
-  preview={status==='ready'?<CustomerLookPreview look={draft} accountName={selectedAccount?.name??'公式アカウント'}/>:undefined}
+  preview={status==='ready'?<CustomerLookPreview accountId={selectedAccountId} look={draft} accountName={accountName}/>:undefined}
   saveStatus={error?<><FieldError id="customer-look-save-error">{error}</FieldError>{conflict?<Button disabled={saving} onClick={()=>void reloadLatest()}>最新を読み直す</Button>:null}</>:undefined}
   saveActions={status==='ready'&&(dirty||saving||!canEdit)?<>{dirty||saving?<Button disabled={saving||!dirty} disabledReason={saving ? '保存しています' : !dirty ? '変更していません' : undefined} onClick={()=>guard.guarded(()=>{if(saved)setDraft(saved);setError('')})}>キャンセル</Button>:null}<Button variant="primary" lockedReason={permissionReason} disabled={!canEdit||!dirty||!!conflict} disabledReason={permissionReason||role===null?undefined:conflict ? '最新のデザインを読み直してから保存してください' : !dirty ? '変更していません' : undefined} busy={saving} onClick={()=>save()}>保存する</Button></>:undefined}>
    {!selectedAccountId?<ListState kind="empty" title="店を選んでください"/>:status==='loading'?<ListState kind="loading" title="デザインを読み込んでいます"/>:status==='error'?<ListState kind="error" title={error} action={<Button onClick={()=>setRetry(current=>current+1)}>もう一度読み込む</Button>}/>:<>

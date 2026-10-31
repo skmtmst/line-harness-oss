@@ -33,6 +33,7 @@ const RECORD_BASE = '2026-11-02T09:00:00+09:00'
 const CIRCLED = '①②③④⑤⑥⑦⑧⑨'
 
 export type StyleExperiencePlayerProps = {
+  accountName?: string
   script: StyleExperienceScript
   /** 見ているスタイル。渡すと外が持つ。 */
   style?: AccountStyle
@@ -68,7 +69,7 @@ function useStageScale(rootRef: React.RefObject<HTMLElement | null>) {
   return size
 }
 
-export function StyleExperiencePlayer({ script, style, onStyleChange, switcher, variant, record = false }: StyleExperiencePlayerProps) {
+export function StyleExperiencePlayer({ accountName, script, style, onStyleChange, switcher, variant, record = false }: StyleExperiencePlayerProps) {
   const rootRef = useRef<HTMLElement>(null)
   const full = variant === 'full'
   // 全部版は右の画面がそろったスタイルだけを回す（教室は LIFF の描く部分の切り出しの後）。
@@ -79,7 +80,8 @@ export function StyleExperiencePlayer({ script, style, onStyleChange, switcher, 
   })
   const { scale, stacked } = useStageScale(rootRef)
   const [base] = useState(() => (record ? new Date(RECORD_BASE) : new Date()))
-  const look = script.styles[position.style]
+  const sampleLook = script.styles[position.style]
+  const look = accountName === undefined ? sampleLook : { ...sampleLook, account: accountName }
   const step = look.steps[position.index]
   const board = full ? scene.board : undefined
   const announce = `${look.label}：${CIRCLED[position.index] ?? position.index + 1} ${step.label}。${scene.line}`
