@@ -87,10 +87,10 @@ describe('m22b 表の左右の余白（文字だけのセルを包む）', () =>
 
   it('/booking/menus：名前の操作を専用の欄に収め、省略する', () => {
     const body = read('v8', 'booking-menus', 'tabs', 'menus-tab.tsx')
-    const css = read('v8', 'booking-menus', 'settings.module.css')
+    const css = read('components', 'shared', 'table.module.css')
     expect(body).toContain('className={styles.colName}')
-    expect(body).toContain('className={styles.menuName}')
-    expect(css).toMatch(/\.menuName\s*\{[^}]*text-overflow: ellipsis;[^}]*white-space: nowrap;/)
+    expect(body).toContain('<RowNameButton title={menu.name} onClick={() => openMenuForm(menu)}>{menu.name}</RowNameButton>')
+    expect(css).toMatch(/\.rowNameLink[^}]*white-space:\s*nowrap[^}]*text-overflow:\s*ellipsis/)
   })
 
   it('/duplicates：先頭の文字を包む', () => {

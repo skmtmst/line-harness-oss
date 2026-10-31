@@ -943,6 +943,7 @@ const BASELINE_DOCUMENTED = new Set<string>([
   'POST /api/booking/admin/waitlist/{id}/convert',
   'POST /api/booking/payments/start',
   'POST /api/booking/payments/webhook/{provider}',
+  'POST /api/booking/stripe-test/webhook',
   'POST /api/booking/payments/{id}/refund',
   'GET /api/booking/payments/{id}/refunds',
   'POST /api/booking/payments/{id}/booking',
