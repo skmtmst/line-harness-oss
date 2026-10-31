@@ -80,6 +80,21 @@ it('機能設定は補助APIが機能オフでも閉じない', async () => {
   expect(host.textContent).not.toContain('この機能は設定でオフになっています')
 })
 
+it.each(['/settings/sns', '/settings/customer-look', '/settings/delivery', '/getting-started', '/ec-commerce', '/pools'])(
+  '設定配下の %s は接続先の機能がオフでも画面を閉じない',
+  async (pathname) => {
+    state.pathname = pathname
+    await render()
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(FEATURE_DISABLED_EVENT, {
+        detail: { featureId: 'external_integrations', accountId: 'account-a' },
+      }))
+    })
+    expect(host.textContent).toContain('ウェビナーの中身')
+    expect(host.querySelector('[data-feature-disabled]')).toBeNull()
+  },
+)
+
 it('受信箱で会話を開いても、補助のAI・EC機能のオフで画面を閉じない', async () => {
   state.pathname = '/chats'
   await render()
