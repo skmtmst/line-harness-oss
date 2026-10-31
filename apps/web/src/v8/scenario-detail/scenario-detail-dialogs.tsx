@@ -8,7 +8,7 @@ import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import { type SegmentCondition } from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { emptyValue } from '@/components/shared/empty-value'
 import FolderSelect, { folderById, folderCreator } from '@/components/shared/folder-select'
 import { Field } from '@/components/shared/form-controls'
@@ -250,9 +250,9 @@ export function ScenarioDetailDialogs({
         cancelLabel="閉じる"
         onCancel={() => setCompareOpen(false)}
         footer={
-          <Button type="button" variant="primary" onClick={() => acceptLatestAndContinue()} busyLabel="処理中…">
+          <DialogActions><Button type="button" variant="primary" onClick={() => acceptLatestAndContinue()} busyLabel="処理中…">
             最新を読み込んで続ける
-          </Button>
+          </Button></DialogActions>
         }
       >
         <VersionCompare before={latestSummary} after={currentSummary} />

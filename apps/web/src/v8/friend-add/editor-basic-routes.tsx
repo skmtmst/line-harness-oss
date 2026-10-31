@@ -88,7 +88,7 @@ export function BasicStep({ rule, setRule, definition, setDefinition, options, c
         </SettingsFormRow>
         {canEdit ? <Button type="button" variant="text" onClick={() => setMemoOpen(true)}>社内メモ</Button> : null}
       </Card>
-      <Dialog open={memoOpen && canEdit} title="社内メモ" dirty={false} onCancel={() => setMemoOpen(false)} footer={<Button type="button" onClick={() => setMemoOpen(false)}>閉じる</Button>}>
+      <Dialog open={memoOpen && canEdit} title="社内メモ" dirty={false} onCancel={() => setMemoOpen(false)} >
         <Field label="社内メモ" htmlFor="fa-internal-memo" note="配信の条件には使いません">
           <SaveErrorField names={["internalMemo", "definition.internalMemo"]}><TextArea id="fa-internal-memo" aria-label="社内メモ" value={definition.internalMemo ?? ''} onChange={(event) => setDefinition((current) => ({ ...current, internalMemo: event.target.value }))} /></SaveErrorField>
         </Field>
