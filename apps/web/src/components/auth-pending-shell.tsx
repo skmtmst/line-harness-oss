@@ -1,5 +1,8 @@
+'use client'
+
 import { Skeleton } from './shared/skeleton'
 import { PageFrame } from './templates/page-frame'
+import PagePending, { usePagePendingTitle, usePagePendingVariant } from './templates/page-pending'
 import shell from './app-shell.module.css'
 import sidebar from './layout/sidebar.module.css'
 import styles from './auth-pending-shell.module.css'
@@ -10,12 +13,13 @@ const ROW_WIDTHS = ['40%', '92%', '86%', '90%', '78%', '88%']
 /**
  * ログインの確認を初めて待つあいだ（開いた直後・ログイン直後）の外枠。
  *
- * 以前は灰色の地の真ん中に緑のくるくるだけだった（2026-10-08 オーナー）。
  * 左メニュー・上の帯・白い板の骨組みで待ち、確認が済んだら本物と入れ替える。
  * 書き出した HTML にもこの形が入るので、読み込み中の最初の一瞬も同じ見え方になる。
  * 中身は出さない（確認が済むまで画面の情報・権限は見せない）。
  */
 export default function AuthPendingShell() {
+  const dashboard = usePagePendingVariant() === 'dashboard'
+  const title = usePagePendingTitle()
   return (
     <div className={shell.shell} data-auth-pending="" role="status" aria-busy="true" aria-label="読み込み中">
       <div className={shell.workspace}>
@@ -32,11 +36,11 @@ export default function AuthPendingShell() {
           <div className={styles.topBar} aria-hidden="true" />
           <div className={shell.main}>
             <div className={shell.content}>
-              <PageFrame kind="pending">
+              {dashboard || title ? <PagePending stage="auth" /> : <PageFrame kind="pending">
                 <div className={styles.rows} aria-hidden="true">
                   {ROW_WIDTHS.map((width, index) => <Skeleton key={index} width={width} height={index === 0 ? 22 : 16} />)}
                 </div>
-              </PageFrame>
+              </PageFrame>}
             </div>
           </div>
         </div>

@@ -25,6 +25,8 @@ it.each(ACCOUNT_STYLES)('%sをポップアップで選び、同じアカウン�
   sessionStorage.setItem(REGISTRATION_STYLE_KEY, 'created-account')
   render(<ResumeRegistrationStyle accountId="created-account" />)
   const dialog = screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  expect(dialog.querySelectorAll('[data-style-switcher]')).toHaveLength(1)
+  expect(dialog.querySelector('[data-window-body]')?.contains(dialog.querySelector('[data-style-switcher]'))).toBe(false)
   const next = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
   expect(next.disabled).toBe(true)
   fireEvent.click(within(dialog).getByRole('button', { name: STYLE_EXPERIENCE_SCRIPT.styles[style].label }))

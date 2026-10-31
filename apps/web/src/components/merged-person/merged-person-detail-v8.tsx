@@ -13,7 +13,7 @@ import { PencilLine, Unlink } from 'lucide-react'
 import Button from '@/components/shared/button'
 import { RowNameLink, TableStateRow } from '@/components/shared/table'
 import { deliveryPriorityDetails, linkedFriendDetails, personDetails, profileValueDetails } from './merged-person-metadata'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import { RequiredBadge } from '@/components/shared/form-controls'
 import ListState from '@/components/shared/list-state'
 import { useStaffRole, canManageRole } from '@/lib/staff-role'
@@ -283,12 +283,10 @@ export default function MergedPersonDetailViewV8({
         error={m.saveError || undefined}
         onCancel={() => m.setUnlinkTarget(null)}
         designNode="Hn9eE"
-        footer={(
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        footer={(<DialogActions>
             <Button type="button" onClick={() => m.setUnlinkTarget(null)} disabled={m.unlinking}>キャンセル</Button>
             <Button type="button" variant="danger" onClick={m.unlink} disabled={m.unlinking || !m.unlinkReason.trim()} busy={m.unlinking} busyLabel="解除中…">結び付けを解除</Button>
-          </div>
-        )}
+          </DialogActions>)}
       >
         <p style={{ fontSize: 13, color: 'var(--color-ink-secondary)', margin: '0 0 8px' }}>
           解除する友だち：<strong>{m.unlinkTarget?.displayName}</strong>

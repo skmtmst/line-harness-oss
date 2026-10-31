@@ -1091,7 +1091,7 @@ function ScoreHistoryDialog({
       designTop={204}
       title="点数の変化の明細"
       description="いつ・何で点数が変わったかを新しい順に並べています。スコアは配信や対応の順番を決める目安で、お客様には見えず、マイル残高は増えも減りもしません。"
-      footer={<div className={styles.dlgFooterEnd}><Button variant="secondary" onClick={onCancel}>閉じる</Button></div>}
+
       onCancel={onCancel}
       busy={loading}
     >

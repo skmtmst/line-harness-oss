@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Send } from 'lucide-react'
 import type { HqTemplateFolder } from '@line-crm/shared'
 import type { HqAccount, HqTemplate } from '@/lib/hq-templates-api'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Button from '@/components/shared/button'
 import Checkbox from '@/components/shared/checkbox'
 import StatusBadge from '@/components/shared/status-badge'
@@ -33,12 +33,12 @@ export default function FolderDistributionDialog({ name, templates, templateFold
     description="フォルダの中のひな形をまとめて、選んだアカウントへ配ります。"
     busy={busy} error={error} onCancel={onCancel}
     designHeaderPadding="24px 24px 8px" designContentPadding="8px 24px 20px"
-    footer={<div className={styles.footer}>
+    footer={<DialogActions>
       <Button disabled={busy} onClick={onCancel}>キャンセル</Button>
       <Button variant="primary" disabled={busy || !picked.length || !selected.length} onClick={() => onConfirm(templates.filter((row) => picked.includes(row.id)), selected)}>
         <Send size={16} aria-hidden="true" />{`${formatNumber(picked.length)} 件を ${selected.length} アカウントへ配る`}
       </Button>
-    </div>}
+    </DialogActions>}
   >
     <div className={styles.sections}>
       {/* 絵 W2GYgL：配るテンプレートはチェックの一覧（種類の札つき）、配る先はフォルダの列＋アカウントのチェックの一覧。 */}

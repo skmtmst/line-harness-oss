@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Minus, Plus } from 'lucide-react'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Select from '@/components/shared/select'
 import Toggle from '@/components/shared/toggle'
@@ -286,26 +286,18 @@ export default function MileageAdjustDialog({
       title="マイルを手で増やす・減らす"
       description="記録に残ります。あとから理由をたどれるようにしてください。"
       busy={busy || policyLoading}
+      dirty={step === 'input' ? undefined : false}
       error={error}
       confirmLabel={step === 'input' ? confirmLabel : undefined}
       confirmIcon={step === 'input' && valid && !highValue ? (delta < 0 ? <Minus size={16} aria-hidden="true" /> : <Plus size={16} aria-hidden="true" />) : undefined}
       cancelLabel={step === 'input' ? 'キャンセル' : undefined}
-      onConfirm={() => { if (step === 'input') void submit() }}
+      onConfirm={step === 'input' ? () => { void submit() } : undefined}
       onCancel={() => { if (!busy) onCancel() }}
-      footer={step === 'requested' ? (
-        <div className={styles.dlgFooterEnd}>
-          <Button onClick={onCancel}>閉じる</Button>
-        </div>
-      ) : step === 'completed' ? (
-        <div className={styles.dlgFooterEnd}>
-          {completedResult?.notificationStatus === 'failed' ? (
-            <Button variant="secondary" disabled={retrying} onClick={() => void retryNotification()} busy={retrying} busyLabel="通知を送り直しています…">
+      footer={step === 'completed' && completedResult?.notificationStatus === 'failed' ? (<DialogActions>
+          <Button variant="secondary" disabled={retrying} onClick={() => void retryNotification()} busy={retrying} busyLabel="通知を送り直しています…">
               通知をもう一度送る
-            </Button>
-          ) : null}
-          <Button onClick={onCancel}>閉じる</Button>
-        </div>
-      ) : undefined}
+          </Button>
+        </DialogActions>) : undefined}
     >
       {step === 'completed' ? (
         <section aria-label="変更結果">

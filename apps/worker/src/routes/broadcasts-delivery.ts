@@ -1,4 +1,4 @@
-import { scopeSegmentQuery } from '../services/segment-query-scope.js';
+import { scopeSegmentQuery, scopedFriendIds } from '../services/segment-query-scope.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { BROADCAST_DEFINITION_GUARD_SQL, broadcastDefinitionGuardArgs } from '../features/broadcasts/index.js';
 import { logger } from '@line-crm/shared/server';
@@ -240,6 +240,10 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     if (accountId) {
       where.push('f.line_account_id = ?');
       binds.push(accountId);
+    } else {
+      const ids = scopedFriendIds(await getVisibleLineAccountScope(c.env.DB, c.get('staff')));
+      where.push(`f.id IN (${ids.sql})`);
+      binds.push(...ids.bindings);
     }
     if (existing.target_type === 'tag') {
       if (!existing.target_tag_id) {
@@ -372,6 +376,7 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
       c.env.DB,
       existing.target_tag_id,
       existing.line_account_id ?? null,
+      existing.line_account_id == null ? await getVisibleLineAccountScope(c.env.DB, c.get('staff')) : undefined,
     );
     const followingCount = friends.filter(f => f.is_following).length;
 

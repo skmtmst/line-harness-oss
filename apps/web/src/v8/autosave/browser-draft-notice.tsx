@@ -5,7 +5,7 @@
  * 見た目は共通の帯のまま（画面の CSS を足さない）。
  */
 import { useEffect, useState } from 'react'
-import Dialog, { DialogActions } from '@/components/shared/dialog'
+import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import Button from '@/components/shared/button'
 import { BROWSER_DRAFT_WORDS } from './use-browser-draft'
@@ -71,7 +71,7 @@ export function ScenarioDraftStatus({ label }: { label: string | null | undefine
       <Button variant="text" size="inline" onClick={() => setOpen(true)} aria-label="自動保存できなかった時の詳細">詳細</Button>
     </span>
     <Dialog open={open} onCancel={() => setOpen(false)} title="下書きを自動保存できませんでした" size="small" contentLayout="form"
-      footer={<DialogActions><Button onClick={() => setOpen(false)}>閉じる</Button></DialogActions>}>
+      >
       <p>入力内容はこの画面に残っています。画面を閉じる前に、必要な内容を控えてください。</p>
       <p>通信状態を確かめて入力を続けると、入力が止まって{AUTOSAVE_DELAY_MS / 1000}秒後にもう一度自動保存します。</p>
       <p>画面の保存・作成ボタンを押すと、この内容がそのまま保存されます。下書きだけを残す操作ではありません。配信中のシナリオでは、その後の配信にも反映されます。下書きだけを残す場合は、入力を変えて自動保存の完了を待ってください。</p>

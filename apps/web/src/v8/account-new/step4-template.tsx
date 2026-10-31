@@ -23,7 +23,7 @@ export default function Step4Template({ templateKey, onOpen }: {
       </Card>
       )}>
       <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="使い方を選ぶ">
-        <h2 className={styles.panelTitle}>使い方のスタイルを選ぶ</h2>
+        <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>使い方のスタイルを選ぶ</h2>
         <p className={styles.asideP}>見本を見て、お店に近いスタイルを選んでください。あとから設定で変更できます。</p>
         {templateKey ? <p className={styles.asideP}>選択中：{STYLE_EXPERIENCE_SCRIPT.styles[templateKey].label}（まだ保存していません）</p> : null}
         <Button type="button" onClick={onOpen}>スタイルを選ぶ</Button>

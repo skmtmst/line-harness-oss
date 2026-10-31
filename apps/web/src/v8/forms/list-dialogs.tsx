@@ -303,8 +303,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
         description="回答データやURLは変わりませんが、回答者に表示されるフォーム名も変わります。"
         busy={renaming}
         onCancel={closeRename}
-        footer={(
-          <div className={styles.panelFooter}>
+        footer={(<DialogActions>
             <Button type="button" variant="secondary" disabled={renaming} onClick={closeRename}>キャンセル</Button>
             <Button
               type="button"
@@ -316,8 +315,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
             >
               保存する
             </Button>
-          </div>
-        )}
+          </DialogActions>)}
       >
         <Field label="フォーム名"><SaveErrorField names={["renameName","rename_name"]}><SharedTextField
             type="text"

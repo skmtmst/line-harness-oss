@@ -5,7 +5,7 @@ const accountNameRequirement = requiredText('名前を入力してください�
 
 import { useEffect, useState } from 'react'
 import { Pencil, RotateCcw, Users } from 'lucide-react'
-import Dialog from '@/components/shared/dialog'
+import Dialog, { DialogActions } from '@/components/shared/dialog'
 import OtpInput, { otpFailureMessage } from '@/components/shared/otp-input'
 import Button from '@/components/shared/button'
 import Select from '@/components/shared/select'
@@ -130,15 +130,15 @@ export function AccountSettingsDialogV8({ account, archived, onClose, onSaved, o
       error={error || undefined}
       onCancel={onClose}
       footer={
-        <div className={`${head.footer} ${head.footerSplit}`}>
-          <Button type="button" variant="secondary" onClick={onArchive}>
+        <DialogActions align="center" leadingAction={<Button type="button" variant="secondary" onClick={onArchive}>
             {archived ? '戻す' : 'アーカイブ'}
-          </Button>
-          <div className={head.footerGroup}>
+          </Button>}>
+
+          <>
             <Button type="button" variant="secondary" onClick={onClose} disabled={busy}>キャンセル</Button>
             <Button type="button" variant="primary" onClick={() => save()} disabled={busy} busy={busy} busyLabel="保存中…">保存</Button>
-          </div>
-        </div>
+          </>
+        </DialogActions>
       }
     >
       <div className={head.head}>
@@ -240,10 +240,10 @@ export function AccountArchiveDialogV8({ account, onClose, onDone }: {
       error={error || undefined}
       onCancel={onClose}
       footer={
-        <div className={`${head.footer} ${head.footerEnd}`}>
+        <DialogActions>
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="danger" onClick={() => archive()} disabled={busy} busy={busy} busyLabel="アーカイブ中…">本人確認してアーカイブする</Button>
-        </div>
+        </DialogActions>
       }
     >
       <div className={head.head}>
@@ -310,12 +310,12 @@ export function AccountRestoreDialogV8({ account, onClose, onDone }: {
       error={error || undefined}
       onCancel={onClose}
       footer={
-        <div className={`${head.footer} ${head.footerEnd}`}>
+        <DialogActions>
           <Button type="button" onClick={onClose} disabled={busy}>キャンセル</Button>
           <Button type="button" variant="primary" onClick={() => restore()} disabled={busy} busy={busy} busyLabel="戻しています…">
             <RotateCcw aria-hidden="true" className={styles.icon} />本人確認して戻す
           </Button>
-        </div>
+        </DialogActions>
       }
     >
       <div className={head.head}>

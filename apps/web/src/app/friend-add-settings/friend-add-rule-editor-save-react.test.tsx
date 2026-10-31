@@ -12,7 +12,7 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/components/shell/page-chrome', async () => (await import('@/test-utils/page-chrome-mock')).pageChromeMock())
 vi.mock('@/lib/staff-role', async (original) => ({ ...await original<typeof import('@/lib/staff-role')>(), useStaffRole: () => 'owner' }))
 vi.mock('@/components/shared/condition-builder', () => ({ default: () => null }))
-vi.mock('@/components/shared/dialog', () => ({ default: () => null }))
+vi.mock('@/components/shared/dialog', async (importOriginal) => ({ ...await importOriginal<typeof import('@/components/shared/dialog')>(), default: () => null }))
 vi.mock('@/components/shared/icon-button', () => ({ default: () => null }))
 vi.mock('@/components/shared/list-state', () => ({ default: ({ title }: { title: string }) => <div>{title}</div> }))
 vi.mock('@/components/shared/select', () => ({ default: ({ value, onChange, options }: any) => <select value={value} onChange={(event: any) => onChange?.(event.target.value)}>{options.map((item: any) => <option key={item.value} value={item.value}>{item.label}</option>)}</select> }))

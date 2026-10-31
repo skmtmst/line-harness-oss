@@ -5,6 +5,7 @@ import { Check } from 'lucide-react'
 import Button from '@/components/shared/button'
 import Card from '@/components/shared/card'
 import SegmentedControl from '@/components/shared/segmented'
+import Select from '@/components/shared/select'
 import StatusBadge from '@/components/shared/status-badge'
 import { STYLE_EXPERIENCE_SCRIPT, StyleExperiencePlayer } from './style-experience-player'
 import styles from './style-choice-step.module.css'
@@ -32,13 +33,14 @@ export type StyleChoiceStepProps = {
   onChoose: (style: AccountStyle) => void
   disabled?: boolean
   variant?: 'minimal' | 'full'
+  switcher?: 'inline' | 'external'
 }
 
-export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, disabled = false, variant = 'minimal' }: StyleChoiceStepProps) {
+/** 窓の固定された帯でも、本文と同じ「見る」切り替えを使う。 */
+export function StyleChoiceSwitcher({ viewing, onView, chosen, disabled = false }: Pick<StyleChoiceStepProps, 'viewing' | 'onView' | 'chosen' | 'disabled'>) {
   const script = STYLE_EXPERIENCE_SCRIPT
-  const viewed = script.styles[viewing]
-  return (
-    <div className={styles.root}>
+  return <div className={styles.switcher} data-style-switcher>
+    <div className={styles.switcherSegments}>
       <SegmentedControl
         aria-label="見るスタイル"
         value={viewing}
@@ -51,6 +53,20 @@ export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, dis
             : { value: style, label: name }
         })}
       />
+    </div>
+    <div className={styles.switcherSelect}>
+      <Select aria-label="見るスタイル" value={viewing} onChange={value => onView(value as AccountStyle)} size="full" disabled={disabled}
+        options={STYLE_CHOICE_ORDER.map(style => ({ value: style, label: `${script.styles[style].label}${chosen === style ? '（選んでいます）' : ''}` }))} />
+    </div>
+  </div>
+}
+
+export default function StyleChoiceStep({ viewing, onView, chosen, onChoose, disabled = false, variant = 'minimal', switcher = 'inline' }: StyleChoiceStepProps) {
+  const script = STYLE_EXPERIENCE_SCRIPT
+  const viewed = script.styles[viewing]
+  return (
+    <div className={styles.root}>
+      {switcher === 'inline' ? <StyleChoiceSwitcher viewing={viewing} onView={onView} chosen={chosen} disabled={disabled} /> : null}
       <section className={styles.can} aria-labelledby={STYLE_CHOICE_START_ID}>
         <h3 id={STYLE_CHOICE_START_ID} tabIndex={-1} className={styles.canTitle}>{`${viewed.label}でできること`}</h3>
         <ul className={styles.canList}>

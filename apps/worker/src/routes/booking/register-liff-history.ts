@@ -1,7 +1,7 @@
 import { liffBookingJson } from '../liff-booking-response.js';
 import type { Env } from '../../worker-env.js';
 import type { Hono } from 'hono';
-import { cancellationQuote } from '../../features/booking/booking-cancellation/index.js';
+import { cancellationQuote, customerCancellationDeadline } from '../../features/booking/booking-cancellation/index.js';
 import { customerBookingPayments } from '../../features/booking/booking-payment-history/index.js';
 import { bookingHistoryItem } from '../../features/booking/booking-history-item/index.js';
 import type { BookingHistoryItem, BookingHistoryResponse } from '@line-crm/shared';
@@ -59,7 +59,7 @@ booking.get('/api/liff/booking/me', async (c) => {
     const {policy_snapshot_json,price_at_booking,ticket,...item}=historyItem(row);
     const policy=policy_snapshot_json?JSON.parse(policy_snapshot_json):null;
     const quote=policy?.enabled?cancellationQuote(policy,row.starts_at,price_at_booking,new Date(),!!ticket):null;
-    return {...item,...(quote?{cancellationQuote:quote}:{}),cancel_deadline_at:quote?.policyAcceptedRequired?row.starts_at:new Date(new Date(row.starts_at).getTime()-Number(row.cancel_deadline_minutes_before)*60000).toISOString()};
+    return {...item,...(quote?{cancellationQuote:quote}:{}),cancel_deadline_at:customerCancellationDeadline(row.starts_at,!!quote?.policyAcceptedRequired,Number(row.cancel_deadline_minutes_before))};
   }), past: past.results.map(historyItem) } satisfies BookingHistoryResponse);
 });
 }
