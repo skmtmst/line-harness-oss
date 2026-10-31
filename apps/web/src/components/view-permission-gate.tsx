@@ -10,6 +10,7 @@ import TargetMissing from '@/components/shared/target-missing'
 import { LockedCreatePage } from '@/components/templates'
 import { PageFrame, PageHeading } from '@/components/templates/page-frame'
 import PagePending from '@/components/templates/page-pending'
+import { entryTitleForPath } from '@/lib/page-title'
 
 const MENU_ITEMS = [...MENU_SECTIONS, ...HQ_MENU_SECTIONS].flatMap(section => section.items)
 // メニューに置かない既知の入口だけを列挙する。未登録の子の道筋まで許可しない。
@@ -65,7 +66,7 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
 
   // LINEアカウントの管理画面は統括の所属だけ。店舗の管理者でもURLから開けない。
   if ((pathname === '/accounts' || pathname.startsWith('/accounts/')) && staffIdentity?.accountScope !== 'all') return <PageFrame kind="detail">
-    <PageHeading title="LINEアカウント" />
+    <PageHeading title={entryTitleForPath(pathname) || 'LINEアカウント'} />
     <TargetMissing kind="forbidden" title="この画面を見る権限がありません" description="LINEアカウントの管理は統括のメンバーが行います。" backHref="/" backLabel="ダッシュボードへ" />
   </PageFrame>
 
@@ -86,7 +87,7 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
     || (MANAGER_PATHS.has(pathname) && canManageRole(signedInRole))
     || (unlistedKey !== undefined && canViewFeature(unlistedKey, role)))
   if (restricted && !allowed && !unlistedAllowed) return <PageFrame kind="detail">
-    <PageHeading title={item?.label ?? '画面'} />
+    <PageHeading title={entryTitleForPath(pathname) || item?.label || 'アクセスできません'} />
     <TargetMissing kind="forbidden" title="この画面を見る権限がありません" description="見たい時はオーナーか管理者に頼んでください。" backHref="/" backLabel="ダッシュボードへ" />
   </PageFrame>
 
@@ -95,7 +96,7 @@ function ResolvedViewPermissionGate({ children }: { children: ReactNode }) {
   const startsDraft = pathname === '/automations/drafts' && Boolean(params.get('automationId')) && !params.get('id')
   const writingEntry = creating || startsDraft
   const backHref = item?.href ?? (pathname.replace(/\/(?:new|create)(?:\/.*)?$/, '') || '/')
-  const title = item ? `${item.label}の${creating ? '作成' : '編集'}` : '新しく作る'
+  const title = entryTitleForPath(pathname) || (item ? `${item.label}の${creating ? '作成' : '編集'}` : '新しく作る')
   const backLabel = item ? `${item.label}の一覧へ` : '一覧へ'
   if (writingEntry && session?.impersonation?.mode === 'read') return <PageFrame kind="create">
     <PageHeading title={title} />
