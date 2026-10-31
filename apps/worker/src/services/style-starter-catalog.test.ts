@@ -31,13 +31,15 @@ beforeEach(()=>{
     UPDATE line_accounts SET liff_id='liff-'||id;`);
 });
 afterEach(()=>{sql.raw.close();vi.restoreAllMocks()});
-test('空の組を明示保存でき、標準文面で埋めず、未選択では投入しない',async()=>{
+test('空の組を明示保存でき、シンプルを選んでも標準文面やメニューで埋めず、未選択では投入しない',async()=>{
   await set([]);
   await initializeAccountStyle(sql.db,'a','t','owner');
   expect(sql.raw.prepare('SELECT COUNT(*) n FROM templates').get()).toEqual({n:0});
   expect(sql.raw.prepare('SELECT COUNT(*) n FROM rich_menu_groups').get()).toEqual({n:0});
-  await saveProfile(sql.db,'a','t','owner',{expectedVersion:1,style:'standard'});
+  await saveProfile(sql.db,'a','t','owner',{expectedVersion:1,style:'standard',answers:{image:{mode:'configured',value:'simple'}}});
   expect(sql.raw.prepare('SELECT COUNT(*) n FROM templates').get()).toEqual({n:0});
+  expect(sql.raw.prepare('SELECT COUNT(*) n FROM rich_menu_groups').get()).toEqual({n:0});
+  expect(sql.raw.prepare('SELECT COUNT(*) n FROM forms').get()).toEqual({n:0});
 });
 test('保存したカタログの版を固定し、新しい版へ勝手に差し替えない',async()=>{
   const choice=await catalog('tag',tag('最初の版'));
@@ -244,7 +246,15 @@ test('7領域のリッチメニューもカタログどおり未公開で入れ�
  expect(sql.raw.prepare("SELECT status FROM rich_menu_groups WHERE account_id='a'").get()).toEqual({status:'draft'});
  expect(sql.raw.prepare('SELECT COUNT(*) n FROM rich_menu_areas').get()).toEqual({n:7});
  expect(sql.raw.prepare('SELECT line_richmenu_id FROM rich_menu_pages').get()).toEqual({line_richmenu_id:null});
- const writes=images.put.mock.calls.length;await applyCatalogStarter(sql.db,'t','a','admin','standard',runtime);
+ const writes=images.put.mock.calls.length;
+ const savedProfile=await saveProfile(sql.db,'a','t','admin',{expectedVersion:1,style:'standard',confirmInitialMenu:true,answers:{image:{mode:'configured',value:'simple'}}},{images:images as unknown as R2Bucket,catalogRuntime:runtime});
+ expect(savedProfile.catalogApplication?.items[0]).toMatchObject({state:'succeeded'});
+ expect(sql.raw.prepare('SELECT COUNT(*) n FROM rich_menu_groups').get()).toEqual({n:1});
+ expect(sql.raw.prepare('SELECT COUNT(*) n FROM rich_menu_areas').get()).toEqual({n:7});
+ expect(sql.raw.prepare('SELECT COUNT(*) n FROM forms').get()).toEqual({n:0});
+ const {starter}=await import('./style-starter-set.js');
+ expect((await starter(sql.db,'t','standard',true)).definition).toEqual({mode:'catalog',items:[],selections:[{kind:'rich_menu',templateId:saved.template.id,versionId:saved.template.current_version_id!}]});
+ await applyCatalogStarter(sql.db,'t','a','admin','standard',runtime);
  expect(images.put).toHaveBeenCalledTimes(writes);expect(sql.raw.prepare('SELECT COUNT(*) n FROM rich_menu_groups').get()).toEqual({n:1});
 });
 test('同じ確認から遅れて届いた別名コピーは二重に実行しない',async()=>{
