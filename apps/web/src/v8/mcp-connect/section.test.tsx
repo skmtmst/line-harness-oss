@@ -1,5 +1,7 @@
 // @vitest-environment happy-dom
 import React from 'react'
+import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
+import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
@@ -24,7 +26,7 @@ const CONNECTION = { id: 'mcp-1', name: 'Claude（Kenta）', level: 'draft', acc
 
 beforeEach(() => {
   vi.clearAllMocks()
-  role.value = 'owner'
+  role.value = verifiedStaffRole('owner')
   apiMock.list.mockResolvedValue({ success: true, data: [CONNECTION] })
   apiMock.create.mockResolvedValue({ success: true, data: { connection: { ...CONNECTION, id: 'mcp-2', level: 'read' }, url: 'https://api.example.test/mcp/acc', key: 'mcp_live_abcdef1234567890' } })
 })
@@ -49,25 +51,29 @@ it('オーナーは接続を作れ、鍵は 1 回だけ出て、閉じる前に�
   expect(screen.getByText(/鍵はもう見られません/)).toBeTruthy()
 })
 
-it('管理者には作るボタンを出さず「オーナーだけが作れます」、止めるはできる', async () => {
-  role.value = 'admin'
+it('管理者には作るボタンを灰色とオーナーの理由で残し、止めるはできる', async () => {
+  role.value = verifiedStaffRole('admin')
   await open()
-  expect(screen.queryByRole('button', { name: '接続を作る' })).toBeNull()
-  expect(screen.getByText('オーナーだけが作れます')).toBeTruthy()
+  const create = screen.getByRole('button', { name: '接続を作る' })
+  expect(create.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.focus(create)
+  expect(screen.getByRole('tooltip').textContent).toBe(PERMISSION_LOCK_REASON.owner)
+  fireEvent.click(create)
+  expect(apiMock.create).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: '「Claude（Kenta）」の操作' }))
   expect(screen.getByRole('menuitem', { name: '止める' })).toBeTruthy()
-  expect(screen.queryByRole('menuitem', { name: '鍵を作り直す' })).toBeNull()
+  expect(screen.getByRole('menuitem', { name: '鍵を作り直す' }).getAttribute('aria-disabled')).toBe('true')
 })
 
 it('閲覧のみは見るだけ（作る・止める・作り直すを出さない）、スタッフには区画を出さない', async () => {
-  role.value = 'viewer'
+  role.value = verifiedStaffRole('viewer')
   await open()
   expect(screen.getByText('Claude（Kenta）')).toBeTruthy()
-  expect(screen.queryByRole('button', { name: '接続を作る' })).toBeNull()
+  expect(screen.getByRole('button', { name: '接続を作る' }).getAttribute('aria-disabled')).toBe('true')
   fireEvent.click(screen.getByRole('button', { name: '「Claude（Kenta）」の操作' }))
-  expect(screen.queryByRole('menuitem', { name: '止める' })).toBeNull()
+  expect(screen.getByRole('menuitem', { name: '止める' }).getAttribute('aria-disabled')).toBe('true')
   cleanup()
-  role.value = 'staff'
+  role.value = verifiedStaffRole('staff')
   await open()
   expect(screen.queryByText('AI とつなぐ（MCP）')).toBeNull()
   expect(apiMock.list).toHaveBeenCalledTimes(1)

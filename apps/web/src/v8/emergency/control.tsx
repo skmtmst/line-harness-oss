@@ -1,5 +1,6 @@
 'use client'
 import { japaneseDetailOf } from '@/components/shared/api-error-message'
+import { useEmergencyTarget } from './control-target'
 import { useRunningVersion } from '@/lib/use-running-version'
 
 import { formatMonthDay, stopMinutes } from './control-time'
@@ -125,7 +126,7 @@ const EmergencyControlV8 = (
   ref: React.Ref<EmergencyControlV8Handle>,
 ) => {
   const runningVersion = useRunningVersion()
-  const [targetAccountId, setTargetAccountId] = useState('all')
+  const { defaultTargetAccountId, targetAccountId, canReadTarget, selectTarget, role: staffRole } = useEmergencyTarget(accounts)
   const [targets, setTargets] = useState<Record<StopTarget, boolean>>({ broadcasts: true, scenarios: true, reminders: true, automations: false })
   const [reason, setReason] = useState('')
   const [reasonDetail, setReasonDetail] = useState('')
@@ -246,14 +247,15 @@ const EmergencyControlV8 = (
     setStepUpMode(null)
     setStepUpError('')
     setRequestKey('')
-    void loadPreview(targetAccountId === 'all' ? null : targetAccountId, generation)
+    if (canReadTarget) void loadPreview(targetAccountId === 'all' ? null : targetAccountId, generation)
+    else clearPreview()
     return () => {
       if (previewGeneration.current === generation) previewGeneration.current += 1
     }
-  }, [loadPreview, targetAccountId])
+  }, [canReadTarget, clearPreview, loadPreview, targetAccountId])
 
   const reloadControl = useCallback(async () => {
-    if (reloadLock.current) return
+    if (reloadLock.current || !canReadTarget) return
     reloadLock.current = true
     applySafety('reload-start')
     const generation = previewGeneration.current
@@ -264,7 +266,7 @@ const EmergencyControlV8 = (
     } finally {
       reloadLock.current = false
     }
-  }, [applySafety, loadPreview, targetAccountId])
+  }, [applySafety, canReadTarget, loadPreview, targetAccountId])
 
   /* 止めた・戻した記録と、いまの版。タブをまたいで同じ口・同じ数え方を使う。 */
   useEffect(() => {
@@ -551,7 +553,7 @@ const EmergencyControlV8 = (
 
   return (
     <div data-design-node="OHwbU" className={styles.board}>
-      <FormLeaveGuard dirty={!isStopped && Boolean(reason.trim() || reasonDetail.trim() || targetAccountId !== 'all' || JSON.stringify(targets) !== JSON.stringify({ broadcasts: true, scenarios: true, reminders: true, automations: false }))} busy={mutationLocked} />
+      <FormLeaveGuard dirty={!isStopped && Boolean(reason.trim() || reasonDetail.trim() || targetAccountId !== defaultTargetAccountId || JSON.stringify(targets) !== JSON.stringify({ broadcasts: true, scenarios: true, reminders: true, automations: false }))} busy={mutationLocked} />
       {/* 外側がある入口では、題の下のnoticeへ1回だけ渡す。 */}
       {!onAccessChange && lockedReason ? <ReadOnlyNotice need="feature" /> : null}
 
@@ -594,6 +596,7 @@ const EmergencyControlV8 = (
               id="emergency-account-v8"
               value={targetAccountId}
               onChange={(value) => {
+                if (!selectTarget(value)) return
                 access.invalidate()
                 previewGeneration.current += 1
                 setImpact(null)
@@ -602,12 +605,11 @@ const EmergencyControlV8 = (
                 setCanControl(false)
                 setBlockedCode(null)
                 setCalculatedAt(null)
-                setTargetAccountId(value)
               }}
               disabled={mutationLocked || isStopped}
               aria-label="緊急停止の対象アカウント"
               options={[
-                { value: 'all', label: 'すべてのアカウント' },
+                { value: 'all', label: 'すべてのアカウント', disabled: staffRole !== 'owner', description: staffRole === 'owner' ? undefined : 'すべてのアカウントの確認と操作はオーナーだけができます。' },
                 ...accounts.map((account) => ({ ...entityOptionMetadata(account), value: account.id, label: `${account.name}（いまのアカウント）` })),
               ]}
             /></SaveErrorField>
@@ -778,7 +780,7 @@ const EmergencyControlV8 = (
 
       <LogEntryDetails canCopy entry={recordEntry} onClose={() => setRecordEntry(null)} />
       {/* 送る経路の網羅（止めると止まる経路）。絵の外なので記録の下に置く。 */}
-      <SendPathCoveragePanel accountId={targetAccountId === 'all' ? null : targetAccountId} revision={control?.version ?? 0} />
+      {canReadTarget ? <SendPathCoveragePanel accountId={targetAccountId === 'all' ? null : targetAccountId} revision={control?.version ?? 0} /> : null}
 
       {/* 確認の窓：止めるときは板 `EA8rM` の1枚（対象・理由必須・言葉・番号）。戻すときは今までどおり。 */}
       <Dialog

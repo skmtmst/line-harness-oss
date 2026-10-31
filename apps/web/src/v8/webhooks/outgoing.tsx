@@ -11,14 +11,12 @@ import type { Folder } from '@line-crm/shared'
 import { api, ApiError, type OutgoingWebhookOverview } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
 import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
-import { useStaffRole } from '@/lib/staff-role'
 import { useNarrowViewport } from '@/lib/use-narrow-viewport'
 import { formatNumber } from '@/lib/format'
 import { ListPage, ListPagePagination } from '@/components/templates'
 import ListToolbar, { ListToolbarFrame, ListToolbarRow, ListToolbarSearchSlot, ListToolbarEnd } from '@/components/shared/list-toolbar'
 import SearchField from '@/components/shared/search-field'
 import Button from '@/components/shared/button'
-import PermissionLockedButton from '@/components/shared/permission-locked-button'
 import StatusBadge from '@/components/shared/status-badge'
 import { TextField } from '@/components/shared/text-field'
 import { RowMenu } from '@/components/shared/row-actions'
@@ -51,6 +49,7 @@ import {
 } from './shell'
 import { MIN_SECRET_LENGTH, generateSecret } from './secret'
 import { eventLabel, isHttpsUrl, maskedUrl, payloadLabel, shortDateTime, urlHost } from './words'
+import { useWebhookWriteAccess, canManageWebhooksNow, captureWebhookWriteAccess } from './write-access'
 import styles from './outgoing.module.css'
 import TruncatedText from '@/components/shared/truncated-text'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
@@ -97,13 +96,10 @@ export default function WebhooksOutgoingV8() {
   const accountScopeRef = useRef({ accountId: selectedAccountId })
   if (accountScopeRef.current.accountId !== selectedAccountId) accountScopeRef.current = { accountId: selectedAccountId }
   const narrow = useNarrowViewport()
-  const staffRole = useStaffRole()
-  /*
-   * 送り先の変更（作る・動かす/止める・直す・合言葉・削除）は統括だけ（R32）。
-   * 試し送信は管理者も使える。見るだけの担当者は中身の確認と検索だけ。
-   */
-  const canManage = staffRole === 'owner'
-  const canTest = canManage || staffRole === 'admin'
+  const management = useWebhookWriteAccess()
+  const ownership = useWebhookWriteAccess(true)
+  const canManage = management.allowed
+  const canTest = canManage
 
   const overview = useWebhookOverview()
   const { outgoing, outgoingStatus, summary, loadedAccountId, reload } = overview
@@ -206,10 +202,11 @@ export default function WebhooksOutgoingV8() {
 
   /* ===== 動かす・止める（押した瞬間に札を変え、裏で保存する） ===== */
   const handleToggle = async (item: OutgoingWebhookOverview, currentActive: boolean) => {
+    if (!canManageWebhooksNow()) { setError(management.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     const accountId = selectedAccountId
     const scope = accountScopeRef.current
     const isCurrent = () => accountScopeRef.current === scope
-    if (!accountId || loadedAccountId !== accountId) {
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId) {
       setError('LINEアカウントの一覧を読み直してください')
       return
     }
@@ -295,8 +292,9 @@ export default function WebhooksOutgoingV8() {
 
   /* ===== 削除 ===== */
   const askDelete = (item: OutgoingWebhookOverview) => {
+    if (!canManageWebhooksNow(true)) return
     const accountId = selectedAccountId
-    if (!accountId || loadedAccountId !== accountId) {
+    if (!accountId || accountRef.current !== accountId || loadedAccountId !== accountId) {
       setError('LINEアカウントの一覧を読み直してください')
       return
     }
@@ -304,6 +302,7 @@ export default function WebhooksOutgoingV8() {
     setDeleteTarget({ id: item.id, name: item.name, accountId })
   }
   const runDelete = async () => {
+    if (!canManageWebhooksNow(true)) { setDeleteError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
     if (!deleteTarget || deleting) return
     const accountId = deleteTarget.accountId
     if (accountId !== selectedAccountId || loadedAccountId !== accountId) {
@@ -334,6 +333,8 @@ export default function WebhooksOutgoingV8() {
 
   /* ===== 合言葉（秘密の鍵）を作り直す ===== */
   const runRotate = async (stepUpToken?: string) => {
+    if (!canManageWebhooksNow(true)) { setRotateError(ownership.reason ?? '担当者の確認が終わるまでお待ちください。'); return }
+    const canContinue = captureWebhookWriteAccess(true)
     if (rotating) return
     setRotateError('')
     const accountId = selectedAccountId
@@ -367,7 +368,7 @@ export default function WebhooksOutgoingV8() {
       const fieldFailure = saveErrors.capture(caught);
 
       if (!stepUpToken && isStepUpRequired(caught)) {
-        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: (token) => runRotate(token) });
+        setStepUp({ purpose: 'webhook.secret', action: 'シークレットを更新する', retry: async (token) => { if (canContinue() && accountRef.current === accountId) return runRotate(token); setRotateError('権限やLINEアカウントが変わったため中止しました。') } });
 
         return
       }
@@ -383,6 +384,7 @@ export default function WebhooksOutgoingV8() {
 
   const folderMove = useFolderMove({
     accountId: selectedAccountId, canEdit: canManage, items: visible, folders,
+    permission: { canWriteNow: canManageWebhooksNow, lockedReason: management.reason },
     move: (item, folderId) => moveOutgoingWebhookToFolder(item.id, selectedAccountId!, folderId),
     onChanged: async () => { await reload(); await loadFolders() },
   })
@@ -391,7 +393,7 @@ export default function WebhooksOutgoingV8() {
   const menuItemsFor = (item: OutgoingWebhookOverview): ActionMenuItem[] => {
     const canActivate = item.hasSecret && isHttpsUrl(item.url)
     const items: ActionMenuItem[] = []
-    if (canManage) {
+    {
       items.push({ id: 'move', label: 'フォルダへ移す', onSelect: () => folderMove.open(item) })
       items.push({ id: 'edit', label: '直す', onSelect: () => { setMenuId(null); router.push(`/webhooks/edit?id=${item.id}`) } })
       items.push({
@@ -420,10 +422,13 @@ export default function WebhooksOutgoingV8() {
       disabledReason: !item.isActive ? '止めている送り先には試し送信できません' : undefined,
       onSelect: () => { setMenuId(null); setTestNotice(''); setTestTarget(item) },
     })
-    if (canManage) {
+    {
       items.push({ id: 'delete', label: '削除する', tone: 'danger', dividerBefore: true, onSelect: () => { setMenuId(null); askDelete(item) } })
     }
-    return items
+    return items.map(item => {
+      const access = item.id === 'secret' || item.id === 'delete' ? ownership : management
+      return { ...item, disabled: item.disabled || (!access.allowed && !access.reason), lockedReason: access.reason }
+    })
   }
 
   /* ===== フォルダの列 ===== */
@@ -438,9 +443,7 @@ export default function WebhooksOutgoingV8() {
     /></SaveErrorField>
   )
   /* 作れない人には押せない［送り先を作る］を薄く置き、乗せると理由を出す。 */
-  const createButton = canManage
-    ? <Button variant="primary" href="/webhooks/new"><Plus size={16} aria-hidden="true" />送り先を作る</Button>
-    : <PermissionLockedButton reason="送り先は統括の担当者だけが作れます" icon={<Plus size={16} aria-hidden="true" />}>送り先を作る</PermissionLockedButton>
+  const createButton = <Button variant="primary" lockedReason={management.reason} {...(canManage ? { href: '/webhooks/new' } : { disabled: true })}><Plus size={16} aria-hidden="true" />送り先を作る</Button>
 
   /* ===== 道具の段 ===== */
   const chips = (
@@ -543,6 +546,7 @@ export default function WebhooksOutgoingV8() {
         description="友だちの動きを、ほかのシステムへ自動で知らせます。"
         create={{ label: '最初の送り先を作る', href: '/webhooks/new' }}
         canCreate={canManage}
+        lockedReason={management.reason ?? null}
         filtered={displayed.length > 0}
         onClearFilters={filterActive ? clearFilters : undefined}
         filteredDescription="検索や絞り込みを外すと、すべて出ます"
@@ -600,7 +604,6 @@ export default function WebhooksOutgoingV8() {
                 const when = eventLabel(item.eventTypes)
                 const payload = payloadLabel(item.eventTypes)
                 const menuItems = menuItemsFor(item)
-                const showMenu = canManage || canTest
                 const tone = toggling ? 'neutral' : failing ? 'danger' : item.isActive ? 'active' : 'neutral'
                 const stateWord = toggling ? '切り替え中' : failing ? '失敗あり' : item.isActive ? '有効' : '停止中'
                 const nameNode = (
@@ -691,7 +694,7 @@ export default function WebhooksOutgoingV8() {
                             ...(item.deliverySummary.canRetry && canManage
                               ? [{ id: 'retry', label: '失敗をやり直す', onSelect: () => { setMenuId(null); router.replace('/webhooks?tab=interactions') } }]
                               : []),
-                            ...(showMenu ? menuItems : []),
+                            ...menuItems,
                           ]}
                           note={canManage ? undefined : MANAGE_REASON}
                         />
@@ -725,10 +728,10 @@ export default function WebhooksOutgoingV8() {
       headingSize="regular"
       title="外部連携"
 
-      actions={canManage ? <Button href="/webhooks?tab=notify"><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button> : undefined}
+      actions={<Button lockedReason={management.reason} {...(canManage ? { href: "/webhooks?tab=notify" } : { disabled: true })}><LayoutTemplate size={16} aria-hidden="true" />見本から作る</Button>}
       tabs={<WebhookTabs active="outgoing" outgoingCount={overview.outgoingCount} incomingCount={overview.incomingCount} />}
       stats={<>
-        {!canManage ? <ViewerBand /> : null}
+        {management.known && !canManage ? <ViewerBand /> : null}
         <WebhookBand
           cells={overviewBandCells({
             outgoing: ready ? displayed : null,
@@ -783,6 +786,8 @@ export default function WebhooksOutgoingV8() {
           title={`送り先「${deleteTarget?.name ?? ''}」を削除しますか？`}
           description="この宛先への送信が止まり、これから起きる出来事は通知されなくなります。すでに送った記録は残ります。この操作は取り消せません。"
           confirmLabel="削除する"
+          confirmDisabled={!ownership.allowed}
+          confirmLockedReason={ownership.reason}
           destructive
           busy={deleting}
           error={deleteError || undefined}
@@ -802,6 +807,8 @@ export default function WebhooksOutgoingV8() {
           onCancel={() => { setRotateTarget(null); setRotateSecret('') }}
           onConfirm={() => runRotate()}
           confirmLabel="保存する"
+          confirmDisabled={!ownership.allowed}
+          confirmLockedReason={ownership.reason}
         >
           <div className={styles.secretRow}>
             <SaveErrorField names={["rotateSecret","secret","rotate_secret"]}><TextField
