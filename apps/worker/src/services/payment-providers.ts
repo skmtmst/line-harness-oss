@@ -1,5 +1,5 @@
 import { safeReceiptUrl } from '../features/booking/booking-payment-history/index.js';
-import { verifyStripeSignature } from './stripe-signature.js';
+import { isStripeTestEvent, verifyStripeSignature } from './stripe-signature.js';
 import type { BookingPaymentStatus } from '@line-crm/db';
 
 /**
@@ -97,10 +97,11 @@ export interface StripeTestSecrets {
 }
 
 interface StripeTestEvent {
+  account?: unknown;
   id?: unknown;
   type?: unknown;
   livemode?: unknown;
-  data?: { object?: { id?: unknown; payment_intent?: unknown; amount?: unknown; amount_refunded?: unknown;
+  data?: { object?: { id?: unknown; livemode?: unknown; payment_intent?: unknown; amount?: unknown; amount_refunded?: unknown;
     currency?: unknown; receipt_url?: unknown } };
 }
 
@@ -140,7 +141,7 @@ export function createStripeTestProvider(secrets: StripeTestSecrets): PaymentPro
       } catch {
         return null;
       }
-      if (event.livemode !== undefined && event.livemode !== false) return null;
+      if (!isStripeTestEvent(event) || event.account !== undefined) return null;
       const object = event?.data?.object;
       const providerPaymentId = event.type === 'charge.refunded' || event.type === 'charge.succeeded' || event.type === 'checkout.session.expired'
         ? object?.payment_intent : object?.id;

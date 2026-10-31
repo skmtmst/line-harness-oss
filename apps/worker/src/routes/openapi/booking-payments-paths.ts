@@ -1,5 +1,13 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const bookingPaymentsPaths = {
+  '/api/booking/stripe-test/webhook': {post: {
+    tags: ['Booking'], summary: 'Connect試験の共通受信', security: [],
+    description: '専用鍵のStripe署名必須。外側と対象のlivemode:falseを検査。未対応付けはpending、未知API版は要確認として保存。外部ID保存後に再開し、ここから外部課金を始めない。',
+    parameters: [{name:'stripe-signature',in:'header',required:true,schema:{type:'string'}}],
+    responses: {'200':{description:'適用済みの再送'},'202':{description:'保存済み・未適用または要確認'},
+      '400':{description:'不正な本文'},'401':{description:'署名不正'},'409':{description:'live・モード未指定・同一IDの内容違い'},
+      '413':{description:'本文上限超過'},'503':{description:'専用鍵または保存先を利用できない'}}
+  }},
   // ── Booking payments（決済の差し替え制） ──────────────────────────
   '/api/booking/admin/payment-config': {
     get: {

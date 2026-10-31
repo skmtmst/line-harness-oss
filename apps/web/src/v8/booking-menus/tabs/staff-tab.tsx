@@ -3,7 +3,7 @@
 import SharedStatusPill from '@/components/shared/status-pill'
 import { useListUrlValue } from '@/components/shared/list-url-state'
 import { useState } from 'react'
-import { RowNameLink } from '@/components/shared/table'
+import { RowNameLink, DataTable, TableHeadRow, Tr, Th, Td } from '@/components/shared/table'
 import HelpTip from '@/components/shared/help-tip'
 import { ListChecks, Plus } from 'lucide-react'
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
@@ -178,17 +178,23 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
         />
       ) : (
       <section className={styles.staffTable}>
-      <div className={`${styles.staffRow} ${styles.staffTableHead}`} aria-hidden="true">
-        <span className={styles.staffName}>スタッフ</span>
-        <span className={styles.staffColMenus}>担当メニュー</span>
-        <span className={assignStyles.priorityCell}>優先度</span>
-        <span className={assignStyles.limitCell}>1日の上限</span>
-        <span className={styles.staffColNoAssign}>指名なし</span>
-        <span className={styles.staffColWork}>勤務（今週）</span>
-        <span className={styles.staffColLink}>カレンダー・ログイン</span>
-        <span className={styles.staffColStatus}>状態</span>
-        <span className={styles.staffColMenu} />
-      </div>
+      <DataTable label="担当スタッフ" columnSizing="content" columnLayout={{
+            headHeight: 'var(--tpl-bk2-staff-head-h)',
+            rowHeight: 'auto', gap: 'var(--tpl-bm-12)', padding: 'var(--tpl-bm-8)',
+            headPadding: 'var(--tpl-bm-8)', bodyTextSize: 'var(--text-label)', collapseScope: 'page',
+          }}>
+          <thead><TableHeadRow className={`${styles.staffRow} ${styles.staffTableHead}`} data-table-layout="columns">
+        <Th className={styles.staffName} grow>スタッフ</Th>
+        <Th className={styles.staffColMenus}>担当メニュー</Th>
+        <Th className={assignStyles.priorityCell}>優先度</Th>
+        <Th className={assignStyles.limitCell}>1日の上限</Th>
+        <Th className={styles.staffColNoAssign} collapseAt="narrow">指名なし</Th>
+        <Th className={styles.staffColWork} collapseAt="narrow">勤務（今週）</Th>
+        <Th className={styles.staffColLink}>カレンダー・ログイン</Th>
+        <Th className={styles.staffColStatus}>状態</Th>
+        <Th className={styles.staffColMenu} />
+      </TableHeadRow></thead>
+          <tbody>
 
       {visible.map((person) => {
         const offered = (matrices[person.id] ?? []).filter((entry) => entry.is_offered).length
@@ -219,14 +225,14 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
           ] satisfies ActionMenuItem[] : []),
         ]
         return (
-          <div key={person.id} className={styles.staffRow}>
-            <span className={styles.staffName}>
+          <Tr key={person.id} className={styles.staffRow} data-table-layout="columns">
+            <Td className={styles.staffName} grow>
               <RowNameLink href={`/booking/staff/shifts?staff_id=${person.id}`} title={person.name}>
                 {person.name}
               </RowNameLink>
               {person.role ? <span className={styles.staffRole} title={person.role}>{person.role}</span> : null}
-            </span>
-            <span className={styles.staffColMenus}>
+            </Td>
+            <Td className={styles.staffColMenus}>
               {offered > 0 ? (
                 <span className={styles.staffCellMain}>{offered}つ</span>
               ) : (
@@ -234,17 +240,17 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
                   0<span className={styles.staffCellSub} title="予約画面に出ません">予約画面に出ません</span>
                 </span>
               )}
-            </span>
-            <span className={assignStyles.priorityCell}>
+            </Td>
+            <Td className={assignStyles.priorityCell}>
               {(() => { const level = PRIORITY[assignment.resources[person.id]?.priority ?? 'normal']; return <StatusBadge tone={level.tone} size="compact">{level.label}</StatusBadge> })()}
-            </span>
-            <span className={assignStyles.limitCell}>
+            </Td>
+            <Td className={assignStyles.limitCell}>
               <span className={styles.staffCellMain}>{assignment.resources[person.id]?.dailyLimit ? `${assignment.resources[person.id]?.dailyLimit} 件` : '上限なし'}</span>
-            </span>
-            <span className={styles.staffColNoAssign}>
+            </Td>
+            <Td className={styles.staffColNoAssign} collapseAt="narrow">
               <span className={styles.staffCellMain}>{person.is_designation_optional ? '入る' : emptyValue('unknown')}</span>
-            </span>
-            <span className={styles.staffColWork}>
+            </Td>
+            <Td className={styles.staffColWork} collapseAt="narrow">
               {extra?.work ? (() => {
                 const [days, range] = extra.work.split('　')
                 return (
@@ -254,17 +260,17 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
                   </>
                 )
               })() : <span className={styles.staffCellMain}>…</span>}
-            </span>
-            <span className={styles.staffColLink}>
+            </Td>
+            <Td className={styles.staffColLink}>
               <StatusBadge tone={extra?.calendar === 'connected' ? 'success' : extra?.calendar === 'error' ? 'caution' : 'neutral'}>
                 {extra?.calendar === 'connected' ? 'つながっている' : extra?.calendar === 'error' ? '確認できません' : 'つないでいない'}
               </StatusBadge>
               <span className={styles.staffCellSub}>ログイン：{memberLabel(person)}</span>
-            </span>
-            <span className={styles.staffColStatus}>
+            </Td>
+            <Td className={styles.staffColStatus}>
               <SharedStatusPill tone={person.is_active ? 'success' : 'neutral'}>{person.is_active ? '受付中' : '停止中'}</SharedStatusPill>
-            </span>
-            <span className={styles.staffColMenu}>
+            </Td>
+            <Td className={styles.staffColMenu}>
               <RowMenu
                 appearance="box"
                 size="row"
@@ -274,11 +280,13 @@ export function StaffTabV8({ accountId, staff, status, error, matrices, extras, 
                 onOpenChange={(next) => setOpenMenuId(next ? person.id : null)}
                 items={menuItems}
               />
-            </span>
-          </div>
+            </Td>
+          </Tr>
         )
       })}
 
+      </tbody>
+      </DataTable>
       {staff.length > STAFF_PAGE_SIZE ? (
         <div className="mt-3 flex items-center justify-between gap-3">
           <ListRange

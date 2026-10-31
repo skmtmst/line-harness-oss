@@ -1,0 +1,1 @@
+export { RestaurantFollowupDemo } from '../../demo'

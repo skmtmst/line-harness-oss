@@ -159,3 +159,8 @@ html:root .field:is(.single, .multi):not(.affixedControl):not([data-look='derive
 html:root .field:is(.single, .multi):not(.affixedControl)[aria-invalid='true']:is(:focus-visible, :focus-within):not(:global([data-input-field] *)) {
   box-shadow: var(--shadow-raised-control), inset 0 0 0 1px var(--color-danger);
 }
+
+/* 権限で止めた欄にも保存済みの内容と焦点の輪を残す。 */
+html:root .field[data-permission-locked] { color: var(--color-ink-secondary); cursor: not-allowed; }
+html:root .field[data-permission-locked]:not(.affixedControl),
+html:root .field:is(.single, .multi)[data-permission-locked]:not(.affixedControl):not([data-look='derived']):not(:global([data-input-field] *)) { background: var(--color-canvas-sunken); }
