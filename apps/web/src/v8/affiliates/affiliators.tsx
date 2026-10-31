@@ -355,24 +355,32 @@ export default function AffiliatorsTab() {
 
   /* まとめて「紹介を止める」。行ごとの確かめは「…」の紹介を止めるが担う。 */
   const bulkTargets = useMemo(() => rows.filter((row) => selected.has(row.id) && row.isActive), [rows, selected])
+  const bulkAcknowledged = useRef(new Set<string>())
+  const bulkArchiveTargets = useRef<AffiliateListRow[]>([])
+  const [bulkError, setBulkError] = useState('')
+  useEffect(() => { if (!bulkConfirm) { bulkAcknowledged.current.clear(); setBulkError('') } }, [bulkConfirm])
   const runBulkArchive = useCallback(async () => {
-    if (bulkTargets.length === 0 || bulkBusy) return
-    setBulkBusy(true)
+    const original = bulkArchiveTargets.current
+    if (original.length === 0 || bulkBusy) return
+    setBulkBusy(true); setBulkError('')
     try {
-      const results = await Promise.allSettled(bulkTargets.map((row) => api.affiliates.archive(row.id, { mode: 'pause' })))
-      const failed = results.filter((r) => r.status === 'rejected' || (r.status === 'fulfilled' && !r.value.success)).length
-      const done = bulkTargets.length - failed
-      if (failed === 0) {
-        notifyToast(`${formatNumber(done)} 人の紹介を止めました。`)
-        setSelected(new Set())
-      } else {
-        notifyToast(`${formatNumber(done)} 人を止めました。${formatNumber(failed)} 人は止められませんでした。`)
+      const targets = original.filter(row => !bulkAcknowledged.current.has(row.id))
+      const results = await Promise.allSettled(targets.map(row => api.affiliates.archive(row.id, { mode: 'pause' })))
+      if (!mounted.current) return
+      results.forEach((result, index) => { if (result.status === 'fulfilled' && result.value.success) bulkAcknowledged.current.add(targets[index].id) })
+      const done = original.filter(row => bulkAcknowledged.current.has(row.id)).length
+      const failed = original.length - done
+      setSelected(current => new Set([...current].filter(id => !bulkAcknowledged.current.has(id))))
+      setRows(current => current.map(row => bulkAcknowledged.current.has(row.id) ? { ...row, isActive: false } : row))
+      if (failed) {
+        setBulkError(`${formatNumber(done)} 人を止めました。${formatNumber(failed)} 人は止められませんでした。もう一度押すと未完了の人だけやり直します。`)
+        return false
       }
-      setBulkConfirm(false)
+      notifyToast(`${formatNumber(done)} 人の紹介を止めました。`)
+      setSelected(new Set()); setBulkConfirm(false)
       void loadList()
-    } finally {
-      setBulkBusy(false)
-    }
+      return true
+    } finally { if (mounted.current) setBulkBusy(false) }
   }, [bulkTargets, bulkBusy, loadList])
 
   const exportCsv = () => {
@@ -622,7 +630,7 @@ export default function AffiliatorsTab() {
     <>
       {table}
       <BulkBar count={readonly ? 0 : selected.size} total={shownRows.length} onSelectAll={() => setSelected(new Set(shownRows.map(item => item.id)))} unit="人" hint="対象を確認してから操作を選んでください">
-        <Button type="button" onClick={() => setBulkConfirm(true)} disabled={bulkTargets.length === 0}>まとめて紹介を止める</Button>
+        <Button type="button" onClick={() => { bulkArchiveTargets.current = bulkTargets; setBulkError(''); setBulkConfirm(true) }} disabled={bulkTargets.length === 0}>まとめて紹介を止める</Button>
         <Button type="button" onClick={() => setSelected(new Set())}>選ぶのをやめる</Button>
       </BulkBar>
     </>
@@ -682,13 +690,13 @@ export default function AffiliatorsTab() {
         />
         <ConfirmDialog
           open={bulkConfirm}
-          title={`${formatNumber(bulkTargets.length)} 人の紹介をまとめて止めますか？`}
+          title={`${formatNumber(bulkArchiveTargets.current.length)} 人の紹介をまとめて止めますか？`}
           description="止めると、その人たちの紹介リンクからの成果はこれから数えません。認めるのを待っている成果がある人は、行の「…」の紹介を止めるで中身を確かめてから止めてください。"
           confirmLabel="まとめて止める"
           destructive
           busy={bulkBusy}
-          onConfirm={() => { return runBulkArchive() }}
-          onCancel={() => setBulkConfirm(false)}
+          error={bulkError || undefined} onSuccess={() => setBulkConfirm(false)} onConfirm={() => runBulkArchive()}
+          onCancel={() => { setBulkConfirm(false); void loadList() }}
         />
         {drawerRow ? (
           <AffiliateDrawer

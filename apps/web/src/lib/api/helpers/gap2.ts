@@ -1,4 +1,5 @@
 import {fetchApi} from '../../api';
+import type {EventMakeupRule} from '../types/events';
 import type {SeriesInput,SeriesOccurrence,Gap2Booking,Gap2Series,BookingAudienceWrite,BookingRouting,FormLayout,MakeupCredit,QaEntry,QaEntryWrite,AiSummary,AiReplyDraft} from '@line-crm/shared';
 type Result<T>={success:true;data:T};
 const e=encodeURIComponent;
@@ -30,7 +31,7 @@ export const formRoutingApi={
  saveGroup:(a:string,id:string,input:{name:string;staffIds:string[];expectedVersion:number})=>fetchApi<Result<{version:number}>>(account(`/api/booking/admin/routing-staff-groups/${e(id)}`,a),json('PUT',input)),
 };
 export const bookingMakeupApi={
- rule:(a:string,eventId:string,rule:{enabled:boolean;cutoffHours:number;validDays:number;monthlyCap:number;target:'same_kind'|'list';targetIds:string[]},expectedRevision:number)=>fetchApi<Result<{revision:number}>>(account(`/api/events/admin/${e(eventId)}/makeup-rule`,a),json('PUT',{rule,expectedRevision})),
+ rule:(a:string,eventId:string,rule:EventMakeupRule,expectedRevision:number)=>fetchApi<Result<{rule:EventMakeupRule;revision:number}>>(account(`/api/events/admin/${e(eventId)}/makeup-rule`,a),json('PUT',{rule,expectedRevision})),
  absenceByStore:(a:string,id:string,input:{grantMakeup?:boolean;reason?:string})=>fetchApi<Result<{eventBooking:{id:string;status:'absent'};makeupCredit:MakeupCredit|null;reasonIfNone:string|null}>>(account(`/api/events/admin/bookings/${e(id)}/absence`,a),json('POST',input)),
  absence:(liffId:string,id:string,token:string,key:string)=>fetchApi<Result<{eventBooking:{id:string;status:'absent'};makeupCredit:MakeupCredit|null;reasonIfNone:string|null}>>(liff(`/api/liff/events/bookings/${e(id)}/absence`,liffId),{...json('POST',{}),headers:bearer(token,key)}),
  list:(liffId:string,token:string)=>fetchApi<Result<MakeupCredit[]>>(liff('/api/liff/events/makeup-credits',liffId),{headers:bearer(token)}),

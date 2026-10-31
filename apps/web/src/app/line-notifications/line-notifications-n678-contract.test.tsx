@@ -1393,7 +1393,8 @@ describe('#988 テスト送信は宛先を見せる確認を挟む', () => {
     await openEditor()
     fireEvent.click(screen.getAllByRole('button', { name: 'テスト受信者に送る' })[0])
 
-    expect(await screen.findByText(/テスト受信者を読み込めませんでした/)).toBeTruthy()
+    const dialog = await screen.findByRole('dialog')
+    expect((await within(dialog).findByRole('alert')).textContent).toMatch(/テスト受信者を読み込めませんでした/)
     expect(screen.queryByRole('button', { name: /名へ送信/ })).toBeNull()
     expect(fixture.testSend).not.toHaveBeenCalled()
   })

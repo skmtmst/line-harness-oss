@@ -612,7 +612,7 @@ function CustomerNotificationEditor({
   return <div data-design-node="Q55bb" className="min-w-0 space-y-4">
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <p className="text-xs font-semibold text-ink-faint"><Button variant="text" size="inline" onClick={onClose} disabled={busy}>LINE通知</Button>　›　お知らせの種類</p>
+        <p className="text-xs font-semibold text-ink-faint"><Button variant="text" textTone="ink" size="inline" onClick={onClose} disabled={busy}>LINE通知</Button>　›　お知らせの種類</p>
         <p className="mt-2 text-xl font-bold text-ink">「{setting.title?.trim() || setting.label}」を編集する</p>
         <p className="mt-1 text-xs text-ink-faint">{definition ? `公開中 ${definition.currentVersionNumber ? `第${definition.currentVersionNumber}版` : emptyValue('none')} ／ 編集中の下書き` : '公開中の内容を編集します。保存した内容は次の通知から使われます。'}</p>
         {hasUnsaved ? <p className="mt-1 text-xs font-semibold text-warning">未保存の変更があります</p> : null}
@@ -1153,7 +1153,9 @@ function LineNotificationsPage() {
       guard,
     })
     applyOutcome(accountId, setting, guard.generation, outcome)
-    if (guard.generation === loadGeneration.current) setBusy(null)
+    if (guard.generation !== loadGeneration.current || outcome.kind === 'stale') return
+    setBusy(null)
+    return outcome.kind === 'applied' && outcome.tone === 'success'
   }
 
   const publish = async (setting: EcNotificationSetting) => {
@@ -1197,8 +1199,7 @@ function LineNotificationsPage() {
   }
   const confirmTestSend = () => {
     const target = testSendDraft
-    closeTestSendConfirm()
-    if (target) void testSend(target)
+    return target ? testSend(target) : undefined
   }
 
   const testSend = async (setting: EcNotificationSetting) => {
@@ -1218,6 +1219,7 @@ function LineNotificationsPage() {
     if (outcome.kind === 'stale') return
     setNotice({ tone: outcome.tone, text: outcome.message })
     setBusy(null)
+    return outcome.tone === 'success'
   }
 
   const tabHref: Record<string, string> = {
@@ -1292,6 +1294,9 @@ function LineNotificationsPage() {
         title="テスト受信者に送信しますか？"
         description="編集中の文面を、テスト受信者として登録されている人へ送ります。お客さま全員への一斉配信ではありません。"
         confirmLabel={testRecipients.items.length > 0 ? `テスト受信者 ${formatNumber(testRecipients.items.length)}名へ送信` : 'テスト受信者に送信'}
+        busy={busy === testSendDraft?.eventType}
+        error={notice?.tone === 'error' ? notice.text : testRecipients.state === 'error' ? 'テスト受信者を読み込めませんでした。時間をおいて、もう一度お試しください。' : undefined}
+        onSuccess={closeTestSendConfirm}
         onConfirm={testRecipients.state === 'ready' && testRecipients.items.length > 0 ? confirmTestSend : undefined}
         onCancel={closeTestSendConfirm}
       >
@@ -1328,7 +1333,10 @@ function LineNotificationsPage() {
       title={pendingToggle?.isEnabled ? `「${pendingToggle.label}」のお知らせを止めますか？` : `「${pendingToggle?.label ?? ''}」のお知らせを出しますか？`}
       description={pendingToggle?.isEnabled ? '止めると、この出来事が起きてもお客さまへLINEが送られなくなります。あとからまた出せます。' : '出すと、この出来事が起きたお客さまへLINEが送られ始めます。'}
       confirmLabel={pendingToggle?.isEnabled ? 'お知らせを止める' : 'お知らせを出す'}
-      onConfirm={pendingToggle ? () => { const s = pendingToggle; setPendingToggle(null); return save(s, !s.isEnabled) } : undefined}
+      busy={busy === pendingToggle?.eventType}
+      error={notice?.tone === 'error' ? notice.text : undefined}
+      onSuccess={() => setPendingToggle(null)}
+      onConfirm={pendingToggle ? () => save(pendingToggle, !pendingToggle.isEnabled) : undefined}
       onCancel={() => setPendingToggle(null)}
     />
     {tab === 'customer' && !expandedSetting ? <>
@@ -1405,7 +1413,7 @@ function LineNotificationsPage() {
                 <Td><TruncatedText value={audienceLabel(setting)} /></Td>
                 <Td><span className={`${styles.num} ${sent ? styles.numStrong : styles.numFaint}`} title={sendCountsFailed ? '送信件数を読み込めませんでした' : undefined}>{sendCountsFailed ? '取得失敗' : sent ? formatNumber(sent) : emptyValue('unknown')}</span></Td>
                 <StatusCell primary={<><StatusBadge tone={status.tone === 'good' ? 'success' : 'neutral'} title={status.warning ?? undefined} aria-description={status.warning ?? undefined}>{status.label}</StatusBadge>{status.warning ? <StatusDot tone="caution" /> : null}</>} />
-                <Td><NotificationToggle setting={setting} busy={busy === setting.eventType} allowed={canChange} lockedReason={manageLockReason} onToggle={() => setPendingToggle(setting)} /></Td>
+                <Td><NotificationToggle setting={setting} busy={busy === setting.eventType} allowed={canChange} lockedReason={manageLockReason} onToggle={() => { setNotice(null); setPendingToggle(setting) }} /></Td>
                 <ActionCell><RowActions edit={{ onClick: () => { if (canChange) setExpanded(setting.eventType) }, disabled: !canChange, lockedReason: manageLockReason }} /></ActionCell>
               </Tr>
             })}

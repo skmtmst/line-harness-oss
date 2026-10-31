@@ -3,7 +3,7 @@
  * 監査 WEB051：版を戻すときに 409 になったら、知らせを残し、次は口が返した今の版で送る。
  */
 import React from 'react'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const net = vi.hoisted(() => ({ list: vi.fn(), revert: vi.fn() }))
@@ -36,12 +36,20 @@ describe('版を戻すときの競合（WEB051）', () => {
     await screen.findByText('第2版')
     await act(async () => { screen.getByText('第1版').click() })
     await revertOnce()
-    await waitFor(() => expect(screen.getByText(/ほかの人が先に保存しました/)).toBeTruthy())
+    const failed = await screen.findByRole('dialog', { name: '第1版に戻しますか？' })
+    await waitFor(() => expect(within(failed).getByRole('alert').textContent).toMatch(/ほかの人が先に保存しました/))
     expect(net.revert.mock.calls[0][3]).toBe(3)
     // 読み直しのあとも知らせは残る。
-    expect(screen.getByText(/ほかの人が先に保存しました/)).toBeTruthy()
+    expect(within(failed).getByRole('alert').textContent).toMatch(/ほかの人が先に保存しました/)
+    const retry = within(failed).getByRole('button', { name: 'もう一度' })
+    expect(retry.hasAttribute('disabled')).toBe(true)
+    await act(async () => { retry.click() })
+    expect(net.revert).toHaveBeenCalledTimes(1)
     // 口は今の版を 5 と返した。読み直した一覧が古くても、5 で送る。
     net.list.mockResolvedValue({ versions: [version(5, 'in_use'), version(4, 'past'), version(3, 'past'), version(2, 'past'), version(1, 'past')] })
+    await act(async () => { within(failed).getByRole('button', { name: 'キャンセル' }).click() })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '第1版に戻しますか？' })).toBeNull())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'この版に戻す' }).hasAttribute('disabled')).toBe(false))
     await revertOnce()
     await waitFor(() => expect(net.revert).toHaveBeenCalledTimes(2))
     expect(net.revert.mock.calls[1][3]).toBe(5)

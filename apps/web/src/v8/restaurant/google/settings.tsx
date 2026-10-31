@@ -60,11 +60,13 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
       setLocationSaved(true)
       setConfirmSwitch(false)
       onChanged()
+      return true
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
       setActionError(errorMessage(err, '店舗を選べませんでした。')) }
+      return false
     } finally {
       setBusy(false)
     }
@@ -78,11 +80,13 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
       await restaurantGoogleApi.disconnect(accountId)
       setConfirmDisconnect(false)
       onChanged()
+      return true
     } catch (err) {
       const fieldFailure = saveErrors.capture(err)
 
       { if (!fieldFailure)
       setActionError(errorMessage(err, '接続を解除できませんでした。')) }
+      return false
     } finally {
       setBusy(false)
     }
@@ -133,14 +137,14 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
         {(
           <div className={styles.buttonRowEnd}>
-            <Button lockedReason={lockedReason} onClick={() => { if (canManage && !busy) setConfirmDisconnect(true) }} disabled={!canManage || busy}>接続を取り消す</Button>
+            <Button lockedReason={lockedReason} onClick={() => { if (canManage && !busy) { setActionError(''); setConfirmDisconnect(true) } }} disabled={!canManage || busy}>接続を取り消す</Button>
             <Button lockedReason={lockedReason} onClick={() => void startConnect()} disabled={!canManage || busy} busy={Boolean(busy)} busyLabel="処理中…">別のGoogleアカウントでやり直す</Button>
-            <Button lockedReason={lockedReason} variant="primary" onClick={() => canManage && !busy && (switchingLocation ? setConfirmSwitch(true) : void selectLocation())} disabled={!canManage || busy || !selectedLocation} busy={Boolean(busy)} busyLabel="処理中…">
+            <Button lockedReason={lockedReason} variant="primary" onClick={() => { if (!canManage || busy) return; setActionError(''); if (switchingLocation) setConfirmSwitch(true); else void selectLocation() }} disabled={!canManage || busy || !selectedLocation} busy={Boolean(busy)} busyLabel="処理中…">
               {switchingLocation ? 'この店舗に切り替える' : 'この店舗を接続する'}
             </Button>
           </div>
         )}
-        <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason} open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} onConfirm={() => disconnect()} onCancel={() => setConfirmDisconnect(false)} />
+        <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason} open={confirmDisconnect} title="接続をやり直しますか？" description="いま進めている接続を取り消します。口コミの履歴は残ります。" confirmLabel="取り消す" destructive busy={busy} error={actionError || undefined} onSuccess={() => setConfirmDisconnect(false)} onConfirm={() => disconnect()} onCancel={() => setConfirmDisconnect(false)} />
         <ConfirmDialog confirmDisabled={!canManage} confirmLockedReason={lockedReason}
           open={confirmSwitch}
           title="接続する店舗を切り替えますか？"
@@ -148,7 +152,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
           confirmLabel="切り替える"
           destructive
           busy={busy}
-          onConfirm={() => selectLocation(true)}
+          error={actionError || undefined} onSuccess={() => setConfirmSwitch(false)} onConfirm={() => selectLocation(true)}
           onCancel={() => setConfirmSwitch(false)}
         />
       </div></SaveErrorScope>
@@ -169,7 +173,7 @@ export default function SettingsBoard({ accountId, data, onChanged }: { accountI
         </dl>
         {(
           <div className={styles.buttonRowEnd}>
-            <Button lockedReason={lockedReason} variant="danger-outline" onClick={() => { if (canManage && !busy) setConfirmDisconnect(true) }} disabled={!canManage || busy}>接続を解除する</Button>
+            <Button lockedReason={lockedReason} variant="danger-outline" onClick={() => { if (canManage && !busy) { setActionError(''); setConfirmDisconnect(true) } }} disabled={!canManage || busy}>接続を解除する</Button>
             <Button lockedReason={lockedReason} onClick={() => void startConnect()} disabled={!canManage || busy} busy={Boolean(busy)} busyLabel="処理中…"><RefreshCw aria-hidden className={styles.icon16} />つなぎ直す</Button>
           </div>
         )}

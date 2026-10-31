@@ -57,59 +57,7 @@
   flex-shrink: 0;
 }
 
-.grid[hidden] { display: none; }
-
-.grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--tpl-d23-ob-grid-gap);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.step {
-  display: flex;
-  align-items: center;
-  gap: var(--tpl-d23-ob-step-gap);
-  min-width: 0;
-  padding: var(--tpl-d23-ob-step-pad);
-  border-radius: var(--tpl-d23-ob-step-radius);
-  background: var(--color-canvas);
-  outline: 1px solid var(--color-hairline);
-  outline-offset: -1px;
-}
-
-.step[data-done] {
-  background: var(--color-step-done-bg);
-}
-
-/* 次の 1 つだけ緑の枠とごく薄い緑の地。 */
-.step[data-next] {
-  background: var(--color-step-next-bg);
-  outline: var(--step-mark-ring) solid var(--color-step-next-border);
-  outline-offset: calc(-1 * var(--step-mark-ring));
-}
-
-.label {
-  overflow: hidden;
-  color: var(--color-ink);
-  font-size: var(--tpl-d23-ob-text);
-  font-weight: 600;
-  line-height: var(--tpl-d23-ob-text-lh);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.step[data-done] .label {
-  color: var(--color-step-done-ink);
-  font-weight: var(--font-weight-ui);
-}
-
 .link {
   flex-shrink: 0;
   white-space: nowrap;
 }
-
-@container v8-page (width < 1100px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@container v8-page (width < 640px) { .grid { grid-template-columns: minmax(0, 1fr); } }

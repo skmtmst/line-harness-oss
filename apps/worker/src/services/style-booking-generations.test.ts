@@ -156,7 +156,19 @@ test('the approved nullable table rebuild preserves populated plans, balances, u
   const tables=['booking_pass_plans','booking_entitlements','event_booking_entitlement_uses','booking_entitlement_events'];
   const before=tables.map(table=>f.raw.prepare(`SELECT * FROM ${table}`).all());
   const sql=readFileSync(new URL('../../../../packages/db/migrations/734_unlimited_monthly_passes.sql',import.meta.url),'utf8');
-  f.raw.transaction(()=>f.raw.exec(sql))();
+  // 後から追加された月謝の依存物は過去の作り直しの対象外。
+  // 試験の空の月謝schemaだけを一時的に外し、同じtransactionで完全に戻す。
+  const extensions=f.raw.prepare("SELECT type,name,sql FROM sqlite_master WHERE type IN('view','trigger') AND sql LIKE '%booking_monthly_%'").all() as Array<{type:string;name:string;sql:string}>;
+  const planIndex=f.raw.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name='monthly_plan_scope'").get() as {sql:string}|undefined;
+  const replacedTriggers=new Set([...sql.matchAll(/DROP TRIGGER (\w+)/g)].map(match=>match[1]));
+  const rename='ALTER TABLE booking_pass_plans_new RENAME TO booking_pass_plans;';
+  expect(sql.split(rename)).toHaveLength(2);
+  f.raw.transaction(()=>{
+    for(const entry of extensions)if(entry.type==='view'||!replacedTriggers.has(entry.name))f.raw.exec(`DROP ${entry.type} "${entry.name}"`);
+    f.raw.exec(sql.replace(rename,rename+(planIndex?`\n${planIndex.sql};`:'')));
+    for(const entry of extensions){f.raw.exec(`DROP ${entry.type} IF EXISTS "${entry.name}"`);f.raw.exec(entry.sql);}
+  })();
+  for(const entry of extensions)expect(f.raw.prepare('SELECT sql FROM sqlite_master WHERE type=? AND name=?').get(entry.type,entry.name)).toEqual({sql:entry.sql});
   expect(tables.map(table=>f.raw.prepare(`SELECT * FROM ${table}`).all())).toEqual(before);
   expect(f.raw.pragma('foreign_key_check')).toEqual([]);
   await use('after-rebuild',e.id);

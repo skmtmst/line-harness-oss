@@ -13,7 +13,7 @@ import Dialog from '@/components/shared/dialog'
 import Notice from '@/components/shared/notice'
 import RadioCard, { RadioCardGroup } from '@/components/shared/radio-card'
 import StatusBadge from '@/components/shared/status-badge'
-import { usePageTitle, usePageCrumbs, useHideSettingsNav } from '@/components/shell/page-chrome'
+import { usePageTitle, usePageCrumbs } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { canManageRole, useStaffRole } from '@/lib/staff-role'
 import { ApiError } from '@/lib/api'
@@ -97,7 +97,6 @@ const DISCONNECT_PRE_FLIGHT_FAILURES = new Set([
 export default function DeliverySettingsPage({ services: initialServices = SERVICES }: { services?: DeliveryService[] } = {}) {
   usePageTitle('デリバリー連携')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
-  useHideSettingsNav()
   const role = useStaffRole()
   const roleCanManage = canManageRole(role)
   const permissionReason = usePermissionLockReason(roleCanManage, 'manager')

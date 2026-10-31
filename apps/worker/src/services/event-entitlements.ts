@@ -1,3 +1,4 @@
+import { monthlyEntitlementAccess } from '@line-crm/db';
 import { EntitlementError, entitlementMonth, entitlementViews } from '../features/booking/booking-entitlements/index.js';
 import { getAccountTimeZone } from './availability.js';
 
@@ -9,9 +10,10 @@ export async function validateEventEntitlement(db: D1Database, account: string, 
     JOIN events ev ON ev.id=? AND ev.line_account_id=e.line_account_id
     WHERE e.id=? AND e.line_account_id=? AND e.friend_id=?`).bind(event,id, account, friend)
     .first<{ event_target_scope_json: string | null; billing_status: string; grace_until: string | null }>();
+  const monthly = await monthlyEntitlementAccess(db, account, id, 'event', event, at);
   const scope = plan?.event_target_scope_json == null ? null : JSON.parse(plan.event_target_scope_json) as string[];
-  if (!grant || grant.status !== 'active' || grant.menu_id || scope === null || scope.length > 0 && !scope.includes(event)
-    || plan?.billing_status === 'stopped' || plan?.billing_status === 'grace' && plan.grace_until && Date.parse(plan.grace_until) <= Date.now()
+  if (!grant || grant.status !== 'active' || grant.menu_id || monthly?.reason || !monthly && (scope === null || scope.length > 0 && !scope.includes(event))
+    || !monthly && (plan?.billing_status === 'stopped' || plan?.billing_status === 'grace' && plan.grace_until && Date.parse(plan.grace_until) <= Date.now())
     || Date.parse(at) < Date.parse(grant.valid_from) || Date.parse(at) >= Date.parse(grant.expires_at)
     || (grant.kind === 'ticket' ? Number(grant.remaining) <= 0 : grant.monthRemaining !== null && grant.monthRemaining <= 0)) {
     throw new EntitlementError('entitlement_unavailable', 409);
@@ -20,7 +22,7 @@ export async function validateEventEntitlement(db: D1Database, account: string, 
 }
 
 export async function eventEntitlementUse(db: D1Database, account: string, booking: string, id: string, at: string) {
-  const period = entitlementMonth(at, await getAccountTimeZone(db, account));
+  const period = await eventEntitlementPeriod(db, account, id, at);
   return db.prepare(`INSERT INTO event_booking_entitlement_uses
     (event_booking_id,event_booking_id_history,line_account_id,event_id,slot_id,starts_at,entitlement_id,period_start,period_end,operation_key,created_at,updated_at)
     SELECT b.id,b.id,b.line_account_id,b.event_id,b.slot_id,s.starts_at,?,?,?,'event-use:'||b.id,?,?
@@ -41,7 +43,7 @@ export async function returnEventEntitlement(db: D1Database, account: string, bo
 }
 
 export async function transferEventEntitlement(db:D1Database,account:string,from:string,to:string,at:string) {
-  const period=entitlementMonth(at,await getAccountTimeZone(db,account));
+  const period=await eventEntitlementPeriod(db,account,(await db.prepare('SELECT entitlement_id FROM event_booking_entitlement_uses WHERE event_booking_id=? AND line_account_id=?').bind(from,account).first<{entitlement_id:string}>())?.entitlement_id??'',at);
   return db.prepare(`UPDATE event_booking_entitlement_uses SET event_booking_id=?,
     slot_id=(SELECT slot_id FROM event_bookings WHERE id=?),starts_at=?,period_start=?,period_end=?,version=version+1
     WHERE event_booking_id=? AND line_account_id=? AND returned_at IS NULL
@@ -72,4 +74,9 @@ export async function discardUnacceptedEventBooking(db:D1Database,account:string
    db.prepare('DELETE FROM event_bookings WHERE id=? AND line_account_id=? AND lock_version=1').bind(id,account),
    db.prepare("SELECT json(CASE WHEN changes()=1 THEN 'true' ELSE 'event_booking_discard_conflict' END)"),
  ]);}catch(error){if(error instanceof Error&&/event_booking_discard_conflict|malformed JSON/.test(error.message))throw new EntitlementError('booking_changed',409);throw error;}
+}
+
+async function eventEntitlementPeriod(db:D1Database,account:string,id:string,at:string) {
+ const fixed=await db.prepare('SELECT period_start,service_end FROM booking_monthly_bound_rights WHERE entitlement_id=? AND account_id=?').bind(id,account).first<{period_start:string;service_end:string}>();
+ return fixed?{periodStart:fixed.period_start,periodEnd:fixed.service_end}:entitlementMonth(at,await getAccountTimeZone(db,account));
 }

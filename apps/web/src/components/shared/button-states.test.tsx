@@ -135,3 +135,19 @@ it('同期の例外でも内部の本文を出さず、次の操作のロック�
   expect(save).toHaveBeenCalledTimes(2)
   expect(screen.queryByRole('alert')).toBeNull()
 })
+
+
+it('リンクと通常のボタンを切り替えても、専用の状態をHTML属性へ出さない', () => {
+  const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+  try {
+    const view = render(<Button href="/friends" busy={false} done={false} busyLabel="処理中" doneLabel="完了" widthReserve="idle" disabledReason="準備中" external={false}>開く</Button>)
+    const link = screen.getByRole('link', { name: '開く' })
+    expect(link.getAttribute('href')).toBe('/friends')
+    for (const attribute of ['busy', 'done', 'busylabel', 'donelabel', 'widthreserve', 'disabledreason', 'external']) expect(link.hasAttribute(attribute)).toBe(false)
+    view.rerender(<Button href={undefined} external={false} busy={false}>開く</Button>)
+    const button = screen.getByRole('button', { name: '開く' })
+    expect(button.hasAttribute('external')).toBe(false)
+    expect(button.getAttribute('aria-busy')).toBeNull()
+    expect(error).not.toHaveBeenCalled()
+  } finally { error.mockRestore() }
+})

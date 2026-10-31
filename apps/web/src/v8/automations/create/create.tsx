@@ -803,7 +803,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
                       setNotice('')
                       return
                     }
-                    setActivateConfirmOpen(true)
+                    setError(''); setActivateConfirmOpen(true)
                   }}
                 >
                   <Play size={16} aria-hidden="true" />つくって動かす
@@ -880,6 +880,7 @@ const { refreshTestRun, askOnePersonTest, runOnePersonTest } = useAutomationTest
         saving={saving}
         setActivateConfirmOpen={setActivateConfirmOpen}
         save={save}
+        error={error}
         name={name}
         selectedEvent={selectedEvent}
         triggerConfigSummary={triggerConfigSummary}

@@ -134,6 +134,9 @@ function EventsCreateV8Inner() {
   const completedSlotRef = useRef<{ accountId: string; eventId: string; cache: InitialSlotCache } | null>(null)
   const createdRef = useRef<{ accountId: string; event: EventDetail; payload: string } | null>(null)
   const [publishOpen, setPublishOpen] = useState(false)
+  const [unknownCreateAccounts, setUnknownCreateAccounts] = useState<Set<string>>(new Set())
+  const unknownCreateRef = useRef(new Set<string>())
+  const createUnknown = Boolean(selectedAccountId && unknownCreateAccounts.has(selectedAccountId))
 
   const update = <K extends keyof EventDetail>(key: K, value: EventDetail[K]) => setDraft((current) => ({ ...current, [key]: value }))
 
@@ -178,7 +181,7 @@ function EventsCreateV8Inner() {
   }
 
   async function save(publish: boolean) {
-    if (!validateInput() || !selectedAccountId) return
+    if (!selectedAccountId || unknownCreateRef.current.has(selectedAccountId) || !validateInput()) return
     if (!feedback.begin('イベント')) return
     retryPublish.current = publish
     setSaving(true)
@@ -186,6 +189,7 @@ function EventsCreateV8Inner() {
     let saved = createdRef.current?.accountId === selectedAccountId ? createdRef.current.event : null
     let eventId = saved?.id ?? null
     let stage: 'event' | 'slots' = 'event'
+    let creating = false
     try {
       const qs: EventQuestion[] = questions.map((question, index) => ({
         id: `q${index + 1}`, label: question.label, type: 'text', required: question.required, options: null,
@@ -200,7 +204,9 @@ function EventsCreateV8Inner() {
       delete payload.id
       delete payload.version
       if (!eventId) {
+        creating = true
         const created = await eventsApi.createEvent(selectedAccountId, payload)
+        if (!created?.id) throw new Error('イベントの作成結果を確認できませんでした。')
         eventId = created.id
         saved = created
       } else if (createdRef.current?.payload !== JSON.stringify(payload)) {
@@ -220,13 +226,16 @@ function EventsCreateV8Inner() {
       initialRef.current = snapshot
       setPublishOpen(false)
       router.push(`/events?highlight=${encodeURIComponent(eventId)}`)
+      return true
     } catch (cause) {
       const fieldFailure = saveErrors.capture(cause);
 
 
-      const reason = cause instanceof ApiError && cause.status === 403
-        ? permissionDeniedMessage('store')
-        : describeApiFailure(cause, '保存')
+      const unknownCreate = creating && !eventId && (!(cause instanceof ApiError) || cause.status >= 500)
+      if (unknownCreate) { unknownCreateRef.current.add(selectedAccountId); setUnknownCreateAccounts(new Set(unknownCreateRef.current)) }
+      const reason = unknownCreate
+        ? 'イベントの作成結果を確認できませんでした。一覧で作成済みか確認してください。確認できるまで、この画面からは作り直せません。'
+        : cause instanceof ApiError && cause.status === 403 ? permissionDeniedMessage('store') : describeApiFailure(cause, '保存')
       { if (!fieldFailure)
       setError(eventId
         ? `イベントは${saved?.is_published === 1 ? '公開済みですが' : '下書きで作りましたが'}、${stage === 'slots' ? '最初の予約枠を作れませんでした' : '変更を保存できませんでした'}。もう一度押すと続きから作ります。（${reason}）`
@@ -234,8 +243,8 @@ function EventsCreateV8Inner() {
       const slotKnown = completedSlotRef.current?.accountId === selectedAccountId && completedSlotRef.current.eventId === eventId
       feedback.failure(reason, eventId ? [`イベント本体（${saved?.is_published === 1 ? '公開済み' : '下書き'}）`, ...(slotKnown ? ['最初の予約枠（作成済み）'] : [])] : [],
         stage === 'slots' ? [slotKnown ? '予約枠の確認・変更' : '最初の予約枠'] : eventId ? ['イベントの変更', ...(slotKnown ? [] : ['最初の予約枠'])] : ['イベントの保存'])
-      setPublishOpen(false)
       setSaving(false)
+      return false
     }
   }
 
@@ -299,13 +308,13 @@ function EventsCreateV8Inner() {
       footerActions={(
         <>
           <Button href="/events">キャンセル</Button>
-          <Button disabled={saving || !selectedAccountId} busy={saving} onClick={() => void save(false)}>下書きを保存</Button>
-          <Button variant="primary" disabled={saving || !selectedAccountId} busy={saving} onClick={() => { if (validateInput()) setPublishOpen(true) }}><Globe size={16} aria-hidden="true" />公開する</Button>
+          <Button disabled={saving || !selectedAccountId || createUnknown} busy={saving} onClick={() => void save(false)}>下書きを保存</Button>
+          <Button variant="primary" disabled={saving || !selectedAccountId || createUnknown} busy={saving} onClick={() => { if (validateInput()) setPublishOpen(true) }}><Globe size={16} aria-hidden="true" />公開する</Button>
         </>
       )} dirty={false}
     >
       {feedback.state.kind === 'idle' && error ? <Notice tone="danger">{error}</Notice> : null}
-      <SaveFeedback state={feedback.state} onRetry={() => save(retryPublish.current)} />
+      <SaveFeedback state={feedback.state} retryDisabled={createUnknown} onRetry={async () => { await save(retryPublish.current) }} />
       {!selectedAccountId ? <Notice tone="info">上のバーでLINE公式アカウントを選んでください</Notice> : null}
 
       <Card variant="form" gap="normal" aria-labelledby="ev-new-body">
@@ -530,7 +539,7 @@ function EventsCreateV8Inner() {
       </Card>
 
       <UnsavedLeaveDialog open={leaveTarget !== null} subject="入力したイベント" onConfirm={confirmLeave} onCancel={cancelLeave} />
-      <ConfirmDialog open={publishOpen} title="イベントを公開する" description="イベントを公開し、お客さまが申し込めるようにします。内容を確かめてください。" confirmLabel="公開する" busy={saving} onConfirm={() => save(true)} onCancel={() => setPublishOpen(false)} />
+      <ConfirmDialog open={publishOpen} title="イベントを公開する" description="イベントを公開し、お客さまが申し込めるようにします。内容を確かめてください。" confirmLabel="公開する" busy={saving} confirmDisabled={createUnknown} confirmDisabledReason="閉じて一覧で作成結果を確認してください。" error={error || undefined} onSuccess={() => setPublishOpen(false)} onConfirm={() => save(true)} onCancel={() => setPublishOpen(false)} />
     </CreatePage></SaveErrorScope>
   )
 }
