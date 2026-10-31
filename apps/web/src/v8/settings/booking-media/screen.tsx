@@ -23,7 +23,7 @@ import { TextField } from '@/components/shared/text-field'
 import { RowActions } from '@/components/shared/row-actions'
 import { DataTable, TableHeadRow, Td, Th, Tr } from '@/components/shared/table'
 import { notifyToast } from '@/components/shared/toast'
-import { useHideSettingsNav, usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
+import { usePageCrumbs, usePageTitle } from '@/components/shell/page-chrome'
 import { useAccount } from '@/contexts/account-context'
 import { ApiError, describeSaveFailure, fetchApi } from '@/lib/api'
 import { restaurantTestApi, type RestaurantMembership, type RestaurantStore } from '@/lib/restaurant-test-api'
@@ -149,7 +149,6 @@ export default function BookingMediaPage() {
   usePageTitle('予約サイト・グルメ媒体')
   usePageCrumbs([{ label: '設定', href: '/settings' }])
   /* 絵（aSmph）には設定の中のメニューが無い。この画面だけ出さない（SNS 連携と同じ）。 */
-  useHideSettingsNav()
   const { selectedAccountId } = useAccount()
   const role = useStaffRole()
   const canManage = canManageRole(role)
