@@ -772,3 +772,19 @@ describe('保持した書込操作の実行直前の判定', () => {
     expect(create).not.toHaveBeenCalled(); expect(update).not.toHaveBeenCalled()
   })
 })
+
+vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: async () => ({ version: '2.7.0', deploy_env: 'staging' }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'account-a', name: '本店' }, { id: 'account-b', name: '二号店' }] }) }))
+
+test('一括停止の窓は操作先を示し、アカウント切替で閉じて古いシナリオを送らない', async () => {
+  const view = await mount()
+  fireEvent.click(within(screen.getByText('新規登録7日間フォロー').closest('tr')!).getByRole('checkbox'))
+  fireEvent.click(screen.getByRole('button', { name: '止める', exact: true }))
+  const dialog = await screen.findByRole('dialog', { name: '選んだシナリオを停止しますか？' })
+  await within(within(dialog).getByRole('region', { name: '操作の対象' })).findByText('本店')
+  expect(update).not.toHaveBeenCalled()
+  state.account = 'account-b'
+  view.rerender(<><ScenariosListV8 /><ToastHost /></>)
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(update).not.toHaveBeenCalled()
+})

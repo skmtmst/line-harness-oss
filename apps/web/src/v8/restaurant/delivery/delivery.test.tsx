@@ -1157,3 +1157,28 @@ it('接続が切れた選択の理由を他の接続済みの行へ流用しな�
   expect((dialog.getByRole('button', { name: '止める', exact: true }) as HTMLButtonElement).disabled).toBe(true)
   expect(fixture.stopIntake).not.toHaveBeenCalled()
 })
+
+vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: async () => ({ version: '2.7.0', deploy_env: 'staging' }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'a', name: '対象LINE-A' }, { id: 'b', name: '対象LINE-B' }, { id: 'account-1', name: '対象LINE-1' }, { id: 'account-2', name: '対象LINE-2' }] }) }))
+
+it('一括停止の確認は切替後に実際のLINEと店を表示し、同じ対象へ1回だけ止める要求を送る', async () => {
+  fixture.stopIntake.mockResolvedValue({ stopped: ['demaecan'], failed: [] })
+  const view = render(<DeliveryPage />)
+  await screen.findByText('#UE-1001')
+  fireEvent.click(screen.getByRole('button', { name: '受付をまとめて止める', exact: true }))
+  const first = within(await screen.findByRole('alertdialog', { name: '受付を一括停止しますか？' }))
+  await first.findByText('対象LINE-1')
+  fixture.accountId.value = 'account-2'
+  const next = ordersData([])
+  next.store = { id: 'store-2', name: '切替先の店' }
+  fixture.orders.mockResolvedValue(next)
+  view.rerender(<DeliveryPage />)
+  const target = within(await screen.findByRole('region', { name: '操作の対象' }))
+  await target.findByText('対象LINE-2')
+  await target.findByText('切替先の店')
+  expect(target.queryByText('対象LINE-1')).toBeNull()
+  expect(fixture.stopIntake).not.toHaveBeenCalled()
+  fireEvent.click(first.getByRole('button', { name: '止める', exact: true }))
+  await waitFor(() => expect(fixture.stopIntake).toHaveBeenCalledTimes(1))
+  expect(fixture.stopIntake.mock.calls[0][0]).toBe('account-2')
+})

@@ -1098,6 +1098,9 @@
 
 - [検証配備でCloudflare混雑時に待って再試行する](release-log/unreleased/2021-masato-cf-staging-deploy-retry.md) — 反映履歴、確認 2026-11-01。
 
+- [操作する対象の確認](v8-requirements/confirmation-targets.md) — 危険な操作の直前に出す対象と環境の正本、確認2026-11-01。
+
+- [反映履歴：確認する操作先](release-log/unreleased/0000-kenta-confirmation-targets.md) — 運用者向けの説明、確認2026-11-01。
 - [反映履歴：LINE来店フォロー・配信イメージ・閲覧と入力の守り](release-log/unreleased/2022-kenta-train-1031f.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
 
 - [反映履歴：配信の人数と時期・来店フォロー・予約の一覧](release-log/unreleased/2023-kenta-train-1031g.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。

@@ -1,5 +1,8 @@
 'use client'
 
+import OperationTargetSummary from '@/components/shared/operation-target-summary'
+
+
 import { useListItemHref } from '@/components/shared/list-navigation'
 import { useDetailPanelUrl } from '@/components/shared/detail-panel'
 import { useListUrlJsonValue } from '@/components/shared/list-url-state'
@@ -357,16 +360,22 @@ export default function AffiliatorsTab() {
   const bulkTargets = useMemo(() => rows.filter((row) => selected.has(row.id) && row.isActive), [rows, selected])
   const bulkAcknowledged = useRef(new Set<string>())
   const bulkArchiveTargets = useRef<AffiliateListRow[]>([])
+  const bulkArchiveAccount = useRef(accountId)
+  useEffect(() => {
+    bulkArchiveAccount.current = accountId
+    bulkArchiveTargets.current = []
+    setBulkConfirm(false); setSelected(new Set()); setBulkBusy(false)
+  }, [accountId])
   const [bulkError, setBulkError] = useState('')
   useEffect(() => { if (!bulkConfirm) { bulkAcknowledged.current.clear(); setBulkError('') } }, [bulkConfirm])
   const runBulkArchive = useCallback(async () => {
     const original = bulkArchiveTargets.current
-    if (original.length === 0 || bulkBusy) return
+    if (bulkArchiveAccount.current !== accountId || original.length === 0 || bulkBusy) return
     setBulkBusy(true); setBulkError('')
     try {
       const targets = original.filter(row => !bulkAcknowledged.current.has(row.id))
       const results = await Promise.allSettled(targets.map(row => api.affiliates.archive(row.id, { mode: 'pause' })))
-      if (!mounted.current) return
+      if (!mounted.current || bulkArchiveAccount.current !== accountId) return
       results.forEach((result, index) => { if (result.status === 'fulfilled' && result.value.success) bulkAcknowledged.current.add(targets[index].id) })
       const done = original.filter(row => bulkAcknowledged.current.has(row.id)).length
       const failed = original.length - done
@@ -380,8 +389,8 @@ export default function AffiliatorsTab() {
       setSelected(new Set()); setBulkConfirm(false)
       void loadList()
       return true
-    } finally { if (mounted.current) setBulkBusy(false) }
-  }, [bulkTargets, bulkBusy, loadList])
+    } finally { if (mounted.current && bulkArchiveAccount.current === accountId) setBulkBusy(false) }
+  }, [accountId, bulkTargets, bulkBusy, loadList])
 
   const exportCsv = () => {
     downloadCsv(csvFileName("アフィリエイター"), [
@@ -630,7 +639,7 @@ export default function AffiliatorsTab() {
     <>
       {table}
       <BulkBar count={readonly ? 0 : selected.size} total={shownRows.length} onSelectAll={() => setSelected(new Set(shownRows.map(item => item.id)))} unit="人" hint="対象を確認してから操作を選んでください">
-        <Button type="button" onClick={() => { bulkArchiveTargets.current = bulkTargets; setBulkError(''); setBulkConfirm(true) }} disabled={bulkTargets.length === 0}>まとめて紹介を止める</Button>
+        <Button type="button" onClick={() => { bulkArchiveAccount.current = accountId; bulkArchiveTargets.current = bulkTargets; setBulkError(''); setBulkConfirm(true) }} disabled={bulkTargets.length === 0}>まとめて紹介を止める</Button>
         <Button type="button" onClick={() => setSelected(new Set())}>選ぶのをやめる</Button>
       </BulkBar>
     </>
@@ -697,7 +706,7 @@ export default function AffiliatorsTab() {
           busy={bulkBusy}
           error={bulkError || undefined} onSuccess={() => setBulkConfirm(false)} onConfirm={() => runBulkArchive()}
           onCancel={() => { setBulkConfirm(false); void loadList() }}
-        />
+        ><OperationTargetSummary accounts={[{ id: bulkArchiveAccount.current ?? '' }]} /></ConfirmDialog>
         {drawerRow ? (
           <AffiliateDrawer
             affiliate={drawerRow}

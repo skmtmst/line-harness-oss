@@ -5,6 +5,7 @@ import React from 'react'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@/lib/api'
+import { within } from '@testing-library/react'
 import { ChangeConfirmScreen } from './profile-confirm'
 import type { GoogleChange } from '@/lib/restaurant-google-api'
 
@@ -33,6 +34,10 @@ function check() { fireEvent.click(screen.getByRole('checkbox', { name: '店舗�
 describe('Google変更案を現在の確認画面から送信する', () => {
   it('変更前後を表示し、確認するまで送信せず、確認して送信すると反映確認中になる', async () => {
     await open()
+    const target = within(await screen.findByRole('region', { name: '操作の対象' }))
+    await target.findByText('対象LINE-1')
+    expect(target.getByText('対象店舗')).toBeTruthy()
+    await target.findByText('検証環境')
     expect(screen.getByText('変更前の店')).toBeTruthy()
     const button = screen.getByRole('button', { name: 'Googleに変更を送信する' })
     expect(button).toHaveProperty('disabled', true)
@@ -113,3 +118,6 @@ describe('Google変更案を現在の確認画面から送信する', () => {
 })
 
 seedIdentity(() => { verifiedStaffRole('owner') })
+
+vi.mock('@/lib/admin-version-cache', () => ({ loadAdminVersionDetail: async () => ({ version: '2.7.0', deploy_env: 'staging' }) }))
+vi.mock('@/lib/line-accounts-cache', () => ({ loadLineAccounts: async () => ({ success: true, data: [{ id: 'a', name: '対象LINE-A' }, { id: 'b', name: '対象LINE-B' }, { id: 'account-1', name: '対象LINE-1' }, { id: 'account-2', name: '対象LINE-2' }] }) }))
