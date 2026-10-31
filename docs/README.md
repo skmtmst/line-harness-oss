@@ -1101,3 +1101,4 @@
 - [反映履歴：LINE来店フォロー・配信イメージ・閲覧と入力の守り](release-log/unreleased/2022-kenta-train-1031f.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
 
 - [反映履歴：配信の人数と時期・来店フォロー・予約の一覧](release-log/unreleased/2023-kenta-train-1031g.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+- [来店フォローの保存失敗の理由](release-log/unreleased/0000-kenta-followup-save-error-reasons.md) — 反映履歴、確認 2026-11-01。

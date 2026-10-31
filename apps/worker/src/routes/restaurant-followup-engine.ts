@@ -27,7 +27,10 @@ function draftInput(value:unknown):value is FollowupDraftInput{
   &&!!body.timing&&typeof body.timing==='object'&&Array.isArray(body.messageBubbles);
 }
 function failure(c:Context<Env>,error:unknown){
- if(error instanceof FollowupDraftError)return c.json({success:false,code:error.code,error:error.message},error.code==='invalid_followup'?422:409);
+ if(error instanceof FollowupDraftError){
+  const payload={success:false,code:error.code,error:error.message};
+  return error.code==='invalid_followup'?inputError(c,payload,422,error.field?[error.field]:[]):c.json(payload,409);
+ }
  if(error instanceof NotificationDeliveryIncomplete&&error.blockedReason){
   if(error.blockedReason==='sending_stopped')return c.json({success:false,code:'sending_stopped',error:'いまは送信を止めています。停止が解除されてから、もう一度テストしてください'},409);
   return c.json({success:false,code:'test_precondition_changed',error:'内容か宛先が変わりました。読み直してからもう一度テストしてください'},409);
