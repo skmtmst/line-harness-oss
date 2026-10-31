@@ -223,7 +223,7 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
 
   return (
     <KpiValueMotionProvider scope={accountId ? JSON.stringify([accountId, style, date, range, days, staff, compare, tab, subTab, view]) : null}>
-    <DashboardPage boardId={`style-${style}`} title={cfg.title} help={cfg.help} subtitle={subtitle} actions={headActions}>
+    <DashboardPage boardId={`style-${style}`} initialContent={{ scope: JSON.stringify([accountId, style]), pending: start.status === 'loading' || (!today && !failed) }} title={cfg.title} help={cfg.help} subtitle={subtitle} actions={headActions}>
       <div className={styles.head}>{filters}</div>
       <div className={styles.inset}>
         {!canWrite && role !== null ? <ReadOnlyNotice /> : null}

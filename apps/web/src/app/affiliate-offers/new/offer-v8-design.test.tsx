@@ -64,7 +64,7 @@ describe('Td4TN 作る画面の絵合わせ', () => {
     expect(screen.getByText('何を成果として数えるか')).toBeTruthy()
     expect(screen.queryByLabelText('成果地点')).toBeNull()
     expect(screen.getByText(/成果地点と案件をつなぐ設定は、まだ保存できません/)).toBeTruthy()
-    expect(screen.getByRole('link', { name: '成果地点を見る' }).getAttribute('href')).toBe('/conversions')
+    expect(screen.getByRole('link', { name: '成果地点を見る' }).getAttribute('href')).toBe('/affiliates?tab=points')
   })
 
   test('頭・見え方・気をつけること・足元が絵どおり', async () => {

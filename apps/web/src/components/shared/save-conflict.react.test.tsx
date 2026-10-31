@@ -145,7 +145,7 @@ describe('比べる先が別の画面のとき', () => {
   it('compareHref を渡すと「違いを比べる」はその画面へのリンクになる', () => {
     render(<SaveConflictBand title="同じ名前があります" compareHref="/conversions?highlight=cv-1" onReload={() => {}} />)
     const link = screen.getByRole('link', { name: /違いを比べる/ })
-    expect(link.getAttribute('href')).toBe('/conversions?highlight=cv-1')
+    expect(link.getAttribute('href')).toBe('/affiliates?highlight=cv-1&tab=points')
   })
 })
 

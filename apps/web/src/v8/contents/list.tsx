@@ -25,7 +25,7 @@ import FolderSelect,{ folderById,folderCreator } from '@/components/shared/folde
 import { Field } from '@/components/shared/form-controls'
 import KpiBand from '@/components/shared/kpi-band'
 import KpiCard from '@/components/shared/kpi-card'
-import ListState from '@/components/shared/list-state'
+import ListState, { LOADING_MESSAGE } from '@/components/shared/list-state'
 import ListToolbar from '@/components/shared/list-toolbar'
 import { useListUrlSetValue,useListUrlValue } from '@/components/shared/list-url-state'
 import ManagedFolderPanel from '@/components/shared/managed-folder-panel'
@@ -311,7 +311,7 @@ export default function MediaLibraryListV8() {
 
   const canManageMedia = mediaManagementPermission === 'allowed' && mediaEditAccess
   const managementPermissionReason = mediaManagementPermission === 'loading'
-    ? '操作権限を確認しています'
+    ? LOADING_MESSAGE
     : mediaManagementPermission === 'error'
       ? '操作権限を確認できないため、安全のため管理操作を止めています'
       : '使用箇所の確認・名前の変更・削除・フォルダの追加は管理者だけができます'
@@ -860,7 +860,7 @@ export default function MediaLibraryListV8() {
       title="登録メディア一覧"
       help="配信で使う画像・動画・音声・ファイルの置き場です。LINE アカウントごとに管理します。"
       explanation="使っているメディアは消せません。いらなくなったら「アーカイブ」にすると一覧と新規選択から外れます（使っている場所や過去の配信はそのまま動きます）。"
-      tabs={!canManageMedia ? (
+      tabs={!canManageMedia && mediaManagementPermission !== 'loading' ? (
         <div className={styles.roBand}><ReadOnlyNotice role="note">{`閲覧のみで見ています。${managementPermissionReason}。`}</ReadOnlyNotice></div>
       ) : undefined}
       stats={(

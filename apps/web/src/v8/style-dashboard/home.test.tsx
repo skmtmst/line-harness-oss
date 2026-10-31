@@ -6,7 +6,7 @@ import HomeDashboard from './home'
 
 const fixture = vi.hoisted(() => ({ accountId: 'account-1', search: '', get: vi.fn() }))
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(fixture.search) }))
-vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId }) }))
+vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: fixture.accountId, accounts: [{ id: fixture.accountId }], loading: false, error: null }) }))
 vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: fixture.get } }))
 vi.mock('@/v8/dashboard/dashboard', () => ({ default: ({ usageStyle }: { usageStyle: string }) => <section aria-label="QRを開けるホーム" data-usage-style={usageStyle} /> }))
 vi.mock('next/dynamic', () => ({ default: () => ({ style }: { style: string }) => <section aria-label={`${style}のホーム`} /> }))

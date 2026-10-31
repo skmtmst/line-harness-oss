@@ -26,6 +26,8 @@ import { useUnsavedGuard } from '@/lib/use-unsaved-guard';
 import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import { UnsavedLeaveDialog } from '@/lib/unsaved-leave-dialog';
 import { usePageTitle } from '@/components/shell/page-chrome';
+import PageResourceScope from '@/components/shell/page-resource-scope';
+import { resolveResourceTitle } from '@/lib/resource-title';
 import { useStaffRole } from '@/lib/staff-role';
 import { useDraftAutosave } from '@/v8/autosave/public/use-draft-autosave/index'
 import { requestUnsavedAction } from '@/lib/unsaved-action';
@@ -69,8 +71,6 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   /* 統括から使うときは、最初の描画から読み込んだ中身で出す（空の一瞬に保存を押させない）。 */
   const [name, setName] = useState(() => host?.initial.name ?? '')
   const [nameError, setNameError] = useState<string | null>(null)
-  /* 統括から使うときは上の帯を「回答フォーム」だけにする（絵 。呼ぶ側の題と同じ）。 */
-  usePageTitle(host ? '回答フォーム' : name || '回答フォーム編集')
   const [description, setDescription] = useState(() => host?.initial.description ?? '')
   const [isActive, setIsActive] = useState(!host)
   const [submitCount, setSubmitCount] = useState(0)
@@ -89,6 +89,9 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [formLoaded, setFormLoaded] = useState(Boolean(host))
+  const title = resolveResourceTitle({ name, loaded: formLoaded, pendingTitle: '回答フォーム編集', emptyTitle: 'フォーム名未設定' })
+  /* 統括へ埋め込むときの帯の題は親の画面に合わせる。 */
+  usePageTitle(host ? '回答フォーム' : title)
   const [formLoadFailed, setFormLoadFailed] = useState<'missing' | 'forbidden' | 'error' | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [bookingStaffError,setBookingStaffError]=useState(false)
@@ -874,7 +877,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
   return (
     <SaveErrorScope errors={saveErrors}><CreatePage
       boardId={narrow ? 'ITBAB' : conflict ? 'J1pdB' : TAB_NODE[editTab]}
-      title={name || 'フォーム名未設定'}
+      title={title}
       help="回答フォームの内容・回答後の動作・受付条件を設定します。"
       separator="none"
       stepsSpacing="compact"
@@ -897,7 +900,7 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
         {!conflict && error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
         {notice ? <Notice tone="success" message={notice} onClose={() => setNotice('')} /> : null}
         {loading || !formLoaded ? (
-          <p className={styles.loading}>読み込み中…</p>
+          <ListState kind="loading" />
         ) : editTab === 'content' ? (
           <ContentTab
             readOnly={!canEdit}
@@ -1036,8 +1039,8 @@ function FormEditInner({ host }: { host?: FormEditHost }) {
 export default function FormEditV8({ host }: { host?: FormEditHost } = {}) {
   // useSearchParams は Suspense の中でしか使えない（静的書き出しのため）。
   return (
-    <Suspense fallback={<p>読み込み中…</p>}>
-      <FormEditInner host={host} />
+    <Suspense fallback={<ListState kind="loading" />}>
+      <PageResourceScope enabled={!host}><FormEditInner host={host} /></PageResourceScope>
     </Suspense>
   )
 }

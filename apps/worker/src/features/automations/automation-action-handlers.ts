@@ -1,3 +1,4 @@
+import { restaurantWaitlistVariables } from '../../services/restaurant-followup-delivery-variables.js';
 import { readRestaurantAutomationDeliveryGate } from '../../services/restaurant-automation-delivery-gate.js';
 import { restaurantBookingVariables, substituteRestaurantBooking } from '../../services/restaurant-booking-context.js';
 import { expandVariables } from '../../services/message-interpolation.js';
@@ -390,7 +391,7 @@ async function sendMessageExecutor(
     const { expandSendCommonVars } = await import('../../services/interpolation-context.js');
     if(initialGate.source.restaurant){
       const body=substituteRestaurantBooking(resolved.content,initialGate.source.context);
-      const vars=restaurantBookingVariables(initialGate.source.context);
+      const vars={...restaurantBookingVariables(initialGate.source.context),...(initialGate.source.waitlistId?await restaurantWaitlistVariables(context.db,context.lineAccountId,initialGate.source.waitlistId):{})};
       const scanned=body.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g,(match,key:string)=>key in vars?'':match);
       const fullFriend=await getFriendById(context.db,friend.id);
       if(!fullFriend)throw invalid('friend_not_found','対象の友だちが見つかりません');

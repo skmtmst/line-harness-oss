@@ -181,10 +181,11 @@ export type BroadcastAssetFolder = {
 
 export type BroadcastMessageAsset = {
   folderId?: string | null;
-  status?: 'draft' | 'published';
+  status?: 'draft' | 'published' | 'published_with_draft';
   hasDraft?: boolean;
   publishedPayload?: Record<string, unknown>;
   publishedVersion?: number;
+  draftRevision?: number;
   id: string;
   lineAccountId: string | null;
   kind: BroadcastAssetKind;

@@ -69,8 +69,8 @@ describe('初期セットが入っていない時の［入れ直す］', () => {
   it('入っていない時だけ帯を出し、押すと今の版で入れ直しの口を呼んで読み直す', async () => {
     fx.ensure.mockResolvedValue({ success: true, data: { inserted: [{ key: 'welcome', kind: 'template' }, { key: 'menu', kind: 'rich_menu' }], skipped: [], existing: 0, starterSet: { id: 's', version: 1 } } })
     render(<DashboardV8 />)
-    expect(screen.getByText('初期セットが入っていません')).toBeTruthy()
-    expect(screen.getByText(/4 件が入っていません/)).toBeTruthy()
+    expect(screen.getByText('初期セットに準備待ちがあります')).toBeTruthy()
+    expect(screen.getByText(/4 件を準備できます/)).toBeTruthy()
     fireEvent.click(retryButton()!)
     await waitFor(() => expect(fx.ensure).toHaveBeenCalledWith('A', 7))
     await screen.findByText('初期セットを 2 件入れました。送る物は止めた状態で入っています。')
@@ -82,23 +82,23 @@ describe('初期セットが入っていない時の［入れ直す］', () => {
   it('入っている時・入れる物が無い時は出さない', () => {
     fx.starter = { applied: true, count: 6, missing: 0 }
     const { rerender } = render(<DashboardV8 />)
-    expect(screen.queryByText('初期セットが入っていません')).toBeNull()
+    expect(screen.queryByText('初期セットに準備待ちがあります')).toBeNull()
     fx.starter = { applied: false, count: 0, missing: 0 }
     rerender(<DashboardV8 />)
-    expect(screen.queryByText('初期セットが入っていません')).toBeNull()
+    expect(screen.queryByText('初期セットに準備待ちがあります')).toBeNull()
   })
 
   it('閲覧のみの人には帯も［入れ直す］も出さない', () => {
     fx.role = 'viewer'
     render(<DashboardV8 />)
     expect(retryButton()).toBeNull()
-    expect(screen.queryByText('初期セットが入っていません')).toBeNull()
+    expect(screen.queryByText('初期セットに準備待ちがあります')).toBeNull()
   })
 
   it('入れる数を数えられない時は押せる形にせず、理由を言う', () => {
     fx.starter = { applied: false, count: 0, missing: null }
     render(<DashboardV8 />)
-    expect(screen.getByText('初期セットが入っていません')).toBeTruthy()
+    expect(screen.getByText('初期セットに準備待ちがあります')).toBeTruthy()
     expect(retryButton()).toBeNull()
     expect(screen.getByText(/ここでは入れ直せません/)).toBeTruthy()
   })

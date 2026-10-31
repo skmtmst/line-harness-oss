@@ -1,5 +1,40 @@
 // 実行時の副作用を混ぜず定義だけを置き、ハンドラは各機能の経路に保つ。
 export const eventsPaths = {
+  '/api/liff/events': {
+    get: {
+      tags: ['Events'],
+      summary: 'LIFFアカウントの公開イベント一覧を取得',
+      description: '有効なLIFFアカウントに属し、公開中で未来の有効な開催枠があるイベントだけをID順に返す。タグ限定のイベントは、そのアカウントの本人確認とタグの照合ができた場合だけ含める。参加用URLは返さない。読み取り専用。',
+      security: [],
+      parameters: [
+        { name: 'liffId', in: 'query', required: true, schema: { type: 'string' }, description: '有効で休止・削除されていないLINEアカウントのLIFF ID' },
+        { name: 'cursor', in: 'query', schema: { type: 'string', maxLength: 128 }, description: '前の応答のnextCursor。省略時は先頭から取得する' },
+        { name: 'Authorization', in: 'header', schema: { type: 'string' }, description: '任意のLIFF IDトークン。本人確認できない場合はタグ限定のイベントを除外する' },
+      ],
+      responses: {
+        '200': {
+          description: '最大50件の公開イベントと次のカーソル。該当がなければ空の一覧',
+          content: { 'application/json': { schema: {
+            type: 'object', required: ['success', 'items', 'nextCursor'],
+            properties: {
+              success: { type: 'boolean', enum: [true] },
+              items: { type: 'array', maxItems: 50, items: {
+                type: 'object', required: ['id', 'name', 'image_url', 'venue_name', 'nextStartsAt'],
+                properties: {
+                  id: { type: 'string' }, name: { type: 'string' },
+                  image_url: { type: 'string', nullable: true },
+                  venue_name: { type: 'string', nullable: true },
+                  nextStartsAt: { type: 'string', description: '未来の有効な開催枠のうち最も早い開始日時' },
+                },
+              } },
+              nextCursor: { type: 'string', nullable: true, description: '続きがなければnull' },
+            },
+          } } },
+        },
+        '400': { description: 'LIFFアカウントを解決できない、またはカーソルが128文字を超える' },
+      },
+    },
+  },
   // ── Event applicant operations ─────────────────────────────────────────
   '/api/events/admin/events/{id}/occurrence-selector': {
     get: {

@@ -44,6 +44,8 @@ export interface HqTemplatePreflight {
   idempotency_fingerprint: string;
   snapshot_token: string;
   text_override?: string | null;
+  /** 承認済みの初期セットだけが使う、未公開で投入する内部モード。 */
+  initial_insert?: number;
   status: 'ready' | 'blocked' | 'expired' | 'consumed';
   created_by: string | null;
   created_at: string;

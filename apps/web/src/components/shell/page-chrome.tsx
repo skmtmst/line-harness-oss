@@ -1,8 +1,8 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { setDocumentTitle } from '@/lib/document-title'
+import { DocumentTitleBoundary, useDocumentTitle, useDocumentTitleScope } from './document-title'
 
 /**
  * 画面の枠（トップバーと本文の幅）に、ページから値を渡すための口。
@@ -55,7 +55,15 @@ interface PageChromeStore extends PageChrome {
 const PageChromeContext = createContext<PageChromeStore | null>(null)
 
 export function PageChromeProvider({ children }: { children: ReactNode }) {
-  const [title, setTitle] = useState<string | null>(null)
+  return <DocumentTitleBoundary><PageChromeState>{children}</PageChromeState></DocumentTitleBoundary>
+}
+
+function PageChromeState({ children }: { children: ReactNode }) {
+  const scope = useDocumentTitleScope()
+  const [titleState, setTitleState] = useState<{ scope: string; title: string | null } | null>(null)
+  const title = titleState?.scope === scope ? titleState.title : null
+  const setTitle = useCallback((next: string | null) => setTitleState({ scope, title: next }), [scope])
+  useDocumentTitle(title)
   const [fullWidth, setFullWidth] = useState(false)
   const [crumbs, setCrumbs] = useState<PageCrumb[] | null>(null)
   const [settingsNavInline, setSettingsNavInline] = useState(false)
@@ -89,16 +97,9 @@ export function usePageTitle(title: string | null | undefined, enabled = true) {
   const setTitle = store?.setTitle
   const next = title && title.length > 0 ? title : null
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!setTitle || !enabled) return
     setTitle(next)
-    /*
-     * ブラウザのタブの題も「<画面名> | musubo」にする（タブを並べて見分けられるように）。
-     * 帯の外の画面（運営・ログイン前）もこれで題が付く。名前が分からない間（null）は
-     * 上の帯の既定（左メニューの画面名）に任せる。
-     */
-    if (next) setDocumentTitle(next)
-    // 画面を離れたら既定へ戻す。戻さないと、次の画面に前の名前が残る。
     return () => setTitle(null)
   }, [next, setTitle, enabled])
 }

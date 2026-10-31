@@ -1,5 +1,6 @@
 'use client'
 
+import SharedButton from '@/components/shared/button'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type FriendStats } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
@@ -97,13 +98,12 @@ export default function FriendKpis() {
           tone="info"
           className="mb-3.5"
           action={(
-            <button
+            <SharedButton variant="text" size="inline" data-notice-inline-action
               type="button"
               onClick={() => void load(selectedAccountId)}
-              className="font-semibold text-action underline"
             >
               再読み込み
-            </button>
+            </SharedButton>
           )}
         >
           友だち集計を読み込めませんでした。

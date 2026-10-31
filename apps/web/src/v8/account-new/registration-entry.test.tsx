@@ -98,7 +98,7 @@ it('本人の権限を確認する前には保存位置を復元しない', () =
   forgetStaffIdentity()
   localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
   render(<AccountRegisterV8 />)
-  expect(screen.getByLabelText('権限を確認しています')).toBeTruthy()
+  expect(screen.getByLabelText('読み込んでいます')).toBeTruthy()
   expect(screen.queryByRole('radio')).toBeNull()
   expect(calls.getStyle).not.toHaveBeenCalled()
 })

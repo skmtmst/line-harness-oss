@@ -1,3 +1,4 @@
+import { INITIAL_MENUS } from '@line-crm/shared'
 import type { IconKey, Choice, Question } from './question-types'
 export type { IconKey, Choice, Question } from './question-types'
 import type { StarterSetItem } from '@/lib/api/helpers/styles'
@@ -162,50 +163,14 @@ export function featureHref(feature: string, fallback?: string, style?: AccountS
 export type SampleTile = { label: string; icon: string; feature: string }
 export type SampleMenu = { account: string; greeting: string; tone: { bg: string; ink: string }; tiles: SampleTile[] }
 
-export const SAMPLE_MENUS: Partial<Record<AccountStyle, SampleMenu>> = {
-  standard: {
-    account: 'ご案内', greeting: '友だち追加ありがとうございます。ご案内やお申し込みは、下のメニューからご確認いただけます。', tone: { bg: 'var(--sample-consult-bg)', ink: 'var(--sample-consult-ink)' },
-    tiles: [{ label: 'ご案内', icon: 'file', feature: 'docs' }, { label: 'お申し込み', icon: 'file', feature: 'forms' }, { label: 'よくある質問', icon: 'bulb', feature: 'faq' }, { label: 'マイページ', icon: 'user', feature: 'mypage' }, { label: 'お知らせ', icon: 'bell', feature: 'news' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' }],
-  },
-  ec: {
-    account: 'オンラインストア', greeting: '友だち追加ありがとうございます。商品やご利用ガイドは、下のメニューからご覧いただけます。', tone: { bg: 'var(--sample-salon-bg)', ink: 'var(--sample-salon-ink)' },
-    tiles: [{ label: '商品を見る', icon: 'bag', feature: 'shop' }, { label: 'お買い物を続ける', icon: 'bag', feature: 'shop' }, { label: 'マイページ', icon: 'user', feature: 'mypage' }, { label: 'クーポン', icon: 'ticket', feature: 'coupons' }, { label: 'ご利用ガイド', icon: 'file', feature: 'docs' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' }],
-  },
-  restaurant: {
-    account: 'musubo - 和食 -', greeting: '友だち追加ありがとうございます。ご予約・クーポンは下のメニューからどうぞ。', tone: { bg: 'var(--sample-restaurant-bg)', ink: 'var(--sample-restaurant-ink)' },
-    tiles: [
-      { label: '予約する', icon: 'calendarCheck', feature: 'booking' }, { label: '予約の確認', icon: 'list', feature: 'history' }, { label: 'クーポン', icon: 'ticket', feature: 'coupons' },
-      { label: 'メニュー', icon: 'book', feature: 'menu' }, { label: 'スタンプ', icon: 'stamp', feature: 'stamps' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' },
-    ],
-  },
-  salon: {
-    account: 'Hair Salon musubo', greeting: '友だち追加ありがとうございます。ご予約・回数券の残りは下のメニューから見られます。', tone: { bg: 'var(--sample-salon-bg)', ink: 'var(--sample-salon-ink)' },
-    tiles: [
-      { label: '予約', icon: 'calendarCheck', feature: 'booking' }, { label: '予約の確認', icon: 'list', feature: 'history' }, { label: '回数券', icon: 'ticket', feature: 'tickets' },
-      { label: 'スタイル写真', icon: 'image', feature: 'photos' }, { label: 'スタンプ', icon: 'stamp', feature: 'stamps' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' },
-    ],
-  },
-  consult: {
-    account: 'musubo 相談窓口', greeting: '友だち追加ありがとうございます。面談のご予約・資料は下のメニューからどうぞ。', tone: { bg: 'var(--sample-consult-bg)', ink: 'var(--sample-consult-ink)' },
-    tiles: [
-      { label: '面談を予約', icon: 'calendarCheck', feature: 'booking' }, { label: '予約の確認', icon: 'list', feature: 'history' }, { label: '資料', icon: 'file', feature: 'docs' },
-      { label: 'よくある質問', icon: 'bulb', feature: 'faq' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' }, { label: '会社のこと', icon: 'building', feature: 'about' },
-    ],
-  },
-  lesson: {
-    account: 'musubo ヨガスタジオ', greeting: '友だち追加ありがとうございます。クラスの予約・振替は下のメニューからどうぞ。', tone: { bg: 'var(--sample-lesson-bg)', ink: 'var(--sample-lesson-ink)' },
-    tiles: [
-      { label: 'クラスを予約', icon: 'calendarCheck', feature: 'booking' }, { label: '予約の確認', icon: 'list', feature: 'history' }, { label: '回数券と月謝', icon: 'ticket', feature: 'tickets' },
-      { label: '振替', icon: 'repeat', feature: 'transfer' }, { label: 'スケジュール', icon: 'calendarDays', feature: 'schedule' }, { label: 'お問い合わせ', icon: 'message', feature: 'contact' },
-    ],
-  },
-}
-
 export const SAMPLE_STYLES: AccountStyle[] = ['restaurant', 'salon', 'consult', 'lesson', 'standard', 'ec']
-
-export function sampleMenuFor(style: AccountStyle): SampleMenu {
-  return SAMPLE_MENUS[style] ?? SAMPLE_MENUS.restaurant!
-}
+const SAMPLE_NAMES:Record<AccountStyle,string>={restaurant:'お店のLINE',salon:'サロンのLINE',consult:'ご相談窓口',lesson:'教室のLINE',standard:'ご案内',ec:'オンラインストア'}
+export const SAMPLE_MENUS = Object.fromEntries(SAMPLE_STYLES.map(style=>[style,{
+ account:SAMPLE_NAMES[style],greeting:'友だち追加ありがとうございます。下のメニューからお進みください。',
+ tone:{bg:`var(--sample-${style==='standard'?'consult':style==='ec'?'salon':style}-bg)`,ink:`var(--sample-${style==='standard'?'consult':style==='ec'?'salon':style}-ink)`},
+ tiles:INITIAL_MENUS[style].buttons.map(button=>({label:button.label,feature:button.feature,icon:button.icon})),
+}])) as Record<AccountStyle,SampleMenu>
+export function sampleMenuFor(style:AccountStyle):SampleMenu { return SAMPLE_MENUS[style] }
 
 /* ── 入った物（starter-items）と初期セットの中身（definition）の突き合わせ ────────── */
 
@@ -301,6 +266,9 @@ export function summarizeSetup(state: StyleState, warnings: StyleWarning[], item
     rows.push({ key: 'activation', title: '入った予約メニュー・お知らせを動かす', note: '止めた状態で入っています', badge: { tone: 'neutral', label: '止めている' }, action: { label: '中身を見る', step: 'summary' } })
   }
   const look = answers.image
+  if(look?.mode==='configured' && look.value==='simple' && items.some(item=>item.kind==='rich_menu'&&item.status!=='published')) {
+    rows.push({key:'initial-menu',title:'最初のメニューの内容を確かめる',note:'ページと予約の設定を終えてから、内容を確認してLINEに出します',badge:{tone:'neutral',label:'下書き'},action:{label:'確かめる',href:'/getting-started/rich-menu'}})
+  }
   if (look?.mode === 'configured' && (look.value === 'keep' || look.value === 'change')) {
     rows.push({ key: 'images', title: 'お店の写真とロゴを入れる', note: '見本の画像のままです', badge: { tone: 'neutral', label: 'あとで' }, action: { label: '画像を変える', href: '/rich-menus' } })
   } else if (look && look.mode !== 'configured') {

@@ -1,3 +1,6 @@
+import { restaurantConfirmationVariables } from './restaurant-followup-delivery-variables.js';
+import { restoreReminderMessage,type BuiltReminderMessage,type ReminderMessagePart } from './reminder-message-set.js';
+import { parseBroadcastMessageParts } from '../features/broadcasts/broadcast-message-set/index.js';
 import { hashOutboundPayload } from './outbound-idempotency.js';
 import { readRestaurantReminderDeliveryGate } from './restaurant-reminder-delivery-gate.js';
 import { restaurantBookingVariables, substituteRestaurantBooking, type RestaurantBookingContext } from './restaurant-booking-context.js';
@@ -164,20 +167,16 @@ export async function buildReminderStepMessage(
   sourceKind: 'reminder' | 'test_send' = 'reminder',
   // 登録時のテンプレート版の写し {"テンプレートID": 公開版番号}。
   // 無いときは今までどおり最新の版を読む（下書き試験・古い登録）。
-  options?: { pinnedTemplateVersions?: Record<string, number> | null; previewOnly?: boolean; restaurantContext?: RestaurantBookingContext|null; approvedTemplates?: FollowupEngineSnapshot['templates'] },
-): Promise<{
-  message: Message;
-  messageType: string;
-  messageContent: string;
-  templateId: string | null;
-  templateVersion: number | null;
-}> {
+  options?: { pinnedTemplateVersions?: Record<string, number> | null; previewOnly?: boolean; restaurantContext?: RestaurantBookingContext|null; approvedTemplates?: FollowupEngineSnapshot['templates'];restaurantVariables?:Record<string,string> },
+): Promise<BuiltReminderMessage & {templateVersion:number|null}> {
   let messageType = step.message_type;
   let messageContent = step.message_content;
   let templateVersion: number | null = null;
+  let bubbles:string|null=null;
   if (step.template_id && options?.approvedTemplates) {
     const template=options.approvedTemplates.get(step.template_id);
-    if(!template||template.message_bubbles_json)throw new Error('APPROVED_TEMPLATE_UNAVAILABLE');
+    if(!template)throw new Error('APPROVED_TEMPLATE_UNAVAILABLE');
+    bubbles=template.message_bubbles_json;
     messageType=template.message_type;messageContent=template.message_content;templateVersion=template.published_version;
   } else if (step.template_id) {
     // 登録時の版があるときはその版で送る。新しい版にするのは
@@ -185,7 +184,7 @@ export async function buildReminderStepMessage(
     const pinned = options?.pinnedTemplateVersions?.[step.template_id];
     if (pinned != null) {
       const version = await getTemplateVersion(db, step.template_id, pinned);
-      if(version?.message_bubbles_json)throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
+      if(version)bubbles=version.message_bubbles_json??null;
       if (version) {
         messageType = version.message_type;
         messageContent = version.message_content;
@@ -194,7 +193,7 @@ export async function buildReminderStepMessage(
     }
     if (templateVersion == null) {
       const template = await getTemplateById(db, step.template_id);
-      if(template?.message_bubbles_json)throw new Error('MULTIPLE_MESSAGES_REQUIRE_BUNDLE_SENDER');
+      if(template)bubbles=template.message_bubbles_json??null;
       if (template) {
         messageType = template.message_type;
         messageContent = template.message_content;
@@ -202,6 +201,14 @@ export async function buildReminderStepMessage(
         templateVersion = Number.isFinite(live) && live > 0 ? live : null;
       }
     }
+  }
+  const parts:ReminderMessagePart[]|null=step.message_parts_json?JSON.parse(step.message_parts_json):bubbles
+    ?parseBroadcastMessageParts({messageType,messageContent,messageBubblesJson:bubbles}):null;
+  if(parts){
+    if(!Array.isArray(parts)||parts.length<1||parts.length>5)throw new Error('REMINDER_MESSAGE_SET_INVALID');
+    const built=await Promise.all(parts.map(part=>buildReminderStepMessage(db,{...step,template_id:null,message_parts_json:null,message_type:part.messageType,message_content:part.messageContent},friend,deliveredAt,sourceKind,options)));
+    const frozen=built.map(part=>({messageType:part.messageType,messageContent:part.messageContent}));
+    return {...built[0],templateId:step.template_id,templateVersion,messages:built.map(part=>part.message),messageParts:frozen,frozenType:'message_set',frozenContent:JSON.stringify(frozen)};
   }
   const resolvedMeta = await resolveMetadata(db, friend);
   // F10: 予約日時・Meet URL は送る側で置き換える。共通展開より先に潰すので、
@@ -213,7 +220,7 @@ export async function buildReminderStepMessage(
       await resolveBookingInterpolation(db, friend.id, deliveredAt),
     )
     : messageContent;
-  const vars=options?.restaurantContext ? restaurantBookingVariables(options.restaurantContext) : null;
+  const vars=options?.restaurantContext ? {...restaurantBookingVariables(options.restaurantContext),...options.restaurantVariables} : options?.restaurantVariables??null;
   const scanned=vars ? bookingContent.replace(/\{\{\s*var\.([a-z][a-z0-9_]*)\s*\}\}/g,(match,key:string)=>key in vars?'':match) : bookingContent;
   const extra = options?.previewOnly
     ? await resolveInterpolationExtra(db,friend.id,scanned)
@@ -249,22 +256,10 @@ async function resolveReminderRunMessage(
   pinnedTemplateVersions: Record<string, number> | null,
   ownedLeases: string[],
   nowIso: string,
-  restaurantOptions?: { restaurantContext:RestaurantBookingContext|null; approvedTemplates:FollowupEngineSnapshot['templates'] },
-): Promise<{
-  message: Message;
-  messageType: string;
-  messageContent: string;
-  templateId: string | null;
-}> {
+  restaurantOptions?: { restaurantContext:RestaurantBookingContext|null; approvedTemplates:FollowupEngineSnapshot['templates'];restaurantVariables?:Record<string,string> },
+): Promise<BuiltReminderMessage> {
   const saved = await getReminderDeliveryRunSentPayload(db, run.id);
-  if (saved) {
-    return {
-      message: buildMessage(saved.messageType, saved.messageContent),
-      messageType: saved.messageType,
-      messageContent: saved.messageContent,
-      templateId: saved.templateId,
-    };
-  }
+  if (saved) return restoreReminderMessage(saved);
   const fresh = await buildReminderStepMessage(db, step, friend, sendAt, 'reminder', {
     pinnedTemplateVersions,
     ...restaurantOptions,
@@ -272,21 +267,14 @@ async function resolveReminderRunMessage(
   // 先に残した処理があるときはそちらを使う（同じ実行の二重保存をしない）。
   const persisted = await saveReminderDeliveryRunSentPayload(db, {
     id: run.id,
-    messageType: fresh.messageType,
-    messageContent: fresh.messageContent,
+    messageType: fresh.frozenType??fresh.messageType,
+    messageContent: fresh.frozenContent??fresh.messageContent,
     templateId: fresh.templateId,
     templateVersion: fresh.templateVersion,
     now: nowIso,
     expectedLeaseExpiresAt: ownedLeases,
   });
-  if (persisted) {
-    return {
-      message: buildMessage(persisted.messageType, persisted.messageContent),
-      messageType: persisted.messageType,
-      messageContent: persisted.messageContent,
-      templateId: persisted.templateId,
-    };
-  }
+  if (persisted) return restoreReminderMessage(persisted);
   return fresh;
 }
 
@@ -582,9 +570,11 @@ export async function processReminderDeliveries(
         const pinnedTemplateVersions = parseTemplateVersionSnapshot(
           enrollment.template_version_snapshot,
         );
+        const restaurantVariables=restaurantGate.approval.managed&&restaurantGate.approval.trigger==='reservation_24h'&&restaurantGate.context
+          ?await restaurantConfirmationVariables(db,run.id,restaurantGate.context,nowIso):undefined;
         const built = await resolveReminderRunMessage(
           db, run, step, friend, sendAt, pinnedTemplateVersions, ownedLeases, nowIso,
-          restaurantGate.approval.managed?{restaurantContext:restaurantGate.context,approvedTemplates:restaurantGate.approval.snapshot.templates}:undefined,
+          restaurantGate.approval.managed?{restaurantContext:restaurantGate.context,approvedTemplates:restaurantGate.approval.snapshot.templates,restaurantVariables}:undefined,
         );
         // 取消と送信の競合対策: push の直前に送る権利を1文で確かめる。
         // この後も beforePush・再検証・関係確認・停止確認のawaitがあり、
@@ -684,7 +674,7 @@ export async function processReminderDeliveries(
         sendStarted=true;
         const response = await deliveryClient.pushMessageWithRequestId(
           friend.line_user_id,
-          [built.message],
+          built.messages??[built.message],
           run.line_retry_key,
         );
 
@@ -697,20 +687,9 @@ export async function processReminderDeliveries(
                (id, friend_reminder_id, reminder_step_id, delivered_at)
              VALUES (?, ?, ?, ?)`,
           ).bind(deliveredId, enrollment.id, step.id, nowIso),
-          db.prepare(
-            `INSERT INTO messages_log
-               (id, friend_id, direction, message_type, content,
-                template_id_at_send, delivery_type, source, line_account_id, created_at)
-             VALUES (?, ?, 'outgoing', ?, ?, ?, 'push', 'reminder', ?, ?)`,
-          ).bind(
-            logId,
-            friend.id,
-            built.messageType,
-            built.messageContent,
-            built.templateId,
-            accountId,
-            nowIso,
-          ),
+          ...(built.messageParts??[built]).map((part,index)=>db.prepare(
+            `INSERT INTO messages_log(id,friend_id,direction,message_type,content,template_id_at_send,delivery_type,source,line_account_id,created_at)
+             VALUES(?,?,'outgoing',?,?,?,'push','reminder',?,?)`).bind(index===0?logId:crypto.randomUUID(),friend.id,part.messageType,part.messageContent,built.templateId,accountId,nowIso)),
           completeReminderDeliveryRunStatement(db, {
             id: run.id,
             friendReminderId: enrollment.id,
@@ -723,7 +702,7 @@ export async function processReminderDeliveries(
         result.succeeded++;
         // push と確定の間に取消が確定すると成功にできない (0 件)。
         // 外部送信の有無が曖昧なため送り直さず、運用の追跡用に記録する。
-        if (Number(completed[2]?.meta?.changes ?? 0) !== 1) {
+        if (Number(completed[completed.length-1]?.meta?.changes ?? 0) !== 1) {
           logger.error("reminder_delivery.confirm_cancelled_delivery_failed");
         }
       } catch (error) {

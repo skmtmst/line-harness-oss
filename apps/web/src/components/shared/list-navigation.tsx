@@ -1,11 +1,12 @@
 'use client'
 
 import NextLink from 'next/link'
+import { canonicalNavigationHref } from '@/lib/canonical-route'
 import { useRouter } from 'next/navigation'
 import { createContext, useContext, useMemo, type ComponentProps } from 'react'
 import { currentListLocation, flushListUrlState, notifyListLocation, useListLocation, useOnAccountSwitch } from './list-url-state'
 
-/** 戻り先にしてよい一覧。最長のパスから照合し、別機能へ条件を渡さない。 */
+/** 戻り先にしてよい一覧。最長のパスから照合し、別機能へ条件を渡さない。固定の転送だけの入口は追加しない。 */
 export const LIST_PATHS = [
   '/tags', '/templates', '/form-submissions', '/friends', '/broadcasts', '/scenarios',
   '/auto-replies', '/reminders', '/rich-menus', '/events', '/webinars', '/automations',
@@ -57,6 +58,10 @@ export function listReturnUrl(current: string, fallback: string, account: string
 
 /** 名前・メニュー・詳細→編集・キャンセル・パンくずが同じ戻り先を持つ。 */
 export function listNavigationHref(href: string, current: string, account: string | null, origin: string, row?: { key: string; id: string } | null): string {
+  return canonicalNavigationHref(listNavigationDestination(href, current, account, origin, row))
+}
+
+function listNavigationDestination(href: string, current: string, account: string | null, origin: string, row?: { key: string; id: string } | null): string {
   try {
     const from = new URL(current, origin)
     const to = new URL(href, origin)
@@ -87,7 +92,7 @@ export function useListNavigationHref() {
   const account = useContext(ListNavigationAccount)
   const row = useContext(RowNavigation)
   const location = useListLocation()
-  return (href: string) => location ? listNavigationHref(href, location, account, window.location.origin, row) : href
+  return (href: string) => location ? listNavigationHref(href, location, account, window.location.origin, row) : canonicalNavigationHref(href)
 }
 
 export function useListReturnHref(fallback: string): string {
@@ -118,7 +123,7 @@ export function useListNavigationRouter(): ReturnType<typeof useRouter> {
   const account = useContext(ListNavigationAccount)
   return useMemo(() => {
     const destination = (href: string) => {
-      if (typeof window === 'undefined' || !window.location) return href
+      if (typeof window === 'undefined' || !window.location) return canonicalNavigationHref(href)
       flushListUrlState()
       const loc = currentListLocation()
       return listNavigationHref(href, `${loc.pathname}${loc.search}${loc.hash}`, account, window.location.origin)

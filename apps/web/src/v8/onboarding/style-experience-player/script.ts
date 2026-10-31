@@ -1,6 +1,6 @@
 import type { BookingMenu, BookingStaff } from '@/lib/api'
 import type { StyleBoard, StyleRow, StyleSideCard } from '@/v8/style-dashboard/public/sample-parts/index'
-import { fieldsToLayout, type RestaurantFloor, type ReservationBoardResource } from '@line-crm/shared'
+import { INITIAL_MENUS, type AccountStyle, fieldsToLayout, type RestaurantFloor, type ReservationBoardResource } from '@line-crm/shared'
 import type { DashboardScene, DatetimeSample, SampleKpi, SampleReservation, StyleExperienceScript, TalkMessage } from './script-types'
 
 /*
@@ -8,6 +8,8 @@ import type { DashboardScene, DatetimeSample, SampleKpi, SampleReservation, Styl
  * 本線に無い機能（予約でベルの数が上がる知らせ・席が光る・月謝・別の会議の道具・購入の画面など）は書かない。
  * 本線と食い違わないことは script.test.ts が照らす（数の帯の並び・カード・言葉・リッチメニュー）。
  */
+
+const menuButtons=(style:AccountStyle)=>INITIAL_MENUS[style].buttons.map(button=>({...button}))
 
 const kpis = (...values: Array<[SampleKpi['metric'], number | null, string, string?]>): SampleKpi[] =>
   values.map(([metric, value, unit, valueText]) => ({ metric, value, unit, ...(valueText ? { valueText } : {}) }))
@@ -188,10 +190,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
           board: { kind: 'floor-map', data: { floor: FLOOR, resources: TABLES } },
         },
       ],
-      richMenu: [
-        { label: '予約する', feature: 'booking' }, { label: '予約の確認', feature: 'history' }, { label: 'クーポン', feature: 'coupons' },
-        { label: 'メニュー', feature: 'menu' }, { label: 'スタンプ', feature: 'stamps' }, { label: 'お問い合わせ', feature: 'contact' },
-      ],
+      richMenu: menuButtons('restaurant'),
     },
     salon: {
       label: 'サロン',
@@ -234,10 +233,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
           board: { kind: 'staff-board', data: salonBoard('done', true) },
         },
       ],
-      richMenu: [
-        { label: '予約する', feature: 'booking' }, { label: '予約の確認', feature: 'booking', actionData: 'history' }, { label: '回数券', feature: 'tickets' },
-        { label: 'スタイル写真', feature: 'content' }, { label: 'スタンプ', feature: 'stamps' }, { label: 'お問い合わせ', feature: 'contact' },
-      ],
+      richMenu: menuButtons('salon'),
     },
     consult: {
       label: '面談・相談',
@@ -280,10 +276,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
           board: { kind: 'staff-board', data: consultBoard('done', true) },
         },
       ],
-      richMenu: [
-        { label: '面談を予約する', feature: 'booking' }, { label: '予約の確認', feature: 'booking', actionData: 'history' }, { label: '資料', feature: 'content' },
-        { label: 'よくある質問', feature: 'content' }, { label: '会社のこと', feature: 'content' }, { label: 'お問い合わせ', feature: 'contact' },
-      ],
+      richMenu: menuButtons('consult'),
     },
     lesson: {
       label: '教室・レッスン',
@@ -295,12 +288,13 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
       ],
       steps: [{ key: 'reserve', label: '予約' }, { key: 'accept', label: '受付' }, { key: 'remind', label: 'リマインド' }, { key: 'visit', label: '出席' }, { key: 'thanks', label: 'お礼' }],
       scenes: [
-        { step: 'reserve', ms: 3500, line: 'クラスを選んで予約します', phone: { part: 'line-talk', data: { caption: '今日', messages: [{ from: 'shop', starter: 'welcome', text: 'こんにちは。レッスンへのお問い合わせありがとうございます。ご希望をお知らせください。', time: '10:00' }] } }, dashboard: { kpis: lessonKpis(2, 70, 1) } },
-        { step: 'accept', ms: 3500, line: '回数券が自動で 1 回使われます', phone: { part: 'line-talk', data: { caption: '今日', messages: [{ from: 'shop', starter: 'welcome', text: 'こんにちは。レッスンへのお問い合わせありがとうございます。ご希望をお知らせください。', time: '10:00' }] } }, dashboard: { kpis: lessonKpis(2, 80, 2) } },
-        { step: 'remind', ms: 3500, line: '前日に案内が届きます', phone: { part: 'line-talk', data: { caption: '前日 18:00', messages: [{ from: 'shop', starter: 'reminder-day-before', text: '明日のクラスについてご案内します。参加方法は申込内容をご確認ください。', time: '18:00' }] } }, dashboard: { kpis: lessonKpis(2, 80, 2) } },
-        { step: 'visit', ms: 3500, line: '出席をつけます', phone: { part: 'line-talk', data: { caption: '前日 18:00', messages: [{ from: 'shop', starter: 'reminder-day-before', text: '明日のクラスについてご案内します。参加方法は申込内容をご確認ください。', time: '18:00' }] } }, dashboard: { kpis: lessonKpis(1, 80, 2) } },
-        { step: 'thanks', ms: 4000, line: '翌日にお礼が届きます（初期セットでは止めた状態で入ります）', phone: { part: 'line-talk', data: { caption: '翌日 12:00', messages: [{ from: 'shop', starter: 'reminder-thanks', text: '昨日はご参加ありがとうございました。ご質問がありましたら、このトークでお知らせください。', time: '12:00' }] } }, dashboard: { kpis: lessonKpis(0, 80, 2) } },
+        { step: 'reserve', ms: 3500, line: 'クラスを選んで予約します', phone: { part: 'line-talk', data: { richMenu: true, caption: '今日', messages: [{ from: 'shop', starter: 'welcome', text: 'こんにちは。レッスンへのお問い合わせありがとうございます。ご希望をお知らせください。', time: '10:00' }] } }, dashboard: { kpis: lessonKpis(2, 70, 1) } },
+        { step: 'accept', ms: 3500, line: '回数券が自動で 1 回使われます', phone: { part: 'line-talk', data: { richMenu: true, caption: '今日', messages: [{ from: 'shop', starter: 'welcome', text: 'こんにちは。レッスンへのお問い合わせありがとうございます。ご希望をお知らせください。', time: '10:00' }] } }, dashboard: { kpis: lessonKpis(2, 80, 2) } },
+        { step: 'remind', ms: 3500, line: '前日に案内が届きます', phone: { part: 'line-talk', data: { richMenu: true, caption: '前日 18:00', messages: [{ from: 'shop', starter: 'reminder-day-before', text: '明日のクラスについてご案内します。参加方法は申込内容をご確認ください。', time: '18:00' }] } }, dashboard: { kpis: lessonKpis(2, 80, 2) } },
+        { step: 'visit', ms: 3500, line: '出席をつけます', phone: { part: 'line-talk', data: { richMenu: true, caption: '前日 18:00', messages: [{ from: 'shop', starter: 'reminder-day-before', text: '明日のクラスについてご案内します。参加方法は申込内容をご確認ください。', time: '18:00' }] } }, dashboard: { kpis: lessonKpis(1, 80, 2) } },
+        { step: 'thanks', ms: 4000, line: '翌日にお礼が届きます（初期セットでは止めた状態で入ります）', phone: { part: 'line-talk', data: { richMenu: true, caption: '翌日 12:00', messages: [{ from: 'shop', starter: 'reminder-thanks', text: '昨日はご参加ありがとうございました。ご質問がありましたら、このトークでお知らせください。', time: '12:00' }] } }, dashboard: { kpis: lessonKpis(0, 80, 2) } },
       ],
+      richMenu: menuButtons('lesson'),
     },
     standard: {
       label: '標準',
@@ -318,10 +312,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
         { step: 'broadcast', ms: 3500, line: 'お知らせをまとめて送ります', phone: { part: 'line-talk', data: { caption: '今日', messages: [{ from: 'shop', text: '新しいメニュー・商品をご用意しました。詳しくは下のメニューからご覧ください。', time: '12:00' }], richMenu: true } }, dashboard: standardDashboard(121, 0, 5), board: { kind: 'cards', data: [card('delivery-row', '配信', [{ label: '新メニュー・新商品', value: '送信済み' }])] } },
         { step: 'form', ms: 4000, line: 'フォームで申し込みを受けます', phone: { part: 'form', data: { layout: STANDARD_FORM, pageIndex: 0, accountName: 'ご案内', bookingMenus: [], caption: null, title: 'お申し込み' } }, dashboard: standardDashboard(121, 0, 5), board: { kind: 'cards', data: [card('answer-row', '回答', [{ label: '見本 ゆうた', value: '新しい回答' }])] } },
       ],
-      richMenu: [
-        { label: 'お知らせ', feature: 'content' }, { label: 'お申し込み', feature: 'content' }, { label: 'よくある質問', feature: 'content' },
-        { label: 'ご利用ガイド', feature: 'content' }, { label: 'マイページ', feature: 'tickets' }, { label: 'お問い合わせ', feature: 'contact' },
-      ],
+      richMenu: menuButtons('standard'),
     },
     ec: {
       label: 'EC',
@@ -339,10 +330,7 @@ export const STYLE_EXPERIENCE_SCRIPT: StyleExperienceScript = {
         { step: 'broadcast', ms: 3500, line: '再入荷を LINE で知らせます', phone: { part: 'line-talk', data: { caption: '今日', messages: [{ from: 'shop', text: '入荷のお知らせを希望された商品が再入荷しました。数に限りがあります。', time: '12:00' }], richMenu: true } }, dashboard: ecDashboard(342, 8, 4), board: { kind: 'cards', data: [card('delivery-row', '配信', [{ label: '再入荷のお知らせ', value: '送信済み' }])] } },
         { step: 'inbox', ms: 4000, line: 'お問い合わせは受信箱でまとめて返します', phone: { part: 'line-talk', data: { caption: '今日', messages: [{ from: 'customer', text: '届く日を教えてください。', time: '15:00' }, { from: 'shop', text: 'お問い合わせありがとうございます。内容を確認して、担当からご連絡します。', time: '15:00' }] } }, dashboard: ecDashboard(342, 8, 4), board: { kind: 'cards', data: [card('inbox-row', '受信箱', [{ label: '見本 さくら', value: '返していない' }])] } },
       ],
-      richMenu: [
-        { label: '商品を見る', feature: 'content' }, { label: 'お買い物を続ける', feature: 'content' }, { label: 'マイページ', feature: 'tickets' },
-        { label: 'クーポン', feature: 'coupons' }, { label: 'ご利用ガイド', feature: 'content' }, { label: 'お問い合わせ', feature: 'contact' },
-      ],
+      richMenu: menuButtons('ec'),
     },
   },
 }

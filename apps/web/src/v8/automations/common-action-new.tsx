@@ -153,7 +153,7 @@ export function CommonActionNew() {
     setActions((current) => current.map((step) => ({ ...step, onFailure: value })))
   }
 
-  if (canManage === null) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" title="権限を確認しています" /></SaveErrorScope>
+  if (canManage === null) return <SaveErrorScope errors={saveErrors}><ListState kind="loading" /></SaveErrorScope>
   if (!canManage) {
     return (
       <SaveErrorScope errors={saveErrors}><div data-design-node="j2hfkS">

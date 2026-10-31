@@ -4237,7 +4237,7 @@ CREATE TABLE hq_template_preflights (
   created_by TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   expires_at TEXT, text_override TEXT
-  CHECK (text_override IS NULL OR length(trim(text_override)) BETWEEN 1 AND 5000),
+  CHECK (text_override IS NULL OR length(trim(text_override)) BETWEEN 1 AND 5000), initial_insert INTEGER NOT NULL DEFAULT 0 CHECK(initial_insert IN (0,1)),
   PRIMARY KEY (id, tenant_id),
   UNIQUE (tenant_id, target_account_id, idempotency_fingerprint),
   UNIQUE (
@@ -8484,6 +8484,39 @@ CREATE TABLE style_change_logs(id TEXT PRIMARY KEY, line_account_id TEXT NOT NUL
 
 CREATE TABLE style_holidays(line_account_id TEXT NOT NULL REFERENCES line_accounts(id), date TEXT NOT NULL, name TEXT NOT NULL, PRIMARY KEY(line_account_id,date));
 
+CREATE TABLE style_starter_catalog_items (
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  template_id TEXT NOT NULL,
+  template_version_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  set_id TEXT NOT NULL REFERENCES style_starter_sets(id),
+  set_version INTEGER NOT NULL CHECK(set_version > 0),
+  style TEXT NOT NULL CHECK(style IN ('standard','ec','restaurant','salon','consult','lesson')),
+  kind TEXT NOT NULL CHECK(kind IN ('rich_menu','template','tag','auto_reply','coupon','form')),
+  initiated_by TEXT NOT NULL REFERENCES staff_members(id),
+  approved_by TEXT NOT NULL REFERENCES staff_members(id),
+  state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','running','succeeded','blocked','failed')),
+  distribution_run_id TEXT,
+  error_code TEXT,
+  lease_token TEXT,
+  lease_until TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(line_account_id,template_id),
+  FOREIGN KEY(template_id,tenant_id) REFERENCES hq_templates(id,tenant_id),
+  FOREIGN KEY(template_version_id,template_id,tenant_id) REFERENCES hq_template_versions(id,template_id,tenant_id)
+);
+
+CREATE TABLE style_starter_catalog_resources (
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  line_account_id TEXT NOT NULL REFERENCES line_accounts(id),
+  resource_kind TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  source_snapshot TEXT NOT NULL CHECK(json_valid(source_snapshot)),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY(line_account_id,resource_kind,target_id)
+);
+
 CREATE TABLE style_starter_items (
  line_account_id TEXT NOT NULL REFERENCES line_accounts(id), style TEXT NOT NULL, item_key TEXT NOT NULL,
  kind TEXT NOT NULL, target_id TEXT NOT NULL, is_sample INTEGER NOT NULL DEFAULT 1,
@@ -11380,6 +11413,8 @@ CREATE INDEX idx_staff_passkeys_staff ON staff_passkeys(staff_id, created_at);
 
 CREATE INDEX idx_staff_permission_receipts_staff_v527
   ON staff_permission_receipts (staff_id, created_at DESC);
+
+CREATE INDEX idx_starter_catalog_tenant_account ON style_starter_catalog_items(tenant_id,line_account_id);
 
 CREATE UNIQUE INDEX idx_stop_suppressions_dedup
   ON entry_route_stop_suppressions (line_account_id, line_user_id, ref_code);

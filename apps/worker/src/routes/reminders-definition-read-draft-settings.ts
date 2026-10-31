@@ -1,3 +1,5 @@
+import { buildMessages } from '../features/broadcasts/broadcast-message-set/index.js';
+import { validateTemplateMessage } from '../services/template-message-validation.js';
 import { type Context } from 'hono';
 import { getReminderById, getReminderSteps, listReminderRegistrants, moveReminderRegistrantTargetDate, getReminderRegistrantById, getReminderVersionSteps, type ResumeExpectedRun, parseReminderVersionSettings, type ReminderDraftSettings, type ReminderVersionRow } from '@line-crm/db';
 
@@ -75,8 +77,24 @@ export function readDraftSettings(
     if (messageContent.length > 5000) {
       return { ok: false, error: '送る内容は5000文字以内で指定してください', status: 422 };
     }
+    let messageParts:ReminderDraftSettings['steps'][number]['messageParts'];
+    if(step.messageParts!==undefined&&!templateId){
+      if(!Array.isArray(step.messageParts)||step.messageParts.length<1||step.messageParts.length>5)return {ok:false,error:'吹き出しは1〜5個で指定してください',status:422};
+      messageParts=[];
+      for(const part of step.messageParts){
+        if(!part||typeof part!=='object'||typeof part.messageType!=='string'||!REMINDER_MESSAGE_TYPES.has(part.messageType)||typeof part.messageContent!=='string')return {ok:false,error:'吹き出しの内容を確認してください',status:422};
+        messageParts.push({messageType:part.messageType,messageContent:part.messageContent});
+      }
+      // 共通の詳細編集で最初の本文だけを直しても、残りの吹き出しを失わない。
+      messageParts[0]={messageType,messageContent};
+      try{
+        buildMessages(messageParts.map((part,index)=>({...part,id:`message-${index+1}`})));
+        if(messageParts.some(part=>!validateTemplateMessage(part.messageType,part.messageContent).ok))throw new Error('invalid');
+      }catch{return {ok:false,error:'吹き出しの内容を確認してください',status:422};}
+    }
     steps.push({
       stableStepId,
+      ...(messageParts?{messageParts}:{}),
       offsetMinutes,
       messageType,
       messageContent,

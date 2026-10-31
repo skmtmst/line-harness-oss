@@ -65,3 +65,18 @@ it('配るのに失敗したら窓を残して失敗を出す', async () => {
   expect(result.current.error).not.toBe('')
   expect(done).not.toHaveBeenCalled()
 })
+
+
+it('一部失敗の結果では再確認後も入力とエラーを残し、成功の知らせを出さない', async () => {
+  net.distribute.mockResolvedValueOnce({success:true,data:{accountCount:1,items:[{accountId:'a',key:'tag',action:'failed'}]}})
+  const done=vi.fn()
+  const {result}=renderHook(()=>useDistribute('salon',7,done))
+  await act(async()=>result.current.setDraft({target:'style',accounts:[],editedAction:'notify'}))
+  await waitFor(()=>expect(result.current.preview).not.toBeNull())
+  await act(async()=>{await result.current.run()})
+  await waitFor(()=>expect(net.preflight).toHaveBeenCalledTimes(2))
+  expect(result.current.draft).toMatchObject({target:'style',editedAction:'notify'})
+  expect(result.current.error).toContain('一部の物を入れられませんでした')
+  expect(net.saved).not.toHaveBeenCalled()
+  expect(done).toHaveBeenCalledTimes(1)
+})

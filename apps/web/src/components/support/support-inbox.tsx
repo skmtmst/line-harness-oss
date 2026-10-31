@@ -316,13 +316,12 @@ export default function SupportInbox({ channel = 'email' }: { channel?: Channel 
           tone="danger"
           className="mb-4"
           action={(
-            <button
+            <Button variant="text" size="inline" data-notice-inline-action
               type="button"
               onClick={() => setInboxRetryKey((key) => key + 1)}
-              className="font-bold underline"
             >
               再試行する
-            </button>
+            </Button>
           )}
         >
           お問い合わせ一覧の更新を一時停止しています（接続できません）。
