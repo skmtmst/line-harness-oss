@@ -85,6 +85,10 @@ type RenderFormDialogsContext = {
 }
 
 export function renderFormDialogs({ active, activeIndex, canEditForms, closeDelete, closeDetail, closeMove, closeRename, deleteError, deleteImpact, deleteImpactLoading, deleteTarget, deleting, deletingFolder, deletingFolderCount, editingFolder, folderBusy, folderDialogOpen, folderError, folders, goDetail, loadForms, moveBusy, moveError, moveFolderId, moveForm, moveTarget, openDelete, openDuplicate, openMove, openStop, removeFolder, removeForm, renameError, renameForm, renameName, renameTarget, renaming, saveRename, selectedAccount, selectedAccountId, setDeletingFolder, setEditingFolder, setFolderDialogOpen, setFolderError, setMoveFolderId, setRenameName, setStopError, setStopRevision, setStopTarget, stopAccepting, stopError, stopImpactLoading, stopping, stopRevision, stopTarget, visibleForms }: RenderFormDialogsContext) {
+  const recommendDelete = deleteImpact?.recommendedAction === 'delete' && deleteImpact.canDelete
+  const recommendArchive = deleteImpact?.recommendedAction === 'archive' && deleteImpact.canArchive
+  const hasPublishedVersion = Boolean(deleteImpact?.blockers.includes('published'))
+  const publishedUrl = hasPublishedVersion ? deleteImpact?.answerUrl : null
   return ((
     <>
       {(folderDialogOpen || editingFolder) && selectedAccountId ? (
@@ -242,7 +246,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
             </Button>
             <Button
               type="button"
-              variant="primary"
+              variant={recommendDelete ? 'secondary' : 'primary'}
               busy={deleting}
               busyLabel="処理中"
               disabled={deleting || deleteImpactLoading || !deleteImpact?.canArchive}
@@ -256,7 +260,7 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
       >
         {/* 絵は頭（題と×）・説明・2枚のカード・注意の帯・ボタンを 14 ずつで並べる。共通の窓の中身の余白（上下24）を詰める。 */}
         <div className={styles.archiveBody}>
-        {deleteImpact?.form.isActive ? (
+        {hasPublishedVersion && deleteImpact?.form.isActive ? (
           <p className={styles.archiveLead}>配っている URL を開いた人には「受付を終了しました」と出ます。</p>
         ) : null}
         {deleteImpactLoading ? (
@@ -264,14 +268,14 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
         ) : deleteImpact ? (
           <>
           <div className={styles.impactOptions}>
-            <div className={styles.impactOption} data-tone="recommended">
-              <p className={styles.impactOptionTitle}>アーカイブする（おすすめ）</p>
+            <div className={styles.impactOption} data-tone={recommendArchive ? 'recommended' : undefined}>
+              <p className={styles.impactOptionTitle}>{recommendArchive ? 'アーカイブする（おすすめ）' : 'アーカイブする'}</p>
               <p className={styles.impactOptionDesc}>
                 {`一覧から隠します。集まった回答 ${formatNumber(deleteImpact.submissionCount)} 件 と友だち情報に保存した答えは残ります。`}
               </p>
             </div>
-            <div className={styles.impactOption} data-disabled={deleteImpact.canDelete ? undefined : ''}>
-              <p className={styles.impactOptionTitle} data-tone="danger">削除する</p>
+            <div className={styles.impactOption} data-tone={recommendDelete ? 'recommended' : undefined} data-disabled={deleteImpact.canDelete ? undefined : ''}>
+              <p className={styles.impactOptionTitle} data-tone="danger">{recommendDelete ? '削除する（おすすめ）' : '削除する'}</p>
               <p className={styles.impactOptionDesc}>
                 {deleteImpact.canDelete
                   ? '未公開・回答なし・利用先なしのため、完全に削除できます。この操作は元に戻せません。'
@@ -280,14 +284,14 @@ export function renderFormDialogs({ active, activeIndex, canEditForms, closeDele
             </div>
           </div>
             {deleteImpact.references.length > 0 ? (
-                  <Notice tone="warn" title={deleteImpact.answerUrl ? `開けなくなる公開URL：${deleteImpact.answerUrl}` : undefined} icon={<TriangleAlert size={16} aria-hidden="true" />}>
+                  <Notice tone="warn" title={publishedUrl ? `開けなくなる公開URL：${publishedUrl}` : undefined} icon={<TriangleAlert size={16} aria-hidden="true" />}>
                     <span>{`${deleteImpact.references.map(referenceLabel).join('と')}がこのフォームを開きます。`}</span>
                   </Notice>
             ) : null}
             {/* 利用先の注意があるときは、その札の title に URL を入れる（絵の窓に URL の行は無い）。 */}
-            {deleteImpact.answerUrl && deleteImpact.references.length === 0 ? (
+            {publishedUrl && deleteImpact.references.length === 0 ? (
               <p className={styles.dialogNote}>
-                開けなくなる公開URL：<span className={styles.breakAll}>{deleteImpact.answerUrl}</span>
+                開けなくなる公開URL：<span className={styles.breakAll}>{publishedUrl}</span>
               </p>
             ) : null}
           </>
