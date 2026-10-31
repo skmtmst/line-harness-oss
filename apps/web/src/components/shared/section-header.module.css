@@ -49,6 +49,7 @@
 :root .root[data-size="small"] .title { font-size: var(--text-body); font-weight: 700; line-height: var(--tpl-rt-label-lh); }
 
 :root .root { gap: var(--polish-space-row); }
+:root .root[data-separation='section'] { margin-block-start: var(--space-12); }
 
 /* ②：役割ごとの文字の段。 */
 :root .title, :root .root[data-size='small'] .title { font-size: var(--tpl-section-title-size); font-weight: var(--tpl-section-title-weight); white-space: normal; overflow: visible; text-overflow: clip; }
