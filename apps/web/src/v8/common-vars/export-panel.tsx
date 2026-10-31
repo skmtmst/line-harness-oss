@@ -1,7 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, type CommonVarExportJob } from '@/lib/api'
+import { api, downloadApiFile, type CommonVarExportJob } from '@/lib/api'
+import { isStepUpRequired, useStepUpGate } from '@/components/step-up-prompt'
+import { describeApiFailure } from '@/components/shared/api-error-message'
 import Button from '@/components/shared/button'
 import Disclosure from '@/components/shared/disclosure'
 import Notice from '@/components/shared/notice'
@@ -29,7 +31,6 @@ const POLL_INTERVAL_MS = 1_200
 /** 「最近の書き出し」に出す件数。 */
 const RECENT_LIMIT = 5
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? ''
 
 function statusTone(status: CommonVarExportJob['status']) {
   switch (status) {
@@ -58,6 +59,20 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
   ungrouped?: boolean
 }) {
   const saveErrors = useSaveFormErrors()
+  const stepUp = useStepUpGate()
+  const operationRef = useRef<symbol | null>(null)
+  const operationContext = useRef(0)
+  useEffect(() => {
+    operationContext.current += 1
+    operationRef.current = null
+    setRequesting(false)
+    stepUp.cancel()
+    return () => {
+      operationContext.current += 1
+      operationRef.current = null
+      stepUp.cancel()
+    }
+  }, [accountId, folderId, ungrouped, stepUp.cancel])
 
   const [jobs, setJobs] = useState<CommonVarExportJob[]>([])
   const [active, setActive] = useState<CommonVarExportJob | null>(null)
@@ -73,7 +88,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
       if (generationRef.current !== generation) return
       if (res.success) setJobs(res.data)
     } catch (saveFailure) {
-      saveErrors.capture(saveFailure)
+      if (generationRef.current === generation) saveErrors.capture(saveFailure)
 
       /* 履歴が読めなくても書き出し自体は止めない */
     }
@@ -98,7 +113,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
           if (latest) setActive(latest)
         }
       } catch (saveFailure) {
-        saveErrors.capture(saveFailure)
+        if (generationRef.current === generation) saveErrors.capture(saveFailure)
 
         /* 表示は一覧の下に出る補助。読めないときは何も出さない */
       }
@@ -115,13 +130,13 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
         const res = await api.commonVars.exportDetail(active.id)
         if (generationRef.current !== generation) return
         if (res.success) {
-          setActive(res.data)
+          setActive(current => current?.id === active.id ? res.data : current)
           if (res.data.status !== 'queued' && res.data.status !== 'running' && accountId) {
             void refresh(accountId, generation)
           }
         }
       } catch (saveFailure) {
-        saveErrors.capture(saveFailure)
+        if (generationRef.current === generation) saveErrors.capture(saveFailure)
 
         /* 一時的な通信障害では監視を止めない */
       }
@@ -129,58 +144,70 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
     return () => window.clearInterval(timer)
   }, [active, accountId, refresh, saveErrors])
 
-  const start = async () => {
-    if (!accountId || requesting) return
+  const run = async (operation: (token?: string) => Promise<CommonVarExportJob | void>, action: string) => {
+    if (!accountId || operationRef.current) return
+    const id = Symbol()
+    const context = operationContext.current
     const generation = generationRef.current
+    const current = () => operationRef.current === id && operationContext.current === context
+      && generationRef.current === generation
+    operationRef.current = id
     setRequesting(true)
     setError('')
+    saveErrors.reset()
     try {
-      const res = await api.commonVars.createExport({
-        accountId,
-        folderId: folderId ?? undefined,
-        ungrouped: ungrouped || undefined,
-      })
-      if (generationRef.current !== generation) return
-      if (!res.success) {
-        setError(res.error || '書き出しを依頼できませんでした。時間をおいて、もう一度お試しください。')
-        return
+      let result: CommonVarExportJob | void
+      try {
+        result = await operation()
+      } catch (caught) {
+        if (!current()) return
+        if (!isStepUpRequired(caught)) throw caught
+        const token = await stepUp.gate('data.export', action)
+        if (!token || !current()) return
+        result = await operation(token)
       }
-      setActive(res.data)
+      if (!current()) return
+      if (result) {
+        setActive(result)
+        setDismissedJobId(null)
+        void refresh(accountId, generation)
+      }
+    } catch (caught) {
+      if (!current()) return
+      const fieldFailure = saveErrors.capture(caught)
+      if (!fieldFailure) setError(describeApiFailure(caught, '書き出し'))
+      // 応答が分からない作成は再送せず、履歴だけを読み直す。
       void refresh(accountId, generation)
-    } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure)
-
-      if (generationRef.current === generation) {
-        { if (!fieldFailure) setError('書き出しを依頼できませんでした。接続を確かめて、もう一度お試しください。') }
-      }
     } finally {
-      if (generationRef.current === generation) setRequesting(false)
+      if (current()) {
+        operationRef.current = null
+        setRequesting(false)
+      }
     }
   }
-
-  const regenerate = async (job: CommonVarExportJob) => {
-    if (!accountId || requesting) return
-    const generation = generationRef.current
-    setRequesting(true)
-    setError('')
-    try {
-      const res = await api.commonVars.regenerateExport(job.id)
-      if (generationRef.current !== generation) return
-      if (!res.success) {
-        setError(res.error || 'もう一度書き出せませんでした')
-        return
-      }
-      setActive(res.data)
-      void refresh(accountId, generation)
-    } catch (saveFailure) {
-      const fieldFailure = saveErrors.capture(saveFailure)
-
-      if (generationRef.current === generation) {
-        { if (!fieldFailure) setError('もう一度書き出せませんでした。接続を確かめて、もう一度お試しください。') }
-      }
-    } finally {
-      if (generationRef.current === generation) setRequesting(false)
-    }
+  const start = () => {
+    if (active?.status === 'queued' || active?.status === 'running') return
+    const input = { accountId: accountId!, folderId: folderId ?? undefined, ungrouped: ungrouped || undefined }
+    return run(async token => {
+      const result = await (token ? api.commonVars.createExport(input, token) : api.commonVars.createExport(input))
+      if (!result.success) throw new Error(result.error)
+      return result.data
+    }, '共通情報を書き出す')
+  }
+  const regenerate = (job: CommonVarExportJob) => {
+    if (job.lineAccountId !== accountId || active?.status === 'queued' || active?.status === 'running') return
+    return run(async token => {
+      const result = await (token ? api.commonVars.regenerateExport(job.id, token) : api.commonVars.regenerateExport(job.id))
+      if (!result.success) throw new Error(result.error)
+      return result.data
+    }, '共通情報をもう一度書き出す')
+  }
+  const download = (job: CommonVarExportJob) => {
+    if (!job.downloadUrl || job.lineAccountId !== accountId) return
+    const path = job.downloadUrl
+    return run(async token => {
+      await downloadApiFile(path, `common-vars-${job.id}.csv`, token ? { stepUpToken: token } : undefined)
+    }, '共通情報のCSVをダウンロードする')
   }
 
   const running = active?.status === 'queued' || active?.status === 'running'
@@ -196,7 +223,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
   const status = error || (active && active.id !== dismissedJobId) || jobs.length > 1 ? (
     <SaveErrorScope errors={saveErrors}>
       {error ? <Notice tone="danger" message={error} onClose={() => setError('')} /> : null}
-      {active && active.id !== dismissedJobId ? (
+      {!error && active && active.id !== dismissedJobId ? (
         <Notice
           tone={active.status === 'expired' ? 'warn' : active.status === 'failed' ? 'danger' : active.status === 'completed' ? 'success' : 'info'}
           role="status"
@@ -204,7 +231,7 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
           onClose={() => setDismissedJobId(active.id)}
           action={<>
             {active.status === 'completed' && active.downloadUrl ? (
-              <Button variant="text" href={`${API_BASE}${active.downloadUrl}`}>CSVをダウンロード</Button>
+              <Button type="button" variant="text" disabled={requesting} onClick={() => void download(active)}>CSVをダウンロード</Button>
             ) : null}
             {active.status === 'completed' || active.status === 'failed' || active.status === 'expired' ? (
               <Button type="button" variant="text" disabled={requesting} onClick={() => void regenerate(active)}>もう一度書き出す</Button>
@@ -232,18 +259,10 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
                     {statusLabel(job.status)}
                   </StatusBadge>
                   {job.status === 'completed' && job.downloadUrl ? (
-                    <a className="text-action font-semibold hover:underline" href={`${API_BASE}${job.downloadUrl}`}>
-                      ダウンロード
-                    </a>
+                    <Button type="button" variant="text" disabled={requesting} onClick={() => void download(job)}>ダウンロード</Button>
                   ) : null}
                   {job.status === 'expired' ? (
-                    <button
-                      type="button"
-                      className="text-action font-semibold hover:underline"
-                      onClick={() => void regenerate(job)}
-                    >
-                      再生成
-                    </button>
+                    <Button type="button" variant="text" disabled={requesting || running} onClick={() => void regenerate(job)}>再生成</Button>
                   ) : null}
                 </span>
               </li>
@@ -253,5 +272,5 @@ export function useVarsExportPanel({ accountId, folderId, ungrouped = false }: {
       ) : null}
     </SaveErrorScope>
   ) : null
-  return { action, status }
+  return { action, status: stepUp.prompt ? <>{stepUp.prompt}{status}</> : status }
 }
