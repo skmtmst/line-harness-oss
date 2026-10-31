@@ -171,6 +171,51 @@ describe('回答フォームの編集（V8）', () => {
     expect(await screen.findByRole('heading', { name: '二号店のアンケート', exact: true })).toBeTruthy()
   })
 
+  it('店舗を替えても元の店の保存と公開を完了し、新しい入力と画面を保つ', async () => {
+    await render('id=form-1')
+    let finish!: (value: unknown) => void
+    formsUpdate.mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    fireEvent.click(screen.getByRole('button', { name: 'この版を公開' }))
+    const dialog = await screen.findByRole('dialog', { name: 'この版を公開する' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'この版を公開' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledTimes(1))
+    account.id = 'acc-2'
+    formsGet.mockResolvedValue({ success: true, data: { ...structuredClone(formData), name: '二号店のアンケート' } })
+    await render('id=form-1')
+    await screen.findByRole('heading', { name: '二号店のアンケート', exact: true })
+    fireEvent.click(screen.getByRole('tab', { name: '受付と見た目' }))
+    const input = screen.getByDisplayValue('二号店のアンケート')
+    fireEvent.change(input, { target: { value: '二号店の入力途中' } })
+    await act(async () => { finish({ success: true, data: { id: 'form-1', contentRevision: 8, updatedAt: '' } }) })
+    expect(formsPublish).toHaveBeenCalledExactlyOnceWith('form-1', 'acc-1', 8)
+    expect(document.body.textContent).not.toContain('この版を公開しました')
+    expect(screen.getByDisplayValue('二号店の入力途中')).toBe(input)
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledTimes(2))
+    expect(formsUpdate.mock.calls.map(call => call[1])).toEqual(['acc-1', 'acc-2'])
+    await screen.findByText('下書きを保存しました')
+  })
+
+  it('対象のIDを替えた後も旧保存の競合を元の対象で確認し、今の画面には表示しない', async () => {
+    await render('id=form-1')
+    let fail!: (error: Error) => void
+    formsUpdate.mockImplementationOnce(() => new Promise((_, reject) => { fail = reject }))
+    fireEvent.click(getPageAction({ name: '下書きを保存' }))
+    await waitFor(() => expect(formsUpdate).toHaveBeenCalledTimes(1))
+    formsGet.mockResolvedValue({ success: true, data: { ...structuredClone(formData), id: 'form-2', name: '次のフォーム' } })
+    await render('id=form-2')
+    await screen.findByRole('heading', { name: '次のフォーム', exact: true })
+    fireEvent.click(screen.getByRole('tab', { name: '受付と見た目' }))
+    const reads = formsGet.mock.calls.length
+    await act(async () => { fail(new ApiError(409, 'conflict', 'VERSION_CONFLICT', { updatedAt: '' })) })
+    expect(formsGet).toHaveBeenCalledTimes(reads + 1)
+    expect(formsGet).toHaveBeenLastCalledWith('form-1', 'acc-1')
+    expect(formsPublish).not.toHaveBeenCalled()
+    expect(screen.getByDisplayValue('次のフォーム')).toBeTruthy()
+    expect(document.body.textContent).not.toContain('ほかの人が')
+    expect(document.body.textContent).not.toContain('下書きを保存しました')
+  })
+
   it('V8 では src/v8 の画面が出て、最初のページの最初の質問の設定が開いている', async () => {
     await render('id=form-1')
     expect(await screen.findByRole('tab', { name: '中身' })).toBeTruthy()
