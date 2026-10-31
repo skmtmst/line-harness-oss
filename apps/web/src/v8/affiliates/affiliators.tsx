@@ -154,6 +154,9 @@ export default function AffiliatorsTab() {
   const [bulkBusy, setBulkBusy] = useState(false)
   const [linkBaseUrl, setLinkBaseUrl] = useState<string | null>(null)
 
+  const listAccount = useRef(accountId)
+  listAccount.current = accountId
+  useEffect(() => { setRows([]) }, [accountId])
   const mounted = useRef(true)
   useEffect(() => {
     mounted.current = true
@@ -171,13 +174,14 @@ export default function AffiliatorsTab() {
   }, [])
 
   const loadList = useCallback(async () => {
+    if (!accountId) { setLoadState('ready'); return }
     setLoadState('loading')
     try {
-      const [affiliatesRes, reportRes] = await Promise.all([api.affiliates.list(), api.affiliates.allReport()])
+      const [affiliatesRes, reportRes] = await Promise.all([api.affiliates.list(accountId), api.affiliates.allReport()])
       if (!affiliatesRes.success || !reportRes.success) throw new Error('fetch failed')
       const affiliates = affiliatesRes.data as unknown as AffiliateItem[]
       const report = new Map((reportRes.data as unknown as AffiliateReportRow[]).map((r) => [r.affiliateId, r]))
-      if (!mounted.current) return
+      if (!mounted.current || listAccount.current !== accountId) return
       setRows(affiliates.map((a) => {
         const rep = report.get(a.id)
         return {
@@ -196,11 +200,11 @@ export default function AffiliatorsTab() {
       }))
       setLoadState('ready')
     } catch {
-      if (!mounted.current) return
+      if (!mounted.current || listAccount.current !== accountId) return
       setRows([])
       setLoadState('error')
     }
-  }, [])
+  }, [accountId])
 
   const loadApprovals = useCallback(async (options: { fresh?: boolean } = {}) => {
     setApprovalState('loading')
