@@ -170,6 +170,31 @@ describe('リッチメニューを直す：下書きの読み込み', () => {
 })
 
 describe('リッチメニューを作る：面の動きの欄', () => {
+  it.each([1, 2])('公開前に%d枚目の名前の空いた面を開いて欄の下に理由を出し、入力すると消す', async (pageNumber) => {
+    const first = { ...GROUP.pages[0], areas: GROUP.pages[0].areas.map(area => ({ ...area })) }
+    const pages = pageNumber === 1 ? [first] : [first, { ...first, id: 'p-next', orderIndex: 1, name: '次のページ', aliasId: 'a-next', areas: [area('next-area', '', 0)] }]
+    if (pageNumber === 1) pages[0].areas[0].label = ''
+    groupBody = { ...GROUP, pages }
+    await open('?id=rmg-x&step=publish')
+    await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) })
+    await settle()
+    expect(screen.queryByText('ボタン名（読み上げラベル）を入力してください')).not.toBeNull()
+    expect(currentStep()).toContain('ボタンの動き')
+    if (pageNumber === 2) expect(screen.getByRole('button', { name: 'タブ2「次のページ」' }).getAttribute('aria-pressed')).toBe('true')
+    const name = screen.getByRole('textbox', { name: /ボタン名/ }) as HTMLInputElement
+    expect(name.value).toBe('')
+    expect(name.getAttribute('aria-invalid')).toBe('true')
+    expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+    await act(async () => { fireEvent.change(name, { target: { value: '予約する' } }) })
+    expect(screen.queryByText('ボタン名（読み上げラベル）を入力してください')).toBeNull()
+    await act(async () => { fireEvent.click(within(screen.getByRole('navigation', { name: 'リッチメニューを作る手順' })).getByRole('button', { name: /公開/ })) })
+    await settle()
+    await act(async () => { fireEvent.click(getPageAction({ name: '公開する', exact: true })) })
+    await settle()
+    expect(screen.queryByRole('alertdialog', { name: '公開の確認' }) ?? screen.queryByRole('dialog', { name: '公開の確認' })).not.toBeNull()
+    expect(calls.filter(path => /\/publish(?:\?|$)/.test(path))).toEqual([])
+  })
+
   it('選んだ面だけの動きの欄を開き、面の名前を出す。別の面を選ぶと欄が入れ替わる', async () => {
     await open('?id=rmg-x&step=buttons')
     expect(screen.getByText('面 A「予約する」の動き')).toBeTruthy()
