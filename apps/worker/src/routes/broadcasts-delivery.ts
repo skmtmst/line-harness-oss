@@ -1,3 +1,5 @@
+import { scopeSegmentQuery } from '../services/segment-query-scope.js';
+import { getVisibleLineAccountScope } from '../services/account-access.js';
 import { BROADCAST_DEFINITION_GUARD_SQL, broadcastDefinitionGuardArgs } from '../features/broadcasts/index.js';
 import { logger } from '@line-crm/shared/server';
 import { simulationContext, scheduleSimulation, processBroadcastSimulation, simulationPreview } from '../features/broadcasts/broadcast-simulation/index.js';
@@ -179,18 +181,14 @@ export const post__api_broadcasts_id_send_2 = async (c: Context<Env, "/api/broad
     }
 
     const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
-    let audienceSql = `SELECT COUNT(*) AS total,
-                                SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-                           FROM (${sql}) q`;
-    const audienceBindings = [...bindings];
-    if (accountId) {
-      audienceSql = `SELECT COUNT(*) AS total,
-                              SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-                         FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
-      audienceBindings.unshift(accountId);
-    }
-    const audience = await c.env.DB.prepare(audienceSql)
-      .bind(...audienceBindings)
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const scoped = scopeSegmentQuery({ sql, bindings }, accountId
+      ? { allowedAccountIds: [accountId], canSeeUnassigned: false }
+      : scope);
+    const audience = await c.env.DB.prepare(`SELECT COUNT(*) AS total,
+      SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
+      FROM (${scoped.sql}) q`)
+      .bind(...scoped.bindings)
       .first<{ total: number; missing_name: number | null }>();
 
     // 名前を差し込む本文は、名前の無い人がいると差し込めない。送る前に止める。
@@ -578,18 +576,14 @@ export const post__api_broadcasts_id_send_segment_3 = async (c: Context<Env, "/a
     const { buildPublicSegmentQuery } = await import('../services/segment-query.js');
     const { sql, bindings } = buildPublicSegmentQuery(body.conditions);
     const accountId = (existing as unknown as Record<string, unknown>).line_account_id as string | null;
-    let audienceSql = `SELECT COUNT(*) AS total,
-                                SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-                           FROM (${sql}) q`;
-    const audienceBindings = [...bindings];
-    if (accountId) {
-      audienceSql = `SELECT COUNT(*) AS total,
-                              SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
-                         FROM (${sql.replace('WHERE', 'WHERE f.line_account_id = ? AND')}) q`;
-      audienceBindings.unshift(accountId);
-    }
-    const audience = await c.env.DB.prepare(audienceSql)
-      .bind(...audienceBindings)
+    const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
+    const scoped = scopeSegmentQuery({ sql, bindings }, accountId
+      ? { allowedAccountIds: [accountId], canSeeUnassigned: false }
+      : scope);
+    const audience = await c.env.DB.prepare(`SELECT COUNT(*) AS total,
+      SUM(CASE WHEN (${DELIVERY_CONSENT_ALLOWED_SQL.replaceAll('f.', 'q.')}) AND (q.display_name IS NULL OR trim(q.display_name) = '') THEN 1 ELSE 0 END) AS missing_name
+      FROM (${scoped.sql}) q`)
+      .bind(...scoped.bindings)
       .first<{ total: number; missing_name: number | null }>();
     if (Number(audience?.missing_name ?? 0) > 0) {
       return inputError(c, {

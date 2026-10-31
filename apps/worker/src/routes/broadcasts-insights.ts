@@ -12,6 +12,7 @@ import { getLineAccountById } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import { resolveLineToken } from '../services/line-token.js';
 
+import { scopeSegmentQuery } from '../services/segment-query-scope.js';
 import { ACCOUNT_KEYS } from '../middleware/feature-body-accounts.js';
 import { ACCOUNT_QUERY_KEYS } from '../middleware/tenant-scope.js';
 import { canAccessAllLineAccounts, getVisibleLineAccountScope } from '../services/account-access.js';
@@ -528,20 +529,15 @@ export const post__api_segments_count_5 = async (c: Context<Env, "/api/segments/
     const { sql, bindings } = buildPublicSegmentQuery(body.conditions as SegmentCondition);
 
     const scope = await getVisibleLineAccountScope(c.env.DB, c.get('staff'));
-    const allowedIds = sqlIdSet(scope.allowedAccountIds);
-    const accountPredicate = accountId
-      ? 'f.line_account_id = ?'
-      : `(f.line_account_id IN (${allowedIds.sql})${scope.canSeeUnassigned ? ' OR f.line_account_id IS NULL' : ''})`;
-    const accountBindings = [...(accountId ? [accountId] : allowedIds.binds), ...bindings];
-    // 条件が OR でも所属の外へ広がらないよう、友だちの入力集合を先に限定する。
-    const accountSql = sql.replace('FROM friends f', `FROM (SELECT * FROM friends f WHERE ${accountPredicate}) f`);
-    if (accountSql === sql) throw new Error('Segment account scope could not be applied');
+    const scoped = scopeSegmentQuery({ sql, bindings }, accountId
+      ? { allowedAccountIds: [accountId], canSeeUnassigned: false }
+      : scope);
 
     /*
      * 集計 SQL は副問い合わせに包んで数える。SELECT から FROM までを正規表現で置換すると、タグ条件の入れ子の FROM まで消して SQL を壊すため。
      */
-    const countSql = `SELECT COUNT(*) AS count FROM (${accountSql}) q`;
-    const result = await c.env.DB.prepare(countSql).bind(...accountBindings).first<{ count: number }>();
+    const countSql = `SELECT COUNT(*) AS count FROM (${scoped.sql}) q`;
+    const result = await c.env.DB.prepare(countSql).bind(...scoped.bindings).first<{ count: number }>();
 
     return c.json({ success: true, count: result?.count ?? 0 });
   } catch (err) {

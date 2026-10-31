@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import { mkdir } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { connectGuardBrowser } from './browser-session.mjs'
+import { stubApi } from './speed-budget.mjs'
+import { mockFetch } from './mock-local.mjs'
 
 const base = process.env.V8_GUARD_BASE || 'http://127.0.0.1:4310'
 const output = process.env.LEDGER_SHOTS
@@ -27,12 +29,13 @@ test('飲食店3画面は共通タブなしで左メニューと画面内の行�
           }
           for (const [key, value] of Object.entries({ lh_csrf: 'visual-qa-csrf', lh_staff_role: 'owner', lh_staff_name: 'K', lh_staff_permissions: '[]', lh_staff_view_permissions: '[]', lh_selected_account: 'visual-qa-account', lh_auth_selection_cleared: '1' })) localStorage.setItem(key, value)
         })
-        await page.route('**/api/dashboard/style?*', async route => {
-          const response = await route.fetch()
-          const body = await response.json()
+        await stubApi(page, async (method, path) => {
+          const response = await mockFetch(method, path)
+          if (new URL(path, base).pathname !== '/api/dashboard/style') return response
+          const body = JSON.parse(response.body)
           body.data.style = 'restaurant'
           body.data.styleSelected = true
-          await route.fulfill({ response, json: body })
+          return { ...response, body: JSON.stringify(body) }
         })
         for (const [route, title] of screens) {
           await page.goto(`${base}/restaurant-test/${route}`, { waitUntil: 'networkidle' })

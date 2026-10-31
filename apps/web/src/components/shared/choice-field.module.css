@@ -78,3 +78,5 @@ html:root .frame[data-choice-field] > [data-choice-trigger]:disabled { cursor: n
 /* 状態の札は入力欄とは分け、従来のボタンの輪を保つ。 */
 html:root .frame[data-choice-field][data-tone]:focus-visible { outline: var(--polish-focus-width) solid var(--polish-focus); outline-offset: var(--polish-focus-offset); }
 html:root .frame[data-choice-field][data-tone][data-choice-invalid]:focus-visible { outline-color: var(--color-danger); }
+
+html:root .frame[data-choice-field][data-choice-surface="select"] { background: var(--gradient-raised-control) var(--color-canvas); }
