@@ -21,11 +21,11 @@ it.each([['予約履歴', LessonHistorySection], ['教室の予約一覧', Event
   vi.mocked(api.myEventBookings).mockImplementation(async tab => ({ items: !absent && tab === 'upcoming' ? [booking] : [] }));
   vi.mocked(api.eventAbsence).mockImplementation(async () => { absent = true; return { credit: null, reason_if_none: 'monthly_cap' }; });
   render(<MemoryRouter><CustomerStyleContext.Provider value="lesson"><Component /></CustomerStyleContext.Provider></MemoryRouter>);
-  fireEvent.click(await screen.findByRole('button', { name: '欠席する', exact: true }));
+  fireEvent.click(await screen.findByRole('button', { name: '欠席する' }));
   const dialog = await screen.findByRole('dialog');
-  fireEvent.click(within(dialog).getByRole('button', { name: '欠席する', exact: true }));
+  fireEvent.click(within(dialog).getByRole('button', { name: '欠席する' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-  await waitFor(() => expect(screen.queryByRole('button', { name: '欠席する', exact: true })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('button', { name: '欠席する' })).toBeNull());
   const notice = screen.getByRole('status');
   expect(notice.textContent).toContain('今月の振替の上限に達しています。欠席は受け付けました。');
   expect(screen.queryByRole('alert')).toBeNull();
