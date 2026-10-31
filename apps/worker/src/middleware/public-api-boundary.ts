@@ -14,7 +14,7 @@ export function isPublicLiffOperation(method: string, path: string): boolean {
 
 export function isPublicApiBoundary(method: string, path: string): boolean {
   const normalizedMethod = method.toUpperCase();
-  if(normalizedMethod==='POST' && (path==='/api/ec/events'||path==='/api/booking/pass-payments/webhook'||path==='/mcp'))return true;
+  if(normalizedMethod==='POST' && (path==='/api/ec/events'||path==='/api/booking/pass-payments/webhook'||path==='/api/booking/stripe-test/webhook'||path==='/mcp'))return true;
   // フォーム定義の GET は LIFF が認証なしで読む。PUT/DELETE は管理 API。
   if (isPublicFormDefinition(normalizedMethod, path)) return true;
   if (normalizedMethod === 'GET' && /^\/api\/forms\/[^/]+\/images\/[^/]+$/.test(path)) return true;

@@ -144,7 +144,7 @@ describe('署名済みStripe試験通知の入口',()=>{
       headers:{'stripe-signature':valid?`t=${timestamp},v1=${signature}`:'bad'}},{DB:f.db,STRIPE_TEST_WEBHOOK_SECRET:secret} as Env['Bindings']);
   }
   it('不正署名と本番通知を拒否し、検証済みデータだけ履歴に入れる',async()=>{
-    const event={id:'evt_signed',type:'payment_intent.payment_failed',livemode:false,data:{object:{id:'pi_test_p',amount:1000,currency:'jpy',customer:'secret-customer'}}};
+    const event={id:'evt_signed',type:'payment_intent.payment_failed',livemode:false,data:{object:{livemode:false,id:'pi_test_p',amount:1000,currency:'jpy',customer:'secret-customer'}}};
     expect((await send(event,false)).status).toBe(401);
     expect((await send({...event,livemode:true})).status).toBe(401);
     expect(f.raw.prepare('SELECT COUNT(*) n FROM booking_payment_events').get()).toEqual({n:0});
@@ -154,7 +154,7 @@ describe('署名済みStripe試験通知の入口',()=>{
   });
   it('charge.succeededから署名済みの領収書だけを保存し、入金・確定を重ねない',async()=>{
     await receive();
-    const event={id:'evt_receipt',type:'charge.succeeded',livemode:false,data:{object:{id:'ch_test',payment_intent:'pi_test_p',
+    const event={id:'evt_receipt',type:'charge.succeeded',livemode:false,data:{object:{livemode:false,id:'ch_test',payment_intent:'pi_test_p',
       amount:1000,currency:'jpy',receipt_url:'https://pay.stripe.com/receipts/test'}}};
     expect((await send(event)).status).toBe(200);
     expect(f.raw.prepare('SELECT receipt_url FROM booking_payments').get()).toEqual({receipt_url:event.data.object.receipt_url});
@@ -164,7 +164,7 @@ describe('署名済みStripe試験通知の入口',()=>{
     expect(f.raw.prepare('SELECT receipt_url FROM booking_payments').get()).toEqual({receipt_url:'https://pay.stripe.com/receipts/test'});
   });
   it('部分返金の累計額と全額返金の累計額を区別して受け付ける',async()=>{
-    const event={id:'evt_refund',type:'charge.refunded',data:{object:{id:'ch_test',payment_intent:'pi_test_p',amount:1000,amount_refunded:500,currency:'jpy'}}};
+    const event={id:'evt_refund',type:'charge.refunded',livemode:false,data:{object:{livemode:false,id:'ch_test',payment_intent:'pi_test_p',amount:1000,amount_refunded:500,currency:'jpy'}}};
     f.raw.exec("UPDATE booking_payments SET status='paid'");
     expect((await send(event)).status).toBe(200);
     expect(f.raw.prepare('SELECT status,refunded_amount FROM booking_payments').get()).toEqual({status:'paid',refunded_amount:500});

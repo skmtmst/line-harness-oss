@@ -140,12 +140,12 @@ export default function UsersV8() {
               { value: 'unlinked', label: 'UID：未連携・要確認' },
             ]}
           /></SaveErrorField>
-        <div className={styles.selectWrap}>
+
           <SaveErrorField names={["account","u.account"]}><EntitySelect
             aria-label="所属アカウントで絞り込む"
             label="所属アカウント"
             valuePrefix="所属アカウント"
-            size="full"
+            size="content"
             value={u.account}
             onChange={u.setAccount}
             options={[
@@ -153,7 +153,7 @@ export default function UsersV8() {
               ...u.accountOptions.map((a) => ({ ...entityOptionMetadata(a), value: a.id, label: a.name })),
             ]}
           /></SaveErrorField>
-        </div>
+
         <SaveErrorField names={["onlyDups","u.onlyDups","only_dups","u.only_dups"]}><Checkbox
           checked={u.onlyDups}
           onCheckedChange={u.setOnlyDups}

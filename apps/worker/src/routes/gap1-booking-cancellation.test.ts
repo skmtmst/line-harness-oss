@@ -76,7 +76,7 @@ test('B1-26: 店が断った取消には請求を作らない、取消の巻戻�
 });
 test('B1-08: 署名が正しい試験の完了通知だけでカードを登録済みにする',async()=>{
  const {createHmac}=await import('node:crypto');connect();await save();d.raw.exec("INSERT INTO booking_payment_methods(id,friend_id,line_account_id,setup_id,idempotency_key,created_at) VALUES('pm','f','a','seti_test_callback','key',datetime('now'))");
- const body=JSON.stringify({livemode:false,type:'setup_intent.succeeded',data:{object:{id:'seti_test_callback',customer:'cus_test',payment_method:'pm_test',status:'succeeded'}}});
+ const body=JSON.stringify({livemode:false,type:'setup_intent.succeeded',data:{object:{livemode:false,id:'seti_test_callback',customer:'cus_test',payment_method:'pm_test',status:'succeeded'}}});
  const t=Math.floor(Date.now()/1000),sig=createHmac('sha256','test-webhook-secret').update(`${t}.${body}`).digest('hex');
  const r=await app().request('/api/liff/booking/setup-webhook',{method:'POST',headers:{'stripe-signature':`t=${t},v1=${sig}`},body});expect(r.status).toBe(200);expect(d.raw.prepare('SELECT status FROM booking_payment_methods').get()).toEqual({status:'ready'});
 });
