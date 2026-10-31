@@ -1,21 +1,21 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { StyleSchedule, StyleSnapshot } from '@line-crm/shared'
 
-const state = vi.hoisted(() => ({ account: 'a', role: 'admin', get: vi.fn(), save: vi.fn(), reset: vi.fn(), summary: vi.fn(), schedule: vi.fn() }))
+const state = vi.hoisted(() => ({ account: 'a', role: 'admin', push: vi.fn(), get: vi.fn(), save: vi.fn(), reset: vi.fn(), summary: vi.fn(), schedule: vi.fn(), warnings: vi.fn(), items: vi.fn() }))
 const firstRun = vi.hoisted(() => ({ steps: [] as unknown[] }))
 vi.mock('@/v8/onboarding/public/use-first-run/index', () => ({ useFirstRun: () => ({ status: 'ready', steps: firstRun.steps, firstRun: null, starter: null, error: null, reload: vi.fn(), watchExpired: false, rewatch: vi.fn() }) }))
 vi.mock('@/v8/onboarding/public/style-setup-progress/index', () => ({ useStyleSetupProgress: (_id: string, style: string) => ({ progress: { style, steps: {} }, reload: vi.fn() }) }))
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/', useSearchParams: () => new URLSearchParams() }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: state.push, replace: vi.fn() }), usePathname: () => '/', useSearchParams: () => new URLSearchParams() }))
 vi.mock('next/link', () => ({ default: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a> }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: state.account }) }))
 vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => state.role }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/v8/restaurant/dashboard/public/use-store-today/index', () => ({ useStoreToday: () => ({}) }))
-vi.mock('@/components/shared/preparing-dialog', () => ({ PREPARING_TITLE: 'preparing', usePreparingDialog: () => ({ open: vi.fn(), dialog: null }) }))
-vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { summary: state.summary, schedule: state.schedule, get: state.get, saveCards: state.save, resetCards: state.reset } }))
+vi.mock('@/components/shared/preparing-dialog', () => ({ PREPARING_TITLE: 'preparing', PREPARING_WORD: '準備中', usePreparingDialog: () => ({ open: vi.fn(), dialog: null }) }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { summary: state.summary, schedule: state.schedule, get: state.get, saveCards: state.save, resetCards: state.reset, warnings: state.warnings, starterItems: state.items } }))
 vi.mock('@/lib/api', async importOriginal => { const actual = await importOriginal<typeof import('@/lib/api')>(); return { ...actual, bookingApi: { ...actual.bookingApi, getPaymentConfig: vi.fn().mockResolvedValue({ data: {} }) } } })
 
 import StyleDashboard from './style-dashboard'
@@ -29,7 +29,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   state.role = 'admin'
   firstRun.steps = buildStepsFromApi(['accounts', 'featureSet', 'attributes', 'friendAdd', 'scenario', 'firstMessage'].map(key => ({ key, state: 'todo', href: '/getting-started', reason: null })) as Parameters<typeof buildStepsFromApi>[0])
-  state.get.mockResolvedValue({ data: { cards: [], version: 2, metricIds: ['bookings', 'attention', 'freeTables', 'noShowRate', 'newBookings'] } })
+  state.account = 'a'
+  state.get.mockResolvedValue({ success: true, data: { style: 'restaurant', styleSelected: true, answers: { image: { mode: 'configured', value: 'simple' } }, cards: [], version: 2, metricIds: ['bookings', 'attention', 'freeTables', 'noShowRate', 'newBookings'] } })
+  state.warnings.mockResolvedValue({ success: true, data: { count: 0, items: [] } })
+  state.items.mockResolvedValue({ success: true, data: { items: [{ target_id: 'notice', kind: 'automation', is_sample: 1, status: 'draft', draftRevision: 'draft' }, { target_id: 'menu', kind: 'rich_menu', is_sample: 1, status: 'draft', draftRevision: null }] } })
   state.summary.mockResolvedValue({ data: snapshot })
   state.schedule.mockResolvedValue({ success: true, data: schedule })
 })
@@ -63,7 +66,7 @@ it.each(['restaurant', 'salon', 'consult', 'lesson'] as const)('%sの専用画�
   const view = render(<StyleDashboard style={style} />)
   const title = await screen.findByRole('heading', { name: 'はじめにやること' })
   const card = title.closest('section')!
-  expect(card.querySelectorAll('li')).toHaveLength(style === 'restaurant' ? 8 : 6)
+  expect(card.querySelectorAll('#first-steps-list > li')).toHaveLength(style === 'restaurant' ? 8 : 6)
   const band = view.container.querySelector('[data-style-dashboard]')!
   expect(card.compareDocumentPosition(band) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
@@ -73,4 +76,67 @@ it('専用画面の閲覧のみでもカードを隠さず、設定の操作を�
   const card = (await screen.findByRole('heading', { name: 'はじめにやること' })).closest('section')!
   expect(card.querySelectorAll('a')).toHaveLength(0)
   expect(card.querySelectorAll('button[aria-disabled="true"]').length).toBeGreaterThan(0)
+})
+
+it.each([
+  ['restaurant', '席の予約設定'], ['salon', 'メニュー・料金'], ['consult', '面談の予約設定'], ['lesson', 'クラス・スケジュール'],
+] as const)('%sの選んだ機能の設定は同じ口と部品で読み、既存の質問へ開く', async (style, note) => {
+  const profile = { style, styleSelected: true, version: 2, cards: [], answers: { image: { mode: 'configured', value: 'simple' } } }
+  state.get.mockResolvedValue({ success: true, data: profile })
+  render(<StyleDashboard style={style} />)
+  expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
+  expect(screen.getByText('入ったお知らせを動かす')).toBeTruthy()
+  expect(screen.getByText(new RegExp(note))).toBeTruthy()
+  expect(state.warnings).toHaveBeenCalledWith('a')
+  expect(state.items).toHaveBeenCalledWith('a')
+  fireEvent.click(screen.getByRole('button', { name: '中身を見る' }))
+  expect(state.push).toHaveBeenLastCalledWith('/?setup=summary')
+  fireEvent.click(screen.getByRole('button', { name: '使い方の設定を開く' }))
+  expect(state.push).toHaveBeenLastCalledWith('/?setup=2')
+})
+
+it.each(['viewer', 'staff'])('%sは設定の欄を読み、変更と中身を見る操作を理由付きで止める', async role => {
+  state.role = role
+  render(<StyleDashboard style="restaurant" />)
+  const button = await screen.findByRole('button', { name: '使い方の設定を開く' })
+  expect(button.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.focus(button)
+  expect((await screen.findByRole('tooltip')).textContent).toContain('管理者')
+  fireEvent.click(button)
+  expect(state.push).not.toHaveBeenCalled()
+  expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
+  expect(state.warnings).toHaveBeenCalledWith('a')
+  expect(state.items).toHaveBeenCalledWith('a')
+  const confirm = screen.getByRole('button', { name: '確かめる' })
+  expect(confirm.getAttribute('aria-disabled')).toBe('true')
+  fireEvent.click(confirm)
+  expect(state.push).not.toHaveBeenCalled()
+  const read = screen.getByRole('button', { name: '中身を見る' })
+  expect(read.getAttribute('aria-disabled')).toBe('true')
+  expect(document.getElementById(read.getAttribute('aria-describedby')!)?.textContent).toContain('中身はオーナーか管理者が見られます')
+  fireEvent.click(read)
+  expect(screen.queryByRole('dialog')).toBeNull()
+  expect(state.push).not.toHaveBeenCalled()
+  expect(state.save).not.toHaveBeenCalled()
+})
+
+it('設定の取得失敗を未設定にせず、同じ口を読み直せる', async () => {
+  state.warnings.mockRejectedValueOnce(new Error('unavailable'))
+  render(<StyleDashboard style="restaurant" />)
+  expect(await screen.findByText('使い方の設定を確認できませんでした')).toBeTruthy()
+  expect(screen.queryByRole('button', { name: '使い方の設定を開く' })).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'もう一度読み込む' }))
+  expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
+  await waitFor(() => expect(state.warnings).toHaveBeenCalledTimes(2))
+})
+
+it('選んだ機能の設定が遅れても数の帯を先に出して下へ動かさない', async () => {
+  let resolve!: (value: unknown) => void
+  state.warnings.mockImplementationOnce(() => new Promise(done => { resolve = done }))
+  const view = render(<StyleDashboard style="restaurant" />)
+  await waitFor(() => expect(state.warnings).toHaveBeenCalled())
+  expect(view.container.querySelector('[data-pending="true"]')).not.toBeNull()
+  await act(async () => resolve({ success: true, data: { items: [] } }))
+  await waitFor(() => expect(view.container.querySelector('[data-pending="true"]')).toBeNull())
+  expect(await screen.findByRole('heading', { name: '選んだ機能の設定' })).toBeTruthy()
 })

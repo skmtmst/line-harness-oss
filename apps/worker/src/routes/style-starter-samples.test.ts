@@ -294,3 +294,41 @@ describe('統括の［標準を読む］［標準に戻す］', () => {
     expect(sets().map((s) => s.version)).toEqual([1]);
   });
 });
+
+
+describe('初期セットの本文とメタ情報の境界', () => {
+  const prepare = async () => {
+    const saved = await request(base + '?account_id=a', 'PUT', { expectedVersion: 0, style: 'restaurant', answers: { image: { mode: 'configured', value: 'simple' } } });
+    expect(saved.status).toBe(200);
+    sql.raw.prepare("UPDATE style_starter_items SET pending_update=? WHERE line_account_id='a'").run(JSON.stringify({ privateBody: '機能本文の目印' }));
+  };
+  test.each([
+    { role: 'staff', readOnly: false },
+    { role: 'staff', readOnly: true },
+    { role: 'admin', readOnly: true },
+    { role: 'owner', readOnly: true },
+  ] as const)('$role / readOnly=$readOnly には本文を一切返さない', async identity => {
+    await prepare(); actor = { ...actor, ...identity };
+    const writesBefore = sql.raw.prepare('SELECT total_changes() n').get();
+    const response = await request(base + '/starter-items?account_id=a');
+    expect(response.status).toBe(200);
+    const items = response.body.data.items as Array<Record<string, unknown>>;
+    expect(items.length).toBeGreaterThan(0);
+    const fields = ['target_id', 'kind', 'key', 'name', 'is_sample', 'isSample', 'status', 'draftRevision', 'requiresActivation', 'activationAllowed'].sort();
+    for (const item of items) { expect(Object.keys(item).sort()).toEqual(fields); expect(item.draftRevision).toBeNull(); }
+    expect(sql.raw.prepare('SELECT total_changes() n').get()).toEqual(writesBefore);
+    expect(items.some(item => item.name && item.target_id && item.kind && item.status)).toBe(true);
+    expect(JSON.stringify(response.body)).not.toContain('機能本文の目印');
+    expect((await request(base + '/starter-items?account_id=b')).status).toBe(404);
+    expect((await request(base + '/activate?account_id=a', 'POST', { confirmed: true, items: [] })).status).toBe(403);
+  });
+  test.each(['owner', 'admin'] as const)('%s の本文は従来どおり返す', async role => {
+    await prepare(); actor = { ...actor, role };
+    const response = await request(base + '/starter-items?account_id=a');
+    expect(response.status).toBe(200);
+    const items = response.body.data.items as Array<Record<string, unknown>>;
+    expect(items.every(item => 'currentSnapshot' in item && 'definition' in item && 'pending_update' in item && 'pendingUpdate' in item)).toBe(true);
+    expect(items.some(item => item.currentSnapshot !== null)).toBe(true);
+    expect(JSON.stringify(response.body)).toContain('機能本文の目印');
+  });
+});

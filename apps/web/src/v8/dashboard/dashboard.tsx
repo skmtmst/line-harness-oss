@@ -19,7 +19,7 @@ import { useAccount } from '@/contexts/account-context'
 import { formatNumber,formatTime } from '@/lib/format'
 import { formatWaitRough } from '@/lib/format-duration'
 import { canManageRole,useStaffRole } from '@/lib/staff-role'
-import { SetupTasks, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
+import { SetupTasks, SetupTasksUnavailable, SetupWarningBands, setupSummary } from '@/v8/onboarding/public/setup-card/index'
 import ListState from '@/components/shared/list-state'
 import { useStyleSetup } from '@/v8/onboarding/public/use-style-setup/index'
 import type { AccountStyle, DashboardCardId } from '@line-crm/shared'
@@ -87,7 +87,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
   const setup = useStyleSetup(d.selectedAccountId, role)
   const start = useFirstSteps(d.selectedAccountId, role, { qrOpen: qrRequested, style: setup.data?.state.style ?? accountStyle })
   const starterResult = useStarterRetryResult(d.selectedAccountId)
-  const setupRest = setupSummary(setup.data)
+  const setupRest = setupSummary(setup.data, !canManage)
   const closedWizardAccount = useRef<string | null>(null)
   const [wizardStep, setWizardStep] = useState<number | 'summary' | null>(null)
   useEffect(() => {
@@ -107,6 +107,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
     setWizardStep((current) => current ?? 0)
   }, [setup.data, canManage, d.selectedAccountId, qrRequested])
   const openSetupStep = (step: string | number) => {
+    if (!canManage) return
     if (typeof step === 'number') { setWizardStep(step); return }
     const names = setup.data ? ['style', 'image'] : []
     setWizardStep(step === 'summary' ? 'summary' : Math.max(0, names.indexOf(step)))
@@ -381,7 +382,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
     ...d.visibleRight.map((item) => item.id),
   ])
   const looseFailures = partialFailuresWithoutCard(data?.partialFailures ?? [], shownCardIds)
-  const setupBands = setup.data && canManage ? <SetupWarningBands data={setup.data} /> : null
+  const setupBands = setup.data ? <SetupWarningBands data={setup.data} configureAllowed={canManage} role={role} /> : null
   /* 初期セットが入っていない時の［入れ直す］。版は使い方の設定が読めてから渡す（閲覧のみには出さない）。 */
   const starterRetry = canManage && d.selectedAccountId && starterRetryVisible(start.starter, starterResult.inserted) ? (
     <StarterRetryNotice key={d.selectedAccountId} accountId={d.selectedAccountId} starter={start.starter} version={setup.data?.state.version ?? null}
@@ -389,7 +390,7 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       onChanged={() => { start.reload(); setup.reload() }} />
   ) : null
   const onboardingSummary = start.summary ?? (canManage && setupRest && start.steps.length > 0 ? summarizeFirstSteps(start.steps) : null)
-  const showOnboarding = role !== null && Boolean(onboardingSummary || setupRest || start.error || setup.error)
+  const showOnboarding = role !== null && Boolean(onboardingSummary || setupRest || start.error || setup.error || !canManage)
   const notice = start.error || setup.error || start.summary || starterRetry || setupRest || setup.data?.warnings.length || viewer || d.error || d.periodNotice || looseFailures.length ? (
     <div className={styles.notices}>
       {viewer ? (
@@ -400,11 +401,11 @@ export default function DashboardV8({ usageStyle, accountStyle = usageStyle ?? '
       {showOnboarding ? <FirstStepsCard
         onRetry={start.reload} summary={onboardingSummary} readOnly={role === 'viewer'} folded={start.folded} onToggle={start.toggle}
         onRecheck={start.watchExpired ? start.rewatch : undefined}
-        onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : undefined}
-        setupTasks={setupRest ? <SetupTasks heading summary={setupRest} onOpenStep={openSetupStep} /> : undefined}
+        onConfigure={setupRest ? () => openSetupStep(setupRest.nextStep) : role !== null && !canManage ? () => openSetupStep('style') : undefined} configureAllowed={canManage}
+        setupTasks={setupRest ? <SetupTasks heading summary={setupRest} onOpenStep={openSetupStep} configureAllowed={canManage} role={role} /> : role !== null && !canManage ? <SetupTasksUnavailable error={setup.error} onRetry={setup.reload} /> : undefined}
         feedback={<>
           {start.error ? <FirstStepsFeedback error={start.error} onRetry={start.reload} /> : null}
-          {setup.error ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}
+          {setup.error && canManage ? <ListState kind="error" title="使い方の設定を確認できませんでした" error={setup.error} onRetry={setup.reload} /> : null}
         </>}
       /> : null}
       {d.periodNotice ? <Notice tone="info" role="status">{d.periodNotice}</Notice> : null}
