@@ -1,4 +1,6 @@
 'use client'
+import { tableCapacityReason, type RestaurantTableDefinition } from '../booking-kit/table-definition'
+import { DialogNote } from '../booking-kit/parts'
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 
 import { jstCalendar } from '@/lib/jst-datetime'
@@ -33,6 +35,7 @@ import styles from './reservations.module.css'
 
 import { formatYen as polishFormatYen, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
+import { phoneReservationInputReason } from '../booking-kit/phone-required'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -80,7 +83,8 @@ function recommendTable(tables: RestaurantTable[], count: number, free: (table: 
     .sort((a, b) => (a.max_capacity - count) - (b.max_capacity - count) || a.code.localeCompare(b.code, 'ja', { numeric: true }))[0] ?? null
 }
 
-export default function PhoneReservation({ storeId, storeName, tables, menuItems, busy, preset, onBack, onSave }: {
+export default function PhoneReservation({ tableDefinition, storeId, storeName, tables, menuItems, busy, preset, onBack, onSave }: {
+  tableDefinition?: RestaurantTableDefinition
   storeId: string
   storeName: string
   tables: RestaurantTable[]
@@ -123,6 +127,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
   const [historyError, setHistoryError] = useState('')
   const formRef = useRef<HTMLFormElement>(null)
   const guests = Number(count)
+  const capacityReason = tableCapacityReason(tableDefinition, selectedAccountId, storeId, tables, guests)
   const fields = useFormErrors()
   fields.define('person', 'お客さま', () => kind !== 'customer' || whoTab !== 'line' || person ? null : '名前・電話番号で探して、お客さまを選んでください。', { required: true })
   fields.define('name', 'お名前', () => kind !== 'customer' || whoTab !== 'phone' || manualName.trim() ? null : 'お名前を入れてください。', { required: true })
@@ -215,6 +220,14 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
   const lastAllergy = history?.visits.find((v) => v.allergy_note)?.allergy_note ?? null
   const [yy, mm, dd] = date.split('-').map(Number)
   const dayDate = yy && mm && dd ? new Date(`${date}T00:00:00+09:00`) : new Date()
+  const inputReason = phoneReservationInputReason([
+    { label: 'お客さま', value: kind !== 'customer' || whoTab !== 'line' || Boolean(person) },
+    { label: 'お名前', value: kind !== 'customer' || whoTab !== 'phone' || manualName },
+    { label: '日付', value: date },
+    { label: '人数', value: count },
+    { label: '時刻', value: time },
+    { label: '仮押さえの期限', value: kind !== 'hold' || holdMinutes },
+  ])
 
   const save = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
@@ -298,7 +311,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
         footerActions={(
           <>
             <Button onClick={onBack} disabled={busy}>キャンセル</Button>
-            <Button variant="primary" disabled={busy || !storeId || !dayReady} onClick={() => formRef.current?.requestSubmit()}>
+            <Button variant="primary" disabled={busy || !storeId || !dayReady || Boolean(inputReason)} disabledReason={inputReason} onClick={() => formRef.current?.requestSubmit()}>
               {kind === 'hold' ? <Lock size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}{kind === 'hold' ? '枠を押さえる' : '台帳に入れる'}
             </Button>
           </>
@@ -379,6 +392,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
             <div className={styles.timeBlock}>
               {fields.invalid('time') ? <Field label="時間" error={fields.error('time')} requirement={fields.requirement('time')}><SaveErrorField names={["time"]}><TimeField aria-label="時間" invalid value={time} onChange={setTime} /></SaveErrorField></Field> : null}
               <p className={styles.timeLabel}>{`空いている時間（${guests}名が入る卓がある時間）`}</p>
+              {capacityReason ? <DialogNote>{capacityReason}</DialogNote> : null}
               {times.length === 0 ? (
                 <p className={styles.sideText}>この日は予約を受ける時間がありません（予約枠・在庫の開ける時間）。</p>
               ) : (

@@ -167,6 +167,7 @@ function LedgerBody({ ctx, view, day, period, status, page, source, phone, onDay
   if (phone) {
     return (
       <PhoneReservation
+        tableDefinition={ctx.tableDefinition}
         storeId={storeId}
         storeName={store?.name || ''}
         tables={tables}

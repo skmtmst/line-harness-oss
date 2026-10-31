@@ -1,4 +1,6 @@
 'use client'
+import { tableCapacityReason, type RestaurantTableDefinition } from '../booking-kit/table-definition'
+import { DialogNote } from '../booking-kit/parts'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
@@ -11,6 +13,7 @@ import type { RestaurantOpeningDay } from '@line-crm/shared'
 import Button from '@/components/shared/button'
 import DateField from '@/components/shared/date-field'
 import Drawer from '@/components/shared/drawer'
+import { DialogActions } from '@/components/shared/dialog'
 import FilterChip from '@/components/shared/filter-chip'
 import IconButton from '@/components/shared/icon-button'
 import SegmentedControl from '@/components/shared/segmented'
@@ -24,6 +27,7 @@ import styles from './front-desk.module.css'
 import { Field } from '@/components/shared/form-controls'
 import { SaveErrorField, SaveErrorScope, useSaveFormErrors } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
+import { phoneReservationInputReason } from '../booking-kit/phone-required'
 
 /*
  * ★V8 電話予約の引き出し（提案 E-2 `wEzuG`）。
@@ -48,9 +52,10 @@ function md(day: Date): string {
   return polishFormatDate(day, { style: 'list-day' })
 }
 
-export default function PhoneReservationDrawer({ open, accountId, storeId, tables, onClose, onSaved }: {
+export default function PhoneReservationDrawer({ tableDefinition, open, accountId, storeId, tables, onClose, onSaved }: {
   open: boolean
   accountId: string
+  tableDefinition?: RestaurantTableDefinition
   storeId: string
   tables: RestaurantTable[]
   onClose: () => void
@@ -64,6 +69,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   const [friend, setFriend] = useState<Friend | null>(null)
   const [name, setName] = useState('')
   const [guests, setGuests] = useState(2)
+  const capacityReason = tableCapacityReason(tableDefinition, accountId, storeId, tables, guests)
   const [dayChoice, setDayChoice] = useState<DayChoice>('today')
   const [picked, setPicked] = useState('')
   const [time, setTime] = useState('')
@@ -152,6 +158,11 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   fields.define('date', '日付', () => (date ? null : '日付を選んでください。'), { required: true })
   fields.define('time', '時刻', () => (!date ? null : !time ? '時刻を選んでください。' : chosenTable ? null : 'この時刻に人数が入る卓がありません。時刻か人数を変えてください。'), { required: true })
   const describedBy = (key: string) => (fields.invalid(key) ? `e2-${key}-error` : undefined)
+  const inputReason = phoneReservationInputReason([
+    { label: 'お名前', value: name },
+    { label: '日付', value: date },
+    { label: '時刻', value: time },
+  ])
 
   const save = async () => {
     setError('')
@@ -187,12 +198,12 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   }
 
   const footer = (
-    <div className={styles.drawerFoot}>
+    <DialogActions align="center" padding="none">
       <Button onClick={onClose} disabled={busy}>キャンセル</Button>
-      <Button variant="primary" onClick={() => void save()} disabled={busy} busy={Boolean(busy)} busyLabel="処理中…">
+      <Button variant="primary" onClick={() => void save()} disabled={busy || Boolean(inputReason)} disabledReason={inputReason} busy={Boolean(busy)} busyLabel="処理中…">
         <Check size={16} aria-hidden="true" />予約を入れる
       </Button>
-    </div>
+    </DialogActions>
   )
 
   return (
@@ -248,7 +259,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
           {!date ? (
             <p className={styles.hint}>日付を選ぶと空いている時刻が出ます。</p>
           ) : times.filter(freeAt).length === 0 ? (
-            <p className={styles.hint}>{`この日に ${guests}名が入る空いた時刻はありません。`}</p>
+            capacityReason ? <DialogNote>{capacityReason}</DialogNote> : <p className={styles.hint}>{`この日に ${guests}名が入る空いた時刻はありません。`}</p>
           ) : (
             <div className={styles.timeChips} role="group" aria-labelledby="e2-times">
               {times.filter(freeAt).map((label) => (
