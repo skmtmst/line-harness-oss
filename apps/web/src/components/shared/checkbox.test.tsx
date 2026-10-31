@@ -147,3 +147,18 @@ describe('印は箱の真ん中（上下左右とも 0.1px 以内）', () => {
     expect(paths).toEqual([CHECK_MARK_PATH, MINUS_MARK_PATH])
   })
 })
+
+it('入力不足は理由を読み上げに結び、押しても変わらず、権限ロックの形を優先する', () => {
+  let changes = 0
+  const view = render(<Checkbox checked={false} disabled disabledReason="見本を開いてください" onCheckedChange={() => { changes += 1 }}>見本を確認した</Checkbox>)
+  const input = screen.getByRole('checkbox', { name: '見本を確認した' }) as HTMLInputElement
+  expect(input.closest('[data-incomplete]')).not.toBeNull()
+  expect(document.getElementById(input.getAttribute('aria-describedby') ?? '')?.textContent).toBe('見本を開いてください')
+  fireEvent.click(screen.getByText('見本を確認した'))
+  expect(changes).toBe(0)
+  view.rerender(<Checkbox checked={false} disabled disabledReason="見本を開いてください" lockedReason="閲覧のみです" onCheckedChange={() => { changes += 1 }}>見本を確認した</Checkbox>)
+  expect(input.closest('[data-incomplete]')).toBeNull()
+  expect(input.hasAttribute('data-permission-locked')).toBe(true)
+  fireEvent.click(input)
+  expect(changes).toBe(0)
+})

@@ -1,3 +1,4 @@
+import { defaultRestaurantReservationForm } from '@line-crm/shared';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import * as followupTestSend from '../services/restaurant-followup-test-send.js';
@@ -293,4 +294,39 @@ it('来店フォローの閲覧権限だけで状態を読め、操作権限が�
  for(const action of ['initialize','reservation_created/draft','reservation_created/test-send','reservation_created/start'])
   expect((await requestAs(path+'/engines/'+action+scope,'staff',{})).status).toBe(403);
  expect(testDb.raw.prepare('SELECT count(*) n FROM rt_store_followup_targets').get()).toEqual({n:0});
+});
+
+it('予約フォームは読むだけで行を作らず、管理者だけが店ごとの版を保存できる',async()=>{
+ newStore();const url=path+'/reservation-form'+scope;
+ expect(await (await request(url)).json()).toMatchObject({data:{version:0,definition:{title:'ご予約'}}});
+ const definition={...defaultRestaurantReservationForm(),title:'夜のお席のご予約'};
+ expect((await requestWithMethod(url,'PUT',{expectedVersion:0,definition})).status).toBe(200);
+ expect((await requestWithMethod(url,'PUT',{expectedVersion:0,definition})).status).toBe(409);
+ expect((await requestWithMethod('/api/restaurant-test/followups/foreign/reservation-form'+scope,'PUT',{expectedVersion:0,definition})).status).toBe(404);
+ for(const access_level of ['full','read_only'] as const){
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'staff',name:'担当',role:'staff',access_level,permission_keys:'["/restaurant-test/line-followup"]',view_permission_keys:'["/restaurant-test/line-followup"]',assigned_line_account_id:null,can_access_descendant_accounts:1});
+  expect((await requestAs(url,'staff')).status).toBe(200);
+  expect((await requestWithMethod(url,'PUT',{expectedVersion:1,definition},'staff')).status).toBe(403);
+ }
+ expect(testDb.raw.prepare("SELECT count(*) n FROM account_settings WHERE key='restaurant.reservation_form:new'").get()).toEqual({n:1});
+});
+
+it('壊れたフォームは管理側の503を保ち、修復の権限と版を照合して監査に残す',async()=>{
+ newStore();const url=path+'/reservation-form'+scope,definition=defaultRestaurantReservationForm();
+ expect((await requestWithMethod(url,'PUT',{expectedVersion:0,definition})).status).toBe(200);
+ testDb.raw.exec("UPDATE account_settings SET value='{broken' WHERE key='restaurant.reservation_form:new'");
+ const response=await request(url);expect(response.status).toBe(503);
+ const body=await response.json() as {data:{repair:{version:number;definition:unknown;repairToken:string}}};
+ expect(body.data.repair.version).toBe(-1);
+ const input={expectedVersion:-1,definition,repairToken:body.data.repair.repairToken};
+ expect((await requestWithMethod(url,'PUT',{...input,repairToken:'old'})).status).toBe(409);
+ expect((await requestWithMethod(url,'PUT',{expectedVersion:1,definition})).status).toBe(503);
+ expect((await requestWithMethod('/api/restaurant-test/followups/foreign/reservation-form'+scope,'PUT',input)).status).toBe(404);
+ authMocks.getStaffByApiKey.mockResolvedValue({id:'staff',name:'担当',role:'staff',access_level:'full',permission_keys:'["/restaurant-test/line-followup"]',assigned_line_account_id:null,can_access_descendant_accounts:1});
+ expect((await requestWithMethod(url,'PUT',input,'staff')).status).toBe(403);
+ authMocks.getStaffByApiKey.mockResolvedValue(null);
+ expect((await requestWithMethod(url,'PUT',input)).status).toBe(200);
+ expect((await requestWithMethod(url,'PUT',input)).status).toBe(409);
+ expect((await requestWithMethod(url,'PUT',{expectedVersion:1,definition})).status).toBe(200);
+ await vi.waitFor(()=>expect(testDb.raw.prepare("SELECT actor_principal_id,target_id,result FROM audit_events WHERE action='restaurant.reservation_form.repair'").all()).toEqual([{actor_principal_id:expect.any(String),target_id:'new',result:'success'}]));
 });

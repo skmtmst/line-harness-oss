@@ -11,7 +11,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from '@/components/shared/list-navigation';
 import { useSearchParams } from 'next/navigation';
 import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation';
-import { AlertTriangle, ArrowRight, Building2, CheckCircle2, Copy, Eye, FileText, Send, SquarePen, Tag as TagIcon, Workflow } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Building2, CheckCircle2, Copy, FileText, Send, SquarePen, Tag as TagIcon, Workflow } from 'lucide-react';
 import type { Folder, HqBroadcastInput, HqBroadcastPreflight, HqBroadcastRun, MessageTemplateDefinition, SegmentCondition } from '@line-crm/shared';
 import ConditionBuilder from '@/components/shared/condition-builder';
 import Dialog from '@/components/shared/dialog';
@@ -69,6 +69,7 @@ import styles from './create.module.css';
 import MessageComposer from '@/components/shared/message-composer';
 import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame';
 import PreviewLauncher from '@/components/templates/preview-launcher';
+import { usePreviewReview } from '@/components/broadcasts/use-preview-review';
 import { Field } from '@/components/shared/form-controls';
 import { SettingsFormRow } from '@/components/shared/settings-form-card';
 import { emptyValue } from '@/components/shared/empty-value';
@@ -210,6 +211,9 @@ export default function HqBroadcastCreate() {
   const [when, setWhen] = useState<'now' | 'later'>('later')
   const [date, setDate] = useState(() => jstDateOffset(1))
   const [time, setTime] = useState('11:00')
+  const previewKey = JSON.stringify([bubbles, accountIds, when, date, time])
+  const previewReview = usePreviewReview(previewKey, false, previewConfirmed, setPreviewConfirmed)
+  const previewOpened = useCallback(() => previewReview.markVariant('A'), [previewReview.markVariant])
 
   const [run, setRun] = useState<HqBroadcastRun | null>(null)
   const [runKey, setRunKey] = useState('')
@@ -771,14 +775,7 @@ export default function HqBroadcastCreate() {
   const shows = (key: BroadcastStepKey) => step === key
   const nextLabel = step === 'basic' ? '対象設定へ' : step === 'audience' ? 'メッセージ設定へ' : step === 'message' ? '送信設定へ' : '配信前チェックへ'
 
-  const previewContent = <>            <div className={formStyles.previewHead}>
-              <h3>LINE の見え方</h3>
-              <div className={formStyles.deviceSwitch} role="group" aria-label="プレビューの端末">
-                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button>
-                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button>
-              </div>
-            </div>
-            <div className={previewDevice === 'pc' ? formStyles.pcPreview : formStyles.phonePreview}>
+  const messagePreview = <div className={previewDevice === 'pc' ? formStyles.pcPreview : formStyles.phonePreview}>
               <LinePreview accountName={exampleStore} caption={when === 'now' ? '今日' : sendWhenLabel} note={`${exampleStore}の例です。差し込みはアカウントごとに変わります（予約ページは省いて見せています）。`}
                 empty={previewBubbles.every((item) => !item) ? 'メッセージは「メッセージを作成」で作ります' : false}>
                 <div className="flex flex-col gap-3 text-ink">
@@ -786,6 +783,15 @@ export default function HqBroadcastCreate() {
                 </div>
               </LinePreview>
             </div>
+
+  const previewContent = (inDialog = false) => <>            <div className={formStyles.previewHead}>
+              <h3>LINE の見え方</h3>
+              <div className={formStyles.deviceSwitch} role="group" aria-label="プレビューの端末">
+                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'phone'} onClick={() => setPreviewDevice('phone')}>スマホ</Button>
+                <Button variant="secondary" className={formStyles.textButton} size="compact" aria-pressed={previewDevice === 'pc'} onClick={() => setPreviewDevice('pc')}>PC</Button>
+              </div>
+            </div>
+            {messagePreview}
             <p className={formStyles.previewCaption}>{'店名は例のアカウントの名前で見せています'}</p>
             <div className={formStyles.previewSummary}><h3>設定内容</h3><dl>{[
               ...(step === 'message' ? [] : [['送るアカウント', chosen.length ? `${accountsLabel}（${formatNumber(chosen.length)}）` : '未選択']]),
@@ -795,9 +801,9 @@ export default function HqBroadcastCreate() {
             ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd title={value}>{value}</dd></div>)}</dl></div>
             <div className={formStyles.previewActions}>
               <Button type="button" disabled={checking || chosen.length === 0} title={chosen.length === 0 ? '先に送るアカウントを選んでください' : undefined} onClick={() => setTestOpen(true)}><Send size={16} aria-hidden /> テストを送る</Button>
-              <Button type="button" onClick={() => setPreviewConfirmed(true)}><Eye size={16} aria-hidden /> 配信イメージを見る</Button>
+              {!inDialog ? <PreviewLauncher key={previewKey} label="配信イメージを見る" onOpened={previewOpened}>{messagePreview}</PreviewLauncher> : null}
             </div>
-            <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed}>{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
+            <SaveErrorField names={["previewConfirmed","preview_confirmed"]}><Checkbox checked={previewConfirmed} onCheckedChange={setPreviewConfirmed} disabled={!previewReview.ready} disabledReason="配信イメージを開いて確認してください">{previewConfirmed ? 'LINEプレビュー確認済み' : 'LINEプレビューが未確認です'}</Checkbox></SaveErrorField>
 </>
 
   return (
@@ -818,9 +824,9 @@ export default function HqBroadcastCreate() {
             )}
           </>
         )}
-        preview={previewContent}
+        preview={previewContent()}
         previewLabel="LINEの見え方"
-        previewToggle={<PreviewLauncher>{previewContent}</PreviewLauncher>}
+        previewToggle={<PreviewLauncher key={previewKey} onOpened={previewOpened}>{previewContent(true)}</PreviewLauncher>}
         status={draftLabel}
          title={<>一括配信を作る</>} headingSize="compact"
         help="送るアカウントを選び、配信対象・メッセージ・送信設定を確かめてから配信します。下書きの保存では、友だちへ送信しません。"

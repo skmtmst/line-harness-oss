@@ -22,7 +22,7 @@ import { useStaffRole, canManageRole } from '@/lib/staff-role';
 import { formatDateTime, formatNumber, formatDate as polishFormatDate } from '@/lib/format';
 import { csvCell } from '@/lib/presentation';
 import { usePageTitle } from '@/components/shell/page-chrome';
-import { PageFrame, PageHeading } from '@/components/templates/page-frame';
+import { PageFrame, PageHeading, PageContent } from '@/components/templates/page-frame';
 import { PageExplanationBody, PageExplanationProvider, PageExplanationToggle } from '@/components/shared/page-explanation';
 import { CreateSummaryCard } from '@/components/templates/create-parts';
 import { type ActionMenuItem } from '@/components/shared/action-menu';
@@ -459,7 +459,7 @@ function ReminderDetailV8() {
 
   const hasErrors = data.summary.errors > 0
   const firstStep = data.steps[0] ?? null
-  const statusLabel = !data.reminder.hasPublishedVersion ? '下書き' : data.reminder.isActive ? '有効' : '停止中'
+  const statusLabel = !data.reminder.hasPublishedVersion ? '下書き' : (reminder?.followupManagement?reminder.followupManagement.effectiveSendingStatus==='active':data.reminder.isActive) ? '有効' : '停止中'
   const nextTime = jstParts(data.summary.nextScheduledAt)?.time ?? ''
   const accountName = selectedAccount?.name ?? 'LINE公式アカウント'
   const meta = [
@@ -484,7 +484,8 @@ function ReminderDetailV8() {
           ]}
         /></>} />
 
-      <DetailColumns presentation="notification" asideLabel="いまの状態と操作" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<>
+
+      <PageContent><DetailColumns presentation="notification" toggleLabel={asideExpanded ? 'いまの状態と操作を閉じる' : 'いまの状態と操作を開く'} asideLabel="いまの状態と操作" expanded={asideExpanded} onExpandedChange={setAsideExpanded} aside={<>
           <div className={styles.sideActions}>
             {canManage && !isUnpublishedDraft ? (
               data.reminder.isActive ? (
@@ -542,6 +543,7 @@ function ReminderDetailV8() {
           )}
         </>}>
         <div className={styles.main}>
+          {reminder?.followupManagement?<Notice tone={reminder.followupManagement.effectiveSendingStatus==='active'?'info':'warn'} action={<Button href={reminder.followupManagement.path}>来店フォローを見る →</Button>}>来店フォロー（{reminder.followupManagement.storeName}）で管理しています。{reminder.followupManagement.reason??'承認された内容で送っています。'}</Notice>:null}
           {actionMessage ? <Notice tone="info">{actionMessage}</Notice> : null}
           {tab === 'overview' ? (
             <OverviewTab
@@ -571,7 +573,7 @@ function ReminderDetailV8() {
             <RegistrantsTab reminderId={reminderId} canManage={canManage} />
           )}
         </div>
-      </DetailColumns>
+      </DetailColumns></PageContent>
 
       <SheetDialog
         open={confirmPause}

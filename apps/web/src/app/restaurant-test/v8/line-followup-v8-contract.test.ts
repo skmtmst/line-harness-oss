@@ -1,71 +1,85 @@
 // @vitest-environment happy-dom
 import React from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defaultRestaurantReservationForm, RESTAURANT_FOLLOWUP_LABELS, type RestaurantFollowupTrigger } from '@line-crm/shared'
 
-const fixture = vi.hoisted(() => ({ read: vi.fn(), save: vi.fn(), publish: vi.fn(), start: vi.fn(), stop: vi.fn() }))
+const fixture = vi.hoisted(() => ({ read: vi.fn(), saveRow: vi.fn(), initialize: vi.fn(), test: vi.fn(), start: vi.fn(), saveForm: vi.fn(), notUsing: vi.fn() }))
 vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAccountId: 'account-1' }) }))
-vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner', canManageRole: () => true }))
+vi.mock('@/lib/staff-role', () => ({ useStaffRole: () => 'owner' }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => '/restaurant-test/line-followup', useSearchParams: () => new URLSearchParams() }))
 vi.mock('@/v8/restaurant/common-a/public/frame/index', () => ({ RestaurantFrame: ({ children }: { children: (ctx: unknown) => React.ReactNode }) => children({ store: { id: 'store-1', name: '試験店' } }) }))
-vi.mock('@/lib/use-feature-visibility', () => ({ useFeatureVisibility: () => ({ status: 'ready', enabled: () => true, features: { friend_fields: true, common_vars: true } }) }))
-vi.mock('@/components/scenarios/scenario-reference-data', () => ({ scenarioReferenceData: { friendFields: async () => ({ success: true, data: [] }), commonVars: async () => ({ success: true, data: [] }) } }))
-vi.mock('@/lib/api/helpers/restaurant-followup', async original => ({
-  ...await original<typeof import('@/lib/api/helpers/restaurant-followup')>(),
-  fetchRestaurantFollowup: fixture.read, saveFollowupMessages: fixture.save,
-  publishFollowupScenario: fixture.publish, requestFollowupStart: fixture.start,
-  stopFollowup: fixture.stop, fetchFollowupReviewHistory: async () => [],
-}))
+vi.mock('@/lib/api/helpers/restaurant-followup-board', () => ({ followupBoardApi: fixture }))
 import LineFollowupV8 from '@/v8/restaurant/line-followup/line-followup'
 
-const bubble = { id: 'body-1', type: 'text', content: { text: 'ありがとうございました' } }
-const live = {
-  storeId: 'store-1', storeName: '試験店', scenarioId: 'scenario-1', templateVersion: 3,
-  sendingStatus: 'stopped', approvalId: null, reviewInvitations: null,
-  steps: [{ trigger: 'post_visit', state: 'stopped', offsetMinutes: 180, bubbles: [bubble],
-    binding: { store_id: 'store-1', trigger: 'post_visit', step_id: 'step-1', offset_minutes: 180, enabled: 0, version: 1 },
-    step: { id: 'step-1', scenarioId: 'scenario-1', messageType: 'text', messageContent: '', messageBubbles: [bubble] },
-  }],
+const triggers = Object.keys(RESTAURANT_FOLLOWUP_LABELS) as RestaurantFollowupTrigger[]
+const timing = (trigger: RestaurantFollowupTrigger) => trigger === 'anniversary_before'
+  ? { mode: 'time' as const, offsetDays: -7, sendAtTime: '10:00' }
+  : { mode: 'countdown' as const, offsetMinutes: trigger === 'post_visit' ? 180 : trigger.startsWith('reservation_') && trigger !== 'reservation_created' ? -120 : 0 }
+const content = (trigger: RestaurantFollowupTrigger) => ({ timing: timing(trigger), messageParts: [{ messageType: 'text', messageContent: 'ありがとうございました' }] })
+let live: ReturnType<typeof snapshot>
+function snapshot() {
+  return {
+    page: { rows: triggers.map(trigger => ({ trigger, enabled: true, version: 3, default_offset_minutes: 0 })), bindings: [], template: null, setup: { notUsing: false, version: 0 } },
+    board: {
+      testRecipient: { state: 'ready', recipientKind: 'self', recipient: { id: 'self', displayName: '本人' } },
+      legacyContents: triggers.map(trigger => ({ trigger, content: content(trigger) })),
+      engines: triggers.map(trigger => ({ trigger, engine: 'automation', targetId: `target-${trigger}`, targetVersion: 4, contentRevision: 'revision-4', enabled: true, effectiveSendingStatus: 'stopped', reason: 'テスト送信と承認を待っています', detailPath: `/automations/drafts?id=target-${trigger}`, editorContent: content(trigger) })),
+    },
+    form: { version: 0, definition: defaultRestaurantReservationForm() },
+  }
 }
 beforeEach(() => {
-  fixture.read.mockResolvedValue(live)
-  fixture.save.mockResolvedValue({ success: true, data: {} })
-  fixture.publish.mockResolvedValue({ success: true, data: {} })
-  fixture.start.mockResolvedValue({ success: true, data: { approvalId: 'approval-1', sendingStatus: 'pending' } })
-  fixture.stop.mockResolvedValue({ success: true, data: { sendingStatus: 'stopped' } })
+  live = snapshot()
+  fixture.read.mockImplementation(async () => structuredClone(live))
+  fixture.saveRow.mockResolvedValue({})
+  fixture.test.mockResolvedValue({ recipientName: '本人', recipientKind: 'self', contentHash: 'same-content', versionId: 'version-4' })
+  fixture.start.mockImplementation(async () => { live.board.engines.find(row => row.trigger === 'post_visit')!.effectiveSendingStatus = 'active'; return {} })
 })
 afterEach(() => { cleanup(); vi.resetAllMocks() })
-
-async function openPostVisit() {
-  render(React.createElement(LineFollowupV8))
-  fireEvent.click(await screen.findByRole('button', { name: '来店後' }))
-}
+async function ready() { render(React.createElement(LineFollowupV8)); await screen.findByRole('article', { name: '予約の回答フォーム' }) }
+const postVisit = () => screen.getByRole('article', { name: RESTAURANT_FOLLOWUP_LABELS.post_visit })
+async function editPostVisit() { await ready(); fireEvent.click(within(postVisit()).getByRole('button', { name: '変える' })); await screen.findByRole('dialog') }
 
 describe('LINE来店フォローの接続後の契約', () => {
-  it('7つの行を保ち、来店後を開くと保存済みの時期と本文を描く', async () => {
-    await openPostVisit()
-    for (const name of ['予約完了時', '予約の前日', '予約の2時間前', '来店後', '口コミ依頼', '順番案内', '記念日前']) expect(screen.getByRole('button', { name })).toBeTruthy()
-    expect(screen.getByRole('button', { name: '来店後' }).getAttribute('aria-expanded')).toBe('true')
-    expect(screen.getByText('退店から 3時間後')).toBeTruthy()
+  it('8枚のカードと7つのスイッチを保ち、来店後は保存済みの時期と本文を描く', async () => {
+    await ready()
+    expect(screen.getAllByRole('article')).toHaveLength(8)
+    expect(screen.getAllByRole('switch')).toHaveLength(7)
+    expect(within(screen.getByRole('article', { name: '予約の回答フォーム' })).queryByRole('switch')).toBeNull()
+    for (const name of Object.values(RESTAURANT_FOLLOWUP_LABELS)) expect(screen.getByRole('article', { name })).toBeTruthy()
+    expect(within(postVisit()).getByText('退店から3時間後に送る')).toBeTruthy()
+    fireEvent.click(within(postVisit()).getByRole('button', { name: '変える' }))
     expect(screen.getByRole('textbox', { name: '本文' }).textContent).toBe('ありがとうございました')
-    expect(fixture.read).toHaveBeenCalledWith('account-1', 'store-1', '試験店')
+    expect((screen.getByRole('spinbutton', { name: 'きっかけから待つ時間' }) as HTMLInputElement).value).toBe('3')
+    expect(fixture.read).toHaveBeenCalledWith('account-1', 'store-1')
   })
-  it('本文を現在の版と一緒に新しい保存口へ送り、選んだ行を変えない', async () => {
-    await openPostVisit()
+  it('変えた行だけを現在の版で保存し、他の行や公開・送信へ進まない', async () => {
+    await editPostVisit()
     const body = screen.getByRole('textbox', { name: '本文' })
     await act(async () => { body.textContent = 'またお待ちしています'; fireEvent.input(body) })
-    fireEvent.click(screen.getByRole('button', { name: '本文を保存する' }))
-    await waitFor(() => expect(fixture.save).toHaveBeenCalledWith('account-1', 'store-1', 'step-1', { expectedVersion: 3, messageBubbles: [{ ...bubble, content: { text: 'またお待ちしています' } }] }))
-    await waitFor(() => expect(screen.getByRole('button', { name: '来店後' }).getAttribute('aria-expanded')).toBe('true'))
+    fireEvent.click(screen.getByRole('button', { name: 'この内容でオンにする' }))
+    expect(fixture.saveRow).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '保存して作る' }))
+    await waitFor(() => expect(fixture.saveRow).toHaveBeenCalledTimes(1))
+    expect(fixture.saveRow).toHaveBeenCalledWith('account-1', 'store-1', 'post_visit', expect.objectContaining({ expectedRowVersion: 3, expectedTargetVersion: 4, expectedContentRevision: 'revision-4', enabled: true, timing: { mode: 'countdown', offsetMinutes: 180 }, messageBubbles: [expect.objectContaining({ type: 'text', content: expect.objectContaining({ text: 'またお待ちしています' }) })] }))
+    expect(fixture.initialize).not.toHaveBeenCalled(); expect(fixture.test).not.toHaveBeenCalled(); expect(fixture.start).not.toHaveBeenCalled()
   })
-  it('本送信は公開と再取得を経て承認を申請し、停止の口も使える', async () => {
-    await openPostVisit()
-    expect(screen.getByText('本送信は止めています（中身の版: 3）')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: '承認を申請する' }))
-    await waitFor(() => expect(fixture.start).toHaveBeenCalledWith('account-1', 'store-1', 3))
-    expect(fixture.publish).toHaveBeenCalledWith('scenario-1')
-    expect(fixture.read.mock.invocationCallOrder[1]).toBeGreaterThan(fixture.publish.mock.invocationCallOrder[0]!)
-    expect(fixture.start.mock.invocationCallOrder[0]).toBeGreaterThan(fixture.read.mock.invocationCallOrder[1]!)
-    fireEvent.click(await screen.findByRole('button', { name: '本送信を止める' }))
-    await waitFor(() => expect(fixture.stop).toHaveBeenCalledWith('account-1', 'store-1'))
+  it('同じ版のテスト成功後だけ開始し、停止は対象の行をオフにして版付きで保存する', async () => {
+    await ready(); fireEvent.click(within(postVisit()).getByRole('button', { name: '試す・送り始める' }))
+    expect(screen.queryByRole('button', { name: 'この内容で送り始める' })).toBeNull()
+    expect(fixture.start).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '自分の LINE で試す' }))
+    await screen.findByRole('button', { name: 'この内容で送り始める' })
+    expect(fixture.test).toHaveBeenCalledWith('account-1', 'store-1', 'post_visit', 4)
+    expect(fixture.start).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'この内容で送り始める' }))
+    await waitFor(() => expect(fixture.start).toHaveBeenCalledWith('account-1', 'store-1', 'post_visit', 4, 'same-content'))
+    expect(fixture.start.mock.invocationCallOrder[0]).toBeGreaterThan(fixture.test.mock.invocationCallOrder[0]!)
+    fireEvent.click(screen.getByRole('button', { name: '閉じる', exact: true }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    fireEvent.click(within(postVisit()).getByRole('switch'))
+    fireEvent.click(screen.getByRole('button', { name: '保存して作る' }))
+    await waitFor(() => expect(fixture.saveRow).toHaveBeenCalledWith('account-1', 'store-1', 'post_visit', expect.objectContaining({ expectedRowVersion: 3, expectedTargetVersion: 4, enabled: false })))
   })
 })

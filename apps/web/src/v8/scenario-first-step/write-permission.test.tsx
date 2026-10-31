@@ -208,3 +208,24 @@ it('スタンプを復元して別の物を選ぶと、LINEの下見も同じ画
   expect(calls.update).not.toHaveBeenCalled(); expect(calls.add).not.toHaveBeenCalled()
   view.unmount()
 })
+
+it('既存の長い選択肢を消さず1通目の保存を止め、訂正後だけ保存する', async () => {
+  const longQuestion = { text: '続けますか？', tapMode: 'single', choices: [{ key: 'a', label: 'あ'.repeat(25), behavior: 'none' }] }
+  calls.read.mockResolvedValue({ success: true, data: { ...row(), steps: [{ ...step, scenarioId: fixture.id, question: longQuestion }] } })
+  const view = render(<FirstStep />)
+  const choice = await screen.findByRole('textbox', { name: /ボタンの文字/ }) as HTMLInputElement
+  expect(choice.value).toBe('あ'.repeat(25))
+  await invoke(held.save)
+  expect(calls.update).not.toHaveBeenCalled()
+  expect(calls.add).not.toHaveBeenCalled()
+  expect(choice.getAttribute('aria-invalid')).toBe('true')
+  expect(view.container.querySelectorAll('input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="true"]')).toHaveLength(1)
+  expect(screen.getByText('ボタンの文字は20文字以内で入力してください。')).toBeTruthy()
+  expect(document.activeElement).toBe(choice)
+  await act(async () => { fireEvent.change(choice, { target: { value: 'あ'.repeat(20) } }) })
+  expect(choice.getAttribute('aria-invalid')).toBeNull()
+  await invoke(held.save)
+  expect(calls.update).toHaveBeenCalledTimes(1)
+  expect(calls.update).toHaveBeenCalledWith('sc-a', 'step-a', expect.objectContaining({ question: expect.objectContaining({ choices: [expect.objectContaining({ label: 'あ'.repeat(20) })] }) }))
+  view.unmount()
+})

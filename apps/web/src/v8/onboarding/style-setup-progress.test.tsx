@@ -131,3 +131,11 @@ it('追加集計が無ければ実測、あれば送り方と明示した辞退�
  expect(progress.steps.followup?.complete).toBeNull()
  expect(progress.steps.attributes?.complete).toBe(true)
 })
+
+it('破損した予約フォームの修復案内を、選んだ店舗のダッシュボードへ渡す',async()=>{
+ const message='予約フォームの設定が読めないため、最小の項目で受け付けています。直してください';
+ net.restaurantProgress.mockResolvedValue({success:true,data:{storeId:'store',tables:true,hours:true,menus:true,reception:true,followup:true,reservationForm:{available:false,message,repairPath:'/restaurant-test/line-followup?store_id=store&repair_form=1'}}});
+ expect((await loadStyleSetupProgress('a','restaurant','store')).notices).toEqual([{message,href:'/restaurant-test/line-followup?store_id=store&repair_form=1'}]);
+ net.restaurantProgress.mockResolvedValue({success:true,data:{storeId:'another',tables:true,hours:true,menus:true,reception:true,followup:true,reservationForm:{available:false,message,repairPath:'/other'}}});
+ expect((await loadStyleSetupProgress('a','restaurant','store')).notices).toBeUndefined();
+});

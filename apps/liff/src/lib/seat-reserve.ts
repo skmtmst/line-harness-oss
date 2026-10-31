@@ -253,6 +253,9 @@ export function seatErrorMessage(e: unknown): string {
   const code = err?.body?.error;
   if (code === 'slot_conflict') return 'この時刻はほかの方の予約で埋まりました。ほかの時刻を選んでください。';
   if (code === 'hold_expired') return 'お取りしていた時間が過ぎました。時刻を選び直してください。';
+  if(code==='reservation_form_changed')return '予約フォームが更新されました。項目を確認して、もう一度予約してください';
+  if(code==='reservation_form_unavailable')return '予約フォームを読み取れません。お店へお問い合わせください';
+  if(code==='invalid_reservation_answers')return 'お名前・連絡先・必須の項目を確認してください';
   if (code === 'version_conflict' || code === 'state_conflict')
     return 'ご予約の内容が変わっていました。画面を読み直してください。';
   if (code === 'self_deadline_passed')
