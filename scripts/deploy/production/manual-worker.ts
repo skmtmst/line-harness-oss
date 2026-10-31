@@ -1,6 +1,7 @@
 #!/usr/bin/env tsx
 /** Worker-only production release when GitHub Actions is unavailable.
- * Run from a clean, current main checkout. This never applies D1 migrations.
+ * Run the reviewed gate from its branch against a clean, current main checkout.
+ * This never applies D1 migrations.
  */
 import { copyFileSync, existsSync, readFileSync, readdirSync, realpathSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve, sep } from 'node:path';
