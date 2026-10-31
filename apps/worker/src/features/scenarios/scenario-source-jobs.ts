@@ -1,3 +1,4 @@
+import { restaurantWaitlistVariables,restaurantConfirmationVariables } from '../../services/restaurant-followup-delivery-variables.js';
 export type { ScenarioSourceJob } from './source-job-types.js';
 import type { ScenarioSourceJob } from './source-job-types.js';
 import { scheduleRestaurantAnniversaries, restaurantAnniversaryState } from '../../services/restaurant-anniversary-followup.js';
@@ -51,7 +52,7 @@ async function sourceState(db: D1Database, j: ScenarioSourceJob): Promise<Source
   JOIN rt_reservations r ON r.id=? AND r.store_id=s.id
   JOIN friends f ON f.id=? AND f.line_account_id=s.line_account_id AND f.line_user_id=r.line_uid AND f.is_following=1
   JOIN line_accounts la ON la.id=s.line_account_id AND la.is_active=1 AND la.archived_at IS NULL
-  WHERE t.sending_status='active' AND s.status='active' AND s.line_account_id=?
+  WHERE NOT EXISTS(SELECT 1 FROM rt_store_followup_targets ft WHERE ft.store_id=b.store_id AND ft.trigger=b.trigger AND ft.engine!='scenario') AND t.sending_status='active' AND s.status='active' AND s.line_account_id=?
   AND t.approved_version_id=? AND sc.current_published_version_id=t.approved_version_id
   AND json_extract(a.payload_json,'$.templateVersion')=t.template_version
   AND json_extract(a.payload_json,'$.scenarioVersionId')=t.approved_version_id
@@ -139,8 +140,7 @@ export async function processScenarioSourceJobs(env: Env['Bindings'], send: Sour
             if (state.trigger === 'waitlist_invited' && !/^https:\/\//.test(env.LIFF_URL ?? ''))
                 throw new Error('liff_unavailable');
             const vars: Record<string, string> = state.trigger==='anniversary_before' ? {store_name:state.store_name,anniversary_date:formatStartsAtForStore(reservationInstant(state.starts_at),state.timezone)} : { reservation_end: formatStartsAtForStore(reservationInstant(state.ends_at), state.timezone), guest_count: String(state.guest_count), course_name: state.course_name ?? '席のみ', store_name: state.store_name, reservation_datetime: formatStartsAtForStore(reservationInstant(state.starts_at), state.timezone),
-                waitlist_book_url: `${(env.LIFF_URL ?? '').replace(/\/$/, '')}/booking?seat_waitlist=${encodeURIComponent(j.source_id)}`,
-                waitlist_decline_url: `${(env.LIFF_URL ?? '').replace(/\/$/, '')}/booking?seat_waitlist=${encodeURIComponent(j.source_id)}&action=decline`,
+                ...(j.source_kind==='restaurant_waitlist'?await restaurantWaitlistVariables(db,j.line_account_id,j.source_id,env.LIFF_URL):{}),
                 restaurant_going: `rc:${j.id}:going`, restaurant_change: `rc:${j.id}:change_requested`, restaurant_cancel: `rc:${j.id}:cancel` };
             // 公開版の吹き出しだけを順番どおりに展開する。下書きは読み直さない。
             const parts = parseBroadcastMessageParts({ messageType: step.message_type, messageContent: step.message_content, messageBubblesJson: step.message_bubbles_json });
@@ -154,11 +154,9 @@ export async function processScenarioSourceJobs(env: Env['Bindings'], send: Sour
                 messages.push(buildMessage(tracked.messageType, tracked.content));
             }
             // 返事の依頼はこの予約版で固定し、再試行は同じID・押し口を使う。
-            if (state.trigger === 'reservation_24h')
-                await db.prepare(`INSERT OR IGNORE INTO rt_reservation_confirmations
-    (request_id,reservation_id,reservation_version,friend_id,requested_at,expires_at) SELECT ?,?,?,?,?,?
-    WHERE EXISTS(SELECT 1 FROM rt_reservations WHERE id=? AND customer_version=? AND status='confirmed')`)
-                    .bind(j.id, j.source_id, state.customer_version, j.friend_id, new Date().toISOString(), state.starts_at, j.source_id, state.customer_version).run();
+            if (state.trigger === 'reservation_24h')await restaurantConfirmationVariables(db,j.id,{
+              ...state,reservation_id:j.source_id,line_account_id:j.line_account_id,friend_id:j.friend_id,
+            },new Date().toISOString());
             const logId = await deterministicLogId(`line-proxy-send:${j.idempotency_key}:${j.friend_id}:0`);
             // 応答喪失のあともログが残れば再送しない。ログ無しなら同じretry keyで回収。
             if (!await db.prepare('SELECT id FROM messages_log WHERE id=?').bind(logId).first()) {

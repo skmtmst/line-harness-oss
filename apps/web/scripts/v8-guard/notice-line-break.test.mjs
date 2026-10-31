@@ -127,12 +127,12 @@ body{margin:0;font-family:sans-serif}main{max-width:1100px;margin:auto;padding:2
       await message.evaluate(el => { el.style.removeProperty('flex'); el.style.removeProperty('width'); el.style.removeProperty('text-wrap') })
       if (width === 420) {
         const url = page.locator('[data-tone="danger"] a')
-        await url.evaluate(el => { el.closest('[data-notice-message]').style.textWrap = 'pretty' })
-        assert.ok((await page.evaluate(findTextOverflow)).length > 0, 'floatと長いURLのprettyは本文のはみ出しとして検出する')
-        await url.evaluate(el => { el.closest('[data-notice-message]').style.removeProperty('text-wrap') })
+        await url.evaluate(el => { el.style.whiteSpace = 'nowrap' })
+        assert.ok((await page.evaluate(findTextOverflow)).length > 0, 'URLを折り返さない故障は本文のはみ出しとして検出する')
+        await url.evaluate(el => { el.style.removeProperty('white-space') })
         assert.deepEqual(await page.evaluate(findTextOverflow), [], 'リンクの通常改行ではみ出しが解消する')
       }
-      // 故障対照：自動句切りによる不要な空きを検出し、通常改行で解消する。
+      // 決めた再現幅のまま、自動句切りによる不要な空きを検出し、復元で解消する。
       const fault = await page.addStyleTag({ content: '#login [data-notice-message], #login [data-notice-message] * {word-break:auto-phrase!important}' })
       assert.equal(hasEarlyWrap(await page.evaluate(measureLines)), true, '旧指定で不要な折り返しを検出する')
       await fault.evaluate(el => el.remove())

@@ -103,7 +103,7 @@ function OtherTextInput({
   );
 }
 
-export default function Form() {
+export default function Form({ readOnlyDocument = false }: {readOnlyDocument?:boolean} = {}) {
   const words = useCustomerWords();
   const style = useCustomerStyle();
   const route = useParams<{ id: string }>();
@@ -113,7 +113,7 @@ export default function Form() {
    * P（試し回答）：管理画面の試しURLに付く合言葉。あるときは下書きを試す。
    * 試しの回答は集計に入らず、回答後の動作も動かない。
    */
-  const testToken = search.get('test_token');
+  const testToken = readOnlyDocument ? null : search.get('test_token');
 
   // 414 幅の板（）は板 ID だけを替える。中身は同じ。
   const wide = useWideViewport();
@@ -122,7 +122,7 @@ export default function Form() {
   const [sectionIndex, setSectionIndex] = useState(0);
   /** 通ってきたページ。「前へ」で分岐を逆にたどるために覚える */
   const [trail, setTrail] = useState<number[]>([]);
-  const request = useRequestGeneration(JSON.stringify([id, testToken, sectionIndex]));
+  const request = useRequestGeneration(JSON.stringify([id, testToken, sectionIndex,readOnlyDocument]));
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
@@ -146,6 +146,7 @@ export default function Form() {
       setLoading(true);
       setForm(null);
       setError(null);
+      setDone(false);setConfirming(false);setSectionIndex(0);setTrail([]);
       try {
         const data = await api.getForm(id, testToken ?? undefined);
         if (cancelled) return;
@@ -156,7 +157,7 @@ export default function Form() {
 
         // 前回の回答を出す設定のときだけ、サーバが中身を返す。
         // 試しでは前の試しを書き戻さない（本物の回答も出さない）。
-        if (!testToken && data.layout.options?.restorePrevious) {
+        if (!readOnlyDocument && !testToken && data.layout.options?.restorePrevious) {
           try {
             const latest = await api.getMyLatestFormAnswer(id);
             if (!cancelled && latest?.answers) {
@@ -193,7 +194,7 @@ export default function Form() {
     return () => {
       cancelled = true;
     };
-  }, [id, reloadKey, testToken]);
+  }, [id, reloadKey, testToken,readOnlyDocument]);
 
   const layout = form?.layout;
   const section = layout?.sections[sectionIndex];
@@ -203,7 +204,7 @@ export default function Form() {
    * 行き先はサーバーが決める（お客さまは書き換えられない）。決められなければ「どれにも当たらない」行き先へ。
    */
   const routingBlock = layout?.sections.flatMap((s) => s.blocks).find((b): b is FormInputBlock => b.kind === 'input' && b.type === 'booking' && b.booking?.routing?.enabled === true);
-  const routingOn = Boolean(routingBlock);
+  const routingOn = !readOnlyDocument && Boolean(routingBlock);
   /** 予約を作るときに添える署名（行き先は答えで決まり、お客さまは書き換えられない）。 */
   const routingToken = useRef<string | null>(null);
   const pageHasBooking = Boolean(section?.blocks.some((b) => b.kind === 'input' && b.type === 'booking'));
@@ -639,11 +640,11 @@ export default function Form() {
    * ページの先頭に並ぶ画像は、題の上の表紙として出す (★V8  の「画像」)。
    * 共通ヘッダは今までどおり題の下・ページの中身の前に出す。
    */
-  const pageBlocks = section?.blocks ?? [];
+  const pageBlocks = readOnlyDocument ? layout.sections.flatMap(section=>section.blocks).filter(block=>block.kind!=='input') : section?.blocks ?? [];
   let coverCount = 0;
   while (coverCount < pageBlocks.length && pageBlocks[coverCount].kind === 'image') coverCount += 1;
   const covers = pageBlocks.slice(0, coverCount);
-  const bodyBlocks = [...layout.header, ...pageBlocks.slice(coverCount)];
+  const bodyBlocks = [...layout.header, ...pageBlocks.slice(coverCount)].filter(block=>!readOnlyDocument || block.kind!=='input');
   const blockView = (block: FormBlock, cover = false) => (
     <BlockView
       key={block.id}
@@ -678,7 +679,7 @@ export default function Form() {
         }}
       >
         {routedPage ? <Stepper steps={['質問', '日時', '確認']} current={routedConfirm ? 2 : 1} /> : null}
-        {!routedPage && multi && options.sectionHeader !== 'none' && (
+        {!readOnlyDocument && !routedPage && multi && options.sectionHeader !== 'none' && (
           <div className="px-4 pt-3">
             <div className="flex gap-1" aria-hidden="true">
               {layout.sections.map((s, i) => (
@@ -709,7 +710,7 @@ export default function Form() {
             </p>
           )}
 
-          {firstPage && <FormReception availability={form.availability} />}
+          {!readOnlyDocument && firstPage && <FormReception availability={form.availability} />}
           {routedPage && routedConfirm && routed?.status === 'ready' && routedPicked ? <RoutedConfirm target={routed.target} whenText={`${utcToJstMd(routedPicked)}（${formatWeekday(japanDate(new Date(routedPicked)))}）${utcToJstHm(routedPicked)}`} /> : null}
           <div className={routedPage && routedConfirm ? 'hidden' : 'contents'}>{bodyBlocks.map((block) => blockView(block))}</div>
 
@@ -728,11 +729,11 @@ export default function Form() {
           )}
 
           {/* 送る最後のページだけ、個人情報の取り扱いの一行。 */}
-          {isLast && <PrivacyNote />}
+          {!readOnlyDocument && isLast && <PrivacyNote />}
         </div>
       </div>
 
-      <BottomBar appearance="form">
+      {!readOnlyDocument && <BottomBar appearance="form">
         <Button variant="primary"
           type="button"
           onClick={() => {
@@ -747,7 +748,7 @@ export default function Form() {
           {sending ? '送信中…' : routedPage && routedEmpty ? `${words.contact}に問い合わせる` : routedPage && routedNeedsPick ? '日時を選んでください' : routedPage && routedPicked && routedConfirm ? 'この内容で送る' : routedPage && routedPicked ? `${utcToJstMd(routedPicked)}（${formatWeekday(japanDate(new Date(routedPicked)))}）${utcToJstHm(routedPicked)} で進む` : isLast ? submitLabelText(options.submitLabel) : options.nextLabel || '次へ'}
         </Button>
 
-      </BottomBar>
+      </BottomBar>}
 
       {confirming && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6">

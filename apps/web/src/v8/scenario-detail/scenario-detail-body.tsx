@@ -134,9 +134,8 @@ export function ScenarioDetailBody({
               続きからやり直す
             </Button>
             <Link href={`/scenarios/detail?id=${duplicateRemainder.copyId}`}>コピーを確認する</Link>
-            <button
+            <Button variant="text" size="inline" data-notice-inline-action textTone="danger"
               type="button"
-              className={styles.dangerLink}
               disabled={discardingDuplicate}
               onClick={() => {
                 setDiscardDuplicateError('')
@@ -144,7 +143,7 @@ export function ScenarioDetailBody({
               }}
             >
               作りかけのコピーを削除する
-            </button>
+            </Button>
           </div>
         </>}>
           <p>前回の複製が途中で止まり、作りかけのコピーが残っています</p>

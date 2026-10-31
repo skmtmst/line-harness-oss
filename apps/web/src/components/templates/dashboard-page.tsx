@@ -1,8 +1,9 @@
 'use client'
-import { Children, createContext, isValidElement, useContext } from 'react'
+import { Children, createContext, isValidElement, useContext, useEffect, useState } from 'react'
 import type { CSSProperties, ReactNode, Ref } from 'react'
 import Card from '@/components/shared/card'
-import { PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
+import ListState from '@/components/shared/list-state'
+import { PageContent, PageFrame, PageHeading, type PageHeadingProps } from './page-frame'
 import styles from './page-templates.module.css'
 
 /**
@@ -23,16 +24,27 @@ export interface DashboardPageProps extends PageHeadingProps {
   tabs?: ReactNode
   notice?: ReactNode
   stats?: ReactNode
+  /** 初回の案内が本文を後から押さないように待つ。表示済みの本文は同じ対象の読み直しで外さない。 */
+  initialContent?: { scope: string; pending: boolean }
   children: ReactNode
   overlays?: ReactNode
 }
-export function DashboardPage({ boardId, standalone, layout, grouping = 'lines', tabs, notice, stats, children, overlays, ...heading }: DashboardPageProps) {
+export function DashboardPage({ boardId, standalone, layout, grouping = 'lines', tabs, notice, stats, initialContent, children, overlays, ...heading }: DashboardPageProps) {
+  const scope = initialContent?.scope
+  const pending = initialContent?.pending ?? false
+  const [readyScope, setReadyScope] = useState<string | null>(null)
+  useEffect(() => { if (scope !== undefined && !pending) setReadyScope(scope) }, [scope, pending])
+  const waiting = pending && readyScope !== scope
+  const content = <>
+    {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
+    <GroupingContext.Provider value={{ grouping, inCard: false }}>{children}</GroupingContext.Provider>
+  </>
   return <PageFrame kind="dashboard" layout={layout} boardId={boardId} standalone={standalone}>
     <PageHeading {...heading} />
     {tabs ? <div className={styles.tabs} data-template-region="tabs">{tabs}</div> : null}
     {notice ? <div className={styles.notice} data-template-region="notice">{notice}</div> : null}
-    {stats ? <div className={styles.stats} data-template-region="stats">{stats}</div> : null}
-    <GroupingContext.Provider value={{ grouping, inCard: false }}>{children}</GroupingContext.Provider>{overlays}
+    {waiting ? <PageContent><ListState kind="loading" loadingShape="cards" /></PageContent> : null}
+    {initialContent ? <div key={scope} className={styles.dashboardContent} data-pending={waiting || undefined} inert={waiting || undefined} aria-hidden={waiting || undefined}>{content}</div> : content}{overlays}
   </PageFrame>
 }
 

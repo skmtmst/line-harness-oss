@@ -1222,13 +1222,12 @@ export default function RemindersListV8() {
           >
             {foldersError && (reminders.length > 0 || !reminderList.error) ? (
             <Notice tone="danger" className={styles.folderNoteNoticePlacement} action={<>
-              <button
+              <Button variant="text" size="inline" data-notice-inline-action
                 type="button"
                 onClick={() => void loadFolders()}
-                className="text-action ml-2 font-semibold hover:underline"
               >
                 もう一度
-              </button>
+              </Button>
             </>}>フォルダを読み込めませんでした。
             </Notice>
             ) : null}
@@ -1267,7 +1266,7 @@ export default function RemindersListV8() {
 
           {actionError && (
           <Notice tone="danger" className={styles.errorBandNoticePlacement} action={<>
-            <button type="button" onClick={() => setActionError('')}>閉じる</button>
+            <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => setActionError('')}>閉じる</Button>
           </>}>
             {actionError}
           </Notice>

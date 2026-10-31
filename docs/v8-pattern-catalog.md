@@ -175,11 +175,17 @@
 <a id="page-head"></a>
 ## page-head 一覧・画面の頭
 
+- ダッシュボードで案内の初回取得が本文を後から押し下げる場合は、`DashboardPage` の `initialContent` に店舗・スタイルの範囲と待機状態を渡す。案内は独立して利用でき、本文は共通の骨組みで待つ。同じ範囲で表示済みの本文は後の読み直しで作り直さない。
+
+- 取得する名前の題は `lib/resource-title.ts` の `resolveResourceTitle` で未取得と取得済み空名を分け、外側の帯と型へ同じ値を渡す。`components/shell/page-resource-scope.tsx` の `PageResourceScope` は店舗・対象IDが変わったときだけ編集状態を作り直し、前の対象名を次へ持ち越さない。内部タブの指定では作り直さず、埋め込みの編集は親の状態管理に任せる。
+
 - **役目**：板の題・「？」・右の主ボタンを1段で出す。画面全体の説明はB-245の「この画面の説明」で灰色の説明を開閉する。
 - **B-245の持ち主**：`components/shared/page-explanation.tsx` の `PageExplanationProvider`・`PageExplanationToggle`・`PageExplanationBody`。型の題の横と既存の説明の位置へ置き、人・画面ごとの開閉を覚える。欄や数の用語説明は `HelpTip`、一時的な失敗・閲覧のみは `Notice` のまま。
 - **作る型の説明**：`components/templates/create-page.tsx` と `components/shared/create-page.tsx` の `CreatePage` が `help` を題の型へ渡す。監査では直接渡した説明文字列を操作と分け、再公開の入口から実際の持ち主まで照合する。説明内の生のボタンや、同名の手書きの型は操作の検査を続ける。
 - **狭い板の右欄**：`CreatePage` の `preview` と `TemplateEditFrame` の `side` は、窓か右欄かを受け取る描画の口も使える。幅で畳む入口と窓は型へ任せ、窓の中にもう一度見え方を開くボタンを置かない。設定の情報と実際の見え方は保持する。
 - **右欄の役目の文字**：`CreatePage` の `previewLabel` / `previewTitle` は、`PreviewLauncher` の既存の `label` / `title` へ渡す。設定・試算・紹介リンクなどをLINEの見え方と呼ばず、画面は今の右欄の役目だけを渡す。手順で内容が変わる時はその段に合わせる。入口や窓を画面で作り足さない。
+- 固定の旧URLは `lib/canonical-route.ts` で正規の入口へそろえる。クライアントの転送待ちは `components/shell/legacy-route.tsx` と `PagePending`、題・説明書は転送先の画面で解決する。メニューの権限キーと旧URLの所属は保持する。
+- ブラウザの題は `components/shell/document-title.tsx` の持ち主だけが描く。画面・認証・スマホの名前は登録して渡し、前のURLの名前は次のURLへ流さない。`usePageTitle` を無効にする埋め込み編集は親の題を保つ。
 - **持ち主（コード）**：`apps/web/src/components/templates/page-frame.tsx`・`apps/web/src/components/shared/page-header.tsx`・`apps/web/src/components/shared/help-tip.tsx`（部品 `PageHeading`・`PageTitle`・`PageFrame`・`ListPage`・`CreatePage`・`DetailPage`・`DashboardPage`・`SettingsPage`・`AnalyticsPage`・`InboxPage`）
   - 読む変数：`--text-title`
 - **持ち主（Pen）**：`EnlYo`「板の頭」・`KjC1z`「？」
@@ -648,7 +654,7 @@
 ## list-state 空・読めない・読み込み中
 
 - **役目**：空・絞り込みで0件・読めなかった（もう一度読み込む）・骨組みを1つの形で出す
-- **持ち主（コード）**：`apps/web/src/components/shared/list-state.tsx`・`apps/web/src/components/shared/list-state.module.css`・`apps/web/src/components/shared/skeleton.tsx`・`apps/web/src/components/shared/skeleton.module.css`・`apps/web/src/components/shared/empty-list.tsx`・`apps/web/src/components/shared/retry-label.tsx`（部品 `ListState`・`TableSkeleton`・`CardsSkeleton`・`Skeleton`・`DelayedSkeleton`・`EmptyList`）
+- **持ち主（コード）**：`apps/web/src/components/templates/page-pending.tsx`・`apps/web/src/components/shared/list-state.tsx`・`apps/web/src/components/shared/list-state.module.css`・`apps/web/src/components/shared/skeleton.tsx`・`apps/web/src/components/shared/skeleton.module.css`・`apps/web/src/components/shared/empty-list.tsx`・`apps/web/src/components/shared/retry-label.tsx`（部品 `PagePending`・`ListState`・`TableSkeleton`・`CardsSkeleton`・`Skeleton`・`DelayedSkeleton`・`EmptyList`）
   - 読む変数：`--radius-mini`
 - **持ち主（Pen）**：`hNXm7`「空の表示」・`jr5Nl`「骨格の行」・`Dr8Wr`「状態/検索結果0件」・`deztM`「状態/取得失敗」・`q0z77i`「状態/読み込み中」
   - 部品の板の html に書き出されていない ID：`Dr8Wr`・`deztM`・`q0z77i`（文書の記録 `~/lh-work/design/v8/review/PEN-UPDATE-1009.md`・`COMPONENT-MAP.md` にある。(d) の写しの比べはできない）
@@ -748,6 +754,7 @@
 
 - **役目**：LINE のトークは LinePreview 1つ。LIFF の画面は LIFF のスマホ枠1つ
 - **持ち主（コード）**：`apps/web/src/components/shared/line-preview.tsx`・`apps/web/src/components/shared/line-preview.module.css`（部品 `LinePreview`・`LinePreviewMessage`・`LinePreviewCard`）
+- クーポンの中身と状態の見本は `shared/coupon-preview.tsx`。外枠は LinePreview、値は shared の couponPresentation、使用済み・期限切れでは写真とコードを描かない。
 - **持ち主（Pen）**：`cfVyj`「LINEの見え方/スマホ」
   - 注：LIFF のスマホ枠は未実装（B-158 の 10）
 - **見つけ方（コード）**：

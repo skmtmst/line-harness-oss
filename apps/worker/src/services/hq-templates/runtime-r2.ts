@@ -27,7 +27,7 @@ function sourceKey(key: string, tenant: string): string {
   return key;
 }
 type Bucket = Pick<R2Bucket, 'head' | 'get' | 'put' | 'delete'>;
-export interface R2RuntimeBinding { db: D1Database; bucket: Bucket; authority: HqTemplateAuthority; templateId: string; templateVersionId: string; textOverride?: string | null; /** 公開 origin は信頼済みサーバー設定だけを使い、要求本文から取らない。 */ publicBaseUrl?: string }
+export interface R2RuntimeBinding { initialDraft?: boolean; db: D1Database; bucket: Bucket; authority: HqTemplateAuthority; templateId: string; templateVersionId: string; textOverride?: string | null; /** 公開 origin は信頼済みサーバー設定だけを使い、要求本文から取らない。 */ publicBaseUrl?: string }
 async function sourceVersion(b: R2RuntimeBinding) {
   if (requireHqTemplateAuthority(b.authority).kind !== 'AUTHORIZED') fail('FORBIDDEN');
   const v = await b.db.prepare(`SELECT v.definition_json,v.content_hash,t.template_type FROM hq_template_versions v JOIN hq_templates t ON t.id=v.template_id AND t.tenant_id=v.tenant_id WHERE v.id=? AND v.template_id=? AND v.tenant_id=? AND t.archived_at IS NULL AND t.template_type IN ('template','rich_menu') AND t.extended_type IS NULL`).bind(b.templateVersionId,b.templateId,b.authority.tenantId).first<{definition_json:string;content_hash:string;template_type:'template'|'rich_menu'}>();
@@ -177,6 +177,7 @@ async function matchRichReference(b:R2RuntimeBinding,ref:RichReference,account:s
   const sourceHash=await digest(JSON.stringify(source)),dbCommit=[exactRowGuard('templates',source!),activeAccountGuard(String(source!.line_account_id),b.authority.tenantId),targetListGuard(listSql,[account],list)],match=matches[0];
   if(match)return {...ref,name:String(source!.name),targetId:match.id,expectedRevision:JSON.stringify([sourceHash,match.draft_revision,match.updated_at]),operation:'reuse',dbCommit};
   const targetId=await plannedTargetId(b,account,ref),template:DbRow={...source!,id:targetId,line_account_id:account,folder_id:null,created_from_recipe_id:null,recipe_clone_run_id:null,published_at:null,publish_idempotency_key:null};delete template.created_at;delete template.updated_at;
+  if(b.initialDraft) Object.assign(template,{published_version:0,draft_revision:1,draft_message_type:template.message_type,draft_message_content:template.message_content});
   return {...ref,name:String(source!.name),targetId,expectedRevision:JSON.stringify([sourceHash,null]),operation:'create',dbCommit:[...dbCommit,guard(`NOT EXISTS(SELECT 1 FROM templates WHERE id=?)`,[targetId]),insertRow('templates',template)]};
 }
 type RichReferencePlan = { matches:RichReferenceMatch[];dbCommit:HqTemplateStatement[] };
@@ -354,6 +355,7 @@ async function messageAdapter(b:R2RuntimeBinding,context:HqTemplateAdapterContex
   const ids=new Map<string,string>();
   for(const [kind,id] of [['template',`template:${definition.template.id}`],...definition.media.flatMap(m=>[['media',`media:${m.id}`],['media_version',m.versionId]])])ids.set(`${kind}:${id}`,(await digest(JSON.stringify([owner,b.templateVersionId,kind,id]))).slice(0,32));
   const dependencies:MessageTemplateAdapterDependencies={
+    initialDraft: b.initialDraft,
     stageSourceObject: async (media, binding) => {
       if (!hqAuthored || !binding.etag) fail('SOURCE_MEDIA_UNAVAILABLE');
       await hqMediaGate(b.db, b.bucket, media.r2Key);
@@ -441,6 +443,7 @@ async function buildR2Plan(b:R2RuntimeBinding,context:HqTemplateAdapterContext,i
 }
 
 export interface R2StoreOptions {
+  initialResourceCommit?: import('./contract.js').HqInitialResourceCommit;
   db: D1Database;
   authority: HqTemplateAuthority;
   templateId: string;
@@ -526,7 +529,7 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
     if (renewed.meta.changes !== 1) fail('CLAIM_LOST');
   };
   let plan: HqTemplateStoreAtomicCommitPlan | null = null;
-  const binding: R2RuntimeBinding = {...options,templateVersionId:p!.template_version_id,textOverride:p!.text_override};
+  const binding: R2RuntimeBinding = {...options,templateVersionId:p!.template_version_id,textOverride:p!.text_override,initialDraft:p!.initial_insert===1};
   try {
     await renewClaim();
     const v = await sourceVersion(binding);
@@ -568,6 +571,7 @@ export async function executeR2RuntimeStore(options: R2StoreOptions): Promise<R2
     for (const r of plan.resolutions) statements.push({ sql: `UPDATE hq_template_preflight_resolutions SET resolution_mode=?,target_id=?,expected_revision=?,alias_name=? WHERE preflight_id=? AND tenant_id=? AND source_id=?`, bindings: [r.mode, r.targetId ?? null, r.expectedRevision ?? null, r.aliasName ?? null, p!.id, authority.tenantId, r.sourceId] });
     statements.push({ sql: `UPDATE hq_template_distribution_results SET status='succeeded',finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),error_code=NULL WHERE run_id=? AND tenant_id=? AND target_account_id=? AND status='staged' AND attempt_count=?`, bindings: claimBindings }, { sql: `INSERT INTO audit_events(id,tenant_id,line_account_id,category,actor_principal_id,actor_role,action,target_kind,target_id,result,after_json) VALUES (?,?,?,'business',?,?,'hq_template.distributed','hq_template',?,'success',?)`, bindings: [crypto.randomUUID(), authority.tenantId, context.targetAccountId, authority.actorId, authority.role, templateId, JSON.stringify({ runId })] });
     for(const o of plan.stage)statements.push({sql:`UPDATE hq_template_owned_r2_keys SET state='committed' WHERE run_id=? AND tenant_id=? AND target_account_id=? AND object_key=? AND owner_token=? AND state='staged'`,bindings:[runId,authority.tenantId,context.targetAccountId,o.key,o.ownerToken]});
+    if(options.initialResourceCommit) statements.push(...await options.initialResourceCommit(context.targetAccountId,plan.resolutions));
     statements.push(captureDistributionName(runId, authority.tenantId, context.targetAccountId));
     for (let commitAttempt = 1; commitAttempt <= MAX_IO_ATTEMPTS; commitAttempt++) {
       try {

@@ -1,3 +1,4 @@
+import { INITIAL_MENUS, initialMenuDocumentText, initialMenuIsDocument } from '@line-crm/shared';
 import {
   getTrackedLinkById,
   type LineAccount,
@@ -84,6 +85,25 @@ export async function assembleRichMenuGroupInput(
   account: Partial<Pick<LineAccount, 'liff_id'>> | null,
   options: RichMenuGroupInputOptions,
 ): Promise<GroupInput> {
+  // すべての公開経路で、他アカウント・非公開・停止中のフォームへ誘導しない。
+  const formIds = new Set((snapshot.pages??[]).flatMap(page=>page.areas??[]).map(area=>area.formId??(area.intent==='form'&&typeof area.actionData?.formId==='string'?area.actionData.formId:null)).filter((id):id is string=>!!id));
+  for(const id of formIds) {
+    const available=await db.prepare(`SELECT 1 FROM forms f JOIN form_accounts a ON a.form_id=f.id
+      JOIN rich_menu_groups g ON g.account_id=a.line_account_id WHERE f.id=? AND g.id=?
+      AND f.status='active' AND f.is_active=1 AND f.current_published_version_id IS NOT NULL`).bind(id,options.fallbackGroupId).first();
+    if(!available)throw new Error('リンク先のフォームを確認して公開してください。');
+    const document=await db.prepare(`SELECT v.layout FROM style_starter_items i JOIN forms f ON f.id=i.target_id JOIN form_versions v ON v.id=f.current_published_version_id AND v.form_id=f.id JOIN rich_menu_groups g ON g.account_id=i.line_account_id
+      WHERE f.id=? AND g.id=? AND i.kind='form' AND i.item_key GLOB 'initial-*'
+      AND (i.item_key LIKE '%-menu' OR i.item_key LIKE '%-access' OR i.item_key LIKE '%-about' OR i.item_key LIKE '%-news' OR i.item_key LIKE '%-guide' OR i.item_key LIKE '%-products')`).bind(id,options.fallbackGroupId).first<{layout:string|null}>();
+    if(document) {
+      const placeholders=new Set(Object.values(INITIAL_MENUS).flatMap(menu=>menu.buttons).filter(button=>initialMenuIsDocument(button.target)).map(button=>initialMenuDocumentText(button.target)));
+      const layout=JSON.parse(document.layout??'{}') as {header?:Array<{kind:string;text?:string}>;sections?:Array<{blocks:Array<{kind:string;text?:string}>}>};
+      const blocks=[...(layout.header??[]),...(layout.sections??[]).flatMap(section=>section.blocks)] as Array<{kind:string;text?:string;url?:string;mediaUrl?:string;label?:string}>;
+      const meaningful=blocks.some(block=>block.kind!=='input'&&(typeof block.text==='string'&&!!block.text.trim()||typeof block.url==='string'&&!!block.url.trim()||block.kind==='image'&&typeof block.mediaUrl==='string'&&!!block.mediaUrl.trim()));
+      if(!meaningful||blocks.some(block=>typeof block.text==='string'&&placeholders.has(block.text.trim())))
+        throw new Error('ご案内ページの見本をお店の内容に変えてください。');
+    }
+  }
   const ids = new Set<string>();
   for (const page of snapshot.pages ?? []) {
     for (const area of page.areas ?? []) {

@@ -101,6 +101,7 @@ export function useFirstSteps(accountId: string | null, role: string | null, opt
     })
   }, [accountId])
   return {
+    status: !enabled ? 'idle' as const : state.status === 'loading' || progress.status === 'loading' ? 'loading' as const : state.status,
     summary: shouldShowFirstSteps(role, summary) ? summary : null, folded, toggle, error: state.error, reload: () => { state.reload(); progress.reload() },
     steps: displaySteps, progress: progress.progress, firstRun: state.firstRun, starter: state.starter, watchExpired: state.watchExpired, rewatch: state.rewatch,
     arrived: canManageRole(role) && done.arrived, dismissArrived: done.dismiss,

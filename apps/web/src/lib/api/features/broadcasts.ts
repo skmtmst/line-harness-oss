@@ -372,10 +372,14 @@ export const broadcastsMethods = {
       const suffix = query.size ? `?${query.toString()}` : ''
       return fetchApi<ApiResponse<Record<BroadcastAssetKind, number>>>(`/api/broadcast-message-assets/counts${suffix}`)
     },
-    create: (data: { lineAccountId?: string | null; kind: BroadcastAssetKind; name: string; payload: Record<string, unknown> }) =>
+    create: (data: { lineAccountId?: string | null; kind: BroadcastAssetKind; name: string; payload: Record<string, unknown>; folderId?: string | null }) =>
       fetchApi<ApiResponse<BroadcastMessageAsset>>('/api/broadcast-message-assets', { method: 'POST', body: JSON.stringify(data) }),
-    update: (id: string, data: { name: string; payload: Record<string, unknown> }) =>
+    update: (id: string, data: { name: string; payload: Record<string, unknown>; folderId?: string | null }) =>
       fetchApi<ApiResponse<BroadcastMessageAsset>>(`/api/broadcast-message-assets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    publish: (id: string, data: { expectedVersion: number; expectedDraftRevision: number }, requestId: string) =>
+      fetchApi<ApiResponse<BroadcastMessageAsset & { replayed: boolean }>>(`/api/broadcast-message-assets/${id}/publish`, {
+        method: 'POST', headers: { 'Idempotency-Key': requestId }, body: JSON.stringify(data),
+      }),
     delete: (id: string) =>
       fetchApi<ApiResponse<null>>(`/api/broadcast-message-assets/${id}`, { method: 'DELETE' }),
     upload: async (file: File, lineAccountId?: string | null): Promise<ApiResponse<{ key: string; url: string; mimeType: string; size: number }>> => {

@@ -11,7 +11,8 @@ import { readStaffIdentity } from '@/lib/staff-identity-state'
  * 変えるときはここ1か所を直す。呼び側の名前は互換のため残す。
  */
 export function useCanManage(): boolean | null {
-  return canManageAutomationRole(useStaffRole(), readPermissionKeys())
+  const role = useStaffRole()
+  return role === null ? null : canManageAutomationRole(role, readPermissionKeys())
 }
 
 function readPermissionKeys(): string[] {

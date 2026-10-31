@@ -260,6 +260,7 @@ export const api = {
     }),
 
   // ===== Event booking =====
+  listEvents: (cursor?:string) => get<{items:Array<{id:string;name:string;venue_name:string|null;image_url:string|null;nextStartsAt:string}>;nextCursor:string|null}>(`/api/liff/events${cursor?'?cursor='+encodeURIComponent(cursor):''}`),
   getEvent: (id: string) => get<EventDetail>(`/api/liff/events/${id}`),
   getEventSlots: (id: string) => get<{ items: EventSlot[] }>(`/api/liff/events/${id}/slots`),
   createEventBooking: (

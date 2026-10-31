@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { getLineAccountById, getRichMenuGroupWithPages, setTrackedLinkBaseUrl } from '@line-crm/db';
+import { publishFormVersion, getLineAccountById, getRichMenuGroupWithPages, setTrackedLinkBaseUrl } from '@line-crm/db';
 import { createTestD1, type SqliteD1 } from '../../test-utils/d1-sqlite.js';
 import { createRichMenuShells, type LineRichMenuClient, type R2Like } from '../../lib/rich-menu-publisher.js';
 import { assembleRichMenuGroupInput, richMenuLiveToSnapshot, type RichMenuGroupSnapshot } from './rich-menu-group-input.js';
 
 let testDb: SqliteD1;
 
-beforeEach(() => {
+beforeEach(async () => {
   testDb = createTestD1({ foreignKeys: true });
   testDb.raw.exec(`
     INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret, liff_id)
@@ -14,6 +14,7 @@ beforeEach(() => {
     INSERT INTO tracked_links (id, name, original_url, line_account_id, short_code)
     VALUES ('w17-tracked', 'Fixture link', 'https://destination.example.test/page', 'w17-account', 'w17-short');
     INSERT INTO forms (id, name, fields) VALUES ('w17-form', 'Fixture form', '[]');
+    INSERT INTO form_accounts(form_id,line_account_id) VALUES('w17-form','w17-account');
     INSERT INTO rich_menu_groups
       (id, account_id, name, chat_bar_text, size, is_default_for_all, default_open)
     VALUES ('w17-group', 'w17-account', 'Fixture menu', 'メニュー', 'large', 1, 1);
@@ -36,6 +37,7 @@ beforeEach(() => {
     VALUES ('w17-area-3', 'w17-page', 1600, 0, 800, 800, 'uri',
             '{"uri":"https://plain.example.test/original"}', NULL, '旧URL');
   `);
+  await publishFormVersion(testDb.db,'w17-form',1);
   expect(testDb.raw.pragma('foreign_keys', { simple: true })).toBe(1);
 });
 afterEach(() => { testDb.raw.close(); });

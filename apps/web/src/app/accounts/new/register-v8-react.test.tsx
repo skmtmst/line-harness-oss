@@ -9,7 +9,7 @@ const calls = vi.hoisted(() => ({
   connectCheck: vi.fn(), connect: vi.fn(), list: vi.fn(), registrationReceipt: vi.fn(),
   followerImportState: vi.fn(), stepFollowerImport: vi.fn(), followerInsight: vi.fn(),
   staffList: vi.fn(), tagList: vi.fn(), tagCreate: vi.fn(), tagSet: vi.fn(), friendsList: vi.fn(),
-  styleGet: vi.fn(), styleSave: vi.fn(),
+  styleGet: vi.fn(), styleSave: vi.fn(), starterSet: vi.fn(),
 }))
 vi.mock('@/lib/api', () => ({
   api: {
@@ -27,7 +27,7 @@ vi.mock('@/lib/api', () => ({
     lineAccountTags: { list: calls.tagList, create: calls.tagCreate, setForAccount: calls.tagSet },
   },
 }))
-vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: calls.styleGet, save: calls.styleSave } }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: calls.styleGet, save: calls.styleSave, starterSet: calls.starterSet } }))
 vi.mock('@/lib/staff-role', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/staff-role')>()), useStaffRole: () => 'owner' }))
 vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,QR' } }))
 vi.mock('@/components/step-up-prompt', () => ({
@@ -82,6 +82,7 @@ beforeEach(() => {
   calls.friendsList.mockResolvedValue({ success: true, data: { total: 0 } })
   calls.styleGet.mockResolvedValue({ success: true, data: { style: 'standard', styleSelected: false, version: 0 } })
   calls.styleSave.mockResolvedValue({ success: true, data: { version: 1 } })
+  calls.starterSet.mockResolvedValue({ success: true, data: { definition: { items: [{ key: 'menu', kind: 'rich_menu' }] } } })
 })
 
 const fill = (id: string, value: string) => fireEvent.change(document.getElementById(id)!, { target: { value } })
@@ -93,6 +94,9 @@ const chooseStyle = async (label: string) => {
   const save = within(dialog).getByRole('button', { name: '次へ' }) as HTMLButtonElement
   await waitFor(() => expect(save.disabled).toBe(false))
   fireEvent.click(save)
+  const menu = await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
+  expect(calls.styleSave).not.toHaveBeenCalled()
+  fireEvent.click(within(menu).getByRole('button', { name: 'このメニューで進む' }))
 }
 /** ②の中だけ進むボタンの名前が違う（v07 Fqy29）。 */
 const nextStep = () => fireEvent.click(screen.getByRole('button', { name: '次のステップへ' }))

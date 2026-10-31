@@ -30,6 +30,7 @@ export function useStyleSetupProgress(accountId: string | null, style: AccountSt
     return () => { window.removeEventListener(ACCOUNT_STYLE_UPDATED, reload); document.removeEventListener('visibilitychange', reload) }
   }, [accountId])
   return {
+    status: !enabled || !accountId || !style || style === 'standard' ? 'idle' as const : snapshot?.scope === scope ? 'ready' as const : 'loading' as const,
     progress: enabled && snapshot?.scope === scope ? snapshot.progress : style ? unknownStyleSetupProgress(style) : undefined,
     reload: () => setTick(value => value + 1),
   }

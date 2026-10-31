@@ -294,13 +294,13 @@ export type {
 } from './calendar';
 export {
   LINE_RETRY_KEY_VALIDITY_MS, cancelFriendReminder, cancelReminderRegistrant, cancelV6RemindersForSource, claimReminderDeliveryRun, completeReminderDeliveryRunStatement,
-  completeReminderIfDone, createReminder, createReminderStep, createReminderWithDraftVersion, deleteReminder, deleteReminderStep,
+  completeReminderIfDone, createReminder, createReminderStep, createReminderWithDraftVersion, prepareReminderDraftCreation, prepareReminderDraftSave, deleteReminder, deleteReminderStep,
   enrollFriendInReminder, enrollFriendsInReminderOnce, failReminderDeliveryRun, friendFieldReminderTargetStatements, getFriendFieldReminders, getFriendReminderSendGate,
   getFriendReminderStatus, getFriendReminders, getFriendsWithFieldValuePage, getOneTimeFriendFieldReminderRegistrants, getPendingReminderDeliveries, getReminderById,
   getReminderDeliveryRunById, getReminderDeliveryRunSentPayload, getReminderDeliveryRunSummary, getReminderDeliveryStepSummaries, getReminderDraftVersion, getReminderPublishedVersion,
   getReminderRegistrantById, getReminderSteps, getReminderVersionById, getReminderVersionSteps, getReminders, getRemindersByIds,
   hasReminderEnrollment, holdExpiredLineRetryRuns, listReminderDeliveryRuns, listReminderRegistrants, markReminderStepDelivered, moveReminderRegistrantTargetDate,
-  parseReminderVersionSettings, parseTemplateVersionSnapshot, publishReminderDraftVersion, recordReminderDraftTest, releaseClaimedReminderRun, reopenCancelledDeliveryRuns,
+  parseReminderVersionSettings, parseTemplateVersionSnapshot, prepareReminderDraftPublication, publishReminderDraftVersion, recordReminderDraftTest, releaseClaimedReminderRun, reopenCancelledDeliveryRuns,
   reorderReminders, rescheduleV6RemindersForSource, restoreReminder, resumeReminderRegistrant, retryReminderDeliveryRun, saveReminderDeliveryRunSentPayload,
   saveReminderDraftVersion, setFriendFieldReminderScanCursor, skipReminderDeliveryRun, snapshotReminderTemplateVersions, updateReminder, verifyClaimedRunBeforeSend,
 } from './reminders/index';

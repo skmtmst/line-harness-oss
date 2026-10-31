@@ -10,6 +10,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { within } from '@testing-library/react'
 import BroadcastAssetManager from './broadcast-asset-manager'
+vi.mock('next/navigation', async () => (await import('@/test-utils/navigation-mock')).navigationMock())
 
 vi.mock('@/contexts/account-context', () => ({
   useAccount: () => ({ selectedAccountId: 'acc-1', loading: false }),

@@ -1,3 +1,4 @@
+import './coupon-preview.test.mjs'
 import './saved-search-label.test.mjs'
 import './single-choice-filters.test.mjs'
 import './notice-line-break.test.mjs'
@@ -24,6 +25,7 @@ import scanPolish from './polish-rules-browser.mjs'
 import scanRowHeights from './control-row-height-browser.mjs'
 import scanRowCentering from './row-centering-browser.mjs'
 import scanHoverReveal from './hover-reveal-browser.mjs'
+import './notice-status-actions.test.mjs'
 test('a framed box clipped by its parent fails; scrollable and restored boxes remain usable', async () => {
   const browser = await connectGuardBrowser()
   try {

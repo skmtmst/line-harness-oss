@@ -22,6 +22,7 @@ const DIRTY_SIGNATURE = /dirty|unsaved|savedSnapshot|未保存/i
 
 /** 番兵を持つ画面。`useUnsavedGuard` と離脱確認ダイアログの両方が必要。 */
 const GUARDED = [
+  'v8/hq-starter-sets/catalog-editor.tsx',
   // 会社・連絡先とプール名の下書きは、共通の FormLeaveGuard が画面離脱を守る。
   'v8/hq/company-contact.tsx',
   'v8/settings/pools/pools.tsx',
@@ -147,6 +148,7 @@ const GUARDED = [
  * 子は `onDirtyChange` 等で報告するだけで、自分では確認対話を出さない。
  */
 const COVERED_BY_PARENT: Record<string, string | readonly string[]> = {
+  'v8/onboarding/initial-menu-page.tsx': 'components/templates/create-page.tsx',
   'v8/friend-add/editor-basic-routes.tsx': 'v8/friend-add/editor.tsx',
   // 登録中のスタッフは親の入力を表示するだけ。入力と離脱確認を持つ親を検査する。
   'v8/booking-staff/phone.tsx': 'v8/booking-staff/staff-new.tsx',

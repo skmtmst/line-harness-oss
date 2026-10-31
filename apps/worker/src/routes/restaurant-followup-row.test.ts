@@ -1,5 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
+import * as followupTestSend from '../services/restaurant-followup-test-send.js';
+import { NotificationDeliveryIncomplete } from '../services/recorded-notification-send.js';
 import { createTestD1, type SqliteD1 } from '../test-utils/d1-sqlite.js';
 type MockStaff = {
   id: string;
@@ -7,6 +9,7 @@ type MockStaff = {
   role: 'owner' | 'admin' | 'staff';
   access_level: 'full' | 'read_only';
   permission_keys: string;
+  view_permission_keys?: string;
   assigned_line_account_id: string | null;
   can_access_descendant_accounts: number;
   tenant_id?: string | null;
@@ -113,6 +116,50 @@ function newStore() {
  INSERT INTO rt_stores(id,organization_id,name,code,line_account_id) VALUES('new','o','新しい店','NEW','account-1'),('foreign','other','他店','FOREIGN','account-2');`);
 }
 const path='/api/restaurant-test/followups/new',scope='?account_id=account-1';
+describe('新しい送り手の保存・承認のHTTP境界',()=>{
+ async function initialRows(){
+  const page=await (await request(path+scope)).json() as {data:{rows:Array<{trigger:string;version:number}>}};
+  return page.data.rows.map(row=>({trigger:row.trigger,input:{expectedRowVersion:row.version,expectedTargetVersion:0,expectedContentRevision:null,enabled:row.trigger==='reservation_created',timing:{mode:'countdown',offsetMinutes:0},messageBubbles:[{id:'text',type:'text',content:{text:'ご予約ありがとうございます'}}]}}));
+ }
+ it('初回は7行まとめて保存し、停止した実物と最新版を返す',async()=>{
+  newStore();const rows=await initialRows();
+  expect((await request(path+'/engines/reservation_created/draft'+scope,rows.find(row=>row.trigger==='reservation_created')!.input)).status).toBe(409);
+  const response=await request(path+'/engines/initialize'+scope,{rows});expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({data:{engines:[expect.objectContaining({engine:'automation',targetVersion:1,effectiveSendingStatus:'stopped'})],message:expect.stringContaining('まだ送っていません')}});
+  expect(testDb.raw.prepare('SELECT count(*) n FROM automation_definitions').get()).toEqual({n:1});
+  const repeated=await request(path+'/engines/initialize'+scope,{rows});expect(repeated.status).toBe(409);
+  expect(testDb.raw.prepare('SELECT count(*) n FROM automation_definitions').get()).toEqual({n:1});
+ });
+ it('未テストは公開せず、権限を本文で偽ってもstaffや閲覧のみは操作できない',async()=>{
+  newStore();await request(path+'/engines/initialize'+scope,{rows:await initialRows()});
+  const body={expectedTargetVersion:1,expectedContentHash:'fake',canApprove:true,staffId:'owner'};
+  expect((await request(path+'/engines/reservation_created/start'+scope,body)).status).toBe(409);
+  for(const access_level of ['full','read_only'] as const){
+   authMocks.getStaffByApiKey.mockResolvedValue({id:'limited',name:'担当',role:access_level==='full'?'staff':'admin',access_level,permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1});
+   for(const operation of ['draft','test-send','start'])expect((await requestAs(path+'/engines/reservation_created/'+operation+scope,'limited',body)).status).toBe(403);
+  }
+  expect(testDb.raw.prepare('SELECT count(*) n FROM rt_approval_requests').get()).toEqual({n:0});
+ });
+ it('店の外の保存と読取を拒否し、対象を増やさない',async()=>{
+  newStore();const rows=await initialRows();
+  expect((await request('/api/restaurant-test/followups/foreign/engines/initialize'+scope,{rows})).status).toBe(404);
+  expect((await request('/api/restaurant-test/followups/foreign/engines'+scope)).status).toBe(404);
+  expect(testDb.raw.prepare('SELECT count(*) n FROM automation_definitions').get()).toEqual({n:0});
+ });
+ it('閲覧のみでも現在の送り方を読めるが保存はできない',async()=>{
+  newStore();
+  authMocks.getStaffByApiKey.mockResolvedValue({id:'reader',name:'閲覧',role:'admin',access_level:'read_only',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1});
+  expect((await requestAs(path+'/engines'+scope,'reader')).status).toBe(200);
+  expect((await requestAs(path+'/engines/initialize'+scope,'reader',{rows:[]})).status).toBe(403);
+ });
+ it('壊れた吹き出しの保存は入力の誤りとして返し、実物を残さない',async()=>{
+  newStore();const rows=await initialRows();
+  rows.find(row=>row.trigger==='reservation_created')!.input.messageBubbles=[{id:'broken',type:'text',content:{text:''}}];
+  const response=await request(path+'/engines/initialize'+scope,{rows});expect(response.status).toBe(422);
+  expect(await response.json()).toMatchObject({code:'invalid_followup',error:'送り方と送る内容を確認してください'});
+  expect(testDb.raw.prepare('SELECT count(*) n FROM automation_definitions').get()).toEqual({n:0});
+ });
+});
 describe('7行の補完とオンのHTTP境界',()=>{
  it('未作成の正当な店は200と7行、知らない店は404',async()=>{
   newStore();const response=await request(path+scope);expect(response.status).toBe(200);
@@ -214,4 +261,36 @@ it('判断者の識別が無い要求は空の記録を保存せず401で止め�
  newStore();authMocks.getStaffByApiKey.mockResolvedValue({id:'',name:'担当',role:'admin',access_level:'full',permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1});
  expect((await requestWithMethod(path+'/setup'+scope,'PUT',{notUsing:true,expectedVersion:0},'unknown')).status).toBe(401);
  expect(testDb.raw.prepare('SELECT count(*) n FROM rt_store_followup_preferences').get()).toEqual({n:0});
+});
+
+for(const [reason,code,message] of [
+ ['sending_stopped','sending_stopped','いまは送信を止めています'],
+ ['REMINDER_TEST_RECIPIENT_NOT_AVAILABLE','test_precondition_changed','内容か宛先が変わりました'],
+ ['restaurant_followup_test_content_changed','test_precondition_changed','内容か宛先が変わりました'],
+])it(`テストを外部要求前に止めた理由${reason}を読み直し可能な409で返す`,async()=>{
+ newStore();const send=vi.spyOn(followupTestSend,'testRestaurantFollowupEngine').mockRejectedValueOnce(new NotificationDeliveryIncomplete('failed',reason));
+ try{
+  const response=await request(path+'/engines/reservation_created/test-send'+scope,{expectedTargetVersion:1});
+  expect(response.status).toBe(409);expect(await response.json()).toMatchObject({success:false,code,error:expect.stringContaining(message)});
+ }finally{send.mockRestore();}
+});
+
+it('来店フォローの閲覧権限だけで状態を読め、操作権限があってもスタッフは送り始められない',async()=>{
+ newStore();
+ const staff={id:'staff',name:'担当',role:'staff' as const,access_level:'full' as const,permission_keys:'[]',view_permission_keys:'[]',assigned_line_account_id:null,can_access_descendant_accounts:1};
+ authMocks.getStaffByApiKey.mockResolvedValue(staff);
+ expect((await requestAs(path+'/engines'+scope,'staff')).status).toBe(403);
+ for(const suffix of ['', '/review-history'])expect((await requestAs(path+suffix+scope,'staff')).status).toBe(200);
+ for(const access_level of ['full','read_only'] as const){
+  authMocks.getStaffByApiKey.mockResolvedValue({...staff,access_level,view_permission_keys:'["/restaurant-test/line-followup"]'});
+  expect((await requestAs(path+'/engines'+scope,'staff')).status).toBe(200);
+  for(const suffix of ['', '/review-history'])expect((await requestAs(path+suffix+scope,'staff')).status).toBe(200);
+  for(const action of ['initialize','reservation_created/draft','reservation_created/test-send','reservation_created/start'])
+   expect((await requestAs(path+'/engines/'+action+scope,'staff',{})).status).toBe(403);
+ }
+ authMocks.getStaffByApiKey.mockResolvedValue({...staff,permission_keys:'["/restaurant-test/line-followup"]'});
+ expect((await requestWithMethod(path+'/rows/reservation_created'+scope,'PUT',{expectedRowVersion:1,enabled:true},'staff')).status).toBe(403);
+ for(const action of ['initialize','reservation_created/draft','reservation_created/test-send','reservation_created/start'])
+  expect((await requestAs(path+'/engines/'+action+scope,'staff',{})).status).toBe(403);
+ expect(testDb.raw.prepare('SELECT count(*) n FROM rt_store_followup_targets').get()).toEqual({n:0});
 });

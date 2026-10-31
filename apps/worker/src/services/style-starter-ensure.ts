@@ -1,7 +1,10 @@
+import { materializeInitialMenuAssets } from './style-initial-assets.js';
 import type { SetupAnswer } from '@line-crm/shared';
 import { hasPendingStyleSelection, profile, type StyleProfile } from './style-profile.js';
 import { StyleError } from './style-setup-core.js';
 import { insertStyleStarterItems } from './style-starter-insert.js';
+import { starter } from './style-starter-set.js';
+import { applyCatalogStarter, type StarterCatalogRuntime } from './style-starter-catalog-apply.js';
 
 /**
  * 今のスタイルの初期セットのうち、まだ入っていない物を決める。
@@ -30,13 +33,22 @@ async function planMissingStarterItems(
 export async function starterApplication(db: D1Database, account: string, tenant: string | null) {
   const p = await profile(db, account);
   if (!p) return null;
+  const set = await starter(db, tenant, p.style);
+  if (set.definition.mode === 'catalog') {
+    const selections = set.definition.selections ?? [];
+    const rows = (await db.prepare("SELECT template_id,template_version_id,state FROM style_starter_catalog_items WHERE line_account_id=? AND tenant_id=?")
+      .bind(account, tenant).all<{template_id:string;template_version_id:string;state:string}>()).results;
+    const count = selections.filter(selection => rows.some(row => row.template_id === selection.templateId && row.template_version_id === selection.versionId && row.state === 'succeeded')).length;
+    return { applied: count === selections.length, count, missing: set.autoInsert && p.selection_mode==='configured' ? selections.length - count : 0 };
+  }
   const count = (await db
     .prepare('SELECT COUNT(*) AS n FROM style_starter_items WHERE line_account_id=?')
     .bind(account)
     .first<{ n: number }>())?.n ?? 0;
   let missing: number | null;
   try {
-    missing = (await planMissingStarterItems(db, account, tenant, 'getting-started', p, new Date().toISOString())).inserted.length;
+    const plan = await planMissingStarterItems(db,account,tenant,'getting-started',p,new Date().toISOString());
+    missing = plan.inserted.length + plan.updated.length;
   } catch (error) {
     // 統括の組が入れ直しで使えない形の時も、手順の一覧そのものは返す。数えられない物を 0 と言わない。
     if (!(error instanceof StyleError)) throw error;
@@ -56,21 +68,34 @@ export async function ensureStyleStarterItems(
   tenant: string | null,
   actor: string,
   input: Record<string, unknown>,
+  images?: R2Bucket,
+  runtime: StarterCatalogRuntime = {},
 ) {
   const p = await profile(db, account);
   if (!p) throw new StyleError('select_style_first', 409);
   if (!Number.isInteger(input.expectedVersion) || input.expectedVersion !== p.version)
     throw new StyleError('version_conflict', 409);
+  const selectedSet = await starter(db, tenant, p.style);
+  if (selectedSet.definition.mode === 'catalog' && tenant) {
+    const before=(await db.prepare("SELECT template_id,template_version_id FROM style_starter_catalog_items WHERE line_account_id=? AND tenant_id=? AND state='succeeded'").bind(account,tenant).all<{template_id:string;template_version_id:string}>()).results;
+    const catalogApplication=await applyCatalogStarter(db,tenant,account,actor,p.style,runtime);
+    return {inserted:catalogApplication.items.filter(row=>row.state==='succeeded'&&!before.some(old=>old.template_id===row.templateId&&old.template_version_id===row.versionId)).map(row=>({key:row.templateId,kind:row.kind})),
+      updated:[],skipped:[],existing:before.length,starterSet:{id:selectedSet.id,version:selectedSet.version},catalogApplication};
+  }
   const now = new Date().toISOString();
-  const { set, inserted, skipped, existing, statements } = await planMissingStarterItems(db, account, tenant, actor, p, now);
+  const answers = JSON.parse(p.answers_json) as Record<string,SetupAnswer>;
+  if(answers.image?.mode==='configured' && answers.image.value==='simple')
+    await materializeInitialMenuAssets(db,images,account,p.style,(await starter(db,tenant,p.style,true)).definition);
+  const { set, inserted, updated, skipped, existing, statements } = await planMissingStarterItems(db,account,tenant,actor,p,now);
   const keys = new Set(set.definition.items.map((item) => item.key));
   const result = {
     inserted: (inserted as Array<{ key: string; kind: string }>).map(({ key, kind }) => ({ key, kind })),
+    updated,
     skipped,
     existing: existing.filter((row) => keys.has(row.item_key)).length,
     starterSet: { id: set.id, version: set.version },
   };
-  if (!inserted.length) return result;
+  if (!inserted.length && !updated.length) return result;
   try {
     await db.batch([
       db.prepare(

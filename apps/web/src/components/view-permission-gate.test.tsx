@@ -123,7 +123,9 @@ it('権限未確定・読込失敗では作成の副作用を始めず、再読�
   const mounted = vi.fn()
   function Draft() { React.useEffect(mounted, []); return <p>下書き作成</p> }
   render(<ViewPermissionGate><Draft /></ViewPermissionGate>)
-  expect(screen.getByText('権限を確認しています')).toBeTruthy()
+  expect(screen.getByLabelText('読み込んでいます').getAttribute('aria-busy')).toBe('true')
+  expect(screen.queryByText(/権限/)).toBeNull()
+  expect(mounted).not.toHaveBeenCalled()
   await act(async () => { await Promise.resolve(); resolve({ success: false, error: 'unavailable' }) })
   expect(await screen.findByText('読み込めませんでした')).toBeTruthy()
   expect(mounted).not.toHaveBeenCalled()

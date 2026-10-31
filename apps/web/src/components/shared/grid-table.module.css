@@ -150,3 +150,10 @@ html:root .table[data-stacked] .row > :first-child { grid-column: 1 / -1; }
 /* 内容の最小幅が入らない時も、既存の段組みで全列を残す。 */
 html:root .table[data-stacked][data-stacked] { display: flex; flex-direction: column; }
 html:root .table[data-stacked][data-stacked] .row { display: grid; }
+
+/* 複数段の選択欄は内容を切らず、行の最小の高さだけを保つ。 */
+html:root .table[data-row-sizing='content'] .row:not([data-head]) {
+  height: auto;
+  min-height: var(--polish-table-row);
+  padding: var(--grid-table-row-padding);
+}

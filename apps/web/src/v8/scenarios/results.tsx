@@ -610,7 +610,7 @@ export default function ScenarioResultsV8() {
                 {/* 続きを読めるかぎり読む。読み込み中の失敗は一覧を消さず、再試行口だけ出す。 */}
                 {runsMoreError ? (
                   <Notice tone="danger" className={styles.moreErrorNoticePlacement} >{runsMoreError}
-                    <button type="button" className={styles.sectionLink} onClick={loadMoreRuns}>もう一度読み込む</button></Notice>
+                    <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={loadMoreRuns}>もう一度読み込む</Button></Notice>
                 ) : null}
                 {runs.pagination.nextCursor ? (
                   <div className={styles.more}>
@@ -660,9 +660,9 @@ export default function ScenarioResultsV8() {
         {/* 候補の取得失敗は「移せるシナリオがありません」と分ける（SCENARIO-10 と同じ分け方）。 */}
         {moveOptionsError ? (
           <Notice tone="danger" className={styles.moreErrorNoticePlacement} >移し先の候補を読み込めませんでした。
-            <button type="button" className={styles.sectionLink} onClick={() => void loadMoveOptions()} disabled={opBusy !== null}>
+            <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void loadMoveOptions()} disabled={opBusy !== null}>
               もう一度読み込む
-            </button></Notice>
+            </Button></Notice>
         ) : (
           <SaveErrorField names={["moveScenarioId"]}><EntityKindField
             kind="scenario"

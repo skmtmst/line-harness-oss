@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { api, type BroadcastAssetKind, type BroadcastMessageAsset } from '@/lib/api'
 import { useAccount } from '@/contexts/account-context'
+import { useListNavigationRouter as useRouter } from '@/components/shared/list-navigation'
 import Button from '@/components/shared/button'
 import { Field } from '@/components/shared/form-controls'
 import { TextField } from '@/components/shared/text-field'
@@ -74,6 +75,7 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
   const uploadGeneration = useRef(new Map<string, number>())
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [items, setItems] = useState<BroadcastMessageAsset[]>([])
+  const router = useRouter()
   const [editing, setEditing] = useState<BroadcastMessageAsset | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [name, setName] = useState('')
@@ -162,6 +164,7 @@ export default function BroadcastAssetManager({ kind, onChanged, renderLayout }:
    */
   useEffect(() => { reset() }, [reset, kind, selectedAccountId])
   const startEdit = (item: BroadcastMessageAsset) => {
+    if (kind === 'coupon') { router.push(`/templates/edit?kind=coupon&id=${encodeURIComponent(item.id)}`); return }
     editorGeneration.current++;
     setEditing(item); setShowForm(true); setName(item.name); setImageUrl(String(item.payload.imageUrl ?? '')); setImageFile(null); setDescription(String(item.payload.description ?? '')); setActionUrl(String(item.payload.actionUrl ?? ''))
     if (kind === 'card_message' && Array.isArray(item.payload.cards)) setCards((item.payload.cards as CardDraft[]).map(card => ({...card, id: card.id || crypto.randomUUID()})))

@@ -17,6 +17,7 @@ export type GridTableDesign = {
   headPadding?: string
   padding?: string
   rowGap?: string
+  /** auto は選択欄など複数段の内容に合わせて行を広げる。 */
   rowHeight?: string
   headHeight?: string
   fontSize: string
@@ -46,7 +47,7 @@ export function GridTable({ children, label, design, framed = true, className, p
   useGridTableStack(actionWidthRef, design.columns, columnSizing !== 'content' && (presentation === undefined || presentation === 'dashboard'))
   const variables = Object.fromEntries(Object.entries(design).map(([key, value]) => [`--grid-table-${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`, value]))
   variables['--grid-table-rest-columns'] = restGridTracks(design.columns)
-  return <div {...props} ref={actionWidthRef} data-shared-part="list-table" role="table" aria-label={label} className={[styles.table, className].filter(Boolean).join(' ')} data-framed={presentation === 'calendar' ? undefined : framed || undefined} data-table-presentation={presentation} data-booking-calendar={presentation === 'calendar' ? '' : undefined} style={variables as CSSProperties}>{children}</div>
+  return <div {...props} ref={actionWidthRef} data-shared-part="list-table" role="table" aria-label={label} className={[styles.table, className].filter(Boolean).join(' ')} data-row-sizing={design.rowHeight === 'auto' ? 'content' : undefined} data-framed={presentation === 'calendar' ? undefined : framed || undefined} data-table-presentation={presentation} data-booking-calendar={presentation === 'calendar' ? '' : undefined} style={variables as CSSProperties}>{children}</div>
 }
 
 export function GridHeadRow({ children, className }: { children: ReactNode; className?: string }) {

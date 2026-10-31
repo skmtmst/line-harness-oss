@@ -368,7 +368,7 @@ export default function OverviewTab({
             <DetailLoading />
           ) : deliveryFailed ? (
             <Notice tone="danger" className={styles.secNoteNoticePlacement} >配信予定を読み込めませんでした
-              <button type="button" className={styles.retry} onClick={() => void data.loadUpcoming()}>もう一度読み込む</button></Notice>
+              <Button variant="text" size="inline" type="button" onClick={() => void data.loadUpcoming()} data-notice-inline-action>もう一度読み込む</Button></Notice>
           ) : nextDelivery ? (
             <IconRow
               surface="card"
