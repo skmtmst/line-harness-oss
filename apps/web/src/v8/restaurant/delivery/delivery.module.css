@@ -405,3 +405,18 @@
   flex: 0 0 var(--tpl-rt-dlv-filter-date);
   min-width: 0;
 }
+
+/* 状態による理由は、同じサービスの操作の次の行にまとめる。 */
+.serviceTop,
+.headActions { flex-wrap: wrap; }
+
+/* 状態理由の行数が違っても、横並びの札と件数は同じ下端にそろえる。 */
+.serviceBottom { margin-top: auto; }
+
+/* 理由の行はその操作だけと縦に組み、頭の操作列全体へ広げない。 */
+.intakeAction {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--tpl-rt-dlv-act-gap);
+}
