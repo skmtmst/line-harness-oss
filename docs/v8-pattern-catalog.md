@@ -933,7 +933,7 @@
 ## steps 手順
 
 - 完了した入力の要約は `Steps.summaries`。変える口は既存の `onSelect` へ渡す。現在・未完の段には要約を出さない。方向の動きは同じ持ち主の `StepContent` と `CreatePage.step` / `CreateStepColumns.step`。入力を作り直さず transform だけを150ms動かし、動きを減らす設定では即時に替える。
-  - 手順の本文へ読み上げの焦点を移す場合は `StepContent.elementRef` と `tabIndex={-1}` を使う。非操作の本文を囲む焦点枠は描かず、中の入力・ボタンの焦点枠は保つ。
+  - 手順を進めたら `StepContent.elementRef` の内側にある現在の段の題（h2/h3、`tabIndex={-1}`）へ焦点を移す。題は文字の幅に収め、共通の焦点枠を出す。本文全体へは焦点を当てず、輪を消す指定も足さない。
 
 - **役目**：題のすぐ下・左寄せ・1行。済みの段だけ押して戻れる
 - **持ち主（コード）**：`apps/web/src/components/templates/steps.tsx`・`apps/web/src/components/templates/steps.module.css`（部品 `Steps`）

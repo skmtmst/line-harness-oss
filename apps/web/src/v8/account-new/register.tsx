@@ -162,7 +162,10 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
   const addFriendUrl = basicId ? `https://line.me/R/ti/p/${encodeURIComponent(basicId.startsWith('@') ? basicId : `@${basicId}`)}` : ''
   const shownStep = V8_STEPS[currentStep - 1]
 
-  useEffect(() => { stepPanelRef.current?.focus() }, [currentStep, sub, precheckAt])
+  const headingReady = !((currentStep === 3 && sub === 2) || currentStep === 5) || Boolean(connection)
+  useEffect(() => {
+    if (headingReady) stepPanelRef.current?.querySelector<HTMLElement>('[data-step-heading]')?.focus()
+  }, [currentStep, sub, precheckAt, headingReady])
   useEffect(() => {
     if (!Object.keys(fieldErrors).length) return
     const invalid = stepPanelRef.current?.querySelector<HTMLInputElement>('[aria-invalid="true"]')
@@ -650,7 +653,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
         )}
       />
       <form className={styles.body} onSubmit={submit} noValidate aria-busy={busy || undefined}>
-        <StepContent elementRef={stepPanelRef} tabIndex={-1} step={currentStep * 10 + sub} className={styles.stepBody}>
+        <StepContent elementRef={stepPanelRef} step={currentStep * 10 + sub}>
           {currentStep === 1 && (
             <Step1Precheck
               badge={badge}
@@ -692,7 +695,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
               )}>
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="接続確認">
                 <p className={styles.subBadge}>{badge}</p>
-                <h2 className={styles.panelTitle}>接続確認</h2>
+                <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>接続確認</h2>
                 <ul className={styles.checkList}>
                   {checkRows.map((row) => (
                     <li key={row.key} className={styles.checkRow} data-phase={row.phase}>
@@ -730,7 +733,7 @@ function AccountRegistrationForm({ draftKey, resumeKey }: { draftKey: string | n
               )}>
               <Card surface="standard" layout="vertical" contentPadding="var(--tpl-htn-panel-pad)" gap="var(--tpl-htn-panel-gap)" className={styles.panel} aria-label="ためしに友だち追加">
                 <p className={styles.subBadge}>{badge}</p>
-                <h2 className={styles.panelTitle}>友だち追加できるか確かめます</h2>
+                <h2 data-step-heading tabIndex={-1} className={styles.panelTitle}>友だち追加できるか確かめます</h2>
                 <div className={styles.qrBlock}>
                   <div className={styles.qrFrame}>
                     {qrDataUrl ? (

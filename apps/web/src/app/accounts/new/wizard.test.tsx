@@ -103,6 +103,7 @@ function enterCheckStep() {
   ack('チャネルを「開発中」から「公開済み」にした')
   nextStep()
   expect(screen.getByRole('button', { name: '接続を確かめる' })).toBeTruthy()
+  expect(document.activeElement).toBe(screen.getByRole('heading', { name: '接続確認', exact: true }))
 }
 
 /** 5行は1行ずつ順に出るので、すべて通るまで待つ（5行 × 420ms）。 */
@@ -114,16 +115,50 @@ async function runCheck() {
 /** ③Step1で登録し、③Step2・④を通って⑤まで進む。 */
 async function saveAndFinish() {
   fireEvent.click(screen.getByRole('button', { name: '登録する' }))
-  await screen.findByText('友だち追加できるか確かめます', { selector: 'h2' })
+  const heading = await screen.findByRole('heading', { name: '友だち追加できるか確かめます' })
+  expect(document.activeElement).toBe(heading)
   await waitFor(() => expect((screen.getByRole('button', { name: '次へ' }) as HTMLButtonElement).disabled).toBe(false))
   next()
   const dialog = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+  expect(document.querySelector('[data-step-heading]')?.textContent).toBe('使い方のスタイルを選ぶ')
+  await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true))
   const skip = within(dialog).getByRole('button', { name: 'あとで設定する' })
   await waitFor(() => expect((skip as HTMLButtonElement).disabled).toBe(false))
   fireEvent.click(skip)
 }
 
 describe('LINEアカウント作成ウィザード', () => {
+  it('質問・段・小さな段を進めたら現在の題へ焦点を移し、本文全体には当てない', () => {
+    render(<NewLineAccountPage />)
+    const expectHeadingFocus = () => {
+      const heading = document.activeElement as HTMLElement
+      expect(['H2', 'H3']).toContain(heading.tagName)
+      expect(heading.getAttribute('tabindex')).toBe('-1')
+      expect(heading.hasAttribute('data-step-heading')).toBe(true)
+      expect(heading.closest('[data-step-content]')).not.toBeNull()
+      expect(document.querySelectorAll('[data-step-content][tabindex]')).toHaveLength(0)
+      return heading
+    }
+    const firstText = expectHeadingFocus().textContent
+    pick('はい、あります')
+    const second = expectHeadingFocus()
+    expect(second.textContent).not.toBe(firstText)
+    expect(second).toBe(screen.getByRole('heading', { name: second.textContent! }))
+    pick('いいえ、引き継ぎません')
+    expectHeadingFocus()
+    pick('使っていません')
+    expect(expectHeadingFocus()).toBe(screen.getByRole('heading', { name: 'ご利用環境の確認' }))
+    next()
+    expect(expectHeadingFocus()).toBe(screen.getByRole('heading', { name: 'Messaging API の情報を入れる' }))
+    fill('v8-channel-id', '123456789')
+    fill('v8-channel-secret', 'synthetic-secret')
+    nextStep()
+    expect(expectHeadingFocus()).toBe(screen.getByRole('heading', { name: 'プロバイダーIDを確認する' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Messaging API へ戻る', exact: true }))
+    expect(expectHeadingFocus()).toBe(screen.getByRole('heading', { name: 'Messaging API の情報を入れる' }))
+    expect((document.getElementById('v8-channel-id') as HTMLInputElement).value).toBe('123456789')
+  })
+
   it('①の質問に答えてから②の4つの小さな段へ順に進む', () => {
     render(<NewLineAccountPage />)
     expect(screen.getByText('ご利用環境の確認', { selector: 'h2' })).toBeTruthy()
@@ -293,7 +328,8 @@ describe('LINEアカウント作成ウィザード', () => {
     enterCheckStep()
     await runCheck()
     await saveAndFinish()
-    await screen.findByText('準備ができました')
+    const completeHeading = await screen.findByRole('heading', { name: '準備ができました' })
+    await waitFor(() => expect(document.activeElement).toBe(completeHeading))
     expect(calls.connect).toHaveBeenCalledWith(expect.objectContaining({
       name: undefined,
       channelId: '123456789',
@@ -305,7 +341,7 @@ describe('LINEアカウント作成ウィザード', () => {
     expect(screen.getByRole('link', { name: '統括コンソールへ戻る' }).getAttribute('href')).toBe('/hq')
     expect(document.body.textContent).not.toContain('synthetic-secret')
     await waitFor(() => expect(notices.lineRegistration).toHaveBeenCalled())
-    expect(screen.getByText('読み込んでいます…')).toBeTruthy()
+    expect(screen.getByText('案内を読み込んでいます…')).toBeTruthy()
     finishNotice({ success: true, data: { available: false } })
     await waitFor(() => expect(document.body.textContent).not.toContain('musubo 運営（契約者専用）'))
   })
@@ -313,16 +349,16 @@ describe('LINEアカウント作成ウィザード', () => {
   it('登録完了の直後に、契約者専用LINEの登録案内を一度だけ出す（案内だけで、閉じられる）', async () => {
     notices.lineRegistration.mockResolvedValue({ success: true, data: {
       available: true, accountName: 'musubo 運営（契約者専用）', basicId: '@musubo', addFriendUrl: 'https://line.me/R/ti/p/@musubo',
-      linked: false, code: '123456', codeExpiresAt: '2026-09-19T00:00:00.000Z',
+      linked: false, code: '123456', codeExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
     } })
     enterCheckStep()
     await runCheck()
     await saveAndFinish()
     await screen.findByText('準備ができました')
-    await screen.findByText('運営からの通知を LINE で受け取る')
+    const notice = await screen.findByRole('dialog', { name: '運営からの通知をLINEで受け取る' })
     await screen.findByText('123456')
-    fireEvent.click(screen.getByRole('button', { name: 'あとで確認する' }))
-    await waitFor(() => expect(screen.queryByText('運営からの通知を LINE で受け取る')).toBeNull())
+    fireEvent.click(within(notice).getByRole('button', { name: '閉じる', exact: true }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '運営からの通知をLINEで受け取る' })).toBeNull())
     expect(notices.lineRegistration).toHaveBeenCalledTimes(1)
   })
 

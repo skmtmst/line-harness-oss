@@ -44,10 +44,17 @@ export function scanPatrolLayout(kind) {
     }
   }
   if (kind === 'focus') {
-    const panel = document.querySelector('[data-step-content][tabindex="-1"]')
-    if (!panel || document.activeElement !== panel) findings.push({ kind: 'step-focus-missing' })
-    else if (!panel.matches(':focus-visible')) findings.push({ kind: 'step-keyboard-focus-missing' })
-    else if (getComputedStyle(panel).outlineStyle !== 'none' && parseFloat(getComputedStyle(panel).outlineWidth) > 0) findings.push({ kind: 'step-container-focus-ring' })
+    const panel = document.querySelector('main form [data-step-content]')
+    const heading = panel?.querySelector('[data-step-heading]')
+    if (!heading || !/^H[23]$/.test(heading.tagName) || heading.tabIndex !== -1 || document.activeElement !== heading) findings.push({ kind: 'step-heading-focus-missing' })
+    else {
+      const style = getComputedStyle(heading)
+      if (!heading.matches(':focus-visible')) findings.push({ kind: 'step-keyboard-focus-missing' })
+      if (style.outlineStyle === 'none' || parseFloat(style.outlineWidth) <= 0) findings.push({ kind: 'step-heading-focus-ring-missing' })
+      const range = document.createRange(); range.selectNodeContents(heading)
+      const bounds = heading.getBoundingClientRect(), text = range.getBoundingClientRect()
+      if (bounds.width > text.width + 2 || bounds.height > text.height + 8) findings.push({ kind: 'step-heading-focus-ring-too-large', bounds: { width: bounds.width, height: bounds.height }, text: { width: text.width, height: text.height } })
+    }
   }
   if (kind === 'status') {
     const table = [...document.querySelectorAll('table')].find(table => [...table.querySelectorAll('th')].some(cell => cell.textContent.trim() === '状態'))
