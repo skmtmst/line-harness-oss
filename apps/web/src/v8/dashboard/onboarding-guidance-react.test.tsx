@@ -231,7 +231,7 @@ it('既知の質問入口から実wizardを開き、戻ると閉じるで保存�
   render(<DashboardV8 />)
   fireEvent.click(await pendingSetup())
   const dialog = await screen.findByRole('dialog', { name: '最初のリッチメニューを選ぶ' })
-  fireEvent.click(within(dialog).getByRole('button', { name: '戻る', exact: true }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'スタイルを選び直す', exact: true }))
   const first = await screen.findByRole('dialog', { name: '使い方のスタイルを選ぶ' })
   fireEvent.click(within(first).getByRole('button', { name: '閉じる', exact: true }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
