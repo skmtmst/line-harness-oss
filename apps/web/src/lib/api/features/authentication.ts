@@ -12,7 +12,6 @@ export const authenticationMethods = {
     /** 切替後の本人確認方式・代理モードを、使い回さずに確かめ直す。 */
     session: () => fetchApi<ApiResponse<{
       impersonation: OpsImpersonation | null
-      recoveryCodesRemaining?: number | null
       unfamiliarAt?: string | null
       stepUpMethod?: 'totp' | 'password' | 'none'
     }>>('/api/auth/session', { cache: 'no-store' }),

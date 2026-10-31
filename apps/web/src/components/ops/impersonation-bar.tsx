@@ -58,7 +58,6 @@ export default function ImpersonationBar({
         if (readPermissionSessionSnapshot() !== pending) return
         rememberSessionSnapshot({
           impersonation: { ...data.impersonation, tenantName: next.tenantName },
-          recoveryCodesRemaining: typeof data.recoveryCodesRemaining === 'number' ? data.recoveryCodesRemaining : null,
           unfamiliarAt: typeof data.unfamiliarAt === 'string' ? data.unfamiliarAt : null,
           stepUpMethod: data.stepUpMethod === 'totp' || data.stepUpMethod === 'password' ? data.stepUpMethod : 'none',
         })

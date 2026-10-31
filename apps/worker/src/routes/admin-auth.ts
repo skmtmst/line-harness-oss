@@ -55,7 +55,7 @@ import {
   stepUpAttemptRetryAfterSeconds,
   updateStaffMember,
 } from '@line-crm/db';
-import { createTotpEnrollment, decryptTotpEnrollment, consumeTotpRecoveryCode, buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
+import { buildTotpUri, decryptTotpSecret, encryptTotpSecret, generateTotpSecret, verifyTotp } from '../lib/totp.js';
 import { isStepUpPurpose } from '../lib/step-up.js';
 import { verifyPassword } from '../services/password-hash.js';
 import { toImpersonationContext } from '../middleware/impersonation.js';
@@ -100,38 +100,14 @@ adminAuth.get('/api/auth/two-factor/policy', async c => {
   return c.json({ success: true, data: { required: await loginMfaRequired(c.env.DB, staff.tenantId, c.env.TOTP_ENCRYPTION_KEY), canEdit: Boolean(canEdit), impersonating: Boolean(activeProxy), ...mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY), ...counts } });
 });
 
-// 本人向けの安全情報も件数だけを返し、コードやハッシュは返さない。
 adminAuth.get('/api/auth/two-factor/self', async c => {
   const principal = c.get('staff');
   if (c.get('impersonation') || await getActiveImpersonation(c.env.DB, principal.id, await adminSessionTokenHashFromRequest(c))) return c.json({ success: false, error: '代理ログイン中は利用できません' }, 403);
   const member = await getStaffById(c.env.DB, principal.id);
   if (!member) return c.json({ success: false, error: '本人の設定を取得できません' }, 403);
   const configuration = mfaConfiguration(c.env.TOTP_ENCRYPTION_KEY);
-  const remaining = member.totp_enabled_at && member.totp_secret_enc && configuration.configured
-    ? (await decryptTotpEnrollment(member.totp_secret_enc, c.env.TOTP_ENCRYPTION_KEY!)).recoveryHashes.length : null;
-  return c.json({ success: true, data: { staffId: member.id, enabledAt: member.totp_enabled_at, remaining,
-    total: 8, canEdit: !principal.readOnly && configuration.configured, ...configuration } });
-});
-
-adminAuth.post('/api/auth/two-factor/recovery', inputJsonBoundary(), async c => {
-  const principal = c.get('staff');
-  if (principal.readOnly || c.get('impersonation') || await getActiveImpersonation(c.env.DB, principal.id, await adminSessionTokenHashFromRequest(c))) return c.json({ success: false, error: '本人だけが作り直せます' }, 403);
-  const member = await getStaffById(c.env.DB, principal.id);
-  if (!member?.totp_enabled_at || !member.totp_secret_enc) return c.json({ success: false, error: '先に二段階認証を登録してください' }, 400);
-  if (!mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)) return c.json({ success: false, error: MFA_KEY_NOTICE }, 400);
-  if (!await consumeStepUpToken(c, 'auth.mfa.recovery')) return stepUpRequiredResponse(c, '回復コードを作り直す前に本人確認してください');
-  const enrollment = await decryptTotpEnrollment(member.totp_secret_enc, c.env.TOTP_ENCRYPTION_KEY!);
-  const next = await createTotpEnrollment(enrollment.secret, c.env.TOTP_ENCRYPTION_KEY!);
-  const changed = await c.env.DB.batch([
-    c.env.DB.prepare('UPDATE staff_members SET totp_secret_enc=? WHERE id=? AND totp_secret_enc=? AND is_active=1')
-      .bind(next.encrypted, member.id, member.totp_secret_enc),
-    auditEventStatement(c.env.DB, { category: 'auth', action: 'auth.mfa.recovery.regenerate', tenantId: member.tenant_id,
-      actorPrincipalId: member.id, actorRole: member.role, targetKind: 'staff', targetId: member.id,
-      riskLevel: 'high', retentionClass: 'security' }, { sql: 'changes()=1', params: [] }),
-  ]);
-  if (changed[0].meta.changes !== 1) return c.json({ success: false, error: '設定が変わりました。読み直してください' }, 409);
-  c.header('Cache-Control', 'private, no-store');
-  return c.json({ success: true, data: { recoveryCodes: next.recoveryCodes } });
+  return c.json({ success: true, data: { staffId: member.id, enabledAt: member.totp_enabled_at,
+    canEdit: !principal.readOnly && configuration.configured, ...configuration } });
 });
 
 adminAuth.put('/api/auth/two-factor/policy', inputJsonBoundary({ required: ['boolean'] }), async c => {
@@ -453,8 +429,7 @@ adminAuth.post('/api/auth/two-factor/verify', inputJsonBoundary({"challengeToken
     await mfaAudit(c, staff.id, 'auth.mfa.verify', 'denied');
     return c.json({ success: false, error: '入力回数を超えました。15分ほど待ってからやり直してください' }, 429);
   }
-  const recovery = await consumeTotpRecoveryCode(c.env.DB, staff.id, staff.totp_secret_enc, masterKey, code);
-  const verified = recovery ? { valid: true, step: null } : await verifyTotp(
+  const verified = await verifyTotp(
     await decryptTotpSecret(staff.totp_secret_enc, masterKey), code, Date.now(), staff.totp_last_used_step,
   );
   if (!verified.valid) {
@@ -464,13 +439,13 @@ adminAuth.post('/api/auth/two-factor/verify', inputJsonBoundary({"challengeToken
 
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
-  if (!recovery && !await claimStaffTotpStep(c.env.DB, staff.id, verified.step!)) {
+  if (!await claimStaffTotpStep(c.env.DB, staff.id, verified.step!)) {
     await deleteTwoFactorChallenge(c.env.DB, tokenHash);
     return c.json({ success: false, error: 'この認証コードは使用済みです。次のコードを入力してください' }, 409);
   }
   if (!await consumeMfaChallenge(c.env.DB, tokenHash)) return c.json({ success: false, error: '認証は使用済みです' }, 409);
   await activatePlatformAdminIfAwaitingTotp(c.env.DB, staff.id);
-  await mfaAudit(c, staff.id, recovery ? 'auth.mfa.recovery' : 'auth.mfa.verify', 'success');
+  await mfaAudit(c, staff.id, 'auth.mfa.verify', 'success');
   const { clearAuthThrottle } = await import('@line-crm/db');
   await clearAuthThrottle(c.env.DB, `mfa:${staff.id}`);
   let session: Awaited<ReturnType<typeof issueSession>>;
@@ -614,11 +589,11 @@ adminAuth.post('/api/auth/two-factor/setup/confirm', inputJsonBoundary({"challen
   const config = resolveAdminAuthConfig(c.env, { requestOrigin: new URL(c.req.url).origin });
   if (config.misconfigured) return c.json({ success: false, error: config.misconfigured }, 500);
 
-  const enrollment = await createTotpEnrollment(await decryptTotpSecret(staff.totp_pending_secret_enc, masterKey), masterKey);
+  const encryptedSecret = await encryptTotpSecret(await decryptTotpSecret(staff.totp_pending_secret_enc, masterKey), masterKey);
   if (!await consumeMfaChallenge(c.env.DB, tokenHash)) return c.json({ success: false, error: '認証は使用済みです' }, 409);
   const updated = await c.env.DB.prepare(`UPDATE staff_members SET totp_secret_enc=?,totp_pending_secret_enc=NULL,
     totp_enabled_at=?,totp_last_used_step=? WHERE id=? AND is_active=1 AND totp_enabled_at IS NULL AND totp_pending_secret_enc=?`)
-    .bind(enrollment.encrypted, new Date().toISOString(), verified.step, staff.id, staff.totp_pending_secret_enc).run();
+    .bind(encryptedSecret, new Date().toISOString(), verified.step, staff.id, staff.totp_pending_secret_enc).run();
   if (updated.meta.changes !== 1) return c.json({ success: false, error: '二段階認証はすでに設定されています' }, 409);
   await activatePlatformAdminIfAwaitingTotp(c.env.DB, staff.id);
   await mfaAudit(c, staff.id, 'auth.mfa.setup', 'success');
@@ -635,7 +610,7 @@ adminAuth.post('/api/auth/two-factor/setup/confirm', inputJsonBoundary({"challen
   await recordLoginAuditBestEffort(c, staff.id);
   return c.json({
     success: true,
-    data: { sessionToken: config.crossSite ? session.sessionToken : undefined, recoveryCodes: enrollment.recoveryCodes },
+    data: { sessionToken: config.crossSite ? session.sessionToken : undefined },
     csrfToken: session.csrfToken,
   });
 });
@@ -870,8 +845,6 @@ adminAuth.get('/api/auth/session', async (c) => {
       impersonation,
       unfamiliarAt: currentSession?.unfamiliar_at ?? null,
       stepUpMethod,
-      recoveryCodesRemaining: staffRecord?.totp_enabled_at && staffRecord.totp_secret_enc && mfaEncryptionConfigured(c.env.TOTP_ENCRYPTION_KEY)
-        ? (await decryptTotpEnrollment(staffRecord.totp_secret_enc, c.env.TOTP_ENCRYPTION_KEY!)).recoveryHashes.length : null,
     },
     csrfToken,
   });

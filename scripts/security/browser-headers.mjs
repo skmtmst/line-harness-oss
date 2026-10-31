@@ -113,10 +113,7 @@ try {
     await page.goto(`${base}/login/two-factor#${new URLSearchParams({ lh_2fa: 'synthetic-challenge', lh_method: 'password', lh_nonce: handoffNonce })}`);
     await expect(page.getByRole('textbox')).toHaveCount(6);
     await page.getByRole('button', { name: 'コードが使えない場合' }).click();
-    await page.getByRole('button', { name: '回復コードを使う' }).click();
-    await expect(page.getByRole('textbox')).toHaveCount(8);
-    for (const [index, character] of [...'ABCD2345'].entries()) await page.getByRole('textbox').nth(index).fill(character);
-    await page.getByRole('button', { name: '確認してログイン', exact: true }).click();
+    for (const [index, character] of [...'123456'].entries()) await page.getByRole('textbox').nth(index).fill(character);
     // ここで見たいのは CSP の下で画面が動くこと。失敗の文言は mock の返す文に任せる。
     await expect(page.getByRole('alert').first()).toBeVisible();
     const violations = await page.evaluate(() => globalThis.__securityViolations);

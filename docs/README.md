@@ -563,6 +563,7 @@
 - [左下の常設「統括へ」撤去・左メニューの上端と左端そろえ](release-log/unreleased/1972-kenta-muse-sidebar-top.md)
 - [枠線のかすれの直し](release-log/unreleased/1797-kenta-crisp-borders.md)
 - [二段階認証の画面を見やすく](release-log/unreleased/1843-kenta-two-factor-card.md)
+- [回復コード機能の撤去](release-log/unreleased/1993-masato-remove-recovery-codes.md)
 - [回復コードのお知らせに「要確認：」](release-log/unreleased/1846-kenta-recovery-notice-prefix.md)
 - [api-17-kenta-hq-folders-template-kinds.md](release-log/drafts/api-17-kenta-hq-folders-template-kinds.md)
 - [fielderr2.md](release-log/drafts/fielderr2.md)

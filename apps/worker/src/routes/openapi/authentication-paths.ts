@@ -83,14 +83,8 @@ export const authenticationPaths = {
     delete: { summary: '本人確認後にAPI鍵と本人の全セッションを失効', tags: ['Auth'], parameters: [{ name: 'X-Step-Up-Token', in: 'header', required: true, schema: { type: 'string' }, description: 'auth.api_key用の一回限りの確認票' }], responses: { '200': { description: '失効済み。秘密値は返さない' }, '401': { description: '再確認が必要' }, '403': { description: '本人操作不可' }, '409': { description: '同時更新' } } },
   },
   '/api/auth/two-factor/self': {
-    get: { summary: '本人の認証アプリ登録日と回復コードの残数', tags: ['Auth'],
-      responses: { '200': { description: '本人だけの登録日・残数・鍵の準備状態。コードとハッシュは返さない' }, '401': { description: '未ログイン' }, '403': { description: '代理ログイン中または本人設定なし' } } },
-  },
-  '/api/auth/two-factor/recovery': {
-    post: { summary: '本人確認後に回復コード8個を作り直す', tags: ['Auth'],
-      parameters: [{ name: 'X-Step-Up-Token', in: 'header', required: true, schema: { type: 'string' }, description: 'auth.mfa.recovery 用の1回限りの本人確認票' }],
-      requestBody: { content: { 'application/json': { schema: { type: 'object' } } } },
-      responses: { '200': { description: '8文字4-4の回復コード8個をこの時だけ返す。前のコードは全部無効。応答保存禁止' }, '400': { description: '未登録または鍵未設定' }, '401': { description: '再確認が必要' }, '403': { description: '本人操作不可' }, '409': { description: '同時更新' } } },
+    get: { summary: '本人の認証アプリ登録日', tags: ['Auth'],
+      responses: { '200': { description: '本人だけの登録日・鍵の準備状態' }, '401': { description: '未ログイン' }, '403': { description: '代理ログイン中または本人設定なし' } } },
   },
   '/api/auth/two-factor/setup': {
     post: {
@@ -103,7 +97,7 @@ export const authenticationPaths = {
     post: {
       tags: ['Auth'], summary: '二段階認証の初回設定を確認してセッションを発行', security: [],
       requestBody: { required: true, content: { 'application/json': { schema: { type: 'object', required: ['challengeToken', 'code'], properties: { challengeToken: { type: 'string' }, code: { type: 'string' } } } } } },
-      responses: { '200': { description: 'TOTP登録・確認済みセッション発行。回復コード8個をこの時だけ返す' }, '400': { description: 'Invalid code' }, '401': { description: 'Invalid or expired setup challenge' }, '429': { description: 'Attempt limit exceeded' } },
+      responses: { '200': { description: 'TOTP登録・確認済みセッション発行' }, '400': { description: 'Invalid code' }, '401': { description: 'Invalid or expired setup challenge' }, '429': { description: 'Attempt limit exceeded' } },
     },
   },
   '/api/auth/ops-invite/check': {

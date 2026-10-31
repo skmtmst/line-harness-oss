@@ -51,7 +51,7 @@ export const staffMethods = {
     beginTwoFactorSetup: (id: string) =>
       fetchApi<ApiResponse<{ provisioningUri: string; manualKey: string }>>(`/api/staff/${id}/two-factor/setup`, { method: 'POST' }),
     confirmTwoFactorSetup: (id: string, code: string) =>
-      fetchApi<ApiResponse<StaffMember & { recoveryCodes?: string[] }>>(`/api/staff/${id}/two-factor/confirm`, { method: 'POST', body: JSON.stringify({ code }) }),
+      fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}/two-factor/confirm`, { method: 'POST', body: JSON.stringify({ code }) }),
     disableTwoFactor: (id: string, stepUpToken?: string) =>
       fetchApi<ApiResponse<StaffMember>>(`/api/staff/${id}/two-factor`, {
         method: 'DELETE',
