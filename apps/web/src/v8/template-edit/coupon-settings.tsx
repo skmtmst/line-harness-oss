@@ -1,6 +1,7 @@
 'use client'
 
 import type { ReactNode } from 'react'
+import type { FormRequirement } from '@/lib/form-requirement'
 import FormSection from '@/components/shared/form-section'
 import { SettingsFormRow } from '@/components/shared/settings-form-card'
 import { Field, FieldError } from '@/components/shared/form-controls'
@@ -13,9 +14,10 @@ import type { useFormErrors } from '@/lib/use-form-errors'
 import type { CouponDraft } from './coupon-draft'
 import styles from './edit.module.css'
 
-export default function CouponSettings({ disabled = false, draft, onChange, title, onTitleChange, fields, image, lottery, onRemoveLottery }: {
+export default function CouponSettings({ disabled = false, draft, onChange, title, onTitleChange, titleRequirement, fields, image, lottery, onRemoveLottery }: {
   disabled?: boolean; draft: CouponDraft; onChange: (patch: Partial<CouponDraft>) => void
   title: string; onTitleChange: (title: string) => void
+  titleRequirement: Pick<FormRequirement<unknown>, 'required'>
   fields: ReturnType<typeof useFormErrors>; image: ReactNode; lottery: boolean; onRemoveLottery: () => void
 }) {
   const bind = (key: string) => ({ ...fields.bind(key), invalid: fields.invalid(key), ...(key === 'benefit' && fields.invalid(key) ? { 'aria-describedby': 'coupon-benefit-error' } : {}) })
@@ -24,7 +26,7 @@ export default function CouponSettings({ disabled = false, draft, onChange, titl
       <SettingsFormRow layout="media-fields">
         {image}
         <div className={styles.couponFields}><fieldset className="contents" disabled={disabled}>
-          <Field label="クーポン名" htmlFor="te-coupon-title" requirement={fields.requirement('couponTitle')} error={fields.error('couponTitle')}>
+          <Field label="クーポン名" htmlFor="te-coupon-title" requirement={titleRequirement} error={fields.error('couponTitle')}>
             <SaveErrorField names={['couponTitle', 'title', 'coupon_title']}><TextField {...bind('couponTitle')} id="te-coupon-title" value={title} onChange={event => onTitleChange(event.target.value)} /></SaveErrorField>
           </Field>
           <Field label="獲得条件" error={fields.error('lottery')} help="現在は条件なしで配れます。抽選や友だち紹介の獲得条件には対応していません。">

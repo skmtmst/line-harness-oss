@@ -518,7 +518,7 @@ function TemplateAssetForm({ kind, visual = false, host, existing }: EditorProps
         {kind === 'coupon' ? (
           <>
             <CouponSettings disabled={!canMutate || busy} draft={couponDraft} onChange={patch => setCouponDraft(current => ({ ...current, ...patch }))}
-              title={couponTitle} onTitleChange={setCouponTitle} fields={fields} lottery={lottery} onRemoveLottery={() => setLottery(false)} image={<div className={styles.couponFields}>
+              title={couponTitle} onTitleChange={setCouponTitle} titleRequirement={fields.requirement('couponTitle')} fields={fields} lottery={lottery} onRemoveLottery={() => setLottery(false)} image={<div className={styles.couponFields}>
                   <SaveErrorField names={["imageUrl","image_url"]}><ImageFrame
                     title="画像を追加"
                     lockedReason={permissionReason}
