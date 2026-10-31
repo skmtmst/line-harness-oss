@@ -164,3 +164,60 @@ for (const width of [1152, 1440]) {
     } finally { await browser.close() }
   })
 }
+
+for (const width of [1152, 1440]) for (const role of ['owner', 'viewer']) {
+  test(`友だちの要点の行は共通の緑か、理由つきの灰色になる ${width} ${role}`, async () => {
+    const browser = await connectGuardBrowser()
+    const writes = [], errors = []
+    try {
+      const fixtureBrowser = { newPage: async options => {
+        const page = await browser.newPage(options)
+        await stubApi(page, async (method, path) => {
+          if (!['GET', 'HEAD'].includes(method)) writes.push({ method, path })
+          const response = await mockFetch(method, path)
+          if (['/api/staff/me', '/api/auth/session'].includes(path.split('?')[0])) {
+            const body = JSON.parse(response.body)
+            body.data = { ...body.data, role, readOnly: role === 'viewer', roleBundle: role === 'viewer' ? 'view_only' : 'admin', permissionKeys: [] }
+            return { ...response, body: JSON.stringify(body) }
+          }
+          return response
+        })
+        return page
+      } }
+      const page = await openPage(fixtureBrowser, { baseUrl: process.env.V8_GUARD_BASE ?? 'http://127.0.0.1:4310', route: '/friends/detail?id=friend-1', width, height: 1100, stable: true, requireSuccess: true, onPageError: error => errors.push(error.message) })
+      await page.waitForFunction(role => localStorage.getItem('lh_staff_role') === role, role)
+      if (await page.locator('[data-customer-rail][data-collapsed]').count()) await page.getByRole('button', { name: '顧客情報', exact: true }).click()
+      const rich = page.locator('[data-friend-profile-panel] section[aria-label="リッチメニュー"]')
+      const action = rich.getByRole(role === 'owner' ? 'link' : 'button', { name: '変える', exact: true })
+      await action.waitFor()
+      assert.equal(await action.getAttribute('data-variant'), 'text')
+      const color = await action.evaluate(el => {
+        const probe = document.createElement('span')
+        probe.style.color = `var(${el.getAttribute('aria-disabled') === 'true' ? '--color-ink-secondary' : '--color-accent-deep'})`
+        document.body.append(probe)
+        const expected = getComputedStyle(probe).color
+        probe.remove()
+        return { actual: getComputedStyle(el).color, expected }
+      })
+      assert.equal(color.actual, color.expected)
+      if (role === 'owner') {
+        assert.equal(await action.getAttribute('href'), '/rich-menus')
+        const delivery = page.locator('[data-friend-profile-panel] section[aria-label="配信の受け取り"]').getByRole('button', { name: '変える', exact: true })
+        assert.equal(await delivery.getAttribute('data-variant'), 'text')
+        assert.equal(await delivery.evaluate(el => getComputedStyle(el).color), color.expected)
+      } else {
+        assert.equal(await action.getAttribute('aria-disabled'), 'true')
+        assert.equal(await action.getAttribute('href'), null)
+        await action.hover()
+        await page.getByRole('tooltip').filter({ hasText: '閲覧のみ' }).waitFor()
+        const before = await page.evaluate(() => location.href)
+        await action.evaluate(el => el.focus())
+        await page.keyboard.press('Enter')
+        assert.equal(await page.evaluate(() => location.href), before)
+        assert.equal(writes.length, 0, '変更できない人の操作で更新しない')
+      }
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false)
+      assert.deepEqual(errors, [])
+    } finally { await browser.close() }
+  })
+}

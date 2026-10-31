@@ -255,14 +255,14 @@ export default function InboxReplyComposer({ dropOver, setDropOver, handlePickAt
             {pendingImageMeta ? '・添付済み' : '添付済み'}
           </span>
         </span>
-        <button
-          type="button"
+        <Button
+          type="button" variant="text" size="inline"
           onClick={() => imageInputRef.current?.click()}
-          disabled={imageUploading}
-          className="text-action shrink-0 whitespace-nowrap text-xs font-semibold"
+          disabled={imageUploading} busy={imageUploading} busyLabel="画像を読み込み中…"
+          className="shrink-0 whitespace-nowrap"
         >
           変更
-        </button>
+        </Button>
         <button
           type="button"
           onClick={clearPendingImage}

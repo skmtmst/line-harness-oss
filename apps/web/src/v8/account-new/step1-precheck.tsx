@@ -67,7 +67,7 @@ export default function Step1Precheck({
             {rows.map((row) => (
               <div key={row.key} className={styles.precheckSummaryRow}>
                 <p className={styles.precheckSummaryText}>{row.label}　→　{row.value}</p>
-                <Button variant="text" textTone="ink" size="inline" onClick={() => onJumpTo(row.key)}>変更</Button>
+                <Button variant="text" size="inline" onClick={() => onJumpTo(row.key)}>変更</Button>
               </div>
             ))}
           </div>

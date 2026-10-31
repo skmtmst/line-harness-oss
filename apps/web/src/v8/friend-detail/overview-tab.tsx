@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import StatusPill from '@/components/shared/status-pill'
-import Link from '@/components/shared/list-navigation'
 import {
   Bell,
   CalendarDays,
@@ -18,6 +17,7 @@ import Button from '@/components/shared/button'
 import Dialog from '@/components/shared/dialog'
 import Checkbox from '@/components/shared/checkbox'
 import TextLink from '@/components/shared/text-link'
+import { usePermissionLockReason } from '@/components/shared/use-permission-lock-reason'
 import TagPill from '@/components/shared/tag-pill'
 import CustomerInfoPanel, { CustomerInfoRail } from '@/components/shared/customer-info-panel'
 import TagOverflow from '@/components/shared/tag-overflow'
@@ -99,6 +99,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
   const { selectedAccountId } = useAccount()
   const accountStyle = useAccountStyle(selectedAccountId)
   const saveErrors = useSaveFormErrors()
+  const manageLockReason = usePermissionLockReason(perms.manage)
   const starred = fields.filter((f) => f.isStarred)
   const { mileage, mileageStatus, richMenu, richMenuStatus } = data
   const support = friend.support
@@ -229,7 +230,7 @@ export function FriendSummaryRail({ friend, friendId, data, perms, fields, value
         </div>
       )}{rankLine ? <p className={styles.memo}>{rankLine}</p> : null}</> },
         { key: 'delivery', label: '配信の受け取り', action: <Button variant="text" size="inline" actionWording onClick={() => setConsentOpen(true)}>{perms.manage ? '変える' : '見る'}</Button>, content: <DeliveryConsentSummary status={consents.status} rows={consents.rows} /> },
-        { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Link className={styles.groupLink} href="/rich-menus">変える</Link> : null, content: <>{richMenuStatus === 'error' ? (
+        { key: 'richMenu', label: 'リッチメニュー', action: perms.manage ? <Button variant="text" size="inline" href="/rich-menus">変える</Button> : <Button variant="text" size="inline" disabled lockedReason={manageLockReason}>変える</Button>, content: <>{richMenuStatus === 'error' ? (
         <p className={`${styles.memo} ${styles.faint}`}>
           読み込めませんでした
           <button type="button" className={styles.retry} onClick={() => void data.loadRichMenu()}>もう一度読み込む</button>
