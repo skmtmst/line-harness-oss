@@ -6,7 +6,7 @@ const net=vi.hoisted(()=>({fetch:vi.fn(),snapshot:vi.fn()}))
 const storesFixture=vi.hoisted(()=>({stores:[{id:'s',name:'人工店舗'}]}))
 vi.mock('next/navigation',()=>({useRouter:()=>({push:vi.fn(),replace:vi.fn()}),useSearchParams:()=>new URLSearchParams()}))
 vi.mock('@/contexts/account-context',()=>({useAccount:()=>({selectedAccountId:'a'})}))
-vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{},useHideSettingsNav:()=>{}}))
+vi.mock('@/components/shell/page-chrome',()=>({usePageTitle:()=>{},usePageCrumbs:()=>{},useHideSettingsNav:()=>{throw new Error('予約サイト・グルメ媒体では設定メニューを隠さない')}}))
 vi.mock('@/lib/staff-role',()=>({useStaffRole:()=> 'owner',canManageRole:()=>true}))
 vi.mock('@/lib/api',async(o)=>({...await o<typeof import('@/lib/api')>(),fetchApi:net.fetch}))
 vi.mock('@/lib/restaurant-test-api',()=>({restaurantTestApi:{
