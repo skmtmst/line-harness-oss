@@ -1001,7 +1001,6 @@ export default function FormsListV8() {
         }
         filtered={filterActive}
         onClearFilters={clearFilters}
-        filteredDescription="「公開中」「下書き」「情報欄に保存」や検索を外すと、すべて出ます"
         data-design-node="I3L41O-empty"
       />
     )
