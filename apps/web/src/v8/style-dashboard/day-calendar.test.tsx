@@ -34,8 +34,8 @@ vi.mock('@/contexts/account-context', () => ({ useAccount: () => ({ selectedAcco
 vi.mock('@/lib/staff-role', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/staff-role')>(), useStaffRole: () => state.role }))
 vi.mock('@/components/shell/page-chrome', () => ({ usePageTitle: () => {}, usePageCrumbs: () => {} }))
 vi.mock('@/v8/restaurant/dashboard/public/use-store-today/index', () => ({ useStoreToday: () => ({}) }))
-vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { summary: state.summary, schedule: state.schedule } }))
-vi.mock('@/components/shared/preparing-dialog', () => ({ PREPARING_TITLE: 'preparing', usePreparingDialog: () => ({ open: vi.fn(), dialog: null }) }))
+vi.mock('@/lib/api/helpers/styles', () => ({ styleApi: { get: vi.fn().mockResolvedValue({ success: false, error: 'unavailable' }), warnings: vi.fn().mockResolvedValue({ success: true, data: { items: [] } }), starterItems: vi.fn().mockResolvedValue({ success: true, data: { items: [] } }), summary: state.summary, schedule: state.schedule } }))
+vi.mock('@/components/shared/preparing-dialog', async importOriginal => ({ ...await importOriginal<typeof import('@/components/shared/preparing-dialog')>(), PREPARING_TITLE: 'preparing', usePreparingDialog: () => ({ open: vi.fn(), dialog: null }) }))
 vi.mock('./date-range', async importOriginal => ({ ...await importOriginal<typeof import('./date-range')>(), jstToday: () => '2026-10-21' }))
 vi.mock('@/lib/api', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/api')>()
