@@ -7,7 +7,7 @@ import Button from '@/components/shared/button'
 import Dialog, { DialogActions } from '@/components/shared/dialog'
 import HelpTip from '@/components/shared/help-tip'
 import { ProgressBar } from '@/components/shared/progress'
-import { StyleChoiceStep, STYLE_CHOICE_START_ID, StyleChoiceStatus } from '@/v8/onboarding/public/style-choice'
+import { StyleChoiceStep, StyleChoiceSwitcher, STYLE_CHOICE_START_ID, StyleChoiceStatus } from '@/v8/onboarding/public/style-choice'
 import { InitialMenuChoice, type InitialMenuSelection } from '@/v8/onboarding'
 import styles from '@/v8/onboarding/wizard.module.css'
 
@@ -38,6 +38,8 @@ export default function RegistrationStyleDialog({ open, accountId, menu, onMenuC
     size="wide"
     designTop={60}
     fitViewport
+    contentLayout={!menuStep ? 'form' : undefined}
+    steps={!menuStep ? <StyleChoiceSwitcher viewing={viewing} onView={setViewing} chosen={choice || null} disabled={busy} /> : undefined}
     designNode="xxpM9"
     onCancel={onClose}
     busy={busy}
@@ -56,7 +58,7 @@ export default function RegistrationStyleDialog({ open, accountId, menu, onMenuC
         <span className={styles.progressName}>使い方のスタイル</span>
       </div>
       <StyleChoiceStatus chosen={choice || null} />
-      {menuStep&&choice?<InitialMenuChoice accountId={accountId} style={choice} value={menu} onChange={onMenuChange} disabled={busy}/>:<StyleChoiceStep viewing={viewing} onView={setViewing} chosen={choice || null} onChoose={onChoose} disabled={busy} />}
+      {menuStep&&choice?<InitialMenuChoice accountId={accountId} style={choice} value={menu} onChange={onMenuChange} disabled={busy}/>:<StyleChoiceStep viewing={viewing} onView={setViewing} chosen={choice || null} onChoose={onChoose} disabled={busy} switcher="external" />}
       <p className={styles.where}><Info aria-hidden="true" className={styles.whereIcon} />あとから変えられます（設定 › アカウント）。</p>
     </div>
   </Dialog>

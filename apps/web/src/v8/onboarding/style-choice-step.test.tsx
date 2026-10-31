@@ -45,6 +45,9 @@ describe('スタイルを選ぶ画面（共通節 S）', () => {
   it('開いた直後は上部の見出しへ焦点を置き、切り替えだけでは保存しない', async () => {
     render(<StyleSetupWizard accountId="a" state={pending} onClose={calls.closed} />)
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('heading', { name: '飲食店でできること' })))
+    const dialog = screen.getByRole('dialog', { name: '使い方のスタイルを選ぶ' })
+    expect(dialog.querySelectorAll('[data-style-switcher]')).toHaveLength(1)
+    expect(dialog.querySelector('[data-window-body]')?.contains(group())).toBe(false)
     expect(within(group()).getAllByRole('button')).toHaveLength(6)
     for (const style of STYLE_EXPERIENCE_SCRIPT.order) {
       view(style)

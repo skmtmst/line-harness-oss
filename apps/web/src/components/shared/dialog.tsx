@@ -70,7 +70,7 @@ export type DialogProps = {
   designTitleRow?: 'mark'
   /** 段の帯を使わず続ける窓、またはアカウントの窓の余白。既定の窓は変えない。 */
   layout?: 'continuous' | 'account-inset' | 'inset'
-  /** 手順の帯。本文のスクロールから独立させる。 */
+  /** 手順や表示の切り替えの帯。本文のスクロールから独立させる。 */
   steps?: ReactNode
   /** 手順の本文を閉じずに切り替える鍵。StepsのcurrentKeyは自動で読む。 */
   stepKey?: string | number
