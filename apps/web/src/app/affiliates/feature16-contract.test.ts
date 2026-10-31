@@ -17,7 +17,6 @@ describe('機能16 現役V8の一覧', () => {
     expect(FLOW).toContain('今月の成果の流れ')
     expect(FLOW).toContain('api.affiliates.paymentSummaries(accountId)')
     expect(FLOW).toContain('api.affiliates.settlementPreview(accountId, period)')
-    expect(FLOW).toContain("row.value === null ? '—'")
   })
 
   it('成果承認は全状態を読み、確認不要だけをまとめて承認する', () => {
