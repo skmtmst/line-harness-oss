@@ -55,6 +55,23 @@
   padding-top: var(--rs-dlg-actions-pad-top, var(--tpl-rs-dlg-actions-pad-plain));
 }
 
+/* 操作を固定する窓だけ、本文と別の共通footerに置く。 */
+.dialogFooter {
+  padding: 0 var(--space-24) var(--space-20);
+}
+
+.scrollHint {
+  flex: 1;
+  min-width: 0;
+  margin: 0 auto 0 0;
+  align-self: center;
+  color: var(--color-ink-secondary);
+  font-size: var(--text-caption);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /*
  * 欄（題＋中身）。間は既定の 6。
  * 窓の中の欄（`DialogField`）は共通の欄を出すので、ここの間は効かない。
