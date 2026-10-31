@@ -25,17 +25,20 @@ import { TextField as SharedTextField } from '@/components/shared/text-field'
  * - コピーに失敗したら黙らず、欄から選べることを伝える（DASH-29）
  * 閲覧のみの人には「経路を分けて発行」（作る操作）を出さない。
  */
-export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
+export function FriendAddLink({ officialProfileUrl, visualQa, canManage, dialogOnly = false }: {
   officialProfileUrl: string | null | undefined
   visualQa?: DashboardOverview['visualQa']
   canManage: boolean
+  dialogOnly?: boolean
 }) {
   const { selectedAccount, selectedAccountId } = useAccount()
   const samePageUrl = useSamePageUrl()
   const params = useSearchParams()
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle')
-  const [routes, setRoutes] = useState<EntryRoute[] | null>(null)
-  const [routesError, setRoutesError] = useState(false)
+  const [routesSnapshot, setRoutesSnapshot] = useState<{ accountId: string; items: EntryRoute[] | null; error: boolean } | null>(null)
+  const currentRoutes = routesSnapshot?.accountId === selectedAccountId ? routesSnapshot : null
+  const routes = currentRoutes?.items ?? null
+  const routesError = currentRoutes?.error ?? false
   const [routesRetry, setRoutesRetry] = useState(0)
   const [routeId, setRouteId] = useState('')
   const qrParam = params.get('qr')
@@ -57,16 +60,15 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
 
   useEffect(() => {
     let cancelled = false
-    setRoutes(null)
-    setRoutesError(false)
+    setRoutesSnapshot(null)
     setRouteId('')
     if (!selectedAccountId) return () => { cancelled = true }
     void api.entryRoutes.list(selectedAccountId)
       .then((res) => {
         if (!res.success) throw new Error('routes_unavailable')
-        if (!cancelled) setRoutes(res.data.filter((route) => route.isActive))
+        if (!cancelled) setRoutesSnapshot({ accountId: selectedAccountId, items: res.data.filter((route) => route.isActive), error: false })
       })
-      .catch(() => { if (!cancelled) setRoutesError(true) })
+      .catch(() => { if (!cancelled) setRoutesSnapshot({ accountId: selectedAccountId, items: null, error: true }) })
     return () => { cancelled = true }
   }, [selectedAccountId, routesRetry])
 
@@ -76,6 +78,23 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
     : `${base}/auth/line`)
   const route = (routes ?? []).find((entry) => entry.id === routeId)
   const link = route ? `${base}/r/${route.refCode}` : baseLink
+  const dialog = <QrDialog
+    key={selectedAccountId}
+    open={showQr && Boolean(selectedAccountId && selectedAccount)}
+    onClose={() => writeQr(null)}
+    accountName={selectedAccount?.displayName ?? 'LINE公式アカウント'}
+    officialProfileUrl={visualQa?.officialProfileUrl ?? officialProfileUrl}
+    accountBasicId={selectedAccount?.basicId ?? null}
+    baseLink={baseLink}
+    initialRouteId={showQr ? qrRouteId : routeId}
+    onRouteIdChange={(id) => writeQr(id || 'base')}
+    routes={routes ?? []}
+    routesPending={routes === null}
+    routesError={routesError}
+    onRetryRoutes={() => setRoutesRetry(value => value + 1)}
+    visualReferenceQr={visualQa?.referenceQr ?? false}
+  />
+  if (dialogOnly) return dialog
 
   return (
     <>
@@ -120,21 +139,7 @@ export function FriendAddLink({ officialProfileUrl, visualQa, canManage }: {
       {copyState === 'failed' ? (
         <p role="alert" className={styles.alert}>コピーできませんでした。上のURL欄を選択してコピーしてください。</p>
       ) : null}
-      <QrDialog
-        open={showQr}
-        onClose={() => writeQr(null)}
-        accountName={selectedAccount?.displayName ?? 'LINE公式アカウント'}
-        officialProfileUrl={visualQa?.officialProfileUrl ?? officialProfileUrl}
-        accountBasicId={selectedAccount?.basicId ?? null}
-        baseLink={baseLink}
-        initialRouteId={showQr ? qrRouteId : routeId}
-        onRouteIdChange={(id) => writeQr(id || 'base')}
-        routes={routes ?? []}
-        routesPending={routes === null}
-        routesError={routesError}
-        onRetryRoutes={()=>setRoutesRetry(value=>value+1)}
-        visualReferenceQr={visualQa?.referenceQr ?? false}
-      />
+      {dialog}
     </>
   )
 }
