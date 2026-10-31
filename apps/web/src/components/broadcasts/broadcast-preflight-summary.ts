@@ -18,8 +18,6 @@ type BroadcastPreflightSummaryInput = {
   scheduledDate: string
   scheduledTime: string
   spreadMinutes: string
-  testPassed: boolean
-  previewConfirmed: boolean
 }
 
 /**
@@ -27,7 +25,7 @@ type BroadcastPreflightSummaryInput = {
  * 入力に対応する事前確認結果だけを受け取り、未取得を0件や利用可能へ置き換えない。
  * 通信・保存・送信の判定は行わない。
  */
-export function broadcastPreflightSummary({ preflight, targetMode, tags, tagId, scenarios, scenariosStatus, audience, excludeTagId, sendMode, scheduledDate, scheduledTime, spreadMinutes, testPassed, previewConfirmed }: BroadcastPreflightSummaryInput) {
+export function broadcastPreflightSummary({ preflight, targetMode, tags, tagId, scenarios, scenariosStatus, audience, excludeTagId, sendMode, scheduledDate, scheduledTime, spreadMinutes }: BroadcastPreflightSummaryInput) {
   const audienceCount = preflight?.audienceCount ?? null
   /** 対象画面の人数も、事前確認が返した同じ確定値だけを使う。 */
   const audienceDisplayCount = audienceCount
@@ -100,11 +98,7 @@ export function broadcastPreflightSummary({ preflight, targetMode, tags, tagId, 
     : null
   // 今すぐ送ると予約を分け、確定前に小窓で対象と本文を読み合わせる。
   const sendWhenLabel = scheduledLabel ?? (sendMode === 'now' ? '今すぐ（確認してから送信）' : null)
-  const unconfirmedCount = preflight
-    ? (preflight.warnings ?? []).filter((w) => w.level === 'warning').length
-      + (testPassed ? 0 : 1)
-      + (previewConfirmed ? 0 : 1)
-    : null
 
-  return { audienceCount, audienceDisplayCount, confirmAudienceLabel, exclusionNote, quota, quotaInsufficient, quotaNote, evaluatedAtLabel, concurrentBroadcasts, scheduledLabel, sendWhenLabel, unconfirmedCount }
+
+  return { audienceCount, audienceDisplayCount, confirmAudienceLabel, exclusionNote, quota, quotaInsufficient, quotaNote, evaluatedAtLabel, concurrentBroadcasts, scheduledLabel, sendWhenLabel }
 }

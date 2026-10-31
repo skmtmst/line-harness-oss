@@ -1077,3 +1077,5 @@
 - [反映履歴：予約の支払通知の受け取り](release-log/unreleased/2011-kenta-stripe-receipts.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [反映履歴：スタイル選択時の使い方の見本](release-log/unreleased/2011-kenta-style-demo.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
 - [反映履歴：文字欄とシナリオの段の権限](release-log/unreleased/2011-kenta-text-step-permission.md) — 運用者向けの変更記録（説明、確認日：2026-10-31）。
+
+- [一斉配信の送信前の確認](release-log/unreleased/0000-kenta-broadcast-check-acknowledgement.md)
