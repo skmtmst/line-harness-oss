@@ -217,7 +217,8 @@ describe('行の削除の窓（xxKtW）', () => {
     await openRowDelete('臨時のお知らせ')
     expect(deleteImpact).toHaveBeenCalledTimes(1)
     expect(deleteImpact).toHaveBeenCalledWith('v-notice', 'account-a')
-    expect(deleteDialog().textContent).toContain('「臨時のお知らせ」を消しますか？')
+    expect(deleteDialog().textContent).toContain('「臨時のお知らせ」を削除しますか？')
+    expect(deleteDialog().querySelector('[data-detail-value]')?.textContent).toBe('臨時のお知らせ')
   })
 
   it('使用先が読めないときは理由を出し、削除の押し口を出さない', async () => {
@@ -229,14 +230,14 @@ describe('行の削除の窓（xxKtW）', () => {
     expect(deleteVar).not.toHaveBeenCalled()
   })
 
-  it('差し込みキーと理由を打つまで削除の押し口を出さず、打てば理由つきで消して一覧を読み直す', async () => {
+  it('差し込みキーと理由がそろうまで削除を止め、そろえば理由つきで消して一覧を読み直す', async () => {
     await render()
     await openRowDelete('臨時のお知らせ')
     const dialog = deleteDialog()
     expect(dialog.textContent).toContain('削除する場合は、差し込みキーを入力してください')
-    expect(findButton('このまま削除')).toBeUndefined()
+    expect(button('このまま削除').disabled).toBe(true)
     await type(inputByPlaceholder('店舗情報の変更のため', dialog), '期間が終わったため')
-    expect(findButton('このまま削除')).toBeUndefined()
+    expect(button('このまま削除').disabled).toBe(true)
     await type(inputByPlaceholder('{{var.temp_notice}}', dialog), '{{var.temp_notice}}')
     const listCalls = listVars.mock.calls.length
     await click(button('このまま削除'))
@@ -258,6 +259,7 @@ describe('行の削除の窓（xxKtW）', () => {
     expect(deleteImpact).toHaveBeenLastCalledWith('v-notice', 'account-a')
     expect(document.body.textContent).toContain('いま使われ始めたため、削除できませんでした。使用先を読み直しました。')
     expect(document.body.textContent).toContain('「臨時のお知らせ」はまだ消せません')
+    expect(deleteDialog().querySelector('[data-detail-value]')?.textContent).toBe('臨時のお知らせ')
     expect(findButton('このまま削除')).toBeUndefined()
   })
 
@@ -268,11 +270,12 @@ describe('行の削除の窓（xxKtW）', () => {
     await openRowDelete('会社名')
     await click(button('キャンセル', deleteDialog()))
     await openRowDelete('臨時のお知らせ')
-    expect(deleteDialog().textContent).toContain('「臨時のお知らせ」を消しますか？')
+    expect(deleteDialog().textContent).toContain('「臨時のお知らせ」を削除しますか？')
+    expect(deleteDialog().querySelector('[data-detail-value]')?.textContent).toBe('臨時のお知らせ')
     await act(async () => { slow.resolve({ success: true, data: blockedCompany }) })
     await flush()
     const dialog = deleteDialog()
-    expect(dialog.textContent).toContain('「臨時のお知らせ」を消しますか？')
+    expect(dialog.textContent).toContain('「臨時のお知らせ」を削除しますか？')
     expect(dialog.textContent).not.toContain('まだ消せません')
     expect(dialog.textContent).not.toContain('10月のお知らせ')
   })
