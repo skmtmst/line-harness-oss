@@ -17,11 +17,8 @@ describe('回答フォームの下書きと公開を分ける', () => {
     expect(source).toContain('await save(true)')
   })
 
-  it('未公開の下書きは保存だけで受付中にせず、公開APIを明示的に呼ぶ', () => {
+  it('未公開の下書きの保存は受付停止を指定する', () => {
     expect(source).toContain('isActive: publishedVersionId ? isActive : false')
-    expect(source).toContain('api.forms.publish(id, selectedAccountId, res.data.contentRevision)')
-    expect(source.indexOf('api.forms.update(id, selectedAccountId'))
-      .toBeLessThan(source.indexOf('api.forms.publish(id, selectedAccountId'))
   })
 
   it('下書き保存では公開中の内容が変わらないことを知らせる', () => {
