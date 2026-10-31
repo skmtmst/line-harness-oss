@@ -1,6 +1,6 @@
 'use client'
 
-import { Children, isValidElement, useCallback, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes, type ReactNode } from 'react'
+import { Children, Fragment, cloneElement, isValidElement, useCallback, useEffect, useState, type ComponentPropsWithRef, type HTMLAttributes, type ReactNode } from 'react'
 import { Check, X } from 'lucide-react'
 import HelpTip from './help-tip'
 import styles from './notice.module.css'
@@ -34,6 +34,29 @@ function leadingText(node: ReactNode): string {
     else if (isValidElement<{ children?: ReactNode }>(child)) text += leadingText(child.props.children)
   })
   return text.trimStart()
+}
+
+/** 段落・箇条書きの先頭にも、同じ行の言葉として札を入れる。本文の幅と段落の余白を保つ。 */
+function prependStatusWord(content: ReactNode, prefix: ReactNode): ReactNode {
+  let placed = false
+  const inlineContainers = new Set(['p', 'span', 'strong', 'em', 'div', 'li', 'ul', 'ol', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'])
+  const prepend = (nodes: ReactNode, mayPlace = true): ReactNode => Children.map(nodes, child => {
+    if (placed || child === null || typeof child === 'boolean' || typeof child === 'string' && !child.trim()) return child
+    if (isValidElement<{ children?: ReactNode; className?: string; hidden?: boolean; 'aria-hidden'?: boolean | 'true' | 'false' }>(child)) {
+      if (child.props.hidden || child.props['aria-hidden'] === true || child.props['aria-hidden'] === 'true' || child.props.className?.split(/\s+/).includes('sr-only')) return child
+      if (typeof child.type === 'string' && ['svg', 'img', 'br', 'hr', 'input'].includes(child.type)) return child
+      if ((child.type === Fragment || typeof child.type === 'string' && inlineContainers.has(child.type)) && child.props.children !== undefined) {
+        const isList = child.type === 'ul' || child.type === 'ol'
+        const nested = prepend(child.props.children, child.type === Fragment ? mayPlace : !isList)
+        if (placed) return cloneElement(child, undefined, nested)
+      }
+    }
+    if (!mayPlace) return child
+    placed = true
+    return <>{prefix}{child}</>
+  })
+  const result = prepend(content)
+  return placed ? result : <>{prefix}{content}</>
 }
 
 export type NoticeProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
@@ -123,6 +146,7 @@ export default function Notice({
   const prefix = word && !leadingText(lead).startsWith(word)
     ? <span className={styles.statusWord} data-notice-status-word>{word}：</span>
     : null
+  const labeledLead = prefix ? prependStatusWord(lead, prefix) : lead
   const node = NODE_BY_TONE[canonical]
   const hasHelp = help !== undefined && help !== null
   const helpTip = hasHelp ? (
@@ -131,7 +155,7 @@ export default function Notice({
       {helpHref ? <a href={helpHref}>くわしく</a> : null}
     </HelpTip>
   ) : null
-  const closeButton = onClose ? <button type="button" className={styles.close} onClick={onClose} aria-label="通知を閉じる"><X aria-hidden="true" size={16} /></button> : null
+  const closeButton = onClose ? <button type="button" className={styles.close} data-notice-close onClick={onClose} aria-label="通知を閉じる"><X aria-hidden="true" size={16} /></button> : null
   return (
     <div
       {...props}
@@ -150,10 +174,10 @@ export default function Notice({
       data-design-node={props['data-design-node'] ?? node}
     >
       <div className={styles.content}>
-        <span className={styles.dot} data-notice-dot aria-hidden="true" />
+        <span className={styles.dotLine} aria-hidden="true"><span className={styles.dot} data-notice-dot aria-hidden="true" /></span>
         <div className={styles.message} data-notice-message>
-          {heading ? <><div className={styles.headingRow}><div className={styles.heading} data-notice-heading>{prefix}{heading}</div>{hasHelp ? helpTip : null}</div><div className={styles.description}>{body}</div></>
-            : <>{prefix}{body}</>}
+          {heading ? <><div className={styles.headingRow}><div className={styles.heading} data-notice-heading>{labeledLead}</div>{hasHelp ? helpTip : null}</div><div className={styles.description}>{body}</div></>
+            : <>{labeledLead}</>}
           {hasHelp && !heading ? helpTip : null}
           {states?.length ? <NoticeStates items={states} /> : null}
           {footer ? <div className={styles.footer}>{footer}</div> : null}

@@ -128,7 +128,7 @@ export default function EmergencyScreen({
     >
       <Tabs size="compact" spacing="settings" label="運用状態の中の切り替え" items={tabs.map((item) => ({ label: item.label, href: TAB_HREF[item.key], current: tab === item.key }))} />
       {accountsFailed ? (
-        <Notice tone="danger" action={<> <button type="button" onClick={() => loadAccounts()} className={styles.inlineLink}>もう一度読み込む</button> </>} >アカウント一覧を読み込めませんでした。{tab === 'security' ? '安全監視は選んだアカウントだけを確認します。選べないときは、一覧を読み直してください。' : '個別のアカウントを選べず、全体が対象になります。'}</Notice>
+        <Notice tone="danger" action={<> <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => loadAccounts()}>もう一度読み込む</Button> </>} >アカウント一覧を読み込めませんでした。{tab === 'security' ? '安全監視は選んだアカウントだけを確認します。選べないときは、一覧を読み直してください。' : '個別のアカウントを選べず、全体が対象になります。'}</Notice>
       ) : null}
       {tab === 'health' ? (
         <HealthPanelV8

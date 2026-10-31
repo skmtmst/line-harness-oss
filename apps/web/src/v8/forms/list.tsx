@@ -850,9 +850,9 @@ export default function FormsListV8() {
       <FolderPanelNote>フォルダを消しても、中のフォームは未分類に残ります。</FolderPanelNote>
       {folderError ? (
         <Notice tone="danger" className={styles.folderNoteNoticePlacement} action={<>
-          <button type="button" onClick={() => void loadForms()} className={styles.textButton}>
+          <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => void loadForms()}>
             もう一度
-          </button>
+          </Button>
         </>}>{folderError}
         </Notice>
       ) : null}
@@ -1207,7 +1207,7 @@ export default function FormsListV8() {
             ) : null}
             {createError ? (
               <Notice tone="danger" action={<>
-                <button type="button" className={styles.textButton} onClick={() => setCreateError('')}>閉じる</button>
+                <Button variant="text" size="inline" data-notice-inline-action type="button" onClick={() => setCreateError('')}>閉じる</Button>
               </>}>{createError}</Notice>
             ) : null}
           </>

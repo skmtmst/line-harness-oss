@@ -60,6 +60,7 @@ test('通知・切替・選択メニュー・吹き出しは不透明な白地�
    for(const [name,selector] of [['通知を開く','[role="dialog"]'],['アカウントを開く','[role="menu"]'],['状態','[data-menu-portal]:has([role="listbox"])'],['数の説明','[role="note"]']]) {
     await page.getByRole('button',{name,exact:true}).click()
     const surface=page.locator(selector);await surface.waitFor(); if(await page.locator('[data-menu-portal]').count()) await page.locator('[data-menu-portal][data-ready="true"]').waitFor()
+    await page.waitForFunction(element => element.getAnimations({ subtree: true }).every(animation => animation.effect?.getTiming().iterations === Infinity || animation.playState !== 'running'), await surface.elementHandle())
     const look=await surface.evaluate(el=>{const c=getComputedStyle(el);return {background:c.backgroundColor,shadow:c.boxShadow}})
     assert.equal(look.background,'rgb(255, 255, 255)',name)
     assert.notEqual(look.shadow,'none',name)
