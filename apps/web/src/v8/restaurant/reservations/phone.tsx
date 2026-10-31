@@ -33,6 +33,7 @@ import styles from './reservations.module.css'
 
 import { formatYen as polishFormatYen, formatNumber } from '@/lib/format'
 import { emptyValue } from '@/components/shared/empty-value'
+import { phoneReservationInputReason } from '../booking-kit/phone-required'
 import NumberInput from '@/components/shared/number-field'
 import { SaveErrorField } from '@/components/shared/save-form-errors'
 import EntitySelect, { entityOptionMetadata } from '@/components/shared/entity-select'
@@ -215,6 +216,14 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
   const lastAllergy = history?.visits.find((v) => v.allergy_note)?.allergy_note ?? null
   const [yy, mm, dd] = date.split('-').map(Number)
   const dayDate = yy && mm && dd ? new Date(`${date}T00:00:00+09:00`) : new Date()
+  const inputReason = phoneReservationInputReason([
+    { label: 'お客さま', value: kind !== 'customer' || whoTab !== 'line' || Boolean(person) },
+    { label: 'お名前', value: kind !== 'customer' || whoTab !== 'phone' || manualName },
+    { label: '日付', value: date },
+    { label: '人数', value: count },
+    { label: '時刻', value: time },
+    { label: '仮押さえの期限', value: kind !== 'hold' || holdMinutes },
+  ])
 
   const save = (event?: FormEvent<HTMLFormElement>) => {
     event?.preventDefault()
@@ -298,7 +307,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
         footerActions={(
           <>
             <Button onClick={onBack} disabled={busy}>キャンセル</Button>
-            <Button variant="primary" disabled={busy || !storeId || !dayReady} onClick={() => formRef.current?.requestSubmit()}>
+            <Button variant="primary" disabled={busy || !storeId || !dayReady || Boolean(inputReason)} disabledReason={inputReason} onClick={() => formRef.current?.requestSubmit()}>
               {kind === 'hold' ? <Lock size={16} aria-hidden="true" /> : <Check size={16} aria-hidden="true" />}{kind === 'hold' ? '枠を押さえる' : '台帳に入れる'}
             </Button>
           </>
