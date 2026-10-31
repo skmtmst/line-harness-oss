@@ -16,6 +16,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({
+  download: vi.fn(),
   listExports: vi.fn(),
   createExport: vi.fn(),
   exportDetail: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('@/lib/api', async (importOriginal: () => Promise<typeof import('@/lib/a
   const actual = await importOriginal()
   return {
     ...actual,
+    downloadApiFile: api.download,
     api: {
       ...actual.api,
       commonVars: {
@@ -86,6 +88,7 @@ async function clickButton(label: string) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  api.download.mockResolvedValue({ totalCount: 12, returnedCount: 12, truncated: false })
   api.listExports.mockResolvedValue({ success: true, data: [] })
   api.createExport.mockResolvedValue({ success: true, data: job() })
   api.exportDetail.mockResolvedValue({ success: true, data: job() })
@@ -110,8 +113,8 @@ describe('共通情報CSVの監査付き出力パネル', () => {
     })
     expect(text()).toContain('完了')
     expect(text()).toContain('12 件')
-    const link = host.querySelector('a[href$="/api/common-vars/exports/job-1/download"]')
-    expect(link).not.toBeNull()
+    await clickButton('CSVをダウンロード')
+    expect(api.download).toHaveBeenCalledWith('/api/common-vars/exports/job-1/download', 'common-vars-job-1.csv', undefined)
   })
 
   it('未分類の絞り込みは ungrouped として送る', async () => {
@@ -153,7 +156,7 @@ describe('共通情報CSVの監査付き出力パネル', () => {
     })
     await render()
     expect(text()).toContain('期限切れ')
-    expect(host.querySelector('a[href$="/download"]')).toBeNull()
+    expect(Array.from(host.querySelectorAll('button')).some(button => button.textContent?.trim() === 'CSVをダウンロード')).toBe(false)
     await clickButton('もう一度書き出す')
     expect(api.regenerateExport).toHaveBeenCalledWith('job-1')
   })
@@ -183,12 +186,13 @@ describe('共通情報CSVの監査付き出力パネル', () => {
   })
 
   it('最近の履歴を残し、通知を閉じても完了のDLと期限切れの再生成を使える', async () => {
-    api.listExports.mockResolvedValue({ success: true, data: [job({ status: 'expired', downloadUrl: null }), job({ id: 'older' })] })
+    api.listExports.mockResolvedValue({ success: true, data: [job({ status: 'expired', downloadUrl: null }), job({ id: 'older', downloadUrl: '/api/common-vars/exports/older/download' })] })
     await render()
     await act(async () => { (host.querySelector('[role="status"] button[aria-label="通知を閉じる"]') as HTMLButtonElement).click() })
     expect(host.querySelector('[role="status"]')).toBeNull()
     expect(text()).toContain('最近の書き出し（2 件）')
-    expect(host.querySelector('details a')?.getAttribute('href')).toContain('/download')
+    await clickButton('ダウンロード')
+    expect(api.download).toHaveBeenCalledWith('/api/common-vars/exports/older/download', 'common-vars-older.csv', undefined)
     await clickButton('再生成')
     expect(api.regenerateExport).toHaveBeenCalledWith('job-1')
   })
@@ -224,6 +228,6 @@ describe('共通情報CSVの監査付き出力パネル', () => {
     api.createExport.mockRejectedValue(new Error('network'))
     await render()
     await clickButton('CSVで書き出す')
-    expect(text()).toContain('書き出しを依頼できませんでした')
+    expect(text()).toContain('書き出しに失敗しました')
   })
 })
