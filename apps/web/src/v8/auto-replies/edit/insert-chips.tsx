@@ -32,21 +32,28 @@ export default function AutoReplyInsertChips({
   onInsert,
   disabled = false, lockedReason,
   load = loadTemplateReferences,
+  references: providedReferences,
+  referenceState,
 }: {
   accountId: string | null
   onInsert: (token: string) => void
   disabled?: boolean
   lockedReason?: string
   load?: (accountId: string) => Promise<TemplateReferences>
+  references?: TemplateReferences
+  referenceState?: 'idle' | 'loading' | 'ready' | 'failed'
 }) {
-  const [references, setReferences] = useState<TemplateReferences>(EMPTY_REFERENCES)
-  const [state, setState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
+  const [loadedReferences, setReferences] = useState<TemplateReferences>(EMPTY_REFERENCES)
+  const [loadedState, setState] = useState<'idle' | 'loading' | 'ready' | 'failed'>('idle')
+  const references = providedReferences ?? loadedReferences
+  const state = referenceState ?? loadedState
   const [menu, setMenu] = useState<MenuKey | null>(null)
   useEffect(() => { if (disabled || lockedReason) setMenu(null) }, [disabled, lockedReason])
   const fieldRef = useRef<HTMLButtonElement>(null)
   const varRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
+    if (providedReferences !== undefined) return
     if (!accountId) { setReferences(EMPTY_REFERENCES); setState('idle'); return }
     let alive = true
     setState('loading')
@@ -54,7 +61,7 @@ export default function AutoReplyInsertChips({
       .then((next) => { if (alive) { setReferences(next); setState('ready') } })
       .catch(() => { if (alive) { setReferences(EMPTY_REFERENCES); setState('failed') } })
     return () => { alive = false }
-  }, [accountId, load])
+  }, [accountId, load, providedReferences])
 
   const pick = (token: string) => { if (disabled || lockedReason) return; setMenu(null); onInsert(token) }
   const why = (ready: boolean, label: string) =>

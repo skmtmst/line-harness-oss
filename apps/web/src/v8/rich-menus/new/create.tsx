@@ -97,7 +97,7 @@ Send,
 Upload
 } from 'lucide-react'
 import { useCallback,useEffect,useRef,useState } from 'react'
-import { describeMenuSummary,isGroupResponse,mediaToFile,parseStoredCondition,projectAreaForDraft } from './create-draft'
+import { describeMenuAudience,describeMenuSummary,isGroupResponse,mediaToFile,parseStoredCondition,projectAreaForDraft } from './create-draft'
 import styles from '../../../app/rich-menus/new/create-v8.module.css'
 
 /* ---------- 本体 ---------- */
@@ -169,7 +169,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
 
 
   /* 手順③ */
-  const [audience, setAudience] = useState<'all' | 'targeted' | 'none' | 'tag'>('all')
+  const [audience, setAudience] = useState<'all' | 'targeted' | 'none' | 'tag'>(host ? 'targeted' : 'none')
   /* 統括のひな形だけ：「タグが付いた人」のタグ名（配った先の同じ名前の有効なタグで出す）。 */
   const [hqTagName, setHqTagName] = useState(host?.initial?.displayTagName ?? '')
   const [targetingCondition, setTargetingCondition] = useState<SegmentCondition | null>(null)
@@ -582,14 +582,16 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
   const currentSummary = describeMenuSummary({
     name,
     chatBarText,
-    audienceAll: audience === 'all',
+    audience,
+    forHq: Boolean(host),
     pages,
   })
   const latestSummary = conflictLatest
     ? describeMenuSummary({
         name: conflictLatest.name,
         chatBarText: conflictLatest.chatBarText,
-        audienceAll: conflictLatest.isDefaultForAll,
+        audience: conflictLatest.targetingEnabled ? 'targeted' : conflictLatest.isDefaultForAll ? 'all' : 'none',
+        forHq: Boolean(host),
         pages: conflictLatest.pages,
       })
     : ''
@@ -1191,7 +1193,7 @@ export default function RichMenuCreateV8({ editGroupId, host }: { editGroupId?: 
               onReload={acceptLatestAndContinue}
             />
           </div>
-        ) : null} noticeSpacing="band" identity={undefined} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} readOnly={!host && !canOperate} summaries={{ shape: `${name}・${tabCount}タブ`, buttons: `${pages.reduce((total, page) => total + page.areas.length, 0)}個のボタン`, audience: audience === 'all' ? '全員' : '条件に合う友だち' }} />}  preview={(inDialog) => renderRail(inDialog)} previewCompactWhenNarrow footerActions={
+        ) : null} noticeSpacing="band" identity={undefined} steps={<Steps label="リッチメニューを作る手順" steps={stepperSteps} currentKey={step} readOnly={!host && !canOperate} summaries={{ shape: `${name}・${tabCount}タブ`, buttons: `${pages.reduce((total, page) => total + page.areas.length, 0)}個のボタン`, audience: describeMenuAudience(audience, Boolean(host)) }} />}  preview={(inDialog) => renderRail(inDialog)} previewCompactWhenNarrow footerActions={
           !host && !canOperate ? <Button href="/rich-menus">一覧へ戻る</Button> : host ? (
             <>
               <Button type="button" onClick={host.onCancel} disabled={busy}>キャンセル</Button>

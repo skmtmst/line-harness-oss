@@ -24,6 +24,14 @@ export function isGroupResponse(value: unknown): value is Group {
 
 /* ---------- 補助（edit/page.tsx と同じ写し。page.tsx は部品を export できないため） ---------- */
 
+/** 表示先の選択・手順・比較で、決めていない状態を条件付きと取り違えない。 */
+export function describeMenuAudience(audience: 'all' | 'targeted' | 'none' | 'tag', forHq = false): string {
+  if (audience === 'all') return forHq ? '全員' : 'すべての友だち'
+  if (audience === 'tag') return 'タグが付いた人'
+  if (audience === 'targeted' && !forHq) return '条件に当てはまる友だちだけ'
+  return '決めない'
+}
+
 /*
  * ★V8 「違いを比べる」の比べる文。版の本文ではなく設定の要約。
  * 最新と入力中の2つを作り、VersionCompare（行ごとの比べる）へ渡す。
@@ -31,14 +39,15 @@ export function isGroupResponse(value: unknown): value is Group {
 export function describeMenuSummary(input: {
   name: string
   chatBarText: string
-  audienceAll: boolean
+  audience: 'all' | 'targeted' | 'none' | 'tag'
+  forHq?: boolean
   pages: Array<{ areas: unknown[] }>
 }): string {
   const areaCount = input.pages.reduce((total, page) => total + page.areas.length, 0)
   return [
     `名前：${input.name || emptyValue('unconfigured')}`,
     `言葉：${input.chatBarText || emptyValue('unconfigured')}`,
-    `出す相手：${input.audienceAll ? 'みんな' : '条件あり'}`,
+    `出す相手：${describeMenuAudience(input.audience, input.forHq)}`,
     `面の数：${input.pages.length}`,
     `ボタンの数：${areaCount}`,
   ].join('\n')

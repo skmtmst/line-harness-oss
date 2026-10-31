@@ -601,7 +601,7 @@ export const get__api_restaurant_test_channels_19 = async (c: Context<Env, "/api
   const organization = await organizationFor(c);
   if (!organization) return c.json({ success: false, error: '飲食店テスト組織がありません' }, 404);
   const storeId = c.req.query('storeId') || organization.scopedStoreId;
-  if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, error: '店舗が正しくありません' }, 400);
+  if (!storeId || (organization.scopedStoreId && organization.scopedStoreId !== storeId) || !await storeBelongsTo(c, organization.id, storeId)) return c.json({ success: false, code: 'restaurant_store_mismatch', error: '店舗が正しくありません' }, 400);
   const db = dbFor(c.env, storeId);
   const store = await db.prepare('SELECT timezone FROM rt_stores WHERE id = ?').bind(storeId).first<{ timezone: string }>();
   const [from, to] = restaurantDayBounds(store!.timezone);

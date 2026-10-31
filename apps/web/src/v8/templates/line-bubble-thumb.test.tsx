@@ -80,6 +80,12 @@ describe('bubbleThumbOf', () => {
 })
 
 describe('LineBubbleThumb', () => {
+  it('一覧から渡した実名で差し込みを描き、保存のキーは変えない', () => {
+    const { container } = render(<LineBubbleThumb thumb={{ kind: 'text', text: '{{account.name}} {{var.business_hours}}' }} tokenNames={{ vars: { business_hours: '営業時間' } }} />)
+    expect(container.textContent).toBe('LINE公式アカウント名 営業時間')
+    expect(container.querySelector('[data-token="{{var.business_hours}}"]')).toBeTruthy()
+  })
+
   it('飾りなので読み上げから外す', () => {
     const root = draw({ kind: 'text', text: 'こんにちは' })
     expect(root.getAttribute('aria-hidden')).toBe('true')
