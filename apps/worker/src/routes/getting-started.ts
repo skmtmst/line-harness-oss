@@ -1,12 +1,11 @@
 import { sqlIdSet } from '@line-crm/db/id-queries';
 import { inputError, inputJsonBoundary } from '../lib/input-errors.js';
 import { Hono } from 'hono';
-import { hasFirstDeliveredMessage, hasSavedFeatureConfiguration, resolveLineCredential } from '@line-crm/db';
+import { hasFirstDeliveredMessage, hasSavedFeatureConfiguration } from '@line-crm/db';
 import type { Env } from '../worker-env.js';
 import type { AuthenticatedStaff } from '../middleware/auth/principal/auth.js';
 import { requireRole } from '../middleware/role-guard.js';
 import { getVisibleLineAccountScope } from '../services/account-access.js';
-import { expectedWebhookUrl, fetchWebhookEndpoint } from '../lib/webhook-endpoint.js';
 import { starterApplication } from '../services/style-starter-ensure.js';
 import { firstRunTimes } from '../services/getting-started-first-run.js';
 import { scenarioIdsStartedBy } from '../services/first-run-funnel.js';
@@ -63,11 +62,6 @@ function withAccess(
 
 interface AccountRow {
   id: string;
-  is_active: number;
-  channel_access_token: string | null;
-  channel_access_token_encrypted: string | null;
-  channel_secret: string | null;
-  channel_secret_encrypted: string | null;
 }
 
 gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'), async (c) => {
@@ -81,46 +75,10 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
 
     const accountIds = accountId ? [accountId] : visibleScope.allowedAccountIds;
     const accounts = accountIds.length > 0 ? await c.env.DB.prepare(
-      `SELECT id, is_active, channel_access_token, channel_access_token_encrypted,
-              channel_secret, channel_secret_encrypted
-         FROM line_accounts
+      `SELECT id FROM line_accounts
         WHERE archived_at IS NULL AND id IN (${sqlIdSet(accountIds).sql})`,
     ).bind(...(accountIds.length ? sqlIdSet(accountIds).binds : [])).all<AccountRow>() : { results: [] as AccountRow[] };
     const rows = accounts.results;
-
-    /*
-      段1。**3つとも揃って初めて「終わり」。**
-      稼働中で、Webhook が合っていて、シークレットが確かめられている。
-      Webhook は LINE に問い合わせて確かめる。**読めなかったものを
-      「合っている」とも「登録されていない」とも言わない。**
-    */
-    const expected = expectedWebhookUrl(c.env.WORKER_URL ?? new URL(c.req.url).origin);
-    const webhookChecks = await Promise.all(
-      rows.map(async (row) => {
-        if (row.is_active !== 1) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
-        const hasSecret = Boolean(row.channel_secret || row.channel_secret_encrypted);
-        if (!hasSecret) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
-        try {
-          const token = await resolveLineCredential(
-            row.channel_access_token_encrypted,
-            row.channel_access_token,
-            { lineAccountId: row.id, field: 'channel_access_token' },
-          );
-          if (!token) return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
-          const check = await fetchWebhookEndpoint(token, expected);
-          return { id: row.id, status: check.status, active: check.active };
-        } catch {
-          return { id: row.id, status: 'unknown' as const, active: null as boolean | null };
-        }
-      }),
-    );
-    /*
-      R74。URLが一致していても、LINE側でWebhookの利用がオフなら
-      受信は届かない。「終わり」に数えない。`active: null`（読めなかった）
-      は従来どおり「合っている側」に寄せず `unknown` のまま——
-      ここでは利用オフ（false）だけを除外する。
-    */
-    const usable = webhookChecks.filter((w) => w.status === 'matched' && w.active !== false).length;
 
     const tagCount = accountId ? await c.env.DB.prepare(
       `SELECT COUNT(*) AS c FROM tags
@@ -184,13 +142,8 @@ gettingStarted.get('/api/getting-started', requireRole('owner', 'admin', 'staff'
     const hasFallbackRule = ruleRows.results.some((row) => row.is_unknown_route_fallback === 1);
     const steps = [
       {
-        ...withAccess(staff, 'accounts', usable > 0 ? 'done' : rows.length > 0 ? 'stalled' : 'todo',
-          rows.length > 0 && usable === 0 ? 'LINE側のWebhook利用設定またはシークレットを確認してください' : null),
-        /*
-          **Webhook を確かめられなかったことを隠さない。** ここが空だと、
-          段1が終わらない理由が運用者に分からない。
-        */
-        webhook: webhookChecks,
+        // 登録済みアカウントがあれば段1は完了。接続状態は運用画面で別に確認する。
+        ...withAccess(staff, 'accounts', rows.length > 0 ? 'done' : 'todo'),
       },
       withAccess(staff, 'attributes',
         (tagCount?.c ?? 0) > 0 || (fieldCount?.c ?? 0) > 0 ? 'done' : 'todo'),
