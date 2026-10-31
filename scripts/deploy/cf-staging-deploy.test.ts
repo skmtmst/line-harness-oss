@@ -153,6 +153,28 @@ describe('cf-staging-deploy', () => {
     expect(result.stderr).toContain('table-rebuild');
   });
 
+  it('retries a D1 step that fails once (API throttling)', () => {
+    const sandbox = makeSandbox({ healthCommit: SHA });
+    sandboxes.push(sandbox);
+    // 1 回目の status だけ失敗し、2 回目から通る tsx の身代わり。
+    writeFileSync(
+      resolve(sandbox, 'node_modules/.bin/tsx'),
+      [
+        '#!/bin/sh',
+        'printf "%s\\n" "$@" >> "$PWD/tsx.args"',
+        'if [ "$2" = status ] && [ ! -f "$PWD/.failed-once" ]; then touch "$PWD/.failed-once"; exit 1; fi',
+        'if [ "$2" = status ]; then printf "対象: nen-line-stg (staging)\\n"; fi',
+        '',
+      ].join('\n'),
+      { mode: 0o755 },
+    );
+    const result = run(sandbox, { CF_STAGING_DEPLOY_MODE: 'apply', CF_STAGING_RETRY_WAIT: '0' });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stderr).toContain('失敗しました（1/4）');
+    expect(read(sandbox, 'tsx').split('status\nstaging').length - 1).toBe(2);
+    expect(read(sandbox, 'wrangler')).not.toContain('--dry-run');
+  });
+
   it('rejects an unknown mode and a dirty tree', () => {
     const sandbox = makeSandbox();
     sandboxes.push(sandbox);
