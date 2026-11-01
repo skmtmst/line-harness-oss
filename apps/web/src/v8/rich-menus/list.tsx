@@ -7,7 +7,7 @@ import ListToolbar, { ListToolbarEnd, ListToolbarFrame, ListToolbarRow, ListTool
 import { formatDate as polishFormatDate, formatDay, formatNumber } from '@/lib/format';
 import { useFeatureAccess } from '@/lib/use-feature-access';
 import { useCallback, useDeferredValue, useEffect, useRef, useState } from 'react';
-import { useListUrlValue, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
+import { readListUrlParam, useListScrollMemory, useListUrlState, useOnAccountSwitch } from '@/components/shared/list-url-state';
 import { CalendarClock, CircleCheck, CloudDownload, CloudOff, FilePen, Hand, Image as ImageIcon, ListOrdered, Plus, Split, TriangleAlert, Trophy } from 'lucide-react';
 
 import { RowNameLink } from '@/components/shared/table';
@@ -45,6 +45,7 @@ import KpiCard from '@/components/shared/kpi-card'
 import ManagedFolderPanel, { managedFolderNavRows } from '@/components/shared/managed-folder-panel';
 import { FolderDotName } from '@/components/shared/folder-dot';
 import ConfirmDialog from '@/components/shared/confirm-dialog'
+import Dialog from '@/components/shared/dialog'
 import { type ActionMenuItem } from '@/components/shared/action-menu';
 import { RowMenu } from '@/components/shared/row-actions';
 import Pagination from '@/components/shared/pagination'
@@ -199,7 +200,6 @@ export default function RichMenusListV8() {
   const featureAccess = useFeatureAccess('richMenus')
   const canEdit = featureAccess
 
-  const [showExternal, setShowExternal] = useListUrlValue('showExternal', false)
   const activeAccountRef = useRef<string | null>(selectedAccount?.id ?? null)
   const importRequestGenerationRef = useRef(0)
   const externalLoadedRef = useRef(false)
@@ -217,7 +217,11 @@ export default function RichMenusListV8() {
    * 詳細・編集へ行って「戻る」と同じ一覧に戻る。絞り込みを変えたらページは 1 へ
    * （同じ書き込みの中で戻す。効果で戻すと、来た瞬間に URL から戻したページまで消える）。
    */
-  const [view, setView] = useListUrlState({ q: '', folder: '', view: '', sort: 'priority', size: '20', page: '1' })
+  const [view, setView] = useListUrlState({ q: '', folder: '', view: '', sort: 'priority', size: '20', page: '1', showExternal: 'false' })
+  const showExternal = view.showExternal === 'true'
+  const setShowExternal = useCallback((open: boolean) => {
+    setView({ showExternal: String(open), page: readListUrlParam('page', '1') })
+  }, [setView])
   const query = view.q
   const folderFilter = view.folder
   const savedFilter = view.view
@@ -399,7 +403,7 @@ export default function RichMenusListV8() {
         setExternal(res.data)
         setExternalStatus('ready')
       } else {
-        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。')
+        setExternalError(richMenuError(undefined, 'externalLoad'))
         setExternal(null)
         setExternalStatus('error')
       }
@@ -408,7 +412,7 @@ export default function RichMenusListV8() {
 
       if (activeAccountRef.current === accountId) {
         { if (!fieldFailure)
-        setExternalError('LINE上の状態を確認できませんでした。少し待ってから、もう一度読み込んでください。') }
+        setExternalError(richMenuError(saveFailure, 'externalLoad')) }
         setExternal(null)
         setExternalStatus('error')
       }
@@ -721,6 +725,11 @@ export default function RichMenusListV8() {
         setImportBusy(false)
       }
     }
+  }
+
+  function closeExternal() {
+    if (importBusy || deleteBusy) return
+    setShowExternal(false)
   }
 
   /* ===== 数の帯 ===== */
@@ -1334,19 +1343,17 @@ export default function RichMenusListV8() {
       overlays={<>
 
         {/* 「LINE上にあるメニュー」の作業画面。 */}
-        {showExternal && selectedAccount ? (
-          <div className={styles.externalLayer}>
-            <ExternalImportWorkspace
+        <Dialog open={showExternal && Boolean(selectedAccount)} title="LINE上にあるメニュー" size="wide" fitViewport onCancel={closeExternal} busy={importBusy || deleteBusy}>
+          {selectedAccount ? <ExternalImportWorkspace
               external={external}
               loading={externalStatus === 'loading'}
               error={externalError}
-              onBack={() => setShowExternal(false)}
+              onBack={closeExternal}
               onReload={() => void reload()}
               onImport={handleImport}
               onDelete={canEdit ? handleDeleteExternal : undefined}
-            />
-          </div>
-        ) : null}
+          /> : null}
+        </Dialog>
 
         {applyTo ? (
           <ApplyToTagModal groupId={applyTo.id} groupName={applyTo.name} onClose={() => setApplyTo(null)} />

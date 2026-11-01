@@ -1,8 +1,5 @@
 /* 「LINE上にあるメニュー」の作業画面（TL7tp）の決まった幅・列。値は `--tpl-rml-ext-*`。 */
 .wrap { max-width: var(--tpl-rml-ext-max-w); }
-@media (min-width: 1280px) {
-  .columns { grid-template-columns: minmax(0, 1fr) var(--tpl-rml-ext-side-w); }
-}
 .menuRow {
   grid-template-columns: var(--tpl-rml-ext-thumb-w) minmax(0, 1fr) auto;
   padding: var(--tpl-rule-row-gap);

@@ -12,7 +12,7 @@ export function unpublishWarningText(warning: string): string {
   return '一部を取り下げきれていません'
 }
 
-export type RichMenuAction = 'load' | 'reorder' | 'delete' | 'unpublish' | 'externalDelete' | 'import'
+export type RichMenuAction = 'load' | 'reorder' | 'delete' | 'unpublish' | 'externalDelete' | 'import' | 'externalLoad'
 
 /** APIや通信の内部表現を、運用者が次の行動を選べる文へ置き換える。 */
 export type RichMenuActionAll = RichMenuAction | 'duplicate'
@@ -29,6 +29,15 @@ export function richMenuErrorAll(error: unknown, action: RichMenuActionAll): str
 }
 
 export function richMenuError(error: unknown, action: RichMenuAction): string {
+  if (action === 'externalLoad') {
+    if (error instanceof ApiError) {
+      if (error.code === 'INVALID_LINE_ACCESS_TOKEN') return 'LINE連携の認証情報を確認できません。連携の設定を確認してください。'
+      if (error.code === 'LINE_RATE_LIMITED') return 'LINEへの問い合わせが集中しています。少し待ってから、もう一度読み込んでください。'
+      if (error.status === 429) return '管理画面への操作が集中しています。少し待ってから、もう一度読み込んでください。'
+      if (error.status === 403) return 'このLINEアカウントのメニューを見る権限がありません。オーナーか管理者に頼んでください。'
+    }
+    return 'LINE上のメニューを読み込めませんでした。LINE公式アカウントの連携状態を確認し、もう一度読み込んでください。'
+  }
   if (error instanceof ApiError) {
     if (error.status === 403) return 'このLINEアカウントのリッチメニューを操作する権限がありません。'
     if (error.status === 404) return '対象のリッチメニューが見つかりません。一覧を読み直してください。'

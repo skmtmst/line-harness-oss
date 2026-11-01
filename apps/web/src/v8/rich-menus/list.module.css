@@ -190,16 +190,6 @@
 .stateTitle { margin: 0; color: var(--color-ink); font-size: var(--tpl-card-title-size); font-weight: 600; }
 .stateDesc { margin: 0; color: var(--color-ink-faint); font-size: var(--text-label); }
 
-/* 「LINE上にあるメニュー」の作業画面（全面）。 */
-.externalLayer {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  overflow-y: auto;
-  padding: var(--tpl-create-content-pad-block);
-  background: var(--color-canvas-sunken);
-}
-
 /* 窓の中身。 */
 .impact {
   display: flex;
