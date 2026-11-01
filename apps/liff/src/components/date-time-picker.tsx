@@ -154,7 +154,7 @@ type DayState = 'open' | 'few' | 'full' | 'closed' | 'past' | 'off' | 'empty';
 /**
  * 読み上げ文。「10月4日 満席」のように日付と状態だけにする。
  * 色・印だけでは伝わらない人に、状態を言葉で渡す。
- * 過ぎた日は「過ぎた日」と読む（期間の外の未来日は「選択できません」）。
+ * 過ぎた日は「過ぎた日」と読む（期間の外の未来日は「受付期間外」）。
  * 枠が1つも無い日は「空きなし」と読む（「満席」は枠があって全部埋まった日だけ）。
  */
 export function dayStateLabel(date: string, state: DayState): string {
@@ -166,7 +166,7 @@ export function dayStateLabel(date: string, state: DayState): string {
   if (state === 'closed') return `${base} お休み`;
   if (state === 'past') return `${base} 過ぎた日`;
   if (state === 'empty') return `${base} 空きなし`;
-  return `${base} 選択できません`;
+  return `${base} 受付期間外`;
 }
 
 function stateOf(date: string, open: Record<string, true>, limited: Record<string, true>, full: Record<string, true>, closed: Record<string, true>, today: string, windowEnd: string): DayState {
@@ -636,6 +636,8 @@ export default function DateTimePicker({
   const monthDays: string[] = [];
   for (let d = monthStart(month); d <= monthEnd(month); d = addDays(d, 1)) monthDays.push(d);
 
+  const monthFrom = monthStart(month) < today ? today : monthStart(month);
+  const monthTo = monthEnd(month) > windowEnd ? windowEnd : monthEnd(month);
   const monthLabel = `${Number(month.slice(0, 4))}年${Number(month.slice(5, 7))}月`;
   const monthHasOpen = monthDays.some((d) => calByDate[d]?.some((t) => t.open));
   const monthHasFew = monthDays.some((d) => calLimited[d]);
@@ -930,7 +932,8 @@ export default function DateTimePicker({
                         aria-label={dayStateLabel(d, state)}
                       >
                         <span className="liff-num text-sm leading-tight">{dayNum}</span>
-                        <span className="flex h-1.5 items-center leading-none">
+                        <span className="flex min-h-1.5 items-center text-[11px] leading-none">
+                          {state === 'off' ? '受付外' : null}
                           {/* 空きの点 (緑＝空き・金＝残りわずか)。消す設定では点を出さない。 */}
                           {settings.vacancyDots && (state === 'open' || state === 'few') && (
                             <span
@@ -954,12 +957,14 @@ export default function DateTimePicker({
                         <span className="text-liff-dot-few">●</span> 残りわずか
                       </span>
                     )}
-                    <span>灰色：満席・休み</span>
+                    <span>灰色：満席・休み・空きなし・過ぎた日</span>
+                    <span>受付外：受付期間の対象外</span>
                   </p>
                 )}
+                <p className="mt-2 text-[13px] leading-6 text-liff-sub">{monthFrom <= monthTo ? `この月の受付期間：${monthFrom === monthTo ? formatJpLong(monthFrom) : `${formatJpLong(monthFrom)}〜${formatJpLong(monthTo)}`}` : 'この月は受付期間外です。'}</p>
                 {!calDay && (
                   <p className="mt-2 text-[13px] leading-6 text-liff-sub">
-                    {monthHasOpen ? '日を選んでください。' : 'この月は空きがありません。'}
+                    {monthHasOpen ? '日を選んでください。' : 'この月の受付期間内に空きがありません。'}
                   </p>
                 )}
               </>
