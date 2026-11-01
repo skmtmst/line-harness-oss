@@ -52,7 +52,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
   const canEdit = canManageRole(role)
   const rows = store ? data.menuItems.filter((row) => row.store_id === store.id) : data.menuItems
   const legacyPending = rows.some((item) => item.priceChangeStatus === 'pending')
-  const scheduledPrices = rows.filter((item) => item.priceChangeStatus === 'approved')
+  const scheduledPrices = rows.filter((item) => item.status === 'active' && item.pendingPrice != null && item.priceChangeStatus === 'approved')
   const [stopId, setStopId] = useState('')
   const [deleteId, setDeleteId] = useState('')
   const stopping = rows.find((row) => row.id === stopId)
@@ -125,7 +125,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
             {rows.map((item) => {
               const archived = item.status === 'archived'
               const draftItem = item.status === 'draft'
-              const pending = item.pendingPrice != null
+              const pending = item.status === 'active' && item.pendingPrice != null
               const allergens = safeArray(item.allergens_json)
               return (
                 <Tr data-row-id={item.id} key={item.id} data-table-layout="columns" onOpen={() => openEdit(item)}>
@@ -140,7 +140,7 @@ function MenuBoard({ ctx }: { ctx: RestaurantV8Context }) {
                       <span title={`新価格 ${formatYen(item.pendingPrice ?? 0)}${item.pendingEffectiveAt ? `・${polishFormatDateTime(new Date(item.pendingEffectiveAt))}から` : ''}`}>
                         <Status value="pending" label={item.priceChangeStatus === 'approved' ? '開始待ち' : '申請中'} />
                       </span>
-                    ) : <Status value={archived ? 'archived' : draftItem ? 'draft' : item.status === 'paused' ? 'paused' : 'active'} />}
+                    ) : <Status value={archived ? 'archived' : draftItem ? 'draft' : item.status === 'paused' ? 'paused' : 'active'} label={archived ? '停止中' : undefined} />}
                   </Td>
                   <ActionCell className={styles.colOps}>
                     {canEdit ? (

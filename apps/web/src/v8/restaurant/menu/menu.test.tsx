@@ -295,3 +295,102 @@ describe('mauOC コースの編集ページ', () => {
 })
 
 afterEach(() => { verifiedStaffRole(null) })
+
+describe('価格変更の開始待ちとメニューの停止状態', () => {
+  const queuedPrice = { price: 8800, status: 'active', pendingPrice: 9900, pendingEffectiveAt: '2099-01-01T00:00:00Z', priceChangeStatus: 'approved' }
+  const scheduledCount = () => document.querySelector('[data-kpi-label][title="開始待ち"]')?.closest('[data-kpi-presentation]')?.querySelector('[data-kpi-number]')?.textContent
+  const menuRow = (name: string) => screen.getByRole('row', { name: new RegExp(name) })
+
+  it.each([['archived', '停止中'], ['paused', '停止中'], ['draft', '下書き']])('%sは未来の価格があっても%sを優先する', async (status, label) => {
+    const data = snapshotOf()
+    data.menuItems = [{ ...data.menuItems[0], ...queuedPrice, status }]
+    fixture.snapshot.mockResolvedValue({ data })
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    expect(within(menuRow('秋の鹿肉コース')).getByText(label)).toBeTruthy()
+    expect(within(menuRow('秋の鹿肉コース')).queryByText('開始待ち')).toBeNull()
+    expect(scheduledCount()).toBe('0')
+  })
+
+  it('開始待ちは公開中の未来の価格だけを数え、停止と下書きを含めない', async () => {
+    const data = snapshotOf()
+    data.menuItems = data.menuItems.map((item, index) => ({ ...item, ...queuedPrice, status: ['active', 'paused', 'archived', 'draft'][index] }))
+    fixture.snapshot.mockResolvedValue({ data })
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    expect(scheduledCount()).toBe('1')
+    expect(within(menuRow('秋の鹿肉コース')).getByText('開始待ち')).toBeTruthy()
+  })
+
+  it('公開中の新価格0円も開始待ちとして残し、元の価格を上書きしない', async () => {
+    const data = snapshotOf()
+    data.menuItems = [{ ...data.menuItems[0], ...queuedPrice, pendingPrice: 0 }]
+    fixture.snapshot.mockResolvedValue({ data })
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    expect(within(menuRow('秋の鹿肉コース')).getByText('開始待ち')).toBeTruthy()
+    expect(within(menuRow('秋の鹿肉コース')).getByText('¥8,800')).toBeTruthy()
+    expect(screen.getByTitle(/新価格 ¥0/)).toBeTruthy()
+    expect(scheduledCount()).toBe('1')
+  })
+
+  it('公開中の以前の価格申請は申請中と確認口を残し、開始待ちには含めない', async () => {
+    const data = snapshotOf()
+    data.menuItems = [{ ...data.menuItems[0], ...queuedPrice, priceChangeStatus: 'pending' }]
+    fixture.snapshot.mockResolvedValue({ data })
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    expect(within(menuRow('秋の鹿肉コース')).getByText('申請中')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '以前の申請を確認する' })).toBeTruthy()
+    expect(scheduledCount()).toBe('0')
+  })
+
+  it('停止と再開の既存送信を保ち、再取得した状態に札と件数を合わせる', async () => {
+    const data = snapshotOf()
+    data.menuItems = [{ ...data.menuItems[0], ...queuedPrice }]
+    fixture.snapshot.mockResolvedValue({ data })
+    render(<MenuPage />)
+    await screen.findByText('メニュー一覧')
+    expect(scheduledCount()).toBe('1')
+    fixture.snapshot.mockResolvedValue({ data: { ...data, menuItems: data.menuItems.map(item => ({ ...item, status: 'archived' })) } })
+    openMenu('秋の鹿肉コース')
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
+    fireEvent.click(screen.getByRole('button', { name: '停止する' }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'archived' }))
+    await waitFor(() => expect(within(menuRow('秋の鹿肉コース')).getByText('停止中')).toBeTruthy())
+    expect(scheduledCount()).toBe('0')
+    fixture.snapshot.mockResolvedValue({ data })
+    fireEvent.click(within(menuRow('秋の鹿肉コース')).getByRole('button', { name: '再開', exact: true }))
+    await waitFor(() => expect(fixture.updateMenu).toHaveBeenCalledWith('account-1', 'm1', { status: 'active' }))
+    await waitFor(() => expect(within(menuRow('秋の鹿肉コース')).getByText('開始待ち')).toBeTruthy())
+    expect(scheduledCount()).toBe('1')
+  })
+})
+
+
+it('停止した旧申請は停止の札と0件を示し、申請を確認する入口を残す', async () => {
+  const data = snapshotOf()
+  data.menuItems = [{ ...data.menuItems[0], price: 8800, status: 'archived', pendingPrice: 9900, priceChangeStatus: 'pending' }]
+  fixture.snapshot.mockResolvedValue({ data })
+  render(<MenuPage />)
+  await screen.findByText('メニュー一覧')
+  const row = screen.getByRole('row', { name: /秋の鹿肉コース/ })
+  expect(within(row).getByText('停止中')).toBeTruthy()
+  expect(within(row).queryByText('申請中')).toBeNull()
+  expect(screen.getByRole('button', { name: '以前の申請を確認する' })).toBeTruthy()
+  const card = document.querySelector('[data-kpi-label][title="開始待ち"]')?.closest('[data-kpi-presentation]')
+  expect(card?.querySelector('[data-kpi-number]')?.textContent).toBe('0')
+})
+
+it('変更額が無い承認済みの記録だけでは開始待ちとせず有効のまま表示する', async () => {
+  const data = snapshotOf()
+  data.menuItems = [{ ...data.menuItems[0], price: 8800, status: 'active', pendingPrice: null, priceChangeStatus: 'approved' }]
+  fixture.snapshot.mockResolvedValue({ data })
+  render(<MenuPage />)
+  await screen.findByText('メニュー一覧')
+  const row = screen.getByRole('row', { name: /秋の鹿肉コース/ })
+  expect(within(row).getByText('有効')).toBeTruthy()
+  expect(within(row).queryByText('開始待ち')).toBeNull()
+  const card = document.querySelector('[data-kpi-label][title="開始待ち"]')?.closest('[data-kpi-presentation]')
+  expect(card?.querySelector('[data-kpi-number]')?.textContent).toBe('0')
+})
