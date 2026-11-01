@@ -12,7 +12,6 @@
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
 
-- [予約ページの読み込み失敗の表示修復](release-log/unreleased/0000-kenta-booking-media-link-recovery.md) — 反映履歴（2026-11-01確認）。
 
 ## 使う人の手引き
 
@@ -1126,4 +1125,5 @@
 - [予約操作・読込中と配信前の案内](release-log/unreleased/2032-kenta-train-1031p.md) — 反映履歴、確認 2026-11-01。
 
 - [振替券・空き待ちと入力表示の改善](release-log/unreleased/2034-kenta-train-1031r.md) — 反映履歴、確認 2026-11-01。
-- [リッチメニューの入力案内](release-log/unreleased/0000-kenta-rich-menu-validation-copy.md)：必須入力の案内文末の整形。確認日：2026-11-01。
+
+- [予約案内・クーポンと入力理由の改善](release-log/unreleased/0000-kenta-train-1031s.md) — 反映履歴、確認 2026-11-01。
