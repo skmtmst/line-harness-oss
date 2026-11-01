@@ -9,6 +9,7 @@ import { type BroadcastStepKey } from '@/components/broadcasts/broadcast-steps'
 import ConditionBuilder from '@/components/shared/condition-builder'
 import ConfirmDialog from '@/components/shared/confirm-dialog'
 import Notice from '@/components/shared/notice'
+import TextLink from '@/components/shared/text-link'
 import SendConfirmDialog,{ describeExclusion,shiftedShort,shiftedWhen } from '@/components/shared/send-confirm-dialog'
 import type { BroadcastApprovalCandidate } from '@/lib/api'
 import { type ApiBroadcast,type BroadcastBubble } from '@/lib/api'
@@ -52,6 +53,7 @@ type RenderBroadcastConfirmDialogsContext = {
   needsApproval: boolean
   needsApprovalSingle: boolean
   preflightDialogOpen: boolean
+  selectedAccountId: string | null
   quota: { monthlyUsed: number | null; monthlyLimit: number | null; remaining: number | null; planned: number; state: "available" | "insufficient" | "unavailable"; reason: string | null; } | null
   quotaInsufficient: boolean
   quotaNote: string | null
@@ -77,7 +79,7 @@ type RenderBroadcastConfirmDialogsContext = {
   title: string
 }
 
-export function renderBroadcastConfirmDialogs({ canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
+export function renderBroadcastConfirmDialogs({ canConfirm, confirmationBlocked, confirmationFields, preflightChecks, approvalCandidates, approvalCandidatesState, approvalConfig, approvalConfigState, approvalNote, approverId, audienceCount, broadcastRole, bubbles, cancelLeave, canSendBroadcast, concurrentBroadcasts, conditionDialogOpen, conditionDraft, confirmAudienceLabel, confirmLeave, confirmMessage, confirmOpen, currentStep, error, exclusionNote, goToStep, leaveTarget, needsApproval, needsApprovalSingle, preflightDialogOpen, selectedAccountId, quota, quotaInsufficient, quotaNote, runPreflight, save, saveDraftNow, saving, scheduledDate, scheduledLabel, scheduledTime, sendMode, sendWhenLabel, sendPreview, setApprovalNote, setApproverId, setCondition, setConditionDialogOpen, setConditionDraft, setConfirmOpen, setPreflightDialogOpen, setPreviewSeq, targetMode, title }: RenderBroadcastConfirmDialogsContext) {
   return (<><UnsavedLeaveDialog
       open={leaveTarget !== null}
       subject="配信の変更"
@@ -137,7 +139,7 @@ export function renderBroadcastConfirmDialogs({ canConfirm, confirmationBlocked,
       confirmLabel="対象を見直す"
       cancelLabel="キャンセル"
       designNode="vW4Es"
-      titleIcon={quotaInsufficient ? <AlertTriangle size={20} /> : <CheckCircle2 size={20} />}
+      titleIcon={quotaInsufficient || preflightChecks.some(check => !check.done) ? <AlertTriangle size={20} /> : <CheckCircle2 size={20} />}
       onCancel={() => setPreflightDialogOpen(false)}
       onConfirm={() => {
         setPreflightDialogOpen(false)
@@ -147,6 +149,7 @@ export function renderBroadcastConfirmDialogs({ canConfirm, confirmationBlocked,
       <ul className="space-y-2 rounded-control border border-hairline bg-canvas-sunken p-4 text-sm">
         {preflightChecks.map(check => <li key={check.key} className={check.done ? 'text-success' : 'text-warning'}>{check.done ? '✓' : '⚠'} {check.label}：{check.key === 'audience' ? audienceCount === null ? '対象人数をまだ取得できていません' : `対象人数 ${formatNumber(audienceCount)}人を確認してください` : check.value}</li>)}
       </ul>
+      {(quota === null || quota.state === 'unavailable') && <TextLink inline href={selectedAccountId ? `/accounts/detail?id=${encodeURIComponent(selectedAccountId)}` : '/accounts'}>LINEの接続設定を見る</TextLink>}
     </ConfirmDialog>
 
     {/* 共通の「送る前の確かめ」（U1・板 F94nep／RxxfO）。承認が要るときは、承認者を選ぶ下の窓を使う。 */}

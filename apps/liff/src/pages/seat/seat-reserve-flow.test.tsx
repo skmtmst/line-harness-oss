@@ -76,9 +76,9 @@ function err(status: number, error: string) {
   return Object.assign(new Error(`API ${status}`), { status, body: { success: false, error } });
 }
 
-function open() {
+function open(entry = '/restaurant/reserve/tok') {
   render(
-    <MemoryRouter initialEntries={['/restaurant/reserve/tok']}>
+    <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path="/restaurant/reserve/:token" element={<SeatReserve />} />
       </Routes>
@@ -306,4 +306,48 @@ it('フォームが途中で変わったら読み直し、仮押さえと入力�
  expect(screen.getByRole('textbox',{name:/お名前/})).toHaveProperty('value','予約する方');expect(seat.hold).toHaveBeenCalledTimes(1);
  fireEvent.click(screen.getByRole('button',{name:'予約を確定する'}));await screen.findByText('ご予約を受け付けました');
  expect(vi.mocked(seat.confirm).mock.calls[1]).toEqual(['r1',3,expect.objectContaining({expectedFormVersion:2,customerName:'予約する方'})]);
+});
+
+
+it.each([
+  { id: 'store-main', name: '然 - NEN - 本店', referralId: null },
+  { id: 'store-east', name: '然 - NEN - 東口店', referralId: 'mock-referral' },
+])('リンクの対象店 $name を確認カードに残し、同じ仮押さえを確定する', async store => {
+  const definition = defaultRestaurantReservationForm();
+  vi.mocked(seat.link).mockResolvedValue({ success: true, data: { id: store.id, name: store.name, timezone: 'Asia/Tokyo', reservationForm: { version: 7, definition } } });
+  vi.mocked(seat.hold).mockResolvedValue({ success: true, data: held({ storeId: store.id }) });
+  vi.mocked(seat.confirm).mockResolvedValue({ success: true, data: held({ storeId: store.id, status: 'confirmed', version: 4, holdExpiresAt: null }) });
+  open(`/restaurant/reserve/tok${store.referralId ? `?referralId=${store.referralId}` : ''}`);
+  fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
+  fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
+  const heading = await screen.findByRole('heading', { name: 'ご予約の内容' });
+  const details = heading.closest('[data-design-node]')!.querySelector('details')!;
+  expect(details.open).toBe(true);
+  details.open = false;
+  fireEvent(details, new Event('toggle'));
+  expect(heading.closest('[data-liff-card]')?.textContent).toContain(store.name);
+  expect(details.textContent).not.toContain(store.name);
+  expect(seat.hold).toHaveBeenCalledWith(expect.objectContaining({ storeId: store.id, startsAt: '2026-10-07T10:00:00.000Z', guestCount: 2 }));
+  fireEvent.click(screen.getByRole('button', { name: '予約を確定する' }));
+  await screen.findByText('ご予約を受け付けました');
+  expect(seat.confirm).toHaveBeenCalledWith('r1', 3, { note: null, customerPhone: null, customerName: '山田 花子', allergyNote: null, expectedFormVersion: 7, ...(store.referralId ? { referralId: store.referralId } : {}) });
+});
+
+it('変更予約もリンクの店名を折り畳み外に出し、仮押さえなしで同じ予約と版を送る', async () => {
+  const original = held({ id: 'booking-east', storeId: 'store-east', startsAt: '2026-10-08T10:00:00.000Z', endsAt: '2026-10-08T12:00:00.000Z', status: 'confirmed', version: 9, holdExpiresAt: null });
+  vi.mocked(seat.link).mockResolvedValue({ success: true, data: { id: 'store-east', name: '然 - NEN - 東口店', timezone: 'Asia/Tokyo' } });
+  vi.mocked(seat.mine).mockResolvedValue({ success: true, data: [original] });
+  vi.mocked(seat.reschedule).mockResolvedValue({ success: true, data: { ...original, version: 10 } });
+  open('/restaurant/reserve/tok?view=mine');
+  fireEvent.click(await screen.findByRole('button', { name: '日時・人数を変える' }));
+  fireEvent.click(await screen.findByRole('radio', { name: '19:00 空きあり' }));
+  fireEvent.click(screen.getByRole('button', { name: 'この時刻で進む' }));
+  const heading = await screen.findByRole('heading', { name: 'この内容に変更します' });
+  expect(heading.closest('[data-design-node]')!.querySelector('details')?.open).toBe(false);
+  expect(heading.closest('[data-liff-card]')?.textContent).toContain('然 - NEN - 東口店');
+  expect(seat.hold).not.toHaveBeenCalled();
+  expect(seat.confirm).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'この内容に変える' }));
+  await screen.findByText('ご予約を変更しました');
+  expect(seat.reschedule).toHaveBeenCalledWith('booking-east', { expectedVersion: 9, startsAt: '2026-10-08T10:00:00.000Z', guestCount: 2, courseId: null });
 });

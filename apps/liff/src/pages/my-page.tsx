@@ -18,7 +18,6 @@ import { loadPaymentViews, paymentText, type PaymentView } from '../lib/booking-
 import { utcToJstHm, utcToJstMd, utcToJstWeekday } from '../lib/datetime.js';
 import liff from '@line/liff';
 import liffRuntime from '../lib/liff-runtime.js';
-import { isNotReadyYet } from '../lib/not-ready.js';
 import { logFailure } from '../lib/user-message.js';
 import LiffLookScope from '../components/liff-look-scope.js';
 import LiffHeader from '../components/ui/liff-header.js';
@@ -47,6 +46,14 @@ type RowState =
   | { kind: 'value'; text: string };
 
 const LOADING: RowState = { kind: 'loading' };
+
+/** 未提供と明示された応答だけを準備中にする。通常の取得失敗は再読込へ進める。 */
+function isFeatureNotReady(error: unknown): boolean {
+  if (error === null || typeof error !== 'object') return false;
+  const { status, code } = error as { status?: unknown; code?: unknown };
+  return status === 501 || (status === 503 && typeof code === 'string'
+    && /^[a-z][a-z0-9_]*_storage_not_ready$/.test(code));
+}
 
 /** 回数券・月謝の行の数（「残り 9 回」「今月 あと 2 回」）。 */
 export function entitlementSummary(items: BookingEntitlement[]): string | null {
@@ -138,14 +145,14 @@ export default function MyPage() {
     });
   }, [reloadKey]);
 
-  // 回数券・月謝は本人用APIから取得する。501のときだけ準備中。
+  // 回数券・月謝は本人用APIから取得する。未提供・保存先の準備未了が明示されたときだけ準備中。
   useEffect(() => {
     api.entitlements().then((items) => {
       setTicketItems(items);
       const text = entitlementSummary(items);
       setTickets(text ? { kind: 'value', text } : { kind: 'hidden' });
     }).catch((e) => {
-      if (isNotReadyYet(e)) { setTickets({ kind: 'soon' }); return; }
+      if (isFeatureNotReady(e)) { setTickets({ kind: 'soon' }); return; }
       logFailure('mypage-entitlements', e);
       setTickets({ kind: 'error' });
     });
@@ -186,8 +193,9 @@ export default function MyPage() {
       // 送る側が目的ごとに止められるまでは「宣伝だけ止める」を出さない（組1 の 16）。
       setPrefs(r.purposeSpecificEnforcement === true ? r : 'soon');
     }).catch((e) => {
-      if (!isNotReadyYet(e)) logFailure('mypage-notification-preferences', e);
-      setPrefs(isNotReadyYet(e) ? 'soon' : 'failed');
+      const notReady = isFeatureNotReady(e);
+      if (!notReady) logFailure('mypage-notification-preferences', e);
+      setPrefs(notReady ? 'soon' : 'failed');
     });
   }, [accountId, reloadKey]);
 
@@ -293,7 +301,7 @@ export default function MyPage() {
               {prefs === null ? (
                 <p className="text-[13px] text-liff-sub">読み込んでいます…</p>
               ) : prefs === 'failed' ? (
-                <LoadErrorView onRetry={() => setReloadKey((k) => k + 1)} />
+                <LoadErrorView compact onRetry={() => setReloadKey((k) => k + 1)} />
               ) : prefs === 'soon' ? (
                 <p className="text-[13px] leading-5 text-liff-sub">{`お知らせごとの受け取りの設定は${COMING_SOON}。`}</p>
               ) : (

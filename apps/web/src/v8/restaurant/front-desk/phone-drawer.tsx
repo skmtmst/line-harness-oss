@@ -1,4 +1,6 @@
 'use client'
+import { tableCapacityReason, type RestaurantTableDefinition } from '../booking-kit/table-definition'
+import { DialogNote } from '../booking-kit/parts'
 import { describeApiFailure } from '@/components/shared/api-error-message'
 import Toggle from '@/components/shared/toggle';
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
@@ -50,9 +52,10 @@ function md(day: Date): string {
   return polishFormatDate(day, { style: 'list-day' })
 }
 
-export default function PhoneReservationDrawer({ open, accountId, storeId, tables, onClose, onSaved }: {
+export default function PhoneReservationDrawer({ tableDefinition, open, accountId, storeId, tables, onClose, onSaved }: {
   open: boolean
   accountId: string
+  tableDefinition?: RestaurantTableDefinition
   storeId: string
   tables: RestaurantTable[]
   onClose: () => void
@@ -66,6 +69,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
   const [friend, setFriend] = useState<Friend | null>(null)
   const [name, setName] = useState('')
   const [guests, setGuests] = useState(2)
+  const capacityReason = tableCapacityReason(tableDefinition, accountId, storeId, tables, guests)
   const [dayChoice, setDayChoice] = useState<DayChoice>('today')
   const [picked, setPicked] = useState('')
   const [time, setTime] = useState('')
@@ -255,7 +259,7 @@ export default function PhoneReservationDrawer({ open, accountId, storeId, table
           {!date ? (
             <p className={styles.hint}>日付を選ぶと空いている時刻が出ます。</p>
           ) : times.filter(freeAt).length === 0 ? (
-            <p className={styles.hint}>{`この日に ${guests}名が入る空いた時刻はありません。`}</p>
+            capacityReason ? <DialogNote>{capacityReason}</DialogNote> : <p className={styles.hint}>{`この日に ${guests}名が入る空いた時刻はありません。`}</p>
           ) : (
             <div className={styles.timeChips} role="group" aria-labelledby="e2-times">
               {times.filter(freeAt).map((label) => (

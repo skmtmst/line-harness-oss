@@ -7,7 +7,8 @@ import { PageChromeProvider } from './page-chrome'
 const state = vi.hoisted(() => ({ query: '', replace: vi.fn() }))
 const router = { replace: state.replace }
 vi.mock('next/navigation', () => ({ useSearchParams: () => new URLSearchParams(state.query) }))
-vi.mock('@/components/shared/list-navigation', () => ({ useListNavigationRouter: () => router }))
+vi.mock('@/components/shared/list-navigation', async importOriginal => ({
+  ...await importOriginal<typeof import('@/components/shared/list-navigation')>(), useListNavigationRouter: () => router }))
 afterEach(() => { cleanup(); state.replace.mockClear(); window.history.replaceState(null, '', '/') })
 
 it.each([

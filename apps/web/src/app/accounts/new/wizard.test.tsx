@@ -423,6 +423,7 @@ describe('LINEアカウント作成ウィザード', () => {
   })
 
   it('引き継ぎ要求が失敗しても理由を示し、画面を開いている間に再試行する', async () => {
+    calls.followerImportState.mockImplementation(() => new Promise(() => {}))
     calls.connect.mockResolvedValue({
       success: true,
       data: { ...checked.data, id: 'retry-account', followerImport: { capability: 'available', phase: 'importing_ids' } },

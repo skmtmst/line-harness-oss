@@ -114,13 +114,16 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
   const hasEmptyBookingAction = tab === 'main' && range === 'today' && today && !search && (emptyBookingState === 'no-bookings' || emptyBookingState === 'no-classes')
   const writeLock = role === null ? undefined : lockUnless(canWrite)
   const viewErrors = useSaveFormErrors()
+  const restaurantStoreReady = Boolean(accountId && !store.loading && !store.error && store.tableDefinition?.accountId === accountId && store.tableDefinition.snapshot === store.snapshot && store.store && store.snapshot?.stores.includes(store.store))
+  const storeLock = restaurantStoreReady ? undefined : !store.loading || store.error ? '店舗情報を確認できません。読み直してからお試しください。' : '店舗情報を読み込んでいます。確認が終わるまでお待ちください。'
+  const reservationLock = cfg.walkIn ? storeLock ?? (!today ? failed ? '予約情報を確認できません。読み直してからお試しください。' : '予約情報を読み込んでいます。確認が終わるまでお待ちください。' : undefined) : undefined
   const headActions = (
     <>
-      {cfg.walkIn && store.store ? <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setWalkInOpen(true) }}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
+      {cfg.walkIn ? <Button disabled={role === null} lockedReason={writeLock || storeLock} onClick={() => { if (canWrite && restaurantStoreReady) setWalkInOpen(true) }}><UserPlus size={16} aria-hidden="true" />ウォークイン</Button> : null}
       <Button lockedReason={writeLock} {...(canWrite ? { href: '/broadcasts' } : { disabled: role === null })}><MessageCircle size={16} aria-hidden="true" />LINE を送る</Button>
       <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setClosureOpen(true) }}><CalendarX2 size={16} aria-hidden="true" />休みを入れる</Button>
       <Button disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) setViewOpen(true) }}><SlidersHorizontal size={16} aria-hidden="true" />表示を変える</Button>
-      {today && !hasEmptyBookingAction ? <Button variant="primary" disabled={role === null} lockedReason={writeLock} onClick={() => { if (canWrite) addNew() }}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button> : null}
+      {cfg.walkIn || (today && !hasEmptyBookingAction) ? <Button variant="primary" disabled={role === null} lockedReason={writeLock || reservationLock} onClick={() => { if (canWrite && (!cfg.walkIn || (restaurantStoreReady && today))) addNew() }}><Plus size={16} aria-hidden="true" />{cfg.primary}</Button> : null}
     </>
   )
 
@@ -267,9 +270,9 @@ export default function StyleDashboard({ style }: { style: IndustryStyle }) {
       <div className={styles.content}><CalendarPeriod period={view === 'calendar' && today ? range === 'month' ? date.slice(0, 7) : today.week?.days[0]?.date ?? date : ''} scope={`${accountId}/${style}/${view}/${range}`}>{body}</CalendarPeriod></div>
       {style === 'restaurant' && store.store ? (
         <>
-          <PhoneReservationDrawer open={phoneOpen} accountId={store.accountId} storeId={store.store.id} tables={tables} onClose={() => setPhoneOpen(false)}
+          <PhoneReservationDrawer tableDefinition={store.tableDefinition} open={phoneOpen} accountId={store.accountId} storeId={store.store.id} tables={tables} onClose={() => setPhoneOpen(false)}
             onSaved={({ lineFailed }) => { setPhoneOpen(false); notifyToast(lineFailed ? '予約は入れました。LINE の確認は送れていません。' : '予約を入れました。', lineFailed ? { tone: 'error' } : undefined); void reload() }} />
-          <WalkInDialog open={walkInOpen} accountId={store.accountId} storeId={store.store.id} tables={tables} onClose={() => setWalkInOpen(false)}
+          <WalkInDialog tableDefinition={store.tableDefinition} open={walkInOpen} accountId={store.accountId} storeId={store.store.id} tables={tables} onClose={() => setWalkInOpen(false)}
             onSaved={({ seated }) => { setWalkInOpen(false); notifyToast(seated ? '入店にしました。' : '席は取りました。来店の印は付けられませんでした。表の［来店］を押してください。', seated ? undefined : { tone: 'error' }); void reload() }} />
         </>
       ) : null}

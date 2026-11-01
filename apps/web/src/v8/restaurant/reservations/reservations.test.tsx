@@ -20,7 +20,7 @@ import ReservationsPage from './reservations'
 import { verifiedStaffRole } from '@/test-utils/verified-staff-role'
 import { forgetSessionSnapshot } from '@/lib/session-snapshot'
 import { PERMISSION_LOCK_REASON } from '@/components/shared/permission-lock'
-import { at, reservation, snapshotOf } from '../booking-kit/test-data'
+import { at, reservation, snapshotOf, tables } from '../booking-kit/test-data'
 
 /* 今日：佐藤（LINE・T1）・山田（食べログ・承認待ち・T3・乳）・押さえ（T4）。 */
 const reservationsToday = () => [
@@ -381,4 +381,16 @@ it('座席表が読めなくても時間と一覧の取得済み予約は残す'
   fireEvent.click(screen.getByRole('button',{name:'一覧',exact:true}))
   expect(await screen.findByRole('button',{name:'山田 太郎',exact:true})).toBeTruthy()
   expect(await screen.findByText('座席表を読み込めませんでした')).toBeTruthy()
+})
+
+it('通常取得の卓定義を電話画面へ渡し、人数が全卓と結合の最大を超える理由を出す（追加取得なし）', async () => {
+  const configured = tables.filter(table => table.is_active).map(table => ({ ...table, max_capacity: Math.min(table.max_capacity, 6) }))
+  fixture.snapshot.mockResolvedValue({ data: snapshotOf({ tables: configured, reservations: [], reservationTotal: 0 }) })
+  fixture.reservationsDay.mockResolvedValue({ data: { reservations: [], closures: [] } })
+  render(<ReservationsPage />)
+  fireEvent.click(await screen.findByRole('button', { name: '電話の予約を入れる' }))
+  fireEvent.change(screen.getByLabelText('人数'), { target: { value: '7' } })
+  expect(await screen.findAllByText('結合を含め最大6名のため、7名は入れません。')).toHaveLength(1)
+  expect(fixture.snapshot).toHaveBeenCalledTimes(1)
+  expect(fixture.createReservation).not.toHaveBeenCalled()
 })
