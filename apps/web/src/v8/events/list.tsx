@@ -92,6 +92,20 @@ function whenText(iso: string | null): string {
   return iso ? `${jstDay(iso)}${jstTime(iso)}` : '日時未設定'
 }
 
+function displaySlot(item: EventListItem): { startsAt: string | null; label: string | null } {
+  if (item.next_slot_starts_at) return { startsAt: item.next_slot_starts_at, label: '次の回' }
+  const past = item.latest_past_slot_starts_at
+  const date = past?.match(/^((\d{4})-(\d{2})-(\d{2}))T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/)
+  const calendar = date ? new Date(`${date[1]}T00:00:00Z`) : null
+  if (past && date && calendar && Number.isFinite(Date.parse(past))
+    && calendar.getUTCFullYear() === Number(date[2])
+    && calendar.getUTCMonth() + 1 === Number(date[3])
+    && calendar.getUTCDate() === Number(date[4])) {
+    return { startsAt: past, label: '直近の回' }
+  }
+  return { startsAt: null, label: null }
+}
+
 function toContextMenuItems(menuItems: ActionMenuItem[]): ContextMenuItem[] {
   return menuItems.map((item) => ({
     id: item.id,
@@ -535,7 +549,8 @@ export default function EventsListV8() {
               const state = eventRowState(e)
               const menuItems = rowMenuItems(e)
               const low = state === 'open' && isLowApplication(e)
-              const when = whenText(e.next_slot_starts_at)
+              const slot = displaySlot(e)
+              const when = whenText(slot.startsAt)
               return (
                 <Tr key={e.id} data-row-id={e.id} selected={folderMove.isSelected(e.id) || highlightedId === e.id} detailKey="event" onOpen={() => openDetail(e.id)}>
                   <NameCell selection={folderMove.checkbox(e)} name={(
@@ -552,7 +567,7 @@ export default function EventsListV8() {
                   />
                   <Td>
                     <span className={styles.whenMain} title={when}>{when}</span>
-                    <span className={styles.whenSub}>{e.next_slot_starts_at ? '次の回' : emptyValue('unknown')}</span>
+                    <span className={styles.whenSub}>{slot.label ?? emptyValue('unknown')}</span>
                   </Td>
                   <Td align="right" className={styles.num}>{`${e.total_active} / ${e.total_capacity ?? emptyValue('unknown')}`}</Td>
                   <Td align="right" className={styles.num}>
@@ -611,7 +626,7 @@ export default function EventsListV8() {
       <DetailPanel
         open={active !== null}
         title={active?.name ?? ''}
-        description={active ? `${whenText(active.next_slot_starts_at)}${active.venue_name ? `・${active.venue_name}` : ''}` : undefined}
+        description={active ? `${whenText(displaySlot(active).startsAt)}${active.venue_name ? `・${active.venue_name}` : ''}` : undefined}
         onClose={closeDetail}
         hasPrev={activeIndex > 0}
         hasNext={activeIndex >= 0 && activeIndex < items.length - 1}
