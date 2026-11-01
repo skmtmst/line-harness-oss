@@ -1126,4 +1126,4 @@
 
 - [振替券・空き待ちと入力表示の改善](release-log/unreleased/2034-kenta-train-1031r.md) — 反映履歴、確認 2026-11-01。
 
-- [予約案内・クーポンと入力理由の改善](release-log/unreleased/0000-kenta-train-1031s.md) — 反映履歴、確認 2026-11-01。
+- [予約案内・クーポンと入力理由の改善](release-log/unreleased/2035-kenta-train-1031s.md) — 反映履歴、確認 2026-11-01。
