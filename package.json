@@ -24,6 +24,7 @@
     "typecheck:scripts": "tsc -p scripts/tsconfig.json",
     "deploy:lock": "tsx scripts/deploy/deploy-lock.ts",
     "deploy:preflight": "tsx scripts/deploy/preflight.ts",
+    "deploy:production:worker:manual": "tsx scripts/deploy/production/manual-worker.ts",
     "deploy:staging": "bash scripts/deploy/staging-deploy.sh",
     "build:bundle": "tsx scripts/release/build-bundle.ts",
     "qa:mock": "node scripts/visual-qa/mock-api.mjs",
