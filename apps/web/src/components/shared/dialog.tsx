@@ -78,6 +78,8 @@ export type DialogProps = {
   /** 操作の左に出す現在の手順など。 */
   footerLead?: ReactNode
   title: string
+  /** 題の文字列と読み上げを保ったまま、省略などの表示を指定する。 */
+  titleContent?: ReactNode
   description?: string
   tone?: 'default' | 'destructive'
   /**
@@ -165,6 +167,7 @@ export default function Dialog({
   stepKey,
   footerLead,
   title,
+  titleContent,
   description,
   tone = 'default',
   descriptionBand,
@@ -268,7 +271,7 @@ export default function Dialog({
   const titleNode = (
     <h2 id={titleId} className={`${styles.title} ${tone === 'destructive' ? styles.destructiveTitle : styles.standardTitle}`} data-has-heading-icon={Boolean(titleIcon || shownHeaderIcon) || undefined}>
       {titleIcon || shownHeaderIcon ? <span className={styles.headerIcon} aria-hidden="true">{titleIcon || shownHeaderIcon}</span> : null}
-      <span>{typeof title === 'string' && tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title}</span>
+      <span>{titleContent ?? (typeof title === 'string' && tone === 'destructive' && isDeleteConfirmation(confirmLabel) ? normalizeDeleteTitle(title) : title)}</span>
     </h2>
   )
   /*  解除の桃箱は「題は箱の外・説明だけ箱の中」のため、題と説明を分けておく。
@@ -296,6 +299,7 @@ export default function Dialog({
       aria-describedby={description ? descriptionId : undefined}
       aria-busy={busy || undefined}
       tabIndex={-1}
+      data-title-content={titleContent != null || undefined}
       data-closing={leaving || undefined}
       data-size={size}
       data-design-layout={designLayout}

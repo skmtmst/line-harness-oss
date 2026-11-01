@@ -1,11 +1,13 @@
 'use client'
+import TruncatedText from '@/components/shared/truncated-text'
+import CommonVarDeleteFields from './delete-fields'
 import StatusBadge from '@/components/shared/status-badge'
 import { DetailContent, DetailField, DetailInlineEdit } from '@/components/shared/detail-content'
 
 import type { CommonVarDeleteImpactItem } from '@line-crm/shared'
 
 import Button from '@/components/shared/button'
-import ConfirmDialog from '@/components/shared/confirm-dialog'
+import ConfirmDialog, { deleteConfirmationTitle } from '@/components/shared/confirm-dialog'
 import DetailPanel from '@/components/shared/detail-panel'
 import Dialog,{ DialogActions } from '@/components/shared/dialog'
 import Disclosure from '@/components/shared/disclosure'
@@ -25,7 +27,7 @@ import { Pause,TriangleAlert } from 'lucide-react'
 import type { Dispatch,RefObject,SetStateAction } from 'react'
 import { formatListDate,formatVarValue } from './list-model'
 import styles from './list.module.css'
-import { blockedReason,canDelete as canDeleteVar,checkedAtText,consequenceText,placeholderText,reasonRequirement,splitItems,typedKeyRequirement,unavailableText,usageText } from './model'
+import { blockedReason,canDelete as canDeleteVar,checkedAtText,consequenceText,placeholderText,reasonRequirement,splitItems,unavailableText,usageText } from './model'
 import { TextField as SharedTextField } from '@/components/shared/text-field'
 
 type RenderCommonVarDialogsContext = {
@@ -167,11 +169,8 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
         designHeaderPadding="24px 24px 0"
         /* 絵 ：まだ消せないときは赤い題にしない（差し替え・止めるへ導く窓）。消せるときだけ赤。 */
         tone={deleteImpact && !deleteImpact.canDelete ? 'default' : 'destructive'}
-        title={deleteTarget
-          ? deleteImpact && !deleteImpact.canDelete
-            ? `「${deleteTarget.name}」はまだ消せません`
-            : `「${deleteTarget.name}」を消しますか？`
-          : ''}
+        title={deleteTarget ? deleteImpact && !deleteImpact.canDelete ? '「' + deleteTarget.name + '」はまだ消せません' : deleteConfirmationTitle(deleteTarget.name) : ''}
+        titleContent={deleteTarget ? <TruncatedText value={deleteImpact && !deleteImpact.canDelete ? '「' + deleteTarget.name + '」はまだ消せません' : deleteConfirmationTitle(deleteTarget.name)} /> : undefined}
         busy={deleteBusy}
         error={deleteError || undefined}
         onCancel={closeDelete}
@@ -201,10 +200,11 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
               >
                 止める
               </Button>) : null}
-            {deletePhase === 'ready' && deleteImpact && deleteImpact.canDelete
-              && canDeleteVar({ impact: deleteImpact, typedKey, reason: deleteReason, busy: deleteBusy }) ? (<Button
+            {deletePhase === 'ready' && deleteImpact && deleteImpact.canDelete ? (<Button
                   type="button"
                   variant="danger"
+                  disabled={!canDeleteVar({ impact: deleteImpact, typedKey, reason: deleteReason, busy: deleteBusy })}
+                  disabledReason={blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason }) ?? undefined}
                   onClick={() => void confirmDirectDelete()}
                   busy={deleteBusy}
                   busyLabel="処理中…"
@@ -215,6 +215,7 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
       >
         {deleteTarget ? (
           <div className={`${styles.dialogBody} ${styles.deleteBody}`}>
+            <DetailField label="削除する共通情報" multiline>{deleteTarget.name}</DetailField>
             {/* 絵 xxKtW：説明は窓の横いっぱい（×の列の下まで）。共通の窓の説明は×の左までなので本文側に置く。 */}
             <p className={styles.deleteLead}>
               {deleteImpact && !deleteImpact.canDelete
@@ -353,27 +354,8 @@ export function renderCommonVarDialogs({ activeIndex, activeItem, activeStopped,
                   <p className={styles.dialogHint}>{unavailableText(deleteImpact)}</p>
                 ) : null}
 
-                <Field label={deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'} requirement={reasonRequirement} error={deleteError && reasonRequirement.check(deleteReason)}><SaveErrorField names={["deleteReason","changeReason","reason","delete_reason"]}><SharedTextField
-                    aria-label={deleteImpact.canDelete ? '消した理由（記録に残ります）' : '消した理由・止める理由（記録に残ります）'}
-                    aria-required={reasonRequirement.required}
-                    value={deleteReason}
-                    onChange={(e) => setDeleteReason(e.target.value)}
-                    placeholder="店舗情報の変更のため"
-                    className={styles.dialogInput}
-                  /></SaveErrorField></Field>
-
-                {deleteImpact.canDelete ? (
-                  <Field label="削除する場合は、差し込みキーを入力してください" requirement={typedKeyRequirement(deleteImpact)}><SaveErrorField names={["typedKey","typed_key"]}><SharedTextField
-                      value={typedKey}
-                      onChange={(e) => setTypedKey(e.target.value)}
-                      placeholder={placeholderText(deleteImpact.variable.varKey)}
-                      className={styles.dialogInput}
-                    /></SaveErrorField></Field>
-                ) : null}
-
-                {deleteImpact.canDelete && blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason }) ? (
-                  <p className={styles.dialogHint}>{blockedReason({ impact: deleteImpact, typedKey, reason: deleteReason })}</p>
-                ) : null}
+                <CommonVarDeleteFields key={deleteTarget.id} impact={deleteImpact} reason={deleteReason}
+                  typedKey={typedKey} onReasonChange={setDeleteReason} onTypedKeyChange={setTypedKey} error={deleteError} />
 
                 <Disclosure title="確認した範囲" size="compact"><p className={styles.dialogHint}>
                   {checkedAtText(deleteImpact.checkedAt)} 時点で、テンプレート・一斉配信・シナリオ・リマインダ・自動応答・回答フォーム・オートメーション・友だち追加時・共通アクションの9種類を確認しました。
