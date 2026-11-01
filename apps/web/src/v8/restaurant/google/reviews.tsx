@@ -434,7 +434,7 @@ export function ReviewDraft({ accountId, reviewId, data, go, onPublished }: { ac
       </div>
       <UnsavedLeaveDialog
         open={leaveTarget !== null}
-        description="このまま移ると、返信文の変更は失われます。下書き保存をしてから移るか、保存せずに移ってください。"
+        subject="返信文の変更"
         onConfirm={confirmLeave}
         onCancel={cancelLeave}
       />
