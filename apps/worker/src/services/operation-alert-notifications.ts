@@ -1,10 +1,12 @@
 import { LineClient } from '@line-crm/line-sdk';
 
 import type { Env } from '../worker-env.js';
+import { fetchQuotaDetails } from '../features/broadcasts/broadcast-quota-guard/index.js';
 import { sendOperationEmail } from './operation-notifications.js';
 
 type OutboxRow = {
   id: string;
+  line_account_id: string;
   channel: 'line' | 'email';
   staff_id: string;
   email: string | null;
@@ -17,6 +19,21 @@ type OutboxRow = {
 };
 
 export const OPERATION_ALERT_NOTIFICATION_LEASE_MS = 10 * 60_000;
+// 運用アラートは管理画面にも残る。古い通知だけで月初のLINE配信枠を消費しない。
+const LINE_ALERT_MAX_AGE_MS = 6 * 60 * 60_000;
+const LINE_ALERT_MAX_ATTEMPTS = 24;
+const LINE_ALERT_MONTHLY_MAX = 20;
+const JST_OFFSET_MS = 9 * 60 * 60_000;
+
+function jstMonthBoundsUtc(now: Date): { start: string; end: string } {
+  const jst = new Date(now.getTime() + JST_OFFSET_MS);
+  const year = jst.getUTCFullYear();
+  const month = jst.getUTCMonth();
+  return {
+    start: new Date(Date.UTC(year, month, 1, -9)).toISOString(),
+    end: new Date(Date.UTC(year, month + 1, 1, -9)).toISOString(),
+  };
+}
 
 /**
  * 解消・確認の知らせに使う短い名前。summaryは「〜があります」という
@@ -61,6 +78,9 @@ export async function processOperationAlertNotificationOutbox(
 ): Promise<{ sent: number; failed: number }> {
   const now = new Date().toISOString();
   const leaseExpiresAt = new Date(Date.parse(now) + OPERATION_ALERT_NOTIFICATION_LEASE_MS).toISOString();
+  const freshnessCutoff = new Date(Date.parse(now) - LINE_ALERT_MAX_AGE_MS).toISOString();
+  const month = jstMonthBoundsUtc(new Date(now));
+  const quotaByAccount = new Map<string, ReturnType<typeof fetchQuotaDetails>>();
   // 設定をオフにする前に積まれた行も送らない。削除して再試行対象から外す。
   await env.DB.prepare(
     `DELETE FROM operation_alert_notification_outbox
@@ -91,7 +111,7 @@ export async function processOperationAlertNotificationOutbox(
         )`,
   ).bind(now).run();
   const rows = await env.DB.prepare(
-    `SELECT o.id, o.channel, o.staff_id, sm.email, sm.line_user_id, la.channel_access_token,
+    `SELECT o.id, o.line_account_id, o.channel, o.staff_id, sm.email, sm.line_user_id, la.channel_access_token,
             e.action, e.severity, e.summary, a.check_key
        FROM operation_alert_notification_outbox o
        JOIN operation_alert_events e ON e.id = o.event_id
@@ -100,16 +120,40 @@ export async function processOperationAlertNotificationOutbox(
        JOIN line_accounts la ON la.id = o.line_account_id
       WHERE o.status IN ('queued', 'failed', 'sending') AND o.next_attempt_at <= ?
         AND la.is_active = 1 AND COALESCE(o.last_error, '') != 'account_inactive'
+        AND (o.channel != 'line' OR (e.created_at >= ? AND o.attempt_count < ?))
       ORDER BY o.next_attempt_at, o.id LIMIT ?`,
-  ).bind(now, Math.max(1, Math.min(limit, 100))).all<OutboxRow>();
+  ).bind(now, freshnessCutoff, LINE_ALERT_MAX_ATTEMPTS, Math.max(1, Math.min(limit, 100))).all<OutboxRow>();
   let sent = 0;
   let failed = 0;
   for (const row of rows.results ?? []) {
+    if (row.channel === 'line') {
+      if (!row.channel_access_token) continue;
+      const quotaPromise = quotaByAccount.get(row.line_account_id) ?? fetchQuotaDetails(row.channel_access_token);
+      quotaByAccount.set(row.line_account_id, quotaPromise);
+      const quota = await quotaPromise;
+      // 使用数を確認できない場合は運用アラートを送らず、顧客向けの枠を優先する。
+      if (quota.used === null || quota.failures.length > 0) continue;
+      if (quota.limit !== null) {
+        const reserve = Math.max(1, Math.ceil(quota.limit * 0.1));
+        if (quota.used >= quota.limit - reserve) continue;
+      }
+    }
     const claimed = await env.DB.prepare(
       `UPDATE operation_alert_notification_outbox
           SET status = 'sending', attempt_count = attempt_count + 1,
               next_attempt_at = ?, updated_at = ?
         WHERE id = ? AND status IN ('queued', 'failed', 'sending') AND next_attempt_at <= ?
+          AND (channel != 'line' OR (attempt_count < ? AND EXISTS (
+            SELECT 1 FROM operation_alert_events e
+             WHERE e.id = operation_alert_notification_outbox.event_id AND e.created_at >= ?
+          )))
+          AND (channel != 'line' OR (
+            SELECT COUNT(*) FROM operation_alert_notification_outbox counted
+             WHERE counted.line_account_id = operation_alert_notification_outbox.line_account_id
+               AND counted.channel = 'line'
+               AND ((counted.status = 'sent' AND counted.sent_at >= ? AND counted.sent_at < ?)
+                 OR (counted.status = 'sending' AND counted.updated_at >= ? AND counted.updated_at < ?))
+          ) < ?)
           AND COALESCE(last_error, '') != 'account_inactive'
           AND NOT EXISTS (SELECT 1 FROM staff_members sm
             WHERE sm.id = operation_alert_notification_outbox.staff_id
@@ -120,7 +164,8 @@ export async function processOperationAlertNotificationOutbox(
                   END = 0)
           AND EXISTS (SELECT 1 FROM line_accounts la
             WHERE la.id = operation_alert_notification_outbox.line_account_id AND la.is_active = 1)`,
-    ).bind(leaseExpiresAt, now, row.id, now).run();
+    ).bind(leaseExpiresAt, now, row.id, now, LINE_ALERT_MAX_ATTEMPTS, freshnessCutoff,
+      month.start, month.end, month.start, month.end, LINE_ALERT_MONTHLY_MAX).run();
     if (Number(claimed.meta?.changes ?? 0) !== 1) continue;
     try {
       const text = alertText(row);
