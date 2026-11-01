@@ -111,7 +111,7 @@ function TablesBoard({ ctx, addRequest }: { ctx: RestaurantV8Context;addRequest:
   /* この卓に入っている、これから先の予約（取消・無断キャンセル・来店済みは除く）。 */
   const upcoming = useMemo(() => (stopping
     ? data.reservations
-      .filter((item) => seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(stopping.id) && !['cancelled', 'no_show', 'completed'].includes(item.status))
+      .filter((item) => seatBoardEntry(item as unknown as Record<string,unknown>).resourceIds.includes(stopping.id) && !['cancelled', 'no_show', 'completed', 'visited', 'seated'].includes(item.status) && !item.departed_at)
       .filter((item) => new Date(item.ends_at).getTime() > now)
       .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
     : []), [data.reservations, stopping, now])
