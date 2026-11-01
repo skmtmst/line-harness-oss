@@ -26,9 +26,9 @@ export function activeDeployment(value: unknown): Active {
   return { deploymentId: deployment.id, versionId: version.version_id };
 }
 
-export function assertManualArgs(args: string[]): { apply: boolean; approvalRef: string; parent: string; recordDir: string; targetCheckout: string; stagingVersion: string; stagingDeployment: string } {
+export function assertManualArgs(args: string[]): { apply: boolean; approvalRef: string; parent: string; recordDir: string; targetCheckout: string; stagingVersion: string; stagingDeployment: string; stagingProofFile: string } {
   const apply = args.includes('--apply');
-  const allowed = ['--apply', '--dry-run', '--approval-ref', '--parent-repo', '--record-dir', '--target-checkout', '--staging-version', '--staging-deployment'];
+  const allowed = ['--apply', '--dry-run', '--approval-ref', '--parent-repo', '--record-dir', '--target-checkout', '--staging-version', '--staging-deployment', '--staging-proof-file'];
   if (args.some(arg => arg.startsWith('--') && !allowed.includes(arg))) throw new Error('unknown_argument');
   if (apply && args.includes('--dry-run')) throw new Error('conflicting_mode');
   const flag = (name: string): string => {
@@ -41,10 +41,12 @@ export function assertManualArgs(args: string[]): { apply: boolean; approvalRef:
   const targetCheckout = flag('--target-checkout') || process.cwd();
   const stagingVersion = flag('--staging-version');
   const stagingDeployment = flag('--staging-deployment');
+  const stagingProofFile = flag('--staging-proof-file');
   if (apply && !/^https:\/\/github\.com\/[^/]+\/[^/]+\/(?:issues|pull)\/\d+(?:#.*)?$/.test(approvalRef)) throw new Error('approval_record');
   if (!isAbsolute(parent) || !isAbsolute(recordDir) || !isAbsolute(targetCheckout) || resolve(recordDir).startsWith(`${resolve(targetCheckout)}${sep}`)) throw new Error('paths');
   if (![stagingVersion, stagingDeployment].every(value => /^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(value))) throw new Error('staging_proof_ids');
-  return { apply, approvalRef, parent, recordDir, targetCheckout, stagingVersion, stagingDeployment };
+  if (stagingProofFile && !isAbsolute(stagingProofFile)) throw new Error('staging_proof_path');
+  return { apply, approvalRef, parent, recordDir, targetCheckout, stagingVersion, stagingDeployment, stagingProofFile };
 }
 
 export function assertRecordDirectory(path: string, checkout = process.cwd(), parent?: string): string {
@@ -96,14 +98,25 @@ export function assertStagingDeployment(value: unknown, versionId: string): void
   if (data?.versions?.length !== 1 || data.versions[0]?.version_id !== versionId || data.versions[0]?.percentage !== 100) throw new Error('staging_deployment_mismatch');
 }
 
-async function stagingProof(sha: string, versionId: string, deploymentId: string): Promise<void> {
+export function assertSavedStagingProof(value: unknown, sha: string, versionId: string, deploymentId: string): void {
+  const proof = value as Record<string, unknown>;
+  if (proof?.candidate_sha !== sha || proof.candidate_version_id !== versionId ||
+      proof.candidate_deployment_id !== deploymentId || proof.candidate_health_status !== 'ok' ||
+      proof.db_migrations_applied !== 0 || typeof proof.recorded_at !== 'string' ||
+      Number.isNaN(Date.parse(proof.recorded_at))) throw new Error('staging_saved_proof_mismatch');
+}
+
+async function stagingProof(sha: string, versionId: string, deploymentId: string, proofFile: string): Promise<void> {
   const name = 'nen-line-stg';
   const version = wranglerJson(['versions', 'view', versionId, '--name', name]);
   if (version?.id !== versionId || versionCommit(version) !== sha) throw new Error('staging_version_sha');
   const deployments = wranglerJson(['deployments', 'list', '--name', name]);
   const deployment = Array.isArray(deployments) ? deployments.find(value => value.id === deploymentId) : null;
-  if (deployment?.id !== deploymentId) throw new Error('staging_deployment_id');
-  assertStagingDeployment(deployment, versionId);
+  if (deployment?.id === deploymentId) { assertStagingDeployment(deployment, versionId); return; }
+  if (!proofFile) throw new Error('staging_deployment_not_recent');
+  const path = realpathSync(proofFile), stats = statSync(path);
+  if (!stats.isFile() || (stats.mode & 0o077) !== 0) throw new Error('staging_proof_file_unsafe');
+  assertSavedStagingProof(JSON.parse(readFileSync(path, 'utf8')), sha, versionId, deploymentId);
 }
 
 export function backupBookmark(value: unknown): string {
@@ -161,7 +174,7 @@ async function run(args: string[]): Promise<void> {
   process.chdir(realpathSync(options.targetCheckout));
   const sha = options.apply ? preflight(options.parent, options.approvalRef) : sourcePreflight(options.parent);
   const name = productionIdentity();
-  await stagingProof(sha, options.stagingVersion, options.stagingDeployment);
+  await stagingProof(sha, options.stagingVersion, options.stagingDeployment, options.stagingProofFile);
   process.env.APPROVED_MIGRATIONS = '[]';
   assertNoPending();
   command('pnpm', ['--filter', 'worker', 'build']);
@@ -183,7 +196,7 @@ async function run(args: string[]): Promise<void> {
   writeFileSync(receipt, JSON.stringify({ sha, before, backup, phase: 'backed_up', recordedAt: new Date().toISOString() }, null, 2), { flag: 'wx', mode: 0o600 });
 
   if (preflight(options.parent, options.approvalRef) !== sha) throw new Error('source_changed');
-  await stagingProof(sha, options.stagingVersion, options.stagingDeployment);
+  await stagingProof(sha, options.stagingVersion, options.stagingDeployment, options.stagingProofFile);
   assertNoPending();
   const latest = await currentActive(name);
   if (latest.versionId !== before.versionId || latest.deploymentId !== before.deploymentId) throw new Error('concurrent_production_deploy');

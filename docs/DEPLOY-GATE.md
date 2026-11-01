@@ -216,6 +216,9 @@ D1 migration、管理画面 Pages、設定変更、配信の実行には使用�
 `codex/development` の通常検証と異なる候補を検証環境へ一時配備するときは、
 検証環境への影響について別途承認を得て、検証ロックを取り、元の版を記録して戻します。
 検証後は元の版へ戻し、復元した版IDと公開SHAを照合します。
+検証から配備までの間に新しい検証配備が10件を超えた場合、Wrangler の履歴一覧から
+候補配備IDが消えます。その場合は検証時に保存した権限限定の記録ファイルを
+`--staging-proof-file` で指定し、Cloudflare に残る候補版のSHAと照合します。
 
 1. `main` を最新にし、親・子の作業ツリーをクリーンにする。配備ゲートはレビュー済みの専用ブランチで実行し、`--target-checkout` で対象のクリーンな `main` 作業ツリーを指定する。これによりゲートの追加で対象SHAが変わらない。
 2. 変更対象の関連テスト、Workerビルド、セキュリティ検査を通し、対象SHAを記録する。
@@ -232,7 +235,8 @@ pnpm deploy:production:worker:manual \
   --record-dir '/absolute/path/to/private-release-records' \
   --target-checkout '/absolute/path/to/clean-main-checkout' \
   --staging-version '<candidate-worker-version-id>' \
-  --staging-deployment '<candidate-100-percent-deployment-id>'
+  --staging-deployment '<candidate-100-percent-deployment-id>' \
+  --staging-proof-file '/absolute/path/to/private-staging-proof.json'
 
 # 本番への適用は、上のdry-runとMasatoの個別承認を確認し、ロック取得・操作停止後だけ
 OPERATIONS_PAUSED=true \
@@ -242,7 +246,8 @@ pnpm deploy:production:worker:manual \
   --record-dir '/absolute/path/to/private-release-records' \
   --target-checkout '/absolute/path/to/clean-main-checkout' \
   --staging-version '<candidate-worker-version-id>' \
-  --staging-deployment '<candidate-100-percent-deployment-id>' --apply
+  --staging-deployment '<candidate-100-percent-deployment-id>' \
+  --staging-proof-file '/absolute/path/to/private-staging-proof.json' --apply
 ```
 
 配備後に異常があればreceiptの `before.versionId` を読み、原因と影響を確認してから

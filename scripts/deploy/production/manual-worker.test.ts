@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync, chmodSync, realpathSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { activeDeployment, assertManualArgs, assertRecordDirectory, assertStagingDeployment, backupBookmark, verifyHotfixResponses, versionCommit } from './manual-worker.js';
+import { activeDeployment, assertManualArgs, assertRecordDirectory, assertSavedStagingProof, assertStagingDeployment, backupBookmark, verifyHotfixResponses, versionCommit } from './manual-worker.js';
 
 const uuidA = '11111111-1111-4111-8111-111111111111';
 const uuidB = '22222222-2222-4222-8222-222222222222';
@@ -46,6 +46,10 @@ describe('manual Worker production gate', () => {
     expect(() => assertStagingDeployment({ versions: [{ version_id: uuidA, percentage: 100 }] }, uuidA)).not.toThrow();
     expect(() => assertStagingDeployment({ versions: [{ version_id: uuidA, percentage: 50 }] }, uuidA)).toThrow('staging_deployment_mismatch');
     expect(() => assertStagingDeployment({ versions: [{ version_id: uuidB, percentage: 100 }] }, uuidA)).toThrow('staging_deployment_mismatch');
+    const proof = { recorded_at: '2026-10-31T15:02:08Z', candidate_sha: sha, candidate_version_id: uuidA, candidate_deployment_id: uuidB, candidate_health_status: 'ok', db_migrations_applied: 0 };
+    expect(() => assertSavedStagingProof(proof, sha, uuidA, uuidB)).not.toThrow();
+    expect(() => assertSavedStagingProof({ ...proof, candidate_health_status: 'failed' }, sha, uuidA, uuidB)).toThrow('staging_saved_proof_mismatch');
+    expect(() => assertSavedStagingProof({ ...proof, db_migrations_applied: 1 }, sha, uuidA, uuidB)).toThrow('staging_saved_proof_mismatch');
   });
 
   it('checks the live responses that the main hotfix actually serves', async () => {
