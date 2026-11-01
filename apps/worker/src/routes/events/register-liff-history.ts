@@ -9,6 +9,7 @@ import { cancelPendingRemindersFor } from '../../services/event-booking-reminder
 import { getMyEventWaitlist, cancelMyEventWaitlist, enqueueEventWaitlistPromotion } from '../../services/event-waitlist.js';
 import { resolveAccountIdFromLiff } from './input.js';
 import { eventWaitlistCaller } from './liff-input.js';
+import { eventBookingMakeupView } from './history-makeup.js';
 
 export function registerLiffHistory(events: Hono<Env>): void {
 // me が動的 ID と解釈されないよう、本人の履歴と取消を /:id より先に登録する。
@@ -36,7 +37,8 @@ events.get('/api/liff/events/me', async (c) => {
                 CASE WHEN b.status = 'confirmed' THEN CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END ELSE NULL END AS venue_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at,
-                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS slot_ends_at
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS slot_ends_at,
+                e.makeup_rule_json AS _makeup_rule_json, s.starts_at AS _makeup_starts_at
            FROM event_bookings b
            JOIN events e ON e.id = b.event_id
            JOIN event_slots s ON s.id = b.slot_id
@@ -53,7 +55,8 @@ events.get('/api/liff/events/me', async (c) => {
                 CASE WHEN b.status = 'confirmed' THEN CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.venueUrl') ELSE e.venue_url END ELSE NULL END AS venue_url,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.cancelDeadlineHoursBefore') ELSE e.cancel_deadline_hours_before END AS cancel_deadline_hours_before,
                 CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at,
-                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS slot_ends_at
+                CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS slot_ends_at,
+                e.makeup_rule_json AS _makeup_rule_json, s.starts_at AS _makeup_starts_at
            FROM event_bookings b
            JOIN events e ON e.id = b.event_id
            JOIN event_slots s ON s.id = b.slot_id
@@ -72,8 +75,8 @@ events.get('/api/liff/events/me', async (c) => {
     const upcoming = ['waiting', 'offered', 'accepted'].includes(row.status) && row.slot_starts_at >= nowIso;
     return tab === 'upcoming' ? upcoming : !upcoming;
   });
-  // 予約の返しの項目はそのまま。待ちの行だけ source と順番を追加する。
-  const items = [...(results ?? []), ...waitlistItems] as Array<Record<string, unknown> & { slot_starts_at: string }>;
+  // 予約に欠席の案内を足し、待ちの行は元のまま並べる。
+  const items = [...(results ?? []).map(row => eventBookingMakeupView(row, Date.parse(nowIso))), ...waitlistItems] as Array<Record<string, unknown> & { slot_starts_at: string }>;
   items.sort((a, b) => tab === 'upcoming'
     ? a.slot_starts_at.localeCompare(b.slot_starts_at)
     : b.slot_starts_at.localeCompare(a.slot_starts_at));
@@ -127,7 +130,8 @@ events.get('/api/liff/events/me/:bookingId', async (c) => {
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.eventDescription') ELSE e.description END AS event_description,
               CASE WHEN b.status = 'confirmed' THEN CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.confirmationMessageExtra') ELSE e.confirmation_message_extra END ELSE NULL END AS confirmation_message_extra,
               CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotStartsAt') ELSE s.starts_at END AS slot_starts_at,
-              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS slot_ends_at
+              CASE WHEN b.event_snapshot_json IS NOT NULL THEN json_extract(b.event_snapshot_json, '$.slotEndsAt') ELSE s.ends_at END AS slot_ends_at,
+                e.makeup_rule_json AS _makeup_rule_json, s.starts_at AS _makeup_starts_at
          FROM event_bookings b
          JOIN events e ON e.id = b.event_id
          JOIN event_slots s ON s.id = b.slot_id
@@ -138,7 +142,7 @@ events.get('/api/liff/events/me/:bookingId', async (c) => {
     .bind(c.req.param('bookingId'), friend.id, account_id)
     .first();
   if (!row) return liffBookingResponse(c, bad(c, 'not_found', 404));
-  return liffBookingJson(c, row);
+  return liffBookingJson(c, eventBookingMakeupView(row, Date.now()));
 });
 
 events.post('/api/liff/events/me/:bookingId/cancel', inputJsonBoundary(), async (c) => {
