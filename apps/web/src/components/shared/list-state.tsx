@@ -97,10 +97,12 @@ function LoadingListState({ title, className, dataDesign, designNode, shape }: {
   }, [scope])
 
   return (
-    <div data-list-state="loading" data-design={dataDesign} data-design-node={designNode} className={className} aria-label={title}>
-      <div aria-busy="true"><DelayedSkeleton loading skeleton={<ListSkeleton shape={shape} />} /></div>
+    <>
+      <div data-list-state="loading" data-design={dataDesign} data-design-node={designNode} className={className} aria-busy="true" aria-label={title}>
+        <DelayedSkeleton loading skeleton={<ListSkeleton shape={shape} />} />
+      </div>
       {elapsedScope === scope ? <p role="status" className={styles.inlineEmpty}>時間がかかっています</p> : null}
-    </div>
+    </>
   )
 }
 
