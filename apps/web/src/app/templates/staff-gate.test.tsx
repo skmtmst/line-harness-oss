@@ -187,7 +187,7 @@ describe('テンプレート一覧のstaffゲート (N-144)', () => {
     await renderListAndWait()
 
     expect(screen.getAllByRole('link', { name: 'メッセージを作る' })[0].getAttribute('href')).toBe('/templates/edit')
-    fireEvent.click(screen.getByRole('button', { name: '見本から作る' }))
+    fireEvent.click(screen.getByRole('button', { name: '種類を選んで作る' }))
     const picker = await screen.findByRole('dialog', { name: 'どの種類を作りますか' })
     expect(within(picker).getByRole('link', { name: '質問' }).getAttribute('href')).toBe('/templates/questions/new')
     fireEvent.click(within(picker).getByRole('button', { name: 'キャンセル' }))

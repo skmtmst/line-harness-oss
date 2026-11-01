@@ -129,7 +129,7 @@ describe('V8 テンプレートの通し', () => {
 
     const openPicker = async () => {
       await act(async () => {
-        fireEvent.click(screen.getAllByRole('button', { name: '見本から作る' })[0])
+        fireEvent.click(screen.getAllByRole('button', { name: '種類を選んで作る' })[0])
       })
       await screen.findByText('どの種類を作りますか')
     }
@@ -154,7 +154,7 @@ describe('V8 テンプレートの通し', () => {
     await mount(<TemplatesListV8 />)
     await screen.findByText('はじめの型')
     await act(async () => {
-      fireEvent.click(screen.getAllByRole('button', { name: '見本から作る' })[0])
+      fireEvent.click(screen.getAllByRole('button', { name: '種類を選んで作る' })[0])
     })
     await screen.findByText('どの種類を作りますか')
     await act(async () => {
