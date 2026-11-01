@@ -15,6 +15,7 @@ export default function WaitlistOfferSheet({ id, seat = false, decline = false, 
   const [readAttempt, setReadAttempt] = useState(0);
   useEffect(() => { let alive = true; setEntry(null); setError(null); const request = seat ? api.seatWaitlists(id) : api.bookingWaitlists(id); request.then(r => { if (!alive) return; const own = r.waitlist.find(w => w.id === id); if (own) setEntry(own); else setError('この案内が見つかりません。'); }).catch(() => { if (alive) setError('案内を読み込めません。もう一度お試しください。'); }); const timer = setInterval(() => setNow(Date.now()), 1000); return () => { alive = false; clearInterval(timer); }; }, [id, seat, readAttempt]);
   const active = entry?.status === 'invited' && !!entry.hold_expires_at && Date.parse(entry.hold_expires_at) > now;
+  const title = message ? '手続きが完了しました' : working ? '手続き中です' : error ? (entry ? '手続きを完了できませんでした' : '案内を確認できません') : !entry ? '案内を確認しています' : active ? (decline ? '今回は見送る' : '空きが出ました') : entry.status === 'waiting' ? '空きの案内を待っています' : entry.status === 'converted' ? 'この案内は予約になりました' : 'この待ちは終了しました';
   const remaining = Math.max(0, Math.ceil(((entry?.hold_expires_at ? Date.parse(entry.hold_expires_at) : now) - now) / 1000));
   async function accept() {
 if (!entry || !active || busy.current) return; busy.current = true; setWorking(true); setError(null); try {
@@ -26,7 +27,7 @@ if (!entry || !active || busy.current) return; busy.current = true; setWorking(t
   return <div className="fixed inset-0 z-50 text-ink" role="dialog" aria-modal="true" aria-label="空いたら知らせる">
     <Button variant="overlay" aria-label="閉じる" onClick={onClose} />
     <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md rounded-t-(--liff-radius-lg) bg-canvas p-4 pb-8">
-      <h2 className="text-[15px] font-bold text-ink">{decline ? '今回は見送る' : '空きが出ました'}</h2>
+      {!paymentBooking && <h2 className="text-[15px] font-bold text-ink">{title}</h2>}
       {entry && <p className="mt-1 text-[13px] text-liff-sub">{formatDateTimeLong(entry.starts_at)}・{'guest_count' in entry ? `${entry.store_name} ${entry.guest_count}名` : `${entry.menu_name}・${entry.staff_name}`}</p>}
       {paymentBooking ? <BookingPayment bookingId={paymentBooking} menuName={('menu_name' in entry! ? entry!.menu_name : '') || 'ご予約'} initialAmount={0} slot={{ date: new Date(entry!.starts_at).toLocaleDateString('sv-SE', { timeZone: 'Asia/Tokyo' }), start: new Date(entry!.starts_at).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' }) }} durationMinutes={('ends_at' in entry! && entry!.ends_at) ? (Date.parse(entry!.ends_at) - Date.parse(entry!.starts_at)) / 60000 : 60} /> : message ? <p className="mt-3" role="status">{message}</p> : entry ? <p className="mt-3 text-[13px]">{active ? `仮押さえは${new Date(entry.hold_expires_at!).toLocaleTimeString('ja-JP', { timeZone: 'Asia/Tokyo', hour: '2-digit', minute: '2-digit' })}までです。${decline ? '見送ると次の方へ案内します。' : '期限内に予約を確定してください。'}` : entry.status === 'waiting' ? 'まだ空きの案内を待っています。' : entry.status === 'converted' ? 'この案内は予約になりました。' : 'この待ちは終わりました。仮押さえはありません。'}</p> : !error ? <p className="mt-3">読み込んでいます。</p> : null}
       {active && !message && !paymentBooking && <p className="mt-3 text-[13px] text-ink" role="timer">残り{Math.floor(remaining / 60)}分{String(remaining % 60).padStart(2, '0')}秒</p>}
