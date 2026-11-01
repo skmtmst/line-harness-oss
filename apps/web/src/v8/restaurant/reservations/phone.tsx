@@ -1,4 +1,6 @@
 'use client'
+import { tableCapacityReason, type RestaurantTableDefinition } from '../booking-kit/table-definition'
+import { DialogNote } from '../booking-kit/parts'
 import { normalizePhone, phoneProblem } from '@line-crm/shared';
 
 import { jstCalendar } from '@/lib/jst-datetime'
@@ -81,7 +83,8 @@ function recommendTable(tables: RestaurantTable[], count: number, free: (table: 
     .sort((a, b) => (a.max_capacity - count) - (b.max_capacity - count) || a.code.localeCompare(b.code, 'ja', { numeric: true }))[0] ?? null
 }
 
-export default function PhoneReservation({ storeId, storeName, tables, menuItems, busy, preset, onBack, onSave }: {
+export default function PhoneReservation({ tableDefinition, storeId, storeName, tables, menuItems, busy, preset, onBack, onSave }: {
+  tableDefinition?: RestaurantTableDefinition
   storeId: string
   storeName: string
   tables: RestaurantTable[]
@@ -124,6 +127,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
   const [historyError, setHistoryError] = useState('')
   const formRef = useRef<HTMLFormElement>(null)
   const guests = Number(count)
+  const capacityReason = tableCapacityReason(tableDefinition, selectedAccountId, storeId, tables, guests)
   const fields = useFormErrors()
   fields.define('person', 'お客さま', () => kind !== 'customer' || whoTab !== 'line' || person ? null : '名前・電話番号で探して、お客さまを選んでください。', { required: true })
   fields.define('name', 'お名前', () => kind !== 'customer' || whoTab !== 'phone' || manualName.trim() ? null : 'お名前を入れてください。', { required: true })
@@ -388,6 +392,7 @@ export default function PhoneReservation({ storeId, storeName, tables, menuItems
             <div className={styles.timeBlock}>
               {fields.invalid('time') ? <Field label="時間" error={fields.error('time')} requirement={fields.requirement('time')}><SaveErrorField names={["time"]}><TimeField aria-label="時間" invalid value={time} onChange={setTime} /></SaveErrorField></Field> : null}
               <p className={styles.timeLabel}>{`空いている時間（${guests}名が入る卓がある時間）`}</p>
+              {capacityReason ? <DialogNote>{capacityReason}</DialogNote> : null}
               {times.length === 0 ? (
                 <p className={styles.sideText}>この日は予約を受ける時間がありません（予約枠・在庫の開ける時間）。</p>
               ) : (

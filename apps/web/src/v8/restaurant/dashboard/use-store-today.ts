@@ -24,6 +24,8 @@ import {
   type RestaurantSnapshot,
   type RestaurantStore,
 } from '@/lib/restaurant-test-api'
+import { useTableDefinition } from '../booking-kit/use-table-definition'
+import type { RestaurantTableDefinition } from '../booking-kit/table-definition'
 import { toYmd } from '@/v8/restaurant/front-desk/public/slots/index'
 
 /** 予約サイト・グルメ媒体の1行。リンク（店舗ページ・管理画面）は「予約サイト・グルメ媒体」の設定（media-links）で保存したもの。 */
@@ -38,6 +40,7 @@ type ChannelRow = { code: string; name: string; receiveMethod?: string; storePag
 
 export type StoreToday = {
   accountId: string
+  tableDefinition?: RestaurantTableDefinition
   snapshot: RestaurantSnapshot | null
   store: RestaurantStore | null
   today: RestaurantReservation[] | null
@@ -95,6 +98,7 @@ export async function loadStoreMedia(accountId: string, storeId: string): Promis
 export function useStoreToday(accountId: string | null): StoreToday {
   const [snapshot, setSnapshot] = useState<RestaurantSnapshot | null>(null)
   const [storeId, setStoreId] = useState('')
+  const { begin, accept, tableDefinition } = useTableDefinition(accountId, snapshot)
   const [today, setToday] = useState<RestaurantReservation[] | null>(null)
   const [rotation,setRotation]=useState<RestaurantRotation|null>(null)
   const [media, setMedia] = useState<StoreMedium[] | null>(null)
@@ -114,6 +118,7 @@ export function useStoreToday(accountId: string | null): StoreToday {
 
   /* 店舗：選んでいる店舗（store-context）→ 無ければ先頭。 */
   const loadSnapshot = useCallback(async () => {
+    const definitionRequest = begin(accountId)
     if (!accountId) { setSnapshot(null); setLoading(false); return }
     setLoading(true)
     try {
@@ -122,6 +127,7 @@ export function useStoreToday(accountId: string | null): StoreToday {
         restaurantTestApi.storeContext(accountId).catch(() => null),
       ])
       setSnapshot(snap.data)
+      accept(definitionRequest, snap.data)
       const selected = context?.data.selectedStore?.id
       setStoreId(snap.data.stores.some((s) => s.id === selected) ? selected! : snap.data.stores[0]?.id ?? '')
       setError(null)
@@ -130,7 +136,7 @@ export function useStoreToday(accountId: string | null): StoreToday {
     } finally {
       setLoading(false)
     }
-  }, [accountId, range])
+  }, [accountId, range, begin, accept])
 
   const loadStore = useCallback(async () => {
     if (!accountId || !storeId) return
@@ -184,5 +190,5 @@ export function useStoreToday(accountId: string | null): StoreToday {
 
   const reload = useCallback(async () => { await loadSnapshot(); await loadStore() }, [loadSnapshot,loadStore])
 
-  return { accountId: accountId ?? '', snapshot, store, today, rotation, media, closeTasks, hours, google, latestReview, oldestReview, loading, error, updatedAt, reload }
+  return { accountId: accountId ?? '', tableDefinition, snapshot, store, today, rotation, media, closeTasks, hours, google, latestReview, oldestReview, loading, error, updatedAt, reload }
 }
