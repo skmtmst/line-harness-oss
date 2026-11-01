@@ -62,6 +62,20 @@ export async function processOperationAlertNotificationOutbox(
 ): Promise<{ sent: number; failed: number }> {
   const now = new Date().toISOString();
   const leaseExpiresAt = new Date(Date.parse(now) + OPERATION_ALERT_NOTIFICATION_LEASE_MS).toISOString();
+  // 設定をオフにする前に積まれた行も送らない。削除して再試行対象から外す。
+  await env.DB.prepare(
+    `DELETE FROM operation_alert_notification_outbox
+      WHERE status IN ('queued', 'failed', 'sending')
+        AND EXISTS (
+          SELECT 1 FROM staff_members sm
+           WHERE sm.id = operation_alert_notification_outbox.staff_id
+             AND json_valid(sm.notification_preferences)
+             AND CASE operation_alert_notification_outbox.channel
+                   WHEN 'line' THEN json_extract(sm.notification_preferences, '$.operations.line')
+                   ELSE json_extract(sm.notification_preferences, '$.operations.email')
+                 END = 0
+        )`,
+  ).run();
   /*
    * アカウント停止中（X-1）。そのアカウントの経路では通知を出さない。
    * 滞留させると再開時に古い通知がまとめて出るので、送れなかった分は
@@ -95,7 +109,17 @@ export async function processOperationAlertNotificationOutbox(
       `UPDATE operation_alert_notification_outbox
           SET status = 'sending', attempt_count = attempt_count + 1,
               next_attempt_at = ?, updated_at = ?
-        WHERE id = ? AND status IN ('queued', 'failed', 'sending') AND next_attempt_at <= ?`,
+        WHERE id = ? AND status IN ('queued', 'failed', 'sending') AND next_attempt_at <= ?
+          AND COALESCE(last_error, '') != 'account_inactive'
+          AND NOT EXISTS (SELECT 1 FROM staff_members sm
+            WHERE sm.id = operation_alert_notification_outbox.staff_id
+              AND json_valid(sm.notification_preferences)
+              AND CASE operation_alert_notification_outbox.channel
+                    WHEN 'line' THEN json_extract(sm.notification_preferences, '$.operations.line')
+                    ELSE json_extract(sm.notification_preferences, '$.operations.email')
+                  END = 0)
+          AND EXISTS (SELECT 1 FROM line_accounts la
+            WHERE la.id = operation_alert_notification_outbox.line_account_id AND la.is_active = 1)`,
     ).bind(leaseExpiresAt, now, row.id, now).run();
     if (Number(claimed.meta?.changes ?? 0) !== 1) continue;
     try {

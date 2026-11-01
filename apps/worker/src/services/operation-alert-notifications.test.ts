@@ -77,6 +77,55 @@ describe('operation alert notification outbox', () => {
     ]);
   });
 
+  it('運用通知のLINE設定をオフにすると新規通知を積まず、設定前の未送信行も送らない', async () => {
+    const testDb = createTestD1();
+    testDb.raw.prepare(
+      `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)
+       VALUES ('account-1', 'channel-1', 'LINE 1', 'token', 'secret')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO staff_members (id, name, email, role, api_key, line_user_id)
+       VALUES ('owner-1', 'Owner', 'owner@example.test', 'owner', 'owner-key', 'U-owner')`,
+    ).run();
+    testDb.raw.prepare(
+      `INSERT INTO operation_health_runs
+         (id, scope_key, line_account_id, window_started_at, source, status, overall_status, started_at, completed_at)
+       VALUES ('run-1', 'account-1', 'account-1', '2026-09-16T00:00:00.000Z',
+               'scheduled', 'completed', 'warning', '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:00.000Z')`,
+    ).run();
+    await reconcileOperationHealthAlerts(testDb.db, {
+      lineAccountId: 'account-1', runId: 'run-1',
+      results: [{
+        id: 'result-1', runId: 'run-1', checkKey: 'dispatch_jobs', status: 'warning',
+        summary: '配信処理に遅延または失敗があります', source: 'test', observedAt: '2026-09-16T00:00:00.000Z',
+      }], now: '2026-09-16T00:00:00.000Z',
+    });
+    await enqueuePendingOperationAlertNotifications(testDb.db, {
+      lineAccountId: 'account-1', now: '2026-09-16T00:00:00.000Z',
+    });
+    expect(testDb.raw.prepare('SELECT channel FROM operation_alert_notification_outbox ORDER BY channel').all())
+      .toEqual([{ channel: 'email' }, { channel: 'line' }]);
+
+    testDb.raw.prepare(
+      `UPDATE staff_members SET notification_preferences = '{"operations":{"line":false,"email":true}}'
+        WHERE id = 'owner-1'`,
+    ).run();
+    const env = { DB: testDb.db } as Env['Bindings'];
+    await processOperationAlertNotificationOutbox(env);
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare('SELECT channel FROM operation_alert_notification_outbox').all())
+      .toEqual([{ channel: 'email' }]);
+
+    testDb.raw.prepare(
+      `UPDATE operation_alert_events SET notification_enqueued_at = NULL WHERE action = 'opened'`,
+    ).run();
+    await enqueuePendingOperationAlertNotifications(testDb.db, {
+      lineAccountId: 'account-1', now: '2026-09-16T00:01:00.000Z',
+    });
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM operation_alert_notification_outbox WHERE channel = 'line'").get())
+      .toEqual({ count: 0 });
+  });
+
   async function seedBase(testDb: ReturnType<typeof createTestD1>) {
     testDb.raw.prepare(
       `INSERT INTO line_accounts (id, channel_id, name, channel_access_token, channel_secret)

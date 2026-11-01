@@ -157,14 +157,23 @@ describe('operation dispatch health', () => {
     expect(account1.status).toBe('danger');
   });
 
-  it('heartbeat欠落と未知jobをnormalにしない', async () => {
+  it('処理待ちがないdispatcherのheartbeat欠落は障害にせず、処理待ちがあれば検知する', async () => {
     await markAllFresh();
     testDb.raw.prepare(
       `DELETE FROM operation_dispatcher_heartbeats WHERE job_name = 'broadcast deliveries'`,
     ).run();
     const missing = await collectOperationDispatchHealth(testDb.db, 'account-1', NOW);
-    expect(missing.status).toBe('danger');
+    expect(missing.status).toBe('normal');
     expect(valueOf(missing).missingHeartbeatCount).toBe(1);
+
+    testDb.raw.prepare(
+      `INSERT INTO broadcasts
+         (id, title, message_type, message_content, target_type, status, scheduled_at,
+          created_at, line_account_id)
+       VALUES ('broadcast-waiting', '対象', 'text', '{}', 'all', 'scheduled', ?, ?, 'account-1')`,
+    ).run(TWO_HOURS_AGO, TWO_HOURS_AGO);
+    const blocked = await collectOperationDispatchHealth(testDb.db, 'account-1', NOW);
+    expect(blocked.status).toBe('danger');
 
     await startOperationDispatcherHeartbeat(testDb.db, 'unknown delivery', NOW);
     await finishOperationDispatcherHeartbeat(testDb.db, 'unknown delivery', 'succeeded', NOW);
