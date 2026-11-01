@@ -1122,5 +1122,5 @@
 - [予約操作・取込と入力案内の改善](release-log/unreleased/2031-kenta-train-1031o.md) — 反映履歴、確認 2026-11-01。
 
 - [予約操作・読込中と配信前の案内](release-log/unreleased/2032-kenta-train-1031p.md) — 反映履歴、確認 2026-11-01。
-- [Google口コミの離脱確認文](release-log/unreleased/0000-kenta-google-review-leave-copy.md)：返信文の変更を残す・破棄する操作と説明を合わせた修正。確認日：2026-11-01。
-- [反映履歴：回答フォームのボタン文字の並び](release-log/unreleased/0000-kenta-form-button-label-layout.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
+
+- [振替券・空き待ちと入力表示の改善](release-log/unreleased/0000-kenta-train-1031r.md) — 反映履歴、確認 2026-11-01。
