@@ -1123,3 +1123,4 @@
 
 - [予約操作・読込中と配信前の案内](release-log/unreleased/2032-kenta-train-1031p.md) — 反映履歴、確認 2026-11-01。
 - [Google口コミの離脱確認文](release-log/unreleased/0000-kenta-google-review-leave-copy.md)：返信文の変更を残す・破棄する操作と説明を合わせた修正。確認日：2026-11-01。
+- [反映履歴：回答フォームのボタン文字の並び](release-log/unreleased/0000-kenta-form-button-label-layout.md) — 運用者向けの変更記録（説明、確認日：2026-11-01）。
