@@ -513,6 +513,8 @@ describe('LINE上のメニューの窓', () => {
     fireEvent.click(trigger)
     await waitFor(() => expect(view.queryByRole('dialog', { name: 'LINE上にあるメニュー' })).not.toBeNull())
     const dialog = view.getByRole('dialog', { name: 'LINE上にあるメニュー' })
+    expect(dialog.getAttribute('data-size')).toBe('wide')
+    expect(dialog.closest('[data-viewport-fit]')?.getAttribute('data-viewport-fit')).toBe('true')
     if (method === 'Escape') fireEvent.keyDown(document, { key: 'Escape' })
     else fireEvent.click(within(dialog).getByRole('button', { name: '閉じる', exact: true }))
     await waitFor(() => expect(view.queryByRole('dialog', { name: 'LINE上にあるメニュー' })).toBeNull())
