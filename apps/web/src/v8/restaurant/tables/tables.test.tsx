@@ -275,3 +275,61 @@ it('配置の詳細を閉じても、自分で指定した位置を保存する'
  fireEvent.click(screen.getByRole('button',{name:/^追加する$/}))
  await waitFor(()=>expect(fixture.createTable).toHaveBeenCalledWith('account-1',expect.objectContaining({floorX:200,floorY:100})))
 })
+
+
+describe('卓の停止で移す予約と残す来店履歴', () => {
+  const arrived = () => [
+    reservation('arrived', { table_id: 't3', customer_name: '来店済みの履歴', status: 'visited', starts_at: at(0, 10), ends_at: at(0, 14) }),
+    reservation('seated', { table_id: 't3', customer_name: '着席済みの履歴', status: 'seated', starts_at: at(0, 10), ends_at: at(0, 14) }),
+    reservation('departed', { table_id: 't3', customer_name: '退店済みの履歴', status: 'visited', departed_at: at(0, 11), starts_at: at(0, 10), ends_at: at(0, 14) }),
+    reservation('legacy-departed', { table_id: 't3', customer_name: '退店時刻がある履歴', status: 'confirmed', departed_at: at(0, 11), starts_at: at(0, 10), ends_at: at(0, 14) }),
+  ]
+  const openStop = async () => {
+    render(<TablesPage />)
+    await screen.findByText('卓の詳細')
+    fireEvent.click(screen.getByRole('button', { name: 'T3・窓側4人卓のその他操作' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: '停止' }))
+    return screen.getByRole('dialog')
+  }
+
+  it.each(['move', 'unassign'])('%sでも来店・退店の履歴を動かさず未完了の先の予約だけを送る', async mode => {
+    const future = reservation('future', { table_id: 't3', customer_name: 'これからの予約', guest_count: 4, starts_at: at(1, 19), ends_at: at(1, 21), customer_version: 7 })
+    fixture.snapshot.mockResolvedValue({ data: snapshotOf({ reservations: [...arrived(), future] }) })
+    const dialog = await openStop()
+    expect(dialog.textContent).toContain('これから先の予約が 1 件')
+    expect(dialog.textContent).toContain('これからの予約')
+    for (const item of arrived()) expect(dialog.textContent).not.toContain(item.customer_name)
+    if (mode === 'unassign') {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'この予約をどうしますか' }))
+      fireEvent.click(within(screen.getByRole('option', { name: '未配席に戻す（予約台帳で割り当てる）' })).getByRole('button'))
+    }
+    fireEvent.click(within(dialog).getByRole('button', { name: mode === 'move' ? '予約を移して止める' : '未配席に戻して止める' }))
+    await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't3', { isActive: false }))
+    expect(fixture.updateReservation).toHaveBeenCalledExactlyOnceWith('account-1', 'future', { tableId: mode === 'move' ? 't4' : null, expectedVersion: 7 })
+    expect(fixture.updateReservation.mock.invocationCallOrder[0]).toBeLessThan(fixture.updateTable.mock.invocationCallOrder[0])
+  })
+
+  it('履歴と終了済みの予約だけなら移動も未配席更新もせず卓だけを止める', async () => {
+    const inactive = ['cancelled', 'no_show', 'completed'].map(status => reservation(status, { table_id: 't3', status, starts_at: at(0, 10), ends_at: at(0, 14) }))
+    const ended = reservation('ended', { table_id: 't3', status: 'confirmed', starts_at: at(0, 10), ends_at: at(0, 12) })
+    fixture.snapshot.mockResolvedValue({ data: snapshotOf({ reservations: [...arrived(), ...inactive, ended] }) })
+    const dialog = await openStop()
+    expect(dialog.textContent).toContain('これから先の予約はありません')
+    expect(within(dialog).queryByRole('button', { name: 'この予約をどうしますか' })).toBeNull()
+    fireEvent.click(within(dialog).getByRole('button', { name: '止める', exact: true }))
+    await waitFor(() => expect(fixture.updateTable).toHaveBeenCalledWith('account-1', 't3', { isActive: false }))
+    expect(fixture.updateReservation).not.toHaveBeenCalled()
+  })
+
+  it('結合予約の2卓目で停止しても未完了の予約を残し、窓のキャンセルでは送らない', async () => {
+    const joined = reservation('joined', { table_id: 't4', table_ids_json: JSON.stringify(['t4', 't3']), customer_name: '結合卓の先の予約', starts_at: at(1, 19), ends_at: at(1, 21) })
+    fixture.snapshot.mockResolvedValue({ data: snapshotOf({ reservations: [...arrived(), joined] }) })
+    const dialog = await openStop()
+    expect(dialog.textContent).toContain('これから先の予約が 1 件')
+    expect(dialog.textContent).toContain('結合卓の先の予約')
+    expect(dialog.textContent).not.toContain('退店済みの履歴')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'キャンセル', exact: true }))
+    expect(fixture.updateReservation).not.toHaveBeenCalled()
+    expect(fixture.updateTable).not.toHaveBeenCalled()
+  })
+})
