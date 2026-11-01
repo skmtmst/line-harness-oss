@@ -7,6 +7,7 @@ import { copyBroadcastDraft,copyRecentBroadcast } from './broadcast-copy-draft'
 
 import { applyBroadcastTemplate } from './broadcast-apply-template'
 import BroadcastCheckAcknowledgement from './broadcast-check-acknowledgement'
+import { useBroadcastFormError } from './use-broadcast-form-error'
 import { confirmBroadcastMessage } from './broadcast-confirm-action'
 import { openBroadcastTest } from './broadcast-open-test'
 import { saveBroadcastTemplate } from './broadcast-save-template'
@@ -304,7 +305,7 @@ export default function BroadcastForm({
   )
   const [testHistory, setTestHistory] = useState<TestSendView[]>([])
   const [previewConfirmed, setPreviewConfirmed] = useState(visualQaAugustCampaign)
-  const [error, setError] = useState('')
+  const { error, setError, setValidationError, resolveValidationError } = useBroadcastFormError()
 
   /*
    * 二者承認（m12a / 設計 A-1・A-4）。確認の窓を開いたときに境目と
@@ -828,7 +829,8 @@ export default function BroadcastForm({
   /** 検査で落ちたとき。メッセージの段の不備は欄で知らせて移り、ほかの段は帯（［〇〇へ移動］つき）。 */
   const rejectValidation = (validationError: string) => {
     if (validationStep() === 'message' && fields.submit().length > 0) { setError(''); return }
-    setError(validationError)
+    if (validationError === validate()) setValidationError(validationError)
+    else setError(validationError)
   }
 
   /*
@@ -1174,6 +1176,9 @@ export default function BroadcastForm({
    * サーバー側で断られた文・直した後の古い文では、指す段がずれるので出さない。
    */
   const liveValidationProblem = validate()
+  useEffect(() => {
+    resolveValidationError(liveValidationProblem)
+  }, [liveValidationProblem, resolveValidationError])
   const validationMoveStep: 'basic' | 'audience' | 'message' | null =
     currentStep && error && error === liveValidationProblem ? validationStep() : null
   /*
