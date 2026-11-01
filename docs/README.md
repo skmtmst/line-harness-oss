@@ -12,6 +12,8 @@
 - [配布・設計資産の受け渡しに必要な証拠](transfer-evidence.md)
 - [更新時のマイグレーション履歴と復旧](update-migration-history.md)
 
+- [予約ページの読み込み失敗の表示修復](release-log/unreleased/0000-kenta-booking-media-link-recovery.md) — 反映履歴（2026-11-01確認）。
+
 ## 使う人の手引き
 
 - [LINE Harness](../README.en.md)
