@@ -1,13 +1,14 @@
 'use client'
 
 
-import type { HTMLAttributes, ReactNode } from 'react'
+import { useContext, useEffect, useMemo, useState, type HTMLAttributes, type ReactNode } from 'react'
 import { Inbox, Lock } from 'lucide-react'
 import Button from './button'
 import TargetMissing from './target-missing'
 import { loadFailureCopy, permissionDeniedMessage, type PermissionScope } from './api-error-message'
 import styles from './list-state.module.css'
 import { DelayedSkeleton, ListSkeleton, type LoadingShape } from './skeleton'
+import { ListNavigationAccount } from './list-navigation'
 
 /**
  * 一覧に中身を出せないときの1枚。
@@ -80,6 +81,29 @@ export const EMPTY_PRESETS: Record<EmptyListPreset, { title: string; description
   filtered: { title: '条件に合うものがありません', description: '条件を変えるか、絞り込みを外してください。' },
 }
 
+function LoadingListState({ title, className, dataDesign, designNode, shape }: {
+  title: string
+  className?: string
+  dataDesign?: string
+  designNode?: string
+  shape: LoadingShape
+}) {
+  const accountId = useContext(ListNavigationAccount)
+  const scope = useMemo(() => ({ accountId }), [accountId])
+  const [elapsedScope, setElapsedScope] = useState<typeof scope | null>(null)
+  useEffect(() => {
+    const timer = setTimeout(() => setElapsedScope(scope), 8_000)
+    return () => clearTimeout(timer)
+  }, [scope])
+
+  return (
+    <div data-list-state="loading" data-design={dataDesign} data-design-node={designNode} className={className} aria-label={title}>
+      <div aria-busy="true"><DelayedSkeleton loading skeleton={<ListSkeleton shape={shape} />} /></div>
+      {elapsedScope === scope ? <p role="status" className={styles.inlineEmpty}>時間がかかっています</p> : null}
+    </div>
+  )
+}
+
 export default function ListState({
   kind,
   permissionScope = 'store',
@@ -128,7 +152,7 @@ export default function ListState({
    */
   error?: unknown
 }) {
-  if (kind === 'loading') return <div data-list-state="loading" data-design={dataDesign} className={className} aria-busy="true" aria-label={title ?? PRESETS.loading.title}><DelayedSkeleton loading skeleton={<ListSkeleton shape={loadingShape} />} /></div>
+  if (kind === 'loading') return <LoadingListState title={title ?? PRESETS.loading.title} className={className} dataDesign={dataDesign} designNode={designNode} shape={loadingShape} />
 
   const preset = kind === 'empty' ? EMPTY_PRESETS[emptyPreset] : PRESETS[kind]
 

@@ -42,7 +42,6 @@ import KpiCard from '@/components/shared/kpi-card'
 import KpiBand from '@/components/shared/kpi-band'
 import { DataTable, TableHeadRow, Th, Tr, Td } from '@/components/shared/table';
 import TagPill from '@/components/shared/tag-pill'
-import { DelayedSkeleton } from '@/components/shared/skeleton';
 import PageSizeSelect from '@/components/shared/page-size-select';
 import ReorderHandle from '@/components/shared/reorder-handle'
 import { useLiveReorder } from '@/lib/use-live-reorder';
@@ -694,7 +693,7 @@ export default function TagsTab({
       filteredDescription="検索語・フォルダ・絞り込みを外すと、すべて出ます"
     />
   ) : (
-    <DelayedSkeleton loading={!ready} skeleton={<div className={styles.skeleton} aria-busy="true" data-design-node="U0aKD" />}>
+    !ready ? <ListState kind="loading" title="タグを読み込んでいます" data-design-node="U0aKD" /> : <>
       <DataTable className={styles.table} data-design="TagTable">
         <thead>
           <TableHeadRow>
@@ -790,7 +789,7 @@ export default function TagsTab({
         <Pagination page={currentPage} pageCount={pages} onPageChange={setPage} ariaLabel="タグのページ送り"
           range={{ total: filtered.length, first: (currentPage - 1) * pageSize + 1, last: Math.min(currentPage * pageSize, filtered.length) }} />
       </ListPager>
-    </DelayedSkeleton>
+    </>
   )
 
   return (
