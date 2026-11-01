@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const pushMessageWithRequestId = vi.hoisted(() => vi.fn(async () => ({})));
+const fetchQuota = vi.hoisted(() => vi.fn(async (): Promise<{
+  used: number | null;
+  limit: number | null;
+}> => ({ used: 0, limit: 200 })));
 const sendViaXServerRelay = vi.hoisted(() => vi.fn(async () => {
   throw new Error('email provider unavailable');
 }));
@@ -8,6 +12,7 @@ const sendViaXServerRelay = vi.hoisted(() => vi.fn(async () => {
 vi.mock('@line-crm/line-sdk', () => ({
   LineClient: class { pushMessageWithRequestId = pushMessageWithRequestId; },
 }));
+vi.mock('./broadcast-quota-guard.js', () => ({ fetchQuota }));
 vi.mock('./support-relay.js', () => ({ sendViaXServerRelay }));
 
 import {
@@ -24,6 +29,8 @@ describe('operation alert notification outbox', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-16T00:00:00.000Z'));
     pushMessageWithRequestId.mockClear();
+    fetchQuota.mockReset();
+    fetchQuota.mockResolvedValue({ used: 0, limit: 200 });
     sendViaXServerRelay.mockClear();
   });
 
@@ -142,6 +149,101 @@ describe('operation alert notification outbox', () => {
                'scheduled', 'completed', 'warning', '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:00.000Z')`,
     ).run();
   }
+
+  async function seedLineNotifications(
+    testDb: ReturnType<typeof createTestD1>,
+    rows: Array<{ id: string; createdAt: string; status?: 'queued' | 'failed' | 'sent'; attempts?: number; sentAt?: string }>,
+  ) {
+    await seedBase(testDb);
+    testDb.raw.prepare(
+      `INSERT INTO operation_alerts
+         (id, line_account_id, check_key, status, severity, summary, source_run_id,
+          first_detected_at, last_detected_at, created_at, updated_at)
+       VALUES ('alert-1', 'account-1', 'webhook', 'open', 'warning',
+               'Webhook受信に失敗があります', 'run-seed',
+               '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:00.000Z',
+               '2026-09-16T00:00:00.000Z', '2026-09-16T00:00:00.000Z')`,
+    ).run();
+    rows.forEach((row, index) => {
+      testDb.raw.prepare(
+        `INSERT INTO operation_alert_events
+           (id, alert_id, line_account_id, source_run_id, action, severity, summary, alert_version, created_at)
+         VALUES (?, 'alert-1', 'account-1', 'run-seed', 'opened', 'warning',
+                 'Webhook受信に失敗があります', ?, ?)`,
+      ).bind(`event-${row.id}`, index + 1, row.createdAt).run();
+      testDb.raw.prepare(
+        `INSERT INTO operation_alert_notification_outbox
+           (id, event_id, line_account_id, staff_id, channel, status, attempt_count,
+            next_attempt_at, sent_at, created_at, updated_at)
+         VALUES (?, ?, 'account-1', 'owner-1', 'line', ?, ?, ?, ?, ?, ?)`,
+      ).bind(row.id, `event-${row.id}`, row.status ?? 'queued', row.attempts ?? 0,
+        row.createdAt, row.sentAt ?? null, row.createdAt, row.sentAt ?? row.createdAt).run();
+    });
+  }
+
+  it('月初に前月の通知を再送せず、新しい通知だけ送る', async () => {
+    const testDb = createTestD1();
+    await seedLineNotifications(testDb, [
+      { id: 'old', createdAt: '2026-10-27T00:00:00.000Z', status: 'failed', attempts: 23 },
+      { id: 'fresh', createdAt: '2026-10-31T15:01:00.000Z' },
+    ]);
+    vi.setSystemTime(new Date('2026-10-31T15:05:00.000Z'));
+
+    await expect(processOperationAlertNotificationOutbox({ DB: testDb.db } as Env['Bindings']))
+      .resolves.toEqual({ sent: 1, failed: 0 });
+    expect(pushMessageWithRequestId).toHaveBeenCalledOnce();
+    expect(testDb.raw.prepare('SELECT id, status, attempt_count FROM operation_alert_notification_outbox ORDER BY id').all())
+      .toEqual([
+        { id: 'fresh', status: 'sent', attempt_count: 1 },
+        { id: 'old', status: 'failed', attempt_count: 23 },
+      ]);
+  });
+
+  it('LINEの残枠を確認できないときと残り10%に達したときは運用アラートを送らない', async () => {
+    const testDb = createTestD1();
+    await seedLineNotifications(testDb, [{ id: 'fresh', createdAt: '2026-09-16T00:00:00.000Z' }]);
+    const env = { DB: testDb.db } as Env['Bindings'];
+    fetchQuota.mockResolvedValue({ used: null, limit: null });
+    await expect(processOperationAlertNotificationOutbox(env)).resolves.toEqual({ sent: 0, failed: 0 });
+    fetchQuota.mockResolvedValue({ used: 10, limit: null });
+    await expect(processOperationAlertNotificationOutbox(env)).resolves.toEqual({ sent: 0, failed: 0 });
+    fetchQuota.mockResolvedValue({ used: 180, limit: 200 });
+    await expect(processOperationAlertNotificationOutbox(env)).resolves.toEqual({ sent: 0, failed: 0 });
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare("SELECT status, attempt_count FROM operation_alert_notification_outbox WHERE id = 'fresh'").get())
+      .toEqual({ status: 'queued', attempt_count: 0 });
+  });
+
+  it('運用アラートはアカウント全体で月20通までとし、再試行も24回で止める', async () => {
+    const testDb = createTestD1();
+    const sentAt = '2026-09-15T15:01:00.000Z';
+    await seedLineNotifications(testDb, [
+      ...Array.from({ length: 20 }, (_, index) => ({ id: `sent-${index}`, createdAt: sentAt, status: 'sent' as const, sentAt })),
+      { id: 'fresh', createdAt: '2026-09-16T00:00:00.000Z' },
+      { id: 'exhausted', createdAt: '2026-09-16T00:00:00.000Z', status: 'failed', attempts: 24 },
+    ]);
+    await expect(processOperationAlertNotificationOutbox({ DB: testDb.db } as Env['Bindings']))
+      .resolves.toEqual({ sent: 0, failed: 0 });
+    expect(pushMessageWithRequestId).not.toHaveBeenCalled();
+    expect(testDb.raw.prepare("SELECT id, status, attempt_count FROM operation_alert_notification_outbox WHERE id IN ('fresh', 'exhausted') ORDER BY id").all())
+      .toEqual([
+        { id: 'exhausted', status: 'failed', attempt_count: 24 },
+        { id: 'fresh', status: 'queued', attempt_count: 0 },
+      ]);
+  });
+
+  it('同じ処理で多数の通知が並んでも月間上限を越えて送らない', async () => {
+    const testDb = createTestD1();
+    await seedLineNotifications(testDb, Array.from({ length: 25 }, (_, index) => ({
+      id: `fresh-${index}`, createdAt: '2026-09-16T00:00:00.000Z',
+    })));
+    await expect(processOperationAlertNotificationOutbox({ DB: testDb.db } as Env['Bindings']))
+      .resolves.toEqual({ sent: 20, failed: 0 });
+    expect(pushMessageWithRequestId).toHaveBeenCalledTimes(20);
+    expect(fetchQuota).toHaveBeenCalledOnce();
+    expect(testDb.raw.prepare("SELECT COUNT(*) AS count FROM operation_alert_notification_outbox WHERE status = 'sent'").get())
+      .toEqual({ count: 20 });
+  });
 
   async function seedResolvedFlap(testDb: ReturnType<typeof createTestD1>) {
     seedBase(testDb);
